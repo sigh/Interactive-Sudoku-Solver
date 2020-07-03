@@ -261,7 +261,7 @@ let makeBaseSudokuConstraints = () => {
       for (let n = 0; n < 9; n++) {
         values.push(valueId(i, j, n));
       }
-      constraints.addConstraint('', values);
+      constraints.addConstraint(`R${i}C${j}`, values);
     }
   }
 
@@ -272,7 +272,7 @@ let makeBaseSudokuConstraints = () => {
       for (let j = 0; j < 9; j++) {
         values.push(valueId(i, j, n));
       }
-      constraints.addConstraint('', values);
+      constraints.addConstraint(`R${i}#${n}`, values);
     }
   }
 
@@ -283,7 +283,7 @@ let makeBaseSudokuConstraints = () => {
       for (let i = 0; i < 9; i++) {
         values.push(valueId(i, j, n));
       }
-      constraints.addConstraint('', values);
+      constraints.addConstraint(`C${j}#${n}`, values);
     }
   }
 
@@ -294,9 +294,9 @@ let makeBaseSudokuConstraints = () => {
     for (let n = 0; n < 9; n++) {
       let values = [];
       for (let c = 0; c < 9; c++) {
-        values.push(valueId(i+c%3, j+(c/3|0), n));
+        values.push(valueId(3*i+c%3, 3*j+(c/3|0), n));
       }
-      constraints.addConstraint('', values);
+      constraints.addConstraint(`B${i}${j}#${n}`, values);
     }
   }
 
