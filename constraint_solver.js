@@ -199,7 +199,7 @@ class ContraintMatrix {
 
     let solutionRows = [];
     this.numBacktracks = 0;
-    let recSolve = () => {
+    const recSolve = () => {
       if (!matrix.hasColumns()) {
         return solutionRows.map(e => e.id);
       }
@@ -225,7 +225,7 @@ class ContraintMatrix {
   }
 }
 
-let makeTestMatrix = () => {
+const makeTestMatrix = () => {
   let matrix = new ContraintMatrix(['A', 'B', 'C', 'D', 'E', 'F']);
   matrix.addConstraint(1, ['A', 'B']);
   matrix.addConstraint(2, ['E', 'F']);
@@ -237,8 +237,8 @@ let makeTestMatrix = () => {
   return matrix;
 }
 
-let makeBaseSudokuConstraints = () => {
-  let valueId = (row, col, n) => {
+const makeBaseSudokuConstraints = () => {
+  const valueId = (row, col, n) => {
     return id = `R${row+1}C${col+1}#${n+1}`;
   }
 
@@ -306,8 +306,8 @@ let makeBaseSudokuConstraints = () => {
   return constraints;
 }
 
-let showSudokuSolution = (solution) => {
-  let parseValueId = (valueId) => ({
+const showSudokuSolution = (solution) => {
+  const parseValueId = (valueId) => ({
     row: parseInt(valueId[1])-1,
     column: parseInt(valueId[3])-1,
     value: parseInt(valueId[5]),
