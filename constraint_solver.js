@@ -8,26 +8,26 @@ class Node {
     this.row = null;
   }
 
-  removeFromColumn() {
+  removeFromRow() {
     this.left.right = this.right;
     this.right.left = this.left;
+  }
+
+  restoreToRow() {
+    this.left.right = this;
+    this.right.left = this;
+  }
+
+  removeFromColumn() {
+    this.up.down = this.down;
+    this.down.up = this.up;
     this.column.count -= 1;
   }
 
   restoreToColumn() {
-    this.left.right = this;
-    this.right.left = this;
-    this.column.count += 1;
-  }
-
-  removeFromRow() {
-    this.up.down = this.down;
-    this.down.up = this.up;
-  }
-
-  restoreToRow() {
     this.up.down = this;
     this.down.up = this;
+    this.column.count += 1;
   }
 
   appendToColumn(column) {
@@ -163,7 +163,7 @@ class ContraintMatrix {
     row.remove();
     row.forEach((rowNode) => {
       rowNode.removeFromColumn();
-      _removeConflictingColumn(rowNode.column);
+      this._removeConflictingColumn(rowNode.column);
     });
   }
 
@@ -180,7 +180,7 @@ class ContraintMatrix {
     row.restore();
     row.forEach((rowNode) => {
       rowNode.restoreToColumn();
-      _restoreConflictingColumn(rowNode.column);
+      this._restoreConflictingColumn(rowNode.column);
     });
   }
 
@@ -194,31 +194,34 @@ class ContraintMatrix {
   }
 
   solve() {
-    let solution = [];
-    let stack = [];
-    let columns = [];
     let matrix = this.matrix;
 
 
     let solutionRows = [];
+    this.numBacktracks = 0;
     let recSolve = () => {
       if (!matrix.hasColumns()) {
-        return true;
+        return solutionRows.map(e => e.id);
       }
       let column = matrix.findMinColumn();
       if (column.count == 0) {
-        return false;
+        return null;
       }
 
       for (let node = column.down; node != column; node = node.down) {
         let row = node.row;
-        _removeCandidateRow(row);
+        solutionRows.push(row);
+        this._removeCandidateRow(row);
         let result = recSolve();
-        _restoreCandidateRow(row);
-        if (result) return true;
+        this._restoreCandidateRow(row);
+        solutionRows.pop();
+        if (result) return result;
+        this.numBacktracks += 1;
       }
-      return false;
+      return null;
     }
+
+    return recSolve();
   }
 }
 
@@ -230,15 +233,15 @@ let makeTestMatrix = () => {
   matrix.addConstraint(4, ['A', 'B', 'C']);
   matrix.addConstraint(5, ['C', 'D']);
   matrix.addConstraint(6, ['D', 'E']);
-  matrix.addConstraint(7, ['A', 'B', 'E', 'F']);
+  matrix.addConstraint(7, ['A', 'E', 'F']);
   return matrix;
 }
 
-let valueId = (row, col, n) => {
-  return id = `R${row}C${col}#${n}`;
-}
-
 let makeBaseSudokuConstraints = () => {
+  let valueId = (row, col, n) => {
+    return id = `R${row+1}C${col+1}#${n+1}`;
+  }
+
   // Create constrained values.
   let valueMap = {};
   for (let i = 0; i < 9; i++) {
@@ -301,4 +304,20 @@ let makeBaseSudokuConstraints = () => {
   }
 
   return constraints;
+}
+
+let showSudokuSolution = (solution) => {
+  let parseValueId = (valueId) => ({
+    row: parseInt(valueId[1])-1,
+    column: parseInt(valueId[3])-1,
+    value: parseInt(valueId[5]),
+  });
+
+  let grid = [...Array(9)].map(e => Array(9));
+  for (const valueId of solution) {
+    let value = parseValueId(valueId);
+    grid[value.row][value.column] = value.value;
+  }
+
+  return grid;
 }
