@@ -4,38 +4,51 @@
 <script src="sudoku.js"></script>
 
 <script>
-  let c = makeBaseSudokuConstraints();
-  // console.log(c);
-  //console.log(c.show());
-  let t = makeTestMatrix();
-  console.log(t.show());
-  // console.log(t.solve());
   window.addEventListener('load', initGrid);
 </script>
 
 <style>
-.cell {
-  display: inline-block;
+.cell-elem {
   width: 50px;
   height: 50px;
 }
 
-.inner-cell:focus {
-  background: lightblue;
+.cell {
+  display: inline-block;
 }
 
-.inner-cell {
+.cell-input:focus {
+  background: rgba(0,0,255,0.1);
+}
+
+.cell-input {
   position: absolute;
   overflow: hidden;
   text-align: center;
   line-height: 50px;
-  width: 50px;
-  height: 50px;
 
   font-size: 30px;
   font-family: sans-serif;
 
   cursor: pointer;
+}
+
+.cell-input:not(:empty) + .cell-solution {
+  display: none;
+}
+
+.cell-solution {
+  position: absolute;
+  overflow: hidden;
+  text-align: center;
+  line-height: 50px;
+
+  font-size: 30px;
+  font-family: sans-serif;
+
+  color: rgb(0, 128, 255);
+
+  pointer-events: none;
 }
 </style>
 

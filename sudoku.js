@@ -37,7 +37,7 @@ class SudokuGrid {
 
       let elem = document.activeElement;
       if (elem == null) return;
-      if (elem.className != 'inner-cell') return;
+      if (!elem.classList.contains('cell-input')) return;
 
       if (val) {
         elem.innerText = val;
@@ -48,7 +48,7 @@ class SudokuGrid {
   }
 
   _styleCell(cell, row, col) {
-    cell.className = 'cell';
+    cell.className = 'cell cell-elem';
     cell.style.border = THIN_BORDER_STYLE;
     if (row%3 == 0) cell.style.borderTop = FAT_BORDER_STYLE;
     if (col%3 == 0) cell.style.borderLeft = FAT_BORDER_STYLE;
@@ -64,12 +64,18 @@ class SudokuGrid {
       for (let j = 0; j < 9; j++) {
         let cell = document.createElement('div');
         this._styleCell(cell, i, j);
-        let cellValue = document.createElement('div');
-        cellValue.tabIndex = i*9 + j;
-        cellValue.className = 'inner-cell';
-        cell.appendChild(cellValue);
+
+        let cellInput = document.createElement('div');
+        cellInput.tabIndex = i*9 + j;
+        cellInput.className = 'cell-input cell-elem';
+        cell.appendChild(cellInput);
+        cellMap[`R${i+1}C${j+1}`] = cellInput;
+
+        let cellSolution = document.createElement('div');
+        cellSolution.className = 'cell-solution cell-elem';
+        cell.appendChild(cellSolution);
+
         row.appendChild(cell);
-        cellMap[`R${i+1}C${j+1}`] = cellValue;
       }
       container.appendChild(row);
     }
@@ -86,6 +92,32 @@ class SudokuGrid {
       }
     }
     return values;
+  }
+
+  _setCellSolution(cellId, value) {
+    let node = this.cellMap[cellId].nextSibling;
+    if (!value) {
+      node.innerText = '';
+    } else {
+      node.innerText = value;
+    }
+  }
+
+  clearSolution() {
+    for (const cellId of Object.keys(this.cellMap)) {
+      this._setCellSolution(cellId, '');
+    }
+  }
+
+  populateSolution(valueIds) {
+    this.clearSolution();
+    if (!valueIds) return;
+
+    for (const valueId of valueIds) {
+      let cellId = valueId.substr(0, 4);
+      let value = valueId[5];
+      this._setCellSolution(cellId, value);
+    }
   }
 }
 
@@ -185,3 +217,4 @@ const showSudokuSolution = (solution) => {
 
   return grid;
 }
+
