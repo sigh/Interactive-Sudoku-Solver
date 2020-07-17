@@ -109,11 +109,13 @@ class SudokuGrid {
     }
   }
 
-  populateSolution(valueIds) {
+  populateSolution(solution) {
+    console.log('Elapsed time: ' + (solution.timeMs).toPrecision(4) + 'ms');
+    console.log('Backtracks: ' + solution.numBacktracks);
     this.clearSolution();
-    if (!valueIds) return;
+    if (!solution.values) return;
 
-    for (const valueId of valueIds) {
+    for (const valueId of solution.values) {
       let cellId = valueId.substr(0, 4);
       let value = valueId[5];
       this._setCellSolution(cellId, value);
@@ -122,85 +124,8 @@ class SudokuGrid {
 }
 
 const solveSudokuGrid = (grid) => {
-  let matrix = makeBaseSudokuConstraints();
-  addFixedSquares(matrix, grid.getCellValues());
-  return matrix.solve();
+  return (new SudokuSolver()).solve(grid.getCellValues());
 };
-
-const addFixedSquares = (baseContraints, fixedSquares) => {
-  for (const valueId of fixedSquares) {
-    baseContraints.addConstraint(`fixed_${valueId}`, [valueId]);
-  }
-};
-
-const makeBaseSudokuConstraints = () => {
-  const valueId = (row, col, n) => {
-    return id = `R${row+1}C${col+1}#${n+1}`;
-  }
-
-  // Create constrained values.
-  let valueMap = {};
-  for (let i = 0; i < 9; i++) {
-    for (let j = 0; j < 9; j++) {
-      for (let n = 0; n < 9; n++) {
-        let id = valueId(i, j, n);
-        valueMap[id] = [i, j, n];
-      }
-    }
-  }
-
-  let constraints = new ContraintMatrix(Object.keys(valueMap));
-
-  // Add constraints.
-
-  // Each cell can only have one value.
-  for (let i = 0; i < 9; i++) {
-    for (let j = 0; j < 9; j++) {
-      let values = [];
-      for (let n = 0; n < 9; n++) {
-        values.push(valueId(i, j, n));
-      }
-      constraints.addConstraint(`R${i}C${j}`, values);
-    }
-  }
-
-  // Each row can only have one of each value.
-  for (let i = 0; i < 9; i++) {
-    for (let n = 0; n < 9; n++) {
-      let values = [];
-      for (let j = 0; j < 9; j++) {
-        values.push(valueId(i, j, n));
-      }
-      constraints.addConstraint(`R${i}#${n}`, values);
-    }
-  }
-
-  // Each column can only have one of each value.
-  for (let j = 0; j < 9; j++) {
-    for (let n = 0; n < 9; n++) {
-      let values = [];
-      for (let i = 0; i < 9; i++) {
-        values.push(valueId(i, j, n));
-      }
-      constraints.addConstraint(`C${j}#${n}`, values);
-    }
-  }
-
-  // Each box can only have one value.
-  for (let b = 0; b < 9; b++) {
-    let i = b/3|0;
-    let j = b%3;
-    for (let n = 0; n < 9; n++) {
-      let values = [];
-      for (let c = 0; c < 9; c++) {
-        values.push(valueId(3*i+c%3, 3*j+(c/3|0), n));
-      }
-      constraints.addConstraint(`B${i}${j}#${n}`, values);
-    }
-  }
-
-  return constraints;
-}
 
 const showSudokuSolution = (solution) => {
   const parseValueId = (valueId) => ({
@@ -217,4 +142,3 @@ const showSudokuSolution = (solution) => {
 
   return grid;
 }
-

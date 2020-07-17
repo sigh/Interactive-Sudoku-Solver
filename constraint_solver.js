@@ -198,7 +198,8 @@ class ContraintMatrix {
 
 
     let solutionRows = [];
-    this.numBacktracks = 0;
+    let numBacktracks = 0;
+    let startTime = performance.now();
     const recSolve = () => {
       if (!matrix.hasColumns()) {
         return solutionRows.map(e => e.id);
@@ -216,12 +217,18 @@ class ContraintMatrix {
         this._restoreCandidateRow(row);
         solutionRows.pop();
         if (result) return result;
-        this.numBacktracks += 1;
+        numBacktracks += 1;
       }
       return null;
     }
 
-    return recSolve();
+    let solution = recSolve();
+    let endTime = performance.now();
+    return {
+      values: solution,
+      numBacktracks: numBacktracks,
+      timeMs: endTime - startTime,
+    }
   }
 }
 
