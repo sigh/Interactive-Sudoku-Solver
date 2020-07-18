@@ -18,6 +18,7 @@ const initGrid = () => {
     // grid.populateSolution(solveSudokuGrid(grid));
     grid.populateSolution(solveAllSudokuGrid(grid));
   });
+  grid.runUpdateCallback();
 };
 
 class SudokuGrid {
@@ -25,11 +26,15 @@ class SudokuGrid {
     this.container = container;
     this.cellMap = this._makeSudokuGrid(container);
     this._setUpKeyBindings(container);
-    this.updateCallback = null;
+    this.setUpdateCallback();
   }
 
   setUpdateCallback(fn) {
-    this.updateCallback = fn;
+    this.updateCallback = fn || (() => {});
+  }
+
+  runUpdateCallback() {
+    this.updateCallback(this);
   }
 
   _setUpKeyBindings(container) {
@@ -56,9 +61,7 @@ class SudokuGrid {
         elem.innerText = '';
       }
 
-      if (this.updateCallback) {
-        this.updateCallback(grid);
-      }
+      this.updateCallback(this);
     });
   }
 
@@ -73,7 +76,6 @@ class SudokuGrid {
 
   _makeSudokuGrid(container) {
     let cellMap = {};
-    let defaultSolution = this._formatMultiSolution('123456789');
 
     for (let i = 0; i < 9; i++) {
       let row = document.createElement('div');
@@ -88,8 +90,7 @@ class SudokuGrid {
         cellMap[`R${i+1}C${j+1}`] = cellInput;
 
         let cellSolution = document.createElement('div');
-        cellSolution.className = 'cell-solution cell-elem cell-multi-solution';
-        cellSolution.innerText = defaultSolution;
+        cellSolution.className = 'cell-solution cell-elem';
         cell.appendChild(cellSolution);
 
         row.appendChild(cell);
@@ -109,6 +110,35 @@ class SudokuGrid {
       }
     }
     return values;
+  }
+
+  _clearCellValues() {
+    for (let cell of Object.values(this.cellMap)) {
+      cell.innerText = '';
+    }
+  }
+
+  clearCellValues() {
+    this._clearCellValues();
+    this.updateCallback(this);
+  }
+
+  populateCellValues(valueIds) {
+    this._clearCellValues();
+    for (let valueId of valueIds) {
+      let parsedValueId = this._parseValueId(valueId);
+      let cellId = parsedValueId.cellId;
+      let value = parsedValueId.value;
+      this.cellMap[cellId].innerText = value;
+    }
+    this.updateCallback(this);
+  }
+
+  _parseValueId(valueId) {
+    return {
+      cellId: valueId.substr(0, 4),
+      value: valueId[5],
+    };
   }
 
   _getSolutionNode(cellId) {
@@ -138,8 +168,9 @@ class SudokuGrid {
     let multiSolutionCells = new Set();
 
     for (const valueId of solution) {
-      let cellId = valueId.substr(0, 4);
-      let value = valueId[5];
+      let parsedValueId = this._parseValueId(valueId);
+      let cellId = parsedValueId.cellId;
+      let value = parsedValueId.value;
       let node = this._getSolutionNode(cellId);
       if (node.innerText != '') {
         node.classList.add('cell-multi-solution');
@@ -171,19 +202,3 @@ const solveAllSudokuGrid = (grid) => {
 const solveForcedSudokuGrid = (grid) => {
   return (new SudokuSolver()).solveForced(grid.getCellValues());
 };
-
-const showSudokuSolution = (solution) => {
-  const parseValueId = (valueId) => ({
-    row: parseInt(valueId[1])-1,
-    column: parseInt(valueId[3])-1,
-    value: parseInt(valueId[5]),
-  });
-
-  let grid = [...Array(9)].map(e => Array(9));
-  for (const valueId of solution) {
-    let value = parseValueId(valueId);
-    grid[value.row][value.column] = value.value;
-  }
-
-  return grid;
-}

@@ -323,6 +323,7 @@ class ContraintMatrix {
 
     let matrix = this.matrix;
     let numBacktracks = 0;
+    let rowsExplored = 0;
     let stack = [];
 
     let validRows = new Set();
@@ -339,6 +340,7 @@ class ContraintMatrix {
       while (unknownRows.size) {
         let rowId = unknownRows.values().next().value;
         unknownRows.delete(rowId);
+        rowsExplored++;
 
         let row = this.matrix.rowMap[rowId];
 
@@ -356,6 +358,11 @@ class ContraintMatrix {
           validRows.add(rowId);
         }
 
+        // NOTE: We could make this more effecient by keeping invalid rows
+        // out, and replacing them back afterwards. However, it is not worth
+        // the code complexity.
+        // It only helps when the grid is already constrained, in which case
+        // the search is fast already.
         this._restoreCandidateRow(row);
       }
 
@@ -373,6 +380,7 @@ class ContraintMatrix {
     return {
       values: [...validRows],
       numBacktracks: numBacktracks,
+      rowsExplored: rowsExplored,
       timeMs: endTime - startTime,
       unique: validRows.size == 81,
     }
