@@ -7,10 +7,6 @@ class SudokuSolver {
     return this._solve(valueIds, m => m.solve());
   }
 
-  solveForced(valueIds) {
-    return this._solve(valueIds, m => m.solveForced());
-  }
-
   solveAllPossibilities(valueIds) {
     return this._solve(valueIds, m => m.solveAllPossibilities());
   }

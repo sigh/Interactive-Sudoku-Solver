@@ -215,15 +215,6 @@ class ContraintMatrix {
     column.restore();
   }
 
-  solveForced() {
-    let matrix = this.matrix;
-    let stack = [];
-    let column = this._solveForced(matrix, stack);
-    if (column && column.count == 0) return [];
-    let partialSolution = stack.map(e => e.row.id);
-    return matrix.remainingRows().concat(partialSolution);
-  }
-
   // Form all forced reductions, i.e. where there is only one option.
   _solveForced(matrix, stack) {
     while (matrix.hasColumns()) {
@@ -333,8 +324,9 @@ class ContraintMatrix {
       // Single forced solution.
       stack.map(e => validRows.add(e.row.id));
     } else if (column.count > 0) {
-      // Many possible solutions.
+      // Possibly many solutions. Validate all remaining rows.
       let unknownRows = new Set(matrix.remainingRows());
+
       // While there are rows which we don't know are valid, keeping
       // picking one and trying it.
       while (unknownRows.size) {
