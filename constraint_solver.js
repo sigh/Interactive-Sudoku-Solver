@@ -219,7 +219,7 @@ class ContraintMatrix {
     let matrix = this.matrix;
     let stack = [];
     let column = this._solveForced(matrix, stack);
-    if (column.count == 0) return [];
+    if (column && column.count == 0) return [];
     let partialSolution = stack.map(e => e.row.id);
     return matrix.remainingRows().concat(partialSolution);
   }

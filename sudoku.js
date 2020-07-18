@@ -12,6 +12,10 @@ const initGrid = () => {
   document.body.appendChild(container);
 
   grid = new SudokuGrid(container);
+
+  grid.setUpdateCallback(() => {
+    grid.populateSolution(solveForcedSudokuGrid(grid));
+  });
 };
 
 class SudokuGrid {
@@ -19,6 +23,11 @@ class SudokuGrid {
     this.container = container;
     this.cellMap = this._makeSudokuGrid(container);
     this._setUpKeyBindings(container);
+    this.updateCallback = null;
+  }
+
+  setUpdateCallback(fn) {
+    this.updateCallback = fn;
   }
 
   _setUpKeyBindings(container) {
@@ -44,6 +53,10 @@ class SudokuGrid {
       } else {
         elem.innerText = '';
       }
+
+      if (this.updateCallback) {
+        this.updateCallback(grid);
+      }
     });
   }
 
@@ -58,6 +71,7 @@ class SudokuGrid {
 
   _makeSudokuGrid(container) {
     let cellMap = {};
+    let defaultSolution = this._formatMultiSolution('123456789');
 
     for (let i = 0; i < 9; i++) {
       let row = document.createElement('div');
@@ -72,7 +86,8 @@ class SudokuGrid {
         cellMap[`R${i+1}C${j+1}`] = cellInput;
 
         let cellSolution = document.createElement('div');
-        cellSolution.className = 'cell-solution cell-elem';
+        cellSolution.className = 'cell-solution cell-elem cell-multi-solution';
+        cellSolution.innerText = defaultSolution;
         cell.appendChild(cellSolution);
 
         row.appendChild(cell);
@@ -106,6 +121,16 @@ class SudokuGrid {
     }
   }
 
+  _formatMultiSolution(values) {
+    let chars = Array(9*2-1).fill(' ');
+    chars[3*2-1] = '\n';
+    chars[6*2-1] = '\n';
+    for (let c of values) {
+      chars[c*2-2] = c;
+    }
+    return chars.join('');
+  }
+
   populateSolution(solution) {
     this.clearSolution();
     let multiSolutionCells = new Set();
@@ -124,13 +149,7 @@ class SudokuGrid {
     // Format multi-solution nodes.
     for (const cellId of multiSolutionCells) {
       let node = this._getSolutionNode(cellId);
-      let chars = Array(9*2-1).fill(' ');
-      chars[3*2-1] = '\n';
-      chars[6*2-1] = '\n';
-      for (let c of node.innerText) {
-        chars[c*2-2] = c;
-      }
-      node.innerText = chars.join('');
+      node.innerText = this._formatMultiSolution(node.innerText);
     }
   }
 }
