@@ -108,6 +108,7 @@ class SudokuGrid {
 
   populateSolution(solution) {
     this.clearSolution();
+    let multiSolutionCells = new Set();
 
     for (const valueId of solution) {
       let cellId = valueId.substr(0, 4);
@@ -115,8 +116,21 @@ class SudokuGrid {
       let node = this._getSolutionNode(cellId);
       if (node.innerText != '') {
         node.classList.add('cell-multi-solution');
+        multiSolutionCells.add(cellId);
       }
       node.innerText += value;
+    }
+
+    // Format multi-solution nodes.
+    for (const cellId of multiSolutionCells) {
+      let node = this._getSolutionNode(cellId);
+      let chars = Array(9*2-1).fill(' ');
+      chars[3*2-1] = '\n';
+      chars[6*2-1] = '\n';
+      for (let c of node.innerText) {
+        chars[c*2-2] = c;
+      }
+      node.innerText = chars.join('');
     }
   }
 }
