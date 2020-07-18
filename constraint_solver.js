@@ -25,9 +25,12 @@ class Node {
   }
 
   restoreToColumn() {
+    // TODO: Fix this so we don't repeatedly add the same column.
+    if (this.up.down != this || this.down.up != this) {
+      this.column.count += 1;
+    }
     this.up.down = this;
     this.down.up = this;
-    this.column.count += 1;
   }
 
   appendToColumn(column) {
@@ -53,6 +56,7 @@ class Column extends Node {
     super();
     this.id = id;
     this.count = 0;
+    this.isColumnHeader = true;
   }
 
   remove() {
@@ -119,7 +123,7 @@ class Matrix extends Node {
 
   findMinColumn() {
     let minNode = null;
-    let minValue = this.count + 1;
+    let minValue = Infinity;
 
     for (let node = this.left; node != this; node = node.left) {
       if (node.count < minValue) {
@@ -200,29 +204,43 @@ class ContraintMatrix {
     let solutionRows = [];
     let numBacktracks = 0;
     let startTime = performance.now();
-    const recSolve = () => {
-      if (!matrix.hasColumns()) {
-        return solutionRows.map(e => e.id);
-      }
-      let column = matrix.findMinColumn();
-      if (column.count == 0) {
-        return null;
-      }
 
-      for (let node = column.down; node != column; node = node.down) {
-        let row = node.row;
-        solutionRows.push(row);
-        this._removeCandidateRow(row);
-        let result = recSolve();
-        this._restoreCandidateRow(row);
-        solutionRows.pop();
-        if (result) return result;
-        numBacktracks += 1;
-      }
-      return null;
-    }
 
-    let solution = recSolve();
+    const _solve = () => {
+      let stack = [matrix.findMinColumn()];
+
+      while (stack.length) {
+        let node = stack.pop();
+
+        // If the node is not a column header then we are backtracking, so
+        // restore the state.
+        if (!node.isColumnHeader) {
+          this._restoreCandidateRow(node.row);
+          numBacktracks += 1;
+        }
+        // Try the next node in the column.
+        node = node.down;
+
+        // If we have tried all the nodes, then backtrack.
+        if (node.isColumnHeader) continue;
+
+        stack.push(node);
+        this._removeCandidateRow(node.row);
+
+        // If we have no more constraints, then the puzzle is solved.
+        if (!matrix.hasColumns()) {
+          return stack.map(e => e.row.id);
+        }
+        // Find the column with the least number of candidates, to speed up
+        // the search.
+        let column = matrix.findMinColumn();
+        // If a column has no candidates, then backtrack.
+        if (column.count == 0) continue;
+        stack.push(column);
+      }
+    };
+
+    let solution = _solve();
     let endTime = performance.now();
     return {
       values: solution,
@@ -243,3 +261,4 @@ const makeTestMatrix = () => {
   matrix.addConstraint(7, ['A', 'E', 'F']);
   return matrix;
 }
+

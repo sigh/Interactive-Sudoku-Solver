@@ -132,3 +132,14 @@ const benchmarkSudoku = (squares, iterations) => {
     fractionSolved: totalSolved/iterations,
   };
 }
+
+let badSolve = () => {
+  // Bad count
+  // let badValues = ["R4C6#2", "R8C2#2", "R3C9#3", "R8C6#4", "R2C2#2"];
+  // Inf loop
+  // let badValues = ["R5C8#8", "R1C3#9", "R4C7#5", "R5C5#2", "R2C9#6"];
+  // Inf loop
+  let badValues = ["R7C7#9", "R6C5#9", "R1C3#1", "R7C3#7", "R7C9#1"];
+  let solver = (new SudokuSolver());
+  return solver.solve(badValues);
+}
