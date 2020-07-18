@@ -139,7 +139,9 @@ let badSolve = () => {
   // Inf loop
   // let badValues = ["R5C8#8", "R1C3#9", "R4C7#5", "R5C5#2", "R2C9#6"];
   // Inf loop
-  let badValues = ["R7C7#9", "R6C5#9", "R1C3#1", "R7C3#7", "R7C9#1"];
+  // let badValues = ["R7C7#9", "R6C5#9", "R1C3#1", "R7C3#7", "R7C9#1"];
+  // Bad count
+  let badValues = ["R6C7#6", "R2C9#3", "R8C2#1", "R3C5#7", "R1C2#3"];
   let solver = (new SudokuSolver());
   return solver.solve(badValues);
 }

@@ -25,12 +25,9 @@ class Node {
   }
 
   restoreToColumn() {
-    // TODO: Fix this so we don't repeatedly add the same column.
-    if (this.up.down != this || this.down.up != this) {
-      this.column.count += 1;
-    }
     this.up.down = this;
     this.down.up = this;
+    this.column.count += 1;
   }
 
   appendToColumn(column) {
@@ -72,6 +69,11 @@ class Column extends Node {
       fn(node);
     }
   }
+  forEachRev(fn) {
+    for (let node = this.up; node != this; node = node.up) {
+      fn(node);
+    }
+  }
 }
 
 class Row extends Node {
@@ -90,6 +92,11 @@ class Row extends Node {
 
   forEach(fn) {
     for (let node = this.right; node != this; node = node.right) {
+      fn(node);
+    }
+  }
+  forEachRev(fn) {
+    for (let node = this.left; node != this; node = node.left) {
       fn(node);
     }
   }
@@ -163,6 +170,8 @@ class ContraintMatrix {
     return this.matrix.show();
   }
 
+  // TODO: Remove forEach and forEachRev with raw loops for performance. Also,
+  // they are not really used elsewhere.
   _removeCandidateRow(row) {
     row.remove();
     row.forEach((rowNode) => {
@@ -180,17 +189,18 @@ class ContraintMatrix {
     });
   }
 
+  // To restore we need to do everything in exactly the reverse order.
   _restoreCandidateRow(row) {
-    row.restore();
-    row.forEach((rowNode) => {
-      rowNode.restoreToColumn();
+    row.forEachRev((rowNode) => {
       this._restoreConflictingColumn(rowNode.column);
+      rowNode.restoreToColumn();
     });
+    row.restore();
   }
 
   _restoreConflictingColumn(column) {
-    column.forEach((node) => {
-      node.row.forEach((rowNode) => rowNode.restoreToColumn());
+    column.forEachRev((node) => {
+      node.row.forEachRev((rowNode) => rowNode.restoreToColumn());
       node.row.restore();
       node.restoreToRow();
     });
@@ -200,11 +210,9 @@ class ContraintMatrix {
   solve() {
     let matrix = this.matrix;
 
-
     let solutionRows = [];
     let numBacktracks = 0;
     let startTime = performance.now();
-
 
     const _solve = () => {
       let stack = [matrix.findMinColumn()];
