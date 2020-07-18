@@ -264,8 +264,10 @@ class ContraintMatrix {
 
     let column = this._solveForced(matrix, stack);
     if (!column) {
+      // Single unique solution.
       solutions.push(stackToSolution(stack));
     } else if (column.count > 0) {
+      // Need to do backtracking search.
       stack.push(column);
 
       while (stack.length) {
@@ -301,16 +303,79 @@ class ContraintMatrix {
       }
     }
 
-    // Unwind the stack to restore the matrix.
-    while (stack.length) {
-      let node = stack.pop();
-      this._restoreCandidateRow(node.row);
-    }
+    this._unwindStack(stack);
 
     return {
       solutions: solutions,
       numBacktracks: numBacktracks,
     };
+  }
+
+  _unwindStack(stack) {
+    while (stack.length) {
+      let node = stack.pop();
+      this._restoreCandidateRow(node.row);
+    }
+  }
+
+  solveAllPossibilities() {
+    let startTime = performance.now();
+
+    let matrix = this.matrix;
+    let numBacktracks = 0;
+    let stack = [];
+
+    let validRows = new Set();
+
+    let column = this._solveForced(matrix, stack);
+    if (!column) {
+      // Single forced solution.
+      stack.map(e => validRows.add(e.row.id));
+    } else if (column.count > 0) {
+      // Many possible solutions.
+      let unknownRows = new Set(matrix.remainingRows());
+      // While there are rows which we don't know are valid, keeping
+      // picking one and trying it.
+      while (unknownRows.size) {
+        let rowId = unknownRows.values().next().value;
+        unknownRows.delete(rowId);
+
+        let row = this.matrix.rowMap[rowId];
+
+        this._removeCandidateRow(row);
+
+        let result = this._solve(matrix, 1);
+        numBacktracks += result.numBacktracks;
+        // If there is a solution, then add all it's entries to validRows.
+        // None of them are unknown anymore.
+        if (result.solutions.length) {
+          result.solutions[0].map(e => {
+            validRows.add(e);
+            unknownRows.delete(e);
+          });
+          validRows.add(rowId);
+        }
+
+        this._restoreCandidateRow(row);
+      }
+
+      // If there are solutions, then everything in the original stack should
+      // be included also.
+      if (validRows.size) {
+        stack.map(e => validRows.add(e.row.id));
+      }
+    }
+
+    this._unwindStack(stack);
+
+    let endTime = performance.now();
+
+    return {
+      values: [...validRows],
+      numBacktracks: numBacktracks,
+      timeMs: endTime - startTime,
+      unique: validRows.size == 81,
+    }
   }
 }
 

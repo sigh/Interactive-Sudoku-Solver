@@ -4,15 +4,21 @@ const valueId = (row, col, n) => {
 
 class SudokuSolver {
   solve(valueIds) {
-    let matrix = this._makeBaseSudokuConstraints();
-    this._addFixedSquares(matrix, valueIds);
-    return matrix.solve();
+    return this._solve(valueIds, m => m.solve());
   }
 
   solveForced(valueIds) {
+    return this._solve(valueIds, m => m.solveForced());
+  }
+
+  solveAllPossibilities(valueIds) {
+    return this._solve(valueIds, m => m.solveAllPossibilities());
+  }
+
+  _solve(valueIds, fn) {
     let matrix = this._makeBaseSudokuConstraints();
     this._addFixedSquares(matrix, valueIds);
-    return matrix.solveForced();
+    return fn(matrix);
   }
 
   _addFixedSquares(baseContraints, fixedValues) {
@@ -119,7 +125,7 @@ class SudokuGridGenerator {
   }
 }
 
-const benchmarkSudoku = (squares, iterations) => {
+const benchmarkSolve = (squares, iterations) => {
   let generator = new SudokuGridGenerator();
   let totalTime = 0;
   let totalSolved = 0;
@@ -128,7 +134,27 @@ const benchmarkSudoku = (squares, iterations) => {
     let values = generator.randomGrid(squares);
     let solution = (new SudokuSolver()).solve(values);
     totalTime += solution.timeMs;
-    totalSolved += (solution.values != null);
+    totalSolved += (solution.values.size > 0);
+    totalBacktracks += solution.numBacktracks;
+  }
+
+  return {
+    averageTime: totalTime/iterations,
+    averageBacktracks: totalBacktracks/iterations,
+    fractionSolved: totalSolved/iterations,
+  };
+};
+
+const benchmarkSolveAll = (squares, iterations) => {
+  let generator = new SudokuGridGenerator();
+  let totalTime = 0;
+  let totalSolved = 0;
+  let totalBacktracks = 0;
+  for (let i = 0; i < iterations; i++) {
+    let values = generator.randomGrid(squares);
+    let solution = (new SudokuSolver()).solveAllPossibilities(values);
+    totalTime += solution.timeMs;
+    totalSolved += (solution.values.size > 0);
     totalBacktracks += solution.numBacktracks;
   }
 
@@ -139,7 +165,7 @@ const benchmarkSudoku = (squares, iterations) => {
   };
 }
 
-let badSolve = () => {
+let debug = () => {
   // Bad count
   // let badValues = ["R4C6#2", "R8C2#2", "R3C9#3", "R8C6#4", "R2C2#2"];
   // Inf loop
