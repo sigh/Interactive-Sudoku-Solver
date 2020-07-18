@@ -1,63 +1,16 @@
 <html>
 
+<head>
+  <title>Sudoku Solver</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+
 <script src="constraint_solver.js"></script>
 <script src="sudoku_grid.js"></script>
 <script src="sudoku_solver.js"></script>
-
 <script>
   window.addEventListener('load', initGrid);
 </script>
-
-<style>
-.cell-elem {
-  width: 50px;
-  height: 50px;
-}
-
-.cell {
-  display: inline-block;
-}
-
-.cell-input:focus {
-  background: rgba(0,0,255,0.1);
-}
-
-.cell-input {
-  position: absolute;
-  overflow: hidden;
-  text-align: center;
-  line-height: 50px;
-
-  font-size: 30px;
-  font-family: sans-serif;
-
-  cursor: pointer;
-}
-
-.cell-input:not(:empty) + .cell-solution {
-  display: none;
-}
-
-.cell-solution {
-  position: absolute;
-  text-align: center;
-  line-height: 50px;
-
-  font-size: 30px;
-  font-family: monospace;
-
-  color: rgb(0, 128, 255);
-
-  pointer-events: none;
-}
-
-.cell-multi-solution {
-  font-size: 15px;
-  line-height: 17px;
-  overflow-wrap: anywhere;
-  white-space: pre-wrap;
-}
-</style>
 
 <body>
 </body>
