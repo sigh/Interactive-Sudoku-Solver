@@ -94,37 +94,39 @@ class SudokuGrid {
     return values;
   }
 
-  _setCellSolution(cellId, value) {
-    let node = this.cellMap[cellId].nextSibling;
-    if (!value) {
-      node.innerText = '';
-    } else {
-      node.innerText = value;
-    }
+  _getSolutionNode(cellId) {
+    return this.cellMap[cellId].nextSibling;
   }
 
   clearSolution() {
     for (const cellId of Object.keys(this.cellMap)) {
-      this._setCellSolution(cellId, '');
+      let node = this._getSolutionNode(cellId);
+      node.innerText = '';
+      node.classList.remove('cell-multi-solution');
     }
   }
 
   populateSolution(solution) {
-    console.log('Elapsed time: ' + (solution.timeMs).toPrecision(4) + 'ms');
-    console.log('Backtracks: ' + solution.numBacktracks);
     this.clearSolution();
-    if (!solution.values) return;
 
-    for (const valueId of solution.values) {
+    for (const valueId of solution) {
       let cellId = valueId.substr(0, 4);
       let value = valueId[5];
-      this._setCellSolution(cellId, value);
+      let node = this._getSolutionNode(cellId);
+      if (node.innerText != '') {
+        node.classList.add('cell-multi-solution');
+      }
+      node.innerText += value;
     }
   }
 }
 
 const solveSudokuGrid = (grid) => {
   return (new SudokuSolver()).solve(grid.getCellValues());
+};
+
+const solveForcedSudokuGrid = (grid) => {
+  return (new SudokuSolver()).solveForced(grid.getCellValues());
 };
 
 const showSudokuSolution = (solution) => {

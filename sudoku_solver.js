@@ -9,6 +9,12 @@ class SudokuSolver {
     return matrix.solve();
   }
 
+  solveForced(valueIds) {
+    let matrix = this._makeBaseSudokuConstraints();
+    this._addFixedSquares(matrix, valueIds);
+    return matrix.solveForced();
+  }
+
   _addFixedSquares(baseContraints, fixedValues) {
     for (const valueId of fixedValues) {
       baseContraints.addConstraint(`fixed_${valueId}`, [valueId]);

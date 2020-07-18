@@ -155,6 +155,14 @@ class Matrix extends Node {
     }
     return result;
   }
+
+  remainingRows() {
+    let result = [];
+    for (let row = this.down; row != this; row = row.down) {
+      result.push(row.id);
+    }
+    return result;
+  }
 }
 
 class ContraintMatrix {
@@ -207,15 +215,43 @@ class ContraintMatrix {
     column.restore();
   }
 
+  solveForced() {
+    let matrix = this.matrix;
+    let stack = [];
+    let column = this._solveForced(matrix, stack);
+    if (column.count == 0) return [];
+    let partialSolution = stack.map(e => e.row.id);
+    return matrix.remainingRows().concat(partialSolution);
+  }
+
+  // Form all forced reductions, i.e. where there is only one option.
+  _solveForced(matrix, stack) {
+    while (matrix.hasColumns()) {
+      // Find the column with the least number of candidates, to speed up
+      // the search.
+      let column = matrix.findMinColumn();
+      if (column.count != 1) return column;
+
+      let node = column.down;
+      stack.push(node);
+      this._removeCandidateRow(node.row);
+    }
+    return null;
+  }
+
   solve() {
     let matrix = this.matrix;
 
-    let solutionRows = [];
     let numBacktracks = 0;
     let startTime = performance.now();
 
     const _solve = () => {
-      let stack = [matrix.findMinColumn()];
+      let stack = [];
+
+      let column = this._solveForced(matrix, stack);
+      if (!column) return stack;
+      if (column.count == 0) return [];
+      stack.push(column);
 
       while (stack.length) {
         let node = stack.pop();
@@ -235,20 +271,18 @@ class ContraintMatrix {
         stack.push(node);
         this._removeCandidateRow(node.row);
 
-        // If we have no more constraints, then the puzzle is solved.
-        if (!matrix.hasColumns()) {
-          return stack.map(e => e.row.id);
-        }
-        // Find the column with the least number of candidates, to speed up
-        // the search.
-        let column = matrix.findMinColumn();
+        let column = this._solveForced(matrix, stack);
+        if (!column) return stack;
+
         // If a column has no candidates, then backtrack.
         if (column.count == 0) continue;
         stack.push(column);
       }
+
+      return [];
     };
 
-    let solution = _solve();
+    let solution = _solve().map(e => e.row.id);
     let endTime = performance.now();
     return {
       values: solution,
