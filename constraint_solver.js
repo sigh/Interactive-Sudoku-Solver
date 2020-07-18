@@ -240,17 +240,32 @@ class ContraintMatrix {
   }
 
   solve() {
-    let matrix = this.matrix;
+    let startTime = performance.now();
+    let result = this._solve(this.matrix, 2);
+    let endTime = performance.now();
+
+    let solution = result.solutions.length ? result.solutions[0] : [];
+    return {
+      values: solution,
+      numBacktracks: result.numBacktracks,
+      timeMs: endTime - startTime,
+      unique: result.solutions.size == 1,
+    }
+  }
+
+  // Solve until maxSolutions are found, and return leaving matrix in the
+  // same state.
+  _solve(matrix, maxSolutions) {
+    const stackToSolution = (stack) => stack.map(e => e.row.id);
 
     let numBacktracks = 0;
-    let startTime = performance.now();
+    let solutions = [];
+    let stack = [];
 
-    const _solve = () => {
-      let stack = [];
-
-      let column = this._solveForced(matrix, stack);
-      if (!column) return stack;
-      if (column.count == 0) return [];
+    let column = this._solveForced(matrix, stack);
+    if (!column) {
+      solutions.push(stackToSolution(stack));
+    } else if (column.count > 0) {
       stack.push(column);
 
       while (stack.length) {
@@ -272,23 +287,30 @@ class ContraintMatrix {
         this._removeCandidateRow(node.row);
 
         let column = this._solveForced(matrix, stack);
-        if (!column) return stack;
+        if (!column) {
+          solutions.push(stackToSolution(stack));
+          if (solutions.length == maxSolutions) {
+            break;
+          }
+          continue;
+        }
 
         // If a column has no candidates, then backtrack.
         if (column.count == 0) continue;
         stack.push(column);
       }
-
-      return [];
-    };
-
-    let solution = _solve().map(e => e.row.id);
-    let endTime = performance.now();
-    return {
-      values: solution,
-      numBacktracks: numBacktracks,
-      timeMs: endTime - startTime,
     }
+
+    // Unwind the stack to restore the matrix.
+    while (stack.length) {
+      let node = stack.pop();
+      this._restoreCandidateRow(node.row);
+    }
+
+    return {
+      solutions: solutions,
+      numBacktracks: numBacktracks,
+    };
   }
 }
 

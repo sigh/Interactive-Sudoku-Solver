@@ -14,7 +14,8 @@ const initGrid = () => {
   grid = new SudokuGrid(container);
 
   grid.setUpdateCallback(() => {
-    grid.populateSolution(solveForcedSudokuGrid(grid));
+    // grid.populateSolution(solveForcedSudokuGrid(grid));
+    grid.populateSolution(solveSudokuGrid(grid));
   });
 };
 
@@ -155,7 +156,9 @@ class SudokuGrid {
 }
 
 const solveSudokuGrid = (grid) => {
-  return (new SudokuSolver()).solve(grid.getCellValues());
+  let result = (new SudokuSolver()).solve(grid.getCellValues());
+  console.log(result);
+  return result.values;
 };
 
 const solveForcedSudokuGrid = (grid) => {
