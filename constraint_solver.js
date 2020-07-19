@@ -154,14 +154,6 @@ class Matrix extends Node {
     }
     return result;
   }
-
-  remainingRows() {
-    let result = [];
-    for (let row = this.down; row != this; row = row.down) {
-      result.push(row.id);
-    }
-    return result;
-  }
 }
 
 class ContraintMatrix {
@@ -246,51 +238,46 @@ class ContraintMatrix {
   // Solve until maxSolutions are found, and return leaving matrix in the
   // same state.
   _solve(matrix, maxSolutions) {
+    // If there are no column, then there is 1 solution - the trival one.
+    if (!matrix.hasColumns()) return {solutions: [[]], numBacktracks: 0};
+
     const stackToSolution = (stack) => stack.map(e => e.row.id);
 
     let numBacktracks = 0;
     let solutions = [];
-    let stack = [];
+    let stack = [matrix.findMinColumn()];
 
-    let column = this._solveForced(matrix, stack);
-    if (!column) {
-      // Single unique solution.
-      solutions.push(stackToSolution(stack));
-    } else if (column.count > 0) {
-      // Need to do backtracking search.
-      stack.push(column);
+    while (stack.length) {
+      let node = stack.pop();
 
-      while (stack.length) {
-        let node = stack.pop();
-
-        // If the node is not a column header then we are backtracking, so
-        // restore the state.
-        if (!(node instanceof Column)) {
-          this._restoreCandidateRow(node.row);
-          numBacktracks += 1;
-        }
-        // Try the next node in the column.
-        node = node.down;
-
-        // If we have tried all the nodes, then backtrack.
-        if (node instanceof Column) continue;
-
-        stack.push(node);
-        this._removeCandidateRow(node.row);
-
-        let column = this._solveForced(matrix, stack);
-        if (!column) {
-          solutions.push(stackToSolution(stack));
-          if (solutions.length == maxSolutions) {
-            break;
-          }
-          continue;
-        }
-
-        // If a column has no candidates, then backtrack.
-        if (column.count == 0) continue;
-        stack.push(column);
+      // If the node is not a column header then we are backtracking, so
+      // restore the state.
+      if (!(node instanceof Column)) {
+        this._restoreCandidateRow(node.row);
+        numBacktracks += 1;
       }
+      // Try the next node in the column.
+      node = node.down;
+
+      // If we have tried all the nodes, then backtrack.
+      if (node instanceof Column) continue;
+
+      stack.push(node);
+      this._removeCandidateRow(node.row);
+
+      let column = this._solveForced(matrix, stack);
+      if (!column) {
+        solutions.push(stackToSolution(stack));
+        if (solutions.length == maxSolutions) {
+          break;
+        }
+        continue;
+      }
+
+      // If a column has no candidates, then backtrack.
+      if (column.count == 0) continue;
+
+      stack.push(column);
     }
 
     this._unwindStack(stack);
@@ -316,63 +303,54 @@ class ContraintMatrix {
     let numBacktracks = 0;
     let rowsExplored = 0;
 
-    // Do initial solve to see if we have 1 or 0 solutions.
+    // First eliminate the forced values.
+    // This will prevent us having to redo work later.
+    let stack = [];
+    this._solveForced(matrix, stack);
+
+    // Do initial solve to see if we have 0, 1 or many solutions.
     let result = this._solve(matrix, 2);
     numBacktracks += result.numBacktracks;
 
     // Every value in the solutions is a valid row.
+    // In addition, all items in the stack are common to all solutions.
     let validRows = new Set();
     result.solutions.forEach(s => s.forEach(r => validRows.add(r)));
+    stack.map(e => validRows.add(e.row.id));
 
     // If there are 1 or 0 solutions, there is nothing else to do.
     // If there are 2 or more, then we have to check all possibilities.
-    if (result.solutions.length == 2) {
-      let stack = [];
+    if (result.solutions.length > 1) {
+      // All remaining rows are possibly valid solutions. Verify each of them.
+      for (let row = matrix.down; row != matrix; row = row.down) {
+        // If we already know that this row is valid, then we don't need
+        // to do anything.
+        if (validRows.has(row.id)) continue;
 
-      // First eliminate the forced values.
-      // NOTE: We are redoing work here, but it should be negligable.
-      this._solveForced(matrix, stack);
-
-      // All remaining rows are possibly valid solutions.
-      // Remove any that have already been found.
-      let unknownRows = new Set(matrix.remainingRows());
-      validRows.forEach(r => unknownRows.delete(r));
-
-      // While there are rows which we don't know are valid, keeping
-      // picking one and trying it.
-      while (unknownRows.size) {
-        let rowId = unknownRows.values().next().value;
-        unknownRows.delete(rowId);
         rowsExplored++;
-
-        let row = this.matrix.rowMap[rowId];
 
         this._removeCandidateRow(row);
 
         let result = this._solve(matrix, 1);
         numBacktracks += result.numBacktracks;
-        // If there is a solution, then add all it's entries to validRows.
-        // None of them are unknown anymore.
         if (result.solutions.length) {
-          result.solutions[0].forEach(e => {
-            validRows.add(e);
-            unknownRows.delete(e);
-          });
-          validRows.add(rowId);
+          // If there is a solution, then add all it's entries to validRows.
+          result.solutions[0].forEach(e => validRows.add(e));
+          // The current row is not part of the matrix, so it's not in the
+          // solution returned by _solve.
+          validRows.add(row.id);
         }
 
-        // NOTE: We could make this more efficient by keeping invalid rows
-        // out, and replacing them back afterwards. However, it is not worth
-        // the code complexity.
-        // We could keep track of this in the stack, but then the meaning
-        // of the stack changed.
+        // NOTE: We could make later searches more efficient by keeping invalid
+        // rows out, and replacing them back afterwards. However, it is not
+        // worth the code complexity.
         // It only helps when the grid is already constrained, in which case
         // the search is fast already.
         this._restoreCandidateRow(row);
       }
-
-      this._unwindStack(stack);
     }
+
+    this._unwindStack(stack);
 
     let endTime = performance.now();
 
