@@ -235,7 +235,7 @@ class ContraintMatrix {
     let result = this._solve(this.matrix, 2);
     let endTime = performance.now();
 
-    let solution = result.solutions.length ? result.solutions[0] : [];
+    let solution = result.solutions[0] || [];
     return {
       values: solution,
       numBacktracks: result.numBacktracks,
@@ -313,19 +313,31 @@ class ContraintMatrix {
     let startTime = performance.now();
 
     let matrix = this.matrix;
+
     let numBacktracks = 0;
     let rowsExplored = 0;
-    let stack = [];
 
+    // Do initial solve to see if we have 1 or 0 solutions.
+    let result = this._solve(matrix, 2);
+    numBacktracks += result.numBacktracks;
+
+    // Every value in the solutions is a valid row.
     let validRows = new Set();
+    result.solutions.forEach(s => s.forEach(r => validRows.add(r)));
 
-    let column = this._solveForced(matrix, stack);
-    if (!column) {
-      // Single forced solution.
-      stack.map(e => validRows.add(e.row.id));
-    } else if (column.count > 0) {
-      // Possibly many solutions. Validate all remaining rows.
+    // If there are 1 or 0 solutions, there is nothing else to do.
+    // If there are 2 or more, then we have to check all possibilities.
+    if (result.solutions.length == 2) {
+      let stack = [];
+
+      // First eliminate the forced values.
+      // NOTE: We are redoing work here, but it should be negligable.
+      this._solveForced(matrix, stack);
+
+      // All remaining rows are possibly valid solutions.
+      // Remove any that have already been found.
       let unknownRows = new Set(matrix.remainingRows());
+      validRows.forEach(r => unknownRows.delete(r));
 
       // While there are rows which we don't know are valid, keeping
       // picking one and trying it.
@@ -343,29 +355,25 @@ class ContraintMatrix {
         // If there is a solution, then add all it's entries to validRows.
         // None of them are unknown anymore.
         if (result.solutions.length) {
-          result.solutions[0].map(e => {
+          result.solutions[0].forEach(e => {
             validRows.add(e);
             unknownRows.delete(e);
           });
           validRows.add(rowId);
         }
 
-        // NOTE: We could make this more effecient by keeping invalid rows
+        // NOTE: We could make this more efficient by keeping invalid rows
         // out, and replacing them back afterwards. However, it is not worth
         // the code complexity.
+        // We could keep track of this in the stack, but then the meaning
+        // of the stack changed.
         // It only helps when the grid is already constrained, in which case
         // the search is fast already.
         this._restoreCandidateRow(row);
       }
 
-      // If there are solutions, then everything in the original stack should
-      // be included also.
-      if (validRows.size) {
-        stack.map(e => validRows.add(e.row.id));
-      }
+      this._unwindStack(stack);
     }
-
-    this._unwindStack(stack);
 
     let endTime = performance.now();
 
