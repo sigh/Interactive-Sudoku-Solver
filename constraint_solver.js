@@ -246,7 +246,7 @@ class ContraintMatrix {
     let solutions = [];
     let stack = [matrix.findMinColumn()];
     let numNodesSearched = 0;
-    let numColumnsSearched = 1;
+    let numColumnsSearched = stack[0].count ? 1 : 0;
 
     while (stack.length) {
       let node = stack.pop();
@@ -317,8 +317,10 @@ class ContraintMatrix {
     // Every value in the solutions is a valid row.
     // In addition, all items in the stack are common to all solutions.
     let validRows = new Set();
-    result.solutions.forEach(s => s.forEach(r => validRows.add(r)));
-    stack.map(e => validRows.add(e.row.id));
+    if (result.solutions.length) {
+      result.solutions.forEach(s => s.forEach(r => validRows.add(r)));
+      stack.map(e => validRows.add(e.row.id));
+    }
 
     // If there are 1 or 0 solutions, there is nothing else to do.
     // If there are 2 or more, then we have to check all possibilities.
