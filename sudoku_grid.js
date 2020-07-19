@@ -63,30 +63,61 @@ class SudokuGrid {
   }
 
   _setUpKeyBindings(container) {
+    const getActiveElem = () => {
+      let elem = document.activeElement;
+      if (elem == null) return null;
+      if (!elem.classList.contains('cell-input')) return null;
+      return elem;
+    };
+
+    const setActiveCellValue = (value) => {
+      let elem = getActiveElem();
+      if (!elem) return;
+
+      elem.innerText = value || '';
+
+      this.updateCallback(this);
+    };
+
+    const moveActiveCell = (dr, dc) => {
+      let elem = getActiveElem();
+      if (!elem) return;
+
+      let row = +elem.id[1];
+      let col = +elem.id[3];
+      row = (row+dr+8)%9+1;
+      col = (col+dc+8)%9+1;
+
+      document.getElementById(`R${row}C${col}`).focus();
+    };
+
     container.addEventListener('keydown', event => {
-      let val = null;
+      // Number key.
       if (event.keyCode >= CHAR_0 && event.keyCode <= CHAR_9) {
-        // Number key.
-        val = event.keyCode - CHAR_0;
-      } else if (event.keyCode == 8) {
-        // Delete key.
-        val = null;
-      } else {
-        // Uninteresting key.
+        setActiveCellValue(event.key);
         return;
       }
 
-      let elem = document.activeElement;
-      if (elem == null) return;
-      if (!elem.classList.contains('cell-input')) return;
+      switch (event.key) {
+        // Delete key.
+        case 'Backspace':
+          setActiveCellValue(null);
+          return;
 
-      if (val) {
-        elem.innerText = val;
-      } else {
-        elem.innerText = '';
+        // Arrow keys.
+        case 'ArrowLeft':
+          moveActiveCell(0, -1);
+          return;
+        case 'ArrowRight':
+          moveActiveCell(0, 1);
+          return;
+        case 'ArrowUp':
+          moveActiveCell(-1, 0);
+          return;
+        case 'ArrowDown':
+          moveActiveCell(1, 0);
+          return;
       }
-
-      this.updateCallback(this);
     });
   }
 
@@ -106,13 +137,15 @@ class SudokuGrid {
       let row = document.createElement('div');
       for (let j = 0; j < 9; j++) {
         let cell = document.createElement('div');
+        let cellId = `R${i+1}C${j+1}`;
         this._styleCell(cell, i, j);
 
         let cellInput = document.createElement('div');
-        cellInput.tabIndex = i*9 + j;
+        cellInput.tabIndex = '0';
         cellInput.className = 'cell-input cell-elem';
+        cellInput.id = cellId;
         cell.appendChild(cellInput);
-        cellMap[`R${i+1}C${j+1}`] = cellInput;
+        cellMap[cellId] = cellInput;
 
         let cellSolution = document.createElement('div');
         cellSolution.className = 'cell-solution cell-elem';
