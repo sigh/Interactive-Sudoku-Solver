@@ -53,7 +53,6 @@ class Column extends Node {
     super();
     this.id = id;
     this.count = 0;
-    this.isColumnHeader = true;
   }
 
   remove() {
@@ -266,7 +265,7 @@ class ContraintMatrix {
 
         // If the node is not a column header then we are backtracking, so
         // restore the state.
-        if (!node.isColumnHeader) {
+        if (!(node instanceof Column)) {
           this._restoreCandidateRow(node.row);
           numBacktracks += 1;
         }
@@ -274,7 +273,7 @@ class ContraintMatrix {
         node = node.down;
 
         // If we have tried all the nodes, then backtrack.
-        if (node.isColumnHeader) continue;
+        if (node instanceof Column) continue;
 
         stack.push(node);
         this._removeCandidateRow(node.row);
