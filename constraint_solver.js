@@ -243,9 +243,10 @@ class ContraintMatrix {
 
     const stackToSolution = (stack) => stack.map(e => e.row.id);
 
-    let numBacktracks = 0;
     let solutions = [];
     let stack = [matrix.findMinColumn()];
+    let numNodesSearched = 0;
+    let numColumnsSearched = 1;
 
     while (stack.length) {
       let node = stack.pop();
@@ -254,7 +255,6 @@ class ContraintMatrix {
       // restore the state.
       if (!(node instanceof Column)) {
         this._restoreCandidateRow(node.row);
-        numBacktracks += 1;
       }
       // Try the next node in the column.
       node = node.down;
@@ -264,6 +264,7 @@ class ContraintMatrix {
 
       stack.push(node);
       this._removeCandidateRow(node.row);
+      numNodesSearched++;
 
       let column = this._solveForced(matrix, stack);
       if (!column) {
@@ -278,13 +279,14 @@ class ContraintMatrix {
       if (column.count == 0) continue;
 
       stack.push(column);
+      numColumnsSearched++;
     }
 
     this._unwindStack(stack);
 
     return {
       solutions: solutions,
-      numBacktracks: numBacktracks,
+      numBacktracks: numNodesSearched - numColumnsSearched,
     };
   }
 
@@ -327,8 +329,6 @@ class ContraintMatrix {
         // to do anything.
         if (validRows.has(row.id)) continue;
 
-        rowsExplored++;
-
         this._removeCandidateRow(row);
 
         let result = this._solve(matrix, 1);
@@ -347,6 +347,8 @@ class ContraintMatrix {
         // It only helps when the grid is already constrained, in which case
         // the search is fast already.
         this._restoreCandidateRow(row);
+
+        rowsExplored++;
       }
     }
 
