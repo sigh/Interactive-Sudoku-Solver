@@ -9,10 +9,38 @@
 <script src="sudoku_grid.js"></script>
 <script src="sudoku_solver.js"></script>
 <script>
-  window.addEventListener('load', initGrid);
+  window.addEventListener('load', initPage);
 </script>
 
 <body>
+
+  <div id="sudoku-grid"></div>
+
+  <div id="display-panel">
+    <div>
+      Display:
+      <select id="solve-type-input">
+        <option value="all-possibilities">All Possibilties</option>
+        <option value="one-solution">One solution</option>
+      </select>
+    </div>
+    <div>
+      Solve time: <span id="solve-time-output"></span>
+    </div>
+    <div>
+      Number of backtracks: <span id="backtrack-output"></span>
+    </div>
+    <div>
+      Unique solution: <span id="unique-output"></span>
+    </div>
+    <div>
+      Valid grid: <span id="valid-output"></span>
+    </div>
+    <div>
+      <button id="clear-grid-button">Clear grid</button>
+    </div>
+  <div>
+
 </body>
 
 </html>

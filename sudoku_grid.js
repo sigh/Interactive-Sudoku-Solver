@@ -1,4 +1,3 @@
-const CELL_SIZE = 50;
 const THIN_BORDER_STYLE = '1px solid';
 const FAT_BORDER_STYLE = '3px solid';
 
@@ -7,15 +6,42 @@ const CHAR_9 = '9'.charCodeAt(0);
 
 let grid = null;
 
-const initGrid = () => {
-  let container = document.createElement('div');
-  document.body.appendChild(container);
+const initPage = () => {
+  let solver = new SudokuSolver();
 
+  // Create grid.
+  let container = document.getElementById('sudoku-grid');
   grid = new SudokuGrid(container);
 
-  grid.setUpdateCallback(() => {
-    // grid.populateSolution(solveSudokuGrid(grid));
-    grid.populateSolution(solveAllSudokuGrid(grid));
+  // Inputs.
+  let clearGridElem = document.getElementById('clear-grid-button');
+  clearGridElem.addEventListener('click', _ => grid.clearCellValues());
+
+  let solveTypeElem = document.getElementById('solve-type-input');
+  solveTypeElem.addEventListener('change', _ => grid.runUpdateCallback());
+
+  // Outputs.
+  let solveTimeElem = document.getElementById('solve-time-output');
+  let backtrackOutputElem = document.getElementById('backtrack-output');
+  let uniqueOutputElem = document.getElementById('unique-output');
+  let validOutputElem = document.getElementById('valid-output');
+
+  grid.setUpdateCallback((cellValues) => {
+    // Solve.
+    let solveFn = (
+      solveTypeElem.value == 'all-possibilities'
+        ? v => solver.solveAllPossibilities(v)
+        : v => solver.solve(v));
+    let result = solveFn(grid.getCellValues());
+
+    // Update grid.
+    grid.setSolution(result.values);
+
+    // Update display panel.
+    solveTimeElem.innerText = result.timeMs.toPrecision(3) + ' ms';
+    backtrackOutputElem.innerText = result.numBacktracks;
+    uniqueOutputElem.innerHTML = result.unique ? '&#10003;' : '&#10007;';
+    validOutputElem.innerHTML = result.values.length ? '&#10003;' : '&#10007;';
   });
   grid.runUpdateCallback();
 };
@@ -122,7 +148,7 @@ class SudokuGrid {
     this.updateCallback(this);
   }
 
-  populateCellValues(valueIds) {
+  setCellValues(valueIds) {
     this._clearCellValues();
     for (let valueId of valueIds) {
       let parsedValueId = this._parseValueId(valueId);
@@ -162,7 +188,7 @@ class SudokuGrid {
     return chars.join('');
   }
 
-  populateSolution(solution) {
+  setSolution(solution) {
     this.clearSolution();
     let multiSolutionCells = new Set();
 
@@ -185,15 +211,3 @@ class SudokuGrid {
     }
   }
 }
-
-const solveSudokuGrid = (grid) => {
-  let result = (new SudokuSolver()).solve(grid.getCellValues());
-  console.log(result);
-  return result.values;
-};
-
-const solveAllSudokuGrid = (grid) => {
-  let result = (new SudokuSolver()).solveAllPossibilities(grid.getCellValues());
-  console.log(result);
-  return result.values;
-};

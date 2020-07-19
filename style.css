@@ -46,3 +46,14 @@
   overflow-wrap: anywhere;
   white-space: pre-wrap;
 }
+
+body > div {
+  display: inline-block;
+  vertical-align: top;
+  font-family: sans-serif;
+  margin: 10px;
+}
+
+#display-panel > div {
+  margin-bottom: 10px;
+}

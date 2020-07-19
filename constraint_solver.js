@@ -240,7 +240,7 @@ class ContraintMatrix {
       values: solution,
       numBacktracks: result.numBacktracks,
       timeMs: endTime - startTime,
-      unique: result.solutions.size == 1,
+      unique: result.solutions.length == 1,
     }
   }
 
@@ -379,6 +379,7 @@ class ContraintMatrix {
   }
 }
 
+// Test example from https://en.wikipedia.org/wiki/Knuth%27s_Algorithm_X
 const makeTestMatrix = () => {
   let matrix = new ContraintMatrix(['A', 'B', 'C', 'D', 'E', 'F']);
   matrix.addConstraint(1, ['A', 'B']);
