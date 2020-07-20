@@ -131,7 +131,7 @@ class Matrix extends Node {
     let minNode = null;
     let minValue = Infinity;
 
-    for (let node = this.left; node != this; node = node.left) {
+    for (let node = this.right; node != this; node = node.right) {
       if (node.count < minValue) {
         minNode = node;
         minValue = node.count;
