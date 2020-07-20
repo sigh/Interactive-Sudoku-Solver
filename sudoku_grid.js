@@ -93,7 +93,7 @@ class SudokuGrid {
 
     container.addEventListener('keydown', event => {
       // Number key.
-      if (event.keyCode >= CHAR_0 && event.keyCode <= CHAR_9) {
+      if (event.keyCode > CHAR_0 && event.keyCode <= CHAR_9) {
         setActiveCellValue(event.key);
         return;
       }
@@ -101,6 +101,7 @@ class SudokuGrid {
       switch (event.key) {
         // Delete key.
         case 'Backspace':
+        case '0':
           setActiveCellValue(null);
           return;
 
