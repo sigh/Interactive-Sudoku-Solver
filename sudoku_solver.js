@@ -12,18 +12,18 @@ class SudokuSolver {
   }
 
   _solve(valueIds, fn) {
-    let matrix = this._makeBaseSudokuConstraints();
-    this._addFixedSquares(matrix, valueIds);
+    let matrix = SudokuSolver._makeBaseSudokuConstraints();
+    SudokuSolver._addFixedSquares(matrix, valueIds);
     return fn(matrix);
   }
 
-  _addFixedSquares(baseContraints, fixedValues) {
+  static _addFixedSquares(baseConstraints, fixedValues) {
     for (const valueId of fixedValues) {
-      baseContraints.addConstraint(`fixed_${valueId}`, [valueId]);
+      baseConstraints.addConstraint(`fixed_${valueId}`, [valueId]);
     }
   }
 
-  _makeBaseSudokuConstraints() {
+  static _makeBaseSudokuConstraints() {
     // Create constrained values.
     let valueMap = {};
     for (let i = 0; i < 9; i++) {
@@ -35,7 +35,7 @@ class SudokuSolver {
       }
     }
 
-    let constraints = new ContraintMatrix(Object.keys(valueMap));
+    let constraints = new ConstraintSolver(Object.keys(valueMap));
 
     // Add constraints.
 
@@ -99,7 +99,7 @@ class SudokuGridGenerator {
     return this.allValues.slice(0, numSquares);
   }
 
-  _allValues() {
+  static _allValues() {
     let values = [];
 
     for (let i = 0; i < 9; i++) {
@@ -113,7 +113,7 @@ class SudokuGridGenerator {
     return values;
   }
 
-  _shuffle(array) {
+  static _shuffle(array) {
     for (let i = array.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [array[i], array[j]] = [array[j], array[i]];

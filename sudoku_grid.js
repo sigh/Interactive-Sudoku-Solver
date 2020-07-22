@@ -49,25 +49,69 @@ const initPage = () => {
 class SudokuGrid {
   constructor(container) {
     this.container = container;
+
     this.cellMap = this._makeSudokuGrid(container);
+    this._setUpSelection(container);
     this._setUpKeyBindings(container);
     this.setUpdateCallback();
+    this.setSelectionCallback();
   }
 
   setUpdateCallback(fn) {
     this.updateCallback = fn || (() => {});
   }
 
+  setSelectionCallback(fn) {
+    this.selectionCallback = fn || (() => {});
+  }
+
   runUpdateCallback() {
     this.updateCallback(this);
   }
 
+  _setUpSelection(container) {
+    this.selection = new Set();
+    let selection = this.selection;
+
+    // Make the container selectable.
+    container.tabIndex = 0;
+
+    const addToSelection = (cell) => {
+      if (cell.classList.contains('cell-input')) {
+        cell.classList.add('selected');
+        selection.add(cell);
+      }
+    };
+    const clearSelection = () => {
+      selection.forEach(e => e.classList.remove('selected'));
+      selection.clear();
+    };
+
+    const mouseoverFn = (e) => addToSelection(e.target);
+
+    container.addEventListener('mousedown', (e) => {
+      clearSelection();
+      container.addEventListener('mouseover', mouseoverFn);
+      addToSelection(e.target);
+      container.focus();
+      e.preventDefault();
+    });
+
+    container.addEventListener('mouseup', (e) => {
+      container.removeEventListener('mouseover', mouseoverFn);
+      let selectedIds= [];
+      selection.forEach(e => selectedIds.push(e.id));
+      this.selectionCallback(selectedIds);
+      e.preventDefault();
+    });
+
+    container.addEventListener('blur', clearSelection);
+  }
+
   _setUpKeyBindings(container) {
     const getActiveElem = () => {
-      let elem = document.activeElement;
-      if (elem == null) return null;
-      if (!elem.classList.contains('cell-input')) return null;
-      return elem;
+      if (this.selection.size != 1) return null;
+      return this.selection.values().next().value;
     };
 
     const setActiveCellValue = (value) => {
@@ -142,7 +186,7 @@ class SudokuGrid {
         this._styleCell(cell, i, j);
 
         let cellInput = document.createElement('div');
-        cellInput.tabIndex = '0';
+        cellInput.tabIndex = 0;
         cellInput.className = 'cell-input cell-elem';
         cellInput.id = cellId;
         cell.appendChild(cellInput);

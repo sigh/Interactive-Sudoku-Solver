@@ -7,10 +7,6 @@
   display: inline-block;
 }
 
-.cell-input:focus {
-  background: rgba(0,0,255,0.1);
-}
-
 .cell-input {
   position: absolute;
   overflow: hidden;
@@ -56,4 +52,8 @@ body > div {
 
 #display-panel > div {
   margin-bottom: 10px;
+}
+
+.selected {
+  background: rgba(0,0,255,0.1);
 }
