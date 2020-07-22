@@ -57,3 +57,13 @@ body > div {
 .selected {
   background: rgba(0,0,255,0.1);
 }
+
+.sudoku-grid-background {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.sudoku-grid {
+  position: relative;
+}

@@ -1,19 +1,22 @@
-const valueId = (row, col, n) => {
+valueId = (row, col, n) => {
   return id = `R${row+1}C${col+1}#${n+1}`;
 };
 
 class SudokuSolver {
-  solve(valueIds) {
-    return this._solve(valueIds, m => m.solve());
+  solve(valueIds, constraints) {
+    return this._solve(valueIds, constraints, m => m.solve());
   }
 
-  solveAllPossibilities(valueIds) {
-    return this._solve(valueIds, m => m.solveAllPossibilities());
+  solveAllPossibilities(valueIds, constraints) {
+    return this._solve(valueIds, constraints, m => m.solveAllPossibilities());
   }
 
-  _solve(valueIds, fn) {
+  _solve(valueIds, constraints, fn) {
     let matrix = SudokuSolver._makeBaseSudokuConstraints();
     SudokuSolver._addFixedSquares(matrix, valueIds);
+    for (const c of (constraints||[])) {
+      matrix.addBinaryConstraint(c.id, c.set1, c.set2, c.fn);
+    }
     return fn(matrix);
   }
 

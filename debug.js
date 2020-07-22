@@ -35,3 +35,6 @@ const testSelection = () => {
     grid.setSolution(solver.remainingRows());
   });
 }
+
+// The thermo in https://www.youtube.com/watch?v=ySPrdlfPHZs
+// Causes a long search when partially filled in.
