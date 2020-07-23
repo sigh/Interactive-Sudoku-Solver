@@ -4,7 +4,7 @@ const FAT_BORDER_STYLE = '3px solid';
 const CHAR_0 = '0'.charCodeAt(0);
 const CHAR_9 = '9'.charCodeAt(0);
 
-const CELL_SIZE = 53;  // 50 + padding.
+const CELL_SIZE = 52;
 
 let grid, constraintManager;
 
@@ -383,7 +383,6 @@ class SudokuGrid {
     let cellMap = {};
 
     for (let i = 0; i < 9; i++) {
-      let row = document.createElement('div');
       for (let j = 0; j < 9; j++) {
         let cell = document.createElement('div');
         let cellId = `R${i+1}C${j+1}`;
@@ -400,9 +399,8 @@ class SudokuGrid {
         cellSolution.className = 'cell-solution cell-elem';
         cell.appendChild(cellSolution);
 
-        row.appendChild(cell);
+        container.appendChild(cell);
       }
-      container.appendChild(row);
     }
 
     return cellMap;
@@ -464,32 +462,33 @@ class SudokuGrid {
     let chars = Array(9*2-1).fill(' ');
     chars[3*2-1] = '\n';
     chars[6*2-1] = '\n';
-    for (let c of values) {
-      chars[c*2-2] = c;
+    for (const v of values) {
+      chars[v*2-2] = v;
     }
     return chars.join('');
   }
 
   setSolution(solution) {
     this.clearSolution();
-    let multiSolutionCells = new Set();
+    let cellValues = new Map();
 
     for (const valueId of solution) {
       let parsedValueId = this._parseValueId(valueId);
       let cellId = parsedValueId.cellId;
       let value = parsedValueId.value;
-      let node = this._getSolutionNode(cellId);
-      if (node.innerText != '') {
-        node.classList.add('cell-multi-solution');
-        multiSolutionCells.add(cellId);
-      }
-      node.innerText += value;
+
+      if (!cellValues.has(cellId)) cellValues.set(cellId, []);
+      cellValues.get(cellId).push(value);
     }
 
-    // Format multi-solution nodes.
-    for (const cellId of multiSolutionCells) {
+    for (const [cellId, values] of cellValues) {
       let node = this._getSolutionNode(cellId);
-      node.innerText = this._formatMultiSolution(node.innerText);
+      if (values.length == 1) {
+        node.innerText = values[0];
+      } else {
+        node.innerText = this._formatMultiSolution(values);
+        node.classList.add('cell-multi-solution');
+      }
     }
   }
 }
