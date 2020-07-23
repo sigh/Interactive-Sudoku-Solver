@@ -278,12 +278,12 @@ class SudokuGrid {
 
     const addToSelection = (cell) => {
       if (cell.classList.contains('cell-input')) {
-        cell.classList.add('selected');
+        cell.parentNode.classList.add('selected');
         selection.add(cell);
       }
     };
     const clearSelection = () => {
-      selection.forEach(e => e.classList.remove('selected'));
+      selection.forEach(e => e.parentNode.classList.remove('selected'));
       selection.clear();
     };
 
