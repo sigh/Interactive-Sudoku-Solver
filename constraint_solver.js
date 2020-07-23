@@ -1,3 +1,5 @@
+const ITERATION_LIMIT = 1000000;
+
 class Node {
   constructor() {
     this.left = this;
@@ -162,6 +164,7 @@ class ConstraintSolver {
   constructor(values) {
     this.matrix = new Matrix(values);
     this._setUpBinaryConstraints();
+    this.iterations = 0;
   }
 
   addConstraint(id, values) {
@@ -243,6 +246,7 @@ class ConstraintSolver {
 
   solve() {
     let startTime = performance.now();
+    this.iterations = 0;
     let result = this._solve(this.matrix, 2);
     let endTime = performance.now();
 
@@ -282,8 +286,13 @@ class ConstraintSolver {
       // If we have tried all the nodes, then backtrack.
       if (node instanceof Column) continue;
 
+      if (this.iterations++ > ITERATION_LIMIT) {
+        throw(`Reached iteration limit of ${ITERATION_LIMIT} without completing`);
+      }
+
       stack.push(node);
       this._removeCandidateRow(node.row);
+      this.iterations++;
 
       numNodesSearched++;
 
@@ -335,6 +344,7 @@ class ConstraintSolver {
 
     let numBacktracks = 0;
     let rowsExplored = 0;
+    this.iterations = 0;
 
     // First eliminate the forced values.
     // This will prevent us having to redo work later.

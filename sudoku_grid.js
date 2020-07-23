@@ -27,25 +27,31 @@ const initPage = () => {
   let backtrackOutputElem = document.getElementById('backtrack-output');
   let uniqueOutputElem = document.getElementById('unique-output');
   let validOutputElem = document.getElementById('valid-output');
+  let errorElem = document.getElementById('error-output');
 
   constraintManager = new ConstraintManager(grid);
 
   grid.setUpdateCallback((cellValues) => {
-    // Solve.
-    let solveFn = (
-      solveTypeElem.value == 'all-possibilities'
-        ? (v, c) => solver.solveAllPossibilities(v, c)
-        : (v, c) => solver.solve(v, c));
-    let result = solveFn(grid.getCellValues(), constraintManager.getConstraints());
+    try {
+      // Solve.
+      let solveFn = (
+        solveTypeElem.value == 'all-possibilities'
+          ? (v, c) => solver.solveAllPossibilities(v, c)
+          : (v, c) => solver.solve(v, c));
+      let result = solveFn(grid.getCellValues(), constraintManager.getConstraints());
 
-    // Update grid.
-    grid.setSolution(result.values);
+      // Update grid.
+      grid.setSolution(result.values);
 
-    // Update display panel.
-    solveTimeElem.innerText = result.timeMs.toPrecision(3) + ' ms';
-    backtrackOutputElem.innerText = result.numBacktracks;
-    uniqueOutputElem.innerHTML = result.unique ? '&#10003;' : '&#10007;';
-    validOutputElem.innerHTML = result.values.length ? '&#10003;' : '&#10007;';
+      // Update display panel.
+      solveTimeElem.innerText = result.timeMs.toPrecision(3) + ' ms';
+      backtrackOutputElem.innerText = result.numBacktracks;
+      uniqueOutputElem.innerHTML = result.unique ? '&#10003;' : '&#10007;';
+      validOutputElem.innerHTML = result.values.length ? '&#10003;' : '&#10007;';
+      errorElem.innerText = '';
+    } catch(e) {
+      errorElem.innerText = e;
+    }
   });
   grid.runUpdateCallback();
 };
@@ -215,7 +221,7 @@ class SudokuGrid {
 
     container.addEventListener('mouseup', (e) => {
       container.removeEventListener('mouseover', mouseoverFn);
-      let selectedIds= [];
+      let selectedIds = [];
       selection.forEach(e => selectedIds.push(e.id));
       this.selectionCallback(selectedIds);
       e.preventDefault();

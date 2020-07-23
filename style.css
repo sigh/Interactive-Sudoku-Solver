@@ -67,3 +67,7 @@ body > div {
 .sudoku-grid {
   position: relative;
 }
+
+.error {
+  color: rgb(200, 0, 0);
+}
