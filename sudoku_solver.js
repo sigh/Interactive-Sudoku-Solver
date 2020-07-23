@@ -1,29 +1,32 @@
-const valueId = (row, col, n) => {
+valueId = (row, col, n) => {
   return id = `R${row+1}C${col+1}#${n+1}`;
 };
 
 class SudokuSolver {
-  solve(valueIds) {
-    return this._solve(valueIds, m => m.solve());
+  solve(valueIds, constraints) {
+    return this._solve(valueIds, constraints, m => m.solve());
   }
 
-  solveAllPossibilities(valueIds) {
-    return this._solve(valueIds, m => m.solveAllPossibilities());
+  solveAllPossibilities(valueIds, constraints) {
+    return this._solve(valueIds, constraints, m => m.solveAllPossibilities());
   }
 
-  _solve(valueIds, fn) {
-    let matrix = this._makeBaseSudokuConstraints();
-    this._addFixedSquares(matrix, valueIds);
+  _solve(valueIds, constraints, fn) {
+    let matrix = SudokuSolver._makeBaseSudokuConstraints();
+    SudokuSolver._addFixedSquares(matrix, valueIds);
+    for (const c of (constraints||[])) {
+      matrix.addBinaryConstraint(c.id, c.set1, c.set2, c.fn);
+    }
     return fn(matrix);
   }
 
-  _addFixedSquares(baseContraints, fixedValues) {
+  static _addFixedSquares(baseConstraints, fixedValues) {
     for (const valueId of fixedValues) {
-      baseContraints.addConstraint(`fixed_${valueId}`, [valueId]);
+      baseConstraints.addConstraint(`fixed_${valueId}`, [valueId]);
     }
   }
 
-  _makeBaseSudokuConstraints() {
+  static _makeBaseSudokuConstraints() {
     // Create constrained values.
     let valueMap = {};
     for (let i = 0; i < 9; i++) {
@@ -35,7 +38,7 @@ class SudokuSolver {
       }
     }
 
-    let constraints = new ContraintMatrix(Object.keys(valueMap));
+    let constraints = new ConstraintSolver(Object.keys(valueMap));
 
     // Add constraints.
 
@@ -99,7 +102,7 @@ class SudokuGridGenerator {
     return this.allValues.slice(0, numSquares);
   }
 
-  _allValues() {
+  static _allValues() {
     let values = [];
 
     for (let i = 0; i < 9; i++) {
@@ -113,7 +116,7 @@ class SudokuGridGenerator {
     return values;
   }
 
-  _shuffle(array) {
+  static _shuffle(array) {
     for (let i = array.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [array[i], array[j]] = [array[j], array[i]];

@@ -4,7 +4,9 @@ const FAT_BORDER_STYLE = '3px solid';
 const CHAR_0 = '0'.charCodeAt(0);
 const CHAR_9 = '9'.charCodeAt(0);
 
-let grid = null;
+const CELL_SIZE = 53;  // 50 + padding.
+
+let grid, constraintManager;
 
 const initPage = () => {
   let solver = new SudokuSolver();
@@ -25,49 +27,213 @@ const initPage = () => {
   let backtrackOutputElem = document.getElementById('backtrack-output');
   let uniqueOutputElem = document.getElementById('unique-output');
   let validOutputElem = document.getElementById('valid-output');
+  let errorElem = document.getElementById('error-output');
+
+  constraintManager = new ConstraintManager(grid);
 
   grid.setUpdateCallback((cellValues) => {
-    // Solve.
-    let solveFn = (
-      solveTypeElem.value == 'all-possibilities'
-        ? v => solver.solveAllPossibilities(v)
-        : v => solver.solve(v));
-    let result = solveFn(grid.getCellValues());
+    try {
+      // Solve.
+      let solveFn = (
+        solveTypeElem.value == 'all-possibilities'
+          ? (v, c) => solver.solveAllPossibilities(v, c)
+          : (v, c) => solver.solve(v, c));
+      let result = solveFn(grid.getCellValues(), constraintManager.getConstraints());
 
-    // Update grid.
-    grid.setSolution(result.values);
+      // Update grid.
+      grid.setSolution(result.values);
 
-    // Update display panel.
-    solveTimeElem.innerText = result.timeMs.toPrecision(3) + ' ms';
-    backtrackOutputElem.innerText = result.numBacktracks;
-    uniqueOutputElem.innerHTML = result.unique ? '&#10003;' : '&#10007;';
-    validOutputElem.innerHTML = result.values.length ? '&#10003;' : '&#10007;';
+      // Update display panel.
+      solveTimeElem.innerText = result.timeMs.toPrecision(3) + ' ms';
+      backtrackOutputElem.innerText = result.numBacktracks;
+      uniqueOutputElem.innerHTML = result.unique ? '&#10003;' : '&#10007;';
+      validOutputElem.innerHTML = result.values.length ? '&#10003;' : '&#10007;';
+      errorElem.innerText = '';
+    } catch(e) {
+      errorElem.innerText = e;
+    }
   });
   grid.runUpdateCallback();
 };
 
+class ConstraintDisplay {
+  constructor(canvas) {
+    this.canvas = canvas;
+    this.ctx = canvas.getContext("2d");
+  }
+
+  static makeDisplay(container) {
+    let canvas = document.createElement('canvas');
+    canvas.height = CELL_SIZE * 9;
+    canvas.width = CELL_SIZE * 9;
+    canvas.className = 'sudoku-grid-background';
+    container.prepend(canvas);
+
+    return new ConstraintDisplay(canvas);
+  }
+
+  static parseCell(cellId) {
+    return [+cellId[1], +cellId[3]];
+  }
+
+  static cellCenter(cellId) {
+    let row, col;
+    [row, col] = ConstraintDisplay.parseCell(cellId);
+    return [col*CELL_SIZE - CELL_SIZE/2, row*CELL_SIZE - CELL_SIZE/2];
+  }
+
+  drawThermometer(cells) {
+    let ctx = this.ctx;
+
+    if (cells.length < 2) throw(`Thermo too short: ${cells}`)
+
+    let x, y;
+
+    ctx.save();
+
+    ctx.globalAlpha = 0.5;
+    ctx.globalCompositeOperation = 'xor';
+
+    // Draw the line.
+    ctx.beginPath();
+    cells.forEach((cell) => {
+      [x, y] = ConstraintDisplay.cellCenter(cell);
+      ctx.lineTo(x, y);
+    });
+    ctx.lineWidth = 15;
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = 'rgba(100, 100, 100)';
+    ctx.stroke();
+
+    // Draw the circle.
+    ctx.beginPath();
+    [x, y] = ConstraintDisplay.cellCenter(cells[0]);
+    ctx.arc(x, y, 15, 2 * Math.PI, false);
+    ctx.fillStyle = 'rgba(100, 100, 100)';
+    ctx.fill();
+
+    ctx.restore();
+  }
+}
+
+class ConstraintManager {
+  constructor(grid) {
+    this.constraints = [];
+    this.grid = grid;
+
+    this.display = ConstraintDisplay.makeDisplay(grid.container);
+
+    grid.setSelectionCallback((selection) => {
+      if (selection.length < 2) return;
+      ConstraintManager.makeThermometerConstraints(selection).forEach((c) => {
+        this.constraints.push(c);
+      });
+      this.display.drawThermometer(selection);
+
+      this.grid.runUpdateCallback();
+    });
+  }
+
+  static makeBinaryConstraint(id, cell1, cell2, fn) {
+    let value = new Map();
+    let set1 = [];
+    let set2 = [];
+    for (let i = 1; i < 10; i++) {
+      set1.push(`${cell1}#${i}`);
+      set2.push(`${cell2}#${i}`);
+      value.set(`${cell1}#${i}`, i);
+      value.set(`${cell2}#${i}`, i);
+    }
+    return {
+      id: id,
+      fn: (a, b) => fn(value.get(a), value.get(b)),
+      set1: set1,
+      set2: set2,
+    }
+  }
+
+  static makeThermometerConstraints(cells) {
+    let constraints = [];
+    for (let i = 1; i < cells.length; i++) {
+      constraints.push(
+        ConstraintManager.makeBinaryConstraint(
+          'thermo-'+i, cells[i-1], cells[i], (a, b) => a < b));
+    }
+    return constraints;
+  };
+
+  getConstraints() {
+    return this.constraints;
+  }
+}
+
 class SudokuGrid {
   constructor(container) {
     this.container = container;
+    container.classList.add('sudoku-grid');
+
     this.cellMap = this._makeSudokuGrid(container);
+    this._setUpSelection(container);
     this._setUpKeyBindings(container);
     this.setUpdateCallback();
+    this.setSelectionCallback();
   }
 
   setUpdateCallback(fn) {
     this.updateCallback = fn || (() => {});
   }
 
+  setSelectionCallback(fn) {
+    this.selectionCallback = fn || (() => {});
+  }
+
   runUpdateCallback() {
     this.updateCallback(this);
   }
 
+  _setUpSelection(container) {
+    this.selection = new Set();
+    let selection = this.selection;
+
+    // Make the container selectable.
+    container.tabIndex = 0;
+
+    const addToSelection = (cell) => {
+      if (cell.classList.contains('cell-input')) {
+        cell.classList.add('selected');
+        selection.add(cell);
+      }
+    };
+    const clearSelection = () => {
+      selection.forEach(e => e.classList.remove('selected'));
+      selection.clear();
+    };
+
+    const mouseoverFn = (e) => addToSelection(e.target);
+
+    container.addEventListener('mousedown', (e) => {
+      clearSelection();
+      container.addEventListener('mouseover', mouseoverFn);
+      addToSelection(e.target);
+      container.focus();
+      e.preventDefault();
+    });
+
+    container.addEventListener('mouseup', (e) => {
+      container.removeEventListener('mouseover', mouseoverFn);
+      let selectedIds = [];
+      selection.forEach(e => selectedIds.push(e.id));
+      this.selectionCallback(selectedIds);
+      e.preventDefault();
+    });
+
+    container.addEventListener('blur', clearSelection);
+  }
+
   _setUpKeyBindings(container) {
     const getActiveElem = () => {
-      let elem = document.activeElement;
-      if (elem == null) return null;
-      if (!elem.classList.contains('cell-input')) return null;
-      return elem;
+      if (this.selection.size != 1) return null;
+      return this.selection.values().next().value;
     };
 
     const setActiveCellValue = (value) => {
@@ -142,7 +308,7 @@ class SudokuGrid {
         this._styleCell(cell, i, j);
 
         let cellInput = document.createElement('div');
-        cellInput.tabIndex = '0';
+        cellInput.tabIndex = 0;
         cellInput.className = 'cell-input cell-elem';
         cellInput.id = cellId;
         cell.appendChild(cellInput);
