@@ -515,17 +515,3 @@ class ConstraintSolver {
     }
   }
 }
-
-// Test example from https://en.wikipedia.org/wiki/Knuth%27s_Algorithm_X
-const makeTestMatrix = () => {
-  let matrix = new ConstraintSolver(['A', 'B', 'C', 'D', 'E', 'F']);
-  matrix.addConstraint(1, ['A', 'B']);
-  matrix.addConstraint(2, ['E', 'F']);
-  matrix.addConstraint(3, ['D', 'E']);
-  matrix.addConstraint(4, ['A', 'B', 'C']);
-  matrix.addConstraint(5, ['C', 'D']);
-  matrix.addConstraint(6, ['D', 'E']);
-  matrix.addConstraint(7, ['A', 'E', 'F']);
-  return matrix;
-}
-
