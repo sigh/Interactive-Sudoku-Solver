@@ -14,10 +14,14 @@ const initPage = () => {
   // Create grid.
   let container = document.getElementById('sudoku-grid');
   grid = new SudokuGrid(container);
+  constraintManager = new ConstraintManager(grid);
 
   // Inputs.
   let clearGridElem = document.getElementById('clear-grid-button');
-  clearGridElem.addEventListener('click', _ => grid.clearCellValues());
+  clearGridElem.addEventListener('click', _ => {
+    constraintManager.clear();
+    grid.clearCellValues()
+  });
 
   let solveTypeElem = document.getElementById('solve-type-input');
   solveTypeElem.addEventListener('change', _ => grid.runUpdateCallback());
@@ -28,8 +32,6 @@ const initPage = () => {
   let uniqueOutputElem = document.getElementById('unique-output');
   let validOutputElem = document.getElementById('valid-output');
   let errorElem = document.getElementById('error-output');
-
-  constraintManager = new ConstraintManager(grid);
 
   grid.setUpdateCallback(() => {
     let cellValues = grid.getCellValues();
@@ -59,19 +61,22 @@ const initPage = () => {
 };
 
 class ConstraintDisplay {
-  constructor(canvas) {
-    this.canvas = canvas;
-    this.ctx = canvas.getContext("2d");
+  constructor(svg) {
+    this.svg = svg;
+  }
+
+  static makeElem(tag) {
+    return document.createElementNS('http://www.w3.org/2000/svg', tag);
   }
 
   static makeDisplay(container) {
-    let canvas = document.createElement('canvas');
-    canvas.height = CELL_SIZE * 9;
-    canvas.width = CELL_SIZE * 9;
-    canvas.className = 'sudoku-grid-background';
-    container.prepend(canvas);
+    let svg = ConstraintDisplay.makeElem('svg');
+    svg.setAttribute('height', CELL_SIZE * 9);
+    svg.setAttribute('width', CELL_SIZE * 9);
+    svg.classList.add('sudoku-grid-background');
+    container.prepend(svg);
 
-    return new ConstraintDisplay(canvas);
+    return new ConstraintDisplay(svg);
   }
 
   static parseCell(cellId) {
@@ -84,56 +89,117 @@ class ConstraintDisplay {
     return [col*CELL_SIZE - CELL_SIZE/2, row*CELL_SIZE - CELL_SIZE/2];
   }
 
-  drawThermometer(cells) {
-    let ctx = this.ctx;
+  clear() {
+    let svg = this.svg;
+    while (svg.lastChild) {
+      svg.removeChild(svg.lastChild);
+    }
+  }
 
+  removeItem(item) {
+    this.svg.removeChild(item);
+  }
+
+  drawThermometer(cells) {
     if (cells.length < 2) throw(`Thermo too short: ${cells}`)
 
+    let thermo = ConstraintDisplay.makeElem('svg');
+    thermo.setAttribute('fill', 'rgb(200, 200, 200)');
+    thermo.setAttribute('stroke', 'rgb(200, 200, 200)');
+
     let x, y;
-
-    ctx.save();
-
-    ctx.globalAlpha = 0.5;
-    ctx.globalCompositeOperation = 'xor';
+    // Draw the circle.
+    [x, y] = ConstraintDisplay.cellCenter(cells[0]);
+    let circle = ConstraintDisplay.makeElem('circle');
+    circle.setAttribute('cx', x);
+    circle.setAttribute('cy', y);
+    circle.setAttribute('r', 15);
+    thermo.appendChild(circle);
 
     // Draw the line.
-    ctx.beginPath();
+    let directions = [];
     cells.forEach((cell) => {
       [x, y] = ConstraintDisplay.cellCenter(cell);
-      ctx.lineTo(x, y);
+      directions.push('L');
+      directions.push(x);
+      directions.push(y);
     });
-    ctx.lineWidth = 15;
-    ctx.lineCap = 'round';
-    ctx.strokeStyle = 'rgba(100, 100, 100)';
-    ctx.stroke();
+    directions[0] = 'M';  // Replace the first direction to a move.
+    let path = ConstraintDisplay.makeElem('path');
+    path.setAttribute('d', directions.join(' '));
+    path.setAttribute('stroke-width', 15);
+    path.setAttribute('stroke-linecap', 'round');
+    path.setAttribute('fill', 'transparent');
+    thermo.appendChild(path);
 
-    // Draw the circle.
-    ctx.beginPath();
-    [x, y] = ConstraintDisplay.cellCenter(cells[0]);
-    ctx.arc(x, y, 15, 2 * Math.PI, false);
-    ctx.fillStyle = 'rgba(100, 100, 100)';
-    ctx.fill();
+    this.svg.append(thermo);
 
-    ctx.restore();
+    return thermo;
   }
 }
 
 class ConstraintManager {
   constructor(grid) {
-    this.constraints = [];
+    this.configs = [];
     this.grid = grid;
 
     this.display = ConstraintDisplay.makeDisplay(grid.container);
+    this.panel = document.getElementById('constraint-panel');
 
     grid.setSelectionCallback((selection) => {
       if (selection.length < 2) return;
-      ConstraintManager.makeThermometerConstraints(selection).forEach((c) => {
-        this.constraints.push(c);
-      });
-      this.display.drawThermometer(selection);
+
+      let constraints = ConstraintManager.makeThermometerConstraints(selection);
+      let displayElem = this.display.drawThermometer(selection);
+
+      let config = {
+        cells: selection,
+        constraints: constraints,
+        displayElem: displayElem,
+      };
+
+      this.addToPanel(config, 'Thermometer');
+
+      this.configs.push(config);
 
       this.grid.runUpdateCallback();
     });
+  }
+
+  _removeConstraint(config) {
+    let index = this.configs.indexOf(config);
+    this.configs.splice(index, 1);
+    this.display.removeItem(config.displayElem);
+    this.panel.removeChild(config.panelItem);
+  }
+
+  addToPanel(config, name) {
+    let panelItem = document.createElement('div');
+    panelItem.className = 'constraint-item';
+
+    let panelButton = document.createElement('button');
+    panelButton.innerHTML = '&#x00D7;';
+    panelItem.appendChild(panelButton);
+
+    let panelLabel = document.createElement('span');
+    panelLabel.innerText = name;
+    panelItem.appendChild(panelLabel);
+
+    config.panelItem = panelItem;
+    let me = this;
+    panelButton.addEventListener('click', () => {
+      me._removeConstraint(config);
+      me.grid.runUpdateCallback();
+    });
+
+    panelItem.addEventListener('mouseover', () => {
+      config.displayElem.classList.add('highlight-constraint');
+    });
+    panelItem.addEventListener('mouseout', () => {
+      config.displayElem.classList.remove('highlight-constraint');
+    });
+
+    this.panel.appendChild(panelItem);
   }
 
   static makeBinaryConstraint(id, cell1, cell2, fn) {
@@ -165,7 +231,17 @@ class ConstraintManager {
   };
 
   getConstraints() {
-    return this.constraints;
+    let constraints = []
+    for (const config of this.configs) {
+      config.constraints.forEach(c => constraints.push(c));
+    }
+    return constraints;
+  }
+
+  clear() {
+    this.display.clear();
+    this.panel.innerHTML = '';
+    this.configs = [];
   }
 }
 
