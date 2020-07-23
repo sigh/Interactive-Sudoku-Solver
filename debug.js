@@ -22,20 +22,6 @@ const testBinaryConstraints = () => {
   return solver;
 }
 
-const testSelection = () => {
-  grid.setSelectionCallback((selection) => {
-    let solver = SudokuSolver._makeBaseSudokuConstraints();
-
-    for (let i = 1; i < selection.length; i++) {
-      addBinaryConstraint(
-        solver, 'thermo-'+i, selection[i-1], selection[i], (a, b) => a < b);
-    }
-
-    solver._enforceArcConsistency(null, solver._allBinaryConstraintColumns());
-    grid.setSolution(solver.remainingRows());
-  });
-}
-
 // Test example from https://en.wikipedia.org/wiki/Knuth%27s_Algorithm_X
 const makeTestMatrix = () => {
   let matrix = new ConstraintSolver(['A', 'B', 'C', 'D', 'E', 'F']);
@@ -115,5 +101,18 @@ const benchmarkSolveAll = (squares, iterations) => {
   };
 }
 
-// The thermo in https://www.youtube.com/watch?v=ySPrdlfPHZs
-// Causes a long search when partially filled in.
+const testBadThermo = () => {
+  // The thermo in https://www.youtube.com/watch?v=ySPrdlfPHZs with mods.
+  // This showed a bug in the search (now fixed).
+  grid.setCellValues(["R1C2#4", "R2C1#2", "R8C1#9", "R9C2#1"]);
+  constraintManager.addConstraint(["R9C4", "R8C3", "R7C2", "R6C1", "R5C2", "R4C3"]);
+  constraintManager.addConstraint(["R4C1", "R3C2", "R2C3", "R1C4", "R2C5", "R3C6"]);
+  constraintManager.addConstraint(["R1C6", "R2C7", "R3C8", "R4C9", "R5C8", "R6C7"]);
+  constraintManager.addConstraint(["R6C9", "R7C8", "R8C7", "R9C6", "R8C5", "R7C4"]);
+  constraintManager.addConstraint(["R5C4", "R5C5"]);
+  grid.runUpdateCallback();
+
+  // Note: https://www.youtube.com/watch?v=ySPrdlfPHZs also causes a long search
+  // when partially filled in.
+}
+

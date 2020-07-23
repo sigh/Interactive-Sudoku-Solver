@@ -149,21 +149,25 @@ class ConstraintManager {
     grid.setSelectionCallback((selection) => {
       if (selection.length < 2) return;
 
-      let constraints = ConstraintManager.makeThermometerConstraints(selection);
-      let displayElem = this.display.drawThermometer(selection);
-
-      let config = {
-        cells: selection,
-        constraints: constraints,
-        displayElem: displayElem,
-      };
-
-      this.addToPanel(config, 'Thermometer');
-
-      this.configs.push(config);
+      this.addConstraint(selection);
 
       this.grid.runUpdateCallback();
     });
+  }
+
+  addConstraint(cells) {
+    let constraints = ConstraintManager._makeThermometerConstraints(cells);
+    let displayElem = this.display.drawThermometer(cells);
+
+    let config = {
+      cells: cells,
+      constraints: constraints,
+      displayElem: displayElem,
+    };
+
+    this.addToPanel(config, 'Thermometer');
+
+    this.configs.push(config);
   }
 
   _removeConstraint(config) {
@@ -220,7 +224,7 @@ class ConstraintManager {
     }
   }
 
-  static makeThermometerConstraints(cells) {
+  static _makeThermometerConstraints(cells) {
     let constraints = [];
     for (let i = 1; i < cells.length; i++) {
       constraints.push(

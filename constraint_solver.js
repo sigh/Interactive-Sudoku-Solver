@@ -492,6 +492,12 @@ class ConstraintSolver {
     let removedRows = [];
     while (pending.length) {
       let column = pending.pop();
+      // If any column is down to 0, then we can stop right away. The puzzle
+      // is inconsistent.
+      // We should defintely not process it, that would cause rows to be
+      // removed twice.
+      if (column.value == 0) break;
+      // Ignore any columns which are not binary constraints.
       let adjConstraints = this.binaryConstraintAdjacencies.get(column);
       if (!adjConstraints) continue;
       for (const adj of adjConstraints) {
