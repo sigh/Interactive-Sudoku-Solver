@@ -61,10 +61,12 @@ const sampleGrids = ({
   "R6C9#1", "R7C1#6", "R7C5#9", "R7C9#3", "R8C6#7", "R8C7#6", "R9C1#5",
   "R9C4#1", "R9C9#2"],
   // Very hard (2s+) from norvig.com/sudoku to find all values.
+  // Requires ~4.2M nodes searched to solveAll.
   c: ["R1C6#6", "R2C2#5", "R2C3#9", "R2C9#8", "R3C1#2", "R3C6#8", "R4C2#4",
       "R4C3#5", "R5C3#3", "R6C3#6", "R6C6#3", "R6C8#5", "R6C9#4", "R7C4#3",
       "R7C5#2", "R7C6#5", "R7C9#6"],
   // Very hard (2s+)
+  // Requires ~4.4M nodes searched to solveAll.
   d: ["R1C6#5", "R1C8#8", "R2C4#6", "R2C6#1", "R2C8#4", "R2C9#3", "R4C2#1",
       "R4C4#5", "R5C4#1", "R5C6#6", "R6C1#3", "R6C9#5", "R7C1#5", "R7C2#3",
       "R7C8#9", "R7C9#1", "R8C9#4"] ,

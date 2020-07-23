@@ -31,14 +31,15 @@ const initPage = () => {
 
   constraintManager = new ConstraintManager(grid);
 
-  grid.setUpdateCallback((cellValues) => {
+  grid.setUpdateCallback(() => {
+    let cellValues = grid.getCellValues();
     try {
       // Solve.
       let solveFn = (
         solveTypeElem.value == 'all-possibilities'
           ? (v, c) => solver.solveAllPossibilities(v, c)
           : (v, c) => solver.solve(v, c));
-      let result = solveFn(grid.getCellValues(), constraintManager.getConstraints());
+      let result = solveFn(cellValues, constraintManager.getConstraints());
 
       // Update grid.
       grid.setSolution(result.values);
@@ -50,6 +51,7 @@ const initPage = () => {
       validOutputElem.innerHTML = result.values.length ? '&#10003;' : '&#10007;';
       errorElem.innerText = '';
     } catch(e) {
+      grid.setSolution(cellValues);
       errorElem.innerText = e;
     }
   });
