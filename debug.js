@@ -116,3 +116,12 @@ const testBadThermo = () => {
   // when partially filled in.
 }
 
+// Slow thermo ~1.14 seconds.
+const testSlowThermo = () => {
+  grid.setCellValues(["R4C6#1", "R5C3#2", "R9C5#1"]);
+  constraintManager.addConstraint(["R7C5", "R7C6", "R7C7", "R6C7", "R5C7", "R4C7"]);
+  constraintManager.addConstraint(["R4C8", "R3C8", "R3C7", "R3C6", "R3C5"]);
+  constraintManager.addConstraint(["R2C5", "R2C4", "R3C4", "R4C4", "R5C4"]);
+  constraintManager.addConstraint(["R2C1", "R2C2", "R2C3"]);
+  grid.runUpdateCallback();
+}
