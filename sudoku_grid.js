@@ -208,19 +208,15 @@ class ConstraintManager {
 
   static makeBinaryConstraint(id, cell1, cell2, fn) {
     let value = new Map();
-    let set1 = [];
-    let set2 = [];
     for (let i = 1; i < 10; i++) {
-      set1.push(`${cell1}#${i}`);
-      set2.push(`${cell2}#${i}`);
       value.set(`${cell1}#${i}`, i);
       value.set(`${cell2}#${i}`, i);
     }
     return {
       id: id,
       fn: (a, b) => fn(value.get(a), value.get(b)),
-      set1: set1,
-      set2: set2,
+      var1: cell1,
+      var2: cell2,
     }
   }
 

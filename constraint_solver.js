@@ -76,6 +76,12 @@ class Column extends Node {
       fn(node);
     }
   }
+
+  rowIds() {
+    let rowIds = [];
+    this.forEach(e => rowIds.push(e.row.id));
+    return rowIds;
+  }
 }
 
 class Row extends Node {
@@ -111,23 +117,29 @@ class Matrix extends Node {
     this.value = 0;
 
     // Set the rows.
-    this.rowMap = {};
+    this.rowMap = new Map();
     for (const rowId of rowIds) {
       let row = new Row(rowId);
-      this.rowMap[rowId] = row;
+      this.rowMap.set(rowId, row);
       row.appendToColumn(this);
     }
+
+    this.columnMap = new Map();
   }
 
   appendColumn(columnId, rowIds) {
+    if (this.columnMap.get(columnId)) {
+      throw(`Column with id ${columnId} already exists`);
+    }
     let column = new Column(columnId);
     for (const rowId of rowIds) {
-      let row = this.rowMap[rowId];
+      let row = this.rowMap.get(rowId);
       let node = new Node();
       node.appendToColumn(column);
       node.appendToRow(row);
     }
     column.appendToRow(this);
+    this.columnMap.set(columnId, column);
     return column;
   }
 
@@ -408,27 +420,51 @@ class ConstraintSolver {
     }
   }
 
-  addBinaryConstraint(id, set1, set2, constraintFn) {
-    this._addBinaryConstraint(id, set1, set2, constraintFn);
-  };
-
   _setUpBinaryConstraints() {
     this.arcInconsistencyMap = new Map();
     this.binaryConstraintAdjacencies = new Map();
-    this.binaryConstraintCache = new Map();
+    // Columns for tracking variables.
+    this.variableColumns = new Map();
   }
 
   _allBinaryConstraintColumns() {
     return [...this.binaryConstraintAdjacencies.keys()];
   }
 
-  _addBinaryConstraint(id, set1, set2, constraintFn) {
-    if (set1.length > 32) throw('Too many values for constraint.');
-    if (set2.length > 32) throw('Too many values for constraint.');
+  _getVariable(variable) {
+    // A variable must an existing column id.
+    let column = this.matrix.columnMap.get(variable);
+    if (!column) {
+      throw(`Variable ${variable} must be an existing column`);
+    }
 
-    let constraintMap = ConstraintSolver._makeConstraintMap(set1, set2, constraintFn);
-    let constraint1 = this._setUpBinaryConstraintColumn(id+'-1', set1, constraintMap);
-    let constraint2 = this._setUpBinaryConstraintColumn(id+'-2', set2, constraintMap);
+    if (!this.variableColumns.has(variable)) {
+      let varColumn = this.matrix.appendColumn('_var_' + variable, column.rowIds());
+      this.variableColumns.set(variable, varColumn);
+      // Variables shouldn't partipate in the exact cover calulation.
+      varColumn.remove();
+      // Set all the hitmasks.
+      let value = 1;
+      varColumn.value = 0;
+      varColumn.forEach(node => {
+        node.value = value;
+        varColumn.value += value;
+        value <<= 1;
+      });
+    }
+
+    return this.variableColumns.get(variable);
+  }
+
+  addBinaryConstraint(id, var1, var2, constraintFn) {
+    let column1 = this._getVariable(var1);
+    let column2 = this._getVariable(var2);
+    if (column1.count > 32) throw('Too many values for constraint.');
+    if (column2.count > 32) throw('Too many values for constraint.');
+
+    let constraintMap = ConstraintSolver._makeConstraintMap(column1, column2, constraintFn);
+    let constraint1 = this._setUpBinaryConstraintColumn(column1, constraintMap);
+    let constraint2 = this._setUpBinaryConstraintColumn(column2, constraintMap);
 
     this._appendToBinaryConstraintAdjacencies(constraint1.column, constraint2);
     this._appendToBinaryConstraintAdjacencies(constraint2.column, constraint1);
@@ -441,8 +477,7 @@ class ConstraintSolver {
     this.binaryConstraintAdjacencies.get(column).push(constraint);
   }
 
-  _setUpBinaryConstraintColumn(id, set, constraintMap) {
-    let column =  ConstraintSolver._addMatrixColumn(this.matrix, id, set);
+  _setUpBinaryConstraintColumn(column, constraintMap) {
     let nodeMap = new Map();
     column.forEach(node => {
       nodeMap.set(node, constraintMap.get(node.row.id));
@@ -453,37 +488,22 @@ class ConstraintSolver {
     };
   }
 
-  static _addMatrixColumn(matrix, id, set) {
-    let column = matrix.appendColumn(id, set);
-    // Don't participate in constraint selection.
-    column.removeFromRow();
-    column.left = column;
-    column.right = column;
-
-    // Use the column value to track efficiently track which values have been
-    // set.
-    column.value = (1 << set.length) - 1
-    let i = 0;
-    column.forEach(node => { node.value = (1 << i++); });
-    return column;
-  }
-
-  static _makeConstraintMap(set1, set2, constraintFn) {
+  static _makeConstraintMap(column1, column2, constraintFn) {
     let constraintMap = new Map();
-    set1.forEach(e => constraintMap.set(e, 0));
-    set2.forEach(e => constraintMap.set(e, 0));
+    column1.forEach(e => constraintMap.set(e.row.id, 0));
+    column2.forEach(e => constraintMap.set(e.row.id, 0));
 
-    for (let i = 0; i < set1.length; ++i) {
-      let v1 = set1[i];
-      for (let j = 0; j < set2.length; ++j) {
-        let v2 = set2[j];
-        if (v1 == v2) throw(`${v1} is in both sets for binary constraint.`);
+    column1.forEach(node1 => {
+      let v1 = node1.row.id;
+      column2.forEach(node2 => {
+        let v2 = node2.row.id;
         if (constraintFn(v1, v2)) {
-          constraintMap.set(v1, constraintMap.get(v1) | (1 << j));
-          constraintMap.set(v2, constraintMap.get(v2) | (1 << i));
+          constraintMap.set(v1, constraintMap.get(v1) | node2.value);
+          constraintMap.set(v2, constraintMap.get(v2) | node1.value);
         }
-      }
-    }
+      });
+    });
+
     return constraintMap;
   }
 

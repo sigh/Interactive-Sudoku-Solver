@@ -15,7 +15,7 @@ class SudokuSolver {
     let matrix = SudokuSolver._makeBaseSudokuConstraints();
     SudokuSolver._addFixedSquares(matrix, valueIds);
     for (const c of (constraints||[])) {
-      matrix.addBinaryConstraint(c.id, c.set1, c.set2, c.fn);
+      matrix.addBinaryConstraint(c.id, c.var1, c.var2, c.fn);
     }
     return fn(matrix);
   }
