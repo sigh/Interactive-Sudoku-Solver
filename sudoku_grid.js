@@ -47,7 +47,7 @@ const initPage = () => {
       grid.setSolution(result.values);
 
       // Update display panel.
-      solveTimeElem.innerText = result.timeMs.toPrecision(3) + ' ms';
+      solveTimeElem.innerText = result.timeMs.toPrecision(4) + ' ms';
       backtrackOutputElem.innerText = result.numBacktracks;
       uniqueOutputElem.innerHTML = result.unique ? '&#10003;' : '&#10007;';
       validOutputElem.innerHTML = result.values.length ? '&#10003;' : '&#10007;';

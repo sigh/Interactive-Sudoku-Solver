@@ -9,6 +9,7 @@ class Node {
     this.column = null;
     this.row = null;
     this.value = 1;
+    this.index = 0;
   }
 
   removeFromRow() {
@@ -40,6 +41,9 @@ class Node {
     column.up = this;
     this.column = column;
     this.column.value += this.value;
+
+    this.index = this.column.totalNodes;
+    this.column.totalNodes++;
   }
 
   appendToRow(row) {
@@ -56,6 +60,7 @@ class Column extends Node {
     super();
     this.id = id;
     this.value = 0;
+    this.totalNodes = 0;
   }
 
   remove() {
@@ -443,13 +448,11 @@ class ConstraintSolver {
       this.variableColumns.set(variable, varColumn);
       // Variables shouldn't partipate in the exact cover calulation.
       varColumn.remove();
-      // Set all the hitmasks.
-      let value = 1;
+      // Create hitmasks and hitsets.
       varColumn.value = 0;
       varColumn.forEach(node => {
-        node.value = value;
-        varColumn.value += value;
-        value <<= 1;
+        node.value = 1 << node.index;
+        varColumn.value += node.value;
       });
     }
 
@@ -478,13 +481,13 @@ class ConstraintSolver {
   }
 
   _setUpBinaryConstraintColumn(column, constraintMap) {
-    let nodeMap = new Map();
+    let nodeList = [];
     column.forEach(node => {
-      nodeMap.set(node, constraintMap.get(node.row.id));
+      nodeList[node.index] = constraintMap.get(node.row.id);
     });
     return {
       column: column,
-      nodeMap: nodeMap,
+      nodeList: nodeList,
     };
   }
 
@@ -522,7 +525,7 @@ class ConstraintSolver {
       if (!adjConstraints) continue;
       for (const adj of adjConstraints) {
         adj.column.forEach((node) => {
-          if (!(adj.nodeMap.get(node) & column.value)) {
+          if (!(adj.nodeList[node.index] & column.value)) {
             // No valid setting exists for this node.
             this._removeInvalidRow(node.row, pending);
             removedRows.push(node.row);
