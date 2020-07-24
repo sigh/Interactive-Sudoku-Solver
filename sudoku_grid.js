@@ -146,7 +146,7 @@ class ConstraintManager {
     this.display = ConstraintDisplay.makeDisplay(grid.container);
     this.panel = document.getElementById('constraint-panel');
 
-    grid.setSelectionCallback((selection) => {
+    grid.selection.setCallback((selection) => {
       if (selection.length < 2) return;
 
       this.addConstraint(selection);
@@ -249,73 +249,91 @@ class ConstraintManager {
   }
 }
 
-class SudokuGrid {
+class Selection {
   constructor(container) {
-    this.container = container;
-    container.classList.add('sudoku-grid');
-
-    this.cellMap = this._makeSudokuGrid(container);
-    this._setUpSelection(container);
-    this._setUpKeyBindings(container);
-    this.setUpdateCallback();
-    this.setSelectionCallback();
-  }
-
-  setUpdateCallback(fn) {
-    this.updateCallback = fn || (() => {});
-  }
-
-  setSelectionCallback(fn) {
-    this.selectionCallback = fn || (() => {});
-  }
-
-  runUpdateCallback() {
-    this.updateCallback(this);
-  }
-
-  _setUpSelection(container) {
-    this.selection = new Set();
-    let selection = this.selection;
+    this._selection = new Set();
+    let selection = this._selection;
+    this.setCallback();
 
     // Make the container selectable.
     container.tabIndex = 0;
 
-    const addToSelection = (cell) => {
-      if (cell.classList.contains('cell-input')) {
-        cell.parentNode.classList.add('selected');
-        selection.add(cell);
-      }
-    };
-    const clearSelection = () => {
-      selection.forEach(e => e.parentNode.classList.remove('selected'));
-      selection.clear();
-    };
-
-    const mouseoverFn = (e) => addToSelection(e.target);
+    const mouseoverFn = (e) => this._addToSelection(e.target);
 
     container.addEventListener('mousedown', (e) => {
-      clearSelection();
+      this._clearSelection();
       container.addEventListener('mouseover', mouseoverFn);
-      addToSelection(e.target);
+      this._addToSelection(e.target);
       container.focus();
       e.preventDefault();
     });
 
     container.addEventListener('mouseup', (e) => {
       container.removeEventListener('mouseover', mouseoverFn);
-      let selectedIds = [];
-      selection.forEach(e => selectedIds.push(e.id));
-      this.selectionCallback(selectedIds);
+      this._runCallback();
       e.preventDefault();
     });
 
-    container.addEventListener('blur', clearSelection);
+    container.addEventListener('blur', (e) => this._clearSelection());
+  }
+
+  updateSelection(cells) {
+    this._clearSelection();
+    cells.forEach(c => this._addToSelection(c));
+    this._runCallback();
+  }
+
+  setCallback(fn) {
+    this.callback = fn || (() => {});
+  }
+
+  getCells() {
+    return [...this._selection];
+  }
+
+  _runCallback() {
+    let selectedIds = [];
+    this._selection.forEach(e => selectedIds.push(e.id));
+    this.callback(selectedIds);
+  }
+
+  _addToSelection(cell) {
+    if (cell.classList.contains('cell-input')) {
+      cell.parentNode.classList.add('selected');
+      this._selection.add(cell);
+    }
+  }
+
+  _clearSelection() {
+    this._selection.forEach(e => e.parentNode.classList.remove('selected'));
+    this._selection.clear();
+  }
+}
+
+class SudokuGrid {
+  constructor(container) {
+    this.container = container;
+    container.classList.add('sudoku-grid');
+
+    this.cellMap = this._makeSudokuGrid(container);
+    this.selection = new Selection(container);
+    this._setUpKeyBindings(container);
+    this.setUpdateCallback();
+  }
+
+  setUpdateCallback(fn) {
+    this.updateCallback = fn || (() => {});
+  }
+
+  runUpdateCallback() {
+    this.updateCallback(this);
   }
 
   _setUpKeyBindings(container) {
     const getActiveElem = () => {
-      if (this.selection.size != 1) return null;
-      return this.selection.values().next().value;
+      let cells = this.selection.getCells();
+      if (cells.length != 1) return null;
+      return cells[0];
     };
 
     const setActiveCellValue = (value) => {
@@ -336,7 +354,9 @@ class SudokuGrid {
       row = (row+dr+8)%9+1;
       col = (col+dc+8)%9+1;
 
-      document.getElementById(`R${row}C${col}`).focus();
+
+      this.selection.updateSelection(
+        [document.getElementById(`R${row}C${col}`)]);
     };
 
     container.addEventListener('keydown', event => {
