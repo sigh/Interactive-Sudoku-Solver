@@ -56,11 +56,12 @@ class Node {
 }
 
 class Column extends Node {
-  constructor(id) {
+  constructor(id, type) {
     super();
     this.id = id;
     this.value = 0;
     this.totalNodes = 0;
+    this.type = type || Column.EXACT_COVER;
   }
 
   remove() {
@@ -88,6 +89,8 @@ class Column extends Node {
     return rowIds;
   }
 }
+Column.EXACT_COVER = 0;
+Column.VARIABLE = 1;
 
 class Row extends Node {
   constructor(id) {
@@ -132,11 +135,12 @@ class Matrix extends Node {
     this.columnMap = new Map();
   }
 
-  appendColumn(columnId, rowIds) {
+  appendColumn(columnId, rowIds, columnType) {
     if (this.columnMap.get(columnId)) {
       throw(`Column with id ${columnId} already exists`);
     }
-    let column = new Column(columnId);
+
+    let column = new Column(columnId, columnType);
     for (const rowId of rowIds) {
       let row = this.rowMap.get(rowId);
       let node = new Node();
@@ -177,6 +181,32 @@ class Matrix extends Node {
   }
 }
 
+class ColumnAccumulator {
+  constructor() {
+    this._variableColumns = [];
+    this._sawEmptyColumn = false;
+  }
+
+  add(column) {
+    if (column.type == Column.VARIABLE) {
+      this._variableColumns.push(column);
+    }
+    if (column.value == 0) this._sawEmptyColumn = true;
+  }
+
+  hasVariableColumn() {
+    return this._variableColumns.length > 0;
+  }
+
+  popVariableColumn() {
+    return this._variableColumns.pop();
+  }
+
+  sawEmptyColumn() {
+    return this._sawEmptyColumn;
+  }
+}
+
 class ConstraintSolver {
   constructor(values) {
     this.matrix = new Matrix(values);
@@ -195,7 +225,7 @@ class ConstraintSolver {
   // TODO: Remove forEach and forEachRev with raw loops for performance. Also,
   // they are not really used elsewhere.
   _removeCandidateRow(row) {
-    let updatedColumns = [];
+    let updatedColumns = new ColumnAccumulator();
     row.remove();
     row.forEach((rowNode) => {
       rowNode.removeFromColumn();
@@ -206,7 +236,6 @@ class ConstraintSolver {
   }
 
   _removeConflictingColumn(column, updatedColumns) {
-    updatedColumns.push(column);
     column.remove();
     column.forEach((node) => {
       node.removeFromRow();
@@ -218,7 +247,7 @@ class ConstraintSolver {
     row.remove();
     row.forEach((rowNode) => {
       rowNode.removeFromColumn();
-      updatedColumns.push(rowNode.column);
+      updatedColumns.add(rowNode.column);
     });
   }
 
@@ -308,10 +337,10 @@ class ConstraintSolver {
       }
 
       stack.push(node);
-      this._removeCandidateRow(node.row);
       this.iterations++;
-
       numNodesSearched++;
+
+      this._removeCandidateRow(node.row);
 
       // let column = this._solveForced(matrix, stack);
       let column = matrix.findMinColumn();
@@ -444,7 +473,7 @@ class ConstraintSolver {
     }
 
     if (!this.variableColumns.has(variable)) {
-      let varColumn = this.matrix.appendColumn('_var_' + variable, column.rowIds());
+      let varColumn = this.matrix.appendColumn('_var_' + variable, column.rowIds(), Column.VARIABLE);
       this.variableColumns.set(variable, varColumn);
       // Variables shouldn't partipate in the exact cover calulation.
       varColumn.remove();
@@ -483,7 +512,7 @@ class ConstraintSolver {
   _setUpBinaryConstraintColumn(column, constraintMap) {
     let nodeList = [];
     column.forEach(node => {
-      nodeList[node.index] = constraintMap.get(node.row.id);
+      nodeList[node.index] = constraintMap.get(node);
     });
     return {
       column: column,
@@ -493,16 +522,14 @@ class ConstraintSolver {
 
   static _makeConstraintMap(column1, column2, constraintFn) {
     let constraintMap = new Map();
-    column1.forEach(e => constraintMap.set(e.row.id, 0));
-    column2.forEach(e => constraintMap.set(e.row.id, 0));
+    column1.forEach(e => constraintMap.set(e, 0));
+    column2.forEach(e => constraintMap.set(e, 0));
 
     column1.forEach(node1 => {
-      let v1 = node1.row.id;
       column2.forEach(node2 => {
-        let v2 = node2.row.id;
-        if (constraintFn(v1, v2)) {
-          constraintMap.set(v1, constraintMap.get(v1) | node2.value);
-          constraintMap.set(v2, constraintMap.get(v2) | node1.value);
+        if (constraintFn(node1.row.id, node2.row.id)) {
+          constraintMap.set(node1, constraintMap.get(node1) | node2.value);
+          constraintMap.set(node2, constraintMap.get(node2) | node1.value);
         }
       });
     });
@@ -511,33 +538,36 @@ class ConstraintSolver {
   }
 
   _enforceArcConsistency(row, updatedColumns) {
+    if (updatedColumns.sawEmptyColumn()) return;
+
     let pending = updatedColumns;
     let removedRows = [];
-    while (pending.length) {
-      let column = pending.pop();
-      // If any column is down to 0, then we can stop right away. The puzzle
-      // is inconsistent.
-      // We should defintely not process it, that would cause rows to be
-      // removed twice.
-      if (column.value == 0) break;
+    // Add to the map early so that we can return at any point.
+    this.arcInconsistencyMap.set(row, removedRows);
+
+    while (pending.hasVariableColumn()) {
+      let column = pending.popVariableColumn();
+      if (column.value == 0) throw('Invalid column');
       // Ignore any columns which are not binary constraints.
       let adjConstraints = this.binaryConstraintAdjacencies.get(column);
       if (!adjConstraints) continue;
       for (const adj of adjConstraints) {
         adj.column.forEach((node) => {
+          if (pending.sawEmptyColumn()) return;
           if (!(adj.nodeList[node.index] & column.value)) {
             // No valid setting exists for this node.
-            this._removeInvalidRow(node.row, pending);
             removedRows.push(node.row);
+            this._removeInvalidRow(node.row, pending);
           }
         });
+        if (pending.sawEmptyColumn()) return;
       }
     }
-    this.arcInconsistencyMap.set(row, removedRows);
   }
 
   _revertArcConsistency(row) {
     let removedRows = this.arcInconsistencyMap.get(row);
+    if (!removedRows) return;
     while(removedRows.length) {
       let row = removedRows.pop();
       this._restoreInvalidRow(row);
