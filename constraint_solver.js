@@ -15,24 +15,32 @@ class Node {
   removeFromRow() {
     this.left.right = this.right;
     this.right.left = this.left;
+    if (this.column) {
+      this.column.count--;
+      this.column.hitSet -= this.value;
+    }
   }
 
   restoreToRow() {
     this.left.right = this;
     this.right.left = this;
+    if (this.column) {
+      this.column.count++;
+      this.column.hitSet += this.value;
+    }
   }
 
   removeFromColumn() {
     this.up.down = this.down;
     this.down.up = this.up;
-    this.column.value--;
+    this.column.count--;
     this.column.hitSet -= this.value;
   }
 
   restoreToColumn() {
     this.up.down = this;
     this.down.up = this;
-    this.column.value++;
+    this.column.count++;
     this.column.hitSet += this.value;
   }
 
@@ -42,10 +50,9 @@ class Node {
     column.up.down = this;
     column.up = this;
     this.column = column;
-    this.column.value += this.value;
 
-    this.index = this.column.totalNodes;
-    this.column.totalNodes++;
+    this.index = this.column.count;
+    this.column.count++;
   }
 
   appendToRow(row) {
@@ -61,8 +68,7 @@ class Column extends Node {
   constructor(id, type) {
     super();
     this.id = id;
-    this.value = 0;
-    this.totalNodes = 0;
+    this.count = 0;
     this.type = type || Column.NORMAL;
     this.extraConstraints = [];
     this.hitSet = 0;
@@ -98,6 +104,8 @@ class Column extends Node {
 }
 Column.NORMAL = 0;
 Column.VARIABLE = 1;
+
+const DUMMY_COLUMN = new Column();
 
 class Row extends Node {
   constructor(id) {
@@ -161,20 +169,20 @@ class Matrix extends Node {
   }
 
   findMinColumn() {
-    let minNode = null;
-    let minValue = Infinity;
+    let minCol = null;
+    let minCount = Infinity;
 
-    for (let node = this.right; node != this; node = node.right) {
-      if (node.value < minValue) {
+    for (let col = this.right; col != this; col = col.right) {
+      if (col.count < minCount) {
         // If the value is zero, we'll never go lower.
-        if (node.value == 0) return node;
+        if (col.count == 0) return col;
 
-        minNode = node;
-        minValue = node.value;
+        minCol = col;
+        minCount = col.count;
       }
     }
 
-    return minNode;
+    return minCol;
   }
 
   hasColumns() {
@@ -203,7 +211,7 @@ class ColumnAccumulator {
     if (column.type == Column.VARIABLE) {
       this._variableColumns.push(column);
     }
-    if (column.value == 0) {
+    if (column.count == 0) {
       this.sawContradition = true;
     }
   }
@@ -233,8 +241,12 @@ class ConstraintSolver {
     return this.matrix.show();
   }
 
-  // TODO: Remove forEach and forEachRev with raw loops for performance. Also,
-  // they are not really used elsewhere.
+  // _removeCandidateRow removes the row and updates all the constraints.
+  //   - Removes conflicting exact cover constraints using alogithms x.
+  //   - Enforces arc consistency on binary constraints.
+  //
+  // Returns true if the remaining matrix is still consistent (assuming the
+  // initial matrix was consistent).
   _removeCandidateRow(row) {
     let updatedColumns = new ColumnAccumulator();
     row.remove();
@@ -244,16 +256,13 @@ class ConstraintSolver {
       rowNode.restoreToColumn();
     });
     this._enforceArcConsistency(row, updatedColumns);
-    // return false;
-    return updatedColumns.sawContradiction;
+    return !updatedColumns.sawContradiction;
   }
 
   _removeSatisfiedColumn(column, updatedColumns) {
     column.remove();
     column.forEach((node) => {
       node.removeFromRow();
-      column.value--;
-      column.hitSet -= node.value;
       this._removeInvalidRow(node.row, updatedColumns);
     });
   }
@@ -280,8 +289,6 @@ class ConstraintSolver {
   _restoreSatisfiedColumn(column) {
     column.forEachRev((node) => {
       this._restoreInvalidRow(node.row);
-      column.value++;
-      column.hitSet += node.value;
       node.restoreToRow();
     });
     column.restore();
@@ -294,15 +301,14 @@ class ConstraintSolver {
 
   // Form all forced reductions, i.e. where there is only one option.
   _solveForced(matrix, stack) {
-    while (matrix.hasColumns()) {
-      // Find the column with the least number of candidates, to speed up
-      // the search.
-      let column = matrix.findMinColumn();
-      if (column.value != 1) return column;
+    // Find the column with the least number of candidates, to speed up
+    // the search.
+    for (let column; column = matrix.findMinColumn();) {
+      if (column.count != 1) return column;
 
       let node = column.down;
       stack.push(node);
-      if (this._removeCandidateRow(node.row)) return {value: 0};
+      if (!this._removeCandidateRow(node.row)) return DUMMY_COLUMN;
     }
     return null;
   }
@@ -325,29 +331,30 @@ class ConstraintSolver {
   // Solve until maxSolutions are found, and return leaving matrix in the
   // same state.
   _solve(matrix, maxSolutions) {
-    // If there are no column, then there is 1 solution - the trival one.
-    if (!matrix.hasColumns()) return {solutions: [[]], numBacktracks: 0};
+    let minColumn = matrix.findMinColumn();
+    // If there are no columns, then there is 1 solution - the trival one.
+    if (!minColumn) return {solutions: [[]], numBacktracks: 0};
 
     const stackToSolution = (stack) => stack.map(e => e.row.id);
 
     let solutions = [];
-    let stack = [matrix.findMinColumn()];
+    let stack = [minColumn];
     let numNodesSearched = 0;
-    let numColumnsSearched = stack[0].value ? 1 : 0;
+    let numColumnsSearched = stack[0].count ? 1 : 0;
 
     while (stack.length) {
       let node = stack.pop();
 
       // If the node is not a column header then we are backtracking, so
       // restore the state.
-      if (!(node instanceof Column)) {
+      if (node.column != null) {
         this._restoreCandidateRow(node.row);
       }
       // Try the next node in the column.
       node = node.down;
 
       // If we have tried all the nodes, then backtrack.
-      if (node instanceof Column) continue;
+      if (node.column == null) continue;
 
       if (this.iterations++ > ITERATION_LIMIT) {
         throw(`Reached iteration limit of ${ITERATION_LIMIT} without completing`);
@@ -357,10 +364,9 @@ class ConstraintSolver {
       this.iterations++;
       numNodesSearched++;
 
-      if (this._removeCandidateRow(node.row)) continue;
+      if (!this._removeCandidateRow(node.row)) continue;
 
-      // let column = this._solveForced(matrix, stack);
-      let column = matrix.findMinColumn();
+      let column = this._solveForced(matrix, stack);
       if (!column) {
         solutions.push(stackToSolution(stack));
         if (solutions.length == maxSolutions) {
@@ -370,7 +376,7 @@ class ConstraintSolver {
       }
 
       // If a column has no candidates, then backtrack.
-      if (column.value == 0) continue;
+      if (column.count == 0) continue;
 
       stack.push(column);
       numColumnsSearched++;
@@ -435,7 +441,7 @@ class ConstraintSolver {
         // to do anything.
         if (validRows.has(row.id)) continue;
 
-        if (this._removeCandidateRow(row)) {
+        if (!this._removeCandidateRow(row)) {
           this._restoreCandidateRow(row);
           continue;
         }
@@ -476,13 +482,6 @@ class ConstraintSolver {
 
   _setUpBinaryConstraints() {
     this.arcInconsistencyMap = new Map();
-    this.binaryConstraintAdjacencies = new Map();
-    // Columns for tracking variables.
-    this.variableColumns = new Map();
-  }
-
-  _allBinaryConstraintColumns() {
-    return [...this.variableColumns.values()];
   }
 
   _getVariable(variable) {
@@ -494,7 +493,6 @@ class ConstraintSolver {
 
     if (column.type != Column.VARIABLE) {
       column.type = Column.VARIABLE;
-      this.variableColumns.set(variable, column);
       // Create hitmasks and hitsets.
       column.hitSet = 0;
       column.forEach(node => {
@@ -503,7 +501,7 @@ class ConstraintSolver {
       });
     }
 
-    return this.variableColumns.get(variable);
+    return column;
   }
 
   addBinaryConstraint(id, var1, var2, constraintFn) {
@@ -558,8 +556,6 @@ class ConstraintSolver {
 
     while (pending.hasVariable()) {
       let column = pending.popVariable();
-      if (column.value == 0) throw('Invalid column');
-      if (column.left.right != column) throw('up');
       for (const adj of column.extraConstraints) {
         if (adj.column.removed) {
           // If it's a removed column, we have to be careful:
