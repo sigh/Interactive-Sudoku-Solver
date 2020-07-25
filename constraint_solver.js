@@ -254,6 +254,9 @@ class ConstraintSolver {
       rowNode.removeFromColumn();
       this._removeSatisfiedColumn(rowNode.column, updatedColumns);
       rowNode.restoreToColumn();
+      // Important, the column should be added when it's in its final state.
+      // In particular, after any restores have happened.
+      updatedColumns.add(rowNode.column);
     });
     this._enforceArcConsistency(row, updatedColumns);
     return !updatedColumns.sawContradiction;
