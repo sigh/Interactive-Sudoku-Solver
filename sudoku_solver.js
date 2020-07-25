@@ -2,28 +2,118 @@ valueId = (row, col, n) => {
   return id = `R${row+1}C${col+1}#${n+1}`;
 };
 
+class SudokuConstraint {
+  apply(constraintSolver) {
+    throw('Unimplemented');
+  }
+}
+
+class ConstraintSet extends SudokuConstraint {
+  constructor(constraints) {
+    super();
+    this._constraints = constraints || [];
+  }
+
+  add(constraint) {
+    this._constraints.push(constraint);
+  }
+
+  apply(constraintSolver) {
+    this._constraints.forEach(c => c.apply(constraintSolver));
+  }
+
+  toString() {
+    let children = this._constraints.map(c => c.toString());
+    return `new ${this.constructor.name}([${children.join(",")}])`;
+  }
+}
+
+class BinaryConstraint extends SudokuConstraint {
+  constructor(cell1, cell2, rawFn) {
+    super();
+    this.cell1 = cell1;
+    this.cell2 = cell2;
+    this.rawFn = rawFn;
+    this.fn = BinaryConstraint._makeMappedFn(cell1, cell2, rawFn);
+  }
+
+  static _makeMappedFn(cell1, cell2, fn) {
+    let value = new Map();
+    for (let i = 1; i < 10; i++) {
+      value.set(`${cell1}#${i}`, i);
+      value.set(`${cell2}#${i}`, i);
+    }
+    return (a, b) => fn(value.get(a), value.get(b));
+  }
+
+  apply(constraintSolver) {
+    constraintSolver.addBinaryConstraint(this.cell1, this.cell2, this.fn);
+  }
+}
+
+class ThermoConstraint extends SudokuConstraint {
+  constructor(cells) {
+    super();
+    this._cells = cells;
+    this._constraints = ThermoConstraint._makeBinaryConstraints(cells);
+  }
+
+  static _makeBinaryConstraints(cells) {
+    let constraints = [];
+    for (let i = 1; i < cells.length; i++) {
+      constraints.push(
+        new BinaryConstraint(cells[i-1], cells[i], (a, b) => a < b));
+    }
+    return constraints;
+  }
+
+  apply(constraintSolver) {
+    for (const c of this._constraints) {
+      c.apply(constraintSolver);
+    }
+  }
+
+  toString() {
+    let input = JSON.stringify(this._cells);
+    return `new ${this.constructor.name}(${input})`;
+  }
+}
+
+class FixedCellsConstraint extends SudokuConstraint {
+  constructor(valueIds) {
+    super();
+    this._valueIds = valueIds;
+  }
+
+  apply(constraintSolver) {
+    for (const valueId of this._valueIds) {
+      constraintSolver.addConstraint(`fixed_${valueId}`, [valueId]);
+    }
+  }
+
+  toString() {
+    let input = JSON.stringify(this._valueIds);
+    return `new ${this.constructor.name}(${input})`;
+  }
+}
+
 class SudokuSolver {
-  solve(valueIds, constraints) {
-    return this._solve(valueIds, constraints, m => m.solve());
+  constructor() {
+    this._constraintSolver = SudokuSolver._makeBaseSudokuConstraints();
+    this._constraints = [];
+  }
+
+  addConstraint(constraint) {
+    constraint.apply(this._constraintSolver);
+    this._constraints.push(constraint);
+  }
+
+  solve() {
+    return this._constraintSolver.solve();
   }
 
   solveAllPossibilities(valueIds, constraints) {
-    return this._solve(valueIds, constraints, m => m.solveAllPossibilities());
-  }
-
-  _solve(valueIds, constraints, fn) {
-    let matrix = SudokuSolver._makeBaseSudokuConstraints();
-    SudokuSolver._addFixedSquares(matrix, valueIds);
-    for (const c of (constraints||[])) {
-      matrix.addBinaryConstraint(c.id, c.var1, c.var2, c.fn);
-    }
-    return fn(matrix);
-  }
-
-  static _addFixedSquares(baseConstraints, fixedValues) {
-    for (const valueId of fixedValues) {
-      baseConstraints.addConstraint(`fixed_${valueId}`, [valueId]);
-    }
+    return this._constraintSolver.solveAllPossibilities();
   }
 
   static _makeBaseSudokuConstraints() {
@@ -89,37 +179,5 @@ class SudokuSolver {
     }
 
     return constraints;
-  }
-}
-
-class SudokuGridGenerator {
-  constructor() {
-    this.allValues = SudokuGridGenerator._allValues();
-  }
-
-  randomGrid(numSquares) {
-    SudokuGridGenerator._shuffle(this.allValues);
-    return this.allValues.slice(0, numSquares);
-  }
-
-  static _allValues() {
-    let values = [];
-
-    for (let i = 0; i < 9; i++) {
-      for (let j = 0; j < 9; j++) {
-        for (let n = 0; n < 9; n++) {
-          values.push(valueId(i, j, n));
-        }
-      }
-    }
-
-    return values;
-  }
-
-  static _shuffle(array) {
-    for (let i = array.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [array[i], array[j]] = [array[j], array[i]];
-    }
   }
 }

@@ -507,7 +507,7 @@ class ConstraintSolver {
     return column;
   }
 
-  addBinaryConstraint(id, var1, var2, constraintFn) {
+  addBinaryConstraint(var1, var2, constraintFn) {
     let column1 = this._getVariable(var1);
     let column2 = this._getVariable(var2);
     if (column1.count > 32) throw('Too many values for constraint.');

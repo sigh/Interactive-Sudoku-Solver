@@ -7,6 +7,7 @@ const CHAR_9 = '9'.charCodeAt(0);
 const CELL_SIZE = 52;
 
 let grid, constraintManager;
+let solution;
 
 const collapseFnCalls = (fn) => {
   let alreadyEnqueued = false;
@@ -23,9 +24,14 @@ const collapseFnCalls = (fn) => {
   });
 }
 
-const initPage = () => {
-  let solver = new SudokuSolver();
+const getCurrentConstraints = () => {
+  let cs = new ConstraintSet();
+  cs.add(new FixedCellsConstraint(grid.getCellValues()));
+  constraintManager.getConstraints().forEach(c => cs.add(c));
+  return cs;
+}
 
+const initPage = () => {
   // Create grid.
   let container = document.getElementById('sudoku-grid');
   grid = new SudokuGrid(container);
@@ -51,12 +57,16 @@ const initPage = () => {
   grid.setUpdateCallback(collapseFnCalls(() => {
     let cellValues = grid.getCellValues();
     try {
+      let solver = new SudokuSolver();
+      let cs = getCurrentConstraints();
+      solver.addConstraint(cs);
+
       // Solve.
-      let solveFn = (
+      let result = (
         solveTypeElem.value == 'all-possibilities'
-          ? (v, c) => solver.solveAllPossibilities(v, c)
-          : (v, c) => solver.solve(v, c));
-      let result = solveFn(cellValues, constraintManager.getConstraints());
+          ? solver.solveAllPossibilities()
+          : solver.solve());
+      solution = result.values;
 
       // Update grid.
       grid.setSolution(result.values);
@@ -171,12 +181,12 @@ class ConstraintManager {
   }
 
   addConstraint(cells) {
-    let constraints = ConstraintManager._makeThermometerConstraints(cells);
+    let constraint = new ThermoConstraint(cells);
     let displayElem = this.display.drawThermometer(cells);
 
     let config = {
       cells: cells,
-      constraints: constraints,
+      constraint: constraint,
       displayElem: displayElem,
     };
 
@@ -221,36 +231,8 @@ class ConstraintManager {
     this.panel.appendChild(panelItem);
   }
 
-  static makeBinaryConstraint(id, cell1, cell2, fn) {
-    let value = new Map();
-    for (let i = 1; i < 10; i++) {
-      value.set(`${cell1}#${i}`, i);
-      value.set(`${cell2}#${i}`, i);
-    }
-    return {
-      id: id,
-      fn: (a, b) => fn(value.get(a), value.get(b)),
-      var1: cell1,
-      var2: cell2,
-    }
-  }
-
-  static _makeThermometerConstraints(cells) {
-    let constraints = [];
-    for (let i = 1; i < cells.length; i++) {
-      constraints.push(
-        ConstraintManager.makeBinaryConstraint(
-          'thermo-'+i, cells[i-1], cells[i], (a, b) => a < b));
-    }
-    return constraints;
-  };
-
   getConstraints() {
-    let constraints = []
-    for (const config of this.configs) {
-      config.constraints.forEach(c => constraints.push(c));
-    }
-    return constraints;
+    return this.configs.map(c => c.constraint);
   }
 
   clear() {
