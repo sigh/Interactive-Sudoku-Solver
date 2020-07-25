@@ -97,6 +97,52 @@ class FixedCellsConstraint extends SudokuConstraint {
   }
 }
 
+class AntiKnightConstraint extends SudokuConstraint {
+  constructor(cells) {
+    super();
+    this._constraints = AntiKnightConstraint._makeBinaryConstraints();
+  }
+
+  static _cellId(r, c) {
+    return `R${r}C${c}`;
+  }
+
+  static _makeBinaryConstraints(cells) {
+    let constraints = [];
+    const boxNumber = (r, c) => ((r-1)/3|0)*3 + c%3;
+    for (let r = 1; r < 10; r++) {
+      for (let c = 1; c < 10; c++) {
+        let cell = AntiKnightConstraint._cellId(r, c);
+        let box = boxNumber(r, c);
+        // We only need half the constraints, as the other half will be
+        // added by the conflict cell.
+        let conflicts = [[r+1, c+2], [r+2, c+1], [r+1, c-2], [r+2, c-1]];
+        for (const [cr, cc] of conflicts) {
+          // Skip any invalid cells or any in the same box as (r, c).
+          if (cr > 0 && cr < 10 && cc > 0 && cc < 10) {
+            if (boxNumber(cr, cc) != box) {
+              let conflict = AntiKnightConstraint._cellId(cr, cc);
+              constraints.push(
+                new BinaryConstraint(cell, conflict, (a, b) => a != b));
+            }
+          }
+        }
+      }
+    }
+    return constraints;
+  }
+
+  apply(constraintSolver) {
+    for (const c of this._constraints) {
+      c.apply(constraintSolver);
+    }
+  }
+
+  toString() {
+    return `new ${this.constructor.name}()`;
+  }
+}
+
 class SudokuSolver {
   constructor() {
     this._constraintSolver = SudokuSolver._makeBaseSudokuConstraints();
@@ -112,8 +158,7 @@ class SudokuSolver {
     return this._constraintSolver.solve();
   }
 
-  solveAllPossibilities(valueIds, constraints) {
-    return this._constraintSolver.solveAllPossibilities();
+  solveAllPossibilities(valueIds, constraints) { return this._constraintSolver.solveAllPossibilities();
   }
 
   static _makeBaseSudokuConstraints() {

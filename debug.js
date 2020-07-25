@@ -151,25 +151,31 @@ const testSlowThermo = () => {
 }
 
 const testCases = () => [
-  {  // From https://www.youtube.com/watch?v=lgJYOuVk910
+  {  // 0: From https://www.youtube.com/watch?v=lgJYOuVk910
     name: 'Thermo 1',
     input:
       new ConstraintSet([new FixedCellsConstraint(["R1C2#4","R1C8#1","R2C1#2","R2C9#6","R8C1#9","R8C9#2","R9C2#1","R9C8#9"]),new ThermoConstraint(["R9C4","R8C3","R7C2","R6C1","R5C2","R4C3"]),new ThermoConstraint(["R4C1","R3C2","R2C3","R1C4","R2C5","R3C6"]),new ThermoConstraint(["R1C6","R2C7","R3C8","R4C9","R5C8","R6C7"]),new ThermoConstraint(["R6C9","R7C8","R8C7","R9C6","R8C5","R7C4"])]),
     expected:
       ["R1C4#6","R3C1#6","R4C3#9","R5C2#8","R1C6#2","R2C7#3","R3C8#4","R4C9#5","R6C1#7","R1C1#8","R1C3#7","R1C9#9","R1C7#5","R1C5#3","R2C2#9","R3C7#2","R8C2#7","R2C5#7","R2C8#8","R3C9#7","R2C4#4","R2C6#1","R8C4#1","R6C5#1","R7C4#9","R7C8#5","R7C2#6","R4C2#2","R6C2#5","R8C5#8","R8C7#6","R8C8#3","R8C3#4","R7C1#3","R5C1#4","R8C6#5","R9C1#5","R9C6#7","R7C6#4","R7C5#2","R7C3#8","R7C9#1","R5C9#3","R5C3#6","R5C6#9","R3C6#8","R3C4#5","R3C5#9","R5C4#2","R5C5#5","R5C8#7","R4C8#6","R4C5#4","R4C6#3","R4C7#8","R4C4#7","R5C7#1","R6C3#3","R6C4#8","R6C6#6","R6C7#9","R6C8#2","R6C9#4","R7C7#7","R9C3#2","R9C4#3","R9C5#6","R9C7#4","R9C9#8","R1C2#4","R1C8#1","R2C1#2","R2C9#6","R2C3#5","R3C2#3","R4C1#1","R8C1#9","R8C9#2","R9C2#1","R3C3#1","R9C8#9"]
   },
-  { // From https://en.wikipedia.org/wiki/Sudoku
+  { // 1: From https://en.wikipedia.org/wiki/Sudoku
     name: 'Classic sudoku, no backtrack',
     input:
       new ConstraintSet([new FixedCellsConstraint(["R1C1#5","R1C2#3","R1C5#7","R2C1#6","R2C4#1","R2C5#9","R2C6#5","R3C2#9","R3C3#8","R3C8#6","R4C1#8","R4C5#6","R4C9#3","R5C1#4","R5C4#8","R5C6#3","R5C9#1","R6C1#7","R6C5#2","R6C9#6","R7C2#6","R7C7#2","R7C8#8","R8C4#4","R8C5#1","R8C6#9","R8C9#5","R9C5#8","R9C8#7","R9C9#9"])]),
     expected:
       ["R1C1#5","R1C2#3","R1C5#7","R2C1#6","R2C4#1","R2C5#9","R2C6#5","R3C2#9","R3C3#8","R3C8#6","R4C1#8","R4C5#6","R4C9#3","R5C1#4","R5C4#8","R1C6#8","R1C4#6","R5C6#3","R5C9#1","R6C1#7","R6C3#3","R6C5#2","R5C5#5","R6C9#6","R7C2#6","R5C2#2","R5C3#6","R4C3#9","R7C7#2","R4C8#2","R7C8#8","R6C7#8","R2C9#8","R2C3#2","R3C1#1","R1C3#4","R2C2#7","R1C9#2","R8C4#4","R4C4#7","R6C4#9","R7C9#4","R9C2#4","R9C5#8","R8C2#8","R3C5#4","R3C6#2","R3C4#3","R7C4#5","R9C4#2","R8C1#2","R8C5#1","R7C5#3","R7C1#9","R7C6#7","R7C3#1","R9C1#3","R8C6#9","R9C6#6","R8C7#6","R8C8#3","R2C8#4","R2C7#3","R6C8#5","R4C7#4","R4C6#1","R4C2#5","R6C2#1","R6C6#4","R9C9#9","R8C9#5","R3C9#7","R3C7#5","R8C3#7","R9C3#5","R9C8#7","R5C8#9","R1C8#1","R1C7#9","R5C7#7","R9C7#1"]
   },
-  { // From https://www.telegraph.co.uk/news/science/science-news/9359579/Worlds-hardest-sudoku-can-you-crack-it.html
+  { // 2: From https://www.telegraph.co.uk/news/science/science-news/9359579/Worlds-hardest-sudoku-can-you-crack-it.html
     name: 'Classic sudoku, hard',
     input:
       new ConstraintSet([new FixedCellsConstraint(["R1C1#8","R2C3#3","R2C4#6","R3C2#7","R3C5#9","R3C7#2","R4C2#5","R4C6#7","R5C5#4","R5C6#5","R5C7#7","R6C4#1","R6C8#3","R7C3#1","R7C8#6","R7C9#8","R8C3#8","R8C4#5","R8C8#1","R9C2#9","R9C7#4"])]),
     expected: ["R8C7#9","R7C7#3","R7C1#5","R7C2#2","R7C5#7","R1C4#7","R2C2#4","R8C1#4","R8C9#7","R2C8#7","R1C2#1","R3C1#6","R3C3#5","R1C3#2","R2C1#9","R1C5#5","R1C7#6","R9C8#5","R9C9#2","R1C6#3","R3C9#3","R3C6#1","R9C5#1","R7C6#4","R7C4#9","R3C4#4","R3C8#8","R6C6#9","R1C8#4","R1C9#9","R2C5#8","R2C6#2","R8C6#6","R8C2#3","R8C5#2","R6C5#6","R4C5#3","R6C2#8","R5C2#6","R5C3#9","R4C3#4","R5C8#2","R4C8#9","R5C4#8","R4C4#2","R4C1#1","R4C7#8","R4C9#6","R5C1#3","R5C9#1","R2C9#5","R2C7#1","R6C3#7","R6C1#2","R6C7#5","R6C9#4","R9C1#7","R9C3#6","R9C4#3","R9C6#8","R1C1#8","R2C3#3","R2C4#6","R3C2#7","R3C5#9","R3C7#2","R4C2#5","R4C6#7","R5C5#4","R5C6#5","R5C7#7","R6C4#1","R6C8#3","R7C3#1","R7C8#6","R7C9#8","R8C3#8","R8C4#5","R8C8#1","R9C2#9","R9C7#4"]
+  },
+  { // 3: https://www.youtube.com/watch?v=mTdhTfAhOI8
+    name: 'Anti knights move',
+    input:
+      new ConstraintSet([new AntiKnightConstraint(), new FixedCellsConstraint(["R1C2#3","R1C5#4","R1C6#1","R1C9#7","R2C4#5","R3C4#8","R3C6#9","R4C1#6","R4C8#7","R5C9#4","R6C2#4","R7C1#3","R8C5#6","R8C8#5","R9C2#6","R9C3#4","R9C4#3"])]),
+    expected: ["R1C2#3","R1C5#4","R1C6#1","R1C9#7","R2C4#5","R3C4#8","R3C6#9","R4C1#6","R4C8#7","R5C9#4","R6C2#4","R7C1#3","R8C5#6","R8C8#5","R9C2#6","R9C3#4","R2C8#4","R3C1#4","R9C4#3","R1C4#2","R5C4#6","R2C6#6","R1C3#6","R1C7#8","R1C8#9","R1C1#5","R9C5#5","R2C5#3","R3C5#7","R3C3#1","R3C2#2","R3C8#3","R2C2#7","R2C1#9","R2C3#8","R2C7#2","R2C9#1","R3C7#6","R3C9#5","R5C7#5","R4C2#1","R4C4#4","R4C6#5","R6C3#5","R7C2#5","R4C7#9","R9C9#9","R4C3#3","R5C6#3","R6C1#2","R8C3#2","R4C5#8","R4C9#2","R6C6#7","R5C5#2","R5C8#1","R6C7#3","R7C8#2","R7C9#6","R6C9#8","R6C8#6","R8C6#4","R7C5#9","R6C5#1","R5C2#8","R5C1#7","R5C3#9","R6C4#9","R7C3#7","R7C4#1","R7C6#8","R7C7#4","R8C2#9","R8C4#7","R8C7#1","R8C1#8","R8C9#3","R9C1#1","R9C6#2","R9C7#7","R9C8#8"]
   }
 ];
 

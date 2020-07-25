@@ -24,10 +24,13 @@ const collapseFnCalls = (fn) => {
   });
 }
 
+let antiKnight = false;
+
 const getCurrentConstraints = () => {
   let cs = new ConstraintSet();
   cs.add(new FixedCellsConstraint(grid.getCellValues()));
   constraintManager.getConstraints().forEach(c => cs.add(c));
+  if (antiKnight) cs.add(new AntiKnightConstraint());
   return cs;
 }
 
