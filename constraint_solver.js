@@ -25,13 +25,15 @@ class Node {
   removeFromColumn() {
     this.up.down = this.down;
     this.down.up = this.up;
-    this.column.value -= this.value;
+    this.column.value--;
+    this.column.hitSet -= this.value;
   }
 
   restoreToColumn() {
     this.up.down = this;
     this.down.up = this;
-    this.column.value += this.value;
+    this.column.value++;
+    this.column.hitSet += this.value;
   }
 
   appendToColumn(column) {
@@ -61,15 +63,19 @@ class Column extends Node {
     this.id = id;
     this.value = 0;
     this.totalNodes = 0;
-    this.type = type || Column.EXACT_COVER;
+    this.type = type || Column.NORMAL;
     this.extraConstraints = [];
+    this.hitSet = 0;
+    this.removed = false;
   }
 
   remove() {
+    this.removed = true;
     this.removeFromRow();
   }
 
   restore() {
+    this.removed = false;
     this.restoreToRow();
   }
 
@@ -90,7 +96,7 @@ class Column extends Node {
     return rowIds;
   }
 }
-Column.EXACT_COVER = 0;
+Column.NORMAL = 0;
 Column.VARIABLE = 1;
 
 class Row extends Node {
@@ -136,12 +142,12 @@ class Matrix extends Node {
     this.columnMap = new Map();
   }
 
-  appendColumn(columnId, rowIds, columnType) {
+  appendColumn(columnId, rowIds) {
     if (this.columnMap.get(columnId)) {
       throw(`Column with id ${columnId} already exists`);
     }
 
-    let column = new Column(columnId, columnType);
+    let column = new Column(columnId);
     for (const rowId of rowIds) {
       let row = this.rowMap.get(rowId);
       let node = new Node();
@@ -149,10 +155,7 @@ class Matrix extends Node {
       node.appendToRow(row);
     }
 
-    if (column.type == Column.EXACT_COVER) {
-      // Only exact cover rows participate in column selection.
-      column.appendToRow(this);
-    }
+    column.appendToRow(this);
     this.columnMap.set(columnId, column);
     return column;
   }
@@ -192,30 +195,26 @@ class Matrix extends Node {
 class ColumnAccumulator {
   constructor() {
     this._variableColumns = [];
-    this._sawEmptyColumn = false;
+    this.sawContradiction = false;
   }
 
   add(column) {
-    if (this._sawEmptyColumn) return;
+    if (this.sawContradiction) return;
     if (column.type == Column.VARIABLE) {
       this._variableColumns.push(column);
     }
     if (column.value == 0) {
-      this._sawEmptyColumn = true;
-      this._variableColumns = [];
+      this.sawContradition = true;
     }
   }
 
   hasVariable() {
-    return this._variableColumns.length > 0;
+    return !this.sawContradition && this._variableColumns.length > 0;
   }
 
   popVariable() {
+    if (this.sawContradition) return null;
     return this._variableColumns.pop();
-  }
-
-  sawEmpty() {
-    return this._sawEmptyColumn;
   }
 }
 
@@ -241,16 +240,20 @@ class ConstraintSolver {
     row.remove();
     row.forEach((rowNode) => {
       rowNode.removeFromColumn();
-      this._removeConflictingColumn(rowNode.column, updatedColumns);
+      this._removeSatisfiedColumn(rowNode.column, updatedColumns);
       rowNode.restoreToColumn();
     });
     this._enforceArcConsistency(row, updatedColumns);
+    // return false;
+    return updatedColumns.sawContradiction;
   }
 
-  _removeConflictingColumn(column, updatedColumns) {
+  _removeSatisfiedColumn(column, updatedColumns) {
     column.remove();
     column.forEach((node) => {
       node.removeFromRow();
+      column.value--;
+      column.hitSet -= node.value;
       this._removeInvalidRow(node.row, updatedColumns);
     });
   }
@@ -268,15 +271,17 @@ class ConstraintSolver {
     this._revertArcConsistency(row);
     row.forEachRev((rowNode) => {
       rowNode.removeFromColumn();
-      this._restoreConflictingColumn(rowNode.column);
+      this._restoreSatisfiedColumn(rowNode.column);
       rowNode.restoreToColumn();
     });
     row.restore();
   }
 
-  _restoreConflictingColumn(column) {
+  _restoreSatisfiedColumn(column) {
     column.forEachRev((node) => {
       this._restoreInvalidRow(node.row);
+      column.value++;
+      column.hitSet += node.value;
       node.restoreToRow();
     });
     column.restore();
@@ -297,7 +302,7 @@ class ConstraintSolver {
 
       let node = column.down;
       stack.push(node);
-      this._removeCandidateRow(node.row);
+      if (this._removeCandidateRow(node.row)) return {value: 0};
     }
     return null;
   }
@@ -352,7 +357,7 @@ class ConstraintSolver {
       this.iterations++;
       numNodesSearched++;
 
-      this._removeCandidateRow(node.row);
+      if (this._removeCandidateRow(node.row)) continue;
 
       // let column = this._solveForced(matrix, stack);
       let column = matrix.findMinColumn();
@@ -430,7 +435,10 @@ class ConstraintSolver {
         // to do anything.
         if (validRows.has(row.id)) continue;
 
-        this._removeCandidateRow(row);
+        if (this._removeCandidateRow(row)) {
+          this._restoreCandidateRow(row);
+          continue;
+        }
 
         let result = this._solve(matrix, 1);
         numBacktracks += result.numBacktracks;
@@ -484,14 +492,14 @@ class ConstraintSolver {
       throw(`Variable ${variable} must be an existing column`);
     }
 
-    if (!this.variableColumns.has(variable)) {
-      let varColumn = this.matrix.appendColumn('_var_' + variable, column.rowIds(), Column.VARIABLE);
-      this.variableColumns.set(variable, varColumn);
+    if (column.type != Column.VARIABLE) {
+      column.type = Column.VARIABLE;
+      this.variableColumns.set(variable, column);
       // Create hitmasks and hitsets.
-      varColumn.value = 0;
-      varColumn.forEach(node => {
+      column.hitSet = 0;
+      column.forEach(node => {
         node.value = 1 << node.index;
-        varColumn.value += node.value;
+        column.hitSet += node.value;
       });
     }
 
@@ -541,26 +549,43 @@ class ConstraintSolver {
   }
 
   _enforceArcConsistency(row, updatedColumns) {
-    if (updatedColumns.sawEmpty()) return;
-
-    let pending = updatedColumns;
     let removedRows = [];
     // Add to the map early so that we can return at any point.
     this.arcInconsistencyMap.set(row, removedRows);
 
+    let pending = updatedColumns;
+    if (updatedColumns.sawContradition) return;
+
     while (pending.hasVariable()) {
       let column = pending.popVariable();
       if (column.value == 0) throw('Invalid column');
+      if (column.left.right != column) throw('up');
       for (const adj of column.extraConstraints) {
-        adj.column.forEach((node) => {
-          if (pending.sawEmpty()) return;
-          if (!(adj.nodeList[node.index] & column.value)) {
-            // No valid setting exists for this node.
-            removedRows.push(node.row);
-            this._removeInvalidRow(node.row, pending);
-          }
-        });
-        if (pending.sawEmpty()) return;
+        if (adj.column.removed) {
+          // If it's a removed column, we have to be careful:
+          //  - We can't remove any nodes.
+          //  - There may be more nodes than are actually valid.
+          adj.column.forEach((node) => {
+            if (pending.sawContradition) return;
+            // If the node has already been removed, we should skip it.
+            if (!(node.value & adj.column.hitSet)) return;
+            if (!(adj.nodeList[node.index] & column.hitSet)) {
+              // If we try to remove any valid rows from a satisfied column,
+              // then that is a contradiction.
+              pending.sawContradiction = true;
+            }
+          });
+        } else {
+          adj.column.forEach((node) => {
+            if (pending.sawContradition) return;
+            if (!(adj.nodeList[node.index] & column.hitSet)) {
+              // No valid setting exists for this node.
+              removedRows.push(node.row);
+              this._removeInvalidRow(node.row, pending);
+            }
+          });
+        }
+        if (pending.sawContradition) return;
       }
     }
   }

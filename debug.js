@@ -101,8 +101,8 @@ const benchmarkSolveAll = (squares, iterations) => {
   };
 }
 
-const testBadThermo = () => {
-  // The thermo in https://www.youtube.com/watch?v=ySPrdlfPHZs with mods.
+const testBadThermo2 = () => {
+  // The thermo in https://www.youtube.com/watch?v=lgJYOuVk910 with mods.
   // This showed a bug in the search (now fixed).
   constraintManager.clear();
   grid.setCellValues(["R1C2#4", "R2C1#2", "R8C1#9", "R9C2#1"]);
@@ -116,6 +116,20 @@ const testBadThermo = () => {
   // Note: https://www.youtube.com/watch?v=ySPrdlfPHZs also causes a long search
   // when partially filled in.
 }
+
+const testBadThermo = () => {
+  // The thermo in https://www.youtube.com/watch?v=lgJYOuVk910.
+  // This showed a bug in search.
+  constraintManager.clear();
+  grid.setCellValues(["R1C2#4", "R1C8#1", "R2C1#2", "R2C9#6", "R8C1#9", "R8C9#2", "R9C2#1", "R9C8#9"]);
+  constraintManager.addConstraint(["R9C4", "R8C3", "R7C2", "R6C1", "R5C2", "R4C3"]);
+  constraintManager.addConstraint(["R4C1", "R3C2", "R2C3", "R1C4", "R2C5", "R3C6"]);
+  constraintManager.addConstraint(["R1C6", "R2C7", "R3C8", "R4C9", "R5C8", "R6C7"]);
+  constraintManager.addConstraint(["R6C9", "R7C8", "R8C7", "R9C6", "R8C5", "R7C4"]);
+  constraintManager.addConstraint(["R5C4", "R5C5"]);
+  grid.runUpdateCallback();
+}
+
 
 // Slow thermo ~1.14 seconds.
 const testSlowThermo = () => {
