@@ -62,6 +62,7 @@ class Column extends Node {
     this.value = 0;
     this.totalNodes = 0;
     this.type = type || Column.EXACT_COVER;
+    this.extraConstraints = [];
   }
 
   remove() {
@@ -147,7 +148,11 @@ class Matrix extends Node {
       node.appendToColumn(column);
       node.appendToRow(row);
     }
-    column.appendToRow(this);
+
+    if (column.type == Column.EXACT_COVER) {
+      // Only exact cover rows participate in column selection.
+      column.appendToRow(this);
+    }
     this.columnMap.set(columnId, column);
     return column;
   }
@@ -158,6 +163,9 @@ class Matrix extends Node {
 
     for (let node = this.right; node != this; node = node.right) {
       if (node.value < minValue) {
+        // If the value is zero, we'll never go lower.
+        if (node.value == 0) return node;
+
         minNode = node;
         minValue = node.value;
       }
@@ -188,21 +196,25 @@ class ColumnAccumulator {
   }
 
   add(column) {
+    if (this._sawEmptyColumn) return;
     if (column.type == Column.VARIABLE) {
       this._variableColumns.push(column);
     }
-    if (column.value == 0) this._sawEmptyColumn = true;
+    if (column.value == 0) {
+      this._sawEmptyColumn = true;
+      this._variableColumns = [];
+    }
   }
 
-  hasVariableColumn() {
+  hasVariable() {
     return this._variableColumns.length > 0;
   }
 
-  popVariableColumn() {
+  popVariable() {
     return this._variableColumns.pop();
   }
 
-  sawEmptyColumn() {
+  sawEmpty() {
     return this._sawEmptyColumn;
   }
 }
@@ -462,7 +474,7 @@ class ConstraintSolver {
   }
 
   _allBinaryConstraintColumns() {
-    return [...this.binaryConstraintAdjacencies.keys()];
+    return [...this.variableColumns.values()];
   }
 
   _getVariable(variable) {
@@ -475,8 +487,6 @@ class ConstraintSolver {
     if (!this.variableColumns.has(variable)) {
       let varColumn = this.matrix.appendColumn('_var_' + variable, column.rowIds(), Column.VARIABLE);
       this.variableColumns.set(variable, varColumn);
-      // Variables shouldn't partipate in the exact cover calulation.
-      varColumn.remove();
       // Create hitmasks and hitsets.
       varColumn.value = 0;
       varColumn.forEach(node => {
@@ -498,15 +508,8 @@ class ConstraintSolver {
     let constraint1 = this._setUpBinaryConstraintColumn(column1, constraintMap);
     let constraint2 = this._setUpBinaryConstraintColumn(column2, constraintMap);
 
-    this._appendToBinaryConstraintAdjacencies(constraint1.column, constraint2);
-    this._appendToBinaryConstraintAdjacencies(constraint2.column, constraint1);
-  }
-
-  _appendToBinaryConstraintAdjacencies(column, constraint) {
-    if (!this.binaryConstraintAdjacencies.has(column)) {
-      this.binaryConstraintAdjacencies.set(column, []);
-    }
-    this.binaryConstraintAdjacencies.get(column).push(constraint);
+    constraint1.column.extraConstraints.push(constraint2);
+    constraint2.column.extraConstraints.push(constraint1);
   }
 
   _setUpBinaryConstraintColumn(column, constraintMap) {
@@ -538,29 +541,26 @@ class ConstraintSolver {
   }
 
   _enforceArcConsistency(row, updatedColumns) {
-    if (updatedColumns.sawEmptyColumn()) return;
+    if (updatedColumns.sawEmpty()) return;
 
     let pending = updatedColumns;
     let removedRows = [];
     // Add to the map early so that we can return at any point.
     this.arcInconsistencyMap.set(row, removedRows);
 
-    while (pending.hasVariableColumn()) {
-      let column = pending.popVariableColumn();
+    while (pending.hasVariable()) {
+      let column = pending.popVariable();
       if (column.value == 0) throw('Invalid column');
-      // Ignore any columns which are not binary constraints.
-      let adjConstraints = this.binaryConstraintAdjacencies.get(column);
-      if (!adjConstraints) continue;
-      for (const adj of adjConstraints) {
+      for (const adj of column.extraConstraints) {
         adj.column.forEach((node) => {
-          if (pending.sawEmptyColumn()) return;
+          if (pending.sawEmpty()) return;
           if (!(adj.nodeList[node.index] & column.value)) {
             // No valid setting exists for this node.
             removedRows.push(node.row);
             this._removeInvalidRow(node.row, pending);
           }
         });
-        if (pending.sawEmptyColumn()) return;
+        if (pending.sawEmpty()) return;
       }
     }
   }

@@ -8,6 +8,21 @@ const CELL_SIZE = 52;
 
 let grid, constraintManager;
 
+const collapseFnCalls = (fn) => {
+  let alreadyEnqueued = false;
+  return (() => {
+    if (alreadyEnqueued) return;
+    alreadyEnqueued = true;
+    window.requestAnimationFrame(() => {
+      try {
+        fn();
+      } finally {
+        alreadyEnqueued = false;
+      }
+    });
+  });
+}
+
 const initPage = () => {
   let solver = new SudokuSolver();
 
@@ -33,7 +48,7 @@ const initPage = () => {
   let validOutputElem = document.getElementById('valid-output');
   let errorElem = document.getElementById('error-output');
 
-  grid.setUpdateCallback(() => {
+  grid.setUpdateCallback(collapseFnCalls(() => {
     let cellValues = grid.getCellValues();
     try {
       // Solve.
@@ -56,7 +71,7 @@ const initPage = () => {
       grid.setSolution(cellValues);
       errorElem.innerText = e;
     }
-  });
+  }));
   grid.runUpdateCallback();
 };
 
@@ -242,6 +257,7 @@ class ConstraintManager {
     this.display.clear();
     this.panel.innerHTML = '';
     this.configs = [];
+    this.grid.runUpdateCallback();
   }
 }
 
