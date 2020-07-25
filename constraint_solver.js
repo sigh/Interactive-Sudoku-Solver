@@ -369,7 +369,8 @@ class ConstraintSolver {
 
       if (!this._removeCandidateRow(node.row)) continue;
 
-      let column = this._solveForced(matrix, stack);
+      let column = matrix.findMinColumn();
+      if (debugCallback != null) debugCallback(this, node, stack, column);
       if (!column) {
         solutions.push(stackToSolution(stack));
         if (solutions.length == maxSolutions) {
@@ -598,3 +599,5 @@ class ConstraintSolver {
     }
   }
 }
+
+let debugCallback = null;
