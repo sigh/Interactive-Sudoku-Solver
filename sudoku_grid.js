@@ -91,9 +91,23 @@ const initPage = () => {
   grid.runUpdateCallback();
 };
 
+// We never need more than 5 colors since the max degree of the graph is 4.
+const KILLER_CAGE_COLORS = [
+  'green',
+  'red',
+  'blue',
+  'yellow',
+  'purple',
+  'orange',
+  'cyan',
+  'brown',
+  'black',
+];
 class ConstraintDisplay {
   constructor(svg) {
     this.svg = svg;
+    this.killerCellColors = new Map();
+    this.killerCages = new Map();
   }
 
   static makeElem(tag) {
@@ -125,10 +139,96 @@ class ConstraintDisplay {
     while (svg.lastChild) {
       svg.removeChild(svg.lastChild);
     }
+    this.killerCellColors = new Map();
+    this.killerCages = new Map();
   }
 
   removeItem(item) {
     this.svg.removeChild(item);
+    if (this.killerCages.has(item)) {
+      for (const cellId of this.killerCages.get(item)) {
+        this.killerCellColors.delete(cellId);
+      }
+      this.killerCages.delete(item);
+    }
+  }
+
+  static _addTextBackground(elem) {
+    let bbox = elem.getBBox();
+    let rect = ConstraintDisplay.makeElem('rect');
+
+    rect.setAttribute('x', bbox.x);
+    rect.setAttribute('y', bbox.y);
+    rect.setAttribute('width', bbox.width);
+    rect.setAttribute('height', bbox.height);
+
+    elem.parentNode.insertBefore(rect, elem);
+    return rect;
+  }
+
+  _chooseKillerCageColor(cellIds) {
+    // Use a greedy algorithm to choose the graph color.
+    let conflictingColors = new Set();
+    for (const cellId of cellIds) {
+      let row, col;
+      [row, col] = ConstraintDisplay.parseCell(cellId);
+      // Lookup all  adjacent cells, it doesn't matter if they valid or not.
+      conflictingColors.add(this.killerCellColors.get(`R${row}C${col+1}`));
+      conflictingColors.add(this.killerCellColors.get(`R${row}C${col-1}`));
+      conflictingColors.add(this.killerCellColors.get(`R${row+1}C${col}`));
+      conflictingColors.add(this.killerCellColors.get(`R${row-1}C${col}`));
+    }
+    // Return the first color that doesn't conflict.
+    for (const color of KILLER_CAGE_COLORS) {
+      if (!conflictingColors.has(color)) return color;
+    }
+    // Otherwse select a random color.
+    return `rgb(${Math.random()*255|0},${Math.random()*255|0},${Math.random()*255|0})`;
+  }
+
+  drawKillerCage(cells, sum) {
+    const cellWidth = CELL_SIZE-1;
+    let x,y;
+
+    let cage = ConstraintDisplay.makeElem('svg');
+    let color = this._chooseKillerCageColor(cells);
+
+    for (const cell of cells) {
+      [x, y] = ConstraintDisplay.cellCenter(cell);
+      let path = ConstraintDisplay.makeElem('path');
+      let directions = [
+        'M', x-cellWidth/2+1, y-cellWidth/2+1,
+        'l', 0, cellWidth,
+        'l', cellWidth, 0,
+        'l', 0, -cellWidth,
+        'l', -cellWidth, 0,
+      ];
+      path.setAttribute('d', directions.join(' '));
+      path.setAttribute('fill', color);
+      path.setAttribute('opacity', '0.1');
+      cage.appendChild(path);
+    }
+    this.killerCages.set(cage, [...cells]);
+    cells.forEach(cell => this.killerCellColors.set(cell, color));
+
+    // Draw the sum in the top-left most cell. Luckly, this is the sort order.
+    cells.sort();
+    [x, y] = ConstraintDisplay.cellCenter(cells[0]);
+
+    let text = ConstraintDisplay.makeElem('text');
+    text.appendChild(document.createTextNode(sum));
+    text.setAttribute('x', x - cellWidth/2 + 1);
+    text.setAttribute('y', y - cellWidth/2 + 2);
+    text.setAttribute('dominant-baseline', 'hanging');
+    text.setAttribute('style',
+      'font-size: 10; font-family: monospace; font-weight: bold;');
+    cage.append(text);
+    this.svg.append(cage);
+
+    let textBackground = ConstraintDisplay._addTextBackground(text);
+    textBackground.setAttribute('fill', 'rgb(200, 200, 200)');
+
+    return cage;
   }
 
   drawThermometer(cells) {
@@ -187,8 +287,9 @@ class ConstraintManager {
   }
 
   addConstraint(cells) {
-    let constraint = new ThermoConstraint(cells);
-    let displayElem = this.display.drawThermometer(cells);
+    let sum = window.prompt('Sum');
+    let constraint = new SumConstraint(cells, +sum);
+    let displayElem = this.display.drawKillerCage(cells, sum);
 
     let config = {
       cells: cells,
@@ -196,7 +297,7 @@ class ConstraintManager {
       displayElem: displayElem,
     };
 
-    this.addToPanel(config, 'Thermometer');
+    this.addToPanel(config, `Killer cage (${sum})`);
 
     this.configs.push(config);
   }
