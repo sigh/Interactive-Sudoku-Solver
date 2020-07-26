@@ -1,4 +1,4 @@
-const ITERATION_LIMIT = 5000000;
+const ITERATION_LIMIT = 50000;
 
 class Node {
   constructor() {
@@ -73,6 +73,7 @@ class Column extends Node {
     this.extraConstraints = [];
     this.hitSet = 0;
     this.removed = false;
+    this.weight = 0;
   }
 
   remove() {
@@ -111,6 +112,7 @@ class Row extends Node {
   constructor(id) {
     super();
     this.id = id;
+    this.weight = 1;
   }
 
   remove() {
@@ -237,6 +239,13 @@ class ConstraintSolver {
     this.matrix.appendColumn(id, values);
   }
 
+  setWeights(weightMap) {
+    let rowMap = this.matrix.rowMap;
+    for (const [rowId, weight] of weightMap) {
+      rowMap.get(rowId).weight = weight;
+    }
+  }
+
   show() {
     return this.matrix.show();
   }
@@ -254,6 +263,7 @@ class ConstraintSolver {
       rowNode.removeFromColumn();
       this._removeSatisfiedColumn(rowNode.column, updatedColumns);
       rowNode.restoreToColumn();
+      rowNode.column.weight += row.weight;
       // Important, the column should be added when it's in its final state.
       // In particular, after any restores have happened.
       updatedColumns.add(rowNode.column);
@@ -282,6 +292,7 @@ class ConstraintSolver {
   _restoreCandidateRow(row) {
     this._revertArcConsistency(row);
     row.forEachRev((rowNode) => {
+      rowNode.column.weight -= row.weight;
       rowNode.removeFromColumn();
       this._restoreSatisfiedColumn(rowNode.column);
       rowNode.restoreToColumn();
@@ -422,7 +433,10 @@ class ConstraintSolver {
     // First eliminate the forced values.
     // This will prevent us having to redo work later.
     let stack = [];
-    this._solveForced(matrix, stack);
+    // TODO: Add this back in.
+    // Currently if it returns a contradition by the constraint solver, then
+    // it is not rediscovered later.
+    // this._solveForced(matrix, stack);
 
     // Do initial solve to see if we have 0, 1 or many solutions.
     let result = this._solve(matrix, 2);
@@ -484,6 +498,28 @@ class ConstraintSolver {
     }
   }
 
+  addSumConstraint(id, vars, sum) {
+    let columns = [];
+    let values = [];
+    for (const v of vars) {
+      let column = this._getVariable(v);
+      // if (!column) {
+      //   throw(`Variable ${variable} must be an existing column`);
+      // }
+      columns.push(column);
+      column.forEach(n => values.push(n.row.id));
+    }
+
+    let constraint = {
+      type: SUM_CONSTRAINT,
+      columns: columns,
+      sum: sum
+    }
+    for (const column of columns) {
+      column.extraConstraints.push(constraint);
+    }
+  }
+
   _setUpBinaryConstraints() {
     this.arcInconsistencyMap = new Map();
   }
@@ -493,6 +529,9 @@ class ConstraintSolver {
     let column = this.matrix.columnMap.get(variable);
     if (!column) {
       throw(`Variable ${variable} must be an existing column`);
+    }
+    if (column.count > 32) {
+      throw(`Variable ${variable} has too many values (max 32)`);
     }
 
     if (column.type != Column.VARIABLE) {
@@ -511,8 +550,6 @@ class ConstraintSolver {
   addBinaryConstraint(var1, var2, constraintFn) {
     let column1 = this._getVariable(var1);
     let column2 = this._getVariable(var2);
-    if (column1.count > 32) throw('Too many values for constraint.');
-    if (column2.count > 32) throw('Too many values for constraint.');
 
     let constraintMap = ConstraintSolver._makeConstraintMap(column1, column2, constraintFn);
     let constraint1 = this._setUpBinaryConstraintColumn(column1, constraintMap);
@@ -528,6 +565,7 @@ class ConstraintSolver {
       nodeList[node.index] = constraintMap.get(node);
     });
     return {
+      type: BINARY_CONSTRAINT,
       column: column,
       nodeList: nodeList,
     };
@@ -561,31 +599,53 @@ class ConstraintSolver {
     while (pending.hasVariable()) {
       let column = pending.popVariable();
       for (const adj of column.extraConstraints) {
-        if (adj.column.removed) {
-          // If it's a removed column, we have to be careful:
-          //  - We can't remove any nodes.
-          //  - There may be more nodes than are actually valid.
-          adj.column.forEach((node) => {
+        switch (adj.type) {
+          case BINARY_CONSTRAINT:
+            if (adj.column.removed) {
+              // If it's a removed column, we have to be careful:
+              //  - We can't remove any nodes.
+              //  - There may be more nodes than are actually valid.
+              adj.column.forEach((node) => {
+                if (pending.sawContradition) return;
+                // If the node has already been removed, we should skip it.
+                if (!(node.value & adj.column.hitSet)) return;
+                if (!(adj.nodeList[node.index] & column.hitSet)) {
+                  // If we try to remove any valid rows from a satisfied column,
+                  // then that is a contradiction.
+                  pending.sawContradiction = true;
+                }
+              });
+            } else {
+              adj.column.forEach((node) => {
+                if (pending.sawContradition) return;
+                if (!(adj.nodeList[node.index] & column.hitSet)) {
+                  // No valid setting exists for this node.
+                  removedRows.push(node.row);
+                  this._removeInvalidRow(node.row, pending);
+                }
+              });
+            }
             if (pending.sawContradition) return;
-            // If the node has already been removed, we should skip it.
-            if (!(node.value & adj.column.hitSet)) return;
-            if (!(adj.nodeList[node.index] & column.hitSet)) {
-              // If we try to remove any valid rows from a satisfied column,
-              // then that is a contradiction.
+            break;
+          case SUM_CONSTRAINT:
+            let sum = 0;
+            let count = 0;
+            for (const adjColumn of adj.columns) {
+              if (adjColumn.count == 1) {
+                count += 1;
+                sum += adjColumn.weight;
+              }
+            }
+            if (sum > adj.sum) {
               pending.sawContradiction = true;
+              return;
             }
-          });
-        } else {
-          adj.column.forEach((node) => {
-            if (pending.sawContradition) return;
-            if (!(adj.nodeList[node.index] & column.hitSet)) {
-              // No valid setting exists for this node.
-              removedRows.push(node.row);
-              this._removeInvalidRow(node.row, pending);
+            if (count == adj.columns.length && sum != adj.sum) {
+              pending.sawContradiction = true;
+              return;
             }
-          });
+            break;
         }
-        if (pending.sawContradition) return;
       }
     }
   }
@@ -599,5 +659,8 @@ class ConstraintSolver {
     }
   }
 }
+
+const BINARY_CONSTRAINT = 2;
+const SUM_CONSTRAINT = 1;
 
 let debugCallback = null;

@@ -25,12 +25,15 @@ const collapseFnCalls = (fn) => {
 }
 
 let antiKnight = false;
+let extraConstraints = [];
 
 const getCurrentConstraints = () => {
   let cs = new ConstraintSet();
   cs.add(new FixedCellsConstraint(grid.getCellValues()));
   constraintManager.getConstraints().forEach(c => cs.add(c));
   if (antiKnight) cs.add(new AntiKnightConstraint());
+  for (c of extraConstraints) cs.add(c);
+
   return cs;
 }
 
@@ -85,7 +88,7 @@ const initPage = () => {
       errorElem.innerText = e;
     }
   }));
-  grid.runUpdateCallback();
+  // grid.runUpdateCallback();
 };
 
 class ConstraintDisplay {

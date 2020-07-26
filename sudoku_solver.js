@@ -143,6 +143,24 @@ class AntiKnightConstraint extends SudokuConstraint {
   }
 }
 
+class SumConstraint extends SudokuConstraint {
+  constructor(cellIds, sum) {
+    super();
+    this._cellIds = cellIds;
+    this._sum = sum;
+  }
+
+  apply(constraintSolver) {
+    constraintSolver.addSumConstraint(`sum_${this._sum}`, this._cellIds, this._sum);
+  }
+
+  toString() {
+    let cells = JSON.stringify(this._cellIds);
+    return `new ${this.constructor.name}(${cells}, ${this._sum})`;
+  }
+}
+
+
 class SudokuSolver {
   constructor() {
     this._constraintSolver = SudokuSolver._makeBaseSudokuConstraints();
@@ -158,22 +176,23 @@ class SudokuSolver {
     return this._constraintSolver.solve();
   }
 
-  solveAllPossibilities(valueIds, constraints) { return this._constraintSolver.solveAllPossibilities();
+  solveAllPossibilities(valueIds, constraints) {
+    return this._constraintSolver.solveAllPossibilities();
   }
 
   static _makeBaseSudokuConstraints() {
     // Create constrained values.
-    let valueMap = {};
+    let valueMap = new Map();
     for (let i = 0; i < 9; i++) {
       for (let j = 0; j < 9; j++) {
         for (let n = 0; n < 9; n++) {
-          let id = valueId(i, j, n);
-          valueMap[id] = [i, j, n];
+          valueMap.set(valueId(i, j, n), n+1);
         }
       }
     }
 
-    let constraints = new ConstraintSolver(Object.keys(valueMap));
+    let constraints = new ConstraintSolver([...valueMap.keys()]);
+    constraints.setWeights(valueMap);
 
     // Add constraints.
 
