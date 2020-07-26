@@ -1,4 +1,4 @@
-const ITERATION_LIMIT = 50000;
+const ITERATION_LIMIT = 5000000;
 
 class Node {
   constructor() {
@@ -170,23 +170,6 @@ class Matrix extends Node {
     return column;
   }
 
-  findMinColumn() {
-    let minCol = null;
-    let minCount = Infinity;
-
-    for (let col = this.right; col != this; col = col.right) {
-      if (col.count < minCount) {
-        // If the value is zero, we'll never go lower.
-        if (col.count == 0) return col;
-
-        minCol = col;
-        minCount = col.count;
-      }
-    }
-
-    return minCol;
-  }
-
   hasColumns() {
     return this.left != this;
   }
@@ -232,6 +215,7 @@ class ConstraintSolver {
   constructor(values) {
     this.matrix = new Matrix(values);
     this._setUpBinaryConstraints();
+    this._sumConstraints = [];
     this.iterations = 0;
   }
 
@@ -313,11 +297,60 @@ class ConstraintSolver {
     row.restore();
   }
 
+  _findMinColumn() {
+    let matrix = this.matrix;
+    let minCol = null;
+    let minCount = Infinity;
+
+    for (let col = matrix.right; col != matrix; col = col.right) {
+      if (col.count < minCount) {
+        // If the value is zero, we'll never go lower.
+        if (col.count == 0) return col;
+
+        minCol = col;
+        minCount = col.count;
+      }
+    }
+
+    // If column with a unique value, then go with that. Otherwise check if
+    // proceed with the more expensive checks.
+    if (minCount == 1) return minCol;
+
+    for (const c of this._sumConstraints) {
+      let sum = 0;
+      let options = 0;  // Remaining options.
+      let count = 0;  // Remaining squares.
+      for (const cc of c.columns) {
+        if (cc.count != 1) {
+          count += 1;
+          options += cc.count;
+        }
+      }
+      if (!count) continue;  // This constraint is already satisfied.
+      // TODO: Justifcation/Proof of this equaton.
+      let countEff = 1 + (count - 1)*(options/count-1)/count;
+      if (countEff > minCount) continue;
+
+      let minOptions = Infinity;
+      for (const cc of c.columns) {
+        if (cc.count != 1 && cc.count < minOptions) {
+          minCol = cc;
+          minOptions = cc.count;
+        }
+      }
+      minCount = countEff;
+      // TODO: Uncomment to return early (because we know there are no zeros).
+      // if (countEff == 1) return minCol;
+    }
+
+    return minCol;
+  }
+
   // Form all forced reductions, i.e. where there is only one option.
   _solveForced(matrix, stack) {
     // Find the column with the least number of candidates, to speed up
     // the search.
-    for (let column; column = matrix.findMinColumn();) {
+    for (let column; column = this._findMinColumn();) {
       if (column.count != 1) return column;
 
       let node = column.down;
@@ -345,7 +378,7 @@ class ConstraintSolver {
   // Solve until maxSolutions are found, and return leaving matrix in the
   // same state.
   _solve(matrix, maxSolutions) {
-    let minColumn = matrix.findMinColumn();
+    let minColumn = this._findMinColumn();
     // If there are no columns, then there is 1 solution - the trival one.
     if (!minColumn) return {solutions: [[]], numBacktracks: 0};
 
@@ -380,7 +413,7 @@ class ConstraintSolver {
 
       if (!this._removeCandidateRow(node.row)) continue;
 
-      let column = matrix.findMinColumn();
+      let column = this._findMinColumn();
       if (debugCallback != null) debugCallback(this, node, stack, column);
       if (!column) {
         solutions.push(stackToSolution(stack));
@@ -518,6 +551,7 @@ class ConstraintSolver {
     for (const column of columns) {
       column.extraConstraints.push(constraint);
     }
+    this._sumConstraints.push(constraint);
   }
 
   _setUpBinaryConstraints() {

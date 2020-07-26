@@ -88,7 +88,7 @@ const initPage = () => {
       errorElem.innerText = e;
     }
   }));
-  // grid.runUpdateCallback();
+  grid.runUpdateCallback();
 };
 
 class ConstraintDisplay {
