@@ -665,7 +665,10 @@ class ConstraintSolver {
             let sum = 0;
             let count = 0;
             for (const adjColumn of adj.columns) {
-              if (adjColumn.count == 1) {
+              if (adjColumn.removed) {
+                // Currently the weight is only set if it is removed.
+                // This is ok, as this will be fixed in a later iteration
+                // before have to do any branching.
                 count += 1;
                 sum += adjColumn.weight;
               }

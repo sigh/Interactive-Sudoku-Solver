@@ -286,8 +286,8 @@ class ConstraintManager {
     });
   }
 
-  addConstraint(cells) {
-    let sum = window.prompt('Sum');
+  addConstraint(cells, sum) {
+    sum = sum || window.prompt('Sum');
     let constraint = new SumConstraint(cells, +sum);
     let displayElem = this.display.drawKillerCage(cells, sum);
 
