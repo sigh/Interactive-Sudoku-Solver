@@ -29,7 +29,7 @@ let extraConstraints = [];
 
 const getCurrentConstraints = () => {
   let cs = new ConstraintSet();
-  cs.add(new FixedCellsConstraint(grid.getCellValues()));
+  cs.add(new FixedCellsConstraint({values: grid.getCellValues()}));
   constraintManager.getConstraints().forEach(c => cs.add(c));
   if (antiKnight) cs.add(new AntiKnightConstraint());
   for (c of extraConstraints) cs.add(c);
@@ -288,7 +288,7 @@ class ConstraintManager {
 
   addConstraint(cells, sum) {
     sum = sum || window.prompt('Sum');
-    let constraint = new SumConstraint(cells, +sum);
+    let constraint = new SumConstraint({cells: cells, sum: +sum});
     let displayElem = this.display.drawKillerCage(cells, sum);
 
     let config = {
