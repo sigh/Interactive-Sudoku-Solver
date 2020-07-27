@@ -662,24 +662,52 @@ class ConstraintSolver {
             if (pending.sawContradition) return;
             break;
           case SUM_CONSTRAINT:
-            let sum = 0;
-            let count = 0;
+            let min = 0;
+            let max = 0;
             for (const adjColumn of adj.columns) {
               if (adjColumn.removed) {
                 // Currently the weight is only set if it is removed.
                 // This is ok, as this will be fixed in a later iteration
                 // before have to do any branching.
-                count += 1;
-                sum += adjColumn.weight;
+                min += adjColumn.weight;
+                max += adjColumn.weight;
+              } else {
+                min += adjColumn.down.row.weight;
+                max += adjColumn.up.row.weight;
               }
             }
-            if (sum > adj.sum) {
+            if (adj.sum < min || adj.sum > max) {
               pending.sawContradiction = true;
               return;
             }
-            if (count == adj.columns.length && sum != adj.sum) {
-              pending.sawContradiction = true;
-              return;
+            // TODO: If one square left, we can just set it.
+            // TODO: If there are only 2 squares left, we can reduce it to
+            // just the matching values.
+            // TODO: For 3 squares, need to experiment to see if it pays off.
+            // TODO: Only in the larger cases does the more general range
+            // calculation make sense.
+            // TODO: For 3 squares we might be able to learn new binary
+            // constraints. Only do this at the start of a solve?
+            for (const adjColumn of adj.columns) {
+              // Check if any values in each columns in the range are impossible
+              // given the current min and max.
+              // If any columns with a count == 1 were inconsistant, then that
+              // would have been ruled out by the initial check.
+              if (adjColumn.count > 1) {
+                let colMin = adjColumn.down.row.weight;
+                let colMax = adjColumn.up.row.weight;
+                let range = colMax - colMin;
+                if (min + range > adj.sum || max - range < adj.sum) {
+                  adjColumn.forEach(node => {
+                    let weight = node.row.weight;
+                    if (min + weight - colMin > adj.sum || max + weight - colMax < adj.sum) {
+                      removedRows.push(node.row);
+                      this._removeInvalidRow(node.row, pending);
+                    }
+                  });
+                  if (pending.sawContradiction) return;
+                }
+              }
             }
             break;
         }
