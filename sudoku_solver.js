@@ -2,17 +2,17 @@ const valueId = (row, col, n) => {
   return id = `R${row+1}C${col+1}#${n+1}`;
 };
 
-class SudokuConstraint {
+class SudokuConstraintConfig {
   constructor(args) {
     this.args = args || {};
   }
 
-  apply(constraintSolver) {
+  toConstraint() {
     throw('Unimplemented');
   }
 
   _getType() {
-    for (const [name,  type] of Object.entries(SudokuConstraint)) {
+    for (const [name,  type] of Object.entries(SudokuConstraintConfig)) {
       if (type == this.constructor) return name;
     }
     throw('Unknown constraint');
@@ -27,7 +27,7 @@ class SudokuConstraint {
     return JSON.parse(json, (key, value) => {
       if (typeof value === 'object') {
         if (value.type) {
-          let type = SudokuConstraint[value.type];
+          let type = SudokuConstraintConfig[value.type];
           return new type(value);
         }
       }
@@ -36,8 +36,8 @@ class SudokuConstraint {
   }
 }
 
-class ConstraintSet extends SudokuConstraint {
-  constructor(args) {
+SudokuConstraintConfig.Set = class extends SudokuConstraintConfig {
+  constructor(args /*{constraints}*/) {
     args = args || {};
     super(args);
     this._constraints = args.constraints || [];
@@ -47,74 +47,53 @@ class ConstraintSet extends SudokuConstraint {
     this._constraints.push(constraint);
   }
 
-  apply(constraintSolver) {
-    this._constraints.forEach(c => c.apply(constraintSolver));
+  toConstraint(solv) {
+    return new ConstraintSolver.ConstraintSet(
+      this._constraints.map(c => c.toConstraint()));
   }
 }
 
-class BinaryConstraint extends SudokuConstraint {
-  constructor(args) {
+SudokuConstraintConfig.Binary = class extends SudokuConstraintConfig {
+  constructor(args /*{cells: [cell1,  cell2], fn)}*/) {
     super(args);
-    this.cell1 = args.cells[0];
-    this.cell2 = args.cells[1];
-    this.rawFn = args.fn;
-    this.fn = BinaryConstraint._makeMappedFn(this.cell1, this.cell2, this.rawFn);
+    this._constraint = new ConstraintSolver.BinaryConstraint(
+      args.cells[0], args.cells[1], args.fn);
   }
 
-  static _makeMappedFn(cell1, cell2, fn) {
-    let value = new Map();
-    for (let i = 1; i < 10; i++) {
-      value.set(`${cell1}#${i}`, i);
-      value.set(`${cell2}#${i}`, i);
-    }
-    return (a, b) => fn(value.get(a), value.get(b));
-  }
-
-  apply(constraintSolver) {
-    constraintSolver.addBinaryConstraint(this.cell1, this.cell2, this.fn);
+  toConstraint() {
+    return this._constraint;
   }
 }
 
-class ThermoConstraint extends SudokuConstraint {
+SudokuConstraintConfig.Thermo = class extends SudokuConstraintConfig {
   constructor(args) {
     super(args);
-    this._cells = args.cells;
-    this._constraints = ThermoConstraint._makeBinaryConstraints(args.cells);
+    this._constraint = new ConstraintSolver.ConstraintSet(
+      SudokuConstraintConfig.Thermo._makeBinaryConstraints(args.cells).map(
+        cc => cc.toConstraint()));
   }
 
   static _makeBinaryConstraints(cells) {
     let constraints = [];
     for (let i = 1; i < cells.length; i++) {
       constraints.push(
-        new BinaryConstraint({cells: [cells[i-1], cells[i]], fn: (a, b) => a < b}));
+        new SudokuConstraintConfig.Binary(
+          {cells: [cells[i-1], cells[i]], fn: (a, b) => a < b}));
     }
     return constraints;
   }
 
-  apply(constraintSolver) {
-    for (const c of this._constraints) {
-      c.apply(constraintSolver);
-    }
+  toConstraint() {
+    return this._constraint;
   }
 }
 
-class FixedCellsConstraint extends SudokuConstraint {
+SudokuConstraintConfig.AntiKnight = class extends SudokuConstraintConfig {
   constructor(args) {
     super(args);
-    this._valueIds = args.values;
-  }
-
-  apply(constraintSolver) {
-    for (const valueId of this._valueIds) {
-      constraintSolver.addConstraint(`fixed_${valueId}`, [valueId]);
-    }
-  }
-}
-
-class AntiKnightConstraint extends SudokuConstraint {
-  constructor(args) {
-    super(args);
-    this._constraints = AntiKnightConstraint._makeBinaryConstraints();
+    this._constraint = new ConstraintSolver.ConstraintSet(
+      SudokuConstraintConfig.AntiKnight._makeBinaryConstraints().map(
+        cc => cc.toConstraint()));
   }
 
   static _cellId(r, c) {
@@ -126,7 +105,7 @@ class AntiKnightConstraint extends SudokuConstraint {
     const boxNumber = (r, c) => ((r-1)/3|0)*3 + c%3;
     for (let r = 1; r < 10; r++) {
       for (let c = 1; c < 10; c++) {
-        let cell = AntiKnightConstraint._cellId(r, c);
+        let cell = SudokuConstraintConfig.AntiKnight._cellId(r, c);
         let box = boxNumber(r, c);
         // We only need half the constraints, as the other half will be
         // added by the conflict cell.
@@ -135,9 +114,9 @@ class AntiKnightConstraint extends SudokuConstraint {
           // Skip any invalid cells or any in the same box as (r, c).
           if (cr > 0 && cr < 10 && cc > 0 && cc < 10) {
             if (boxNumber(cr, cc) != box) {
-              let conflict = AntiKnightConstraint._cellId(cr, cc);
+              let conflict = SudokuConstraintConfig.AntiKnight._cellId(cr, cc);
               constraints.push(
-                new BinaryConstraint({cells: [cell, conflict], fn: (a, b) => a != b}));
+                new SudokuConstraintConfig.Binary({cells: [cell, conflict], fn: (a, b) => a != b}));
             }
           }
         }
@@ -146,54 +125,70 @@ class AntiKnightConstraint extends SudokuConstraint {
     return constraints;
   }
 
-  apply(constraintSolver) {
-    for (const c of this._constraints) {
-      c.apply(constraintSolver);
-    }
+  toConstraint() {
+    return this._constraint;
   }
 }
 
-class SumConstraint extends SudokuConstraint {
-  constructor(args) {
+SudokuConstraintConfig.Sum = class extends SudokuConstraintConfig {
+  constructor(args /*{cells, sum}*/) {
     super(args);
-    this._cellIds = args.cells;
-    this._sum = args.sum;
+    this._constraint = new ConstraintSolver.SumConstraint(
+      args.cells, args.sum);
   }
 
-  apply(constraintSolver) {
-    constraintSolver.addSumConstraint(`sum_${this._sum}`, this._cellIds, this._sum);
+  toConstraint() {
+    return this._constraint;
   }
 }
 
-SudokuConstraint.Set = ConstraintSet;
-SudokuConstraint.Binary = BinaryConstraint;
-SudokuConstraint.Thermo = ThermoConstraint;
-SudokuConstraint.AntiKnight = AntiKnightConstraint;
-SudokuConstraint.Sum = SumConstraint;
-SudokuConstraint.FixedCells = FixedCellsConstraint;
+
+SudokuConstraintConfig.FixedCells = class extends SudokuConstraintConfig {
+  constructor(args /*{values}*/) {
+    super(args);
+    this._constraint = new ConstraintSolver.ConstraintSet(
+      args.values.map(
+        v => new ConstraintSolver.OneOfConstraint(`fixed_${v}`, [v])));
+  }
+
+  toConstraint() {
+    return this._constraint;
+  }
+}
 
 class SudokuSolver {
   constructor() {
-    this._constraintSolver = SudokuSolver._makeBaseSudokuConstraints();
-    this._constraints = [];
+    this._valueMap = new Map();
+    this._solverConstraints = [];
+    this._makeBaseSudokuConstraints();
+    this._lastSolver = null;
   }
 
-  addConstraint(constraint) {
-    constraint.apply(this._constraintSolver);
-    this._constraints.push(constraint);
+  addConstraint(config) {
+    this._solverConstraints.push(config.toConstraint());
   }
 
   solve() {
-    return this._constraintSolver.solve();
+    return this._solver().solve();
   }
 
   solveAllPossibilities(valueIds, constraints) {
-    return this._constraintSolver.solveAllPossibilities();
+    return this._solver().solveAllPossibilities();
   }
 
-  static _makeBaseSudokuConstraints() {
+  _solver() {
+    this._lastSolver = new ConstraintSolver(
+      this._solverConstraints,
+      [...this._valueMap.keys()],
+      this._valueMap);
+    return this._lastSolver;
+  }
+
+  _makeBaseSudokuConstraints() {
+    let constraints = this._solverConstraints;
+
     // Create constrained values.
-    let valueMap = new Map();
+    let valueMap = this._valueMap;
     for (let i = 0; i < 9; i++) {
       for (let j = 0; j < 9; j++) {
         for (let n = 0; n < 9; n++) {
@@ -201,9 +196,6 @@ class SudokuSolver {
         }
       }
     }
-
-    let constraints = new ConstraintSolver([...valueMap.keys()]);
-    constraints.setWeights(valueMap);
 
     // Add constraints.
 
@@ -214,7 +206,8 @@ class SudokuSolver {
         for (let n = 0; n < 9; n++) {
           values.push(valueId(i, j, n));
         }
-        constraints.addConstraint(`R${i+1}C${j+1}`, values);
+        constraints.push(
+          new ConstraintSolver.OneOfConstraint(`R${i+1}C${j+1}`, values));
       }
     }
 
@@ -225,7 +218,8 @@ class SudokuSolver {
         for (let j = 0; j < 9; j++) {
           values.push(valueId(i, j, n));
         }
-        constraints.addConstraint(`R${i+1}#${n+1}`, values);
+        constraints.push(
+          new ConstraintSolver.OneOfConstraint(`R${i+1}#${n+1}`, values));
       }
     }
 
@@ -236,7 +230,8 @@ class SudokuSolver {
         for (let i = 0; i < 9; i++) {
           values.push(valueId(i, j, n));
         }
-        constraints.addConstraint(`C${j+1}#${n+1}`, values);
+        constraints.push(
+          new ConstraintSolver.OneOfConstraint(`C${j+1}#${n+1}`, values));
       }
     }
 
@@ -249,7 +244,8 @@ class SudokuSolver {
         for (let c = 0; c < 9; c++) {
           values.push(valueId(3*i+c%3, 3*j+(c/3|0), n));
         }
-        constraints.addConstraint(`B${i+1}${j+1}#${n+1}`, values);
+        constraints.push(
+          new ConstraintSolver.OneOfConstraint(`B${i+1}${j+1}#${n+1}`, values));
       }
     }
 

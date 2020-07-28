@@ -307,7 +307,7 @@ class ConstraintManager {
         config = {
           cells: cells,
           name: `Killer cage [sum: ${args.sum}]`,
-          constraint: new SumConstraint(args),
+          constraint: new SudokuConstraintConfig.Sum(args),
           displayElem: this.display.drawKillerCage(args.cells, args.sum),
         }
         break;
@@ -315,7 +315,7 @@ class ConstraintManager {
         config = {
           cells: cells,
           name: `Themometer [len: ${cells.length}]`,
-          constraint: new ThermoConstraint({cells: cells}),
+          constraint: new SudokuConstraintConfig.Thermo({cells: cells}),
           displayElem: this.display.drawThermometer(cells),
         }
         break;
@@ -368,13 +368,13 @@ class ConstraintManager {
   getConstraints() {
     let constraints = this.configs.map(c => c.constraint);
     if (this._isAntiKnight) {
-      constraints.push(new AntiKnightConstraint());
+      constraints.push(new SudokuConstraintConfig.AntiKnight());
     }
     constraints.push(
-      new FixedCellsConstraint(
+      new SudokuConstraintConfig.FixedCells(
         {values: this.grid.getCellValues()}));
 
-    return new ConstraintSet({constraints: constraints});
+    return new SudokuConstraintConfig.Set({constraints: constraints});
   }
 
   clear() {

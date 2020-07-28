@@ -212,18 +212,18 @@ class ColumnAccumulator {
 }
 
 class ConstraintSolver {
-  constructor(values) {
+  constructor(constraints, values, weights) {
     this.matrix = new Matrix(values);
-    this._setUpBinaryConstraints();
+    if (weights) this._setWeights(weights);
     this._sumConstraints = [];
+
+    constraints.forEach(c => c.apply(this));
+
+    this.arcInconsistencyMap = new Map();
     this.iterations = 0;
   }
 
-  addConstraint(id, values) {
-    this.matrix.appendColumn(id, values);
-  }
-
-  setWeights(weightMap) {
+  _setWeights(weightMap) {
     let rowMap = this.matrix.rowMap;
     for (const [rowId, weight] of weightMap) {
       rowMap.get(rowId).weight = weight;
@@ -563,33 +563,6 @@ class ConstraintSolver {
     }
   }
 
-  addSumConstraint(id, vars, sum) {
-    let columns = [];
-    let values = [];
-    for (const v of vars) {
-      let column = this._getVariable(v);
-      // if (!column) {
-      //   throw(`Variable ${variable} must be an existing column`);
-      // }
-      columns.push(column);
-      column.forEach(n => values.push(n.row.id));
-    }
-
-    let constraint = {
-      type: SUM_CONSTRAINT,
-      columns: columns,
-      sum: sum
-    }
-    for (const column of columns) {
-      column.extraConstraints.push(constraint);
-    }
-    this._sumConstraints.push(constraint);
-  }
-
-  _setUpBinaryConstraints() {
-    this.arcInconsistencyMap = new Map();
-  }
-
   _getVariable(variable) {
     // A variable must an existing column id.
     let column = this.matrix.columnMap.get(variable);
@@ -611,47 +584,6 @@ class ConstraintSolver {
     }
 
     return column;
-  }
-
-  addBinaryConstraint(var1, var2, constraintFn) {
-    let column1 = this._getVariable(var1);
-    let column2 = this._getVariable(var2);
-
-    let constraintMap = ConstraintSolver._makeConstraintMap(column1, column2, constraintFn);
-    let constraint1 = this._setUpBinaryConstraintColumn(column1, constraintMap);
-    let constraint2 = this._setUpBinaryConstraintColumn(column2, constraintMap);
-
-    constraint1.column.extraConstraints.push(constraint2);
-    constraint2.column.extraConstraints.push(constraint1);
-  }
-
-  _setUpBinaryConstraintColumn(column, constraintMap) {
-    let nodeList = [];
-    column.forEach(node => {
-      nodeList[node.index] = constraintMap.get(node);
-    });
-    return {
-      type: BINARY_CONSTRAINT,
-      column: column,
-      nodeList: nodeList,
-    };
-  }
-
-  static _makeConstraintMap(column1, column2, constraintFn) {
-    let constraintMap = new Map();
-    column1.forEach(e => constraintMap.set(e, 0));
-    column2.forEach(e => constraintMap.set(e, 0));
-
-    column1.forEach(node1 => {
-      column2.forEach(node2 => {
-        if (constraintFn(node1.row.id, node2.row.id)) {
-          constraintMap.set(node1, constraintMap.get(node1) | node2.value);
-          constraintMap.set(node2, constraintMap.get(node2) | node1.value);
-        }
-      });
-    });
-
-    return constraintMap;
   }
 
   _enforceArcConsistency(row, updatedColumns) {
@@ -753,6 +685,126 @@ class ConstraintSolver {
     while(removedRows.length) {
       let row = removedRows.pop();
       this._restoreInvalidRow(row);
+    }
+  }
+}
+
+ConstraintSolver.Constraint = class {}
+
+ConstraintSolver.OneOfConstraint = class extends ConstraintSolver.Constraint {
+  constructor(id, values) {
+    super();
+    this.values = values;
+    this.id = id;
+  }
+
+  apply(solver) {
+    solver.matrix.appendColumn(this.id, this.values);
+  }
+}
+
+ConstraintSolver.SumConstraint = class extends ConstraintSolver.Constraint {
+  constructor(vars, sum) {
+    super();
+    this._vars = vars;
+    this._sum = sum;
+  }
+
+  apply(solver) {
+    let id = `sum_${this._sum}`
+    let vars = this._vars
+    let sum = this._sum;
+
+    let columns = [];
+    let values = [];
+    for (const v of vars) {
+      let column = solver._getVariable(v);
+      // if (!column) {
+      //   throw(`Variable ${variable} must be an existing column`);
+      // }
+      columns.push(column);
+      column.forEach(n => values.push(n.row.id));
+    }
+
+    let constraint = {
+      type: SUM_CONSTRAINT,
+      columns: columns,
+      sum: sum
+    }
+    for (const column of columns) {
+      column.extraConstraints.push(constraint);
+    }
+    solver._sumConstraints.push(constraint);
+  }
+}
+
+ConstraintSolver.BinaryConstraint = class extends ConstraintSolver.Constraint {
+  constructor(var1, var2, fn) {
+    super();
+    this._var1 = var1;
+    this._var2 = var2;
+    this._fn = fn;
+  }
+
+  apply(solver) {
+    let var1 = this._var1;
+    let var2 = this._var2;
+    let constraintFn = this._fn;
+
+    let column1 = solver._getVariable(var1);
+    let column2 = solver._getVariable(var2);
+
+    let constraintMap = ConstraintSolver.BinaryConstraint._makeConstraintMap(
+      column1, column2, constraintFn);
+    let constraint1 = ConstraintSolver.BinaryConstraint._setUpColumn(
+      column1, constraintMap);
+    let constraint2 = ConstraintSolver.BinaryConstraint._setUpColumn(
+      column2, constraintMap);
+
+    constraint1.column.extraConstraints.push(constraint2);
+    constraint2.column.extraConstraints.push(constraint1);
+  }
+
+  static _setUpColumn(column, constraintMap) {
+    let nodeList = [];
+    column.forEach(node => {
+      nodeList[node.index] = constraintMap.get(node);
+    });
+    return {
+      type: BINARY_CONSTRAINT,
+      column: column,
+      nodeList: nodeList,
+    };
+  }
+
+  static _makeConstraintMap(column1, column2, constraintFn) {
+    let constraintMap = new Map();
+    column1.forEach(e => constraintMap.set(e, 0));
+    column2.forEach(e => constraintMap.set(e, 0));
+
+    column1.forEach(node1 => {
+      column2.forEach(node2 => {
+        if (constraintFn(node1.row.weight, node2.row.weight)) {
+          constraintMap.set(node1, constraintMap.get(node1) | node2.value);
+          constraintMap.set(node2, constraintMap.get(node2) | node1.value);
+        }
+      });
+    });
+
+    return constraintMap;
+  }
+
+}
+
+ConstraintSolver.ConstraintSet = class extends ConstraintSolver.Constraint {
+  constructor(constraints) {
+    super();
+    this._constraints = constraints;
+  }
+
+  apply(solver) {
+    for (const constraint of this._constraints) {
+      constraint.apply(solver);
     }
   }
 }

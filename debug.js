@@ -225,7 +225,7 @@ const arrayEquals = (a, b) => {
 
 const runTestCases = () => {
   for (const tc of testCases()) {
-    let constraint = SudokuConstraint.fromJSON(tc.input);
+    let constraint = SudokuConstraintConfig.fromJSON(tc.input);
     let solver = new SudokuSolver();
     solver.addConstraint(constraint);
     let result = solver.solveAllPossibilities();
