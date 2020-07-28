@@ -327,7 +327,39 @@ class ConstraintSolver {
         }
       }
       if (!count) continue;  // This constraint is already satisfied.
-      // TODO: Justifcation/Proof of this equaton.
+      // To prioritize sum squares, we want a number which is comparable to
+      // the count of an unconstrained variable.
+      // Let:
+      //   countEff = The number we want to calculate.
+      //   options = The number of possible remaining values. i.e. sum of counts
+      //             of unfixed variables in the sum.
+      //   numVar = The number of remaining unfixed variables.
+      // Then the average number of options per variable is:
+      //   optionsAv = options/numVar
+      // If we fix (numVar - 1) variables, then the last variable is forced.
+      // Thus, ignoring the target sum, the approximate number permutations of
+      // values is:
+      //   permAv = optionsAv**(numVar-1)
+      // We want to compare this to the case where there is no sum, and all
+      // variables are free. Thus the effective number of options per
+      // variable is:
+      //  optionsAvEff = permAv**(1/numVar) = optionsAv**((numVar-1)/numVar)
+      // Approximating with (e**x ~= 1+x):
+      //  optionsAvEff ~= 1 + log(optionsAv)*(numVar-1)/numVar
+      // Approximating with (log(1+x) ~= x):
+      //  optionsAvEff ~= 1 + (optionsAv-1)*(numVar-1)/numVar
+      // Using this value as the effective count:
+      //  countEff = 1 + (options/numVar - 1)*(numVar-1)/numVar;
+      //
+      //  We can verify that this has several desirable properties:
+      //   - When numVar = 1, countEff = 1. i.e. The square is forced.
+      //   - When numVar = 2, countEff ~= optionsAv/2. i.e. Half the count of
+      //     2 free squares.
+      //   - countEff is always lower than optionsAv.
+      //
+      // Note: At the momemnt, the calculation is already expensive enough that
+      // the approximation is not warrented. We may also be able to do better
+      // if we consider entropy per variable.
       let countEff = 1 + (count - 1)*(options/count-1)/count;
       if (countEff > minCount) continue;
 
