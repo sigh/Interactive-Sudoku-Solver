@@ -88,3 +88,21 @@ body > div {
   fill: rgb(200, 150, 200);
   stroke: rgb(200, 150, 200);
 }
+
+#constraint-panel h1 {
+  margin: 0px 0px;
+  font-size: large;
+  line-height: 1;
+}
+
+#constraint-panel {
+  line-height: 2;
+}
+
+input[type=number]{
+ width: 3em;
+}
+
+fieldset[disabled]{
+  color: grey;
+}

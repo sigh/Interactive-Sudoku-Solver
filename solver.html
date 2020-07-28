@@ -45,6 +45,35 @@
   </div>
 
   <div id="constraint-panel">
+    <h1>Constraints</h1>
+
+    <div>
+      <input type="checkbox" id="anti-knight-input">
+      <label for="anti-knight-input">Anti-Knight</label>
+    </div>
+
+    <form id="multi-cell-constraint-input">
+      <fieldset tabindex="0" disabled>
+        Create from selection
+        <div>
+          <input type="radio" id="multi-cell-constraint-thermo" name="constraint-type" value="thermo" checked>
+          <label for="multi-cell-constraint-thermo">Thermometer</label>
+        </div>
+        <div>
+          <input type="radio" id="multi-cell-constraint-cage" name="constraint-type" value="cage">
+          <label for="multi-cell-constraint-cage">
+            Cage
+            Sum: <input type="number" name="sum" min=0>
+          </label>
+        </div>
+        <div>
+          <button type="submit">Add</button>
+        </div>
+      </fieldset>
+    </form>
+
+    <div id="displayed-constraints">
+    </div>
   </div>
 
 </body>

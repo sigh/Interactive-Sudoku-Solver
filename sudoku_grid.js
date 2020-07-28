@@ -24,17 +24,8 @@ const collapseFnCalls = (fn) => {
   });
 }
 
-let antiKnight = false;
-let extraConstraints = [];
-
 const getCurrentConstraints = () => {
-  let cs = new ConstraintSet();
-  cs.add(new FixedCellsConstraint({values: grid.getCellValues()}));
-  constraintManager.getConstraints().forEach(c => cs.add(c));
-  if (antiKnight) cs.add(new AntiKnightConstraint());
-  for (c of extraConstraints) cs.add(c);
-
-  return cs;
+  return constraintManager.getConstraints();
 }
 
 const initPage = () => {
@@ -275,41 +266,77 @@ class ConstraintManager {
     this.grid = grid;
 
     this.display = ConstraintDisplay.makeDisplay(grid.container);
-    this.panel = document.getElementById('constraint-panel');
 
-    grid.selection.setCallback((selection) => {
-      if (selection.length < 2) return;
-
-      this.addConstraint(selection);
-
-      this.grid.runUpdateCallback();
-    });
+    this._setUpPanel();
   }
 
-  addConstraint(cells, sum) {
-    sum = sum || window.prompt('Sum');
-    let constraint = new SumConstraint({cells: cells, sum: +sum});
-    let displayElem = this.display.drawKillerCage(cells, sum);
-
-    let config = {
-      cells: cells,
-      constraint: constraint,
-      displayElem: displayElem,
+  _setUpPanel() {
+    this._panel = document.getElementById('displayed-constraints');
+    this.antiKnightInput = document.getElementById('anti-knight-input');
+    this.antiKnightInput.onchange = e => {
+      this._isAntiKnight = this.antiKnightInput.checked;
+      this.grid.runUpdateCallback();
     };
 
-    this.addToPanel(config, `Killer cage (${sum})`);
+    this._form = document.getElementById('multi-cell-constraint-input');
+    this.grid.selection.setCallback((selection) => {
+      let disabled = (selection.length < 2);
+      this._form.firstElementChild.disabled = disabled;
+      // Focus on the submit button so that that we can immediately press enter.
+      if (!disabled) {
+        this._form.querySelector('button[type=submit]').focus();
+      }
+    });
+    this._form.onsubmit = e => {
+      this._addConstraintFromForm();
+      return false;
+    }
+    this.grid.selection.addSelectionPreserver(this._form);
+  }
 
-    this.configs.push(config);
+  _addConstraintFromForm() {
+    let cells = grid.selection.getCells().map(e => e.id);
+    if (cells.length < 2) throw('Selection too short.');
+
+    let formData = new FormData(this._form);
+
+    let config;
+    switch (formData.get('constraint-type')) {
+      case 'cage':
+        let args = {cells: cells, sum: +formData.get('sum')};
+        config = {
+          cells: cells,
+          name: `Killer cage [sum: ${args.sum}]`,
+          constraint: new SumConstraint(args),
+          displayElem: this.display.drawKillerCage(args.cells, args.sum),
+        }
+        break;
+      case 'thermo':
+        config = {
+          cells: cells,
+          name: `Themometer [len: ${cells.length}]`,
+          constraint: new ThermoConstraint({cells: cells}),
+          displayElem: this.display.drawThermometer(cells),
+        }
+        break;
+    }
+
+    if (config) {
+      this._addToPanel(config);
+      this.configs.push(config);
+    }
+    this.grid.selection.updateSelection([]);
+    this.grid.runUpdateCallback();
   }
 
   _removeConstraint(config) {
     let index = this.configs.indexOf(config);
     this.configs.splice(index, 1);
     this.display.removeItem(config.displayElem);
-    this.panel.removeChild(config.panelItem);
+    this._panel.removeChild(config.panelItem);
   }
 
-  addToPanel(config, name) {
+  _addToPanel(config) {
     let panelItem = document.createElement('div');
     panelItem.className = 'constraint-item';
 
@@ -318,7 +345,7 @@ class ConstraintManager {
     panelItem.appendChild(panelButton);
 
     let panelLabel = document.createElement('span');
-    panelLabel.innerText = name;
+    panelLabel.textContent = config.name;
     panelItem.appendChild(panelLabel);
 
     config.panelItem = panelItem;
@@ -335,16 +362,24 @@ class ConstraintManager {
       config.displayElem.classList.remove('highlight-constraint');
     });
 
-    this.panel.appendChild(panelItem);
+    this._panel.appendChild(panelItem);
   }
 
   getConstraints() {
-    return this.configs.map(c => c.constraint);
+    let constraints = this.configs.map(c => c.constraint);
+    if (this._isAntiKnight) {
+      constraints.push(new AntiKnightConstraint());
+    }
+    constraints.push(
+      new FixedCellsConstraint(
+        {values: this.grid.getCellValues()}));
+
+    return new ConstraintSet({constraints: constraints});
   }
 
   clear() {
     this.display.clear();
-    this.panel.innerHTML = '';
+    this._panel.innerHTML = '';
     this.configs = [];
     this.grid.runUpdateCallback();
   }
@@ -353,6 +388,7 @@ class ConstraintManager {
 class Selection {
   constructor(container) {
     this._selection = new Set();
+    this._selectionPreservers = [container];
     let selection = this._selection;
     this.setCallback();
 
@@ -360,10 +396,24 @@ class Selection {
     container.tabIndex = 0;
 
     const mouseoverFn = (e) => this._addToSelection(e.target);
+    const outsideClickListener = e => {
+      // Don't do anything if the click is inside one of the elements where
+      // we want to retain clicks.
+      for (const elem of this._selectionPreservers) {
+        if (elem.contains(e.target)) return;
+      }
+      // Otherwise clear the selection.
+      this._clearSelection();
+      document.body.removeEventListener('click', outsideClickListener);
+    };
 
     container.addEventListener('mousedown', (e) => {
-      this._clearSelection();
+      // If the shift key is pressed, continue adding to the selection.
+      if (!e.shiftKey) {
+        this._clearSelection();
+      }
       container.addEventListener('mouseover', mouseoverFn);
+      document.body.addEventListener('click', outsideClickListener);
       this._addToSelection(e.target);
       container.focus();
       e.preventDefault();
@@ -374,14 +424,16 @@ class Selection {
       this._runCallback();
       e.preventDefault();
     });
-
-    container.addEventListener('blur', (e) => this._clearSelection());
   }
 
   updateSelection(cells) {
     this._clearSelection();
     cells.forEach(c => this._addToSelection(c));
     this._runCallback();
+  }
+
+  addSelectionPreserver(elem) {
+    this._selectionPreservers.push(elem);
   }
 
   setCallback(fn) {
@@ -408,6 +460,7 @@ class Selection {
   _clearSelection() {
     this._selection.forEach(e => e.parentNode.classList.remove('selected'));
     this._selection.clear();
+    this._runCallback();
   }
 }
 
