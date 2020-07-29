@@ -321,11 +321,55 @@ class ConstraintManager {
           fixedValues.push(valueId(i/9|0, i%9, input[i]-1));
         }
       }
-      this.grid.setCellValues(fixedValues);
-    } else {
-      console.log('Unrecognised input type');
+      this.loadConstraint(
+        new SudokuConstraintConfig.FixedCells({values: fixedValues}));
+      return;
     }
 
+    try {
+      let constraint = SudokuConstraintConfig.fromJSON(input);
+      this.loadConstraint(constraint);
+    } catch (e) {
+      console.log('Unrecognised input type');
+    }
+  }
+
+  loadConstraint(constraint) {
+    let args = constraint.args;
+    let config;
+    switch (constraint.type()) {
+      case 'FixedCells':
+        this.grid.setCellValues(args.values);
+        break;
+      case 'Thermo':
+        config = {
+          cells: args.cells,
+          name: `Themometer [len: ${args.cells.length}]`,
+          constraint: constraint,
+          displayElem: this.display.drawThermometer(args.cells),
+        };
+        this._addToPanel(config);
+        this.configs.push(config);
+        break;
+      case 'Sum':
+        config = {
+          cells: args.cells,
+          name: `Killer cage [sum: ${args.sum}]`,
+          constraint: constraint,
+          displayElem: this.display.drawKillerCage(args.cells, args.sum),
+        };
+        this._addToPanel(config);
+        this.configs.push(config);
+        break;
+      case 'AntiKnight':
+        this.antiKnightInput.checked = true;
+        break;
+      case 'Set':
+        for (let constraint of args.constraints) {
+          this.loadConstraint(constraint);
+        }
+        break;
+    }
     this.runUpdateCallback();
   }
 
@@ -335,31 +379,19 @@ class ConstraintManager {
 
     let formData = new FormData(this._selectionFrom);
 
-    let config;
+    let constraint;
     switch (formData.get('constraint-type')) {
       case 'cage':
-        let args = {cells: cells, sum: +formData.get('sum')};
-        config = {
-          cells: cells,
-          name: `Killer cage [sum: ${args.sum}]`,
-          constraint: new SudokuConstraintConfig.Sum(args),
-          displayElem: this.display.drawKillerCage(args.cells, args.sum),
-        }
+        constraint = new SudokuConstraintConfig.Sum(
+          {cells: cells, sum: +formData.get('sum')});
+        this.loadConstraint(constraint);
         break;
       case 'thermo':
-        config = {
-          cells: cells,
-          name: `Themometer [len: ${cells.length}]`,
-          constraint: new SudokuConstraintConfig.Thermo({cells: cells}),
-          displayElem: this.display.drawThermometer(cells),
-        }
+        constraint = new SudokuConstraintConfig.Thermo({cells: cells});
+        this.loadConstraint(constraint);
         break;
     }
 
-    if (config) {
-      this._addToPanel(config);
-      this.configs.push(config);
-    }
     this.grid.selection.updateSelection([]);
     this.runUpdateCallback();
   }

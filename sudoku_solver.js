@@ -11,7 +11,7 @@ class SudokuConstraintConfig {
     throw('Unimplemented');
   }
 
-  _getType() {
+  type() {
     for (const [name,  type] of Object.entries(SudokuConstraintConfig)) {
       if (type == this.constructor) return name;
     }
@@ -19,7 +19,7 @@ class SudokuConstraintConfig {
   }
 
   toJSON() {
-    let type = this._getType();  // Ensure type comes first.
+    let type = this.type();  // Ensure type comes first.
     return {type: type, ...this.args};
   }
 
@@ -37,10 +37,9 @@ class SudokuConstraintConfig {
 }
 
 SudokuConstraintConfig.Set = class extends SudokuConstraintConfig {
-  constructor(args /*{constraints}*/) {
-    args = args || {};
-    super(args);
-    this._constraints = args.constraints || [];
+  constructor({constraints}) {
+    super(arguments[0]);
+    this._constraints = constraints || [];
   }
 
   add(constraint) {
@@ -54,10 +53,9 @@ SudokuConstraintConfig.Set = class extends SudokuConstraintConfig {
 }
 
 SudokuConstraintConfig.Binary = class extends SudokuConstraintConfig {
-  constructor(args /*{cells: [cell1,  cell2], fn)}*/) {
-    super(args);
-    this._constraint = new ConstraintSolver.BinaryConstraint(
-      args.cells[0], args.cells[1], args.fn);
+  constructor({cells: [cell1,  cell2], fn}) {
+    super(arguments[0]);
+    this._constraint = new ConstraintSolver.BinaryConstraint(cell1, cell2, fn);
   }
 
   toConstraint() {
@@ -66,10 +64,10 @@ SudokuConstraintConfig.Binary = class extends SudokuConstraintConfig {
 }
 
 SudokuConstraintConfig.Thermo = class extends SudokuConstraintConfig {
-  constructor(args) {
-    super(args);
+  constructor({cells}) {
+    super(arguments[0]);
     this._constraint = new ConstraintSolver.ConstraintSet(
-      SudokuConstraintConfig.Thermo._makeBinaryConstraints(args.cells).map(
+      SudokuConstraintConfig.Thermo._makeBinaryConstraints(cells).map(
         cc => cc.toConstraint()));
   }
 
@@ -89,8 +87,8 @@ SudokuConstraintConfig.Thermo = class extends SudokuConstraintConfig {
 }
 
 SudokuConstraintConfig.AntiKnight = class extends SudokuConstraintConfig {
-  constructor(args) {
-    super(args);
+  constructor({}) {
+    super(arguments[0]);
     this._constraint = new ConstraintSolver.ConstraintSet(
       SudokuConstraintConfig.AntiKnight._makeBinaryConstraints().map(
         cc => cc.toConstraint()));
@@ -131,10 +129,9 @@ SudokuConstraintConfig.AntiKnight = class extends SudokuConstraintConfig {
 }
 
 SudokuConstraintConfig.Sum = class extends SudokuConstraintConfig {
-  constructor(args /*{cells, sum}*/) {
-    super(args);
-    this._constraint = new ConstraintSolver.SumConstraint(
-      args.cells, args.sum);
+  constructor({cells, sum}) {
+    super(arguments[0]);
+    this._constraint = new ConstraintSolver.SumConstraint(cells, sum);
   }
 
   toConstraint() {
@@ -144,10 +141,10 @@ SudokuConstraintConfig.Sum = class extends SudokuConstraintConfig {
 
 
 SudokuConstraintConfig.FixedCells = class extends SudokuConstraintConfig {
-  constructor(args /*{values}*/) {
-    super(args);
+  constructor({values}) {
+    super(arguments[0]);
     this._constraint = new ConstraintSolver.ConstraintSet(
-      args.values.map(
+      values.map(
         v => new ConstraintSolver.OneOfConstraint(`fixed_${v}`, [v])));
   }
 
