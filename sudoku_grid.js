@@ -38,7 +38,6 @@ const initPage = () => {
   let clearGridElem = document.getElementById('clear-grid-button');
   clearGridElem.addEventListener('click', _ => {
     constraintManager.clear();
-    grid.clearCellValues()
   });
 
   let solveTypeElem = document.getElementById('solve-type-input');
@@ -51,7 +50,7 @@ const initPage = () => {
   let validOutputElem = document.getElementById('valid-output');
   let errorElem = document.getElementById('error-output');
 
-  grid.setUpdateCallback(collapseFnCalls(() => {
+  constraintManager.setUpdateCallback(collapseFnCalls(() => {
     let cellValues = grid.getCellValues();
     try {
       let solver = new SudokuSolver();
@@ -264,10 +263,20 @@ class ConstraintManager {
   constructor(grid) {
     this.configs = [];
     this.grid = grid;
+    grid.setUpdateCallback(() => this.runUpdateCallback());
 
     this.display = ConstraintDisplay.makeDisplay(grid.container);
+    this.setUpdateCallback();
 
     this._setUpPanel();
+  }
+
+  setUpdateCallback(fn) {
+    this.updateCallback = fn || (() => {});
+  }
+
+  runUpdateCallback() {
+    this.updateCallback(this);
   }
 
   _setUpPanel() {
@@ -275,30 +284,56 @@ class ConstraintManager {
     this.antiKnightInput = document.getElementById('anti-knight-input');
     this.antiKnightInput.onchange = e => {
       this._isAntiKnight = this.antiKnightInput.checked;
-      this.grid.runUpdateCallback();
+      this.runUpdateCallback();
     };
 
-    this._form = document.getElementById('multi-cell-constraint-input');
+    this._selectionFrom = document.getElementById('multi-cell-constraint-input');
     this.grid.selection.setCallback((selection) => {
       let disabled = (selection.length < 2);
-      this._form.firstElementChild.disabled = disabled;
+      this._selectionFrom.firstElementChild.disabled = disabled;
       // Focus on the submit button so that that we can immediately press enter.
       if (!disabled) {
-        this._form.querySelector('button[type=submit]').focus();
+        this._selectionFrom.querySelector('button[type=submit]').focus();
       }
     });
-    this._form.onsubmit = e => {
+    this._selectionFrom.onsubmit = e => {
       this._addConstraintFromForm();
       return false;
     }
-    this.grid.selection.addSelectionPreserver(this._form);
+    this.grid.selection.addSelectionPreserver(this._selectionFrom);
+
+    let freeInputForm = document.getElementById('freeform-constraint-input');
+    freeInputForm.onsubmit = e => {
+      let input = (new FormData(freeInputForm)).get('freeform-input');
+      this._loadFreeFormInput(input.trim());
+      return false;
+    }
+  }
+
+  _loadFreeFormInput(input) {
+    this.clear();
+
+    if (input.length == 81) {
+      let fixedValues = [];
+      for (let i = 0; i < 81; i++) {
+        let charCode = input.charCodeAt(i);
+        if (charCode > CHAR_0 && charCode <= CHAR_9) {
+          fixedValues.push(valueId(i/9|0, i%9, input[i]-1));
+        }
+      }
+      this.grid.setCellValues(fixedValues);
+    } else {
+      console.log('Unrecognised input type');
+    }
+
+    this.runUpdateCallback();
   }
 
   _addConstraintFromForm() {
     let cells = grid.selection.getCells().map(e => e.id);
     if (cells.length < 2) throw('Selection too short.');
 
-    let formData = new FormData(this._form);
+    let formData = new FormData(this._selectionFrom);
 
     let config;
     switch (formData.get('constraint-type')) {
@@ -326,7 +361,7 @@ class ConstraintManager {
       this.configs.push(config);
     }
     this.grid.selection.updateSelection([]);
-    this.grid.runUpdateCallback();
+    this.runUpdateCallback();
   }
 
   _removeConstraint(config) {
@@ -349,10 +384,9 @@ class ConstraintManager {
     panelItem.appendChild(panelLabel);
 
     config.panelItem = panelItem;
-    let me = this;
     panelButton.addEventListener('click', () => {
-      me._removeConstraint(config);
-      me.grid.runUpdateCallback();
+      this._removeConstraint(config);
+      this.runUpdateCallback();
     });
 
     panelItem.addEventListener('mouseover', () => {
@@ -381,7 +415,8 @@ class ConstraintManager {
     this.display.clear();
     this._panel.innerHTML = '';
     this.configs = [];
-    this.grid.runUpdateCallback();
+    this.grid.clearCellValues()
+    this.runUpdateCallback();
   }
 }
 
@@ -599,7 +634,7 @@ class SudokuGrid {
 
   clearCellValues() {
     this._clearCellValues();
-    this.updateCallback(this);
+    this.updateCallback();
   }
 
   setCellValues(valueIds) {
@@ -610,7 +645,7 @@ class SudokuGrid {
       let value = parsedValueId.value;
       this.cellMap[cellId].innerText = value;
     }
-    this.updateCallback(this);
+    this.updateCallback();
   }
 
   _parseValueId(valueId) {

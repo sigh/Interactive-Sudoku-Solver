@@ -106,3 +106,7 @@ input[type=number]{
 fieldset[disabled]{
   color: grey;
 }
+
+textarea {
+  margin: 10px 0px;
+}
