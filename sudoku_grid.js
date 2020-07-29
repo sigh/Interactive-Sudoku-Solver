@@ -96,6 +96,7 @@ const KILLER_CAGE_COLORS = [
 class ConstraintDisplay {
   constructor(svg) {
     this.svg = svg;
+    this._diagonals = [null, null];
     this.killerCellColors = new Map();
     this.killerCages = new Map();
   }
@@ -257,12 +258,36 @@ class ConstraintDisplay {
 
     return thermo;
   }
+
+  drawDiagonal(direction) {
+    let size = CELL_SIZE*9;
+    let line = ConstraintDisplay.makeElem('path');
+    let directions = [
+      'M', 0, direction > 0 ? size : 0,
+      'L', size, direction > 0 ? 0 : size,
+    ];
+    line.setAttribute('d', directions.join(' '));
+    line.setAttribute('stroke-width', 1);
+    line.setAttribute('fill', 'transparent');
+    line.setAttribute('stroke', 'rgb(255, 0, 0)');
+
+    this.svg.appendChild(line);
+    this._diagonals[direction > 0] = line;
+
+    return line;
+  }
+
+  removeDiagonal(direction) {
+    let item = this._diagonals[direction > 0];
+    if (item) this.removeItem(item);
+  }
 }
 
 class ConstraintManager {
   constructor(grid) {
     this.configs = [];
     this.grid = grid;
+    this._checkboxes = {};
     grid.setUpdateCallback(() => this.runUpdateCallback());
 
     this.display = ConstraintDisplay.makeDisplay(grid.container);
@@ -281,11 +306,27 @@ class ConstraintManager {
 
   _setUpPanel() {
     this._panel = document.getElementById('displayed-constraints');
-    this.antiKnightInput = document.getElementById('anti-knight-input');
-    this.antiKnightInput.onchange = e => {
-      this._isAntiKnight = this.antiKnightInput.checked;
+
+    this._checkboxes.antiKnight = document.getElementById('anti-knight-input');
+    this._checkboxes.diagonalPlus = document.getElementById('diagonal-plus-input');
+    this._checkboxes.diagonalMinus = document.getElementById('diagonal-minus-input');
+    this._checkboxes.antiKnight.onchange = e => this.runUpdateCallback();
+    this._checkboxes.diagonalPlus.onchange = e => {
+      if (this._checkboxes.diagonalPlus.checked) {
+        this.display.drawDiagonal(1);
+      } else {
+        this.display.removeDiagonal(1);
+      }
       this.runUpdateCallback();
-    };
+    }
+    this._checkboxes.diagonalMinus.onchange = e => {
+      if (this._checkboxes.diagonalMinus.checked) {
+        this.display.drawDiagonal(-1);
+      } else {
+        this.display.removeDiagonal(-1);
+      }
+      this.runUpdateCallback();
+    }
 
     this._selectionFrom = document.getElementById('multi-cell-constraint-input');
     this.grid.selection.setCallback((selection) => {
@@ -362,7 +403,18 @@ class ConstraintManager {
         this.configs.push(config);
         break;
       case 'AntiKnight':
-        this.antiKnightInput.checked = true;
+        this._checkboxes.antiKnight.checked = true;
+        break;
+      case 'Diagonal':
+        // TODO: The code for handling constraints is littered around this
+        // class and duplicated. Consolidate it into one place.
+        if (args.direction > 0) {
+          this._checkboxes.diagonalPlus.checked = true;
+          this.display.drawDiagonal(1);
+        } else {
+          this._checkboxes.diagonalMinus.checked = true;
+          this.display.drawDiagonal(-1);
+        }
         break;
       case 'Set':
         for (let constraint of args.constraints) {
@@ -433,8 +485,14 @@ class ConstraintManager {
 
   getConstraints() {
     let constraints = this.configs.map(c => c.constraint);
-    if (this._isAntiKnight) {
+    if (this._checkboxes.antiKnight.checked) {
       constraints.push(new SudokuConstraintConfig.AntiKnight());
+    }
+    if (this._checkboxes.diagonalPlus.checked) {
+      constraints.push(new SudokuConstraintConfig.Diagonal({direction: 1}));
+    }
+    if (this._checkboxes.diagonalMinus.checked) {
+      constraints.push(new SudokuConstraintConfig.Diagonal({direction: -1}));
     }
     constraints.push(
       new SudokuConstraintConfig.FixedCells(
@@ -446,6 +504,9 @@ class ConstraintManager {
   clear() {
     this.display.clear();
     this._panel.innerHTML = '';
+    for (const input of Object.values(this._checkboxes)) {
+      input.checked = false;
+    }
     this.configs = [];
     this.grid.clearCellValues()
     this.runUpdateCallback();

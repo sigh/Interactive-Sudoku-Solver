@@ -87,8 +87,8 @@ SudokuConstraintConfig.Thermo = class extends SudokuConstraintConfig {
 }
 
 SudokuConstraintConfig.AntiKnight = class extends SudokuConstraintConfig {
-  constructor({}) {
-    super(arguments[0]);
+  constructor() {
+    super();
     this._constraint = new ConstraintSolver.ConstraintSet(
       SudokuConstraintConfig.AntiKnight._makeBinaryConstraints().map(
         cc => cc.toConstraint()));
@@ -127,6 +127,33 @@ SudokuConstraintConfig.AntiKnight = class extends SudokuConstraintConfig {
     return this._constraint;
   }
 }
+
+SudokuConstraintConfig.Diagonal = class extends SudokuConstraintConfig {
+  constructor({direction}) {
+    super(arguments[0]);
+    this._constraint = new ConstraintSolver.ConstraintSet(
+      SudokuConstraintConfig.Diagonal._makeConstraints(direction));
+  }
+
+  static _makeConstraints(direction) {
+    let constraints = [];
+    for (let n = 0; n < 9; n++) {
+      let values = [];
+      for (let i = 0; i < 9; i++) {
+        values.push(valueId(i, direction > 0 ? 8-i : i, n));
+      }
+      let id = `diagonal_${direction > 0 ? '+' : '-'}_${n+1}`;
+      constraints.push(new ConstraintSolver.OneOfConstraint(id, values));
+    }
+
+    return constraints;
+  }
+
+  toConstraint() {
+    return this._constraint;
+  }
+}
+
 
 SudokuConstraintConfig.Sum = class extends SudokuConstraintConfig {
   constructor({cells, sum}) {
