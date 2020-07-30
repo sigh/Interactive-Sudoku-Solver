@@ -1,4 +1,4 @@
-const ITERATION_LIMIT = 5000000;
+const ITERATION_LIMIT = 1000000;
 
 class Node {
   constructor() {
@@ -219,8 +219,14 @@ class ConstraintSolver {
 
     constraints.forEach(c => c.apply(this));
 
-    this.arcInconsistencyMap = new Map();
-    this.iterations = 0;
+    this._arcInconsistencyMap = new Map();
+    this.stack = [];
+    this.solutions = [];
+    this.counters = {
+      nodesSearched: 0,
+      columnsSearched: 0,
+      guesses: 0,
+    };
   }
 
   _setWeights(weightMap) {
@@ -378,56 +384,69 @@ class ConstraintSolver {
     return minCol;
   }
 
-  // Form all forced reductions, i.e. where there is only one option.
-  _solveForced(matrix, stack) {
-    // Find the column with the least number of candidates, to speed up
-    // the search.
-    for (let column; column = this._findMinColumn();) {
-      if (column.count != 1) return column;
-
-      let node = column.down;
-      stack.push(node);
-      if (!this._removeCandidateRow(node.row)) return DUMMY_COLUMN;
-    }
-    return null;
-  }
-
   solve() {
+    let solutions = [];
     let startTime = performance.now();
-    this.iterations = 0;
-    let result = this._solve(this.matrix, 2);
+    this._solve(
+      2, () => solutions.push(ConstraintSolver._stackToSolution(this.stack)));
     let endTime = performance.now();
 
-    let solution = result.solutions[0] || [];
+    let solution = solutions[0] || [];
     return {
       values: solution,
-      numBacktracks: result.numBacktracks,
+      numBacktracks: this.counters.nodesSearched - this.counters.columnsSearched,
       timeMs: endTime - startTime,
-      unique: result.solutions.length == 1,
+      unique: this.solutions.length == 1,
     }
   }
 
-  // Solve until maxSolutions are found, and return leaving matrix in the
-  // same state.
-  _solve(matrix, maxSolutions) {
+  static _stackToSolution(stack) {
+    return stack.map(e => e.row.id);
+  }
+
+  // Solve until maxSolutions are found, and returns leaving the stack
+  // fully unwound.
+  _solve(maxSolutions, solutionFn) {
     let minColumn = this._findMinColumn();
     // If there are no columns, then there is 1 solution - the trival one.
-    if (!minColumn) return {solutions: [[]], numBacktracks: 0};
+    if (!minColumn) {
+      this._addSolution();
+      return 1;
+    }
 
-    const stackToSolution = (stack) => stack.map(e => e.row.id);
+    this.stack.push(minColumn);
 
-    let solutions = [];
-    let stack = [minColumn];
+    let result = this._runSolver(maxSolutions, ITERATION_LIMIT, solutionFn);
+    if (!result) {
+      throw(`Reached iteration limit of ${ITERATION_LIMIT} without completing`);
+    }
+
+    this._unwindStack();
+
+    return result;
+  }
+
+  // _runSolver runs the solver until either maxSolutions are found, or
+  // maxIterations steps have passed.
+  // Returns true if the solver completed successfully without reaching
+  // maxIterations.
+  _runSolver(maxSolutions, maxIterations, solutionFn) {
+    let stack = this.stack;
+
     let numNodesSearched = 0;
-    let numColumnsSearched = stack[0].count ? 1 : 0;
+    let numColumnsSearched = 0;
+    let numSolutions = 0;
+    let numGuesses = 0;
 
-    while (stack.length) {
+    while (stack.length && numNodesSearched < maxIterations) {
       let node = stack.pop();
 
       // If the node is not a column header then we are backtracking, so
       // restore the state.
       if (node.column != null) {
         this._restoreCandidateRow(node.row);
+      } else {
+        if (node.count > 0) numColumnsSearched++;
       }
       // Try the next node in the column.
       node = node.down;
@@ -435,21 +454,19 @@ class ConstraintSolver {
       // If we have tried all the nodes, then backtrack.
       if (node.column == null) continue;
 
-      if (this.iterations++ > ITERATION_LIMIT) {
-        throw(`Reached iteration limit of ${ITERATION_LIMIT} without completing`);
-      }
-
       stack.push(node);
-      this.iterations++;
       numNodesSearched++;
+      // If there was more than one node to choose from, then this was a guess.
+      if (node.down.column != null) numGuesses++;
 
       if (!this._removeCandidateRow(node.row)) continue;
 
       let column = this._findMinColumn();
       if (debugCallback != null) debugCallback(this, node, stack, column);
       if (!column) {
-        solutions.push(stackToSolution(stack));
-        if (solutions.length == maxSolutions) {
+        solutionFn();
+        numSolutions++;
+        if (numSolutions == maxSolutions) {
           break;
         }
         continue;
@@ -459,18 +476,17 @@ class ConstraintSolver {
       if (column.count == 0) continue;
 
       stack.push(column);
-      numColumnsSearched++;
     }
 
-    this._unwindStack(stack);
+    this.counters.nodesSearched += numNodesSearched;
+    this.counters.columnsSearched += numColumnsSearched;
+    this.counters.guesses += numGuesses;
 
-    return {
-      solutions: solutions,
-      numBacktracks: numNodesSearched - numColumnsSearched,
-    };
+    return numNodesSearched < maxIterations;
   }
 
-  _unwindStack(stack) {
+  _unwindStack() {
+    let stack = this.stack;
     while (stack.length) {
       let node = stack.pop();
       this._restoreCandidateRow(node.row);
@@ -489,36 +505,26 @@ class ConstraintSolver {
   solveAllPossibilities() {
     let startTime = performance.now();
 
-    let matrix = this.matrix;
+    // TODO: Do all forced reductions first to avoid having to do them for
+    // each iteration.
 
-    let numBacktracks = 0;
-    let rowsExplored = 0;
-    this.iterations = 0;
-
-    // First eliminate the forced values.
-    // This will prevent us having to redo work later.
-    let stack = [];
-    // TODO: Add this back in.
-    // Currently if it returns a contradition by the constraint solver, then
-    // it is not rediscovered later.
-    // this._solveForced(matrix, stack);
+    let solutions = [];
 
     // Do initial solve to see if we have 0, 1 or many solutions.
-    let result = this._solve(matrix, 2);
-    numBacktracks += result.numBacktracks;
+    this._solve(
+      2, () => solutions.push(ConstraintSolver._stackToSolution(this.stack)));
 
     // Every value in the solutions is a valid row.
-    // In addition, all items in the stack are common to all solutions.
     let validRows = new Set();
-    if (result.solutions.length) {
-      result.solutions.forEach(s => s.forEach(r => validRows.add(r)));
-      stack.map(e => validRows.add(e.row.id));
+    if (solutions.length > 0) {
+      this.solutions.forEach(s => s.forEach(r => validRows.add(r)));
     }
 
     // If there are 1 or 0 solutions, there is nothing else to do.
     // If there are 2 or more, then we have to check all possibilities.
-    if (result.solutions.length > 1) {
+    if (solutions.length > 1) {
       // All remaining rows are possibly valid solutions. Verify each of them.
+      let matrix = this.matrix;
       for (let row = matrix.down; row != matrix; row = row.down) {
         // If we already know that this row is valid, then we don't need
         // to do anything.
@@ -529,15 +535,12 @@ class ConstraintSolver {
           continue;
         }
 
-        let result = this._solve(matrix, 1);
-        numBacktracks += result.numBacktracks;
-        if (result.solutions.length) {
-          // If there is a solution, then add all it's entries to validRows.
-          result.solutions[0].forEach(e => validRows.add(e));
-          // The current row is not part of the matrix, so it's not in the
-          // solution returned by _solve.
-          validRows.add(row.id);
-        }
+        this._solve(1, () => {
+          let solution = ConstraintSolver._stackToSolution(this.stack);
+          solution.unshift(row.id);
+          solution.forEach(e => validRows.add(e));
+          solutions.push(solution);
+        });
 
         // NOTE: We could make later searches more efficient by keeping invalid
         // rows out, and replacing them back afterwards. However, it is not
@@ -545,19 +548,14 @@ class ConstraintSolver {
         // It only helps when the grid is already constrained, in which case
         // the search is fast already.
         this._restoreCandidateRow(row);
-
-        rowsExplored++;
       }
     }
-
-    this._unwindStack(stack);
 
     let endTime = performance.now();
 
     return {
       values: [...validRows],
-      numBacktracks: numBacktracks,
-      rowsExplored: rowsExplored,
+      numBacktracks: this.counters.nodesSearched - this.counters.columnsSearched,
       timeMs: endTime - startTime,
       unique: validRows.size == 81,
     }
@@ -589,7 +587,7 @@ class ConstraintSolver {
   _enforceArcConsistency(row, updatedColumns) {
     let removedRows = [];
     // Add to the map early so that we can return at any point.
-    this.arcInconsistencyMap.set(row, removedRows);
+    this._arcInconsistencyMap.set(row, removedRows);
 
     let pending = updatedColumns;
     if (updatedColumns.sawContradition) return;
@@ -683,7 +681,7 @@ class ConstraintSolver {
   }
 
   _revertArcConsistency(row) {
-    let removedRows = this.arcInconsistencyMap.get(row);
+    let removedRows = this._arcInconsistencyMap.get(row);
     if (!removedRows) return;
     while(removedRows.length) {
       let row = removedRows.pop();
