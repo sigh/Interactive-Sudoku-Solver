@@ -346,12 +346,13 @@ class ConstraintManager {
     let freeInputForm = document.getElementById('freeform-constraint-input');
     freeInputForm.onsubmit = e => {
       let input = (new FormData(freeInputForm)).get('freeform-input');
-      this._loadFreeFormInput(input.trim());
+      this.loadFromText(input.trim());
       return false;
     }
   }
 
-  _loadFreeFormInput(input) {
+  loadFromText(input) {
+    input = input.trim();
     this.clear();
 
     if (input.length == 81) {

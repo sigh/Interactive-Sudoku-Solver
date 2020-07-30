@@ -67,16 +67,15 @@ SudokuConstraintConfig.Thermo = class extends SudokuConstraintConfig {
   constructor({cells}) {
     super(arguments[0]);
     this._constraint = new ConstraintSolver.ConstraintSet(
-      SudokuConstraintConfig.Thermo._makeBinaryConstraints(cells).map(
-        cc => cc.toConstraint()));
+      SudokuConstraintConfig.Thermo._makeBinaryConstraints(cells));
   }
 
   static _makeBinaryConstraints(cells) {
     let constraints = [];
     for (let i = 1; i < cells.length; i++) {
       constraints.push(
-        new SudokuConstraintConfig.Binary(
-          {cells: [cells[i-1], cells[i]], fn: (a, b) => a < b}));
+        new ConstraintSolver.BinaryConstraint(
+          cells[i-1], cells[i], (a, b) => a < b));
     }
     return constraints;
   }
@@ -90,8 +89,7 @@ SudokuConstraintConfig.AntiKnight = class extends SudokuConstraintConfig {
   constructor() {
     super();
     this._constraint = new ConstraintSolver.ConstraintSet(
-      SudokuConstraintConfig.AntiKnight._makeBinaryConstraints().map(
-        cc => cc.toConstraint()));
+      SudokuConstraintConfig.AntiKnight._makeBinaryConstraints());
   }
 
   static _cellId(r, c) {
@@ -114,7 +112,8 @@ SudokuConstraintConfig.AntiKnight = class extends SudokuConstraintConfig {
             if (boxNumber(cr, cc) != box) {
               let conflict = SudokuConstraintConfig.AntiKnight._cellId(cr, cc);
               constraints.push(
-                new SudokuConstraintConfig.Binary({cells: [cell, conflict], fn: (a, b) => a != b}));
+                new ConstraintSolver.BinaryConstraint(
+                  cell, conflict, ((a, b) => a != b), true));
             }
           }
         }

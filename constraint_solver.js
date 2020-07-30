@@ -599,6 +599,9 @@ class ConstraintSolver {
       for (const adj of column.extraConstraints) {
         switch (adj.type) {
           case BINARY_CONSTRAINT:
+            // Optmization for constraints where it doesn't help to prune until
+            // the value is fixed.
+            if (adj.onlyApplyWhenFinal && !column.removed) continue;
             if (adj.column.removed) {
               // If it's a removed column, we have to be careful:
               //  - We can't remove any nodes.
@@ -739,11 +742,12 @@ ConstraintSolver.SumConstraint = class extends ConstraintSolver.Constraint {
 }
 
 ConstraintSolver.BinaryConstraint = class extends ConstraintSolver.Constraint {
-  constructor(var1, var2, fn) {
+  constructor(var1, var2, fn, onlyApplyWhenFinal) {
     super();
     this._var1 = var1;
     this._var2 = var2;
     this._fn = fn;
+    this._onlyApplyWhenFinal = onlyApplyWhenFinal || false;
   }
 
   apply(solver) {
@@ -756,16 +760,14 @@ ConstraintSolver.BinaryConstraint = class extends ConstraintSolver.Constraint {
 
     let constraintMap = ConstraintSolver.BinaryConstraint._makeConstraintMap(
       column1, column2, constraintFn);
-    let constraint1 = ConstraintSolver.BinaryConstraint._setUpColumn(
-      column1, constraintMap);
-    let constraint2 = ConstraintSolver.BinaryConstraint._setUpColumn(
-      column2, constraintMap);
+    let constraint1 = this._setUpColumn(column1, constraintMap);
+    let constraint2 = this._setUpColumn(column2, constraintMap);
 
     constraint1.column.extraConstraints.push(constraint2);
     constraint2.column.extraConstraints.push(constraint1);
   }
 
-  static _setUpColumn(column, constraintMap) {
+  _setUpColumn(column, constraintMap) {
     let nodeList = [];
     column.forEach(node => {
       nodeList[node.index] = constraintMap.get(node);
@@ -774,6 +776,7 @@ ConstraintSolver.BinaryConstraint = class extends ConstraintSolver.Constraint {
       type: BINARY_CONSTRAINT,
       column: column,
       nodeList: nodeList,
+      onlyApplyWhenFinal: this._onlyApplyWhenFinal,
     };
   }
 

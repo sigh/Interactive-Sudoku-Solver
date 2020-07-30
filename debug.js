@@ -176,7 +176,13 @@ const testSlowThermo = () => {
   grid.runUpdateCallback();
 }
 
-const testCases = () => [
+const loadSlowKnight = () => {
+  // Slow ambiguous anti-knight:
+  let config = '{"type":"Set","constraints":[{"type":"AntiKnight"},{"type":"FixedCells","values":["R1C2#3","R1C9#7","R3C6#9","R3C7#2","R4C1#6","R4C4#4","R5C9#5","R6C2#4","R7C1#3","R8C5#6","R8C8#5","R9C2#6","R9C3#4","R9C4#3"]}]}';
+  constraintManager.loadFromText(config);
+}
+
+const testCases = [
   {  // 0: From https://www.youtube.com/watch?v=lgJYOuVk910
     name: 'Thermo 1',
     input:
@@ -217,10 +223,6 @@ const testCases = () => [
   },
 ];
 
-// Example with overruns iteraton limit even when searching for one solution:
-// from https://www.youtube.com/watch?v=JUyBOk1ZmbE
-// "new ConstraintSet([new FixedCellsConstraint([]),new SumConstraint(["R1C1","R1C2","R1C3"], 14),new SumConstraint(["R2C1","R2C2"], 8),new SumConstraint(["R3C1","R3C2"], 12),new SumConstraint(["R2C3","R3C3","R3C4"], 17),new SumConstraint(["R1C4","R1C5","R2C4","R2C5","R3C5"], 20),new SumConstraint(["R4C1","R4C2","R5C1","R5C2"], 21),new SumConstraint(["R6C1","R7C1","R8C1","R8C2"], 19),new SumConstraint(["R9C1","R9C2"], 14),new SumConstraint(["R6C2","R6C3"], 10),new SumConstraint(["R9C3","R9C4"], 13),new SumConstraint(["R7C5","R8C5","R8C6","R9C5","R9C6"], 24),new SumConstraint(["R6C4","R6C5","R7C4"], 14),new SumConstraint(["R4C4","R5C4","R5C5","R5C6","R6C6"], 25),new SumConstraint(["R3C6","R4C5","R4C6"], 14),new SumConstraint(["R2C6","R2C7"], 16),new SumConstraint(["R3C7","R3C8"], 7),new SumConstraint(["R4C7","R4C8"], 8)])"
-
 const arrayEquals = (a, b) => {
   if (a.length != b.length) return false;
   for (let i = 0; i < a.length; i++) {
@@ -230,7 +232,7 @@ const arrayEquals = (a, b) => {
 }
 
 const runTestCases = () => {
-  for (const tc of testCases()) {
+  for (const tc of testCases) {
     let constraint = SudokuConstraintConfig.fromJSON(tc.input);
     let solver = new SudokuSolver();
     solver.addConstraint(constraint);
