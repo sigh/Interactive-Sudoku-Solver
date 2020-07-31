@@ -221,7 +221,6 @@ class ConstraintSolver {
 
     this._arcInconsistencyMap = new Map();
     this.stack = [];
-    this.solutions = [];
     this.counters = {
       nodesSearched: 0,
       columnsSearched: 0,
@@ -396,7 +395,7 @@ class ConstraintSolver {
       values: solution,
       numBacktracks: this.counters.nodesSearched - this.counters.columnsSearched,
       timeMs: endTime - startTime,
-      unique: this.solutions.length == 1,
+      unique: solutions.length == 1,
     }
   }
 
@@ -517,7 +516,7 @@ class ConstraintSolver {
     // Every value in the solutions is a valid row.
     let validRows = new Set();
     if (solutions.length > 0) {
-      this.solutions.forEach(s => s.forEach(r => validRows.add(r)));
+      solutions.forEach(s => s.forEach(r => validRows.add(r)));
     }
 
     // If there are 1 or 0 solutions, there is nothing else to do.
