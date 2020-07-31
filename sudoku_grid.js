@@ -299,7 +299,7 @@ class ConstraintManager {
     let freeInputForm = document.getElementById('freeform-constraint-input');
     freeInputForm.onsubmit = e => {
       let input = (new FormData(freeInputForm)).get('freeform-input');
-      this.loadFromText(input.trim());
+      this.loadFromText(input);
       return false;
     }
 
@@ -307,28 +307,9 @@ class ConstraintManager {
   }
 
   loadFromText(input) {
-    input = input.trim();
     this.clear();
-
-    if (input.length == 81) {
-      let fixedValues = [];
-      for (let i = 0; i < 81; i++) {
-        let charCode = input.charCodeAt(i);
-        if (charCode > CHAR_0 && charCode <= CHAR_9) {
-          fixedValues.push(valueId(i/9|0, i%9, input[i]-1));
-        }
-      }
-      this.loadConstraint(
-        new SudokuConstraintConfig.FixedCells({values: fixedValues}));
-      return;
-    }
-
-    try {
-      let constraint = SudokuConstraintConfig.fromJSON(input);
-      this.loadConstraint(constraint);
-    } catch (e) {
-      console.log(`Unrecognised input type (${e})`);
-    }
+    let constraint = SudokuConstraintConfig.fromText(input);
+    if (constraint) this.loadConstraint(constraint);
   }
 
   loadConstraint(constraint) {

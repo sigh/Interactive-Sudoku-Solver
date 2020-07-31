@@ -34,6 +34,89 @@ class SudokuConstraintConfig {
       return value;
     });
   }
+
+  static _parseKillerFormat(text) {
+    // Determine the cell directions.
+    let cellDirections = [];
+    for (let i = 0; i < 81; i++) {
+      switch (text[i]) {
+        case 'v':
+          cellDirections.push(i+9);
+          break;
+        case '^':
+          cellDirections.push(i-9);
+          break;
+        case '<':
+          cellDirections.push(i-1);
+          break;
+        case '>':
+          cellDirections.push(i+1);
+          break;
+        default:
+          cellDirections.push(i);
+      }
+    }
+
+    let cages = new Map();
+    for (let i = 0; i < 81; i++) {
+      let cageCell = i;
+      while (cellDirections[cageCell] != cageCell) {
+        cageCell = cellDirections[cageCell];
+      }
+      if (!cages.has(cageCell)) {
+        let c = text[cageCell];
+        let sum;
+        if (c >= '1' && c <= '9') {
+          sum = +c;
+        } else if (c >= 'A' && c <= 'Z') {
+          sum = c.charCodeAt(0) - 'A'.charCodeAt(0) + 10;
+        } else if (c >= 'a' && c <= 'j') {
+          sum = c.charCodeAt(0) - 'a'.charCodeAt(0) + 36;
+        } else {
+          // Not a valid cage, ignore.
+          continue;
+        }
+        cages.set(cageCell, {
+          sum: sum,
+          cells: [],
+        });
+      }
+      cages.get(cageCell).cells.push(`R${(i/9|0)+1}C${i%9+1}`);
+    }
+
+    let constraints = [];
+    for (const config of cages.values()) {
+      constraints.push(new SudokuConstraintConfig.Sum(config));
+    }
+    return new SudokuConstraintConfig.Set({constraints: constraints});
+  }
+
+  static fromText(text) {
+    text = text.trim();
+
+    if (text.length == 81 && text.match(/[^<V>]/)) {
+      return this._parseKillerFormat(text);
+    }
+
+    if (text.length == 81) {
+      let fixedValues = [];
+      for (let i = 0; i < 81; i++) {
+        let charCode = text.charCodeAt(i);
+        if (charCode > CHAR_0 && charCode <= CHAR_9) {
+          fixedValues.push(valueId(i/9|0, i%9, text[i]-1));
+        }
+      }
+      return new SudokuConstraintConfig.FixedCells({values: fixedValues});
+    }
+
+    try {
+      return SudokuConstraintConfig.fromJSON(text);
+      this.loadConstraint(constraint);
+    } catch (e) {
+      console.log(`Unrecognised input type (${e})`);
+      return null;
+    }
+  }
 }
 
 SudokuConstraintConfig.Set = class extends SudokuConstraintConfig {
