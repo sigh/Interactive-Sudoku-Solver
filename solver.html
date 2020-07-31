@@ -15,30 +15,25 @@
 
 <body>
 
-  <div id="sudoku-grid"></div>
+  <div id="sudoku-grid-outer">
+    <div id="sudoku-grid"></div>
+    <div id="solution-control-panel">
+      <button id="solution-start">|&lt;</button>
+      <button id="solution-back">&lt;</button>
+      <button id="solution-forward">&gt;</button>
+    </div>
+  </div>
 
   <div id="display-panel">
     <div>
-      Display:
-      <select id="solve-type-input">
+      Mode:
+      <select id="solve-mode-input">
         <option value="all-possibilities">All Possibilties</option>
         <option value="one-solution">One solution</option>
+        <option value="step-by-step" checked>Step-by-step</option>
       </select>
     </div>
-    <div>
-      Solve time: <span id="solve-time-output"></span>
-    </div>
-    <div>
-      Number of backtracks: <span id="backtrack-output"></span>
-    </div>
-    <div>
-      Unique solution: <span id="unique-output"></span>
-    </div>
-    <div>
-      Valid grid: <span id="valid-output"></span>
-    </div>
-    <div>
-      <button id="clear-grid-button">Clear grid</button>
+    <div id="state-output">
     </div>
     <div id="error-output" class="error">
     </div>
@@ -46,6 +41,10 @@
 
   <div id="constraint-panel">
     <h1>Constraints</h1>
+
+    <div>
+      <button id="clear-constraints-button">Clear</button>
+    </div>
 
     <div>
       <input type="checkbox" id="anti-knight-input">

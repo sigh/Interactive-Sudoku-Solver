@@ -110,3 +110,21 @@ fieldset[disabled]{
 textarea {
   margin: 10px 0px;
 }
+
+#solution-control-panel {
+  margin: 10px auto;
+  text-align: center;
+}
+
+#solution-control-panel button {
+  font-size: x-large;
+  font-weight: bold;
+  letter-spacing: -5px;
+  font-family: monospace;
+  height: 40px;
+  width: 40px;
+}
+
+#display-panel {
+  line-height: 2;
+}

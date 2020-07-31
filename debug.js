@@ -73,7 +73,7 @@ const benchmarkSolve = (squares, iterations) => {
   let totalBacktracks = 0;
   for (let i = 0; i < iterations; i++) {
     let values = generator.randomGrid(squares);
-    let result = (new SudokuSolver()).solve(values);
+    let result = (new SudokuSolverBuilder()).build().solve(values);
     totalTime += result.timeMs;
     totalSolved += (result.values.length > 0);
     totalBacktracks += result.numBacktracks;
@@ -94,7 +94,7 @@ const benchmarkSolveAll = (squares, iterations) => {
   let totalRowsExplored = 0;
   for (let i = 0; i < iterations; i++) {
     let values = generator.randomGrid(squares);
-    let result = (new SudokuSolver()).solveAllPossibilities(values);
+    let result = (new SudokuSolverBuilder()).build().solveAllPossibilities(values);
     totalTime += result.timeMs;
     totalSolved += (result.values.length > 0);
     totalBacktracks += result.numBacktracks;
@@ -234,9 +234,9 @@ const arrayEquals = (a, b) => {
 const runTestCases = () => {
   for (const tc of testCases) {
     let constraint = SudokuConstraintConfig.fromJSON(tc.input);
-    let solver = new SudokuSolver();
-    solver.addConstraint(constraint);
-    let result = solver.solveAllPossibilities();
+    let builder = new SudokuSolverBuilder();
+    builder.addConstraint(constraint);
+    let result = builder.build().solveAllPossibilities();
 
     result.values.sort();
     tc.expected.sort();
@@ -247,63 +247,4 @@ const runTestCases = () => {
     }
   }
   console.log('Tests passed');
-};
-
-let listener;
-const stepThroughSolver = (numSteps) => {
-  document.removeEventListener('keydown', listener);
-  let steps = [];
-  debugCallback = (solver, node, stack, column) => {
-    steps.push({
-      stack: stack.map(e => e.row.id),
-      columnId: column ? column.id : null,
-      count: column ? column.count : null,
-      options: solver.remainingRows(),
-    });
-    if (steps.length > numSteps) throw('Reached step limit');
-  }
-  let solver = new SudokuSolver();
-  let cs = getCurrentConstraints();
-  solver.addConstraint(cs);
-
-  try {
-    solver.solve();
-  } catch (e) {
-    console.log('Cause exception: ' + e);
-  }
-
-  let i = 0;
-  const renderStep = () => {
-    let s = steps[i];
-    console.log(`Step: ${i} - depth: ${s.stack.length} - ${s.columnId} #options: ${s.count}`);
-    grid.setSolution(s.stack.concat(s.options));
-    grid.selection.updateSelection([
-      document.getElementById(s.stack[s.stack.length-1].substring(0, 4))
-    ]);
-  };
-
-  listener = document.addEventListener('keydown', event => {
-    switch (event.key) {
-      // Arrow keys.
-      case 'ArrowLeft':
-        if (i > 0) i--;
-        break;
-      case 'ArrowRight':
-        if (i < numSteps) i++;
-        break;
-      case 'ArrowUp':
-        i = 0;
-        break;
-      case 'ArrowDown':
-        i = numSteps - 1;
-        break;
-      case 'Esc':
-        document.removeEventListener('keydown', listener);
-        return;
-    }
-    renderStep();
-  });
-
-  console.log('Use arrow keys to navigate');
-  renderStep();
 };

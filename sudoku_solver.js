@@ -179,32 +179,22 @@ SudokuConstraintConfig.FixedCells = class extends SudokuConstraintConfig {
   }
 }
 
-class SudokuSolver {
+class SudokuSolverBuilder {
   constructor() {
     this._valueMap = new Map();
     this._solverConstraints = [];
     this._makeBaseSudokuConstraints();
-    this._lastSolver = null;
   }
 
   addConstraint(config) {
     this._solverConstraints.push(config.toConstraint());
   }
 
-  solve() {
-    return this._solver().solve();
-  }
-
-  solveAllPossibilities(valueIds, constraints) {
-    return this._solver().solveAllPossibilities();
-  }
-
-  _solver() {
-    this._lastSolver = new ConstraintSolver(
+  build() {
+    return new ConstraintSolver(
       this._solverConstraints,
       [...this._valueMap.keys()],
       this._valueMap);
-    return this._lastSolver;
   }
 
   _makeBaseSudokuConstraints() {

@@ -24,61 +24,14 @@ const collapseFnCalls = (fn) => {
   });
 }
 
-const getCurrentConstraints = () => {
-  return constraintManager.getConstraints();
-}
-
 const initPage = () => {
   // Create grid.
   let container = document.getElementById('sudoku-grid');
   grid = new SudokuGrid(container);
   constraintManager = new ConstraintManager(grid);
 
-  // Inputs.
-  let clearGridElem = document.getElementById('clear-grid-button');
-  clearGridElem.addEventListener('click', _ => {
-    constraintManager.clear();
-  });
-
-  let solveTypeElem = document.getElementById('solve-type-input');
-  solveTypeElem.addEventListener('change', _ => grid.runUpdateCallback());
-
-  // Outputs.
-  let solveTimeElem = document.getElementById('solve-time-output');
-  let backtrackOutputElem = document.getElementById('backtrack-output');
-  let uniqueOutputElem = document.getElementById('unique-output');
-  let validOutputElem = document.getElementById('valid-output');
-  let errorElem = document.getElementById('error-output');
-
-  constraintManager.setUpdateCallback(collapseFnCalls(() => {
-    let cellValues = grid.getCellValues();
-    try {
-      let solver = new SudokuSolver();
-      let cs = getCurrentConstraints();
-      solver.addConstraint(cs);
-
-      // Solve.
-      let result = (
-        solveTypeElem.value == 'all-possibilities'
-          ? solver.solveAllPossibilities()
-          : solver.solve());
-      solution = result.values;
-
-      // Update grid.
-      grid.setSolution(result.values);
-
-      // Update display panel.
-      solveTimeElem.innerText = result.timeMs.toPrecision(4) + ' ms';
-      backtrackOutputElem.innerText = result.numBacktracks;
-      uniqueOutputElem.innerHTML = result.unique ? '&#10003;' : '&#10007;';
-      validOutputElem.innerHTML = result.values.length ? '&#10003;' : '&#10007;';
-      errorElem.innerText = '';
-    } catch(e) {
-      grid.setSolution(cellValues);
-      errorElem.innerText = e;
-    }
-  }));
-  grid.runUpdateCallback();
+  let solutionController = new SolutionController(constraintManager, grid);
+  solutionController.update();
 };
 
 // We never need more than 5 colors since the max degree of the graph is 4.
@@ -349,6 +302,8 @@ class ConstraintManager {
       this.loadFromText(input.trim());
       return false;
     }
+
+    document.getElementById('clear-constraints-button').onclick = () => this.clear();
   }
 
   loadFromText(input) {
@@ -372,7 +327,7 @@ class ConstraintManager {
       let constraint = SudokuConstraintConfig.fromJSON(input);
       this.loadConstraint(constraint);
     } catch (e) {
-      console.log('Unrecognised input type');
+      console.log(`Unrecognised input type (${e})`);
     }
   }
 
@@ -555,9 +510,9 @@ class Selection {
     });
   }
 
-  updateSelection(cells) {
+  updateSelection(cellIds) {
     this._clearSelection();
-    cells.forEach(c => this._addToSelection(c));
+    cellIds.forEach(c => this._addToSelection(document.getElementById(c)));
     this._runCallback();
   }
 
@@ -638,8 +593,7 @@ class SudokuGrid {
       col = (col+dc+8)%9+1;
 
 
-      this.selection.updateSelection(
-        [document.getElementById(`R${row}C${col}`)]);
+      this.selection.updateSelection([`R${row}C${col}`]);
     };
 
     container.addEventListener('keydown', event => {
@@ -771,27 +725,185 @@ class SudokuGrid {
     return chars.join('');
   }
 
-  setSolution(solution) {
+  // Display solution on grid.
+  //  - If solution contains mutiple values for single cell, they will be shown
+  //    as pencil marks.
+  //  - Anything in pencilmarks will always be shown as pencil marks.
+  setSolution(solution, pencilmarks) {
+    pencilmarks = pencilmarks || [];
+
     this.clearSolution();
     let cellValues = new Map();
+    let pencilmarkCell = new Set();
 
-    for (const valueId of solution) {
+    const handleValue = (valueId) => {
       let parsedValueId = this._parseValueId(valueId);
       let cellId = parsedValueId.cellId;
       let value = parsedValueId.value;
 
       if (!cellValues.has(cellId)) cellValues.set(cellId, []);
       cellValues.get(cellId).push(value);
+      return cellId;
+    };
+    for (const valueId of solution) {
+      handleValue(valueId);
+    }
+    for (const valueId of pencilmarks) {
+      let cellId = handleValue(valueId);
+      pencilmarkCell.add(cellId);
     }
 
     for (const [cellId, values] of cellValues) {
       let node = this._getSolutionNode(cellId);
-      if (values.length == 1) {
+      if (values.length == 1 && !pencilmarkCell.has(cellId)) {
         node.innerText = values[0];
       } else {
         node.innerText = this._formatMultiSolution(values);
         node.classList.add('cell-multi-solution');
       }
     }
+  }
+}
+
+class SolutionController {
+  constructor(constraintManager, grid) {
+    this._constraintManager = constraintManager;
+    this._grid = grid;
+    constraintManager.setUpdateCallback(collapseFnCalls(() => {
+      this.update();
+    }));
+    this._solveModeElem = document.getElementById('solve-mode-input');
+    this._solveModeElem.addEventListener('change', _ => this.update());
+
+    this._controlElem = document.getElementById('solution-control-panel');
+
+    this._setUpStepByStep();
+  }
+
+  _setUpStepByStep() {
+    let startElem = document.getElementById('solution-start');
+    let forwardElem = document.getElementById('solution-forward');
+    let backElem = document.getElementById('solution-back');
+
+    document.addEventListener('keydown', event => {
+      switch (event.key) {
+        case 'n':
+          forwardElem.click();
+          break;
+        case 'p':
+          backElem.click();
+          break;
+        case 's':
+          startElem.click();
+          break;
+      }
+    });
+  }
+
+  update() {
+    let cellValues = grid.getCellValues();
+    this._controlElem.style.visibility = 'hidden';
+    try {
+      let builder = new SudokuSolverBuilder();
+      let cs = constraintManager.getConstraints();
+      builder.addConstraint(cs);
+
+      let solver = builder.build();
+
+      let result;
+      switch (this._solveModeElem.value) {
+        case 'all-possibilities':
+          result = solver.solveAllPossibilities();
+          break;
+        case 'one-solution':
+          result = solver.solve();
+          break;
+        case 'step-by-step':
+          this._runStepByStep(solver);
+          return;
+      }
+
+      grid.setSolution(result.values);
+      let numSolutionsSeen = result.solutionsSeen.length;
+      this._displayState(
+        numSolutionsSeen, (numSolutionsSeen < 2), result.timeMs,
+        {'# Backtracks': result.numBacktracks});
+    } catch(e) {
+      grid.setSolution(cellValues);
+      let errorElem = document.getElementById('error-output');
+      errorElem.innerText = e;
+    }
+  }
+
+  static _addStateVariable(container, label, value) {
+    let elem = document.createElement('div');
+    elem.textContent = `${label}: ${value}`;
+    container.appendChild(elem);
+  }
+
+  _displayState(numSolutionsSeen, sawAllSolutions, timeMs, infoMap) {
+    let container = document.getElementById('state-output');
+    container.innerHTML = '';
+
+    let solutionText = numSolutionsSeen + (sawAllSolutions ? '' : '+');
+    if (numSolutionsSeen == 0 && !sawAllSolutions) solutionText = '?';
+    SolutionController._addStateVariable(
+      container, '# Solutions', solutionText);
+
+    SolutionController._addStateVariable(
+      container, 'Runtime', timeMs.toPrecision(4) + ' ms');
+
+    for (const [key, value] of Object.entries(infoMap)) {
+      SolutionController._addStateVariable(container, key, value);
+    }
+
+    let errorElem = document.getElementById('error-output');
+    errorElem.innerText = '';
+  }
+
+  _displayStepByStepState(state) {
+    let selection = [];
+    if (!state.done) {
+      grid.setSolution(state.values, state.remainingOptions);
+      if (state.values.length > 0) {
+        selection.push(state.values[state.values.length-1].substring(0, 4));
+      }
+    }
+    grid.selection.updateSelection(selection);
+    document.getElementById('solution-forward').disabled = state.done;
+    document.getElementById('solution-back').disabled = state.step == 0;
+    document.getElementById('solution-start').disabled = state.step == 0;
+
+    let counters = state.counters;
+    this._displayState(0, false, state.timeMs, {
+      '# Backtracks': counters.nodesSearched - counters.columnsSearched,
+      '# Nodes searched': counters.nodesSearched,
+      '# Constraints searched': counters.columnsSearched,
+    });
+  }
+
+  _runStepByStep(solver) {
+    let startElem = document.getElementById('solution-start');
+    let forwardElem = document.getElementById('solution-forward');
+    let backElem = document.getElementById('solution-back');
+
+    let state = null;
+
+    forwardElem.onclick = () => {
+      state = solver.step(1);
+      this._displayStepByStepState(state);
+    };
+    backElem.onclick = () => {
+      solver.reset();
+      state = solver.step(state.step-1);
+      this._displayStepByStepState(state);
+    };
+    startElem.onclick = () => {
+      state = solver.reset();
+      this._displayStepByStepState(state);
+    };
+
+    this._controlElem.style.visibility = 'visible';
+    startElem.click();
   }
 }

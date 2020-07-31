@@ -221,11 +221,31 @@ class ConstraintSolver {
 
     this._arcInconsistencyMap = new Map();
     this.stack = [];
+    this._done = false;
+    this._initCounters();
+    this._initTimer();
+  }
+
+  _initCounters() {
     this.counters = {
       nodesSearched: 0,
       columnsSearched: 0,
       guesses: 0,
     };
+  }
+
+  _initTimer() {
+    this._timeMs = 0;
+    this._startOfCurrentTimer = null;
+  }
+
+  _startTimer() {
+    this._startOfCurrentTimer = performance.now();
+  }
+
+  _stopTimer() {
+    this._timeMs += performance.now() - this._startOfCurrentTimer;
+    this._startOfCurrentTimer = null;
   }
 
   _setWeights(weightMap) {
@@ -385,17 +405,19 @@ class ConstraintSolver {
 
   solve() {
     let solutions = [];
-    let startTime = performance.now();
+
+    this._initTimer();
+    this._startTimer();
     this._solve(
       2, () => solutions.push(ConstraintSolver._stackToSolution(this.stack)));
-    let endTime = performance.now();
+    this._stopTimer();
 
     let solution = solutions[0] || [];
     return {
       values: solution,
       numBacktracks: this.counters.nodesSearched - this.counters.columnsSearched,
-      timeMs: endTime - startTime,
-      unique: solutions.length == 1,
+      timeMs: this._timeMs,
+      solutionsSeen: solutions,
     }
   }
 
@@ -406,15 +428,6 @@ class ConstraintSolver {
   // Solve until maxSolutions are found, and returns leaving the stack
   // fully unwound.
   _solve(maxSolutions, solutionFn) {
-    let minColumn = this._findMinColumn();
-    // If there are no columns, then there is 1 solution - the trival one.
-    if (!minColumn) {
-      this._addSolution();
-      return 1;
-    }
-
-    this.stack.push(minColumn);
-
     let result = this._runSolver(maxSolutions, ITERATION_LIMIT, solutionFn);
     if (!result) {
       throw(`Reached iteration limit of ${ITERATION_LIMIT} without completing`);
@@ -425,12 +438,60 @@ class ConstraintSolver {
     return result;
   }
 
+  state() {
+    // Run solver for 0 steps to initiate if not already.
+    this._runSolver(0, 0, () => {});
+    return this._state();
+  }
+
+  _state() {
+    let partialSolution = ConstraintSolver._stackToSolution(this.stack);
+    if (partialSolution[partialSolution.length-1] === undefined) {
+      partialSolution.pop();
+    }
+    let counters = {...this.counters};
+    counters.backtracks = counters.nodesSearched - counters.columnsSearched;
+    return {
+      values: partialSolution,
+      remainingOptions: this.remainingRows(),
+      step: this.counters.nodesSearched,
+      counters: counters,
+      timeMs: this._timeMs,
+      done: this._done,
+    }
+  }
+
+  step(n) {
+    this._startTimer();
+    this._runSolver(0, n, () => {});
+    this._stopTimer();
+    return this._state();
+  }
+
+  reset() {
+    this._unwindStack();
+    this._initCounters();
+    this._initTimer();
+    return this.state();
+  }
+
   // _runSolver runs the solver until either maxSolutions are found, or
   // maxIterations steps have passed.
   // Returns true if the solver completed successfully without reaching
   // maxIterations.
   _runSolver(maxSolutions, maxIterations, solutionFn) {
     let stack = this.stack;
+
+    // Initialize if the stack is empty.
+    if (stack.length == 0) {
+      let minColumn = this._findMinColumn();
+      // If there are no columns, then there is 1 solution - the trival one.
+      if (!minColumn) {
+        this._addSolution();
+        return true;
+      }
+      this.stack.push(minColumn);
+    }
 
     let numNodesSearched = 0;
     let numColumnsSearched = 0;
@@ -461,7 +522,6 @@ class ConstraintSolver {
       if (!this._removeCandidateRow(node.row)) continue;
 
       let column = this._findMinColumn();
-      if (debugCallback != null) debugCallback(this, node, stack, column);
       if (!column) {
         solutionFn();
         numSolutions++;
@@ -477,6 +537,8 @@ class ConstraintSolver {
       stack.push(column);
     }
 
+    this._done = (stack.length == 0);
+
     this.counters.nodesSearched += numNodesSearched;
     this.counters.columnsSearched += numColumnsSearched;
     this.counters.guesses += numGuesses;
@@ -488,8 +550,11 @@ class ConstraintSolver {
     let stack = this.stack;
     while (stack.length) {
       let node = stack.pop();
-      this._restoreCandidateRow(node.row);
+      if (node.column != null) {  // If the node is not a column header.
+        this._restoreCandidateRow(node.row);
+      }
     }
+    this._done = false;
   }
 
   remainingRows() {
@@ -502,7 +567,8 @@ class ConstraintSolver {
   }
 
   solveAllPossibilities() {
-    let startTime = performance.now();
+    this._initTimer();
+    this._startTimer();
 
     // TODO: Do all forced reductions first to avoid having to do them for
     // each iteration.
@@ -550,13 +616,13 @@ class ConstraintSolver {
       }
     }
 
-    let endTime = performance.now();
+    this._stopTimer();
 
     return {
       values: [...validRows],
       numBacktracks: this.counters.nodesSearched - this.counters.columnsSearched,
-      timeMs: endTime - startTime,
-      unique: validRows.size == 81,
+      timeMs: this._timeMs,
+      solutionsSeen: solutions,
     }
   }
 
@@ -811,5 +877,3 @@ ConstraintSolver.ConstraintSet = class extends ConstraintSolver.Constraint {
 
 const BINARY_CONSTRAINT = 2;
 const SUM_CONSTRAINT = 1;
-
-let debugCallback = null;
