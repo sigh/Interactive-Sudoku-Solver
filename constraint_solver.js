@@ -1,4 +1,4 @@
-const ITERATION_LIMIT = 1000000;
+const ITERATION_LIMIT = 10000000;
 
 class Node {
   constructor() {

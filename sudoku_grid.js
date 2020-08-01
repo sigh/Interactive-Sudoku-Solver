@@ -307,9 +307,20 @@ class ConstraintManager {
   }
 
   loadFromText(input) {
+    // Avoid updating until after the constraints are drawn.
+    // TODO: Do this in a more principled way.
+    let updateCallback = this.updateCallback;
+    this.setUpdateCallback();
+
     this.clear();
+    this.grid.clearSolution();
     let constraint = SudokuConstraint.fromText(input);
     if (constraint) this.loadConstraint(constraint);
+
+    window.setTimeout(() => {
+      this.setUpdateCallback(updateCallback);
+      this.runUpdateCallback();
+    }, 10);
   }
 
   loadConstraint(constraint) {
