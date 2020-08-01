@@ -2,7 +2,7 @@ const valueId = (row, col, n) => {
   return id = `R${row+1}C${col+1}#${n+1}`;
 };
 
-class SudokuConstraintConfig {
+class SudokuConstraint {
   constructor(args) {
     this.args = args || {};
   }
@@ -12,7 +12,7 @@ class SudokuConstraintConfig {
   }
 
   type() {
-    for (const [name,  type] of Object.entries(SudokuConstraintConfig)) {
+    for (const [name,  type] of Object.entries(SudokuConstraint)) {
       if (type == this.constructor) return name;
     }
     throw('Unknown constraint');
@@ -27,7 +27,7 @@ class SudokuConstraintConfig {
     return JSON.parse(json, (key, value) => {
       if (typeof value === 'object') {
         if (value.type) {
-          let type = SudokuConstraintConfig[value.type];
+          let type = SudokuConstraint[value.type];
           return new type(value);
         }
       }
@@ -86,9 +86,9 @@ class SudokuConstraintConfig {
 
     let constraints = [];
     for (const config of cages.values()) {
-      constraints.push(new SudokuConstraintConfig.Sum(config));
+      constraints.push(new SudokuConstraint.Sum(config));
     }
-    return new SudokuConstraintConfig.Set({constraints: constraints});
+    return new SudokuConstraint.Set({constraints: constraints});
   }
 
   static fromText(text) {
@@ -106,11 +106,11 @@ class SudokuConstraintConfig {
           fixedValues.push(valueId(i/9|0, i%9, text[i]-1));
         }
       }
-      return new SudokuConstraintConfig.FixedCells({values: fixedValues});
+      return new SudokuConstraint.FixedCells({values: fixedValues});
     }
 
     try {
-      return SudokuConstraintConfig.fromJSON(text);
+      return SudokuConstraint.fromJSON(text);
       this.loadConstraint(constraint);
     } catch (e) {
       console.log(`Unrecognised input type (${e})`);
@@ -119,7 +119,7 @@ class SudokuConstraintConfig {
   }
 }
 
-SudokuConstraintConfig.Set = class extends SudokuConstraintConfig {
+SudokuConstraint.Set = class extends SudokuConstraint {
   constructor({constraints}) {
     super(arguments[0]);
     this._constraints = constraints || [];
@@ -135,7 +135,7 @@ SudokuConstraintConfig.Set = class extends SudokuConstraintConfig {
   }
 }
 
-SudokuConstraintConfig.Binary = class extends SudokuConstraintConfig {
+SudokuConstraint.Binary = class extends SudokuConstraint {
   constructor({cells: [cell1,  cell2], fn}) {
     super(arguments[0]);
     this._constraint = new ConstraintSolver.BinaryConstraint(cell1, cell2, fn);
@@ -146,11 +146,11 @@ SudokuConstraintConfig.Binary = class extends SudokuConstraintConfig {
   }
 }
 
-SudokuConstraintConfig.Thermo = class extends SudokuConstraintConfig {
+SudokuConstraint.Thermo = class extends SudokuConstraint {
   constructor({cells}) {
     super(arguments[0]);
     this._constraint = new ConstraintSolver.ConstraintSet(
-      SudokuConstraintConfig.Thermo._makeBinaryConstraints(cells));
+      SudokuConstraint.Thermo._makeBinaryConstraints(cells));
   }
 
   static _makeBinaryConstraints(cells) {
@@ -168,11 +168,11 @@ SudokuConstraintConfig.Thermo = class extends SudokuConstraintConfig {
   }
 }
 
-SudokuConstraintConfig.AntiKnight = class extends SudokuConstraintConfig {
+SudokuConstraint.AntiKnight = class extends SudokuConstraint {
   constructor() {
     super();
     this._constraint = new ConstraintSolver.ConstraintSet(
-      SudokuConstraintConfig.AntiKnight._makeBinaryConstraints());
+      SudokuConstraint.AntiKnight._makeBinaryConstraints());
   }
 
   static _cellId(r, c) {
@@ -184,7 +184,7 @@ SudokuConstraintConfig.AntiKnight = class extends SudokuConstraintConfig {
     const boxNumber = (r, c) => ((r-1)/3|0)*3 + c%3;
     for (let r = 1; r < 10; r++) {
       for (let c = 1; c < 10; c++) {
-        let cell = SudokuConstraintConfig.AntiKnight._cellId(r, c);
+        let cell = SudokuConstraint.AntiKnight._cellId(r, c);
         let box = boxNumber(r, c);
         // We only need half the constraints, as the other half will be
         // added by the conflict cell.
@@ -193,7 +193,7 @@ SudokuConstraintConfig.AntiKnight = class extends SudokuConstraintConfig {
           // Skip any invalid cells or any in the same box as (r, c).
           if (cr > 0 && cr < 10 && cc > 0 && cc < 10) {
             if (boxNumber(cr, cc) != box) {
-              let conflict = SudokuConstraintConfig.AntiKnight._cellId(cr, cc);
+              let conflict = SudokuConstraint.AntiKnight._cellId(cr, cc);
               constraints.push(
                 new ConstraintSolver.BinaryConstraint(
                   cell, conflict, ((a, b) => a != b), true));
@@ -210,11 +210,11 @@ SudokuConstraintConfig.AntiKnight = class extends SudokuConstraintConfig {
   }
 }
 
-SudokuConstraintConfig.Diagonal = class extends SudokuConstraintConfig {
+SudokuConstraint.Diagonal = class extends SudokuConstraint {
   constructor({direction}) {
     super(arguments[0]);
     this._constraint = new ConstraintSolver.ConstraintSet(
-      SudokuConstraintConfig.Diagonal._makeConstraints(direction));
+      SudokuConstraint.Diagonal._makeConstraints(direction));
   }
 
   static _makeConstraints(direction) {
@@ -237,7 +237,7 @@ SudokuConstraintConfig.Diagonal = class extends SudokuConstraintConfig {
 }
 
 
-SudokuConstraintConfig.Sum = class extends SudokuConstraintConfig {
+SudokuConstraint.Sum = class extends SudokuConstraint {
   constructor({cells, sum}) {
     super(arguments[0]);
     this._constraint = new ConstraintSolver.SumConstraint(cells, sum);
@@ -249,7 +249,7 @@ SudokuConstraintConfig.Sum = class extends SudokuConstraintConfig {
 }
 
 
-SudokuConstraintConfig.FixedCells = class extends SudokuConstraintConfig {
+SudokuConstraint.FixedCells = class extends SudokuConstraint {
   constructor({values}) {
     super(arguments[0]);
     this._constraint = new ConstraintSolver.ConstraintSet(
@@ -262,7 +262,7 @@ SudokuConstraintConfig.FixedCells = class extends SudokuConstraintConfig {
   }
 }
 
-class SudokuSolverBuilder {
+class SudokuBuilder {
   constructor() {
     this._valueMap = new Map();
     this._solverConstraints = [];

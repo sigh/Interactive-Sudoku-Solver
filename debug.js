@@ -73,7 +73,7 @@ const benchmarkSolve = (squares, iterations) => {
   let totalBacktracks = 0;
   for (let i = 0; i < iterations; i++) {
     let values = generator.randomGrid(squares);
-    let result = (new SudokuSolverBuilder()).build().solve(values);
+    let result = (new SudokuBuilder()).build().solve(values);
     totalTime += result.timeMs;
     totalSolved += (result.values.length > 0);
     totalBacktracks += result.numBacktracks;
@@ -94,7 +94,7 @@ const benchmarkSolveAll = (squares, iterations) => {
   let totalRowsExplored = 0;
   for (let i = 0; i < iterations; i++) {
     let values = generator.randomGrid(squares);
-    let result = (new SudokuSolverBuilder()).build().solveAllPossibilities(values);
+    let result = (new SudokuBuilder()).build().solveAllPossibilities(values);
     totalTime += result.timeMs;
     totalSolved += (result.values.length > 0);
     totalBacktracks += result.numBacktracks;
@@ -233,8 +233,8 @@ const arrayEquals = (a, b) => {
 
 const runTestCases = () => {
   for (const tc of testCases) {
-    let constraint = SudokuConstraintConfig.fromJSON(tc.input);
-    let builder = new SudokuSolverBuilder();
+    let constraint = SudokuConstraint.fromJSON(tc.input);
+    let builder = new SudokuBuilder();
     builder.addConstraint(constraint);
     let result = builder.build().solveAllPossibilities();
 

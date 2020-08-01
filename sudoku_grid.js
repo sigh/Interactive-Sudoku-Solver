@@ -308,7 +308,7 @@ class ConstraintManager {
 
   loadFromText(input) {
     this.clear();
-    let constraint = SudokuConstraintConfig.fromText(input);
+    let constraint = SudokuConstraint.fromText(input);
     if (constraint) this.loadConstraint(constraint);
   }
 
@@ -371,12 +371,12 @@ class ConstraintManager {
     let constraint;
     switch (formData.get('constraint-type')) {
       case 'cage':
-        constraint = new SudokuConstraintConfig.Sum(
+        constraint = new SudokuConstraint.Sum(
           {cells: cells, sum: +formData.get('sum')});
         this.loadConstraint(constraint);
         break;
       case 'thermo':
-        constraint = new SudokuConstraintConfig.Thermo({cells: cells});
+        constraint = new SudokuConstraint.Thermo({cells: cells});
         this.loadConstraint(constraint);
         break;
     }
@@ -423,19 +423,19 @@ class ConstraintManager {
   getConstraints() {
     let constraints = this.configs.map(c => c.constraint);
     if (this._checkboxes.antiKnight.checked) {
-      constraints.push(new SudokuConstraintConfig.AntiKnight());
+      constraints.push(new SudokuConstraint.AntiKnight());
     }
     if (this._checkboxes.diagonalPlus.checked) {
-      constraints.push(new SudokuConstraintConfig.Diagonal({direction: 1}));
+      constraints.push(new SudokuConstraint.Diagonal({direction: 1}));
     }
     if (this._checkboxes.diagonalMinus.checked) {
-      constraints.push(new SudokuConstraintConfig.Diagonal({direction: -1}));
+      constraints.push(new SudokuConstraint.Diagonal({direction: -1}));
     }
     constraints.push(
-      new SudokuConstraintConfig.FixedCells(
+      new SudokuConstraint.FixedCells(
         {values: this.grid.getCellValues()}));
 
-    return new SudokuConstraintConfig.Set({constraints: constraints});
+    return new SudokuConstraint.Set({constraints: constraints});
   }
 
   clear() {
@@ -754,7 +754,7 @@ class SolutionController {
       this.update();
     }));
     this._solveModeElem = document.getElementById('solve-mode-input');
-    this._solveModeElem.addEventListener('change', _ => this.update());
+    this._solveModeElem.onchange = () => this.update();
 
     this._controlElem = document.getElementById('solution-control-panel');
 
@@ -782,10 +782,11 @@ class SolutionController {
   }
 
   update() {
-    let cellValues = grid.getCellValues();
-    this._controlElem.style.visibility = 'hidden';
+    this._controlElem.style.visibility = (
+      this._solveModeElem.value == 'step-by-step' ? 'visible' : 'hidden');
+
     try {
-      let builder = new SudokuSolverBuilder();
+      let builder = new SudokuBuilder();
       let cs = constraintManager.getConstraints();
       builder.addConstraint(cs);
 
@@ -804,13 +805,9 @@ class SolutionController {
           return;
       }
 
-      grid.setSolution(result.values);
-      let numSolutionsSeen = result.solutionsSeen.length;
-      this._displayState(
-        numSolutionsSeen, (numSolutionsSeen < 2), result.timeMs,
-        {'# Backtracks': result.numBacktracks});
+      this._grid.setSolution(result.values);
+      this._displayState(result);
     } catch(e) {
-      grid.setSolution(cellValues);
       let errorElem = document.getElementById('error-output');
       errorElem.innerText = e;
     }
@@ -822,21 +819,35 @@ class SolutionController {
     container.appendChild(elem);
   }
 
-  _displayState(numSolutionsSeen, sawAllSolutions, timeMs, infoMap) {
+  static _formatTimeMs(timeMs) {
+    if (timeMs < 1000) {
+      return timeMs.toPrecision(3) + ' ms';
+    }
+    return (timeMs/1000).toPrecision(3) + ' s';
+  }
+
+  _displayState(state) {
+    let counters = state.counters;
+
     let container = document.getElementById('state-output');
     container.innerHTML = '';
 
-    let solutionText = numSolutionsSeen + (sawAllSolutions ? '' : '+');
-    if (numSolutionsSeen == 0 && !sawAllSolutions) solutionText = '?';
+    let solutionText = counters.solutions + (state.done ? '' : '+');
+    if (counters.solutions == 0 && !state.done) solutionText = '?';
     SolutionController._addStateVariable(
       container, '# Solutions', solutionText);
 
-    SolutionController._addStateVariable(
-      container, 'Runtime', timeMs.toPrecision(4) + ' ms');
+    SolutionController._addStateVariable(container,
+      '# Guesses', counters.guesses);
+    SolutionController._addStateVariable(container,
+      '# Backtracks', counters.nodesSearched - counters.columnsSearched);
+    SolutionController._addStateVariable(container,
+      '# Nodes searched', counters.nodesSearched);
+    SolutionController._addStateVariable(container,
+      '# Constraints searched', counters.columnsSearched);
 
-    for (const [key, value] of Object.entries(infoMap)) {
-      SolutionController._addStateVariable(container, key, value);
-    }
+    SolutionController._addStateVariable(
+      container, 'Runtime', SolutionController._formatTimeMs(state.timeMs));
 
     let errorElem = document.getElementById('error-output');
     errorElem.innerText = '';
@@ -855,12 +866,7 @@ class SolutionController {
     document.getElementById('solution-back').disabled = state.step == 0;
     document.getElementById('solution-start').disabled = state.step == 0;
 
-    let counters = state.counters;
-    this._displayState(0, false, state.timeMs, {
-      '# Backtracks': counters.nodesSearched - counters.columnsSearched,
-      '# Nodes searched': counters.nodesSearched,
-      '# Constraints searched': counters.columnsSearched,
-    });
+    this._displayState(state);
   }
 
   _runStepByStep(solver) {
@@ -884,7 +890,6 @@ class SolutionController {
       this._displayStepByStepState(state);
     };
 
-    this._controlElem.style.visibility = 'visible';
     startElem.click();
   }
 }

@@ -227,10 +227,11 @@ class ConstraintSolver {
   }
 
   _initCounters() {
-    this.counters = {
+    this._counters = {
       nodesSearched: 0,
       columnsSearched: 0,
       guesses: 0,
+      solutions: 0,
     };
   }
 
@@ -415,9 +416,10 @@ class ConstraintSolver {
     let solution = solutions[0] || [];
     return {
       values: solution,
-      numBacktracks: this.counters.nodesSearched - this.counters.columnsSearched,
+      counters: this._getCounters(),
       timeMs: this._timeMs,
       solutionsSeen: solutions,
+      done: solutions.length < 2,
     }
   }
 
@@ -444,18 +446,22 @@ class ConstraintSolver {
     return this._state();
   }
 
+  _getCounters() {
+    let counters = {...this._counters};
+    counters.backtracks = counters.nodesSearched - counters.columnsSearched;
+    return counters;
+  }
+
   _state() {
     let partialSolution = ConstraintSolver._stackToSolution(this.stack);
     if (partialSolution[partialSolution.length-1] === undefined) {
       partialSolution.pop();
     }
-    let counters = {...this.counters};
-    counters.backtracks = counters.nodesSearched - counters.columnsSearched;
     return {
       values: partialSolution,
       remainingOptions: this.remainingRows(),
-      step: this.counters.nodesSearched,
-      counters: counters,
+      step: this._counters.nodesSearched,
+      counters: this._getCounters(),
       timeMs: this._timeMs,
       done: this._done,
     }
@@ -488,6 +494,7 @@ class ConstraintSolver {
       // If there are no columns, then there is 1 solution - the trival one.
       if (!minColumn) {
         this._addSolution();
+        this._counters.solutions++;
         return true;
       }
       this.stack.push(minColumn);
@@ -539,9 +546,10 @@ class ConstraintSolver {
 
     this._done = (stack.length == 0);
 
-    this.counters.nodesSearched += numNodesSearched;
-    this.counters.columnsSearched += numColumnsSearched;
-    this.counters.guesses += numGuesses;
+    this._counters.nodesSearched += numNodesSearched;
+    this._counters.columnsSearched += numColumnsSearched;
+    this._counters.guesses += numGuesses;
+    this._counters.solutions += numSolutions;
 
     return numNodesSearched < maxIterations;
   }
@@ -620,9 +628,10 @@ class ConstraintSolver {
 
     return {
       values: [...validRows],
-      numBacktracks: this.counters.nodesSearched - this.counters.columnsSearched,
+      counters: this._getCounters(),
       timeMs: this._timeMs,
       solutionsSeen: solutions,
+      done: solutions.length < 2,
     }
   }
 
