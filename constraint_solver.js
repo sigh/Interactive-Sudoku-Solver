@@ -189,25 +189,27 @@ class ColumnAccumulator {
   constructor() {
     this._variableColumns = [];
     this.sawContradiction = false;
+    this._extraConstraints = [];
   }
 
   add(column) {
-    if (this.sawContradiction) return;
-    if (column.type == Column.VARIABLE) {
-      this._variableColumns.push(column);
-    }
     if (column.count == 0) {
       this.sawContradition = true;
     }
+    if (this.sawContradiction) return;
+
+    for (let i = 0; i < column.extraConstraints.length; i++) {
+      this._extraConstraints.push(column.extraConstraints[i]);
+    }
   }
 
-  hasVariable() {
-    return !this.sawContradition && this._variableColumns.length > 0;
+  hasExtraConstraints() {
+    return !this.sawContradition && this._extraConstraints.length > 0;
   }
 
-  popVariable() {
+  popExtraConstraint() {
     if (this.sawContradition) return null;
-    return this._variableColumns.pop();
+    return this._extraConstraints.pop();
   }
 }
 
@@ -666,91 +668,89 @@ class ConstraintSolver {
     let pending = updatedColumns;
     if (updatedColumns.sawContradition) return;
 
-    while (pending.hasVariable()) {
-      let column = pending.popVariable();
-      for (const adj of column.extraConstraints) {
-        switch (adj.type) {
-          case BINARY_CONSTRAINT:
-            // Optmization for constraints where it doesn't help to prune until
-            // the value is fixed.
-            if (adj.onlyApplyWhenFinal && !column.removed) continue;
-            if (adj.column.removed) {
-              // If it's a removed column, we have to be careful:
-              //  - We can't remove any nodes.
-              //  - There may be more nodes than are actually valid.
-              adj.column.forEach((node) => {
-                if (pending.sawContradition) return;
-                // If the node has already been removed, we should skip it.
-                if (!(node.value & adj.column.hitSet)) return;
-                if (!(adj.nodeList[node.index] & column.hitSet)) {
-                  // If we try to remove any valid rows from a satisfied column,
-                  // then that is a contradiction.
-                  pending.sawContradiction = true;
-                }
-              });
+    while (pending.hasExtraConstraints()) {
+      let c = pending.popExtraConstraint();
+      switch (c.type) {
+        case BINARY_CONSTRAINT:
+          // Optmization for constraints where it doesn't help to prune until
+          // the value is fixed.
+          if (c.onlyApplyWhenFinal && !c.column.removed) continue;
+          if (c.adjColumn.removed) {
+            // If it's a removed column, we have to be careful:
+            //  - We can't remove any nodes.
+            //  - There may be more nodes than are actually valid.
+            c.adjColumn.forEach((node) => {
+              if (pending.sawContradition) return;
+              // If the node has already been removed, we should skip it.
+              if (!(node.value & c.adjColumn.hitSet)) return;
+              if (!(c.nodeList[node.index] & c.column.hitSet)) {
+                // If we try to remove any valid rows from a satisfied column,
+                // then that is a contradiction.
+                pending.sawContradiction = true;
+              }
+            });
+          } else {
+            c.adjColumn.forEach((node) => {
+              if (pending.sawContradition) return;
+              if (!(c.nodeList[node.index] & c.column.hitSet)) {
+                // No valid setting exists for this node.
+                removedRows.push(node.row);
+                this._removeInvalidRow(node.row, pending);
+              }
+            });
+          }
+          break;
+        case SUM_CONSTRAINT:
+          let min = 0;
+          let max = 0;
+          for (const adjColumn of c.columns) {
+            if (adjColumn.removed) {
+              // Currently the weight is only set if it is removed.
+              // This is ok, as this will be fixed in a later iteration
+              // before have to do any branching.
+              min += adjColumn.weight;
+              max += adjColumn.weight;
             } else {
-              adj.column.forEach((node) => {
-                if (pending.sawContradition) return;
-                if (!(adj.nodeList[node.index] & column.hitSet)) {
-                  // No valid setting exists for this node.
-                  removedRows.push(node.row);
-                  this._removeInvalidRow(node.row, pending);
-                }
-              });
+              min += adjColumn.down.row.weight;
+              max += adjColumn.up.row.weight;
             }
-            if (pending.sawContradition) return;
-            break;
-          case SUM_CONSTRAINT:
-            let min = 0;
-            let max = 0;
-            for (const adjColumn of adj.columns) {
-              if (adjColumn.removed) {
-                // Currently the weight is only set if it is removed.
-                // This is ok, as this will be fixed in a later iteration
-                // before have to do any branching.
-                min += adjColumn.weight;
-                max += adjColumn.weight;
-              } else {
-                min += adjColumn.down.row.weight;
-                max += adjColumn.up.row.weight;
+          }
+          if (c.sum < min || c.sum > max) {
+            pending.sawContradiction = true;
+            return;
+          }
+          // TODO: If one square left, we can just set it.
+          // TODO: If there are only 2 squares left, we can reduce it to
+          // just the matching values.
+          // TODO: For 3 squares, need to experiment to see if it pays off.
+          // TODO: Only in the larger cases does the more general range
+          // calculation make sense.
+          // TODO: For 3 squares we might be able to learn new binary
+          // constraints. Only do this at the start of a solve?
+          for (const adjColumn of c.columns) {
+            // Check if any values in each columns in the range are impossible
+            // given the current min and max.
+            // If any columns with a count == 1 were inconsistant, then that
+            // would have been ruled out by the initial check.
+            if (adjColumn.count > 1) {
+              let colMin = adjColumn.down.row.weight;
+              let colMax = adjColumn.up.row.weight;
+              let range = colMax - colMin;
+              if (min + range > c.sum || max - range < c.sum) {
+                adjColumn.forEach(node => {
+                  let weight = node.row.weight;
+                  if (min + weight - colMin > c.sum || max + weight - colMax < c.sum) {
+                    removedRows.push(node.row);
+                    this._removeInvalidRow(node.row, pending);
+                  }
+                });
+                if (pending.sawContradiction) return;
               }
             }
-            if (adj.sum < min || adj.sum > max) {
-              pending.sawContradiction = true;
-              return;
-            }
-            // TODO: If one square left, we can just set it.
-            // TODO: If there are only 2 squares left, we can reduce it to
-            // just the matching values.
-            // TODO: For 3 squares, need to experiment to see if it pays off.
-            // TODO: Only in the larger cases does the more general range
-            // calculation make sense.
-            // TODO: For 3 squares we might be able to learn new binary
-            // constraints. Only do this at the start of a solve?
-            for (const adjColumn of adj.columns) {
-              // Check if any values in each columns in the range are impossible
-              // given the current min and max.
-              // If any columns with a count == 1 were inconsistant, then that
-              // would have been ruled out by the initial check.
-              if (adjColumn.count > 1) {
-                let colMin = adjColumn.down.row.weight;
-                let colMax = adjColumn.up.row.weight;
-                let range = colMax - colMin;
-                if (min + range > adj.sum || max - range < adj.sum) {
-                  adjColumn.forEach(node => {
-                    let weight = node.row.weight;
-                    if (min + weight - colMin > adj.sum || max + weight - colMax < adj.sum) {
-                      removedRows.push(node.row);
-                      this._removeInvalidRow(node.row, pending);
-                    }
-                  });
-                  if (pending.sawContradiction) return;
-                }
-              }
-            }
-            break;
-        }
+          }
+          break;
       }
+      if (pending.sawContradiction) return;
     }
   }
 
@@ -832,24 +832,23 @@ ConstraintSolver.BinaryConstraint = class extends ConstraintSolver.Constraint {
 
     let constraintMap = ConstraintSolver.BinaryConstraint._makeConstraintMap(
       column1, column2, constraintFn);
-    let constraint1 = this._setUpColumn(column1, constraintMap);
-    let constraint2 = this._setUpColumn(column2, constraintMap);
-
-    constraint1.column.extraConstraints.push(constraint2);
-    constraint2.column.extraConstraints.push(constraint1);
+    this._setUpConstraint(column1, column2, constraintMap);
+    this._setUpConstraint(column2, column1, constraintMap);
   }
 
-  _setUpColumn(column, constraintMap) {
+  _setUpConstraint(column, adjColumn, constraintMap) {
     let nodeList = [];
-    column.forEach(node => {
+    adjColumn.forEach(node => {
       nodeList[node.index] = constraintMap.get(node);
     });
-    return {
+    let constraint = {
       type: BINARY_CONSTRAINT,
       column: column,
+      adjColumn: adjColumn,
       nodeList: nodeList,
       onlyApplyWhenFinal: this._onlyApplyWhenFinal,
     };
+    column.extraConstraints.push(constraint);
   }
 
   static _makeConstraintMap(column1, column2, constraintFn) {
