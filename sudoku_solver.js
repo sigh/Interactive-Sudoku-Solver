@@ -240,7 +240,7 @@ SudokuConstraint.Diagonal = class extends SudokuConstraint {
 SudokuConstraint.Sum = class extends SudokuConstraint {
   constructor({cells, sum}) {
     super(arguments[0]);
-    this._constraint = new ConstraintSolver.SumConstraint(cells, sum);
+    this._constraint = new ConstraintSolver.SumConstraint(cells, sum, true);
   }
 
   toConstraint() {

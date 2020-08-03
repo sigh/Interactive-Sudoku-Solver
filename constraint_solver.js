@@ -113,13 +113,16 @@ class Row extends Node {
     super();
     this.id = id;
     this.weight = 1;
+    this.removed = false;
   }
 
   remove() {
+    this.removed = true;
     this.removeFromColumn();
   }
 
   restore() {
+    this.removed = false;
     this.restoreToColumn();
   }
 
@@ -187,7 +190,6 @@ class Matrix extends Node {
 
 class ColumnAccumulator {
   constructor() {
-    this._variableColumns = [];
     this.sawContradiction = false;
     this._extraConstraints = [];
   }
@@ -693,9 +695,11 @@ class ConstraintSolver {
       }
 
       for (const row of rowsToRemove) {
-        removedRows.push(row);
-        this._removeInvalidRow(row, pending);
-        if (pending.sawContradition) return;
+        if (!row.removed) {
+          removedRows.push(row);
+          this._removeInvalidRow(row, pending);
+          if (pending.sawContradition) return;
+        }
       }
     }
   }
@@ -754,10 +758,11 @@ class BinaryConstraintHandler extends ConstraintHandler {
 }
 
 class SumConstraintHandler extends ConstraintHandler {
-  constructor(columns, sum) {
+  constructor(columns, sum, uniqueWeights) {
     super();
     this.columns = columns;
     this.sum = sum;
+    this.uniqueWeights = uniqueWeights;
     this.type = SUM_CONSTRAINT;
   }
 
@@ -766,21 +771,43 @@ class SumConstraintHandler extends ConstraintHandler {
 
     let min = 0;
     let max = 0;
-    for (const adjColumn of this.columns) {
-      if (adjColumn.removed) {
+    let seenValueHitSet = 0;  // Track duplicates.
+    for (const column of this.columns) {
+      if (column.removed) {
         // Currently the weight is only set if it is removed.
         // This is ok, as this will be fixed in a later iteration
         // before have to do any branching.
-        min += adjColumn.weight;
-        max += adjColumn.weight;
+        min += column.weight;
+        max += column.weight;
       } else {
-        min += adjColumn.down.row.weight;
-        max += adjColumn.up.row.weight;
+        min += column.down.row.weight;
+        max += column.up.row.weight;
+      }
+      if (this.uniqueWeights && column.count == 1) {
+        if (seenValueHitSet & column.hitSet) {
+          // We saw a duplicate so this is a contradiction.
+          return null;
+        }
+        seenValueHitSet |= column.hitSet;
       }
     }
     if (this.sum < min || this.sum > max) {
       return null;
     }
+
+    // Enforce uniqueness.
+    if (this.uniqueWeights) {
+      for (const column of this.columns) {
+        if (column.count > 1 && (column.hitSet & seenValueHitSet)) {
+          column.forEach(node => {
+            if ((1 << node.index) & seenValueHitSet) {
+              rowsToRemove.push(node.row);
+            }
+          });
+        }
+      }
+    }
+
     // TODO: If one square left, we can just set it.
     // TODO: If there are only 2 squares left, we can reduce it to
     // just the matching values.
@@ -789,17 +816,17 @@ class SumConstraintHandler extends ConstraintHandler {
     // calculation make sense.
     // TODO: For 3 squares we might be able to learn new binary
     // constraints. Only do this at the start of a solve?
-    for (const adjColumn of this.columns) {
+    for (const column of this.columns) {
       // Check if any values in each columns in the range are impossible
       // given the current min and max.
       // If any columns with a count == 1 were inconsistant, then that
       // would have been ruled out by the initial check.
-      if (adjColumn.count > 1) {
-        let colMin = adjColumn.down.row.weight;
-        let colMax = adjColumn.up.row.weight;
+      if (column.count > 1) {
+        let colMin = column.down.row.weight;
+        let colMax = column.up.row.weight;
         let range = colMax - colMin;
         if (min + range > this.sum || max - range < this.sum) {
-          adjColumn.forEach(node => {
+          column.forEach(node => {
             let weight = node.row.weight;
             if (min + weight - colMin > this.sum || max + weight - colMax < this.sum) {
               rowsToRemove.push(node.row);
@@ -827,10 +854,11 @@ ConstraintSolver.OneOfConstraint = class extends ConstraintSolver.Constraint {
 }
 
 ConstraintSolver.SumConstraint = class extends ConstraintSolver.Constraint {
-  constructor(vars, sum) {
+  constructor(vars, sum, uniqueWeights) {
     super();
     this._vars = vars;
     this._sum = sum;
+    this._uniqueWeights = uniqueWeights;
   }
 
   apply(solver) {
@@ -839,17 +867,17 @@ ConstraintSolver.SumConstraint = class extends ConstraintSolver.Constraint {
     let sum = this._sum;
 
     let columns = [];
-    let values = [];
     for (const v of vars) {
       let column = solver._getVariable(v);
-      // if (!column) {
-      //   throw(`Variable ${variable} must be an existing column`);
-      // }
       columns.push(column);
-      column.forEach(n => values.push(n.row.id));
+      column.forEach(node => {
+        if (node.index != node.row.weight - 1) {
+          throw("Node weights don't correspond to index. Some optimizations don't hold.");
+        }
+      });
     }
 
-    let constraint = new SumConstraintHandler(columns, sum);
+    let constraint = new SumConstraintHandler(columns, sum, this._uniqueWeights);
     for (const column of columns) {
       column.extraConstraints.push(constraint);
     }
