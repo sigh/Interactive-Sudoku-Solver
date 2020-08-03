@@ -771,7 +771,8 @@ class SumConstraintHandler extends ConstraintHandler {
 
     let min = 0;
     let max = 0;
-    let seenValueHitSet = 0;  // Track duplicates.
+    let fixedValueHitSet = 0;  // Track duplicates.
+    let allWeightsHitSet = 0;  // Track duplicates.
     for (const column of this.columns) {
       if (column.removed) {
         // Currently the weight is only set if it is removed.
@@ -783,24 +784,59 @@ class SumConstraintHandler extends ConstraintHandler {
         min += column.down.row.weight;
         max += column.up.row.weight;
       }
-      if (this.uniqueWeights && column.count == 1) {
-        if (seenValueHitSet & column.hitSet) {
-          // We saw a duplicate so this is a contradiction.
-          return null;
+      if (this.uniqueWeights) {
+        if (column.count == 1) {
+          if (fixedValueHitSet & column.hitSet) {
+            // We saw a duplicate so this is a contradiction.
+            return null;
+          }
+          fixedValueHitSet |= column.hitSet;
         }
-        seenValueHitSet |= column.hitSet;
+        allWeightsHitSet |= column.hitSet;
       }
     }
     if (this.sum < min || this.sum > max) {
       return null;
     }
+    // Short-circuit the rest of the function because everything is fixed, and
+    // the sum is correct.
+    if (this.sum == min && this.sum == max) {
+      return rowsToRemove;
+    }
 
-    // Enforce uniqueness.
+    // Check that sum can be made from unique weights.
+    if (this.uniqueWeights) {
+      let numSquares = this.columns.length;
+      let minSum = 0;
+      for (let i = 1; i < 10; i++) {
+        if (allWeightsHitSet & (1 << (i-1))) {
+          minSum += i;
+          if (!--numSquares) break;
+        }
+      }
+      if (numSquares || this.sum < minSum) {
+        return null;
+      }
+
+      numSquares = this.columns.length;
+      let maxSum = 0;
+      for (let i = 9; i > 0; i--) {
+        if (allWeightsHitSet & (1 << (i-1))) {
+          maxSum += i;
+          if (!--numSquares) break;
+        }
+      }
+      if (this.sum > maxSum) {
+        return null;
+      }
+    }
+
+    // Remove fixed values from any of the remaining variables.
     if (this.uniqueWeights) {
       for (const column of this.columns) {
-        if (column.count > 1 && (column.hitSet & seenValueHitSet)) {
+        if (column.count > 1 && (column.hitSet & fixedValueHitSet)) {
           column.forEach(node => {
-            if ((1 << node.index) & seenValueHitSet) {
+            if ((1 << node.index) & fixedValueHitSet) {
               rowsToRemove.push(node.row);
             }
           });
@@ -835,6 +871,7 @@ class SumConstraintHandler extends ConstraintHandler {
         }
       }
     }
+
     return rowsToRemove;
   }
 }
