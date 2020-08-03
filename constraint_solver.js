@@ -348,10 +348,14 @@ class ConstraintSolver {
       let sum = 0;
       let options = 0;  // Remaining options.
       let count = 0;  // Remaining squares.
+      let maxCount = 0;
       for (const cc of c.columns) {
         if (cc.count != 1) {
           count += 1;
           options += cc.count;
+          if (cc.count > maxCount) {
+            maxCount = cc.count;
+          }
         }
       }
       if (!count) continue;  // This constraint is already satisfied.
@@ -362,9 +366,13 @@ class ConstraintSolver {
       //   options = The number of possible remaining values. i.e. sum of counts
       //             of unfixed variables in the sum.
       //   numVar = The number of remaining unfixed variables.
+      //   maxCount = The variable with the largest number of options.
       // Then the average number of options per variable is:
-      //   optionsAv = options/numVar
-      // If we fix (numVar - 1) variables, then the last variable is forced.
+      //   optionsAvNaive = options/numVar
+      // However, if we fix (numVar - 1) variables, then the last variable is
+      // forced. We can choose the least constrained option to be forced,
+      // giving:
+      //   optionsAv = (options - maxCount)/(numVar-1)
       // Thus, ignoring the target sum, the approximate number permutations of
       // values is:
       //   permAv = optionsAv**(numVar-1)
@@ -377,7 +385,7 @@ class ConstraintSolver {
       // Approximating with (log(1+x) ~= x):
       //  optionsAvEff ~= 1 + (optionsAv-1)*(numVar-1)/numVar
       // Using this value as the effective count:
-      //  countEff = 1 + (options/numVar - 1)*(numVar-1)/numVar;
+      //  countEff = 1 + (options-maxCount-numVar-1)/numVar;
       //
       //  We can verify that this has several desirable properties:
       //   - When numVar = 1, countEff = 1. i.e. The square is forced.
@@ -394,7 +402,7 @@ class ConstraintSolver {
       // what the sum actually is. To account for this, squish (countEff-1)
       // by an adjustmentFactor. This results in up to 2x performance increase.
       const adjustmentFactor = 2;
-      let countEff = 1 + (count - 1)*(options/count-1)/(count*adjustmentFactor);
+      let countEff = 1 + (options-maxCount-count+1)/(count*adjustmentFactor);
       if (countEff > minCount) continue;
 
       // If this is the best constraint so far, then choose the variable
