@@ -388,9 +388,17 @@ class ConstraintSolver {
       // Note: At the momemnt, the calculation is already expensive enough that
       // the approximation is not warrented. We may also be able to do better
       // if we consider entropy per variable.
-      let countEff = 1 + (count - 1)*(options/count-1)/count;
+      //
+      // The above approximation over-estimates optionsAvEff. In addition, the
+      // options are usually more constrainted, because we haven't considered
+      // what the sum actually is. To account for this, squish (countEff-1)
+      // by an adjustmentFactor. This results in up to 2x performance increase.
+      const adjustmentFactor = 2;
+      let countEff = 1 + (count - 1)*(options/count-1)/(count*adjustmentFactor);
       if (countEff > minCount) continue;
 
+      // If this is the best constraint so far, then choose the variable
+      // with the least number of options.
       let minOptions = Infinity;
       for (const cc of c.columns) {
         if (cc.count != 1 && cc.count < minOptions) {
