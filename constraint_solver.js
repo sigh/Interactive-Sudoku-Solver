@@ -772,27 +772,29 @@ class SumConstraintHandler extends ConstraintHandler {
     let min = 0;
     let max = 0;
     let fixedValueHitSet = 0;  // Track duplicates.
-    let allWeightsHitSet = 0;  // Track duplicates.
+    let unfixedValueHitSet = 0;  // Track duplicates.
+    let fixedSum = 0;
+    let numUnfixed = 0;
     for (const column of this.columns) {
-      if (column.removed) {
-        // Currently the weight is only set if it is removed.
-        // This is ok, as this will be fixed in a later iteration
-        // before have to do any branching.
-        min += column.weight;
-        max += column.weight;
-      } else {
-        min += column.down.row.weight;
-        max += column.up.row.weight;
-      }
-      if (this.uniqueWeights) {
-        if (column.count == 1) {
+      if (column.count == 1) {
+        let weight = column.removed ? column.weight : column.down.row.weight;
+        min += weight;
+        max += weight;
+
+        if (this.uniqueWeights) {
           if (fixedValueHitSet & column.hitSet) {
             // We saw a duplicate so this is a contradiction.
             return null;
           }
           fixedValueHitSet |= column.hitSet;
+          fixedSum += weight;
         }
-        allWeightsHitSet |= column.hitSet;
+      } else {
+        min += column.down.row.weight;
+        max += column.up.row.weight;
+
+        unfixedValueHitSet |= column.hitSet;
+        numUnfixed++;
       }
     }
     if (this.sum < min || this.sum > max) {
@@ -806,40 +808,32 @@ class SumConstraintHandler extends ConstraintHandler {
 
     // Check that sum can be made from unique weights.
     if (this.uniqueWeights) {
-      let numSquares = this.columns.length;
-      let minSum = 0;
-      for (let i = 1; i < 10; i++) {
-        if (allWeightsHitSet & (1 << (i-1))) {
-          minSum += i;
-          if (!--numSquares) break;
-        }
+      // Find all possible legal values.
+      // This is specific to Sudoku killer cages.
+      let options = SumConstraintHandler.KILLER_CAGE_SUMS[numUnfixed][this.sum - fixedSum];
+      let possible = 0;
+      for (let option of options) {
+        if (option & unfixedValueHitSet) possible |= option;
       }
-      if (numSquares || this.sum < minSum) {
+
+      // If there are no possible sums, then we found a contradiction.
+      if (!possible) {
         return null;
       }
 
-      numSquares = this.columns.length;
-      let maxSum = 0;
-      for (let i = 9; i > 0; i--) {
-        if (allWeightsHitSet & (1 << (i-1))) {
-          maxSum += i;
-          if (!--numSquares) break;
-        }
-      }
-      if (this.sum > maxSum) {
-        return null;
-      }
-    }
-
-    // Remove fixed values from any of the remaining variables.
-    if (this.uniqueWeights) {
-      for (const column of this.columns) {
-        if (column.count > 1 && (column.hitSet & fixedValueHitSet)) {
-          column.forEach(node => {
-            if ((1 << node.index) & fixedValueHitSet) {
-              rowsToRemove.push(node.row);
-            }
-          });
+      // Otherwise remove any which are either:
+      //  - Not included in any sum.
+      //  - Already in the fixed values.
+      let valuesToRemove = unfixedValueHitSet & (~possible | fixedValueHitSet);
+      if (valuesToRemove) {
+        for (const column of this.columns) {
+          if (column.count > 1 && (column.hitSet & valuesToRemove)) {
+            column.forEach(node => {
+              if ((1 << node.index) & valuesToRemove) {
+                rowsToRemove.push(node.row);
+              }
+            });
+          }
         }
       }
     }
@@ -875,6 +869,32 @@ class SumConstraintHandler extends ConstraintHandler {
     return rowsToRemove;
   }
 }
+SumConstraintHandler.KILLER_CAGE_SUMS = (() => {
+  let sums = [];
+  for (let n = 0; n < 10; n++) {
+    let totals = [];
+    sums.push(totals);
+    for (let i = 0; i < 46; i++) {
+      totals.push([]);
+    }
+  }
+
+  // Recursively find all sums of subsets of {1..9}.
+  const findAllSums = (n, count, sum, hits) => {
+    if (n == 9) {
+      sums[count][sum].push(hits);
+      return;
+    }
+
+    n++;
+    findAllSums(n, count+1, sum+n, hits|(1<<(n-1)));
+    findAllSums(n, count, sum, hits);
+  }
+  findAllSums(0, 0, 0, 0);
+
+  return sums;
+})();
+
 
 ConstraintSolver.Constraint = class {}
 
