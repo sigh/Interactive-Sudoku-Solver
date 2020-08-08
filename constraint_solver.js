@@ -365,79 +365,25 @@ class ConstraintSolver {
     // proceed with the more expensive checks.
     if (minCount == 1) return minCol;
 
+    let minConstraint = null;
     for (const c of this._sumConstraints) {
-      let sum = 0;
-      let options = 0;  // Remaining options.
-      let count = 0;  // Remaining squares.
-      let maxCount = 0;
-      for (const cc of c.columns) {
-        if (cc.count != 1) {
-          count += 1;
-          options += cc.count;
-          if (cc.count > maxCount) {
-            maxCount = cc.count;
-          }
-        }
-      }
-      if (!count) continue;  // This constraint is already satisfied.
-      // To prioritize sum squares, we want a number which is comparable to
-      // the count of an unconstrained variable.
-      // Let:
-      //   countEff = The number we want to calculate.
-      //   options = The number of possible remaining values. i.e. sum of counts
-      //             of unfixed variables in the sum.
-      //   numVar = The number of remaining unfixed variables.
-      //   maxCount = The variable with the largest number of options.
-      // Then the average number of options per variable is:
-      //   optionsAvNaive = options/numVar
-      // However, if we fix (numVar - 1) variables, then the last variable is
-      // forced. We can choose the least constrained option to be forced,
-      // giving:
-      //   optionsAv = (options - maxCount)/(numVar-1)
-      // Thus, ignoring the target sum, the approximate number permutations of
-      // values is:
-      //   permAv = optionsAv**(numVar-1)
-      // We want to compare this to the case where there is no sum, and all
-      // variables are free. Thus the effective number of options per
-      // variable is:
-      //  optionsAvEff = permAv**(1/numVar) = optionsAv**((numVar-1)/numVar)
-      // Approximating with (e**x ~= 1+x):
-      //  optionsAvEff ~= 1 + log(optionsAv)*(numVar-1)/numVar
-      // Approximating with (log(1+x) ~= x):
-      //  optionsAvEff ~= 1 + (optionsAv-1)*(numVar-1)/numVar
-      // Using this value as the effective count:
-      //  countEff = 1 + (options-maxCount-numVar-1)/numVar;
-      //
-      //  We can verify that this has several desirable properties:
-      //   - When numVar = 1, countEff = 1. i.e. The square is forced.
-      //   - When numVar = 2, countEff ~= optionsAv/2. i.e. Half the count of
-      //     2 free squares.
-      //   - countEff is always lower than optionsAv.
-      //
-      // Note: At the momemnt, the calculation is already expensive enough that
-      // the approximation is not warrented. We may also be able to do better
-      // if we consider entropy per variable.
-      //
-      // The above approximation over-estimates optionsAvEff. In addition, the
-      // options are usually more constrainted, because we haven't considered
-      // what the sum actually is. To account for this, squish (countEff-1)
-      // by an adjustmentFactor. This results in up to 2x performance increase.
-      const adjustmentFactor = 2;
-      let countEff = 1 + (options-maxCount-count+1)/(count*adjustmentFactor);
+      let countEff = c.effectiveCount();
       if (countEff > minCount) continue;
 
-      // If this is the best constraint so far, then choose the variable
-      // with the least number of options.
+      minConstraint = c;
+      minCount = countEff;
+    }
+
+    // If a constraint had a lower effective count, then choose its variable
+    // with the least number of options.
+    if (minConstraint) {
       let minOptions = Infinity;
-      for (const cc of c.columns) {
-        if (cc.count != 1 && cc.count < minOptions) {
-          minCol = cc;
-          minOptions = cc.count;
+      for (const c of minConstraint.columns) {
+        if (c.count != 1 && c.count < minOptions) {
+          minCol = c;
+          minOptions = c.count;
         }
       }
-      minCount = countEff;
-      // TODO: Uncomment to return early (because we know there are no zeros).
-      // if (countEff == 1) return minCol;
     }
 
     return minCol;
@@ -903,6 +849,68 @@ class SumConstraintHandler extends ConstraintHandler {
     }
 
     return rowsToRemove;
+  }
+
+  effectiveCount() {
+    let sum = 0;
+    let options = 0;  // Remaining options.
+    let count = 0;  // Remaining squares.
+    let maxCount = 0;
+    for (const c of this.columns) {
+      if (c.count != 1) {
+        count += 1;
+        options += c.count;
+        if (c.count > maxCount) {
+          maxCount = c.count;
+        }
+      }
+    }
+    if (!count) return Infinity;  // This constraint is already satisfied.
+    // To prioritize sum squares, we want a number which is comparable to
+    // the count of an unconstrained variable.
+    // Let:
+    //   countEff = The number we want to calculate.
+    //   options = The number of possible remaining values. i.e. sum of counts
+    //             of unfixed variables in the sum.
+    //   numVar = The number of remaining unfixed variables.
+    //   maxCount = The variable with the largest number of options.
+    // Then the average number of options per variable is:
+    //   optionsAvNaive = options/numVar
+    // However, if we fix (numVar - 1) variables, then the last variable is
+    // forced. We can choose the least constrained option to be forced,
+    // giving:
+    //   optionsAv = (options - maxCount)/(numVar-1)
+    // Thus, ignoring the target sum, the approximate number permutations of
+    // values is:
+    //   permAv = optionsAv**(numVar-1)
+    // We want to compare this to the case where there is no sum, and all
+    // variables are free. Thus the effective number of options per
+    // variable is:
+    //  optionsAvEff = permAv**(1/numVar) = optionsAv**((numVar-1)/numVar)
+    // Approximating with (e**x ~= 1+x):
+    //  optionsAvEff ~= 1 + log(optionsAv)*(numVar-1)/numVar
+    // Approximating with (log(1+x) ~= x):
+    //  optionsAvEff ~= 1 + (optionsAv-1)*(numVar-1)/numVar
+    // Using this value as the effective count:
+    //  countEff = 1 + (options-maxCount-numVar-1)/numVar;
+    //
+    //  We can verify that this has several desirable properties:
+    //   - When numVar = 1, countEff = 1. i.e. The square is forced.
+    //   - When numVar = 2, countEff ~= optionsAv/2. i.e. Half the count of
+    //     2 free squares.
+    //   - countEff is always lower than optionsAv.
+    //
+    // Note: At the momemnt, the calculation is already expensive enough that
+    // the approximation is not warrented. We may also be able to do better
+    // if we consider entropy per variable.
+    //
+    // The above approximation over-estimates optionsAvEff. In addition, the
+    // options are usually more constrainted, because we haven't considered
+    // what the sum actually is. To account for this, squish (countEff-1)
+    // by an adjustmentFactor. This results in up to 2x performance increase.
+    const adjustmentFactor = 2;
+    let countEff = 1 + (options-maxCount-count+1)/(count*adjustmentFactor);
+    return countEff;
   }
 }
 SumConstraintHandler.KILLER_CAGE_SUMS = (() => {
