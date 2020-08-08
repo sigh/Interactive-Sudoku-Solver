@@ -197,21 +197,40 @@ class ColumnAccumulator {
   add(column) {
     if (column.count == 0) {
       this.sawContradition = true;
+      this._extraConstraints = [];
     }
     if (this.sawContradiction) return;
 
     for (let i = 0; i < column.extraConstraints.length; i++) {
-      this._extraConstraints.push(column.extraConstraints[i]);
+      let c = column.extraConstraints[i];
+      c.dirty = true;
+      this._extraConstraints.push(c);
     }
   }
 
   hasExtraConstraints() {
-    return !this.sawContradition && this._extraConstraints.length > 0;
+    return this._extraConstraints.length > 0;
   }
 
   popExtraConstraint() {
     if (this.sawContradition) return null;
-    return this._extraConstraints.pop();
+
+    // The top of the stack will always be dirty:
+    //  - When we add an new item it is always set to dirty.
+    //  - When we remove an item, we clean all the non-dirty items from the
+    //    top of the stack.
+    let c = this._extraConstraints.pop();
+    c.dirty = false;
+
+    // Clean up any non-dirty items.
+    // Using a dirty flag is faster than using a Set to dedupe.
+    for (let i = this._extraConstraints.length-1; i >= 0; i--) {
+      if (this._extraConstraints[i].dirty) break;
+      this._extraConstraints.pop();
+    }
+
+    // Return the non-dirty item.
+    return c;
   }
 }
 
@@ -729,7 +748,11 @@ class ConstraintSolver {
   }
 }
 
-class ConstraintHandler {}
+class ConstraintHandler {
+  constructor() {
+    this.dirty = false;
+  }
+}
 
 class BinaryConstraintHandler extends ConstraintHandler {
   constructor(column, adjColumn, nodeList, onlyApplyWhenFinal) {
@@ -738,7 +761,6 @@ class BinaryConstraintHandler extends ConstraintHandler {
     this.adjColumn = adjColumn;
     this.nodeList = nodeList;
     this.onlyApplyWhenFinal = onlyApplyWhenFinal;
-    this.type = BINARY_CONSTRAINT;
   }
 
   enforceConsistency() {
@@ -778,7 +800,6 @@ class SumConstraintHandler extends ConstraintHandler {
     this.columns = columns;
     this.sum = sum;
     this.uniqueWeights = uniqueWeights;
-    this.type = SUM_CONSTRAINT;
   }
 
   enforceConsistency() {
@@ -1020,6 +1041,3 @@ ConstraintSolver.ConstraintSet = class extends ConstraintSolver.Constraint {
     }
   }
 }
-
-const BINARY_CONSTRAINT = 2;
-const SUM_CONSTRAINT = 1;
