@@ -764,15 +764,17 @@ class SolutionController {
     constraintManager.setUpdateCallback(collapseFnCalls(() => {
       this.update();
     }));
-    this._solveModeElem = document.getElementById('solve-mode-input');
-    this._solveModeElem.onchange = () => this.update();
 
     this._elements = {
       start: document.getElementById('solution-start'),
       forward: document.getElementById('solution-forward'),
       back: document.getElementById('solution-back'),
       control: document.getElementById('solution-control-panel'),
+      stepOutput: document.getElementById('solution-step-output'),
+      mode: document.getElementById('solve-mode-input'),
     }
+
+    this._elements.mode.onchange = () => this.update();
 
     this._setUpStepByStep();
   }
@@ -795,7 +797,7 @@ class SolutionController {
 
   update() {
     this._elements.control.style.visibility = (
-      this._solveModeElem.value == 'all-possibilities' ? 'hidden' : 'visible');
+      this._elements.mode.value == 'all-possibilities' ? 'hidden' : 'visible');
 
     try {
       let builder = new SudokuBuilder();
@@ -804,7 +806,7 @@ class SolutionController {
 
       let solver = builder.build();
 
-      switch (this._solveModeElem.value) {
+      switch (this._elements.mode.value) {
         case 'all-possibilities':
           let result = solver.solveAllPossibilities();
           this._grid.setSolution(result.values);
@@ -875,6 +877,7 @@ class SolutionController {
     this._elements.forward.disabled = state.done;
     this._elements.back.disabled = state.step == 0;
     this._elements.start.disabled = state.step == 0;
+    this._elements.stepOutput.textContent = state.step+1;
 
     this._displayState(state);
   }
@@ -896,7 +899,9 @@ class SolutionController {
       this._displayStepByStepState(state);
     };
 
-    this._elements.start.click();
+    // Run the onclick handler (just calling click() would only work when
+    // the start button is enabled).
+    this._elements.start.onclick();
   }
 
   _displaySolutionIteratorState(solution, n, state) {
@@ -905,6 +910,7 @@ class SolutionController {
     this._elements.forward.disabled = (state.counters.solutions == n + 1);
     this._elements.back.disabled = n == 0;
     this._elements.start.disabled = n == 0;
+    this._elements.stepOutput.textContent = n+1;
 
     this._displayState(state);
   }
