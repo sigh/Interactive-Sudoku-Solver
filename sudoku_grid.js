@@ -767,34 +767,35 @@ class SolutionController {
     this._solveModeElem = document.getElementById('solve-mode-input');
     this._solveModeElem.onchange = () => this.update();
 
-    this._controlElem = document.getElementById('solution-control-panel');
+    this._elements = {
+      start: document.getElementById('solution-start'),
+      forward: document.getElementById('solution-forward'),
+      back: document.getElementById('solution-back'),
+      control: document.getElementById('solution-control-panel'),
+    }
 
     this._setUpStepByStep();
   }
 
   _setUpStepByStep() {
-    let startElem = document.getElementById('solution-start');
-    let forwardElem = document.getElementById('solution-forward');
-    let backElem = document.getElementById('solution-back');
-
     document.addEventListener('keydown', event => {
       switch (event.key) {
         case 'n':
-          forwardElem.click();
+          this._elements.forward.click();
           break;
         case 'p':
-          backElem.click();
+          this._elements.back.click();
           break;
         case 's':
-          startElem.click();
+          this._elements.start.click();
           break;
       }
     });
   }
 
   update() {
-    this._controlElem.style.visibility = (
-      this._solveModeElem.value == 'step-by-step' ? 'visible' : 'hidden');
+    this._elements.control.style.visibility = (
+      this._solveModeElem.value == 'all-possibilities' ? 'hidden' : 'visible');
 
     try {
       let builder = new SudokuBuilder();
@@ -803,21 +804,19 @@ class SolutionController {
 
       let solver = builder.build();
 
-      let result;
       switch (this._solveModeElem.value) {
         case 'all-possibilities':
-          result = solver.solveAllPossibilities();
-          break;
+          let result = solver.solveAllPossibilities();
+          this._grid.setSolution(result.values);
+          this._displayState(result);
+          return;
         case 'one-solution':
-          result = solver.solve();
-          break;
+          this._runSolutionIterator(solver);
+          return;
         case 'step-by-step':
           this._runStepByStep(solver);
           return;
       }
-
-      this._grid.setSolution(result.values);
-      this._displayState(result);
     } catch(e) {
       let errorElem = document.getElementById('error-output');
       errorElem.innerText = e;
@@ -873,34 +872,78 @@ class SolutionController {
       }
     }
     grid.selection.updateSelection(selection);
-    document.getElementById('solution-forward').disabled = state.done;
-    document.getElementById('solution-back').disabled = state.step == 0;
-    document.getElementById('solution-start').disabled = state.step == 0;
+    this._elements.forward.disabled = state.done;
+    this._elements.back.disabled = state.step == 0;
+    this._elements.start.disabled = state.step == 0;
 
     this._displayState(state);
   }
 
   _runStepByStep(solver) {
-    let startElem = document.getElementById('solution-start');
-    let forwardElem = document.getElementById('solution-forward');
-    let backElem = document.getElementById('solution-back');
-
     let state = null;
 
-    forwardElem.onclick = () => {
+    this._elements.forward.onclick = () => {
       state = solver.step(1);
       this._displayStepByStepState(state);
     };
-    backElem.onclick = () => {
+    this._elements.back.onclick = () => {
       solver.reset();
       state = solver.step(state.step-1);
       this._displayStepByStepState(state);
     };
-    startElem.onclick = () => {
+    this._elements.start.onclick = () => {
       state = solver.reset();
       this._displayStepByStepState(state);
     };
 
-    startElem.click();
+    this._elements.start.click();
+  }
+
+  _displaySolutionIteratorState(solution, n, state) {
+    grid.setSolution(solution || []);
+
+    this._elements.forward.disabled = (state.counters.solutions == n + 1);
+    this._elements.back.disabled = n == 0;
+    this._elements.start.disabled = n == 0;
+
+    this._displayState(state);
+  }
+
+  _runSolutionIterator(solver) {
+    let solutions = [];
+    let solutionNum = 0;
+
+    const nextSolution = () => {
+      solutions.push(solver.nextSolution());
+    };
+
+    const update = () => {
+      this._displaySolutionIteratorState(
+        solutions[solutionNum], solutionNum, solver.state());
+    };
+
+    this._elements.forward.onclick = () => {
+      solutionNum++;
+      // Always stay an extra step ahead so that we always know if there are
+      // more solutions.
+      if (solutions.length <= solutionNum+1) {
+        nextSolution();
+      }
+      update();
+    };
+    this._elements.back.onclick = () => {
+      solutionNum--;
+      update();
+    };
+    this._elements.start.onclick = () => {
+      let solutionNum = 0;
+      update();
+    };
+
+    // Run next solution twice to get the first two solutions (if they exist)
+    // so that we automatically check for uniqueness.
+    nextSolution();
+    nextSolution();
+    update();
   }
 }

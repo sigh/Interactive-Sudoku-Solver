@@ -223,6 +223,10 @@ const testCases = [
   },
 ];
 
+const loadInput = (input) => {
+  constraintManager.loadFromText(input);
+}
+
 const arrayEquals = (a, b) => {
   if (a.length != b.length) return false;
   for (let i = 0; i < a.length; i++) {

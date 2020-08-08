@@ -494,6 +494,17 @@ class ConstraintSolver {
     return this._state();
   }
 
+  nextSolution() {
+    this._startTimer();
+    let solution = null
+    this._runSolver(1, Infinity, () => {
+      solution = ConstraintSolver._stackToSolution(this.stack);
+    });
+    this._stopTimer();
+
+    return solution;
+  }
+
   reset() {
     this._unwindStack();
     this._initCounters();
@@ -506,6 +517,10 @@ class ConstraintSolver {
   // Returns true if the solver completed successfully without reaching
   // maxIterations.
   _runSolver(maxSolutions, maxIterations, solutionFn) {
+    if (this._done) {
+      return true;
+    }
+
     let stack = this.stack;
 
     // Initialize if the stack is empty.
