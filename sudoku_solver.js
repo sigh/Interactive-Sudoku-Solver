@@ -181,7 +181,7 @@ SudokuConstraint._Anti = class extends SudokuConstraint {
 
   _makeBinaryConstraints() {
     let constraints = [];
-    const boxNumber = (r, c) => ((r-1)/3|0)*3 + c%3;
+    const boxNumber = (r, c) => ((r-1)/3|0)*3 + ((c-1)/3|0)%3;
     for (let r = 1; r < 10; r++) {
       for (let c = 1; c < 10; c++) {
         let cell = SudokuConstraint.AntiKnight._cellId(r, c);

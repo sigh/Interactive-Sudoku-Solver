@@ -1,4 +1,6 @@
-const ITERATION_LIMIT = 10000000;
+const ITERATION_LIMIT = 2000000;
+
+const USE_FUTURE_DEGREE = true;
 
 class Node {
   constructor() {
@@ -19,6 +21,7 @@ class Node {
       this.column.count--;
       this.column.hitSet -= this.value;
     }
+    this.row.count--;
   }
 
   restoreToRow() {
@@ -28,6 +31,7 @@ class Node {
       this.column.count++;
       this.column.hitSet += this.value;
     }
+    this.row.count++;
   }
 
   removeFromColumn() {
@@ -61,6 +65,7 @@ class Node {
     row.left.right = this;
     row.left = this;
     this.row = row;
+    this.row.count++;
   }
 }
 
@@ -114,6 +119,7 @@ class Row extends Node {
     this.id = id;
     this.weight = 1;
     this.removed = false;
+    this.count = 0;
   }
 
   remove() {
@@ -346,32 +352,71 @@ class ConstraintSolver {
     row.restore();
   }
 
+  // Approximate the number of variables constrained by this column.
+  _futureDegree(column) {
+    let degree = 0;
+    column.forEach(node => {
+      degree += node.row.count;
+    });
+    // Determine the average degree per value.
+    degree /= column.count;
+
+    // Then add an extra degree for column in an extra constraint.
+    column.extraConstraints.forEach(constraint => {
+      // Subtract one, as we don't want to count the current column.
+      // NOTE: We could check for only columns which are still uninstantiated
+      //       but that would take longer and doesn't seem to be worth it.
+      degree += constraint.columns.length - 1;
+    });
+
+    return degree;
+  }
+
   _findMinColumn() {
     let matrix = this.matrix;
     let minCol = null;
-    let minCount = Infinity;
+    let minScore = Infinity;
 
     for (let col = matrix.right; col != matrix; col = col.right) {
-      if (col.count < minCount) {
-        // If the value is zero, we'll never go lower.
-        if (col.count == 0) return col;
+      // If the value is zero, we'll never go lower.
+      if (col.count == 0) return col;
+      // If the minScore is negative, we've already seen a column of count
+      // 1, so we are just searching for 0s now.
+      if (minScore < 0) continue;
 
+      if (col.count == 1) {
         minCol = col;
-        minCount = col.count;
+        minScore = -1;
+        continue;
+      }
+
+      let score = col.count;
+      if (USE_FUTURE_DEGREE) {
+        score = col.count / this._futureDegree(col);
+      }
+      if (score < minScore) {
+        minCol = col;
+        minScore = score;
       }
     }
 
     // If column with a unique value, then go with that. Otherwise check if
     // proceed with the more expensive checks.
-    if (minCount == 1) return minCol;
+    if (minScore < 0) return minCol;
 
+    // If we are using future degree, then special handling for sum constraints
+    // is not relavent (it is almost always a higher score.
+    // However, USE_FUTURE_DEGREE does help with sums regardless.
+    if (USE_FUTURE_DEGREE) return minCol;
+
+    // TODO: Update this to be consistent with USE_FUTURE_DEGREE.
     let minConstraint = null;
     for (const c of this._sumConstraints) {
       let countEff = c.effectiveCount();
-      if (countEff > minCount) continue;
+      if (countEff > minScore) continue;
 
       minConstraint = c;
-      minCount = countEff;
+      minScore = countEff;
     }
 
     // If a constraint had a lower effective count, then choose its variable
@@ -707,6 +752,7 @@ class BinaryConstraintHandler extends ConstraintHandler {
     this.adjColumn = adjColumn;
     this.nodeList = nodeList;
     this.onlyApplyWhenFinal = onlyApplyWhenFinal;
+    this.columns = [column, adjColumn];
   }
 
   enforceConsistency() {
@@ -746,6 +792,7 @@ class SumConstraintHandler extends ConstraintHandler {
     this.columns = columns;
     this.sum = sum;
     this.uniqueWeights = uniqueWeights;
+    this.count = columns.length;
   }
 
   enforceConsistency() {
