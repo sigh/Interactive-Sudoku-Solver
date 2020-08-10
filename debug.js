@@ -221,6 +221,12 @@ const testCases = [
       '{"type":"Set","constraints":[{"type":"Diagonal","direction":1},{"type":"Diagonal","direction":-1},{"type":"FixedCells","values":["R1C3#1","R1C7#2","R2C3#2","R2C4#3","R2C9#4","R3C1#4","R4C1#5","R4C3#3","R4C8#6","R5C2#1","R5C9#5","R6C3#6","R7C5#7","R7C6#8","R8C5#9","R9C2#7","R9C6#1","R9C8#9"]}]}',
     expected: ["R1C3#1","R1C7#2","R2C3#2","R2C4#3","R2C9#4","R3C1#4","R4C1#5","R4C3#3","R4C8#6","R5C2#1","R5C9#5","R6C3#6","R7C5#7","R7C6#8","R8C5#9","R9C2#7","R9C6#1","R9C8#9","R8C1#1","R5C3#7","R2C1#7","R7C3#9","R3C3#5","R8C3#8","R9C3#4","R6C5#5","R9C4#5","R1C6#5","R2C6#6","R1C5#4","R2C2#9","R1C4#9","R3C9#9","R4C7#9","R6C1#9","R5C6#9","R2C5#1","R2C7#5","R2C8#8","R8C2#5","R7C8#5","R1C8#3","R1C9#7","R3C8#1","R3C7#6","R3C2#3","R4C4#7","R3C6#7","R4C9#1","R5C4#6","R6C4#1","R7C7#1","R7C4#4","R8C4#2","R3C4#8","R3C5#2","R4C5#8","R5C5#3","R8C6#3","R8C8#4","R5C8#2","R5C1#8","R1C1#6","R1C2#8","R5C7#4","R6C6#2","R4C6#4","R4C2#2","R6C2#4","R6C8#7","R7C2#6","R8C7#7","R8C9#6","R9C1#2","R7C1#3","R7C9#2","R9C5#6","R9C9#8","R6C9#3","R6C7#8","R9C7#3"],
   },
+  {  // 6: https://www.reddit.com/r/sudoku/comments/gk8si6/antiking_antiknight_sudoku_to_compliment_the/
+    name: 'Anti-knight Anti-king',
+    input:
+      '{"type":"Set","constraints":[{"type":"AntiKnight"},{"type":"AntiKing"},{"type":"FixedCells","values":["R1C1#1","R1C7#5","R1C8#6","R1C9#7","R2C1#2","R2C2#3","R2C3#4","R2C9#8"]}]}',
+    expected: ["R1C1#1", "R1C7#5", "R1C8#6", "R1C9#7", "R2C1#2", "R2C2#3", "R2C3#4", "R1C6#4", "R1C5#3", "R1C4#2", "R2C4#5", "R2C5#6", "R2C6#7", "R3C1#5", "R3C2#6", "R3C3#7", "R4C8#7", "R2C9#8", "R1C2#9", "R1C3#8", "R2C7#1", "R2C8#9", "R3C6#8", "R3C5#9", "R3C4#1", "R4C2#8", "R4C3#2", "R4C4#3", "R4C5#4", "R4C1#9", "R4C6#5", "R4C7#6", "R4C9#1", "R5C3#5", "R5C4#6", "R5C5#7", "R6C3#1", "R5C2#4", "R5C1#3", "R6C2#7", "R6C1#6", "R7C1#8", "R7C2#2", "R7C5#5", "R8C1#4", "R8C2#5", "R9C1#7", "R9C2#1", "R5C6#1", "R5C8#8", "R7C8#1", "R7C7#7", "R8C5#1", "R8C4#7", "R8C7#8", "R9C5#2", "R6C5#8", "R6C4#9", "R6C6#2", "R5C7#9", "R5C9#2", "R7C3#3", "R7C4#4", "R7C6#6", "R7C9#9", "R8C3#6", "R8C9#3", "R3C9#4", "R3C8#3", "R3C7#2", "R6C9#5", "R6C8#4", "R6C7#3", "R8C6#9", "R8C8#2", "R9C3#9", "R9C4#8", "R9C6#3", "R9C7#4", "R9C8#5", "R9C9#6"],
+  }
 ];
 
 const loadInput = (input) => {

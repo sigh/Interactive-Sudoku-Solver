@@ -261,9 +261,11 @@ class ConstraintManager {
     this._panel = document.getElementById('displayed-constraints');
 
     this._checkboxes.antiKnight = document.getElementById('anti-knight-input');
+    this._checkboxes.antiKing = document.getElementById('anti-king-input');
     this._checkboxes.diagonalPlus = document.getElementById('diagonal-plus-input');
     this._checkboxes.diagonalMinus = document.getElementById('diagonal-minus-input');
     this._checkboxes.antiKnight.onchange = e => this.runUpdateCallback();
+    this._checkboxes.antiKing.onchange = e => this.runUpdateCallback();
     this._checkboxes.diagonalPlus.onchange = e => {
       if (this._checkboxes.diagonalPlus.checked) {
         this.display.drawDiagonal(1);
@@ -353,6 +355,9 @@ class ConstraintManager {
       case 'AntiKnight':
         this._checkboxes.antiKnight.checked = true;
         break;
+      case 'AntiKing':
+        this._checkboxes.antiKing.checked = true;
+        break;
       case 'Diagonal':
         // TODO: The code for handling constraints is littered around this
         // class and duplicated. Consolidate it into one place.
@@ -435,6 +440,9 @@ class ConstraintManager {
     let constraints = this.configs.map(c => c.constraint);
     if (this._checkboxes.antiKnight.checked) {
       constraints.push(new SudokuConstraint.AntiKnight());
+    }
+    if (this._checkboxes.antiKing.checked) {
+      constraints.push(new SudokuConstraint.AntiKing());
     }
     if (this._checkboxes.diagonalPlus.checked) {
       constraints.push(new SudokuConstraint.Diagonal({direction: 1}));
@@ -544,6 +552,7 @@ class SudokuGrid {
   constructor(container) {
     this.container = container;
     container.classList.add('sudoku-grid');
+    this._solutionValues = [];
 
     this.cellMap = this._makeSudokuGrid(container);
     this.selection = new Selection(container);
@@ -705,6 +714,7 @@ class SudokuGrid {
       node.innerText = '';
       node.classList.remove('cell-multi-solution');
     }
+    this._solutionValues = [];
   }
 
   _formatMultiSolution(values) {
@@ -732,6 +742,7 @@ class SudokuGrid {
       let parsedValueId = this._parseValueId(valueId);
       let cellId = parsedValueId.cellId;
       let value = parsedValueId.value;
+      this._solutionValues.push(valueId);
 
       if (!cellValues.has(cellId)) cellValues.set(cellId, []);
       cellValues.get(cellId).push(value);
@@ -754,6 +765,10 @@ class SudokuGrid {
         node.classList.add('cell-multi-solution');
       }
     }
+  }
+
+  getSolutionValues() {
+    return this._solutionValues;
   }
 }
 

@@ -168,18 +168,18 @@ SudokuConstraint.Thermo = class extends SudokuConstraint {
   }
 }
 
-SudokuConstraint.AntiKnight = class extends SudokuConstraint {
+SudokuConstraint._Anti = class extends SudokuConstraint {
   constructor() {
     super();
     this._constraint = new ConstraintSolver.ConstraintSet(
-      SudokuConstraint.AntiKnight._makeBinaryConstraints());
+      this._makeBinaryConstraints());
   }
 
   static _cellId(r, c) {
     return `R${r}C${c}`;
   }
 
-  static _makeBinaryConstraints() {
+  _makeBinaryConstraints() {
     let constraints = [];
     const boxNumber = (r, c) => ((r-1)/3|0)*3 + c%3;
     for (let r = 1; r < 10; r++) {
@@ -188,7 +188,7 @@ SudokuConstraint.AntiKnight = class extends SudokuConstraint {
         let box = boxNumber(r, c);
         // We only need half the constraints, as the other half will be
         // added by the conflict cell.
-        let conflicts = [[r+1, c+2], [r+2, c+1], [r+1, c-2], [r+2, c-1]];
+        let conflicts = this.cellConflicts(r, c);
         for (const [cr, cc] of conflicts) {
           // Skip any invalid cells or any in the same box as (r, c).
           if (cr > 0 && cr < 10 && cc > 0 && cc < 10) {
@@ -207,6 +207,22 @@ SudokuConstraint.AntiKnight = class extends SudokuConstraint {
 
   toConstraint() {
     return this._constraint;
+  }
+
+  cellConflicts(r, c) {
+    throw('Not implemented');
+  }
+}
+
+SudokuConstraint.AntiKnight = class extends SudokuConstraint._Anti {
+  cellConflicts(r, c) {
+    return [[r+1, c+2], [r+2, c+1], [r+1, c-2], [r+2, c-1]];
+  }
+}
+
+SudokuConstraint.AntiKing = class extends SudokuConstraint._Anti {
+  cellConflicts(r, c) {
+    return [[r+1, c+1], [r+1, c-1]];
   }
 }
 
