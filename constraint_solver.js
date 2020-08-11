@@ -199,45 +199,38 @@ class Matrix extends Node {
 class ColumnAccumulator {
   constructor() {
     this.sawContradiction = false;
+
+    // We keep the invariant that:
+    //   this._extraConstraints contains c <=> c.dirty == this._generation
     this._extraConstraints = [];
+    this._generation = ++ColumnAccumulator.dirtyGeneration;
   }
+
+  static dirtyGeneration = 0;
 
   add(column) {
     if (column.count == 0) {
       this.sawContradiction = true;
-      this._extraConstraints = [];
     }
     if (this.sawContradiction) return;
 
+    let generation = this._generation;
     for (let i = 0; i < column.extraConstraints.length; i++) {
       let c = column.extraConstraints[i];
-      c.dirty = true;
-      this._extraConstraints.push(c);
+      if (c.dirty !== generation) {
+        c.dirty = generation;
+        this._extraConstraints.push(c);
+      }
     }
   }
 
   hasExtraConstraints() {
-    return this._extraConstraints.length > 0;
+    return !this.sawContradiction && this._extraConstraints.length > 0;
   }
 
   popExtraConstraint() {
-    if (this.sawContradiction) return null;
-
-    // The top of the stack will always be dirty:
-    //  - When we add an new item it is always set to dirty.
-    //  - When we remove an item, we clean all the non-dirty items from the
-    //    top of the stack.
     let c = this._extraConstraints.pop();
-    c.dirty = false;
-
-    // Clean up any non-dirty items.
-    // Using a dirty flag is faster than using a Set to dedupe.
-    for (let i = this._extraConstraints.length-1; i >= 0; i--) {
-      if (this._extraConstraints[i].dirty) break;
-      this._extraConstraints.pop();
-    }
-
-    // Return the non-dirty item.
+    c.dirty = 0;
     return c;
   }
 }
@@ -743,7 +736,7 @@ class ConstraintSolver {
 
 class ConstraintHandler {
   constructor() {
-    this.dirty = false;
+    this.dirty = 0;
   }
 }
 
