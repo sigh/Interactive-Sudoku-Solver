@@ -1,3 +1,5 @@
+"use strict";
+
 const ITERATION_LIMIT = 2000000;
 
 const USE_FUTURE_DEGREE = true;
@@ -202,7 +204,7 @@ class ColumnAccumulator {
 
   add(column) {
     if (column.count == 0) {
-      this.sawContradition = true;
+      this.sawContradiction = true;
       this._extraConstraints = [];
     }
     if (this.sawContradiction) return;
@@ -219,7 +221,7 @@ class ColumnAccumulator {
   }
 
   popExtraConstraint() {
-    if (this.sawContradition) return null;
+    if (this.sawContradiction) return null;
 
     // The top of the stack will always be dirty:
     //  - When we add an new item it is always set to dirty.
@@ -709,7 +711,7 @@ class ConstraintSolver {
     this._arcInconsistencyMap.set(row, removedRows);
 
     let pending = updatedColumns;
-    if (updatedColumns.sawContradition) return;
+    if (updatedColumns.sawContradiction) return;
 
     while (pending.hasExtraConstraints()) {
       let constraint = pending.popExtraConstraint();
@@ -723,7 +725,7 @@ class ConstraintSolver {
         if (!row.removed) {
           removedRows.push(row);
           this._removeInvalidRow(row, pending);
-          if (pending.sawContradition) return;
+          if (pending.sawContradiction) return;
         }
       }
     }
