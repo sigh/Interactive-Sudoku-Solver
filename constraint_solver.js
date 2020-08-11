@@ -1,6 +1,6 @@
 "use strict";
 
-const ITERATION_LIMIT = 2000000;
+const ITERATION_LIMIT = 3000000;
 
 const USE_FUTURE_DEGREE = true;
 
@@ -350,19 +350,19 @@ class ConstraintSolver {
   // Approximate the number of variables constrained by this column.
   _futureDegree(column) {
     let degree = 0;
-    column.forEach(node => {
+    for (let node = column.down; node != column; node = node.down) {
       degree += node.row.count;
-    });
+    }
     // Determine the average degree per value.
     degree /= column.count;
 
     // Then add an extra degree for column in an extra constraint.
-    column.extraConstraints.forEach(constraint => {
+    for (const constraint of column.extraConstraints) {
       // Subtract one, as we don't want to count the current column.
       // NOTE: We could check for only columns which are still uninstantiated
       //       but that would take longer and doesn't seem to be worth it.
       degree += constraint.columns.length - 1;
-    });
+    }
 
     return degree;
   }
