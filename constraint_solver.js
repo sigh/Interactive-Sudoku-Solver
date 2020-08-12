@@ -204,6 +204,8 @@ class ColumnAccumulator {
     //   this._extraConstraints contains c <=> c.dirty == this._generation
     this._extraConstraints = [];
     this._generation = ++ColumnAccumulator.dirtyGeneration;
+
+    this._forcedColumns = [];
   }
 
   static dirtyGeneration = 0;
@@ -213,6 +215,10 @@ class ColumnAccumulator {
       this.sawContradiction = true;
     }
     if (this.sawContradiction) return;
+
+    if (column.count == 1 && !column.removed) {
+      this._forcedColumns.push(column);
+    }
 
     let generation = this._generation;
     for (let i = 0; i < column.extraConstraints.length; i++) {
@@ -232,6 +238,14 @@ class ColumnAccumulator {
     let c = this._extraConstraints.pop();
     c.dirty = 0;
     return c;
+  }
+
+  popForcedColumn() {
+    while (this._forcedColumns.length) {
+      let col = this._forcedColumns.pop();
+      if (!col.removed) return col;
+    }
+    return null;
   }
 }
 
@@ -262,6 +276,7 @@ class ConstraintSolver {
     };
     this._initTimer();
     this._arcInconsistencyMap = new Map();
+    this._columnAccumulator = new ColumnAccumulator();
   }
 
   _initTimer() {
@@ -295,8 +310,7 @@ class ConstraintSolver {
   //
   // Returns true if the remaining matrix is still consistent (assuming the
   // initial matrix was consistent).
-  _removeCandidateRow(row) {
-    let updatedColumns = new ColumnAccumulator();
+  _removeCandidateRow(row, updatedColumns) {
     row.remove();
     row.forEach((rowNode) => {
       rowNode.removeFromColumn();
@@ -372,7 +386,15 @@ class ConstraintSolver {
     return degree;
   }
 
-  _findMinColumn() {
+  _findMinColumn(updatedColumns) {
+    if (updatedColumns.sawContradiction) {
+      throw('updatedColumns shuld not have a contradiction');
+    }
+    let forcedColumn = updatedColumns.popForcedColumn();
+    if (forcedColumn) {
+      return forcedColumn;
+    }
+
     let matrix = this.matrix;
     let minCol = null;
     let minScore = Infinity;
@@ -534,7 +556,7 @@ class ConstraintSolver {
 
     // Initialize if the stack is empty.
     if (stack.length == 0) {
-      let minColumn = this._findMinColumn();
+      let minColumn = this._findMinColumn(this._columnAccumulator);
       // If there are no columns, then there is 1 solution - the trival one.
       if (!minColumn) {
         this._addSolution();
@@ -570,9 +592,12 @@ class ConstraintSolver {
       // If there was more than one node to choose from, then this was a guess.
       if (node.down.column != null) numGuesses++;
 
-      if (!this._removeCandidateRow(node.row)) continue;
+      if (!this._removeCandidateRow(node.row, this._columnAccumulator)) {
+        this._columnAccumulator = new ColumnAccumulator();
+        continue;
+      }
 
-      let column = this._findMinColumn();
+      let column = this._findMinColumn(this._columnAccumulator);
       if (!column) {
         solutionFn();
         numSolutions++;
@@ -647,7 +672,8 @@ class ConstraintSolver {
         // to do anything.
         if (validRows.has(row.id)) continue;
 
-        if (!this._removeCandidateRow(row)) {
+        this._columnAccumulator = new ColumnAccumulator();
+        if (!this._removeCandidateRow(row, this._columnAccumulator)) {
           this._restoreCandidateRow(row);
           continue;
         }
