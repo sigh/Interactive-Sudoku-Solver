@@ -243,20 +243,25 @@ class ConstraintSolver {
 
     constraints.forEach(c => c.apply(this));
 
-    this._arcInconsistencyMap = new Map();
-    this.stack = [];
-    this._done = false;
-    this._initCounters();
-    this._initTimer();
+    this._stack = [];
+
+    this._init();
   }
 
-  _initCounters() {
+  _init() {
+    if (this._stack.length > 0) {
+      throw("Can't initialize ConstraintSolver when stack is not empty.");
+    }
+
+    this._done = false;
     this._counters = {
       nodesSearched: 0,
       columnsSearched: 0,
       guesses: 0,
       solutions: 0,
     };
+    this._initTimer();
+    this._arcInconsistencyMap = new Map();
   }
 
   _initTimer() {
@@ -435,7 +440,7 @@ class ConstraintSolver {
     this._initTimer();
     this._startTimer();
     this._solve(
-      2, () => solutions.push(ConstraintSolver._stackToSolution(this.stack)));
+      2, () => solutions.push(ConstraintSolver._stackToSolution(this._stack)));
     this._stopTimer();
 
     let solution = solutions[0] || [];
@@ -478,7 +483,7 @@ class ConstraintSolver {
   }
 
   _state() {
-    let partialSolution = ConstraintSolver._stackToSolution(this.stack);
+    let partialSolution = ConstraintSolver._stackToSolution(this._stack);
     if (partialSolution[partialSolution.length-1] === undefined) {
       partialSolution.pop();
     }
@@ -503,7 +508,7 @@ class ConstraintSolver {
     this._startTimer();
     let solution = null
     this._runSolver(1, Infinity, () => {
-      solution = ConstraintSolver._stackToSolution(this.stack);
+      solution = ConstraintSolver._stackToSolution(this._stack);
     });
     this._stopTimer();
 
@@ -512,8 +517,7 @@ class ConstraintSolver {
 
   reset() {
     this._unwindStack();
-    this._initCounters();
-    this._initTimer();
+    this._init();
     return this.state();
   }
 
@@ -526,7 +530,7 @@ class ConstraintSolver {
       return true;
     }
 
-    let stack = this.stack;
+    let stack = this._stack;
 
     // Initialize if the stack is empty.
     if (stack.length == 0) {
@@ -537,7 +541,7 @@ class ConstraintSolver {
         this._counters.solutions++;
         return true;
       }
-      this.stack.push(minColumn);
+      this._stack.push(minColumn);
     }
 
     let numNodesSearched = 0;
@@ -595,7 +599,7 @@ class ConstraintSolver {
   }
 
   _unwindStack() {
-    let stack = this.stack;
+    let stack = this._stack;
     while (stack.length) {
       let node = stack.pop();
       if (node.column != null) {  // If the node is not a column header.
@@ -625,7 +629,7 @@ class ConstraintSolver {
 
     // Do initial solve to see if we have 0, 1 or many solutions.
     this._solve(
-      2, () => solutions.push(ConstraintSolver._stackToSolution(this.stack)));
+      2, () => solutions.push(ConstraintSolver._stackToSolution(this._stack)));
 
     // Every value in the solutions is a valid row.
     let validRows = new Set();
@@ -649,7 +653,7 @@ class ConstraintSolver {
         }
 
         this._solve(1, () => {
-          let solution = ConstraintSolver._stackToSolution(this.stack);
+          let solution = ConstraintSolver._stackToSolution(this._stack);
           solution.unshift(row.id);
           solution.forEach(e => validRows.add(e));
           solutions.push(solution);
