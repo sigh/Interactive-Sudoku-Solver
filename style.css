@@ -48,6 +48,14 @@
   pointer-events: none;
 }
 
+.sudoku-grid.solving .cell-solution {
+  color: rgb(128, 128, 128);
+}
+
+#state-output.solving {
+  color: rgb(128, 128, 128);
+}
+
 .cell-multi-solution {
   font-size: 15px;
   line-height: 17px;
@@ -127,4 +135,11 @@ textarea {
 
 #display-panel {
   line-height: 2;
+}
+
+#progress {
+  text-align: center;
+  font-weight: bold;
+  font-size: large;
+  color: darkviolet;
 }

@@ -315,7 +315,6 @@ class ConstraintManager {
     this.setUpdateCallback();
 
     this.clear();
-    this.grid.clearSolution();
     let constraint = SudokuConstraint.fromText(input);
     if (constraint) this.loadConstraint(constraint);
 
@@ -465,6 +464,7 @@ class ConstraintManager {
     }
     this.configs = [];
     this.grid.clearCellValues()
+    this.grid.clearSolution();
     this.runUpdateCallback();
   }
 }
@@ -787,6 +787,8 @@ class SolutionController {
       control: document.getElementById('solution-control-panel'),
       stepOutput: document.getElementById('solution-step-output'),
       mode: document.getElementById('solve-mode-input'),
+      stateOutput: document.getElementById('state-output'),
+      progress: document.getElementById('progress'),
     }
 
     this._elements.mode.onchange = () => this.update();
@@ -811,33 +813,45 @@ class SolutionController {
   }
 
   update() {
+    this._grid.container.classList.add('solving');
+    this._elements.stateOutput.classList.add('solving');
     this._elements.control.style.visibility = (
       this._elements.mode.value == 'all-possibilities' ? 'hidden' : 'visible');
+    this._setProgress('Solving');
 
-    try {
-      let builder = new SudokuBuilder();
-      let cs = constraintManager.getConstraints();
-      builder.addConstraint(cs);
+    window.setTimeout(() => {  // Force rendering before we solve.
+      try {
+        let builder = new SudokuBuilder();
+        let cs = constraintManager.getConstraints();
+        builder.addConstraint(cs);
 
-      let solver = builder.build();
+        let solver = builder.build();
 
-      switch (this._elements.mode.value) {
-        case 'all-possibilities':
-          let result = solver.solveAllPossibilities();
-          this._grid.setSolution(result.values);
-          this._displayState(result);
-          return;
-        case 'one-solution':
-          this._runSolutionIterator(solver);
-          return;
-        case 'step-by-step':
-          this._runStepByStep(solver);
-          return;
+        switch (this._elements.mode.value) {
+          case 'all-possibilities':
+            let result = solver.solveAllPossibilities();
+            this._grid.setSolution(result.values);
+            this._displayState(result);
+            break;
+          case 'one-solution':
+            this._runSolutionIterator(solver);
+            break;
+          case 'step-by-step':
+            this._runStepByStep(solver);
+            break;
+        }
+        this._grid.container.classList.remove('solving');
+        this._elements.stateOutput.classList.remove('solving');
+      } catch(e) {
+        let errorElem = document.getElementById('error-output');
+        errorElem.innerText = e;
       }
-    } catch(e) {
-      let errorElem = document.getElementById('error-output');
-      errorElem.innerText = e;
-    }
+      this._setProgress();
+    });
+  }
+
+  _setProgress(text) {
+    this._elements.progress.textContent = text || '';
   }
 
   static _addStateVariable(container, label, value) {
@@ -856,7 +870,7 @@ class SolutionController {
   _displayState(state) {
     let counters = state.counters;
 
-    let container = document.getElementById('state-output');
+    let container = this._elements.stateOutput;
     container.innerHTML = '';
 
     let solutionText = counters.solutions + (state.done ? '' : '+');
