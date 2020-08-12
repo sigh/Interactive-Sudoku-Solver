@@ -386,7 +386,7 @@ class ConstraintSolver {
     return degree;
   }
 
-  _findMinColumn(updatedColumns) {
+  _selectNextColumn(updatedColumns) {
     if (updatedColumns.sawContradiction) {
       throw('updatedColumns shuld not have a contradiction');
     }
@@ -556,14 +556,14 @@ class ConstraintSolver {
 
     // Initialize if the stack is empty.
     if (stack.length == 0) {
-      let minColumn = this._findMinColumn(this._columnAccumulator);
+      let column = this._selectNextColumn(this._columnAccumulator);
       // If there are no columns, then there is 1 solution - the trival one.
-      if (!minColumn) {
+      if (!column) {
         this._addSolution();
         this._counters.solutions++;
         return true;
       }
-      this._stack.push(minColumn);
+      this._stack.push(column);
     }
 
     let numNodesSearched = 0;
@@ -597,7 +597,7 @@ class ConstraintSolver {
         continue;
       }
 
-      let column = this._findMinColumn(this._columnAccumulator);
+      let column = this._selectNextColumn(this._columnAccumulator);
       if (!column) {
         solutionFn();
         numSolutions++;
