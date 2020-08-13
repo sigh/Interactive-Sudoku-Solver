@@ -912,20 +912,33 @@ class SolutionController {
   }
 
   _runStepByStep(solver) {
-    let state = null;
+    let step = 0;
+    let iter = null;
+
+    const forwardNSteps = (n) => {
+      step += n;
+      while (n-- > 0) {
+        iter.next();
+      }
+      this._displayStepByStepState(solver.state());
+    };
+    const reset = () => {
+      solver.reset();
+      iter = solver.steps();
+      step = 0;
+    }
 
     this._elements.forward.onclick = () => {
-      state = solver.step(1);
-      this._displayStepByStepState(state);
+      forwardNSteps(1);
     };
     this._elements.back.onclick = () => {
-      solver.reset();
-      state = solver.step(state.step-1);
-      this._displayStepByStepState(state);
+      let prevStep = step - 1;
+      reset();
+      forwardNSteps(prevStep);
     };
     this._elements.start.onclick = () => {
-      state = solver.reset();
-      this._displayStepByStepState(state);
+      reset();
+      forwardNSteps(0);
     };
 
     // Run the onclick handler (just calling click() would only work when
@@ -946,10 +959,11 @@ class SolutionController {
 
   _runSolutionIterator(solver) {
     let solutions = [];
+    let iter = solver.solutions();
     let solutionNum = 0;
 
     const nextSolution = () => {
-      solutions.push(solver.nextSolution());
+      solutions.push(iter.next().value);
     };
 
     const update = () => {
