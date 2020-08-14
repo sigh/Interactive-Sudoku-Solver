@@ -4,4 +4,4 @@ const afterRedraw = async (fn) => {
       resolve(fn());
     });
   });
-};
+}

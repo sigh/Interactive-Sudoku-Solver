@@ -772,8 +772,62 @@ class SudokuGrid {
   }
 }
 
+class WorkerProxy {
+  constructor() {
+    this._worker = new Worker('worker.js');
+    this._worker.addEventListener('message', (msg) => this._handleMessage(msg));
+
+    this._waiting = new Map();
+    this._msgId = 0;
+  }
+
+  _handleMessage(response) {
+    let resolve = this._waiting.get(response.data.msgId);
+    if (resolve) {
+      this._waiting.delete(response.data.msgId);
+      resolve(response.data.result);
+    }
+  }
+
+  _callWorker(action, payload) {
+    let msgId = this._msgId++;
+    let promise = new Promise((resolve, reject) => {
+      this._waiting.set(msgId, resolve);
+    });
+
+    this._worker.postMessage({
+      action: action,
+      payload: payload,
+      msgId: msgId
+    });
+    return promise;
+  }
+
+  async solveAllPossibilies(constraint) {
+    return this._callWorker(
+      'solveAllPossibilies', JSON.stringify(constraint));
+  }
+
+  solutionIterator(constraint) {
+    let promise = this._callWorker(
+      'solutionIterator', JSON.stringify(constraint));
+    return {
+      next: async () => {
+        let result = await promise;
+        if (!result.done) {
+          promise = this._callWorker('nextSolution');
+        } else {
+          promise = null;
+        }
+        return result;
+      }
+    };
+  }
+};
+
 class SolutionController {
   constructor(constraintManager, grid) {
+    this._workerProxy = new WorkerProxy();
     this._constraintManager = constraintManager;
     this._grid = grid;
     constraintManager.setUpdateCallback(collapseFnCalls(() => {
@@ -819,22 +873,18 @@ class SolutionController {
     this._setProgress('Solving');
     this._setSolving(true);
 
-    afterRedraw(() => {
+    afterRedraw(async () => {
       try {
-        let builder = new SudokuBuilder();
-        let cs = constraintManager.getConstraints();
-        builder.addConstraint(cs);
-
-        let solver = builder.build();
+        let constraint = constraintManager.getConstraints();
 
         switch (this._elements.mode.value) {
           case 'all-possibilities':
-            let result = solver.solveAllPossibilities();
+            let result = await this._workerProxy.solveAllPossibilies(constraint);
             this._grid.setSolution(result.values);
             this._displayState(result);
             break;
           case 'one-solution':
-            this._runSolutionIterator(solver);
+            this._runSolutionIterator(constraint);
             break;
           case 'step-by-step':
             this._runStepByStep(solver);
@@ -967,18 +1017,24 @@ class SolutionController {
     this._displayState(state);
   }
 
-  async _runSolutionIterator(solver) {
+  async _runSolutionIterator(constraint) {
+    let iter = this._workerProxy.solutionIterator(constraint);
     let solutions = [];
-    let iter = solver.solutions();
     let solutionNum = 0;
+    let state = null;
 
-    const nextSolution = () => {
-      solutions.push(iter.next().value);
+    const nextSolution = async (message) => {
+      this._setProgress(message);
+      let next = await iter.next();
+      state = next.state;
+      if (!next.done) {
+        solutions.push(next.value);
+      }
     };
 
     const update = () => {
       this._displaySolutionIteratorState(
-        solutions[solutionNum], solutionNum, solver.state());
+        solutions[solutionNum], solutionNum, state);
     };
 
     this._elements.forward.onclick = async () => {
@@ -986,8 +1042,7 @@ class SolutionController {
       // Always stay an extra step ahead so that we always know if there are
       // more solutions.
       if (solutions.length <= solutionNum+1) {
-        this._setProgress('Finding next solution');
-        await afterRedraw(nextSolution);
+        await nextSolution('Finding next solution');
       }
       update();
     };
@@ -1001,14 +1056,13 @@ class SolutionController {
     };
 
     // Find the first solution.
-    nextSolution();
+    await nextSolution('Solving');
     update();
     if (!solutions[0]) return;
 
     // If we found one solution, keep searching so that we can check if the
     // solution is unique.
-    this._setProgress('Checking uniqueness');
-    await afterRedraw(nextSolution);
+    await nextSolution('Checking uniqueness');
     update();
   }
 }
