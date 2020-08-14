@@ -789,6 +789,7 @@ class SolutionController {
       mode: document.getElementById('solve-mode-input'),
       stateOutput: document.getElementById('state-output'),
       progress: document.getElementById('progress'),
+      error: document.getElementById('error-output'),
     }
 
     this._elements.mode.onchange = () => this.update();
@@ -813,13 +814,12 @@ class SolutionController {
   }
 
   update() {
-    this._grid.container.classList.add('solving');
-    this._elements.stateOutput.classList.add('solving');
     this._elements.control.style.visibility = (
       this._elements.mode.value == 'all-possibilities' ? 'hidden' : 'visible');
     this._setProgress('Solving');
+    this._setSolving(true);
 
-    window.setTimeout(() => {  // Force rendering before we solve.
+    afterRedraw(() => {
       try {
         let builder = new SudokuBuilder();
         let cs = constraintManager.getConstraints();
@@ -840,18 +840,27 @@ class SolutionController {
             this._runStepByStep(solver);
             break;
         }
-        this._grid.container.classList.remove('solving');
-        this._elements.stateOutput.classList.remove('solving');
       } catch(e) {
-        let errorElem = document.getElementById('error-output');
-        errorElem.innerText = e;
+        this._setError(e);
+        this._setProgress();
       }
-      this._setProgress();
     });
   }
 
   _setProgress(text) {
     this._elements.progress.textContent = text || '';
+  }
+  _setError(text) {
+    this._elements.error.textContent = text || '';
+  }
+  _setSolving(isSolving) {
+    if (isSolving) {
+      this._grid.container.classList.add('solving');
+      this._elements.stateOutput.classList.add('solving');
+    } else {
+      this._grid.container.classList.remove('solving');
+      this._elements.stateOutput.classList.remove('solving');
+    }
   }
 
   static _addStateVariable(container, label, value) {
@@ -890,8 +899,9 @@ class SolutionController {
     SolutionController._addStateVariable(
       container, 'Runtime', SolutionController._formatTimeMs(state.timeMs));
 
-    let errorElem = document.getElementById('error-output');
-    errorElem.innerText = '';
+    this._setError();
+    this._setProgress();
+    this._setSolving(false);
   }
 
   _displayStepByStepState(state) {
@@ -957,7 +967,7 @@ class SolutionController {
     this._displayState(state);
   }
 
-  _runSolutionIterator(solver) {
+  async _runSolutionIterator(solver) {
     let solutions = [];
     let iter = solver.solutions();
     let solutionNum = 0;
@@ -971,12 +981,13 @@ class SolutionController {
         solutions[solutionNum], solutionNum, solver.state());
     };
 
-    this._elements.forward.onclick = () => {
+    this._elements.forward.onclick = async () => {
       solutionNum++;
       // Always stay an extra step ahead so that we always know if there are
       // more solutions.
       if (solutions.length <= solutionNum+1) {
-        nextSolution();
+        this._setProgress('Finding next solution');
+        await afterRedraw(nextSolution);
       }
       update();
     };
@@ -989,10 +1000,15 @@ class SolutionController {
       update();
     };
 
-    // Run next solution twice to get the first two solutions (if they exist)
-    // so that we automatically check for uniqueness.
+    // Find the first solution.
     nextSolution();
-    nextSolution();
+    update();
+    if (!solutions[0]) return;
+
+    // If we found one solution, keep searching so that we can check if the
+    // solution is unique.
+    this._setProgress('Checking uniqueness');
+    await afterRedraw(nextSolution);
     update();
   }
 }
