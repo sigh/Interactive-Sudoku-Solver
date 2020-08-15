@@ -774,11 +774,15 @@ class SudokuGrid {
 
 class WorkerProxy {
   constructor() {
-    this._worker = new Worker('worker.js');
-    this._worker.addEventListener('message', (msg) => this._handleMessage(msg));
+    this._initWorker();
 
     this._waiting = new Map();
     this._msgId = 0;
+  }
+
+  _initWorker() {
+    this._worker = new Worker('worker.js');
+    this._worker.addEventListener('message', (msg) => this._handleMessage(msg));
   }
 
   _handleMessage(response) {
@@ -823,6 +827,11 @@ class WorkerProxy {
       }
     };
   }
+
+  terminate() {
+    this._worker.terminate();
+    this._initWorker();
+  }
 };
 
 class SolutionController {
@@ -844,9 +853,14 @@ class SolutionController {
       stateOutput: document.getElementById('state-output'),
       progress: document.getElementById('progress'),
       error: document.getElementById('error-output'),
+      stop: document.getElementById('stop-solver'),
     }
 
     this._elements.mode.onchange = () => this.update();
+    this._elements.stop.onclick = () => {
+      this._workerProxy.terminate();
+      this._setProgress('Aborted');
+    }
 
     this._setUpStepByStep();
   }
@@ -907,9 +921,11 @@ class SolutionController {
     if (isSolving) {
       this._grid.container.classList.add('solving');
       this._elements.stateOutput.classList.add('solving');
+      this._elements.stop.disabled = false;
     } else {
       this._grid.container.classList.remove('solving');
       this._elements.stateOutput.classList.remove('solving');
+      this._elements.stop.disabled = true;
     }
   }
 

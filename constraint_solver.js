@@ -1,7 +1,5 @@
 "use strict";
 
-const ITERATION_LIMIT = 3000000;
-
 const USE_FUTURE_DEGREE = true;
 
 class Node {
@@ -463,14 +461,11 @@ class ConstraintSolver {
   // Solve until maxSolutions are found, and returns leaving the stack
   // fully unwound.
   _solve(maxSolutions, solutionFn) {
-    let iter = this._runSolver(ITERATION_LIMIT);
+    let iter = this._runSolver(Infinity);
     let numSolutions = 0;
     while (numSolutions < maxSolutions) {
       let result = iter.next();
       if (result.done) break;
-      if (!result.value) {
-        throw(`Reached iteration limit of ${ITERATION_LIMIT} without completing`);
-      }
       solutionFn(result.value);
       numSolutions++;
     }
@@ -518,11 +513,8 @@ class ConstraintSolver {
 
   *solutions() {
     this._startTimer();
-    for (const result of this._runSolver(ITERATION_LIMIT)) {
+    for (const result of this._runSolver(Infinity)) {
       this._stopTimer();
-      if (!result) {
-        throw(`Reached iteration limit of ${ITERATION_LIMIT} without completing`);
-      }
       yield ConstraintSolver._stackToSolution(this._stack);
       this._startTimer();
     }
