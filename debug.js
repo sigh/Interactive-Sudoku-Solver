@@ -229,6 +229,10 @@ const testCases = [
   }
 ];
 
+const sleep = (ms) => {
+  return new Promise(resolve => setTimeout(resolve, ms));
+};
+
 const loadInput = (input) => {
   constraintManager.loadFromText(input);
 }

@@ -7,6 +7,7 @@
 
 <script src="util.js"></script>
 <script src="constraint_solver.js"></script>
+<script src="solver_proxy.js"></script>
 <script src="sudoku_grid.js"></script>
 <script src="sudoku_solver.js"></script>
 <script src="debug.js"></script>
@@ -30,9 +31,9 @@
     <div>
       Mode:
       <select id="solve-mode-input">
+        <option value="step-by-step" checked>Step-by-step</option>
         <option value="all-possibilities">All Possibilties</option>
         <option value="one-solution">One solution</option>
-        <option value="step-by-step" checked>Step-by-step</option>
       </select>
     </div>
     <div>

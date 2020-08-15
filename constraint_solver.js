@@ -266,6 +266,7 @@ class ConstraintSolver {
     }
 
     this._done = false;
+    this._iter = null;
     this._counters = {
       nodesSearched: 0,
       columnsSearched: 0,
@@ -461,7 +462,8 @@ class ConstraintSolver {
   // Solve until maxSolutions are found, and returns leaving the stack
   // fully unwound.
   _solve(maxSolutions, solutionFn) {
-    let iter = this._runSolver(Infinity);
+    let iter = this._runSolver();
+
     let numSolutions = 0;
     while (numSolutions < maxSolutions) {
       let result = iter.next();
@@ -479,51 +481,74 @@ class ConstraintSolver {
     return counters;
   }
 
+  reset() {
+    this._unwindStack();
+    this._init();
+  }
+
   state() {
-    let partialSolution = ConstraintSolver._stackToSolution(this._stack);
-    if (partialSolution[partialSolution.length-1] === undefined) {
-      partialSolution.pop();
-    }
     return {
-      values: partialSolution,
-      remainingOptions: this.remainingRows(),
-      step: this._counters.nodesSearched,
       counters: this._getCounters(),
       timeMs: this._timeMs,
       done: this._done,
     }
   }
 
-  reset() {
-    this._unwindStack();
-    this._init();
+  _getIter(iterationsUntilYield) {
+    // If an iterator doesn't exist, then create it.
+    if (!this._iter) {
+      if (this._stack.length) {
+        throw("Can't create iterator when stack is not empty");
+      }
+
+      this._iter = this._runSolver(iterationsUntilYield);
+    }
+
+    return this._iter;
   }
 
-  *steps() {
+  nextSolution() {
+    let iter = this._getIter();
+
     this._startTimer();
-    for (const result of this._runSolver(1)) {
-      this._stopTimer();
-      // Only yield steps, not solutions!
-      if (!result) yield null;
-      this._startTimer();
+    let result = this._iter.next();
+    this._stopTimer();
+
+    if (result.done) return null;
+
+    return ConstraintSolver._stackToSolution(result.value);
+  }
+
+  goToStep(n) {
+    // Easiest way to go backwards is to start from the start again.
+    if (n < this._counters.nodesSearched) this.reset();
+
+    let iter = this._getIter(1);
+
+    // Iterate until we have seen n steps.
+    this._startTimer();
+    while (this._counters.nodesSearched + this._done < n && !this._done) {
+      iter.next(1);
     }
     this._stopTimer();
-  }
 
+    if (this._done) return null;
 
-  *solutions() {
-    this._startTimer();
-    for (const result of this._runSolver(Infinity)) {
-      this._stopTimer();
-      yield ConstraintSolver._stackToSolution(this._stack);
-      this._startTimer();
+    let partialSolution = ConstraintSolver._stackToSolution(this._stack);
+    if (partialSolution[partialSolution.length-1] === undefined) {
+      partialSolution.pop();
     }
-    this._stopTimer();
+    return {
+      values: partialSolution,
+      remainingOptions: this._remainingRows(),
+    }
   }
 
-  // _runSolver runs the solver yielding each solution.
-  // It also yields null every yieldIterations.
-  *_runSolver(yieldIterations) {
+  // _runSolver runs the solver yielding each solution, and optionally at
+  // intermediate steps.
+  // The value returned to yeild determines how many steps to run for (-1 for
+  // no limit).
+  *_runSolver(iterationsUntilYield) {
     if (this._done) {
       return true;
     }
@@ -542,13 +567,12 @@ class ConstraintSolver {
       this._stack.push(column);
     }
 
-    let iterationsUntilYield = yieldIterations;
     let counters = this._counters;
+    iterationsUntilYield = iterationsUntilYield || -1;
 
     while (stack.length) {
       if (!iterationsUntilYield) {
-        yield null;
-        iterationsUntilYield = yieldIterations;
+        iterationsUntilYield = (yield null) || -1;
       }
       let node = stack.pop();
 
@@ -579,7 +603,7 @@ class ConstraintSolver {
       let column = this._selectNextColumn(this._columnAccumulator);
       if (!column) {
         counters.solutions++;
-        yield this._stack;
+        iterationsUntilYield = (yield this._stack) || -1;
         continue;
       }
 
@@ -601,9 +625,10 @@ class ConstraintSolver {
       }
     }
     this._done = false;
+    this._iter = null;  // This always invalidates the iterator.
   }
 
-  remainingRows() {
+  _remainingRows() {
     let rows = [];
     let matrix = this.matrix;
     for (let row = matrix.down; row != matrix; row = row.down) {
@@ -665,13 +690,9 @@ class ConstraintSolver {
 
     this._stopTimer();
 
-    return {
-      values: [...validRows],
-      counters: this._getCounters(),
-      timeMs: this._timeMs,
-      solutionsSeen: solutions,
-      done: solutions.length < 2,
-    }
+    this._done = solutions.length < 2;
+
+    return [...validRows];
   }
 
   _getVariable(variable) {

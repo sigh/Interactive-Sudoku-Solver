@@ -1,40 +1,50 @@
 self.importScripts('constraint_solver.js');
 self.importScripts('sudoku_solver.js');
 
-let solver = null;
-let iter = null;
+let workerSolver = null;
 
-const ACTIONS = {
-  solveAllPossibilies: (jsonConstraint) => {
-    solver = makeSolver(jsonConstraint);
-    let result = solver.solveAllPossibilities();
-    solver = null;
-    return result;
-  },
-  solutionIterator: (jsonConstraint) => {
-    solver = makeSolver(jsonConstraint);
-    iter = solver.solutions()
-    return ACTIONS.nextSolution();
-  },
-  nextSolution: () => {
-    let next = iter.next();
-    next.state = solver.state();
-    return next;
-  },
+const handleWorkerMethod = (method, payload) => {
+  switch (method) {
+    case 'init':
+      let constraint = SudokuConstraint.fromJSON(payload);
+      let builder = new SudokuBuilder();
+      builder.addConstraint(constraint);
+
+      workerSolver = builder.build();
+
+      return true;
+
+    case 'solveAllPossibilities':
+      return workerSolver.solveAllPossibilities();
+
+    case 'nextSolution':
+      return workerSolver.nextSolution();
+
+    case 'goToStep':
+      return workerSolver.goToStep(payload);
+  }
+  throw(`Unknown method ${method}`);
 };
 
-self.onmessage = (msg) => {
-  let result = ACTIONS[msg.data.action](msg.data.payload);
+const sendState = () => {
   self.postMessage({
-    result: result,
-    msgId: msg.data.msgId,
+    type: 'state',
+    state: workerSolver.state(),
   });
 };
 
-const makeSolver = (jsonConstraint) => {
-  let constraint = SudokuConstraint.fromJSON(jsonConstraint);
-  let builder = new SudokuBuilder();
-  builder.addConstraint(constraint);
-
-  return builder.build();
+self.onmessage = (msg) => {
+  try {
+    let result = handleWorkerMethod(msg.data.method, msg.data.payload);
+    sendState();
+    self.postMessage({
+      type: 'result',
+      result: result,
+    });
+  } catch(e) {
+    self.postMessage({
+      type: 'exception',
+      error: e,
+    });
+  }
 };

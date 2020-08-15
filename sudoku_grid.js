@@ -6,8 +6,7 @@ const CHAR_9 = '9'.charCodeAt(0);
 
 const CELL_SIZE = 52;
 
-let grid, constraintManager;
-let solution;
+let grid, constraintManager, controller;
 
 const collapseFnCalls = (fn) => {
   let alreadyEnqueued = false;
@@ -32,6 +31,8 @@ const initPage = () => {
 
   let solutionController = new SolutionController(constraintManager, grid);
   solutionController.update();
+
+  controller = solutionController;
 };
 
 // We never need more than 5 colors since the max degree of the graph is 4.
@@ -772,71 +773,9 @@ class SudokuGrid {
   }
 }
 
-class WorkerProxy {
-  constructor() {
-    this._initWorker();
-
-    this._waiting = new Map();
-    this._msgId = 0;
-  }
-
-  _initWorker() {
-    this._worker = new Worker('worker.js');
-    this._worker.addEventListener('message', (msg) => this._handleMessage(msg));
-  }
-
-  _handleMessage(response) {
-    let resolve = this._waiting.get(response.data.msgId);
-    if (resolve) {
-      this._waiting.delete(response.data.msgId);
-      resolve(response.data.result);
-    }
-  }
-
-  _callWorker(action, payload) {
-    let msgId = this._msgId++;
-    let promise = new Promise((resolve, reject) => {
-      this._waiting.set(msgId, resolve);
-    });
-
-    this._worker.postMessage({
-      action: action,
-      payload: payload,
-      msgId: msgId
-    });
-    return promise;
-  }
-
-  async solveAllPossibilies(constraint) {
-    return this._callWorker(
-      'solveAllPossibilies', JSON.stringify(constraint));
-  }
-
-  solutionIterator(constraint) {
-    let promise = this._callWorker(
-      'solutionIterator', JSON.stringify(constraint));
-    return {
-      next: async () => {
-        let result = await promise;
-        if (!result.done) {
-          promise = this._callWorker('nextSolution');
-        } else {
-          promise = null;
-        }
-        return result;
-      }
-    };
-  }
-
-  terminate() {
-    this._worker.terminate();
-    this._initWorker();
-  }
-};
-
 class SolutionController {
   constructor(constraintManager, grid) {
-    this._workerProxy = new WorkerProxy();
+    this._solver = null;
     this._constraintManager = constraintManager;
     this._grid = grid;
     constraintManager.setUpdateCallback(collapseFnCalls(() => {
@@ -858,14 +797,16 @@ class SolutionController {
 
     this._elements.mode.onchange = () => this.update();
     this._elements.stop.onclick = () => {
-      this._workerProxy.terminate();
-      this._setProgress('Aborted');
+      this._solver.terminate();
+      this._solver = null;
+      this._setError('Aborted');
+      this._setSolving(false);
     }
 
-    this._setUpStepByStep();
+    this._setUpKeyBindings();
   }
 
-  _setUpStepByStep() {
+  _setUpKeyBindings() {
     document.addEventListener('keydown', event => {
       switch (event.key) {
         case 'n':
@@ -881,51 +822,64 @@ class SolutionController {
     });
   }
 
+  async _getNewSolver(constraints) {
+    if (this._solver) this._solver.terminate();
+    this._solver = new SolverProxy(state => this._displayState(state));
+    await this._solver.init(constraints);
+    return this._solver;
+  }
+
   update() {
     this._elements.control.style.visibility = (
       this._elements.mode.value == 'all-possibilities' ? 'hidden' : 'visible');
-    this._setProgress('Solving');
     this._setSolving(true);
 
     afterRedraw(async () => {
       try {
-        let constraint = constraintManager.getConstraints();
+        let constraints = constraintManager.getConstraints();
+        let solver = await this._getNewSolver(constraints);
 
         switch (this._elements.mode.value) {
           case 'all-possibilities':
-            let result = await this._workerProxy.solveAllPossibilies(constraint);
-            this._grid.setSolution(result.values);
-            this._displayState(result);
+            let result = await solver.solveAllPossibilities();
+            this._grid.setSolution(result);
+            this._setSolving(false);
             break;
           case 'one-solution':
-            this._runSolutionIterator(constraint);
+            this._runSolutionIterator(solver);
             break;
           case 'step-by-step':
-            this._runStepByStep(solver);
+            this._runStepIterator(solver);
             break;
         }
       } catch(e) {
         this._setError(e);
-        this._setProgress();
+        this._setSolving(false);
       }
     });
   }
 
-  _setProgress(text) {
-    this._elements.progress.textContent = text || '';
-  }
   _setError(text) {
     this._elements.error.textContent = text || '';
   }
+
   _setSolving(isSolving) {
     if (isSolving) {
       this._grid.container.classList.add('solving');
       this._elements.stateOutput.classList.add('solving');
       this._elements.stop.disabled = false;
+      this._elements.start.disabled = true;
+      this._elements.forward.disabled = true;
+      this._elements.back.disabled = true;
+      this._elements.progress.textContent = 'Running solver';
     } else {
       this._grid.container.classList.remove('solving');
       this._elements.stateOutput.classList.remove('solving');
       this._elements.stop.disabled = true;
+      this._elements.start.disabled = false;
+      this._elements.forward.disabled = false;
+      this._elements.back.disabled = false;
+      this._elements.progress.textContent = '';
     }
   }
 
@@ -964,101 +918,85 @@ class SolutionController {
 
     SolutionController._addStateVariable(
       container, 'Runtime', SolutionController._formatTimeMs(state.timeMs));
-
-    this._setError();
-    this._setProgress();
-    this._setSolving(false);
   }
 
-  _displayStepByStepState(state) {
-    let selection = [];
-    if (!state.done) {
-      grid.setSolution(state.values, state.remainingOptions);
-      if (state.values.length > 0) {
-        selection.push(state.values[state.values.length-1].substring(0, 4));
-      }
-    }
-    grid.selection.updateSelection(selection);
-    this._elements.forward.disabled = state.done;
-    this._elements.back.disabled = state.step == 0;
-    this._elements.start.disabled = state.step == 0;
-    this._elements.stepOutput.textContent = state.step+1;
-
-    this._displayState(state);
-  }
-
-  _runStepByStep(solver) {
+  _runStepIterator(solver) {
     let step = 0;
-    let iter = null;
 
-    const forwardNSteps = (n) => {
-      step += n;
-      while (n-- > 0) {
-        iter.next();
+    const update = async () => {
+      this._setSolving(true);
+      let result = await solver.goToStep(step);
+      this._setSolving(false);
+
+      // Update the grid.
+      let selection = [];
+      if (result) {
+        grid.setSolution(result.values, result.remainingOptions);
+        if (result.values.length > 0) {
+          selection.push(result.values[result.values.length-1].substring(0, 4));
+        }
       }
-      this._displayStepByStepState(solver.state());
+      grid.selection.updateSelection(selection);
+
+      this._elements.forward.disabled = (result == null);
+      this._elements.back.disabled = (step == 0);
+      this._elements.start.disabled = (step == 0);
+      this._elements.stepOutput.textContent = step+1;
     };
-    const reset = () => {
-      solver.reset();
-      iter = solver.steps();
-      step = 0;
-    }
 
     this._elements.forward.onclick = () => {
-      forwardNSteps(1);
+      step++;
+      update();
     };
     this._elements.back.onclick = () => {
-      let prevStep = step - 1;
-      reset();
-      forwardNSteps(prevStep);
+      step--;
+      update();
     };
     this._elements.start.onclick = () => {
-      reset();
-      forwardNSteps(0);
+      step = 0;
+      update();
     };
 
     // Run the onclick handler (just calling click() would only work when
     // the start button is enabled).
     this._elements.start.onclick();
+    this._setSolving(false);
   }
 
-  _displaySolutionIteratorState(solution, n, state) {
-    grid.setSolution(solution || []);
-
-    this._elements.forward.disabled = (state.counters.solutions == n + 1);
-    this._elements.back.disabled = n == 0;
-    this._elements.start.disabled = n == 0;
-    this._elements.stepOutput.textContent = n+1;
-
-    this._displayState(state);
-  }
-
-  async _runSolutionIterator(constraint) {
-    let iter = this._workerProxy.solutionIterator(constraint);
+  async _runSolutionIterator(solver) {
     let solutions = [];
-    let solutionNum = 0;
-    let state = null;
+    let solutionNum = 1;
+    let done = false;
 
-    const nextSolution = async (message) => {
-      this._setProgress(message);
-      let next = await iter.next();
-      state = next.state;
-      if (!next.done) {
-        solutions.push(next.value);
+    const nextSolution = async () => {
+      if (done) return;
+
+      this._setSolving(true);
+      let solution = await solver.nextSolution();
+      this._setSolving(false);
+
+      if (solution) {
+        solutions.push(solution);
+      } else {
+        done = true;
       }
     };
 
     const update = () => {
-      this._displaySolutionIteratorState(
-        solutions[solutionNum], solutionNum, state);
+      this._grid.setSolution(solutions[solutionNum-1] || []);
+
+      this._elements.forward.disabled = (done && solutionNum == solutions.length);
+      this._elements.back.disabled = (solutionNum == 1);
+      this._elements.start.disabled = (solutionNum == 1);
+      this._elements.stepOutput.textContent = solutionNum;
     };
 
     this._elements.forward.onclick = async () => {
       solutionNum++;
       // Always stay an extra step ahead so that we always know if there are
       // more solutions.
-      if (solutions.length <= solutionNum+1) {
-        await nextSolution('Finding next solution');
+      if (solutions.length == solutionNum) {
+        await nextSolution();
       }
       update();
     };
@@ -1067,18 +1005,17 @@ class SolutionController {
       update();
     };
     this._elements.start.onclick = () => {
-      let solutionNum = 0;
+      solutionNum = 1;
       update();
     };
 
     // Find the first solution.
-    await nextSolution('Solving');
+    await nextSolution();
     update();
-    if (!solutions[0]) return;
 
-    // If we found one solution, keep searching so that we can check if the
-    // solution is unique.
-    await nextSolution('Checking uniqueness');
+    // Keep searching so that we can check if the solution is unique.
+    // (This is automatically elided if there are no solutions.
+    await nextSolution();
     update();
   }
 }
