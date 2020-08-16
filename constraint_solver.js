@@ -256,6 +256,10 @@ class ConstraintSolver {
     constraints.forEach(c => c.apply(this));
 
     this._stack = [];
+    this._progress = {
+      frequency: 0,
+      callback: null
+    };
 
     this._init();
   }
@@ -273,23 +277,9 @@ class ConstraintSolver {
       guesses: 0,
       solutions: 0,
     };
-    this._initTimer();
+    this._timer = new Timer();
     this._arcInconsistencyMap = new Map();
     this._columnAccumulator = new ColumnAccumulator();
-  }
-
-  _initTimer() {
-    this._timeMs = 0;
-    this._startOfCurrentTimer = null;
-  }
-
-  _startTimer() {
-    this._startOfCurrentTimer = performance.now();
-  }
-
-  _stopTimer() {
-    this._timeMs += performance.now() - this._startOfCurrentTimer;
-    this._startOfCurrentTimer = null;
   }
 
   _setWeights(weightMap) {
@@ -489,7 +479,7 @@ class ConstraintSolver {
   state() {
     return {
       counters: this._getCounters(),
-      timeMs: this._timeMs,
+      timeMs: this._timer.elapsedMs(),
       done: this._done,
     }
   }
@@ -507,12 +497,17 @@ class ConstraintSolver {
     return this._iter;
   }
 
+  setProgressCallback(callback, frequency) {
+    this._progress.callback = callback;
+    this._progress.frequency = frequency;
+  }
+
   nextSolution() {
     let iter = this._getIter();
 
-    this._startTimer();
+    this._timer.unpause();
     let result = this._iter.next();
-    this._stopTimer();
+    this._timer.pause();
 
     if (result.done) return null;
 
@@ -526,11 +521,11 @@ class ConstraintSolver {
     let iter = this._getIter(1);
 
     // Iterate until we have seen n steps.
-    this._startTimer();
+    this._timer.unpause();
     while (this._counters.nodesSearched + this._done < n && !this._done) {
       iter.next(1);
     }
-    this._stopTimer();
+    this._timer.pause();
 
     if (this._done) return null;
 
@@ -568,9 +563,13 @@ class ConstraintSolver {
     }
 
     let counters = this._counters;
+    let progressFrequency = this._progress.frequency;
     iterationsUntilYield = iterationsUntilYield || -1;
 
     while (stack.length) {
+      if (counters.nodesSearched % progressFrequency == 0) {
+        this._progress.callback();
+      }
       if (!iterationsUntilYield) {
         iterationsUntilYield = (yield null) || -1;
       }
@@ -638,8 +637,8 @@ class ConstraintSolver {
   }
 
   solveAllPossibilities() {
-    this._initTimer();
-    this._startTimer();
+    this._timer = new Timer();
+    this._timer.unpause();
 
     // TODO: Do all forced reductions first to avoid having to do them for
     // each iteration.
@@ -688,7 +687,7 @@ class ConstraintSolver {
       }
     }
 
-    this._stopTimer();
+    this._timer.pause();
 
     this._done = solutions.length < 2;
 

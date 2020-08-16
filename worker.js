@@ -1,3 +1,4 @@
+self.importScripts('util.js');
 self.importScripts('constraint_solver.js');
 self.importScripts('sudoku_solver.js');
 
@@ -6,11 +7,14 @@ let workerSolver = null;
 const handleWorkerMethod = (method, payload) => {
   switch (method) {
     case 'init':
-      let constraint = SudokuConstraint.fromJSON(payload);
+      let constraint = SudokuConstraint.fromJSON(payload.jsonConstraint);
       let builder = new SudokuBuilder();
       builder.addConstraint(constraint);
 
       workerSolver = builder.build();
+      if (payload.updateFrequency) {
+        workerSolver.setProgressCallback(sendState, payload.updateFrequency);
+      }
 
       return true;
 

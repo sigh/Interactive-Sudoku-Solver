@@ -8,12 +8,17 @@ class SolverProxy {
     this._stateHandler = stateHandler || (() => null);
   }
 
+  static UPDATE_FREQUENCY = 100000;
+
   async init(constraint) {
     if (this._initialized) {
       throw(`SolverProxy already initialized.`);
     }
     this._initialized = true;
-    await this._callWorker('init', JSON.stringify(constraint));
+    await this._callWorker('init', {
+      jsonConstraint: JSON.stringify(constraint),
+      updateFrequency: SolverProxy.UPDATE_FREQUENCY,
+    });
   }
 
   async solveAllPossibilities() {

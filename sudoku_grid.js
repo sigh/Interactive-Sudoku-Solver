@@ -866,15 +866,14 @@ class SolutionController {
   _setSolving(isSolving) {
     if (isSolving) {
       this._grid.container.classList.add('solving');
-      this._elements.stateOutput.classList.add('solving');
       this._elements.stop.disabled = false;
       this._elements.start.disabled = true;
       this._elements.forward.disabled = true;
       this._elements.back.disabled = true;
       this._elements.progress.textContent = 'Running solver';
+      this._setError();
     } else {
       this._grid.container.classList.remove('solving');
-      this._elements.stateOutput.classList.remove('solving');
       this._elements.stop.disabled = true;
       this._elements.start.disabled = false;
       this._elements.forward.disabled = false;
@@ -903,7 +902,6 @@ class SolutionController {
     container.innerHTML = '';
 
     let solutionText = counters.solutions + (state.done ? '' : '+');
-    if (counters.solutions == 0 && !state.done) solutionText = '?';
     SolutionController._addStateVariable(
       container, '# Solutions', solutionText);
 
