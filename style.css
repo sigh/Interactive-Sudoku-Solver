@@ -48,12 +48,8 @@
   pointer-events: none;
 }
 
-.sudoku-grid.solving .cell-solution {
-  color: rgb(128, 128, 128);
-}
-
-#state-output.solving {
-  color: rgb(128, 128, 128);
+.sudoku-grid.hidden-solution .cell-solution {
+  visibility: hidden;
 }
 
 .cell-multi-solution {

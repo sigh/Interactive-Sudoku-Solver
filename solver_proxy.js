@@ -1,25 +1,19 @@
 class SolverProxy {
-  constructor(stateHandler) {
-    this._worker = new Worker('worker.js');
-    this._worker.addEventListener('message', (msg) => this._handleMessage(msg));
+  constructor(stateHandler, worker) {
+    if (!worker) {
+      throw('Call SolverProxy.make()');
+    }
+
+    this._worker = worker;
+    this._messageHandler = (msg) => this._handleMessage(msg);
+    this._worker.addEventListener('message', this._messageHandler);
     this._waiting = null;
 
     this._initialized = false;
     this._stateHandler = stateHandler || (() => null);
   }
 
-  static UPDATE_FREQUENCY = 100000;
-
-  async init(constraint) {
-    if (this._initialized) {
-      throw(`SolverProxy already initialized.`);
-    }
-    this._initialized = true;
-    await this._callWorker('init', {
-      jsonConstraint: JSON.stringify(constraint),
-      updateFrequency: SolverProxy.UPDATE_FREQUENCY,
-    });
-  }
+  static UPDATE_FREQUENCY = 10000;
 
   async solveAllPossibilities() {
     return this._callWorker('solveAllPossibilities');
@@ -55,6 +49,9 @@ class SolverProxy {
     if (!this._initialized) {
       throw(`SolverProxy not initialized.`);
     }
+    if (!this._worker) {
+      throw(`SolverProxy has been terminated.`);
+    }
     if (this._waiting) {
       throw(`Can't call worker while a method is in progress. (${this._waiting.method})`);
     }
@@ -76,8 +73,39 @@ class SolverProxy {
     return promise;
   }
 
+  static unusedWorkers = [];
+
+  static async make(constraints, stateHandler) {
+    if (!this.unusedWorkers.length) {
+      this.unusedWorkers.push(new Worker('worker.js'));
+    }
+    let worker = this.unusedWorkers.pop();
+    let solverProxy = new SolverProxy(stateHandler, worker);
+
+    await solverProxy._init(constraints, this.UPDATE_FREQUENCY);
+
+    return solverProxy;
+  }
+
+  async _init(constraint, updateFrequency) {
+    this._initialized = true;
+    await this._callWorker('init', {
+      jsonConstraint: JSON.stringify(constraint),
+      updateFrequency: updateFrequency,
+    });
+  }
+
   terminate() {
-    this._worker.terminate();
+    if (!this._worker) return;
+
+    this._worker.removeEventListener('message', this._messageHandler);
+    // If we are waiting, we have to kill it because we don't know how long
+    // we'll be waiting. Otherwise we can just release it to be reused.
+    if (this._waiting) {
+      this._worker.terminate();
+    } else {
+      SolverProxy.unusedWorkers.push(this._worker);
+    }
     this._worker = null;
   }
 };

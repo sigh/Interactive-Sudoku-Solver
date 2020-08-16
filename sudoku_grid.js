@@ -229,7 +229,7 @@ class ConstraintManager {
     this._checkboxes = {};
     grid.setUpdateCallback(() => this.runUpdateCallback());
 
-    this.display = ConstraintDisplay.makeDisplay(grid.container);
+    this.display = ConstraintDisplay.makeDisplay(grid._container);
     this.setUpdateCallback();
 
     this._setUpPanel();
@@ -450,7 +450,7 @@ class ConstraintManager {
     }
     this.configs = [];
     this.grid.clearCellValues()
-    this.grid.clearSolution();
+    this.grid.setSolution();
     this.runUpdateCallback();
   }
 }
@@ -536,11 +536,11 @@ class Selection {
 
 class SudokuGrid {
   constructor(container) {
-    this.container = container;
+    this._container = container;
     container.classList.add('sudoku-grid');
     this._solutionValues = [];
 
-    this.cellMap = this._makeSudokuGrid(container);
+    this._cellMap = this._makeSudokuGrid(container);
     this.selection = new Selection(container);
     this._setUpKeyBindings(container);
     this.setUpdateCallback();
@@ -624,7 +624,7 @@ class SudokuGrid {
   }
 
   _makeSudokuGrid(container) {
-    let cellMap = {};
+    let cellMap = new Map();
 
     for (let i = 0; i < 9; i++) {
       for (let j = 0; j < 9; j++) {
@@ -637,7 +637,7 @@ class SudokuGrid {
         cellInput.className = 'cell-input cell-elem';
         cellInput.id = cellId;
         cell.appendChild(cellInput);
-        cellMap[cellId] = cellInput;
+        cellMap.set(cellId, cellInput);
 
         let cellSolution = document.createElement('div');
         cellSolution.className = 'cell-solution cell-elem';
@@ -652,7 +652,7 @@ class SudokuGrid {
 
   getCellValues() {
     let values = [];
-    for (let [key, cell] of Object.entries(this.cellMap)) {
+    for (let [key, cell] of this._cellMap) {
       let value = cell.innerText;
       if (value){
         values.push(`${key}#${value}`);
@@ -662,8 +662,8 @@ class SudokuGrid {
   }
 
   _clearCellValues() {
-    for (let cell of Object.values(this.cellMap)) {
-      cell.innerText = '';
+    for (let cell of this._cellMap.values()) {
+      cell.textContent = '';
     }
   }
 
@@ -678,7 +678,7 @@ class SudokuGrid {
       let parsedValueId = this._parseValueId(valueId);
       let cellId = parsedValueId.cellId;
       let value = parsedValueId.value;
-      this.cellMap[cellId].innerText = value;
+      this._cellMap.get(cellId).textContent = value;
     }
     this.updateCallback();
   }
@@ -690,17 +690,10 @@ class SudokuGrid {
     };
   }
 
-  _getSolutionNode(cellId) {
-    return this.cellMap[cellId].nextSibling;
-  }
-
-  clearSolution() {
-    for (const cellId of Object.keys(this.cellMap)) {
-      let node = this._getSolutionNode(cellId);
-      node.innerText = '';
-      node.classList.remove('cell-multi-solution');
+  *_solutionNodes() {
+    for (const [cellId, cell] of this._cellMap) {
+      yield [cellId, cell.nextSibling];
     }
-    this._solutionValues = [];
   }
 
   _formatMultiSolution(values) {
@@ -719,8 +712,22 @@ class SudokuGrid {
   //  - Anything in pencilmarks will always be shown as pencil marks.
   setSolution(solution, pencilmarks) {
     pencilmarks = pencilmarks || [];
+    solution = solution || [];
+    this._solutionValues = [];
 
-    this.clearSolution();
+    // If we have no solution, just hide it instead.
+    // However, we wait a bit so that we don't fliker if the solution is updated
+    // again immediatly.
+    if (!solution.length && !pencilmarks.length) {
+      window.setTimeout(() => {
+        // Ensure there is still no solution.
+        if (this._solutionValues.length == 0) {
+          this._container.classList.add('hidden-solution');
+        }
+      }, 100);
+      return;
+    }
+
     let cellValues = new Map();
     let pencilmarkCell = new Set();
 
@@ -742,15 +749,19 @@ class SudokuGrid {
       pencilmarkCell.add(cellId);
     }
 
-    for (const [cellId, values] of cellValues) {
-      let node = this._getSolutionNode(cellId);
-      if (values.length == 1 && !pencilmarkCell.has(cellId)) {
-        node.innerText = values[0];
+    for (const [cellId, node] of this._solutionNodes()) {
+      let values = cellValues.get(cellId);
+      if (!values) {
+        node.textContent = '';
+      } else if (values.length == 1 && !pencilmarkCell.has(cellId)) {
+        node.textContent = values[0];
+        node.classList.remove('cell-multi-solution');
       } else {
-        node.innerText = this._formatMultiSolution(values);
+        node.textContent = this._formatMultiSolution(values);
         node.classList.add('cell-multi-solution');
       }
     }
+    this._container.classList.remove('hidden-solution');
   }
 
   getSolutionValues() {
@@ -808,12 +819,13 @@ class SolutionController {
     if (this._solver) this._solver.terminate();
   }
 
-  async _makeNewSolver() {
+  async _replaceSolver() {
     this._terminateSolver();
-    this._solver = new SolverProxy(state => this._displayState(state));
 
     let constraints = this._constraintManager.getConstraints();
-    await this._solver.init(constraints);
+    this._solver = await SolverProxy.make(
+      constraints, state => this._displayState(state));
+
     return this._solver;
   }
 
@@ -821,9 +833,10 @@ class SolutionController {
     this._elements.control.style.visibility = (
       this._elements.mode.value == 'all-possibilities' ? 'hidden' : 'visible');
     this._setSolving(true);
+    this._grid.setSolution();
 
     try {
-      let solver = await this._makeNewSolver();
+      let solver = await this._replaceSolver();
 
       switch (this._elements.mode.value) {
         case 'all-possibilities':
@@ -850,7 +863,6 @@ class SolutionController {
 
   _setSolving(isSolving) {
     if (isSolving) {
-      this._grid.container.classList.add('solving');
       this._elements.stop.disabled = false;
       this._elements.start.disabled = true;
       this._elements.forward.disabled = true;
@@ -858,7 +870,6 @@ class SolutionController {
       this._elements.solving.style.visibility = 'visible';
       this._setError();
     } else {
-      this._grid.container.classList.remove('solving');
       this._elements.stop.disabled = true;
       this._elements.start.disabled = false;
       this._elements.forward.disabled = false;
@@ -959,7 +970,7 @@ class SolutionController {
     };
 
     const update = () => {
-      this._grid.setSolution(solutions[solutionNum-1] || []);
+      this._grid.setSolution(solutions[solutionNum-1]);
 
       this._elements.forward.disabled = (done && solutionNum == solutions.length);
       this._elements.back.disabled = (solutionNum == 1);
