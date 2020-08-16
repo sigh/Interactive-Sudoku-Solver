@@ -1,10 +1,24 @@
-const afterRedraw = async (fn) => {
-  return new Promise((resolve, reject) => {
-    setTimeout(() => {
-      resolve(fn());
+const formatTimeMs = (timeMs) => {
+  if (timeMs < 1000) {
+    return timeMs.toPrecision(3) + ' ms';
+  }
+  return (timeMs/1000).toPrecision(3) + ' s';
+};
+
+const collapseFnCalls = (fn) => {
+  let alreadyEnqueued = false;
+  return (() => {
+    if (alreadyEnqueued) return;
+    alreadyEnqueued = true;
+    window.requestAnimationFrame(() => {
+      try {
+        fn();
+      } finally {
+        alreadyEnqueued = false;
+      }
     });
   });
-}
+};
 
 // A timer which can be paused and unpaused and accumulates the elapsed time.
 // Start paused.

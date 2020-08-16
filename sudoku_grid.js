@@ -6,22 +6,9 @@ const CHAR_9 = '9'.charCodeAt(0);
 
 const CELL_SIZE = 52;
 
+// Make these variables global so that we can easily access them from the
+// console.
 let grid, constraintManager, controller;
-
-const collapseFnCalls = (fn) => {
-  let alreadyEnqueued = false;
-  return (() => {
-    if (alreadyEnqueued) return;
-    alreadyEnqueued = true;
-    window.requestAnimationFrame(() => {
-      try {
-        fn();
-      } finally {
-        alreadyEnqueued = false;
-      }
-    });
-  });
-}
 
 const initPage = () => {
   // Create grid.
@@ -29,10 +16,8 @@ const initPage = () => {
   grid = new SudokuGrid(container);
   constraintManager = new ConstraintManager(grid);
 
-  let solutionController = new SolutionController(constraintManager, grid);
-  solutionController.update();
-
-  controller = solutionController;
+  controller = new SolutionController(constraintManager, grid);
+  controller.update();
 };
 
 // We never need more than 5 colors since the max degree of the graph is 4.
@@ -379,7 +364,7 @@ class ConstraintManager {
   }
 
   _addConstraintFromForm() {
-    let cells = grid.selection.getCells().map(e => e.id);
+    let cells = this.grid.selection.getCells().map(e => e.id);
     if (cells.length < 2) throw('Selection too short.');
 
     let formData = new FormData(this._selectionFrom);
@@ -778,9 +763,7 @@ class SolutionController {
     this._solver = null;
     this._constraintManager = constraintManager;
     this._grid = grid;
-    constraintManager.setUpdateCallback(collapseFnCalls(() => {
-      this.update();
-    }));
+    constraintManager.setUpdateCallback(collapseFnCalls(() => this.update()));
 
     this._elements = {
       start: document.getElementById('solution-start'),
@@ -790,15 +773,14 @@ class SolutionController {
       stepOutput: document.getElementById('solution-step-output'),
       mode: document.getElementById('solve-mode-input'),
       stateOutput: document.getElementById('state-output'),
-      progress: document.getElementById('progress'),
+      solving: document.getElementById('solving-indicator'),
       error: document.getElementById('error-output'),
       stop: document.getElementById('stop-solver'),
     }
 
     this._elements.mode.onchange = () => this.update();
     this._elements.stop.onclick = () => {
-      this._solver.terminate();
-      this._solver = null;
+      this._terminateSolver();
       this._setError('Aborted');
       this._setSolving(false);
     }
@@ -822,41 +804,44 @@ class SolutionController {
     });
   }
 
-  async _getNewSolver(constraints) {
+  _terminateSolver() {
     if (this._solver) this._solver.terminate();
+  }
+
+  async _makeNewSolver() {
+    this._terminateSolver();
     this._solver = new SolverProxy(state => this._displayState(state));
+
+    let constraints = this._constraintManager.getConstraints();
     await this._solver.init(constraints);
     return this._solver;
   }
 
-  update() {
+  async update() {
     this._elements.control.style.visibility = (
       this._elements.mode.value == 'all-possibilities' ? 'hidden' : 'visible');
     this._setSolving(true);
 
-    afterRedraw(async () => {
-      try {
-        let constraints = constraintManager.getConstraints();
-        let solver = await this._getNewSolver(constraints);
+    try {
+      let solver = await this._makeNewSolver();
 
-        switch (this._elements.mode.value) {
-          case 'all-possibilities':
-            let result = await solver.solveAllPossibilities();
-            this._grid.setSolution(result);
-            this._setSolving(false);
-            break;
-          case 'one-solution':
-            this._runSolutionIterator(solver);
-            break;
-          case 'step-by-step':
-            this._runStepIterator(solver);
-            break;
-        }
-      } catch(e) {
-        this._setError(e);
-        this._setSolving(false);
+      switch (this._elements.mode.value) {
+        case 'all-possibilities':
+          let result = await solver.solveAllPossibilities();
+          this._grid.setSolution(result);
+          this._setSolving(false);
+          break;
+        case 'one-solution':
+          this._runSolutionIterator(solver);
+          break;
+        case 'step-by-step':
+          this._runStepIterator(solver);
+          break;
       }
-    });
+    } catch(e) {
+      this._setError(e);
+      this._setSolving(false);
+    }
   }
 
   _setError(text) {
@@ -870,7 +855,7 @@ class SolutionController {
       this._elements.start.disabled = true;
       this._elements.forward.disabled = true;
       this._elements.back.disabled = true;
-      this._elements.progress.textContent = 'Running solver';
+      this._elements.solving.style.visibility = 'visible';
       this._setError();
     } else {
       this._grid.container.classList.remove('solving');
@@ -878,7 +863,7 @@ class SolutionController {
       this._elements.start.disabled = false;
       this._elements.forward.disabled = false;
       this._elements.back.disabled = false;
-      this._elements.progress.textContent = '';
+      this._elements.solving.style.visibility = 'hidden';
     }
   }
 
@@ -886,13 +871,6 @@ class SolutionController {
     let elem = document.createElement('div');
     elem.textContent = `${label}: ${value}`;
     container.appendChild(elem);
-  }
-
-  static _formatTimeMs(timeMs) {
-    if (timeMs < 1000) {
-      return timeMs.toPrecision(3) + ' ms';
-    }
-    return (timeMs/1000).toPrecision(3) + ' s';
   }
 
   _displayState(state) {
@@ -915,7 +893,7 @@ class SolutionController {
       '# Constraints searched', counters.columnsSearched);
 
     SolutionController._addStateVariable(
-      container, 'Runtime', SolutionController._formatTimeMs(state.timeMs));
+      container, 'Runtime', formatTimeMs(state.timeMs));
   }
 
   _runStepIterator(solver) {
@@ -929,12 +907,12 @@ class SolutionController {
       // Update the grid.
       let selection = [];
       if (result) {
-        grid.setSolution(result.values, result.remainingOptions);
+        this._grid.setSolution(result.values, result.remainingOptions);
         if (result.values.length > 0) {
           selection.push(result.values[result.values.length-1].substring(0, 4));
         }
       }
-      grid.selection.updateSelection(selection);
+      this._grid.selection.updateSelection(selection);
 
       this._elements.forward.disabled = (result == null);
       this._elements.back.disabled = (step == 0);

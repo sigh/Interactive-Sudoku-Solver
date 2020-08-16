@@ -98,7 +98,7 @@ body > div {
 }
 
 #constraint-panel h1 {
-  margin: 0px 0px;
+  margin-top: 0px;
   font-size: large;
   line-height: 1;
 }
@@ -135,11 +135,11 @@ textarea {
 
 #display-panel {
   line-height: 2;
+  width: 250px;
 }
 
-#progress {
-  text-align: center;
+#solving-indicator {
   font-weight: bold;
-  font-size: large;
   color: darkviolet;
+  margin: 0px 20px;
 }

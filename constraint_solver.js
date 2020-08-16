@@ -289,10 +289,6 @@ class ConstraintSolver {
     }
   }
 
-  show() {
-    return this.matrix.show();
-  }
-
   // _removeCandidateRow removes the row and updates all the constraints.
   //   - Removes conflicting exact cover constraints using alogithms x.
   //   - Enforces arc consistency on binary constraints.
