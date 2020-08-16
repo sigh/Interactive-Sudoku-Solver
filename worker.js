@@ -26,14 +26,19 @@ const handleWorkerMethod = (method, payload) => {
 
     case 'goToStep':
       return workerSolver.goToStep(payload);
+
+    case 'countSolutions':
+      return workerSolver.countSolutions();
   }
   throw(`Unknown method ${method}`);
 };
 
-const sendState = () => {
+const sendState = (extraState) => {
+  let state = workerSolver.state();
+  state.extra = extraState;
   self.postMessage({
     type: 'state',
-    state: workerSolver.state(),
+    state: state,
   });
 };
 

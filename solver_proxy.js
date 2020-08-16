@@ -13,7 +13,9 @@ class SolverProxy {
     this._stateHandler = stateHandler || (() => null);
   }
 
-  static UPDATE_FREQUENCY = 10000;
+  // Ask for a state update every 2**14 iterations.
+  // Using a non-power of 10 makes the display loook faster :)
+  static UPDATE_FREQUENCY = 16384;
 
   async solveAllPossibilities() {
     return this._callWorker('solveAllPossibilities');
@@ -25,6 +27,10 @@ class SolverProxy {
 
   async goToStep(n) {
     return this._callWorker('goToStep', n);
+  }
+
+  async countSolutions() {
+    return this._callWorker('countSolutions');
   }
 
   _handleMessage(response) {
@@ -103,6 +109,7 @@ class SolverProxy {
     // we'll be waiting. Otherwise we can just release it to be reused.
     if (this._waiting) {
       this._worker.terminate();
+      this._waiting.reject('Aborted');
     } else {
       SolverProxy.unusedWorkers.push(this._worker);
     }

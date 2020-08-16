@@ -258,7 +258,8 @@ class ConstraintSolver {
     this._stack = [];
     this._progress = {
       frequency: 0,
-      callback: null
+      callback: null,
+      extraState: null,
     };
 
     this._init();
@@ -477,6 +478,7 @@ class ConstraintSolver {
       counters: this._getCounters(),
       timeMs: this._timer.elapsedMs(),
       done: this._done,
+      extra: null,
     }
   }
 
@@ -498,6 +500,11 @@ class ConstraintSolver {
     this._progress.frequency = frequency;
   }
 
+  _sendProgress() {
+    this._progress.callback(
+      this._progress.extraState ? this._progress.extraState() : null);
+  }
+
   nextSolution() {
     let iter = this._getIter();
 
@@ -508,6 +515,38 @@ class ConstraintSolver {
     if (result.done) return null;
 
     return ConstraintSolver._stackToSolution(result.value);
+  }
+
+  countSolutions(updateFrequency) {
+    this.reset();
+
+    // Add a sample solution to the state updates, but only if a different
+    // solution is ready.
+    let sampleSolution = null;
+    this._progress.extraState = () => {
+      let result = null;
+      if (sampleSolution) {
+        result = {solution: sampleSolution};
+        sampleSolution = null;
+      }
+      return result;
+    };
+
+    this._timer.unpause();
+    for (let stack of this._getIter()) {
+      // Only store a sample solution if we don't have one.
+      if (sampleSolution == null) {
+        sampleSolution = ConstraintSolver._stackToSolution(stack)
+      }
+    }
+    this._timer.pause();
+
+    // Send progress one last time to ensure the last solution is sent.
+    this._sendProgress();
+
+    this._progress.extraState = null;
+
+    return this._counters.solutions;
   }
 
   goToStep(n) {
@@ -564,7 +603,7 @@ class ConstraintSolver {
 
     while (stack.length) {
       if (counters.nodesSearched % progressFrequency == 0) {
-        this._progress.callback();
+        this._sendProgress();
       }
       if (!iterationsUntilYield) {
         iterationsUntilYield = (yield null) || -1;

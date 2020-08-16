@@ -5,15 +5,19 @@ const formatTimeMs = (timeMs) => {
   return (timeMs/1000).toPrecision(3) + ' s';
 };
 
-const collapseFnCalls = (fn) => {
+const deferUntilAnimationFrame = (fn) => {
+  let lastArgs = null;
   let alreadyEnqueued = false;
-  return (() => {
+  return ((...args) => {
+    lastArgs = args;
     if (alreadyEnqueued) return;
+
     alreadyEnqueued = true;
     window.requestAnimationFrame(() => {
       try {
-        fn();
+        fn(...lastArgs);
       } finally {
+        lastArgs = null;
         alreadyEnqueued = false;
       }
     });

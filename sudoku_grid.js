@@ -17,7 +17,6 @@ const initPage = () => {
   constraintManager = new ConstraintManager(grid);
 
   controller = new SolutionController(constraintManager, grid);
-  controller.update();
 };
 
 // We never need more than 5 colors since the max degree of the graph is 4.
@@ -544,6 +543,8 @@ class SudokuGrid {
     this.selection = new Selection(container);
     this._setUpKeyBindings(container);
     this.setUpdateCallback();
+
+    this.setSolution = deferUntilAnimationFrame(this.setSolution.bind(this));
   }
 
   setUpdateCallback(fn) {
@@ -774,7 +775,8 @@ class SolutionController {
     this._solver = null;
     this._constraintManager = constraintManager;
     this._grid = grid;
-    constraintManager.setUpdateCallback(collapseFnCalls(() => this.update()));
+    constraintManager.setUpdateCallback(
+      deferUntilAnimationFrame(this._update.bind(this)));
 
     this._elements = {
       start: document.getElementById('solution-start'),
@@ -789,14 +791,15 @@ class SolutionController {
       stop: document.getElementById('stop-solver'),
     }
 
-    this._elements.mode.onchange = () => this.update();
-    this._elements.stop.onclick = () => {
-      this._terminateSolver();
-      this._setError('Aborted');
-      this._setSolving(false);
-    }
+    this._elements.mode.onchange = () => this._update();
+    this._elements.stop.onclick = () => this._terminateSolver();
 
     this._setUpKeyBindings();
+
+    this._displayStateVariables =
+      deferUntilAnimationFrame(this._displayStateVariables.bind(this));
+
+    this._update();
   }
 
   _setUpKeyBindings() {
@@ -829,32 +832,26 @@ class SolutionController {
     return this._solver;
   }
 
-  async update() {
+  async _update() {
     this._elements.control.style.visibility = (
       this._elements.mode.value == 'all-possibilities' ? 'hidden' : 'visible');
-    this._setSolving(true);
+
+    let solver = await this._replaceSolver();
+
     this._grid.setSolution();
 
-    try {
-      let solver = await this._replaceSolver();
 
-      switch (this._elements.mode.value) {
-        case 'all-possibilities':
-          let result = await solver.solveAllPossibilities();
-          this._grid.setSolution(result);
-          this._setSolving(false);
-          break;
-        case 'one-solution':
-          this._runSolutionIterator(solver);
-          break;
-        case 'step-by-step':
-          this._runStepIterator(solver);
-          break;
-      }
-    } catch(e) {
-      this._setError(e);
-      this._setSolving(false);
-    }
+    let handler = {
+      'all-possibilities': this._runAllPossibilites,
+      'solutions': this._runSolutionIterator,
+      'step-by-step': this._runStepIterator,
+      'count-solutions': this._runCounter,
+    }[this._elements.mode.value];
+
+    this._setSolving(true);
+    handler.bind(this)(solver)
+      .catch(e => this._setError(e))
+      .finally(() => this._setSolving(false));
   }
 
   _setError(text) {
@@ -871,9 +868,6 @@ class SolutionController {
       this._setError();
     } else {
       this._elements.stop.disabled = true;
-      this._elements.start.disabled = false;
-      this._elements.forward.disabled = false;
-      this._elements.back.disabled = false;
       this._elements.solving.style.visibility = 'hidden';
     }
   }
@@ -884,7 +878,7 @@ class SolutionController {
     container.appendChild(elem);
   }
 
-  _displayState(state) {
+  _displayStateVariables(state) {
     let counters = state.counters;
 
     let container = this._elements.stateOutput;
@@ -907,7 +901,21 @@ class SolutionController {
       container, 'Runtime', formatTimeMs(state.timeMs));
   }
 
-  _runStepIterator(solver) {
+  _displayState(state) {
+    // Handle this in a seperate function, as then it can be defered
+    // independently of the solution update:w
+    this._displayStateVariables(state);
+
+    // Handle extra state.
+    let extra = state.extra;
+    if (!extra) return;
+
+    if (extra.solution) {
+      this._grid.setSolution(extra.solution);
+    }
+  }
+
+  async _runStepIterator(solver) {
     let step = 0;
 
     const update = async () => {
@@ -972,7 +980,7 @@ class SolutionController {
     const update = () => {
       this._grid.setSolution(solutions[solutionNum-1]);
 
-      this._elements.forward.disabled = (done && solutionNum == solutions.length);
+      this._elements.forward.disabled = (done && solutionNum >= solutions.length);
       this._elements.back.disabled = (solutionNum == 1);
       this._elements.start.disabled = (solutionNum == 1);
       this._elements.stepOutput.textContent = solutionNum;
@@ -1004,5 +1012,16 @@ class SolutionController {
     // (This is automatically elided if there are no solutions.
     await nextSolution();
     update();
+  }
+
+  async _runAllPossibilites(solver) {
+    let result = await solver.solveAllPossibilities();
+    this._grid.setSolution(result);
+    this._setSolving(false);
+  }
+
+  async _runCounter(solver) {
+    await solver.countSolutions();
+    this._setSolving(false);
   }
 }
