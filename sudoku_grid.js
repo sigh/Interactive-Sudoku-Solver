@@ -910,8 +910,8 @@ class SolutionController {
     let extra = state.extra;
     if (!extra) return;
 
-    if (extra.solution) {
-      this._grid.setSolution(extra.solution);
+    if (extra.solution || extra.pencilmarks) {
+      this._grid.setSolution(extra.solution, extra.pencilmarks);
     }
   }
 

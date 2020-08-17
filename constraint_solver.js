@@ -672,27 +672,44 @@ class ConstraintSolver {
   }
 
   solveAllPossibilities() {
-    this._timer = new Timer();
-    this._timer.unpause();
+    this.reset();
 
+    let validRows = new Set();
+
+    // Send the current valid rows with the progress update, if there have
+    // been any changes.
+    let lastSize = 0;
+    this._progress.extraState = () => {
+      if (validRows.size == lastSize) return null;
+      lastSize = validRows.size;
+      return {pencilmarks: [...validRows]};
+    };
+
+    this._timer.unpause();
+    this._solveAllPossibilities(validRows);
+    this._timer.pause();
+
+    this._progress.extraState = null;
+
+    return [...validRows];
+  }
+
+  _solveAllPossibilities(validRows) {
     // TODO: Do all forced reductions first to avoid having to do them for
     // each iteration.
 
-    let solutions = [];
-
     // Do initial solve to see if we have 0, 1 or many solutions.
-    this._solve(
-      2, () => solutions.push(ConstraintSolver._stackToSolution(this._stack)));
+    this._solve(2,
+      () => {
+        ConstraintSolver._stackToSolution(this._stack).forEach(
+          r => validRows.add(r));
+      });
 
-    // Every value in the solutions is a valid row.
-    let validRows = new Set();
-    if (solutions.length > 0) {
-      solutions.forEach(s => s.forEach(r => validRows.add(r)));
-    }
+    let numSolutions = this._counters.solutions;
 
     // If there are 1 or 0 solutions, there is nothing else to do.
     // If there are 2 or more, then we have to check all possibilities.
-    if (solutions.length > 1) {
+    if (numSolutions > 1) {
       // All remaining rows are possibly valid solutions. Verify each of them.
       let matrix = this.matrix;
       for (let row = matrix.down; row != matrix; row = row.down) {
@@ -710,7 +727,6 @@ class ConstraintSolver {
           let solution = ConstraintSolver._stackToSolution(this._stack);
           solution.unshift(row.id);
           solution.forEach(e => validRows.add(e));
-          solutions.push(solution);
         });
 
         // NOTE: We could make later searches more efficient by keeping invalid
@@ -722,11 +738,7 @@ class ConstraintSolver {
       }
     }
 
-    this._timer.pause();
-
-    this._done = solutions.length < 2;
-
-    return [...validRows];
+    this._done = this._counters.solutions < 2;
   }
 
   _getVariable(variable) {
