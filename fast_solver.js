@@ -32,7 +32,6 @@ class SudokuSolver {
   constructor(constraints) {
     this._initCellArray();
     this._stack = new Array(NUM_CELLS);
-    this._depth = 0;
 
     this._progress = {
       frequency: 0,
@@ -46,7 +45,6 @@ class SudokuSolver {
   }
 
   reset() {
-    this._done = false;
     this._iter = null;
     this._counters = {
       nodesSearched: 0,
@@ -54,8 +52,14 @@ class SudokuSolver {
       guesses: 0,
       solutions: 0,
     };
-    this._cells[0].set(this._initialCells);
+    this._resetStack();
     this._timer = new Timer();
+  }
+
+  _resetStack() {
+    this._depth = 0;
+    this._done = false;
+    this._cells[0].set(this._initialCells);
   }
 
   _initCellArray() {
@@ -203,6 +207,56 @@ class SudokuSolver {
     this._done = true;
   }
 
+  // Solve until maxSolutions are found, and returns leaving the stack
+  // fully unwound.
+  _solve(maxSolutions, solutionFn) {
+    let iter = this._runSolver();
+
+    for (let i = 0; i < maxSolutions; i++) {
+      let result = iter.next();
+      if (result.done) break;
+      solutionFn(result.value);
+    }
+
+    this._resetStack();
+  }
+
+  _solveAllPossibilities(validRows) {
+    // TODO: Do all forced reductions first to avoid having to do them for
+    // each iteration.
+
+    // Do initial solve to see if we have 0, 1 or many solutions.
+    this._solve(2,
+      (cells) => {
+        cells.forEach((c, i) => { validRows[i] |= c; } );
+      });
+
+    let numSolutions = this._counters.solutions;
+
+    // If there are 1 or 0 solutions, there is nothing else to do.
+    // If there are 2 or more, then we have to check all possibilities.
+    if (numSolutions > 1) {
+      for (let i = 0; i < NUM_CELLS; i++) {
+        for (let v = 1; v < ALL_VALUES; v <<= 1) {
+          // We already know this is a valid row.
+          if (validRows[i] & v) continue;
+          // This is NOT a valid row.
+          if (!(this._cells[0][i] & v)) continue;
+
+          // Fix the current value and attempt to solve.
+          // Solve will also reset any changes we made to this._cells[0].
+          this._cells[0][i] = v;
+          this._solve(1, (cells) => {
+            cells.forEach((c, i) => { validRows[i] |= c; } );
+          });
+        }
+      }
+    }
+
+    this._done = this._counters.solutions < 2;
+  }
+
+
   state() {
     let counters = {...this._counters};
     counters.backtracks = counters.nodessearched - counters.columnssearched;
@@ -264,6 +318,19 @@ class SudokuSolver {
     return this._counters.solutions;
   }
 
+  static _makePencilmarks(cells) {
+    let pencilmarks = [];
+    for (let i = 0; i < NUM_CELLS; i++) {
+      let values = cells[i];
+      while (values) {
+        let value = values & -values;
+        pencilmarks.push(valueId(i/GRID_SIZE|0, i%GRID_SIZE|0, LookupTable.VALUES[value]-1));
+        values &= ~value;
+      }
+    }
+    return pencilmarks;
+  }
+
   goToStep(n) {
     // Easiest way to go backwards is to start from the start again.
     if (n < this._counters.nodesSearched) this.reset();
@@ -280,22 +347,33 @@ class SudokuSolver {
     if (this._done) return null;
 
     let cells = this._cells[this._depth];
-    let result = [];
-    for (let i = 0; i < NUM_CELLS; i++) {
-      let values = cells[i];
-      while(values) {
-        let value = values & -values;
-        result.push(valueId(i/GRID_SIZE|0, i%GRID_SIZE|0, LookupTable.VALUES[value]-1));
-        values &= ~value;
-      }
-    }
     return {
-      values: result,
+      values: SudokuSolver._makePencilmarks(cells),
     }
   }
 
   solveAllPossibilities() {
-    throw('Unimplimented');
+    this.reset();
+
+    let validRows = new Uint16Array(NUM_CELLS);
+
+    // Send the current valid rows with the progress update, if there have
+    // been any changes.
+    let lastSize = 0;
+    this._progress.extraState = () => {
+      let pencilmarks = SudokuSolver._makePencilmarks(validRows);
+      if (pencilmarks.length == lastSize) return null;
+      lastSize = pencilmarks.size;
+      return {pencilmarks: pencilmarks};
+    };
+
+    this._timer.unpause();
+    this._solveAllPossibilities(validRows);
+    this._timer.pause();
+
+    this._progress.extraState = null;
+
+    return SudokuSolver._makePencilmarks(validRows);
   }
 }
 
