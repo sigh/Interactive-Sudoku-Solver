@@ -95,7 +95,7 @@ class SolverProxy {
 
   async _init(constraint, updateFrequency) {
     this._initialized = true;
-    await this._callWorker('init', {
+    await this._callWorker('initFast', {
       jsonConstraint: JSON.stringify(constraint),
       updateFrequency: updateFrequency,
     });

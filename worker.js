@@ -1,6 +1,7 @@
 self.importScripts('util.js');
 self.importScripts('constraint_solver.js');
 self.importScripts('sudoku_solver.js');
+self.importScripts('fast_solver.js');
 
 let workerSolver = null;
 
@@ -12,6 +13,15 @@ const handleWorkerMethod = (method, payload) => {
       builder.addConstraint(constraint);
 
       workerSolver = builder.build();
+      if (payload.updateFrequency) {
+        workerSolver.setProgressCallback(sendState, payload.updateFrequency);
+      }
+
+      return true;
+
+    case 'initFast':
+
+      workerSolver = new SudokuSolver();
       if (payload.updateFrequency) {
         workerSolver.setProgressCallback(sendState, payload.updateFrequency);
       }
