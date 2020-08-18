@@ -31,7 +31,7 @@ class SudokuSolver {
 
   constructor(constraints) {
     this._initCellArray();
-    this._stack = new Array(NUM_CELLS);
+    this._stack = new Uint8Array(NUM_CELLS);
 
     this._progress = {
       frequency: 0,
@@ -60,6 +60,11 @@ class SudokuSolver {
     this._depth = 0;
     this._done = false;
     this._cells[0].set(this._initialCells);
+    // Re-initialize the cell indexes in the stack.
+    // This is not required, but keeps things deterministic.
+    for (let i = 0; i < NUM_CELLS; i++) {
+      this._stack[i] = i;
+    }
   }
 
   _initCellArray() {
@@ -92,8 +97,22 @@ class SudokuSolver {
   }
 
 
-  _selectNextCell(cells, depth) {
-    return depth;
+  // Find the best cell and bring it to the front. This means that it will
+  // be processed next.
+  _sortStackByBestCell(stack, cells) {
+    let counts = LookupTable.COUNTS;
+    let minCount = counts[cells[stack[0]]];
+
+    // Find the cell with the lowest count. If we see a count of 1, then we
+    // know we can't get any better (any domain wipeouts should have already
+    // been rejected).
+    for (let i = 0; i < stack.length && minCount > 1; i++) {
+      let count = counts[cells[stack[i]]];
+      if (count < minCount) {
+        [stack[i], stack[0]] = [stack[0], stack[i]];
+        count = minCount;
+      }
+    }
   }
 
   _enforceConstraints(cells, cell) {
@@ -142,7 +161,7 @@ class SudokuSolver {
     let counters = this._counters;
 
     if (depth === 0) {
-      stack[depth] = this._selectNextCell(this._cells[depth], depth);
+      this._sortStackByBestCell(stack.subarray(depth), this._cells[depth]);
       depth++;
       counters.columnsSearched++;
     }
@@ -196,8 +215,8 @@ class SudokuSolver {
         continue;
       }
 
-      stack[depth] = this._selectNextCell(cells, depth);
-      // Cell has no possible values, skip it.
+      this._sortStackByBestCell(stack.subarray(depth), cells);
+      // Cell has no possible values, backtrack.
       if (!cells[stack[depth]]) continue;
 
       counters.columnsSearched++;
