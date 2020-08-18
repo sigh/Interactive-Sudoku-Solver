@@ -130,7 +130,7 @@ SudokuConstraint.Set = class extends SudokuConstraint {
   }
 
   toConstraint(solv) {
-    return new ConstraintSolver.ConstraintSet(
+    return new SudokuSolver.ConstraintSet(
       this._constraints.map(c => c.toConstraint()));
   }
 }
@@ -268,9 +268,7 @@ SudokuConstraint.Sum = class extends SudokuConstraint {
 SudokuConstraint.FixedCells = class extends SudokuConstraint {
   constructor({values}) {
     super(arguments[0]);
-    this._constraint = new ConstraintSolver.ConstraintSet(
-      values.map(
-        v => new ConstraintSolver.OneOfConstraint(`fixed_${v}`, [v])));
+    this._constraint = new SudokuSolver.FixedCells(values);
   }
 
   toConstraint() {

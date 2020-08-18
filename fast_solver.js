@@ -29,7 +29,7 @@ class LookupTable {
 
 class SudokuSolver {
 
-  constructor() {
+  constructor(constraints) {
     this._initCellArray();
     this._stack = new Array(NUM_CELLS);
     this._depth = 0;
@@ -39,6 +39,8 @@ class SudokuSolver {
       callback: null,
       extraState: null,
     };
+
+    constraints.apply(this);
 
     this.reset();
   }
@@ -52,7 +54,7 @@ class SudokuSolver {
       guesses: 0,
       solutions: 0,
     };
-    this._cells[0].fill(ALL_VALUES);
+    this._cells[0].set(this._initialCells);
     this._timer = new Timer();
   }
 
@@ -67,6 +69,8 @@ class SudokuSolver {
         i*NUM_CELLS*Uint16Array.BYTES_PER_ELEMENT,
         NUM_CELLS);
     }
+    this._initialCells = new Uint16Array(NUM_CELLS);
+    this._initialCells.fill(ALL_VALUES);
   }
 
   _sendProgress() {
@@ -295,4 +299,39 @@ class SudokuSolver {
   }
 }
 
-let solver = new SudokuSolver();
+SudokuSolver.Constraint = class {
+  static parseValueId(valueId) {
+    return {
+      row: +valueId[1]-1,
+      col: +valueId[3]-1,
+      value: +valueId[5],
+    };
+  }
+}
+
+SudokuSolver.ConstraintSet = class extends SudokuSolver.Constraint {
+  constructor(constraints) {
+    super();
+    this._constraints = constraints;
+  }
+
+  apply(solver) {
+    for (const constraint of this._constraints) {
+      constraint.apply(solver);
+    }
+  }
+}
+
+SudokuSolver.FixedCells = class extends ConstraintSolver.Constraint {
+  constructor(valueIds) {
+    super();
+    this._valueIds = valueIds;
+  }
+
+  apply(solver) {
+    for (const valueId of this._valueIds) {
+      let {row, col, value} = SudokuSolver.Constraint.parseValueId(valueId);
+      solver._initialCells[row*GRID_SIZE + col] = (1 << (value-1));
+    }
+  }
+}
