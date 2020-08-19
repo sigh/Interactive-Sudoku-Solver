@@ -1,3 +1,5 @@
+"use strict";
+
 const BOX_SIZE = 3;
 const GRID_SIZE = BOX_SIZE*BOX_SIZE;
 const ALL_VALUES = (1<<GRID_SIZE)-1;
@@ -5,26 +7,87 @@ const COMBINATIONS = (1<<GRID_SIZE);
 const NUM_CELLS = GRID_SIZE*GRID_SIZE;
 
 class LookupTable {
-  static _emptyTable() {
-    return new Uint8Array(COMBINATIONS);
-  }
-
-  static VALUES = (() => {
-    let table = LookupTable._emptyTable();
+  static VALUE = (() => {
+    let table = new Uint8Array(COMBINATIONS);
     for (let i = 0; i < GRID_SIZE; i++) {
       table[1 << i] = i+1;
     }
     return table;
   })();
 
-  static COUNTS = (() => {
-    let table = LookupTable._emptyTable();
+  static COUNT = (() => {
+    let table = new Uint8Array(COMBINATIONS);
     for (let i = 1; i < COMBINATIONS; i++) {
-      // Count is one greater than the count with the last bit removed.
+      // COUNT is one greater than the count with the last set bit removed.
       table[i] = 1 + table[i & (i-1)];
     }
     return table;
   })();
+
+  static SUM = (() => {
+    let table = new Uint8Array(COMBINATIONS);
+    for (let i = 1; i < COMBINATIONS; i++) {
+      // SUM is the value of the lowest set bit plus the sum  of the rest.
+      table[i] = table[i & (i-1)] + LookupTable.VALUE[i & -i];
+    }
+    return table;
+  })();
+
+  static MIN = (() => {
+    let table = new Uint8Array(COMBINATIONS);
+    for (let i = 1; i < COMBINATIONS; i++) {
+      // MIN is the value of the last bit set.
+      table[i] = LookupTable.VALUE[i & -i];
+    }
+    return table;
+  })();
+
+  static MAX = (() => {
+    let table = new Uint8Array(COMBINATIONS);
+    table[1] = LookupTable.VALUE[1];
+    for (let i = 2; i < COMBINATIONS; i++) {
+      // MAX is greater than the max when everything has been decreased by
+      // 1.
+      table[i] = 1 + table[i >> 1];
+    }
+    return table;
+  })();
+
+  static _binaryFunctionCache = new Map();
+  static _binaryFunctionKey(fn) {
+    let key = 0n;
+    for (let i = 0; i < GRID_SIZE; i++) {
+      for (let j = 0; j < GRID_SIZE; j++) {
+        if (fn(i, j)) key |= 1n << BigInt(i*GRID_SIZE+j);
+      }
+    }
+    return key;
+  }
+
+  static forBinaryFunction(fn) {
+    // Check the cache first.
+    let key = this._binaryFunctionKey(fn);
+    if (this._binaryFunctionCache.has(key)) {
+      return this._binaryFunctionCache.get(key);
+    }
+    let table = new Uint16Array(COMBINATIONS);
+    this._binaryFunctionCache.set(key, table);
+
+    // Populate base cases, where there is a single value set.
+    for (let i = 0; i < GRID_SIZE; i++) {
+      for (let j = 0; j < GRID_SIZE; j++) {
+        if (fn(i+1, j+1)) {
+          table[1 << i] |= 1 << j;
+        }
+      }
+    }
+    // To fill in the rest, OR together all the valid settings for each value
+    // set.
+    for (let i = 1; i < COMBINATIONS; i++) {
+      table[i] = table[i & (i-1)] | table[i & -i];
+    }
+    return table;
+  }
 }
 
 class SudokuSolver {
@@ -80,6 +143,13 @@ class SudokuSolver {
     }
     this._initialCells = new Uint16Array(NUM_CELLS);
     this._initialCells.fill(ALL_VALUES);
+
+    this._cellConflicts = new Array(NUM_CELLS);
+    this._cellConstraintHandlers = new Array(NUM_CELLS);
+    for (let i = 0; i < NUM_CELLS; i++) {
+      this._cellConflicts[i] = [];
+      this._cellConstraintHandlers[i] = [];
+    }
   }
 
   _sendProgress() {
@@ -100,7 +170,7 @@ class SudokuSolver {
   // Find the best cell and bring it to the front. This means that it will
   // be processed next.
   _sortStackByBestCell(stack, cells) {
-    let counts = LookupTable.COUNTS;
+    let counts = LookupTable.COUNT;
     let minCount = counts[cells[stack[0]]];
 
     // Find the cell with the lowest count. If we see a count of 1, then we
@@ -117,31 +187,26 @@ class SudokuSolver {
 
   _enforceConstraints(cells, cell) {
     let value = cells[cell];
-    let removeValue = ~cells[cell];
+    let cellAccumulator = new CellAccumulator(this);
+    cellAccumulator.add(cell);
 
-    let row = cell/GRID_SIZE|0;
-    let col = cell%GRID_SIZE|0;
-    for (let i = 0; i < GRID_SIZE; i++) {
-      if (i != col) {
-        if (!(cells[GRID_SIZE*row+i] &= removeValue)) return false;
+    for (const conflict of this._cellConflicts[cell]) {
+      if (cells[conflict] & value) {
+        if (!(cells[conflict] &= ~value)) return false;
+        cellAccumulator.add(conflict);
       }
-      if (i != row) {
-        if (!(cells[GRID_SIZE*i+col] &= removeValue)) return false;
-      }
+    }
 
-      let bi = i/BOX_SIZE|0;
-      let bj = i%BOX_SIZE|0;
-      let bc = ((row/BOX_SIZE|0)*BOX_SIZE + bi)*GRID_SIZE + (col/BOX_SIZE|0)*BOX_SIZE + bj;
-      if (bc != cell) {
-        if (!(cells[bc] &= removeValue)) return false;
-      }
+    while (cellAccumulator.hasConstraints()) {
+      let c = cellAccumulator.popConstraint();
+      if (!c.enforceConsistency(cells)) return false;
     }
 
     return true;
   }
 
   static _cellsToSolution(cells) {
-    let values = cells.map(value => LookupTable.VALUES[value])
+    let values = cells.map(value => LookupTable.VALUE[value])
     let result = [];
     for (let i = 0; i < NUM_CELLS; i++) {
       result.push(valueId(i/GRID_SIZE|0, i%GRID_SIZE|0, values[i]-1));
@@ -343,7 +408,7 @@ class SudokuSolver {
       let values = cells[i];
       while (values) {
         let value = values & -values;
-        pencilmarks.push(valueId(i/GRID_SIZE|0, i%GRID_SIZE|0, LookupTable.VALUES[value]-1));
+        pencilmarks.push(valueId(i/GRID_SIZE|0, i%GRID_SIZE|0, LookupTable.VALUE[value]-1));
         values &= ~value;
       }
     }
@@ -396,13 +461,193 @@ class SudokuSolver {
   }
 }
 
+class CellAccumulator {
+  constructor(solver) {
+    this._solver = solver;
+
+    // We keep the invariant that:
+    //   this._extraConstraints contains c <=> c.dirty == this._generation
+    this._constraints = [];
+    this._generation = ++this.constructor.dirtyGeneration;
+  }
+
+  static dirtyGeneration = 0;
+
+  add(cell) {
+    for (const c of this._solver._cellConstraintHandlers[cell]) {
+      if (c.dirty != this._generation) {
+        c.dirty = this._generation;
+        this._constraints.push(c);
+      }
+    }
+  }
+
+  hasConstraints() {
+    return this._constraints.length > 0;
+  }
+
+  popConstraint() {
+    let c = this._constraints.pop();
+    c.dirty = 0;
+    return c;
+  }
+}
+
+SudokuSolver.ConstraintHandler = class {
+  constructor() {
+    this.dirty = 0;
+  }
+}
+
+
+SudokuSolver.NonetConstraintHandler = class extends SudokuSolver.ConstraintHandler {
+  constructor(cells) {
+    super();
+    this._constraintCells = cells;
+  }
+
+  enforceConsistency(cells) {
+    // TODO: Ignore hidden singles we've already found.
+    // TODO: Ignore nonets we've already processed.
+    let allValues = 0;
+    let uniqueValues = 0;
+    for (const cell of this._constraintCells) {
+      let v = cells[cell];
+      uniqueValues &= ~v;
+      uniqueValues |= (v&~allValues);
+      allValues |= v;
+    }
+    if (allValues != ALL_VALUES) return false;
+
+    // Search for hidden singles.
+    if (uniqueValues) {
+      for (const cell of this._constraintCells) {
+        if (cells[cell] & uniqueValues) {
+          cells[cell] &= uniqueValues;
+          // We also want it to be true that cells[cell] now only has a single
+          // value, but that should always be true here.
+        }
+      }
+    }
+
+    return true;
+  }
+}
+
+SudokuSolver.BinaryConstraintHandler = class extends SudokuSolver.ConstraintHandler {
+  constructor(cells, tables) {
+    super();
+    this._constraintCells = cells;
+    this._tables = tables;
+  }
+
+  enforceConsistency(cells) {
+    let v0 = cells[this._constraintCells[0]];
+    let v1 = cells[this._constraintCells[1]];
+
+    v0 &= this._tables[1][v1];
+    v1 &= this._tables[0][v0];
+
+    cells[this._constraintCells[0]] = v0;
+    cells[this._constraintCells[1]] = v1;
+
+    return v0 && v1;
+  }
+}
+
+SudokuSolver.SumHandler = class extends SudokuSolver.ConstraintHandler {
+  constructor(cells, sum) {
+    super();
+    this._constraintCells = cells;
+    this._sum = sum;
+  }
+
+  enforceConsistency(cells) {
+    // Check that the given sum is within the min and max possible sums.
+    let min = 0;
+    let max = 0;
+    for (const cell of this._constraintCells) {
+      min += LookupTable.MIN[cells[cell]];
+      max += LookupTable.MAX[cells[cell]];
+    }
+
+    // It is impossible to make the target sum.
+    if (this._sum < min || this._sum > max) return false;
+    // We've reached the target sum exactly.
+    if (this._sum == min && this._sum == max) return true;
+
+    // Check that we can make the current sum with the unique values remaining.
+    // NOTE: This is only valid if we assume unique values.
+    let fixedValues = 0;
+    let allValues = 0;
+    for (const cell of this._constraintCells) {
+      let value = cells[cell];
+      allValues |= value;
+      if (!(value&(value-1))) fixedValues |= value;
+    }
+
+    let sumOptions = SudokuSolver.SumHandler.KILLER_CAGE_SUMS
+        [this._constraintCells.length - LookupTable.COUNT[fixedValues]]
+        [this._sum - LookupTable.SUM[fixedValues]];
+    if (!sumOptions) return false;
+
+    let unfixedValues = allValues & ~fixedValues;
+    let possible = 0;
+    for (const option of sumOptions) {
+      if ((option & unfixedValues) === option) possible |= option;
+    }
+    if (!possible) return false;
+
+    // Remove any values that aren't part of any solution.
+    let valuesToRemove = unfixedValues & ~possible;
+    if (valuesToRemove) {
+      for (const cell of this._constraintCells) {
+        // Safe to apply to every cell, since we know that none of the
+        // fixedValues are in unfixedValues.
+        cells[cell] &= ~valuesToRemove;
+      }
+    }
+
+    // TODO: The possiblities check above can't check if the required values
+    // are in different cells.
+    // Consider porting the range check here as well.
+
+    return true;
+  }
+
+  static KILLER_CAGE_SUMS = (() => {
+    let table = [];
+    for (let n = 0; n < GRID_SIZE+1; n++) {
+      let totals = [];
+      table.push(totals);
+      for (let i = 0; i < (GRID_SIZE*(GRID_SIZE+1)/2)+1; i++) {
+        totals.push([]);
+      }
+    }
+
+    let counts = LookupTable.COUNT;
+    let sums = LookupTable.SUM;
+    for (let i = 0; i < COMBINATIONS; i++) {
+      table[counts[i]][sums[i]].push(i);
+    }
+
+    return table;
+  })();
+}
+
+
 SudokuSolver.Constraint = class {
   static parseValueId(valueId) {
     return {
-      row: +valueId[1]-1,
-      col: +valueId[3]-1,
+      cell: this.parseCellId(valueId),
       value: +valueId[5],
     };
+  }
+
+  static parseCellId(cellId) {
+    let row = +cellId[1]-1;
+    let col = +cellId[3]-1;
+    return row*GRID_SIZE+col;
   }
 }
 
@@ -427,8 +672,74 @@ SudokuSolver.FixedCells = class extends ConstraintSolver.Constraint {
 
   apply(solver) {
     for (const valueId of this._valueIds) {
-      let {row, col, value} = SudokuSolver.Constraint.parseValueId(valueId);
-      solver._initialCells[row*GRID_SIZE + col] = (1 << (value-1));
+      let {cell, value} = SudokuSolver.Constraint.parseValueId(valueId);
+      solver._initialCells[cell] = (1 << (value-1));
     }
   }
 }
+
+SudokuSolver.AllDifferent = class extends ConstraintSolver.Constraint {
+  constructor(cells) {
+    super();
+    this._cells = cells;
+  }
+
+  apply(solver) {
+    let cells = this._cells;
+    for (const cell of cells) {
+      let conflicts = solver._cellConflicts[cell];
+      let currentConflicts = new Set(conflicts);
+      for (const conflictCell of cells) {
+        if (cell != conflictCell && !currentConflicts.has(conflictCell)) {
+          conflicts.push(conflictCell);
+        }
+      }
+    }
+
+    if (cells.length == 9) {
+      let handler = new SudokuSolver.NonetConstraintHandler(cells);
+      for (const cell of cells) {
+        solver._cellConstraintHandlers[cell].push(handler);
+      }
+    }
+  }
+}
+
+SudokuSolver.BinaryConstraint = class extends ConstraintSolver.Constraint {
+  constructor(cell1, cell2, fn) {
+    super();
+    this._cells = [cell1, cell2];
+    this._fn = fn;
+  }
+
+  apply(solver) {
+    let tables = [
+      LookupTable.forBinaryFunction(this._fn),
+      LookupTable.forBinaryFunction((a, b) => this._fn(b, a)),
+    ];
+    let handler = new SudokuSolver.BinaryConstraintHandler(this._cells, tables);
+    for (const cell of this._cells) {
+      solver._cellConstraintHandlers[cell].push(handler);
+    }
+  }
+
+}
+
+SudokuSolver.Sum = class extends ConstraintSolver.Constraint {
+  constructor(cells, sum) {
+    super();
+    this._cells = cells;
+    this._sum = sum;
+  }
+
+  apply(solver) {
+    (new SudokuSolver.AllDifferent(this._cells)).apply(solver);
+
+    let handler = new SudokuSolver.SumHandler(this._cells, this._sum);
+    for (const cell of this._cells) {
+      solver._cellConstraintHandlers[cell].push(handler);
+    }
+  }
+
+}
+

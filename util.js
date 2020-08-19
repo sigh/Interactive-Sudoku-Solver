@@ -24,6 +24,9 @@ const deferUntilAnimationFrame = (fn) => {
   });
 };
 
+let _count = 0;
+const count = () => { _count++; };
+
 // A timer which can be paused and unpaused and accumulates the elapsed time.
 // Start paused.
 class Timer {

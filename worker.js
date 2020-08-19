@@ -8,22 +8,13 @@ let workerSolver = null;
 const handleWorkerMethod = (method, payload) => {
   let constraint;
   switch (method) {
-    case 'init':
-      constraint = SudokuConstraint.fromJSON(payload.jsonConstraint);
+    case 'initFast':
+      let constraint = SudokuConstraint.fromJSON(payload.jsonConstraint);
+
       let builder = new SudokuBuilder();
       builder.addConstraint(constraint);
 
       workerSolver = builder.build();
-      if (payload.updateFrequency) {
-        workerSolver.setProgressCallback(sendState, payload.updateFrequency);
-      }
-
-      return true;
-
-    case 'initFast':
-      constraint = SudokuConstraint.fromJSON(payload.jsonConstraint).toConstraint();
-
-      workerSolver = new SudokuSolver(constraint);
 
       if (payload.updateFrequency) {
         workerSolver.setProgressCallback(sendState, payload.updateFrequency);
