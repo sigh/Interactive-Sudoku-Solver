@@ -110,7 +110,7 @@ class SudokuSolver {
       let count = counts[cells[stack[i]]];
       if (count < minCount) {
         [stack[i], stack[0]] = [stack[0], stack[i]];
-        count = minCount;
+        minCount = count;
       }
     }
   }
