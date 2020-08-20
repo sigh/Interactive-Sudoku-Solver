@@ -891,11 +891,11 @@ class SolutionController {
     SolutionController._addStateVariable(container,
       '# Guesses', counters.guesses);
     SolutionController._addStateVariable(container,
-      '# Backtracks', counters.nodesSearched - counters.columnsSearched);
+      '# Backtracks', counters.backtracks);
     SolutionController._addStateVariable(container,
-      '# Nodes searched', counters.nodesSearched);
+      '# Values searched', counters.valuesSearched);
     SolutionController._addStateVariable(container,
-      '# Constraints searched', counters.columnsSearched);
+      '# Cells searched', counters.cellsSearched);
 
     SolutionController._addStateVariable(
       container, 'Runtime', formatTimeMs(state.timeMs));

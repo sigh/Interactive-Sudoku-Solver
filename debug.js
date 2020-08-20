@@ -252,11 +252,11 @@ const runTestCases = () => {
     builder.addConstraint(constraint);
     let result = builder.build().solveAllPossibilities();
 
-    result.values.sort();
+    result.sort();
     tc.expected.sort();
-    if (!arrayEquals(result.values, tc.expected)) {
+    if (!arrayEquals(result, tc.expected)) {
       console.log('Expected', tc.expected);
-      console.log('Got', result.values);
+      console.log('Got', result);
       throw('Test failed: ' + tc.name);
     }
   }

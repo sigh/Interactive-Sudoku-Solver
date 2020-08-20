@@ -92,7 +92,7 @@ class LookupTable {
 
 class SudokuSolver {
 
-  constructor(constraints) {
+  constructor(handlers) {
     this._initCellArray();
     this._stack = new Uint8Array(NUM_CELLS);
 
@@ -102,16 +102,52 @@ class SudokuSolver {
       extraState: null,
     };
 
-    constraints.apply(this);
+    this._setUpHandlers(handlers);
 
     this.reset();
+  }
+
+  _setUpHandlers(handlers) {
+    let cellConflicts = new Array(NUM_CELLS);
+    this._cellConstraintHandlers = new Array(NUM_CELLS);
+    for (let i = 0; i < NUM_CELLS; i++) {
+      cellConflicts[i] = new Set();
+      this._cellConstraintHandlers[i] = [];
+    }
+
+    for (const handler of handlers) {
+      // Run any initial enforcement.
+      // TODO: Move this into the solve loop so that it is inluded in the
+      // timing.
+      if (handler.ENFORCE_AT_START) {
+        handler.enforceConsistency(this._initialGrid);
+      }
+
+      // Add all cells that h
+      // andler claims to be attached to the list of
+      // handlers for that cell.
+      for (const cell of handler.cells) {
+        this._cellConstraintHandlers[cell].push(handler);
+      }
+
+      // Add handling for conflicting cells.
+      let conflictSet = handler.conflictSet();
+      for (const c of conflictSet) {
+        for (const d of conflictSet) {
+          if (c != d) cellConflicts[c].add(d);
+        }
+      }
+    }
+
+    // Set cell conflicts so that they are unique.
+    this._cellConflicts = cellConflicts.map(c => new Uint8Array(c));
   }
 
   reset() {
     this._iter = null;
     this._counters = {
-      nodesSearched: 0,
-      columnsSearched: 0,
+      valuesSearched: 0,
+      cellsSearched: 0,
       guesses: 0,
       solutions: 0,
     };
@@ -122,7 +158,7 @@ class SudokuSolver {
   _resetStack() {
     this._depth = 0;
     this._done = false;
-    this._cells[0].set(this._initialCells);
+    this._grids[0].set(this._initialGrid);
     // Re-initialize the cell indexes in the stack.
     // This is not required, but keeps things deterministic.
     for (let i = 0; i < NUM_CELLS; i++) {
@@ -134,22 +170,15 @@ class SudokuSolver {
     let buffer = new ArrayBuffer(
       (NUM_CELLS+1) * NUM_CELLS * Uint16Array.BYTES_PER_ELEMENT);
 
-    this._cells = new Array(NUM_CELLS+1);
+    this._grids = new Array(NUM_CELLS+1);
     for (let i = 0; i < NUM_CELLS+1; i++) {
-      this._cells[i] = new Uint16Array(
+      this._grids[i] = new Uint16Array(
         buffer,
         i*NUM_CELLS*Uint16Array.BYTES_PER_ELEMENT,
         NUM_CELLS);
     }
-    this._initialCells = new Uint16Array(NUM_CELLS);
-    this._initialCells.fill(ALL_VALUES);
-
-    this._cellConflicts = new Array(NUM_CELLS);
-    this._cellConstraintHandlers = new Array(NUM_CELLS);
-    for (let i = 0; i < NUM_CELLS; i++) {
-      this._cellConflicts[i] = [];
-      this._cellConstraintHandlers[i] = [];
-    }
+    this._initialGrid = new Uint16Array(NUM_CELLS);
+    this._initialGrid.fill(ALL_VALUES);
   }
 
   _sendProgress() {
@@ -169,15 +198,15 @@ class SudokuSolver {
 
   // Find the best cell and bring it to the front. This means that it will
   // be processed next.
-  _sortStackByBestCell(stack, cells) {
+  _updateCellOrder(stack, grid) {
     let counts = LookupTable.COUNT;
-    let minCount = counts[cells[stack[0]]];
+    let minCount = counts[grid[stack[0]]];
 
     // Find the cell with the lowest count. If we see a count of 1, then we
     // know we can't get any better (any domain wipeouts should have already
     // been rejected).
     for (let i = 0; i < stack.length && minCount > 1; i++) {
-      let count = counts[cells[stack[i]]];
+      let count = counts[grid[stack[i]]];
       if (count < minCount) {
         [stack[i], stack[0]] = [stack[0], stack[i]];
         minCount = count;
@@ -185,28 +214,31 @@ class SudokuSolver {
     }
   }
 
-  _enforceConstraints(cells, cell) {
-    let value = cells[cell];
+  _enforceConstraints(grid, cell) {
+    let value = grid[cell];
     let cellAccumulator = new CellAccumulator(this);
     cellAccumulator.add(cell);
 
     for (const conflict of this._cellConflicts[cell]) {
-      if (cells[conflict] & value) {
-        if (!(cells[conflict] &= ~value)) return false;
+      if (grid[conflict] & value) {
+        if (!(grid[conflict] &= ~value)) return false;
         cellAccumulator.add(conflict);
       }
     }
 
+    if (cell == 7*GRID_SIZE+8) {
+      let x = 1;
+    }
     while (cellAccumulator.hasConstraints()) {
       let c = cellAccumulator.popConstraint();
-      if (!c.enforceConsistency(cells)) return false;
+      if (!c.enforceConsistency(grid)) return false;
     }
 
     return true;
   }
 
-  static _cellsToSolution(cells) {
-    let values = cells.map(value => LookupTable.VALUE[value])
+  static _gridToSolution(grid) {
+    let values = grid.map(value => LookupTable.VALUE[value])
     let result = [];
     for (let i = 0; i < NUM_CELLS; i++) {
       result.push(valueId(i/GRID_SIZE|0, i%GRID_SIZE|0, values[i]-1));
@@ -226,9 +258,9 @@ class SudokuSolver {
     let counters = this._counters;
 
     if (depth === 0) {
-      this._sortStackByBestCell(stack.subarray(depth), this._cells[depth]);
+      this._updateCellOrder(stack.subarray(depth), this._grids[depth]);
       depth++;
-      counters.columnsSearched++;
+      counters.cellsSearched++;
     }
 
     let progressFrequency = this._progress.frequency;
@@ -237,8 +269,8 @@ class SudokuSolver {
     while (depth) {
       depth--;
       let cell = stack[depth];
-      let cells = this._cells[depth];
-      let values = cells[cell];
+      let grid = this._grids[depth];
+      let values = grid[cell];
 
       // We've run out of legal values in this cell, so backtrack.
       if (!values) continue;
@@ -246,22 +278,22 @@ class SudokuSolver {
       // Find the next smallest to try, and remove it from our set of
       // candidates.
       let value = values & -values;
-      cells[cell] &= ~value;
+      grid[cell] &= ~value;
 
-      counters.nodesSearched++;
+      counters.valuesSearched++;
       if (value != values) counters.guesses++;
       iterationsUntilYield--;
 
       // Copy current cell values.
       depth++;
-      this._cells[depth].set(cells);
-      cells = this._cells[depth];
+      this._grids[depth].set(grid);
+      grid = this._grids[depth];
 
       // Propogate constraints.
-      cells[cell] = value;
-      let hasContradiction = !this._enforceConstraints(cells, cell);
+      grid[cell] = value;
+      let hasContradiction = !this._enforceConstraints(grid, cell);
 
-      if (counters.nodesSearched % progressFrequency == 0) {
+      if (counters.valuesSearched % progressFrequency == 0) {
         this._sendProgress();
       }
       if (!iterationsUntilYield) {
@@ -276,15 +308,15 @@ class SudokuSolver {
         // This is a solution!
         counters.solutions++;
         this._depth = depth;
-        iterationsUntilYield = (yield cells) || -1;
+        iterationsUntilYield = (yield grid) || -1;
         continue;
       }
 
-      this._sortStackByBestCell(stack.subarray(depth), cells);
+      this._updateCellOrder(stack.subarray(depth), grid);
       // Cell has no possible values, backtrack.
-      if (!cells[stack[depth]]) continue;
+      if (!grid[stack[depth]]) continue;
 
-      counters.columnsSearched++;
+      counters.cellsSearched++;
       depth++;
     }
 
@@ -311,8 +343,8 @@ class SudokuSolver {
 
     // Do initial solve to see if we have 0, 1 or many solutions.
     this._solve(2,
-      (cells) => {
-        cells.forEach((c, i) => { validRows[i] |= c; } );
+      (grid) => {
+        grid.forEach((c, i) => { validRows[i] |= c; } );
       });
 
     let numSolutions = this._counters.solutions;
@@ -325,13 +357,13 @@ class SudokuSolver {
           // We already know this is a valid row.
           if (validRows[i] & v) continue;
           // This is NOT a valid row.
-          if (!(this._cells[0][i] & v)) continue;
+          if (!(this._grids[0][i] & v)) continue;
 
           // Fix the current value and attempt to solve.
-          // Solve will also reset any changes we made to this._cells[0].
-          this._cells[0][i] = v;
-          this._solve(1, (cells) => {
-            cells.forEach((c, i) => { validRows[i] |= c; } );
+          // Solve will also reset any changes we made to this._grids[0].
+          this._grids[0][i] = v;
+          this._solve(1, (grid) => {
+            grid.forEach((c, i) => { validRows[i] |= c; } );
           });
         }
       }
@@ -343,7 +375,7 @@ class SudokuSolver {
 
   state() {
     let counters = {...this._counters};
-    counters.backtracks = counters.nodessearched - counters.columnssearched;
+    counters.backtracks = counters.valuesSearched - counters.cellsSearched;
 
     return {
       counters: counters,
@@ -367,7 +399,7 @@ class SudokuSolver {
 
     if (result.done) return null;
 
-    return SudokuSolver._cellsToSolution(result.value);
+    return SudokuSolver._gridToSolution(result.value);
   }
 
   countSolutions(updateFrequency) {
@@ -389,7 +421,7 @@ class SudokuSolver {
     for (let stack of this._getIter()) {
       // Only store a sample solution if we don't have one.
       if (sampleSolution == null) {
-        sampleSolution = SudokuSolver._cellsToSolution(stack)
+        sampleSolution = SudokuSolver._gridToSolution(stack)
       }
     }
     this._timer.pause();
@@ -402,10 +434,10 @@ class SudokuSolver {
     return this._counters.solutions;
   }
 
-  static _makePencilmarks(cells) {
+  static _makePencilmarks(grid) {
     let pencilmarks = [];
     for (let i = 0; i < NUM_CELLS; i++) {
-      let values = cells[i];
+      let values = grid[i];
       while (values) {
         let value = values & -values;
         pencilmarks.push(valueId(i/GRID_SIZE|0, i%GRID_SIZE|0, LookupTable.VALUE[value]-1));
@@ -417,22 +449,22 @@ class SudokuSolver {
 
   goToStep(n) {
     // Easiest way to go backwards is to start from the start again.
-    if (n < this._counters.nodesSearched) this.reset();
+    if (n < this._counters.valuesSearched) this.reset();
 
     let iter = this._getIter(1);
 
     // Iterate until we have seen n steps.
     this._timer.unpause();
-    while (this._counters.nodesSearched + this._done < n && !this._done) {
+    while (this._counters.valuesSearched + this._done < n && !this._done) {
       iter.next(1);
     }
     this._timer.pause();
 
     if (this._done) return null;
 
-    let cells = this._cells[this._depth];
+    let grid = this._grids[this._depth];
     return {
-      values: SudokuSolver._makePencilmarks(cells),
+      values: SudokuSolver._makePencilmarks(grid),
     }
   }
 
@@ -494,25 +526,63 @@ class CellAccumulator {
 }
 
 SudokuSolver.ConstraintHandler = class {
-  constructor() {
+  // If true, then enforce the constraint before solving.
+  ENFORCE_AT_START = false;
+
+  constructor(cells) {
+    // This constraint is enforced whenever these cells are touched.
+    this.cells = cells || [];
+    // Dirty bit for determining if the constraint needs to be enforced.
     this.dirty = 0;
+  }
+
+  enforceConsistency(grid) {
+    return true;
+  }
+
+  conflictSet() {
+    return [];
   }
 }
 
+SudokuSolver.FixedCellsHandler = class extends SudokuSolver.ConstraintHandler{
+  ENFORCE_AT_START = true;
 
-SudokuSolver.NonetConstraintHandler = class extends SudokuSolver.ConstraintHandler {
-  constructor(cells) {
+  constructor(valueMap) {
     super();
-    this._constraintCells = cells;
+    this._valueMap = valueMap;
   }
 
-  enforceConsistency(cells) {
+  enforceConsistency(grid) {
+    for (const [cell, value] of this._valueMap) {
+      grid[cell] = 1 << (value-1);
+    }
+  }
+}
+
+SudokuSolver.AllDifferentHandler = class extends SudokuSolver.ConstraintHandler {
+  constructor(conflictCells) {
+    super();
+    this._conflictCells = conflictCells;
+  }
+
+  conflictSet() {
+    return this._conflictCells;
+  }
+}
+
+SudokuSolver.NonetHandler = class extends SudokuSolver.ConstraintHandler {
+  constructor(cells) {
+    super(cells);
+  }
+
+  enforceConsistency(grid) {
     // TODO: Ignore hidden singles we've already found.
     // TODO: Ignore nonets we've already processed.
     let allValues = 0;
     let uniqueValues = 0;
-    for (const cell of this._constraintCells) {
-      let v = cells[cell];
+    for (const cell of this.cells) {
+      let v = grid[cell];
       uniqueValues &= ~v;
       uniqueValues |= (v&~allValues);
       allValues |= v;
@@ -521,10 +591,10 @@ SudokuSolver.NonetConstraintHandler = class extends SudokuSolver.ConstraintHandl
 
     // Search for hidden singles.
     if (uniqueValues) {
-      for (const cell of this._constraintCells) {
-        if (cells[cell] & uniqueValues) {
-          cells[cell] &= uniqueValues;
-          // We also want it to be true that cells[cell] now only has a single
+      for (const cell of this.cells) {
+        if (grid[cell] & uniqueValues) {
+          grid[cell] &= uniqueValues;
+          // We also want it to be true that grid[cell] now only has a single
           // value, but that should always be true here.
         }
       }
@@ -532,24 +602,30 @@ SudokuSolver.NonetConstraintHandler = class extends SudokuSolver.ConstraintHandl
 
     return true;
   }
+
+  conflictSet() {
+    return this.cells;
+  }
 }
 
 SudokuSolver.BinaryConstraintHandler = class extends SudokuSolver.ConstraintHandler {
-  constructor(cells, tables) {
-    super();
-    this._constraintCells = cells;
-    this._tables = tables;
+  constructor(cell1, cell2, fn) {
+    super([cell1, cell2]);
+    this._tables = [
+      LookupTable.forBinaryFunction(fn),
+      LookupTable.forBinaryFunction((a, b) => fn(b, a)),
+    ];
   }
 
-  enforceConsistency(cells) {
-    let v0 = cells[this._constraintCells[0]];
-    let v1 = cells[this._constraintCells[1]];
+  enforceConsistency(grid) {
+    let v0 = grid[this.cells[0]];
+    let v1 = grid[this.cells[1]];
 
     v0 &= this._tables[1][v1];
     v1 &= this._tables[0][v0];
 
-    cells[this._constraintCells[0]] = v0;
-    cells[this._constraintCells[1]] = v1;
+    grid[this.cells[0]] = v0;
+    grid[this.cells[1]] = v1;
 
     return v0 && v1;
   }
@@ -557,18 +633,17 @@ SudokuSolver.BinaryConstraintHandler = class extends SudokuSolver.ConstraintHand
 
 SudokuSolver.SumHandler = class extends SudokuSolver.ConstraintHandler {
   constructor(cells, sum) {
-    super();
-    this._constraintCells = cells;
+    super(cells);
     this._sum = sum;
   }
 
-  enforceConsistency(cells) {
+  enforceConsistency(grid) {
     // Check that the given sum is within the min and max possible sums.
     let min = 0;
     let max = 0;
-    for (const cell of this._constraintCells) {
-      min += LookupTable.MIN[cells[cell]];
-      max += LookupTable.MAX[cells[cell]];
+    for (const cell of this.cells) {
+      min += LookupTable.MIN[grid[cell]];
+      max += LookupTable.MAX[grid[cell]];
     }
 
     // It is impossible to make the target sum.
@@ -580,14 +655,14 @@ SudokuSolver.SumHandler = class extends SudokuSolver.ConstraintHandler {
     // NOTE: This is only valid if we assume unique values.
     let fixedValues = 0;
     let allValues = 0;
-    for (const cell of this._constraintCells) {
-      let value = cells[cell];
+    for (const cell of this.cells) {
+      let value = grid[cell];
       allValues |= value;
       if (!(value&(value-1))) fixedValues |= value;
     }
 
     let sumOptions = SudokuSolver.SumHandler.KILLER_CAGE_SUMS
-        [this._constraintCells.length - LookupTable.COUNT[fixedValues]]
+        [this.cells.length - LookupTable.COUNT[fixedValues]]
         [this._sum - LookupTable.SUM[fixedValues]];
     if (!sumOptions) return false;
 
@@ -601,10 +676,10 @@ SudokuSolver.SumHandler = class extends SudokuSolver.ConstraintHandler {
     // Remove any values that aren't part of any solution.
     let valuesToRemove = unfixedValues & ~possible;
     if (valuesToRemove) {
-      for (const cell of this._constraintCells) {
+      for (const cell of this.cells) {
         // Safe to apply to every cell, since we know that none of the
         // fixedValues are in unfixedValues.
-        cells[cell] &= ~valuesToRemove;
+        grid[cell] &= ~valuesToRemove;
       }
     }
 
@@ -613,6 +688,10 @@ SudokuSolver.SumHandler = class extends SudokuSolver.ConstraintHandler {
     // Consider porting the range check here as well.
 
     return true;
+  }
+
+  conflictSet() {
+    return this.cells;
   }
 
   static KILLER_CAGE_SUMS = (() => {
@@ -634,112 +713,3 @@ SudokuSolver.SumHandler = class extends SudokuSolver.ConstraintHandler {
     return table;
   })();
 }
-
-
-SudokuSolver.Constraint = class {
-  static parseValueId(valueId) {
-    return {
-      cell: this.parseCellId(valueId),
-      value: +valueId[5],
-    };
-  }
-
-  static parseCellId(cellId) {
-    let row = +cellId[1]-1;
-    let col = +cellId[3]-1;
-    return row*GRID_SIZE+col;
-  }
-}
-
-SudokuSolver.ConstraintSet = class extends SudokuSolver.Constraint {
-  constructor(constraints) {
-    super();
-    this._constraints = constraints;
-  }
-
-  apply(solver) {
-    for (const constraint of this._constraints) {
-      constraint.apply(solver);
-    }
-  }
-}
-
-SudokuSolver.FixedCells = class extends ConstraintSolver.Constraint {
-  constructor(valueIds) {
-    super();
-    this._valueIds = valueIds;
-  }
-
-  apply(solver) {
-    for (const valueId of this._valueIds) {
-      let {cell, value} = SudokuSolver.Constraint.parseValueId(valueId);
-      solver._initialCells[cell] = (1 << (value-1));
-    }
-  }
-}
-
-SudokuSolver.AllDifferent = class extends ConstraintSolver.Constraint {
-  constructor(cells) {
-    super();
-    this._cells = cells;
-  }
-
-  apply(solver) {
-    let cells = this._cells;
-    for (const cell of cells) {
-      let conflicts = solver._cellConflicts[cell];
-      let currentConflicts = new Set(conflicts);
-      for (const conflictCell of cells) {
-        if (cell != conflictCell && !currentConflicts.has(conflictCell)) {
-          conflicts.push(conflictCell);
-        }
-      }
-    }
-
-    if (cells.length == 9) {
-      let handler = new SudokuSolver.NonetConstraintHandler(cells);
-      for (const cell of cells) {
-        solver._cellConstraintHandlers[cell].push(handler);
-      }
-    }
-  }
-}
-
-SudokuSolver.BinaryConstraint = class extends ConstraintSolver.Constraint {
-  constructor(cell1, cell2, fn) {
-    super();
-    this._cells = [cell1, cell2];
-    this._fn = fn;
-  }
-
-  apply(solver) {
-    let tables = [
-      LookupTable.forBinaryFunction(this._fn),
-      LookupTable.forBinaryFunction((a, b) => this._fn(b, a)),
-    ];
-    let handler = new SudokuSolver.BinaryConstraintHandler(this._cells, tables);
-    for (const cell of this._cells) {
-      solver._cellConstraintHandlers[cell].push(handler);
-    }
-  }
-
-}
-
-SudokuSolver.Sum = class extends ConstraintSolver.Constraint {
-  constructor(cells, sum) {
-    super();
-    this._cells = cells;
-    this._sum = sum;
-  }
-
-  apply(solver) {
-    (new SudokuSolver.AllDifferent(this._cells)).apply(solver);
-
-    let handler = new SudokuSolver.SumHandler(this._cells, this._sum);
-    for (const cell of this._cells) {
-      solver._cellConstraintHandlers[cell].push(handler);
-    }
-  }
-
-}
-

@@ -7,10 +7,6 @@ class SudokuConstraint {
     this.args = args || {};
   }
 
-  toConstraint() {
-    throw('Unimplemented');
-  }
-
   type() {
     for (const [name,  type] of Object.entries(SudokuConstraint)) {
       if (type == this.constructor) return name;
@@ -138,13 +134,10 @@ SudokuConstraint.Set = class extends SudokuConstraint {
     this._constraints = constraints || [];
   }
 
-  add(constraint) {
-    this._constraints.push(constraint);
-  }
-
-  toConstraint(solv) {
-    return new SudokuSolver.ConstraintSet(
-      this._constraints.map(c => c.toConstraint()));
+  *handlers() {
+    for (const constraint of this._constraints) {
+      yield* constraint.handlers();
+    }
   }
 }
 
@@ -155,8 +148,8 @@ SudokuConstraint.Binary = class extends SudokuConstraint {
     this._fn = fn;
   }
 
-  toConstraint() {
-    return new SudokuSolver.BinaryConstraint(...this._cells[0], fn);
+  *handler() {
+    yield new SudokuSolver.BinaryConstraintHandler(...this._cells, this._fn);
   }
 }
 
@@ -166,15 +159,13 @@ SudokuConstraint.Thermo = class extends SudokuConstraint {
     this._cells = cells.map(SudokuConstraint.parseCellId);
   }
 
-  toConstraint() {
+  *handlers() {
     let constraints = [];
     let cells = this._cells;
     for (let i = 1; i < cells.length; i++) {
-      constraints.push(
-        new SudokuSolver.BinaryConstraint(
-          cells[i-1], cells[i], (a, b) => a < b));
+      yield new SudokuSolver.BinaryConstraintHandler(
+        cells[i-1], cells[i], (a, b) => a < b);
     }
-    return new SudokuSolver.ConstraintSet(constraints);
   }
 }
 
@@ -183,25 +174,22 @@ SudokuConstraint._Anti = class extends SudokuConstraint {
     super();
   }
 
-  toConstraint() {
+  *handlers() {
     let constraints = [];
 
-    for (let r = 0; r < 10; r++) {
-      for (let c = 1; c < 10; c++) {
+    for (let r = 0; r < GRID_SIZE; r++) {
+      for (let c = 1; c < GRID_SIZE; c++) {
         let cell = r*GRID_SIZE+c;
         // We only need half the constraints, as the other half will be
         // added by the conflict cell.
         let conflicts = this.cellConflicts(r, c);
-        for (const [cr, cc] of this.cellConflicts(r, c)) {
-          let conflict = cr*GRID_SIZE+cc;
-          if (conflict >=0 && conflict < NUM_CELLS) {
-            constraints.push(new SudokuSolver.AllDifferent([cell, conflict]));
-          }
+        for (const [rr, cc] of this.cellConflicts(r, c)) {
+          if (rr < 0 || rr >= GRID_SIZE || cc < 0 || cc >= GRID_SIZE) continue;
+          let conflict = rr*GRID_SIZE+cc;
+          yield new SudokuSolver.AllDifferentHandler([cell, conflict]);
         }
       }
     }
-
-    return new SudokuSolver.ConstraintSet(constraints);
   }
 
   cellConflicts(r, c) {
@@ -227,7 +215,7 @@ SudokuConstraint.Diagonal = class extends SudokuConstraint {
     this._direction = direction;
   }
 
-  toConstraint() {
+  *handlers() {
     let cells = [];
 
     for (let r = 0; r < GRID_SIZE; r++) {
@@ -235,7 +223,7 @@ SudokuConstraint.Diagonal = class extends SudokuConstraint {
       cells.push(r*GRID_SIZE+c);
     }
 
-    return new SudokuSolver.AllDifferent(cells);
+    yield new SudokuSolver.NonetHandler(cells);
   }
 }
 
@@ -246,72 +234,87 @@ SudokuConstraint.Sum = class extends SudokuConstraint {
     this._sum = sum;
   }
 
-  toConstraint() {
-    return new SudokuSolver.Sum(this._cells, this._sum);
+  *handlers() {
+    yield new SudokuSolver.SumHandler(this._cells, this._sum);
   }
 }
-
 
 SudokuConstraint.FixedCells = class extends SudokuConstraint {
   constructor({values}) {
     super(arguments[0]);
-    this._values = values;
+    this._valueIds = values;
   }
 
-  toConstraint() {
-    return new SudokuSolver.FixedCells(this._values);
+  *handlers() {
+    let valueMap = new Map();
+    for (const valueId of this._valueIds) {
+      let {cell, value} = SudokuConstraint.parseValueId(valueId);
+      valueMap.set(cell, value);
+    }
+    yield new SudokuSolver.FixedCellsHandler(valueMap);
+  }
+}
+
+SudokuConstraint.AllDifferent = class extends SudokuConstraint {
+  constructor({cells}) {
+    super(arguments[0]);
+    this._cells = cells;
+  }
+
+  *handlers() {
+    yield new SudokuSolver.AllDifferentHandler(this._cells);
+    if (this._cells.length == 9) {
+      yield new SudokuSolver.NonetHandler(this._cells);
+    }
   }
 }
 
 class SudokuBuilder {
   constructor() {
-    this._solverConstraints = [];
+    this._constraints = [];
     this._makeBaseSudokuConstraints();
   }
 
-  addConstraint(config) {
-    this._solverConstraints.push(config.toConstraint());
+  addConstraint(constraint) {
+    this._constraints.push(constraint);
   }
 
   build() {
-    return new SudokuSolver(
-      new SudokuSolver.ConstraintSet(this._solverConstraints));
+    let constraint = new SudokuConstraint.Set(
+      {constraints: this._constraints});
+    return new SudokuSolver(constraint.handlers());
   }
 
   _makeBaseSudokuConstraints() {
-    let constraints = this._solverConstraints;
-
     // Row constraints.
     for (let row = 0; row < GRID_SIZE; row++) {
-      let cellIds = [];
+      let cells = [];
       for (let col = 0; col < GRID_SIZE; col++) {
-        cellIds.push(row*GRID_SIZE+col);
+        cells.push(row*GRID_SIZE+col);
       }
-      constraints.push(new SudokuSolver.AllDifferent(cellIds));
+      this.addConstraint(new SudokuConstraint.AllDifferent({cells: cells}));
     }
 
     // Column constraints.
     for (let col = 0; col < GRID_SIZE; col++) {
-      let cellIds = [];
+      let cells = [];
       for (let row = 0; row < GRID_SIZE; row++) {
-        cellIds.push(row*GRID_SIZE+col);
+        cells.push(row*GRID_SIZE+col);
       }
-      constraints.push(new SudokuSolver.AllDifferent(cellIds));
+      this.addConstraint(new SudokuConstraint.AllDifferent({cells: cells}));
     }
 
     // Box constraints.
     for (let b = 0; b < GRID_SIZE; b++) {
       let bi = b/3|0;
       let bj = b%3;
-      let cellIds = [];
+      let cells = [];
       for (let c = 0; c < GRID_SIZE; c++) {
         let row = BOX_SIZE*bi+(c%3|0);
         let col = BOX_SIZE*bj+(c/3|0);
-        cellIds.push(row*GRID_SIZE+col);
+        cells.push(row*GRID_SIZE+col);
       }
-      constraints.push(new SudokuSolver.AllDifferent(cellIds));
+      this.addConstraint(new SudokuConstraint.AllDifferent({cells: cells}));
     }
-
-    return constraints;
   }
 }
