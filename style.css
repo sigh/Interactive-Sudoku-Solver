@@ -134,8 +134,12 @@ textarea {
   width: 250px;
 }
 
-#solving-indicator {
+#solve-status {
   font-weight: bold;
   color: darkviolet;
   margin: 0px 20px;
+}
+#solve-status:empty:after {
+  content: '.';
+  visibility: hidden;
 }

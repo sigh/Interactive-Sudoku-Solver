@@ -156,7 +156,6 @@ class SudokuSolver {
   }
 
   _resetStack() {
-    this._depth = 0;
     this._done = false;
     this._grids[0].set(this._initialGrid);
     // Re-initialize the cell indexes in the stack.
@@ -186,10 +185,10 @@ class SudokuSolver {
       this._progress.extraState ? this._progress.extraState() : null);
   }
 
-  _getIter(iterationsUntilYield) {
+  _getIter(yieldEveryStep) {
     // If an iterator doesn't exist, then create it.
     if (!this._iter) {
-      this._iter = this._runSolver(iterationsUntilYield);
+      this._iter = this._runSolver(yieldEveryStep);
     }
 
     return this._iter;
@@ -237,20 +236,19 @@ class SudokuSolver {
     return true;
   }
 
-  static _gridToSolution(grid) {
-    let values = grid.map(value => LookupTable.VALUE[value])
-    let result = [];
-    for (let i = 0; i < NUM_CELLS; i++) {
-      result.push(valueId(i/GRID_SIZE|0, i%GRID_SIZE|0, values[i]-1));
+  static _resultToSolution(result) {
+    let values = result.grid.map(value => LookupTable.VALUE[value])
+    let solution = [];
+    for (const cell of result.stack) {
+      solution.push(valueId(cell/GRID_SIZE|0, cell%GRID_SIZE|0, values[cell]-1));
     }
-    return result;
+    return solution;
   }
 
   // _runSolver runs the solver yielding each solution, and optionally at
-  // intermediate steps.
-  // The value returned to yield determines how many steps to run for (-1 for
-  // no limit).
-  *_runSolver(iterationsUntilYield) {
+  // each step.
+  *_runSolver(yieldEveryStep) {
+    yieldEveryStep = yieldEveryStep || false;
     if (this._done) return true;
 
     let depth = 0;
@@ -264,7 +262,6 @@ class SudokuSolver {
     }
 
     let progressFrequency = this._progress.frequency;
-    iterationsUntilYield = iterationsUntilYield || -1;
 
     while (depth) {
       depth--;
@@ -282,7 +279,6 @@ class SudokuSolver {
 
       counters.valuesSearched++;
       if (value != values) counters.guesses++;
-      iterationsUntilYield--;
 
       // Copy current cell values.
       depth++;
@@ -296,9 +292,14 @@ class SudokuSolver {
       if (counters.valuesSearched % progressFrequency == 0) {
         this._sendProgress();
       }
-      if (!iterationsUntilYield) {
-        this._depth = depth;
-        iterationsUntilYield = (yield null) || -1;
+      if (yieldEveryStep) {
+        let yieldValue = {
+          grid: grid,
+          isSolution: !hasContradiction && (depth == NUM_CELLS),
+          stack: stack.subarray(0, depth),
+          hasContradiction: hasContradiction,
+        };
+        yieldEveryStep = (yield yieldValue) || false;
       }
 
       if (hasContradiction) continue;
@@ -307,8 +308,13 @@ class SudokuSolver {
         // We've set all the values, and we haven't found a contradiction.
         // This is a solution!
         counters.solutions++;
-        this._depth = depth;
-        iterationsUntilYield = (yield grid) || -1;
+        let yieldValue = {
+          grid: grid,
+          isSolution: true,
+          stack: stack,
+          hasContradiction: false,
+        };
+        yieldEveryStep = (yield yieldValue) || false;
         continue;
       }
 
@@ -325,15 +331,12 @@ class SudokuSolver {
 
   // Solve until maxSolutions are found, and returns leaving the stack
   // fully unwound.
-  _solve(maxSolutions, solutionFn) {
-    let iter = this._runSolver();
-
-    for (let i = 0; i < maxSolutions; i++) {
-      let result = iter.next();
-      if (result.done) break;
-      solutionFn(result.value);
+  *_solve(maxSolutions) {
+    let i = 0;
+    for (const solution of this._runSolver()) {
+      yield solution.grid;
+      if (++i == maxSolutions) break;
     }
-
     this._resetStack();
   }
 
@@ -342,10 +345,9 @@ class SudokuSolver {
     // each iteration.
 
     // Do initial solve to see if we have 0, 1 or many solutions.
-    this._solve(2,
-      (grid) => {
-        grid.forEach((c, i) => { validRows[i] |= c; } );
-      });
+    for (const grid of this._solve(2)) {
+      grid.forEach((c, i) => { validRows[i] |= c; } );
+    }
 
     let numSolutions = this._counters.solutions;
 
@@ -362,9 +364,9 @@ class SudokuSolver {
           // Fix the current value and attempt to solve.
           // Solve will also reset any changes we made to this._grids[0].
           this._grids[0][i] = v;
-          this._solve(1, (grid) => {
+          for (const grid of this._solve(1)) {
             grid.forEach((c, i) => { validRows[i] |= c; } );
-          });
+          };
         }
       }
     }
@@ -399,7 +401,7 @@ class SudokuSolver {
 
     if (result.done) return null;
 
-    return SudokuSolver._gridToSolution(result.value);
+    return SudokuSolver._resultToSolution(result.value);
   }
 
   countSolutions(updateFrequency) {
@@ -418,10 +420,10 @@ class SudokuSolver {
     };
 
     this._timer.unpause();
-    for (let stack of this._getIter()) {
+    for (const result of this._getIter()) {
       // Only store a sample solution if we don't have one.
       if (sampleSolution == null) {
-        sampleSolution = SudokuSolver._gridToSolution(stack)
+        sampleSolution = SudokuSolver._resultToSolution(result)
       }
     }
     this._timer.pause();
@@ -434,9 +436,12 @@ class SudokuSolver {
     return this._counters.solutions;
   }
 
-  static _makePencilmarks(grid) {
+  static _makePencilmarks(grid, ignoreCells) {
+    let ignoreSet = new Set(ignoreCells);
+
     let pencilmarks = [];
     for (let i = 0; i < NUM_CELLS; i++) {
+      if (ignoreSet.has(i)) continue;
       let values = grid[i];
       while (values) {
         let value = values & -values;
@@ -448,23 +453,28 @@ class SudokuSolver {
   }
 
   goToStep(n) {
+    n++;
+
     // Easiest way to go backwards is to start from the start again.
     if (n < this._counters.valuesSearched) this.reset();
 
-    let iter = this._getIter(1);
+    let iter = this._getIter(true);
+    let result = null;
 
     // Iterate until we have seen n steps.
     this._timer.unpause();
     while (this._counters.valuesSearched + this._done < n && !this._done) {
-      iter.next(1);
+      result = iter.next(true).value;
     }
     this._timer.pause();
 
     if (this._done) return null;
 
-    let grid = this._grids[this._depth];
     return {
-      values: SudokuSolver._makePencilmarks(grid),
+      values: SudokuSolver._resultToSolution(result),
+      pencilmarks: SudokuSolver._makePencilmarks(result.grid, result.stack),
+      isSolution: result.isSolution,
+      hasContradiction: result.hasContradiction,
     }
   }
 

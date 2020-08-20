@@ -21,10 +21,10 @@
   <div id="sudoku-grid-outer">
     <div id="sudoku-grid"></div>
     <div id="solution-control-panel">
-      <button id="solution-start">|&lt;</button>
-      <button id="solution-back">&lt;</button>
+      <button id="solution-start" title="start (s)">|&lt;</button>
+      <button id="solution-back" title="previous (p)">&lt;</button>
       <span id="solution-step-output"></span>
-      <button id="solution-forward">&gt;</button>
+      <button id="solution-forward" title="next (n)">&gt;</button>
     </div>
   </div>
 
@@ -32,15 +32,15 @@
     <div>
       Mode:
       <select id="solve-mode-input">
-        <option value="solutions">Solutions</option>
         <option value="all-possibilities">All possibilties</option>
+        <option value="solutions">Solutions</option>
         <option value="count-solutions" checked>Count solutions</option>
         <option value="step-by-step" checked>Step-by-step</option>
       </select>
     </div>
     <div>
       <button id="stop-solver">Abort</button>
-      <span id="solving-indicator">Solving</span>
+      <span id="solve-status"></span>
     </div>
     <div id="state-output">
     </div>

@@ -786,9 +786,10 @@ class SolutionController {
       stepOutput: document.getElementById('solution-step-output'),
       mode: document.getElementById('solve-mode-input'),
       stateOutput: document.getElementById('state-output'),
-      solving: document.getElementById('solving-indicator'),
+      solveStatus: document.getElementById('solve-status'),
       error: document.getElementById('error-output'),
       stop: document.getElementById('stop-solver'),
+      stepStatus: document.getElementById('step-by-step-status'),
     }
 
     this._elements.mode.onchange = () => this._update();
@@ -803,18 +804,47 @@ class SolutionController {
   }
 
   _setUpKeyBindings() {
+    const keyHandlers = {
+      n: () => this._elements.forward.click(),
+      p: () => this._elements.back.click(),
+      s: () => this._elements.start.click(),
+    };
+    let firingKeys = new Map();
+
+    // Keep running handler every frame as long as the key is still held down.
+    const runHandler = (key, handler) => {
+      if (!firingKeys.has(key)) return;
+      handler();
+      window.requestAnimationFrame(() => runHandler(key, handler));
+    };
+
+    const FIRE_WAIT = 1;
+    const FIRE_FAST = 2;
+
     document.addEventListener('keydown', event => {
-      switch (event.key) {
-        case 'n':
-          this._elements.forward.click();
-          break;
-        case 'p':
-          this._elements.back.click();
-          break;
-        case 's':
-          this._elements.start.click();
-          break;
+      let key = event.key;
+      let handler = keyHandlers[key];
+      if (!handler) return;
+
+      // If the key is not currently pressed, then just fire the handler and
+      // record that they key has been pressed.
+      // We don't want to start firing continuously as that makes it way too
+      // sensitive.
+      if (!firingKeys.has(key)) {
+        firingKeys.set(key, FIRE_WAIT);
+        handler();
+        return;
       }
+
+      // If we haven't started fast fire mode, do so now!
+      if (firingKeys.get(key) != FIRE_FAST) {
+        firingKeys.set(key, FIRE_FAST);
+        runHandler(key, handler);
+      }
+
+    });
+    document.addEventListener('keyup', event => {
+      firingKeys.delete(event.key);
     });
   }
 
@@ -832,14 +862,14 @@ class SolutionController {
     return this._solver;
   }
 
-  async _update() {
-    this._elements.control.style.visibility = (
-      this._elements.mode.value == 'all-possibilities' ? 'hidden' : 'visible');
+  _showIterationControls(show) {
+    this._elements.control.style.visibility = show ? 'visible' : 'hidden';
+  }
 
+  async _update() {
     let solver = await this._replaceSolver();
 
     this._grid.setSolution();
-
 
     let handler = {
       'all-possibilities': this._runAllPossibilites,
@@ -864,11 +894,11 @@ class SolutionController {
       this._elements.start.disabled = true;
       this._elements.forward.disabled = true;
       this._elements.back.disabled = true;
-      this._elements.solving.style.visibility = 'visible';
+      this._elements.solveStatus.textContent = 'Solving';
       this._setError();
     } else {
       this._elements.stop.disabled = true;
-      this._elements.solving.style.visibility = 'hidden';
+      this._elements.solveStatus.textContent = '';
     }
   }
 
@@ -915,6 +945,14 @@ class SolutionController {
     }
   }
 
+  _setStepStatus(result) {
+    if (result.isSolution) {
+      this._elements.solveStatus.textContent = 'Solution';
+    } else if (result.hasContradiction) {
+      this._elements.solveStatus.textContent = 'Contradiction';
+    }
+  }
+
   async _runStepIterator(solver) {
     let step = 0;
 
@@ -926,10 +964,11 @@ class SolutionController {
       // Update the grid.
       let selection = [];
       if (result) {
-        this._grid.setSolution(result.values, result.remainingOptions);
+        this._grid.setSolution(result.values, result.pencilmarks);
         if (result.values.length > 0) {
           selection.push(result.values[result.values.length-1].substring(0, 4));
         }
+        this._setStepStatus(result);
       }
       this._grid.selection.updateSelection(selection);
 
@@ -951,6 +990,8 @@ class SolutionController {
       step = 0;
       update();
     };
+
+    this._showIterationControls(true);
 
     // Run the onclick handler (just calling click() would only work when
     // the start button is enabled).
@@ -1004,6 +1045,8 @@ class SolutionController {
       update();
     };
 
+    this._showIterationControls(true);
+
     // Find the first solution.
     await nextSolution();
     update();
@@ -1015,12 +1058,14 @@ class SolutionController {
   }
 
   async _runAllPossibilites(solver) {
+    this._showIterationControls(false);
     let result = await solver.solveAllPossibilities();
     this._grid.setSolution(result);
     this._setSolving(false);
   }
 
   async _runCounter(solver) {
+    this._showIterationControls(false);
     await solver.countSolutions();
     this._setSolving(false);
   }
