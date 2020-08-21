@@ -223,7 +223,7 @@ class ConstraintDisplay {
 
 class ConstraintManager {
   constructor(grid) {
-    this.configs = [];
+    this._configs = [];
     this.grid = grid;
     this._checkboxes = {};
     grid.setUpdateCallback(() => this.runUpdateCallback());
@@ -285,8 +285,12 @@ class ConstraintManager {
 
     let freeInputForm = document.getElementById('freeform-constraint-input');
     freeInputForm.onsubmit = e => {
-      let input = (new FormData(freeInputForm)).get('freeform-input');
-      this.loadFromText(input);
+      try {
+        let input = (new FormData(freeInputForm)).get('freeform-input');
+        this.loadFromText(input);
+      } catch (e) {
+        // TODO: Display the error.
+      }
       return false;
     }
 
@@ -294,47 +298,39 @@ class ConstraintManager {
   }
 
   loadFromText(input) {
-    // Avoid updating until after the constraints are drawn.
-    // TODO: Do this in a more principled way.
-    let updateCallback = this.updateCallback;
-    this.setUpdateCallback();
-
     this.clear();
     let constraint = SudokuConstraint.fromText(input);
     if (constraint) this.loadConstraint(constraint);
 
-    window.setTimeout(() => {
-      this.setUpdateCallback(updateCallback);
-      this.runUpdateCallback();
-    }, 10);
+    this.runUpdateCallback();
   }
 
   loadConstraint(constraint) {
-    let args = constraint.args;
     let config;
-    switch (constraint.type()) {
-      case 'FixedCells':
-        this.grid.setCellValues(args.values);
+    switch (constraint.type) {
+      case 'Givens':
+        this.grid.setCellValues(constraint.values);
         break;
       case 'Thermo':
         config = {
-          cells: args.cells,
-          name: `Themometer [len: ${args.cells.length}]`,
+          cells: constraint.cells,
+          name: `Themometer [len: ${constraint.cells.length}]`,
           constraint: constraint,
-          displayElem: this.display.drawThermometer(args.cells),
+          displayElem: this.display.drawThermometer(constraint.cells),
         };
         this._addToPanel(config);
-        this.configs.push(config);
+        this._configs.push(config);
         break;
       case 'Sum':
         config = {
-          cells: args.cells,
-          name: `Killer cage [sum: ${args.sum}]`,
+          cells: constraint.cells,
+          name: `Killer cage [sum: ${constraint.sum}]`,
           constraint: constraint,
-          displayElem: this.display.drawKillerCage(args.cells, args.sum),
+          displayElem: this.display.drawKillerCage(
+            constraint.cells, constraint.sum),
         };
         this._addToPanel(config);
-        this.configs.push(config);
+        this._configs.push(config);
         break;
       case 'AntiKnight':
         this._checkboxes.antiKnight.checked = true;
@@ -345,7 +341,7 @@ class ConstraintManager {
       case 'Diagonal':
         // TODO: The code for handling constraints is littered around this
         // class and duplicated. Consolidate it into one place.
-        if (args.direction > 0) {
+        if (constraint.direction > 0) {
           this._checkboxes.diagonalPlus.checked = true;
           this.display.drawDiagonal(1);
         } else {
@@ -354,9 +350,7 @@ class ConstraintManager {
         }
         break;
       case 'Set':
-        for (let constraint of args.constraints) {
-          this.loadConstraint(constraint);
-        }
+        constraint.constraints.forEach(c => this.loadConstraint(c));
         break;
     }
     this.runUpdateCallback();
@@ -371,12 +365,11 @@ class ConstraintManager {
     let constraint;
     switch (formData.get('constraint-type')) {
       case 'cage':
-        constraint = new SudokuConstraint.Sum(
-          {cells: cells, sum: +formData.get('sum')});
+        constraint = new SudokuConstraint.Sum(+formData.get('sum'), ...cells);
         this.loadConstraint(constraint);
         break;
       case 'thermo':
-        constraint = new SudokuConstraint.Thermo({cells: cells});
+        constraint = new SudokuConstraint.Thermo(...cells);
         this.loadConstraint(constraint);
         break;
     }
@@ -386,8 +379,8 @@ class ConstraintManager {
   }
 
   _removeConstraint(config) {
-    let index = this.configs.indexOf(config);
-    this.configs.splice(index, 1);
+    let index = this._configs.indexOf(config);
+    this._configs.splice(index, 1);
     this.display.removeItem(config.displayElem);
     this._panel.removeChild(config.panelItem);
   }
@@ -421,7 +414,7 @@ class ConstraintManager {
   }
 
   getConstraints() {
-    let constraints = this.configs.map(c => c.constraint);
+    let constraints = this._configs.map(c => c.constraint);
     if (this._checkboxes.antiKnight.checked) {
       constraints.push(new SudokuConstraint.AntiKnight());
     }
@@ -429,16 +422,15 @@ class ConstraintManager {
       constraints.push(new SudokuConstraint.AntiKing());
     }
     if (this._checkboxes.diagonalPlus.checked) {
-      constraints.push(new SudokuConstraint.Diagonal({direction: 1}));
+      constraints.push(new SudokuConstraint.Diagonal(1));
     }
     if (this._checkboxes.diagonalMinus.checked) {
-      constraints.push(new SudokuConstraint.Diagonal({direction: -1}));
+      constraints.push(new SudokuConstraint.Diagonal(-11));
     }
     constraints.push(
-      new SudokuConstraint.FixedCells(
-        {values: this.grid.getCellValues()}));
+      new SudokuConstraint.Givens(...this.grid.getCellValues()));
 
-    return new SudokuConstraint.Set({constraints: constraints});
+    return new SudokuConstraint.Set(constraints);
   }
 
   clear() {
@@ -447,7 +439,7 @@ class ConstraintManager {
     for (const input of Object.values(this._checkboxes)) {
       input.checked = false;
     }
-    this.configs = [];
+    this._configs = [];
     this.grid.clearCellValues()
     this.grid.setSolution();
     this.runUpdateCallback();
@@ -656,7 +648,7 @@ class SudokuGrid {
     for (let [key, cell] of this._cellMap) {
       let value = cell.innerText;
       if (value){
-        values.push(`${key}#${value}`);
+        values.push(`${key}_${value}`);
       }
     }
     return values;
@@ -725,7 +717,7 @@ class SudokuGrid {
         if (this._solutionValues.length == 0) {
           this._container.classList.add('hidden-solution');
         }
-      }, 100);
+      }, 10);
       return;
     }
 
@@ -770,13 +762,43 @@ class SudokuGrid {
   }
 }
 
+class UrlHandler {
+  constructor(onUpdate) {
+    this.allowUrlUpdates = false;
+    this._onUpdate = onUpdate;
+
+    window.onpopstate = this._reloadFromUrl.bind(this);
+    this._reloadFromUrl();
+  }
+
+  update(params) {
+    if (!this.allowUrlUpdates) return;
+
+    let url = new URL(window.location.href);
+
+    for (const [key, value] of Object.entries(params)) {
+      url.searchParams.set(key, value);
+    }
+
+    let newUrl = url.toString();
+    if (newUrl != window.location.href) {
+      history.pushState(null, null, url.toString());
+    }
+  }
+
+  _reloadFromUrl() {
+    let url = new URL(window.location.href);
+    this._onUpdate(url.searchParams);
+  }
+}
+
 class SolutionController {
   constructor(constraintManager, grid) {
     this._solver = null;
     this._constraintManager = constraintManager;
     this._grid = grid;
-    constraintManager.setUpdateCallback(
-      deferUntilAnimationFrame(this._update.bind(this)));
+    this._update = deferUntilAnimationFrame(this._update.bind(this));
+    constraintManager.setUpdateCallback(this._update.bind(this));
 
     this._elements = {
       start: document.getElementById('solution-start'),
@@ -800,7 +822,19 @@ class SolutionController {
     this._displayStateVariables =
       deferUntilAnimationFrame(this._displayStateVariables.bind(this));
 
-    this._update();
+    this._urlHandler = new UrlHandler((params) => {
+      let mode = params.get('mode');
+      if (mode) this._elements.mode.value = mode;
+
+      let constraintsText = params.get('q');
+      if (constraintsText) {
+        this._constraintManager.loadFromText(constraintsText);
+      }
+    });
+
+    this._update().then(() => {
+      this._urlHandler.allowUrlUpdates = true;
+    });
   }
 
   _setUpKeyBindings() {
@@ -852,10 +886,9 @@ class SolutionController {
     if (this._solver) this._solver.terminate();
   }
 
-  async _replaceSolver() {
+  async _replaceSolver(constraints) {
     this._terminateSolver();
 
-    let constraints = this._constraintManager.getConstraints();
     this._solver = await SolverProxy.make(
       constraints, state => this._displayState(state));
 
@@ -867,16 +900,20 @@ class SolutionController {
   }
 
   async _update() {
-    let solver = await this._replaceSolver();
+    let constraints = this._constraintManager.getConstraints();
+    let mode = this._elements.mode.value;
+    this._urlHandler.update({mode: mode, q: constraints});
 
-    this._grid.setSolution();
+    let solver = await this._replaceSolver(constraints);
+
+    this._grid.setSolution([]);
 
     let handler = {
       'all-possibilities': this._runAllPossibilites,
       'solutions': this._runSolutionIterator,
       'step-by-step': this._runStepIterator,
       'count-solutions': this._runCounter,
-    }[this._elements.mode.value];
+    }[mode];
 
     this._setSolving(true);
     handler.bind(this)(solver)

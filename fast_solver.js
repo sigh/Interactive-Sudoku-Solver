@@ -225,9 +225,6 @@ class SudokuSolver {
       }
     }
 
-    if (cell == 7*GRID_SIZE+8) {
-      let x = 1;
-    }
     while (cellAccumulator.hasConstraints()) {
       let c = cellAccumulator.popConstraint();
       if (!c.enforceConsistency(grid)) return false;

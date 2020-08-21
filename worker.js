@@ -1,5 +1,5 @@
 self.importScripts('util.js');
-self.importScripts('constraint_solver.js');
+self.importScripts('constraint.js');
 self.importScripts('sudoku_solver.js');
 self.importScripts('fast_solver.js');
 
@@ -9,10 +9,8 @@ const handleWorkerMethod = (method, payload) => {
   let constraint;
   switch (method) {
     case 'initFast':
-      let constraint = SudokuConstraint.fromJSON(payload.jsonConstraint);
-
       let builder = new SudokuBuilder();
-      builder.addConstraint(constraint);
+      builder.addConstraint(payload.constraint);
 
       workerSolver = builder.build();
 

@@ -7,23 +7,32 @@ const formatTimeMs = (timeMs) => {
 
 const deferUntilAnimationFrame = (fn) => {
   let lastArgs = null;
+  let promise = null;
   let alreadyEnqueued = false;
   return ((...args) => {
     lastArgs = args;
-    if (alreadyEnqueued) return;
 
-    alreadyEnqueued = true;
-    window.requestAnimationFrame(() => {
-      try {
-        fn(...lastArgs);
-      } finally {
-        lastArgs = null;
-        alreadyEnqueued = false;
-      }
-    });
+    if (!alreadyEnqueued) {
+      alreadyEnqueued = true;
+      promise = new Promise((resolve) => {
+        window.requestAnimationFrame(() => {
+          try {
+            fn(...lastArgs);
+          } finally {
+            resolve();
+            lastArgs = null;
+            promise = null;
+            alreadyEnqueued = false;
+          }
+        });
+      });
+    }
+
+    return promise;
   });
 };
 
+// Helper to count operations for debugging.
 let _count = 0;
 const count = () => { _count++; };
 
