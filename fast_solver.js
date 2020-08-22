@@ -140,7 +140,9 @@ class SudokuSolver {
     }
 
     // Set cell conflicts so that they are unique.
+    // Sort them, so they are in a predictable order.
     this._cellConflicts = cellConflicts.map(c => new Uint8Array(c));
+    this._cellConflicts.forEach(c => c.sort());
   }
 
   reset() {
@@ -598,14 +600,21 @@ SudokuSolver.NonetHandler = class extends SudokuSolver.ConstraintHandler {
       allValues |= v;
     }
     if (allValues != ALL_VALUES) return false;
+    // NOTE: This is only useful if everywhere else aborts when a domain wipeout
+    // if found.
+    // i.e. If all values are unique values, and there are no cells with no
+    // values, then this constraint must be satisfied.
+    if (uniqueValues == ALL_VALUES) return true;
 
-    // Search for hidden singles.
     if (uniqueValues) {
+      // We have hidden singles. Find and constrain them.
       for (const cell of this.cells) {
-        if (grid[cell] & uniqueValues) {
-          grid[cell] &= uniqueValues;
-          // We also want it to be true that grid[cell] now only has a single
-          // value, but that should always be true here.
+        let value = grid[cell] & uniqueValues;
+        if (value) {
+          // If we have more value that means a single cell holds more than
+          // one unique value.
+          if (value&(value-1)) return false;
+          grid[cell] = value;
         }
       }
     }
@@ -648,18 +657,49 @@ SudokuSolver.SumHandler = class extends SudokuSolver.ConstraintHandler {
   }
 
   enforceConsistency(grid) {
-    // Check that the given sum is within the min and max possible sums.
-    let min = 0;
-    let max = 0;
+    // Determine how much headrroom there is in the range between the extreme
+    // values and the target sum.
+    let sumMinusMin = this._sum;
+    let maxMinusSum = -this._sum;
     for (const cell of this.cells) {
-      min += LookupTable.MIN[grid[cell]];
-      max += LookupTable.MAX[grid[cell]];
+      sumMinusMin -= LookupTable.MIN[grid[cell]];
+      maxMinusSum += LookupTable.MAX[grid[cell]];
     }
 
     // It is impossible to make the target sum.
-    if (this._sum < min || this._sum > max) return false;
+    if (sumMinusMin < 0 || maxMinusSum < 0) return false;
     // We've reached the target sum exactly.
-    if (this._sum == min && this._sum == max) return true;
+    if (sumMinusMin == 0 && maxMinusSum == 0) return true;
+
+    // Remove any values which aren't possible because they would cause the sum
+    // to be too high.
+    if (sumMinusMin < GRID_SIZE || maxMinusSum < GRID_SIZE) {
+      for (const cell of this.cells) {
+        let value = grid[cell];
+        // If there is a single value, then the range is always fine.
+        if (!(value&(value-1))) continue;
+
+        let cellMin = LookupTable.MIN[value];
+        let cellMax = LookupTable.MAX[value];
+        let range = cellMax - cellMin;
+
+        if (sumMinusMin < range) {
+          let x = sumMinusMin + cellMin;
+          // Remove any values GREATER than x. Even if all other squares
+          // take their minimum values, these are too big.
+          if (!(value &= ((1<<x)-1))) return false;
+          grid[cell] = value;
+        }
+
+        if (maxMinusSum < range) {
+          // Remove any values LESS than x. Even if all other squares
+          // take their maximum values, these are too small.
+          let x = cellMax - maxMinusSum;
+          if (!(value &= -(1<<(x-1)))) return false;
+          grid[cell] = value;
+        }
+      }
+    }
 
     // Check that we can make the current sum with the unique values remaining.
     // NOTE: This is only valid if we assume unique values.
@@ -670,6 +710,7 @@ SudokuSolver.SumHandler = class extends SudokuSolver.ConstraintHandler {
       allValues |= value;
       if (!(value&(value-1))) fixedValues |= value;
     }
+    if (allValues == fixedValues) return true;
 
     let sumOptions = SudokuSolver.SumHandler.KILLER_CAGE_SUMS
         [this.cells.length - LookupTable.COUNT[fixedValues]]
@@ -689,13 +730,9 @@ SudokuSolver.SumHandler = class extends SudokuSolver.ConstraintHandler {
       for (const cell of this.cells) {
         // Safe to apply to every cell, since we know that none of the
         // fixedValues are in unfixedValues.
-        grid[cell] &= ~valuesToRemove;
+        if (!(grid[cell] &= ~valuesToRemove)) return false;
       }
     }
-
-    // TODO: The possiblities check above can't check if the required values
-    // are in different cells.
-    // Consider porting the range check here as well.
 
     return true;
   }
