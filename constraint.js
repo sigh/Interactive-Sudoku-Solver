@@ -104,7 +104,7 @@ class SudokuConstraint {
       }
     }
     if (new Set(nonDigitCharacters).size > 1) return null;
-    return new SudokuConstraint.Givens(...fixedValues);
+    return new SudokuConstraint.FixedValues(...fixedValues);
   }
 
   static fromText(text) {
@@ -171,7 +171,7 @@ class SudokuConstraint {
     }
   }
 
-  static Givens = class extends SudokuConstraint {
+  static FixedValues = class extends SudokuConstraint {
     constructor(...values) {
       super(arguments);
       this.values = values;
@@ -194,5 +194,5 @@ class SudokuConstraint {
     return map;
   })();
 }
-// Make Givens the default.
-SudokuConstraint[''] = SudokuConstraint.Givens;
+// Make FixedValues the default.
+SudokuConstraint[''] = SudokuConstraint.FixedValues;

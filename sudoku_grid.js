@@ -308,7 +308,7 @@ class ConstraintManager {
   loadConstraint(constraint) {
     let config;
     switch (constraint.type) {
-      case 'Givens':
+      case 'FixedValues':
         this.grid.setCellValues(constraint.values);
         break;
       case 'Thermo':
@@ -428,7 +428,7 @@ class ConstraintManager {
       constraints.push(new SudokuConstraint.Diagonal(-11));
     }
     constraints.push(
-      new SudokuConstraint.Givens(...this.grid.getCellValues()));
+      new SudokuConstraint.FixedValues(...this.grid.getCellValues()));
 
     return new SudokuConstraint.Set(constraints);
   }
@@ -960,9 +960,11 @@ class SolutionController {
     SolutionController._addStateVariable(container,
       '# Backtracks', counters.backtracks);
     SolutionController._addStateVariable(container,
-      '# Values searched', counters.valuesSearched);
-    SolutionController._addStateVariable(container,
       '# Cells searched', counters.cellsSearched);
+    SolutionController._addStateVariable(container,
+      '# Values tried', counters.valuesSearched);
+    SolutionController._addStateVariable(container,
+      '# Constraints processed', counters.constraintsProcessed);
 
     SolutionController._addStateVariable(
       container, 'Runtime', formatTimeMs(state.timeMs));

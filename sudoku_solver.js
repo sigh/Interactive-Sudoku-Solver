@@ -102,7 +102,7 @@ class SudokuBuilder {
         }
         break;
 
-      case 'Givens':
+      case 'FixedValues':
         let valueMap = new Map();
         for (const valueId of constraint.values) {
           let {cell, value} = parseValueId(valueId);

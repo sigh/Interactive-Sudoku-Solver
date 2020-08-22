@@ -150,6 +150,7 @@ class SudokuSolver {
       cellsSearched: 0,
       guesses: 0,
       solutions: 0,
+      constraintsProcessed: 0,
     };
     this._resetStack();
     this._timer = new Timer();
@@ -217,6 +218,7 @@ class SudokuSolver {
     let value = grid[cell];
     let cellAccumulator = new CellAccumulator(this);
     cellAccumulator.add(cell);
+    let counters = this._counters;
 
     for (const conflict of this._cellConflicts[cell]) {
       if (grid[conflict] & value) {
@@ -226,6 +228,7 @@ class SudokuSolver {
     }
 
     while (cellAccumulator.hasConstraints()) {
+      counters.constraintsProcessed++;
       let c = cellAccumulator.popConstraint();
       if (!c.enforceConsistency(grid)) return false;
     }
