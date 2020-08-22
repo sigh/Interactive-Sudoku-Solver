@@ -644,7 +644,7 @@ SudokuSolver.BinaryConstraintHandler = class extends SudokuSolver.ConstraintHand
 SudokuSolver.SumHandler = class extends SudokuSolver.ConstraintHandler {
   constructor(cells, sum) {
     super(cells);
-    this._sum = sum;
+    this._sum = +sum;
   }
 
   enforceConsistency(grid) {
