@@ -86,7 +86,7 @@ class SudokuBuilder {
           let c = constraint.direction > 0 ? GRID_SIZE-r-1 : r;
           cells.push(r*GRID_SIZE+c);
         }
-        yield new SudokuSolver.NonetHandler(cells);
+        yield *this._allDifferentHandlers(cells);
         break;
 
       case 'Sum':
@@ -96,10 +96,7 @@ class SudokuBuilder {
 
       case 'AllDifferent':
         cells = constraint.cells.map(parseCellId);
-        yield new SudokuSolver.AllDifferentHandler(cells);
-        if (cells.length == 9) {
-          yield new SudokuSolver.NonetHandler(cells);
-        }
+        yield *this._allDifferentHandlers(cells);
         break;
 
       case 'FixedValues':
@@ -128,6 +125,18 @@ class SudokuBuilder {
       default:
         throw('Unknown constraint type: ' + constraint.type);
     }
+  }
+
+  static *_allDifferentHandlers(cells) {
+    cells.sort((a, b) => a-b);
+    if (cells.length > GRID_SIZE) throw('Too many cells for AllDifferent');
+    if (cells.length < GRID_SIZE) {
+      yield new SudokuSolver.AllDifferentHandler(cells);
+      return;
+    }
+
+    // Exactly 9 cells.
+    yield new SudokuSolver.NonetHandler(cells);
   }
 
   static *_antiHandlers(conflictFn) {

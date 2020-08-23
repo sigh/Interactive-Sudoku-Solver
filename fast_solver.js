@@ -142,7 +142,7 @@ class SudokuSolver {
     // Set cell conflicts so that they are unique.
     // Sort them, so they are in a predictable order.
     this._cellConflicts = cellConflicts.map(c => new Uint8Array(c));
-    this._cellConflicts.forEach(c => c.sort());
+    this._cellConflicts.forEach(c => c.sort((a, b) => a-b));
   }
 
   reset() {
@@ -197,21 +197,31 @@ class SudokuSolver {
     return this._iter;
   }
 
-
   // Find the best cell and bring it to the front. This means that it will
   // be processed next.
   _updateCellOrder(stack, grid) {
-    let counts = LookupTable.COUNT;
-    let minCount = counts[grid[stack[0]]];
-
-    // Find the cell with the lowest count. If we see a count of 1, then we
-    // know we can't get any better (any domain wipeouts should have already
-    // been rejected).
-    for (let i = 0; i < stack.length && minCount > 1; i++) {
-      let count = counts[grid[stack[i]]];
-      if (count < minCount) {
+    // Do a first pass to check if there are any cells with 1 (or 0) cells set.
+    // Since these can be resolved with no back-tracking, we return immediately.
+    // NOTE: The constraint handlers are written such that they detect domain
+    // wipeouts, so we should never find them here. Even if they exist, it
+    // just means we do a few more useless forced cell resolutions.
+    for (let i = 0; i < stack.length; i++) {
+      let v = grid[stack[i]];
+      if (!(v&(v-1))) {
         [stack[i], stack[0]] = [stack[0], stack[i]];
-        minCount = count;
+        return;
+      }
+    }
+
+    // From here ALL cells have at least 2 candidates.
+    // Choose one with the smallest count.
+    let minScore = GRID_SIZE + 1;
+
+    for (let i = 0; i < stack.length; i++) {
+      let count = LookupTable.COUNT[grid[stack[i]]];
+      if (count < minScore) {
+        [stack[i], stack[0]] = [stack[0], stack[i]];
+        minScore = count;
       }
     }
   }
@@ -543,7 +553,7 @@ SudokuSolver.ConstraintHandler = class {
 
   constructor(cells) {
     // This constraint is enforced whenever these cells are touched.
-    this.cells = cells || [];
+    this.cells = new Uint8Array(cells || []);
     // Dirty bit for determining if the constraint needs to be enforced.
     this.dirty = 0;
   }
@@ -593,8 +603,8 @@ SudokuSolver.NonetHandler = class extends SudokuSolver.ConstraintHandler {
     // TODO: Ignore nonets we've already processed.
     let allValues = 0;
     let uniqueValues = 0;
-    for (const cell of this.cells) {
-      let v = grid[cell];
+    for (let i = 0; i < GRID_SIZE; i++) {
+      let v = grid[this.cells[i]];
       uniqueValues &= ~v;
       uniqueValues |= (v&~allValues);
       allValues |= v;
@@ -608,7 +618,8 @@ SudokuSolver.NonetHandler = class extends SudokuSolver.ConstraintHandler {
 
     if (uniqueValues) {
       // We have hidden singles. Find and constrain them.
-      for (const cell of this.cells) {
+      for (let i = 0; i < GRID_SIZE; i++) {
+        let cell = this.cells[i];
         let value = grid[cell] & uniqueValues;
         if (value) {
           // If we have more value that means a single cell holds more than
@@ -662,8 +673,9 @@ SudokuSolver.SumHandler = class extends SudokuSolver.ConstraintHandler {
     let sumMinusMin = this._sum;
     let maxMinusSum = -this._sum;
     for (const cell of this.cells) {
-      sumMinusMin -= LookupTable.MIN[grid[cell]];
-      maxMinusSum += LookupTable.MAX[grid[cell]];
+      let v = grid[cell];
+      sumMinusMin -= LookupTable.MIN[v];
+      maxMinusSum += LookupTable.MAX[v];
     }
 
     // It is impossible to make the target sum.
@@ -701,26 +713,33 @@ SudokuSolver.SumHandler = class extends SudokuSolver.ConstraintHandler {
       }
     }
 
-    // Check that we can make the current sum with the unique values remaining.
+    // Check that we can make the current sum with the unfixed values remaining.
     // NOTE: This is only valid if we assume unique values.
     let fixedValues = 0;
     let allValues = 0;
+    let uniqueValues = 0;
     for (const cell of this.cells) {
       let value = grid[cell];
+      uniqueValues &= ~value;
+      uniqueValues |= (value&~allValues);
       allValues |= value;
       if (!(value&(value-1))) fixedValues |= value;
     }
     if (allValues == fixedValues) return true;
 
+    let numUnfixed = this.cells.length - LookupTable.COUNT[fixedValues];
     let sumOptions = SudokuSolver.SumHandler.KILLER_CAGE_SUMS
-        [this.cells.length - LookupTable.COUNT[fixedValues]]
-        [this._sum - LookupTable.SUM[fixedValues]];
+        [numUnfixed][this._sum - LookupTable.SUM[fixedValues]];
     if (!sumOptions) return false;
 
     let unfixedValues = allValues & ~fixedValues;
     let possible = 0;
+    let requiredUniques = uniqueValues;
     for (const option of sumOptions) {
-      if ((option & unfixedValues) === option) possible |= option;
+      if ((option & unfixedValues) === option) {
+        possible |= option;
+        requiredUniques &= option;
+      }
     }
     if (!possible) return false;
 
@@ -731,6 +750,21 @@ SudokuSolver.SumHandler = class extends SudokuSolver.ConstraintHandler {
         // Safe to apply to every cell, since we know that none of the
         // fixedValues are in unfixedValues.
         if (!(grid[cell] &= ~valuesToRemove)) return false;
+      }
+    }
+
+    // requiredUniques are values that appear in all possible solutions AND
+    // are unique. Thus, we can enforce these values.
+    // NOTE: This is the same as the NonetHandler uniqueness check.
+    if (requiredUniques) {
+      for (const cell of this.cells) {
+        let value = grid[cell] & requiredUniques;
+        if (value) {
+          // If we have more value that means a single cell holds more than
+          // one unique value.
+          if (value&(value-1)) return false;
+          grid[cell] = value;
+        }
       }
     }
 
