@@ -221,6 +221,76 @@ class ConstraintDisplay {
   }
 }
 
+class CheckboxConstraints {
+  constructor(display, onChange) {
+    this._checkboxes = {
+      antiKnight: {
+        id: 'anti-knight-input',
+        constraint: new SudokuConstraint.AntiKnight(),
+      },
+      antiKing: {
+        id: 'anti-king-input',
+        constraint: new SudokuConstraint.AntiKing(),
+      },
+      antiConsecutive: {
+        id: 'anti-consecutive-input',
+        constraint: new SudokuConstraint.AntiConsecutive(),
+      },
+      diagonalPlus: {
+        id: 'diagonal-plus-input',
+        constraint: new SudokuConstraint.Diagonal(1),
+      },
+      diagonalMinus: {
+        id: 'diagonal-minus-input',
+        constraint: new SudokuConstraint.Diagonal(-1),
+      },
+    };
+
+    for (const item of Object.values(this._checkboxes)) {
+      item.element = document.getElementById(item.id);
+      item.element.onchange = onChange;
+    }
+
+    this._checkboxes.diagonalPlus.element.onchange = e => {
+      if (this._checkboxes.diagonalPlus.element.checked) {
+        display.drawDiagonal(1);
+      } else {
+        display.removeDiagonal(1);
+      }
+      onChange();
+    }
+    this._checkboxes.diagonalMinus.element.onchange = e => {
+      if (this._checkboxes.diagonalMinus.element.checked) {
+        display.drawDiagonal(-1);
+      } else {
+        display.removeDiagonal(-1);
+      }
+      onChange();
+    }
+  }
+
+  getConstraint() {
+    let constraints = [];
+    for (const item of Object.values(this._checkboxes)) {
+      if (item.element.checked) {
+        constraints.push(item.constraint);
+      }
+    }
+    return new SudokuConstraint.Set(constraints);
+  }
+
+  check(name) {
+    this._checkboxes[name].element.checked = true;
+    this._checkboxes[name].element.dispatchEvent(new Event('change'));
+  }
+
+  uncheckAll() {
+    for (const item of Object.values(this._checkboxes)) {
+      item.element.checked = false;
+    }
+  }
+}
+
 class ConstraintManager {
   constructor(grid) {
     this._configs = [];
@@ -245,28 +315,8 @@ class ConstraintManager {
   _setUpPanel() {
     this._panel = document.getElementById('displayed-constraints');
 
-    this._checkboxes.antiKnight = document.getElementById('anti-knight-input');
-    this._checkboxes.antiKing = document.getElementById('anti-king-input');
-    this._checkboxes.diagonalPlus = document.getElementById('diagonal-plus-input');
-    this._checkboxes.diagonalMinus = document.getElementById('diagonal-minus-input');
-    this._checkboxes.antiKnight.onchange = e => this.runUpdateCallback();
-    this._checkboxes.antiKing.onchange = e => this.runUpdateCallback();
-    this._checkboxes.diagonalPlus.onchange = e => {
-      if (this._checkboxes.diagonalPlus.checked) {
-        this.display.drawDiagonal(1);
-      } else {
-        this.display.removeDiagonal(1);
-      }
-      this.runUpdateCallback();
-    }
-    this._checkboxes.diagonalMinus.onchange = e => {
-      if (this._checkboxes.diagonalMinus.checked) {
-        this.display.drawDiagonal(-1);
-      } else {
-        this.display.removeDiagonal(-1);
-      }
-      this.runUpdateCallback();
-    }
+    this._checkboxConstraints = new CheckboxConstraints(
+      this.display, this.runUpdateCallback.bind(this));
 
     this._selectionFrom = document.getElementById('multi-cell-constraint-input');
     this.grid.selection.setCallback((selection) => {
@@ -333,20 +383,19 @@ class ConstraintManager {
         this._configs.push(config);
         break;
       case 'AntiKnight':
-        this._checkboxes.antiKnight.checked = true;
+        this._checkboxConstraints.check('antiKnight');
         break;
       case 'AntiKing':
-        this._checkboxes.antiKing.checked = true;
+        this._checkboxConstraints.check('antiKing');
+        break;
+      case 'AntiConsecutive':
+        this._checkboxConstraints.check('antiConsecutive');
         break;
       case 'Diagonal':
-        // TODO: The code for handling constraints is littered around this
-        // class and duplicated. Consolidate it into one place.
         if (constraint.direction > 0) {
-          this._checkboxes.diagonalPlus.checked = true;
-          this.display.drawDiagonal(1);
+          this._checkboxConstraints.check('diagonalPlus');
         } else {
-          this._checkboxes.diagonalMinus.checked = true;
-          this.display.drawDiagonal(-1);
+          this._checkboxConstraints.check('diagonalMinus');
         }
         break;
       case 'Set':
@@ -415,18 +464,7 @@ class ConstraintManager {
 
   getConstraints() {
     let constraints = this._configs.map(c => c.constraint);
-    if (this._checkboxes.antiKnight.checked) {
-      constraints.push(new SudokuConstraint.AntiKnight());
-    }
-    if (this._checkboxes.antiKing.checked) {
-      constraints.push(new SudokuConstraint.AntiKing());
-    }
-    if (this._checkboxes.diagonalPlus.checked) {
-      constraints.push(new SudokuConstraint.Diagonal(1));
-    }
-    if (this._checkboxes.diagonalMinus.checked) {
-      constraints.push(new SudokuConstraint.Diagonal(-11));
-    }
+    constraints.push(this._checkboxConstraints.getConstraint());
     constraints.push(
       new SudokuConstraint.FixedValues(...this.grid.getCellValues()));
 
@@ -436,9 +474,7 @@ class ConstraintManager {
   clear() {
     this.display.clear();
     this._panel.innerHTML = '';
-    for (const input of Object.values(this._checkboxes)) {
-      input.checked = false;
-    }
+    this._checkboxConstraints.uncheckAll();
     this._configs = [];
     this.grid.clearCellValues()
     this.grid.setSolution();

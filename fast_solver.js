@@ -261,17 +261,23 @@ class SudokuSolver {
   // each step.
   *_runSolver(yieldEveryStep) {
     yieldEveryStep = yieldEveryStep || false;
-    if (this._done) return true;
 
     let depth = 0;
     let stack = this._stack;
     let counters = this._counters;
 
-    if (depth === 0) {
-      this._updateCellOrder(stack.subarray(depth), this._grids[depth]);
-      depth++;
-      counters.cellsSearched++;
+    if (yieldEveryStep) {
+      yieldEveryStep = (yield {
+        grid: this._grids[0],
+        isSolution: false,
+        stack: [],
+        hasContradiction: false,
+      }) || false;
     }
+
+    this._updateCellOrder(stack.subarray(depth), this._grids[depth]);
+    depth++;
+    counters.cellsSearched++;
 
     let progressFrequency = this._progress.frequency;
 
@@ -305,13 +311,15 @@ class SudokuSolver {
         this._sendProgress();
       }
       if (yieldEveryStep) {
-        let yieldValue = {
+        // The value may have been over-written by the constraint enforcer
+        // (i.e. if there was a contradiction). Replace it for the output.
+        grid[cell] = value;
+        yieldEveryStep = (yield {
           grid: grid,
           isSolution: !hasContradiction && (depth == NUM_CELLS),
           stack: stack.subarray(0, depth),
           hasContradiction: hasContradiction,
-        };
-        yieldEveryStep = (yield yieldValue) || false;
+        }) || false;
       }
 
       if (hasContradiction) continue;
@@ -320,13 +328,12 @@ class SudokuSolver {
         // We've set all the values, and we haven't found a contradiction.
         // This is a solution!
         counters.solutions++;
-        let yieldValue = {
+        yieldEveryStep = (yield {
           grid: grid,
           isSolution: true,
           stack: stack,
           hasContradiction: false,
-        };
-        yieldEveryStep = (yield yieldValue) || false;
+        }) || false;
         continue;
       }
 
@@ -465,19 +472,17 @@ class SudokuSolver {
   }
 
   goToStep(n) {
-    n++;
-
     // Easiest way to go backwards is to start from the start again.
-    if (n < this._counters.valuesSearched) this.reset();
+    if (n <= this._counters.valuesSearched) this.reset();
 
     let iter = this._getIter(true);
     let result = null;
 
     // Iterate until we have seen n steps.
     this._timer.unpause();
-    while (this._counters.valuesSearched + this._done < n && !this._done) {
+    do {
       result = iter.next(true).value;
-    }
+    } while ((this._counters.valuesSearched + this._done < n) && !this._done);
     this._timer.pause();
 
     if (this._done) return null;

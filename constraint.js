@@ -149,6 +149,8 @@ class SudokuConstraint {
 
   static AntiKing = class extends SudokuConstraint {}
 
+  static AntiConsecutive = class extends SudokuConstraint {}
+
   static Diagonal = class extends SudokuConstraint {
     constructor(direction) {
       super(arguments);

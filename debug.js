@@ -184,6 +184,12 @@ const testCases = [
     input:
       '.AntiKnight.AntiKing.~R1C1_1~R1C7_5~R1C8_6~R1C9_7~R2C1_2~R2C2_3~R2C3_4~R2C9_8',
     expected: '198234567234567198567198234982345671345671982671982345823456719456719823719823456',
+  },
+  {  // 7: http://rishipuri.blogspot.com/2013/02/antiknight-nonconsecutive-sudoku-2013-2.html
+    name: 'Anti-consecutive',
+    input:
+      '.AntiConsecutive.~R3C4_4~R3C6_7~R4C3_6~R4C7_5~R6C3_4~R6C7_3~R7C4_2~R7C6_5',
+    expected: '973518264425963718861427953316842597758396142294751386649275831182639475537184629',
   }
 ];
 
