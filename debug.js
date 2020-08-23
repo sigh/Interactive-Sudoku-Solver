@@ -53,9 +53,7 @@ const benchmarkSolve = (squares, iterations) => {
     let values = generator.randomGrid(squares);
 
     let constraint = new SudokuConstraint.FixedValues(...values);
-    let builder = new SudokuBuilder();
-    builder.addConstraint(constraint);
-    let solver = builder.build();
+    let solver = SudokuBuilder.build(constraint);
 
     let result = solver.nextSolution();
     let state = solver.state();
@@ -80,9 +78,7 @@ const benchmarkSolveAll = (squares, iterations) => {
     let values = generator.randomGrid(squares);
 
     let constraint = new SudokuConstraint.FixedValues(...values);
-    let builder = new SudokuBuilder();
-    builder.addConstraint(constraint);
-    let solver = builder.build();
+    let solver = SudokuBuilder.build(constraint);
 
     let result = solver.solveAllPossibilities();
     let state = solver.state();
@@ -230,9 +226,8 @@ const runTestCases = () => {
 
   for (const tc of testCases) {
     let constraint = SudokuConstraint.fromString(tc.input);
-    let builder = new SudokuBuilder();
-    builder.addConstraint(constraint);
-    let result = builder.build().solveAllPossibilities();
+    let solver = SudokuBuilder.build(constraint);
+    let result = solver.solveAllPossibilities();
 
     if (result.length != 81) fail(tc, result);
 

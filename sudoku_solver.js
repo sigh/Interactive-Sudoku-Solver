@@ -20,55 +20,49 @@ const parseCellId = (cellId) => {
 };
 
 class SudokuBuilder {
-  constructor() {
-    this._constraints = [];
-    this._makeBaseSudokuConstraints();
+  static build(constraint) {
+    return new SudokuSolver(SudokuBuilder._handlers(constraint));
   }
 
-  addConstraint(constraint) {
-    this._constraints.push(constraint);
+  static *_handlers(constraint) {
+    yield* SudokuBuilder._baseHandlers();
+    yield* SudokuBuilder._constraintHandlers(constraint);
   }
 
-  build() {
-    let constraintSet = new SudokuConstraint.Set(this._constraints);
-    let handlers = SudokuBuilder._handlers(constraintSet);
-    return new SudokuSolver(handlers);
-  }
-
-  _makeBaseSudokuConstraints() {
+  static *_baseHandlers() {
     // Row constraints.
     for (let row = 0; row < GRID_SIZE; row++) {
       let cells = [];
       for (let col = 0; col < GRID_SIZE; col++) {
-        cells.push(cellId(row, col));
+        cells.push(row*GRID_SIZE+col);
       }
-      this.addConstraint(new SudokuConstraint.AllDifferent(...cells));
+      yield new SudokuSolver.NonetHandler(cells);
     }
 
     // Column constraints.
     for (let col = 0; col < GRID_SIZE; col++) {
       let cells = [];
       for (let row = 0; row < GRID_SIZE; row++) {
-        cells.push(cellId(row, col));
+        cells.push(row*GRID_SIZE+col);
       }
-      this.addConstraint(new SudokuConstraint.AllDifferent(...cells));
+      yield new SudokuSolver.NonetHandler(cells);
     }
 
     // Box constraints.
     for (let b = 0; b < GRID_SIZE; b++) {
-      let bi = b/3|0;
-      let bj = b%3;
+      let bi = b/BOX_SIZE|0;
+      let bj = b%BOX_SIZE|0;
       let cells = [];
       for (let c = 0; c < GRID_SIZE; c++) {
-        let row = BOX_SIZE*bi+(c%3|0);
-        let col = BOX_SIZE*bj+(c/3|0);
-        cells.push(cellId(row, col));
+        let row = BOX_SIZE*bi+(c%BOX_SIZE|0);
+        let col = BOX_SIZE*bj+(c/BOX_SIZE|0);
+        cells.push(row*GRID_SIZE+col);
       }
-      this.addConstraint(new SudokuConstraint.AllDifferent(...cells));
+      yield new SudokuSolver.NonetHandler(cells);
     }
   }
 
-  static *_handlers(constraint) {
+  static *_constraintHandlers(constraint) {
     let cells;
     switch (constraint.type) {
       case 'AntiKnight':
@@ -118,7 +112,7 @@ class SudokuBuilder {
 
       case 'Set':
         for (const c of constraint.constraints) {
-          yield* this._handlers(c);
+          yield* this._constraintHandlers(c);
         }
         break;
 
