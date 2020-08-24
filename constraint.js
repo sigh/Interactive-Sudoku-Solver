@@ -1,14 +1,46 @@
+const BOX_SIZE = 3;
+const GRID_SIZE = BOX_SIZE*BOX_SIZE;
+const NUM_CELLS = GRID_SIZE*GRID_SIZE;
+
+const toValueId = (row, col, n) => {
+  return id = `R${row+1}C${col+1}_${n}`;
+};
+
+const toCellId = (row, col) => {
+  return id = `R${row+1}C${col+1}`;
+};
+
+const toCellIndex = (row, col) => {
+  return row*GRID_SIZE+col;
+};
+
+const toRowCol = (cell) => {
+  return [cell/GRID_SIZE|0, cell%GRID_SIZE|0];
+};
+
+const parseValueId = (valueId) => {
+  let cellId = valueId.substr(0, 4);
+  return {
+    value: +valueId[5],
+    cellId: cellId,
+    ...parseCellId(cellId),
+  };
+};
+
+const parseCellId = (cellId) => {
+  let row = +cellId[1]-1;
+  let col = +cellId[3]-1;
+  return {
+    cell: toCellIndex(row, col),
+    row: row,
+    col: col,
+  };
+};
+
 class SudokuConstraint {
   constructor(args) {
     this.args = args ? [...args] : [];
-    this.type = SudokuConstraint.TYPES.get(this.constructor);
-  }
-
-  _type() {
-    for (const [name,  type] of Object.entries(SudokuConstraint)) {
-      if (type == this.constructor) return name;
-    }
-    throw('Unknown constraint');
+    this.type = this.constructor.name;
   }
 
   static fromString(str) {
@@ -20,30 +52,33 @@ class SudokuConstraint {
     for (const item of items) {
       let args = item.split('~');
       let type = args.shift();
+      if (!type) type = this.DEFAULT.name;
       constraints.push(new SudokuConstraint[type](...args));
     }
     return new SudokuConstraint.Set(constraints);
   }
 
-  toString() {
-    let arr = [this.type, ...this.args];
+  toString(replaceType) {
+    let type = this.type;
+    if (this.constructor == this.constructor.DEFAULT) type = '';
+    let arr = [type, ...this.args];
     return '.' + arr.join('~');
   }
 
   static _parseKillerFormat(text) {
-    if (text.length != 81) return null;
+    if (text.length != NUM_CELLS) return null;
     if (!text.match(/[^<V>]/)) return null;
     if (!text.match(/^[0-9A-Za-j^<V>]*$/)) return null;
 
     // Determine the cell directions.
     let cellDirections = [];
-    for (let i = 0; i < 81; i++) {
+    for (let i = 0; i < NUM_CELLS; i++) {
       switch (text[i]) {
         case 'v':
-          cellDirections.push(i+9);
+          cellDirections.push(i+GRID_SIZE);
           break;
         case '^':
-          cellDirections.push(i-9);
+          cellDirections.push(i-GRID_SIZE);
           break;
         case '<':
           cellDirections.push(i-1);
@@ -57,7 +92,7 @@ class SudokuConstraint {
     }
 
     let cages = new Map();
-    for (let i = 0; i < 81; i++) {
+    for (let i = 0; i < NUM_CELLS; i++) {
       let cageCell = i;
       while (cellDirections[cageCell] != cageCell) {
         cageCell = cellDirections[cageCell];
@@ -80,7 +115,7 @@ class SudokuConstraint {
           cells: [],
         });
       }
-      cages.get(cageCell).cells.push(`R${(i/9|0)+1}C${i%9+1}`);
+      cages.get(cageCell).cells.push(toCellId(...toRowCol(i)));
     }
 
     let constraints = [];
@@ -91,16 +126,16 @@ class SudokuConstraint {
   }
 
   static _parsePlainSudoku(text) {
-    if (text.length != 81) return null;
+    if (text.length != NUM_CELLS) return null;
 
     let fixedValues = [];
     let nonDigitCharacters = [];
-    for (let i = 0; i < 81; i++) {
-      let charCode = text.charCodeAt(i);
-      if (charCode > CHAR_0 && charCode <= CHAR_9) {
-        fixedValues.push(valueId(i/9|0, i%9, text[i]-1));
+    for (let i = 0; i < NUM_CELLS; i++) {
+      let c = text[i];
+      if (c >= '1' && c <= '9') {
+        fixedValues.push(toValueId(...toRowCol(i), c));
       } else {
-        nonDigitCharacters.push(charCode);
+        nonDigitCharacters.push(c);
       }
     }
     if (new Set(nonDigitCharacters).size > 1) return null;
@@ -127,7 +162,7 @@ class SudokuConstraint {
     }
   }
 
-  static Set = class extends SudokuConstraint {
+  static Set = class Set extends SudokuConstraint {
     constructor(constraints) {
       super(arguments);
       this.constraints = constraints;
@@ -138,27 +173,27 @@ class SudokuConstraint {
     }
   }
 
-  static Thermo = class extends SudokuConstraint {
+  static Thermo = class Thermo extends SudokuConstraint {
     constructor(...cells) {
       super(arguments);
       this.cells = cells;
     }
   }
 
-  static AntiKnight = class extends SudokuConstraint {}
+  static AntiKnight = class AntiKnight extends SudokuConstraint {}
 
-  static AntiKing = class extends SudokuConstraint {}
+  static AntiKing = class AntiKing extends SudokuConstraint {}
 
-  static AntiConsecutive = class extends SudokuConstraint {}
+  static AntiConsecutive = class AntiConsecutive extends SudokuConstraint {}
 
-  static Diagonal = class extends SudokuConstraint {
+  static Diagonal = class Diagonal extends SudokuConstraint {
     constructor(direction) {
       super(arguments);
       this.direction = direction;
     }
   }
 
-  static Sum = class extends SudokuConstraint {
+  static Sum = class Sum extends SudokuConstraint {
     constructor(sum, ...cells) {
       super(arguments);
       this.cells = cells;
@@ -166,35 +201,19 @@ class SudokuConstraint {
     }
   }
 
-  static AllDifferent = class extends SudokuConstraint {
+  static AllDifferent = class AllDifferent extends SudokuConstraint {
     constructor(...cells) {
       super(arguments);
       this.cells = cells;
     }
   }
 
-  static FixedValues = class extends SudokuConstraint {
+  static FixedValues = class FixedValues extends SudokuConstraint {
     constructor(...values) {
       super(arguments);
       this.values = values;
-      this._type = this.type;
-    }
-
-    toString() {
-      this.type = '';
-      let str = super.toString();
-      this.type = this._type;
-      return str;
     }
   }
 
-  static TYPES = (() => {
-    let map = new Map();
-    for (const [key, value] of Object.entries(SudokuConstraint)) {
-      map.set(value, key);
-    }
-    return map;
-  })();
+  static DEFAULT = this.FixedValues;
 }
-// Make FixedValues the default.
-SudokuConstraint[''] = SudokuConstraint.FixedValues;

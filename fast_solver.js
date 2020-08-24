@@ -1,10 +1,7 @@
 "use strict";
 
-const BOX_SIZE = 3;
-const GRID_SIZE = BOX_SIZE*BOX_SIZE;
 const ALL_VALUES = (1<<GRID_SIZE)-1;
 const COMBINATIONS = (1<<GRID_SIZE);
-const NUM_CELLS = GRID_SIZE*GRID_SIZE;
 
 class LookupTable {
   static VALUE = (() => {
@@ -91,15 +88,191 @@ class LookupTable {
 }
 
 class SudokuSolver {
+  constructor(handlers) {
+    this._internalSolver = new SudokuSolver.InternalSolver(handlers);
+
+    this._progressExtraStateFn = null;
+    this._progressCallback = null;
+
+    this._reset();
+  }
+
+  _reset() {
+    this._internalSolver.reset();
+    this._iter = null;
+    this._timer = new Timer();
+  }
+
+  setProgressCallback(callback, frequency) {
+    this._progressCallback = callback;
+    this._internalSolver.setProgressCallback(
+      this._sendProgress.bind(this),
+      frequency);
+  }
+
+  _sendProgress() {
+    let extraState = null;
+    if (this._progressExtraStateFn) extraState = this._progressExtraStateFn();
+    if (this._progressCallback) this._progressCallback(extraState);
+  }
+
+  countSolutions() {
+    this._reset();
+
+    // Add a sample solution to the state updates, but only if a different
+    // solution is ready.
+    let sampleSolution = null;
+    this._progressExtraStateFn = () => {
+      let result = null;
+      if (sampleSolution) {
+        result = {solution: sampleSolution};
+        sampleSolution = null;
+      }
+      return result;
+    };
+
+    this._timer.runTimed(() => {
+      for (const result of this._getIter()) {
+        // Only store a sample solution if we don't have one.
+        if (sampleSolution == null) {
+          sampleSolution = this.constructor._resultToSolution(result)
+        }
+      }
+    });
+
+    // Send progress one last time to ensure the last solution is sent.
+    this._sendProgress();
+
+    this._progressExtraStateFn = null;
+
+    return this._internalSolver.counters.solutions;
+  }
+
+  nthSolution(n) {
+    let result = this._nthIteration(n, false);
+    if (!result) return null;
+
+    return this.constructor._resultToSolution(result);
+  }
+
+  nthStep(n) {
+    let result = this._nthIteration(n, true);
+    if (!result) return null;
+
+    return {
+      values: this.constructor._resultToSolution(result),
+      pencilmarks: this.constructor._makePencilmarks(result.grid, result.stack),
+      isSolution: result.isSolution,
+      hasContradiction: result.hasContradiction,
+    }
+  }
+
+  _nthIteration(n, stepByStep) {
+    n++;
+    let iter = this._getIter(stepByStep);
+    // To go backwards we start from the start.
+    if (n < iter.count) {
+      this._reset();
+      iter = this._getIter(stepByStep);
+    }
+
+    // Iterate until we have seen n steps.
+    let result = null;
+    this._timer.runTimed(() => {
+      do {
+        result = iter.next();
+      } while (iter.count < n);
+    });
+
+    if (result.done) return null;
+    return result.value;
+  }
+
+  solveAllPossibilities() {
+    this._reset();
+
+    let validRows = new Uint16Array(NUM_CELLS);
+
+    // Send the current valid rows with the progress update, if there have
+    // been any changes.
+    let lastSize = 0;
+    this._progressExtraStateFn = () => {
+      let pencilmarks = this.constructor._makePencilmarks(validRows);
+      if (pencilmarks.length == lastSize) return null;
+      lastSize = pencilmarks.size;
+      return {pencilmarks: pencilmarks};
+    };
+
+    this._timer.runTimed(() => {
+      this._internalSolver.solveAllPossibilities(validRows);
+    });
+
+    this._progressExtraStateFn = null;
+
+    return this.constructor._makePencilmarks(validRows);
+  }
+
+  state() {
+    let counters = {...this._internalSolver.counters};
+    counters.backtracks = counters.valuesSearched - counters.cellsSearched;
+
+    return {
+      counters: counters,
+      timeMs: this._timer.elapsedMs(),
+      done: this._internalSolver.done,
+    }
+  }
+
+  _getIter(yieldEveryStep) {
+    yieldEveryStep = !!yieldEveryStep;
+
+    // If an iterator doesn't exist or is of the wrong type, then create it.
+    if (!this._iter || this._iter.yieldEveryStep != yieldEveryStep) {
+      this._iter = {
+        yieldEveryStep: yieldEveryStep,
+        iter: new IteratorWithCount(this._internalSolver.run(yieldEveryStep)),
+      };
+    }
+
+    return this._iter.iter;
+  }
+
+  static _resultToSolution(result) {
+    let values = result.grid.map(value => LookupTable.VALUE[value])
+    let solution = [];
+    for (const cell of result.stack) {
+      solution.push(toValueId(...toRowCol(cell), values[cell]));
+    }
+    return solution;
+  }
+
+  static _makePencilmarks(grid, ignoreCells) {
+    let ignoreSet = new Set(ignoreCells);
+
+    let pencilmarks = [];
+    for (let i = 0; i < NUM_CELLS; i++) {
+      if (ignoreSet.has(i)) continue;
+      let values = grid[i];
+      while (values) {
+        let value = values & -values;
+        pencilmarks.push(toValueId(...toRowCol(i), LookupTable.VALUE[value]));
+        values &= ~value;
+      }
+    }
+    return pencilmarks;
+  }
+}
+
+SudokuSolver.InternalSolver = class {
 
   constructor(handlers) {
     this._initCellArray();
     this._stack = new Uint8Array(NUM_CELLS);
 
+    this._runCounter = 0;
     this._progress = {
       frequency: 0,
       callback: null,
-      extraState: null,
     };
 
     this._setUpHandlers(handlers);
@@ -147,7 +320,7 @@ class SudokuSolver {
 
   reset() {
     this._iter = null;
-    this._counters = {
+    this.counters = {
       valuesSearched: 0,
       cellsSearched: 0,
       guesses: 0,
@@ -155,11 +328,16 @@ class SudokuSolver {
       constraintsProcessed: 0,
     };
     this._resetStack();
-    this._timer = new Timer();
   }
 
   _resetStack() {
-    this._done = false;
+    // If we are at the start anyway, then there is nothing to do.
+    if (this._atStart) return;
+
+    this._runCounter++;
+
+    this.done = false;
+    this._atStart = true;
     this._grids[0].set(this._initialGrid);
     // Re-initialize the cell indexes in the stack.
     // This is not required, but keeps things deterministic.
@@ -181,20 +359,6 @@ class SudokuSolver {
     }
     this._initialGrid = new Uint16Array(NUM_CELLS);
     this._initialGrid.fill(ALL_VALUES);
-  }
-
-  _sendProgress() {
-    this._progress.callback(
-      this._progress.extraState ? this._progress.extraState() : null);
-  }
-
-  _getIter(yieldEveryStep) {
-    // If an iterator doesn't exist, then create it.
-    if (!this._iter) {
-      this._iter = this._runSolver(yieldEveryStep);
-    }
-
-    return this._iter;
   }
 
   // Find the best cell and bring it to the front. This means that it will
@@ -228,9 +392,9 @@ class SudokuSolver {
 
   _enforceConstraints(grid, cell) {
     let value = grid[cell];
-    let cellAccumulator = new CellAccumulator(this);
+    let cellAccumulator = new SudokuSolver.CellAccumulator(this);
     cellAccumulator.add(cell);
-    let counters = this._counters;
+    let counters = this.counters;
 
     for (const conflict of this._cellConflicts[cell]) {
       if (grid[conflict] & value) {
@@ -248,31 +412,31 @@ class SudokuSolver {
     return true;
   }
 
-  static _resultToSolution(result) {
-    let values = result.grid.map(value => LookupTable.VALUE[value])
-    let solution = [];
-    for (const cell of result.stack) {
-      solution.push(valueId(cell/GRID_SIZE|0, cell%GRID_SIZE|0, values[cell]-1));
-    }
-    return solution;
-  }
-
-  // _runSolver runs the solver yielding each solution, and optionally at
+  // run runs the solver yielding each solution, and optionally at
   // each step.
-  *_runSolver(yieldEveryStep) {
+  *run(yieldEveryStep) {
     yieldEveryStep = yieldEveryStep || false;
+
+    // Set up iterator validation.
+    if (!this._atStart) throw('State is not in initial state.');
+    this._atStart = false;
+    let runCounter = ++this._runCounter;
+    const checkRunCounter = () => {
+      if (runCounter != this._runCounter) throw('Iterator no longer valid');
+    };
 
     let depth = 0;
     let stack = this._stack;
-    let counters = this._counters;
+    let counters = this.counters;
 
     if (yieldEveryStep) {
-      yieldEveryStep = (yield {
+      yield {
         grid: this._grids[0],
         isSolution: false,
         stack: [],
         hasContradiction: false,
-      }) || false;
+      }
+      checkRunCounter();
     }
 
     this._updateCellOrder(stack.subarray(depth), this._grids[depth]);
@@ -308,18 +472,19 @@ class SudokuSolver {
       let hasContradiction = !this._enforceConstraints(grid, cell);
 
       if (counters.valuesSearched % progressFrequency == 0) {
-        this._sendProgress();
+        this._progress.callback();
       }
       if (yieldEveryStep) {
         // The value may have been over-written by the constraint enforcer
         // (i.e. if there was a contradiction). Replace it for the output.
         grid[cell] = value;
-        yieldEveryStep = (yield {
+        yield {
           grid: grid,
-          isSolution: !hasContradiction && (depth == NUM_CELLS),
+          isSolution: false,
           stack: stack.subarray(0, depth),
           hasContradiction: hasContradiction,
-        }) || false;
+        };
+        checkRunCounter();
       }
 
       if (hasContradiction) continue;
@@ -328,38 +493,36 @@ class SudokuSolver {
         // We've set all the values, and we haven't found a contradiction.
         // This is a solution!
         counters.solutions++;
-        yieldEveryStep = (yield {
+        yield {
           grid: grid,
           isSolution: true,
           stack: stack,
           hasContradiction: false,
-        }) || false;
+        };
+        checkRunCounter();
         continue;
       }
 
       this._updateCellOrder(stack.subarray(depth), grid);
-      // Cell has no possible values, backtrack.
-      if (!grid[stack[depth]]) continue;
-
       counters.cellsSearched++;
       depth++;
     }
 
-    this._done = true;
+    this.done = true;
   }
 
   // Solve until maxSolutions are found, and returns leaving the stack
   // fully unwound.
   *_solve(maxSolutions) {
     let i = 0;
-    for (const solution of this._runSolver()) {
+    for (const solution of this.run()) {
       yield solution.grid;
       if (++i == maxSolutions) break;
     }
     this._resetStack();
   }
 
-  _solveAllPossibilities(validRows) {
+  solveAllPossibilities(validRows) {
     // TODO: Do all forced reductions first to avoid having to do them for
     // each iteration.
 
@@ -368,7 +531,7 @@ class SudokuSolver {
       grid.forEach((c, i) => { validRows[i] |= c; } );
     }
 
-    let numSolutions = this._counters.solutions;
+    let numSolutions = this.counters.solutions;
 
     // If there are 1 or 0 solutions, there is nothing else to do.
     // If there are 2 or more, then we have to check all possibilities.
@@ -390,137 +553,18 @@ class SudokuSolver {
       }
     }
 
-    this._done = this._counters.solutions < 2;
-  }
-
-
-  state() {
-    let counters = {...this._counters};
-    counters.backtracks = counters.valuesSearched - counters.cellsSearched;
-
-    return {
-      counters: counters,
-      timeMs: this._timer.elapsedMs(),
-      done: this._done,
-      extra: null,
-    }
+    // We only know for sure that the we found all solutions if we only found
+    // one.
+    this.done = numSolutions < 2;
   }
 
   setProgressCallback(callback, frequency) {
     this._progress.callback = callback;
     this._progress.frequency = frequency;
   }
-
-  nextSolution() {
-    let iter = this._getIter();
-
-    this._timer.unpause();
-    let result = this._iter.next();
-    this._timer.pause();
-
-    if (result.done) return null;
-
-    return SudokuSolver._resultToSolution(result.value);
-  }
-
-  countSolutions(updateFrequency) {
-    this.reset();
-
-    // Add a sample solution to the state updates, but only if a different
-    // solution is ready.
-    let sampleSolution = null;
-    this._progress.extraState = () => {
-      let result = null;
-      if (sampleSolution) {
-        result = {solution: sampleSolution};
-        sampleSolution = null;
-      }
-      return result;
-    };
-
-    this._timer.unpause();
-    for (const result of this._getIter()) {
-      // Only store a sample solution if we don't have one.
-      if (sampleSolution == null) {
-        sampleSolution = SudokuSolver._resultToSolution(result)
-      }
-    }
-    this._timer.pause();
-
-    // Send progress one last time to ensure the last solution is sent.
-    this._sendProgress();
-
-    this._progress.extraState = null;
-
-    return this._counters.solutions;
-  }
-
-  static _makePencilmarks(grid, ignoreCells) {
-    let ignoreSet = new Set(ignoreCells);
-
-    let pencilmarks = [];
-    for (let i = 0; i < NUM_CELLS; i++) {
-      if (ignoreSet.has(i)) continue;
-      let values = grid[i];
-      while (values) {
-        let value = values & -values;
-        pencilmarks.push(valueId(i/GRID_SIZE|0, i%GRID_SIZE|0, LookupTable.VALUE[value]-1));
-        values &= ~value;
-      }
-    }
-    return pencilmarks;
-  }
-
-  goToStep(n) {
-    // Easiest way to go backwards is to start from the start again.
-    if (n <= this._counters.valuesSearched) this.reset();
-
-    let iter = this._getIter(true);
-    let result = null;
-
-    // Iterate until we have seen n steps.
-    this._timer.unpause();
-    do {
-      result = iter.next(true).value;
-    } while ((this._counters.valuesSearched + this._done < n) && !this._done);
-    this._timer.pause();
-
-    if (this._done) return null;
-
-    return {
-      values: SudokuSolver._resultToSolution(result),
-      pencilmarks: SudokuSolver._makePencilmarks(result.grid, result.stack),
-      isSolution: result.isSolution,
-      hasContradiction: result.hasContradiction,
-    }
-  }
-
-  solveAllPossibilities() {
-    this.reset();
-
-    let validRows = new Uint16Array(NUM_CELLS);
-
-    // Send the current valid rows with the progress update, if there have
-    // been any changes.
-    let lastSize = 0;
-    this._progress.extraState = () => {
-      let pencilmarks = SudokuSolver._makePencilmarks(validRows);
-      if (pencilmarks.length == lastSize) return null;
-      lastSize = pencilmarks.size;
-      return {pencilmarks: pencilmarks};
-    };
-
-    this._timer.unpause();
-    this._solveAllPossibilities(validRows);
-    this._timer.pause();
-
-    this._progress.extraState = null;
-
-    return SudokuSolver._makePencilmarks(validRows);
-  }
 }
 
-class CellAccumulator {
+SudokuSolver.CellAccumulator = class {
   constructor(solver) {
     this._solver = solver;
 

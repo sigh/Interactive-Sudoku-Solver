@@ -1,9 +1,3 @@
-const THIN_BORDER_STYLE = '1px solid';
-const FAT_BORDER_STYLE = '3px solid';
-
-const CHAR_0 = '0'.charCodeAt(0);
-const CHAR_9 = '9'.charCodeAt(0);
-
 const CELL_SIZE = 52;
 
 // Make these variables global so that we can easily access them from the
@@ -19,61 +13,39 @@ const initPage = () => {
   controller = new SolutionController(constraintManager, grid);
 };
 
-// We never need more than 5 colors since the max degree of the graph is 4.
-const KILLER_CAGE_COLORS = [
-  'green',
-  'red',
-  'blue',
-  'yellow',
-  'purple',
-  'orange',
-  'cyan',
-  'brown',
-  'black',
-];
 class ConstraintDisplay {
   constructor(svg) {
-    this.svg = svg;
-    this._diagonals = [null, null];
-    this.killerCellColors = new Map();
-    this.killerCages = new Map();
-  }
-
-  static makeElem(tag) {
-    return document.createElementNS('http://www.w3.org/2000/svg', tag);
+    this._svg = svg;
+    this.clear();  // clear() to initialize.
   }
 
   static makeDisplay(container) {
-    let svg = ConstraintDisplay.makeElem('svg');
-    svg.setAttribute('height', CELL_SIZE * 9);
-    svg.setAttribute('width', CELL_SIZE * 9);
+    let svg = createSvgElement('svg');
+    svg.setAttribute('height', CELL_SIZE * GRID_SIZE);
+    svg.setAttribute('width', CELL_SIZE * GRID_SIZE);
     svg.classList.add('sudoku-grid-background');
     container.prepend(svg);
 
     return new ConstraintDisplay(svg);
   }
 
-  static parseCell(cellId) {
-    return [+cellId[1], +cellId[3]];
-  }
-
   static cellCenter(cellId) {
-    let row, col;
-    [row, col] = ConstraintDisplay.parseCell(cellId);
-    return [col*CELL_SIZE - CELL_SIZE/2, row*CELL_SIZE - CELL_SIZE/2];
+    let {row, col} = parseCellId(cellId);
+    return [col*CELL_SIZE + CELL_SIZE/2, row*CELL_SIZE + CELL_SIZE/2];
   }
 
   clear() {
-    let svg = this.svg;
+    let svg = this._svg;
     while (svg.lastChild) {
       svg.removeChild(svg.lastChild);
     }
     this.killerCellColors = new Map();
     this.killerCages = new Map();
+    this._diagonals = [null, null];
   }
 
   removeItem(item) {
-    this.svg.removeChild(item);
+    this._svg.removeChild(item);
     if (this.killerCages.has(item)) {
       for (const cellId of this.killerCages.get(item)) {
         this.killerCellColors.delete(cellId);
@@ -84,7 +56,7 @@ class ConstraintDisplay {
 
   static _addTextBackground(elem) {
     let bbox = elem.getBBox();
-    let rect = ConstraintDisplay.makeElem('rect');
+    let rect = createSvgElement('rect');
 
     rect.setAttribute('x', bbox.x);
     rect.setAttribute('y', bbox.y);
@@ -95,20 +67,31 @@ class ConstraintDisplay {
     return rect;
   }
 
+  static KILLER_CAGE_COLORS = [
+    'green',
+    'red',
+    'blue',
+    'yellow',
+    'cyan',
+    'brown',
+    'black',
+    'purple',
+    'orange',
+  ];
+
   _chooseKillerCageColor(cellIds) {
     // Use a greedy algorithm to choose the graph color.
     let conflictingColors = new Set();
     for (const cellId of cellIds) {
-      let row, col;
-      [row, col] = ConstraintDisplay.parseCell(cellId);
+      let {row, col} = parseCellId(cellId);
       // Lookup all  adjacent cells, it doesn't matter if they valid or not.
-      conflictingColors.add(this.killerCellColors.get(`R${row}C${col+1}`));
-      conflictingColors.add(this.killerCellColors.get(`R${row}C${col-1}`));
-      conflictingColors.add(this.killerCellColors.get(`R${row+1}C${col}`));
-      conflictingColors.add(this.killerCellColors.get(`R${row-1}C${col}`));
+      conflictingColors.add(this.killerCellColors.get(toCellId(row, col+1)));
+      conflictingColors.add(this.killerCellColors.get(toCellId(row, col-1)));
+      conflictingColors.add(this.killerCellColors.get(toCellId(row+1, col)));
+      conflictingColors.add(this.killerCellColors.get(toCellId(row-1, col)));
     }
     // Return the first color that doesn't conflict.
-    for (const color of KILLER_CAGE_COLORS) {
+    for (const color of this.constructor.KILLER_CAGE_COLORS) {
       if (!conflictingColors.has(color)) return color;
     }
     // Otherwse select a random color.
@@ -119,12 +102,12 @@ class ConstraintDisplay {
     const cellWidth = CELL_SIZE-1;
     let x,y;
 
-    let cage = ConstraintDisplay.makeElem('svg');
+    let cage = createSvgElement('svg');
     let color = this._chooseKillerCageColor(cells);
 
     for (const cell of cells) {
       [x, y] = ConstraintDisplay.cellCenter(cell);
-      let path = ConstraintDisplay.makeElem('path');
+      let path = createSvgElement('path');
       let directions = [
         'M', x-cellWidth/2+1, y-cellWidth/2+1,
         'l', 0, cellWidth,
@@ -144,7 +127,7 @@ class ConstraintDisplay {
     cells.sort();
     [x, y] = ConstraintDisplay.cellCenter(cells[0]);
 
-    let text = ConstraintDisplay.makeElem('text');
+    let text = createSvgElement('text');
     text.appendChild(document.createTextNode(sum));
     text.setAttribute('x', x - cellWidth/2 + 1);
     text.setAttribute('y', y - cellWidth/2 + 2);
@@ -152,7 +135,7 @@ class ConstraintDisplay {
     text.setAttribute('style',
       'font-size: 10; font-family: monospace; font-weight: bold;');
     cage.append(text);
-    this.svg.append(cage);
+    this._svg.append(cage);
 
     let textBackground = ConstraintDisplay._addTextBackground(text);
     textBackground.setAttribute('fill', 'rgb(200, 200, 200)');
@@ -163,14 +146,14 @@ class ConstraintDisplay {
   drawThermometer(cells) {
     if (cells.length < 2) throw(`Thermo too short: ${cells}`)
 
-    let thermo = ConstraintDisplay.makeElem('svg');
+    let thermo = createSvgElement('svg');
     thermo.setAttribute('fill', 'rgb(200, 200, 200)');
     thermo.setAttribute('stroke', 'rgb(200, 200, 200)');
 
     let x, y;
     // Draw the circle.
     [x, y] = ConstraintDisplay.cellCenter(cells[0]);
-    let circle = ConstraintDisplay.makeElem('circle');
+    let circle = createSvgElement('circle');
     circle.setAttribute('cx', x);
     circle.setAttribute('cy', y);
     circle.setAttribute('r', 15);
@@ -185,21 +168,21 @@ class ConstraintDisplay {
       directions.push(y);
     });
     directions[0] = 'M';  // Replace the first direction to a move.
-    let path = ConstraintDisplay.makeElem('path');
+    let path = createSvgElement('path');
     path.setAttribute('d', directions.join(' '));
     path.setAttribute('stroke-width', 15);
     path.setAttribute('stroke-linecap', 'round');
     path.setAttribute('fill', 'transparent');
     thermo.appendChild(path);
 
-    this.svg.append(thermo);
+    this._svg.append(thermo);
 
     return thermo;
   }
 
   drawDiagonal(direction) {
-    let size = CELL_SIZE*9;
-    let line = ConstraintDisplay.makeElem('path');
+    let size = CELL_SIZE*GRID_SIZE;
+    let line = createSvgElement('path');
     let directions = [
       'M', 0, direction > 0 ? size : 0,
       'L', size, direction > 0 ? 0 : size,
@@ -209,7 +192,7 @@ class ConstraintDisplay {
     line.setAttribute('fill', 'transparent');
     line.setAttribute('stroke', 'rgb(255, 0, 0)');
 
-    this.svg.appendChild(line);
+    this._svg.appendChild(line);
     this._diagonals[direction > 0] = line;
 
     return line;
@@ -246,6 +229,7 @@ class CheckboxConstraints {
       },
     };
 
+    // Setup the elements.
     for (const item of Object.values(this._checkboxes)) {
       item.element = document.getElementById(item.id);
       item.element.onchange = onChange;
@@ -294,11 +278,11 @@ class CheckboxConstraints {
 class ConstraintManager {
   constructor(grid) {
     this._configs = [];
-    this.grid = grid;
+    this._grid = grid;
     this._checkboxes = {};
     grid.setUpdateCallback(() => this.runUpdateCallback());
 
-    this.display = ConstraintDisplay.makeDisplay(grid._container);
+    this._display = ConstraintDisplay.makeDisplay(grid._container);
     this.setUpdateCallback();
 
     this._setUpPanel();
@@ -316,10 +300,10 @@ class ConstraintManager {
     this._panel = document.getElementById('displayed-constraints');
 
     this._checkboxConstraints = new CheckboxConstraints(
-      this.display, this.runUpdateCallback.bind(this));
+      this._display, this.runUpdateCallback.bind(this));
 
     this._selectionFrom = document.getElementById('multi-cell-constraint-input');
-    this.grid.selection.setCallback((selection) => {
+    this._grid.selection.setCallback((selection) => {
       let disabled = (selection.length < 2);
       this._selectionFrom.firstElementChild.disabled = disabled;
       // Focus on the submit button so that that we can immediately press enter.
@@ -331,7 +315,7 @@ class ConstraintManager {
       this._addConstraintFromForm();
       return false;
     }
-    this.grid.selection.addSelectionPreserver(this._selectionFrom);
+    this._grid.selection.addSelectionPreserver(this._selectionFrom);
 
     let freeInputForm = document.getElementById('freeform-constraint-input');
     freeInputForm.onsubmit = e => {
@@ -359,14 +343,14 @@ class ConstraintManager {
     let config;
     switch (constraint.type) {
       case 'FixedValues':
-        this.grid.setCellValues(constraint.values);
+        this._grid.setCellValues(constraint.values);
         break;
       case 'Thermo':
         config = {
           cells: constraint.cells,
           name: `Themometer [len: ${constraint.cells.length}]`,
           constraint: constraint,
-          displayElem: this.display.drawThermometer(constraint.cells),
+          displayElem: this._display.drawThermometer(constraint.cells),
         };
         this._addToPanel(config);
         this._configs.push(config);
@@ -376,7 +360,7 @@ class ConstraintManager {
           cells: constraint.cells,
           name: `Killer cage [sum: ${constraint.sum}]`,
           constraint: constraint,
-          displayElem: this.display.drawKillerCage(
+          displayElem: this._display.drawKillerCage(
             constraint.cells, constraint.sum),
         };
         this._addToPanel(config);
@@ -406,7 +390,7 @@ class ConstraintManager {
   }
 
   _addConstraintFromForm() {
-    let cells = this.grid.selection.getCells().map(e => e.id);
+    let cells = this._grid.selection.getCells().map(e => e.id);
     if (cells.length < 2) throw('Selection too short.');
 
     let formData = new FormData(this._selectionFrom);
@@ -423,14 +407,14 @@ class ConstraintManager {
         break;
     }
 
-    this.grid.selection.updateSelection([]);
+    this._grid.selection.updateSelection([]);
     this.runUpdateCallback();
   }
 
   _removeConstraint(config) {
     let index = this._configs.indexOf(config);
     this._configs.splice(index, 1);
-    this.display.removeItem(config.displayElem);
+    this._display.removeItem(config.displayElem);
     this._panel.removeChild(config.panelItem);
   }
 
@@ -466,18 +450,18 @@ class ConstraintManager {
     let constraints = this._configs.map(c => c.constraint);
     constraints.push(this._checkboxConstraints.getConstraint());
     constraints.push(
-      new SudokuConstraint.FixedValues(...this.grid.getCellValues()));
+      new SudokuConstraint.FixedValues(...this._grid.getCellValues()));
 
     return new SudokuConstraint.Set(constraints);
   }
 
   clear() {
-    this.display.clear();
+    this._display.clear();
     this._panel.innerHTML = '';
     this._checkboxConstraints.uncheckAll();
     this._configs = [];
-    this.grid.clearCellValues()
-    this.grid.setSolution();
+    this._grid.setCellValues([])
+    this._grid.setSolution();
     this.runUpdateCallback();
   }
 }
@@ -594,7 +578,7 @@ class SudokuGrid {
       let elem = getActiveElem();
       if (!elem) return;
 
-      elem.innerText = value || '';
+      elem.textContent = value || '';
 
       this.updateCallback(this);
     };
@@ -603,18 +587,16 @@ class SudokuGrid {
       let elem = getActiveElem();
       if (!elem) return;
 
-      let row = +elem.id[1];
-      let col = +elem.id[3];
-      row = (row+dr+8)%9+1;
-      col = (col+dc+8)%9+1;
+      let {row, col} = parseCellId(elem.id);
+      row = (row+dr+GRID_SIZE)%GRID_SIZE;
+      col = (col+dc+GRID_SIZE)%GRID_SIZE;
 
-
-      this.selection.updateSelection([`R${row}C${col}`]);
+      this.selection.updateSelection([toCellId(row, col)]);
     };
 
     container.addEventListener('keydown', event => {
       // Number key.
-      if (event.keyCode > CHAR_0 && event.keyCode <= CHAR_9) {
+      if (event.key > '0' && event.key <= '9') {
         setActiveCellValue(event.key);
         return;
       }
@@ -643,22 +625,25 @@ class SudokuGrid {
     });
   }
 
+  static THIN_BORDER_STYLE = '1px solid';
+  static FAT_BORDER_STYLE = '3px solid';
+
   _styleCell(cell, row, col) {
     cell.className = 'cell cell-elem';
-    cell.style.border = THIN_BORDER_STYLE;
-    if (row%3 == 0) cell.style.borderTop = FAT_BORDER_STYLE;
-    if (col%3 == 0) cell.style.borderLeft = FAT_BORDER_STYLE;
-    if (row == 8) cell.style.borderBottom = FAT_BORDER_STYLE;
-    if (col == 8) cell.style.borderRight = FAT_BORDER_STYLE;
+    cell.style.border = SudokuGrid.THIN_BORDER_STYLE;
+    if (row%BOX_SIZE == 0) cell.style.borderTop = SudokuGrid.FAT_BORDER_STYLE;
+    if (col%BOX_SIZE == 0) cell.style.borderLeft = SudokuGrid.FAT_BORDER_STYLE;
+    if (row == GRID_SIZE-1) cell.style.borderBottom = SudokuGrid.FAT_BORDER_STYLE;
+    if (col == GRID_SIZE-1) cell.style.borderRight = SudokuGrid.FAT_BORDER_STYLE;
   }
 
   _makeSudokuGrid(container) {
     let cellMap = new Map();
 
-    for (let i = 0; i < 9; i++) {
-      for (let j = 0; j < 9; j++) {
+    for (let i = 0; i < GRID_SIZE; i++) {
+      for (let j = 0; j < GRID_SIZE; j++) {
         let cell = document.createElement('div');
-        let cellId = `R${i+1}C${j+1}`;
+        let cellId = toCellId(i, j);
         this._styleCell(cell, i, j);
 
         let cellInput = document.createElement('div');
@@ -681,10 +666,11 @@ class SudokuGrid {
 
   getCellValues() {
     let values = [];
-    for (let [key, cell] of this._cellMap) {
-      let value = cell.innerText;
+    for (let [cellId, cell] of this._cellMap) {
+      let value = cell.textContent;
       if (value){
-        values.push(`${key}_${value}`);
+        let {row, col} = parseCellId(cellId);
+        values.push(toValueId(row, col, value));
       }
     }
     return values;
@@ -696,27 +682,13 @@ class SudokuGrid {
     }
   }
 
-  clearCellValues() {
-    this._clearCellValues();
-    this.updateCallback();
-  }
-
   setCellValues(valueIds) {
     this._clearCellValues();
     for (let valueId of valueIds) {
-      let parsedValueId = this._parseValueId(valueId);
-      let cellId = parsedValueId.cellId;
-      let value = parsedValueId.value;
+      let {cellId, value} = parseValueId(valueId);
       this._cellMap.get(cellId).textContent = value;
     }
     this.updateCallback();
-  }
-
-  _parseValueId(valueId) {
-    return {
-      cellId: valueId.substr(0, 4),
-      value: valueId[5],
-    };
   }
 
   *_solutionNodes() {
@@ -726,9 +698,9 @@ class SudokuGrid {
   }
 
   _formatMultiSolution(values) {
-    let chars = Array(9*2-1).fill(' ');
-    chars[3*2-1] = '\n';
-    chars[6*2-1] = '\n';
+    let chars = Array(GRID_SIZE*2-1).fill(' ');
+    chars[BOX_SIZE*2-1] = '\n';
+    chars[BOX_SIZE*2*2-1] = '\n';
     for (const v of values) {
       chars[v*2-2] = v;
     }
@@ -761,9 +733,7 @@ class SudokuGrid {
     let pencilmarkCell = new Set();
 
     const handleValue = (valueId) => {
-      let parsedValueId = this._parseValueId(valueId);
-      let cellId = parsedValueId.cellId;
-      let value = parsedValueId.value;
+      let {cellId, value} = parseValueId(valueId);
       this._solutionValues.push(valueId);
 
       if (!cellValues.has(cellId)) cellValues.set(cellId, []);
@@ -847,7 +817,6 @@ class SolutionController {
       solveStatus: document.getElementById('solve-status'),
       error: document.getElementById('error-output'),
       stop: document.getElementById('stop-solver'),
-      stepStatus: document.getElementById('step-by-step-status'),
     }
 
     this._elements.mode.onchange = () => this._update();
@@ -925,8 +894,8 @@ class SolutionController {
   async _replaceSolver(constraints) {
     this._terminateSolver();
 
-    this._solver = await SolverProxy.make(
-      constraints, state => this._displayState(state));
+    this._solver = await SudokuBuilder.buildInWorker(
+      constraints, this._displayState.bind(this));
 
     return this._solver;
   }
@@ -1033,14 +1002,14 @@ class SolutionController {
 
     const update = async () => {
       this._setSolving(true);
-      let result = await solver.goToStep(step);
+      let result = await solver.nthStep(step);
       this._setSolving(false);
 
       // Update the grid.
       let selection = [];
       if (result) {
         this._grid.setSolution(result.values, result.pencilmarks);
-        if (result.values.length > 0) {
+        if (result.values.length > 0 && !result.isSolution) {
           selection.push(result.values[result.values.length-1].substring(0, 4));
         }
         this._setStepStatus(result);
@@ -1083,7 +1052,7 @@ class SolutionController {
       if (done) return;
 
       this._setSolving(true);
-      let solution = await solver.nextSolution();
+      let solution = await solver.nthSolution(solutions.length);
       this._setSolving(false);
 
       if (solution) {

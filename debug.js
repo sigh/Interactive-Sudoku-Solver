@@ -11,10 +11,10 @@ class SudokuGridGenerator {
   static _allValues() {
     let values = [];
 
-    for (let i = 0; i < 9; i++) {
-      for (let j = 0; j < 9; j++) {
-        for (let n = 0; n < 9; n++) {
-          values.push(valueId(i, j, n));
+    for (let i = 0; i < GRID_SIZE; i++) {
+      for (let j = 0; j < GRID_SIZE; j++) {
+        for (let n = 0; n < GRID_SIZE; n++) {
+          values.push(toValueId(i, j, n+1));
         }
       }
     }

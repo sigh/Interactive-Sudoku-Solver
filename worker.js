@@ -19,11 +19,11 @@ const handleWorkerMethod = (method, payload) => {
     case 'solveAllPossibilities':
       return workerSolver.solveAllPossibilities();
 
-    case 'nextSolution':
-      return workerSolver.nextSolution();
+    case 'nthSolution':
+      return workerSolver.nthSolution(payload);
 
-    case 'goToStep':
-      return workerSolver.goToStep(payload);
+    case 'nthStep':
+      return workerSolver.nthStep(payload);
 
     case 'countSolutions':
       return workerSolver.countSolutions();

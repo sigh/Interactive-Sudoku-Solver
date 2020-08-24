@@ -5,6 +5,10 @@ const formatTimeMs = (timeMs) => {
   return (timeMs/1000).toPrecision(3) + ' s';
 };
 
+const createSvgElement = (tag) => {
+  return document.createElementNS('http://www.w3.org/2000/svg', tag);
+}
+
 const deferUntilAnimationFrame = (fn) => {
   let lastArgs = null;
   let promise = null;
@@ -34,7 +38,7 @@ const deferUntilAnimationFrame = (fn) => {
 
 // Helper to count operations for debugging.
 let _count = 0;
-const count = () => { _count++; };
+const COUNT = () => { _count++; };
 
 // A timer which can be paused and unpaused and accumulates the elapsed time.
 // Start paused.
@@ -66,4 +70,24 @@ class Timer {
     }
     return elapsedMs;
   }
+
+  runTimed(fn) {
+    this.unpause();
+    fn();
+    this.pause();
+  }
+}
+
+class IteratorWithCount {
+  constructor(iter) {
+    this._iter = iter;
+    this.count = 0;
+  }
+
+  next() {
+    this.count++;
+    return this._iter.next();
+  }
+
+  [Symbol.iterator] = () => this;
 }
