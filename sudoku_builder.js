@@ -67,8 +67,9 @@ class SudokuConstraint {
 
   static _parseKillerFormat(text) {
     if (text.length != NUM_CELLS) return null;
-    if (!text.match(/[^<V>]/)) return null;
-    if (!text.match(/^[0-9A-Za-j^<V>]*$/)) return null;
+    // Note: The second ` is just there so my syntax highlighter is happy.
+    if (!text.match(/[<V>^``]/)) return null;
+    if (!text.match(/^[0-9A-Za-j^<V>``]*$/)) return null;
 
     // Determine the cell directions.
     let cellDirections = [];
@@ -85,6 +86,9 @@ class SudokuConstraint {
           break;
         case '>':
           cellDirections.push(i+1);
+          break;
+        case '`':
+          cellDirections.push(i-GRID_SIZE-1);
           break;
         default:
           cellDirections.push(i);
