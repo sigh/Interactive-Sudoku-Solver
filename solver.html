@@ -5,14 +5,13 @@
   <link rel="stylesheet" href="style.css">
 </head>
 
-<script src="util.js"></script>
-<script src="constraint.js"></script>
-<script src="fast_solver.js"></script>
-<script src="sudoku_grid.js"></script>
-<script src="sudoku_solver.js"></script>
-<script src="debug.js"></script>
+<script defer src="util.js"></script>
+<script defer src="sudoku_builder.js"></script>
+<script defer src="render_page.js"></script>
+<script async src="sudoku_solver.js"></script>
+<script async src="debug.js"></script>
 <script>
-  window.addEventListener('load', initPage);
+  window.addEventListener('load', () => { initPage(); });
 </script>
 
 <body>

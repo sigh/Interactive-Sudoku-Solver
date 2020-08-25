@@ -1,7 +1,6 @@
 self.importScripts('util.js');
-self.importScripts('constraint.js');
+self.importScripts('sudoku_builder.js');
 self.importScripts('sudoku_solver.js');
-self.importScripts('fast_solver.js');
 
 let workerSolver = null;
 
