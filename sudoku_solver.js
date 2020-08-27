@@ -710,7 +710,7 @@ SudokuSolver.BinaryConstraintHandler = class extends SudokuSolver.ConstraintHand
   }
 }
 
-SudokuSolver.SumHandler = class extends SudokuSolver.ConstraintHandler {
+SudokuSolver.CageHandler = class extends SudokuSolver.ConstraintHandler {
   constructor(cells, sum) {
     super(cells);
     this._sum = +sum;
@@ -777,7 +777,7 @@ SudokuSolver.SumHandler = class extends SudokuSolver.ConstraintHandler {
     if (allValues == fixedValues) return true;
 
     let numUnfixed = this.cells.length - LookupTable.COUNT[fixedValues];
-    let sumOptions = SudokuSolver.SumHandler.KILLER_CAGE_SUMS
+    let sumOptions = SudokuSolver.CageHandler.KILLER_CAGE_SUMS
         [numUnfixed][this._sum - LookupTable.SUM[fixedValues]];
     if (!sumOptions) return false;
 

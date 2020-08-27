@@ -65,7 +65,7 @@ class SudokuConstraint {
     return '.' + arr.join('~');
   }
 
-  static _parseKillerFormat(text) {
+  static _parseShortKillerFormat(text) {
     if (text.length != NUM_CELLS) return null;
     // Note: The second ` is just there so my syntax highlighter is happy.
     if (!text.match(/[<V>^``]/)) return null;
@@ -124,7 +124,39 @@ class SudokuConstraint {
 
     let constraints = [];
     for (const config of cages.values()) {
-      constraints.push(new SudokuConstraint.Sum(config.sum, ...config.cells));
+      constraints.push(new SudokuConstraint.Cage(config.sum, ...config.cells));
+    }
+    return new SudokuConstraint.Set(constraints);
+  }
+
+  static _parseLongKillerFormat(text) {
+    if (!text.startsWith('3x3:')) return null;
+
+    let parts = text.split(':');
+    if (parts[2] != 'k') return null;
+    if (parts.length != NUM_CELLS + 4) return null;
+
+    let cages = new Map();
+    for (let i = 0; i < NUM_CELLS; i++) {
+      let value = +parts[i + 3];
+      let cageId = value%256;
+      let cageSum = value/256|0;
+
+      if (!cageSum) continue;
+
+      if (!cages.has(cageId)) {
+        cages.set(cageId, {sum: cageSum, cells: []});
+      }
+      cages.get(cageId).cells.push(toCellId(...toRowCol(i)));
+    }
+
+    let constraints = [];
+    if (parts[1] == 'd') {
+      constraints.push(new SudokuConstraint.Diagonal(1));
+      constraints.push(new SudokuConstraint.Diagonal(-1));
+    }
+    for (const config of cages.values()) {
+      constraints.push(new SudokuConstraint.Cage(config.sum, ...config.cells));
     }
     return new SudokuConstraint.Set(constraints);
   }
@@ -152,7 +184,10 @@ class SudokuConstraint {
 
     let constraint;
 
-    constraint = this._parseKillerFormat(text);
+    constraint = this._parseShortKillerFormat(text);
+    if (constraint) return constraint;
+
+    constraint = this._parseLongKillerFormat(text);
     if (constraint) return constraint;
 
     constraint = this._parsePlainSudoku(text);
@@ -197,7 +232,7 @@ class SudokuConstraint {
     }
   }
 
-  static Sum = class Sum extends SudokuConstraint {
+  static Cage = class Cage extends SudokuConstraint {
     constructor(sum, ...cells) {
       super(arguments);
       this.cells = cells;
@@ -310,9 +345,9 @@ class SudokuBuilder {
         yield *this._allDifferentHandlers(cells);
         break;
 
-      case 'Sum':
+      case 'Cage':
         cells = constraint.cells.map(c => parseCellId(c).cell);
-        yield new SudokuSolver.SumHandler(cells, constraint.sum);
+        yield new SudokuSolver.CageHandler(cells, constraint.sum);
         break;
 
       case 'AllDifferent':

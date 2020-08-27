@@ -348,17 +348,17 @@ class ConstraintManager {
       case 'Thermo':
         config = {
           cells: constraint.cells,
-          name: `Themometer [len: ${constraint.cells.length}]`,
+          name: `Themo [len: ${constraint.cells.length}]`,
           constraint: constraint,
           displayElem: this._display.drawThermometer(constraint.cells),
         };
         this._addToPanel(config);
         this._configs.push(config);
         break;
-      case 'Sum':
+      case 'Cage':
         config = {
           cells: constraint.cells,
-          name: `Killer cage [sum: ${constraint.sum}]`,
+          name: `Cage [sum: ${constraint.sum}]`,
           constraint: constraint,
           displayElem: this._display.drawKillerCage(
             constraint.cells, constraint.sum),
@@ -398,7 +398,7 @@ class ConstraintManager {
     let constraint;
     switch (formData.get('constraint-type')) {
       case 'cage':
-        constraint = new SudokuConstraint.Sum(+formData.get('sum'), ...cells);
+        constraint = new SudokuConstraint.Cage(+formData.get('sum'), ...cells);
         this.loadConstraint(constraint);
         break;
       case 'thermo':
@@ -407,7 +407,7 @@ class ConstraintManager {
         break;
     }
 
-    this._grid.selection.updateSelection([]);
+    this._grid.selection.setCells([]);
     this.runUpdateCallback();
   }
 
@@ -437,10 +437,10 @@ class ConstraintManager {
     });
 
     panelItem.addEventListener('mouseover', () => {
-      config.displayElem.classList.add('highlight-constraint');
+      this._grid.highlight.setCells(config.cells);
     });
     panelItem.addEventListener('mouseout', () => {
-      config.displayElem.classList.remove('highlight-constraint');
+      this._grid.highlight.setCells([]);
     });
 
     this._panel.appendChild(panelItem);
@@ -466,13 +466,56 @@ class ConstraintManager {
   }
 }
 
-class Selection {
-  constructor(container) {
-    this._selection = new Set();
-    this._selectionPreservers = [container];
-    let selection = this._selection;
+class Highlight {
+  constructor(container, cssClass) {
+    this._cells = new Set();
+    this._cssClass = cssClass;
     this.setCallback();
+  }
 
+  setCells(cellIds) {
+    this._clear();
+    cellIds.forEach(c => this._addToSelection(document.getElementById(c)));
+    this._runCallback();
+  }
+
+  getCells() {
+    return [...this._cells];
+  }
+
+  setCallback(fn) {
+    this.callback = fn || (() => {});
+  }
+
+  _runCallback() {
+    let cellIds = [];
+    this._cells.forEach(e => cellIds.push(e.id));
+    this.callback(cellIds);
+  }
+
+  _addToSelection(cell) {
+    if (cell.classList.contains('cell-input')) {
+      cell.parentNode.classList.add(this._cssClass);
+      this._cells.add(cell);
+    }
+  }
+
+  _clear() {
+    this._cells.forEach(e => e.parentNode.classList.remove(this._cssClass));
+    this._cells.clear();
+    this._runCallback();
+  }
+}
+
+class Selection extends Highlight {
+  constructor(container) {
+    super(container, 'selected');
+    this._selectionPreservers = [container];
+
+    this._setUpMouseHandlers(container);
+  }
+
+  _setUpMouseHandlers(container) {
     // Make the container selectable.
     container.tabIndex = 0;
 
@@ -484,14 +527,14 @@ class Selection {
         if (elem.contains(e.target)) return;
       }
       // Otherwise clear the selection.
-      this._clearSelection();
+      this._clear();
       document.body.removeEventListener('click', outsideClickListener);
     };
 
     container.addEventListener('mousedown', (e) => {
       // If the shift key is pressed, continue adding to the selection.
       if (!e.shiftKey) {
-        this._clearSelection();
+        this._clear();
       }
       container.addEventListener('mouseover', mouseoverFn);
       document.body.addEventListener('click', outsideClickListener);
@@ -507,41 +550,8 @@ class Selection {
     });
   }
 
-  updateSelection(cellIds) {
-    this._clearSelection();
-    cellIds.forEach(c => this._addToSelection(document.getElementById(c)));
-    this._runCallback();
-  }
-
   addSelectionPreserver(elem) {
     this._selectionPreservers.push(elem);
-  }
-
-  setCallback(fn) {
-    this.callback = fn || (() => {});
-  }
-
-  getCells() {
-    return [...this._selection];
-  }
-
-  _runCallback() {
-    let selectedIds = [];
-    this._selection.forEach(e => selectedIds.push(e.id));
-    this.callback(selectedIds);
-  }
-
-  _addToSelection(cell) {
-    if (cell.classList.contains('cell-input')) {
-      cell.parentNode.classList.add('selected');
-      this._selection.add(cell);
-    }
-  }
-
-  _clearSelection() {
-    this._selection.forEach(e => e.parentNode.classList.remove('selected'));
-    this._selection.clear();
-    this._runCallback();
   }
 }
 
@@ -553,6 +563,7 @@ class SudokuGrid {
 
     this._cellMap = this._makeSudokuGrid(container);
     this.selection = new Selection(container);
+    this.highlight = new Highlight(container, 'highlighted');
     this._setUpKeyBindings(container);
     this.setUpdateCallback();
 
@@ -591,7 +602,7 @@ class SudokuGrid {
       row = (row+dr+GRID_SIZE)%GRID_SIZE;
       col = (col+dc+GRID_SIZE)%GRID_SIZE;
 
-      this.selection.updateSelection([toCellId(row, col)]);
+      this.selection.setCells([toCellId(row, col)]);
     };
 
     container.addEventListener('keydown', event => {
@@ -1014,7 +1025,7 @@ class SolutionController {
         }
         this._setStepStatus(result);
       }
-      this._grid.selection.updateSelection(selection);
+      this._grid.selection.setCells(selection);
 
       this._elements.forward.disabled = (result == null);
       this._elements.back.disabled = (step == 0);

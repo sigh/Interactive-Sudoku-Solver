@@ -74,8 +74,22 @@ body > div {
   background: rgba(0,0,255,0.1);
 }
 
+.highlighted {
+  background: rgba(255,255,0,0.5);
+}
+
 .error {
   color: rgb(200, 0, 0);
+}
+
+#displayed-constraints {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  width: 300px;
+}
+
+.constraint-item {
+  cursor: default;
 }
 
 .constraint-item button {
@@ -86,11 +100,6 @@ body > div {
 }
 .constraint-item button:hover {
   color: black;
-}
-
-.highlight-constraint {
-  fill: rgb(200, 150, 200);
-  stroke: rgb(200, 150, 200);
 }
 
 #constraint-panel h1 {
@@ -142,4 +151,8 @@ textarea {
 #solve-status:empty:after {
   content: '.';
   visibility: hidden;
+}
+
+#freeform-constraint-text {
+  width: 100%;
 }
