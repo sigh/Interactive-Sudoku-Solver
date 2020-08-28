@@ -263,6 +263,8 @@ class SudokuSolver {
   }
 }
 
+const SOLVER_INITIALIZE_AT_START = true;
+
 SudokuSolver.InternalSolver = class {
 
   constructor(handlers) {
@@ -296,8 +298,7 @@ SudokuSolver.InternalSolver = class {
         handler.enforceConsistency(this._initialGrid);
       }
 
-      // Add all cells that h
-      // andler claims to be attached to the list of
+      // Add all cells that the handler claims to be attached to the list of
       // handlers for that cell.
       for (const cell of handler.cells) {
         this._cellConstraintHandlers[cell].push(handler);
@@ -390,11 +391,11 @@ SudokuSolver.InternalSolver = class {
     }
   }
 
-  _enforceConstraints(grid, cell) {
-    let value = grid[cell];
+  _enforceValue(grid, value, cell) {
+    grid[cell] = value;
+
     let cellAccumulator = new SudokuSolver.CellAccumulator(this);
     cellAccumulator.add(cell);
-    let counters = this.counters;
 
     for (const conflict of this._cellConflicts[cell]) {
       if (grid[conflict] & value) {
@@ -402,6 +403,12 @@ SudokuSolver.InternalSolver = class {
         cellAccumulator.add(conflict);
       }
     }
+
+    return this._enforceConstraints(grid, cellAccumulator);
+  }
+
+  _enforceConstraints(grid, cellAccumulator) {
+    let counters = this.counters;
 
     while (cellAccumulator.hasConstraints()) {
       counters.constraintsProcessed++;
@@ -428,6 +435,13 @@ SudokuSolver.InternalSolver = class {
     let depth = 0;
     let stack = this._stack;
     let counters = this.counters;
+
+    if (SOLVER_INITIALIZE_AT_START) {
+      // Enforce constraints for all cells.
+      let cellAccumulator = new SudokuSolver.CellAccumulator(this);
+      for (let i = 0; i < NUM_CELLS; i++) cellAccumulator.add(i);
+      this._enforceConstraints(this._grids[0], cellAccumulator);
+    }
 
     if (yieldEveryStep) {
       yield {
@@ -469,7 +483,7 @@ SudokuSolver.InternalSolver = class {
 
       // Propogate constraints.
       grid[cell] = value;
-      let hasContradiction = !this._enforceConstraints(grid, cell);
+      let hasContradiction = !this._enforceValue(grid, value, cell);
 
       if (counters.valuesSearched % progressFrequency == 0) {
         this._progress.callback();
