@@ -397,7 +397,10 @@ SudokuSolver.InternalSolver = class {
     let cellAccumulator = new SudokuSolver.CellAccumulator(this);
     cellAccumulator.add(cell);
 
-    for (const conflict of this._cellConflicts[cell]) {
+    const conflicts = this._cellConflicts[cell];
+    const numConflicts = conflicts.length;
+    for (let i = 0; i < numConflicts; i++) {
+      const conflict = conflicts[i];
       if (grid[conflict] & value) {
         if (!(grid[conflict] &= ~value)) return false;
         cellAccumulator.add(conflict);
@@ -580,7 +583,7 @@ SudokuSolver.InternalSolver = class {
 
 SudokuSolver.CellAccumulator = class {
   constructor(solver) {
-    this._solver = solver;
+    this._handlers = solver._cellConstraintHandlers;
 
     // We keep the invariant that:
     //   this._extraConstraints contains c <=> c.dirty == this._generation
@@ -591,7 +594,10 @@ SudokuSolver.CellAccumulator = class {
   static dirtyGeneration = 0;
 
   add(cell) {
-    for (const c of this._solver._cellConstraintHandlers[cell]) {
+    const handlers = this._handlers[cell];
+    const numHandlers = handlers.length;
+    for (let i = 0; i < numHandlers; i++) {
+      const c = handlers[i];
       if (c.dirty != this._generation) {
         c.dirty = this._generation;
         this._constraints.push(c);
@@ -731,12 +737,15 @@ SudokuSolver.CageHandler = class extends SudokuSolver.ConstraintHandler {
   }
 
   enforceConsistency(grid) {
+    const cells = this.cells;
+    const numCells = cells.length;
+
     // Determine how much headrroom there is in the range between the extreme
     // values and the target sum.
     let sumMinusMin = this._sum;
     let maxMinusSum = -this._sum;
-    for (const cell of this.cells) {
-      let v = grid[cell];
+    for (let i = 0; i < numCells; i++) {
+      let v = grid[cells[i]];
       sumMinusMin -= LookupTable.MIN[v];
       maxMinusSum += LookupTable.MAX[v];
     }
@@ -749,8 +758,8 @@ SudokuSolver.CageHandler = class extends SudokuSolver.ConstraintHandler {
     // Remove any values which aren't possible because they would cause the sum
     // to be too high.
     if (sumMinusMin < GRID_SIZE || maxMinusSum < GRID_SIZE) {
-      for (const cell of this.cells) {
-        let value = grid[cell];
+      for (let i = 0; i < numCells; i++) {
+        let value = grid[cells[i]];
         // If there is a single value, then the range is always fine.
         if (!(value&(value-1))) continue;
 
@@ -763,7 +772,7 @@ SudokuSolver.CageHandler = class extends SudokuSolver.ConstraintHandler {
           // Remove any values GREATER than x. Even if all other squares
           // take their minimum values, these are too big.
           if (!(value &= ((1<<x)-1))) return false;
-          grid[cell] = value;
+          grid[cells[i]] = value;
         }
 
         if (maxMinusSum < range) {
@@ -771,7 +780,7 @@ SudokuSolver.CageHandler = class extends SudokuSolver.ConstraintHandler {
           // take their maximum values, these are too small.
           let x = cellMax - maxMinusSum;
           if (!(value &= -(1<<(x-1)))) return false;
-          grid[cell] = value;
+          grid[cells[i]] = value;
         }
       }
     }
@@ -781,8 +790,8 @@ SudokuSolver.CageHandler = class extends SudokuSolver.ConstraintHandler {
     let fixedValues = 0;
     let allValues = 0;
     let uniqueValues = 0;
-    for (const cell of this.cells) {
-      let value = grid[cell];
+    for (let i = 0; i < numCells; i++) {
+      let value = grid[cells[i]];
       uniqueValues &= ~value;
       uniqueValues |= (value&~allValues);
       allValues |= value;
@@ -798,7 +807,8 @@ SudokuSolver.CageHandler = class extends SudokuSolver.ConstraintHandler {
     let unfixedValues = allValues & ~fixedValues;
     let possible = 0;
     let requiredUniques = uniqueValues;
-    for (const option of sumOptions) {
+    for (let i = 0; i < sumOptions.length; i++) {
+      let option = sumOptions[i];
       if ((option & unfixedValues) === option) {
         possible |= option;
         requiredUniques &= option;
@@ -809,10 +819,10 @@ SudokuSolver.CageHandler = class extends SudokuSolver.ConstraintHandler {
     // Remove any values that aren't part of any solution.
     let valuesToRemove = unfixedValues & ~possible;
     if (valuesToRemove) {
-      for (const cell of this.cells) {
+      for (let i = 0; i < numCells; i++) {
         // Safe to apply to every cell, since we know that none of the
         // fixedValues are in unfixedValues.
-        if (!(grid[cell] &= ~valuesToRemove)) return false;
+        if (!(grid[cells[i]] &= ~valuesToRemove)) return false;
       }
     }
 
@@ -820,13 +830,13 @@ SudokuSolver.CageHandler = class extends SudokuSolver.ConstraintHandler {
     // are unique. Thus, we can enforce these values.
     // NOTE: This is the same as the NonetHandler uniqueness check.
     if (requiredUniques) {
-      for (const cell of this.cells) {
-        let value = grid[cell] & requiredUniques;
+      for (let i = 0; i < numCells; i++) {
+        let value = grid[cells[i]] & requiredUniques;
         if (value) {
           // If we have more value that means a single cell holds more than
           // one unique value.
           if (value&(value-1)) return false;
-          grid[cell] = value;
+          grid[cells[i]] = value;
         }
       }
     }
