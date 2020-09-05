@@ -191,25 +191,25 @@ class SudokuSolver {
   solveAllPossibilities() {
     this._reset();
 
-    let validRows = new Uint16Array(NUM_CELLS);
+    let valuesInSolutions = new Uint16Array(NUM_CELLS);
 
-    // Send the current valid rows with the progress update, if there have
+    // Send the current values with the progress update, if there have
     // been any changes.
     let lastSize = 0;
     this._progressExtraStateFn = () => {
-      let pencilmarks = this.constructor._makePencilmarks(validRows);
+      let pencilmarks = this.constructor._makePencilmarks(valuesInSolutions);
       if (pencilmarks.length == lastSize) return null;
       lastSize = pencilmarks.size;
       return {pencilmarks: pencilmarks};
     };
 
     this._timer.runTimed(() => {
-      this._internalSolver.solveAllPossibilities(validRows);
+      this._internalSolver.solveAllPossibilities(valuesInSolutions);
     });
 
     this._progressExtraStateFn = null;
 
-    return this.constructor._makePencilmarks(validRows);
+    return this.constructor._makePencilmarks(valuesInSolutions);
   }
 
   state() {
@@ -528,51 +528,46 @@ SudokuSolver.InternalSolver = class {
     this.done = true;
   }
 
-  // Solve until maxSolutions are found, and returns leaving the stack
-  // fully unwound.
-  *_solve(maxSolutions) {
-    let i = 0;
-    for (const solution of this.run()) {
-      yield solution.grid;
-      if (++i == maxSolutions) break;
-    }
-    this._resetStack();
-  }
-
-  solveAllPossibilities(validRows) {
+  solveAllPossibilities(valuesInSolutions) {
     // TODO: Do all forced reductions first to avoid having to do them for
     // each iteration.
 
-    // Do initial solve to see if we have 0, 1 or many solutions.
-    for (const grid of this._solve(2)) {
-      grid.forEach((c, i) => { validRows[i] |= c; } );
-    }
-
-    let numSolutions = this.counters.solutions;
-
-    // If there are 1 or 0 solutions, there is nothing else to do.
-    // If there are 2 or more, then we have to check all possibilities.
-    if (numSolutions > 1) {
-      for (let i = 0; i < NUM_CELLS; i++) {
-        for (let v = 1; v < ALL_VALUES; v <<= 1) {
-          // We already know this is a valid row.
-          if (validRows[i] & v) continue;
-          // This is NOT a valid row.
-          if (!(this._grids[0][i] & v)) continue;
-
-          // Fix the current value and attempt to solve.
-          // Solve will also reset any changes we made to this._grids[0].
-          this._grids[0][i] = v;
-          for (const grid of this._solve(1)) {
-            grid.forEach((c, i) => { validRows[i] |= c; } );
-          };
+    // Search for solutions.
+    // Keep searching until we we see a redudant solution:
+    //  - We want to avoid searching for all solutions, as there might be so
+    //    many that it is intractable (e.g. empty grid).
+    //  - On the other-hand, we don't want to abort too early and lose all the
+    //    state/knowledge gained from the current search.
+    const search = () => {
+      for (const solution of this.run()) {
+        const grid = solution.grid;
+        if (grid.every((c, i) => valuesInSolutions[i] & c)) {
+          return false;
         }
+        grid.forEach((c, i) => { valuesInSolutions[i] |= c; });
+      }
+      return true;
+    };
+
+    const foundAllSolutions = search();
+
+    // If the initial search found all the solutions, then we are done.
+    if (foundAllSolutions) return;
+
+    this._resetStack();
+    for (let i = 0; i < NUM_CELLS; i++) {
+      for (let v = 1; v < ALL_VALUES; v <<= 1) {
+        // We already know this is a value is in a solution.
+        if (valuesInSolutions[i] & v) continue;
+        // This is NOT a a valid value.
+        if (!(this._grids[0][i] & v)) continue;
+
+        // Fix the current value and attempt to solve.
+        this._grids[0][i] = v;
+        search();
+        this._resetStack();
       }
     }
-
-    // We only know for sure that the we found all solutions if we only found
-    // one.
-    this.done = numSolutions < 2;
   }
 
   setProgressCallback(callback, frequency) {
