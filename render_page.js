@@ -362,7 +362,7 @@ class ConstraintManager {
       this._display, this.runUpdateCallback.bind(this));
 
     this._selectionFrom = document.getElementById('multi-cell-constraint-input');
-    this._grid.selection.setCallback((selection) => {
+    this._grid.selection.addCallback((selection) => {
       let disabled = (selection.length < 2);
       this._selectionFrom.firstElementChild.disabled = disabled;
       // Focus on the submit button so that that we can immediately press enter.
@@ -543,7 +543,7 @@ class Highlight {
   constructor(container, cssClass) {
     this._cells = new Set();
     this._cssClass = cssClass;
-    this.setCallback();
+    this._callbacks = [];
   }
 
   setCells(cellIds) {
@@ -556,14 +556,14 @@ class Highlight {
     return [...this._cells];
   }
 
-  setCallback(fn) {
-    this.callback = fn || (() => {});
+  addCallback(fn) {
+    this._callbacks.push(fn);
   }
 
   _runCallback() {
     let cellIds = [];
     this._cells.forEach(e => cellIds.push(e.id));
-    this.callback(cellIds);
+    this._callbacks.forEach(fn => fn(cellIds));
   }
 
   _addToSelection(cell) {
@@ -612,7 +612,6 @@ class Selection extends Highlight {
       container.addEventListener('mouseover', mouseoverFn);
       document.body.addEventListener('click', outsideClickListener);
       this._addToSelection(e.target);
-      container.focus();
       e.preventDefault();
     });
 
@@ -634,8 +633,20 @@ class SudokuGrid {
     container.classList.add('sudoku-grid');
     this._solutionValues = [];
 
+    // fake-input is an invisible text input which is used to ensure that
+    // numbers can be entered on mobile.
+    this._fakeInput = document.getElementById('fake-input');
+
     this._cellMap = this._makeSudokuGrid(container);
     this.selection = new Selection(container);
+    this.selection.addCallback(cellIds => {
+      if (cellIds.length != 1) return;
+      let cell = document.getElementById(cellIds[0]);
+      let fakeInput = this._fakeInput;
+      fakeInput.style.left = cell.offsetLeft;
+      fakeInput.style.top = cell.offsetTop;
+      fakeInput.select();
+    });
     this.highlight = new Highlight(container, 'highlighted');
     this._setUpKeyBindings(container);
     this.setUpdateCallback();
@@ -678,20 +689,25 @@ class SudokuGrid {
       this.selection.setCells([toCellId(row, col)]);
     };
 
-    container.addEventListener('keydown', event => {
-      // Number key.
-      if (event.key > '0' && event.key <= '9') {
-        setActiveCellValue(event.key);
-        return;
+    let fakeInput = this._fakeInput;
+    fakeInput.addEventListener('input', event => {
+      const value = +fakeInput.value;
+      if (value > 0 && value <= 9) {
+        setActiveCellValue(value);
+      } else {
+        setActiveCellValue(null);
       }
+      // Ensure that any user input results in a value which makes sense to us:
+      //   - Select so that the ensure content is replaced by the new value.
+      //   - Initialize with x, so that backspace can be detected.
+      fakeInput.value = 'x';
+      fakeInput.select();
+      return;
+    });
 
+    fakeInput.addEventListener('keydown', event => {
+      fakeInput.select(); // Restore the selection.
       switch (event.key) {
-        // Delete key.
-        case 'Backspace':
-        case '0':
-          setActiveCellValue(null);
-          return;
-
         // Arrow keys.
         case 'ArrowLeft':
           moveActiveCell(0, -1);
