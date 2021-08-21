@@ -8,7 +8,7 @@
 <script defer src="util.js"></script>
 <script defer src="sudoku_builder.js"></script>
 <script defer src="render_page.js"></script>
-<script async src="sudoku_solver.js"></script>
+<script defer src="sudoku_solver.js"></script>
 <script async src="debug.js"></script>
 <script>
   window.addEventListener('load', () => { initPage(); });
@@ -86,10 +86,14 @@
           <label for="multi-cell-constraint-thermo">Thermometer</label>
         </div>
         <div>
+          <input type="radio" id="multi-cell-constraint-arrow" name="constraint-type" value="arrow">
+          <label for="multi-cell-constraint-arrow">Arrow Sum</label>
+        </div>
+        <div>
           <input type="radio" id="multi-cell-constraint-cage" name="constraint-type" value="cage">
           <label for="multi-cell-constraint-cage">
             Cage
-            Sum: <input type="number" name="sum" min=0>
+            Sum: <input type="number" name="cage-sum" min=0>
           </label>
         </div>
         <div>

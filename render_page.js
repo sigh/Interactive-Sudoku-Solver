@@ -24,6 +24,24 @@ class ConstraintDisplay {
     svg.setAttribute('height', CELL_SIZE * GRID_SIZE);
     svg.setAttribute('width', CELL_SIZE * GRID_SIZE);
     svg.classList.add('sudoku-grid-background');
+
+    // Reuasable arrowhead marker.
+    let arrowhead = createSvgElement('marker');
+    arrowhead.id = 'arrowhead';
+    arrowhead.className.baseVal = 'keep-in-svg';
+    arrowhead.setAttribute('refX', '3');
+    arrowhead.setAttribute('refY', '3');
+    arrowhead.setAttribute('markerWidth', '4');
+    arrowhead.setAttribute('markerHeight', '7');
+    arrowhead.setAttribute('orient', 'auto');
+    let arrowPath = createSvgElement('path');
+    arrowPath.setAttribute('d', 'M 0 0 L 3 3 L 0 6');
+    arrowPath.setAttribute('fill', 'none');
+    arrowPath.setAttribute('stroke-width', 1);
+    arrowPath.setAttribute('stroke', 'rgb(200, 200, 200)');
+    arrowhead.appendChild(arrowPath);
+    svg.append(arrowhead);
+
     container.prepend(svg);
 
     return new ConstraintDisplay(svg);
@@ -36,7 +54,7 @@ class ConstraintDisplay {
 
   clear() {
     let svg = this._svg;
-    while (svg.lastChild) {
+    while (svg.lastChild.className.baseVal != 'keep-in-svg') {
       svg.removeChild(svg.lastChild);
     }
     this.killerCellColors = new Map();
@@ -141,6 +159,47 @@ class ConstraintDisplay {
     textBackground.setAttribute('fill', 'rgb(200, 200, 200)');
 
     return cage;
+  }
+
+  drawArrow(cells) {
+    if (cells.length < 2) throw(`Arrow too short: ${cells}`)
+
+    let arrow = createSvgElement('svg');
+    arrow.setAttribute('fill', 'transparent');
+    arrow.setAttribute('stroke', 'rgb(200, 200, 200)');
+    arrow.setAttribute('stroke-width', 3);
+    arrow.setAttribute('stroke-linecap', 'round');
+
+    let x, y;
+    // Draw the circle.
+    [x, y] = ConstraintDisplay.cellCenter(cells[0]);
+    let circle = createSvgElement('circle');
+    circle.setAttribute('cx', x);
+    circle.setAttribute('cy', y);
+    circle.setAttribute('r', 15);
+    arrow.appendChild(circle);
+
+    // Draw the line.
+    let directions = [];
+    cells.forEach((cell) => {
+      [x, y] = ConstraintDisplay.cellCenter(cell);
+      directions.push('L');
+      directions.push(x);
+      directions.push(y);
+    });
+    directions[0] = 'M';  // Replace the first direction to a move.
+
+    let path = createSvgElement('path');
+    path.setAttribute('d', directions.join(' '));
+    path.setAttribute('stroke-dashoffset', -15);
+    path.setAttribute('stroke-dasharray', path.getTotalLength());
+    path.setAttribute('marker-end', 'url(#arrowhead)');
+
+    arrow.appendChild(path);
+
+    this._svg.append(arrow);
+
+    return arrow;
   }
 
   drawThermometer(cells) {
@@ -345,6 +404,16 @@ class ConstraintManager {
       case 'FixedValues':
         this._grid.setCellValues(constraint.values);
         break;
+      case 'Arrow':
+        config = {
+          cells: constraint.cells,
+          name: `Arrow [len: ${constraint.cells.length-1}]`,
+          constraint: constraint,
+          displayElem: this._display.drawArrow(constraint.cells),
+        };
+        this._addToPanel(config);
+        this._configs.push(config);
+        break;
       case 'Thermo':
         config = {
           cells: constraint.cells,
@@ -397,8 +466,12 @@ class ConstraintManager {
 
     let constraint;
     switch (formData.get('constraint-type')) {
+      case 'arrow':
+        constraint = new SudokuConstraint.Arrow(...cells);
+        this.loadConstraint(constraint);
+        break;
       case 'cage':
-        constraint = new SudokuConstraint.Cage(+formData.get('sum'), ...cells);
+        constraint = new SudokuConstraint.Cage(+formData.get('cage-sum'), ...cells);
         this.loadConstraint(constraint);
         break;
       case 'thermo':

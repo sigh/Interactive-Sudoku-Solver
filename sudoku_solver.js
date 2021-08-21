@@ -725,6 +725,75 @@ SudokuSolver.BinaryConstraintHandler = class extends SudokuSolver.ConstraintHand
   }
 }
 
+SudokuSolver.ArrowHandler = class extends SudokuSolver.ConstraintHandler {
+  constructor(cells) {
+    super(cells);
+    [this._sumCell, ...this._arrowCells] = cells;
+  }
+
+  enforceConsistency(grid) {
+    const arrowCells = this._arrowCells;
+    const numCells = arrowCells.length;
+
+    //  Determine sumMin and sumMax based on arrow.
+    let sumMin = 0;
+    let sumMax = 0;
+    for (let i = 0; i < numCells; i++) {
+      let v = grid[arrowCells[i]];
+      sumMin += LookupTable.MIN[v];
+      sumMax += LookupTable.MAX[v];
+    }
+
+    // Constraint sumCell.
+    let sum = grid[this._sumCell];
+    // Remove any values GREATER than sumMax.
+    if (!(sum &= ((1<<sumMax)-1))) return false;
+    // Remove any values LESS than sumMin.
+    if (!(sum &= -(1<<(sumMin-1)))) return false;
+    grid[this._sumCell] = sum;
+
+    // We've reached the exact sum.
+    if (sumMin == sumMax) return true;
+
+    // Determine how much headroom there is in the range between the extreme
+    // values and the target sum.
+    let sumMinusMin = LookupTable.MAX[sum] - sumMin;
+    let maxMinusSum = -LookupTable.MIN[sum] + sumMax;
+
+    // Remove any values which aren't possible because they would cause the sum
+    // to be too high.
+    for (let i = 0; i < numCells; i++) {
+      let value = grid[arrowCells[i]];
+      // If there is a single value, then the range is always fine.
+      if (!(value&(value-1))) continue;
+
+      let cellMin = LookupTable.MIN[value];
+      let cellMax = LookupTable.MAX[value];
+      let range = cellMax - cellMin;
+
+      if (sumMinusMin < range) {
+        let x = sumMinusMin + cellMin;
+        // Remove any values GREATER than x. Even if all other squares
+        // take their minimum values, these are too big.
+        if (!(value &= ((1<<x)-1))) return false;
+        grid[arrowCells[i]] = value;
+      }
+
+      if (maxMinusSum < range) {
+        // Remove any values LESS than x. Even if all other squares
+        // take their maximum values, these are too small.
+        let x = cellMax - maxMinusSum;
+        if (!(value &= -(1<<(x-1)))) return false;
+        grid[arrowCells[i]] = value;
+      }
+    }
+
+    // TODO: Check that we can make the current sum with the remaining values.
+
+    return true;
+  }
+}
+
 SudokuSolver.CageHandler = class extends SudokuSolver.ConstraintHandler {
   constructor(cells, sum) {
     super(cells);
@@ -735,7 +804,7 @@ SudokuSolver.CageHandler = class extends SudokuSolver.ConstraintHandler {
     const cells = this.cells;
     const numCells = cells.length;
 
-    // Determine how much headrroom there is in the range between the extreme
+    // Determine how much headroom there is in the range between the extreme
     // values and the target sum.
     let sumMinusMin = this._sum;
     let maxMinusSum = -this._sum;

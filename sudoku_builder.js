@@ -232,6 +232,13 @@ class SudokuConstraint {
     }
   }
 
+  static Arrow = class Arrow extends SudokuConstraint {
+    constructor(...cells) {
+      super(arguments);
+      this.cells = cells;
+    }
+  }
+
   static Cage = class Cage extends SudokuConstraint {
     constructor(sum, ...cells) {
       super(arguments);
@@ -343,6 +350,11 @@ class SudokuBuilder {
           cells.push(toCellIndex(r, c));
         }
         yield *this._allDifferentHandlers(cells);
+        break;
+
+      case 'Arrow':
+        cells = constraint.cells.map(c => parseCellId(c).cell);
+        yield new SudokuSolver.ArrowHandler(cells);
         break;
 
       case 'Cage':
