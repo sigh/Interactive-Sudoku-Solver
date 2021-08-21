@@ -592,7 +592,15 @@ class Selection extends Highlight {
     // Make the container selectable.
     container.tabIndex = 0;
 
-    const mouseoverFn = (e) => this._addToSelection(e.target);
+    let currCell = null;
+    const pointerMoveFn = e => {
+      // NOTE: e.target does't work correctly for pointers.
+      let target = document.elementFromPoint(e.clientX, e.clientY);
+      if (target != currCell) {
+        currCell = target;
+        this._addToSelection(currCell);
+      }
+    };
     const outsideClickListener = e => {
       // Don't do anything if the click is inside one of the elements where
       // we want to retain clicks.
@@ -603,22 +611,24 @@ class Selection extends Highlight {
       this._clear();
       document.body.removeEventListener('click', outsideClickListener);
     };
-
-    container.addEventListener('mousedown', (e) => {
+    container.addEventListener('pointerdown', e => {
       // If the shift key is pressed, continue adding to the selection.
       if (!e.shiftKey) {
         this._clear();
       }
-      container.addEventListener('mouseover', mouseoverFn);
+      container.addEventListener('pointermove', pointerMoveFn);
       document.body.addEventListener('click', outsideClickListener);
-      this._addToSelection(e.target);
+      currCell = null;
+      pointerMoveFn(e);
       e.preventDefault();
     });
-
-    container.addEventListener('mouseup', (e) => {
-      container.removeEventListener('mouseover', mouseoverFn);
+    container.addEventListener('pointerup', e => {
+      container.removeEventListener('pointermove', pointerMoveFn);
       this._runCallback();
       e.preventDefault();
+    });
+    container.addEventListener('touchmove', e => {
+      if (e.touches.length == 1) e.preventDefault();
     });
   }
 
