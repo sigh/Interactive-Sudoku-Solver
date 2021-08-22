@@ -290,14 +290,8 @@ SudokuSolver.InternalSolver = class {
       this._cellConstraintHandlers[i] = [];
     }
 
+    handlers = Array.from(handlers);
     for (const handler of handlers) {
-      // Run any initial enforcement.
-      // TODO: Move this into the solve loop so that it is inluded in the
-      // timing.
-      if (handler.ENFORCE_AT_START) {
-        handler.enforceConsistency(this._initialGrid);
-      }
-
       // Add all cells that the handler claims to be attached to the list of
       // handlers for that cell.
       for (const cell of handler.cells) {
@@ -317,6 +311,11 @@ SudokuSolver.InternalSolver = class {
     // Sort them, so they are in a predictable order.
     this._cellConflicts = cellConflicts.map(c => new Uint8Array(c));
     this._cellConflicts.forEach(c => c.sort((a, b) => a-b));
+
+    // TODO: Include as part of the solver for timing?
+    for (const handler of handlers) {
+      handler.initialize(this._initialGrid, this._cellConflicts);
+    }
   }
 
   reset() {
@@ -612,9 +611,6 @@ SudokuSolver.CellAccumulator = class {
 }
 
 SudokuSolver.ConstraintHandler = class {
-  // If true, then enforce the constraint before solving.
-  ENFORCE_AT_START = false;
-
   constructor(cells) {
     // This constraint is enforced whenever these cells are touched.
     this.cells = new Uint8Array(cells || []);
@@ -629,11 +625,13 @@ SudokuSolver.ConstraintHandler = class {
   conflictSet() {
     return [];
   }
+
+  initialize(initialGrid, cellConflicts) {
+    return;
+  }
 }
 
 SudokuSolver.FixedCellsHandler = class extends SudokuSolver.ConstraintHandler{
-  ENFORCE_AT_START = true;
-
   constructor(valueMap) {
     super();
     this._valueMap = valueMap;
@@ -643,6 +641,10 @@ SudokuSolver.FixedCellsHandler = class extends SudokuSolver.ConstraintHandler{
     for (const [cell, value] of this._valueMap) {
       grid[cell] = 1 << (value-1);
     }
+  }
+
+  initialize(initialGrid) {
+    this.enforceConsistency(initialGrid);
   }
 }
 
@@ -725,45 +727,14 @@ SudokuSolver.BinaryConstraintHandler = class extends SudokuSolver.ConstraintHand
   }
 }
 
-SudokuSolver.ArrowHandler = class extends SudokuSolver.ConstraintHandler {
-  constructor(cells) {
-    super(cells);
-    [this._sumCell, ...this._arrowCells] = cells;
-  }
-
-  enforceConsistency(grid) {
-    const arrowCells = this._arrowCells;
-    const numCells = arrowCells.length;
-
-    //  Determine sumMin and sumMax based on arrow.
-    let sumMin = 0;
-    let sumMax = 0;
-    for (let i = 0; i < numCells; i++) {
-      let v = grid[arrowCells[i]];
-      sumMin += LookupTable.MIN[v];
-      sumMax += LookupTable.MAX[v];
-    }
-
-    // Constraint sumCell.
-    let sum = grid[this._sumCell];
-    // Remove any values GREATER than sumMax.
-    if (!(sum &= ((1<<sumMax)-1))) return false;
-    // Remove any values LESS than sumMin.
-    if (!(sum &= -(1<<(sumMin-1)))) return false;
-    grid[this._sumCell] = sum;
-
-    // We've reached the exact sum.
-    if (sumMin == sumMax) return true;
-
-    // Determine how much headroom there is in the range between the extreme
-    // values and the target sum.
-    let sumMinusMin = LookupTable.MAX[sum] - sumMin;
-    let maxMinusSum = -LookupTable.MIN[sum] + sumMax;
+class SumHandlerUtil {
+  static restrictValueRange(grid, cells, sumMinusMin, maxMinusSum) {
+    const numCells = cells.length;
 
     // Remove any values which aren't possible because they would cause the sum
     // to be too high.
     for (let i = 0; i < numCells; i++) {
-      let value = grid[arrowCells[i]];
+      let value = grid[cells[i]];
       // If there is a single value, then the range is always fine.
       if (!(value&(value-1))) continue;
 
@@ -776,7 +747,7 @@ SudokuSolver.ArrowHandler = class extends SudokuSolver.ConstraintHandler {
         // Remove any values GREATER than x. Even if all other squares
         // take their minimum values, these are too big.
         if (!(value &= ((1<<x)-1))) return false;
-        grid[arrowCells[i]] = value;
+        grid[cells[i]] = value;
       }
 
       if (maxMinusSum < range) {
@@ -784,70 +755,15 @@ SudokuSolver.ArrowHandler = class extends SudokuSolver.ConstraintHandler {
         // take their maximum values, these are too small.
         let x = cellMax - maxMinusSum;
         if (!(value &= -(1<<(x-1)))) return false;
-        grid[arrowCells[i]] = value;
+        grid[cells[i]] = value;
       }
     }
-
-    // TODO: Check that we can make the current sum with the remaining values.
 
     return true;
   }
-}
 
-SudokuSolver.CageHandler = class extends SudokuSolver.ConstraintHandler {
-  constructor(cells, sum) {
-    super(cells);
-    this._sum = +sum;
-  }
-
-  enforceConsistency(grid) {
-    const cells = this.cells;
+  static restrictUniqueCells(grid, sum, cells) {
     const numCells = cells.length;
-
-    // Determine how much headroom there is in the range between the extreme
-    // values and the target sum.
-    let sumMinusMin = this._sum;
-    let maxMinusSum = -this._sum;
-    for (let i = 0; i < numCells; i++) {
-      let v = grid[cells[i]];
-      sumMinusMin -= LookupTable.MIN[v];
-      maxMinusSum += LookupTable.MAX[v];
-    }
-
-    // It is impossible to make the target sum.
-    if (sumMinusMin < 0 || maxMinusSum < 0) return false;
-    // We've reached the target sum exactly.
-    if (sumMinusMin == 0 && maxMinusSum == 0) return true;
-
-    // Remove any values which aren't possible because they would cause the sum
-    // to be too high.
-    if (sumMinusMin < GRID_SIZE || maxMinusSum < GRID_SIZE) {
-      for (let i = 0; i < numCells; i++) {
-        let value = grid[cells[i]];
-        // If there is a single value, then the range is always fine.
-        if (!(value&(value-1))) continue;
-
-        let cellMin = LookupTable.MIN[value];
-        let cellMax = LookupTable.MAX[value];
-        let range = cellMax - cellMin;
-
-        if (sumMinusMin < range) {
-          let x = sumMinusMin + cellMin;
-          // Remove any values GREATER than x. Even if all other squares
-          // take their minimum values, these are too big.
-          if (!(value &= ((1<<x)-1))) return false;
-          grid[cells[i]] = value;
-        }
-
-        if (maxMinusSum < range) {
-          // Remove any values LESS than x. Even if all other squares
-          // take their maximum values, these are too small.
-          let x = cellMax - maxMinusSum;
-          if (!(value &= -(1<<(x-1)))) return false;
-          grid[cells[i]] = value;
-        }
-      }
-    }
 
     // Check that we can make the current sum with the unfixed values remaining.
     // NOTE: This is only valid if we assume unique values.
@@ -861,11 +777,12 @@ SudokuSolver.CageHandler = class extends SudokuSolver.ConstraintHandler {
       allValues |= value;
       if (!(value&(value-1))) fixedValues |= value;
     }
+    // TODO: Check if allValues actually has numCells unique values.
     if (allValues == fixedValues) return true;
 
-    let numUnfixed = this.cells.length - LookupTable.COUNT[fixedValues];
-    let sumOptions = SudokuSolver.CageHandler.KILLER_CAGE_SUMS
-        [numUnfixed][this._sum - LookupTable.SUM[fixedValues]];
+    let numUnfixed = cells.length - LookupTable.COUNT[fixedValues];
+    let sumOptions = SumHandlerUtil.KILLER_CAGE_SUMS
+        [numUnfixed][sum - LookupTable.SUM[fixedValues]];
     if (!sumOptions) return false;
 
     let unfixedValues = allValues & ~fixedValues;
@@ -908,10 +825,6 @@ SudokuSolver.CageHandler = class extends SudokuSolver.ConstraintHandler {
     return true;
   }
 
-  conflictSet() {
-    return this.cells;
-  }
-
   static KILLER_CAGE_SUMS = (() => {
     let table = [];
     for (let n = 0; n < GRID_SIZE+1; n++) {
@@ -930,4 +843,110 @@ SudokuSolver.CageHandler = class extends SudokuSolver.ConstraintHandler {
 
     return table;
   })();
+}
+
+SudokuSolver.ArrowHandler = class extends SudokuSolver.ConstraintHandler {
+  constructor(cells) {
+    super(cells);
+    [this._sumCell, ...this._arrowCells] = cells;
+    this._uniqueArrow = false;  // Are the values in the arrow unique.
+  }
+
+  initialize(initialGrid, cellConflicts) {
+    let uniqueArrow = true;
+    let conflicts = cellConflicts[this._arrowCells[0]];
+    for (let i = 1; i < this._arrowCells.length; i++) {
+      if (!conflicts.includes(this._arrowCells[i])) {
+        uniqueArrow = false;
+        break;
+      }
+    }
+    this._uniqueArrow = uniqueArrow;
+
+    this.enforceConsistency(initialGrid);
+  }
+
+  enforceConsistency(grid) {
+    const arrowCells = this._arrowCells;
+    const numCells = arrowCells.length;
+
+    //  Determine sumMin and sumMax based on arrow.
+    let sumMin = 0;
+    let sumMax = 0;
+    for (let i = 0; i < numCells; i++) {
+      let v = grid[arrowCells[i]];
+      sumMin += LookupTable.MIN[v];
+      sumMax += LookupTable.MAX[v];
+    }
+
+    // Constraint sumCell.
+    let sums = grid[this._sumCell];
+    // Remove any values GREATER than sumMax.
+    if (sumMax < GRID_SIZE && !(sums &= ((1<<sumMax)-1))) return false;
+    // Remove any values LESS than sumMin.
+    if (sumMin > GRID_SIZE || !(sums &= -(1<<(sumMin-1)))) return false;
+    grid[this._sumCell] = sums;
+
+    // We've reached the exact sum.
+    if (sumMin == sumMax) return true;
+
+    // Determine how much headroom there is in the range between the extreme
+    // values and the target sum.
+    let sumMinusMin = LookupTable.MAX[sums] - sumMin;
+    let maxMinusSum = -LookupTable.MIN[sums] + sumMax;
+
+    if (!SumHandlerUtil.restrictValueRange(grid, this._arrowCells,
+                                           sumMinusMin, maxMinusSum)) {
+      return false;
+    }
+
+    let sum = LookupTable.VALUE[sums];
+    if (this._uniqueArrow && sum > 0) {
+      return SumHandlerUtil.restrictUniqueCells(grid, sum, this._arrowCells);
+    }
+
+    return true;
+  }
+}
+
+SudokuSolver.CageHandler = class extends SudokuSolver.ConstraintHandler {
+  constructor(cells, sum) {
+    super(cells);
+    this._sum = +sum;
+  }
+
+  enforceConsistency(grid) {
+    const cells = this.cells;
+    const numCells = cells.length;
+
+    // Determine how much headroom there is in the range between the extreme
+    // values and the target sum.
+    let sumMinusMin = this._sum;
+    let maxMinusSum = -this._sum;
+    for (let i = 0; i < numCells; i++) {
+      let v = grid[cells[i]];
+      let min = LookupTable.MIN[v];
+      let max = LookupTable.MAX[v];
+      sumMinusMin -= min;
+      maxMinusSum += max;
+    }
+
+    // It is impossible to make the target sum.
+    if (sumMinusMin < 0 || maxMinusSum < 0) return false;
+    // We've reached the target sum exactly.
+    if (sumMinusMin == 0 && maxMinusSum == 0) return true;
+
+    if (sumMinusMin < GRID_SIZE || maxMinusSum < GRID_SIZE) {
+      if (!SumHandlerUtil.restrictValueRange(grid, cells,
+                                             sumMinusMin, maxMinusSum)) {
+        return false;
+      }
+    }
+
+    return SumHandlerUtil.restrictUniqueCells(grid, this._sum, this.cells);
+  }
+
+  conflictSet() {
+    return this.cells;
+  }
 }
