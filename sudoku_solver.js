@@ -729,11 +729,9 @@ SudokuSolver.BinaryConstraintHandler = class extends SudokuSolver.ConstraintHand
 
 class SumHandlerUtil {
   static restrictValueRange(grid, cells, sumMinusMin, maxMinusSum) {
-    const numCells = cells.length;
-
     // Remove any values which aren't possible because they would cause the sum
     // to be too high.
-    for (let i = 0; i < numCells; i++) {
+    for (let i = 0; i < cells.length; i++) {
       let value = grid[cells[i]];
       // If there is a single value, then the range is always fine.
       if (!(value&(value-1))) continue;
@@ -762,7 +760,10 @@ class SumHandlerUtil {
     return true;
   }
 
-  static restrictUniqueCells(grid, sum, cells) {
+  // Restricts cell values to those sets which could make one of the provided
+  // sums.
+  // Returns 0 if no sums are possible, otherwise a bitwise OR of 1<<(sum-1).
+  static restrictUniqueCells(grid, sums, cells) {
     const numCells = cells.length;
 
     // Check that we can make the current sum with the unfixed values remaining.
@@ -777,34 +778,46 @@ class SumHandlerUtil {
       if (!(value&(value-1))) fixedValues |= value;
     }
     // Check if we have enough unique values.
-    if (LookupTable.COUNT[allValues] < numCells) return false;
+    if (LookupTable.COUNT[allValues] < numCells) return 0;
     // Check if we have fixed all the values.
-    if (allValues == fixedValues) return true;
-
-    let numUnfixed = cells.length - LookupTable.COUNT[fixedValues];
-    let sumOptions = SumHandlerUtil.KILLER_CAGE_SUMS
-        [numUnfixed][sum - LookupTable.SUM[fixedValues]];
-    if (!sumOptions) return false;
+    if (allValues == fixedValues) {
+      return 1<<(LookupTable.SUM[fixedValues]-1);
+    }
 
     let unfixedValues = allValues & ~fixedValues;
-    let possible = 0;
     let requiredUniques = uniqueValues;
-    for (let i = 0; i < sumOptions.length; i++) {
-      let option = sumOptions[i];
-      if ((option & unfixedValues) === option) {
-        possible |= option;
-        requiredUniques &= option;
+    let possibilities = 0;
+    let numUnfixed = cells.length - LookupTable.COUNT[fixedValues];
+    let unfixedCageSums = SumHandlerUtil.KILLER_CAGE_SUMS[numUnfixed];
+
+    let sumValue = 0;
+    for (let i = 0; i < sums.length; i++) {
+      let sum = sums[i];
+
+      let sumOptions = unfixedCageSums[sum - LookupTable.SUM[fixedValues]];
+      if (!sumOptions) continue;
+
+      let isPossible = false;
+      for (let j = 0; j < sumOptions.length; j++) {
+        let option = sumOptions[j];
+        if ((option & unfixedValues) === option) {
+          possibilities |= option;
+          requiredUniques &= option;
+          isPossible = true;
+        }
       }
+      if (isPossible) sumValue |= 1<<(sum-1);
     }
-    if (!possible) return false;
+
+    if (!possibilities) return 0;
 
     // Remove any values that aren't part of any solution.
-    let valuesToRemove = unfixedValues & ~possible;
+    let valuesToRemove = unfixedValues & ~possibilities;
     if (valuesToRemove) {
       for (let i = 0; i < numCells; i++) {
         // Safe to apply to every cell, since we know that none of the
         // fixedValues are in unfixedValues.
-        if (!(grid[cells[i]] &= ~valuesToRemove)) return false;
+        if (!(grid[cells[i]] &= ~valuesToRemove)) return 0;
       }
     }
 
@@ -817,13 +830,13 @@ class SumHandlerUtil {
         if (value) {
           // If we have more value that means a single cell holds more than
           // one unique value.
-          if (value&(value-1)) return false;
+          if (value&(value-1)) return 0;
           grid[cells[i]] = value;
         }
       }
     }
 
-    return true;
+    return sumValue;
   }
 
   static KILLER_CAGE_SUMS = (() => {
@@ -901,9 +914,19 @@ SudokuSolver.ArrowHandler = class extends SudokuSolver.ConstraintHandler {
       return false;
     }
 
-    let sum = LookupTable.VALUE[sums];
-    if (this._uniqueArrow && sum > 0) {
-      return SumHandlerUtil.restrictUniqueCells(grid, sum, this._arrowCells);
+    if (this._uniqueArrow) {
+      // Create a list of all the sums.
+      let sumList = [];
+      while (sums) {
+        let sumValue = sums & -sums;
+        sums &= ~sumValue;
+        sumList.push(LookupTable.VALUE[sumValue]);
+      }
+
+      // Restrict the sum and arrow cells values.
+      grid[this._sumCell] &= SumHandlerUtil.restrictUniqueCells(
+        grid, sumList, this._arrowCells);
+      if (grid[this._sumCell] === 0) return false;
     }
 
     return true;
@@ -914,6 +937,7 @@ SudokuSolver.CageHandler = class extends SudokuSolver.ConstraintHandler {
   constructor(cells, sum) {
     super(cells);
     this._sum = +sum;
+    this._sumList = [0];
   }
 
   enforceConsistency(grid) {
@@ -944,7 +968,8 @@ SudokuSolver.CageHandler = class extends SudokuSolver.ConstraintHandler {
       }
     }
 
-    return SumHandlerUtil.restrictUniqueCells(grid, this._sum, this.cells);
+    this._sumList[0] = this._sum;
+    return 0 !== SumHandlerUtil.restrictUniqueCells(grid, this._sumList, this.cells);
   }
 
   conflictSet() {
