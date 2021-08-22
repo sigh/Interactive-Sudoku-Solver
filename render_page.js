@@ -975,6 +975,9 @@ class SolutionController {
       let handler = keyHandlers[key];
       if (!handler) return;
 
+      // Prevent the keypress from affecting the fake-input field.
+      event.preventDefault();
+
       // If the key is not currently pressed, then just fire the handler and
       // record that they key has been pressed.
       // We don't want to start firing continuously as that makes it way too
