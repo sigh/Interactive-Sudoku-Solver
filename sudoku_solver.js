@@ -766,7 +766,6 @@ class SumHandlerUtil {
     const numCells = cells.length;
 
     // Check that we can make the current sum with the unfixed values remaining.
-    // NOTE: This is only valid if we assume unique values.
     let fixedValues = 0;
     let allValues = 0;
     let uniqueValues = 0;
@@ -777,7 +776,9 @@ class SumHandlerUtil {
       allValues |= value;
       if (!(value&(value-1))) fixedValues |= value;
     }
-    // TODO: Check if allValues actually has numCells unique values.
+    // Check if we have enough unique values.
+    if (LookupTable.COUNT[allValues] < numCells) return false;
+    // Check if we have fixed all the values.
     if (allValues == fixedValues) return true;
 
     let numUnfixed = cells.length - LookupTable.COUNT[fixedValues];
