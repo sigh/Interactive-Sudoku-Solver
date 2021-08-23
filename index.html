@@ -22,11 +22,18 @@
     <div id="sudoku-grid">
       <input id="fake-input" inputmode="numeric" type="text" value="x">
     </div>
-    <div id="solution-control-panel">
-      <button id="solution-start" title="start (s)">|&lt;</button>
-      <button id="solution-back" title="previous (p)">&lt;</button>
-      <span id="solution-step-output"></span>
-      <button id="solution-forward" title="next (n)">&gt;</button>
+    <div id="grid-control-buttons">
+      <div id="solution-control-panel">
+        <button id="solution-start" title="start (s)">|&lt;</button>
+        <button id="solution-back" title="previous (p)">&lt;</button>
+        <div id="solution-step-output"></div>
+        <button id="solution-forward" title="next (n)">&gt;</button>
+      </div>
+      <div>
+        <span id="solve-status"></span>
+        <span id="error-output" class="error"></span>
+      </div>
+      <button id="stop-solver" class="danger-button">Abort</button>
     </div>
   </div>
 
@@ -39,91 +46,90 @@
         <option value="step-by-step" checked>Step-by-step</option>
       </select>
     </div>
-    <div>
-      <button id="stop-solver">Abort</button>
-      <span id="solve-status"></span>
-    </div>
-    <div id="state-output">
-    </div>
-    <div id="error-output" class="error">
-    </div>
+    <div id="state-output"></div>
   </div>
 
   <div id="constraint-panel">
-    <h1>Constraints</h1>
+    <div class="two-column vcenter-items">
+      <h1>Constraints</h1>
 
-    <div>
-      <button id="clear-constraints-button">Clear</button>
+      <div>
+        <button id="clear-constraints-button" class="danger-button">Reset</button>
+      </div>
     </div>
 
-    <div>
-      <input type="checkbox" id="anti-knight-input">
-      <label for="anti-knight-input">Anti-Knight</label>
+    <div class="two-column">
+      <form id="multi-cell-constraint-input">
+        <fieldset tabindex="0" disabled>
+          <span>Create from selection</span>
+          <div>
+            <input type="radio" id="multi-cell-constraint-thermo" name="constraint-type" value="thermo" checked>
+            <label for="multi-cell-constraint-thermo">Thermometer</label>
+          </div>
+          <div>
+            <input type="radio" id="multi-cell-constraint-arrow" name="constraint-type" value="arrow">
+            <label for="multi-cell-constraint-arrow">Arrow Sum</label>
+          </div>
+          <div>
+            <input type="radio" id="multi-cell-constraint-cage" name="constraint-type" value="cage">
+            <label for="multi-cell-constraint-cage">
+              Cage
+              Sum: <input type="number" name="cage-sum" min=0>
+            </label>
+          <div>
+            <input type="radio" id="multi-cell-constraint-white-dot" name="constraint-type" value="white-dot">
+            <label for="multi-cell-constraint-white-dot">&plusmn;1</label>
+          </div>
+          <div>
+            <input type="radio" id="multi-cell-constraint-black-dot" name="constraint-type" value="black-dot">
+            <label for="multi-cell-constraint-black-dot">&times;&divide;2</label>
+          </div>
+          </div>
+          <div>
+            <button type="submit">Add</button>
+          </div>
+        </fieldset>
+      </form>
+
+      <div>
+        <div>
+          <input type="checkbox" id="anti-knight-input">
+          <label for="anti-knight-input">Anti-Knight</label>
+        </div>
+
+        <div>
+          <input type="checkbox" id="anti-king-input">
+          <label for="anti-king-input">Anti-King</label>
+        </div>
+
+        <div>
+          <input type="checkbox" id="anti-consecutive-input">
+          <label for="anti-consecutive-input">Anti-Consecutive</label>
+        </div>
+
+        <div>
+          <input type="checkbox" id="diagonal-plus-input">
+          <label for="diagonal-plus-input">&#10187; Diagonal</label>
+        </div>
+
+        <div>
+          <input type="checkbox" id="diagonal-minus-input">
+          <label for="diagonal-minus-input">&#10189; Diagonal</label>
+        </div>
+      </div>
     </div>
 
-    <div>
-      <input type="checkbox" id="anti-king-input">
-      <label for="anti-king-input">Anti-King</label>
-    </div>
+    <div id="displayed-constraints"></div>
 
-    <div>
-      <input type="checkbox" id="anti-consecutive-input">
-      <label for="anti-consecutive-input">Anti-Consecutive</label>
-    </div>
-
-    <div>
-      <input type="checkbox" id="diagonal-plus-input">
-      <label for="diagonal-plus-input">Diagonal +</label>
-    </div>
-
-    <div>
-      <input type="checkbox" id="diagonal-minus-input">
-      <label for="diagonal-minus-input">Diagonal -</label>
-    </div>
-
-    <form id="multi-cell-constraint-input">
-      <fieldset tabindex="0" disabled>
-        Create from selection
-        <div>
-          <input type="radio" id="multi-cell-constraint-thermo" name="constraint-type" value="thermo" checked>
-          <label for="multi-cell-constraint-thermo">Thermometer</label>
-        </div>
-        <div>
-          <input type="radio" id="multi-cell-constraint-arrow" name="constraint-type" value="arrow">
-          <label for="multi-cell-constraint-arrow">Arrow Sum</label>
-        </div>
-        <div>
-          <input type="radio" id="multi-cell-constraint-cage" name="constraint-type" value="cage">
-          <label for="multi-cell-constraint-cage">
-            Cage
-            Sum: <input type="number" name="cage-sum" min=0>
-          </label>
-        <div>
-          <input type="radio" id="multi-cell-constraint-white-dot" name="constraint-type" value="white-dot">
-          <label for="multi-cell-constraint-white-dot">&plusmn;1</label>
-        </div>
-        <div>
-          <input type="radio" id="multi-cell-constraint-black-dot" name="constraint-type" value="black-dot">
-          <label for="multi-cell-constraint-black-dot">&times;&divide;2</label>
-        </div>
-        </div>
-        <div>
-          <button type="submit">Add</button>
-        </div>
-      </fieldset>
-    </form>
     <form id="freeform-constraint-input">
-        <textarea id="freeform-constraint-text" name="freeform-input" rows="10"></textarea>
+        <textarea id="freeform-constraint-text" name="freeform-input" rows="4"></textarea>
         <div>
           <button type="submit">Load from text</button>
         </div>
     </form>
-
-    <div id="displayed-constraints">
-    </div>
   </div>
   <footer>
-    Code:
+    Code at
     <a href="https://github.com/sigh/Interactive-Sudoku-Solver">
       https://github.com/sigh/Interactive-Sudoku-Solver
     </a>

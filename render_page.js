@@ -476,7 +476,7 @@ class ConstraintManager {
       case 'Thermo':
         config = {
           cells: constraint.cells,
-          name: `Themo [len: ${constraint.cells.length}]`,
+          name: `Thermo [len: ${constraint.cells.length}]`,
           constraint: constraint,
           displayElem: this._display.drawThermometer(constraint.cells),
         };
@@ -556,6 +556,7 @@ class ConstraintManager {
     this._configs.splice(index, 1);
     this._display.removeItem(config.displayElem);
     this._panel.removeChild(config.panelItem);
+    this._grid.highlight.setCells([]);
   }
 
   _addToPanel(config) {

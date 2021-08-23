@@ -4,6 +4,8 @@
   display: inline-grid;
   grid-template-columns: repeat(9, 52px);
   grid-template-rows: repeat(9, 52px);
+
+  box-shadow: 3px 3px 10px;
 }
 
 .sudoku-grid-background {
@@ -68,8 +70,38 @@ body > div {
 
 button {
   font-size: 16px;
+  border-radius:5px;
+  color:#ffffff;
+
+  border:1px solid #124d77;
+  background:linear-gradient(to bottom, #2dabf9 5%, #0688fa 100%);
+  background-color:#2dabf9;
+  text-shadow:0px 1px 0px #263666;
+
   padding: 5px 15px;
   margin: 5px 0px;
+}
+button:hover {
+  background:linear-gradient(to bottom, #0688fa 5%, #2dabf9 100%);
+  background-color:#0688fa;
+}
+button:disabled {
+  opacity: 0.5;
+}
+button:active {
+  position:relative;
+  top:1px;
+}
+
+button.danger-button {
+  border-color: #942911;
+  background:linear-gradient(to bottom, #d0451b 5%, #bc3315 100%);
+  background-color:#d0451b;
+  text-shadow:0px 1px 0px #854629;
+}
+button.danger-button:hover {
+  background:linear-gradient(to bottom, #bc3315 5%, #d0451b 100%);
+  background-color:#bc3315;
 }
 
 #display-panel > div {
@@ -86,12 +118,15 @@ button {
 
 .error {
   color: rgb(200, 0, 0);
+  font-weight: bold;
 }
 
 #displayed-constraints {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  width: 300px;
+
+  background: rgba(0,0,255,0.1);
+  border-radius: 10px;
 }
 
 .constraint-item {
@@ -109,7 +144,6 @@ button {
 }
 
 #constraint-panel h1 {
-  margin-top: 0px;
   font-size: 20px;
   line-height: 1;
 }
@@ -126,23 +160,41 @@ fieldset[disabled]{
   color: grey;
 }
 
+fieldset {
+  border: none;
+  background: rgb(0,0,255,0.1);
+  border-radius: 10px;
+  width: fit-content;
+}
+fieldset > span {
+  font-size: 18px;
+}
+
 textarea {
   margin: 10px 0px;
 }
 
-#solution-control-panel {
-  margin: 10px auto;
-  text-align: center;
+#grid-control-buttons {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 10px 0px;
 }
-
+#grid-control-buttons button {
+  height: 50px;
+  margin: 0 10px;
+}
 #solution-control-panel button {
   font-size: x-large;
   font-weight: bold;
   letter-spacing: -5px;
   font-family: monospace;
-  height: 50px;
   width: 50px;
-  margin: 0 10px;
+}
+#solution-step-output {
+  display: inline-block;
+  min-width: 40px;
+  text-align: center;
 }
 
 #display-panel {
@@ -152,7 +204,6 @@ textarea {
 #solve-status {
   font-weight: bold;
   color: darkviolet;
-  margin: 0px 20px;
 }
 #solve-status:empty:after {
   content: '.';
@@ -196,7 +247,17 @@ textarea {
 
 #solve-mode-input {
   font-size: 16px;
-  padding: 5px 25px;
+  padding: 5px 10px;
   text-align: center;
   text-align-last: center;
+  margin: 10px 0;
+}
+
+.two-column {
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+}
+.vcenter-items {
+  align-items: center;
 }
