@@ -63,7 +63,13 @@ body > div {
   display: inline-block;
   vertical-align: top;
   font-family: sans-serif;
-  margin: 10px;
+  margin: 15px;
+}
+
+button {
+  font-size: 16px;
+  padding: 5px 15px;
+  margin: 5px 0px;
 }
 
 #display-panel > div {
@@ -104,7 +110,7 @@ body > div {
 
 #constraint-panel h1 {
   margin-top: 0px;
-  font-size: large;
+  font-size: 20px;
   line-height: 1;
 }
 
@@ -134,13 +140,13 @@ textarea {
   font-weight: bold;
   letter-spacing: -5px;
   font-family: monospace;
-  height: 40px;
-  width: 40px;
+  height: 50px;
+  width: 50px;
+  margin: 0 10px;
 }
 
 #display-panel {
   line-height: 2;
-  width: 300px;
 }
 
 #solve-status {
@@ -165,4 +171,32 @@ textarea {
   /* Required to stop auto-zooming on mobile. */
   width: 1em;
   font-size: 16px;
+}
+
+#state-output {
+  font-size: 12px;
+}
+
+#state-output > div {
+  margin: 10px 0;
+}
+
+#state-output span {
+  display: block;
+  line-height: 120%;
+}
+
+#state-output > div:first-of-type {
+  font-size: 16px;
+}
+
+.state-output-title {
+  color: grey;
+}
+
+#solve-mode-input {
+  font-size: 16px;
+  padding: 5px 25px;
+  text-align: center;
+  text-align-last: center;
 }

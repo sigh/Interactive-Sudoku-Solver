@@ -9,3 +9,13 @@ while making it easy to explore the solution space including:
  - Stepping through the solving process.
 
  It does not aim to follow human alogrithms for solving sodoku.
+
+See it in action at http://sigh.github.io/Interactive-Sudoku-Solver
+
+## Running locally
+
+Run locally using [Jekyll](https://jekyllrb.com/):
+
+```
+$ jekyll serve
+```

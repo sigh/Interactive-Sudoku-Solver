@@ -1001,6 +1001,7 @@ class SolutionController {
 
     this._setUpKeyBindings();
 
+    this._setUpStateOutput();
     this._displayStateVariables =
       deferUntilAnimationFrame(this._displayStateVariables.bind(this));
 
@@ -1130,29 +1131,49 @@ class SolutionController {
     container.appendChild(elem);
   }
 
-  _displayStateVariables(state) {
-    let counters = state.counters;
-
+  _setUpStateOutput() {
     let container = this._elements.stateOutput;
-    container.innerHTML = '';
+    let vars = [
+      'solutions',
+      'guesses',
+      'backtracks',
+      'cellsSearched',
+      'valuesTried',
+      'constraintsProcessed',
+      'runtime',
+    ];
+    this._stateVars = {};
+    for (const v of vars) {
+      let elem = document.createElement('div');
+      let value = document.createElement('span');
+      let title = document.createElement('span');
+      title.textContent = camelCaseToWords(v);
+      title.className = 'state-output-title';
+      elem.appendChild(value);
+      elem.appendChild(title);
+      container.appendChild(elem);
 
-    let solutionText = counters.solutions + (state.done ? '' : '+');
-    SolutionController._addStateVariable(
-      container, '# Solutions', solutionText);
+      this._stateVars[v] = value;
+    }
+  }
 
-    SolutionController._addStateVariable(container,
-      '# Guesses', counters.guesses);
-    SolutionController._addStateVariable(container,
-      '# Backtracks', counters.backtracks);
-    SolutionController._addStateVariable(container,
-      '# Cells searched', counters.cellsSearched);
-    SolutionController._addStateVariable(container,
-      '# Values tried', counters.valuesSearched);
-    SolutionController._addStateVariable(container,
-      '# Constraints processed', counters.constraintsProcessed);
+  _displayStateVariables(state) {
+    const counters = state.counters;
 
-    SolutionController._addStateVariable(
-      container, 'Runtime', formatTimeMs(state.timeMs));
+    for (const v in this._stateVars) {
+      let text;
+      switch (v) {
+        case 'solutions':
+          text = counters.solutions + (state.done ? '' : '+');
+          break;
+        case 'runtime':
+          text = formatTimeMs(state.timeMs);
+          break;
+        default:
+          text = counters[v];
+      }
+      this._stateVars[v].textContent = text;
+    }
   }
 
   _displayState(state) {
@@ -1173,7 +1194,7 @@ class SolutionController {
     if (result.isSolution) {
       this._elements.solveStatus.textContent = 'Solution';
     } else if (result.hasContradiction) {
-      this._elements.solveStatus.textContent = 'Contradiction';
+      this._elements.solveStatus.textContent = 'Conflict';
     }
   }
 

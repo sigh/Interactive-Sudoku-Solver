@@ -7,7 +7,12 @@ const formatTimeMs = (timeMs) => {
 
 const createSvgElement = (tag) => {
   return document.createElementNS('http://www.w3.org/2000/svg', tag);
-}
+};
+
+const camelCaseToWords = (text) => {
+  text = text.replace(/([A-Z])/g, " $1").toLowerCase();
+  return text[0].toUpperCase() + text.slice(1);
+};
 
 const deferUntilAnimationFrame = (fn) => {
   let lastArgs = null;

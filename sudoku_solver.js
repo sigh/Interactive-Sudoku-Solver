@@ -214,7 +214,7 @@ class SudokuSolver {
 
   state() {
     let counters = {...this._internalSolver.counters};
-    counters.backtracks = counters.valuesSearched - counters.cellsSearched;
+    counters.backtracks = counters.valuesTried - counters.cellsSearched;
 
     return {
       counters: counters,
@@ -321,7 +321,7 @@ SudokuSolver.InternalSolver = class {
   reset() {
     this._iter = null;
     this.counters = {
-      valuesSearched: 0,
+      valuesTried: 0,
       cellsSearched: 0,
       guesses: 0,
       solutions: 0,
@@ -475,7 +475,7 @@ SudokuSolver.InternalSolver = class {
       let value = values & -values;
       grid[cell] &= ~value;
 
-      counters.valuesSearched++;
+      counters.valuesTried++;
       if (value != values) counters.guesses++;
 
       // Copy current cell values.
@@ -487,7 +487,7 @@ SudokuSolver.InternalSolver = class {
       grid[cell] = value;
       let hasContradiction = !this._enforceValue(grid, value, cell);
 
-      if (counters.valuesSearched % progressFrequency == 0) {
+      if (counters.valuesTried % progressFrequency == 0) {
         this._progress.callback();
       }
       if (yieldEveryStep) {
