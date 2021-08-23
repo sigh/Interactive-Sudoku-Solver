@@ -232,6 +232,20 @@ class SudokuConstraint {
     }
   }
 
+  static WhiteDot = class WhiteDot extends SudokuConstraint {
+    constructor(...cells) {
+      super(arguments);
+      this.cells = cells;
+    }
+  }
+
+  static BlackDot = class BlackDot extends SudokuConstraint {
+    constructor(...cells) {
+      super(arguments);
+      this.cells = cells;
+    }
+  }
+
   static Arrow = class Arrow extends SudokuConstraint {
     constructor(...cells) {
       super(arguments);
@@ -388,6 +402,18 @@ class SudokuBuilder {
         for (const c of constraint.constraints) {
           yield* this._constraintHandlers(c);
         }
+        break;
+
+      case 'WhiteDot':
+        cells = constraint.cells.map(c => parseCellId(c).cell);
+        yield new SudokuSolver.BinaryConstraintHandler(
+          cells[0], cells[1], (a, b) => a == b+1 || a == b-1);
+        break;
+
+      case 'BlackDot':
+        cells = constraint.cells.map(c => parseCellId(c).cell);
+        yield new SudokuSolver.BinaryConstraintHandler(
+          cells[0], cells[1], (a, b) => a == b*2 || b == a*2);
         break;
 
       default:

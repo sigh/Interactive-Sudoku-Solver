@@ -161,6 +161,28 @@ class ConstraintDisplay {
     return cage;
   }
 
+  drawDot(cells, fillColor) {
+    if (cells.length != 2) throw(`White dot must be two cells: ${cells}`)
+
+    // Find the midpoint between the squares.
+    let [x0, y0] = ConstraintDisplay.cellCenter(cells[0]);
+    let [x1, y1] = ConstraintDisplay.cellCenter(cells[1]);
+    let x = (x0+x1)/2;
+    let y = (y0+y1)/2;
+
+    let dot = createSvgElement('circle');
+    dot.setAttribute('fill', fillColor);
+    dot.setAttribute('stroke', 'black');
+    dot.setAttribute('stroke-width', 1);
+    dot.setAttribute('cx', x);
+    dot.setAttribute('cy', y);
+    dot.setAttribute('r', 4);
+
+    this._svg.append(dot);
+
+    return dot;
+  }
+
   drawArrow(cells) {
     if (cells.length < 2) throw(`Arrow too short: ${cells}`)
 
@@ -355,11 +377,24 @@ class ConstraintManager {
     this.updateCallback(this);
   }
 
+  _cellsAreAdjacent(cells) {
+    if (cells.length != 2) return false;
+    // Manhatten distance is exactly 1.
+    let cell0 = parseCellId(cells[0]);
+    let cell1 = parseCellId(cells[1]);
+    return 1 == Math.abs(cell0.row - cell1.row) + Math.abs(cell0.col - cell1.col);
+  }
+
   _setUpPanel() {
     this._panel = document.getElementById('displayed-constraints');
 
     this._checkboxConstraints = new CheckboxConstraints(
       this._display, this.runUpdateCallback.bind(this));
+
+    let adjacentOnlyConstraints = [
+      document.getElementById('multi-cell-constraint-white-dot'),
+      document.getElementById('multi-cell-constraint-black-dot'),
+    ];
 
     this._selectionFrom = document.getElementById('multi-cell-constraint-input');
     this._grid.selection.addCallback((selection) => {
@@ -367,6 +402,10 @@ class ConstraintManager {
       this._selectionFrom.firstElementChild.disabled = disabled;
       // Focus on the submit button so that that we can immediately press enter.
       if (!disabled) {
+        let cellsAreAdjacent = this._cellsAreAdjacent(selection);
+        for (let c of adjacentOnlyConstraints) {
+          c.disabled = !cellsAreAdjacent;
+        }
         this._selectionFrom.querySelector('button[type=submit]').focus();
       }
     });
@@ -403,6 +442,26 @@ class ConstraintManager {
     switch (constraint.type) {
       case 'FixedValues':
         this._grid.setCellValues(constraint.values);
+        break;
+      case 'BlackDot':
+        config = {
+          cells: constraint.cells,
+          name: `&#9679; [${constraint.cells}]`,
+          constraint: constraint,
+          displayElem: this._display.drawDot(constraint.cells, 'black'),
+        };
+        this._addToPanel(config);
+        this._configs.push(config);
+        break;
+      case 'WhiteDot':
+        config = {
+          cells: constraint.cells,
+          name: `&#9675 [${constraint.cells}]`,
+          constraint: constraint,
+          displayElem: this._display.drawDot(constraint.cells, 'white'),
+        };
+        this._addToPanel(config);
+        this._configs.push(config);
         break;
       case 'Arrow':
         config = {
@@ -478,6 +537,14 @@ class ConstraintManager {
         constraint = new SudokuConstraint.Thermo(...cells);
         this.loadConstraint(constraint);
         break;
+      case 'white-dot':
+        constraint = new SudokuConstraint.WhiteDot(...cells);
+        this.loadConstraint(constraint);
+        break;
+      case 'black-dot':
+        constraint = new SudokuConstraint.BlackDot(...cells);
+        this.loadConstraint(constraint);
+        break;
     }
 
     this._grid.selection.setCells([]);
@@ -500,7 +567,7 @@ class ConstraintManager {
     panelItem.appendChild(panelButton);
 
     let panelLabel = document.createElement('span');
-    panelLabel.textContent = config.name;
+    panelLabel.innerHTML = config.name;
     panelItem.appendChild(panelLabel);
 
     config.panelItem = panelItem;

@@ -763,7 +763,7 @@ class SumHandlerUtil {
   // Restricts cell values to those sets which could make one of the provided
   // sums.
   // Returns 0 if no sums are possible, otherwise a bitwise OR of 1<<(sum-1).
-  static restrictUniqueCells(grid, sums, cells) {
+  static restrictCellsUnique(grid, sums, cells) {
     const numCells = cells.length;
 
     // Check that we can make the current sum with the unfixed values remaining.
@@ -781,7 +781,9 @@ class SumHandlerUtil {
     if (LookupTable.COUNT[allValues] < numCells) return 0;
     // Check if we have fixed all the values.
     if (allValues == fixedValues) {
-      return 1<<(LookupTable.SUM[fixedValues]-1);
+      let sum = LookupTable.SUM[fixedValues];
+      if (sums.length == 1 && sum != sums[0]) return 0;
+      return 1<<(sum-1);
     }
 
     let unfixedValues = allValues & ~fixedValues;
@@ -924,7 +926,7 @@ SudokuSolver.ArrowHandler = class extends SudokuSolver.ConstraintHandler {
       }
 
       // Restrict the sum and arrow cells values.
-      grid[this._sumCell] &= SumHandlerUtil.restrictUniqueCells(
+      grid[this._sumCell] &= SumHandlerUtil.restrictCellsUnique(
         grid, sumList, this._arrowCells);
       if (grid[this._sumCell] === 0) return false;
     }
@@ -969,7 +971,7 @@ SudokuSolver.CageHandler = class extends SudokuSolver.ConstraintHandler {
     }
 
     this._sumList[0] = this._sum;
-    return 0 !== SumHandlerUtil.restrictUniqueCells(grid, this._sumList, this.cells);
+    return 0 !== SumHandlerUtil.restrictCellsUnique(grid, this._sumList, this.cells);
   }
 
   conflictSet() {
