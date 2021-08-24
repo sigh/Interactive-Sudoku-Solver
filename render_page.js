@@ -116,6 +116,9 @@ class ConstraintDisplay {
     return `rgb(${Math.random()*255|0},${Math.random()*255|0},${Math.random()*255|0})`;
   }
 
+  _svgHighlightRegion(svg, cells) {
+  }
+
   drawKillerCage(cells, sum) {
     const cellWidth = CELL_SIZE-1;
     let x,y;
@@ -494,6 +497,17 @@ class ConstraintManager {
         this._addToPanel(config);
         this._configs.push(config);
         break;
+      case 'Sum':
+        config = {
+          cells: constraint.cells,
+          name: `Sum (${constraint.sum})`,
+          constraint: constraint,
+          displayElem: this._display.drawKillerCage(
+            constraint.cells, constraint.sum),
+        };
+        this._addToPanel(config);
+        this._configs.push(config);
+        break;
       case 'AntiKnight':
         this._checkboxConstraints.check('antiKnight');
         break;
@@ -531,6 +545,10 @@ class ConstraintManager {
         break;
       case 'cage':
         constraint = new SudokuConstraint.Cage(+formData.get('cage-sum'), ...cells);
+        this.loadConstraint(constraint);
+        break;
+      case 'diag-sum':
+        constraint = new SudokuConstraint.Sum(+formData.get('diag-sum'), ...cells);
         this.loadConstraint(constraint);
         break;
       case 'thermo':

@@ -164,7 +164,7 @@ button.danger-button:hover:enabled {
 }
 
 input[type=number]{
- width: 3em;
+ width: 4em;
 }
 
 fieldset[disabled]{

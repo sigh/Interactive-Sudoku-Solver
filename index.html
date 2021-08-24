@@ -73,9 +73,17 @@
           <div>
             <input type="radio" id="multi-cell-constraint-cage" name="constraint-type" value="cage">
             <label for="multi-cell-constraint-cage">
-              Cage
-              Sum: <input type="number" name="cage-sum" min=0>
+              Killer Cage
+              <input type="number" name="cage-sum" min=0 placeholder="sum">
             </label>
+          </div>
+          <div>
+            <input type="radio" id="multi-cell-constraint-diag-sum" name="constraint-type" value="diag-sum">
+            <label for="multi-cell-constraint-diag-sum">
+              Little Killer
+              <input type="number" name="diag-sum" min=0 placeholder="sum">
+            </label>
+          </div>
           <div>
             <input type="radio" id="multi-cell-constraint-white-dot" name="constraint-type" value="white-dot">
             <label for="multi-cell-constraint-white-dot">&plusmn;1</label>
@@ -83,7 +91,6 @@
           <div>
             <input type="radio" id="multi-cell-constraint-black-dot" name="constraint-type" value="black-dot">
             <label for="multi-cell-constraint-black-dot">&times;&divide;2</label>
-          </div>
           </div>
           <div>
             <button type="submit">Add</button>

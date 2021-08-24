@@ -261,6 +261,14 @@ class SudokuConstraint {
     }
   }
 
+  static Sum = class Sum extends SudokuConstraint {
+    constructor(sum, ...cells) {
+      super(arguments);
+      this.cells = cells;
+      this.sum = sum;
+    }
+  }
+
   static AllDifferent = class AllDifferent extends SudokuConstraint {
     constructor(...cells) {
       super(arguments);
@@ -374,6 +382,11 @@ class SudokuBuilder {
       case 'Cage':
         cells = constraint.cells.map(c => parseCellId(c).cell);
         yield new SudokuSolver.CageHandler(cells, constraint.sum);
+        break;
+
+      case 'Sum':
+        cells = constraint.cells.map(c => parseCellId(c).cell);
+        yield new SudokuSolver.SumHandler(cells, constraint.sum);
         break;
 
       case 'AllDifferent':
