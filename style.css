@@ -81,7 +81,7 @@ button {
   padding: 5px 15px;
   margin: 5px 0px;
 }
-button:hover {
+button:hover:enabled {
   background:linear-gradient(to bottom, #0688fa 5%, #2dabf9 100%);
   background-color:#0688fa;
 }
@@ -99,7 +99,7 @@ button.danger-button {
   background-color:#d0451b;
   text-shadow:0px 1px 0px #854629;
 }
-button.danger-button:hover {
+button.danger-button:hover:enabled {
   background:linear-gradient(to bottom, #bc3315 5%, #d0451b 100%);
   background-color:#bc3315;
 }
@@ -131,16 +131,27 @@ button.danger-button:hover {
 
 .constraint-item {
   cursor: default;
+  display: flex;
+  align-items: center;
+  border-radius: 10px;
+  background: rgba(255,255,0,0.5);
+  margin: 5px;
 }
 
 .constraint-item button {
   border: 0px;
-  color: grey;
+  color: #d0451b;
   background: transparent;
+  font-size: 25px;
   cursor: pointer;
+  margin: 0px;
+  padding: auto;
+}
+.constraint-item:hover {
+  background: rgba(255,255,0,0.8);
 }
 .constraint-item button:hover {
-  color: black;
+  color: #bc3315;
 }
 
 #constraint-panel h1 {
@@ -174,22 +185,30 @@ textarea {
   margin: 10px 0px;
 }
 
-#grid-control-buttons {
+.control-panel {
   display: flex;
-  justify-content: space-between;
   align-items: center;
   margin: 10px 0px;
+  gap: 15px;
 }
-#grid-control-buttons button {
+.control-panel button {
   height: 50px;
-  margin: 0 10px;
+  min-width: 50px;
 }
-#solution-control-panel button {
-  font-size: x-large;
-  font-weight: bold;
-  letter-spacing: -5px;
-  font-family: monospace;
+#grid-control-buttons {
+  justify-content: space-between;
+}
+#solution-control-panel {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+button.icon-button {
+  height: 50px;
   width: 50px;
+  font-size: 25px;
+  font-weight: bold;
+  padding: 0px;
 }
 #solution-step-output {
   display: inline-block;

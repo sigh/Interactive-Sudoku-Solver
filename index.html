@@ -22,12 +22,12 @@
     <div id="sudoku-grid">
       <input id="fake-input" inputmode="numeric" type="text" value="x">
     </div>
-    <div id="grid-control-buttons">
+    <div id="grid-control-buttons" class="control-panel">
       <div id="solution-control-panel">
-        <button id="solution-start" title="start (s)">|&lt;</button>
-        <button id="solution-back" title="previous (p)">&lt;</button>
+        <button id="solution-start" class="icon-button" title="start (s)">&#171;</button>
+        <button id="solution-back" class="icon-button" title="previous (p)">&#8249;</button>
         <div id="solution-step-output"></div>
-        <button id="solution-forward" title="next (n)">&gt;</button>
+        <button id="solution-forward" class="icon-button" title="next (n)">&#8250;</button>
       </div>
       <div>
         <span id="solve-status"></span>
@@ -50,12 +50,12 @@
   </div>
 
   <div id="constraint-panel">
-    <div class="two-column vcenter-items">
-      <h1>Constraints</h1>
+    <h1>Constraints</h1>
 
-      <div>
-        <button id="clear-constraints-button" class="danger-button">Reset</button>
-      </div>
+    <div class="control-panel">
+        <button id="clear-constraints-button" class="danger-button">Clear</button>
+        <button id="undo-button" class="icon-button" title="undo" disabled>&#10226;</button>
+        <button id="redo-button" class="icon-button" title="redo" disabled>&#10227;</button>
     </div>
 
     <div class="two-column">

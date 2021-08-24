@@ -446,7 +446,7 @@ class ConstraintManager {
       case 'BlackDot':
         config = {
           cells: constraint.cells,
-          name: `&#9679; [${constraint.cells}]`,
+          name: `&#9679; (${constraint.cells})`,
           constraint: constraint,
           displayElem: this._display.drawDot(constraint.cells, 'black'),
         };
@@ -456,7 +456,7 @@ class ConstraintManager {
       case 'WhiteDot':
         config = {
           cells: constraint.cells,
-          name: `&#9675 [${constraint.cells}]`,
+          name: `&#9675 (${constraint.cells})`,
           constraint: constraint,
           displayElem: this._display.drawDot(constraint.cells, 'white'),
         };
@@ -466,7 +466,7 @@ class ConstraintManager {
       case 'Arrow':
         config = {
           cells: constraint.cells,
-          name: `Arrow [len: ${constraint.cells.length-1}]`,
+          name: `Arrow (${constraint.cells.length-1}-cell)`,
           constraint: constraint,
           displayElem: this._display.drawArrow(constraint.cells),
         };
@@ -476,7 +476,7 @@ class ConstraintManager {
       case 'Thermo':
         config = {
           cells: constraint.cells,
-          name: `Thermo [len: ${constraint.cells.length}]`,
+          name: `Thermo (${constraint.cells.length}-cell)`,
           constraint: constraint,
           displayElem: this._display.drawThermometer(constraint.cells),
         };
@@ -486,7 +486,7 @@ class ConstraintManager {
       case 'Cage':
         config = {
           cells: constraint.cells,
-          name: `Cage [sum: ${constraint.sum}]`,
+          name: `Cage (${constraint.sum})`,
           constraint: constraint,
           displayElem: this._display.drawKillerCage(
             constraint.cells, constraint.sum),
@@ -946,18 +946,68 @@ class SudokuGrid {
   }
 }
 
-class UrlHandler {
+class HistoryHandler {
+  MAX_HISTORY = 50;
+  HISTORY_ADJUSTMENT = 10;
+
   constructor(onUpdate) {
-    this.allowUrlUpdates = false;
-    this._onUpdate = onUpdate;
+    this._blockHistoryUpdates = false;
+    this._onUpdate = (params) => {
+      this._blockHistoryUpdates = true;
+      onUpdate(params);
+      this._blockHistoryUpdates = false;
+    }
+
+    this._history = [];
+    this._historyLocation = -1;
+
+    this._undoButton = document.getElementById('undo-button');
+    this._undoButton.onclick = () => this._incrementHistory(-1);
+    this._redoButton = document.getElementById('redo-button');
+    this._redoButton.onclick = () => this._incrementHistory(+1);
 
     window.onpopstate = this._reloadFromUrl.bind(this);
     this._reloadFromUrl();
   }
 
   update(params) {
-    if (!this.allowUrlUpdates) return;
+    if (this._blockHistoryUpdates) return;
+    let q = '' + (params.q||'');
 
+    this._addToHistory(q);
+    this._updateUrl(params);
+  }
+
+  _addToHistory(q) {
+    if (q == this._history[this._historyLocation]) return;
+    this._history.length = this._historyLocation + 1;
+    this._history.push(q||'');
+    this._historyLocation++;
+
+    if (this._history.length > HistoryHandler.MAX_HISTORY) {
+      this._history = this._history.slice(HISTORY_ADJUSTMENT);
+      this._historyLocation -= HISTORY_ADJUSTMENT;
+    }
+
+    this._updateButtons();
+  }
+
+  _incrementHistory(delta) {
+    let q = this._history[this._historyLocation+delta];
+    if (q === undefined) return;
+    this._historyLocation += delta;
+    this._updateButtons();
+
+    this._updateUrl({q: q});
+    this._onUpdate(new URLSearchParams({q: q}));
+  }
+
+  _updateButtons() {
+    this._undoButton.disabled = this._historyLocation <= 0;
+    this._redoButton.disabled = this._historyLocation >= this._history.length - 1;
+  }
+
+  _updateUrl(params) {
     let url = new URL(window.location.href);
 
     for (const [key, value] of Object.entries(params)) {
@@ -972,6 +1022,7 @@ class UrlHandler {
 
   _reloadFromUrl() {
     let url = new URL(window.location.href);
+    this._addToHistory(url.searchParams.get('q'));
     this._onUpdate(url.searchParams);
   }
 }
@@ -1006,7 +1057,7 @@ class SolutionController {
     this._displayStateVariables =
       deferUntilAnimationFrame(this._displayStateVariables.bind(this));
 
-    this._urlHandler = new UrlHandler((params) => {
+    this._historyHandler = new HistoryHandler((params) => {
       let mode = params.get('mode');
       if (mode) this._elements.mode.value = mode;
 
@@ -1016,9 +1067,7 @@ class SolutionController {
       }
     });
 
-    this._update().then(() => {
-      this._urlHandler.allowUrlUpdates = true;
-    });
+    this._update();
   }
 
   _setUpKeyBindings() {
@@ -1089,7 +1138,7 @@ class SolutionController {
   async _update() {
     let constraints = this._constraintManager.getConstraints();
     let mode = this._elements.mode.value;
-    this._urlHandler.update({mode: mode, q: constraints});
+    this._historyHandler.update({mode: mode, q: constraints});
 
     let solver = await this._replaceSolver(constraints);
 
