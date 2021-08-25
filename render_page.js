@@ -1,5 +1,3 @@
-const CELL_SIZE = 52;
-
 // Make these variables global so that we can easily access them from the
 // console.
 let grid, constraintManager, controller;
@@ -12,281 +10,6 @@ const initPage = () => {
 
   controller = new SolutionController(constraintManager, grid);
 };
-
-class ConstraintDisplay {
-  constructor(svg) {
-    this._svg = svg;
-    this.clear();  // clear() to initialize.
-  }
-
-  static makeDisplay(container) {
-    let svg = createSvgElement('svg');
-    svg.setAttribute('height', CELL_SIZE * GRID_SIZE);
-    svg.setAttribute('width', CELL_SIZE * GRID_SIZE);
-    svg.classList.add('sudoku-grid-background');
-
-    // Reuasable arrowhead marker.
-    let arrowhead = createSvgElement('marker');
-    arrowhead.id = 'arrowhead';
-    arrowhead.className.baseVal = 'keep-in-svg';
-    arrowhead.setAttribute('refX', '3');
-    arrowhead.setAttribute('refY', '3');
-    arrowhead.setAttribute('markerWidth', '4');
-    arrowhead.setAttribute('markerHeight', '7');
-    arrowhead.setAttribute('orient', 'auto');
-    let arrowPath = createSvgElement('path');
-    arrowPath.setAttribute('d', 'M 0 0 L 3 3 L 0 6');
-    arrowPath.setAttribute('fill', 'none');
-    arrowPath.setAttribute('stroke-width', 1);
-    arrowPath.setAttribute('stroke', 'rgb(200, 200, 200)');
-    arrowhead.appendChild(arrowPath);
-    svg.append(arrowhead);
-
-    container.prepend(svg);
-
-    return new ConstraintDisplay(svg);
-  }
-
-  static cellCenter(cellId) {
-    let {row, col} = parseCellId(cellId);
-    return [col*CELL_SIZE + CELL_SIZE/2, row*CELL_SIZE + CELL_SIZE/2];
-  }
-
-  clear() {
-    let svg = this._svg;
-    while (svg.lastChild.className.baseVal != 'keep-in-svg') {
-      svg.removeChild(svg.lastChild);
-    }
-    this.killerCellColors = new Map();
-    this.killerCages = new Map();
-    this._diagonals = [null, null];
-  }
-
-  removeItem(item) {
-    this._svg.removeChild(item);
-    if (this.killerCages.has(item)) {
-      for (const cellId of this.killerCages.get(item)) {
-        this.killerCellColors.delete(cellId);
-      }
-      this.killerCages.delete(item);
-    }
-  }
-
-  static _addTextBackground(elem) {
-    let bbox = elem.getBBox();
-    let rect = createSvgElement('rect');
-
-    rect.setAttribute('x', bbox.x);
-    rect.setAttribute('y', bbox.y);
-    rect.setAttribute('width', bbox.width);
-    rect.setAttribute('height', bbox.height);
-
-    elem.parentNode.insertBefore(rect, elem);
-    return rect;
-  }
-
-  static KILLER_CAGE_COLORS = [
-    'green',
-    'red',
-    'blue',
-    'yellow',
-    'cyan',
-    'brown',
-    'black',
-    'purple',
-    'orange',
-  ];
-
-  _chooseKillerCageColor(cellIds) {
-    // Use a greedy algorithm to choose the graph color.
-    let conflictingColors = new Set();
-    for (const cellId of cellIds) {
-      let {row, col} = parseCellId(cellId);
-      // Lookup all  adjacent cells, it doesn't matter if they valid or not.
-      conflictingColors.add(this.killerCellColors.get(toCellId(row, col+1)));
-      conflictingColors.add(this.killerCellColors.get(toCellId(row, col-1)));
-      conflictingColors.add(this.killerCellColors.get(toCellId(row+1, col)));
-      conflictingColors.add(this.killerCellColors.get(toCellId(row-1, col)));
-    }
-    // Return the first color that doesn't conflict.
-    for (const color of this.constructor.KILLER_CAGE_COLORS) {
-      if (!conflictingColors.has(color)) return color;
-    }
-    // Otherwse select a random color.
-    return `rgb(${Math.random()*255|0},${Math.random()*255|0},${Math.random()*255|0})`;
-  }
-
-  _svgHighlightRegion(svg, cells) {
-  }
-
-  drawKillerCage(cells, sum) {
-    const cellWidth = CELL_SIZE-1;
-    let x,y;
-
-    let cage = createSvgElement('svg');
-    let color = this._chooseKillerCageColor(cells);
-
-    for (const cell of cells) {
-      [x, y] = ConstraintDisplay.cellCenter(cell);
-      let path = createSvgElement('path');
-      let directions = [
-        'M', x-cellWidth/2+1, y-cellWidth/2+1,
-        'l', 0, cellWidth,
-        'l', cellWidth, 0,
-        'l', 0, -cellWidth,
-        'l', -cellWidth, 0,
-      ];
-      path.setAttribute('d', directions.join(' '));
-      path.setAttribute('fill', color);
-      path.setAttribute('opacity', '0.1');
-      cage.appendChild(path);
-    }
-    this.killerCages.set(cage, [...cells]);
-    cells.forEach(cell => this.killerCellColors.set(cell, color));
-
-    // Draw the sum in the top-left most cell. Luckly, this is the sort order.
-    cells.sort();
-    [x, y] = ConstraintDisplay.cellCenter(cells[0]);
-
-    let text = createSvgElement('text');
-    text.appendChild(document.createTextNode(sum));
-    text.setAttribute('x', x - cellWidth/2 + 1);
-    text.setAttribute('y', y - cellWidth/2 + 2);
-    text.setAttribute('dominant-baseline', 'hanging');
-    text.setAttribute('style',
-      'font-size: 10; font-family: monospace; font-weight: bold;');
-    cage.append(text);
-    this._svg.append(cage);
-
-    let textBackground = ConstraintDisplay._addTextBackground(text);
-    textBackground.setAttribute('fill', 'rgb(200, 200, 200)');
-
-    return cage;
-  }
-
-  drawDot(cells, fillColor) {
-    if (cells.length != 2) throw(`White dot must be two cells: ${cells}`)
-
-    // Find the midpoint between the squares.
-    let [x0, y0] = ConstraintDisplay.cellCenter(cells[0]);
-    let [x1, y1] = ConstraintDisplay.cellCenter(cells[1]);
-    let x = (x0+x1)/2;
-    let y = (y0+y1)/2;
-
-    let dot = createSvgElement('circle');
-    dot.setAttribute('fill', fillColor);
-    dot.setAttribute('stroke', 'black');
-    dot.setAttribute('stroke-width', 1);
-    dot.setAttribute('cx', x);
-    dot.setAttribute('cy', y);
-    dot.setAttribute('r', 4);
-
-    this._svg.append(dot);
-
-    return dot;
-  }
-
-  drawArrow(cells) {
-    if (cells.length < 2) throw(`Arrow too short: ${cells}`)
-
-    let arrow = createSvgElement('svg');
-    arrow.setAttribute('fill', 'transparent');
-    arrow.setAttribute('stroke', 'rgb(200, 200, 200)');
-    arrow.setAttribute('stroke-width', 3);
-    arrow.setAttribute('stroke-linecap', 'round');
-
-    let x, y;
-    // Draw the circle.
-    [x, y] = ConstraintDisplay.cellCenter(cells[0]);
-    let circle = createSvgElement('circle');
-    circle.setAttribute('cx', x);
-    circle.setAttribute('cy', y);
-    circle.setAttribute('r', 15);
-    arrow.appendChild(circle);
-
-    // Draw the line.
-    let directions = [];
-    cells.forEach((cell) => {
-      [x, y] = ConstraintDisplay.cellCenter(cell);
-      directions.push('L');
-      directions.push(x);
-      directions.push(y);
-    });
-    directions[0] = 'M';  // Replace the first direction to a move.
-
-    let path = createSvgElement('path');
-    path.setAttribute('d', directions.join(' '));
-    path.setAttribute('stroke-dashoffset', -15);
-    path.setAttribute('stroke-dasharray', path.getTotalLength());
-    path.setAttribute('marker-end', 'url(#arrowhead)');
-
-    arrow.appendChild(path);
-
-    this._svg.append(arrow);
-
-    return arrow;
-  }
-
-  drawThermometer(cells) {
-    if (cells.length < 2) throw(`Thermo too short: ${cells}`)
-
-    let thermo = createSvgElement('svg');
-    thermo.setAttribute('fill', 'rgb(200, 200, 200)');
-    thermo.setAttribute('stroke', 'rgb(200, 200, 200)');
-
-    let x, y;
-    // Draw the circle.
-    [x, y] = ConstraintDisplay.cellCenter(cells[0]);
-    let circle = createSvgElement('circle');
-    circle.setAttribute('cx', x);
-    circle.setAttribute('cy', y);
-    circle.setAttribute('r', 15);
-    thermo.appendChild(circle);
-
-    // Draw the line.
-    let directions = [];
-    cells.forEach((cell) => {
-      [x, y] = ConstraintDisplay.cellCenter(cell);
-      directions.push('L');
-      directions.push(x);
-      directions.push(y);
-    });
-    directions[0] = 'M';  // Replace the first direction to a move.
-    let path = createSvgElement('path');
-    path.setAttribute('d', directions.join(' '));
-    path.setAttribute('stroke-width', 15);
-    path.setAttribute('stroke-linecap', 'round');
-    path.setAttribute('fill', 'transparent');
-    thermo.appendChild(path);
-
-    this._svg.append(thermo);
-
-    return thermo;
-  }
-
-  drawDiagonal(direction) {
-    let size = CELL_SIZE*GRID_SIZE;
-    let line = createSvgElement('path');
-    let directions = [
-      'M', 0, direction > 0 ? size : 0,
-      'L', size, direction > 0 ? 0 : size,
-    ];
-    line.setAttribute('d', directions.join(' '));
-    line.setAttribute('stroke-width', 1);
-    line.setAttribute('fill', 'transparent');
-    line.setAttribute('stroke', 'rgb(255, 0, 0)');
-
-    this._svg.appendChild(line);
-    this._diagonals[direction > 0] = line;
-
-    return line;
-  }
-
-  removeDiagonal(direction) {
-    let item = this._diagonals[direction > 0];
-    if (item) this.removeItem(item);
-  }
-}
 
 class CheckboxConstraints {
   constructor(display, onChange) {
@@ -366,10 +89,9 @@ class ConstraintManager {
     this._checkboxes = {};
     grid.setUpdateCallback(() => this.runUpdateCallback());
 
-    this._display = ConstraintDisplay.makeDisplay(grid._container);
-    this.setUpdateCallback();
-
+    this._display = new ConstraintDisplay(grid._container, grid.selection);
     this._setUpPanel();
+    this.setUpdateCallback();
   }
 
   setUpdateCallback(fn) {
@@ -399,26 +121,30 @@ class ConstraintManager {
       document.getElementById('multi-cell-constraint-black-dot'),
     ];
 
-    this._selectionFrom = document.getElementById('multi-cell-constraint-input');
+    let selectionForm = document.forms['multi-cell-constraint-input'];
     this._grid.selection.addCallback((selection) => {
       let disabled = (selection.length < 2);
-      this._selectionFrom.firstElementChild.disabled = disabled;
+      selectionForm.firstElementChild.disabled = disabled;
       // Focus on the submit button so that that we can immediately press enter.
       if (!disabled) {
         let cellsAreAdjacent = this._cellsAreAdjacent(selection);
         for (let c of adjacentOnlyConstraints) {
           c.disabled = !cellsAreAdjacent;
         }
-        this._selectionFrom.querySelector('button[type=submit]').focus();
+        selectionForm.querySelector('button[type=submit]').focus();
       }
     });
-    this._selectionFrom.onsubmit = e => {
-      this._addConstraintFromForm();
+    selectionForm.onsubmit = e => {
+      this._addConstraintFromForm(selectionForm);
       return false;
     }
-    this._grid.selection.addSelectionPreserver(this._selectionFrom);
+    let cageInput = document.getElementById('multi-cell-constraint-cage');
+    selectionForm['cage-sum'].onfocus = () => { cageInput.checked = true; };
+    this._grid.selection.addSelectionPreserver(selectionForm);
 
-    let freeInputForm = document.getElementById('freeform-constraint-input');
+    this._setUpLittleKiller();
+
+    let freeInputForm = document.forms['freeform-constraint-input'];
     freeInputForm.onsubmit = e => {
       try {
         let input = (new FormData(freeInputForm)).get('freeform-input');
@@ -430,6 +156,46 @@ class ConstraintManager {
     }
 
     document.getElementById('clear-constraints-button').onclick = () => this.clear();
+  }
+
+  _setUpLittleKiller() {
+    this._litteKillerConstraints = {};
+
+
+    let killerForm = document.forms['little-killer-input'];
+    const clearLittleKiller = () => {
+      let initialCell = this._grid.selection.getCells()[0].id;
+      delete this._litteKillerConstraints[initialCell];
+      this._display.removeLittleKiller(initialCell);
+      this._grid.selection.setCells([]);
+      this.runUpdateCallback();
+    };
+    killerForm.onsubmit = e => {
+      let formData = new FormData(killerForm);
+      let sum = +formData.get('sum');
+      if (!sum) {
+        clearLittleKiller();
+        return false;
+      }
+
+      let initialCell = this._grid.selection.getCells()[0].id;
+      let constraint = new SudokuConstraint.LittleKiller(sum, initialCell);
+      this.loadConstraint(constraint);
+
+      this._grid.selection.setCells([]);
+      this.runUpdateCallback();
+      return false;
+    };
+    this._grid.selection.addSelectionPreserver(killerForm);
+
+    document.getElementById('little-killer-clear').onclick = clearLittleKiller;
+  }
+
+  _removeAllLittleKillers() {
+    for (const cell in this._litteKillerConstraints) {
+      this._display.removeLittleKiller(cell);
+    }
+    this._litteKillerConstraints = {};
   }
 
   loadFromText(input) {
@@ -497,16 +263,9 @@ class ConstraintManager {
         this._addToPanel(config);
         this._configs.push(config);
         break;
-      case 'Sum':
-        config = {
-          cells: constraint.cells,
-          name: `Sum (${constraint.sum})`,
-          constraint: constraint,
-          displayElem: this._display.drawKillerCage(
-            constraint.cells, constraint.sum),
-        };
-        this._addToPanel(config);
-        this._configs.push(config);
+      case 'LittleKiller':
+        this._litteKillerConstraints[constraint.initialCell] = constraint;
+        this._display.addLittleKiller(constraint.initialCell, constraint.sum);
         break;
       case 'AntiKnight':
         this._checkboxConstraints.check('antiKnight');
@@ -531,11 +290,11 @@ class ConstraintManager {
     this.runUpdateCallback();
   }
 
-  _addConstraintFromForm() {
+  _addConstraintFromForm(selectionForm) {
     let cells = this._grid.selection.getCells().map(e => e.id);
     if (cells.length < 2) throw('Selection too short.');
 
-    let formData = new FormData(this._selectionFrom);
+    let formData = new FormData(selectionForm);
 
     let constraint;
     switch (formData.get('constraint-type')) {
@@ -545,10 +304,6 @@ class ConstraintManager {
         break;
       case 'cage':
         constraint = new SudokuConstraint.Cage(+formData.get('cage-sum'), ...cells);
-        this.loadConstraint(constraint);
-        break;
-      case 'diag-sum':
-        constraint = new SudokuConstraint.Sum(+formData.get('diag-sum'), ...cells);
         this.loadConstraint(constraint);
         break;
       case 'thermo':
@@ -569,7 +324,7 @@ class ConstraintManager {
     this.runUpdateCallback();
   }
 
-  _removeConstraint(config) {
+  _removePanelConstraint(config) {
     let index = this._configs.indexOf(config);
     this._configs.splice(index, 1);
     this._display.removeItem(config.displayElem);
@@ -591,7 +346,7 @@ class ConstraintManager {
 
     config.panelItem = panelItem;
     panelButton.addEventListener('click', () => {
-      this._removeConstraint(config);
+      this._removePanelConstraint(config);
       this.runUpdateCallback();
     });
 
@@ -608,6 +363,7 @@ class ConstraintManager {
   getConstraints() {
     let constraints = this._configs.map(c => c.constraint);
     constraints.push(this._checkboxConstraints.getConstraint());
+    constraints.push(...Object.values(this._litteKillerConstraints));
     constraints.push(
       new SudokuConstraint.FixedValues(...this._grid.getCellValues()));
 
@@ -618,6 +374,7 @@ class ConstraintManager {
     this._display.clear();
     this._panel.innerHTML = '';
     this._checkboxConstraints.uncheckAll();
+    this._removeAllLittleKillers();
     this._configs = [];
     this._grid.setCellValues([])
     this._grid.setSolution();

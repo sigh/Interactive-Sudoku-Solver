@@ -148,7 +148,8 @@ const loadSlowArrow = () => {
 }
 
 const loadHardLittleKiller = () => {
-  let config = `.Sum~13~R9C2~R8C1.Sum~16~R9C3~R8C2~R7C1.Sum~16~R9C5~R8C6~R7C7~R6C8~R5C9.Sum~15~R9C4~R8C5~R7C6~R6C7~R5C8~R4C9.Sum~31~R9C3~R8C4~R7C5~R6C6~R5C7~R4C8~R3C9.Sum~20~R1C4~R2C3~R3C2~R4C1.Sum~10~R1C5~R2C4~R3C3~R4C2~R5C1.Sum~21~R1C6~R2C5~R3C4~R4C3~R5C2~R6C1.Sum~5~R2C9~R1C8.Sum~12~R1C7~R2C8~R3C9.`;
+  // From https://www.youtube.com/watch?v=RjznoTdOHRM
+  let config = `.LittleKiller~20~R1C4.LittleKiller~10~R1C5.LittleKiller~21~R1C6.LittleKiller~5~R2C9.LittleKiller~12~R3C9.LittleKiller~13~R8C1.LittleKiller~16~R7C1.LittleKiller~31~R9C3.LittleKiller~15~R9C4.LittleKiller~16~R9C5`;
   constraintManager.loadFromText(config);
 };
 
@@ -216,7 +217,7 @@ const testCases = [
   {  // 10: https://www.youtube.com/watch?v=y4eKdI3ZJ78
     name: 'Little Killer',
     input:
-      '.Sum~22~R9C9~R8C8~R7C7~R6C6~R5C5~R4C4~R3C3~R2C2~R1C1.Sum~28~R9C8~R8C7~R7C6~R6C5~R5C4~R4C3~R3C2~R2C1.Sum~23~R1C5~R2C4~R3C3~R4C2~R5C1.Sum~34~R1C7~R2C6~R3C5~R4C4~R5C3~R6C2~R7C1.Sum~40~R1C8~R2C7~R3C6~R4C5~R5C4~R6C3~R7C2~R8C1.Sum~42~R1C9~R2C8~R3C7~R4C6~R5C5~R6C4~R7C3~R8C2~R9C1.Sum~26~R9C7~R8C6~R7C5~R6C4~R5C3~R4C2~R3C1.~R3C2_5~R3C7_2~R5C4_3~R5C5_7',
+      '.~R3C2_5~R3C7_2~R5C4_3~R5C5_7.LittleKiller~22~R1C1.LittleKiller~28~R2C1.LittleKiller~26~R3C1.LittleKiller~23~R1C5.LittleKiller~34~R1C7.LittleKiller~40~R1C8.LittleKiller~42~R1C9',
     expected: '198235764427968531653714289732186945541379826986542173865421397279653418314897652',
   }
 ];

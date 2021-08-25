@@ -953,7 +953,6 @@ SudokuSolver.SumHandler = class extends SudokuSolver.ConstraintHandler {
     this.enforceConsistency(initialGrid);
   }
 
-
   enforceConsistency(grid) {
     const cells = this.cells;
     const numCells = cells.length;

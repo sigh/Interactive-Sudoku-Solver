@@ -261,12 +261,36 @@ class SudokuConstraint {
     }
   }
 
-  static Sum = class Sum extends SudokuConstraint {
-    constructor(sum, ...cells) {
+  static LittleKiller = class LittleKiller extends SudokuConstraint {
+    constructor(sum, initialCell) {
       super(arguments);
-      this.cells = cells;
+      this.initialCell = initialCell;
       this.sum = sum;
     }
+
+    static CELL_MAP = (() => {
+      let map = {};
+
+      const addLittleKiller = (row, col, dr, dc) => {
+        let cells = [];
+        for (; row >= 0 && col >= 0 && col < GRID_SIZE && row < GRID_SIZE;
+               row+=dr, col+=dc) {
+          cells.push(toCellId(row, col));
+        }
+        map[cells[0]] = cells;
+      };
+
+      // Left side.
+      for (let row=0; row < GRID_SIZE-1; row++) addLittleKiller(row, 0, 1, 1);
+      // Right side.
+      for (let row=1; row < GRID_SIZE-1; row++) addLittleKiller(row, GRID_SIZE-1, -1, -1);
+      // Top side.
+      for (let col=1; col < GRID_SIZE; col++) addLittleKiller(0, col, 1, -1);
+      // Bottom side.
+      for (let col=1; col < GRID_SIZE-1; col++) addLittleKiller(GRID_SIZE-1, col, -1, 1);
+
+      return map;
+    })();
   }
 
   static AllDifferent = class AllDifferent extends SudokuConstraint {
@@ -384,8 +408,9 @@ class SudokuBuilder {
         yield new SudokuSolver.CageHandler(cells, constraint.sum);
         break;
 
-      case 'Sum':
-        cells = constraint.cells.map(c => parseCellId(c).cell);
+      case 'LittleKiller':
+        cells = SudokuConstraint.LittleKiller
+          .CELL_MAP[constraint.initialCell].map(c => parseCellId(c).cell);
         yield new SudokuSolver.SumHandler(cells, constraint.sum);
         break;
 

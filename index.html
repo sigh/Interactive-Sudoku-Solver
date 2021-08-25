@@ -8,6 +8,7 @@
 
 <script defer src="util.js"></script>
 <script defer src="sudoku_builder.js"></script>
+<script defer src="constraint_display.js"></script>
 <script defer src="render_page.js"></script>
 <script defer src="sudoku_solver.js"></script>
 <script async src="debug.js"></script>
@@ -53,7 +54,7 @@
     <h1>Constraints</h1>
 
     <div class="control-panel">
-        <button id="clear-constraints-button" class="danger-button">Clear</button>
+        <button id="clear-constraints-button" class="danger-button">Clear All</button>
         <button id="undo-button" class="icon-button" title="undo" disabled>&#10226;</button>
         <button id="redo-button" class="icon-button" title="redo" disabled>&#10227;</button>
     </div>
@@ -75,13 +76,6 @@
             <label for="multi-cell-constraint-cage">
               Killer Cage
               <input type="number" name="cage-sum" min=0 placeholder="sum">
-            </label>
-          </div>
-          <div>
-            <input type="radio" id="multi-cell-constraint-diag-sum" name="constraint-type" value="diag-sum">
-            <label for="multi-cell-constraint-diag-sum">
-              Little Killer
-              <input type="number" name="diag-sum" min=0 placeholder="sum">
             </label>
           </div>
           <div>
@@ -123,6 +117,21 @@
           <input type="checkbox" id="diagonal-minus-input">
           <label for="diagonal-minus-input">&#10189; Diagonal</label>
         </div>
+
+        <form id="little-killer-input">
+          <fieldset tabindex="0" disabled>
+            <div>
+              Little Killer
+              <input type="number" name="sum" min=0 placeholder="sum">
+              <input type="hidden" name="dir">
+            </div>
+            <div>
+              <button type="submit">Set</button>
+              <button type="button" id="little-killer-clear" class="danger-button">Clear</button>
+            </div>
+          </fieldset>
+        </form>
+
       </div>
     </div>
 

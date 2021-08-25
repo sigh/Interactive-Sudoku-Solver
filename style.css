@@ -8,7 +8,7 @@
   box-shadow: 3px 3px 10px;
 }
 
-.sudoku-grid-background {
+.sudoku-constraint-svg {
   position: absolute;
   top: 0;
   left: 0;
@@ -167,15 +167,12 @@ input[type=number]{
  width: 4em;
 }
 
-fieldset[disabled]{
-  color: grey;
-}
-
 fieldset {
-  border: none;
-  background: rgb(0,0,255,0.1);
   border-radius: 10px;
   width: fit-content;
+}
+fieldset[disabled]{
+  color: grey;
 }
 fieldset > span {
   font-size: 18px;
@@ -279,4 +276,23 @@ button.icon-button {
 }
 .vcenter-items {
   align-items: center;
+}
+
+.little-killer-arrow {
+  opacity: 0.3;
+  cursor: pointer;
+}
+.little-killer-arrow.active-arrow {
+  opacity: 1;
+}
+.little-killer-arrow.selected-arrow,
+.little-killer-arrow:hover {
+  filter: brightness(0.5);
+  opacity: 1;
+}
+
+#multi-cell-constraint-input > fieldset {
+  border: none;
+  background: rgb(0,0,255,0.1);
+  width: fit-content;
 }
