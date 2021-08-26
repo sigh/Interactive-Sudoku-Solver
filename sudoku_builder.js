@@ -405,7 +405,8 @@ class SudokuBuilder {
 
       case 'Cage':
         cells = constraint.cells.map(c => parseCellId(c).cell);
-        yield new SudokuSolver.CageHandler(cells, constraint.sum);
+        yield new SudokuSolver.SumHandler(cells, constraint.sum);
+        yield *this._allDifferentHandlers(cells);
         break;
 
       case 'LittleKiller':

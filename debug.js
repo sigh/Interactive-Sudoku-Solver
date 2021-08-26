@@ -232,7 +232,7 @@ const arrayEquals = (a, b) => {
 }
 
 const runTestCases = () => {
-  const fail = (tc, result) => {
+  const fail = (name, tc, result) => {
     console.log('Test failed: ' + name);
     console.log('Expected', tc.solution);
     console.log('Got     ', result);
@@ -247,16 +247,16 @@ const runTestCases = () => {
     let solver = SudokuBuilder.build(constraint);
     let result = solver.solveAllPossibilities();
 
-    if (result.length != 81) fail(tc, result);
+    if (result.length != 81) fail(name, tc, result);
 
     let shortSolution;
     try {
       shortSolution = toShortSolution(result);
     } catch(e) {
       console.log(e);
-      fail(tc, result);
+      fail(name, tc, result);
     }
-    if (shortSolution != tc.solution) fail(tc, shortSolution);
+    if (shortSolution != tc.solution) fail(name, tc, shortSolution);
 
     let state = solver.state();
     output.push({name: name, ...state.counters, timeMs: state.timeMs});
