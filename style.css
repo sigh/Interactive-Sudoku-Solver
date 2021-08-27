@@ -89,8 +89,7 @@ button:disabled {
   opacity: 0.5;
 }
 button:active {
-  position:relative;
-  top:1px;
+  box-shadow: inset 0px 0px 3px #555;
 }
 
 button.danger-button {
@@ -105,7 +104,8 @@ button.danger-button:hover:enabled {
 }
 
 #display-panel > div {
-  margin-bottom: 10px;
+  margin-bottom: 20px;
+  width: 160px;
 }
 
 .selected {
@@ -226,8 +226,20 @@ button.icon-button {
   visibility: hidden;
 }
 
+#freeform-constraint-input {
+  position: relative;
+  margin-top: 20px;
+}
+#freeform-constraint-input button {
+  position: absolute;
+  margin: 5px;
+  bottom: 0;
+  right: 0;
+}
 #freeform-constraint-text {
+  margin: 0;
   width: 100%;
+  padding: 2px 0px 40px 2px;
 }
 
 #fake-input {
@@ -251,14 +263,6 @@ button.icon-button {
 #state-output span {
   display: block;
   line-height: 120%;
-}
-
-#state-output > div:first-of-type {
-  font-size: 16px;
-}
-
-.state-output-title {
-  color: grey;
 }
 
 #solve-mode-input {
@@ -295,4 +299,20 @@ button.icon-button {
   border: none;
   background: rgb(0,0,255,0.1);
   width: fit-content;
+}
+
+.description {
+  line-height: 1;
+  font-size: 12;
+  color: grey;
+  max-width: 350px;
+}
+.description p {
+  margin: 4px 0;
+}
+
+footer {
+  color: grey;
+  font-family: sans-serif;
+  font-size: 12px;
 }

@@ -46,12 +46,25 @@
         <option value="count-solutions" checked>Count solutions</option>
         <option value="step-by-step" checked>Step-by-step</option>
       </select>
+      <div id="solve-mode-description" class="description"></div>
     </div>
     <div id="state-output"></div>
   </div>
 
   <div id="constraint-panel">
     <h1>Constraints</h1>
+
+    <div class="description">
+      <p>
+        To set a value, select a cell and type a number.
+      </p>
+      <p>
+        To create a multi-cell constraint, select and drag.
+      </p>
+      <p>
+        To place a little killer constraint, select an arrow outside the grid.
+      </p>
+    </div>
 
     <div class="control-panel">
         <button id="clear-constraints-button" class="danger-button">Clear All</button>
@@ -138,10 +151,8 @@
     <div id="displayed-constraints"></div>
 
     <form id="freeform-constraint-input">
-        <textarea id="freeform-constraint-text" name="freeform-input" rows="4"></textarea>
-        <div>
-          <button type="submit">Load from text</button>
-        </div>
+      <textarea id="freeform-constraint-text" name="freeform-input" rows="4"></textarea>
+      <button type="submit">Load from text</button>
     </form>
   </div>
   <footer>

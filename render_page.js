@@ -810,6 +810,13 @@ class SolutionController {
     this._update = deferUntilAnimationFrame(this._update.bind(this));
     constraintManager.setUpdateCallback(this._update.bind(this));
 
+    this._modeHandlers = {
+      'all-possibilities': this._runAllPossibilites,
+      'solutions': this._runSolutionIterator,
+      'count-solutions': this._runCounter,
+      'step-by-step': this._runStepIterator,
+    };
+
     this._elements = {
       start: document.getElementById('solution-start'),
       forward: document.getElementById('solution-forward'),
@@ -817,6 +824,7 @@ class SolutionController {
       control: document.getElementById('solution-control-panel'),
       stepOutput: document.getElementById('solution-step-output'),
       mode: document.getElementById('solve-mode-input'),
+      modeDescription: document.getElementById('solve-mode-description'),
       stateOutput: document.getElementById('state-output'),
       solveStatus: document.getElementById('solve-status'),
       error: document.getElementById('error-output'),
@@ -910,6 +918,17 @@ class SolutionController {
     this._elements.control.style.visibility = show ? 'visible' : 'hidden';
   }
 
+  static _MODE_DESCRIPTIONS = {
+    'all-possibilities':
+      'Show all values which are present in any valid solution.',
+    'solutions':
+      'View each solution.',
+    'count-solutions':
+      'Count the total number of solutions by iterating over all solutions.',
+    'step-by-step':
+      'Step through the solving process.',
+  };
+
   async _update() {
     let constraints = this._constraintManager.getConstraints();
     let mode = this._elements.mode.value;
@@ -919,12 +938,10 @@ class SolutionController {
 
     this._grid.setSolution([]);
 
-    let handler = {
-      'all-possibilities': this._runAllPossibilites,
-      'solutions': this._runSolutionIterator,
-      'step-by-step': this._runStepIterator,
-      'count-solutions': this._runCounter,
-    }[mode];
+    let description = SolutionController._MODE_DESCRIPTIONS[mode];
+    this._elements.modeDescription.textContent = description;
+
+    let handler = this._modeHandlers[mode];
 
     this._setSolving(true);
     handler.bind(this)(solver)
@@ -973,7 +990,8 @@ class SolutionController {
       let value = document.createElement('span');
       let title = document.createElement('span');
       title.textContent = camelCaseToWords(v);
-      title.className = 'state-output-title';
+      title.className = 'description';
+      if (v == 'solutions') title.style.fontSize = '16px';
       elem.appendChild(value);
       elem.appendChild(title);
       container.appendChild(elem);
