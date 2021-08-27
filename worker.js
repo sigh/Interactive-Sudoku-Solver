@@ -9,8 +9,8 @@ const handleWorkerMethod = (method, payload) => {
     case 'init':
       workerSolver = SudokuBuilder.build(payload.constraint);
 
-      if (payload.updateFrequency) {
-        workerSolver.setProgressCallback(sendState, payload.updateFrequency);
+      if (payload.logUpdateFrequency) {
+        workerSolver.setProgressCallback(sendState, payload.logUpdateFrequency);
       }
 
       return true;

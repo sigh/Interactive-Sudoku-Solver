@@ -103,11 +103,11 @@ class SudokuSolver {
     this._timer = new Timer();
   }
 
-  setProgressCallback(callback, frequency) {
+  setProgressCallback(callback, logFrequency) {
     this._progressCallback = callback;
     this._internalSolver.setProgressCallback(
       this._sendProgress.bind(this),
-      frequency);
+      logFrequency);
   }
 
   _sendProgress() {
@@ -273,7 +273,7 @@ SudokuSolver.InternalSolver = class {
 
     this._runCounter = 0;
     this._progress = {
-      frequency: 0,
+      frequencyMask: -1,
       callback: null,
     };
 
@@ -459,7 +459,7 @@ SudokuSolver.InternalSolver = class {
     depth++;
     counters.cellsSearched++;
 
-    let progressFrequency = this._progress.frequency;
+    const progressFrequencyMask = this._progress.frequencyMask;
 
     while (depth) {
       depth--;
@@ -487,7 +487,7 @@ SudokuSolver.InternalSolver = class {
       grid[cell] = value;
       let hasContradiction = !this._enforceValue(grid, value, cell);
 
-      if (counters.valuesTried % progressFrequency == 0) {
+      if ((counters.valuesTried & progressFrequencyMask) === 0) {
         this._progress.callback();
       }
       if (yieldEveryStep) {
@@ -569,9 +569,12 @@ SudokuSolver.InternalSolver = class {
     }
   }
 
-  setProgressCallback(callback, frequency) {
+  setProgressCallback(callback, logFrequency) {
     this._progress.callback = callback;
-    this._progress.frequency = frequency;
+    this._progress.frequencyMask = -1;
+    if (callback) {
+      this._progress.frequencyMask = (1<<logFrequency)-1;
+    }
   }
 }
 

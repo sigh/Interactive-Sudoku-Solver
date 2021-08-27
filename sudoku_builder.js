@@ -316,8 +316,8 @@ class SudokuBuilder {
   }
 
   // Ask for a state update every 2**14 iterations.
-  // Using a non-power of 10 makes the display loook faster :)
-  static UPDATE_FREQUENCY = 16384;
+  // NOTE: Using a non-power of 10 makes the display loook faster :)
+  static LOG_UPDATE_FREQUENCY = 14;
 
   static _unusedWorkers = [];
 
@@ -330,7 +330,7 @@ class SudokuBuilder {
 
     let solverProxy = new SolverProxy(stateHandler, worker);
 
-    await solverProxy.init(constraints, this.UPDATE_FREQUENCY);
+    await solverProxy.init(constraints, this.LOG_UPDATE_FREQUENCY);
 
     return solverProxy;
   }
@@ -581,11 +581,11 @@ class SolverProxy {
     return promise;
   }
 
-  async init(constraint, updateFrequency) {
+  async init(constraint, logUpdateFrequency) {
     this._initialized = true;
     await this._callWorker('init', {
       constraint: constraint,
-      updateFrequency: updateFrequency,
+      logUpdateFrequency: logUpdateFrequency,
     });
   }
 
