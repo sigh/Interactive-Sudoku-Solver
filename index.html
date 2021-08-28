@@ -9,6 +9,7 @@
 <script defer src="util.js"></script>
 <script defer src="sudoku_builder.js"></script>
 <script defer src="constraint_display.js"></script>
+<script defer src="examples.js"></script>
 <script defer src="render_page.js"></script>
 <script defer src="sudoku_solver.js"></script>
 <script async src="debug.js"></script>
@@ -19,41 +20,7 @@
 <body>
   <h1>Interactive Sudoku Solver</h1>
 
-  <div id="sudoku-grid-outer">
-    <div id="sudoku-grid">
-      <input id="fake-input" inputmode="numeric" type="text" value="x">
-    </div>
-    <div id="grid-control-buttons" class="control-panel">
-      <div id="solution-control-panel">
-        <button id="solution-start" class="icon-button" title="start (s)">&#171;</button>
-        <button id="solution-back" class="icon-button" title="previous (p)">&#8249;</button>
-        <div id="solution-step-output"></div>
-        <button id="solution-forward" class="icon-button" title="next (n)">&#8250;</button>
-      </div>
-      <div>
-        <span id="solve-status"></span>
-        <span id="error-output" class="error"></span>
-      </div>
-      <button id="stop-solver" class="danger-button">Abort</button>
-    </div>
-  </div>
-
-  <div id="display-panel">
-    <div>
-      <select id="solve-mode-input">
-        <option value="all-possibilities">All possibilties</option>
-        <option value="solutions">Solutions</option>
-        <option value="count-solutions" checked>Count solutions</option>
-        <option value="step-by-step" checked>Step-by-step</option>
-      </select>
-      <div id="solve-mode-description" class="description"></div>
-    </div>
-    <div id="state-output"></div>
-  </div>
-
-  <div id="constraint-panel">
-    <h1>Constraints</h1>
-
+  <div id="instruction-panel">
     <div class="description">
       <p>
         To set a value, select a cell and type a number.
@@ -66,95 +33,147 @@
       </p>
     </div>
 
-    <div class="control-panel">
-        <button id="clear-constraints-button" class="danger-button">Clear All</button>
-        <button id="undo-button" class="icon-button" title="undo" disabled>&#10226;</button>
-        <button id="redo-button" class="icon-button" title="redo" disabled>&#10227;</button>
+    <span class="description">OR</span>
+
+    <div>
+      <select id="example-select">
+        <option>-- Load an example --</option>
+      </select>
+      <a>(Source)</a>
+    </div>
+  </div>
+
+  <div id="sudoku-container">
+
+    <div id="sudoku-grid-outer">
+      <div id="sudoku-grid">
+        <input id="fake-input" inputmode="numeric" type="text" value="x">
+      </div>
+      <div id="grid-control-buttons" class="control-panel">
+        <div id="solution-control-panel">
+          <button id="solution-start" class="icon-button" title="start (s)">&#171;</button>
+          <button id="solution-back" class="icon-button" title="previous (p)">&#8249;</button>
+          <div id="solution-step-output"></div>
+          <button id="solution-forward" class="icon-button" title="next (n)">&#8250;</button>
+        </div>
+        <div>
+          <span id="solve-status"></span>
+          <span id="error-output" class="error"></span>
+        </div>
+        <button id="stop-solver" class="danger-button">Abort</button>
+      </div>
     </div>
 
-    <div class="two-column">
-      <form id="multi-cell-constraint-input">
-        <fieldset tabindex="0" disabled>
-          <span>Create from selection</span>
-          <div>
-            <input type="radio" id="multi-cell-constraint-thermo" name="constraint-type" value="thermo" checked>
-            <label for="multi-cell-constraint-thermo">Thermometer</label>
-          </div>
-          <div>
-            <input type="radio" id="multi-cell-constraint-arrow" name="constraint-type" value="arrow">
-            <label for="multi-cell-constraint-arrow">Arrow Sum</label>
-          </div>
-          <div>
-            <input type="radio" id="multi-cell-constraint-cage" name="constraint-type" value="cage">
-            <label for="multi-cell-constraint-cage">
-              Killer Cage
-              <input type="number" name="cage-sum" min=0 placeholder="sum">
-            </label>
-          </div>
-          <div>
-            <input type="radio" id="multi-cell-constraint-white-dot" name="constraint-type" value="white-dot">
-            <label for="multi-cell-constraint-white-dot">&plusmn;1</label>
-          </div>
-          <div>
-            <input type="radio" id="multi-cell-constraint-black-dot" name="constraint-type" value="black-dot">
-            <label for="multi-cell-constraint-black-dot">&times;&divide;2</label>
-          </div>
-          <div>
-            <button type="submit">Add</button>
-          </div>
-        </fieldset>
-      </form>
-
+    <div id="display-panel">
       <div>
-        <div>
-          <input type="checkbox" id="anti-knight-input">
-          <label for="anti-knight-input">Anti-Knight</label>
-        </div>
+        <select id="solve-mode-input">
+          <option value="all-possibilities">All possibilties</option>
+          <option value="solutions">Solutions</option>
+          <option value="count-solutions" checked>Count solutions</option>
+          <option value="step-by-step" checked>Step-by-step</option>
+        </select>
+        <div id="solve-mode-description" class="description"></div>
+      </div>
+      <div id="state-output"></div>
+    </div>
 
-        <div>
-          <input type="checkbox" id="anti-king-input">
-          <label for="anti-king-input">Anti-King</label>
-        </div>
+    <div id="constraint-panel">
+      <h1>Constraints</h1>
 
-        <div>
-          <input type="checkbox" id="anti-consecutive-input">
-          <label for="anti-consecutive-input">Anti-Consecutive</label>
-        </div>
+      <div class="control-panel">
+          <button id="clear-constraints-button" class="danger-button">Clear All</button>
+          <button id="undo-button" class="icon-button" title="undo" disabled>&#10226;</button>
+          <button id="redo-button" class="icon-button" title="redo" disabled>&#10227;</button>
+      </div>
 
-        <div>
-          <input type="checkbox" id="diagonal-plus-input">
-          <label for="diagonal-plus-input">&#10187; Diagonal</label>
-        </div>
-
-        <div>
-          <input type="checkbox" id="diagonal-minus-input">
-          <label for="diagonal-minus-input">&#10189; Diagonal</label>
-        </div>
-
-        <form id="little-killer-input">
+      <div class="two-column">
+        <form id="multi-cell-constraint-input">
           <fieldset tabindex="0" disabled>
+            <span>Create from selection</span>
             <div>
-              Little Killer
-              <input type="number" name="sum" min=0 placeholder="sum">
-              <input type="hidden" name="dir">
+              <input type="radio" id="multi-cell-constraint-thermo" name="constraint-type" value="thermo" checked>
+              <label for="multi-cell-constraint-thermo">Thermometer</label>
             </div>
             <div>
-              <button type="submit">Set</button>
-              <button type="button" id="little-killer-clear" class="danger-button">Clear</button>
+              <input type="radio" id="multi-cell-constraint-arrow" name="constraint-type" value="arrow">
+              <label for="multi-cell-constraint-arrow">Arrow Sum</label>
+            </div>
+            <div>
+              <input type="radio" id="multi-cell-constraint-cage" name="constraint-type" value="cage">
+              <label for="multi-cell-constraint-cage">
+                Killer Cage
+                <input type="number" name="cage-sum" min=0 placeholder="sum">
+              </label>
+            </div>
+            <div>
+              <input type="radio" id="multi-cell-constraint-white-dot" name="constraint-type" value="white-dot">
+              <label for="multi-cell-constraint-white-dot">&plusmn;1</label>
+            </div>
+            <div>
+              <input type="radio" id="multi-cell-constraint-black-dot" name="constraint-type" value="black-dot">
+              <label for="multi-cell-constraint-black-dot">&times;&divide;2</label>
+            </div>
+            <div>
+              <button type="submit">Add</button>
             </div>
           </fieldset>
         </form>
 
+        <div>
+          <div>
+            <input type="checkbox" id="anti-knight-input">
+            <label for="anti-knight-input">Anti-Knight</label>
+          </div>
+
+          <div>
+            <input type="checkbox" id="anti-king-input">
+            <label for="anti-king-input">Anti-King</label>
+          </div>
+
+          <div>
+            <input type="checkbox" id="anti-consecutive-input">
+            <label for="anti-consecutive-input">Anti-Consecutive</label>
+          </div>
+
+          <div>
+            <input type="checkbox" id="diagonal-plus-input">
+            <label for="diagonal-plus-input">&#10187; Diagonal</label>
+          </div>
+
+          <div>
+            <input type="checkbox" id="diagonal-minus-input">
+            <label for="diagonal-minus-input">&#10189; Diagonal</label>
+          </div>
+
+          <form id="little-killer-input">
+            <fieldset tabindex="0" disabled>
+              <div>
+                Little Killer
+                <input type="number" name="sum" min=0 placeholder="sum">
+                <input type="hidden" name="dir">
+              </div>
+              <div>
+                <button type="submit">Set</button>
+                <button type="button" id="little-killer-clear" class="danger-button">Clear</button>
+              </div>
+            </fieldset>
+          </form>
+
+        </div>
       </div>
+
+      <div id="displayed-constraints"></div>
+
+      <hr>
+
+      <form id="freeform-constraint-input">
+        <textarea id="freeform-constraint-text" name="freeform-input" rows="4"></textarea>
+        <button type="submit">Load from text</button>
+      </form>
     </div>
 
-    <div id="displayed-constraints"></div>
-
-    <form id="freeform-constraint-input">
-      <textarea id="freeform-constraint-text" name="freeform-input" rows="4"></textarea>
-      <button type="submit">Load from text</button>
-    </form>
   </div>
+
   <footer>
     Code at
     <a href="https://github.com/sigh/Interactive-Sudoku-Solver">

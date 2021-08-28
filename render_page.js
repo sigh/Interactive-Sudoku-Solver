@@ -82,6 +82,61 @@ class CheckboxConstraints {
   }
 }
 
+class ExampleHandler {
+  static _EXAMPLES = [
+    'Classic sudoku',
+    'Thermosudoku',
+    'Killer sudoku',
+    'Arrow sudoku',
+    'Anti-knight, Anti-consecutive',
+    'Little killer',
+    'Sudoku X',
+  ];
+
+  constructor(constraintManager) {
+    this._ignoreConstraintChanges = false;
+    this._exampleSelect = this._setUp();
+    this._constraintManager = constraintManager;
+  }
+
+  _setUp() {
+    let exampleSelect = document.getElementById('example-select');
+
+    for (const example of ExampleHandler._EXAMPLES) {
+      if (!EXAMPLES[example]) throw('Unknown example: ' + example);
+      let option = document.createElement('option');
+      option.textContent = example;
+      exampleSelect.appendChild(option);
+    }
+
+    let link = exampleSelect.nextElementSibling;
+    exampleSelect.onchange = () => {
+      if (exampleSelect.selectedIndex) {
+        let example = exampleSelect.options[exampleSelect.selectedIndex].text;
+        link.href = EXAMPLES[example].src;
+        link.style.display = 'inline-block';
+
+        this._ignoreConstraintChanges = true;
+        this._constraintManager.loadFromText(EXAMPLES[example].input);
+        this._ignoreConstraintChanges = false;
+      } else {
+        link.style.display = 'none';
+        this._ignoreConstraintChanges = true;
+      }
+    };
+    exampleSelect.onchange();
+
+    return exampleSelect;
+  }
+
+  newConstraintLoaded() {
+    if (!this._ignoreConstraintChanges) {
+      this._exampleSelect.selectedIndex = 0;
+      this._exampleSelect.onchange();
+    }
+  }
+}
+
 class ConstraintManager {
   constructor(grid) {
     this._configs = [];
@@ -99,6 +154,7 @@ class ConstraintManager {
   }
 
   runUpdateCallback() {
+    this._exampleHandler.newConstraintLoaded();
     this.updateCallback(this);
   }
 
@@ -113,9 +169,11 @@ class ConstraintManager {
   _setUpPanel() {
     this._panel = document.getElementById('displayed-constraints');
 
+    // Checkbox constraints.
     this._checkboxConstraints = new CheckboxConstraints(
       this._display, this.runUpdateCallback.bind(this));
 
+    // Multi-cell selections.
     let adjacentOnlyConstraints = [
       document.getElementById('multi-cell-constraint-white-dot'),
       document.getElementById('multi-cell-constraint-black-dot'),
@@ -142,8 +200,13 @@ class ConstraintManager {
     selectionForm['cage-sum'].onfocus = () => { cageInput.checked = true; };
     this._grid.selection.addSelectionPreserver(selectionForm);
 
+    // Little killer.
     this._setUpLittleKiller();
 
+    // Load examples.
+    this._exampleHandler = new ExampleHandler(this);
+
+    // Free-form.
     let freeInputForm = document.forms['freeform-constraint-input'];
     freeInputForm.onsubmit = e => {
       try {
@@ -155,6 +218,7 @@ class ConstraintManager {
       return false;
     }
 
+    // Clear button.
     document.getElementById('clear-constraints-button').onclick = () => this.clear();
   }
 
