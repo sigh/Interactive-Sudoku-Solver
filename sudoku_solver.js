@@ -376,27 +376,21 @@ SudokuSolver.InternalSolver = class {
   // Find the best cell and bring it to the front. This means that it will
   // be processed next.
   _updateCellOrder(stack, grid) {
-    // Do a first pass to check if there are any cells with 1 (or 0) cells set.
-    // Since these can be resolved with no back-tracking, we return immediately.
+    // Choose the cell with the smallest count.
+    // Return immediately if we find any cells with 1 or 0 values set.
     // NOTE: The constraint handlers are written such that they detect domain
-    // wipeouts, so we should never find them here. Even if they exist, it
-    // just means we do a few more useless forced cell resolutions.
-    for (let i = 0; i < stack.length; i++) {
-      let v = grid[stack[i]];
-      if (!(v&(v-1))) {
-        [stack[i], stack[0]] = [stack[0], stack[i]];
-        return;
-      }
-    }
+    // wipeouts (0 values), so we should never find them here. Even if they
+    // exist, it just means we do a few more useless forced cell resolutions.
+    // NOTE: If the scoring is more complicated than counts, it can be useful
+    // to do an initial pass to detect 1 or 0 value cells (~(v&(v-1))).
 
-    // From here ALL cells have at least 2 candidates.
-    // Choose one with the smallest count.
     let minScore = GRID_SIZE + 1;
 
     for (let i = 0; i < stack.length; i++) {
       let count = LookupTable.COUNT[grid[stack[i]]];
       if (count < minScore) {
         [stack[i], stack[0]] = [stack[0], stack[i]];
+        if (count < 2) return;
         minScore = count;
       }
     }
