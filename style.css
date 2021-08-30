@@ -349,3 +349,45 @@ footer {
   font-family: sans-serif;
   font-size: 12px;
 }
+
+.tooltip {
+  position: relative;
+  cursor: pointer;
+}
+.tooltip::before {
+  content: '?';
+
+  height: 12px;
+  width: 12px;
+  line-height: 12px;
+
+  background-color:#ddd;
+  display:inline-block;
+  border-radius:100%;
+  text-align:center;
+  text-decoration:none;
+
+  font-weight: bold;
+  font-size:10px;
+
+  border: 2px solid #aaa;
+  color: #999;
+}
+.tooltip:hover::after {
+  content: attr(data-text);
+  position: absolute;
+  top: 90%;
+
+  width: 300px;
+  padding: 3px;
+  border-radius: 5px;
+  background:#ffd;
+  box-shadow: 2px 2px 5px;
+
+  line-height: 1;
+  color: black;
+  font-size: 12px;
+  max-width: 200px;
+
+  z-index: 1000;
+}
