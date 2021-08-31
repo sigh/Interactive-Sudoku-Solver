@@ -91,6 +91,7 @@ class ExampleHandler {
     'Anti-knight, Anti-consecutive',
     'Little killer',
     'Sudoku X',
+    'Sandwich sudoku',
   ];
 
   constructor(constraintManager) {
@@ -223,43 +224,53 @@ class ConstraintManager {
   }
 
   _setUpLittleKiller() {
-    this._litteKillerConstraints = {};
+    this._outsideArrowConstraints = {};
 
 
-    let killerForm = document.forms['little-killer-input'];
-    const clearLittleKiller = () => {
-      let initialCell = this._grid.selection.getCells()[0].id;
-      delete this._litteKillerConstraints[initialCell];
-      this._display.removeLittleKiller(initialCell);
+    let outsideArrowForm = document.forms['outside-arrow-input'];
+    const clearOutsideArrow = () => {
+      let formData = new FormData(outsideArrowForm);
+      let id = formData.get('id');
+      delete this._outsideArrowConstraints[id];
+      this._display.removeOutsideArrow(id);
       this._grid.selection.setCells([]);
       this.runUpdateCallback();
     };
-    killerForm.onsubmit = e => {
-      let formData = new FormData(killerForm);
-      let sum = +formData.get('sum');
-      if (!sum) {
-        clearLittleKiller();
+    outsideArrowForm.onsubmit = e => {
+      let formData = new FormData(outsideArrowForm);
+      let type = formData.get('type');
+      let id = formData.get('id');
+
+      let sum = formData.get('sum');
+      if (sum == '' || sum != +sum) {
+        clearOutsideArrow();
         return false;
       }
+      sum = +sum;
 
-      let initialCell = this._grid.selection.getCells()[0].id;
-      let constraint = new SudokuConstraint.LittleKiller(sum, initialCell);
-      this.loadConstraint(constraint);
+      switch (type) {
+        case 'little-killer':
+          this.loadConstraint(new SudokuConstraint.LittleKiller(sum, id));
+          break;
+        case 'sandwich':
+          this.loadConstraint(new SudokuConstraint.Sandwich(sum, id));
+          break;
+      }
 
       this._grid.selection.setCells([]);
       this.runUpdateCallback();
       return false;
     };
-    this._grid.selection.addSelectionPreserver(killerForm);
+    this._grid.selection.addSelectionPreserver(outsideArrowForm);
 
-    document.getElementById('little-killer-clear').onclick = clearLittleKiller;
+    document.getElementById('outside-arrow-clear').onclick = clearOutsideArrow;
   }
 
   _removeAllLittleKillers() {
-    for (const cell in this._litteKillerConstraints) {
-      this._display.removeLittleKiller(cell);
+    for (const cell in this._outsideArrowConstraints) {
+      this._display.removeOutsideArrow(cell);
     }
-    this._litteKillerConstraints = {};
+    this._outsideArrowConstraints = {};
   }
 
   loadFromText(input) {
@@ -328,8 +339,12 @@ class ConstraintManager {
         this._configs.push(config);
         break;
       case 'LittleKiller':
-        this._litteKillerConstraints[constraint.initialCell] = constraint;
-        this._display.addLittleKiller(constraint.initialCell, constraint.sum);
+        this._outsideArrowConstraints[constraint.id] = constraint;
+        this._display.addOutsideArrow(constraint.id, constraint.sum);
+        break;
+      case 'Sandwich':
+        this._outsideArrowConstraints[constraint.id] = constraint;
+        this._display.addOutsideArrow(constraint.id, constraint.sum);
         break;
       case 'AntiKnight':
         this._checkboxConstraints.check('antiKnight');
@@ -427,7 +442,7 @@ class ConstraintManager {
   getConstraints() {
     let constraints = this._configs.map(c => c.constraint);
     constraints.push(this._checkboxConstraints.getConstraint());
-    constraints.push(...Object.values(this._litteKillerConstraints));
+    constraints.push(...Object.values(this._outsideArrowConstraints));
     constraints.push(
       new SudokuConstraint.FixedValues(...this._grid.getCellValues()));
 

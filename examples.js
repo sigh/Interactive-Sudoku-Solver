@@ -72,6 +72,11 @@ const EXAMPLES = {
       '.~R3C2_5~R3C7_2~R5C4_3~R5C5_7.LittleKiller~22~R1C1.LittleKiller~28~R2C1.LittleKiller~26~R3C1.LittleKiller~23~R1C5.LittleKiller~34~R1C7.LittleKiller~40~R1C8.LittleKiller~42~R1C9',
     solution: '198235764427968531653714289732186945541379826986542173865421397279653418314897652',
   },
+  'Sandwich sudoku': {
+    src: 'https://www.youtube.com/watch?v=2wfR6QIvNn4&t=4s',
+    input: '.Sandwich~8~C1.Sandwich~4~C2.Sandwich~17~C3.Sandwich~35~C4.Sandwich~14~C5.Sandwich~13~C6.Sandwich~3~C7.Sandwich~10~C8.Sandwich~25~C9.Sandwich~4~R1.Sandwich~33~R2.Sandwich~20~R3.Sandwich~17~R4.Sandwich~26~R5.Sandwich~10~R6.Sandwich~16~R7.Sandwich~24~R8.Sandwich~0~R9.~R3C3_1~R5C5_5~R7C7_9',
+    solution: '236941875954378612871625439182439756397856124645217398413562987569783241728194563',
+  },
 
   // Classic grids that used to be slow. 3 and 4 used to take 2+ seconds.
   'Classic sudoku, was slow (1)': {
@@ -107,6 +112,9 @@ const EXAMPLES = {
   'Little killer, slow': {
     src: 'https://www.youtube.com/watch?v=RjznoTdOHRM',
     input: `.LittleKiller~20~R1C4.LittleKiller~10~R1C5.LittleKiller~21~R1C6.LittleKiller~5~R2C9.LittleKiller~12~R3C9.LittleKiller~13~R8C1.LittleKiller~16~R7C1.LittleKiller~31~R9C3.LittleKiller~15~R9C4.LittleKiller~16~R9C5`,
+  },
+  'Sandwich, partial, slow': {
+    input: '.Sandwich~8~C1.Sandwich~4~C2.Sandwich~17~C3.Sandwich~3~C7.Sandwich~10~C8.Sandwich~25~C9.Sandwich~4~R1.Sandwich~33~R2.Sandwich~17~R4.Sandwich~16~R7.',
   }
 };
 

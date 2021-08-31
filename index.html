@@ -26,10 +26,21 @@
         To set a value, select a cell and type a number.
       </p>
       <p>
-        To create a multi-cell constraint, select and drag.
+        To add a multi-cell constraint, select and drag.
       </p>
       <p>
-        To place a little killer constraint, select an arrow outside the grid.
+        To add a Little Killer
+        <span class="tooltip"
+          data-text="Values along diagonal must add to the given sum. Values may repeat.">
+        </span>
+        constraint, select a diagonal arrow outside the grid.
+      </p>
+      <p>
+        To add a Sandwich
+        <span class="tooltip"
+          data-text="Values between the 1 and the 9 in the row or column must add to the given sum.">
+        </span>
+        constraint, select a row/column arrow outside the grid.
       </p>
     </div>
 
@@ -175,23 +186,37 @@
             </span>
           </div>
 
-          <form id="little-killer-input">
-            <fieldset tabindex="0" disabled>
-              <div>
-                Little Killer
-                <input type="number" name="sum" min=0 placeholder="sum">
-                <span class="tooltip"
-                  data-text="Values along this diagonal must add to the given sum. Values may repeat.">
-                </span>
-              </div>
-              <div>
-                <button type="submit">Set</button>
-                <button type="button" id="little-killer-clear" class="danger-button">Clear</button>
-              </div>
-            </fieldset>
-          </form>
-
         </div>
+      </div>
+
+      <div>
+        <form id="outside-arrow-input">
+          <fieldset tabindex="0" disabled>
+            <input type="hidden" name="id">
+
+            <input type="number" name="sum" min=0 placeholder="sum">
+
+            <input type="radio" id="little-killer-option" name="type" value="little-killer">
+            <label for="little-killer-option">
+              Little Killer
+              <span class="tooltip"
+                data-text="Values along diagonal must add to the given sum. Values may repeat.">
+              </span>
+            </label>
+            <input type="radio" id="sandwich-option" name="type" value="sandwich">
+            <label for="sandwich-option">
+              Sandwich
+              <span class="tooltip"
+                data-text="Values between the 1 and the 9 in the row or column must add to the given sum.">
+              </span>
+            </label>
+
+            <div>
+              <button type="submit">Set</button>
+              <button type="button" id="outside-arrow-clear" class="danger-button">Clear</button>
+            </div>
+          </fieldset>
+        </form>
       </div>
 
       <div id="displayed-constraints"></div>

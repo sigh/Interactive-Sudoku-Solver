@@ -297,17 +297,24 @@ select {
   align-items: center;
 }
 
-.little-killer-arrow {
-  opacity: 0.3;
+.outside-arrow {
+  opacity: 0.2;
   cursor: pointer;
 }
-.little-killer-arrow.active-arrow {
+.outside-arrow.active-arrow {
   opacity: 1;
 }
-.little-killer-arrow.selected-arrow,
-.little-killer-arrow:hover {
+.outside-arrow.selected-arrow,
+.outside-arrow:hover {
   filter: brightness(0.5);
   opacity: 1;
+}
+.outside-arrow.selected-arrow > text,
+.outside-arrow:hover > text {
+  fill: #f0f;
+}
+.outside-arrow.active-arrow.sandwich > path {
+  opacity: 0;
 }
 
 #multi-cell-constraint-input > fieldset {
@@ -320,7 +327,7 @@ select {
   line-height: 1;
   font-size: 12;
   color: grey;
-  max-width: 350px;
+  max-width: 450px;
 }
 .description p {
   margin: 4px 0;

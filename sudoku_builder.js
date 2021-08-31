@@ -262,9 +262,9 @@ class SudokuConstraint {
   }
 
   static LittleKiller = class LittleKiller extends SudokuConstraint {
-    constructor(sum, initialCell) {
+    constructor(sum, id) {
       super(arguments);
-      this.initialCell = initialCell;
+      this.id = id;
       this.sum = sum;
     }
 
@@ -288,6 +288,36 @@ class SudokuConstraint {
       for (let col=1; col < GRID_SIZE; col++) addLittleKiller(0, col, 1, -1);
       // Bottom side.
       for (let col=1; col < GRID_SIZE-1; col++) addLittleKiller(GRID_SIZE-1, col, -1, 1);
+
+      return map;
+    })();
+  }
+
+  static Sandwich = class Sandwich extends SudokuConstraint {
+    constructor(sum, id) {
+      super(arguments);
+      this.id = id;
+      this.sum = sum;
+    }
+
+    static CELL_MAP = (() => {
+      let map = {};
+
+      const addSandwich = (name, row, col, dr, dc) => {
+        let cells = [];
+        for (; col < GRID_SIZE && row < GRID_SIZE;
+               row+=dr, col+=dc) {
+          cells.push(toCellId(row, col));
+        }
+        map[name] = cells;
+      };
+
+      for (let row=0; row < GRID_SIZE; row++) {
+        addSandwich(`R${row+1}`, row, 0, 0, 1);
+      }
+      for (let col=0; col < GRID_SIZE; col++) {
+        addSandwich(`C${col+1}`, 0, col, 1, 0);
+      }
 
       return map;
     })();
@@ -411,8 +441,14 @@ class SudokuBuilder {
 
       case 'LittleKiller':
         cells = SudokuConstraint.LittleKiller
-          .CELL_MAP[constraint.initialCell].map(c => parseCellId(c).cell);
+          .CELL_MAP[constraint.id].map(c => parseCellId(c).cell);
         yield new SudokuSolver.SumHandler(cells, constraint.sum);
+        break;
+
+      case 'Sandwich':
+        cells = SudokuConstraint.Sandwich
+          .CELL_MAP[constraint.id].map(c => parseCellId(c).cell);
+        yield new SudokuSolver.SandwichHandler(cells, constraint.sum);
         break;
 
       case 'AllDifferent':

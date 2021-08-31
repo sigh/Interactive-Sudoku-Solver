@@ -1126,3 +1126,132 @@ SudokuSolver.SumHandler = class extends SudokuSolver.ConstraintHandler {
     }
   }
 }
+
+SudokuSolver.SandwichHandler = class extends SudokuSolver.ConstraintHandler {
+  constructor(cells, sum) {
+    super(cells);
+    this._sum = +sum;
+    this._sumList = [+sum];
+    this._distances = SudokuSolver.SandwichHandler._POSSIBLE_DISTANCES[+sum];
+    this._combinations = SudokuSolver.SandwichHandler._POSSIBLE_COMBINATIONS[+sum];
+  }
+
+  initialize(initialGrid, cellConflicts) {
+    // this.enforceConsistency(initialGrid);
+  }
+
+  fixedRange(grid, sum, cells) {
+    const numCells = cells.length;
+
+    // Determine how much headroom there is in the range between the extreme
+    // values and the target sum.
+    let minSum = 0;
+    let maxSum = 0;
+    for (let i = 0; i < numCells; i++) {
+      let v = grid[cells[i]];
+      let min = LookupTable.MIN[v];
+      let max = LookupTable.MAX[v];
+      minSum += min;
+      maxSum += max;
+    }
+
+    // It is impossible to make the target sum.
+    if (sum < minSum || maxSum < sum) return false;
+    // We've reached the target sum exactly.
+    if (minSum == maxSum) return true;
+
+    if (sum - minSum < GRID_SIZE || maxSum - sum < GRID_SIZE) {
+      if (!SumHandlerUtil.restrictValueRange(grid, cells,
+                                             sum - minSum, maxSum - sum)) {
+        return false;
+      }
+    }
+
+    return (0 !== SumHandlerUtil.restrictCellsSingleConflictSet(
+      grid, this._sumList, cells));
+  }
+
+  static _POSSIBLE_DISTANCES = (() => {
+    let sums = [];
+    for (let i = 0; i <= 35; i++) sums[i] = new Set();
+
+    let mask = 1 | (1<<8);
+    for (let i = 0; i < COMBINATIONS; i++) {
+      if (i & mask) continue;
+      sums[LookupTable.SUM[i]].add(LookupTable.COUNT[i]+1);
+    }
+    for (let i = 0; i <= 35; i++) {
+      sums[i] = Array.from(sums[i]);
+      sums[i].sort();
+      sums[i].sort();
+    }
+    return sums;
+  })();
+
+  static _POSSIBLE_COMBINATIONS = (() => {
+    let sums = [];
+    for (let i = 0; i <= 35; i++) {
+      sums[i] = {};
+      let distances = this._POSSIBLE_DISTANCES[i];
+      for (let j = 0; j < distances.length; j++) sums[i][distances[j]] = [];
+    }
+
+    let mask = 1 | (1<<8);
+    for (let i = 0; i < COMBINATIONS; i++) {
+      if (i & mask) continue;
+      let sum = LookupTable.SUM[i];
+      sums[sum][LookupTable.COUNT[i]+1].push(i);
+    }
+
+    return sums;
+  })();
+
+  enforceConsistency(grid) {
+    const cells = this.cells;
+
+    let validSettings = new Uint16Array(GRID_SIZE);
+
+    let minDist = this._distances[0];
+    let maxDist = this._distances[this._distances.length];
+    let mask = 1 | (1<<8);
+    for (let i = 0; i < GRID_SIZE; i++) {
+      let v = grid[cells[i]];
+      if (!(v & mask)) continue;
+      let vRev = mask & ((v>>8) | (v<<8));
+
+      let allValues = 0;
+      let p = i;
+      for (let j = 0; j < this._distances.length; j++) {
+        let d = this._distances[j];
+        if (i+d >= GRID_SIZE) break;
+        if (!(grid[cells[i+d]] & vRev)) continue;
+        for (;p < i+d; p++) {
+          allValues |= grid[cells[p]];
+        }
+        let combinations = this._combinations[d];
+        let possible = 0;
+        let notPossible = 0;
+        for (let k = 0; k < combinations.length; k++) {
+          if (!(~allValues & combinations[k])) {
+            possible |= combinations[k];
+            notPossible |= ~combinations[k];
+          }
+        }
+        notPossible &= ~mask & ALL_VALUES;
+        if (possible || notPossible) {
+          let k = 0;
+          while (k < i) validSettings[k++] |= notPossible;
+          validSettings[k++] |= v & mask;
+          while (k < i+d) validSettings[k++] |= possible;;
+          validSettings[k++] |= vRev;
+          while (k < GRID_SIZE) validSettings[k++] |= notPossible;;
+        }
+      }
+    }
+    for (let i = 0; i < GRID_SIZE; i++) {
+      if (!(grid[cells[i]] &= validSettings[i])) return false;
+    }
+
+    return true;
+  }
+}

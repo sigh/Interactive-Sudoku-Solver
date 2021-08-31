@@ -93,6 +93,7 @@ const testCases = [
   'Arrow killer sudoku',
   'Kropki sudoku',
   'Little killer',
+  'Sandwich sudoku',
 ];
 
 const sleep = (ms) => {

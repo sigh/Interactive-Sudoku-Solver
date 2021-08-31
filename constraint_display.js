@@ -64,8 +64,9 @@ class ConstraintDisplay {
       hitbox.setAttribute('fill', 'transparent');
 
       let text = createSvgElement('text');
-      text.setAttribute('x', arrowX-dx*0.6);
-      text.setAttribute('y', arrowY-dy*0.6);
+      let textOffsetFactor = dx*dy ? 0.6 : 0;
+      text.setAttribute('x', arrowX-dx*textOffsetFactor);
+      text.setAttribute('y', arrowY-dy*textOffsetFactor);
       text.setAttribute('text-anchor', 'middle');
       text.setAttribute('dominant-baseline', 'middle');
       text.setAttribute('style',
@@ -75,32 +76,40 @@ class ConstraintDisplay {
       arrow.appendChild(hitbox);
       arrow.appendChild(path);
       arrow.appendChild(text);
-      arrow.classList.add('little-killer-arrow');
+      arrow.classList.add('outside-arrow');
 
       return arrow;
     };
 
-    let form = document.forms['little-killer-input'];
+    let form = document.forms['outside-arrow-input'];
     let selectionForm = document.forms['multi-cell-constraint-input'].firstElementChild;
     let selectedArrow = null;
     gridSelection.addCallback(() => {
-      form.firstElementChild.disabled = true;
-
       if (selectedArrow) selectedArrow.classList.remove('selected-arrow');
       selectedArrow = null;
+      form.firstElementChild.disabled = true;
     });
-    let handleClick = (cells, arrowSvg) => {
+    let formOptions = [
+      document.getElementById('little-killer-option'),
+      document.getElementById('sandwich-option'),
+    ];
+    let handleClick = (type, id, cells, arrowSvg) => {
       gridSelection.setCells(cells);
       selectionForm.disabled = true;
       form.firstElementChild.disabled = false;
-      form['sum'].select();
+      form.type.value = type;
+      form.id.value = id;
+      form.sum.select();
+
+      for (let option of formOptions) option.disabled = true;
+      document.getElementById(type+'-option').disabled = false;
 
       selectedArrow = arrowSvg;
       selectedArrow.classList.add('selected-arrow');
     };
 
-    this._littleKillerMap = {};
-    const addArrow = (cells) => {
+    this._outsideArrowMap = {};
+    const addArrow = (type, id, cells) => {
       let cell0 = parseCellId(cells[0]);
       let cell1 = parseCellId(cells[1]);
 
@@ -110,12 +119,16 @@ class ConstraintDisplay {
         cell1.col-cell0.col);
       g.appendChild(arrowSvg);
 
-      this._littleKillerMap[cells[0]] = arrowSvg;
-      arrowSvg.onclick = () => handleClick(cells, arrowSvg);
+      this._outsideArrowMap[id] = arrowSvg;
+      arrowSvg.onclick = () => handleClick(type, id, cells, arrowSvg);
+      arrowSvg.classList.add(type);
     };
 
-    for (const cellId in SudokuConstraint.LittleKiller.CELL_MAP) {
-      addArrow(SudokuConstraint.LittleKiller.CELL_MAP[cellId]);
+    for (const id in SudokuConstraint.LittleKiller.CELL_MAP) {
+      addArrow('little-killer', id, SudokuConstraint.LittleKiller.CELL_MAP[id]);
+    }
+    for (const id in SudokuConstraint.Sandwich.CELL_MAP) {
+      addArrow('sandwich', id, SudokuConstraint.Sandwich.CELL_MAP[id]);
     }
 
     return g;
@@ -210,8 +223,8 @@ class ConstraintDisplay {
     return `rgb(${Math.random()*255|0},${Math.random()*255|0},${Math.random()*255|0})`;
   }
 
-  addLittleKiller(initialCell, sum) {
-    let elem = this._littleKillerMap[initialCell];
+  addOutsideArrow(id, sum) {
+    let elem = this._outsideArrowMap[id];
     elem.classList.add('active-arrow');
 
     let text = elem.lastChild;
@@ -221,8 +234,8 @@ class ConstraintDisplay {
     return elem;
   }
 
-  removeLittleKiller(initialCell) {
-    let elem = this._littleKillerMap[initialCell];
+  removeOutsideArrow(initialCell) {
+    let elem = this._outsideArrowMap[initialCell];
     elem.classList.remove('active-arrow');
 
     let text = elem.lastChild;
