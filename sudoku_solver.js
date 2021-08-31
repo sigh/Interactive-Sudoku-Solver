@@ -875,6 +875,7 @@ class SumHandlerUtil {
     return sumValue;
   }
 
+  // Scratch buffers for reuse so we don't have to create arrays at runtime.
   static _seenMins = new Uint16Array(GRID_SIZE);
   static _seenMaxs = new Uint16Array(GRID_SIZE);
 
@@ -1099,10 +1100,8 @@ SudokuSolver.SumHandler = class extends SudokuSolver.ConstraintHandler {
     let maxSum = 0;
     for (let i = 0; i < numCells; i++) {
       let v = grid[cells[i]];
-      let min = LookupTable.MIN[v];
-      let max = LookupTable.MAX[v];
-      minSum += min;
-      maxSum += max;
+      minSum += LookupTable.MIN[v];
+      maxSum += LookupTable.MAX[v];
     }
 
     // It is impossible to make the target sum.
@@ -1131,123 +1130,157 @@ SudokuSolver.SandwichHandler = class extends SudokuSolver.ConstraintHandler {
   constructor(cells, sum) {
     super(cells);
     this._sum = +sum;
-    this._sumList = [+sum];
-    this._distances = SudokuSolver.SandwichHandler._POSSIBLE_DISTANCES[+sum];
-    this._combinations = SudokuSolver.SandwichHandler._POSSIBLE_COMBINATIONS[+sum];
+    this._distances = SudokuSolver.SandwichHandler._DISTANCE_RANGE[+sum];
+    this._combinations = SudokuSolver.SandwichHandler._COMBINATIONS[+sum];
   }
 
-  initialize(initialGrid, cellConflicts) {
-    // this.enforceConsistency(initialGrid);
-  }
+  static _BORDER_MASK = 1 | (1 << (GRID_SIZE-1));
+  static _MAX_SUM = 35;
+  static _VALUE_MASK = ~this._BORDER_MASK & ALL_VALUES;
 
-  fixedRange(grid, sum, cells) {
-    const numCells = cells.length;
-
-    // Determine how much headroom there is in the range between the extreme
-    // values and the target sum.
-    let minSum = 0;
-    let maxSum = 0;
-    for (let i = 0; i < numCells; i++) {
-      let v = grid[cells[i]];
-      let min = LookupTable.MIN[v];
-      let max = LookupTable.MAX[v];
-      minSum += min;
-      maxSum += max;
+  // Possible combinations for values between the 1 and 9 for each possible sum.
+  // Grouped by distance.
+  static _COMBINATIONS = (() => {
+    let table = [];
+    const maxD = GRID_SIZE-1;
+    for (let i = 0; i <= this._MAX_SUM; i++) {
+      table[i] = new Array(maxD);
+      for (let d = 0; d <= maxD; d++) table[i][d] = [];
     }
 
-    // It is impossible to make the target sum.
-    if (sum < minSum || maxSum < sum) return false;
-    // We've reached the target sum exactly.
-    if (minSum == maxSum) return true;
+    for (let i = 0; i < COMBINATIONS; i++) {
+      if (i & this._BORDER_MASK) continue;
+      let sum = LookupTable.SUM[i];
+      table[sum][LookupTable.COUNT[i]+1].push(i);
+    }
 
-    if (sum - minSum < GRID_SIZE || maxSum - sum < GRID_SIZE) {
-      if (!SumHandlerUtil.restrictValueRange(grid, cells,
-                                             sum - minSum, maxSum - sum)) {
-        return false;
+    for (let i = 0; i <= this._MAX_SUM; i++) {
+      for (let d = 0; d <= maxD; d++) {
+        table[i][d] = new Uint16Array(table[i][d]);
       }
     }
 
-    return (0 !== SumHandlerUtil.restrictCellsSingleConflictSet(
-      grid, this._sumList, cells));
-  }
-
-  static _POSSIBLE_DISTANCES = (() => {
-    let sums = [];
-    for (let i = 0; i <= 35; i++) sums[i] = new Set();
-
-    let mask = 1 | (1<<8);
-    for (let i = 0; i < COMBINATIONS; i++) {
-      if (i & mask) continue;
-      sums[LookupTable.SUM[i]].add(LookupTable.COUNT[i]+1);
-    }
-    for (let i = 0; i <= 35; i++) {
-      sums[i] = Array.from(sums[i]);
-      sums[i].sort();
-      sums[i].sort();
-    }
-    return sums;
+    return table;
   })();
 
-  static _POSSIBLE_COMBINATIONS = (() => {
-    let sums = [];
-    for (let i = 0; i <= 35; i++) {
-      sums[i] = {};
-      let distances = this._POSSIBLE_DISTANCES[i];
-      for (let j = 0; j < distances.length; j++) sums[i][distances[j]] = [];
-    }
+  // Distance range between the 1 and 9 for each possible sum.
+  // Map combination to [min, max].
+  static _DISTANCE_RANGE = (() => {
+    let table = [];
+    for (let i = 0; i <= this._MAX_SUM; i++) {
+      let row = this._COMBINATIONS[i];
 
-    let mask = 1 | (1<<8);
-    for (let i = 0; i < COMBINATIONS; i++) {
-      if (i & mask) continue;
-      let sum = LookupTable.SUM[i];
-      sums[sum][LookupTable.COUNT[i]+1].push(i);
-    }
+      let j = 0;
+      while (j < row.length && !row[j].length) j++;
+      let dMin = j;
+      while (j < row.length && row[j].length) j++;
+      let dMax = j-1;
 
-    return sums;
+      table.push([dMin, dMax]);
+    }
+    return table;
   })();
+
+  // Scratch buffers for reuse so we don't have to create arrays at runtime.
+  static _validSettings = new Uint16Array(GRID_SIZE);
+  static _cellValues = new Uint16Array(GRID_SIZE);
 
   enforceConsistency(grid) {
     const cells = this.cells;
+    const borderMask = SudokuSolver.SandwichHandler._BORDER_MASK;
 
-    let validSettings = new Uint16Array(GRID_SIZE);
-
-    let minDist = this._distances[0];
-    let maxDist = this._distances[this._distances.length];
-    let mask = 1 | (1<<8);
+    // Cache the grid values for faster lookup.
+    let values = SudokuSolver.SandwichHandler._cellValues;
+    let numBorders = 0;
     for (let i = 0; i < GRID_SIZE; i++) {
-      let v = grid[cells[i]];
-      if (!(v & mask)) continue;
-      let vRev = mask & ((v>>8) | (v<<8));
+      let v = values[i] = grid[cells[i]];
+      if (v & borderMask) numBorders++;
+    }
 
-      let allValues = 0;
-      let p = i;
-      for (let j = 0; j < this._distances.length; j++) {
-        let d = this._distances[j];
-        if (i+d >= GRID_SIZE) break;
-        if (!(grid[cells[i+d]] & vRev)) continue;
-        for (;p < i+d; p++) {
-          allValues |= grid[cells[p]];
-        }
-        let combinations = this._combinations[d];
-        let possible = 0;
-        let notPossible = 0;
+    // If there are exactly two borders, then we know exactly which cells
+    // form the sum. Perform a range check.
+    // NOTE: This doesn't save any consistency checks, but does short-circuit
+    // all the extra work below, so saves a small bit of time.
+    if (numBorders < 2) return false;
+    if (numBorders === 2) {
+      let minSum = 0;
+      let maxSum = 0;
+      let i = 0;
+      while (!(values[i++] & borderMask));
+      while (!(values[i] & borderMask)) {
+        minSum += LookupTable.MIN[values[i]];
+        maxSum += LookupTable.MAX[values[i]];
+        i++;
+      }
+
+      let sum = this._sum;
+      // It is impossible to make the target sum.
+      if (sum < minSum || maxSum < sum) return false;
+      // We've reached the target sum exactly.
+      if (minSum == maxSum) return true;
+    }
+
+    // Build up a set of valid cell values.
+    let validSettings = SudokuSolver.SandwichHandler._validSettings;
+    validSettings.fill(0);
+
+    // Iterate over each possible starting index for the first 1 or 9.
+    // Check if the other values are consistant with the required sum.
+    // Given that the values must form a nonet, this is sufficient to ensure
+    // that the constraint is fully satisfied.
+    const valueMask = SudokuSolver.SandwichHandler._VALUE_MASK;
+    const [minDist, maxDist] = this._distances;
+    const maxIndex = GRID_SIZE - minDist;
+    let prefixValues = 0;
+    let pPrefix = 0;
+    for (let i = 0; i < maxIndex; i++) {
+      let v = values[i];
+      // If we don't have a 1 or 9, move onto the next index.
+      if (!(v &= borderMask)) continue;
+      // Determine what the matching 1 or 9 value needs to be.
+      const vRev = borderMask & ((v>>8) | (v<<8));
+
+      // For each possible gap:
+      //  - Determine the currently possible values inside the gap.
+      //  - Find every valid combination that can be made from these values.
+      //  - Use them to determine the possible inside and outside values.
+      let innerValues = 0;
+      let pInner = i+1;
+      for (let j = i+minDist; j <= i+maxDist && j < GRID_SIZE; j++) {
+        if (!(values[j] & vRev)) continue;
+
+        while (pInner < j) innerValues |= values[pInner++];
+        while (pPrefix < i) prefixValues |= values[pPrefix++];
+        let outerValues = prefixValues;
+        for (let k=pInner+1; k < GRID_SIZE; k++) outerValues |= values[k];
+
+        let combinations = this._combinations[j-i];
+        let innerPossibilities = 0;
+        let outerPossibilities = 0;
         for (let k = 0; k < combinations.length; k++) {
-          if (!(~allValues & combinations[k])) {
-            possible |= combinations[k];
-            notPossible |= ~combinations[k];
+          let c = combinations[k];
+          // Check if the inner values can create the combination, and the
+          // outer values can create the complement.
+          if (!((~innerValues & c) | (~outerValues & ~c & valueMask))) {
+            innerPossibilities |= c;
+            outerPossibilities |= ~c;
           }
         }
-        notPossible &= ~mask & ALL_VALUES;
-        if (possible || notPossible) {
+        outerPossibilities &= valueMask;
+        // If we have either innerPossibilities or outerPossibilities it means
+        // we have at least one valid setting. Either maybe empty if there
+        // are 0 cells in the inner or outer range.
+        if (innerPossibilities || outerPossibilities) {
           let k = 0;
-          while (k < i) validSettings[k++] |= notPossible;
-          validSettings[k++] |= v & mask;
-          while (k < i+d) validSettings[k++] |= possible;;
+          while (k < i) validSettings[k++] |= outerPossibilities;
+          validSettings[k++] |= v;
+          while (k < j) validSettings[k++] |= innerPossibilities;
           validSettings[k++] |= vRev;
-          while (k < GRID_SIZE) validSettings[k++] |= notPossible;;
+          while (k < GRID_SIZE) validSettings[k++] |= outerPossibilities;
         }
       }
     }
+
     for (let i = 0; i < GRID_SIZE; i++) {
       if (!(grid[cells[i]] &= validSettings[i])) return false;
     }
