@@ -722,16 +722,9 @@ SudokuSolver.BinaryConstraintHandler = class extends SudokuSolver.ConstraintHand
   }
 
   enforceConsistency(grid) {
-    let v0 = grid[this.cells[0]];
-    let v1 = grid[this.cells[1]];
-
-    v0 &= this._tables[1][v1];
-    v1 &= this._tables[0][v0];
-
-    grid[this.cells[0]] = v0;
-    grid[this.cells[1]] = v1;
-
-    return v0 && v1;
+    return (
+      (grid[this.cells[0]] &= this._tables[1][grid[this.cells[1]]]) &&
+      (grid[this.cells[1]] &= this._tables[0][grid[this.cells[0]]]))
   }
 }
 
