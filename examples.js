@@ -115,6 +115,10 @@ const EXAMPLES = {
   },
   'Sandwich, partial, slow': {
     input: '.Sandwich~8~C1.Sandwich~4~C2.Sandwich~17~C3.Sandwich~3~C7.Sandwich~10~C8.Sandwich~25~C9.Sandwich~4~R1.Sandwich~33~R2.Sandwich~17~R4.Sandwich~16~R7.',
+  },
+  'Anti-consectutive, hard': {
+    src: 'http://forum.enjoysudoku.com/sudokuncexplainer-to-solve-and-rate-sudoku-non-consecutive-t36949.html#p285907',
+    input: '.AntiConsecutive.~R1C2_3~R2C3_6~R3C4_5~R3C8_7',
   }
 };
 

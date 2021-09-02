@@ -65,8 +65,8 @@ class LookupTable {
   static _binaryFunctionCache = new Map();
   static _binaryFunctionKey(fn) {
     let key = 0n;
-    for (let i = 0; i < GRID_SIZE; i++) {
-      for (let j = 0; j < GRID_SIZE; j++) {
+    for (let i = 1; i <= GRID_SIZE; i++) {
+      for (let j = 1; j <= GRID_SIZE; j++) {
         if (fn(i, j)) key |= 1n << BigInt(i*GRID_SIZE+j);
       }
     }

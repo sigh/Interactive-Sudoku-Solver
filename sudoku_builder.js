@@ -435,14 +435,24 @@ class SudokuBuilder {
 
       case 'Cage':
         cells = constraint.cells.map(c => parseCellId(c).cell);
-        yield new SudokuSolver.SumHandler(cells, constraint.sum);
-        yield *this._allDifferentHandlers(cells);
+        if (cells.length == 2) {
+          yield new SudokuSolver.BinaryConstraintHandler(
+            cells[0], cells[1], (a, b) => a != b && a + b == constraint.sum);
+        } else {
+          yield new SudokuSolver.SumHandler(cells, constraint.sum);
+          yield *this._allDifferentHandlers(cells);
+        }
         break;
 
       case 'LittleKiller':
         cells = SudokuConstraint.LittleKiller
           .CELL_MAP[constraint.id].map(c => parseCellId(c).cell);
-        yield new SudokuSolver.SumHandler(cells, constraint.sum);
+        if (cells.length == 2) {
+          yield new SudokuSolver.BinaryConstraintHandler(
+            cells[0], cells[1], (a, b) => a + b == constraint.sum);
+        } else {
+          yield new SudokuSolver.SumHandler(cells, constraint.sum);
+        }
         break;
 
       case 'Sandwich':
