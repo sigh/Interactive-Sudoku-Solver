@@ -646,14 +646,10 @@ SudokuSolver.FixedCellsHandler = class extends SudokuSolver.ConstraintHandler{
     this._valueMap = valueMap;
   }
 
-  enforceConsistency(grid) {
-    for (const [cell, value] of this._valueMap) {
-      grid[cell] = 1 << (value-1);
-    }
-  }
-
   initialize(initialGrid) {
-    this.enforceConsistency(initialGrid);
+    for (const [cell, value] of this._valueMap) {
+      initialGrid[cell] = 1 << (value-1);
+    }
   }
 }
 
@@ -1013,8 +1009,6 @@ SudokuSolver.ArrowHandler = class extends SudokuSolver.ConstraintHandler {
   initialize(initialGrid, cellConflicts) {
     this._conflictSets = SumHandlerUtil.findConflictSets(
       this._arrowCells, cellConflicts);
-
-    this.enforceConsistency(initialGrid);
   }
 
   enforceConsistency(grid) {
@@ -1085,8 +1079,6 @@ SudokuSolver.SumHandler = class extends SudokuSolver.ConstraintHandler {
   initialize(initialGrid, cellConflicts) {
     this._conflictSets = SumHandlerUtil.findConflictSets(
       this.cells, cellConflicts);
-
-    this.enforceConsistency(initialGrid);
   }
 
   enforceConsistency(grid) {
