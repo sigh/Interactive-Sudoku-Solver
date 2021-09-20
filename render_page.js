@@ -941,11 +941,13 @@ class SolutionController {
   }
 
   _setUpAutoSolve() {
-    const cookieValue = document.cookie
-      .split('; ')
-      .find(row => row.startsWith('autoSolve='))
-      .split('=')[1];
-    this._elements.autoSolve.checked = cookieValue !== 'false';
+    try {
+      const cookieValue = document.cookie
+        .split('; ')
+        .find(row => row.startsWith('autoSolve='))
+        .split('=')[1];
+      this._elements.autoSolve.checked = cookieValue !== 'false';
+    } catch (e) { /* ignore */ }
 
     this._elements.autoSolve.onchange = () => {
       let isChecked = this._elements.autoSolve.checked ? true : false;
