@@ -1048,6 +1048,7 @@ class SolutionController {
       this._grid.setSolution([]);
       this._clearStateVariables();
       this._terminateSolver();
+      this._showIterationControls(false);
     }
   }
 
