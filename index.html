@@ -77,10 +77,14 @@
           <div id="solution-step-output"></div>
           <button id="solution-forward" class="icon-button" title="next (n)">&#8250;</button>
         </div>
-        <div>
-          <span id="solve-status"></span>
-          <span id="error-output" class="error"></span>
+        <div class="switch">
+          <label>
+            <input id="auto-solve-input" type="checkbox" checked>
+            <span></span>
+          </label>
+          Auto-solve
         </div>
+        <button id="solve-button">Solve</button>
         <button id="stop-solver" class="danger-button">Abort</button>
       </div>
     </div>
@@ -88,14 +92,18 @@
     <div id="display-panel">
       <div>
         <select id="solve-mode-input">
-          <option value="all-possibilities">All possibilties</option>
+          <option value="all-possibilities" checked>All possibilities</option>
           <option value="solutions">Solutions</option>
-          <option value="count-solutions" checked>Count solutions</option>
-          <option value="step-by-step" checked>Step-by-step</option>
+          <option value="count-solutions">Count solutions</option>
+          <option value="step-by-step">Step-by-step</option>
         </select>
         <div id="solve-mode-description" class="description"></div>
       </div>
       <div id="state-output"></div>
+      <div>
+        <span id="solve-status"></span>
+        <span id="error-output" class="error"></span>
+      </div>
     </div>
 
     <div id="constraint-panel">

@@ -270,14 +270,17 @@ button.icon-button {
 #state-output {
   font-size: 12px;
 }
-
 #state-output > div {
   margin: 10px 0;
 }
-
 #state-output span {
   display: block;
   line-height: 120%;
+}
+#state-output span:after {
+  /* Ensure that the empty spans still take up space. */
+  content: '.';
+  visibility: hidden;
 }
 
 select {
@@ -397,4 +400,59 @@ footer {
   max-width: 200px;
 
   z-index: 1000;
+}
+
+/* Toggle switch
+ * From: https://www.w3schools.com/howto/howto_css_switch.asp
+ */
+.switch {
+  white-space: nowrap;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+}
+.switch label {
+  position: relative;
+  display: inline-block;
+  width: 45px;
+  height: 25px;
+}
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.switch label span {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #ccc;
+  transition: .4s;
+
+  border-radius: 50px;
+}
+.switch label span:before {
+  position: absolute;
+  content: "";
+  height: 19px;
+  width: 19px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: .4s;
+
+  border-radius: 50%;
+}
+input:checked + span {
+  background-color: #2196F3;
+}
+input:focus + span {
+  box-shadow: 0 0 1px #2196F3;
+}
+input:checked + span:before {
+  transform: translateX(19px);
 }

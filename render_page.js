@@ -865,7 +865,11 @@ class HistoryHandler {
     let url = new URL(window.location.href);
 
     for (const [key, value] of Object.entries(params)) {
-      url.searchParams.set(key, value);
+      if (value !== undefined) {
+        url.searchParams.set(key, value);
+      } else {
+        url.searchParams.delete(key);
+      }
     }
 
     let newUrl = url.toString();
@@ -908,11 +912,15 @@ class SolutionController {
       solveStatus: document.getElementById('solve-status'),
       error: document.getElementById('error-output'),
       stop: document.getElementById('stop-solver'),
+      solve: document.getElementById('solve-button'),
+      autoSolve: document.getElementById('auto-solve-input'),
     }
 
     this._elements.mode.onchange = () => this._update();
     this._elements.stop.onclick = () => this._terminateSolver();
+    this._elements.solve.onclick = () => this._solve();
 
+    this._setUpAutoSolve();
     this._setUpKeyBindings();
 
     this._setUpStateOutput();
@@ -930,6 +938,20 @@ class SolutionController {
     });
 
     this._update();
+  }
+
+  _setUpAutoSolve() {
+    const cookieValue = document.cookie
+      .split('; ')
+      .find(row => row.startsWith('autoSolve='))
+      .split('=')[1];
+    this._elements.autoSolve.checked = cookieValue !== 'false';
+
+    this._elements.autoSolve.onchange = () => {
+      let isChecked = this._elements.autoSolve.checked ? true : false;
+      document.cookie = `autoSolve=${isChecked}`;
+      if (isChecked) this._update();
+    }
   }
 
   _setUpKeyBindings() {
@@ -1011,14 +1033,29 @@ class SolutionController {
   async _update() {
     let constraints = this._constraintManager.getConstraints();
     let mode = this._elements.mode.value;
+    let auto = this._elements.autoSolve.checked;
+
     this._historyHandler.update({mode: mode, q: constraints});
+
+    let description = SolutionController._MODE_DESCRIPTIONS[mode];
+    this._elements.modeDescription.textContent = description;
+
+    if (auto || mode === 'step-by-step') {
+      this._solve(constraints);
+    } else {
+      this._grid.setSolution([]);
+      this._clearStateVariables();
+      this._terminateSolver();
+    }
+  }
+
+  async _solve(constraints) {
+    constraints ||= this._constraintManager.getConstraints();
+    let mode = this._elements.mode.value;
 
     let solver = await this._replaceSolver(constraints);
 
     this._grid.setSolution([]);
-
-    let description = SolutionController._MODE_DESCRIPTIONS[mode];
-    this._elements.modeDescription.textContent = description;
 
     let handler = this._modeHandlers[mode];
 
@@ -1079,6 +1116,12 @@ class SolutionController {
     }
   }
 
+  _clearStateVariables() {
+    for (const v in this._stateVars) {
+      this._stateVars[v].textContent = '';
+    }
+  }
+
   _displayStateVariables(state) {
     const counters = state.counters;
 
@@ -1100,7 +1143,7 @@ class SolutionController {
 
   _displayState(state) {
     // Handle this in a seperate function, as then it can be defered
-    // independently of the solution update:w
+    // independently of the solution update.
     this._displayStateVariables(state);
 
     // Handle extra state.
