@@ -159,7 +159,7 @@ class ConstraintManager {
     this.updateCallback(this);
   }
 
-  _cellsAreAdjacent(cells) {
+  static _cellsAreAdjacent(cells) {
     if (cells.length != 2) return false;
     // Manhatten distance is exactly 1.
     let cell0 = parseCellId(cells[0]);
@@ -174,31 +174,26 @@ class ConstraintManager {
     this._checkboxConstraints = new CheckboxConstraints(
       this._display, this.runUpdateCallback.bind(this));
 
-    // Multi-cell selections.
-    let adjacentOnlyConstraints = [
-      document.getElementById('multi-cell-constraint-white-dot'),
-      document.getElementById('multi-cell-constraint-black-dot'),
-    ];
 
     let selectionForm = document.forms['multi-cell-constraint-input'];
-    this._grid.selection.addCallback((selection) => {
-      let disabled = (selection.length < 2);
-      selectionForm.firstElementChild.disabled = disabled;
-      // Focus on the submit button so that that we can immediately press enter.
-      if (!disabled) {
-        let cellsAreAdjacent = this._cellsAreAdjacent(selection);
-        for (let c of adjacentOnlyConstraints) {
-          c.disabled = !cellsAreAdjacent;
-        }
-        selectionForm.querySelector('button[type=submit]').focus();
-      }
-    });
+    this._grid.selection.addCallback(
+      (selection) => this.constructor._onNewSelection(
+        selection, selectionForm));
+
     selectionForm.onsubmit = e => {
       this._addConstraintFromForm(selectionForm);
       return false;
     }
-    let cageInput = document.getElementById('multi-cell-constraint-cage');
-    selectionForm['cage-sum'].onfocus = () => { cageInput.checked = true; };
+
+    // Selecting anything in the constraint cage will select it and focus on
+    // the input box.
+    selectionForm['multi-cell-constraint-cage'].onchange = () => {
+      selectionForm['cage-sum'].select();
+    };
+    selectionForm['cage-sum'].onfocus = () => {
+      selectionForm['multi-cell-constraint-cage'].checked = true;
+    };
+
     this._grid.selection.addSelectionPreserver(selectionForm);
 
     // Little killer.
@@ -221,6 +216,40 @@ class ConstraintManager {
 
     // Clear button.
     document.getElementById('clear-constraints-button').onclick = () => this.clear();
+  }
+
+  static _onNewSelection(selection, selectionForm) {
+    // Only enable the selection panel if the selection is long enough.
+    const disabled = (selection.length < 2);
+    selectionForm.firstElementChild.disabled = disabled;
+    if (disabled) return;
+
+    // Multi-cell selections.
+    const adjacentOnlyConstraints = [
+      'multi-cell-constraint-white-dot',
+      'multi-cell-constraint-black-dot',
+    ];
+
+    // Enable/disable the adjacent only constraints.
+    let cellsAreAdjacent = this._cellsAreAdjacent(selection);
+    for (const c of adjacentOnlyConstraints) {
+      const elem = selectionForm[c];
+      if (cellsAreAdjacent) {
+        elem.disabled = false;
+      } else {
+        elem.checked = false;
+        elem.disabled = true;
+      }
+    }
+
+    // Focus on the the form so we can immediately press enter.
+    //   - If the cage is selected then focus on the text box for easy input.
+    //   - Otherwise just focus on the submit button.
+    if (selectionForm['multi-cell-constraint-cage'].checked) {
+      selectionForm['cage-sum'].select();
+    } else {
+      selectionForm.querySelector('button[type=submit]').focus();
+    }
   }
 
   _setUpLittleKiller() {
