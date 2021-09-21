@@ -226,7 +226,6 @@ class SudokuSolver {
 
   state() {
     let counters = {...this._internalSolver.counters};
-    counters.backtracks = counters.valuesTried - counters.cellsSearched;
 
     return {
       counters: counters,
@@ -291,25 +290,27 @@ SudokuSolver.InternalSolver = class {
 
     this._handlers = this._setUpHandlers(handlerGen);
 
-    // Ranks go from 0->255, with 0 being the best.
-    this._cellRank = this._initCellRanks();
+    // Priorities go from 0->255, with 255 being the best.
+    // This can be used to prioritize which cells to search.
+    this._cellPriorities = this._initCellPriorities();
 
     this.reset();
   }
 
-  _initCellRanks() {
-    // Initialize cells with worst rank.
-    let ranks = new Uint8Array(NUM_CELLS);
-    ranks.fill(0xff);
+  _initCellPriorities() {
+    let priorities = new Uint8Array(NUM_CELLS);
 
     for (const handler of this._handlers) {
-      // The most constrainted cells have the best ranks.
+      // The most constrainted cells have the best priorities.
+      // For now just look at the most restricted constraint the cell is part
+      // of.
       for (const cell of handler.cells) {
-        ranks[cell] = Math.min(ranks[cell], handler.cells.length);
+        priorities[cell] = Math.min(
+          priorities[cell], GRID_SIZE-handler.cells.length);
       }
     }
 
-    return ranks;
+    return priorities;
   }
 
   _setUpHandlers(handlers) {
@@ -355,10 +356,22 @@ SudokuSolver.InternalSolver = class {
     this.counters = {
       valuesTried: 0,
       cellsSearched: 0,
+      backtracks: 0,
       guesses: 0,
       solutions: 0,
       constraintsProcessed: 0,
     };
+
+    // _backtrackTriggers counts the the number of times a cell is responsible
+    // for finding a contradition and causing a backtrack.
+    // Cells with a high count are the best candidates for searching as we
+    // may find the contradition faster. Ideally, this allows the search to
+    // learn the critical areas of the grid where it is more valuable to search
+    // first.
+    // _backtrackTriggers are exponentially decayed so that the search can
+    // learn new parts of the search space effectively.
+    this._backtrackTriggers = Array.from(this._cellPriorities);
+
     this._resetStack();
   }
 
@@ -404,23 +417,27 @@ SudokuSolver.InternalSolver = class {
     // NOTE: If the scoring is more complicated than counts, it can be useful
     // to do an initial pass to detect 1 or 0 value cells (~(v&(v-1))).
 
-    let minScore = 1 << 16;
+    // Find the cell with the minimum score (remaining possibilities in the
+    // cell).
+    // Break ties with the hit count.
+    let minScore = GRID_SIZE + 1;
+    let maxTriggerCount = 0;
 
     for (let i = 0; i < stack.length; i++) {
-      const count = LookupTable.COUNT[grid[stack[i]]];
+      const cell = stack[i];
+      const count = LookupTable.COUNT[grid[cell]];
       // If we have a single value then just use it - as it will involve no
       // guessing.
       if (count <= 1) {
         [stack[i], stack[0]] = [stack[0], stack[i]];
         return;
       }
-      // Otherwise calculate the score:
-      //  - Make rank is 255.
-      //  - The lower the score the better.
-      const score = (count << 8) +  this._cellRank[stack[i]];
-      if (score < minScore) {
+
+      const triggerCount = this._backtrackTriggers[cell];
+      if (count < minScore || count == minScore && triggerCount > maxTriggerCount ) {
         [stack[i], stack[0]] = [stack[0], stack[i]];
-        minScore = score;
+        minScore = count;
+        maxTriggerCount = triggerCount;
       }
     }
   }
@@ -521,6 +538,16 @@ SudokuSolver.InternalSolver = class {
       // Propogate constraints.
       grid[cell] = value;
       let hasContradiction = !this._enforceValue(grid, value, cell);
+      if (hasContradiction) {
+        counters.backtracks++;
+        // Exponentially decay the counts.
+        if (counters.backtracks % (NUM_CELLS*NUM_CELLS) == 0) {
+          for (let i = 0; i < NUM_CELLS; i++) {
+            this._backtrackTriggers[i]>>=1;
+          }
+        }
+        this._backtrackTriggers[cell]++;
+      }
 
       if ((counters.valuesTried & progressFrequencyMask) === 0) {
         this._progress.callback();
