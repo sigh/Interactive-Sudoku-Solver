@@ -274,6 +274,66 @@ class SudokuSolver {
   }
 }
 
+SudokuSolver.ConstraintOptimizer = class {
+  static #NONET_SUM = GRID_SIZE*(GRID_SIZE+1)/2;
+
+  static optimize(handlers) {
+    handlers = this.#findHiddenCages(handlers);
+
+    return handlers;
+  }
+
+  static #findHiddenCages(handlers) {
+    // TODO: Consider interation with FixedCells.
+    const sumHandlers = handlers.filter(h => h instanceof SudokuSolver.SumHandler);
+    const nonetHandlers = handlers.filter(h => h instanceof SudokuSolver.NonetHandler);
+
+    // For now assume that sum constraints don't overlap.
+    const cellMap = new Array(NUM_CELLS);
+    for (const h of sumHandlers) {
+      for (const c of h.cells) {
+        cellMap[c] = h;
+      }
+    }
+
+    for (const h of nonetHandlers) {
+      const constraintMap = new Map();
+      // Map from constraints to cell.
+      for (const c of h.cells) {
+        const k = cellMap[c];
+        if (k) {
+          if (constraintMap.has(k)) {
+            constraintMap.get(k).push(c);
+          } else {
+            constraintMap.set(k, [c])
+          }
+        }
+      }
+
+      // Find contraints which have cells entirely within this nonet.
+      const constrainedCells = [];
+      let constrainedSum = 0;
+      for (const [k, cells] of constraintMap) {
+        if (k.cells.length == cells.length) {
+          constrainedCells.push(...cells);
+          constrainedSum += k._sum;
+        }
+      }
+
+      if (constrainedCells.length > 0 && constrainedCells.length < GRID_SIZE) {
+        // TODO: 1 cell is a fixed cell constraint. This can be in the next
+        // optimization phase, which handles 1 and 2 cell constraints.
+        const complementCells = setDifference(h.cells, constrainedCells);
+        const complementSum = this.#NONET_SUM - constrainedSum;
+        handlers.push(new SudokuSolver.SumHandler(
+          complementCells, complementSum));
+      }
+    }
+
+    return handlers;
+  }
+}
+
 const SOLVER_INITIALIZE_AT_START = true;
 
 SudokuSolver.InternalSolver = class {
@@ -288,7 +348,9 @@ SudokuSolver.InternalSolver = class {
       callback: null,
     };
 
-    this._handlers = this._setUpHandlers(handlerGen);
+    this._handlers = SudokuSolver.ConstraintOptimizer.optimize(
+      Array.from(handlerGen));
+    this._setUpHandlers(this._handlers);
 
     // Priorities go from 0->255, with 255 being the best.
     // This can be used to prioritize which cells to search.
@@ -321,7 +383,6 @@ SudokuSolver.InternalSolver = class {
       this._cellConstraintHandlers[i] = [];
     }
 
-    handlers = Array.from(handlers);
     for (const handler of handlers) {
       // Add all cells that the handler claims to be attached to the list of
       // handlers for that cell.
@@ -347,8 +408,6 @@ SudokuSolver.InternalSolver = class {
     for (const handler of handlers) {
       handler.initialize(this._initialGrid, cellConflicts);
     }
-
-    return handlers;
   }
 
   reset() {

@@ -14,6 +14,10 @@ const camelCaseToWords = (text) => {
   return text[0].toUpperCase() + text.slice(1);
 };
 
+const setDifference = (a, b) => {
+  return a.filter(v => !b.includes(v));
+}
+
 const deferUntilAnimationFrame = (fn) => {
   let lastArgs = null;
   let promise = null;
