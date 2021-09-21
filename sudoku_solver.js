@@ -279,7 +279,7 @@ const SOLVER_INITIALIZE_AT_START = true;
 
 SudokuSolver.InternalSolver = class {
 
-  constructor(handlers) {
+  constructor(handlerGen) {
     this._initCellArray();
     this._stack = new Uint8Array(NUM_CELLS);
 
@@ -289,9 +289,27 @@ SudokuSolver.InternalSolver = class {
       callback: null,
     };
 
-    this._setUpHandlers(handlers);
+    this._handlers = this._setUpHandlers(handlerGen);
+
+    // Ranks go from 0->255, with 0 being the best.
+    this._cellRank = this._initCellRanks();
 
     this.reset();
+  }
+
+  _initCellRanks() {
+    // Initialize cells with worst rank.
+    let ranks = new Uint8Array(NUM_CELLS);
+    ranks.fill(0xff);
+
+    for (const handler of this._handlers) {
+      // The most constrainted cells have the best ranks.
+      for (const cell of handler.cells) {
+        ranks[cell] = Math.min(ranks[cell], handler.cells.length);
+      }
+    }
+
+    return ranks;
   }
 
   _setUpHandlers(handlers) {
@@ -328,6 +346,8 @@ SudokuSolver.InternalSolver = class {
     for (const handler of handlers) {
       handler.initialize(this._initialGrid, cellConflicts);
     }
+
+    return handlers;
   }
 
   reset() {
@@ -384,14 +404,23 @@ SudokuSolver.InternalSolver = class {
     // NOTE: If the scoring is more complicated than counts, it can be useful
     // to do an initial pass to detect 1 or 0 value cells (~(v&(v-1))).
 
-    let minScore = GRID_SIZE + 1;
+    let minScore = 1 << 16;
 
     for (let i = 0; i < stack.length; i++) {
-      let count = LookupTable.COUNT[grid[stack[i]]];
-      if (count < minScore) {
+      const count = LookupTable.COUNT[grid[stack[i]]];
+      // If we have a single value then just use it - as it will involve no
+      // guessing.
+      if (count <= 1) {
         [stack[i], stack[0]] = [stack[0], stack[i]];
-        if (count < 2) return;
-        minScore = count;
+        return;
+      }
+      // Otherwise calculate the score:
+      //  - Make rank is 255.
+      //  - The lower the score the better.
+      const score = (count << 8) +  this._cellRank[stack[i]];
+      if (score < minScore) {
+        [stack[i], stack[0]] = [stack[0], stack[i]];
+        minScore = score;
       }
     }
   }
