@@ -64,13 +64,15 @@ class LookupTable {
 
   static _binaryFunctionCache = new Map();
   static _binaryFunctionKey(fn) {
-    let key = 0n;
+    let keyParts = [];
     for (let i = 1; i <= GRID_SIZE; i++) {
+      let part = 0;
       for (let j = 1; j <= GRID_SIZE; j++) {
-        if (fn(i, j)) key |= 1n << BigInt(i*GRID_SIZE+j);
+        part |= fn(i, j) << j;
       }
+      keyParts.push(part);
     }
-    return key;
+    return keyParts.join(',');
   }
 
   static forBinaryFunction(fn) {
@@ -79,6 +81,7 @@ class LookupTable {
     if (this._binaryFunctionCache.has(key)) {
       return this._binaryFunctionCache.get(key);
     }
+
     let table = new Uint16Array(COMBINATIONS);
     this._binaryFunctionCache.set(key, table);
 
@@ -277,15 +280,71 @@ class SudokuSolver {
 SudokuSolver.ConstraintOptimizer = class {
   static #NONET_SUM = GRID_SIZE*(GRID_SIZE+1)/2;
 
-  static optimize(handlers) {
+  static optimize(handlers, cellConflictSets) {
+    handlers = this.#addNonetHandlers(handlers);
+
     handlers = this.#findHiddenCages(handlers);
+
+    handlers = this.#replaceWithBinaryConstraints(handlers, cellConflictSets);
+
+    handlers = this.#replaceWithFixedValues(handlers);
 
     return handlers;
   }
 
+  // Add nonet handlers for any AllDifferentHandler which have 9 cells.
+  static #addNonetHandlers(handlers) {
+    for (const h of handlers) {
+      if (h instanceof SudokuSolver.AllDifferentHandler) {
+        const c = h.conflictSet();
+        if (c.length == GRID_SIZE) {
+          handlers.push(new SudokuSolver.NonetHandler(c));
+        }
+      }
+    }
+
+    return handlers;
+  }
+
+  // Find 2-cell constraints and replace them with binary constraints.
+  // Only handles sums at the moment.
+  static #replaceWithBinaryConstraints(handlers, cellConflictSets) {
+    for (let i = 0; i < handlers.length; i++) {
+      const h = handlers[i];
+      if (h.cells.length != 2) continue;
+
+      if (h instanceof SudokuSolver.SumHandler) {
+        const hasConflict = cellConflictSets[h.cells[0]].has(h.cells[1]);
+        handlers[i] = new SudokuSolver.BinaryConstraintHandler(
+          h.cells[0], h.cells[1],
+          (a, b) => a+b == h._sum && (!hasConflict || a != b));
+      }
+    }
+
+    return handlers;
+  }
+
+  // Find 1-cell constraints and convert them to fixed values.
+  static #replaceWithFixedValues(handlers) {
+    for (let i = 0; i < handlers.length; i++) {
+      const h = handlers[i];
+      if (h.cells.length != 1) continue;
+
+      if (h instanceof SudokuSolver.SumHandler) {
+        handlers[i] = new SudokuSolver.FixedCellsHandler(
+          new Map([[h.cells[0], h._sum]]));
+      }
+    }
+
+    return handlers;
+  }
+
+  // Find sets of cells which we can infer have a known sum and unique values.
   static #findHiddenCages(handlers) {
-    // TODO: Consider interation with FixedCells.
+    // TODO: Consider how this interactions with fixed cells.
     const sumHandlers = handlers.filter(h => h instanceof SudokuSolver.SumHandler);
+    if (sumHandlers.length == 0) return handlers;
+
     const nonetHandlers = handlers.filter(h => h instanceof SudokuSolver.NonetHandler);
 
     // For now assume that sum constraints don't overlap.
@@ -309,6 +368,7 @@ SudokuSolver.ConstraintOptimizer = class {
           }
         }
       }
+      if (!constraintMap.size) continue;
 
       // Find contraints which have cells entirely within this nonet.
       const constrainedCells = [];
@@ -320,14 +380,18 @@ SudokuSolver.ConstraintOptimizer = class {
         }
       }
 
-      if (constrainedCells.length > 0 && constrainedCells.length < GRID_SIZE) {
-        // TODO: 1 cell is a fixed cell constraint. This can be in the next
-        // optimization phase, which handles 1 and 2 cell constraints.
-        const complementCells = setDifference(h.cells, constrainedCells);
-        const complementSum = this.#NONET_SUM - constrainedSum;
-        handlers.push(new SudokuSolver.SumHandler(
-          complementCells, complementSum));
-      }
+      // No constraints within this nonet.
+      if (constrainedCells.length == 0) continue;
+      // The remaining 8-cell will already be constrained after the first
+      // pass.
+      if (constrainedCells.length == 1) continue;
+      // Nothing left to constrain.
+      if (constrainedCells.length == GRID_SIZE) continue;
+
+      const complementCells = setDifference(h.cells, constrainedCells);
+      const complementSum = this.#NONET_SUM - constrainedSum;
+      handlers.push(new SudokuSolver.SumHandler(
+        complementCells, complementSum));
     }
 
     return handlers;
@@ -348,9 +412,7 @@ SudokuSolver.InternalSolver = class {
       callback: null,
     };
 
-    this._handlers = SudokuSolver.ConstraintOptimizer.optimize(
-      Array.from(handlerGen));
-    this._setUpHandlers(this._handlers);
+    this._handlers = this._setUpHandlers(Array.from(handlerGen));
 
     // Priorities go from 0->255, with 255 being the best.
     // This can be used to prioritize which cells to search.
@@ -375,39 +437,52 @@ SudokuSolver.InternalSolver = class {
     return priorities;
   }
 
-  _setUpHandlers(handlers) {
-    let cellConflicts = new Array(NUM_CELLS);
-    this._cellConstraintHandlers = new Array(NUM_CELLS);
-    for (let i = 0; i < NUM_CELLS; i++) {
-      cellConflicts[i] = new Set();
-      this._cellConstraintHandlers[i] = [];
-    }
+  static #findCellConflicts(handlers) {
+    const cellConflictSets = new Array(NUM_CELLS);
+    for (let i = 0; i < NUM_CELLS; i++) cellConflictSets[i] = new Set();
 
-    for (const handler of handlers) {
-      // Add all cells that the handler claims to be attached to the list of
-      // handlers for that cell.
-      for (const cell of handler.cells) {
-        this._cellConstraintHandlers[cell].push(handler);
-      }
-
-      // Add handling for conflicting cells.
-      let conflictSet = handler.conflictSet();
+    for (const h of handlers) {
+      const conflictSet = h.conflictSet();
       for (const c of conflictSet) {
         for (const d of conflictSet) {
-          if (c != d) cellConflicts[c].add(d);
+          if (c != d) cellConflictSets[c].add(d);
         }
       }
     }
 
+    return cellConflictSets;
+  }
+
+  _setUpHandlers(handlers) {
+    const cellConflictSets = this.constructor.#findCellConflicts(handlers);
+
     // Set cell conflicts so that they are unique.
     // Sort them, so they are in a predictable order.
-    this._cellConflicts = cellConflicts.map(c => new Uint8Array(c));
+    this._cellConflicts = cellConflictSets.map(c => new Uint8Array(c));
     this._cellConflicts.forEach(c => c.sort((a, b) => a-b));
+
+    // Optimize handlers.
+    handlers = SudokuSolver.ConstraintOptimizer.optimize(
+      handlers, cellConflictSets);;
+
+    // Add all cells that the handler claims to be attached to the list of
+    // handlers for that cell.
+    this._cellConstraintHandlers = new Array(NUM_CELLS);
+    for (let i = 0; i < NUM_CELLS; i++) {
+      this._cellConstraintHandlers[i] = [];
+    }
+    for (const handler of handlers) {
+      for (const cell of handler.cells) {
+        this._cellConstraintHandlers[cell].push(handler);
+      }
+    }
 
     // TODO: Include as part of the solver for timing?
     for (const handler of handlers) {
-      handler.initialize(this._initialGrid, cellConflicts);
+      handler.initialize(this._initialGrid, cellConflictSets);
     }
+
+    return handlers;
   }
 
   reset() {
@@ -771,6 +846,7 @@ SudokuSolver.FixedCellsHandler = class extends SudokuSolver.ConstraintHandler{
 SudokuSolver.AllDifferentHandler = class extends SudokuSolver.ConstraintHandler {
   constructor(conflictCells) {
     super();
+    conflictCells.sort((a, b) => a - b);
     this._conflictCells = conflictCells;
   }
 

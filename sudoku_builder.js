@@ -425,7 +425,7 @@ class SudokuBuilder {
           let c = constraint.direction > 0 ? GRID_SIZE-r-1 : r;
           cells.push(toCellIndex(r, c));
         }
-        yield *this._allDifferentHandlers(cells);
+        yield new SudokuSolver.AllDifferentHandler(cells);
         break;
 
       case 'Arrow':
@@ -435,24 +435,14 @@ class SudokuBuilder {
 
       case 'Cage':
         cells = constraint.cells.map(c => parseCellId(c).cell);
-        if (cells.length == 2) {
-          yield new SudokuSolver.BinaryConstraintHandler(
-            cells[0], cells[1], (a, b) => a != b && a + b == constraint.sum);
-        } else {
-          yield new SudokuSolver.SumHandler(cells, constraint.sum);
-          yield *this._allDifferentHandlers(cells);
-        }
+        yield new SudokuSolver.SumHandler(cells, constraint.sum);
+        yield new SudokuSolver.AllDifferentHandler(cells);
         break;
 
       case 'LittleKiller':
         cells = SudokuConstraint.LittleKiller
           .CELL_MAP[constraint.id].map(c => parseCellId(c).cell);
-        if (cells.length == 2) {
-          yield new SudokuSolver.BinaryConstraintHandler(
-            cells[0], cells[1], (a, b) => a + b == constraint.sum);
-        } else {
-          yield new SudokuSolver.SumHandler(cells, constraint.sum);
-        }
+        yield new SudokuSolver.SumHandler(cells, constraint.sum);
         break;
 
       case 'Sandwich':
@@ -463,7 +453,7 @@ class SudokuBuilder {
 
       case 'AllDifferent':
         cells = constraint.cells.map(c => parseCellId(c).cell);
-        yield *this._allDifferentHandlers(cells);
+        yield new SudokuSolver.AllDifferentHandler(cells);
         break;
 
       case 'FixedValues':
@@ -504,18 +494,6 @@ class SudokuBuilder {
       default:
         throw('Unknown constraint type: ' + constraint.type);
     }
-  }
-
-  static *_allDifferentHandlers(cells) {
-    cells.sort((a, b) => a-b);
-    if (cells.length > GRID_SIZE) throw('Too many cells for AllDifferent');
-    if (cells.length < GRID_SIZE) {
-      yield new SudokuSolver.AllDifferentHandler(cells);
-      return;
-    }
-
-    // Exactly 9 cells.
-    yield new SudokuSolver.NonetHandler(cells);
   }
 
   static *_antiHandlers(conflictFn) {
