@@ -166,6 +166,7 @@ button.danger-button:hover:enabled {
   background: rgba(255,255,0,0.8);
 }
 .constraint-item button:hover {
+  background: none;
   color: #bc3315;
 }
 
@@ -431,7 +432,7 @@ footer {
   right: 0;
   bottom: 0;
   background-color: #ccc;
-  transition: .4s;
+  transition: .1s;
 
   border-radius: 50px;
 }
@@ -443,7 +444,7 @@ footer {
   left: 3px;
   bottom: 3px;
   background-color: white;
-  transition: .4s;
+  transition: .1s;
 
   border-radius: 50%;
 }
@@ -455,4 +456,8 @@ input:focus + span {
 }
 input:checked + span:before {
   transform: translateX(19px);
+}
+
+#solve-mode-description {
+  height: 30px;
 }

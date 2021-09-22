@@ -917,6 +917,7 @@ class HistoryHandler {
 class SolutionController {
   constructor(constraintManager, grid) {
     this._solver = null;
+    this._isSolving = false;
     this._constraintManager = constraintManager;
     this._grid = grid;
     this._update = deferUntilAnimationFrame(this._update.bind(this));
@@ -981,7 +982,9 @@ class SolutionController {
     this._elements.autoSolve.onchange = () => {
       let isChecked = this._elements.autoSolve.checked ? true : false;
       document.cookie = `autoSolve=${isChecked}`;
-      if (isChecked) this._update();
+      // If we have enabled auto-solve, then start solving! Unless
+      // we are already solving.
+      if (isChecked && !this._isSolving) this._update();
     }
   }
 
@@ -1102,6 +1105,7 @@ class SolutionController {
   }
 
   _setSolving(isSolving) {
+    this._isSolving = isSolving;
     if (isSolving) {
       this._elements.stop.disabled = false;
       this._elements.start.disabled = true;
