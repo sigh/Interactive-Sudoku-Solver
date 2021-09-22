@@ -317,7 +317,7 @@ SudokuSolver.ConstraintOptimizer = class {
         const hasConflict = cellConflictSets[h.cells[0]].has(h.cells[1]);
         handlers[i] = new SudokuSolver.BinaryConstraintHandler(
           h.cells[0], h.cells[1],
-          (a, b) => a+b == h._sum && (!hasConflict || a != b));
+          (a, b) => a+b == h.sum() && (!hasConflict || a != b));
       }
     }
 
@@ -332,7 +332,7 @@ SudokuSolver.ConstraintOptimizer = class {
 
       if (h instanceof SudokuSolver.SumHandler) {
         handlers[i] = new SudokuSolver.FixedCellsHandler(
-          new Map([[h.cells[0], h._sum]]));
+          new Map([[h.cells[0], h.sum()]]));
       }
     }
 
@@ -376,7 +376,7 @@ SudokuSolver.ConstraintOptimizer = class {
       for (const [k, cells] of constraintMap) {
         if (k.cells.length == cells.length) {
           constrainedCells.push(...cells);
-          constrainedSum += k._sum;
+          constrainedSum += k.sum();
         }
       }
 
@@ -1253,37 +1253,106 @@ SudokuSolver.ArrowHandler = class extends SudokuSolver.ConstraintHandler {
 }
 
 SudokuSolver.SumHandler = class extends SudokuSolver.ConstraintHandler {
+  #conflictSets;
+  #conflictMap;
+  #sum;
+  #sumList = [0];
+
   constructor(cells, sum) {
     super(cells);
-    this._sum = +sum;
-    this._sumList = [+sum];
-    this._conflictSets = null;
+    this.#sum = +sum;
+    this.#sumList[0] = this.#sum;
+  }
+
+  sum() {
+    return this.#sum;
   }
 
   initialize(initialGrid, cellConflicts) {
-    this._conflictSets = SumHandlerUtil.findConflictSets(
+    this.#conflictSets = SumHandlerUtil.findConflictSets(
       this.cells, cellConflicts);
+
+    this.#conflictMap = new Uint8Array(this.cells.length);
+    this.#conflictSets.forEach(
+      (s,i) => s.forEach(
+        c => this.#conflictMap[this.cells.indexOf(c)] = i));
+  }
+
+  // Optimize the 2-cell case by solving it exactly and efficiently.
+  // REQUIRES that there is at least one unfixed cell.
+  #enforceTwoRemainingCells(grid, targetSum) {
+    const cells = this.cells;
+    const numCells = cells.length;
+
+    // Find the index of the first cell with more than one entry.
+    // There MUST be one because minSum != maxSum.
+    let i0 = 0;
+    let v0 = grid[cells[i0]];
+    while (!(v0&(v0-1))) v0 = grid[cells[++i0]];
+
+    // Find the second cell with only one entry (if it exists).
+    for (let i1 = i0+1; i1 < numCells; i1++) {
+      // Continue until we find a cell with only one entry.
+      let v1 = grid[cells[i1]];
+      if (!(v1&(v1-1))) continue;
+
+      // Remove any values which don't have their counterpart value to add to
+      // targetSum.
+      v1 &= (LookupTable.REVERSE[v0] << (targetSum-1)) >> GRID_SIZE;
+      v0 &= (LookupTable.REVERSE[v1] << (targetSum-1)) >> GRID_SIZE;
+
+      // If the cells are in the same conflict set, also ensure the sum is
+      // distict values.
+      if ((targetSum&1) == 0 && this.#conflictMap[i0] === this.#conflictMap[i1]) {
+        // targetSum/2 can't be valid value.
+        let mask = ~(1 << ((targetSum>>1)-1));
+        v0 &= mask;
+        v1 &= mask;
+      }
+
+      if (!(v1 && v0)) return false;
+
+      grid[cells[i0]] = v0;
+      grid[cells[i1]] = v1;
+      return true;
+    }
+
+    // There was only one cell. Constrain it, and return.
+    v0 &= 1<<(targetSum-1);
+    if (!v0) return false;
+    grid[cells[i0]] = v0;
+    return true;
   }
 
   enforceConsistency(grid) {
     const cells = this.cells;
     const numCells = cells.length;
-    const sum = this._sum;
+    const sum = this.#sum;
 
     // Determine how much headroom there is in the range between the extreme
     // values and the target sum.
     let minSum = 0;
     let maxSum = 0;
+    let fixedValues = 0;
     for (let i = 0; i < numCells; i++) {
-      let v = grid[cells[i]];
-      minSum += LookupTable.MIN[v];
-      maxSum += LookupTable.MAX[v];
+      const v = grid[cells[i]];
+      const min = LookupTable.MIN[v];
+      const max = LookupTable.MAX[v];
+      minSum += min;
+      maxSum += max;
+      if (min === max) fixedValues |= v;
     }
 
     // It is impossible to make the target sum.
     if (sum < minSum || maxSum < sum) return false;
     // We've reached the target sum exactly.
     if (minSum == maxSum) return true;
+
+    // If there are 2 or 1 remaining values then handle that explicitly.
+    if (numCells - LookupTable.COUNT[fixedValues] <= 2) {
+      const targetSum = sum - LookupTable.SUM[fixedValues];
+      return this.#enforceTwoRemainingCells(grid, targetSum);
+    }
 
     if (sum - minSum < GRID_SIZE || maxSum - sum < GRID_SIZE) {
       if (!SumHandlerUtil.restrictValueRange(grid, cells,
@@ -1292,12 +1361,12 @@ SudokuSolver.SumHandler = class extends SudokuSolver.ConstraintHandler {
       }
     }
 
-    if (this._conflictSets.length == 1) {
+    if (this.#conflictSets.length == 1) {
       return (0 !== SumHandlerUtil.restrictCellsSingleConflictSet(
-        grid, this._sumList, cells));
+        grid, this.#sumList, cells));
     } else {
       return (0 !== SumHandlerUtil.restrictCellsMultiConflictSet(
-        grid, sum, sum, cells, this._conflictSets));
+        grid, sum, sum, cells, this.#conflictSets));
     }
   }
 }
