@@ -278,22 +278,22 @@ class SudokuSolver {
 }
 
 SudokuSolver.ConstraintOptimizer = class {
-  static #NONET_SUM = GRID_SIZE*(GRID_SIZE+1)/2;
+  static _NONET_SUM = GRID_SIZE*(GRID_SIZE+1)/2;
 
   static optimize(handlers, cellConflictSets) {
-    handlers = this.#addNonetHandlers(handlers);
+    handlers = this._addNonetHandlers(handlers);
 
-    handlers = this.#findHiddenCages(handlers);
+    handlers = this._findHiddenCages(handlers);
 
-    handlers = this.#replaceWithBinaryConstraints(handlers, cellConflictSets);
+    handlers = this._replaceWithBinaryConstraints(handlers, cellConflictSets);
 
-    handlers = this.#replaceWithFixedValues(handlers);
+    handlers = this._replaceWithFixedValues(handlers);
 
     return handlers;
   }
 
   // Add nonet handlers for any AllDifferentHandler which have 9 cells.
-  static #addNonetHandlers(handlers) {
+  static _addNonetHandlers(handlers) {
     for (const h of handlers) {
       if (h instanceof SudokuSolver.AllDifferentHandler) {
         const c = h.conflictSet();
@@ -308,7 +308,7 @@ SudokuSolver.ConstraintOptimizer = class {
 
   // Find 2-cell constraints and replace them with binary constraints.
   // Only handles sums at the moment.
-  static #replaceWithBinaryConstraints(handlers, cellConflictSets) {
+  static _replaceWithBinaryConstraints(handlers, cellConflictSets) {
     for (let i = 0; i < handlers.length; i++) {
       const h = handlers[i];
       if (h.cells.length != 2) continue;
@@ -325,7 +325,7 @@ SudokuSolver.ConstraintOptimizer = class {
   }
 
   // Find 1-cell constraints and convert them to fixed values.
-  static #replaceWithFixedValues(handlers) {
+  static _replaceWithFixedValues(handlers) {
     for (let i = 0; i < handlers.length; i++) {
       const h = handlers[i];
       if (h.cells.length != 1) continue;
@@ -340,7 +340,7 @@ SudokuSolver.ConstraintOptimizer = class {
   }
 
   // Find sets of cells which we can infer have a known sum and unique values.
-  static #findHiddenCages(handlers) {
+  static _findHiddenCages(handlers) {
     // TODO: Consider how this interactions with fixed cells.
     const sumHandlers = handlers.filter(h => h instanceof SudokuSolver.SumHandler);
     if (sumHandlers.length == 0) return handlers;
@@ -389,7 +389,7 @@ SudokuSolver.ConstraintOptimizer = class {
       if (constrainedCells.length == GRID_SIZE) continue;
 
       const complementCells = setDifference(h.cells, constrainedCells);
-      const complementSum = this.#NONET_SUM - constrainedSum;
+      const complementSum = this._NONET_SUM - constrainedSum;
       handlers.push(new SudokuSolver.SumHandler(
         complementCells, complementSum));
     }
@@ -437,7 +437,7 @@ SudokuSolver.InternalSolver = class {
     return priorities;
   }
 
-  static #findCellConflicts(handlers) {
+  static _findCellConflicts(handlers) {
     const cellConflictSets = new Array(NUM_CELLS);
     for (let i = 0; i < NUM_CELLS; i++) cellConflictSets[i] = new Set();
 
@@ -454,7 +454,7 @@ SudokuSolver.InternalSolver = class {
   }
 
   _setUpHandlers(handlers) {
-    const cellConflictSets = this.constructor.#findCellConflicts(handlers);
+    const cellConflictSets = this.constructor._findCellConflicts(handlers);
 
     // Set cell conflicts so that they are unique.
     // Sort them, so they are in a predictable order.
@@ -1253,34 +1253,34 @@ SudokuSolver.ArrowHandler = class extends SudokuSolver.ConstraintHandler {
 }
 
 SudokuSolver.SumHandler = class extends SudokuSolver.ConstraintHandler {
-  #conflictSets;
-  #conflictMap;
-  #sum;
-  #sumList = [0];
+  _conflictSets;
+  _conflictMap;
+  _sum;
+  _sumList = [0];
 
   constructor(cells, sum) {
     super(cells);
-    this.#sum = +sum;
-    this.#sumList[0] = this.#sum;
+    this._sum = +sum;
+    this._sumList[0] = this._sum;
   }
 
   sum() {
-    return this.#sum;
+    return this._sum;
   }
 
   initialize(initialGrid, cellConflicts) {
-    this.#conflictSets = SumHandlerUtil.findConflictSets(
+    this._conflictSets = SumHandlerUtil.findConflictSets(
       this.cells, cellConflicts);
 
-    this.#conflictMap = new Uint8Array(this.cells.length);
-    this.#conflictSets.forEach(
+    this._conflictMap = new Uint8Array(this.cells.length);
+    this._conflictSets.forEach(
       (s,i) => s.forEach(
-        c => this.#conflictMap[this.cells.indexOf(c)] = i));
+        c => this._conflictMap[this.cells.indexOf(c)] = i));
   }
 
   // Optimize the 2-cell case by solving it exactly and efficiently.
   // REQUIRES that there is at least one unfixed cell.
-  #enforceTwoRemainingCells(grid, targetSum) {
+  _enforceTwoRemainingCells(grid, targetSum) {
     const cells = this.cells;
     const numCells = cells.length;
 
@@ -1303,7 +1303,7 @@ SudokuSolver.SumHandler = class extends SudokuSolver.ConstraintHandler {
 
       // If the cells are in the same conflict set, also ensure the sum is
       // distict values.
-      if ((targetSum&1) == 0 && this.#conflictMap[i0] === this.#conflictMap[i1]) {
+      if ((targetSum&1) == 0 && this._conflictMap[i0] === this._conflictMap[i1]) {
         // targetSum/2 can't be valid value.
         let mask = ~(1 << ((targetSum>>1)-1));
         v0 &= mask;
@@ -1327,7 +1327,7 @@ SudokuSolver.SumHandler = class extends SudokuSolver.ConstraintHandler {
   enforceConsistency(grid) {
     const cells = this.cells;
     const numCells = cells.length;
-    const sum = this.#sum;
+    const sum = this._sum;
 
     // Determine how much headroom there is in the range between the extreme
     // values and the target sum.
@@ -1351,7 +1351,7 @@ SudokuSolver.SumHandler = class extends SudokuSolver.ConstraintHandler {
     // If there are 2 or 1 remaining values then handle that explicitly.
     if (numCells - LookupTable.COUNT[fixedValues] <= 2) {
       const targetSum = sum - LookupTable.SUM[fixedValues];
-      return this.#enforceTwoRemainingCells(grid, targetSum);
+      return this._enforceTwoRemainingCells(grid, targetSum);
     }
 
     if (sum - minSum < GRID_SIZE || maxSum - sum < GRID_SIZE) {
@@ -1361,12 +1361,12 @@ SudokuSolver.SumHandler = class extends SudokuSolver.ConstraintHandler {
       }
     }
 
-    if (this.#conflictSets.length == 1) {
+    if (this._conflictSets.length == 1) {
       return (0 !== SumHandlerUtil.restrictCellsSingleConflictSet(
-        grid, this.#sumList, cells));
+        grid, this._sumList, cells));
     } else {
       return (0 !== SumHandlerUtil.restrictCellsMultiConflictSet(
-        grid, sum, sum, cells, this.#conflictSets));
+        grid, sum, sum, cells, this._conflictSets));
     }
   }
 }
