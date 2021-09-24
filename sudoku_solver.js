@@ -433,6 +433,8 @@ SudokuSolver.InternalSolver = class {
 
     this._handlers = this._setUpHandlers(Array.from(handlerGen));
 
+    this._cellAccumulator = new SudokuSolver.CellAccumulator(this._handlers);
+
     // Priorities go from 0->255, with 255 being the best.
     // This can be used to prioritize which cells to search.
     this._cellPriorities = this._initCellPriorities();
@@ -482,19 +484,7 @@ SudokuSolver.InternalSolver = class {
 
     // Optimize handlers.
     handlers = SudokuSolver.ConstraintOptimizer.optimize(
-      handlers, cellConflictSets);;
-
-    // Add all cells that the handler claims to be attached to the list of
-    // handlers for that cell.
-    this._cellConstraintHandlers = new Array(NUM_CELLS);
-    for (let i = 0; i < NUM_CELLS; i++) {
-      this._cellConstraintHandlers[i] = [];
-    }
-    for (const handler of handlers) {
-      for (const cell of handler.cells) {
-        this._cellConstraintHandlers[cell].push(handler);
-      }
-    }
+      handlers, cellConflictSets);
 
     // TODO: Include as part of the solver for timing?
     for (const handler of handlers) {
@@ -603,7 +593,8 @@ SudokuSolver.InternalSolver = class {
   _enforceValue(grid, value, cell) {
     grid[cell] = value;
 
-    let cellAccumulator = new SudokuSolver.CellAccumulator(this);
+    let cellAccumulator = this._cellAccumulator;
+    cellAccumulator.clear();
     cellAccumulator.add(cell);
 
     const conflicts = this._cellConflicts[cell];
@@ -650,7 +641,8 @@ SudokuSolver.InternalSolver = class {
 
     if (SOLVER_INITIALIZE_AT_START) {
       // Enforce constraints for all cells.
-      let cellAccumulator = new SudokuSolver.CellAccumulator(this);
+      let cellAccumulator = this._cellAccumulator;
+      cellAccumulator.clear();
       for (let i = 0; i < NUM_CELLS; i++) cellAccumulator.add(i);
       this._enforceConstraints(this._grids[0], cellAccumulator);
     }
@@ -799,37 +791,64 @@ SudokuSolver.InternalSolver = class {
 }
 
 SudokuSolver.CellAccumulator = class {
-  constructor(solver) {
-    this._handlers = solver._cellConstraintHandlers;
+  // NOTE: This is intended to be created once, and reused.
+  constructor(handlers, cellMap) {
+    this._handlers = handlers;
+    this._cellMap = this.constructor._makeCellMap(handlers);
 
-    // We keep the invariant that:
-    //   this._extraConstraints contains c <=> c.dirty == this._generation
-    this._constraints = [];
-    this._generation = ++this.constructor.dirtyGeneration;
+    this._linkedList = new Int16Array(this._handlers.length);
+    this._linkedList.fill(-1);
+    this._head = -1;
   }
 
-  static dirtyGeneration = 0;
+  static _makeCellMap(handlers) {
+    // Add all cells that the handler claims to be attached to the list of
+    // handlers for that cell.
+    const cellHandlerMap = new Array(NUM_CELLS);
+    for (let i = 0; i < NUM_CELLS; i++) {
+      cellHandlerMap[i] = [];
+    }
+    for (let i = 0; i < handlers.length; i++) {
+      for (const cell of handlers[i].cells) {
+        cellHandlerMap[cell].push(i);
+      }
+    }
+    return cellHandlerMap;
+  }
 
   add(cell) {
-    const handlers = this._handlers[cell];
-    const numHandlers = handlers.length;
-    for (let i = 0; i < numHandlers; i++) {
-      const c = handlers[i];
-      if (c.dirty != this._generation) {
-        c.dirty = this._generation;
-        this._constraints.push(c);
+    const indexes = this._cellMap[cell];
+    const numHandlers = indexes.length;
+    for (let j = 0; j < numHandlers; j++) {
+      const i = indexes[j];
+      if (this._linkedList[i] < 0) {
+        this._linkedList[i] = this._head;
+        this._head = i;
       }
     }
   }
 
+  clear() {
+    const ll = this._linkedList;
+    let head = this._head;
+    while (head >= 0) {
+      const newHead = ll[head];
+      ll[head] = -1;
+      head = newHead;
+    }
+    this._head = -1;
+  }
+
   hasConstraints() {
-    return this._constraints.length > 0;
+    return this._head >= 0;
   }
 
   popConstraint() {
-    let c = this._constraints.pop();
-    c.dirty = 0;
-    return c;
+    const oldHead = this._head;
+    this._head = this._linkedList[oldHead];
+    this._linkedList[oldHead] = -1;
+
+    return this._handlers[oldHead];
   }
 }
 
@@ -837,8 +856,6 @@ SudokuSolver.ConstraintHandler = class {
   constructor(cells) {
     // This constraint is enforced whenever these cells are touched.
     this.cells = new Uint8Array(cells || []);
-    // Dirty bit for determining if the constraint needs to be enforced.
-    this.dirty = 0;
   }
 
   enforceConsistency(grid) {
