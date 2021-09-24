@@ -330,8 +330,7 @@ SudokuSolver.ConstraintOptimizer = class {
     return handlers;
   }
 
-  // Find 2-cell constraints and replace them with binary constraints.
-  // Only handles sums at the moment.
+  // Find {1-3}-cell sum constraints and replace them dedicated handlers.
   static _sizeSpecificSumHandlers(handlers, cellConflictSets) {
     for (let i = 0; i < handlers.length; i++) {
       const h = handlers[i];
@@ -562,7 +561,7 @@ SudokuSolver.InternalSolver = class {
 
   // Find the best cell and bring it to the front. This means that it will
   // be processed next.
-  _updateCellOrder(stack, grid) {
+  _updateCellOrder(stack, depth, grid) {
     // Choose the cell with the smallest count.
     // Return immediately if we find any cells with 1 or 0 values set.
     // NOTE: The constraint handlers are written such that they detect domain
@@ -571,29 +570,34 @@ SudokuSolver.InternalSolver = class {
     // NOTE: If the scoring is more complicated than counts, it can be useful
     // to do an initial pass to detect 1 or 0 value cells (~(v&(v-1))).
 
+    const triggerCounts = this._backtrackTriggers;
+    const stackLen = stack.length;
+
     // Find the cell with the minimum score (remaining possibilities in the
     // cell).
     // Break ties with the hit count.
     let minScore = GRID_SIZE + 1;
     let maxTriggerCount = 0;
+    let bestIndex = 0;
 
-    for (let i = 0; i < stack.length; i++) {
+    for (let i = depth; i < stackLen; i++) {
       const cell = stack[i];
       const count = LookupTable.COUNT[grid[cell]];
       // If we have a single value then just use it - as it will involve no
       // guessing.
       if (count <= 1) {
-        [stack[i], stack[0]] = [stack[0], stack[i]];
-        return;
+        bestIndex = i;
+        break;
       }
 
-      const triggerCount = this._backtrackTriggers[cell];
-      if (count < minScore || count == minScore && triggerCount > maxTriggerCount ) {
-        [stack[i], stack[0]] = [stack[0], stack[i]];
+      if (count < minScore || count == minScore && triggerCounts[cell] > maxTriggerCount ) {
+        bestIndex = i;
         minScore = count;
-        maxTriggerCount = triggerCount;
+        maxTriggerCount = triggerCounts[cell];
       }
     }
+
+    [stack[bestIndex], stack[depth]] = [stack[depth], stack[bestIndex]];
   }
 
   _enforceValue(grid, value, cell) {
@@ -661,7 +665,7 @@ SudokuSolver.InternalSolver = class {
       checkRunCounter();
     }
 
-    this._updateCellOrder(stack.subarray(depth), this._grids[depth]);
+    this._updateCellOrder(stack, depth, this._grids[depth]);
     depth++;
     counters.cellsSearched++;
 
@@ -735,7 +739,7 @@ SudokuSolver.InternalSolver = class {
         continue;
       }
 
-      this._updateCellOrder(stack.subarray(depth), grid);
+      this._updateCellOrder(stack, depth, grid);
       counters.cellsSearched++;
       depth++;
     }
@@ -887,12 +891,12 @@ SudokuSolver.NonetHandler = class extends SudokuSolver.ConstraintHandler {
     let uniqueValues = 0;
     let fixedValues = 0;
     for (let i = 0; i < GRID_SIZE; i++) {
-      let v = grid[cells[i]];
-      uniqueValues &= ~v;
-      uniqueValues |= (v&~allValues);
+      const v = grid[cells[i]];
+      uniqueValues = (uniqueValues&~v) | (v&~allValues);
       allValues |= v;
-      if (!(v&(v-1))) fixedValues |= v;
+      fixedValues |= (!(v&(v-1)))*v;  // Better than branching.
     }
+
     if (allValues != ALL_VALUES) return false;
     if (fixedValues == ALL_VALUES) return true;
 
@@ -1002,11 +1006,11 @@ class SumHandlerUtil {
     let allValues = 0;
     let uniqueValues = 0;
     for (let i = 0; i < numCells; i++) {
-      let value = grid[cells[i]];
-      uniqueValues &= ~value;
-      uniqueValues |= (value&~allValues);
-      allValues |= value;
-      if (!(value&(value-1))) fixedValues |= value;
+      const v = grid[cells[i]];
+      uniqueValues &= ~v;
+      uniqueValues |= (v&~allValues);
+      allValues |= v;
+      fixedValues |= (!(v&(v-1)))*v; // Better than branching.
     }
     const fixedSum = LookupTable.SUM[fixedValues];
 
@@ -1032,14 +1036,19 @@ class SumHandlerUtil {
       const sumOptions = unfixedCageSums[sum - fixedSum];
       if (!sumOptions) continue;
 
-      let isPossible = false;
+      let isPossible = 0;
       for (let j = 0; j < sumOptions.length; j++) {
         const option = sumOptions[j];
-        if ((option & unfixedValues) === option) {
-          possibilities |= option;
-          requiredUniques &= option;
-          isPossible = true;
-        }
+        // Branchlessly check that:
+        // if ((option & unfixedValues) === option) {
+        //   possibilities |= option;
+        //   requiredUniques &= option;
+        //   isPossible = true;
+        // }
+        const includeOption = -!(option & ~unfixedValues);
+        possibilities |= option&includeOption;
+        requiredUniques &= option|~includeOption;
+        isPossible |= includeOption;
       }
       if (isPossible) sumValue |= 1<<(sum-1);
     }
@@ -1501,7 +1510,7 @@ SudokuSolver.SumHandler = class extends SudokuSolver.ConstraintHandler {
     // Determine how much headroom there is in the range between the extreme
     // values and the target sum.
     let rangeInfoSum = 0;
-    for (let i = 0; i < numCells; i++) {
+    for (let i = numCells-1; i >= 0; i--) {
       rangeInfoSum += LookupTable.RANGE_INFO[grid[cells[i]]];
     }
 
@@ -1518,13 +1527,15 @@ SudokuSolver.SumHandler = class extends SudokuSolver.ConstraintHandler {
     // unsatisfiable.
     if (numUnfixed < 0) return false;
 
-    // If there are few remaining values then handle them explicitly.
+    // If there are few remaining cells then handle them explicitly.
     if (numUnfixed <= 3) {
       const fixedSum = (rangeInfoSum>>14) & 0x7f;
       const targetSum = sum - fixedSum;
       return this._enforceFewRemainingCells(grid, targetSum, numUnfixed);
     }
 
+    // Restrict the possible range of values in each cell based on whether they
+    // will cause the sum to be too large or too small.
     if (sum - minSum < GRID_SIZE || maxSum - sum < GRID_SIZE) {
       if (!SumHandlerUtil.restrictValueRange(grid, cells,
                                              sum - minSum, maxSum - sum)) {
