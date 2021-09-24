@@ -70,6 +70,9 @@ class LookupTable {
       const isFixed = fixed > 0 ? 1 : 0;
       table[i] = (isFixed<<21)|(fixed<<14)|minMax;
     }
+    // If there are no values, set a high value for isFixed to indicate the
+    // result is invalid. This is intended to be detectable after summing.
+    table[0] = GRID_SIZE << 21;
     return table;
   })();
 
@@ -1182,6 +1185,97 @@ class SumHandlerUtil {
     return -1;
   }
 
+  static enforceThreeCellConsistency(grid, cells, sum, conflictMap) {
+    let v0 = grid[cells[0]];
+    let v1 = grid[cells[1]];
+    let v2 = grid[cells[2]];
+
+    // Find each set of pairwise sums.
+    let sums2 = this._PAIRWISE_SUMS[(v0<<GRID_SIZE)|v1]<<2;
+    let sums1 = this._PAIRWISE_SUMS[(v0<<GRID_SIZE)|v2]<<2;
+    let sums0 = this._PAIRWISE_SUMS[(v1<<GRID_SIZE)|v2]<<2;
+
+    // If the cell values are possibly repeated, then handle that.
+    if (conflictMap !== null) {
+      if (conflictMap[0] != conflictMap[1]) {
+        sums2 |= this._DOUBLES[v0&v1];
+      }
+      if (conflictMap[0] != conflictMap[2]) {
+        sums1 |= this._DOUBLES[v0&v2];
+      }
+      if (conflictMap[1] != conflictMap[2]) {
+        sums0 |= this._DOUBLES[v1&v2];
+      }
+    }
+
+    // Constrain each value based on the possible sums of the other two.
+    // NOTE: We don't care if a value is reused in the result, as that will
+    // be removed in one of the other two cases.
+    const shift = sum-1;
+    v2 &= LookupTable.REVERSE[((sums2 << GRID_SIZE)>>shift) & ALL_VALUES];
+    v1 &= LookupTable.REVERSE[((sums1 << GRID_SIZE)>>shift) & ALL_VALUES];
+    v0 &= LookupTable.REVERSE[((sums0 << GRID_SIZE)>>shift) & ALL_VALUES];
+
+    if (!(v1 && v1 && v2)) return false;
+
+    grid[cells[0]] = v0;
+    grid[cells[1]] = v1;
+    grid[cells[2]] = v2;
+
+    return true;
+  }
+
+  // Precompute the sums for all pairs of cells. Assumes cells must be unique.
+  //
+  // For cell values a and b:
+  // _PAIRWISE_SUMS[(a<<GRID_SIZE)|b] = sum>>2;
+  // (The shift is so the result fits in 16 bits).
+  static _PAIRWISE_SUMS = (() => {
+    const table = new Uint16Array(COMBINATIONS*COMBINATIONS);
+
+    for (let i = 0; i < COMBINATIONS; i++) {
+      for (let j = i; j < COMBINATIONS; j++) {
+        let result = 0;
+        for (let k = 1; k <= GRID_SIZE; k++) {
+          // Check if j contains k.
+          const kInJ = (j>>(k-1))&1;
+          if (kInJ) {
+            // Add k to all values in i.
+            let s = i<<k;
+            // Remove 2*k, as we require the values to be unique.
+            s &= ~(1<<(2*k-1));
+            // Store s-2, so we don't overrun 16 bits.
+            // (Note, we have an extra one from the sum already).
+            s >>= 2;
+            result |= s;
+          }
+        }
+        table[(i<<GRID_SIZE)|j] = table[(j<<GRID_SIZE)|i] = result;
+      }
+    }
+
+    return table;
+  })();
+
+  // Store the sum of a+a for all combinations of a.
+  static _DOUBLES = (() => {
+    const table = new Uint32Array(COMBINATIONS);
+
+    for (let j = 0; j < COMBINATIONS; j++) {
+      let result = 0;
+      for (let k = 1; k <= GRID_SIZE; k++) {
+        // Check if j contains k.
+        const kInJ = (j>>(k-1))&1;
+        if (kInJ) {
+          const s = 1<<(2*k-1);
+          result |= s;
+        }
+      }
+      table[j] = result;
+    }
+    return table;
+  })();
+
   static KILLER_CAGE_SUMS = (() => {
     let table = [];
     for (let n = 0; n < GRID_SIZE+1; n++) {
@@ -1278,113 +1372,31 @@ SudokuSolver.ArrowHandler = class extends SudokuSolver.ConstraintHandler {
 
 // Solve 3-cell sums exactly with a 512 KB lookup table.
 SudokuSolver.ThreeCellSumHandler = class extends SudokuSolver.ConstraintHandler {
+  _sum = 0;
+  _conflictMap = null;
+
   constructor(cells, sum) {
     super(cells);
     this._sum = +sum;
   }
 
   initialize(initialGrid, cellConflicts) {
-    this._conflictMap = new Uint8Array(this.cells.length);
-
-    this._conflictSets = SumHandlerUtil.findConflictSets(
+    const conflictSets = SumHandlerUtil.findConflictSets(
       this.cells, cellConflicts);
-    this._conflictSets.forEach(
-      (s,i) => s.forEach(
-        c => this._conflictMap[this.cells.indexOf(c)] = i));
+    if (conflictSets.length > 1) {
+      this._conflictMap = new Uint8Array(this.cells.length);
+
+      conflictSets.forEach(
+        (s,i) => s.forEach(
+          c => this._conflictMap[this.cells.indexOf(c)] = i));
+    }
   }
 
   enforceConsistency(grid) {
-    const cells = this.cells;
-
-    let v0 = grid[cells[0]];
-    let v1 = grid[cells[1]];
-    let v2 = grid[cells[2]];
-
-    // Find each set of pairwise sums.
-    let sums2 = this.constructor._PAIRWISE_SUMS[(v0<<GRID_SIZE)|v1]<<2;
-    let sums1 = this.constructor._PAIRWISE_SUMS[(v0<<GRID_SIZE)|v2]<<2;
-    let sums0 = this.constructor._PAIRWISE_SUMS[(v1<<GRID_SIZE)|v2]<<2;
-
-    // If the cell values are possibly repeated, then handle that.
-    if (this._conflictSets.length != 1) {
-      if (this._conflictMap[0] != this._conflictMap[1]) {
-        sums2 |= this.constructor._DOUBLE[v0&v1];
-      }
-      if (this._conflictMap[0] != this._conflictMap[2]) {
-        sums1 |= this.constructor._DOUBLE[v0&v2];
-      }
-      if (this._conflictMap[1] != this._conflictMap[2]) {
-        sums0 |= this.constructor._DOUBLE[v1&v2];
-      }
-    }
-
-    // Constrain each value based on the possible sums of the other two.
-    // NOTE: We don't care if a value is reused in the result, as that will
-    // be removed in one of the other two cases.
-    const shift = this._sum-1;
-    v2 &= LookupTable.REVERSE[((sums2 << GRID_SIZE)>>shift) & ALL_VALUES];
-    v1 &= LookupTable.REVERSE[((sums1 << GRID_SIZE)>>shift) & ALL_VALUES];
-    v0 &= LookupTable.REVERSE[((sums0 << GRID_SIZE)>>shift) & ALL_VALUES];
-
-    if (!(v1 && v1 && v2)) return false;
-
-    grid[cells[0]] = v0;
-    grid[cells[1]] = v1;
-    grid[cells[2]] = v2;
-
-    return true;
+    return SumHandlerUtil.enforceThreeCellConsistency(
+      grid, this.cells, this._sum, this._conflictMap);
   }
 
-  // Precompute the sums for all pairs of cells. Assumes cells must be unique.
-  //
-  // For cell values a and b:
-  // _PAIRWISE_SUMS[(a<<GRID_SIZE)|b] = sum>>2;
-  // (The shift is so the result fits in 16 bits).
-  static _PAIRWISE_SUMS = (() => {
-    const table = new Uint16Array(COMBINATIONS*COMBINATIONS);
-
-    for (let i = 0; i < COMBINATIONS; i++) {
-      for (let j = i; j < COMBINATIONS; j++) {
-        let result = 0;
-        for (let k = 1; k <= GRID_SIZE; k++) {
-          // Check if j contains k.
-          const kInJ = (j>>(k-1))&1;
-          if (kInJ) {
-            // Add k to all values in i.
-            let s = i<<k;
-            // Remove 2*k, as we require the values to be unique.
-            s &= ~(1<<(2*k-1));
-            // Store s-2, so we don't overrun 16 bits.
-            // (Note, we have an extra one from the sum already).
-            s >>= 2;
-            result |= s;
-          }
-        }
-        table[(i<<GRID_SIZE)|j] = table[(j<<GRID_SIZE)|i] = result;
-      }
-    }
-
-    return table;
-  })();
-
-  // Store the sum of a+a for all combinations of a.
-  static _DOUBLES = (() => {
-    const table = new Uint32Array(COMBINATIONS);
-
-    for (let j = 0; j < COMBINATIONS; j++) {
-      let result = 0;
-      for (let k = 1; k <= GRID_SIZE; k++) {
-        // Check if j contains k.
-        const kInJ = (j>>(k-1))&1;
-        if (kInJ) {
-          const s = 1<<(2*k-1);
-          result |= s;
-        }
-      }
-      table[j] = result;
-    }
-    return table;
-  })();
 }
 
 SudokuSolver.SumHandler = class extends SudokuSolver.ConstraintHandler {
@@ -1413,50 +1425,72 @@ SudokuSolver.SumHandler = class extends SudokuSolver.ConstraintHandler {
         c => this._conflictMap[this.cells.indexOf(c)] = i));
   }
 
-  // Optimize the 2-cell case by solving it exactly and efficiently.
-  // REQUIRES that there is at least one unfixed cell.
-  _enforceTwoRemainingCells(grid, targetSum) {
+  static _valueBuffer = new Uint16Array(GRID_SIZE);
+  static _conflictMapBuffer = new Uint8Array(GRID_SIZE);
+  static _cellBuffer = new Uint8Array(GRID_SIZE);
+
+  // Optimize the {1-3}-cell case by solving it exactly and efficiently.
+  // REQUIRES that:
+  //  - The number of unfixed cells is accurate.
+  //  - None of the values are zero.
+  _enforceFewRemainingCells(grid, targetSum, numUnfixed) {
     const cells = this.cells;
-    const numCells = cells.length;
 
-    // Find the index of the first cell with more than one entry.
-    // There MUST be one because minSum != maxSum.
-    let i0 = 0;
-    let v0 = grid[cells[i0]];
-    while (!(v0&(v0-1))) v0 = grid[cells[++i0]];
+    const cellBuffer = this.constructor._cellBuffer;
+    const valueBuffer = this.constructor._valueBuffer;
+    const conflictMapBuffer = this.constructor._conflictMapBuffer;
 
-    // Find the second cell with only one entry (if it exists).
-    for (let i1 = i0+1; i1 < numCells; i1++) {
-      // Continue until we find a cell with only one entry.
-      let v1 = grid[cells[i1]];
-      if (!(v1&(v1-1))) continue;
-
-      // Remove any values which don't have their counterpart value to add to
-      // targetSum.
-      v1 &= (LookupTable.REVERSE[v0] << (targetSum-1)) >> GRID_SIZE;
-      v0 &= (LookupTable.REVERSE[v1] << (targetSum-1)) >> GRID_SIZE;
-
-      // If the cells are in the same conflict set, also ensure the sum is
-      // distict values.
-      if ((targetSum&1) == 0 && this._conflictMap[i0] === this._conflictMap[i1]) {
-        // targetSum/2 can't be valid value.
-        const mask = ~(1 << ((targetSum>>1)-1));
-        v0 &= mask;
-        v1 &= mask;
+    let j = 0;
+    for (let i = cells.length-1; i >= 0; i--) {
+      const c = cells[i];
+      const v = grid[c];
+      if (v&(v-1)) {
+        conflictMapBuffer[j] = this._conflictMap[i];
+        cellBuffer[j] = c;
+        valueBuffer[j] = v;
+        j++;
       }
-
-      if (!(v1 && v0)) return false;
-
-      grid[cells[i0]] = v0;
-      grid[cells[i1]] = v1;
-      return true;
     }
 
-    // There was only one cell. Constrain it, and return.
-    v0 &= 1<<(targetSum-1);
-    if (!v0) return false;
-    grid[cells[i0]] = v0;
-    return true;
+    switch (numUnfixed) {
+      case 1: {
+        // Set value to the target sum exactly.
+        const v = valueBuffer[0] & (1<<(targetSum-1));
+        return (grid[cellBuffer[0]] = v);
+      }
+
+      case 2: {
+        let v0 = valueBuffer[0];
+        let v1 = valueBuffer[1];
+
+        // Remove any values which don't have their counterpart value to add to
+        // targetSum.
+        v1 &= (LookupTable.REVERSE[v0] << (targetSum-1)) >> GRID_SIZE;
+        v0 &= (LookupTable.REVERSE[v1] << (targetSum-1)) >> GRID_SIZE;
+
+        // If the cells are in the same conflict set, also ensure the sum is
+        // distict values.
+        if ((targetSum&1) == 0 &&
+            conflictMapBuffer[0] === conflictMapBuffer[1]) {
+          // targetSum/2 can't be valid value.
+          const mask = ~(1 << ((targetSum>>1)-1));
+          v0 &= mask;
+          v1 &= mask;
+        }
+
+        if (!(v1 && v0)) return false;
+
+        grid[cellBuffer[0]] = v0;
+        grid[cellBuffer[1]] = v1;
+        return true;
+      }
+
+      case 3: {
+        return SumHandlerUtil.enforceThreeCellConsistency(
+          grid, cellBuffer, targetSum,
+          this._conflictSets.length == 1 ? null : conflictMapBuffer);
+      }
+    }
   }
 
   enforceConsistency(grid) {
@@ -1479,13 +1513,16 @@ SudokuSolver.SumHandler = class extends SudokuSolver.ConstraintHandler {
     // NOTE: Uniqueness constraint is already enforced by the solver via confictCells.
     if (minSum == maxSum) return true;
 
-    const numFixed = rangeInfoSum>>21;
+    const numUnfixed = numCells - (rangeInfoSum>>21);
+    // A large fixed value indicates a cell has a 0, hence is already
+    // unsatisfiable.
+    if (numUnfixed < 0) return false;
 
-    // If there are 2 or 1 remaining values then handle that explicitly.
-    if (numCells - numFixed <= 2) {
+    // If there are few remaining values then handle them explicitly.
+    if (numUnfixed <= 3) {
       const fixedSum = (rangeInfoSum>>14) & 0x7f;
       const targetSum = sum - fixedSum;
-      return this._enforceTwoRemainingCells(grid, targetSum);
+      return this._enforceFewRemainingCells(grid, targetSum, numUnfixed);
     }
 
     if (sum - minSum < GRID_SIZE || maxSum - sum < GRID_SIZE) {
