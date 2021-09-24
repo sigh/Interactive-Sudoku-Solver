@@ -308,9 +308,7 @@ SudokuSolver.ConstraintOptimizer = class {
 
     handlers = this._findHiddenCages(handlers);
 
-    handlers = this._replaceWithBinaryConstraints(handlers, cellConflictSets);
-
-    handlers = this._replaceWithFixedValues(handlers);
+    handlers = this._sizeSpecificSumHandlers(handlers, cellConflictSets);
 
     return handlers;
   }
@@ -331,31 +329,27 @@ SudokuSolver.ConstraintOptimizer = class {
 
   // Find 2-cell constraints and replace them with binary constraints.
   // Only handles sums at the moment.
-  static _replaceWithBinaryConstraints(handlers, cellConflictSets) {
+  static _sizeSpecificSumHandlers(handlers, cellConflictSets) {
     for (let i = 0; i < handlers.length; i++) {
       const h = handlers[i];
-      if (h.cells.length != 2) continue;
+      if (!(h instanceof SudokuSolver.SumHandler)) continue;
 
-      if (h instanceof SudokuSolver.SumHandler) {
-        const hasConflict = cellConflictSets[h.cells[0]].has(h.cells[1]);
-        handlers[i] = new SudokuSolver.BinaryConstraintHandler(
-          h.cells[0], h.cells[1],
-          (a, b) => a+b == h.sum() && (!hasConflict || a != b));
-      }
-    }
+      switch (h.cells.length) {
+        case 1:
+          handlers[i] = new SudokuSolver.FixedCellsHandler(
+            new Map([[h.cells[0], h.sum()]]));
+          break;
 
-    return handlers;
-  }
+        case 2:
+          const hasConflict = cellConflictSets[h.cells[0]].has(h.cells[1]);
+          handlers[i] = new SudokuSolver.BinaryConstraintHandler(
+            h.cells[0], h.cells[1],
+            (a, b) => a+b == h.sum() && (!hasConflict || a != b));
+          break;
 
-  // Find 1-cell constraints and convert them to fixed values.
-  static _replaceWithFixedValues(handlers) {
-    for (let i = 0; i < handlers.length; i++) {
-      const h = handlers[i];
-      if (h.cells.length != 1) continue;
-
-      if (h instanceof SudokuSolver.SumHandler) {
-        handlers[i] = new SudokuSolver.FixedCellsHandler(
-          new Map([[h.cells[0], h.sum()]]));
+        case 3:
+          handlers[i] = new SudokuSolver.ThreeCellSumHandler(h.cells, h.sum());
+          break;
       }
     }
 
@@ -1280,6 +1274,117 @@ SudokuSolver.ArrowHandler = class extends SudokuSolver.ConstraintHandler {
 
     return true;
   }
+}
+
+// Solve 3-cell sums exactly with a 512 KB lookup table.
+SudokuSolver.ThreeCellSumHandler = class extends SudokuSolver.ConstraintHandler {
+  constructor(cells, sum) {
+    super(cells);
+    this._sum = +sum;
+  }
+
+  initialize(initialGrid, cellConflicts) {
+    this._conflictMap = new Uint8Array(this.cells.length);
+
+    this._conflictSets = SumHandlerUtil.findConflictSets(
+      this.cells, cellConflicts);
+    this._conflictSets.forEach(
+      (s,i) => s.forEach(
+        c => this._conflictMap[this.cells.indexOf(c)] = i));
+  }
+
+  enforceConsistency(grid) {
+    const cells = this.cells;
+
+    let v0 = grid[cells[0]];
+    let v1 = grid[cells[1]];
+    let v2 = grid[cells[2]];
+
+    // Find each set of pairwise sums.
+    let sums2 = this.constructor._PAIRWISE_SUMS[(v0<<GRID_SIZE)|v1]<<2;
+    let sums1 = this.constructor._PAIRWISE_SUMS[(v0<<GRID_SIZE)|v2]<<2;
+    let sums0 = this.constructor._PAIRWISE_SUMS[(v1<<GRID_SIZE)|v2]<<2;
+
+    // If the cell values are possibly repeated, then handle that.
+    if (this._conflictSets.length != 1) {
+      if (this._conflictMap[0] != this._conflictMap[1]) {
+        sums2 |= this.constructor._DOUBLE[v0&v1];
+      }
+      if (this._conflictMap[0] != this._conflictMap[2]) {
+        sums1 |= this.constructor._DOUBLE[v0&v2];
+      }
+      if (this._conflictMap[1] != this._conflictMap[2]) {
+        sums0 |= this.constructor._DOUBLE[v1&v2];
+      }
+    }
+
+    // Constrain each value based on the possible sums of the other two.
+    // NOTE: We don't care if a value is reused in the result, as that will
+    // be removed in one of the other two cases.
+    const shift = this._sum-1;
+    v2 &= LookupTable.REVERSE[((sums2 << GRID_SIZE)>>shift) & ALL_VALUES];
+    v1 &= LookupTable.REVERSE[((sums1 << GRID_SIZE)>>shift) & ALL_VALUES];
+    v0 &= LookupTable.REVERSE[((sums0 << GRID_SIZE)>>shift) & ALL_VALUES];
+
+    if (!(v1 && v1 && v2)) return false;
+
+    grid[cells[0]] = v0;
+    grid[cells[1]] = v1;
+    grid[cells[2]] = v2;
+
+    return true;
+  }
+
+  // Precompute the sums for all pairs of cells. Assumes cells must be unique.
+  //
+  // For cell values a and b:
+  // _PAIRWISE_SUMS[(a<<GRID_SIZE)|b] = sum>>2;
+  // (The shift is so the result fits in 16 bits).
+  static _PAIRWISE_SUMS = (() => {
+    const table = new Uint16Array(COMBINATIONS*COMBINATIONS);
+
+    for (let i = 0; i < COMBINATIONS; i++) {
+      for (let j = i; j < COMBINATIONS; j++) {
+        let result = 0;
+        for (let k = 1; k <= GRID_SIZE; k++) {
+          // Check if j contains k.
+          const kInJ = (j>>(k-1))&1;
+          if (kInJ) {
+            // Add k to all values in i.
+            let s = i<<k;
+            // Remove 2*k, as we require the values to be unique.
+            s &= ~(1<<(2*k-1));
+            // Store s-2, so we don't overrun 16 bits.
+            // (Note, we have an extra one from the sum already).
+            s >>= 2;
+            result |= s;
+          }
+        }
+        table[(i<<GRID_SIZE)|j] = table[(j<<GRID_SIZE)|i] = result;
+      }
+    }
+
+    return table;
+  })();
+
+  // Store the sum of a+a for all combinations of a.
+  static _DOUBLES = (() => {
+    const table = new Uint32Array(COMBINATIONS);
+
+    for (let j = 0; j < COMBINATIONS; j++) {
+      let result = 0;
+      for (let k = 1; k <= GRID_SIZE; k++) {
+        // Check if j contains k.
+        const kInJ = (j>>(k-1))&1;
+        if (kInJ) {
+          const s = 1<<(2*k-1);
+          result |= s;
+        }
+      }
+      table[j] = result;
+    }
+    return table;
+  })();
 }
 
 SudokuSolver.SumHandler = class extends SudokuSolver.ConstraintHandler {
