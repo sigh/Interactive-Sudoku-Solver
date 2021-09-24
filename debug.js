@@ -163,9 +163,9 @@ const runAllWithChecks = (puzzles) => {
     let result = solver.nthSolution(0);
     solver.nthSolution(1); // Try to find a second solution to prove uniqueness.
 
-    { // Test.
-      if (result.length != GRID_SIZE*GRID_SIZE) fail(name, puzzle, result);
-
+    if (!result || result.length != GRID_SIZE*GRID_SIZE) {
+      fail(name, puzzle, result);
+    } else {
       let shortSolution;
       try {
         shortSolution = toShortSolution(result);

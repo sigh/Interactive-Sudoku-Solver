@@ -30,22 +30,45 @@ class LookupTable {
     return table;
   })();
 
-  static MIN = (() => {
-    let table = new Uint8Array(COMBINATIONS);
-    for (let i = 1; i < COMBINATIONS; i++) {
-      // MIN is the value of the last bit set.
-      table[i] = LookupTable.VALUE[i & -i];
-    }
-    return table;
-  })();
-
-  static MAX = (() => {
-    let table = new Uint8Array(COMBINATIONS);
+  // Combines min and max into a single integer:
+  // Layout: [min: 7 bits, range: 7 bits]
+  //
+  // The extra bits allow these values to be summed to determine the total
+  // of mins and maxs.
+  static MIN_MAX = (() => {
+    // Initialize the table with MAXs.
+    const table = new Uint16Array(COMBINATIONS);
     table[1] = LookupTable.VALUE[1];
     for (let i = 2; i < COMBINATIONS; i++) {
       // MAX is greater than the max when everything has been decreased by
       // 1.
       table[i] = 1 + table[i >> 1];
+    }
+
+    // Add the MINs.
+    for (let i = 1; i < COMBINATIONS; i++) {
+      // MIN is the value of the last bit set.
+      const min = LookupTable.VALUE[i & -i];
+      table[i] |= min<<7;
+    }
+
+    return table;
+  })();
+
+  // Combines useful info about the range of numbers in a cell.
+  // Designed to be summed, so that the aggregate stats can be found.
+  // Layout: [isFixed: 7 bits, fixed: 7 bits, min: 7 bits, range: 7 bits]
+  //
+  // Sum of isFixed gives the number of fixed cells.
+  // Sum of fixed gives the sum of fixed cells.
+  // Min and max as a in Lookup.MIN_MAX.
+  static RANGE_INFO = (() => {
+    const table = new Uint32Array(COMBINATIONS);
+    for (let i = 1; i < COMBINATIONS; i++) {
+      const minMax = this.MIN_MAX[i];
+      const fixed = this.VALUE[i];
+      const isFixed = fixed > 0 ? 1 : 0;
+      table[i] = (isFixed<<21)|(fixed<<14)|minMax;
     }
     return table;
   })();
@@ -949,12 +972,13 @@ class SumHandlerUtil {
       // If there is a single value, then the range is always fine.
       if (!(value&(value-1))) continue;
 
-      let cellMin = LookupTable.MIN[value];
-      let cellMax = LookupTable.MAX[value];
-      let range = cellMax - cellMin;
+      const minMax = LookupTable.MIN_MAX[value];
+      const cellMin = minMax >> 7;
+      const cellMax = minMax & 0x7f;
+      const range = cellMax-cellMin;
 
       if (sumMinusMin < range) {
-        let x = sumMinusMin + cellMin;
+        const x = sumMinusMin + cellMin;
         // Remove any values GREATER than x. Even if all other squares
         // take their minimum values, these are too big.
         if (!(value &= ((1<<x)-1))) return false;
@@ -964,7 +988,7 @@ class SumHandlerUtil {
       if (maxMinusSum < range) {
         // Remove any values LESS than x. Even if all other squares
         // take their maximum values, these are too small.
-        let x = cellMax - maxMinusSum;
+        const x = cellMax - maxMinusSum;
         if (!(value &= -(1<<(x-1)))) return false;
         grid[cells[i]] = value;
       }
@@ -1082,9 +1106,12 @@ class SumHandlerUtil {
       let seenMax = 0;
 
       for (let i = 0; i < set.length; i++) {
-        let v = grid[set[i]];
-        let minShift = LookupTable.MIN[v] - 1;
-        let maxShift = GRID_SIZE - LookupTable.MAX[v];
+        const minMax = LookupTable.MIN_MAX[grid[set[i]]];
+        const min = minMax>>7;
+        const max = minMax&0x7f;
+
+        const minShift = min-1;
+        const maxShift = GRID_SIZE - max;
 
         // Set the smallest unset value >= min.
         // i.e. Try to add min to seenMin, but it if already exists then find
@@ -1201,16 +1228,17 @@ SudokuSolver.ArrowHandler = class extends SudokuSolver.ConstraintHandler {
     const numCells = arrowCells.length;
 
     //  Determine sumMin and sumMax based on arrow.
-    let sumMin = 0;
-    let sumMax = 0;
+    let minMaxSum = 0;
     for (let i = 0; i < numCells; i++) {
-      let v = grid[arrowCells[i]];
-      sumMin += LookupTable.MIN[v];
-      sumMax += LookupTable.MAX[v];
+      minMaxSum += LookupTable.MIN_MAX[grid[arrowCells[i]]];
     }
+
+    const sumMin = minMaxSum>>7;
+    const sumMax = minMaxSum&0x7f;
 
     // Constraint sumCell.
     let sums = grid[this._sumCell];
+
     // Remove any values GREATER than sumMax.
     if (sumMax < GRID_SIZE && !(sums &= ((1<<sumMax)-1))) return false;
     // Remove any values LESS than sumMin.
@@ -1220,10 +1248,14 @@ SudokuSolver.ArrowHandler = class extends SudokuSolver.ConstraintHandler {
     // We've reached the exact sum.
     if (sumMin == sumMax) return true;
 
+    const minMaxTarget = LookupTable.MIN_MAX[sums];
+    const minTarget = minMaxTarget>>7;
+    const maxTarget = minMaxTarget&0x7f;
+
     // Determine how much headroom there is in the range between the extreme
     // values and the target sum.
-    let sumMinusMin = LookupTable.MAX[sums] - sumMin;
-    let maxMinusSum = -LookupTable.MIN[sums] + sumMax;
+    const sumMinusMin = maxTarget - sumMin;
+    const maxMinusSum = -minTarget + sumMax;
 
     if (!SumHandlerUtil.restrictValueRange(grid, this._arrowCells,
                                            sumMinusMin, maxMinusSum)) {
@@ -1244,7 +1276,7 @@ SudokuSolver.ArrowHandler = class extends SudokuSolver.ConstraintHandler {
         grid, sumList, this._arrowCells);
     } else {
       grid[this._sumCell] &= SumHandlerUtil.restrictCellsMultiConflictSet(
-        grid, LookupTable.MIN[sums], LookupTable.MAX[sums], this._arrowCells,
+        grid, minTarget, maxTarget, this._arrowCells,
         this._conflictSets);
     }
     if (grid[this._sumCell] === 0) return false;
@@ -1332,30 +1364,24 @@ SudokuSolver.SumHandler = class extends SudokuSolver.ConstraintHandler {
 
     // Determine how much headroom there is in the range between the extreme
     // values and the target sum.
-    let minSum = 0;
-    let maxSum = 0;
-    let fixedSum = 0;
-    let numFixed = 0;
+    let rangeInfoSum = 0;
     for (let i = 0; i < numCells; i++) {
-      const v = grid[cells[i]];
-      const min = LookupTable.MIN[v];
-      const max = LookupTable.MAX[v];
-      minSum += min;
-      maxSum += max;
-      if (min === max) {
-        fixedSum += min;
-        numFixed++;  // We may have repeated values, so track count explicitly.
-      }
+      rangeInfoSum += LookupTable.RANGE_INFO[grid[cells[i]]];
     }
 
+    const maxSum = rangeInfoSum & 0x7f;
+    const minSum = (rangeInfoSum>>7) & 0x7f;
     // It is impossible to make the target sum.
     if (sum < minSum || maxSum < sum) return false;
     // We've reached the target sum exactly.
     // NOTE: Uniqueness constraint is already enforced by the solver via confictCells.
     if (minSum == maxSum) return true;
 
+    const numFixed = rangeInfoSum>>21;
+
     // If there are 2 or 1 remaining values then handle that explicitly.
     if (numCells - numFixed <= 2) {
+      const fixedSum = (rangeInfoSum>>14) & 0x7f;
       const targetSum = sum - fixedSum;
       return this._enforceTwoRemainingCells(grid, targetSum);
     }
@@ -1454,17 +1480,17 @@ SudokuSolver.SandwichHandler = class extends SudokuSolver.ConstraintHandler {
     // all the extra work below, so saves a small bit of time.
     if (numBorders < 2) return false;
     if (numBorders === 2) {
-      let minSum = 0;
-      let maxSum = 0;
       let i = 0;
+      let minMaxSum = 0;
       while (!(values[i++] & borderMask));
       while (!(values[i] & borderMask)) {
-        minSum += LookupTable.MIN[values[i]];
-        maxSum += LookupTable.MAX[values[i]];
+        minMaxSum += LookupTable.MIN_MAX[values[i]];
         i++;
       }
 
-      let sum = this._sum;
+      const sum = this._sum;
+      const minSum = minMaxSum>>7;
+      const maxSum = minMaxSum&0x7f;
       // It is impossible to make the target sum.
       if (sum < minSum || maxSum < sum) return false;
       // We've reached the target sum exactly.
