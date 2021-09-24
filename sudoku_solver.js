@@ -884,25 +884,22 @@ SudokuSolver.NonetHandler = class extends SudokuSolver.ConstraintHandler {
   }
 
   enforceConsistency(grid) {
-    let cells = this.cells;
+    const cells = this.cells;
 
-    // TODO: Ignore hidden singles we've already found.
-    // TODO: Ignore nonets we've already processed.
     let allValues = 0;
     let uniqueValues = 0;
+    let fixedValues = 0;
     for (let i = 0; i < GRID_SIZE; i++) {
       let v = grid[cells[i]];
       uniqueValues &= ~v;
       uniqueValues |= (v&~allValues);
       allValues |= v;
+      if (!(v&(v-1))) fixedValues |= v;
     }
     if (allValues != ALL_VALUES) return false;
-    // NOTE: This is only useful if everywhere else aborts when a domain wipeout
-    // if found.
-    // i.e. If all values are unique values, and there are no cells with no
-    // values, then this constraint must be satisfied.
-    if (uniqueValues == ALL_VALUES) return true;
+    if (fixedValues == ALL_VALUES) return true;
 
+    uniqueValues &= ~fixedValues;
     if (uniqueValues) {
       // We have hidden singles. Find and constrain them.
       for (let i = 0; i < GRID_SIZE; i++) {
