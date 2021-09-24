@@ -990,32 +990,33 @@ class SumHandlerUtil {
       allValues |= value;
       if (!(value&(value-1))) fixedValues |= value;
     }
+    const fixedSum = LookupTable.SUM[fixedValues];
+
     // Check if we have enough unique values.
     if (LookupTable.COUNT[allValues] < numCells) return 0;
     // Check if we have fixed all the values.
     if (allValues == fixedValues) {
-      let sum = LookupTable.SUM[fixedValues];
-      if (targetSums.length == 1 && sum != targetSums[0]) return 0;
-      return 1<<(sum-1);
+      if (targetSums.length == 1 && fixedSum != targetSums[0]) return 0;
+      return 1<<(fixedSum-1);
     }
 
-    let unfixedValues = allValues & ~fixedValues;
+    const unfixedValues = allValues & ~fixedValues;
     let requiredUniques = uniqueValues;
-    let numUnfixed = cells.length - LookupTable.COUNT[fixedValues];
+    const numUnfixed = cells.length - LookupTable.COUNT[fixedValues];
 
     // For each possible targetSum, find the possible cell value settings.
     let possibilities = 0;
-    let unfixedCageSums = SumHandlerUtil.KILLER_CAGE_SUMS[numUnfixed];
+    const unfixedCageSums = SumHandlerUtil.KILLER_CAGE_SUMS[numUnfixed];
     let sumValue = 0;
     for (let i = 0; i < targetSums.length; i++) {
       let sum = targetSums[i];
 
-      let sumOptions = unfixedCageSums[sum - LookupTable.SUM[fixedValues]];
+      const sumOptions = unfixedCageSums[sum - fixedSum];
       if (!sumOptions) continue;
 
       let isPossible = false;
       for (let j = 0; j < sumOptions.length; j++) {
-        let option = sumOptions[j];
+        const option = sumOptions[j];
         if ((option & unfixedValues) === option) {
           possibilities |= option;
           requiredUniques &= option;
@@ -1028,7 +1029,7 @@ class SumHandlerUtil {
     if (!possibilities) return 0;
 
     // Remove any values that aren't part of any solution.
-    let valuesToRemove = unfixedValues & ~possibilities;
+    const valuesToRemove = unfixedValues & ~possibilities;
     if (valuesToRemove) {
       for (let i = 0; i < numCells; i++) {
         // Safe to apply to every cell, since we know that none of the
@@ -1305,7 +1306,7 @@ SudokuSolver.SumHandler = class extends SudokuSolver.ConstraintHandler {
       // distict values.
       if ((targetSum&1) == 0 && this._conflictMap[i0] === this._conflictMap[i1]) {
         // targetSum/2 can't be valid value.
-        let mask = ~(1 << ((targetSum>>1)-1));
+        const mask = ~(1 << ((targetSum>>1)-1));
         v0 &= mask;
         v1 &= mask;
       }
@@ -1333,24 +1334,29 @@ SudokuSolver.SumHandler = class extends SudokuSolver.ConstraintHandler {
     // values and the target sum.
     let minSum = 0;
     let maxSum = 0;
-    let fixedValues = 0;
+    let fixedSum = 0;
+    let numFixed = 0;
     for (let i = 0; i < numCells; i++) {
       const v = grid[cells[i]];
       const min = LookupTable.MIN[v];
       const max = LookupTable.MAX[v];
       minSum += min;
       maxSum += max;
-      if (min === max) fixedValues |= v;
+      if (min === max) {
+        fixedSum += min;
+        numFixed++;  // We may have repeated values, so track count explicitly.
+      }
     }
 
     // It is impossible to make the target sum.
     if (sum < minSum || maxSum < sum) return false;
     // We've reached the target sum exactly.
+    // NOTE: Uniqueness constraint is already enforced by the solver via confictCells.
     if (minSum == maxSum) return true;
 
     // If there are 2 or 1 remaining values then handle that explicitly.
-    if (numCells - LookupTable.COUNT[fixedValues] <= 2) {
-      const targetSum = sum - LookupTable.SUM[fixedValues];
+    if (numCells - numFixed <= 2) {
+      const targetSum = sum - fixedSum;
       return this._enforceTwoRemainingCells(grid, targetSum);
     }
 
