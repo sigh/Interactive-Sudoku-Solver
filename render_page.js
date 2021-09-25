@@ -1134,6 +1134,7 @@ class SolutionController {
       'cellsSearched',
       'valuesTried',
       'constraintsProcessed',
+      'puzzleSetupTime',
       'runtime',
     ];
     this._stateVars = {};
@@ -1166,6 +1167,9 @@ class SolutionController {
       switch (v) {
         case 'solutions':
           text = counters.solutions + (state.done ? '' : '+');
+          break;
+        case 'puzzleSetupTime':
+          text = state.puzzleSetupTime ? formatTimeMs(state.puzzleSetupTime) : '?';
           break;
         case 'runtime':
           text = formatTimeMs(state.timeMs);

@@ -348,12 +348,13 @@ class SudokuBuilder {
   // Ask for a state update every 2**14 iterations.
   // NOTE: Using a non-power of 10 makes the display loook faster :)
   static LOG_UPDATE_FREQUENCY = 14;
+  static CACHE_BUST_PARAM = `cachebuster=${Math.random()}`;
 
   static _unusedWorkers = [];
 
   static async buildInWorker(constraints, stateHandler) {
     if (!this._unusedWorkers.length) {
-      this._unusedWorkers.push(new Worker('worker.js'));
+      this._unusedWorkers.push(new Worker('worker.js?' + this.CACHE_BUST_PARAM));
     }
     let worker = this._unusedWorkers.pop();
     worker.release = () => this._unusedWorkers.push(worker);
