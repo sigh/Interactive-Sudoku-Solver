@@ -578,11 +578,16 @@ SudokuConstraintHandler.Sum = class extends SudokuConstraintHandler {
   _conflictMap;
   _sum;
   _sumList = [0];
+  _complementCells = null;
 
   constructor(cells, sum) {
     super(cells);
     this._sum = +sum;
     this._sumList[0] = this._sum;
+  }
+
+  setComplementCells(cells) {
+    this._complementCells = cells;
   }
 
   sum() {
@@ -667,6 +672,60 @@ SudokuConstraintHandler.Sum = class extends SudokuConstraintHandler {
     }
   }
 
+  _enforceCombinationsWithComplement(grid) {
+    const set0 = this.cells;
+    const set1 = this._complementCells;
+    const sum = this._sum;
+
+    let values0 = 0;
+    for (let i = set0.length-1; i >= 0; i--) {
+      values0 |= grid[set0[i]];
+    }
+    let values1 = 0;
+    for (let i = set1.length-1; i >= 0; i--) {
+      values1 |= grid[set1[i]];
+    }
+
+    // NOTE: The following have been left out as I couldn't get them to show
+    // a measurable improvement.
+    //   - Calculating the fixedSum and reduce the target some.
+    //   - Short-circuiting this by checking if the sum has already been
+    //     reached.
+
+    const cageSums = SumHandlerUtil.KILLER_CAGE_SUMS[set0.length][sum];
+    let possibilities0 = 0;
+    let possibilities1 = 0;
+
+    for (let j = 0; j < cageSums.length; j++) {
+      const option = cageSums[j];
+      // Branchlessly check that the option is consistent with both set1 and
+      // set0.
+      const includeOption = -(!(option & ~values0) & !(~option & ~values1 & ALL_VALUES));
+      possibilities0 |= option&includeOption;
+      possibilities1 |= ~option&includeOption;
+    }
+    if (!possibilities0) return false;
+
+    // Remove any values that aren't part of any solution.
+    // Same as for sum handler.
+    const valuesToRemove0 = values0 & ~possibilities0;
+    if (valuesToRemove0) {
+      for (let i = 0; i < set0.length; i++) {
+        if (!(grid[set0[i]] &= ~valuesToRemove0)) return false;
+      }
+    }
+    const valuesToRemove1 = values1 & ~possibilities1;
+    if (valuesToRemove1) {
+      for (let i = 0; i < set1.length; i++) {
+        if (!(grid[set1[i]] &= ~valuesToRemove1)) return false;
+      }
+    }
+
+    // NOTE: Seems like require unqiues doesn't help much here.
+
+    return true;
+  }
+
   enforceConsistency(grid) {
     const cells = this.cells;
     const numCells = cells.length;
@@ -692,29 +751,41 @@ SudokuConstraintHandler.Sum = class extends SudokuConstraintHandler {
     // unsatisfiable.
     if (numUnfixed < 0) return false;
 
-    // If there are few remaining cells then handle them explicitly.
     if (numUnfixed <= 3) {
+    // If there are few remaining cells then handle them explicitly.
       const fixedSum = (rangeInfoSum>>14) & 0x7f;
       const targetSum = sum - fixedSum;
-      return this._enforceFewRemainingCells(grid, targetSum, numUnfixed);
-    }
-
-    // Restrict the possible range of values in each cell based on whether they
-    // will cause the sum to be too large or too small.
-    if (sum - minSum < GRID_SIZE || maxSum - sum < GRID_SIZE) {
-      if (!SumHandlerUtil.restrictValueRange(grid, cells,
-                                             sum - minSum, maxSum - sum)) {
+      if (!this._enforceFewRemainingCells(grid, targetSum, numUnfixed)) {
         return false;
+      }
+    } else {
+      // Restrict the possible range of values in each cell based on whether they
+      // will cause the sum to be too large or too small.
+      if (sum - minSum < GRID_SIZE || maxSum - sum < GRID_SIZE) {
+        if (!SumHandlerUtil.restrictValueRange(grid, cells,
+                                               sum - minSum, maxSum - sum)) {
+          return false;
+        }
       }
     }
 
-    if (this._conflictSets.length == 1) {
-      return (0 !== SumHandlerUtil.restrictCellsSingleConflictSet(
-        grid, this._sumList, cells));
-    } else {
-      return (0 !== SumHandlerUtil.restrictCellsMultiConflictSet(
-        grid, sum, sum, cells, this._conflictSets));
+    if (this._complementCells !== null) {
+      return this._enforceCombinationsWithComplement(grid);
     }
+
+    // If we have less then 3 unfixed cells, then we've already don't all
+    // we can.
+    if (numUnfixed <= 3) return true;
+
+    if (this._conflictSets.length == 1) {
+      if (0 === SumHandlerUtil.restrictCellsSingleConflictSet(
+        grid, this._sumList, cells)) return false;
+    } else {
+      if (0 === SumHandlerUtil.restrictCellsMultiConflictSet(
+        grid, sum, sum, cells, this._conflictSets)) return false;
+    }
+
+    return true;
   }
 }
 
@@ -974,6 +1045,7 @@ class SudokuConstraintOptimizer {
         if (k.cells.length == cells.length) {
           constrainedCells.push(...cells);
           constrainedSum += k.sum();
+          k.setComplementCells(setDifference(h.cells, k.cells));
         }
       }
 
@@ -987,8 +1059,10 @@ class SudokuConstraintOptimizer {
 
       const complementCells = setDifference(h.cells, constrainedCells);
       const complementSum = this._NONET_SUM - constrainedSum;
-      handlers.push(new SudokuConstraintHandler.Sum(
-        complementCells, complementSum));
+      const complementHandler = new SudokuConstraintHandler.Sum(
+        complementCells, complementSum);
+      complementHandler.setComplementCells(constrainedCells);
+      handlers.push(complementHandler);
     }
 
     return handlers;
