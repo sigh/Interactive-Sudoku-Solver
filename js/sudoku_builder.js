@@ -354,7 +354,7 @@ class SudokuBuilder {
 
   static async buildInWorker(constraints, stateHandler) {
     if (!this._unusedWorkers.length) {
-      this._unusedWorkers.push(new Worker('worker.js?' + this.CACHE_BUST_PARAM));
+      this._unusedWorkers.push(new Worker('js/worker.js?' + this.CACHE_BUST_PARAM));
     }
     let worker = this._unusedWorkers.pop();
     worker.release = () => this._unusedWorkers.push(worker);
@@ -378,7 +378,7 @@ class SudokuBuilder {
       for (let col = 0; col < GRID_SIZE; col++) {
         cells.push(toCellIndex(row, col));
       }
-      yield new SudokuSolver.NonetHandler(cells);
+      yield new SudokuConstraintHandler.Nonet(cells);
     }
 
     // Column constraints.
@@ -387,7 +387,7 @@ class SudokuBuilder {
       for (let row = 0; row < GRID_SIZE; row++) {
         cells.push(toCellIndex(row, col));
       }
-      yield new SudokuSolver.NonetHandler(cells);
+      yield new SudokuConstraintHandler.Nonet(cells);
     }
 
     // Box constraints.
@@ -400,7 +400,7 @@ class SudokuBuilder {
         let col = BOX_SIZE*bj+(c/BOX_SIZE|0);
         cells.push(toCellIndex(row, col));
       }
-      yield new SudokuSolver.NonetHandler(cells);
+      yield new SudokuConstraintHandler.Nonet(cells);
     }
   }
 
@@ -426,35 +426,35 @@ class SudokuBuilder {
           let c = constraint.direction > 0 ? GRID_SIZE-r-1 : r;
           cells.push(toCellIndex(r, c));
         }
-        yield new SudokuSolver.AllDifferentHandler(cells);
+        yield new SudokuConstraintHandler.AllDifferent(cells);
         break;
 
       case 'Arrow':
         cells = constraint.cells.map(c => parseCellId(c).cell);
-        yield new SudokuSolver.ArrowHandler(cells);
+        yield new SudokuConstraintHandler.Arrow(cells);
         break;
 
       case 'Cage':
         cells = constraint.cells.map(c => parseCellId(c).cell);
-        yield new SudokuSolver.SumHandler(cells, constraint.sum);
-        yield new SudokuSolver.AllDifferentHandler(cells);
+        yield new SudokuConstraintHandler.Sum(cells, constraint.sum);
+        yield new SudokuConstraintHandler.AllDifferent(cells);
         break;
 
       case 'LittleKiller':
         cells = SudokuConstraint.LittleKiller
           .CELL_MAP[constraint.id].map(c => parseCellId(c).cell);
-        yield new SudokuSolver.SumHandler(cells, constraint.sum);
+        yield new SudokuConstraintHandler.Sum(cells, constraint.sum);
         break;
 
       case 'Sandwich':
         cells = SudokuConstraint.Sandwich
           .CELL_MAP[constraint.id].map(c => parseCellId(c).cell);
-        yield new SudokuSolver.SandwichHandler(cells, constraint.sum);
+        yield new SudokuConstraintHandler.Sandwich(cells, constraint.sum);
         break;
 
       case 'AllDifferent':
         cells = constraint.cells.map(c => parseCellId(c).cell);
-        yield new SudokuSolver.AllDifferentHandler(cells);
+        yield new SudokuConstraintHandler.AllDifferent(cells);
         break;
 
       case 'FixedValues':
@@ -463,13 +463,13 @@ class SudokuBuilder {
           let {cell, value} = parseValueId(valueId);
           valueMap.set(cell, value);
         }
-        yield new SudokuSolver.FixedCellsHandler(valueMap);
+        yield new SudokuConstraintHandler.FixedCells(valueMap);
         break;
 
       case 'Thermo':
         cells = constraint.cells.map(c => parseCellId(c).cell);
         for (let i = 1; i < cells.length; i++) {
-          yield new SudokuSolver.BinaryConstraintHandler(
+          yield new SudokuConstraintHandler.BinaryConstraint(
             cells[i-1], cells[i], (a, b) => a < b);
         }
         break;
@@ -482,13 +482,13 @@ class SudokuBuilder {
 
       case 'WhiteDot':
         cells = constraint.cells.map(c => parseCellId(c).cell);
-        yield new SudokuSolver.BinaryConstraintHandler(
+        yield new SudokuConstraintHandler.BinaryConstraint(
           cells[0], cells[1], (a, b) => a == b+1 || a == b-1);
         break;
 
       case 'BlackDot':
         cells = constraint.cells.map(c => parseCellId(c).cell);
-        yield new SudokuSolver.BinaryConstraintHandler(
+        yield new SudokuConstraintHandler.BinaryConstraint(
           cells[0], cells[1], (a, b) => a == b*2 || b == a*2);
         break;
 
@@ -506,7 +506,7 @@ class SudokuBuilder {
         for (const [rr, cc] of conflictFn(r, c)) {
           if (rr < 0 || rr >= GRID_SIZE || cc < 0 || cc >= GRID_SIZE) continue;
           let conflict = toCellIndex(rr, cc);
-          yield new SudokuSolver.AllDifferentHandler([cell, conflict]);
+          yield new SudokuConstraintHandler.AllDifferent([cell, conflict]);
         }
       }
     }
@@ -522,7 +522,7 @@ class SudokuBuilder {
         for (const [rr, cc] of adjacentCellsFn(r, c)) {
           if (rr < 0 || rr >= GRID_SIZE || cc < 0 || cc >= GRID_SIZE) continue;
           let conflict = toCellIndex(rr, cc);
-          yield new SudokuSolver.BinaryConstraintHandler(
+          yield new SudokuConstraintHandler.BinaryConstraint(
             cell, conflict, constraintFn);
         }
       }

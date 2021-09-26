@@ -2,7 +2,8 @@ const START_INIT_WORKER = performance.now();
 
 self.importScripts('util.js');
 self.importScripts('sudoku_builder.js');
-self.importScripts('sudoku_solver.js');
+self.importScripts('solver/engine.js');
+self.importScripts('solver/handlers.js');
 
 let workerSolver = null;
 let workerSolverSetUpTime = 0;

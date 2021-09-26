@@ -3,7 +3,7 @@
 
 <head>
   <title>Interactive Sudoku Solver</title>
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="css/style.css">
 
   <!-- Global site tag (gtag.js) - Google Analytics -->
   <script async src="https://www.googletagmanager.com/gtag/js?id=UA-177463638-1"></script>
@@ -16,13 +16,14 @@
   </script>
 </head>
 
-<script defer src="util.js"></script>
-<script defer src="sudoku_builder.js"></script>
-<script defer src="constraint_display.js"></script>
-<script defer src="examples.js"></script>
-<script defer src="render_page.js"></script>
-<script defer src="sudoku_solver.js"></script>
-<script async src="debug.js"></script>
+<script defer src="js/util.js"></script>
+<script defer src="js/sudoku_builder.js"></script>
+<script defer src="js/constraint_display.js"></script>
+<script defer src="js/examples.js"></script>
+<script defer src="js/render_page.js"></script>
+<script defer src="js/solver/engine.js"></script>
+<script defer src="js/solver/handlers.js"></script>
+<script async src="js/debug.js"></script>
 <script>
   window.addEventListener('load', () => { initPage(); });
 </script>
