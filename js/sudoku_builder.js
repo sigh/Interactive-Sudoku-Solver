@@ -219,6 +219,20 @@ class SudokuConstraint {
     }
   }
 
+  static Whisper = class Whisper extends SudokuConstraint {
+    constructor(...cells) {
+      super(arguments);
+      this.cells = cells;
+    }
+  }
+
+  static Palindrome = class Palindrome extends SudokuConstraint {
+    constructor(...cells) {
+      super(arguments);
+      this.cells = cells;
+    }
+  }
+
   static AntiKnight = class AntiKnight extends SudokuConstraint {}
 
   static AntiKing = class AntiKing extends SudokuConstraint {}
@@ -471,6 +485,23 @@ class SudokuBuilder {
         for (let i = 1; i < cells.length; i++) {
           yield new SudokuConstraintHandler.BinaryConstraint(
             cells[i-1], cells[i], (a, b) => a < b);
+        }
+        break;
+
+      case 'Whisper':
+        cells = constraint.cells.map(c => parseCellId(c).cell);
+        for (let i = 1; i < cells.length; i++) {
+          yield new SudokuConstraintHandler.BinaryConstraint(
+            cells[i-1], cells[i], (a, b) => a >= b+5 || a <= b-5);
+        }
+        break;
+
+      case 'Palindrome':
+        cells = constraint.cells.map(c => parseCellId(c).cell);
+        const numCells = cells.length;
+        for (let i = 0; i < numCells/2; i++) {
+          yield new SudokuConstraintHandler.BinaryConstraint(
+            cells[i], cells[numCells-1-i], (a, b) => a == b);
         }
         break;
 

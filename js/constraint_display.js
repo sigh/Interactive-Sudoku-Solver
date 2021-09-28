@@ -350,6 +350,41 @@ class ConstraintDisplay {
     return arrow;
   }
 
+  _drawLine(cells, color) {
+    if (cells.length < 2) throw(`Thermo too short: ${cells}`)
+
+    let line = createSvgElement('svg');
+    line.setAttribute('fill', 'transparent');
+    line.setAttribute('stroke', color);
+
+    let directions = [];
+    cells.forEach((cell) => {
+      const [x, y] = ConstraintDisplay.cellCenter(cell);
+      directions.push('L');
+      directions.push(x);
+      directions.push(y);
+    });
+    directions[0] = 'M';  // Replace the first direction to a move.
+    let path = createSvgElement('path');
+    path.setAttribute('d', directions.join(' '));
+    path.setAttribute('stroke-width', 5);
+    path.setAttribute('stroke-linecap', 'round');
+
+    line.appendChild(path);
+
+    this._svg.append(line);
+
+    return line;
+  }
+
+  drawWhisper(cells) {
+    return this._drawLine(cells, 'rgb(255, 200, 255)');
+  }
+
+  drawPalindrome(cells) {
+    return this._drawLine(cells, 'rgb(200, 200, 255)');
+  }
+
   drawThermometer(cells) {
     if (cells.length < 2) throw(`Thermo too short: ${cells}`)
 

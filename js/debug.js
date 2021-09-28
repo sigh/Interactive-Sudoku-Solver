@@ -134,6 +134,8 @@ const TEST_CASES = [
   'Little killer',
   'Little killer 2',
   'Sandwich sudoku',
+  'German whispers',
+  'Palindromes',
 ];
 
 const runHardKillers = () => {

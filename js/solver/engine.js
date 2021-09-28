@@ -700,7 +700,7 @@ class LookupTable {
 
   static _binaryFunctionCache = new Map();
   static _binaryFunctionKey(fn) {
-    let keyParts = [];
+    const keyParts = [];
     for (let i = 1; i <= GRID_SIZE; i++) {
       let part = 0;
       for (let j = 1; j <= GRID_SIZE; j++) {
@@ -713,12 +713,12 @@ class LookupTable {
 
   static forBinaryFunction(fn) {
     // Check the cache first.
-    let key = this._binaryFunctionKey(fn);
+    const key = this._binaryFunctionKey(fn);
     if (this._binaryFunctionCache.has(key)) {
       return this._binaryFunctionCache.get(key);
     }
 
-    let table = new Uint16Array(COMBINATIONS);
+    const table = new Uint16Array(COMBINATIONS);
     this._binaryFunctionCache.set(key, table);
 
     // Populate base cases, where there is a single value set.

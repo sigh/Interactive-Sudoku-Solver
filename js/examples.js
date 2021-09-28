@@ -84,6 +84,16 @@ const EXAMPLES = {
     input: '.Sandwich~8~C1.Sandwich~4~C2.Sandwich~17~C3.Sandwich~35~C4.Sandwich~14~C5.Sandwich~13~C6.Sandwich~3~C7.Sandwich~10~C8.Sandwich~25~C9.Sandwich~4~R1.Sandwich~33~R2.Sandwich~20~R3.Sandwich~17~R4.Sandwich~26~R5.Sandwich~10~R6.Sandwich~16~R7.Sandwich~24~R8.Sandwich~0~R9.~R3C3_1~R5C5_5~R7C7_9',
     solution: '236941875954378612871625439182439756397856124645217398413562987569783241728194563',
   },
+  'German whispers': {
+    src: 'https://www.youtube.com/watch?v=nH3vat8z9uM',
+    input: '.Whisper~R8C1~R7C1~R7C2~R8C3~R9C3~R9C2.Whisper~R9C6~R8C7~R7C7~R7C8~R6C9~R5C8.Whisper~R6C3~R5C2~R4C3~R3C4~R2C5~R1C6~R1C7~R2C8~R3C8~R4C7~R5C6~R6C6~R7C6~R8C5~R7C4.Whisper~R4C5~R4C6~R3C7.~R1C5_1~R2C2_5~R5C1_6~R5C9_9~R7C3_3~R8C8_3~R9C1_5~R9C5_3',
+    solution: '796413852352689417184275693247591386615348279839762541923857164478126935561934728',
+  },
+  'Palindromes': {
+    src: 'https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?chlang=en&id=0001WP',
+    input: '.Palindrome~R7C1~R6C2~R5C1~R4C2~R3C3~R2C4~R1C5~R2C6~R1C7.Palindrome~R9C3~R8C4~R9C5~R8C6~R7C7~R6C8~R5C9~R4C8~R3C9.Palindrome~R7C4~R7C5~R7C6~R6C7~R5C7~R4C7.Palindrome~R3C6~R3C5~R3C4~R4C3~R5C3~R6C3.~R1C1_6~R1C9_5~R2C3_8~R2C5_5~R2C7_9~R4C1_8~R4C5_1~R4C9_3~R5C5_4~R6C5_2~R8C1_9~R8C3_7~R8C7_8~R8C9_2~R9C2_5~R9C8_6',
+    solution: '694178235128453976375296481842619753719345628536827149283761594967534812451982367',
+  },
 
   // Classic grids that used to be slow. 3 and 4 used to take 2+ seconds.
   'Classic sudoku, was slow (1)': {

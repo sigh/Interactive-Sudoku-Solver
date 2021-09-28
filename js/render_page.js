@@ -92,6 +92,8 @@ class ExampleHandler {
     'Little killer',
     'Sudoku X',
     'Sandwich sudoku',
+    'German whispers',
+    'Palindromes',
   ];
 
   constructor(constraintManager) {
@@ -356,6 +358,26 @@ class ConstraintManager {
         this._addToPanel(config);
         this._configs.push(config);
         break;
+      case 'Whisper':
+        config = {
+          cells: constraint.cells,
+          name: `Whisper (${constraint.cells.length}-cell)`,
+          constraint: constraint,
+          displayElem: this._display.drawWhisper(constraint.cells),
+        };
+        this._addToPanel(config);
+        this._configs.push(config);
+        break;
+      case 'Palindrome':
+        config = {
+          cells: constraint.cells,
+          name: `Palindrome (${constraint.cells.length}-cell)`,
+          constraint: constraint,
+          displayElem: this._display.drawPalindrome(constraint.cells),
+        };
+        this._addToPanel(config);
+        this._configs.push(config);
+        break;
       case 'Cage':
         config = {
           cells: constraint.cells,
@@ -416,6 +438,14 @@ class ConstraintManager {
         break;
       case 'thermo':
         constraint = new SudokuConstraint.Thermo(...cells);
+        this.loadConstraint(constraint);
+        break;
+      case 'whisper':
+        constraint = new SudokuConstraint.Whisper(...cells);
+        this.loadConstraint(constraint);
+        break;
+      case 'palindrome':
+        constraint = new SudokuConstraint.Palindrome(...cells);
         this.loadConstraint(constraint);
         break;
       case 'white-dot':
