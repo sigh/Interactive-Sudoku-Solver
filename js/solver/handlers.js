@@ -163,7 +163,7 @@ class SumHandlerUtil {
   // Restricts cell values to only combinations which could make one of the
   // provided sums. Assumes cells are all in the same conflict set.
   // Returns a mask for the valid sum values (thus 0 if none are possible).
-  static restrictCellsSingleConflictSet(grid, targetSums, cells, offset) {
+  static restrictCellsSingleConflictSet(grid, baseSum, sumOffsets, cells, offset) {
     const numCells = cells.length;
 
     // Check that we can make the current sum with the unfixed values remaining.
@@ -183,7 +183,7 @@ class SumHandlerUtil {
     if (LookupTable.COUNT[allValues] < numCells) return 0;
     // Check if we have fixed all the values.
     if (allValues == fixedValues) {
-      if (targetSums.length == 1 && fixedSum != targetSums[0]) return 0;
+      if (sumOffsets == 1 && fixedSum != baseSum) return 0;
       return 1<<(fixedSum-1);
     }
 
@@ -195,8 +195,11 @@ class SumHandlerUtil {
     let possibilities = 0;
     const unfixedCageSums = SumHandlerUtil.KILLER_CAGE_SUMS[numUnfixed];
     let sumValue = 0;
-    for (let i = 0; i < targetSums.length; i++) {
-      let sum = targetSums[i];
+    baseSum--;
+    while (sumOffsets) {
+      const v = sumOffsets & -sumOffsets;
+      sumOffsets &= ~v;
+      const sum = baseSum + LookupTable.VALUE[v];
 
       const sumOptions = unfixedCageSums[sum - fixedSum];
       if (!sumOptions) continue;
@@ -503,13 +506,11 @@ SudokuConstraintHandler.Sum = class extends SudokuConstraintHandler {
   _conflictSets;
   _conflictMap;
   _sum;
-  _sumList = [0];
   _complementCells = null;
 
   constructor(cells, sum) {
     super(cells);
     this._sum = +sum;
-    this._sumList[0] = this._sum;
     this._sumCells = cells;
   }
 
@@ -706,7 +707,7 @@ SudokuConstraintHandler.Sum = class extends SudokuConstraintHandler {
 
     if (this._conflictSets.length == 1) {
       if (0 === SumHandlerUtil.restrictCellsSingleConflictSet(
-        grid, this._sumList, cells, 0)) return false;
+        grid, this._sum, 1, cells, 0)) return false;
     } else {
       if (0 === SumHandlerUtil.restrictCellsMultiConflictSet(
         grid, sum, sum, cells, this._conflictSets, 0)) return false;
@@ -727,7 +728,7 @@ SudokuConstraintHandler.CellDepedentSum = class extends SudokuConstraintHandler.
   // If there is only one value remaining in sum, then call the standard
   // sum handler.
   _callSuperEnforceConsistency(grid, sums) {
-    this._sumList[0] = this._sum = LookupTable.VALUE[sums] - this._offset;
+    this._sum = LookupTable.VALUE[sums] - this._offset;
     return super.enforceConsistency(grid);
   }
 
@@ -783,17 +784,9 @@ SudokuConstraintHandler.CellDepedentSum = class extends SudokuConstraintHandler.
     }
 
     if (this._conflictSets.length == 1) {
-      // Create a list of all the sums.
-      let sumList = [];
-      while (sums) {
-        let sumValue = sums & -sums;
-        sums &= ~sumValue;
-        sumList.push(LookupTable.VALUE[sumValue]);
-      }
-
       // Restrict the sum and arrow cells values.
       grid[this._targetCell] &= SumHandlerUtil.restrictCellsSingleConflictSet(
-        grid, sumList, this._sumCells, offset);
+        grid, 1, sums, this._sumCells, offset);
     } else {
       grid[this._targetCell] &= SumHandlerUtil.restrictCellsMultiConflictSet(
         grid, minTarget, maxTarget, this._sumCells,
