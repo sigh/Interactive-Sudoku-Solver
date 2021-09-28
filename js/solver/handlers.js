@@ -470,7 +470,7 @@ class SumHandlerUtil {
   })();
 }
 
-SudokuConstraintHandler.Arrow = class extends SudokuConstraintHandler {
+SudokuConstraintHandler.CellDepedentSum = class extends SudokuConstraintHandler {
   constructor(cells, offset) {
     super(cells);
     this._offset = offset || 0;
@@ -1041,7 +1041,10 @@ class SudokuConstraintOptimizer {
       }
       if (!constraintMap.size) continue;
 
-      // Find contraints which have cells entirely within this nonet.
+
+      // Find contraints which have cells entirely (or mostly) within
+      // this nonet.
+      const outies = [];
       const constrainedCells = [];
       let constrainedSum = 0;
       for (const [k, cells] of constraintMap) {
@@ -1049,15 +1052,34 @@ class SudokuConstraintOptimizer {
           constrainedCells.push(...cells);
           constrainedSum += k.sum();
           k.setComplementCells(setDifference(h.cells, k.cells));
-        } else if (k.cells.length == cells.length+1 && k.cells.length > 4) {
-          // We need to tune this to only be added where it is most valuable.
-          // Very little value for small cells, but gives a huge win for
-          // larger cells.
-          const complementCells = [...setDifference(h.cells, cells)];
-          const extraCell = setDifference(k.cells, cells);
-          handlers.push(new SudokuConstraintHandler.Arrow(
-            [extraCell[0], ...complementCells], k.sum() - this._NONET_SUM));
+        } else if (k.cells.length == cells.length+1) {
+          outies.push(k);
         }
+      }
+
+      // Short-circuit the common case where there is nothing special in the
+      // nonet.
+      if (outies.length == 0 && constrainedCells.length == 0) continue;
+
+      const complementCells = setDifference(h.cells, constrainedCells);
+      const complementSum = this._NONET_SUM - constrainedSum;
+
+      // If a cage sticks out of a nonet by 1 cell, then we can form the
+      // equivalent of an arrow sum (with offset). That is, the value of the
+      // cell outside nonet is direct offset of the sum of the remaining
+      // cells in the nonet outside the cage. The sum can be further reduced
+      // by any other cages (i.e. known sums) in the nonet.
+      for (const o of outies) {
+        const remainingCells = setDifference(complementCells, o.cells);
+        // This may be worth tuning better.
+        // In general a higher number means more constraining, but it
+        // takes longer.
+        if (remainingCells.length > 5) continue;
+
+        const extraCell = setDifference(o.cells, h.cells);
+        const remainingSum = o.sum() - complementSum;
+        handlers.push(new SudokuConstraintHandler.CellDepedentSum(
+          [extraCell[0], ...remainingCells], remainingSum));
       }
 
       // No constraints within this nonet.
@@ -1068,8 +1090,6 @@ class SudokuConstraintOptimizer {
       // Nothing left to constrain.
       if (constrainedCells.length == GRID_SIZE) continue;
 
-      const complementCells = setDifference(h.cells, constrainedCells);
-      const complementSum = this._NONET_SUM - constrainedSum;
       const complementHandler = new SudokuConstraintHandler.Sum(
         complementCells, complementSum);
       complementHandler.setComplementCells(constrainedCells);

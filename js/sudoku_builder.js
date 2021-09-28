@@ -445,7 +445,7 @@ class SudokuBuilder {
 
       case 'Arrow':
         cells = constraint.cells.map(c => parseCellId(c).cell);
-        yield new SudokuConstraintHandler.Arrow(cells, 0);
+        yield new SudokuConstraintHandler.CellDepedentSum(cells, 0);
         break;
 
       case 'Cage':
