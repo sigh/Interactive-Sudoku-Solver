@@ -190,38 +190,36 @@ class SumHandlerUtil {
     const unfixedValues = allValues & ~fixedValues;
     let requiredUniques = uniqueValues;
     const numUnfixed = cells.length - LookupTable.COUNT[fixedValues];
+    const sumLookup = SumHandlerUtil.KILLER_CAGE_INFO[unfixedValues][numUnfixed];
 
-    // For each possible targetSum, find the possible cell value settings.
     let possibilities = 0;
-    const unfixedCageSums = SumHandlerUtil.KILLER_CAGE_SUMS[numUnfixed];
     let sumValue = 0;
-    baseSum--;
-    while (sumOffsets) {
-      const v = sumOffsets & -sumOffsets;
-      sumOffsets &= ~v;
-      const sum = baseSum + LookupTable.VALUE[v];
 
-      const sumOptions = unfixedCageSums[sum - fixedSum];
-      if (!sumOptions) continue;
-
-      let isPossible = 0;
-      for (let j = 0; j < sumOptions.length; j++) {
-        const option = sumOptions[j];
-        // Branchlessly check that:
-        // if ((option & unfixedValues) === option) {
-        //   possibilities |= option;
-        //   requiredUniques &= option;
-        //   isPossible = true;
-        // }
-        const includeOption = -!(option & ~unfixedValues);
-        possibilities |= option&includeOption;
-        requiredUniques &= option|~includeOption;
-        isPossible |= includeOption;
+    if (sumOffsets === 1) {
+      // Handle the common case where we only have one sum.
+      possibilities = sumLookup[baseSum-fixedSum];
+      if (!possibilities) return 0;
+      if (possibilities) {
+        sumValue = 1<<(baseSum-1);
+        requiredUniques &= possibilities >> 9;
       }
-      if (isPossible) sumValue |= 1<<(sum-1);
-    }
+    } else {
+      // For each possible targetSum, find the possible cell value settings.
+      baseSum--;
+      while (sumOffsets) {
+        const v = sumOffsets & -sumOffsets;
+        sumOffsets &= ~v;
+        const sum = baseSum + LookupTable.VALUE[v];
 
-    if (!possibilities) return 0;
+        const sumPossibilities = sumLookup[sum-fixedSum];
+        if (sumPossibilities) {
+          possibilities |= sumPossibilities;
+          sumValue |= 1<<(sum-1);
+          requiredUniques &= sumPossibilities >> 9;
+        }
+      }
+      if (!possibilities) return 0;
+    }
 
     // Remove any values that aren't part of any solution.
     const valuesToRemove = unfixedValues & ~possibilities;
@@ -453,12 +451,14 @@ class SumHandlerUtil {
     return table;
   })();
 
+  static _MAX_SUM = (GRID_SIZE*(GRID_SIZE+1)/2);
+
   static KILLER_CAGE_SUMS = (() => {
     let table = [];
     for (let n = 0; n < GRID_SIZE+1; n++) {
       let totals = [];
       table.push(totals);
-      for (let i = 0; i < (GRID_SIZE*(GRID_SIZE+1)/2)+1; i++) {
+      for (let i = 0; i < this._MAX_SUM+1; i++) {
         totals.push([]);
       }
     }
@@ -471,6 +471,45 @@ class SumHandlerUtil {
 
     return table;
   })();
+
+  // KILLER_CAGE_INFO[values][numCells][sum] = v
+  // v = [requiredUniques: 9 bits, possibilities: 9 bits]
+  //
+  // possibilities: values which are in any solution.
+  // requiredUniques: values which are a required part of any solution.
+  static KILLER_CAGE_INFO = (() => {
+    const table = [];
+    let count = 0;
+    for (let i = 0; i < COMBINATIONS; i++) {
+      const valueTable = [new Uint32Array()];
+      table.push(valueTable);
+
+      const maxCount = LookupTable.COUNT[i];
+      for (let j = 1; j < maxCount+1; j++) {
+        const countTable = new Uint32Array(this._MAX_SUM+1);
+        valueTable.push(countTable);
+
+        const sums = SumHandlerUtil.KILLER_CAGE_SUMS[j];
+        for (let s = 1; s < sums.length; s++) {
+          const options = sums[s];
+          let possibilities = 0;
+          let required = ALL_VALUES;
+          for (const o of options) {
+            if ((o & i) == o) {
+              possibilities |= o;
+              required &= o;
+            }
+          }
+          if (possibilities) {
+            countTable[s] = possibilities | (required << 9);
+          }
+        }
+      }
+    }
+
+    return table;
+  })();
+
 }
 
 // Solve 3-cell sums exactly with a 512 KB lookup table.
