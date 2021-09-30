@@ -140,6 +140,90 @@ class ExampleHandler {
   }
 }
 
+class JigsawManager {
+  constructor(display, onChange, makePanelItem) {
+    this._display = display;
+    this._makePanelItem = makePanelItem;
+    this._jigsawCheckbox = document.getElementById('jigsaw-input');
+
+    this._jigsawCheckbox.onchange = e => {
+      this._updateDependentElements();
+      onChange();
+    }
+
+    this._regionPanel = document.getElementById('displayed-regions');
+
+    this._pieces = [];
+  }
+
+  _updateDependentElements() {
+    const checked = this.enabled();
+
+    const jigsawRadio = document.getElementById('multi-cell-constraint-jigsaw').parentNode;
+    jigsawRadio.style.display = checked ? null : 'none';
+
+    const jigsawPanel = document.getElementById('displayed-regions');
+    jigsawPanel.style.display = checked ? null : 'none';
+
+    this._display.useJigsawRegions(checked);
+  }
+
+  enabled() {
+    return this._jigsawCheckbox.checked;
+  }
+
+  getConstraint() {
+    if (this.enabled()) {
+      return new SudokuConstraint.Set(this._pieces.map(
+        c => new SudokuConstraint.Jigsaw(...c.cells)));
+    } else {
+      return new SudokuConstraint.Set([]);
+    }
+  }
+
+  clear() {
+    this._pieces = [];
+    this._jigsawCheckbox.checked = false;
+    this._regionPanel.innerHTML = '';
+    this._updateDependentElements();
+  }
+
+  isValidJigsawPiece(selection) {
+    if (selection.length != 9) return false;
+    if (!this.enabled()) return false;
+
+    return true;
+  }
+
+  removePiece(config) {
+    let index = this._pieces.indexOf(config);
+    this._pieces.splice(index, 1);
+    this._display.removeItem(config.displayElem);
+    config.panelItem.parentNode.removeChild(config.panelItem);
+    this._grid.highlight.setCells([]);
+  }
+
+  _addToRegionPanel(config) {
+    this._regionPanel.appendChild(this._makePanelItem(config));
+  }
+
+  addPiece(cells) {
+    const config = {
+      cells: cells,
+      name: 'Piece',
+      displayElem: this._display.drawRegion(cells),
+    };
+    this._addToRegionPanel(config);
+    this._pieces.push(config);
+  }
+
+  setPieces(constraint) {
+    this.addPiece(constraint.cells);
+    this._jigsawCheckbox.checked = true;
+    this._updateDependentElements();
+  }
+}
+
 class ConstraintManager {
   constructor(grid) {
     this._configs = [];
@@ -170,16 +254,19 @@ class ConstraintManager {
   }
 
   _setUpPanel() {
-    this._panel = document.getElementById('displayed-constraints');
+    this._constraintPanel = document.getElementById('displayed-constraints');
 
     // Checkbox constraints.
     this._checkboxConstraints = new CheckboxConstraints(
       this._display, this.runUpdateCallback.bind(this));
 
+    this._jigsawManager = new JigsawManager(
+      this._display, this.runUpdateCallback.bind(this),
+      this._makePanelItem.bind(this));
 
     let selectionForm = document.forms['multi-cell-constraint-input'];
     this._grid.selection.addCallback(
-      (selection) => this.constructor._onNewSelection(
+      (selection) => this._onNewSelection(
         selection, selectionForm));
 
     selectionForm.onsubmit = e => {
@@ -220,7 +307,7 @@ class ConstraintManager {
     document.getElementById('clear-constraints-button').onclick = () => this.clear();
   }
 
-  static _onNewSelection(selection, selectionForm) {
+  _onNewSelection(selection, selectionForm) {
     // Only enable the selection panel if the selection is long enough.
     const disabled = (selection.length < 2);
     selectionForm.firstElementChild.disabled = disabled;
@@ -233,7 +320,7 @@ class ConstraintManager {
     ];
 
     // Enable/disable the adjacent only constraints.
-    let cellsAreAdjacent = this._cellsAreAdjacent(selection);
+    let cellsAreAdjacent = this.constructor._cellsAreAdjacent(selection);
     for (const c of adjacentOnlyConstraints) {
       const elem = selectionForm[c];
       if (cellsAreAdjacent) {
@@ -243,6 +330,9 @@ class ConstraintManager {
         elem.disabled = true;
       }
     }
+
+    selectionForm['multi-cell-constraint-jigsaw'].disabled = (
+        !this._jigsawManager.isValidJigsawPiece(selection));
 
     // Focus on the the form so we can immediately press enter.
     //   - If the cage is selected then focus on the text box for easy input.
@@ -358,6 +448,9 @@ class ConstraintManager {
         this._addToPanel(config);
         this._configs.push(config);
         break;
+      case 'Jigsaw':
+        this._jigsawManager.setPieces(constraint);
+        break;
       case 'Whisper':
         config = {
           cells: constraint.cells,
@@ -440,6 +533,9 @@ class ConstraintManager {
         constraint = new SudokuConstraint.Thermo(...cells);
         this.loadConstraint(constraint);
         break;
+      case 'jigsaw':
+        this._jigsawManager.addPiece(cells);
+        break;
       case 'whisper':
         constraint = new SudokuConstraint.Whisper(...cells);
         this.loadConstraint(constraint);
@@ -463,14 +559,19 @@ class ConstraintManager {
   }
 
   _removePanelConstraint(config) {
-    let index = this._configs.indexOf(config);
-    this._configs.splice(index, 1);
+    if (config.constraint.type == 'Jigsaw') {
+      this._jigsawManager.removePiece(config);
+    } else {
+      const index = this._configs.indexOf(config);
+      this._configs.splice(index, 1);
+    }
+
     this._display.removeItem(config.displayElem);
-    this._panel.removeChild(config.panelItem);
+    config.panelItem.parentNode.removeChild(config.panelItem);
     this._grid.highlight.setCells([]);
   }
 
-  _addToPanel(config) {
+  _makePanelItem(config) {
     let panelItem = document.createElement('div');
     panelItem.className = 'constraint-item';
 
@@ -495,11 +596,16 @@ class ConstraintManager {
       this._grid.highlight.setCells([]);
     });
 
-    this._panel.appendChild(panelItem);
+    return panelItem;
+  }
+
+  _addToPanel(config) {
+    this._constraintPanel.appendChild(this._makePanelItem(config));
   }
 
   getConstraints() {
     let constraints = this._configs.map(c => c.constraint);
+    constraints.push(this._jigsawManager.getConstraint());
     constraints.push(this._checkboxConstraints.getConstraint());
     constraints.push(...Object.values(this._outsideArrowConstraints));
     constraints.push(
@@ -510,10 +616,11 @@ class ConstraintManager {
 
   clear() {
     this._display.clear();
-    this._panel.innerHTML = '';
+    this._constraintPanel.innerHTML = '';
     this._checkboxConstraints.uncheckAll();
     this._removeAllLittleKillers();
     this._configs = [];
+    this._jigsawManager.clear();
     this._grid.setCellValues([])
     this._grid.setSolution();
     this.runUpdateCallback();

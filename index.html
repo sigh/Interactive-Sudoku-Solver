@@ -120,6 +120,13 @@
         <form id="multi-cell-constraint-input">
           <fieldset tabindex="0" disabled>
             <span>Create from selection</span>
+            <div style="display: none;">
+              <input type="radio" id="multi-cell-constraint-jigsaw" name="constraint-type" value="jigsaw">
+              <label for="multi-cell-constraint-jigsaw">Jigsaw Piece</label>
+              <span class="tooltip"
+                data-text="Values inside the jigsaw piece can't repeat.">
+              </span>
+            </div>
             <div>
               <input type="radio" id="multi-cell-constraint-cage" name="constraint-type" value="cage" checked>
               <label for="multi-cell-constraint-cage">
@@ -221,6 +228,14 @@
             </span>
           </div>
 
+          <div>
+            <input type="checkbox" id="jigsaw-input">
+            <label for="jigsaw-input">Jigsaw</label>
+            <span class="tooltip"
+              data-text="The 3x3 box constraint is removed and replaced with irregular regions.">
+            </span>
+          </div>
+
         </div>
       </div>
 
@@ -255,6 +270,7 @@
       </div>
 
       <div id="displayed-constraints"></div>
+      <div id="displayed-regions"></div>
 
       <hr>
 

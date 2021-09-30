@@ -212,6 +212,13 @@ class SudokuConstraint {
     }
   }
 
+  static Jigsaw = class Jigsaw extends SudokuConstraint {
+    constructor(...cells) {
+      super(arguments);
+      this.cells = cells;
+    }
+  }
+
   static Thermo = class Thermo extends SudokuConstraint {
     constructor(...cells) {
       super(arguments);
@@ -380,12 +387,25 @@ class SudokuBuilder {
     return solverProxy;
   }
 
-  static *_handlers(constraint) {
-    yield* SudokuBuilder._baseHandlers();
-    yield* SudokuBuilder._constraintHandlers(constraint);
+  static hasJigsaw(constraint) {
+    switch (constraint.type) {
+      case 'Jigsaw':
+        return true;
+      case 'Set':
+        return constraint.constraints.some(c => this.hasJigsaw(c));
+    }
+    return false;
   }
 
-  static *_baseHandlers() {
+  static *_handlers(constraint) {
+    yield* SudokuBuilder._rowColHandlers();
+    yield* SudokuBuilder._constraintHandlers(constraint);
+    if (!this.hasJigsaw(constraint)) {
+      yield* SudokuBuilder._boxHandlers();
+    }
+  }
+
+  static *_rowColHandlers() {
     // Row constraints.
     for (let row = 0; row < GRID_SIZE; row++) {
       let cells = [];
@@ -403,7 +423,9 @@ class SudokuBuilder {
       }
       yield new SudokuConstraintHandler.Nonet(cells);
     }
+  }
 
+  static *_boxHandlers() {
     // Box constraints.
     for (let b = 0; b < GRID_SIZE; b++) {
       let bi = b/BOX_SIZE|0;
@@ -432,6 +454,11 @@ class SudokuBuilder {
 
       case 'AntiConsecutive':
         yield* this._antiConsecutiveHandlers();
+        break;
+
+      case 'Jigsaw':
+        cells = constraint.cells.map(c => parseCellId(c).cell);
+        yield new SudokuConstraintHandler.AllDifferent(cells);
         break;
 
       case 'Diagonal':

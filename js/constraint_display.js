@@ -13,9 +13,14 @@ class ConstraintDisplay {
     container.style.padding = `${padding}px`;
 
     svg.append(this._makeGrid());
-    svg.append(this._makeDefaultRegions());
+
+    this._defaultRegions = this._makeDefaultRegions();
+    svg.append(this._defaultRegions);
+    this._regionGroup = this._makeRegionGroup();
+    svg.append(this._regionGroup);
 
     const constraintGroup = createSvgElement('g');
+    this._constraintGroup = constraintGroup;
     this._applyGridOffset(constraintGroup);
     svg.append(constraintGroup);
 
@@ -24,7 +29,6 @@ class ConstraintDisplay {
 
     container.prepend(svg);
 
-    this._svg = constraintGroup;
     this._gridSelection = gridSelection;
     this.clear();  // clear() to initialize.
   }
@@ -162,17 +166,22 @@ class ConstraintDisplay {
   }
 
   clear() {
-    let svg = this._svg;
+    let svg = this._constraintGroup;
     while (svg.lastChild) {
       svg.removeChild(svg.lastChild);
     }
+    svg = this._regionGroup;
+    while (svg.lastChild) {
+      svg.removeChild(svg.lastChild);
+    }
+
     this.killerCellColors = new Map();
     this.killerCages = new Map();
     this._diagonals = [null, null];
   }
 
   removeItem(item) {
-    this._svg.removeChild(item);
+    item.parentNode.removeChild(item);
     if (this.killerCages.has(item)) {
       for (const cellId of this.killerCages.get(item)) {
         this.killerCellColors.delete(cellId);
@@ -281,7 +290,7 @@ class ConstraintDisplay {
     text.setAttribute('style',
       'font-size: 10; font-family: monospace; font-weight: bold;');
     cage.append(text);
-    this._svg.append(cage);
+    this._constraintGroup.append(cage);
 
     let textBackground = ConstraintDisplay._addTextBackground(text);
     textBackground.setAttribute('fill', 'rgb(200, 200, 200)');
@@ -306,7 +315,7 @@ class ConstraintDisplay {
     dot.setAttribute('cy', y);
     dot.setAttribute('r', 4);
 
-    this._svg.append(dot);
+    this._constraintGroup.append(dot);
 
     return dot;
   }
@@ -336,7 +345,7 @@ class ConstraintDisplay {
 
     arrow.appendChild(path);
 
-    this._svg.append(arrow);
+    this._constraintGroup.append(arrow);
 
     return arrow;
   }
@@ -349,7 +358,7 @@ class ConstraintDisplay {
     line.setAttribute('stroke-width', 5);
     line.setAttribute('stroke-linecap', 'round');
 
-    this._svg.append(line);
+    this._constraintGroup.append(line);
 
     return line;
   }
@@ -383,7 +392,7 @@ class ConstraintDisplay {
     path.setAttribute('stroke-linecap', 'round');
     thermo.appendChild(path);
 
-    this._svg.append(thermo);
+    this._constraintGroup.append(thermo);
 
     return thermo;
   }
@@ -397,7 +406,7 @@ class ConstraintDisplay {
     line.setAttribute('stroke-width', 1);
     line.setAttribute('stroke', 'rgb(255, 0, 0)');
 
-    this._svg.appendChild(line);
+    this._constraintGroup.appendChild(line);
     this._diagonals[direction > 0] = line;
 
     return line;
@@ -415,17 +424,28 @@ class ConstraintDisplay {
     const gridSize = cellSize*GRID_SIZE;
 
     grid.setAttribute('stroke-width', 1);
-    grid.setAttribute('stroke', 'rgb(0, 0, 0)');
+    grid.setAttribute('stroke', 'rgb(150, 150, 150)');
 
     for (let i = 0; i <= GRID_SIZE; i++) {
-      grid.appendChild(this._makePath([
+      const path1 = this._makePath([
         [0, i*cellSize],
         [gridSize, i*cellSize],
-      ]));
-      grid.appendChild(this._makePath([
+      ]);
+      const path2 = this._makePath([
         [i*cellSize, 0],
         [i*cellSize, gridSize],
-      ]));
+      ]);
+
+      // Make borders darker.
+      if (i == 0 || i == GRID_SIZE) {
+        path1.setAttribute('stroke-width', 2);
+        path1.setAttribute('stroke', 'rgb(0, 0, 0)');
+        path2.setAttribute('stroke-width', 2);
+        path2.setAttribute('stroke', 'rgb(0, 0, 0)');
+      }
+
+      grid.appendChild(path1);
+      grid.appendChild(path2);
     }
 
     return grid;
@@ -441,7 +461,7 @@ class ConstraintDisplay {
     grid.setAttribute('stroke', 'rgb(0, 0, 0)');
     grid.setAttribute('stroke-linecap', 'round');
 
-    for (let i = 0; i <= GRID_SIZE; i+=3) {
+    for (let i = 3; i < GRID_SIZE; i+=3) {
       grid.appendChild(this._makePath([
         [0, i*cellSize],
         [gridSize, i*cellSize],
@@ -453,6 +473,68 @@ class ConstraintDisplay {
     }
 
     return grid;
+  }
+
+  _makeRegionGroup() {
+    const g = createSvgElement('g');
+    this._applyGridOffset(g);
+
+    g.setAttribute('stroke-width', 2);
+    g.setAttribute('stroke', 'rgb(0, 0, 0)');
+    g.setAttribute('stroke-linecap', 'round');
+
+    return g;
+  }
+
+  useJigsawRegions(enable) {
+    this._defaultRegions.setAttribute('display', enable ? 'none' : null);
+    this._regionGroup.setAttribute('display', enable ? null : 'none');
+  }
+
+  drawRegion(region) {
+    const cellSet = new Set(region.map(c => parseCellId(c).cell));
+
+    const g = createSvgElement('g');
+    const cellSize = ConstraintDisplay.CELL_SIZE;
+    const gridSize = cellSize*GRID_SIZE;
+
+    for (const cell of cellSet) {
+      const [row, col] = toRowCol(cell);
+
+      const cellUp    = toCellIndex(row-1, col);
+      const cellDown  = toCellIndex(row+1, col);
+      const cellLeft  = toCellIndex(row, col-1);
+      const cellRight = toCellIndex(row, col+1);
+
+      if (!cellSet.has(cellLeft)) {
+        g.appendChild(this._makePath([
+          [col*cellSize, row*cellSize],
+          [col*cellSize, (row+1)*cellSize],
+        ]));
+      }
+      if (!cellSet.has(cellRight)) {
+        g.appendChild(this._makePath([
+          [(col+1)*cellSize, row*cellSize],
+          [(col+1)*cellSize, (row+1)*cellSize],
+        ]));
+      }
+      if (!cellSet.has(cellUp)) {
+        g.appendChild(this._makePath([
+          [col*cellSize, row*cellSize],
+          [(col+1)*cellSize, row*cellSize],
+        ]));
+      }
+      if (!cellSet.has(cellDown)) {
+        g.appendChild(this._makePath([
+          [col*cellSize, (row+1)*cellSize],
+          [(col+1)*cellSize, (row+1)*cellSize],
+        ]));
+      }
+    }
+
+    this._regionGroup.appendChild(g);
+
+    return g;
   }
 
   _applyGridOffset(elem) {

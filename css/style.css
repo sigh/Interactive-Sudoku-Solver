@@ -118,6 +118,10 @@ button.danger-button:hover:enabled {
   background-color:#bc3315;
 }
 
+#display-panel {
+  line-height: 2;
+}
+
 #display-panel > div {
   margin-bottom: 20px;
   width: 160px;
@@ -142,6 +146,16 @@ button.danger-button:hover:enabled {
 
   background: rgba(0,0,255,0.1);
   border-radius: 10px;
+}
+
+#displayed-regions {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+
+  background: rgba(0,0,255,0.1);
+  border-radius: 10px;
+
+  margin-top: 10px;
 }
 
 .constraint-item {
@@ -227,10 +241,6 @@ button.icon-button {
   display: inline-block;
   min-width: 40px;
   text-align: center;
-}
-
-#display-panel {
-  line-height: 2;
 }
 
 #solve-status {
