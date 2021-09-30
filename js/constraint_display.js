@@ -12,8 +12,11 @@ class ConstraintDisplay {
 
     container.style.padding = `${padding}px`;
 
-    let constraintGroup = createSvgElement('g');
-    constraintGroup.setAttribute('transform', `translate(${padding},${padding})`);
+    svg.append(this._makeGrid());
+    svg.append(this._makeDefaultRegions());
+
+    const constraintGroup = createSvgElement('g');
+    this._applyGridOffset(constraintGroup);
     svg.append(constraintGroup);
 
     svg.append(this._makeArrowhead());
@@ -27,9 +30,8 @@ class ConstraintDisplay {
   }
 
   _makeLittleKillers(gridSelection) {
-    let g = createSvgElement('g');
-    let padding = ConstraintDisplay.SVG_PADDING;
-    g.setAttribute('transform', `translate(${padding},${padding})`);
+    const g = createSvgElement('g');
+    this._applyGridOffset(g);
 
     const makeArrow = (row, col, dr, dc) => {
       const [x, y] = ConstraintDisplay.cellCenter(toCellId(row, col));
@@ -273,7 +275,7 @@ class ConstraintDisplay {
 
     let text = createSvgElement('text');
     text.appendChild(document.createTextNode(sum));
-    text.setAttribute('x', x - cellWidth/2 + 1);
+    text.setAttribute('x', x - cellWidth/2);
     text.setAttribute('y', y - cellWidth/2 + 2);
     text.setAttribute('dominant-baseline', 'hanging');
     text.setAttribute('style',
@@ -318,9 +320,8 @@ class ConstraintDisplay {
     arrow.setAttribute('stroke-width', 3);
     arrow.setAttribute('stroke-linecap', 'round');
 
-    let x, y;
     // Draw the circle.
-    [x, y] = ConstraintDisplay.cellCenter(cells[0]);
+    const [x, y] = ConstraintDisplay.cellCenter(cells[0]);
     let circle = createSvgElement('circle');
     circle.setAttribute('cx', x);
     circle.setAttribute('cy', y);
@@ -328,17 +329,7 @@ class ConstraintDisplay {
     arrow.appendChild(circle);
 
     // Draw the line.
-    let directions = [];
-    cells.forEach((cell) => {
-      [x, y] = ConstraintDisplay.cellCenter(cell);
-      directions.push('L');
-      directions.push(x);
-      directions.push(y);
-    });
-    directions[0] = 'M';  // Replace the first direction to a move.
-
-    let path = createSvgElement('path');
-    path.setAttribute('d', directions.join(' '));
+    const path = this._makePath(cells.map(ConstraintDisplay.cellCenter));
     path.setAttribute('stroke-dashoffset', -15);
     path.setAttribute('stroke-dasharray', path.getTotalLength());
     path.setAttribute('marker-end', 'url(#arrowhead)');
@@ -350,27 +341,13 @@ class ConstraintDisplay {
     return arrow;
   }
 
-  _drawLine(cells, color) {
-    if (cells.length < 2) throw(`Thermo too short: ${cells}`)
+  _drawConstraintLine(cells, color) {
+    if (cells.length < 2) throw(`Line too short: ${cells}`)
 
-    let line = createSvgElement('svg');
-    line.setAttribute('fill', 'transparent');
+    const line = this._makePath(cells.map(ConstraintDisplay.cellCenter));
     line.setAttribute('stroke', color);
-
-    let directions = [];
-    cells.forEach((cell) => {
-      const [x, y] = ConstraintDisplay.cellCenter(cell);
-      directions.push('L');
-      directions.push(x);
-      directions.push(y);
-    });
-    directions[0] = 'M';  // Replace the first direction to a move.
-    let path = createSvgElement('path');
-    path.setAttribute('d', directions.join(' '));
-    path.setAttribute('stroke-width', 5);
-    path.setAttribute('stroke-linecap', 'round');
-
-    line.appendChild(path);
+    line.setAttribute('stroke-width', 5);
+    line.setAttribute('stroke-linecap', 'round');
 
     this._svg.append(line);
 
@@ -378,11 +355,11 @@ class ConstraintDisplay {
   }
 
   drawWhisper(cells) {
-    return this._drawLine(cells, 'rgb(255, 200, 255)');
+    return this._drawConstraintLine(cells, 'rgb(255, 200, 255)');
   }
 
   drawPalindrome(cells) {
-    return this._drawLine(cells, 'rgb(200, 200, 255)');
+    return this._drawConstraintLine(cells, 'rgb(200, 200, 255)');
   }
 
   drawThermometer(cells) {
@@ -392,9 +369,8 @@ class ConstraintDisplay {
     thermo.setAttribute('fill', 'rgb(200, 200, 200)');
     thermo.setAttribute('stroke', 'rgb(200, 200, 200)');
 
-    let x, y;
     // Draw the circle.
-    [x, y] = ConstraintDisplay.cellCenter(cells[0]);
+    const [x, y] = ConstraintDisplay.cellCenter(cells[0]);
     let circle = createSvgElement('circle');
     circle.setAttribute('cx', x);
     circle.setAttribute('cy', y);
@@ -402,19 +378,9 @@ class ConstraintDisplay {
     thermo.appendChild(circle);
 
     // Draw the line.
-    let directions = [];
-    cells.forEach((cell) => {
-      [x, y] = ConstraintDisplay.cellCenter(cell);
-      directions.push('L');
-      directions.push(x);
-      directions.push(y);
-    });
-    directions[0] = 'M';  // Replace the first direction to a move.
-    let path = createSvgElement('path');
-    path.setAttribute('d', directions.join(' '));
+    const path = this._makePath(cells.map(ConstraintDisplay.cellCenter));
     path.setAttribute('stroke-width', 15);
     path.setAttribute('stroke-linecap', 'round');
-    path.setAttribute('fill', 'transparent');
     thermo.appendChild(path);
 
     this._svg.append(thermo);
@@ -423,15 +389,12 @@ class ConstraintDisplay {
   }
 
   drawDiagonal(direction) {
-    let size = ConstraintDisplay.CELL_SIZE*GRID_SIZE;
-    let line = createSvgElement('path');
-    let directions = [
-      'M', 0, direction > 0 ? size : 0,
-      'L', size, direction > 0 ? 0 : size,
-    ];
-    line.setAttribute('d', directions.join(' '));
+    const size = ConstraintDisplay.CELL_SIZE*GRID_SIZE;
+    const line = this._makePath([
+      [0, direction > 0 ? size : 0],
+      [size, direction > 0 ? 0 : size],
+    ]);
     line.setAttribute('stroke-width', 1);
-    line.setAttribute('fill', 'transparent');
     line.setAttribute('stroke', 'rgb(255, 0, 0)');
 
     this._svg.appendChild(line);
@@ -443,5 +406,71 @@ class ConstraintDisplay {
   removeDiagonal(direction) {
     let item = this._diagonals[direction > 0];
     if (item) this.removeItem(item);
+  }
+
+  _makeGrid() {
+    const grid = createSvgElement('g');
+    this._applyGridOffset(grid);
+    const cellSize = ConstraintDisplay.CELL_SIZE;
+    const gridSize = cellSize*GRID_SIZE;
+
+    grid.setAttribute('stroke-width', 1);
+    grid.setAttribute('stroke', 'rgb(0, 0, 0)');
+
+    for (let i = 0; i <= GRID_SIZE; i++) {
+      grid.appendChild(this._makePath([
+        [0, i*cellSize],
+        [gridSize, i*cellSize],
+      ]));
+      grid.appendChild(this._makePath([
+        [i*cellSize, 0],
+        [i*cellSize, gridSize],
+      ]));
+    }
+
+    return grid;
+  }
+
+  _makeDefaultRegions() {
+    const grid = createSvgElement('g');
+    this._applyGridOffset(grid);
+    const cellSize = ConstraintDisplay.CELL_SIZE;
+    const gridSize = cellSize*GRID_SIZE;
+
+    grid.setAttribute('stroke-width', 2);
+    grid.setAttribute('stroke', 'rgb(0, 0, 0)');
+    grid.setAttribute('stroke-linecap', 'round');
+
+    for (let i = 0; i <= GRID_SIZE; i+=3) {
+      grid.appendChild(this._makePath([
+        [0, i*cellSize],
+        [gridSize, i*cellSize],
+      ]));
+      grid.appendChild(this._makePath([
+        [i*cellSize, 0],
+        [i*cellSize, gridSize],
+      ]));
+    }
+
+    return grid;
+  }
+
+  _applyGridOffset(elem) {
+    const padding = this.constructor.SVG_PADDING;
+    elem.setAttribute('transform', `translate(${padding},${padding})`);
+  }
+
+  _makePath(coords) {
+    const line = createSvgElement('path');
+
+    const parts = [];
+    for (const c of coords) {
+      parts.push('L', ...c);
+    }
+    parts[0] = 'M';
+
+    line.setAttribute('d', parts.join(' '));
+    line.setAttribute('fill', 'transparent');
+    return line;
   }
 }

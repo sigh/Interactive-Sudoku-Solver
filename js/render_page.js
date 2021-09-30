@@ -716,26 +716,14 @@ class SudokuGrid {
     });
   }
 
-  static THIN_BORDER_STYLE = '1px solid';
-  static FAT_BORDER_STYLE = '3px solid';
-
-  _styleCell(cell, row, col) {
-    cell.className = 'cell cell-elem';
-    cell.style.border = SudokuGrid.THIN_BORDER_STYLE;
-    if (row%BOX_SIZE == 0) cell.style.borderTop = SudokuGrid.FAT_BORDER_STYLE;
-    if (col%BOX_SIZE == 0) cell.style.borderLeft = SudokuGrid.FAT_BORDER_STYLE;
-    if (row == GRID_SIZE-1) cell.style.borderBottom = SudokuGrid.FAT_BORDER_STYLE;
-    if (col == GRID_SIZE-1) cell.style.borderRight = SudokuGrid.FAT_BORDER_STYLE;
-  }
-
   _makeSudokuGrid(container) {
     let cellMap = new Map();
 
     for (let i = 0; i < GRID_SIZE; i++) {
       for (let j = 0; j < GRID_SIZE; j++) {
         let cell = document.createElement('div');
+        cell.className = 'cell cell-elem';
         let cellId = toCellId(i, j);
-        this._styleCell(cell, i, j);
 
         let cellInput = document.createElement('div');
         cellInput.tabIndex = 0;
@@ -788,10 +776,15 @@ class SudokuGrid {
     }
   }
 
-  _formatMultiSolution(values) {
-    let chars = Array(GRID_SIZE*2-1).fill(' ');
+  static _TEMPLATE_ARRAY = (() => {
+    const chars = Array(GRID_SIZE*2-1).fill(' ');
     chars[BOX_SIZE*2-1] = '\n';
     chars[BOX_SIZE*2*2-1] = '\n';
+    return chars;
+  })();
+
+  _formatMultiSolution(values) {
+    const chars = [...this.constructor._TEMPLATE_ARRAY];
     for (const v of values) {
       chars[v*2-2] = v;
     }
