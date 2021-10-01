@@ -14,6 +14,23 @@
   left: 0;
 }
 
+.heatmap {
+  position: absolute;
+  top: 0;
+  left: 0;
+  opacity: 0.5;
+
+  display: inline-grid;
+  grid-template-columns: repeat(9, 52px);
+  grid-template-rows: repeat(9, 52px);
+
+  pointer-events: none;
+}
+.heatmap .cell-elem {
+  opacity: 0;
+  background: red;
+}
+
 .cell-elem {
   width: 52px;
   height: 52px;

@@ -7,8 +7,12 @@ const initPage = () => {
   let container = document.getElementById('sudoku-grid');
   grid = new SudokuGrid(container);
   constraintManager = new ConstraintManager(grid);
+  let heatmap;
+  if (EXPORT_CONFLICT_HEATMAP) {
+    heatmap = new Heatmap(grid._container);
+  }
 
-  controller = new SolutionController(constraintManager, grid);
+  controller = new SolutionController(constraintManager, grid, heatmap);
 };
 
 class CheckboxConstraints {
@@ -1099,10 +1103,11 @@ class HistoryHandler {
 }
 
 class SolutionController {
-  constructor(constraintManager, grid) {
+  constructor(constraintManager, grid, heatmap) {
     this._solver = null;
     this._isSolving = false;
     this._constraintManager = constraintManager;
+    this._heatmap = heatmap;
     this._grid = grid;
     this._update = deferUntilAnimationFrame(this._update.bind(this));
     constraintManager.setUpdateCallback(this._update.bind(this));
@@ -1258,6 +1263,8 @@ class SolutionController {
     let description = SolutionController._MODE_DESCRIPTIONS[mode];
     this._elements.modeDescription.textContent = description;
 
+    if (this._heatmap) this._heatmap.clearValues();
+
     if (auto || mode === 'step-by-step') {
       this._solve(constraints);
     } else {
@@ -1370,6 +1377,10 @@ class SolutionController {
     // Handle this in a seperate function, as then it can be defered
     // independently of the solution update.
     this._displayStateVariables(state);
+
+    if (this._heatmap) {
+      this._heatmap.setValues(state.backtrackTriggers);
+    }
 
     // Handle extra state.
     let extra = state.extra;
@@ -1503,5 +1514,45 @@ class SolutionController {
     this._showIterationControls(false);
     await solver.countSolutions();
     this._setSolving(false);
+  }
+}
+
+class Heatmap {
+  constructor(container) {
+    this._heatmap = document.createElement('div');
+    this._heatmap.className = 'heatmap';
+    this._heatmap.style.padding = container.style.padding;
+    container.append(this._heatmap);
+
+    this._cellMap = this._makeHeatmap(this._heatmap);
+  }
+
+  _makeHeatmap(container) {
+    const cellMap = new Map();
+
+    for (let i = 0; i < GRID_SIZE; i++) {
+      for (let j = 0; j < GRID_SIZE; j++) {
+        const cell = document.createElement('div');
+        cell.className = 'cell-elem';
+        const cellIndex = toCellIndex(i, j);
+        cellMap[cellIndex] = cell;
+
+        container.appendChild(cell);
+      }
+    }
+
+    return cellMap;
+  }
+
+  clearValues() {
+    for (let i = 0; i < NUM_CELLS; i++) {
+      this._cellMap[i].style.opacity = 0;
+    }
+  }
+
+  setValues(values) {
+    for (let i = 0; i < NUM_CELLS; i++) {
+      this._cellMap[i].style.opacity = values[i]/1000;
+    }
   }
 }

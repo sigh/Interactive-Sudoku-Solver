@@ -1,6 +1,6 @@
 "use strict";
 
-const SOLVER_INITIALIZE_AT_START = true;
+const EXPORT_CONFLICT_HEATMAP = false;
 
 class SudokuSolver {
   constructor(handlers) {
@@ -128,13 +128,19 @@ class SudokuSolver {
   }
 
   state() {
-    let counters = {...this._internalSolver.counters};
+    const counters = {...this._internalSolver.counters};
 
-    return {
+    const state = {
       counters: counters,
       timeMs: this._timer.elapsedMs(),
       done: this._internalSolver.done,
     }
+
+    if (EXPORT_CONFLICT_HEATMAP) {
+      state.backtrackTriggers = this._internalSolver.getBacktrackTriggers();
+    }
+
+    return state;
   }
 
   _getIter(yieldEveryStep) {
@@ -277,6 +283,10 @@ SudokuSolver.InternalSolver = class {
     this._resetStack();
   }
 
+  getBacktrackTriggers() {
+    return this._backtrackTriggers.slice();
+  }
+
   _resetStack() {
     // If we are at the start anyway, then there is nothing to do.
     if (this._atStart) return;
@@ -398,7 +408,7 @@ SudokuSolver.InternalSolver = class {
     let stack = this._stack;
     let counters = this.counters;
 
-    if (SOLVER_INITIALIZE_AT_START) {
+    {
       // Enforce constraints for all cells.
       let cellAccumulator = this._cellAccumulator;
       cellAccumulator.clear();
