@@ -33,14 +33,30 @@ const arrayEquals = (a, b) => {
   return true;
 }
 
-const runAllWithChecks = (puzzles) => {
-  const fail = (name, puzzle, result) => {
-    console.log('Test failed: ' + (name || puzzle.input));
-    console.log('Expected', puzzle.solution);
-    console.log('Got     ', result);
-    throw('Test failed: ' + name);
-  };
+const puzzleFromStr = (puzzleCfg) => {
+  let puzzleStr, solution, name='';
+  if (Array.isArray(puzzleCfg)) {
+    [puzzleStr, solution] = puzzleCfg;
+  } else {
+    puzzleStr = puzzleCfg;
+  }
+  puzzle = EXAMPLES[puzzleStr];
+  if (!puzzle) {
+    puzzle = {input: puzzleStr, solution: solution};
+  } else {
+    name = puzzleStr;
+  }
+  return [name, puzzle];
+};
 
+const failTest = (name, puzzle, result) => {
+  console.log('Test failed: ' + (name || puzzle.input));
+  console.log('Expected', puzzle.solution);
+  console.log('Got     ', result);
+  throw('Test failed: ' + name);
+};
+
+const runAllWithChecks = (puzzles) => {
   const sumObjectValues = (a, b) => {
     let result = {...a};
     for (const [k, v] of Object.entries(b)) {
@@ -50,22 +66,6 @@ const runAllWithChecks = (puzzles) => {
     }
     return result;
   };
-
-  const puzzleFromStr = (puzzleCfg) => {
-    let puzzleStr, solution, name='';
-    if (Array.isArray(puzzleCfg)) {
-      [puzzleStr, solution] = puzzleCfg;
-    } else {
-      puzzleStr = puzzleCfg;
-    }
-    puzzle = EXAMPLES[puzzleStr];
-    if (!puzzle) {
-      puzzle = {input: puzzleStr, solution: solution};
-    } else {
-      name = puzzleStr;
-    }
-    return [name, puzzle];
-  }
 
   let solutions = [];
   let rows = [];
@@ -81,20 +81,27 @@ const runAllWithChecks = (puzzles) => {
     let result = solver.nthSolution(0);
     solver.nthSolution(1); // Try to find a second solution to prove uniqueness.
 
-    if (!result || result.length != GRID_SIZE*GRID_SIZE) {
-      fail(name, puzzle, result);
+    if (puzzle.solution === null) {
+      // We expect no solution.
+      if (result) {
+        const shortSolution = toShortSolution(result);
+        failTest(name, puzzle, shortSolution);
+      }
+      solutions.push(null);
+    } else if (!result || result.length != GRID_SIZE*GRID_SIZE) {
+      failTest(name, puzzle, result);
     } else {
       let shortSolution;
       try {
         shortSolution = toShortSolution(result);
       } catch(e) {
         console.log(e);
-        fail(name, puzzle, result);
+        failTest(name, puzzle, result);
       }
       solutions.push(shortSolution);
 
       if (puzzle.solution) {
-        if (shortSolution != puzzle.solution) fail(name, puzzle, shortSolution);
+        if (shortSolution != puzzle.solution) failTest(name, puzzle, shortSolution);
       }
     }
 
@@ -109,6 +116,50 @@ const runAllWithChecks = (puzzles) => {
   console.table(rows);
 
   return solutions;
+}
+
+const runValidateLayoutTests = () => {
+  const cases = [
+    'Classic sudoku',
+    'Jigsaw',
+    'Invalid jigsaw, easy',
+    'Invalid jigsaw, hard',
+  ];
+  let rows = [];
+
+  const extractJigsawConstraint = (c) => {
+    switch (c.type) {
+      case 'Jigsaw':
+        return c;
+      case 'Set':
+        return c.constraints.find(extractJigsawConstraint);
+    }
+    return null;
+  };
+
+  for (const puzzleCfg of cases) {
+    const [name, puzzle] = puzzleFromStr(puzzleCfg);
+
+    // Log a fixed string so the progress gets collapsed to a single line.
+    console.log('solving...');
+
+    const fullConstraint = SudokuConstraint.fromText(puzzle.input);
+    const layoutConstraint = extractJigsawConstraint(fullConstraint) || new SudokuConstraint.Set([]);
+    const solver = SudokuBuilder.build(layoutConstraint);
+    const result = solver.validateLayout();
+
+    const expectedResult = (puzzle.solution !== null);
+
+    if (result != expectedResult) {
+      failTest(name, puzzle, result);
+    }
+
+    let state = solver.state();
+    let row = {name: name, ...state.counters, timeMs: state.timeMs};
+    rows.push(row);
+  }
+
+  console.table(rows);
 }
 
 const runTestCases = () => {

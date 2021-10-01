@@ -130,10 +130,12 @@ class SudokuSolver {
   validateLayout() {
     this._reset();
 
-    let result = this._nthIteration(0, false);
-    if (!result) return false;
+    let result = false;
+    this._timer.runTimed(() => {
+      result = this._internalSolver.validateLayout();
+    });
 
-    return true;
+    return result;
   }
 
   state() {
@@ -159,7 +161,10 @@ class SudokuSolver {
     if (!this._iter || this._iter.yieldEveryStep != yieldEveryStep) {
       this._iter = {
         yieldEveryStep: yieldEveryStep,
-        iter: new IteratorWithCount(this._internalSolver.run(yieldEveryStep)),
+        iter: new IteratorWithCount(this._internalSolver.run(
+          yieldEveryStep
+          ? SudokuSolver.InternalSolver.YIELD_ON_STEP
+          : SudokuSolver.InternalSolver.YIELD_ON_SOLUTION))
       };
     }
 
@@ -400,10 +405,17 @@ SudokuSolver.InternalSolver = class {
     return true;
   }
 
+  static YIELD_ON_SOLUTION = 0;
+  static YIELD_ON_STEP = 1;
+  static YIELD_ON_BACKTRACK_DECAY = 2;
+
+  static _BACKTRACK_DECAY_INTERVAL = NUM_CELLS*NUM_CELLS;
+
   // run runs the solver yielding each solution, and optionally at
   // each step.
-  *run(yieldEveryStep) {
-    yieldEveryStep = yieldEveryStep || false;
+  *run(yieldWhen) {
+    const yieldEveryStep = yieldWhen === this.constructor.YIELD_ON_STEP;
+    const yieldOnDecay = yieldWhen === this.constructor.YIELD_ON_BACKTRACK_DECAY;
 
     // Set up iterator validation.
     if (!this._atStart) throw('State is not in initial state.');
@@ -469,9 +481,17 @@ SudokuSolver.InternalSolver = class {
       if (hasContradiction) {
         counters.backtracks++;
         // Exponentially decay the counts.
-        if (counters.backtracks % (NUM_CELLS*NUM_CELLS) == 0) {
+        if (0 === counters.backtracks % this.constructor._BACKTRACK_DECAY_INTERVAL) {
           for (let i = 0; i < NUM_CELLS; i++) {
             this._backtrackTriggers[i]>>=1;
+          }
+          if (yieldOnDecay) {
+            yield {
+              grid: grid,
+              isSolution: false,
+              stack: stack.subarray(0, depth),
+              hasContradiction: hasContradiction,
+            };
           }
         }
         this._backtrackTriggers[cell]++;
@@ -561,6 +581,78 @@ SudokuSolver.InternalSolver = class {
         this._resetStack();
       }
     }
+  }
+
+  validateLayout() {
+    // All handlers should be nonet handlers, but let's filter just in case.
+    const nonetHandlers = this._handlers.filter(
+      h => h instanceof SudokuConstraintHandler.Nonet);
+
+    // Fill the nonet with values 1->9.
+    const fillNonet = (nonet) => {
+      nonet.cells.forEach((c, i) => this._grids[0][c] = 1<<i);
+    }
+
+    // Choose the nonet with the the most conflicted cells.
+    const chooseNonet = () => {
+      let bestNonet = null;
+      let maxScore = -1;
+      for (const h of nonetHandlers) {
+        const score = h.cells.map(
+          c => this._backtrackTriggers[c]).reduce((a, b)=>a+b);
+        if (score > maxScore) {
+          bestNonet = h;
+          maxScore = score;
+        }
+      }
+
+      return bestNonet;
+    };
+
+    const attempLog = [];
+
+    // Do a attempt to solve.
+    const attempt = () => {
+      this._resetStack();
+      this.counters.maxDepth = 0;
+
+      const nonet = chooseNonet();
+      fillNonet(nonet);
+
+      for (const result of this.run(this.constructor.YIELD_ON_BACKTRACK_DECAY)) {
+        if (result.isSolution) return true;
+        attempLog.push([nonet, this.counters.maxDepth]);
+        return undefined;
+      }
+      return false;
+    }
+
+    // Do a small number of short attempts.
+    // Each time the most promising nonet will be chosen as a seed, ideally
+    // getting closer to the best choice.
+    for (let i = 0; i < 5; i++) {
+      const result = attempt(this.constructor.YIELD_ON_BACKTRACK_DECAY);
+      if (result !== undefined) return result;
+    }
+
+    // Stop messing around, and commit.
+    this._resetStack();
+
+    // Unfortunately, the same nonet can't be chosen twice, so we don't know
+    // if we've landed on the best one.
+    // Assume that we've hit a stable state where we alternate between the best
+    // nonet and another, thus just look at the last two.
+    const attemptOptions = attempLog.slice(-2);
+    // Sort by score, putting the min score first.
+    attemptOptions.sort((a,b) => a[1]-b[1]);
+    // Find the nonet with the best score.
+    const bestNonet = attemptOptions[0][0];
+    fillNonet(bestNonet);
+
+    // Run the final search until we find a solution or prove that one doesn't
+    // exist.
+    for (const result of this.run()) return true;
+    return false;
   }
 
   setProgressCallback(callback, logFrequency) {
