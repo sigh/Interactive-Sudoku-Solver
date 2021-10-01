@@ -157,6 +157,11 @@ button.danger-button:hover:enabled {
   font-weight: bold;
 }
 
+.result {
+  color: rgb(0, 0, 200);
+  font-weight: bold;
+}
+
 #displayed-constraints {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -491,4 +496,10 @@ input:checked + span:before {
 
 #solve-mode-description {
   height: 30px;
+}
+
+#validate-layout-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }

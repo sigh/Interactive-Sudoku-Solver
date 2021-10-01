@@ -149,8 +149,8 @@ class JigsawManager {
   constructor(display, onChange, makePanelItem) {
     this._display = display;
     this._makePanelItem = makePanelItem;
-    this._jigsawCheckbox = document.getElementById('jigsaw-input');
 
+    this._jigsawCheckbox = document.getElementById('jigsaw-input');
     this._jigsawCheckbox.onchange = e => {
       this._updateDependentElements();
       onChange();
@@ -170,6 +170,9 @@ class JigsawManager {
 
     const jigsawPanel = document.getElementById('displayed-regions');
     jigsawPanel.style.display = checked ? null : 'none';
+
+    const button = document.getElementById('validate-layout-button');
+    button.disabled = !checked;
 
     this._display.useJigsawRegions(checked);
   }
@@ -661,6 +664,10 @@ class ConstraintManager {
     this._constraintPanel.appendChild(this._makePanelItem(config));
   }
 
+  getLayoutConstraint() {
+    return this._jigsawManager.getConstraint();
+  }
+
   getConstraints() {
     let constraints = this._configs.map(c => c.constraint);
     constraints.push(this._jigsawManager.getConstraint());
@@ -1130,14 +1137,17 @@ class SolutionController {
       stateOutput: document.getElementById('state-output'),
       solveStatus: document.getElementById('solve-status'),
       error: document.getElementById('error-output'),
+      validateResult: document.getElementById('validate-result-output'),
       stop: document.getElementById('stop-solver'),
       solve: document.getElementById('solve-button'),
+      validate: document.getElementById('validate-layout-button'),
       autoSolve: document.getElementById('auto-solve-input'),
     }
 
     this._elements.mode.onchange = () => this._update();
     this._elements.stop.onclick = () => this._terminateSolver();
     this._elements.solve.onclick = () => this._solve();
+    this._elements.validate.onclick = () => this._validateLayout();
 
     this._setUpAutoSolve();
     this._setUpKeyBindings();
@@ -1264,6 +1274,7 @@ class SolutionController {
     this._elements.modeDescription.textContent = description;
 
     if (this._heatmap) this._heatmap.clearValues();
+    this._setValidateResult();
 
     if (auto || mode === 'step-by-step') {
       this._solve(constraints);
@@ -1291,19 +1302,41 @@ class SolutionController {
       .finally(() => this._setSolving(false));
   }
 
+  async _validateLayout(constraints) {
+    const solver = await this._replaceSolver(this._constraintManager.getLayoutConstraint());
+
+    const statusElem = this._elements.solveStatus;
+
+    let handler = async (solver) => {
+      let result = await solver.validateLayout();
+      this._setValidateResult(result ?'Valid layout' : 'Invalid layout');
+      this._setSolving(false);
+    };
+
+    this._setSolving(true, 'Validating Layout');
+    handler.bind(this)(solver)
+      .catch(e => this._setError(e))
+      .finally(() => this._setSolving(false));
+  }
+
   _setError(text) {
     this._elements.error.textContent = text || '';
   }
 
-  _setSolving(isSolving) {
+  _setValidateResult(text) {
+    this._elements.validateResult.textContent = text || '';
+  }
+
+  _setSolving(isSolving, msg) {
     this._isSolving = isSolving;
     if (isSolving) {
       this._elements.stop.disabled = false;
       this._elements.start.disabled = true;
       this._elements.forward.disabled = true;
       this._elements.back.disabled = true;
-      this._elements.solveStatus.textContent = 'Solving';
+      this._elements.solveStatus.textContent = msg || 'Solving';
       this._setError();
+      this._setValidateResult();
     } else {
       this._elements.stop.disabled = true;
       this._elements.solveStatus.textContent = '';

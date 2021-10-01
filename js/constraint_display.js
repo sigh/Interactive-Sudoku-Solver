@@ -42,7 +42,7 @@ class ConstraintDisplay {
     this._regionContainer.append(this._regionGroup);
 
     this._missingRegion = createSvgElement('g');
-    this._missingRegion.setAttribute('fill', 'rgb(255, 0, 0)');
+    this._missingRegion.setAttribute('fill', 'rgb(0, 0, 0)');
     this._missingRegion.setAttribute('opacity', '0.05');
     this._regionContainer.append(this._missingRegion);
 

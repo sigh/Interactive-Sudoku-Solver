@@ -127,6 +127,15 @@ class SudokuSolver {
     return this.constructor._makePencilmarks(valuesInSolutions);
   }
 
+  validateLayout() {
+    this._reset();
+
+    let result = this._nthIteration(0, false);
+    if (!result) return false;
+
+    return true;
+  }
+
   state() {
     const counters = {...this._internalSolver.counters};
 

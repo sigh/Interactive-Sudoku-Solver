@@ -634,6 +634,10 @@ class SolverProxy {
     return this._callWorker('solveAllPossibilities');
   }
 
+  async validateLayout() {
+    return this._callWorker('validateLayout');
+  }
+
   async nthSolution(n) {
     return this._callWorker('nthSolution', n);
   }

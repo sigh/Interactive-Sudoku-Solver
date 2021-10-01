@@ -26,6 +26,9 @@ const handleWorkerMethod = (method, payload) => {
     case 'solveAllPossibilities':
       return workerSolver.solveAllPossibilities();
 
+    case 'validateLayout':
+      return workerSolver.validateLayout();
+
     case 'nthSolution':
       return workerSolver.nthSolution(payload);
 
