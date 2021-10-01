@@ -94,6 +94,7 @@ class ExampleHandler {
     'Sandwich sudoku',
     'German whispers',
     'Palindromes',
+    'Jigsaw',
   ];
 
   constructor(constraintManager) {
@@ -153,7 +154,8 @@ class JigsawManager {
 
     this._regionPanel = document.getElementById('displayed-regions');
 
-    this._pieces = [];
+    this._piecesMap = Array(NUM_CELLS).fill(0);
+    this._maxPieceId = 0;
   }
 
   _updateDependentElements() {
@@ -173,16 +175,38 @@ class JigsawManager {
   }
 
   getConstraint() {
-    if (this.enabled()) {
-      return new SudokuConstraint.Set(this._pieces.map(
-        c => new SudokuConstraint.Jigsaw(...c.cells)));
-    } else {
-      return new SudokuConstraint.Set([]);
+    if (!this.enabled()) return new SudokuConstraint.Set([]);
+
+    const indexMap = new Map();
+    const grid = Array(NUM_CELLS).fill('-');
+    this._piecesMap.forEach((p, i) => {
+      if (!indexMap.has(p)) indexMap.set(p, indexMap.size);
+      grid[i] = indexMap.get(p);
+    });
+    return new SudokuConstraint.Jigsaw(grid.join(''));
+  }
+
+  setConstraint(constraint) {
+    const grid = constraint.grid;
+    const map = new Map();
+    for (let i = 0; i < NUM_CELLS; i++) {
+      const v = grid[i];
+      if (!map.has(v)) map.set(v, []);
+      map.get(v).push(i);
     }
+
+    for (const [_, cells] of map) {
+      if (cells.length == 9) {
+        this.addPiece(cells.map(c => toCellId(...toRowCol(c))));
+      }
+    }
+
+    this._jigsawCheckbox.checked = true;
+    this._updateDependentElements();
   }
 
   clear() {
-    this._pieces = [];
+    this._piecesMap.fill(0);
     this._jigsawCheckbox.checked = false;
     this._regionPanel.innerHTML = '';
     this._updateDependentElements();
@@ -192,15 +216,19 @@ class JigsawManager {
     if (selection.length != 9) return false;
     if (!this.enabled()) return false;
 
+    // Check that we aren't overlapping an existing tile.
+    if (selection.some(c => this._piecesMap[parseCellId(c).cell] != 0)) {
+      return false;
+    }
+
     return true;
   }
 
   removePiece(config) {
-    let index = this._pieces.indexOf(config);
-    this._pieces.splice(index, 1);
     this._display.removeItem(config.displayElem);
     config.panelItem.parentNode.removeChild(config.panelItem);
-    this._grid.highlight.setCells([]);
+
+    config.cells.forEach(c => this._piecesMap[parseCellId(c).cell] = 0);
   }
 
   _addToRegionPanel(config) {
@@ -208,19 +236,16 @@ class JigsawManager {
   }
 
   addPiece(cells) {
+    const pieceId = ++this._maxPieceId;
+    cells.forEach(c => this._piecesMap[parseCellId(c).cell] = pieceId);
     const config = {
+      isJigsaw: true,
+      pieceId: pieceId,
       cells: cells,
-      name: 'Piece',
+      name: '',
       displayElem: this._display.drawRegion(cells),
     };
     this._addToRegionPanel(config);
-    this._pieces.push(config);
-  }
-
-  setPieces(constraint) {
-    this.addPiece(constraint.cells);
-    this._jigsawCheckbox.checked = true;
-    this._updateDependentElements();
   }
 }
 
@@ -331,8 +356,12 @@ class ConstraintManager {
       }
     }
 
-    selectionForm['multi-cell-constraint-jigsaw'].disabled = (
-        !this._jigsawManager.isValidJigsawPiece(selection));
+    if (this._jigsawManager.isValidJigsawPiece(selection)) {
+      selectionForm['multi-cell-constraint-jigsaw'].disabled = false;
+      selectionForm['multi-cell-constraint-jigsaw'].checked = true;
+    } else {
+      selectionForm['multi-cell-constraint-jigsaw'].disabled = true;
+    }
 
     // Focus on the the form so we can immediately press enter.
     //   - If the cage is selected then focus on the text box for easy input.
@@ -411,7 +440,7 @@ class ConstraintManager {
       case 'BlackDot':
         config = {
           cells: constraint.cells,
-          name: `&#9679; (${constraint.cells})`,
+          name: '&#9679',
           constraint: constraint,
           displayElem: this._display.drawDot(constraint.cells, 'black'),
         };
@@ -421,7 +450,7 @@ class ConstraintManager {
       case 'WhiteDot':
         config = {
           cells: constraint.cells,
-          name: `&#9675 (${constraint.cells})`,
+          name: '&#9675',
           constraint: constraint,
           displayElem: this._display.drawDot(constraint.cells, 'white'),
         };
@@ -431,7 +460,7 @@ class ConstraintManager {
       case 'Arrow':
         config = {
           cells: constraint.cells,
-          name: `Arrow (${constraint.cells.length-1}-cell)`,
+          name: 'Arrow',
           constraint: constraint,
           displayElem: this._display.drawArrow(constraint.cells),
         };
@@ -441,7 +470,7 @@ class ConstraintManager {
       case 'Thermo':
         config = {
           cells: constraint.cells,
-          name: `Thermo (${constraint.cells.length}-cell)`,
+          name: 'Thermo',
           constraint: constraint,
           displayElem: this._display.drawThermometer(constraint.cells),
         };
@@ -449,12 +478,12 @@ class ConstraintManager {
         this._configs.push(config);
         break;
       case 'Jigsaw':
-        this._jigsawManager.setPieces(constraint);
+        this._jigsawManager.setConstraint(constraint);
         break;
       case 'Whisper':
         config = {
           cells: constraint.cells,
-          name: `Whisper (${constraint.cells.length}-cell)`,
+          name: 'Whisper',
           constraint: constraint,
           displayElem: this._display.drawWhisper(constraint.cells),
         };
@@ -464,7 +493,7 @@ class ConstraintManager {
       case 'Palindrome':
         config = {
           cells: constraint.cells,
-          name: `Palindrome (${constraint.cells.length}-cell)`,
+          name: 'Palindrome',
           constraint: constraint,
           displayElem: this._display.drawPalindrome(constraint.cells),
         };
@@ -559,15 +588,15 @@ class ConstraintManager {
   }
 
   _removePanelConstraint(config) {
-    if (config.constraint.type == 'Jigsaw') {
+    if (config.isJigsaw) {
       this._jigsawManager.removePiece(config);
     } else {
       const index = this._configs.indexOf(config);
       this._configs.splice(index, 1);
+      this._display.removeItem(config.displayElem);
+      config.panelItem.parentNode.removeChild(config.panelItem);
     }
 
-    this._display.removeItem(config.displayElem);
-    config.panelItem.parentNode.removeChild(config.panelItem);
     this._grid.highlight.setCells([]);
   }
 
@@ -578,6 +607,8 @@ class ConstraintManager {
     let panelButton = document.createElement('button');
     panelButton.innerHTML = '&#x00D7;';
     panelItem.appendChild(panelButton);
+
+    panelItem.append(this._makePanelIcon(config));
 
     let panelLabel = document.createElement('span');
     panelLabel.innerHTML = config.name;
@@ -597,6 +628,29 @@ class ConstraintManager {
     });
 
     return panelItem;
+  }
+
+  _makePanelIcon(config) {
+    const svg = createSvgElement('svg');
+    const transform = 'scale(0.06)';
+
+    const borders = this._display.makeBorders('rgb(255, 255, 255)');
+    borders.setAttribute('transform', transform);
+    borders.setAttribute('stoke-width', 0);
+    svg.append(borders);
+
+    const elem = config.displayElem.cloneNode(true);
+    elem.setAttribute('transform', transform);
+    elem.setAttribute('stroke-width', 15);
+    elem.setAttribute('opacity', 1);
+
+    svg.append(elem);
+    svg.style.height = '28px';
+    svg.style.width = '28px';
+    // Undo the opacity (for killer cages).
+    svg.style.filter = 'saturate(100)';
+
+    return svg;
   }
 
   _addToPanel(config) {
@@ -1264,6 +1318,7 @@ class SolutionController {
       'cellsSearched',
       'valuesTried',
       'constraintsProcessed',
+      'maxDepth',
       'puzzleSetupTime',
       'runtime',
     ];

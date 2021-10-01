@@ -261,6 +261,7 @@ SudokuSolver.InternalSolver = class {
       guesses: 0,
       solutions: 0,
       constraintsProcessed: 0,
+      maxDepth: 0,
     };
 
     // _backtrackTriggers counts the the number of times a cell is responsible
@@ -455,6 +456,7 @@ SudokuSolver.InternalSolver = class {
           }
         }
         this._backtrackTriggers[cell]++;
+        if (depth > counters.maxDepth) counters.maxDepth = depth;
       }
 
       if ((counters.valuesTried & progressFrequencyMask) === 0) {
@@ -479,6 +481,7 @@ SudokuSolver.InternalSolver = class {
         // We've set all the values, and we haven't found a contradiction.
         // This is a solution!
         counters.solutions++;
+        counters.maxDepth = NUM_CELLS;
         yield {
           grid: grid,
           isSolution: true,

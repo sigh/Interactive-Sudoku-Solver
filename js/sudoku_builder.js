@@ -178,6 +178,16 @@ class SudokuConstraint {
     return new SudokuConstraint.FixedValues(...fixedValues);
   }
 
+  static _parseJigsaw(text) {
+    if (text.length != NUM_CELLS*2) return null;
+
+    const fixedValues = this._parsePlainSudoku(text.substr(0, NUM_CELLS));
+    if (fixedValues == null) return null;
+    return new SudokuConstraint.Set([
+      new SudokuConstraint.Jigsaw(text.substr(NUM_CELLS)),
+      fixedValues]);
+  }
+
   static fromText(text) {
     // Remove all whitespace.
     text = text.replace(/\s+/g, '');
@@ -188,6 +198,9 @@ class SudokuConstraint {
     if (constraint) return constraint;
 
     constraint = this._parseLongKillerFormat(text);
+    if (constraint) return constraint;
+
+    constraint = this._parseJigsaw(text);
     if (constraint) return constraint;
 
     constraint = this._parsePlainSudoku(text);
@@ -213,9 +226,9 @@ class SudokuConstraint {
   }
 
   static Jigsaw = class Jigsaw extends SudokuConstraint {
-    constructor(...cells) {
+    constructor(grid) {
       super(arguments);
-      this.cells = cells;
+      this.grid = grid;
     }
   }
 
@@ -457,8 +470,19 @@ class SudokuBuilder {
         break;
 
       case 'Jigsaw':
-        cells = constraint.cells.map(c => parseCellId(c).cell);
-        yield new SudokuConstraintHandler.AllDifferent(cells);
+        const grid = constraint.grid;
+        const map = new Map();
+        for (let i = 0; i < NUM_CELLS; i++) {
+          const v = grid[i];
+          if (!map.has(v)) map.set(v, []);
+          map.get(v).push(i);
+        }
+
+        for (const [_, cells] of map) {
+          if (cells.length == GRID_SIZE) {
+            yield new SudokuConstraintHandler.AllDifferent(cells);
+          }
+        }
         break;
 
       case 'Diagonal':
