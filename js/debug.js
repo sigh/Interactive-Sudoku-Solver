@@ -277,3 +277,11 @@ const runTarekHard = () => {
     'M<S<<H<<OM^<<^<^>^^<O<<<N^R^K^X>>^^^>^I^<<^>^^P^<<^I^N^^^>>>^>^>^RU<O<<^^>^<^<<^<',
   ]);
 };
+
+const printGrid = (grid) => {
+  const matrix = [];
+  for (let i = 0; i < GRID_SIZE; i++) {
+    matrix.push(grid.slice(i*GRID_SIZE, (i+1)*GRID_SIZE));
+  }
+  console.table(matrix);
+}

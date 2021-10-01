@@ -483,6 +483,9 @@ class SudokuBuilder {
             yield new SudokuConstraintHandler.AllDifferent(cells);
           }
         }
+
+        // Just to let the solver know that this is a jigsaw puzzle.
+        yield new SudokuConstraintHandler.Jigsaw();
         break;
 
       case 'Diagonal':

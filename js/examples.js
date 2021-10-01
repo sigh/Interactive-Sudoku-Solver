@@ -177,7 +177,7 @@ const EXAMPLES = {
   // Invalid jigsaws.
   'Invalid jigsaw, easy': {
     src: 'http://forum.enjoysudoku.com/jigsaw-layouts-generate-test-t35712.html#p274998',
-    input: ' Jigsaw~000000001223411101223415111223455556223444566233334566777374566787774566788888888.',
+    input: '.Jigsaw~000000001223411101223415111223455556223444566233334566777374566787774566788888888.',
     solution: null,
   },
   'Invalid jigsaw, hard': {

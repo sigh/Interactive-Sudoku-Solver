@@ -1000,6 +1000,50 @@ SudokuConstraintHandler.Sandwich = class extends SudokuConstraintHandler {
   }
 }
 
+// This only exists to let the solver know this is a jigsaw puzzle, and
+// optimize for it.
+SudokuConstraintHandler.Jigsaw = class extends SudokuConstraintHandler {}
+
+SudokuConstraintHandler.SameValues = class extends SudokuConstraintHandler {
+  constructor(cells0, cells1) {
+    super([...cells0, ...cells1]);
+    if (cells0.length != cells1.length) {
+      throw('SameValues must use sets of the same length.');
+    }
+
+    this._cells0 = cells0;
+    this._cells1 = cells1;
+  }
+
+  enforceConsistency(grid) {
+    const cells0 = this._cells0;
+    const cells1 = this._cells1;
+    const numCells = cells0.length;
+
+    let values0 = 0;
+    let values1 = 0;
+    for (let i = numCells; i >= 0; i--) {
+      values0 |= grid[cells0[i]];
+      values1 |= grid[cells1[i]];
+    }
+
+    if (values1 == values0) return true;
+
+    const values = values1 & values0;
+
+    // Check if we have enough values.
+    if (LookupTable.COUNT[values] < numCells) return false;
+
+    // Enforce the constrained value set.
+    const cells = this.cells;
+    for (let i = numCells*2-1; i >= 0; i--) {
+      if (!(grid[cells[i]] &= values)) return false;
+    }
+
+    return true;
+  }
+}
+
 class SudokuConstraintOptimizer {
   static _NONET_SUM = GRID_SIZE*(GRID_SIZE+1)/2;
 
@@ -1009,6 +1053,11 @@ class SudokuConstraintOptimizer {
     handlers = this._findHiddenCages(handlers);
 
     handlers = this._sizeSpecificSumHandlers(handlers, cellConflictSets);
+
+    const jigsawHandler = handlers.find(h => h instanceof SudokuConstraintHandler.Jigsaw);
+    if (jigsawHandler) {
+      handlers = this._optimizeJigsaw(handlers);
+    }
 
     return handlers;
   }
@@ -1142,6 +1191,30 @@ class SudokuConstraintOptimizer {
         complementCells, complementSum);
       complementHandler.setComplementCells(constrainedCells);
       handlers.push(complementHandler);
+    }
+
+    return handlers;
+  }
+
+  // Add same value handlers for the intersections between nonets.
+  static _optimizeJigsaw(handlers) {
+    const nonetHandlers = handlers.filter(h => h instanceof SudokuConstraintHandler.Nonet);
+
+    for (const h0 of nonetHandlers) {
+      for (const h1 of nonetHandlers) {
+        if (h0 === h1) continue;
+
+        const diff0 = setDifference(h0.cells, h1.cells);
+        if (diff0.length > 6 || diff0.length == 0) continue;
+
+        // We have some overlapping cells!
+        // This means diff0 and diff1 must contain the same values.
+        const diff1 = setDifference(h1.cells, h0.cells);
+
+        // TODO: Optmize the diff0.length == 1 case (and 2?).
+        handlers.push(new SudokuConstraintHandler.SameValues(
+          diff0, diff1));
+      }
     }
 
     return handlers;

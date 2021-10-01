@@ -456,7 +456,9 @@ SudokuSolver.InternalSolver = class {
           }
         }
         this._backtrackTriggers[cell]++;
-        if (depth > counters.maxDepth) counters.maxDepth = depth;
+        if (depth > counters.maxDepth) {
+          counters.maxDepth = depth;
+        }
       }
 
       if ((counters.valuesTried & progressFrequencyMask) === 0) {
