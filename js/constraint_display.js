@@ -47,6 +47,7 @@ class ConstraintDisplay {
     this._regionContainer.append(this._missingRegion);
 
     svg.append(this._regionContainer);
+    this.useJigsawRegions(false);
   }
 
   _makeLittleKillers(gridSelection) {
