@@ -168,16 +168,19 @@
             <div class="two-column">
               <div>
                 <input type="radio" id="multi-cell-constraint-white-dot" name="constraint-type" value="white-dot">
-                <label for="multi-cell-constraint-white-dot">&plusmn;1</label>
+                <label for="multi-cell-constraint-white-dot">&plusmn;1 &#9675;</label>
                   <span class="tooltip"
-                    data-text="Values must be consecutive. Adjacent cells only.">
+                    data-text="Kropki white dot: values must be consecutive. Adjacent cells only.">
                   </span>
               </div>
               <div>
                 <input type="radio" id="multi-cell-constraint-black-dot" name="constraint-type" value="black-dot">
-                <label for="multi-cell-constraint-black-dot">&times;&divide;2</label>
+                <label for="multi-cell-constraint-black-dot">
+                  <span class="muldiv"><span>&times;</span><span>&divide;</span></span>
+                  2 &#9679;
+                </label>
                   <span class="tooltip"
-                    data-text="One value must be double the other. Adjacent cells only.">
+                    data-text="Kropki black dot: one value must be double the other. Adjacent cells only.">
                   </span>
               </div>
             </div>

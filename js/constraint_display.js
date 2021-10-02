@@ -361,17 +361,26 @@ class ConstraintDisplay {
     arrow.setAttribute('stroke-linecap', 'round');
 
     // Draw the circle.
+    const circleRadius = 15;
     const [x, y] = ConstraintDisplay.cellIdCenter(cells[0]);
     let circle = createSvgElement('circle');
     circle.setAttribute('cx', x);
     circle.setAttribute('cy', y);
-    circle.setAttribute('r', 15);
+    circle.setAttribute('r', circleRadius);
     arrow.appendChild(circle);
 
+    const points = cells.map(ConstraintDisplay.cellIdCenter);
+
+    // Remove the circle part from the path.
+    {
+      const [dx, dy] = [points[1][0]-points[0][0], points[1][1]-points[0][1]];
+      const frac = circleRadius/Math.sqrt(dx*dx+dy*dy);
+      points[0][0] += dx*frac;
+      points[0][1] += dy*frac;
+    }
+
     // Draw the line.
-    const path = this._makePath(cells.map(ConstraintDisplay.cellIdCenter));
-    path.setAttribute('stroke-dashoffset', -15);
-    path.setAttribute('stroke-dasharray', path.getTotalLength());
+    const path = this._makePath(points);
     path.setAttribute('marker-end', 'url(#arrowhead)');
 
     arrow.appendChild(path);
