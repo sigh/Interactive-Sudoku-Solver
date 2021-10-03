@@ -101,36 +101,37 @@ const runFnWithChecks = async (puzzles, fn, onFailure) => {
       result = await resultPromise;
     } catch(e) {
       onFailure(name, puzzle, e);
+    } finally {
+      solver.terminate();
     }
-    solver.terminate();
 
-    let shortSolution;
-    if (Array.isArray(result)) {
-      shortSolution = toShortSolution(result);
-      solutions.push(shortSolution);
-    } else {
-      solutions.push(null);
-    }
-    const resultToCheck = shortSolution || result;
-
-    if (puzzle.solution !== undefined) {
-      // We want to test the result.
-
-      if (!puzzle.solution) {
-        // Expect no solution.
-        if (result) {
-          onFailure(name, puzzle, resultToCheck);
-        }
+    if (result !== undefined) {
+      let shortSolution;
+      if (Array.isArray(result)) {
+        shortSolution = toShortSolution(result);
+        solutions.push(shortSolution);
       } else {
-        // Expect a solution.
-        if (!result || resultToCheck != puzzle.solution) {
-          onFailure(name, puzzle, resultToCheck);
+        solutions.push(null);
+      }
+      const resultToCheck = shortSolution || result;
+
+      if (puzzle.solution !== undefined) {
+        // We want to test the result.
+
+        if (!puzzle.solution) {
+          // Expect no solution.
+          if (result) {
+            onFailure(name, puzzle, resultToCheck);
+          }
+        } else {
+          // Expect a solution.
+          if (!result || resultToCheck != puzzle.solution) {
+            onFailure(name, puzzle, resultToCheck);
+          }
         }
       }
     }
 
-
-    // let state = solver.state();
     let row = {name: name, ...state.counters, timeMs: state.timeMs};
     rows.push(row);
     total = sumObjectValues(total, row);
@@ -197,3 +198,7 @@ const printGrid = (grid) => {
   }
   console.table(matrix);
 }
+
+const showCellIndex = () => {
+  infoOverlay.setValues([...Array(NUM_CELLS).keys()]);
+};

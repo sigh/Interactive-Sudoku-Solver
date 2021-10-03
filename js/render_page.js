@@ -1,15 +1,15 @@
 // Make these variables global so that we can easily access them from the
 // console.
-let grid, constraintManager, controller;
+let grid, constraintManager, controller, infoOverlay;
 
 const initPage = () => {
   // Create grid.
   let container = document.getElementById('sudoku-grid');
   grid = new SudokuGrid(container);
   constraintManager = new ConstraintManager(grid);
-  const heatmap = new Heatmap(grid._container);
+  infoOverlay = new InfoOverlay(grid._container);
 
-  controller = new SolutionController(constraintManager, grid, heatmap);
+  controller = new SolutionController(constraintManager, grid, infoOverlay);
 };
 
 class CheckboxConstraints {
@@ -1126,11 +1126,11 @@ class HistoryHandler {
 }
 
 class SolutionController {
-  constructor(constraintManager, grid, heatmap) {
+  constructor(constraintManager, grid, infoOverlay) {
     this._solver = null;
     this._isSolving = false;
     this._constraintManager = constraintManager;
-    this._heatmap = heatmap;
+    this._infoOverlay = infoOverlay;
     this._grid = grid;
     this._update = deferUntilAnimationFrame(this._update.bind(this));
     constraintManager.setUpdateCallback(this._update.bind(this));
@@ -1295,7 +1295,7 @@ class SolutionController {
       this._solve(constraints);
     } else {
       this._grid.setSolution([]);
-      this._heatmap.clearValues();
+      this._infoOverlay.clear();
       this._clearStateVariables();
       this._terminateSolver();
       this._showIterationControls(false);
@@ -1309,7 +1309,7 @@ class SolutionController {
     let solver = await this._replaceSolver(constraints);
 
     this._grid.setSolution([]);
-    this._heatmap.clearValues();
+    this._infoOverlay.clear();
 
     let handler = this._modeHandlers[mode];
 
@@ -1320,7 +1320,7 @@ class SolutionController {
   }
 
   async _validateLayout(constraints) {
-    this._heatmap.clearValues();
+    this._infoOverlay.clear();
 
     const solver = await this._replaceSolver(this._constraintManager.getLayoutConstraint());
 
@@ -1431,7 +1431,7 @@ class SolutionController {
     this._displayStateVariables(state);
 
     if (state.backtrackTriggers) {
-      this._heatmap.setValues(state.backtrackTriggers);
+      this._infoOverlay.setHeatmapValues(state.backtrackTriggers);
     }
 
     // Handle extra state.
@@ -1569,21 +1569,22 @@ class SolutionController {
   }
 }
 
-// A heatmap which is lazily loaded.
-class Heatmap {
-  _heatmap;
+// A info overlay which is lazily loaded.
+class InfoOverlay {
+  _infoOverlay;
   _cellMap;
   _container;
+  _isClear = true;
 
   constructor(container) {
     this._container = container;
   }
 
-  _initHeatmap() {
-    const heatmap = document.createElement('div');
-    heatmap.className = 'heatmap';
-    heatmap.style.padding = this._container.style.padding;
-    this._container.append(heatmap);
+  _initInfoOverlay() {
+    const infoOverlay = document.createElement('div');
+    infoOverlay.className = 'info-overlay';
+    infoOverlay.style.padding = this._container.style.padding;
+    this._container.append(infoOverlay);
 
     const cellMap = new Map();
 
@@ -1594,26 +1595,41 @@ class Heatmap {
         const cellIndex = toCellIndex(i, j);
         cellMap[cellIndex] = cell;
 
-        heatmap.appendChild(cell);
+        infoOverlay.appendChild(cell);
       }
     }
 
     this._cellMap = cellMap;
-    this._heatmap = heatmap;
+    this._infoOverlay = infoOverlay;
   }
 
-  clearValues() {
-    if (!this._heatmap) return;
+  clear() {
+    if (!this._infoOverlay) return;
+    if (this._isClear) return;
 
-    this._heatmap.style.visibility = 'hidden';
+    for (let i = 0; i < NUM_CELLS; i++) {
+      this._cellMap[i].style.background = 'none';
+      this._cellMap[i].textContent = '';
+    }
+    this._isClear = true;
+  }
+
+  setHeatmapValues(values) {
+    if (!this._infoOverlay) this._initInfoOverlay();
+
+    for (let i = 0; i < NUM_CELLS; i++) {
+      this._cellMap[i].style.background = (
+        `rgba(255, 0, 0, ${values[i]/1000})`);
+    }
+    this._isClear = false;
   }
 
   setValues(values) {
-    if (!this._heatmap) this._initHeatmap();
+    if (!this._infoOverlay) this._initInfoOverlay();
 
-    this._heatmap.style.visibility = 'visible';
     for (let i = 0; i < NUM_CELLS; i++) {
-      this._cellMap[i].style.opacity = values[i]/1000;
+      this._cellMap[i].textContent = values[i];
     }
+    this._isClear = false;
   }
 }
