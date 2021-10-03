@@ -1,6 +1,6 @@
 "use strict";
 
-const EXPORT_CONFLICT_HEATMAP = false;
+var EXPORT_CONFLICT_HEATMAP = false;
 
 class SudokuSolver {
   constructor(handlers) {

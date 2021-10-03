@@ -379,6 +379,12 @@ class SudokuBuilder {
     return new SudokuSolver(SudokuBuilder._handlers(constraint));
   }
 
+  // GLobal vars to pass to the worker.
+  static GLOBAL_VARS = [
+    'EXPORT_CONFLICT_HEATMAP',
+  ];
+
+
   // Ask for a state update every 2**14 iterations.
   // NOTE: Using a non-power of 10 makes the display loook faster :)
   static LOG_UPDATE_FREQUENCY = 14;
@@ -386,16 +392,30 @@ class SudokuBuilder {
 
   static _unusedWorkers = [];
 
+  static getGlobalVars() {
+    const options = new Map();
+
+    for (const v of this.GLOBAL_VARS) {
+      if (window[v]) {
+        options.set(v, window[v]);
+      }
+    }
+    options.set('test', 'foo');
+
+    return options;
+  }
+
   static async buildInWorker(constraints, stateHandler) {
     if (!this._unusedWorkers.length) {
       this._unusedWorkers.push(new Worker('js/worker.js?' + this.CACHE_BUST_PARAM));
     }
-    let worker = this._unusedWorkers.pop();
+    const worker = this._unusedWorkers.pop();
     worker.release = () => this._unusedWorkers.push(worker);
 
-    let solverProxy = new SolverProxy(stateHandler, worker);
+    const solverProxy = new SolverProxy(stateHandler, worker);
+    const globalVars = this.getGlobalVars();
 
-    await solverProxy.init(constraints, this.LOG_UPDATE_FREQUENCY);
+    await solverProxy.init(constraints, this.LOG_UPDATE_FREQUENCY, globalVars);
 
     return solverProxy;
   }
@@ -696,11 +716,12 @@ class SolverProxy {
     return promise;
   }
 
-  async init(constraint, logUpdateFrequency) {
+  async init(constraint, logUpdateFrequency, globalVars) {
     this._initialized = true;
     await this._callWorker('init', {
       constraint: constraint,
       logUpdateFrequency: logUpdateFrequency,
+      globalVars,
     });
   }
 

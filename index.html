@@ -14,19 +14,21 @@
 
     gtag('config', 'UA-177463638-1');
   </script>
-</head>
 
-<script defer src="js/util.js"></script>
-<script defer src="js/sudoku_builder.js"></script>
-<script defer src="js/constraint_display.js"></script>
-<script defer src="js/examples.js"></script>
-<script defer src="js/render_page.js"></script>
-<script defer src="js/solver/engine.js"></script>
-<script defer src="js/solver/handlers.js"></script>
-<script async src="js/debug.js"></script>
-<script>
-  window.addEventListener('load', () => { initPage(); });
-</script>
+  <script defer src="data/example_puzzles.js"></script>
+  <script defer src="js/util.js"></script>
+  <script defer src="js/sudoku_builder.js"></script>
+  <script defer src="js/constraint_display.js"></script>
+  <script defer src="js/render_page.js"></script>
+  <script>
+    window.addEventListener('load', () => {
+      initPage();
+      const loadDebug = dynamicJSFileLoader('js/debug.js');
+      window.loadDebug = loadDebug;
+    });
+  </script>
+
+</head>
 
 <body>
   <h1>Interactive Sudoku Solver</h1>

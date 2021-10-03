@@ -100,3 +100,19 @@ class IteratorWithCount {
 
   [Symbol.iterator] = () => this;
 }
+
+const loadJSFile = (path) => {
+  const script = document.createElement('script');
+  script.src = path;
+  script.async = false;
+  document.head.append(script);
+};
+
+const dynamicJSFileLoader = (path) => {
+  let loaded = false;
+  return () => {
+    if (loaded) return;
+    loadJSFile(path);
+    loaded = true;
+  };
+};
