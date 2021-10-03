@@ -178,14 +178,37 @@ class SudokuConstraint {
     return new SudokuConstraint.FixedValues(...fixedValues);
   }
 
+  static _parseJigsawLayout(text) {
+    if (text.length != NUM_CELLS) return null;
+
+    const chars = new Set(text);
+    if (chars.size != 9) return null;
+
+    const counter = {};
+    chars.forEach(c => counter[c] = 0);
+    for (let i = 0; i < NUM_CELLS; i++) {
+      counter[text[i]]++;
+    }
+
+    if (Object.values(counter).some(c => c != 9)) return null;
+
+    return new SudokuConstraint.Jigsaw(text);
+  }
+
   static _parseJigsaw(text) {
+    if (text.length == NUM_CELLS) {
+      return this._parseJigsawLayout(text);
+    }
+
     if (text.length != NUM_CELLS*2) return null;
+
+    const layout = this._parseJigsawLayout(text.substr(NUM_CELLS));
+    if (layout == null) return null;
 
     const fixedValues = this._parsePlainSudoku(text.substr(0, NUM_CELLS));
     if (fixedValues == null) return null;
-    return new SudokuConstraint.Set([
-      new SudokuConstraint.Jigsaw(text.substr(NUM_CELLS)),
-      fixedValues]);
+
+    return new SudokuConstraint.Set([layout, fixedValues]);
   }
 
   static fromText(text) {

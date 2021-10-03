@@ -3,9 +3,7 @@ loadJSFile('js/solver/handlers.js');
 loadJSFile('data/killers.js');
 loadJSFile('data/jigsaw_layouts.js');
 
-const sleep = (ms) => {
-  return new Promise(resolve => setTimeout(resolve, ms));
-};
+var TEST_TIMEOUT_MS = 1000;
 
 const loadInput = (input) => {
   let puzzle = EXAMPLES[input];
@@ -53,14 +51,7 @@ const puzzleFromCfg = (puzzleCfg) => {
   return [puzzleStr, puzzle];
 };
 
-const failTest = (name, puzzle, result) => {
-  console.log('Test failed: ' + (name || puzzle.input));
-  console.log('Expected', puzzle.solution);
-  console.log('Got     ', result);
-  throw('Test failed: ' + name);
-};
-
-const runAllWithChecks = (puzzles) => {
+const runFnWithChecks = async (puzzles, fn, onFailure) => {
   const sumObjectValues = (a, b) => {
     let result = {...a};
     for (const [k, v] of Object.entries(b)) {
@@ -71,49 +62,79 @@ const runAllWithChecks = (puzzles) => {
     return result;
   };
 
+  const failTest = (name, puzzle, result) => {
+    console.log('Test failed: ' + (name || puzzle.input));
+    console.log('Expected', puzzle.solution);
+    console.log('Got     ', result);
+    throw('Test failed: ' + name);
+  };
+  onFailure ||= failTest;
+
+  let state;
+  const stateHandler = (s) => { state = s; };
+
   let solutions = [];
   let rows = [];
   let total = {};
   for (const puzzleCfg of puzzles) {
     const [name, puzzle] = puzzleFromCfg(puzzleCfg);
 
+    // Set up solver.
+    const constraint = SudokuConstraint.fromText(puzzle.input);
+    const solver = await SudokuBuilder.buildInWorker(constraint, stateHandler);
+
     // Log a fixed string so the progress gets collapsed to a single line.
+    // Do this after the worker has started to ensure a nice output.
     console.log('solving...');
 
-    let constraint = SudokuConstraint.fromText(puzzle.input);
-    let solver = SudokuBuilder.build(constraint);
-    let result = solver.nthSolution(0);
-    solver.nthSolution(1); // Try to find a second solution to prove uniqueness.
+    // Start solver with optional timeout.
+    let resultPromise = fn(solver);
+    if (TEST_TIMEOUT_MS) {
+      resultPromise = withDeadline(
+        resultPromise, TEST_TIMEOUT_MS,
+        `Solver timed out (${TEST_TIMEOUT_MS}ms)`);
+    }
 
-    if (puzzle.solution === null) {
-      // We expect no solution.
-      if (result) {
-        const shortSolution = toShortSolution(result);
-        failTest(name, puzzle, shortSolution);
-      }
-      solutions.push(null);
-    } else if (!result || result.length != GRID_SIZE*GRID_SIZE) {
-      failTest(name, puzzle, result);
-    } else {
-      let shortSolution;
-      try {
-        shortSolution = toShortSolution(result);
-      } catch(e) {
-        console.log(e);
-        failTest(name, puzzle, result);
-      }
+    // Wait for solver.
+    let result;
+    try {
+      result = await resultPromise;
+    } catch(e) {
+      onFailure(name, puzzle, e);
+    }
+    solver.terminate();
+
+    let shortSolution;
+    if (Array.isArray(result)) {
+      shortSolution = toShortSolution(result);
       solutions.push(shortSolution);
+    } else {
+      solutions.push(null);
+    }
+    const resultToCheck = shortSolution || result;
 
-      if (puzzle.solution) {
-        if (shortSolution != puzzle.solution) failTest(name, puzzle, shortSolution);
+    if (puzzle.solution !== undefined) {
+      // We want to test the result.
+
+      if (!puzzle.solution) {
+        // Expect no solution.
+        if (result) {
+          onFailure(name, puzzle, resultToCheck);
+        }
+      } else {
+        // Expect a solution.
+        if (!result || resultToCheck != puzzle.solution) {
+          onFailure(name, puzzle, resultToCheck);
+        }
       }
     }
 
-    let state = solver.state();
+
+    // let state = solver.state();
     let row = {name: name, ...state.counters, timeMs: state.timeMs};
     rows.push(row);
     total = sumObjectValues(total, row);
-    total.name = null;
+    total.name = 'Total';
   }
 
   rows.total = total;
@@ -122,74 +143,52 @@ const runAllWithChecks = (puzzles) => {
   return solutions;
 };
 
-const runValidateLayoutTests = () => {
-  const cases = VALID_JIGSAW_LAYOUTS.map(l =>['.Jigsaw~'+l, true]);
-  cases.push(...INVALID_JIGSAW_LAYOUTS.map(l =>['.Jigsaw~'+l, null]));
+const runAllWithChecks = (puzzles, onFailure) => {
+  return runFnWithChecks(puzzles, async (solver) => {
+    const result = await solver.nthSolution(0);
+    await solver.nthSolution(1); // Try to find a second solution to prove uniqueness.
+    return result;
+  }, onFailure);
+};
 
-  let rows = [];
-
-  const extractJigsawConstraint = (c) => {
-    switch (c.type) {
-      case 'Jigsaw':
-        return c;
-      case 'Set':
-        return c.constraints.find(extractJigsawConstraint);
-    }
-    return null;
-  };
-
-  for (const puzzleCfg of cases) {
-    const [name, puzzle] = puzzleFromCfg(puzzleCfg);
-
-    // Log a fixed string so the progress gets collapsed to a single line.
-    console.log('solving...');
-
-    const fullConstraint = SudokuConstraint.fromText(puzzle.input);
-    const layoutConstraint = extractJigsawConstraint(fullConstraint) || new SudokuConstraint.Set([]);
-    const solver = SudokuBuilder.build(layoutConstraint);
-    const result = solver.validateLayout();
-
-    const expectedResult = (puzzle.solution !== null);
-
-    if (result != expectedResult) {
-      failTest(name, puzzle, result);
-    }
-
-    let state = solver.state();
-    let row = {name: name, ...state.counters, timeMs: state.timeMs};
-    rows.push(row);
-  }
-
-  console.table(rows);
+const runValidateLayout = (cases, onFailure) => {
+  return runFnWithChecks(cases, (solver) => {
+    return solver.validateLayout();
+  }, onFailure);
 }
 
-const runTestCases = () => {
-  runAllWithChecks(TEST_CASES);
+const runValidateLayoutTests = (onFailure) => {
+  const cases = [].concat(
+    VALID_JIGSAW_LAYOUTS.slice(0, 50),
+    INVALID_JIGSAW_LAYOUTS);
+  runValidateLayout(cases, onFailure);
 };
 
-const runAll = (puzzles) => {
-  runAllWithChecks(puzzles);
+const runTestCases = (onFailure) => {
+  runAllWithChecks([
+    'Thermosudoku',
+    'Classic sudoku',
+    'Classic sudoku, hard',
+    'Anti-knights move',
+    'Killer sudoku',
+    'Sudoku X',
+    'Anti-knight Anti-king',
+    'Anti-knight, Anti-consecutive',
+    'Arrow sudoku',
+    'Arrow killer sudoku',
+    'Kropki sudoku',
+    'Little killer',
+    'Little killer 2',
+    'Sandwich sudoku',
+    'German whispers',
+    'Palindromes',
+    'Jigsaw',
+  ], onFailure);
 };
 
-const TEST_CASES = [
-  'Thermosudoku',
-  'Classic sudoku',
-  'Classic sudoku, hard',
-  'Anti-knights move',
-  'Killer sudoku',
-  'Sudoku X',
-  'Anti-knight Anti-king',
-  'Anti-knight, Anti-consecutive',
-  'Arrow sudoku',
-  'Arrow killer sudoku',
-  'Kropki sudoku',
-  'Little killer',
-  'Little killer 2',
-  'Sandwich sudoku',
-  'German whispers',
-  'Palindromes',
-  'Jigsaw',
-];
+const runAll = (puzzles, onFailure) => {
+  runAllWithChecks(puzzles, onFailure);
+};
 
 const printGrid = (grid) => {
   const matrix = [];

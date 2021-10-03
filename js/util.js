@@ -116,3 +116,10 @@ const dynamicJSFileLoader = (path) => {
     loaded = true;
   };
 };
+
+const withDeadline = (promise, delay, reason) => {
+  const awaitTimeout = new Promise(
+    (resolve, reject) => setTimeout((() => reject(reason)), delay));
+
+  return Promise.race([promise, awaitTimeout]);
+};

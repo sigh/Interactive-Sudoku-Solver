@@ -327,6 +327,7 @@ class ConstraintManager {
         let input = (new FormData(freeInputForm)).get('freeform-input');
         this.loadFromText(input);
       } catch (e) {
+        console.log(e);
         // TODO: Display the error.
       }
       return false;
@@ -702,6 +703,10 @@ class Highlight {
     this._runCallback();
   }
 
+  size() {
+    return this._cells.size;
+  }
+
   getCells() {
     return [...this._cells];
   }
@@ -881,6 +886,20 @@ class SudokuGrid {
         case 'ArrowDown':
           moveActiveCell(1, 0);
           return;
+      }
+    });
+
+    window.addEventListener('keydown', event => {
+      if (this.selection.size() == 0) return;
+      switch (event.key) {
+        case 'c':
+          this.selection.getCells().forEach(c => c.textContent = '');
+          break;
+        case 'f':
+          if (this.selection.size() != 9) return;
+          this.selection.getCells().forEach((c,i) => c.textContent = i+1);
+          this.updateCallback(this);
+          break;
       }
     });
   }
