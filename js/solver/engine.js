@@ -413,15 +413,17 @@ SudokuSolver.InternalSolver = class {
 
   static YIELD_ON_SOLUTION = 0;
   static YIELD_ON_STEP = 1;
-  static YIELD_ON_BACKTRACK_DECAY = 2;
 
   static _BACKTRACK_DECAY_INTERVAL = NUM_CELLS*NUM_CELLS;
 
-  // run runs the solver yielding each solution, and optionally at
-  // each step.
+  // run runs the solve.
+  // yieldWhen can be:
+  //  YIELD_ON_SOLUTION to yielding each solution.
+  //  YIELD_ON_STEP to yield every step.
+  //  n > 1 to yield every n contraditions.
   *run(yieldWhen) {
     const yieldEveryStep = yieldWhen === this.constructor.YIELD_ON_STEP;
-    const yieldOnDecay = yieldWhen === this.constructor.YIELD_ON_BACKTRACK_DECAY;
+    const yieldOnContradiction = yieldWhen > 1 ? yieldWhen : 0;
 
     // Set up iterator validation.
     if (!this._atStart) throw('State is not in initial state.');
@@ -496,18 +498,20 @@ SudokuSolver.InternalSolver = class {
           for (let i = 0; i < NUM_CELLS; i++) {
             this._backtrackTriggers[i]>>=1;
           }
-          if (yieldOnDecay) {
-            yield {
-              grid: grid,
-              isSolution: false,
-              stack: stack.subarray(0, depth),
-              hasContradiction: hasContradiction,
-            };
-          }
         }
         this._backtrackTriggers[cell]++;
         if (depth > counters.maxDepth) {
           counters.maxDepth = depth;
+        }
+
+        if (0 !== yieldOnContradiction &&
+            0 === counters.backtracks % yieldOnContradiction) {
+          yield {
+            grid: grid,
+            isSolution: false,
+            stack: stack.subarray(0, depth),
+            hasContradiction: hasContradiction,
+          };
         }
       }
 
@@ -625,6 +629,7 @@ SudokuSolver.InternalSolver = class {
     };
 
     const attempLog = [];
+    const SEARCH_LIMIT = 10000;
 
     // Do a attempt to solve.
     const attempt = () => {
@@ -634,7 +639,7 @@ SudokuSolver.InternalSolver = class {
       const nonet = chooseNonet();
       fillNonet(nonet);
 
-      for (const result of this.run(this.constructor.YIELD_ON_BACKTRACK_DECAY)) {
+      for (const result of this.run(SEARCH_LIMIT)) {
         if (result.isSolution) return true;
         attempLog.push([nonet, this.counters.maxDepth]);
         return undefined;
@@ -646,7 +651,7 @@ SudokuSolver.InternalSolver = class {
     // Each time the most promising nonet will be chosen as a seed, ideally
     // getting closer to the best choice.
     for (let i = 0; i < 5; i++) {
-      const result = attempt(this.constructor.YIELD_ON_BACKTRACK_DECAY);
+      const result = attempt();
       if (result !== undefined) return result;
     }
 
