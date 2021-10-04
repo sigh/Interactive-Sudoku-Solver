@@ -202,6 +202,8 @@ SudokuSolver.InternalSolver = class {
   constructor(handlerGen) {
     this._initCellArray();
     this._stack = new Uint8Array(NUM_CELLS);
+    this._progressRatioStack = new Array(NUM_CELLS);
+    this._progressRatioStack.fill(1);
 
     this._runCounter = 0;
     this._progress = {
@@ -282,6 +284,7 @@ SudokuSolver.InternalSolver = class {
       solutions: 0,
       constraintsProcessed: 0,
       maxDepth: 0,
+      progressRatio: 0,
     };
 
     // _backtrackTriggers counts the the number of times a cell is responsible
@@ -360,6 +363,7 @@ SudokuSolver.InternalSolver = class {
       // guessing.
       if (count <= 1) {
         bestIndex = i;
+        minScore = 1;
         break;
       }
 
@@ -371,6 +375,8 @@ SudokuSolver.InternalSolver = class {
     }
 
     [stack[bestIndex], stack[depth]] = [stack[depth], stack[bestIndex]];
+
+    return minScore;
   }
 
   _enforceValue(grid, value, cell) {
@@ -426,8 +432,9 @@ SudokuSolver.InternalSolver = class {
     };
 
     let depth = 0;
-    let stack = this._stack;
-    let counters = this.counters;
+    const stack = this._stack;
+    const counters = this.counters;
+    const progressRatioStack = this._progressRatioStack;
 
     {
       // Enforce constraints for all cells.
@@ -447,9 +454,12 @@ SudokuSolver.InternalSolver = class {
       checkRunCounter();
     }
 
-    this._updateCellOrder(stack, depth, this._grids[depth]);
-    depth++;
-    counters.cellsSearched++;
+    {
+      const count = this._updateCellOrder(stack, depth, this._grids[depth]);
+      depth++;
+      progressRatioStack[depth] = progressRatioStack[depth-1]/count;
+      counters.cellsSearched++;
+    }
 
     const progressFrequencyMask = this._progress.frequencyMask;
 
@@ -479,6 +489,7 @@ SudokuSolver.InternalSolver = class {
       grid[cell] = value;
       let hasContradiction = !this._enforceValue(grid, value, cell);
       if (hasContradiction) {
+        counters.progressRatio += progressRatioStack[depth];
         counters.backtracks++;
         // Exponentially decay the counts.
         if (0 === counters.backtracks % this.constructor._BACKTRACK_DECAY_INTERVAL) {
@@ -519,6 +530,7 @@ SudokuSolver.InternalSolver = class {
       if (hasContradiction) continue;
 
       if (depth == NUM_CELLS) {
+        counters.progressRatio += progressRatioStack[depth];
         // We've set all the values, and we haven't found a contradiction.
         // This is a solution!
         counters.solutions++;
@@ -533,9 +545,12 @@ SudokuSolver.InternalSolver = class {
         continue;
       }
 
-      this._updateCellOrder(stack, depth, grid);
-      counters.cellsSearched++;
-      depth++;
+      {
+        const count = this._updateCellOrder(stack, depth, grid);
+        counters.cellsSearched++;
+        depth++;
+        progressRatioStack[depth] = progressRatioStack[depth-1]/count;
+      }
     }
 
     this.done = true;

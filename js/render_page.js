@@ -1377,7 +1377,7 @@ class SolutionController {
       'cellsSearched',
       'valuesTried',
       'constraintsProcessed',
-      'maxDepth',
+      'searchSpaceExplored',
       'puzzleSetupTime',
       'runtime',
     ];
@@ -1417,6 +1417,13 @@ class SolutionController {
           break;
         case 'runtime':
           text = formatTimeMs(state.timeMs);
+          break;
+        case 'searchSpaceExplored':
+          if (state.done) {
+            text = '100%';
+          } else {
+            text = (counters.progressRatio * 100).toPrecision(3) + '%';
+          }
           break;
         default:
           text = counters[v];
