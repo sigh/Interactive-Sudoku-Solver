@@ -105,6 +105,7 @@ const loadJSFile = (path) => {
   const script = document.createElement('script');
   script.src = path;
   script.async = false;
+  const cachebuster = '?cachebuster=' + Math.random();
   document.head.append(script);
 };
 

@@ -1419,7 +1419,7 @@ class SolutionController {
           text = formatTimeMs(state.timeMs);
           break;
         case 'searchSpaceExplored':
-          if (state.done) {
+          if (state.done && counters.progressRatio < 1) {
             text = '100%';
           } else {
             text = (counters.progressRatio * 100).toPrecision(3) + '%';

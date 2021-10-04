@@ -2,6 +2,7 @@ loadJSFile('js/solver/engine.js');
 loadJSFile('js/solver/handlers.js');
 loadJSFile('data/killers.js');
 loadJSFile('data/jigsaw_layouts.js');
+loadJSFile('data/invalid_jigsaw_layouts.js');
 
 var TEST_TIMEOUT_MS = 1000;
 
@@ -62,13 +63,18 @@ const runFnWithChecks = async (puzzles, fn, onFailure) => {
     return result;
   };
 
+  let numFailures = 0;
   const failTest = (name, puzzle, result) => {
-    console.log('Test failed: ' + (name || puzzle.input));
-    console.log('Expected', puzzle.solution);
-    console.log('Got     ', result);
-    throw('Test failed: ' + name);
+    numFailures++;
+    if (onFailure) {
+      onFailure();
+    } else {
+      console.log('Test failed: ' + (name || puzzle.input));
+      console.log('Expected', puzzle.solution);
+      console.log('Got     ', result);
+      throw('Test failed: ' + name);
+    }
   };
-  onFailure ||= failTest;
 
   let state;
   const stateHandler = (s) => { state = s; };
@@ -100,7 +106,7 @@ const runFnWithChecks = async (puzzles, fn, onFailure) => {
     try {
       result = await resultPromise;
     } catch(e) {
-      onFailure(name, puzzle, e);
+      failTest(name, puzzle, e);
     } finally {
       solver.terminate();
     }
@@ -121,12 +127,12 @@ const runFnWithChecks = async (puzzles, fn, onFailure) => {
         if (!puzzle.solution) {
           // Expect no solution.
           if (result) {
-            onFailure(name, puzzle, resultToCheck);
+            failTest(name, puzzle, resultToCheck);
           }
         } else {
           // Expect a solution.
           if (!result || resultToCheck != puzzle.solution) {
-            onFailure(name, puzzle, resultToCheck);
+            failTest(name, puzzle, resultToCheck);
           }
         }
       }
@@ -140,6 +146,10 @@ const runFnWithChecks = async (puzzles, fn, onFailure) => {
 
   rows.total = total;
   console.table(rows);
+
+  if (numFailures > 0) {
+    console.error(numFailures + ' failures');
+  }
 
   return solutions;
 };
@@ -161,7 +171,7 @@ const runValidateLayout = (cases, onFailure) => {
 const runValidateLayoutTests = (onFailure) => {
   const cases = [].concat(
     VALID_JIGSAW_LAYOUTS.slice(0, 50),
-    INVALID_JIGSAW_LAYOUTS);
+    EASY_INVALID_JIGSAW_LAYOUTS);
   runValidateLayout(cases, onFailure);
 };
 
