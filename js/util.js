@@ -14,9 +14,35 @@ const camelCaseToWords = (text) => {
   return text[0].toUpperCase() + text.slice(1);
 };
 
+// TODO: Name this to make it is is clear it is for arrays.
 const setDifference = (a, b) => {
   return a.filter(v => !b.includes(v));
-}
+};
+
+const setIntersection = (a, b) => {
+  const intersection = new Set()
+  for (const elem of a) {
+      if (b.has(elem)) {
+          intersection.add(elem)
+      }
+  }
+  return intersection;
+};
+
+const setDifferences = (a, b) => {
+  const diffA = new Set(a);
+  const diffB = new Set();
+
+  for (const elem of b) {
+    if (a.has(elem)) {
+      diffA.delete(elem);
+    } else {
+      diffB.add(elem);
+    }
+  }
+  return [diffA, diffB];
+};
+
 
 const deferUntilAnimationFrame = (fn) => {
   let lastArgs = null;
@@ -103,9 +129,9 @@ class IteratorWithCount {
 
 const loadJSFile = (path) => {
   const script = document.createElement('script');
-  script.src = path;
-  script.async = false;
   const cachebuster = '?cachebuster=' + Math.random();
+  script.src = path + cachebuster;
+  script.async = false;
   document.head.append(script);
 };
 
