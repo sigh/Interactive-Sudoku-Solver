@@ -1424,6 +1424,12 @@ class SolutionController {
           } else {
             text = (counters.progressRatio * 100).toPrecision(3) + '%';
           }
+
+          if (counters.progressRatioPrev > 0) {
+            const extra = counters.progressRatioPrev * 100;
+            const extraText = extra >= 100 ? Math.floor(extra): extra.toPrecision(2);
+            text += ` (+${extraText}%)`;
+          }
           break;
         default:
           text = counters[v];

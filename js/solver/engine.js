@@ -285,6 +285,7 @@ SudokuSolver.InternalSolver = class {
       constraintsProcessed: 0,
       maxDepth: 0,
       progressRatio: 0,
+      progressRatioPrev: 0,
     };
 
     // _backtrackTriggers counts the the number of times a cell is responsible
@@ -437,6 +438,9 @@ SudokuSolver.InternalSolver = class {
     const stack = this._stack;
     const counters = this.counters;
     const progressRatioStack = this._progressRatioStack;
+
+    counters.progressRatioPrev += counters.progressRatio;
+    counters.progressRatio = 0;
 
     {
       // Enforce constraints for all cells.
