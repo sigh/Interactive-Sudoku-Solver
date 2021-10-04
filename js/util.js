@@ -14,8 +14,7 @@ const camelCaseToWords = (text) => {
   return text[0].toUpperCase() + text.slice(1);
 };
 
-// TODO: Name this to make it is is clear it is for arrays.
-const setDifference = (a, b) => {
+const arrayDifference = (a, b) => {
   return a.filter(v => !b.includes(v));
 };
 
@@ -29,20 +28,16 @@ const setIntersection = (a, b) => {
   return intersection;
 };
 
-const setDifferences = (a, b) => {
-  const diffA = new Set(a);
-  const diffB = new Set();
+const setDifference = (a, b) => {
+  const diff = new Set();
 
-  for (const elem of b) {
-    if (a.has(elem)) {
-      diffA.delete(elem);
-    } else {
-      diffB.add(elem);
+  for (const elem of a) {
+    if (!b.has(elem)) {
+      diff.add(elem);
     }
   }
-  return [diffA, diffB];
+  return diff;
 };
-
 
 const deferUntilAnimationFrame = (fn) => {
   let lastArgs = null;

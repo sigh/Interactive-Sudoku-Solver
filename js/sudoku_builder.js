@@ -528,7 +528,7 @@ class SudokuBuilder {
         }
 
         // Just to let the solver know that this is a jigsaw puzzle.
-        yield new SudokuConstraintHandler.Jigsaw();
+        yield new SudokuConstraintHandler.Jigsaw([...map.values()]);
         break;
 
       case 'Diagonal':

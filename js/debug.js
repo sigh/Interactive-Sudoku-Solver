@@ -67,7 +67,7 @@ const runFnWithChecks = async (puzzles, fn, onFailure) => {
   const failTest = (name, puzzle, result) => {
     numFailures++;
     if (onFailure) {
-      onFailure();
+      onFailure(name, puzzle, result);
     } else {
       console.log('Test failed: ' + (name || puzzle.input));
       console.log('Expected', puzzle.solution);

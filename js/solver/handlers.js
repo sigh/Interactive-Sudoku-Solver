@@ -1002,17 +1002,24 @@ SudokuConstraintHandler.Sandwich = class extends SudokuConstraintHandler {
 
 // This only exists to let the solver know this is a jigsaw puzzle, and
 // optimize for it.
-SudokuConstraintHandler.Jigsaw = class extends SudokuConstraintHandler {}
+SudokuConstraintHandler.Jigsaw = class extends SudokuConstraintHandler {
+  constructor(regions) {
+    super();
+    this.regions = regions;
+  }
+}
 
 SudokuConstraintHandler.SameValues = class extends SudokuConstraintHandler {
-  constructor(cells0, cells1) {
+  constructor(cells0, cells1, isUnique) {
     super([...cells0, ...cells1]);
     if (cells0.length != cells1.length) {
       throw('SameValues must use sets of the same length.');
     }
 
-    this._cells0 = cells0;
-    this._cells1 = cells1;
+    this._cells0 = new Uint8Array(cells0);
+    this._cells1 = new Uint8Array(cells1);
+    // TODO: Figure out automatically.
+    this._isUnique = isUnique;
   }
 
   enforceConsistency(grid) {
@@ -1032,7 +1039,7 @@ SudokuConstraintHandler.SameValues = class extends SudokuConstraintHandler {
     const values = values1 & values0;
 
     // Check if we have enough values.
-    if (LookupTable.COUNT[values] < numCells) return false;
+    if (this._isUnique && LookupTable.COUNT[values] < numCells) return false;
 
     // Enforce the constrained value set.
     const cells = this.cells;
@@ -1056,7 +1063,8 @@ class SudokuConstraintOptimizer {
 
     const jigsawHandler = handlers.find(h => h instanceof SudokuConstraintHandler.Jigsaw);
     if (jigsawHandler) {
-      handlers = this._optimizeJigsaw(handlers);
+      handlers = this._optimizeJigsawIntersections(handlers);
+      handlers = this._optimizeJigsawLawOfLeftovers(handlers, jigsawHandler);
     }
 
     return handlers;
@@ -1146,7 +1154,7 @@ class SudokuConstraintOptimizer {
         if (k.cells.length == cells.length) {
           constrainedCells.push(...cells);
           constrainedSum += k.sum();
-          k.setComplementCells(setDifference(h.cells, k.cells));
+          k.setComplementCells(arrayDifference(h.cells, k.cells));
         } else if (k.cells.length == cells.length+1) {
           outies.push(k);
         }
@@ -1156,7 +1164,7 @@ class SudokuConstraintOptimizer {
       // nonet.
       if (outies.length == 0 && constrainedCells.length == 0) continue;
 
-      const complementCells = setDifference(h.cells, constrainedCells);
+      const complementCells = arrayDifference(h.cells, constrainedCells);
       const complementSum = this._NONET_SUM - constrainedSum;
 
       // If a cage sticks out of a nonet by 1 cell, then we can form the
@@ -1165,17 +1173,17 @@ class SudokuConstraintOptimizer {
       // cells in the nonet outside the cage. The sum can be further reduced
       // by any other cages (i.e. known sums) in the nonet.
       for (const o of outies) {
-        const remainingCells = setDifference(complementCells, o.cells);
+        const remainingCells = arrayDifference(complementCells, o.cells);
         // This may be worth tuning better.
         // In general a higher number means more constraining, but it
         // takes longer.
         if (remainingCells.length > 5) continue;
 
-        const extraCell = setDifference(o.cells, h.cells);
+        const extraCell = arrayDifference(o.cells, h.cells);
         const remainingSum = o.sum() - complementSum;
         const handler = new SudokuConstraintHandler.CellDepedentSum(
           [extraCell[0], ...remainingCells], remainingSum);
-        handler.setComplementCells(setDifference(h.cells, remainingCells));
+        handler.setComplementCells(arrayDifference(h.cells, remainingCells));
         handlers.push(handler);
       }
 
@@ -1197,25 +1205,90 @@ class SudokuConstraintOptimizer {
   }
 
   // Add same value handlers for the intersections between nonets.
-  static _optimizeJigsaw(handlers) {
+  static _optimizeJigsawIntersections(handlers) {
     const nonetHandlers = handlers.filter(h => h instanceof SudokuConstraintHandler.Nonet);
 
+    // Add constraints due to overlapping regions.
     for (const h0 of nonetHandlers) {
       for (const h1 of nonetHandlers) {
         if (h0 === h1) continue;
 
-        const diff0 = setDifference(h0.cells, h1.cells);
+        const diff0 = arrayDifference(h0.cells, h1.cells);
         if (diff0.length > 6 || diff0.length == 0) continue;
 
         // We have some overlapping cells!
         // This means diff0 and diff1 must contain the same values.
-        const diff1 = setDifference(h1.cells, h0.cells);
+        const diff1 = arrayDifference(h1.cells, h0.cells);
 
         // TODO: Optmize the diff0.length == 1 case (and 2?).
         handlers.push(new SudokuConstraintHandler.SameValues(
-          diff0, diff1));
+          diff0, diff1, true));
       }
     }
+
+    return handlers;
+  }
+
+  static _makeRegions(fn) {
+    let regions = [];
+    for (let r = 0; r < GRID_SIZE; r++) {
+      let region = [];
+      for (let i = 0; i < GRID_SIZE; i++) {
+        region.push(fn(r, i));
+      }
+      regions.push(region);
+    }
+    return regions;
+  }
+
+  static _ROW_REGIONS = this._makeRegions((r, i) => r*GRID_SIZE+i);
+  static _COL_REGIONS = this._makeRegions((c, i) => i*GRID_SIZE+c);
+
+  static _optimizeJigsawLawOfLeftovers(handlers, jigsawHandler) {
+    const pieces = jigsawHandler.regions.map(r => new Set(r));
+
+    const handleRegionSet = (rs) => {
+      const superRegion = new Set();
+      const remainingPieces = new Set(pieces);
+      const piecesRegion = new Set();
+
+      let i=0;
+      for (const r of rs) {
+        i++;
+        if (i == GRID_SIZE) break;
+
+        // Add r to our super-region.
+        r.forEach(e => superRegion.add(e));
+
+        // Add any remaining pieces with enough overlap to our super-region.
+        for (const p of remainingPieces) {
+          const intersection = setIntersection(p, superRegion);
+          if (intersection.size > GRID_SIZE/2) {
+            remainingPieces.delete(p);
+            for (const c of p) piecesRegion.add(c);
+          }
+        }
+
+        // Don't process the first region, as that may just double up work from
+        // the nonet-intersection handler.
+        if (i == 1) continue;
+
+        // We can only match when regions are the same size.
+        if (superRegion.size != piecesRegion.size) continue;
+
+        const diffA = setDifference(superRegion, piecesRegion);
+        if (diffA.size == 0) continue;
+
+        const diffB = setDifference(piecesRegion, superRegion);
+
+        // All values in the set differences must be the same.
+        handlers.push(new SudokuConstraintHandler.SameValues(
+            diffA, diffB, false));
+      }
+    };
+
+    handleRegionSet(this._ROW_REGIONS);
+    handleRegionSet(this._COL_REGIONS);
 
     return handlers;
   }
