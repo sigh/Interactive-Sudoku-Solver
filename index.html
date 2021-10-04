@@ -24,8 +24,7 @@
     window.addEventListener('load', () => {
       initPage();
       const loadDebug = dynamicJSFileLoader('js/debug.js');
-      window.loadDebug = loadDebug;
-      loadDebug();
+      self.loadDebug = loadDebug;
     });
   </script>
 
