@@ -211,9 +211,9 @@ SudokuSolver.InternalSolver = class {
       callback: null,
     };
 
-    this._handlers = this._setUpHandlers(Array.from(handlerGen));
+    this._handlerSet = this._setUpHandlers(Array.from(handlerGen));
 
-    this._cellAccumulator = new SudokuSolver.CellAccumulator(this._handlers);
+    this._cellAccumulator = new SudokuSolver.CellAccumulator(this._handlerSet);
 
     // Priorities go from 0->255, with 255 being the best.
     // This can be used to prioritize which cells to search.
@@ -225,7 +225,7 @@ SudokuSolver.InternalSolver = class {
   _initCellPriorities() {
     let priorities = new Uint8Array(NUM_CELLS);
 
-    for (const handler of this._handlers) {
+    for (const handler of this._handlerSet) {
       // The most constrainted cells have the best priorities.
       // For now just look at the most restricted constraint the cell is part
       // of.
@@ -262,16 +262,17 @@ SudokuSolver.InternalSolver = class {
     this._cellConflicts = cellConflictSets.map(c => new Uint8Array(c));
     this._cellConflicts.forEach(c => c.sort((a, b) => a-b));
 
+    const handlerSet = new HandlerSet(handlers);
+
     // Optimize handlers.
-    handlers = SudokuConstraintOptimizer.optimize(
-      handlers, cellConflictSets);
+    SudokuConstraintOptimizer.optimize(handlerSet, cellConflictSets);
 
     // TODO: Include as part of the solver for timing?
-    for (const handler of handlers) {
+    for (const handler of handlerSet) {
       handler.initialize(this._initialGrid, cellConflictSets);
     }
 
-    return handlers;
+    return handlerSet;
   }
 
   reset() {
@@ -608,8 +609,7 @@ SudokuSolver.InternalSolver = class {
 
   validateLayout() {
     // All handlers should be nonet handlers, but let's filter just in case.
-    const nonetHandlers = this._handlers.filter(
-      h => h instanceof SudokuConstraintHandler.Nonet);
+    const nonetHandlers = this._handlerSet.getAllofType(SudokuConstraintHandler.Nonet);
 
     // Fill the nonet with values 1->9.
     const fillNonet = (nonet) => {
@@ -690,28 +690,13 @@ SudokuSolver.InternalSolver = class {
 
 SudokuSolver.CellAccumulator = class {
   // NOTE: This is intended to be created once, and reused.
-  constructor(handlers, cellMap) {
-    this._handlers = handlers;
-    this._cellMap = this.constructor._makeCellMap(handlers);
+  constructor(handlerSet) {
+    this._handlers = handlerSet.getAll();
+    this._cellMap = handlerSet.getCellMap();
 
     this._linkedList = new Int16Array(this._handlers.length);
     this._linkedList.fill(-1);
     this._head = -1;
-  }
-
-  static _makeCellMap(handlers) {
-    // Add all cells that the handler claims to be attached to the list of
-    // handlers for that cell.
-    const cellHandlerMap = new Array(NUM_CELLS);
-    for (let i = 0; i < NUM_CELLS; i++) {
-      cellHandlerMap[i] = [];
-    }
-    for (let i = 0; i < handlers.length; i++) {
-      for (const cell of handlers[i].cells) {
-        cellHandlerMap[cell].push(i);
-      }
-    }
-    return cellHandlerMap;
   }
 
   add(cell) {

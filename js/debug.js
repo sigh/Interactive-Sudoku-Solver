@@ -29,14 +29,6 @@ const toShortSolution = (valueIds) => {
   return result.join('');
 }
 
-const arrayEquals = (a, b) => {
-  if (a.length != b.length) return false;
-  for (let i = 0; i < a.length; i++) {
-    if (a[i] != b[i]) return false;
-  }
-  return true;
-}
-
 const puzzleFromCfg = (puzzleCfg) => {
   let puzzleStr, solution, name='';
   if (Array.isArray(puzzleCfg)) {

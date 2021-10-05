@@ -468,7 +468,7 @@ class SudokuBuilder {
       for (let col = 0; col < GRID_SIZE; col++) {
         cells.push(toCellIndex(row, col));
       }
-      yield new SudokuConstraintHandler.Nonet(cells);
+      yield new SudokuConstraintHandler.AllDifferent(cells);
     }
 
     // Column constraints.
@@ -477,7 +477,7 @@ class SudokuBuilder {
       for (let row = 0; row < GRID_SIZE; row++) {
         cells.push(toCellIndex(row, col));
       }
-      yield new SudokuConstraintHandler.Nonet(cells);
+      yield new SudokuConstraintHandler.AllDifferent(cells);
     }
   }
 
@@ -492,7 +492,7 @@ class SudokuBuilder {
         let col = BOX_SIZE*bj+(c/BOX_SIZE|0);
         cells.push(toCellIndex(row, col));
       }
-      yield new SudokuConstraintHandler.Nonet(cells);
+      yield new SudokuConstraintHandler.AllDifferent(cells);
     }
   }
 

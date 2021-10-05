@@ -1051,152 +1051,218 @@ SudokuConstraintHandler.SameValues = class extends SudokuConstraintHandler {
   }
 }
 
+class HandlerSet {
+  constructor(handlers) {
+    this._handlers = [];
+    this._indexLookup = new Map();
+
+    this._cellMap = new Array(NUM_CELLS);
+    for (let i = 0; i < NUM_CELLS; i++) this._cellMap[i] = [];
+
+    this.add(...handlers);
+  }
+
+  getAllofType(type) {
+    return this._handlers.filter(h => h.constructor === type);
+  }
+
+  getAll() {
+    return this._handlers;
+  }
+
+  getCellMap() {
+    return this._cellMap;
+  }
+
+  getIndex(handler) {
+    return this._indexLookup.get(handler);
+  }
+
+  getHandler(index) {
+    return this._handlers[index];
+  }
+
+  replace(oldHandler, newHandler) {
+    const index = this._handlers.indexOf(oldHandler);
+
+    if (!arraysAreEqual(oldHandler.cells, newHandler.cells)) {
+      this._remove(index);
+      this._add(newHandler, index);
+    } else {
+      this._handlers[index] = newHandler;
+    }
+  }
+
+  _remove(index) {
+    const handler = this._handlers[index];
+    for (const c of handler.cells) {
+      const indexInMap = this._cellMap[c].indexOf(index);
+      this._cellMap[c].splice(indexInMap, 1);
+    }
+    this._handlers[index] = null;
+  }
+
+  _add(handler, index) {
+    handler.cells.forEach(c => this._cellMap[c].push(index));
+    this._handlers[index] = handler;
+    this._indexLookup.set(handler, index);
+  }
+
+  add(...handlers) {
+    for (const h of handlers) {
+      this._add(h, this._handlers.length);
+    }
+  }
+
+  [Symbol.iterator]() {
+    return this._handlers[Symbol.iterator]();
+  }
+}
+
 class SudokuConstraintOptimizer {
   static _NONET_SUM = GRID_SIZE*(GRID_SIZE+1)/2;
 
-  static optimize(handlers, cellConflictSets) {
-    handlers = this._addNonetHandlers(handlers);
+  static optimize(handlerSet, cellConflictSets) {
+    this._addNonetHandlers(handlerSet);
 
-    this._optimizeSumHandlers(handlers, cellConflictSets);
+    this._optimizeSums(handlerSet, cellConflictSets);
 
-    const jigsawHandler = handlers.find(h => h instanceof SudokuConstraintHandler.Jigsaw);
-    if (jigsawHandler) {
-      handlers = this._optimizeJigsawIntersections(handlers);
-      handlers = this._optimizeJigsawLawOfLeftovers(handlers, jigsawHandler);
-    }
+    this._optimizeJigsaw(handlerSet);
+  }
 
-    return handlers;
+  static _optimizeJigsaw(handlerSet) {
+    const jigsawHandlers = handlerSet.getAllofType(SudokuConstraintHandler.Jigsaw);
+    if (jigsawHandlers.length == 0) return;
+    if (jigsawHandlers.length > 1) throw('Multiple jigsaw handlers');
+    const jigsawHandler = jigsawHandlers[0];
+
+
+    handlerSet.add(...this._makeJigsawIntersections(handlerSet));
+
+    handlerSet.add(...this._makeJigsawLawOfLeftoverHandlers(jigsawHandler));
   }
 
   // Find a non-overlapping set of handlers.
-  static _findNonOverlapping(handlers) {
-    // Index the cells in each handler.
-    const cellMap = new Array(NUM_CELLS);
-    for (let i = 0; i < NUM_CELLS; i++) {
-      cellMap[i] = [];
-    }
+  static _findNonOverlapping(handlers, fullHandlerSet) {
+    const handlerIndexes = new Set(
+      handlers.map(h => fullHandlerSet.getIndex(h)));
+    const cellMap = fullHandlerSet.getCellMap();
+
+    // Sort handers by number of overlapping handlers.
+    const handlersByOverlaps = [];
     for (const h of handlers) {
-      h.cells.forEach(c => cellMap[c].push(h));
+      const overlapIndexes = [];
+      for (const c of h.cells) {
+        overlapIndexes.push(...cellMap[c]);
+      }
+      const numOverlap = setIntersection(overlapIndexes, handlerIndexes);
+      handlersByOverlaps.push([h, numOverlap]);
     }
-
-    // Sort handers by number conflicting handlers.
-    const handlersByConflicts = handlers.map(
-      h => [h.cells.map(c => cellMap[c].length).reduce((a,b)=>a+b), h]);
-    handlersByConflicts.sort((a,b) => a[0]-b[0]);
-
-    const cellsIncluded = new Set();
+    handlersByOverlaps.sort((a,b) => a[1]-b[1]);
 
     // Take non-conflicting handlers starting with the ones with least
-    // conflicts.
+    // overlaps.
     // This means that we avoid the ones which conflict with many cells.
     // i.e. greedy bin-packing.
-    const result = [];
-    for (const [_, h] of handlersByConflicts) {
+    const cellsIncluded = new Set();
+    const nonOverlappingHandlers = [];
+    for (const [h, _] of handlersByOverlaps) {
       if (h.cells.some(c => cellsIncluded.has(c))) continue;
-      result.push(h);
+      nonOverlappingHandlers.push(h);
       h.cells.forEach(c => cellsIncluded.add(c));
     }
 
-    return result;
+    return nonOverlappingHandlers;
   }
 
-  static _optimizeSumHandlers(handlers, cellConflictSets) {
+  static _optimizeSums(handlerSet, cellConflictSets) {
     // TODO: Consider how this interactions with fixed cells.
-    let sumHandlers = handlers.filter(h => (h.constructor === SudokuConstraintHandler.Sum));
-    if (sumHandlers.length == 0) return handlers;
+    let sumHandlers = handlerSet.getAllofType(SudokuConstraintHandler.Sum);
+    if (sumHandlers.length == 0) return;
 
-    sumHandlers = this._findNonOverlapping(sumHandlers);
+    sumHandlers = this._findNonOverlapping(sumHandlers, handlerSet);
+    // TODO: Find missing sum handler.
 
-    handlers = this._optimizeKillerInnieOutie(handlers, sumHandlers);
-    handlers = this._findHiddenCages(handlers, sumHandlers);
+    handlerSet.add(...this._makeInnieOutieSumHandlers(sumHandlers));
 
-    handlers = this._sizeSpecificSumHandlers(handlers, cellConflictSets);
+    handlerSet.add(...this._makeHiddenCageHandlers(handlerSet, sumHandlers));
 
-    return handlers;
+    this._replaceSizeSpecificSumHandlers(handlerSet, cellConflictSets);
+
+    return;
   }
 
   // Add nonet handlers for any AllDifferentHandler which have 9 cells.
-  static _addNonetHandlers(handlers) {
-    for (const h of handlers) {
-      if (h instanceof SudokuConstraintHandler.AllDifferent) {
-        const c = h.conflictSet();
-        if (c.length == GRID_SIZE) {
-          handlers.push(new SudokuConstraintHandler.Nonet(c));
-        }
+  static _addNonetHandlers(handlerSet) {
+    for (const h of
+         handlerSet.getAllofType(SudokuConstraintHandler.AllDifferent)) {
+      const c = h.conflictSet();
+      if (c.length == GRID_SIZE) {
+        handlerSet.add(new SudokuConstraintHandler.Nonet(c));
       }
     }
-
-    return handlers;
   }
 
   // Find {1-3}-cell sum constraints and replace them dedicated handlers.
-  static _sizeSpecificSumHandlers(handlers, cellConflictSets) {
-    for (let i = 0; i < handlers.length; i++) {
-      const h = handlers[i];
-      if (!(h instanceof SudokuConstraintHandler.Sum)) continue;
-      if (h.sum() == 0) continue;
-
+  static _replaceSizeSpecificSumHandlers(handlerSet, cellConflictSets) {
+    const sumHandlers = handlerSet.getAllofType(SudokuConstraintHandler.Sum);
+    for (const h of sumHandlers) {
+      let newHandler;
       switch (h.cells.length) {
         case 1:
-          handlers[i] = new SudokuConstraintHandler.FixedCells(
-            new Map([[h.cells[0], h.sum()]]));
+            newHandler = new SudokuConstraintHandler.FixedCells(
+              new Map([[h.cells[0], h.sum()]]));
           break;
 
         case 2:
           const hasConflict = cellConflictSets[h.cells[0]].has(h.cells[1]);
-          handlers[i] = new SudokuConstraintHandler.BinaryConstraint(
+          newHandler = new SudokuConstraintHandler.BinaryConstraint(
             h.cells[0], h.cells[1],
             (a, b) => a+b == h.sum() && (!hasConflict || a != b));
           break;
 
         case 3:
-          handlers[i] = new SudokuConstraintHandler.ThreeCellSum(h.cells, h.sum());
+          newHandler = new SudokuConstraintHandler.ThreeCellSum(h.cells, h.sum());
           break;
       }
-    }
 
-    return handlers;
+      if (newHandler) {
+        handlerSet.replace(h, newHandler);
+      }
+    }
   }
 
   // Find sets of cells which we can infer have a known sum and unique values.
-  static _findHiddenCages(handlers, sumHandlers) {
-    const nonetHandlers = handlers.filter(h => h instanceof SudokuConstraintHandler.Nonet);
+  static _makeHiddenCageHandlers(handlerSet, sumHandlers) {
+    const nonetHandlers = handlerSet.getAllofType(SudokuConstraintHandler.Nonet);
+    const newHandlers = [];
 
-    // We require that handlers are not overlapping (already checked elsewhere).
-    const cellMap = new Array(NUM_CELLS);
-    for (const h of sumHandlers) {
-      for (const c of h.cells) {
-        cellMap[c] = h;
-      }
-    }
+    const sumHandlerIndexes = new Set(
+      sumHandlers.map(h => handlerSet.getIndex(h)));
+
+    const cellMap = handlerSet.getCellMap();
 
     for (const h of nonetHandlers) {
-      const constraintMap = new Map();
-      // Map from constraints to cell.
+      // Find sum contraints which overlap this nonet.
+      let overlappingHandlerIndexes = new Set();
       for (const c of h.cells) {
-        const k = cellMap[c];
-        if (k) {
-          if (constraintMap.has(k)) {
-            constraintMap.get(k).push(c);
-          } else {
-            constraintMap.set(k, [c])
-          }
-        }
+        cellMap[c].forEach(i => overlappingHandlerIndexes.add(i));
       }
-      if (!constraintMap.size) continue;
+      overlappingHandlerIndexes = setIntersection(
+        overlappingHandlerIndexes, sumHandlerIndexes);
+      if (!overlappingHandlerIndexes.size) continue;
 
-
-      // Find contraints which have cells entirely (or mostly) within
-      // this nonet.
       const outies = [];
       const constrainedCells = [];
       let constrainedSum = 0;
-      for (const [k, cells] of constraintMap) {
-        if (k.cells.length == cells.length) {
-          constrainedCells.push(...cells);
+      for (const i of overlappingHandlerIndexes) {
+        const k = handlerSet.getHandler(i);
+        const overlap = arrayIntersect(h.cells, k.cells);
+        if (overlap.length == k.cells.length) {
+          constrainedCells.push(...overlap);
           constrainedSum += k.sum();
           k.setComplementCells(arrayDifference(h.cells, k.cells));
-        } else if (k.cells.length == cells.length+1) {
+        } else if (k.cells.length == overlap.length+1) {
           outies.push(k);
         }
       }
@@ -1225,7 +1291,7 @@ class SudokuConstraintOptimizer {
         const handler = new SudokuConstraintHandler.CellDepedentSum(
           [extraCell[0], ...remainingCells], remainingSum);
         handler.setComplementCells(arrayDifference(h.cells, remainingCells));
-        handlers.push(handler);
+        newHandlers.push(handler);
       }
 
       // No constraints within this nonet.
@@ -1239,15 +1305,16 @@ class SudokuConstraintOptimizer {
       const complementHandler = new SudokuConstraintHandler.Sum(
         complementCells, complementSum);
       complementHandler.setComplementCells(constrainedCells);
-      handlers.push(complementHandler);
+      newHandlers.push(complementHandler);
     }
 
-    return handlers;
+    return newHandlers;
   }
 
   // Add same value handlers for the intersections between nonets.
-  static _optimizeJigsawIntersections(handlers) {
-    const nonetHandlers = handlers.filter(h => h instanceof SudokuConstraintHandler.Nonet);
+  static _makeJigsawIntersections(handlerSet) {
+    const nonetHandlers = handlerSet.getAllofType(SudokuConstraintHandler.Nonet);
+    const newHandlers = [];
 
     // Add constraints due to overlapping regions.
     for (const h0 of nonetHandlers) {
@@ -1262,12 +1329,12 @@ class SudokuConstraintOptimizer {
         const diff1 = arrayDifference(h1.cells, h0.cells);
 
         // TODO: Optmize the diff0.length == 1 case (and 2?).
-        handlers.push(new SudokuConstraintHandler.SameValues(
+        newHandlers.push(new SudokuConstraintHandler.SameValues(
           diff0, diff1, true));
       }
     }
 
-    return handlers;
+    return newHandlers;
   }
 
   static _makeRegions(fn) {
@@ -1285,8 +1352,9 @@ class SudokuConstraintOptimizer {
   static _ROW_REGIONS = this._makeRegions((r, i) => r*GRID_SIZE+i);
   static _COL_REGIONS = this._makeRegions((c, i) => i*GRID_SIZE+c);
 
-  static _optimizeJigsawLawOfLeftovers(handlers, jigsawHandler) {
+  static _makeJigsawLawOfLeftoverHandlers(jigsawHandler) {
     const pieces = jigsawHandler.regions.map(r => new Set(r));
+    const newHandlers = [];
 
     const handleRegionSet = (rs) => {
       const superRegion = new Set();
@@ -1325,7 +1393,7 @@ class SudokuConstraintOptimizer {
         if (diffA.size > GRID_SIZE || diffB.size > GRID_SIZE) continue;
 
         // All values in the set differences must be the same.
-        handlers.push(new SudokuConstraintHandler.SameValues(
+        newHandlers.push(new SudokuConstraintHandler.SameValues(
             diffA, diffB, false));
       }
     };
@@ -1333,10 +1401,12 @@ class SudokuConstraintOptimizer {
     handleRegionSet(this._ROW_REGIONS);
     handleRegionSet(this._COL_REGIONS);
 
-    return handlers;
+    return newHandlers;
   }
 
-  static _optimizeKillerInnieOutie(handlers, sumHandlers) {
+  static _makeInnieOutieSumHandlers(sumHandlers) {
+    const newHandlers = [];
+
     const handleRegionSet = (rs) => {
       const superRegion = new Set();
       const remainingHandlers = new Set(sumHandlers);
@@ -1368,7 +1438,6 @@ class SudokuConstraintOptimizer {
         const diffA = setDifference(superRegion, piecesRegion);
         const diffB = setDifference(piecesRegion, superRegion);
 
-
         // TODO: diffA == 0 or diffB == 0 -> ordinary sum constraint.
 
         // We can only do arrow constraints when the diff is 1.
@@ -1381,11 +1450,11 @@ class SudokuConstraintOptimizer {
         if (diffA.size == 1) {
           const handler = new SudokuConstraintHandler.CellDepedentSum(
             [...diffA, ...diffB], -sumDelta);
-          handlers.push(handler);
+          newHandlers.push(handler);
         } else {
           const handler = new SudokuConstraintHandler.CellDepedentSum(
             [...diffB, ...diffA], sumDelta);
-          handlers.push(handler);
+          newHandlers.push(handler);
         }
       }
     };
@@ -1393,6 +1462,6 @@ class SudokuConstraintOptimizer {
     handleRegionSet(this._ROW_REGIONS);
     handleRegionSet(this._COL_REGIONS);
 
-    return handlers;
+    return newHandlers;
   }
 }

@@ -18,6 +18,18 @@ const arrayDifference = (a, b) => {
   return a.filter(v => !b.includes(v));
 };
 
+const arrayIntersect = (a, b) => {
+  return a.filter(v => b.includes(v));
+};
+
+const arraysAreEqual = (a, b) => {
+  if (a.length != b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] != b[i]) return false;
+  }
+  return true;
+}
+
 const setIntersection = (a, b) => {
   const intersection = new Set()
   for (const elem of a) {
