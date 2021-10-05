@@ -74,8 +74,8 @@ const HS_KILLERS = [
    '894637125725418369316259487952143678163872594478965231631784952589321746247596813'],
 ];
 
-// 1 to 40 from: http://rcbroughton.co.uk/sudoku/forum/viewtopic.php?f=3&t=434#p2453
-const TAREK_QUICK = [
+// 1 to 42 from: http://rcbroughton.co.uk/sudoku/forum/viewtopic.php?f=3&t=434#p2453
+const TAREK_ALL = [
   'G<<L<K<L<^G>^>^E^^>^IJ<G^<G^>^^I^<>^HC<C^<B^N^^G^<>^>^^E^<DF<^PG^<>^^J<^^<H<<>^>^',
   'G<<M<L<M<^O>^>^C^^>^FF<G^<C^>^^H^<>^FE<E^<C^M^^H^<>^>^^E^<FH<^MH^<>^^L<^^<D<<>^>^',
   'G<<N<J<H<^O>^>^K^^>^GI<A^<L^>^^E^<>^FF<E^<C^I^^E^<>^>^^C^<GH<^QF^<>^^E<^^<J<<>^>^',
@@ -116,13 +116,6 @@ const TAREK_QUICK = [
   'KNLDDMBC<M```````^J````L```A``````F`I````JF``D`I`IP```E```D````I``C`````^<```````',
   'QQH7IGID<H```````^N````O```8``````8`F````LG``M`S`IG```E```D````D``8`````^<```````',
   'H<S<<K<<LO^<<^<^>^^<R<<<Y^F^O^V>>^^^>^K^<<^>^^P^<<^S^M^^^>>>^>^>^IM<T<<^^>^<^<<^<',
-];
-
-// 41 and 42 from: http://rcbroughton.co.uk/sudoku/forum/viewtopic.php?f=3&t=434#p2453
-// Takes ~1 minute each.
-const TAREK_HARD = [
   'S<J<<O<<KJ^<<^<^>^^<N<<<J^Q^S^O>>^^^>^W^<<^>^^O^<<^T^J^^^>>>^>^>^ML<S<<^^>^<^<<^<',
   'M<S<<H<<OM^<<^<^>^^<O<<<N^R^K^X>>^^^>^I^<<^>^^P^<<^I^N^^^>>>^>^>^RU<O<<^^>^<^<<^<',
 ];
-
-const TAREK_ALL = [].concat(TAREK_QUICK, TAREK_HARD);

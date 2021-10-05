@@ -1057,15 +1057,60 @@ class SudokuConstraintOptimizer {
   static optimize(handlers, cellConflictSets) {
     handlers = this._addNonetHandlers(handlers);
 
-    handlers = this._findHiddenCages(handlers);
-
-    handlers = this._sizeSpecificSumHandlers(handlers, cellConflictSets);
+    this._optimizeSumHandlers(handlers, cellConflictSets);
 
     const jigsawHandler = handlers.find(h => h instanceof SudokuConstraintHandler.Jigsaw);
     if (jigsawHandler) {
       handlers = this._optimizeJigsawIntersections(handlers);
       handlers = this._optimizeJigsawLawOfLeftovers(handlers, jigsawHandler);
     }
+
+    return handlers;
+  }
+
+  // Find a non-overlapping set of handlers.
+  static _findNonOverlapping(handlers) {
+    // Index the cells in each handler.
+    const cellMap = new Array(NUM_CELLS);
+    for (let i = 0; i < NUM_CELLS; i++) {
+      cellMap[i] = [];
+    }
+    for (const h of handlers) {
+      h.cells.forEach(c => cellMap[c].push(h));
+    }
+
+    // Sort handers by number conflicting handlers.
+    const handlersByConflicts = handlers.map(
+      h => [h.cells.map(c => cellMap[c].length).reduce((a,b)=>a+b), h]);
+    handlersByConflicts.sort((a,b) => a[0]-b[0]);
+
+    const cellsIncluded = new Set();
+
+    // Take non-conflicting handlers starting with the ones with least
+    // conflicts.
+    // This means that we avoid the ones which conflict with many cells.
+    // i.e. greedy bin-packing.
+    const result = [];
+    for (const [_, h] of handlersByConflicts) {
+      if (h.cells.some(c => cellsIncluded.has(c))) continue;
+      result.push(h);
+      h.cells.forEach(c => cellsIncluded.add(c));
+    }
+
+    return result;
+  }
+
+  static _optimizeSumHandlers(handlers, cellConflictSets) {
+    // TODO: Consider how this interactions with fixed cells.
+    let sumHandlers = handlers.filter(h => (h.constructor === SudokuConstraintHandler.Sum));
+    if (sumHandlers.length == 0) return handlers;
+
+    sumHandlers = this._findNonOverlapping(sumHandlers);
+
+    handlers = this._optimizeKillerInnieOutie(handlers, sumHandlers);
+    handlers = this._findHiddenCages(handlers, sumHandlers);
+
+    handlers = this._sizeSpecificSumHandlers(handlers, cellConflictSets);
 
     return handlers;
   }
@@ -1114,14 +1159,10 @@ class SudokuConstraintOptimizer {
   }
 
   // Find sets of cells which we can infer have a known sum and unique values.
-  static _findHiddenCages(handlers) {
-    // TODO: Consider how this interactions with fixed cells.
-    const sumHandlers = handlers.filter(h => (h instanceof SudokuConstraintHandler.Sum) && h.sum() > 0);
-    if (sumHandlers.length == 0) return handlers;
-
+  static _findHiddenCages(handlers, sumHandlers) {
     const nonetHandlers = handlers.filter(h => h instanceof SudokuConstraintHandler.Nonet);
 
-    // For now assume that sum constraints don't overlap.
+    // We require that handlers are not overlapping (already checked elsewhere).
     const cellMap = new Array(NUM_CELLS);
     for (const h of sumHandlers) {
       for (const c of h.cells) {
@@ -1278,12 +1319,74 @@ class SudokuConstraintOptimizer {
 
         const diffA = setDifference(superRegion, piecesRegion);
         if (diffA.size == 0) continue;
-
         const diffB = setDifference(piecesRegion, superRegion);
+        // Ignore diff that too big, they are probably not very well
+        // constrained.
+        if (diffA.size > GRID_SIZE || diffB.size > GRID_SIZE) continue;
 
         // All values in the set differences must be the same.
         handlers.push(new SudokuConstraintHandler.SameValues(
             diffA, diffB, false));
+      }
+    };
+
+    handleRegionSet(this._ROW_REGIONS);
+    handleRegionSet(this._COL_REGIONS);
+
+    return handlers;
+  }
+
+  static _optimizeKillerInnieOutie(handlers, sumHandlers) {
+    const handleRegionSet = (rs) => {
+      const superRegion = new Set();
+      const remainingHandlers = new Set(sumHandlers);
+      const piecesRegion = new Set();
+      let piecesSum = 0;
+
+      let i=0;
+      for (const r of rs) {
+        i++;
+        if (i == GRID_SIZE) break;
+
+        // Add r to our super-region.
+        r.forEach(e => superRegion.add(e));
+
+        // Add any remaining pieces with enough overlap to our super-region.
+        for (const h of remainingHandlers) {
+          const intersection = setIntersection(h.cells, superRegion);
+          if (intersection.size > h.cells.length/2) {
+            remainingHandlers.delete(h);
+            for (const c of h.cells) piecesRegion.add(c);
+            piecesSum += h.sum();
+          }
+        }
+
+        // Don't process the first region, as that may just double up work from
+        // the nonet-intersection handler.
+        if (i == 1) continue;
+
+        const diffA = setDifference(superRegion, piecesRegion);
+        const diffB = setDifference(piecesRegion, superRegion);
+
+
+        // TODO: diffA == 0 or diffB == 0 -> ordinary sum constraint.
+
+        // We can only do arrow constraints when the diff is 1.
+        if (diffA.size !== 1 && diffB.size !== 1) continue;
+        // Don't use this if the diff is too large.
+        if (diffA.size > GRID_SIZE || diffB.size > GRID_SIZE) continue;
+
+        const sumDelta = piecesSum - i*this._NONET_SUM;
+
+        if (diffA.size == 1) {
+          const handler = new SudokuConstraintHandler.CellDepedentSum(
+            [...diffA, ...diffB], -sumDelta);
+          handlers.push(handler);
+        } else {
+          const handler = new SudokuConstraintHandler.CellDepedentSum(
+            [...diffB, ...diffA], sumDelta);
+          handlers.push(handler);
+        }
       }
     };
 

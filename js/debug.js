@@ -170,8 +170,9 @@ const runValidateLayout = (cases, onFailure) => {
 
 const runValidateLayoutTests = (onFailure) => {
   const cases = [].concat(
-    VALID_JIGSAW_LAYOUTS.slice(0, 50),
-    EASY_INVALID_JIGSAW_LAYOUTS);
+    VALID_JIGSAW_LAYOUTS.slice(0, 20),
+    EASY_INVALID_JIGSAW_LAYOUTS,
+    FAST_INVALID_JIGSAW_LAYOUTS.slice(0, 20));
   runValidateLayout(cases, onFailure);
 };
 
@@ -182,6 +183,7 @@ const runTestCases = (onFailure) => {
     'Classic sudoku, hard',
     'Anti-knights move',
     'Killer sudoku',
+    'Killer sudoku, with overlap',
     'Sudoku X',
     'Anti-knight Anti-king',
     'Anti-knight, Anti-consecutive',
