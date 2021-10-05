@@ -320,6 +320,7 @@ SudokuSolver.InternalSolver = class {
     for (let i = 0; i < NUM_CELLS; i++) {
       this._stack[i] = i;
     }
+    this._progressRatioStack[0] = 1;
   }
 
   _initCellArray() {
@@ -569,17 +570,25 @@ SudokuSolver.InternalSolver = class {
     // TODO: Do all forced reductions first to avoid having to do them for
     // each iteration.
 
+    const counters = this.counters;
+    const progressRatioThreshold = 1/GRID_SIZE;
+
     // Search for solutions.
     // Keep searching until we we see a redudant solution:
     //  - We want to avoid searching for all solutions, as there might be so
     //    many that it is intractable (e.g. empty grid).
     //  - On the other-hand, we don't want to abort too early and lose all the
     //    state/knowledge gained from the current search.
+    // But also, continue searching if we have passed a threshold search ratio.
+    // This probably means the search will completely quickly enough if we just
+    // wait and we don't risk losing all the state we gained.
     const search = () => {
       for (const solution of this.run()) {
         const grid = solution.grid;
-        if (grid.every((c, i) => valuesInSolutions[i] & c)) {
-          return false;
+        if (counters.progressRatio < progressRatioThreshold) {
+          if (grid.every((c, i) => valuesInSolutions[i] & c)) {
+            return false;
+          }
         }
         grid.forEach((c, i) => { valuesInSolutions[i] |= c; });
       }
@@ -598,6 +607,10 @@ SudokuSolver.InternalSolver = class {
         if (valuesInSolutions[i] & v) continue;
         // This is NOT a a valid value.
         if (!(this._grids[0][i] & v)) continue;
+
+        // Set the progress ratio to smaller to reflect the fact that we aren't
+        // searching the entire space.
+        this._progressRatioStack[0] = 1/GRID_SIZE;
 
         // Fix the current value and attempt to solve.
         this._grids[0][i] = v;
