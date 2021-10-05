@@ -48,6 +48,11 @@ const handleWorkerMethod = (method, payload) => {
   throw(`Unknown method ${method}`);
 };
 
+const pendingDebugLogs = [];
+const debugLog = (data) => {
+  pendingDebugLogs.push(data);
+};
+
 const sendState = (extraState) => {
   let state = workerSolver.state();
   state.extra = extraState;
@@ -56,6 +61,12 @@ const sendState = (extraState) => {
     type: 'state',
     state: state,
   });
+  if (pendingDebugLogs.length) {
+    self.postMessage({
+      type: 'debug',
+      logs: pendingDebugLogs.splice(0),
+    });
+  }
 };
 
 self.onmessage = (msg) => {

@@ -140,14 +140,18 @@ const loadJSFile = (path) => {
   script.src = path + cachebuster;
   script.async = false;
   document.head.append(script);
+
+  return new Promise(resolve => {
+    script.onload = resolve;
+  });
 };
 
 const dynamicJSFileLoader = (path) => {
   let loaded = false;
-  return () => {
+  return async () => {
     if (loaded) return;
-    loadJSFile(path);
     loaded = true;
+    await loadJSFile(path);
   };
 };
 

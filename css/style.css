@@ -509,3 +509,19 @@ input:checked + span:before {
 .muldiv > span {
     display: block;
 }
+
+#debug-container {
+  resize: both;
+  overflow: auto;
+  height: 100px;
+  width: 95%;
+  box-shadow: inset 0px 0px 3px #555;
+  padding: 3px;
+
+  display: none;
+  cursor: pointer;
+}
+
+#debug-container > div > span:first-child {
+  color: grey;
+}

@@ -6,6 +6,8 @@ loadJSFile('data/invalid_jigsaw_layouts.js');
 
 var TEST_TIMEOUT_MS = 1000;
 
+controller.enableDebugOutput();
+
 const loadInput = (input) => {
   let puzzle = EXAMPLES[input];
   if (puzzle) input = puzzle.input;

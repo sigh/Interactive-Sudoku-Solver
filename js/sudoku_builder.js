@@ -411,7 +411,7 @@ class SudokuBuilder {
   // Ask for a state update every 2**14 iterations.
   // NOTE: Using a non-power of 10 makes the display loook faster :)
   static LOG_UPDATE_FREQUENCY = 14;
-  static CACHE_BUST_PARAM = `cachebuster=${Math.random()}`;
+  static CACHE_BUST_PARAM = `?cachebuster=${Math.random()}`;
 
   static _unusedWorkers = [];
 
@@ -428,14 +428,14 @@ class SudokuBuilder {
     return options;
   }
 
-  static async buildInWorker(constraints, stateHandler) {
+  static async buildInWorker(constraints, stateHandler, debugHandler) {
     if (!this._unusedWorkers.length) {
-      this._unusedWorkers.push(new Worker('js/worker.js?' + this.CACHE_BUST_PARAM));
+      this._unusedWorkers.push(new Worker('js/worker.js' + this.CACHE_BUST_PARAM));
     }
     const worker = this._unusedWorkers.pop();
     worker.release = () => this._unusedWorkers.push(worker);
 
-    const solverProxy = new SolverProxy(stateHandler, worker);
+    const solverProxy = new SolverProxy(worker, stateHandler, debugHandler);
     const globalVars = this.getGlobalVars();
 
     await solverProxy.init(constraints, this.LOG_UPDATE_FREQUENCY, globalVars);
@@ -659,9 +659,9 @@ class SudokuBuilder {
 }
 
 class SolverProxy {
-  constructor(stateHandler, worker) {
+  constructor(worker, stateHandler, debugHandler) {
     if (!worker) {
-      throw('Call SolverProxy.make()');
+      throw('Must provide worker');
     }
 
     this._worker = worker;
@@ -671,6 +671,7 @@ class SolverProxy {
 
     this._initialized = false;
     this._stateHandler = stateHandler || (() => null);
+    this._debugHandler = debugHandler || (() => null);
   }
 
   async solveAllPossibilities() {
@@ -707,6 +708,9 @@ class SolverProxy {
         break;
       case 'state':
         this._stateHandler(data.state);
+        break;
+      case 'debug':
+        this._debugHandler(data.logs);
         break;
     }
   }

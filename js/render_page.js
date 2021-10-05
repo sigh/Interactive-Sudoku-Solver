@@ -1125,6 +1125,61 @@ class HistoryHandler {
   }
 }
 
+class DebugOutput {
+  constructor(grid) {
+    this._container = document.getElementById('debug-container');
+    this._visible = false;
+    this._grid = grid;
+  }
+
+  clear() {
+    if (!this._visible) return;
+
+    this._container.textContent = '';
+  }
+
+  addLogs(logs) {
+    if (!this._visible) return;
+    logs.forEach(l => this._addLog(l));
+  }
+
+  _addLog(data) {
+    const elem = document.createElement('div');
+
+    const locSpan = document.createElement('span');
+    locSpan.textContent = data.loc + ': ';
+
+    const msgSpan = document.createElement('msg');
+    let msg = data.msg;
+    if (data.args) {
+      msg += ' ' + JSON.stringify(data.args).replaceAll('"', '');
+    }
+    msgSpan.textContent = msg;
+
+    elem.append(locSpan);
+    elem.append(msgSpan);
+
+    if (data.cells && data.cells.length) {
+      const cellIds = [...data.cells].map(c => toCellId(...toRowCol(c)));
+      elem.addEventListener('mouseover', () => {
+        this._grid.highlight.setCells(cellIds);
+      });
+      elem.addEventListener('mouseout', () => {
+        this._grid.highlight.setCells([]);
+      });
+    }
+
+    this._container.append(elem);
+  }
+
+  enable(enable) {
+    if (enable === undefined) enable = true;
+    this._visible = enable;
+    this._container.style.display = enable ? 'block' : 'none';
+    this.clear();
+  }
+}
+
 class SolutionController {
   constructor(constraintManager, grid, infoOverlay) {
     this._solver = null;
@@ -1132,6 +1187,7 @@ class SolutionController {
     this._constraintManager = constraintManager;
     this._infoOverlay = infoOverlay;
     this._grid = grid;
+    this._debugOutput = new DebugOutput(grid);
     this._update = deferUntilAnimationFrame(this._update.bind(this));
     constraintManager.setUpdateCallback(this._update.bind(this));
 
@@ -1183,6 +1239,10 @@ class SolutionController {
     });
 
     this._update();
+  }
+
+  enableDebugOutput(enable) {
+    this._debugOutput.enable(enable);
   }
 
   _setUpAutoSolve() {
@@ -1259,7 +1319,8 @@ class SolutionController {
     this._terminateSolver();
 
     this._solver = await SudokuBuilder.buildInWorker(
-      constraints, this._displayState.bind(this));
+      constraints, this._displayState.bind(this),
+      (logs) => this._debugOutput.addLogs(logs));
 
     return this._solver;
   }
@@ -1297,6 +1358,7 @@ class SolutionController {
       this._grid.setSolution([]);
       this._infoOverlay.clear();
       this._clearStateVariables();
+      this._debugOutput.clear();
       this._terminateSolver();
       this._showIterationControls(false);
     }
@@ -1306,10 +1368,11 @@ class SolutionController {
     constraints ||= this._constraintManager.getConstraints();
     let mode = this._elements.mode.value;
 
-    let solver = await this._replaceSolver(constraints);
-
     this._grid.setSolution([]);
     this._infoOverlay.clear();
+    this._debugOutput.clear();
+
+    let solver = await this._replaceSolver(constraints);
 
     let handler = this._modeHandlers[mode];
 
@@ -1321,6 +1384,7 @@ class SolutionController {
 
   async _validateLayout(constraints) {
     this._infoOverlay.clear();
+    this._debugOutput.clear();
 
     const solver = await this._replaceSolver(this._constraintManager.getLayoutConstraint());
 

@@ -19,7 +19,7 @@ class SudokuConstraintHandler {
   }
 }
 
-SudokuConstraintHandler.FixedCells = class extends SudokuConstraintHandler {
+SudokuConstraintHandler.FixedCells = class FixedCells extends SudokuConstraintHandler {
   constructor(valueMap) {
     super();
     this._valueMap = valueMap;
@@ -32,7 +32,7 @@ SudokuConstraintHandler.FixedCells = class extends SudokuConstraintHandler {
   }
 }
 
-SudokuConstraintHandler.AllDifferent = class extends SudokuConstraintHandler {
+SudokuConstraintHandler.AllDifferent = class AllDifferent extends SudokuConstraintHandler {
   constructor(conflictCells) {
     super();
     conflictCells.sort((a, b) => a - b);
@@ -44,7 +44,7 @@ SudokuConstraintHandler.AllDifferent = class extends SudokuConstraintHandler {
   }
 }
 
-SudokuConstraintHandler.Nonet = class extends SudokuConstraintHandler {
+SudokuConstraintHandler.Nonet = class Nonet extends SudokuConstraintHandler {
   constructor(cells) {
     super(cells);
   }
@@ -89,7 +89,7 @@ SudokuConstraintHandler.Nonet = class extends SudokuConstraintHandler {
   }
 }
 
-SudokuConstraintHandler.BinaryConstraint = class extends SudokuConstraintHandler {
+SudokuConstraintHandler.BinaryConstraint = class BinaryConstraint extends SudokuConstraintHandler {
   constructor(cell1, cell2, fn) {
     super([cell1, cell2]);
     this._tables = [
@@ -513,7 +513,7 @@ class SumHandlerUtil {
 }
 
 // Solve 3-cell sums exactly with a 512 KB lookup table.
-SudokuConstraintHandler.ThreeCellSum = class extends SudokuConstraintHandler {
+SudokuConstraintHandler.ThreeCellSum = class ThreeCellSum extends SudokuConstraintHandler {
   _sum = 0;
   _conflictMap = null;
 
@@ -541,7 +541,7 @@ SudokuConstraintHandler.ThreeCellSum = class extends SudokuConstraintHandler {
 
 }
 
-SudokuConstraintHandler.Sum = class extends SudokuConstraintHandler {
+SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
   _conflictSets;
   _conflictMap;
   _sum;
@@ -756,7 +756,7 @@ SudokuConstraintHandler.Sum = class extends SudokuConstraintHandler {
   }
 }
 
-SudokuConstraintHandler.CellDepedentSum = class extends SudokuConstraintHandler.Sum {
+SudokuConstraintHandler.CellDepedentSum = class CellDepedentSum extends SudokuConstraintHandler.Sum {
   constructor(cells, offset) {
     super(cells, 0);
     this._offset = offset || 0;
@@ -837,7 +837,7 @@ SudokuConstraintHandler.CellDepedentSum = class extends SudokuConstraintHandler.
   }
 }
 
-SudokuConstraintHandler.Sandwich = class extends SudokuConstraintHandler {
+SudokuConstraintHandler.Sandwich = class Sandwich extends SudokuConstraintHandler {
   constructor(cells, sum) {
     super(cells);
     this._sum = +sum;
@@ -1002,14 +1002,14 @@ SudokuConstraintHandler.Sandwich = class extends SudokuConstraintHandler {
 
 // This only exists to let the solver know this is a jigsaw puzzle, and
 // optimize for it.
-SudokuConstraintHandler.Jigsaw = class extends SudokuConstraintHandler {
+SudokuConstraintHandler.Jigsaw = class Jigsaw extends SudokuConstraintHandler {
   constructor(regions) {
     super();
     this.regions = regions;
   }
 }
 
-SudokuConstraintHandler.SameValues = class extends SudokuConstraintHandler {
+SudokuConstraintHandler.SameValues = class SameValues extends SudokuConstraintHandler {
   constructor(cells0, cells1, isUnique) {
     super([...cells0, ...cells1]);
     if (cells0.length != cells1.length) {
@@ -1228,6 +1228,11 @@ class SudokuConstraintOptimizer {
 
       if (newHandler) {
         handlerSet.replace(h, newHandler);
+        debugLog({
+          loc: '_replaceSizeSpecificSumHandlers',
+          msg: 'Replace with: ' + newHandler.constructor.name,
+          cells: newHandler.cells,
+        });
       }
     }
   }
@@ -1292,6 +1297,13 @@ class SudokuConstraintOptimizer {
           [extraCell[0], ...remainingCells], remainingSum);
         handler.setComplementCells(arrayDifference(h.cells, remainingCells));
         newHandlers.push(handler);
+
+        debugLog({
+          loc: '_makeHiddenCageHandlers',
+          msg: 'Add: ' + handler.constructor.name,
+          args: {offset: remainingSum, sumCell: extraCell[0]},
+          cells: handler.cells
+        });
       }
 
       // No constraints within this nonet.
@@ -1306,6 +1318,12 @@ class SudokuConstraintOptimizer {
         complementCells, complementSum);
       complementHandler.setComplementCells(constrainedCells);
       newHandlers.push(complementHandler);
+      debugLog({
+        loc: '_makeHiddenCageHandlers',
+        msg: 'Add: ' + complementHandler.constructor.name,
+        args: {sum: complementSum},
+        cells: complementCells
+      });
     }
 
     return newHandlers;
@@ -1329,8 +1347,14 @@ class SudokuConstraintOptimizer {
         const diff1 = arrayDifference(h1.cells, h0.cells);
 
         // TODO: Optmize the diff0.length == 1 case (and 2?).
-        newHandlers.push(new SudokuConstraintHandler.SameValues(
-          diff0, diff1, true));
+        const handler = new SudokuConstraintHandler.SameValues(
+          diff0, diff1, true);
+        newHandlers.push(handler);
+        debugLog({
+          loc: '_makeJigsawIntersections',
+          msg: 'Add: SameValues',
+          cells: handler.cells,
+        });
       }
     }
 
@@ -1393,8 +1417,14 @@ class SudokuConstraintOptimizer {
         if (diffA.size > GRID_SIZE || diffB.size > GRID_SIZE) continue;
 
         // All values in the set differences must be the same.
-        newHandlers.push(new SudokuConstraintHandler.SameValues(
-            diffA, diffB, false));
+        const newHandler = new SudokuConstraintHandler.SameValues(
+            diffA, diffB, false);
+        newHandlers.push(newHandler);
+        debugLog({
+          loc: '_makeJigsawLawOfLeftoverHandlers',
+          msg: 'Add: ' + newHandler.constructor.name,
+          cells: newHandler.cells,
+        });
       }
     };
 
@@ -1447,15 +1477,22 @@ class SudokuConstraintOptimizer {
 
         const sumDelta = piecesSum - i*this._NONET_SUM;
 
+        let newHandler;
         if (diffA.size == 1) {
-          const handler = new SudokuConstraintHandler.CellDepedentSum(
+          newHandler = new SudokuConstraintHandler.CellDepedentSum(
             [...diffA, ...diffB], -sumDelta);
-          newHandlers.push(handler);
         } else {
-          const handler = new SudokuConstraintHandler.CellDepedentSum(
+          newHandler = new SudokuConstraintHandler.CellDepedentSum(
             [...diffB, ...diffA], sumDelta);
-          newHandlers.push(handler);
         }
+
+        newHandlers.push(newHandler);
+        debugLog({
+          loc: '_makeInnieOutieSumHandlers',
+          msg: 'Add: ' + newHandler.constructor.name,
+          args: {offset: newHandler._offset, sumCell: newHandler.cells[0]},
+          cells: newHandler.cells,
+        });
       }
     };
 
