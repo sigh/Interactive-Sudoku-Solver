@@ -178,6 +178,7 @@ const runTestCases = (onFailure) => {
     'Anti-knights move',
     'Killer sudoku',
     'Killer sudoku, with overlap',
+    'Killer sudoku, with gaps',
     'Sudoku X',
     'Anti-knight Anti-king',
     'Anti-knight, Anti-consecutive',

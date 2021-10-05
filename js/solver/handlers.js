@@ -1172,7 +1172,7 @@ class SudokuConstraintOptimizer {
       h.cells.forEach(c => cellsIncluded.add(c));
     }
 
-    return nonOverlappingHandlers;
+    return [nonOverlappingHandlers, cellsIncluded];
   }
 
   static _optimizeSums(handlerSet, cellConflictSets) {
@@ -1180,8 +1180,10 @@ class SudokuConstraintOptimizer {
     let sumHandlers = handlerSet.getAllofType(SudokuConstraintHandler.Sum);
     if (sumHandlers.length == 0) return;
 
-    sumHandlers = this._findNonOverlapping(sumHandlers, handlerSet);
-    // TODO: Find missing sum handler.
+    let sumCells;
+    [sumHandlers, sumCells] = this._findNonOverlapping(sumHandlers, handlerSet);
+
+    handlerSet.add(...this._fillInSumGap(sumHandlers, sumCells));
 
     handlerSet.add(...this._makeInnieOutieSumHandlers(sumHandlers));
 
@@ -1190,6 +1192,32 @@ class SudokuConstraintOptimizer {
     this._replaceSizeSpecificSumHandlers(handlerSet, cellConflictSets);
 
     return;
+  }
+
+  static _fillInSumGap(sumHandlers, sumCells) {
+    // Fill in a gap if one remains.
+    const numNonSumCells = NUM_CELLS - sumCells.size;
+    if (numNonSumCells == 0 || numNonSumCells >= GRID_SIZE) return [];
+
+    const sumHandlersSum = sumHandlers.map(h => h.sum()).reduce((a,b)=>a+b);
+    const remainingSum = GRID_SIZE*this._NONET_SUM - sumHandlersSum;
+
+    const remainingCells = new Set(ALL_CELLS);
+    sumHandlers.forEach(h => h.cells.forEach(c => remainingCells.delete(c)));
+    const newHandler = new SudokuConstraintHandler.Sum(
+      new Uint8Array(remainingCells), remainingSum);
+
+    sumHandlers.push(newHandler);
+    remainingCells.forEach(c => sumCells.add(c));
+
+    debugLog({
+      loc: '_fillInSumGap',
+      msg: 'Add: ' + newHandler.constructor.name,
+      args: {sum: remainingSum},
+      cells: newHandler.cells,
+    });
+
+    return [newHandler];
   }
 
   // Add nonet handlers for any AllDifferentHandler which have 9 cells.
@@ -1414,7 +1442,7 @@ class SudokuConstraintOptimizer {
         const diffB = setDifference(piecesRegion, superRegion);
         // Ignore diff that too big, they are probably not very well
         // constrained.
-        if (diffA.size > GRID_SIZE || diffB.size > GRID_SIZE) continue;
+        if (diffA.size >= GRID_SIZE || diffB.size >= GRID_SIZE) continue;
 
         // All values in the set differences must be the same.
         const newHandler = new SudokuConstraintHandler.SameValues(
@@ -1468,29 +1496,40 @@ class SudokuConstraintOptimizer {
         const diffA = setDifference(superRegion, piecesRegion);
         const diffB = setDifference(piecesRegion, superRegion);
 
-        // TODO: diffA == 0 or diffB == 0 -> ordinary sum constraint.
+        // No diff, no new constraints to add.
+        if (diffA.size == 0 && diffB.size == 0) continue;
 
         // We can only do arrow constraints when the diff is 1.
-        if (diffA.size !== 1 && diffB.size !== 1) continue;
+        // We can only do sum constraints when the diff is 0.
+        if (diffA.size > 1 && diffB.size > 1) continue;
         // Don't use this if the diff is too large.
-        if (diffA.size > GRID_SIZE || diffB.size > GRID_SIZE) continue;
+        if (diffA.size >= GRID_SIZE || diffB.size >= GRID_SIZE) continue;
 
         const sumDelta = piecesSum - i*this._NONET_SUM;
 
         let newHandler;
-        if (diffA.size == 1) {
+        let args;
+        if (diffA.size == 0) {
+          newHandler = new SudokuConstraintHandler.Sum([...diffB], sumDelta);
+          args = {sum: sumDelta};
+        } else if (diffB.size == 0) {
+          newHandler = new SudokuConstraintHandler.Sum([...diffA], -sumDelta);
+          args = {sum: -sumDelta};
+        } else if (diffA.size == 1) {
           newHandler = new SudokuConstraintHandler.CellDepedentSum(
             [...diffA, ...diffB], -sumDelta);
-        } else {
+          args = {offset: -sumDelta, sumCell: newHandler.cells[0]};
+        } else if (diffB.size == 1) {
           newHandler = new SudokuConstraintHandler.CellDepedentSum(
             [...diffB, ...diffA], sumDelta);
+          args = {offset: sumDelta, sumCell: newHandler.cells[0]};
         }
 
         newHandlers.push(newHandler);
         debugLog({
           loc: '_makeInnieOutieSumHandlers',
           msg: 'Add: ' + newHandler.constructor.name,
-          args: {offset: newHandler._offset, sumCell: newHandler.cells[0]},
+          args: args,
           cells: newHandler.cells,
         });
       }

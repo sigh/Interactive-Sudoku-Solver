@@ -1,6 +1,11 @@
 const BOX_SIZE = 3;
 const GRID_SIZE = BOX_SIZE*BOX_SIZE;
 const NUM_CELLS = GRID_SIZE*GRID_SIZE;
+const ALL_CELLS = (() => {
+  const cells = new Array(NUM_CELLS);
+  for (let i = 0; i < NUM_CELLS; i++) cells[i] = i;
+  return cells;
+})();
 
 const toValueId = (row, col, n) => {
   return id = `R${row+1}C${col+1}_${n}`;
