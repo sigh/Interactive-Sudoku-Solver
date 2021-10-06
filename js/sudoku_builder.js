@@ -546,8 +546,10 @@ class SudokuBuilder {
         break;
 
       case 'Arrow':
-        cells = constraint.cells.map(c => parseCellId(c).cell);
-        yield new SudokuConstraintHandler.CellDepedentSum(cells, 0);
+        const [negativeCell, ...positiveCells] = constraint.cells.map(
+          c => parseCellId(c).cell);
+        yield new SudokuConstraintHandler.SumWithNegative(
+          positiveCells, negativeCell, 0);
         break;
 
       case 'Cage':

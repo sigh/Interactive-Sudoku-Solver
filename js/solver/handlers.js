@@ -702,16 +702,21 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
   }
 }
 
-SudokuConstraintHandler.CellDepedentSum = class CellDepedentSum extends SudokuConstraintHandler.Sum {
-  constructor(cells, offset) {
-    const sum = GRID_SIZE+1-offset;
-    super(cells, sum);
-    [this._targetCell, ...this._positiveCells] = cells;
-    this._negativeCells = [this._targetCell];
+// SumWithNegative allows one cell in the sum to be negative.
+// We can easily extend this class to multiple cells, but it hasn't shown to
+// provide any benefit.
+SudokuConstraintHandler.SumWithNegative = class SumWithNegative extends SudokuConstraintHandler.Sum {
+  constructor(positiveCells, negativeCell, sum) {
+    sum += GRID_SIZE+1;
+    super([...positiveCells, negativeCell], sum);
+
+    this._positiveCells = positiveCells;
+    this._negativeCells = [negativeCell];
+    this._negativeCell = negativeCell;
     this._conflictSets = null;
 
     // IMPORTANT: Complement cells don't work for this currently, because
-    // we can't guarentee that reversed targetSum is a unique value.
+    // we can't guarentee that reversed negativeCells is a unique value.
     // This will stop anyone adding them.
     this._complementCells = null;
   }
@@ -719,13 +724,13 @@ SudokuConstraintHandler.CellDepedentSum = class CellDepedentSum extends SudokuCo
   setComplementCells() {}
 
   enforceConsistency(grid) {
-    grid[this._targetCell] = LookupTable.REVERSE[grid[this._targetCell]];
+    grid[this._negativeCell] = LookupTable.REVERSE[grid[this._negativeCell]];
 
     const result = super.enforceConsistency(grid);
 
     // Reverse the value back even if we fail to make the output and debugging
     // easier.
-    grid[this._targetCell] = LookupTable.REVERSE[grid[this._targetCell]];
+    grid[this._negativeCell] = LookupTable.REVERSE[grid[this._negativeCell]];
 
     return result;
   }
@@ -1222,7 +1227,7 @@ class SudokuConstraintOptimizer {
           constrainedCells.push(...overlap);
           constrainedSum += k.sum();
           k.setComplementCells(arrayDifference(h.cells, k.cells));
-        } else if (k.cells.length == overlap.length+1) {
+        } else if (k.cells.length - overlap.length == 1) {
           outies.push(k);
         }
       }
@@ -1246,17 +1251,17 @@ class SudokuConstraintOptimizer {
         // takes longer.
         if (remainingCells.length > 5) continue;
 
-        const extraCell = arrayDifference(o.cells, h.cells);
-        const remainingSum = o.sum() - complementSum;
-        const handler = new SudokuConstraintHandler.CellDepedentSum(
-          [extraCell[0], ...remainingCells], remainingSum);
+        const extraCells = arrayDifference(o.cells, h.cells);
+        const remainingSum = complementSum - o.sum();
+        const handler = new SudokuConstraintHandler.SumWithNegative(
+          remainingCells, extraCells[0], remainingSum);
         newHandlers.push(handler);
 
         if (ENABLE_DEBUG_LOGS) {
           debugLog({
             loc: '_makeHiddenCageHandlers',
             msg: 'Add: ' + handler.constructor.name,
-            args: {offset: remainingSum, sumCell: extraCell[0]},
+            args: {offset: remainingSum, negativeCells: [...extraCells]},
             cells: handler.cells
           });
         }
@@ -1418,37 +1423,37 @@ class SudokuConstraintOptimizer {
     const piecesMap = new Map(sumHandlers.map(h => [h.cells, h.sum()]));
 
     const handleOverlap = (superRegion, piecesRegion, usedPieces) => {
-      const diffA = setDifference(superRegion, piecesRegion);
-      const diffB = setDifference(piecesRegion, superRegion);
+      let diffA = setDifference(superRegion, piecesRegion);
+      let diffB = setDifference(piecesRegion, superRegion);
 
       // No diff, no new constraints to add.
       if (diffA.size == 0 && diffB.size == 0) return;
-
-      // We can only do arrow constraints when the diff is 1.
-      // We can only do sum constraints when the diff is 0.
-      if (diffA.size > 1 && diffB.size > 1) return;
       // Don't use this if the diff is too large.
       if (diffA.size >= GRID_SIZE || diffB.size >= GRID_SIZE) return;
 
+      // We can only do negative sum constraints when the diff is 1.
+      // We can only do sum constraints when the diff is 0.
+      if (diffA.size > 1 && diffB.size > 1) return;
+
       let sumDelta = -superRegion.size*this._NONET_SUM/GRID_SIZE;
       for (const p of usedPieces) sumDelta += piecesMap.get(p);
+
+      // Ensure diffA is the smaller.
+      if (diffA.size > diffB.size) {
+        [diffA, diffB] = [diffB, diffA];
+        sumDelta = -sumDelta;
+      }
 
       let newHandler;
       let args;
       if (diffA.size == 0) {
         newHandler = new SudokuConstraintHandler.Sum([...diffB], sumDelta);
         args = {sum: sumDelta};
-      } else if (diffB.size == 0) {
-        newHandler = new SudokuConstraintHandler.Sum([...diffA], -sumDelta);
-        args = {sum: -sumDelta};
-      } else if (diffA.size == 1) {
-        newHandler = new SudokuConstraintHandler.CellDepedentSum(
-          [...diffA, ...diffB], -sumDelta);
-        args = {offset: -sumDelta, sumCell: newHandler.cells[0]};
-      } else if (diffB.size == 1) {
-        newHandler = new SudokuConstraintHandler.CellDepedentSum(
-          [...diffB, ...diffA], sumDelta);
-        args = {offset: sumDelta, sumCell: newHandler.cells[0]};
+      } else {
+        const negativeCell = [...diffA][0];
+        newHandler = new SudokuConstraintHandler.SumWithNegative(
+          [...diffB], negativeCell, sumDelta);
+        args = {sum: sumDelta, negativeCell: negativeCell};
       }
 
       newHandlers.push(newHandler);
