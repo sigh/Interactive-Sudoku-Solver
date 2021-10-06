@@ -516,7 +516,7 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
   _conflictSets;
   _conflictMap;
   _sum;
-  _complementCells = null;
+  _complementCells;
 
   constructor(cells, sum) {
     super(cells);
@@ -526,6 +526,10 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
 
   setComplementCells(cells) {
     this._complementCells = cells;
+  }
+
+  hasComplementCells(cells) {
+    this._complementCells !== undefined;
   }
 
   sum() {
@@ -540,6 +544,13 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
     this._conflictSets.forEach(
       (s,i) => s.forEach(
         c => this._conflictMap[this._sumCells.indexOf(c)] = i));
+
+    // Ensure that _complementCells is null.
+    // undefined is used by the optimizer to know that a value has not been
+    // set yet.
+    if (this._complementCells === undefined) {
+      this._complementCells = null;
+    }
   }
 
   static _valueBuffer = new Uint16Array(GRID_SIZE);
@@ -1098,6 +1109,8 @@ class SudokuConstraintOptimizer {
 
     this._optimizeSums(handlerSet, cellConflictSets);
 
+    this._addSumComplementCells(handlerSet);
+
     this._optimizeJigsaw(handlerSet);
   }
 
@@ -1163,6 +1176,38 @@ class SudokuConstraintOptimizer {
     this._replaceSizeSpecificSumHandlers(handlerSet, cellConflictSets);
 
     return;
+  }
+
+  static _addSumComplementCells(handlerSet) {
+    const nonetHandlers = (
+      handlerSet.getAllofType(SudokuConstraintHandler.Nonet).map(
+        h => handlerSet.getIndex(h)));
+    const cellMap = handlerSet.getCellMap();
+
+    const findCommonHandler = (cells) => {
+      let commonHandlers = nonetHandlers;
+      for (const c of cells) {
+        commonHandlers = arrayIntersect(commonHandlers, cellMap[c]);
+        if (commonHandlers.length == 0) return;
+      }
+      return handlerSet.getHandler(commonHandlers[0]);
+    };
+
+    const process = (type, cellsFn) => {
+      for (const h of handlerSet.getAllofType(type)) {
+        if (h.hasComplementCells()) continue;
+
+        const cells = cellsFn(h);
+        const commonHandler = findCommonHandler(cells);
+        if (!commonHandler) continue;
+
+        const complementCells = arrayDifference(commonHandler.cells, cells);
+        h.setComplementCells(complementCells);
+      }
+    };
+
+    process(SudokuConstraintHandler.CellDepedentSum, h => h._sumCells);
+    process(SudokuConstraintHandler.Sum, h => h.cells);
   }
 
   static _fillInSumGap(sumHandlers, sumCells) {
