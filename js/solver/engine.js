@@ -287,6 +287,7 @@ SudokuSolver.InternalSolver = class {
       maxDepth: 0,
       progressRatio: 0,
       progressRatioPrev: 0,
+      branchesIgnored: 0,
     };
 
     // _backtrackTriggers counts the the number of times a cell is responsible
@@ -298,6 +299,7 @@ SudokuSolver.InternalSolver = class {
     // _backtrackTriggers are exponentially decayed so that the search can
     // learn new parts of the search space effectively.
     this._backtrackTriggers = Array.from(this._cellPriorities);
+    this._uninterestingValues = null;
 
     this._resetStack();
   }
@@ -336,6 +338,16 @@ SudokuSolver.InternalSolver = class {
     }
     this._initialGrid = new Uint16Array(NUM_CELLS);
     this._initialGrid.fill(ALL_VALUES);
+  }
+
+  _hasInterestingSolutions(stack, grid, uninterestingValues) {
+    // We need to check all cells because we maybe validating a cell above
+    // us, or finding a value for a cell below us.
+    for (let i = 0; i < NUM_CELLS; i++) {
+      const cell = stack[i];
+      if (grid[cell]&~uninterestingValues[cell]) return true;
+    }
+    return false;
   }
 
   // Find the best cell and bring it to the front. This means that it will
@@ -555,6 +567,13 @@ SudokuSolver.InternalSolver = class {
         continue;
       }
 
+      if (this._uninterestingValues) {
+        if (!this._hasInterestingSolutions(stack, grid, this._uninterestingValues)) {
+          counters.branchesIgnored++;
+          continue;
+        }
+      }
+
       {
         const count = this._updateCellOrder(stack, depth, grid);
         counters.cellsSearched++;
@@ -567,55 +586,16 @@ SudokuSolver.InternalSolver = class {
   }
 
   solveAllPossibilities(valuesInSolutions) {
-    // TODO: Do all forced reductions first to avoid having to do them for
-    // each iteration.
-
     const counters = this.counters;
-    const progressRatioThreshold = 1/GRID_SIZE;
 
-    // Search for solutions.
-    // Keep searching until we we see a redudant solution:
-    //  - We want to avoid searching for all solutions, as there might be so
-    //    many that it is intractable (e.g. empty grid).
-    //  - On the other-hand, we don't want to abort too early and lose all the
-    //    state/knowledge gained from the current search.
-    // But also, continue searching if we have passed a threshold search ratio.
-    // This probably means the search will completely quickly enough if we just
-    // wait and we don't risk losing all the state we gained.
-    const search = () => {
-      for (const solution of this.run()) {
-        const grid = solution.grid;
-        if (counters.progressRatio < progressRatioThreshold) {
-          if (grid.every((c, i) => valuesInSolutions[i] & c)) {
-            return false;
-          }
-        }
-        grid.forEach((c, i) => { valuesInSolutions[i] |= c; });
-      }
-      return true;
-    };
+    for (const solution of this.run()) {
+      solution.grid.forEach((c, i) => { valuesInSolutions[i] |= c; });
 
-    const foundAllSolutions = search();
-
-    // If the initial search found all the solutions, then we are done.
-    if (foundAllSolutions) return;
-
-    this._resetStack();
-    for (let i = 0; i < NUM_CELLS; i++) {
-      for (let v = 1; v < ALL_VALUES; v <<= 1) {
-        // We already know this is a value is in a solution.
-        if (valuesInSolutions[i] & v) continue;
-        // This is NOT a a valid value.
-        if (!(this._grids[0][i] & v)) continue;
-
-        // Set the progress ratio to smaller to reflect the fact that we aren't
-        // searching the entire space.
-        this._progressRatioStack[0] = 1/GRID_SIZE;
-
-        // Fix the current value and attempt to solve.
-        this._grids[0][i] = v;
-        search();
-        this._resetStack();
+      // Once we have 2 solutions, then start ignoring branches which maybe
+      // duplicating existing solution (up to this point, every branch is
+      // interesting).
+      if (counters.solutions == 2) {
+        this._uninterestingValues = valuesInSolutions;
       }
     }
   }

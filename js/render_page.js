@@ -1475,7 +1475,7 @@ class SolutionController {
       let text;
       switch (v) {
         case 'solutions':
-          text = counters.solutions + (state.done ? '' : '+');
+          text = counters.solutions + (counters.branchesIgnored ? '+' : '');
           break;
         case 'puzzleSetupTime':
           text = state.puzzleSetupTime ? formatTimeMs(state.puzzleSetupTime) : '?';
@@ -1484,11 +1484,7 @@ class SolutionController {
           text = formatTimeMs(state.timeMs);
           break;
         case 'searchSpaceExplored':
-          if (state.done && counters.progressRatio < 1) {
-            text = '100%';
-          } else {
-            text = (counters.progressRatio * 100).toPrecision(3) + '%';
-          }
+          text = (counters.progressRatio * 100).toPrecision(3) + '%';
 
           if (counters.progressRatioPrev > 0) {
             const extra = counters.progressRatioPrev * 100;
