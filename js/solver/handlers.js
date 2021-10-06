@@ -1414,62 +1414,69 @@ class SudokuConstraintOptimizer {
   static _ROW_REGIONS = this._makeRegions((r, i) => r*GRID_SIZE+i);
   static _COL_REGIONS = this._makeRegions((c, i) => i*GRID_SIZE+c);
 
-  static _makeJigsawLawOfLeftoverHandlers(jigsawHandler) {
-    const pieces = jigsawHandler.regions.map(r => new Set(r));
-    const newHandlers = [];
+  static _generalRegionOverlapProcessor(regions, pieces, callback) {
+    const superRegion = new Set();
+    const remainingPieces = new Set(pieces);
+    const usedPieces = [];
+    const piecesRegion = new Set();
 
-    const handleRegionSet = (rs) => {
-      const superRegion = new Set();
-      const remainingPieces = new Set(pieces);
-      const piecesRegion = new Set();
+    let i=0;
+    for (const r of regions) {
+      i++;
+      if (i == GRID_SIZE) break;
 
-      let i=0;
-      for (const r of rs) {
-        i++;
-        if (i == GRID_SIZE) break;
+      // Add r to our super-region.
+      r.forEach(e => superRegion.add(e));
 
-        // Add r to our super-region.
-        r.forEach(e => superRegion.add(e));
-
-        // Add any remaining pieces with enough overlap to our super-region.
-        for (const p of remainingPieces) {
-          const intersection = setIntersection(p, superRegion);
-          if (intersection.size > GRID_SIZE/2) {
-            remainingPieces.delete(p);
-            for (const c of p) piecesRegion.add(c);
-          }
-        }
-
-        // Don't process the first region, as that may just double up work from
-        // the nonet-intersection handler.
-        if (i == 1) continue;
-
-        // We can only match when regions are the same size.
-        if (superRegion.size != piecesRegion.size) continue;
-
-        const diffA = setDifference(superRegion, piecesRegion);
-        if (diffA.size == 0) continue;
-        const diffB = setDifference(piecesRegion, superRegion);
-        // Ignore diff that too big, they are probably not very well
-        // constrained.
-        if (diffA.size >= GRID_SIZE || diffB.size >= GRID_SIZE) continue;
-
-        // All values in the set differences must be the same.
-        const newHandler = new SudokuConstraintHandler.SameValues(
-            diffA, diffB, false);
-        newHandlers.push(newHandler);
-        if (ENABLE_DEBUG_LOGS) {
-          debugLog({
-            loc: '_makeJigsawLawOfLeftoverHandlers',
-            msg: 'Add: ' + newHandler.constructor.name,
-            cells: newHandler.cells,
-          });
+      // Add any remaining pieces with enough overlap to our super-region.
+      for (const p of remainingPieces) {
+        const intersection = setIntersection(p, superRegion);
+        if (intersection.size > p.length/2) {
+          remainingPieces.delete(p);
+          for (const c of p) piecesRegion.add(c);
+          usedPieces.push(p);
         }
       }
-    };
 
-    handleRegionSet(this._ROW_REGIONS);
-    handleRegionSet(this._COL_REGIONS);
+      // Don't process the first region, as that usually doubles up work from
+      // elsewhere.
+      if (i == 1) continue;
+
+      callback(superRegion, piecesRegion, usedPieces);
+    }
+  }
+
+  static _makeJigsawLawOfLeftoverHandlers(jigsawHandler) {
+    const newHandlers = [];
+
+    const handleOverlap = (superRegion, piecesRegion, usedPieces) => {
+      // We can only match when regions are the same size.
+      if (superRegion.size != piecesRegion.size) return;
+
+      const diffA = setDifference(superRegion, piecesRegion);
+      if (diffA.size == 0) return;
+      const diffB = setDifference(piecesRegion, superRegion);
+      // Ignore diff that too big, they are probably not very well
+      // constrained.
+      if (diffA.size >= GRID_SIZE) return;
+
+      // All values in the set differences must be the same.
+      const newHandler = new SudokuConstraintHandler.SameValues(
+          diffA, diffB, false);
+      newHandlers.push(newHandler);
+      if (ENABLE_DEBUG_LOGS) {
+        debugLog({
+          loc: '_makeJigsawLawOfLeftoverHandlers',
+          msg: 'Add: ' + newHandler.constructor.name,
+          cells: newHandler.cells,
+        });
+      }
+    }
+
+    this._generalRegionOverlapProcessor(
+      this._ROW_REGIONS, jigsawHandler.regions, handleOverlap);
+    this._generalRegionOverlapProcessor(
+      this._COL_REGIONS, jigsawHandler.regions, handleOverlap);
 
     return newHandlers;
   }
@@ -1477,80 +1484,58 @@ class SudokuConstraintOptimizer {
   static _makeInnieOutieSumHandlers(sumHandlers) {
     const newHandlers = [];
 
-    const handleRegionSet = (rs) => {
-      const superRegion = new Set();
-      const remainingHandlers = new Set(sumHandlers);
-      const piecesRegion = new Set();
-      let piecesSum = 0;
+    const pieces = sumHandlers.map(h => h.cells);
+    const piecesMap = new Map(sumHandlers.map(h => [h.cells, h.sum()]));
 
-      let i=0;
-      for (const r of rs) {
-        i++;
-        if (i == GRID_SIZE) break;
+    const handleOverlap = (superRegion, piecesRegion, usedPieces) => {
+      const diffA = setDifference(superRegion, piecesRegion);
+      const diffB = setDifference(piecesRegion, superRegion);
 
-        // Add r to our super-region.
-        r.forEach(e => superRegion.add(e));
+      // No diff, no new constraints to add.
+      if (diffA.size == 0 && diffB.size == 0) return;
 
-        // Add any remaining pieces with enough overlap to our super-region.
-        for (const h of remainingHandlers) {
-          const intersection = setIntersection(h.cells, superRegion);
-          if (intersection.size > h.cells.length/2) {
-            remainingHandlers.delete(h);
-            for (const c of h.cells) piecesRegion.add(c);
-            piecesSum += h.sum();
-          }
-        }
+      // We can only do arrow constraints when the diff is 1.
+      // We can only do sum constraints when the diff is 0.
+      if (diffA.size > 1 && diffB.size > 1) return;
+      // Don't use this if the diff is too large.
+      if (diffA.size >= GRID_SIZE || diffB.size >= GRID_SIZE) return;
 
-        // Don't process the first region, as that may just double up work from
-        // the nonet-intersection handler.
-        if (i == 1) continue;
+      let sumDelta = -superRegion.size*this._NONET_SUM/GRID_SIZE;
+      for (const p of usedPieces) sumDelta += piecesMap.get(p);
 
-        const diffA = setDifference(superRegion, piecesRegion);
-        const diffB = setDifference(piecesRegion, superRegion);
+      let newHandler;
+      let args;
+      if (diffA.size == 0) {
+        newHandler = new SudokuConstraintHandler.Sum([...diffB], sumDelta);
+        args = {sum: sumDelta};
+      } else if (diffB.size == 0) {
+        newHandler = new SudokuConstraintHandler.Sum([...diffA], -sumDelta);
+        args = {sum: -sumDelta};
+      } else if (diffA.size == 1) {
+        newHandler = new SudokuConstraintHandler.CellDepedentSum(
+          [...diffA, ...diffB], -sumDelta);
+        args = {offset: -sumDelta, sumCell: newHandler.cells[0]};
+      } else if (diffB.size == 1) {
+        newHandler = new SudokuConstraintHandler.CellDepedentSum(
+          [...diffB, ...diffA], sumDelta);
+        args = {offset: sumDelta, sumCell: newHandler.cells[0]};
+      }
 
-        // No diff, no new constraints to add.
-        if (diffA.size == 0 && diffB.size == 0) continue;
-
-        // We can only do arrow constraints when the diff is 1.
-        // We can only do sum constraints when the diff is 0.
-        if (diffA.size > 1 && diffB.size > 1) continue;
-        // Don't use this if the diff is too large.
-        if (diffA.size >= GRID_SIZE || diffB.size >= GRID_SIZE) continue;
-
-        const sumDelta = piecesSum - i*this._NONET_SUM;
-
-        let newHandler;
-        let args;
-        if (diffA.size == 0) {
-          newHandler = new SudokuConstraintHandler.Sum([...diffB], sumDelta);
-          args = {sum: sumDelta};
-        } else if (diffB.size == 0) {
-          newHandler = new SudokuConstraintHandler.Sum([...diffA], -sumDelta);
-          args = {sum: -sumDelta};
-        } else if (diffA.size == 1) {
-          newHandler = new SudokuConstraintHandler.CellDepedentSum(
-            [...diffA, ...diffB], -sumDelta);
-          args = {offset: -sumDelta, sumCell: newHandler.cells[0]};
-        } else if (diffB.size == 1) {
-          newHandler = new SudokuConstraintHandler.CellDepedentSum(
-            [...diffB, ...diffA], sumDelta);
-          args = {offset: sumDelta, sumCell: newHandler.cells[0]};
-        }
-
-        newHandlers.push(newHandler);
-        if (ENABLE_DEBUG_LOGS) {
-          debugLog({
-            loc: '_makeInnieOutieSumHandlers',
-            msg: 'Add: ' + newHandler.constructor.name,
-            args: args,
-            cells: newHandler.cells,
-          });
-        }
+      newHandlers.push(newHandler);
+      if (ENABLE_DEBUG_LOGS) {
+        debugLog({
+          loc: '_makeInnieOutieSumHandlers',
+          msg: 'Add: ' + newHandler.constructor.name,
+          args: args,
+          cells: newHandler.cells,
+        });
       }
     };
 
-    handleRegionSet(this._ROW_REGIONS);
-    handleRegionSet(this._COL_REGIONS);
+    this._generalRegionOverlapProcessor(
+      this._ROW_REGIONS, pieces, handleOverlap);
+    this._generalRegionOverlapProcessor(
+      this._COL_REGIONS, pieces, handleOverlap);
 
     return newHandlers;
   }
