@@ -1210,12 +1210,14 @@ class SudokuConstraintOptimizer {
     sumHandlers.push(newHandler);
     remainingCells.forEach(c => sumCells.add(c));
 
-    debugLog({
-      loc: '_fillInSumGap',
-      msg: 'Add: ' + newHandler.constructor.name,
-      args: {sum: remainingSum},
-      cells: newHandler.cells,
-    });
+    if (ENABLE_DEBUG_LOGS) {
+      debugLog({
+        loc: '_fillInSumGap',
+        msg: 'Add: ' + newHandler.constructor.name,
+        args: {sum: remainingSum},
+        cells: newHandler.cells,
+      });
+    }
 
     return [newHandler];
   }
@@ -1256,11 +1258,13 @@ class SudokuConstraintOptimizer {
 
       if (newHandler) {
         handlerSet.replace(h, newHandler);
-        debugLog({
-          loc: '_replaceSizeSpecificSumHandlers',
-          msg: 'Replace with: ' + newHandler.constructor.name,
-          cells: newHandler.cells,
-        });
+        if (ENABLE_DEBUG_LOGS) {
+          debugLog({
+            loc: '_replaceSizeSpecificSumHandlers',
+            msg: 'Replace with: ' + newHandler.constructor.name,
+            cells: newHandler.cells,
+          });
+        }
       }
     }
   }
@@ -1326,12 +1330,14 @@ class SudokuConstraintOptimizer {
         handler.setComplementCells(arrayDifference(h.cells, remainingCells));
         newHandlers.push(handler);
 
-        debugLog({
-          loc: '_makeHiddenCageHandlers',
-          msg: 'Add: ' + handler.constructor.name,
-          args: {offset: remainingSum, sumCell: extraCell[0]},
-          cells: handler.cells
-        });
+        if (ENABLE_DEBUG_LOGS) {
+          debugLog({
+            loc: '_makeHiddenCageHandlers',
+            msg: 'Add: ' + handler.constructor.name,
+            args: {offset: remainingSum, sumCell: extraCell[0]},
+            cells: handler.cells
+          });
+        }
       }
 
       // No constraints within this nonet.
@@ -1346,12 +1352,14 @@ class SudokuConstraintOptimizer {
         complementCells, complementSum);
       complementHandler.setComplementCells(constrainedCells);
       newHandlers.push(complementHandler);
-      debugLog({
-        loc: '_makeHiddenCageHandlers',
-        msg: 'Add: ' + complementHandler.constructor.name,
-        args: {sum: complementSum},
-        cells: complementCells
-      });
+      if (ENABLE_DEBUG_LOGS) {
+        debugLog({
+          loc: '_makeHiddenCageHandlers',
+          msg: 'Add: ' + complementHandler.constructor.name,
+          args: {sum: complementSum},
+          cells: complementCells
+        });
+      }
     }
 
     return newHandlers;
@@ -1378,11 +1386,13 @@ class SudokuConstraintOptimizer {
         const handler = new SudokuConstraintHandler.SameValues(
           diff0, diff1, true);
         newHandlers.push(handler);
-        debugLog({
-          loc: '_makeJigsawIntersections',
-          msg: 'Add: SameValues',
-          cells: handler.cells,
-        });
+        if (ENABLE_DEBUG_LOGS) {
+          debugLog({
+            loc: '_makeJigsawIntersections',
+            msg: 'Add: SameValues',
+            cells: handler.cells,
+          });
+        }
       }
     }
 
@@ -1448,11 +1458,13 @@ class SudokuConstraintOptimizer {
         const newHandler = new SudokuConstraintHandler.SameValues(
             diffA, diffB, false);
         newHandlers.push(newHandler);
-        debugLog({
-          loc: '_makeJigsawLawOfLeftoverHandlers',
-          msg: 'Add: ' + newHandler.constructor.name,
-          cells: newHandler.cells,
-        });
+        if (ENABLE_DEBUG_LOGS) {
+          debugLog({
+            loc: '_makeJigsawLawOfLeftoverHandlers',
+            msg: 'Add: ' + newHandler.constructor.name,
+            cells: newHandler.cells,
+          });
+        }
       }
     };
 
@@ -1526,12 +1538,14 @@ class SudokuConstraintOptimizer {
         }
 
         newHandlers.push(newHandler);
-        debugLog({
-          loc: '_makeInnieOutieSumHandlers',
-          msg: 'Add: ' + newHandler.constructor.name,
-          args: args,
-          cells: newHandler.cells,
-        });
+        if (ENABLE_DEBUG_LOGS) {
+          debugLog({
+            loc: '_makeInnieOutieSumHandlers',
+            msg: 'Add: ' + newHandler.constructor.name,
+            args: args,
+            cells: newHandler.cells,
+          });
+        }
       }
     };
 

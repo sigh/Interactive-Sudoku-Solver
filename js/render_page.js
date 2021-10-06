@@ -1174,6 +1174,7 @@ class DebugOutput {
 
   enable(enable) {
     if (enable === undefined) enable = true;
+    ENABLE_DEBUG_LOGS = enable;
     this._visible = enable;
     this._container.style.display = enable ? 'block' : 'none';
     this.clear();

@@ -1,3 +1,5 @@
+var ENABLE_DEBUG_LOGS = false;
+
 const BOX_SIZE = 3;
 const GRID_SIZE = BOX_SIZE*BOX_SIZE;
 const NUM_CELLS = GRID_SIZE*GRID_SIZE;
@@ -410,6 +412,7 @@ class SudokuBuilder {
   // GLobal vars to pass to the worker.
   static GLOBAL_VARS = [
     'EXPORT_CONFLICT_HEATMAP',
+    'ENABLE_DEBUG_LOGS',
   ];
 
 
@@ -424,11 +427,8 @@ class SudokuBuilder {
     const options = new Map();
 
     for (const v of this.GLOBAL_VARS) {
-      if (window[v]) {
-        options.set(v, window[v]);
-      }
+      options.set(v, window[v]);
     }
-    options.set('test', 'foo');
 
     return options;
   }
