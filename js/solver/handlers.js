@@ -1412,7 +1412,15 @@ class SudokuConstraintOptimizer {
   }
 
   static _ROW_REGIONS = this._makeRegions((r, i) => r*GRID_SIZE+i);
+  static _ROW_REGIONS_REV = this._ROW_REGIONS.slice().reverse();
   static _COL_REGIONS = this._makeRegions((c, i) => i*GRID_SIZE+c);
+  static _COL_REGIONS_REV = this._COL_REGIONS.slice().reverse();
+  static _ALL_OVERLAP_REGIONS = [
+    this._ROW_REGIONS,
+    this._ROW_REGIONS_REV,
+    this._COL_REGIONS,
+    this._COL_REGIONS_REV,
+  ];
 
   static _generalRegionOverlapProcessor(regions, pieces, callback) {
     const superRegion = new Set();
@@ -1473,10 +1481,10 @@ class SudokuConstraintOptimizer {
       }
     }
 
-    this._generalRegionOverlapProcessor(
-      this._ROW_REGIONS, jigsawHandler.regions, handleOverlap);
-    this._generalRegionOverlapProcessor(
-      this._COL_REGIONS, jigsawHandler.regions, handleOverlap);
+    for (const r of this._ALL_OVERLAP_REGIONS) {
+      this._generalRegionOverlapProcessor(
+        r, jigsawHandler.regions, handleOverlap);
+    }
 
     return newHandlers;
   }
@@ -1532,10 +1540,10 @@ class SudokuConstraintOptimizer {
       }
     };
 
-    this._generalRegionOverlapProcessor(
-      this._ROW_REGIONS, pieces, handleOverlap);
-    this._generalRegionOverlapProcessor(
-      this._COL_REGIONS, pieces, handleOverlap);
+    for (const r of this._ALL_OVERLAP_REGIONS) {
+      this._generalRegionOverlapProcessor(
+        r, pieces, handleOverlap);
+    }
 
     return newHandlers;
   }
