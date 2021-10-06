@@ -512,35 +512,6 @@ class SumHandlerUtil {
 
 }
 
-// Solve 3-cell sums exactly with a 512 KB lookup table.
-SudokuConstraintHandler.ThreeCellSum = class ThreeCellSum extends SudokuConstraintHandler {
-  _sum = 0;
-  _conflictMap = null;
-
-  constructor(cells, sum) {
-    super(cells);
-    this._sum = +sum;
-  }
-
-  initialize(initialGrid, cellConflicts) {
-    const conflictSets = SumHandlerUtil.findConflictSets(
-      this.cells, cellConflicts);
-    if (conflictSets.length > 1) {
-      this._conflictMap = new Uint8Array(this.cells.length);
-
-      conflictSets.forEach(
-        (s,i) => s.forEach(
-          c => this._conflictMap[this.cells.indexOf(c)] = i));
-    }
-  }
-
-  enforceConsistency(grid) {
-    return SumHandlerUtil.enforceThreeCellConsistency(
-      grid, this.cells, this._sum, this._conflictMap);
-  }
-
-}
-
 SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
   _conflictSets;
   _conflictMap;
@@ -1249,10 +1220,6 @@ class SudokuConstraintOptimizer {
           newHandler = new SudokuConstraintHandler.BinaryConstraint(
             h.cells[0], h.cells[1],
             (a, b) => a+b == h.sum() && (!hasConflict || a != b));
-          break;
-
-        case 3:
-          newHandler = new SudokuConstraintHandler.ThreeCellSum(h.cells, h.sum());
           break;
       }
 
