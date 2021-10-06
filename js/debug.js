@@ -4,7 +4,7 @@ loadJSFile('data/killers.js');
 loadJSFile('data/jigsaw_layouts.js');
 loadJSFile('data/invalid_jigsaw_layouts.js');
 
-var TEST_TIMEOUT_MS = 1000;
+var TEST_TIMEOUT_MS = 0;
 
 controller.enableDebugOutput();
 
@@ -19,7 +19,7 @@ const getShortSolution = () => {
 };
 
 const toShortSolution = (valueIds) => {
-  let result = new Array(81);
+  let result = new Array(NUM_CELLS);
   const DEFAULT_VALUE = '.';
   result.fill(DEFAULT_VALUE);
 
