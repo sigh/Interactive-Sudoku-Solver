@@ -88,6 +88,7 @@ class ExampleHandler {
     'Classic sudoku',
     'Thermosudoku',
     'Killer sudoku',
+    'Killer sudoku, hard',
     'Arrow sudoku',
     'Anti-knight, Anti-consecutive',
     'Little killer',
