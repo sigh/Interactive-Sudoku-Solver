@@ -47,6 +47,8 @@ const puzzleFromCfg = (puzzleCfg) => {
 };
 
 const runFnWithChecks = async (puzzles, fn, onFailure) => {
+  const startTime = performance.now();
+
   const sumObjectValues = (a, b) => {
     let result = {...a};
     for (const [k, v] of Object.entries(b)) {
@@ -139,7 +141,10 @@ const runFnWithChecks = async (puzzles, fn, onFailure) => {
   }
 
   rows.total = total;
+
+  const endTime = performance.now();
   console.table(rows);
+  console.log('Finished in: ' + Math.floor(endTime - startTime) + 'ms');
 
   if (numFailures > 0) {
     console.error(numFailures + ' failures');
@@ -148,30 +153,30 @@ const runFnWithChecks = async (puzzles, fn, onFailure) => {
   return solutions;
 };
 
-const runAllWithChecks = (puzzles, onFailure) => {
-  return runFnWithChecks(puzzles, async (solver) => {
+const runAllWithChecks = async (puzzles, onFailure) => {
+  return await runFnWithChecks(puzzles, async (solver) => {
     const result = await solver.nthSolution(0);
     await solver.nthSolution(1); // Try to find a second solution to prove uniqueness.
     return result;
   }, onFailure);
 };
 
-const runValidateLayout = (cases, onFailure) => {
-  return runFnWithChecks(cases, (solver) => {
-    return solver.validateLayout();
+const runValidateLayout = async (cases, onFailure) => {
+  return await runFnWithChecks(cases, async (solver) => {
+    return await solver.validateLayout();
   }, onFailure);
 }
 
-const runValidateLayoutTests = (onFailure) => {
+const runValidateLayoutTests = async (onFailure) => {
   const cases = [].concat(
     VALID_JIGSAW_LAYOUTS.slice(0, 20),
     EASY_INVALID_JIGSAW_LAYOUTS,
     FAST_INVALID_JIGSAW_LAYOUTS.slice(0, 20));
-  runValidateLayout(cases, onFailure);
+  await runValidateLayout(cases, onFailure);
 };
 
-const runTestCases = (onFailure) => {
-  runAllWithChecks([
+const runSolveTests = async (onFailure) => {
+  await runAllWithChecks([
     'Thermosudoku',
     'Classic sudoku',
     'Classic sudoku, hard',
@@ -194,8 +199,13 @@ const runTestCases = (onFailure) => {
   ], onFailure);
 };
 
-const runAll = (puzzles, onFailure) => {
-  runAllWithChecks(puzzles, onFailure);
+const runAllTests = async () => {
+  await runSolveTests();
+  await runValidateLayoutTests();
+};
+
+const runAll = async (puzzles, onFailure) => {
+  await runAllWithChecks(puzzles, onFailure);
 };
 
 const printGrid = (grid) => {
