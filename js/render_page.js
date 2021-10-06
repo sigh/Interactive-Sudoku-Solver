@@ -1477,7 +1477,8 @@ class SolutionController {
       let text;
       switch (v) {
         case 'solutions':
-          text = counters.solutions + (counters.branchesIgnored ? '+' : '');
+          const searchComplete = state.done && !counters.branchesIgnored;
+          text = counters.solutions + (searchComplete ? '' : '+');
           break;
         case 'puzzleSetupTime':
           text = state.puzzleSetupTime ? formatTimeMs(state.puzzleSetupTime) : '?';
