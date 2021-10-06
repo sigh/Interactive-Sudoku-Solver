@@ -895,6 +895,7 @@ class SudokuGrid {
       switch (event.key) {
         case 'c':
           this.selection.getCells().forEach(c => c.textContent = '');
+          this.updateCallback(this);
           break;
         case 'f':
           if (this.selection.size() != 9) return;
