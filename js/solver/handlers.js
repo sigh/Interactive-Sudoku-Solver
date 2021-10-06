@@ -160,10 +160,7 @@ class SumHandlerUtil {
     return true;
   }
 
-  // Restricts cell values to only combinations which could make one of the
-  // provided sums. Assumes cells are all in the same conflict set.
-  // Returns a mask for the valid sum values (thus 0 if none are possible).
-  static restrictCellsSingleConflictSet(grid, baseSum, sumOffsets, cells, offset) {
+  static restrictCellsSingleConflictSet(grid, sum, cells) {
     const numCells = cells.length;
 
     // Check that we can make the current sum with the unfixed values remaining.
@@ -177,14 +174,13 @@ class SumHandlerUtil {
       allValues |= v;
       fixedValues |= (!(v&(v-1)))*v; // Better than branching.
     }
-    const fixedSum = LookupTable.SUM[fixedValues]+offset;
+    const fixedSum = LookupTable.SUM[fixedValues]
 
     // Check if we have enough unique values.
-    if (LookupTable.COUNT[allValues] < numCells) return 0;
+    if (LookupTable.COUNT[allValues] < numCells) return false
     // Check if we have fixed all the values.
     if (allValues == fixedValues) {
-      if (sumOffsets == 1 && fixedSum != baseSum) return 0;
-      return 1<<(fixedSum-1);
+      return fixedSum == sum;
     }
 
     const unfixedValues = allValues & ~fixedValues;
@@ -193,32 +189,12 @@ class SumHandlerUtil {
     const sumLookup = SumHandlerUtil.KILLER_CAGE_INFO[unfixedValues][numUnfixed];
 
     let possibilities = 0;
-    let sumValue = 0;
 
-    if (sumOffsets === 1) {
-      // Handle the common case where we only have one sum.
-      possibilities = sumLookup[baseSum-fixedSum];
-      if (!possibilities) return 0;
-      if (possibilities) {
-        sumValue = 1<<(baseSum-1);
-        requiredUniques &= possibilities >> 9;
-      }
-    } else {
-      // For each possible targetSum, find the possible cell value settings.
-      baseSum--;
-      while (sumOffsets) {
-        const v = sumOffsets & -sumOffsets;
-        sumOffsets &= ~v;
-        const sum = baseSum + LookupTable.VALUE[v];
-
-        const sumPossibilities = sumLookup[sum-fixedSum];
-        if (sumPossibilities) {
-          possibilities |= sumPossibilities;
-          sumValue |= 1<<(sum-1);
-          requiredUniques &= sumPossibilities >> 9;
-        }
-      }
-      if (!possibilities) return 0;
+    // Handle the common case where we only have one sum.
+    possibilities = sumLookup[sum-fixedSum];
+    if (!possibilities) return false;
+    if (possibilities) {
+      requiredUniques &= possibilities >> 9;
     }
 
     // Remove any values that aren't part of any solution.
@@ -227,7 +203,7 @@ class SumHandlerUtil {
       for (let i = 0; i < numCells; i++) {
         // Safe to apply to every cell, since we know that none of the
         // fixedValues are in unfixedValues.
-        if (!(grid[cells[i]] &= ~valuesToRemove)) return 0;
+        if (!(grid[cells[i]] &= ~valuesToRemove)) return false;
       }
     }
 
@@ -240,13 +216,13 @@ class SumHandlerUtil {
         if (value) {
           // If we have more value that means a single cell holds more than
           // one unique value.
-          if (value&(value-1)) return 0;
+          if (value&(value-1)) return false;
           grid[cells[i]] = value;
         }
       }
     }
 
-    return sumValue;
+    return true;
   }
 
   // Scratch buffers for reuse so we don't have to create arrays at runtime.
@@ -255,9 +231,7 @@ class SumHandlerUtil {
 
   // Restricts cell values to only the ranges that are possible taking into
   // account uniqueness constraints between values.
-  // Returns a mask for the valid sum values (thus 0 if none are possible).
-  static restrictCellsMultiConflictSet(
-        grid, minTargetSum, maxTargetSum, cells, conflictSets, offset) {
+  static restrictCellsMultiConflictSet(grid, sum, cells, conflictSets) {
     const numSets = conflictSets.length;
 
     // Find a set of miniumum and maximum unique values which can be set,
@@ -292,7 +266,7 @@ class SumHandlerUtil {
         seenMax |= (x & -x) << maxShift;
       }
 
-      if (seenMin > ALL_VALUES || seenMax > ALL_VALUES) return 0;
+      if (seenMin > ALL_VALUES || seenMax > ALL_VALUES) return false;
 
       seenMax = LookupTable.REVERSE[seenMax];
       strictMin += LookupTable.SUM[seenMin];
@@ -304,10 +278,10 @@ class SumHandlerUtil {
 
     // Calculate degrees of freedom in the cell values.
     // i.e. How much leaway is there from the min and max value of each cell.
-    let minDof = maxTargetSum - offset - strictMin;
-    let maxDof = strictMax - minTargetSum + offset;
-    if (minDof < 0 || maxDof < 0) return 0;
-    if (minDof >= GRID_SIZE-1 && maxDof >= GRID_SIZE-1) return -1;
+    let minDof = sum - strictMin;
+    let maxDof = strictMax - sum;
+    if (minDof < 0 || maxDof < 0) return false;
+    if (minDof >= GRID_SIZE-1 && maxDof >= GRID_SIZE-1) return true;
 
     // Restrict values based on the degrees of freedom.
     for (let s = 0; s < numSets; s++) {
@@ -330,34 +304,18 @@ class SumHandlerUtil {
       }
 
       // If the value mask could potentially remove some values, then apply
-      // the mask to the valeus in the set.
+      // the mask to the values in the set.
       if (~valueMask & ALL_VALUES) {
-        let set = conflictSets[s];
+        const set = conflictSets[s];
         for (let i = 0; i < set.length; i++) {
           if (!(grid[set[i]] &= valueMask)) {
-            return 0;
+            return false;
           }
         }
       }
     }
 
-    // If we have a range of sums, then restrict the sum based on the degrees
-    // of freedom.
-    if (minTargetSum != maxTargetSum) {
-      let sumMask = ALL_VALUES;
-      if (minTargetSum > maxDof) {
-        sumMask = ALL_VALUES << (minTargetSum-1-maxDof);
-      }
-      if (GRID_SIZE > maxTargetSum+minDof) {
-        sumMask &= ALL_VALUES >> (GRID_SIZE-(maxTargetSum+minDof));
-      }
-      return sumMask;
-    }
-
-    // Return a permissive mask, since if there is there is only one target
-    // sum then restricting it is moot. If the sum was invalid, this function
-    // would already have returned 0.
-    return -1;
+    return true;
   }
 
   static enforceThreeCellConsistency(grid, cells, sum, conflictMap) {
@@ -517,11 +475,13 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
   _conflictMap;
   _sum;
   _complementCells;
+  _positiveCells = [];
+  _negativeCells = [];
 
   constructor(cells, sum) {
     super(cells);
     this._sum = +sum;
-    this._sumCells = cells;
+    this._positiveCells = cells;
   }
 
   setComplementCells(cells) {
@@ -538,12 +498,16 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
 
   initialize(initialGrid, cellConflicts) {
     this._conflictSets = SumHandlerUtil.findConflictSets(
-      this._sumCells, cellConflicts);
+      this._positiveCells, cellConflicts);
+    if (this._negativeCells.length) {
+      this._conflictSets.push(...SumHandlerUtil.findConflictSets(
+        this._negativeCells, cellConflicts));
+    }
 
-    this._conflictMap = new Uint8Array(this._sumCells.length);
+    this._conflictMap = new Uint8Array(this.cells.length);
     this._conflictSets.forEach(
       (s,i) => s.forEach(
-        c => this._conflictMap[this._sumCells.indexOf(c)] = i));
+        c => this._conflictMap[this.cells.indexOf(c)] = i));
 
     // Ensure that _complementCells is null.
     // undefined is used by the optimizer to know that a value has not been
@@ -562,7 +526,7 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
   //  - The number of unfixed cells is accurate.
   //  - None of the values are zero.
   _enforceFewRemainingCells(grid, targetSum, numUnfixed) {
-    const cells = this._sumCells;
+    const cells = this.cells;
 
     const cellBuffer = this.constructor._cellBuffer;
     const valueBuffer = this.constructor._valueBuffer;
@@ -622,7 +586,7 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
   }
 
   _enforceCombinationsWithComplement(grid) {
-    const set0 = this._sumCells;
+    const set0 = this.cells;
     const set1 = this._complementCells;
     const sum = this._sum;
 
@@ -676,7 +640,7 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
   }
 
   enforceConsistency(grid) {
-    const cells = this._sumCells;
+    const cells = this.cells;
     const numCells = cells.length;
     const sum = this._sum;
 
@@ -727,11 +691,11 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
     if (numUnfixed <= 3) return true;
 
     if (this._conflictSets.length == 1) {
-      if (0 === SumHandlerUtil.restrictCellsSingleConflictSet(
-        grid, this._sum, 1, cells, 0)) return false;
+      if (!SumHandlerUtil.restrictCellsSingleConflictSet(
+        grid, this._sum, cells)) return false;
     } else {
-      if (0 === SumHandlerUtil.restrictCellsMultiConflictSet(
-        grid, sum, sum, cells, this._conflictSets, 0)) return false;
+      if (!SumHandlerUtil.restrictCellsMultiConflictSet(
+        grid, sum, cells, this._conflictSets, 0)) return false;
     }
 
     return true;
@@ -740,82 +704,30 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
 
 SudokuConstraintHandler.CellDepedentSum = class CellDepedentSum extends SudokuConstraintHandler.Sum {
   constructor(cells, offset) {
-    super(cells, 0);
-    this._offset = offset || 0;
-    [this._targetCell, ...this._sumCells] = cells;
+    const sum = GRID_SIZE+1-offset;
+    super(cells, sum);
+    [this._targetCell, ...this._positiveCells] = cells;
+    this._negativeCells = [this._targetCell];
     this._conflictSets = null;
+
+    // IMPORTANT: Complement cells don't work for this currently, because
+    // we can't guarentee that reversed targetSum is a unique value.
+    // This will stop anyone adding them.
+    this._complementCells = null;
   }
 
-  // If there is only one value remaining in sum, then call the standard
-  // sum handler.
-  _callSuperEnforceConsistency(grid, sums) {
-    this._sum = LookupTable.VALUE[sums] - this._offset;
-    return super.enforceConsistency(grid);
-  }
+  setComplementCells() {}
 
   enforceConsistency(grid) {
-    let sums = grid[this._targetCell];
+    grid[this._targetCell] = LookupTable.REVERSE[grid[this._targetCell]];
 
-    if (!sums) return false;
-    if (!(sums&(sums-1))) {
-      return this._callSuperEnforceConsistency(grid, sums);
-    }
+    const result = super.enforceConsistency(grid);
 
-    const arrowCells = this._sumCells;
-    const numCells = arrowCells.length;
-    const offset = this._offset;
+    // Reverse the value back even if we fail to make the output and debugging
+    // easier.
+    grid[this._targetCell] = LookupTable.REVERSE[grid[this._targetCell]];
 
-    //  Determine sumMin and sumMax based on arrow.
-    let minMaxSum = 0;
-    for (let i = 0; i < numCells; i++) {
-      minMaxSum += LookupTable.MIN_MAX[grid[arrowCells[i]]];
-    }
-
-    const sumMin = (minMaxSum>>7)+offset;
-    const sumMax = (minMaxSum&0x7f)+offset;
-    if (sumMax <= 0 || sumMin > GRID_SIZE) return false;
-
-    // Constraint targetCell.
-
-    // Remove any values GREATER than sumMax.
-    if (sumMax < GRID_SIZE && !(sums &= ((1<<sumMax)-1))) return false;
-    // Remove any values LESS than sumMin.
-    if (sumMin > 0 && !(sums &= -(1<<(sumMin-1)))) return false;
-    grid[this._targetCell] = sums;
-
-    // We've reached the exact sum.
-    if (sumMin == sumMax) return true;
-
-    if (!(sums&(sums-1))) {
-      return this._callSuperEnforceConsistency(grid, sums);
-    }
-
-    const minMaxTarget = LookupTable.MIN_MAX[sums];
-    const minTarget = minMaxTarget>>7;
-    const maxTarget = minMaxTarget&0x7f;
-
-    // Determine how much headroom there is in the range between the extreme
-    // values and the target sum.
-    const sumMinusMin = maxTarget - sumMin;
-    const maxMinusSum = -minTarget + sumMax;
-
-    if (!SumHandlerUtil.restrictValueRange(grid, this._sumCells,
-                                           sumMinusMin, maxMinusSum)) {
-      return false;
-    }
-
-    if (this._conflictSets.length == 1) {
-      // Restrict the sum and arrow cells values.
-      grid[this._targetCell] &= SumHandlerUtil.restrictCellsSingleConflictSet(
-        grid, 1, sums, this._sumCells, offset);
-    } else {
-      grid[this._targetCell] &= SumHandlerUtil.restrictCellsMultiConflictSet(
-        grid, minTarget, maxTarget, this._sumCells,
-        this._conflictSets, offset);
-    }
-    if (grid[this._targetCell] === 0) return false;
-
-    return true;
+    return result;
   }
 }
 
@@ -1206,7 +1118,6 @@ class SudokuConstraintOptimizer {
       }
     };
 
-    process(SudokuConstraintHandler.CellDepedentSum, h => h._sumCells);
     process(SudokuConstraintHandler.Sum, h => h.cells);
   }
 
@@ -1339,7 +1250,6 @@ class SudokuConstraintOptimizer {
         const remainingSum = o.sum() - complementSum;
         const handler = new SudokuConstraintHandler.CellDepedentSum(
           [extraCell[0], ...remainingCells], remainingSum);
-        handler.setComplementCells(arrayDifference(h.cells, remainingCells));
         newHandlers.push(handler);
 
         if (ENABLE_DEBUG_LOGS) {
