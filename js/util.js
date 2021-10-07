@@ -140,7 +140,6 @@ class IteratorWithCount {
 const preloadJSFile = (path) => {
   const o = document.createElement('object');
   o.data = path + CACHE_BUST_PARAM;
-  o.style.display = 'none';
   o.width = 0;
   o.height = 0;
   document.body.appendChild(o);
