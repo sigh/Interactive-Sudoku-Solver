@@ -1211,12 +1211,15 @@ class SolutionController {
       modeDescription: document.getElementById('solve-mode-description'),
       stateOutput: document.getElementById('state-output'),
       solveStatus: document.getElementById('solve-status'),
+      stepStatus: document.getElementById('step-status'),
       error: document.getElementById('error-output'),
       validateResult: document.getElementById('validate-result-output'),
       stop: document.getElementById('stop-solver'),
       solve: document.getElementById('solve-button'),
       validate: document.getElementById('validate-layout-button'),
       autoSolve: document.getElementById('auto-solve-input'),
+      progressBar: document.getElementById('solve-progress'),
+      progressPercentage: document.getElementById('solve-percentage'),
     }
 
     this._elements.mode.onchange = () => this._update();
@@ -1228,8 +1231,7 @@ class SolutionController {
     this._setUpKeyBindings();
 
     this._setUpStateOutput();
-    this._displayStateVariables =
-      deferUntilAnimationFrame(this._displayStateVariables.bind(this));
+    this._displayState = deferUntilAnimationFrame(this._displayState.bind(this));
 
     this._historyHandler = new HistoryHandler((params) => {
       let mode = params.get('mode');
@@ -1322,7 +1324,7 @@ class SolutionController {
     this._terminateSolver();
 
     this._solver = await SudokuBuilder.buildInWorker(
-      constraints, this._displayState.bind(this),
+      constraints, this._updateState.bind(this),
       (logs) => this._debugOutput.addLogs(logs));
 
     return this._solver;
@@ -1361,6 +1363,7 @@ class SolutionController {
       this._grid.setSolution([]);
       this._infoOverlay.clear();
       this._clearStateVariables();
+      this._setError();
       this._debugOutput.clear();
       this._terminateSolver();
       this._showIterationControls(false);
@@ -1399,7 +1402,7 @@ class SolutionController {
       this._setSolving(false);
     };
 
-    this._setSolving(true, 'Validating Layout');
+    this._setSolving(true, 'Validating');
     handler.bind(this)(solver)
       .catch(e => this._setError(e))
       .finally(() => this._setSolving(false));
@@ -1415,6 +1418,7 @@ class SolutionController {
 
   _setSolving(isSolving, msg) {
     this._isSolving = isSolving;
+    this._elements.stepStatus.textContent = '';
     if (isSolving) {
       this._elements.stop.disabled = false;
       this._elements.start.disabled = true;
@@ -1468,6 +1472,8 @@ class SolutionController {
     for (const v in this._stateVars) {
       this._stateVars[v].textContent = '';
     }
+    this._elements.progressBar.setAttribute('value', 0);
+    this._elements.progressPercentage.textContent = '';
   }
 
   _displayStateVariables(state) {
@@ -1488,12 +1494,6 @@ class SolutionController {
           break;
         case 'searchSpaceExplored':
           text = (counters.progressRatio * 100).toPrecision(3) + '%';
-
-          if (counters.progressRatioPrev > 0) {
-            const extra = counters.progressRatioPrev * 100;
-            const extraText = extra >= 100 ? Math.floor(extra): extra.toPrecision(2);
-            text += ` (+${extraText}%)`;
-          }
           break;
         default:
           text = counters[v];
@@ -1502,16 +1502,20 @@ class SolutionController {
     }
   }
 
-  _displayState(state) {
-    // Handle this in a seperate function, as then it can be defered
-    // independently of the solution update.
-    this._displayStateVariables(state);
+  _updateProgressBar(state) {
+    const progress = state.done
+        ? 1
+        : state.counters.progressRatio + state.counters.branchesIgnored;
+    const percent = Math.round(progress*100);
+    this._elements.progressBar.setAttribute('value', progress);
+    this._elements.progressPercentage.textContent = percent + '%';
+  }
 
-    if (state.backtrackTriggers) {
-      this._infoOverlay.setHeatmapValues(state.backtrackTriggers);
-    }
+  _updateState(state) {
+    this._displayState(state);
 
     // Handle extra state.
+    // This must be handled as we see it because we only see each solution once.
     let extra = state.extra;
     if (!extra) return;
 
@@ -1520,11 +1524,21 @@ class SolutionController {
     }
   }
 
+  _displayState(state) {
+    this._displayStateVariables(state);
+
+    this._updateProgressBar(state);
+
+    if (state.backtrackTriggers) {
+      this._infoOverlay.setHeatmapValues(state.backtrackTriggers);
+    }
+  }
+
   _setStepStatus(result) {
     if (result.isSolution) {
-      this._elements.solveStatus.textContent = 'Solution';
+      this._elements.stepStatus.textContent = 'Solution';
     } else if (result.hasContradiction) {
-      this._elements.solveStatus.textContent = 'Conflict';
+      this._elements.stepStatus.textContent = 'Conflict';
     }
   }
 

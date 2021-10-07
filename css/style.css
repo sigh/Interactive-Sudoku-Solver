@@ -265,15 +265,6 @@ button.icon-button {
   text-align: center;
 }
 
-#solve-status {
-  font-weight: bold;
-  color: darkviolet;
-}
-#solve-status:empty:after {
-  content: '.';
-  visibility: hidden;
-}
-
 #freeform-constraint-input {
   position: relative;
   margin-top: 10px;
@@ -524,4 +515,29 @@ input:checked + span:before {
 
 #debug-container > div > span:first-child {
   color: grey;
+}
+
+#progress-container {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+}
+#progress-container span {
+  line-height: 1em;
+  font-size: small;
+  color: #4444FF;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+#progress-container span:empty:after {
+  content: '.';
+  visibility: hidden;
+}
+progress {
+  width: 100%;
+}
+
+#step-status {
+  font-weight: bold;
+  color: darkviolet;
 }

@@ -564,7 +564,7 @@ SudokuSolver.InternalSolver = class {
 
       if (this._uninterestingValues) {
         if (!this._hasInterestingSolutions(stack, grid, this._uninterestingValues)) {
-          counters.branchesIgnored++;
+          counters.branchesIgnored += progressRatioStack[depth];
           continue;
         }
       }
@@ -649,7 +649,10 @@ SudokuSolver.InternalSolver = class {
     // getting closer to the best choice.
     for (let i = 0; i < 10; i++) {
       const result = attempt();
-      if (result !== undefined) return result;
+      if (result !== undefined) {
+        this.done = true;
+        return result;
+      }
     }
 
     // Stop messing around, and commit.
@@ -668,8 +671,11 @@ SudokuSolver.InternalSolver = class {
 
     // Run the final search until we find a solution or prove that one doesn't
     // exist.
-    for (const result of this.run()) return true;
-    return false;
+    let result = false;
+    for (const result of this.run()) { result = true; break; }
+
+    this.done = true;
+    return result;
   }
 
   setProgressCallback(callback, logFrequency) {
