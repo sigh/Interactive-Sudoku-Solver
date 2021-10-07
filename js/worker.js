@@ -1,10 +1,12 @@
 const START_INIT_WORKER = performance.now();
 
 const cachebuster = self.location.search;
-self.importScripts('util.js' + cachebuster);
-self.importScripts('sudoku_builder.js' + cachebuster);
-self.importScripts('solver/engine.js' + cachebuster);
-self.importScripts('solver/handlers.js' + cachebuster);
+self.importScripts(
+  'util.js' + cachebuster,
+  'sudoku_builder.js' + cachebuster,
+  'solver/engine.js' + cachebuster,
+  'solver/handlers.js' + cachebuster);
+
 
 let workerSolver = null;
 let workerSolverSetUpTime = 0;
