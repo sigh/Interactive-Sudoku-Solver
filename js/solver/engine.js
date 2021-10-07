@@ -284,7 +284,6 @@ SudokuSolver.InternalSolver = class {
       guesses: 0,
       solutions: 0,
       constraintsProcessed: 0,
-      maxDepth: 0,
       progressRatio: 0,
       progressRatioPrev: 0,
       branchesIgnored: 0,
@@ -518,9 +517,6 @@ SudokuSolver.InternalSolver = class {
           }
         }
         this._backtrackTriggers[cell]++;
-        if (depth > counters.maxDepth) {
-          counters.maxDepth = depth;
-        }
 
         if (0 !== yieldOnContradiction &&
             0 === counters.backtracks % yieldOnContradiction) {
@@ -556,7 +552,6 @@ SudokuSolver.InternalSolver = class {
         // We've set all the values, and we haven't found a contradiction.
         // This is a solution!
         counters.solutions++;
-        counters.maxDepth = NUM_CELLS;
         yield {
           grid: grid,
           isSolution: true,
@@ -626,19 +621,24 @@ SudokuSolver.InternalSolver = class {
     };
 
     const attempLog = [];
-    const SEARCH_LIMIT = 10000;
+    const SEARCH_LIMIT = 1000;
 
     // Do a attempt to solve.
     const attempt = () => {
       this._resetStack();
-      this.counters.maxDepth = 0;
 
       const nonet = chooseNonet();
       fillNonet(nonet);
+      // Reduce backtrack triggers so that we don't weight the last runs too
+      // heavily.
+      // TODO: Do this in a more principled way.
+      for (let i = 0; i < NUM_CELLS; i++) {
+        this._backtrackTriggers[i] >>= 1;
+      }
 
       for (const result of this.run(SEARCH_LIMIT)) {
         if (result.isSolution) return true;
-        attempLog.push([nonet, this.counters.maxDepth]);
+        attempLog.push([nonet, this.counters.progressRatio]);
         return undefined;
       }
       return false;
@@ -647,7 +647,7 @@ SudokuSolver.InternalSolver = class {
     // Do a small number of short attempts.
     // Each time the most promising nonet will be chosen as a seed, ideally
     // getting closer to the best choice.
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 10; i++) {
       const result = attempt();
       if (result !== undefined) return result;
     }
@@ -660,8 +660,8 @@ SudokuSolver.InternalSolver = class {
     // Assume that we've hit a stable state where we alternate between the best
     // nonet and another, thus just look at the last two.
     const attemptOptions = attempLog.slice(-2);
-    // Sort by score, putting the min score first.
-    attemptOptions.sort((a,b) => a[1]-b[1]);
+    // Sort by score, putting the max score first.
+    attemptOptions.sort((a,b) => b[1]-a[1]);
     // Find the nonet with the best score.
     const bestNonet = attemptOptions[0][0];
     fillNonet(bestNonet);
