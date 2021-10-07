@@ -415,7 +415,6 @@ class SudokuBuilder {
     'ENABLE_DEBUG_LOGS',
   ];
 
-
   // Ask for a state update every 2**14 iterations.
   // NOTE: Using a non-power of 10 makes the display loook faster :)
   static LOG_UPDATE_FREQUENCY = 14;
@@ -434,7 +433,7 @@ class SudokuBuilder {
 
   static async buildInWorker(constraints, stateHandler, debugHandler) {
     if (!this._unusedWorkers.length) {
-      this._unusedWorkers.push(new Worker('js/worker.js' + CACHE_BUST_PARAM));
+      this._unusedWorkers.push(new Worker('js/worker.js' + VERSION_PARAM));
     }
     const worker = this._unusedWorkers.pop();
     worker.release = () => this._unusedWorkers.push(worker);

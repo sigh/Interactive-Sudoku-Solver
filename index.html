@@ -1,9 +1,12 @@
+---
+layout: null
+---
 <html>
 
 
 <head>
   <title>Interactive Sudoku Solver</title>
-  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="{{ 'css/style.css?v=' | append: site.github.build_revision | relative_url }}">
 
   <!-- Global site tag (gtag.js) - Google Analytics -->
   <script async src="https://www.googletagmanager.com/gtag/js?id=UA-177463638-1"></script>
@@ -15,19 +18,15 @@
     gtag('config', 'UA-177463638-1');
   </script>
 
-  <script defer src="data/example_puzzles.js"></script>
-  <script defer src="js/util.js"></script>
-  <script defer src="js/sudoku_builder.js"></script>
-  <script defer src="js/constraint_display.js"></script>
-  <script defer src="js/render_page.js"></script>
+  <script defer src="{{ '/data/example_puzzles.js?v=' | append: site.github.build_revision | relative_url }}"></script>
+  <script defer src="{{ '/js/util.js?v=' | append: site.github.build_revision | relative_url }}"></script>
+  <script defer src="{{ '/js/sudoku_builder.js?v=' | append: site.github.build_revision | relative_url }}"></script>
+  <script defer src="{{ '/js/constraint_display.js?v=' | append: site.github.build_revision | relative_url }}"></script>
+  <script defer src="{{ '/js/render_page.js?v=' | append: site.github.build_revision | relative_url }}"></script>
   <script>
-    window.addEventListener('load', () => {
-      // Preload the files required for the worker.
-      preloadJSFile('js/util.js');
-      preloadJSFile('js/sudoku_builder.js');
-      preloadJSFile('js/solver/engine.js');
-      preloadJSFile('js/solver/handlers.js');
+    var VERSION_PARAM = '?v=' + ('{{ site.github.build_revision }}' || Math.random());
 
+    window.addEventListener('load', () => {
       initPage();
 
       const loadDebug = dynamicJSFileLoader('js/debug.js');
