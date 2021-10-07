@@ -134,12 +134,19 @@ const runFnWithChecks = async (puzzles, fn, onFailure) => {
       }
     }
 
-    let row = {name: name, ...state.counters, timeMs: state.timeMs};
+    delete state.counters.progressRatio;
+    delete state.counters.progressRatioPrev;
+    const row = {
+      name: name,
+      ...state.counters,
+      setupTime: state.puzzleSetupTime,
+      timeMs: state.timeMs};
     rows.push(row);
+
     total = sumObjectValues(total, row);
-    total.name = 'Total';
   }
 
+  total.name = 'Total';
   rows.total = total;
 
   const endTime = performance.now();
