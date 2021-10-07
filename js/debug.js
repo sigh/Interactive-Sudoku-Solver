@@ -139,8 +139,8 @@ const runFnWithChecks = async (puzzles, fn, onFailure) => {
     const row = {
       name: name,
       ...state.counters,
-      setupTime: state.puzzleSetupTime,
-      timeMs: state.timeMs};
+      setupTimeMs: state.puzzleSetupTime,
+      rumtimeMs: state.timeMs};
     rows.push(row);
 
     total = sumObjectValues(total, row);
