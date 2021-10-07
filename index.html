@@ -22,7 +22,14 @@
   <script defer src="js/render_page.js"></script>
   <script>
     window.addEventListener('load', () => {
+      // Preload the files required for the worker.
+      preloadJSFile('js/util.js');
+      preloadJSFile('js/sudoku_builder.js');
+      preloadJSFile('js/solver/engine.js');
+      preloadJSFile('js/solver/handlers.js');
+
       initPage();
+
       const loadDebug = dynamicJSFileLoader('js/debug.js');
       self.loadDebug = loadDebug;
     });

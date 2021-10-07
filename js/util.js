@@ -1,3 +1,6 @@
+var CACHE_BUST_PARAM = `?cachebuster=${Math.random()}`;
+
+
 const formatTimeMs = (timeMs) => {
   if (timeMs < 1000) {
     return timeMs.toPrecision(3) + ' ms';
@@ -134,10 +137,18 @@ class IteratorWithCount {
   [Symbol.iterator] = () => this;
 }
 
+const preloadJSFile = (path) => {
+  const o = document.createElement('object');
+  o.data = path + CACHE_BUST_PARAM;
+  o.style.display = 'none';
+  o.width = 0;
+  o.height = 0;
+  document.body.appendChild(o);
+};
+
 const loadJSFile = (path) => {
   const script = document.createElement('script');
-  const cachebuster = '?cachebuster=' + Math.random();
-  script.src = path + cachebuster;
+  script.src = path + CACHE_BUST_PARAM;
   script.async = false;
   document.head.append(script);
 
