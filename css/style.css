@@ -147,6 +147,9 @@ button.danger-button:hover:enabled {
 .highlighted {
   background: rgba(255,255,0,0.5);
 }
+.highlighted-step {
+  box-shadow: inset 0 0 10px #0000FF;
+}
 
 .error {
   color: rgb(200, 0, 0);

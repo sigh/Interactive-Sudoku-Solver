@@ -285,6 +285,7 @@ class ConstraintManager {
 
   _setUpPanel() {
     this._constraintPanel = document.getElementById('displayed-constraints');
+    this._panelItemHighlighter = this._grid.createHighlighter('highlighted');
 
     // Checkbox constraints.
     this._checkboxConstraints = new CheckboxConstraints(
@@ -603,7 +604,7 @@ class ConstraintManager {
       config.panelItem.parentNode.removeChild(config.panelItem);
     }
 
-    this._grid.highlight.setCells([]);
+    this._panelItemHighlighter.setCells([]);
   }
 
   _makePanelItem(config) {
@@ -627,10 +628,10 @@ class ConstraintManager {
     });
 
     panelItem.addEventListener('mouseover', () => {
-      this._grid.highlight.setCells(config.cells);
+      this._panelItemHighlighter.setCells(config.cells);
     });
     panelItem.addEventListener('mouseout', () => {
-      this._grid.highlight.setCells([]);
+      this._panelItemHighlighter.setCells([]);
     });
 
     return panelItem;
@@ -813,11 +814,14 @@ class SudokuGrid {
       fakeInput.style.top = cell.offsetTop;
       fakeInput.select();
     });
-    this.highlight = new Highlight(container, 'highlighted');
     this._setUpKeyBindings(container);
     this.setUpdateCallback();
 
     this.setSolution = deferUntilAnimationFrame(this.setSolution.bind(this));
+  }
+
+  createHighlighter(cssClass) {
+    return new Highlight(this._container, cssClass);
   }
 
   setUpdateCallback(fn) {
@@ -1133,6 +1137,8 @@ class DebugOutput {
     this._visible = false;
     this._grid = grid;
     this._infoOverlay = infoOverlay;
+
+    this._debugCellHighlighter = grid.createHighlighter('highlighted');
   }
 
   clear() {
@@ -1171,10 +1177,10 @@ class DebugOutput {
     if (data.cells && data.cells.length) {
       const cellIds = [...data.cells].map(c => toCellId(...toRowCol(c)));
       elem.addEventListener('mouseover', () => {
-        this._grid.highlight.setCells(cellIds);
+        this._debugCellHighlighter.setCells(cellIds);
       });
       elem.addEventListener('mouseout', () => {
-        this._grid.highlight.setCells([]);
+        this._debugCellHighlighter.setCells([]);
       });
     }
 
@@ -1339,6 +1345,7 @@ class SolutionController {
     this._isSolving = false;
     this._constraintManager = constraintManager;
     this._grid = grid;
+    this._stepHighlighter = grid.createHighlighter('highlighted-step');
     this._debugOutput = new DebugOutput(grid, infoOverlay);
     this._update = deferUntilAnimationFrame(this._update.bind(this));
     constraintManager.setUpdateCallback(this._update.bind(this));
@@ -1501,6 +1508,7 @@ class SolutionController {
 
   _resetSolver() {
     this._terminateSolver();
+    this._stepHighlighter.setCells([]);
     this._grid.setSolution([]);
     this._stateDisplay.clear();
     this._setValidateResult();
@@ -1581,7 +1589,7 @@ class SolutionController {
       } else {
         this._stateDisplay.setStepStatus(null);
       }
-      this._grid.selection.setCells(selection);
+      this._stepHighlighter.setCells(selection);
 
       this._elements.forward.disabled = (result == null);
       this._elements.back.disabled = (step == 0);
