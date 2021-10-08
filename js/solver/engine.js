@@ -236,8 +236,7 @@ SudokuSolver.InternalSolver = class {
       // For now just look at the most restricted constraint the cell is part
       // of.
       for (const cell of handler.cells) {
-        priorities[cell] = Math.min(
-          priorities[cell], GRID_SIZE-handler.cells.length);
+        priorities[cell] += handler.cells.length;
       }
     }
 
@@ -383,20 +382,25 @@ SudokuSolver.InternalSolver = class {
       // guessing.
       if (count <= 1) {
         bestIndex = i;
-        minScore = 1;
         break;
       }
 
-      if (count < minScore || count == minScore && triggerCounts[cell] > maxTriggerCount ) {
+      let score = count;
+      // Ugly ugly tuning, but this almost universally speeds things up.
+      // Especially for very under-constrainted problems.
+      // TODO: Figure out a more principled way of doing this.
+      if (triggerCounts[cell] > NUM_CELLS) score -= 2;
+
+      if (score < minScore || score == minScore && triggerCounts[cell] > maxTriggerCount ) {
         bestIndex = i;
-        minScore = count;
+        minScore = score;
         maxTriggerCount = triggerCounts[cell];
       }
     }
 
     [stack[bestIndex], stack[depth]] = [stack[depth], stack[bestIndex]];
 
-    return minScore;
+    return LookupTable.COUNT[grid[stack[depth]]];
   }
 
   _enforceValue(grid, value, cell) {
