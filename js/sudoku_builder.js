@@ -431,14 +431,14 @@ class SudokuBuilder {
     return options;
   }
 
-  static async buildInWorker(constraints, stateHandler, debugHandler) {
+  static async buildInWorker(constraints, stateHandler, statusHandler, debugHandler) {
     if (!this._unusedWorkers.length) {
       this._unusedWorkers.push(new Worker('js/worker.js' + VERSION_PARAM));
     }
     const worker = this._unusedWorkers.pop();
     worker.release = () => this._unusedWorkers.push(worker);
 
-    const solverProxy = new SolverProxy(worker, stateHandler, debugHandler);
+    const solverProxy = new SolverProxy(worker, stateHandler, statusHandler, debugHandler);
     const globalVars = this.getGlobalVars();
 
     await solverProxy.init(constraints, this.LOG_UPDATE_FREQUENCY, globalVars);
@@ -664,7 +664,7 @@ class SudokuBuilder {
 }
 
 class SolverProxy {
-  constructor(worker, stateHandler, debugHandler) {
+  constructor(worker, stateHandler, statusHandler, debugHandler) {
     if (!worker) {
       throw('Must provide worker');
     }
@@ -677,6 +677,7 @@ class SolverProxy {
     this._initialized = false;
     this._stateHandler = stateHandler || (() => null);
     this._debugHandler = debugHandler || (() => null);
+    this._statusHandler = statusHandler || (() => null);
   }
 
   async solveAllPossibilities() {
@@ -700,22 +701,27 @@ class SolverProxy {
   }
 
   _handleMessage(response) {
+    // Solver has been terminated.
+    if (!this._worker) return;
+
     let data = response.data;
 
     switch (data.type) {
       case 'result':
         this._waiting.resolve(data.result);
+        this._statusHandler(false, this._waiting.method);
         this._waiting = null;
         break;
       case 'exception':
         this._waiting.reject(data.error);
+        this._statusHandler(false, this._waiting.method);
         this._waiting = null;
         break;
       case 'state':
         this._stateHandler(data.state);
         break;
       case 'debug':
-        this._debugHandler(data.logs);
+        this._debugHandler(data.data);
         break;
     }
   }
@@ -730,6 +736,8 @@ class SolverProxy {
     if (this._waiting) {
       throw(`Can't call worker while a method is in progress. (${this._waiting.method})`);
     }
+
+    this._statusHandler(true, method);
 
     let promise = new Promise((resolve, reject) => {
       this._waiting = {
@@ -759,16 +767,18 @@ class SolverProxy {
 
   terminate() {
     if (!this._worker) return;
+    const worker = this._worker;
+    this._worker = null;
 
-    this._worker.removeEventListener('message', this._messageHandler);
+    worker.removeEventListener('message', this._messageHandler);
     // If we are waiting, we have to kill it because we don't know how long
     // we'll be waiting. Otherwise we can just release it to be reused.
     if (this._waiting) {
-      this._worker.terminate();
-      this._waiting.reject('Aborted');
+      worker.terminate();
+      this._waiting.reject('Aborted worker running: ' + this._waiting.method);
+      this._statusHandler(false, 'terminate');
     } else {
-      this._worker.release();
+      worker.release();
     }
-    this._worker = null;
   }
 };

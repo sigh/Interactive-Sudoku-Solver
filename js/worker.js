@@ -58,17 +58,21 @@ const debugLog = (data) => {
 };
 
 const sendState = (extraState) => {
-  let state = workerSolver.state();
+  const state = workerSolver.state();
   state.extra = extraState;
   state.puzzleSetupTime = workerSolverSetUpTime;
   self.postMessage({
     type: 'state',
     state: state,
   });
-  if (pendingDebugLogs.length) {
+  const debugState = workerSolver.debugState();
+  if (pendingDebugLogs.length || debugState) {
     self.postMessage({
       type: 'debug',
-      logs: pendingDebugLogs.splice(0),
+      data: {
+        logs: pendingDebugLogs.splice(0),
+        debugState: debugState,
+      },
     });
   }
 };

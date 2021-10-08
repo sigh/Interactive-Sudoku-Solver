@@ -1128,21 +1128,28 @@ class HistoryHandler {
 }
 
 class DebugOutput {
-  constructor(grid) {
+  constructor(grid, infoOverlay) {
     this._container = document.getElementById('debug-container');
     this._visible = false;
     this._grid = grid;
+    this._infoOverlay = infoOverlay;
   }
 
   clear() {
     if (!this._visible) return;
 
     this._container.textContent = '';
+    this._infoOverlay.clear();
   }
 
-  addLogs(logs) {
+  update(data) {
     if (!this._visible) return;
-    logs.forEach(l => this._addLog(l));
+
+    data.logs.forEach(l => this._addLog(l));
+
+    if (data.debugState && data.debugState.backtrackTriggers) {
+      this._infoOverlay.setHeatmapValues(data.debugState.backtrackTriggers);
+    }
   }
 
   _addLog(data) {
@@ -1183,14 +1190,156 @@ class DebugOutput {
   }
 }
 
+class SolverStateDisplay {
+  constructor(grid) {
+    this._grid = grid;
+
+    this._elements = {
+      progressContainer: document.getElementById('progress-container'),
+      stateOutput: document.getElementById('state-output'),
+      error: document.getElementById('error-output'),
+      progressBar: document.getElementById('solve-progress'),
+      progressPercentage: document.getElementById('solve-percentage'),
+      solveStatus: document.getElementById('solve-status'),
+      stepStatus: document.getElementById('step-status'),
+    };
+
+    this._setUpStateOutput();
+
+    this._lazyUpdateState = deferUntilAnimationFrame(
+      this._lazyUpdateState.bind(this));
+  }
+
+  _lazyUpdateState(state) {
+    this._displayStateVariables(state);
+
+    this._updateProgressBar(state);
+  }
+
+  _METHOD_TO_STATUS = {
+    'solveAllPossibilities': 'Solving',
+    'nthSolution': 'Solving',
+    'nthStep': '',
+    'countSolutions': 'Counting',
+    'validateLayout': 'Validating',
+    'terminate': 'Aborted',
+  };
+
+  setSolveStatus(isSolving, method) {
+    if (!isSolving && method == 'terminate') {
+      this._elements.solveStatus.textContent = this._METHOD_TO_STATUS[method];
+      this._elements.progressContainer.classList.add('error');
+      return;
+    }
+
+    if (isSolving) {
+      this._elements.solveStatus.textContent = this._METHOD_TO_STATUS[method];
+    } else {
+      this._elements.solveStatus.textContent = '';
+    }
+    this._elements.progressContainer.classList.remove('error');
+  }
+
+  setState(state) {
+    this._lazyUpdateState(state);
+
+    // Handle extra state.
+    // This must be handled as we see it because we only see each solution once.
+    let extra = state.extra;
+    if (!extra) return;
+
+    if (extra.solution || extra.pencilmarks) {
+      this._grid.setSolution(extra.solution, extra.pencilmarks);
+    }
+  }
+
+  setStepStatus(status) {
+    this._elements.stepStatus.textContent = status || '';
+  }
+
+  clear() {
+    for (const v in this._stateVars) {
+      this._stateVars[v].textContent = '';
+    }
+    this._elements.progressBar.setAttribute('value', 0);
+    this._elements.progressPercentage.textContent = '';
+    this.setSolveStatus(false, '');
+    this._elements.solveStatus.textContent = '';
+    this._elements.stepStatus.textContent = '';
+  }
+
+  _displayStateVariables(state) {
+    const counters = state.counters;
+
+    for (const v in this._stateVars) {
+      let text;
+      switch (v) {
+        case 'solutions':
+          const searchComplete = state.done && !counters.branchesIgnored;
+          text = counters.solutions + (searchComplete ? '' : '+');
+          break;
+        case 'puzzleSetupTime':
+          text = state.puzzleSetupTime ? formatTimeMs(state.puzzleSetupTime) : '?';
+          break;
+        case 'runtime':
+          text = formatTimeMs(state.timeMs);
+          break;
+        case 'searchSpaceExplored':
+          text = (counters.progressRatio * 100).toPrecision(3) + '%';
+          break;
+        default:
+          text = counters[v];
+      }
+      this._stateVars[v].textContent = text;
+    }
+  }
+
+  _updateProgressBar(state) {
+    const progress = state.done
+        ? 1
+        : state.counters.progressRatio + state.counters.branchesIgnored;
+    const percent = Math.round(progress*100);
+    this._elements.progressBar.setAttribute('value', progress);
+    this._elements.progressPercentage.textContent = percent + '%';
+  }
+
+  _setUpStateOutput() {
+    let container = this._elements.stateOutput;
+    let vars = [
+      'solutions',
+      'guesses',
+      'backtracks',
+      'cellsSearched',
+      'valuesTried',
+      'constraintsProcessed',
+      'searchSpaceExplored',
+      'puzzleSetupTime',
+      'runtime',
+    ];
+    this._stateVars = {};
+    for (const v of vars) {
+      let elem = document.createElement('div');
+      let value = document.createElement('span');
+      let title = document.createElement('span');
+      title.textContent = camelCaseToWords(v);
+      title.className = 'description';
+      if (v == 'solutions') title.style.fontSize = '16px';
+      elem.appendChild(value);
+      elem.appendChild(title);
+      container.appendChild(elem);
+
+      this._stateVars[v] = value;
+    }
+  }
+}
+
 class SolutionController {
   constructor(constraintManager, grid, infoOverlay) {
     this._solver = null;
     this._isSolving = false;
     this._constraintManager = constraintManager;
-    this._infoOverlay = infoOverlay;
     this._grid = grid;
-    this._debugOutput = new DebugOutput(grid);
+    this._debugOutput = new DebugOutput(grid, infoOverlay);
     this._update = deferUntilAnimationFrame(this._update.bind(this));
     constraintManager.setUpdateCallback(this._update.bind(this));
 
@@ -1199,6 +1348,7 @@ class SolutionController {
       'solutions': this._runSolutionIterator,
       'count-solutions': this._runCounter,
       'step-by-step': this._runStepIterator,
+      'validate-layout': this._runValidateLayout,
     };
 
     this._elements = {
@@ -1209,17 +1359,12 @@ class SolutionController {
       stepOutput: document.getElementById('solution-step-output'),
       mode: document.getElementById('solve-mode-input'),
       modeDescription: document.getElementById('solve-mode-description'),
-      stateOutput: document.getElementById('state-output'),
-      solveStatus: document.getElementById('solve-status'),
-      stepStatus: document.getElementById('step-status'),
       error: document.getElementById('error-output'),
       validateResult: document.getElementById('validate-result-output'),
       stop: document.getElementById('stop-solver'),
       solve: document.getElementById('solve-button'),
       validate: document.getElementById('validate-layout-button'),
       autoSolve: document.getElementById('auto-solve-input'),
-      progressBar: document.getElementById('solve-progress'),
-      progressPercentage: document.getElementById('solve-percentage'),
     }
 
     this._elements.mode.onchange = () => this._update();
@@ -1230,8 +1375,7 @@ class SolutionController {
     this._setUpAutoSolve();
     this._setUpKeyBindings();
 
-    this._setUpStateOutput();
-    this._displayState = deferUntilAnimationFrame(this._displayState.bind(this));
+    this._stateDisplay = new SolverStateDisplay(grid);
 
     this._historyHandler = new HistoryHandler((params) => {
       let mode = params.get('mode');
@@ -1317,17 +1461,10 @@ class SolutionController {
   }
 
   _terminateSolver() {
-    if (this._solver) this._solver.terminate();
-  }
-
-  async _replaceSolver(constraints) {
-    this._terminateSolver();
-
-    this._solver = await SudokuBuilder.buildInWorker(
-      constraints, this._updateState.bind(this),
-      (logs) => this._debugOutput.addLogs(logs));
-
-    return this._solver;
+    if (this._solver) {
+      this._solver.terminate();
+      this._solver = null;
+    }
   }
 
   _showIterationControls(show) {
@@ -1355,200 +1492,81 @@ class SolutionController {
     let description = SolutionController._MODE_DESCRIPTIONS[mode];
     this._elements.modeDescription.textContent = description;
 
-    this._setValidateResult();
-
     if (auto || mode === 'step-by-step') {
       this._solve(constraints);
     } else {
-      this._grid.setSolution([]);
-      this._infoOverlay.clear();
-      this._clearStateVariables();
-      this._setError();
-      this._debugOutput.clear();
-      this._terminateSolver();
-      this._showIterationControls(false);
+      this._resetSolver();
     }
   }
 
-  async _solve(constraints) {
-    constraints ||= this._constraintManager.getConstraints();
-    let mode = this._elements.mode.value;
-
+  _resetSolver() {
+    this._terminateSolver();
     this._grid.setSolution([]);
-    this._infoOverlay.clear();
+    this._stateDisplay.clear();
+    this._setValidateResult();
     this._debugOutput.clear();
-
-    let solver = await this._replaceSolver(constraints);
-
-    let handler = this._modeHandlers[mode];
-
-    this._setSolving(true);
-    handler.bind(this)(solver)
-      .catch(e => this._setError(e))
-      .finally(() => this._setSolving(false));
+    this._showIterationControls(false);
   }
 
-  async _validateLayout(constraints) {
-    this._infoOverlay.clear();
-    this._debugOutput.clear();
-
-    const solver = await this._replaceSolver(this._constraintManager.getLayoutConstraint());
-
-    const statusElem = this._elements.solveStatus;
-
-    let handler = async (solver) => {
-      let result = await solver.validateLayout();
-      this._setValidateResult(result ?'Valid layout' : 'Invalid layout');
-      this._setSolving(false);
-    };
-
-    this._setSolving(true, 'Validating');
-    handler.bind(this)(solver)
-      .catch(e => this._setError(e))
-      .finally(() => this._setSolving(false));
+  async _solve(constraints) {
+    const mode = this._elements.mode.value;
+    this._replaceAndRunSolver(mode, constraints);
   }
 
-  _setError(text) {
-    this._elements.error.textContent = text || '';
+  async _validateLayout() {
+    const constraints = this._constraintManager.getLayoutConstraint();
+    this._replaceAndRunSolver('validate-layout', constraints);
+  }
+
+  async _replaceAndRunSolver(mode, constraints) {
+    constraints ||= this._constraintManager.getConstraints();
+
+    this._resetSolver();
+
+    this._solver = await SudokuBuilder.buildInWorker(
+      constraints,
+      s => this._stateDisplay.setState(s),
+      this._solveStatusChanged.bind(this),
+      data => this._debugOutput.update(data));
+
+    const handler = this._modeHandlers[mode];
+
+    handler.bind(this)(this._solver)
+      .catch(e => {
+        if (!e.startsWith('Aborted')) {
+          throw(e);
+        }
+      });
   }
 
   _setValidateResult(text) {
     this._elements.validateResult.textContent = text || '';
   }
 
-  _setSolving(isSolving, msg) {
+  _solveStatusChanged(isSolving, method) {
     this._isSolving = isSolving;
-    this._elements.stepStatus.textContent = '';
+    this._stateDisplay.setSolveStatus(isSolving, method);
+
     if (isSolving) {
       this._elements.stop.disabled = false;
       this._elements.start.disabled = true;
       this._elements.forward.disabled = true;
       this._elements.back.disabled = true;
-      this._elements.solveStatus.textContent = msg || 'Solving';
-      this._setError();
-      this._setValidateResult();
     } else {
       this._elements.stop.disabled = true;
-      this._elements.solveStatus.textContent = '';
     }
   }
 
-  static _addStateVariable(container, label, value) {
-    let elem = document.createElement('div');
-    elem.textContent = `${label}: ${value}`;
-    container.appendChild(elem);
-  }
-
-  _setUpStateOutput() {
-    let container = this._elements.stateOutput;
-    let vars = [
-      'solutions',
-      'guesses',
-      'backtracks',
-      'cellsSearched',
-      'valuesTried',
-      'constraintsProcessed',
-      'searchSpaceExplored',
-      'puzzleSetupTime',
-      'runtime',
-    ];
-    this._stateVars = {};
-    for (const v of vars) {
-      let elem = document.createElement('div');
-      let value = document.createElement('span');
-      let title = document.createElement('span');
-      title.textContent = camelCaseToWords(v);
-      title.className = 'description';
-      if (v == 'solutions') title.style.fontSize = '16px';
-      elem.appendChild(value);
-      elem.appendChild(title);
-      container.appendChild(elem);
-
-      this._stateVars[v] = value;
-    }
-  }
-
-  _clearStateVariables() {
-    for (const v in this._stateVars) {
-      this._stateVars[v].textContent = '';
-    }
-    this._elements.progressBar.setAttribute('value', 0);
-    this._elements.progressPercentage.textContent = '';
-  }
-
-  _displayStateVariables(state) {
-    const counters = state.counters;
-
-    for (const v in this._stateVars) {
-      let text;
-      switch (v) {
-        case 'solutions':
-          const searchComplete = state.done && !counters.branchesIgnored;
-          text = counters.solutions + (searchComplete ? '' : '+');
-          break;
-        case 'puzzleSetupTime':
-          text = state.puzzleSetupTime ? formatTimeMs(state.puzzleSetupTime) : '?';
-          break;
-        case 'runtime':
-          text = formatTimeMs(state.timeMs);
-          break;
-        case 'searchSpaceExplored':
-          text = (counters.progressRatio * 100).toPrecision(3) + '%';
-          break;
-        default:
-          text = counters[v];
-      }
-      this._stateVars[v].textContent = text;
-    }
-  }
-
-  _updateProgressBar(state) {
-    const progress = state.done
-        ? 1
-        : state.counters.progressRatio + state.counters.branchesIgnored;
-    const percent = Math.round(progress*100);
-    this._elements.progressBar.setAttribute('value', progress);
-    this._elements.progressPercentage.textContent = percent + '%';
-  }
-
-  _updateState(state) {
-    this._displayState(state);
-
-    // Handle extra state.
-    // This must be handled as we see it because we only see each solution once.
-    let extra = state.extra;
-    if (!extra) return;
-
-    if (extra.solution || extra.pencilmarks) {
-      this._grid.setSolution(extra.solution, extra.pencilmarks);
-    }
-  }
-
-  _displayState(state) {
-    this._displayStateVariables(state);
-
-    this._updateProgressBar(state);
-
-    if (state.backtrackTriggers) {
-      this._infoOverlay.setHeatmapValues(state.backtrackTriggers);
-    }
-  }
-
-  _setStepStatus(result) {
-    if (result.isSolution) {
-      this._elements.stepStatus.textContent = 'Solution';
-    } else if (result.hasContradiction) {
-      this._elements.stepStatus.textContent = 'Conflict';
-    }
+  async _runValidateLayout(solver) {
+    const result = await solver.validateLayout();
+    this._setValidateResult(result ?'Valid layout' : 'Invalid layout');
   }
 
   async _runStepIterator(solver) {
     let step = 0;
 
     const update = async () => {
-      this._setSolving(true);
       let result = await solver.nthStep(step);
-      this._setSolving(false);
 
       // Update the grid.
       let selection = [];
@@ -1557,7 +1575,11 @@ class SolutionController {
         if (result.values.length > 0 && !result.isSolution) {
           selection.push(result.values[result.values.length-1].substring(0, 4));
         }
-        this._setStepStatus(result);
+        this._stateDisplay.setStepStatus(
+          result.isSolution ? 'Solution' :
+          result.hasContradiction ? 'Conflict' : null);
+      } else {
+        this._stateDisplay.setStepStatus(null);
       }
       this._grid.selection.setCells(selection);
 
@@ -1585,7 +1607,6 @@ class SolutionController {
     // Run the onclick handler (just calling click() would only work when
     // the start button is enabled).
     this._elements.start.onclick();
-    this._setSolving(false);
   }
 
   async _runSolutionIterator(solver) {
@@ -1596,9 +1617,7 @@ class SolutionController {
     const nextSolution = async () => {
       if (done) return;
 
-      this._setSolving(true);
       let solution = await solver.nthSolution(solutions.length);
-      this._setSolving(false);
 
       if (solution) {
         solutions.push(solution);
@@ -1647,16 +1666,12 @@ class SolutionController {
   }
 
   async _runAllPossibilites(solver) {
-    this._showIterationControls(false);
     let result = await solver.solveAllPossibilities();
     this._grid.setSolution(result);
-    this._setSolving(false);
   }
 
   async _runCounter(solver) {
-    this._showIterationControls(false);
     await solver.countSolutions();
-    this._setSolving(false);
   }
 }
 

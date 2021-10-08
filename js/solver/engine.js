@@ -138,6 +138,16 @@ class SudokuSolver {
     return result;
   }
 
+  debugState() {
+    if (EXPORT_CONFLICT_HEATMAP) {
+      return {
+        backtrackTriggers: this._internalSolver.getBacktrackTriggers(),
+      };
+    } else {
+      return null;
+    }
+  }
+
   state() {
     const counters = {...this._internalSolver.counters};
 
@@ -145,10 +155,6 @@ class SudokuSolver {
       counters: counters,
       timeMs: this._timer.elapsedMs(),
       done: this._internalSolver.done,
-    }
-
-    if (EXPORT_CONFLICT_HEATMAP) {
-      state.backtrackTriggers = this._internalSolver.getBacktrackTriggers();
     }
 
     return state;

@@ -522,10 +522,13 @@ input:checked + span:before {
   flex-wrap: wrap;
   justify-content: space-between;
 }
+#progress-container.error {
+  filter: hue-rotate(120deg) brightness(0.8);
+}
 #progress-container span {
   line-height: 1em;
   font-size: small;
-  color: #4444FF;
+  color: #4444ff;
   font-weight: bold;
   text-transform: uppercase;
 }
