@@ -18,22 +18,27 @@ class CheckboxConstraints {
       antiKnight: {
         id: 'anti-knight-input',
         constraint: new SudokuConstraint.AntiKnight(),
+        isLayout: true,
       },
       antiKing: {
         id: 'anti-king-input',
         constraint: new SudokuConstraint.AntiKing(),
+        isLayout: true,
       },
       antiConsecutive: {
         id: 'anti-consecutive-input',
         constraint: new SudokuConstraint.AntiConsecutive(),
+        isLayout: false,
       },
       diagonalPlus: {
         id: 'diagonal-plus-input',
         constraint: new SudokuConstraint.Diagonal(1),
+        isLayout: true,
       },
       diagonalMinus: {
         id: 'diagonal-minus-input',
         constraint: new SudokuConstraint.Diagonal(-1),
+        isLayout: true,
       },
     };
 
@@ -61,14 +66,24 @@ class CheckboxConstraints {
     }
   }
 
-  getConstraint() {
+  _getConstraint(layout) {
     let constraints = [];
     for (const item of Object.values(this._checkboxes)) {
+      if (layout && !item.isLayout) continue;
+
       if (item.element.checked) {
         constraints.push(item.constraint);
       }
     }
     return new SudokuConstraint.Set(constraints);
+  }
+
+  getConstraint() {
+    return this._getConstraint(false);
+  }
+
+  getLayoutConstraint() {
+    return this._getConstraint(true);
   }
 
   check(name) {
@@ -168,9 +183,6 @@ class JigsawManager {
 
     const jigsawPanel = document.getElementById('displayed-regions');
     jigsawPanel.style.display = checked ? null : 'none';
-
-    const button = document.getElementById('validate-layout-button');
-    button.disabled = !checked;
 
     this._display.useJigsawRegions(checked);
   }
@@ -665,7 +677,10 @@ class ConstraintManager {
   }
 
   getLayoutConstraint() {
-    return this._jigsawManager.getConstraint();
+    const constraints = [];
+    constraints.push(this._jigsawManager.getConstraint());
+    constraints.push(this._checkboxConstraints.getLayoutConstraint());
+    return new SudokuConstraint.Set(constraints);
   }
 
   getConstraints() {
@@ -1567,7 +1582,7 @@ class SolutionController {
 
   async _runValidateLayout(solver) {
     const result = await solver.validateLayout();
-    this._setValidateResult(result ?'Valid layout' : 'Invalid layout');
+    this._setValidateResult(result ? 'Valid layout' : 'Invalid layout');
   }
 
   async _runStepIterator(solver) {
