@@ -40,6 +40,11 @@ class CheckboxConstraints {
         constraint: new SudokuConstraint.Diagonal(-1),
         isLayout: true,
       },
+      noBoxes: {
+        id: 'no-boxes-input',
+        constraint: new SudokuConstraint.NoBoxes(),
+        isLayout: true,
+      },
     };
 
     // Setup the elements.
@@ -62,6 +67,10 @@ class CheckboxConstraints {
       } else {
         display.removeDiagonal(-1);
       }
+      onChange();
+    }
+    this._checkboxes.noBoxes.element.onchange = e => {
+      display.useDefaultRegions(!this._checkboxes.noBoxes.element.checked);
       onChange();
     }
   }
@@ -163,36 +172,14 @@ class JigsawManager {
     this._display = display;
     this._makePanelItem = makePanelItem;
 
-    this._jigsawCheckbox = document.getElementById('jigsaw-input');
-    this._jigsawCheckbox.onchange = e => {
-      this._updateDependentElements();
-      onChange();
-    }
-
     this._regionPanel = document.getElementById('displayed-regions');
 
     this._piecesMap = Array(NUM_CELLS).fill(0);
     this._maxPieceId = 0;
   }
 
-  _updateDependentElements() {
-    const checked = this.enabled();
-
-    const jigsawRadio = document.getElementById('multi-cell-constraint-jigsaw').parentNode;
-    jigsawRadio.style.display = checked ? null : 'none';
-
-    const jigsawPanel = document.getElementById('displayed-regions');
-    jigsawPanel.style.display = checked ? null : 'none';
-
-    this._display.useJigsawRegions(checked);
-  }
-
-  enabled() {
-    return this._jigsawCheckbox.checked;
-  }
-
   getConstraint() {
-    if (!this.enabled()) return new SudokuConstraint.Set([]);
+    if (this._piecesMap.every(x => x == 0)) return new SudokuConstraint.Set([]);
 
     const indexMap = new Map();
     const grid = Array(NUM_CELLS).fill('-');
@@ -217,21 +204,15 @@ class JigsawManager {
         this.addPiece(cells.map(c => toCellId(...toRowCol(c))));
       }
     }
-
-    this._jigsawCheckbox.checked = true;
-    this._updateDependentElements();
   }
 
   clear() {
     this._piecesMap.fill(0);
-    this._jigsawCheckbox.checked = false;
     this._regionPanel.innerHTML = '';
-    this._updateDependentElements();
   }
 
   isValidJigsawPiece(selection) {
     if (selection.length != 9) return false;
-    if (!this.enabled()) return false;
 
     // Check that we aren't overlapping an existing tile.
     if (selection.some(c => this._piecesMap[parseCellId(c).cell] != 0)) {
@@ -553,6 +534,9 @@ class ConstraintManager {
         } else {
           this._checkboxConstraints.check('diagonalMinus');
         }
+        break;
+      case 'NoBoxes':
+        this._checkboxConstraints.check('noBoxes');
         break;
       case 'Set':
         constraint.constraints.forEach(c => this.loadConstraint(c));

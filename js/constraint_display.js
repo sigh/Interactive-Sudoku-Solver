@@ -24,6 +24,8 @@ class ConstraintDisplay {
     svg.append(this._makeArrowhead());
     svg.append(this._makeLittleKillers(gridSelection));
 
+    svg.append(this.makeBorders());
+
     container.prepend(svg);
 
     this._gridSelection = gridSelection;
@@ -47,7 +49,6 @@ class ConstraintDisplay {
     this._regionContainer.append(this._missingRegion);
 
     svg.append(this._regionContainer);
-    this.useJigsawRegions(false);
   }
 
   _makeLittleKillers(gridSelection) {
@@ -478,8 +479,6 @@ class ConstraintDisplay {
       ]));
     }
 
-    grid.append(this.makeBorders());
-
     return grid;
   }
 
@@ -488,6 +487,7 @@ class ConstraintDisplay {
     const gridSize = cellSize*GRID_SIZE;
 
     const g = createSvgElement('g');
+    this._applyGridOffset(g);
     g.setAttribute('stroke-width', 2);
     g.setAttribute('stroke', 'rgb(0, 0, 0)');
     const path = this._makePath([
@@ -527,9 +527,8 @@ class ConstraintDisplay {
     return grid;
   }
 
-  useJigsawRegions(enable) {
-    this._defaultRegions.setAttribute('display', enable ? 'none' : null);
-    this._regionContainer.setAttribute('display', enable ? null : 'none');
+  useDefaultRegions(enable) {
+    this._defaultRegions.setAttribute('display', enable ? null : 'none');
   }
 
   _updateMissingRegion() {
@@ -538,6 +537,9 @@ class ConstraintDisplay {
     while (svg.lastChild) {
       svg.removeChild(svg.lastChild);
     }
+
+    // Don't shade in anything if there are no jigsaw pieces.
+    if (this._regionElems.size == 0) return;
 
     // Find the current missing cells.
     const missingCells = new Set();
@@ -568,7 +570,7 @@ class ConstraintDisplay {
 
     const g = createSvgElement('g');
     g.setAttribute('stroke-width', 2);
-    g.setAttribute('stroke', 'rgb(0, 0, 0)');
+    g.setAttribute('stroke', 'rgb(100, 100, 100)');
     g.setAttribute('stroke-linecap', 'round');
 
     const cellSize = ConstraintDisplay.CELL_SIZE;

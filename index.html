@@ -135,14 +135,7 @@ layout: null
       <div class="two-column">
         <form id="multi-cell-constraint-input">
           <fieldset tabindex="0" disabled>
-            <span>Create from selection</span>
-            <div style="display: none;">
-              <input type="radio" id="multi-cell-constraint-jigsaw" name="constraint-type" value="jigsaw">
-              <label for="multi-cell-constraint-jigsaw">Jigsaw Piece</label>
-              <span class="tooltip"
-                data-text="Values inside the jigsaw piece can't repeat. Pieces must contain 9 cells, and cannot overlap.">
-              </span>
-            </div>
+            <h2>Create from selection</h2>
             <div>
               <input type="radio" id="multi-cell-constraint-cage" name="constraint-type" value="cage" checked>
               <label for="multi-cell-constraint-cage">
@@ -152,6 +145,13 @@ layout: null
                   data-text="Values must add up to the given sum. All values must be unique.">
                 </span>
               </label>
+            </div>
+            <div>
+              <input type="radio" id="multi-cell-constraint-jigsaw" name="constraint-type" value="jigsaw">
+              <label for="multi-cell-constraint-jigsaw">Jigsaw Piece</label>
+              <span class="tooltip"
+                data-text="Values inside the jigsaw piece can't repeat. Pieces must contain 9 cells, and cannot overlap.">
+              </span>
             </div>
             <div>
               <input type="radio" id="multi-cell-constraint-thermo" name="constraint-type" value="thermo">
@@ -204,9 +204,7 @@ layout: null
               <button type="submit">Add</button>
             </div>
           </fieldset>
-        </form>
 
-        <div>
           <div>
             <input type="checkbox" id="anti-consecutive-input">
             <label for="anti-consecutive-input">Anti-Consecutive</label>
@@ -214,9 +212,10 @@ layout: null
               data-text="No adjacent cells can have consecutive values.">
             </span>
           </div>
+        </form>
 
-          <hr>
-
+        <div>
+          <h2>Layout</h2>
           <div>
             <input type="checkbox" id="anti-knight-input">
             <label for="anti-knight-input">Anti-Knight</label>
@@ -250,12 +249,14 @@ layout: null
           </div>
 
           <div>
-            <input type="checkbox" id="jigsaw-input">
-            <label for="jigsaw-input">Jigsaw</label>
+            <input type="checkbox" id="no-boxes-input">
+            <label for="no-boxes-input">No Boxes</label>
             <span class="tooltip"
-              data-text="The 3x3 box constraint is removed and replaced with irregular regions.">
+              data-text="No standard 3x3 box constraints.">
             </span>
           </div>
+
+          <div id="displayed-regions"></div>
 
           <div id="validate-layout-container">
             <div>
@@ -300,7 +301,6 @@ layout: null
       </div>
 
       <div id="displayed-constraints"></div>
-      <div id="displayed-regions"></div>
 
       <hr>
 

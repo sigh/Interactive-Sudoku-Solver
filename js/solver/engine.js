@@ -647,7 +647,10 @@ SudokuSolver.InternalSolver = class {
       }
 
       for (const result of this.run(SEARCH_LIMIT)) {
-        if (result.isSolution) return true;
+        if (result.isSolution) {
+          this.counters.branchesIgnored = 1-this.counters.progressRatio;
+          return true;
+        }
         attempLog.push([nonet, this.counters.progressRatio]);
         return undefined;
       }

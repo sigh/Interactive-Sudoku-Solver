@@ -199,7 +199,10 @@ class SudokuConstraint {
 
     if (Object.values(counter).some(c => c != 9)) return null;
 
-    return new SudokuConstraint.Jigsaw(text);
+    return new SudokuConstraint.Set([
+      new SudokuConstraint.Jigsaw(text),
+      new SudokuConstraint.NoBoxes(),
+    ]);
   }
 
   static _parseJigsaw(text) {
@@ -282,6 +285,8 @@ class SudokuConstraint {
       this.cells = cells;
     }
   }
+
+  static NoBoxes = class NoBoxes extends SudokuConstraint {}
 
   static AntiKnight = class AntiKnight extends SudokuConstraint {}
 
@@ -446,12 +451,12 @@ class SudokuBuilder {
     return solverProxy;
   }
 
-  static hasJigsaw(constraint) {
+  static hasNoBoxes(constraint) {
     switch (constraint.type) {
-      case 'Jigsaw':
+      case 'NoBoxes':
         return true;
       case 'Set':
-        return constraint.constraints.some(c => this.hasJigsaw(c));
+        return constraint.constraints.some(c => this.hasNoBoxes(c));
     }
     return false;
   }
@@ -459,7 +464,7 @@ class SudokuBuilder {
   static *_handlers(constraint) {
     yield* SudokuBuilder._rowColHandlers();
     yield* SudokuBuilder._constraintHandlers(constraint);
-    if (!this.hasJigsaw(constraint)) {
+    if (!this.hasNoBoxes(constraint)) {
       yield* SudokuBuilder._boxHandlers();
     }
   }
@@ -502,6 +507,8 @@ class SudokuBuilder {
   static *_constraintHandlers(constraint) {
     let cells;
     switch (constraint.type) {
+      case 'NoBoxes':
+        break;
       case 'AntiKnight':
         yield* this._antiHandlers(
           (r, c) => [[r+1, c+2], [r+2, c+1], [r+1, c-2], [r+2, c-1]]);

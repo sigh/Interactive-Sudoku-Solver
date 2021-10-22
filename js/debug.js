@@ -203,6 +203,7 @@ const runSolveTests = async (onFailure) => {
     'German whispers',
     'Palindromes',
     'Jigsaw',
+    'Jigsaw boxes, disconnected',
   ], onFailure);
 };
 

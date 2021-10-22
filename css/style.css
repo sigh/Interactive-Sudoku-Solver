@@ -170,13 +170,16 @@ button.danger-button:hover:enabled {
 }
 
 #displayed-regions {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
+  display: flex;
+  flex-direction: column;
 
   background: rgba(0,0,255,0.1);
   border-radius: 10px;
 
   margin-top: 10px;
+
+  height: 75px;
+  overflow: scroll;
 }
 
 .constraint-item {
@@ -228,9 +231,6 @@ fieldset {
 }
 fieldset[disabled]{
   color: grey;
-}
-fieldset > span {
-  font-size: 18px;
 }
 
 textarea {
@@ -546,4 +546,10 @@ progress {
 #step-status {
   font-weight: bold;
   color: darkviolet;
+}
+
+h2 {
+  font-size: 18px;
+  font-weight: normal;
+  margin: 0;
 }
