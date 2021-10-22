@@ -204,6 +204,8 @@ const runSolveTests = async (onFailure) => {
     'Palindromes',
     'Jigsaw',
     'Jigsaw boxes, disconnected',
+    'Windoku',
+    'X-Windoku',
   ], onFailure);
 };
 

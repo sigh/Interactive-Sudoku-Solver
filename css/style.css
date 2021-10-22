@@ -181,6 +181,11 @@ button.danger-button:hover:enabled {
   height: 75px;
   overflow: scroll;
 }
+#displayed-regions:empty:before {
+  content: 'Jigsaw pieces';
+  color: grey;
+  text-align: center;
+}
 
 .constraint-item {
   cursor: default;

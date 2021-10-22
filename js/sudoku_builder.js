@@ -288,6 +288,30 @@ class SudokuConstraint {
 
   static NoBoxes = class NoBoxes extends SudokuConstraint {}
 
+  static Windoku = class Windoku extends SudokuConstraint {
+    static REGIONS = (() => {
+      const regions = [];
+
+      const offsets = [
+        [1, 1],
+        [1, 5],
+        [5, 1],
+        [5, 5],
+      ];
+      for (const [r, c] of offsets) {
+        let cells = [];
+        for (let i = 0; i < GRID_SIZE; i++) {
+          const row = r+(i%BOX_SIZE|0);
+          const col = c+(i/BOX_SIZE|0);
+          cells.push(toCellIndex(row, col));
+        }
+        regions.push(cells);
+      }
+
+      return regions;
+    })();
+  }
+
   static AntiKnight = class AntiKnight extends SudokuConstraint {}
 
   static AntiKing = class AntiKing extends SudokuConstraint {}
@@ -490,7 +514,6 @@ class SudokuBuilder {
   }
 
   static *_boxHandlers() {
-    // Box constraints.
     for (let b = 0; b < GRID_SIZE; b++) {
       let bi = b/BOX_SIZE|0;
       let bj = b%BOX_SIZE|0;
@@ -509,6 +532,7 @@ class SudokuBuilder {
     switch (constraint.type) {
       case 'NoBoxes':
         break;
+
       case 'AntiKnight':
         yield* this._antiHandlers(
           (r, c) => [[r+1, c+2], [r+2, c+1], [r+1, c-2], [r+2, c-1]]);
@@ -630,6 +654,12 @@ class SudokuBuilder {
         cells = constraint.cells.map(c => parseCellId(c).cell);
         yield new SudokuConstraintHandler.BinaryConstraint(
           cells[0], cells[1], (a, b) => a == b*2 || b == a*2);
+        break;
+
+      case 'Windoku':
+        for (const cells of SudokuConstraint.Windoku.REGIONS) {
+          yield new SudokuConstraintHandler.AllDifferent(cells);
+        }
         break;
 
       default:

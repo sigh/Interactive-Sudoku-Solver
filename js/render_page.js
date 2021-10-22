@@ -40,6 +40,11 @@ class CheckboxConstraints {
         constraint: new SudokuConstraint.Diagonal(-1),
         isLayout: true,
       },
+      windoku: {
+        id: 'windoku-input',
+        constraint: new SudokuConstraint.Windoku(),
+        isLayout: true,
+      },
       noBoxes: {
         id: 'no-boxes-input',
         constraint: new SudokuConstraint.NoBoxes(),
@@ -71,6 +76,10 @@ class CheckboxConstraints {
     }
     this._checkboxes.noBoxes.element.onchange = e => {
       display.useDefaultRegions(!this._checkboxes.noBoxes.element.checked);
+      onChange();
+    }
+    this._checkboxes.windoku.element.onchange = e => {
+      display.enableWindokuRegion(this._checkboxes.windoku.element.checked);
       onChange();
     }
   }
@@ -121,6 +130,7 @@ class ExampleHandler {
     'German whispers',
     'Palindromes',
     'Jigsaw',
+    'X-Windoku',
   ];
 
   constructor(constraintManager) {
@@ -537,6 +547,9 @@ class ConstraintManager {
         break;
       case 'NoBoxes':
         this._checkboxConstraints.check('noBoxes');
+        break;
+      case 'Windoku':
+        this._checkboxConstraints.check('windoku');
         break;
       case 'Set':
         constraint.constraints.forEach(c => this.loadConstraint(c));

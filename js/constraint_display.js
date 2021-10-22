@@ -49,6 +49,17 @@ class ConstraintDisplay {
     this._regionContainer.append(this._missingRegion);
 
     svg.append(this._regionContainer);
+
+    this._windokuRegion = createSvgElement('g');
+    this._windokuRegion.setAttribute('fill', 'rgb(255, 0, 255)');
+    this._windokuRegion.setAttribute('opacity', '0.1');
+    for (const region of SudokuConstraint.Windoku.REGIONS) {
+      for (const cell of region) {
+        this._windokuRegion.append(this._makeCellSquare(cell));
+      }
+    }
+    this.enableWindokuRegion(false);
+    this._regionContainer.append(this._windokuRegion);
   }
 
   _makeLittleKillers(gridSelection) {
@@ -207,6 +218,9 @@ class ConstraintDisplay {
 
     this._regionElems = new Map();
     this._updateMissingRegion();
+
+    this.enableWindokuRegion(false);
+    this.useDefaultRegions(true);
   }
 
   removeItem(item) {
@@ -293,19 +307,11 @@ class ConstraintDisplay {
     const cage = createSvgElement('g');
     const color = this._chooseKillerCageColor(cells);
 
-    for (const cell of cells) {
-      [x, y] = ConstraintDisplay.cellIdCenter(cell);
-      let path = createSvgElement('path');
-      let directions = [
-        'M', x-cellWidth/2+1, y-cellWidth/2+1,
-        'l', 0, cellWidth,
-        'l', cellWidth, 0,
-        'l', 0, -cellWidth,
-        'l', -cellWidth, 0,
-      ];
-      path.setAttribute('d', directions.join(' '));
+    for (const cellId of cells) {
+      const path = this._makeCellSquare(parseCellId(cellId).cell);
       path.setAttribute('fill', color);
       path.setAttribute('opacity', '0.1');
+
       cage.appendChild(path);
     }
     this.killerCages.set(cage, [...cells]);
@@ -531,6 +537,26 @@ class ConstraintDisplay {
     this._defaultRegions.setAttribute('display', enable ? null : 'none');
   }
 
+  enableWindokuRegion(enable) {
+    this._windokuRegion.setAttribute('display', enable ? null : 'none');
+  }
+
+  _makeCellSquare(cell) {
+    const cellWidth = ConstraintDisplay.CELL_SIZE;
+
+    const [x, y] = ConstraintDisplay.cellCenter(cell);
+    const path = createSvgElement('path');
+    const directions = [
+      'M', x-cellWidth/2+1, y-cellWidth/2+1,
+      'l', 0, cellWidth,
+      'l', cellWidth, 0,
+      'l', 0, -cellWidth,
+      'l', -cellWidth, 0,
+    ];
+    path.setAttribute('d', directions.join(' '));
+    return path;
+  }
+
   _updateMissingRegion() {
     // Clear missing region.
     const svg = this._missingRegion;
@@ -547,21 +573,9 @@ class ConstraintDisplay {
     this._regionElems.forEach(
       cs => cs.forEach(c => missingCells.delete(parseCellId(c).cell)));
 
-    const cellWidth = ConstraintDisplay.CELL_SIZE;
-
     // Shade in the missing cells.
     for (const cell of missingCells) {
-      const [x, y] = ConstraintDisplay.cellCenter(cell);
-      const path = createSvgElement('path');
-      const directions = [
-        'M', x-cellWidth/2+1, y-cellWidth/2+1,
-        'l', 0, cellWidth,
-        'l', cellWidth, 0,
-        'l', 0, -cellWidth,
-        'l', -cellWidth, 0,
-      ];
-      path.setAttribute('d', directions.join(' '));
-      svg.appendChild(path);
+      svg.appendChild(this._makeCellSquare(cell));
     }
   }
 
