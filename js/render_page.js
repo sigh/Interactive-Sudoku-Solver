@@ -1288,12 +1288,12 @@ class SolverStateDisplay {
 
   _displayStateVariables(state) {
     const counters = state.counters;
+    const searchComplete = state.done && !counters.branchesIgnored;
 
     for (const v in this._stateVars) {
       let text;
       switch (v) {
         case 'solutions':
-          const searchComplete = state.done && !counters.branchesIgnored;
           text = counters.solutions + (searchComplete ? '' : '+');
           break;
         case 'puzzleSetupTime':
@@ -1304,6 +1304,7 @@ class SolverStateDisplay {
           break;
         case 'searchSpaceExplored':
           text = (counters.progressRatio * 100).toPrecision(3) + '%';
+          if (searchComplete) text = '100%';
           break;
         default:
           text = counters[v];
