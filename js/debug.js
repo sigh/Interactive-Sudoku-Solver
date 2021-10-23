@@ -3,6 +3,7 @@ loadJSFile('js/solver/handlers.js');
 loadJSFile('data/killers.js');
 loadJSFile('data/jigsaw_layouts.js');
 loadJSFile('data/invalid_jigsaw_layouts.js');
+loadJSFile('data/jigsaw_box_layouts.js');
 
 var TEST_TIMEOUT_MS = 0;
 
@@ -178,7 +179,8 @@ const runValidateLayoutTests = async (onFailure) => {
   const cases = [].concat(
     VALID_JIGSAW_LAYOUTS.slice(0, 20),
     EASY_INVALID_JIGSAW_LAYOUTS,
-    FAST_INVALID_JIGSAW_LAYOUTS.slice(0, 20));
+    FAST_INVALID_JIGSAW_LAYOUTS.slice(0, 20),
+    VALID_JIGSAW_BOX_LAYOUTS.slice(0, 10));
   await runValidateLayout(cases, onFailure);
 };
 
