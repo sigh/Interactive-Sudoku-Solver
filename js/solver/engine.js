@@ -606,38 +606,23 @@ SudokuSolver.InternalSolver = class {
   }
 
   validateLayout() {
-    // All handlers should be nonet handlers, but let's filter just in case.
+    // Choose just the nonet handlers.
     const nonetHandlers = this._handlerSet.getAllofType(SudokuConstraintHandler.Nonet);
 
-    // Fill the nonet with values 1->9.
+    // Function to fill a nonet with values 1->9.
     const fillNonet = (nonet) => {
       nonet.cells.forEach((c, i) => this._grids[0][c] = 1<<i);
-    }
-
-    // Choose the nonet with the the most conflicted cells.
-    const chooseNonet = () => {
-      let bestNonet = null;
-      let maxScore = -1;
-      for (const h of nonetHandlers) {
-        const score = h.cells.map(
-          c => this._backtrackTriggers[c]).reduce((a, b)=>a+b);
-        if (score > maxScore) {
-          bestNonet = h;
-          maxScore = score;
-        }
-      }
-
-      return bestNonet;
     };
 
-    const attempLog = [];
-    const SEARCH_LIMIT = 1000;
+    const attemptLog = [];
+    // Arbitrary seach limit. Too much lower and there are some cases which get
+    // stuck for too long.
+    const SEARCH_LIMIT = 200;
 
-    // Do a attempt to solve.
-    const attempt = () => {
+    // Function to attempt to solve with one nonet fixed.
+    const attempt = (nonet) => {
       this._resetStack();
 
-      const nonet = chooseNonet();
       fillNonet(nonet);
       // Reduce backtrack triggers so that we don't weight the last runs too
       // heavily.
@@ -651,35 +636,31 @@ SudokuSolver.InternalSolver = class {
           this.counters.branchesIgnored = 1-this.counters.progressRatio;
           return true;
         }
-        attempLog.push([nonet, this.counters.progressRatio]);
+        attemptLog.push([nonet, this.counters.progressRatio]);
         return undefined;
       }
       return false;
-    }
+    };
 
-    // Do a small number of short attempts.
-    // Each time the most promising nonet will be chosen as a seed, ideally
-    // getting closer to the best choice.
-    for (let i = 0; i < 10; i++) {
-      const result = attempt();
+    // Try doing a short search from every nonet.
+    for (const nonet of nonetHandlers) {
+      const result = attempt(nonet);
+      // If the search completed, then we can return the result immediately.
       if (result !== undefined) {
         this.done = true;
         return result;
       }
     }
 
-    // Stop messing around, and commit.
-    this._resetStack();
+    // None of the searches completed. Choose the nonet which had the most
+    // progress (i.e. the search covered more of the search space), and do
+    // a full search from there.
 
-    // Unfortunately, the same nonet can't be chosen twice, so we don't know
-    // if we've landed on the best one.
-    // Assume that we've hit a stable state where we alternate between the best
-    // nonet and another, thus just look at the last two.
-    const attemptOptions = attempLog.slice(-2);
-    // Sort by score, putting the max score first.
-    attemptOptions.sort((a,b) => b[1]-a[1]);
     // Find the nonet with the best score.
-    const bestNonet = attemptOptions[0][0];
+    attemptLog.sort((a,b) => b[1]-a[1]);
+    const bestNonet = attemptLog[0][0];
+
+    this._resetStack();
     fillNonet(bestNonet);
 
     // Run the final search until we find a solution or prove that one doesn't
