@@ -105,8 +105,13 @@ class SudokuConstraint {
     let cages = new Map();
     for (let i = 0; i < NUM_CELLS; i++) {
       let cageCell = i;
+      let count = 0;
       while (cellDirections[cageCell] != cageCell) {
         cageCell = cellDirections[cageCell];
+        count++;
+        if (count > GRID_SIZE) {
+          throw('Infinite loop in killer input: ' + text);
+        }
       }
       if (!cages.has(cageCell)) {
         let c = text[cageCell];
