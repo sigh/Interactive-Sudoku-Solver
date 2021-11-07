@@ -52,7 +52,7 @@ class SudokuConstraint {
 
   static fromString(str) {
     let items = str.split('.');
-    if (items[0]) throw('Invalid constraint string: ' + str);
+    if (items[0]) throw('Invalid constraint string.');
     items.shift();
 
     let constraints = [];
@@ -60,6 +60,9 @@ class SudokuConstraint {
       let args = item.split('~');
       let type = args.shift();
       if (!type) type = this.DEFAULT.name;
+      if (!SudokuConstraint[type]) {
+        throw('Unknown constraint type: ' + type);
+      }
       constraints.push(new SudokuConstraint[type](...args));
     }
     return new SudokuConstraint.Set(constraints);
@@ -110,7 +113,7 @@ class SudokuConstraint {
         cageCell = cellDirections[cageCell];
         count++;
         if (count > GRID_SIZE) {
-          throw('Infinite loop in killer input: ' + text);
+          throw('Loop in Killer Sudoku input.');
         }
       }
       if (!cages.has(cageCell)) {
@@ -244,12 +247,7 @@ class SudokuConstraint {
     constraint = this._parsePlainSudoku(text);
     if (constraint) return constraint;
 
-    try {
-      return SudokuConstraint.fromString(text);
-    } catch (e) {
-      console.log(`Unrecognised input type (${e})`);
-      return null;
-    }
+    return SudokuConstraint.fromString(text);
   }
 
   static Set = class Set extends SudokuConstraint {

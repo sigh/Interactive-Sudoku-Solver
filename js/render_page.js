@@ -326,17 +326,22 @@ class ConstraintManager {
     this._exampleHandler = new ExampleHandler(this);
 
     // Free-form.
-    let freeInputForm = document.forms['freeform-constraint-input'];
+    const freeInputForm = document.forms['freeform-constraint-input'];
+    const freeInputError = document.getElementById('freeform-constraint-input-error');
     freeInputForm.onsubmit = e => {
+      e.preventDefault();
+      const input = (new FormData(freeInputForm)).get('freeform-input');
       try {
-        let input = (new FormData(freeInputForm)).get('freeform-input');
         this.loadFromText(input);
       } catch (e) {
-        console.log(e);
-        // TODO: Display the error.
+        console.log(e + ' Input: ' + input);
+        freeInputError.textContent = e;
       }
       return false;
-    }
+    };
+    freeInputForm['freeform-input'].oninput = () => {
+      freeInputError.textContent = '';
+    };
 
     // Clear button.
     document.getElementById('clear-constraints-button').onclick = () => this.clear();
@@ -434,9 +439,11 @@ class ConstraintManager {
   }
 
   loadFromText(input) {
-    this.clear();
-    let constraint = SudokuConstraint.fromText(input);
-    if (constraint) this.loadConstraint(constraint);
+    const constraint = SudokuConstraint.fromText(input);
+    if (constraint) {
+      this.clear();
+      this.loadConstraint(constraint);
+    }
 
     this.runUpdateCallback();
   }

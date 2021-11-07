@@ -274,10 +274,12 @@ button.icon-button {
 }
 
 #freeform-constraint-input {
-  position: relative;
   margin-top: 10px;
 }
-#freeform-constraint-input button {
+#freeform-constraint-text-container {
+  position: relative;
+}
+#freeform-constraint-text-container button {
   position: absolute;
   margin: 5px;
   bottom: 0;
@@ -287,6 +289,11 @@ button.icon-button {
   margin: 0;
   width: 100%;
   padding: 2px 0px 40px 2px;
+}
+#freeform-constraint-input-error {
+  color: rgb(200, 0, 0);
+  font-size: small;
+  max-width: fit-content;
 }
 
 #fake-input {
