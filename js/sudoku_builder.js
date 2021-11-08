@@ -76,10 +76,13 @@ class SudokuConstraint {
   }
 
   static _parseShortKillerFormat(text) {
+    // Reference for format:
+    // http://forum.enjoysudoku.com/understandable-snarfable-killer-cages-t6119.html
+
     if (text.length != NUM_CELLS) return null;
     // Note: The second ` is just there so my syntax highlighter is happy.
-    if (!text.match(/[<v>^``]/)) return null;
-    if (!text.match(/^[0-9A-Za-j^<v>``]*$/)) return null;
+    if (!text.match(/[<v>^`',.`]/)) return null;
+    if (!text.match(/^[0-9A-Za-j^<v>`'',.`]*$/)) return null;
 
     // Determine the cell directions.
     let cellDirections = [];
@@ -99,6 +102,15 @@ class SudokuConstraint {
           break;
         case '`':
           cellDirections.push(i-GRID_SIZE-1);
+          break;
+        case '\'':
+          cellDirections.push(i-GRID_SIZE+1);
+          break;
+        case ',':
+          cellDirections.push(i+GRID_SIZE-1);
+          break;
+        case '.':
+          cellDirections.push(i+GRID_SIZE+1);
           break;
         default:
           cellDirections.push(i);
@@ -145,6 +157,9 @@ class SudokuConstraint {
   }
 
   static _parseLongKillerFormat(text) {
+    // Reference to format definition:
+    // http://www.sudocue.net/forum/viewtopic.php?f=1&t=519
+
     if (!text.startsWith('3x3:')) return null;
 
     let parts = text.split(':');
