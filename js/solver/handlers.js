@@ -19,6 +19,8 @@ class SudokuConstraintHandler {
   }
 }
 
+SudokuConstraintHandler.NoBoxes = class NoBoxes extends SudokuConstraintHandler {}
+
 SudokuConstraintHandler.FixedCells = class FixedCells extends SudokuConstraintHandler {
   constructor(valueMap) {
     super();
@@ -1022,16 +1024,18 @@ class SudokuConstraintOptimizer {
   static _NONET_SUM = GRID_SIZE*(GRID_SIZE+1)/2;
 
   static optimize(handlerSet, cellConflictSets) {
+    const hasBoxes = handlerSet.getAllofType(SudokuConstraintHandler.NoBoxes).length == 0;
+
     this._addNonetHandlers(handlerSet);
 
-    this._optimizeSums(handlerSet, cellConflictSets);
+    this._optimizeSums(handlerSet, cellConflictSets, hasBoxes);
 
     this._addSumComplementCells(handlerSet);
 
-    this._optimizeJigsaw(handlerSet);
+    this._optimizeJigsaw(handlerSet, hasBoxes);
   }
 
-  static _optimizeJigsaw(handlerSet) {
+  static _optimizeJigsaw(handlerSet, hasBoxes) {
     const jigsawHandlers = handlerSet.getAllofType(SudokuConstraintHandler.Jigsaw);
     if (jigsawHandlers.length == 0) return;
     if (jigsawHandlers.length > 1) throw('Multiple jigsaw handlers');
@@ -1040,7 +1044,7 @@ class SudokuConstraintOptimizer {
 
     handlerSet.add(...this._makeJigsawIntersections(handlerSet));
 
-    handlerSet.add(...this._makeJigsawLawOfLeftoverHandlers(jigsawHandler));
+    handlerSet.add(...this._makeJigsawLawOfLeftoverHandlers(jigsawHandler, hasBoxes));
   }
 
   // Find a non-overlapping set of handlers.
@@ -1076,7 +1080,7 @@ class SudokuConstraintOptimizer {
     return [nonOverlappingHandlers, cellsIncluded];
   }
 
-  static _optimizeSums(handlerSet, cellConflictSets) {
+  static _optimizeSums(handlerSet, cellConflictSets, hasBoxes) {
     // TODO: Consider how this interactions with fixed cells.
     let sumHandlers = handlerSet.getAllofType(SudokuConstraintHandler.Sum);
     if (sumHandlers.length == 0) return;
@@ -1086,7 +1090,7 @@ class SudokuConstraintOptimizer {
 
     handlerSet.add(...this._fillInSumGap(sumHandlers, sumCells));
 
-    handlerSet.add(...this._makeInnieOutieSumHandlers(sumHandlers));
+    handlerSet.add(...this._makeInnieOutieSumHandlers(sumHandlers, hasBoxes));
 
     handlerSet.add(...this._makeHiddenCageHandlers(handlerSet, sumHandlers));
 
@@ -1339,14 +1343,23 @@ class SudokuConstraintOptimizer {
   }
 
   static _ROW_REGIONS = this._makeRegions((r, i) => r*GRID_SIZE+i);
-  static _ROW_REGIONS_REV = this._ROW_REGIONS.slice().reverse();
   static _COL_REGIONS = this._makeRegions((c, i) => i*GRID_SIZE+c);
-  static _COL_REGIONS_REV = this._COL_REGIONS.slice().reverse();
-  static _ALL_OVERLAP_REGIONS = [
+  static _OVERLAP_REGIONS = [
     this._ROW_REGIONS,
-    this._ROW_REGIONS_REV,
+    this._ROW_REGIONS.slice().reverse(),
     this._COL_REGIONS,
-    this._COL_REGIONS_REV,
+    this._COL_REGIONS.slice().reverse(),
+    // Try regions in an interleaved order. Specific order affects performance,
+    // but most orders seem to have a similar effect.
+    [0, 2, 4, 6, 8, 1, 3, 5, 7].map(i => this._ROW_REGIONS[i]),
+    [0, 2, 4, 6, 8, 1, 3, 5, 7].map(i => this._COL_REGIONS[i]),
+  ];
+  static _BOX_REGIONS = this._makeRegions(
+    (r, i) => ((r/BOX_SIZE|0)*BOX_SIZE+(i%BOX_SIZE|0))*GRID_SIZE
+              +(r%BOX_SIZE|0)*BOX_SIZE+(i/BOX_SIZE|0));
+  static _OVERLAP_REGIONS_WITH_BOX = [
+    ...this._OVERLAP_REGIONS,
+    this._BOX_REGIONS,
   ];
 
   static _generalRegionOverlapProcessor(regions, pieces, callback) {
@@ -1381,7 +1394,7 @@ class SudokuConstraintOptimizer {
     }
   }
 
-  static _makeJigsawLawOfLeftoverHandlers(jigsawHandler) {
+  static _makeJigsawLawOfLeftoverHandlers(jigsawHandler, hasBoxes) {
     const newHandlers = [];
 
     const handleOverlap = (superRegion, piecesRegion, usedPieces) => {
@@ -1408,7 +1421,9 @@ class SudokuConstraintOptimizer {
       }
     }
 
-    for (const r of this._ALL_OVERLAP_REGIONS) {
+    const overlapRegions = (
+      hasBoxes ? this._OVERLAP_REGIONS_WITH_BOX : this._OVERLAP_REGIONS);
+    for (const r of overlapRegions) {
       this._generalRegionOverlapProcessor(
         r, jigsawHandler.regions, handleOverlap);
     }
@@ -1416,7 +1431,7 @@ class SudokuConstraintOptimizer {
     return newHandlers;
   }
 
-  static _makeInnieOutieSumHandlers(sumHandlers) {
+  static _makeInnieOutieSumHandlers(sumHandlers, hasBoxes) {
     const newHandlers = [];
 
     const pieces = sumHandlers.map(h => h.cells);
@@ -1467,7 +1482,9 @@ class SudokuConstraintOptimizer {
       }
     };
 
-    for (const r of this._ALL_OVERLAP_REGIONS) {
+    const overlapRegions = (
+      hasBoxes ? this._OVERLAP_REGIONS_WITH_BOX : this._OVERLAP_REGIONS);
+    for (const r of overlapRegions) {
       this._generalRegionOverlapProcessor(
         r, pieces, handleOverlap);
     }

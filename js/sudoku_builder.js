@@ -549,6 +549,7 @@ class SudokuBuilder {
     let cells;
     switch (constraint.type) {
       case 'NoBoxes':
+        yield new SudokuConstraintHandler.NoBoxes();
         break;
 
       case 'AntiKnight':
