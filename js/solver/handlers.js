@@ -1,9 +1,15 @@
 "use strict";
 
 class SudokuConstraintHandler {
+  static _defaultId = 0;
+
   constructor(cells) {
     // This constraint is enforced whenever these cells are touched.
     this.cells = new Uint8Array(cells || []);
+
+    const id = this.constructor._defaultId++;
+    // By default every id is unique.
+    this.idStr = this.constructor.name + '-' + id.toString();
   }
 
   enforceConsistency(grid) {
@@ -481,9 +487,13 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
   _negativeCells = [];
 
   constructor(cells, sum) {
+    cells.sort();
+
     super(cells);
     this._sum = +sum;
     this._positiveCells = cells;
+
+    this.idStr = [this.constructor.name, cells, sum].join('-');
   }
 
   setComplementCells(cells) {
@@ -709,6 +719,7 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
 // provide any benefit.
 SudokuConstraintHandler.SumWithNegative = class SumWithNegative extends SudokuConstraintHandler.Sum {
   constructor(positiveCells, negativeCell, sum) {
+    positiveCells.sort();
     sum += GRID_SIZE+1;
     super([...positiveCells, negativeCell], sum);
 
@@ -912,6 +923,8 @@ SudokuConstraintHandler.Jigsaw = class Jigsaw extends SudokuConstraintHandler {
 
 SudokuConstraintHandler.SameValues = class SameValues extends SudokuConstraintHandler {
   constructor(cells0, cells1, isUnique) {
+    cells0.sort();
+    cells1.sort();
     super([...cells0, ...cells1]);
     if (cells0.length != cells1.length) {
       throw('SameValues must use sets of the same length.');
@@ -921,6 +934,8 @@ SudokuConstraintHandler.SameValues = class SameValues extends SudokuConstraintHa
     this._cells1 = new Uint8Array(cells1);
     // TODO: Figure out automatically.
     this._isUnique = isUnique;
+
+    this.idStr = [this.constructor.name, cells0, cells1].join('-');
   }
 
   enforceConsistency(grid) {
@@ -955,6 +970,7 @@ SudokuConstraintHandler.SameValues = class SameValues extends SudokuConstraintHa
 class HandlerSet {
   constructor(handlers) {
     this._handlers = [];
+    this._seen = new Set();
     this._indexLookup = new Map();
 
     this._cellMap = new Array(NUM_CELLS);
@@ -1011,6 +1027,12 @@ class HandlerSet {
 
   add(...handlers) {
     for (const h of handlers) {
+      // Don't add duplicate handlers.
+      if (this._seen.has(h.idStr)) {
+        continue;
+      }
+      this._seen.add(h.idStr);
+
       this._add(h, this._handlers.length);
     }
   }
@@ -1410,7 +1432,7 @@ class SudokuConstraintOptimizer {
 
       // All values in the set differences must be the same.
       const newHandler = new SudokuConstraintHandler.SameValues(
-          diffA, diffB, false);
+          [...diffA], [...diffB], false);
       newHandlers.push(newHandler);
       if (ENABLE_DEBUG_LOGS) {
         debugLog({
