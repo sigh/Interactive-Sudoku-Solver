@@ -357,22 +357,19 @@ SudokuSolver.InternalSolver = class {
   // Find the best cell and bring it to the front. This means that it will
   // be processed next.
   _updateCellOrder(stack, depth, grid) {
-    // Choose the cell with the smallest count.
+    // Choose cells based on value count and number of conflicts encountered.
     // Return immediately if we find any cells with 1 or 0 values set.
     // NOTE: The constraint handlers are written such that they detect domain
     // wipeouts (0 values), so we should never find them here. Even if they
     // exist, it just means we do a few more useless forced cell resolutions.
-    // NOTE: If the scoring is more complicated than counts, it can be useful
+    // NOTE: If the scoring is more complicated, it can be useful
     // to do an initial pass to detect 1 or 0 value cells (~(v&(v-1))).
 
     const triggerCounts = this._backtrackTriggers;
     const stackLen = stack.length;
 
-    // Find the cell with the minimum score (remaining possibilities in the
-    // cell).
-    // Break ties with the hit count.
-    let minScore = GRID_SIZE + 1;
-    let maxTriggerCount = 0;
+    // Find the cell with the minimum score.
+    let minScore = Infinity;
     let bestIndex = 0;
 
     for (let i = depth; i < stackLen; i++) {
@@ -385,16 +382,12 @@ SudokuSolver.InternalSolver = class {
         break;
       }
 
-      let score = count;
-      // Ugly ugly tuning, but this almost universally speeds things up.
-      // Especially for very under-constrainted problems.
-      // TODO: Figure out a more principled way of doing this.
-      if (triggerCounts[cell] > NUM_CELLS) score -= 2;
+      const tc = triggerCounts[cell] || 1;  // Ensure we don't divide by zero.
+      const score = count/tc;
 
-      if (score < minScore || score == minScore && triggerCounts[cell] > maxTriggerCount ) {
+      if (score < minScore) {
         bestIndex = i;
         minScore = score;
-        maxTriggerCount = triggerCounts[cell];
       }
     }
 
