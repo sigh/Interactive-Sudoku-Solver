@@ -131,7 +131,7 @@ class SudokuConstraint {
       if (!cages.has(cageCell)) {
         let c = text[cageCell];
         let sum;
-        if (c >= '1' && c <= '9') {
+        if (c >= '0' && c <= '9') {
           sum = +c;
         } else if (c >= 'A' && c <= 'Z') {
           sum = c.charCodeAt(0) - 'A'.charCodeAt(0) + 10;
@@ -602,7 +602,9 @@ class SudokuBuilder {
 
       case 'Cage':
         cells = constraint.cells.map(c => parseCellId(c).cell);
-        yield new SudokuConstraintHandler.Sum(cells, constraint.sum);
+        if (constraint.sum > 0) {
+          yield new SudokuConstraintHandler.Sum(cells, constraint.sum);
+        }
         yield new SudokuConstraintHandler.AllDifferent(cells);
         break;
 
