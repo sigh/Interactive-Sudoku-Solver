@@ -487,6 +487,8 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
   _negativeCells = [];
 
   constructor(cells, sum) {
+    if (cells.length > GRID_SIZE) throw('Too many cells');
+
     cells.sort();
 
     super(cells);
@@ -1223,6 +1225,42 @@ class SudokuConstraintOptimizer {
     }
   }
 
+  // Create a Sum handler out of all the cages sticking out of a nonet.
+  static _addSumIntersectionHandler(
+      handlerSet, nonetHandler, overlappingHandlerIndexes) {
+
+    let totalSum = 0;
+    let cells = [];
+    for (const i of overlappingHandlerIndexes) {
+      const k = handlerSet.getHandler(i);
+      totalSum += k.sum();
+      cells.push(...k.cells);
+    }
+    // These cells would never cover the entire nonet.
+    if (cells.length <= GRID_SIZE) return null;
+    // We don't want too many cells in the new sum.
+    if (cells.length > GRID_SIZE + 6) return null;
+
+    const overlap = arrayIntersect(nonetHandler.cells, cells);
+    // We need all cells in the nonet to be covered.
+    if (overlap.length != GRID_SIZE) return null;
+
+    const outsideCells = arrayDifference(cells, nonetHandler.cells);
+    const outsideSum = totalSum - this._NONET_SUM;
+    const handler = new SudokuConstraintHandler.Sum(outsideCells, outsideSum);
+
+    if (ENABLE_DEBUG_LOGS) {
+      debugLog({
+        loc: '_addSumIntersectionHandler',
+        msg: 'Add: ' + handler.constructor.name,
+        args: {sum: handler.sum()},
+        cells: handler.cells
+      });
+    }
+
+    return handler;
+  }
+
   // Find sets of cells which we can infer have a known sum and unique values.
   static _makeHiddenCageHandlers(handlerSet, sumHandlers) {
     const nonetHandlers = handlerSet.getAllofType(SudokuConstraintHandler.Nonet);
@@ -1242,6 +1280,12 @@ class SudokuConstraintOptimizer {
       overlappingHandlerIndexes = setIntersection(
         overlappingHandlerIndexes, sumHandlerIndexes);
       if (!overlappingHandlerIndexes.size) continue;
+
+      {
+        const sumIntersectionHandler = this._addSumIntersectionHandler(
+            handlerSet, h, overlappingHandlerIndexes);
+        if (sumIntersectionHandler) newHandlers.push(sumIntersectionHandler);
+      }
 
       const outies = [];
       const constrainedCells = [];
