@@ -1562,7 +1562,7 @@ class SolutionController {
 
     handler.bind(this)(this._solver)
       .catch(e => {
-        if (!e.startsWith('Aborted')) {
+        if (!e.toString().startsWith('Aborted')) {
           throw(e);
         }
       });

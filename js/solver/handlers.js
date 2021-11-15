@@ -89,6 +89,25 @@ SudokuConstraintHandler.Nonet = class Nonet extends SudokuConstraintHandler {
       }
     }
 
+    // Check for naked pairs.
+
+    // We won't have anything useful to do unless we have at least 2 free cells.
+    if (GRID_SIZE-LookupTable.COUNT[fixedValues] <= 2) return true;
+
+    for (let i = 0; i < GRID_SIZE-1; i++) {
+      const v = grid[cells[i]];
+      if (LookupTable.COUNT[v] != 2) continue;
+      for (let j = i+1; j < GRID_SIZE; j++) {
+        if (grid[cells[j]] !== v) continue;
+        // Found a pair, remove it from all other entries.
+        for (let k = 0; k < GRID_SIZE; k++) {
+          if (k != i && k != j) {
+            if (!(grid[cells[k]] &= ~v)) return false;
+          }
+        }
+      }
+    }
+
     return true;
   }
 
