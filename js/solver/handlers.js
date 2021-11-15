@@ -1415,10 +1415,6 @@ class SudokuConstraintOptimizer {
     this._ROW_REGIONS.slice().reverse(),
     this._COL_REGIONS,
     this._COL_REGIONS.slice().reverse(),
-    // Try regions in an interleaved order. Specific order affects performance,
-    // but most orders seem to have a similar effect.
-    [0, 2, 4, 6, 8, 1, 3, 5, 7].map(i => this._ROW_REGIONS[i]),
-    [0, 2, 4, 6, 8, 1, 3, 5, 7].map(i => this._COL_REGIONS[i]),
   ];
   static _BOX_REGIONS = this._makeRegions(
     (r, i) => ((r/BOX_SIZE|0)*BOX_SIZE+(i%BOX_SIZE|0))*GRID_SIZE
