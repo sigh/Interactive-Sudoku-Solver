@@ -602,8 +602,11 @@ class SudokuBuilder {
 
       case 'Cage':
         cells = constraint.cells.map(c => parseCellId(c).cell);
-        if (constraint.sum > 0) {
+        if (constraint.sum > 0 && cells.length < GRID_SIZE) {
           yield new SudokuConstraintHandler.Sum(cells, constraint.sum);
+        }
+        if (cells.length == GRID_SIZE && constraint.sum != 45) {
+          yield new SudokuConstraintHandler.False(cells);
         }
         yield new SudokuConstraintHandler.AllDifferent(cells);
         break;

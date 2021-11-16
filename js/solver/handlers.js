@@ -32,6 +32,10 @@ class SudokuConstraintHandler {
 
 SudokuConstraintHandler.NoBoxes = class NoBoxes extends SudokuConstraintHandler {}
 
+SudokuConstraintHandler.False = class False extends SudokuConstraintHandler {
+  enforceConsistency() { return false; }
+}
+
 SudokuConstraintHandler.FixedCells = class FixedCells extends SudokuConstraintHandler {
   constructor(valueMap) {
     super();
