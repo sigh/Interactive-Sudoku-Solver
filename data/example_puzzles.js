@@ -33,7 +33,7 @@ const EXAMPLES = {
   'Killer sudoku, hard': {
     src: 'http://forum.enjoysudoku.com/killing-with-flowers-t36181-15.html#p279032',
     input: 'S<J<<O<<KJ^<<^<^>^^<N<<<J^Q^S^O>>^^^>^W^<<^>^^O^<<^T^J^^^>>>^>^>^ML<S<<^^>^<^<<^<',
-    solution: '931685274572149386468732915724963158613578492895214637387421569256397841149856723',
+    solution: '283197546967542813415368729591726384876439152324851967149275638752683491638914275',
   },
   'Killer sudoku, with overlap': {
     // Same as 'Killer sudoku, but with overlapping (redundant) sums.
