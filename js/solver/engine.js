@@ -229,14 +229,17 @@ SudokuSolver.InternalSolver = class {
   }
 
   _initCellPriorities() {
-    let priorities = new Uint8Array(NUM_CELLS);
+    const priorities = new Uint8Array(NUM_CELLS);
+
+    // TODO: Determine priorities in a more principaled way.
+    //  - Add one for each conflict cell.
+    //  - Add custom priorities for each constraint based on how restrictive it
+    //    is.
 
     for (const handler of this._handlerSet) {
-      // The most constrainted cells have the best priorities.
-      // For now just look at the most restricted constraint the cell is part
-      // of.
+      const priority = handler.priority();
       for (const cell of handler.cells) {
-        priorities[cell] += handler.cells.length;
+        priorities[cell] += priority;
       }
     }
 

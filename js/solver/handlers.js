@@ -23,6 +23,11 @@ class SudokuConstraintHandler {
   initialize(initialGrid, cellConflicts) {
     return;
   }
+
+  priority() {
+    // By default, constraints which constrain more cells have higher priority.
+    return this.cells.length;
+  }
 }
 
 SudokuConstraintHandler.NoBoxes = class NoBoxes extends SudokuConstraintHandler {}
@@ -527,6 +532,12 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
 
   sum() {
     return this._sum;
+  }
+
+  priority() {
+    // We want smaller cages to have higher priority, but we still want all sums
+    // to have a high priority.
+    return GRID_SIZE*2-this.cells.length;
   }
 
   initialize(initialGrid, cellConflicts) {
