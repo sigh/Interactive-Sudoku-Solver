@@ -1518,6 +1518,15 @@ class SudokuConstraintOptimizer {
     const pieces = sumHandlers.map(h => h.cells);
     const piecesMap = new Map(sumHandlers.map(h => [h.cells, h.sum()]));
 
+    const cellsInSum = new Set();
+    sumHandlers.forEach(h => h.cells.forEach(c => cellsInSum.add(c)));
+    const hasCellsWithoutSum = (cells) => {
+      for (const c of cells) {
+        if (!cellsInSum.has(c)) return true;
+      }
+      return false;
+    };
+
     const handleOverlap = (superRegion, piecesRegion, usedPieces) => {
       let diffA = setDifference(superRegion, piecesRegion);
       let diffB = setDifference(piecesRegion, superRegion);
@@ -1525,11 +1534,19 @@ class SudokuConstraintOptimizer {
       // No diff, no new constraints to add.
       if (diffA.size == 0 && diffB.size == 0) return;
       // Don't use this if the diff is too large.
-      if (diffA.size + diffB.size > this._MAX_SUM_SIZE) return;
+      if (diffA.size + diffB.size > GRID_SIZE) return;
 
       // We can only do negative sum constraints when the diff is 1.
       // We can only do sum constraints when the diff is 0.
       if (diffA.size > 1 && diffB.size > 1) return;
+
+      if (!(hasCellsWithoutSum(diffA) || hasCellsWithoutSum(diffB))) {
+        // If all cells in the diff overalp with a piece, then limit the size of
+        // the sum.
+        if (diffA.size + diffB.size > this._MAX_SUM_SIZE) return;
+        // Otherwise we are adding a sum constraint to a cell which doesn't
+        // currently have one, so we'll take all the help we can get!
+      }
 
       let sumDelta = -superRegion.size*this._NONET_SUM/GRID_SIZE;
       for (const p of usedPieces) sumDelta += piecesMap.get(p);
