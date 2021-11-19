@@ -81,7 +81,7 @@ class SudokuConstraint {
 
     if (text.length != NUM_CELLS) return null;
     // Note: The second ` is just there so my syntax highlighter is happy.
-    if (!text.match(/[<v>^`',.`]/)) return null;
+    if (!text.match(/[<v>^`',`]/)) return null;
     if (!text.match(/^[0-9A-Za-j^<v>`'',.`]*$/)) return null;
 
     // Determine the cell directions.
