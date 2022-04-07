@@ -133,15 +133,6 @@ button.danger-button:hover:enabled {
   background-color:#bc3315;
 }
 
-@media screen and (min-width: 600px) {
-  #display-panel {
-    width: 160px;
-  }
-  #state-output {
-    flex-direction: column;
-  }
-}
-
 .selected {
   background: rgba(0,0,255,0.1);
 }
@@ -308,11 +299,16 @@ button.icon-button {
   font-size: 16px;
 }
 
+#display-panel {
+  width: 160px;
+}
+
 #state-output {
   font-size: 12px;
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
+  flex-direction: column;
 }
 #state-output span {
   display: block;
@@ -322,6 +318,16 @@ button.icon-button {
   /* Ensure that the empty spans still take up space. */
   content: '.';
   visibility: hidden;
+}
+
+@media screen and (max-width: 600px) {
+  #display-panel {
+    width: unset;
+    order: -1;
+  }
+  #state-output {
+    flex-direction: unset;
+  }
 }
 
 select {
