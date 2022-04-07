@@ -81,12 +81,14 @@ body {
 
 #instruction-panel {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 20px;
 }
-#instruction-panel > span {
+#instruction-panel span.description {
   font-size: 16px;
   font-weight: bold;
+  margin-right: 20px;
 }
 
 #sudoku-container {
@@ -367,7 +369,7 @@ select {
 
 .description {
   line-height: 1;
-  font-size: 12;
+  font-size: 12px;
   color: grey;
   max-width: 450px;
 }
