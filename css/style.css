@@ -133,13 +133,13 @@ button.danger-button:hover:enabled {
   background-color:#bc3315;
 }
 
-#display-panel {
-  line-height: 2;
-}
-
-#display-panel > div {
-  margin-bottom: 20px;
-  width: 160px;
+@media screen and (min-width: 600px) {
+  #display-panel {
+    width: 160px;
+  }
+  #state-output {
+    flex-direction: column;
+  }
 }
 
 .selected {
@@ -310,9 +310,9 @@ button.icon-button {
 
 #state-output {
   font-size: 12px;
-}
-#state-output > div {
-  margin: 10px 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
 }
 #state-output span {
   display: block;
@@ -498,8 +498,17 @@ input:checked + span:before {
   transform: translateX(19px);
 }
 
+#solve-mode-input-container {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 10px;
+}
+#solve-mode-input {
+  margin-right: 10px;
+}
 #solve-mode-description {
-  height: 30px;
+  max-width: 160px;
 }
 
 #validate-layout-container {
