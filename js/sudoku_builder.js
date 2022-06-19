@@ -854,4 +854,8 @@ class SolverProxy {
       worker.release();
     }
   }
+
+  isTerminated() {
+    return this._worker === null;
+  }
 };

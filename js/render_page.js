@@ -1376,7 +1376,10 @@ class SolverStateDisplay {
 
 class SolutionController {
   constructor(constraintManager, grid, infoOverlay) {
-    this._solver = null;
+    // Solvers are a list in case we manage to start more than one. This can
+    // happen when we are waiting for a worker to initialize.
+    this._solverPromises = [];
+
     this._isSolving = false;
     this._constraintManager = constraintManager;
     this._grid = grid;
@@ -1504,10 +1507,10 @@ class SolutionController {
   }
 
   _terminateSolver() {
-    if (this._solver) {
-      this._solver.terminate();
-      this._solver = null;
+    for (const promise of this._solverPromises) {
+      promise.then(solver => solver.terminate());
     }
+    this._solverPromises = [];
   }
 
   _showIterationControls(show) {
@@ -1567,15 +1570,20 @@ class SolutionController {
 
     this._resetSolver();
 
-    this._solver = await SudokuBuilder.buildInWorker(
+    const newSolverPromise = SudokuBuilder.buildInWorker(
       constraints,
       s => this._stateDisplay.setState(s),
       this._solveStatusChanged.bind(this),
       data => this._debugOutput.update(data));
+    this._solverPromises.push(newSolverPromise);
+
+    const newSolver = await newSolverPromise;
+
+    if (newSolver.isTerminated()) return;
 
     const handler = this._modeHandlers[mode];
 
-    handler.bind(this)(this._solver)
+    handler.bind(this)(newSolver)
       .catch(e => {
         if (!e.toString().startsWith('Aborted')) {
           throw(e);
