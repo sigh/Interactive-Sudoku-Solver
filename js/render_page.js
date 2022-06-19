@@ -4,7 +4,8 @@ let grid, constraintManager, controller, infoOverlay;
 
 const initPage = () => {
   // Create grid.
-  let container = document.getElementById('sudoku-grid');
+  const container = document.getElementById('sudoku-grid');
+  container.className = `size-${GRID_SIZE}x${GRID_SIZE}`;
   grid = new SudokuGrid(container);
   constraintManager = new ConstraintManager(grid);
   infoOverlay = new InfoOverlay(grid._container);
@@ -211,7 +212,7 @@ class JigsawManager {
     }
 
     for (const [_, cells] of map) {
-      if (cells.length == 9) {
+      if (cells.length == GRID_SIZE) {
         this.addPiece(cells.map(c => toCellId(...toRowCol(c))));
       }
     }
@@ -223,7 +224,7 @@ class JigsawManager {
   }
 
   isValidJigsawPiece(selection) {
-    if (selection.length != 9) return false;
+    if (selection.length != GRID_SIZE) return false;
 
     // Check that we aren't overlapping an existing tile.
     if (selection.some(c => this._piecesMap[parseCellId(c).cell] != 0)) {
@@ -936,7 +937,7 @@ class SudokuGrid {
           this.updateCallback(this);
           break;
         case 'f':
-          if (this.selection.size() != 9) return;
+          if (this.selection.size() != GRID_SIZE) return;
           this.selection.getCells().forEach((c,i) => c.textContent = i+1);
           this.updateCallback(this);
           break;

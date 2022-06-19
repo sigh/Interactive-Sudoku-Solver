@@ -2,10 +2,16 @@
   position: relative;
 
   display: inline-grid;
-  grid-template-columns: repeat(9, 52px);
-  grid-template-rows: repeat(9, 52px);
 
   box-shadow: 3px 3px 10px;
+}
+.size-9x9 {
+  grid-template-columns: repeat(9, 52px);
+  grid-template-rows: repeat(9, 52px);
+}
+.size-16x16 {
+  grid-template-columns: repeat(16, 52px);
+  grid-template-rows: repeat(16, 52px);
 }
 
 .sudoku-constraint-svg {
@@ -21,10 +27,18 @@
   opacity: 0.5;
 
   display: inline-grid;
-  grid-template-columns: repeat(9, 52px);
-  grid-template-rows: repeat(9, 52px);
+  grid-template-columns: repeat(16, 52px);
+  grid-template-rows: repeat(16, 52px);
 
   pointer-events: none;
+}
+.size-9x9 .info-overlay {
+  grid-template-columns: repeat(9, 52px);
+  grid-template-rows: repeat(9, 52px);
+}
+.size-16x16 .info-overlay {
+  grid-template-columns: repeat(16, 52px);
+  grid-template-rows: repeat(16, 52px);
 }
 
 .cell-elem {
@@ -68,10 +82,16 @@
 }
 
 .cell-multi-solution {
-  font-size: 15px;
-  line-height: 17px;
   overflow-wrap: anywhere;
   white-space: pre-wrap;
+}
+.size-9x9 .cell-multi-solution {
+  font-size: 15px;
+  line-height: 17px;
+}
+.size-16x16 .cell-multi-solution {
+  font-size: 9px;
+  line-height: 10px;
 }
 
 body {

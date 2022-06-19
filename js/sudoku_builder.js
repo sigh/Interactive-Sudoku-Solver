@@ -1,20 +1,26 @@
 var ENABLE_DEBUG_LOGS = false;
 
+const DEFAULT_BOX_SIZE = 3;
+const MAX_BOX_SIZE = 4;
 const BOX_SIZE = 3;
+
 const GRID_SIZE = BOX_SIZE*BOX_SIZE;
 const NUM_CELLS = GRID_SIZE*GRID_SIZE;
+const MAX_VALUE_BASE = MAX_BOX_SIZE*MAX_BOX_SIZE+1;
+
 const ALL_CELLS = (() => {
+
   const cells = new Array(NUM_CELLS);
   for (let i = 0; i < NUM_CELLS; i++) cells[i] = i;
   return cells;
 })();
 
 const toValueId = (row, col, n) => {
-  return id = `R${row+1}C${col+1}_${n}`;
+  return id = `${toCellId(row, col)}_${n}`;
 };
 
 const toCellId = (row, col) => {
-  return id = `R${row+1}C${col+1}`;
+  return id = `R${(row+1).toString(MAX_VALUE_BASE)}C${(col+1).toString(MAX_VALUE_BASE)}`;
 };
 
 const toCellIndex = (row, col) => {
@@ -28,15 +34,15 @@ const toRowCol = (cell) => {
 const parseValueId = (valueId) => {
   let cellId = valueId.substr(0, 4);
   return {
-    value: +valueId[5],
+    value: parseInt(valueId.substr(5)),
     cellId: cellId,
     ...parseCellId(cellId),
   };
 };
 
 const parseCellId = (cellId) => {
-  let row = +cellId[1]-1;
-  let col = +cellId[3]-1;
+  let row = parseInt(cellId[1], MAX_VALUE_BASE)-1;
+  let col = parseInt(cellId[3], MAX_VALUE_BASE)-1;
   return {
     cell: toCellIndex(row, col),
     row: row,

@@ -407,6 +407,7 @@ class SumHandlerUtil {
   // _PAIRWISE_SUMS[(a<<GRID_SIZE)|b] = sum>>2;
   // (The shift is so the result fits in 16 bits).
   static _PAIRWISE_SUMS = (() => {
+    if (BOX_SIZE > DEFAULT_BOX_SIZE) return;
     const table = new Uint16Array(COMBINATIONS*COMBINATIONS);
 
     for (let i = 0; i < COMBINATIONS; i++) {
@@ -479,6 +480,7 @@ class SumHandlerUtil {
   // possibilities: values which are in any solution.
   // requiredUniques: values which are a required part of any solution.
   static KILLER_CAGE_INFO = (() => {
+    if (BOX_SIZE > DEFAULT_BOX_SIZE) return;
     const table = [];
     let count = 0;
     for (let i = 0; i < COMBINATIONS; i++) {
@@ -801,7 +803,7 @@ SudokuConstraintHandler.Sandwich = class Sandwich extends SudokuConstraintHandle
   }
 
   static _BORDER_MASK = 1 | (1 << (GRID_SIZE-1));
-  static _MAX_SUM = 35;
+  static _MAX_SUM = (GRID_SIZE*(GRID_SIZE-1)/2)-1;
   static _VALUE_MASK = ~this._BORDER_MASK & ALL_VALUES;
 
   // Possible combinations for values between the 1 and 9 for each possible sum.

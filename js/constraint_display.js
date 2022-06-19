@@ -545,7 +545,7 @@ class ConstraintDisplay {
     grid.setAttribute('stroke', 'rgb(0, 0, 0)');
     grid.setAttribute('stroke-linecap', 'round');
 
-    for (let i = 3; i < GRID_SIZE; i+=3) {
+    for (let i = BOX_SIZE; i < GRID_SIZE; i+=BOX_SIZE) {
       grid.appendChild(this._makePath([
         [0, i*cellSize],
         [gridSize, i*cellSize],
