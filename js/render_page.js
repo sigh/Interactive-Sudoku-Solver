@@ -128,6 +128,7 @@ class ExampleHandler {
     'Sudoku X',
     'Sandwich sudoku',
     'German whispers',
+    'Between lines',
     'Palindromes',
     'Jigsaw',
     'X-Windoku',
@@ -517,6 +518,16 @@ class ConstraintManager {
         this._addToPanel(config);
         this._configs.push(config);
         break;
+      case 'Between':
+        config = {
+          cells: constraint.cells,
+          name: 'Between',
+          constraint: constraint,
+          displayElem: this._display.drawBetween(constraint.cells),
+        };
+        this._addToPanel(config);
+        this._configs.push(config);
+        break;
       case 'Cage':
         config = {
           cells: constraint.cells,
@@ -590,6 +601,10 @@ class ConstraintManager {
         break;
       case 'whisper':
         constraint = new SudokuConstraint.Whisper(...cells);
+        this.loadConstraint(constraint);
+        break;
+      case 'between':
+        constraint = new SudokuConstraint.Between(...cells);
         this.loadConstraint(constraint);
         break;
       case 'palindrome':

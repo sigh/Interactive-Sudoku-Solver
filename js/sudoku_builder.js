@@ -297,6 +297,13 @@ class SudokuConstraint {
     }
   }
 
+  static Between = class Between extends SudokuConstraint {
+    constructor(...cells) {
+      super(arguments);
+      this.cells = cells;
+    }
+  }
+
   static Palindrome = class Palindrome extends SudokuConstraint {
     constructor(...cells) {
       super(arguments);
@@ -651,6 +658,11 @@ class SudokuBuilder {
           yield new SudokuConstraintHandler.BinaryConstraint(
             cells[i-1], cells[i], (a, b) => a >= b+5 || a <= b-5);
         }
+        break;
+
+      case 'Between':
+        cells = constraint.cells.map(c => parseCellId(c).cell);
+        yield new SudokuConstraintHandler.Between(cells);
         break;
 
       case 'Palindrome':

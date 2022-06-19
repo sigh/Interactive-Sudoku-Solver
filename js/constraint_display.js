@@ -359,6 +359,25 @@ class ConstraintDisplay {
     return dot;
   }
 
+  _CIRCLE_RADIUS = 15;
+
+  _makeCircle(cell) {
+    const [x, y] = ConstraintDisplay.cellIdCenter(cell);
+    let circle = createSvgElement('circle');
+    circle.setAttribute('cx', x);
+    circle.setAttribute('cy', y);
+    circle.setAttribute('r', this._CIRCLE_RADIUS);
+
+    return circle;
+  }
+
+  _removeCircleFromLine(p0, p1) {
+    const [dx, dy] = [p1[0]-p0[0], p1[1]-p0[1]];
+    const frac = this._CIRCLE_RADIUS/Math.sqrt(dx*dx+dy*dy);
+    p0[0] += dx*frac;
+    p0[1] += dy*frac;
+  }
+
   drawArrow(cells) {
     if (cells.length < 2) throw(`Arrow too short: ${cells}`)
 
@@ -369,23 +388,10 @@ class ConstraintDisplay {
     arrow.setAttribute('stroke-linecap', 'round');
 
     // Draw the circle.
-    const circleRadius = 15;
-    const [x, y] = ConstraintDisplay.cellIdCenter(cells[0]);
-    let circle = createSvgElement('circle');
-    circle.setAttribute('cx', x);
-    circle.setAttribute('cy', y);
-    circle.setAttribute('r', circleRadius);
-    arrow.appendChild(circle);
+    arrow.appendChild(this._makeCircle(cells[0]));
 
     const points = cells.map(ConstraintDisplay.cellIdCenter);
-
-    // Remove the circle part from the path.
-    {
-      const [dx, dy] = [points[1][0]-points[0][0], points[1][1]-points[0][1]];
-      const frac = circleRadius/Math.sqrt(dx*dx+dy*dy);
-      points[0][0] += dx*frac;
-      points[0][1] += dy*frac;
-    }
+    this._removeCircleFromLine(points[0], points[1])
 
     // Draw the line.
     const path = this._makePath(points);
@@ -415,6 +421,31 @@ class ConstraintDisplay {
     return this._drawConstraintLine(cells, 'rgb(255, 200, 255)');
   }
 
+  drawBetween(cells) {
+    const len = cells.length;
+    if (len < 2) throw(`Line too short: ${cells}`)
+
+    let between  = createSvgElement('g');
+    between.setAttribute('stroke', 'rgb(200, 200, 200)');
+    between.setAttribute('stroke-width', 3);
+    between.setAttribute('stroke-linecap', 'round');
+    between.setAttribute('fill', 'transparent');
+
+    // Draw the circle.
+    between.appendChild(this._makeCircle(cells[0]));
+    between.appendChild(this._makeCircle(cells[len-1]));
+
+    const points = cells.map(ConstraintDisplay.cellIdCenter);
+    this._removeCircleFromLine(points[0], points[1])
+    this._removeCircleFromLine(points[len-1], points[len-2])
+    const path = this._makePath(points);
+    between.appendChild(path);
+
+    this._constraintGroup.append(between);
+
+    return between;
+  }
+
   drawPalindrome(cells) {
     return this._drawConstraintLine(cells, 'rgb(200, 200, 255)');
   }
@@ -427,12 +458,7 @@ class ConstraintDisplay {
     thermo.setAttribute('stroke', 'rgb(200, 200, 200)');
 
     // Draw the circle.
-    const [x, y] = ConstraintDisplay.cellIdCenter(cells[0]);
-    let circle = createSvgElement('circle');
-    circle.setAttribute('cx', x);
-    circle.setAttribute('cy', y);
-    circle.setAttribute('r', 15);
-    thermo.appendChild(circle);
+    thermo.appendChild(this._makeCircle(cells[0]));
 
     // Draw the line.
     const path = this._makePath(cells.map(ConstraintDisplay.cellIdCenter));

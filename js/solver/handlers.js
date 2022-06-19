@@ -1003,6 +1003,45 @@ SudokuConstraintHandler.SameValues = class SameValues extends SudokuConstraintHa
   }
 }
 
+SudokuConstraintHandler.Between = class Between extends SudokuConstraintHandler {
+  constructor(cells) {
+    super(cells);
+    this._ends = [cells[0], cells[cells.length-1]]
+    this._mids = cells.slice(1, cells.length-1)
+  }
+
+  enforceConsistency(grid) {
+    const endsCombined = grid[this._ends[0]] | grid[this._ends[1]];
+    let minMax = LookupTable.MIN_MAX[endsCombined];
+    let cellMin = (minMax >> 7) + 1;
+    let cellMax = (minMax & 0x7f) - 1;
+    if (cellMin > cellMax) return false;
+
+    // Constrain the mids by masking out any values that can never be between
+    // the ends.
+    let mask = ((1 << (cellMax-cellMin+1)) - 1) << (cellMin-1);
+    let fixedValues = 0;
+    for (let i = 0; i < this._mids.length; i++) {
+      const v = (grid[this._mids[i]] &= mask);
+      if (!v) return false;
+      fixedValues |= (!(v&(v-1)))*v;
+    }
+
+    // Constrain the ends by masking out anything which rules out one of the
+    // mids.
+    if (fixedValues) {
+      minMax = LookupTable.MIN_MAX[fixedValues];
+      cellMin = (minMax >> 7);
+      cellMax = (minMax & 0x7f);
+      mask = ~(((1 << (cellMax-cellMin+1)) - 1) << (cellMin-1));
+      if (!(grid[this._ends[0]] &= mask)) return false;
+      if (!(grid[this._ends[1]] &= mask)) return false;
+    }
+
+    return true;
+  }
+}
+
 class HandlerSet {
   constructor(handlers) {
     this._handlers = [];
