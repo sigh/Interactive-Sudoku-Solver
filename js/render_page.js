@@ -263,14 +263,14 @@ class JigsawManager {
 }
 
 class ConstraintManager {
-  constructor(grid, shape) {
+  constructor(grid) {
     this._configs = [];
     this._grid = grid;
     this._shape = grid.shape;
     this._checkboxes = {};
     grid.setUpdateCallback(() => this.runUpdateCallback());
 
-    this._display = new ConstraintDisplay(grid._container, grid.selection);
+    this._display = new ConstraintDisplay(grid._container, grid.selection, this._shape);
     this._setUpPanel();
     this.setUpdateCallback();
   }

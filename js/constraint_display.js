@@ -2,10 +2,12 @@ class ConstraintDisplay {
   static SVG_PADDING = 27;
   static CELL_SIZE = 52;
 
-  constructor(container, gridSelection) {
+  constructor(container, gridSelection, shape) {
+    this._shape = shape;
+
     let svg = createSvgElement('svg');
     let padding = ConstraintDisplay.SVG_PADDING;
-    let sideLength = ConstraintDisplay.CELL_SIZE * GRID_SIZE + padding*2;
+    let sideLength = ConstraintDisplay.CELL_SIZE * shape.gridSize + padding*2;
     svg.setAttribute('height', sideLength);
     svg.setAttribute('width', sideLength);
     svg.classList.add('sudoku-constraint-svg');
@@ -67,7 +69,7 @@ class ConstraintDisplay {
     this._applyGridOffset(g);
 
     const makeArrow = (row, col, dr, dc) => {
-      const [x, y] = ConstraintDisplay.cellIdCenter(SHAPE.makeCellId(row, col));
+      const [x, y] = this.cellIdCenter(this._shape.makeCellId(row, col));
       const cellSize = ConstraintDisplay.CELL_SIZE;
 
       const arrowLen = 0.2;
@@ -145,8 +147,8 @@ class ConstraintDisplay {
 
     this._outsideArrowMap = {};
     const addArrow = (type, id, cells) => {
-      let cell0 = SHAPE.parseCellId(cells[0]);
-      let cell1 = SHAPE.parseCellId(cells[1]);
+      let cell0 = this._shape.parseCellId(cells[0]);
+      let cell1 = this._shape.parseCellId(cells[1]);
 
       let arrowSvg = makeArrow(
         cell0.row, cell0.col,
@@ -159,11 +161,11 @@ class ConstraintDisplay {
       arrowSvg.classList.add(type);
     };
 
-    const littleKillerCellMap = SudokuConstraint.LittleKiller.cellMap(SHAPE);
+    const littleKillerCellMap = SudokuConstraint.LittleKiller.cellMap(this._shape);
     for (const id in littleKillerCellMap) {
       addArrow('little-killer', id, littleKillerCellMap[id]);
     }
-    const sandwichCellMap = SudokuConstraint.Sandwich.cellMap(SHAPE);
+    const sandwichCellMap = SudokuConstraint.Sandwich.cellMap(this._shape);
     for (const id in sandwichCellMap) {
       addArrow('sandwich', id, sandwichCellMap[id]);
     }
@@ -190,13 +192,13 @@ class ConstraintDisplay {
     return arrowhead;
   }
 
-  static cellIdCenter(cellId) {
-    const {row, col} = SHAPE.parseCellId(cellId);
+  cellIdCenter(cellId) {
+    const {row, col} = this._shape.parseCellId(cellId);
     return ConstraintDisplay._cellCenter(row, col);
   }
 
-  static cellCenter(cell) {
-    return ConstraintDisplay._cellCenter(...SHAPE.splitCellIndex(cell));
+  cellCenter(cell) {
+    return ConstraintDisplay._cellCenter(...this._shape.splitCellIndex(cell));
   }
 
   static _cellCenter(row, col) {
@@ -268,12 +270,12 @@ class ConstraintDisplay {
     // Use a greedy algorithm to choose the graph color.
     let conflictingColors = new Set();
     for (const cellId of cellIds) {
-      let {row, col} = SHAPE.parseCellId(cellId);
+      let {row, col} = this._shape.parseCellId(cellId);
       // Lookup all  adjacent cells, it doesn't matter if they valid or not.
-      conflictingColors.add(this.killerCellColors.get(SHAPE.makeCellId(row, col+1)));
-      conflictingColors.add(this.killerCellColors.get(SHAPE.makeCellId(row, col-1)));
-      conflictingColors.add(this.killerCellColors.get(SHAPE.makeCellId(row+1, col)));
-      conflictingColors.add(this.killerCellColors.get(SHAPE.makeCellId(row-1, col)));
+      conflictingColors.add(this.killerCellColors.get(this._shape.makeCellId(row, col+1)));
+      conflictingColors.add(this.killerCellColors.get(this._shape.makeCellId(row, col-1)));
+      conflictingColors.add(this.killerCellColors.get(this._shape.makeCellId(row+1, col)));
+      conflictingColors.add(this.killerCellColors.get(this._shape.makeCellId(row-1, col)));
     }
     // Return the first color that doesn't conflict.
     for (const color of this.constructor.KILLER_CAGE_COLORS) {
@@ -310,7 +312,7 @@ class ConstraintDisplay {
     const color = this._chooseKillerCageColor(cells);
 
     for (const cellId of cells) {
-      const path = this._makeCellSquare(SHAPE.parseCellId(cellId).cell);
+      const path = this._makeCellSquare(this._shape.parseCellId(cellId).cell);
       path.setAttribute('fill', color);
       path.setAttribute('opacity', '0.1');
 
@@ -321,7 +323,7 @@ class ConstraintDisplay {
 
     // Draw the sum in the top-left most cell. Luckly, this is the sort order.
     cells.sort();
-    [x, y] = ConstraintDisplay.cellIdCenter(cells[0]);
+    [x, y] = this.cellIdCenter(cells[0]);
 
     let text = createSvgElement('text');
     text.appendChild(document.createTextNode(sum));
@@ -343,8 +345,8 @@ class ConstraintDisplay {
     if (cells.length != 2) throw(`White dot must be two cells: ${cells}`)
 
     // Find the midpoint between the squares.
-    let [x0, y0] = ConstraintDisplay.cellIdCenter(cells[0]);
-    let [x1, y1] = ConstraintDisplay.cellIdCenter(cells[1]);
+    let [x0, y0] = this.cellIdCenter(cells[0]);
+    let [x1, y1] = this.cellIdCenter(cells[1]);
     let x = (x0+x1)/2;
     let y = (y0+y1)/2;
 
@@ -364,7 +366,7 @@ class ConstraintDisplay {
   _CIRCLE_RADIUS = 15;
 
   _makeCircle(cell) {
-    const [x, y] = ConstraintDisplay.cellIdCenter(cell);
+    const [x, y] = this.cellIdCenter(cell);
     let circle = createSvgElement('circle');
     circle.setAttribute('cx', x);
     circle.setAttribute('cy', y);
@@ -392,7 +394,7 @@ class ConstraintDisplay {
     // Draw the circle.
     arrow.appendChild(this._makeCircle(cells[0]));
 
-    const points = cells.map(ConstraintDisplay.cellIdCenter);
+    const points = cells.map(c => this.cellIdCenter(c));
     this._removeCircleFromLine(points[0], points[1])
 
     // Draw the line.
@@ -409,7 +411,7 @@ class ConstraintDisplay {
   _drawConstraintLine(cells, color) {
     if (cells.length < 2) throw(`Line too short: ${cells}`)
 
-    const line = this._makePath(cells.map(ConstraintDisplay.cellIdCenter));
+    const line = this._makePath(cells.map(c => this.cellIdCenter(c)));
     line.setAttribute('stroke', color);
     line.setAttribute('stroke-width', 5);
     line.setAttribute('stroke-linecap', 'round');
@@ -437,7 +439,7 @@ class ConstraintDisplay {
     between.appendChild(this._makeCircle(cells[0]));
     between.appendChild(this._makeCircle(cells[len-1]));
 
-    const points = cells.map(ConstraintDisplay.cellIdCenter);
+    const points = cells.map(c => this.cellIdCenter(c));
     this._removeCircleFromLine(points[0], points[1])
     this._removeCircleFromLine(points[len-1], points[len-2])
     const path = this._makePath(points);
@@ -463,7 +465,7 @@ class ConstraintDisplay {
     thermo.appendChild(this._makeCircle(cells[0]));
 
     // Draw the line.
-    const path = this._makePath(cells.map(ConstraintDisplay.cellIdCenter));
+    const path = this._makePath(cells.map(c => this.cellIdCenter(c)));
     path.setAttribute('stroke-width', 15);
     path.setAttribute('stroke-linecap', 'round');
     thermo.appendChild(path);
@@ -474,7 +476,7 @@ class ConstraintDisplay {
   }
 
   drawDiagonal(direction) {
-    const size = ConstraintDisplay.CELL_SIZE*GRID_SIZE;
+    const size = ConstraintDisplay.CELL_SIZE*this._shape.gridSize;
     const line = this._makePath([
       [0, direction > 0 ? size : 0],
       [size, direction > 0 ? 0 : size],
@@ -497,12 +499,12 @@ class ConstraintDisplay {
     const grid = createSvgElement('g');
     this._applyGridOffset(grid);
     const cellSize = ConstraintDisplay.CELL_SIZE;
-    const gridSize = cellSize*GRID_SIZE;
+    const gridSize = cellSize*this._shape.gridSize;
 
     grid.setAttribute('stroke-width', 1);
     grid.setAttribute('stroke', 'rgb(150, 150, 150)');
 
-    for (let i = 1; i < GRID_SIZE; i++) {
+    for (let i = 1; i < this._shape.gridSize; i++) {
       grid.append(this._makePath([
         [0, i*cellSize],
         [gridSize, i*cellSize],
@@ -518,7 +520,7 @@ class ConstraintDisplay {
 
   makeBorders(fill) {
     const cellSize = ConstraintDisplay.CELL_SIZE;
-    const gridSize = cellSize*GRID_SIZE;
+    const gridSize = cellSize*this._shape.gridSize;
 
     const g = createSvgElement('g');
     this._applyGridOffset(g);
@@ -541,13 +543,13 @@ class ConstraintDisplay {
     const grid = createSvgElement('g');
     this._applyGridOffset(grid);
     const cellSize = ConstraintDisplay.CELL_SIZE;
-    const gridSize = cellSize*GRID_SIZE;
+    const gridSize = cellSize*this._shape.gridSize;
 
     grid.setAttribute('stroke-width', 2);
     grid.setAttribute('stroke', 'rgb(0, 0, 0)');
     grid.setAttribute('stroke-linecap', 'round');
 
-    for (let i = BOX_SIZE; i < GRID_SIZE; i+=BOX_SIZE) {
+    for (let i = this._shape.boxSize; i < this._shape.gridSize; i+=this._shape.boxSize) {
       grid.appendChild(this._makePath([
         [0, i*cellSize],
         [gridSize, i*cellSize],
@@ -572,7 +574,7 @@ class ConstraintDisplay {
   _makeCellSquare(cell) {
     const cellWidth = ConstraintDisplay.CELL_SIZE;
 
-    const [x, y] = ConstraintDisplay.cellCenter(cell);
+    const [x, y] = this.cellCenter(cell);
     const path = createSvgElement('path');
     const directions = [
       'M', x-cellWidth/2+1, y-cellWidth/2+1,
@@ -597,9 +599,9 @@ class ConstraintDisplay {
 
     // Find the current missing cells.
     const missingCells = new Set();
-    for (let i = 0; i < NUM_CELLS; i++) missingCells.add(i);
+    for (let i = 0; i < this._shape.numCells; i++) missingCells.add(i);
     this._regionElems.forEach(
-      cs => cs.forEach(c => missingCells.delete(SHAPE.parseCellId(c).cell)));
+      cs => cs.forEach(c => missingCells.delete(this._shape.parseCellId(c).cell)));
 
     // Shade in the missing cells.
     for (const cell of missingCells) {
@@ -608,7 +610,7 @@ class ConstraintDisplay {
   }
 
   drawRegion(region) {
-    const cellSet = new Set(region.map(c => SHAPE.parseCellId(c).cell));
+    const cellSet = new Set(region.map(c => this._shape.parseCellId(c).cell));
 
     const g = createSvgElement('g');
     g.setAttribute('stroke-width', 2);
@@ -616,15 +618,15 @@ class ConstraintDisplay {
     g.setAttribute('stroke-linecap', 'round');
 
     const cellSize = ConstraintDisplay.CELL_SIZE;
-    const gridSize = cellSize*GRID_SIZE;
+    const gridSize = cellSize*this._shape.gridSize;
 
     for (const cell of cellSet) {
-      const [row, col] = SHAPE.splitCellIndex(cell);
+      const [row, col] = this._shape.splitCellIndex(cell);
 
-      const cellUp    = SHAPE.cellIndex(row-1, col);
-      const cellDown  = SHAPE.cellIndex(row+1, col);
-      const cellLeft  = SHAPE.cellIndex(row, col-1);
-      const cellRight = SHAPE.cellIndex(row, col+1);
+      const cellUp    = this._shape.cellIndex(row-1, col);
+      const cellDown  = this._shape.cellIndex(row+1, col);
+      const cellLeft  = this._shape.cellIndex(row, col-1);
+      const cellRight = this._shape.cellIndex(row, col+1);
 
       if (!cellSet.has(cellLeft)) {
         g.appendChild(this._makePath([
