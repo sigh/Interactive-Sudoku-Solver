@@ -1017,15 +1017,16 @@ class SudokuGrid {
     }
   }
 
-  static _TEMPLATE_ARRAY = (() => {
-    const chars = Array(GRID_SIZE*2-1).fill(' ');
-    chars[BOX_SIZE*2-1] = '\n';
-    chars[BOX_SIZE*2*2-1] = '\n';
+  _makeTemplateArray() {
+    const shape = this.shape;
+    const chars = new Array(shape.gridSize*2-1).fill(' ');
+    chars[shape.boxSize*2-1] = '\n';
+    chars[shape.boxSize*2*2-1] = '\n';
     return chars;
-  })();
+  }
 
   _formatMultiSolution(values) {
-    const chars = [...this.constructor._TEMPLATE_ARRAY];
+    const chars = this._makeTemplateArray();
     for (const v of values) {
       chars[v*2-2] = v;
     }

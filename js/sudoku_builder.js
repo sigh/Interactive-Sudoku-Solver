@@ -17,6 +17,18 @@ class GridShape {
     Object.freeze(this);
   }
 
+  static shapeMemoizer(f) {
+    const map = new Map();
+    return s => {
+      let result = map.get(s);
+      if (result) return result;
+
+      result = f(s);
+      map.set(s, result);
+      return result;
+    };
+  }
+
   makeValueId = (cellIndex, n) => {
     const cellId = this.makeCellId(...this.splitCellIndex(cellIndex));
     return `${cellId}_${n}`;
@@ -68,8 +80,9 @@ class SudokuTextParser {
     // Reference for format:
     // http://forum.enjoysudoku.com/understandable-snarfable-killer-cages-t6119.html
 
-    const numCells = SHAPE_9x9.numCells;
-    const gridSize = SHAPE_9x9.gridSize;
+    const shape = SHAPE_9x9;
+    const numCells = shape.numCells;
+    const gridSize = shape.gridSize;
 
     if (text.length != numCells) return null;
     // Note: The second ` is just there so my syntax highlighter is happy.
@@ -138,7 +151,7 @@ class SudokuTextParser {
           cells: [],
         });
       }
-      cages.get(cageCell).cells.push(SHAPE.makeCellId(...SHAPE.splitCellIndex(i)));
+      cages.get(cageCell).cells.push(shape.makeCellId(...shape.splitCellIndex(i)));
     }
 
     let constraints = [];
@@ -154,7 +167,8 @@ class SudokuTextParser {
 
     if (!text.startsWith('3x3:')) return null;
 
-    const numCells = SHAPE_9x9.numCells;
+    const shape = SHAPE_9x9;
+    const numCells = shape.numCells;
 
     let parts = text.split(':');
     if (parts[2] != 'k') return null;
@@ -171,7 +185,7 @@ class SudokuTextParser {
       if (!cages.has(cageId)) {
         cages.set(cageId, {sum: cageSum, cells: []});
       }
-      cages.get(cageId).cells.push(SHAPE.makeCellId(...SHAPE.splitCellIndex(i)));
+      cages.get(cageId).cells.push(shape.makeCellId(...shape.splitCellIndex(i)));
     }
 
     let constraints = [];
@@ -185,8 +199,9 @@ class SudokuTextParser {
     return new SudokuConstraint.Set(constraints);
   }
 
-  static _parsePlainSudoku(text, gridSize, baseChar) {
-    const numCells = gridSize*gridSize;
+  static _parsePlainSudoku(text, shape, baseChar) {
+    const numCells = shape.numCells;
+    const gridSize = shape.gridSize;
 
     if (text.length != numCells) return null;
 
@@ -197,7 +212,7 @@ class SudokuTextParser {
     for (let i = 0; i < numCells; i++) {
       let c = text.charCodeAt(i);
       if (c >= baseCharCode && c <= baseCharCode+gridSize-1) {
-        fixedValues.push(SHAPE.makeValueId(i, c-baseCharCode+1));
+        fixedValues.push(shape.makeValueId(i, c-baseCharCode+1));
       } else {
         nonValueCharacters.push(c);
       }
@@ -207,16 +222,17 @@ class SudokuTextParser {
   }
 
   static parsePlain9x9(text) {
-    return this._parsePlainSudoku(text, SHAPE_9x9.gridSize, '1');
+    return this._parsePlainSudoku(text, SHAPE_9x9, '1');
   }
 
   static parsePlain16x16(text) {
-    return this._parsePlainSudoku(text, SHAPE_16x16.gridSize, 'A');
+    return this._parsePlainSudoku(text, SHAPE_16x16, 'A');
   }
 
   static parseJigsawLayout(text) {
-    const numCells = SHAPE_9x9.numCells;
-    const gridSize = SHAPE_9x9.gridSize;
+    const shape = SHAPE_9x9;
+    const numCells = shape.numCells;
+    const gridSize = shape.gridSize;
 
     if (text.length != numCells) return null;
 
@@ -238,8 +254,9 @@ class SudokuTextParser {
   }
 
   static parseJigsaw(text) {
-    const numCells = SHAPE_9x9.numCells;
-    const gridSize = SHAPE_9x9.gridSize;
+    const shape = SHAPE_9x9;
+    const numCells = shape.numCells;
+    const gridSize = shape.gridSize;
 
     if (text.length == numCells) {
       return this.parseJigsawLayout(text);
@@ -261,15 +278,17 @@ class SudokuTextParser {
 
     const parts = [...rawText.matchAll(/[.]|\d+/g)];
     const numParts = parts.length;
-    if (numParts != SHAPE_9x9.numCells && numParts != SHAPE_16x16.numCells) {
-      return;
-    }
+
+    let shape = null;
+    if (numParts == SHAPE_9x9.numCells) { shape = SHAPE_9x9; }
+    else if (numParts == SHAPE_16x16.numCells) { shape = SHAPE_16x16; }
+    else { return; }
 
     let fixedValues = [];
     for (let i = 0; i < numParts; i++) {
       const cell = parts[i];
       if (cell == '.') continue;
-      fixedValues.push(SHAPE.makeValueId(i, cell));
+      fixedValues.push(shape.makeValueId(i, cell));
     }
 
     return new SudokuConstraint.FixedValues(...fixedValues);
@@ -392,6 +411,10 @@ class SudokuConstraint {
 
   static Windoku = class Windoku extends SudokuConstraint {
     static REGIONS = (() => {
+      const shape = SHAPE_9x9;  // Windoku only makes sense for 9x9.
+      const gridSize = shape.gridSize;
+      const boxSize = shape.boxSize;
+
       const regions = [];
 
       const offsets = [
@@ -402,10 +425,10 @@ class SudokuConstraint {
       ];
       for (const [r, c] of offsets) {
         let cells = [];
-        for (let i = 0; i < GRID_SIZE; i++) {
-          const row = r+(i%BOX_SIZE|0);
-          const col = c+(i/BOX_SIZE|0);
-          cells.push(SHAPE.cellIndex(row, col));
+        for (let i = 0; i < gridSize; i++) {
+          const row = r+(i%boxSize|0);
+          const col = c+(i/boxSize|0);
+          cells.push(shape.cellIndex(row, col));
         }
         regions.push(cells);
       }
@@ -463,29 +486,30 @@ class SudokuConstraint {
       this.sum = sum;
     }
 
-    static CELL_MAP = (() => {
+    static cellMap = GridShape.shapeMemoizer((shape) => {
       let map = {};
+      const gridSize = shape.gridSize;
 
       const addLittleKiller = (row, col, dr, dc) => {
         let cells = [];
-        for (; row >= 0 && col >= 0 && col < GRID_SIZE && row < GRID_SIZE;
+        for (; row >= 0 && col >= 0 && col < gridSize && row < gridSize;
                row+=dr, col+=dc) {
-          cells.push(SHAPE.makeCellId(row, col));
+          cells.push(shape.makeCellId(row, col));
         }
         map[cells[0]] = cells;
       };
 
       // Left side.
-      for (let row=0; row < GRID_SIZE-1; row++) addLittleKiller(row, 0, 1, 1);
+      for (let row=0; row < gridSize-1; row++) addLittleKiller(row, 0, 1, 1);
       // Right side.
-      for (let row=1; row < GRID_SIZE-1; row++) addLittleKiller(row, GRID_SIZE-1, -1, -1);
+      for (let row=1; row < gridSize-1; row++) addLittleKiller(row, gridSize-1, -1, -1);
       // Top side.
-      for (let col=1; col < GRID_SIZE; col++) addLittleKiller(0, col, 1, -1);
+      for (let col=1; col < gridSize; col++) addLittleKiller(0, col, 1, -1);
       // Bottom side.
-      for (let col=1; col < GRID_SIZE-1; col++) addLittleKiller(GRID_SIZE-1, col, -1, 1);
+      for (let col=1; col < gridSize-1; col++) addLittleKiller(gridSize-1, col, -1, 1);
 
       return map;
-    })();
+    });
   }
 
   static Sandwich = class Sandwich extends SudokuConstraint {
@@ -495,27 +519,28 @@ class SudokuConstraint {
       this.sum = sum;
     }
 
-    static CELL_MAP = (() => {
+    static cellMap = GridShape.shapeMemoizer((shape) => {
       let map = {};
+      const gridSize = shape.gridSize;
 
       const addSandwich = (name, row, col, dr, dc) => {
         let cells = [];
-        for (; col < GRID_SIZE && row < GRID_SIZE;
+        for (; col < gridSize && row < gridSize;
                row+=dr, col+=dc) {
-          cells.push(SHAPE.makeCellId(row, col));
+          cells.push(shape.makeCellId(row, col));
         }
         map[name] = cells;
       };
 
-      for (let row=0; row < GRID_SIZE; row++) {
+      for (let row=0; row < gridSize; row++) {
         addSandwich(`R${row+1}`, row, 0, 0, 1);
       }
-      for (let col=0; col < GRID_SIZE; col++) {
+      for (let col=0; col < gridSize; col++) {
         addSandwich(`C${col+1}`, 0, col, 1, 0);
       }
 
       return map;
-    })();
+    });
   }
 
   static AllDifferent = class AllDifferent extends SudokuConstraint {
@@ -699,13 +724,13 @@ class SudokuBuilder {
 
       case 'LittleKiller':
         cells = SudokuConstraint.LittleKiller
-          .CELL_MAP[constraint.id].map(c => SHAPE.parseCellId(c).cell);
+          .cellMap(SHAPE)[constraint.id].map(c => SHAPE.parseCellId(c).cell);
         yield new SudokuConstraintHandler.Sum(cells, constraint.sum);
         break;
 
       case 'Sandwich':
         cells = SudokuConstraint.Sandwich
-          .CELL_MAP[constraint.id].map(c => SHAPE.parseCellId(c).cell);
+          .cellMap(SHAPE)[constraint.id].map(c => SHAPE.parseCellId(c).cell);
         yield new SudokuConstraintHandler.Sandwich(cells, constraint.sum);
         break;
 

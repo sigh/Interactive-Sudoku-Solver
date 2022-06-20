@@ -159,11 +159,13 @@ class ConstraintDisplay {
       arrowSvg.classList.add(type);
     };
 
-    for (const id in SudokuConstraint.LittleKiller.CELL_MAP) {
-      addArrow('little-killer', id, SudokuConstraint.LittleKiller.CELL_MAP[id]);
+    const littleKillerCellMap = SudokuConstraint.LittleKiller.cellMap(SHAPE);
+    for (const id in littleKillerCellMap) {
+      addArrow('little-killer', id, littleKillerCellMap[id]);
     }
-    for (const id in SudokuConstraint.Sandwich.CELL_MAP) {
-      addArrow('sandwich', id, SudokuConstraint.Sandwich.CELL_MAP[id]);
+    const sandwichCellMap = SudokuConstraint.Sandwich.cellMap(SHAPE);
+    for (const id in sandwichCellMap) {
+      addArrow('sandwich', id, sandwichCellMap[id]);
     }
 
     return g;
