@@ -67,7 +67,7 @@ class ConstraintDisplay {
     this._applyGridOffset(g);
 
     const makeArrow = (row, col, dr, dc) => {
-      const [x, y] = ConstraintDisplay.cellIdCenter(toCellId(row, col));
+      const [x, y] = ConstraintDisplay.cellIdCenter(SHAPE.makeCellId(row, col));
       const cellSize = ConstraintDisplay.CELL_SIZE;
 
       const arrowLen = 0.2;
@@ -145,8 +145,8 @@ class ConstraintDisplay {
 
     this._outsideArrowMap = {};
     const addArrow = (type, id, cells) => {
-      let cell0 = parseCellId(cells[0]);
-      let cell1 = parseCellId(cells[1]);
+      let cell0 = SHAPE.parseCellId(cells[0]);
+      let cell1 = SHAPE.parseCellId(cells[1]);
 
       let arrowSvg = makeArrow(
         cell0.row, cell0.col,
@@ -189,12 +189,12 @@ class ConstraintDisplay {
   }
 
   static cellIdCenter(cellId) {
-    const {row, col} = parseCellId(cellId);
+    const {row, col} = SHAPE.parseCellId(cellId);
     return ConstraintDisplay._cellCenter(row, col);
   }
 
   static cellCenter(cell) {
-    return ConstraintDisplay._cellCenter(...toRowCol(cell));
+    return ConstraintDisplay._cellCenter(...SHAPE.splitCellIndex(cell));
   }
 
   static _cellCenter(row, col) {
@@ -266,12 +266,12 @@ class ConstraintDisplay {
     // Use a greedy algorithm to choose the graph color.
     let conflictingColors = new Set();
     for (const cellId of cellIds) {
-      let {row, col} = parseCellId(cellId);
+      let {row, col} = SHAPE.parseCellId(cellId);
       // Lookup all  adjacent cells, it doesn't matter if they valid or not.
-      conflictingColors.add(this.killerCellColors.get(toCellId(row, col+1)));
-      conflictingColors.add(this.killerCellColors.get(toCellId(row, col-1)));
-      conflictingColors.add(this.killerCellColors.get(toCellId(row+1, col)));
-      conflictingColors.add(this.killerCellColors.get(toCellId(row-1, col)));
+      conflictingColors.add(this.killerCellColors.get(SHAPE.makeCellId(row, col+1)));
+      conflictingColors.add(this.killerCellColors.get(SHAPE.makeCellId(row, col-1)));
+      conflictingColors.add(this.killerCellColors.get(SHAPE.makeCellId(row+1, col)));
+      conflictingColors.add(this.killerCellColors.get(SHAPE.makeCellId(row-1, col)));
     }
     // Return the first color that doesn't conflict.
     for (const color of this.constructor.KILLER_CAGE_COLORS) {
@@ -308,7 +308,7 @@ class ConstraintDisplay {
     const color = this._chooseKillerCageColor(cells);
 
     for (const cellId of cells) {
-      const path = this._makeCellSquare(parseCellId(cellId).cell);
+      const path = this._makeCellSquare(SHAPE.parseCellId(cellId).cell);
       path.setAttribute('fill', color);
       path.setAttribute('opacity', '0.1');
 
@@ -597,7 +597,7 @@ class ConstraintDisplay {
     const missingCells = new Set();
     for (let i = 0; i < NUM_CELLS; i++) missingCells.add(i);
     this._regionElems.forEach(
-      cs => cs.forEach(c => missingCells.delete(parseCellId(c).cell)));
+      cs => cs.forEach(c => missingCells.delete(SHAPE.parseCellId(c).cell)));
 
     // Shade in the missing cells.
     for (const cell of missingCells) {
@@ -606,7 +606,7 @@ class ConstraintDisplay {
   }
 
   drawRegion(region) {
-    const cellSet = new Set(region.map(c => parseCellId(c).cell));
+    const cellSet = new Set(region.map(c => SHAPE.parseCellId(c).cell));
 
     const g = createSvgElement('g');
     g.setAttribute('stroke-width', 2);
@@ -617,12 +617,12 @@ class ConstraintDisplay {
     const gridSize = cellSize*GRID_SIZE;
 
     for (const cell of cellSet) {
-      const [row, col] = toRowCol(cell);
+      const [row, col] = SHAPE.splitCellIndex(cell);
 
-      const cellUp    = toCellIndex(row-1, col);
-      const cellDown  = toCellIndex(row+1, col);
-      const cellLeft  = toCellIndex(row, col-1);
-      const cellRight = toCellIndex(row, col+1);
+      const cellUp    = SHAPE.cellIndex(row-1, col);
+      const cellDown  = SHAPE.cellIndex(row+1, col);
+      const cellLeft  = SHAPE.cellIndex(row, col-1);
+      const cellRight = SHAPE.cellIndex(row, col+1);
 
       if (!cellSet.has(cellLeft)) {
         g.appendChild(this._makePath([

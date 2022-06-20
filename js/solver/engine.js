@@ -181,7 +181,7 @@ class SudokuSolver {
     let values = result.grid.map(value => LookupTable.VALUE[value])
     let solution = [];
     for (const cell of result.stack) {
-      solution.push(toValueId(...toRowCol(cell), values[cell]));
+      solution.push(SHAPE.makeValueId(cell, values[cell]));
     }
     return solution;
   }
@@ -195,7 +195,7 @@ class SudokuSolver {
       let values = grid[i];
       while (values) {
         let value = values & -values;
-        pencilmarks.push(toValueId(...toRowCol(i), LookupTable.VALUE[value]));
+        pencilmarks.push(SHAPE.makeValueId(i, LookupTable.VALUE[value]));
         values &= ~value;
       }
     }

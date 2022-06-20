@@ -25,7 +25,7 @@ const toShortSolution = (valueIds) => {
   result.fill(DEFAULT_VALUE);
 
   for (const valueId of valueIds) {
-    let {cell, value} = parseValueId(valueId);
+    let {cell, value} = SHAPE.parseValueId(valueId);
     if (result[cell] != DEFAULT_VALUE) throw('Too many solutions per cell.');
     result[cell] = value;
   }

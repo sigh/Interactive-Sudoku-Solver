@@ -407,7 +407,7 @@ class SumHandlerUtil {
   // _PAIRWISE_SUMS[(a<<GRID_SIZE)|b] = sum>>2;
   // (The shift is so the result fits in 16 bits).
   static _PAIRWISE_SUMS = (() => {
-    if (GRID_SIZE != GRID_SIZE_9x9) return;
+    if (SHAPE !== SHAPE_9x9) return;
     const table = new Uint16Array(COMBINATIONS*COMBINATIONS);
 
     for (let i = 0; i < COMBINATIONS; i++) {
@@ -480,7 +480,7 @@ class SumHandlerUtil {
   // possibilities: values which are in any solution.
   // requiredUniques: values which are a required part of any solution.
   static KILLER_CAGE_INFO = (() => {
-    if (GRID_SIZE != GRID_SIZE_9x9) return;
+    if (SHAPE !== SHAPE_9x9) return;
     const table = [];
     let count = 0;
     for (let i = 0; i < COMBINATIONS; i++) {
@@ -721,7 +721,7 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
     // unsatisfiable.
     if (numUnfixed < 0) return false;
 
-    const hasFewUnfixed = numUnfixed <= 3 && (GRID_SIZE == GRID_SIZE_9x9 || numUnfixed <= 2);
+    const hasFewUnfixed = numUnfixed <= 3 && (SHAPE === SHAPE_9x9 || numUnfixed <= 2);
 
     if (hasFewUnfixed) {
     // If there are few remaining cells then handle them explicitly.
@@ -748,7 +748,7 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
     // If _enforceFewRemainingCells has run, then we've already done all we can.
     if (hasFewUnfixed) return true;
 
-    if (this._conflictSets.length == 1 && GRID_SIZE == GRID_SIZE_9x9) {
+    if (this._conflictSets.length == 1 && SHAPE === SHAPE_9x9) {
       if (!SumHandlerUtil.restrictCellsSingleConflictSet(
         grid, this._sum, cells)) return false;
     } else {
@@ -1137,7 +1137,7 @@ class SudokuConstraintOptimizer {
 
     this._addHouseHandlers(handlerSet);
 
-    if (GRID_SIZE == GRID_SIZE_9x9) {
+    if (SHAPE == SHAPE_9x9) {
       this._optimizeSums(handlerSet, cellConflictSets, hasBoxes);
 
       this._addSumComplementCells(handlerSet);

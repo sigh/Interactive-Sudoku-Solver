@@ -213,7 +213,7 @@ class JigsawManager {
 
     for (const [_, cells] of map) {
       if (cells.length == GRID_SIZE) {
-        this.addPiece(cells.map(c => toCellId(...toRowCol(c))));
+        this.addPiece(cells.map(c => SHAPE.makeCellId(...SHAPE.splitCellIndex(c))));
       }
     }
   }
@@ -227,7 +227,7 @@ class JigsawManager {
     if (selection.length != GRID_SIZE) return false;
 
     // Check that we aren't overlapping an existing tile.
-    if (selection.some(c => this._piecesMap[parseCellId(c).cell] != 0)) {
+    if (selection.some(c => this._piecesMap[SHAPE.parseCellId(c).cell] != 0)) {
       return false;
     }
 
@@ -238,7 +238,7 @@ class JigsawManager {
     this._display.removeItem(config.displayElem);
     config.panelItem.parentNode.removeChild(config.panelItem);
 
-    config.cells.forEach(c => this._piecesMap[parseCellId(c).cell] = 0);
+    config.cells.forEach(c => this._piecesMap[SHAPE.parseCellId(c).cell] = 0);
   }
 
   _addToRegionPanel(config) {
@@ -247,7 +247,7 @@ class JigsawManager {
 
   addPiece(cells) {
     const pieceId = ++this._maxPieceId;
-    cells.forEach(c => this._piecesMap[parseCellId(c).cell] = pieceId);
+    cells.forEach(c => this._piecesMap[SHAPE.parseCellId(c).cell] = pieceId);
     const config = {
       isJigsaw: true,
       pieceId: pieceId,
@@ -283,8 +283,8 @@ class ConstraintManager {
   static _cellsAreAdjacent(cells) {
     if (cells.length != 2) return false;
     // Manhatten distance is exactly 1.
-    let cell0 = parseCellId(cells[0]);
-    let cell1 = parseCellId(cells[1]);
+    let cell0 = SHAPE.parseCellId(cells[0]);
+    let cell1 = SHAPE.parseCellId(cells[1]);
     return 1 == Math.abs(cell0.row - cell1.row) + Math.abs(cell0.col - cell1.col);
   }
 
@@ -894,11 +894,11 @@ class SudokuGrid {
       let elem = getActiveElem();
       if (!elem) return;
 
-      let {row, col} = parseCellId(elem.id);
+      let {row, col} = SHAPE.parseCellId(elem.id);
       row = (row+dr+GRID_SIZE)%GRID_SIZE;
       col = (col+dc+GRID_SIZE)%GRID_SIZE;
 
-      this.selection.setCells([toCellId(row, col)]);
+      this.selection.setCells([SHAPE.makeCellId(row, col)]);
     };
 
     let fakeInput = this._fakeInput;
@@ -955,7 +955,7 @@ class SudokuGrid {
       for (let j = 0; j < GRID_SIZE; j++) {
         let cell = document.createElement('div');
         cell.className = 'cell cell-elem';
-        let cellId = toCellId(i, j);
+        let cellId = SHAPE.makeCellId(i, j);
 
         let cellInput = document.createElement('div');
         cellInput.tabIndex = 0;
@@ -980,8 +980,8 @@ class SudokuGrid {
     for (let [cellId, cell] of this._cellMap) {
       let value = cell.textContent;
       if (value){
-        let {row, col} = parseCellId(cellId);
-        values.push(toValueId(row, col, value));
+        let {cell} = SHAPE.parseCellId(cellId);
+        values.push(SHAPE.makeValueId(cell, value));
       }
     }
     return values;
@@ -996,7 +996,7 @@ class SudokuGrid {
   setCellValues(valueIds) {
     this._clearCellValues();
     for (let valueId of valueIds) {
-      let {cellId, value} = parseValueId(valueId);
+      let {cellId, value} = SHAPE.parseValueId(valueId);
       this._cellMap.get(cellId).textContent = value;
     }
     this.updateCallback();
@@ -1049,7 +1049,7 @@ class SudokuGrid {
     let pencilmarkCell = new Set();
 
     const handleValue = (valueId) => {
-      let {cellId, value} = parseValueId(valueId);
+      let {cellId, value} = SHAPE.parseValueId(valueId);
       this._solutionValues.push(valueId);
 
       if (!cellValues.has(cellId)) cellValues.set(cellId, []);
@@ -1213,7 +1213,7 @@ class DebugOutput {
     elem.append(msgSpan);
 
     if (data.cells && data.cells.length) {
-      const cellIds = [...data.cells].map(c => toCellId(...toRowCol(c)));
+      const cellIds = [...data.cells].map(c => SHAPE.makeCellId(...SHAPE.splitCellIndex(c)));
       elem.addEventListener('mouseover', () => {
         this._debugCellHighlighter.setCells(cellIds);
       });
@@ -1754,7 +1754,7 @@ class InfoOverlay {
       for (let j = 0; j < GRID_SIZE; j++) {
         const cell = document.createElement('div');
         cell.className = 'cell-elem';
-        const cellIndex = toCellIndex(i, j);
+        const cellIndex = SHAPE.cellIndex(i, j);
         cellMap[cellIndex] = cell;
 
         infoOverlay.appendChild(cell);
