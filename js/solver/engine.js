@@ -737,130 +737,155 @@ SudokuSolver.CellAccumulator = class {
   }
 }
 
-const ALL_VALUES = (1<<GRID_SIZE)-1;
-const COMBINATIONS = (1<<GRID_SIZE);
+class LookupTables {
+  static get = memoize((shape) => {
+    return new LookupTables(true, shape);
+  });
 
-class LookupTable {
-  static VALUE = (() => {
-    let table = new Uint8Array(COMBINATIONS);
-    for (let i = 0; i < GRID_SIZE; i++) {
-      table[1 << i] = i+1;
-    }
-    return table;
-  })();
+  constructor(do_not_call, shape) {
+    if (!do_not_call) throw('Use LookupTables.get(shape)');
 
-  static COUNT = (() => {
-    let table = new Uint8Array(COMBINATIONS);
-    for (let i = 1; i < COMBINATIONS; i++) {
-      // COUNT is one greater than the count with the last set bit removed.
-      table[i] = 1 + table[i & (i-1)];
-    }
-    return table;
-  })();
+    this.allValues = (1<<shape.gridSize)-1;
+    this.combinations = 1<<shape.gridSize;
 
-  static SUM = (() => {
-    let table = new Uint8Array(COMBINATIONS);
-    for (let i = 1; i < COMBINATIONS; i++) {
-      // SUM is the value of the lowest set bit plus the sum  of the rest.
-      table[i] = table[i & (i-1)] + LookupTable.VALUE[i & -i];
-    }
-    return table;
-  })();
+    const combinations = this.combinations;
+    const gridSize = shape.gridSize;
 
-  // Combines min and max into a single integer:
-  // Layout: [min: 7 bits, range: 7 bits]
-  //
-  // The extra bits allow these values to be summed to determine the total
-  // of mins and maxs.
-  static MIN_MAX = (() => {
-    // Initialize the table with MAXs.
-    const table = new Uint16Array(COMBINATIONS);
-    table[1] = LookupTable.VALUE[1];
-    for (let i = 2; i < COMBINATIONS; i++) {
-      // MAX is greater than the max when everything has been decreased by
-      // 1.
-      table[i] = 1 + table[i >> 1];
-    }
-
-    // Add the MINs.
-    for (let i = 1; i < COMBINATIONS; i++) {
-      // MIN is the value of the last bit set.
-      const min = LookupTable.VALUE[i & -i];
-      table[i] |= min<<7;
-    }
-
-    return table;
-  })();
-
-  // Combines useful info about the range of numbers in a cell.
-  // Designed to be summed, so that the aggregate stats can be found.
-  // Layout: [isFixed: 7 bits, fixed: 7 bits, min: 7 bits, range: 7 bits]
-  //
-  // Sum of isFixed gives the number of fixed cells.
-  // Sum of fixed gives the sum of fixed cells.
-  // Min and max as a in Lookup.MIN_MAX.
-  static RANGE_INFO = (() => {
-    const table = new Uint32Array(COMBINATIONS);
-    for (let i = 1; i < COMBINATIONS; i++) {
-      const minMax = this.MIN_MAX[i];
-      const fixed = this.VALUE[i];
-      const isFixed = fixed > 0 ? 1 : 0;
-      table[i] = (isFixed<<21)|(fixed<<14)|minMax;
-    }
-    // If there are no values, set a high value for isFixed to indicate the
-    // result is invalid. This is intended to be detectable after summing.
-    table[0] = GRID_SIZE << 21;
-    return table;
-  })();
-
-  static REVERSE = (() => {
-    let table = new Uint16Array(COMBINATIONS);
-    for (let i = 0; i < COMBINATIONS; i++) {
-      let rev = 0;
-      for (let j = 0; j < GRID_SIZE; j++) {
-        rev |= ((i>>j)&1)<<(GRID_SIZE-1-j);
+    this.value = (() => {
+      let table = new Uint8Array(combinations);
+      for (let i = 0; i < gridSize; i++) {
+        table[1 << i] = i+1;
       }
-      table[i] = rev;
-    }
-    return table;
-  })();
+      return table;
+    })();
 
-  static _binaryFunctionCache = new Map();
-  static _binaryFunctionKey(fn) {
-    const keyParts = [];
-    for (let i = 1; i <= GRID_SIZE; i++) {
-      let part = 0;
-      for (let j = 1; j <= GRID_SIZE; j++) {
-        part |= fn(i, j) << j;
+    this.count = (() => {
+      let table = new Uint8Array(combinations);
+      for (let i = 1; i < combinations; i++) {
+        // COUNT is one greater than the count with the last set bit removed.
+        table[i] = 1 + table[i & (i-1)];
       }
-      keyParts.push(part);
-    }
-    return keyParts.join(',');
-  }
+      return table;
+    })();
 
-  static forBinaryFunction(fn) {
-    // Check the cache first.
-    const key = this._binaryFunctionKey(fn);
-    if (this._binaryFunctionCache.has(key)) {
-      return this._binaryFunctionCache.get(key);
-    }
+    this.sum = (() => {
+      let table = new Uint8Array(combinations);
+      for (let i = 1; i < combinations; i++) {
+        // SUM is the value of the lowest set bit plus the sum  of the rest.
+        table[i] = table[i & (i-1)] + this.value[i & -i];
+      }
+      return table;
+    })();
 
-    const table = new Uint16Array(COMBINATIONS);
-    this._binaryFunctionCache.set(key, table);
+    // Combines min and max into a single integer:
+    // Layout: [min: 7 bits, max: 7 bits]
+    //
+    // The extra bits allow these values to be summed to determine the total
+    // of mins and maxs.
+    this.minMax = (() => {
+      // Initialize the table with MAXs.
+      const table = new Uint16Array(combinations);
+      table[1] = this.value[1];
+      for (let i = 2; i < combinations; i++) {
+        // MAX is greater than the max when everything has been decreased by
+        // 1.
+        table[i] = 1 + table[i >> 1];
+      }
 
-    // Populate base cases, where there is a single value set.
-    for (let i = 0; i < GRID_SIZE; i++) {
-      for (let j = 0; j < GRID_SIZE; j++) {
-        if (fn(i+1, j+1)) {
-          table[1 << i] |= 1 << j;
+      // Add the MINs.
+      for (let i = 1; i < combinations; i++) {
+        // MIN is the value of the last bit set.
+        const min = this.value[i & -i];
+        table[i] |= min<<7;
+      }
+
+      return table;
+    })();
+
+    // Combines useful info about the range of numbers in a cell.
+    // Designed to be summed, so that the aggregate stats can be found.
+    // Layout: [isFixed: 7 bits, fixed: 7 bits, min: 7 bits, max: 7 bits]
+    //
+    // Sum of isFixed gives the number of fixed cells.
+    // Sum of fixed gives the sum of fixed cells.
+    // Min and max as a in Lookup.MIN_MAX.
+    this.rangeInfo = (() => {
+      const table = new Uint32Array(combinations);
+      for (let i = 1; i < combinations; i++) {
+        const minMax = this.minMax[i];
+        const fixed = this.value[i];
+        const isFixed = fixed > 0 ? 1 : 0;
+        table[i] = (isFixed<<21)|(fixed<<14)|minMax;
+      }
+      // If there are no values, set a high value for isFixed to indicate the
+      // result is invalid. This is intended to be detectable after summing.
+      table[0] = gridSize << 21;
+      return table;
+    })();
+
+    this.reverse = (() => {
+      let table = new Uint16Array(combinations);
+      for (let i = 0; i < combinations; i++) {
+        let rev = 0;
+        for (let j = 0; j < gridSize; j++) {
+          rev |= ((i>>j)&1)<<(gridSize-1-j);
+        }
+        table[i] = rev;
+      }
+      return table;
+    })();
+
+    const binaryFunctionKey = (fn) => {
+      const keyParts = [];
+      for (let i = 1; i <= gridSize; i++) {
+        let part = 0;
+        for (let j = 1; j <= gridSize; j++) {
+          part |= fn(i, j) << j;
+        }
+        keyParts.push(part);
+      }
+      return keyParts.join(',');
+    };
+
+    this.forBinaryFunction = memoize((fn) => {
+      const table = new Uint16Array(combinations);
+
+      // Populate base cases, where there is a single value set.
+      for (let i = 0; i < gridSize; i++) {
+        for (let j = 0; j < gridSize; j++) {
+          if (fn(i+1, j+1)) {
+            table[1 << i] |= 1 << j;
+          }
         }
       }
-    }
-    // To fill in the rest, OR together all the valid settings for each value
-    // set.
-    for (let i = 1; i < COMBINATIONS; i++) {
-      table[i] = table[i & (i-1)] | table[i & -i];
-    }
-    return table;
+      // To fill in the rest, OR together all the valid settings for each value
+      // set.
+      for (let i = 1; i < combinations; i++) {
+        table[i] = table[i & (i-1)] | table[i & -i];
+      }
+      return table;
+    },
+    binaryFunctionKey);
   }
+}
+
+const LOOKUP_TABLES = LookupTables.get(SHAPE);
+
+const ALL_VALUES = LOOKUP_TABLES.allValues;
+const COMBINATIONS = LOOKUP_TABLES.combinations;
+
+class LookupTable {
+  static VALUE = LOOKUP_TABLES.value;
+
+  static COUNT = LOOKUP_TABLES.count;
+
+  static SUM = LOOKUP_TABLES.sum;
+
+  static MIN_MAX = LOOKUP_TABLES.minMax;
+
+  static RANGE_INFO = LOOKUP_TABLES.rangeInfo;
+
+  static REVERSE = LOOKUP_TABLES.reverse;
+
+  static forBinaryFunction = fn => LOOKUP_TABLES.forBinaryFunction(fn);
 }
