@@ -425,7 +425,9 @@ SudokuSolver.InternalSolver = class {
     while (cellAccumulator.hasConstraints()) {
       counters.constraintsProcessed++;
       const c = cellAccumulator.head();
-      if (!c.enforceConsistency(grid, cellAccumulator)) return false;
+      if (!c.enforceConsistency(grid, cellAccumulator)) {
+        return false;
+      }
       cellAccumulator.popConstraint();
     }
 
@@ -603,12 +605,12 @@ SudokuSolver.InternalSolver = class {
   }
 
   validateLayout() {
-    // Choose just the nonet handlers.
-    const nonetHandlers = this._handlerSet.getAllofType(SudokuConstraintHandler.Nonet);
+    // Choose just the house handlers.
+    const houseHandlers = this._handlerSet.getAllofType(SudokuConstraintHandler.House);
 
-    // Function to fill a nonet with values 1->9.
-    const fillNonet = (nonet) => {
-      nonet.cells.forEach((c, i) => this._grids[0][c] = 1<<i);
+    // Function to fill a house with all values.
+    const fillHouse = (house) => {
+      house.cells.forEach((c, i) => this._grids[0][c] = 1<<i);
     };
 
     const attemptLog = [];
@@ -616,11 +618,11 @@ SudokuSolver.InternalSolver = class {
     // stuck for too long.
     const SEARCH_LIMIT = 200;
 
-    // Function to attempt to solve with one nonet fixed.
-    const attempt = (nonet) => {
+    // Function to attempt to solve with one house fixed.
+    const attempt = (house) => {
       this._resetStack();
 
-      fillNonet(nonet);
+      fillHouse(house);
       // Reduce backtrack triggers so that we don't weight the last runs too
       // heavily.
       // TODO: Do this in a more principled way.
@@ -633,15 +635,15 @@ SudokuSolver.InternalSolver = class {
           this.counters.branchesIgnored = 1-this.counters.progressRatio;
           return true;
         }
-        attemptLog.push([nonet, this.counters.progressRatio]);
+        attemptLog.push([house, this.counters.progressRatio]);
         return undefined;
       }
       return false;
     };
 
-    // Try doing a short search from every nonet.
-    for (const nonet of nonetHandlers) {
-      const result = attempt(nonet);
+    // Try doing a short search from every house.
+    for (const house of houseHandlers) {
+      const result = attempt(house);
       // If the search completed, then we can return the result immediately.
       if (result !== undefined) {
         this.done = true;
@@ -649,16 +651,16 @@ SudokuSolver.InternalSolver = class {
       }
     }
 
-    // None of the searches completed. Choose the nonet which had the most
+    // None of the searches completed. Choose the house which had the most
     // progress (i.e. the search covered more of the search space), and do
     // a full search from there.
 
-    // Find the nonet with the best score.
+    // Find the house with the best score.
     attemptLog.sort((a,b) => b[1]-a[1]);
-    const bestNonet = attemptLog[0][0];
+    const besthouse = attemptLog[0][0];
 
     this._resetStack();
-    fillNonet(bestNonet);
+    fillhouse(besthouse);
 
     // Run the final search until we find a solution or prove that one doesn't
     // exist.

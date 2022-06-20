@@ -1,12 +1,18 @@
 var ENABLE_DEBUG_LOGS = false;
 
-const DEFAULT_BOX_SIZE = 3;
-const MAX_BOX_SIZE = 4;
-const BOX_SIZE = 3;
+const BOX_SIZE = 4;
 
 const GRID_SIZE = BOX_SIZE*BOX_SIZE;
 const NUM_CELLS = GRID_SIZE*GRID_SIZE;
+
+const MAX_BOX_SIZE = 4;
+const MAX_GRID_SIZE = MAX_BOX_SIZE*MAX_BOX_SIZE;
 const MAX_VALUE_BASE = MAX_BOX_SIZE*MAX_BOX_SIZE+1;
+
+const GRID_SIZE_9x9 = 9;
+const NUM_CELLS_9x9 = GRID_SIZE_9x9*GRID_SIZE_9x9;
+const GRID_SIZE_16x16 = 16;
+const NUM_CELLS_16x16 = GRID_SIZE_16x16*GRID_SIZE_16x16;
 
 const ALL_CELLS = (() => {
 
@@ -51,17 +57,12 @@ const parseCellId = (cellId) => {
 };
 
 class SudokuTextParser {
-  static GRID_SIZE_9x9 = 9;
-  static NUM_CELLS_9x9 = this.GRID_SIZE_9x9*this.GRID_SIZE_9x9;
-  static GRID_SIZE_16x16 = 16;
-  static NUM_CELLS_16x16 = this.GRID_SIZE_16x16*this.GRID_SIZE_16x16;
-
   static parseShortKillerFormat(text) {
     // Reference for format:
     // http://forum.enjoysudoku.com/understandable-snarfable-killer-cages-t6119.html
 
-    const numCells = this.NUM_CELLS_9x9;
-    const gridSize = this.GRID_SIZE_9x9;
+    const numCells = NUM_CELLS_9x9;
+    const gridSize = GRID_SIZE_9x9;
 
     if (text.length != numCells) return null;
     // Note: The second ` is just there so my syntax highlighter is happy.
@@ -146,7 +147,7 @@ class SudokuTextParser {
 
     if (!text.startsWith('3x3:')) return null;
 
-    const numCells = this.NUM_CELLS_9x9;
+    const numCells = NUM_CELLS_9x9;
 
     let parts = text.split(':');
     if (parts[2] != 'k') return null;
@@ -199,16 +200,16 @@ class SudokuTextParser {
   }
 
   static parsePlain9x9(text) {
-    return this._parsePlainSudoku(text, this.GRID_SIZE_9x9, '1');
+    return this._parsePlainSudoku(text, GRID_SIZE_9x9, '1');
   }
 
   static parsePlain16x16(text) {
-    return this._parsePlainSudoku(text, this.GRID_SIZE_16x16, 'A');
+    return this._parsePlainSudoku(text, GRID_SIZE_16x16, 'A');
   }
 
   static parseJigsawLayout(text) {
-    const numCells = this.NUM_CELLS_9x9;
-    const gridSize = this.GRID_SIZE_9x9;
+    const numCells = NUM_CELLS_9x9;
+    const gridSize = GRID_SIZE_9x9;
 
     if (text.length != numCells) return null;
 
@@ -230,8 +231,8 @@ class SudokuTextParser {
   }
 
   static parseJigsaw(text) {
-    const numCells = this.NUM_CELLS_9x9;
-    const gridSize = this.GRID_SIZE_9x9;
+    const numCells = NUM_CELLS_9x9;
+    const gridSize = GRID_SIZE_9x9;
 
     if (text.length == numCells) {
       return this.parseJigsawLayout(text);
@@ -246,6 +247,25 @@ class SudokuTextParser {
     if (fixedValues == null) return null;
 
     return new SudokuConstraint.Set([layout, fixedValues]);
+  }
+
+  static parseGridLayout(rawText) {
+    if (rawText.length < NUM_CELLS_9x9*2) return null;
+
+    const parts = [...rawText.matchAll(/[.]|\d+/g)];
+    const numParts = parts.length;
+    if (numParts != NUM_CELLS_9x9 && numParts != NUM_CELLS_16x16) {
+      return;
+    }
+
+    let fixedValues = [];
+    for (let i = 0; i < numParts; i++) {
+      const cell = parts[i];
+      if (cell == '.') continue;
+      fixedValues.push(toValueId(...toRowCol(i), cell));
+    }
+
+    return new SudokuConstraint.FixedValues(...fixedValues);
   }
 
   static parseText(rawText) {
@@ -267,6 +287,9 @@ class SudokuTextParser {
     if (constraint) return constraint;
 
     constraint = this.parsePlain16x16(text);
+    if (constraint) return constraint;
+
+    constraint = this.parseGridLayout(rawText);
     if (constraint) return constraint;
 
     return null;
