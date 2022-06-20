@@ -50,55 +50,33 @@ const parseCellId = (cellId) => {
   };
 };
 
-class SudokuConstraint {
-  constructor(args) {
-    this.args = args ? [...args] : [];
-    this.type = this.constructor.name;
-  }
+class SudokuTextParser {
+  static GRID_SIZE_9x9 = 9;
+  static NUM_CELLS_9x9 = this.GRID_SIZE_9x9*this.GRID_SIZE_9x9;
+  static GRID_SIZE_16x16 = 16;
+  static NUM_CELLS_16x16 = this.GRID_SIZE_16x16*this.GRID_SIZE_16x16;
 
-  static fromString(str) {
-    let items = str.split('.');
-    if (items[0]) throw('Invalid constraint string.');
-    items.shift();
-
-    let constraints = [];
-    for (const item of items) {
-      let args = item.split('~');
-      let type = args.shift();
-      if (!type) type = this.DEFAULT.name;
-      if (!SudokuConstraint[type]) {
-        throw('Unknown constraint type: ' + type);
-      }
-      constraints.push(new SudokuConstraint[type](...args));
-    }
-    return new SudokuConstraint.Set(constraints);
-  }
-
-  toString(replaceType) {
-    let type = this.type;
-    if (this.constructor == this.constructor.DEFAULT) type = '';
-    let arr = [type, ...this.args];
-    return '.' + arr.join('~');
-  }
-
-  static _parseShortKillerFormat(text) {
+  static parseShortKillerFormat(text) {
     // Reference for format:
     // http://forum.enjoysudoku.com/understandable-snarfable-killer-cages-t6119.html
 
-    if (text.length != NUM_CELLS) return null;
+    const numCells = this.NUM_CELLS_9x9;
+    const gridSize = this.GRID_SIZE_9x9;
+
+    if (text.length != numCells) return null;
     // Note: The second ` is just there so my syntax highlighter is happy.
     if (!text.match(/[<v>^`',`]/)) return null;
     if (!text.match(/^[0-9A-Za-j^<v>`'',.`]*$/)) return null;
 
     // Determine the cell directions.
     let cellDirections = [];
-    for (let i = 0; i < NUM_CELLS; i++) {
+    for (let i = 0; i < numCells; i++) {
       switch (text[i]) {
         case 'v':
-          cellDirections.push(i+GRID_SIZE);
+          cellDirections.push(i+gridSize);
           break;
         case '^':
-          cellDirections.push(i-GRID_SIZE);
+          cellDirections.push(i-gridSize);
           break;
         case '<':
           cellDirections.push(i-1);
@@ -107,16 +85,16 @@ class SudokuConstraint {
           cellDirections.push(i+1);
           break;
         case '`':
-          cellDirections.push(i-GRID_SIZE-1);
+          cellDirections.push(i-gridSize-1);
           break;
         case '\'':
-          cellDirections.push(i-GRID_SIZE+1);
+          cellDirections.push(i-gridSize+1);
           break;
         case ',':
-          cellDirections.push(i+GRID_SIZE-1);
+          cellDirections.push(i+gridSize-1);
           break;
         case '.':
-          cellDirections.push(i+GRID_SIZE+1);
+          cellDirections.push(i+gridSize+1);
           break;
         default:
           cellDirections.push(i);
@@ -124,13 +102,13 @@ class SudokuConstraint {
     }
 
     let cages = new Map();
-    for (let i = 0; i < NUM_CELLS; i++) {
+    for (let i = 0; i < numCells; i++) {
       let cageCell = i;
       let count = 0;
       while (cellDirections[cageCell] != cageCell) {
         cageCell = cellDirections[cageCell];
         count++;
-        if (count > GRID_SIZE) {
+        if (count > gridSize) {
           throw('Loop in Killer Sudoku input.');
         }
       }
@@ -162,18 +140,20 @@ class SudokuConstraint {
     return new SudokuConstraint.Set(constraints);
   }
 
-  static _parseLongKillerFormat(text) {
+  static parseLongKillerFormat(text) {
     // Reference to format definition:
     // http://www.sudocue.net/forum/viewtopic.php?f=1&t=519
 
     if (!text.startsWith('3x3:')) return null;
 
+    const numCells = this.NUM_CELLS_9x9;
+
     let parts = text.split(':');
     if (parts[2] != 'k') return null;
-    if (parts.length != NUM_CELLS + 4) return null;
+    if (parts.length != numCells + 4) return null;
 
     let cages = new Map();
-    for (let i = 0; i < NUM_CELLS; i++) {
+    for (let i = 0; i < numCells; i++) {
       let value = +parts[i + 3];
       let cageId = value%256;
       let cageSum = value/256|0;
@@ -197,36 +177,51 @@ class SudokuConstraint {
     return new SudokuConstraint.Set(constraints);
   }
 
-  static _parsePlainSudoku(text) {
-    if (text.length != NUM_CELLS) return null;
+  static _parsePlainSudoku(text, gridSize, baseChar) {
+    const numCells = gridSize*gridSize;
+
+    if (text.length != numCells) return null;
+
+    const baseCharCode = baseChar.charCodeAt(0);
 
     let fixedValues = [];
-    let nonDigitCharacters = [];
-    for (let i = 0; i < NUM_CELLS; i++) {
-      let c = text[i];
-      if (c >= '1' && c <= '9') {
-        fixedValues.push(toValueId(...toRowCol(i), c));
+    let nonValueCharacters = [];
+    for (let i = 0; i < numCells; i++) {
+      let c = text.charCodeAt(i);
+      if (c >= baseCharCode && c <= baseCharCode+gridSize-1) {
+        fixedValues.push(toValueId(...toRowCol(i), c-baseCharCode+1));
       } else {
-        nonDigitCharacters.push(c);
+        nonValueCharacters.push(c);
       }
     }
-    if (new Set(nonDigitCharacters).size > 1) return null;
+    if (new Set(nonValueCharacters).size > 1) return null;
     return new SudokuConstraint.FixedValues(...fixedValues);
   }
 
-  static _parseJigsawLayout(text) {
-    if (text.length != NUM_CELLS) return null;
+  static parsePlain9x9(text) {
+    return this._parsePlainSudoku(text, this.GRID_SIZE_9x9, '1');
+  }
+
+  static parsePlain16x16(text) {
+    return this._parsePlainSudoku(text, this.GRID_SIZE_16x16, 'A');
+  }
+
+  static parseJigsawLayout(text) {
+    const numCells = this.NUM_CELLS_9x9;
+    const gridSize = this.GRID_SIZE_9x9;
+
+    if (text.length != numCells) return null;
 
     const chars = new Set(text);
-    if (chars.size != 9) return null;
+    if (chars.size != gridSize) return null;
 
     const counter = {};
     chars.forEach(c => counter[c] = 0);
-    for (let i = 0; i < NUM_CELLS; i++) {
+    for (let i = 0; i < numCells; i++) {
       counter[text[i]]++;
     }
 
-    if (Object.values(counter).some(c => c != 9)) return null;
+    if (Object.values(counter).some(c => c != gridSize)) return null;
 
     return new SudokuConstraint.Set([
       new SudokuConstraint.Jigsaw(text),
@@ -234,41 +229,87 @@ class SudokuConstraint {
     ]);
   }
 
-  static _parseJigsaw(text) {
-    if (text.length == NUM_CELLS) {
-      return this._parseJigsawLayout(text);
+  static parseJigsaw(text) {
+    const numCells = this.NUM_CELLS_9x9;
+    const gridSize = this.GRID_SIZE_9x9;
+
+    if (text.length == numCells) {
+      return this.parseJigsawLayout(text);
     }
 
-    if (text.length != NUM_CELLS*2) return null;
+    if (text.length != numCells*2) return null;
 
-    const layout = this._parseJigsawLayout(text.substr(NUM_CELLS));
+    const layout = this.parseJigsawLayout(text.substr(numCells));
     if (layout == null) return null;
 
-    const fixedValues = this._parsePlainSudoku(text.substr(0, NUM_CELLS));
+    const fixedValues = this.parsePlain9x9(text.substr(0, numCells));
     if (fixedValues == null) return null;
 
     return new SudokuConstraint.Set([layout, fixedValues]);
   }
 
-  static fromText(text) {
+  static parseText(rawText) {
     // Remove all whitespace.
-    text = text.replace(/\s+/g, '');
+    const text = rawText.replace(/\s+/g, '');
 
     let constraint;
 
-    constraint = this._parseShortKillerFormat(text);
+    constraint = this.parseShortKillerFormat(text);
     if (constraint) return constraint;
 
-    constraint = this._parseLongKillerFormat(text);
+    constraint = this.parseLongKillerFormat(text);
     if (constraint) return constraint;
 
-    constraint = this._parseJigsaw(text);
+    constraint = this.parseJigsaw(text);
     if (constraint) return constraint;
 
-    constraint = this._parsePlainSudoku(text);
+    constraint = this.parsePlain9x9(text);
     if (constraint) return constraint;
 
-    return SudokuConstraint.fromString(text);
+    constraint = this.parsePlain16x16(text);
+    if (constraint) return constraint;
+
+    return null;
+  }
+}
+
+class SudokuConstraint {
+  constructor(args) {
+    this.args = args ? [...args] : [];
+    this.type = this.constructor.name;
+  }
+
+  static fromString(str) {
+    str = str.replace(/\s+/g, '');
+    let items = str.split('.');
+    if (items[0]) throw('Invalid constraint string.');
+    items.shift();
+
+    let constraints = [];
+    for (const item of items) {
+      let args = item.split('~');
+      let type = args.shift();
+      if (!type) type = this.DEFAULT.name;
+      if (!SudokuConstraint[type]) {
+        throw('Unknown constraint type: ' + type);
+      }
+      constraints.push(new SudokuConstraint[type](...args));
+    }
+    return new SudokuConstraint.Set(constraints);
+  }
+
+  toString() {
+    let type = this.type;
+    if (this.constructor == this.constructor.DEFAULT) type = '';
+    let arr = [type, ...this.args];
+    return '.' + arr.join('~');
+  }
+
+  static fromText(rawText) {
+    let constraint = SudokuTextParser.parseText(rawText);
+    if (constraint) return constraint;
+
+    return SudokuConstraint.fromString(rawText);
   }
 
   static Set = class Set extends SudokuConstraint {

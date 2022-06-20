@@ -237,7 +237,7 @@ class SumHandlerUtil {
     possibilities = sumLookup[sum-fixedSum];
     if (!possibilities) return false;
     if (possibilities) {
-      requiredUniques &= possibilities >> 9;
+      requiredUniques &= possibilities >> GRID_SIZE;
     }
 
     // Remove any values that aren't part of any solution.
@@ -504,7 +504,7 @@ class SumHandlerUtil {
             }
           }
           if (possibilities) {
-            countTable[s] = possibilities | (required << 9);
+            countTable[s] = possibilities | (required << GRID_SIZE);
           }
         }
       }
