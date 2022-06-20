@@ -3,8 +3,9 @@
 var EXPORT_CONFLICT_HEATMAP = false;
 
 class SudokuSolver {
-  constructor(handlers) {
-    this._internalSolver = new SudokuSolver.InternalSolver(handlers);
+  constructor(handlers, shape) {
+    this._shape = shape;
+    this._internalSolver = new SudokuSolver.InternalSolver(handlers, shape);
 
     this._progressExtraStateFn = null;
     this._progressCallback = null;
@@ -50,7 +51,7 @@ class SudokuSolver {
       for (const result of this._getIter()) {
         // Only store a sample solution if we don't have one.
         if (sampleSolution == null) {
-          sampleSolution = this.constructor._resultToSolution(result)
+          sampleSolution = this.constructor._resultToSolution(result, this._shape)
         }
       }
     });
@@ -67,7 +68,7 @@ class SudokuSolver {
     let result = this._nthIteration(n, false);
     if (!result) return null;
 
-    return this.constructor._resultToSolution(result);
+    return this.constructor._resultToSolution(result, this._shape);
   }
 
   nthStep(n) {
@@ -75,7 +76,7 @@ class SudokuSolver {
     if (!result) return null;
 
     return {
-      values: this.constructor._resultToSolution(result),
+      values: this.constructor._resultToSolution(result, this._shape),
       pencilmarks: this.constructor._makePencilmarks(result.grid, result.stack),
       isSolution: result.isSolution,
       hasContradiction: result.hasContradiction,
@@ -106,7 +107,7 @@ class SudokuSolver {
   solveAllPossibilities() {
     this._reset();
 
-    let valuesInSolutions = new Uint16Array(NUM_CELLS);
+    let valuesInSolutions = new Uint16Array(this._shape.numCells);
 
     // Send the current values with the progress update, if there have
     // been any changes.
@@ -177,25 +178,25 @@ class SudokuSolver {
     return this._iter.iter;
   }
 
-  static _resultToSolution(result) {
+  static _resultToSolution(result, shape) {
     let values = result.grid.map(value => LookupTable.VALUE[value])
     let solution = [];
     for (const cell of result.stack) {
-      solution.push(SHAPE.makeValueId(cell, values[cell]));
+      solution.push(shape.makeValueId(cell, values[cell]));
     }
     return solution;
   }
 
-  static _makePencilmarks(grid, ignoreCells) {
+  static _makePencilmarks(grid, ignoreCells, shape) {
     let ignoreSet = new Set(ignoreCells);
 
     let pencilmarks = [];
-    for (let i = 0; i < NUM_CELLS; i++) {
+    for (let i = 0; i < shape.numCells; i++) {
       if (ignoreSet.has(i)) continue;
       let values = grid[i];
       while (values) {
         let value = values & -values;
-        pencilmarks.push(SHAPE.makeValueId(i, LookupTable.VALUE[value]));
+        pencilmarks.push(shape.makeValueId(i, LookupTable.VALUE[value]));
         values &= ~value;
       }
     }
@@ -205,10 +206,13 @@ class SudokuSolver {
 
 SudokuSolver.InternalSolver = class {
 
-  constructor(handlerGen) {
+  constructor(handlerGen, shape) {
+    this._shape = shape;
+    this._numCells = this._shape.numCells;
+
     this._initCellArray();
-    this._stack = new Uint8Array(NUM_CELLS);
-    this._progressRatioStack = new Array(NUM_CELLS);
+    this._stack = new Uint8Array(shape.numCells);
+    this._progressRatioStack = new Array(shape.numCells);
     this._progressRatioStack.fill(1);
 
     this._runCounter = 0;
@@ -229,7 +233,7 @@ SudokuSolver.InternalSolver = class {
   }
 
   _initCellPriorities() {
-    const priorities = new Uint8Array(NUM_CELLS);
+    const priorities = new Uint8Array(this._shape.numCells);
 
     // TODO: Determine priorities in a more principaled way.
     //  - Add one for each conflict cell.
@@ -246,9 +250,9 @@ SudokuSolver.InternalSolver = class {
     return priorities;
   }
 
-  static _findCellConflicts(handlers) {
-    const cellConflictSets = new Array(NUM_CELLS);
-    for (let i = 0; i < NUM_CELLS; i++) cellConflictSets[i] = new Set();
+  static _findCellConflicts(handlers, shape) {
+    const cellConflictSets = new Array(shape.numCells);
+    for (let i = 0; i < shape.numCells; i++) cellConflictSets[i] = new Set();
 
     for (const h of handlers) {
       const conflictSet = h.conflictSet();
@@ -263,7 +267,7 @@ SudokuSolver.InternalSolver = class {
   }
 
   _setUpHandlers(handlers) {
-    const cellConflictSets = this.constructor._findCellConflicts(handlers);
+    const cellConflictSets = this.constructor._findCellConflicts(handlers, this._shape);
 
     // Set cell conflicts so that they are unique.
     // Sort them, so they are in a predictable order.
@@ -326,31 +330,33 @@ SudokuSolver.InternalSolver = class {
     this._grids[0].set(this._initialGrid);
     // Re-initialize the cell indexes in the stack.
     // This is not required, but keeps things deterministic.
-    for (let i = 0; i < NUM_CELLS; i++) {
+    for (let i = 0; i < this._numCells; i++) {
       this._stack[i] = i;
     }
     this._progressRatioStack[0] = 1;
   }
 
   _initCellArray() {
-    let buffer = new ArrayBuffer(
-      (NUM_CELLS+1) * NUM_CELLS * Uint16Array.BYTES_PER_ELEMENT);
+    const numCells = this._numCells;
 
-    this._grids = new Array(NUM_CELLS+1);
-    for (let i = 0; i < NUM_CELLS+1; i++) {
+    let buffer = new ArrayBuffer(
+      (numCells+1) * numCells * Uint16Array.BYTES_PER_ELEMENT);
+
+    this._grids = new Array(numCells+1);
+    for (let i = 0; i < numCells+1; i++) {
       this._grids[i] = new Uint16Array(
         buffer,
-        i*NUM_CELLS*Uint16Array.BYTES_PER_ELEMENT,
-        NUM_CELLS);
+        i*numCells*Uint16Array.BYTES_PER_ELEMENT,
+        numCells);
     }
-    this._initialGrid = new Uint16Array(NUM_CELLS);
+    this._initialGrid = new Uint16Array(numCells);
     this._initialGrid.fill(ALL_VALUES);
   }
 
   _hasInterestingSolutions(stack, grid, uninterestingValues) {
     // We need to check all cells because we maybe validating a cell above
     // us, or finding a value for a cell below us.
-    for (let i = 0; i < NUM_CELLS; i++) {
+    for (let i = 0; i < this._numCells; i++) {
       const cell = stack[i];
       if (grid[cell]&~uninterestingValues[cell]) return true;
     }
@@ -437,7 +443,7 @@ SudokuSolver.InternalSolver = class {
   static YIELD_ON_SOLUTION = 0;
   static YIELD_ON_STEP = 1;
 
-  static _BACKTRACK_DECAY_INTERVAL = NUM_CELLS*NUM_CELLS;
+  static _BACKTRACK_DECAY_INTERVAL = 100*100;
 
   // run runs the solve.
   // yieldWhen can be:
@@ -468,7 +474,7 @@ SudokuSolver.InternalSolver = class {
       // Enforce constraints for all cells.
       let cellAccumulator = this._cellAccumulator;
       cellAccumulator.clear();
-      for (let i = 0; i < NUM_CELLS; i++) cellAccumulator.add(i);
+      for (let i = 0; i < this._numCells; i++) cellAccumulator.add(i);
       this._enforceConstraints(this._grids[0], cellAccumulator);
     }
 
@@ -521,7 +527,7 @@ SudokuSolver.InternalSolver = class {
         counters.backtracks++;
         // Exponentially decay the counts.
         if (0 === counters.backtracks % this.constructor._BACKTRACK_DECAY_INTERVAL) {
-          for (let i = 0; i < NUM_CELLS; i++) {
+          for (let i = 0; i < this._numCells; i++) {
             this._backtrackTriggers[i]>>=1;
           }
         }
@@ -556,7 +562,7 @@ SudokuSolver.InternalSolver = class {
 
       if (hasContradiction) continue;
 
-      if (depth == NUM_CELLS) {
+      if (depth == this._numCells) {
         counters.progressRatio += progressRatioStack[depth];
         // We've set all the values, and we haven't found a contradiction.
         // This is a solution!
@@ -626,7 +632,7 @@ SudokuSolver.InternalSolver = class {
       // Reduce backtrack triggers so that we don't weight the last runs too
       // heavily.
       // TODO: Do this in a more principled way.
-      for (let i = 0; i < NUM_CELLS; i++) {
+      for (let i = 0; i < this._numCells; i++) {
         this._backtrackTriggers[i] >>= 1;
       }
 

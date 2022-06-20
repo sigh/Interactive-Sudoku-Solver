@@ -1,5 +1,7 @@
 var ENABLE_DEBUG_LOGS = false;
 
+const BIG_GRID = false;
+
 class GridShape {
   constructor(gridSize, boxSize) {
     this.boxSize = boxSize;
@@ -69,7 +71,7 @@ const SHAPE_9x9 = new GridShape(9, 3);
 const SHAPE_16x16 = new GridShape(16, 4);
 const SHAPE_MAX = SHAPE_16x16;
 
-const SHAPE = SHAPE_9x9;
+const SHAPE = BIG_GRID ? SHAPE_16x16 : SHAPE_9x9;
 
 const BOX_SIZE = SHAPE.boxSize;
 const GRID_SIZE = SHAPE.gridSize;
@@ -563,7 +565,7 @@ class SudokuConstraint {
 class SudokuBuilder {
   static build(constraint) {
     const shape = SHAPE;  // TODO: Get shape from constraint.
-    return new SudokuSolver(SudokuBuilder._handlers(constraint, shape));
+    return new SudokuSolver(SudokuBuilder._handlers(constraint, shape), shape);
   }
 
   // GLobal vars to pass to the worker.
