@@ -164,3 +164,15 @@ const withDeadline = (promise, delay, reason) => {
 
   return Promise.race([promise, awaitTimeout]);
 };
+
+const memoize = (f) => {
+  const map = new Map();
+  return s => {
+    let result = map.get(s);
+    if (result) return result;
+
+    result = f(s);
+    map.set(s, result);
+    return result;
+  };
+};

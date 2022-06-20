@@ -19,18 +19,6 @@ class GridShape {
     Object.freeze(this);
   }
 
-  static shapeMemoizer(f) {
-    const map = new Map();
-    return s => {
-      let result = map.get(s);
-      if (result) return result;
-
-      result = f(s);
-      map.set(s, result);
-      return result;
-    };
-  }
-
   makeValueId = (cellIndex, n) => {
     const cellId = this.makeCellId(...this.splitCellIndex(cellIndex));
     return `${cellId}_${n}`;
@@ -488,7 +476,7 @@ class SudokuConstraint {
       this.sum = sum;
     }
 
-    static cellMap = GridShape.shapeMemoizer((shape) => {
+    static cellMap = memoize((shape) => {
       let map = {};
       const gridSize = shape.gridSize;
 
@@ -521,7 +509,7 @@ class SudokuConstraint {
       this.sum = sum;
     }
 
-    static cellMap = GridShape.shapeMemoizer((shape) => {
+    static cellMap = memoize((shape) => {
       let map = {};
       const gridSize = shape.gridSize;
 
