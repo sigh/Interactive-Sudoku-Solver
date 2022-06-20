@@ -874,14 +874,21 @@ class SudokuGrid {
       return cells[0];
     };
 
-    const setActiveCellValue = (value) => {
-      let elem = getActiveElem();
+    const updateActiveCellValue = (value) => {
+      const elem = getActiveElem();
       if (!elem) return;
 
-      elem.textContent = value || '';
+      const currValue = parseInt(elem.textContent) || 0;
+      const intValue = parseInt(value);
+
+      let newValue = currValue*10 + intValue;
+      if (newValue > GRID_SIZE) newValue = intValue;
+      if (newValue > GRID_SIZE) newValue = 0;
+
+      elem.textContent = newValue || '';
 
       this.updateCallback(this);
-    };
+    }
 
     const moveActiveCell = (dr, dc) => {
       let elem = getActiveElem();
@@ -896,12 +903,8 @@ class SudokuGrid {
 
     let fakeInput = this._fakeInput;
     fakeInput.addEventListener('input', event => {
-      const value = +fakeInput.value;
-      if (value > 0 && value <= 9) {
-        setActiveCellValue(value);
-      } else {
-        setActiveCellValue(null);
-      }
+      updateActiveCellValue(fakeInput.value);
+
       // Ensure that any user input results in a value which makes sense to us:
       //   - Select so that the ensure content is replaced by the new value.
       //   - Initialize with x, so that backspace can be detected.
