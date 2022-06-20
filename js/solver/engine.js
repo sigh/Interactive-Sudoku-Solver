@@ -77,7 +77,7 @@ class SudokuSolver {
 
     return {
       values: this.constructor._resultToSolution(result, this._shape),
-      pencilmarks: this.constructor._makePencilmarks(result.grid, result.stack),
+      pencilmarks: this.constructor._makePencilmarks(result.grid, this._shape, result.stack),
       isSolution: result.isSolution,
       hasContradiction: result.hasContradiction,
     }
@@ -113,7 +113,7 @@ class SudokuSolver {
     // been any changes.
     let lastSize = 0;
     this._progressExtraStateFn = () => {
-      let pencilmarks = this.constructor._makePencilmarks(valuesInSolutions);
+      let pencilmarks = this.constructor._makePencilmarks(valuesInSolutions, this._shape);
       if (pencilmarks.length == lastSize) return null;
       lastSize = pencilmarks.size;
       return {pencilmarks: pencilmarks};
@@ -125,7 +125,7 @@ class SudokuSolver {
 
     this._progressExtraStateFn = null;
 
-    return this.constructor._makePencilmarks(valuesInSolutions);
+    return this.constructor._makePencilmarks(valuesInSolutions, this._shape);
   }
 
   validateLayout() {
@@ -187,7 +187,7 @@ class SudokuSolver {
     return solution;
   }
 
-  static _makePencilmarks(grid, ignoreCells, shape) {
+  static _makePencilmarks(grid, shape, ignoreCells) {
     let ignoreSet = new Set(ignoreCells);
 
     let pencilmarks = [];
