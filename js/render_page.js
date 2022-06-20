@@ -3,12 +3,13 @@
 let grid, constraintManager, controller, infoOverlay;
 
 const initPage = () => {
+  const shape = SHAPE;
+
   // Create grid.
   const container = document.getElementById('sudoku-grid');
-  container.className = `size-${GRID_SIZE}x${GRID_SIZE}`;
-  grid = new SudokuGrid(container);
+  grid = new SudokuGrid(container, shape);
   constraintManager = new ConstraintManager(grid);
-  infoOverlay = new InfoOverlay(grid._container);
+  infoOverlay = new InfoOverlay(grid);
 
   controller = new SolutionController(constraintManager, grid, infoOverlay);
 };
@@ -180,13 +181,14 @@ class ExampleHandler {
 }
 
 class JigsawManager {
-  constructor(display, onChange, makePanelItem) {
+  constructor(display, onChange, makePanelItem, shape) {
     this._display = display;
+    this._shape = shape;
     this._makePanelItem = makePanelItem;
 
     this._regionPanel = document.getElementById('displayed-regions');
 
-    this._piecesMap = Array(NUM_CELLS).fill(0);
+    this._piecesMap = Array(this._shape.numCells).fill(0);
     this._maxPieceId = 0;
   }
 
@@ -194,7 +196,7 @@ class JigsawManager {
     if (this._piecesMap.every(x => x == 0)) return new SudokuConstraint.Set([]);
 
     const indexMap = new Map();
-    const grid = Array(NUM_CELLS).fill('-');
+    const grid = Array(this._shape.numCells).fill('-');
     this._piecesMap.forEach((p, i) => {
       if (!indexMap.has(p)) indexMap.set(p, indexMap.size);
       grid[i] = indexMap.get(p);
@@ -205,15 +207,16 @@ class JigsawManager {
   setConstraint(constraint) {
     const grid = constraint.grid;
     const map = new Map();
-    for (let i = 0; i < NUM_CELLS; i++) {
+    const shape = this._shape;
+    for (let i = 0; i < grid.length; i++) {
       const v = grid[i];
       if (!map.has(v)) map.set(v, []);
       map.get(v).push(i);
     }
 
     for (const [_, cells] of map) {
-      if (cells.length == GRID_SIZE) {
-        this.addPiece(cells.map(c => SHAPE.makeCellId(...SHAPE.splitCellIndex(c))));
+      if (cells.length == shape.gridSize) {
+        this.addPiece(cells.map(c => shape.makeCellId(...shape.splitCellIndex(c))));
       }
     }
   }
@@ -224,10 +227,10 @@ class JigsawManager {
   }
 
   isValidJigsawPiece(selection) {
-    if (selection.length != GRID_SIZE) return false;
+    if (selection.length != this._shape.gridSize) return false;
 
     // Check that we aren't overlapping an existing tile.
-    if (selection.some(c => this._piecesMap[SHAPE.parseCellId(c).cell] != 0)) {
+    if (selection.some(c => this._piecesMap[this._shape.parseCellId(c).cell] != 0)) {
       return false;
     }
 
@@ -238,7 +241,7 @@ class JigsawManager {
     this._display.removeItem(config.displayElem);
     config.panelItem.parentNode.removeChild(config.panelItem);
 
-    config.cells.forEach(c => this._piecesMap[SHAPE.parseCellId(c).cell] = 0);
+    config.cells.forEach(c => this._piecesMap[this._shape.parseCellId(c).cell] = 0);
   }
 
   _addToRegionPanel(config) {
@@ -247,7 +250,7 @@ class JigsawManager {
 
   addPiece(cells) {
     const pieceId = ++this._maxPieceId;
-    cells.forEach(c => this._piecesMap[SHAPE.parseCellId(c).cell] = pieceId);
+    cells.forEach(c => this._piecesMap[this._shape.parseCellId(c).cell] = pieceId);
     const config = {
       isJigsaw: true,
       pieceId: pieceId,
@@ -260,9 +263,10 @@ class JigsawManager {
 }
 
 class ConstraintManager {
-  constructor(grid) {
+  constructor(grid, shape) {
     this._configs = [];
     this._grid = grid;
+    this._shape = grid.shape;
     this._checkboxes = {};
     grid.setUpdateCallback(() => this.runUpdateCallback());
 
@@ -283,8 +287,8 @@ class ConstraintManager {
   static _cellsAreAdjacent(cells) {
     if (cells.length != 2) return false;
     // Manhatten distance is exactly 1.
-    let cell0 = SHAPE.parseCellId(cells[0]);
-    let cell1 = SHAPE.parseCellId(cells[1]);
+    let cell0 = this._shape.parseCellId(cells[0]);
+    let cell1 = this._shape.parseCellId(cells[1]);
     return 1 == Math.abs(cell0.row - cell1.row) + Math.abs(cell0.col - cell1.col);
   }
 
@@ -298,7 +302,7 @@ class ConstraintManager {
 
     this._jigsawManager = new JigsawManager(
       this._display, this.runUpdateCallback.bind(this),
-      this._makePanelItem.bind(this));
+      this._makePanelItem.bind(this), this._shape);
 
     let selectionForm = document.forms['multi-cell-constraint-input'];
     this._grid.selection.addCallback(
@@ -830,9 +834,11 @@ class Selection extends Highlight {
 }
 
 class SudokuGrid {
-  constructor(container) {
+  constructor(container, shape) {
     this._container = container;
+    this.shape = shape;
     container.classList.add('sudoku-grid');
+    container.classList.add(`size-${shape.name}`);
     this._solutionValues = [];
 
     // fake-input is an invisible text input which is used to ensure that
@@ -868,6 +874,8 @@ class SudokuGrid {
   }
 
   _setUpKeyBindings(container) {
+    const gridSize = this.shape.gridSize;
+
     const getActiveElem = () => {
       let cells = this.selection.getCells();
       if (cells.length != 1) return null;
@@ -882,8 +890,8 @@ class SudokuGrid {
       const intValue = parseInt(value);
 
       let newValue = currValue*10 + intValue;
-      if (newValue > GRID_SIZE) newValue = intValue;
-      if (newValue > GRID_SIZE) newValue = 0;
+      if (newValue > gridSize) newValue = intValue;
+      if (newValue > gridSize) newValue = 0;
 
       elem.textContent = newValue || '';
 
@@ -894,11 +902,11 @@ class SudokuGrid {
       let elem = getActiveElem();
       if (!elem) return;
 
-      let {row, col} = SHAPE.parseCellId(elem.id);
-      row = (row+dr+GRID_SIZE)%GRID_SIZE;
-      col = (col+dc+GRID_SIZE)%GRID_SIZE;
+      let {row, col} = this.shape.parseCellId(elem.id);
+      row = (row+dr+gridSize)%gridSize;
+      col = (col+dc+gridSize)%gridSize;
 
-      this.selection.setCells([SHAPE.makeCellId(row, col)]);
+      this.selection.setCells([this.shape.makeCellId(row, col)]);
     };
 
     let fakeInput = this._fakeInput;
@@ -940,7 +948,7 @@ class SudokuGrid {
           this.updateCallback(this);
           break;
         case 'f':
-          if (this.selection.size() != GRID_SIZE) return;
+          if (this.selection.size() != gridSize) return;
           this.selection.getCells().forEach((c,i) => c.textContent = i+1);
           this.updateCallback(this);
           break;
@@ -950,12 +958,13 @@ class SudokuGrid {
 
   _makeSudokuGrid(container) {
     let cellMap = new Map();
+    const gridSize = this.shape.gridSize;
 
-    for (let i = 0; i < GRID_SIZE; i++) {
-      for (let j = 0; j < GRID_SIZE; j++) {
+    for (let i = 0; i < gridSize; i++) {
+      for (let j = 0; j < gridSize; j++) {
         let cell = document.createElement('div');
         cell.className = 'cell cell-elem';
-        let cellId = SHAPE.makeCellId(i, j);
+        let cellId = this.shape.makeCellId(i, j);
 
         let cellInput = document.createElement('div');
         cellInput.tabIndex = 0;
@@ -980,8 +989,8 @@ class SudokuGrid {
     for (let [cellId, cell] of this._cellMap) {
       let value = cell.textContent;
       if (value){
-        let {cell} = SHAPE.parseCellId(cellId);
-        values.push(SHAPE.makeValueId(cell, value));
+        let {cell} = this.shape.parseCellId(cellId);
+        values.push(this.shape.makeValueId(cell, value));
       }
     }
     return values;
@@ -996,7 +1005,7 @@ class SudokuGrid {
   setCellValues(valueIds) {
     this._clearCellValues();
     for (let valueId of valueIds) {
-      let {cellId, value} = SHAPE.parseValueId(valueId);
+      let {cellId, value} = this.shape.parseValueId(valueId);
       this._cellMap.get(cellId).textContent = value;
     }
     this.updateCallback();
@@ -1049,7 +1058,7 @@ class SudokuGrid {
     let pencilmarkCell = new Set();
 
     const handleValue = (valueId) => {
-      let {cellId, value} = SHAPE.parseValueId(valueId);
+      let {cellId, value} = this.shape.parseValueId(valueId);
       this._solutionValues.push(valueId);
 
       if (!cellValues.has(cellId)) cellValues.set(cellId, []);
@@ -1212,8 +1221,10 @@ class DebugOutput {
     elem.append(locSpan);
     elem.append(msgSpan);
 
+    const shape = this._grid.shape;
+
     if (data.cells && data.cells.length) {
-      const cellIds = [...data.cells].map(c => SHAPE.makeCellId(...SHAPE.splitCellIndex(c)));
+      const cellIds = [...data.cells].map(c => shape.makeCellId(...shape.splitCellIndex(c)));
       elem.addEventListener('mouseover', () => {
         this._debugCellHighlighter.setCells(cellIds);
       });
@@ -1737,9 +1748,11 @@ class InfoOverlay {
   _cellMap;
   _container;
   _isClear = true;
+  _shape;
 
-  constructor(container) {
-    this._container = container;
+  constructor(grid) {
+    this._container = grid._container;
+    this._shape = grid.shape;
   }
 
   _initInfoOverlay() {
@@ -1750,11 +1763,11 @@ class InfoOverlay {
 
     const cellMap = new Map();
 
-    for (let i = 0; i < GRID_SIZE; i++) {
-      for (let j = 0; j < GRID_SIZE; j++) {
+    for (let i = 0; i < this._shape.gridSize; i++) {
+      for (let j = 0; j < this._shape.gridSize; j++) {
         const cell = document.createElement('div');
         cell.className = 'cell-elem';
-        const cellIndex = SHAPE.cellIndex(i, j);
+        const cellIndex = this._shape.cellIndex(i, j);
         cellMap[cellIndex] = cell;
 
         infoOverlay.appendChild(cell);
@@ -1769,7 +1782,7 @@ class InfoOverlay {
     if (!this._infoOverlay) return;
     if (this._isClear) return;
 
-    for (let i = 0; i < NUM_CELLS; i++) {
+    for (let i = 0; i < this._shape.numCells; i++) {
       this._cellMap[i].style.background = 'none';
       this._cellMap[i].textContent = '';
     }
@@ -1779,7 +1792,7 @@ class InfoOverlay {
   setHeatmapValues(values) {
     if (!this._infoOverlay) this._initInfoOverlay();
 
-    for (let i = 0; i < NUM_CELLS; i++) {
+    for (let i = 0; i < this._shape.numCells; i++) {
       this._cellMap[i].style.background = (
         `rgba(255, 0, 0, ${values[i]/1000})`);
     }
@@ -1789,7 +1802,7 @@ class InfoOverlay {
   setValues(values) {
     if (!this._infoOverlay) this._initInfoOverlay();
 
-    for (let i = 0; i < NUM_CELLS; i++) {
+    for (let i = 0; i < this._shape.numCells; i++) {
       this._cellMap[i].textContent = values[i];
     }
     this._isClear = false;

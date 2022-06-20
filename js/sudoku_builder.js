@@ -7,6 +7,8 @@ class GridShape {
     this.numValues = gridSize;
     this.numCells = gridSize * gridSize;
 
+    this.name = `${gridSize}x${gridSize}`;
+
     this._valueBase = this.numValues+1;
 
     this.allCells = new Array(this.numCells);
