@@ -486,6 +486,9 @@ class SudokuBuilder {
   }
 
   static async buildInWorker(constraints, stateHandler, statusHandler, debugHandler) {
+    // Ensure any pending terminations are enacted.
+    await new Promise(r => setTimeout(r, 0));
+
     if (!this._unusedWorkers.length) {
       this._unusedWorkers.push(new Worker('js/worker.js' + VERSION_PARAM));
     }
@@ -496,7 +499,6 @@ class SudokuBuilder {
     const globalVars = this.getGlobalVars();
 
     await solverProxy.init(constraints, this.LOG_UPDATE_FREQUENCY, globalVars);
-
     return solverProxy;
   }
 

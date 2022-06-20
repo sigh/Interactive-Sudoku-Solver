@@ -1581,9 +1581,9 @@ class SolutionController {
 
     if (newSolver.isTerminated()) return;
 
-    const handler = this._modeHandlers[mode];
+    const handler = this._modeHandlers[mode].bind(this);
 
-    handler.bind(this)(newSolver)
+    handler(newSolver)
       .catch(e => {
         if (!e.toString().startsWith('Aborted')) {
           throw(e);
