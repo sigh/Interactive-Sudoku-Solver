@@ -1,8 +1,12 @@
 const formatTimeMs = (timeMs) => {
-  if (timeMs < 1000) {
+  if (timeMs < 1e3) {
     return timeMs.toPrecision(3) + ' ms';
+  } else if (timeMs < 60e3) {
+    return (timeMs/1000).toPrecision(3) + ' s';
+  } else {
+    const timeS = timeMs/1e3|0;
+    return (timeS/60|0) + ' min ' + (timeS%60) + ' s';
   }
-  return (timeMs/1000).toPrecision(3) + ' s';
 };
 
 const createSvgElement = (tag) => {
