@@ -16,6 +16,8 @@ class GridShape {
     this.allCells = new Array(this.numCells);
     for (let i = 0; i < this.numCells; i++) this.allCells[i] = i;
 
+    this.maxSum = this.gridSize*(this.gridSize+1)/2;
+
     Object.freeze(this);
   }
 
@@ -714,7 +716,7 @@ class SudokuBuilder {
         if (constraint.sum > 0 && cells.length < gridSize) {
           yield new SudokuConstraintHandler.Sum(cells, constraint.sum);
         }
-        if (cells.length == gridSize && constraint.sum != 45) {
+        if (cells.length == gridSize && constraint.sum != shape.maxSum) {
           yield new SudokuConstraintHandler.False(cells);
         }
         yield new SudokuConstraintHandler.AllDifferent(cells);

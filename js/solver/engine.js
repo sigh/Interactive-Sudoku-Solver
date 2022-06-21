@@ -282,11 +282,11 @@ SudokuSolver.InternalSolver = class {
     const handlerSet = new HandlerSet(handlers);
 
     // Optimize handlers.
-    SudokuConstraintOptimizer.optimize(handlerSet, cellConflictSets);
+    SudokuConstraintOptimizer.optimize(handlerSet, cellConflictSets, this._shape);
 
     // TODO: Include as part of the solver for timing?
     for (const handler of handlerSet) {
-      handler.initialize(this._initialGrid, cellConflictSets);
+      handler.initialize(this._initialGrid, cellConflictSets, this._shape);
     }
 
     return handlerSet;
