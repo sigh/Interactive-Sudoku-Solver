@@ -279,7 +279,7 @@ SudokuSolver.InternalSolver = class {
     this._cellConflicts = cellConflictSets.map(c => new Uint8Array(c));
     this._cellConflicts.forEach(c => c.sort((a, b) => a-b));
 
-    const handlerSet = new HandlerSet(handlers);
+    const handlerSet = new HandlerSet(handlers, this._shape);
 
     // Optimize handlers.
     SudokuConstraintOptimizer.optimize(handlerSet, cellConflictSets, this._shape);
