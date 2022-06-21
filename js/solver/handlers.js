@@ -133,9 +133,17 @@ SudokuConstraintHandler.House = class House extends SudokuConstraintHandler {
 SudokuConstraintHandler.BinaryConstraint = class BinaryConstraint extends SudokuConstraintHandler {
   constructor(cell1, cell2, fn) {
     super([cell1, cell2]);
+    this._fn = fn;
+    this._tables = null;
+  }
+
+  initialize(initialGrid, cellConflicts, shape) {
+    const lookupTables = LookupTables.get(shape);
+    const fn = this._fn;
+    this._fn = null;
     this._tables = [
-      LookupTable.forBinaryFunction(fn),
-      LookupTable.forBinaryFunction((a, b) => fn(b, a)),
+      lookupTables.forBinaryFunction(fn),
+      lookupTables.forBinaryFunction((a, b) => fn(b, a)),
     ];
   }
 
@@ -802,45 +810,67 @@ SudokuConstraintHandler.Sandwich = class Sandwich extends SudokuConstraintHandle
   constructor(cells, sum) {
     super(cells);
     this._sum = +sum;
-    this._distances = SudokuConstraintHandler.Sandwich._DISTANCE_RANGE[+sum];
-    this._combinations = SudokuConstraintHandler.Sandwich._COMBINATIONS[+sum];
   }
 
-  static _BORDER_MASK = 1 | (1 << (GRID_SIZE-1));
-  static _MAX_SUM = (GRID_SIZE*(GRID_SIZE-1)/2)-1;
-  static _VALUE_MASK = ~this._BORDER_MASK & ALL_VALUES;
+  initialize(initialGrid, cellConflicts, shape) {
+    const lookupTables = LookupTables.get(shape);
+
+    this._gridSize = shape.gridSize;
+    this._borderMask = SudokuConstraintHandler.Sandwich._borderMask(shape);
+    this._valueMask = ~this._borderMask & lookupTables.allValues;
+    this._minMaxTable = lookupTables.minMax;
+
+    this._distances = SudokuConstraintHandler.Sandwich._distanceRange(shape)[this._sum];
+    this._combinations = SudokuConstraintHandler.Sandwich._combinations(shape)[this._sum];
+  }
+
+  static _borderMask(shape) {
+    return 1 | (1 << (shape.gridSize-1));
+  }
+
+  // Max sum within the sandwich.
+  static _maxSum(shape) {
+    return (shape.gridSize*(shape.gridSize-1)/2)-1;
+  }
 
   // Possible combinations for values between the 1 and 9 for each possible sum.
   // Grouped by distance.
-  static _COMBINATIONS = (() => {
+  static _combinations = memoize((shape) => {
+    const lookupTables = LookupTables.get(shape);
+    const maxSum = this._maxSum(shape);
+    const borderMask = this._borderMask(shape);
+
     let table = [];
-    const maxD = GRID_SIZE-1;
-    for (let i = 0; i <= this._MAX_SUM; i++) {
+    const maxD = shape.gridSize-1;
+    for (let i = 0; i <= maxSum; i++) {
       table[i] = new Array(maxD);
       for (let d = 0; d <= maxD; d++) table[i][d] = [];
     }
 
-    for (let i = 0; i < COMBINATIONS; i++) {
-      if (i & this._BORDER_MASK) continue;
-      let sum = LookupTable.SUM[i];
-      table[sum][LookupTable.COUNT[i]+1].push(i);
+    for (let i = 0; i < lookupTables.combinations; i++) {
+      if (i & borderMask) continue;
+      let sum = lookupTables.sum[i];
+      table[sum][lookupTables.count[i]+1].push(i);
     }
 
-    for (let i = 0; i <= this._MAX_SUM; i++) {
+    for (let i = 0; i <= maxSum; i++) {
       for (let d = 0; d <= maxD; d++) {
         table[i][d] = new Uint16Array(table[i][d]);
       }
     }
 
     return table;
-  })();
+  });
 
   // Distance range between the 1 and 9 for each possible sum.
   // Map combination to [min, max].
-  static _DISTANCE_RANGE = (() => {
+  static _distanceRange = memoize((shape) => {
+    const combinations = this._combinations(shape);
+    const maxSum = this._maxSum(shape);
+
     let table = [];
-    for (let i = 0; i <= this._MAX_SUM; i++) {
-      let row = this._COMBINATIONS[i];
+    for (let i = 0; i <= maxSum; i++) {
+      let row = combinations[i];
 
       let j = 0;
       while (j < row.length && !row[j].length) j++;
@@ -851,20 +881,21 @@ SudokuConstraintHandler.Sandwich = class Sandwich extends SudokuConstraintHandle
       table.push([dMin, dMax]);
     }
     return table;
-  })();
+  });
 
   // Scratch buffers for reuse so we don't have to create arrays at runtime.
-  static _validSettings = new Uint16Array(GRID_SIZE);
-  static _cellValues = new Uint16Array(GRID_SIZE);
+  static _validSettings = new Uint16Array(SHAPE_MAX.gridSize);
+  static _cellValues = new Uint16Array(SHAPE_MAX.gridSize);
 
   enforceConsistency(grid) {
     const cells = this.cells;
-    const borderMask = SudokuConstraintHandler.Sandwich._BORDER_MASK;
+    const borderMask = this._borderMask;
+    const gridSize = this._gridSize;
 
     // Cache the grid values for faster lookup.
     let values = SudokuConstraintHandler.Sandwich._cellValues;
     let numBorders = 0;
-    for (let i = 0; i < GRID_SIZE; i++) {
+    for (let i = 0; i < gridSize; i++) {
       let v = values[i] = grid[cells[i]];
       if (v & borderMask) numBorders++;
     }
@@ -879,7 +910,7 @@ SudokuConstraintHandler.Sandwich = class Sandwich extends SudokuConstraintHandle
       let minMaxSum = 0;
       while (!(values[i++] & borderMask));
       while (!(values[i] & borderMask)) {
-        minMaxSum += LookupTable.MIN_MAX[values[i]];
+        minMaxSum += this._minMaxTable[values[i]];
         i++;
       }
 
@@ -900,9 +931,9 @@ SudokuConstraintHandler.Sandwich = class Sandwich extends SudokuConstraintHandle
     // Check if the other values are consistant with the required sum.
     // Given that the values must form a house, this is sufficient to ensure
     // that the constraint is fully satisfied.
-    const valueMask = SudokuConstraintHandler.Sandwich._VALUE_MASK;
+    const valueMask = this._valueMask;
     const [minDist, maxDist] = this._distances;
-    const maxIndex = GRID_SIZE - minDist;
+    const maxIndex = gridSize - minDist;
     let prefixValues = 0;
     let pPrefix = 0;
     for (let i = 0; i < maxIndex; i++) {
@@ -918,13 +949,13 @@ SudokuConstraintHandler.Sandwich = class Sandwich extends SudokuConstraintHandle
       //  - Use them to determine the possible inside and outside values.
       let innerValues = 0;
       let pInner = i+1;
-      for (let j = i+minDist; j <= i+maxDist && j < GRID_SIZE; j++) {
+      for (let j = i+minDist; j <= i+maxDist && j < gridSize; j++) {
         if (!(values[j] & vRev)) continue;
 
         while (pInner < j) innerValues |= values[pInner++];
         while (pPrefix < i) prefixValues |= values[pPrefix++];
         let outerValues = prefixValues;
-        for (let k=pInner+1; k < GRID_SIZE; k++) outerValues |= values[k];
+        for (let k=pInner+1; k < gridSize; k++) outerValues |= values[k];
 
         let combinations = this._combinations[j-i];
         let innerPossibilities = 0;
@@ -948,12 +979,12 @@ SudokuConstraintHandler.Sandwich = class Sandwich extends SudokuConstraintHandle
           validSettings[k++] |= v;
           while (k < j) validSettings[k++] |= innerPossibilities;
           validSettings[k++] |= vRev;
-          while (k < GRID_SIZE) validSettings[k++] |= outerPossibilities;
+          while (k < gridSize) validSettings[k++] |= outerPossibilities;
         }
       }
     }
 
-    for (let i = 0; i < GRID_SIZE; i++) {
+    for (let i = 0; i < gridSize; i++) {
       if (!(grid[cells[i]] &= validSettings[i])) return false;
     }
 
@@ -987,6 +1018,10 @@ SudokuConstraintHandler.SameValues = class SameValues extends SudokuConstraintHa
     this.idStr = [this.constructor.name, cells0, cells1].join('-');
   }
 
+  initialize(initialGrid, cellConflicts, shape) {
+    this._countTable = LookupTables.get(shape).count;
+  }
+
   enforceConsistency(grid) {
     const cells0 = this._cells0;
     const cells1 = this._cells1;
@@ -1004,7 +1039,7 @@ SudokuConstraintHandler.SameValues = class SameValues extends SudokuConstraintHa
     const values = values1 & values0;
 
     // Check if we have enough values.
-    if (this._isUnique && LookupTable.COUNT[values] < numCells) return false;
+    if (this._isUnique && this._countTable[values] < numCells) return false;
 
     // Enforce the constrained value set.
     const cells = this.cells;
@@ -1023,9 +1058,13 @@ SudokuConstraintHandler.Between = class Between extends SudokuConstraintHandler 
     this._mids = cells.slice(1, cells.length-1)
   }
 
+  initialize(initialGrid, cellConflicts, shape) {
+    this._minMaxTable = LookupTables.get(shape).minMax;
+  }
+
   enforceConsistency(grid) {
     const endsCombined = grid[this._ends[0]] | grid[this._ends[1]];
-    let minMax = LookupTable.MIN_MAX[endsCombined];
+    let minMax = this._minMaxTable[endsCombined];
     let cellMin = (minMax >> 7) + 1;
     let cellMax = (minMax & 0x7f) - 1;
     if (cellMin > cellMax) return false;
@@ -1043,7 +1082,7 @@ SudokuConstraintHandler.Between = class Between extends SudokuConstraintHandler 
     // Constrain the ends by masking out anything which rules out one of the
     // mids.
     if (fixedValues) {
-      minMax = LookupTable.MIN_MAX[fixedValues];
+      minMax = this._minMaxTable[fixedValues];
       cellMin = (minMax >> 7);
       cellMax = (minMax & 0x7f);
       mask = ~(((1 << (cellMax-cellMin+1)) - 1) << (cellMin-1));
