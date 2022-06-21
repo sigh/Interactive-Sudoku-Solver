@@ -179,7 +179,9 @@ class SudokuSolver {
   }
 
   static _resultToSolution(result, shape) {
-    let values = result.grid.map(value => LookupTable.VALUE[value])
+    const valueTable = LookupTables.get(shape).value;
+
+    const values = result.grid.map(value => valueTable[value])
     let solution = [];
     for (const cell of result.stack) {
       solution.push(shape.makeValueId(cell, values[cell]));
@@ -188,6 +190,8 @@ class SudokuSolver {
   }
 
   static _makePencilmarks(grid, shape, ignoreCells) {
+    const valueTable = LookupTables.get(shape).value;
+
     let ignoreSet = new Set(ignoreCells);
 
     let pencilmarks = [];
@@ -196,7 +200,7 @@ class SudokuSolver {
       let values = grid[i];
       while (values) {
         let value = values & -values;
-        pencilmarks.push(shape.makeValueId(i, LookupTable.VALUE[value]));
+        pencilmarks.push(shape.makeValueId(i, valueTable[value]));
         values &= ~value;
       }
     }
@@ -209,6 +213,7 @@ SudokuSolver.InternalSolver = class {
   constructor(handlerGen, shape) {
     this._shape = shape;
     this._numCells = this._shape.numCells;
+    this._countTable = LookupTables.get(shape).count;
 
     this._initCellArray();
     this._stack = new Uint8Array(shape.numCells);
@@ -350,7 +355,9 @@ SudokuSolver.InternalSolver = class {
         numCells);
     }
     this._initialGrid = new Uint16Array(numCells);
-    this._initialGrid.fill(ALL_VALUES);
+
+    const allValues = LookupTables.get(this._shape).allValues;
+    this._initialGrid.fill(allValues);
   }
 
   _hasInterestingSolutions(stack, grid, uninterestingValues) {
@@ -381,9 +388,11 @@ SudokuSolver.InternalSolver = class {
     let minScore = Infinity;
     let bestIndex = 0;
 
+    const countTable = this._countTable;
+
     for (let i = depth; i < stackLen; i++) {
       const cell = stack[i];
-      const count = LookupTable.COUNT[grid[cell]];
+      const count = countTable[grid[cell]];
       // If we have a single value then just use it - as it will involve no
       // guessing.
       if (count <= 1) {
@@ -402,7 +411,7 @@ SudokuSolver.InternalSolver = class {
 
     [stack[bestIndex], stack[depth]] = [stack[depth], stack[bestIndex]];
 
-    return LookupTable.COUNT[grid[stack[depth]]];
+    return countTable[grid[stack[depth]]];
   }
 
   _enforceValue(grid, value, cell) {
