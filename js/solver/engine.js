@@ -877,24 +877,3 @@ class LookupTables {
     binaryFunctionKey);
   }
 }
-
-const LOOKUP_TABLES = LookupTables.get(SHAPE);
-
-const ALL_VALUES = LOOKUP_TABLES.allValues;
-const COMBINATIONS = LOOKUP_TABLES.combinations;
-
-class LookupTable {
-  static VALUE = LOOKUP_TABLES.value;
-
-  static COUNT = LOOKUP_TABLES.count;
-
-  static SUM = LOOKUP_TABLES.sum;
-
-  static MIN_MAX = LOOKUP_TABLES.minMax;
-
-  static RANGE_INFO = LOOKUP_TABLES.rangeInfo;
-
-  static REVERSE = LOOKUP_TABLES.reverse;
-
-  static forBinaryFunction = fn => LOOKUP_TABLES.forBinaryFunction(fn);
-}

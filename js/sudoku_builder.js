@@ -63,10 +63,6 @@ const SHAPE_MAX = SHAPE_16x16;
 
 const SHAPE = BIG_GRID ? SHAPE_16x16 : SHAPE_9x9;
 
-const BOX_SIZE = SHAPE.boxSize;
-const GRID_SIZE = SHAPE.gridSize;
-const NUM_CELLS = SHAPE.numCells;
-
 class SudokuTextParser {
   static parseShortKillerFormat(text) {
     // Reference for format:

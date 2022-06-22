@@ -20,12 +20,13 @@ const getShortSolution = () => {
 };
 
 const toShortSolution = (valueIds) => {
-  let result = new Array(NUM_CELLS);
+  const shape = grid.shape;
+  let result = new Array(shape.numCells);
   const DEFAULT_VALUE = '.';
   result.fill(DEFAULT_VALUE);
 
   for (const valueId of valueIds) {
-    let {cell, value} = SHAPE.parseValueId(valueId);
+    let {cell, value} = shape.parseValueId(valueId);
     if (result[cell] != DEFAULT_VALUE) throw('Too many solutions per cell.');
     result[cell] = value;
   }
@@ -223,13 +224,15 @@ const runAll = async (puzzles, onFailure) => {
 };
 
 const printGrid = (grid) => {
+  const gridSize = Math.sqrt(grid);
   const matrix = [];
-  for (let i = 0; i < GRID_SIZE; i++) {
-    matrix.push(grid.slice(i*GRID_SIZE, (i+1)*GRID_SIZE));
+  for (let i = 0; i < gridSize; i++) {
+    matrix.push(grid.slice(i*gridSize, (i+1)*gridSize));
   }
   console.table(matrix);
 }
 
 const showCellIndex = () => {
-  infoOverlay.setValues([...Array(NUM_CELLS).keys()]);
+  const numCells = this._shape.numCells;
+  infoOverlay.setValues([...Array(numCells).keys()]);
 };

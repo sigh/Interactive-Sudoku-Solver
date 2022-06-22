@@ -764,7 +764,7 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
     // unsatisfiable.
     if (numUnfixed < 0) return false;
 
-    const hasFewUnfixed = numUnfixed <= 3 && (SHAPE === SHAPE_9x9 || numUnfixed <= 2);
+    const hasFewUnfixed = numUnfixed <= 3 && (this._shape === SHAPE_9x9 || numUnfixed <= 2);
 
     if (hasFewUnfixed) {
     // If there are few remaining cells then handle them explicitly.
