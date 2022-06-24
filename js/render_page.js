@@ -284,7 +284,7 @@ class ConstraintManager {
     this.updateCallback(this);
   }
 
-  static _cellsAreAdjacent(cells) {
+  _cellsAreAdjacent(cells) {
     if (cells.length != 2) return false;
     // Manhatten distance is exactly 1.
     let cell0 = this._shape.parseCellId(cells[0]);
@@ -366,7 +366,7 @@ class ConstraintManager {
     ];
 
     // Enable/disable the adjacent only constraints.
-    let cellsAreAdjacent = this.constructor._cellsAreAdjacent(selection);
+    let cellsAreAdjacent = this._cellsAreAdjacent(selection);
     for (const c of adjacentOnlyConstraints) {
       const elem = selectionForm[c];
       if (cellsAreAdjacent) {
