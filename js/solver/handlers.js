@@ -195,48 +195,6 @@ class SumHandlerUtil {
       return table;
     })();
 
-    // killerCageInfo[values][numCells][sum] = v
-    // v = [requiredUniques: 9 bits, possibilities: 9 bits]
-    //
-    // possibilities: values which are in any solution.
-    // requiredUniques: values which are a required part of any solution.
-    this.killerCageInfo = (() => {
-      if (numValues > SHAPE_9x9.numValues) return null;
-
-      const counts = this._lookupTables.count;
-      const table = [];
-
-      let count = 0;
-      for (let i = 0; i < combinations; i++) {
-        const valueTable = [new Uint32Array()];
-        table.push(valueTable);
-
-        const maxCount = counts[i];
-        for (let j = 1; j < maxCount+1; j++) {
-          const countTable = new Uint32Array(maxSum+1);
-          valueTable.push(countTable);
-
-          const sums = this.killerCageSums[j];
-          for (let s = 1; s < sums.length; s++) {
-            const options = sums[s];
-            let possibilities = 0;
-            let required = this._lookupTables.allValues;
-            for (const o of options) {
-              if ((o & i) == o) {
-                possibilities |= o;
-                required &= o;
-              }
-            }
-            if (possibilities) {
-              countTable[s] = possibilities | (required << numValues);
-            }
-          }
-        }
-      }
-
-      return table;
-    })();
-
     // Precompute the sums for all pairs of cells. Assumes cells must be unique.
     //
     // For cell values a and b:
@@ -370,16 +328,16 @@ class SumHandlerUtil {
     const unfixedValues = allValues & ~fixedValues;
     let requiredUniques = uniqueValues;
     const numUnfixed = cells.length - this._lookupTables.count[fixedValues];
-    const sumLookup = this.killerCageInfo[unfixedValues][numUnfixed];
 
     let possibilities = 0;
-
-    // Handle the common case where we only have one sum.
-    possibilities = sumLookup[sum-fixedSum];
-    if (!possibilities) return false;
-    if (possibilities) {
-      requiredUniques &= possibilities >> this._numValues;
+    const options = this.killerCageSums[numUnfixed][sum-fixedSum];
+    for (const o of options) {
+      if ((o & unfixedValues) == o) {
+        possibilities |= o;
+        requiredUniques &= o;
+      }
     }
+    if (!possibilities) return false;
 
     // Remove any values that aren't part of any solution.
     const valuesToRemove = unfixedValues & ~possibilities;
@@ -799,7 +757,7 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
     // If enforceFewRemainingCells has run, then we've already done all we can.
     if (hasFewUnfixed) return true;
 
-    if (this._conflictSets.length == 1 && this._util.killerCageInfo) {
+    if (this._conflictSets.length == 1) {
       if (!this._util.restrictCellsSingleConflictSet(
         grid, this._sum, cells)) return false;
     } else {
