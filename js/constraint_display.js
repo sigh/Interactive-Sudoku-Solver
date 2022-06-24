@@ -1,8 +1,153 @@
-class ConstraintDisplay {
+class DisplayBase {
+  static SVG_PADDING = 27;
+  static CELL_SIZE = 52;
+
+  cellIdCenter(cellId) {
+    const {row, col} = this._shape.parseCellId(cellId);
+    return DisplayBase._cellCenter(row, col);
+  }
+
+  cellCenter(cell) {
+    return DisplayBase._cellCenter(...this._shape.splitCellIndex(cell));
+  }
+
+  static _cellCenter(row, col) {
+    const cellSize = ConstraintDisplay.CELL_SIZE;
+    return [col*cellSize + cellSize/2, row*cellSize + cellSize/2];
+  }
+
+  _applyGridOffset(elem) {
+    const padding = this.constructor.SVG_PADDING;
+    elem.setAttribute('transform', `translate(${padding},${padding})`);
+  }
+}
+
+class SolutionDisplay extends DisplayBase {
+  constructor(container, constraintManager, shape) {
+    super();
+    this._shape = shape;
+    this._solutionValues = [];
+    this._constraintManager = constraintManager;
+
+    let svg = createSvgElement('svg');
+    this._applyGridOffset(svg);
+    svg.classList.add('sudoku-display-svg');
+    let padding = DisplayBase.SVG_PADDING;
+    let sideLength = DisplayBase.CELL_SIZE * shape.gridSize + padding*2;
+
+    svg.setAttribute('height', sideLength);
+    svg.setAttribute('width', sideLength);
+
+    this._svg = svg;
+
+    container.append(svg);
+
+    this.setSolution = deferUntilAnimationFrame(this.setSolution.bind(this));
+  }
+
+  // Display solution on grid.
+  //  - If solution contains mutiple values for single cell, they will be shown
+  //    as pencil marks.
+  //  - Anything in pencilmarks will always be shown as pencil marks.
+  setSolution(solution, pencilmarks) {
+    pencilmarks = pencilmarks || [];
+    solution = solution || [];
+    this._solutionValues = [];
+
+    // If we have no solution, just hide it instead.
+    // However, we wait a bit so that we don't fliker if the solution is updated
+    // again immediatly.
+    if (!solution.length && !pencilmarks.length) {
+      window.setTimeout(() => {
+        // Ensure there is still no solution.
+        if (this._solutionValues.length == 0) {
+          this._svg.classList.add('hidden-solution');
+        }
+      }, 10);
+      return;
+    }
+
+    clearDOMNode(this._svg);
+
+    let cellValues = new Map();
+    let pencilmarkCell = new Set();
+
+    const handleValue = (valueId) => {
+      let {cellId, value} = this._shape.parseValueId(valueId);
+      this._solutionValues.push(valueId);
+
+      if (!cellValues.has(cellId)) cellValues.set(cellId, []);
+      cellValues.get(cellId).push(value);
+      return cellId;
+    };
+    for (const valueId of solution) {
+      handleValue(valueId);
+    }
+    for (const valueId of pencilmarks) {
+      let cellId = handleValue(valueId);
+      pencilmarkCell.add(cellId);
+    }
+
+    for (const cellId of this._constraintManager.getFixedCells()) {
+      cellValues.delete(cellId);
+    }
+
+    const makeTextNode = (str, x, y, cls) => {
+      const text = createSvgElement('text');
+      text.appendChild(document.createTextNode(str));
+      text.setAttribute('class', cls);
+      text.setAttribute('x', x);
+      text.setAttribute('y', y);
+      return text;
+    };
+
+    const LINE_HEIGHT = 17;
+    for (const [cellId, values] of cellValues) {
+      const [x, y] = this.cellIdCenter(cellId);
+
+      if (values.length == 1 && !pencilmarkCell.has(cellId)) {
+        this._svg.append(makeTextNode(
+          values[0], x, y, 'solution-value'));
+      } else {
+        let offset = -LINE_HEIGHT;
+        for (const line of this._formatMultiSolution(values)) {
+          this._svg.append(makeTextNode(
+            line, x, y+offset, 'solution-multi-value'));
+          offset += LINE_HEIGHT;
+        }
+      }
+    }
+    this._svg.classList.remove('hidden-solution');
+  }
+
+  _makeTemplateArray() {
+    const shape = this._shape;
+    const chars = new Array(shape.gridSize*2-1).fill(' ');
+    chars[shape.boxSize*2-1] = '\n';
+    chars[shape.boxSize*2*2-1] = '\n';
+    return chars;
+  }
+
+  _formatMultiSolution(values) {
+    const chars = this._makeTemplateArray();
+    for (const v of values) {
+      chars[v*2-2] = v;
+    }
+    return chars.join('').split(/\n/);
+  }
+
+  getSolutionValues() {
+    return this._solutionValues;
+  }
+}
+
+class ConstraintDisplay extends DisplayBase {
   static SVG_PADDING = 27;
   static CELL_SIZE = 52;
 
   constructor(container, gridSelection, shape) {
+    super();
+
     this._shape = shape;
 
     let svg = createSvgElement('svg');
@@ -10,7 +155,7 @@ class ConstraintDisplay {
     let sideLength = ConstraintDisplay.CELL_SIZE * shape.gridSize + padding*2;
     svg.setAttribute('height', sideLength);
     svg.setAttribute('width', sideLength);
-    svg.classList.add('sudoku-constraint-svg');
+    svg.classList.add('sudoku-display-svg');
 
     container.style.padding = `${padding}px`;
 
@@ -18,14 +163,16 @@ class ConstraintDisplay {
 
     this._initializeRegions(svg);
 
-    const constraintGroup = createSvgElement('g');
-    this._constraintGroup = constraintGroup;
-    this._applyGridOffset(constraintGroup);
-    svg.append(constraintGroup);
+    this._constraintGroup = createSvgElement('g');
+    this._applyGridOffset(this._constraintGroup);
+    svg.append(this._constraintGroup);
+
+    this._fixedValueGroup = createSvgElement('g');
+    this._applyGridOffset(this._fixedValueGroup);
+    svg.append(this._fixedValueGroup);
 
     svg.append(this._makeArrowhead());
     svg.append(this._makeLittleKillers(gridSelection));
-
     svg.append(this.makeBorders());
 
     container.prepend(svg);
@@ -192,29 +339,12 @@ class ConstraintDisplay {
     return arrowhead;
   }
 
-  cellIdCenter(cellId) {
-    const {row, col} = this._shape.parseCellId(cellId);
-    return ConstraintDisplay._cellCenter(row, col);
-  }
-
-  cellCenter(cell) {
-    return ConstraintDisplay._cellCenter(...this._shape.splitCellIndex(cell));
-  }
-
-  static _cellCenter(row, col) {
-    const cellSize = ConstraintDisplay.CELL_SIZE;
-    return [col*cellSize + cellSize/2, row*cellSize + cellSize/2];
-  }
-
   clear() {
-    let svg = this._constraintGroup;
-    while (svg.lastChild) {
-      svg.removeChild(svg.lastChild);
-    }
-    svg = this._regionGroup;
-    while (svg.lastChild) {
-      svg.removeChild(svg.lastChild);
-    }
+    clearDOMNode(this._constraintGroup);
+    clearDOMNode(this._regionGroup);
+
+    clearDOMNode(this._fixedValueGroup);
+    this._fixedValueMap = new Map();
 
     this.killerCellColors = new Map();
     this.killerCages = new Map();
@@ -495,6 +625,30 @@ class ConstraintDisplay {
     if (item) this.removeItem(item);
   }
 
+  drawFixedValue(cell, value) {
+    // Clear the old value.
+    const oldText = this._fixedValueMap.get(cell);
+    if (oldText) {
+      this._fixedValueGroup.removeChild(oldText);
+      this._fixedValueMap.delete(cell);
+    }
+
+    // If we are unsetting the cell, nothing else to do.
+    if (value === '' || value === undefined) return;
+
+    // Create and append the new node.
+    const text = createSvgElement('text');
+    text.setAttribute('class', 'fixed-value');
+    text.appendChild(document.createTextNode(value));
+    const [x, y] = this.cellIdCenter(cell);
+    text.setAttribute('x', x);
+    text.setAttribute('y', y);
+
+    this._fixedValueGroup.append(text);
+
+    this._fixedValueMap.set(cell, text);
+  }
+
   _makeGrid() {
     const grid = createSvgElement('g');
     this._applyGridOffset(grid);
@@ -659,11 +813,6 @@ class ConstraintDisplay {
     this._updateMissingRegion();
 
     return g;
-  }
-
-  _applyGridOffset(elem) {
-    const padding = this.constructor.SVG_PADDING;
-    elem.setAttribute('transform', `translate(${padding},${padding})`);
   }
 
   _makePath(coords) {

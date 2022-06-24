@@ -11,7 +11,7 @@ const initPage = () => {
   constraintManager = new ConstraintManager(grid);
   infoOverlay = new InfoOverlay(grid);
 
-  controller = new SolutionController(constraintManager, grid, infoOverlay);
+  controller = new SolutionController(constraintManager, grid, infoOverlay, container);
 };
 
 class CheckboxConstraints {
@@ -181,7 +181,7 @@ class ExampleHandler {
 }
 
 class JigsawManager {
-  constructor(display, onChange, makePanelItem, shape) {
+  constructor(display, makePanelItem, shape) {
     this._display = display;
     this._shape = shape;
     this._makePanelItem = makePanelItem;
@@ -268,10 +268,13 @@ class ConstraintManager {
     this._grid = grid;
     this._shape = grid.shape;
     this._checkboxes = {};
-    grid.setUpdateCallback(() => this.runUpdateCallback());
 
     this._display = new ConstraintDisplay(grid._container, grid.selection, this._shape);
     this._setUpPanel();
+    this._fixedValues = new FixedValues(
+      grid, this._display, this.runUpdateCallback.bind(this));
+    this._inputManager = new GridInputManager(grid, this._fixedValues);
+
     this.setUpdateCallback();
   }
 
@@ -301,8 +304,7 @@ class ConstraintManager {
       this._display, this.runUpdateCallback.bind(this));
 
     this._jigsawManager = new JigsawManager(
-      this._display, this.runUpdateCallback.bind(this),
-      this._makePanelItem.bind(this), this._shape);
+      this._display, this._makePanelItem.bind(this), this._shape);
 
     let selectionForm = document.forms['multi-cell-constraint-input'];
     this._grid.selection.addCallback(
@@ -458,7 +460,9 @@ class ConstraintManager {
     let config;
     switch (constraint.type) {
       case 'FixedValues':
-        this._grid.setCellValues(constraint.values);
+        constraint.values.forEach(valueId => {
+          this._fixedValues.setValueId(valueId);
+        });
         break;
       case 'BlackDot':
         config = {
@@ -712,11 +716,14 @@ class ConstraintManager {
     constraints.push(this._jigsawManager.getConstraint());
     constraints.push(this._checkboxConstraints.getConstraint());
     constraints.push(...Object.values(this._outsideArrowConstraints));
-    constraints.push(
-      new SudokuConstraint.FixedValues(...this._grid.getCellValues()));
+    constraints.push(this._fixedValues.getConstraint());
     constraints.push(new SudokuConstraint.Shape(this._shape.name));
 
     return new SudokuConstraint.Set(constraints);
+  }
+
+  getFixedCells() {
+    return this._fixedValues.getFixedCells();
   }
 
   clear() {
@@ -726,8 +733,7 @@ class ConstraintManager {
     this._removeAllLittleKillers();
     this._configs = [];
     this._jigsawManager.clear();
-    this._grid.clearCellValues([])
-    this._grid.setSolution();
+    this._fixedValues.unsafeClear();  // OK because display is cleared.
     this.runUpdateCallback();
   }
 }
@@ -834,48 +840,88 @@ class Selection extends Highlight {
   }
 }
 
-class SudokuGrid {
-  constructor(container, shape) {
-    this._container = container;
-    this.shape = shape;
-    container.classList.add('sudoku-grid');
-    container.classList.add(`size-${shape.name}`);
-    this._solutionValues = [];
+class FixedValues {
+  constructor(grid, display, onChange) {
+    this._grid = grid;
+    this._fixedValueMap = new Map();
+    this._display = display;
+    this._onChange = onChange;
+  }
+
+  inputDigit(cell, digit) {
+    const currValue = this._fixedValueMap.get(cell) || 0;
+
+    let newValue;
+    if (digit === null) {
+      newValue = 0;
+    } else {
+      const gridSize = this._grid.shape.gridSize;
+      newValue = currValue*10 + digit;
+      if (newValue > gridSize) newValue = digit;
+      if (newValue > gridSize) newValue = 0;
+    }
+
+    this.updateValue(cell, newValue);
+  }
+
+  updateValue(cell, value) {
+    if (value) {
+      this._fixedValueMap.set(cell, value);
+    } else {
+      this._fixedValueMap.delete(cell);
+    }
+
+    this._display.drawFixedValue(cell, value || '');
+    this._onChange();
+  }
+
+  setValueId(valueId) {
+    const parsed = this._grid.shape.parseValueId(valueId);
+    this.updateValue(parsed.cellId, parsed.value);
+  }
+
+  getConstraint() {
+    const values = [];
+    for (const [cell, value] of this._fixedValueMap) {
+      values.push(`${cell}_${value}`);
+    }
+    return new SudokuConstraint.FixedValues(...values);
+  }
+
+  getFixedCells() {
+    return this._fixedValueMap.keys();
+  }
+
+  unsafeClear() {
+    this._fixedValueMap = new Map();
+  }
+}
+
+class GridInputManager {
+  constructor(grid, fixedValues) {
+    this._grid = grid;
+    this._fixedValues = fixedValues;
+
+    this.selection = grid.selection;
 
     // fake-input is an invisible text input which is used to ensure that
     // numbers can be entered on mobile.
-    this._fakeInput = document.getElementById('fake-input');
+    let fakeInput = document.getElementById('fake-input');
+    this._fakeInput = fakeInput;
 
-    this._cellMap = this._makeSudokuGrid(container);
-    this.selection = new Selection(container);
     this.selection.addCallback(cellIds => {
       if (cellIds.length != 1) return;
       let cell = document.getElementById(cellIds[0]);
-      let fakeInput = this._fakeInput;
       fakeInput.style.left = cell.offsetLeft;
       fakeInput.style.top = cell.offsetTop;
       fakeInput.select();
     });
-    this._setUpKeyBindings(container);
-    this.setUpdateCallback();
 
-    this.setSolution = deferUntilAnimationFrame(this.setSolution.bind(this));
+    this._setUpKeyBindings();
   }
 
-  createHighlighter(cssClass) {
-    return new Highlight(this._container, cssClass);
-  }
-
-  setUpdateCallback(fn) {
-    this.updateCallback = fn || (() => {});
-  }
-
-  runUpdateCallback() {
-    this.updateCallback(this);
-  }
-
-  _setUpKeyBindings(container) {
-    const gridSize = this.shape.gridSize;
+  _setUpKeyBindings() {
+    const grid = this._grid;
 
     const getActiveElem = () => {
       let cells = this.selection.getCells();
@@ -883,31 +929,38 @@ class SudokuGrid {
       return cells[0];
     };
 
-    const updateActiveCellValue = (value) => {
+    const getActiveCell = () => {
       const elem = getActiveElem();
-      if (!elem) return;
+      if (elem) return elem.id;
+      return null;
+    };
 
-      const currValue = parseInt(elem.textContent) || 0;
-      const intValue = parseInt(value);
+    const updateActiveCellValue = (value) => {
+      const cell = getActiveCell();
+      if (!cell) return;
 
-      let newValue = currValue*10 + intValue;
-      if (newValue > gridSize) newValue = intValue;
-      if (newValue > gridSize) newValue = 0;
+      if (value == '') {
+        this._fixedValues.updateValue(cell, '');
+        return;
+      }
 
-      elem.textContent = newValue || '';
-
-      this.updateCallback(this);
+      const digit = parseInt(value);
+      if (!Number.isNaN(digit)) {
+        this._fixedValues.inputDigit(cell, digit);
+      }
     }
 
     const moveActiveCell = (dr, dc) => {
       let elem = getActiveElem();
       if (!elem) return;
 
-      let {row, col} = this.shape.parseCellId(elem.id);
+      const shape = grid.shape;
+      let {row, col} = shape.parseCellId(elem.id);
+      const gridSize = shape.gridSize;
       row = (row+dr+gridSize)%gridSize;
       col = (col+dc+gridSize)%gridSize;
 
-      this.selection.setCells([this.shape.makeCellId(row, col)]);
+      this.selection.setCells([shape.makeCellId(row, col)]);
     };
 
     let fakeInput = this._fakeInput;
@@ -945,16 +998,31 @@ class SudokuGrid {
       if (this.selection.size() == 0) return;
       switch (event.key) {
         case 'c':
-          this.selection.getCells().forEach(c => c.textContent = '');
-          this.updateCallback(this);
+          this.selection.getCells().forEach(
+            c => this._fixedValues.updateValue(c.id, ''));
           break;
         case 'f':
-          if (this.selection.size() != gridSize) return;
-          this.selection.getCells().forEach((c,i) => c.textContent = i+1);
-          this.updateCallback(this);
+          if (this.selection.size() != grid.shape.gridSize) return;
+          this.selection.getCells().forEach(
+            (c,i) => this._fixedValues.updateValue(c.id, i+1));
           break;
       }
     });
+  }
+}
+
+class SudokuGrid {
+  constructor(container, shape) {
+    this._container = container;
+    this.shape = shape;
+    this.selection = new Selection(container);
+    container.classList.add('sudoku-grid');
+    container.classList.add(`size-${shape.name}`);
+    this._cellMap = this._makeSudokuGrid(container);
+  }
+
+  createHighlighter(cssClass) {
+    return new Highlight(this._container, cssClass);
   }
 
   _makeSudokuGrid(container) {
@@ -974,123 +1042,11 @@ class SudokuGrid {
         cell.appendChild(cellInput);
         cellMap.set(cellId, cellInput);
 
-        let cellSolution = document.createElement('div');
-        cellSolution.className = 'cell-solution cell-elem';
-        cell.appendChild(cellSolution);
-
         container.appendChild(cell);
       }
     }
 
     return cellMap;
-  }
-
-  getCellValues() {
-    let values = [];
-    for (let [cellId, cell] of this._cellMap) {
-      let value = cell.textContent;
-      if (value){
-        let {cell} = this.shape.parseCellId(cellId);
-        values.push(this.shape.makeValueId(cell, value));
-      }
-    }
-    return values;
-  }
-
-  clearCellValues() {
-    for (let cell of this._cellMap.values()) {
-      cell.textContent = '';
-    }
-  }
-
-  setCellValues(valueIds) {
-    for (let valueId of valueIds) {
-      let {cellId, value} = this.shape.parseValueId(valueId);
-      this._cellMap.get(cellId).textContent = value;
-    }
-    this.updateCallback();
-  }
-
-  *_solutionNodes() {
-    for (const [cellId, cell] of this._cellMap) {
-      yield [cellId, cell.nextSibling];
-    }
-  }
-
-  _makeTemplateArray() {
-    const shape = this.shape;
-    const chars = new Array(shape.gridSize*2-1).fill(' ');
-    chars[shape.boxSize*2-1] = '\n';
-    chars[shape.boxSize*2*2-1] = '\n';
-    return chars;
-  }
-
-  _formatMultiSolution(values) {
-    const chars = this._makeTemplateArray();
-    for (const v of values) {
-      chars[v*2-2] = v;
-    }
-    return chars.join('');
-  }
-
-  // Display solution on grid.
-  //  - If solution contains mutiple values for single cell, they will be shown
-  //    as pencil marks.
-  //  - Anything in pencilmarks will always be shown as pencil marks.
-  setSolution(solution, pencilmarks) {
-    pencilmarks = pencilmarks || [];
-    solution = solution || [];
-    this._solutionValues = [];
-
-    // If we have no solution, just hide it instead.
-    // However, we wait a bit so that we don't fliker if the solution is updated
-    // again immediatly.
-    if (!solution.length && !pencilmarks.length) {
-      window.setTimeout(() => {
-        // Ensure there is still no solution.
-        if (this._solutionValues.length == 0) {
-          this._container.classList.add('hidden-solution');
-        }
-      }, 10);
-      return;
-    }
-
-    let cellValues = new Map();
-    let pencilmarkCell = new Set();
-
-    const handleValue = (valueId) => {
-      let {cellId, value} = this.shape.parseValueId(valueId);
-      this._solutionValues.push(valueId);
-
-      if (!cellValues.has(cellId)) cellValues.set(cellId, []);
-      cellValues.get(cellId).push(value);
-      return cellId;
-    };
-    for (const valueId of solution) {
-      handleValue(valueId);
-    }
-    for (const valueId of pencilmarks) {
-      let cellId = handleValue(valueId);
-      pencilmarkCell.add(cellId);
-    }
-
-    for (const [cellId, node] of this._solutionNodes()) {
-      let values = cellValues.get(cellId);
-      if (!values) {
-        node.textContent = '';
-      } else if (values.length == 1 && !pencilmarkCell.has(cellId)) {
-        node.textContent = values[0];
-        node.classList.remove('cell-multi-solution');
-      } else {
-        node.textContent = this._formatMultiSolution(values);
-        node.classList.add('cell-multi-solution');
-      }
-    }
-    this._container.classList.remove('hidden-solution');
-  }
-
-  getSolutionValues() {
-    return this._solutionValues;
   }
 }
 
@@ -1247,8 +1203,8 @@ class DebugOutput {
 }
 
 class SolverStateDisplay {
-  constructor(grid) {
-    this._grid = grid;
+  constructor(solutionDisplay) {
+    this._solutionDisplay = solutionDisplay;
 
     this._elements = {
       progressContainer: document.getElementById('progress-container'),
@@ -1305,7 +1261,7 @@ class SolverStateDisplay {
     if (!extra) return;
 
     if (extra.solution || extra.pencilmarks) {
-      this._grid.setSolution(extra.solution, extra.pencilmarks);
+      this._solutionDisplay.setSolution(extra.solution, extra.pencilmarks);
     }
   }
 
@@ -1391,11 +1347,13 @@ class SolverStateDisplay {
 }
 
 class SolutionController {
-  constructor(constraintManager, grid, infoOverlay) {
+  constructor(constraintManager, grid, infoOverlay, container) {
     // Solvers are a list in case we manage to start more than one. This can
     // happen when we are waiting for a worker to initialize.
     this._solverPromises = [];
 
+    this._solutionDisplay = new SolutionDisplay(
+      container, constraintManager, grid.shape);
     this._isSolving = false;
     this._constraintManager = constraintManager;
     this._grid = grid;
@@ -1436,7 +1394,7 @@ class SolutionController {
     this._setUpAutoSolve();
     this._setUpKeyBindings();
 
-    this._stateDisplay = new SolverStateDisplay(grid);
+    this._stateDisplay = new SolverStateDisplay(this._solutionDisplay);
 
     this._historyHandler = new HistoryHandler((params) => {
       let mode = params.get('mode');
@@ -1453,6 +1411,10 @@ class SolutionController {
 
   enableDebugOutput(enable) {
     this._debugOutput.enable(enable);
+  }
+
+  getSolutionValues() {
+    return this._solutionDisplay.getSolutionValues();
   }
 
   _setUpAutoSolve() {
@@ -1545,6 +1507,7 @@ class SolutionController {
   };
 
   async _update() {
+    this._solutionDisplay.setSolution([]);
     let constraints = this._constraintManager.getConstraints();
     let mode = this._elements.mode.value;
     let auto = this._elements.autoSolve.checked;
@@ -1564,7 +1527,7 @@ class SolutionController {
   _resetSolver() {
     this._terminateSolver();
     this._stepHighlighter.setCells([]);
-    this._grid.setSolution([]);
+    this._solutionDisplay.setSolution([]);
     this._stateDisplay.clear();
     this._setValidateResult();
     this._debugOutput.clear();
@@ -1639,7 +1602,7 @@ class SolutionController {
       // Update the grid.
       let selection = [];
       if (result) {
-        this._grid.setSolution(result.values, result.pencilmarks);
+        this._solutionDisplay.setSolution(result.values, result.pencilmarks);
         if (result.values.length > 0 && !result.isSolution) {
           selection.push(result.values[result.values.length-1].substring(0, 4));
         }
@@ -1695,7 +1658,7 @@ class SolutionController {
     };
 
     const update = () => {
-      this._grid.setSolution(solutions[solutionNum-1]);
+      this._solutionDisplay.setSolution(solutions[solutionNum-1]);
 
       this._elements.forward.disabled = (done && solutionNum >= solutions.length);
       this._elements.back.disabled = (solutionNum == 1);
@@ -1735,7 +1698,7 @@ class SolutionController {
 
   async _runAllPossibilites(solver) {
     let result = await solver.solveAllPossibilities();
-    this._grid.setSolution(result);
+    this._solutionDisplay.setSolution(result);
   }
 
   async _runCounter(solver) {

@@ -14,7 +14,7 @@
   grid-template-rows: repeat(16, 52px);
 }
 
-.sudoku-constraint-svg {
+.sudoku-display-svg {
   position: absolute;
   top: 0;
   left: 0;
@@ -44,6 +44,7 @@
 .cell-elem {
   width: 52px;
   height: 52px;
+  z-index: 10;
 }
 
 .cell-input {
@@ -60,38 +61,37 @@
   cursor: pointer;
 }
 
-.cell-input:not(:empty) + .cell-solution {
-  display: none;
+.fixed-value {
+  font-size: 30px;
+  font-family: sans-serif;
+  text-anchor: middle;
+  dominant-baseline: middle;
 }
 
-.cell-solution {
-  position: absolute;
-  text-align: center;
-  line-height: 50px;
 
+.solution-value {
   font-size: 30px;
   font-family: monospace;
 
-  color: rgb(0, 128, 255);
+  fill: rgb(0, 128, 255);
 
-  pointer-events: none;
+  text-anchor: middle;
+  dominant-baseline: middle;
 }
 
-.sudoku-grid.hidden-solution .cell-solution {
-  visibility: hidden;
-}
-
-.cell-multi-solution {
-  overflow-wrap: anywhere;
-  white-space: pre-wrap;
-}
-.size-9x9 .cell-multi-solution {
+.solution-multi-value {
   font-size: 15px;
-  line-height: 17px;
+  font-family: monospace;
+
+  fill: rgb(0, 128, 255);
+
+  text-anchor: middle;
+  dominant-baseline: middle;
+  white-space: pre;
 }
-.size-16x16 .cell-multi-solution {
-  font-size: 9px;
-  line-height: 10px;
+
+.hidden-solution {
+  visibility: hidden;
 }
 
 body {

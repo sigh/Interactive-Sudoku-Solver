@@ -178,3 +178,9 @@ const memoize = (f, keyFn) => {
     return result;
   };
 };
+
+const clearDOMNode = (node) => {
+  while (node.lastChild) {
+    node.removeChild(node.lastChild);
+  }
+}
