@@ -714,6 +714,7 @@ class ConstraintManager {
     constraints.push(...Object.values(this._outsideArrowConstraints));
     constraints.push(
       new SudokuConstraint.FixedValues(...this._grid.getCellValues()));
+    constraints.push(new SudokuConstraint.Shape([this._shape.name]));
 
     return new SudokuConstraint.Set(constraints);
   }

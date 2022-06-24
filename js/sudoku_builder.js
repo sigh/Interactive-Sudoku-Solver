@@ -3,6 +3,10 @@ var ENABLE_DEBUG_LOGS = false;
 const BIG_GRID = false;
 
 class GridShape {
+  static _registry = new Map();
+  static _register(shape) { this._registry.set(shape.name, shape); }
+  static get(name) { return this._registry.get(name); }
+
   constructor(gridSize, boxSize) {
     this.boxSize = boxSize;
     this.gridSize = gridSize;
@@ -19,6 +23,7 @@ class GridShape {
     this.maxSum = this.gridSize*(this.gridSize+1)/2;
 
     Object.freeze(this);
+    this.constructor._register(this);
   }
 
   makeValueId = (cellIndex, n) => {
@@ -206,7 +211,10 @@ class SudokuTextParser {
       }
     }
     if (new Set(nonValueCharacters).size > 1) return null;
-    return new SudokuConstraint.FixedValues(...fixedValues);
+    return new SudokuConstraint.Set([
+      new SudokuConstraint.Shape(shape),
+      new SudokuConstraint.FixedValues(...fixedValues),
+    ]);
   }
 
   static parsePlain9x9(text) {
@@ -244,7 +252,6 @@ class SudokuTextParser {
   static parseJigsaw(text) {
     const shape = SHAPE_9x9;
     const numCells = shape.numCells;
-    const gridSize = shape.gridSize;
 
     if (text.length == numCells) {
       return this.parseJigsawLayout(text);
@@ -279,7 +286,10 @@ class SudokuTextParser {
       fixedValues.push(shape.makeValueId(i, cell));
     }
 
-    return new SudokuConstraint.FixedValues(...fixedValues);
+    return new SudokuConstraint.Set([
+      new SudokuConstraint.Shape(shape),
+      new SudokuConstraint.FixedValues(...fixedValues),
+    ]);
   }
 
   static parseText(rawText) {
@@ -403,7 +413,14 @@ class SudokuConstraint {
     }
   }
 
-  static NoBoxes = class NoBoxes extends SudokuConstraint {}
+  static _Meta = class _Meta extends SudokuConstraint { isMeta = true; }
+  static NoBoxes = class NoBoxes extends SudokuConstraint._Meta {}
+  static Shape = class Shape extends SudokuConstraint._Meta {
+    toString() {
+      if (this.args[0] === SHAPE_9x9.name) return '';
+      return super.toString();
+    }
+  }
 
   static Windoku = class Windoku extends SudokuConstraint {
     static REGIONS = (() => {
@@ -558,8 +575,11 @@ class SudokuConstraint {
 
 class SudokuBuilder {
   static build(constraint) {
-    const shape = SHAPE;  // TODO: Get shape from constraint.
-    return new SudokuSolver(SudokuBuilder._handlers(constraint, shape), shape);
+    const metaConstraint = this.getMeta(constraint);
+
+    const shapeArgs = metaConstraint.get('Shape');
+    const shape = shapeArgs ? GridShape.get(shapeArgs[0]) : SHAPE_9x9;
+    return new SudokuSolver(this._handlers(constraint, metaConstraint, shape), shape);
   }
 
   // GLobal vars to pass to the worker.
@@ -596,25 +616,31 @@ class SudokuBuilder {
 
     const solverProxy = new SolverProxy(worker, stateHandler, statusHandler, debugHandler);
     const globalVars = this.getGlobalVars();
-
     await solverProxy.init(constraints, this.LOG_UPDATE_FREQUENCY, globalVars);
     return solverProxy;
   }
 
-  static hasNoBoxes(constraint) {
-    switch (constraint.type) {
-      case 'NoBoxes':
-        return true;
-      case 'Set':
-        return constraint.constraints.some(c => this.hasNoBoxes(c));
+  static getMeta(constraint) {
+    const metaConstraint = new Map();
+
+    const getMetaRec = (c) => {
+      if (c.type === 'Set') {
+        c.constraints.forEach(getMetaRec);
+        return;
+      }
+      if (c.isMeta) {
+        metaConstraint.set(c.type, c.args);
+      }
     }
-    return false;
+
+    getMetaRec(constraint);
+    return metaConstraint;
   }
 
-  static *_handlers(constraint, shape) {
+  static *_handlers(constraint, metaConstraint, shape) {
     yield* SudokuBuilder._rowColHandlers(shape);
     yield* SudokuBuilder._constraintHandlers(constraint, shape);
-    if (!this.hasNoBoxes(constraint)) {
+    if (!metaConstraint.has('NoBoxes')) {
       yield* SudokuBuilder._boxHandlers(shape);
     }
   }
@@ -663,6 +689,8 @@ class SudokuBuilder {
 
     let cells;
     switch (constraint.type) {
+      case 'Shape':
+        break;
       case 'NoBoxes':
         yield new SudokuConstraintHandler.NoBoxes();
         break;
