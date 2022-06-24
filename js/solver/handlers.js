@@ -201,7 +201,7 @@ class SumHandlerUtil {
     // possibilities: values which are in any solution.
     // requiredUniques: values which are a required part of any solution.
     this.killerCageInfo = (() => {
-      if (numValues !== 9) return null;
+      if (numValues > SHAPE_9x9.numValues) return null;
 
       const counts = this._lookupTables.count;
       const table = [];
@@ -243,7 +243,7 @@ class SumHandlerUtil {
     // _pairwiseSums[(a<<numValues)|b] = sum>>2;
     // (The shift is so the result fits in 16 bits).
     this._pairwiseSums = (() => {
-      if (numValues !== 9) return;
+      if (numValues > SHAPE_9x9.numValues) return;
       const table = new Uint16Array(combinations*combinations);
 
       for (let i = 0; i < combinations; i++) {
@@ -506,7 +506,7 @@ class SumHandlerUtil {
     return true;
   }
 
-  enforceThreeCellConsistency(grid, cells, sum, conflictMap) {
+  _enforceThreeCellConsistency(grid, cells, sum, conflictMap) {
     const numValues = this._numValues;
 
     let v0 = grid[cells[0]];
@@ -519,7 +519,7 @@ class SumHandlerUtil {
     let sums0 = this._pairwiseSums[(v1<<numValues)|v2]<<2;
 
     // If the cell values are possibly repeated, then handle that.
-    if (conflictMap !== null) {
+    if (conflictMap[0] !== conflictMap[1] || conflictMap[0] !== conflictMap[2]) {
       if (conflictMap[0] != conflictMap[1]) {
         sums2 |= this._doubles[v0&v1];
       }
@@ -548,6 +548,79 @@ class SumHandlerUtil {
     grid[cells[2]] = v2;
 
     return true;
+  }
+
+  static _valueBuffer = new Uint16Array(SHAPE_MAX.numValues);
+  static _conflictMapBuffer = new Uint8Array(SHAPE_MAX.numValues);
+  static _cellBuffer = new Uint8Array(SHAPE_MAX.numValues);
+
+  // Determines if enforceFewRemainingCells() can be run.
+  hasFewRemainingCells(numUnfixed) {
+    return numUnfixed <= (this._pairwiseSums ? 3 : 2);
+  }
+
+  // Solve small cases exactly and efficiently.
+  // Call hasFewRemainingCells() to determine if it can be run.
+  // REQUIRES that:
+  //  - The number of unfixed cells is accurate.
+  //  - None of the values are zero.
+  enforceFewRemainingCells(grid, targetSum, numUnfixed, cells, conflictMap) {
+    const cellBuffer = this.constructor._cellBuffer;
+    const valueBuffer = this.constructor._valueBuffer;
+    const conflictMapBuffer = this.constructor._conflictMapBuffer;
+
+    const gridSize = this._numValues;
+
+    let j = 0;
+    for (let i = cells.length-1; i >= 0; i--) {
+      const c = cells[i];
+      const v = grid[c];
+      if (v&(v-1)) {
+        conflictMapBuffer[j] = conflictMap[i];
+        cellBuffer[j] = c;
+        valueBuffer[j] = v;
+        j++;
+      }
+    }
+
+    switch (numUnfixed) {
+      case 1: {
+        // Set value to the target sum exactly.
+        const v = valueBuffer[0] & (1<<(targetSum-1));
+        return (grid[cellBuffer[0]] = v);
+      }
+
+      case 2: {
+        let v0 = valueBuffer[0];
+        let v1 = valueBuffer[1];
+
+        // Remove any values which don't have their counterpart value to add to
+        // targetSum.
+        v1 &= (this._lookupTables.reverse[v0] << (targetSum-1)) >> gridSize;
+        v0 &= (this._lookupTables.reverse[v1] << (targetSum-1)) >> gridSize;
+
+        // If the cells are in the same conflict set, also ensure the sum is
+        // distict values.
+        if ((targetSum&1) == 0 &&
+            conflictMapBuffer[0] === conflictMapBuffer[1]) {
+          // targetSum/2 can't be valid value.
+          const mask = ~(1 << ((targetSum>>1)-1));
+          v0 &= mask;
+          v1 &= mask;
+        }
+
+        if (!(v1 && v0)) return false;
+
+        grid[cellBuffer[0]] = v0;
+        grid[cellBuffer[1]] = v1;
+        return true;
+      }
+
+      case 3: {
+        return this._enforceThreeCellConsistency(
+          grid, cellBuffer, targetSum, conflictMapBuffer);
+      }
+    }
   }
 }
 
@@ -609,76 +682,6 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
     // set yet.
     if (this._complementCells === undefined) {
       this._complementCells = null;
-    }
-  }
-
-  static _valueBuffer = new Uint16Array(SHAPE_MAX.numValues);
-  static _conflictMapBuffer = new Uint8Array(SHAPE_MAX.numValues);
-  static _cellBuffer = new Uint8Array(SHAPE_MAX.numValues);
-
-  // Optimize the {1-3}-cell case by solving it exactly and efficiently.
-  // REQUIRES that:
-  //  - The number of unfixed cells is accurate.
-  //  - None of the values are zero.
-  _enforceFewRemainingCells(grid, targetSum, numUnfixed) {
-    const cells = this.cells;
-
-    const cellBuffer = this.constructor._cellBuffer;
-    const valueBuffer = this.constructor._valueBuffer;
-    const conflictMapBuffer = this.constructor._conflictMapBuffer;
-
-    const gridSize = this._shape.gridSize;
-
-    let j = 0;
-    for (let i = cells.length-1; i >= 0; i--) {
-      const c = cells[i];
-      const v = grid[c];
-      if (v&(v-1)) {
-        conflictMapBuffer[j] = this._conflictMap[i];
-        cellBuffer[j] = c;
-        valueBuffer[j] = v;
-        j++;
-      }
-    }
-
-    switch (numUnfixed) {
-      case 1: {
-        // Set value to the target sum exactly.
-        const v = valueBuffer[0] & (1<<(targetSum-1));
-        return (grid[cellBuffer[0]] = v);
-      }
-
-      case 2: {
-        let v0 = valueBuffer[0];
-        let v1 = valueBuffer[1];
-
-        // Remove any values which don't have their counterpart value to add to
-        // targetSum.
-        v1 &= (this._lookupTables.reverse[v0] << (targetSum-1)) >> gridSize;
-        v0 &= (this._lookupTables.reverse[v1] << (targetSum-1)) >> gridSize;
-
-        // If the cells are in the same conflict set, also ensure the sum is
-        // distict values.
-        if ((targetSum&1) == 0 &&
-            conflictMapBuffer[0] === conflictMapBuffer[1]) {
-          // targetSum/2 can't be valid value.
-          const mask = ~(1 << ((targetSum>>1)-1));
-          v0 &= mask;
-          v1 &= mask;
-        }
-
-        if (!(v1 && v0)) return false;
-
-        grid[cellBuffer[0]] = v0;
-        grid[cellBuffer[1]] = v1;
-        return true;
-      }
-
-      case 3: {
-        return this._util.enforceThreeCellConsistency(
-          grid, cellBuffer, targetSum,
-          this._conflictSets.length == 1 ? null : conflictMapBuffer);
-      }
     }
   }
 
@@ -764,13 +767,13 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
     // unsatisfiable.
     if (numUnfixed < 0) return false;
 
-    const hasFewUnfixed = numUnfixed <= 3 && (this._shape === SHAPE_9x9 || numUnfixed <= 2);
+    const hasFewUnfixed = this._util.hasFewRemainingCells();
 
     if (hasFewUnfixed) {
     // If there are few remaining cells then handle them explicitly.
       const fixedSum = (rangeInfoSum>>14) & 0x7f;
       const targetSum = sum - fixedSum;
-      if (!this._enforceFewRemainingCells(grid, targetSum, numUnfixed)) {
+      if (!this._util.enforceFewRemainingCells(grid, targetSum, numUnfixed, this.cells, this._conflictMap)) {
         return false;
       }
     } else {
@@ -788,10 +791,10 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
       return this._enforceCombinationsWithComplement(grid);
     }
 
-    // If _enforceFewRemainingCells has run, then we've already done all we can.
+    // If enforceFewRemainingCells has run, then we've already done all we can.
     if (hasFewUnfixed) return true;
 
-    if (this._conflictSets.length == 1 && this._shape === SHAPE_9x9) {
+    if (this._conflictSets.length == 1 && this._util.killerCageInfo) {
       if (!this._util.restrictCellsSingleConflictSet(
         grid, this._sum, cells)) return false;
     } else {

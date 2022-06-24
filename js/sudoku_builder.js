@@ -1,6 +1,6 @@
 var ENABLE_DEBUG_LOGS = false;
 
-const BIG_GRID = true;
+const BIG_GRID = false;
 
 class GridShape {
   static _registry = new Map();
