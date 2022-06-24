@@ -1,6 +1,6 @@
 var ENABLE_DEBUG_LOGS = false;
 
-const BIG_GRID = false;
+const BIG_GRID = true;
 
 class GridShape {
   static _registry = new Map();
@@ -413,7 +413,10 @@ class SudokuConstraint {
     }
   }
 
-  static _Meta = class _Meta extends SudokuConstraint { isMeta = true; }
+  static _Meta = class _Meta extends SudokuConstraint {
+    constructor(...args) { super(args); }
+    isMeta = true;
+  }
   static NoBoxes = class NoBoxes extends SudokuConstraint._Meta {}
   static Shape = class Shape extends SudokuConstraint._Meta {
     toString() {
@@ -575,10 +578,8 @@ class SudokuConstraint {
 
 class SudokuBuilder {
   static build(constraint) {
-    const metaConstraint = this.getMeta(constraint);
-
-    const shapeArgs = metaConstraint.get('Shape');
-    const shape = shapeArgs ? GridShape.get(shapeArgs[0]) : SHAPE_9x9;
+    const metaConstraint = this._getMeta(constraint);
+    const shape = this._getShape(metaConstraint);
     return new SudokuSolver(this._handlers(constraint, metaConstraint, shape), shape);
   }
 
@@ -620,7 +621,7 @@ class SudokuBuilder {
     return solverProxy;
   }
 
-  static getMeta(constraint) {
+  static _getMeta(constraint) {
     const metaConstraint = new Map();
 
     const getMetaRec = (c) => {
@@ -635,6 +636,16 @@ class SudokuBuilder {
 
     getMetaRec(constraint);
     return metaConstraint;
+  }
+
+  static _getShape(metaConstraint) {
+    const shapeArgs = metaConstraint.get('Shape');
+    const shape = shapeArgs ? GridShape.get(shapeArgs[0]) : SHAPE_9x9;
+    if (!shape) throw('Unknown shape: ' + shapeArgs[0]);
+    return shape;
+  }
+  static getShape(constraint) {
+    return this._getShape(this._getMeta(constraint));
   }
 
   static *_handlers(constraint, metaConstraint, shape) {

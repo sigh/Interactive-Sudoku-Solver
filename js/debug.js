@@ -16,12 +16,11 @@ const loadInput = (input) => {
 }
 
 const getShortSolution = () => {
-  return toShortSolution(grid.getSolutionValues());
+  return toShortSolution(grid.getSolutionValues(), grid.shape);
 };
 
-const toShortSolution = (valueIds) => {
-  const shape = grid.shape;
-  let result = new Array(shape.numCells);
+const toShortSolution = (valueIds, shape) => {
+  let result = new Array(valueIds.length);
   const DEFAULT_VALUE = '.';
   result.fill(DEFAULT_VALUE);
 
@@ -86,6 +85,7 @@ const runFnWithChecks = async (puzzles, fn, onFailure) => {
     // Set up solver.
     const constraint = SudokuConstraint.fromText(puzzle.input);
     const solver = await SudokuBuilder.buildInWorker(constraint, stateHandler);
+    const shape = SudokuBuilder.getShape(constraint);
 
     // Log a fixed string so the progress gets collapsed to a single line.
     // Do this after the worker has started to ensure a nice output.
@@ -112,7 +112,7 @@ const runFnWithChecks = async (puzzles, fn, onFailure) => {
     if (result !== undefined) {
       let shortSolution;
       if (Array.isArray(result)) {
-        shortSolution = toShortSolution(result);
+        shortSolution = toShortSolution(result, shape);
         solutions.push(shortSolution);
       } else {
         solutions.push(null);
@@ -211,6 +211,10 @@ const runSolveTests = async (onFailure) => {
     'Jigsaw boxes, disconnected',
     'Windoku',
     'X-Windoku',
+  ], onFailure);
+
+  await runAllWithChecks([
+    '16x16, X-Sudoku',
   ], onFailure);
 };
 
