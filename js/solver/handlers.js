@@ -311,7 +311,7 @@ class SumHandlerUtil {
   }
 
   restrictValueRange(grid, cells, sumMinusMin, maxMinusSum) {
-    const minMaxLookup = this._lookupTables.minMax;
+    const minMaxLookup = this._lookupTables.minMax8Bit;
     // Remove any values which aren't possible because they would cause the sum
     // to be too high.
     for (let i = 0; i < cells.length; i++) {
@@ -320,8 +320,8 @@ class SumHandlerUtil {
       if (!(value&(value-1))) continue;
 
       const minMax = minMaxLookup[value];
-      const cellMin = minMax >> 7;
-      const cellMax = minMax & 0x7f;
+      const cellMin = minMax >> 8;
+      const cellMax = minMax & 0xff;
       const range = cellMax-cellMin;
 
       if (sumMinusMin < range) {
@@ -427,7 +427,7 @@ class SumHandlerUtil {
     let strictMin = 0;
     let strictMax = 0;
 
-    const minMaxLookup = this._lookupTables.minMax;
+    const minMaxLookup = this._lookupTables.minMax8Bit;
     const numValues = this._numValues;
     const allValues = this._lookupTables.allValues;
 
@@ -438,8 +438,8 @@ class SumHandlerUtil {
 
       for (let i = 0; i < set.length; i++) {
         const minMax = minMaxLookup[grid[set[i]]];
-        const min = minMax>>7;
-        const max = minMax&0x7f;
+        const min = minMax>>8;
+        const max = minMax&0xff;
 
         const minShift = min-1;
         const maxShift = numValues - max;
@@ -662,6 +662,11 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
 
   initialize(initialGrid, cellConflicts, shape) {
     this._shape = shape;
+
+    if (this.cells.length > shape.numValues) {
+      throw('Number of cells in the sum must be no more than the number of values.');
+    }
+
     this._lookupTables = LookupTables.get(shape.numValues);
     this._util = SumHandlerUtil.get(shape.numValues);
 
@@ -754,15 +759,15 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
       rangeInfoSum += rangeInfo[grid[cells[i]]];
     }
 
-    const maxSum = rangeInfoSum & 0x7f;
-    const minSum = (rangeInfoSum>>7) & 0x7f;
+    const maxSum = rangeInfoSum & 0xff;
+    const minSum = (rangeInfoSum>>8) & 0xff;
     // It is impossible to make the target sum.
     if (sum < minSum || maxSum < sum) return false;
     // We've reached the target sum exactly.
     // NOTE: Uniqueness constraint is already enforced by the solver via confictCells.
     if (minSum == maxSum) return true;
 
-    const numUnfixed = numCells - (rangeInfoSum>>21);
+    const numUnfixed = numCells - (rangeInfoSum>>24);
     // A large fixed value indicates a cell has a 0, hence is already
     // unsatisfiable.
     if (numUnfixed < 0) return false;
@@ -771,7 +776,7 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
 
     if (hasFewUnfixed) {
     // If there are few remaining cells then handle them explicitly.
-      const fixedSum = (rangeInfoSum>>14) & 0x7f;
+      const fixedSum = (rangeInfoSum>>16) & 0xff;
       const targetSum = sum - fixedSum;
       if (!this._util.enforceFewRemainingCells(grid, targetSum, numUnfixed, this.cells, this._conflictMap)) {
         return false;
@@ -858,7 +863,7 @@ SudokuConstraintHandler.Sandwich = class Sandwich extends SudokuConstraintHandle
     this._gridSize = shape.gridSize;
     this._borderMask = SudokuConstraintHandler.Sandwich._borderMask(shape);
     this._valueMask = ~this._borderMask & lookupTables.allValues;
-    this._minMaxTable = lookupTables.minMax;
+    this._minMaxTable = lookupTables.minMax8Bit;
 
     this._distances = SudokuConstraintHandler.Sandwich._distanceRange(shape)[this._sum];
     this._combinations = SudokuConstraintHandler.Sandwich._combinations(shape)[this._sum];
@@ -950,13 +955,15 @@ SudokuConstraintHandler.Sandwich = class Sandwich extends SudokuConstraintHandle
       let minMaxSum = 0;
       while (!(values[i++] & borderMask));
       while (!(values[i] & borderMask)) {
+        // NOTE: 8 bits is fine here because we can have at most (numValues-2) cells.
+        // For 16x16, 16*14 = 224 < 8 bits.
         minMaxSum += this._minMaxTable[values[i]];
         i++;
       }
 
       const sum = this._sum;
-      const minSum = minMaxSum>>7;
-      const maxSum = minMaxSum&0x7f;
+      const minSum = minMaxSum>>8;
+      const maxSum = minMaxSum&0xff;
       // It is impossible to make the target sum.
       if (sum < minSum || maxSum < sum) return false;
       // We've reached the target sum exactly.
@@ -1099,14 +1106,14 @@ SudokuConstraintHandler.Between = class Between extends SudokuConstraintHandler 
   }
 
   initialize(initialGrid, cellConflicts, shape) {
-    this._minMaxTable = LookupTables.get(shape.numValues).minMax;
+    this._minMaxTable = LookupTables.get(shape.numValues).minMax8Bit;
   }
 
   enforceConsistency(grid) {
     const endsCombined = grid[this._ends[0]] | grid[this._ends[1]];
     let minMax = this._minMaxTable[endsCombined];
-    let cellMin = (minMax >> 7) + 1;
-    let cellMax = (minMax & 0x7f) - 1;
+    let cellMin = (minMax >> 8) + 1;
+    let cellMax = (minMax & 0xff) - 1;
     if (cellMin > cellMax) return false;
 
     // Constrain the mids by masking out any values that can never be between
@@ -1123,8 +1130,8 @@ SudokuConstraintHandler.Between = class Between extends SudokuConstraintHandler 
     // mids.
     if (fixedValues) {
       minMax = this._minMaxTable[fixedValues];
-      cellMin = (minMax >> 7);
-      cellMax = (minMax & 0x7f);
+      cellMin = (minMax >> 8);
+      cellMax = (minMax & 0xff);
       mask = ~(((1 << (cellMax-cellMin+1)) - 1) << (cellMin-1));
       if (!(grid[this._ends[0]] &= mask)) return false;
       if (!(grid[this._ends[1]] &= mask)) return false;

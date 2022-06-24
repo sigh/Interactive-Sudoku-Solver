@@ -786,11 +786,11 @@ class LookupTables {
     })();
 
     // Combines min and max into a single integer:
-    // Layout: [min: 7 bits, max: 7 bits]
+    // Layout: [min: 8 bits, max: 8 bits]
     //
     // The extra bits allow these values to be summed to determine the total
     // of mins and maxs.
-    this.minMax = (() => {
+    this.minMax8Bit = (() => {
       // Initialize the table with MAXs.
       const table = new Uint16Array(combinations);
       table[1] = this.value[1];
@@ -804,7 +804,7 @@ class LookupTables {
       for (let i = 1; i < combinations; i++) {
         // MIN is the value of the last bit set.
         const min = this.value[i & -i];
-        table[i] |= min<<7;
+        table[i] |= min<<8;
       }
 
       return table;
@@ -812,22 +812,22 @@ class LookupTables {
 
     // Combines useful info about the range of numbers in a cell.
     // Designed to be summed, so that the aggregate stats can be found.
-    // Layout: [isFixed: 7 bits, fixed: 7 bits, min: 7 bits, max: 7 bits]
+    // Layout: [isFixed: 4 bits, fixed: 8 bits, min: 8 bits, max: 8 bits]
     //
     // Sum of isFixed gives the number of fixed cells.
     // Sum of fixed gives the sum of fixed cells.
-    // Min and max as a in Lookup.MIN_MAX.
+    // Min and max as a in minMax.
     this.rangeInfo = (() => {
       const table = new Uint32Array(combinations);
       for (let i = 1; i < combinations; i++) {
-        const minMax = this.minMax[i];
+        const minMax = this.minMax8Bit[i];
         const fixed = this.value[i];
         const isFixed = fixed > 0 ? 1 : 0;
-        table[i] = (isFixed<<21)|(fixed<<14)|minMax;
+        table[i] = (isFixed<<24)|(fixed<<16)|minMax;
       }
       // If there are no values, set a high value for isFixed to indicate the
       // result is invalid. This is intended to be detectable after summing.
-      table[0] = numValues << 21;
+      table[0] = numValues << 24;
       return table;
     })();
 
