@@ -343,10 +343,18 @@ class SudokuConstraint {
   }
 
   static fromText(rawText) {
-    let constraint = SudokuTextParser.parseText(rawText);
-    if (constraint) return constraint;
-
-    return SudokuConstraint.fromString(rawText);
+    const constraints = [];
+    // Parse sections seperated by a blank line separately,
+    // and then merge their constraints.
+    for (const part of rawText.split(/\n\s*\n/)) {
+      let constraint = SudokuTextParser.parseText(part);
+      if (!constraint) {
+        constraint = SudokuConstraint.fromString(part);
+      }
+      constraints.push(constraint);
+    }
+    if (constraints.length == 1) return constraints[0];
+    return new SudokuConstraint.Set(constraints);
   }
 
   static Set = class Set extends SudokuConstraint {

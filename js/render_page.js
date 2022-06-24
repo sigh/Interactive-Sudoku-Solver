@@ -725,7 +725,7 @@ class ConstraintManager {
     this._removeAllLittleKillers();
     this._configs = [];
     this._jigsawManager.clear();
-    this._grid.setCellValues([])
+    this._grid.clearCellValues([])
     this._grid.setSolution();
     this.runUpdateCallback();
   }
@@ -996,14 +996,13 @@ class SudokuGrid {
     return values;
   }
 
-  _clearCellValues() {
+  clearCellValues() {
     for (let cell of this._cellMap.values()) {
       cell.textContent = '';
     }
   }
 
   setCellValues(valueIds) {
-    this._clearCellValues();
     for (let valueId of valueIds) {
       let {cellId, value} = this.shape.parseValueId(valueId);
       this._cellMap.get(cellId).textContent = value;
