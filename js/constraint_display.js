@@ -101,7 +101,8 @@ class SolutionDisplay extends DisplayBase {
       return text;
     };
 
-    const LINE_HEIGHT = 17;
+    const LINE_HEIGHT = this._shape.gridSize == SHAPE_9x9.gridSize ? 17 : 10;
+    const START_OFFSET = -DisplayBase.CELL_SIZE/2+2;
     for (const [cellId, values] of cellValues) {
       const [x, y] = this.cellIdCenter(cellId);
 
@@ -109,7 +110,7 @@ class SolutionDisplay extends DisplayBase {
         this._svg.append(makeTextNode(
           values[0], x, y, 'solution-value'));
       } else {
-        let offset = -LINE_HEIGHT;
+        let offset = START_OFFSET;
         for (const line of this._formatMultiSolution(values)) {
           this._svg.append(makeTextNode(
             line, x, y+offset, 'solution-multi-value'));
@@ -120,20 +121,33 @@ class SolutionDisplay extends DisplayBase {
     this._svg.classList.remove('hidden-solution');
   }
 
-  _makeTemplateArray() {
-    const shape = this._shape;
-    const chars = new Array(shape.gridSize*2-1).fill(' ');
-    chars[shape.boxSize*2-1] = '\n';
-    chars[shape.boxSize*2*2-1] = '\n';
-    return chars;
-  }
+  _makeTemplateArray = memoize((shape) => {
+    const charsPerLine = 2*shape.boxSize-1;
+
+    let charCount = 0;
+    const slots = [];
+    for (let i = 1; i <= shape.numValues; i++) {
+      const slot = i < 10 ? ' ' : '  ';
+      slots.push(slot);
+      charCount += slot.length + 1;
+
+      if (charCount >= charsPerLine) {
+        slots.push('\n');
+        charCount = 0;
+      } else {
+        slots.push(' ');
+      }
+    }
+
+    return slots;
+  });
 
   _formatMultiSolution(values) {
-    const chars = this._makeTemplateArray();
+    const slots = [...this._makeTemplateArray(this._shape)];
     for (const v of values) {
-      chars[v*2-2] = v;
+      slots[v*2-2] = v;
     }
-    return chars.join('').split(/\n/);
+    return slots.join('').split(/\n/);
   }
 
   getSolutionValues() {

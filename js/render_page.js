@@ -855,17 +855,18 @@ class FixedValues {
     if (digit === null) {
       newValue = 0;
     } else {
-      const gridSize = this._grid.shape.gridSize;
+      const numValues = this._grid.shape.numValues;
       newValue = currValue*10 + digit;
-      if (newValue > gridSize) newValue = digit;
-      if (newValue > gridSize) newValue = 0;
+      if (newValue > numValues) newValue = digit;
+      if (newValue > numValues) newValue = 0;
     }
 
     this.updateValue(cell, newValue);
   }
 
   updateValue(cell, value) {
-    if (value) {
+    const numValues = this._grid.shape.numValues;
+    if (value > 0 && value <= numValues) {
       this._fixedValueMap.set(cell, value);
     } else {
       this._fixedValueMap.delete(cell);
@@ -1002,7 +1003,6 @@ class GridInputManager {
             c => this._fixedValues.updateValue(c.id, ''));
           break;
         case 'f':
-          if (this.selection.size() != grid.shape.gridSize) return;
           this.selection.getCells().forEach(
             (c,i) => this._fixedValues.updateValue(c.id, i+1));
           break;

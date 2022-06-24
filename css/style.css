@@ -86,8 +86,11 @@
   fill: rgb(0, 128, 255);
 
   text-anchor: middle;
-  dominant-baseline: middle;
+  dominant-baseline: hanging;
   white-space: pre;
+}
+.size-16x16 .solution-multi-value {
+  font-size: 9px;
 }
 
 .hidden-solution {
