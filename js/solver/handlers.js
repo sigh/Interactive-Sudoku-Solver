@@ -134,10 +134,17 @@ SudokuConstraintHandler.BinaryConstraint = class BinaryConstraint extends Sudoku
     ];
   }
 
-  enforceConsistency(grid) {
-    return (
-      (grid[this.cells[0]] &= this._tables[1][grid[this.cells[1]]]) &&
-      (grid[this.cells[1]] &= this._tables[0][grid[this.cells[0]]]))
+  enforceConsistency(grid, cellAccumulator) {
+    const v0 = grid[this.cells[0]];
+    const v1 = grid[this.cells[1]];
+
+    const v0New = grid[this.cells[0]] = v0 & this._tables[1][v1];
+    const v1New = grid[this.cells[1]] = v1 & this._tables[0][v0];
+
+    if (!(v0New && v1New)) return false;
+    if (v0 != v0New) cellAccumulator.add(this.cells[0]);
+    if (v1 != v1New) cellAccumulator.add(this.cells[1]);
+    return true;
   }
 }
 

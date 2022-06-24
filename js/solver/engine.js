@@ -424,8 +424,9 @@ SudokuSolver.InternalSolver = class {
 
     while (cellAccumulator.hasConstraints()) {
       counters.constraintsProcessed++;
-      let c = cellAccumulator.popConstraint();
-      if (!c.enforceConsistency(grid)) return false;
+      const c = cellAccumulator.head();
+      if (!c.enforceConsistency(grid, cellAccumulator)) return false;
+      cellAccumulator.popConstraint();
     }
 
     return true;
@@ -713,6 +714,10 @@ SudokuSolver.CellAccumulator = class {
 
   hasConstraints() {
     return this._head >= 0;
+  }
+
+  head() {
+    return this._handlers[this._head];
   }
 
   popConstraint() {

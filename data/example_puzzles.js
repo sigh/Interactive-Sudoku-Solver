@@ -140,12 +140,13 @@ const EXAMPLES = {
   // Slow case examples (some no longer slow).
   'Thermo, slow': {
     input: `
-      .~R4C6_1~R5C3_2~R9C5_1
-      .Thermo~R7C5~R7C6~R7C7~R6C7~R5C7~R4C7
-      .Thermo~R4C8~R3C8~R3C7~R3C6~R3C5
-      .Thermo~R2C5~R2C4~R3C4~R4C4~R5C4
-      .Thermo~R2C1~R2C2~R2C3
+      .Thermo~r1c2~r2c3.Thermo~r3c2~r2c1.Thermo~r4c2~r5c1.Thermo~r6c2~r5c3
+      .Thermo~r7c2~r8c3.Thermo~r9c2~r8c1.Thermo~r1c6~r2c6.Thermo~r3c5~r2c4
+      .Thermo~r3c5~r2c5.Thermo~r6c5~r5c4.Thermo~r7c5~r8c4.Thermo~r9c6~r8c6
+      .Thermo~r1c8~r2c9.Thermo~r3c8~r2c7.Thermo~r4c8~r5c9.Thermo~r6c8~r5c7
+      .Thermo~r7c8~r8c9.Thermo~r9c8~r8c7
     `,
+    solution: '953874162816235497472916538265398741794621385138457629387169254529743816641582973',
   },
   'Anti-Knight, slow': {
     input: '.AntiKnight.~R1C2_3~R1C9_7~R3C6_9~R3C7_2~R4C1_6~R4C4_4~R5C9_5~R6C2_4~R7C1_3~R8C5_6~R8C8_5~R9C2_6~R9C3_4~R9C4_3',
