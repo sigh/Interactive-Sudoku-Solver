@@ -179,7 +179,7 @@ class SudokuSolver {
   }
 
   static _resultToSolution(result, shape) {
-    const valueTable = LookupTables.get(shape).value;
+    const valueTable = LookupTables.get(shape.numValues).value;
 
     const values = result.grid.map(value => valueTable[value])
     let solution = [];
@@ -190,7 +190,7 @@ class SudokuSolver {
   }
 
   static _makePencilmarks(grid, shape, ignoreCells) {
-    const valueTable = LookupTables.get(shape).value;
+    const valueTable = LookupTables.get(shape.numValues).value;
 
     let ignoreSet = new Set(ignoreCells);
 
@@ -213,7 +213,7 @@ SudokuSolver.InternalSolver = class {
   constructor(handlerGen, shape) {
     this._shape = shape;
     this._numCells = this._shape.numCells;
-    this._countTable = LookupTables.get(shape).count;
+    this._countTable = LookupTables.get(shape.numValues).count;
 
     this._initCellArray();
     this._stack = new Uint8Array(shape.numCells);
@@ -356,7 +356,7 @@ SudokuSolver.InternalSolver = class {
     }
     this._initialGrid = new Uint16Array(numCells);
 
-    const allValues = LookupTables.get(this._shape).allValues;
+    const allValues = LookupTables.get(this._shape.numValues).allValues;
     this._initialGrid.fill(allValues);
   }
 
@@ -747,22 +747,21 @@ SudokuSolver.CellAccumulator = class {
 }
 
 class LookupTables {
-  static get = memoize((shape) => {
-    return new LookupTables(true, shape);
+  static get = memoize((numValues) => {
+    return new LookupTables(true, numValues);
   });
 
-  constructor(do_not_call, shape) {
-    if (!do_not_call) throw('Use LookupTables.get(shape)');
+  constructor(do_not_call, numValues) {
+    if (!do_not_call) throw('Use LookupTables.get(shape.numValues)');
 
-    this.allValues = (1<<shape.gridSize)-1;
-    this.combinations = 1<<shape.gridSize;
+    this.allValues = (1<<numValues)-1;
+    this.combinations = 1<<numValues;
 
     const combinations = this.combinations;
-    const gridSize = shape.gridSize;
 
     this.value = (() => {
       let table = new Uint8Array(combinations);
-      for (let i = 0; i < gridSize; i++) {
+      for (let i = 0; i < numValues; i++) {
         table[1 << i] = i+1;
       }
       return table;
@@ -828,7 +827,7 @@ class LookupTables {
       }
       // If there are no values, set a high value for isFixed to indicate the
       // result is invalid. This is intended to be detectable after summing.
-      table[0] = gridSize << 21;
+      table[0] = numValues << 21;
       return table;
     })();
 
@@ -836,8 +835,8 @@ class LookupTables {
       let table = new Uint16Array(combinations);
       for (let i = 0; i < combinations; i++) {
         let rev = 0;
-        for (let j = 0; j < gridSize; j++) {
-          rev |= ((i>>j)&1)<<(gridSize-1-j);
+        for (let j = 0; j < numValues; j++) {
+          rev |= ((i>>j)&1)<<(numValues-1-j);
         }
         table[i] = rev;
       }
@@ -846,9 +845,9 @@ class LookupTables {
 
     const binaryFunctionKey = (fn) => {
       const keyParts = [];
-      for (let i = 1; i <= gridSize; i++) {
+      for (let i = 1; i <= numValues; i++) {
         let part = 0;
-        for (let j = 1; j <= gridSize; j++) {
+        for (let j = 1; j <= numValues; j++) {
           part |= fn(i, j) << j;
         }
         keyParts.push(part);
@@ -860,8 +859,8 @@ class LookupTables {
       const table = new Uint16Array(combinations);
 
       // Populate base cases, where there is a single value set.
-      for (let i = 0; i < gridSize; i++) {
-        for (let j = 0; j < gridSize; j++) {
+      for (let i = 0; i < numValues; i++) {
+        for (let j = 0; j < numValues; j++) {
           if (fn(i+1, j+1)) {
             table[1 << i] |= 1 << j;
           }

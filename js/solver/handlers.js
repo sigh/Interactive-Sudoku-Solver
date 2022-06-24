@@ -66,7 +66,7 @@ SudokuConstraintHandler.House = class House extends SudokuConstraintHandler {
 
   initialize(initialGrid, cellConflicts, shape) {
     this._shape = shape;
-    this._lookupTables = LookupTables.get(shape);
+    this._lookupTables = LookupTables.get(shape.numValues);
   }
 
   enforceConsistency(grid) {
@@ -138,7 +138,7 @@ SudokuConstraintHandler.BinaryConstraint = class BinaryConstraint extends Sudoku
   }
 
   initialize(initialGrid, cellConflicts, shape) {
-    const lookupTables = LookupTables.get(shape);
+    const lookupTables = LookupTables.get(shape.numValues);
     const fn = this._fn;
     this._fn = null;
     this._tables = [
@@ -163,25 +163,25 @@ SudokuConstraintHandler.BinaryConstraint = class BinaryConstraint extends Sudoku
 
 class SumHandlerUtil {
 
-  static get = memoize((shape) => {
-    return new SumHandlerUtil(true, shape);
+  static get = memoize((numValues) => {
+    return new SumHandlerUtil(true, numValues);
   });
 
-  constructor(do_not_call, shape) {
-    if (!do_not_call) throw('Use SumHandlerUtil.get(shape)');
+  constructor(do_not_call, numValues) {
+    if (!do_not_call) throw('Use SumHandlerUtil.get(shape.numValues)');
 
-    this._shape = shape;
-    this._lookupTables = LookupTables.get(shape);
+    this._numValues = numValues;
+    this._lookupTables = LookupTables.get(numValues);
 
-    const gridSize = shape.gridSize;
     const combinations = this._lookupTables.combinations;
+    const maxSum = numValues*(numValues+1)/2;
 
     this.killerCageSums = (() => {
       let table = [];
-      for (let n = 0; n < gridSize+1; n++) {
+      for (let n = 0; n < numValues+1; n++) {
         let totals = [];
         table.push(totals);
-        for (let i = 0; i < shape.maxSum+1; i++) {
+        for (let i = 0; i < maxSum+1; i++) {
           totals.push([]);
         }
       }
@@ -201,7 +201,7 @@ class SumHandlerUtil {
     // possibilities: values which are in any solution.
     // requiredUniques: values which are a required part of any solution.
     this.killerCageInfo = (() => {
-      if (shape !== SHAPE_9x9) return null;
+      if (numValues !== 9) return null;
 
       const counts = this._lookupTables.count;
       const table = [];
@@ -213,7 +213,7 @@ class SumHandlerUtil {
 
         const maxCount = counts[i];
         for (let j = 1; j < maxCount+1; j++) {
-          const countTable = new Uint32Array(this._shape.maxSum+1);
+          const countTable = new Uint32Array(maxSum+1);
           valueTable.push(countTable);
 
           const sums = this.killerCageSums[j];
@@ -228,7 +228,7 @@ class SumHandlerUtil {
               }
             }
             if (possibilities) {
-              countTable[s] = possibilities | (required << gridSize);
+              countTable[s] = possibilities | (required << numValues);
             }
           }
         }
@@ -240,16 +240,16 @@ class SumHandlerUtil {
     // Precompute the sums for all pairs of cells. Assumes cells must be unique.
     //
     // For cell values a and b:
-    // _pairwiseSums[(a<<gridSize)|b] = sum>>2;
+    // _pairwiseSums[(a<<numValues)|b] = sum>>2;
     // (The shift is so the result fits in 16 bits).
     this._pairwiseSums = (() => {
-      if (shape !== SHAPE_9x9) return;
+      if (numValues !== 9) return;
       const table = new Uint16Array(combinations*combinations);
 
       for (let i = 0; i < combinations; i++) {
         for (let j = i; j < combinations; j++) {
           let result = 0;
-          for (let k = 1; k <= gridSize; k++) {
+          for (let k = 1; k <= numValues; k++) {
             // Check if j contains k.
             const kInJ = (j>>(k-1))&1;
             if (kInJ) {
@@ -263,7 +263,7 @@ class SumHandlerUtil {
               result |= s;
             }
           }
-          table[(i<<gridSize)|j] = table[(j<<gridSize)|i] = result;
+          table[(i<<numValues)|j] = table[(j<<numValues)|i] = result;
         }
       }
 
@@ -276,7 +276,7 @@ class SumHandlerUtil {
 
       for (let j = 0; j < combinations; j++) {
         let result = 0;
-        for (let k = 1; k <= gridSize; k++) {
+        for (let k = 1; k <= numValues; k++) {
           // Check if j contains k.
           const kInJ = (j>>(k-1))&1;
           if (kInJ) {
@@ -378,7 +378,7 @@ class SumHandlerUtil {
     possibilities = sumLookup[sum-fixedSum];
     if (!possibilities) return false;
     if (possibilities) {
-      requiredUniques &= possibilities >> this._shape.gridSize;
+      requiredUniques &= possibilities >> this._numValues;
     }
 
     // Remove any values that aren't part of any solution.
@@ -410,8 +410,8 @@ class SumHandlerUtil {
   }
 
   // Scratch buffers for reuse so we don't have to create arrays at runtime.
-  static _seenMins = new Uint16Array(SHAPE_MAX.gridSize);
-  static _seenMaxs = new Uint16Array(SHAPE_MAX.gridSize);
+  static _seenMins = new Uint16Array(SHAPE_MAX.numValues);
+  static _seenMaxs = new Uint16Array(SHAPE_MAX.numValues);
 
   // Restricts cell values to only the ranges that are possible taking into
   // account uniqueness constraints between values.
@@ -428,7 +428,7 @@ class SumHandlerUtil {
     let strictMax = 0;
 
     const minMaxLookup = this._lookupTables.minMax;
-    const gridSize = this._shape.gridSize;
+    const numValues = this._numValues;
     const allValues = this._lookupTables.allValues;
 
     for (let s = 0; s < numSets; s++) {
@@ -442,7 +442,7 @@ class SumHandlerUtil {
         const max = minMax&0x7f;
 
         const minShift = min-1;
-        const maxShift = gridSize - max;
+        const maxShift = numValues - max;
 
         // Set the smallest unset value >= min.
         // i.e. Try to add min to seenMin, but it if already exists then find
@@ -469,7 +469,7 @@ class SumHandlerUtil {
     let minDof = sum - strictMin;
     let maxDof = strictMax - sum;
     if (minDof < 0 || maxDof < 0) return false;
-    if (minDof >= gridSize-1 && maxDof >= gridSize-1) return true;
+    if (minDof >= numValues-1 && maxDof >= numValues-1) return true;
 
     // Restrict values based on the degrees of freedom.
     for (let s = 0; s < numSets; s++) {
@@ -481,12 +481,12 @@ class SumHandlerUtil {
 
       let valueMask = -1;
 
-      if (minDof < gridSize-1) {
+      if (minDof < numValues-1) {
         for (let j = minDof; j--;) seenMin |= seenMin<<1;
         valueMask = seenMin;
       }
 
-      if (maxDof < gridSize-1) {
+      if (maxDof < numValues-1) {
         for (let j = maxDof; j--;) seenMax |= seenMax>>1;
         valueMask &= seenMax;
       }
@@ -507,16 +507,16 @@ class SumHandlerUtil {
   }
 
   enforceThreeCellConsistency(grid, cells, sum, conflictMap) {
-    const gridSize = this._shape.gridSize;
+    const numValues = this._numValues;
 
     let v0 = grid[cells[0]];
     let v1 = grid[cells[1]];
     let v2 = grid[cells[2]];
 
     // Find each set of pairwise sums.
-    let sums2 = this._pairwiseSums[(v0<<gridSize)|v1]<<2;
-    let sums1 = this._pairwiseSums[(v0<<gridSize)|v2]<<2;
-    let sums0 = this._pairwiseSums[(v1<<gridSize)|v2]<<2;
+    let sums2 = this._pairwiseSums[(v0<<numValues)|v1]<<2;
+    let sums1 = this._pairwiseSums[(v0<<numValues)|v2]<<2;
+    let sums0 = this._pairwiseSums[(v1<<numValues)|v2]<<2;
 
     // If the cell values are possibly repeated, then handle that.
     if (conflictMap !== null) {
@@ -537,9 +537,9 @@ class SumHandlerUtil {
     const shift = sum-1;
     const allValues = this._lookupTables.allValues;
     const reverse = this._lookupTables.reverse;
-    v2 &= reverse[((sums2 << gridSize)>>shift) & allValues];
-    v1 &= reverse[((sums1 << gridSize)>>shift) & allValues];
-    v0 &= reverse[((sums0 << gridSize)>>shift) & allValues];
+    v2 &= reverse[((sums2 << numValues)>>shift) & allValues];
+    v1 &= reverse[((sums1 << numValues)>>shift) & allValues];
+    v0 &= reverse[((sums0 << numValues)>>shift) & allValues];
 
     if (!(v1 && v1 && v2)) return false;
 
@@ -589,8 +589,8 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
 
   initialize(initialGrid, cellConflicts, shape) {
     this._shape = shape;
-    this._lookupTables = LookupTables.get(shape);
-    this._util = SumHandlerUtil.get(shape);
+    this._lookupTables = LookupTables.get(shape.numValues);
+    this._util = SumHandlerUtil.get(shape.numValues);
 
     this._conflictSets = this._util.findConflictSets(
       this._positiveCells, cellConflicts);
@@ -612,9 +612,9 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
     }
   }
 
-  static _valueBuffer = new Uint16Array(SHAPE_MAX.gridSize);
-  static _conflictMapBuffer = new Uint8Array(SHAPE_MAX.gridSize);
-  static _cellBuffer = new Uint8Array(SHAPE_MAX.gridSize);
+  static _valueBuffer = new Uint16Array(SHAPE_MAX.numValues);
+  static _conflictMapBuffer = new Uint8Array(SHAPE_MAX.numValues);
+  static _cellBuffer = new Uint8Array(SHAPE_MAX.numValues);
 
   // Optimize the {1-3}-cell case by solving it exactly and efficiently.
   // REQUIRES that:
@@ -850,7 +850,7 @@ SudokuConstraintHandler.Sandwich = class Sandwich extends SudokuConstraintHandle
   }
 
   initialize(initialGrid, cellConflicts, shape) {
-    const lookupTables = LookupTables.get(shape);
+    const lookupTables = LookupTables.get(shape.numValues);
 
     this._gridSize = shape.gridSize;
     this._borderMask = SudokuConstraintHandler.Sandwich._borderMask(shape);
@@ -873,7 +873,7 @@ SudokuConstraintHandler.Sandwich = class Sandwich extends SudokuConstraintHandle
   // Possible combinations for values between the 1 and 9 for each possible sum.
   // Grouped by distance.
   static _combinations = memoize((shape) => {
-    const lookupTables = LookupTables.get(shape);
+    const lookupTables = LookupTables.get(shape.numValues);
     const maxSum = this._maxSum(shape);
     const borderMask = this._borderMask(shape);
 
@@ -1056,7 +1056,7 @@ SudokuConstraintHandler.SameValues = class SameValues extends SudokuConstraintHa
   }
 
   initialize(initialGrid, cellConflicts, shape) {
-    this._countTable = LookupTables.get(shape).count;
+    this._countTable = LookupTables.get(shape.numValues).count;
   }
 
   enforceConsistency(grid) {
@@ -1096,7 +1096,7 @@ SudokuConstraintHandler.Between = class Between extends SudokuConstraintHandler 
   }
 
   initialize(initialGrid, cellConflicts, shape) {
-    this._minMaxTable = LookupTables.get(shape).minMax;
+    this._minMaxTable = LookupTables.get(shape.numValues).minMax;
   }
 
   enforceConsistency(grid) {
