@@ -11,7 +11,7 @@ const initPage = () => {
 
   const inputManager = new GridInputManager(shape, displayContainer);
   constraintManager = new ConstraintManager(shape, inputManager, displayContainer);
-  infoOverlay = new InfoOverlay(shape, container, displayContainer);
+  infoOverlay = new InfoOverlay(shape, displayContainer);
 
   controller = new SolutionController(constraintManager, shape, displayContainer, infoOverlay);
 };
@@ -1704,58 +1704,21 @@ class SolutionController {
 
 // A info overlay which is lazily loaded.
 class InfoOverlay {
-  _infoOverlay;
-  _cellMap;
-  _container;
-  _isClear = true;
-  _shape;
-
-  constructor(shape, container, displayContainer) {
-    this._container = container;
-    this._displayContainer = displayContainer;
+  constructor(shape, displayContainer) {
     this._shape = shape;
 
     this._heatmap = displayContainer.createHighlighter();
-  }
-
-  _initInfoOverlay() {
-    const infoOverlay = document.createElement('div');
-    infoOverlay.className = 'info-overlay';
-    infoOverlay.style.padding = this._container.style.padding;
-    this._container.append(infoOverlay);
-
-    const cellMap = new Map();
-
-    for (let i = 0; i < this._shape.gridSize; i++) {
-      for (let j = 0; j < this._shape.gridSize; j++) {
-        const cell = document.createElement('div');
-        cell.className = 'cell-elem';
-        const cellIndex = this._shape.cellIndex(i, j);
-        cellMap[cellIndex] = cell;
-
-        infoOverlay.appendChild(cell);
-      }
-    }
-
-    this._cellMap = cellMap;
-    this._infoOverlay = infoOverlay;
+    this._textInfo = new InfoTextDisplay(shape);
+    displayContainer.addDisplayItem(this._textInfo);
   }
 
   clear() {
     this._heatmap.clear();
-
-    if (!this._infoOverlay) return;
-    if (this._isClear) return;
-
-    for (let i = 0; i < this._shape.numCells; i++) {
-      this._cellMap[i].textContent = '';
-    }
-    this._isClear = true;
+    this._textInfo.clear();
   }
 
   setHeatmapValues(values) {
     const shape = this._shape;
-
     this._heatmap.clear();
 
     for (let i = 0; i < values.length; i++) {
@@ -1767,11 +1730,12 @@ class InfoOverlay {
   }
 
   setValues(values) {
-    if (!this._infoOverlay) this._initInfoOverlay();
+    const shape = this._shape;
+    this._textInfo.clear();
 
-    for (let i = 0; i < this._shape.numCells; i++) {
-      this._cellMap[i].textContent = values[i];
+    for (let i = 0; i < values.length; i++) {
+      const cellId = shape.makeCellId(...shape.splitCellIndex(i));
+      this._textInfo.setText(cellId, values[i]);
     }
-    this._isClear = false;
   }
 }

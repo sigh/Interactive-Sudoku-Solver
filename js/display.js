@@ -37,6 +37,12 @@ class DisplayItem {
     return DisplayItem._cellCenter(row, col);
   }
 
+  cellIdCorner(cellId) {
+    const cellWidth = DisplayItem.CELL_SIZE;
+    const [x, y] = this.cellIdCenter(cellId);
+    return [x - cellWidth/2, y - cellWidth/2 + 2];
+  }
+
   cellCenter(cell) {
     return DisplayItem._cellCenter(...this._shape.splitCellIndex(cell));
   }
@@ -45,6 +51,15 @@ class DisplayItem {
     const cellSize = ConstraintDisplay.CELL_SIZE;
     return [col*cellSize + cellSize/2, row*cellSize + cellSize/2];
   }
+
+  makeTextNode(str, x, y, cls) {
+    const text = createSvgElement('text');
+    text.appendChild(document.createTextNode(str));
+    text.setAttribute('class', cls);
+    text.setAttribute('x', x);
+    text.setAttribute('y', y);
+    return text;
+  };
 
   _applyGridOffset(elem) {
     const padding = this.constructor.SVG_PADDING;
@@ -65,6 +80,31 @@ class DisplayItem {
     ];
     path.setAttribute('d', directions.join(' '));
     return path;
+  }
+
+  clear() {
+    clearDOMNode(this._svg);
+  }
+}
+
+class InfoTextDisplay extends DisplayItem {
+  constructor(shape) {
+    super();
+
+    let svg = this.getSvg();
+    this._applyGridOffset(svg);
+    let sideLength = DisplayItem.CELL_SIZE * shape.gridSize;
+
+    svg.setAttribute('height', sideLength);
+    svg.setAttribute('width', sideLength);
+
+    this._shape = shape;
+  }
+
+  setText(cellId, str) {
+    const [x, y] = this.cellIdCorner(cellId);
+    const textNode = this.makeTextNode(str, x, y, 'info-overlay-item');
+    this._svg.append(textNode);
   }
 }
 
@@ -132,32 +172,24 @@ class SolutionDisplay extends DisplayItem {
       cellValues.delete(cellId);
     }
 
-    const makeTextNode = (str, x, y, cls) => {
-      const text = createSvgElement('text');
-      text.appendChild(document.createTextNode(str));
-      text.setAttribute('class', cls);
-      text.setAttribute('x', x);
-      text.setAttribute('y', y);
-      return text;
-    };
-
     const LINE_HEIGHT = this._shape.gridSize == SHAPE_9x9.gridSize ? 17 : 10;
     const START_OFFSET = -DisplayItem.CELL_SIZE/2+2;
     for (const [cellId, values] of cellValues) {
       const [x, y] = this.cellIdCenter(cellId);
 
       if (values.length == 1 && !pencilmarkCell.has(cellId)) {
-        this._svg.append(makeTextNode(
+        this._svg.append(this.makeTextNode(
           values[0], x, y, 'solution-value'));
       } else {
         let offset = START_OFFSET;
         for (const line of this._formatMultiSolution(values)) {
-          this._svg.append(makeTextNode(
+          this._svg.append(this.makeTextNode(
             line, x, y+offset, 'solution-multi-value'));
           offset += LINE_HEIGHT;
         }
       }
     }
+
     this._svg.classList.remove('hidden-solution');
   }
 
@@ -526,7 +558,6 @@ class ConstraintDisplay extends DisplayItem {
   }
 
   drawKillerCage(cells, sum) {
-    const cellWidth = ConstraintDisplay.CELL_SIZE;
     let x,y;
 
     const cage = createSvgElement('g');
@@ -544,15 +575,13 @@ class ConstraintDisplay extends DisplayItem {
 
     // Draw the sum in the top-left most cell. Luckly, this is the sort order.
     cells.sort();
-    [x, y] = this.cellIdCenter(cells[0]);
+    [x, y] = this.cellIdCorner(cells[0]);
 
     let text = createSvgElement('text');
     text.appendChild(document.createTextNode(sum));
-    text.setAttribute('x', x - cellWidth/2);
-    text.setAttribute('y', y - cellWidth/2 + 2);
-    text.setAttribute('dominant-baseline', 'hanging');
-    text.setAttribute('style',
-      'font-size: 10; font-family: monospace; font-weight: bold;');
+    text.setAttribute('x', x);
+    text.setAttribute('y', y);
+    text.setAttribute('class', 'killer-cage-sum');
     cage.append(text);
     this._constraintGroup.append(cage);
 

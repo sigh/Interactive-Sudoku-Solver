@@ -237,6 +237,6 @@ const printGrid = (grid) => {
 }
 
 const showCellIndex = () => {
-  const numCells = this._shape.numCells;
+  const numCells = constraintManager._shape.numCells;
   infoOverlay.setValues([...Array(numCells).keys()]);
 };

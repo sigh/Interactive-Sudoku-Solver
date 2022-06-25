@@ -26,27 +26,6 @@
   pointer-events: none;
 }
 
-.info-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  opacity: 0.5;
-
-  display: inline-grid;
-  grid-template-columns: repeat(16, 52px);
-  grid-template-rows: repeat(16, 52px);
-
-  pointer-events: none;
-}
-.size-9x9 .info-overlay {
-  grid-template-columns: repeat(9, 52px);
-  grid-template-rows: repeat(9, 52px);
-}
-.size-16x16 .info-overlay {
-  grid-template-columns: repeat(16, 52px);
-  grid-template-rows: repeat(16, 52px);
-}
-
 .fixed-value {
   font-size: 30px;
   font-family: sans-serif;
@@ -77,6 +56,18 @@
 }
 .size-16x16 .solution-multi-value {
   font-size: 9px;
+}
+
+.info-overlay-item {
+  opacity: 0.5;
+  dominant-baseline: hanging;
+}
+
+.killer-cage-sum {
+  font-size: 10px;
+  font-family: monospace;
+  font-weight: bold;
+  dominant-baseline: hanging;
 }
 
 .hidden-solution {
