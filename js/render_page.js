@@ -270,8 +270,8 @@ class ConstraintManager {
     this._shape = shape;
     this._checkboxes = {};
 
-    this._display = new ConstraintDisplay(inputManager, this._shape);
-    displayContainer.addDisplayItem(this._display);
+    this._display = new ConstraintDisplay(
+      inputManager, this._shape, displayContainer);
     this._setUpPanel(inputManager, displayContainer);
     this._fixedValues = new FixedValues(
       shape, inputManager, this._display, this.runUpdateCallback.bind(this));
@@ -680,7 +680,9 @@ class ConstraintManager {
     const svg = createSvgElement('svg');
     const transform = 'scale(0.06)';
 
-    const borders = this._display.makeBorders('rgb(255, 255, 255)');
+    const borders = createSvgElement('g');
+    svg.append(borders);
+    this._display.makeBorders(borders, 'rgb(255, 255, 255)');
     borders.setAttribute('transform', transform);
     borders.setAttribute('stoke-width', 0);
     svg.append(borders);
@@ -779,8 +781,7 @@ class Selection {
 
     this._highlight = displayContainer.createHighlighter('selected-cell');
 
-    this._clickInterceptor = new ClickInterceptor(shape);
-    displayContainer.addDisplayItem(this._clickInterceptor);
+    this._clickInterceptor = displayContainer.getClickInterceptor();
 
     this._selectionPreservers = [this._clickInterceptor.getSvg()];
 
@@ -1357,8 +1358,8 @@ class SolutionController {
     this._solverPromises = [];
 
     this._solutionDisplay = new SolutionDisplay(
-      constraintManager, shape);
-    displayContainer.addDisplayItem(this._solutionDisplay);
+      constraintManager, shape,
+      displayContainer.getNewGroup('solution-group'));
     this._isSolving = false;
     this._constraintManager = constraintManager;
     this._stepHighlighter = displayContainer.createHighlighter('highlighted-step-cell');
@@ -1716,8 +1717,8 @@ class InfoOverlay {
     this._shape = shape;
 
     this._heatmap = displayContainer.createHighlighter();
-    this._textInfo = new InfoTextDisplay(shape);
-    displayContainer.addDisplayItem(this._textInfo);
+    this._textInfo = new InfoTextDisplay(
+      shape, displayContainer.getNewGroup('text-info-group'));
   }
 
   clear() {

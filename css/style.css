@@ -19,6 +19,9 @@
   top: 0;
   left: 0;
 }
+.main-sudoku-display-svg {
+  z-index: 10;
+}
 .click-interceptor-svg {
   z-index: 100;
 }

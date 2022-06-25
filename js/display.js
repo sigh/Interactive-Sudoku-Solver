@@ -1,21 +1,46 @@
 class DisplayContainer {
   constructor(container, shape) {
+    const padding = DisplayItem.SVG_PADDING;
+    const sideLength = DisplayItem.CELL_SIZE * shape.gridSize + padding*2;
+
     this.shape = shape;
     container.classList.add('sudoku-grid');
     container.classList.add(`size-${shape.name}`);
-    container.style.padding = `${DisplayItem.SVG_PADDING}px`;
+    container.style.padding = `${padding}px`;
     this._container = container;
 
-    this._highlightDisplay = new HighlightDisplay(shape);
-    this.addDisplayItem(this._highlightDisplay);
+    const svg = createSvgElement('svg');
+    svg.classList.add('sudoku-display-svg');
+    svg.classList.add('main-sudoku-display-svg');
+    svg.setAttribute('height', sideLength);
+    svg.setAttribute('width', sideLength);
+    this._mainSvg = svg;
+    this._container.append(svg);
+
+    this._highlightDisplay = new HighlightDisplay(
+      shape, this.getNewGroup('highlight-group'));
+
+    this._clickInterceptor = new ClickInterceptor(shape);
+    this._container.append(this._clickInterceptor.getSvg());
   }
 
   createHighlighter(cssClass) {
     return new Highlight(this._highlightDisplay, cssClass);
   }
 
-  addDisplayItem(item) {
-    this._container.append(item.getSvg());
+  getNewGroup(groupName) {
+    const group = createSvgElement('g');
+    group.id = groupName;
+    this._mainSvg.append(group);
+    return group;
+  }
+
+  addElement(element) {
+    this._mainSvg.append(element);
+  }
+
+  getClickInterceptor() {
+    return this._clickInterceptor
   }
 }
 
@@ -23,9 +48,8 @@ class DisplayItem {
   static SVG_PADDING = 27;
   static CELL_SIZE = 52;
 
-  constructor() {
-    this._svg = createSvgElement('svg');
-    this._svg.classList.add('sudoku-display-svg');
+  constructor(svg) {
+    this._svg = svg;
   }
 
   getSvg() {
@@ -89,16 +113,17 @@ class DisplayItem {
 
 class ClickInterceptor extends DisplayItem {
   constructor(shape) {
-    super();
-
-    let svg = this.getSvg();
-    this._applyGridOffset(svg);
-    let sideLength = DisplayItem.CELL_SIZE * shape.gridSize;
-
-    svg.setAttribute('height', sideLength);
-    svg.setAttribute('width', sideLength);
+    const svg = createSvgElement('svg');
+    svg.classList.add('sudoku-display-svg');
     svg.classList.add('click-interceptor-svg');
 
+    const sideLength = DisplayItem.CELL_SIZE * shape.gridSize;
+    svg.setAttribute('height', sideLength);
+    svg.setAttribute('width', sideLength);
+
+    super(svg);
+
+    this._applyGridOffset(svg);
     this._shape = shape;
   }
 
@@ -113,16 +138,9 @@ class ClickInterceptor extends DisplayItem {
 }
 
 class InfoTextDisplay extends DisplayItem {
-  constructor(shape) {
-    super();
-
-    let svg = this.getSvg();
+  constructor(shape, svg) {
+    super(svg);
     this._applyGridOffset(svg);
-    let sideLength = DisplayItem.CELL_SIZE * shape.gridSize;
-
-    svg.setAttribute('height', sideLength);
-    svg.setAttribute('width', sideLength);
-
     this._shape = shape;
   }
 
@@ -134,18 +152,13 @@ class InfoTextDisplay extends DisplayItem {
 }
 
 class SolutionDisplay extends DisplayItem {
-  constructor(constraintManager, shape) {
-    super();
+  constructor(constraintManager, shape, svg) {
+    super(svg);
     this._shape = shape;
     this._solutionValues = [];
     this._constraintManager = constraintManager;
 
-    let svg = this.getSvg();
     this._applyGridOffset(svg);
-    let sideLength = DisplayItem.CELL_SIZE * shape.gridSize;
-
-    svg.setAttribute('height', sideLength);
-    svg.setAttribute('width', sideLength);
 
     this.setSolution = deferUntilAnimationFrame(this.setSolution.bind(this));
   }
@@ -253,18 +266,11 @@ class SolutionDisplay extends DisplayItem {
 }
 
 class HighlightDisplay extends DisplayItem {
-  constructor(shape) {
-    super();
+  constructor(shape, svg) {
+    super(svg);
 
     this._shape = shape;
-
-    const svg = this.getSvg();
     this._applyGridOffset(svg);
-    svg.classList.add('selection-svg');
-    let sideLength = DisplayItem.CELL_SIZE * shape.gridSize;
-
-    svg.setAttribute('height', sideLength);
-    svg.setAttribute('width', sideLength);
   }
 
   highlightCell(cellId, cssClass) {
@@ -289,42 +295,33 @@ class ConstraintDisplay extends DisplayItem {
   static SVG_PADDING = 27;
   static CELL_SIZE = 52;
 
-  constructor(inputManager, shape) {
+  constructor(inputManager, shape, displayContainer) {
     super();
 
     this._shape = shape;
 
-    const svg = this.getSvg();
-    let padding = ConstraintDisplay.SVG_PADDING;
-    let sideLength = ConstraintDisplay.CELL_SIZE * shape.gridSize + padding*2;
-    svg.setAttribute('height', sideLength);
-    svg.setAttribute('width', sideLength);
+    this._makeGrid(displayContainer);
 
-    svg.append(this._makeGrid());
+    this._initializeRegions(displayContainer);
 
-    this._initializeRegions(svg);
-
-    this._constraintGroup = createSvgElement('g');
+    this._constraintGroup = displayContainer.getNewGroup('constraint-group');
     this._applyGridOffset(this._constraintGroup);
-    svg.append(this._constraintGroup);
 
-    this._fixedValueGroup = createSvgElement('g');
+    this._fixedValueGroup = displayContainer.getNewGroup('fixed-value-group');
     this._applyGridOffset(this._fixedValueGroup);
-    svg.append(this._fixedValueGroup);
 
-    svg.append(this._makeArrowhead());
-    svg.append(this._makeLittleKillers(inputManager));
-    inputManager.addSelectionPreserver(svg);
-    svg.append(this.makeBorders());
+    displayContainer.addElement(this._makeArrowhead());
+    this._makeLittleKillers(inputManager, displayContainer);
+    this.makeBorders(displayContainer.getNewGroup('border-group'));
 
     this.clear();  // clear() to initialize.
   }
 
-  _initializeRegions(svg) {
-    this._defaultRegions = this._makeDefaultRegions();
-    svg.append(this._defaultRegions);
+  _initializeRegions(displayContainer) {
+    this._defaultRegions = this._makeDefaultRegions(
+      displayContainer.getNewGroup('default-region-group'));
 
-    this._regionContainer = createSvgElement('g');
+    this._regionContainer = displayContainer.getNewGroup('other-region-group');
 
     this._regionGroup = createSvgElement('g');
 
@@ -335,8 +332,6 @@ class ConstraintDisplay extends DisplayItem {
     this._missingRegion.setAttribute('fill', 'rgb(0, 0, 0)');
     this._missingRegion.setAttribute('opacity', '0.05');
     this._regionContainer.append(this._missingRegion);
-
-    svg.append(this._regionContainer);
 
     this._windokuRegion = createSvgElement('g');
     this._windokuRegion.setAttribute('fill', 'rgb(255, 0, 255)');
@@ -350,8 +345,8 @@ class ConstraintDisplay extends DisplayItem {
     this._regionContainer.append(this._windokuRegion);
   }
 
-  _makeLittleKillers(inputManager) {
-    const g = createSvgElement('g');
+  _makeLittleKillers(inputManager, displayContainer) {
+    const g = displayContainer.getNewGroup('little-killer-group');
     this._applyGridOffset(g);
 
     const makeArrow = (row, col, dr, dc) => {
@@ -430,6 +425,7 @@ class ConstraintDisplay extends DisplayItem {
       selectedArrow = arrowSvg;
       selectedArrow.classList.add('selected-arrow');
     };
+    inputManager.addSelectionPreserver(g);
 
     this._outsideArrowMap = {};
     const addArrow = (type, id, cells) => {
@@ -785,10 +781,10 @@ class ConstraintDisplay extends DisplayItem {
     this._fixedValueMap.set(cell, text);
   }
 
-  _makeGrid() {
-    const grid = createSvgElement('g');
+  _makeGrid(displayContainer) {
+    const grid = displayContainer.getNewGroup('base-grid-group');
     this._applyGridOffset(grid);
-    const cellSize = ConstraintDisplay.CELL_SIZE;
+    const cellSize = DisplayItem.CELL_SIZE;
     const gridSize = cellSize*this._shape.gridSize;
 
     grid.setAttribute('stroke-width', 1);
@@ -804,15 +800,12 @@ class ConstraintDisplay extends DisplayItem {
         [i*cellSize, gridSize],
       ]));
     }
-
-    return grid;
   }
 
-  makeBorders(fill) {
+  makeBorders(g, fill) {
     const cellSize = ConstraintDisplay.CELL_SIZE;
     const gridSize = cellSize*this._shape.gridSize;
 
-    const g = createSvgElement('g');
     this._applyGridOffset(g);
     g.setAttribute('stroke-width', 2);
     g.setAttribute('stroke', 'rgb(0, 0, 0)');
@@ -829,8 +822,7 @@ class ConstraintDisplay extends DisplayItem {
     return g;
   }
 
-  _makeDefaultRegions() {
-    const grid = createSvgElement('g');
+  _makeDefaultRegions(grid) {
     this._applyGridOffset(grid);
     const cellSize = ConstraintDisplay.CELL_SIZE;
     const gridSize = cellSize*this._shape.gridSize;
