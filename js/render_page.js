@@ -20,9 +20,6 @@ const initPage = () => {
   constraintManager.addReshapeListener(infoOverlay);
 
   controller = new SolutionController(constraintManager, displayContainer, infoOverlay);
-
-  constraintManager.reshape(shape);
-  controller._update();
 };
 
 class CheckboxConstraints {
@@ -199,7 +196,7 @@ class JigsawManager {
 
     this._regionPanel = document.getElementById('displayed-regions');
 
-    this._piecesMap = null;
+    this._piecesMap = new Array();
     this._maxPieceId = 0;
   }
 
@@ -300,6 +297,8 @@ class ConstraintManager {
     if (this._shape === shape) return;
 
     this._shape = shape;
+    // TODO: Keep layout options that are shape agnostic.
+    this.clear();
     for (const listener of this._reshapeListeners) {
       listener.reshape(shape);
     }
@@ -478,6 +477,7 @@ class ConstraintManager {
     const constraint = SudokuConstraint.fromText(input);
     if (constraint) {
       this.clear();
+      this.reshape(SHAPE);  // TODO: Determine shape properly.
       this.loadConstraint(constraint);
     }
 
@@ -742,6 +742,9 @@ class ConstraintManager {
   }
 
   getConstraints() {
+    // TODO: Read shape properly.
+    if (!this._shape) this.reshape(SHAPE_9x9);
+
     let constraints = this._configs.map(c => c.constraint);
     constraints.push(this._jigsawManager.getConstraint());
     constraints.push(this._checkboxConstraints.getConstraint());
@@ -1107,7 +1110,7 @@ class HistoryHandler {
     this._redoButton.onclick = () => this._incrementHistory(+1);
 
     window.onpopstate = this._reloadFromUrl.bind(this);
-    // this._reloadFromUrl(); TODO
+    this._reloadFromUrl();
   }
 
   update(params) {
@@ -1450,8 +1453,7 @@ class SolutionController {
       }
     });
 
-    // TODO: Put back.
-    // this._update();
+    this._update();
   }
 
   enableDebugOutput(enable) {
