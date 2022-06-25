@@ -342,14 +342,14 @@ class ConstraintDisplay extends DisplayItem {
 
     this._constraintGroup = displayContainer.getNewGroup('constraint-group');
     this._applyGridOffset(this._constraintGroup);
+    this._killerCageDisplay = new KillerCageDisplay(
+      displayContainer.getNewGroup('killer-cage-group'));
 
     this._diagonalDisplay = new DiagonalDisplay(
       displayContainer.getNewGroup('diagonal-group'));
 
-    // TODO: Split out fixedValue and killer cages into their
-    // own classes.
-    this._fixedValueGroup = displayContainer.getNewGroup('fixed-value-group');
-    this._applyGridOffset(this._fixedValueGroup);
+    this._fixedValueDisplay = new FixedValueDisplay(
+      displayContainer.getNewGroup('fixed-value-group'));
 
     displayContainer.addElement(this._makeArrowhead());
     this._outsideArrows = new OutsideArrowDisplay(
@@ -370,6 +370,8 @@ class ConstraintDisplay extends DisplayItem {
     this._outsideArrows.reshape(shape);
     this._diagonalDisplay.reshape(shape);
     this._borders.reshape(shape);
+    this._fixedValueDisplay.reshape(shape);
+    this._killerCageDisplay.reshape(shape);
   }
 
   // Reusable arrowhead marker.
@@ -394,14 +396,13 @@ class ConstraintDisplay extends DisplayItem {
   clear() {
     clearDOMNode(this._constraintGroup);
 
-    clearDOMNode(this._fixedValueGroup);
-    this._fixedValueMap = new Map();
+    this._fixedValueDisplay.clear();
 
-    this.killerCellColors = new Map();
-    this.killerCages = new Map();
     this._diagonalDisplay.clear();
 
     this._jigsawRegions.clear();
+
+    this._killerCageDisplay.clear();
 
     this.enableWindokuRegion(false);
     this.useDefaultRegions(true);
@@ -414,58 +415,8 @@ class ConstraintDisplay extends DisplayItem {
   removeItem(item) {
     if (!item) return;
     if (this._jigsawRegions.removeItem(item)) return;
-
+    if (this._killerCages.removeItem(item)) return;
     item.parentNode.removeChild(item);
-    if (this.killerCages.has(item)) {
-      for (const cellId of this.killerCages.get(item)) {
-        this.killerCellColors.delete(cellId);
-      }
-      this.killerCages.delete(item);
-    }
-  }
-
-  static _addTextBackground(elem) {
-    let bbox = elem.getBBox();
-    let rect = createSvgElement('rect');
-
-    rect.setAttribute('x', bbox.x);
-    rect.setAttribute('y', bbox.y);
-    rect.setAttribute('width', bbox.width);
-    rect.setAttribute('height', bbox.height);
-
-    elem.parentNode.insertBefore(rect, elem);
-    return rect;
-  }
-
-  static KILLER_CAGE_COLORS = [
-    'green',
-    'red',
-    'blue',
-    'yellow',
-    'cyan',
-    'brown',
-    'black',
-    'purple',
-    'orange',
-  ];
-
-  _chooseKillerCageColor(cellIds) {
-    // Use a greedy algorithm to choose the graph color.
-    let conflictingColors = new Set();
-    for (const cellId of cellIds) {
-      let {row, col} = this._shape.parseCellId(cellId);
-      // Lookup all  adjacent cells, it doesn't matter if they valid or not.
-      conflictingColors.add(this.killerCellColors.get(this._shape.makeCellId(row, col+1)));
-      conflictingColors.add(this.killerCellColors.get(this._shape.makeCellId(row, col-1)));
-      conflictingColors.add(this.killerCellColors.get(this._shape.makeCellId(row+1, col)));
-      conflictingColors.add(this.killerCellColors.get(this._shape.makeCellId(row-1, col)));
-    }
-    // Return the first color that doesn't conflict.
-    for (const color of this.constructor.KILLER_CAGE_COLORS) {
-      if (!conflictingColors.has(color)) return color;
-    }
-    // Otherwse select a random color.
-    return `rgb(${Math.random()*255|0},${Math.random()*255|0},${Math.random()*255|0})`;
   }
 
   addOutsideArrow(id, sum) {
@@ -477,37 +428,7 @@ class ConstraintDisplay extends DisplayItem {
   }
 
   drawKillerCage(cells, sum) {
-    let x,y;
-
-    const cage = createSvgElement('g');
-    const color = this._chooseKillerCageColor(cells);
-
-    for (const cellId of cells) {
-      const path = this._makeCellSquare(this._shape.parseCellId(cellId).cell);
-      path.setAttribute('fill', color);
-      path.setAttribute('opacity', '0.1');
-
-      cage.appendChild(path);
-    }
-    this.killerCages.set(cage, [...cells]);
-    cells.forEach(cell => this.killerCellColors.set(cell, color));
-
-    // Draw the sum in the top-left most cell. Luckly, this is the sort order.
-    cells.sort();
-    [x, y] = this.cellIdCorner(cells[0]);
-
-    let text = createSvgElement('text');
-    text.appendChild(document.createTextNode(sum));
-    text.setAttribute('x', x);
-    text.setAttribute('y', y);
-    text.setAttribute('class', 'killer-cage-sum');
-    cage.append(text);
-    this._constraintGroup.append(cage);
-
-    let textBackground = ConstraintDisplay._addTextBackground(text);
-    textBackground.setAttribute('fill', 'rgb(200, 200, 200)');
-
-    return cage;
+    return this._killerCageDisplay.drawKillerCage(cells, sum);
   }
 
   drawDot(cells, fillColor) {
@@ -653,27 +574,7 @@ class ConstraintDisplay extends DisplayItem {
   }
 
   drawFixedValue(cell, value) {
-    // Clear the old value.
-    const oldText = this._fixedValueMap.get(cell);
-    if (oldText) {
-      this._fixedValueGroup.removeChild(oldText);
-      this._fixedValueMap.delete(cell);
-    }
-
-    // If we are unsetting the cell, nothing else to do.
-    if (value === '' || value === undefined) return;
-
-    // Create and append the new node.
-    const text = createSvgElement('text');
-    text.setAttribute('class', 'fixed-value');
-    text.appendChild(document.createTextNode(value));
-    const [x, y] = this.cellIdCenter(cell);
-    text.setAttribute('x', x);
-    text.setAttribute('y', y);
-
-    this._fixedValueGroup.append(text);
-
-    this._fixedValueMap.set(cell, text);
+    this._fixedValueDisplay.drawValue(cell, value);
   }
 
   useDefaultRegions(enable) {
@@ -1122,5 +1023,147 @@ class DiagonalDisplay extends DisplayItem {
         this.drawDiagonal(direction);
       }
     }
+  }
+}
+
+class FixedValueDisplay extends DisplayItem {
+  constructor(svg) {
+    super(svg);
+    this._applyGridOffset(svg);
+    this._map = new Map();
+  }
+
+  clear() {
+    super.clear();
+    this._map.clear();
+  }
+
+  drawValue(cell, value) {
+    const svg = this.getSvg();
+
+    // Clear the old value.
+    const oldText = this._map.get(cell);
+    if (oldText) {
+      svg.removeChild(oldText);
+      this._map.delete(cell);
+    }
+
+    // If we are unsetting the cell, nothing else to do.
+    if (value === '' || value === undefined) return;
+
+    // Create and append the new node.
+    const text = createSvgElement('text');
+    text.setAttribute('class', 'fixed-value');
+    text.appendChild(document.createTextNode(value));
+    const [x, y] = this.cellIdCenter(cell);
+    text.setAttribute('x', x);
+    text.setAttribute('y', y);
+
+    svg.append(text);
+
+    this._map.set(cell, text);
+  }
+}
+
+class KillerCageDisplay extends DisplayItem {
+  constructor(svg) {
+    super(svg);
+    this._applyGridOffset(svg);
+
+    this.clear();
+  }
+
+  clear() {
+    super.clear();
+    this._killerCellColors = new Map();
+    this._killerCages = new Map();
+  }
+
+  removeCage(item) {
+    if (this._killerCages.has(item)) {
+      item.parentNode.removeChild(item);
+      for (const cellId of this._killerCages.get(item)) {
+        this._killerCellColors.delete(cellId);
+      }
+      this._killerCages.delete(item);
+      return true;
+    }
+    return false;
+  }
+
+  drawKillerCage(cells, sum) {
+    let x,y;
+
+    const cage = createSvgElement('g');
+    const color = this._chooseKillerCageColor(cells);
+
+    for (const cellId of cells) {
+      const path = this._makeCellSquare(this._shape.parseCellId(cellId).cell);
+      path.setAttribute('fill', color);
+      path.setAttribute('opacity', '0.1');
+
+      cage.appendChild(path);
+    }
+    this._killerCages.set(cage, [...cells]);
+    cells.forEach(cell => this._killerCellColors.set(cell, color));
+
+    // Draw the sum in the top-left most cell. Luckly, this is the sort order.
+    cells.sort();
+    [x, y] = this.cellIdCorner(cells[0]);
+
+    const text = this.makeTextNode(
+      sum, x, y, 'killer-cage-sum');
+    cage.append(text);
+    this.getSvg().append(cage);
+
+    let textBackground = this.constructor._addTextBackground(text);
+    textBackground.setAttribute('fill', 'rgb(200, 200, 200)');
+
+    return cage;
+  }
+
+  static _addTextBackground(elem) {
+    const bbox = elem.getBBox();
+    const rect = createSvgElement('rect');
+
+    rect.setAttribute('x', bbox.x);
+    rect.setAttribute('y', bbox.y);
+    rect.setAttribute('width', bbox.width);
+    rect.setAttribute('height', bbox.height);
+
+    elem.parentNode.insertBefore(rect, elem);
+    return rect;
+  }
+
+  static KILLER_CAGE_COLORS = [
+    'green',
+    'red',
+    'blue',
+    'yellow',
+    'cyan',
+    'brown',
+    'black',
+    'purple',
+    'orange',
+  ];
+
+  _chooseKillerCageColor(cellIds) {
+    const shape = this._shape;
+    // Use a greedy algorithm to choose the graph color.
+    const conflictingColors = new Set();
+    for (const cellId of cellIds) {
+      let {row, col} = shape.parseCellId(cellId);
+      // Lookup all  adjacent cells, it doesn't matter if they valid or not.
+      conflictingColors.add(this._killerCellColors.get(shape.makeCellId(row, col+1)));
+      conflictingColors.add(this._killerCellColors.get(shape.makeCellId(row, col-1)));
+      conflictingColors.add(this._killerCellColors.get(shape.makeCellId(row+1, col)));
+      conflictingColors.add(this._killerCellColors.get(shape.makeCellId(row-1, col)));
+    }
+    // Return the first color that doesn't conflict.
+    for (const color of this.constructor.KILLER_CAGE_COLORS) {
+      if (!conflictingColors.has(color)) return color;
+    }
+    // Otherwse select a random color.
+    return `rgb(${Math.random()*255|0},${Math.random()*255|0},${Math.random()*255|0})`;
   }
 }
