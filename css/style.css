@@ -336,10 +336,15 @@ button.icon-button {
 
 select {
   font-size: 16px;
-  padding: 5px 10px;
+  padding: 5px 5px 5px 10px;
   text-align: center;
   text-align-last: center;
   margin: 10px 0;
+}
+#shape-select {
+  padding: 0px 5px 0px 10px;
+  margin: 0;
+  margin-right: 2px;
 }
 
 .two-column {
@@ -414,6 +419,7 @@ footer {
 .tooltip {
   position: relative;
   cursor: pointer;
+  vertical-align: text-top;
 }
 .tooltip::before {
   content: '?';

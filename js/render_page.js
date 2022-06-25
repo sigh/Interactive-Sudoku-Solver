@@ -328,6 +328,9 @@ class ConstraintManager {
     this._constraintPanel = document.getElementById('displayed-constraints');
     this._panelItemHighlighter = displayContainer.createHighlighter('highlighted-cell');
 
+    // Shape selection.
+    this._setUpShapeSelect();
+
     // Checkbox constraints.
     this._checkboxConstraints = new CheckboxConstraints(
       this._display, this.runUpdateCallback.bind(this));
@@ -381,6 +384,16 @@ class ConstraintManager {
 
     // Clear button.
     document.getElementById('clear-constraints-button').onclick = () => this.clear();
+  }
+
+  _setUpShapeSelect() {
+    const shapeSelect = document.getElementById('shape-select');
+    shapeSelect.onchange = () => {
+      const shapeName = shapeSelect.options[shapeSelect.selectedIndex].value;
+      const shape = GridShape.get(shapeName);
+      if (!shape) throw('Invalid shape: ' + shapeName);
+      this.reshape(shape);
+    };
   }
 
   _onNewSelection(selection, selectionForm) {
