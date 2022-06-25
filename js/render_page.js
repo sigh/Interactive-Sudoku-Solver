@@ -92,12 +92,20 @@ class CheckboxConstraints {
     }
   }
 
+  reshape(shape) {
+    const element = this._checkboxes.windoku.element;
+
+    const enableWindoku = (shape === SHAPE_9x9);
+    element.disabled = !enableWindoku;
+    if (!enableWindoku) element.checked = false;
+  }
+
   _getConstraint(layout) {
     let constraints = [];
     for (const item of Object.values(this._checkboxes)) {
       if (layout && !item.isLayout) continue;
 
-      if (item.element.checked) {
+      if (item.element.checked && !item.element.disabled) {
         constraints.push(item.constraint);
       }
     }
@@ -363,6 +371,7 @@ class ConstraintManager {
     // Checkbox constraints.
     this._checkboxConstraints = new CheckboxConstraints(
       this._display, this.runUpdateCallback.bind(this));
+    this.addReshapeListener(this._checkboxConstraints);
 
     this._jigsawManager = new JigsawManager(
       this._display, this._makePanelItem.bind(this));
