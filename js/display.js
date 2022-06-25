@@ -83,7 +83,7 @@ class DisplayItem {
   }
 
   static _cellCenter(row, col) {
-    const cellSize = ConstraintDisplay.CELL_SIZE;
+    const cellSize = DisplayItem.CELL_SIZE;
     return [col*cellSize + cellSize/2, row*cellSize + cellSize/2];
   }
 
@@ -327,9 +327,6 @@ class HighlightDisplay extends DisplayItem {
 }
 
 class ConstraintDisplay extends DisplayItem {
-  static SVG_PADDING = 27;
-  static CELL_SIZE = 52;
-
   constructor(inputManager, shape, displayContainer) {
     super();
 
@@ -646,7 +643,7 @@ class ConstraintDisplay extends DisplayItem {
   }
 
   drawDiagonal(direction) {
-    const size = ConstraintDisplay.CELL_SIZE*this._shape.gridSize;
+    const size = DisplayItem.CELL_SIZE*this._shape.gridSize;
     const line = this._makePath([
       [0, direction > 0 ? size : 0],
       [size, direction > 0 ? 0 : size],
@@ -740,18 +737,21 @@ class BorderDisplay extends DisplayItem {
     this._fill = fill;
   }
 
+  gridSizePixels() {
+    return DisplayItem.CELL_SIZE*this._shape.gridSize;
+  }
+
   reshape(shape) {
     super.reshape(shape);
     this.clear();
 
-    const cellSize = DisplayItem.CELL_SIZE;
-    const gridSize = cellSize*this._shape.gridSize;
+    const gridSizePixels = this.gridSizePixels();
 
     const path = this._makePath([
       [0, 0],
-      [0, gridSize],
-      [gridSize, gridSize],
-      [gridSize, 0],
+      [0, gridSizePixels],
+      [gridSizePixels, gridSizePixels],
+      [gridSizePixels, 0],
       [0, 0],
     ]);
     if (this._fill) path.setAttribute('fill', this._fill);
@@ -774,17 +774,17 @@ class DefaultRegions extends DisplayItem {
     this.clear();
 
     const cellSize = DisplayItem.CELL_SIZE;
-    const gridSize = cellSize*shape.gridSize;
+    const gridSizePixels = cellSize*shape.gridSize;
     const svg = this.getSvg();
 
-    for (let i = shape.boxSize; i < gridSize; i+=shape.boxSize) {
+    for (let i = shape.boxSize; i < shape.gridSize; i+=shape.boxSize) {
       svg.appendChild(this._makePath([
         [0, i*cellSize],
-        [gridSize, i*cellSize],
+        [gridSizePixels, i*cellSize],
       ]));
       svg.appendChild(this._makePath([
         [i*cellSize, 0],
-        [i*cellSize, gridSize],
+        [i*cellSize, gridSizePixels],
       ]));
     }
   }
@@ -866,7 +866,7 @@ class JigsawRegionDisplay extends DisplayItem {
     g.setAttribute('stroke', 'rgb(100, 100, 100)');
     g.setAttribute('stroke-linecap', 'round');
 
-    const cellSize = ConstraintDisplay.CELL_SIZE;
+    const cellSize = DisplayItem.CELL_SIZE;
 
     for (const cell of cellSet) {
       const [row, col] = this._shape.splitCellIndex(cell);

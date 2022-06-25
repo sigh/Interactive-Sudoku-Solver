@@ -718,14 +718,22 @@ class ConstraintManager {
     return panelItem;
   }
 
+  _PANEL_ICON_SIZE_PX = 28;
+
   _makePanelIcon(config) {
     const svg = createSvgElement('svg');
-    const transform = 'scale(0.06)';
 
     const borders = createSvgElement('g');
-    new BorderDisplay(
-      borders, 'rgb(255, 255, 255)').reshape(this._shape);
+    const borderDisplay = new BorderDisplay(
+      borders, 'rgb(255, 255, 255)');
+    borderDisplay.reshape(this._shape);
     svg.append(borders);
+
+    // Determine the correct scale to fit our icon size.
+    const gridSizePixels = borderDisplay.gridSizePixels();
+    const scale = this._PANEL_ICON_SIZE_PX/gridSizePixels;
+    const transform = `scale(${scale})`;
+
     borders.setAttribute('transform', transform);
     borders.setAttribute('stoke-width', 0);
 
@@ -735,8 +743,8 @@ class ConstraintManager {
     elem.setAttribute('opacity', 1);
 
     svg.append(elem);
-    svg.style.height = '28px';
-    svg.style.width = '28px';
+    svg.style.height = this._PANEL_ICON_SIZE_PX + 'px';
+    svg.style.width = this._PANEL_ICON_SIZE_PX + 'px';
     // Undo the opacity (for killer cages).
     svg.style.filter = 'saturate(100)';
 
