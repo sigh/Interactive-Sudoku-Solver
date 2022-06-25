@@ -1,19 +1,28 @@
 // Make these variables global so that we can easily access them from the
 // console.
-let constraintManager, controller, infoOverlay;
+let constraintManager, controller, infoOverlay, displayContainer;
 
 const initPage = () => {
   const shape = SHAPE;
 
   // Create grid.
   const container = document.getElementById('sudoku-grid');
-  const displayContainer = new DisplayContainer(container, shape);
+  displayContainer = new DisplayContainer(container);
+  const inputManager = new GridInputManager(displayContainer);
 
-  const inputManager = new GridInputManager(shape, displayContainer);
-  constraintManager = new ConstraintManager(shape, inputManager, displayContainer);
-  infoOverlay = new InfoOverlay(shape, displayContainer);
+  constraintManager = new ConstraintManager(
+    shape, inputManager, displayContainer);
+  constraintManager.addReshapeListener(displayContainer);
+  constraintManager.addReshapeListener(inputManager);
 
-  controller = new SolutionController(constraintManager, shape, displayContainer, infoOverlay);
+  // TODO: Don't expose this globally.
+  infoOverlay = new InfoOverlay(displayContainer);
+  constraintManager.addReshapeListener(infoOverlay);
+
+  controller = new SolutionController(constraintManager, displayContainer, infoOverlay);
+
+  constraintManager.reshape(shape);
+  controller._update();
 };
 
 class CheckboxConstraints {
@@ -183,15 +192,20 @@ class ExampleHandler {
 }
 
 class JigsawManager {
-  constructor(display, makePanelItem, shape) {
+  constructor(display, makePanelItem) {
     this._display = display;
-    this._shape = shape;
+    this._shape = null;
     this._makePanelItem = makePanelItem;
 
     this._regionPanel = document.getElementById('displayed-regions');
 
-    this._piecesMap = Array(this._shape.numCells).fill(0);
+    this._piecesMap = null;
     this._maxPieceId = 0;
+  }
+
+  reshape(shape) {
+    this._shape = shape;
+    this._piecesMap = Array(shape.numCells).fill(0);
   }
 
   getConstraint() {
@@ -267,17 +281,31 @@ class JigsawManager {
 class ConstraintManager {
   constructor(shape, inputManager, displayContainer) {
     this._configs = [];
-    this._shape = shape;
+    this._shape = null;
     this._checkboxes = {};
+    this._reshapeListeners = [];
 
     this._display = new ConstraintDisplay(
-      inputManager, this._shape, displayContainer);
+      inputManager, shape, displayContainer);
+    this.addReshapeListener(this._display);
     this._setUpPanel(inputManager, displayContainer);
     this._fixedValues = new FixedValues(
-      shape, inputManager, this._display, this.runUpdateCallback.bind(this));
-
+      inputManager, this._display, this.runUpdateCallback.bind(this));
+    this.addReshapeListener(this._fixedValues);
 
     this.setUpdateCallback();
+  }
+
+  reshape(shape) {
+    if (this._shape === shape) return;
+
+    this._shape = shape;
+    for (const listener of this._reshapeListeners) {
+      listener.reshape(shape);
+    }
+  }
+  addReshapeListener(listener) {
+    this._reshapeListeners.push(listener);
   }
 
   setUpdateCallback(fn) {
@@ -306,7 +334,8 @@ class ConstraintManager {
       this._display, this.runUpdateCallback.bind(this));
 
     this._jigsawManager = new JigsawManager(
-      this._display, this._makePanelItem.bind(this), this._shape);
+      this._display, this._makePanelItem.bind(this));
+    this.addReshapeListener(this._jigsawManager);
 
     const selectionForm = document.forms['multi-cell-constraint-input'];
     inputManager.onSelection(
@@ -681,11 +710,11 @@ class ConstraintManager {
     const transform = 'scale(0.06)';
 
     const borders = createSvgElement('g');
+    new BorderDisplay(
+      borders, 'rgb(255, 255, 255)').reshape(this._shape);
     svg.append(borders);
-    this._display.makeBorders(borders, 'rgb(255, 255, 255)');
     borders.setAttribute('transform', transform);
     borders.setAttribute('stoke-width', 0);
-    svg.append(borders);
 
     const elem = config.displayElem.cloneNode(true);
     elem.setAttribute('transform', transform);
@@ -777,8 +806,7 @@ class Highlight {
 }
 
 class Selection {
-  constructor(displayContainer, shape) {
-
+  constructor(displayContainer) {
     this._highlight = displayContainer.createHighlighter('selected-cell');
 
     this._clickInterceptor = displayContainer.getClickInterceptor();
@@ -859,8 +887,8 @@ class Selection {
 }
 
 class FixedValues {
-  constructor(shape, inputManager, display, onChange) {
-    this._shape = shape;
+  constructor(inputManager, display, onChange) {
+    this._shape = null;
     this._fixedValueMap = new Map();
     this._display = display;
     this._onChange = onChange;
@@ -868,6 +896,8 @@ class FixedValues {
     inputManager.onNewDigit(this._inputDigit.bind(this));
     inputManager.onSetValue(this._updateValue.bind(this));
   }
+
+  reshape(shape) { this._shape = shape; }
 
   _inputDigit(cell, digit) {
     const currValue = this._fixedValueMap.get(cell) || 0;
@@ -920,8 +950,8 @@ class FixedValues {
 }
 
 class GridInputManager {
-  constructor(shape, displayContainer) {
-    this._shape = shape;
+  constructor(displayContainer) {
+    this._shape = null;
 
     this._callbacks = {
       onNewDigit: [],
@@ -933,7 +963,7 @@ class GridInputManager {
     let fakeInput = document.getElementById('fake-input');
     this._fakeInput = fakeInput;
 
-    this._selection = new Selection(displayContainer, shape);
+    this._selection = new Selection(displayContainer);
     this._selection.addCallback(cellIds => {
       if (cellIds.length == 1) {
         this._runCallbacks(this._callbacks.onSelection, []);
@@ -948,6 +978,8 @@ class GridInputManager {
 
     this._setUpKeyBindings();
   }
+
+  reshape(shape) { this._shape = shape; }
 
   onNewDigit(fn) { this._callbacks.onNewDigit.push(fn); }
   onSetValue(fn) { this._callbacks.onSetValue.push(fn); }
@@ -970,8 +1002,6 @@ class GridInputManager {
   }
 
   _setUpKeyBindings() {
-    const shape = this._shape;
-
     const getActiveCell = () => {
       let cells = [...this._selection.getCells()];
       if (cells.length != 1) return null;
@@ -997,6 +1027,7 @@ class GridInputManager {
       let cell = getActiveCell();
       if (!cell) return;
 
+      const shape = this._shape;
       let {row, col} = shape.parseCellId(cell);
       const gridSize = shape.gridSize;
       row = (row+dr+gridSize)%gridSize;
@@ -1076,7 +1107,7 @@ class HistoryHandler {
     this._redoButton.onclick = () => this._incrementHistory(+1);
 
     window.onpopstate = this._reloadFromUrl.bind(this);
-    this._reloadFromUrl();
+    // this._reloadFromUrl(); TODO
   }
 
   update(params) {
@@ -1141,13 +1172,18 @@ class HistoryHandler {
 }
 
 class DebugOutput {
-  constructor(shape, displayContainer, infoOverlay) {
+  constructor(displayContainer, infoOverlay) {
     this._container = document.getElementById('debug-container');
     this._visible = false;
-    this._shape = shape;
+    this._shape = null;
     this._infoOverlay = infoOverlay;
 
     this._debugCellHighlighter = displayContainer.createHighlighter('highlighted-cell');
+  }
+
+  reshape(shape) {
+    this.clear();
+    this.shape = shape;
   }
 
   clear() {
@@ -1352,18 +1388,21 @@ class SolverStateDisplay {
 }
 
 class SolutionController {
-  constructor(constraintManager, shape, displayContainer, infoOverlay) {
+  constructor(constraintManager, displayContainer, infoOverlay) {
     // Solvers are a list in case we manage to start more than one. This can
     // happen when we are waiting for a worker to initialize.
     this._solverPromises = [];
 
     this._solutionDisplay = new SolutionDisplay(
-      constraintManager, shape,
-      displayContainer.getNewGroup('solution-group'));
+      constraintManager, displayContainer.getNewGroup('solution-group'));
+    constraintManager.addReshapeListener(this._solutionDisplay);
+
     this._isSolving = false;
     this._constraintManager = constraintManager;
     this._stepHighlighter = displayContainer.createHighlighter('highlighted-step-cell');
-    this._debugOutput = new DebugOutput(shape, displayContainer, infoOverlay);
+    this._debugOutput = new DebugOutput(displayContainer, infoOverlay);
+    constraintManager.addReshapeListener(this._debugOutput);
+
     this._update = deferUntilAnimationFrame(this._update.bind(this));
     constraintManager.setUpdateCallback(this._update.bind(this));
 
@@ -1411,7 +1450,8 @@ class SolutionController {
       }
     });
 
-    this._update();
+    // TODO: Put back.
+    // this._update();
   }
 
   enableDebugOutput(enable) {
@@ -1713,12 +1753,19 @@ class SolutionController {
 
 // A info overlay which is lazily loaded.
 class InfoOverlay {
-  constructor(shape, displayContainer) {
-    this._shape = shape;
+  constructor(displayContainer) {
+    this._shape = null;
 
     this._heatmap = displayContainer.createHighlighter();
     this._textInfo = new InfoTextDisplay(
-      shape, displayContainer.getNewGroup('text-info-group'));
+      displayContainer.getNewGroup('text-info-group'));
+  }
+
+  reshape(shape) {
+    this._shape = shape;
+    this.clear();
+
+    this._textInfo.reshape(shape);
   }
 
   clear() {

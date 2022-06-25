@@ -1,27 +1,35 @@
 class DisplayContainer {
-  constructor(container, shape) {
+  constructor(container) {
     const padding = DisplayItem.SVG_PADDING;
-    const sideLength = DisplayItem.CELL_SIZE * shape.gridSize + padding*2;
-
-    this.shape = shape;
-    container.classList.add('sudoku-grid');
-    container.classList.add(`size-${shape.name}`);
     container.style.padding = `${padding}px`;
     this._container = container;
 
     const svg = createSvgElement('svg');
     svg.classList.add('sudoku-display-svg');
     svg.classList.add('main-sudoku-display-svg');
-    svg.setAttribute('height', sideLength);
-    svg.setAttribute('width', sideLength);
+
     this._mainSvg = svg;
     this._container.append(svg);
 
     this._highlightDisplay = new HighlightDisplay(
-      shape, this.getNewGroup('highlight-group'));
+      this.getNewGroup('highlight-group'));
 
-    this._clickInterceptor = new ClickInterceptor(shape);
+    this._clickInterceptor = new ClickInterceptor();
     this._container.append(this._clickInterceptor.getSvg());
+  }
+
+  reshape(shape) {
+    this._container.className = '';
+    this._container.classList.add('sudoku-grid');
+    this._container.classList.add(`size-${shape.name}`);
+
+    const padding = DisplayItem.SVG_PADDING;
+    const sideLength = DisplayItem.CELL_SIZE * shape.gridSize + padding*2;
+    this._mainSvg.setAttribute('height', sideLength);
+    this._mainSvg.setAttribute('width', sideLength);
+
+    this._highlightDisplay.reshape(shape);
+    this._clickInterceptor.reshape(shape);
   }
 
   createHighlighter(cssClass) {
@@ -50,7 +58,10 @@ class DisplayItem {
 
   constructor(svg) {
     this._svg = svg;
+    this._shape = null;
   }
+
+  reshape(shape) { this._shape = shape; };
 
   getSvg() {
     return this._svg;
@@ -106,25 +117,44 @@ class DisplayItem {
     return path;
   }
 
+
+  _makePath(coords) {
+    const line = createSvgElement('path');
+
+    const parts = [];
+    for (const c of coords) {
+      parts.push('L', ...c);
+    }
+    parts[0] = 'M';
+
+    line.setAttribute('d', parts.join(' '));
+    line.setAttribute('fill', 'transparent');
+    return line;
+  }
+
   clear() {
     clearDOMNode(this._svg);
   }
 }
 
 class ClickInterceptor extends DisplayItem {
-  constructor(shape) {
+  constructor() {
     const svg = createSvgElement('svg');
     svg.classList.add('sudoku-display-svg');
     svg.classList.add('click-interceptor-svg');
 
-    const sideLength = DisplayItem.CELL_SIZE * shape.gridSize;
-    svg.setAttribute('height', sideLength);
-    svg.setAttribute('width', sideLength);
-
     super(svg);
 
     this._applyGridOffset(svg);
-    this._shape = shape;
+  }
+
+  reshape(shape) {
+    super.reshape(shape);
+
+    const sideLength = DisplayItem.CELL_SIZE * shape.gridSize;
+    const svg = this.getSvg();
+    svg.setAttribute('height', sideLength);
+    svg.setAttribute('width', sideLength);
   }
 
   cellAt(x, y) {
@@ -138,10 +168,9 @@ class ClickInterceptor extends DisplayItem {
 }
 
 class InfoTextDisplay extends DisplayItem {
-  constructor(shape, svg) {
+  constructor(svg) {
     super(svg);
     this._applyGridOffset(svg);
-    this._shape = shape;
   }
 
   setText(cellId, str) {
@@ -152,15 +181,19 @@ class InfoTextDisplay extends DisplayItem {
 }
 
 class SolutionDisplay extends DisplayItem {
-  constructor(constraintManager, shape, svg) {
+  constructor(constraintManager, svg) {
     super(svg);
-    this._shape = shape;
     this._solutionValues = [];
     this._constraintManager = constraintManager;
 
     this._applyGridOffset(svg);
 
     this.setSolution = deferUntilAnimationFrame(this.setSolution.bind(this));
+  }
+
+  reshape(shape) {
+    this.clear();
+    super.reshape(shape);
   }
 
   // Display solution on grid.
@@ -266,10 +299,10 @@ class SolutionDisplay extends DisplayItem {
 }
 
 class HighlightDisplay extends DisplayItem {
-  constructor(shape, svg) {
+  constructor(svg) {
     super(svg);
 
-    this._shape = shape;
+    this._shape = null;
     this._applyGridOffset(svg);
   }
 
@@ -300,159 +333,42 @@ class ConstraintDisplay extends DisplayItem {
 
     this._shape = shape;
 
-    this._makeGrid(displayContainer);
+    this._gridDisplay = new GridDisplay(
+      displayContainer.getNewGroup('base-grid-group'));
 
-    this._initializeRegions(displayContainer);
+    this._defaultRegions = new DefaultRegions(
+      displayContainer.getNewGroup('default-region-group'));
+    this._windokuRegions = new WindokuRegionDisplay(
+      displayContainer.getNewGroup('windoku-region-group'));
+    this._jigsawRegions = new JigsawRegionDisplay(
+      displayContainer.getNewGroup('jigsaw-region-group'));
 
     this._constraintGroup = displayContainer.getNewGroup('constraint-group');
     this._applyGridOffset(this._constraintGroup);
 
+    // TODO: Split out fixedValue and killer cages into their
+    // own classes.
     this._fixedValueGroup = displayContainer.getNewGroup('fixed-value-group');
     this._applyGridOffset(this._fixedValueGroup);
 
     displayContainer.addElement(this._makeArrowhead());
-    this._makeLittleKillers(inputManager, displayContainer);
-    this.makeBorders(displayContainer.getNewGroup('border-group'));
+    this._outsideArrows = new OutsideArrowDisplay(
+      displayContainer.getNewGroup('outside-arrow-group'),
+      inputManager);
+    this._borders = new BorderDisplay(
+      displayContainer.getNewGroup('border-group'));
 
     this.clear();  // clear() to initialize.
   }
 
-  _initializeRegions(displayContainer) {
-    this._defaultRegions = this._makeDefaultRegions(
-      displayContainer.getNewGroup('default-region-group'));
-
-    this._regionContainer = displayContainer.getNewGroup('other-region-group');
-
-    this._regionGroup = createSvgElement('g');
-
-    this._applyGridOffset(this._regionContainer);
-    this._regionContainer.append(this._regionGroup);
-
-    this._missingRegion = createSvgElement('g');
-    this._missingRegion.setAttribute('fill', 'rgb(0, 0, 0)');
-    this._missingRegion.setAttribute('opacity', '0.05');
-    this._regionContainer.append(this._missingRegion);
-
-    this._windokuRegion = createSvgElement('g');
-    this._windokuRegion.setAttribute('fill', 'rgb(255, 0, 255)');
-    this._windokuRegion.setAttribute('opacity', '0.1');
-    for (const region of SudokuConstraint.Windoku.REGIONS) {
-      for (const cell of region) {
-        this._windokuRegion.append(this._makeCellSquare(cell));
-      }
-    }
-    this.enableWindokuRegion(false);
-    this._regionContainer.append(this._windokuRegion);
-  }
-
-  _makeLittleKillers(inputManager, displayContainer) {
-    const g = displayContainer.getNewGroup('little-killer-group');
-    this._applyGridOffset(g);
-
-    const makeArrow = (row, col, dr, dc) => {
-      const [x, y] = this.cellIdCenter(this._shape.makeCellId(row, col));
-      const cellSize = ConstraintDisplay.CELL_SIZE;
-
-      const arrowLen = 0.2;
-      const arrowX = x - dc * cellSize*(0.5 + arrowLen);
-      const arrowY = y - dr * cellSize*(0.5 + arrowLen);
-      const d = cellSize*arrowLen-1;
-      const dx = dc*d;
-      const dy = dr*d;
-
-      let directions = [
-        'M', arrowX, arrowY,
-        'L', arrowX + dx, arrowY + dy,
-      ];
-      let path = createSvgElement('path');
-      path.setAttribute('d', directions.join(' '));
-
-      path.setAttribute('marker-end', 'url(#arrowhead)');
-      path.setAttribute('fill', 'transparent');
-      path.setAttribute('stroke', 'rgb(200, 200, 200)');
-      path.setAttribute('stroke-width', 3);
-      path.setAttribute('stroke-linecap', 'round');
-
-      let hitboxSize = d + 8;
-      let hitbox = createSvgElement('rect');
-      hitbox.setAttribute('x', arrowX + dx/2 - hitboxSize/2);
-      hitbox.setAttribute('y', arrowY + dy/2 - hitboxSize/2);
-      hitbox.setAttribute('height', hitboxSize);
-      hitbox.setAttribute('width', hitboxSize);
-      hitbox.setAttribute('fill', 'transparent');
-
-      let text = createSvgElement('text');
-      let textOffsetFactor = dx*dy ? 0.6 : 0;
-      text.setAttribute('x', arrowX-dx*textOffsetFactor);
-      text.setAttribute('y', arrowY-dy*textOffsetFactor);
-      text.setAttribute('text-anchor', 'middle');
-      text.setAttribute('dominant-baseline', 'middle');
-      text.setAttribute('style',
-        'font-size: 16; font-family: monospace; font-weight: bold;');
-
-      let arrow = createSvgElement('g');
-      arrow.appendChild(hitbox);
-      arrow.appendChild(path);
-      arrow.appendChild(text);
-      arrow.classList.add('outside-arrow');
-
-      return arrow;
-    };
-
-    let form = document.forms['outside-arrow-input'];
-    let selectionForm = document.forms['multi-cell-constraint-input'].firstElementChild;
-    let selectedArrow = null;
-    inputManager.onSelection((cells) => {
-      if (selectedArrow) selectedArrow.classList.remove('selected-arrow');
-      selectedArrow = null;
-      form.firstElementChild.disabled = true;
-    });
-    let formOptions = [
-      document.getElementById('little-killer-option'),
-      document.getElementById('sandwich-option'),
-    ];
-    let handleClick = (type, id, cells, arrowSvg) => {
-      inputManager.setSelection(cells);
-      selectionForm.disabled = true;
-      form.firstElementChild.disabled = false;
-      form.type.value = type;
-      form.id.value = id;
-      form.sum.select();
-
-      for (let option of formOptions) option.disabled = true;
-      document.getElementById(type+'-option').disabled = false;
-
-      selectedArrow = arrowSvg;
-      selectedArrow.classList.add('selected-arrow');
-    };
-    inputManager.addSelectionPreserver(g);
-
-    this._outsideArrowMap = {};
-    const addArrow = (type, id, cells) => {
-      let cell0 = this._shape.parseCellId(cells[0]);
-      let cell1 = this._shape.parseCellId(cells[1]);
-
-      let arrowSvg = makeArrow(
-        cell0.row, cell0.col,
-        cell1.row-cell0.row,
-        cell1.col-cell0.col);
-      g.appendChild(arrowSvg);
-
-      this._outsideArrowMap[id] = arrowSvg;
-      arrowSvg.onclick = () => handleClick(type, id, cells, arrowSvg);
-      arrowSvg.classList.add(type);
-    };
-
-    const littleKillerCellMap = SudokuConstraint.LittleKiller.cellMap(this._shape);
-    for (const id in littleKillerCellMap) {
-      addArrow('little-killer', id, littleKillerCellMap[id]);
-    }
-    const sandwichCellMap = SudokuConstraint.Sandwich.cellMap(this._shape);
-    for (const id in sandwichCellMap) {
-      addArrow('sandwich', id, sandwichCellMap[id]);
-    }
-
-    return g;
+  reshape(shape) {
+    this._shape = shape;
+    this._gridDisplay.reshape(shape);
+    this._defaultRegions.reshape(shape);
+    this._windokuRegions.reshape(shape);
+    this._jigsawRegions.reshape(shape);
+    this._outsideArrows.reshape(shape);
+    this._borders.reshape(shape);
   }
 
   // Reusable arrowhead marker.
@@ -476,7 +392,6 @@ class ConstraintDisplay extends DisplayItem {
 
   clear() {
     clearDOMNode(this._constraintGroup);
-    clearDOMNode(this._regionGroup);
 
     clearDOMNode(this._fixedValueGroup);
     this._fixedValueMap = new Map();
@@ -485,20 +400,22 @@ class ConstraintDisplay extends DisplayItem {
     this.killerCages = new Map();
     this._diagonals = [null, null];
 
-    this._regionElems = new Map();
-    this._updateMissingRegion();
+    this._jigsawRegions.clear();
 
     this.enableWindokuRegion(false);
     this.useDefaultRegions(true);
   }
 
+  drawRegion(region) {
+    return this._jigsawRegions.drawRegion(region);
+  }
+
   removeItem(item) {
     if (!item) return;
+    if (this._jigsawRegions.removeItem(item)) return;
+
     item.parentNode.removeChild(item);
-    if (this._regionElems.has(item)) {
-      this._regionElems.delete(item);
-      this._updateMissingRegion();
-    } else if (this.killerCages.has(item)) {
+    if (this.killerCages.has(item)) {
       for (const cellId of this.killerCages.get(item)) {
         this.killerCellColors.delete(cellId);
       }
@@ -551,22 +468,11 @@ class ConstraintDisplay extends DisplayItem {
   }
 
   addOutsideArrow(id, sum) {
-    let elem = this._outsideArrowMap[id];
-    elem.classList.add('active-arrow');
-
-    let text = elem.lastChild;
-    if (text.lastChild) text.removeChild(text.lastChild);
-    text.appendChild(document.createTextNode(sum));
-
-    return elem;
+    this._outsideArrows.addOutsideArrow(id, sum);
   }
 
   removeOutsideArrow(initialCell) {
-    let elem = this._outsideArrowMap[initialCell];
-    elem.classList.remove('active-arrow');
-
-    let text = elem.lastChild;
-    if (text.lastChild) text.removeChild(text.lastChild);
+    this._outsideArrows.removeOutsideArrow(initialCell);
   }
 
   drawKillerCage(cells, sum) {
@@ -781,16 +687,34 @@ class ConstraintDisplay extends DisplayItem {
     this._fixedValueMap.set(cell, text);
   }
 
-  _makeGrid(displayContainer) {
-    const grid = displayContainer.getNewGroup('base-grid-group');
-    this._applyGridOffset(grid);
+  useDefaultRegions(enable) {
+    this._defaultRegions.enable(enable);
+  }
+
+  enableWindokuRegion(enable) {
+    this._windokuRegions.enableWindokuRegion(enable);
+  }
+}
+
+class GridDisplay extends DisplayItem {
+  constructor(svg) {
+    super(svg);
+
+    this._applyGridOffset(svg);
+    svg.setAttribute('stroke-width', 1);
+    svg.setAttribute('stroke', 'rgb(150, 150, 150)');
+  }
+
+  reshape(shape) {
+    super.reshape(shape);
+    this.clear();
+
     const cellSize = DisplayItem.CELL_SIZE;
-    const gridSize = cellSize*this._shape.gridSize;
+    const gridSize = cellSize*shape.gridSize;
 
-    grid.setAttribute('stroke-width', 1);
-    grid.setAttribute('stroke', 'rgb(150, 150, 150)');
+    const grid = this.getSvg();
 
-    for (let i = 1; i < this._shape.gridSize; i++) {
+    for (let i = 1; i < gridSize; i++) {
       grid.append(this._makePath([
         [0, i*cellSize],
         [gridSize, i*cellSize],
@@ -801,14 +725,26 @@ class ConstraintDisplay extends DisplayItem {
       ]));
     }
   }
+}
 
-  makeBorders(g, fill) {
-    const cellSize = ConstraintDisplay.CELL_SIZE;
+class BorderDisplay extends DisplayItem {
+  constructor(svg, fill) {
+    super(svg);
+
+    this._applyGridOffset(svg);
+    svg.setAttribute('stroke-width', 2);
+    svg.setAttribute('stroke', 'rgb(0, 0, 0)');
+
+    this._fill = fill;
+  }
+
+  reshape(shape) {
+    super.reshape(shape);
+    this.clear();
+
+    const cellSize = DisplayItem.CELL_SIZE;
     const gridSize = cellSize*this._shape.gridSize;
 
-    this._applyGridOffset(g);
-    g.setAttribute('stroke-width', 2);
-    g.setAttribute('stroke', 'rgb(0, 0, 0)');
     const path = this._makePath([
       [0, 0],
       [0, gridSize],
@@ -816,63 +752,108 @@ class ConstraintDisplay extends DisplayItem {
       [gridSize, 0],
       [0, 0],
     ]);
-    if (fill) path.setAttribute('fill', fill);
-    g.append(path);
+    if (this._fill) path.setAttribute('fill', this._fill);
+    this.getSvg().append(path);
+  }
+}
 
-    return g;
+class DefaultRegions extends DisplayItem {
+  constructor(svg) {
+    super(svg);
+
+    this._applyGridOffset(svg);
+    svg.setAttribute('stroke-width', 2);
+    svg.setAttribute('stroke', 'rgb(0, 0, 0)');
+    svg.setAttribute('stroke-linecap', 'round');
   }
 
-  _makeDefaultRegions(grid) {
-    this._applyGridOffset(grid);
-    const cellSize = ConstraintDisplay.CELL_SIZE;
-    const gridSize = cellSize*this._shape.gridSize;
+  reshape(shape) {
+    super.reshape(shape);
+    this.clear();
 
-    grid.setAttribute('stroke-width', 2);
-    grid.setAttribute('stroke', 'rgb(0, 0, 0)');
-    grid.setAttribute('stroke-linecap', 'round');
+    const cellSize = DisplayItem.CELL_SIZE;
+    const gridSize = cellSize*shape.gridSize;
+    const svg = this.getSvg();
 
-    for (let i = this._shape.boxSize; i < this._shape.gridSize; i+=this._shape.boxSize) {
-      grid.appendChild(this._makePath([
+    for (let i = shape.boxSize; i < gridSize; i+=shape.boxSize) {
+      svg.appendChild(this._makePath([
         [0, i*cellSize],
         [gridSize, i*cellSize],
       ]));
-      grid.appendChild(this._makePath([
+      svg.appendChild(this._makePath([
         [i*cellSize, 0],
         [i*cellSize, gridSize],
       ]));
     }
-
-    return grid;
   }
 
-  useDefaultRegions(enable) {
-    this._defaultRegions.setAttribute('display', enable ? null : 'none');
+  enable(enable) {
+    this.getSvg().setAttribute('display', enable ? null : 'none');
+  }
+}
+
+class WindokuRegionDisplay extends DisplayItem {
+  constructor(svg) {
+    super(svg);
+    this._applyGridOffset(svg);
+
+    svg.setAttribute('fill', 'rgb(255, 0, 255)');
+    svg.setAttribute('opacity', '0.1');
+
+    this.enableWindokuRegion(false);
+  }
+
+  reshape(shape) {
+    super.reshape(shape);
+    this.clear();
+
+    const svg = this.getSvg();
+
+    // Windoku only works for 9x9, but we can just be agnostic to that here.
+    for (const region of SudokuConstraint.Windoku.REGIONS) {
+      for (const cell of region) {
+        svg.append(this._makeCellSquare(cell));
+      }
+    }
   }
 
   enableWindokuRegion(enable) {
-    this._windokuRegion.setAttribute('display', enable ? null : 'none');
+    this.getSvg().setAttribute('display', enable ? null : 'none');
+  }
+}
+
+class JigsawRegionDisplay extends DisplayItem {
+  constructor(svg) {
+    super(svg);
+    this._applyGridOffset(svg);
+
+    this._regionGroup = createSvgElement('g');
+    svg.append(this._regionGroup);
+
+    this._regionElems = null;
+
+    this._missingRegion = createSvgElement('g');
+    this._missingRegion.setAttribute('fill', 'rgb(0, 0, 0)');
+    this._missingRegion.setAttribute('opacity', '0.05');
+    svg.append(this._missingRegion);
+
+    this.clear();
   }
 
-  _updateMissingRegion() {
-    // Clear missing region.
-    const svg = this._missingRegion;
-    while (svg.lastChild) {
-      svg.removeChild(svg.lastChild);
+  clear() {
+    clearDOMNode(this._regionGroup);
+    this._regionElems = new Map();
+    this._updateMissingRegion();
+  }
+
+  removeItem(item) {
+    if (this._regionElems.has(item)) {
+      item.parentNode.removeChild(item);
+      this._regionElems.delete(item);
+      this._updateMissingRegion();
+      return true;
     }
-
-    // Don't shade in anything if there are no jigsaw pieces.
-    if (this._regionElems.size == 0) return;
-
-    // Find the current missing cells.
-    const missingCells = new Set();
-    for (let i = 0; i < this._shape.numCells; i++) missingCells.add(i);
-    this._regionElems.forEach(
-      cs => cs.forEach(c => missingCells.delete(this._shape.parseCellId(c).cell)));
-
-    // Shade in the missing cells.
-    for (const cell of missingCells) {
-      svg.appendChild(this._makeCellSquare(cell));
-    }
+    return false;
   }
 
   drawRegion(region) {
@@ -884,7 +865,6 @@ class ConstraintDisplay extends DisplayItem {
     g.setAttribute('stroke-linecap', 'round');
 
     const cellSize = ConstraintDisplay.CELL_SIZE;
-    const gridSize = cellSize*this._shape.gridSize;
 
     for (const cell of cellSet) {
       const [row, col] = this._shape.splitCellIndex(cell);
@@ -927,17 +907,167 @@ class ConstraintDisplay extends DisplayItem {
     return g;
   }
 
-  _makePath(coords) {
-    const line = createSvgElement('path');
-
-    const parts = [];
-    for (const c of coords) {
-      parts.push('L', ...c);
+  _updateMissingRegion() {
+    // Clear missing region.
+    const svg = this._missingRegion;
+    while (svg.lastChild) {
+      svg.removeChild(svg.lastChild);
     }
-    parts[0] = 'M';
 
-    line.setAttribute('d', parts.join(' '));
-    line.setAttribute('fill', 'transparent');
-    return line;
+    // Don't shade in anything if there are no jigsaw pieces.
+    if (this._regionElems.size == 0) return;
+
+    // Find the current missing cells.
+    const missingCells = new Set();
+    for (let i = 0; i < this._shape.numCells; i++) missingCells.add(i);
+    this._regionElems.forEach(
+      cs => cs.forEach(c => missingCells.delete(this._shape.parseCellId(c).cell)));
+
+    // Shade in the missing cells.
+    for (const cell of missingCells) {
+      svg.appendChild(this._makeCellSquare(cell));
+    }
   }
+}
+
+class OutsideArrowDisplay extends DisplayItem {
+  constructor(svg, inputManager) {
+    super(svg);
+    this._applyGridOffset(svg);
+    inputManager.addSelectionPreserver(svg);
+
+    const form = document.forms['outside-arrow-input'];
+    const selectionForm = document.forms['multi-cell-constraint-input'].firstElementChild;
+
+    let selectedArrow = null;
+    inputManager.onSelection((cells) => {
+      if (selectedArrow) selectedArrow.classList.remove('selected-arrow');
+      selectedArrow = null;
+      form.firstElementChild.disabled = true;
+    });
+    const formOptions = [
+      document.getElementById('little-killer-option'),
+      document.getElementById('sandwich-option'),
+    ];
+
+    this._handleClick = (type, id, cells, arrowSvg) => {
+      inputManager.setSelection(cells);
+      selectionForm.disabled = true;
+      form.firstElementChild.disabled = false;
+      form.type.value = type;
+      form.id.value = id;
+      form.sum.select();
+
+      for (let option of formOptions) option.disabled = true;
+      document.getElementById(type+'-option').disabled = false;
+
+      selectedArrow = arrowSvg;
+      selectedArrow.classList.add('selected-arrow');
+    };
+
+    this._outsideArrowMap = null;
+  }
+
+  reshape(shape) {
+    super.reshape(shape);
+    this.clear();
+    this._outsideArrowMap = new Map();
+
+    const littleKillerCellMap = SudokuConstraint.LittleKiller.cellMap(shape);
+    for (const id in littleKillerCellMap) {
+      this._addArrow('little-killer', id, littleKillerCellMap[id]);
+    }
+    const sandwichCellMap = SudokuConstraint.Sandwich.cellMap(shape);
+    for (const id in sandwichCellMap) {
+      this._addArrow('sandwich', id, sandwichCellMap[id]);
+    }
+  }
+
+  addOutsideArrow(id, sum) {
+    const elem = this._outsideArrowMap.get(id);
+    elem.classList.add('active-arrow');
+
+    const text = elem.lastChild;
+    if (text.lastChild) text.removeChild(text.lastChild);
+    text.appendChild(document.createTextNode(sum));
+
+    return elem;
+  }
+
+  removeOutsideArrow(initialCell) {
+    const elem = this._outsideArrowMap.get(initialCell);
+    elem.classList.remove('active-arrow');
+
+    const text = elem.lastChild;
+    if (text.lastChild) text.removeChild(text.lastChild);
+  }
+
+  _addArrow(type, id, cells) {
+    const shape = this._shape;
+
+    const cell0 = shape.parseCellId(cells[0]);
+    const cell1 = shape.parseCellId(cells[1]);
+
+    const arrowSvg = this._makeArrow(
+      cell0.row, cell0.col,
+      cell1.row-cell0.row,
+      cell1.col-cell0.col);
+    this.getSvg().appendChild(arrowSvg);
+
+    this._outsideArrowMap.set(id, arrowSvg);
+    arrowSvg.onclick = () => this._handleClick(type, id, cells, arrowSvg);
+    arrowSvg.classList.add(type);
+  };
+
+  _makeArrow(row, col, dr, dc) {
+    const shape = this._shape;
+
+    const [x, y] = this.cellIdCenter(shape.makeCellId(row, col));
+    const cellSize = DisplayItem.CELL_SIZE;
+
+    const arrowLen = 0.2;
+    const arrowX = x - dc * cellSize*(0.5 + arrowLen);
+    const arrowY = y - dr * cellSize*(0.5 + arrowLen);
+    const d = cellSize*arrowLen-1;
+    const dx = dc*d;
+    const dy = dr*d;
+
+    let directions = [
+      'M', arrowX, arrowY,
+      'L', arrowX + dx, arrowY + dy,
+    ];
+    let path = createSvgElement('path');
+    path.setAttribute('d', directions.join(' '));
+
+    path.setAttribute('marker-end', 'url(#arrowhead)');
+    path.setAttribute('fill', 'transparent');
+    path.setAttribute('stroke', 'rgb(200, 200, 200)');
+    path.setAttribute('stroke-width', 3);
+    path.setAttribute('stroke-linecap', 'round');
+
+    let hitboxSize = d + 8;
+    let hitbox = createSvgElement('rect');
+    hitbox.setAttribute('x', arrowX + dx/2 - hitboxSize/2);
+    hitbox.setAttribute('y', arrowY + dy/2 - hitboxSize/2);
+    hitbox.setAttribute('height', hitboxSize);
+    hitbox.setAttribute('width', hitboxSize);
+    hitbox.setAttribute('fill', 'transparent');
+
+    let text = createSvgElement('text');
+    let textOffsetFactor = dx*dy ? 0.6 : 0;
+    text.setAttribute('x', arrowX-dx*textOffsetFactor);
+    text.setAttribute('y', arrowY-dy*textOffsetFactor);
+    text.setAttribute('text-anchor', 'middle');
+    text.setAttribute('dominant-baseline', 'middle');
+    text.setAttribute('style',
+      'font-size: 16; font-family: monospace; font-weight: bold;');
+
+    let arrow = createSvgElement('g');
+    arrow.appendChild(hitbox);
+    arrow.appendChild(path);
+    arrow.appendChild(text);
+    arrow.classList.add('outside-arrow');
+
+    return arrow;
+  };
 }
