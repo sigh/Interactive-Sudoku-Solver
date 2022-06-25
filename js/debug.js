@@ -7,7 +7,7 @@ loadJSFile('data/jigsaw_box_layouts.js');
 
 var TEST_TIMEOUT_MS = 0;
 
-controller.enableDebugOutput();
+controller.debugOutput.enable();
 
 const loadInput = (input) => {
   let puzzle = EXAMPLES[input];
@@ -237,6 +237,7 @@ const printGrid = (grid) => {
 }
 
 const showCellIndex = () => {
-  const numCells = constraintManager._shape.numCells;
-  infoOverlay.setValues([...Array(numCells).keys()]);
+  const numCells = constraintManager.getShape().numCells;
+  controller.debugOutput.setOverlayValues(
+    [...Array(numCells).keys()]);
 };

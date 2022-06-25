@@ -1,6 +1,6 @@
 // Make these variables global so that we can easily access them from the
 // console.
-let constraintManager, controller, infoOverlay, displayContainer;
+let constraintManager, controller, displayContainer;
 
 const initPage = () => {
   // Create grid.
@@ -13,11 +13,7 @@ const initPage = () => {
   constraintManager.addReshapeListener(displayContainer);
   constraintManager.addReshapeListener(inputManager);
 
-  // TODO: Don't expose this globally.
-  infoOverlay = new InfoOverlay(displayContainer);
-  constraintManager.addReshapeListener(infoOverlay);
-
-  controller = new SolutionController(constraintManager, displayContainer, infoOverlay);
+  controller = new SolutionController(constraintManager, displayContainer);
 };
 
 class CheckboxConstraints {
@@ -357,6 +353,10 @@ class ConstraintManager {
   runUpdateCallback() {
     this._exampleHandler.newConstraintLoaded();
     this.updateCallback(this);
+  }
+
+  getShape() {
+    return this._shape;
   }
 
   _cellsAreAdjacent(cells) {
@@ -1226,18 +1226,19 @@ class HistoryHandler {
 }
 
 class DebugOutput {
-  constructor(displayContainer, infoOverlay) {
+  constructor(displayContainer) {
     this._container = document.getElementById('debug-container');
     this._visible = false;
     this._shape = null;
-    this._infoOverlay = infoOverlay;
+    this._infoOverlay = new InfoOverlay(displayContainer);;
 
     this._debugCellHighlighter = displayContainer.createHighlighter('highlighted-cell');
   }
 
   reshape(shape) {
     this.clear();
-    this.shape = shape;
+    this._shape = shape;
+    this._infoOverlay.reshape(shape);
   }
 
   clear() {
@@ -1255,6 +1256,10 @@ class DebugOutput {
     if (data.debugState && data.debugState.backtrackTriggers) {
       this._infoOverlay.setHeatmapValues(data.debugState.backtrackTriggers);
     }
+  }
+
+  setOverlayValues(values) {
+    this._infoOverlay.setValues(values);
   }
 
   _addLog(data) {
@@ -1442,7 +1447,7 @@ class SolverStateDisplay {
 }
 
 class SolutionController {
-  constructor(constraintManager, displayContainer, infoOverlay) {
+  constructor(constraintManager, displayContainer) {
     // Solvers are a list in case we manage to start more than one. This can
     // happen when we are waiting for a worker to initialize.
     this._solverPromises = [];
@@ -1456,8 +1461,9 @@ class SolutionController {
     this._isSolving = false;
     this._constraintManager = constraintManager;
     this._stepHighlighter = displayContainer.createHighlighter('highlighted-step-cell');
-    this._debugOutput = new DebugOutput(displayContainer, infoOverlay);
-    constraintManager.addReshapeListener(this._debugOutput);
+
+    this.debugOutput = new DebugOutput(displayContainer);
+    constraintManager.addReshapeListener(this.debugOutput);
 
     this._update = deferUntilAnimationFrame(this._update.bind(this));
     constraintManager.setUpdateCallback(this._update.bind(this));
@@ -1513,10 +1519,6 @@ class SolutionController {
     // Terminate any runnings solvers ASAP, so they are less
     // likely to cause problems sending stale data.
     this._terminateSolver();
-  }
-
-  enableDebugOutput(enable) {
-    this._debugOutput.enable(enable);
   }
 
   getSolutionValues() {
@@ -1636,7 +1638,7 @@ class SolutionController {
     this._solutionDisplay.setSolution([]);
     this._stateDisplay.clear();
     this._setValidateResult();
-    this._debugOutput.clear();
+    this.debugOutput.clear();
     this._showIterationControls(false);
   }
 
@@ -1659,7 +1661,7 @@ class SolutionController {
       constraints,
       s => this._stateDisplay.setState(s),
       this._solveStatusChanged.bind(this),
-      data => this._debugOutput.update(data));
+      data => this.debugOutput.update(data));
     this._solverPromises.push(newSolverPromise);
 
     const newSolver = await newSolverPromise;
