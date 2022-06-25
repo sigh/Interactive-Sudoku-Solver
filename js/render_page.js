@@ -3,15 +3,13 @@
 let constraintManager, controller, infoOverlay, displayContainer;
 
 const initPage = () => {
-  const shape = SHAPE;
-
   // Create grid.
   const container = document.getElementById('sudoku-grid');
   displayContainer = new DisplayContainer(container);
   const inputManager = new GridInputManager(displayContainer);
 
   constraintManager = new ConstraintManager(
-    shape, inputManager, displayContainer);
+    inputManager, displayContainer);
   constraintManager.addReshapeListener(displayContainer);
   constraintManager.addReshapeListener(inputManager);
 
@@ -277,6 +275,8 @@ class JigsawManager {
 
 // TODO: Make this a ShapeManager, and have it hold the canonical shape.
 class ShapeSelector {
+  static DEFAULT_SHAPE = SHAPE_9x9;
+
   constructor(constraintManager) {
     this._constraintManager = constraintManager;
 
@@ -291,17 +291,23 @@ class ShapeSelector {
     if (!shape) throw('Invalid shape: ' + shapeName);
     this._constraintManager.reshape(shape);
   }
+
+  loadConstraintShape(constraint) {
+    const shape = SudokuBuilder.getShape(constraint);
+    this._constraintManager.reshape(shape);
+    this._select.value = shape.name;
+  }
 }
 
 class ConstraintManager {
-  constructor(shape, inputManager, displayContainer) {
+  constructor(inputManager, displayContainer) {
     this._configs = [];
     this._shape = null;
     this._checkboxes = {};
     this._reshapeListeners = [];
 
     this._display = new ConstraintDisplay(
-      inputManager, shape, displayContainer);
+      inputManager, displayContainer);
     this.addReshapeListener(this._display);
     this._setUpPanel(inputManager, displayContainer);
     this._fixedValues = new FixedValues(
@@ -497,7 +503,7 @@ class ConstraintManager {
     const constraint = SudokuConstraint.fromText(input);
     if (constraint) {
       this.clear();
-      this.reshape(SHAPE);  // TODO: Determine shape properly.
+      this._shapeSelector.loadConstraintShape(constraint);
       this.loadConstraint(constraint);
     }
 

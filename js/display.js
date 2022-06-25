@@ -327,10 +327,8 @@ class HighlightDisplay extends DisplayItem {
 }
 
 class ConstraintDisplay extends DisplayItem {
-  constructor(inputManager, shape, displayContainer) {
+  constructor(inputManager, displayContainer) {
     super();
-
-    this._shape = shape;
 
     this._gridDisplay = new GridDisplay(
       displayContainer.getNewGroup('base-grid-group'));
