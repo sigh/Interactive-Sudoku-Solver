@@ -87,6 +87,31 @@ class DisplayItem {
   }
 }
 
+class ClickInterceptor extends DisplayItem {
+  constructor(shape) {
+    super();
+
+    let svg = this.getSvg();
+    this._applyGridOffset(svg);
+    let sideLength = DisplayItem.CELL_SIZE * shape.gridSize;
+
+    svg.setAttribute('height', sideLength);
+    svg.setAttribute('width', sideLength);
+    svg.classList.add('click-interceptor-svg');
+
+    this._shape = shape;
+  }
+
+  cellAt(x, y) {
+    const shape = this._shape;
+    const row = y/DisplayItem.CELL_SIZE|0;
+    const col = x/DisplayItem.CELL_SIZE|0;
+    if (row < 0 || row >= shape.gridSize) return null;
+    if (col < 0 || col >= shape.gridSize) return null;
+    return shape.makeCellId(row, col);
+  }
+}
+
 class InfoTextDisplay extends DisplayItem {
   constructor(shape) {
     super();
@@ -257,15 +282,6 @@ class HighlightDisplay extends DisplayItem {
 
   removeHighlight(path) {
     this._svg.removeChild(path);
-  }
-
-  cellAt(x, y) {
-    const shape = this._shape;
-    const row = y/DisplayItem.CELL_SIZE|0;
-    const col = x/DisplayItem.CELL_SIZE|0;
-    if (row < 0 || row >= shape.gridSize) return null;
-    if (col < 0 || col >= shape.gridSize) return null;
-    return shape.makeCellId(row, col);
   }
 }
 

@@ -19,11 +19,8 @@
   top: 0;
   left: 0;
 }
-.selection-svg {
+.click-interceptor-svg {
   z-index: 100;
-}
-.selection-svg * {
-  pointer-events: none;
 }
 
 .fixed-value {
@@ -296,7 +293,7 @@ button.icon-button {
 #fake-input {
   opacity: 0;
   cursor: pointer;
-  position: absolute;
+  position: relative;
   z-index: -1;
   /* Required to stop auto-zooming on mobile. */
   width: 1em;

@@ -775,15 +775,16 @@ class Highlight {
 }
 
 class Selection {
-  constructor(displayContainer) {
+  constructor(displayContainer, shape) {
 
     this._highlight = displayContainer.createHighlighter('selected-cell');
-    // TODO: Can we avoid this.
-    this._display = this._highlight._display;
 
-    this._selectionPreservers = [this._display.getSvg()];
+    this._clickInterceptor = new ClickInterceptor(shape);
+    displayContainer.addDisplayItem(this._clickInterceptor);
 
-    this._setUpMouseHandlers(this._display.getSvg());
+    this._selectionPreservers = [this._clickInterceptor.getSvg()];
+
+    this._setUpMouseHandlers(this._clickInterceptor.getSvg());
 
     this._callbacks = [];
   }
@@ -804,13 +805,17 @@ class Selection {
   getCells(cellIds) { return this._highlight.getCells(cellIds); }
   size() { return this._highlight.size; }
 
+  cellIdCenter(cellId) {
+    return this._clickInterceptor.cellIdCenter(cellId);
+  }
+
   _setUpMouseHandlers(container) {
     // Make the container selectable.
     container.tabIndex = 0;
 
     let currCell = null;
     const pointerMoveFn = e => {
-      const target = this._display.cellAt(e.offsetX, e.offsetY);
+      const target = this._clickInterceptor.cellAt(e.offsetX, e.offsetY);
       if (target !== null && target !== currCell) {
         currCell = target;
         this._highlight.addCell(currCell);
@@ -927,10 +932,13 @@ class GridInputManager {
     let fakeInput = document.getElementById('fake-input');
     this._fakeInput = fakeInput;
 
-    this._selection = new Selection(displayContainer);
+    this._selection = new Selection(displayContainer, shape);
     this._selection.addCallback(cellIds => {
       if (cellIds.length == 1) {
         this._runCallbacks(this._callbacks.onSelection, []);
+        const [x, y] = this._selection.cellIdCenter(cellIds[0]);
+        fakeInput.style.top = y + 'px';
+        fakeInput.style.left = x + 'px';
         fakeInput.select();
       } else {
         this._runCallbacks(this._callbacks.onSelection, cellIds);
