@@ -19,6 +19,12 @@
   top: 0;
   left: 0;
 }
+.selection-svg {
+  z-index: 100;
+}
+.selection-svg * {
+  pointer-events: none;
+}
 
 .info-overlay {
   position: absolute;
@@ -156,15 +162,19 @@ button.danger-button:hover:enabled {
   background-color:#bc3315;
 }
 
-.selected {
-  background: rgba(0,0,255,0.1);
+.selected-cell {
+  fill: rgba(0,0,255);
+  opacity: 0.1;
 }
 
-.highlighted {
-  background: rgba(255,255,0,0.5);
+.highlighted-cell {
+  fill: rgba(255,255,0);
+  opacity: 0.5;
 }
-.highlighted-step {
-  box-shadow: inset 0 0 10px #0000FF;
+.highlighted-step-cell {
+  /* TODO: Make this a gradient. */
+  fill: rgba(0,255,0);
+  opacity: 0.5;
 }
 
 .error {

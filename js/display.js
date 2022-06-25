@@ -20,6 +20,22 @@ class DisplayBase {
     const padding = this.constructor.SVG_PADDING;
     elem.setAttribute('transform', `translate(${padding},${padding})`);
   }
+
+  _makeCellSquare(cell) {
+    const cellWidth = DisplayBase.CELL_SIZE;
+
+    const [x, y] = this.cellCenter(cell);
+    const path = createSvgElement('path');
+    const directions = [
+      'M', x-cellWidth/2+1, y-cellWidth/2+1,
+      'l', 0, cellWidth,
+      'l', cellWidth, 0,
+      'l', 0, -cellWidth,
+      'l', -cellWidth, 0,
+    ];
+    path.setAttribute('d', directions.join(' '));
+    return path;
+  }
 }
 
 class SolutionDisplay extends DisplayBase {
@@ -32,8 +48,7 @@ class SolutionDisplay extends DisplayBase {
     let svg = createSvgElement('svg');
     this._applyGridOffset(svg);
     svg.classList.add('sudoku-display-svg');
-    let padding = DisplayBase.SVG_PADDING;
-    let sideLength = DisplayBase.CELL_SIZE * shape.gridSize + padding*2;
+    let sideLength = DisplayBase.CELL_SIZE * shape.gridSize;
 
     svg.setAttribute('height', sideLength);
     svg.setAttribute('width', sideLength);
@@ -152,6 +167,55 @@ class SolutionDisplay extends DisplayBase {
 
   getSolutionValues() {
     return this._solutionValues;
+  }
+}
+
+class HighlightDisplay extends DisplayBase {
+  constructor(container, shape) {
+    super();
+
+    this._shape = shape;
+
+    let svg = createSvgElement('svg');
+    this._applyGridOffset(svg);
+    svg.classList.add('sudoku-display-svg');
+    svg.classList.add('selection-svg');
+    let sideLength = DisplayBase.CELL_SIZE * shape.gridSize;
+
+    svg.setAttribute('height', sideLength);
+    svg.setAttribute('width', sideLength);
+
+    this._svg = svg;
+
+    container.append(svg);
+  }
+
+  highlightCell(cellId, cssClass) {
+    const parsed = this._shape.parseCellId(cellId);
+
+    const path = this._makeCellSquare(parsed.cell);
+    path.setAttribute('class', cssClass);
+
+    this._svg.appendChild(path);
+
+    return path;
+  }
+
+  removeHighlight(path) {
+    this._svg.removeChild(path);
+  }
+
+  getSvg() {
+    return this._svg;
+  }
+
+  cellAt(x, y) {
+    const shape = this._shape;
+    const row = y/DisplayBase.CELL_SIZE|0;
+    const col = x/DisplayBase.CELL_SIZE|0;
+    if (row < 0 || row >= shape.gridSize) return null;
+    if (col < 0 || col >= shape.gridSize) return null;
+    return shape.makeCellId(row, col);
   }
 }
 
@@ -737,22 +801,6 @@ class ConstraintDisplay extends DisplayBase {
 
   enableWindokuRegion(enable) {
     this._windokuRegion.setAttribute('display', enable ? null : 'none');
-  }
-
-  _makeCellSquare(cell) {
-    const cellWidth = ConstraintDisplay.CELL_SIZE;
-
-    const [x, y] = this.cellCenter(cell);
-    const path = createSvgElement('path');
-    const directions = [
-      'M', x-cellWidth/2+1, y-cellWidth/2+1,
-      'l', 0, cellWidth,
-      'l', cellWidth, 0,
-      'l', 0, -cellWidth,
-      'l', -cellWidth, 0,
-    ];
-    path.setAttribute('d', directions.join(' '));
-    return path;
   }
 
   _updateMissingRegion() {

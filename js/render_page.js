@@ -297,7 +297,7 @@ class ConstraintManager {
 
   _setUpPanel() {
     this._constraintPanel = document.getElementById('displayed-constraints');
-    this._panelItemHighlighter = this._grid.createHighlighter('highlighted');
+    this._panelItemHighlighter = this._grid.createHighlighter('highlighted-cell');
 
     // Checkbox constraints.
     this._checkboxConstraints = new CheckboxConstraints(
@@ -739,15 +739,16 @@ class ConstraintManager {
 }
 
 class Highlight {
-  constructor(container, cssClass) {
-    this._cells = new Set();
+  constructor(display, cssClass) {
+    this._cells = new Map();
     this._cssClass = cssClass;
     this._callbacks = [];
+    this._display = display;
   }
 
   setCells(cellIds) {
     this._clear();
-    cellIds.forEach(c => this._addToSelection(document.getElementById(c)));
+    for (const cellId of cellIds) this._addToSelection(cellId);
     this._runCallback();
   }
 
@@ -756,7 +757,7 @@ class Highlight {
   }
 
   getCells() {
-    return [...this._cells];
+    return this._cells.keys();
   }
 
   addCallback(fn) {
@@ -764,31 +765,31 @@ class Highlight {
   }
 
   _runCallback() {
-    let cellIds = [];
-    this._cells.forEach(e => cellIds.push(e.id));
-    this._callbacks.forEach(fn => fn(cellIds));
+    this._callbacks.forEach(fn => fn(this._cells.keys()));
   }
 
   _addToSelection(cell) {
-    if (cell.classList.contains('cell-input')) {
-      cell.parentNode.classList.add(this._cssClass);
-      this._cells.add(cell);
+    if (!this._cells.has(cell)) {
+      const path = this._display.highlightCell(cell, this._cssClass);
+      this._cells.set(cell, path);
     }
   }
 
   _clear() {
-    this._cells.forEach(e => e.parentNode.classList.remove(this._cssClass));
+    for (const path of this._cells.values()) {
+      this._display.removeHighlight(path)
+    }
     this._cells.clear();
     this._runCallback();
   }
 }
 
 class Selection extends Highlight {
-  constructor(container) {
-    super(container, 'selected');
-    this._selectionPreservers = [container];
+  constructor(display) {
+    super(display, 'selected-cell');
+    this._selectionPreservers = [display.getSvg()];
 
-    this._setUpMouseHandlers(container);
+    this._setUpMouseHandlers(display.getSvg());
   }
 
   _setUpMouseHandlers(container) {
@@ -797,9 +798,9 @@ class Selection extends Highlight {
 
     let currCell = null;
     const pointerMoveFn = e => {
-      // NOTE: e.target does't work correctly for pointers.
-      let target = document.elementFromPoint(e.clientX, e.clientY);
-      if (target != currCell) {
+
+      const target = this._display.cellAt(e.offsetX, e.offsetY);
+      if (target !== null && target !== currCell) {
         currCell = target;
         this._addToSelection(currCell);
       }
@@ -1015,14 +1016,16 @@ class SudokuGrid {
   constructor(container, shape) {
     this._container = container;
     this.shape = shape;
-    this.selection = new Selection(container);
+    const highlightDisplay = new HighlightDisplay(container, shape);
+    this._highlightDisplay = highlightDisplay;
+    this.selection = new Selection(highlightDisplay);
     container.classList.add('sudoku-grid');
     container.classList.add(`size-${shape.name}`);
     this._cellMap = this._makeSudokuGrid(container);
   }
 
   createHighlighter(cssClass) {
-    return new Highlight(this._container, cssClass);
+    return new Highlight(this._highlightDisplay, cssClass);
   }
 
   _makeSudokuGrid(container) {
@@ -1142,7 +1145,7 @@ class DebugOutput {
     this._grid = grid;
     this._infoOverlay = infoOverlay;
 
-    this._debugCellHighlighter = grid.createHighlighter('highlighted');
+    this._debugCellHighlighter = grid.createHighlighter('highlighted-cell');
   }
 
   clear() {
@@ -1357,7 +1360,7 @@ class SolutionController {
     this._isSolving = false;
     this._constraintManager = constraintManager;
     this._grid = grid;
-    this._stepHighlighter = grid.createHighlighter('highlighted-step');
+    this._stepHighlighter = grid.createHighlighter('highlighted-step-cell');
     this._debugOutput = new DebugOutput(grid, infoOverlay);
     this._update = deferUntilAnimationFrame(this._update.bind(this));
     constraintManager.setUpdateCallback(this._update.bind(this));
