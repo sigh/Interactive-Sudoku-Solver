@@ -47,26 +47,6 @@
   grid-template-rows: repeat(16, 52px);
 }
 
-.cell-elem {
-  width: 52px;
-  height: 52px;
-  z-index: 10;
-}
-
-.cell-input {
-  position: absolute;
-  overflow: hidden;
-  text-align: center;
-  line-height: 50px;
-
-  font-size: 30px;
-  font-family: sans-serif;
-
-  border-radius: 25px;
-
-  cursor: pointer;
-}
-
 .fixed-value {
   font-size: 30px;
   font-family: sans-serif;

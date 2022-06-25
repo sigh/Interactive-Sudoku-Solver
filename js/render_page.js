@@ -1021,35 +1021,10 @@ class SudokuGrid {
     this.selection = new Selection(highlightDisplay);
     container.classList.add('sudoku-grid');
     container.classList.add(`size-${shape.name}`);
-    this._cellMap = this._makeSudokuGrid(container);
   }
 
   createHighlighter(cssClass) {
     return new Highlight(this._highlightDisplay, cssClass);
-  }
-
-  _makeSudokuGrid(container) {
-    let cellMap = new Map();
-    const gridSize = this.shape.gridSize;
-
-    for (let i = 0; i < gridSize; i++) {
-      for (let j = 0; j < gridSize; j++) {
-        let cell = document.createElement('div');
-        cell.className = 'cell cell-elem';
-        let cellId = this.shape.makeCellId(i, j);
-
-        let cellInput = document.createElement('div');
-        cellInput.tabIndex = 0;
-        cellInput.className = 'cell-input cell-elem';
-        cellInput.id = cellId;
-        cell.appendChild(cellInput);
-        cellMap.set(cellId, cellInput);
-
-        container.appendChild(cell);
-      }
-    }
-
-    return cellMap;
   }
 }
 
@@ -1359,7 +1334,6 @@ class SolutionController {
       container, constraintManager, grid.shape);
     this._isSolving = false;
     this._constraintManager = constraintManager;
-    this._grid = grid;
     this._stepHighlighter = grid.createHighlighter('highlighted-step-cell');
     this._debugOutput = new DebugOutput(grid, infoOverlay);
     this._update = deferUntilAnimationFrame(this._update.bind(this));
