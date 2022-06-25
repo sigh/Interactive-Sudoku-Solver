@@ -11,7 +11,7 @@ const initPage = () => {
 
   const inputManager = new GridInputManager(shape, displayContainer);
   constraintManager = new ConstraintManager(shape, inputManager, displayContainer);
-  infoOverlay = new InfoOverlay(shape, container);
+  infoOverlay = new InfoOverlay(shape, container, displayContainer);
 
   controller = new SolutionController(constraintManager, shape, displayContainer, infoOverlay);
 };
@@ -643,7 +643,7 @@ class ConstraintManager {
       config.panelItem.parentNode.removeChild(config.panelItem);
     }
 
-    this._panelItemHighlighter.setCells([]);
+    this._panelItemHighlighter.clear();
   }
 
   _makePanelItem(config) {
@@ -670,7 +670,7 @@ class ConstraintManager {
       this._panelItemHighlighter.setCells(config.cells);
     });
     panelItem.addEventListener('mouseout', () => {
-      this._panelItemHighlighter.setCells([]);
+      this._panelItemHighlighter.clear();
     });
 
     return panelItem;
@@ -741,14 +741,13 @@ class Highlight {
   constructor(display, cssClass) {
     this._cells = new Map();
     this._cssClass = cssClass;
-    this._callbacks = [];
+
     this._display = display;
   }
 
   setCells(cellIds) {
-    this._clear();
-    for (const cellId of cellIds) this._addToSelection(cellId);
-    this._runCallback();
+    this.clear();
+    for (const cellId of cellIds) this.addCell(cellId);
   }
 
   size() {
@@ -759,37 +758,51 @@ class Highlight {
     return this._cells.keys();
   }
 
+  addCell(cell) {
+    if (!this._cells.has(cell)) {
+      const path = this._display.highlightCell(cell, this._cssClass);
+      this._cells.set(cell, path);
+      return path;
+    }
+  }
+
+  clear() {
+    for (const path of this._cells.values()) {
+      this._display.removeHighlight(path)
+    }
+    this._cells.clear();
+  }
+}
+
+class Selection {
+  constructor(displayContainer) {
+
+    this._highlight = displayContainer.createHighlighter('selected-cell');
+    // TODO: Can we avoid this.
+    this._display = this._highlight._display;
+
+    this._selectionPreservers = [this._display.getSvg()];
+
+    this._setUpMouseHandlers(this._display.getSvg());
+
+    this._callbacks = [];
+  }
+
   addCallback(fn) {
     this._callbacks.push(fn);
   }
 
   _runCallback() {
-    this._callbacks.forEach(fn => fn([...this._cells.keys()]));
+    this._callbacks.forEach(fn => fn(
+      [...this._highlight.getCells()]));
   }
 
-  _addToSelection(cell) {
-    if (!this._cells.has(cell)) {
-      const path = this._display.highlightCell(cell, this._cssClass);
-      this._cells.set(cell, path);
-    }
-  }
-
-  _clear() {
-    for (const path of this._cells.values()) {
-      this._display.removeHighlight(path)
-    }
-    this._cells.clear();
+  setCells(cellIds) {
+    this._highlight.setCells(cellIds);
     this._runCallback();
   }
-}
-
-class Selection extends Highlight {
-  constructor(display) {
-    super(display, 'selected-cell');
-    this._selectionPreservers = [display.getSvg()];
-
-    this._setUpMouseHandlers(display.getSvg());
-  }
+  getCells(cellIds) { return this._highlight.getCells(cellIds); }
+  size() { return this._highlight.size; }
 
   _setUpMouseHandlers(container) {
     // Make the container selectable.
@@ -800,7 +813,7 @@ class Selection extends Highlight {
       const target = this._display.cellAt(e.offsetX, e.offsetY);
       if (target !== null && target !== currCell) {
         currCell = target;
-        this._addToSelection(currCell);
+        this._highlight.addCell(currCell);
       }
     };
     const outsideClickListener = e => {
@@ -810,13 +823,13 @@ class Selection extends Highlight {
         if (elem.contains(e.target)) return;
       }
       // Otherwise clear the selection.
-      this._clear();
+      this.setCells([]);
       document.body.removeEventListener('click', outsideClickListener);
     };
     container.addEventListener('pointerdown', e => {
       // If the shift key is pressed, continue adding to the selection.
       if (!e.shiftKey) {
-        this._clear();
+        this.setCells([]);
       }
       container.addEventListener('pointermove', pointerMoveFn);
       document.body.addEventListener('click', outsideClickListener);
@@ -914,7 +927,7 @@ class GridInputManager {
     let fakeInput = document.getElementById('fake-input');
     this._fakeInput = fakeInput;
 
-    this._selection = new Selection(displayContainer._highlightDisplay);
+    this._selection = new Selection(displayContainer);
     this._selection.addCallback(cellIds => {
       if (cellIds.length == 1) {
         this._runCallbacks(this._callbacks.onSelection, []);
@@ -1018,12 +1031,15 @@ class GridInputManager {
       if (this._selection.size() == 0) return;
       switch (event.key) {
         case 'c':
-          this._selection.getCells().forEach(
-            c => this._runCallbacks(this._callbacks.onSetValue, c.id, null));
+          for (const cell of this._selection.getCells()) {
+            this._runCallbacks(this._callbacks.onSetValue, cell, null);
+          }
           break;
         case 'f':
-          this._selection.getCells().forEach(
-            (c,i) => this._runCallbacks(this._callbacks.onSetValue, c.id, i+1));
+          let i = 1;
+          for (const cell of this._selection.getCells()) {
+            this._runCallbacks(this._callbacks.onSetValue, cell, i++);
+          }
           break;
       }
     });
@@ -1166,7 +1182,7 @@ class DebugOutput {
         this._debugCellHighlighter.setCells(cellIds);
       });
       elem.addEventListener('mouseout', () => {
-        this._debugCellHighlighter.setCells([]);
+        this._debugCellHighlighter.clear();
       });
     }
 
@@ -1694,9 +1710,12 @@ class InfoOverlay {
   _isClear = true;
   _shape;
 
-  constructor(shape, container) {
+  constructor(shape, container, displayContainer) {
     this._container = container;
+    this._displayContainer = displayContainer;
     this._shape = shape;
+
+    this._heatmap = displayContainer.createHighlighter();
   }
 
   _initInfoOverlay() {
@@ -1723,24 +1742,28 @@ class InfoOverlay {
   }
 
   clear() {
+    this._heatmap.clear();
+
     if (!this._infoOverlay) return;
     if (this._isClear) return;
 
     for (let i = 0; i < this._shape.numCells; i++) {
-      this._cellMap[i].style.background = 'none';
       this._cellMap[i].textContent = '';
     }
     this._isClear = true;
   }
 
   setHeatmapValues(values) {
-    if (!this._infoOverlay) this._initInfoOverlay();
+    const shape = this._shape;
 
-    for (let i = 0; i < this._shape.numCells; i++) {
-      this._cellMap[i].style.background = (
-        `rgba(255, 0, 0, ${values[i]/1000})`);
+    this._heatmap.clear();
+
+    for (let i = 0; i < values.length; i++) {
+      const cellId = shape.makeCellId(...shape.splitCellIndex(i));
+      const path = this._heatmap.addCell(cellId);
+      path.setAttribute('fill', 'rgb(255, 0, 0)');
+      path.setAttribute('opacity', values[i]/1000);
     }
-    this._isClear = false;
   }
 
   setValues(values) {

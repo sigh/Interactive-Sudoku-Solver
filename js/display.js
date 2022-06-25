@@ -214,7 +214,9 @@ class HighlightDisplay extends DisplayItem {
     const parsed = this._shape.parseCellId(cellId);
 
     const path = this._makeCellSquare(parsed.cell);
-    path.setAttribute('class', cssClass);
+    if (cssClass) {
+      path.setAttribute('class', cssClass);
+    }
 
     this._svg.appendChild(path);
 
