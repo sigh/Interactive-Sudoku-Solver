@@ -8,10 +8,12 @@ const initPage = () => {
   // Create grid.
   const container = document.getElementById('sudoku-grid');
   grid = new SudokuGrid(container, shape);
-  constraintManager = new ConstraintManager(grid);
-  infoOverlay = new InfoOverlay(grid);
+  const highlightDisplay = new HighlightDisplay(container, shape);
+  const inputManager = new GridInputManager(shape, highlightDisplay);
+  constraintManager = new ConstraintManager(grid, container, inputManager, highlightDisplay);
+  infoOverlay = new InfoOverlay(shape, container);
 
-  controller = new SolutionController(constraintManager, grid, infoOverlay, container);
+  controller = new SolutionController(constraintManager, grid, highlightDisplay, infoOverlay, container);
 };
 
 class CheckboxConstraints {
@@ -263,17 +265,17 @@ class JigsawManager {
 }
 
 class ConstraintManager {
-  constructor(grid) {
+  constructor(grid, container, inputManager, highlightDisplay) {
     this._configs = [];
     this._grid = grid;
     this._shape = grid.shape;
     this._checkboxes = {};
 
-    this._display = new ConstraintDisplay(grid._container, grid.selection, this._shape);
-    this._setUpPanel();
+    this._display = new ConstraintDisplay(container, inputManager, this._shape);
+    this._setUpPanel(inputManager, highlightDisplay);
     this._fixedValues = new FixedValues(
-      grid, this._display, this.runUpdateCallback.bind(this));
-    this._inputManager = new GridInputManager(grid, this._fixedValues);
+      grid, inputManager, this._display, this.runUpdateCallback.bind(this));
+
 
     this.setUpdateCallback();
   }
@@ -295,9 +297,9 @@ class ConstraintManager {
     return 1 == Math.abs(cell0.row - cell1.row) + Math.abs(cell0.col - cell1.col);
   }
 
-  _setUpPanel() {
+  _setUpPanel(inputManager, highlightDisplay) {
     this._constraintPanel = document.getElementById('displayed-constraints');
-    this._panelItemHighlighter = this._grid.createHighlighter('highlighted-cell');
+    this._panelItemHighlighter = new Highlight(highlightDisplay, 'highlighted-cell');
 
     // Checkbox constraints.
     this._checkboxConstraints = new CheckboxConstraints(
@@ -306,15 +308,15 @@ class ConstraintManager {
     this._jigsawManager = new JigsawManager(
       this._display, this._makePanelItem.bind(this), this._shape);
 
-    let selectionForm = document.forms['multi-cell-constraint-input'];
-    this._grid.selection.addCallback(
-      (selection) => this._onNewSelection(
-        selection, selectionForm));
+    const selectionForm = document.forms['multi-cell-constraint-input'];
+    inputManager.onSelection(
+      (selection) => this._onNewSelection(selection, selectionForm));
+    inputManager.addSelectionPreserver(selectionForm);
 
     selectionForm.onsubmit = e => {
       this._addConstraintFromForm(selectionForm);
       return false;
-    }
+    };
 
     // Selecting anything in the constraint cage will select it and focus on
     // the input box.
@@ -325,10 +327,8 @@ class ConstraintManager {
       selectionForm['multi-cell-constraint-cage'].checked = true;
     };
 
-    this._grid.selection.addSelectionPreserver(selectionForm);
-
     // Little killer.
-    this._setUpLittleKiller();
+    this._setUpLittleKiller(inputManager);
 
     // Load examples.
     this._exampleHandler = new ExampleHandler(this);
@@ -396,9 +396,8 @@ class ConstraintManager {
     }
   }
 
-  _setUpLittleKiller() {
+  _setUpLittleKiller(inputManager) {
     this._outsideArrowConstraints = {};
-
 
     let outsideArrowForm = document.forms['outside-arrow-input'];
     const clearOutsideArrow = () => {
@@ -406,7 +405,7 @@ class ConstraintManager {
       let id = formData.get('id');
       delete this._outsideArrowConstraints[id];
       this._display.removeOutsideArrow(id);
-      this._grid.selection.setCells([]);
+      inputManager.setSelection([]);
       this.runUpdateCallback();
     };
     outsideArrowForm.onsubmit = e => {
@@ -430,11 +429,11 @@ class ConstraintManager {
           break;
       }
 
-      this._grid.selection.setCells([]);
+      inputManager.setSelection([]);
       this.runUpdateCallback();
       return false;
     };
-    this._grid.selection.addSelectionPreserver(outsideArrowForm);
+    inputManager.addSelectionPreserver(outsideArrowForm);
 
     document.getElementById('outside-arrow-clear').onclick = clearOutsideArrow;
   }
@@ -765,7 +764,7 @@ class Highlight {
   }
 
   _runCallback() {
-    this._callbacks.forEach(fn => fn(this._cells.keys()));
+    this._callbacks.forEach(fn => fn([...this._cells.keys()]));
   }
 
   _addToSelection(cell) {
@@ -798,7 +797,6 @@ class Selection extends Highlight {
 
     let currCell = null;
     const pointerMoveFn = e => {
-
       const target = this._display.cellAt(e.offsetX, e.offsetY);
       if (target !== null && target !== currCell) {
         currCell = target;
@@ -842,14 +840,17 @@ class Selection extends Highlight {
 }
 
 class FixedValues {
-  constructor(grid, display, onChange) {
+  constructor(grid, inputManager, display, onChange) {
     this._grid = grid;
     this._fixedValueMap = new Map();
     this._display = display;
     this._onChange = onChange;
+
+    inputManager.onNewDigit(this._inputDigit.bind(this));
+    inputManager.onSetValue(this._updateValue.bind(this));
   }
 
-  inputDigit(cell, digit) {
+  _inputDigit(cell, digit) {
     const currValue = this._fixedValueMap.get(cell) || 0;
 
     let newValue;
@@ -862,10 +863,10 @@ class FixedValues {
       if (newValue > numValues) newValue = 0;
     }
 
-    this.updateValue(cell, newValue);
+    this._updateValue(cell, newValue);
   }
 
-  updateValue(cell, value) {
+  _updateValue(cell, value) {
     const numValues = this._grid.shape.numValues;
     if (value > 0 && value <= numValues) {
       this._fixedValueMap.set(cell, value);
@@ -879,7 +880,7 @@ class FixedValues {
 
   setValueId(valueId) {
     const parsed = this._grid.shape.parseValueId(valueId);
-    this.updateValue(parsed.cellId, parsed.value);
+    this._updateValue(parsed.cellId, parsed.value);
   }
 
   getConstraint() {
@@ -900,41 +901,56 @@ class FixedValues {
 }
 
 class GridInputManager {
-  constructor(grid, fixedValues) {
-    this._grid = grid;
-    this._fixedValues = fixedValues;
+  constructor(shape, highlightDisplay) {
+    this._shape = shape;
 
-    this.selection = grid.selection;
-
+    this._callbacks = {
+      onNewDigit: [],
+      onSetValue: [],
+      onSelection: [],
+    };
     // fake-input is an invisible text input which is used to ensure that
     // numbers can be entered on mobile.
     let fakeInput = document.getElementById('fake-input');
     this._fakeInput = fakeInput;
 
-    this.selection.addCallback(cellIds => {
-      if (cellIds.length != 1) return;
-      let cell = document.getElementById(cellIds[0]);
-      fakeInput.style.left = cell.offsetLeft;
-      fakeInput.style.top = cell.offsetTop;
-      fakeInput.select();
+    this._selection = new Selection(highlightDisplay);
+    this._selection.addCallback(cellIds => {
+      if (cellIds.length == 1) {
+        this._runCallbacks(this._callbacks.onSelection, []);
+        fakeInput.select();
+      } else {
+        this._runCallbacks(this._callbacks.onSelection, cellIds);
+      }
     });
 
     this._setUpKeyBindings();
   }
 
-  _setUpKeyBindings() {
-    const grid = this._grid;
+  onNewDigit(fn) { this._callbacks.onNewDigit.push(fn); }
+  onSetValue(fn) { this._callbacks.onSetValue.push(fn); }
+  onSelection(fn) { this._callbacks.onSelection.push(fn); }
 
-    const getActiveElem = () => {
-      let cells = this.selection.getCells();
-      if (cells.length != 1) return null;
-      return cells[0];
-    };
+  addSelectionPreserver(obj) {
+    this._selection.addSelectionPreserver(obj);
+  }
+  setSelection(cells) {
+    this._selection.setCells(cells);
+  }
+
+  _runCallbacks(callbacks, ...args) {
+    for (const callback of callbacks) {
+      callback(...args);
+    }
+  }
+
+  _setUpKeyBindings() {
+    const shape = this._shape;
 
     const getActiveCell = () => {
-      const elem = getActiveElem();
-      if (elem) return elem.id;
-      return null;
+      let cells = [...this._selection.getCells()];
+      if (cells.length != 1) return null;
+      return cells[0];
     };
 
     const updateActiveCellValue = (value) => {
@@ -942,27 +958,26 @@ class GridInputManager {
       if (!cell) return;
 
       if (value == '') {
-        this._fixedValues.updateValue(cell, '');
+        this._runCallbacks(this._callbacks.onSetValue, cell, null);
         return;
       }
 
       const digit = parseInt(value);
       if (!Number.isNaN(digit)) {
-        this._fixedValues.inputDigit(cell, digit);
+        this._runCallbacks(this._callbacks.onNewDigit, cell, digit);
       }
     }
 
     const moveActiveCell = (dr, dc) => {
-      let elem = getActiveElem();
-      if (!elem) return;
+      let cell = getActiveCell();
+      if (!cell) return;
 
-      const shape = grid.shape;
-      let {row, col} = shape.parseCellId(elem.id);
+      let {row, col} = shape.parseCellId(cell);
       const gridSize = shape.gridSize;
       row = (row+dr+gridSize)%gridSize;
       col = (col+dc+gridSize)%gridSize;
 
-      this.selection.setCells([shape.makeCellId(row, col)]);
+      this._selection.setCells([shape.makeCellId(row, col)]);
     };
 
     let fakeInput = this._fakeInput;
@@ -997,15 +1012,15 @@ class GridInputManager {
     });
 
     window.addEventListener('keydown', event => {
-      if (this.selection.size() == 0) return;
+      if (this._selection.size() == 0) return;
       switch (event.key) {
         case 'c':
-          this.selection.getCells().forEach(
-            c => this._fixedValues.updateValue(c.id, ''));
+          this._selection.getCells().forEach(
+            c => this._runCallbacks(this._callbacks.onSetValue, c.id, null));
           break;
         case 'f':
-          this.selection.getCells().forEach(
-            (c,i) => this._fixedValues.updateValue(c.id, i+1));
+          this._selection.getCells().forEach(
+            (c,i) => this._runCallbacks(this._callbacks.onSetValue, c.id, i+1));
           break;
       }
     });
@@ -1014,11 +1029,7 @@ class GridInputManager {
 
 class SudokuGrid {
   constructor(container, shape) {
-    this._container = container;
     this.shape = shape;
-    const highlightDisplay = new HighlightDisplay(container, shape);
-    this._highlightDisplay = highlightDisplay;
-    this.selection = new Selection(highlightDisplay);
     container.classList.add('sudoku-grid');
     container.classList.add(`size-${shape.name}`);
   }
@@ -1114,13 +1125,13 @@ class HistoryHandler {
 }
 
 class DebugOutput {
-  constructor(grid, infoOverlay) {
+  constructor(grid, highlightDisplay, infoOverlay) {
     this._container = document.getElementById('debug-container');
     this._visible = false;
     this._grid = grid;
     this._infoOverlay = infoOverlay;
 
-    this._debugCellHighlighter = grid.createHighlighter('highlighted-cell');
+    this._debugCellHighlighter = new Highlight(highlightDisplay, 'highlighted-cell');
   }
 
   clear() {
@@ -1325,7 +1336,7 @@ class SolverStateDisplay {
 }
 
 class SolutionController {
-  constructor(constraintManager, grid, infoOverlay, container) {
+  constructor(constraintManager, grid, highlightDisplay, infoOverlay, container) {
     // Solvers are a list in case we manage to start more than one. This can
     // happen when we are waiting for a worker to initialize.
     this._solverPromises = [];
@@ -1334,8 +1345,8 @@ class SolutionController {
       container, constraintManager, grid.shape);
     this._isSolving = false;
     this._constraintManager = constraintManager;
-    this._stepHighlighter = grid.createHighlighter('highlighted-step-cell');
-    this._debugOutput = new DebugOutput(grid, infoOverlay);
+    this._stepHighlighter = new Highlight(highlightDisplay, 'highlighted-step-cell');
+    this._debugOutput = new DebugOutput(grid, highlightDisplay, infoOverlay);
     this._update = deferUntilAnimationFrame(this._update.bind(this));
     constraintManager.setUpdateCallback(this._update.bind(this));
 
@@ -1691,9 +1702,9 @@ class InfoOverlay {
   _isClear = true;
   _shape;
 
-  constructor(grid) {
-    this._container = grid._container;
-    this._shape = grid.shape;
+  constructor(shape, container) {
+    this._container = container;
+    this._shape = shape;
   }
 
   _initInfoOverlay() {

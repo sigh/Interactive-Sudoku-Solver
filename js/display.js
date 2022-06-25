@@ -223,7 +223,7 @@ class ConstraintDisplay extends DisplayBase {
   static SVG_PADDING = 27;
   static CELL_SIZE = 52;
 
-  constructor(container, gridSelection, shape) {
+  constructor(container, inputManager, shape) {
     super();
 
     this._shape = shape;
@@ -250,12 +250,12 @@ class ConstraintDisplay extends DisplayBase {
     svg.append(this._fixedValueGroup);
 
     svg.append(this._makeArrowhead());
-    svg.append(this._makeLittleKillers(gridSelection));
+    svg.append(this._makeLittleKillers(inputManager));
+    inputManager.addSelectionPreserver(svg);
     svg.append(this.makeBorders());
 
     container.prepend(svg);
 
-    this._gridSelection = gridSelection;
     this.clear();  // clear() to initialize.
   }
 
@@ -289,7 +289,7 @@ class ConstraintDisplay extends DisplayBase {
     this._regionContainer.append(this._windokuRegion);
   }
 
-  _makeLittleKillers(gridSelection) {
+  _makeLittleKillers(inputManager) {
     const g = createSvgElement('g');
     this._applyGridOffset(g);
 
@@ -346,7 +346,7 @@ class ConstraintDisplay extends DisplayBase {
     let form = document.forms['outside-arrow-input'];
     let selectionForm = document.forms['multi-cell-constraint-input'].firstElementChild;
     let selectedArrow = null;
-    gridSelection.addCallback(() => {
+    inputManager.onSelection((cells) => {
       if (selectedArrow) selectedArrow.classList.remove('selected-arrow');
       selectedArrow = null;
       form.firstElementChild.disabled = true;
@@ -356,7 +356,7 @@ class ConstraintDisplay extends DisplayBase {
       document.getElementById('sandwich-option'),
     ];
     let handleClick = (type, id, cells, arrowSvg) => {
-      gridSelection.setCells(cells);
+      inputManager.setSelection(cells);
       selectionForm.disabled = true;
       form.firstElementChild.disabled = false;
       form.type.value = type;
