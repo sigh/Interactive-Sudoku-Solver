@@ -275,6 +275,24 @@ class JigsawManager {
   }
 }
 
+// TODO: Make this a ShapeManager, and have it hold the canonical shape.
+class ShapeSelector {
+  constructor(constraintManager) {
+    this._constraintManager = constraintManager;
+
+    this._select = document.getElementById('shape-select');
+    this._select.onchange = () => { this.reloadShape(); };
+  }
+
+  reloadShape() {
+    const shapeSelect = this._select;
+    const shapeName = shapeSelect.options[shapeSelect.selectedIndex].value;
+    const shape = GridShape.get(shapeName);
+    if (!shape) throw('Invalid shape: ' + shapeName);
+    this._constraintManager.reshape(shape);
+  }
+}
+
 class ConstraintManager {
   constructor(shape, inputManager, displayContainer) {
     this._configs = [];
@@ -289,6 +307,8 @@ class ConstraintManager {
     this._fixedValues = new FixedValues(
       inputManager, this._display, this.runUpdateCallback.bind(this));
     this.addReshapeListener(this._fixedValues);
+
+    this._shapeSelector = new ShapeSelector(this);
 
     this.setUpdateCallback();
   }
@@ -327,9 +347,6 @@ class ConstraintManager {
   _setUpPanel(inputManager, displayContainer) {
     this._constraintPanel = document.getElementById('displayed-constraints');
     this._panelItemHighlighter = displayContainer.createHighlighter('highlighted-cell');
-
-    // Shape selection.
-    this._setUpShapeSelect();
 
     // Checkbox constraints.
     this._checkboxConstraints = new CheckboxConstraints(
@@ -384,16 +401,6 @@ class ConstraintManager {
 
     // Clear button.
     document.getElementById('clear-constraints-button').onclick = () => this.clear();
-  }
-
-  _setUpShapeSelect() {
-    const shapeSelect = document.getElementById('shape-select');
-    shapeSelect.onchange = () => {
-      const shapeName = shapeSelect.options[shapeSelect.selectedIndex].value;
-      const shape = GridShape.get(shapeName);
-      if (!shape) throw('Invalid shape: ' + shapeName);
-      this.reshape(shape);
-    };
   }
 
   _onNewSelection(selection, selectionForm) {
@@ -763,8 +770,7 @@ class ConstraintManager {
   }
 
   getConstraints() {
-    // TODO: Read shape properly.
-    if (!this._shape) this.reshape(SHAPE_9x9);
+    if (!this._shape) this._shapeSelector.reloadShape();
 
     let constraints = this._configs.map(c => c.constraint);
     constraints.push(this._jigsawManager.getConstraint());
