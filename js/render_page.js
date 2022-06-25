@@ -273,29 +273,40 @@ class JigsawManager {
   }
 }
 
-// TODO: Make this a ShapeManager, and have it hold the canonical shape.
-class ShapeSelector {
-  static DEFAULT_SHAPE = SHAPE_9x9;
-
-  constructor(constraintManager) {
-    this._constraintManager = constraintManager;
+class ShapeManager {
+  constructor() {
+    this._shape = null;
+    this._reshapeListeners = [];
 
     this._select = document.getElementById('shape-select');
     this._select.onchange = () => { this.reloadShape(); };
   }
 
+  reshape(shape) {
+    if (this._shape === shape) return;
+
+    this._shape = shape;
+    for (const listener of this._reshapeListeners) {
+      listener.reshape(shape);
+    }
+  }
+
+  addReshapeListener(listener) {
+    this._reshapeListeners.push(listener);
+  }
+
   reloadShape() {
     const shapeSelect = this._select;
-    const shapeName = shapeSelect.options[shapeSelect.selectedIndex].value;
+    const shapeName = shapeSelect.value;
     const shape = GridShape.get(shapeName);
     if (!shape) throw('Invalid shape: ' + shapeName);
-    this._constraintManager.reshape(shape);
+    this.reshape(shape);
   }
 
   loadConstraintShape(constraint) {
-    const shape = SudokuBuilder.getShape(constraint);
-    this._constraintManager.reshape(shape);
+    const shape = SudokuConstraint.getShape(constraint);
     this._select.value = shape.name;
+    this.reshape(shape);
   }
 }
 
@@ -304,7 +315,9 @@ class ConstraintManager {
     this._configs = [];
     this._shape = null;
     this._checkboxes = {};
-    this._reshapeListeners = [];
+
+    this._shapeManager = new ShapeManager();
+    this._shapeManager.addReshapeListener(this);
 
     this._display = new ConstraintDisplay(
       inputManager, displayContainer);
@@ -314,23 +327,16 @@ class ConstraintManager {
       inputManager, this._display, this.runUpdateCallback.bind(this));
     this.addReshapeListener(this._fixedValues);
 
-    this._shapeSelector = new ShapeSelector(this);
-
     this.setUpdateCallback();
   }
 
   reshape(shape) {
-    if (this._shape === shape) return;
-
-    this._shape = shape;
     // TODO: Keep layout options that are shape agnostic.
     this.clear();
-    for (const listener of this._reshapeListeners) {
-      listener.reshape(shape);
-    }
+    this._shape = shape;
   }
   addReshapeListener(listener) {
-    this._reshapeListeners.push(listener);
+    this._shapeManager.addReshapeListener(listener);
   }
 
   setUpdateCallback(fn) {
@@ -503,7 +509,7 @@ class ConstraintManager {
     const constraint = SudokuConstraint.fromText(input);
     if (constraint) {
       this.clear();
-      this._shapeSelector.loadConstraintShape(constraint);
+      this._shapeManager.loadConstraintShape(constraint);
       this.loadConstraint(constraint);
     }
 
@@ -776,7 +782,7 @@ class ConstraintManager {
   }
 
   getConstraints() {
-    if (!this._shape) this._shapeSelector.reloadShape();
+    if (!this._shape) this._shapeManager.reloadShape();
 
     let constraints = this._configs.map(c => c.constraint);
     constraints.push(this._jigsawManager.getConstraint());

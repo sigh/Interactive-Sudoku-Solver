@@ -85,7 +85,7 @@ const runFnWithChecks = async (puzzles, fn, onFailure) => {
     // Set up solver.
     const constraint = SudokuConstraint.fromText(puzzle.input);
     const solver = await SudokuBuilder.buildInWorker(constraint, stateHandler);
-    const shape = SudokuBuilder.getShape(constraint);
+    const shape = SudokuConstraint.getShape(constraint);
 
     // Log a fixed string so the progress gets collapsed to a single line.
     // Do this after the worker has started to ensure a nice output.
