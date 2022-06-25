@@ -343,6 +343,9 @@ class ConstraintDisplay extends DisplayItem {
     this._constraintGroup = displayContainer.getNewGroup('constraint-group');
     this._applyGridOffset(this._constraintGroup);
 
+    this._diagonalDisplay = new DiagonalDisplay(
+      displayContainer.getNewGroup('diagonal-group'));
+
     // TODO: Split out fixedValue and killer cages into their
     // own classes.
     this._fixedValueGroup = displayContainer.getNewGroup('fixed-value-group');
@@ -365,6 +368,7 @@ class ConstraintDisplay extends DisplayItem {
     this._windokuRegions.reshape(shape);
     this._jigsawRegions.reshape(shape);
     this._outsideArrows.reshape(shape);
+    this._diagonalDisplay.reshape(shape);
     this._borders.reshape(shape);
   }
 
@@ -395,7 +399,7 @@ class ConstraintDisplay extends DisplayItem {
 
     this.killerCellColors = new Map();
     this.killerCages = new Map();
-    this._diagonals = [null, null];
+    this._diagonalDisplay.clear();
 
     this._jigsawRegions.clear();
 
@@ -641,23 +645,11 @@ class ConstraintDisplay extends DisplayItem {
   }
 
   drawDiagonal(direction) {
-    const size = DisplayItem.CELL_SIZE*this._shape.gridSize;
-    const line = this._makePath([
-      [0, direction > 0 ? size : 0],
-      [size, direction > 0 ? 0 : size],
-    ]);
-    line.setAttribute('stroke-width', 1);
-    line.setAttribute('stroke', 'rgb(255, 0, 0)');
-
-    this._constraintGroup.appendChild(line);
-    this._diagonals[direction > 0] = line;
-
-    return line;
+    this._diagonalDisplay.drawDiagonal(direction);
   }
 
   removeDiagonal(direction) {
-    let item = this._diagonals[direction > 0];
-    if (item) this.removeItem(item);
+    this._diagonalDisplay.removeDiagonal(direction);
   }
 
   drawFixedValue(cell, value) {
@@ -1070,4 +1062,65 @@ class OutsideArrowDisplay extends DisplayItem {
 
     return arrow;
   };
+}
+
+class DiagonalDisplay extends DisplayItem {
+  DIRECTIONS = [1, -1];
+
+  constructor(svg) {
+    super(svg);
+    this._applyGridOffset(svg);
+    this._diagonals = [null, null];
+
+    svg.setAttribute('stroke-width', 1);
+    svg.setAttribute('stroke', 'rgb(255, 0, 0)');
+  }
+
+  _directionIndex(direction) {
+    return direction > 0;
+  }
+
+  drawDiagonal(direction) {
+    const index = this._directionIndex(direction);
+    if (this._diagonals[index]) return this._diagonals[index];
+
+    const shape = this._shape;
+
+    const size = DisplayItem.CELL_SIZE*shape.gridSize;
+    const line = this._makePath([
+      [0, direction > 0 ? size : 0],
+      [size, direction > 0 ? 0 : size],
+    ]);
+
+    this.getSvg().appendChild(line);
+    this._diagonals[index] = line;
+
+    return line;
+  }
+
+  removeDiagonal(direction) {
+    const index = this._directionIndex(direction);
+    let item = this._diagonals[index];
+    if (item) item.parentNode.removeChild(item);
+    this._diagonals[index] = null;
+  }
+
+  clear() {
+    for (const direction of this.DIRECTIONS) {
+      this.removeDiagonal(direction);
+    }
+  }
+
+  reshape(shape) {
+    super.reshape(shape);
+
+    // Redraw the diagonals with the correct shape.
+    for (const direction of this.DIRECTIONS) {
+      const index = this._directionIndex(direction);
+      if (this._diagonals[index]) {
+        this.removeDiagonal(direction);
+        this.drawDiagonal(direction);
+      }
+    }
+  }
 }

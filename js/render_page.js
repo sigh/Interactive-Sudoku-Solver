@@ -339,9 +339,12 @@ class ConstraintManager {
   }
 
   reshape(shape) {
-    // TODO: Keep layout options that are shape agnostic.
+    // Keep the checkbox constraints, since they are shape-agnostic.
+    const checkboxes = this._checkboxConstraints.getConstraint();
+
     this.clear();
     this._shape = shape;
+    this.loadConstraint(checkboxes);
   }
   addReshapeListener(listener) {
     this._shapeManager.addReshapeListener(listener);
