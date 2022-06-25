@@ -1,19 +1,19 @@
 // Make these variables global so that we can easily access them from the
 // console.
-let grid, constraintManager, controller, infoOverlay;
+let constraintManager, controller, infoOverlay;
 
 const initPage = () => {
   const shape = SHAPE;
 
   // Create grid.
   const container = document.getElementById('sudoku-grid');
-  grid = new SudokuGrid(container, shape);
-  const highlightDisplay = new HighlightDisplay(container, shape);
-  const inputManager = new GridInputManager(shape, highlightDisplay);
-  constraintManager = new ConstraintManager(grid, container, inputManager, highlightDisplay);
+  const displayContainer = new DisplayContainer(container, shape);
+
+  const inputManager = new GridInputManager(shape, displayContainer);
+  constraintManager = new ConstraintManager(shape, inputManager, displayContainer);
   infoOverlay = new InfoOverlay(shape, container);
 
-  controller = new SolutionController(constraintManager, grid, highlightDisplay, infoOverlay, container);
+  controller = new SolutionController(constraintManager, shape, displayContainer, infoOverlay);
 };
 
 class CheckboxConstraints {
@@ -265,16 +265,16 @@ class JigsawManager {
 }
 
 class ConstraintManager {
-  constructor(grid, container, inputManager, highlightDisplay) {
+  constructor(shape, inputManager, displayContainer) {
     this._configs = [];
-    this._grid = grid;
-    this._shape = grid.shape;
+    this._shape = shape;
     this._checkboxes = {};
 
-    this._display = new ConstraintDisplay(container, inputManager, this._shape);
-    this._setUpPanel(inputManager, highlightDisplay);
+    this._display = new ConstraintDisplay(inputManager, this._shape);
+    displayContainer.addDisplayItem(this._display);
+    this._setUpPanel(inputManager, displayContainer);
     this._fixedValues = new FixedValues(
-      grid, inputManager, this._display, this.runUpdateCallback.bind(this));
+      shape, inputManager, this._display, this.runUpdateCallback.bind(this));
 
 
     this.setUpdateCallback();
@@ -297,9 +297,9 @@ class ConstraintManager {
     return 1 == Math.abs(cell0.row - cell1.row) + Math.abs(cell0.col - cell1.col);
   }
 
-  _setUpPanel(inputManager, highlightDisplay) {
+  _setUpPanel(inputManager, displayContainer) {
     this._constraintPanel = document.getElementById('displayed-constraints');
-    this._panelItemHighlighter = new Highlight(highlightDisplay, 'highlighted-cell');
+    this._panelItemHighlighter = displayContainer.createHighlighter('highlighted-cell');
 
     // Checkbox constraints.
     this._checkboxConstraints = new CheckboxConstraints(
@@ -314,7 +314,7 @@ class ConstraintManager {
     inputManager.addSelectionPreserver(selectionForm);
 
     selectionForm.onsubmit = e => {
-      this._addConstraintFromForm(selectionForm);
+      this._addConstraintFromForm(selectionForm, inputManager);
       return false;
     };
 
@@ -584,8 +584,8 @@ class ConstraintManager {
     this.runUpdateCallback();
   }
 
-  _addConstraintFromForm(selectionForm) {
-    let cells = this._grid.selection.getCells().map(e => e.id);
+  _addConstraintFromForm(selectionForm, inputManager) {
+    const cells = inputManager.getSelection();
     if (cells.length < 2) throw('Selection too short.');
 
     let formData = new FormData(selectionForm);
@@ -629,7 +629,7 @@ class ConstraintManager {
         break;
     }
 
-    this._grid.selection.setCells([]);
+    inputManager.setSelection([]);
     this.runUpdateCallback();
   }
 
@@ -840,8 +840,8 @@ class Selection extends Highlight {
 }
 
 class FixedValues {
-  constructor(grid, inputManager, display, onChange) {
-    this._grid = grid;
+  constructor(shape, inputManager, display, onChange) {
+    this._shape = shape;
     this._fixedValueMap = new Map();
     this._display = display;
     this._onChange = onChange;
@@ -857,7 +857,7 @@ class FixedValues {
     if (digit === null) {
       newValue = 0;
     } else {
-      const numValues = this._grid.shape.numValues;
+      const numValues = this._shape.numValues;
       newValue = currValue*10 + digit;
       if (newValue > numValues) newValue = digit;
       if (newValue > numValues) newValue = 0;
@@ -867,7 +867,7 @@ class FixedValues {
   }
 
   _updateValue(cell, value) {
-    const numValues = this._grid.shape.numValues;
+    const numValues = this._shape.numValues;
     if (value > 0 && value <= numValues) {
       this._fixedValueMap.set(cell, value);
     } else {
@@ -879,7 +879,7 @@ class FixedValues {
   }
 
   setValueId(valueId) {
-    const parsed = this._grid.shape.parseValueId(valueId);
+    const parsed = this._shape.parseValueId(valueId);
     this._updateValue(parsed.cellId, parsed.value);
   }
 
@@ -901,7 +901,7 @@ class FixedValues {
 }
 
 class GridInputManager {
-  constructor(shape, highlightDisplay) {
+  constructor(shape, displayContainer) {
     this._shape = shape;
 
     this._callbacks = {
@@ -914,7 +914,7 @@ class GridInputManager {
     let fakeInput = document.getElementById('fake-input');
     this._fakeInput = fakeInput;
 
-    this._selection = new Selection(highlightDisplay);
+    this._selection = new Selection(displayContainer._highlightDisplay);
     this._selection.addCallback(cellIds => {
       if (cellIds.length == 1) {
         this._runCallbacks(this._callbacks.onSelection, []);
@@ -936,6 +936,9 @@ class GridInputManager {
   }
   setSelection(cells) {
     this._selection.setCells(cells);
+  }
+  getSelection() {
+    return [...this._selection.getCells()];
   }
 
   _runCallbacks(callbacks, ...args) {
@@ -1027,18 +1030,6 @@ class GridInputManager {
   }
 }
 
-class SudokuGrid {
-  constructor(container, shape) {
-    this.shape = shape;
-    container.classList.add('sudoku-grid');
-    container.classList.add(`size-${shape.name}`);
-  }
-
-  createHighlighter(cssClass) {
-    return new Highlight(this._highlightDisplay, cssClass);
-  }
-}
-
 class HistoryHandler {
   MAX_HISTORY = 50;
   HISTORY_ADJUSTMENT = 10;
@@ -1125,13 +1116,13 @@ class HistoryHandler {
 }
 
 class DebugOutput {
-  constructor(grid, highlightDisplay, infoOverlay) {
+  constructor(shape, displayContainer, infoOverlay) {
     this._container = document.getElementById('debug-container');
     this._visible = false;
-    this._grid = grid;
+    this._shape = shape;
     this._infoOverlay = infoOverlay;
 
-    this._debugCellHighlighter = new Highlight(highlightDisplay, 'highlighted-cell');
+    this._debugCellHighlighter = displayContainer.createHighlighter('highlighted-cell');
   }
 
   clear() {
@@ -1167,7 +1158,7 @@ class DebugOutput {
     elem.append(locSpan);
     elem.append(msgSpan);
 
-    const shape = this._grid.shape;
+    const shape = this._shape;
 
     if (data.cells && data.cells.length) {
       const cellIds = [...data.cells].map(c => shape.makeCellId(...shape.splitCellIndex(c)));
@@ -1336,17 +1327,18 @@ class SolverStateDisplay {
 }
 
 class SolutionController {
-  constructor(constraintManager, grid, highlightDisplay, infoOverlay, container) {
+  constructor(constraintManager, shape, displayContainer, infoOverlay) {
     // Solvers are a list in case we manage to start more than one. This can
     // happen when we are waiting for a worker to initialize.
     this._solverPromises = [];
 
     this._solutionDisplay = new SolutionDisplay(
-      container, constraintManager, grid.shape);
+      constraintManager, shape);
+    displayContainer.addDisplayItem(this._solutionDisplay);
     this._isSolving = false;
     this._constraintManager = constraintManager;
-    this._stepHighlighter = new Highlight(highlightDisplay, 'highlighted-step-cell');
-    this._debugOutput = new DebugOutput(grid, highlightDisplay, infoOverlay);
+    this._stepHighlighter = displayContainer.createHighlighter('highlighted-step-cell');
+    this._debugOutput = new DebugOutput(shape, displayContainer, infoOverlay);
     this._update = deferUntilAnimationFrame(this._update.bind(this));
     constraintManager.setUpdateCallback(this._update.bind(this));
 

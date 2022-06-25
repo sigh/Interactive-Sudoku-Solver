@@ -16,7 +16,7 @@ const loadInput = (input) => {
 }
 
 const getShortSolution = () => {
-  return toShortSolution(controller.getSolutionValues(), grid.shape);
+  return toShortSolution(...controller.getSolutionValues());
 };
 
 const toShortSolution = (valueIds, shape) => {

@@ -1,14 +1,44 @@
-class DisplayBase {
+class DisplayContainer {
+  constructor(container, shape) {
+    this.shape = shape;
+    container.classList.add('sudoku-grid');
+    container.classList.add(`size-${shape.name}`);
+    container.style.padding = `${DisplayItem.SVG_PADDING}px`;
+    this._container = container;
+
+    this._highlightDisplay = new HighlightDisplay(shape);
+    this.addDisplayItem(this._highlightDisplay);
+  }
+
+  createHighlighter(cssClass) {
+    return new Highlight(this._highlightDisplay, cssClass);
+  }
+
+  addDisplayItem(item) {
+    this._container.append(item.getSvg());
+  }
+}
+
+class DisplayItem {
   static SVG_PADDING = 27;
   static CELL_SIZE = 52;
 
+  constructor() {
+    this._svg = createSvgElement('svg');
+    this._svg.classList.add('sudoku-display-svg');
+  }
+
+  getSvg() {
+    return this._svg;
+  }
+
   cellIdCenter(cellId) {
     const {row, col} = this._shape.parseCellId(cellId);
-    return DisplayBase._cellCenter(row, col);
+    return DisplayItem._cellCenter(row, col);
   }
 
   cellCenter(cell) {
-    return DisplayBase._cellCenter(...this._shape.splitCellIndex(cell));
+    return DisplayItem._cellCenter(...this._shape.splitCellIndex(cell));
   }
 
   static _cellCenter(row, col) {
@@ -22,7 +52,7 @@ class DisplayBase {
   }
 
   _makeCellSquare(cell) {
-    const cellWidth = DisplayBase.CELL_SIZE;
+    const cellWidth = DisplayItem.CELL_SIZE;
 
     const [x, y] = this.cellCenter(cell);
     const path = createSvgElement('path');
@@ -38,24 +68,19 @@ class DisplayBase {
   }
 }
 
-class SolutionDisplay extends DisplayBase {
-  constructor(container, constraintManager, shape) {
+class SolutionDisplay extends DisplayItem {
+  constructor(constraintManager, shape) {
     super();
     this._shape = shape;
     this._solutionValues = [];
     this._constraintManager = constraintManager;
 
-    let svg = createSvgElement('svg');
+    let svg = this.getSvg();
     this._applyGridOffset(svg);
-    svg.classList.add('sudoku-display-svg');
-    let sideLength = DisplayBase.CELL_SIZE * shape.gridSize;
+    let sideLength = DisplayItem.CELL_SIZE * shape.gridSize;
 
     svg.setAttribute('height', sideLength);
     svg.setAttribute('width', sideLength);
-
-    this._svg = svg;
-
-    container.append(svg);
 
     this.setSolution = deferUntilAnimationFrame(this.setSolution.bind(this));
   }
@@ -117,7 +142,7 @@ class SolutionDisplay extends DisplayBase {
     };
 
     const LINE_HEIGHT = this._shape.gridSize == SHAPE_9x9.gridSize ? 17 : 10;
-    const START_OFFSET = -DisplayBase.CELL_SIZE/2+2;
+    const START_OFFSET = -DisplayItem.CELL_SIZE/2+2;
     for (const [cellId, values] of cellValues) {
       const [x, y] = this.cellIdCenter(cellId);
 
@@ -166,28 +191,23 @@ class SolutionDisplay extends DisplayBase {
   }
 
   getSolutionValues() {
-    return this._solutionValues;
+    return [this._solutionValues, this._shape];
   }
 }
 
-class HighlightDisplay extends DisplayBase {
-  constructor(container, shape) {
+class HighlightDisplay extends DisplayItem {
+  constructor(shape) {
     super();
 
     this._shape = shape;
 
-    let svg = createSvgElement('svg');
+    const svg = this.getSvg();
     this._applyGridOffset(svg);
-    svg.classList.add('sudoku-display-svg');
     svg.classList.add('selection-svg');
-    let sideLength = DisplayBase.CELL_SIZE * shape.gridSize;
+    let sideLength = DisplayItem.CELL_SIZE * shape.gridSize;
 
     svg.setAttribute('height', sideLength);
     svg.setAttribute('width', sideLength);
-
-    this._svg = svg;
-
-    container.append(svg);
   }
 
   highlightCell(cellId, cssClass) {
@@ -205,37 +225,30 @@ class HighlightDisplay extends DisplayBase {
     this._svg.removeChild(path);
   }
 
-  getSvg() {
-    return this._svg;
-  }
-
   cellAt(x, y) {
     const shape = this._shape;
-    const row = y/DisplayBase.CELL_SIZE|0;
-    const col = x/DisplayBase.CELL_SIZE|0;
+    const row = y/DisplayItem.CELL_SIZE|0;
+    const col = x/DisplayItem.CELL_SIZE|0;
     if (row < 0 || row >= shape.gridSize) return null;
     if (col < 0 || col >= shape.gridSize) return null;
     return shape.makeCellId(row, col);
   }
 }
 
-class ConstraintDisplay extends DisplayBase {
+class ConstraintDisplay extends DisplayItem {
   static SVG_PADDING = 27;
   static CELL_SIZE = 52;
 
-  constructor(container, inputManager, shape) {
+  constructor(inputManager, shape) {
     super();
 
     this._shape = shape;
 
-    let svg = createSvgElement('svg');
+    const svg = this.getSvg();
     let padding = ConstraintDisplay.SVG_PADDING;
     let sideLength = ConstraintDisplay.CELL_SIZE * shape.gridSize + padding*2;
     svg.setAttribute('height', sideLength);
     svg.setAttribute('width', sideLength);
-    svg.classList.add('sudoku-display-svg');
-
-    container.style.padding = `${padding}px`;
 
     svg.append(this._makeGrid());
 
@@ -253,8 +266,6 @@ class ConstraintDisplay extends DisplayBase {
     svg.append(this._makeLittleKillers(inputManager));
     inputManager.addSelectionPreserver(svg);
     svg.append(this.makeBorders());
-
-    container.prepend(svg);
 
     this.clear();  // clear() to initialize.
   }
