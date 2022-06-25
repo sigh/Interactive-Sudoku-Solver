@@ -1447,6 +1447,8 @@ class SolutionController {
     // happen when we are waiting for a worker to initialize.
     this._solverPromises = [];
 
+    constraintManager.addReshapeListener(this);
+
     this._solutionDisplay = new SolutionDisplay(
       constraintManager, displayContainer.getNewGroup('solution-group'));
     constraintManager.addReshapeListener(this._solutionDisplay);
@@ -1505,6 +1507,12 @@ class SolutionController {
     });
 
     this._update();
+  }
+
+  reshape() {
+    // Terminate any runnings solvers ASAP, so they are less
+    // likely to cause problems sending stale data.
+    this._terminateSolver();
   }
 
   enableDebugOutput(enable) {
