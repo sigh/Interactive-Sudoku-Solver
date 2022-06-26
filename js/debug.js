@@ -24,7 +24,7 @@ const toShortSolution = (valueIds, shape) => {
   const DEFAULT_VALUE = '.';
   result.fill(DEFAULT_VALUE);
 
-  const baseCharCode = SudokuTextParser.SHAPE_TO_BASE_CHAR.get(shape);
+  const baseCharCode = SudokuTextParser.SHAPE_TO_BASE_CHAR_CODE.get(shape);
 
   for (const valueId of valueIds) {
     let {cell, value} = shape.parseValueId(valueId);
@@ -219,6 +219,7 @@ const runSolveTests = async (onFailure) => {
     '16x16',
     '16x16: Sudoku X',
     '16x16: Sudoku X, hard',
+    '16x16: Jigsaw',
   ], onFailure);
 };
 

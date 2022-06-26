@@ -146,6 +146,7 @@ class ExampleHandler {
     'X-Windoku',
     '16x16',
     '16x16: Sudoku X, hard',
+    '16x16: Jigsaw',
   ];
 
   constructor(constraintManager) {
@@ -212,11 +213,14 @@ class JigsawManager {
   getConstraint() {
     if (this._piecesMap.every(x => x == 0)) return new SudokuConstraint.Set([]);
 
+    const baseCharCode = SudokuTextParser.SHAPE_TO_BASE_CHAR_CODE.get(this._shape);
+
     const indexMap = new Map();
     const grid = Array(this._shape.numCells).fill('-');
     this._piecesMap.forEach((p, i) => {
       if (!indexMap.has(p)) indexMap.set(p, indexMap.size);
-      grid[i] = indexMap.get(p);
+      grid[i] = String.fromCharCode(
+        baseCharCode + indexMap.get(p));
     });
     return new SudokuConstraint.Jigsaw(grid.join(''));
   }

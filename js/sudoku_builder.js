@@ -193,7 +193,7 @@ class SudokuTextParser {
     return new SudokuConstraint.Set(constraints);
   }
 
-  static SHAPE_TO_BASE_CHAR = new Map([
+  static SHAPE_TO_BASE_CHAR_CODE = new Map([
     [SHAPE_9x9, '1'.charCodeAt(0)],
     [SHAPE_16x16, 'A'.charCodeAt(0)],
   ])
@@ -228,8 +228,6 @@ class SudokuTextParser {
     const shape = GridShape.fromNumCells(text.length);
     if (!shape) return null;
 
-    if (shape !== SHAPE_9x9) return null;
-
     const numCells = shape.numCells;
     const gridSize = shape.gridSize;
 
@@ -256,8 +254,6 @@ class SudokuTextParser {
 
     const shape = GridShape.fromNumCells(text.length/2);
     if (!shape) return null;
-
-    if (shape !== SHAPE_9x9) return null;
 
     const numCells = shape.numCells;
 
