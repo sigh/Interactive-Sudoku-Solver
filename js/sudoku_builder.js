@@ -453,31 +453,26 @@ class SudokuConstraint {
   }
 
   static Windoku = class Windoku extends SudokuConstraint {
-    static REGIONS = (() => {
-      const shape = SHAPE_9x9;  // Windoku only makes sense for 9x9.
+    static regions = memoize((shape) => {
       const gridSize = shape.gridSize;
       const boxSize = shape.boxSize;
 
       const regions = [];
 
-      const offsets = [
-        [1, 1],
-        [1, 5],
-        [5, 1],
-        [5, 5],
-      ];
-      for (const [r, c] of offsets) {
-        let cells = [];
-        for (let i = 0; i < gridSize; i++) {
-          const row = r+(i%boxSize|0);
-          const col = c+(i/boxSize|0);
-          cells.push(shape.cellIndex(row, col));
+      for (let i = 1; i < gridSize; i+=boxSize+1) {
+        for (let j = 1; j < gridSize; j+=boxSize+1) {
+          const cells = [];
+          for (let k = 0; k < gridSize; k++) {
+            const row = i+(k%boxSize|0);
+            const col = j+(k/boxSize|0);
+            cells.push(shape.cellIndex(row, col));
+          }
+          regions.push(cells);
         }
-        regions.push(cells);
       }
 
       return regions;
-    })();
+    });
   }
 
   static AntiKnight = class AntiKnight extends SudokuConstraint {}
@@ -840,7 +835,7 @@ class SudokuBuilder {
         break;
 
       case 'Windoku':
-        for (const cells of SudokuConstraint.Windoku.REGIONS) {
+        for (const cells of SudokuConstraint.Windoku.regions(shape)) {
           yield new SudokuConstraintHandler.AllDifferent(cells);
         }
         break;

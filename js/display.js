@@ -723,8 +723,7 @@ class WindokuRegionDisplay extends DisplayItem {
 
     const svg = this.getSvg();
 
-    // Windoku only works for 9x9, but we can just be agnostic to that here.
-    for (const region of SudokuConstraint.Windoku.REGIONS) {
+    for (const region of SudokuConstraint.Windoku.regions(shape)) {
       for (const cell of region) {
         svg.append(this._makeCellSquare(cell));
       }
