@@ -1042,7 +1042,7 @@ SudokuConstraintHandler.SameValues = class SameValues extends SudokuConstraintHa
       values1 |= grid[cells1[i]];
     }
 
-    if (values1 == values0) return true;
+    if (values1 === values0) return true;
 
     const values = values1 & values0;
 
@@ -1050,9 +1050,15 @@ SudokuConstraintHandler.SameValues = class SameValues extends SudokuConstraintHa
     if (this._isUnique && this._countTable[values] < numCells) return false;
 
     // Enforce the constrained value set.
-    const cells = this.cells;
-    for (let i = numCells*2-1; i >= 0; i--) {
-      if (!(grid[cells[i]] &= values)) return false;
+    if (values0 !== values) {
+      for (let i = numCells-1; i >= 0; i--) {
+        if (!(grid[cells0[i]] &= values)) return false;
+      }
+    }
+    if (values1 !== values) {
+      for (let i = numCells-1; i >= 0; i--) {
+        if (!(grid[cells1[i]] &= values)) return false;
+      }
     }
 
     return true;
@@ -1232,8 +1238,8 @@ class SudokuConstraintOptimizer {
   static _addHouseIntersections(handlerSet, shape) {
     const houseHandlers = handlerSet.getAllofType(SudokuConstraintHandler.House);
     const numHandlers = houseHandlers.length;
-    for (let i = 0; i < numHandlers; i++) {
-      for (let j = 0; j < numHandlers; j++) {
+    for (let i = 1; i < numHandlers; i++) {
+      for (let j = 0; j < i; j++) {
         const intersectionSize = arrayIntersectSize(
           houseHandlers[i].cells, houseHandlers[j].cells);
         if (intersectionSize !== shape.boxSize) continue;

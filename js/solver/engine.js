@@ -444,17 +444,15 @@ SudokuSolver.InternalSolver = class {
   }
 
   _enforceAuxHandlers(grid, cell, cellAccumulator) {
-    // Only enforce aux handlers for cells which have been deemed "important".
-    // In this case where they have recently caused a backtrack.
-    if (this._backtrackTriggers[cell] < 2) return true;
-
     const counters = this.counters;
+
     for (const handler of this._handlerSet.lookupAux(cell)) {
       counters.constraintsProcessed++;
       if (!handler.enforceConsistency(grid, cellAccumulator)) {
         return false;
       }
     }
+
     return true;
   }
 
