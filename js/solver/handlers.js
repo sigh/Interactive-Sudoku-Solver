@@ -316,7 +316,10 @@ class SumHandlerUtil {
       allValues |= v;
       fixedValues |= (!(v&(v-1)))*v; // Better than branching.
     }
-    const fixedSum = this._lookupTables.sum[fixedValues]
+    const fixedSum = this._lookupTables.sum[fixedValues];
+    // This should have been caught by the range checks, but we
+    // could have restricted cells in the meantime.
+    if (fixedSum > sum) return false;
 
     // Check if we have enough unique values.
     if (this._lookupTables.count[allValues] < numCells) return false
