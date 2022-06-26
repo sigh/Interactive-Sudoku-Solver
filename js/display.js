@@ -308,6 +308,27 @@ class HighlightDisplay extends DisplayItem {
     this._applyGridOffset(svg);
   }
 
+  static makeRadialGradient(id) {
+    const gradient = createSvgElement('radialGradient');
+    gradient.id = id;
+
+    let stop;
+
+    stop = createSvgElement('stop');
+    stop.setAttribute('offset', '70%');
+    stop.setAttribute('stop-opacity', '0');
+    stop.setAttribute('stop-color', 'rgb(0,255,0)');
+    gradient.append(stop);
+
+    stop = createSvgElement('stop');
+    stop.setAttribute('offset', '100%');
+    stop.setAttribute('stop-opacity', '1');
+    stop.setAttribute('stop-color', 'rgb(0,255,0)');
+    gradient.append(stop);
+
+    return gradient;
+  }
+
   highlightCell(cellId, cssClass) {
     const parsed = this._shape.parseCellId(cellId);
 

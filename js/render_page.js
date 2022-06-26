@@ -1461,6 +1461,9 @@ class SolutionController {
     this._isSolving = false;
     this._constraintManager = constraintManager;
     this._stepHighlighter = displayContainer.createHighlighter('highlighted-step-cell');
+    displayContainer.addElement(
+      HighlightDisplay.makeRadialGradient('highlighted-step-gradient'));
+    console.log(displayContainer._mainSvg);
 
     this.debugOutput = new DebugOutput(displayContainer);
     constraintManager.addReshapeListener(this.debugOutput);

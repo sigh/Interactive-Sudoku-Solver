@@ -143,8 +143,7 @@ button.danger-button:hover:enabled {
   opacity: 0.5;
 }
 .highlighted-step-cell {
-  /* TODO: Make this a gradient. */
-  fill: rgba(0,255,0);
+  fill: url('#highlighted-step-gradient');
   opacity: 0.5;
 }
 
