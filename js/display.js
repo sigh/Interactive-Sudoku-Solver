@@ -436,7 +436,7 @@ class ConstraintDisplay extends DisplayItem {
   removeItem(item) {
     if (!item) return;
     if (this._jigsawRegions.removeItem(item)) return;
-    if (this._killerCages.removeItem(item)) return;
+    if (this._killerCageDisplay.removeCage(item)) return;
     item.parentNode.removeChild(item);
   }
 
