@@ -217,6 +217,11 @@ button.danger-button:hover:enabled {
 #constraint-panel {
   line-height: 2;
 }
+#outside-arrow-input {
+  /* Hack, because for some reason `vertical-align: text-top` moves the tooltip
+     down for just the little killer:( */
+  line-height: 1;
+}
 
 #constraint-panel svg {
   margin-right: 10px;
