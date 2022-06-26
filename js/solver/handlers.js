@@ -1037,7 +1037,7 @@ SudokuConstraintHandler.SameValues = class SameValues extends SudokuConstraintHa
 
     let values0 = 0;
     let values1 = 0;
-    for (let i = numCells; i >= 0; i--) {
+    for (let i = numCells-1; i >= 0; i--) {
       values0 |= grid[cells0[i]];
       values1 |= grid[cells1[i]];
     }
