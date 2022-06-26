@@ -1245,7 +1245,7 @@ class SudokuConstraintOptimizer {
         if (ENABLE_DEBUG_LOGS) {
           debugLog({
             loc: '_addHouseIntersections',
-            msg: 'Add: ' + newHandler.constructor.name,
+            msg: `Add: ${newHandler.constructor.name} (aux)`,
             cells: newHandler.cells,
           });
         }
