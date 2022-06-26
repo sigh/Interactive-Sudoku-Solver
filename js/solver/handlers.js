@@ -819,6 +819,12 @@ SudokuConstraintHandler.Sandwich = class Sandwich extends SudokuConstraintHandle
   }
 
   initialize(initialGrid, cellConflicts, shape) {
+    // If the sum is not feasible, force the grid to be invalid.
+    if (this._sum < 0 || this._sum > this.constructor._maxSum(shape)) {
+      this.cells.forEach(c => initialGrid[c] = 0);
+      return;
+    }
+
     const lookupTables = LookupTables.get(shape.numValues);
 
     this._gridSize = shape.gridSize;
@@ -839,7 +845,7 @@ SudokuConstraintHandler.Sandwich = class Sandwich extends SudokuConstraintHandle
     return (shape.gridSize*(shape.gridSize-1)/2)-1;
   }
 
-  // Possible combinations for values between the 1 and 9 for each possible sum.
+  // Possible combinations for values between the sentinals for each possible sum.
   // Grouped by distance.
   static _combinations = memoize((shape) => {
     const lookupTables = LookupTables.get(shape.numValues);
@@ -868,7 +874,7 @@ SudokuConstraintHandler.Sandwich = class Sandwich extends SudokuConstraintHandle
     return table;
   });
 
-  // Distance range between the 1 and 9 for each possible sum.
+  // Distance range between the sentinals for each possible sum.
   // Map combination to [min, max].
   static _distanceRange = memoize((shape) => {
     const combinations = this._combinations(shape);
@@ -935,21 +941,22 @@ SudokuConstraintHandler.Sandwich = class Sandwich extends SudokuConstraintHandle
     let validSettings = SudokuConstraintHandler.Sandwich._validSettings;
     validSettings.fill(0);
 
-    // Iterate over each possible starting index for the first 1 or 9.
+    // Iterate over each possible starting index for the first sentinal.
     // Check if the other values are consistant with the required sum.
     // Given that the values must form a house, this is sufficient to ensure
     // that the constraint is fully satisfied.
     const valueMask = this._valueMask;
     const [minDist, maxDist] = this._distances;
     const maxIndex = gridSize - minDist;
+    const shift = gridSize-1;
     let prefixValues = 0;
     let pPrefix = 0;
     for (let i = 0; i < maxIndex; i++) {
       let v = values[i];
-      // If we don't have a 1 or 9, move onto the next index.
+      // If we don't have a sentinal, move onto the next index.
       if (!(v &= borderMask)) continue;
-      // Determine what the matching 1 or 9 value needs to be.
-      const vRev = borderMask & ((v>>8) | (v<<8));
+      // Determine what the matching sentinal value needs to be.
+      const vRev = borderMask & ((v>>shift) | (v<<shift));
 
       // For each possible gap:
       //  - Determine the currently possible values inside the gap.
