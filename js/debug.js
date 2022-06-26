@@ -214,7 +214,9 @@ const runSolveTests = async (onFailure) => {
   ], onFailure);
 
   await runAllWithChecks([
-    '16x16, X-Sudoku',
+    '16x16',
+    '16x16: Sudoku X',
+    '16x16: Sudoku X, hard',
   ], onFailure);
 };
 

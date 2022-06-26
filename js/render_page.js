@@ -144,6 +144,8 @@ class ExampleHandler {
     'Palindromes',
     'Jigsaw',
     'X-Windoku',
+    '16x16',
+    '16x16: Sudoku X, hard',
   ];
 
   constructor(constraintManager) {
@@ -1463,7 +1465,6 @@ class SolutionController {
     this._stepHighlighter = displayContainer.createHighlighter('highlighted-step-cell');
     displayContainer.addElement(
       HighlightDisplay.makeRadialGradient('highlighted-step-gradient'));
-    console.log(displayContainer._mainSvg);
 
     this.debugOutput = new DebugOutput(displayContainer);
     constraintManager.addReshapeListener(this.debugOutput);

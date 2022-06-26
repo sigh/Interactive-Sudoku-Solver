@@ -2,8 +2,13 @@ var ENABLE_DEBUG_LOGS = false;
 
 class GridShape {
   static _registry = new Map();
-  static _register(shape) { this._registry.set(shape.name, shape); }
+  static _numCellsLookup = new Map();
+  static _register(shape) {
+    this._registry.set(shape.name, shape);
+    this._numCellsLookup.set(shape.numCells, shape);
+  }
   static get(name) { return this._registry.get(name); }
+  static fromNumCells(numCells) { return this._numCellsLookup.get(numCells); }
 
   constructor(gridSize, boxSize) {
     this.boxSize = boxSize;
@@ -188,12 +193,19 @@ class SudokuTextParser {
     return new SudokuConstraint.Set(constraints);
   }
 
-  static _parsePlainSudoku(text, shape, baseChar) {
+  static _SHAPE_TO_BASE_CHAR = new Map([
+    [SHAPE_9x9, '1'],
+    [SHAPE_16x16, 'A'],
+  ])
+
+  static parsePlainSudoku(text) {
+    const shape = GridShape.fromNumCells(text.length);
+    if (!shape) return null;
+
     const numCells = shape.numCells;
     const gridSize = shape.gridSize;
 
-    if (text.length != numCells) return null;
-
+    const baseChar = this._SHAPE_TO_BASE_CHAR.get(shape);
     const baseCharCode = baseChar.charCodeAt(0);
 
     let fixedValues = [];
@@ -208,25 +220,19 @@ class SudokuTextParser {
     }
     if (new Set(nonValueCharacters).size > 1) return null;
     return new SudokuConstraint.Set([
-      new SudokuConstraint.Shape(shape),
+      new SudokuConstraint.Shape(shape.name),
       new SudokuConstraint.FixedValues(...fixedValues),
     ]);
   }
 
-  static parsePlain9x9(text) {
-    return this._parsePlainSudoku(text, SHAPE_9x9, '1');
-  }
-
-  static parsePlain16x16(text) {
-    return this._parsePlainSudoku(text, SHAPE_16x16, 'A');
-  }
-
   static parseJigsawLayout(text) {
-    const shape = SHAPE_9x9;
+    const shape = GridShape.fromNumCells(text.length);
+    if (!shape) return null;
+
+    if (shape !== SHAPE_9x9) return null;
+
     const numCells = shape.numCells;
     const gridSize = shape.gridSize;
-
-    if (text.length != numCells) return null;
 
     const chars = new Set(text);
     if (chars.size != gridSize) return null;
@@ -240,25 +246,26 @@ class SudokuTextParser {
     if (Object.values(counter).some(c => c != gridSize)) return null;
 
     return new SudokuConstraint.Set([
+      new SudokuConstraint.Shape(shape.name),
       new SudokuConstraint.Jigsaw(text),
       new SudokuConstraint.NoBoxes(),
     ]);
   }
 
   static parseJigsaw(text) {
-    const shape = SHAPE_9x9;
+    if (text.length%2 !== 0) return null;
+
+    const shape = GridShape.fromNumCells(text.length/2);
+    if (!shape) return null;
+
+    if (shape !== SHAPE_9x9) return null;
+
     const numCells = shape.numCells;
-
-    if (text.length == numCells) {
-      return this.parseJigsawLayout(text);
-    }
-
-    if (text.length != numCells*2) return null;
 
     const layout = this.parseJigsawLayout(text.substr(numCells));
     if (layout == null) return null;
 
-    const fixedValues = this.parsePlain9x9(text.substr(0, numCells));
+    const fixedValues = this.parsePlainSudoku(text.substr(0, numCells));
     if (fixedValues == null) return null;
 
     return new SudokuConstraint.Set([layout, fixedValues]);
@@ -283,7 +290,7 @@ class SudokuTextParser {
     }
 
     return new SudokuConstraint.Set([
-      new SudokuConstraint.Shape(shape),
+      new SudokuConstraint.Shape(shape.name),
       new SudokuConstraint.FixedValues(...fixedValues),
     ]);
   }
@@ -303,10 +310,10 @@ class SudokuTextParser {
     constraint = this.parseJigsaw(text);
     if (constraint) return constraint;
 
-    constraint = this.parsePlain9x9(text);
+    constraint = this.parseJigsawLayout(text);
     if (constraint) return constraint;
 
-    constraint = this.parsePlain16x16(text);
+    constraint = this.parsePlainSudoku(text);
     if (constraint) return constraint;
 
     constraint = this.parseGridLayout(rawText);
@@ -385,7 +392,7 @@ class SudokuConstraint {
   static getShapeFromMeta(metaConstraint) {
     const shapeArgs = metaConstraint.get('Shape');
     const shape = shapeArgs ? GridShape.get(shapeArgs[0]) : this.DEFAULT_SHAPE;
-    if (!shape) throw('Unknown shape: ' + shapeArgs[0]);
+    if (!shape) throw('Unknown shape: ' + shape);
     return shape;
   }
   static getShape(constraint) {
