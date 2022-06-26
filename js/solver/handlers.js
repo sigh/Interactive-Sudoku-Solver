@@ -1436,9 +1436,9 @@ class SudokuConstraintOptimizer {
     // We don't want too many cells in the new sum.
     if (cells.length > gridSize + this._MAX_SUM_SIZE) return null;
 
-    const overlap = arrayIntersect(houseHandler.cells, cells);
+    const overlap = arrayIntersectSize(houseHandler.cells, cells);
     // We need all cells in the house to be covered.
-    if (overlap.length != gridSize) return null;
+    if (overlap != gridSize) return null;
 
     const outsideCells = arrayDifference(cells, houseHandler.cells);
     const outsideSum = totalSum - shape.maxSum;
@@ -1487,12 +1487,12 @@ class SudokuConstraintOptimizer {
       let constrainedSum = 0;
       for (const i of overlappingHandlerIndexes) {
         const k = handlerSet.getHandler(i);
-        const overlap = arrayIntersect(h.cells, k.cells);
-        if (overlap.length == k.cells.length) {
-          constrainedCells.push(...overlap);
+        const overlapSize = arrayIntersectSize(h.cells, k.cells);
+        if (overlapSize == k.cells.length) {
+          constrainedCells.push(...arrayIntersect(h.cells, k.cells));
           constrainedSum += k.sum();
           k.setComplementCells(arrayDifference(h.cells, k.cells));
-        } else if (k.cells.length - overlap.length == 1) {
+        } else if (k.cells.length - overlapSize == 1) {
           outies.push(k);
         }
       }
