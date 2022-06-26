@@ -1108,8 +1108,14 @@ class HandlerSet {
     this._seen = new Set();
     this._indexLookup = new Map();
 
+    this._auxHandlers = [];
+
     this._cellMap = new Array(shape.numCells);
-    for (let i = 0; i < shape.numCells; i++) this._cellMap[i] = [];
+    this._auxHandlerLookup = new Array(shape.numCells);
+    for (let i = 0; i < shape.numCells; i++) {
+      this._cellMap[i] = [];
+      this._auxHandlerLookup[i] = [];
+    }
 
     this.add(...handlers);
   }
@@ -1120,6 +1126,14 @@ class HandlerSet {
 
   getAll() {
     return this._handlers;
+  }
+
+  getAux() {
+    return this._auxHandlers;
+  }
+
+  lookupAux(cell) {
+    return this._auxHandlerLookup[cell];
   }
 
   getCellMap() {
@@ -1172,6 +1186,24 @@ class HandlerSet {
     }
   }
 
+  addAux(...handlers) {
+    for (const h of handlers) {
+      // Don't add duplicate handlers.
+      if (this._seen.has(h.idStr)) {
+        continue;
+      }
+      this._seen.add(h.idStr);
+
+      this._addAux(h);
+    }
+  }
+
+  _addAux(handler) {
+    this._auxHandlers.push(handler);
+    handler.cells.forEach(
+      c => this._auxHandlerLookup[c].push(handler));
+  }
+
   [Symbol.iterator]() {
     return this._handlers[Symbol.iterator]();
   }
@@ -1191,6 +1223,34 @@ class SudokuConstraintOptimizer {
     this._addSumComplementCells(handlerSet);
 
     this._optimizeJigsaw(handlerSet, hasBoxes, shape);
+
+    if (hasBoxes) {
+      this._addHouseIntersections(handlerSet, shape);
+    }
+  }
+
+  static _addHouseIntersections(handlerSet, shape) {
+    const houseHandlers = handlerSet.getAllofType(SudokuConstraintHandler.House);
+    const numHandlers = houseHandlers.length;
+    for (let i = 0; i < numHandlers; i++) {
+      for (let j = 0; j < numHandlers; j++) {
+        const intersectionSize = arrayIntersectSize(
+          houseHandlers[i].cells, houseHandlers[j].cells);
+        if (intersectionSize !== shape.boxSize) continue;
+        const newHandler = new SudokuConstraintHandler.SameValues(
+          arrayDifference(houseHandlers[i].cells, houseHandlers[j].cells),
+          arrayDifference(houseHandlers[j].cells, houseHandlers[i].cells),
+          true);
+        handlerSet.addAux(newHandler);
+        if (ENABLE_DEBUG_LOGS) {
+          debugLog({
+            loc: '_addHouseIntersections',
+            msg: 'Add: ' + newHandler.constructor.name,
+            cells: newHandler.cells,
+          });
+        }
+      }
+    }
   }
 
   static _optimizeJigsaw(handlerSet, hasBoxes, shape) {

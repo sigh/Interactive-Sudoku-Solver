@@ -26,6 +26,10 @@ const arrayIntersect = (a, b) => {
   return a.filter(v => b.includes(v));
 };
 
+const arrayIntersectSize = (a, b) => {
+  return a.reduce((p, v) => p + b.includes(v), 0);
+}
+
 const arraysAreEqual = (a, b) => {
   if (a.length != b.length) return false;
   for (let i = 0; i < a.length; i++) {
