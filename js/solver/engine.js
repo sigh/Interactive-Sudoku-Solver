@@ -699,7 +699,7 @@ SudokuSolver.InternalSolver = class {
     const besthouse = attemptLog[0][0];
 
     this._resetStack();
-    fillhouse(besthouse);
+    fillHouse(besthouse);
 
     // Run the final search until we find a solution or prove that one doesn't
     // exist.
