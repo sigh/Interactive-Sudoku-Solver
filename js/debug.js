@@ -24,10 +24,12 @@ const toShortSolution = (valueIds, shape) => {
   const DEFAULT_VALUE = '.';
   result.fill(DEFAULT_VALUE);
 
+  const baseCharCode = SudokuTextParser.SHAPE_TO_BASE_CHAR.get(shape);
+
   for (const valueId of valueIds) {
     let {cell, value} = shape.parseValueId(valueId);
     if (result[cell] != DEFAULT_VALUE) throw('Too many solutions per cell.');
-    result[cell] = value;
+    result[cell] = String.fromCharCode(baseCharCode+value-1);
   }
   return result.join('');
 }
