@@ -1162,6 +1162,11 @@ SudokuConstraintHandler.Between = class Between extends SudokuConstraintHandler 
     return this._binaryConstraint.initialize(initialGrid, cellConflicts, shape);
   }
 
+  conflictSet() {
+    // The ends must be unique if there are any cells in the middle.
+    return this._mids.length ? this._ends : [];
+  }
+
   enforceConsistency(grid, cellAccumulator) {
     // Constrain the ends to be consistant with each other.
     if (!this._binaryConstraint.enforceConsistency(grid, cellAccumulator)) {
