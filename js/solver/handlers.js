@@ -705,7 +705,6 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
 
     return true;
   }
-
   enforceConsistency(grid) {
     const cells = this.cells;
     const numCells = cells.length;
@@ -720,8 +719,19 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
       rangeInfoSum += rangeInfo[grid[cells[i]]];
     }
 
-    const maxSum = rangeInfoSum & 0xff;
-    const minSum = (rangeInfoSum>>8) & 0xff;
+    let maxSum = rangeInfoSum & 0xff;
+    let minSum = (rangeInfoSum>>8) & 0xff;
+
+    if (maxSum === 0) {
+      // This can only happen if there are 16 16s. This is rare, so special
+      // handling is fine.
+      maxSum = 1<<8;
+      minSum -= 1;
+      // If both minSum and maxSum are 0, then we have a fixed list of 16s.
+      // So just return if the sum is equal.
+      if (minSum == 0) return sum === 1<<8;
+    }
+
     // It is impossible to make the target sum.
     if (sum < minSum || maxSum < sum) return false;
     // We've reached the target sum exactly.
