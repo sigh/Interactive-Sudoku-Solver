@@ -785,6 +785,19 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
 // SumWithNegative allows one cell in the sum to be negative.
 // We can easily extend this class to multiple cells, but it hasn't shown to
 // provide any benefit.
+//
+// How this works
+// --------------
+// Initial constraint is:
+//   a1+a2+...+an - b = s
+// If reverse the bitset for `b`, then we get the value:
+//   B = G+1 - b where `G` is the gridSize (number of values).
+// This gives a new constraint which is sum of positives:
+//   a1+a2+...+an + B = s + G+1;
+// Thus we can reverse `b` then use the Sum handler with the updated sum.
+//
+// Note that `B` is still a value in the same range as `b`, so the Sum handler
+// does not need to be made more general.
 SudokuConstraintHandler.SumWithNegative = class SumWithNegative extends SudokuConstraintHandler.Sum {
   constructor(positiveCells, negativeCell, sum) {
     positiveCells.sort();
