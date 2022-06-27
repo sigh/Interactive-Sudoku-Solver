@@ -1,32 +1,23 @@
 class DisplayContainer {
   constructor(container) {
-    const padding = DisplayItem.SVG_PADDING;
-    container.style.padding = `${padding}px`;
-    this._container = container;
-
     const svg = createSvgElement('svg');
-    svg.classList.add('sudoku-display-svg');
-    svg.classList.add('main-sudoku-display-svg');
 
     this._mainSvg = svg;
-    this._container.append(svg);
+    container.append(svg);
 
     this._highlightDisplay = new HighlightDisplay(
       this.getNewGroup('highlight-group'));
 
     this._clickInterceptor = new ClickInterceptor();
-    this._container.append(this._clickInterceptor.getSvg());
+    container.append(this._clickInterceptor.getSvg());
   }
 
   reshape(shape) {
-    this._container.className = '';
-    this._container.classList.add('sudoku-grid');
-    this._container.classList.add(`size-${shape.name}`);
-
     const padding = DisplayItem.SVG_PADDING;
     const sideLength = DisplayItem.CELL_SIZE * shape.gridSize + padding*2;
     this._mainSvg.setAttribute('height', sideLength);
     this._mainSvg.setAttribute('width', sideLength);
+    this._mainSvg.setAttribute('class', `size-${shape.name}`);
 
     this._highlightDisplay.reshape(shape);
     this._clickInterceptor.reshape(shape);
@@ -140,7 +131,6 @@ class DisplayItem {
 class ClickInterceptor extends DisplayItem {
   constructor() {
     const svg = createSvgElement('svg');
-    svg.classList.add('sudoku-display-svg');
     svg.classList.add('click-interceptor-svg');
 
     super(svg);

@@ -1,29 +1,14 @@
-.sudoku-grid {
+#sudoku-grid {
   position: relative;
-
-  display: inline-grid;
 
   box-shadow: 3px 3px 10px;
 }
-.size-9x9 {
-  grid-template-columns: repeat(9, 52px);
-  grid-template-rows: repeat(9, 52px);
-}
-.size-16x16 {
-  grid-template-columns: repeat(16, 52px);
-  grid-template-rows: repeat(16, 52px);
-}
 
-.sudoku-display-svg {
+.click-interceptor-svg {
+  z-index: 100;
   position: absolute;
   top: 0;
   left: 0;
-}
-.main-sudoku-display-svg {
-  z-index: 10;
-}
-.click-interceptor-svg {
-  z-index: 100;
 }
 
 .fixed-value {
@@ -32,8 +17,6 @@
   text-anchor: middle;
   dominant-baseline: middle;
 }
-
-
 .solution-value {
   font-size: 30px;
   font-family: monospace;
@@ -43,7 +26,6 @@
   text-anchor: middle;
   dominant-baseline: middle;
 }
-
 .solution-multi-value {
   font-size: 15px;
   font-family: monospace;
@@ -300,7 +282,7 @@ button.icon-button {
 #fake-input {
   opacity: 0;
   cursor: pointer;
-  position: relative;
+  position: absolute;
   z-index: -1;
   /* Required to stop auto-zooming on mobile. */
   width: 1em;
