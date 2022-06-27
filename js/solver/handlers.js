@@ -12,7 +12,7 @@ class SudokuConstraintHandler {
     this.idStr = this.constructor.name + '-' + id.toString();
   }
 
-  enforceConsistency(grid) {
+  enforceConsistency(grid, cellAccumulator) {
     return true;
   }
 
@@ -33,7 +33,17 @@ class SudokuConstraintHandler {
 SudokuConstraintHandler.NoBoxes = class NoBoxes extends SudokuConstraintHandler {}
 
 SudokuConstraintHandler.False = class False extends SudokuConstraintHandler {
-  enforceConsistency() { return false; }
+  constructor(cells) {
+    // The cells with which to associate the failure.
+    super(cells);
+
+    if (cells.length === 0) throw 'False needs cells to be effective.';
+  }
+
+  initialize(initialGrid, cellConflicts, shape) {
+    return false;
+  }
+  enforceConsistency(grid, cellAccumulator) { return false; }
 }
 
 SudokuConstraintHandler.FixedCells = class FixedCells extends SudokuConstraintHandler {

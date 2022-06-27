@@ -749,7 +749,7 @@ class SudokuBuilder {
         if (constraint.cells.length <= gridSize) {
           yield new SudokuConstraintHandler.SumWithNegative(
             positiveCells, negativeCell, 0);
-        } else if (constraint.cells.length == gridSize+1) {
+        } else if (positiveCells.length == gridSize) {
           let valueMap = new Map();
           for (const cell of positiveCells) valueMap.set(cell, 1);
           valueMap.set(negativeCell, gridSize);
@@ -758,7 +758,8 @@ class SudokuBuilder {
           // Sum can't handle more than gridSize cells.
           // Arrows can't have more than gridSize cells in the stem
           // to make the final sum.
-          yield new SudokuConstraintHandler.False();
+          yield new SudokuConstraintHandler.False(
+            [negativeCell, ...positiveCells]);
         }
 
         break;
@@ -771,7 +772,7 @@ class SudokuBuilder {
             yield new SudokuConstraintHandler.Sum(cells, constraint.sum);
           } else {
             // Sum can't handle more than gridSize cells.
-            yield new SudokuConstraintHandler.False();
+            yield new SudokuConstraintHandler.False(cells);
           }
         }
         yield new SudokuConstraintHandler.AllDifferent(cells);
