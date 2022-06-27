@@ -743,19 +743,36 @@ class SudokuBuilder {
         break;
 
       case 'Arrow':
-        const [negativeCell, ...positiveCells] = constraint.cells.map(
-          c => shape.parseCellId(c).cell);
-        yield new SudokuConstraintHandler.SumWithNegative(
-          positiveCells, negativeCell, 0);
+        const [negativeCell, ...positiveCells] = (
+          constraint.cells.map(c => shape.parseCellId(c).cell));
+
+        if (constraint.cells.length <= gridSize) {
+          yield new SudokuConstraintHandler.SumWithNegative(
+            positiveCells, negativeCell, 0);
+        } else if (constraint.cells.length == gridSize+1) {
+          let valueMap = new Map();
+          for (const cell of positiveCells) valueMap.set(cell, 1);
+          valueMap.set(negativeCell, gridSize);
+          yield new SudokuConstraintHandler.FixedCells(valueMap);
+        } else {
+          // Sum can't handle more than gridSize cells.
+          // Arrows can't have more than gridSize cells in the stem
+          // to make the final sum.
+          yield new SudokuConstraintHandler.False();
+        }
+
         break;
 
       case 'Cage':
         cells = constraint.cells.map(c => shape.parseCellId(c).cell);
-        if (constraint.sum > 0 && cells.length < gridSize) {
-          yield new SudokuConstraintHandler.Sum(cells, constraint.sum);
-        }
-        if (cells.length == gridSize && constraint.sum != shape.maxSum) {
-          yield new SudokuConstraintHandler.False(cells);
+        // A sum of 0 means any sum is ok - i.e. the same as AllDifferent.
+        if (constraint.sum != 0) {
+          if (cells.length <= gridSize) {
+            yield new SudokuConstraintHandler.Sum(cells, constraint.sum);
+          } else {
+            // Sum can't handle more than gridSize cells.
+            yield new SudokuConstraintHandler.False();
+          }
         }
         yield new SudokuConstraintHandler.AllDifferent(cells);
         break;
