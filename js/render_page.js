@@ -894,13 +894,23 @@ class Selection {
     // Make the container selectable.
     container.tabIndex = 0;
 
+    const cellFuziness = 1.4*(DisplayItem.CELL_SIZE/2);
+
     let currCell = null;
+    let currCenter = null;
     const pointerMoveFn = e => {
       const target = this._clickInterceptor.cellAt(e.offsetX, e.offsetY);
-      if (target !== null && target !== currCell) {
-        currCell = target;
-        this._highlight.addCell(currCell);
-      }
+      if (target === null || target === currCell) return;
+
+      // Make current cell hitbox larger so that we can more easily
+      // select diagonals without hitting adjacent cells.
+      const dx = Math.abs(e.offsetX-currCenter[0]);
+      const dy = Math.abs(e.offsetY-currCenter[1]);
+      if (Math.max(dx, dy) < cellFuziness) return;
+
+      currCell = target;
+      currCenter = this._clickInterceptor.cellIdCenter(currCell);
+      this._highlight.addCell(currCell);
     };
     const outsideClickListener = e => {
       // Don't do anything if the click is inside one of the elements where
@@ -920,6 +930,7 @@ class Selection {
       container.addEventListener('pointermove', pointerMoveFn);
       document.body.addEventListener('click', outsideClickListener);
       currCell = null;
+      currCenter = [Infinity, Infinity];
       pointerMoveFn(e);
       e.preventDefault();
     });
