@@ -271,6 +271,20 @@ SudokuSolver.InternalSolver = class {
     return cellConflictSets;
   }
 
+  // Invalidate the grid, given the handler which said it was impossible.
+  // We invalidate the grid by setting cells to zero. We want to set the
+  // most meaningful cells to the user.
+  _invalidateGrid(grid, handler) {
+    // Try to use the handler cells.
+    let cells = handler.cells;
+    // Otherwise the cells in the conflict set.
+    if (!cells.length) cells = handler.conflictSet();
+    cells.forEach(c => grid[c] = 0);
+
+    // Otherwise just set the entire grid to 0.
+    if (!cells.length) grid.fill(0);
+  }
+
   _setUpHandlers(handlers) {
     const cellConflictSets = this.constructor._findCellConflicts(handlers, this._shape);
 
@@ -284,13 +298,16 @@ SudokuSolver.InternalSolver = class {
     // Optimize handlers.
     SudokuConstraintOptimizer.optimize(handlerSet, cellConflictSets, this._shape);
 
-    // TODO: Include as part of the solver for timing?
     for (const handler of handlerSet) {
-      handler.initialize(this._initialGrid, cellConflictSets, this._shape);
+      if (!handler.initialize(this._initialGrid, cellConflictSets, this._shape)) {
+        this._invalidateGrid(this._initialGrid, handler);
+      }
     }
 
     for (const handler of handlerSet.getAux()) {
-      handler.initialize(this._initialGrid, cellConflictSets, this._shape);
+      if (!handler.initialize(this._initialGrid, cellConflictSets, this._shape)) {
+        this._invalidateGrid(this._initialGrid, handler);
+      }
     }
 
     return handlerSet;
@@ -888,6 +905,7 @@ class LookupTables {
           }
         }
       }
+
       // To fill in the rest, OR together all the valid settings for each value
       // set.
       for (let i = 1; i < combinations; i++) {

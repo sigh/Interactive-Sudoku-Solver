@@ -20,7 +20,9 @@ class SudokuConstraintHandler {
     return [];
   }
 
-  initialize(initialGrid, cellConflicts, shape) {}
+  initialize(initialGrid, cellConflicts, shape) {
+    return true;
+  }
 
   priority() {
     // By default, constraints which constrain more cells have higher priority.
@@ -44,6 +46,8 @@ SudokuConstraintHandler.FixedCells = class FixedCells extends SudokuConstraintHa
     for (const [cell, value] of this._valueMap) {
       initialGrid[cell] = 1 << (value-1);
     }
+
+    return true;
   }
 }
 
@@ -52,6 +56,10 @@ SudokuConstraintHandler.AllDifferent = class AllDifferent extends SudokuConstrai
     super();
     conflictCells.sort((a, b) => a - b);
     this._conflictCells = conflictCells;
+  }
+
+  initialize(initialGrid, cellConflicts, shape) {
+    return this._conflictCells.length <= shape.numValues;
   }
 
   conflictSet() {
@@ -67,6 +75,8 @@ SudokuConstraintHandler.House = class House extends SudokuConstraintHandler {
   initialize(initialGrid, cellConflicts, shape) {
     this._shape = shape;
     this._lookupTables = LookupTables.get(shape.numValues);
+
+    return true;
   }
 
   enforceConsistency(grid) {
@@ -145,6 +155,9 @@ SudokuConstraintHandler.BinaryConstraint = class BinaryConstraint extends Sudoku
       lookupTables.forBinaryFunction(fn),
       lookupTables.forBinaryFunction((a, b) => fn(b, a)),
     ];
+
+    // If no values are legal at the start, then this constraint is invalid.
+    return this._tables[0][lookupTables.allValues] !== 0;
   }
 
   enforceConsistency(grid, cellAccumulator) {
@@ -167,6 +180,10 @@ class SumHandlerUtil {
     return new SumHandlerUtil(true, numValues);
   });
 
+  static maxCageSum(numValues) {
+    return numValues*(numValues+1)/2;
+  }
+
   constructor(do_not_call, numValues) {
     if (!do_not_call) throw('Use SumHandlerUtil.get(shape.numValues)');
 
@@ -174,7 +191,7 @@ class SumHandlerUtil {
     this._lookupTables = LookupTables.get(numValues);
 
     const combinations = this._lookupTables.combinations;
-    const maxSum = numValues*(numValues+1)/2;
+    const maxSum = this.constructor.maxCageSum(numValues);
 
     this.killerCageSums = (() => {
       let table = [];
@@ -625,6 +642,8 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
     this._shape = shape;
 
     if (this.cells.length > shape.numValues) {
+      // This isn't an invalid grid,
+      // we just can't handle it because rangeInfo might overflow.
       throw('Number of cells in the sum must be no more than the number of values.');
     }
 
@@ -649,6 +668,17 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
     if (this._complementCells === undefined) {
       this._complementCells = null;
     }
+
+    // Check for valid sums.
+    const sum = this._sum;
+    if (!Number.isInteger(sum) || sum < 0) return false;
+    if (sum > shape.numValues * this.cells.length) return false;
+    if (this._conflictSets.length == 1
+        && sum > SumHandlerUtil.maxCageSum(shape.numValues)) {
+      return false;
+    }
+
+    return true;
   }
 
   _enforceCombinationsWithComplement(grid) {
@@ -816,7 +846,7 @@ SudokuConstraintHandler.SumWithNegative = class SumWithNegative extends SudokuCo
 
   initialize(initialGrid, cellConflicts, shape) {
     this._sum += shape.gridSize + 1;
-    super.initialize(initialGrid, cellConflicts, shape);
+    return super.initialize(initialGrid, cellConflicts, shape);
   }
 
   setComplementCells() {}
@@ -842,10 +872,12 @@ SudokuConstraintHandler.Sandwich = class Sandwich extends SudokuConstraintHandle
   }
 
   initialize(initialGrid, cellConflicts, shape) {
-    // If the sum is not feasible, force the grid to be invalid.
-    if (this._sum < 0 || this._sum > this.constructor._maxSum(shape)) {
-      this.cells.forEach(c => initialGrid[c] = 0);
-      return;
+    // Sanity check.
+    if (this.cells.length != shape.numValues) return false;
+    // Check that the sum is feasible.
+    const sum = this._sum;
+    if (!Number.isInteger(sum) || sum < 0 || sum > this.constructor._maxSum(shape)) {
+      return false;
     }
 
     const lookupTables = LookupTables.get(shape.numValues);
@@ -855,8 +887,10 @@ SudokuConstraintHandler.Sandwich = class Sandwich extends SudokuConstraintHandle
     this._valueMask = ~this._borderMask & lookupTables.allValues;
     this._minMaxTable = lookupTables.minMax8Bit;
 
-    this._distances = SudokuConstraintHandler.Sandwich._distanceRange(shape)[this._sum];
-    this._combinations = SudokuConstraintHandler.Sandwich._combinations(shape)[this._sum];
+    this._distances = SudokuConstraintHandler.Sandwich._distanceRange(shape)[sum];
+    this._combinations = SudokuConstraintHandler.Sandwich._combinations(shape)[sum];
+
+    return true;
   }
 
   static _borderMask(shape) {
@@ -1045,6 +1079,7 @@ SudokuConstraintHandler.SameValues = class SameValues extends SudokuConstraintHa
     cells1.sort();
     super([...cells0, ...cells1]);
     if (cells0.length != cells1.length) {
+      // Throw, because same values are only created by our code.
       throw('SameValues must use sets of the same length.');
     }
 
@@ -1058,6 +1093,8 @@ SudokuConstraintHandler.SameValues = class SameValues extends SudokuConstraintHa
 
   initialize(initialGrid, cellConflicts, shape) {
     this._countTable = LookupTables.get(shape.numValues).count;
+
+    return true;
   }
 
   enforceConsistency(grid) {
@@ -1112,7 +1149,7 @@ SudokuConstraintHandler.Between = class Between extends SudokuConstraintHandler 
 
     this._binaryConstraint = new SudokuConstraintHandler.BinaryConstraint(
       ...this._ends, (a, b) => Math.abs(a-b) >= minEndsDelta);
-    this._binaryConstraint.initialize(initialGrid, cellConflicts, shape);
+    return this._binaryConstraint.initialize(initialGrid, cellConflicts, shape);
   }
 
   enforceConsistency(grid, cellAccumulator) {
