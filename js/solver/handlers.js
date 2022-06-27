@@ -248,7 +248,7 @@ class SumHandlerUtil {
     })();
   }
 
-  findConflictSets(cells, cellConflicts) {
+  static findConflictSets(cells, cellConflicts) {
     let currentSet = [];
     let conflictSets = [currentSet];
 
@@ -631,10 +631,10 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
     this._lookupTables = LookupTables.get(shape.numValues);
     this._util = SumHandlerUtil.get(shape.numValues);
 
-    this._conflictSets = this._util.findConflictSets(
+    this._conflictSets = SumHandlerUtil.findConflictSets(
       this._positiveCells, cellConflicts);
     if (this._negativeCells.length) {
-      this._conflictSets.push(...this._util.findConflictSets(
+      this._conflictSets.push(...SumHandlerUtil.findConflictSets(
         this._negativeCells, cellConflicts));
     }
 
@@ -1091,18 +1091,32 @@ SudokuConstraintHandler.Between = class Between extends SudokuConstraintHandler 
 
   initialize(initialGrid, cellConflicts, shape) {
     this._minMaxTable = LookupTables.get(shape.numValues).minMax8Bit;
+
+    const conflictSets = SumHandlerUtil.findConflictSets(
+      this._mids, cellConflicts);
+    const maxConflictSize = Math.max(0, ...conflictSets.map(a => a.length));
+    const minEndsDelta = maxConflictSize ? maxConflictSize+1 : 0;
+
+    this._binaryConstraint = new SudokuConstraintHandler.BinaryConstraint(
+      ...this._ends, (a, b) => Math.abs(a-b) >= minEndsDelta);
+    this._binaryConstraint.initialize(initialGrid, cellConflicts, shape);
   }
 
-  enforceConsistency(grid) {
+  enforceConsistency(grid, cellAccumulator) {
+    // Constrain the ends to be consistant with each other.
+    if (!this._binaryConstraint.enforceConsistency(grid, cellAccumulator)) {
+      return false;
+    }
+
     const endsCombined = grid[this._ends[0]] | grid[this._ends[1]];
     let minMax = this._minMaxTable[endsCombined];
-    let cellMin = (minMax >> 8) + 1;
-    let cellMax = (minMax & 0xff) - 1;
-    if (cellMin > cellMax) return false;
+    const endsMin = minMax >> 8;
+    const endsMax = minMax & 0xff;
+    const delta = endsMax - endsMin;
 
     // Constrain the mids by masking out any values that can never be between
     // the ends.
-    let mask = ((1 << (cellMax-cellMin+1)) - 1) << (cellMin-1);
+    let mask = ((1 << (delta-1)) - 1) << endsMin;
     let fixedValues = 0;
     for (let i = 0; i < this._mids.length; i++) {
       const v = (grid[this._mids[i]] &= mask);
@@ -1114,8 +1128,8 @@ SudokuConstraintHandler.Between = class Between extends SudokuConstraintHandler 
     // mids.
     if (fixedValues) {
       minMax = this._minMaxTable[fixedValues];
-      cellMin = (minMax >> 8);
-      cellMax = (minMax & 0xff);
+      const cellMin = minMax >> 8;
+      const cellMax = minMax & 0xff;
       mask = ~(((1 << (cellMax-cellMin+1)) - 1) << (cellMin-1));
       if (!(grid[this._ends[0]] &= mask)) return false;
       if (!(grid[this._ends[1]] &= mask)) return false;
