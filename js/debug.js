@@ -213,6 +213,7 @@ const runSolveTests = async (onFailure) => {
     'Jigsaw boxes, disconnected',
     'Windoku',
     'X-Windoku',
+    'Region sum lines',
   ], onFailure);
 
   await runAllWithChecks([

@@ -609,7 +609,10 @@ class SudokuBuilder {
   static build(constraint) {
     const metaConstraint = SudokuConstraint.getMeta(constraint);
     const shape = SudokuConstraint.getShapeFromMeta(metaConstraint);
-    return new SudokuSolver(this._handlers(constraint, metaConstraint, shape), shape);
+    const noBoxes = metaConstraint.has('NoBoxes');
+
+    return new SudokuSolver(
+      this._handlers(constraint, shape, noBoxes), shape);
   }
 
   // GLobal vars to pass to the worker.
@@ -650,10 +653,10 @@ class SudokuBuilder {
     return solverProxy;
   }
 
-  static *_handlers(constraint, metaConstraint, shape) {
+  static *_handlers(constraint, shape, noBoxes) {
     yield* SudokuBuilder._rowColHandlers(shape);
-    yield* SudokuBuilder._constraintHandlers(constraint, shape);
-    if (!metaConstraint.has('NoBoxes')) {
+    yield* SudokuBuilder._constraintHandlers(constraint, shape, noBoxes);
+    if (!noBoxes) {
       yield* SudokuBuilder._boxHandlers(shape);
     }
   }
@@ -697,7 +700,7 @@ class SudokuBuilder {
     }
   }
 
-  static *_constraintHandlers(constraint, shape) {
+  static *_constraintHandlers(constraint, shape, noBoxes) {
     const gridSize = shape.gridSize;
 
     let cells;
@@ -828,8 +831,11 @@ class SudokuBuilder {
         break;
 
       case 'RegionSumLine':
-        cells = constraint.cells.map(c => shape.parseCellId(c).cell);
-        yield new SudokuConstraintHandler.RegionSumLine(cells);
+        // Region sum lines only makes sense when we have boxes.
+        if (!noBoxes) {
+          cells = constraint.cells.map(c => shape.parseCellId(c).cell);
+          yield new SudokuConstraintHandler.RegionSumLine(cells);
+        }
         break;
 
       case 'Between':
@@ -848,7 +854,7 @@ class SudokuBuilder {
 
       case 'Set':
         for (const c of constraint.constraints) {
-          yield* this._constraintHandlers(c, shape);
+          yield* this._constraintHandlers(c, shape, noBoxes);
         }
         break;
 
