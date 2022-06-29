@@ -526,6 +526,10 @@ class ConstraintDisplay extends DisplayItem {
     return this._drawConstraintLine(cells, 'rgb(255, 200, 255)');
   }
 
+  drawRegionSumLine(cells) {
+    return this._drawConstraintLine(cells, 'rgb(100, 255, 100)');
+  }
+
   drawBetween(cells) {
     const len = cells.length;
     if (len < 2) throw(`Line too short: ${cells}`)

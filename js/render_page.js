@@ -607,6 +607,16 @@ class ConstraintManager {
         this._addToPanel(config);
         this._configs.push(config);
         break;
+      case 'RegionSumLine':
+        config = {
+          cells: constraint.cells,
+          name: 'RegionSumLine',
+          constraint: constraint,
+          displayElem: this._display.drawRegionSumLine(constraint.cells),
+        };
+        this._addToPanel(config);
+        this._configs.push(config);
+        break;
       case 'Cage':
         config = {
           cells: constraint.cells,
@@ -680,6 +690,10 @@ class ConstraintManager {
         break;
       case 'whisper':
         constraint = new SudokuConstraint.Whisper(...cells);
+        this.loadConstraint(constraint);
+        break;
+      case 'region-sum':
+        constraint = new SudokuConstraint.RegionSumLine(...cells);
         this.loadConstraint(constraint);
         break;
       case 'between':

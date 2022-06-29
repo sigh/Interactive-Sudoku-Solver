@@ -426,6 +426,13 @@ class SudokuConstraint {
     }
   }
 
+  static RegionSumLine = class RegionSumLine extends SudokuConstraint {
+    constructor(...cells) {
+      super(arguments);
+      this.cells = cells;
+    }
+  }
+
   static Between = class Between extends SudokuConstraint {
     constructor(...cells) {
       super(arguments);
@@ -818,6 +825,11 @@ class SudokuBuilder {
           yield new SudokuConstraintHandler.BinaryConstraint(
             cells[i-1], cells[i], (a, b) => a >= b+5 || a <= b-5);
         }
+        break;
+
+      case 'RegionSumLine':
+        cells = constraint.cells.map(c => shape.parseCellId(c).cell);
+        yield new SudokuConstraintHandler.RegionSumLine(cells);
         break;
 
       case 'Between':

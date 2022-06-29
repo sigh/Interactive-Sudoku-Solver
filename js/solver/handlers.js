@@ -1142,6 +1142,149 @@ SudokuConstraintHandler.SameValues = class SameValues extends SudokuConstraintHa
   }
 }
 
+SudokuConstraintHandler.RegionSumLine = class RegionSumLine extends SudokuConstraintHandler {
+  constructor(cells) {
+    super(cells);
+  }
+
+  initialize(initialGrid, cellConflicts, shape) {
+    const cellToBox = new Map();
+
+    const gridSize = shape.gridSize;
+    const boxSize = shape.boxSize;
+
+    for (let b = 0; b < gridSize; b++) {
+      const bi = b/boxSize|0;
+      const bj = b%boxSize|0;
+      for (let c = 0; c < gridSize; c++) {
+        const row = boxSize*bi+(c%boxSize|0);
+        const col = boxSize*bj+(c/boxSize|0);
+        cellToBox.set(shape.cellIndex(row, col), b);
+      }
+    }
+
+    const cellSets = [];
+    let curSet = null;
+    let curBox = -1;
+    for (const cell of this.cells) {
+      const newBox = cellToBox.get(cell);
+      if (newBox != curBox) {
+        curBox = newBox;
+        curSet = [];
+        cellSets.push(curSet);
+      }
+      curSet.push(cell);
+    }
+
+    const lookupTables = LookupTables.get(shape.numValues);
+    this._minMaxTable = lookupTables.minMax8Bit;
+
+    this._singles = cellSets.filter(s => s.length == 1).map(s => s[0]);
+    this._multi = cellSets.filter(s => s.length > 1);
+    this._minMaxCache = new Uint16Array(this._multi.length);
+
+    this._arrows = [];
+    if (this._singles.length > 0) {
+      // If we have any singles then we can solve every multi-cell
+      // area by treating it as the stem of an arrow.
+      const single = this._singles[0];
+      for (const cells of this._multi) {
+        const arrow = new SudokuConstraintHandler.SumWithNegative(
+          cells, single, 0);
+        arrow.initialize(initialGrid, cellConflicts, shape);
+        this._arrows.push(arrow);
+      }
+      this._multi = [];
+    }
+
+    this._util = SumHandlerUtil.get(shape.numValues);
+
+    return true;
+  }
+
+  _enforceSingles(grid, cellAccumulator) {
+    const numSingles = this._singles.length;
+
+    // Single values must all be the same, so only take values which
+    // are legal in ALL cells.
+    let valueSet = -1>>>1;
+    for (let i = 0; i < numSingles; i++) {
+      valueSet &= grid[this._singles[i]];
+    }
+
+    // No possible settings for the single values.
+    if (valueSet == 0) return false;
+
+    // Constrain the singles.
+    for (let i = 0; i < numSingles; i++) {
+      grid[this._singles[i]] = valueSet;
+    }
+
+    return true;
+  }
+
+  _enforceMulti(grid, cellAccumulator) {
+
+    const minMaxTable = this._minMaxTable;
+    const minMaxs = this._minMaxCache;
+
+    // Determine the range of possible sums.
+    let globalMin = 0;
+    let globalMax = -1>>>1;
+    for (let i = 0; i < this._multi.length; i++) {
+      let minMax = 0;
+      for (const cell of this._multi[i]) {
+        minMax += minMaxTable[grid[cell]];
+      }
+      minMaxs[i] = minMax;
+      const sumMin = minMax >> 8;
+      const sumMax = minMax & 0xff;
+      globalMin = Math.max(sumMin, globalMin);
+      globalMax = Math.min(sumMax, globalMax);
+    }
+
+    if (globalMin > globalMax) return false;
+
+    // Constraint each set to the known range.
+    for (let i = 0; i < this._multi.length; i++) {
+      const cells = this._multi[i];
+      const minMax = minMaxs[i];
+      const sumMin = minMax >> 8;
+      const sumMax = minMax & 0xff;
+      const sumMinusMin = globalMax - sumMin;
+      const maxMinusSum = sumMax - globalMin;
+      if (!this._util.restrictValueRange(grid, cells, sumMinusMin, maxMinusSum)) {
+        return false;
+      }
+
+      if (globalMin == globalMax) {
+        // We know the sum, and cells should always be in a single box
+        // (by definition).
+        if (!this._util.restrictCellsSingleConflictSet(
+          grid, globalMin, cells)) return false;
+      }
+    }
+
+    return true;
+  }
+
+  enforceConsistency(grid, cellAccumulator) {
+    if (this._singles.length > 1) {
+      if (!this._enforceSingles(grid, cellAccumulator)) return false;
+    }
+    if (this._arrows.length > 0) {
+      for (const arrow of this._arrows) {
+        if (!arrow.enforceConsistency(grid, cellAccumulator)) return false;
+      }
+    }
+    if (this._multi.length > 0) {
+      if (!this._enforceMulti(grid, cellAccumulator)) return false;
+    }
+
+    return true;
+  }
+}
+
 SudokuConstraintHandler.Between = class Between extends SudokuConstraintHandler {
   constructor(cells) {
     super(cells);
