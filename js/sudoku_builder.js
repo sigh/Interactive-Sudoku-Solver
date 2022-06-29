@@ -603,6 +603,34 @@ class SudokuConstraint {
   }
 
   static DEFAULT = this.FixedValues;
+
+  static _makeRegions(fn, gridSize) {
+    const regions = new Array(gridSize);
+    for (let r = 0; r < gridSize; r++) {
+      const cells = new Array(gridSize);
+      for (let i = 0; i < gridSize; i++) {
+        cells[i] = fn(r, i);
+      }
+      regions[r] = cells;
+    }
+    return regions;
+  }
+
+  static rowRegions = memoize((shape) => {
+    const gridSize = shape.gridSize;
+    return this._makeRegions((r, i) => r*gridSize+i, gridSize);
+  });
+  static colRegions = memoize((shape) => {
+    const gridSize = shape.gridSize;
+    return this._makeRegions((c, i) => i*gridSize+c, gridSize);
+  });
+  static boxRegions = memoize((shape) => {
+    const gridSize = shape.gridSize;
+    const boxSize = shape.boxSize;
+    return this._makeRegions(
+      (r, i) => ((r/boxSize|0)*boxSize+(i%boxSize|0))*gridSize
+                +(r%boxSize|0)*boxSize+(i/boxSize|0), gridSize);
+  });
 }
 
 class SudokuBuilder {
@@ -662,40 +690,16 @@ class SudokuBuilder {
   }
 
   static *_rowColHandlers(shape) {
-    const gridSize = shape.gridSize;
-
-    // Row constraints.
-    for (let row = 0; row < gridSize; row++) {
-      let cells = [];
-      for (let col = 0; col < gridSize; col++) {
-        cells.push(shape.cellIndex(row, col));
-      }
+    for (const cells of SudokuConstraint.rowRegions(shape)) {
       yield new SudokuConstraintHandler.AllDifferent(cells);
     }
-
-    // Column constraints.
-    for (let col = 0; col < gridSize; col++) {
-      let cells = [];
-      for (let row = 0; row < gridSize; row++) {
-        cells.push(shape.cellIndex(row, col));
-      }
+    for (const cells of SudokuConstraint.colRegions(shape)) {
       yield new SudokuConstraintHandler.AllDifferent(cells);
     }
   }
 
   static *_boxHandlers(shape) {
-    const gridSize = shape.gridSize;
-    const boxSize = shape.boxSize;
-
-    for (let b = 0; b < gridSize; b++) {
-      const bi = b/boxSize|0;
-      const bj = b%boxSize|0;
-      let cells = [];
-      for (let c = 0; c < gridSize; c++) {
-        const row = boxSize*bi+(c%boxSize|0);
-        const col = boxSize*bj+(c/boxSize|0);
-        cells.push(shape.cellIndex(row, col));
-      }
+    for (const cells of SudokuConstraint.boxRegions(shape)) {
       yield new SudokuConstraintHandler.AllDifferent(cells);
     }
   }

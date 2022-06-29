@@ -1148,27 +1148,19 @@ SudokuConstraintHandler.RegionSumLine = class RegionSumLine extends SudokuConstr
   }
 
   initialize(initialGrid, cellConflicts, shape) {
+    // Map cells to box regions.
     const cellToBox = new Map();
-
-    const gridSize = shape.gridSize;
-    const boxSize = shape.boxSize;
-
-    for (let b = 0; b < gridSize; b++) {
-      const bi = b/boxSize|0;
-      const bj = b%boxSize|0;
-      for (let c = 0; c < gridSize; c++) {
-        const row = boxSize*bi+(c%boxSize|0);
-        const col = boxSize*bj+(c/boxSize|0);
-        cellToBox.set(shape.cellIndex(row, col), b);
-      }
+    for (const boxRegion of SudokuConstraint.boxRegions(shape)) {
+      for (const cell of boxRegion) cellToBox.set(cell, boxRegion);
     }
 
+    // Split cells into sections of equal sum.
     const cellSets = [];
     let curSet = null;
-    let curBox = -1;
+    let curBox = null;
     for (const cell of this.cells) {
       const newBox = cellToBox.get(cell);
-      if (newBox != curBox) {
+      if (newBox !== curBox) {
         curBox = newBox;
         curSet = [];
         cellSets.push(curSet);
@@ -1176,9 +1168,11 @@ SudokuConstraintHandler.RegionSumLine = class RegionSumLine extends SudokuConstr
       curSet.push(cell);
     }
 
+    this._util = SumHandlerUtil.get(shape.numValues);
     const lookupTables = LookupTables.get(shape.numValues);
     this._minMaxTable = lookupTables.minMax8Bit;
 
+    // Separate the single- and multi-cell sections.
     this._singles = cellSets.filter(s => s.length == 1).map(s => s[0]);
     this._multi = cellSets.filter(s => s.length > 1);
     this._minMaxCache = new Uint16Array(this._multi.length);
@@ -1196,8 +1190,6 @@ SudokuConstraintHandler.RegionSumLine = class RegionSumLine extends SudokuConstr
       }
       this._multi = [];
     }
-
-    this._util = SumHandlerUtil.get(shape.numValues);
 
     return true;
   }
@@ -1834,23 +1826,9 @@ class SudokuConstraintOptimizer {
     return newHandlers;
   }
 
-  static _makeRegions(fn, gridSize) {
-    let regions = [];
-    for (let r = 0; r < gridSize; r++) {
-      let region = [];
-      for (let i = 0; i < gridSize; i++) {
-        region.push(fn(r, i));
-      }
-      regions.push(region);
-    }
-    return regions;
-  }
-
   static _overlapRegions = memoize((shape) => {
-    const gridSize = shape.gridSize;
-
-    const rowRegions = this._makeRegions((r, i) => r*gridSize+i, gridSize);
-    const colRegions = this._makeRegions((c, i) => i*gridSize+c, gridSize);
+    const rowRegions = SudokuConstraint.rowRegions(shape);
+    const colRegions = SudokuConstraint.colRegions(shape);
     return [
       rowRegions,
       rowRegions.slice().reverse(),
@@ -1860,15 +1838,9 @@ class SudokuConstraintOptimizer {
   });
 
   static _overlapRegionsWithBox = memoize((shape) => {
-    const boxSize = shape.boxSize;
-    const gridSize = shape.gridSize;
-
-    const boxRegions = this._makeRegions(
-      (r, i) => ((r/boxSize|0)*boxSize+(i%boxSize|0))*gridSize
-                +(r%boxSize|0)*boxSize+(i/boxSize|0), gridSize);
     return [
       ...this._overlapRegions(shape),
-      boxRegions,
+      SudokuConstraint.boxRegions(shape),
     ];
   });
 
