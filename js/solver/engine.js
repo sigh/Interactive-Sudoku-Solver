@@ -217,7 +217,7 @@ SudokuSolver.InternalSolver = class {
 
     this._initCellArray();
     this._stack = new Uint8Array(shape.numCells);
-    this._progressRatioStack = new Array(shape.numCells);
+    this._progressRatioStack = new Array(shape.numCells+1);
     this._progressRatioStack.fill(1);
 
     this._runCounter = 0;
@@ -478,11 +478,11 @@ SudokuSolver.InternalSolver = class {
 
     while (cellAccumulator.hasConstraints()) {
       counters.constraintsProcessed++;
-      const c = cellAccumulator.head();
+      const c = cellAccumulator.popConstraint();
+      // TODO: Avoid c being added to cellAccumulator during this time.
       if (!c.enforceConsistency(grid, cellAccumulator)) {
         return false;
       }
-      cellAccumulator.popConstraint();
     }
 
     return true;
@@ -741,8 +741,8 @@ SudokuSolver.CellAccumulator = class {
     this._cellMap = handlerSet.getCellMap();
 
     this._linkedList = new Int16Array(this._handlers.length);
-    this._linkedList.fill(-1);
-    this._head = -1;
+    this._linkedList.fill(-2);  // -2 = Not in list.
+    this._head = -1;  // -1 = null pointer.
   }
 
   add(cell) {
@@ -750,7 +750,7 @@ SudokuSolver.CellAccumulator = class {
     const numHandlers = indexes.length;
     for (let j = 0; j < numHandlers; j++) {
       const i = indexes[j];
-      if (this._linkedList[i] < 0) {
+      if (this._linkedList[i] < -1) {
         this._linkedList[i] = this._head;
         this._head = i;
       }
@@ -762,7 +762,7 @@ SudokuSolver.CellAccumulator = class {
     let head = this._head;
     while (head >= 0) {
       const newHead = ll[head];
-      ll[head] = -1;
+      ll[head] = -2;
       head = newHead;
     }
     this._head = -1;
@@ -779,7 +779,7 @@ SudokuSolver.CellAccumulator = class {
   popConstraint() {
     const oldHead = this._head;
     this._head = this._linkedList[oldHead];
-    this._linkedList[oldHead] = -1;
+    this._linkedList[oldHead] = -2;
 
     return this._handlers[oldHead];
   }
