@@ -376,11 +376,10 @@ SudokuSolver.InternalSolver = class {
     this._initialGrid.fill(allValues);
   }
 
-  _hasInterestingSolutions(stack, grid, uninterestingValues) {
+  _hasInterestingSolutions(grid, uninterestingValues) {
     // We need to check all cells because we maybe validating a cell above
     // us, or finding a value for a cell below us.
-    for (let i = 0; i < this._numCells; i++) {
-      const cell = stack[i];
+    for (let cell = 0; cell < this._numCells; cell++) {
       if (grid[cell] & ~uninterestingValues[cell]) return true;
     }
     return false;
@@ -619,7 +618,7 @@ SudokuSolver.InternalSolver = class {
       }
 
       if (this._uninterestingValues) {
-        if (!this._hasInterestingSolutions(stack, grid, this._uninterestingValues)) {
+        if (!this._hasInterestingSolutions(grid, this._uninterestingValues)) {
           counters.branchesIgnored += progressRatioStack[depth];
           continue;
         }
