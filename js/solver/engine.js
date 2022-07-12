@@ -77,7 +77,7 @@ class SudokuSolver {
 
     return {
       values: this.constructor._resultToSolution(result, this._shape),
-      pencilmarks: this.constructor._makePencilmarks(result.grid, this._shape, result.stack),
+      pencilmarks: this.constructor._makePencilmarks(result.grid, this._shape, result.cellOrder),
       isSolution: result.isSolution,
       hasContradiction: result.hasContradiction,
     }
@@ -181,7 +181,7 @@ class SudokuSolver {
   static _resultToSolution(result, shape) {
     const values = result.grid.map(value => LookupTables.toValue(value))
     let solution = [];
-    for (const cell of result.stack) {
+    for (const cell of result.cellOrder) {
       solution.push(shape.makeValueId(cell, values[cell]));
     }
     return solution;
@@ -211,7 +211,8 @@ SudokuSolver.InternalSolver = class {
     this._numCells = this._shape.numCells;
 
     this._initCellArray();
-    this._stack = new Uint8Array(shape.numCells);
+    this._cellOrder = new Uint8Array(shape.numCells);
+    this._recStack = new Uint16Array(shape.numCells + 1);
     this._progressRatioStack = new Array(shape.numCells + 1);
     this._progressRatioStack.fill(1);
 
@@ -349,10 +350,10 @@ SudokuSolver.InternalSolver = class {
     this.done = false;
     this._atStart = true;
     this._grids[0].set(this._initialGrid);
-    // Re-initialize the cell indexes in the stack.
+    // Re-initialize the cell indexes in the cellOrder.
     // This is not required, but keeps things deterministic.
     for (let i = 0; i < this._numCells; i++) {
-      this._stack[i] = i;
+      this._cellOrder[i] = i;
     }
     this._progressRatioStack[0] = 1;
   }
@@ -387,7 +388,7 @@ SudokuSolver.InternalSolver = class {
 
   // Find the best cell and bring it to the front. This means that it will
   // be processed next.
-  _updateCellOrder(stack, depth, grid) {
+  _updateCellOrder(cellOrder, cellIndex, grid) {
     // Choose cells based on value count and number of conflicts encountered.
     // Return immediately if we find any cells with 1 or 0 values set.
     // NOTE: The constraint handlers are written such that they detect domain
@@ -397,14 +398,14 @@ SudokuSolver.InternalSolver = class {
     // to do an initial pass to detect 1 or 0 value cells (~(v&(v-1))).
 
     const triggerCounts = this._backtrackTriggers;
-    const stackLen = stack.length;
+    const numCells = cellOrder.length;
 
     // Find the cell with the minimum score.
     let minScore = Infinity;
     let bestIndex = 0;
 
-    for (let i = depth; i < stackLen; i++) {
-      const cell = stack[i];
+    for (let i = cellIndex; i < numCells; i++) {
+      const cell = cellOrder[i];
       const count = countOnes16bit(grid[cell]);
       // If we have a single value then just use it - as it will involve no
       // guessing.
@@ -422,9 +423,9 @@ SudokuSolver.InternalSolver = class {
       }
     }
 
-    [stack[bestIndex], stack[depth]] = [stack[depth], stack[bestIndex]];
+    [cellOrder[bestIndex], cellOrder[cellIndex]] = [cellOrder[cellIndex], cellOrder[bestIndex]];
 
-    return countOnes16bit(grid[stack[depth]]);
+    return countOnes16bit(grid[cellOrder[cellIndex]]);
   }
 
   _enforceValue(grid, value, cell) {
@@ -502,13 +503,11 @@ SudokuSolver.InternalSolver = class {
       if (runCounter != this._runCounter) throw ('Iterator no longer valid');
     };
 
-    let depth = 0;
-    const stack = this._stack;
     const counters = this.counters;
-    const progressRatioStack = this._progressRatioStack;
-
     counters.progressRatioPrev += counters.progressRatio;
     counters.progressRatio = 0;
+
+    const progressFrequencyMask = this._progress.frequencyMask;
 
     {
       // Enforce constraints for all cells.
@@ -522,24 +521,56 @@ SudokuSolver.InternalSolver = class {
       yield {
         grid: this._grids[0],
         isSolution: false,
-        stack: [],
+        cellOrder: [],
         hasContradiction: false,
       }
       checkRunCounter();
     }
 
-    {
-      const count = this._updateCellOrder(stack, depth, this._grids[depth]);
-      depth++;
-      progressRatioStack[depth] = progressRatioStack[depth - 1] / count;
-      counters.cellsSearched++;
-    }
+    const progressRatioStack = this._progressRatioStack;
+    const cellOrder = this._cellOrder;
 
-    const progressFrequencyMask = this._progress.frequencyMask;
+    let depth = 0;
+    const recStack = this._recStack;
+    recStack[depth++] = 0;
+    let isNewCellIndex = true;
 
     while (depth) {
       depth--;
-      let cell = stack[depth];
+      let cellIndex = recStack[depth];
+
+      if (isNewCellIndex) {
+        isNewCellIndex = false;
+
+        // TODO: Handle fixed cells.
+
+        let grid = this._grids[depth];
+
+        // We've reached the end, so output a solution!
+        if (cellIndex == this._shape.numCells) {
+          counters.progressRatio += progressRatioStack[depth];
+          // We've set all the values, and we haven't found a contradiction.
+          // This is a solution!
+          counters.solutions++;
+          yield {
+            grid: grid,
+            isSolution: true,
+            cellOrder: cellOrder,
+            hasContradiction: false,
+          };
+          checkRunCounter();
+          continue;
+        }
+
+        // Find the next cell to explore.
+        const count = this._updateCellOrder(cellOrder, cellIndex, grid);
+
+        // Update counters.
+        counters.cellsSearched++;
+        progressRatioStack[depth + 1] = progressRatioStack[depth] / count;
+      }
+
+      let cell = cellOrder[cellIndex];
       let grid = this._grids[depth];
       let values = grid[cell];
 
@@ -555,7 +586,7 @@ SudokuSolver.InternalSolver = class {
       if (value != values) counters.guesses++;
 
       // Copy current cell values.
-      depth++;
+      depth++;  // NOTE: recStack already has cell_index
       this._grids[depth].set(grid);
       grid = this._grids[depth];
 
@@ -578,7 +609,7 @@ SudokuSolver.InternalSolver = class {
           yield {
             grid: grid,
             isSolution: false,
-            stack: stack.subarray(0, depth),
+            cellOrder: cellOrder.subarray(0, cellIndex),
             hasContradiction: hasContradiction,
           };
         }
@@ -594,28 +625,13 @@ SudokuSolver.InternalSolver = class {
         yield {
           grid: grid,
           isSolution: false,
-          stack: stack.subarray(0, depth),
+          cellOrder: cellOrder.subarray(0, cellIndex),
           hasContradiction: hasContradiction,
         };
         checkRunCounter();
       }
 
       if (hasContradiction) continue;
-
-      if (depth == this._numCells) {
-        counters.progressRatio += progressRatioStack[depth];
-        // We've set all the values, and we haven't found a contradiction.
-        // This is a solution!
-        counters.solutions++;
-        yield {
-          grid: grid,
-          isSolution: true,
-          stack: stack,
-          hasContradiction: false,
-        };
-        checkRunCounter();
-        continue;
-      }
 
       if (this._uninterestingValues) {
         if (!this._hasInterestingSolutions(grid, this._uninterestingValues)) {
@@ -624,12 +640,9 @@ SudokuSolver.InternalSolver = class {
         }
       }
 
-      {
-        const count = this._updateCellOrder(stack, depth, grid);
-        counters.cellsSearched++;
-        depth++;
-        progressRatioStack[depth] = progressRatioStack[depth - 1] / count;
-      }
+      // Recurse to the new cell.
+      recStack[depth++] = cellIndex + 1;
+      isNewCellIndex = true;
     }
 
     this.done = true;
