@@ -179,9 +179,7 @@ class SudokuSolver {
   }
 
   static _resultToSolution(result, shape) {
-    const valueTable = LookupTables.get(shape.numValues).value;
-
-    const values = result.grid.map(value => valueTable[value])
+    const values = result.grid.map(value => LookupTables.toValue(value))
     let solution = [];
     for (const cell of result.stack) {
       solution.push(shape.makeValueId(cell, values[cell]));
@@ -190,8 +188,6 @@ class SudokuSolver {
   }
 
   static _makePencilmarks(grid, shape, ignoreCells) {
-    const valueTable = LookupTables.get(shape.numValues).value;
-
     let ignoreSet = new Set(ignoreCells);
 
     let pencilmarks = [];
@@ -200,7 +196,7 @@ class SudokuSolver {
       let values = grid[i];
       while (values) {
         let value = values & -values;
-        pencilmarks.push(shape.makeValueId(i, valueTable[value]));
+        pencilmarks.push(shape.makeValueId(i, LookupTables.toValue(value)));
         values &= ~value;
       }
     }
@@ -790,6 +786,14 @@ class LookupTables {
     return new LookupTables(true, numValues);
   });
 
+  static fromValue = (i) => {
+    return 1 << (i - 1);
+  };
+
+  static toValue(v) {
+    return 32 - Math.clz32(v);
+  };
+
   constructor(do_not_call, numValues) {
     if (!do_not_call) throw ('Use LookupTables.get(shape.numValues)');
 
@@ -797,14 +801,6 @@ class LookupTables {
     this.combinations = 1 << numValues;
 
     const combinations = this.combinations;
-
-    this.value = (() => {
-      let table = new Uint8Array(combinations);
-      for (let i = 0; i < numValues; i++) {
-        table[1 << i] = i + 1;
-      }
-      return table;
-    })();
 
     this.count = (() => {
       let table = new Uint8Array(combinations);
@@ -819,7 +815,7 @@ class LookupTables {
       let table = new Uint8Array(combinations);
       for (let i = 1; i < combinations; i++) {
         // SUM is the value of the lowest set bit plus the sum  of the rest.
-        table[i] = table[i & (i - 1)] + this.value[i & -i];
+        table[i] = table[i & (i - 1)] + LookupTables.toValue(i & -i);
       }
       return table;
     })();
@@ -832,7 +828,7 @@ class LookupTables {
     this.minMax8Bit = (() => {
       // Initialize the table with MAXs.
       const table = new Uint16Array(combinations);
-      table[1] = this.value[1];
+      table[1] = LookupTables.toValue(1);
       for (let i = 2; i < combinations; i++) {
         // MAX is greater than the max when everything has been decreased by
         // 1.
@@ -842,7 +838,7 @@ class LookupTables {
       // Add the MINs.
       for (let i = 1; i < combinations; i++) {
         // MIN is the value of the last bit set.
-        const min = this.value[i & -i];
+        const min = LookupTables.toValue(i & -i);
         table[i] |= min << 8;
       }
 
@@ -860,8 +856,8 @@ class LookupTables {
       const table = new Uint32Array(combinations);
       for (let i = 1; i < combinations; i++) {
         const minMax = this.minMax8Bit[i];
-        const fixed = this.value[i];
-        const isFixed = fixed > 0 ? 1 : 0;
+        const fixed = this.count[i] == 1 ? LookupTables.toValue(i) : 0;
+        const isFixed = fixed ? 1 : 0;
         table[i] = (isFixed << 24) | (fixed << 16) | minMax;
       }
       // If there are no values, set a high value for isFixed to indicate the
