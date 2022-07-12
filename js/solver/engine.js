@@ -583,15 +583,18 @@ SudokuSolver.InternalSolver = class {
       grid[cell] &= ~value;
 
       counters.valuesTried++;
-      if (value != values) counters.guesses++;
 
-      // Copy current cell values.
-      depth++;  // NOTE: recStack already has cell_index
-      this._grids[depth].set(grid);
-      grid = this._grids[depth];
+      if (value != values) {
+        // If we have to choose between multiple branches, copy the current grid
+        // into a new stack frame.
+        counters.guesses++;
+        depth++;  // NOTE: recStack already has cell_index
+        this._grids[depth].set(grid);
+        grid = this._grids[depth];
+        grid[cell] = value;
+      }
 
       // Propogate constraints.
-      grid[cell] = value;
       let hasContradiction = !this._enforceValue(grid, value, cell);
       if (hasContradiction) {
         counters.progressRatio += progressRatioStack[depth];
