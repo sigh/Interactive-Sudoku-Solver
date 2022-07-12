@@ -18,12 +18,12 @@ class GridShape {
 
     this.name = `${gridSize}x${gridSize}`;
 
-    this._valueBase = this.numValues+1;
+    this._valueBase = this.numValues + 1;
 
     this.allCells = new Array(this.numCells);
     for (let i = 0; i < this.numCells; i++) this.allCells[i] = i;
 
-    this.maxSum = this.gridSize*(this.gridSize+1)/2;
+    this.maxSum = this.gridSize * (this.gridSize + 1) / 2;
 
     Object.freeze(this);
     this.constructor._register(this);
@@ -35,15 +35,15 @@ class GridShape {
   }
 
   makeCellId = (row, col) => {
-    return `R${(row+1).toString(this._valueBase)}C${(col+1).toString(this._valueBase)}`;
+    return `R${(row + 1).toString(this._valueBase)}C${(col + 1).toString(this._valueBase)}`;
   }
 
   cellIndex = (row, col) => {
-    return row*this.gridSize+col;
+    return row * this.gridSize + col;
   };
 
   splitCellIndex = (cell) => {
-    return [cell/this.gridSize|0, cell%this.gridSize|0];
+    return [cell / this.gridSize | 0, cell % this.gridSize | 0];
   };
   parseValueId = (valueId) => {
     let cellId = valueId.substr(0, 4);
@@ -55,8 +55,8 @@ class GridShape {
   };
 
   parseCellId = (cellId) => {
-    let row = parseInt(cellId[1], this._valueBase)-1;
-    let col = parseInt(cellId[3], this._valueBase)-1;
+    let row = parseInt(cellId[1], this._valueBase) - 1;
+    let col = parseInt(cellId[3], this._valueBase) - 1;
     return {
       cell: this.cellIndex(row, col),
       row: row,
@@ -88,28 +88,28 @@ class SudokuTextParser {
     for (let i = 0; i < numCells; i++) {
       switch (text[i]) {
         case 'v':
-          cellDirections.push(i+gridSize);
+          cellDirections.push(i + gridSize);
           break;
         case '^':
-          cellDirections.push(i-gridSize);
+          cellDirections.push(i - gridSize);
           break;
         case '<':
-          cellDirections.push(i-1);
+          cellDirections.push(i - 1);
           break;
         case '>':
-          cellDirections.push(i+1);
+          cellDirections.push(i + 1);
           break;
         case '`':
-          cellDirections.push(i-gridSize-1);
+          cellDirections.push(i - gridSize - 1);
           break;
         case '\'':
-          cellDirections.push(i-gridSize+1);
+          cellDirections.push(i - gridSize + 1);
           break;
         case ',':
-          cellDirections.push(i+gridSize-1);
+          cellDirections.push(i + gridSize - 1);
           break;
         case '.':
-          cellDirections.push(i+gridSize+1);
+          cellDirections.push(i + gridSize + 1);
           break;
         default:
           cellDirections.push(i);
@@ -124,7 +124,7 @@ class SudokuTextParser {
         cageCell = cellDirections[cageCell];
         count++;
         if (count > gridSize) {
-          throw('Loop in Killer Sudoku input.');
+          throw ('Loop in Killer Sudoku input.');
         }
       }
       if (!cages.has(cageCell)) {
@@ -171,13 +171,13 @@ class SudokuTextParser {
     let cages = new Map();
     for (let i = 0; i < numCells; i++) {
       let value = +parts[i + 3];
-      let cageId = value%256;
-      let cageSum = value/256|0;
+      let cageId = value % 256;
+      let cageSum = value / 256 | 0;
 
       if (!cageSum) continue;
 
       if (!cages.has(cageId)) {
-        cages.set(cageId, {sum: cageSum, cells: []});
+        cages.set(cageId, { sum: cageSum, cells: [] });
       }
       cages.get(cageId).cells.push(shape.makeCellId(...shape.splitCellIndex(i)));
     }
@@ -211,8 +211,8 @@ class SudokuTextParser {
     let nonValueCharacters = [];
     for (let i = 0; i < numCells; i++) {
       let c = text.charCodeAt(i);
-      if (c >= baseCharCode && c <= baseCharCode+gridSize-1) {
-        fixedValues.push(shape.makeValueId(i, c-baseCharCode+1));
+      if (c >= baseCharCode && c <= baseCharCode + gridSize - 1) {
+        fixedValues.push(shape.makeValueId(i, c - baseCharCode + 1));
       } else {
         nonValueCharacters.push(c);
       }
@@ -250,9 +250,9 @@ class SudokuTextParser {
   }
 
   static parseJigsaw(text) {
-    if (text.length%2 !== 0) return null;
+    if (text.length % 2 !== 0) return null;
 
-    const shape = GridShape.fromNumCells(text.length/2);
+    const shape = GridShape.fromNumCells(text.length / 2);
     if (!shape) return null;
 
     const numCells = shape.numCells;
@@ -267,7 +267,7 @@ class SudokuTextParser {
   }
 
   static parseGridLayout(rawText) {
-    if (rawText.length < SHAPE_9x9.numCells*2) return null;
+    if (rawText.length < SHAPE_9x9.numCells * 2) return null;
 
     const parts = [...rawText.matchAll(/[.]|\d+/g)];
     const numParts = parts.length;
@@ -329,7 +329,7 @@ class SudokuConstraint {
   static fromString(str) {
     str = str.replace(/\s+/g, '');
     let items = str.split('.');
-    if (items[0]) throw('Invalid constraint string.');
+    if (items[0]) throw ('Invalid constraint string.');
     items.shift();
 
     let constraints = [];
@@ -338,7 +338,7 @@ class SudokuConstraint {
       let type = args.shift();
       if (!type) type = this.DEFAULT.name;
       if (!SudokuConstraint[type]) {
-        throw('Unknown constraint type: ' + type);
+        throw ('Unknown constraint type: ' + type);
       }
       constraints.push(new SudokuConstraint[type](...args));
     }
@@ -387,7 +387,7 @@ class SudokuConstraint {
   static getShapeFromMeta(metaConstraint) {
     const shapeArgs = metaConstraint.get('Shape');
     const shape = shapeArgs ? GridShape.get(shapeArgs[0]) : this.DEFAULT_SHAPE;
-    if (!shape) throw('Unknown shape: ' + shape);
+    if (!shape) throw ('Unknown shape: ' + shape);
     return shape;
   }
   static getShape(constraint) {
@@ -451,7 +451,7 @@ class SudokuConstraint {
     constructor(...args) { super(args); }
     isMeta = true;
   }
-  static NoBoxes = class NoBoxes extends SudokuConstraint._Meta {}
+  static NoBoxes = class NoBoxes extends SudokuConstraint._Meta { }
   static Shape = class Shape extends SudokuConstraint._Meta {
     toString() {
       if (this.args[0] === SHAPE_9x9.name) return '';
@@ -466,12 +466,12 @@ class SudokuConstraint {
 
       const regions = [];
 
-      for (let i = 1; i < gridSize; i+=boxSize+1) {
-        for (let j = 1; j < gridSize; j+=boxSize+1) {
+      for (let i = 1; i < gridSize; i += boxSize + 1) {
+        for (let j = 1; j < gridSize; j += boxSize + 1) {
           const cells = [];
           for (let k = 0; k < gridSize; k++) {
-            const row = i+(k%boxSize|0);
-            const col = j+(k/boxSize|0);
+            const row = i + (k % boxSize | 0);
+            const col = j + (k / boxSize | 0);
             cells.push(shape.cellIndex(row, col));
           }
           regions.push(cells);
@@ -482,11 +482,11 @@ class SudokuConstraint {
     });
   }
 
-  static AntiKnight = class AntiKnight extends SudokuConstraint {}
+  static AntiKnight = class AntiKnight extends SudokuConstraint { }
 
-  static AntiKing = class AntiKing extends SudokuConstraint {}
+  static AntiKing = class AntiKing extends SudokuConstraint { }
 
-  static AntiConsecutive = class AntiConsecutive extends SudokuConstraint {}
+  static AntiConsecutive = class AntiConsecutive extends SudokuConstraint { }
 
   static Diagonal = class Diagonal extends SudokuConstraint {
     constructor(direction) {
@@ -538,20 +538,20 @@ class SudokuConstraint {
       const addLittleKiller = (row, col, dr, dc) => {
         let cells = [];
         for (; row >= 0 && col >= 0 && col < gridSize && row < gridSize;
-               row+=dr, col+=dc) {
+          row += dr, col += dc) {
           cells.push(shape.makeCellId(row, col));
         }
         map[cells[0]] = cells;
       };
 
       // Left side.
-      for (let row=0; row < gridSize-1; row++) addLittleKiller(row, 0, 1, 1);
+      for (let row = 0; row < gridSize - 1; row++) addLittleKiller(row, 0, 1, 1);
       // Right side.
-      for (let row=1; row < gridSize-1; row++) addLittleKiller(row, gridSize-1, -1, -1);
+      for (let row = 1; row < gridSize - 1; row++) addLittleKiller(row, gridSize - 1, -1, -1);
       // Top side.
-      for (let col=1; col < gridSize; col++) addLittleKiller(0, col, 1, -1);
+      for (let col = 1; col < gridSize; col++) addLittleKiller(0, col, 1, -1);
       // Bottom side.
-      for (let col=1; col < gridSize-1; col++) addLittleKiller(gridSize-1, col, -1, 1);
+      for (let col = 1; col < gridSize - 1; col++) addLittleKiller(gridSize - 1, col, -1, 1);
 
       return map;
     });
@@ -571,17 +571,17 @@ class SudokuConstraint {
       const addSandwich = (name, row, col, dr, dc) => {
         let cells = [];
         for (; col < gridSize && row < gridSize;
-               row+=dr, col+=dc) {
+          row += dr, col += dc) {
           cells.push(shape.makeCellId(row, col));
         }
         map[name] = cells;
       };
 
-      for (let row=0; row < gridSize; row++) {
-        addSandwich(`R${row+1}`, row, 0, 0, 1);
+      for (let row = 0; row < gridSize; row++) {
+        addSandwich(`R${row + 1}`, row, 0, 0, 1);
       }
-      for (let col=0; col < gridSize; col++) {
-        addSandwich(`C${col+1}`, 0, col, 1, 0);
+      for (let col = 0; col < gridSize; col++) {
+        addSandwich(`C${col + 1}`, 0, col, 1, 0);
       }
 
       return map;
@@ -618,18 +618,18 @@ class SudokuConstraint {
 
   static rowRegions = memoize((shape) => {
     const gridSize = shape.gridSize;
-    return this._makeRegions((r, i) => r*gridSize+i, gridSize);
+    return this._makeRegions((r, i) => r * gridSize + i, gridSize);
   });
   static colRegions = memoize((shape) => {
     const gridSize = shape.gridSize;
-    return this._makeRegions((c, i) => i*gridSize+c, gridSize);
+    return this._makeRegions((c, i) => i * gridSize + c, gridSize);
   });
   static boxRegions = memoize((shape) => {
     const gridSize = shape.gridSize;
     const boxSize = shape.boxSize;
     return this._makeRegions(
-      (r, i) => ((r/boxSize|0)*boxSize+(i%boxSize|0))*gridSize
-                +(r%boxSize|0)*boxSize+(i/boxSize|0), gridSize);
+      (r, i) => ((r / boxSize | 0) * boxSize + (i % boxSize | 0)) * gridSize
+        + (r % boxSize | 0) * boxSize + (i / boxSize | 0), gridSize);
   });
 }
 
@@ -717,11 +717,11 @@ class SudokuBuilder {
 
       case 'AntiKnight':
         yield* this._antiHandlers(shape,
-          (r, c) => [[r+1, c+2], [r+2, c+1], [r+1, c-2], [r+2, c-1]]);
+          (r, c) => [[r + 1, c + 2], [r + 2, c + 1], [r + 1, c - 2], [r + 2, c - 1]]);
         break;
 
       case 'AntiKing':
-        yield* this._antiHandlers(shape, (r, c) => [[r+1, c+1], [r+1, c-1]]);
+        yield* this._antiHandlers(shape, (r, c) => [[r + 1, c + 1], [r + 1, c - 1]]);
         break;
 
       case 'AntiConsecutive':
@@ -750,7 +750,7 @@ class SudokuBuilder {
       case 'Diagonal':
         cells = [];
         for (let r = 0; r < gridSize; r++) {
-          let c = constraint.direction > 0 ? gridSize-r-1 : r;
+          let c = constraint.direction > 0 ? gridSize - r - 1 : r;
           cells.push(shape.cellIndex(r, c));
         }
         yield new SudokuConstraintHandler.AllDifferent(cells);
@@ -812,7 +812,7 @@ class SudokuBuilder {
       case 'FixedValues':
         let valueMap = new Map();
         for (const valueId of constraint.values) {
-          let {cell, value} = shape.parseValueId(valueId);
+          let { cell, value } = shape.parseValueId(valueId);
           valueMap.set(cell, value);
         }
         yield new SudokuConstraintHandler.FixedCells(valueMap);
@@ -822,7 +822,7 @@ class SudokuBuilder {
         cells = constraint.cells.map(c => shape.parseCellId(c).cell);
         for (let i = 1; i < cells.length; i++) {
           yield new SudokuConstraintHandler.BinaryConstraint(
-            cells[i-1], cells[i], (a, b) => a < b);
+            cells[i - 1], cells[i], (a, b) => a < b);
         }
         break;
 
@@ -830,7 +830,7 @@ class SudokuBuilder {
         cells = constraint.cells.map(c => shape.parseCellId(c).cell);
         for (let i = 1; i < cells.length; i++) {
           yield new SudokuConstraintHandler.BinaryConstraint(
-            cells[i-1], cells[i], (a, b) => a >= b+5 || a <= b-5);
+            cells[i - 1], cells[i], (a, b) => a >= b + 5 || a <= b - 5);
         }
         break;
 
@@ -850,9 +850,9 @@ class SudokuBuilder {
       case 'Palindrome':
         cells = constraint.cells.map(c => shape.parseCellId(c).cell);
         const numCells = cells.length;
-        for (let i = 0; i < numCells/2; i++) {
+        for (let i = 0; i < numCells / 2; i++) {
           yield new SudokuConstraintHandler.BinaryConstraint(
-            cells[i], cells[numCells-1-i], (a, b) => a == b);
+            cells[i], cells[numCells - 1 - i], (a, b) => a == b);
         }
         break;
 
@@ -865,13 +865,13 @@ class SudokuBuilder {
       case 'WhiteDot':
         cells = constraint.cells.map(c => shape.parseCellId(c).cell);
         yield new SudokuConstraintHandler.BinaryConstraint(
-          cells[0], cells[1], (a, b) => a == b+1 || a == b-1);
+          cells[0], cells[1], (a, b) => a == b + 1 || a == b - 1);
         break;
 
       case 'BlackDot':
         cells = constraint.cells.map(c => shape.parseCellId(c).cell);
         yield new SudokuConstraintHandler.BinaryConstraint(
-          cells[0], cells[1], (a, b) => a == b*2 || b == a*2);
+          cells[0], cells[1], (a, b) => a == b * 2 || b == a * 2);
         break;
 
       case 'Windoku':
@@ -881,7 +881,7 @@ class SudokuBuilder {
         break;
 
       default:
-        throw('Unknown constraint type: ' + constraint.type);
+        throw ('Unknown constraint type: ' + constraint.type);
     }
   }
 
@@ -905,8 +905,8 @@ class SudokuBuilder {
   static *_antiConsecutiveHandlers(shape) {
     const gridSize = shape.gridSize;
 
-    const adjacentCellsFn = (r, c) => [[r+1, c], [r, c+1]];
-    const constraintFn = (a, b) => (a != b+1 && a != b-1 && a != b);
+    const adjacentCellsFn = (r, c) => [[r + 1, c], [r, c + 1]];
+    const constraintFn = (a, b) => (a != b + 1 && a != b - 1 && a != b);
 
     for (let r = 0; r < gridSize; r++) {
       for (let c = 0; c < gridSize; c++) {
@@ -925,7 +925,7 @@ class SudokuBuilder {
 class SolverProxy {
   constructor(worker, stateHandler, statusHandler, debugHandler) {
     if (!worker) {
-      throw('Must provide worker');
+      throw ('Must provide worker');
     }
 
     this._worker = worker;
@@ -987,13 +987,13 @@ class SolverProxy {
 
   _callWorker(method, payload) {
     if (!this._initialized) {
-      throw(`SolverProxy not initialized.`);
+      throw (`SolverProxy not initialized.`);
     }
     if (!this._worker) {
-      throw(`SolverProxy has been terminated.`);
+      throw (`SolverProxy has been terminated.`);
     }
     if (this._waiting) {
-      throw(`Can't call worker while a method is in progress. (${this._waiting.method})`);
+      throw (`Can't call worker while a method is in progress. (${this._waiting.method})`);
     }
 
     this._statusHandler(true, method);

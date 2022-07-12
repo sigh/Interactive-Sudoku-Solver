@@ -49,7 +49,7 @@ const handleWorkerMethod = (method, payload) => {
     case 'countSolutions':
       return workerSolver.countSolutions();
   }
-  throw(`Unknown method ${method}`);
+  throw (`Unknown method ${method}`);
 };
 
 const pendingDebugLogs = [];
@@ -85,7 +85,7 @@ self.onmessage = (msg) => {
       type: 'result',
       result: result,
     });
-  } catch(e) {
+  } catch (e) {
     self.postMessage({
       type: 'exception',
       error: e,

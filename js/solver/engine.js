@@ -41,7 +41,7 @@ class SudokuSolver {
     this._progressExtraStateFn = () => {
       let result = null;
       if (sampleSolution) {
-        result = {solution: sampleSolution};
+        result = { solution: sampleSolution };
         sampleSolution = null;
       }
       return result;
@@ -116,7 +116,7 @@ class SudokuSolver {
       let pencilmarks = this.constructor._makePencilmarks(valuesInSolutions, this._shape);
       if (pencilmarks.length == lastSize) return null;
       lastSize = pencilmarks.size;
-      return {pencilmarks: pencilmarks};
+      return { pencilmarks: pencilmarks };
     };
 
     this._timer.runTimed(() => {
@@ -150,7 +150,7 @@ class SudokuSolver {
   }
 
   state() {
-    const counters = {...this._internalSolver.counters};
+    const counters = { ...this._internalSolver.counters };
 
     const state = {
       counters: counters,
@@ -170,8 +170,8 @@ class SudokuSolver {
         yieldEveryStep: yieldEveryStep,
         iter: new IteratorWithCount(this._internalSolver.run(
           yieldEveryStep
-          ? SudokuSolver.InternalSolver.YIELD_ON_STEP
-          : SudokuSolver.InternalSolver.YIELD_ON_SOLUTION))
+            ? SudokuSolver.InternalSolver.YIELD_ON_STEP
+            : SudokuSolver.InternalSolver.YIELD_ON_SOLUTION))
       };
     }
 
@@ -217,7 +217,7 @@ SudokuSolver.InternalSolver = class {
 
     this._initCellArray();
     this._stack = new Uint8Array(shape.numCells);
-    this._progressRatioStack = new Array(shape.numCells+1);
+    this._progressRatioStack = new Array(shape.numCells + 1);
     this._progressRatioStack.fill(1);
 
     this._runCounter = 0;
@@ -291,7 +291,7 @@ SudokuSolver.InternalSolver = class {
     // Set cell conflicts so that they are unique.
     // Sort them, so they are in a predictable order.
     this._cellConflicts = cellConflictSets.map(c => new Uint8Array(c));
-    this._cellConflicts.forEach(c => c.sort((a, b) => a-b));
+    this._cellConflicts.forEach(c => c.sort((a, b) => a - b));
 
     const handlerSet = new HandlerSet(handlers, this._shape);
 
@@ -366,13 +366,13 @@ SudokuSolver.InternalSolver = class {
     const numCells = this._numCells;
 
     let buffer = new ArrayBuffer(
-      (numCells+1) * numCells * Uint16Array.BYTES_PER_ELEMENT);
+      (numCells + 1) * numCells * Uint16Array.BYTES_PER_ELEMENT);
 
-    this._grids = new Array(numCells+1);
-    for (let i = 0; i < numCells+1; i++) {
+    this._grids = new Array(numCells + 1);
+    for (let i = 0; i < numCells + 1; i++) {
       this._grids[i] = new Uint16Array(
         buffer,
-        i*numCells*Uint16Array.BYTES_PER_ELEMENT,
+        i * numCells * Uint16Array.BYTES_PER_ELEMENT,
         numCells);
     }
     this._initialGrid = new Uint16Array(numCells);
@@ -386,7 +386,7 @@ SudokuSolver.InternalSolver = class {
     // us, or finding a value for a cell below us.
     for (let i = 0; i < this._numCells; i++) {
       const cell = stack[i];
-      if (grid[cell]&~uninterestingValues[cell]) return true;
+      if (grid[cell] & ~uninterestingValues[cell]) return true;
     }
     return false;
   }
@@ -422,7 +422,7 @@ SudokuSolver.InternalSolver = class {
       }
 
       const tc = triggerCounts[cell] || 1;  // Ensure we don't divide by zero.
-      const score = count/tc;
+      const score = count / tc;
 
       if (score < minScore) {
         bestIndex = i;
@@ -491,7 +491,7 @@ SudokuSolver.InternalSolver = class {
   static YIELD_ON_SOLUTION = 0;
   static YIELD_ON_STEP = 1;
 
-  static _BACKTRACK_DECAY_INTERVAL = 100*100;
+  static _BACKTRACK_DECAY_INTERVAL = 100 * 100;
 
   // run runs the solve.
   // yieldWhen can be:
@@ -503,11 +503,11 @@ SudokuSolver.InternalSolver = class {
     const yieldOnContradiction = yieldWhen > 1 ? yieldWhen : 0;
 
     // Set up iterator validation.
-    if (!this._atStart) throw('State is not in initial state.');
+    if (!this._atStart) throw ('State is not in initial state.');
     this._atStart = false;
     let runCounter = ++this._runCounter;
     const checkRunCounter = () => {
-      if (runCounter != this._runCounter) throw('Iterator no longer valid');
+      if (runCounter != this._runCounter) throw ('Iterator no longer valid');
     };
 
     let depth = 0;
@@ -539,7 +539,7 @@ SudokuSolver.InternalSolver = class {
     {
       const count = this._updateCellOrder(stack, depth, this._grids[depth]);
       depth++;
-      progressRatioStack[depth] = progressRatioStack[depth-1]/count;
+      progressRatioStack[depth] = progressRatioStack[depth - 1] / count;
       counters.cellsSearched++;
     }
 
@@ -576,13 +576,13 @@ SudokuSolver.InternalSolver = class {
         // Exponentially decay the counts.
         if (0 === counters.backtracks % this.constructor._BACKTRACK_DECAY_INTERVAL) {
           for (let i = 0; i < this._numCells; i++) {
-            this._backtrackTriggers[i]>>=1;
+            this._backtrackTriggers[i] >>= 1;
           }
         }
         this._backtrackTriggers[cell]++;
 
         if (0 !== yieldOnContradiction &&
-            0 === counters.backtracks % yieldOnContradiction) {
+          0 === counters.backtracks % yieldOnContradiction) {
           yield {
             grid: grid,
             isSolution: false,
@@ -636,7 +636,7 @@ SudokuSolver.InternalSolver = class {
         const count = this._updateCellOrder(stack, depth, grid);
         counters.cellsSearched++;
         depth++;
-        progressRatioStack[depth] = progressRatioStack[depth-1]/count;
+        progressRatioStack[depth] = progressRatioStack[depth - 1] / count;
       }
     }
 
@@ -664,7 +664,7 @@ SudokuSolver.InternalSolver = class {
 
     // Function to fill a house with all values.
     const fillHouse = (house) => {
-      house.cells.forEach((c, i) => this._grids[0][c] = 1<<i);
+      house.cells.forEach((c, i) => this._grids[0][c] = 1 << i);
     };
 
     const attemptLog = [];
@@ -686,7 +686,7 @@ SudokuSolver.InternalSolver = class {
 
       for (const result of this.run(SEARCH_LIMIT)) {
         if (result.isSolution) {
-          this.counters.branchesIgnored = 1-this.counters.progressRatio;
+          this.counters.branchesIgnored = 1 - this.counters.progressRatio;
           return true;
         }
         attemptLog.push([house, this.counters.progressRatio]);
@@ -710,7 +710,7 @@ SudokuSolver.InternalSolver = class {
     // a full search from there.
 
     // Find the house with the best score.
-    attemptLog.sort((a,b) => b[1]-a[1]);
+    attemptLog.sort((a, b) => b[1] - a[1]);
     const besthouse = attemptLog[0][0];
 
     this._resetStack();
@@ -729,7 +729,7 @@ SudokuSolver.InternalSolver = class {
     this._progress.callback = callback;
     this._progress.frequencyMask = -1;
     if (callback) {
-      this._progress.frequencyMask = (1<<logFrequency)-1;
+      this._progress.frequencyMask = (1 << logFrequency) - 1;
     }
   }
 }
@@ -791,17 +791,17 @@ class LookupTables {
   });
 
   constructor(do_not_call, numValues) {
-    if (!do_not_call) throw('Use LookupTables.get(shape.numValues)');
+    if (!do_not_call) throw ('Use LookupTables.get(shape.numValues)');
 
-    this.allValues = (1<<numValues)-1;
-    this.combinations = 1<<numValues;
+    this.allValues = (1 << numValues) - 1;
+    this.combinations = 1 << numValues;
 
     const combinations = this.combinations;
 
     this.value = (() => {
       let table = new Uint8Array(combinations);
       for (let i = 0; i < numValues; i++) {
-        table[1 << i] = i+1;
+        table[1 << i] = i + 1;
       }
       return table;
     })();
@@ -810,7 +810,7 @@ class LookupTables {
       let table = new Uint8Array(combinations);
       for (let i = 1; i < combinations; i++) {
         // COUNT is one greater than the count with the last set bit removed.
-        table[i] = 1 + table[i & (i-1)];
+        table[i] = 1 + table[i & (i - 1)];
       }
       return table;
     })();
@@ -819,7 +819,7 @@ class LookupTables {
       let table = new Uint8Array(combinations);
       for (let i = 1; i < combinations; i++) {
         // SUM is the value of the lowest set bit plus the sum  of the rest.
-        table[i] = table[i & (i-1)] + this.value[i & -i];
+        table[i] = table[i & (i - 1)] + this.value[i & -i];
       }
       return table;
     })();
@@ -843,7 +843,7 @@ class LookupTables {
       for (let i = 1; i < combinations; i++) {
         // MIN is the value of the last bit set.
         const min = this.value[i & -i];
-        table[i] |= min<<8;
+        table[i] |= min << 8;
       }
 
       return table;
@@ -862,7 +862,7 @@ class LookupTables {
         const minMax = this.minMax8Bit[i];
         const fixed = this.value[i];
         const isFixed = fixed > 0 ? 1 : 0;
-        table[i] = (isFixed<<24)|(fixed<<16)|minMax;
+        table[i] = (isFixed << 24) | (fixed << 16) | minMax;
       }
       // If there are no values, set a high value for isFixed to indicate the
       // result is invalid. This is intended to be detectable after summing.
@@ -875,7 +875,7 @@ class LookupTables {
       for (let i = 0; i < combinations; i++) {
         let rev = 0;
         for (let j = 0; j < numValues; j++) {
-          rev |= ((i>>j)&1)<<(numValues-1-j);
+          rev |= ((i >> j) & 1) << (numValues - 1 - j);
         }
         table[i] = rev;
       }
@@ -900,7 +900,7 @@ class LookupTables {
       // Populate base cases, where there is a single value set.
       for (let i = 0; i < numValues; i++) {
         for (let j = 0; j < numValues; j++) {
-          if (fn(i+1, j+1)) {
+          if (fn(i + 1, j + 1)) {
             table[1 << i] |= 1 << j;
           }
         }
@@ -909,10 +909,10 @@ class LookupTables {
       // To fill in the rest, OR together all the valid settings for each value
       // set.
       for (let i = 1; i < combinations; i++) {
-        table[i] = table[i & (i-1)] | table[i & -i];
+        table[i] = table[i & (i - 1)] | table[i & -i];
       }
       return table;
     },
-    binaryFunctionKey);
+      binaryFunctionKey);
   }
 }

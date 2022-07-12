@@ -153,7 +153,7 @@ class ExampleHandler {
     let exampleSelect = document.getElementById('example-select');
 
     for (const example of ExampleHandler._EXAMPLES) {
-      if (!EXAMPLES[example]) throw('Unknown example: ' + example);
+      if (!EXAMPLES[example]) throw ('Unknown example: ' + example);
       let option = document.createElement('option');
       option.textContent = example;
       exampleSelect.appendChild(option);
@@ -303,7 +303,7 @@ class ShapeManager {
     const shapeSelect = this._select;
     const shapeName = shapeSelect.value;
     const shape = GridShape.get(shapeName);
-    if (!shape) throw('Invalid shape: ' + shapeName);
+    if (!shape) throw ('Invalid shape: ' + shapeName);
     this.reshape(shape);
   }
 
@@ -347,7 +347,7 @@ class ConstraintManager {
   }
 
   setUpdateCallback(fn) {
-    this.updateCallback = fn || (() => {});
+    this.updateCallback = fn || (() => { });
   }
 
   runUpdateCallback() {
@@ -668,7 +668,7 @@ class ConstraintManager {
 
   _addConstraintFromForm(selectionForm, inputManager) {
     const cells = inputManager.getSelection();
-    if (cells.length < 2) throw('Selection too short.');
+    if (cells.length < 2) throw ('Selection too short.');
 
     let formData = new FormData(selectionForm);
 
@@ -775,7 +775,7 @@ class ConstraintManager {
 
     // Determine the correct scale to fit our icon size.
     const gridSizePixels = borderDisplay.gridSizePixels();
-    const scale = this._PANEL_ICON_SIZE_PX/gridSizePixels;
+    const scale = this._PANEL_ICON_SIZE_PX / gridSizePixels;
     const transform = `scale(${scale})`;
 
     borders.setAttribute('transform', transform);
@@ -909,7 +909,7 @@ class Selection {
     // Make the container selectable.
     container.tabIndex = 0;
 
-    const cellFuziness = 1.4*(DisplayItem.CELL_SIZE/2);
+    const cellFuziness = 1.4 * (DisplayItem.CELL_SIZE / 2);
 
     let currCell = null;
     let currCenter = null;
@@ -919,8 +919,8 @@ class Selection {
 
       // Make current cell hitbox larger so that we can more easily
       // select diagonals without hitting adjacent cells.
-      const dx = Math.abs(e.offsetX-currCenter[0]);
-      const dy = Math.abs(e.offsetY-currCenter[1]);
+      const dx = Math.abs(e.offsetX - currCenter[0]);
+      const dy = Math.abs(e.offsetY - currCenter[1]);
       if (Math.max(dx, dy) < cellFuziness) return;
 
       currCell = target;
@@ -985,7 +985,7 @@ class FixedValues {
       newValue = 0;
     } else {
       const numValues = this._shape.numValues;
-      newValue = currValue*10 + digit;
+      newValue = currValue * 10 + digit;
       if (newValue > numValues) newValue = digit;
       if (newValue > numValues) newValue = 0;
     }
@@ -1106,10 +1106,10 @@ class GridInputManager {
       if (!cell) return;
 
       const shape = this._shape;
-      let {row, col} = shape.parseCellId(cell);
+      let { row, col } = shape.parseCellId(cell);
       const gridSize = shape.gridSize;
-      row = (row+dr+gridSize)%gridSize;
-      col = (col+dc+gridSize)%gridSize;
+      row = (row + dr + gridSize) % gridSize;
+      col = (col + dc + gridSize) % gridSize;
 
       this._selection.setCells([shape.makeCellId(row, col)]);
     };
@@ -1190,7 +1190,7 @@ class HistoryHandler {
 
   update(params) {
     if (this._blockHistoryUpdates) return;
-    let q = '' + (params.q||'');
+    let q = '' + (params.q || '');
 
     this._addToHistory(q);
     this._updateUrl(params);
@@ -1199,7 +1199,7 @@ class HistoryHandler {
   _addToHistory(q) {
     if (q == this._history[this._historyLocation]) return;
     this._history.length = this._historyLocation + 1;
-    this._history.push(q||'');
+    this._history.push(q || '');
     this._historyLocation++;
 
     if (this._history.length > HistoryHandler.MAX_HISTORY) {
@@ -1211,13 +1211,13 @@ class HistoryHandler {
   }
 
   _incrementHistory(delta) {
-    let q = this._history[this._historyLocation+delta];
+    let q = this._history[this._historyLocation + delta];
     if (q === undefined) return;
     this._historyLocation += delta;
     this._updateButtons();
 
-    this._updateUrl({q: q});
-    this._onUpdate(new URLSearchParams({q: q}));
+    this._updateUrl({ q: q });
+    this._onUpdate(new URLSearchParams({ q: q }));
   }
 
   _updateButtons() {
@@ -1433,9 +1433,9 @@ class SolverStateDisplay {
 
   _updateProgressBar(state) {
     const progress = state.done
-        ? 1
-        : state.counters.progressRatio + state.counters.branchesIgnored;
-    const percent = Math.round(progress*100);
+      ? 1
+      : state.counters.progressRatio + state.counters.branchesIgnored;
+    const percent = Math.round(progress * 100);
     this._elements.progressBar.setAttribute('value', progress);
     this._elements.progressPercentage.textContent = percent + '%';
   }
@@ -1646,7 +1646,7 @@ class SolutionController {
     let mode = this._elements.mode.value;
     let auto = this._elements.autoSolve.checked;
 
-    this._historyHandler.update({mode: mode, q: constraints});
+    this._historyHandler.update({ mode: mode, q: constraints });
 
     let description = SolutionController._MODE_DESCRIPTIONS[mode];
     this._elements.modeDescription.textContent = description;
@@ -1699,7 +1699,7 @@ class SolutionController {
     handler(newSolver)
       .catch(e => {
         if (!e.toString().startsWith('Aborted')) {
-          throw(e);
+          throw (e);
         }
       });
   }
@@ -1738,11 +1738,11 @@ class SolutionController {
       if (result) {
         this._solutionDisplay.setSolution(result.values, result.pencilmarks);
         if (result.values.length > 0 && !result.isSolution) {
-          selection.push(result.values[result.values.length-1].substring(0, 4));
+          selection.push(result.values[result.values.length - 1].substring(0, 4));
         }
         this._stateDisplay.setStepStatus(
           result.isSolution ? 'Solution' :
-          result.hasContradiction ? 'Conflict' : null);
+            result.hasContradiction ? 'Conflict' : null);
       } else {
         this._stateDisplay.setStepStatus(null);
       }
@@ -1751,7 +1751,7 @@ class SolutionController {
       this._elements.forward.disabled = (result == null);
       this._elements.back.disabled = (step == 0);
       this._elements.start.disabled = (step == 0);
-      this._elements.stepOutput.textContent = step+1;
+      this._elements.stepOutput.textContent = step + 1;
     };
 
     this._elements.forward.onclick = () => {
@@ -1792,7 +1792,7 @@ class SolutionController {
     };
 
     const update = () => {
-      this._solutionDisplay.setSolution(solutions[solutionNum-1]);
+      this._solutionDisplay.setSolution(solutions[solutionNum - 1]);
 
       this._elements.forward.disabled = (done && solutionNum >= solutions.length);
       this._elements.back.disabled = (solutionNum == 1);
@@ -1870,7 +1870,7 @@ class InfoOverlay {
       const cellId = shape.makeCellId(...shape.splitCellIndex(i));
       const path = this._heatmap.addCell(cellId);
       path.setAttribute('fill', 'rgb(255, 0, 0)');
-      path.setAttribute('opacity', values[i]/1000);
+      path.setAttribute('opacity', values[i] / 1000);
     }
   }
 

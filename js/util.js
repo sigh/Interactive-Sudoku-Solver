@@ -2,10 +2,10 @@ const formatTimeMs = (timeMs) => {
   if (timeMs < 1e3) {
     return timeMs.toPrecision(3) + ' ms';
   } else if (timeMs < 60e3) {
-    return (timeMs/1000).toPrecision(3) + ' s';
+    return (timeMs / 1000).toPrecision(3) + ' s';
   } else {
-    const timeS = timeMs/1e3|0;
-    return (timeS/60|0) + ' min ' + (timeS%60) + ' s';
+    const timeS = timeMs / 1e3 | 0;
+    return (timeS / 60 | 0) + ' min ' + (timeS % 60) + ' s';
   }
 };
 
@@ -41,9 +41,9 @@ const arraysAreEqual = (a, b) => {
 const setIntersection = (a, b) => {
   const intersection = new Set()
   for (const elem of a) {
-      if (b.has(elem)) {
-          intersection.add(elem)
-      }
+    if (b.has(elem)) {
+      intersection.add(elem)
+    }
   }
   return intersection;
 };

@@ -27,15 +27,15 @@ const toShortSolution = (valueIds, shape) => {
   const baseCharCode = SudokuTextParser.SHAPE_TO_BASE_CHAR_CODE.get(shape);
 
   for (const valueId of valueIds) {
-    let {cell, value} = shape.parseValueId(valueId);
-    if (result[cell] != DEFAULT_VALUE) throw('Too many solutions per cell.');
-    result[cell] = String.fromCharCode(baseCharCode+value-1);
+    let { cell, value } = shape.parseValueId(valueId);
+    if (result[cell] != DEFAULT_VALUE) throw ('Too many solutions per cell.');
+    result[cell] = String.fromCharCode(baseCharCode + value - 1);
   }
   return result.join('');
 }
 
 const puzzleFromCfg = (puzzleCfg) => {
-  let puzzleStr, solution, name='';
+  let puzzleStr, solution, name = '';
   if (Array.isArray(puzzleCfg)) {
     [puzzleStr, solution] = puzzleCfg;
   } else {
@@ -43,7 +43,7 @@ const puzzleFromCfg = (puzzleCfg) => {
   }
   puzzle = EXAMPLES[puzzleStr];
   if (!puzzle) {
-    puzzle = {input: puzzleStr, solution: solution};
+    puzzle = { input: puzzleStr, solution: solution };
   }
 
   return [puzzleStr, puzzle];
@@ -53,7 +53,7 @@ const runFnWithChecks = async (puzzles, fn, onFailure) => {
   const startTime = performance.now();
 
   const sumObjectValues = (a, b) => {
-    let result = {...a};
+    let result = { ...a };
     for (const [k, v] of Object.entries(b)) {
       if (!v) continue;
       if (!result[k]) result[k] = 0;
@@ -71,7 +71,7 @@ const runFnWithChecks = async (puzzles, fn, onFailure) => {
       console.log('Test failed: ' + (name || puzzle.input));
       console.log('Expected', puzzle.solution);
       console.log('Got     ', result);
-      throw('Test failed: ' + name);
+      throw ('Test failed: ' + name);
     }
   };
 
@@ -105,7 +105,7 @@ const runFnWithChecks = async (puzzles, fn, onFailure) => {
     let result;
     try {
       result = await resultPromise;
-    } catch(e) {
+    } catch (e) {
       failTest(name, puzzle, e);
     } finally {
       solver.terminate();
@@ -144,7 +144,8 @@ const runFnWithChecks = async (puzzles, fn, onFailure) => {
       name: name,
       ...state.counters,
       setupTimeMs: state.puzzleSetupTime,
-      rumtimeMs: state.timeMs};
+      rumtimeMs: state.timeMs
+    };
     rows.push(row);
 
     total = sumObjectValues(total, row);
@@ -237,7 +238,7 @@ const printGrid = (grid) => {
   const gridSize = Math.sqrt(grid);
   const matrix = [];
   for (let i = 0; i < gridSize; i++) {
-    matrix.push(grid.slice(i*gridSize, (i+1)*gridSize));
+    matrix.push(grid.slice(i * gridSize, (i + 1) * gridSize));
   }
   console.table(matrix);
 }

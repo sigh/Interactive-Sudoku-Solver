@@ -14,7 +14,7 @@ class DisplayContainer {
 
   reshape(shape) {
     const padding = DisplayItem.SVG_PADDING;
-    const sideLength = DisplayItem.CELL_SIZE * shape.gridSize + padding*2;
+    const sideLength = DisplayItem.CELL_SIZE * shape.gridSize + padding * 2;
     this._mainSvg.setAttribute('height', sideLength);
     this._mainSvg.setAttribute('width', sideLength);
     this._mainSvg.setAttribute('class', `size-${shape.name}`);
@@ -59,14 +59,14 @@ class DisplayItem {
   }
 
   cellIdCenter(cellId) {
-    const {row, col} = this._shape.parseCellId(cellId);
+    const { row, col } = this._shape.parseCellId(cellId);
     return DisplayItem._cellCenter(row, col);
   }
 
   cellIdCorner(cellId) {
     const cellWidth = DisplayItem.CELL_SIZE;
     const [x, y] = this.cellIdCenter(cellId);
-    return [x - cellWidth/2, y - cellWidth/2 + 2];
+    return [x - cellWidth / 2, y - cellWidth / 2 + 2];
   }
 
   cellCenter(cell) {
@@ -75,7 +75,7 @@ class DisplayItem {
 
   static _cellCenter(row, col) {
     const cellSize = DisplayItem.CELL_SIZE;
-    return [col*cellSize + cellSize/2, row*cellSize + cellSize/2];
+    return [col * cellSize + cellSize / 2, row * cellSize + cellSize / 2];
   }
 
   makeTextNode(str, x, y, cls) {
@@ -98,7 +98,7 @@ class DisplayItem {
     const [x, y] = this.cellCenter(cell);
     const path = createSvgElement('path');
     const directions = [
-      'M', x-cellWidth/2+1, y-cellWidth/2+1,
+      'M', x - cellWidth / 2 + 1, y - cellWidth / 2 + 1,
       'l', 0, cellWidth,
       'l', cellWidth, 0,
       'l', 0, -cellWidth,
@@ -149,8 +149,8 @@ class ClickInterceptor extends DisplayItem {
 
   cellAt(x, y) {
     const shape = this._shape;
-    const row = y/DisplayItem.CELL_SIZE|0;
-    const col = x/DisplayItem.CELL_SIZE|0;
+    const row = y / DisplayItem.CELL_SIZE | 0;
+    const col = x / DisplayItem.CELL_SIZE | 0;
     if (row < 0 || row >= shape.gridSize) return null;
     if (col < 0 || col >= shape.gridSize) return null;
     return shape.makeCellId(row, col);
@@ -216,7 +216,7 @@ class SolutionDisplay extends DisplayItem {
     let pencilmarkCell = new Set();
 
     const handleValue = (valueId) => {
-      let {cellId, value} = this._shape.parseValueId(valueId);
+      let { cellId, value } = this._shape.parseValueId(valueId);
       this._solutionValues.push(valueId);
 
       if (!cellValues.has(cellId)) cellValues.set(cellId, []);
@@ -236,7 +236,7 @@ class SolutionDisplay extends DisplayItem {
     }
 
     const LINE_HEIGHT = this._shape.gridSize == SHAPE_9x9.gridSize ? 17 : 10;
-    const START_OFFSET = -DisplayItem.CELL_SIZE/2+2;
+    const START_OFFSET = -DisplayItem.CELL_SIZE / 2 + 2;
     for (const [cellId, values] of cellValues) {
       const [x, y] = this.cellIdCenter(cellId);
 
@@ -247,7 +247,7 @@ class SolutionDisplay extends DisplayItem {
         let offset = START_OFFSET;
         for (const line of this._formatMultiSolution(values)) {
           this._svg.append(this.makeTextNode(
-            line, x, y+offset, 'solution-multi-value'));
+            line, x, y + offset, 'solution-multi-value'));
           offset += LINE_HEIGHT;
         }
       }
@@ -257,7 +257,7 @@ class SolutionDisplay extends DisplayItem {
   }
 
   _makeTemplateArray = memoize((shape) => {
-    const charsPerLine = 2*shape.boxSize-1;
+    const charsPerLine = 2 * shape.boxSize - 1;
 
     let charCount = 0;
     const slots = [];
@@ -280,7 +280,7 @@ class SolutionDisplay extends DisplayItem {
   _formatMultiSolution(values) {
     const slots = [...this._makeTemplateArray(this._shape)];
     for (const v of values) {
-      slots[v*2-2] = v;
+      slots[v * 2 - 2] = v;
     }
     return slots.join('').split(/\n/);
   }
@@ -443,13 +443,13 @@ class ConstraintDisplay extends DisplayItem {
   }
 
   drawDot(cells, fillColor) {
-    if (cells.length != 2) throw(`White dot must be two cells: ${cells}`)
+    if (cells.length != 2) throw (`White dot must be two cells: ${cells}`)
 
     // Find the midpoint between the squares.
     let [x0, y0] = this.cellIdCenter(cells[0]);
     let [x1, y1] = this.cellIdCenter(cells[1]);
-    let x = (x0+x1)/2;
-    let y = (y0+y1)/2;
+    let x = (x0 + x1) / 2;
+    let y = (y0 + y1) / 2;
 
     let dot = createSvgElement('circle');
     dot.setAttribute('fill', fillColor);
@@ -477,14 +477,14 @@ class ConstraintDisplay extends DisplayItem {
   }
 
   _removeCircleFromLine(p0, p1) {
-    const [dx, dy] = [p1[0]-p0[0], p1[1]-p0[1]];
-    const frac = this._CIRCLE_RADIUS/Math.sqrt(dx*dx+dy*dy);
-    p0[0] += dx*frac;
-    p0[1] += dy*frac;
+    const [dx, dy] = [p1[0] - p0[0], p1[1] - p0[1]];
+    const frac = this._CIRCLE_RADIUS / Math.sqrt(dx * dx + dy * dy);
+    p0[0] += dx * frac;
+    p0[1] += dy * frac;
   }
 
   drawArrow(cells) {
-    if (cells.length < 2) throw(`Arrow too short: ${cells}`)
+    if (cells.length < 2) throw (`Arrow too short: ${cells}`)
 
     let arrow = createSvgElement('g');
     arrow.setAttribute('fill', 'transparent');
@@ -510,7 +510,7 @@ class ConstraintDisplay extends DisplayItem {
   }
 
   _drawConstraintLine(cells, color) {
-    if (cells.length < 2) throw(`Line too short: ${cells}`)
+    if (cells.length < 2) throw (`Line too short: ${cells}`)
 
     const line = this._makePath(cells.map(c => this.cellIdCenter(c)));
     line.setAttribute('stroke', color);
@@ -532,9 +532,9 @@ class ConstraintDisplay extends DisplayItem {
 
   drawBetween(cells) {
     const len = cells.length;
-    if (len < 2) throw(`Line too short: ${cells}`)
+    if (len < 2) throw (`Line too short: ${cells}`)
 
-    let between  = createSvgElement('g');
+    let between = createSvgElement('g');
     between.setAttribute('stroke', 'rgb(200, 200, 200)');
     between.setAttribute('stroke-width', 3);
     between.setAttribute('stroke-linecap', 'round');
@@ -542,11 +542,11 @@ class ConstraintDisplay extends DisplayItem {
 
     // Draw the circle.
     between.appendChild(this._makeCircle(cells[0]));
-    between.appendChild(this._makeCircle(cells[len-1]));
+    between.appendChild(this._makeCircle(cells[len - 1]));
 
     const points = cells.map(c => this.cellIdCenter(c));
     this._removeCircleFromLine(points[0], points[1])
-    this._removeCircleFromLine(points[len-1], points[len-2])
+    this._removeCircleFromLine(points[len - 1], points[len - 2])
     const path = this._makePath(points);
     between.appendChild(path);
 
@@ -560,7 +560,7 @@ class ConstraintDisplay extends DisplayItem {
   }
 
   drawThermometer(cells) {
-    if (cells.length < 2) throw(`Thermo too short: ${cells}`)
+    if (cells.length < 2) throw (`Thermo too short: ${cells}`)
 
     let thermo = createSvgElement('g');
     thermo.setAttribute('fill', 'rgb(200, 200, 200)');
@@ -615,18 +615,18 @@ class GridDisplay extends DisplayItem {
     this.clear();
 
     const cellSize = DisplayItem.CELL_SIZE;
-    const gridSize = cellSize*shape.gridSize;
+    const gridSize = cellSize * shape.gridSize;
 
     const grid = this.getSvg();
 
     for (let i = 1; i < gridSize; i++) {
       grid.append(this._makePath([
-        [0, i*cellSize],
-        [gridSize, i*cellSize],
+        [0, i * cellSize],
+        [gridSize, i * cellSize],
       ]));
       grid.append(this._makePath([
-        [i*cellSize, 0],
-        [i*cellSize, gridSize],
+        [i * cellSize, 0],
+        [i * cellSize, gridSize],
       ]));
     }
   }
@@ -644,7 +644,7 @@ class BorderDisplay extends DisplayItem {
   }
 
   gridSizePixels() {
-    return DisplayItem.CELL_SIZE*this._shape.gridSize;
+    return DisplayItem.CELL_SIZE * this._shape.gridSize;
   }
 
   reshape(shape) {
@@ -680,17 +680,17 @@ class DefaultRegions extends DisplayItem {
     this.clear();
 
     const cellSize = DisplayItem.CELL_SIZE;
-    const gridSizePixels = cellSize*shape.gridSize;
+    const gridSizePixels = cellSize * shape.gridSize;
     const svg = this.getSvg();
 
-    for (let i = shape.boxSize; i < shape.gridSize; i+=shape.boxSize) {
+    for (let i = shape.boxSize; i < shape.gridSize; i += shape.boxSize) {
       svg.appendChild(this._makePath([
-        [0, i*cellSize],
-        [gridSizePixels, i*cellSize],
+        [0, i * cellSize],
+        [gridSizePixels, i * cellSize],
       ]));
       svg.appendChild(this._makePath([
-        [i*cellSize, 0],
-        [i*cellSize, gridSizePixels],
+        [i * cellSize, 0],
+        [i * cellSize, gridSizePixels],
       ]));
     }
   }
@@ -776,33 +776,33 @@ class JigsawRegionDisplay extends DisplayItem {
     for (const cell of cellSet) {
       const [row, col] = this._shape.splitCellIndex(cell);
 
-      const cellUp    = this._shape.cellIndex(row-1, col);
-      const cellDown  = this._shape.cellIndex(row+1, col);
-      const cellLeft  = this._shape.cellIndex(row, col-1);
-      const cellRight = this._shape.cellIndex(row, col+1);
+      const cellUp = this._shape.cellIndex(row - 1, col);
+      const cellDown = this._shape.cellIndex(row + 1, col);
+      const cellLeft = this._shape.cellIndex(row, col - 1);
+      const cellRight = this._shape.cellIndex(row, col + 1);
 
       if (!cellSet.has(cellLeft)) {
         g.appendChild(this._makePath([
-          [col*cellSize, row*cellSize],
-          [col*cellSize, (row+1)*cellSize],
+          [col * cellSize, row * cellSize],
+          [col * cellSize, (row + 1) * cellSize],
         ]));
       }
       if (!cellSet.has(cellRight)) {
         g.appendChild(this._makePath([
-          [(col+1)*cellSize, row*cellSize],
-          [(col+1)*cellSize, (row+1)*cellSize],
+          [(col + 1) * cellSize, row * cellSize],
+          [(col + 1) * cellSize, (row + 1) * cellSize],
         ]));
       }
       if (!cellSet.has(cellUp)) {
         g.appendChild(this._makePath([
-          [col*cellSize, row*cellSize],
-          [(col+1)*cellSize, row*cellSize],
+          [col * cellSize, row * cellSize],
+          [(col + 1) * cellSize, row * cellSize],
         ]));
       }
       if (!cellSet.has(cellDown)) {
         g.appendChild(this._makePath([
-          [col*cellSize, (row+1)*cellSize],
-          [(col+1)*cellSize, (row+1)*cellSize],
+          [col * cellSize, (row + 1) * cellSize],
+          [(col + 1) * cellSize, (row + 1) * cellSize],
         ]));
       }
     }
@@ -866,7 +866,7 @@ class OutsideArrowDisplay extends DisplayItem {
       form.sum.select();
 
       for (let option of formOptions) option.disabled = true;
-      document.getElementById(type+'-option').disabled = false;
+      document.getElementById(type + '-option').disabled = false;
 
       selectedArrow = arrowSvg;
       selectedArrow.classList.add('selected-arrow');
@@ -917,8 +917,8 @@ class OutsideArrowDisplay extends DisplayItem {
 
     const arrowSvg = this._makeArrow(
       cell0.row, cell0.col,
-      cell1.row-cell0.row,
-      cell1.col-cell0.col);
+      cell1.row - cell0.row,
+      cell1.col - cell0.col);
     this.getSvg().appendChild(arrowSvg);
 
     this._outsideArrowMap.set(id, arrowSvg);
@@ -933,11 +933,11 @@ class OutsideArrowDisplay extends DisplayItem {
     const cellSize = DisplayItem.CELL_SIZE;
 
     const arrowLen = 0.2;
-    const arrowX = x - dc * cellSize*(0.5 + arrowLen);
-    const arrowY = y - dr * cellSize*(0.5 + arrowLen);
-    const d = cellSize*arrowLen-1;
-    const dx = dc*d;
-    const dy = dr*d;
+    const arrowX = x - dc * cellSize * (0.5 + arrowLen);
+    const arrowY = y - dr * cellSize * (0.5 + arrowLen);
+    const d = cellSize * arrowLen - 1;
+    const dx = dc * d;
+    const dy = dr * d;
 
     let directions = [
       'M', arrowX, arrowY,
@@ -954,16 +954,16 @@ class OutsideArrowDisplay extends DisplayItem {
 
     let hitboxSize = d + 8;
     let hitbox = createSvgElement('rect');
-    hitbox.setAttribute('x', arrowX + dx/2 - hitboxSize/2);
-    hitbox.setAttribute('y', arrowY + dy/2 - hitboxSize/2);
+    hitbox.setAttribute('x', arrowX + dx / 2 - hitboxSize / 2);
+    hitbox.setAttribute('y', arrowY + dy / 2 - hitboxSize / 2);
     hitbox.setAttribute('height', hitboxSize);
     hitbox.setAttribute('width', hitboxSize);
     hitbox.setAttribute('fill', 'transparent');
 
     let text = createSvgElement('text');
-    let textOffsetFactor = dx*dy ? 0.6 : 0;
-    text.setAttribute('x', arrowX-dx*textOffsetFactor);
-    text.setAttribute('y', arrowY-dy*textOffsetFactor);
+    let textOffsetFactor = dx * dy ? 0.6 : 0;
+    text.setAttribute('x', arrowX - dx * textOffsetFactor);
+    text.setAttribute('y', arrowY - dy * textOffsetFactor);
     text.setAttribute('text-anchor', 'middle');
     text.setAttribute('dominant-baseline', 'middle');
     text.setAttribute('style',
@@ -1001,7 +1001,7 @@ class DiagonalDisplay extends DisplayItem {
 
     const shape = this._shape;
 
-    const size = DisplayItem.CELL_SIZE*shape.gridSize;
+    const size = DisplayItem.CELL_SIZE * shape.gridSize;
     const line = this._makePath([
       [0, direction > 0 ? size : 0],
       [size, direction > 0 ? 0 : size],
@@ -1106,7 +1106,7 @@ class KillerCageDisplay extends DisplayItem {
   }
 
   drawKillerCage(cells, sum) {
-    let x,y;
+    let x, y;
 
     const cage = createSvgElement('g');
     const color = this._chooseKillerCageColor(cells);
@@ -1166,18 +1166,18 @@ class KillerCageDisplay extends DisplayItem {
     // Use a greedy algorithm to choose the graph color.
     const conflictingColors = new Set();
     for (const cellId of cellIds) {
-      let {row, col} = shape.parseCellId(cellId);
+      let { row, col } = shape.parseCellId(cellId);
       // Lookup all  adjacent cells, it doesn't matter if they valid or not.
-      conflictingColors.add(this._killerCellColors.get(shape.makeCellId(row, col+1)));
-      conflictingColors.add(this._killerCellColors.get(shape.makeCellId(row, col-1)));
-      conflictingColors.add(this._killerCellColors.get(shape.makeCellId(row+1, col)));
-      conflictingColors.add(this._killerCellColors.get(shape.makeCellId(row-1, col)));
+      conflictingColors.add(this._killerCellColors.get(shape.makeCellId(row, col + 1)));
+      conflictingColors.add(this._killerCellColors.get(shape.makeCellId(row, col - 1)));
+      conflictingColors.add(this._killerCellColors.get(shape.makeCellId(row + 1, col)));
+      conflictingColors.add(this._killerCellColors.get(shape.makeCellId(row - 1, col)));
     }
     // Return the first color that doesn't conflict.
     for (const color of this.constructor.KILLER_CAGE_COLORS) {
       if (!conflictingColors.has(color)) return color;
     }
     // Otherwse select a random color.
-    return `rgb(${Math.random()*255|0},${Math.random()*255|0},${Math.random()*255|0})`;
+    return `rgb(${Math.random() * 255 | 0},${Math.random() * 255 | 0},${Math.random() * 255 | 0})`;
   }
 }
