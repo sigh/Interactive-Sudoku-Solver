@@ -13,7 +13,7 @@ layout: null
   <script async src="https://www.googletagmanager.com/gtag/js?id=UA-177463638-1"></script>
   <script>
     window.dataLayer = window.dataLayer || [];
-    function gtag(){dataLayer.push(arguments);}
+    function gtag() { dataLayer.push(arguments); }
     gtag('js', new Date());
 
     gtag('config', 'UA-177463638-1');
@@ -50,8 +50,7 @@ layout: null
       </p>
       <p>
         To add a Little Killer
-        <span class="tooltip"
-          data-text="Values along diagonal must add to the given sum. Values may repeat.">
+        <span class="tooltip" data-text="Values along diagonal must add to the given sum. Values may repeat.">
         </span>
         constraint, select a diagonal arrow outside the grid.
       </p>
@@ -129,9 +128,10 @@ layout: null
       <h1>Constraints</h1>
 
       <div class="control-panel">
-          <button id="clear-constraints-button" class="danger-button">Clear All</button>
-          <button id="undo-button" class="icon-button" title="undo" disabled>&#10554;</button>
-          <button id="redo-button" class="icon-button" title="redo" disabled style="transform:rotateY(180deg)">&#10554;</button>
+        <button id="clear-constraints-button" class="danger-button">Clear All</button>
+        <button id="undo-button" class="icon-button" title="undo" disabled>&#10554;</button>
+        <button id="redo-button" class="icon-button" title="redo" disabled
+          style="transform:rotateY(180deg)">&#10554;</button>
       </div>
 
       <div class="two-column">
@@ -143,8 +143,7 @@ layout: null
               <label for="multi-cell-constraint-cage">
                 Cage
                 <input type="number" name="cage-sum" min=0 placeholder="sum">
-                <span class="tooltip"
-                  data-text="Values must add up to the given sum. All values must be unique.">
+                <span class="tooltip" data-text="Values must add up to the given sum. All values must be unique.">
                 </span>
               </label>
             </div>
@@ -158,43 +157,37 @@ layout: null
             <div>
               <input type="radio" id="multi-cell-constraint-thermo" name="constraint-type" value="thermo">
               <label for="multi-cell-constraint-thermo">Thermometer</label>
-              <span class="tooltip"
-                data-text="Values must be in increasing order starting at the bulb.">
+              <span class="tooltip" data-text="Values must be in increasing order starting at the bulb.">
               </span>
             </div>
             <div>
               <input type="radio" id="multi-cell-constraint-arrow" name="constraint-type" value="arrow">
               <label for="multi-cell-constraint-arrow">Arrow Sum</label>
-              <span class="tooltip"
-                data-text="Values along the arrow must sum to the value in the circle.">
+              <span class="tooltip" data-text="Values along the arrow must sum to the value in the circle.">
               </span>
             </div>
             <div>
               <input type="radio" id="multi-cell-constraint-palindrome" name="constraint-type" value="palindrome">
               <label for="multi-cell-constraint-palindrome">Palindrome</label>
-              <span class="tooltip"
-                data-text="The values along the line form a palindrome.">
+              <span class="tooltip" data-text="The values along the line form a palindrome.">
               </span>
             </div>
             <div>
               <input type="radio" id="multi-cell-constraint-whisper" name="constraint-type" value="whisper">
               <label for="multi-cell-constraint-whisper">Whisper</label>
-              <span class="tooltip"
-                data-text="Adjacent values on the line must differ by at least 5.">
+              <span class="tooltip" data-text="Adjacent values on the line must differ by at least 5.">
               </span>
             </div>
             <div>
               <input type="radio" id="multi-cell-constraint-between" name="constraint-type" value="between">
               <label for="multi-cell-constraint-between">Between Line</label>
-              <span class="tooltip"
-                data-text="Values on the line must be strictly between the values in the circles.">
+              <span class="tooltip" data-text="Values on the line must be strictly between the values in the circles.">
               </span>
             </div>
             <div>
               <input type="radio" id="multi-cell-constraint-region-sum" name="constraint-type" value="region-sum">
               <label for="multi-cell-constraint-region-sum">Region Sum Line</label>
-              <span class="tooltip"
-                data-text="Values on the line have an equal sum N within each
+              <span class="tooltip" data-text="Values on the line have an equal sum N within each
                            box it passes through. If a line passes through the
                            same box more than once, each individual segment of
                            such a line within that box sums to N separately.
@@ -206,9 +199,8 @@ layout: null
               <div>
                 <input type="radio" id="multi-cell-constraint-white-dot" name="constraint-type" value="white-dot">
                 <label for="multi-cell-constraint-white-dot">&plusmn;1 &#9675;</label>
-                  <span class="tooltip"
-                    data-text="Kropki white dot: values must be consecutive. Adjacent cells only.">
-                  </span>
+                <span class="tooltip" data-text="Kropki white dot: values must be consecutive. Adjacent cells only.">
+                </span>
               </div>
               <div>
                 <input type="radio" id="multi-cell-constraint-black-dot" name="constraint-type" value="black-dot">
@@ -216,9 +208,9 @@ layout: null
                   <span class="muldiv"><span>&times;</span><span>&divide;</span></span>
                   2 &#9679;
                 </label>
-                  <span class="tooltip"
-                    data-text="Kropki black dot: one value must be double the other. Adjacent cells only.">
-                  </span>
+                <span class="tooltip"
+                  data-text="Kropki black dot: one value must be double the other. Adjacent cells only.">
+                </span>
               </div>
             </div>
             <div>
@@ -229,8 +221,7 @@ layout: null
           <div>
             <input type="checkbox" id="anti-consecutive-input">
             <label for="anti-consecutive-input">Anti-Consecutive</label>
-            <span class="tooltip"
-              data-text="No adjacent cells can have consecutive values.">
+            <span class="tooltip" data-text="No adjacent cells can have consecutive values.">
             </span>
           </div>
         </form>
@@ -247,48 +238,42 @@ layout: null
           <div>
             <input type="checkbox" id="anti-knight-input">
             <label for="anti-knight-input">Anti-Knight</label>
-            <span class="tooltip"
-              data-text="Cells which are a knight's move away cannot have the same value.">
+            <span class="tooltip" data-text="Cells which are a knight's move away cannot have the same value.">
             </span>
           </div>
 
           <div>
             <input type="checkbox" id="anti-king-input">
             <label for="anti-king-input">Anti-King</label>
-            <span class="tooltip"
-              data-text="Cells which are a king's move away cannot have the same value.">
+            <span class="tooltip" data-text="Cells which are a king's move away cannot have the same value.">
             </span>
           </div>
 
           <div>
             <input type="checkbox" id="diagonal-plus-input">
             <label for="diagonal-plus-input">&#10187; Diagonal</label>
-            <span class="tooltip"
-              data-text="Values along the positive diagonal must be unique.">
+            <span class="tooltip" data-text="Values along the positive diagonal must be unique.">
             </span>
           </div>
 
           <div>
             <input type="checkbox" id="diagonal-minus-input">
             <label for="diagonal-minus-input">&#10189; Diagonal</label>
-            <span class="tooltip"
-              data-text="Values along the negative diagonal must be unique.">
+            <span class="tooltip" data-text="Values along the negative diagonal must be unique.">
             </span>
           </div>
 
           <div>
             <input type="checkbox" id="windoku-input">
             <label for="windoku-input">Windoku</label>
-            <span class="tooltip"
-              data-text="Values in the 3x3 windoku boxes must be uniques.">
+            <span class="tooltip" data-text="Values in the 3x3 windoku boxes must be uniques.">
             </span>
           </div>
 
           <div>
             <input type="checkbox" id="no-boxes-input">
             <label for="no-boxes-input">No Boxes</label>
-            <span class="tooltip"
-              data-text="No standard 3x3 box constraints.">
+            <span class="tooltip" data-text="No standard 3x3 box constraints.">
             </span>
           </div>
 
@@ -316,8 +301,7 @@ layout: null
             <input type="radio" id="little-killer-option" name="type" value="little-killer">
             <label for="little-killer-option">
               Little Killer
-              <span class="tooltip"
-                data-text="Values along diagonal must add to the given sum. Values may repeat.">
+              <span class="tooltip" data-text="Values along diagonal must add to the given sum. Values may repeat.">
               </span>
             </label>
             <input type="radio" id="sandwich-option" name="type" value="sandwich">
@@ -347,8 +331,8 @@ layout: null
         </div>
         <div id="freeform-constraint-input-error"></div>
       </form>
-      </div>
     </div>
+  </div>
 
   </div>
 
