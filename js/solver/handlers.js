@@ -125,12 +125,11 @@ SudokuConstraintHandler.House = class House extends SudokuConstraintHandler {
     // Check for naked pairs.
 
     // We won't have anything useful to do unless we have at least 2 free cells.
-    const countTable = this._lookupTables.count;
-    if (gridSize - countTable[fixedValues] <= 2) return true;
+    if (gridSize - countOnes16bit(fixedValues) <= 2) return true;
 
     for (let i = 0; i < gridSize - 1; i++) {
       const v = grid[cells[i]];
-      if (countTable[v] != 2) continue;
+      if (countOnes16bit(v) != 2) continue;
       for (let j = i + 1; j < gridSize; j++) {
         if (grid[cells[j]] !== v) continue;
         // Found a pair, remove it from all other entries.
@@ -213,10 +212,9 @@ class SumHandlerUtil {
         }
       }
 
-      const counts = this._lookupTables.count;
       const sums = this._lookupTables.sum;
       for (let i = 0; i < combinations; i++) {
-        table[counts[i]][sums[i]].push(i);
+        table[countOnes16bit(i)][sums[i]].push(i);
       }
 
       return table;
@@ -349,7 +347,7 @@ class SumHandlerUtil {
     if (fixedSum > sum) return false;
 
     // Check if we have enough unique values.
-    if (this._lookupTables.count[allValues] < numCells) return false
+    if (countOnes16bit(allValues) < numCells) return false
     // Check if we have fixed all the values.
     if (allValues == fixedValues) {
       return fixedSum == sum;
@@ -357,7 +355,7 @@ class SumHandlerUtil {
 
     const unfixedValues = allValues & ~fixedValues;
     let requiredUniques = uniqueValues;
-    const numUnfixed = cells.length - this._lookupTables.count[fixedValues];
+    const numUnfixed = cells.length - countOnes16bit(fixedValues);
 
     let possibilities = 0;
     const options = this.killerCageSums[numUnfixed][sum - fixedSum];
@@ -929,7 +927,7 @@ SudokuConstraintHandler.Sandwich = class Sandwich extends SudokuConstraintHandle
     for (let i = 0; i < lookupTables.combinations; i++) {
       if (i & borderMask) continue;
       let sum = lookupTables.sum[i];
-      table[sum][lookupTables.count[i] + 1].push(i);
+      table[sum][countOnes16bit(i) + 1].push(i);
     }
 
     for (let i = 0; i <= maxSum; i++) {
@@ -1101,12 +1099,6 @@ SudokuConstraintHandler.SameValues = class SameValues extends SudokuConstraintHa
     this.idStr = [this.constructor.name, cells0, cells1].join('-');
   }
 
-  initialize(initialGrid, cellConflicts, shape) {
-    this._countTable = LookupTables.get(shape.numValues).count;
-
-    return true;
-  }
-
   enforceConsistency(grid) {
     const cells0 = this._cells0;
     const cells1 = this._cells1;
@@ -1124,7 +1116,7 @@ SudokuConstraintHandler.SameValues = class SameValues extends SudokuConstraintHa
     const values = values1 & values0;
 
     // Check if we have enough values.
-    if (this._isUnique && this._countTable[values] < numCells) return false;
+    if (this._isUnique && countOnes16bit(values) < numCells) return false;
 
     // Enforce the constrained value set.
     if (values0 !== values) {

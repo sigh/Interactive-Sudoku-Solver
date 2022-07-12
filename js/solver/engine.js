@@ -209,7 +209,6 @@ SudokuSolver.InternalSolver = class {
   constructor(handlerGen, shape) {
     this._shape = shape;
     this._numCells = this._shape.numCells;
-    this._countTable = LookupTables.get(shape.numValues).count;
 
     this._initCellArray();
     this._stack = new Uint8Array(shape.numCells);
@@ -405,11 +404,9 @@ SudokuSolver.InternalSolver = class {
     let minScore = Infinity;
     let bestIndex = 0;
 
-    const countTable = this._countTable;
-
     for (let i = depth; i < stackLen; i++) {
       const cell = stack[i];
-      const count = countTable[grid[cell]];
+      const count = countOnes16bit(grid[cell]);
       // If we have a single value then just use it - as it will involve no
       // guessing.
       if (count <= 1) {
@@ -428,7 +425,7 @@ SudokuSolver.InternalSolver = class {
 
     [stack[bestIndex], stack[depth]] = [stack[depth], stack[bestIndex]];
 
-    return countTable[grid[stack[depth]]];
+    return countOnes16bit(grid[stack[depth]]);
   }
 
   _enforceValue(grid, value, cell) {
@@ -802,15 +799,6 @@ class LookupTables {
 
     const combinations = this.combinations;
 
-    this.count = (() => {
-      let table = new Uint8Array(combinations);
-      for (let i = 1; i < combinations; i++) {
-        // COUNT is one greater than the count with the last set bit removed.
-        table[i] = 1 + table[i & (i - 1)];
-      }
-      return table;
-    })();
-
     this.sum = (() => {
       let table = new Uint8Array(combinations);
       for (let i = 1; i < combinations; i++) {
@@ -856,7 +844,7 @@ class LookupTables {
       const table = new Uint32Array(combinations);
       for (let i = 1; i < combinations; i++) {
         const minMax = this.minMax8Bit[i];
-        const fixed = this.count[i] == 1 ? LookupTables.toValue(i) : 0;
+        const fixed = countOnes16bit(i) == 1 ? LookupTables.toValue(i) : 0;
         const isFixed = fixed ? 1 : 0;
         table[i] = (isFixed << 24) | (fixed << 16) | minMax;
       }
