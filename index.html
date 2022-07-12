@@ -32,6 +32,9 @@ layout: null
 
       const loadDebug = dynamicJSFileLoader('js/debug.js');
       self.loadDebug = loadDebug;
+
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('debug') !== null) self.loadDebug();
     });
   </script>
 
