@@ -564,6 +564,9 @@ SudokuSolver.InternalSolver = class {
 
         // Find the next cell to explore.
         const count = this._updateCellOrder(cellOrder, cellIndex, grid);
+        if (count === 0) {
+          continue;
+        }
 
         // Update counters.
         counters.cellsSearched++;
@@ -574,11 +577,11 @@ SudokuSolver.InternalSolver = class {
       let grid = this._grids[depth];
       let values = grid[cell];
 
-      // We've run out of legal values in this cell, so backtrack.
-      if (!values) continue;
-
       // Find the next smallest to try, and remove it from our set of
       // candidates.
+      // NOTE: We will always have a value because:
+      //        - we would have returned earlier on domain wipeout.
+      //        - we don't add to the stack on the final value in a cell.
       let value = values & -values;
       grid[cell] &= ~value;
 
@@ -591,7 +594,6 @@ SudokuSolver.InternalSolver = class {
         depth++;  // NOTE: recStack already has cell_index
         this._grids[depth].set(grid);
         grid = this._grids[depth];
-        grid[cell] = value;
       }
 
       // Propogate constraints.
