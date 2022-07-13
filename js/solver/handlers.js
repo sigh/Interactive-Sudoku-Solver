@@ -527,7 +527,7 @@ class SumHandlerUtil {
     v1 &= reverse[((sums1 << numValues) >> shift) & allValues];
     v0 &= reverse[((sums0 << numValues) >> shift) & allValues];
 
-    if (!(v1 && v1 && v2)) return false;
+    if (!(v0 && v1 && v2)) return false;
 
     grid[cells[0]] = v0;
     grid[cells[1]] = v1;
