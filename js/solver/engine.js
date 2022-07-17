@@ -395,7 +395,7 @@ SudokuSolver.InternalSolver = class {
     // wipeouts (0 values), so we should never find them here. Even if they
     // exist, it just means we do a few more useless forced cell resolutions.
     // NOTE: If the scoring is more complicated, it can be useful
-    // to do an initial pass to detect 1 or 0 value cells (~(v&(v-1))).
+    // to do an initial pass to detect 1 or 0 value cells (!(v&(v-1))).
 
     const triggerCounts = this._backtrackTriggers;
     const numCells = cellOrder.length;
@@ -409,6 +409,9 @@ SudokuSolver.InternalSolver = class {
       const count = countOnes16bit(grid[cell]);
       // If we have a single value then just use it - as it will involve no
       // guessing.
+      // NOTE: We could use more efficient check for count() < 1, but it's not
+      // worth it as this only happens at most once per loop. The full count()
+      // will have to occur anyway for every other iteration.
       if (count <= 1) {
         bestIndex = i;
         break;

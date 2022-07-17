@@ -739,10 +739,11 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
       }
     }
 
-    // NOTE: Seems like require unqiues doesn't help much here.
+    // NOTE: Seems like require uniques doesn't help much here.
 
     return true;
   }
+
   enforceConsistency(grid) {
     const cells = this.cells;
     const numCells = cells.length;
