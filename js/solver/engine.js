@@ -541,6 +541,7 @@ SudokuSolver.InternalSolver = class {
     while (depth) {
       depth--;
       let cellIndex = recStack[depth];
+      let count = 0;
 
       if (isNewCellIndex) {
         isNewCellIndex = false;
@@ -566,7 +567,7 @@ SudokuSolver.InternalSolver = class {
         }
 
         // Find the next cell to explore.
-        const count = this._updateCellOrder(cellOrder, cellIndex, grid);
+        count = this._updateCellOrder(cellOrder, cellIndex, grid);
         if (count === 0) {
           continue;
         }
@@ -579,6 +580,7 @@ SudokuSolver.InternalSolver = class {
       let cell = cellOrder[cellIndex];
       let grid = this._grids[depth];
       let values = grid[cell];
+      if (!values) continue;
 
       // Find the next smallest to try, and remove it from our set of
       // candidates.
@@ -589,11 +591,10 @@ SudokuSolver.InternalSolver = class {
       grid[cell] &= ~value;
 
       counters.valuesTried++;
+      if (value != values) counters.guesses++;
 
-      if (value != values) {
-        // If we have to choose between multiple branches, copy the current grid
-        // into a new stack frame.
-        counters.guesses++;
+      if (count != 1) {
+        // If count == 1, we can elide the copying.
         depth++;  // NOTE: recStack already has cell_index
         this._grids[depth].set(grid);
         grid = this._grids[depth];
