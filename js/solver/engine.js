@@ -397,8 +397,16 @@ SudokuSolver.InternalSolver = class {
     // NOTE: If the scoring is more complicated, it can be useful
     // to do an initial pass to detect 1 or 0 value cells (!(v&(v-1))).
 
-    const triggerCounts = this._backtrackTriggers;
+    // Quick check - if the first value is a singleton, then just return without
+    // the extra bookkeeping.
+    {
+      let firstValue = grid[cellOrder[cellIndex]];
+      if ((firstValue & (firstValue - 1)) === 0) return 1;
+    }
+
     const numCells = cellOrder.length;
+
+    const triggerCounts = this._backtrackTriggers;
 
     // Find the cell with the minimum score.
     let minScore = Infinity;
@@ -431,8 +439,8 @@ SudokuSolver.InternalSolver = class {
     return countOnes16bit(grid[cellOrder[cellIndex]]);
   }
 
-  _enforceValue(grid, value, cell) {
-    grid[cell] = value;
+  _enforceValue(grid, cell) {
+    let value = grid[cell];
 
     let cellAccumulator = this._cellAccumulator;
     cellAccumulator.clear();
@@ -583,27 +591,32 @@ SudokuSolver.InternalSolver = class {
       let grid = this._grids[depth];
       let values = grid[cell];
 
-      // Find the next smallest to try, and remove it from our set of
-      // candidates.
+      // Find the next smallest value to try.
       // NOTE: We will always have a value because:
       //        - we would have returned earlier on domain wipeout.
       //        - we don't add to the stack on the final value in a cell.
       let value = values & -values;
-      grid[cell] &= ~value;
-
       counters.valuesTried++;
-      if (value != values) {
-        counters.guesses++;
 
+      if (values != value) {
         // We only need to start a new recursion frame when there is more than
         // one value to try.
+
         depth++;  // NOTE: recStack already has cell_index
+        counters.guesses++;
+
+        // Remove the value from our set of candidates.
+        // NOTE: We only have to do this, because we will return back to this
+        //       stack frame.
+        grid[cell] &= ~value;
+
         this._grids[depth].set(grid);
         grid = this._grids[depth];
+        grid[cell] = value;
       }
 
       // Propogate constraints.
-      let hasContradiction = !this._enforceValue(grid, value, cell);
+      let hasContradiction = !this._enforceValue(grid, cell);
       if (hasContradiction) {
         counters.progressRatio += progressDelta;
         counters.backtracks++;
