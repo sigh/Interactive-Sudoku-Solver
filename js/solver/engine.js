@@ -537,6 +537,7 @@ SudokuSolver.InternalSolver = class {
     const recStack = this._recStack;
     recStack[depth++] = 0;
     let isNewCellIndex = true;
+    let progressDelta = 1;
 
     while (depth) {
       depth--;
@@ -552,7 +553,7 @@ SudokuSolver.InternalSolver = class {
 
         // We've reached the end, so output a solution!
         if (cellIndex == this._shape.numCells) {
-          counters.progressRatio += progressRatioStack[depth];
+          counters.progressRatio += progressDelta;
           // We've set all the values, and we haven't found a contradiction.
           // This is a solution!
           counters.solutions++;
@@ -574,13 +575,13 @@ SudokuSolver.InternalSolver = class {
 
         // Update counters.
         counters.cellsSearched++;
-        progressRatioStack[depth + 1] = progressRatioStack[depth] / count;
+        progressRatioStack[depth] = progressDelta / count;
       }
+      progressDelta = progressRatioStack[depth];
 
       let cell = cellOrder[cellIndex];
       let grid = this._grids[depth];
       let values = grid[cell];
-      if (!values) continue;
 
       // Find the next smallest to try, and remove it from our set of
       // candidates.
@@ -591,10 +592,11 @@ SudokuSolver.InternalSolver = class {
       grid[cell] &= ~value;
 
       counters.valuesTried++;
-      if (value != values) counters.guesses++;
+      if (value != values) {
+        counters.guesses++;
 
-      if (count != 1) {
-        // If count == 1, we can elide the copying.
+        // We only need to start a new recursion frame when there is more than
+        // one value to try.
         depth++;  // NOTE: recStack already has cell_index
         this._grids[depth].set(grid);
         grid = this._grids[depth];
@@ -603,7 +605,7 @@ SudokuSolver.InternalSolver = class {
       // Propogate constraints.
       let hasContradiction = !this._enforceValue(grid, value, cell);
       if (hasContradiction) {
-        counters.progressRatio += progressRatioStack[depth];
+        counters.progressRatio += progressDelta;
         counters.backtracks++;
         // Exponentially decay the counts.
         if (0 === counters.backtracks % this.constructor._BACKTRACK_DECAY_INTERVAL) {
@@ -644,7 +646,7 @@ SudokuSolver.InternalSolver = class {
 
       if (this._uninterestingValues) {
         if (!this._hasInterestingSolutions(grid, this._uninterestingValues)) {
-          counters.branchesIgnored += progressRatioStack[depth];
+          counters.branchesIgnored += progressDelta;
           continue;
         }
       }
