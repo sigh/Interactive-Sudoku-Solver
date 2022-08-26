@@ -198,23 +198,41 @@ layout: null
                            Has no effect if 'No Boxes' is set.">
               </span>
             </div>
+            <div class="two-column panel-edge-constraints">
+              <div>
+                <div>
+                  <input type="radio" id="multi-cell-constraint-white-dot" name="constraint-type" value="white-dot">
+                  <label for="multi-cell-constraint-white-dot">&plusmn;1 &#9675;</label>
+                  <span class="tooltip" data-text="Kropki white dot: values must be consecutive. Adjacent cells only.">
+                  </span>
+                </div>
+                <div>
+                  <input type="radio" id="multi-cell-constraint-v" name="constraint-type" value="v">
+                  <label for="multi-cell-constraint-v">v: 5&#931;</label>
+                  <span class="tooltip" data-text="v: values must add to 5. Adjacent cells only.">
+                  </span>
+                </div>
+              </div>
+              <div>
+                <div>
+                  <input type="radio" id="multi-cell-constraint-black-dot" name="constraint-type" value="black-dot">
+                  <label for="multi-cell-constraint-black-dot">
+                    <span class="muldiv"><span>&times;</span><span>&divide;</span></span>
+                    2 &#9679;
+                  </label>
+                  <span class="tooltip"
+                    data-text="Kropki black dot: one value must be double the other. Adjacent cells only.">
+                  </span>
+                </div>
+                <div>
+                  <input type="radio" id="multi-cell-constraint-x" name="constraint-type" value="x">
+                  <label for="multi-cell-constraint-x">x: 10&#931</label>
+                  <span class="tooltip" data-text="x: values must add to 10. Adjacent cells only.">
+                  </span>
+                </div>
+              </div>
+            </div>
             <div class="two-column">
-              <div>
-                <input type="radio" id="multi-cell-constraint-white-dot" name="constraint-type" value="white-dot">
-                <label for="multi-cell-constraint-white-dot">&plusmn;1 &#9675;</label>
-                <span class="tooltip" data-text="Kropki white dot: values must be consecutive. Adjacent cells only.">
-                </span>
-              </div>
-              <div>
-                <input type="radio" id="multi-cell-constraint-black-dot" name="constraint-type" value="black-dot">
-                <label for="multi-cell-constraint-black-dot">
-                  <span class="muldiv"><span>&times;</span><span>&divide;</span></span>
-                  2 &#9679;
-                </label>
-                <span class="tooltip"
-                  data-text="Kropki black dot: one value must be double the other. Adjacent cells only.">
-                </span>
-              </div>
             </div>
             <div>
               <button type="submit">Add</button>

@@ -130,6 +130,7 @@ class ExampleHandler {
     'Anti-knight, Anti-consecutive',
     'Little killer',
     'Sudoku X',
+    'XV-kropki',
     'Sandwich sudoku',
     'German whispers',
     'Between lines',
@@ -436,6 +437,8 @@ class ConstraintManager {
     const adjacentOnlyConstraints = [
       'multi-cell-constraint-white-dot',
       'multi-cell-constraint-black-dot',
+      'multi-cell-constraint-x',
+      'multi-cell-constraint-v',
     ];
 
     // Enable/disable the adjacent only constraints.
@@ -534,6 +537,26 @@ class ConstraintManager {
         constraint.values.forEach(valueId => {
           this._fixedValues.setValueId(valueId);
         });
+        break;
+      case 'X':
+        config = {
+          cells: constraint.cells,
+          name: 'x',
+          constraint: constraint,
+          displayElem: this._display.drawXV(constraint.cells, 'x'),
+        };
+        this._addToPanel(config);
+        this._configs.push(config);
+        break;
+      case 'V':
+        config = {
+          cells: constraint.cells,
+          name: 'v',
+          constraint: constraint,
+          displayElem: this._display.drawXV(constraint.cells, 'v'),
+        };
+        this._addToPanel(config);
+        this._configs.push(config);
         break;
       case 'BlackDot':
         config = {
@@ -711,6 +734,14 @@ class ConstraintManager {
         break;
       case 'black-dot':
         constraint = new SudokuConstraint.BlackDot(...cells);
+        this.loadConstraint(constraint);
+        break;
+      case 'x':
+        constraint = new SudokuConstraint.X(...cells);
+        this.loadConstraint(constraint);
+        break;
+      case 'v':
+        constraint = new SudokuConstraint.V(...cells);
         this.loadConstraint(constraint);
         break;
     }

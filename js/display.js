@@ -449,7 +449,7 @@ class ConstraintDisplay extends DisplayItem {
   }
 
   drawDot(cells, fillColor) {
-    if (cells.length != 2) throw (`White dot must be two cells: ${cells}`)
+    if (cells.length != 2) throw (`Dot must be two cells: ${cells}`);
 
     // Find the midpoint between the squares.
     let [x0, y0] = this.cellIdCenter(cells[0]);
@@ -469,6 +469,36 @@ class ConstraintDisplay extends DisplayItem {
 
     return dot;
   }
+
+  drawXV(cells, letter) {
+    if (cells.length != 2) throw (`XV be two cells: ${cells}`);
+
+    // Find the midpoint between the squares.
+    let [x0, y0] = this.cellIdCenter(cells[0]);
+    let [x1, y1] = this.cellIdCenter(cells[1]);
+    let x = (x0 + x1) / 2;
+    let y = (y0 + y1) / 2;
+
+    const g = createSvgElement('g');
+
+    let text = this.makeTextNode(letter, x, y, 'xv-display');
+    text.setAttribute('text-anchor', 'middle');
+    text.setAttribute('dominant-baseline', 'middle');
+    text.setAttribute('style', 'font-weight: 900;');
+    text.setAttribute('fill', 'white');
+    g.append(text);
+
+    text = this.makeTextNode(letter, x, y, 'xv-display');
+    text.setAttribute('text-anchor', 'middle');
+    text.setAttribute('dominant-baseline', 'middle');
+    text.setAttribute('style', 'font-weight: 100;');
+    g.append(text);
+
+    this._adjConstraintGroup.append(g);
+
+    return text;
+  }
+
 
   _CIRCLE_RADIUS = 15;
 

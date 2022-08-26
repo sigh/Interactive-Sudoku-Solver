@@ -215,6 +215,8 @@ const runSolveTests = async (onFailure) => {
     'Windoku',
     'X-Windoku',
     'Region sum lines',
+    'XV-sudoku',
+    'XV-kropki',
   ], onFailure);
 
   await runAllWithChecks([

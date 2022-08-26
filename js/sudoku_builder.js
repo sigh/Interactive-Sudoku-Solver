@@ -521,6 +521,20 @@ class SudokuConstraint {
     }
   }
 
+  static X = class X extends SudokuConstraint {
+    constructor(...cells) {
+      super(arguments);
+      this.cells = cells;
+    }
+  }
+
+  static V = class V extends SudokuConstraint {
+    constructor(...cells) {
+      super(arguments);
+      this.cells = cells;
+    }
+  }
+
   static Arrow = class Arrow extends SudokuConstraint {
     constructor(...cells) {
       super(arguments);
@@ -876,6 +890,16 @@ class SudokuBuilder {
           cells = constraint.cells.map(c => shape.parseCellId(c).cell);
           yield new SudokuConstraintHandler.BinaryConstraint(
             cells[0], cells[1], (a, b) => a == b * 2 || b == a * 2);
+          break;
+
+        case 'X':
+          cells = constraint.cells.map(c => shape.parseCellId(c).cell);
+          yield new SudokuConstraintHandler.Sum(cells, 10);
+          break;
+
+        case 'V':
+          cells = constraint.cells.map(c => shape.parseCellId(c).cell);
+          yield new SudokuConstraintHandler.Sum(cells, 5);
           break;
 
         case 'Windoku':
