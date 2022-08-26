@@ -351,8 +351,12 @@ class ConstraintDisplay extends DisplayItem {
     this._jigsawRegions = new JigsawRegionDisplay(
       displayContainer.getNewGroup('jigsaw-region-group'));
 
-    this._constraintGroup = displayContainer.getNewGroup('constraint-group');
-    this._applyGridOffset(this._constraintGroup);
+    this._thermoGroup = displayContainer.getNewGroup('thermo-group');
+    this._applyGridOffset(this._thermoGroup);
+    this._lineConstraintGroup = displayContainer.getNewGroup('line-constraint-group');
+    this._applyGridOffset(this._lineConstraintGroup);
+    this._adjConstraintGroup = displayContainer.getNewGroup('adj-constraint-group');
+    this._applyGridOffset(this._adjConstraintGroup);
     this._killerCageDisplay = new KillerCageDisplay(
       displayContainer.getNewGroup('killer-cage-group'));
 
@@ -405,7 +409,9 @@ class ConstraintDisplay extends DisplayItem {
   }
 
   clear() {
-    clearDOMNode(this._constraintGroup);
+    clearDOMNode(this._thermoGroup);
+    clearDOMNode(this._lineConstraintGroup);
+    clearDOMNode(this._adjConstraintGroup);
 
     this._fixedValueDisplay.clear();
 
@@ -459,7 +465,7 @@ class ConstraintDisplay extends DisplayItem {
     dot.setAttribute('cy', y);
     dot.setAttribute('r', 4);
 
-    this._constraintGroup.append(dot);
+    this._adjConstraintGroup.append(dot);
 
     return dot;
   }
@@ -504,7 +510,7 @@ class ConstraintDisplay extends DisplayItem {
 
     arrow.appendChild(path);
 
-    this._constraintGroup.append(arrow);
+    this._lineConstraintGroup.append(arrow);
 
     return arrow;
   }
@@ -517,7 +523,7 @@ class ConstraintDisplay extends DisplayItem {
     line.setAttribute('stroke-width', 5);
     line.setAttribute('stroke-linecap', 'round');
 
-    this._constraintGroup.append(line);
+    this._lineConstraintGroup.append(line);
 
     return line;
   }
@@ -550,7 +556,7 @@ class ConstraintDisplay extends DisplayItem {
     const path = this._makePath(points);
     between.appendChild(path);
 
-    this._constraintGroup.append(between);
+    this._lineConstraintGroup.append(between);
 
     return between;
   }
@@ -563,8 +569,8 @@ class ConstraintDisplay extends DisplayItem {
     if (cells.length < 2) throw (`Thermo too short: ${cells}`)
 
     let thermo = createSvgElement('g');
-    thermo.setAttribute('fill', 'rgb(200, 200, 200)');
-    thermo.setAttribute('stroke', 'rgb(200, 200, 200)');
+    thermo.setAttribute('fill', 'rgb(220, 220, 220)');
+    thermo.setAttribute('stroke', 'rgb(220, 220, 220)');
 
     // Draw the circle.
     thermo.appendChild(this._makeCircle(cells[0]));
@@ -575,7 +581,7 @@ class ConstraintDisplay extends DisplayItem {
     path.setAttribute('stroke-linecap', 'round');
     thermo.appendChild(path);
 
-    this._constraintGroup.append(thermo);
+    this._thermoGroup.append(thermo);
 
     return thermo;
   }
