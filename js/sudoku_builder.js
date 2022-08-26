@@ -367,21 +367,32 @@ class SudokuConstraint {
     return new SudokuConstraint.Set(constraints);
   }
 
-  static getMeta(constraint) {
-    const metaConstraint = new Map();
+  static toLists(constraint) {
+    const constraints = [];
+    const metaConstraints = [];
 
-    const getMetaRec = (c) => {
+    const toListRec = (c) => {
       if (c.type === 'Set') {
-        c.constraints.forEach(getMetaRec);
-        return;
+        c.constraints.forEach(toListRec);
+      } else if (c.isMeta) {
+        metaConstraints.push(c);
+      } else {
+        constraints.push(c);
       }
-      if (c.isMeta) {
-        metaConstraint.set(c.type, c.args);
-      }
+    };
+    toListRec(constraint);
+
+    return [constraints, metaConstraints];
+  }
+
+  static getMetaConfig(metaConstraints) {
+    const metaConfig = new Map();
+
+    for (const c of metaConstraints) {
+      metaConfig.set(c.type, c.args);
     }
 
-    getMetaRec(constraint);
-    return metaConstraint;
+    return metaConfig;
   }
 
   static getShapeFromMeta(metaConstraint) {
@@ -391,7 +402,8 @@ class SudokuConstraint {
     return shape;
   }
   static getShape(constraint) {
-    return this.getShapeFromMeta(this.getMeta(constraint));
+    const [_, metaConstraints] = this.toLists(constraint);
+    return this.getShapeFromMeta(this.getMetaConfig(metaConstraints));
   }
 
   static Set = class Set extends SudokuConstraint {
@@ -635,12 +647,13 @@ class SudokuConstraint {
 
 class SudokuBuilder {
   static build(constraint) {
-    const metaConstraint = SudokuConstraint.getMeta(constraint);
+    const [constraints, metaConstraints] = SudokuConstraint.toLists(constraint);
+    const metaConstraint = SudokuConstraint.getMetaConfig(metaConstraints);
     const shape = SudokuConstraint.getShapeFromMeta(metaConstraint);
     const noBoxes = metaConstraint.has('NoBoxes');
 
     return new SudokuSolver(
-      this._handlers(constraint, shape, noBoxes), shape);
+      this._handlers(constraints, shape, noBoxes), shape);
   }
 
   // GLobal vars to pass to the worker.
@@ -681,11 +694,13 @@ class SudokuBuilder {
     return solverProxy;
   }
 
-  static *_handlers(constraint, shape, noBoxes) {
+  static *_handlers(constraints, shape, noBoxes) {
     yield* SudokuBuilder._rowColHandlers(shape);
-    yield* SudokuBuilder._constraintHandlers(constraint, shape, noBoxes);
+    yield* SudokuBuilder._constraintHandlers(constraints, shape, noBoxes);
     if (!noBoxes) {
       yield* SudokuBuilder._boxHandlers(shape);
+    } else {
+      yield new SudokuConstraintHandler.NoBoxes();
     }
   }
 
@@ -704,184 +719,174 @@ class SudokuBuilder {
     }
   }
 
-  static *_constraintHandlers(constraint, shape, noBoxes) {
+  static *_constraintHandlers(constraints, shape, noBoxes) {
     const gridSize = shape.gridSize;
 
-    let cells;
-    switch (constraint.type) {
-      case 'Shape':
-        break;
-      case 'NoBoxes':
-        yield new SudokuConstraintHandler.NoBoxes();
-        break;
+    for (const constraint of constraints) {
+      let cells;
+      switch (constraint.type) {
+        case 'AntiKnight':
+          yield* this._antiHandlers(shape,
+            (r, c) => [[r + 1, c + 2], [r + 2, c + 1], [r + 1, c - 2], [r + 2, c - 1]]);
+          break;
 
-      case 'AntiKnight':
-        yield* this._antiHandlers(shape,
-          (r, c) => [[r + 1, c + 2], [r + 2, c + 1], [r + 1, c - 2], [r + 2, c - 1]]);
-        break;
+        case 'AntiKing':
+          yield* this._antiHandlers(shape, (r, c) => [[r + 1, c + 1], [r + 1, c - 1]]);
+          break;
 
-      case 'AntiKing':
-        yield* this._antiHandlers(shape, (r, c) => [[r + 1, c + 1], [r + 1, c - 1]]);
-        break;
+        case 'AntiConsecutive':
+          yield* this._antiConsecutiveHandlers(shape);
+          break;
 
-      case 'AntiConsecutive':
-        yield* this._antiConsecutiveHandlers(shape);
-        break;
-
-      case 'Jigsaw':
-        const grid = constraint.grid;
-        const map = new Map();
-        for (let i = 0; i < grid.length; i++) {
-          const v = grid[i];
-          if (!map.has(v)) map.set(v, []);
-          map.get(v).push(i);
-        }
-
-        for (const [_, cells] of map) {
-          if (cells.length == gridSize) {
-            yield new SudokuConstraintHandler.AllDifferent(cells);
+        case 'Jigsaw':
+          const grid = constraint.grid;
+          const map = new Map();
+          for (let i = 0; i < grid.length; i++) {
+            const v = grid[i];
+            if (!map.has(v)) map.set(v, []);
+            map.get(v).push(i);
           }
-        }
 
-        // Just to let the solver know that this is a jigsaw puzzle.
-        yield new SudokuConstraintHandler.Jigsaw([...map.values()]);
-        break;
+          for (const [_, cells] of map) {
+            if (cells.length == gridSize) {
+              yield new SudokuConstraintHandler.AllDifferent(cells);
+            }
+          }
 
-      case 'Diagonal':
-        cells = [];
-        for (let r = 0; r < gridSize; r++) {
-          let c = constraint.direction > 0 ? gridSize - r - 1 : r;
-          cells.push(shape.cellIndex(r, c));
-        }
-        yield new SudokuConstraintHandler.AllDifferent(cells);
-        break;
+          // Just to let the solver know that this is a jigsaw puzzle.
+          yield new SudokuConstraintHandler.Jigsaw([...map.values()]);
+          break;
 
-      case 'Arrow':
-        const [negativeCell, ...positiveCells] = (
-          constraint.cells.map(c => shape.parseCellId(c).cell));
+        case 'Diagonal':
+          cells = [];
+          for (let r = 0; r < gridSize; r++) {
+            let c = constraint.direction > 0 ? gridSize - r - 1 : r;
+            cells.push(shape.cellIndex(r, c));
+          }
+          yield new SudokuConstraintHandler.AllDifferent(cells);
+          break;
 
-        if (constraint.cells.length <= gridSize) {
-          yield new SudokuConstraintHandler.SumWithNegative(
-            positiveCells, negativeCell, 0);
-        } else if (positiveCells.length == gridSize) {
-          let valueMap = new Map();
-          for (const cell of positiveCells) valueMap.set(cell, 1);
-          valueMap.set(negativeCell, gridSize);
-          yield new SudokuConstraintHandler.FixedCells(valueMap);
-        } else {
-          // Sum can't handle more than gridSize cells.
-          // Arrows can't have more than gridSize cells in the stem
-          // to make the final sum.
-          yield new SudokuConstraintHandler.False(
-            [negativeCell, ...positiveCells]);
-        }
+        case 'Arrow':
+          const [negativeCell, ...positiveCells] = (
+            constraint.cells.map(c => shape.parseCellId(c).cell));
 
-        break;
-
-      case 'Cage':
-        cells = constraint.cells.map(c => shape.parseCellId(c).cell);
-        // A sum of 0 means any sum is ok - i.e. the same as AllDifferent.
-        if (constraint.sum != 0) {
-          if (cells.length <= gridSize) {
-            yield new SudokuConstraintHandler.Sum(cells, constraint.sum);
+          if (constraint.cells.length <= gridSize) {
+            yield new SudokuConstraintHandler.SumWithNegative(
+              positiveCells, negativeCell, 0);
+          } else if (positiveCells.length == gridSize) {
+            let valueMap = new Map();
+            for (const cell of positiveCells) valueMap.set(cell, 1);
+            valueMap.set(negativeCell, gridSize);
+            yield new SudokuConstraintHandler.FixedCells(valueMap);
           } else {
             // Sum can't handle more than gridSize cells.
-            yield new SudokuConstraintHandler.False(cells);
+            // Arrows can't have more than gridSize cells in the stem
+            // to make the final sum.
+            yield new SudokuConstraintHandler.False(
+              [negativeCell, ...positiveCells]);
           }
-        }
-        yield new SudokuConstraintHandler.AllDifferent(cells);
-        break;
 
-      case 'LittleKiller':
-        cells = SudokuConstraint.LittleKiller
-          .cellMap(shape)[constraint.id].map(c => shape.parseCellId(c).cell);
-        yield new SudokuConstraintHandler.Sum(cells, constraint.sum);
-        break;
+          break;
 
-      case 'Sandwich':
-        cells = SudokuConstraint.Sandwich
-          .cellMap(shape)[constraint.id].map(c => shape.parseCellId(c).cell);
-        yield new SudokuConstraintHandler.Sandwich(cells, constraint.sum);
-        break;
-
-      case 'AllDifferent':
-        cells = constraint.cells.map(c => shape.parseCellId(c).cell);
-        yield new SudokuConstraintHandler.AllDifferent(cells);
-        break;
-
-      case 'FixedValues':
-        let valueMap = new Map();
-        for (const valueId of constraint.values) {
-          let { cell, value } = shape.parseValueId(valueId);
-          valueMap.set(cell, value);
-        }
-        yield new SudokuConstraintHandler.FixedCells(valueMap);
-        break;
-
-      case 'Thermo':
-        cells = constraint.cells.map(c => shape.parseCellId(c).cell);
-        for (let i = 1; i < cells.length; i++) {
-          yield new SudokuConstraintHandler.BinaryConstraint(
-            cells[i - 1], cells[i], (a, b) => a < b);
-        }
-        break;
-
-      case 'Whisper':
-        cells = constraint.cells.map(c => shape.parseCellId(c).cell);
-        for (let i = 1; i < cells.length; i++) {
-          yield new SudokuConstraintHandler.BinaryConstraint(
-            cells[i - 1], cells[i], (a, b) => a >= b + 5 || a <= b - 5);
-        }
-        break;
-
-      case 'RegionSumLine':
-        // Region sum lines only makes sense when we have boxes.
-        if (!noBoxes) {
+        case 'Cage':
           cells = constraint.cells.map(c => shape.parseCellId(c).cell);
-          yield new SudokuConstraintHandler.RegionSumLine(cells);
-        }
-        break;
-
-      case 'Between':
-        cells = constraint.cells.map(c => shape.parseCellId(c).cell);
-        yield new SudokuConstraintHandler.Between(cells);
-        break;
-
-      case 'Palindrome':
-        cells = constraint.cells.map(c => shape.parseCellId(c).cell);
-        const numCells = cells.length;
-        for (let i = 0; i < numCells / 2; i++) {
-          yield new SudokuConstraintHandler.BinaryConstraint(
-            cells[i], cells[numCells - 1 - i], (a, b) => a == b);
-        }
-        break;
-
-      case 'Set':
-        for (const c of constraint.constraints) {
-          yield* this._constraintHandlers(c, shape, noBoxes);
-        }
-        break;
-
-      case 'WhiteDot':
-        cells = constraint.cells.map(c => shape.parseCellId(c).cell);
-        yield new SudokuConstraintHandler.BinaryConstraint(
-          cells[0], cells[1], (a, b) => a == b + 1 || a == b - 1);
-        break;
-
-      case 'BlackDot':
-        cells = constraint.cells.map(c => shape.parseCellId(c).cell);
-        yield new SudokuConstraintHandler.BinaryConstraint(
-          cells[0], cells[1], (a, b) => a == b * 2 || b == a * 2);
-        break;
-
-      case 'Windoku':
-        for (const cells of SudokuConstraint.Windoku.regions(shape)) {
+          // A sum of 0 means any sum is ok - i.e. the same as AllDifferent.
+          if (constraint.sum != 0) {
+            if (cells.length <= gridSize) {
+              yield new SudokuConstraintHandler.Sum(cells, constraint.sum);
+            } else {
+              // Sum can't handle more than gridSize cells.
+              yield new SudokuConstraintHandler.False(cells);
+            }
+          }
           yield new SudokuConstraintHandler.AllDifferent(cells);
-        }
-        break;
+          break;
 
-      default:
-        throw ('Unknown constraint type: ' + constraint.type);
+        case 'LittleKiller':
+          cells = SudokuConstraint.LittleKiller
+            .cellMap(shape)[constraint.id].map(c => shape.parseCellId(c).cell);
+          yield new SudokuConstraintHandler.Sum(cells, constraint.sum);
+          break;
+
+        case 'Sandwich':
+          cells = SudokuConstraint.Sandwich
+            .cellMap(shape)[constraint.id].map(c => shape.parseCellId(c).cell);
+          yield new SudokuConstraintHandler.Sandwich(cells, constraint.sum);
+          break;
+
+        case 'AllDifferent':
+          cells = constraint.cells.map(c => shape.parseCellId(c).cell);
+          yield new SudokuConstraintHandler.AllDifferent(cells);
+          break;
+
+        case 'FixedValues':
+          let valueMap = new Map();
+          for (const valueId of constraint.values) {
+            let { cell, value } = shape.parseValueId(valueId);
+            valueMap.set(cell, value);
+          }
+          yield new SudokuConstraintHandler.FixedCells(valueMap);
+          break;
+
+        case 'Thermo':
+          cells = constraint.cells.map(c => shape.parseCellId(c).cell);
+          for (let i = 1; i < cells.length; i++) {
+            yield new SudokuConstraintHandler.BinaryConstraint(
+              cells[i - 1], cells[i], (a, b) => a < b);
+          }
+          break;
+
+        case 'Whisper':
+          cells = constraint.cells.map(c => shape.parseCellId(c).cell);
+          for (let i = 1; i < cells.length; i++) {
+            yield new SudokuConstraintHandler.BinaryConstraint(
+              cells[i - 1], cells[i], (a, b) => a >= b + 5 || a <= b - 5);
+          }
+          break;
+
+        case 'RegionSumLine':
+          // Region sum lines only makes sense when we have boxes.
+          if (!noBoxes) {
+            cells = constraint.cells.map(c => shape.parseCellId(c).cell);
+            yield new SudokuConstraintHandler.RegionSumLine(cells);
+          }
+          break;
+
+        case 'Between':
+          cells = constraint.cells.map(c => shape.parseCellId(c).cell);
+          yield new SudokuConstraintHandler.Between(cells);
+          break;
+
+        case 'Palindrome':
+          cells = constraint.cells.map(c => shape.parseCellId(c).cell);
+          const numCells = cells.length;
+          for (let i = 0; i < numCells / 2; i++) {
+            yield new SudokuConstraintHandler.BinaryConstraint(
+              cells[i], cells[numCells - 1 - i], (a, b) => a == b);
+          }
+          break;
+
+        case 'WhiteDot':
+          cells = constraint.cells.map(c => shape.parseCellId(c).cell);
+          yield new SudokuConstraintHandler.BinaryConstraint(
+            cells[0], cells[1], (a, b) => a == b + 1 || a == b - 1);
+          break;
+
+        case 'BlackDot':
+          cells = constraint.cells.map(c => shape.parseCellId(c).cell);
+          yield new SudokuConstraintHandler.BinaryConstraint(
+            cells[0], cells[1], (a, b) => a == b * 2 || b == a * 2);
+          break;
+
+        case 'Windoku':
+          for (const cells of SudokuConstraint.Windoku.regions(shape)) {
+            yield new SudokuConstraintHandler.AllDifferent(cells);
+          }
+          break;
+
+        default:
+          throw ('Unknown constraint type: ' + constraint.type);
+      }
     }
   }
 
