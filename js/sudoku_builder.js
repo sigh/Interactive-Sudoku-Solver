@@ -464,6 +464,8 @@ class SudokuConstraint {
     isMeta = true;
   }
   static NoBoxes = class NoBoxes extends SudokuConstraint._Meta { }
+  static StrictKropki = class StrictKropki extends SudokuConstraint._Meta { }
+  static StrictXV = class StrictXV extends SudokuConstraint._Meta { }
   static Shape = class Shape extends SudokuConstraint._Meta {
     toString() {
       if (this.args[0] === SHAPE_9x9.name) return '';
@@ -662,12 +664,11 @@ class SudokuConstraint {
 class SudokuBuilder {
   static build(constraint) {
     const [constraints, metaConstraints] = SudokuConstraint.toLists(constraint);
-    const metaConstraint = SudokuConstraint.getMetaConfig(metaConstraints);
-    const shape = SudokuConstraint.getShapeFromMeta(metaConstraint);
-    const noBoxes = metaConstraint.has('NoBoxes');
+    const metaConfig = SudokuConstraint.getMetaConfig(metaConstraints);
+    const shape = SudokuConstraint.getShapeFromMeta(metaConfig);
 
     return new SudokuSolver(
-      this._handlers(constraints, shape, noBoxes), shape);
+      this._handlers(constraints, shape, metaConfig), shape);
   }
 
   // GLobal vars to pass to the worker.
@@ -708,13 +709,21 @@ class SudokuBuilder {
     return solverProxy;
   }
 
-  static *_handlers(constraints, shape, noBoxes) {
+  static *_handlers(constraints, shape, metaConfig) {
+    const noBoxes = metaConfig.has('NoBoxes');
     yield* SudokuBuilder._rowColHandlers(shape);
     yield* SudokuBuilder._constraintHandlers(constraints, shape, noBoxes);
-    if (!noBoxes) {
-      yield* SudokuBuilder._boxHandlers(shape);
-    } else {
+    if (noBoxes) {
       yield new SudokuConstraintHandler.NoBoxes();
+    } else {
+      yield* SudokuBuilder._boxHandlers(shape);
+    }
+    if (metaConfig.has('StrictKropki')) {
+      const types = ['BlackDot', 'WhiteDot'];
+      yield* SudokuBuilder._strictAdjHandlers(
+        constraints.filter(x => types.includes(x.type)),
+        shape,
+        (a, b) => a != b * 2 && b != a * 2 && b != a - 1 && b != a + 1);
     }
   }
 
@@ -733,7 +742,27 @@ class SudokuBuilder {
     }
   }
 
-  static *_constraintHandlers(constraints, shape, noBoxes) {
+  static *_strictAdjHandlers(constraints, shape, constraintFn) {
+    const numCells = shape.numCells;
+    const intCmp = (a, b) => a - b;
+    const pairId = p => p[0] + p[1] * numCells;
+
+    // Find all the cell pairs that have constraints.
+    const cellPairs = constraints
+      .map(x => x.cells.map(c => shape.parseCellId(c).cell));
+    cellPairs.forEach(p => p.sort(intCmp));
+    const pairIds = new Set(cellPairs.map(pairId));
+
+    // Add negative constraints for all other cell pairs.
+    for (const p of this._adjacentCellPairs(shape)) {
+      p.sort(intCmp);
+      if (pairIds.has(pairId(p))) continue;
+      yield new SudokuConstraintHandler.BinaryConstraint(
+        p[0], p[1], constraintFn);
+    }
+  }
+
+  static * _constraintHandlers(constraints, shape, noBoxes) {
     const gridSize = shape.gridSize;
 
     for (const constraint of constraints) {
@@ -914,7 +943,7 @@ class SudokuBuilder {
     }
   }
 
-  static *_antiHandlers(shape, conflictFn) {
+  static * _antiHandlers(shape, conflictFn) {
     const gridSize = shape.gridSize;
 
     for (let r = 0; r < gridSize; r++) {
@@ -931,22 +960,33 @@ class SudokuBuilder {
     }
   }
 
-  static *_antiConsecutiveHandlers(shape) {
+  static _adjacentCellPairs(shape) {
+    const pairs = [];
+
     const gridSize = shape.gridSize;
 
+    // Only look at adjacent cells with larger indexes.
     const adjacentCellsFn = (r, c) => [[r + 1, c], [r, c + 1]];
-    const constraintFn = (a, b) => (a != b + 1 && a != b - 1 && a != b);
 
     for (let r = 0; r < gridSize; r++) {
       for (let c = 0; c < gridSize; c++) {
         let cell = shape.cellIndex(r, c);
         for (const [rr, cc] of adjacentCellsFn(r, c)) {
           if (rr < 0 || rr >= gridSize || cc < 0 || cc >= gridSize) continue;
-          let conflict = shape.cellIndex(rr, cc);
-          yield new SudokuConstraintHandler.BinaryConstraint(
-            cell, conflict, constraintFn);
+          pairs.push([cell, shape.cellIndex(rr, cc)]);
         }
       }
+    }
+
+    return pairs;
+  }
+
+  static * _antiConsecutiveHandlers(shape) {
+    const constraintFn = (a, b) => (a != b + 1 && a != b - 1 && a != b);
+
+    for (const [cell, conflict] of this._adjacentCellPairs(shape)) {
+      yield new SudokuConstraintHandler.BinaryConstraint(
+        cell, conflict, constraintFn);
     }
   }
 }

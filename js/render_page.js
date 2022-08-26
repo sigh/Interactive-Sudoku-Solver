@@ -34,6 +34,11 @@ class CheckboxConstraints {
         constraint: new SudokuConstraint.AntiConsecutive(),
         isLayout: false,
       },
+      strictKropki: {
+        id: 'strict-kropki-input',
+        constraint: new SudokuConstraint.StrictKropki(),
+        isLayout: false,
+      },
       diagonalPlus: {
         id: 'diagonal-plus-input',
         constraint: new SudokuConstraint.Diagonal(1),
@@ -668,6 +673,9 @@ class ConstraintManager {
         break;
       case 'AntiConsecutive':
         this._checkboxConstraints.check('antiConsecutive');
+        break;
+      case 'StrictKropki':
+        this._checkboxConstraints.check('strictKropki');
         break;
       case 'Diagonal':
         if (constraint.direction > 0) {

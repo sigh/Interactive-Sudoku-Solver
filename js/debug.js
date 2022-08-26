@@ -217,6 +217,7 @@ const runSolveTests = async (onFailure) => {
     'Region sum lines',
     'XV-sudoku',
     'XV-kropki',
+    'Strict kropki',
   ], onFailure);
 
   await runAllWithChecks([

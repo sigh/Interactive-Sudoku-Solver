@@ -238,13 +238,6 @@ layout: null
               <button type="submit">Add</button>
             </div>
           </fieldset>
-
-          <div>
-            <input type="checkbox" id="anti-consecutive-input">
-            <label for="anti-consecutive-input">Anti-Consecutive</label>
-            <span class="tooltip" data-text="No adjacent cells can have consecutive values.">
-            </span>
-          </div>
         </form>
 
         <div>
@@ -307,6 +300,21 @@ layout: null
             <div>
               <span id="validate-result-output" class="result"></span>
             </div>
+          </div>
+
+          <div>
+            <input type="checkbox" id="anti-consecutive-input">
+            <label for="anti-consecutive-input">Anti-Consecutive</label>
+            <span class="tooltip" data-text="No adjacent cells can have consecutive values.">
+            </span>
+          </div>
+
+          <div>
+            <input type="checkbox" id="strict-kropki-input">
+            <label for="strict-kropki-input">Strict Kropki</label>
+            <span class="tooltip"
+              data-text="Only explicitly marked cell pairs satisfy Kropki (black/white dot) constraints.">
+            </span>
           </div>
 
         </div>
