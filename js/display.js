@@ -481,24 +481,25 @@ class ConstraintDisplay extends DisplayItem {
 
     const g = createSvgElement('g');
 
+    // Create a white background using a larger font weight.
     let text = this.makeTextNode(letter, x, y, 'xv-display');
     text.setAttribute('text-anchor', 'middle');
     text.setAttribute('dominant-baseline', 'middle');
-    text.setAttribute('style', 'font-weight: 900;');
+    text.setAttribute('style', 'font-size: 20; font-weight: 900;');
     text.setAttribute('fill', 'white');
     g.append(text);
 
+    // Create the actual text.
     text = this.makeTextNode(letter, x, y, 'xv-display');
     text.setAttribute('text-anchor', 'middle');
     text.setAttribute('dominant-baseline', 'middle');
-    text.setAttribute('style', 'font-weight: 100;');
+    text.setAttribute('style', 'font-size: 20; font-weight: 100;');
     g.append(text);
 
     this._adjConstraintGroup.append(g);
 
     return text;
   }
-
 
   _CIRCLE_RADIUS = 15;
 

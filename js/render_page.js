@@ -39,6 +39,11 @@ class CheckboxConstraints {
         constraint: new SudokuConstraint.StrictKropki(),
         isLayout: false,
       },
+      strictXV: {
+        id: 'strict-xv-input',
+        constraint: new SudokuConstraint.StrictXV(),
+        isLayout: false,
+      },
       diagonalPlus: {
         id: 'diagonal-plus-input',
         constraint: new SudokuConstraint.Diagonal(1),
@@ -676,6 +681,9 @@ class ConstraintManager {
         break;
       case 'StrictKropki':
         this._checkboxConstraints.check('strictKropki');
+        break;
+      case 'StrictXV':
+        this._checkboxConstraints.check('strictXV');
         break;
       case 'Diagonal':
         if (constraint.direction > 0) {

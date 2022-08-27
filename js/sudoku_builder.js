@@ -725,6 +725,13 @@ class SudokuBuilder {
         shape,
         (a, b) => a != b * 2 && b != a * 2 && b != a - 1 && b != a + 1);
     }
+    if (metaConfig.has('StrictXV')) {
+      const types = ['X', 'V'];
+      yield* SudokuBuilder._strictAdjHandlers(
+        constraints.filter(x => types.includes(x.type)),
+        shape,
+        (a, b) => a + b != 5 && a + b != 10);
+    }
   }
 
   static *_rowColHandlers(shape) {

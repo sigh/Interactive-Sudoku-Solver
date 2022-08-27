@@ -218,6 +218,7 @@ const runSolveTests = async (onFailure) => {
     'XV-sudoku',
     'XV-kropki',
     'Strict kropki',
+    'Strict XV',
   ], onFailure);
 
   await runAllWithChecks([
