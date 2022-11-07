@@ -44,6 +44,11 @@ class CheckboxConstraints {
         constraint: new SudokuConstraint.StrictXV(),
         isLayout: false,
       },
+      disjointSets: {
+        id: 'disjoint-sets',
+        constraint: new SudokuConstraint.DisjointSets(),
+        isLayout: false,
+      },
       diagonalPlus: {
         id: 'diagonal-plus-input',
         constraint: new SudokuConstraint.Diagonal(1),
@@ -148,6 +153,7 @@ class ExampleHandler {
     'Jigsaw',
     'X-Windoku',
     'Region sum lines',
+    'Disjoint little killer',
     '16x16',
     '16x16: Sudoku X, hard',
     '16x16: Jigsaw',
@@ -684,6 +690,9 @@ class ConstraintManager {
         break;
       case 'StrictXV':
         this._checkboxConstraints.check('strictXV');
+        break;
+      case 'DisjointSets':
+        this._checkboxConstraints.check('disjointSets');
         break;
       case 'Diagonal':
         if (constraint.direction > 0) {

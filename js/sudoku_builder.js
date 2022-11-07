@@ -496,6 +496,8 @@ class SudokuConstraint {
     });
   }
 
+  static DisjointSets = class DisjointSets extends SudokuConstraint { }
+
   static AntiKnight = class AntiKnight extends SudokuConstraint { }
 
   static AntiKing = class AntiKing extends SudokuConstraint { }
@@ -658,6 +660,13 @@ class SudokuConstraint {
     return this._makeRegions(
       (r, i) => ((r / boxSize | 0) * boxSize + (i % boxSize | 0)) * gridSize
         + (r % boxSize | 0) * boxSize + (i / boxSize | 0), gridSize);
+  });
+  static disjointSetRegions = memoize((shape) => {
+    const gridSize = shape.gridSize;
+    const boxSize = shape.boxSize;
+    return this._makeRegions(
+      (r, i) => ((i / boxSize | 0) * boxSize + (r % boxSize | 0)) * gridSize
+        + (i % boxSize | 0) * boxSize + (r / boxSize | 0), gridSize);
   });
 }
 
@@ -940,6 +949,12 @@ class SudokuBuilder {
 
         case 'Windoku':
           for (const cells of SudokuConstraint.Windoku.regions(shape)) {
+            yield new SudokuConstraintHandler.AllDifferent(cells);
+          }
+          break;
+
+        case 'DisjointSets':
+          for (const cells of SudokuConstraint.disjointSetRegions(shape)) {
             yield new SudokuConstraintHandler.AllDifferent(cells);
           }
           break;

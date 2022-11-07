@@ -151,6 +151,11 @@ const EXAMPLES = {
     input: '.X~R2C1~R3C1.X~R1C3~R2C3.X~R1C8~R1C9.X~R3C8~R3C9.X~R3C6~R3C7.X~R5C6~R5C5.X~R7C8~R8C8.X~R7C9~R8C9.X~R7C4~R7C5.X~R6C3~R6C4.X~R7C3~R8C3.X~R6C2~R7C2.X~R8C4~R9C4.V~R7C3~R7C4.V~R4C1~R5C1.V~R5C7~R5C8.V~R2C8~R2C9.StrictXV.~R8C5_2~R2C5_1',
     solution: '683472519947516832152983764361849275295637148478251396834195627516724983729368451',
   },
+  'Disjoint little killer': {
+    src: 'https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?chlang=en&id=0006TM',
+    input: '.DisjointSets.LittleKiller~62~R1C9.LittleKiller~33~R1C1.LittleKiller~12~R1C3.LittleKiller~14~R3C9.LittleKiller~21~R9C7.LittleKiller~36~R9C5.LittleKiller~8~R7C1.LittleKiller~9~R1C2.',
+    solution: '325784169719625483684319725843297651592861347167543298478932516236158974951476832',
+  },
 
   // Classic grids that used to be slow. 3 and 4 used to take 2+ seconds.
   'Classic sudoku, was slow (1)': {

@@ -6,9 +6,7 @@ layout: null
 
 <head>
   <title>Interactive Sudoku Solver</title>
-  <meta
-    name="description"
-    content="Fast interactive Sudoku solver. Supports many variants including 16x16 grids.">
+  <meta name="description" content="Fast interactive Sudoku solver. Supports many variants including 16x16 grids.">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="stylesheet" href="{{ 'css/style.css?v=' | append: site.github.build_revision | relative_url }}">
 
@@ -324,6 +322,13 @@ layout: null
             <input type="checkbox" id="strict-xv-input">
             <label for="strict-xv-input">Strict XV</label>
             <span class="tooltip" data-text="Only explicitly marked cell pairs satisfy XV constraints.">
+            </span>
+          </div>
+
+          <div>
+            <input type="checkbox" id="disjoint-sets">
+            <label for="disjoint-sets">Disjoint Sets</label>
+            <span class="tooltip" data-text="No digit may appear in the same position in any two boxes.">
             </span>
           </div>
 
