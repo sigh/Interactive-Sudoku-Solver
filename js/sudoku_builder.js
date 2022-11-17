@@ -438,6 +438,13 @@ class SudokuConstraint {
     }
   }
 
+  static Renban = class Renban extends SudokuConstraint {
+    constructor(...cells) {
+      super(arguments);
+      this.cells = cells;
+    }
+  }
+
   static RegionSumLine = class RegionSumLine extends SudokuConstraint {
     constructor(...cells) {
       super(arguments);
@@ -900,6 +907,19 @@ class SudokuBuilder {
           for (let i = 1; i < cells.length; i++) {
             yield new SudokuConstraintHandler.BinaryConstraint(
               cells[i - 1], cells[i], (a, b) => a >= b + 5 || a <= b - 5);
+          }
+          break;
+
+        case 'Renban':
+          cells = constraint.cells.map(c => shape.parseCellId(c).cell);
+          yield new SudokuConstraintHandler.AllDifferent(cells);
+          let diff = cells.length;
+          for (let i = 0; i < cells.length; i++) {
+            for (let j = i+1; j < cells.length; j++) {
+              yield new SudokuConstraintHandler.BinaryConstraint(
+                cells[i], cells[j], (a, b) => Math.abs(a-b)<diff
+                );
+            }
           }
           break;
 

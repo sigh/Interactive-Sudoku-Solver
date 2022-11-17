@@ -148,6 +148,7 @@ class ExampleHandler {
     'XV-kropki',
     'Sandwich sudoku',
     'German whispers',
+    'Renban',
     'Between lines',
     'Palindromes',
     'Jigsaw',
@@ -627,6 +628,16 @@ class ConstraintManager {
         this._addToPanel(config);
         this._configs.push(config);
         break;
+      case 'Renban':
+        config = {
+          cells: constraint.cells,
+          name: 'Renban',
+          constraint: constraint,
+          displayElem: this._display.drawRenban(constraint.cells),
+        };
+        this._addToPanel(config);
+        this._configs.push(config);
+        break;
       case 'Palindrome':
         config = {
           cells: constraint.cells,
@@ -739,6 +750,10 @@ class ConstraintManager {
         break;
       case 'whisper':
         constraint = new SudokuConstraint.Whisper(...cells);
+        this.loadConstraint(constraint);
+        break;
+      case 'renban':
+        constraint = new SudokuConstraint.Renban(...cells);
         this.loadConstraint(constraint);
         break;
       case 'region-sum':
