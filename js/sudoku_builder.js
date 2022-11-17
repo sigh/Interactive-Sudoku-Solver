@@ -432,9 +432,16 @@ class SudokuConstraint {
   }
 
   static Whisper = class Whisper extends SudokuConstraint {
-    constructor(...cells) {
+    constructor(difference, ...cells) {
+      // German whisper lines omit the difference, so the
+      // first argument is actually a cell
+      if (difference!=+difference) {
+        cells.unshift(difference);
+        difference = 5;
+      }
       super(arguments);
       this.cells = cells;
+      this.difference = +difference;
     }
   }
 
@@ -903,10 +910,11 @@ class SudokuBuilder {
           break;
 
         case 'Whisper':
+          let difference = constraint.difference;
           cells = constraint.cells.map(c => shape.parseCellId(c).cell);
           for (let i = 1; i < cells.length; i++) {
             yield new SudokuConstraintHandler.BinaryConstraint(
-              cells[i - 1], cells[i], (a, b) => a >= b + 5 || a <= b - 5);
+              cells[i - 1], cells[i], (a, b) => a >= b + difference || a <= b - difference);
           }
           break;
 

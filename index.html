@@ -178,9 +178,12 @@ layout: null
             </div>
             <div>
               <input type="radio" id="multi-cell-constraint-whisper" name="constraint-type" value="whisper">
-              <label for="multi-cell-constraint-whisper">Whisper</label>
-              <span class="tooltip" data-text="Adjacent values on the line must differ by at least 5.">
-              </span>
+              <label for="multi-cell-constraint-whisper">
+                Whisper
+                <input type="number" name="whisper-difference" min=1 max=8 value="5">
+                <span class="tooltip" data-text="Adjacent values on the line must differ by at least this amount.">
+                </span>
+              </label>
             </div>
             <div>
               <input type="radio" id="multi-cell-constraint-renban" name="constraint-type" value="renban">
