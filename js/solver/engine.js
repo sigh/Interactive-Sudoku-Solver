@@ -649,7 +649,7 @@ SudokuSolver.InternalSolver = class {
         yield {
           grid: grid,
           isSolution: false,
-          cellOrder: cellOrder.subarray(0, cellIndex),
+          cellOrder: cellOrder.subarray(0, cellIndex + 1),
           hasContradiction: hasContradiction,
         };
         checkRunCounter();
