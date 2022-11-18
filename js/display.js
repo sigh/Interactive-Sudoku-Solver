@@ -564,7 +564,7 @@ class ConstraintDisplay extends DisplayItem {
   }
 
   drawRenban(cells) {
-    return this._drawConstraintLine(cells, 'rgb(200, 0, 200)');
+    return this._drawConstraintLine(cells, 'rgb(230, 190, 155)');
   }
 
   drawRegionSumLine(cells) {
