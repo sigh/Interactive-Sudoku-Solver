@@ -632,15 +632,9 @@ class ConstraintManager {
         this._jigsawManager.setConstraint(constraint);
         break;
       case 'Whisper':
-        var name;
-        if (constraint.difference==5) {
-          name = 'Whisper';
-        } else {
-          name = 'Whisper ('+constraint.difference+')';
-        }
         config = {
           cells: constraint.cells,
-          name: name,
+          name: `Whisper (${constraint.difference})`,
           constraint: constraint,
           displayElem: this._display.drawWhisper(constraint.cells),
         };
@@ -769,11 +763,7 @@ class ConstraintManager {
         break;
       case 'whisper':
         let difference = +formData.get('whisper-difference');
-        if (difference==5) {
-          constraint = new SudokuConstraint.Whisper(...cells);
-        } else {
-          constraint = new SudokuConstraint.Whisper(difference, ...cells);
-        }
+        constraint = new SudokuConstraint.Whisper(difference, ...cells);
         this.loadConstraint(constraint);
         break;
       case 'renban':
