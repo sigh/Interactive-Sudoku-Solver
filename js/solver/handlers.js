@@ -183,9 +183,13 @@ SudokuConstraintHandler.BinaryConstraint = class BinaryConstraint extends Sudoku
   }
 }
 
-SudokuConstraintHandler.Renban = class Renban extends SudokuConstraintHandler {
+SudokuConstraintHandler.AllContiguous = class AllContiguous extends SudokuConstraintHandler {
   constructor(cells) {
     super(cells);
+  }
+
+  conflictSet() {
+    return this.cells;
   }
 
   enforceConsistency(grid, cellAccumulator) {
@@ -194,11 +198,10 @@ SudokuConstraintHandler.Renban = class Renban extends SudokuConstraintHandler {
 
     let values = 0;
     for (let i = 0; i < numCells; i++) {
-      const value = grid[cells[i]];
-      values |= value;
+      values |= grid[cells[i]];
     }
 
-    // Find the min values for contiguous ranges.
+    // Find the possible starting values of contiguous ranges.
     let squishedValues = values;
     for (let i = 1; i < numCells; i++) {
       squishedValues &= values >> i;
@@ -211,7 +214,7 @@ SudokuConstraintHandler.Renban = class Renban extends SudokuConstraintHandler {
       mask |= squishedValues << i;
     }
 
-    if ((values & mask) != values) {
+    if (values & ~mask) {
       // If there are values outside the mask, remove them.
       for (let i = 0; i < numCells; i++) {
         if (!(grid[cells[i]] &= mask)) {

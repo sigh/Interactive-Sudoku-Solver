@@ -920,8 +920,7 @@ class SudokuBuilder {
 
         case 'Renban':
           cells = constraint.cells.map(c => shape.parseCellId(c).cell);
-          yield new SudokuConstraintHandler.AllDifferent(cells);
-          yield new SudokuConstraintHandler.Renban(cells);
+          yield new SudokuConstraintHandler.AllContiguous(cells);
           break;
 
         case 'RegionSumLine':
