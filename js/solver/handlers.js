@@ -183,6 +183,48 @@ SudokuConstraintHandler.BinaryConstraint = class BinaryConstraint extends Sudoku
   }
 }
 
+SudokuConstraintHandler.Renban = class Renban extends SudokuConstraintHandler {
+  constructor(cells) {
+    super(cells);
+  }
+
+  enforceConsistency(grid, cellAccumulator) {
+    const cells = this.cells;
+    const numCells = cells.length;
+
+    let values = 0;
+    for (let i = 0; i < numCells; i++) {
+      const value = grid[cells[i]];
+      values |= value;
+    }
+
+    // Find the min values for contiguous ranges.
+    let squishedValues = values;
+    for (let i = 1; i < numCells; i++) {
+      squishedValues &= values >> i;
+    }
+    if (!squishedValues) return false;
+
+    // Expand out possible contiguous ranges.
+    let mask = squishedValues;
+    for (let i = 1; i < numCells; i++) {
+      mask |= squishedValues << i;
+    }
+
+    if ((values & mask) != values) {
+      // If there are values outside the mask, remove them.
+      for (let i = 0; i < numCells; i++) {
+        if (!(grid[cells[i]] &= mask)) {
+          return false;
+        }
+        cellAccumulator.add(cells[i]);
+      }
+    }
+
+    return true;
+  }
+}
+
 class SumHandlerUtil {
 
   static get = memoize((numValues) => {
