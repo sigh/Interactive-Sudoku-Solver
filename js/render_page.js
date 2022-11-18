@@ -148,6 +148,8 @@ class ExampleHandler {
     'XV-kropki',
     'Sandwich sudoku',
     'German whispers',
+    'International whispers',
+    'Renban',
     'Between lines',
     'Palindromes',
     'Jigsaw',
@@ -415,6 +417,15 @@ class ConstraintManager {
       selectionForm['multi-cell-constraint-cage'].checked = true;
     };
 
+    // Selecting anything in the whisper constraint will select it and focus on
+    // the input box.
+    selectionForm['multi-cell-constraint-whisper'].onchange = () => {
+      selectionForm['whisper-difference'].select();
+    };
+    selectionForm['whisper-difference'].onfocus = () => {
+      selectionForm['multi-cell-constraint-whisper'].checked = true;
+    };
+
     // Little killer.
     this._setUpLittleKiller(inputManager);
 
@@ -478,9 +489,12 @@ class ConstraintManager {
 
     // Focus on the the form so we can immediately press enter.
     //   - If the cage is selected then focus on the text box for easy input.
+    //   - If the whisper is selected then focus on the text box for easy input.
     //   - Otherwise just focus on the submit button.
     if (selectionForm['multi-cell-constraint-cage'].checked) {
       selectionForm['cage-sum'].select();
+    } else if (selectionForm['multi-cell-constraint-whisper'].checked) {
+      selectionForm['whisper-difference'].select();
     } else {
       selectionForm.querySelector('button[type=submit]').focus();
     }
@@ -618,11 +632,27 @@ class ConstraintManager {
         this._jigsawManager.setConstraint(constraint);
         break;
       case 'Whisper':
+        var name;
+        if (constraint.difference==5) {
+          name = 'Whisper';
+        } else {
+          name = 'Whisper ('+constraint.difference+')';
+        }
         config = {
           cells: constraint.cells,
-          name: 'Whisper',
+          name: name,
           constraint: constraint,
           displayElem: this._display.drawWhisper(constraint.cells),
+        };
+        this._addToPanel(config);
+        this._configs.push(config);
+        break;
+      case 'Renban':
+        config = {
+          cells: constraint.cells,
+          name: 'Renban',
+          constraint: constraint,
+          displayElem: this._display.drawRenban(constraint.cells),
         };
         this._addToPanel(config);
         this._configs.push(config);
@@ -738,7 +768,16 @@ class ConstraintManager {
         this._jigsawManager.addPiece(cells);
         break;
       case 'whisper':
-        constraint = new SudokuConstraint.Whisper(...cells);
+        let difference = +formData.get('whisper-difference');
+        if (difference==5) {
+          constraint = new SudokuConstraint.Whisper(...cells);
+        } else {
+          constraint = new SudokuConstraint.Whisper(difference, ...cells);
+        }
+        this.loadConstraint(constraint);
+        break;
+      case 'renban':
+        constraint = new SudokuConstraint.Renban(...cells);
         this.loadConstraint(constraint);
         break;
       case 'region-sum':

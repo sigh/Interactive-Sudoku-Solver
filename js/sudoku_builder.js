@@ -432,6 +432,20 @@ class SudokuConstraint {
   }
 
   static Whisper = class Whisper extends SudokuConstraint {
+    constructor(difference, ...cells) {
+      // German whisper lines omit the difference, so the
+      // first argument is actually a cell
+      if (difference!=+difference) {
+        cells.unshift(difference);
+        difference = 5;
+      }
+      super(arguments);
+      this.cells = cells;
+      this.difference = +difference;
+    }
+  }
+
+  static Renban = class Renban extends SudokuConstraint {
     constructor(...cells) {
       super(arguments);
       this.cells = cells;
@@ -896,10 +910,24 @@ class SudokuBuilder {
           break;
 
         case 'Whisper':
+          let difference = constraint.difference;
           cells = constraint.cells.map(c => shape.parseCellId(c).cell);
           for (let i = 1; i < cells.length; i++) {
             yield new SudokuConstraintHandler.BinaryConstraint(
-              cells[i - 1], cells[i], (a, b) => a >= b + 5 || a <= b - 5);
+              cells[i - 1], cells[i], (a, b) => a >= b + difference || a <= b - difference);
+          }
+          break;
+
+        case 'Renban':
+          cells = constraint.cells.map(c => shape.parseCellId(c).cell);
+          yield new SudokuConstraintHandler.AllDifferent(cells);
+          let diff = cells.length;
+          for (let i = 0; i < cells.length; i++) {
+            for (let j = i+1; j < cells.length; j++) {
+              yield new SudokuConstraintHandler.BinaryConstraint(
+                cells[i], cells[j], (a, b) => Math.abs(a-b)<diff
+                );
+            }
           }
           break;
 

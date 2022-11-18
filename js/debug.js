@@ -208,6 +208,8 @@ const runSolveTests = async (onFailure) => {
     'Little killer 2',
     'Sandwich sudoku',
     'German whispers',
+    'International whispers',
+    'Renban',
     'Between lines',
     'Palindromes',
     'Jigsaw',
