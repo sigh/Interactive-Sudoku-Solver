@@ -54,7 +54,7 @@ SudokuConstraintHandler.FixedCells = class FixedCells extends SudokuConstraintHa
 
   initialize(initialGrid) {
     for (const [cell, value] of this._valueMap) {
-      initialGrid[cell] = LookupTables.fromValue(value);
+      initialGrid[cell] &= LookupTables.fromValue(value);
     }
 
     return true;
