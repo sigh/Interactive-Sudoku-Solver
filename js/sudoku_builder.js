@@ -668,6 +668,29 @@ class SudokuConstraint {
     });
   }
 
+  static Skyscraper = class Skyscraper extends SudokuConstraint {
+    constructor(rowCol, count1, count2) {
+      super(arguments);
+      this.rowCol = rowCol;
+      this.count1 = count1;
+      this.count2 = count2;
+    }
+
+    static getCells(shape, rowCol) {
+      const gridSize = shape.gridSize;
+
+      let colRow = rowCol[0].toLowerCase() == 'r' ? 'c' : 'r';
+      let cells = [];
+      for (let i = 0; i < gridSize; i++) {
+        const part = `${colRow}${i + 1}`;
+        cells.push(colRow == 'r' ? part + rowCol : rowCol + part);
+      }
+
+      return cells;
+    }
+  }
+
+
   static AllDifferent = class AllDifferent extends SudokuConstraint {
     constructor(...cells) {
       super(arguments);
@@ -941,6 +964,21 @@ class SudokuBuilder {
           cells = SudokuConstraint.Sandwich
             .cellMap(shape)[constraint.id].map(c => shape.parseCellId(c).cell);
           yield new SudokuConstraintHandler.Sandwich(cells, constraint.sum);
+          break;
+
+        case 'Skyscraper':
+          cells = SudokuConstraint.Skyscraper
+            .getCells(shape, constraint.rowCol).map(
+              c => shape.parseCellId(c).cell);
+          if (constraint.count1) {
+            yield new SudokuConstraintHandler.Skyscraper(
+              cells, constraint.count1);
+          }
+          if (constraint.count2) {
+            cells = cells.slice().reverse();
+            yield new SudokuConstraintHandler.Skyscraper(
+              cells, constraint.count2);
+          }
           break;
 
         case 'AllDifferent':

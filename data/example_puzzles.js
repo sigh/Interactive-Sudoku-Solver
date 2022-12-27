@@ -187,6 +187,11 @@ const EXAMPLES = {
     input: '.LittleKiller~23~R1C1.LittleKiller~12~R2C9.LittleKiller~23~R3C9.LittleKiller~25~R5C9.LittleKiller~12~R7C1.LittleKiller~25~R1C6.~R7C2_2~R7C8_5.XSum~25~c1~1.XSum~23~c1~-1.XSum~12~c5~1.XSum~25~c5~-1.XSum~23~c9~1.XSum~12~c9~-1',
     solution: '562831974837429165941576238195384726286715349473692581329168457758943612614257893',
   },
+  'Skyscraper': {
+    src: 'https://www.youtube.com/watch?v=rLlZA5ZND00',
+    input: '.~R1C1_1~R1C6_2~R1C9_8~R3C1_3~R3C4_6~R3C7_4~R5C1_5~R5C3_2~R5C6_3~R7C1_7~R7C4_8~R7C7_2~R9C9_6~R9C6_4~R9C1_9.Skyscraper~c5~5.Skyscraper~r2~2.Skyscraper~r4~4.Skyscraper~r6~6.Skyscraper~r8~8',
+    solution: '147932658826145937359678412678419325592783164413256789765891243234567891981324576',
+  },
 
   // Classic grids that used to be slow. 3 and 4 used to take 2+ seconds.
   'Classic sudoku, was slow (1)': {
