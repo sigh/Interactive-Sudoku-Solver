@@ -992,6 +992,59 @@ SudokuConstraintHandler.SumWithNegative = class SumWithNegative extends SudokuCo
   }
 }
 
+SudokuConstraintHandler.Skyscraper = class Skyscraper extends SudokuConstraintHandler {
+  constructor(cells, numVisible) {
+    super(cells);
+    this._numVisible = +numVisible;
+  }
+
+  initialize(initialGrid, cellConflicts, shape) {
+    const cells = this.cells;
+    const numVisible = this._numVisible;
+    const maxValue = shape.numValues
+    const lookupTables = LookupTables.get(shape.numValues);
+    this._lookupTables = lookupTables;
+    this._maxValue = LookupTables.fromValue(shape.numValues);
+
+    // If only 1 cell is visible, then the first cell must be
+    // the highest.
+    if (numVisible == 1) {
+      initialGrid[cells[0]] &= LookupTables.fromValue(maxValue);
+      return true;
+    }
+
+    // Mask off initial cells which won't have room to get too high.
+    let mask = lookupTables.allValues;
+    for (let i = numVisible - 1; i >= 0; i--, mask >>= 1) {
+      initialGrid[cells[i]] &= mask;
+    }
+
+    return true;
+  }
+
+  enforceConsistency(grid) {
+    const cells = this.cells;
+
+    // Find resolved values until we hit the tallest skyscraper.
+    // If all values are not yet resolved then skip enforcement for now.
+    let visible = 0;
+    let currentMax = 0;
+    for (let i = 0; i < cells.length; i++) {
+      const value = grid[cells[i]];
+      // Check if we have multiple values.
+      if (value & (value - 1)) return true;
+
+      if (value > currentMax) {
+        currentMax = value;
+        visible++;
+      }
+      if (value == this._maxValue) break;
+    }
+
+    return visible == this._numVisible;
+  }
+}
+
 SudokuConstraintHandler.Sandwich = class Sandwich extends SudokuConstraintHandler {
   constructor(cells, sum) {
     super(cells);
