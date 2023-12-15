@@ -1565,7 +1565,7 @@ class SudokuConstraintOptimizer {
   }
 
   // Find a non-overlapping set of handlers.
-  static _findNonOverlapping(handlers, fullHandlerSet) {
+  static _findNonOverlappingSubset(handlers, fullHandlerSet) {
     const handlerIndexes = new Set(
       handlers.map(h => fullHandlerSet.getIndex(h)));
 
@@ -1598,12 +1598,11 @@ class SudokuConstraintOptimizer {
     let sumHandlers = handlerSet.getAllofType(SudokuConstraintHandler.Sum);
     if (sumHandlers.length == 0) return;
 
-    let sumCells;
-    [sumHandlers, sumCells] = this._findNonOverlapping(sumHandlers, handlerSet);
+    let [filteredSumHandlers, sumCells] = this._findNonOverlappingSubset(sumHandlers, handlerSet);
 
-    handlerSet.add(...this._fillInSumGap(sumHandlers, sumCells, shape));
+    handlerSet.add(...this._fillInSumGap(filteredSumHandlers, sumCells, shape));
 
-    handlerSet.add(...this._makeInnieOutieSumHandlers(sumHandlers, hasBoxes, shape));
+    handlerSet.add(...this._makeInnieOutieSumHandlers(filteredSumHandlers, hasBoxes, shape));
 
     handlerSet.add(...this._makeHiddenCageHandlers(handlerSet, sumHandlers, shape));
 
@@ -1715,16 +1714,14 @@ class SudokuConstraintOptimizer {
   }
 
   // Create a Sum handler out of all the cages sticking out of a house.
-  static _addSumIntersectionHandler(
-    handlerSet, houseHandler, overlappingHandlerIndexes, shape) {
+  static _addSumIntersectionHandler(houseHandler, sumHandlers, shape) {
     const gridSize = shape.gridSize;
 
     let totalSum = 0;
     let cells = [];
-    for (const i of overlappingHandlerIndexes) {
-      const k = handlerSet.getHandler(i);
-      totalSum += k.sum();
-      cells.push(...k.cells);
+    for (const h of sumHandlers) {
+      totalSum += h.sum();
+      cells.push(...h.cells);
     }
     // These cells would never cover the entire house.
     if (cells.length <= gridSize) return null;
@@ -1732,7 +1729,7 @@ class SudokuConstraintOptimizer {
     // We don't want too many cells in the new sum.
     if (cells.length > gridSize + this._MAX_SUM_SIZE) return null;
 
-    const overlap = arrayIntersectSize(houseHandler.cells, cells);
+    const overlap = arrayIntersectSize(cells, houseHandler.cells);
     // We need all cells in the house to be covered.
     if (overlap != gridSize) return null;
 
@@ -1753,34 +1750,45 @@ class SudokuConstraintOptimizer {
   }
 
   // Find sets of cells which we can infer have a known sum and unique values.
-  static _makeHiddenCageHandlers(handlerSet, sumHandlers, shape) {
+  static _makeHiddenCageHandlers(handlerSet, allSumHandlers, shape) {
     const houseHandlers = handlerSet.getAllofType(SudokuConstraintHandler.House);
     const newHandlers = [];
 
-    const sumHandlerIndexes = new Set(
-      sumHandlers.map(h => handlerSet.getIndex(h)));
+    const allSumHandlerIndexes = new Set(
+      allSumHandlers.map(h => handlerSet.getIndex(h)));
 
     for (const h of houseHandlers) {
       // Find sum constraints which overlap this house.
-      let overlappingHandlerIndexes = handlerSet.getIntersectingIndexes(h);
-      overlappingHandlerIndexes = setIntersection(
-        overlappingHandlerIndexes, sumHandlerIndexes);
-      if (!overlappingHandlerIndexes.size) continue;
+      let currentHouseSumIndexes = handlerSet.getIntersectingIndexes(h);
+      currentHouseSumIndexes = setIntersection(
+        currentHouseSumIndexes, allSumHandlerIndexes);
+      if (!currentHouseSumIndexes.size) continue;
+
+      // For the sum intersection, we need to ensure that the sum handlers don't
+      // overlap themselves.
+      // We do this separately for each house so that we can don't have to
+      // force the same handle to be used in every house it intersects.
+      const [filteredSumHandlers, sumCells] = this._findNonOverlappingSubset(
+        Array.from(currentHouseSumIndexes).map(
+          i => handlerSet.getHandler(i)),
+        handlerSet);
 
       {
         const sumIntersectionHandler = this._addSumIntersectionHandler(
-          handlerSet, h, overlappingHandlerIndexes, shape);
+          h, filteredSumHandlers, shape);
         if (sumIntersectionHandler) newHandlers.push(sumIntersectionHandler);
       }
 
+      // Outies are cages which stick out of the house by 1 cell.
       const outies = [];
+      // Constrained cells are those from cages which are fully contained within
+      // the house.
       const constrainedCells = [];
       let constrainedSum = 0;
-      for (const i of overlappingHandlerIndexes) {
-        const k = handlerSet.getHandler(i);
+      for (const k of filteredSumHandlers) {
         const overlapSize = arrayIntersectSize(h.cells, k.cells);
         if (overlapSize == k.cells.length) {
-          constrainedCells.push(...arrayIntersect(h.cells, k.cells));
+          constrainedCells.push(...k.cells);
           constrainedSum += k.sum();
           k.setComplementCells(arrayDifference(h.cells, k.cells));
         } else if (k.cells.length - overlapSize == 1) {
@@ -1863,7 +1871,7 @@ class SudokuConstraintOptimizer {
         // This means diff0 and diff1 must contain the same values.
         const diff1 = arrayDifference(h1.cells, h0.cells);
 
-        // TODO: Optmize the diff0.length == 1 case (and 2?).
+        // TODO: Optimize the diff0.length == 1 case (and 2?).
         const handler = new SudokuConstraintHandler.SameValues(
           diff0, diff1, true);
         newHandlers.push(handler);

@@ -48,13 +48,19 @@ const setIntersection = (a, b) => {
   return intersection;
 };
 
-const setDifference = (a, b) => {
-  const diff = new Set();
+// A must be a set, b must be iterable.
+const setIntersectSize = (a, b) => {
+  let count = 0;
+  for (const elem of b) {
+    count += a.has(elem);
+  }
+  return count;
+}
 
-  for (const elem of a) {
-    if (!b.has(elem)) {
-      diff.add(elem);
-    }
+const setDifference = (a, b) => {
+  const diff = new Set(a);
+  for (const elem of b) {
+    diff.delete(elem);
   }
   return diff;
 };
