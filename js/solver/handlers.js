@@ -695,10 +695,12 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
   initialize(initialGrid, cellConflicts, shape) {
     this._shape = shape;
 
-    if (this.cells.length > shape.numValues) {
+    const maxNumCells = Math.floor(LookupTables.MAX_SUM / shape.numValues);
+    if (this.cells.length > maxNumCells) {
       // This isn't an invalid grid,
       // we just can't handle it because rangeInfo might overflow.
-      throw ('Number of cells in the sum must be no more than the number of values.');
+      throw ('Number of cells in the sum ' +
+        `can't cause sum to exceed ${LookupTables.MAX_SUM}`);
     }
 
     this._lookupTables = LookupTables.get(shape.numValues);
@@ -726,10 +728,21 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
     // Check for valid sums.
     const sum = this._sum;
     if (!Number.isInteger(sum) || sum < 0) return false;
-    if (sum > shape.numValues * this.cells.length) return false;
+    // Other builder will ensure that no configuration would actually
+    // make this a valid solution.
+    if (sum > LookupTables.MAX_SUM) return false;
     if (this._conflictSets.length == 1
       && sum > SumHandlerUtil.maxCageSum(shape.numValues)) {
       return false;
+    }
+    // Ensure each conflict set is not too large. This only matters if we remove
+    // standard regions.
+    for (const conflictSet of this._conflictSets) {
+      if (conflictSet.length > shape.numValues) {
+        // The UI should not allow users to create such sets, and the
+        // optimizer should avoid them as well.
+        throw ('Conflict set is too large.');
+      }
     }
 
     return true;
@@ -1575,7 +1588,7 @@ class SudokuConstraintOptimizer {
   }
 
   static _optimizeSums(handlerSet, cellConflictSets, hasBoxes, shape) {
-    // TODO: Consider how this interactions with fixed cells.
+    // TODO: Consider how this interacts with fixed cells.
     let sumHandlers = handlerSet.getAllofType(SudokuConstraintHandler.Sum);
     if (sumHandlers.length == 0) return;
 
@@ -1709,6 +1722,7 @@ class SudokuConstraintOptimizer {
     }
     // These cells would never cover the entire house.
     if (cells.length <= gridSize) return null;
+
     // We don't want too many cells in the new sum.
     if (cells.length > gridSize + this._MAX_SUM_SIZE) return null;
 
@@ -1743,7 +1757,7 @@ class SudokuConstraintOptimizer {
     const cellMap = handlerSet.getCellMap();
 
     for (const h of houseHandlers) {
-      // Find sum contraints which overlap this house.
+      // Find sum constraints which overlap this house.
       let overlappingHandlerIndexes = new Set();
       for (const c of h.cells) {
         cellMap[c].forEach(i => overlappingHandlerIndexes.add(i));

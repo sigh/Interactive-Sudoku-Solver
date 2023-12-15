@@ -205,6 +205,7 @@ const runSolveTests = async (onFailure) => {
     'Arrow killer sudoku',
     'Kropki sudoku',
     'Little killer',
+    'Little killer - Hidden Sum',
     'Little killer 2',
     'Sandwich sudoku',
     'German whispers',
