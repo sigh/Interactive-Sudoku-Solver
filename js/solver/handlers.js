@@ -1429,6 +1429,16 @@ class HandlerSet {
     return this._cellMap;
   }
 
+  getIntersectingIndexes(handler) {
+    const handlerIndex = this._indexLookup.get(handler);
+    const intersectingHandlers = new Set();
+    for (const c of handler.cells) {
+      this._cellMap[c].forEach(i => intersectingHandlers.add(i));
+    }
+    intersectingHandlers.delete(handlerIndex);
+    return intersectingHandlers;
+  }
+
   getIndex(handler) {
     return this._indexLookup.get(handler);
   }
@@ -1558,15 +1568,11 @@ class SudokuConstraintOptimizer {
   static _findNonOverlapping(handlers, fullHandlerSet) {
     const handlerIndexes = new Set(
       handlers.map(h => fullHandlerSet.getIndex(h)));
-    const cellMap = fullHandlerSet.getCellMap();
 
     // Sort handers by number of overlapping handlers.
     const handlersByOverlaps = [];
     for (const h of handlers) {
-      const overlapIndexes = [];
-      for (const c of h.cells) {
-        overlapIndexes.push(...cellMap[c]);
-      }
+      const overlapIndexes = fullHandlerSet.getIntersectingIndexes(h);
       const numOverlap = setIntersection(overlapIndexes, handlerIndexes);
       handlersByOverlaps.push([h, numOverlap]);
     }
@@ -1754,14 +1760,9 @@ class SudokuConstraintOptimizer {
     const sumHandlerIndexes = new Set(
       sumHandlers.map(h => handlerSet.getIndex(h)));
 
-    const cellMap = handlerSet.getCellMap();
-
     for (const h of houseHandlers) {
       // Find sum constraints which overlap this house.
-      let overlappingHandlerIndexes = new Set();
-      for (const c of h.cells) {
-        cellMap[c].forEach(i => overlappingHandlerIndexes.add(i));
-      }
+      let overlappingHandlerIndexes = handlerSet.getIntersectingIndexes(h);
       overlappingHandlerIndexes = setIntersection(
         overlappingHandlerIndexes, sumHandlerIndexes);
       if (!overlappingHandlerIndexes.size) continue;
