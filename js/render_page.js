@@ -339,6 +339,7 @@ class ConstraintManager {
     this._shape = null;
     this._checkboxes = {};
 
+    this._invisibleConstraints = [];
     this._shapeManager = new ShapeManager();
     this._shapeManager.addReshapeListener(this);
 
@@ -734,6 +735,9 @@ class ConstraintManager {
       case 'Set':
         constraint.constraints.forEach(c => this.loadConstraint(c));
         break;
+      default:
+        this._invisibleConstraints.push(constraint);
+        break;
     }
     this.runUpdateCallback();
   }
@@ -900,6 +904,7 @@ class ConstraintManager {
     constraints.push(...Object.values(this._outsideArrowConstraints));
     constraints.push(this._fixedValues.getConstraint());
     constraints.push(new SudokuConstraint.Shape(this._shape.name));
+    constraints.push(...this._invisibleConstraints);
 
     return new SudokuConstraint.Set(constraints);
   }
@@ -916,6 +921,7 @@ class ConstraintManager {
     this._configs = [];
     this._jigsawManager.clear();
     this._fixedValues.unsafeClear();  // OK because display is cleared.
+    this._invisibleConstraints = [];
     this.runUpdateCallback();
   }
 }

@@ -869,6 +869,10 @@ class LookupTables {
       return table;
     })();
 
+    // The maximum sum is 2^8=256, so we can use 8 bits to store the sum
+    // in rangeInfo.
+    this.MAX_SUM = 1 << 8;
+
     // Combines useful info about the range of numbers in a cell.
     // Designed to be summed, so that the aggregate stats can be found.
     // Layout: [isFixed: 4 bits, fixed: 8 bits, min: 8 bits, max: 8 bits]
