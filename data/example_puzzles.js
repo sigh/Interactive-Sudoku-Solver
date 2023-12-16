@@ -173,6 +173,16 @@ const EXAMPLES = {
     input: '.DisjointSets.LittleKiller~62~R1C9.LittleKiller~33~R1C1.LittleKiller~12~R1C3.LittleKiller~14~R3C9.LittleKiller~21~R9C7.LittleKiller~36~R9C5.LittleKiller~8~R7C1.LittleKiller~9~R1C2.',
     solution: '325784169719625483684319725843297651592861347167543298478932516236158974951476832',
   },
+  'Hailstone - little killer': {
+    src: 'https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?id=0008H3',
+    input: '..Cage~14~R5C3~R5C4~R6C4.Cage~19~R6C6~R6C5~R7C5.Cage~14~R4C4~R4C5~R3C5.Cage~14~R4C6~R5C6~R5C7.Diagonal~1.Diagonal~-1.LittleKiller~47~R3C1.LittleKiller~49~R2C1.LittleKiller~30~R8C9.LittleKiller~45~R7C9.LittleKiller~43~R1C7.LittleKiller~44~R1C8.LittleKiller~34~R9C2.LittleKiller~52~R9C3',
+    solution: '815432976763918245942567318278351694154896732396274581437685129681729453529143867',
+  },
+  'Hailstone (easier) - little killer': {
+    src: 'https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?id=0008H3',
+    input: '..Cage~14~R5C3~R5C4~R6C4.Cage~19~R6C6~R6C5~R7C5.Cage~14~R4C4~R4C5~R3C5.Cage~14~R4C6~R5C6~R5C7.Diagonal~1.Diagonal~-1.LittleKiller~47~R3C1.LittleKiller~49~R2C1.LittleKiller~30~R8C9.LittleKiller~45~R7C9.LittleKiller~43~R1C7.LittleKiller~44~R1C8.LittleKiller~34~R9C2.LittleKiller~52~R9C3.~R1C5_3~R9C5_4~R5C1_1~R5C9_2',
+    solution: '815432976763918245942567318278351694154896732396274581437685129681729453529143867',
+  },
 
   // Classic grids that used to be slow. 3 and 4 used to take 2+ seconds.
   'Classic sudoku, was slow (1)': {
