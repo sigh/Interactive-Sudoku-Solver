@@ -222,6 +222,7 @@ const runSolveTests = async (onFailure) => {
     'XV-kropki',
     'Strict kropki',
     'Strict XV',
+    'Hailstone (easier) - little killer',
   ], onFailure);
 
   await runAllWithChecks([
