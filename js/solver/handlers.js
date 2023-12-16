@@ -695,15 +695,15 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
   initialize(initialGrid, cellConflicts, shape) {
     this._shape = shape;
 
-    const maxNumCells = Math.floor(LookupTables.MAX_SUM / shape.numValues);
-    if (this.cells.length > maxNumCells) {
+    this._lookupTables = LookupTables.get(shape.numValues);
+
+    if (this.cells.length > this._lookupTables.MAX_CELLS_IN_SUM) {
       // This isn't an invalid grid,
       // we just can't handle it because rangeInfo might overflow.
-      throw ('Number of cells in the sum ' +
-        `can't cause sum to exceed ${LookupTables.MAX_SUM}`);
+      throw ('Number of cells in the sum' +
+        `can't exceed ${this._lookupTables.MAX_CELLS_IN_SUM}`);
     }
 
-    this._lookupTables = LookupTables.get(shape.numValues);
     this._util = SumHandlerUtil.get(shape.numValues);
 
     this._conflictSets = SumHandlerUtil.findConflictSets(
@@ -1714,34 +1714,94 @@ class SudokuConstraintOptimizer {
   }
 
   // Create a Sum handler out of all the cages sticking out of a house.
-  static _addSumIntersectionHandler(houseHandler, sumHandlers, shape) {
+  static _addSumIntersectionHandler(
+    houseHandler, intersectingSumHandlers, intersectingHouseHandlers,
+    allHouseHandlers, shape) {
     const gridSize = shape.gridSize;
 
     let totalSum = 0;
-    let cells = [];
-    for (const h of sumHandlers) {
+    let cells = new Set();
+    let uncoveredCells = new Set(houseHandler.cells);
+    for (const h of intersectingSumHandlers) {
       totalSum += h.sum();
-      cells.push(...h.cells);
+      h.cells.forEach(c => cells.add(c));
+      h.cells.forEach(c => uncoveredCells.delete(c));
     }
-    // These cells would never cover the entire house.
-    if (cells.length <= gridSize) return null;
 
-    // We don't want too many cells in the new sum.
-    if (cells.length > gridSize + this._MAX_SUM_SIZE) return null;
+    // If we haven't filled up the entire house then try to greedily fill the
+    // holes with house handlers.
+    let usedExtraHouses = false;
+    if (uncoveredCells.size > 0) {
+      for (const h of intersectingHouseHandlers) {
+        // Ignore any houses which intersect with the existing cells.
+        if (setIntersectSize(cells, h.cells) > 0) continue;
+        // Ignore any houses which don't cover the uncovered cells.
+        const intersectSize = setIntersectSize(uncoveredCells, h.cells);
+        if (intersectSize == 0) continue;
+        // Ignore handlers which only intersect in one square. This is likely
+        // a row crossing a column, and is generally not useful.
+        if (intersectSize == 1) continue;
+        // Ensure the intersection only covers the uncovered cells.
+        if (intersectSize != arrayIntersectSize(houseHandler.cells, h.cells)) {
+          continue;
+        }
+        // This handler fills in an existing gap.
+        totalSum += shape.maxSum;
+        h.cells.forEach(c => cells.add(c));
+        h.cells.forEach(c => uncoveredCells.delete(c));
+        usedExtraHouses = true;
+        if (uncoveredCells.size == 0) break;
+      }
+    }
 
-    const overlap = arrayIntersectSize(cells, houseHandler.cells);
-    // We need all cells in the house to be covered.
-    if (overlap != gridSize) return null;
+    // If we still haven't covered all the cells, then give up.
+    if (uncoveredCells.size > 0) return null;
 
-    const outsideCells = arrayDifference(cells, houseHandler.cells);
-    const outsideSum = totalSum - shape.maxSum;
-    const handler = new SudokuConstraintHandler.Sum(outsideCells, outsideSum);
+    // Remove the current house cells, as we care about the cells outside the
+    // house.
+    houseHandler.cells.forEach(c => cells.delete(c));
+    totalSum -= shape.maxSum;
+
+    // While it's possible that there could be a house completely contained
+    // within the cells, then try to find and remove them.
+    // Note that houses used to construct the cells won't match as we have
+    // already removed the cells in the current house.
+    if (usedExtraHouses && cells.size >= gridSize) {
+      for (const h of allHouseHandlers) {
+        // Ignore any houses which don't cover the cells.
+        const intersectSize = setIntersectSize(cells, h.cells);
+        if (intersectSize != gridSize) continue;
+        // This house is completely contained within the cells.
+        totalSum -= shape.maxSum;
+        h.cells.forEach(c => cells.delete(c));
+        if (cells.size < gridSize) break;
+      }
+    }
+
+    if (cells.size == 0) return null;
+
+    // Can't have too many cells in the sum.
+    if (cells.size > LookupTables.get(shape.numValues).MAX_CELLS_IN_SUM) {
+      return null;
+    }
+
+    // Don't put too many cells in the sum as this adds a lot of constraints
+    // which may be less useful.
+    // An exception is made if we used extra houses to fill in gaps  as it
+    // is more likely to have contained interesting interactions with
+    // distant cells.
+    if (!usedExtraHouses && cells.size > this._MAX_SUM_SIZE) {
+      return null;
+    }
+
+    const handler = new SudokuConstraintHandler.Sum(
+      Array.from(cells), totalSum);
 
     if (ENABLE_DEBUG_LOGS) {
       debugLog({
         loc: '_addSumIntersectionHandler',
         msg: 'Add: ' + handler.constructor.name,
-        args: { sum: handler.sum() },
+        args: { sum: handler.sum(), usedExtraHouses: usedExtraHouses },
         cells: handler.cells
       });
     }
@@ -1756,26 +1816,32 @@ class SudokuConstraintOptimizer {
 
     const allSumHandlerIndexes = new Set(
       allSumHandlers.map(h => handlerSet.getIndex(h)));
+    const houseHandlerIndexes = new Set(
+      houseHandlers.map(h => handlerSet.getIndex(h)));
 
     for (const h of houseHandlers) {
       // Find sum constraints which overlap this house.
-      let currentHouseSumIndexes = handlerSet.getIntersectingIndexes(h);
-      currentHouseSumIndexes = setIntersection(
-        currentHouseSumIndexes, allSumHandlerIndexes);
+      let intersectingHandlers = handlerSet.getIntersectingIndexes(h);
+      const currentHouseSumIndexes = setIntersection(
+        intersectingHandlers, allSumHandlerIndexes);
       if (!currentHouseSumIndexes.size) continue;
 
       // For the sum intersection, we need to ensure that the sum handlers don't
       // overlap themselves.
       // We do this separately for each house so that we can don't have to
       // force the same handle to be used in every house it intersects.
-      const [filteredSumHandlers, sumCells] = this._findNonOverlappingSubset(
+      const [filteredSumHandlers, _] = this._findNonOverlappingSubset(
         Array.from(currentHouseSumIndexes).map(
           i => handlerSet.getHandler(i)),
         handlerSet);
 
       {
+        const intersectingHouseHandlers = Array.from(
+          setIntersection(intersectingHandlers, houseHandlerIndexes)).map(
+            i => handlerSet.getHandler(i));
         const sumIntersectionHandler = this._addSumIntersectionHandler(
-          h, filteredSumHandlers, shape);
+          h, filteredSumHandlers, intersectingHouseHandlers, houseHandlers,
+          shape);
         if (sumIntersectionHandler) newHandlers.push(sumIntersectionHandler);
       }
 
@@ -1922,8 +1988,8 @@ class SudokuConstraintOptimizer {
 
       // Add any remaining pieces with enough overlap to our super-region.
       for (const p of remainingPieces) {
-        const intersection = setIntersection(p, superRegion);
-        if (intersection.size > p.length / 2) {
+        const intersectionSize = setIntersectSize(superRegion, p);
+        if (intersectionSize > p.length / 2) {
           remainingPieces.delete(p);
           for (const c of p) piecesRegion.add(c);
           usedPieces.push(p);

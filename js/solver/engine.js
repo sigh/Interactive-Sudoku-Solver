@@ -869,9 +869,10 @@ class LookupTables {
       return table;
     })();
 
-    // The maximum sum is 2^8=256, so we can use 8 bits to store the sum
-    // in rangeInfo.
-    this.MAX_SUM = 1 << 8;
+    // The maximum number of cells in a sum is 16 so that it can the count
+    // can be stored in 4 bits. This is important for the layout of
+    // isFixed in rangeInfo.
+    this.MAX_CELLS_IN_SUM = 16;
 
     // Combines useful info about the range of numbers in a cell.
     // Designed to be summed, so that the aggregate stats can be found.

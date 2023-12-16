@@ -38,17 +38,18 @@ const arraysAreEqual = (a, b) => {
   return true;
 }
 
+// `a` must be a set, `b` must be iterable.
 const setIntersection = (a, b) => {
   const intersection = new Set()
-  for (const elem of a) {
-    if (b.has(elem)) {
+  for (const elem of b) {
+    if (a.has(elem)) {
       intersection.add(elem)
     }
   }
   return intersection;
 };
 
-// A must be a set, b must be iterable.
+// `a` must be a set, `b` must be iterable.
 const setIntersectSize = (a, b) => {
   let count = 0;
   for (const elem of b) {
