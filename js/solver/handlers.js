@@ -94,14 +94,15 @@ SudokuConstraintHandler.House = class House extends SudokuConstraintHandler {
     const gridSize = this._shape.gridSize;
 
     let allValues = 0;
-    let uniqueValues = 0;
+    let nonUniqueValues = 0;
     let fixedValues = 0;
     for (let i = 0; i < gridSize; i++) {
       const v = grid[cells[i]];
-      uniqueValues = (uniqueValues & ~v) | (v & ~allValues);
+      nonUniqueValues |= allValues & v;
       allValues |= v;
       fixedValues |= (!(v & (v - 1))) * v;  // Better than branching.
     }
+    let uniqueValues = allValues & ~nonUniqueValues;
 
     if (allValues != this._lookupTables.allValues) return false;
     if (fixedValues == this._lookupTables.allValues) return true;
