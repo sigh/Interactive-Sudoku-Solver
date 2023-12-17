@@ -123,6 +123,25 @@ class DisplayItem {
     return line;
   }
 
+  _makeDiagonalPattern(id, color) {
+    let pattern = createSvgElement('pattern');
+    pattern.id = id;
+    const hatchWidth = '10';
+    pattern.setAttribute('width', hatchWidth);
+    pattern.setAttribute('height', hatchWidth);
+    pattern.setAttribute('patternTransform', 'rotate(45 0 0)');
+    pattern.setAttribute('patternUnits', 'userSpaceOnUse');
+    let line = createSvgElement('line');
+    line.setAttribute('x1', '0');
+    line.setAttribute('y1', '0');
+    line.setAttribute('x2', '0');
+    line.setAttribute('y2', '10');
+    line.setAttribute('style', `stroke:${color}; stroke-width:${hatchWidth}`);
+    pattern.appendChild(line);
+
+    return pattern;
+  }
+
   clear() {
     clearDOMNode(this._svg);
   }
@@ -444,8 +463,8 @@ class ConstraintDisplay extends DisplayItem {
     this._outsideArrows.removeOutsideArrow(initialCell);
   }
 
-  drawKillerCage(cells, sum) {
-    return this._killerCageDisplay.drawKillerCage(cells, sum);
+  drawKillerCage(cells, sum, patterned) {
+    return this._killerCageDisplay.drawKillerCage(cells, sum, patterned);
   }
 
   drawDot(cells, fillColor) {
@@ -1124,6 +1143,7 @@ class KillerCageDisplay extends DisplayItem {
   constructor(svg) {
     super(svg);
     this._applyGridOffset(svg);
+    this._unusedPatternId = 0;
 
     this.clear();
   }
@@ -1146,15 +1166,25 @@ class KillerCageDisplay extends DisplayItem {
     return false;
   }
 
-  drawKillerCage(cells, sum) {
+  drawKillerCage(cells, sum, patterned) {
     let x, y;
 
     const cage = createSvgElement('g');
     const color = this._chooseKillerCageColor(cells);
 
+    let patternId = null;
+    if (patterned) {
+      patternId = 'sum-pattern-' + this._unusedPatternId++;
+      cage.appendChild(this._makeDiagonalPattern(patternId, color));
+    }
+
     for (const cellId of cells) {
       const path = this._makeCellSquare(this._shape.parseCellId(cellId).cell);
-      path.setAttribute('fill', color);
+      if (patterned) {
+        path.setAttribute('fill', `url(#${patternId})`);
+      } else {
+        path.setAttribute('fill', color);
+      }
       path.setAttribute('opacity', '0.1');
 
       cage.appendChild(path);

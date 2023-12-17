@@ -707,7 +707,7 @@ class ConstraintManager {
           name: `Sum (${constraint.sum})`,
           constraint: constraint,
           displayElem: this._display.drawKillerCage(
-            constraint.cells, constraint.sum),
+            constraint.cells, constraint.sum, true),
         };
         this._addToPanel(config);
         this._configs.push(config);
