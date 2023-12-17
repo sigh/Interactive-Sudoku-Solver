@@ -102,12 +102,11 @@ SudokuConstraintHandler.House = class House extends SudokuConstraintHandler {
       allValues |= v;
       fixedValues |= (!(v & (v - 1))) * v;  // Better than branching.
     }
-    let uniqueValues = allValues & ~nonUniqueValues;
 
     if (allValues != this._lookupTables.allValues) return false;
     if (fixedValues == this._lookupTables.allValues) return true;
 
-    uniqueValues &= ~fixedValues;
+    let uniqueValues = allValues & ~nonUniqueValues & ~fixedValues;
     if (uniqueValues) {
       // We have hidden singles. Find and constrain them.
       for (let i = 0; i < gridSize; i++) {
@@ -379,11 +378,10 @@ class SumHandlerUtil {
     // Check that we can make the current sum with the unfixed values remaining.
     let fixedValues = 0;
     let allValues = 0;
-    let uniqueValues = 0;
+    let nonUniqueValues = 0;
     for (let i = 0; i < numCells; i++) {
       const v = grid[cells[i]];
-      uniqueValues &= ~v;
-      uniqueValues |= (v & ~allValues);
+      nonUniqueValues |= allValues & v;
       allValues |= v;
       fixedValues |= (!(v & (v - 1))) * v; // Better than branching.
     }
@@ -400,7 +398,7 @@ class SumHandlerUtil {
     }
 
     const unfixedValues = allValues & ~fixedValues;
-    let requiredUniques = uniqueValues;
+    let requiredUniques = allValues & ~nonUniqueValues;
     const numUnfixed = cells.length - countOnes16bit(fixedValues);
 
     let possibilities = 0;
