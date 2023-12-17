@@ -1770,7 +1770,10 @@ class SolutionController {
     let mode = this._elements.mode.value;
     let auto = this._elements.autoSolve.checked;
 
-    this._historyHandler.update({ mode: mode, q: constraints });
+    let params = { mode: mode, q: constraints };
+    // Remove mode if it is the default.
+    if (mode == 'all-possibilities') params.mode = undefined;
+    this._historyHandler.update(params);
 
     let description = SolutionController._MODE_DESCRIPTIONS[mode];
     this._elements.modeDescription.textContent = description;
