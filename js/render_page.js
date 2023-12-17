@@ -417,6 +417,14 @@ class ConstraintManager {
     selectionForm['cage-sum'].onfocus = () => {
       selectionForm['multi-cell-constraint-cage'].checked = true;
     };
+    // Selecting anything in the constraint sum will select it and focus on
+    // the input box.
+    selectionForm['multi-cell-constraint-sum'].onchange = () => {
+      selectionForm['plain-sum'].select();
+    };
+    selectionForm['plain-sum'].onfocus = () => {
+      selectionForm['multi-cell-constraint-sum'].checked = true;
+    };
 
     // Selecting anything in the whisper constraint will select it and focus on
     // the input box.
@@ -693,6 +701,17 @@ class ConstraintManager {
         this._addToPanel(config);
         this._configs.push(config);
         break;
+      case 'Sum':
+        config = {
+          cells: constraint.cells,
+          name: `Sum (${constraint.sum})`,
+          constraint: constraint,
+          displayElem: this._display.drawKillerCage(
+            constraint.cells, constraint.sum),
+        };
+        this._addToPanel(config);
+        this._configs.push(config);
+        break;
       case 'LittleKiller':
         this._outsideArrowConstraints[constraint.id] = constraint;
         this._display.addOutsideArrow(constraint.id, constraint.sum);
@@ -756,6 +775,10 @@ class ConstraintManager {
         break;
       case 'cage':
         constraint = new SudokuConstraint.Cage(+formData.get('cage-sum'), ...cells);
+        this.loadConstraint(constraint);
+        break;
+      case 'sum':
+        constraint = new SudokuConstraint.Sum(+formData.get('plain-sum'), ...cells);
         this.loadConstraint(constraint);
         break;
       case 'thermo':

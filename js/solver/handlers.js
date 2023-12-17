@@ -1801,7 +1801,7 @@ class SudokuConstraintOptimizer {
         debugLog({
           loc: '_addSumIntersectionHandler',
           msg: 'Discarded potential handler: ' +
-            `.HiddenSum~${totalSum}~${cellString}`,
+            `.Sum~${totalSum}~${cellString}`,
           args: { sum: totalSum },
           cells: cellsArray
         });
