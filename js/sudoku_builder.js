@@ -568,7 +568,7 @@ class SudokuConstraint {
     }
   }
 
-  static HiddenSum = class HiddenSum extends SudokuConstraint {
+  static Sum = class Sum extends SudokuConstraint {
     constructor(sum, ...cells) {
       super(arguments);
       this.cells = cells;
@@ -883,7 +883,7 @@ class SudokuBuilder {
           yield new SudokuConstraintHandler.AllDifferent(cells);
           break;
 
-        case 'HiddenSum':
+        case 'Sum':
           cells = constraint.cells.map(c => shape.parseCellId(c).cell);
           yield new SudokuConstraintHandler.Sum(cells, constraint.sum);
           break;

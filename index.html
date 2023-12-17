@@ -152,6 +152,15 @@ layout: null
               </label>
             </div>
             <div>
+              <input type="radio" id="multi-cell-constraint-sum" name="constraint-type" value="sum">
+              <label for="multi-cell-constraint-sum">
+                Sum
+                <input type="number" name="plain-sum" min=0 placeholder="sum">
+                <span class="tooltip" data-text="Values must add up to the given sum. Values don't need to be unique.">
+                </span>
+              </label>
+            </div>
+            <div>
               <input type="radio" id="multi-cell-constraint-jigsaw" name="constraint-type" value="jigsaw">
               <label for="multi-cell-constraint-jigsaw">Jigsaw Piece</label>
               <span class="tooltip"
