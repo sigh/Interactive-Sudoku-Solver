@@ -1764,7 +1764,8 @@ class SudokuConstraintOptimizer {
     // within the cells, then try to find and remove them.
     // Note that houses used to construct the cells won't match as we have
     // already removed the cells in the current house.
-    if (usedExtraHouses && cells.size >= gridSize) {
+    let removedExtraHouses = false;
+    if (cells.size >= gridSize) {
       for (const h of allHouseHandlers) {
         // Ignore any houses which don't cover the cells.
         const intersectSize = setIntersectSize(cells, h.cells);
@@ -1772,6 +1773,7 @@ class SudokuConstraintOptimizer {
         // This house is completely contained within the cells.
         totalSum -= shape.maxSum;
         h.cells.forEach(c => cells.delete(c));
+        removedExtraHouses = true;
         if (cells.size < gridSize) break;
       }
     }
@@ -1783,12 +1785,27 @@ class SudokuConstraintOptimizer {
       return null;
     }
 
+    // NOTE: This restriction is here to avoid pessimising the performance of
+    // TAREK_ALL and EXTREME_KILLERS puzzles.
     // Don't put too many cells in the sum as this adds a lot of constraints
     // which may be less useful.
     // An exception is made if we used extra houses to fill in gaps  as it
     // is more likely to have contained interesting interactions with
     // distant cells.
-    if (!usedExtraHouses && cells.size > this._MAX_SUM_SIZE) {
+    if (!usedExtraHouses &&
+      (cells.size > this._MAX_SUM_SIZE || removedExtraHouses)) {
+      if (ENABLE_DEBUG_LOGS) {
+        const cellsArray = Array.from(cells);
+        const cellString = cellsArray.map(
+          c => `R${c / gridSize | 0 + 1}C${c % gridSize + 1}`).join('~');
+        debugLog({
+          loc: '_addSumIntersectionHandler',
+          msg: 'Discarded potential handler: ' +
+            `.HiddenSum~${totalSum}~${cellString}`,
+          args: { sum: totalSum },
+          cells: cellsArray
+        });
+      }
       return null;
     }
 
@@ -1796,10 +1813,13 @@ class SudokuConstraintOptimizer {
       Array.from(cells), totalSum);
 
     if (ENABLE_DEBUG_LOGS) {
+      let args = { sum: handler.sum() };
+      if (usedExtraHouses) args.usedExtraHouses = usedExtraHouses;
+      if (removedExtraHouses) args.removedExtraHouses = removedExtraHouses;
       debugLog({
         loc: '_addSumIntersectionHandler',
         msg: 'Add: ' + handler.constructor.name,
-        args: { sum: handler.sum(), usedExtraHouses: usedExtraHouses },
+        args: args,
         cells: handler.cells
       });
     }
