@@ -1797,7 +1797,7 @@ class SudokuConstraintOptimizer {
       if (ENABLE_DEBUG_LOGS) {
         const cellsArray = Array.from(cells);
         const cellString = cellsArray.map(
-          c => `R${c / gridSize | 0 + 1}C${c % gridSize + 1}`).join('~');
+          c => `R${((c / gridSize) | 0) + 1}C${(c % gridSize) + 1}`).join('~');
         debugLog({
           loc: '_addSumIntersectionHandler',
           msg: 'Discarded potential handler: ' +
