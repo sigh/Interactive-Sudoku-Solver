@@ -489,6 +489,16 @@ class ConstraintManager {
       }
     }
 
+    // Sum constraints can only be of size 16 or less.
+    {
+      const sumDisabled = (selection.length > 16);
+      selectionForm['multi-cell-constraint-sum'].disabled = sumDisabled;
+      selectionForm['multi-cell-constraint-sum-input'].disabled = sumDisabled;
+      if (sumDisabled) {
+        selectionForm['multi-cell-constraint-sum'].checked = false;
+      }
+    }
+
     if (this._jigsawManager.isValidJigsawPiece(selection)) {
       selectionForm['multi-cell-constraint-jigsaw'].disabled = false;
       selectionForm['multi-cell-constraint-jigsaw'].checked = true;

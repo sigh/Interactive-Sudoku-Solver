@@ -155,8 +155,9 @@ layout: null
               <input type="radio" id="multi-cell-constraint-sum" name="constraint-type" value="sum">
               <label for="multi-cell-constraint-sum">
                 Sum
-                <input type="number" name="plain-sum" min=0 placeholder="sum">
-                <span class="tooltip" data-text="Values must add up to the given sum. Values don't need to be unique.">
+                <input type="number" id="multi-cell-constraint-sum-input" name="plain-sum" min=0 placeholder="sum">
+                <span class="tooltip"
+                  data-text="Values must add up to the given sum. Values don't need to be unique. Only up to 16 cells are allowed.">
                 </span>
               </label>
             </div>
