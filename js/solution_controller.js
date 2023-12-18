@@ -304,11 +304,87 @@ class SolverStateDisplay {
   }
 }
 
+class SolutionContainer {
+  constructor() {
+    this._solutions = [];
+    this._done = false;
+    this._listener = () => { };
+  }
+
+  setDone() {
+    this._done = true;
+    this._listener();
+  }
+
+  add() {
+    this._listener();
+  }
+
+  done() {
+    return this._done;
+  }
+
+  count() {
+    return this._solutions.length;
+  }
+
+  get(i) {
+    return this._solutions[i - 1];
+  }
+
+  setUpdateListener(fn) {
+    this._listener = fn;
+  }
+}
+
+SolutionContainer.Blackhole = class extends SolutionContainer {
+  add(...solutions) {
+    super.add(...solutions);
+  }
+}
+
+SolutionContainer.AllPossibilties = class extends SolutionContainer {
+  constructor() {
+    super();
+    this._pencilmarks = [];
+  }
+
+  setDone() {
+    for (let i = 0; i < this._pencilmarks.length; i++) {
+      if (this._pencilmarks[i].size == 1) {
+        this._pencilmarks[i] = this._pencilmarks[i].values().next().value;
+      }
+    }
+    super.setDone();
+  }
+
+  add(...solutions) {
+    super.add(...solutions);
+    this._solutions.push(...solutions);
+
+    if (this._pencilmarks.length == 0) {
+      this._pencilmarks = Array.from(solutions[0]).map(() => new Set());
+    }
+    for (const solution of solutions) {
+      for (let i = 0; i < solution.length; i++) {
+        this._pencilmarks[i].add(solution[i]);
+      }
+    }
+  }
+
+  get(i) {
+    if (i == 0) return this._pencilmarks;
+    return super.get(i);
+  }
+}
+
 class SolutionController {
   constructor(constraintManager, displayContainer) {
     // Solvers are a list in case we manage to start more than one. This can
     // happen when we are waiting for a worker to initialize.
     this._solverPromises = [];
+
+    this._solutionContainer = new SolutionContainer.Blackhole();
 
     constraintManager.addReshapeListener(this);
 
@@ -503,6 +579,7 @@ class SolutionController {
     this._setValidateResult();
     this.debugOutput.clear();
     this._showIterationControls(false);
+    this._solutionContainer = new SolutionContainer.Blackhole();
   }
 
   async _solve(constraints) {
@@ -522,7 +599,13 @@ class SolutionController {
 
     const newSolverPromise = SudokuBuilder.buildInWorker(
       constraints,
-      s => this._stateDisplay.setState(s),
+      s => {
+        this._stateDisplay.setState(s);
+        if (s.extra && s.extra.solutionsToStore) {
+          this._solutionContainer.add(...s.extra.solutionsToStore);
+        }
+        if (s.done) { this._solutionContainer.setDone(); }
+      },
       this._solveStatusChanged.bind(this),
       data => this.debugOutput.update(data));
     this._solverPromises.push(newSolverPromise);
@@ -668,8 +751,46 @@ class SolutionController {
   }
 
   async _runAllPossibilites(solver) {
-    let result = await solver.solveAllPossibilities();
-    this._solutionDisplay.setSolution(result);
+    this._iterateUsingSolutionContainer(new SolutionContainer.AllPossibilties());
+    await solver.solveAllPossibilities();
+  }
+
+  _iterateUsingSolutionContainer(solutions) {
+    this._solutionContainer = solutions;
+
+    let minSolution = 0;
+    let solutionNum = 0;
+
+    const update = () => {
+      if (solutions.done() && solutions.count() == 1) {
+        minSolution = 1;
+        solutionNum = 1;
+      }
+
+      let solution = solutions.get(solutionNum);
+      this._solutionDisplay.setSolutionNew(solution);
+
+      this._elements.forward.disabled = (solutionNum >= solutions.count());
+      this._elements.back.disabled = (solutionNum == minSolution);
+      this._elements.start.disabled = (solutionNum == minSolution);
+      this._elements.stepOutput.textContent = solutionNum;
+    };
+    solutions.setUpdateListener(update);
+
+    this._elements.forward.onclick = async () => {
+      solutionNum++;
+      update();
+    };
+    this._elements.back.onclick = () => {
+      solutionNum--;
+      update();
+    };
+    this._elements.start.onclick = () => {
+      solutionNum = minSolution;
+      update();
+    };
+
+    this._showIterationControls(true);
   }
 
   async _runCounter(solver) {

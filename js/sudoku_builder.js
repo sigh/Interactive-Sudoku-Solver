@@ -38,6 +38,10 @@ class GridShape {
     return `R${(row + 1).toString(this._valueBase)}C${(col + 1).toString(this._valueBase)}`;
   }
 
+  makeCellIdFromIndex = (i) => {
+    return this.makeCellId(...this.splitCellIndex(i));
+  }
+
   cellIndex = (row, col) => {
     return row * this.gridSize + col;
   };

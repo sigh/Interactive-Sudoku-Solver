@@ -211,10 +211,22 @@ class SolutionDisplay extends DisplayItem {
   //  - If solution contains mutiple values for single cell, they will be shown
   //    as pencil marks.
   //  - Anything in pencilmarks will always be shown as pencil marks.
-  setSolution(solution, pencilmarks) {
+  setSolution(solution, pencilmarks, rawSolution) {
     pencilmarks = pencilmarks || [];
     solution = solution || [];
     this._solutionValues = [];
+
+    if (rawSolution) {
+      for (let c = 0; c < rawSolution.length; c++) {
+        if (rawSolution[c] instanceof Set) {
+          for (const v of rawSolution[c]) {
+            solution.push(this._shape.makeValueId(c, v));
+          }
+        } else {
+          solution.push(this._shape.makeValueId(c, rawSolution[c]));
+        }
+      }
+    }
 
     // If we have no solution, just hide it instead.
     // However, we wait a bit so that we don't fliker if the solution is updated
@@ -269,6 +281,59 @@ class SolutionDisplay extends DisplayItem {
             line, x, y + offset, 'solution-multi-value'));
           offset += LINE_HEIGHT;
         }
+      }
+    }
+
+    this._svg.classList.remove('hidden-solution');
+  }
+
+  // Display solution on grid.
+  //  - If solution cell contains a container then it will be displayed as
+  //    pencilmarks.
+  setSolutionNew(solution) {
+    solution = solution || [];
+    this._solutionValues = [];
+
+    // If we have no solution, just hide it instead.
+    // However, we wait a bit so that we don't flicker if the solution is updated
+    // again immediately.
+    if (!solution.length) {
+      window.setTimeout(() => {
+        // Ensure there is still no solution.
+        if (this._solutionValues.length == 0) {
+          this._svg.classList.add('hidden-solution');
+        }
+      }, 10);
+      return;
+    }
+
+    clearDOMNode(this._svg);
+
+    const fixedCells = new Set(this._constraintManager.getFixedCells());
+
+    const LINE_HEIGHT = this._shape.gridSize == SHAPE_9x9.gridSize ? 17 : 10;
+    const START_OFFSET = -DisplayItem.CELL_SIZE / 2 + 2;
+    for (let i = 0; i < solution.length; i++) {
+      const cellId = this._shape.makeCellIdFromIndex(i);
+      if (fixedCells.has(cellId)) continue;
+
+      const value = solution[i];
+      const [x, y] = this.cellIdCenter(cellId);
+
+      if (isIterable(value)) {
+        let offset = START_OFFSET;
+        for (const line of this._formatMultiSolution(value)) {
+          this._svg.append(this.makeTextNode(
+            line, x, y + offset, 'solution-multi-value'));
+          offset += LINE_HEIGHT;
+        }
+        for (const v of value) {
+          this._solutionValues.push(this._shape.makeValueId(i, v));
+        }
+      } else if (value) {
+        this._svg.append(this.makeTextNode(
+          value, x, y, 'solution-value'));
+        this._solutionValues.push(this._shape.makeValueId(i, value));
       }
     }
 
