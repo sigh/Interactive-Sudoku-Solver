@@ -7,8 +7,6 @@ loadJSFile('data/jigsaw_box_layouts.js');
 
 var TEST_TIMEOUT_MS = 0;
 
-controller.debugOutput.enable();
-
 const loadInput = (input) => {
   let puzzle = EXAMPLES[input];
   if (puzzle) input = puzzle.input;

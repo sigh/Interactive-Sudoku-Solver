@@ -31,11 +31,15 @@ layout: null
     window.addEventListener('load', () => {
       initPage();
 
-      const loadDebug = dynamicJSFileLoader('js/debug.js');
-      self.loadDebug = loadDebug;
-
       const urlParams = new URLSearchParams(window.location.search);
-      if (urlParams.get('debug') !== null) self.loadDebug();
+      self.loadDebug = () => {
+        const promise = dynamicJSFileLoader('js/debug.js');
+        controller.debugOutput.enable();
+        return promise;
+      };
+      if (urlParams.get('debug') !== null) {
+        self.loadDebug();
+      }
     });
   </script>
 
