@@ -108,21 +108,23 @@ class SudokuSolver {
     this._reset();
 
     let valuesInSolutions = new Uint16Array(this._shape.numCells);
+    let solutions = [];
 
     // Send the current values with the progress update, if there have
     // been any changes.
-    let lastSize = 0;
     this._progressExtraStateFn = () => {
-      let pencilmarks = this.constructor._makePencilmarks(valuesInSolutions, this._shape);
-      if (pencilmarks.length == lastSize) return null;
-      lastSize = pencilmarks.size;
-      return { pencilmarks: pencilmarks };
+      if (!solutions.length) return null;
+      return {
+        solutionsToStore: solutions.splice(0),
+      };
     };
 
     this._timer.runTimed(() => {
-      this._internalSolver.solveAllPossibilities(valuesInSolutions);
+      this._internalSolver.solveAllPossibilities(solutions, valuesInSolutions);
     });
 
+    // Send progress one last time to ensure all the solutions are sent.
+    this._sendProgress();
     this._progressExtraStateFn = null;
 
     return this.constructor._makePencilmarks(valuesInSolutions, this._shape);
@@ -672,11 +674,12 @@ SudokuSolver.InternalSolver = class {
     this.done = true;
   }
 
-  solveAllPossibilities(valuesInSolutions) {
+  solveAllPossibilities(solutions, valuesInSolutions) {
     const counters = this.counters;
 
     for (const solution of this.run()) {
       solution.grid.forEach((c, i) => { valuesInSolutions[i] |= c; });
+      solutions.push(solution.grid.map(value => LookupTables.toValue(value)));
 
       // Once we have 2 solutions, then start ignoring branches which maybe
       // duplicating existing solution (up to this point, every branch is
