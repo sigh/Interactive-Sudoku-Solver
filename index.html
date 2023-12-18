@@ -33,9 +33,9 @@ layout: null
 
       const urlParams = new URLSearchParams(window.location.search);
       self.loadDebug = () => {
-        const promise = dynamicJSFileLoader('js/debug.js');
+        const loader = dynamicJSFileLoader('js/debug.js');
         controller.debugOutput.enable();
-        return promise;
+        return loader();
       };
       if (urlParams.get('debug') !== null) {
         self.loadDebug();
