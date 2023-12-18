@@ -319,20 +319,27 @@ class SumHandlerUtil {
   }
 
   static findConflictSets(cells, cellConflicts) {
-    let currentSet = [];
-    let conflictSets = [currentSet];
+    let conflictSets = [];
+    let unassignedCells = new Set(cells)
 
-    for (const cell of cells) {
-      // Determine if this cell is in a conflict set with every cell in the
-      // current set. Otherwise start a new set.
-      for (const conflictCell of currentSet) {
-        if (!cellConflicts[cell].has(conflictCell)) {
-          currentSet = [];
-          conflictSets.push(currentSet);
-          break;
+    while (unassignedCells.size > 0) {
+      let currentSet = [];
+      for (const unassignedCell of unassignedCells) {
+        // Determine if this cell is in a conflict set with every cell in the
+        // current set. If so, then add it to the current set.
+        let addToCurrentSet = true;
+        for (const conflictCell of currentSet) {
+          if (!cellConflicts[unassignedCell].has(conflictCell)) {
+            addToCurrentSet = false;
+            break;
+          }
+        }
+        if (addToCurrentSet) {
+          currentSet.push(unassignedCell);
+          unassignedCells.delete(unassignedCell);
         }
       }
-      currentSet.push(cell);
+      conflictSets.push(currentSet);
     }
 
     return conflictSets;
