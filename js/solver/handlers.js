@@ -1796,11 +1796,10 @@ class SudokuConstraintOptimizer {
       (cells.size > this._MAX_SUM_SIZE || removedExtraHouses)) {
       if (ENABLE_DEBUG_LOGS) {
         const cellsArray = Array.from(cells);
-        const cellString = cellsArray.map(
-          c => `R${((c / gridSize) | 0) + 1}C${(c % gridSize) + 1}`).join('~');
+        const cellString = cellsArray.map(c => shape.makeCellId(c)).join('~');
         debugLog({
           loc: '_addSumIntersectionHandler',
-          msg: 'Discarded potential handler: ' +
+          msg: 'Discarded inferred handler: ' +
             `.Sum~${totalSum}~${cellString}`,
           args: { sum: totalSum },
           cells: cellsArray
