@@ -208,3 +208,7 @@ const clearDOMNode = (node) => {
 function isIterable(obj) {
   return typeof obj[Symbol.iterator] === 'function';
 }
+
+function isObject(obj) {
+  return typeof obj === 'object' && obj !== null;
+}

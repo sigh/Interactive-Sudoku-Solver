@@ -322,7 +322,7 @@ class SolutionHandler {
     return this._solutions.length;
   }
 
-  get(i) {
+  async get(i) {
     return this._solutions[i - 1];
   }
 
@@ -369,7 +369,7 @@ SolutionHandler.AllPossibilities = class extends SolutionHandler {
     super.add(...solutions);
   }
 
-  get(i) {
+  async get(i) {
     if (i == 0) return this._pencilmarks;
     return super.get(i);
   }
@@ -414,12 +414,55 @@ SolutionHandler.AllSolutions = class extends SolutionHandler {
     return this._pending;
   }
 
-  get(i) {
+  async get(i) {
     // Ensure we have at least one past the solution being asked for.
     this._targetCount = i + 1;
     this._tryFetchMore();
 
     return super.get(i);
+  }
+}
+
+SolutionHandler.StepByStep = class extends SolutionHandler {
+  constructor(solver) {
+    super(solver);
+    this._pending = null;
+    this._numSteps = Infinity;
+  }
+
+  setDone() { }
+
+  minSolution() {
+    return 0;
+  }
+
+  async run() { }
+
+  count() {
+    return this._numSteps;
+  }
+
+  _handleStep(i, result) {
+    if (result == null) {
+      this._numSteps = i;
+      return {
+        pencilmarks: null,
+        stepStatus: null,
+        latestCell: null,
+      };
+    }
+    let stepStatus = result.isSolution ? 'Solution' :
+      result.hasContradiction ? 'Conflict' : null;
+    return {
+      pencilmarks: result.pencilmarks,
+      stepStatus: stepStatus,
+      latestCell: result.latestCell,
+    };
+  }
+
+  async get(i) {
+    return this._solver.nthStep(i).then(
+      (result) => this._handleStep(i, result));
   }
 }
 
@@ -433,7 +476,7 @@ SolutionHandler.Counter = class extends SolutionHandler {
     await this._solver.countSolutions();
   }
 
-  get() {
+  async get(i) {
     return this._solutions[0];
   }
 }
@@ -709,50 +752,9 @@ class SolutionController {
   }
 
   async _runStepIterator(solver) {
-    let step = 0;
-
-    const update = async () => {
-      let result = await solver.nthStep(step);
-
-      // Update the grid.
-      let selection = [];
-      if (result) {
-        this._solutionDisplay.setSolution(result.values, result.pencilmarks);
-        if (result.values.length > 0 && !result.isSolution) {
-          selection.push(result.values[result.values.length - 1].substring(0, 4));
-        }
-        this._stateDisplay.setStepStatus(
-          result.isSolution ? 'Solution' :
-            result.hasContradiction ? 'Conflict' : null);
-      } else {
-        this._stateDisplay.setStepStatus(null);
-      }
-      this._stepHighlighter.setCells(selection);
-
-      this._elements.forward.disabled = (result == null);
-      this._elements.back.disabled = (step == 0);
-      this._elements.start.disabled = (step == 0);
-      this._elements.stepOutput.textContent = step + 1;
-    };
-
-    this._elements.forward.onclick = () => {
-      step++;
-      update();
-    };
-    this._elements.back.onclick = () => {
-      step--;
-      update();
-    };
-    this._elements.start.onclick = () => {
-      step = 0;
-      update();
-    };
-
-    this._showIterationControls(true);
-
-    // Run the onclick handler (just calling click() would only work when
-    // the start button is enabled).
-    this._elements.start.onclick();
+    let handler = new SolutionHandler.StepByStep(solver);
+    handler.run();
+    this._iterateOverSolutions(handler);
   }
 
   async _runSolutionIterator(solver) {
@@ -772,13 +774,24 @@ class SolutionController {
 
     let solutionNum = handler.minSolution();
 
-    const update = () => {
+    const update = async () => {
       if (solutionNum < handler.minSolution()) {
         solutionNum = handler.minSolution();
       }
 
-      let solution = handler.get(solutionNum);
-      this._solutionDisplay.setSolutionNew(solution);
+      let result = await handler.get(solutionNum);
+      if (isObject(result)) {
+        // If result is an object, then it is a step result.
+        this._solutionDisplay.setSolutionNew(result.pencilmarks);
+        this._stateDisplay.setStepStatus(result.stepStatus);
+        if (result.latestCell) {
+          this._stepHighlighter.setCells([result.latestCell]);
+        } else {
+          this._stepHighlighter.setCells([]);
+        }
+      } else {
+        this._solutionDisplay.setSolutionNew(result);
+      }
 
       let minSolution = handler.minSolution();
       this._elements.forward.disabled = (solutionNum >= handler.count());
@@ -807,8 +820,8 @@ class SolutionController {
 
   async _runCounter(solver) {
     this._solutionHandler = new SolutionHandler.Counter(solver);
-    this._solutionHandler.setUpdateListener(() => {
-      this._solutionDisplay.setSolutionNew(this._solutionHandler.get());
+    this._solutionHandler.setUpdateListener(async () => {
+      this._solutionDisplay.setSolutionNew(await this._solutionHandler.get());
     });
     await this._solutionHandler.run();
   }
