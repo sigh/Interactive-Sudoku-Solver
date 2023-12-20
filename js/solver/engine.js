@@ -68,7 +68,7 @@ class SudokuSolver {
     let result = this._nthIteration(n, false);
     if (!result) return null;
 
-    return this.constructor._resultToSolution(result, this._shape);
+    return this.constructor._gridToSolution(result.grid);
   }
 
   nthStep(n) {

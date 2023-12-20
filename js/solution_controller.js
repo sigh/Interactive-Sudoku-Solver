@@ -311,6 +311,8 @@ class SolutionContainer {
     this._listener = () => { };
   }
 
+  minSolution() { return 1; }
+
   setDone() {
     this._done = true;
     this._listener();
@@ -349,6 +351,10 @@ SolutionContainer.AllPossibilties = class extends SolutionContainer {
     this._pencilmarks = [];
   }
 
+  minSolution() {
+    return this.done() && this.count() == 1 ? 1 : 0;
+  }
+
   setDone() {
     for (let i = 0; i < this._pencilmarks.length; i++) {
       if (this._pencilmarks[i].size == 1) {
@@ -359,7 +365,6 @@ SolutionContainer.AllPossibilties = class extends SolutionContainer {
   }
 
   add(...solutions) {
-    super.add(...solutions);
     this._solutions.push(...solutions);
 
     if (this._pencilmarks.length == 0) {
@@ -370,6 +375,8 @@ SolutionContainer.AllPossibilties = class extends SolutionContainer {
         this._pencilmarks[i].add(solution[i]);
       }
     }
+
+    super.add(...solutions);
   }
 
   get(i) {
@@ -378,10 +385,57 @@ SolutionContainer.AllPossibilties = class extends SolutionContainer {
   }
 }
 
+SolutionContainer.AllSolutions = class extends SolutionContainer {
+  constructor(solver) {
+    super();
+    this._pending = null;
+    this._solver = solver;
+    this._targetCount = 2;
+  }
+
+  minSolution() { return 1; }
+
+  add(...solutions) {
+    this._solutions.push(...solutions);
+    super.add(...solutions);
+  }
+
+  _tryFetchMore() {
+    // We've already finished.
+    if (this._done) return;
+    // We are already waiting for results.
+    if (this._pending) return;
+    // If we've already reached the target count then return.
+    if (this.count() >= this._targetCount) return;
+
+    this._pending = this._solver.nthSolution(this._solutions.length).then(
+      solution => {
+        this._pending = null;
+        if (solution) {
+          this.add(solution);
+          if (this.count() < this._targetCount) {
+            this._tryFetchMore();
+          }
+        } else {
+          this.setDone();
+        }
+      });
+    return this._pending;
+  }
+
+  get(i) {
+    // Ensure we have at least one past the solution being asked for.
+    this._targetCount = i + 1;
+    this._tryFetchMore();
+
+    return super.get(i);
+  }
+}
+
 SolutionContainer.Counter = class extends SolutionContainer {
   add(...solutions) {
-    super.add(...solutions);
     this._solutions = [solutions.pop()];
+    super.add(...solutions);
   }
 
   get() {
@@ -416,7 +470,7 @@ class SolutionController {
     constraintManager.setUpdateCallback(this._update.bind(this));
 
     this._modeHandlers = {
-      'all-possibilities': this._runAllPossibilites,
+      'all-possibilities': this._runAllPossibilities,
       'solutions': this._runSolutionIterator,
       'count-solutions': this._runCounter,
       'step-by-step': this._runStepIterator,
@@ -706,62 +760,12 @@ class SolutionController {
   }
 
   async _runSolutionIterator(solver) {
-    let solutions = [];
-    let solutionNum = 1;
-    let done = false;
-
-    const nextSolution = async () => {
-      if (done) return;
-
-      let solution = await solver.nthSolution(solutions.length);
-
-      if (solution) {
-        solutions.push(solution);
-      } else {
-        done = true;
-      }
-    };
-
-    const update = () => {
-      this._solutionDisplay.setSolution(solutions[solutionNum - 1]);
-
-      this._elements.forward.disabled = (done && solutionNum >= solutions.length);
-      this._elements.back.disabled = (solutionNum == 1);
-      this._elements.start.disabled = (solutionNum == 1);
-      this._elements.stepOutput.textContent = solutionNum;
-    };
-
-    this._elements.forward.onclick = async () => {
-      solutionNum++;
-      // Always stay an extra step ahead so that we always know if there are
-      // more solutions.
-      if (solutions.length == solutionNum) {
-        await nextSolution();
-      }
-      update();
-    };
-    this._elements.back.onclick = () => {
-      solutionNum--;
-      update();
-    };
-    this._elements.start.onclick = () => {
-      solutionNum = 1;
-      update();
-    };
-
-    this._showIterationControls(true);
-
-    // Find the first solution.
-    await nextSolution();
-    update();
-
-    // Keep searching so that we can check if the solution is unique.
-    // (This is automatically elided if there are no solutions.
-    await nextSolution();
-    update();
+    let container = new SolutionContainer.AllSolutions(solver);
+    container._tryFetchMore();
+    this._iterateUsingSolutionContainer(container);
   }
 
-  async _runAllPossibilites(solver) {
+  async _runAllPossibilities(solver) {
     this._iterateUsingSolutionContainer(new SolutionContainer.AllPossibilties());
     await solver.solveAllPossibilities();
   }
@@ -769,18 +773,17 @@ class SolutionController {
   _iterateUsingSolutionContainer(solutions) {
     this._solutionContainer = solutions;
 
-    let minSolution = 0;
-    let solutionNum = 0;
+    let solutionNum = solutions.minSolution();
 
     const update = () => {
-      if (solutions.done() && solutions.count() == 1) {
-        minSolution = 1;
-        solutionNum = 1;
+      if (solutionNum < solutions.minSolution()) {
+        solutionNum = solutions.minSolution();
       }
 
       let solution = solutions.get(solutionNum);
       this._solutionDisplay.setSolutionNew(solution);
 
+      let minSolution = solutions.minSolution();
       this._elements.forward.disabled = (solutionNum >= solutions.count());
       this._elements.back.disabled = (solutionNum == minSolution);
       this._elements.start.disabled = (solutionNum == minSolution);
@@ -797,11 +800,12 @@ class SolutionController {
       update();
     };
     this._elements.start.onclick = () => {
-      solutionNum = minSolution;
+      solutionNum = solutions.minSolution();
       update();
     };
 
     this._showIterationControls(true);
+    update();
   }
 
   async _runCounter(solver) {
