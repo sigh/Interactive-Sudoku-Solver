@@ -212,15 +212,6 @@ class SolverStateDisplay {
 
   setState(state) {
     this._lazyUpdateState(state);
-
-    // Handle extra state.
-    // This must be handled as we see it because we only see each solution once.
-    let extra = state.extra;
-    if (!extra) return;
-
-    if (extra.solution || extra.pencilmarks) {
-      this._solutionDisplay.setSolution(extra.solution, extra.pencilmarks);
-    }
   }
 
   setStepStatus(status) {
@@ -304,8 +295,9 @@ class SolverStateDisplay {
   }
 }
 
-class SolutionContainer {
-  constructor() {
+class SolutionHandler {
+  constructor(solver) {
+    this._solver = solver;
     this._solutions = [];
     this._done = false;
     this._listener = () => { };
@@ -339,16 +331,14 @@ class SolutionContainer {
   }
 }
 
-SolutionContainer.Blackhole = class extends SolutionContainer {
-  add(...solutions) {
-    super.add(...solutions);
-  }
-}
-
-SolutionContainer.AllPossibilties = class extends SolutionContainer {
-  constructor() {
-    super();
+SolutionHandler.AllPossibilities = class extends SolutionHandler {
+  constructor(solver) {
+    super(solver);
     this._pencilmarks = [];
+  }
+
+  async run() {
+    await this._solver.solveAllPossibilities();
   }
 
   minSolution() {
@@ -385,15 +375,16 @@ SolutionContainer.AllPossibilties = class extends SolutionContainer {
   }
 }
 
-SolutionContainer.AllSolutions = class extends SolutionContainer {
+SolutionHandler.AllSolutions = class extends SolutionHandler {
   constructor(solver) {
-    super();
+    super(solver);
     this._pending = null;
-    this._solver = solver;
     this._targetCount = 2;
   }
 
-  minSolution() { return 1; }
+  async run() {
+    await this._tryFetchMore();
+  }
 
   add(...solutions) {
     this._solutions.push(...solutions);
@@ -432,10 +423,14 @@ SolutionContainer.AllSolutions = class extends SolutionContainer {
   }
 }
 
-SolutionContainer.Counter = class extends SolutionContainer {
+SolutionHandler.Counter = class extends SolutionHandler {
   add(...solutions) {
     this._solutions = [solutions.pop()];
     super.add(...solutions);
+  }
+
+  async run() {
+    await this._solver.countSolutions();
   }
 
   get() {
@@ -449,7 +444,7 @@ class SolutionController {
     // happen when we are waiting for a worker to initialize.
     this._solverPromises = [];
 
-    this._solutionContainer = new SolutionContainer.Blackhole();
+    this._solutionHandler = null;
 
     constraintManager.addReshapeListener(this);
 
@@ -644,7 +639,7 @@ class SolutionController {
     this._setValidateResult();
     this.debugOutput.clear();
     this._showIterationControls(false);
-    this._solutionContainer = new SolutionContainer.Blackhole();
+    this._solutionHandler = null;
   }
 
   async _solve(constraints) {
@@ -666,10 +661,11 @@ class SolutionController {
       constraints,
       s => {
         this._stateDisplay.setState(s);
+        if (!this._solutionHandler) return;
         if (s.extra && s.extra.solutionsToStore) {
-          this._solutionContainer.add(...s.extra.solutionsToStore);
+          this._solutionHandler.add(...s.extra.solutionsToStore);
         }
-        if (s.done) { this._solutionContainer.setDone(); }
+        if (s.done) { this._solutionHandler.setDone(); }
       },
       this._solveStatusChanged.bind(this),
       data => this.debugOutput.update(data));
@@ -760,36 +756,37 @@ class SolutionController {
   }
 
   async _runSolutionIterator(solver) {
-    let container = new SolutionContainer.AllSolutions(solver);
-    container._tryFetchMore();
-    this._iterateUsingSolutionContainer(container);
+    let handler = new SolutionHandler.AllSolutions(solver);
+    handler.run();
+    this._iterateOverSolutions(handler);
   }
 
   async _runAllPossibilities(solver) {
-    this._iterateUsingSolutionContainer(new SolutionContainer.AllPossibilties());
-    await solver.solveAllPossibilities();
+    let handler = new SolutionHandler.AllPossibilities(solver);
+    this._iterateOverSolutions(handler);
+    await handler.run();
   }
 
-  _iterateUsingSolutionContainer(solutions) {
-    this._solutionContainer = solutions;
+  _iterateOverSolutions(handler) {
+    this._solutionHandler = handler;
 
-    let solutionNum = solutions.minSolution();
+    let solutionNum = handler.minSolution();
 
     const update = () => {
-      if (solutionNum < solutions.minSolution()) {
-        solutionNum = solutions.minSolution();
+      if (solutionNum < handler.minSolution()) {
+        solutionNum = handler.minSolution();
       }
 
-      let solution = solutions.get(solutionNum);
+      let solution = handler.get(solutionNum);
       this._solutionDisplay.setSolutionNew(solution);
 
-      let minSolution = solutions.minSolution();
-      this._elements.forward.disabled = (solutionNum >= solutions.count());
+      let minSolution = handler.minSolution();
+      this._elements.forward.disabled = (solutionNum >= handler.count());
       this._elements.back.disabled = (solutionNum == minSolution);
       this._elements.start.disabled = (solutionNum == minSolution);
       this._elements.stepOutput.textContent = solutionNum;
     };
-    solutions.setUpdateListener(update);
+    handler.setUpdateListener(update);
 
     this._elements.forward.onclick = async () => {
       solutionNum++;
@@ -800,7 +797,7 @@ class SolutionController {
       update();
     };
     this._elements.start.onclick = () => {
-      solutionNum = solutions.minSolution();
+      solutionNum = handler.minSolution();
       update();
     };
 
@@ -809,10 +806,10 @@ class SolutionController {
   }
 
   async _runCounter(solver) {
-    this._solutionContainer = new SolutionContainer.Counter();
-    this._solutionContainer.setUpdateListener(() => {
-      this._solutionDisplay.setSolutionNew(this._solutionContainer.get());
+    this._solutionHandler = new SolutionHandler.Counter(solver);
+    this._solutionHandler.setUpdateListener(() => {
+      this._solutionDisplay.setSolutionNew(this._solutionHandler.get());
     });
-    await solver.countSolutions();
+    await this._solutionHandler.run();
   }
 }
