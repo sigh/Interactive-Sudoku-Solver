@@ -203,7 +203,7 @@ class SolutionDisplay extends DisplayItem {
   reshape(shape) {
     // This clears the solution, but importantly it overwrites any pending
     // setSolution calls.
-    this.setSolution();
+    this.setSolutionNew();
     super.reshape(shape);
   }
 

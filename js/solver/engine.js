@@ -41,7 +41,7 @@ class SudokuSolver {
     this._progressExtraStateFn = () => {
       let result = null;
       if (sampleSolution) {
-        result = { solution: sampleSolution };
+        result = { solutionsToStore: [sampleSolution] };
         sampleSolution = null;
       }
       return result;
@@ -51,7 +51,7 @@ class SudokuSolver {
       for (const result of this._getIter()) {
         // Only store a sample solution if we don't have one.
         if (sampleSolution == null) {
-          sampleSolution = this.constructor._resultToSolution(result, this._shape)
+          sampleSolution = this.constructor._gridToSolution(result.grid);
         }
       }
     });
@@ -115,7 +115,8 @@ class SudokuSolver {
     this._progressExtraStateFn = () => {
       if (!solutions.length) return null;
       return {
-        solutionsToStore: solutions.splice(0),
+        solutionsToStore: solutions.splice(0).map(
+          s => this.constructor._gridToSolution(s)),
       };
     };
 
@@ -187,6 +188,10 @@ class SudokuSolver {
       solution.push(shape.makeValueId(cell, values[cell]));
     }
     return solution;
+  }
+
+  static _gridToSolution(grid) {
+    return grid.map(value => LookupTables.toValue(value));
   }
 
   static _makePencilmarks(grid, shape, ignoreCells) {
@@ -677,9 +682,9 @@ SudokuSolver.InternalSolver = class {
   solveAllPossibilities(solutions, valuesInSolutions) {
     const counters = this.counters;
 
-    for (const solution of this.run()) {
-      solution.grid.forEach((c, i) => { valuesInSolutions[i] |= c; });
-      solutions.push(solution.grid.map(value => LookupTables.toValue(value)));
+    for (const result of this.run()) {
+      result.grid.forEach((c, i) => { valuesInSolutions[i] |= c; });
+      solutions.push(result.grid.slice(0));
 
       // Once we have 2 solutions, then start ignoring branches which maybe
       // duplicating existing solution (up to this point, every branch is
