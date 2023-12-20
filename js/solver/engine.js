@@ -75,9 +75,19 @@ class SudokuSolver {
     let result = this._nthIteration(n, true);
     if (!result) return null;
 
+    let pencilmarks = this.constructor._makePencilmarks(result.grid, this._shape);
+    for (const cell of result.cellOrder) {
+      pencilmarks[cell] = LookupTables.toValue(result.grid[cell]);
+    }
+
+    let latestCell = result.cellOrder.length ?
+      this._shape.makeCellIdFromIndex(
+        result.cellOrder[result.cellOrder.length - 1]) : null;
+
+
     return {
-      values: this.constructor._resultToSolution(result, this._shape),
-      pencilmarks: this.constructor._makePencilmarks(result.grid, this._shape, result.cellOrder),
+      pencilmarks: pencilmarks,
+      latestCell: latestCell,
       isSolution: result.isSolution,
       hasContradiction: result.hasContradiction,
     }
@@ -181,31 +191,21 @@ class SudokuSolver {
     return this._iter.iter;
   }
 
-  static _resultToSolution(result, shape) {
-    const values = result.grid.map(value => LookupTables.toValue(value))
-    let solution = [];
-    for (const cell of result.cellOrder) {
-      solution.push(shape.makeValueId(cell, values[cell]));
-    }
-    return solution;
-  }
-
   static _gridToSolution(grid) {
     return grid.map(value => LookupTables.toValue(value));
   }
 
-  static _makePencilmarks(grid, shape, ignoreCells) {
-    let ignoreSet = new Set(ignoreCells);
-
-    let pencilmarks = [];
+  static _makePencilmarks(grid, shape) {
+    let pencilmarks = new Array(shape.numCells);
     for (let i = 0; i < shape.numCells; i++) {
-      if (ignoreSet.has(i)) continue;
+      let s = new Set();
       let values = grid[i];
       while (values) {
         let value = values & -values;
-        pencilmarks.push(shape.makeValueId(i, LookupTables.toValue(value)));
         values &= ~value;
+        s.add(LookupTables.toValue(value));
       }
+      pencilmarks[i] = s;
     }
     return pencilmarks;
   }

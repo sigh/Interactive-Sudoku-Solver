@@ -197,7 +197,7 @@ class SolutionDisplay extends DisplayItem {
 
     this._applyGridOffset(svg);
 
-    this.setSolution = deferUntilAnimationFrame(this.setSolution.bind(this));
+    this.setSolutionNew = deferUntilAnimationFrame(this.setSolutionNew.bind(this));
   }
 
   reshape(shape) {
@@ -205,86 +205,6 @@ class SolutionDisplay extends DisplayItem {
     // setSolution calls.
     this.setSolutionNew();
     super.reshape(shape);
-  }
-
-  // Display solution on grid.
-  //  - If solution contains mutiple values for single cell, they will be shown
-  //    as pencil marks.
-  //  - Anything in pencilmarks will always be shown as pencil marks.
-  setSolution(solution, pencilmarks, rawSolution) {
-    pencilmarks = pencilmarks || [];
-    solution = solution || [];
-    this._solutionValues = [];
-
-    if (rawSolution) {
-      for (let c = 0; c < rawSolution.length; c++) {
-        if (rawSolution[c] instanceof Set) {
-          for (const v of rawSolution[c]) {
-            solution.push(this._shape.makeValueId(c, v));
-          }
-        } else {
-          solution.push(this._shape.makeValueId(c, rawSolution[c]));
-        }
-      }
-    }
-
-    // If we have no solution, just hide it instead.
-    // However, we wait a bit so that we don't fliker if the solution is updated
-    // again immediatly.
-    if (!solution.length && !pencilmarks.length) {
-      window.setTimeout(() => {
-        // Ensure there is still no solution.
-        if (this._solutionValues.length == 0) {
-          this._svg.classList.add('hidden-solution');
-        }
-      }, 10);
-      return;
-    }
-
-    clearDOMNode(this._svg);
-
-    let cellValues = new Map();
-    let pencilmarkCell = new Set();
-
-    const handleValue = (valueId) => {
-      let { cellId, value } = this._shape.parseValueId(valueId);
-      this._solutionValues.push(valueId);
-
-      if (!cellValues.has(cellId)) cellValues.set(cellId, []);
-      cellValues.get(cellId).push(value);
-      return cellId;
-    };
-    for (const valueId of solution) {
-      handleValue(valueId);
-    }
-    for (const valueId of pencilmarks) {
-      let cellId = handleValue(valueId);
-      pencilmarkCell.add(cellId);
-    }
-
-    for (const cellId of this._constraintManager.getFixedCells()) {
-      cellValues.delete(cellId);
-    }
-
-    const LINE_HEIGHT = this._shape.gridSize == SHAPE_9x9.gridSize ? 17 : 10;
-    const START_OFFSET = -DisplayItem.CELL_SIZE / 2 + 2;
-    for (const [cellId, values] of cellValues) {
-      const [x, y] = this.cellIdCenter(cellId);
-
-      if (values.length == 1 && !pencilmarkCell.has(cellId)) {
-        this._svg.append(this.makeTextNode(
-          values[0], x, y, 'solution-value'));
-      } else {
-        let offset = START_OFFSET;
-        for (const line of this._formatMultiSolution(values)) {
-          this._svg.append(this.makeTextNode(
-            line, x, y + offset, 'solution-multi-value'));
-          offset += LINE_HEIGHT;
-        }
-      }
-    }
-
-    this._svg.classList.remove('hidden-solution');
   }
 
   // Display solution on grid.
