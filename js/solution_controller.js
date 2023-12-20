@@ -378,6 +378,17 @@ SolutionContainer.AllPossibilties = class extends SolutionContainer {
   }
 }
 
+SolutionContainer.Counter = class extends SolutionContainer {
+  add(...solutions) {
+    super.add(...solutions);
+    this._solutions = [solutions.pop()];
+  }
+
+  get() {
+    return this._solutions[0];
+  }
+}
+
 class SolutionController {
   constructor(constraintManager, displayContainer) {
     // Solvers are a list in case we manage to start more than one. This can
@@ -551,7 +562,7 @@ class SolutionController {
   };
 
   async _update() {
-    this._solutionDisplay.setSolution([]);
+    this._solutionDisplay.setSolutionNew(null);
     let constraints = this._constraintManager.getConstraints();
     let mode = this._elements.mode.value;
     let auto = this._elements.autoSolve.checked;
@@ -574,7 +585,7 @@ class SolutionController {
   _resetSolver() {
     this._terminateSolver();
     this._stepHighlighter.setCells([]);
-    this._solutionDisplay.setSolution([]);
+    this._solutionDisplay.setSolutionNew(null);
     this._stateDisplay.clear();
     this._setValidateResult();
     this.debugOutput.clear();
@@ -794,6 +805,10 @@ class SolutionController {
   }
 
   async _runCounter(solver) {
+    this._solutionContainer = new SolutionContainer.Counter();
+    this._solutionContainer.setUpdateListener(() => {
+      this._solutionDisplay.setSolutionNew(this._solutionContainer.get());
+    });
     await solver.countSolutions();
   }
 }
