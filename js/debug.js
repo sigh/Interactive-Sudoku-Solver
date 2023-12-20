@@ -17,17 +17,15 @@ const getShortSolution = () => {
   return toShortSolution(...controller.getSolutionValues());
 };
 
-const toShortSolution = (valueIds, shape) => {
-  let result = new Array(valueIds.length);
+const toShortSolution = (solution, shape) => {
+  const baseCharCode = SudokuTextParser.SHAPE_TO_BASE_CHAR_CODE.get(shape);
   const DEFAULT_VALUE = '.';
+
+  let result = new Array(solution.length);
   result.fill(DEFAULT_VALUE);
 
-  const baseCharCode = SudokuTextParser.SHAPE_TO_BASE_CHAR_CODE.get(shape);
-
-  for (const valueId of valueIds) {
-    let { cell, value } = shape.parseValueId(valueId);
-    if (result[cell] != DEFAULT_VALUE) throw ('Too many solutions per cell.');
-    result[cell] = String.fromCharCode(baseCharCode + value - 1);
+  for (let i = 0; i < solution.length; i++) {
+    result[i] = String.fromCharCode(baseCharCode + solution[i] - 1);
   }
   return result.join('');
 }
@@ -111,7 +109,7 @@ const runFnWithChecks = async (puzzles, fn, onFailure) => {
 
     if (result !== undefined) {
       let shortSolution;
-      if (Array.isArray(result)) {
+      if (isIterable(result)) {
         shortSolution = toShortSolution(result, shape);
         solutions.push(shortSolution);
       } else {

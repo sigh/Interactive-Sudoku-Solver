@@ -295,7 +295,9 @@ class SolverStateDisplay {
   }
 }
 
-class SolutionHandler {
+class ModeHandler {
+  ITERATION_CONTROLS = false;
+
   constructor(solver) {
     this._solver = solver;
     this._solutions = [];
@@ -303,7 +305,7 @@ class SolutionHandler {
     this._listener = () => { };
   }
 
-  minSolution() { return 1; }
+  minIndex() { return 1; }
 
   setDone() {
     this._done = true;
@@ -331,7 +333,9 @@ class SolutionHandler {
   }
 }
 
-SolutionHandler.AllPossibilities = class extends SolutionHandler {
+ModeHandler.AllPossibilities = class extends ModeHandler {
+  ITERATION_CONTROLS = true;
+
   constructor(solver) {
     super(solver);
     this._pencilmarks = [];
@@ -341,7 +345,9 @@ SolutionHandler.AllPossibilities = class extends SolutionHandler {
     await this._solver.solveAllPossibilities();
   }
 
-  minSolution() {
+  minIndex() {
+    // If we are done, and there is only one solution, then don't bother
+    // showing the summary.
     return this.done() && this.count() == 1 ? 1 : 0;
   }
 
@@ -375,7 +381,9 @@ SolutionHandler.AllPossibilities = class extends SolutionHandler {
   }
 }
 
-SolutionHandler.AllSolutions = class extends SolutionHandler {
+ModeHandler.AllSolutions = class extends ModeHandler {
+  ITERATION_CONTROLS = true;
+
   constructor(solver) {
     super(solver);
     this._pending = null;
@@ -383,7 +391,7 @@ SolutionHandler.AllSolutions = class extends SolutionHandler {
   }
 
   async run() {
-    await this._tryFetchMore();
+    await this._fetchSolutions();
   }
 
   add(...solutions) {
@@ -391,39 +399,37 @@ SolutionHandler.AllSolutions = class extends SolutionHandler {
     super.add(...solutions);
   }
 
-  _tryFetchMore() {
-    // We've already finished.
-    if (this._done) return;
-    // We are already waiting for results.
-    if (this._pending) return;
-    // If we've already reached the target count then return.
-    if (this.count() >= this._targetCount) return;
+  async _fetchSolutions() {
+    while (!this.done()) {
+      // We are already waiting for results.
+      if (this._pending) return;
+      // If we've already reached the target count then return.
+      if (this.count() >= this._targetCount) return;
 
-    this._pending = this._solver.nthSolution(this._solutions.length).then(
-      solution => {
-        this._pending = null;
-        if (solution) {
-          this.add(solution);
-          if (this.count() < this._targetCount) {
-            this._tryFetchMore();
-          }
-        } else {
-          this.setDone();
-        }
-      });
-    return this._pending;
+      this._pending = this._solver.nthSolution(this.count());
+      const solution = await this._pending;
+      this._pending = null;
+
+      if (solution) {
+        this.add(solution);
+      } else {
+        this.setDone();
+      }
+    }
   }
 
   async get(i) {
     // Ensure we have at least one past the solution being asked for.
     this._targetCount = i + 1;
-    this._tryFetchMore();
+    this._fetchSolutions();
 
     return super.get(i);
   }
 }
 
-SolutionHandler.StepByStep = class extends SolutionHandler {
+ModeHandler.StepByStep = class extends ModeHandler {
+  ITERATION_CONTROLS = true;
+
   constructor(solver) {
     super(solver);
     this._pending = null;
@@ -432,7 +438,7 @@ SolutionHandler.StepByStep = class extends SolutionHandler {
 
   setDone() { }
 
-  minSolution() {
+  minIndex() {
     return 0;
   }
 
@@ -457,7 +463,7 @@ SolutionHandler.StepByStep = class extends SolutionHandler {
       pencilmarks: result.pencilmarks,
       stepStatus: stepStatus,
       latestCell: result.latestCell,
-    };
+    }
   }
 
   async get(i) {
@@ -466,7 +472,7 @@ SolutionHandler.StepByStep = class extends SolutionHandler {
   }
 }
 
-SolutionHandler.Counter = class extends SolutionHandler {
+ModeHandler.CountSolutions = class extends ModeHandler {
   add(...solutions) {
     this._solutions = [solutions.pop()];
     super.add(...solutions);
@@ -481,13 +487,33 @@ SolutionHandler.Counter = class extends SolutionHandler {
   }
 }
 
+ModeHandler.ValidateLayout = class extends ModeHandler {
+  constructor(solver) {
+    super(solver);
+    this._result = null;
+  }
+
+  async run() {
+    this._result = await this._solver.validateLayout();
+    this._listener();
+    return this._result;
+  }
+
+  async get() {
+    if (this._result === null) return null;
+    return {
+      validateResult: this._result ? 'Valid layout' : 'Invalid layout'
+    };
+  }
+}
+
 class SolutionController {
   constructor(constraintManager, displayContainer) {
     // Solvers are a list in case we manage to start more than one. This can
     // happen when we are waiting for a worker to initialize.
     this._solverPromises = [];
 
-    this._solutionHandler = null;
+    this._modeHandler = null;
 
     constraintManager.addReshapeListener(this);
 
@@ -682,7 +708,7 @@ class SolutionController {
     this._setValidateResult();
     this.debugOutput.clear();
     this._showIterationControls(false);
-    this._solutionHandler = null;
+    this._modeHandler = null;
   }
 
   async _solve(constraints) {
@@ -704,11 +730,11 @@ class SolutionController {
       constraints,
       s => {
         this._stateDisplay.setState(s);
-        if (!this._solutionHandler) return;
+        if (!this._modeHandler) return;
         if (s.extra && s.extra.solutionsToStore) {
-          this._solutionHandler.add(...s.extra.solutionsToStore);
+          this._modeHandler.add(...s.extra.solutionsToStore);
         }
-        if (s.done) { this._solutionHandler.setDone(); }
+        if (s.done) { this._modeHandler.setDone(); }
       },
       this._solveStatusChanged.bind(this),
       data => this.debugOutput.update(data));
@@ -747,82 +773,85 @@ class SolutionController {
   }
 
   async _runValidateLayout(solver) {
-    const result = await solver.validateLayout();
-    this._setValidateResult(result ? 'Valid layout' : 'Invalid layout');
+    const handler = new ModeHandler.ValidateLayout(solver);
+    handler.run();
+    this._iterateModeHandler(handler);
   }
 
   async _runStepIterator(solver) {
-    let handler = new SolutionHandler.StepByStep(solver);
+    const handler = new ModeHandler.StepByStep(solver);
     handler.run();
-    this._iterateOverSolutions(handler);
+    this._iterateModeHandler(handler);
   }
 
   async _runSolutionIterator(solver) {
-    let handler = new SolutionHandler.AllSolutions(solver);
+    let handler = new ModeHandler.AllSolutions(solver);
     handler.run();
-    this._iterateOverSolutions(handler);
+    this._iterateModeHandler(handler);
   }
 
   async _runAllPossibilities(solver) {
-    let handler = new SolutionHandler.AllPossibilities(solver);
-    this._iterateOverSolutions(handler);
+    let handler = new ModeHandler.AllPossibilities(solver);
+    this._iterateModeHandler(handler);
     await handler.run();
   }
 
-  _iterateOverSolutions(handler) {
-    this._solutionHandler = handler;
+  _iterateModeHandler(handler) {
+    this._modeHandler = handler;
 
-    let solutionNum = handler.minSolution();
+    let index = handler.minIndex();
 
     const update = async () => {
-      if (solutionNum < handler.minSolution()) {
-        solutionNum = handler.minSolution();
+      if (index < handler.minIndex()) {
+        index = handler.minIndex();
       }
 
-      let result = await handler.get(solutionNum);
-      if (isObject(result)) {
+      let result = await handler.get(index);
+      if (!result || isIterable(result)) {
+        this._solutionDisplay.setSolutionNew(result);
+      } else if (result) {
         // If result is an object, then it is a step result.
         this._solutionDisplay.setSolutionNew(result.pencilmarks);
         this._stateDisplay.setStepStatus(result.stepStatus);
+        this._setValidateResult(result.validateResult);
         if (result.latestCell) {
           this._stepHighlighter.setCells([result.latestCell]);
         } else {
           this._stepHighlighter.setCells([]);
         }
-      } else {
-        this._solutionDisplay.setSolutionNew(result);
       }
 
-      let minSolution = handler.minSolution();
-      this._elements.forward.disabled = (solutionNum >= handler.count());
-      this._elements.back.disabled = (solutionNum == minSolution);
-      this._elements.start.disabled = (solutionNum == minSolution);
-      this._elements.stepOutput.textContent = solutionNum;
+      let minIndex = handler.minIndex();
+      this._elements.forward.disabled = (index >= handler.count());
+      this._elements.back.disabled = (index == minIndex);
+      this._elements.start.disabled = (index == minIndex);
+      this._elements.stepOutput.textContent = index;
     };
     handler.setUpdateListener(update);
 
-    this._elements.forward.onclick = async () => {
-      solutionNum++;
-      update();
-    };
-    this._elements.back.onclick = () => {
-      solutionNum--;
-      update();
-    };
-    this._elements.start.onclick = () => {
-      solutionNum = handler.minSolution();
-      update();
-    };
+    if (handler.ITERATION_CONTROLS) {
+      this._elements.forward.onclick = async () => {
+        index++;
+        update();
+      };
+      this._elements.back.onclick = () => {
+        index--;
+        update();
+      };
+      this._elements.start.onclick = () => {
+        index = handler.minIndex();
+        update();
+      };
 
-    this._showIterationControls(true);
+      this._showIterationControls(true);
+    }
+
     update();
   }
 
   async _runCounter(solver) {
-    this._solutionHandler = new SolutionHandler.Counter(solver);
-    this._solutionHandler.setUpdateListener(async () => {
-      this._solutionDisplay.setSolutionNew(await this._solutionHandler.get());
-    });
-    await this._solutionHandler.run();
+    let handler = new ModeHandler.CountSolutions(solver);
+    this._iterateModeHandler(handler);
+    handler.run();
   }
 }
