@@ -84,7 +84,7 @@ body {
   margin: 15px 0;
 }
 
-#stats-buttons {
+#state-buttons {
   display: flex;
   gap: 15px;
   margin: 5px 0;
@@ -129,14 +129,14 @@ button.danger-button:hover:enabled {
   background-color: #bc3315;
 }
 
-#stats-buttons button {
+#state-buttons button {
   height: 30px;
   width: 30px;
   padding: 5px 5px;
   margin: 0px 0px;
 }
 
-#stats-buttons button>img {
+#state-buttons button>img {
   height: 20px;
   width: 20px;
   filter: invert(1);
@@ -663,4 +663,30 @@ h2 {
   font-size: 18px;
   font-weight: normal;
   margin: 0;
+}
+
+#stats-container {
+  border: none;
+  width: 500px;
+
+  padding: 5px;
+  box-shadow: #00000029 2px 2px 5px 2px;
+  border-radius: 10px;
+}
+
+#stats-container button {
+  height: 20px;
+  width: 20px;
+  padding: 0;
+  margin: 0;
+}
+
+#stats-header {
+  height: 20px;
+  padding: 5px;
+  border-radius: 5px;
+  background: lightgrey;
+
+  display: flex;
+  justify-content: space-between;
 }
