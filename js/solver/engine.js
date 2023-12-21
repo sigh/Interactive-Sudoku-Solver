@@ -41,7 +41,7 @@ class SudokuSolver {
     this._progressExtraStateFn = () => {
       let result = null;
       if (sampleSolution) {
-        result = { solutionsToStore: [sampleSolution] };
+        result = { solutions: [sampleSolution] };
         sampleSolution = null;
       }
       return result;
@@ -125,7 +125,7 @@ class SudokuSolver {
     this._progressExtraStateFn = () => {
       if (!solutions.length) return null;
       return {
-        solutionsToStore: solutions.splice(0).map(
+        solutions: solutions.splice(0).map(
           s => this.constructor._gridToSolution(s)),
       };
     };
