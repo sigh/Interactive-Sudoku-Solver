@@ -208,3 +208,8 @@ const clearDOMNode = (node) => {
 function isIterable(obj) {
   return typeof obj[Symbol.iterator] === 'function';
 }
+
+function localTimestamp() {
+  const tzoffset = (new Date()).getTimezoneOffset() * 60000; //offset in milliseconds
+  return (new Date(Date.now() - tzoffset)).toISOString().slice(0, -1);
+}

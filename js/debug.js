@@ -13,23 +13,6 @@ const loadInput = (input) => {
   constraintManager.loadFromText(input);
 }
 
-const getShortSolution = () => {
-  return toShortSolution(...controller.getSolutionValues());
-};
-
-const toShortSolution = (solution, shape) => {
-  const baseCharCode = SudokuTextParser.SHAPE_TO_BASE_CHAR_CODE.get(shape);
-  const DEFAULT_VALUE = '.';
-
-  let result = new Array(solution.length);
-  result.fill(DEFAULT_VALUE);
-
-  for (let i = 0; i < solution.length; i++) {
-    result[i] = String.fromCharCode(baseCharCode + solution[i] - 1);
-  }
-  return result.join('');
-}
-
 const puzzleFromCfg = (puzzleCfg) => {
   let puzzleStr, solution, name = '';
   if (Array.isArray(puzzleCfg)) {
