@@ -297,6 +297,7 @@ class SolverStateDisplay {
 
 class ModeHandler {
   ITERATION_CONTROLS = false;
+  ALLOW_DOWNLOAD = false;
 
   constructor() {
     this._solver = null;
@@ -332,6 +333,10 @@ class ModeHandler {
     return this._solutions[i - 1];
   }
 
+  solutions() {
+    return Array.from(this._solutions);
+  }
+
   setUpdateListener(fn) {
     this._listener = fn;
   }
@@ -339,6 +344,7 @@ class ModeHandler {
 
 ModeHandler.AllPossibilities = class extends ModeHandler {
   ITERATION_CONTROLS = true;
+  ALLOW_DOWNLOAD = true;
 
   constructor() {
     super();
@@ -388,6 +394,7 @@ ModeHandler.AllPossibilities = class extends ModeHandler {
 
 ModeHandler.AllSolutions = class extends ModeHandler {
   ITERATION_CONTROLS = true;
+  ALLOW_DOWNLOAD = true;
 
   constructor() {
     super();
@@ -531,6 +538,7 @@ class SolutionController {
 
     this._currentModeHandler = null;
 
+    this._shape = null;
     constraintManager.addReshapeListener(this);
 
     this._solutionDisplay = new SolutionDisplay(
@@ -572,6 +580,7 @@ class SolutionController {
       solve: document.getElementById('solve-button'),
       validate: document.getElementById('validate-layout-button'),
       autoSolve: document.getElementById('auto-solve-input'),
+      download: document.getElementById('download-button'),
     }
 
     this._elements.mode.onchange = () => this._update();
@@ -597,14 +606,11 @@ class SolutionController {
     this._update();
   }
 
-  reshape() {
+  reshape(shape) {
     // Terminate any runnings solvers ASAP, so they are less
     // likely to cause problems sending stale data.
+    this._shape = shape;
     this._terminateSolver();
-  }
-
-  getSolutionValues() {
-    return this._solutionDisplay.getSolutionValues();
   }
 
   _setUpAutoSolve() {
@@ -697,7 +703,7 @@ class SolutionController {
   };
 
   async _update() {
-    this._solutionDisplay.setSolutionNew(null);
+    this._solutionDisplay.setSolution(null);
     let constraints = this._constraintManager.getConstraints();
     let mode = this._elements.mode.value;
     let auto = this._elements.autoSolve.checked;
@@ -720,7 +726,7 @@ class SolutionController {
   _resetSolver() {
     this._terminateSolver();
     this._stepHighlighter.setCells([]);
-    this._solutionDisplay.setSolutionNew(null);
+    this._solutionDisplay.setSolution(null);
     this._stateDisplay.clear();
     this._setValidateResult();
     this.debugOutput.clear();
@@ -801,10 +807,10 @@ class SolutionController {
 
       let result = await handler.get(index);
       if (!result || isIterable(result)) {
-        this._solutionDisplay.setSolutionNew(result);
+        this._solutionDisplay.setSolution(result);
       } else if (result) {
         // If result is an object, then it is a step result.
-        this._solutionDisplay.setSolutionNew(result.pencilmarks);
+        this._solutionDisplay.setSolution(result.pencilmarks);
         this._stateDisplay.setStepStatus(result.stepStatus);
         this._setValidateResult(result.validateResult);
         if (result.latestCell) {
@@ -853,6 +859,29 @@ class SolutionController {
       this._showIterationControls(true);
     }
 
+    this._elements.download.disabled = !handler.ALLOW_DOWNLOAD;
+    if (handler.ALLOW_DOWNLOAD) {
+      this._elements.download.onclick = () => {
+        const solutions = handler.solutions();
+        this._downloadSolutionFile(solutions);
+      }
+    }
+
     update();
+  }
+
+  _downloadSolutionFile(solutions) {
+    // Create the object URL.
+    const text = solutions.map(s => toShortSolution(s, this._shape)).join('\n');
+    const blob = new Blob([text], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+
+    // Create a dummy element and click it.
+    const elem = window.document.createElement('a');
+    elem.href = url;
+    elem.download = `sudoku-iss-solutions-${localTimestamp()}.txt`;
+    document.body.appendChild(elem);
+    elem.click();
+    document.body.removeChild(elem);
   }
 }

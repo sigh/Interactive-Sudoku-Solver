@@ -192,27 +192,32 @@ class InfoTextDisplay extends DisplayItem {
 class SolutionDisplay extends DisplayItem {
   constructor(constraintManager, svg) {
     super(svg);
-    this._solutionValues = [];
+    this._currentSolution = [];
     this._constraintManager = constraintManager;
 
     this._applyGridOffset(svg);
 
-    this.setSolutionNew = deferUntilAnimationFrame(this.setSolutionNew.bind(this));
+    this.setSolution = deferUntilAnimationFrame(this.setSolution.bind(this));
+    this._copyElem = document.getElementById('copy-button');
+    this._copyElem.onclick = () => {
+      const solutionText = toShortSolution(this._currentSolution, this._shape);
+      navigator.clipboard.writeText(solutionText);
+    };
   }
 
   reshape(shape) {
     // This clears the solution, but importantly it overwrites any pending
     // setSolution calls.
-    this.setSolutionNew();
+    this.setSolution();
     super.reshape(shape);
   }
 
   // Display solution on grid.
   //  - If solution cell contains a container then it will be displayed as
   //    pencilmarks.
-  setSolutionNew(solution) {
+  setSolution(solution) {
     solution = solution || [];
-    this._solutionValues = [];
+    this._currentSolution = solution.slice();
 
     // If we have no solution, just hide it instead.
     // However, we wait a bit so that we don't flicker if the solution is updated
@@ -220,8 +225,9 @@ class SolutionDisplay extends DisplayItem {
     if (!solution.length) {
       window.setTimeout(() => {
         // Ensure there is still no solution.
-        if (this._solutionValues.length == 0) {
+        if (this._currentSolution.length == 0) {
           this._svg.classList.add('hidden-solution');
+          this._copyElem.disabled = true;
         }
       }, 10);
       return;
@@ -247,15 +253,13 @@ class SolutionDisplay extends DisplayItem {
             line, x, y + offset, 'solution-multi-value'));
           offset += LINE_HEIGHT;
         }
-        for (const v of value) {
-          this._solutionValues.push(this._shape.makeValueId(i, v));
-        }
       } else if (value) {
         this._svg.append(this.makeTextNode(
           value, x, y, 'solution-value'));
-        this._solutionValues.push(this._shape.makeValueId(i, value));
       }
     }
+
+    this._copyElem.disabled = !solution.every((v) => v && isFinite(v));
 
     this._svg.classList.remove('hidden-solution');
   }
@@ -287,10 +291,6 @@ class SolutionDisplay extends DisplayItem {
       slots[v * 2 - 2] = v;
     }
     return slots.join('').split(/\n/);
-  }
-
-  getSolutionValues() {
-    return [this._solutionValues, this._shape];
   }
 }
 

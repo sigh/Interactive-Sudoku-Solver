@@ -44,11 +44,12 @@ class GridShape {
 
   cellIndex = (row, col) => {
     return row * this.gridSize + col;
-  };
+  }
 
   splitCellIndex = (cell) => {
     return [cell / this.gridSize | 0, cell % this.gridSize | 0];
-  };
+  }
+
   parseValueId = (valueId) => {
     let cellId = valueId.substr(0, 4);
     return {
@@ -56,7 +57,7 @@ class GridShape {
       cellId: cellId,
       ...this.parseCellId(cellId),
     };
-  };
+  }
 
   parseCellId = (cellId) => {
     let row = parseInt(cellId[1], this._valueBase) - 1;
@@ -66,7 +67,7 @@ class GridShape {
       row: row,
       col: col,
     };
-  };
+  }
 }
 
 const SHAPE_9x9 = new GridShape(9, 3);
@@ -1173,3 +1174,16 @@ class SolverProxy {
     return this._worker === null;
   }
 };
+
+const toShortSolution = (solution, shape) => {
+  const baseCharCode = SudokuTextParser.SHAPE_TO_BASE_CHAR_CODE.get(shape);
+  const DEFAULT_VALUE = '.';
+
+  let result = new Array(solution.length);
+  result.fill(DEFAULT_VALUE);
+
+  for (let i = 0; i < solution.length; i++) {
+    result[i] = String.fromCharCode(baseCharCode + solution[i] - 1);
+  }
+  return result.join('');
+}

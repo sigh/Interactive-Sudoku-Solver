@@ -84,6 +84,12 @@ body {
   margin: 15px 0;
 }
 
+#download {
+  display: flex;
+  gap: 15px;
+  margin: 5px 0;
+}
+
 button {
   font-size: 16px;
   border-radius: 5px;
@@ -121,6 +127,19 @@ button.danger-button {
 button.danger-button:hover:enabled {
   background: linear-gradient(to bottom, #bc3315 5%, #d0451b 100%);
   background-color: #bc3315;
+}
+
+#download button {
+  height: 30px;
+  width: 30px;
+  padding: 5px 5px;
+  margin: 0px 0px;
+}
+
+#download button>img {
+  height: 20px;
+  width: 20px;
+  filter: invert(1);
 }
 
 .selected-cell {
