@@ -160,6 +160,117 @@ class DebugOutput {
   }
 }
 
+class StateHistoryDisplay {
+  CHART_HEIGHT = 200;
+  CHART_WIDTH = 300;
+
+  constructor() {
+    this._states = [];
+    this._statsContainer = null;
+
+    this._setUpChartButton();
+    this._charts = [];
+  }
+
+  add(state) {
+    this._states.push({
+      timeMs: state.timeMs / 1000,
+      guesses: state.counters.guesses,
+      solutions: state.counters.solutions,
+    });
+    this._updateCharts();
+  }
+
+  _updateCharts() {
+    if (!this._statsContainer || !this._statsContainer.open) {
+      return;
+    }
+
+    for (const chart of this._charts) {
+      chart.update('none');
+    }
+  }
+
+  clear() {
+    this._states.length = 0;
+  }
+
+  _setUpChartButton() {
+    const button = document.getElementById('chart-button');
+    button.onclick = () => {
+      this._loadStatsContainer();
+      this.constructor._openAndPositionDialog(this._statsContainer);
+      this._updateCharts();
+    };
+    button.disabled = false;
+  }
+
+  static _openAndPositionDialog(dialog) {
+    dialog.style.top = ((window.innerHeight / 2) - (dialog.offsetHeight / 2)) + 'px';
+    dialog.style.left = ((window.innerWidth / 2) - (dialog.offsetWidth / 2)) + 'px';
+    dialog.show();
+  }
+
+  async _loadStatsContainer() {
+    if (this._statsContainer) return;
+
+    this._statsContainer = document.getElementById('stats-container');
+    await dynamicJSFileLoader('lib/chart.umd.min.js')();
+
+    this._setUpStatsWindow(this._statsContainer);
+
+    const chartContainer = document.createElement('div');
+    chartContainer.style.height = this.CHART_HEIGHT;
+
+    const ctx = document.createElement('canvas');
+    chartContainer.appendChild(ctx);
+    this._statsContainer.appendChild(chartContainer);
+    this._charts.push(this._makeChart(ctx, 'solutions'));
+  }
+
+  _setUpStatsWindow(container) {
+    document.getElementById('chart-close-button').onclick = () => {
+      container.close();
+    }
+  }
+
+  _makeChart(ctx, yAxis) {
+    const options = {
+      responsive: true,
+      maintainAspectRatio: false,
+      pointRadius: 0,
+      parsing: {
+        xAxisKey: 'timeMs',
+        yAxisKey: yAxis,
+      },
+      scales: {
+        x: {
+          type: 'linear',
+          grace: 0,
+          beginAtZero: true,
+        }
+      },
+      plugins: {
+        legend: {
+          display: false,
+        }
+      }
+    };
+    const data = {
+      datasets: [{
+        data: this._states
+      }],
+    };
+    const config = {
+      type: 'line',
+      data: data,
+      options: options,
+    };
+
+    return new Chart(ctx, config);
+  }
+}
+
 class SolverStateDisplay {
   constructor(solutionDisplay) {
     this._solutionDisplay = solutionDisplay;
@@ -175,6 +286,7 @@ class SolverStateDisplay {
     };
 
     this._setUpStateOutput();
+    this._stateHistory = new StateHistoryDisplay();
 
     this._lazyUpdateState = deferUntilAnimationFrame(
       this._lazyUpdateState.bind(this));
@@ -184,6 +296,8 @@ class SolverStateDisplay {
     this._displayStateVariables(state);
 
     this._updateProgressBar(state);
+
+    this._stateHistory.add(state);
   }
 
   _METHOD_TO_STATUS = {
@@ -227,6 +341,7 @@ class SolverStateDisplay {
     this.setSolveStatus(false, '');
     this._elements.solveStatus.textContent = '';
     this._elements.stepStatus.textContent = '';
+    this._stateHistory.clear();
   }
 
   _displayStateVariables(state) {
