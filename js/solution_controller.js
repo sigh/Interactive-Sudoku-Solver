@@ -298,11 +298,15 @@ class SolverStateDisplay {
 class ModeHandler {
   ITERATION_CONTROLS = false;
 
-  constructor(solver) {
-    this._solver = solver;
+  constructor() {
+    this._solver = null;
     this._solutions = [];
     this._done = false;
     this._listener = () => { };
+  }
+
+  async run(solver) {
+    this._solver = solver;
   }
 
   minIndex() { return 1; }
@@ -336,12 +340,13 @@ class ModeHandler {
 ModeHandler.AllPossibilities = class extends ModeHandler {
   ITERATION_CONTROLS = true;
 
-  constructor(solver) {
-    super(solver);
+  constructor() {
+    super();
     this._pencilmarks = [];
   }
 
-  async run() {
+  async run(solver) {
+    await super.run(solver);
     await this._solver.solveAllPossibilities();
   }
 
@@ -384,13 +389,14 @@ ModeHandler.AllPossibilities = class extends ModeHandler {
 ModeHandler.AllSolutions = class extends ModeHandler {
   ITERATION_CONTROLS = true;
 
-  constructor(solver) {
-    super(solver);
+  constructor() {
+    super();
     this._pending = null;
     this._targetCount = 2;
   }
 
-  async run() {
+  async run(solver) {
+    super.run(solver);
     await this._fetchSolutions();
   }
 
@@ -430,8 +436,8 @@ ModeHandler.AllSolutions = class extends ModeHandler {
 ModeHandler.StepByStep = class extends ModeHandler {
   ITERATION_CONTROLS = true;
 
-  constructor(solver) {
-    super(solver);
+  constructor() {
+    super();
     this._pending = null;
     this._numSteps = Infinity;
   }
@@ -442,7 +448,9 @@ ModeHandler.StepByStep = class extends ModeHandler {
     return 0;
   }
 
-  async run() { }
+  async run(solver) {
+    await super.run(solver);
+  }
 
   count() {
     return this._numSteps;
@@ -478,7 +486,8 @@ ModeHandler.CountSolutions = class extends ModeHandler {
     super.add(...solutions);
   }
 
-  async run() {
+  async run(solver) {
+    await super.run(solver);
     await this._solver.countSolutions();
   }
 
@@ -488,12 +497,13 @@ ModeHandler.CountSolutions = class extends ModeHandler {
 }
 
 ModeHandler.ValidateLayout = class extends ModeHandler {
-  constructor(solver) {
-    super(solver);
+  constructor() {
+    super();
     this._result = null;
   }
 
-  async run() {
+  async run(solver) {
+    await super.run(solver);
     this._result = await this._solver.validateLayout();
     this._listener();
     return this._result;
@@ -513,7 +523,7 @@ class SolutionController {
     // happen when we are waiting for a worker to initialize.
     this._solverPromises = [];
 
-    this._modeHandler = null;
+    this._currentModeHandler = null;
 
     constraintManager.addReshapeListener(this);
 
@@ -534,11 +544,11 @@ class SolutionController {
     constraintManager.setUpdateCallback(this._update.bind(this));
 
     this._modeHandlers = {
-      'all-possibilities': this._runAllPossibilities,
-      'solutions': this._runSolutionIterator,
-      'count-solutions': this._runCounter,
-      'step-by-step': this._runStepIterator,
-      'validate-layout': this._runValidateLayout,
+      'all-possibilities': ModeHandler.AllPossibilities,
+      'solutions': ModeHandler.AllSolutions,
+      'count-solutions': ModeHandler.CountSolutions,
+      'step-by-step': ModeHandler.StepByStep,
+      'validate-layout': ModeHandler.ValidateLayout,
     };
 
     this._elements = {
@@ -708,7 +718,7 @@ class SolutionController {
     this._setValidateResult();
     this.debugOutput.clear();
     this._showIterationControls(false);
-    this._modeHandler = null;
+    this._currentModeHandler = null;
   }
 
   async _solve(constraints) {
@@ -726,15 +736,16 @@ class SolutionController {
 
     this._resetSolver();
 
+    const handler = new this._modeHandlers[mode]();
+
     const newSolverPromise = SudokuBuilder.buildInWorker(
       constraints,
       s => {
         this._stateDisplay.setState(s);
-        if (!this._modeHandler) return;
-        if (s.extra && s.extra.solutionsToStore) {
-          this._modeHandler.add(...s.extra.solutionsToStore);
+        if (s.extra && s.extra.solutions) {
+          handler.add(...s.extra.solutions);
         }
-        if (s.done) { this._modeHandler.setDone(); }
+        if (s.done) { handler.setDone(); }
       },
       this._solveStatusChanged.bind(this),
       data => this.debugOutput.update(data));
@@ -744,14 +755,9 @@ class SolutionController {
 
     if (newSolver.isTerminated()) return;
 
-    const handler = this._modeHandlers[mode].bind(this);
-
-    handler(newSolver)
-      .catch(e => {
-        if (!e.toString().startsWith('Aborted')) {
-          throw (e);
-        }
-      });
+    // Run the handler.
+    this._currentModeHandler = handler;
+    this._runModeHandler(handler, newSolver);
   }
 
   _setValidateResult(text) {
@@ -772,32 +778,8 @@ class SolutionController {
     }
   }
 
-  async _runValidateLayout(solver) {
-    const handler = new ModeHandler.ValidateLayout(solver);
-    handler.run();
-    this._iterateModeHandler(handler);
-  }
-
-  async _runStepIterator(solver) {
-    const handler = new ModeHandler.StepByStep(solver);
-    handler.run();
-    this._iterateModeHandler(handler);
-  }
-
-  async _runSolutionIterator(solver) {
-    let handler = new ModeHandler.AllSolutions(solver);
-    handler.run();
-    this._iterateModeHandler(handler);
-  }
-
-  async _runAllPossibilities(solver) {
-    let handler = new ModeHandler.AllPossibilities(solver);
-    this._iterateModeHandler(handler);
-    await handler.run();
-  }
-
-  _iterateModeHandler(handler) {
-    this._modeHandler = handler;
+  _runModeHandler(handler, solver) {
+    handler.run(solver);
 
     let index = handler.minIndex();
 
@@ -821,11 +803,13 @@ class SolutionController {
         }
       }
 
-      let minIndex = handler.minIndex();
-      this._elements.forward.disabled = (index >= handler.count());
-      this._elements.back.disabled = (index == minIndex);
-      this._elements.start.disabled = (index == minIndex);
-      this._elements.stepOutput.textContent = index;
+      if (handler.ITERATION_CONTROLS) {
+        let minIndex = handler.minIndex();
+        this._elements.forward.disabled = (index >= handler.count());
+        this._elements.back.disabled = (index == minIndex);
+        this._elements.start.disabled = (index == minIndex);
+        this._elements.stepOutput.textContent = index;
+      }
     };
     handler.setUpdateListener(update);
 
@@ -847,11 +831,5 @@ class SolutionController {
     }
 
     update();
-  }
-
-  async _runCounter(solver) {
-    let handler = new ModeHandler.CountSolutions(solver);
-    this._iterateModeHandler(handler);
-    handler.run();
   }
 }
