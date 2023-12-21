@@ -439,7 +439,7 @@ ModeHandler.StepByStep = class extends ModeHandler {
   constructor() {
     super();
     this._pending = null;
-    this._numSteps = Infinity;
+    this._numSteps = 0;
   }
 
   setDone() { }
@@ -467,6 +467,10 @@ ModeHandler.StepByStep = class extends ModeHandler {
     }
     let stepStatus = result.isSolution ? 'Solution' :
       result.hasContradiction ? 'Conflict' : null;
+    // Update numSteps if we have a new max.
+    if (i + 1 > this._numSteps) {
+      this._numSteps = i + 1;
+    }
     return {
       pencilmarks: result.pencilmarks,
       stepStatus: stepStatus,
@@ -475,8 +479,10 @@ ModeHandler.StepByStep = class extends ModeHandler {
   }
 
   async get(i) {
-    return this._solver.nthStep(i).then(
-      (result) => this._handleStep(i, result));
+    this._pending = this._solver.nthStep(i);
+    const result = await this._pending;
+    this._pending = null;
+    return this._handleStep(i, result);
   }
 }
 
@@ -553,6 +559,7 @@ class SolutionController {
 
     this._elements = {
       start: document.getElementById('solution-start'),
+      end: document.getElementById('solution-end'),
       forward: document.getElementById('solution-forward'),
       back: document.getElementById('solution-back'),
       control: document.getElementById('solution-control-panel'),
@@ -772,6 +779,7 @@ class SolutionController {
       this._elements.stop.disabled = false;
       this._elements.start.disabled = true;
       this._elements.forward.disabled = true;
+      this._elements.end.disabled = true;
       this._elements.back.disabled = true;
     } else {
       this._elements.stop.disabled = true;
@@ -782,9 +790,12 @@ class SolutionController {
     handler.run(solver);
 
     let index = handler.minIndex();
+    let follow = false;
 
     const update = async () => {
-      if (index < handler.minIndex()) {
+      if (follow) {
+        index = handler.count();
+      } else if (index < handler.minIndex()) {
         index = handler.minIndex();
       }
 
@@ -808,7 +819,12 @@ class SolutionController {
         this._elements.forward.disabled = (index >= handler.count());
         this._elements.back.disabled = (index == minIndex);
         this._elements.start.disabled = (index == minIndex);
+        this._elements.end.disabled = (index >= handler.count());
         this._elements.stepOutput.textContent = index;
+      }
+
+      if (follow && handler.count() > index) {
+        update();
       }
     };
     handler.setUpdateListener(update);
@@ -816,14 +832,21 @@ class SolutionController {
     if (handler.ITERATION_CONTROLS) {
       this._elements.forward.onclick = async () => {
         index++;
+        follow = false;
         update();
       };
       this._elements.back.onclick = () => {
         index--;
+        follow = false;
         update();
       };
       this._elements.start.onclick = () => {
         index = handler.minIndex();
+        follow = false;
+        update();
+      };
+      this._elements.end.onclick = () => {
+        follow = true;
         update();
       };
 
