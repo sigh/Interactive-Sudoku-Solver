@@ -263,7 +263,14 @@ textarea {
 #solution-control-panel {
   display: flex;
   align-items: center;
-  gap: 15px;
+  gap: 2px;
+  flex-direction: column;
+}
+
+#solution-control-buttons {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 button.icon-button {
@@ -273,6 +280,11 @@ button.icon-button {
   font-weight: bold;
   padding: 0px;
 }
+
+#solution-control-buttons button.icon-button {
+  height: 35px;
+}
+
 
 #solution-step-output {
   display: inline-block;
