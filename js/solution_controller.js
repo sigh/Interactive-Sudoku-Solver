@@ -162,7 +162,9 @@ class DebugOutput {
 
 class StateHistoryDisplay {
   CHART_HEIGHT = 200;
-  CHART_WIDTH = 300;
+  CONTAINER_WIDTH = 600;
+  AXIS_WIDTH = 50;
+  MAX_NUM_STATES = 1000;
 
   constructor() {
     this._states = [];
@@ -181,7 +183,32 @@ class StateHistoryDisplay {
       constraintsProcessed: state.counters.constraintsProcessed,
       solutions: state.counters.solutions,
     });
+    this._compressStates(this._states);
     this._updateCharts();
+  }
+
+  _compressStates(states) {
+    if (states.length <= this.MAX_NUM_STATES) return;
+
+    // Figure out the minimum time delta between states.
+    const targetCount = this.MAX_NUM_STATES / 2;
+    const deltaT = states[states.length - 1].timeMs / targetCount;
+
+    // Remove states which are too close together.
+    let j = 0;
+    let nextT = 0;
+    for (let i = 0; i < states.length - 1; i++) {
+      const state = states[i];
+      if (state.timeMs >= nextT) {
+        nextT = state.timeMs + deltaT;
+        states[j++] = state;
+      }
+    }
+    // Always include the last state.
+    states[j++] = states[states.length - 1];
+
+    // Truncate the states.
+    states.length = j;
   }
 
   _updateCharts() {
@@ -231,6 +258,7 @@ class StateHistoryDisplay {
     document.getElementById('chart-close-button').onclick = () => {
       container.close();
     }
+    container.style.width = this.CONTAINER_WIDTH + 'px';
   }
 
   _addChartDisplay(container, yAxis) {
@@ -271,7 +299,7 @@ class StateHistoryDisplay {
           },
         },
         y: {
-          afterFit: (axis) => { axis.width = 50; },
+          afterFit: (axis) => { axis.width = this.AXIS_WIDTH; },
           ticks: {
             font: { size: 10 },
             callback: formatNumberMetric,
@@ -286,7 +314,8 @@ class StateHistoryDisplay {
     };
     const data = {
       datasets: [{
-        data: this._states
+        data: this._states,
+        stepped: true,
       }],
     };
     const config = {
