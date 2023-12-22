@@ -228,16 +228,16 @@ class StateHistoryDisplay {
     const button = document.getElementById('chart-button');
     button.onclick = () => {
       this._loadStatsContainer();
-      this.constructor._openAndPositionDialog(this._statsContainer);
+      this.constructor._openAndPositionContainer(this._statsContainer);
       this._updateCharts();
     };
     button.disabled = false;
   }
 
-  static _openAndPositionDialog(dialog) {
-    dialog.style.top = ((window.innerHeight / 2) - (dialog.offsetHeight / 2)) + 'px';
-    dialog.style.left = ((window.innerWidth / 2) - (dialog.offsetWidth / 2)) + 'px';
-    dialog.show();
+  static _openAndPositionContainer(container) {
+    container.style.top = ((window.innerHeight / 2) - (container.offsetHeight / 2)) + 'px';
+    container.style.left = ((window.innerWidth / 2) - (container.offsetWidth / 2)) + 'px';
+    container.style.display = 'block';
   }
 
   async _loadStatsContainer() {
@@ -259,9 +259,11 @@ class StateHistoryDisplay {
 
   _setUpStatsWindow(container) {
     document.getElementById('chart-close-button').onclick = () => {
-      container.close();
+      container.style.display = 'none';
     }
     container.style.width = this.CONTAINER_WIDTH + 'px';
+
+    makeDraggable(container, document.getElementById('stats-header'));
   }
 
   _addChartDisplay(container, title, ...yAxis) {
