@@ -100,7 +100,7 @@ layout: null
             <button id="solution-start" class="icon-button" title="start (s)">&#171;</button>
             <button id="solution-back" class="icon-button" title="previous (p)">&#8249;</button>
             <button id="solution-forward" class="icon-button" title="next (n)">&#8250;</button>
-            <button id="solution-end" class="icon-button" title="next (n)">&#187;</button>
+            <button id="solution-end" class="icon-button" title="end">&#187;</button>
           </div>
         </div>
         <div class="switch">
@@ -110,8 +110,8 @@ layout: null
           </label>
           Auto-solve
         </div>
-        <button id="solve-button">Solve</button>
-        <button id="stop-solver" class="danger-button">Abort</button>
+        <button id="solve-button" title="solve">Solve</button>
+        <button id="stop-solver" class="danger-button" title="abort">Abort</button>
       </div>
     </div>
 
@@ -119,7 +119,7 @@ layout: null
       <div id="stats-container">
         <div id="stats-header">
           <h2>Stats by runtime</h2>
-          <button id="chart-close-button" class="danger-button">&#10006;</button>
+          <button id="chart-close-button" class="danger-button" title="Close chart view">&#10006;</button>
         </div>
       </div>
       <div id="solve-mode-input-container">
@@ -139,13 +139,13 @@ layout: null
           <span id="solve-percentage"></span>
         </div>
         <div id="state-buttons">
-          <button id="copy-button" disabled>
+          <button id="copy-button" title="Copy solution to clipboard" disabled>
             <img src="img/copy-48.png" alt="Copy">
           </button>
-          <button id="download-button" disabled>
+          <button id="download-button" title="Download solutions" disabled>
             <img src="img/download-48.png" alt="Download">
           </button>
-          <button id="chart-button" title="Show stats chart" disabled>
+          <button id="chart-button" title="Show stats charts" disabled>
             <img src="img/chart-48.png" alt="Chart">
           </button>
         </div>
@@ -158,7 +158,7 @@ layout: null
       <h1>Constraints</h1>
 
       <div class="control-panel">
-        <button id="clear-constraints-button" class="danger-button">Clear All</button>
+        <button id="clear-constraints-button" class="danger-button" title="Clear all constraints">Clear All</button>
         <button id="undo-button" class="icon-button" title="undo" disabled>&#10554;</button>
         <button id="redo-button" class="icon-button" title="redo" disabled
           style="transform:rotateY(180deg)">&#10554;</button>
@@ -281,7 +281,7 @@ layout: null
             <div class="two-column">
             </div>
             <div>
-              <button type="submit">Add</button>
+              <button type="submit" title="Add constraint">Add</button>
             </div>
           </fieldset>
         </form>
@@ -348,7 +348,7 @@ layout: null
 
           <div id="validate-layout-container">
             <div>
-              <button id="validate-layout-button">Validate layout</button>
+              <button id="validate-layout-button" title="Validate layout">Validate layout</button>
             </div>
             <div>
               <span id="validate-result-output" class="result"></span>
@@ -402,8 +402,9 @@ layout: null
             </label>
 
             <div>
-              <button type="submit">Set</button>
-              <button type="button" id="outside-arrow-clear" class="danger-button">Clear</button>
+              <button type="submit" title="Set constraint">Set</button>
+              <button type="button" id="outside-arrow-clear" class="danger-button"
+                title="Clear constraint">Clear</button>
             </div>
           </fieldset>
         </form>
@@ -416,7 +417,7 @@ layout: null
       <form id="freeform-constraint-input">
         <div id="freeform-constraint-text-container">
           <textarea id="freeform-constraint-text" name="freeform-input" rows="4"></textarea>
-          <button type="submit">Load from text</button>
+          <button type="submit" title="Load from text">Load from text</button>
         </div>
         <div id="freeform-constraint-input-error"></div>
       </form>
