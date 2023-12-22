@@ -690,9 +690,8 @@ h2 {
   justify-content: space-between;
 }
 
-h3 {
-  font-size: 14px;
-  font-weight: normal;
-  margin: 5px;
-  margin-top: 10px;
+#stats-container .description {
+  margin: 3px;
+  margin-top: 6px;
+  color: black;
 }

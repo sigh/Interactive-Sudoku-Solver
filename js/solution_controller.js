@@ -161,8 +161,8 @@ class DebugOutput {
 }
 
 class StateHistoryDisplay {
-  CHART_HEIGHT = 200;
-  CONTAINER_WIDTH = 600;
+  CHART_HEIGHT = 100;
+  CONTAINER_WIDTH = 400;
   AXIS_WIDTH = 50;
   MAX_NUM_STATES = 1000;
 
@@ -178,9 +178,8 @@ class StateHistoryDisplay {
     this._states.push({
       timeMs: state.timeMs / 1000,
       guesses: state.counters.guesses,
-      progressRatio: state.counters.progressRatio,
-      branchesIgnored: state.counters.branchesIgnored,
-      constraintsProcessed: state.counters.constraintsProcessed,
+      searchedPercentage: state.counters.progressRatio * 100,
+      skippedPercentage: state.counters.branchesIgnored * 100,
       solutions: state.counters.solutions,
     });
     this._compressStates(this._states);
@@ -249,9 +248,13 @@ class StateHistoryDisplay {
 
     this._setUpStatsWindow(this._statsContainer);
 
-    this._addChartDisplay(this._statsContainer, 'solutions');
-    this._addChartDisplay(this._statsContainer, 'progressRatio');
-    this._addChartDisplay(this._statsContainer, 'guesses');
+    this._addChartDisplay(this._statsContainer,
+      'Solutions', 'solutions');
+    this._addChartDisplay(this._statsContainer,
+      'Progress percentage (searched + skipped)',
+      'skippedPercentage', 'searchedPercentage');
+    this._addChartDisplay(this._statsContainer,
+      'Guesses', 'guesses');
   }
 
   _setUpStatsWindow(container) {
@@ -261,9 +264,10 @@ class StateHistoryDisplay {
     container.style.width = this.CONTAINER_WIDTH + 'px';
   }
 
-  _addChartDisplay(container, yAxis) {
-    const titleElem = document.createElement('h3');
-    titleElem.textContent = camelCaseToWords(yAxis);
+  _addChartDisplay(container, title, ...yAxis) {
+    const titleElem = document.createElement('div');
+    titleElem.classList.add('description');
+    titleElem.textContent = title;
     container.appendChild(titleElem);
 
     const chartContainer = document.createElement('div');
@@ -272,18 +276,20 @@ class StateHistoryDisplay {
 
     const ctx = document.createElement('canvas');
     chartContainer.appendChild(ctx);
-    this._makeChart(ctx, yAxis);
+    this._makeChart(ctx, ...yAxis);
     return chartContainer;
   }
 
-  _makeChart(ctx, yAxis) {
+  _makeChart(ctx, ...yAxis) {
     const options = {
       responsive: true,
       maintainAspectRatio: false,
       pointRadius: 0,
       parsing: {
         xAxisKey: 'timeMs',
-        yAxisKey: yAxis,
+      },
+      interaction: {
+        intersect: false,
       },
       elements: {
         line: { borderWidth: 1 },
@@ -299,6 +305,7 @@ class StateHistoryDisplay {
           },
         },
         y: {
+          stacked: true,
           afterFit: (axis) => { axis.width = this.AXIS_WIDTH; },
           ticks: {
             font: { size: 10 },
@@ -313,10 +320,14 @@ class StateHistoryDisplay {
       }
     };
     const data = {
-      datasets: [{
+      datasets: yAxis.map((key) => ({
+        label: key,
         data: this._states,
         stepped: true,
-      }],
+        parsing: {
+          yAxisKey: key,
+        },
+      }))
     };
     const config = {
       type: 'line',
