@@ -314,7 +314,7 @@ class StateHistoryDisplay {
           ticks: {
             font: { size: 10 },
             callback: function (...args) {
-              // Use function so that this is bound.
+              // Use function so that `this` is bound.
               return Chart.Ticks.formatters.numeric.apply(this, args) + 's';
             }
           },
@@ -367,7 +367,6 @@ class SolverStateDisplay {
       progressBar: document.getElementById('solve-progress'),
       progressPercentage: document.getElementById('solve-percentage'),
       solveStatus: document.getElementById('solve-status'),
-      stepStatus: document.getElementById('step-status'),
     };
 
     this._setUpStateOutput();
@@ -413,10 +412,6 @@ class SolverStateDisplay {
     this._lazyUpdateState(state);
   }
 
-  setStepStatus(status) {
-    this._elements.stepStatus.textContent = status || '';
-  }
-
   clear() {
     for (const v in this._stateVars) {
       this._stateVars[v].textContent = '';
@@ -425,7 +420,6 @@ class SolverStateDisplay {
     this._elements.progressPercentage.textContent = '';
     this.setSolveStatus(false, '');
     this._elements.solveStatus.textContent = '';
-    this._elements.stepStatus.textContent = '';
     this._stateHistory.clear();
   }
 
@@ -530,7 +524,12 @@ class ModeHandler {
   }
 
   async get(i) {
-    return this._solutions[i - 1];
+    let description = `Solution ${i}`;
+    if (this.count() == 1 && this.done()) description = 'Unique solution';
+    return {
+      solution: this._solutions[i - 1],
+      description: description,
+    }
   }
 
   solutions() {
@@ -587,7 +586,10 @@ ModeHandler.AllPossibilities = class extends ModeHandler {
   }
 
   async get(i) {
-    if (i == 0) return this._pencilmarks;
+    if (i == 0) return {
+      solution: this._pencilmarks,
+      description: 'All possibilities',
+    }
     return super.get(i);
   }
 }
@@ -667,7 +669,7 @@ ModeHandler.StepByStep = class extends ModeHandler {
     if (result == null) {
       this._numSteps = i;
       return {
-        pencilmarks: null,
+        solution: null,
         stepStatus: null,
         latestCell: null,
       };
@@ -679,8 +681,9 @@ ModeHandler.StepByStep = class extends ModeHandler {
       this._numSteps = i + 1;
     }
     return {
-      pencilmarks: result.pencilmarks,
+      solution: result.pencilmarks,
       stepStatus: stepStatus,
+      description: `Step ${i}`,
       latestCell: result.latestCell,
     }
   }
@@ -705,7 +708,7 @@ ModeHandler.CountSolutions = class extends ModeHandler {
   }
 
   async get(i) {
-    return this._solutions[0];
+    return { solution: this._solutions[0] }
   }
 }
 
@@ -1006,17 +1009,15 @@ class SolutionController {
       }
 
       let result = await handler.get(index);
-      if (!result || isIterable(result)) {
+      if (!result) {
         this._solutionDisplay.setSolution(result);
-      } else if (result) {
-        // If result is an object, then it is a step result.
-        this._solutionDisplay.setSolution(result.pencilmarks);
-        this._stateDisplay.setStepStatus(result.stepStatus);
-        this._setValidateResult(result.validateResult);
+      } else {
+        this._solutionDisplay.setSolution(result.solution);
+        if (result.validateResult) {
+          this._setValidateResult(result.validateResult);
+        }
         if (result.latestCell) {
           this._stepHighlighter.setCells([result.latestCell]);
-        } else {
-          this._stepHighlighter.setCells([]);
         }
       }
 
@@ -1026,7 +1027,10 @@ class SolutionController {
         this._elements.back.disabled = (index == minIndex);
         this._elements.start.disabled = (index == minIndex);
         this._elements.end.disabled = (index >= handler.count());
-        this._elements.stepOutput.textContent = index;
+
+        let text = result.description;
+        if (result.stepStatus) text += ` [${result.stepStatus}]`;
+        this._elements.stepOutput.textContent = text;
       }
 
       if (follow && handler.count() > index) {
