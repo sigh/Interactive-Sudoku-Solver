@@ -161,7 +161,7 @@ class DebugOutput {
 }
 
 class StateHistoryDisplay {
-  CHART_HEIGHT = 100;
+  CHART_HEIGHT = 120;
   CONTAINER_WIDTH = 400;
   AXIS_WIDTH = 50;
   MAX_NUM_STATES = 1000;
@@ -169,6 +169,7 @@ class StateHistoryDisplay {
   constructor() {
     this._states = [];
     this._statsContainer = null;
+    this._visible = false;
 
     this._setUpChartButton();
     this._charts = [];
@@ -211,7 +212,7 @@ class StateHistoryDisplay {
   }
 
   _updateCharts() {
-    if (!this._statsContainer || !this._statsContainer.open) {
+    if (!this._visible) {
       return;
     }
 
@@ -227,8 +228,17 @@ class StateHistoryDisplay {
   _setUpChartButton() {
     const button = document.getElementById('chart-button');
     button.onclick = () => {
-      this._loadStatsContainer();
-      this.constructor._openAndPositionContainer(this._statsContainer);
+      // Ensure container is initialized.
+      this._initStatsContainer();
+      // Toggle visibility.
+      if (this._visible) {
+        this._statsContainer.style.display = 'none';
+        this._visible = false;
+        return;
+      }
+
+      this._statsContainer.style.display = 'block';
+      this._visible = true;
       this._updateCharts();
     };
     button.disabled = false;
@@ -240,7 +250,7 @@ class StateHistoryDisplay {
     container.style.display = 'block';
   }
 
-  async _loadStatsContainer() {
+  async _initStatsContainer() {
     if (this._statsContainer) return;
 
     this._statsContainer = document.getElementById('stats-container');
