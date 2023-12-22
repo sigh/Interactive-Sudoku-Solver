@@ -313,7 +313,10 @@ class StateHistoryDisplay {
           beginAtZero: true,
           ticks: {
             font: { size: 10 },
-            callback: (value) => value + 's'
+            callback: function (...args) {
+              // Use function so that this is bound.
+              return Chart.Ticks.formatters.numeric.apply(this, args) + 's';
+            }
           },
         },
         y: {
