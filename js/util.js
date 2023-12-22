@@ -212,13 +212,42 @@ const clearDOMNode = (node) => {
   while (node.lastChild) {
     node.removeChild(node.lastChild);
   }
-}
+};
 
-function isIterable(obj) {
+const isIterable = (obj) => {
   return typeof obj[Symbol.iterator] === 'function';
-}
+};
 
-function localTimestamp() {
+const localTimestamp = () => {
   const tzoffset = (new Date()).getTimezoneOffset() * 60000; //offset in milliseconds
   return (new Date(Date.now() - tzoffset)).toISOString().slice(0, -1);
-}
+};
+
+const makeDraggable = (element, handle) => {
+  let offsetX = 0;
+  let offsetY = 0;
+
+  const handleMouseDown = (event) => {
+    offsetX = event.clientX - element.offsetLeft;
+    offsetY = event.clientY - element.offsetTop;
+    console.log('offset', offsetX, offsetY);
+    console.log('element', element.offsetLeft, element.offsetTop);
+    document.addEventListener('mouseup', handleMouseUp);
+    document.addEventListener('mousemove', handleMouseMove);
+  };
+
+  const handleMouseUp = () => {
+    document.removeEventListener('mouseup', handleMouseUp);
+    document.removeEventListener('mousemove', handleMouseMove);
+  };
+
+  const handleMouseMove = (event) => {
+    console.log('move', event.clientX, event.clientY);
+    element.style.left = (event.clientX - offsetX) + 'px';
+    element.style.top = (event.clientY - offsetY) + 'px';
+    console.log('element', element.style.left, element.style.top);
+    console.log('element', element.offsetLeft, element.offsetTop);
+  };
+
+  handle.addEventListener('mousedown', handleMouseDown);
+};

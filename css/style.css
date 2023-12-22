@@ -666,10 +666,14 @@ h2 {
 }
 
 #stats-container {
-  border: none;
+  position: absolute;
+  display: none;
+
+  border: 1px solid grey;
 
   padding: 5px;
   box-shadow: #00000029 2px 2px 5px 2px;
+  background: white;
   border-radius: 10px;
 }
 
@@ -688,6 +692,7 @@ h2 {
 
   display: flex;
   justify-content: space-between;
+  cursor: hand;
 }
 
 #stats-container .description {
