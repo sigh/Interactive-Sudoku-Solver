@@ -668,6 +668,7 @@ h2 {
 #stats-container {
   position: absolute;
   display: none;
+  z-index: 1000;
 
   border: 1px solid grey;
 
@@ -688,11 +689,13 @@ h2 {
   height: 20px;
   padding: 5px;
   border-radius: 5px;
-  background: lightgrey;
+  background: #cdcdcd;
+  background: linear-gradient(to bottom, #cdcdcd 5%, #c0c0c0 100%);
+  border: 1px solid #cdcdcd;
 
   display: flex;
   justify-content: space-between;
-  cursor: hand;
+  cursor: grab;
 }
 
 #stats-container .description {
