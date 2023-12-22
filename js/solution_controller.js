@@ -539,6 +539,13 @@ class ModeHandler {
   setUpdateListener(fn) {
     this._listener = fn;
   }
+
+  handleSolverException(e) {
+    // If the solver was terminated, then don't show an error.
+    if (!e.toString().startsWith('Aborted')) {
+      throw (e);
+    }
+  }
 }
 
 ModeHandler.AllPossibilities = class extends ModeHandler {
@@ -636,7 +643,7 @@ ModeHandler.AllSolutions = class extends ModeHandler {
   async get(i) {
     // Ensure we have at least one past the solution being asked for.
     this._targetCount = i + 1;
-    this._fetchSolutions();
+    this._fetchSolutions().catch(this.handleSolverException);
 
     return super.get(i);
   }
@@ -996,7 +1003,7 @@ class SolutionController {
   }
 
   _runModeHandler(handler, solver) {
-    handler.run(solver);
+    handler.run(solver).catch(handler.handleSolverException);
 
     let index = handler.minIndex();
     let follow = false;
@@ -1008,7 +1015,7 @@ class SolutionController {
         index = handler.minIndex();
       }
 
-      let result = await handler.get(index);
+      let result = await handler.get(index).catch(handler.handleSolverException);
       if (!result) {
         this._solutionDisplay.setSolution(result);
       } else {
