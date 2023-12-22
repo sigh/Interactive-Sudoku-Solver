@@ -176,6 +176,9 @@ class StateHistoryDisplay {
     this._states.push({
       timeMs: state.timeMs / 1000,
       guesses: state.counters.guesses,
+      progressRatio: state.counters.progressRatio,
+      branchesIgnored: state.counters.branchesIgnored,
+      constraintsProcessed: state.counters.constraintsProcessed,
       solutions: state.counters.solutions,
     });
     this._updateCharts();
@@ -219,19 +222,30 @@ class StateHistoryDisplay {
 
     this._setUpStatsWindow(this._statsContainer);
 
-    const chartContainer = document.createElement('div');
-    chartContainer.style.height = this.CHART_HEIGHT;
-
-    const ctx = document.createElement('canvas');
-    chartContainer.appendChild(ctx);
-    this._statsContainer.appendChild(chartContainer);
-    this._charts.push(this._makeChart(ctx, 'solutions'));
+    this._addChartDisplay(this._statsContainer, 'solutions');
+    this._addChartDisplay(this._statsContainer, 'progressRatio');
+    this._addChartDisplay(this._statsContainer, 'guesses');
   }
 
   _setUpStatsWindow(container) {
     document.getElementById('chart-close-button').onclick = () => {
       container.close();
     }
+  }
+
+  _addChartDisplay(container, yAxis) {
+    const titleElem = document.createElement('h3');
+    titleElem.textContent = camelCaseToWords(yAxis);
+    container.appendChild(titleElem);
+
+    const chartContainer = document.createElement('div');
+    chartContainer.style.height = this.CHART_HEIGHT;
+    container.appendChild(chartContainer);
+
+    const ctx = document.createElement('canvas');
+    chartContainer.appendChild(ctx);
+    this._makeChart(ctx, yAxis);
+    return chartContainer;
   }
 
   _makeChart(ctx, yAxis) {
@@ -243,11 +257,25 @@ class StateHistoryDisplay {
         xAxisKey: 'timeMs',
         yAxisKey: yAxis,
       },
+      elements: {
+        line: { borderWidth: 1 },
+      },
       scales: {
         x: {
           type: 'linear',
           grace: 0,
           beginAtZero: true,
+          ticks: {
+            font: { size: 10 },
+            callback: (value) => value + 's'
+          },
+        },
+        y: {
+          afterFit: (axis) => { axis.width = 50; },
+          ticks: {
+            font: { size: 10 },
+            callback: formatNumberMetric,
+          }
         }
       },
       plugins: {
@@ -267,7 +295,9 @@ class StateHistoryDisplay {
       options: options,
     };
 
-    return new Chart(ctx, config);
+    const chart = new Chart(ctx, config);
+    this._charts.push(chart);
+    return chart;
   }
 }
 

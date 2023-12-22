@@ -9,6 +9,15 @@ const formatTimeMs = (timeMs) => {
   }
 };
 
+const formatNumberMetric = (value) => {
+  if (value == 0) return value;
+  if (value < 0.001) return value.toExponential(1);
+  if (value < 1000) return value;
+  if (value < 1000000) return (value / 1000) + 'k';
+  if (value < 1000000000) return (value / 1000000) + 'M';
+  return (value / 1000000000) + 'T';
+};
+
 const createSvgElement = (tag) => {
   return document.createElementNS('http://www.w3.org/2000/svg', tag);
 };
