@@ -726,9 +726,6 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
     // Check for valid sums.
     const sum = this._sum;
     if (!Number.isInteger(sum) || sum < 0) return false;
-    // Other builder will ensure that no configuration would actually
-    // make this a valid solution.
-    if (sum > LookupTables.MAX_SUM) return false;
     if (this._conflictSets.length == 1
       && sum > SumHandlerUtil.maxCageSum(shape.numValues)) {
       return false;
