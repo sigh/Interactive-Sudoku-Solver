@@ -230,8 +230,6 @@ const makeDraggable = (element, handle) => {
   const handleMouseDown = (event) => {
     offsetX = event.clientX - element.offsetLeft;
     offsetY = event.clientY - element.offsetTop;
-    console.log('offset', offsetX, offsetY);
-    console.log('element', element.offsetLeft, element.offsetTop);
     document.addEventListener('mouseup', handleMouseUp);
     document.addEventListener('mousemove', handleMouseMove);
   };
@@ -242,11 +240,8 @@ const makeDraggable = (element, handle) => {
   };
 
   const handleMouseMove = (event) => {
-    console.log('move', event.clientX, event.clientY);
     element.style.left = (event.clientX - offsetX) + 'px';
     element.style.top = (event.clientY - offsetY) + 'px';
-    console.log('element', element.style.left, element.style.top);
-    console.log('element', element.offsetLeft, element.offsetTop);
   };
 
   handle.addEventListener('mousedown', handleMouseDown);
