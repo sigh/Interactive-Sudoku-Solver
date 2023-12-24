@@ -469,13 +469,8 @@ SudokuSolver.InternalSolver = class {
     return countOnes16bit(grid[cellOrder[cellIndex]]);
   }
 
-  _enforceValue(grid, cell, lastContradiction) {
+  _enforceValue(grid, cell, cellAccumulator) {
     let value = grid[cell];
-
-    let cellAccumulator = this._cellAccumulator;
-    cellAccumulator.clear();
-    cellAccumulator.add(cell);
-    if (lastContradiction > -1) cellAccumulator.add(lastContradiction);
 
     const conflicts = this._cellConflicts[cell];
     const numConflicts = conflicts.length;
@@ -577,7 +572,8 @@ SudokuSolver.InternalSolver = class {
     recStack[depth++] = 0;
     let isNewCellIndex = true;
     let progressDelta = 1;
-    let lastContradictionCell = new Int16Array(this._numCells);
+    // The last cell which caused a contradiction at each level.
+    const lastContradictionCell = new Int16Array(this._numCells);
     lastContradictionCell.fill(-1);
 
     while (depth) {
@@ -648,10 +644,25 @@ SudokuSolver.InternalSolver = class {
         grid[cell] = value;
       }
 
+      let cellAccumulator = this._cellAccumulator;
+      cellAccumulator.clear();
+      cellAccumulator.add(cell);
+      // Queue up extra constraints based on prior backtracks. The idea being
+      // that constraints that apply this the contradiction cell are likely
+      // to turn up a contradiction here if it exists.
+      if (lastContradictionCell[cellIndex] >= 0) {
+        cellAccumulator.add(lastContradictionCell[cellIndex]);
+        // If this is the last value at this level, clear the
+        // lastContradictionCell as the next time we reach this level won't be
+        // from the same subtree that caused the contradiction.
+        if (values == value) lastContradictionCell[cellIndex] = -1;
+      }
+
       // Propagate constraints.
-      let hasContradiction = !this._enforceValue(grid, cell, lastContradictionCell[cellIndex]);
-      if (values == value) lastContradictionCell[cellIndex] = -1;
+      let hasContradiction = !this._enforceValue(grid, cell, cellAccumulator);
       if (hasContradiction) {
+        // Store the current cells, so that the level immediately above us
+        // can act on this information to run extra constraints.
         if (cellIndex > 0) lastContradictionCell[cellIndex - 1] = cell;
         counters.progressRatio += progressDelta;
         counters.backtracks++;
