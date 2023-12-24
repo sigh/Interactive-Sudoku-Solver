@@ -30,7 +30,7 @@ class GridShape {
   }
 
   makeValueId = (cellIndex, n) => {
-    const cellId = this.makeCellId(...this.splitCellIndex(cellIndex));
+    const cellId = this.makeCellIdFromIndex(cellIndex);
     return `${cellId}_${n}`;
   }
 
@@ -150,7 +150,7 @@ class SudokuTextParser {
           cells: [],
         });
       }
-      cages.get(cageCell).cells.push(shape.makeCellId(...shape.splitCellIndex(i)));
+      cages.get(cageCell).cells.push(shape.makeCellIdFromIndex(i));
     }
 
     let constraints = [];
@@ -184,7 +184,7 @@ class SudokuTextParser {
       if (!cages.has(cageId)) {
         cages.set(cageId, { sum: cageSum, cells: [] });
       }
-      cages.get(cageId).cells.push(shape.makeCellId(...shape.splitCellIndex(i)));
+      cages.get(cageId).cells.push(shape.makeCellIdFromIndex(i));
     }
 
     let constraints = [];
