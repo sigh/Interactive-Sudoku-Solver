@@ -173,16 +173,34 @@ class StateHistoryDisplay {
 
     this._setUpChartButton();
     this._charts = [];
+
+    this._updateCharts = deferUntilAnimationFrame(
+      this._updateCharts.bind(this));
+
+    this._deltaT = 0;
+    this._nextT = 0;
   }
 
   add(state) {
-    this._states.push({
+
+    const newState = {
       timeMs: state.timeMs / 1000,
       guesses: state.counters.guesses,
       searchedPercentage: state.counters.progressRatio * 100,
       skippedPercentage: state.counters.branchesIgnored * 100,
       solutions: state.counters.solutions,
-    });
+    };
+
+    if (this._states.length && newState.timeMs < this._nextT) {
+      // If the new state is too soon then just update last point.
+      this._states[this._states.length - 1] = newState;
+    } else {
+      // The new state is sufficiently new, so add a new data point.
+      this._states.push(newState);
+      this._nextT += this._deltaT;
+    }
+
+    // NOTE: Both of these defer work until it needs to be done.
     this._compressStates(this._states);
     this._updateCharts();
   }
@@ -200,15 +218,20 @@ class StateHistoryDisplay {
     for (let i = 0; i < states.length - 1; i++) {
       const state = states[i];
       if (state.timeMs >= nextT) {
-        nextT = state.timeMs + deltaT;
+        nextT += deltaT;
         states[j++] = state;
       }
     }
+
     // Always include the last state.
     states[j++] = states[states.length - 1];
 
     // Truncate the states.
     states.length = j;
+
+    // Update the global deltaT and nextT.
+    this._deltaT = deltaT;
+    this._nextT = nextT;
   }
 
   _updateCharts() {
@@ -380,8 +403,6 @@ class SolverStateDisplay {
     this._displayStateVariables(state);
 
     this._updateProgressBar(state);
-
-    this._stateHistory.add(state);
   }
 
   _METHOD_TO_STATUS = {
@@ -410,6 +431,9 @@ class SolverStateDisplay {
 
   setState(state) {
     this._lazyUpdateState(state);
+    // Don't update state history lazily, as that will cause gaps when
+    // the window is not active.
+    this._stateHistory.add(state);
   }
 
   clear() {
