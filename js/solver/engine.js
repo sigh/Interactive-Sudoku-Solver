@@ -393,6 +393,19 @@ SudokuSolver.InternalSolver = class {
     return false;
   }
 
+  // Find the cell with the minimum score. Return the index into cellOrder.
+  _minCountCellIndex(grid, cellOrder, cellIndex) {
+    let minCount = 1 << 16;
+    for (let i = cellIndex; i < numCells; i++) {
+      const count = countOnes16bit(grid[cellOrder[i]]);
+      if (count < minCount) {
+        bestIndex = i;
+        minCount = count;
+      }
+    }
+    return bestIndex;
+  }
+
   // Find the best cell and bring it to the front. This means that it will
   // be processed next.
   _updateCellOrder(cellOrder, cellIndex, grid) {
@@ -416,7 +429,7 @@ SudokuSolver.InternalSolver = class {
     const triggerCounts = this._backtrackTriggers;
 
     // Find the cell with the minimum score.
-    let minScore = Infinity;
+    let maxScore = -1;
     let bestIndex = 0;
 
     for (let i = cellIndex; i < numCells; i++) {
@@ -429,16 +442,26 @@ SudokuSolver.InternalSolver = class {
       // will have to occur anyway for every other iteration.
       if (count <= 1) {
         bestIndex = i;
+        maxScore = -1;
         break;
       }
 
-      const tc = triggerCounts[cell] || 1;  // Ensure we don't divide by zero.
-      const score = count / tc;
+      let score = triggerCounts[cell] / count;
 
-      if (score < minScore) {
+      if (score > maxScore) {
         bestIndex = i;
-        minScore = score;
+        maxScore = score;
       }
+    }
+
+    if (maxScore === 0) {
+      // It's rare that maxScore is 0 since all backtrack triggers must be 0.
+      // However, in this case we can run a special loop to find the cell with
+      // the min count.
+      //
+      // Looping over the cells again is not a concern since this is rare. It is
+      // better to take it out of the main loop.
+      bestIndex = this._minCountCellIndex(grid, cellOrder, cellIndex);
     }
 
     [cellOrder[bestIndex], cellOrder[cellIndex]] = [cellOrder[cellIndex], cellOrder[bestIndex]];
