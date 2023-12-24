@@ -469,12 +469,13 @@ SudokuSolver.InternalSolver = class {
     return countOnes16bit(grid[cellOrder[cellIndex]]);
   }
 
-  _enforceValue(grid, cell) {
+  _enforceValue(grid, cell, lastContradiction) {
     let value = grid[cell];
 
     let cellAccumulator = this._cellAccumulator;
     cellAccumulator.clear();
     cellAccumulator.add(cell);
+    if (lastContradiction > -1) cellAccumulator.add(lastContradiction);
 
     const conflicts = this._cellConflicts[cell];
     const numConflicts = conflicts.length;
@@ -576,6 +577,8 @@ SudokuSolver.InternalSolver = class {
     recStack[depth++] = 0;
     let isNewCellIndex = true;
     let progressDelta = 1;
+    let lastContradictionCell = new Int16Array(this._numCells);
+    lastContradictionCell.fill(-1);
 
     while (depth) {
       depth--;
@@ -636,7 +639,7 @@ SudokuSolver.InternalSolver = class {
         counters.guesses++;
 
         // Remove the value from our set of candidates.
-        // NOTE: We only have to do this, because we will return back to this
+        // NOTE: We only have to do this because we will return back to this
         //       stack frame.
         grid[cell] &= ~value;
 
@@ -645,9 +648,11 @@ SudokuSolver.InternalSolver = class {
         grid[cell] = value;
       }
 
-      // Propogate constraints.
-      let hasContradiction = !this._enforceValue(grid, cell);
+      // Propagate constraints.
+      let hasContradiction = !this._enforceValue(grid, cell, lastContradictionCell[cellIndex]);
+      if (values == value) lastContradictionCell[cellIndex] = -1;
       if (hasContradiction) {
+        if (cellIndex > 0) lastContradictionCell[cellIndex - 1] = cell;
         counters.progressRatio += progressDelta;
         counters.backtracks++;
         // Exponentially decay the counts.
