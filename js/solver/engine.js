@@ -238,7 +238,7 @@ SudokuSolver.InternalSolver = class {
     this._initCellArray();
     this._cellOrder = new Uint8Array(shape.numCells);
     this._recStack = new Uint16Array(shape.numCells + 1);
-    this._progressRatioStack = Array.from(this._recStack).fill(1);
+    this._progressRatioRemaining = Array.from(this._recStack).fill(0.0);
 
     this._runCounter = 0;
     this._progress = {
@@ -402,7 +402,7 @@ SudokuSolver.InternalSolver = class {
     for (let i = 0; i < this._numCells; i++) {
       this._cellOrder[i] = i;
     }
-    this._progressRatioStack[0] = 1;
+    this._progressRatioRemaining[0] = 1.0;
   }
 
   _initCellArray() {
@@ -689,14 +689,14 @@ SudokuSolver.InternalSolver = class {
       this._stepState.step = 1;
     }
 
-    const progressRatioStack = this._progressRatioStack;
+    const progressRemainingStack = this._progressRatioRemaining;
     const cellOrder = this._cellOrder;
 
     let depth = 0;
     const recStack = this._recStack;
     recStack[depth++] = 0;
     let isNewCellIndex = true;
-    let progressDelta = 1;
+    let progressDelta = 1.0;
     // The last cell which caused a contradiction at each level.
     const lastContradictionCell = new Int16Array(this._numCells);
     lastContradictionCell.fill(-1);
@@ -704,14 +704,13 @@ SudokuSolver.InternalSolver = class {
     while (depth) {
       depth--;
       let cellIndex = recStack[depth];
-      let count = 0;
+
+      let grid = this._grids[depth];
 
       if (isNewCellIndex) {
         isNewCellIndex = false;
 
         // TODO: Handle fixed cells.
-
-        let grid = this._grids[depth];
 
         // We've reached the end, so output a solution!
         if (cellIndex == this._shape.numCells) {
@@ -729,20 +728,24 @@ SudokuSolver.InternalSolver = class {
           continue;
         }
 
-        // Find the next cell to explore.
-        count = this._updateCellOrder(cellOrder, cellIndex, grid);
-        if (count === 0) {
-          continue;
-        }
+        progressRemainingStack[depth] = progressDelta;
 
         // Update counters.
         counters.cellsSearched++;
-        progressRatioStack[depth] = progressDelta / count;
       }
-      progressDelta = progressRatioStack[depth];
+
+      // Find the next cell to explore and update progress.
+      {
+        const count = this._updateCellOrder(cellOrder, cellIndex, grid);
+        if (count === 0) continue;
+
+        // Assume the remaining progress is evenly distributed among the value
+        // options.
+        progressDelta = progressRemainingStack[depth] / count;
+        progressRemainingStack[depth] -= progressDelta;
+      }
 
       let cell = cellOrder[cellIndex];
-      let grid = this._grids[depth];
       let values = grid[cell];
 
       // Find the next smallest value to try.
