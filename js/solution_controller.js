@@ -702,7 +702,7 @@ ModeHandler.StepByStep = class extends ModeHandler {
       return {
         solution: null,
         stepStatus: null,
-        latestCell: null,
+        highlightCells: [],
       };
     }
     let stepStatus = result.isSolution ? 'Solution' :
@@ -715,7 +715,7 @@ ModeHandler.StepByStep = class extends ModeHandler {
       solution: result.pencilmarks,
       stepStatus: stepStatus,
       description: `Step ${i}`,
-      latestCell: result.latestCell,
+      highlightCells: result.latestCell ? [result.latestCell] : [],
     }
   }
 
@@ -1047,8 +1047,8 @@ class SolutionController {
         if (result.validateResult) {
           this._setValidateResult(result.validateResult);
         }
-        if (result.latestCell) {
-          this._stepHighlighter.setCells([result.latestCell]);
+        if (result.highlightCells) {
+          this._stepHighlighter.setCells(result.highlightCells);
         }
       }
 
