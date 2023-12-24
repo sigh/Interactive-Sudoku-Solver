@@ -250,7 +250,7 @@ class JigsawManager {
 
     for (const [_, cells] of map) {
       if (cells.length == shape.gridSize) {
-        this.addPiece(cells.map(c => shape.makeCellId(...shape.splitCellIndex(c))));
+        this.addPiece(cells.map(c => shape.makeCellIdFromIndex(c)));
       }
     }
   }
@@ -1315,7 +1315,7 @@ class InfoOverlay {
     this._heatmap.clear();
 
     for (let i = 0; i < values.length; i++) {
-      const cellId = shape.makeCellId(...shape.splitCellIndex(i));
+      const cellId = shape.makeCellIdFromIndex(i);
       const path = this._heatmap.addCell(cellId);
       path.setAttribute('fill', 'rgb(255, 0, 0)');
       path.setAttribute('opacity', values[i] / 1000);
@@ -1327,7 +1327,7 @@ class InfoOverlay {
     this._textInfo.clear();
 
     for (let i = 0; i < values.length; i++) {
-      const cellId = shape.makeCellId(...shape.splitCellIndex(i));
+      const cellId = shape.makeCellIdFromIndex(i);
       this._textInfo.setText(cellId, values[i]);
     }
   }

@@ -139,7 +139,7 @@ class DebugOutput {
     const shape = this._shape;
 
     if (data.cells && data.cells.length) {
-      const cellIds = [...data.cells].map(c => shape.makeCellId(...shape.splitCellIndex(c)));
+      const cellIds = [...data.cells].map(c => shape.makeCellIdFromIndex(c));
       elem.addEventListener('mouseover', () => {
         this._debugCellHighlighter.setCells(cellIds);
       });

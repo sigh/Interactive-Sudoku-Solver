@@ -1800,7 +1800,7 @@ class SudokuConstraintOptimizer {
       (cells.size > this._MAX_SUM_SIZE || removedExtraHouses)) {
       if (ENABLE_DEBUG_LOGS) {
         const cellsArray = Array.from(cells);
-        const cellString = cellsArray.map(c => shape.makeCellId(c)).join('~');
+        const cellString = cellsArray.map(c => shape.makeCellIdFromIndex(c)).join('~');
         debugLog({
           loc: '_addSumIntersectionHandler',
           msg: 'Discarded inferred handler: ' +
