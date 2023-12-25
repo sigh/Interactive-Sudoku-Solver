@@ -1824,34 +1824,40 @@ class SudokuConstraintOptimizer {
       return null;
     }
 
-    // NOTE: This restriction is here to avoid pessimising the performance of
-    // TAREK_ALL and EXTREME_KILLERS puzzles.
-    // Don't put too many cells in the sum as this adds a lot of constraints
-    // which may be less useful.
-    // An exception is made if we used extra houses to fill in gaps  as it
-    // is more likely to have contained interesting interactions with
-    // distant cells.
-    if (!usedExtraHouses &&
-      (cells.size > this._MAX_SUM_SIZE || removedExtraHouses)) {
-      if (ENABLE_DEBUG_LOGS) {
-        const cellsArray = Array.from(cells);
-        const cellString = cellsArray.map(c => shape.makeCellIdFromIndex(c)).join('~');
-        debugLog({
-          loc: '_addSumIntersectionHandler',
-          msg: 'Discarded inferred handler: ' +
-            `.Sum~${totalSum}~${cellString}`,
-          args: { sum: totalSum },
-          cells: cellsArray
-        });
+    // Don't add sums with too many cells, as they are less likely to be
+    // restrictive and useful.
+    // Make an exception for when the total sum is closer to an extreme
+    // (large or small) as that will restrict its values more.
+    if (cells.size > this._MAX_SUM_SIZE) {
+      // If the average value of the sum is close to the middle, then the
+      // values have more leeway. Use this to determine if the sum is worth
+      // keeping.
+      const avgVal = totalSum / cells.size;
+      const sumSkew = Math.abs(avgVal - shape.numValues / 2);
+
+      const MIN_SUM_SKEW = 2;
+      if (sumSkew < MIN_SUM_SKEW) {
+        if (ENABLE_DEBUG_LOGS) {
+          const cellsArray = Array.from(cells);
+          const cellString = cellsArray.map(c => shape.makeCellIdFromIndex(c)).join('~');
+          debugLog({
+            loc: '_addSumIntersectionHandler',
+            msg: 'Discarded inferred handler: ' +
+              `.Sum~${totalSum}~${cellString}`,
+            args: { sumSkew: sumSkew },
+            cells: cellsArray,
+          });
+        }
+
+        return null;
       }
-      return null;
     }
 
     const handler = new SudokuConstraintHandler.Sum(
       Array.from(cells), totalSum);
 
     if (ENABLE_DEBUG_LOGS) {
-      let args = { sum: handler.sum() };
+      let args = { sum: handler.sum(), size: handler.cells.length };
       if (usedExtraHouses) args.usedExtraHouses = usedExtraHouses;
       if (removedExtraHouses) args.removedExtraHouses = removedExtraHouses;
       debugLog({
