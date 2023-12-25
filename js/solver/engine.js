@@ -255,6 +255,18 @@ SudokuSolver.InternalSolver = class {
       }
     }
 
+    if (ENABLE_DEBUG_LOGS) {
+      debugLog({
+        loc: '_initCellPriorities',
+        msg: 'Hover for values',
+        args: {
+          min: Math.min(...priorities),
+          max: Math.max(...priorities),
+        },
+        overlay: priorities,
+      });
+    }
+
     return priorities;
   }
 
