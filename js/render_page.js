@@ -1326,6 +1326,8 @@ class InfoOverlay {
     const shape = this._shape;
     this._textInfo.clear();
 
+    if (!values) return;
+
     for (let i = 0; i < values.length; i++) {
       const cellId = shape.makeCellIdFromIndex(i);
       this._textInfo.setText(cellId, values[i]);

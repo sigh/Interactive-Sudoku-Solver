@@ -44,8 +44,7 @@
 }
 
 .info-overlay-item {
-  opacity: 0.5;
-  dominant-baseline: hanging;
+  font-size: 12;
 }
 
 .killer-cage-sum {

@@ -63,10 +63,16 @@ class DisplayItem {
     return DisplayItem._cellCenter(row, col);
   }
 
-  cellIdCorner(cellId) {
+  cellIdTopLeftCorner(cellId) {
     const cellWidth = DisplayItem.CELL_SIZE;
     const [x, y] = this.cellIdCenter(cellId);
     return [x - cellWidth / 2, y - cellWidth / 2 + 2];
+  }
+
+  cellIdBottomLeftCorner(cellId) {
+    const cellWidth = DisplayItem.CELL_SIZE;
+    const [x, y] = this.cellIdCenter(cellId);
+    return [x - cellWidth / 2, y + cellWidth / 2];
   }
 
   cellCenter(cell) {
@@ -183,8 +189,8 @@ class InfoTextDisplay extends DisplayItem {
   }
 
   setText(cellId, str) {
-    const [x, y] = this.cellIdCorner(cellId);
-    const textNode = this.makeTextNode(str, x, y, 'info-overlay-item');
+    const [x, y] = this.cellIdBottomLeftCorner(cellId);
+    const textNode = this.makeTextNode(str, x + 2, y - 2, 'info-overlay-item');
     this._svg.append(textNode);
   }
 }
@@ -1179,7 +1185,7 @@ class KillerCageDisplay extends DisplayItem {
 
     // Draw the sum in the top-left most cell. Luckly, this is the sort order.
     cells.sort();
-    [x, y] = this.cellIdCorner(cells[0]);
+    [x, y] = this.cellIdTopLeftCorner(cells[0]);
 
     const text = this.makeTextNode(
       sum, x, y, 'killer-cage-sum');

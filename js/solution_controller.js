@@ -127,7 +127,7 @@ class DebugOutput {
     locSpan.textContent = data.loc + ': ';
 
     const msgSpan = document.createElement('msg');
-    let msg = data.msg;
+    let msg = data.msg || '';
     if (data.args) {
       msg += ' ' + JSON.stringify(data.args).replaceAll('"', '');
     }
@@ -145,6 +145,15 @@ class DebugOutput {
       });
       elem.addEventListener('mouseout', () => {
         this._debugCellHighlighter.clear();
+      });
+    }
+
+    if (data.overlay) {
+      elem.addEventListener('mouseover', () => {
+        this._infoOverlay.setValues(data.overlay);
+      });
+      elem.addEventListener('mouseout', () => {
+        this._infoOverlay.setValues();
       });
     }
 
