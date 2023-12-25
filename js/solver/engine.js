@@ -233,17 +233,17 @@ SudokuSolver.InternalSolver = class {
 
     this._cellAccumulator = new SudokuSolver.CellAccumulator(this._handlerSet);
 
-    // Priorities go from 0->255, with 255 being the best.
-    // This can be used to prioritize which cells to search.
     this._cellPriorities = this._initCellPriorities();
 
     this.reset();
   }
 
+  // Cell priorities are used to determine the order in which cells are
+  // searched with preference given to cells with higher priority.
   _initCellPriorities() {
-    const priorities = new Uint8Array(this._shape.numCells);
+    const priorities = new Int32Array(this._shape.numCells);
 
-    // TODO: Determine priorities in a more principaled way.
+    // TODO: Determine priorities in a more principled way.
     //  - Add one for each conflict cell.
     //  - Add custom priorities for each constraint based on how restrictive it
     //    is.
@@ -331,14 +331,16 @@ SudokuSolver.InternalSolver = class {
     };
 
     // _backtrackTriggers counts the the number of times a cell is responsible
-    // for finding a contradition and causing a backtrack.
+    // for finding a contradiction and causing a backtrack. It is exponentially
+    // decayed so that the information reflects the most recent search areas.
     // Cells with a high count are the best candidates for searching as we
-    // may find the contradition faster. Ideally, this allows the search to
+    // may find the contradiction faster. Ideally, this allows the search to
     // learn the critical areas of the grid where it is more valuable to search
     // first.
-    // _backtrackTriggers are exponentially decayed so that the search can
-    // learn new parts of the search space effectively.
-    this._backtrackTriggers = Array.from(this._cellPriorities);
+    // _backtrackTriggers are initialized to the cell priorities so that
+    // so that the initial part of the search is still able to prioritize cells
+    // which may lead to a contradiction.
+    this._backtrackTriggers = this._cellPriorities.slice();
     this._uninterestingValues = null;
 
     this._resetStack();
