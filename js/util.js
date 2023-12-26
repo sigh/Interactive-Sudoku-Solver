@@ -215,7 +215,7 @@ const clearDOMNode = (node) => {
 };
 
 const isIterable = (obj) => {
-  return typeof obj[Symbol.iterator] === 'function';
+  return obj && typeof obj[Symbol.iterator] === 'function';
 };
 
 const localTimestamp = () => {
