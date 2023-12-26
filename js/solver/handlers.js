@@ -705,7 +705,7 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
   _negativeCells = [];
 
   constructor(cells, sum) {
-    cells.sort();
+    cells.sort((a, b) => a - b);
 
     super(cells);
     this._sum = +sum;
@@ -936,7 +936,7 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
 // does not need to be made more general.
 SudokuConstraintHandler.SumWithNegative = class SumWithNegative extends SudokuConstraintHandler.Sum {
   constructor(positiveCells, negativeCell, sum) {
-    positiveCells.sort();
+    positiveCells.sort((a, b) => a - b);
     super([...positiveCells, negativeCell], sum);
 
     this._positiveCells = positiveCells;
@@ -1181,8 +1181,8 @@ SudokuConstraintHandler.Jigsaw = class Jigsaw extends SudokuConstraintHandler {
 
 SudokuConstraintHandler.SameValues = class SameValues extends SudokuConstraintHandler {
   constructor(cells0, cells1, isUnique) {
-    cells0.sort();
-    cells1.sort();
+    cells0.sort((a, b) => a - b);
+    cells1.sort((a, b) => a - b);
     super([...cells0, ...cells1]);
     if (cells0.length != cells1.length) {
       // Throw, because same values are only created by our code.
