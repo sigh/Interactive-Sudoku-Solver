@@ -318,7 +318,42 @@ class SumHandlerUtil {
     })();
   }
 
+  // Partition the cells into subsets where all cells must be unique.
   static findConflictSets(cells, cellConflicts) {
+    let bestConflictSetsScore = 0;
+    let bestConflictSets = [];
+    let randomGen = new RandomIntGenerator(0);
+
+    const NUM_TRIALS = 5;
+
+    // Choose `NUM_TRIALS` random orderings of the cells and find the one that
+    // generates the best conflict sets.
+    // NOTE: The first ordering is the original (sorted) ordering. This ordering
+    //       should work well for little killers and other linear regions.
+    cells = [...cells];
+    for (let i = 0; i < NUM_TRIALS; i++) {
+      let conflictSets = this.findConflictSetsGreedy(cells, cellConflicts);
+      // If there is only one conflict set, then we can't do any better.
+      if (conflictSets.length == 1) return conflictSets;
+
+      // Optimize for the sum of triangle numbers.
+      let conflictSetsScore = conflictSets.reduce(
+        (acc, cs) => cs.length * (cs.length + 1) / 2 + acc, 0);
+      if (conflictSetsScore > bestConflictSetsScore) {
+        bestConflictSetsScore = conflictSetsScore;
+        bestConflictSets = conflictSets;
+      }
+
+      shuffleArray(cells, randomGen);
+    }
+
+    return bestConflictSets;
+  }
+
+  // Partition the cells into subsets where all cells must be unique.
+  // Applies a greedy algorithm by, each iteration, choosing a cell and adding
+  // as many remaining cells to it as possible to create the next set.
+  static findConflictSetsGreedy(cells, cellConflicts) {
     let conflictSets = [];
     let unassignedCells = new Set(cells)
 
