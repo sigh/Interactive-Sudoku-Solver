@@ -381,7 +381,7 @@ class ConstraintManager {
 
   _cellsAreAdjacent(cells) {
     if (cells.length != 2) return false;
-    // Manhatten distance is exactly 1.
+    // Manhattan distance is exactly 1.
     let cell0 = this._shape.parseCellId(cells[0]);
     let cell1 = this._shape.parseCellId(cells[1]);
     return 1 == Math.abs(cell0.row - cell1.row) + Math.abs(cell0.col - cell1.col);
@@ -1033,7 +1033,7 @@ class Selection {
     // Make the container selectable.
     container.tabIndex = 0;
 
-    const cellFuziness = 1.4 * (DisplayItem.CELL_SIZE / 2);
+    const cellFuzziness = 1.4 * (DisplayItem.CELL_SIZE / 2);
 
     let currCell = null;
     let currCenter = null;
@@ -1045,7 +1045,7 @@ class Selection {
       // select diagonals without hitting adjacent cells.
       const dx = Math.abs(e.offsetX - currCenter[0]);
       const dy = Math.abs(e.offsetY - currCenter[1]);
-      if (Math.max(dx, dy) < cellFuziness) return;
+      if (Math.max(dx, dy) < cellFuzziness) return;
 
       currCell = target;
       currCenter = this._clickInterceptor.cellIdCenter(currCell);

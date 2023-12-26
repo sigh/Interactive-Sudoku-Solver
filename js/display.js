@@ -1239,7 +1239,7 @@ class KillerCageDisplay extends DisplayItem {
     for (const color of this.constructor.KILLER_CAGE_COLORS) {
       if (!conflictingColors.has(color)) return color;
     }
-    // Otherwse select a random color.
+    // Otherwise select a random color.
     return `rgb(${Math.random() * 255 | 0},${Math.random() * 255 | 0},${Math.random() * 255 | 0})`;
   }
 }
