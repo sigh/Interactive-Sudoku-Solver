@@ -410,7 +410,8 @@ SudokuSolver.InternalSolver = class {
   // Find the cell with the minimum score. Return the index into cellOrder.
   _minCountCellIndex(grid, cellOrder, cellIndex) {
     let minCount = 1 << 16;
-    for (let i = cellIndex; i < numCells; i++) {
+    let bestIndex = 0;
+    for (let i = cellIndex; i < grid.length; i++) {
       const count = countOnes16bit(grid[cellOrder[i]]);
       if (count < minCount) {
         bestIndex = i;
