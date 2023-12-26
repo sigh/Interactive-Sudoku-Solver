@@ -359,7 +359,7 @@ class SudokuConstraint {
 
   static fromText(rawText) {
     const constraints = [];
-    // Parse sections seperated by a blank line separately,
+    // Parse sections separated by a blank line separately,
     // and then merge their constraints.
     for (const part of rawText.split(/\n\s*\n/)) {
       let constraint = SudokuTextParser.parseText(part);
@@ -714,7 +714,7 @@ class SudokuBuilder {
   ];
 
   // Ask for a state update every 2**14 iterations.
-  // NOTE: Using a non-power of 10 makes the display loook faster :)
+  // NOTE: Using a non-power of 10 makes the display look faster :)
   static LOG_UPDATE_FREQUENCY = 14;
 
   static _unusedWorkers = [];

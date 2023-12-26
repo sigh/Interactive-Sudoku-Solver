@@ -542,7 +542,7 @@ SudokuSolver.InternalSolver = class {
   // yieldWhen can be:
   //  YIELD_ON_SOLUTION to yielding each solution.
   //  YIELD_ON_STEP to yield every step.
-  //  n > 1 to yield every n contraditions.
+  //  n > 1 to yield every n contradictions.
   *run(yieldWhen) {
     const yieldEveryStep = yieldWhen === this.constructor.YIELD_ON_STEP;
     const yieldOnContradiction = yieldWhen > 1 ? yieldWhen : 0;
@@ -759,7 +759,7 @@ SudokuSolver.InternalSolver = class {
     };
 
     const attemptLog = [];
-    // Arbitrary seach limit. Too much lower and there are some cases which get
+    // Arbitrary search limit. Too much lower and there are some cases which get
     // stuck for too long.
     const SEARCH_LIMIT = 200;
 
@@ -802,10 +802,10 @@ SudokuSolver.InternalSolver = class {
 
     // Find the house with the best score.
     attemptLog.sort((a, b) => b[1] - a[1]);
-    const besthouse = attemptLog[0][0];
+    const bestHouse = attemptLog[0][0];
 
     this._resetStack();
-    fillHouse(besthouse);
+    fillHouse(bestHouse);
 
     // Run the final search until we find a solution or prove that one doesn't
     // exist.

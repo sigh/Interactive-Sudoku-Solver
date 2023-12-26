@@ -490,7 +490,7 @@ class SumHandlerUtil {
   restrictCellsMultiConflictSet(grid, sum, conflictSets) {
     const numSets = conflictSets.length;
 
-    // Find a set of miniumum and maximum unique values which can be set,
+    // Find a set of minimum and maximum unique values which can be set,
     // taking into account uniqueness within constraint sets.
     // From this determine the minimum and maximum possible sums.
 
@@ -537,7 +537,7 @@ class SumHandlerUtil {
     }
 
     // Calculate degrees of freedom in the cell values.
-    // i.e. How much leaway is there from the min and max value of each cell.
+    // i.e. How much leeway is there from the min and max value of each cell.
     let minDof = sum - strictMin;
     let maxDof = strictMax - sum;
     if (minDof < 0 || maxDof < 0) return false;
@@ -548,7 +548,7 @@ class SumHandlerUtil {
       let seenMin = seenMins[s];
       let seenMax = seenMaxs[s];
       // If min and max are the same, then the values can't be constrained
-      // anymore (and a positive dof guarentees that they are ok).
+      // anymore (and a positive dof guarantees that they are ok).
       if (seenMin == seenMax) continue;
 
       let valueMask = -1;
@@ -672,7 +672,7 @@ class SumHandlerUtil {
         v0 &= (this._lookupTables.reverse[v1] << (targetSum - 1)) >> gridSize;
 
         // If the cells are in the same conflict set, also ensure the sum is
-        // distict values.
+        // distinct values.
         if ((targetSum & 1) == 0 &&
           conflictMapBuffer[0] === conflictMapBuffer[1]) {
           // targetSum/2 can't be valid value.
@@ -870,7 +870,8 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
     // It is impossible to make the target sum.
     if (sum < minSum || maxSum < sum) return false;
     // We've reached the target sum exactly.
-    // NOTE: Uniqueness constraint is already enforced by the solver via confictCells.
+    // NOTE: Uniqueness constraint is already enforced by the solver via
+    //       conflictCells.
     if (minSum == maxSum) return true;
 
     const numUnfixed = numCells - (rangeInfoSum >> 24);
@@ -944,7 +945,7 @@ SudokuConstraintHandler.SumWithNegative = class SumWithNegative extends SudokuCo
     this._conflictSets = null;
 
     // IMPORTANT: Complement cells don't work for this currently, because
-    // we can't guarentee that reversed negativeCells is a unique value.
+    // we can't guarantee that reversed negativeCells is a unique value.
     // This will stop anyone adding them.
     this._complementCells = null;
   }
@@ -1007,7 +1008,7 @@ SudokuConstraintHandler.Sandwich = class Sandwich extends SudokuConstraintHandle
     return (shape.gridSize * (shape.gridSize - 1) / 2) - 1;
   }
 
-  // Possible combinations for values between the sentinals for each possible sum.
+  // Possible combinations for values between the sentinels for each possible sum.
   // Grouped by distance.
   static _combinations = memoize((shape) => {
     const lookupTables = LookupTables.get(shape.numValues);
@@ -1036,7 +1037,7 @@ SudokuConstraintHandler.Sandwich = class Sandwich extends SudokuConstraintHandle
     return table;
   });
 
-  // Distance range between the sentinals for each possible sum.
+  // Distance range between the sentinels for each possible sum.
   // Map combination to [min, max].
   static _distanceRange = memoize((shape) => {
     const combinations = this._combinations(shape);
@@ -1103,8 +1104,8 @@ SudokuConstraintHandler.Sandwich = class Sandwich extends SudokuConstraintHandle
     let validSettings = SudokuConstraintHandler.Sandwich._validSettings;
     validSettings.fill(0);
 
-    // Iterate over each possible starting index for the first sentinal.
-    // Check if the other values are consistant with the required sum.
+    // Iterate over each possible starting index for the first sentinel.
+    // Check if the other values are consistent with the required sum.
     // Given that the values must form a house, this is sufficient to ensure
     // that the constraint is fully satisfied.
     const valueMask = this._valueMask;
@@ -1115,9 +1116,9 @@ SudokuConstraintHandler.Sandwich = class Sandwich extends SudokuConstraintHandle
     let pPrefix = 0;
     for (let i = 0; i < maxIndex; i++) {
       let v = values[i];
-      // If we don't have a sentinal, move onto the next index.
+      // If we don't have a sentinel, move onto the next index.
       if (!(v &= borderMask)) continue;
-      // Determine what the matching sentinal value needs to be.
+      // Determine what the matching sentinel value needs to be.
       const vRev = borderMask & ((v >> shift) | (v << shift));
 
       // For each possible gap:
@@ -1392,7 +1393,7 @@ SudokuConstraintHandler.Between = class Between extends SudokuConstraintHandler 
   }
 
   enforceConsistency(grid, cellAccumulator) {
-    // Constrain the ends to be consistant with each other.
+    // Constrain the ends to be consistent with each other.
     if (!this._binaryConstraint.enforceConsistency(grid, cellAccumulator)) {
       return false;
     }
@@ -2133,7 +2134,7 @@ class SudokuConstraintOptimizer {
       if (diffA.size > 1 && diffB.size > 1) return;
 
       if (!(hasCellsWithoutSum(diffA) || hasCellsWithoutSum(diffB))) {
-        // If all cells in the diff overalp with a piece, then limit the size of
+        // If all cells in the diff overlap with a piece, then limit the size of
         // the sum.
         if (diffA.size + diffB.size > this._MAX_SUM_SIZE) return;
         // Otherwise we are adding a sum constraint to a cell which doesn't

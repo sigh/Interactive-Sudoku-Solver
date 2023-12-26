@@ -219,8 +219,8 @@ const isIterable = (obj) => {
 };
 
 const localTimestamp = () => {
-  const tzoffset = (new Date()).getTimezoneOffset() * 60000; //offset in milliseconds
-  return (new Date(Date.now() - tzoffset)).toISOString().slice(0, -1);
+  const tzOffset = (new Date()).getTimezoneOffset() * 60000; //offset in milliseconds
+  return (new Date(Date.now() - tzOffset)).toISOString().slice(0, -1);
 };
 
 const makeDraggable = (element, handle) => {
