@@ -445,7 +445,8 @@ class SumHandlerUtil {
 
     let possibilities = 0;
     const options = this.killerCageSums[numUnfixed][sum - fixedSum];
-    for (const o of options) {
+    for (let i = options.length - 1; i >= 0; i--) {
+      const o = options[i];
       if ((o & unfixedValues) == o) {
         possibilities |= o;
         requiredUniques &= o;
