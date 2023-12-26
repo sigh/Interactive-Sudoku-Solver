@@ -246,3 +246,29 @@ const makeDraggable = (element, handle) => {
 
   handle.addEventListener('mousedown', handleMouseDown);
 };
+
+const shuffleArray = (arr, randomGenerator) => {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = randomGenerator.randomInt(i);
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+};
+
+// Random number generator which allows seeding.
+class RandomIntGenerator {
+  constructor(seed) {
+    this._state = seed || 0;
+    this._stateMod = 32987;
+  }
+
+  _incState() {
+    this._state = ((this._state * 23984982 + 328423) % this._stateMod) | 0;
+  }
+
+  // Random integer in the range [0, max].
+  randomInt(max) {
+    this._incState();
+    const rand = this._state / this._stateMod;
+    return Math.floor(rand * (max + 1));
+  }
+}
