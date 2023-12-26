@@ -1183,8 +1183,8 @@ class KillerCageDisplay extends DisplayItem {
     this._killerCages.set(cage, [...cells]);
     cells.forEach(cell => this._killerCellColors.set(cell, color));
 
-    // Draw the sum in the top-left most cell. Luckly, this is the sort order.
-    cells.sort();
+    // Draw the sum in the top-left most cell. Luckily, this is the sort order.
+    cells.sort((a, b) => a - b);
     [x, y] = this.cellIdTopLeftCorner(cells[0]);
 
     const text = this.makeTextNode(
