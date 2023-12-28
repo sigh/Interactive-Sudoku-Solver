@@ -708,6 +708,11 @@ ModeHandler.StepByStep = class extends ModeHandler {
 
   _addStepGuide(step, value) {
     this._stepGuides.set(step, value);
+    // Remove any step guides which are invalidated by this new step.
+    // i.e. any step that comes after.
+    for (const [s, _] of this._stepGuides) {
+      if (s > step) this._stepGuides.delete(s);
+    }
     this._listener();
   }
 
