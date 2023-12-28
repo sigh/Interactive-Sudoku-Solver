@@ -44,7 +44,7 @@ const handleWorkerMethod = (method, payload) => {
       return workerSolver.nthSolution(payload);
 
     case 'nthStep':
-      return workerSolver.nthStep(payload);
+      return workerSolver.nthStep(...payload);
 
     case 'countSolutions':
       return workerSolver.countSolutions();

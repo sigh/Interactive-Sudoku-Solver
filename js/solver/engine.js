@@ -71,8 +71,8 @@ class SudokuSolver {
     return this.constructor._gridToSolution(result.grid);
   }
 
-  nthStep(n) {
-    let result = this._nthIteration(n, true);
+  nthStep(n, stepGuides) {
+    let result = this._nthIteration(n, stepGuides);
     if (!result) return null;
 
     let pencilmarks = this.constructor._makePencilmarks(result.grid, this._shape);
@@ -101,13 +101,13 @@ class SudokuSolver {
     }
   }
 
-  _nthIteration(n, stepByStep) {
+  _nthIteration(n, stepGuides) {
     n++;
-    let iter = this._getIter(stepByStep);
+    let iter = this._getIter(stepGuides);
     // To go backwards we start from the start.
-    if (n < iter.count) {
+    if (n <= iter.count) {
       this._reset();
-      iter = this._getIter(stepByStep);
+      iter = this._getIter(stepGuides);
     }
 
     // Iterate until we have seen n steps.
@@ -182,8 +182,11 @@ class SudokuSolver {
     return state;
   }
 
-  _getIter(yieldEveryStep) {
-    yieldEveryStep = !!yieldEveryStep;
+  _getIter(stepGuides) {
+    const yieldEveryStep = !!stepGuides;
+    if (yieldEveryStep) {
+      this._internalSolver._stepGuides = stepGuides;
+    }
 
     // If an iterator doesn't exist or is of the wrong type, then create it.
     if (!this._iter || this._iter.yieldEveryStep != yieldEveryStep) {
@@ -344,6 +347,7 @@ SudokuSolver.InternalSolver = class {
 
   reset() {
     this._iter = null;
+    this._stepGuides = null;
     this.counters = {
       valuesTried: 0,
       cellsSearched: 0,
@@ -583,6 +587,7 @@ SudokuSolver.InternalSolver = class {
       this._enforceConstraints(this._grids[0], cellAccumulator);
     }
 
+    let step = 0;
     if (yieldEveryStep) {
       yield {
         grid: this._grids[0],
@@ -592,6 +597,7 @@ SudokuSolver.InternalSolver = class {
         hasContradiction: false,
       }
       checkRunCounter();
+      step++;
     }
 
     const progressRatioStack = this._progressRatioStack;
@@ -655,6 +661,11 @@ SudokuSolver.InternalSolver = class {
       //        - we would have returned earlier on domain wipeout.
       //        - we don't add to the stack on the final value in a cell.
       let value = values & -values;
+      if (yieldEveryStep) {
+        if (this._stepGuides.has(step)) {
+          value = 1 << (this._stepGuides.get(step) - 1);
+        }
+      }
       counters.valuesTried++;
 
       if (values != value) {
@@ -730,6 +741,7 @@ SudokuSolver.InternalSolver = class {
           hasContradiction: hasContradiction,
         };
         checkRunCounter();
+        step++;
       }
 
       if (hasContradiction) continue;

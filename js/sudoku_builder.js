@@ -1093,8 +1093,8 @@ class SolverProxy {
     return this._callWorker('nthSolution', n);
   }
 
-  async nthStep(n) {
-    return this._callWorker('nthStep', n);
+  async nthStep(n, stepGuides) {
+    return this._callWorker('nthStep', [n, stepGuides]);
   }
 
   async countSolutions() {

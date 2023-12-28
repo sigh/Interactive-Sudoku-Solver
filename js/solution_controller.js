@@ -689,6 +689,7 @@ ModeHandler.StepByStep = class extends ModeHandler {
     super();
     this._pending = null;
     this._numSteps = 0;
+    this._stepGuides = new Map();
   }
 
   setDone() { }
@@ -703,6 +704,11 @@ ModeHandler.StepByStep = class extends ModeHandler {
 
   count() {
     return this._numSteps;
+  }
+
+  _addStepGuide(step, value) {
+    this._stepGuides.set(step, value);
+    this._listener();
   }
 
   _handleStep(i, result) {
@@ -722,12 +728,13 @@ ModeHandler.StepByStep = class extends ModeHandler {
       statusElem.appendChild(document.createTextNode('{'));
       let first = true;
       for (const value of result.values) {
-        if (!first) statusElem.appendChild(document.createTextNode(', '));
+        if (!first) statusElem.appendChild(document.createTextNode(','));
         first = false;
 
         let valueLink = document.createElement('a');
-        valueLink.href = '#';
+        valueLink.href = 'javascript:void(0)';
         valueLink.textContent = value;
+        valueLink.onclick = this._addStepGuide.bind(this, i, value);
         statusElem.appendChild(valueLink);
       }
       statusElem.appendChild(document.createTextNode('}'));
@@ -740,13 +747,13 @@ ModeHandler.StepByStep = class extends ModeHandler {
     return {
       solution: result.pencilmarks,
       stepStatus: statusElem,
-      description: `Step ${i} ${statusText}`,
+      description: `Step ${i} ${statusText} `,
       highlightCells: result.latestCell ? [result.latestCell] : [],
     }
   }
 
   async get(i) {
-    this._pending = this._solver.nthStep(i);
+    this._pending = this._solver.nthStep(i, this._stepGuides);
     const result = await this._pending;
     this._pending = null;
     return this._handleStep(i, result);
