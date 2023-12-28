@@ -659,6 +659,14 @@ class SudokuConstraint {
     }
   }
 
+  static Priority = class Priority extends SudokuConstraint {
+    constructor(priority, ...cells) {
+      super(arguments);
+      this.cells = cells;
+      this.priority = priority;
+    }
+  }
+
   static DEFAULT = this.FixedValues;
 
   static _makeRegions(fn, gridSize) {
@@ -995,6 +1003,11 @@ class SudokuBuilder {
           for (const cells of SudokuConstraint.disjointSetRegions(shape)) {
             yield new SudokuConstraintHandler.AllDifferent(cells);
           }
+          break;
+
+        case 'Priority':
+          cells = constraint.cells.map(c => shape.parseCellId(c).cell);
+          yield new SudokuConstraintHandler.Priority(cells, constraint.priority);
           break;
 
         default:

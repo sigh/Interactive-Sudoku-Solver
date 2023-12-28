@@ -255,6 +255,12 @@ SudokuSolver.InternalSolver = class {
       }
     }
 
+    for (const handler of this._handlerSet.getAllofType(SudokuConstraintHandler.Priority)) {
+      for (const cell of handler.priorityCells()) {
+        priorities[cell] = handler.priority();
+      }
+    }
+
     if (ENABLE_DEBUG_LOGS) {
       debugLog({
         loc: '_initCellPriorities',
