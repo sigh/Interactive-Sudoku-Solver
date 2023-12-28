@@ -185,7 +185,7 @@ class SudokuSolver {
   _getIter(stepGuides) {
     const yieldEveryStep = !!stepGuides;
     if (yieldEveryStep) {
-      this._internalSolver._stepGuides = stepGuides;
+      this._internalSolver._stepState.stepGuides = stepGuides;
     }
 
     // If an iterator doesn't exist or is of the wrong type, then create it.
@@ -347,7 +347,7 @@ SudokuSolver.InternalSolver = class {
 
   reset() {
     this._iter = null;
-    this._stepGuides = null;
+    this._stepState = {};
     this.counters = {
       valuesTried: 0,
       cellsSearched: 0,
@@ -587,7 +587,6 @@ SudokuSolver.InternalSolver = class {
       this._enforceConstraints(this._grids[0], cellAccumulator);
     }
 
-    let step = 0;
     if (yieldEveryStep) {
       yield {
         grid: this._grids[0],
@@ -597,7 +596,7 @@ SudokuSolver.InternalSolver = class {
         hasContradiction: false,
       }
       checkRunCounter();
-      step++;
+      this._stepState.step = 1;
     }
 
     const progressRatioStack = this._progressRatioStack;
@@ -662,9 +661,8 @@ SudokuSolver.InternalSolver = class {
       //        - we don't add to the stack on the final value in a cell.
       let value = values & -values;
       if (yieldEveryStep) {
-        if (this._stepGuides.has(step)) {
-          value = 1 << (this._stepGuides.get(step) - 1);
-        }
+        let newValue = this._adjustForStepState();
+        if (newValue) value = newValue;
       }
       counters.valuesTried++;
 
@@ -741,7 +739,7 @@ SudokuSolver.InternalSolver = class {
           hasContradiction: hasContradiction,
         };
         checkRunCounter();
-        step++;
+        this._stepState.step++;
       }
 
       if (hasContradiction) continue;
@@ -850,6 +848,14 @@ SudokuSolver.InternalSolver = class {
     if (callback) {
       this._progress.frequencyMask = (1 << logFrequency) - 1;
     }
+  }
+
+  _adjustForStepState() {
+    const step = this._stepState.step;
+    if (this._stepState.stepGuides.has(step)) {
+      return LookupTables.fromValue(this._stepState.stepGuides.get(step));
+    }
+    return null;
   }
 }
 
