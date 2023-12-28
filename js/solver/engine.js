@@ -660,9 +660,12 @@ SudokuSolver.InternalSolver = class {
       //        - we would have returned earlier on domain wipeout.
       //        - we don't add to the stack on the final value in a cell.
       let value = values & -values;
+      // Adjust the value for step-by-step.
       if (yieldEveryStep) {
-        let newValue = this._adjustForStepState();
-        if (newValue) value = newValue;
+        value = this._adjustForStepState(cellOrder, cellIndex, grid);
+        // The cell order may be changed.
+        cell = cellOrder[cellIndex];
+        values = grid[cell];
       }
       counters.valuesTried++;
 
@@ -850,12 +853,29 @@ SudokuSolver.InternalSolver = class {
     }
   }
 
-  _adjustForStepState() {
+  _adjustForStepState(cellOrder, cellIndex, grid) {
     const step = this._stepState.step;
-    if (this._stepState.stepGuides.has(step)) {
-      return LookupTables.fromValue(this._stepState.stepGuides.get(step));
+    const guide = this._stepState.stepGuides.get(step) || {};
+
+    // If there is a cell guide, then update cell order.
+    if (guide.cell) {
+      const cell = guide.cell;
+      for (let i = cellIndex; i < cellOrder.length; i++) {
+        if (cellOrder[i] == cell) {
+          [cellOrder[cellIndex], cellOrder[i]] = [cellOrder[i], cellOrder[cellIndex]];
+          break;
+        }
+      }
     }
-    return null;
+
+    if (guide.value) {
+      // Return the new value.
+      return LookupTables.fromValue(guide.value);
+    } else {
+      // Or determine the default value.
+      const values = grid[cellOrder[cellIndex]];
+      return values & -values;
+    }
   }
 }
 

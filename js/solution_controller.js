@@ -525,6 +525,7 @@ class SolverStateDisplay {
 class ModeHandler {
   ITERATION_CONTROLS = false;
   ALLOW_DOWNLOAD = false;
+  ALLOW_ALT_CLICK = false;
 
   constructor() {
     this._solver = null;
@@ -684,6 +685,7 @@ ModeHandler.AllSolutions = class extends ModeHandler {
 
 ModeHandler.StepByStep = class extends ModeHandler {
   ITERATION_CONTROLS = true;
+  ALLOW_ALT_CLICK = true;
 
   constructor() {
     super();
@@ -706,13 +708,32 @@ ModeHandler.StepByStep = class extends ModeHandler {
     return this._numSteps;
   }
 
-  _addStepGuide(step, value) {
-    this._stepGuides.set(step, value);
-    // Remove any step guides which are invalidated by this new step.
-    // i.e. any step that comes after.
+  handleAltClick(step, cell) {
+    this._addStepGuideCell(step, cell);
+    this._listener();
+  }
+
+  _invalidateStepGuides(minStep) {
     for (const [s, _] of this._stepGuides) {
-      if (s > step) this._stepGuides.delete(s);
+      if (s >= minStep) this._stepGuides.delete(s);
     }
+  }
+
+  _addStepGuideCell(step, cell) {
+    // Invalidate step guides, including the current step.
+    // We don't want the current value to remain.
+    this._invalidateStepGuides(step);
+    this._stepGuides.set(step, { cell: cell });
+  }
+
+  _addStepGuideValue(step, value) {
+    // Invalid step guides which come after this step.
+    // We still want to keep any cell guides on this step.
+    this._invalidateStepGuides(step + 1);
+    if (!this._stepGuides.has(step)) {
+      this._stepGuides.set(step, {});
+    }
+    this._stepGuides.get(step).value = value;
     this._listener();
   }
 
@@ -739,7 +760,7 @@ ModeHandler.StepByStep = class extends ModeHandler {
         let valueLink = document.createElement('a');
         valueLink.href = 'javascript:void(0)';
         valueLink.textContent = value;
-        valueLink.onclick = this._addStepGuide.bind(this, i, value);
+        valueLink.onclick = this._addStepGuideValue.bind(this, i, value);
         statusElem.appendChild(valueLink);
       }
       statusElem.appendChild(document.createTextNode('}'));
@@ -861,7 +882,7 @@ class SolutionController {
     this._elements.validate.onclick = () => this._validateLayout();
 
     this._setUpAutoSolve();
-    this._setUpKeyBindings();
+    this._setUpKeyBindings(displayContainer);
 
     this._stateDisplay = new SolverStateDisplay(this._solutionDisplay);
 
@@ -950,6 +971,22 @@ class SolutionController {
     document.addEventListener('keyup', event => {
       firingKeys.delete(event.key);
     });
+
+    // Listen for clicks in the solution grid.
+    this._altClickHandler = null;
+    const clickInterceptor = displayContainer.getClickInterceptor();
+    const clickContainer = clickInterceptor.getSvg();
+    clickContainer.addEventListener('click', e => {
+      // Only do something if it was an alt-click on a valid cell,
+      // and there is a handler to handle it.
+      if (!this._altClickHandler) return;
+      if (!e.altKey) return;
+      const target = clickInterceptor.cellAt(e.offsetX, e.offsetY);
+      if (target === null) return;
+
+      this._altClickHandler(target);
+      e.preventDefault();
+    });
   }
 
   _terminateSolver() {
@@ -971,7 +1008,8 @@ class SolutionController {
     'count-solutions':
       'Count the total number of solutions by iterating over all solutions.',
     'step-by-step':
-      'Step through the solving process.',
+      'Step through the solving process. ' +
+      'Alt-click on a cell to force the solver to resolve it next.',
   };
 
   async _update() {
@@ -1004,6 +1042,7 @@ class SolutionController {
     this.debugOutput.clear();
     this._showIterationControls(false);
     this._currentModeHandler = null;
+    this._altClickHandler = null;
   }
 
   async _solve(constraints) {
@@ -1069,6 +1108,7 @@ class SolutionController {
 
     let index = handler.minIndex();
     let follow = false;
+    let currentSolution = null;
 
     const update = async () => {
       if (follow) {
@@ -1079,9 +1119,9 @@ class SolutionController {
 
       let result = await handler.get(index).catch(handler.handleSolverException);
       if (!result) {
-        this._solutionDisplay.setSolution(result);
+        currentSolution = null;
       } else {
-        this._solutionDisplay.setSolution(result.solution);
+        currentSolution = result.solution;
         if (result.validateResult) {
           this._setValidateResult(result.validateResult);
         }
@@ -1089,6 +1129,7 @@ class SolutionController {
           this._stepHighlighter.setCells(result.highlightCells);
         }
       }
+      this._solutionDisplay.setSolution(currentSolution);
 
       if (handler.ITERATION_CONTROLS) {
         let minIndex = handler.minIndex();
@@ -1138,6 +1179,14 @@ class SolutionController {
       this._elements.download.onclick = () => {
         const solutions = handler.solutions();
         this._downloadSolutionFile(solutions);
+      }
+    }
+
+    if (handler.ALLOW_ALT_CLICK) {
+      this._altClickHandler = (cell) => {
+        let cellIndex = this._shape.parseCellId(cell).cell;
+        if (!currentSolution || !isIterable(currentSolution[cellIndex])) return;
+        handler.handleAltClick(index, cellIndex);
       }
     }
 
