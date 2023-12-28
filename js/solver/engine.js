@@ -84,12 +84,20 @@ class SudokuSolver {
       this._shape.makeCellIdFromIndex(
         result.cellOrder[result.cellOrder.length - 1]) : null;
 
+    let valueArray = [];
+    let values = result.values;
+    while (values) {
+      let value = values & -values;
+      values &= ~value;
+      valueArray.push(LookupTables.toValue(value));
+    }
 
     return {
       pencilmarks: pencilmarks,
       latestCell: latestCell,
       isSolution: result.isSolution,
       hasContradiction: result.hasContradiction,
+      values: valueArray,
     }
   }
 
@@ -580,6 +588,7 @@ SudokuSolver.InternalSolver = class {
         grid: this._grids[0],
         isSolution: false,
         cellOrder: [],
+        values: 0,
         hasContradiction: false,
       }
       checkRunCounter();
@@ -717,6 +726,7 @@ SudokuSolver.InternalSolver = class {
           grid: grid,
           isSolution: false,
           cellOrder: cellOrder.subarray(0, cellIndex + 1),
+          values: values | value,
           hasContradiction: hasContradiction,
         };
         checkRunCounter();

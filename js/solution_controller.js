@@ -716,6 +716,12 @@ ModeHandler.StepByStep = class extends ModeHandler {
     }
     let stepStatus = result.isSolution ? 'Solution' :
       result.hasContradiction ? 'Conflict' : null;
+
+    let valueString = '';
+    if (result.values) {
+      valueString = `{${result.values.join(',')}}`;
+    }
+
     // Update numSteps if we have a new max.
     if (i + 1 > this._numSteps) {
       this._numSteps = i + 1;
@@ -723,7 +729,7 @@ ModeHandler.StepByStep = class extends ModeHandler {
     return {
       solution: result.pencilmarks,
       stepStatus: stepStatus,
-      description: `Step ${i}`,
+      description: `Step ${i} ${valueString}`,
       highlightCells: result.latestCell ? [result.latestCell] : [],
     }
   }
