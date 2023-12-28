@@ -716,7 +716,7 @@ ModeHandler.StepByStep = class extends ModeHandler {
       this._numSteps = i;
       return {
         solution: null,
-        stepStatus: null,
+        statusElem: null,
         highlightCells: [],
       };
     }
@@ -746,7 +746,7 @@ ModeHandler.StepByStep = class extends ModeHandler {
     }
     return {
       solution: result.pencilmarks,
-      stepStatus: statusElem,
+      statusElem: statusElem,
       description: `Step ${i} ${statusText} `,
       highlightCells: result.latestCell ? [result.latestCell] : [],
     }
@@ -1093,8 +1093,8 @@ class SolutionController {
         this._elements.end.disabled = (index >= handler.count());
 
         this._elements.stepOutput.textContent = result.description;
-        if (result.stepStatus) {
-          this._elements.stepOutput.appendChild(result.stepStatus);
+        if (result.statusElem) {
+          this._elements.stepOutput.appendChild(result.statusElem);
         }
       }
 
