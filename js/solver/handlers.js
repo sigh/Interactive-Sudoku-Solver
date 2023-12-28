@@ -32,6 +32,26 @@ class SudokuConstraintHandler {
 
 SudokuConstraintHandler.NoBoxes = class NoBoxes extends SudokuConstraintHandler { }
 
+// This handler purely exists to manually adjust the priorities of cells to
+// adjust initial cell selection.
+SudokuConstraintHandler.Priority = class Priority extends SudokuConstraintHandler {
+  constructor(cells, priority) {
+    // Don't register cells, so that this handler doesn't get added to the cells
+    // and is not invoked during solving or any other calculations.
+    super();
+    this._priorityCells = cells;
+    this._priority = priority;
+  }
+
+  priority() {
+    return this._priority;
+  }
+
+  priorityCells() {
+    return this._priorityCells;
+  }
+}
+
 SudokuConstraintHandler.False = class False extends SudokuConstraintHandler {
   constructor(cells) {
     // The cells with which to associate the failure.
