@@ -714,12 +714,23 @@ ModeHandler.StepByStep = class extends ModeHandler {
         highlightCells: [],
       };
     }
-    let stepStatus = result.isSolution ? 'Solution' :
-      result.hasContradiction ? 'Conflict' : null;
+    let statusText = result.isSolution ? '[Solution]' :
+      result.hasContradiction ? '[Conflict]' : '';
 
-    let valueString = '';
-    if (result.values) {
-      valueString = `{${result.values.join(',')}}`;
+    let statusElem = document.createElement('span');
+    if (result.values && result.values.length) {
+      statusElem.appendChild(document.createTextNode('{'));
+      let first = true;
+      for (const value of result.values) {
+        if (!first) statusElem.appendChild(document.createTextNode(', '));
+        first = false;
+
+        let valueLink = document.createElement('a');
+        valueLink.href = '#';
+        valueLink.textContent = value;
+        statusElem.appendChild(valueLink);
+      }
+      statusElem.appendChild(document.createTextNode('}'));
     }
 
     // Update numSteps if we have a new max.
@@ -728,8 +739,8 @@ ModeHandler.StepByStep = class extends ModeHandler {
     }
     return {
       solution: result.pencilmarks,
-      stepStatus: stepStatus,
-      description: `Step ${i} ${valueString}`,
+      stepStatus: statusElem,
+      description: `Step ${i} ${statusText}`,
       highlightCells: result.latestCell ? [result.latestCell] : [],
     }
   }
@@ -1074,9 +1085,10 @@ class SolutionController {
         this._elements.start.disabled = (index == minIndex);
         this._elements.end.disabled = (index >= handler.count());
 
-        let text = result.description;
-        if (result.stepStatus) text += ` [${result.stepStatus}]`;
-        this._elements.stepOutput.textContent = text;
+        this._elements.stepOutput.textContent = result.description;
+        if (result.stepStatus) {
+          this._elements.stepOutput.appendChild(result.stepStatus);
+        }
       }
 
       if (follow && handler.count() > index) {
