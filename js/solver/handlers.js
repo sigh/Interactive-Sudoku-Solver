@@ -1450,6 +1450,98 @@ SudokuConstraintHandler.Between = class Between extends SudokuConstraintHandler 
   }
 }
 
+SudokuConstraintHandler.XSum = class XSum extends SudokuConstraintHandler {
+  constructor(cells, sum) {
+    super(cells);
+    this._sum = +sum;
+    this._control = cells[0];
+    this._internalSumHandler = new SudokuConstraintHandler.Sum(
+      this.cells.slice(), this._sum);
+  }
+
+  initialize(initialGrid, cellConflicts, shape) {
+    this._internalSumHandler.initialize(
+      initialGrid, cellConflicts, shape);
+    this._scratchGrid = initialGrid.slice();
+    this._resultGrid = initialGrid.slice();
+    this._lookupTables = LookupTables.get(shape.numValues);
+    return true;
+  }
+
+  _restrictControlCell(grid) {
+    // Figure out the range of acceptable values for the control cell.
+    const cells = this.cells;
+    const numCells = cells.length;
+    const sum = this._sum;
+    const control = this._control;
+    const minMaxLookup = this._lookupTables.minMax8Bit;
+
+    let minSum = 0;
+    let maxSum = 0;
+
+    for (let i = 0; i < numCells; i++) {
+      const minMax = minMaxLookup[grid[cells[i]]];
+      minSum += minMax >> 8;
+      maxSum += minMax & 0xff;
+      // TODO: Use uniqueness to restrict.
+
+      if (minSum > sum || maxSum < sum) {
+        // This count isn't possible, so remove it from the control.
+        grid[control] &= ~LookupTables.fromValue(i + 1);
+        // minSum will never get lower.
+        if (minSum > sum) break;
+      }
+    }
+
+    return grid[control] !== 0;
+  }
+
+  enforceConsistency(grid, cellAccumulator) {
+    if (!this._restrictControlCell(grid)) return false;
+
+    const sumHandler = this._internalSumHandler;
+    const cells = this.cells;
+
+    let values = grid[this._control];
+    const numControl = countOnes16bit(values);
+    if (numControl == 1) {
+      // There is a single value, so we can just enforce the sum directly.
+      let v = LookupTables.toValue(values);
+      sumHandler.cells = cells.slice(0, v);
+      return sumHandler.enforceConsistency(grid, cellAccumulator);
+    }
+
+    // For each possible value of the control cell, enforce the sum.
+    // In practice there should only be a few value control values.
+    sumHandler.cells = [];
+    const scratchGrid = this._scratchGrid;
+    const resultGrid = this._resultGrid;
+    resultGrid.fill(0);
+    // Determine minControl, because these are the only cells we can actually
+    // constrain.
+    const minControl = this._lookupTables.minMax8Bit[values] >> 8;
+    for (let i = 0; i < cells.length && values; i++) {
+      sumHandler.cells.push(cells[i]);
+      const value = LookupTables.fromValue(i + 1);
+      if (!(values & value)) continue;
+
+      scratchGrid.set(grid);
+      scratchGrid[this._control] = value;
+      if (sumHandler.enforceConsistency(scratchGrid, cellAccumulator)) {
+        for (let j = 0; j < minControl; j++) {
+          resultGrid[cells[j]] |= scratchGrid[cells[j]];
+        }
+      }
+    }
+
+    for (let j = 0; j < minControl; j++) {
+      grid[cells[j]] = resultGrid[cells[j]];
+    }
+
+    return grid[this._control] !== 0;
+  }
+}
+
 class HandlerSet {
   constructor(handlers, shape) {
     this._handlers = [];

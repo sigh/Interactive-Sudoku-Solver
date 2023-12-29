@@ -614,6 +614,29 @@ class SudokuConstraint {
     });
   }
 
+  static XSum = class XSum extends SudokuConstraint {
+    constructor(sum, rowCol, dir) {
+      super(arguments);
+      this.sum = sum;
+      this.rowCol = rowCol;
+      this.dir = dir;
+    }
+
+    static getCells(shape, rowCol, dir) {
+      const gridSize = shape.gridSize;
+
+      let colRow = rowCol[0].toLowerCase() == 'r' ? 'c' : 'r';
+      let cells = [];
+      const start = dir == 1 ? 1 : gridSize;
+      for (let i = 0; i < gridSize; i++) {
+        const part = `${colRow}${start + i * dir}`;
+        cells.push(colRow == 'r' ? part + rowCol : rowCol + part);
+      }
+
+      return cells;
+    }
+  }
+
   static Sandwich = class Sandwich extends SudokuConstraint {
     constructor(sum, id) {
       super(arguments);
@@ -905,6 +928,13 @@ class SudokuBuilder {
           cells = SudokuConstraint.LittleKiller
             .cellMap(shape)[constraint.id].map(c => shape.parseCellId(c).cell);
           yield new SudokuConstraintHandler.Sum(cells, constraint.sum);
+          break;
+
+        case 'XSum':
+          cells = SudokuConstraint.XSum
+            .getCells(shape, constraint.rowCol, constraint.dir).map(
+              c => shape.parseCellId(c).cell);
+          yield new SudokuConstraintHandler.XSum(cells, constraint.sum);
           break;
 
         case 'Sandwich':

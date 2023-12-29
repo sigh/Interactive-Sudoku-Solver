@@ -203,6 +203,7 @@ const runSolveTests = async (onFailure) => {
     'Strict kropki',
     'Strict XV',
     'Hailstone (easier) - little killer',
+    'X-Sum little killer',
   ], onFailure);
 
   await runAllWithChecks([
