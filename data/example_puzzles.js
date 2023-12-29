@@ -221,6 +221,10 @@ const EXAMPLES = {
     src: 'http://forum.enjoysudoku.com/new-killer-setter-t38092-15.html#p306873',
     input: '.Cage~7~R2C2~R3C2~R4C2.Cage~5~R2C6~R2C7.Cage~6~R3C7~R3C8.Cage~6~R4C6~R4C7.Cage~15~R7C9~R6C9.Cage~3~R9C7~R9C6.Cage~17~R8C3~R7C3.Cage~23~R6C3~R6C4~R7C4.',
   },
+  'X-Sum little killer': {
+    input: '.LittleKiller~23~R1C1.LittleKiller~12~R2C9.LittleKiller~23~R3C9.LittleKiller~25~R5C9.LittleKiller~12~R7C1.LittleKiller~25~R1C6.~R7C2_2~R7C8_5.XSum~25~c1~1.XSum~23~c1~-1.XSum~12~c5~1.XSum~25~c5~-1.XSum~23~c9~1.XSum~12~c9~-1',
+    solution: '562831974837429165941576238195384726286715349473692581329168457758943612614257893',
+  },
 
   // Extreme killers.
   'Wecoc #1': {
