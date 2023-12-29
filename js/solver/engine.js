@@ -943,6 +943,16 @@ class LookupTables {
     return 32 - Math.clz32(v);
   };
 
+  static toValuesArray(values) {
+    let result = [];
+    while (values) {
+      let value = values & -values;
+      values &= ~value;
+      result.push(LookupTables.toValue(value));
+    }
+    return result;
+  }
+
   constructor(do_not_call, numValues) {
     if (!do_not_call) throw ('Use LookupTables.get(shape.numValues)');
 

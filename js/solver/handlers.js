@@ -1004,19 +1004,29 @@ SudokuConstraintHandler.Skyscraper = class Skyscraper extends SudokuConstraintHa
     const maxValue = shape.numValues
     const lookupTables = LookupTables.get(shape.numValues);
     this._lookupTables = lookupTables;
-    this._maxValue = LookupTables.fromValue(shape.numValues);
+    this._maxHeight = shape.numValues;
+
+    // Check that all cells are unique.
+    for (let i = 0; i < cells.length; i++) {
+      for (let j = 0; j < i; j++) {
+        if (!cellConflicts[cells[i]].has(cells[j])) {
+          throw ('Skyscraper handler requires all cells to be distinct.');
+        }
+      }
+    }
 
     // If only 1 cell is visible, then the first cell must be
     // the highest.
     if (numVisible == 1) {
-      initialGrid[cells[0]] &= LookupTables.fromValue(maxValue);
-      return true;
+      return !!(initialGrid[cells[0]] &= LookupTables.fromValue(maxValue));
     }
 
     // Mask off initial cells which won't have room to get too high.
     let mask = lookupTables.allValues;
     for (let i = numVisible - 1; i >= 0; i--, mask >>= 1) {
-      initialGrid[cells[i]] &= mask;
+      if (!(initialGrid[cells[i]] &= mask)) {
+        return false;
+      }
     }
 
     return true;
@@ -1024,24 +1034,71 @@ SudokuConstraintHandler.Skyscraper = class Skyscraper extends SudokuConstraintHa
 
   enforceConsistency(grid) {
     const cells = this.cells;
+    const maxHeight = this._maxHeight;
+    const target = this._numVisible;
 
-    // Find resolved values until we hit the tallest skyscraper.
-    // If all values are not yet resolved then skip enforcement for now.
-    let visible = 0;
-    let currentMax = 0;
+    // Check that the target is within a viable range of visibilities for
+    // max-height cells.
+    let currentHeightForMax = 0;
+    let currentHeightForMin = 0;
+    let hasValidMaxHeight = false;
+    // Start minVisible and maxVisible at 1, to avoid explicitly counting
+    // the max-height cell.
+    let maxVisible = 1;
+    let minVisible = 1;
     for (let i = 0; i < cells.length; i++) {
-      const value = grid[cells[i]];
-      // Check if we have multiple values.
-      if (value & (value - 1)) return true;
+      let values = grid[cells[i]];
 
-      if (value > currentMax) {
-        currentMax = value;
-        visible++;
+      const minMax = this._lookupTables.minMax8Bit[values];
+      const min = minMax >> 8;
+      const max = minMax & 0xff;
+
+      if (max == maxHeight) {
+        // For the rest of the processing, we want to ignore the maxValue.
+        values &= ~LookupTables.fromValue(maxHeight);
+        // If the target visibility is not feasible here then the max height
+        // must not be in this cell.
+        if (maxVisible < target || minVisible > target) {
+          if (!(grid[cells[i]] = values)) {
+            return false;
+          }
+        } else {
+          hasValidMaxHeight = true;
+        }
+        // We found the max skyscraper, nothing afterwards matters.
+        if (!values) break;
       }
-      if (value == this._maxValue) break;
+
+      // currentHeightForMin is the max of all values that we've seen.
+      // If the min is greater than currentHeightForMin then this cell must be
+      // visible. Even if min is equal, then we must still use this cell
+      // as it must be distinct from the previous currentHeightForMin.
+      if (min >= currentHeightForMin) minVisible++;
+      // Even if we don't use this cell, we must update the currentHeightForMin
+      // because it may be the case that we could have used this cell rather
+      // than the previous max.
+      if (max > currentHeightForMin) currentHeightForMin = max;
+
+      // If there is any larger values and currentHeightForMax then we can use
+      // this cell to increase visibility.
+      if (max > currentHeightForMax) {
+        maxVisible++;
+        if (min > currentHeightForMax) {
+          // If the min is larger, then that's easy as we are forced to use it.
+          currentHeightForMax = min;
+        } else {
+          // If min is not larger, then we must only increment the current max
+          // by 1. Even though this may not be a valid value for this cell, it
+          // may be possible to this value could have been used by a lower cell
+          // to set a more conservative height for the same visibility.
+          currentHeightForMax++;
+        }
+      }
     }
 
-    return visible == this._numVisible;
+    // NOTE: We can't infer anything from the *current* values of minVisible
+    // and maxVisible because earlier values may have been valid.
+    return hasValidMaxHeight;
   }
 }
 
