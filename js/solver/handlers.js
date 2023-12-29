@@ -1454,7 +1454,7 @@ SudokuConstraintHandler.XSum = class XSum extends SudokuConstraintHandler {
   constructor(cells, sum) {
     super(cells);
     this._sum = +sum;
-    this._control = cells[0];
+    this._controlCell = cells[0];
     this._internalSumHandler = new SudokuConstraintHandler.Sum(
       this.cells.slice(), this._sum);
   }
@@ -1465,15 +1465,22 @@ SudokuConstraintHandler.XSum = class XSum extends SudokuConstraintHandler {
     this._scratchGrid = initialGrid.slice();
     this._resultGrid = initialGrid.slice();
     this._lookupTables = LookupTables.get(shape.numValues);
+
+    // Cache the partial cell arrays to make it easier to pass into the sumHandler.
+    let array = [];
+    for (let i = 0; i < shape.gridSize; i++) {
+      array.push(this.cells.slice(0, i + 1));
+    }
+    this._cellArrays = array;
     return true;
   }
 
+  // Determine and restrict the range of acceptable values for the control cell.
   _restrictControlCell(grid) {
-    // Figure out the range of acceptable values for the control cell.
     const cells = this.cells;
     const numCells = cells.length;
     const sum = this._sum;
-    const control = this._control;
+    const controlCell = this._controlCell;
     const minMaxLookup = this._lookupTables.minMax8Bit;
 
     let minSum = 0;
@@ -1483,17 +1490,17 @@ SudokuConstraintHandler.XSum = class XSum extends SudokuConstraintHandler {
       const minMax = minMaxLookup[grid[cells[i]]];
       minSum += minMax >> 8;
       maxSum += minMax & 0xff;
-      // TODO: Use uniqueness to restrict.
+      // NOTE: We can uniqueness to restrict this even more.
 
       if (minSum > sum || maxSum < sum) {
         // This count isn't possible, so remove it from the control.
-        grid[control] &= ~LookupTables.fromValue(i + 1);
+        grid[controlCell] &= ~LookupTables.fromValue(i + 1);
         // minSum will never get lower.
         if (minSum > sum) break;
       }
     }
 
-    return grid[control] !== 0;
+    return grid[controlCell] !== 0;
   }
 
   enforceConsistency(grid, cellAccumulator) {
@@ -1501,44 +1508,49 @@ SudokuConstraintHandler.XSum = class XSum extends SudokuConstraintHandler {
 
     const sumHandler = this._internalSumHandler;
     const cells = this.cells;
+    const controlCell = this._controlCell;
 
-    let values = grid[this._control];
+    let values = grid[controlCell];
     const numControl = countOnes16bit(values);
     if (numControl == 1) {
       // There is a single value, so we can just enforce the sum directly.
-      let v = LookupTables.toValue(values);
-      sumHandler.cells = cells.slice(0, v);
+      const index = LookupTables.toValue(values) - 1;
+      sumHandler.cells = this._cellArrays[index];
       return sumHandler.enforceConsistency(grid, cellAccumulator);
     }
 
     // For each possible value of the control cell, enforce the sum.
     // In practice there should only be a few value control values.
-    sumHandler.cells = [];
     const scratchGrid = this._scratchGrid;
     const resultGrid = this._resultGrid;
     resultGrid.fill(0);
-    // Determine minControl, because these are the only cells we can actually
-    // constrain.
+    // Determine minControl, because we can only constraint this many cells.
+    // Cells beyond that may have unconstrained values depending on the control.
     const minControl = this._lookupTables.minMax8Bit[values] >> 8;
-    for (let i = 0; i < cells.length && values; i++) {
-      sumHandler.cells.push(cells[i]);
-      const value = LookupTables.fromValue(i + 1);
-      if (!(values & value)) continue;
+    while (values) {
+      const value = values & -values;
+      values &= ~value;
 
+      const index = LookupTables.toValue(value) - 1;
+      sumHandler.cells = this._cellArrays[index];
+
+      // NOTE: This can be optimized to use a smaller (cell.length size) grid.
       scratchGrid.set(grid);
-      scratchGrid[this._control] = value;
+      scratchGrid[controlCell] = value;
       if (sumHandler.enforceConsistency(scratchGrid, cellAccumulator)) {
+        // This is a valid setting so add it to the possible candidates.
         for (let j = 0; j < minControl; j++) {
           resultGrid[cells[j]] |= scratchGrid[cells[j]];
         }
       }
     }
 
+    // Copy over all the valid values to the real grid.
     for (let j = 0; j < minControl; j++) {
       grid[cells[j]] = resultGrid[cells[j]];
     }
 
-    return grid[this._control] !== 0;
+    return grid[controlCell] !== 0;
   }
 }
 
