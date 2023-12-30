@@ -429,7 +429,7 @@ select {
   fill: #f0f;
 }
 
-.outside-arrow.active-arrow.sandwich>path {
+.outside-arrow.active-arrow.full-line-arrow>path {
   opacity: 0;
 }
 

@@ -446,12 +446,12 @@ class ConstraintDisplay extends DisplayItem {
     item.parentNode.removeChild(item);
   }
 
-  addOutsideArrow(id, sum) {
-    this._outsideArrows.addOutsideArrow(id, sum);
+  addOutsideArrow(constraintType, lineId, value) {
+    this._outsideArrows.addOutsideArrow(constraintType, lineId, value);
   }
 
-  removeOutsideArrow(initialCell) {
-    this._outsideArrows.removeOutsideArrow(initialCell);
+  removeOutsideArrow(constraintType, lineId) {
+    this._outsideArrows.removeOutsideArrow(constraintType, lineId);
   }
 
   drawKillerCage(cells, sum, patterned) {
@@ -903,23 +903,27 @@ class OutsideArrowDisplay extends DisplayItem {
       selectedArrow = null;
       form.firstElementChild.disabled = true;
     });
-    const formOptions = [
-      document.getElementById('little-killer-option'),
-      document.getElementById('sandwich-option'),
-    ];
+    const formOptions = new Map([
+      ['LittleKiller', document.getElementById('little-killer-option')],
+      ['Sandwich', document.getElementById('sandwich-option')],
+    ]);
 
-    this._handleClick = (type, id, cells, arrowSvg) => {
+    this._handleClick = (lineId, cells) => {
+      const arrow = this._outsideArrowMap.get(lineId);
+
       inputManager.setSelection(cells);
       selectionForm.disabled = true;
       form.firstElementChild.disabled = false;
-      form.type.value = type;
-      form.id.value = id;
-      form.sum.select();
+      form.id.value = lineId;
+      form.value.select();
 
-      for (let option of formOptions) option.disabled = true;
-      document.getElementById(type + '-option').disabled = false;
+      const types = arrow.constraintTypes;
+      for (let [type, option] of formOptions) {
+        option.disabled = !types.includes(type);
+      }
+      form.type.value = types[0];
 
-      selectedArrow = arrowSvg;
+      selectedArrow = arrow.svg;
       selectedArrow.classList.add('selected-arrow');
     };
 
@@ -932,37 +936,38 @@ class OutsideArrowDisplay extends DisplayItem {
     this._outsideArrowMap = new Map();
 
     const littleKillerCellMap = SudokuConstraint.LittleKiller.cellMap(shape);
-    for (const id in littleKillerCellMap) {
-      this._addArrow('little-killer', id, littleKillerCellMap[id]);
+    for (const lineId in littleKillerCellMap) {
+      this._addArrow('diagonal-arrow', lineId, littleKillerCellMap[lineId]);
+      this._outsideArrowMap.get(lineId).constraintTypes.push('LittleKiller');
     }
-    const sandwichCellMap = SudokuConstraint.fullLineCellMap(shape);
-    for (const [id, cells] of sandwichCellMap) {
-      if (id.endsWith(',-1')) continue;
-      const arrowId = id.split(',')[0];
-      this._addArrow('sandwich', arrowId, cells);
+    for (const [lineId, cells] of SudokuConstraint.fullLineCellMap(shape)) {
+      this._addArrow('full-line-arrow', lineId, cells);
+      if (lineId.endsWith(',1')) {
+        this._outsideArrowMap.get(lineId).constraintTypes.push('Sandwich');
+      }
     }
   }
 
-  addOutsideArrow(id, sum) {
-    const elem = this._outsideArrowMap.get(id);
+  addOutsideArrow(constraintType, arrowId, value) {
+    const elem = this._outsideArrowMap.get(arrowId).svg;
     elem.classList.add('active-arrow');
 
     const text = elem.lastChild;
     if (text.lastChild) text.removeChild(text.lastChild);
-    text.appendChild(document.createTextNode(sum));
+    text.appendChild(document.createTextNode(value));
 
     return elem;
   }
 
-  removeOutsideArrow(initialCell) {
-    const elem = this._outsideArrowMap.get(initialCell);
+  removeOutsideArrow(constraintType, arrowId) {
+    const elem = this._outsideArrowMap.get(arrowId).svg;
     elem.classList.remove('active-arrow');
 
     const text = elem.lastChild;
     if (text.lastChild) text.removeChild(text.lastChild);
   }
 
-  _addArrow(type, id, cells) {
+  _addArrow(arrowType, arrowId, cells) {
     const shape = this._shape;
 
     const cell0 = shape.parseCellId(cells[0]);
@@ -974,9 +979,9 @@ class OutsideArrowDisplay extends DisplayItem {
       cell1.col - cell0.col);
     this.getSvg().appendChild(arrowSvg);
 
-    this._outsideArrowMap.set(id, arrowSvg);
-    arrowSvg.onclick = () => this._handleClick(type, id, cells, arrowSvg);
-    arrowSvg.classList.add(type);
+    this._outsideArrowMap.set(arrowId, { svg: arrowSvg, constraintTypes: [] });
+    arrowSvg.onclick = () => this._handleClick(arrowId, cells);
+    arrowSvg.classList.add(arrowType);
   };
 
   _makeArrow(row, col, dr, dc) {
