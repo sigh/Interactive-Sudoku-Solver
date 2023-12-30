@@ -1021,8 +1021,18 @@ SudokuConstraintHandler.Skyscraper = class Skyscraper extends SudokuConstraintHa
 
     // If only 1 cell is visible, then the first cell must be
     // the highest.
+    // TODO: Make enforcer strong enough to deduce these.
     if (numVisible == 1) {
       return !!(initialGrid[cells[0]] &= LookupTables.fromValue(maxValue));
+    }
+    // If all cells are visible, then all cells are fixed.
+    if (numVisible == maxValue) {
+      for (let i = 0; i < maxValue; i++) {
+        console.log('before', initialGrid[cells[i]]);
+        if (!(initialGrid[cells[i]] &= LookupTables.fromValue(i + 1))) {
+          return false;
+        }
+      }
     }
 
     // Mask off initial cells which won't have room to get too high.
@@ -1071,6 +1081,15 @@ SudokuConstraintHandler.Skyscraper = class Skyscraper extends SudokuConstraintHa
         }
         // We found the max skyscraper, nothing afterwards matters.
         if (!values) break;
+      }
+
+      // If we are already at the target for minVisible and we don't already
+      // already have a valid max-height, we can't increase it anymore.
+      if (!hasValidMaxHeight && minVisible == target) {
+        const mask = LookupTables.fromValue(currentHeightForMin) - 1;
+        if (!(grid[cells[i]] &= mask)) {
+          return false;
+        }
       }
 
       // currentHeightForMin is the max of all values that we've seen.
