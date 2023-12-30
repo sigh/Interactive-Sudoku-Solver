@@ -672,8 +672,8 @@ class SudokuConstraint {
     constructor(rowCol, count1, count2) {
       super(arguments);
       this.rowCol = rowCol;
-      this.count1 = count1;
-      this.count2 = count2;
+      this.count1 = +count1;
+      this.count2 = +count2;
     }
 
     static getCells(shape, rowCol) {

@@ -192,6 +192,11 @@ const EXAMPLES = {
     input: '.~R1C1_1~R1C6_2~R1C9_8~R3C1_3~R3C4_6~R3C7_4~R5C1_5~R5C3_2~R5C6_3~R7C1_7~R7C4_8~R7C7_2~R9C9_6~R9C6_4~R9C1_9.Skyscraper~c5~5.Skyscraper~r2~2.Skyscraper~r4~4.Skyscraper~r6~6.Skyscraper~r8~8',
     solution: '147932658826145937359678412678419325592783164413256789765891243234567891981324576',
   },
+  'Homogeneous skyscraper': {
+    src: 'https://sudokutheory.com/wiki/index.php?title=Snipes#Skyscrapers',
+    input: '.Skyscraper~c1~6.Skyscraper~c3~6.Skyscraper~c6~6.Skyscraper~r5~6.Skyscraper~r8~6.Skyscraper~r1~0~6.Skyscraper~r4~0~6.Skyscraper~r7~0~6.Skyscraper~c2~0~6.Skyscraper~c4~0~6',
+    solution: '491872653582631974673495218714986532356724189829513746968357421145268397237149865',
+  },
 
   // Classic grids that used to be slow. 3 and 4 used to take 2+ seconds.
   'Classic sudoku, was slow (1)': {
