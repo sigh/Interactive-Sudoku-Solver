@@ -996,6 +996,10 @@ SudokuConstraintHandler.Skyscraper = class Skyscraper extends SudokuConstraintHa
   constructor(cells, numVisible) {
     super(cells);
     this._numVisible = +numVisible;
+
+    if (0 >= this._numVisible) {
+      throw ('Skyscraper visibility target must be > 0');
+    }
   }
 
   initialize(initialGrid, cellConflicts, shape) {

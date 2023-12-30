@@ -205,6 +205,7 @@ const runSolveTests = async (onFailure) => {
     'Hailstone (easier) - little killer',
     'X-Sum little killer',
     'Skyscraper',
+    'Homogeneous skyscraper',
   ], onFailure);
 
   await runAllWithChecks([
