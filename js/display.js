@@ -935,9 +935,11 @@ class OutsideArrowDisplay extends DisplayItem {
     for (const id in littleKillerCellMap) {
       this._addArrow('little-killer', id, littleKillerCellMap[id]);
     }
-    const sandwichCellMap = SudokuConstraint.Sandwich.cellMap(shape);
-    for (const id in sandwichCellMap) {
-      this._addArrow('sandwich', id, sandwichCellMap[id]);
+    const sandwichCellMap = SudokuConstraint.fullLineCellMap(shape);
+    for (const [id, cells] of sandwichCellMap) {
+      if (id.endsWith(',-1')) continue;
+      const arrowId = id.split(',')[0];
+      this._addArrow('sandwich', arrowId, cells);
     }
   }
 

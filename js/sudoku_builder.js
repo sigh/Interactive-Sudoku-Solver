@@ -618,22 +618,8 @@ class SudokuConstraint {
     constructor(sum, rowCol, dir) {
       super(arguments);
       this.sum = sum;
-      this.rowCol = rowCol;
+      this.rowCol = rowCol.toUpperCase();
       this.dir = dir;
-    }
-
-    static getCells(shape, rowCol, dir) {
-      const gridSize = shape.gridSize;
-
-      let colRow = rowCol[0].toLowerCase() == 'r' ? 'c' : 'r';
-      let cells = [];
-      const start = dir == 1 ? 1 : gridSize;
-      for (let i = 0; i < gridSize; i++) {
-        const part = `${colRow}${start + i * dir}`;
-        cells.push(colRow == 'r' ? part + rowCol : rowCol + part);
-      }
-
-      return cells;
     }
   }
 
@@ -643,53 +629,16 @@ class SudokuConstraint {
       this.id = id;
       this.sum = sum;
     }
-
-    static cellMap = memoize((shape) => {
-      let map = {};
-      const gridSize = shape.gridSize;
-
-      const addSandwich = (name, row, col, dr, dc) => {
-        let cells = [];
-        for (; col < gridSize && row < gridSize;
-          row += dr, col += dc) {
-          cells.push(shape.makeCellId(row, col));
-        }
-        map[name] = cells;
-      };
-
-      for (let row = 0; row < gridSize; row++) {
-        addSandwich(`R${row + 1}`, row, 0, 0, 1);
-      }
-      for (let col = 0; col < gridSize; col++) {
-        addSandwich(`C${col + 1}`, 0, col, 1, 0);
-      }
-
-      return map;
-    });
   }
 
   static Skyscraper = class Skyscraper extends SudokuConstraint {
     constructor(rowCol, count1, count2) {
       super(arguments);
-      this.rowCol = rowCol;
+      this.rowCol = rowCol.toUpperCase();
       this.count1 = +count1;
       this.count2 = +count2;
     }
-
-    static getCells(shape, rowCol) {
-      const gridSize = shape.gridSize;
-
-      let colRow = rowCol[0].toLowerCase() == 'r' ? 'c' : 'r';
-      let cells = [];
-      for (let i = 0; i < gridSize; i++) {
-        const part = `${colRow}${i + 1}`;
-        cells.push(colRow == 'r' ? part + rowCol : rowCol + part);
-      }
-
-      return cells;
-    }
   }
-
 
   static AllDifferent = class AllDifferent extends SudokuConstraint {
     constructor(...cells) {
@@ -748,6 +697,26 @@ class SudokuConstraint {
     return this._makeRegions(
       (r, i) => ((i / boxSize | 0) * boxSize + (r % boxSize | 0)) * gridSize
         + (i % boxSize | 0) * boxSize + (r / boxSize | 0), gridSize);
+  });
+
+  static fullLineCellMap = memoize((shape) => {
+    let map = new Map();
+    const gridSize = shape.gridSize;
+
+    const rowRegions = this.rowRegions(shape);
+    for (let row = 0; row < gridSize; row++) {
+      const cells = rowRegions[row].map(c => shape.makeCellIdFromIndex(c));
+      map.set(`R${row + 1},1`, cells);
+      map.set(`R${row + 1},-1`, cells.slice().reverse());
+    }
+    const colRegions = this.colRegions(shape);
+    for (let col = 0; col < gridSize; col++) {
+      const cells = colRegions[col].map(c => shape.makeCellIdFromIndex(c));
+      map.set(`C${col + 1},1`, cells);
+      map.set(`C${col + 1},-1`, cells.slice().reverse());
+    }
+
+    return map;
   });
 }
 
@@ -954,21 +923,22 @@ class SudokuBuilder {
           break;
 
         case 'XSum':
-          cells = SudokuConstraint.XSum
-            .getCells(shape, constraint.rowCol, constraint.dir).map(
+          cells = SudokuConstraint.fullLineCellMap(shape)
+            .get([constraint.rowCol, constraint.dir].toString()).map(
               c => shape.parseCellId(c).cell);
           yield new SudokuConstraintHandler.XSum(cells, constraint.sum);
           break;
 
         case 'Sandwich':
-          cells = SudokuConstraint.Sandwich
-            .cellMap(shape)[constraint.id].map(c => shape.parseCellId(c).cell);
+          cells = SudokuConstraint.fullLineCellMap(shape)
+            .get([constraint.id, 1].toString()).map(
+              c => shape.parseCellId(c).cell);
           yield new SudokuConstraintHandler.Sandwich(cells, constraint.sum);
           break;
 
         case 'Skyscraper':
-          cells = SudokuConstraint.Skyscraper
-            .getCells(shape, constraint.rowCol).map(
+          cells = SudokuConstraint.fullLineCellMap(shape)
+            .get([constraint.rowCol, 1].toString()).map(
               c => shape.parseCellId(c).cell);
           if (constraint.count1) {
             yield new SudokuConstraintHandler.Skyscraper(
