@@ -588,6 +588,10 @@ class SudokuConstraint {
       this.sum = sum;
     }
 
+    lineId() {
+      return this.id;
+    }
+
     static cellMap = memoize((shape) => {
       let map = {};
       const gridSize = shape.gridSize;
@@ -628,6 +632,10 @@ class SudokuConstraint {
       super(arguments);
       this.id = id;
       this.sum = sum;
+    }
+
+    lineId() {
+      return this.id + ',1';
     }
   }
 
