@@ -555,6 +555,10 @@ class ConstraintManager {
           id = lineId.split(',')[0];
           this.loadConstraint(new SudokuConstraint.Sandwich(value, id));
           break;
+        case 'XSum':
+          let [rowCol, dir] = lineId.split(',');
+          this.loadConstraint(new SudokuConstraint.XSum(value, rowCol, dir));
+          break;
       }
 
       inputManager.setSelection([]);
@@ -734,6 +738,12 @@ class ConstraintManager {
           constraint.type, constraint.lineId(), constraint.sum);
         break;
       case 'Sandwich':
+        this._outsideArrowConstraints.set(
+          `${constraint.type}-${constraint.lineId()}`, constraint);
+        this._display.addOutsideArrow(
+          constraint.type, constraint.lineId(), constraint.sum);
+        break;
+      case 'XSum':
         this._outsideArrowConstraints.set(
           `${constraint.type}-${constraint.lineId()}`, constraint);
         this._display.addOutsideArrow(

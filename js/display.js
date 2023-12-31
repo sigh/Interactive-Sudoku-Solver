@@ -906,6 +906,7 @@ class OutsideArrowDisplay extends DisplayItem {
     const formOptions = new Map([
       ['LittleKiller', document.getElementById('little-killer-option')],
       ['Sandwich', document.getElementById('sandwich-option')],
+      ['XSum', document.getElementById('xsum-option')],
     ]);
 
     this._handleClick = (lineId, cells) => {
@@ -921,7 +922,9 @@ class OutsideArrowDisplay extends DisplayItem {
       for (let [type, option] of formOptions) {
         option.disabled = !types.includes(type);
       }
-      form.type.value = types[0];
+      if (!types.includes(form.type.value)) {
+        form.type.value = types[0];
+      }
 
       selectedArrow = arrow.svg;
       selectedArrow.classList.add('selected-arrow');
@@ -937,37 +940,65 @@ class OutsideArrowDisplay extends DisplayItem {
 
     const littleKillerCellMap = SudokuConstraint.LittleKiller.cellMap(shape);
     for (const lineId in littleKillerCellMap) {
-      this._addArrow('diagonal-arrow', lineId, littleKillerCellMap[lineId]);
+      this._addArrowSvg('diagonal-arrow', lineId, littleKillerCellMap[lineId]);
       this._outsideArrowMap.get(lineId).constraintTypes.push('LittleKiller');
     }
     for (const [lineId, cells] of SudokuConstraint.fullLineCellMap(shape)) {
-      this._addArrow('full-line-arrow', lineId, cells);
+      this._addArrowSvg('full-line-arrow', lineId, cells);
       if (lineId.endsWith(',1')) {
         this._outsideArrowMap.get(lineId).constraintTypes.push('Sandwich');
       }
+      this._outsideArrowMap.get(lineId).constraintTypes.push('XSum');
     }
   }
 
   addOutsideArrow(constraintType, arrowId, value) {
-    const elem = this._outsideArrowMap.get(arrowId).svg;
-    elem.classList.add('active-arrow');
-
-    const text = elem.lastChild;
-    if (text.lastChild) text.removeChild(text.lastChild);
-    text.appendChild(document.createTextNode(value));
-
-    return elem;
+    this._outsideArrowMap.get(arrowId).currentValues.set(constraintType, value);
+    this._updateArrowValues(arrowId);
   }
 
   removeOutsideArrow(constraintType, arrowId) {
-    const elem = this._outsideArrowMap.get(arrowId).svg;
-    elem.classList.remove('active-arrow');
-
-    const text = elem.lastChild;
-    if (text.lastChild) text.removeChild(text.lastChild);
+    this._outsideArrowMap.get(arrowId).currentValues.delete(constraintType);
+    this._updateArrowValues(arrowId);
   }
 
-  _addArrow(arrowType, arrowId, cells) {
+  _updateArrowValues(arrowId) {
+    const arrow = this._outsideArrowMap.get(arrowId);
+    const elem = arrow.svg;
+
+    // Remove all the old values.
+    const textNode = elem.lastChild;
+    if (textNode.lastChild) textNode.removeChild(textNode.lastChild);
+
+    // If there are no values, set it inactive and stop.
+    if (!arrow.currentValues.size) {
+      elem.classList.remove('active-arrow');
+      return;
+    }
+
+    elem.classList.add('active-arrow');
+
+    // Render the current values.
+    const textParts = [];
+    for (const [type, value] of arrow.currentValues) {
+      let brackets = ['', ''];
+      switch (type) {
+        case 'XSum':
+          brackets = '⟨⟩';
+          break;
+      }
+      textParts.push(brackets[0], value, brackets[1]);
+    }
+    const text = textParts.join('');
+    if (textNode.lastChild) textNode.removeChild(textNode.lastChild);
+    textNode.appendChild(document.createTextNode(text));
+
+    // Choose font size based on the number of values.
+    const fontSize = 16 - 2 * arrow.currentValues.size;
+    textNode.setAttribute('style', `font-size: ${fontSize}px`);
+  }
+
+  _addArrowSvg(arrowType, arrowId, cells) {
     const shape = this._shape;
 
     const cell0 = shape.parseCellId(cells[0]);
@@ -979,7 +1010,9 @@ class OutsideArrowDisplay extends DisplayItem {
       cell1.col - cell0.col);
     this.getSvg().appendChild(arrowSvg);
 
-    this._outsideArrowMap.set(arrowId, { svg: arrowSvg, constraintTypes: [] });
+    this._outsideArrowMap.set(
+      arrowId,
+      { svg: arrowSvg, constraintTypes: [], currentValues: new Map() });
     arrowSvg.onclick = () => this._handleClick(arrowId, cells);
     arrowSvg.classList.add(arrowType);
   };
@@ -1024,8 +1057,6 @@ class OutsideArrowDisplay extends DisplayItem {
     text.setAttribute('y', arrowY - dy * textOffsetFactor);
     text.setAttribute('text-anchor', 'middle');
     text.setAttribute('dominant-baseline', 'middle');
-    text.setAttribute('style',
-      'font-size: 16; font-family: monospace; font-weight: bold;');
 
     let arrow = createSvgElement('g');
     arrow.appendChild(hitbox);
