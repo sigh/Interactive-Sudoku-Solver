@@ -644,11 +644,17 @@ class SudokuConstraint {
   }
 
   static Skyscraper = class Skyscraper extends SudokuConstraint {
-    constructor(rowCol, count1, count2) {
+    constructor(rowCol, countDown, countUp) {
       super(arguments);
       this.rowCol = rowCol.toUpperCase();
-      this.count1 = +count1;
-      this.count2 = +count2;
+      this.countDown = +countDown;
+      this.countUp = +countUp;
+    }
+
+    lineId() {
+      if (this.countDown) return this.rowCol + ',1';
+      if (this.countUp) return this.rowCol + ',-1';
+      return null;
     }
   }
 
@@ -952,14 +958,14 @@ class SudokuBuilder {
           cells = SudokuConstraint.fullLineCellMap(shape)
             .get([constraint.rowCol, 1].toString()).map(
               c => shape.parseCellId(c).cell);
-          if (constraint.count1) {
+          if (constraint.countDown) {
             yield new SudokuConstraintHandler.Skyscraper(
-              cells, constraint.count1);
+              cells, constraint.countDown);
           }
-          if (constraint.count2) {
+          if (constraint.countUp) {
             cells = cells.slice().reverse();
             yield new SudokuConstraintHandler.Skyscraper(
-              cells, constraint.count2);
+              cells, constraint.countUp);
           }
           break;
 

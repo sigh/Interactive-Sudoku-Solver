@@ -227,7 +227,7 @@ button.danger-button:hover:enabled {
 }
 
 #constraint-panel {
-  line-height: 2;
+  line-height: 1.8;
 }
 
 #outside-arrow-input {
@@ -247,7 +247,7 @@ button.danger-button:hover:enabled {
 
 input[type=number] {
   width: 4.5em;
-  height: 2em;
+  height: 1.8em;
 }
 
 input[disabled]+label {
@@ -432,6 +432,13 @@ select {
 
 .outside-arrow.active-arrow.full-line-arrow>path {
   opacity: 0;
+}
+
+#outside-arrow-type-options {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  column-gap: 10px;
+  row-gap: 5px;
 }
 
 #multi-cell-constraint-input>fieldset {
