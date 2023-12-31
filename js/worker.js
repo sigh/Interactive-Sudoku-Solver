@@ -6,7 +6,8 @@ const START_INIT_WORKER = performance.now();
     'util.js' + versionParam,
     'sudoku_builder.js' + versionParam,
     'solver/engine.js' + versionParam,
-    'solver/handlers.js' + versionParam);
+    'solver/handlers.js' + versionParam,
+    'solver/optimizer.js' + versionParam);
 }
 
 

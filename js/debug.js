@@ -1,5 +1,6 @@
 loadJSFile('js/solver/engine.js');
 loadJSFile('js/solver/handlers.js');
+loadJSFile('js/solver/optimizer.js');
 loadJSFile('data/killers.js');
 loadJSFile('data/thermos.js');
 loadJSFile('data/jigsaw_layouts.js');
