@@ -384,6 +384,12 @@ class OutsideArrowConstraints {
     return `${type}|${lineId}`;
   }
 
+  static _isValidValue(value, type) {
+    if (value == '' || value != +value) return false;
+    if (type != 'Sandwich' && +value == 0) return false;
+    return true;
+  }
+
   _setUp(inputManager) {
     this._constraints = new Map();
 
@@ -403,7 +409,7 @@ class OutsideArrowConstraints {
       let lineId = formData.get('id');
 
       let value = formData.get('value');
-      if (value == '' || value != +value) {
+      if (!this.constructor._isValidValue(value, type)) {
         clearOutsideArrow();
         return false;
       }
@@ -437,14 +443,16 @@ class OutsideArrowConstraints {
         {
           const values = constraint.values();
           if (values[0]) {
+            const lineId = constraint.rowCol + ',1';
             this._addConstraint(
-              new SudokuConstraint[type](constraint.rowCol, values[0], 0),
-              constraint.rowCol + ',1', values[0]);
+              this.constructor._makeConstraint(type, lineId, values[0]),
+              lineId, values[0]);
           }
           if (values[1]) {
+            const lineId = constraint.rowCol + ',-1';
             this._addConstraint(
-              new SudokuConstraint[type](constraint.rowCol, 0, values[1]),
-              constraint.rowCol + ',-1', values[1]);
+              this.constructor._makeConstraint(type, lineId, values[1]),
+              lineId, values[1]);
           }
         }
         break;
@@ -478,8 +486,8 @@ class OutsideArrowConstraints {
       case 'Skyscraper':
         return new SudokuConstraint[type](
           rowCol,
-          dir == 1 ? value : 0,
-          dir == 1 ? 0 : value);
+          dir == 1 ? value : '',
+          dir == 1 ? '' : value);
       default:
         throw ('Unknown type: ' + type);
     }
