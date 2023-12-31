@@ -625,13 +625,17 @@ input:checked+span:before {
 #debug-container {
   resize: both;
   overflow: auto;
-  height: 100px;
+  height: 200px;
   width: 95%;
   box-shadow: inset 0px 0px 3px #555;
   padding: 3px;
 
   display: none;
   cursor: pointer;
+}
+
+#close-debug-button {
+  display: none;
 }
 
 #debug-container>div>span:first-child {
