@@ -184,7 +184,7 @@ const EXAMPLES = {
     solution: '815432976763918245942567318278351694154896732396274581437685129681729453529143867',
   },
   'X-Sum little killer': {
-    input: '.LittleKiller~23~R1C1.LittleKiller~12~R2C9.LittleKiller~23~R3C9.LittleKiller~25~R5C9.LittleKiller~12~R7C1.LittleKiller~25~R1C6.~R7C2_2~R7C8_5.XSum~25~c1~1.XSum~23~c1~-1.XSum~12~c5~1.XSum~25~c5~-1.XSum~23~c9~1.XSum~12~c9~-1',
+    input: '.LittleKiller~23~R1C1.LittleKiller~12~R2C9.LittleKiller~23~R3C9.LittleKiller~25~R5C9.LittleKiller~12~R7C1.LittleKiller~25~R1C6.~R7C2_2~R7C8_5.XSum~C1~25~23.XSum~C5~12~25.XSum~C9~23~12',
     solution: '562831974837429165941576238195384726286715349473692581329168457758943612614257893',
   },
   'Skyscraper': {
