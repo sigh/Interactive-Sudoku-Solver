@@ -156,6 +156,8 @@ class ExampleHandler {
     'X-Windoku',
     'Region sum lines',
     'Disjoint little killer',
+    'Skyscraper',
+    'X-Sum',
     '16x16',
     '16x16: Sudoku X, hard',
     '16x16: Jigsaw',
