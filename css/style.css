@@ -85,7 +85,7 @@ body {
 
 #state-buttons {
   display: flex;
-  gap: 15px;
+  gap: 10px;
   margin: 5px 0;
 }
 
@@ -275,8 +275,7 @@ textarea {
 }
 
 .control-panel button {
-  height: 50px;
-  min-width: 50px;
+  /* min-width: 50px; */
 }
 
 #grid-control-buttons {
@@ -296,18 +295,17 @@ textarea {
   gap: 10px;
 }
 
-button.icon-button {
+button.big-button {
   height: 50px;
-  width: 50px;
+  min-width: 50px;
+}
+
+button.icon-button {
+  min-width: 50px;
   font-size: 25px;
   font-weight: bold;
   padding: 0px;
 }
-
-#solution-control-buttons button.icon-button {
-  height: 35px;
-}
-
 
 #solution-step-output {
   display: inline-block;
