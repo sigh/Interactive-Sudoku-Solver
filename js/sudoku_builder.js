@@ -523,6 +523,26 @@ class SudokuConstraint {
 
   static AntiConsecutive = class AntiConsecutive extends SudokuConstraint { }
 
+  static GlobalEntropy = class GlobalEntropy extends SudokuConstraint {
+    static regions = memoize((shape) => {
+      const gridSize = shape.gridSize;
+      const regions = [];
+
+      for (let i = 0; i < gridSize - 1; i++) {
+        for (let j = 0; j < gridSize - 1; j++) {
+          regions.push([
+            shape.cellIndex(i, j),
+            shape.cellIndex(i, j + 1),
+            shape.cellIndex(i + 1, j),
+            shape.cellIndex(i + 1, j + 1),
+          ]);
+        }
+      }
+
+      return regions;
+    });
+  }
+
   static Diagonal = class Diagonal extends SudokuConstraint {
     constructor(direction) {
       super(arguments);
@@ -1056,6 +1076,12 @@ class SudokuBuilder {
         case 'DisjointSets':
           for (const cells of SudokuConstraint.disjointSetRegions(shape)) {
             yield new SudokuConstraintHandler.AllDifferent(cells);
+          }
+          break;
+
+        case 'GlobalEntropy':
+          for (const cells of SudokuConstraint.GlobalEntropy.regions(shape)) {
+            yield new SudokuConstraintHandler.LocalEntropy(cells);
           }
           break;
 
