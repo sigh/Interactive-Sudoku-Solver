@@ -34,13 +34,15 @@ layout: null
     window.addEventListener('load', () => {
       initPage();
 
-      const urlParams = new URLSearchParams(window.location.search);
+      const url = new URL(window.location);
       self.loadDebug = () => {
         const loader = dynamicJSFileLoader('js/debug.js');
         controller.debugOutput.enable();
+        url.searchParams.set('debug', 1);
+        window.history.pushState(null, null, url);
         return loader();
       };
-      if (urlParams.get('debug') !== null) {
+      if (url.searchParams.get('debug') !== null) {
         self.loadDebug();
       }
     });
