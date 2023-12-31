@@ -1683,6 +1683,39 @@ SudokuConstraintHandler.XSum = class XSum extends SudokuConstraintHandler {
   }
 }
 
+SudokuConstraintHandler.LocalEntropy = class LocalEntropy extends SudokuConstraintHandler {
+  initialize(initialGrid, cellConflicts, shape) {
+    this._lookupTables = LookupTables.get(shape.numValues);
+    this._squishedMask = (
+      LookupTables.fromValue(1) |
+      LookupTables.fromValue(4) |
+      LookupTables.fromValue(7));
+    this._valuesBuffer = new Uint16Array(this.cells.length);
+
+    return true;
+  }
+
+  enforceConsistency(grid, cellAccumulator) {
+    const cells = this.cells;
+    const numCells = this.cells.length;
+    const squishedMask = this._squishedMask;
+    const valuesBuffer = this._valuesBuffer;
+
+    let allValues = 0;
+    for (let i = 0; i < numCells; i++) {
+      let squishedValues = grid[cells[i]];
+      squishedValues |= squishedValues >> 1;
+      squishedValues |= squishedValues >> 1;
+      squishedValues &= squishedMask;
+      // valuesBuffer[i] = squishedValues;
+      allValues |= squishedValues;
+    }
+
+    if (allValues != squishedMask) return false;
+    return true;
+  }
+}
+
 class HandlerSet {
   constructor(handlers, shape) {
     this._handlers = [];

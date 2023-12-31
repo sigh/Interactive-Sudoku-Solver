@@ -207,6 +207,11 @@ const EXAMPLES = {
     input: '.Renban~R2C1~R3C1~R4C1~R4C2.Renban~R3C3~R4C3~R5C3~R6C3.Renban~R2C5~R3C5.Renban~R6C4~R5C4~R4C4~R4C5~R4C6.Renban~R9C1~R8C1~R8C2~R9C3.Renban~R9C7~R8C8~R8C9~R9C9.Renban~R7C4~R7C5~R7C6~R6C6~R5C6.Renban~R3C7~R4C7~R5C7~R5C8~R5C9.Renban~R2C7~R2C8~R2C9~R3C9~R4C9..Skyscraper~c2~3~4.Skyscraper~c4~0~3.Skyscraper~c6~4.Skyscraper~c7~5.Skyscraper~c8~4~4.Skyscraper~c9~0~5.Skyscraper~r1~3~6.Skyscraper~r3~4.Skyscraper~r5~3~3.Skyscraper~r6~5.Skyscraper~r8~4.Skyscraper~r9~4~3',
     solution: '359876142821943567674152389795634218183297456246518793932465871468721935517389624',
   },
+  'Global entropy': {
+    src: 'https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?id=0008G7',
+    input: '.~R1C1_8~R1C9_7~R3C4_9~R3C6_5~R4C6_8~R4C4_6~R4C3_5~R6C3_6~R6C4_1~R7C4_7~R7C6_3~R6C6_9~R6C7_4~R4C7_9~R9C9_4~R9C1_2.GlobalEntropy',
+    solution: '891234567534867291672915348315648972948372615726159483459783126183426759267591834',
+  },
 
   // Classic grids that used to be slow. 3 and 4 used to take 2+ seconds.
   'Classic sudoku, was slow (1)': {
@@ -244,6 +249,11 @@ const EXAMPLES = {
   'White Room  - killer sudoku': {
     src: 'http://forum.enjoysudoku.com/new-killer-setter-t38092-15.html#p306873',
     input: '.Cage~7~R2C2~R3C2~R4C2.Cage~5~R2C6~R2C7.Cage~6~R3C7~R3C8.Cage~6~R4C6~R4C7.Cage~15~R7C9~R6C9.Cage~3~R9C7~R9C6.Cage~17~R8C3~R7C3.Cage~23~R6C3~R6C4~R7C4.',
+  },
+  'Heat up - global entropy': {
+    src: 'https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?id=000FZ4',
+    input: '.Thermo~R1C2~R2C2~R3C1.Thermo~R2C9~R2C8~R1C7.Thermo~R4C5~R5C6~R6C5~R5C4.Thermo~R8C1~R8C2~R9C3.Thermo~R9C8~R8C8~R7C9.Skyscraper~C4~5~0.Skyscraper~R6~5~0.Skyscraper~C6~0~5.Skyscraper~R4~0~5..GlobalEntropy',
+    solution: '834159627659273841712486395967518432183942576425367918376824159241695783598731264',
   },
 
   // Extreme killers.

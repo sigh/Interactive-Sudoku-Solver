@@ -87,6 +87,11 @@ class CheckboxConstraints {
         constraint: new SudokuConstraint.DisjointSets(),
         isLayout: false,
       },
+      globalEntropy: {
+        id: 'global-entropy-input',
+        constraint: new SudokuConstraint.GlobalEntropy(),
+        isLayout: false,
+      },
       diagonalPlus: {
         id: 'diagonal-plus-input',
         constraint: new SudokuConstraint.Diagonal(1),
@@ -196,6 +201,7 @@ class ExampleHandler {
     'Disjoint little killer',
     'Skyscraper',
     'X-Sum',
+    'Global entropy',
     '16x16',
     '16x16: Sudoku X, hard',
     '16x16: Jigsaw',
@@ -888,6 +894,9 @@ class ConstraintManager {
         break;
       case 'DisjointSets':
         this._checkboxConstraints.check('disjointSets');
+        break;
+      case 'GlobalEntropy':
+        this._checkboxConstraints.check('globalEntropy');
         break;
       case 'Diagonal':
         if (constraint.direction > 0) {

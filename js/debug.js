@@ -207,6 +207,7 @@ const runSolveTests = async (onFailure) => {
     'X-Sum little killer',
     'Skyscraper',
     'Homogeneous skyscraper',
+    'Global entropy',
   ], onFailure);
 
   await runAllWithChecks([
