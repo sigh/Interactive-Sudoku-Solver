@@ -130,8 +130,8 @@ SudokuConstraintHandler.House = class House extends SudokuConstraintHandler {
     if (uniqueValues) {
       // We have hidden singles. Find and constrain them.
       for (let i = 0; i < gridSize; i++) {
-        let cell = cells[i];
-        let value = grid[cell] & uniqueValues;
+        const cell = cells[i];
+        const value = grid[cell] & uniqueValues;
         if (value) {
           // If we have more value that means a single cell holds more than
           // one unique value.
@@ -1683,6 +1683,7 @@ SudokuConstraintHandler.XSum = class XSum extends SudokuConstraintHandler {
   }
 }
 
+// Enforce the "Global entropy" constraint for a single 2x2 region.
 SudokuConstraintHandler.LocalEntropy = class LocalEntropy extends SudokuConstraintHandler {
   initialize(initialGrid, cellConflicts, shape) {
     this._lookupTables = LookupTables.get(shape.numValues);
@@ -1701,17 +1702,43 @@ SudokuConstraintHandler.LocalEntropy = class LocalEntropy extends SudokuConstrai
     const squishedMask = this._squishedMask;
     const valuesBuffer = this._valuesBuffer;
 
+    // This code is very similar to the House handler, but adjusted to
+    // collapse the values into 3 sets.
     let allValues = 0;
+    let nonUniqueValues = 0;
+    let fixedValues = 0;
     for (let i = 0; i < numCells; i++) {
-      let squishedValues = grid[cells[i]];
-      squishedValues |= squishedValues >> 1;
-      squishedValues |= squishedValues >> 1;
-      squishedValues &= squishedMask;
-      // valuesBuffer[i] = squishedValues;
-      allValues |= squishedValues;
+      let v = grid[cells[i]];
+      v |= (v >> 1) | (v >> 2);
+      v &= squishedMask;
+      valuesBuffer[i] = v;
+      nonUniqueValues |= allValues & v;
+      allValues |= v;
+      fixedValues |= (!(v & (v - 1))) * v;  // Better than branching.
     }
 
     if (allValues != squishedMask) return false;
+    if (fixedValues == squishedMask) return true;
+
+    let uniqueValues = allValues & ~nonUniqueValues & ~fixedValues;
+    if (uniqueValues) {
+      // We have "hidden singles" equivalent. Find and constrain them.
+      for (let i = 0; i < numCells; i++) {
+        const value = valuesBuffer[i] & uniqueValues;
+        if (value) {
+          // If we have more value that means a single cell holds more than
+          // one unique value.
+          if (value & (value - 1)) return false;
+          // Unsquish the value.
+          const unsquishedValue = value | (value << 1) | (value << 2);
+          const cell = cells[i];
+          grid[cell] &= unsquishedValue;
+          cellAccumulator.add(cell);
+          uniqueValues &= ~value;
+        }
+      }
+    }
+
     return true;
   }
 }
