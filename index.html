@@ -386,29 +386,49 @@ layout: null
             <input type="hidden" name="id">
 
 
-            <input type="radio" id="little-killer-option" name="type" value="LittleKiller">
-            <label for="little-killer-option">
-              Little Killer
-              <span class="tooltip" data-text="Values along diagonal must add to the given sum. Values may repeat.">
-              </span>
-            </label>
-            <input type="radio" id="sandwich-option" name="type" value="Sandwich">
-            <label for="sandwich-option">
-              Sandwich
-              <span class="tooltip"
-                data-text="Values between the 1 and the 9 in the row or column must add to the given sum.">
-              </span>
-            </label>
-            <input type="radio" id="xsum-option" name="type" value="XSum">
-            <label for="xsum-option">
-              X-Sum
-              <span class="tooltip" data-text="
+            <div id="outside-arrow-type-options">
+              <div>
+                <input type="radio" id="little-killer-option" name="type" value="LittleKiller">
+                <label for="little-killer-option">
+                  Little Killer
+                  <span class="tooltip" data-text="Values along diagonal must add to the given sum. Values may repeat.">
+                  </span>
+                </label>
+              </div>
+              <div>
+                <input type="radio" id="sandwich-option" name="type" value="Sandwich">
+                <label for="sandwich-option">
+                  Sandwich
+                  <span class="tooltip"
+                    data-text="Values between the 1 and the 9 in the row or column must add to the given sum.">
+                  </span>
+                </label>
+              </div>
+              <div>
+                <input type="radio" id="xsum-option" name="type" value="XSum">
+                <label for="xsum-option">
+                  X-Sum
+                  <span class="tooltip" data-text="
                   The sum of the first X numbers must add up to the given sum.
                   X is the number in the first cell in the direction of the row
                   or column.
                 ">
-              </span>
-            </label>
+                  </span>
+                </label>
+              </div>
+              <div>
+                <input type="radio" id="skyscraper-option" name="type" value="Skyscraper">
+                <label for="skyscraper-option">
+                  Skyscraper
+                  <span class="tooltip" data-text="
+                  Digits in the grid represent skyscrapers of that height.
+                  Higher skyscrapers obscure smaller ones.
+                  Clues outside the grid show the number of visible skyscrapers in that row/column from the clue's direction of view.
+                ">
+                  </span>
+                </label>
+              </div>
+            </div>
 
             <div>
               <input type="number" name="value" min=0 placeholder="value">

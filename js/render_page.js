@@ -450,7 +450,7 @@ class ConstraintManager {
       try {
         this.loadFromText(input);
       } catch (e) {
-        console.log(e + ' Input: ' + input);
+        console.error(e + ' Input: ' + input);
         freeInputError.textContent = e;
       }
       return false;
@@ -556,8 +556,19 @@ class ConstraintManager {
           this.loadConstraint(new SudokuConstraint.Sandwich(value, id));
           break;
         case 'XSum':
-          let [rowCol, dir] = lineId.split(',');
-          this.loadConstraint(new SudokuConstraint.XSum(value, rowCol, dir));
+          {
+            let [rowCol, dir] = lineId.split(',');
+            this.loadConstraint(new SudokuConstraint.XSum(value, rowCol, dir));
+          }
+          break;
+        case 'Skyscraper':
+          {
+            let [rowCol, dir] = lineId.split(',');
+            this.loadConstraint(new SudokuConstraint.Skyscraper(
+              rowCol,
+              dir == 1 ? value : 0,
+              dir == 1 ? 0 : value));
+          }
           break;
       }
 
@@ -732,22 +743,25 @@ class ConstraintManager {
         this._configs.push(config);
         break;
       case 'LittleKiller':
-        this._outsideArrowConstraints.set(
-          `${constraint.type}-${constraint.lineId()}`, constraint);
-        this._display.addOutsideArrow(
-          constraint.type, constraint.lineId(), constraint.sum);
-        break;
       case 'Sandwich':
-        this._outsideArrowConstraints.set(
-          `${constraint.type}-${constraint.lineId()}`, constraint);
-        this._display.addOutsideArrow(
-          constraint.type, constraint.lineId(), constraint.sum);
-        break;
       case 'XSum':
-        this._outsideArrowConstraints.set(
-          `${constraint.type}-${constraint.lineId()}`, constraint);
-        this._display.addOutsideArrow(
-          constraint.type, constraint.lineId(), constraint.sum);
+        this._addOutsideArrowConstraint(constraint, constraint.sum);
+        break;
+      case 'Skyscraper':
+        {
+          if (constraint.countDown) {
+            let constraintDown = new SudokuConstraint.Skyscraper(
+              constraint.rowCol, constraint.countDown, 0);
+            this._addOutsideArrowConstraint(
+              constraintDown, constraintDown.countDown);
+          }
+          if (constraint.countUp) {
+            let constraintUp = new SudokuConstraint.Skyscraper(
+              constraint.rowCol, 0, constraint.countUp);
+            this._addOutsideArrowConstraint(
+              constraintUp, constraintUp.countUp);
+          }
+        }
         break;
       case 'AntiKnight':
         this._checkboxConstraints.check('antiKnight');
@@ -788,6 +802,13 @@ class ConstraintManager {
         break;
     }
     this.runUpdateCallback();
+  }
+
+  _addOutsideArrowConstraint(constraint, value) {
+    this._outsideArrowConstraints.set(
+      `${constraint.type}-${constraint.lineId()}`, constraint);
+    this._display.addOutsideArrow(
+      constraint.type, constraint.lineId(), value);
   }
 
   _addConstraintFromForm(selectionForm, inputManager) {

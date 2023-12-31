@@ -907,6 +907,7 @@ class OutsideArrowDisplay extends DisplayItem {
       ['LittleKiller', document.getElementById('little-killer-option')],
       ['Sandwich', document.getElementById('sandwich-option')],
       ['XSum', document.getElementById('xsum-option')],
+      ['Skyscraper', document.getElementById('skyscraper-option')],
     ]);
 
     this._handleClick = (lineId, cells) => {
@@ -949,6 +950,7 @@ class OutsideArrowDisplay extends DisplayItem {
         this._outsideArrowMap.get(lineId).constraintTypes.push('Sandwich');
       }
       this._outsideArrowMap.get(lineId).constraintTypes.push('XSum');
+      this._outsideArrowMap.get(lineId).constraintTypes.push('Skyscraper');
     }
   }
 
@@ -985,6 +987,9 @@ class OutsideArrowDisplay extends DisplayItem {
       switch (type) {
         case 'XSum':
           brackets = '⟨⟩';
+          break;
+        case 'Skyscraper':
+          brackets = '[]';
           break;
       }
       textParts.push(brackets[0], value, brackets[1]);
