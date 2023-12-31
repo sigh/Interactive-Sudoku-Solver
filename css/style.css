@@ -246,7 +246,8 @@ button.danger-button:hover:enabled {
 }
 
 input[type=number] {
-  width: 4em;
+  width: 4.5em;
+  height: 2em;
 }
 
 input[disabled]+label {

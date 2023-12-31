@@ -385,7 +385,6 @@ layout: null
           <fieldset tabindex="0" disabled>
             <input type="hidden" name="id">
 
-            <input type="number" name="value" min=0 placeholder="value">
 
             <input type="radio" id="little-killer-option" name="type" value="LittleKiller">
             <label for="little-killer-option">
@@ -400,8 +399,19 @@ layout: null
                 data-text="Values between the 1 and the 9 in the row or column must add to the given sum.">
               </span>
             </label>
+            <input type="radio" id="xsum-option" name="type" value="XSum">
+            <label for="xsum-option">
+              X-Sum
+              <span class="tooltip" data-text="
+                  The sum of the first X numbers must add up to the given sum.
+                  X is the number in the first cell in the direction of the row
+                  or column.
+                ">
+              </span>
+            </label>
 
             <div>
+              <input type="number" name="value" min=0 placeholder="value">
               <button type="submit" title="Set constraint">Set</button>
               <button type="button" id="outside-arrow-clear" class="danger-button"
                 title="Clear constraint">Clear</button>

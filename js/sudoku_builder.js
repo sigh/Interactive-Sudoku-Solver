@@ -625,6 +625,10 @@ class SudokuConstraint {
       this.rowCol = rowCol.toUpperCase();
       this.dir = dir;
     }
+
+    lineId() {
+      return this.rowCol + ',' + this.dir;
+    }
   }
 
   static Sandwich = class Sandwich extends SudokuConstraint {
