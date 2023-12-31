@@ -66,10 +66,23 @@ layout: null
         constraint, select a diagonal arrow outside the grid.
       </p>
       <p>
-        To add a Sandwich
+        To add a
+        Sandwich
         <span class="tooltip"
           data-text="Values between the 1 and the 9 in the row or column must add to the given sum.">
-        </span>
+        </span>,
+        X-Sum
+        <span class="tooltip" data-text="
+            The sum of the first X numbers must add up to the given sum.
+            X is the number in the first cell in the direction of the row
+            or column.
+          "></span>,
+        or Skyscraper
+        <span class="tooltip" data-text="
+            Digits in the grid represent skyscrapers of that height.
+            Higher skyscrapers obscure smaller ones.
+            Clues outside the grid show the number of visible skyscrapers in that row/column from the clue's direction of view.
+          "></span>
         constraint, select a row/column arrow outside the grid.
       </p>
     </div>
@@ -409,10 +422,10 @@ layout: null
                 <label for="xsum-option">
                   X-Sum
                   <span class="tooltip" data-text="
-                  The sum of the first X numbers must add up to the given sum.
-                  X is the number in the first cell in the direction of the row
-                  or column.
-                ">
+                    The sum of the first X numbers must add up to the given sum.
+                    X is the number in the first cell in the direction of the row
+                    or column.
+                  ">
                   </span>
                 </label>
               </div>
@@ -421,10 +434,10 @@ layout: null
                 <label for="skyscraper-option">
                   Skyscraper
                   <span class="tooltip" data-text="
-                  Digits in the grid represent skyscrapers of that height.
-                  Higher skyscrapers obscure smaller ones.
-                  Clues outside the grid show the number of visible skyscrapers in that row/column from the clue's direction of view.
-                ">
+                    Digits in the grid represent skyscrapers of that height.
+                    Higher skyscrapers obscure smaller ones.
+                    Clues outside the grid show the number of visible skyscrapers in that row/column from the clue's direction of view.
+                  ">
                   </span>
                 </label>
               </div>

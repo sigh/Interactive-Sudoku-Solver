@@ -923,8 +923,15 @@ class OutsideArrowDisplay extends DisplayItem {
       for (let [type, option] of formOptions) {
         option.disabled = !types.includes(type);
       }
+
+      // Ensure that the selected type is valid for this arrow.
       if (!types.includes(form.type.value)) {
-        form.type.value = types[0];
+        // If possible, select an arrow type that is already present.
+        if (arrow.currentValues.size) {
+          form.type.value = arrow.currentValues.keys().next().value;
+        } else {
+          form.type.value = types[0];
+        }
       }
 
       selectedArrow = arrow.svg;
@@ -970,36 +977,61 @@ class OutsideArrowDisplay extends DisplayItem {
 
     // Remove all the old values.
     const textNode = elem.lastChild;
-    if (textNode.lastChild) textNode.removeChild(textNode.lastChild);
+    clearDOMNode(textNode);
 
     // If there are no values, set it inactive and stop.
-    if (!arrow.currentValues.size) {
+    const numValues = arrow.currentValues.size;
+    if (!numValues) {
       elem.classList.remove('active-arrow');
       return;
     }
 
     elem.classList.add('active-arrow');
 
-    // Render the current values.
-    const textParts = [];
+    // Construct the output strings.
+    const valueStrings = [];
     for (const [type, value] of arrow.currentValues) {
-      let brackets = ['', ''];
+      let valueStr = value;
       switch (type) {
         case 'XSum':
-          brackets = '⟨⟩';
+          valueStr = `⟨${value}⟩`;
           break;
         case 'Skyscraper':
-          brackets = '[]';
+          valueStr = `[${value}]`;
           break;
       }
-      textParts.push(brackets[0], value, brackets[1]);
+      valueStrings.push(valueStr);
     }
-    const text = textParts.join('');
-    if (textNode.lastChild) textNode.removeChild(textNode.lastChild);
-    textNode.appendChild(document.createTextNode(text));
+    if (numValues == 1 || !arrowId.includes(',') || arrowId.startsWith('C')) {
+      // For little killers and for columns, the values can be shown
+      // horizontally. (For little killers, its because we know there can only
+      // be one).
+      // This is also trivially true for single values.
+      const text = valueStrings.join('');
+      textNode.appendChild(document.createTextNode(text));
+    } else {
+      // For rows, we need to show the values vertically.
+
+      // Set the x position to the default for the text element.
+      // This is as if we were positioning a single value.
+      const x = textNode.getAttribute('x');
+      // The spacing between each value (in line-height units).
+      const spacingEm = 1.2;
+      // The initial y value needs to be adjusted for the fact we have
+      // multiple lines. We are adjusting from a baseline of a single line.
+      const initialDyEm = -spacingEm * (numValues - 1) / 2;
+      for (let i = 0; i < numValues; i++) {
+        const str = valueStrings[i];
+        const tspan = createSvgElement('tspan');
+        tspan.setAttribute('x', x);
+        tspan.setAttribute('dy', (i == 0 ? initialDyEm : spacingEm) + 'em');
+        tspan.appendChild(document.createTextNode(str));
+        textNode.appendChild(tspan);
+      }
+    }
 
     // Choose font size based on the number of values.
-    const fontSize = 16 - 2 * arrow.currentValues.size;
+    const fontSize = 17 - 2 * arrow.currentValues.size;
     textNode.setAttribute('style', `font-size: ${fontSize}px`);
   }
 
