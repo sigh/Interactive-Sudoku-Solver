@@ -1,11 +1,10 @@
-// Make these variables global so that we can easily access them from the
-// console.
-let constraintManager, controller, displayContainer;
+// Make these variables global so that debug functions can access them.
+let constraintManager, controller;
 
 const initPage = () => {
   // Create grid.
   const container = document.getElementById('sudoku-grid');
-  displayContainer = new DisplayContainer(container);
+  const displayContainer = new DisplayContainer(container);
   const inputManager = new GridInputManager(displayContainer);
 
   constraintManager = new ConstraintManager(
@@ -14,6 +13,45 @@ const initPage = () => {
   constraintManager.addReshapeListener(inputManager);
 
   controller = new SolutionController(constraintManager, displayContainer);
+
+  _setUpDebug(controller);
+};
+
+const _setUpDebug = (controller) => {
+  const DEBUG_PARAM_NAME = 'debug';
+  let debugLoaded = false;
+
+  const updateURL = (enable) => {
+    const url = new URL(window.location);
+    if (enable) {
+      url.searchParams.set(DEBUG_PARAM_NAME, 1);
+    } else {
+      url.searchParams.delete(DEBUG_PARAM_NAME);
+    }
+    window.history.pushState(null, null, url);
+  };
+  const closeButton = document.getElementById('close-debug-button');
+
+  window.loadDebug = () => {
+    controller.debugOutput.enable(true);
+    updateURL(true);
+    closeButton.style.display = 'block';
+    if (debugLoaded) return Promise.resolve();
+
+    debugLoaded = true;
+    return dynamicJSFileLoader('js/debug.js')();
+  };
+  window.closeDebug = () => {
+    controller.debugOutput.enable(false);
+    closeButton.style.display = 'none';
+    updateURL(false);
+  };
+  closeButton.onclick = window.closeDebug;
+
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.get(DEBUG_PARAM_NAME) !== null) {
+    window.loadDebug();
+  }
 };
 
 class CheckboxConstraints {

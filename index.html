@@ -31,21 +31,7 @@ layout: null
   <script>
     var VERSION_PARAM = '?v=' + ('{{ site.github.build_revision }}' || Math.random());
 
-    window.addEventListener('load', () => {
-      initPage();
-
-      const url = new URL(window.location);
-      self.loadDebug = () => {
-        const loader = dynamicJSFileLoader('js/debug.js');
-        controller.debugOutput.enable();
-        url.searchParams.set('debug', 1);
-        window.history.pushState(null, null, url);
-        return loader();
-      };
-      if (url.searchParams.get('debug') !== null) {
-        self.loadDebug();
-      }
-    });
+    window.addEventListener('load', () => initPage());
   </script>
 
 </head>
@@ -98,6 +84,8 @@ layout: null
       </select>
       <a>(Source)</a>
     </div>
+
+    <button id="close-debug-button" class="danger-button" title="Close debug">Close debug</button>
   </div>
 
   <div id="debug-container">

@@ -163,6 +163,8 @@ class DebugOutput {
   enable(enable) {
     if (enable === undefined) enable = true;
     ENABLE_DEBUG_LOGS = enable;
+
+    // Reset the container.
     this._visible = enable;
     this._container.style.display = enable ? 'block' : 'none';
     this.clear();
@@ -924,7 +926,7 @@ class SolutionController {
     }
   }
 
-  _setUpKeyBindings() {
+  _setUpKeyBindings(displayContainer) {
     const keyHandlers = {
       n: () => this._elements.forward.click(),
       p: () => this._elements.back.click(),
