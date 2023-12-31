@@ -588,10 +588,6 @@ class SudokuConstraint {
       this.sum = sum;
     }
 
-    lineId() {
-      return this.id;
-    }
-
     static cellMap = memoize((shape) => {
       let map = {};
       const gridSize = shape.gridSize;
@@ -619,15 +615,15 @@ class SudokuConstraint {
   }
 
   static XSum = class XSum extends SudokuConstraint {
-    constructor(sum, rowCol, dir) {
+    constructor(rowCol, sumInc, sumDec) {
       super(arguments);
-      this.sum = sum;
       this.rowCol = rowCol.toUpperCase();
-      this.dir = dir;
+      this.sumDec = +sumDec;
+      this.sumInc = +sumInc;
     }
 
-    lineId() {
-      return this.rowCol + ',' + this.dir;
+    values() {
+      return [this.sumInc, this.sumDec];
     }
   }
 
@@ -637,18 +633,18 @@ class SudokuConstraint {
       this.id = id;
       this.sum = sum;
     }
-
-    lineId() {
-      return this.id + ',1';
-    }
   }
 
   static Skyscraper = class Skyscraper extends SudokuConstraint {
-    constructor(rowCol, countDown, countUp) {
+    constructor(rowCol, countInc, countDec) {
       super(arguments);
       this.rowCol = rowCol.toUpperCase();
-      this.countDown = +countDown;
-      this.countUp = +countUp;
+      this.countInc = +countInc;
+      this.countDec = +countDec;
+    }
+
+    values() {
+      return [this.countInc, this.countDec];
     }
   }
 
@@ -936,9 +932,17 @@ class SudokuBuilder {
 
         case 'XSum':
           cells = SudokuConstraint.fullLineCellMap(shape)
-            .get([constraint.rowCol, constraint.dir].toString()).map(
+            .get([constraint.rowCol, 1].toString()).map(
               c => shape.parseCellId(c).cell);
-          yield new SudokuConstraintHandler.XSum(cells, constraint.sum);
+          if (constraint.sumInc) {
+            yield new SudokuConstraintHandler.XSum(
+              cells, constraint.sumInc);
+          }
+          if (constraint.sumDec) {
+            cells = cells.slice().reverse();
+            yield new SudokuConstraintHandler.XSum(
+              cells, constraint.sumDec);
+          }
           break;
 
         case 'Sandwich':
@@ -952,14 +956,14 @@ class SudokuBuilder {
           cells = SudokuConstraint.fullLineCellMap(shape)
             .get([constraint.rowCol, 1].toString()).map(
               c => shape.parseCellId(c).cell);
-          if (constraint.countDown) {
+          if (constraint.countInc) {
             yield new SudokuConstraintHandler.Skyscraper(
-              cells, constraint.countDown);
+              cells, constraint.countInc);
           }
-          if (constraint.countUp) {
+          if (constraint.countDec) {
             cells = cells.slice().reverse();
             yield new SudokuConstraintHandler.Skyscraper(
-              cells, constraint.countUp);
+              cells, constraint.countDec);
           }
           break;
 
