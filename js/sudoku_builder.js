@@ -650,12 +650,6 @@ class SudokuConstraint {
       this.countDown = +countDown;
       this.countUp = +countUp;
     }
-
-    lineId() {
-      if (this.countDown) return this.rowCol + ',1';
-      if (this.countUp) return this.rowCol + ',-1';
-      return null;
-    }
   }
 
   static AllDifferent = class AllDifferent extends SudokuConstraint {

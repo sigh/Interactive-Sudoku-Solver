@@ -369,33 +369,10 @@ class OutsideArrowConstraints {
       }
       value = +value;
 
-      let id;
-      switch (type) {
-        case 'LittleKiller':
-          id = lineId;
-          this.addConstraint(new SudokuConstraint.LittleKiller(value, id));
-          break;
-        case 'Sandwich':
-          id = lineId.split(',')[0];
-          this.addConstraint(new SudokuConstraint.Sandwich(value, id));
-          break;
-        case 'XSum':
-          {
-            let [rowCol, dir] = lineId.split(',');
-            this.addConstraint(new SudokuConstraint.XSum(value, rowCol, dir));
-          }
-          break;
-        case 'Skyscraper':
-          {
-            let [rowCol, dir] = lineId.split(',');
-            this.addConstraint(
-              new SudokuConstraint.Skyscraper(
-                rowCol,
-                dir == 1 ? value : 0,
-                dir == 1 ? 0 : value));
-          }
-          break;
-      }
+      this._addConstraint(
+        this.constructor._makeConstraint(type, lineId, value),
+        lineId,
+        value);
 
       inputManager.setSelection([]);
       this._onChange();
@@ -411,43 +388,83 @@ class OutsideArrowConstraints {
       case 'LittleKiller':
       case 'Sandwich':
       case 'XSum':
-        this._addConstraint(constraint, constraint.sum);
+        this._addConstraint(constraint, constraint.lineId(), constraint.sum);
         break;
       case 'Skyscraper':
-        {
-          if (constraint.countDown) {
-            let constraintDown = new SudokuConstraint.Skyscraper(
-              constraint.rowCol, constraint.countDown, 0);
-            this._addConstraint(
-              constraintDown, constraintDown.countDown);
-          }
-          if (constraint.countUp) {
-            let constraintUp = new SudokuConstraint.Skyscraper(
-              constraint.rowCol, 0, constraint.countUp);
-            this._addConstraint(
-              constraintUp, constraintUp.countUp);
-          }
+        if (constraint.countDown) {
+          this._addConstraint(
+            new SudokuConstraint.Skyscraper(constraint.rowCol, constraint.countDown, 0),
+            constraint.rowCol + ',1', constraint.countDown);
         }
+        if (constraint.countUp) {
+          this._addConstraint(
+            new SudokuConstraint.Skyscraper(constraint.rowCol, 0, constraint.countUp),
+            constraint.rowCol + ',-1', constraint.countUp);
+        }
+        break;
+      default:
+        throw ('Unknown type: ' + type);
     }
   }
 
-  _addConstraint(constraint, value) {
+  _addConstraint(constraint, lineId, value) {
     this._constraints.set(
-      this.constructor._mapKey(constraint.type, constraint.lineId()),
-      constraint);
-    this._display.addOutsideArrow(
-      constraint.type, constraint.lineId(), value);
+      this.constructor._mapKey(constraint.type, lineId), constraint);
+    this._display.addOutsideArrow(constraint.type, lineId, value);
   }
 
   clear() {
-    for (const [_, constraint] of this._constraints) {
-      this._display.removeOutsideArrow(constraint.type, constraint.lineId());
+    for (const [key, _] of this._constraints) {
+      const [type, lineId] = key.split('-');
+      this._display.removeOutsideArrow(type, lineId);
     }
     this._constraints = new Map();
   }
 
+  static _makeConstraint(type, lineId, value) {
+    let [rowCol, dir] = lineId.split(',');
+    switch (type) {
+      case 'LittleKiller':
+        return new SudokuConstraint.LittleKiller(value, lineId);
+      case 'XSum':
+        return new SudokuConstraint.XSum(value, rowCol, dir);
+      case 'Sandwich':
+        return new SudokuConstraint.Sandwich(value, rowCol);
+      case 'Skyscraper':
+        return new SudokuConstraint.Skyscraper(
+          rowCol,
+          dir == 1 ? value : 0,
+          dir == 1 ? 0 : value);
+      default:
+        throw ('Unknown type: ' + type);
+    }
+  }
+
   getConstraints() {
-    return this._constraints.values();
+    const seenSkyscrapers = new Map();
+
+    const constraints = [];
+    for (const constraint of this._constraints.values()) {
+      if (constraint.type == 'Skyscraper') {
+        if (seenSkyscrapers.has(constraint.rowCol)) {
+          // Merge with the previous.
+          const index = seenSkyscrapers.get(constraint.rowCol);
+          const existingConstraint = constraints[index];
+          constraints[index] = new SudokuConstraint.Skyscraper(
+            constraint.rowCol,
+            existingConstraint.countDown || constraint.countDown,
+            existingConstraint.countUp || constraint.countUp);
+          // We can skip adding another constraint.
+          continue;
+        } else {
+          // Add to the seen list.
+          seenSkyscrapers.set(constraint.rowCol, constraints.length);
+        }
+      }
+
+      constraints.push(constraint);
+    };
+    return constraints;
   }
 }
 
