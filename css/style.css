@@ -1,3 +1,7 @@
+body {
+  font-size: 14px;
+}
+
 #sudoku-grid {
   position: relative;
 
@@ -71,7 +75,7 @@ body {
 }
 
 #instruction-panel span.description {
-  font-size: 16px;
+  font-size: 14px;
   font-weight: bold;
   margin-right: 20px;
 }
@@ -230,10 +234,22 @@ button.danger-button:hover:enabled {
   line-height: 1.8;
 }
 
+#constraint-panel>div:first-child {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
 #outside-arrow-input {
   /* Hack, because for some reason `vertical-align: text-top` moves the tooltip
      down for just the little killer:( */
   line-height: 1;
+}
+
+#outside-arrow-input>fieldset>div:last-child {
+  display: flex;
+  align-items: center;
+  column-gap: 15px;
 }
 
 #constraint-panel svg {
@@ -247,7 +263,7 @@ button.danger-button:hover:enabled {
 
 input[type=number] {
   width: 4.5em;
-  height: 1.8em;
+  height: 1.6em;
 }
 
 input[disabled]+label {
@@ -272,10 +288,6 @@ textarea {
   align-items: center;
   margin: 10px 0px;
   gap: 15px;
-}
-
-.control-panel button {
-  /* min-width: 50px; */
 }
 
 #grid-control-buttons {
@@ -385,7 +397,7 @@ button.icon-button {
 }
 
 select {
-  font-size: 16px;
+  font-size: 14px;
   padding: 5px 5px 5px 10px;
   text-align: center;
   text-align-last: center;
@@ -673,7 +685,7 @@ progress {
 }
 
 h2 {
-  font-size: 18px;
+  font-size: 16px;
   font-weight: normal;
   margin: 0;
 }
