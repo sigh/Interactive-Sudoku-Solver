@@ -912,6 +912,9 @@ class ConstraintManager {
       case 'Set':
         constraint.constraints.forEach(c => this.loadConstraint(c));
         break;
+      case 'Shape':
+        // Nothing to do, but ensure it is not added to invisible constraints.
+        break;
       default:
         this._invisibleConstraints.push(constraint);
         break;
