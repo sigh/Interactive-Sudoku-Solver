@@ -311,8 +311,8 @@ textarea {
 }
 
 #solution-control-panel {
+  width: 250px;
   display: flex;
-  align-items: center;
   gap: 2px;
   flex-direction: column;
 }
@@ -336,9 +336,11 @@ button.icon-button {
 }
 
 #solution-step-output {
-  display: inline-block;
-  min-width: 40px;
-  text-align: center;
+  display: block;
+  width: 100%;
+  text-align: left;
+  overflow: scroll;
+  white-space: nowrap;
 }
 
 #freeform-constraint-input {
