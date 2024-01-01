@@ -837,7 +837,7 @@ class SolutionController {
     constraintManager.addReshapeListener(this);
 
     this._solutionDisplay = new SolutionDisplay(
-      constraintManager, displayContainer.getNewGroup('solution-group'));
+      displayContainer.getNewGroup('solution-group'));
     constraintManager.addReshapeListener(this._solutionDisplay);
 
     this._isSolving = false;
@@ -1015,7 +1015,8 @@ class SolutionController {
   };
 
   async _update() {
-    this._solutionDisplay.setSolution(null);
+    this._solutionDisplay.setSolution();
+    this._solutionDisplay.setNewConstraints(this._constraintManager);
     let constraints = this._constraintManager.getConstraints();
     let mode = this._elements.mode.value;
     let auto = this._elements.autoSolve.checked;
@@ -1038,7 +1039,7 @@ class SolutionController {
   _resetSolver() {
     this._terminateSolver();
     this._stepHighlighter.setCells([]);
-    this._solutionDisplay.setSolution(null);
+    this._solutionDisplay.setSolution();
     this._stateDisplay.clear();
     this._setValidateResult();
     this.debugOutput.clear();
