@@ -351,7 +351,11 @@ class GivensDisplay extends CellValueDisplay {
   SINGLE_VALUE_CLASS = 'given-single-value';
 
   drawGivens(givensMap) {
-    if (!givensMap || !givensMap.size) return;
+    // Quickly clear the givens display if there are no givens.
+    if (!givensMap.size) {
+      clearDOMNode(this.getSvg());
+      return;
+    }
 
     let grid = new Array(this._shape.numCells).fill(null);
     for (const [cell, values] of givensMap) {
