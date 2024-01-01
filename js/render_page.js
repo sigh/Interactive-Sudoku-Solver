@@ -201,6 +201,7 @@ class ExampleHandler {
     'Disjoint little killer',
     'Skyscraper',
     'X-Sum',
+    'Odd even',
     'Global entropy',
     '16x16',
     '16x16: Sudoku X, hard',
