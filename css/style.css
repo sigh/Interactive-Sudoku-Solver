@@ -15,19 +15,27 @@ body {
   left: 0;
 }
 
-.fixed-value {
+.given-single-value {
   font-size: 30px;
   font-family: sans-serif;
   text-anchor: middle;
   dominant-baseline: middle;
 }
 
-.multi-value {
-  font-size: 12px;
-  fill: grey;
-  font-family: sans-serif;
+.given-multi-value {
+  font-size: 15px;
+  font-family: monospace;
+
+  fill: lightgrey;
+  stroke: rgb(255, 255, 255);
+
   text-anchor: middle;
-  dominant-baseline: middle;
+  dominant-baseline: hanging;
+  white-space: pre;
+}
+
+.size-16x16 .given-multi-value {
+  font-size: 9px;
 }
 
 .solution-value {

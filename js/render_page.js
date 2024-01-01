@@ -732,9 +732,7 @@ class ConstraintManager {
     let config;
     switch (constraint.type) {
       case 'Givens':
-        constraint.values.forEach(valueId => {
-          this._givenCandidates.setValueId(valueId);
-        });
+        this._givenCandidates.setValueIds(constraint.values);
         break;
       case 'X':
         config = {
@@ -1268,26 +1266,31 @@ class GivenCandidates {
   }
 
   _replaceValue(cell, value) {
-    this._replaceValues(cell, [value]);
+    this._replaceValuesNoUpdate(cell, [value]);
+    this._givensUpdated();
   }
 
-  _replaceValues(cell, values) {
+  _replaceValuesNoUpdate(cell, values) {
     const numValues = this._shape.numValues;
     values = values.filter(v => v && v > 0 && v <= numValues);
     if (values && values.length) {
       this._givensMap.set(cell, values);
-      this._display.drawFixedValue(cell, values.join('|'));
     } else {
       this._givensMap.delete(cell);
-      this._display.drawFixedValue(cell, '');
     }
-
-    this._onChange();
   }
 
-  setValueId(valueId) {
-    const parsed = this._shape.parseValueId(valueId);
-    this._replaceValues(parsed.cellId, parsed.values);
+  setValueIds(valueIds) {
+    for (const valueId of valueIds) {
+      const parsed = this._shape.parseValueId(valueId);
+      this._replaceValuesNoUpdate(parsed.cellId, parsed.values);
+    }
+    this._givensUpdated();
+  }
+
+  _givensUpdated() {
+    this._display.drawGivens(this._givensMap);
+    this._onChange();
   }
 
   getConstraint() {

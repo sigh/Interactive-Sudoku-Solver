@@ -195,79 +195,41 @@ class InfoTextDisplay extends DisplayItem {
   }
 }
 
-class SolutionDisplay extends DisplayItem {
-  constructor(constraintManager, svg) {
+class CellValueDisplay extends DisplayItem {
+  MULTI_VALUE_CLASS = 'multi-value';
+  SINGLE_VALUE_CLASS = 'single-value';
+  VERTICAL_OFFSET = 0;
+
+  constructor(svg) {
     super(svg);
-    this._currentSolution = [];
-    this._constraintManager = constraintManager;
-
     this._applyGridOffset(svg);
-
-    this.setSolution = deferUntilAnimationFrame(this.setSolution.bind(this));
-    this._copyElem = document.getElementById('copy-button');
-    this._copyElem.onclick = () => {
-      const solutionText = toShortSolution(this._currentSolution, this._shape);
-      navigator.clipboard.writeText(solutionText);
-    };
   }
 
-  reshape(shape) {
-    // This clears the solution, but importantly it overwrites any pending
-    // setSolution calls.
-    this.setSolution();
-    super.reshape(shape);
-  }
-
-  // Display solution on grid.
-  //  - If solution cell contains a container then it will be displayed as
-  //    pencilmarks.
-  setSolution(solution) {
-    solution = solution || [];
-    this._currentSolution = solution.slice();
-
-    // If we have no solution, just hide it instead.
-    // However, we wait a bit so that we don't flicker if the solution is updated
-    // again immediately.
-    if (!solution.length) {
-      window.setTimeout(() => {
-        // Ensure there is still no solution.
-        if (this._currentSolution.length == 0) {
-          this._svg.classList.add('hidden-solution');
-          this._copyElem.disabled = true;
-        }
-      }, 10);
-      return;
-    }
-
-    clearDOMNode(this._svg);
-
-    const fixedCells = new Set(this._constraintManager.getFixedCells());
+  _renderGridValues(grid, ignoredCells) {
+    const svg = this.getSvg();
+    clearDOMNode(svg);
 
     const LINE_HEIGHT = this._shape.gridSize == SHAPE_9x9.gridSize ? 17 : 10;
-    const START_OFFSET = -DisplayItem.CELL_SIZE / 2 + 2;
-    for (let i = 0; i < solution.length; i++) {
+    const START_OFFSET = -DisplayItem.CELL_SIZE / 2 + this.VERTICAL_OFFSET;
+    for (let i = 0; i < grid.length; i++) {
       const cellId = this._shape.makeCellIdFromIndex(i);
-      if (fixedCells.has(cellId)) continue;
+      if (ignoredCells.has(cellId)) continue;
 
-      const value = solution[i];
+      const value = grid[i];
       const [x, y] = this.cellIdCenter(cellId);
 
       if (isIterable(value)) {
         let offset = START_OFFSET;
         for (const line of this._formatMultiSolution(value)) {
-          this._svg.append(this.makeTextNode(
-            line, x, y + offset, 'solution-multi-value'));
+          svg.append(this.makeTextNode(
+            line, x, y + offset, this.MULTI_VALUE_CLASS));
           offset += LINE_HEIGHT;
         }
       } else if (value) {
-        this._svg.append(this.makeTextNode(
-          value, x, y, 'solution-value'));
+        svg.append(this.makeTextNode(
+          value, x, y, this.SINGLE_VALUE_CLASS));
       }
     }
-
-    this._copyElem.disabled = !solution.every((v) => v && isFinite(v));
-
-    this._svg.classList.remove('hidden-solution');
   }
 
   _makeTemplateArray = memoize((shape) => {
@@ -296,7 +258,98 @@ class SolutionDisplay extends DisplayItem {
     for (const v of values) {
       slots[v * 2 - 2] = v;
     }
+    return this._multiSolutionToLines(slots);
+  }
+
+  _multiSolutionToLines(slots) {
     return slots.join('').split(/\n/);
+  }
+}
+
+class SolutionDisplay extends CellValueDisplay {
+  MULTI_VALUE_CLASS = 'solution-multi-value';
+  SINGLE_VALUE_CLASS = 'solution-value';
+  VERTICAL_OFFSET = 2;
+
+  constructor(constraintManager, svg) {
+    super(svg);
+    this._currentSolution = [];
+    this._constraintManager = constraintManager;
+
+    this.setSolution = deferUntilAnimationFrame(this.setSolution.bind(this));
+    this._copyElem = document.getElementById('copy-button');
+    this._copyElem.onclick = () => {
+      const solutionText = toShortSolution(this._currentSolution, this._shape);
+      navigator.clipboard.writeText(solutionText);
+    };
+  }
+
+  reshape(shape) {
+    // This clears the solution, but importantly it overwrites any pending
+    // setSolution calls.
+    this.setSolution();
+    super.reshape(shape);
+  }
+
+  // Display solution on grid.
+  //  - If solution cell contains a container then it will be displayed as
+  //    pencilmarks.
+  setSolution(solution) {
+    solution = solution || [];
+    this._currentSolution = solution.slice();
+    const svg = this.getSvg();
+
+    // If we have no solution, just hide it instead.
+    // However, we wait a bit so that we don't flicker if the solution is updated
+    // again immediately.
+    if (!solution.length) {
+      window.setTimeout(() => {
+        // Ensure there is still no solution.
+        if (this._currentSolution.length == 0) {
+          svg.classList.add('hidden-solution');
+          this._copyElem.disabled = true;
+        }
+      }, 10);
+      return;
+    }
+
+    const fixedCells = new Set(this._constraintManager.getFixedCells());
+
+    this._renderGridValues(solution, fixedCells);
+
+    this._copyElem.disabled = !solution.every((v) => v && isFinite(v));
+
+    svg.classList.remove('hidden-solution');
+  }
+}
+
+class GivensDisplay extends CellValueDisplay {
+  MULTI_VALUE_CLASS = 'given-multi-value';
+  SINGLE_VALUE_CLASS = 'given-single-value';
+
+  drawGivens(givensMap) {
+    if (!givensMap || !givensMap.size) return;
+
+    let grid = new Array(this._shape.numCells).fill(null);
+    for (const [cell, values] of givensMap) {
+      const index = this._shape.parseCellId(cell).cell;
+      grid[index] = values.length == 1 ? values[0] : values;
+    }
+
+    // NOTE: We re-render the entire grid each time, but we already do this for
+    // solutions which is much more common.
+    // This allows us to share code with the solution display.
+    this._renderGridValues(grid, new Set());
+  }
+
+  _multiSolutionToLines(slots) {
+    const REPLACE_CHAR = '●';
+    slots = slots.map(v => {
+      if (typeof v !== 'number') return v;
+      if (v < 10) return REPLACE_CHAR;
+      return REPLACE_CHAR + ' ';
+    });
+    return super._multiSolutionToLines(slots);
   }
 }
 
@@ -373,8 +426,8 @@ class ConstraintDisplay extends DisplayItem {
     this._diagonalDisplay = new DiagonalDisplay(
       displayContainer.getNewGroup('diagonal-group'));
 
-    this._fixedValueDisplay = new FixedValueDisplay(
-      displayContainer.getNewGroup('fixed-value-group'));
+    this._givensDisplay = new GivensDisplay(
+      displayContainer.getNewGroup('givens-group'));
 
     displayContainer.addElement(this._makeArrowhead());
     this._outsideArrows = new OutsideArrowDisplay(
@@ -395,7 +448,7 @@ class ConstraintDisplay extends DisplayItem {
     this._outsideArrows.reshape(shape);
     this._diagonalDisplay.reshape(shape);
     this._borders.reshape(shape);
-    this._fixedValueDisplay.reshape(shape);
+    this._givensDisplay.reshape(shape);
     this._killerCageDisplay.reshape(shape);
   }
 
@@ -423,7 +476,7 @@ class ConstraintDisplay extends DisplayItem {
     clearDOMNode(this._lineConstraintGroup);
     clearDOMNode(this._adjConstraintGroup);
 
-    this._fixedValueDisplay.clear();
+    this._givensDisplay.clear();
 
     this._diagonalDisplay.clear();
 
@@ -639,8 +692,8 @@ class ConstraintDisplay extends DisplayItem {
     this._diagonalDisplay.removeDiagonal(direction);
   }
 
-  drawFixedValue(cell, value) {
-    this._fixedValueDisplay.drawValue(cell, value);
+  drawGivens(givensMap) {
+    this._givensDisplay.drawGivens(givensMap);
   }
 
   useDefaultRegions(enable) {
@@ -1163,45 +1216,6 @@ class DiagonalDisplay extends DisplayItem {
         this.drawDiagonal(direction);
       }
     }
-  }
-}
-
-class FixedValueDisplay extends DisplayItem {
-  constructor(svg) {
-    super(svg);
-    this._applyGridOffset(svg);
-    this._map = new Map();
-  }
-
-  clear() {
-    super.clear();
-    this._map.clear();
-  }
-
-  drawValue(cell, value) {
-    const svg = this.getSvg();
-
-    // Clear the old value.
-    const oldText = this._map.get(cell);
-    if (oldText) {
-      svg.removeChild(oldText);
-      this._map.delete(cell);
-    }
-
-    // If we are unsetting the cell, nothing else to do.
-    if (value === '' || value === undefined) return;
-
-    // Create and append the new node.
-    const text = createSvgElement('text');
-    text.setAttribute('class', value.includes('|') ? 'multi-value' : 'fixed-value');
-    text.appendChild(document.createTextNode(value));
-    const [x, y] = this.cellIdCenter(cell);
-    text.setAttribute('x', x);
-    text.setAttribute('y', y);
-
-    svg.append(text);
-
-    this._map.set(cell, text);
   }
 }
 
