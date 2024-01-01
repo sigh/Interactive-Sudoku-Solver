@@ -66,7 +66,7 @@ SudokuConstraintHandler.False = class False extends SudokuConstraintHandler {
   enforceConsistency(grid, cellAccumulator) { return false; }
 }
 
-SudokuConstraintHandler.FixedCells = class FixedCells extends SudokuConstraintHandler {
+SudokuConstraintHandler.GivenCandidates = class GivenCandidates extends SudokuConstraintHandler {
   constructor(valueMap) {
     super();
     this._valueMap = valueMap;
@@ -74,7 +74,11 @@ SudokuConstraintHandler.FixedCells = class FixedCells extends SudokuConstraintHa
 
   initialize(initialGrid) {
     for (const [cell, value] of this._valueMap) {
-      initialGrid[cell] &= LookupTables.fromValue(value);
+      if (isIterable(value)) {
+        initialGrid[cell] &= LookupTables.fromValuesArray(value);
+      } else {
+        initialGrid[cell] &= LookupTables.fromValue(value);
+      }
     }
 
     return true;
