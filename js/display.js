@@ -58,6 +58,11 @@ class DisplayItem {
     return this._svg;
   }
 
+  cellIndexCenter(cellIndex) {
+    const [row, col] = this._shape.splitCellIndex(cellIndex);
+    return DisplayItem._cellCenter(row, col);
+  }
+
   cellIdCenter(cellId) {
     const { row, col } = this._shape.parseCellId(cellId);
     return DisplayItem._cellCenter(row, col);
@@ -205,18 +210,17 @@ class CellValueDisplay extends DisplayItem {
     this._applyGridOffset(svg);
   }
 
-  _renderGridValues(grid, ignoredCells) {
+  _renderGridValues(grid) {
     const svg = this.getSvg();
     clearDOMNode(svg);
 
     const LINE_HEIGHT = this._shape.gridSize == SHAPE_9x9.gridSize ? 17 : 10;
     const START_OFFSET = -DisplayItem.CELL_SIZE / 2 + this.VERTICAL_OFFSET;
     for (let i = 0; i < grid.length; i++) {
-      const cellId = this._shape.makeCellIdFromIndex(i);
-      if (ignoredCells.has(cellId)) continue;
-
       const value = grid[i];
-      const [x, y] = this.cellIdCenter(cellId);
+      if (!value) continue;
+
+      const [x, y] = this.cellIndexCenter(i);
 
       if (isIterable(value)) {
         let offset = START_OFFSET;
@@ -271,10 +275,9 @@ class SolutionDisplay extends CellValueDisplay {
   SINGLE_VALUE_CLASS = 'solution-value';
   VERTICAL_OFFSET = 2;
 
-  constructor(constraintManager, svg) {
+  constructor(svg) {
     super(svg);
     this._currentSolution = [];
-    this._constraintManager = constraintManager;
 
     this.setSolution = deferUntilAnimationFrame(this.setSolution.bind(this));
     this._copyElem = document.getElementById('copy-button');
@@ -282,6 +285,7 @@ class SolutionDisplay extends CellValueDisplay {
       const solutionText = toShortSolution(this._currentSolution, this._shape);
       navigator.clipboard.writeText(solutionText);
     };
+    this._fixedCellIndexes = [];
   }
 
   reshape(shape) {
@@ -289,6 +293,17 @@ class SolutionDisplay extends CellValueDisplay {
     // setSolution calls.
     this.setSolution();
     super.reshape(shape);
+  }
+
+  setNewConstraints(constraintManager) {
+    // Update fixed cell indexes, as we can cache them as long as the constraints
+    // remain the same.
+    this._fixedCellIndexes = [];
+    const fixedCells = constraintManager.getFixedCells();
+    for (const cellId of fixedCells) {
+      const index = this._shape.parseCellId(cellId).cell;
+      this._fixedCellIndexes.push(index);
+    }
   }
 
   // Display solution on grid.
@@ -313,11 +328,19 @@ class SolutionDisplay extends CellValueDisplay {
       return;
     }
 
-    const fixedCells = new Set(this._constraintManager.getFixedCells());
+    // We don't want to show anything for cells where the value was
+    // fixed.
+    if (this._fixedCellIndexes.length) {
+      solution = solution.slice();
+      for (const index of this._fixedCellIndexes) {
+        solution[index] = null;
+      }
+    }
 
-    this._renderGridValues(solution, fixedCells);
+    this._renderGridValues(solution);
 
-    this._copyElem.disabled = !solution.every((v) => v && isFinite(v));
+    this._copyElem.disabled = (
+      !solution.every(v => v && isFinite(v)));
 
     svg.classList.remove('hidden-solution');
   }
@@ -339,7 +362,7 @@ class GivensDisplay extends CellValueDisplay {
     // NOTE: We re-render the entire grid each time, but we already do this for
     // solutions which is much more common.
     // This allows us to share code with the solution display.
-    this._renderGridValues(grid, new Set());
+    this._renderGridValues(grid);
   }
 
   _multiSolutionToLines(slots) {
