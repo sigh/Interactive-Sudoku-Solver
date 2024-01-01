@@ -1248,6 +1248,7 @@ class GivenCandidates {
 
     inputManager.onNewDigit(this._inputDigit.bind(this));
     inputManager.onSetValue(this._replaceValue.bind(this));
+    inputManager.onSetValuesMultiCell(this._replaceValuesMultiCell.bind(this));
   }
 
   reshape(shape) { this._shape = shape; }
@@ -1266,6 +1267,13 @@ class GivenCandidates {
     }
 
     this._replaceValue(cell, newValue);
+  }
+
+  _replaceValuesMultiCell(cells, values) {
+    for (const cell of cells) {
+      this._replaceValuesNoUpdate(cell, values);
+    }
+    this._givensUpdated();
   }
 
   _replaceValue(cell, value) {
@@ -1324,6 +1332,7 @@ class GridInputManager {
     this._callbacks = {
       onNewDigit: [],
       onSetValue: [],
+      onSetValuesMultiCell: [],
       onSelection: [],
     };
     // fake-input is an invisible text input which is used to ensure that
@@ -1333,6 +1342,7 @@ class GridInputManager {
 
     this._selection = new Selection(displayContainer);
     this._selection.addCallback(cellIds => {
+      this._multiValueInputManager.updateSelection(cellIds);
       if (cellIds.length == 1) {
         this._runCallbacks(this._callbacks.onSelection, []);
         const [x, y] = this._selection.cellIdCenter(cellIds[0]);
@@ -1345,12 +1355,21 @@ class GridInputManager {
     });
 
     this._setUpKeyBindings();
+    this._multiValueInputManager = new MultiValueInputManager(
+      this,
+      (...args) => {
+        this._runCallbacks(this._callbacks.onSetValuesMultiCell, ...args)
+      });
   }
 
-  reshape(shape) { this._shape = shape; }
+  reshape(shape) {
+    this._shape = shape;
+    this._multiValueInputManager.reshape(shape);
+  }
 
   onNewDigit(fn) { this._callbacks.onNewDigit.push(fn); }
   onSetValue(fn) { this._callbacks.onSetValue.push(fn); }
+  onSetValuesMultiCell(fn) { this._callbacks.onSetValuesMultiCell.push(fn); }
   onSelection(fn) { this._callbacks.onSelection.push(fn); }
 
   addSelectionPreserver(obj) {
@@ -1451,6 +1470,73 @@ class GridInputManager {
           break;
       }
     });
+  }
+}
+
+class MultiValueInputManager {
+  constructor(inputManager, onChange) {
+    this._containerElem = document.getElementById('multi-value-cell-input');
+    this._dropdownElem = this._containerElem.getElementsByClassName('dropdown-container')[0];
+    this._listElem = this._dropdownElem.getElementsByClassName('dropdown-body')[0];
+    this._onChange = onChange;
+
+    this._setUp(inputManager);
+  }
+
+  updateSelection(selection) {
+    this._currentSelection = [];
+    this._clearForm();
+    this._currentSelection = selection;
+  };
+
+  reshape(shape) {
+    clearDOMNode(this._listElem);
+    for (let i = 0; i < shape.numValues; i++) {
+      const li = document.createElement('li');
+      const input = document.createElement('input');
+      input.setAttribute('type', 'checkbox');
+      li.appendChild(input);
+      li.appendChild(document.createTextNode(i + 1));
+      this._listElem.appendChild(li);
+    }
+  }
+
+  _setUp(inputManager) {
+    const dropdown = this._dropdownElem;
+    dropdown.getElementsByClassName('dropdown-anchor')[0].onclick = (e) => {
+      dropdown.classList.toggle('visible');
+    };
+
+    inputManager.addSelectionPreserver(this._containerElem);
+
+    this._currentSelection = [];
+
+    const form = this._containerElem;
+    form.onchange = () => {
+      if (this._currentSelection.length == 0) return;
+
+      this._onChange(
+        this._currentSelection,
+        this._getCheckedValues());
+    };
+  }
+
+  _getCheckedValues() {
+    const inputs = this._containerElem.elements;
+    const setValues = [];
+    for (let i = 0; i < inputs.length; i++) {
+      if (inputs[i].checked) {
+        setValues.push(i + 1);
+      }
+    }
+    return setValues;
+  }
+
+  _clearForm() {
+    const inputs = this._containerElem.elements;
+    for (let i = 0; i < inputs.length; i++) {
+      inputs[i].checked = false;
+    }
   }
 }
 
