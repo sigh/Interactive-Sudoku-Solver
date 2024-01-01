@@ -1478,6 +1478,7 @@ class MultiValueInputManager {
     this._containerElem = document.getElementById('multi-value-cell-input');
     this._dropdownElem = this._containerElem.getElementsByClassName('dropdown-container')[0];
     this._listElem = this._dropdownElem.getElementsByClassName('dropdown-body')[0];
+    this._fieldset = this._containerElem.getElementsByTagName('fieldset')[0];
     this._onChange = onChange;
 
     this._setUp(inputManager);
@@ -1487,23 +1488,39 @@ class MultiValueInputManager {
     this._currentSelection = [];
     this._clearForm();
     this._currentSelection = selection;
+    // Add a delay so that the display doesn't flicker.
+    // We don't have to worry about consistency as it uses the
+    // latest value of _currentSelection.
+    window.setTimeout(() => {
+      if (this._currentSelection.length == 0) {
+        this._dropdownElem.classList.add('disabled');
+      } else {
+        this._dropdownElem.classList.remove('disabled');
+      }
+    }, 100);
   };
 
   reshape(shape) {
     clearDOMNode(this._listElem);
     for (let i = 0; i < shape.numValues; i++) {
       const li = document.createElement('li');
+      const label = document.createElement('label');
       const input = document.createElement('input');
       input.setAttribute('type', 'checkbox');
-      li.appendChild(input);
-      li.appendChild(document.createTextNode(i + 1));
+      label.appendChild(input);
+      label.appendChild(document.createTextNode(i + 1));
+      li.appendChild(label);
       this._listElem.appendChild(li);
     }
+
+    this._listElem.style.setProperty(
+      'grid-template-columns', `repeat(${shape.boxSize}, 1fr)`);
   }
 
   _setUp(inputManager) {
     const dropdown = this._dropdownElem;
     dropdown.getElementsByClassName('dropdown-anchor')[0].onclick = (e) => {
+      if (this._currentSelection.length == 0) return;
       dropdown.classList.toggle('visible');
     };
 
