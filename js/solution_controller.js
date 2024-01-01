@@ -751,7 +751,7 @@ ModeHandler.StepByStep = class extends ModeHandler {
     let statusText = result.isSolution ? '[Solution]' :
       result.hasContradiction ? '[Conflict]' : '';
 
-    let statusElem = document.createElement('span');
+    const statusElem = document.createElement('span');
     if (result.values && result.values.length) {
       statusElem.appendChild(document.createTextNode('{'));
       let first = true;
@@ -767,6 +767,7 @@ ModeHandler.StepByStep = class extends ModeHandler {
       }
       statusElem.appendChild(document.createTextNode('}'));
     }
+    statusElem.appendChild(document.createTextNode(' ' + statusText));
 
     // Update numSteps if we have a new max.
     if (i + 1 > this._numSteps) {
@@ -775,7 +776,7 @@ ModeHandler.StepByStep = class extends ModeHandler {
     return {
       solution: result.pencilmarks,
       statusElem: statusElem,
-      description: `Step ${i} ${statusText} `,
+      description: `Step ${i}`,
       highlightCells: result.latestCell ? [result.latestCell] : [],
     }
   }
@@ -866,7 +867,7 @@ class SolutionController {
       forward: document.getElementById('solution-forward'),
       back: document.getElementById('solution-back'),
       control: document.getElementById('solution-control-panel'),
-      stepOutput: document.getElementById('solution-step-output'),
+      iterationState: document.getElementById('solution-iteration-state'),
       mode: document.getElementById('solve-mode-input'),
       modeDescription: document.getElementById('solve-mode-description'),
       error: document.getElementById('error-output'),
@@ -1141,9 +1142,11 @@ class SolutionController {
         this._elements.start.disabled = (index == minIndex);
         this._elements.end.disabled = (index >= handler.count());
 
-        this._elements.stepOutput.textContent = result.description;
+        this._elements.iterationState.textContent = result.description;
         if (result.statusElem) {
-          this._elements.stepOutput.appendChild(result.statusElem);
+          this._elements.iterationState.appendChild(
+            document.createTextNode(' '));
+          this._elements.iterationState.appendChild(result.statusElem);
         }
       }
 

@@ -335,7 +335,7 @@ button.icon-button {
   padding: 0px;
 }
 
-#solution-step-output {
+#solution-iteration-state {
   display: block;
   width: 100%;
   text-align: left;
