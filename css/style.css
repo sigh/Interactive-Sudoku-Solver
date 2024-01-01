@@ -22,6 +22,14 @@ body {
   dominant-baseline: middle;
 }
 
+.multi-value {
+  font-size: 12px;
+  fill: grey;
+  font-family: sans-serif;
+  text-anchor: middle;
+  dominant-baseline: middle;
+}
+
 .solution-value {
   font-size: 30px;
   font-family: monospace;

@@ -1193,7 +1193,7 @@ class FixedValueDisplay extends DisplayItem {
 
     // Create and append the new node.
     const text = createSvgElement('text');
-    text.setAttribute('class', 'fixed-value');
+    text.setAttribute('class', value.includes('|') ? 'multi-value' : 'fixed-value');
     text.appendChild(document.createTextNode(value));
     const [x, y] = this.cellIdCenter(cell);
     text.setAttribute('x', x);

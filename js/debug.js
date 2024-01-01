@@ -208,6 +208,7 @@ const runSolveTests = async (onFailure) => {
     'Skyscraper',
     'Homogeneous skyscraper',
     'Global entropy',
+    'Odd even',
   ], onFailure);
 
   await runAllWithChecks([

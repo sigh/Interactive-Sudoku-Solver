@@ -51,9 +51,9 @@ class GridShape {
   }
 
   parseValueId = (valueId) => {
-    let cellId = valueId.substr(0, 4);
+    let [cellId, ...values] = valueId.split('_');
     return {
-      value: parseInt(valueId.substr(5)),
+      values: values.map(v => parseInt(v)),
       cellId: cellId,
       ...this.parseCellId(cellId),
     };
@@ -225,7 +225,7 @@ class SudokuTextParser {
     if (new Set(nonValueCharacters).size > 1) return null;
     return new SudokuConstraint.Set([
       new SudokuConstraint.Shape(shape.name),
-      new SudokuConstraint.FixedValues(...fixedValues),
+      new SudokuConstraint.Givens(...fixedValues),
     ]);
   }
 
@@ -291,7 +291,7 @@ class SudokuTextParser {
 
     return new SudokuConstraint.Set([
       new SudokuConstraint.Shape(shape.name),
-      new SudokuConstraint.FixedValues(...fixedValues),
+      new SudokuConstraint.Givens(...fixedValues),
     ]);
   }
 
@@ -675,12 +675,13 @@ class SudokuConstraint {
     }
   }
 
-  static FixedValues = class FixedValues extends SudokuConstraint {
+  static Givens = class Givens extends SudokuConstraint {
     constructor(...values) {
       super(arguments);
       this.values = values;
     }
   }
+  static FixedValues = this.Givens;  // For backwards compatibility.
 
   static Priority = class Priority extends SudokuConstraint {
     constructor(priority, ...cells) {
@@ -690,7 +691,7 @@ class SudokuConstraint {
     }
   }
 
-  static DEFAULT = this.FixedValues;
+  static DEFAULT = this.Givens;
 
   static _makeRegions(fn, gridSize) {
     const regions = new Array(gridSize);
@@ -914,7 +915,7 @@ class SudokuBuilder {
             let valueMap = new Map();
             for (const cell of positiveCells) valueMap.set(cell, 1);
             valueMap.set(negativeCell, gridSize);
-            yield new SudokuConstraintHandler.FixedCells(valueMap);
+            yield new SudokuConstraintHandler.GivenCandidates(valueMap);
           } else {
             // Sum can't handle more than gridSize cells.
             // Arrows can't have more than gridSize cells in the stem
@@ -992,13 +993,13 @@ class SudokuBuilder {
           yield new SudokuConstraintHandler.AllDifferent(cells);
           break;
 
-        case 'FixedValues':
+        case 'Givens':
           let valueMap = new Map();
           for (const valueId of constraint.values) {
-            let { cell, value } = shape.parseValueId(valueId);
-            valueMap.set(cell, value);
+            const { cell, values } = shape.parseValueId(valueId);
+            valueMap.set(cell, values);
           }
-          yield new SudokuConstraintHandler.FixedCells(valueMap);
+          yield new SudokuConstraintHandler.GivenCandidates(valueMap);
           break;
 
         case 'Thermo':

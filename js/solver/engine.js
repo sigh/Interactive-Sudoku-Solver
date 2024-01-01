@@ -939,6 +939,14 @@ class LookupTables {
     return 1 << (i - 1);
   };
 
+  static fromValuesArray = (xs) => {
+    let result = 0;
+    for (const x of xs) {
+      result |= this.fromValue(x);
+    }
+    return result;
+  };
+
   static toValue(v) {
     return 32 - Math.clz32(v);
   };

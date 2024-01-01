@@ -178,7 +178,7 @@ class SudokuConstraintOptimizer {
       let newHandler;
       switch (h.cells.length) {
         case 1:
-          newHandler = new SudokuConstraintHandler.FixedCells(
+          newHandler = new SudokuConstraintHandler.GivenCandidates(
             new Map([[h.cells[0], h.sum()]]));
           break;
 

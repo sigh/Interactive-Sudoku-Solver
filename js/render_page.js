@@ -544,9 +544,9 @@ class ConstraintManager {
       inputManager, displayContainer);
     this.addReshapeListener(this._display);
     this._setUpPanel(inputManager, displayContainer);
-    this._fixedValues = new FixedValues(
+    this._givenCandidates = new GivenCandidates(
       inputManager, this._display, this.runUpdateCallback.bind(this));
-    this.addReshapeListener(this._fixedValues);
+    this.addReshapeListener(this._givenCandidates);
 
     this.setUpdateCallback();
   }
@@ -731,9 +731,9 @@ class ConstraintManager {
   loadConstraint(constraint) {
     let config;
     switch (constraint.type) {
-      case 'FixedValues':
+      case 'Givens':
         constraint.values.forEach(valueId => {
-          this._fixedValues.setValueId(valueId);
+          this._givenCandidates.setValueId(valueId);
         });
         break;
       case 'X':
@@ -1085,7 +1085,7 @@ class ConstraintManager {
     constraints.push(this._jigsawManager.getConstraint());
     constraints.push(this._checkboxConstraints.getConstraint());
     constraints.push(...this._outsideArrowConstraints.getConstraints());
-    constraints.push(this._fixedValues.getConstraint());
+    constraints.push(this._givenCandidates.getConstraint());
     constraints.push(new SudokuConstraint.Shape(this._shape.name));
     constraints.push(...this._invisibleConstraints);
 
@@ -1093,7 +1093,7 @@ class ConstraintManager {
   }
 
   getFixedCells() {
-    return this._fixedValues.getFixedCells();
+    return this._givenCandidates.getFixedCells();
   }
 
   clear() {
@@ -1103,7 +1103,7 @@ class ConstraintManager {
     this._outsideArrowConstraints.clear();
     this._configs = [];
     this._jigsawManager.clear();
-    this._fixedValues.unsafeClear();  // OK because display is cleared.
+    this._givenCandidates.unsafeClear();  // OK because display is cleared.
     this._invisibleConstraints = [];
     this.runUpdateCallback();
   }
@@ -1238,21 +1238,22 @@ class Selection {
   }
 }
 
-class FixedValues {
+class GivenCandidates {
   constructor(inputManager, display, onChange) {
     this._shape = null;
-    this._fixedValueMap = new Map();
+    this._givensMap = new Map();
     this._display = display;
     this._onChange = onChange;
 
     inputManager.onNewDigit(this._inputDigit.bind(this));
-    inputManager.onSetValue(this._updateValue.bind(this));
+    inputManager.onSetValue(this._replaceValue.bind(this));
   }
 
   reshape(shape) { this._shape = shape; }
 
   _inputDigit(cell, digit) {
-    const currValue = this._fixedValueMap.get(cell) || 0;
+    const values = this._givensMap.get(cell) || [];
+    const currValue = values.length == 1 ? values[0] : 0;
 
     let newValue;
     if (digit === null) {
@@ -1261,43 +1262,52 @@ class FixedValues {
       const numValues = this._shape.numValues;
       newValue = currValue * 10 + digit;
       if (newValue > numValues) newValue = digit;
-      if (newValue > numValues) newValue = 0;
     }
 
-    this._updateValue(cell, newValue);
+    this._replaceValue(cell, newValue);
   }
 
-  _updateValue(cell, value) {
+  _replaceValue(cell, value) {
+    this._replaceValues(cell, [value]);
+  }
+
+  _replaceValues(cell, values) {
     const numValues = this._shape.numValues;
-    if (value > 0 && value <= numValues) {
-      this._fixedValueMap.set(cell, value);
+    values = values.filter(v => v && v > 0 && v <= numValues);
+    if (values && values.length) {
+      this._givensMap.set(cell, values);
+      this._display.drawFixedValue(cell, values.join('|'));
     } else {
-      this._fixedValueMap.delete(cell);
+      this._givensMap.delete(cell);
+      this._display.drawFixedValue(cell, '');
     }
 
-    this._display.drawFixedValue(cell, value || '');
     this._onChange();
   }
 
   setValueId(valueId) {
     const parsed = this._shape.parseValueId(valueId);
-    this._updateValue(parsed.cellId, parsed.value);
+    this._replaceValues(parsed.cellId, parsed.values);
   }
 
   getConstraint() {
-    const values = [];
-    for (const [cell, value] of this._fixedValueMap) {
-      values.push(`${cell}_${value}`);
+    const valueIds = [];
+    for (const [cell, values] of this._givensMap) {
+      valueIds.push(`${cell}_${values.join('_')}`);
     }
-    return new SudokuConstraint.FixedValues(...values);
+    return new SudokuConstraint.Givens(...valueIds);
   }
 
   getFixedCells() {
-    return this._fixedValueMap.keys();
+    let cells = [];
+    for (const [cell, values] of this._givensMap) {
+      if (values.length === 1) cells.push(cell);
+    }
+    return cells;
   }
 
   unsafeClear() {
-    this._fixedValueMap = new Map();
+    this._givensMap = new Map();
   }
 }
 
