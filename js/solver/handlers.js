@@ -1747,6 +1747,69 @@ SudokuConstraintHandler.LocalEntropy = class LocalEntropy extends SudokuConstrai
   }
 }
 
+SudokuConstraintHandler.Quadruple = class Quadruple extends SudokuConstraintHandler {
+  constructor(topLeftCell, gridSize, values) {
+    const cells = [
+      topLeftCell,
+      topLeftCell + 1,
+      topLeftCell + gridSize,
+      topLeftCell + gridSize + 1];
+    super(cells);
+    this._values = values;
+    this._valueMask = LookupTables.fromValuesArray(values);
+
+    if (new Set(values).size != values.length) {
+      throw ('Quadruple handler currently requires distinct values.');
+    }
+    if (topLeftCell % gridSize + 1 == gridSize || topLeftCell >= gridSize * (gridSize - 1)) {
+      throw ('Quadruple can not start on the last row or column.');
+    }
+  }
+
+  initialize(initialGrid, cellConflicts, shape) {
+    return true;
+  }
+
+  enforceConsistency(grid, cellAccumulator) {
+    const cells = this.cells;
+    const numCells = cells.length;
+    const valuesMask = this._valueMask;
+
+    let allValues = 0;
+    let nonUniqueValues = 0;
+    let fixedValues = 0;
+    for (let i = 0; i < numCells; i++) {
+      let v = grid[cells[i]];
+      fixedValues |= (!(v & (v - 1))) * v;  // Better than branching.
+      nonUniqueValues |= allValues & v;
+      allValues |= v;
+    }
+
+    allValues &= valuesMask;
+    fixedValues &= valuesMask;
+    if (allValues !== valuesMask) return false;
+    if (fixedValues === valuesMask) return true;
+
+    let uniqueValues = allValues & ~nonUniqueValues & ~fixedValues;
+    if (uniqueValues) {
+      // We have hidden singles. Find and constrain them.
+      for (let i = 0; i < numCells; i++) {
+        const cell = cells[i];
+        const value = grid[cell] & uniqueValues;
+        if (value) {
+          // If we have more value that means a single cell holds more than
+          // one unique value.
+          if (value & (value - 1)) return false;
+          grid[cell] = value;
+          if (!(uniqueValues &= ~value)) break;
+        }
+      }
+    }
+
+    return true;
+  }
+}
+
 class HandlerSet {
   constructor(handlers, shape) {
     this._handlers = [];

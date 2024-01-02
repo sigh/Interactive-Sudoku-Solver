@@ -217,6 +217,11 @@ const EXAMPLES = {
     input: '.~R1C6_7~R1C7_2~R1C8_1~R1C9_6~R2C9_5~R2C8_7~R2C7_9~R2C6_4~R8C1_2~R8C2_7~R8C3_4~R8C4_5~R9C1_9~R9C2_5~R9C3_8~R9C4_2~R4C7_2_4_6_8~R4C8_2_4_6_8~R5C6_2_4_6_8~R6C6_2_4_6_8~R6C7_2_4_6_8~R6C8_2_4_6_8~R7C6_2_4_6_8~R8C7_2_4_6_8~R8C8_2_4_6_8~R2C3_1_3_5_7_9~R3C2_1_3_5_7_9~R4C4_1_3_5_7_9~R4C2_1_3_5_7_9~R5C4_1_3_5_7_9~R5C2_1_3_5_7_9~R3C4_1_3_5_7_9~R6C3_1_3_5_7_9',
     solution: '549837216823614975716925348635149827492786153187352469361478592274593681958261734',
   },
+  'Quadruple X': {
+    src: 'https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?id=00040T',
+    input: '.Diagonal~1.Diagonal~-1..Quad~R1C1~1~4~6~7.Quad~R5C1~2~3.Quad~R6C1~1~2.Quad~R3C3~1~2~4~8.Quad~R6C3~3~5~8~9.Quad~R2C4~6~7.Quad~R7C5~3~6.Quad~R3C6~4~5~8~9.Quad~R6C6~2~3~6~7.Quad~R3C8~1~2.Quad~R4C8~1~5.Quad~R8C8~2~3~4~5',
+    solution: '762384591415729368398165427654278913837691245129543786543812679971436852286957134',
+  },
 
   // Classic grids that used to be slow. 3 and 4 used to take 2+ seconds.
   'Classic sudoku, was slow (1)': {
