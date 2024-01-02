@@ -188,8 +188,7 @@ class StateHistoryDisplay {
     this._updateCharts = deferUntilAnimationFrame(
       this._updateCharts.bind(this));
 
-    this._deltaT = 0;
-    this._nextT = 0;
+    this.clear();
   }
 
   add(state) {
@@ -256,6 +255,10 @@ class StateHistoryDisplay {
   }
 
   clear() {
+    this._deltaT = 0;
+    this._nextT = 0;
+    // NOTE: _states must be updated in place since we have passed it into the
+    //       chart.
     this._states.length = 0;
   }
 
