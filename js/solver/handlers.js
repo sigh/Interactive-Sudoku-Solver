@@ -1755,18 +1755,26 @@ SudokuConstraintHandler.Quadruple = class Quadruple extends SudokuConstraintHand
       topLeftCell + gridSize,
       topLeftCell + gridSize + 1];
     super(cells);
-    this._values = values;
+    this.values = values;
+
+    this.valueCounts = new Map(values.map(v => [v, 0]));
+    for (const v of values) {
+      this.valueCounts.set(v, this.valueCounts.get(v) + 1);
+    }
+
     this._valueMask = LookupTables.fromValuesArray(values);
 
-    if (new Set(values).size != values.length) {
-      throw ('Quadruple handler currently requires distinct values.');
-    }
     if (topLeftCell % gridSize + 1 == gridSize || topLeftCell >= gridSize * (gridSize - 1)) {
       throw ('Quadruple can not start on the last row or column.');
     }
   }
 
   initialize(initialGrid, cellConflicts, shape) {
+    if (this.valueCounts.size != values.length) {
+      // NOTE: Check this during initialization so that the optimizer has a
+      // chance to replace this with a handler that can handle the case.
+      throw ('Quadruple handler requires distinct values.');
+    }
     return true;
   }
 
@@ -1778,19 +1786,21 @@ SudokuConstraintHandler.Quadruple = class Quadruple extends SudokuConstraintHand
     let allValues = 0;
     let nonUniqueValues = 0;
     let fixedValues = 0;
+    let numFixed = 0;
     for (let i = 0; i < numCells; i++) {
       let v = grid[cells[i]];
-      fixedValues |= (!(v & (v - 1))) * v;  // Better than branching.
+      if (!(v & (v - 1))) {
+        fixedValues |= v;
+        numFixed++;
+      }
       nonUniqueValues |= allValues & v;
       allValues |= v;
     }
 
-    allValues &= valuesMask;
-    fixedValues &= valuesMask;
-    if (allValues !== valuesMask) return false;
-    if (fixedValues === valuesMask) return true;
+    if (valuesMask & ~allValues) return false;
+    if (!(valuesMask & ~fixedValues)) return true;
 
-    let uniqueValues = allValues & ~nonUniqueValues & ~fixedValues;
+    let uniqueValues = valuesMask & allValues & ~nonUniqueValues & ~fixedValues;
     if (uniqueValues) {
       // We have hidden singles. Find and constrain them.
       for (let i = 0; i < numCells; i++) {
@@ -1801,7 +1811,23 @@ SudokuConstraintHandler.Quadruple = class Quadruple extends SudokuConstraintHand
           // one unique value.
           if (value & (value - 1)) return false;
           grid[cell] = value;
+          cellAccumulator.add(cell);
           if (!(uniqueValues &= ~value)) break;
+        }
+      }
+    }
+
+    const remainingValues = valuesMask & ~fixedValues;
+    const numRemainingCells = numCells - numFixed;
+    if (remainingValues !== (allValues & ~fixedValues)
+      && countOnes16bit(remainingValues) == numRemainingCells) {
+      // The number of remaining cell is exactly the number of remaining values.
+      // We can constrain the remaining cells to the remaining values.
+      for (let i = 0; i < numCells; i++) {
+        const cell = cells[i];
+        if (!(grid[cell] & fixedValues)) {
+          if (!(grid[cell] &= remainingValues)) return false;
+          cellAccumulator.add(cell);
         }
       }
     }

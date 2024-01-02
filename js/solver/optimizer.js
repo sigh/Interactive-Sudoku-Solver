@@ -13,6 +13,8 @@ class SudokuConstraintOptimizer {
 
     this._optimizeJigsaw(handlerSet, hasBoxes, shape);
 
+    this._optimizeQuadruple(handlerSet, shape);
+
     if (hasBoxes) {
       this._addHouseIntersections(handlerSet, shape);
     }
@@ -633,5 +635,20 @@ class SudokuConstraintOptimizer {
     }
 
     return newHandlers;
+  }
+
+  static _optimizeQuadruple(handlerSet) {
+    const quadHandlers = handlerSet.getAllofType(SudokuConstraintHandler.Quadruple);
+
+    for (const h of quadHandlers) {
+      // If there are 4 different values, then all the cells must be different
+      // and can only contain these values.
+      if (h.valueCounts.size == 4) {
+        handlerSet.add(new SudokuConstraintHandler.AllDifferent(h.cells));
+        handlerSet.add(new SudokuConstraintHandler.GivenCandidates(
+          new Map([...h.cells].map(c => [c, h.values]))));
+        continue;
+      }
+    }
   }
 }
