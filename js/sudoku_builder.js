@@ -675,6 +675,14 @@ class SudokuConstraint {
     }
   }
 
+  static Quad = class Quad extends SudokuConstraint {
+    constructor(topLeftCell, ...values) {
+      super(arguments);
+      this.topLeftCell = topLeftCell;
+      this.values = values;
+    }
+  }
+
   static Givens = class Givens extends SudokuConstraint {
     constructor(...values) {
       super(arguments);
@@ -1084,6 +1092,13 @@ class SudokuBuilder {
           for (const cells of SudokuConstraint.GlobalEntropy.regions(shape)) {
             yield new SudokuConstraintHandler.LocalEntropy(cells);
           }
+          break;
+
+        case 'Quad':
+          yield new SudokuConstraintHandler.Quadruple(
+            shape.parseCellId(constraint.topLeftCell).cell,
+            shape.gridSize,
+            constraint.values.map(v => +v));
           break;
 
         case 'Priority':
