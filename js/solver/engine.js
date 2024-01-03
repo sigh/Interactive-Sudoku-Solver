@@ -521,9 +521,11 @@ SudokuSolver.InternalSolver = class {
   _enforceAuxHandlers(grid, cell, cellAccumulator) {
     const counters = this.counters;
 
-    for (const handler of this._handlerSet.lookupAux(cell)) {
+    const handlers = this._handlerSet.lookupAux(cell);
+    const numHandlers = handlers.length;
+    for (let i = 0; i < numHandlers; i++) {
       counters.constraintsProcessed++;
-      if (!handler.enforceConsistency(grid, cellAccumulator)) {
+      if (!handlers[i].enforceConsistency(grid, cellAccumulator)) {
         return false;
       }
     }
