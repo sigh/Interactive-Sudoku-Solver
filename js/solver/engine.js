@@ -207,16 +207,17 @@ class SudokuSolver {
   }
 
   static _makePencilmarks(grid, shape) {
-    let pencilmarks = new Array(shape.numCells);
-    for (let i = 0; i < shape.numCells; i++) {
-      let s = new Set();
+    const pencilmarks = [];
+    const numCells = shape.numCells | 0;
+    for (let i = 0; i < numCells; i++) {
+      const s = new Set();
       let values = grid[i];
       while (values) {
         let value = values & -values;
         values &= ~value;
         s.add(LookupTables.toValue(value));
       }
-      pencilmarks[i] = s;
+      pencilmarks.push(s);
     }
     return pencilmarks;
   }
@@ -231,8 +232,7 @@ SudokuSolver.InternalSolver = class {
     this._initCellArray();
     this._cellOrder = new Uint8Array(shape.numCells);
     this._recStack = new Uint16Array(shape.numCells + 1);
-    this._progressRatioStack = new Array(shape.numCells + 1);
-    this._progressRatioStack.fill(1);
+    this._progressRatioStack = Array.from(this._recStack).fill(1);
 
     this._runCounter = 0;
     this._progress = {
@@ -288,8 +288,10 @@ SudokuSolver.InternalSolver = class {
   }
 
   static _findCellConflicts(handlers, shape) {
-    const cellConflictSets = new Array(shape.numCells);
-    for (let i = 0; i < shape.numCells; i++) cellConflictSets[i] = new Set();
+    const cellConflictSets = [];
+    for (let i = 0; i < shape.numCells; i++) {
+      cellConflictSets.push(new Set());
+    }
 
     for (const h of handlers) {
       const conflictSet = h.conflictSet();
@@ -403,12 +405,12 @@ SudokuSolver.InternalSolver = class {
     let buffer = new ArrayBuffer(
       (numCells + 1) * numCells * Uint16Array.BYTES_PER_ELEMENT);
 
-    this._grids = new Array(numCells + 1);
+    this._grids = [];
     for (let i = 0; i < numCells + 1; i++) {
-      this._grids[i] = new Uint16Array(
+      this._grids.push(new Uint16Array(
         buffer,
         i * numCells * Uint16Array.BYTES_PER_ELEMENT,
-        numCells);
+        numCells));
     }
     this._initialGrid = new Uint16Array(numCells);
 

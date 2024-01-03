@@ -262,7 +262,7 @@ class JigsawManager {
 
     this._regionPanel = document.getElementById('displayed-regions');
 
-    this._piecesMap = new Array();
+    this._piecesMap = [];
     this._maxPieceId = 0;
   }
 

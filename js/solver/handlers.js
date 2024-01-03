@@ -1172,8 +1172,9 @@ SudokuConstraintHandler.Sandwich = class Sandwich extends SudokuConstraintHandle
     let table = [];
     const maxD = shape.gridSize - 1;
     for (let i = 0; i <= maxSum; i++) {
-      table[i] = new Array(maxD);
-      for (let d = 0; d <= maxD; d++) table[i][d] = [];
+      const subtable = [];
+      table.push(subtable);
+      for (let d = 0; d <= maxD; d++) subtable.push([]);
     }
 
     for (let i = 0; i < lookupTables.combinations; i++) {
@@ -1898,11 +1899,11 @@ class HandlerSet {
 
     this._auxHandlers = [];
 
-    this._cellMap = new Array(shape.numCells);
-    this._auxHandlerLookup = new Array(shape.numCells);
+    this._cellMap = [];
+    this._auxHandlerLookup = [];
     for (let i = 0; i < shape.numCells; i++) {
-      this._cellMap[i] = [];
-      this._auxHandlerLookup[i] = [];
+      this._cellMap.push([]);
+      this._auxHandlerLookup.push([]);
     }
 
     this.add(...handlers);
