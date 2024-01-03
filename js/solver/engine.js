@@ -914,10 +914,6 @@ SudokuSolver.CellAccumulator = class {
     return this._head >= 0;
   }
 
-  head() {
-    return this._handlers[this._head];
-  }
-
   popConstraint() {
     const oldHead = this._head;
     this._head = this._linkedList[oldHead];
