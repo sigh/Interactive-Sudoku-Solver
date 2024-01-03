@@ -80,6 +80,12 @@ class DisplayItem {
     return [x - cellWidth / 2, y + cellWidth / 2];
   }
 
+  cellIdBottomRightCorner(cellId) {
+    const cellWidth = DisplayItem.CELL_SIZE;
+    const [x, y] = this.cellIdCenter(cellId);
+    return [x + cellWidth / 2, y + cellWidth / 2];
+  }
+
   cellCenter(cell) {
     return DisplayItem._cellCenter(...this._shape.splitCellIndex(cell));
   }
@@ -453,6 +459,9 @@ class ConstraintDisplay extends DisplayItem {
     this._diagonalDisplay = new DiagonalDisplay(
       displayContainer.getNewGroup('diagonal-group'));
 
+    this._quadGroup = displayContainer.getNewGroup('quad-group');
+    this._applyGridOffset(this._quadGroup);
+
     this._givensDisplay = new GivensDisplay(
       displayContainer.getNewGroup('givens-group'));
 
@@ -500,6 +509,7 @@ class ConstraintDisplay extends DisplayItem {
 
   clear() {
     clearDOMNode(this._thermoGroup);
+    clearDOMNode(this._quadGroup);
     clearDOMNode(this._lineConstraintGroup);
     clearDOMNode(this._adjConstraintGroup);
 
@@ -709,6 +719,39 @@ class ConstraintDisplay extends DisplayItem {
     this._thermoGroup.append(thermo);
 
     return thermo;
+  }
+
+  drawQuad(topLeftCell, values) {
+    const quad = createSvgElement('g');
+    const QUAD_CIRCLE_RADIUS = 10;
+    const QUAD_TEXT_OFFSET = 5;
+
+    const [cx, cy] = this.cellIdBottomRightCorner(topLeftCell);
+    const circle = createSvgElement('circle');
+    circle.setAttribute('cx', cx);
+    circle.setAttribute('cy', cy);
+    circle.setAttribute('r', QUAD_CIRCLE_RADIUS);
+    circle.setAttribute('fill', 'white');
+    circle.setAttribute('stroke', 'black');
+    circle.setAttribute('stroke-width', 1);
+    quad.appendChild(circle);
+
+    // Space out values evenly around the circle.
+    const numValues = values.length;
+    const angleInc = 2 * Math.PI / numValues;
+    const startAngle = numValues > 2 ? - Math.PI / 2 : Math.PI;
+    const offset = numValues == 1 ? 0 : QUAD_TEXT_OFFSET;
+    for (let i = 0; i < numValues; i++) {
+      const value = values[i];
+      const x = cx + Math.cos(startAngle + i * angleInc) * offset;
+      const y = 1 + cy + Math.sin(startAngle + i * angleInc) * offset;
+      const text = this.makeTextNode(value, x, y, 'quad-value');
+      quad.appendChild(text);
+    }
+
+    this._quadGroup.append(quad);
+
+    return quad;
   }
 
   drawDiagonal(direction) {

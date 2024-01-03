@@ -681,6 +681,17 @@ class SudokuConstraint {
       this.topLeftCell = topLeftCell;
       this.values = values;
     }
+
+    cells() {
+      const shape = SHAPE_MAX;
+      const { row, col } = shape.parseCellId(this.topLeftCell);
+      return [
+        this.topLeftCell,
+        shape.makeCellId(row, col + 1),
+        shape.makeCellId(row + 1, col),
+        shape.makeCellId(row + 1, col + 1),
+      ];
+    }
   }
 
   static Givens = class Givens extends SudokuConstraint {
