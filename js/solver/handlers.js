@@ -115,12 +115,12 @@ SudokuConstraintHandler.House = class House extends SudokuConstraintHandler {
 
   enforceConsistency(grid) {
     const cells = this.cells;
-    const gridSize = this._shape.gridSize;
+    const numCells = cells.length;
 
     let allValues = 0;
     let nonUniqueValues = 0;
     let fixedValues = 0;
-    for (let i = 0; i < gridSize; i++) {
+    for (let i = 0; i < numCells; i++) {
       const v = grid[cells[i]];
       nonUniqueValues |= allValues & v;
       allValues |= v;
@@ -133,7 +133,7 @@ SudokuConstraintHandler.House = class House extends SudokuConstraintHandler {
     let uniqueValues = allValues & ~nonUniqueValues & ~fixedValues;
     if (uniqueValues) {
       // We have hidden singles. Find and constrain them.
-      for (let i = 0; i < gridSize; i++) {
+      for (let i = 0; i < numCells; i++) {
         const cell = cells[i];
         const value = grid[cell] & uniqueValues;
         if (value) {
@@ -149,15 +149,15 @@ SudokuConstraintHandler.House = class House extends SudokuConstraintHandler {
     // Check for naked pairs.
 
     // We won't have anything useful to do unless we have at least 2 free cells.
-    if (gridSize - countOnes16bit(fixedValues) <= 2) return true;
+    if (numCells - countOnes16bit(fixedValues) <= 2) return true;
 
-    for (let i = 0; i < gridSize - 1; i++) {
+    for (let i = 0; i < numCells - 1; i++) {
       const v = grid[cells[i]];
       if (countOnes16bit(v) != 2) continue;
-      for (let j = i + 1; j < gridSize; j++) {
+      for (let j = i + 1; j < numCells; j++) {
         if (grid[cells[j]] !== v) continue;
         // Found a pair, remove it from all other entries.
-        for (let k = 0; k < gridSize; k++) {
+        for (let k = 0; k < numCells; k++) {
           if (k != i && k != j) {
             if (!(grid[cells[k]] &= ~v)) return false;
           }
@@ -666,7 +666,7 @@ class SumHandlerUtil {
     const valueBuffer = this.constructor._valueBuffer;
     const conflictMapBuffer = this.constructor._conflictMapBuffer;
 
-    const gridSize = this._numValues;
+    const gridSize = this._numValues | 0;
 
     let j = 0;
     for (let i = cells.length - 1; i >= 0; i--) {
@@ -868,14 +868,14 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
   enforceConsistency(grid) {
     const cells = this.cells;
     const numCells = cells.length;
-    const sum = this._sum;
-    const gridSize = this._shape.gridSize;
+    const sum = this._sum | 0;
+    const gridSize = this._shape.gridSize | 0;
 
     // Determine how much headroom there is in the range between the extreme
     // values and the target sum.
     const rangeInfo = this._lookupTables.rangeInfo;
     let rangeInfoSum = 0;
-    for (let i = numCells - 1; i >= 0; i--) {
+    for (let i = 0; i < numCells; i++) {
       rangeInfoSum += rangeInfo[grid[cells[i]]];
     }
 
@@ -1219,13 +1219,13 @@ SudokuConstraintHandler.Sandwich = class Sandwich extends SudokuConstraintHandle
 
   enforceConsistency(grid) {
     const cells = this.cells;
-    const borderMask = this._borderMask;
-    const gridSize = this._gridSize;
+    const borderMask = this._borderMask | 0;
+    const numCells = this.cells.length;
 
     // Cache the grid values for faster lookup.
     let values = SudokuConstraintHandler.Sandwich._cellValues;
     let numBorders = 0;
-    for (let i = 0; i < gridSize; i++) {
+    for (let i = 0; i < numCells; i++) {
       let v = values[i] = grid[cells[i]];
       if (v & borderMask) numBorders++;
     }
@@ -1265,8 +1265,8 @@ SudokuConstraintHandler.Sandwich = class Sandwich extends SudokuConstraintHandle
     // that the constraint is fully satisfied.
     const valueMask = this._valueMask;
     const [minDist, maxDist] = this._distances;
-    const maxIndex = gridSize - minDist;
-    const shift = gridSize - 1;
+    const maxIndex = numCells - minDist;
+    const shift = numCells - 1;
     let prefixValues = 0;
     let pPrefix = 0;
     for (let i = 0; i < maxIndex; i++) {
@@ -1282,13 +1282,13 @@ SudokuConstraintHandler.Sandwich = class Sandwich extends SudokuConstraintHandle
       //  - Use them to determine the possible inside and outside values.
       let innerValues = 0;
       let pInner = i + 1;
-      for (let j = i + minDist; j <= i + maxDist && j < gridSize; j++) {
+      for (let j = i + minDist; j <= i + maxDist && j < numCells; j++) {
         if (!(values[j] & vRev)) continue;
 
         while (pInner < j) innerValues |= values[pInner++];
         while (pPrefix < i) prefixValues |= values[pPrefix++];
         let outerValues = prefixValues;
-        for (let k = pInner + 1; k < gridSize; k++) outerValues |= values[k];
+        for (let k = pInner + 1; k < numCells; k++) outerValues |= values[k];
 
         let combinations = this._combinations[j - i];
         let innerPossibilities = 0;
@@ -1312,12 +1312,12 @@ SudokuConstraintHandler.Sandwich = class Sandwich extends SudokuConstraintHandle
           validSettings[k++] |= v;
           while (k < j) validSettings[k++] |= innerPossibilities;
           validSettings[k++] |= vRev;
-          while (k < gridSize) validSettings[k++] |= outerPossibilities;
+          while (k < numCells) validSettings[k++] |= outerPossibilities;
         }
       }
     }
 
-    for (let i = 0; i < gridSize; i++) {
+    for (let i = 0; i < numCells; i++) {
       if (!(grid[cells[i]] &= validSettings[i])) return false;
     }
 
