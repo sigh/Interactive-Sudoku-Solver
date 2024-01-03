@@ -75,7 +75,7 @@ class SudokuSolver {
     let result = this._nthIteration(n, stepGuides);
     if (!result) return null;
 
-    let pencilmarks = this.constructor._makePencilmarks(result.grid, this._shape);
+    let pencilmarks = this.constructor._makePencilmarks(result.grid);
     for (const cell of result.cellOrder) {
       pencilmarks[cell] = LookupTables.toValue(result.grid[cell]);
     }
@@ -146,7 +146,7 @@ class SudokuSolver {
     this._sendProgress();
     this._progressExtraStateFn = null;
 
-    return this.constructor._makePencilmarks(valuesInSolutions, this._shape);
+    return this.constructor._makePencilmarks(valuesInSolutions);
   }
 
   validateLayout() {
@@ -206,18 +206,11 @@ class SudokuSolver {
     return grid.map(value => LookupTables.toValue(value));
   }
 
-  static _makePencilmarks(grid, shape) {
+  static _makePencilmarks(grid) {
     const pencilmarks = [];
-    const numCells = shape.numCells | 0;
-    for (let i = 0; i < numCells; i++) {
-      const s = new Set();
-      let values = grid[i];
-      while (values) {
-        let value = values & -values;
-        values &= ~value;
-        s.add(LookupTables.toValue(value));
-      }
-      pencilmarks.push(s);
+    for (let i = 0; i < grid.length; i++) {
+      pencilmarks.push(new Set(
+        LookupTables.toValuesArray(grid[i])));
     }
     return pencilmarks;
   }
