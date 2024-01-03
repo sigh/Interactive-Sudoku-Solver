@@ -115,15 +115,28 @@ class DebugOutput {
   update(data) {
     if (!this._visible) return;
 
+    const isScrolledToBottom = this._isScrolledToBottom(this._container);
+
     data.logs.forEach(l => this._addLog(l));
 
     if (data.debugState && data.debugState.backtrackTriggers) {
       this._infoOverlay.setHeatmapValues(data.debugState.backtrackTriggers);
     }
+
+    if (isScrolledToBottom) {
+      this._scrollToBottom(this._container);
+    }
   }
 
   setOverlayValues(values) {
     this._infoOverlay.setValues(values);
+  }
+
+  _isScrolledToBottom(obj) {
+    return obj.scrollTop === (obj.scrollHeight - obj.offsetHeight);
+  }
+  _scrollToBottom(obj) {
+    obj.scrollTop = obj.scrollHeight;
   }
 
   _addDuplicateLog(data) {
@@ -154,6 +167,9 @@ class DebugOutput {
     this._logDedupe.currentSpan = null;
 
     const elem = document.createElement('div');
+    if (data.important) {
+      elem.classList.add('important-log-line');
+    }
 
     const locSpan = document.createElement('span');
     locSpan.textContent = data.loc + ': ';

@@ -844,3 +844,8 @@ select {
 .duplicate-log-line {
   margin-left: 50px;
 }
+
+.important-log-line {
+  font-weight: bold;
+  margin: 5px 0;
+}
