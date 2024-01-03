@@ -74,6 +74,16 @@ body {
   dominant-baseline: hanging;
 }
 
+.quad-value {
+  font-size: 9px;
+  text-anchor: middle;
+  dominant-baseline: middle;
+}
+
+.size-16x16 .quad-value {
+  font-size: 7px;
+}
+
 .hidden-solution {
   visibility: hidden;
 }
@@ -284,6 +294,15 @@ input[type=number] {
 
 input[disabled]+label {
   color: grey;
+}
+
+input:invalid {
+  border: none;
+  outline: 2px solid red;
+}
+
+#multi-cell-constraint-quad-input {
+  width: 80px;
 }
 
 fieldset {

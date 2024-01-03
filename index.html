@@ -287,7 +287,18 @@ layout: null
                   </div>
                 </div>
               </div>
-              <div class="two-column">
+              <div>
+                <input type="radio" id="multi-cell-constraint-quad" name="constraint-type" value="quad">
+                <label for="multi-cell-constraint-quad">
+                  Quad
+                  <input type="text" id="multi-cell-constraint-quad-input" name="quad-values" ,
+                    pattern="\d+([, ]*\d+){0,3}[, ]*" />
+                  <span class="tooltip" data-text="
+                    All the given values must be present in the surrounding 2x2 square.
+                    Select a 2x2 square to enable.
+                  ">
+                  </span>
+                </label>
               </div>
               <div>
                 <button type="submit" title="Add constraint">Add</button>

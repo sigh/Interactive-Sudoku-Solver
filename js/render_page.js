@@ -203,6 +203,7 @@ class ExampleHandler {
     'X-Sum',
     'Odd even',
     'Global entropy',
+    'Quadruple X',
     '16x16',
     '16x16: Sudoku X, hard',
     '16x16: Jigsaw',
@@ -577,6 +578,17 @@ class ConstraintManager {
     return this._shape;
   }
 
+  _cellsAre2x2Square(cells) {
+    if (cells.length != 4) return false;
+    cells = cells.map(
+      c => this._shape.parseCellId(c)).sort((a, b) => a.cell - b.cell);
+    let { row, col } = cells[0];
+    return (
+      (cells[1].row == row && cells[1].col == col + 1) &&
+      (cells[2].row == row + 1 && cells[2].col == col) &&
+      (cells[3].row == row + 1 && cells[3].col == col + 1));
+  }
+
   _cellsAreAdjacent(cells) {
     if (cells.length != 2) return false;
     // Manhattan distance is exactly 1.
@@ -631,6 +643,15 @@ class ConstraintManager {
     };
     selectionForm['whisper-difference'].onfocus = () => {
       selectionForm['multi-cell-constraint-whisper'].checked = true;
+    };
+
+    // Selecting anything in the whisper constraint will select it and focus on
+    // the input box.
+    selectionForm['multi-cell-constraint-quad'].onchange = () => {
+      selectionForm['quad-values'].select();
+    };
+    selectionForm['quad-values'].onfocus = () => {
+      selectionForm['multi-cell-constraint-quad'].checked = true;
     };
 
     // Outside arrows.
@@ -698,6 +719,16 @@ class ConstraintManager {
       }
     }
 
+    // Quad constraint must have exactly 4 cells, and they must be in a grid.
+    {
+      const quadDisabled = !(selection.length == 4 && this._cellsAre2x2Square(selection));
+      selectionForm['multi-cell-constraint-quad'].disabled = quadDisabled;
+      selectionForm['multi-cell-constraint-quad-input'].disabled = quadDisabled;
+      if (quadDisabled) {
+        selectionForm['multi-cell-constraint-quad'].checked = false;
+      }
+    }
+
     if (this._jigsawManager.isValidJigsawPiece(selection)) {
       selectionForm['multi-cell-constraint-jigsaw'].disabled = false;
       selectionForm['multi-cell-constraint-jigsaw'].checked = true;
@@ -711,8 +742,12 @@ class ConstraintManager {
     //   - Otherwise just focus on the submit button.
     if (selectionForm['multi-cell-constraint-cage'].checked) {
       selectionForm['cage-sum'].select();
+    } else if (selectionForm['multi-cell-constraint-sum'].checked) {
+      selectionForm['plain-sum'].select();
     } else if (selectionForm['multi-cell-constraint-whisper'].checked) {
       selectionForm['whisper-difference'].select();
+    } else if (selectionForm['multi-cell-constraint-quad'].checked) {
+      selectionForm['quad-values'].select();
     } else {
       selectionForm.querySelector('button[type=submit]').focus();
     }
@@ -870,6 +905,18 @@ class ConstraintManager {
         this._addToPanel(config);
         this._configs.push(config);
         break;
+      case 'Quad':
+        config = {
+          cells: constraint.cells(),
+          name: `Quad (${constraint.values.join(',')})`,
+          constraint: constraint,
+          displayElem: this._display.drawQuad(
+            constraint.topLeftCell, constraint.values),
+          replaceKey: `Quad-${constraint.topLeftCell}`,
+        };
+        this._addToPanel(config);
+        this._configs.push(config);
+        break;
       case 'LittleKiller':
       case 'Sandwich':
       case 'XSum':
@@ -987,6 +1034,16 @@ class ConstraintManager {
         constraint = new SudokuConstraint.V(...cells);
         this.loadConstraint(constraint);
         break;
+      case 'quad':
+        let valuesStr = formData.get('quad-values');
+        let values = valuesStr.split(/[, ]+/).map(v => +v).filter(
+          v => Number.isInteger(v) && v >= 1 && v <= this._shape.numValues);
+        if (values.length) {
+          cells.sort();
+          constraint = new SudokuConstraint.Quad(cells[0], ...values);
+          this.loadConstraint(constraint);
+        }
+        break;
     }
 
     inputManager.setSelection([]);
@@ -1032,6 +1089,15 @@ class ConstraintManager {
     panelItem.addEventListener('mouseout', () => {
       this._panelItemHighlighter.clear();
     });
+
+    if (config.replaceKey) {
+      for (const other of this._configs) {
+        if (config.replaceKey == other.replaceKey) {
+          this._removePanelConstraint(other);
+          break;
+        }
+      }
+    }
 
     return panelItem;
   }
