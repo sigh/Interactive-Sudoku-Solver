@@ -222,6 +222,11 @@ const EXAMPLES = {
     input: '.Diagonal~1.Diagonal~-1..Quad~R1C1~1~4~6~7.Quad~R5C1~2~3.Quad~R6C1~1~2.Quad~R3C3~1~2~4~8.Quad~R6C3~3~5~8~9.Quad~R2C4~6~7.Quad~R7C5~3~6.Quad~R3C6~4~5~8~9.Quad~R6C6~2~3~6~7.Quad~R3C8~1~2.Quad~R4C8~1~5.Quad~R8C8~2~3~4~5',
     solution: '762384591415729368398165427654278913837691245129543786543812679971436852286957134',
   },
+  'Quadruple - repeated values': {
+    src: 'https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?id=00022p&chlang=en',
+    input: '.Quad~R1C1~1~2~3~4.Quad~R1C8~6~7~8~9.Quad~R2C2~4~5~6~7.Quad~R2C7~3~4~5~6.Quad~R3C3~1~3~5~6.Quad~R3C6~4~7~7~8.Quad~R6C1~4~5~5~9.Quad~R6C8~2~4~7~8.Quad~R7C3~3~4~6~8.Quad~R7C6~2~2~5~6',
+    solution: '239456187147283569865197432926348715378521946451769328593812674784635291612974853',
+  },
 
   // Classic grids that used to be slow. 3 and 4 used to take 2+ seconds.
   'Classic sudoku, was slow (1)': {
