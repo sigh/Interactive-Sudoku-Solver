@@ -102,18 +102,36 @@ class SudokuSolver {
   }
 
   _nthIteration(n, stepGuides) {
+    const yieldEveryStep = !!stepGuides;
+
     n++;
-    let iter = this._getIter(stepGuides);
+    let iter = this._getIter(yieldEveryStep);
     // To go backwards we start from the start.
     if (n <= iter.count) {
       this._reset();
-      iter = this._getIter(stepGuides);
+      iter = this._getIter(yieldEveryStep);
+    }
+
+    if (yieldEveryStep) {
+      // TODO: Encapsulate this within InternalSolver.
+      this._internalSolver._stepState ||= {};
+      this._internalSolver._stepState.stepGuides = stepGuides;
+      this._internalSolver._stepState.logSteps = false;
     }
 
     // Iterate until we have seen n steps.
     let result = null;
     this._timer.runTimed(() => {
       do {
+        // Only show debug logs for the target step.
+        if (yieldEveryStep && iter.count == n - 1) {
+          this._internalSolver._stepState.logSteps = ENABLE_DEBUG_LOGS;
+          debugLog({
+            loc: 'nthStep',
+            msg: 'Step ' + iter.count,
+            important: true
+          });
+        }
         result = iter.next();
       } while (iter.count < n);
     });
@@ -182,12 +200,7 @@ class SudokuSolver {
     return state;
   }
 
-  _getIter(stepGuides) {
-    const yieldEveryStep = !!stepGuides;
-    if (yieldEveryStep) {
-      this._internalSolver._stepState.stepGuides = stepGuides;
-    }
-
+  _getIter(yieldEveryStep) {
     // If an iterator doesn't exist or is of the wrong type, then create it.
     if (!this._iter || this._iter.yieldEveryStep != yieldEveryStep) {
       this._iter = {
@@ -342,7 +355,7 @@ SudokuSolver.InternalSolver = class {
 
   reset() {
     this._iter = null;
-    this._stepState = {};
+    this._stepState = null;
     this.counters = {
       valuesTried: 0,
       cellsSearched: 0,
@@ -497,11 +510,40 @@ SudokuSolver.InternalSolver = class {
     return countOnes16bit(grid[cellOrder[cellIndex]]);
   }
 
+  _logEnforceValue(grid, cell, value, conflicts) {
+    const changedCells = conflicts.filter(c => grid[c] & value);
+    debugLog({
+      loc: '_enforceValue',
+      msg: 'Enforcing value',
+      args: {
+        cell: this._shape.makeCellIdFromIndex(cell),
+        value: LookupTables.toValue(value),
+        cellsChanged: changedCells.length
+      },
+      cells: changedCells,
+    });
+
+    if (changedCells.length) {
+      const emptyCells = changedCells.filter(c => !(grid[c] & ~value));
+      if (emptyCells.length) {
+        debugLog({
+          loc: '_enforceValue',
+          msg: 'Enforcing value caused wipeout',
+          cells: emptyCells,
+        });
+      }
+    }
+  }
+
   _enforceValue(grid, cell, cellAccumulator) {
     let value = grid[cell];
 
     const conflicts = this._cellConflicts[cell];
     const numConflicts = conflicts.length;
+    const logSteps = this._stepState !== null && this._stepState.logSteps;
+    if (logSteps) {
+      this._logEnforceValue(grid, cell, value, conflicts);
+    }
     for (let i = 0; i < numConflicts; i++) {
       const conflict = conflicts[i];
       if (grid[conflict] & value) {
@@ -511,37 +553,86 @@ SudokuSolver.InternalSolver = class {
     }
 
     // Only enforce aux handlers for the current cell.
-    if (!this._enforceAuxHandlers(grid, cell, cellAccumulator)) {
+    if (!this._enforceAuxHandlers(grid, cell, cellAccumulator, logSteps)) {
       return false;
     }
 
-    return this._enforceConstraints(grid, cellAccumulator);
+    return this._enforceConstraints(grid, cellAccumulator, logSteps);
   }
 
-  _enforceAuxHandlers(grid, cell, cellAccumulator) {
+  static _debugGridBuffer = new Uint16Array(SHAPE_MAX.numCells);
+
+  _debugEnforceConsistency(loc, grid, handler, cellAccumulator) {
+    const oldGrid = this.constructor._debugGridBuffer;
+    oldGrid.set(grid);
+
+    const result = handler.enforceConsistency(grid, cellAccumulator);
+    const diff = {};
+    let hasDiff = false;
+    for (let i = 0; i < grid.length; i++) {
+      if (oldGrid[i] != grid[i]) {
+        diff[this._shape.makeCellIdFromIndex(i)] = (
+          LookupTables.toValuesArray(oldGrid[i] & ~grid[i]));
+        hasDiff = true;
+      }
+    }
+
+    if (hasDiff) {
+      debugLog({
+        loc: loc,
+        msg: `${handler.constructor.name} removed: `,
+        args: diff,
+        cells: handler.cells,
+      });
+    }
+    if (!result) {
+      debugLog({
+        loc: loc,
+        msg: `${handler.constructor.name} returned false`,
+        cells: handler.cells,
+      });
+    }
+
+    return result;
+  }
+
+  _enforceAuxHandlers(grid, cell, cellAccumulator, logSteps) {
     const counters = this.counters;
 
     const handlers = this._handlerSet.lookupAux(cell);
     const numHandlers = handlers.length;
     for (let i = 0; i < numHandlers; i++) {
       counters.constraintsProcessed++;
-      if (!handlers[i].enforceConsistency(grid, cellAccumulator)) {
-        return false;
+      const h = handlers[i];
+      if (logSteps) {
+        if (!this._debugEnforceConsistency('_enforceAuxHandlers', grid, h, cellAccumulator)) {
+          return false;
+        }
+      } else {
+        if (!h.enforceConsistency(grid, cellAccumulator)) {
+          return false;
+        }
       }
     }
 
     return true;
   }
 
-  _enforceConstraints(grid, cellAccumulator) {
+  _enforceConstraints(grid, cellAccumulator, logSteps) {
     const counters = this.counters;
 
     while (cellAccumulator.hasConstraints()) {
       counters.constraintsProcessed++;
       const c = cellAccumulator.popConstraint();
-      // TODO: Avoid c being added to cellAccumulator during this time.
-      if (!c.enforceConsistency(grid, cellAccumulator)) {
-        return false;
+      if (logSteps) {
+        if (!this._debugEnforceConsistency('_enforceConstraints', grid, c, cellAccumulator)) {
+          return false;
+        }
+      } else {
+        // TODO: Avoid c being added to cellAccumulator during this time.
+        if (!c.enforceConsistency(grid, cellAccumulator)) {
+          return false;
+        }
       }
     }
 
@@ -558,7 +649,7 @@ SudokuSolver.InternalSolver = class {
   //  YIELD_ON_SOLUTION to yielding each solution.
   //  YIELD_ON_STEP to yield every step.
   //  n > 1 to yield every n contradictions.
-  *run(yieldWhen) {
+  * run(yieldWhen) {
     const yieldEveryStep = yieldWhen === this.constructor.YIELD_ON_STEP;
     const yieldOnContradiction = yieldWhen > 1 ? yieldWhen : 0;
 
@@ -581,10 +672,12 @@ SudokuSolver.InternalSolver = class {
       let cellAccumulator = this._cellAccumulator;
       cellAccumulator.clear();
       for (let i = 0; i < this._numCells; i++) cellAccumulator.add(i);
-      this._enforceConstraints(this._grids[0], cellAccumulator);
+      const logSteps = this._stepState !== null && this._stepState.logSteps;
+      this._enforceConstraints(this._grids[0], cellAccumulator, logSteps);
     }
 
     if (yieldEveryStep) {
+      this._stepState ||= {};
       yield {
         grid: this._grids[0],
         isSolution: false,
