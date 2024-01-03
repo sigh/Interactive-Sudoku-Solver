@@ -840,3 +840,7 @@ select {
 #multi-value-cell-input .visible .dropdown-body {
   display: grid;
 }
+
+.duplicate-log-line {
+  margin-left: 50px;
+}
