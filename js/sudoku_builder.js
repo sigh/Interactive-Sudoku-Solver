@@ -20,8 +20,8 @@ class GridShape {
 
     this._valueBase = this.numValues + 1;
 
-    this.allCells = new Array(this.numCells);
-    for (let i = 0; i < this.numCells; i++) this.allCells[i] = i;
+    this.allCells = [];
+    for (let i = 0; i < this.numCells; i++) this.allCells.push(i);
 
     this.maxSum = this.gridSize * (this.gridSize + 1) / 2;
 
@@ -713,13 +713,13 @@ class SudokuConstraint {
   static DEFAULT = this.Givens;
 
   static _makeRegions(fn, gridSize) {
-    const regions = new Array(gridSize);
+    const regions = [];
     for (let r = 0; r < gridSize; r++) {
-      const cells = new Array(gridSize);
+      const cells = [];
       for (let i = 0; i < gridSize; i++) {
-        cells[i] = fn(r, i);
+        cells.push(fn(r, i));
       }
-      regions[r] = cells;
+      regions.push(cells);
     }
     return regions;
   }
@@ -1299,8 +1299,7 @@ const toShortSolution = (solution, shape) => {
   const baseCharCode = SudokuTextParser.SHAPE_TO_BASE_CHAR_CODE.get(shape);
   const DEFAULT_VALUE = '.';
 
-  let result = new Array(solution.length);
-  result.fill(DEFAULT_VALUE);
+  const result = new Array(solution.length).fill(DEFAULT_VALUE);
 
   for (let i = 0; i < solution.length; i++) {
     result[i] = String.fromCharCode(baseCharCode + solution[i] - 1);
