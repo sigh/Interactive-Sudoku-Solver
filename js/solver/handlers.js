@@ -113,7 +113,7 @@ SudokuConstraintHandler.House = class House extends SudokuConstraintHandler {
     return true;
   }
 
-  enforceConsistency(grid) {
+  enforceConsistency(grid, cellAccumulator) {
     const cells = this.cells;
     const numCells = cells.length;
 
@@ -865,7 +865,7 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
     return true;
   }
 
-  enforceConsistency(grid) {
+  enforceConsistency(grid, cellAccumulator) {
     const cells = this.cells;
     const numCells = cells.length;
     const sum = this._sum | 0;
@@ -982,11 +982,11 @@ SudokuConstraintHandler.SumWithNegative = class SumWithNegative extends SudokuCo
 
   setComplementCells() { }
 
-  enforceConsistency(grid) {
+  enforceConsistency(grid, cellAccumulator) {
     const reverse = this._lookupTables.reverse;
     grid[this._negativeCell] = reverse[grid[this._negativeCell]];
 
-    const result = super.enforceConsistency(grid);
+    const result = super.enforceConsistency(grid, cellAccumulator);
 
     // Reverse the value back even if we fail to make the output and debugging
     // easier.
@@ -1026,7 +1026,7 @@ SudokuConstraintHandler.Skyscraper = class Skyscraper extends SudokuConstraintHa
     return true;
   }
 
-  enforceConsistency(grid) {
+  enforceConsistency(grid, cellAccumulator) {
     const cells = this.cells;
     const maxHeight = this._maxHeight;
     const target = this._numVisible;
@@ -1217,7 +1217,7 @@ SudokuConstraintHandler.Sandwich = class Sandwich extends SudokuConstraintHandle
   static _validSettings = new Uint16Array(SHAPE_MAX.gridSize);
   static _cellValues = new Uint16Array(SHAPE_MAX.gridSize);
 
-  enforceConsistency(grid) {
+  enforceConsistency(grid, cellAccumulator) {
     const cells = this.cells;
     const borderMask = this._borderMask | 0;
     const numCells = this.cells.length;
@@ -1352,7 +1352,7 @@ SudokuConstraintHandler.SameValues = class SameValues extends SudokuConstraintHa
     this.idStr = [this.constructor.name, cells0, cells1].join('-');
   }
 
-  enforceConsistency(grid) {
+  enforceConsistency(grid, cellAccumulator) {
     const cells0 = this._cells0;
     const cells1 = this._cells1;
     const numCells = cells0.length;
