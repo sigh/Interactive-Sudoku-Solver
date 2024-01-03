@@ -646,17 +646,38 @@ class SudokuConstraintOptimizer {
         // if there are repeats.
         handlerSet.add(new SudokuConstraintHandler.GivenCandidates(
           new Map([...h.cells].map(c => [c, h.values]))));
+        if (ENABLE_DEBUG_LOGS) {
+          debugLog({
+            loc: '_optimizeQuadruple',
+            msg: 'Add: GivenCandidates',
+            cells: h.cells,
+          });
+        }
       }
 
       if (h.valueCounts.size == 4) {
         // If there are 4 different values, then the cells must be different.
         handlerSet.add(new SudokuConstraintHandler.AllDifferent(h.cells));
+        if (ENABLE_DEBUG_LOGS) {
+          debugLog({
+            loc: '_optimizeQuadruple',
+            msg: 'Add: AllDifferent',
+            cells: h.cells,
+          });
+        }
         continue;
       }
       if ([...h.valueCounts.values()].some(c => c > 2)) {
         // There can't be more than 2 of each value, as the cells must be in
         // a 2x2 box. Hence each cell conflicts with 2 others.
         handlerSet.replace(h, new SudokuConstraintHandler.False(h.cells));
+        if (ENABLE_DEBUG_LOGS) {
+          debugLog({
+            loc: '_optimizeQuadruple',
+            msg: 'Replace with: False',
+            cells: h.cells,
+          });
+        }
         continue;
       }
     }
