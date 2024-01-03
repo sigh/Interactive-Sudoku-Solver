@@ -104,6 +104,12 @@ class DebugOutput {
 
     this._container.textContent = '';
     this._infoOverlay.clear();
+
+    this._logDedupe = {
+      lastKey: '',
+      count: 0,
+      currentSpan: null,
+    };
   }
 
   update(data) {
@@ -120,7 +126,33 @@ class DebugOutput {
     this._infoOverlay.setValues(values);
   }
 
+  _addDuplicateLog(data) {
+    if (!this._logDedupe.currentSpan) {
+      this._logDedupe.count = 1;
+      this._logDedupe.currentSpan = document.createElement('span');
+      this._logDedupe.currentSpan.classList.add('duplicate-log-line');
+      this._container.append(this._logDedupe.currentSpan);
+    }
+    const span = this._logDedupe.currentSpan;
+    const count = ++this._logDedupe.count;
+
+    const repeatSpan = document.createElement('span');
+    repeatSpan.textContent = ` x${count}`;
+    this._addLogMouseOver(repeatSpan, data);
+
+    span.append(repeatSpan);
+  }
+
   _addLog(data) {
+    const argsStr = JSON.stringify(data.args || '').replaceAll('"', '');
+
+    const key = `${data.loc} ${data.msg} ${argsStr}`;
+    if (key == this._logDedupe.lastKey) {
+      return this._addDuplicateLog(data);
+    }
+    this._logDedupe.lastKey = key;
+    this._logDedupe.currentSpan = null;
+
     const elem = document.createElement('div');
 
     const locSpan = document.createElement('span');
@@ -129,13 +161,19 @@ class DebugOutput {
     const msgSpan = document.createElement('msg');
     let msg = data.msg || '';
     if (data.args) {
-      msg += ' ' + JSON.stringify(data.args).replaceAll('"', '');
+      msg += ' ' + argsStr;
     }
     msgSpan.textContent = msg;
 
     elem.append(locSpan);
     elem.append(msgSpan);
 
+    this._addLogMouseOver(elem, data);
+
+    this._container.append(elem);
+  }
+
+  _addLogMouseOver(elem, data) {
     const shape = this._shape;
 
     if (data.cells && data.cells.length) {
@@ -156,8 +194,6 @@ class DebugOutput {
         this._infoOverlay.setValues();
       });
     }
-
-    this._container.append(elem);
   }
 
   enable(enable) {

@@ -299,7 +299,7 @@ class SudokuConstraintOptimizer {
             loc: '_addSumIntersectionHandler',
             msg: 'Discarded inferred handler: ' +
               `.Sum~${totalSum}~${cellString}`,
-            args: { sumSkew: sumSkew },
+            args: { sumSkew: +sumSkew.toFixed(2) },
             cells: cellsArray,
           });
         }
