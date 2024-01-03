@@ -641,12 +641,22 @@ class SudokuConstraintOptimizer {
     const quadHandlers = handlerSet.getAllofType(SudokuConstraintHandler.Quadruple);
 
     for (const h of quadHandlers) {
-      // If there are 4 different values, then all the cells must be different
-      // and can only contain these values.
-      if (h.valueCounts.size == 4) {
-        handlerSet.add(new SudokuConstraintHandler.AllDifferent(h.cells));
+      if (h.values.length == 4) {
+        // If there are four values, then all the givens are restricted, even
+        // if there are repeats.
         handlerSet.add(new SudokuConstraintHandler.GivenCandidates(
           new Map([...h.cells].map(c => [c, h.values]))));
+      }
+
+      if (h.valueCounts.size == 4) {
+        // If there are 4 different values, then the cells must be different.
+        handlerSet.add(new SudokuConstraintHandler.AllDifferent(h.cells));
+        continue;
+      }
+      if ([...h.valueCounts.values()].some(c => c > 2)) {
+        // There can't be more than 2 of each value, as the cells must be in
+        // a 2x2 box. Hence each cell conflicts with 2 others.
+        handlerSet.replace(h, new SudokuConstraintHandler.False(h.cells));
         continue;
       }
     }

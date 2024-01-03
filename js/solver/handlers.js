@@ -1749,11 +1749,14 @@ SudokuConstraintHandler.LocalEntropy = class LocalEntropy extends SudokuConstrai
 
 SudokuConstraintHandler.Quadruple = class Quadruple extends SudokuConstraintHandler {
   constructor(topLeftCell, gridSize, values) {
+    // NOTE: Ordered so that the diagonals are next to each other.
+    // This makes it easier to constraint repeated values (which must
+    // lie on the diagonal).
     const cells = [
       topLeftCell,
+      topLeftCell + gridSize + 1,
       topLeftCell + 1,
-      topLeftCell + gridSize,
-      topLeftCell + gridSize + 1];
+      topLeftCell + gridSize];
     super(cells);
     this.values = values;
 
@@ -1763,25 +1766,73 @@ SudokuConstraintHandler.Quadruple = class Quadruple extends SudokuConstraintHand
     }
 
     this._valueMask = LookupTables.fromValuesArray(values);
+    // Repeated values is an array of masks [v_n, otherValues_n, ...]
+    this._repeatedValues = [];
+    for (const [value, count] of this.valueCounts) {
+      if (count > 1) {
+        this._repeatedValues.push(
+          LookupTables.fromValue(value),
+          this._valueMask & ~LookupTables.fromValue(value));
+      }
+    }
 
     if (topLeftCell % gridSize + 1 == gridSize || topLeftCell >= gridSize * (gridSize - 1)) {
       throw ('Quadruple can not start on the last row or column.');
     }
   }
 
-  initialize(initialGrid, cellConflicts, shape) {
-    if (this.valueCounts.size != values.length) {
-      // NOTE: Check this during initialization so that the optimizer has a
-      // chance to replace this with a handler that can handle the case.
-      throw ('Quadruple handler requires distinct values.');
+  _enforceRepeatedValues(grid, cellAccumulator) {
+    const repeatedValues = this._repeatedValues;
+    const d1Or = grid[this.cells[0]] | grid[this.cells[1]];
+    const d2Or = grid[this.cells[2]] | grid[this.cells[3]];
+    const d1And = grid[this.cells[0]] & grid[this.cells[1]];
+    const d2And = grid[this.cells[2]] & grid[this.cells[3]];
+    for (let i = 0; i < repeatedValues.length; i += 2) {
+      const value = repeatedValues[i];
+      const otherValues = repeatedValues[i + 1];
+
+      // A repeated value must lie on a diagonal.
+      // If both cells in a diagonal don't contain the value, we can
+      // constrain the cells.
+
+      if (value & ~d1And) {
+        // Other values must be on this diagonal.
+        if (otherValues & ~d1Or) return false;
+        // value is not in d1. Then it must be in d2.
+        if (!(grid[this.cells[2]] &= value)) return false;
+        if (!(grid[this.cells[3]] &= value)) return false;
+        // If the value is in one of the cells, remove it from the other.
+        if (d1Or & value) {
+          if (!(grid[this.cells[0]] &= ~value)) return false;
+          if (!(grid[this.cells[1]] &= ~value)) return false;
+        }
+      } else if (value & ~d2And) {
+        // Other values must be on this diagonal.
+        if (otherValues & ~d2Or) return false;
+        // value is not in d2. Then it must be in d1.
+        if (!(grid[this.cells[0]] &= value)) return false;
+        if (!(grid[this.cells[1]] &= value)) return false;
+        // If the value is in one of the cells, remove it from the other.
+        if (d2Or & value) {
+          if (!(grid[this.cells[2]] &= ~value)) return false;
+          if (!(grid[this.cells[3]] &= ~value)) return false;
+        }
+      }
     }
-    return true;
   }
 
   enforceConsistency(grid, cellAccumulator) {
     const cells = this.cells;
     const numCells = cells.length;
     const valuesMask = this._valueMask;
+    const hasRepeatedValues = this._repeatedValues.length > 0;
+
+    if (hasRepeatedValues) {
+      // NOTE: This must happen before the valueMask & ~fixedValues
+      // check as that can return true even if all repeated values aren't
+      // satisfied.
+      this._enforceRepeatedValues(grid, cellAccumulator);
+    }
 
     let allValues = 0;
     let nonUniqueValues = 0;
@@ -1800,34 +1851,37 @@ SudokuConstraintHandler.Quadruple = class Quadruple extends SudokuConstraintHand
     if (valuesMask & ~allValues) return false;
     if (!(valuesMask & ~fixedValues)) return true;
 
-    let uniqueValues = valuesMask & allValues & ~nonUniqueValues & ~fixedValues;
-    if (uniqueValues) {
-      // We have hidden singles. Find and constrain them.
-      for (let i = 0; i < numCells; i++) {
-        const cell = cells[i];
-        const value = grid[cell] & uniqueValues;
-        if (value) {
-          // If we have more value that means a single cell holds more than
-          // one unique value.
-          if (value & (value - 1)) return false;
-          grid[cell] = value;
-          cellAccumulator.add(cell);
-          if (!(uniqueValues &= ~value)) break;
+    if (!hasRepeatedValues) {
+      // Only check for hidden singles when we don't have a repeated value.
+      const uniqueValues = valuesMask & allValues & ~nonUniqueValues & ~fixedValues;
+      if (uniqueValues) {
+        // We have hidden singles. Find and constrain them.
+        for (let i = 0; i < numCells; i++) {
+          const cell = cells[i];
+          const value = grid[cell] & uniqueValues;
+          if (value) {
+            // If we have more value that means a single cell holds more than
+            // one unique value.
+            if (value & (value - 1)) return false;
+            grid[cell] = value;
+            cellAccumulator.add(cell);
+          }
         }
       }
     }
 
     const remainingValues = valuesMask & ~fixedValues;
     const numRemainingCells = numCells - numFixed;
-    if (remainingValues !== (allValues & ~fixedValues)
-      && countOnes16bit(remainingValues) == numRemainingCells) {
+    if (countOnes16bit(remainingValues) == numRemainingCells) {
       // The number of remaining cell is exactly the number of remaining values.
       // We can constrain the remaining cells to the remaining values.
       for (let i = 0; i < numCells; i++) {
-        const cell = cells[i];
-        if (!(grid[cell] & fixedValues)) {
-          if (!(grid[cell] &= remainingValues)) return false;
-          cellAccumulator.add(cell);
+        const v = grid[cells[i]];
+        // If this cell is fixed, skip it.
+        if (!(v & ~fixedValues)) continue;
+        // Otherwise if there are unwanted values, remove them.
+        if (v & ~remainingValues) {
+          if (!(grid[cells[i]] = v & remainingValues)) return false;
         }
       }
     }
