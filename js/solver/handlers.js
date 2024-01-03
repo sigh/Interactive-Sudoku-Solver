@@ -1784,8 +1784,6 @@ SudokuConstraintHandler.Quadruple = class Quadruple extends SudokuConstraintHand
 
   _enforceRepeatedValues(grid, cellAccumulator) {
     const repeatedValues = this._repeatedValues;
-    const d1Or = grid[this.cells[0]] | grid[this.cells[1]];
-    const d2Or = grid[this.cells[2]] | grid[this.cells[3]];
     const d1And = grid[this.cells[0]] & grid[this.cells[1]];
     const d2And = grid[this.cells[2]] & grid[this.cells[3]];
     for (let i = 0; i < repeatedValues.length; i += 2) {
@@ -1797,6 +1795,7 @@ SudokuConstraintHandler.Quadruple = class Quadruple extends SudokuConstraintHand
       // constrain the cells.
 
       if (value & ~d1And) {
+        const d1Or = grid[this.cells[0]] | grid[this.cells[1]];
         // Other values must be on this diagonal.
         if (otherValues & ~d1Or) return false;
         // value is not in d1. Then it must be in d2.
@@ -1808,6 +1807,7 @@ SudokuConstraintHandler.Quadruple = class Quadruple extends SudokuConstraintHand
           if (!(grid[this.cells[1]] &= ~value)) return false;
         }
       } else if (value & ~d2And) {
+        const d2Or = grid[this.cells[2]] | grid[this.cells[3]];
         // Other values must be on this diagonal.
         if (otherValues & ~d2Or) return false;
         // value is not in d2. Then it must be in d1.
