@@ -642,7 +642,7 @@ SudokuSolver.InternalSolver = class {
   static YIELD_ON_SOLUTION = 0;
   static YIELD_ON_STEP = 1;
 
-  static _BACKTRACK_DECAY_INTERVAL = 100 * 100;
+  static _LOG_BACKTRACK_DECAY_INTERVAL = 14;
 
   // run runs the solve.
   // yieldWhen can be:
@@ -666,6 +666,8 @@ SudokuSolver.InternalSolver = class {
     counters.progressRatio = 0;
 
     const progressFrequencyMask = this._progress.frequencyMask;
+    const backtrackDecayMask = (1 << this.constructor._LOG_BACKTRACK_DECAY_INTERVAL) - 1;
+    let iterationCounterForUpdates = 0;
 
     {
       // Enforce constraints for all cells.
@@ -762,7 +764,17 @@ SudokuSolver.InternalSolver = class {
         // may have changed.
         progressDelta = progressRemainingStack[depth] / count;
         progressRemainingStack[depth] -= progressDelta;
+
         counters.valuesTried++;
+        iterationCounterForUpdates++
+      }
+      if ((iterationCounterForUpdates & backtrackDecayMask) === 0) {
+        // Exponentially decay the counts.
+        for (let i = 0; i < this._numCells; i++) {
+          this._backtrackTriggers[i] >>= 1;
+        }
+        // Ensure that the counter doesn't overflow.
+        iterationCounterForUpdates &= (1 << 30) - 1;
       }
 
       if (count !== 1) {
@@ -804,12 +816,6 @@ SudokuSolver.InternalSolver = class {
         if (cellIndex > 0) lastContradictionCell[cellIndex - 1] = cell;
         counters.progressRatio += progressDelta;
         counters.backtracks++;
-        // Exponentially decay the counts.
-        if (0 === counters.backtracks % this.constructor._BACKTRACK_DECAY_INTERVAL) {
-          for (let i = 0; i < this._numCells; i++) {
-            this._backtrackTriggers[i] >>= 1;
-          }
-        }
         this._backtrackTriggers[cell]++;
 
         if (0 !== yieldOnContradiction &&
@@ -823,9 +829,10 @@ SudokuSolver.InternalSolver = class {
         }
       }
 
-      if ((counters.valuesTried & progressFrequencyMask) === 0) {
+      if ((iterationCounterForUpdates & progressFrequencyMask) === 0) {
         this._progress.callback();
       }
+
       if (yieldEveryStep) {
         // The value may have been over-written by the constraint enforcer
         // (i.e. if there was a contradiction). Replace it for the output.
