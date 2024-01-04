@@ -225,20 +225,15 @@ SudokuConstraintHandler.House = class House extends SudokuConstraintHandler {
 }
 
 SudokuConstraintHandler.BinaryConstraint = class BinaryConstraint extends SudokuConstraintHandler {
-  constructor(cell1, cell2, fn) {
+  constructor(cell1, cell2, key) {
     super([cell1, cell2]);
-    this._fn = fn;
-    this._tables = null;
+    this._key = key;
+    this._tables = [];
   }
 
   initialize(initialGrid, cellConflicts, shape) {
     const lookupTables = LookupTables.get(shape.numValues);
-    const fn = this._fn;
-    this._fn = null;
-    this._tables = [
-      lookupTables.forBinaryFunction(fn),
-      lookupTables.forBinaryFunction((a, b) => fn(b, a)),
-    ];
+    this._tables = lookupTables.forBinaryKey(this._key);
 
     // If no values are legal at the start, then this constraint is invalid.
     return this._tables[0][lookupTables.allValues] !== 0;
@@ -1769,7 +1764,10 @@ SudokuConstraintHandler.Between = class Between extends SudokuConstraintHandler 
     const minEndsDelta = maxConflictSize ? maxConflictSize + 1 : 0;
 
     this._binaryConstraint = new SudokuConstraintHandler.BinaryConstraint(
-      ...this._ends, (a, b) => Math.abs(a - b) >= minEndsDelta);
+      ...this._ends,
+      SudokuConstraint.Binary.fnToKey(
+        (a, b) => Math.abs(a - b) >= minEndsDelta,
+        shape.numValues));
     return this._binaryConstraint.initialize(initialGrid, cellConflicts, shape);
   }
 

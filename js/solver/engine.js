@@ -1420,27 +1420,21 @@ class LookupTables {
       return table;
     })();
 
-    const binaryFunctionKey = (fn) => {
-      const keyParts = [];
-      for (let i = 1; i <= numValues; i++) {
-        let part = 0;
-        for (let j = 1; j <= numValues; j++) {
-          part |= fn(i, j) << j;
-        }
-        keyParts.push(part);
-      }
-      return keyParts.join(',');
-    };
-
-    this.forBinaryFunction = memoize((fn) => {
+    this.forBinaryKey = memoize((key) => {
       const table = new Uint16Array(combinations);
+      const tableInv = new Uint16Array(combinations);
+
+      let keyInt = BigInt('0x' + key);
+      const mask = (1n << BigInt(numValues + 1)) - 1n;
 
       // Populate base cases, where there is a single value set.
       for (let i = 0; i < numValues; i++) {
+        let v = Number((keyInt & mask));
+        keyInt >>= BigInt(numValues);
         for (let j = 0; j < numValues; j++) {
-          if (fn(i + 1, j + 1)) {
-            table[1 << i] |= 1 << j;
-          }
+          table[1 << i] |= (v & 1) << j;
+          tableInv[1 << j] |= (v & 1) << i;
+          v >>= 1;
         }
       }
 
@@ -1448,9 +1442,9 @@ class LookupTables {
       // set.
       for (let i = 1; i < combinations; i++) {
         table[i] = table[i & (i - 1)] | table[i & -i];
+        tableInv[i] = tableInv[i & (i - 1)] | tableInv[i & -i];
       }
-      return table;
-    },
-      binaryFunctionKey);
+      return [table, tableInv];
+    });
   }
 }
