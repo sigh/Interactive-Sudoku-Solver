@@ -735,15 +735,8 @@ SudokuSolver.InternalSolver = class {
       }
 
       // Find the next cell to explore and update progress.
-      {
-        const count = this._updateCellOrder(cellOrder, cellIndex, grid);
-        if (count === 0) continue;
-
-        // Assume the remaining progress is evenly distributed among the value
-        // options.
-        progressDelta = progressRemainingStack[depth] / count;
-        progressRemainingStack[depth] -= progressDelta;
-      }
+      let count = this._updateCellOrder(cellOrder, cellIndex, grid) | 0;
+      if (count === 0) continue;
 
       let cell = cellOrder[cellIndex];
       let values = grid[cell];
@@ -759,10 +752,20 @@ SudokuSolver.InternalSolver = class {
         // The cell order may be changed.
         cell = cellOrder[cellIndex];
         values = grid[cell];
+        count = countOnes16bit(values) | 0;
       }
-      counters.valuesTried++;
 
-      if (values != value) {
+      {
+        // Assume the remaining progress is evenly distributed among the value
+        // options.
+        // NOTE: We must do this after _adjustForStepState, as the cell order
+        // may have changed.
+        progressDelta = progressRemainingStack[depth] / count;
+        progressRemainingStack[depth] -= progressDelta;
+        counters.valuesTried++;
+      }
+
+      if (count !== 1) {
         // We only need to start a new recursion frame when there is more than
         // one value to try.
 
@@ -790,7 +793,7 @@ SudokuSolver.InternalSolver = class {
         // If this is the last value at this level, clear the
         // lastContradictionCell as the next time we reach this level won't be
         // from the same subtree that caused the contradiction.
-        if (values == value) lastContradictionCell[cellIndex] = -1;
+        if (count === 1) lastContradictionCell[cellIndex] = -1;
       }
 
       // Propagate constraints.
