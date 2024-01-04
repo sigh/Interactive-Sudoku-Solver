@@ -798,6 +798,7 @@ ModeHandler.StepByStep = class extends ModeHandler {
     if (result == null) {
       this._numSteps = i;
       return {
+        description: `Step ${i} [Done]`,
         solution: null,
         statusElem: null,
         highlightCells: [],
