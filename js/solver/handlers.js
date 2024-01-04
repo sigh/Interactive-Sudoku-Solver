@@ -212,6 +212,11 @@ SudokuConstraintHandler.AllContiguous = class AllContiguous extends SudokuConstr
     super(cells);
   }
 
+  initialize(initialGrid, cellConflicts, shape) {
+    this._minMax8Bit = LookupTables.get(shape.numValues).minMax8Bit;
+    return true;
+  }
+
   conflictSet() {
     return this.cells;
   }
@@ -220,31 +225,60 @@ SudokuConstraintHandler.AllContiguous = class AllContiguous extends SudokuConstr
     const cells = this.cells;
     const numCells = cells.length;
 
-    let values = 0;
+    let allValues = 0;
+    let nonUniqueValues = 0;
+    let fixedValues = 0;
     for (let i = 0; i < numCells; i++) {
-      values |= grid[cells[i]];
+      const v = grid[cells[i]];
+      nonUniqueValues |= allValues & v;
+      allValues |= v;
+      fixedValues |= !(v & (v - 1)) * v; // Better than branching.
     }
 
     // Find the possible starting values of contiguous ranges.
-    let squishedValues = values;
+    let squishedValues = allValues;
     for (let i = 1; i < numCells; i++) {
-      squishedValues &= values >> i;
+      squishedValues &= allValues >> i;
     }
     if (!squishedValues) return false;
 
     // Expand out possible contiguous ranges.
-    let mask = squishedValues;
+    let possibleValues = squishedValues;
     for (let i = 1; i < numCells; i++) {
-      mask |= squishedValues << i;
+      possibleValues |= squishedValues << i;
     }
+    if (fixedValues == possibleValues) return true;
 
-    if (values & ~mask) {
+    if (allValues & ~possibleValues) {
       // If there are values outside the mask, remove them.
       for (let i = 0; i < numCells; i++) {
-        if (!(grid[cells[i]] &= mask)) {
-          return false;
-        }
+        if (!(grid[cells[i]] &= possibleValues)) return false;
         cellAccumulator.add(cells[i]);
+      }
+    }
+
+    // Try to find values which must be contained in the contiguous ranges.
+    const minMax = this._minMax8Bit[squishedValues];
+    const min = minMax >> 8;
+    const max = minMax & 0xff;
+    // Min and max are too far, there are no required values.
+    if (max - min >= numCells) return true;
+    // We must contain all values from [max, min+numCells).
+    const mustContain = ((1 << (min + numCells)) - (1 << max)) >> 1;
+
+    let uniqueValues = mustContain & ~nonUniqueValues & ~fixedValues;
+    if (uniqueValues) {
+      // We have hidden singles. Find and constrain them.
+      for (let i = 0; i < numCells; i++) {
+        const cell = cells[i];
+        const value = grid[cell] & uniqueValues;
+        if (value) {
+          // If we have more value that means a single cell holds more than
+          // one unique value.
+          if (value & (value - 1)) return false;
+          grid[cell] = value;
+          if (!(uniqueValues &= ~value)) break;
+        }
       }
     }
 
@@ -1854,7 +1888,7 @@ SudokuConstraintHandler.Quadruple = class Quadruple extends SudokuConstraintHand
 
     if (!hasRepeatedValues) {
       // Only check for hidden singles when we don't have a repeated value.
-      const uniqueValues = valuesMask & allValues & ~nonUniqueValues & ~fixedValues;
+      const uniqueValues = valuesMask & ~nonUniqueValues & ~fixedValues;
       if (uniqueValues) {
         // We have hidden singles. Find and constrain them.
         for (let i = 0; i < numCells; i++) {
