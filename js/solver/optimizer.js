@@ -102,7 +102,7 @@ class SudokuConstraintOptimizer {
 
     handlerSet.add(...this._makeHiddenCageHandlers(handlerSet, sumHandlers, shape));
 
-    this._replaceSizeSpecificSumHandlers(handlerSet, cellConflictSets);
+    this._replaceSizeSpecificSumHandlers(handlerSet, cellConflictSets, shape);
 
     return;
   }
@@ -178,7 +178,7 @@ class SudokuConstraintOptimizer {
   }
 
   // Find {1-3}-cell sum constraints and replace them dedicated handlers.
-  _replaceSizeSpecificSumHandlers(handlerSet, cellConflictSets) {
+  _replaceSizeSpecificSumHandlers(handlerSet, cellConflictSets, shape) {
     const sumHandlers = handlerSet.getAllofType(SudokuConstraintHandler.Sum);
     for (const h of sumHandlers) {
       let newHandler;
@@ -192,7 +192,9 @@ class SudokuConstraintOptimizer {
           const hasConflict = cellConflictSets[h.cells[0]].has(h.cells[1]);
           newHandler = new SudokuConstraintHandler.BinaryConstraint(
             h.cells[0], h.cells[1],
-            (a, b) => a + b == h.sum() && (!hasConflict || a != b));
+            SudokuConstraint.Binary.fnToKey(
+              (a, b) => a + b == h.sum() && (!hasConflict || a != b),
+              shape.numValues));
           break;
       }
 

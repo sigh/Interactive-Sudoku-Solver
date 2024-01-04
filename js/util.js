@@ -194,15 +194,14 @@ const withDeadline = (promise, delay, reason) => {
   return Promise.race([promise, awaitTimeout]);
 };
 
-const memoize = (f, keyFn) => {
+const memoize = (f) => {
   const map = new Map();
-  keyFn = keyFn || (a => a);
-  return a => {
-    const key = keyFn(a);
+  return (...a) => {
+    const key = a.length <= 1 ? a[0] : JSON.stringify(a);
     let result = map.get(key);
     if (result) return result;
 
-    result = f(a);
+    result = f(...a);
     map.set(key, result);
     return result;
   };

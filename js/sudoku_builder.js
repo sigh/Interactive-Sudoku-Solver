@@ -432,6 +432,10 @@ class SudokuConstraint {
       super(arguments);
       this.cells = cells;
     }
+
+    static fnKey = memoize((numValues) =>
+      SudokuConstraint.Binary.fnToKey((a, b) => a < b, numValues)
+    );
   }
 
   static Whisper = class Whisper extends SudokuConstraint {
@@ -446,6 +450,12 @@ class SudokuConstraint {
       this.cells = cells;
       this.difference = +difference;
     }
+
+    static fnKey = memoize((difference, numValues) =>
+      SudokuConstraint.Binary.fnToKey(
+        (a, b) => a >= b + difference || a <= b - difference,
+        numValues)
+    );
   }
 
   static Renban = class Renban extends SudokuConstraint {
@@ -474,6 +484,10 @@ class SudokuConstraint {
       super(arguments);
       this.cells = cells;
     }
+
+    static fnKey = memoize((numValues) =>
+      SudokuConstraint.Binary.fnToKey((a, b) => a == b, numValues)
+    );
   }
 
   static _Meta = class _Meta extends SudokuConstraint {
@@ -481,8 +495,20 @@ class SudokuConstraint {
     isMeta = true;
   }
   static NoBoxes = class NoBoxes extends SudokuConstraint._Meta { }
-  static StrictKropki = class StrictKropki extends SudokuConstraint._Meta { }
-  static StrictXV = class StrictXV extends SudokuConstraint._Meta { }
+  static StrictKropki = class StrictKropki extends SudokuConstraint._Meta {
+    static fnKey = memoize((numValues) =>
+      SudokuConstraint.Binary.fnToKey(
+        (a, b) => a != b * 2 && b != a * 2 && b != a - 1 && b != a + 1,
+        numValues)
+    );
+  }
+  static StrictXV = class StrictXV extends SudokuConstraint._Meta {
+    static fnKey = memoize((numValues) =>
+      SudokuConstraint.Binary.fnToKey(
+        (a, b) => a + b != 5 && a + b != 10,
+        numValues)
+    );
+  }
   static Shape = class Shape extends SudokuConstraint._Meta {
     toString() {
       if (this.args[0] === SHAPE_9x9.name) return '';
@@ -519,7 +545,13 @@ class SudokuConstraint {
 
   static AntiKing = class AntiKing extends SudokuConstraint { }
 
-  static AntiConsecutive = class AntiConsecutive extends SudokuConstraint { }
+  static AntiConsecutive = class AntiConsecutive extends SudokuConstraint {
+    static fnKey = memoize((numValues) =>
+      SudokuConstraint.Binary.fnToKey(
+        (a, b) => (a != b + 1 && a != b - 1 && a != b),
+        numValues)
+    );
+  }
 
   static GlobalEntropy = class GlobalEntropy extends SudokuConstraint {
     static regions = memoize((shape) => {
@@ -553,6 +585,12 @@ class SudokuConstraint {
       super(arguments);
       this.cells = cells;
     }
+
+    static fnKey = memoize((numValues) =>
+      SudokuConstraint.Binary.fnToKey(
+        (a, b) => a == b + 1 || a == b - 1,
+        numValues)
+    );
   }
 
   static BlackDot = class BlackDot extends SudokuConstraint {
@@ -560,6 +598,12 @@ class SudokuConstraint {
       super(arguments);
       this.cells = cells;
     }
+
+    static fnKey = memoize((numValues) =>
+      SudokuConstraint.Binary.fnToKey(
+        (a, b) => a == b * 2 || b == a * 2,
+        numValues)
+    );
   }
 
   static X = class X extends SudokuConstraint {
@@ -692,6 +736,32 @@ class SudokuConstraint {
     }
   }
 
+  static Binary = class Binary extends SudokuConstraint {
+    constructor(name, key, ...cells) {
+      super(arguments);
+      this.name = name;
+      this.key = key;
+      this.cells = cells;
+    }
+
+    static fnToKey(fn, numValues) {
+      return this._fnToBigInt(fn, numValues).toString(16);
+    }
+
+    static _fnToBigInt(fn, numValues) {
+      let key = 0n;
+      const shiftInc = BigInt(numValues);
+      for (let i = 1, shift = 0n; i <= numValues; i++, shift += shiftInc) {
+        let part = 0;
+        for (let j = 1; j <= numValues; j++) {
+          part |= fn(i, j) << (j - 1);
+        }
+        key |= BigInt(part) << shift;
+      }
+      return key;
+    }
+  }
+
   static Givens = class Givens extends SudokuConstraint {
     constructor(...values) {
       super(arguments);
@@ -817,14 +887,14 @@ class SudokuBuilder {
       yield* SudokuBuilder._strictAdjHandlers(
         constraints.filter(x => types.includes(x.type)),
         shape,
-        (a, b) => a != b * 2 && b != a * 2 && b != a - 1 && b != a + 1);
+        SudokuConstraint.StrictKropki.fnKey(shape.numValues));
     }
     if (metaConfig.has('StrictXV')) {
       const types = ['X', 'V'];
       yield* SudokuBuilder._strictAdjHandlers(
         constraints.filter(x => types.includes(x.type)),
         shape,
-        (a, b) => a + b != 5 && a + b != 10);
+        SudokuConstraint.StrictXV.fnKey(shape.numValues));
     }
   }
 
@@ -843,7 +913,7 @@ class SudokuBuilder {
     }
   }
 
-  static *_strictAdjHandlers(constraints, shape, constraintFn) {
+  static *_strictAdjHandlers(constraints, shape, fnKey) {
     const numCells = shape.numCells;
     const intCmp = (a, b) => a - b;
     const pairId = p => p[0] + p[1] * numCells;
@@ -859,7 +929,7 @@ class SudokuBuilder {
       p.sort(intCmp);
       if (pairIds.has(pairId(p))) continue;
       yield new SudokuConstraintHandler.BinaryConstraint(
-        p[0], p[1], constraintFn);
+        p[0], p[1], fnKey);
     }
   }
 
@@ -1012,7 +1082,8 @@ class SudokuBuilder {
           cells = constraint.cells.map(c => shape.parseCellId(c).cell);
           for (let i = 1; i < cells.length; i++) {
             yield new SudokuConstraintHandler.BinaryConstraint(
-              cells[i - 1], cells[i], (a, b) => a < b);
+              cells[i - 1], cells[i],
+              SudokuConstraint.Thermo.fnKey(shape.numValues));
           }
           break;
 
@@ -1021,7 +1092,8 @@ class SudokuBuilder {
           cells = constraint.cells.map(c => shape.parseCellId(c).cell);
           for (let i = 1; i < cells.length; i++) {
             yield new SudokuConstraintHandler.BinaryConstraint(
-              cells[i - 1], cells[i], (a, b) => a >= b + difference || a <= b - difference);
+              cells[i - 1], cells[i],
+              SudokuConstraint.Whisper.fnKey(difference, shape.numValues));
           }
           break;
 
@@ -1048,20 +1120,23 @@ class SudokuBuilder {
           const numCells = cells.length;
           for (let i = 0; i < numCells / 2; i++) {
             yield new SudokuConstraintHandler.BinaryConstraint(
-              cells[i], cells[numCells - 1 - i], (a, b) => a == b);
+              cells[i], cells[numCells - 1 - i],
+              SudokuConstraint.Palindrome.fnKey(shape.numValues));
           }
           break;
 
         case 'WhiteDot':
           cells = constraint.cells.map(c => shape.parseCellId(c).cell);
           yield new SudokuConstraintHandler.BinaryConstraint(
-            cells[0], cells[1], (a, b) => a == b + 1 || a == b - 1);
+            cells[0], cells[1],
+            SudokuConstraint.WhiteDot.fnKey(shape.numValues));
           break;
 
         case 'BlackDot':
           cells = constraint.cells.map(c => shape.parseCellId(c).cell);
           yield new SudokuConstraintHandler.BinaryConstraint(
-            cells[0], cells[1], (a, b) => a == b * 2 || b == a * 2);
+            cells[0], cells[1],
+            SudokuConstraint.BlackDot.fnKey(shape.numValues));
           break;
 
         case 'X':
@@ -1149,11 +1224,10 @@ class SudokuBuilder {
   }
 
   static * _antiConsecutiveHandlers(shape) {
-    const constraintFn = (a, b) => (a != b + 1 && a != b - 1 && a != b);
-
     for (const [cell, conflict] of this._adjacentCellPairs(shape)) {
       yield new SudokuConstraintHandler.BinaryConstraint(
-        cell, conflict, constraintFn);
+        cell, conflict,
+        SudokuConstraint.AntiConsecutive.fnKey(shape.numValues));
     }
   }
 }
