@@ -84,20 +84,12 @@ class SudokuSolver {
       this._shape.makeCellIdFromIndex(
         result.cellOrder[result.cellOrder.length - 1]) : null;
 
-    let valueArray = [];
-    let values = result.values;
-    while (values) {
-      let value = values & -values;
-      values &= ~value;
-      valueArray.push(LookupTables.toValue(value));
-    }
-
     return {
       pencilmarks: pencilmarks,
       latestCell: latestCell,
       isSolution: result.isSolution,
       hasContradiction: result.hasContradiction,
-      values: valueArray,
+      values: LookupTables.toValuesArray(result.values),
     }
   }
 
@@ -547,7 +539,7 @@ SudokuSolver.InternalSolver = class {
     for (let i = 0; i < numConflicts; i++) {
       const conflict = conflicts[i];
       if (grid[conflict] & value) {
-        if (!(grid[conflict] &= ~value)) return false;
+        if (!(grid[conflict] ^= value)) return false;
         cellAccumulator.add(conflict);
       }
     }
@@ -787,7 +779,7 @@ SudokuSolver.InternalSolver = class {
         // Remove the value from our set of candidates.
         // NOTE: We only have to do this because we will return back to this
         //       stack frame.
-        grid[cell] &= ~value;
+        grid[cell] ^= value;
 
         this._grids[depth].set(grid);
         grid = this._grids[depth];
@@ -1054,7 +1046,7 @@ class LookupTables {
     let result = [];
     while (values) {
       let value = values & -values;
-      values &= ~value;
+      values ^= value;
       result.push(LookupTables.toValue(value));
     }
     return result;

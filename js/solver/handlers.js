@@ -1698,7 +1698,7 @@ SudokuConstraintHandler.XSum = class XSum extends SudokuConstraintHandler {
     const minControl = this._lookupTables.minMax8Bit[values] >> 8;
     while (values) {
       const value = values & -values;
-      values &= ~value;
+      values ^= value;
 
       const index = LookupTables.toValue(value) - 1;
       sumHandler.cells = this._cellArrays[index];
