@@ -2,37 +2,16 @@
 
 class SudokuSolver {
   constructor(handlers, shape, debugOptions) {
-    const debugLogger = this._setupDebugOptions(debugOptions);
+    this._debugger = new SudokuSolver.Debugger(this, debugOptions);
     this._shape = shape;
 
     this._internalSolver = new SudokuSolver.InternalSolver(
-      handlers, shape, debugLogger);
+      handlers, shape, this._debugger.getLogDebugFn());
 
     this._progressExtraStateFn = null;
     this._progressCallback = null;
 
     this._reset();
-  }
-
-  _setupDebugOptions(debugOptions) {
-    // Set default options.
-    this._debugOptions = {
-      enableLogs: false,
-      exportBacktrackCounts: false,
-    };
-    if (!debugOptions) return;
-
-    // Only copy over options for known values.
-    for (const key of Object.keys(debugOptions)) {
-      if (key in this._debugOptions) {
-        this._debugOptions[key] = debugOptions[key];
-      }
-    }
-    // TODO: Stop this being a global variable.
-    if (!this._debugOptions.enableLogs) {
-      return null;
-    }
-    return debugLog;
   }
 
   _reset() {
@@ -193,13 +172,7 @@ class SudokuSolver {
   }
 
   debugState() {
-    if (this._debugOptions.exportBacktrackCounts) {
-      return {
-        backtrackTriggers: this._internalSolver.getBacktrackTriggers(),
-      };
-    } else {
-      return null;
-    }
+    return this._debugger.getDebugState();
   }
 
   state() {
@@ -242,6 +215,52 @@ class SudokuSolver {
     return pencilmarks;
   }
 }
+
+SudokuSolver.Debugger = class {
+  constructor(solver, debugOptions) {
+    this._solver = solver;
+    this._debugOptions = {
+      enableLogs: false,
+      exportBacktrackCounts: false,
+    };
+    this._hasAnyDebugging = false;
+    this._logDebug = null;
+    this._pendingDebugLogs = [];
+
+    if (debugOptions) {
+      // Only copy over options for known values.
+      for (const key of Object.keys(debugOptions)) {
+        if (key in this._debugOptions) {
+          this._debugOptions[key] = debugOptions[key];
+          this._hasAnyDebugging ||= debugOptions[key];
+        }
+      }
+    }
+
+    if (this._debugOptions.enableLogs) {
+      this._logDebug = (data) => {
+        this._pendingDebugLogs.push(data);
+      };
+    }
+  }
+
+  getDebugState() {
+    if (!this._hasAnyDebugging) return null;
+
+    const result = {};
+    if (this._pendingDebugLogs.length) {
+      result.logs = this._pendingDebugLogs.splice(0);
+    }
+    if (this._debugOptions.exportBacktrackCounts) {
+      result.backtrackCounts = this._solver._internalSolver.getBacktrackTriggers();
+    }
+    return result;
+  }
+
+  getLogDebugFn() {
+    return this._logDebug;
+  }
+};
 
 SudokuSolver.InternalSolver = class {
 

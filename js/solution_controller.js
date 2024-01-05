@@ -168,16 +168,19 @@ class DebugManager {
   _update(data) {
     if (!this._visible) return;
 
-    const isScrolledToBottom = this._isScrolledToBottom(this._logOutput);
 
-    data.logs.forEach(l => this._addLog(l));
+    if (data.logs) {
+      const isScrolledToBottom = this._isScrolledToBottom(this._logOutput);
 
-    if (data.debugState && data.debugState.backtrackTriggers) {
-      this._infoOverlay.setHeatmapValues(data.debugState.backtrackTriggers);
+      data.logs.forEach(l => this._addLog(l));
+
+      if (isScrolledToBottom) {
+        this._scrollToBottom(this._logOutput);
+      }
     }
 
-    if (isScrolledToBottom) {
-      this._scrollToBottom(this._logOutput);
+    if (data.backtrackCounts) {
+      this._infoOverlay.setHeatmapValues(data.backtrackCounts);
     }
   }
 
