@@ -156,6 +156,7 @@ SudokuConstraintHandler.House = class House extends SudokuConstraintHandler {
       if (!this._exposeHiddenSingles(grid, cells, hiddenSingles)) {
         return false;
       }
+      fixedValues |= hiddenSingles;
     }
 
     // Check for naked pairs.
@@ -280,7 +281,7 @@ SudokuConstraintHandler.AllContiguous = class AllContiguous extends SudokuConstr
     // We must contain all values from [max, min+numCells).
     const mustContain = ((1 << (min + numCells)) - (1 << max)) >> 1;
 
-    let hiddenSingles = mustContain & ~nonUniqueValues & ~fixedValues;
+    const hiddenSingles = mustContain & ~nonUniqueValues & ~fixedValues;
     if (hiddenSingles) {
       if (!this._exposeHiddenSingles(grid, cells, hiddenSingles)) {
         return false;
@@ -1896,6 +1897,8 @@ SudokuConstraintHandler.Quadruple = class Quadruple extends SudokuConstraintHand
           return false;
         }
       }
+      fixedValues |= hiddenSingles;
+      numFixed += countOnes16bit(hiddenSingles);
     }
 
     const remainingValues = valuesMask & ~fixedValues;
