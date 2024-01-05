@@ -105,10 +105,10 @@ class SudokuSolver {
     }
 
     if (yieldEveryStep) {
-      // TODO: Encapsulate this within InternalSolver.
-      this._internalSolver._stepState ||= {};
-      this._internalSolver._stepState.stepGuides = stepGuides;
-      this._internalSolver._stepState.logSteps = false;
+      this._internalSolver.setStepState({
+        stepGuides: stepGuides,
+        logSteps: false,
+      });
     }
 
     // Iterate until we have seen n steps.
@@ -116,8 +116,8 @@ class SudokuSolver {
     this._timer.runTimed(() => {
       do {
         // Only show debug logs for the target step.
-        if (yieldEveryStep && iter.count == n - 1) {
-          this._internalSolver._stepState.logSteps = ENABLE_DEBUG_LOGS;
+        if (yieldEveryStep && ENABLE_DEBUG_LOGS && iter.count == n - 1) {
+          this._internalSolver.setStepState({ logSteps: true });
           debugLog({
             loc: 'nthStep',
             msg: 'Step ' + iter.count,
@@ -631,6 +631,17 @@ SudokuSolver.InternalSolver = class {
     return true;
   }
 
+  setStepState(keys) {
+    if (this._stepState == null) {
+      this._stepState = {
+        stepGuides: null,
+        logSteps: false,
+        step: 0,
+      };
+    }
+    this._stepState = { ...this._stepState, ...keys };
+  }
+
   static YIELD_ON_SOLUTION = 0;
   static YIELD_ON_STEP = 1;
 
@@ -671,7 +682,7 @@ SudokuSolver.InternalSolver = class {
     }
 
     if (yieldEveryStep) {
-      this._stepState ||= {};
+      this.setStepState({});
       yield {
         grid: this._grids[0],
         isSolution: false,
