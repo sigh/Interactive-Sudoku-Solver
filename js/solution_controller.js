@@ -155,8 +155,6 @@ class DebugManager {
   }
 
   clear() {
-    if (!this._visible) return;
-
     this._logOutput.textContent = '';
     this._infoOverlay.clear();
 
@@ -269,7 +267,6 @@ class DebugManager {
 
   enable(enable) {
     if (enable === undefined) enable = true;
-    ENABLE_DEBUG_LOGS = enable;
 
     // Reset the container.
     this._visible = enable;

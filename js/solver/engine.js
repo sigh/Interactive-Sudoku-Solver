@@ -2,9 +2,11 @@
 
 class SudokuSolver {
   constructor(handlers, shape, debugOptions) {
-    this._setupDebugOptions(debugOptions);
+    const debugLogger = this._setupDebugOptions(debugOptions);
     this._shape = shape;
-    this._internalSolver = new SudokuSolver.InternalSolver(handlers, shape);
+
+    this._internalSolver = new SudokuSolver.InternalSolver(
+      handlers, shape, debugLogger);
 
     this._progressExtraStateFn = null;
     this._progressCallback = null;
@@ -27,7 +29,10 @@ class SudokuSolver {
       }
     }
     // TODO: Stop this being a global variable.
-    ENABLE_DEBUG_LOGS = this._debugOptions.enableLogs;
+    if (!this._debugOptions.enableLogs) {
+      return null;
+    }
+    return debugLog;
   }
 
   _reset() {
@@ -133,9 +138,9 @@ class SudokuSolver {
     this._timer.runTimed(() => {
       do {
         // Only show debug logs for the target step.
-        if (yieldEveryStep && ENABLE_DEBUG_LOGS && iter.count == n - 1) {
+        if (yieldEveryStep && this._logDebug && iter.count == n - 1) {
           this._internalSolver.setStepState({ logSteps: true });
-          debugLog({
+          this._logDebug({
             loc: 'nthStep',
             msg: 'Step ' + iter.count,
             important: true
@@ -240,9 +245,10 @@ class SudokuSolver {
 
 SudokuSolver.InternalSolver = class {
 
-  constructor(handlerGen, shape) {
+  constructor(handlerGen, shape, debugLogger) {
     this._shape = shape;
     this._numCells = this._shape.numCells;
+    this._logDebug = debugLogger;
 
     this._initCellArray();
     this._cellOrder = new Uint8Array(shape.numCells);
@@ -287,8 +293,8 @@ SudokuSolver.InternalSolver = class {
       }
     }
 
-    if (ENABLE_DEBUG_LOGS) {
-      debugLog({
+    if (this._logDebug) {
+      this._logDebug({
         loc: '_initCellPriorities',
         msg: 'Hover for values',
         args: {
@@ -345,11 +351,7 @@ SudokuSolver.InternalSolver = class {
     const handlerSet = new HandlerSet(handlers, this._shape);
 
     // Optimize handlers.
-    let debugLogger = null;
-    if (ENABLE_DEBUG_LOGS) {
-      debugLogger = debugLog;
-    }
-    new SudokuConstraintOptimizer(debugLogger).optimize(
+    new SudokuConstraintOptimizer(this._logDebug).optimize(
       handlerSet, cellConflictSets, this._shape);
 
     for (const handler of handlerSet) {
@@ -526,7 +528,7 @@ SudokuSolver.InternalSolver = class {
 
   _logEnforceValue(grid, cell, value, conflicts) {
     const changedCells = conflicts.filter(c => grid[c] & value);
-    debugLog({
+    this._logDebug({
       loc: '_enforceValue',
       msg: 'Enforcing value',
       args: {
@@ -540,7 +542,7 @@ SudokuSolver.InternalSolver = class {
     if (changedCells.length) {
       const emptyCells = changedCells.filter(c => !(grid[c] & ~value));
       if (emptyCells.length) {
-        debugLog({
+        this._logDebug({
           loc: '_enforceValue',
           msg: 'Enforcing value caused wipeout',
           cells: emptyCells,
@@ -592,7 +594,7 @@ SudokuSolver.InternalSolver = class {
     }
 
     if (hasDiff) {
-      debugLog({
+      this._logDebug({
         loc: loc,
         msg: `${handler.constructor.name} removed: `,
         args: diff,
@@ -600,7 +602,7 @@ SudokuSolver.InternalSolver = class {
       });
     }
     if (!result) {
-      debugLog({
+      this._logDebug({
         loc: loc,
         msg: `${handler.constructor.name} returned false`,
         cells: handler.cells,

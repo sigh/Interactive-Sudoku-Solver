@@ -1,5 +1,3 @@
-var ENABLE_DEBUG_LOGS = false;
-
 class GridShape {
   static _registry = new Map();
   static _numCellsLookup = new Map();
