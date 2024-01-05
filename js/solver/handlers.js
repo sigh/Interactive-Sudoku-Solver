@@ -101,9 +101,30 @@ SudokuConstraintHandler.AllDifferent = class AllDifferent extends SudokuConstrai
   }
 }
 
+SudokuConstraintHandler._CommonHandlerUtil = class _CommonHandlerUtil {
+  static exposeHiddenSingles(grid, cells, hiddenSingles) {
+    hiddenSingles = hiddenSingles | 0;
+    const numCells = cells.length;
+    for (let i = 0; i < numCells; i++) {
+      const cell = cells[i];
+      const value = grid[cell] & hiddenSingles;
+      if (value) {
+        // If we have more value that means a single cell holds more than
+        // one hidden single.
+        if (value & (value - 1)) return false;
+        grid[cell] = value;
+      }
+    }
+    return true;
+  }
+}
+
 SudokuConstraintHandler.House = class House extends SudokuConstraintHandler {
   constructor(cells) {
     super(cells);
+    this._exposeHiddenSingles = SudokuConstraintHandler._CommonHandlerUtil.exposeHiddenSingles;
+    this._shape = null;
+    this._lookupTables = null;
   }
 
   initialize(initialGrid, cellConflicts, shape) {
@@ -124,25 +145,16 @@ SudokuConstraintHandler.House = class House extends SudokuConstraintHandler {
       const v = grid[cells[i]];
       nonUniqueValues |= allValues & v;
       allValues |= v;
-      fixedValues |= (!(v & (v - 1))) * v;  // Better than branching.
+      fixedValues |= (!(v & (v - 1))) * v;  // Avoid branching.
     }
 
     if (allValues != this._lookupTables.allValues) return false;
     if (fixedValues == this._lookupTables.allValues) return true;
 
-    let uniqueValues = allValues & ~nonUniqueValues & ~fixedValues;
-    if (uniqueValues) {
-      // We have hidden singles. Find and constrain them.
-      for (let i = 0; i < numCells; i++) {
-        const cell = cells[i];
-        const value = grid[cell] & uniqueValues;
-        if (value) {
-          // If we have more value that means a single cell holds more than
-          // one unique value.
-          if (value & (value - 1)) return false;
-          grid[cell] = value;
-          if (!(uniqueValues &= ~value)) break;
-        }
+    const hiddenSingles = allValues & ~nonUniqueValues & ~fixedValues;
+    if (hiddenSingles) {
+      if (!this._exposeHiddenSingles(grid, cells, hiddenSingles)) {
+        return false;
       }
     }
 
@@ -210,6 +222,8 @@ SudokuConstraintHandler.BinaryConstraint = class BinaryConstraint extends Sudoku
 SudokuConstraintHandler.AllContiguous = class AllContiguous extends SudokuConstraintHandler {
   constructor(cells) {
     super(cells);
+    this._exposeHiddenSingles = SudokuConstraintHandler._CommonHandlerUtil.exposeHiddenSingles;
+    this._minMax8Bit = null;
   }
 
   initialize(initialGrid, cellConflicts, shape) {
@@ -232,7 +246,7 @@ SudokuConstraintHandler.AllContiguous = class AllContiguous extends SudokuConstr
       const v = grid[cells[i]];
       nonUniqueValues |= allValues & v;
       allValues |= v;
-      fixedValues |= !(v & (v - 1)) * v; // Better than branching.
+      fixedValues |= !(v & (v - 1)) * v; // Avoid branching.
     }
 
     // Find the possible starting values of contiguous ranges.
@@ -266,19 +280,10 @@ SudokuConstraintHandler.AllContiguous = class AllContiguous extends SudokuConstr
     // We must contain all values from [max, min+numCells).
     const mustContain = ((1 << (min + numCells)) - (1 << max)) >> 1;
 
-    let uniqueValues = mustContain & ~nonUniqueValues & ~fixedValues;
-    if (uniqueValues) {
-      // We have hidden singles. Find and constrain them.
-      for (let i = 0; i < numCells; i++) {
-        const cell = cells[i];
-        const value = grid[cell] & uniqueValues;
-        if (value) {
-          // If we have more value that means a single cell holds more than
-          // one unique value.
-          if (value & (value - 1)) return false;
-          grid[cell] = value;
-          if (!(uniqueValues &= ~value)) break;
-        }
+    let hiddenSingles = mustContain & ~nonUniqueValues & ~fixedValues;
+    if (hiddenSingles) {
+      if (!this._exposeHiddenSingles(grid, cells, hiddenSingles)) {
+        return false;
       }
     }
 
@@ -286,10 +291,10 @@ SudokuConstraintHandler.AllContiguous = class AllContiguous extends SudokuConstr
   }
 }
 
-class SumHandlerUtil {
+SudokuConstraintHandler._SumHandlerUtil = class _SumHandlerUtil {
 
   static get = memoize((numValues) => {
-    return new SumHandlerUtil(true, numValues);
+    return new SudokuConstraintHandler._SumHandlerUtil(true, numValues);
   });
 
   static maxCageSum(numValues) {
@@ -301,6 +306,7 @@ class SumHandlerUtil {
 
     this._numValues = numValues;
     this._lookupTables = LookupTables.get(numValues);
+    this._exposeHiddenSingles = SudokuConstraintHandler._CommonHandlerUtil.exposeHiddenSingles;
 
     const combinations = this._lookupTables.combinations;
     const maxSum = this.constructor.maxCageSum(numValues);
@@ -483,7 +489,7 @@ class SumHandlerUtil {
       const v = grid[cells[i]];
       nonUniqueValues |= allValues & v;
       allValues |= v;
-      fixedValues |= (!(v & (v - 1))) * v; // Better than branching.
+      fixedValues |= (!(v & (v - 1))) * v; // Avoid branching.
     }
     const fixedSum = this._lookupTables.sum[fixedValues];
     // This should have been caught by the range checks, but we
@@ -524,16 +530,9 @@ class SumHandlerUtil {
 
     // requiredUniques are values that appear in all possible solutions AND
     // are unique. Thus, we can enforce these values.
-    // NOTE: This is the same as the HouseHandler uniqueness check.
     if (requiredUniques) {
-      for (let i = 0; i < numCells; i++) {
-        let value = grid[cells[i]] & requiredUniques;
-        if (value) {
-          // If we have more value that means a single cell holds more than
-          // one unique value.
-          if (value & (value - 1)) return false;
-          grid[cells[i]] = value;
-        }
+      if (!this._exposeHiddenSingles(grid, cells, requiredUniques)) {
+        return false;
       }
     }
 
@@ -553,8 +552,8 @@ class SumHandlerUtil {
     // taking into account uniqueness within constraint sets.
     // From this determine the minimum and maximum possible sums.
 
-    let seenMins = SumHandlerUtil._seenMins;
-    let seenMaxs = SumHandlerUtil._seenMaxs;
+    let seenMins = SudokuConstraintHandler._SumHandlerUtil._seenMins;
+    let seenMaxs = SudokuConstraintHandler._SumHandlerUtil._seenMaxs;
     let strictMin = 0;
     let strictMax = 0;
 
@@ -803,13 +802,15 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
         `can't exceed ${this._lookupTables.MAX_CELLS_IN_SUM}`);
     }
 
-    this._util = SumHandlerUtil.get(shape.numValues);
+    this._util = SudokuConstraintHandler._SumHandlerUtil.get(shape.numValues);
 
-    this._conflictSets = SumHandlerUtil.findConflictSets(
-      this._positiveCells, cellConflicts);
+    this._conflictSets = (
+      SudokuConstraintHandler._SumHandlerUtil.findConflictSets(
+        this._positiveCells, cellConflicts));
     if (this._negativeCells.length) {
-      this._conflictSets.push(...SumHandlerUtil.findConflictSets(
-        this._negativeCells, cellConflicts));
+      this._conflictSets.push(
+        ...SudokuConstraintHandler._SumHandlerUtil.findConflictSets(
+          this._negativeCells, cellConflicts));
     }
 
     this._conflictMap = new Uint8Array(this.cells.length);
@@ -828,7 +829,7 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
     const sum = this._sum;
     if (!Number.isInteger(sum) || sum < 0) return false;
     if (this._conflictSets.length == 1
-      && sum > SumHandlerUtil.maxCageSum(shape.numValues)) {
+      && sum > SudokuConstraintHandler._SumHandlerUtil.maxCageSum(shape.numValues)) {
       return false;
     }
     // Ensure each conflict set is not too large. This only matters if we remove
@@ -1447,7 +1448,7 @@ SudokuConstraintHandler.RegionSumLine = class RegionSumLine extends SudokuConstr
       curSet.push(cell);
     }
 
-    this._util = SumHandlerUtil.get(shape.numValues);
+    this._util = SudokuConstraintHandler._SumHandlerUtil.get(shape.numValues);
     const lookupTables = LookupTables.get(shape.numValues);
     this._minMaxTable = lookupTables.minMax8Bit;
 
@@ -1566,7 +1567,7 @@ SudokuConstraintHandler.Between = class Between extends SudokuConstraintHandler 
   initialize(initialGrid, cellConflicts, shape) {
     this._minMaxTable = LookupTables.get(shape.numValues).minMax8Bit;
 
-    const conflictSets = SumHandlerUtil.findConflictSets(
+    const conflictSets = SudokuConstraintHandler._SumHandlerUtil.findConflictSets(
       this._mids, cellConflicts);
     const maxConflictSize = Math.max(0, ...conflictSets.map(a => a.length));
     const minEndsDelta = maxConflictSize ? maxConflictSize + 1 : 0;
@@ -1753,17 +1754,17 @@ SudokuConstraintHandler.LocalEntropy = class LocalEntropy extends SudokuConstrai
       valuesBuffer[i] = v;
       nonUniqueValues |= allValues & v;
       allValues |= v;
-      fixedValues |= (!(v & (v - 1))) * v;  // Better than branching.
+      fixedValues |= (!(v & (v - 1))) * v;  // Avoid branching.
     }
 
     if (allValues != squishedMask) return false;
     if (fixedValues == squishedMask) return true;
 
-    let uniqueValues = allValues & ~nonUniqueValues & ~fixedValues;
-    if (uniqueValues) {
+    let hiddenSquishedSingles = allValues & ~nonUniqueValues & ~fixedValues;
+    if (hiddenSquishedSingles) {
       // We have "hidden singles" equivalent. Find and constrain them.
       for (let i = 0; i < numCells; i++) {
-        const value = valuesBuffer[i] & uniqueValues;
+        const value = valuesBuffer[i] & hiddenSquishedSingles;
         if (value) {
           // If we have more value that means a single cell holds more than
           // one unique value.
@@ -1773,7 +1774,6 @@ SudokuConstraintHandler.LocalEntropy = class LocalEntropy extends SudokuConstrai
           const cell = cells[i];
           grid[cell] &= unsquishedValue;
           cellAccumulator.add(cell);
-          uniqueValues &= ~value;
         }
       }
     }
@@ -1810,6 +1810,8 @@ SudokuConstraintHandler.Quadruple = class Quadruple extends SudokuConstraintHand
           this._valueMask & ~LookupTables.fromValue(value));
       }
     }
+
+    this._exposeHiddenSingles = SudokuConstraintHandler._CommonHandlerUtil.exposeHiddenSingles;
 
     if (topLeftCell % gridSize + 1 == gridSize || topLeftCell >= gridSize * (gridSize - 1)) {
       throw ('Quadruple can not start on the last row or column.');
@@ -1888,19 +1890,10 @@ SudokuConstraintHandler.Quadruple = class Quadruple extends SudokuConstraintHand
 
     if (!hasRepeatedValues) {
       // Only check for hidden singles when we don't have a repeated value.
-      const uniqueValues = valuesMask & ~nonUniqueValues & ~fixedValues;
-      if (uniqueValues) {
-        // We have hidden singles. Find and constrain them.
-        for (let i = 0; i < numCells; i++) {
-          const cell = cells[i];
-          const value = grid[cell] & uniqueValues;
-          if (value) {
-            // If we have more value that means a single cell holds more than
-            // one unique value.
-            if (value & (value - 1)) return false;
-            grid[cell] = value;
-            cellAccumulator.add(cell);
-          }
+      const hiddenSingles = valuesMask & ~nonUniqueValues & ~fixedValues;
+      if (hiddenSingles) {
+        if (!this._exposeHiddenSingles(grid, cells, hiddenSingles)) {
+          return false;
         }
       }
     }
