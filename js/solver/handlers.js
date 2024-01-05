@@ -175,6 +175,7 @@ SudokuConstraintHandler.House = class House extends SudokuConstraintHandler {
             if (!(grid[cells[k]] &= ~v)) return false;
           }
         }
+        break;
       }
     }
 
