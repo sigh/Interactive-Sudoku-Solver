@@ -345,7 +345,12 @@ SudokuSolver.InternalSolver = class {
     const handlerSet = new HandlerSet(handlers, this._shape);
 
     // Optimize handlers.
-    SudokuConstraintOptimizer.optimize(handlerSet, cellConflictSets, this._shape);
+    let debugLogger = null;
+    if (ENABLE_DEBUG_LOGS) {
+      debugLogger = debugLog;
+    }
+    new SudokuConstraintOptimizer(debugLogger).optimize(
+      handlerSet, cellConflictSets, this._shape);
 
     for (const handler of handlerSet) {
       if (!handler.initialize(this._initialGrid, cellConflictSets, this._shape)) {
