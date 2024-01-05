@@ -89,7 +89,7 @@ class DebugManager {
   constructor(displayContainer, cookieManager) {
     this._container = document.getElementById('debug-container');
     this._logOutput = document.getElementById('debug-logs');
-    this._visible = false;
+    this._enabled = false;
     this._shape = null;
     this._infoOverlay = new InfoOverlay(displayContainer);;
     this._elements = {
@@ -120,7 +120,8 @@ class DebugManager {
       window.history.pushState(null, null, url);
     };
 
-    window.loadDebug = () => {
+    // Set up loading and closing.
+    const loadDebug = () => {
       this.enable(true);
       updateURL(true);
       if (debugLoaded) return Promise.resolve();
@@ -128,17 +129,19 @@ class DebugManager {
       debugLoaded = true;
       return dynamicJSFileLoader('js/debug.js')();
     };
-    window.closeDebug = () => {
+    window.loadDebug = loadDebug;
+    this._elements.closeButton.onclick = () => {
       this.enable(false);
       updateURL(false);
     };
 
+    // Load debug if we are already in debug mode.
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get(this.DEBUG_PARAM_NAME) !== null) {
-      window.loadDebug();
+      loadDebug();
     }
-    this._elements.closeButton.onclick = window.closeDebug;
 
+    // Initialize options checkboxes.
     for (const [key, element] of Object.entries(this._checkboxes)) {
       const value = cookieManager.get(key);
       if (value !== undefined) {
@@ -151,7 +154,7 @@ class DebugManager {
   }
 
   getOptions() {
-    if (!this._visible) return null;
+    if (!this._enabled) return null;
     return Object.fromEntries(
       Object.entries(this._checkboxes).map(
         ([k, v]) => [k, v.checked]
@@ -181,7 +184,7 @@ class DebugManager {
   }
 
   _update(data) {
-    if (!this._visible) return;
+    if (!this._enabled) return;
 
 
     if (data.logs) {
@@ -287,7 +290,7 @@ class DebugManager {
     if (enable === undefined) enable = true;
 
     // Reset the container.
-    this._visible = enable;
+    this._enabled = enable;
     this._container.classList.toggle('hidden', !enable);
     this.clear();
   }
