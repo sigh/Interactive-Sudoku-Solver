@@ -13,45 +13,6 @@ const initPage = () => {
   constraintManager.addReshapeListener(inputManager);
 
   controller = new SolutionController(constraintManager, displayContainer);
-
-  _setUpDebug(controller);
-};
-
-const _setUpDebug = (controller) => {
-  const DEBUG_PARAM_NAME = 'debug';
-  let debugLoaded = false;
-
-  const updateURL = (enable) => {
-    const url = new URL(window.location);
-    if (enable) {
-      url.searchParams.set(DEBUG_PARAM_NAME, 1);
-    } else {
-      url.searchParams.delete(DEBUG_PARAM_NAME);
-    }
-    window.history.pushState(null, null, url);
-  };
-  const closeButton = document.getElementById('close-debug-button');
-
-  window.loadDebug = () => {
-    controller.debugManager.enable(true);
-    updateURL(true);
-    closeButton.style.display = 'block';
-    if (debugLoaded) return Promise.resolve();
-
-    debugLoaded = true;
-    return dynamicJSFileLoader('js/debug.js')();
-  };
-  window.closeDebug = () => {
-    controller.debugManager.enable(false);
-    closeButton.style.display = 'none';
-    updateURL(false);
-  };
-  closeButton.onclick = window.closeDebug;
-
-  const urlParams = new URLSearchParams(window.location.search);
-  if (urlParams.get(DEBUG_PARAM_NAME) !== null) {
-    window.loadDebug();
-  }
 };
 
 class CheckboxConstraints {

@@ -797,9 +797,11 @@ class SudokuBuilder {
     worker.release = () => this._unusedWorkers.push(worker);
 
     const solverProxy = new SolverProxy(
-      worker, stateHandler, statusHandler, debugHandler.getCallback());
+      worker, stateHandler, statusHandler,
+      debugHandler && debugHandler.getCallback());
     await solverProxy.init(
-      constraints, this.LOG_UPDATE_FREQUENCY, debugHandler.getOptions());
+      constraints, this.LOG_UPDATE_FREQUENCY,
+      debugHandler && debugHandler.getOptions());
     return solverProxy;
   }
 
@@ -1253,11 +1255,9 @@ class SolverProxy {
 
   async init(constraint, logUpdateFrequency, debugOptions) {
     this._initialized = true;
-    await this._callWorker('init', {
-      constraint: constraint,
-      logUpdateFrequency: logUpdateFrequency,
-      debugOptions,
-    });
+    await this._callWorker(
+      'init',
+      { constraint, logUpdateFrequency, debugOptions });
   }
 
   terminate() {
