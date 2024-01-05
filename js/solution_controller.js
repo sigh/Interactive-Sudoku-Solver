@@ -86,7 +86,7 @@ class HistoryHandler {
 class DebugManager {
   DEBUG_PARAM_NAME = 'debug';
 
-  constructor(displayContainer) {
+  constructor(displayContainer, cookieManager) {
     this._container = document.getElementById('debug-container');
     this._logOutput = document.getElementById('debug-logs');
     this._visible = false;
@@ -97,13 +97,17 @@ class DebugManager {
       debugLogsCheckbox: document.getElementById('debug-logs-checkbox'),
       backtrackHeatmapCheckbox: document.getElementById('backtrack-heatmap-checkbox'),
     };
+    this._checkboxes = {
+      enableLogs: this._elements.debugLogsCheckbox,
+      exportBacktrackCounts: this._elements.backtrackHeatmapCheckbox,
+    };
 
     this._debugCellHighlighter = displayContainer.createHighlighter('highlighted-cell');
 
-    this._setUp();
+    this._setUp(cookieManager);
   }
 
-  _setUp() {
+  _setUp(cookieManager) {
     let debugLoaded = false;
 
     const updateURL = (enable) => {
@@ -134,14 +138,25 @@ class DebugManager {
       window.loadDebug();
     }
     this._elements.closeButton.onclick = window.closeDebug;
+
+    for (const [key, element] of Object.entries(this._checkboxes)) {
+      const value = cookieManager.get(key);
+      if (value !== undefined) {
+        element.checked = (value === 'true');
+      }
+      element.onchange = () => {
+        cookieManager.set(key, element.checked);
+      }
+    }
   }
 
   getOptions() {
     if (!this._visible) return null;
-    return {
-      enableLogs: this._elements.debugLogsCheckbox.checked,
-      exportBacktrackCounts: this._elements.backtrackHeatmapCheckbox.checked,
-    };
+    return Object.fromEntries(
+      Object.entries(this._checkboxes).map(
+        ([k, v]) => [k, v.checked]
+      )
+    );
   }
 
   getCallback() {
@@ -937,6 +952,36 @@ ModeHandler.ValidateLayout = class extends ModeHandler {
   }
 }
 
+class CookieManager {
+  constructor() {
+    this._values = this._initCookieValues();
+  }
+
+  _initCookieValues() {
+    const values = new Map();
+    try {
+      // Initialize cookie values from document.cookie.
+      const cookies = document.cookie.split(';');
+      for (const cookie of cookies) {
+        const [key, value] = cookie.split('=');
+        values.set(key.trim(), value.trim());
+      }
+    } catch (e) { /* ignore */ }
+
+    return values;
+  }
+
+  get(key) {
+    return this._values.get(key);
+  }
+
+  set(key, value) {
+    this._values.set(key, value);
+    // Note: This updates the cookie without touching the other values.
+    document.cookie = `${key}=${value}`;
+  }
+}
+
 class SolutionController {
   constructor(constraintManager, displayContainer) {
     // Solvers are a list in case we manage to start more than one. This can
@@ -958,7 +1003,8 @@ class SolutionController {
     displayContainer.addElement(
       HighlightDisplay.makeRadialGradient('highlighted-step-gradient'));
 
-    this.debugManager = new DebugManager(displayContainer);
+    const cookieManager = new CookieManager();
+    this.debugManager = new DebugManager(displayContainer, cookieManager);
     constraintManager.addReshapeListener(this.debugManager);
 
     this._update = deferUntilAnimationFrame(this._update.bind(this));
@@ -995,7 +1041,7 @@ class SolutionController {
     this._elements.solve.onclick = () => this._solve();
     this._elements.validate.onclick = () => this._validateLayout();
 
-    this._setUpAutoSolve();
+    this._setUpAutoSolve(cookieManager);
     this._setUpKeyBindings(displayContainer);
 
     this._stateDisplay = new SolverStateDisplay(this._solutionDisplay);
@@ -1020,18 +1066,13 @@ class SolutionController {
     this._terminateSolver();
   }
 
-  _setUpAutoSolve() {
-    try {
-      const cookieValue = document.cookie
-        .split('; ')
-        .find(row => row.startsWith('autoSolve='))
-        .split('=')[1];
-      this._elements.autoSolve.checked = cookieValue !== 'false';
-    } catch (e) { /* ignore */ }
+  _setUpAutoSolve(cookieManager) {
+    this._elements.autoSolve.checked = (
+      cookieManager.get('autoSolve') !== 'false');
 
     this._elements.autoSolve.onchange = () => {
       let isChecked = this._elements.autoSolve.checked ? true : false;
-      document.cookie = `autoSolve=${isChecked}`;
+      cookieManager.set('autoSolve', isChecked);
       // If we have enabled auto-solve, then start solving! Unless
       // we are already solving.
       if (isChecked && !this._isSolving) this._update();
