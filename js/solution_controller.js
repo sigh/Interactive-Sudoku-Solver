@@ -83,7 +83,7 @@ class HistoryHandler {
   }
 }
 
-class DebugOutput {
+class DebugManager {
   constructor(displayContainer) {
     this._container = document.getElementById('debug-container');
     this._visible = false;
@@ -91,6 +91,17 @@ class DebugOutput {
     this._infoOverlay = new InfoOverlay(displayContainer);;
 
     this._debugCellHighlighter = displayContainer.createHighlighter('highlighted-cell');
+  }
+
+  getOptions() {
+    return {
+      enableLogs: !!self['ENABLE_DEBUG_LOGS'],
+      exportBacktrackCounts: !!self['EXPORT_CONFLICT_HEATMAP'],
+    };
+  }
+
+  getCallback() {
+    return (data => this._update(data));
   }
 
   reshape(shape) {
@@ -112,7 +123,7 @@ class DebugOutput {
     };
   }
 
-  update(data) {
+  _update(data) {
     if (!this._visible) return;
 
     const isScrolledToBottom = this._isScrolledToBottom(this._container);
@@ -903,8 +914,8 @@ class SolutionController {
     displayContainer.addElement(
       HighlightDisplay.makeRadialGradient('highlighted-step-gradient'));
 
-    this.debugOutput = new DebugOutput(displayContainer);
-    constraintManager.addReshapeListener(this.debugOutput);
+    this.debugManager = new DebugManager(displayContainer);
+    constraintManager.addReshapeListener(this.debugManager);
 
     this._update = deferUntilAnimationFrame(this._update.bind(this));
     constraintManager.setUpdateCallback(this._update.bind(this));
@@ -1099,7 +1110,7 @@ class SolutionController {
     this._solutionDisplay.setSolution();
     this._stateDisplay.clear();
     this._setValidateResult();
-    this.debugOutput.clear();
+    this.debugManager.clear();
     this._showIterationControls(false);
     this._currentModeHandler = null;
     this._altClickHandler = null;
@@ -1132,7 +1143,7 @@ class SolutionController {
         if (s.done) { handler.setDone(); }
       },
       this._solveStatusChanged.bind(this),
-      data => this.debugOutput.update(data));
+      this.debugManager);
     this._solverPromises.push(newSolverPromise);
 
     const newSolver = await newSolverPromise;

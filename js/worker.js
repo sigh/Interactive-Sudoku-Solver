@@ -17,15 +17,9 @@ let workerSolverSetUpTime = 0;
 const handleWorkerMethod = (method, payload) => {
   switch (method) {
     case 'init':
-      if (payload.globalVars) {
-        for (const [v, value] of payload.globalVars) {
-          self[v] = value;
-        }
-      }
-
       const timer = new Timer();
       timer.runTimed(() => {
-        workerSolver = SudokuBuilder.build(payload.constraint);
+        workerSolver = SudokuBuilder.build(payload.constraint, payload.debugOptions);
       });
       workerSolverSetUpTime = timer.elapsedMs();
 

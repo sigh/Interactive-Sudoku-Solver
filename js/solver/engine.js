@@ -1,9 +1,8 @@
 "use strict";
 
-var EXPORT_CONFLICT_HEATMAP = false;
-
 class SudokuSolver {
-  constructor(handlers, shape) {
+  constructor(handlers, shape, debugOptions) {
+    this._setupDebugOptions(debugOptions);
     this._shape = shape;
     this._internalSolver = new SudokuSolver.InternalSolver(handlers, shape);
 
@@ -11,6 +10,24 @@ class SudokuSolver {
     this._progressCallback = null;
 
     this._reset();
+  }
+
+  _setupDebugOptions(debugOptions) {
+    // Set default options.
+    this._debugOptions = {
+      enableLogs: false,
+      exportBacktrackCounts: false,
+    };
+    if (!debugOptions) return;
+
+    // Only copy over options for known values.
+    for (const key of Object.keys(debugOptions)) {
+      if (key in this._debugOptions) {
+        this._debugOptions[key] = debugOptions[key];
+      }
+    }
+    // TODO: Stop this being a global variable.
+    ENABLE_DEBUG_LOGS = this._debugOptions.enableLogs;
   }
 
   _reset() {
@@ -171,7 +188,7 @@ class SudokuSolver {
   }
 
   debugState() {
-    if (EXPORT_CONFLICT_HEATMAP) {
+    if (this._debugOptions.exportBacktrackCounts) {
       return {
         backtrackTriggers: this._internalSolver.getBacktrackTriggers(),
       };
