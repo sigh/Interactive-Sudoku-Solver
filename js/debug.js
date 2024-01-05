@@ -240,6 +240,6 @@ const printGrid = (grid) => {
 
 const showCellIndex = () => {
   const numCells = constraintManager.getShape().numCells;
-  controller.debugOutput.setOverlayValues(
+  controller.debugManager.setOverlayValues(
     [...Array(numCells).keys()]);
 };

@@ -769,36 +769,22 @@ class SudokuConstraint {
 }
 
 class SudokuBuilder {
-  static build(constraint) {
+  static build(constraint, debugOptions) {
     const [constraints, metaConstraints] = SudokuConstraint.toLists(constraint);
     const metaConfig = SudokuConstraint.getMetaConfig(metaConstraints);
     const shape = SudokuConstraint.getShapeFromMeta(metaConfig);
 
     return new SudokuSolver(
-      this._handlers(constraints, shape, metaConfig), shape);
+      this._handlers(constraints, shape, metaConfig),
+      shape,
+      debugOptions);
   }
-
-  // GLobal vars to pass to the worker.
-  static GLOBAL_VARS = [
-    'EXPORT_CONFLICT_HEATMAP',
-    'ENABLE_DEBUG_LOGS',
-  ];
 
   // Ask for a state update every 2**14 iterations.
   // NOTE: Using a non-power of 10 makes the display look faster :)
   static LOG_UPDATE_FREQUENCY = 14;
 
   static _unusedWorkers = [];
-
-  static getGlobalVars() {
-    const options = new Map();
-
-    for (const v of this.GLOBAL_VARS) {
-      options.set(v, window[v]);
-    }
-
-    return options;
-  }
 
   static async buildInWorker(constraints, stateHandler, statusHandler, debugHandler) {
     // Ensure any pending terminations are enacted.
@@ -810,9 +796,10 @@ class SudokuBuilder {
     const worker = this._unusedWorkers.pop();
     worker.release = () => this._unusedWorkers.push(worker);
 
-    const solverProxy = new SolverProxy(worker, stateHandler, statusHandler, debugHandler);
-    const globalVars = this.getGlobalVars();
-    await solverProxy.init(constraints, this.LOG_UPDATE_FREQUENCY, globalVars);
+    const solverProxy = new SolverProxy(
+      worker, stateHandler, statusHandler, debugHandler.getCallback());
+    await solverProxy.init(
+      constraints, this.LOG_UPDATE_FREQUENCY, debugHandler.getOptions());
     return solverProxy;
   }
 
@@ -1264,12 +1251,12 @@ class SolverProxy {
     return promise;
   }
 
-  async init(constraint, logUpdateFrequency, globalVars) {
+  async init(constraint, logUpdateFrequency, debugOptions) {
     this._initialized = true;
     await this._callWorker('init', {
       constraint: constraint,
       logUpdateFrequency: logUpdateFrequency,
-      globalVars,
+      debugOptions,
     });
   }
 

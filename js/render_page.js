@@ -33,7 +33,7 @@ const _setUpDebug = (controller) => {
   const closeButton = document.getElementById('close-debug-button');
 
   window.loadDebug = () => {
-    controller.debugOutput.enable(true);
+    controller.debugManager.enable(true);
     updateURL(true);
     closeButton.style.display = 'block';
     if (debugLoaded) return Promise.resolve();
@@ -42,7 +42,7 @@ const _setUpDebug = (controller) => {
     return dynamicJSFileLoader('js/debug.js')();
   };
   window.closeDebug = () => {
-    controller.debugOutput.enable(false);
+    controller.debugManager.enable(false);
     closeButton.style.display = 'none';
     updateURL(false);
   };
