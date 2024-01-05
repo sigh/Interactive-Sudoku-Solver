@@ -84,19 +84,63 @@ class HistoryHandler {
 }
 
 class DebugManager {
+  DEBUG_PARAM_NAME = 'debug';
+
   constructor(displayContainer) {
     this._container = document.getElementById('debug-container');
+    this._logOutput = document.getElementById('debug-logs');
     this._visible = false;
     this._shape = null;
     this._infoOverlay = new InfoOverlay(displayContainer);;
+    this._elements = {
+      closeButton: document.getElementById('close-debug-button'),
+      debugLogsCheckbox: document.getElementById('debug-logs-checkbox'),
+      backtrackHeatmapCheckbox: document.getElementById('backtrack-heatmap-checkbox'),
+    };
 
     this._debugCellHighlighter = displayContainer.createHighlighter('highlighted-cell');
+
+    this._setUp();
+  }
+
+  _setUp() {
+    let debugLoaded = false;
+
+    const updateURL = (enable) => {
+      const url = new URL(window.location);
+      if (enable) {
+        url.searchParams.set(this.DEBUG_PARAM_NAME, 1);
+      } else {
+        url.searchParams.delete(this.DEBUG_PARAM_NAME);
+      }
+      window.history.pushState(null, null, url);
+    };
+
+    window.loadDebug = () => {
+      this.enable(true);
+      updateURL(true);
+      if (debugLoaded) return Promise.resolve();
+
+      debugLoaded = true;
+      return dynamicJSFileLoader('js/debug.js')();
+    };
+    window.closeDebug = () => {
+      this.enable(false);
+      updateURL(false);
+    };
+
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get(this.DEBUG_PARAM_NAME) !== null) {
+      window.loadDebug();
+    }
+    this._elements.closeButton.onclick = window.closeDebug;
   }
 
   getOptions() {
+    if (!this._visible) return null;
     return {
-      enableLogs: !!self['ENABLE_DEBUG_LOGS'],
-      exportBacktrackCounts: !!self['EXPORT_CONFLICT_HEATMAP'],
+      enableLogs: this._elements.debugLogsCheckbox.checked,
+      exportBacktrackCounts: this._elements.backtrackHeatmapCheckbox.checked,
     };
   }
 
@@ -113,7 +157,7 @@ class DebugManager {
   clear() {
     if (!this._visible) return;
 
-    this._container.textContent = '';
+    this._logOutput.textContent = '';
     this._infoOverlay.clear();
 
     this._logDedupe = {
@@ -126,7 +170,7 @@ class DebugManager {
   _update(data) {
     if (!this._visible) return;
 
-    const isScrolledToBottom = this._isScrolledToBottom(this._container);
+    const isScrolledToBottom = this._isScrolledToBottom(this._logOutput);
 
     data.logs.forEach(l => this._addLog(l));
 
@@ -135,7 +179,7 @@ class DebugManager {
     }
 
     if (isScrolledToBottom) {
-      this._scrollToBottom(this._container);
+      this._scrollToBottom(this._logOutput);
     }
   }
 
@@ -155,7 +199,7 @@ class DebugManager {
       this._logDedupe.count = 1;
       this._logDedupe.currentSpan = document.createElement('span');
       this._logDedupe.currentSpan.classList.add('duplicate-log-line');
-      this._container.append(this._logDedupe.currentSpan);
+      this._logOutput.append(this._logDedupe.currentSpan);
     }
     const span = this._logDedupe.currentSpan;
     const count = ++this._logDedupe.count;
@@ -197,7 +241,7 @@ class DebugManager {
 
     this._addLogMouseOver(elem, data);
 
-    this._container.append(elem);
+    this._logOutput.append(elem);
   }
 
   _addLogMouseOver(elem, data) {
@@ -229,7 +273,7 @@ class DebugManager {
 
     // Reset the container.
     this._visible = enable;
-    this._container.style.display = enable ? 'block' : 'none';
+    this._container.classList.toggle('hidden', !enable);
     this.clear();
   }
 }

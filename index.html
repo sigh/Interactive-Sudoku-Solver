@@ -85,10 +85,21 @@ layout: null
       <a>(Source)</a>
     </div>
 
-    <button id="close-debug-button" class="danger-button" title="Close debug">Close debug</button>
   </div>
 
-  <div id="debug-container">
+  <div id="debug-container" class="hidden">
+    <div id="debug-logs"></div>
+    <div id="debug-panel">
+      <label>
+        <input checked type="checkbox" id="debug-logs-checkbox">
+        Debug logs
+      </label>
+      <label>
+        <input type="checkbox" id="backtrack-heatmap-checkbox">
+        Backtrack heatmap
+      </label>
+      <button id="close-debug-button" class="danger-button" title="Close debug">Close debug</button>
+    </div>
   </div>
 
   <div id="sudoku-container">
