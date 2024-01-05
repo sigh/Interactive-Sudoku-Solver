@@ -9,10 +9,9 @@ loadJSFile('data/jigsaw_box_layouts.js');
 
 var TEST_TIMEOUT_MS = 0;
 
-const loadInput = (input) => {
-  let puzzle = EXAMPLES[input];
-  if (puzzle) input = puzzle.input;
-  constraintManager.loadFromText(input);
+const loadInput = (puzzleCfg) => {
+  const [_, puzzle] = puzzleFromCfg(puzzleCfg);
+  constraintManager.loadFromText(puzzle.input);
 }
 
 const puzzleFromCfg = (puzzleCfg) => {
