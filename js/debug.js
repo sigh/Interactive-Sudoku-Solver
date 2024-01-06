@@ -237,9 +237,3 @@ const printGrid = (grid) => {
   }
   console.table(matrix);
 }
-
-const showCellIndex = () => {
-  const numCells = constraintManager.getShape().numCells;
-  controller.debugManager.setOverlayValues(
-    [...Array(numCells).keys()]);
-};
