@@ -104,10 +104,11 @@ class DebugManager {
 
     this._debugCellHighlighter = displayContainer.createHighlighter('highlighted-cell');
 
-    this._setUp(cookieManager);
+    this._initializeState(cookieManager);
+    this._setupHoverElements();
   }
 
-  _setUp(cookieManager) {
+  _initializeState(cookieManager) {
     let debugLoaded = false;
 
     const updateURL = (enable) => {
@@ -150,6 +151,22 @@ class DebugManager {
       element.onchange = () => {
         cookieManager.set(key, element.checked);
       }
+    }
+  }
+
+  _setupHoverElements() {
+    const elements = [
+      ['debug-cell-id', (index) => this._shape.makeCellIdFromIndex(index)],
+      ['debug-cell-index', (index) => index],
+    ];
+
+    for (const [id, fn] of elements) {
+      const element = document.getElementById(id);
+      const overlayValuesFn = () => {
+        const numCells = this._shape.numCells;
+        return [...new Array(numCells).keys()].map(fn);
+      };
+      this._setInfoOverlayOnHover(element, overlayValuesFn);
     }
   }
 
@@ -200,10 +217,6 @@ class DebugManager {
     if (data.backtrackCounts) {
       this._infoOverlay.setHeatmapValues(data.backtrackCounts);
     }
-  }
-
-  setOverlayValues(values) {
-    this._infoOverlay.setValues(values);
   }
 
   _isScrolledToBottom(obj) {
@@ -277,13 +290,19 @@ class DebugManager {
     }
 
     if (data.overlay) {
-      elem.addEventListener('mouseover', () => {
-        this._infoOverlay.setValues(data.overlay);
-      });
-      elem.addEventListener('mouseout', () => {
-        this._infoOverlay.setValues();
-      });
+      this._setInfoOverlayOnHover(elem, data.overlay);
     }
+  }
+
+  _setInfoOverlayOnHover(elem, data) {
+    elem.addEventListener('mouseover', () => {
+      let values = data;
+      if (typeof data === 'function') values = data();
+      this._infoOverlay.setValues(values);
+    });
+    elem.addEventListener('mouseout', () => {
+      this._infoOverlay.setValues();
+    });
   }
 
   enable(enable) {

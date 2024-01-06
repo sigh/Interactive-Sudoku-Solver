@@ -700,6 +700,23 @@ input:checked+span:before {
   width: 200px;
 }
 
+.debug-hover {
+  margin-top: 10px;
+  padding: 5px;
+  width: fit-content;
+
+  cursor: pointer;
+  color: black;
+  background-color: #f0f0f0;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+}
+
+.debug-hover:hover {
+  color: white;
+  background-color: #888;
+}
+
 #close-debug-button {
   width: fit-content;
   margin-top: 20px;
