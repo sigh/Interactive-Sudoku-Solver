@@ -134,6 +134,59 @@ SudokuConstraintHandler.House = class House extends SudokuConstraintHandler {
     return true;
   }
 
+  static _seenPairs = new Uint16Array(SHAPE_MAX.numValues);
+  static _pairLocations = new Uint16Array(SHAPE_MAX.numValues);
+
+  _enforceNakedPairs(grid, cells) {
+    const numCells = cells.length;
+
+    let numPairs = 0 | 0;
+    const seenPairs = this.constructor._seenPairs;
+    const pairLocations = this.constructor._pairLocations;
+    for (let i = 0; i < numCells; i++) {
+      const v = grid[cells[i]];
+      if (countOnes16bit(v) != 2) continue;
+      seenPairs[numPairs] = v;
+      pairLocations[numPairs] = i;
+      numPairs++;
+    }
+
+    for (let i = 1; i < numPairs; i++) {
+      const v = seenPairs[i];
+      for (let j = 0; j < i; j++) {
+        if (v !== seenPairs[j]) continue;
+
+        // We found a matching pair.
+        const pi = pairLocations[i];
+        const pj = pairLocations[j];
+        // Remove the pair from all other entries.
+        for (let k = 0; k < numCells; k++) {
+          if (k == pi || k == pj) continue;
+
+          // If there is anything to remove, try to remove it.
+          // If that eliminates this cell then return false.
+          let kv = grid[cells[k]];
+          if (!(kv & v)) continue;
+          if (!(kv &= ~v)) return false;
+          grid[cells[k]] = kv;
+
+          // If removing values made this a naked pair then add it to the list.
+          if (countOnes16bit(kv) == 2) {
+            seenPairs[numPairs] = kv;
+            pairLocations[numPairs] = k;
+            numPairs++;
+          }
+        }
+
+        // If we found a match for this pair, then we won't find another one
+        // for the same pair.
+        break;
+      }
+    }
+
+    return true;
+  }
+
   enforceConsistency(grid, cellAccumulator) {
     const cells = this.cells;
     const numCells = cells.length;
@@ -160,26 +213,10 @@ SudokuConstraintHandler.House = class House extends SudokuConstraintHandler {
     }
 
     // Check for naked pairs.
-
     // We won't have anything useful to do unless we have at least 2 free cells.
     if (numCells - countOnes16bit(fixedValues) <= 2) return true;
 
-    for (let i = 0; i < numCells - 1; i++) {
-      const v = grid[cells[i]];
-      if (countOnes16bit(v) != 2) continue;
-      for (let j = i + 1; j < numCells; j++) {
-        if (grid[cells[j]] !== v) continue;
-        // Found a pair, remove it from all other entries.
-        for (let k = 0; k < numCells; k++) {
-          if (k != i && k != j) {
-            if (!(grid[cells[k]] &= ~v)) return false;
-          }
-        }
-        break;
-      }
-    }
-
-    return true;
+    return this._enforceNakedPairs(grid, cells);
   }
 
   conflictSet() {
