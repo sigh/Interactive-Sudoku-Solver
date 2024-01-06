@@ -100,7 +100,6 @@ class DebugManager {
     this._debugCellHighlighter = displayContainer.createHighlighter('highlighted-cell');
 
     this._initializeState(cookieManager);
-    this._setupHoverElements();
   }
 
   _initializeState(cookieManager) {
@@ -123,13 +122,26 @@ class DebugManager {
       if (debugLoaded) return Promise.resolve();
 
       debugLoaded = true;
+
+      // Defer setting up hover elements until we need them.
+      this._setupHoverElements();
+      // Return a promise so that the caller can wait for debug
+      // functions to be available.
       return dynamicJSFileLoader('js/debug.js')();
     };
-    window.loadDebug = loadDebug;
-    document.getElementById('close-debug-button').onclick = () => {
+    const closeDebug = () => {
       this.enable(false);
       updateURL(false);
     };
+
+    // Wire up loading and closing.
+    window.loadDebug = loadDebug;
+    document.addEventListener('keydown', (event) => {
+      if (event.ctrlKey && event.key === 'd') {
+        this._enabled ? closeDebug() : loadDebug();
+      }
+    });
+    document.getElementById('close-debug-button').onclick = closeDebug;
 
     // Load debug if we are already in debug mode.
     const urlParams = new URLSearchParams(window.location.search);
