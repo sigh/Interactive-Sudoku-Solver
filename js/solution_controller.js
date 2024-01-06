@@ -92,15 +92,10 @@ class DebugManager {
     this._enabled = false;
     this._shape = null;
     this._infoOverlay = new InfoOverlay(displayContainer);;
-    this._elements = {
-      closeButton: document.getElementById('close-debug-button'),
-      debugLogsCheckbox: document.getElementById('debug-logs-checkbox'),
-      backtrackHeatmapCheckbox: document.getElementById('backtrack-heatmap-checkbox'),
-    };
-    this._checkboxes = {
-      enableLogs: this._elements.debugLogsCheckbox,
-      exportBacktrackCounts: this._elements.backtrackHeatmapCheckbox,
-    };
+    this._checkboxes = [
+      ['enableLogs', document.getElementById('debug-logs-checkbox')],
+      ['exportBacktrackCounts', document.getElementById('backtrack-heatmap-checkbox')]
+    ];
 
     this._debugCellHighlighter = displayContainer.createHighlighter('highlighted-cell');
 
@@ -131,7 +126,7 @@ class DebugManager {
       return dynamicJSFileLoader('js/debug.js')();
     };
     window.loadDebug = loadDebug;
-    this._elements.closeButton.onclick = () => {
+    document.getElementById('close-debug-button').onclick = () => {
       this.enable(false);
       updateURL(false);
     };
@@ -143,7 +138,7 @@ class DebugManager {
     }
 
     // Initialize options checkboxes.
-    for (const [key, element] of Object.entries(this._checkboxes)) {
+    for (const [key, element] of this._checkboxes) {
       const value = cookieManager.get(key);
       if (value !== undefined) {
         element.checked = (value === 'true');
@@ -173,7 +168,7 @@ class DebugManager {
   getOptions() {
     if (!this._enabled) return null;
     return Object.fromEntries(
-      Object.entries(this._checkboxes).map(
+      this._checkboxes.map(
         ([k, v]) => [k, v.checked]
       )
     );
