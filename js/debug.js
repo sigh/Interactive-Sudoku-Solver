@@ -1,11 +1,13 @@
-loadJSFile('js/solver/engine.js');
-loadJSFile('js/solver/handlers.js');
-loadJSFile('js/solver/optimizer.js');
-loadJSFile('data/killers.js');
-loadJSFile('data/thermos.js');
-loadJSFile('data/jigsaw_layouts.js');
-loadJSFile('data/invalid_jigsaw_layouts.js');
-loadJSFile('data/jigsaw_box_layouts.js');
+const debugFilesLoaded = Promise.all([
+  loadJSFile('js/solver/engine.js'),
+  loadJSFile('js/solver/handlers.js'),
+  loadJSFile('js/solver/optimizer.js'),
+  loadJSFile('data/killers.js'),
+  loadJSFile('data/thermos.js'),
+  loadJSFile('data/jigsaw_layouts.js'),
+  loadJSFile('data/invalid_jigsaw_layouts.js'),
+  loadJSFile('data/jigsaw_box_layouts.js'),
+]);
 
 var TEST_TIMEOUT_MS = 0;
 
