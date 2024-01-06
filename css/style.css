@@ -698,10 +698,10 @@ input:checked+span:before {
   flex-direction: column;
   margin: 0 10px;
   width: 200px;
+  gap: 10px;
 }
 
 .debug-hover {
-  margin-top: 10px;
   padding: 5px;
   width: fit-content;
 
@@ -719,7 +719,6 @@ input:checked+span:before {
 
 #close-debug-button {
   width: fit-content;
-  margin-top: 20px;
   font-size: 14px;
 }
 

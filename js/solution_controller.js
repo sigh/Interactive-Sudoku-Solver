@@ -122,12 +122,13 @@ class DebugManager {
       if (debugLoaded) return Promise.resolve();
 
       debugLoaded = true;
+      const loaderPromise = dynamicJSFileLoader('js/debug.js')();
 
-      // Defer setting up hover elements until we need them.
-      this._setupHoverElements();
+      this._deferredSetup(cookieManager, loaderPromise);
+
       // Return a promise so that the caller can wait for debug
       // functions to be available.
-      return dynamicJSFileLoader('js/debug.js')();
+      return loaderPromise;
     };
     const closeDebug = () => {
       this.enable(false);
@@ -148,6 +149,10 @@ class DebugManager {
     if (urlParams.get(this.DEBUG_PARAM_NAME) !== null) {
       loadDebug();
     }
+  }
+
+  _deferredSetup(cookieManager, loaderPromise) {
+    // Things setup only when the debugger is actually loaded.
 
     // Initialize options checkboxes.
     for (const [key, element] of this._checkboxes) {
@@ -159,9 +164,8 @@ class DebugManager {
         cookieManager.set(key, element.checked);
       }
     }
-  }
 
-  _setupHoverElements() {
+    // Setup hover elements.
     const elements = [
       ['debug-cell-id', (index) => this._shape.makeCellIdFromIndex(index)],
       ['debug-cell-index', (index) => index],
@@ -175,6 +179,56 @@ class DebugManager {
       };
       this._setInfoOverlayOnHover(element, overlayValuesFn);
     }
+
+    // Debug puzzle loader.
+    loaderPromise.then(() => {
+      debugFilesLoaded.then(() => {
+        this._loadDebugPuzzleInput();
+      });
+    });
+  }
+
+  _loadDebugPuzzleInput() {
+    const datalist = document.getElementById('debug-puzzles');
+    for (const name of Object.keys(EXAMPLES)) {
+      const option = document.createElement('option');
+      option.value = name;
+      datalist.appendChild(option);
+    }
+    const puzzleLists = new Map([
+      ['TAREK_ALL', TAREK_ALL],
+      ['EXTREME_KILLERS', EXTREME_KILLERS],
+      ['HARD_THERMOS', HARD_THERMOS],
+      ['MATHEMAGIC_KILLERS', MATHEMAGIC_KILLERS]]);
+    for (const [listName, list] of puzzleLists) {
+      for (let i = 0; i < list.length; i++) {
+        const option = document.createElement('option');
+        option.value = `${listName}[${i}]`;
+        datalist.appendChild(option);
+      }
+    }
+
+    const input = document.getElementById('debug-puzzle-input');
+    input.onchange = () => {
+      const name = input.value;
+      // Clear the input after a short time so the user can still notice
+      // what was selected.
+      window.setTimeout(() => {
+        input.value = '';
+      }, 300);
+
+      if (name in EXAMPLES) {
+        loadInput(name);
+        return;
+      }
+      let [_, puzzleListName, indexStr] = name.match(/(\w+)\[(\d+)\]/);
+      const list = puzzleLists.get(puzzleListName);
+      const index = parseInt(indexStr);
+      if (list && Number.isInteger(index)) {
+        loadInput(list[index]);
+        return;
+      }
+    };
   }
 
   getOptions() {
