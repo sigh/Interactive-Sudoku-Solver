@@ -546,6 +546,28 @@ SudokuSolver.InternalSolver = class {
     return countOnes16bit(grid[cellOrder[cellIndex]]);
   }
 
+  _selectNextCandidate(cellOrder, cellIndex, grid, adjustForStepState) {
+    // Find the next cell to explore and update progress.
+    let count = this._updateCellOrder(cellOrder, cellIndex, grid);
+
+    let cell = cellOrder[cellIndex];
+
+    // Find the next smallest value to try.
+    // NOTE: We will always have a value because:
+    //        - we would have returned earlier on domain wipeout.
+    //        - we don't add to the stack on the final value in a cell.
+    let values = grid[cell];
+    let value = values & -values;
+
+    // Adjust the value for step-by-step.
+    if (adjustForStepState) {
+      [cell, value, count] = this._adjustForStepState(
+        cellOrder, cellIndex, grid);
+    }
+
+    return [cell, value, count];
+  }
+
   _logEnforceValue(grid, cell, value, conflicts) {
     const changedCells = conflicts.filter(c => grid[c] & value);
     this._logDebug({
@@ -783,32 +805,15 @@ SudokuSolver.InternalSolver = class {
         counters.cellsSearched++;
       }
 
-      // Find the next cell to explore and update progress.
-      let count = this._updateCellOrder(cellOrder, cellIndex, grid) | 0;
+      let [cell, value, count] = this._selectNextCandidate(
+        cellOrder, cellIndex, grid, yieldEveryStep);
       if (count === 0) continue;
 
-      let cell = cellOrder[cellIndex];
-      let values = grid[cell];
-
-      // Find the next smallest value to try.
-      // NOTE: We will always have a value because:
-      //        - we would have returned earlier on domain wipeout.
-      //        - we don't add to the stack on the final value in a cell.
-      let value = values & -values;
-      // Adjust the value for step-by-step.
-      if (yieldEveryStep) {
-        value = this._adjustForStepState(cellOrder, cellIndex, grid);
-        // The cell order may be changed.
-        cell = cellOrder[cellIndex];
-        values = grid[cell];
-        count = countOnes16bit(values) | 0;
-      }
+      const originalValues = grid[cell];
 
       {
         // Assume the remaining progress is evenly distributed among the value
         // options.
-        // NOTE: We must do this after _adjustForStepState, as the cell order
-        // may have changed.
         progressDelta = progressRemainingStack[depth] / count;
         progressRemainingStack[depth] -= progressDelta;
 
@@ -828,7 +833,7 @@ SudokuSolver.InternalSolver = class {
         // We only need to start a new recursion frame when there is more than
         // one value to try.
 
-        depth++;  // NOTE: recStack already has cell_index
+        depth++;  // NOTE: cellOrder already has cellIndex
         counters.guesses++;
 
         // Remove the value from our set of candidates.
@@ -838,8 +843,10 @@ SudokuSolver.InternalSolver = class {
 
         this._grids[depth].set(grid);
         grid = this._grids[depth];
-        grid[cell] = value;
       }
+      // NOTE: Set this even when count == 1 to allow for other candidate
+      //       selection methods.
+      grid[cell] = value;
 
       let cellAccumulator = this._cellAccumulator;
       cellAccumulator.clear();
@@ -888,7 +895,7 @@ SudokuSolver.InternalSolver = class {
           grid: grid,
           isSolution: false,
           cellOrder: cellOrder.subarray(0, cellIndex + 1),
-          values: values | value,
+          values: originalValues,
           hasContradiction: hasContradiction,
         };
         checkRunCounter();
@@ -1018,14 +1025,19 @@ SudokuSolver.InternalSolver = class {
       }
     }
 
+    const cell = cellOrder[cellIndex];
+    const currentValues = grid[cell];
+
+    let value = 0;
     if (guide.value) {
-      // Return the new value.
-      return LookupTables.fromValue(guide.value);
+      // Use the value from the guide.
+      value = LookupTables.fromValue(guide.value);
     } else {
       // Or determine the default value.
-      const values = grid[cellOrder[cellIndex]];
-      return values & -values;
+      value = currentValues & -currentValues;
     }
+
+    return [cell, value, countOnes16bit(currentValues)];
   }
 }
 
