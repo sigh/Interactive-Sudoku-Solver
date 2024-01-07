@@ -3,6 +3,7 @@
 class SudokuSolver {
   constructor(handlers, shape, debugOptions) {
     this._debugger = new SudokuSolver.Debugger(this, debugOptions);
+    this._logDebug = this._debugger.getLogDebugFn();
     this._shape = shape;
 
     this._internalSolver = new SudokuSolver.InternalSolver(
