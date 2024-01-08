@@ -346,7 +346,7 @@ class SolutionDisplay extends CellValueDisplay {
     this._renderGridValues(solution);
 
     this._copyElem.disabled = (
-      !solution.every(v => v && isFinite(v)));
+      !this._currentSolution.every(v => v && isFinite(v)));
 
     svg.classList.remove('hidden-solution');
   }
