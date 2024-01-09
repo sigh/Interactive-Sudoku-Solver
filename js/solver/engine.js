@@ -469,11 +469,11 @@ SudokuSolver.InternalSolver = class {
     return false;
   }
 
-  // Find the cell with the minimum score. Return the index into cellOrder.
-  _minCountCellIndex(grid, cellOrder, cellIndex) {
+  // Find the cell index with the minimum score. Return the index into cellOrder.
+  _minCountCellIndex(grid, cellOrder, currentIndex) {
     let minCount = 1 << 16;
     let bestIndex = 0;
-    for (let i = cellIndex; i < grid.length; i++) {
+    for (let i = currentIndex; i < grid.length; i++) {
       const count = countOnes16bit(grid[cellOrder[i]]);
       if (count < minCount) {
         bestIndex = i;
@@ -483,33 +483,22 @@ SudokuSolver.InternalSolver = class {
     return bestIndex;
   }
 
-  // Find the best cell and bring it to the front. This means that it will
-  // be processed next.
-  _updateCellOrder(cellOrder, cellIndex, grid) {
+  _selectBestCell(grid, cellOrder, currentIndex) {
     // Choose cells based on value count and number of conflicts encountered.
-    // Return immediately if we find any cells with 1 or 0 values set.
     // NOTE: The constraint handlers are written such that they detect domain
     // wipeouts (0 values), so we should never find them here. Even if they
     // exist, it just means we do a few more useless forced cell resolutions.
     // NOTE: If the scoring is more complicated, it can be useful
     // to do an initial pass to detect 1 or 0 value cells (!(v&(v-1))).
 
-    // Quick check - if the first value is a singleton, then just return without
-    // the extra bookkeeping.
-    {
-      let firstValue = grid[cellOrder[cellIndex]];
-      if ((firstValue & (firstValue - 1)) === 0) return 1;
-    }
-
-    const numCells = cellOrder.length;
-
-    const triggerCounts = this._backtrackTriggers;
+    const numCells = grid.length;
+    const backtrackTriggers = this._backtrackTriggers;
 
     // Find the cell with the minimum score.
     let maxScore = -1;
     let bestIndex = 0;
 
-    for (let i = cellIndex; i < numCells; i++) {
+    for (let i = currentIndex; i < numCells; i++) {
       const cell = cellOrder[i];
       const count = countOnes16bit(grid[cell]);
       // If we have a single value then just use it - as it will involve no
@@ -523,7 +512,7 @@ SudokuSolver.InternalSolver = class {
         break;
       }
 
-      let score = triggerCounts[cell] / count;
+      let score = backtrackTriggers[cell] / count;
 
       if (score > maxScore) {
         bestIndex = i;
@@ -538,19 +527,25 @@ SudokuSolver.InternalSolver = class {
       //
       // Looping over the cells again is not a concern since this is rare. It is
       // better to take it out of the main loop.
-      bestIndex = this._minCountCellIndex(grid, cellOrder, cellIndex);
+      bestIndex = this._minCountCellIndex(grid, cellOrder, currentIndex);
     }
 
-    [cellOrder[bestIndex], cellOrder[cellIndex]] = [cellOrder[cellIndex], cellOrder[bestIndex]];
-
-    return countOnes16bit(grid[cellOrder[cellIndex]]);
+    return bestIndex;
   }
 
-  _selectNextCandidate(cellOrder, cellIndex, grid, adjustForStepState) {
-    // Find the next cell to explore and update progress.
-    let count = this._updateCellOrder(cellOrder, cellIndex, grid);
+  _selectBestCandidate(grid, cellOrder, currentIndex) {
+    // Quick check - if the first value is a singleton, then just return without
+    // the extra bookkeeping.
+    {
+      const firstValue = grid[cellOrder[currentIndex]];
+      if ((firstValue & (firstValue - 1)) === 0) {
+        return [currentIndex, firstValue, firstValue !== 0 ? 1 : 0];
+      }
+    }
 
-    let cell = cellOrder[cellIndex];
+    // Find the best cell to explore next.
+    const cellIndex = this._selectBestCell(grid, cellOrder, currentIndex);
+    const cell = cellOrder[cellIndex];
 
     // Find the next smallest value to try.
     // NOTE: We will always have a value because:
@@ -559,11 +554,23 @@ SudokuSolver.InternalSolver = class {
     let values = grid[cell];
     let value = values & -values;
 
+    return [cellIndex, value, countOnes16bit(values)];
+  }
+
+  _selectNextCandidate(cellOrder, currentIndex, grid, yieldEveryStep) {
+    let [cellIndex, value, count] = this._selectBestCandidate(
+      grid, cellOrder, currentIndex);
+
     // Adjust the value for step-by-step.
-    if (adjustForStepState) {
-      [cell, value, count] = this._adjustForStepState(
-        cellOrder, cellIndex, grid);
+    if (yieldEveryStep) {
+      [cellIndex, value, count] = this._adjustForStepState(
+        grid, cellOrder, currentIndex, cellIndex, value);
     }
+    const cell = cellOrder[cellIndex];
+
+    // Update cellOrder.
+    [cellOrder[cellIndex], cellOrder[currentIndex]] =
+      [cellOrder[currentIndex], cellOrder[cellIndex]];
 
     return [cell, value, count];
   }
@@ -805,7 +812,7 @@ SudokuSolver.InternalSolver = class {
         counters.cellsSearched++;
       }
 
-      let [cell, value, count] = this._selectNextCandidate(
+      const [cell, value, count] = this._selectNextCandidate(
         cellOrder, cellIndex, grid, yieldEveryStep);
       if (count === 0) continue;
 
@@ -1010,34 +1017,28 @@ SudokuSolver.InternalSolver = class {
     }
   }
 
-  _adjustForStepState(cellOrder, cellIndex, grid) {
+  _adjustForStepState(grid, cellOrder, currentIndex, cellIndex, value) {
     const step = this._stepState.step;
     const guide = this._stepState.stepGuides.get(step) || {};
 
-    // If there is a cell guide, then update cell order.
+    // If there is a cell guide, then use that.
     if (guide.cell) {
-      const cell = guide.cell;
-      for (let i = cellIndex; i < cellOrder.length; i++) {
-        if (cellOrder[i] == cell) {
-          [cellOrder[cellIndex], cellOrder[i]] = [cellOrder[i], cellOrder[cellIndex]];
-          break;
-        }
-      }
+      const newCellIndex = cellOrder.indexOf(guide.cell, currentIndex);
+      if (newCellIndex !== -1) cellIndex = newCellIndex;
     }
 
-    const cell = cellOrder[cellIndex];
-    const currentValues = grid[cell];
+    const cellValues = grid[cellOrder[cellIndex]];
 
-    let value = 0;
     if (guide.value) {
       // Use the value from the guide.
       value = LookupTables.fromValue(guide.value);
-    } else {
-      // Or determine the default value.
-      value = currentValues & -currentValues;
+    } else if (guide.cell) {
+      // Or if we had a guide cell then choose a value which is valid for that
+      // cell.
+      value = cellValues & -cellValues;
     }
 
-    return [cell, value, countOnes16bit(currentValues)];
+    return [cellIndex, value, countOnes16bit(cellValues)];
   }
 }
 
