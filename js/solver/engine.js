@@ -271,8 +271,6 @@ SudokuSolver.InternalSolver = class {
     this._logDebug = debugLogger;
 
     this._initGrid();
-    this._candidateSelector = new SudokuSolver.CandidateSelector(
-      shape, debugLogger);
     this._recStack = new Uint16Array(shape.numCells + 1);
     this._progressRemainingStack = Array.from(this._recStack).fill(0.0);
 
@@ -285,6 +283,8 @@ SudokuSolver.InternalSolver = class {
     this._handlerSet = this._setUpHandlers(Array.from(handlerGen));
 
     this._cellAccumulator = new SudokuSolver.CellAccumulator(this._handlerSet);
+    this._candidateSelector = new SudokuSolver.CandidateSelector(
+      shape, this._handlerSet, debugLogger);
 
     this._cellPriorities = this._initCellPriorities();
 
@@ -908,11 +908,18 @@ SudokuSolver.InternalSolver = class {
 }
 
 SudokuSolver.CandidateSelector = class CandidateSelector {
-  constructor(shape, debugLogger) {
+  constructor(shape, handlerSet, debugLogger) {
     this._shape = shape;
     this._cellOrder = new Uint8Array(shape.numCells);
     this._backtrackTriggers = null;
     this._logDebug = debugLogger;
+
+    this._houseHandlers = handlerSet.getAllofType(SudokuConstraintHandler.House);
+
+    this._candidateSelectionState = [];
+    for (let i = 0; i < shape.numCells; i++) {
+      this._candidateSelectionState.push(null);
+    }
   }
 
   reset(backtrackTriggers) {
@@ -924,6 +931,8 @@ SudokuSolver.CandidateSelector = class CandidateSelector {
     }
 
     this._backtrackTriggers = backtrackTriggers;
+
+    this._candidateSelectionState.fill(null);
   }
 
   getCellOrder(upto) {
@@ -940,16 +949,20 @@ SudokuSolver.CandidateSelector = class CandidateSelector {
     if (stepState) {
       if (stepState.logSteps) {
         this._logSelectNextCandidate(
-          'Best candidate:', cellOrder[cellOffset], value, count);
+          'Best candidate:', cellOrder[cellOffset], value, count, cellDepth);
       }
 
       let adjusted = false;
-      [cellOffset, value, count, adjusted] = this._adjustForStepState(
+      [cellOffset, value, adjusted] = this._adjustForStepState(
         stepState, grid, cellOrder, cellDepth, cellOffset, value);
 
-      if (adjusted && stepState.logSteps) {
-        this._logSelectNextCandidate(
-          'Adjusted by user:', cellOrder[cellOffset], value, count);
+      if (adjusted) {
+        count = countOnes16bit(grid[cellOrder[cellOffset]]);
+        this._candidateSelectionState[cellDepth] = null;
+        if (stepState.logSteps) {
+          this._logSelectNextCandidate(
+            'Adjusted by user:', cellOrder[cellOffset], value, count, cellDepth);
+        }
       }
     }
     const cell = cellOrder[cellOffset];
@@ -961,7 +974,7 @@ SudokuSolver.CandidateSelector = class CandidateSelector {
     return [cell, value, count];
   }
 
-  _logSelectNextCandidate(msg, cell, value, count) {
+  _logSelectNextCandidate(msg, cell, value, count, cellDepth) {
     this._logDebug({
       loc: 'selectNextCandidate',
       msg: msg,
@@ -969,12 +982,22 @@ SudokuSolver.CandidateSelector = class CandidateSelector {
         cell: this._shape.makeCellIdFromIndex(cell),
         value: LookupTables.toValue(value),
         numOptions: count,
+        cellDepth: cellDepth,
+        state: this._candidateSelectionState[cellDepth],
       },
       cells: [cell],
     });
   }
 
   _selectBestCandidate(grid, cellOrder, cellDepth) {
+    // If we have a special candidate state, then use that.
+    // It will always be a singleton.
+    if (this._candidateSelectionState[cellDepth] !== null) {
+      const state = this._candidateSelectionState[cellDepth];
+      this._candidateSelectionState[cellDepth] = null;
+      return [cellOrder.indexOf(state.cell1), state.value, 1];
+    }
+
     // Quick check - if the first value is a singleton, then just return without
     // the extra bookkeeping.
     {
@@ -985,7 +1008,7 @@ SudokuSolver.CandidateSelector = class CandidateSelector {
     }
 
     // Find the best cell to explore next.
-    const cellOffset = this._selectBestCell(grid, cellOrder, cellDepth);
+    let cellOffset = this._selectBestCell(grid, cellOrder, cellDepth);
     const cell = cellOrder[cellOffset];
 
     // Find the next smallest value to try.
@@ -994,8 +1017,24 @@ SudokuSolver.CandidateSelector = class CandidateSelector {
     //        - we don't add to the stack on the final value in a cell.
     let values = grid[cell];
     let value = values & -values;
+    let count = countOnes16bit(values);
 
-    return [cellOffset, value, countOnes16bit(values)];
+    // Consider branching on a single digit within a house. Only to this if we
+    // are:
+    //  - Currently exploring a cell with more than 2 values.
+    //  - Have non-zero backtrackTriggers (and thus score).
+    if (count > 2 && this._backtrackTriggers[cell] > 0) {
+      const score = this._backtrackTriggers[cell] / count;
+      let result = this._findCandidatesByHouse(grid);
+      if (result.score >= score) {
+        count = 2;
+        value = result.value;
+        cellOffset = cellOrder.indexOf(result.cell0);
+        this._candidateSelectionState[cellDepth] = result;
+      }
+    }
+
+    return [cellOffset, value, count];
   }
 
   _selectBestCell(grid, cellOrder, cellDepth) {
@@ -1089,7 +1128,73 @@ SudokuSolver.CandidateSelector = class CandidateSelector {
       adjusted = true;
     }
 
-    return [cellOffset, value, countOnes16bit(cellValues), adjusted];
+    return [cellOffset, value, adjusted];
+  }
+
+  _findCandidatesByHouse(grid) {
+    const handlers = this._houseHandlers;
+
+    // Find all candidates with exactly two values.
+    let bestResult = {
+      score: -1,
+      value: 0,
+      cell0: 0,
+      cell1: 0,
+    };
+    for (let i = 0; i < handlers.length; i++) {
+      const handler = handlers[i];
+      const cells = handler.cells;
+      const numCells = cells.length;
+
+      let allValues = 0;
+      let moreThanOne = 0;
+      let moreThanTwo = 0;
+      for (let i = 0; i < numCells; i++) {
+        const v = grid[cells[i]];
+        moreThanTwo |= moreThanOne & v;
+        moreThanOne |= allValues & v;
+        allValues |= v;
+      }
+
+      let exactlyTwo = moreThanOne & ~moreThanTwo;
+      while (exactlyTwo) {
+        let v = exactlyTwo & -exactlyTwo;
+        exactlyTwo ^= v;
+        const result = this._scoreHouseCandidateValue(grid, cells, v);
+        if (result.score > bestResult.score) {
+          bestResult = result;
+        }
+      }
+    }
+
+    return bestResult;
+  }
+
+  _scoreHouseCandidateValue(grid, cells, v) {
+    let numCells = cells.length;
+    let cell0 = 0;
+    let cell1 = 0;
+    for (let i = 0; i < numCells; i++) {
+      if (grid[cells[i]] & v) {
+        [cell0, cell1] = [cell1, cells[i]];
+      }
+    }
+
+    let bt0 = this._backtrackTriggers[cell0];
+    let bt1 = this._backtrackTriggers[cell1];
+    if (bt0 < bt1) {
+      [bt0, bt1] = [bt1, bt0];
+      [cell0, cell1] = [cell1, cell0];
+    }
+    // NOTE: score = bt0 performs well on HARD_THERMOS and MATHEMAGIC_KILLERS.
+    const score = bt0 / 2;  // max(bt[cell_i]) / numCells
+
+    return {
+      value: v,
+      score: score,
+      cell0: cell0,
+      cell1: cell1,
+    };
   }
 }
 
