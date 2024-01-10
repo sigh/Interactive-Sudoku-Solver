@@ -285,6 +285,8 @@ SudokuSolver.InternalSolver = class {
     this._cellAccumulator = new SudokuSolver.CellAccumulator(this._handlerSet);
     this._candidateSelector = new SudokuSolver.CandidateSelector(
       shape, this._handlerSet, debugLogger);
+    this._candidateSelector = new SudokuSolver.CandidateSelector(
+      shape, this._handlerSet, debugLogger);
 
     this._cellPriorities = this._initCellPriorities();
 
@@ -661,7 +663,7 @@ SudokuSolver.InternalSolver = class {
     let recDepth = 0;
     const recStack = this._recStack;
     recStack[recDepth++] = 0;
-    let isNewCellDepth = true;
+    let isNewNode = true;
     let progressDelta = 1.0;
     // The last cell which caused a contradiction at each level.
     const lastContradictionCell = new Int16Array(this._numCells);
@@ -673,8 +675,10 @@ SudokuSolver.InternalSolver = class {
 
       let grid = this._grids[recDepth];
 
-      if (isNewCellDepth) {
-        isNewCellDepth = false;
+      const wasNewNode = isNewNode;
+
+      if (isNewNode) {
+        isNewNode = false;
 
         // TODO: Handle fixed cells.
 
@@ -701,7 +705,7 @@ SudokuSolver.InternalSolver = class {
       }
 
       const [cell, value, count] = this._candidateSelector.selectNextCandidate(
-        cellDepth, grid, this._stepState);
+        cellDepth, grid, this._stepState, wasNewNode);
       if (count === 0) continue;
 
       const originalValues = grid[cell];
@@ -808,7 +812,7 @@ SudokuSolver.InternalSolver = class {
 
       // Recurse to the new cell.
       recStack[recDepth++] = cellDepth + 1;
-      isNewCellDepth = true;
+      isNewNode = true;
     }
 
     this.done = true;
@@ -920,6 +924,9 @@ SudokuSolver.CandidateSelector = class CandidateSelector {
     for (let i = 0; i < shape.numCells; i++) {
       this._candidateSelectionState.push(null);
     }
+
+    const houseHandlerSet = new HandlerSet(this._houseHandlers, shape);
+    this._cellAccumulator = new SudokuSolver.CellAccumulator(houseHandlerSet);
   }
 
   reset(backtrackTriggers) {
@@ -940,10 +947,10 @@ SudokuSolver.CandidateSelector = class CandidateSelector {
     return this._cellOrder.subarray(0, upto);
   }
 
-  selectNextCandidate(cellDepth, grid, stepState) {
+  selectNextCandidate(cellDepth, grid, stepState, isNewNode) {
     const cellOrder = this._cellOrder;
     let [cellOffset, value, count] = this._selectBestCandidate(
-      grid, cellOrder, cellDepth);
+      grid, cellOrder, cellDepth, isNewNode);
 
     // Adjust the value for step-by-step.
     if (stepState) {
@@ -989,7 +996,7 @@ SudokuSolver.CandidateSelector = class CandidateSelector {
     });
   }
 
-  _selectBestCandidate(grid, cellOrder, cellDepth) {
+  _selectBestCandidate(grid, cellOrder, cellDepth, isNewNode) {
     // If we have a special candidate state, then use that.
     // It will always be a singleton.
     if (this._candidateSelectionState[cellDepth] !== null) {
@@ -1021,11 +1028,13 @@ SudokuSolver.CandidateSelector = class CandidateSelector {
 
     // Consider branching on a single digit within a house. Only to this if we
     // are:
+    //  - Exploring this node for the first time. If we have backtracked here
+    //    it is less likely that this will yield a better candidate.
     //  - Currently exploring a cell with more than 2 values.
     //  - Have non-zero backtrackTriggers (and thus score).
-    if (count > 2 && this._backtrackTriggers[cell] > 0) {
+    if (isNewNode && count > 2 && this._backtrackTriggers[cell] > 0) {
       const score = this._backtrackTriggers[cell] / count;
-      let result = this._findCandidatesByHouse(grid);
+      let result = this._findCandidatesByHouse(grid, score);
       if (result.score >= score) {
         count = 2;
         value = result.value;
@@ -1108,9 +1117,9 @@ SudokuSolver.CandidateSelector = class CandidateSelector {
 
     // If there is a cell guide, then use that.
     if (guide.cell) {
-      const newCellIndex = cellOrder.indexOf(guide.cell, cellDepth);
-      if (newCellIndex !== -1) {
-        cellOffset = newCellIndex;
+      const newCellOffset = cellOrder.indexOf(guide.cell, cellDepth);
+      if (newCellOffset !== -1) {
+        cellOffset = newCellOffset;
         adjusted = true;
       }
     }
@@ -1131,8 +1140,21 @@ SudokuSolver.CandidateSelector = class CandidateSelector {
     return [cellOffset, value, adjusted];
   }
 
-  _findCandidatesByHouse(grid) {
-    const handlers = this._houseHandlers;
+  _findCandidatesByHouse(grid, score) {
+    const numCells = grid.length;
+
+    // Add all handlers with cells which can potentially beat the current score.
+    const minBt = Math.ceil(score * 2) | 0;
+    const backtrackTriggers = this._backtrackTriggers;
+    const cellAccumulator = this._cellAccumulator;
+    for (let i = 0; i < numCells; i++) {
+      if (backtrackTriggers[i] >= minBt) {
+        const v = grid[i];
+        if (v & (v - 1)) {
+          cellAccumulator.add(i);
+        }
+      }
+    }
 
     // Find all candidates with exactly two values.
     let bestResult = {
@@ -1141,8 +1163,8 @@ SudokuSolver.CandidateSelector = class CandidateSelector {
       cell0: 0,
       cell1: 0,
     };
-    for (let i = 0; i < handlers.length; i++) {
-      const handler = handlers[i];
+    while (cellAccumulator.hasConstraints()) {
+      const handler = cellAccumulator.popConstraint();
       const cells = handler.cells;
       const numCells = cells.length;
 
@@ -1182,11 +1204,14 @@ SudokuSolver.CandidateSelector = class CandidateSelector {
 
     let bt0 = this._backtrackTriggers[cell0];
     let bt1 = this._backtrackTriggers[cell1];
+    // Make bt0 the larger of the two.
+    // Also make cell0 the cell with the larger backtrack trigger, since cell0
+    // is searched first. NOTE: This turns out ot be a bit faster, but means
+    // we usually find the solution later in the search.
     if (bt0 < bt1) {
       [bt0, bt1] = [bt1, bt0];
       [cell0, cell1] = [cell1, cell0];
     }
-    // NOTE: score = bt0 performs well on HARD_THERMOS and MATHEMAGIC_KILLERS.
     const score = bt0 / 2;  // max(bt[cell_i]) / numCells
 
     return {
