@@ -273,7 +273,7 @@ SudokuSolver.InternalSolver = class {
     this._initGrid();
     this._candidateSelector = new SudokuSolver.CandidateSelector(shape);
     this._recStack = new Uint16Array(shape.numCells + 1);
-    this._progressRatioRemaining = Array.from(this._recStack).fill(0.0);
+    this._progressRemainingStack = Array.from(this._recStack).fill(0.0);
 
     this._runCounter = 0;
     this._progress = {
@@ -434,7 +434,7 @@ SudokuSolver.InternalSolver = class {
     this.done = false;
     this._atStart = true;
     this._grids[0].set(this._initialGrid);
-    this._progressRatioRemaining[0] = 1.0;
+    this._progressRemainingStack[0] = 1.0;
   }
 
   _initGrid() {
@@ -657,30 +657,28 @@ SudokuSolver.InternalSolver = class {
       this._stepState.step = 1;
     }
 
-    const progressRemainingStack = this._progressRatioRemaining;
-
-    let depth = 0;
+    let recDepth = 0;
     const recStack = this._recStack;
-    recStack[depth++] = 0;
-    let isNewCellIndex = true;
+    recStack[recDepth++] = 0;
+    let isNewCellDepth = true;
     let progressDelta = 1.0;
     // The last cell which caused a contradiction at each level.
     const lastContradictionCell = new Int16Array(this._numCells);
     lastContradictionCell.fill(-1);
 
-    while (depth) {
-      depth--;
-      let cellIndex = recStack[depth];
+    while (recDepth) {
+      recDepth--;
+      const cellDepth = recStack[recDepth];
 
-      let grid = this._grids[depth];
+      let grid = this._grids[recDepth];
 
-      if (isNewCellIndex) {
-        isNewCellIndex = false;
+      if (isNewCellDepth) {
+        isNewCellDepth = false;
 
         // TODO: Handle fixed cells.
 
         // We've reached the end, so output a solution!
-        if (cellIndex == this._shape.numCells) {
+        if (cellDepth == this._shape.numCells) {
           counters.progressRatio += progressDelta;
           // We've set all the values, and we haven't found a contradiction.
           // This is a solution!
@@ -695,14 +693,14 @@ SudokuSolver.InternalSolver = class {
           continue;
         }
 
-        progressRemainingStack[depth] = progressDelta;
+        this._progressRemainingStack[recDepth] = progressDelta;
 
         // Update counters.
         counters.cellsSearched++;
       }
 
       const [cell, value, count] = this._candidateSelector.selectNextCandidate(
-        cellIndex, grid, this._stepState);
+        cellDepth, grid, this._stepState);
       if (count === 0) continue;
 
       const originalValues = grid[cell];
@@ -710,8 +708,8 @@ SudokuSolver.InternalSolver = class {
       {
         // Assume the remaining progress is evenly distributed among the value
         // options.
-        progressDelta = progressRemainingStack[depth] / count;
-        progressRemainingStack[depth] -= progressDelta;
+        progressDelta = this._progressRemainingStack[recDepth] / count;
+        this._progressRemainingStack[recDepth] -= progressDelta;
 
         counters.valuesTried++;
         iterationCounterForUpdates++
@@ -729,7 +727,7 @@ SudokuSolver.InternalSolver = class {
         // We only need to start a new recursion frame when there is more than
         // one value to try.
 
-        depth++;
+        recDepth++;
         counters.guesses++;
 
         // Remove the value from our set of candidates.
@@ -737,8 +735,8 @@ SudokuSolver.InternalSolver = class {
         //       stack frame.
         grid[cell] ^= value;
 
-        this._grids[depth].set(grid);
-        grid = this._grids[depth];
+        this._grids[recDepth].set(grid);
+        grid = this._grids[recDepth];
       }
       // NOTE: Set this even when count == 1 to allow for other candidate
       //       selection methods.
@@ -750,12 +748,12 @@ SudokuSolver.InternalSolver = class {
       // Queue up extra constraints based on prior backtracks. The idea being
       // that constraints that apply this the contradiction cell are likely
       // to turn up a contradiction here if it exists.
-      if (lastContradictionCell[cellIndex] >= 0) {
-        cellAccumulator.add(lastContradictionCell[cellIndex]);
+      if (lastContradictionCell[cellDepth] >= 0) {
+        cellAccumulator.add(lastContradictionCell[cellDepth]);
         // If this is the last value at this level, clear the
         // lastContradictionCell as the next time we reach this level won't be
         // from the same subtree that caused the contradiction.
-        if (count === 1) lastContradictionCell[cellIndex] = -1;
+        if (count === 1) lastContradictionCell[cellDepth] = -1;
       }
 
       // Propagate constraints.
@@ -763,7 +761,7 @@ SudokuSolver.InternalSolver = class {
       if (hasContradiction) {
         // Store the current cells, so that the level immediately above us
         // can act on this information to run extra constraints.
-        if (cellIndex > 0) lastContradictionCell[cellIndex - 1] = cell;
+        if (cellDepth > 0) lastContradictionCell[cellDepth - 1] = cell;
         counters.progressRatio += progressDelta;
         counters.backtracks++;
         this._backtrackTriggers[cell]++;
@@ -773,7 +771,7 @@ SudokuSolver.InternalSolver = class {
           yield {
             grid: grid,
             isSolution: false,
-            cellOrder: this._candidateSelector.getCellOrder(cellIndex),
+            cellOrder: this._candidateSelector.getCellOrder(cellDepth),
             hasContradiction: hasContradiction,
           };
         }
@@ -790,7 +788,7 @@ SudokuSolver.InternalSolver = class {
         yield {
           grid: grid,
           isSolution: false,
-          cellOrder: this._candidateSelector.getCellOrder(cellIndex + 1),
+          cellOrder: this._candidateSelector.getCellOrder(cellDepth + 1),
           values: originalValues,
           hasContradiction: hasContradiction,
         };
@@ -808,8 +806,8 @@ SudokuSolver.InternalSolver = class {
       }
 
       // Recurse to the new cell.
-      recStack[depth++] = cellIndex + 1;
-      isNewCellIndex = true;
+      recStack[recDepth++] = cellDepth + 1;
+      isNewCellDepth = true;
     }
 
     this.done = true;
@@ -906,53 +904,6 @@ SudokuSolver.InternalSolver = class {
     }
   }
 
-}
-
-SudokuSolver.CellAccumulator = class {
-  // NOTE: This is intended to be created once, and reused.
-  constructor(handlerSet) {
-    this._handlers = handlerSet.getAll();
-    this._cellMap = handlerSet.getCellMap();
-
-    this._linkedList = new Int16Array(this._handlers.length);
-    this._linkedList.fill(-2);  // -2 = Not in list.
-    this._head = -1;  // -1 = null pointer.
-  }
-
-  add(cell) {
-    const indexes = this._cellMap[cell];
-    const numHandlers = indexes.length;
-    for (let j = 0; j < numHandlers; j++) {
-      const i = indexes[j];
-      if (this._linkedList[i] < -1) {
-        this._linkedList[i] = this._head;
-        this._head = i;
-      }
-    }
-  }
-
-  clear() {
-    const ll = this._linkedList;
-    let head = this._head;
-    while (head >= 0) {
-      const newHead = ll[head];
-      ll[head] = -2;
-      head = newHead;
-    }
-    this._head = -1;
-  }
-
-  hasConstraints() {
-    return this._head >= 0;
-  }
-
-  popConstraint() {
-    const oldHead = this._head;
-    this._head = this._linkedList[oldHead];
-    this._linkedList[oldHead] = -2;
-
-    return this._handlers[oldHead];
-  }
 }
 
 SudokuSolver.CandidateSelector = class CandidateSelector {
@@ -1106,6 +1057,53 @@ SudokuSolver.CandidateSelector = class CandidateSelector {
     }
 
     return [cellIndex, value, countOnes16bit(cellValues)];
+  }
+}
+
+SudokuSolver.CellAccumulator = class {
+  // NOTE: This is intended to be created once, and reused.
+  constructor(handlerSet) {
+    this._handlers = handlerSet.getAll();
+    this._cellMap = handlerSet.getCellMap();
+
+    this._linkedList = new Int16Array(this._handlers.length);
+    this._linkedList.fill(-2);  // -2 = Not in list.
+    this._head = -1;  // -1 = null pointer.
+  }
+
+  add(cell) {
+    const indexes = this._cellMap[cell];
+    const numHandlers = indexes.length;
+    for (let j = 0; j < numHandlers; j++) {
+      const i = indexes[j];
+      if (this._linkedList[i] < -1) {
+        this._linkedList[i] = this._head;
+        this._head = i;
+      }
+    }
+  }
+
+  clear() {
+    const ll = this._linkedList;
+    let head = this._head;
+    while (head >= 0) {
+      const newHead = ll[head];
+      ll[head] = -2;
+      head = newHead;
+    }
+    this._head = -1;
+  }
+
+  hasConstraints() {
+    return this._head >= 0;
+  }
+
+  popConstraint() {
+    const oldHead = this._head;
+    this._head = this._linkedList[oldHead];
+    this._linkedList[oldHead] = -2;
+
+    return this._handlers[oldHead];
   }
 }
 
