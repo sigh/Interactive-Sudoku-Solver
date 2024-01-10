@@ -931,32 +931,32 @@ SudokuSolver.CandidateSelector = class CandidateSelector {
     return this._cellOrder.subarray(0, upto);
   }
 
-  selectNextCandidate(currentIndex, grid, stepState) {
+  selectNextCandidate(cellDepth, grid, stepState) {
     const cellOrder = this._cellOrder;
-    let [cellIndex, value, count] = this._selectBestCandidate(
-      grid, cellOrder, currentIndex);
+    let [cellOffset, value, count] = this._selectBestCandidate(
+      grid, cellOrder, cellDepth);
 
     // Adjust the value for step-by-step.
     if (stepState) {
       if (stepState.logSteps) {
         this._logSelectNextCandidate(
-          'Best candidate:', cellOrder[cellIndex], value, count);
+          'Best candidate:', cellOrder[cellOffset], value, count);
       }
 
       let adjusted = false;
-      [cellIndex, value, count, adjusted] = this._adjustForStepState(
-        stepState, grid, cellOrder, currentIndex, cellIndex, value);
+      [cellOffset, value, count, adjusted] = this._adjustForStepState(
+        stepState, grid, cellOrder, cellDepth, cellOffset, value);
 
       if (adjusted && stepState.logSteps) {
         this._logSelectNextCandidate(
-          'Adjusted by user:', cellOrder[cellIndex], value, count);
+          'Adjusted by user:', cellOrder[cellOffset], value, count);
       }
     }
-    const cell = cellOrder[cellIndex];
+    const cell = cellOrder[cellOffset];
 
     // Update cellOrder.
-    [cellOrder[cellIndex], cellOrder[currentIndex]] =
-      [cellOrder[currentIndex], cellOrder[cellIndex]];
+    [cellOrder[cellOffset], cellOrder[cellDepth]] =
+      [cellOrder[cellDepth], cellOrder[cellOffset]];
 
     return [cell, value, count];
   }
@@ -974,19 +974,19 @@ SudokuSolver.CandidateSelector = class CandidateSelector {
     });
   }
 
-  _selectBestCandidate(grid, cellOrder, currentIndex) {
+  _selectBestCandidate(grid, cellOrder, cellDepth) {
     // Quick check - if the first value is a singleton, then just return without
     // the extra bookkeeping.
     {
-      const firstValue = grid[cellOrder[currentIndex]];
+      const firstValue = grid[cellOrder[cellDepth]];
       if ((firstValue & (firstValue - 1)) === 0) {
-        return [currentIndex, firstValue, firstValue !== 0 ? 1 : 0];
+        return [cellDepth, firstValue, firstValue !== 0 ? 1 : 0];
       }
     }
 
     // Find the best cell to explore next.
-    const cellIndex = this._selectBestCell(grid, cellOrder, currentIndex);
-    const cell = cellOrder[cellIndex];
+    const cellOffset = this._selectBestCell(grid, cellOrder, cellDepth);
+    const cell = cellOrder[cellOffset];
 
     // Find the next smallest value to try.
     // NOTE: We will always have a value because:
@@ -995,10 +995,10 @@ SudokuSolver.CandidateSelector = class CandidateSelector {
     let values = grid[cell];
     let value = values & -values;
 
-    return [cellIndex, value, countOnes16bit(values)];
+    return [cellOffset, value, countOnes16bit(values)];
   }
 
-  _selectBestCell(grid, cellOrder, currentIndex) {
+  _selectBestCell(grid, cellOrder, cellDepth) {
     // Choose cells based on value count and number of conflicts encountered.
     // NOTE: The constraint handlers are written such that they detect domain
     // wipeouts (0 values), so we should never find them here. Even if they
@@ -1011,9 +1011,9 @@ SudokuSolver.CandidateSelector = class CandidateSelector {
 
     // Find the cell with the minimum score.
     let maxScore = -1;
-    let bestIndex = 0;
+    let bestOffset = 0;
 
-    for (let i = currentIndex; i < numCells; i++) {
+    for (let i = cellDepth; i < numCells; i++) {
       const cell = cellOrder[i];
       const count = countOnes16bit(grid[cell]);
       // If we have a single value then just use it - as it will involve no
@@ -1022,7 +1022,7 @@ SudokuSolver.CandidateSelector = class CandidateSelector {
       // worth it as this only happens at most once per loop. The full count()
       // will have to occur anyway for every other iteration.
       if (count <= 1) {
-        bestIndex = i;
+        bestOffset = i;
         maxScore = -1;
         break;
       }
@@ -1030,7 +1030,7 @@ SudokuSolver.CandidateSelector = class CandidateSelector {
       let score = backtrackTriggers[cell] / count;
 
       if (score > maxScore) {
-        bestIndex = i;
+        bestOffset = i;
         maxScore = score;
       }
     }
@@ -1042,41 +1042,41 @@ SudokuSolver.CandidateSelector = class CandidateSelector {
       //
       // Looping over the cells again is not a concern since this is rare. It is
       // better to take it out of the main loop.
-      bestIndex = this._minCountCellIndex(grid, cellOrder, currentIndex);
+      bestOffset = this._minCountCellIndex(grid, cellOrder, cellDepth);
     }
 
-    return bestIndex;
+    return bestOffset;
   }
 
   // Find the cell index with the minimum score. Return the index into cellOrder.
-  _minCountCellIndex(grid, cellOrder, currentIndex) {
+  _minCountCellIndex(grid, cellOrder, cellDepth) {
     let minCount = 1 << 16;
-    let bestIndex = 0;
-    for (let i = currentIndex; i < grid.length; i++) {
+    let bestOffset = 0;
+    for (let i = cellDepth; i < grid.length; i++) {
       const count = countOnes16bit(grid[cellOrder[i]]);
       if (count < minCount) {
-        bestIndex = i;
+        bestOffset = i;
         minCount = count;
       }
     }
-    return bestIndex;
+    return bestOffset;
   }
 
-  _adjustForStepState(stepState, grid, cellOrder, currentIndex, cellIndex, value) {
+  _adjustForStepState(stepState, grid, cellOrder, cellDepth, cellOffset, value) {
     const step = stepState.step;
     const guide = stepState.stepGuides.get(step) || {};
     let adjusted = false;
 
     // If there is a cell guide, then use that.
     if (guide.cell) {
-      const newCellIndex = cellOrder.indexOf(guide.cell, currentIndex);
+      const newCellIndex = cellOrder.indexOf(guide.cell, cellDepth);
       if (newCellIndex !== -1) {
-        cellIndex = newCellIndex;
+        cellOffset = newCellIndex;
         adjusted = true;
       }
     }
 
-    const cellValues = grid[cellOrder[cellIndex]];
+    const cellValues = grid[cellOrder[cellOffset]];
 
     if (guide.value) {
       // Use the value from the guide.
@@ -1089,7 +1089,7 @@ SudokuSolver.CandidateSelector = class CandidateSelector {
       adjusted = true;
     }
 
-    return [cellIndex, value, countOnes16bit(cellValues), adjusted];
+    return [cellOffset, value, countOnes16bit(cellValues), adjusted];
   }
 }
 
