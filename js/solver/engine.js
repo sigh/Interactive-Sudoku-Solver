@@ -271,7 +271,8 @@ SudokuSolver.InternalSolver = class {
     this._logDebug = debugLogger;
 
     this._initGrid();
-    this._candidateSelector = new SudokuSolver.CandidateSelector(shape);
+    this._candidateSelector = new SudokuSolver.CandidateSelector(
+      shape, debugLogger);
     this._recStack = new Uint16Array(shape.numCells + 1);
     this._progressRemainingStack = Array.from(this._recStack).fill(0.0);
 
@@ -907,9 +908,11 @@ SudokuSolver.InternalSolver = class {
 }
 
 SudokuSolver.CandidateSelector = class CandidateSelector {
-  constructor(shape) {
+  constructor(shape, debugLogger) {
+    this._shape = shape;
     this._cellOrder = new Uint8Array(shape.numCells);
     this._backtrackTriggers = null;
+    this._logDebug = debugLogger;
   }
 
   reset(backtrackTriggers) {
@@ -935,8 +938,19 @@ SudokuSolver.CandidateSelector = class CandidateSelector {
 
     // Adjust the value for step-by-step.
     if (stepState) {
-      [cellIndex, value, count] = this._adjustForStepState(
+      if (stepState.logSteps) {
+        this._logSelectNextCandidate(
+          'Best candidate:', cellOrder[cellIndex], value, count);
+      }
+
+      let adjusted = false;
+      [cellIndex, value, count, adjusted] = this._adjustForStepState(
         stepState, grid, cellOrder, currentIndex, cellIndex, value);
+
+      if (adjusted && stepState.logSteps) {
+        this._logSelectNextCandidate(
+          'Adjusted by user:', cellOrder[cellIndex], value, count);
+      }
     }
     const cell = cellOrder[cellIndex];
 
@@ -945,6 +959,19 @@ SudokuSolver.CandidateSelector = class CandidateSelector {
       [cellOrder[currentIndex], cellOrder[cellIndex]];
 
     return [cell, value, count];
+  }
+
+  _logSelectNextCandidate(msg, cell, value, count) {
+    this._logDebug({
+      loc: 'selectNextCandidate',
+      msg: msg,
+      args: {
+        cell: this._shape.makeCellIdFromIndex(cell),
+        value: LookupTables.toValue(value),
+        numOptions: count,
+      },
+      cells: [cell],
+    });
   }
 
   _selectBestCandidate(grid, cellOrder, currentIndex) {
@@ -1038,11 +1065,15 @@ SudokuSolver.CandidateSelector = class CandidateSelector {
   _adjustForStepState(stepState, grid, cellOrder, currentIndex, cellIndex, value) {
     const step = stepState.step;
     const guide = stepState.stepGuides.get(step) || {};
+    let adjusted = false;
 
     // If there is a cell guide, then use that.
     if (guide.cell) {
       const newCellIndex = cellOrder.indexOf(guide.cell, currentIndex);
-      if (newCellIndex !== -1) cellIndex = newCellIndex;
+      if (newCellIndex !== -1) {
+        cellIndex = newCellIndex;
+        adjusted = true;
+      }
     }
 
     const cellValues = grid[cellOrder[cellIndex]];
@@ -1050,13 +1081,15 @@ SudokuSolver.CandidateSelector = class CandidateSelector {
     if (guide.value) {
       // Use the value from the guide.
       value = LookupTables.fromValue(guide.value);
+      adjusted = true;
     } else if (guide.cell) {
       // Or if we had a guide cell then choose a value which is valid for that
       // cell.
       value = cellValues & -cellValues;
+      adjusted = true;
     }
 
-    return [cellIndex, value, countOnes16bit(cellValues)];
+    return [cellIndex, value, countOnes16bit(cellValues), adjusted];
   }
 }
 
