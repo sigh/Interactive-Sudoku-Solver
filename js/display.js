@@ -286,7 +286,7 @@ class SolutionDisplay extends CellValueDisplay {
     this._currentSolution = [];
 
     this.setSolution = deferUntilAnimationFrame(this.setSolution.bind(this));
-    this._copyElem = document.getElementById('copy-button');
+    this._copyElem = document.getElementById('copy-solution-button');
     this._copyElem.onclick = () => {
       const solutionText = toShortSolution(this._currentSolution, this._shape);
       navigator.clipboard.writeText(solutionText);
