@@ -643,6 +643,11 @@ class ConstraintManager {
 
     // Clear button.
     document.getElementById('clear-constraints-button').onclick = () => this.clear();
+
+    // Copy to clipboard.
+    document.getElementById('copy-constraints-button').onclick = () => {
+      navigator.clipboard.writeText(this.getConstraints());
+    };
   }
 
   _onNewSelection(selection, selectionForm) {

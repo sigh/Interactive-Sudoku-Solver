@@ -178,13 +178,13 @@ layout: null
           <span id="solve-percentage"></span>
         </div>
         <div id="state-buttons">
-          <button id="copy-button" title="Copy solution to clipboard" class="icon-button" disabled>
+          <button id="copy-solution-button" title="Copy solution to clipboard" class="image-button" disabled>
             <img src="img/copy-48.png" alt="Copy">
           </button>
-          <button id="download-button" title="Download solutions" class="icon-button" disabled>
+          <button id="download-solutions-button" title="Download solutions" class="image-button" disabled>
             <img src="img/download-48.png" alt="Download">
           </button>
-          <button id="chart-button" title="Show stats charts" class="icon-button" disabled>
+          <button id="chart-button" title="Show stats charts" class="image-button" disabled>
             <img src="img/chart-48.png" alt="Chart">
           </button>
         </div>
@@ -197,6 +197,9 @@ layout: null
         <h1>Constraints</h1>
 
         <div class="control-panel">
+          <button id="copy-constraints-button" title="Copy constraint to clipboard" class="image-button">
+            <img src="img/copy-48.png" alt="Copy constraint">
+          </button>
           <button id="clear-constraints-button" class="danger-button" title="Clear all constraints">Clear All</button>
           <button id="undo-button" class="icon-button" title="undo" disabled>&#10554;</button>
           <button id="redo-button" class="icon-button" title="redo" disabled
@@ -520,6 +523,7 @@ layout: null
     <a href="https://github.com/sigh/Interactive-Sudoku-Solver">
       https://github.com/sigh/Interactive-Sudoku-Solver</a>.
     Solver runs fastest on Chrome.
+    <a href="javascript:loadDebug()">[Load debug mode]</a>
     <br>
     More projects at <a href="https://sigh.github.io/">sigh.github.io</a>.
   </footer>

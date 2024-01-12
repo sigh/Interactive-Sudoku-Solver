@@ -1118,7 +1118,7 @@ class SolutionController {
       solve: document.getElementById('solve-button'),
       validate: document.getElementById('validate-layout-button'),
       autoSolve: document.getElementById('auto-solve-input'),
-      download: document.getElementById('download-button'),
+      download: document.getElementById('download-solutions-button'),
     }
 
     this._elements.mode.onchange = () => this._update();
