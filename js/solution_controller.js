@@ -86,7 +86,7 @@ class HistoryHandler {
 class DebugManager {
   DEBUG_PARAM_NAME = 'debug';
 
-  constructor(displayContainer, cookieManager) {
+  constructor(displayContainer) {
     this._container = document.getElementById('debug-container');
     this._logOutput = document.getElementById('debug-logs');
     this._enabled = false;
@@ -99,10 +99,10 @@ class DebugManager {
 
     this._debugCellHighlighter = displayContainer.createHighlighter('highlighted-cell');
 
-    this._initializeState(cookieManager);
+    this._initializeState();
   }
 
-  _initializeState(cookieManager) {
+  _initializeState() {
     let debugLoaded = false;
 
     const updateURL = (enable) => {
@@ -124,7 +124,7 @@ class DebugManager {
       debugLoaded = true;
       const loaderPromise = dynamicJSFileLoader('js/debug.js')();
 
-      this._deferredSetup(cookieManager, loaderPromise);
+      this._deferredSetup(loaderPromise);
 
       // Return a promise so that the caller can wait for debug
       // functions to be available.
@@ -151,17 +151,17 @@ class DebugManager {
     }
   }
 
-  _deferredSetup(cookieManager, loaderPromise) {
+  _deferredSetup(loaderPromise) {
     // Things setup only when the debugger is actually loaded.
 
     // Initialize options checkboxes.
     for (const [key, element] of this._checkboxes) {
-      const value = cookieManager.get(key);
+      const value = localStorage.getItem(key);
       if (value !== undefined) {
         element.checked = (value === 'true');
       }
       element.onchange = () => {
-        cookieManager.set(key, element.checked);
+        localStorage.setItem(key, element.checked);
       }
     }
 
@@ -1035,9 +1035,19 @@ ModeHandler.ValidateLayout = class extends ModeHandler {
   }
 }
 
-class CookieManager {
+class DeprecatedCookieManager {
   constructor() {
     this._values = this._initCookieValues();
+
+    if (this._values.has('autoSolve')) {
+      localStorage.setItem('autoSolve', this._values.get('autoSolve'));
+    }
+    const eraseCookie = (name) => {
+      document.cookie = name + '=; Max-Age=-99999999;';
+    };
+    eraseCookie('autoSolve');
+    eraseCookie('enableLogs');
+    eraseCookie('exportBacktrackCounts');
   }
 
   _initCookieValues() {
@@ -1052,16 +1062,6 @@ class CookieManager {
     } catch (e) { /* ignore */ }
 
     return values;
-  }
-
-  get(key) {
-    return this._values.get(key);
-  }
-
-  set(key, value) {
-    this._values.set(key, value);
-    // Note: This updates the cookie without touching the other values.
-    document.cookie = `${key}=${value}`;
   }
 }
 
@@ -1086,8 +1086,10 @@ class SolutionController {
     displayContainer.addElement(
       HighlightDisplay.makeRadialGradient('highlighted-step-gradient'));
 
-    const cookieManager = new CookieManager();
-    this.debugManager = new DebugManager(displayContainer, cookieManager);
+    // Init localstorage from cookies. TODO: Remove after a few days.
+    new DeprecatedCookieManager();
+
+    this.debugManager = new DebugManager(displayContainer);
     constraintManager.addReshapeListener(this.debugManager);
 
     this._update = deferUntilAnimationFrame(this._update.bind(this));
@@ -1124,7 +1126,7 @@ class SolutionController {
     this._elements.solve.onclick = () => this._solve();
     this._elements.validate.onclick = () => this._validateLayout();
 
-    this._setUpAutoSolve(cookieManager);
+    this._setUpAutoSolve();
     this._setUpKeyBindings(displayContainer);
 
     this._stateDisplay = new SolverStateDisplay(this._solutionDisplay);
@@ -1149,13 +1151,13 @@ class SolutionController {
     this._terminateSolver();
   }
 
-  _setUpAutoSolve(cookieManager) {
+  _setUpAutoSolve() {
     this._elements.autoSolve.checked = (
-      cookieManager.get('autoSolve') !== 'false');
+      localStorage.getItem('autoSolve') !== 'false');
 
     this._elements.autoSolve.onchange = () => {
       let isChecked = this._elements.autoSolve.checked ? true : false;
-      cookieManager.set('autoSolve', isChecked);
+      localStorage.setItem('autoSolve', isChecked);
       // If we have enabled auto-solve, then start solving! Unless
       // we are already solving.
       if (isChecked && !this._isSolving) this._update();
