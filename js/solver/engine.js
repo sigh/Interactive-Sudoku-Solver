@@ -282,9 +282,7 @@ SudokuSolver.InternalSolver = class {
 
     this._handlerSet = this._setUpHandlers(Array.from(handlerGen));
 
-    this._cellAccumulator = new SudokuSolver.CellAccumulator(this._handlerSet);
-    this._candidateSelector = new SudokuSolver.CandidateSelector(
-      shape, this._handlerSet, debugLogger);
+    this._handlerAccumulator = new SudokuSolver.HandlerAccumulator(this._handlerSet);
     this._candidateSelector = new SudokuSolver.CandidateSelector(
       shape, this._handlerSet, debugLogger);
 
@@ -397,7 +395,7 @@ SudokuSolver.InternalSolver = class {
     this._stepState = null;
     this.counters = {
       valuesTried: 0,
-      cellsSearched: 0,
+      nodesSearched: 0,
       backtracks: 0,
       guesses: 0,
       solutions: 0,
@@ -493,7 +491,7 @@ SudokuSolver.InternalSolver = class {
     }
   }
 
-  _enforceValue(grid, cell, cellAccumulator) {
+  _enforceValue(grid, cell, handlerAccumulator) {
     let value = grid[cell];
 
     const conflicts = this._cellConflicts[cell];
@@ -506,25 +504,25 @@ SudokuSolver.InternalSolver = class {
       const conflict = conflicts[i];
       if (grid[conflict] & value) {
         if (!(grid[conflict] ^= value)) return false;
-        cellAccumulator.add(conflict);
+        handlerAccumulator.addForCell(conflict);
       }
     }
 
     // Only enforce aux handlers for the current cell.
-    if (!this._enforceAuxHandlers(grid, cell, cellAccumulator, logSteps)) {
+    if (!this._enforceAuxHandlers(grid, cell, handlerAccumulator, logSteps)) {
       return false;
     }
 
-    return this._enforceConstraints(grid, cellAccumulator, logSteps);
+    return this._enforceConstraints(grid, handlerAccumulator, logSteps);
   }
 
   static _debugGridBuffer = new Uint16Array(SHAPE_MAX.numCells);
 
-  _debugEnforceConsistency(loc, grid, handler, cellAccumulator) {
+  _debugEnforceConsistency(loc, grid, handler, handlerAccumulator) {
     const oldGrid = this.constructor._debugGridBuffer;
     oldGrid.set(grid);
 
-    const result = handler.enforceConsistency(grid, cellAccumulator);
+    const result = handler.enforceConsistency(grid, handlerAccumulator);
     const diff = {};
     let hasDiff = false;
     for (let i = 0; i < grid.length; i++) {
@@ -554,7 +552,7 @@ SudokuSolver.InternalSolver = class {
     return result;
   }
 
-  _enforceAuxHandlers(grid, cell, cellAccumulator, logSteps) {
+  _enforceAuxHandlers(grid, cell, handlerAccumulator, logSteps) {
     const counters = this.counters;
 
     const handlers = this._handlerSet.lookupAux(cell);
@@ -563,11 +561,12 @@ SudokuSolver.InternalSolver = class {
       counters.constraintsProcessed++;
       const h = handlers[i];
       if (logSteps) {
-        if (!this._debugEnforceConsistency('_enforceAuxHandlers', grid, h, cellAccumulator)) {
+        if (!this._debugEnforceConsistency(
+          '_enforceAuxHandlers', grid, h, handlerAccumulator)) {
           return false;
         }
       } else {
-        if (!h.enforceConsistency(grid, cellAccumulator)) {
+        if (!h.enforceConsistency(grid, handlerAccumulator)) {
           return false;
         }
       }
@@ -576,19 +575,19 @@ SudokuSolver.InternalSolver = class {
     return true;
   }
 
-  _enforceConstraints(grid, cellAccumulator, logSteps) {
+  _enforceConstraints(grid, handlerAccumulator, logSteps) {
     const counters = this.counters;
 
-    while (cellAccumulator.hasConstraints()) {
+    while (handlerAccumulator.hasConstraints()) {
       counters.constraintsProcessed++;
-      const c = cellAccumulator.popConstraint();
+      const c = handlerAccumulator.popConstraint();
       if (logSteps) {
-        if (!this._debugEnforceConsistency('_enforceConstraints', grid, c, cellAccumulator)) {
+        if (!this._debugEnforceConsistency('_enforceConstraints', grid, c, handlerAccumulator)) {
           return false;
         }
       } else {
-        // TODO: Avoid c being added to cellAccumulator during this time.
-        if (!c.enforceConsistency(grid, cellAccumulator)) {
+        // TODO: Avoid c being added to handlerAccumulator during this time.
+        if (!c.enforceConsistency(grid, handlerAccumulator)) {
           return false;
         }
       }
@@ -640,11 +639,11 @@ SudokuSolver.InternalSolver = class {
 
     {
       // Enforce constraints for all cells.
-      let cellAccumulator = this._cellAccumulator;
-      cellAccumulator.clear();
-      for (let i = 0; i < this._numCells; i++) cellAccumulator.add(i);
+      const handlerAccumulator = this._handlerAccumulator;
+      handlerAccumulator.clear();
+      for (let i = 0; i < this._numCells; i++) handlerAccumulator.addForCell(i);
       const logSteps = this._stepState !== null && this._stepState.logSteps;
-      this._enforceConstraints(this._grids[0], cellAccumulator, logSteps);
+      this._enforceConstraints(this._grids[0], handlerAccumulator, logSteps);
     }
 
     if (yieldEveryStep) {
@@ -701,7 +700,7 @@ SudokuSolver.InternalSolver = class {
         this._progressRemainingStack[recDepth] = progressDelta;
 
         // Update counters.
-        counters.cellsSearched++;
+        counters.nodesSearched++;
       }
 
       const [cell, value, count] = this._candidateSelector.selectNextCandidate(
@@ -747,14 +746,14 @@ SudokuSolver.InternalSolver = class {
       //       selection methods.
       grid[cell] = value;
 
-      let cellAccumulator = this._cellAccumulator;
-      cellAccumulator.clear();
-      cellAccumulator.add(cell);
+      const handlerAccumulator = this._handlerAccumulator;
+      handlerAccumulator.clear();
+      handlerAccumulator.addForCell(cell);
       // Queue up extra constraints based on prior backtracks. The idea being
       // that constraints that apply this the contradiction cell are likely
       // to turn up a contradiction here if it exists.
       if (lastContradictionCell[cellDepth] >= 0) {
-        cellAccumulator.add(lastContradictionCell[cellDepth]);
+        handlerAccumulator.addForCell(lastContradictionCell[cellDepth]);
         // If this is the last value at this level, clear the
         // lastContradictionCell as the next time we reach this level won't be
         // from the same subtree that caused the contradiction.
@@ -762,7 +761,7 @@ SudokuSolver.InternalSolver = class {
       }
 
       // Propagate constraints.
-      let hasContradiction = !this._enforceValue(grid, cell, cellAccumulator);
+      let hasContradiction = !this._enforceValue(grid, cell, handlerAccumulator);
       if (hasContradiction) {
         // Store the current cells, so that the level immediately above us
         // can act on this information to run extra constraints.
@@ -918,15 +917,15 @@ SudokuSolver.CandidateSelector = class CandidateSelector {
     this._backtrackTriggers = null;
     this._logDebug = debugLogger;
 
-    this._houseHandlers = handlerSet.getAllofType(SudokuConstraintHandler.House);
-
     this._candidateSelectionState = [];
     for (let i = 0; i < shape.numCells; i++) {
       this._candidateSelectionState.push(null);
     }
 
-    const houseHandlerSet = new HandlerSet(this._houseHandlers, shape);
-    this._cellAccumulator = new SudokuSolver.CellAccumulator(houseHandlerSet);
+    const houseHandlerSet = new HandlerSet(
+      handlerSet.getAllofType(SudokuConstraintHandler.House), shape);
+    this._houseHandlerAccumulator = new SudokuSolver.HandlerAccumulator(
+      houseHandlerSet);
   }
 
   reset(backtrackTriggers) {
@@ -1146,12 +1145,12 @@ SudokuSolver.CandidateSelector = class CandidateSelector {
     // Add all handlers with cells which can potentially beat the current score.
     const minBt = Math.ceil(score * 2) | 0;
     const backtrackTriggers = this._backtrackTriggers;
-    const cellAccumulator = this._cellAccumulator;
+    const handlerAccumulator = this._houseHandlerAccumulator;
     for (let i = 0; i < numCells; i++) {
       if (backtrackTriggers[i] >= minBt) {
         const v = grid[i];
         if (v & (v - 1)) {
-          cellAccumulator.add(i);
+          handlerAccumulator.addForCell(i);
         }
       }
     }
@@ -1163,8 +1162,8 @@ SudokuSolver.CandidateSelector = class CandidateSelector {
       cell0: 0,
       cell1: 0,
     };
-    while (cellAccumulator.hasConstraints()) {
-      const handler = cellAccumulator.popConstraint();
+    while (handlerAccumulator.hasConstraints()) {
+      const handler = handlerAccumulator.popConstraint();
       const cells = handler.cells;
       const numCells = cells.length;
 
@@ -1223,7 +1222,7 @@ SudokuSolver.CandidateSelector = class CandidateSelector {
   }
 }
 
-SudokuSolver.CellAccumulator = class {
+SudokuSolver.HandlerAccumulator = class {
   // NOTE: This is intended to be created once, and reused.
   constructor(handlerSet) {
     this._handlers = handlerSet.getAll();
@@ -1234,7 +1233,7 @@ SudokuSolver.CellAccumulator = class {
     this._head = -1;  // -1 = null pointer.
   }
 
-  add(cell) {
+  addForCell(cell) {
     const indexes = this._cellMap[cell];
     const numHandlers = indexes.length;
     for (let j = 0; j < numHandlers; j++) {

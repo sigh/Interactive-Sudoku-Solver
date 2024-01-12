@@ -708,7 +708,7 @@ class SolverStateDisplay {
       'solutions',
       'guesses',
       'backtracks',
-      'cellsSearched',
+      'nodesSearched',
       'valuesTried',
       'constraintsProcessed',
       'searchSpaceExplored',
