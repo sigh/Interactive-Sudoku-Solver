@@ -539,6 +539,7 @@ class StateHistoryDisplay {
       responsive: true,
       maintainAspectRatio: false,
       pointRadius: 0,
+      animation: false,
       parsing: {
         xAxisKey: 'timeMs',
       },
