@@ -96,15 +96,64 @@ body {
 #instruction-panel {
   display: flex;
   flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 15px;
+}
+
+#instruction-panel>div {
+  max-width: 400px;
+  display: flex;
+}
+
+#example-select {
+  margin-top: 0px;
+  width: 200px;
+}
+
+#example-select-container {
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 20px;
 }
 
 #instruction-panel span.description {
   font-size: 14px;
   font-weight: bold;
-  margin-right: 20px;
+  margin-right: 15px;
+  margin-top: 0.5em;
 }
+
+#freeform-constraint-input {
+  display: inline-block;
+  margin-top: 0px;
+}
+
+#freeform-constraint-text-container {
+  position: relative;
+}
+
+#freeform-constraint-text-container button {
+  position: absolute;
+  font-size: 14px;
+  margin: 5px;
+  bottom: 0;
+  right: 0;
+}
+
+#freeform-constraint-text {
+  width: 300px;
+  font-size: 12px;
+  margin: 0;
+  padding: 2px 0px 35px 2px;
+}
+
+#freeform-constraint-input-error {
+  color: rgb(200, 0, 0);
+  font-size: small;
+  max-width: fit-content;
+  position: absolute;
+}
+
 
 #sudoku-container {
   display: flex;
@@ -360,33 +409,6 @@ button.icon-button {
   text-align: left;
   overflow: scroll;
   white-space: nowrap;
-}
-
-#freeform-constraint-input {
-  margin-top: 10px;
-}
-
-#freeform-constraint-text-container {
-  position: relative;
-}
-
-#freeform-constraint-text-container button {
-  position: absolute;
-  margin: 5px;
-  bottom: 0;
-  right: 0;
-}
-
-#freeform-constraint-text {
-  margin: 0;
-  width: 100%;
-  padding: 2px 0px 40px 2px;
-}
-
-#freeform-constraint-input-error {
-  color: rgb(200, 0, 0);
-  font-size: small;
-  max-width: fit-content;
 }
 
 #fake-input {

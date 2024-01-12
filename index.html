@@ -40,52 +40,70 @@ layout: null
   <h1>Interactive Sudoku Solver</h1>
 
   <div id="instruction-panel">
-    <div class="description">
-      <p>
-        To set a value, select a cell and type a number.
-      </p>
-      <p>
-        To add a multi-cell constraint, select and drag; or shift-click.
-      </p>
-      <p>
-        To add a Little Killer
-        <span class="tooltip" data-text="Values along diagonal must add to the given sum. Values may repeat.">
-        </span>
-        constraint, select a diagonal arrow outside the grid.
-      </p>
-      <p>
-        To add a
-        Sandwich
-        <span class="tooltip"
-          data-text="Values between the 1 and the 9 in the row or column must add to the given sum.">
-        </span>,
-        X-Sum
-        <span class="tooltip" data-text="
+    <div>
+      <div class="description">
+        <p>
+          To set a value, select a cell and type a number.
+        </p>
+        <p>
+          To add a multi-cell constraint, select and drag; or shift-click.
+        </p>
+        <p>
+          To add a Little Killer
+          <span class="tooltip" data-text="Values along diagonal must add to the given sum. Values may repeat.">
+          </span>
+          constraint, select a diagonal arrow outside the grid.
+        </p>
+        <p>
+          To add a
+          Sandwich
+          <span class="tooltip"
+            data-text="Values between the 1 and the 9 in the row or column must add to the given sum.">
+          </span>,
+          X-Sum
+          <span class="tooltip" data-text="
             The sum of the first X numbers must add up to the given sum.
             X is the number in the first cell in the direction of the row
             or column.
           "></span>,
-        or Skyscraper
-        <span class="tooltip" data-text="
+          or Skyscraper
+          <span class="tooltip" data-text="
             Digits in the grid represent skyscrapers of that height.
             Higher skyscrapers obscure smaller ones.
             Clues outside the grid show the number of visible skyscrapers in that row/column from the clue's direction of view.
           "></span>
-        constraint, select a row/column arrow outside the grid.
-      </p>
+          constraint, select a row/column arrow outside the grid.
+        </p>
+      </div>
     </div>
 
 
     <div>
       <span class="description">OR</span>
 
-      <select id="example-select">
-        <option>-- Load an example --</option>
-      </select>
-      <a>(Source)</a>
+      <span id="example-select-container">
+        <select id="example-select">
+          <option>-- Load an example --</option>
+        </select>
+        <a style="display:none">(Source)</a>
+      </span>
+    </div>
+
+    <div>
+      <span class="description">OR</span>
+
+      <form id="freeform-constraint-input">
+        <span id="freeform-constraint-text-container">
+          <textarea id="freeform-constraint-text" name="freeform-input" rows="3"></textarea>
+          <button type="submit" title="Load from text">Load from text</button>
+        </span>
+        <div id="freeform-constraint-input-error"></div>
+      </form>
     </div>
 
   </div>
+
+  <hr>
 
   <div id="debug-container" class="hidden">
     <div id="debug-logs"></div>
@@ -494,16 +512,6 @@ layout: null
       </div>
 
       <div id="displayed-constraints"></div>
-
-      <hr>
-
-      <form id="freeform-constraint-input">
-        <div id="freeform-constraint-text-container">
-          <textarea id="freeform-constraint-text" name="freeform-input" rows="4"></textarea>
-          <button type="submit" title="Load from text">Load from text</button>
-        </div>
-        <div id="freeform-constraint-input-error"></div>
-      </form>
     </div>
   </div>
 
