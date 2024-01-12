@@ -544,6 +544,7 @@ class StateHistoryDisplay {
         xAxisKey: 'timeMs',
       },
       interaction: {
+        mode: 'index',
         intersect: false,
       },
       elements: {
@@ -574,7 +575,10 @@ class StateHistoryDisplay {
       plugins: {
         legend: {
           display: false,
-        }
+        },
+        tooltip: {
+          mode: 'index',
+        },
       }
     };
     const data = {
