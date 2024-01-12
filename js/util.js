@@ -254,6 +254,23 @@ const shuffleArray = (arr, randomGenerator) => {
   }
 };
 
+const autoSaveField = (element) => {
+  if (!element.id) {
+    console.error('Auto-save field must have an ID.');
+    return;
+  }
+
+  const key = `autoSave-${element.id}`;
+  const savedValue = sessionStorage.getItem(key);
+  if (savedValue !== undefined) {
+    element.value = savedValue;
+  }
+
+  element.addEventListener('change', () => {
+    sessionStorage.setItem(key, element.value);
+  });
+};
+
 // Random number generator which allows seeding.
 class RandomIntGenerator {
   constructor(seed) {

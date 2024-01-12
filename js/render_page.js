@@ -639,6 +639,7 @@ class ConstraintManager {
     freeInputForm['freeform-input'].oninput = () => {
       freeInputError.textContent = '';
     };
+    autoSaveField(freeInputForm['freeform-input']);
 
     // Clear button.
     document.getElementById('clear-constraints-button').onclick = () => this.clear();
