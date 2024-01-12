@@ -12,7 +12,7 @@ class SudokuConstraintHandler {
     this.idStr = this.constructor.name + '-' + id.toString();
   }
 
-  enforceConsistency(grid, cellAccumulator) {
+  enforceConsistency(grid, handlerAccumulator) {
     return true;
   }
 
@@ -63,7 +63,7 @@ SudokuConstraintHandler.False = class False extends SudokuConstraintHandler {
   initialize(initialGrid, cellConflicts, shape) {
     return false;
   }
-  enforceConsistency(grid, cellAccumulator) { return false; }
+  enforceConsistency(grid, handlerAccumulator) { return false; }
 }
 
 SudokuConstraintHandler.GivenCandidates = class GivenCandidates extends SudokuConstraintHandler {
@@ -187,7 +187,7 @@ SudokuConstraintHandler.House = class House extends SudokuConstraintHandler {
     return true;
   }
 
-  enforceConsistency(grid, cellAccumulator) {
+  enforceConsistency(grid, handlerAccumulator) {
     const cells = this.cells;
     const numCells = cells.length;
 
@@ -244,7 +244,7 @@ SudokuConstraintHandler.BinaryConstraint = class BinaryConstraint extends Sudoku
     return this._tables[0][lookupTables.allValues] !== 0;
   }
 
-  enforceConsistency(grid, cellAccumulator) {
+  enforceConsistency(grid, handlerAccumulator) {
     const v0 = grid[this.cells[0]];
     const v1 = grid[this.cells[1]];
 
@@ -252,8 +252,8 @@ SudokuConstraintHandler.BinaryConstraint = class BinaryConstraint extends Sudoku
     const v1New = grid[this.cells[1]] = v1 & this._tables[0][v0];
 
     if (!(v0New && v1New)) return false;
-    if (v0 != v0New) cellAccumulator.add(this.cells[0]);
-    if (v1 != v1New) cellAccumulator.add(this.cells[1]);
+    if (v0 != v0New) handlerAccumulator.addForCell(this.cells[0]);
+    if (v1 != v1New) handlerAccumulator.addForCell(this.cells[1]);
     return true;
   }
 }
@@ -274,7 +274,7 @@ SudokuConstraintHandler.AllContiguous = class AllContiguous extends SudokuConstr
     return this.cells;
   }
 
-  enforceConsistency(grid, cellAccumulator) {
+  enforceConsistency(grid, handlerAccumulator) {
     const cells = this.cells;
     const numCells = cells.length;
 
@@ -306,7 +306,7 @@ SudokuConstraintHandler.AllContiguous = class AllContiguous extends SudokuConstr
       // If there are values outside the mask, remove them.
       for (let i = 0; i < numCells; i++) {
         if (!(grid[cells[i]] &= possibleValues)) return false;
-        cellAccumulator.add(cells[i]);
+        handlerAccumulator.addForCell(cells[i]);
       }
     }
 
@@ -939,7 +939,7 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
     return true;
   }
 
-  enforceConsistency(grid, cellAccumulator) {
+  enforceConsistency(grid, handlerAccumulator) {
     const cells = this.cells;
     const numCells = cells.length;
     const sum = this._sum | 0;
@@ -1056,11 +1056,11 @@ SudokuConstraintHandler.SumWithNegative = class SumWithNegative extends SudokuCo
 
   setComplementCells() { }
 
-  enforceConsistency(grid, cellAccumulator) {
+  enforceConsistency(grid, handlerAccumulator) {
     const reverse = this._lookupTables.reverse;
     grid[this._negativeCell] = reverse[grid[this._negativeCell]];
 
-    const result = super.enforceConsistency(grid, cellAccumulator);
+    const result = super.enforceConsistency(grid, handlerAccumulator);
 
     // Reverse the value back even if we fail to make the output and debugging
     // easier.
@@ -1100,7 +1100,7 @@ SudokuConstraintHandler.Skyscraper = class Skyscraper extends SudokuConstraintHa
     return true;
   }
 
-  enforceConsistency(grid, cellAccumulator) {
+  enforceConsistency(grid, handlerAccumulator) {
     const cells = this.cells;
     const maxHeight = this._maxHeight;
     const target = this._numVisible;
@@ -1291,7 +1291,7 @@ SudokuConstraintHandler.Sandwich = class Sandwich extends SudokuConstraintHandle
   static _validSettings = new Uint16Array(SHAPE_MAX.gridSize);
   static _cellValues = new Uint16Array(SHAPE_MAX.gridSize);
 
-  enforceConsistency(grid, cellAccumulator) {
+  enforceConsistency(grid, handlerAccumulator) {
     const cells = this.cells;
     const borderMask = this._borderMask | 0;
     const numCells = this.cells.length;
@@ -1426,7 +1426,7 @@ SudokuConstraintHandler.SameValues = class SameValues extends SudokuConstraintHa
     this.idStr = [this.constructor.name, cells0, cells1].join('-');
   }
 
-  enforceConsistency(grid, cellAccumulator) {
+  enforceConsistency(grid, handlerAccumulator) {
     const cells0 = this._cells0;
     const cells1 = this._cells1;
     const numCells = cells0.length;
@@ -1513,7 +1513,7 @@ SudokuConstraintHandler.RegionSumLine = class RegionSumLine extends SudokuConstr
     return true;
   }
 
-  _enforceSingles(grid, cellAccumulator) {
+  _enforceSingles(grid, handlerAccumulator) {
     const numSingles = this._singles.length;
 
     // Single values must all be the same, so only take values which
@@ -1534,7 +1534,7 @@ SudokuConstraintHandler.RegionSumLine = class RegionSumLine extends SudokuConstr
     return true;
   }
 
-  _enforceMulti(grid, cellAccumulator) {
+  _enforceMulti(grid, handlerAccumulator) {
 
     const minMaxTable = this._minMaxTable;
     const minMaxs = this._minMaxCache;
@@ -1579,17 +1579,17 @@ SudokuConstraintHandler.RegionSumLine = class RegionSumLine extends SudokuConstr
     return true;
   }
 
-  enforceConsistency(grid, cellAccumulator) {
+  enforceConsistency(grid, handlerAccumulator) {
     if (this._singles.length > 1) {
-      if (!this._enforceSingles(grid, cellAccumulator)) return false;
+      if (!this._enforceSingles(grid, handlerAccumulator)) return false;
     }
     if (this._arrows.length > 0) {
       for (const arrow of this._arrows) {
-        if (!arrow.enforceConsistency(grid, cellAccumulator)) return false;
+        if (!arrow.enforceConsistency(grid, handlerAccumulator)) return false;
       }
     }
     if (this._multi.length > 0) {
-      if (!this._enforceMulti(grid, cellAccumulator)) return false;
+      if (!this._enforceMulti(grid, handlerAccumulator)) return false;
     }
 
     return true;
@@ -1621,9 +1621,9 @@ SudokuConstraintHandler.Between = class Between extends SudokuConstraintHandler 
     return this._mids.length ? this._ends : [];
   }
 
-  enforceConsistency(grid, cellAccumulator) {
+  enforceConsistency(grid, handlerAccumulator) {
     // Constrain the ends to be consistent with each other.
-    if (!this._binaryConstraint.enforceConsistency(grid, cellAccumulator)) {
+    if (!this._binaryConstraint.enforceConsistency(grid, handlerAccumulator)) {
       return false;
     }
 
@@ -1711,7 +1711,7 @@ SudokuConstraintHandler.XSum = class XSum extends SudokuConstraintHandler {
     return grid[controlCell] !== 0;
   }
 
-  enforceConsistency(grid, cellAccumulator) {
+  enforceConsistency(grid, handlerAccumulator) {
     if (!this._restrictControlCell(grid)) return false;
 
     const sumHandler = this._internalSumHandler;
@@ -1724,7 +1724,7 @@ SudokuConstraintHandler.XSum = class XSum extends SudokuConstraintHandler {
       // There is a single value, so we can just enforce the sum directly.
       const index = LookupTables.toValue(values) - 1;
       sumHandler.cells = this._cellArrays[index];
-      return sumHandler.enforceConsistency(grid, cellAccumulator);
+      return sumHandler.enforceConsistency(grid, handlerAccumulator);
     }
 
     // For each possible value of the control cell, enforce the sum.
@@ -1745,7 +1745,7 @@ SudokuConstraintHandler.XSum = class XSum extends SudokuConstraintHandler {
       // NOTE: This can be optimized to use a smaller (cell.length size) grid.
       scratchGrid.set(grid);
       scratchGrid[controlCell] = value;
-      if (sumHandler.enforceConsistency(scratchGrid, cellAccumulator)) {
+      if (sumHandler.enforceConsistency(scratchGrid, handlerAccumulator)) {
         // This is a valid setting so add it to the possible candidates.
         for (let j = 0; j < minControl; j++) {
           resultGrid[cells[j]] |= scratchGrid[cells[j]];
@@ -1775,7 +1775,7 @@ SudokuConstraintHandler.LocalEntropy = class LocalEntropy extends SudokuConstrai
     return true;
   }
 
-  enforceConsistency(grid, cellAccumulator) {
+  enforceConsistency(grid, handlerAccumulator) {
     const cells = this.cells;
     const numCells = this.cells.length;
     const squishedMask = this._squishedMask;
@@ -1812,7 +1812,7 @@ SudokuConstraintHandler.LocalEntropy = class LocalEntropy extends SudokuConstrai
           const unsquishedValue = value | (value << 1) | (value << 2);
           const cell = cells[i];
           grid[cell] &= unsquishedValue;
-          cellAccumulator.add(cell);
+          handlerAccumulator.addForCell(cell);
         }
       }
     }
@@ -1857,7 +1857,7 @@ SudokuConstraintHandler.Quadruple = class Quadruple extends SudokuConstraintHand
     }
   }
 
-  _enforceRepeatedValues(grid, cellAccumulator) {
+  _enforceRepeatedValues(grid, handlerAccumulator) {
     const repeatedValues = this._repeatedValues;
     const d1And = grid[this.cells[0]] & grid[this.cells[1]];
     const d2And = grid[this.cells[2]] & grid[this.cells[3]];
@@ -1897,7 +1897,7 @@ SudokuConstraintHandler.Quadruple = class Quadruple extends SudokuConstraintHand
     }
   }
 
-  enforceConsistency(grid, cellAccumulator) {
+  enforceConsistency(grid, handlerAccumulator) {
     const cells = this.cells;
     const numCells = cells.length;
     const valuesMask = this._valueMask;
@@ -1907,7 +1907,7 @@ SudokuConstraintHandler.Quadruple = class Quadruple extends SudokuConstraintHand
       // NOTE: This must happen before the valueMask & ~fixedValues
       // check as that can return true even if all repeated values aren't
       // satisfied.
-      this._enforceRepeatedValues(grid, cellAccumulator);
+      this._enforceRepeatedValues(grid, handlerAccumulator);
     }
 
     let allValues = 0;
