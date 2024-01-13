@@ -1290,6 +1290,14 @@ class LookupTables {
     return 32 - Math.clz32(v);
   };
 
+  static maxValue(v) {
+    return 32 - Math.clz32(v);
+  };
+
+  static minValue(v) {
+    return 32 - Math.clz32(v & -v);
+  };
+
   static toValuesArray(values) {
     let result = [];
     while (values) {
@@ -1322,6 +1330,9 @@ class LookupTables {
     //
     // The extra bits allow these values to be summed to determine the total
     // of mins and maxs.
+    //
+    // NOTE: This is faster than calling LookupTables.minValue and
+    // LookupTables.maxValue separately, but only if both are required.
     this.minMax8Bit = (() => {
       // Initialize the table with MAXs.
       const table = new Uint16Array(combinations);
