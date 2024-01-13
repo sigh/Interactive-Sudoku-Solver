@@ -207,7 +207,7 @@ const runSolveTests = async (onFailure) => {
     'Hailstone (easier) - little killer',
     'X-Sum little killer',
     'Skyscraper',
-    'Homogeneous skyscraper',
+    'Skyscraper - all 6',
     'Global entropy',
     'Odd even',
     'Quadruple X',
