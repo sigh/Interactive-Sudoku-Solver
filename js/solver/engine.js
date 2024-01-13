@@ -415,11 +415,12 @@ SudokuSolver.InternalSolver = class {
     // _backtrackTriggers are initialized to the cell priorities so that
     // so that the initial part of the search is still able to prioritize cells
     // which may lead to a contradiction.
+    // NOTE: _backtrackTriggers must not be reassigned as we pass the reference
+    // to the candidateSelector.
     this._backtrackTriggers = this._cellPriorities.slice();
     this._uninterestingValues = null;
 
     this._resetStack();
-    this._candidateSelector.reset(this._backtrackTriggers);
   }
 
   getBacktrackTriggers() {
@@ -427,7 +428,11 @@ SudokuSolver.InternalSolver = class {
   }
 
   _resetStack() {
-    // If we are at the start anyway, then there is nothing to do.
+    // Candidate selector must be reset each time, because backtrackTriggers
+    // object may have changed.
+    this._candidateSelector.reset(this._backtrackTriggers);
+
+    // If we are at the start anyway, then there is nothing else to do.
     if (this._atStart) return;
 
     this._runCounter++;
