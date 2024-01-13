@@ -1188,7 +1188,8 @@ class SolutionController {
     const FIRE_FAST = 2;
 
     document.addEventListener('keydown', event => {
-      if (document.activeElement.tagName == 'TEXTAREA') return;
+      if (document.activeElement.tagName === 'TEXTAREA' ||
+        document.activeElement.tagName === 'INPUT') return;
       let key = event.key;
       let handler = keyHandlers[key];
       if (!handler) return;
