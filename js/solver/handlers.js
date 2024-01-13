@@ -1117,11 +1117,12 @@ SudokuConstraintHandler.Skyscraper = class Skyscraper extends SudokuConstraintHa
 
       const minMax = this._lookupTables.minMax8Bit[values];
       const min = minMax >> 8;
-      const max = minMax & 0xff;
+      let max = minMax & 0xff;
 
       if (max == maxHeight) {
         // For the rest of the processing, we want to ignore the maxValue.
-        values &= ~LookupTables.fromValue(maxHeight);
+        values ^= LookupTables.fromValue(maxHeight);
+        max = LookupTables.maxValue(values);
         // If the target visibility is not feasible here then the max height
         // must not be in this cell.
         if (maxVisible < target || minVisible > target) {
@@ -1158,7 +1159,7 @@ SudokuConstraintHandler.Skyscraper = class Skyscraper extends SudokuConstraintHa
       // than the previous max.
       if (max > currentHeightForMin) currentHeightForMin = max;
 
-      // If there is any larger values and currentHeightForMax then we can use
+      // If there is any larger values than currentHeightForMax then we can use
       // this cell to increase visibility.
       if (max > currentHeightForMax) {
         maxVisible++;
@@ -1167,8 +1168,9 @@ SudokuConstraintHandler.Skyscraper = class Skyscraper extends SudokuConstraintHa
           currentHeightForMax = min;
         } else {
           // If min is not larger, then we may have been able to reorder to use
-          // a previous cell to get a lower height.
-          // Thus the best we can do is to just increment the currentHeightForMax.
+          // a previous or future cell to get a lower height.
+          // Hence we must be conservative and increment the currentHeightForMax
+          // to only the next value.
           currentHeightForMax++;
         }
       }
@@ -1178,6 +1180,10 @@ SudokuConstraintHandler.Skyscraper = class Skyscraper extends SudokuConstraintHa
       // enough room.
       // NOTE: This covers the naive initialization of the constraint where
       // high values are removed from the first cells.
+      // NOTE: This can be moved before the maxVisible (and minVisible) checks
+      //       if shortfall is adjusted to `shortfall = target - maxVisible - 1`
+      //       to account fo the fact that maxVisible might be incremented.
+      //       Currently this makes things worse.
       const shortfall = target - maxVisible;
       if (shortfall > 0) {
         const minForbidden = maxHeight - shortfall;
