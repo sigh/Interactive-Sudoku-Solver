@@ -109,8 +109,8 @@ SudokuConstraintHandler._CommonHandlerUtil = class _CommonHandlerUtil {
       const cell = cells[i];
       const value = grid[cell] & hiddenSingles;
       if (value) {
-        // If we have more value that means a single cell holds more than
-        // one hidden single.
+        // If there there is more than one value, then this cell has
+        // has multiple hidden singles, which is a contradiction.
         if (value & (value - 1)) return false;
         grid[cell] = value;
       }
@@ -1808,8 +1808,8 @@ SudokuConstraintHandler.LocalEntropy = class LocalEntropy extends SudokuConstrai
       for (let i = 0; i < numCells; i++) {
         const value = valuesBuffer[i] & hiddenSquishedSingles;
         if (value) {
-          // If we have more value that means a single cell holds more than
-          // one unique value.
+          // If there there is more than one value, then this cell has
+          // has multiple hidden singles, which is a contradiction.
           if (value & (value - 1)) return false;
           // Unsquish the value.
           const unsquishedValue = value | (value << 1) | (value << 2);
