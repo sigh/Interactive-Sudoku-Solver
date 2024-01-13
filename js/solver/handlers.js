@@ -1184,9 +1184,11 @@ SudokuConstraintHandler.Skyscraper = class Skyscraper extends SudokuConstraintHa
       // NOTE: This covers the naive initialization of the constraint where
       // high values are removed from the first cells.
       const shortfall = target - maxVisible;
-      const minForbidden = maxHeight - shortfall;
-      if (minForbidden < maxHeight) {
-        const mask = (LookupTables.fromValue(minForbidden) - 1) | LookupTables.fromValue(maxHeight);
+      if (shortfall > 0) {
+        const minForbidden = maxHeight - shortfall;
+        // NOTE: This cell can't be max-height as we have not yet reached the
+        // target.
+        const mask = LookupTables.fromValue(minForbidden) - 1;
         if (!(grid[cells[i]] &= mask)) {
           return false;
         }
