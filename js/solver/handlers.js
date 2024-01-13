@@ -1082,8 +1082,6 @@ SudokuConstraintHandler.Skyscraper = class Skyscraper extends SudokuConstraintHa
 
   initialize(initialGrid, cellConflicts, shape) {
     const cells = this.cells;
-    const numVisible = this._numVisible;
-    const maxValue = shape.numValues
     const lookupTables = LookupTables.get(shape.numValues);
     this._lookupTables = lookupTables;
     this._maxHeight = shape.numValues;
@@ -1114,7 +1112,7 @@ SudokuConstraintHandler.Skyscraper = class Skyscraper extends SudokuConstraintHa
     // the max-height cell.
     let maxVisible = 1;
     let minVisible = 1;
-    let usedValuesForMax = 0;
+    let allValues = 0;
     for (let i = 0; i < cells.length; i++) {
       let values = grid[cells[i]];
 
@@ -1141,10 +1139,11 @@ SudokuConstraintHandler.Skyscraper = class Skyscraper extends SudokuConstraintHa
           break;
         }
       }
+      allValues |= values;
 
       // If we are already at the target for minVisible and we don't already
-      // already have a valid max-height, we can't increase it anymore.
-      if (numMaxHeight === 0 && minVisible == target) {
+      // have a valid max-height, we can't increase it anymore.
+      if (numMaxHeight === 0 && minVisible === target) {
         const mask = LookupTables.fromValue(currentHeightForMin) - 1;
         if (!(grid[cells[i]] &= mask)) {
           return false;
@@ -1169,13 +1168,14 @@ SudokuConstraintHandler.Skyscraper = class Skyscraper extends SudokuConstraintHa
           // If the min is larger, then that's easy as we are forced to use it.
           currentHeightForMax = min;
         } else {
-          // If min is not larger, then we must only increment the current max
-          // by 1. Even though this may not be a valid value for this cell, it
-          // may be possible to this value could have been used by a lower cell
-          // to set a more conservative height for the same visibility.
-          currentHeightForMax++;
+          // If min is not larger, then we may have been able to reorder to use
+          // a previous cell to get a lower height.
+          // Thus we find the minimum value of all cells up to now which is
+          // greater than the currentHeightForMax.
+          const currentHeightForMaxMask = LookupTables.fromValue(currentHeightForMax + 1) - 1;
+          const availableValues = allValues & ~currentHeightForMaxMask;
+          currentHeightForMax = this._lookupTables.minMax8Bit[availableValues] >> 8;
         }
-        usedValuesForMax |= LookupTables.fromValue(currentHeightForMax);
       }
 
       // We need enough numbers to increment visibility up to the target.
