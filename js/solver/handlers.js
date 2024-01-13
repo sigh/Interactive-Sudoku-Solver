@@ -1174,7 +1174,7 @@ SudokuConstraintHandler.Skyscraper = class Skyscraper extends SudokuConstraintHa
           // greater than the currentHeightForMax.
           const currentHeightForMaxMask = LookupTables.fromValue(currentHeightForMax + 1) - 1;
           const availableValues = allValues & ~currentHeightForMaxMask;
-          currentHeightForMax = this._lookupTables.minMax8Bit[availableValues] >> 8;
+          currentHeightForMax = LookupTables.minValue(availableValues);
         }
       }
 
@@ -1219,7 +1219,7 @@ SudokuConstraintHandler.Sandwich = class Sandwich extends SudokuConstraintHandle
     this._gridSize = shape.gridSize;
     this._borderMask = SudokuConstraintHandler.Sandwich._borderMask(shape);
     this._valueMask = ~this._borderMask & lookupTables.allValues;
-    this._minMaxTable = lookupTables.minMax8Bit;
+    this._minMax8Bit = lookupTables.minMax8Bit;
 
     this._distances = SudokuConstraintHandler.Sandwich._distanceRange(shape)[sum];
     this._combinations = SudokuConstraintHandler.Sandwich._combinations(shape)[sum];
@@ -1316,7 +1316,7 @@ SudokuConstraintHandler.Sandwich = class Sandwich extends SudokuConstraintHandle
       while (!(values[i] & borderMask)) {
         // NOTE: 8 bits is fine here because we can have at most (numValues-2) cells.
         // For 16x16, 16*14 = 224 < 8 bits.
-        minMaxSum += this._minMaxTable[values[i]];
+        minMaxSum += this._minMax8Bit[values[i]];
         i++;
       }
 
@@ -1489,7 +1489,7 @@ SudokuConstraintHandler.RegionSumLine = class RegionSumLine extends SudokuConstr
 
     this._util = SudokuConstraintHandler._SumHandlerUtil.get(shape.numValues);
     const lookupTables = LookupTables.get(shape.numValues);
-    this._minMaxTable = lookupTables.minMax8Bit;
+    this._minMax8Bit = lookupTables.minMax8Bit;
 
     // Separate the single- and multi-cell sections.
     this._singles = cellSets.filter(s => s.length == 1).map(s => s[0]);
@@ -1536,7 +1536,7 @@ SudokuConstraintHandler.RegionSumLine = class RegionSumLine extends SudokuConstr
 
   _enforceMulti(grid, handlerAccumulator) {
 
-    const minMaxTable = this._minMaxTable;
+    const minMaxTable = this._minMax8Bit;
     const minMaxs = this._minMaxCache;
 
     // Determine the range of possible sums.
@@ -1604,7 +1604,7 @@ SudokuConstraintHandler.Between = class Between extends SudokuConstraintHandler 
   }
 
   initialize(initialGrid, cellConflicts, shape) {
-    this._minMaxTable = LookupTables.get(shape.numValues).minMax8Bit;
+    this._minMax8Bit = LookupTables.get(shape.numValues).minMax8Bit;
 
     const conflictSets = SudokuConstraintHandler._SumHandlerUtil.findConflictSets(
       this._mids, cellConflicts);
@@ -1628,7 +1628,7 @@ SudokuConstraintHandler.Between = class Between extends SudokuConstraintHandler 
     }
 
     const endsCombined = grid[this._ends[0]] | grid[this._ends[1]];
-    let minMax = this._minMaxTable[endsCombined];
+    let minMax = this._minMax8Bit[endsCombined];
     const endsMin = minMax >> 8;
     const endsMax = minMax & 0xff;
     const delta = endsMax - endsMin;
@@ -1646,7 +1646,7 @@ SudokuConstraintHandler.Between = class Between extends SudokuConstraintHandler 
     // Constrain the ends by masking out anything which rules out one of the
     // mids.
     if (fixedValues) {
-      minMax = this._minMaxTable[fixedValues];
+      minMax = this._minMax8Bit[fixedValues];
       const cellMin = minMax >> 8;
       const cellMax = minMax & 0xff;
       mask = ~(((1 << (cellMax - cellMin + 1)) - 1) << (cellMin - 1));
@@ -1734,7 +1734,7 @@ SudokuConstraintHandler.XSum = class XSum extends SudokuConstraintHandler {
     resultGrid.fill(0);
     // Determine minControl, because we can only constraint this many cells.
     // Cells beyond that may have unconstrained values depending on the control.
-    const minControl = this._lookupTables.minMax8Bit[values] >> 8;
+    const minControl = LookupTables.minValue(values);
     while (values) {
       const value = values & -values;
       values ^= value;
