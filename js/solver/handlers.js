@@ -1112,7 +1112,6 @@ SudokuConstraintHandler.Skyscraper = class Skyscraper extends SudokuConstraintHa
     // the max-height cell.
     let maxVisible = 1;
     let minVisible = 1;
-    let allValues = 0;
     for (let i = 0; i < cells.length; i++) {
       let values = grid[cells[i]];
 
@@ -1139,7 +1138,6 @@ SudokuConstraintHandler.Skyscraper = class Skyscraper extends SudokuConstraintHa
           break;
         }
       }
-      allValues |= values;
 
       // If we are already at the target for minVisible and we don't already
       // have a valid max-height, we can't increase it anymore.
@@ -1170,11 +1168,8 @@ SudokuConstraintHandler.Skyscraper = class Skyscraper extends SudokuConstraintHa
         } else {
           // If min is not larger, then we may have been able to reorder to use
           // a previous cell to get a lower height.
-          // Thus we find the minimum value of all cells up to now which is
-          // greater than the currentHeightForMax.
-          const currentHeightForMaxMask = LookupTables.fromValue(currentHeightForMax + 1) - 1;
-          const availableValues = allValues & ~currentHeightForMaxMask;
-          currentHeightForMax = LookupTables.minValue(availableValues);
+          // Thus the best we can do is to just increment the currentHeightForMax.
+          currentHeightForMax++;
         }
       }
 
