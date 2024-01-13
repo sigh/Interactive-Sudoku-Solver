@@ -26,3 +26,11 @@ const HARD_THERMOS = [
     '561798243784263915239541687472916538618352794953487162146825379395174826827639451'
   ]
 ];
+
+// TODO: Rename this file.
+const SKYSCRAPERS = [
+  'Skyscraper',
+  'Skyscraper - all 5',
+  'Skyscraper - all 6',
+  'Renban skyscrapers',
+];
