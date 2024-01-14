@@ -459,6 +459,9 @@ class ConstraintDisplay extends DisplayItem {
     this._diagonalDisplay = new DiagonalDisplay(
       displayContainer.getNewGroup('diagonal-group'));
 
+    this._customBinaryDisplay = displayContainer.getNewGroup('custom-binary-group');
+    this._applyGridOffset(this._customBinaryDisplay);
+
     this._quadGroup = displayContainer.getNewGroup('quad-group');
     this._applyGridOffset(this._quadGroup);
 
@@ -512,6 +515,7 @@ class ConstraintDisplay extends DisplayItem {
     clearDOMNode(this._quadGroup);
     clearDOMNode(this._lineConstraintGroup);
     clearDOMNode(this._adjConstraintGroup);
+    clearDOMNode(this._customBinaryDisplay);
 
     this._givensDisplay.clear();
 
@@ -568,6 +572,53 @@ class ConstraintDisplay extends DisplayItem {
     this._adjConstraintGroup.append(dot);
 
     return dot;
+  }
+
+  // Color list for use by constraints that need different colors.
+  static COLOR_LIST = [
+    'green',
+    'red',
+    'blue',
+    'yellow',
+    'cyan',
+    'brown',
+    'black',
+    'purple',
+    'orange',
+  ];
+
+  static _customBinaryColorIndex = 0;
+  drawCustomBinary(cells) {
+    const g = createSvgElement('g');
+    this._customBinaryDisplay.append(g);
+
+    g.setAttribute('fill', 'transparent');
+    g.setAttribute('stroke-width', 1);
+    const index = this.constructor._customBinaryColorIndex++;
+    const colors = this.constructor.COLOR_LIST;
+    g.setAttribute('stroke', colors[index % colors.length]);
+
+    for (let i = 1; i < cells.length; i++) {
+      if (!cells[i - 1] || !cells[i]) continue;
+      this._drawCustomBinaryPair(
+        cells[i - 1], cells[i], g);
+    }
+
+    return g;
+  }
+
+  _drawCustomBinaryPair(cell0, cell1, g) {
+    const cells = [cell0, cell1];
+    // Draw the line.
+    const path = this._makePath(cells.map(c => this.cellIdCenter(c)));
+    path.setAttribute('stroke-dasharray', '2');
+    g.appendChild(path);
+
+    // Draw the circles.
+    for (const circle of cells.map(c => this._makeCircle(c))) {
+      circle.setAttribute('r', 5);
+      g.appendChild(circle);
+    }
   }
 
   drawXV(cells, letter) {
@@ -1370,18 +1421,6 @@ class KillerCageDisplay extends DisplayItem {
     return rect;
   }
 
-  static KILLER_CAGE_COLORS = [
-    'green',
-    'red',
-    'blue',
-    'yellow',
-    'cyan',
-    'brown',
-    'black',
-    'purple',
-    'orange',
-  ];
-
   _chooseKillerCageColor(cellIds) {
     const shape = this._shape;
     // Use a greedy algorithm to choose the graph color.
@@ -1395,7 +1434,7 @@ class KillerCageDisplay extends DisplayItem {
       conflictingColors.add(this._killerCellColors.get(shape.makeCellId(row - 1, col)));
     }
     // Return the first color that doesn't conflict.
-    for (const color of this.constructor.KILLER_CAGE_COLORS) {
+    for (const color of ConstraintDisplay.COLOR_LIST) {
       if (!conflictingColors.has(color)) return color;
     }
     // Otherwise select a random color.
