@@ -242,6 +242,11 @@ const EXAMPLES = {
     input: '.GlobalEntropy.Skyscraper~R1~8~.Skyscraper~R6~~7.',
     solution: '234567819687193542915248376472915638361482957598736421726359184159824763843671295',
   },
+  'Odd-even thermo': {
+    src: 'https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?id=0003V5',
+    input: '.Binary~oe-thermo~4010140505415154~r1c2~r1c3~r1c4~r1c5~~r1c8~r1c9~r2c9~r3c9~~r2c8~r2c7~~r3c4~r3c3~~r3c2~r4c2~r4c1~~r6c3~r5c3~r5c4~r4c4~~r5c6~r4c6~r4c5~~r6c8~r6c9~r5c9~~r7r2~r7c3~~r7c8~r7c9~r8c9~~r8c2~r9c2~r9c1~~r8c4~r9c4~~r8c5~r9c5~r9c6',
+    solution: '613798524298145736457362198971853642384621975562479813139286457726514389845937261',
+  },
 
   // Classic grids that used to be slow. 3 and 4 used to take 2+ seconds.
   'Classic sudoku, was slow (1)': {

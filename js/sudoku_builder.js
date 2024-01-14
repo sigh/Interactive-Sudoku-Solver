@@ -1174,6 +1174,17 @@ class SudokuBuilder {
             constraint.values.map(v => +v));
           break;
 
+        case 'Binary':
+          cells = constraint.cells.map(c => c && shape.parseCellId(c).cell);
+          for (let i = 1; i < cells.length; i++) {
+            if (!cells[i - 1] || !cells[i]) continue;
+            yield new SudokuConstraintHandler.BinaryConstraint(
+              cells[i - 1], cells[i],
+              constraint.key);
+          }
+          break;
+
+
         case 'Priority':
           cells = constraint.cells.map(c => shape.parseCellId(c).cell);
           yield new SudokuConstraintHandler.Priority(cells, constraint.priority);
