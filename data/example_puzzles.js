@@ -275,6 +275,11 @@ const EXAMPLES = {
     input: '.Thermo~R1C2~R2C2~R3C1.Thermo~R2C9~R2C8~R1C7.Thermo~R4C5~R5C6~R6C5~R5C4.Thermo~R8C1~R8C2~R9C3.Thermo~R9C8~R8C8~R7C9.Skyscraper~C4~5~0.Skyscraper~R6~5~0.Skyscraper~C6~0~5.Skyscraper~R4~0~5..GlobalEntropy',
     solution: '834159627659273841712486395967518432183942576425367918376824159241695783598731264',
   },
+  'Miracle - skyscraper entropy': {
+    src: 'https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?id=000GHN',
+    input: '.GlobalEntropy.Skyscraper~R1~8~.Skyscraper~R6~~7.',
+    solution: '234567819687193542915248376472915638361482957598736421726359184159824763843671295',
+  },
 
   // Extreme killers.
   'Wecoc #1': {
