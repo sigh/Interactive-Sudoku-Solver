@@ -1256,15 +1256,15 @@ SudokuConstraintHandler.Skyscraper = class Skyscraper extends SudokuConstraintHa
     // Backward pass using the knowledge of where the max-height cells are.
     // This determines which cells *must* be visible, and we can remove values
     // which would prevent that.
-    //  - This pass attempts to reduces the checks to sub-problems when we know
+    //  - Attempts to reduce the checks to sub-problems when we know
     //    a cell is forced to be visible.
     //  - Constrains the minimum values of cells, unlike the forward pass
     //    which constrained the maximum values.
-    //  - Only constrain up to the first max-height cell because after
+    //  - Only constrains up to the first max-height cell because after
     //    that the cells could potentially take any value.
-    //  - Still constrain the first max-height cell, because it is either
+    //  - Still constrains the first max-height cell, because it is either
     //    max-height or it must be valid for a later max-height.
-    //  - Don't constraint the first cell because its minimum is never
+    //  - Doesn't constrain the first cell because its minimum is never
     //    restricted.
     let subMaxHeight = maxHeight;
     let lastSubMaxHeightIndex = lastMaxHeightIndex;
@@ -1272,7 +1272,7 @@ SudokuConstraintHandler.Skyscraper = class Skyscraper extends SudokuConstraintHa
     for (let i = firstMaxHeightIndex; i > 0; i--) {
       const state = states[i - 1];
 
-      // Check if we any leeway to reach the current subTarget because we
+      // Check if we any leeway to reach the current subTarget before we
       // reach the sub-max-height cell.
       // If not then we must force this cell to be visible.
       const cellsRemaining = lastSubMaxHeightIndex - i;
