@@ -1098,54 +1098,99 @@ SudokuConstraintHandler.Skyscraper = class Skyscraper extends SudokuConstraintHa
     return true;
   }
 
+  // Set up temporary storage for states.
+  static _statesBuffer = (() => {
+    let states = [];
+    for (let i = 0; i < SHAPE_MAX.numValues; i++) {
+      states.push({
+        minVisible: 0,
+        maxVisible: 0,
+        currentHeightForMin: 0,
+        currentHeightForMax: 0,
+      });
+    }
+    return states;
+  })();
+
   enforceConsistency(grid, handlerAccumulator) {
     const cells = this.cells;
     const maxHeight = this._maxHeight;
+    const maxHeightValue = LookupTables.fromValue(maxHeight);
     const target = this._numVisible;
+    const states = this.constructor._statesBuffer;
 
-    // Check that the target is within a viable range of visibilities for
-    // max-height cells.
+    // The first part of the forward pass that constraints the maximum values of
+    // cells based on our ability to reach the target.
+    // It continues until we reach the first viable max-height cell.
     let currentHeightForMax = 0;
     let currentHeightForMin = 0;
-    let numMaxHeight = 0;
+    // Track whether there are cells with small values which might be pruned.
+    // This is used to determine if we should run the backward pass.
+    let hasSmallerValues = 0;
     // Start minVisible and maxVisible at 1, to avoid explicitly counting
     // the max-height cell.
     let maxVisible = 1;
     let minVisible = 1;
-    for (let i = 0; i < cells.length; i++) {
-      let values = grid[cells[i]];
-
-      const minMax = this._lookupTables.minMax8Bit[values];
+    let index = 0;
+    for (; index < cells.length; index++) {
+      let v = grid[cells[index]];
+      const minMax = this._lookupTables.minMax8Bit[v];
       const min = minMax >> 8;
       let max = minMax & 0xff;
 
       if (max == maxHeight) {
-        // For the rest of the processing, we want to ignore the maxValue.
-        values ^= LookupTables.fromValue(maxHeight);
-        max = LookupTables.maxValue(values);
-        // If the target visibility is not feasible here then the max height
-        // must not be in this cell.
-        if (maxVisible < target || minVisible > target) {
-          if (!(grid[cells[i]] = values)) {
-            return false;
-          }
-        } else {
-          numMaxHeight++;
-        }
-        // We found the max-height cell, nothing afterwards matters.
-        // It has to be the unique one.
-        if (min == maxHeight) {
-          numMaxHeight = 1;
+        v ^= maxHeightValue;
+        // We found our first max-height cell.
+        if (maxVisible >= target) {
+          if (v) hasSmallerValues = true;
           break;
+        }
+
+        // Otherwise max-height is not a valid value.
+        if (!(grid[cells[index]] = v)) {
+          return false;
+        }
+        max = LookupTables.maxValue(v);
+      }
+
+      // If we are already at the target for minVisible then we can't increase
+      // it anymore.
+      if (minVisible === target) {
+        const mask = LookupTables.fromValue(currentHeightForMin) - 1;
+        if (!(grid[cells[index]] &= mask)) {
+          return false;
         }
       }
 
-      // If we are already at the target for minVisible and we don't already
-      // have a valid max-height, we can't increase it anymore.
-      if (numMaxHeight === 0 && minVisible === target) {
-        const mask = LookupTables.fromValue(currentHeightForMin) - 1;
-        if (!(grid[cells[i]] &= mask)) {
+      // We need enough numbers to increment visibility up to the target.
+      // Remove any values which are too large and hence would not leave
+      // enough room.
+      // NOTE: This covers the naive initialization of the constraint where
+      // high values are removed from the first cells.
+      const shortfall = target - (maxVisible + 1);
+      if (shortfall > 0) {
+        const minForbidden = maxHeight - shortfall;
+        const mask = LookupTables.fromValue(minForbidden) - 1;
+        if (!(grid[cells[index]] &= mask)) {
           return false;
+        }
+      }
+
+      // If there are any values larger than currentHeightForMax then we can use
+      // this cell to increase visibility.
+      if (max > currentHeightForMax) {
+        maxVisible++;
+        if (min > currentHeightForMax) {
+          // If the min is larger, then visibility forced anyway, and the min
+          // leaves us with the most leeway.
+          currentHeightForMax = min;
+        } else {
+          // If min is not larger, then we can only increment
+          // currentHeightForMax.
+          // A previous or future cell to be used to get a lower height than
+          // the values just in this cell.
+          currentHeightForMax++;
+          hasSmallerValues = true;
         }
       }
 
@@ -1159,46 +1204,116 @@ SudokuConstraintHandler.Skyscraper = class Skyscraper extends SudokuConstraintHa
       // than the previous max.
       if (max > currentHeightForMin) currentHeightForMin = max;
 
-      // If there is any larger values than currentHeightForMax then we can use
-      // this cell to increase visibility.
-      if (max > currentHeightForMax) {
-        maxVisible++;
-        if (min > currentHeightForMax) {
-          // If the min is larger, then that's easy as we are forced to use it.
-          currentHeightForMax = min;
-        } else {
-          // If min is not larger, then we may have been able to reorder to use
-          // a previous or future cell to get a lower height.
-          // Hence we must be conservative and increment the currentHeightForMax
-          // to only the next value.
-          currentHeightForMax++;
-        }
+      {
+        // Save the states for the backward pass.
+        const state = states[index];
+        state.minVisible = minVisible;
+        state.maxVisible = maxVisible;
+        state.currentHeightForMin = currentHeightForMin;
+        state.currentHeightForMax = currentHeightForMax;
+      }
+    }
+
+    // If we didn't find any max-height cells, then the constraint is not valid.
+    // Similarly if minVisible was already too high when we reached the target.
+    if (index == cells.length || minVisible > target) return false;
+
+    // The second part of the forward pass, which finds all the valid
+    // valid max-height cells, and removes the max-height value from the rest.
+    const firstMaxHeightIndex = index;
+    let lastMaxHeightIndex = index;
+    for (; index < cells.length; index++) {
+      // If minVisible is already too high, then just keep clearing the
+      // max-height value without any other processing.
+      if (minVisible > target) {
+        if (!(grid[cells[index]] &= ~maxHeightValue)) return false;
+        continue;
       }
 
-      // We need enough numbers to increment visibility up to the target.
-      // Remove any values which are too large and hence would not leave
-      // enough room.
-      // NOTE: This covers the naive initialization of the constraint where
-      // high values are removed from the first cells.
-      // NOTE: This can be moved before the maxVisible (and minVisible) checks
-      //       if shortfall is adjusted to `shortfall = target - maxVisible - 1`
-      //       to account fo the fact that maxVisible might be incremented.
-      //       Currently this makes things worse.
-      const shortfall = target - maxVisible;
-      if (shortfall > 0) {
-        const minForbidden = maxHeight - shortfall;
-        // NOTE: This cell can't be max-height as we have not yet reached the
-        // target.
-        const mask = LookupTables.fromValue(minForbidden) - 1;
+      const v = grid[cells[index]];
+      const minMax = this._lookupTables.minMax8Bit[v];
+      const min = minMax >> 8;
+      let max = minMax & 0xff;
+
+      if (max == maxHeight) {
+        lastMaxHeightIndex = index;
+        // If this max-height is the only valid value then the rest of the cells
+        // can't be max-height.
+        if (min == maxHeight) break;
+        // Exclude the max-height from the minVisible calculation.
+        max = LookupTables.maxValue(v ^ maxHeightValue);
+      }
+
+      // Update minVisible as in the first part of the forward pass.
+      if (min >= currentHeightForMin) minVisible++;
+      if (max > currentHeightForMin) currentHeightForMin = max;
+    }
+
+    // We only need to do the backward pass if the cells which must be visible
+    // had smaller values which might be constrained.
+    if (!hasSmallerValues) return true;
+
+    // Backward pass using the knowledge of where the max-height cells are.
+    // This determines which cells *must* be visible, and we can remove values
+    // which would prevent that.
+    //  - This pass attempts to reduces the checks to sub-problems when we know
+    //    a cell is forced to be visible.
+    //  - Constrains the minimum values of cells, unlike the forward pass
+    //    which constrained the maximum values.
+    //  - Only constrain up to the first max-height cell because after
+    //    that the cells could potentially take any value.
+    //  - Still constrain the first max-height cell, because it is either
+    //    max-height or it must be valid for a later max-height.
+    //  - Don't constraint the first cell because its minimum is never
+    //    restricted.
+    let subMaxHeight = maxHeight;
+    let lastSubMaxHeightIndex = lastMaxHeightIndex;
+    let subTarget = target;
+    for (let i = firstMaxHeightIndex; i > 0; i--) {
+      const state = states[i - 1];
+
+      // Check if we any leeway to reach the current subTarget because we
+      // reach the sub-max-height cell.
+      // If not then we must force this cell to be visible.
+      const cellsRemaining = lastSubMaxHeightIndex - i;
+      const visRemaining = subTarget - state.maxVisible;
+      if (visRemaining == cellsRemaining) {
+        // Constrain this cell to be above the current minimum height for
+        // maximum visibility.
+        const minHeight = state.currentHeightForMax;
+        const mask = ~(LookupTables.fromValue(minHeight + 1) - 1);
         if (!(grid[cells[i]] &= mask)) {
           return false;
         }
       }
+
+      // Check if this cell is always visible.
+      // If so then we can make this the new subTarget.
+      const v = grid[cells[i]];
+      const cellMin = LookupTables.minValue(v);
+      if (cellMin > state.currentHeightForMin) {
+        // We need to err on the side of reducing subTarget by at least as much
+        // as required (err on the side of smaller subTarget).
+        // However, we can take the minimum of two conservative estimates:
+        //  - The number of cells since the last subTarget
+        //    (assuming all of them would be visible).
+        //  - The number of heights to to the last subTarget
+        //    (assuming all of them are used). We must use cellMin, since this
+        //    is the worst case.
+        const heightDelta = subMaxHeight - cellMin;
+        const indexDelta = lastSubMaxHeightIndex - i;
+        const targetReduction = (
+          heightDelta < indexDelta ? heightDelta : indexDelta);
+        subTarget -= targetReduction;
+        if (subTarget < 0) break;
+
+        const cellMax = LookupTables.maxValue(v);
+        subMaxHeight = cellMax;
+        lastSubMaxHeightIndex = i;
+      }
     }
 
-    // NOTE: We can't infer anything from the *current* values of minVisible
-    // and maxVisible because earlier values may have been valid.
-    return numMaxHeight > 0;
+    return true;
   }
 }
 
