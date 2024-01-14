@@ -884,6 +884,16 @@ class ConstraintManager {
         this._addToPanel(config);
         this._configs.push(config);
         break;
+      case 'Binary':
+        config = {
+          cells: constraint.cells,
+          name: `${constraint.name || 'Binary'}`,
+          constraint: constraint,
+          displayElem: this._display.drawCustomBinary(constraint.cells),
+        };
+        this._addToPanel(config);
+        this._configs.push(config);
+        break;
       case 'LittleKiller':
       case 'Sandwich':
       case 'XSum':
