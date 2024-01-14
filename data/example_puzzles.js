@@ -232,6 +232,16 @@ const EXAMPLES = {
     input: '.Quad~R1C1~1~2~3~4.Quad~R1C8~6~7~8~9.Quad~R2C2~4~5~6~7.Quad~R2C7~3~4~5~6.Quad~R3C3~1~3~5~6.Quad~R3C6~4~7~7~8.Quad~R6C1~4~5~5~9.Quad~R6C8~2~4~7~8.Quad~R7C3~3~4~6~8.Quad~R7C6~2~2~5~6',
     solution: '239456187147283569865197432926348715378521946451769328593812674784635291612974853',
   },
+  'Heat up - global entropy': {
+    src: 'https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?id=000FZ4',
+    input: '.Thermo~R1C2~R2C2~R3C1.Thermo~R2C9~R2C8~R1C7.Thermo~R4C5~R5C6~R6C5~R5C4.Thermo~R8C1~R8C2~R9C3.Thermo~R9C8~R8C8~R7C9.Skyscraper~C4~5~0.Skyscraper~R6~5~0.Skyscraper~C6~0~5.Skyscraper~R4~0~5..GlobalEntropy',
+    solution: '834159627659273841712486395967518432183942576425367918376824159241695783598731264',
+  },
+  'Miracle - skyscraper entropy': {
+    src: 'https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?id=000GHN',
+    input: '.GlobalEntropy.Skyscraper~R1~8~.Skyscraper~R6~~7.',
+    solution: '234567819687193542915248376472915638361482957598736421726359184159824763843671295',
+  },
 
   // Classic grids that used to be slow. 3 and 4 used to take 2+ seconds.
   'Classic sudoku, was slow (1)': {
@@ -269,16 +279,6 @@ const EXAMPLES = {
   'White Room  - killer sudoku': {
     src: 'http://forum.enjoysudoku.com/new-killer-setter-t38092-15.html#p306873',
     input: '.Cage~7~R2C2~R3C2~R4C2.Cage~5~R2C6~R2C7.Cage~6~R3C7~R3C8.Cage~6~R4C6~R4C7.Cage~15~R7C9~R6C9.Cage~3~R9C7~R9C6.Cage~17~R8C3~R7C3.Cage~23~R6C3~R6C4~R7C4.',
-  },
-  'Heat up - global entropy': {
-    src: 'https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?id=000FZ4',
-    input: '.Thermo~R1C2~R2C2~R3C1.Thermo~R2C9~R2C8~R1C7.Thermo~R4C5~R5C6~R6C5~R5C4.Thermo~R8C1~R8C2~R9C3.Thermo~R9C8~R8C8~R7C9.Skyscraper~C4~5~0.Skyscraper~R6~5~0.Skyscraper~C6~0~5.Skyscraper~R4~0~5..GlobalEntropy',
-    solution: '834159627659273841712486395967518432183942576425367918376824159241695783598731264',
-  },
-  'Miracle - skyscraper entropy': {
-    src: 'https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?id=000GHN',
-    input: '.GlobalEntropy.Skyscraper~R1~8~.Skyscraper~R6~~7.',
-    solution: '234567819687193542915248376472915638361482957598736421726359184159824763843671295',
   },
 
   // Extreme killers.
