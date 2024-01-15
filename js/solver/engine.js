@@ -374,12 +374,13 @@ SudokuSolver.InternalSolver = class {
       if (a.cells.length != b.cells.length) {
         return a.cells.length - b.cells.length;
       }
-      if (a.constructor.name != b.constructor.name) {
-        return a.constructor.name.localeCompare(b.constructor.name);
-      }
       // After this it doesn't matter, as long as it is deterministic.
       // There still might be equal handlers after comparing cells and
       // the handler type, but that is ok.
+      if (a.constructor.name != b.constructor.name) {
+        return a.constructor.name.localeCompare(b.constructor.name);
+      }
+      // Put cell comparison last as it is the most expensive.
       const aCells = a.cells.join(',');
       const bCells = b.cells.join(',');
       return aCells.localeCompare(bCells);
