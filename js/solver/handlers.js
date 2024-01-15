@@ -1119,8 +1119,9 @@ SudokuConstraintHandler.Skyscraper = class Skyscraper extends SudokuConstraintHa
     const target = this._numVisible;
     const states = this.constructor._statesBuffer;
 
-    // The first part of the forward pass that constraints the maximum values of
-    // cells based on our ability to reach the target.
+    // Pass 1a (forward pass - part a)
+    //  - Calculate min/max visibility state at each index.
+    //  - Constraint values which would cause minVisibility to be too high.
     // It continues until we reach the first viable max-height cell.
     let currentHeightForMax = 0;
     let currentHeightForMin = 0;
@@ -1132,6 +1133,7 @@ SudokuConstraintHandler.Skyscraper = class Skyscraper extends SudokuConstraintHa
     let maxVisible = 1;
     let minVisible = 1;
     let index = 0;
+    let startAllFixed = true;
     for (; index < cells.length; index++) {
       let v = grid[cells[index]];
 
@@ -1158,23 +1160,10 @@ SudokuConstraintHandler.Skyscraper = class Skyscraper extends SudokuConstraintHa
         }
       }
 
-      // We need enough numbers to increment visibility up to the target.
-      // Remove any values which are too large and hence would not leave
-      // enough room.
-      // NOTE: This covers the naive initialization of the constraint where
-      // high values are removed from the first cells.
-      const shortfall = target - (maxVisible + 1);
-      if (shortfall > 0) {
-        const minForbidden = maxHeight - shortfall;
-        const mask = LookupTables.fromValue(minForbidden) - 1;
-        if (!(grid[cells[index]] &= mask)) {
-          return false;
-        }
-      }
-
       const minMax = this._lookupTables.minMax8Bit[grid[cells[index]]];
       const min = minMax >> 8;
       const max = minMax & 0xff;
+      if (min != max) startAllFixed = false;
 
       // If there are any values larger than currentHeightForMax then we can use
       // this cell to increase visibility.
@@ -1218,8 +1207,9 @@ SudokuConstraintHandler.Skyscraper = class Skyscraper extends SudokuConstraintHa
     // Similarly if minVisible was already too high when we reached the target.
     if (index == cells.length || minVisible > target) return false;
 
-    // The second part of the forward pass, which finds all the valid
-    // valid max-height cells, and removes the max-height value from the rest.
+    // Pass 1b (forward pass - part b)
+    //  - Find all valid max-height cells and remove the max-height value from
+    //    the rest.
     const firstMaxHeightIndex = index;
     let lastMaxHeightIndex = index;
     for (; index < cells.length; index++) {
@@ -1249,12 +1239,61 @@ SudokuConstraintHandler.Skyscraper = class Skyscraper extends SudokuConstraintHa
       if (max > currentHeightForMin) currentHeightForMin = max;
     }
 
+    // If all the initial values are fixed don't both running anymore passes.
+    if (startAllFixed) return true;
+
+    // Pass 2 (backward pass)
+    // Given knowledge of the last max-height cell, restrict the maximum values
+    // of cells if they don't leave enough space to reach the target.
+    // NOTE: This covers the naive initialization of the constraint where
+    // high values are removed from the first cells.
+    {
+      // `valuesUntilLastMaxHeight` tells us which values are available to help
+      // increase the visibility.
+      let valuesUntilLastMaxHeight = 0;
+      for (index = lastMaxHeightIndex - 1; index >= firstMaxHeightIndex; index--) {
+        valuesUntilLastMaxHeight |= grid[cells[index]];
+      }
+      valuesUntilLastMaxHeight &= ~maxHeightValue;
+
+      // These variables are incrementally updated to ensure the
+      // calculation is linear-time.
+      // - `minForbiddenValue` is the smallest value which is forbidden as it
+      // prevent us reaching the target visibility.
+      // - `forbiddenCount` is the number of values which are forbidden.
+      let minForbiddenValue = maxHeightValue;
+      let forbiddenCount = 0;
+
+      for (; index >= 0; index--) {
+        const state = states[index];
+
+        let shortfall = target - state.maxVisible;
+        if (shortfall > 0) {
+          // Accumulate forbidden values until we have enough to cover the
+          // shortfall.
+          while (forbiddenCount < shortfall && minForbiddenValue > 1) {
+            minForbiddenValue >>= 1;
+            if (valuesUntilLastMaxHeight & minForbiddenValue) {
+              forbiddenCount++;
+            }
+          }
+
+          // `minForbiddenValue - 1` creates a mask of all values below
+          // the forbidden value.
+          if (!(grid[cells[index]] &= minForbiddenValue - 1)) {
+            return false;
+          }
+        }
+        valuesUntilLastMaxHeight |= grid[cells[index]];
+      }
+    }
+
     // We only need to do the backward pass if the cells which must be visible
     // had smaller values which might be constrained.
     if (!hasSmallerValues) return true;
 
-    // Backward pass using the knowledge of where the max-height cells are.
-    // This determines which cells *must* be visible, and we can remove values
+    // Pass 3 (backward pass)
+    // Determines which cells *must* be visible, and we can remove values
     // which would prevent that.
     //  - Attempts to reduce the checks to sub-problems when we know
     //    a cell is forced to be visible.
