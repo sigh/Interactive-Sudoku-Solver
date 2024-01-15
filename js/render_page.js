@@ -566,10 +566,12 @@ class ConstraintManager {
     this._checkboxConstraints = new CheckboxConstraints(
       this._display, this.runUpdateCallback.bind(this));
 
+    // Jigsaw constraints
     this._jigsawManager = new JigsawManager(
       this._display, this._makePanelItem.bind(this));
     this.addReshapeListener(this._jigsawManager);
 
+    // Multi-cell constraints.
     const selectionForm = document.forms['multi-cell-constraint-input'];
     inputManager.onSelection(
       (selection) => this._onNewSelection(selection, selectionForm));
@@ -614,6 +616,12 @@ class ConstraintManager {
     selectionForm['quad-values'].onfocus = () => {
       selectionForm['multi-cell-constraint-quad'].checked = true;
     };
+
+    // Custom binary.
+    this._customBinaryConstraints = new CustomBinaryConstraintManager(
+      inputManager, this._display, this._addToPanel.bind(this),
+      this.runUpdateCallback.bind(this));
+    this.addReshapeListener(this._customBinaryConstraints);
 
     // Outside arrows.
     this._outsideArrowConstraints = new OutsideArrowConstraints(
@@ -885,14 +893,7 @@ class ConstraintManager {
         this._configs.push(config);
         break;
       case 'Binary':
-        config = {
-          cells: constraint.cells,
-          name: `${constraint.name || 'Binary'}`,
-          constraint: constraint,
-          displayElem: this._display.drawCustomBinary(constraint.cells),
-        };
-        this._addToPanel(config);
-        this._configs.push(config);
+        this._customBinaryConstraints.addConstraint(constraint);
         break;
       case 'LittleKiller':
       case 'Sandwich':
@@ -1031,8 +1032,12 @@ class ConstraintManager {
     if (config.isJigsaw) {
       this._jigsawManager.removePiece(config);
     } else {
-      const index = this._configs.indexOf(config);
-      this._configs.splice(index, 1);
+      if (config.isCustomBinary) {
+        this._customBinaryConstraints.removeConstraint(config);
+      } else {
+        const index = this._configs.indexOf(config);
+        this._configs.splice(index, 1);
+      }
       this._display.removeItem(config.displayElem);
       config.panelItem.parentNode.removeChild(config.panelItem);
     }
@@ -1130,6 +1135,7 @@ class ConstraintManager {
     constraints.push(this._jigsawManager.getConstraint());
     constraints.push(this._checkboxConstraints.getConstraint());
     constraints.push(...this._outsideArrowConstraints.getConstraints());
+    constraints.push(...this._customBinaryConstraints.getConstraints());
     constraints.push(this._givenCandidates.getConstraint());
     constraints.push(new SudokuConstraint.Shape(this._shape.name));
     constraints.push(...this._invisibleConstraints);
@@ -1146,6 +1152,7 @@ class ConstraintManager {
     this._constraintPanel.innerHTML = '';
     this._checkboxConstraints.uncheckAll();
     this._outsideArrowConstraints.clear();
+    this._customBinaryConstraints.clear();
     this._configs = [];
     this._jigsawManager.clear();
     this._givenCandidates.unsafeClear();  // OK because display is cleared.
@@ -1499,6 +1506,8 @@ class GridInputManager {
     });
 
     window.addEventListener('keydown', event => {
+      if (document.activeElement.tagName === 'TEXTAREA' ||
+        document.activeElement.tagName === 'INPUT') return;
       if (this._selection.size() == 0) return;
       switch (event.key) {
         case 'c':
@@ -1517,20 +1526,27 @@ class GridInputManager {
   }
 }
 
-class MultiValueInputManager {
-  constructor(inputManager, onChange) {
-    this._containerElem = document.getElementById('multi-value-cell-input');
+class DropdownInputManager {
+  constructor(inputManager, containerId) {
+    this._containerElem = document.getElementById(containerId);
     this._dropdownElem = this._containerElem.getElementsByClassName('dropdown-container')[0];
-    this._listElem = this._dropdownElem.getElementsByClassName('dropdown-body')[0];
-    this._fieldset = this._containerElem.getElementsByTagName('fieldset')[0];
-    this._onChange = onChange;
 
-    this._setUp(inputManager);
+    this._setUpDropdownInputManager(inputManager);
+  }
+
+  _setUpDropdownInputManager(inputManager) {
+    const dropdown = this._dropdownElem;
+    dropdown.getElementsByClassName('dropdown-anchor')[0].onclick = (e) => {
+      if (this._currentSelection.length == 0) return;
+      dropdown.classList.toggle('visible');
+    };
+
+    inputManager.addSelectionPreserver(this._containerElem);
+
+    this._currentSelection = [];
   }
 
   updateSelection(selection) {
-    this._currentSelection = [];
-    this._clearForm();
     this._currentSelection = selection;
     // Add a delay so that the display doesn't flicker.
     // We don't have to worry about consistency as it uses the
@@ -1542,6 +1558,103 @@ class MultiValueInputManager {
         this._dropdownElem.classList.remove('disabled');
       }
     }, 100);
+  };
+}
+
+class CustomBinaryConstraintManager extends DropdownInputManager {
+  constructor(inputManager, display, addToPanel, onChange) {
+    super(inputManager, 'custom-binary-input');
+
+    inputManager.onSelection(
+      (selection) => this.updateSelection(selection));
+
+    this._addToPanel = addToPanel;
+    this._onChange = onChange;
+    this._configs = [];
+    this._shape = null;
+    this._display = display;
+
+    this._setUp();
+  }
+
+  reshape(shape) {
+    this._shape = shape;
+  }
+
+  _setUp() {
+    const form = this._containerElem;
+    form.onsubmit = e => {
+      const formData = new FormData(form);
+      const name = formData.get('name');
+      const fnStr = formData.get('function');
+
+      let key = null;
+      try {
+        const fn = Function(
+          `return ((a,b)=>${fnStr})`)();
+        key = SudokuConstraint.Binary.fnToKey(
+          fn, this._shape.numValues);
+      } catch (e) {
+        console.error(e);
+        return false;
+      }
+
+      const encodedName = SudokuConstraint.Binary.encodeName(name);
+      this._add(encodedName, key, this._currentSelection.slice());
+      this._onChange();
+
+      return false;
+    };
+  }
+
+  clear() {
+    this._configs = [];
+  }
+
+  addConstraint(constraint) {
+    this._add(constraint.name, constraint.key, constraint.cells);
+  }
+
+  _add(encodedName, key, cells) {
+    const name = SudokuConstraint.Binary.decodeName(encodedName);
+
+    const config = {
+      encodedName: encodedName,
+      name: name || 'Custom',
+      key: key,
+      cells: cells,
+      isCustomBinary: true,
+      displayElem: this._display.drawCustomBinary(cells),
+    };
+    this._addToPanel(config);
+    this._configs.push(config);
+  }
+
+  removeConstraint(config) {
+    const index = this._configs.indexOf(config);
+    this._configs.splice(index, 1);
+  }
+
+  getConstraints() {
+    return this._configs.map((c) =>
+      new SudokuConstraint.Binary(
+        c.encodedName, c.key, ...c.cells));
+  }
+}
+
+class MultiValueInputManager extends DropdownInputManager {
+  constructor(inputManager, onChange) {
+    super(inputManager, 'multi-value-cell-input');
+    this._listElem = this._dropdownElem.getElementsByClassName('dropdown-body')[0];
+    this._onChange = onChange;
+
+    this._setUp();
+  }
+
+  updateSelection(selection) {
+    this._currentSelection = [];
+    this._clearForm();
+    super.updateSelection(selection);
   };
 
   reshape(shape) {
@@ -1561,17 +1674,7 @@ class MultiValueInputManager {
       'grid-template-columns', `repeat(${shape.boxSize}, 1fr)`);
   }
 
-  _setUp(inputManager) {
-    const dropdown = this._dropdownElem;
-    dropdown.getElementsByClassName('dropdown-anchor')[0].onclick = (e) => {
-      if (this._currentSelection.length == 0) return;
-      dropdown.classList.toggle('visible');
-    };
-
-    inputManager.addSelectionPreserver(this._containerElem);
-
-    this._currentSelection = [];
-
+  _setUp() {
     const form = this._containerElem;
     form.onchange = () => {
       if (this._currentSelection.length == 0) return;

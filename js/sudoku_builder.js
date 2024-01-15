@@ -760,6 +760,19 @@ class SudokuConstraint {
       }
       return key;
     }
+
+    static encodeName(displayName) {
+      const name = encodeURIComponent(displayName);
+      return name.replace(/\./g, '%2E').replace(/~/g, '%7E');
+    }
+
+    static decodeName(name) {
+      let displayName = name;
+      try {
+        displayName = decodeURIComponent(name);
+      } catch (e) { }
+      return displayName;
+    }
   }
 
   static Givens = class Givens extends SudokuConstraint {

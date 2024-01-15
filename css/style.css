@@ -372,7 +372,7 @@ textarea {
 .control-panel {
   display: flex;
   align-items: center;
-  margin: 10px 0px;
+  margin-top: 10px;
   gap: 10px;
 }
 
@@ -836,6 +836,22 @@ h2 {
   color: black;
 }
 
+#custom-binary-input .dropdown-body>div {
+  margin: 5px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+#custom-binary-input-function {
+  display: flex;
+  gap: 10px;
+}
+
+#custom-binary-input-function textarea {
+  margin: 0;
+}
+
 .dropdown-container {
   display: inline-block;
   position: relative;
@@ -886,7 +902,11 @@ select {
   border-top: none;
   box-shadow: 2px 2px 5px grey;
   background-color: white;
-  z-index: 1;
+  z-index: 2;
+}
+
+#multi-value-cell-input .dropdown-body {
+  z-index: 3;
 }
 
 .dropdown-container.disabled .dropdown-body {
@@ -903,11 +923,11 @@ select {
   gap: 5px;
 }
 
-#multi-value-cell-input .dropdown-container {
+.dropdown-container {
   width: 100%;
 }
 
-#multi-value-cell-input .visible .dropdown-body {
+.dropdown-container.visible .dropdown-body {
   display: grid;
 }
 
