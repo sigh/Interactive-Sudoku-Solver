@@ -7,6 +7,12 @@ const SKYSCRAPERS = [
   'Renban skyscrapers',
 ];
 
+const GLOBAL_ENTROPY = [
+  'Global entropy',
+  'Heat up - global entropy',
+  'Miracle - skyscraper entropy',
+];
+
 // From https://sudokutheory.com/wiki/index.php?title=Snipes#Thermo
 // Also see this thread: 'http://forum.enjoysudoku.com/minimal-futoshiki-sudoshiki-puzzles-t32904-30.html#p322490'
 const HARD_THERMOS = [
