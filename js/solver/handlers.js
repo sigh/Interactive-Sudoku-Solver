@@ -1921,13 +1921,97 @@ SudokuConstraintHandler.XSum = class XSum extends SudokuConstraintHandler {
 
 // Enforce the "Global entropy" constraint for a single 2x2 region.
 SudokuConstraintHandler.LocalEntropy = class LocalEntropy extends SudokuConstraintHandler {
+  constructor(cells) {
+    super(cells);
+    this._conflictMap = [];
+  }
+
+  static _valuesBuffer = new Uint16Array(SHAPE_MAX.numValues);
+  static _SQUISHED_MASK = (
+    LookupTables.fromValue(1) |
+    LookupTables.fromValue(4) |
+    LookupTables.fromValue(7));
+  static _TRIADS = [
+    LookupTables.fromValuesArray([1, 2, 3]),
+    LookupTables.fromValuesArray([4, 5, 6]),
+    LookupTables.fromValuesArray([7, 8, 9])];
+
+  _populateConflictMap(conflictMap, cellConflicts) {
+    const numCells = this.cells.length;
+
+    // Indexing scheme for conflictMap:
+    // - conflictMap[2*i+j|i<j] = [cells which conflict with both i and j].
+    // - conflictMap[0] = [cells which conflict with all four cells].
+    // We don't care about 3-way conflicts, as we can just use the 4-way
+    // set as a conservative approximation.
+    for (let i = 0; i <= 2 * (numCells - 1) + numCells; i++) {
+      conflictMap.push(null);
+    }
+
+    // Add all pairwise conflicts.
+    for (let i = 0; i < numCells; i++) {
+      for (let j = i + 1; j < numCells; j++) {
+        const conflicts = setIntersection(
+          cellConflicts[this.cells[i]], cellConflicts[this.cells[j]]);
+        conflictMap[2 * i + j] = new Uint8Array(conflicts);
+      }
+    }
+    // Add cells which conflict with the whole region.
+    // Find the intersection of cell{0,1} and cell{2,3}
+    const conflictWithAll = arrayIntersect(
+      conflictMap[2 * 0 + 1], conflictMap[2 * 2 + 3]);
+    conflictMap[0] = new Uint8Array(conflictWithAll);
+  }
+
   initialize(initialGrid, cellConflicts, shape) {
-    this._lookupTables = LookupTables.get(shape.numValues);
-    this._squishedMask = (
-      LookupTables.fromValue(1) |
-      LookupTables.fromValue(4) |
-      LookupTables.fromValue(7));
-    this._valuesBuffer = new Uint16Array(this.cells.length);
+    this._populateConflictMap(this._conflictMap, cellConflicts);
+
+    return true;
+  }
+
+  _enforceRequiredValues(grid) {
+    const cells = this.cells;
+    const numCells = this.cells.length;
+
+    // Determine the unsquished allValues and fixedValues.
+    let allValues = 0;
+    let fixedValues = 0;
+    for (let i = 0; i < numCells; i++) {
+      let v = grid[cells[i]];
+      allValues |= v;
+      fixedValues |= (!(v & (v - 1))) * v;  // Avoid branching.
+    }
+
+    if (allValues == fixedValues) return true;
+
+    const triads = this.constructor._TRIADS;
+    for (let i = 0; i < triads.length; i++) {
+      const triadValue = triads[i] & allValues;
+      // Skip triads which have more than one value, or which are already fixed.
+      if ((triadValue & (triadValue - 1)) || (triadValue & fixedValues)) {
+        continue;
+      }
+      // Now we know `triadValue` is a required value and is in multiple cells.
+
+      // Find the cells which contain `triadValue`, and the index into
+      // conflictMap in case the cellCount is 2.
+      let conflictIndex = 0;
+      let cellCount = 0;
+      for (let j = 0; j < numCells; j++) {
+        if (grid[cells[j]] & triadValue) {
+          conflictIndex = conflictIndex * 2 + j;
+          cellCount++;
+        }
+      }
+      // If there are 3 or 4 cells, we use the full conflict set.
+      if (cellCount > 2) conflictIndex = 0;
+
+      // Remove triadValue from all the conflicts.
+      const conflictCells = this._conflictMap[conflictIndex];
+      for (let j = 0; j < conflictCells.length; j++) {
+        if (!(grid[conflictCells[j]] &= ~triadValue)) return false;
+      }
+    }
 
     return true;
   }
@@ -1935,8 +2019,8 @@ SudokuConstraintHandler.LocalEntropy = class LocalEntropy extends SudokuConstrai
   enforceConsistency(grid, handlerAccumulator) {
     const cells = this.cells;
     const numCells = this.cells.length;
-    const squishedMask = this._squishedMask;
-    const valuesBuffer = this._valuesBuffer;
+    const squishedMask = this.constructor._SQUISHED_MASK;
+    const valuesBuffer = this.constructor._valuesBuffer;
 
     // This code is very similar to the House handler, but adjusted to
     // collapse the values into 3 sets.
@@ -1974,7 +2058,7 @@ SudokuConstraintHandler.LocalEntropy = class LocalEntropy extends SudokuConstrai
       }
     }
 
-    return true;
+    return this._enforceRequiredValues(grid);
   }
 }
 
