@@ -1134,11 +1134,8 @@ SudokuConstraintHandler.Skyscraper = class Skyscraper extends SudokuConstraintHa
     let index = 0;
     for (; index < cells.length; index++) {
       let v = grid[cells[index]];
-      const minMax = this._lookupTables.minMax8Bit[v];
-      const min = minMax >> 8;
-      let max = minMax & 0xff;
 
-      if (max == maxHeight) {
+      if (v & maxHeightValue) {
         v ^= maxHeightValue;
         // We found our first max-height cell.
         if (maxVisible >= target) {
@@ -1150,7 +1147,6 @@ SudokuConstraintHandler.Skyscraper = class Skyscraper extends SudokuConstraintHa
         if (!(grid[cells[index]] = v)) {
           return false;
         }
-        max = LookupTables.maxValue(v);
       }
 
       // If we are already at the target for minVisible then we can't increase
@@ -1175,6 +1171,10 @@ SudokuConstraintHandler.Skyscraper = class Skyscraper extends SudokuConstraintHa
           return false;
         }
       }
+
+      const minMax = this._lookupTables.minMax8Bit[grid[cells[index]]];
+      const min = minMax >> 8;
+      const max = minMax & 0xff;
 
       // If there are any values larger than currentHeightForMax then we can use
       // this cell to increase visibility.
