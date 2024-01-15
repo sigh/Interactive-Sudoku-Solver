@@ -362,6 +362,29 @@ SudokuSolver.InternalSolver = class {
   }
 
   _setUpHandlers(handlers) {
+    // Sort initial handlers so that the solver performance doesn't
+    // depend on the input order.
+    // TODO: Do this in a more principled way. Consider doing this
+    //       twice - once now and once after the optimizer runs.
+    handlers.sort((a, b) => {
+      // Put the handlers with the least cells first.
+      // This just worked out better.
+      // Most puzzles don't seem to depend too much on this order, but
+      // it makes a 2x difference for some.
+      if (a.cells.length != b.cells.length) {
+        return a.cells.length - b.cells.length;
+      }
+      if (a.constructor.name != b.constructor.name) {
+        return a.constructor.name.localeCompare(b.constructor.name);
+      }
+      // After this it doesn't matter, as long as it is deterministic.
+      // There still might be equal handlers after comparing cells and
+      // the handler type, but that is ok.
+      const aCells = a.cells.join(',');
+      const bCells = b.cells.join(',');
+      return aCells.localeCompare(bCells);
+    });
+
     const cellConflictSets = this.constructor._findCellConflicts(handlers, this._shape);
 
     // Set cell conflicts so that they are unique.
