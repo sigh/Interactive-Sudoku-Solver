@@ -2025,14 +2025,16 @@ SudokuConstraintHandler.LocalEntropy = class LocalEntropy extends SudokuConstrai
     // This code is very similar to the House handler, but adjusted to
     // collapse the values into 3 sets.
     let allValues = 0;
-    let nonUniqueValues = 0;
+    let atLeastTwo = 0;
+    let atLeastThree = 0;
     let fixedValues = 0;
     for (let i = 0; i < numCells; i++) {
       let v = grid[cells[i]];
       v |= (v >> 1) | (v >> 2);
       v &= squishedMask;
       valuesBuffer[i] = v;
-      nonUniqueValues |= allValues & v;
+      atLeastThree |= atLeastTwo & v;
+      atLeastTwo |= allValues & v;
       allValues |= v;
       fixedValues |= (!(v & (v - 1))) * v;  // Avoid branching.
     }
@@ -2040,7 +2042,7 @@ SudokuConstraintHandler.LocalEntropy = class LocalEntropy extends SudokuConstrai
     if (allValues != squishedMask) return false;
     if (fixedValues == squishedMask) return true;
 
-    let hiddenSquishedSingles = allValues & ~nonUniqueValues & ~fixedValues;
+    let hiddenSquishedSingles = allValues & ~atLeastTwo & ~fixedValues;
     if (hiddenSquishedSingles) {
       // We have "hidden singles" equivalent. Find and constrain them.
       for (let i = 0; i < numCells; i++) {
@@ -2054,6 +2056,29 @@ SudokuConstraintHandler.LocalEntropy = class LocalEntropy extends SudokuConstrai
           const cell = cells[i];
           grid[cell] &= unsquishedValue;
           handlerAccumulator.addForCell(cell);
+        }
+      }
+      fixedValues |= hiddenSquishedSingles;
+    }
+
+    // Look for hidden pairs if there are at least 2 values set in exactly
+    // two places.
+    const exactlyTwo = atLeastTwo & ~atLeastThree & ~fixedValues;
+    if (exactlyTwo & (exactlyTwo - 1)) {
+      for (let i = 0; i < numCells - 1; i++) {
+        const v = valuesBuffer[i] & exactlyTwo;
+        if (!(v & (v - 1))) continue;
+
+        for (let j = i + 1; j < numCells; j++) {
+          if (!(v & ~valuesBuffer[j])) {
+            // The jth cell includes all the values in v. Thus we have a
+            // pair.
+            // Eliminate all other values from the pair in case it is a
+            // hidden pair.
+            const unsquishedValue = v | (v << 1) | (v << 2);
+            grid[cells[i]] &= unsquishedValue;
+            grid[cells[j]] &= unsquishedValue;
+          }
         }
       }
     }
