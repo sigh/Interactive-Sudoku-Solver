@@ -1570,7 +1570,7 @@ class CustomBinaryConstraintManager extends DropdownInputManager {
 
     this._addToPanel = addToPanel;
     this._onChange = onChange;
-    this._configs = [];
+    this._configs = new Map();
     this._shape = null;
     this._display = display;
 
@@ -1599,8 +1599,7 @@ class CustomBinaryConstraintManager extends DropdownInputManager {
         return false;
       }
 
-      const encodedName = SudokuConstraint.Binary.encodeName(name);
-      this._add(encodedName, key, this._currentSelection.slice());
+      this._add(key, name, this._currentSelection.slice());
       this._onChange();
 
       return false;
@@ -1608,37 +1607,47 @@ class CustomBinaryConstraintManager extends DropdownInputManager {
   }
 
   clear() {
-    this._configs = [];
+    this._configs.clear();
   }
 
   addConstraint(constraint) {
-    this._add(constraint.name, constraint.key, constraint.cells);
+    for (const { name, cells } of
+      SudokuConstraint.Binary.parseGroups(constraint.items, true)) {
+      this._add(constraint.key, name, cells);
+    }
   }
 
-  _add(encodedName, key, cells) {
-    const name = SudokuConstraint.Binary.decodeName(encodedName);
-
+  _add(key, name, cells) {
     const config = {
-      encodedName: encodedName,
       name: name || 'Custom',
+      originalName: name,
       key: key,
       cells: cells,
       isCustomBinary: true,
       displayElem: this._display.drawCustomBinary(cells),
     };
     this._addToPanel(config);
-    this._configs.push(config);
+
+    if (!this._configs.has(key)) this._configs.set(key, []);
+    this._configs.get(key).push(config);
   }
 
   removeConstraint(config) {
-    const index = this._configs.indexOf(config);
-    this._configs.splice(index, 1);
+    const keyConfigs = this._configs.get(config.key);
+    const index = keyConfigs.indexOf(config);
+    keyConfigs.splice(index, 1);
   }
 
   getConstraints() {
-    return this._configs.map((c) =>
-      new SudokuConstraint.Binary(
-        c.encodedName, c.key, ...c.cells));
+    const constraints = [];
+    for (const [key, configs] of this._configs) {
+      if (!configs.length) continue;
+      constraints.push(
+        SudokuConstraint.Binary.makeFromGroups(
+          key,
+          configs.map(c => ({ name: c.originalName, cells: c.cells }))));
+    }
+    return constraints;
   }
 }
 

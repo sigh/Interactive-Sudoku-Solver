@@ -599,9 +599,7 @@ class ConstraintDisplay extends DisplayItem {
     g.setAttribute('stroke', colors[index % colors.length]);
 
     for (let i = 1; i < cells.length; i++) {
-      if (!cells[i - 1] || !cells[i]) continue;
-      this._drawCustomBinaryPair(
-        cells[i - 1], cells[i], g);
+      this._drawCustomBinaryPair(cells[i - 1], cells[i], g);
     }
 
     return g;

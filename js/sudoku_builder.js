@@ -737,11 +737,58 @@ class SudokuConstraint {
   }
 
   static Binary = class Binary extends SudokuConstraint {
-    constructor(name, key, ...cells) {
+    constructor(key, ...items) {
       super(arguments);
-      this.name = name;
       this.key = key;
-      this.cells = cells;
+      this.items = items;
+    }
+
+    static makeFromGroups(key, groups) {
+      const items = [];
+      let currentName = '';
+      // Sort so that all names appear together.
+      groups.sort((a, b) => a.name.localeCompare(b.name));
+
+      for (const group of groups) {
+        if (group.name == currentName) {
+          items.push('');
+        } else {
+          currentName = group.name;
+          items.push('_' + this.encodeName(currentName));
+        }
+        items.push(...group.cells);
+      }
+
+      return new SudokuConstraint.Binary(key, ...items);
+    }
+
+    static *parseGroups(items, includeNames) {
+      let currentName = '';
+      let currentGroup = {
+        cells: [],
+        name: currentName,
+      };
+      for (const item of items) {
+        if (item.length && item[0] == 'R' || item[0] == 'r') {
+          // This is a cell.
+          currentGroup.cells.push(item);
+          continue;
+        }
+        // Otherwise we are starting a new group. Yield the current one.
+        if (currentGroup.cells.length) yield currentGroup;
+
+        // Update the name if it has been replaced.
+        if (item.length && includeNames) {
+          currentName = this.decodeName(item.substring(1));
+        }
+
+        currentGroup = {
+          cells: [],
+          name: currentName,
+        };
+      }
+
+      if (currentGroup.cells.length) yield currentGroup;
     }
 
     static fnToKey(fn, numValues) {
@@ -1188,12 +1235,13 @@ class SudokuBuilder {
           break;
 
         case 'Binary':
-          cells = constraint.cells.map(c => c && shape.parseCellId(c).cell);
-          for (let i = 1; i < cells.length; i++) {
-            if (!cells[i - 1] || !cells[i]) continue;
-            yield new SudokuConstraintHandler.BinaryConstraint(
-              cells[i - 1], cells[i],
-              constraint.key);
+          for (const g of SudokuConstraint.Binary.parseGroups(constraint.items)) {
+            cells = g.cells.map(c => c && shape.parseCellId(c).cell);
+            for (let i = 1; i < cells.length; i++) {
+              yield new SudokuConstraintHandler.BinaryConstraint(
+                cells[i - 1], cells[i],
+                constraint.key);
+            }
           }
           break;
 
