@@ -288,3 +288,31 @@ class RandomIntGenerator {
     return Math.floor(rand * (max + 1));
   }
 }
+
+class Base64Codec {
+  static BASE64_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-';
+  static BASE64_INDEX = (() => {
+    const lookup = new Uint8Array(127);
+    for (let i = 0; i < this.BASE64_CHARS.length; i++) {
+      lookup[this.BASE64_CHARS.charCodeAt(i)] = i;
+    }
+    return lookup;
+  })();
+
+  static encode6BitArray(array) {
+    return array.map((v) => this.BASE64_CHARS[v]).join('');
+  };
+
+  static decodeTo6BitArray(str, array) {
+    array ||= new Uint8Array(str.length);
+    if (array.length < str.length) {
+      throw ('Array is too short.');
+    }
+
+    for (let i = 0; i < str.length; i++) {
+      array[i] = this.BASE64_INDEX[str.charCodeAt(i)];
+    }
+
+    return array;
+  }
+};

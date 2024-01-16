@@ -792,20 +792,32 @@ class SudokuConstraint {
     }
 
     static fnToKey(fn, numValues) {
-      return this._fnToBigInt(fn, numValues).toString(16);
+      const array = this._fnTo6BitArray(fn, numValues);
+      return Base64Codec.encode6BitArray(array);
     }
 
-    static _fnToBigInt(fn, numValues) {
-      let key = 0n;
-      const shiftInc = BigInt(numValues);
-      for (let i = 1, shift = 0n; i <= numValues; i++, shift += shiftInc) {
-        let part = 0;
+    static _fnTo6BitArray(fn, numValues) {
+      const NUM_BITS = 6;
+      const array = [];
+
+      let v = 0;
+      let vIndex = 0;
+      for (let i = 1; i <= numValues; i++) {
         for (let j = 1; j <= numValues; j++) {
-          part |= fn(i, j) << (j - 1);
+          v |= (!!fn(i, j)) << vIndex;
+          if (++vIndex == NUM_BITS) {
+            array.push(v);
+            vIndex = 0;
+            v = 0;
+          }
         }
-        key |= BigInt(part) << shift;
       }
-      return key;
+      array.push(v);
+
+      // Trim trailing zeros.
+      while (array.length && !array[array.length - 1]) array.pop();
+
+      return array;
     }
 
     static encodeName(displayName) {

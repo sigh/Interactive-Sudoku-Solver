@@ -1420,21 +1420,31 @@ class LookupTables {
       return table;
     })();
 
+    const NUM_BITS_BASE64 = 6;
+    const keyArr = new Uint8Array(
+      Math.ceil(numValues * numValues / NUM_BITS_BASE64));
+
     this.forBinaryKey = memoize((key) => {
       const table = new Uint16Array(combinations);
       const tableInv = new Uint16Array(combinations);
 
-      let keyInt = BigInt('0x' + key);
-      const mask = (1n << BigInt(numValues + 1)) - 1n;
+      keyArr.fill(0);
+      Base64Codec.decodeTo6BitArray(key, keyArr);
 
       // Populate base cases, where there is a single value set.
+      let keyIndex = 0;
+      let vIndex = 0;
       for (let i = 0; i < numValues; i++) {
-        let v = Number((keyInt & mask));
-        keyInt >>= BigInt(numValues);
         for (let j = 0; j < numValues; j++) {
-          table[1 << i] |= (v & 1) << j;
-          tableInv[1 << j] |= (v & 1) << i;
-          v >>= 1;
+          const v = keyArr[keyIndex] & 1;
+          table[1 << i] |= v << j;
+          tableInv[1 << j] |= v << i;
+
+          keyArr[keyIndex] >>= 1;
+          if (++vIndex == NUM_BITS_BASE64) {
+            vIndex = 0;
+            keyIndex++;
+          }
         }
       }
 
