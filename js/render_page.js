@@ -639,7 +639,6 @@ class ConstraintManager {
       try {
         this.loadFromText(input);
       } catch (e) {
-        console.error(e + ' Input: ' + input);
         freeInputError.textContent = e;
       }
       return false;
@@ -1583,6 +1582,8 @@ class CustomBinaryConstraintManager extends DropdownInputManager {
 
   _setUp() {
     const form = this._containerElem;
+    const errorElem = document.getElementById(
+      'custom-binary-input-function-error');
     form.onsubmit = e => {
       const formData = new FormData(form);
       const name = formData.get('name');
@@ -1595,7 +1596,7 @@ class CustomBinaryConstraintManager extends DropdownInputManager {
         key = SudokuConstraint.Binary.fnToKey(
           fn, this._shape.numValues);
       } catch (e) {
-        console.error(e);
+        errorElem.textContent = e;
         return false;
       }
 
@@ -1603,6 +1604,9 @@ class CustomBinaryConstraintManager extends DropdownInputManager {
       this._onChange();
 
       return false;
+    };
+    form['function'].oninput = () => {
+      errorElem.textContent = '';
     };
   }
 

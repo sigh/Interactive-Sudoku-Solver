@@ -97,7 +97,7 @@ layout: null
           <textarea id="freeform-constraint-text" name="freeform-input" rows="3"></textarea>
           <button type="submit" title="Load from text">Load from text</button>
         </span>
-        <div id="freeform-constraint-input-error"></div>
+        <div id="freeform-constraint-input-error" class="error"></div>
       </form>
     </div>
 
@@ -485,6 +485,7 @@ layout: null
                 Constraint: <code>(a,b) =></code>
                 <textarea rows="3" name="function"></textarea>
               </div>
+              <div id="custom-binary-input-function-error" class="error"></div>
               <div>
                 <button type="submit" title="Add constraint">Add</button>
               </div>
