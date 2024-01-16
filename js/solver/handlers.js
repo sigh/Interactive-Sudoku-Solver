@@ -229,6 +229,9 @@ SudokuConstraintHandler.BinaryConstraint = class BinaryConstraint extends Sudoku
     super([cell1, cell2]);
     this._key = key;
     this._tables = [];
+
+    // Ensure we dedupe binary constraints.
+    this.idStr = [this.constructor.name, key, cell1, cell2].join('-');
   }
 
   initialize(initialGrid, cellConflicts, shape) {
