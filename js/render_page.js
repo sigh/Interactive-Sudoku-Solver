@@ -1624,7 +1624,7 @@ class CustomBinaryConstraintManager extends DropdownInputManager {
       key: key,
       cells: cells,
       isCustomBinary: true,
-      displayElem: this._display.drawCustomBinary(cells),
+      displayElem: this._display.drawCustomBinary(cells, key),
     };
     this._addToPanel(config);
 
