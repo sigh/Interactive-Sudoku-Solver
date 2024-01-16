@@ -211,6 +211,7 @@ const runSolveTests = async (onFailure) => {
     'Odd even',
     'Quadruple X',
     'Quadruple - repeated values',
+    'Odd-even thermo',
   ], onFailure);
 
   await runAllWithChecks([
