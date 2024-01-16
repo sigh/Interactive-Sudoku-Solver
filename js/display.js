@@ -461,6 +461,7 @@ class ConstraintDisplay extends DisplayItem {
 
     this._customBinaryDisplay = displayContainer.getNewGroup('custom-binary-group');
     this._applyGridOffset(this._customBinaryDisplay);
+    this._customBinaryColors = new ColorPicker();
 
     this._quadGroup = displayContainer.getNewGroup('quad-group');
     this._applyGridOffset(this._quadGroup);
@@ -515,7 +516,9 @@ class ConstraintDisplay extends DisplayItem {
     clearDOMNode(this._quadGroup);
     clearDOMNode(this._lineConstraintGroup);
     clearDOMNode(this._adjConstraintGroup);
+
     clearDOMNode(this._customBinaryDisplay);
+    this._customBinaryColors.clear();
 
     this._givensDisplay.clear();
 
@@ -537,6 +540,7 @@ class ConstraintDisplay extends DisplayItem {
     if (!item) return;
     if (this._jigsawRegions.removeItem(item)) return;
     if (this._killerCageDisplay.removeCage(item)) return;
+    this._customBinaryColors.removeItem(item);
     item.parentNode.removeChild(item);
   }
 
@@ -574,30 +578,16 @@ class ConstraintDisplay extends DisplayItem {
     return dot;
   }
 
-  // Color list for use by constraints that need different colors.
-  static COLOR_LIST = [
-    'green',
-    'red',
-    'blue',
-    'yellow',
-    'cyan',
-    'brown',
-    'black',
-    'purple',
-    'orange',
-  ];
-
-  static _customBinaryColorIndex = 0;
-  drawCustomBinary(cells) {
+  drawCustomBinary(cells, key) {
     const g = createSvgElement('g');
     this._customBinaryDisplay.append(g);
 
     const LINE_WIDTH = 2;
 
     g.setAttribute('stroke-width', LINE_WIDTH);
-    const index = this.constructor._customBinaryColorIndex++;
-    const colors = this.constructor.COLOR_LIST;
-    const color = colors[index % colors.length];
+
+    const color = this._customBinaryColors.pickColor(key);
+    this._customBinaryColors.addItem(g, color, key);
     g.setAttribute('fill', color);
     g.setAttribute('stroke', color);
 
@@ -1348,23 +1338,19 @@ class KillerCageDisplay extends DisplayItem {
     super(svg);
     this._applyGridOffset(svg);
     this._unusedPatternId = 0;
+    this._killerCellColors = new ColorPicker();
 
     this.clear();
   }
 
   clear() {
     super.clear();
-    this._killerCellColors = new Map();
-    this._killerCages = new Map();
+    this._killerCellColors.clear();
   }
 
   removeCage(item) {
-    if (this._killerCages.has(item)) {
+    if (this._killerCellColors.removeItem(item)) {
       item.parentNode.removeChild(item);
-      for (const cellId of this._killerCages.get(item)) {
-        this._killerCellColors.delete(cellId);
-      }
-      this._killerCages.delete(item);
       return true;
     }
     return false;
@@ -1393,8 +1379,7 @@ class KillerCageDisplay extends DisplayItem {
 
       cage.appendChild(path);
     }
-    this._killerCages.set(cage, [...cells]);
-    cells.forEach(cell => this._killerCellColors.set(cell, color));
+    this._killerCellColors.addItem(cage, color, ...cells);
 
     // Draw the sum in the top-left most cell. Luckily, this is the sort order.
     cells.sort((a, b) => a - b);
@@ -1427,20 +1412,100 @@ class KillerCageDisplay extends DisplayItem {
   _chooseKillerCageColor(cellIds) {
     const shape = this._shape;
     // Use a greedy algorithm to choose the graph color.
-    const conflictingColors = new Set();
+    const conflictingCells = [];
     for (const cellId of cellIds) {
       let { row, col } = shape.parseCellId(cellId);
-      // Lookup all  adjacent cells, it doesn't matter if they valid or not.
-      conflictingColors.add(this._killerCellColors.get(shape.makeCellId(row, col + 1)));
-      conflictingColors.add(this._killerCellColors.get(shape.makeCellId(row, col - 1)));
-      conflictingColors.add(this._killerCellColors.get(shape.makeCellId(row + 1, col)));
-      conflictingColors.add(this._killerCellColors.get(shape.makeCellId(row - 1, col)));
+      // Lookup all adjacent cells, it doesn't matter if they valid or not.
+      conflictingCells.push(shape.makeCellId(row, col + 1));
+      conflictingCells.push(shape.makeCellId(row, col - 1));
+      conflictingCells.push(shape.makeCellId(row + 1, col));
+      conflictingCells.push(shape.makeCellId(row - 1, col));
     }
-    // Return the first color that doesn't conflict.
-    for (const color of ConstraintDisplay.COLOR_LIST) {
-      if (!conflictingColors.has(color)) return color;
-    }
-    // Otherwise select a random color.
-    return `rgb(${Math.random() * 255 | 0},${Math.random() * 255 | 0},${Math.random() * 255 | 0})`;
+    return this._killerCellColors.pickColor(null, conflictingCells);
   }
 }
+
+class ColorPicker {
+  // Default color list.
+  COLOR_LIST = [
+    'green',
+    'red',
+    'blue',
+    'orange',
+    'cyan',
+    'brown',
+    'black',
+    'purple',
+    'gold',
+  ];
+
+  constructor() {
+    this._keyToColors = new Map();
+    this._itemToKeys = new Map();
+    this._keyToItems = new Map();
+  }
+
+  // Pick a color:
+  // - If there is already a color for the given key then use that.
+  // - Otherwise pick a color that is not used by any of the conflicting keys.
+  // - If conflicting keys is not set then avoid all used keys.
+  pickColor(key, conflictingKeys) {
+    if (key != null && this._keyToColors.has(key)) {
+      return this._keyToColors.get(key);
+    }
+
+    let conflictingColors = null;
+    if (!conflictingKeys) {
+      conflictingColors = new Set(this._keyToColors.values());
+    } else {
+      conflictingColors = new Set(
+        conflictingKeys.map(k => this._keyToColors.get(k)));
+    }
+
+    for (const color of this.COLOR_LIST) {
+      if (!conflictingColors.has(color)) return color;
+    }
+
+    return this.constructor._randomColor();
+  }
+
+  static _randomColor() {
+    return `rgb(${Math.random() * 255 | 0},${Math.random() * 255 | 0},${Math.random() * 255 | 0})`;
+  }
+
+  addItem(item, color, ...keys) {
+    this._itemToKeys.set(item, keys);
+    for (const key of keys) {
+      this._keyToColors.set(key, color);
+
+      if (!this._keyToItems.has(key)) {
+        this._keyToItems.set(key, new Set());
+      }
+      this._keyToItems.get(key).add(item);
+    }
+  }
+
+  removeItem(item) {
+    if (!this._itemToKeys.has(item)) return false;
+
+    for (const key of this._itemToKeys.get(item)) {
+      const keyItems = this._keyToItems.get(key);
+      keyItems.delete(item);
+      // If there are no more items with this key, then remove it.
+      if (!keyItems.size) {
+        this._keyToColors.delete(key);
+        this._keyToItems.delete(key);
+      }
+    }
+
+    this._itemToKeys.delete(item);
+
+    return true;
+  }
+
+  clear() {
+    this._keyToColors.clear();
+    this._itemToKeys.clear();
+    this._keyToItems.clear();
+  }
+};
