@@ -188,7 +188,8 @@ button:hover:enabled {
 }
 
 button:disabled {
-  opacity: 0.5;
+  /* Emulate opacity(0.5) without making it transparent. */
+  filter: contrast(0.333) brightness(1.5);
 }
 
 button:active {
@@ -263,7 +264,8 @@ button.image-button>img {
   margin-top: 10px;
 
   height: 75px;
-  overflow: scroll;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 #displayed-regions:empty:before {
@@ -420,7 +422,7 @@ button.icon-button {
   display: block;
   width: 100%;
   text-align: left;
-  overflow: scroll;
+  overflow: visible;
   white-space: nowrap;
 }
 
