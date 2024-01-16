@@ -592,31 +592,36 @@ class ConstraintDisplay extends DisplayItem {
     const g = createSvgElement('g');
     this._customBinaryDisplay.append(g);
 
-    g.setAttribute('fill', 'transparent');
-    g.setAttribute('stroke-width', 1);
+    const LINE_WIDTH = 2;
+
+    g.setAttribute('stroke-width', LINE_WIDTH);
     const index = this.constructor._customBinaryColorIndex++;
     const colors = this.constructor.COLOR_LIST;
-    g.setAttribute('stroke', colors[index % colors.length]);
+    const color = colors[index % colors.length];
+    g.setAttribute('fill', color);
+    g.setAttribute('stroke', color);
 
-    for (let i = 1; i < cells.length; i++) {
-      this._drawCustomBinaryPair(cells[i - 1], cells[i], g);
-    }
+    const centers = cells.map(c => this.cellIdCenter(c));
 
-    return g;
-  }
-
-  _drawCustomBinaryPair(cell0, cell1, g) {
-    const cells = [cell0, cell1];
     // Draw the line.
-    const path = this._makePath(cells.map(c => this.cellIdCenter(c)));
+    const path = this._makePath(centers);
     path.setAttribute('stroke-dasharray', '2');
     g.appendChild(path);
 
     // Draw the circles.
-    for (const circle of cells.map(c => this._makeCircle(c))) {
-      circle.setAttribute('r', 5);
+    for (let i = 0; i < cells.length; i++) {
+      const circle = this._makeCircle(cells[i]);
+      if (i == 0) {
+        circle.setAttribute('r', LINE_WIDTH * 2);
+        circle.setAttribute('fill', 'transparent');
+        circle.setAttribute('stroke-width', 1);
+      } else {
+        circle.setAttribute('r', LINE_WIDTH);
+      }
       g.appendChild(circle);
     }
+
+    return g;
   }
 
   drawXV(cells, letter) {
