@@ -315,4 +315,8 @@ class Base64Codec {
 
     return array;
   }
+
+  static lengthOf6BitArray(numBits) {
+    return Math.ceil(numBits / 6);
+  }
 };

@@ -1422,7 +1422,7 @@ class LookupTables {
 
     const NUM_BITS_BASE64 = 6;
     const keyArr = new Uint8Array(
-      Math.ceil(numValues * numValues / NUM_BITS_BASE64));
+      Base64Codec.lengthOf6BitArray(numValues * numValues));
 
     this.forBinaryKey = memoize((key) => {
       const table = new Uint16Array(combinations);
