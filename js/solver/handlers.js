@@ -88,6 +88,7 @@ SudokuConstraintHandler.GivenCandidates = class GivenCandidates extends SudokuCo
 SudokuConstraintHandler.AllDifferent = class AllDifferent extends SudokuConstraintHandler {
   constructor(conflictCells) {
     super();
+    conflictCells = conflictCells.slice();
     conflictCells.sort((a, b) => a - b);
     this._conflictCells = conflictCells;
   }
@@ -431,7 +432,7 @@ SudokuConstraintHandler._SumHandlerUtil = class _SumHandlerUtil {
     // generates the best conflict sets.
     // NOTE: The first ordering is the original (sorted) ordering. This ordering
     //       should work well for little killers and other linear regions.
-    cells = [...cells];
+    cells = cells.slice();
     for (let i = 0; i < NUM_TRIALS; i++) {
       let conflictSets = this.findConflictSetsGreedy(cells, cellConflicts);
       // If there is only one conflict set, then we can't do any better.
@@ -800,6 +801,7 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
   _negativeCells = [];
 
   constructor(cells, sum) {
+    cells = cells.slice();
     cells.sort((a, b) => a - b);
 
     super(cells);
@@ -1033,6 +1035,7 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
 // does not need to be made more general.
 SudokuConstraintHandler.SumWithNegative = class SumWithNegative extends SudokuConstraintHandler.Sum {
   constructor(positiveCells, negativeCell, sum) {
+    positiveCells = positiveCells.slice();
     positiveCells.sort((a, b) => a - b);
     super([...positiveCells, negativeCell], sum);
 
@@ -1565,6 +1568,9 @@ SudokuConstraintHandler.Jigsaw = class Jigsaw extends SudokuConstraintHandler {
 
 SudokuConstraintHandler.SameValues = class SameValues extends SudokuConstraintHandler {
   constructor(cells0, cells1, isUnique) {
+    cells0 = cells0.slice();
+    cells1 = cells1.slice();
+
     cells0.sort((a, b) => a - b);
     cells1.sort((a, b) => a - b);
     super([...cells0, ...cells1]);
