@@ -249,6 +249,11 @@ button.image-button>img {
 
   background: rgba(0, 0, 255, 0.1);
   border-radius: 10px;
+
+  font-size: 12px;
+  width: min-content;
+  min-width: 100%;
+  line-height: 1.2em;
 }
 
 #displayed-regions {
@@ -277,7 +282,12 @@ button.image-button>img {
   align-items: center;
   border-radius: 10px;
   background: rgba(255, 255, 0, 0.5);
-  margin: 5px;
+  margin: 3px;
+}
+
+.constraint-item span {
+  margin-right: 5px;
+  margin-left: 10px;
 }
 
 .constraint-item button {
@@ -287,7 +297,7 @@ button.image-button>img {
   font-size: 25px;
   cursor: pointer;
   margin: 0px;
-  padding: auto;
+  padding: 2px 10px;
 }
 
 .constraint-item:hover {
@@ -314,6 +324,11 @@ button.image-button>img {
   justify-content: space-between;
 }
 
+#constraint-panel .panel-edge-constraints {
+  margin-right: 10px;
+  gap: 2px;
+}
+
 #outside-arrow-input {
   /* Hack, because for some reason `vertical-align: text-top` moves the tooltip
      down for just the little killer:( */
@@ -324,15 +339,6 @@ button.image-button>img {
   display: flex;
   align-items: center;
   column-gap: 15px;
-}
-
-#constraint-panel svg {
-  margin-right: 10px;
-}
-
-#constraint-panel .panel-edge-constraints {
-  margin-right: 10px;
-  gap: 2px;
 }
 
 input[type=number] {
