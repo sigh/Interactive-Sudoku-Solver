@@ -465,12 +465,14 @@ layout: null
                 </p>
                 <p>
                   The function takes the two cell values
-                  as input and should return true if this is valid.
+                  as input and should return true or false to indicate if this
+                  pair of values is valid.
                 </p>
                 <p>
                   If more than two cells are selected then the constraint will
                   be applied to each consecutive pairs of cells. e.g. for
-                  cells [A, B, C] the constraints will be (A,B) and (B,C).
+                  cells [A, B, C] the constraint will be applied to [A,B] and
+                  [B,C].
                 </p>
                 <p>
                   Example: <code>a &lt; b</code> will emulate a thermometer
@@ -479,7 +481,7 @@ layout: null
               </div>
               <div>
                 Name:
-                <input type="text" name="name" placeholder="optional" maxlength="15" columns="15">
+                <input type="text" name="name" placeholder="optional" maxlength="20" columns="20">
               </div>
               <div id="custom-binary-input-function">
                 Constraint: <code>(a,b) =></code>
