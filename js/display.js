@@ -459,8 +459,8 @@ class ConstraintDisplay extends DisplayItem {
     this._diagonalDisplay = new DiagonalDisplay(
       displayContainer.getNewGroup('diagonal-group'));
 
-    this._customBinaryDisplay = displayContainer.getNewGroup('custom-binary-group');
-    this._applyGridOffset(this._customBinaryDisplay);
+    this._customBinaryGroup = displayContainer.getNewGroup('custom-binary-group');
+    this._applyGridOffset(this._customBinaryGroup);
     this._customBinaryColors = new ColorPicker();
 
     this._quadGroup = displayContainer.getNewGroup('quad-group');
@@ -517,7 +517,7 @@ class ConstraintDisplay extends DisplayItem {
     clearDOMNode(this._lineConstraintGroup);
     clearDOMNode(this._adjConstraintGroup);
 
-    clearDOMNode(this._customBinaryDisplay);
+    clearDOMNode(this._customBinaryGroup);
     this._customBinaryColors.clear();
 
     this._givensDisplay.clear();
@@ -580,7 +580,7 @@ class ConstraintDisplay extends DisplayItem {
 
   drawCustomBinary(cells, key, type) {
     const g = createSvgElement('g');
-    this._customBinaryDisplay.append(g);
+    this._customBinaryGroup.append(g);
 
     const LINE_WIDTH = 2;
 
