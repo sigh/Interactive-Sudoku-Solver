@@ -760,7 +760,7 @@ class SudokuConstraint {
         items.push(...group.cells);
       }
 
-      return new SudokuConstraint.Binary(key, ...items);
+      return new this(key, ...items);
     }
 
     static *parseGroups(items, includeNames) {
@@ -832,6 +832,15 @@ class SudokuConstraint {
         displayName = decodeURIComponent(name);
       } catch (e) { }
       return displayName;
+    }
+  }
+
+  static BinaryX = class BinaryX extends SudokuConstraint.Binary {
+    static fnToKey(fn, numValues) {
+      // Make the function symmetric.
+      return super.fnToKey(
+        (a, b) => fn(a, b) && fn(b, a),
+        numValues);
     }
   }
 
@@ -1258,6 +1267,19 @@ class SudokuBuilder {
           }
           break;
 
+        case 'BinaryX':
+          for (const g of SudokuConstraint.Binary.parseGroups(constraint.items)) {
+            cells = g.cells.map(c => c && shape.parseCellId(c).cell);
+            // This assumes that the key is already symmetric.
+            for (let i = 0; i < cells.length; i++) {
+              for (let j = i + 1; j < cells.length; j++) {
+                yield new SudokuConstraintHandler.BinaryConstraint(
+                  cells[i], cells[j],
+                  constraint.key);
+              }
+            }
+          }
+          break;
 
         case 'Priority':
           cells = constraint.cells.map(c => shape.parseCellId(c).cell);

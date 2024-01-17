@@ -212,6 +212,7 @@ const runSolveTests = async (onFailure) => {
     'Quadruple X',
     'Quadruple - repeated values',
     'Odd-even thermo',
+    'Nabner thermo - easy',
   ], onFailure);
 
   await runAllWithChecks([
