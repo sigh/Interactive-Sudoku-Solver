@@ -332,7 +332,8 @@ class SudokuConstraint {
   static fromString(str) {
     str = str.replace(/\s+/g, '');
     let items = str.split('.');
-    if (items[0]) throw ('Invalid constraint string.');
+    if (items[0]) throw (
+      'Invalid constraint string: Constraint must start with a "."');
     items.shift();
 
     let constraints = [];

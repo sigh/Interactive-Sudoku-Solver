@@ -196,7 +196,7 @@ class ExampleHandler {
         link.style.display = 'inline-block';
 
         this._ignoreConstraintChanges = true;
-        this._constraintManager.loadFromText(EXAMPLES[example].input);
+        this._constraintManager.loadUnsafeFromText(EXAMPLES[example].input);
         this._ignoreConstraintChanges = false;
       } else {
         link.style.display = 'none';
@@ -631,23 +631,7 @@ class ConstraintManager {
     // Load examples.
     this._exampleHandler = new ExampleHandler(this);
 
-    // Free-form.
-    const freeInputForm = document.forms['freeform-constraint-input'];
-    const freeInputError = document.getElementById('freeform-constraint-input-error');
-    freeInputForm.onsubmit = e => {
-      e.preventDefault();
-      const input = (new FormData(freeInputForm)).get('freeform-input');
-      try {
-        this.loadFromText(input);
-      } catch (e) {
-        freeInputError.textContent = e;
-      }
-      return false;
-    };
-    freeInputForm['freeform-input'].oninput = () => {
-      freeInputError.textContent = '';
-    };
-    autoSaveField(freeInputForm['freeform-input']);
+    this._setUpFreeFormInput();
 
     // Clear button.
     document.getElementById('clear-constraints-button').onclick = () => this.clear();
@@ -656,6 +640,46 @@ class ConstraintManager {
     document.getElementById('copy-constraints-button').onclick = () => {
       navigator.clipboard.writeText(this.getConstraints());
     };
+  }
+
+  _setUpFreeFormInput() {
+    // Free-form.
+    const form = document.forms['freeform-constraint-input'];
+    const errorElem = document.getElementById('freeform-constraint-input-error');
+    const inputElem = form['freeform-input'];
+
+    // Allow loading free-form input from other locations.
+    this.loadUnsafeFromText = (input) => {
+      try {
+        this._loadFromText(input);
+      } catch (e) {
+        errorElem.textContent = e;
+        // If we were called from outside the form, then put the value in the
+        // so that the user can see the constraint which failed.
+        if (inputElem.value != input) inputElem.value = input;
+      }
+    };
+
+    form.onsubmit = e => {
+      e.preventDefault();
+      const input = inputElem.value;
+      this.loadUnsafeFromText(input);
+      return false;
+    };
+    inputElem.oninput = () => {
+      errorElem.textContent = '';
+    };
+    autoSaveField(inputElem);
+  }
+
+  _loadFromText(input) {
+    const constraint = SudokuConstraint.fromText(input);
+
+    this.clear();
+    this._shapeManager.loadConstraintShape(constraint);
+    this.loadConstraint(constraint);
+
+    this.runUpdateCallback();
   }
 
   _onNewSelection(selection, selectionForm) {
@@ -726,17 +750,6 @@ class ConstraintManager {
     } else {
       selectionForm.querySelector('button[type=submit]').focus();
     }
-  }
-
-  loadFromText(input) {
-    const constraint = SudokuConstraint.fromText(input);
-    if (constraint) {
-      this.clear();
-      this._shapeManager.loadConstraintShape(constraint);
-      this.loadConstraint(constraint);
-    }
-
-    this.runUpdateCallback();
   }
 
   loadConstraint(constraint) {

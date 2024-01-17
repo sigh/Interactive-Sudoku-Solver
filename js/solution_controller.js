@@ -1142,7 +1142,7 @@ class SolutionController {
 
       let constraintsText = params.get('q');
       if (constraintsText) {
-        this._constraintManager.loadFromText(constraintsText);
+        this._constraintManager.loadUnsafeFromText(constraintsText);
       }
     });
 
