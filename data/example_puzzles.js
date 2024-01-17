@@ -247,6 +247,11 @@ const EXAMPLES = {
     input: '.Binary~UFVQFUAFQAE~_Odd-Even%20Thermo~r1c2~r1c3~r1c4~r1c5~~r1c8~r1c9~r2c9~r3c9~~r2c8~r2c7~~r3c4~r3c3~~r3c2~r4c2~r4c1~~r6c3~r5c3~r5c4~r4c4~~r5c6~r4c6~r4c5~~r6c8~r6c9~r5c9~~r7r2~r7c3~~r7c8~r7c9~r8c9~~r8c2~r9c2~r9c1~~r8c4~r9c4~~r8c5~r9c5~r9c6',
     solution: '613798524298145736457362198971853642384621975562479813139286457726514389845937261',
   },
+  'Knight-arrows': {
+    src: 'https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?id=000EBE',
+    input: '.Arrow~R1C7~R1C6~R2C6~R3C6.Arrow~R3C1~R4C1~R4C2~R4C3.Arrow~R8C2~R9C1~R9C2.Arrow~R9C3~R9C4~R8C4~R7C4.Arrow~R8C8~R9C9~R9C8.Arrow~R7C9~R6C9~R6C8~R6C7.BlackDot~R4C3~R4C4.AntiKnight.Binary~EAEBEAAQAAAAE~~R3C6~R4C6.~R9C3_8~R5C5_5~R3C1_9~R1C7_6~R7C9_7',
+    solution: '382971645716542389945683271234819756167254938859736412491368527673125894528497163',
+  },
 
   // Classic grids that used to be slow. 3 and 4 used to take 2+ seconds.
   'Classic sudoku, was slow (1)': {

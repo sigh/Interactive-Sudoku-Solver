@@ -163,6 +163,7 @@ class ExampleHandler {
     'Skyscraper',
     'X-Sum',
     'Odd even',
+    'Odd-even thermo',
     'Global entropy',
     'Quadruple X',
     '16x16',
