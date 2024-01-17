@@ -504,7 +504,7 @@ class StateHistoryDisplay {
       'Solutions', 'solutions');
     this._addChartDisplay(this._statsContainer,
       'Progress percentage (searched + skipped)',
-      'skippedPercentage', 'searchedPercentage');
+      'searchedPercentage', 'skippedPercentage');
     this._addChartDisplay(this._statsContainer,
       'Guesses', 'guesses');
   }

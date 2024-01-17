@@ -15,7 +15,7 @@ const formatNumberMetric = (value) => {
   if (value < 1000) return value;
   if (value < 1000000) return (value / 1000) + 'k';
   if (value < 1000000000) return (value / 1000000) + 'M';
-  return (value / 1000000000) + 'T';
+  return (value / 1000000000) + 'G';
 };
 
 const createSvgElement = (tag) => {
