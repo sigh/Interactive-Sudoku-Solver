@@ -12,7 +12,7 @@ var TEST_TIMEOUT_MS = 0;
 
 const loadInput = (puzzleCfg) => {
   const [_, puzzle] = puzzleFromCfg(puzzleCfg);
-  constraintManager.loadFromText(puzzle.input);
+  constraintManager.loadUnsafeFromText(puzzle.input);
 }
 
 const puzzleFromCfg = (puzzleCfg) => {
