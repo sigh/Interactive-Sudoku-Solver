@@ -142,7 +142,6 @@ body {
 
 #freeform-constraint-text {
   width: 300px;
-  font-size: 12px;
   margin: 0;
   padding: 2px 0px 35px 2px;
 }
@@ -370,6 +369,7 @@ fieldset[disabled] {
 
 textarea {
   margin: 10px 0px;
+  font-size: 12px;
 }
 
 .control-panel {
@@ -843,12 +843,22 @@ h2 {
   margin: 5px;
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 10px;
+}
+
+#custom-binary-input select {
+  margin: 0;
+  padding-top: 2px;
+  padding-bottom: 2px;
 }
 
 #custom-binary-input-function {
   display: flex;
   gap: 10px;
+}
+
+#custom-binary-input-function code {
+  font-size: 12px;
 }
 
 #custom-binary-input-function textarea {
@@ -860,6 +870,7 @@ h2 {
   position: relative;
   font-size: 14px;
   user-select: none;
+  line-height: 1.2em;
 }
 
 .dropdown-container .dropdown-anchor,

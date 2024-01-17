@@ -578,7 +578,7 @@ class ConstraintDisplay extends DisplayItem {
     return dot;
   }
 
-  drawCustomBinary(cells, key) {
+  drawCustomBinary(cells, key, type) {
     const g = createSvgElement('g');
     this._customBinaryDisplay.append(g);
 
@@ -586,8 +586,9 @@ class ConstraintDisplay extends DisplayItem {
 
     g.setAttribute('stroke-width', LINE_WIDTH);
 
-    const color = this._customBinaryColors.pickColor(key);
-    this._customBinaryColors.addItem(g, color, key);
+    const colorKey = `${key}-${type}`;
+    const color = this._customBinaryColors.pickColor(colorKey);
+    this._customBinaryColors.addItem(g, color, colorKey);
     g.setAttribute('fill', color);
     g.setAttribute('stroke', color);
 
@@ -601,7 +602,7 @@ class ConstraintDisplay extends DisplayItem {
     // Draw the circles.
     for (let i = 0; i < cells.length; i++) {
       const circle = this._makeCircle(cells[i]);
-      if (i == 0) {
+      if (i == 0 && type != 'BinaryX') {
         circle.setAttribute('r', LINE_WIDTH * 2);
         circle.setAttribute('fill', 'transparent');
         circle.setAttribute('stroke-width', 1);

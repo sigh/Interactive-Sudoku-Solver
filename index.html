@@ -464,15 +464,9 @@ layout: null
                   JavaScript function.
                 </p>
                 <p>
-                  The function takes the two cell values
-                  as input and should return true or false to indicate if this
-                  pair of values is valid.
-                </p>
-                <p>
-                  If more than two cells are selected then the constraint will
-                  be applied to each consecutive pairs of cells. e.g. for
-                  cells [A, B, C] the constraint will be applied to [A,B] and
-                  [B,C].
+                  The function takes the two cell values as input and should
+                  return true or false to indicate if the pair of values is
+                  valid.
                 </p>
                 <p>
                   Example: <code>a &lt; b</code> will emulate a thermometer
@@ -483,11 +477,27 @@ layout: null
                 Name:
                 <input type="text" name="name" placeholder="optional" maxlength="20" columns="20">
               </div>
-              <div id="custom-binary-input-function">
-                Constraint: <code>(a,b) =></code>
-                <textarea rows="3" name="function"></textarea>
+              <div>
+                Chain handling
+                <span class="tooltip" data-text="
+                  Select how to handle chains of more than two cells. e.g. for
+                  a chain of cells [A, B, C] 'Consecutive pairs' will create
+                  constraints on [A, B] and [B, C] while 'All pairs' will create
+                  constraints on [A, B], [A, C], [B, A], [B, C], [C, A]
+                  and [C, B].">
+                </span>:
+                <select name="chain-mode">
+                  <option value="Binary">Consecutive pairs</option>
+                  <option value="BinaryX">All pairs</option>
+                </select>
               </div>
-              <div id="custom-binary-input-function-error" class="error"></div>
+              <div>
+                <div id="custom-binary-input-function">
+                  Constraint: <code>(a,b) =></code>
+                  <textarea rows="3" name="function"></textarea>
+                </div>
+                <div id="custom-binary-input-function-error" class="error"></div>
+              </div>
               <div>
                 <button type="submit" title="Add constraint">Add</button>
               </div>

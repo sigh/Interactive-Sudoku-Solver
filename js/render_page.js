@@ -166,6 +166,7 @@ class ExampleHandler {
     'Odd-even thermo',
     'Global entropy',
     'Quadruple X',
+    'Nabner thermo',
     '16x16',
     '16x16: Sudoku X, hard',
     '16x16: Jigsaw',
@@ -908,6 +909,9 @@ class ConstraintManager {
       case 'Binary':
         this._customBinaryConstraints.addConstraint(constraint);
         break;
+      case 'BinaryX':
+        this._customBinaryConstraints.addConstraint(constraint);
+        break;
       case 'LittleKiller':
       case 'Sandwich':
       case 'XSum':
@@ -1601,20 +1605,21 @@ class CustomBinaryConstraintManager extends DropdownInputManager {
     form.onsubmit = e => {
       const formData = new FormData(form);
       const name = formData.get('name');
+      const type = formData.get('chain-mode');
       const fnStr = formData.get('function');
 
       let key = null;
       try {
         const fn = Function(
           `return ((a,b)=>${fnStr})`)();
-        key = SudokuConstraint.Binary.fnToKey(
+        key = SudokuConstraint[type].fnToKey(
           fn, this._shape.numValues);
       } catch (e) {
         errorElem.textContent = e;
         return false;
       }
 
-      this._add(key, name, this._currentSelection.slice());
+      this._add(key, name, this._currentSelection.slice(), type);
       this._onChange();
 
       return false;
@@ -1631,37 +1636,45 @@ class CustomBinaryConstraintManager extends DropdownInputManager {
   addConstraint(constraint) {
     for (const { name, cells } of
       SudokuConstraint.Binary.parseGroups(constraint.items, true)) {
-      this._add(constraint.key, name, cells);
+      this._add(constraint.key, name, cells, constraint.type);
     }
   }
 
-  _add(key, name, cells) {
+  _add(key, name, cells, type) {
+    if (type != 'Binary' && type != 'BinaryX') {
+      return false;
+    }
+
     const config = {
       name: name || 'Custom',
       originalName: name,
       key: key,
       cells: cells,
+      type: type,
       isCustomBinary: true,
-      displayElem: this._display.drawCustomBinary(cells, key),
+      mapKey: `${type}-${key}`,
+      displayElem: this._display.drawCustomBinary(cells, key, type),
     };
     this._addToPanel(config);
 
-    if (!this._configs.has(key)) this._configs.set(key, []);
-    this._configs.get(key).push(config);
+    const mapKey = config.mapKey;
+    if (!this._configs.has(mapKey)) this._configs.set(mapKey, []);
+    this._configs.get(mapKey).push(config);
   }
 
   removeConstraint(config) {
-    const keyConfigs = this._configs.get(config.key);
+    const keyConfigs = this._configs.get(config.mapKey);
     const index = keyConfigs.indexOf(config);
     keyConfigs.splice(index, 1);
   }
 
   getConstraints() {
     const constraints = [];
-    for (const [key, configs] of this._configs) {
+    for (const configs of this._configs.values()) {
       if (!configs.length) continue;
+      const { key, type } = configs[0];
       constraints.push(
-        SudokuConstraint.Binary.makeFromGroups(
+        SudokuConstraint[type].makeFromGroups(
           key,
           configs.map(c => ({ name: c.originalName, cells: c.cells }))));
     }
