@@ -1040,36 +1040,6 @@ ModeHandler.ValidateLayout = class extends ModeHandler {
   }
 }
 
-class DeprecatedCookieManager {
-  constructor() {
-    this._values = this._initCookieValues();
-
-    if (this._values.has('autoSolve')) {
-      localStorage.setItem('autoSolve', this._values.get('autoSolve'));
-    }
-    const eraseCookie = (name) => {
-      document.cookie = name + '=; Max-Age=-99999999;';
-    };
-    eraseCookie('autoSolve');
-    eraseCookie('enableLogs');
-    eraseCookie('exportBacktrackCounts');
-  }
-
-  _initCookieValues() {
-    const values = new Map();
-    try {
-      // Initialize cookie values from document.cookie.
-      const cookies = document.cookie.split(';');
-      for (const cookie of cookies) {
-        const [key, value] = cookie.split('=');
-        values.set(key.trim(), value.trim());
-      }
-    } catch (e) { /* ignore */ }
-
-    return values;
-  }
-}
-
 class SolutionController {
   constructor(constraintManager, displayContainer) {
     // Solvers are a list in case we manage to start more than one. This can
@@ -1090,9 +1060,6 @@ class SolutionController {
     this._stepHighlighter = displayContainer.createHighlighter('highlighted-step-cell');
     displayContainer.addElement(
       HighlightDisplay.makeRadialGradient('highlighted-step-gradient'));
-
-    // Init localstorage from cookies. TODO: Remove after a few days.
-    new DeprecatedCookieManager();
 
     this.debugManager = new DebugManager(displayContainer);
     constraintManager.addReshapeListener(this.debugManager);
