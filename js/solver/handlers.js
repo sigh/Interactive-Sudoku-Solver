@@ -225,7 +225,7 @@ SudokuConstraintHandler.House = class House extends SudokuConstraintHandler {
   static _seenPairs = new Uint16Array(SHAPE_MAX.numValues);
   static _pairLocations = new Uint16Array(SHAPE_MAX.numValues);
 
-  _enforceNakedPairs(grid, cells) {
+  _enforceNakedPairs(grid, cells, handlerAccumulator) {
     const numCells = cells.length;
 
     let numPairs = 0 | 0;
@@ -257,6 +257,7 @@ SudokuConstraintHandler.House = class House extends SudokuConstraintHandler {
           if (!(kv & v)) continue;
           if (!(kv &= ~v)) return false;
           grid[cells[k]] = kv;
+          handlerAccumulator.addForCell(cells[k]);
 
           // If removing values made this a naked pair then add it to the list.
           if (countOnes16bit(kv) == 2) {
@@ -304,7 +305,7 @@ SudokuConstraintHandler.House = class House extends SudokuConstraintHandler {
     // We won't have anything useful to do unless we have at least 2 free cells.
     if (numCells - countOnes16bit(fixedValues) <= 2) return true;
 
-    return this._enforceNakedPairs(grid, cells);
+    return this._enforceNakedPairs(grid, cells, handlerAccumulator);
   }
 
   exclusionCells() {
@@ -1869,12 +1870,18 @@ SudokuConstraintHandler.SameValues = class SameValues extends SudokuConstraintHa
     // Enforce the constrained value set.
     if (values0 !== values) {
       for (let i = numCells - 1; i >= 0; i--) {
-        if (!(grid[cells0[i]] &= values)) return false;
+        if (grid[cells0[i]] & ~values) {
+          if (!(grid[cells0[i]] &= values)) return false;
+          handlerAccumulator.addForCell(cells0[i]);
+        }
       }
     }
     if (values1 !== values) {
       for (let i = numCells - 1; i >= 0; i--) {
-        if (!(grid[cells1[i]] &= values)) return false;
+        if (grid[cells1[i]] & ~values) {
+          if (!(grid[cells1[i]] &= values)) return false;
+          handlerAccumulator.addForCell(cells1[i]);
+        }
       }
     }
 
