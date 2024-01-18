@@ -30,19 +30,27 @@ const puzzleFromCfg = (puzzleCfg) => {
   return [puzzleStr, puzzle];
 };
 
-const runFnWithChecks = async (puzzles, fn, onFailure) => {
-  const startTime = performance.now();
-
-  const sumObjectValues = (a, b) => {
-    let result = { ...a };
-    for (const [k, v] of Object.entries(b)) {
+const sumObjectValues = (first, ...items) => {
+  if (!first) return {};
+  let result = { ...first };
+  for (const item of items) {
+    for (const [k, v] of Object.entries(item)) {
       if (!v) continue;
       if (!result[k]) result[k] = 0;
       result[k] += v;
     }
-    return result;
-  };
+  }
+  return result;
+};
 
+const addTotalToStats = (stats) => {
+  const totals = sumObjectValues(...stats);
+  delete totals.puzzle;
+  delete totals.collection;
+  stats.total = totals;
+}
+
+const runFnWithChecks = async (puzzles, fn, onFailure) => {
   let numFailures = 0;
   const failTest = (name, puzzle, result) => {
     numFailures++;
@@ -60,8 +68,7 @@ const runFnWithChecks = async (puzzles, fn, onFailure) => {
   const stateHandler = (s) => { state = s; };
 
   let solutions = [];
-  let rows = [];
-  let total = {};
+  let stats = [];
   for (const puzzleCfg of puzzles) {
     const [name, puzzle] = puzzleFromCfg(puzzleCfg);
 
@@ -122,28 +129,24 @@ const runFnWithChecks = async (puzzles, fn, onFailure) => {
     delete state.counters.progressRatio;
     delete state.counters.progressRatioPrev;
     const row = {
-      name: name,
+      puzzle: name,
       ...state.counters,
       setupTimeMs: state.puzzleSetupTime,
       rumtimeMs: state.timeMs
     };
-    rows.push(row);
-
-    total = sumObjectValues(total, row);
+    stats.push(row);
   }
-
-  total.name = 'Total';
-  rows.total = total;
-
-  const endTime = performance.now();
-  console.table(rows);
-  console.log('Finished in: ' + Math.floor(endTime - startTime) + 'ms');
 
   if (numFailures > 0) {
     console.error(numFailures + ' failures');
   }
 
-  return solutions;
+  addTotalToStats(stats);
+
+  return {
+    solutions,
+    stats,
+  }
 };
 
 const runAllWithChecks = async (puzzles, onFailure) => {
@@ -166,11 +169,15 @@ const runValidateLayoutTests = async (onFailure) => {
     EASY_INVALID_JIGSAW_LAYOUTS,
     FAST_INVALID_JIGSAW_LAYOUTS.slice(0, 20),
     VALID_JIGSAW_BOX_LAYOUTS.slice(0, 10));
-  await runValidateLayout(cases, onFailure);
+  const result = await runValidateLayout(cases, onFailure);
+  result.collection = 'Jigsaw layouts';
+  return [result];
 };
 
 const runSolveTests = async (onFailure) => {
-  await runAllWithChecks([
+  const results = [];
+  let result = null;
+  result = await runAllWithChecks([
     'Thermosudoku',
     'Classic sudoku',
     'Classic sudoku, hard',
@@ -214,22 +221,36 @@ const runSolveTests = async (onFailure) => {
     'Odd-even thermo',
     'Nabner thermo - easy',
   ], onFailure);
+  result.collection = '9x9';
+  results.push(result);
 
-  await runAllWithChecks([
+  result = await runAllWithChecks([
     '16x16',
     '16x16: Sudoku X',
     '16x16: Sudoku X, hard',
     '16x16: Jigsaw',
   ], onFailure);
+  result.collection = '16x16';
+  results.push(result);
+
+  return results;
 };
 
 const runAllTests = async () => {
-  await runSolveTests();
-  await runValidateLayoutTests();
+  let results = [];
+  results.push(...await runSolveTests());
+  results.push(...await runValidateLayoutTests());
+  console.log(results);
+  const stats = results.map(
+    r => ({ collection: r.collection, ...r.stats.total }));
+  addTotalToStats(stats);
+  console.table(stats);
 };
 
-const runAll = async (puzzles, onFailure) => {
-  await runAllWithChecks(puzzles, onFailure);
+const runAll = async (puzzles) => {
+  const result = await runAllWithChecks(puzzles);
+  console.table(result.stats);
+  return result;
 };
 
 const printGrid = (grid) => {
