@@ -280,11 +280,15 @@ SudokuConstraintHandler.AllContiguous = class AllContiguous extends SudokuConstr
     let allValues = 0;
     let nonUniqueValues = 0;
     let fixedValues = 0;
+    let allMins = 0;
+    let allMaxs = 0;
     for (let i = 0; i < numCells; i++) {
       const v = grid[cells[i]];
       nonUniqueValues |= allValues & v;
       allValues |= v;
       fixedValues |= !(v & (v - 1)) * v; // Avoid branching.
+      allMins |= v & -v;
+      allMaxs |= LookupTables.fromValue(LookupTables.maxValue(v));
     }
 
     // Find the possible starting values of contiguous ranges.
@@ -300,6 +304,17 @@ SudokuConstraintHandler.AllContiguous = class AllContiguous extends SudokuConstr
       possibleValues |= squishedValues << i;
     }
     if (fixedValues == possibleValues) return true;
+
+    // Constraint possibleValues from being too high or too low based on the
+    // maximum/minimum values individual cells can take.
+    // NOTE: This can be simplified to be direct bitwise ops, but keeping
+    // this for readability.
+    const tooHigh = LookupTables.minValue(allMaxs) + numCells;
+    const tooLow = LookupTables.maxValue(allMins) - numCells;
+    possibleValues &= LookupTables.fromValue(tooHigh) - 1;
+    if (tooLow > 0) {
+      possibleValues &= -LookupTables.fromValue(tooLow + 1);
+    }
 
     if (allValues & ~possibleValues) {
       // If there are values outside the mask, remove them.
