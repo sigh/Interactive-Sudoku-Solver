@@ -11,23 +11,19 @@ const debugFilesLoaded = Promise.all([
 var TEST_TIMEOUT_MS = 0;
 
 const loadInput = (puzzleCfg) => {
-  const [_, puzzle] = puzzleFromCfg(puzzleCfg);
+  const puzzle = puzzleFromCfg(puzzleCfg);
   constraintManager.loadUnsafeFromText(puzzle.input);
 }
 
 const puzzleFromCfg = (puzzleCfg) => {
-  let puzzleStr, solution, name = '';
-  if (Array.isArray(puzzleCfg)) {
-    [puzzleStr, solution] = puzzleCfg;
-  } else {
-    puzzleStr = puzzleCfg;
-  }
-  puzzle = EXAMPLES[puzzleStr];
-  if (!puzzle) {
-    puzzle = { input: puzzleStr, solution: solution };
+  if (typeof puzzleCfg === 'object') {
+    return { name: puzzleCfg.input, ...puzzleCfg };
   }
 
-  return [puzzleStr, puzzle];
+  const puzzle = EXAMPLES[puzzleCfg];
+  if (puzzle) return { name: puzzleCfg, ...puzzle };
+
+  return { name: puzzleCfg, input: puzzleCfg };
 };
 
 const sumObjectValues = (first, ...items) => {
@@ -52,15 +48,15 @@ const addTotalToStats = (stats) => {
 
 const runFnWithChecks = async (puzzles, fn, onFailure) => {
   let numFailures = 0;
-  const failTest = (name, puzzle, result) => {
+  const failTest = (puzzle, result) => {
     numFailures++;
     if (onFailure) {
-      onFailure(name, puzzle, result);
+      onFailure(puzzle, result);
     } else {
-      console.log('Test failed: ' + (name || puzzle.input));
+      console.log('Test failed: ' + puzzle.name);
       console.log('Expected', puzzle.solution);
       console.log('Got     ', result);
-      throw ('Test failed: ' + name);
+      throw ('Test failed: ' + puzzle.name);
     }
   };
 
@@ -70,7 +66,7 @@ const runFnWithChecks = async (puzzles, fn, onFailure) => {
   let solutions = [];
   let stats = [];
   for (const puzzleCfg of puzzles) {
-    const [name, puzzle] = puzzleFromCfg(puzzleCfg);
+    const puzzle = puzzleFromCfg(puzzleCfg);
 
     // Set up solver.
     const constraint = SudokuConstraint.fromText(puzzle.input);
@@ -94,7 +90,7 @@ const runFnWithChecks = async (puzzles, fn, onFailure) => {
     try {
       result = await resultPromise;
     } catch (e) {
-      failTest(name, puzzle, e);
+      failTest(puzzle, e);
     } finally {
       solver.terminate();
     }
@@ -115,12 +111,12 @@ const runFnWithChecks = async (puzzles, fn, onFailure) => {
         if (!puzzle.solution) {
           // Expect no solution.
           if (result) {
-            failTest(name, puzzle, resultToCheck);
+            failTest(puzzle, resultToCheck);
           }
         } else {
           // Expect a solution.
           if (!result || resultToCheck != puzzle.solution) {
-            failTest(name, puzzle, resultToCheck);
+            failTest(puzzle, resultToCheck);
           }
         }
       }
@@ -129,7 +125,7 @@ const runFnWithChecks = async (puzzles, fn, onFailure) => {
     delete state.counters.progressRatio;
     delete state.counters.progressRatioPrev;
     const row = {
-      puzzle: name,
+      puzzle: puzzle.name,
       ...state.counters,
       setupTimeMs: state.puzzleSetupTime,
       rumtimeMs: state.timeMs

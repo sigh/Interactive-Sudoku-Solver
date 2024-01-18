@@ -1,9 +1,9 @@
 const withJigsawLayoutResult = (expectedResult, layouts) => {
-  return layouts.map(l => [l, expectedResult]);
+  return layouts.map(l => ({ input: l, solution: expectedResult }));
 };
 
 const EASY_INVALID_JIGSAW_LAYOUTS = withJigsawLayoutResult(null, [
-   // http://forum.enjoysudoku.com/jigsaw-layouts-generate-test-t35712.html#p274998
+  // http://forum.enjoysudoku.com/jigsaw-layouts-generate-test-t35712.html#p274998
   '000000001223411101223415111223455556223444566233334566777374566787774566788888888',
   '000000001222304111222344111222344411555333444665553777666553777666583777688888888',
   // Partial.
