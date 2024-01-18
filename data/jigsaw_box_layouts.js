@@ -1,5 +1,5 @@
 const withJigsawBoxLayoutResult = (expectedResult, layouts) => {
-  return layouts.map(l => ['.Jigsaw~'+l, expectedResult]);
+  return layouts.map(l => ({ input: '.Jigsaw~' + l, solution: expectedResult }));
 };
 
 const VALID_JIGSAW_BOX_LAYOUTS = withJigsawBoxLayoutResult(true, [
