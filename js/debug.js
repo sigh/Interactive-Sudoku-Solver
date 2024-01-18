@@ -26,51 +26,35 @@ const puzzleFromCfg = (puzzleCfg) => {
   return { name: puzzleCfg, input: puzzleCfg };
 };
 
-const sumObjectValues = (first, ...items) => {
-  if (!first) return {};
-  let result = { ...first };
-  for (const item of items) {
-    for (const [k, v] of Object.entries(item)) {
-      if (!v) continue;
-      if (!result[k]) result[k] = 0;
-      result[k] += v;
+class PuzzleRunner {
+  static _sumObjectValues(first, ...items) {
+    if (!first) return {};
+    let result = { ...first };
+    for (const item of items) {
+      for (const [k, v] of Object.entries(item)) {
+        if (!v) continue;
+        if (!result[k]) result[k] = 0;
+        result[k] += v;
+      }
     }
+    return result;
   }
-  return result;
-};
 
-const addTotalToStats = (stats) => {
-  const totals = sumObjectValues(...stats);
-  delete totals.puzzle;
-  delete totals.collection;
-  stats.total = totals;
-}
+  static addTotalToStats(stats) {
+    const totals = this._sumObjectValues(...stats);
+    delete totals.puzzle;
+    delete totals.collection;
+    stats.total = totals;
+  }
 
-const runFnWithChecks = async (puzzles, fn, onFailure) => {
-  let numFailures = 0;
-  const failTest = (puzzle, result) => {
-    numFailures++;
-    if (onFailure) {
-      onFailure(puzzle, result);
-    } else {
-      console.log('Test failed: ' + puzzle.name);
-      console.log('Expected', puzzle.solution);
-      console.log('Got     ', result);
-      throw ('Test failed: ' + puzzle.name);
-    }
-  };
+  static _state = null;
+  static _stateHandler(s) { this._state = s; };
 
-  let state;
-  const stateHandler = (s) => { state = s; };
-
-  let solutions = [];
-  let stats = [];
-  for (const puzzleCfg of puzzles) {
-    const puzzle = puzzleFromCfg(puzzleCfg);
-
+  static async _runFnWithChecksSinglePuzzle(puzzle, fn, onFailure) {
     // Set up solver.
     const constraint = SudokuConstraint.fromText(puzzle.input);
-    const solver = await SudokuBuilder.buildInWorker(constraint, stateHandler);
+    const solver = await SudokuBuilder.buildInWorker(
+      constraint, this._stateHandler.bind(this));
     const shape = SudokuConstraint.getShape(constraint);
 
     // Log a fixed string so the progress gets collapsed to a single line.
@@ -90,18 +74,17 @@ const runFnWithChecks = async (puzzles, fn, onFailure) => {
     try {
       result = await resultPromise;
     } catch (e) {
-      failTest(puzzle, e);
+      onFailure(puzzle, e);
     } finally {
       solver.terminate();
     }
 
+    let solution = null;
     if (result !== undefined) {
       let shortSolution;
       if (isIterable(result)) {
         shortSolution = toShortSolution(result, shape);
-        solutions.push(shortSolution);
-      } else {
-        solutions.push(null);
+        solution = shortSolution;
       }
       const resultToCheck = shortSolution || result;
 
@@ -111,52 +94,87 @@ const runFnWithChecks = async (puzzles, fn, onFailure) => {
         if (!puzzle.solution) {
           // Expect no solution.
           if (result) {
-            failTest(puzzle, resultToCheck);
+            onFailure(puzzle, resultToCheck);
           }
         } else {
           // Expect a solution.
           if (!result || resultToCheck != puzzle.solution) {
-            failTest(puzzle, resultToCheck);
+            onFailure(puzzle, resultToCheck);
           }
         }
       }
     }
 
+    const state = this._state;
     delete state.counters.progressRatio;
     delete state.counters.progressRatioPrev;
-    const row = {
+    const stats = {
       puzzle: puzzle.name,
       ...state.counters,
       setupTimeMs: state.puzzleSetupTime,
       rumtimeMs: state.timeMs
     };
-    stats.push(row);
+
+    return {
+      solution,
+      stats
+    };
   }
 
-  if (numFailures > 0) {
-    console.error(numFailures + ' failures');
+  static async runFnWithChecks(puzzles, fn, onFailure) {
+    let numFailures = 0;
+    const failTest = (puzzle, result) => {
+      numFailures++;
+      if (onFailure) {
+        onFailure(puzzle, result);
+      } else {
+        console.log('Test failed: ' + puzzle.name);
+        console.log('Expected', puzzle.solution);
+        console.log('Got     ', result);
+        throw ('Test failed: ' + puzzle.name);
+      }
+    };
+
+    const solutions = [];
+    const stats = [];
+    for (const puzzleCfg of puzzles) {
+      if (Array.isArray(puzzleCfg)) {
+        const result = await this.runFnWithChecks(puzzleCfg, fn, onFailure);
+        solutions.push(result.solutions);
+        stats.push(result.stats.total);
+      } else {
+        const puzzle = puzzleFromCfg(puzzleCfg);
+        const result = await this._runFnWithChecksSinglePuzzle(puzzle, fn, failTest);
+        solutions.push(result.solution);
+        stats.push(result.stats);
+      }
+    }
+
+    if (numFailures > 0) {
+      console.error(numFailures + ' failures');
+    }
+
+    this.addTotalToStats(stats);
+
+    return {
+      solutions,
+      stats,
+    }
   }
 
-  addTotalToStats(stats);
-
-  return {
-    solutions,
-    stats,
+  static async runAllWithChecks(puzzles, onFailure) {
+    return await this.runFnWithChecks(puzzles, async (solver) => {
+      const result = await solver.nthSolution(0);
+      await solver.nthSolution(1); // Try to find a second solution to prove uniqueness.
+      return result;
+    }, onFailure);
   }
-};
 
-const runAllWithChecks = async (puzzles, onFailure) => {
-  return await runFnWithChecks(puzzles, async (solver) => {
-    const result = await solver.nthSolution(0);
-    await solver.nthSolution(1); // Try to find a second solution to prove uniqueness.
-    return result;
-  }, onFailure);
-};
-
-const runValidateLayout = async (cases, onFailure) => {
-  return await runFnWithChecks(cases, async (solver) => {
-    return await solver.validateLayout();
-  }, onFailure);
+  static async runValidateLayout(cases, onFailure) {
+    return await this.runFnWithChecks(cases, async (solver) => {
+      return await solver.validateLayout();
+    }, onFailure);
+  }
 }
 
 const runValidateLayoutTests = async (onFailure) => {
@@ -165,7 +183,7 @@ const runValidateLayoutTests = async (onFailure) => {
     EASY_INVALID_JIGSAW_LAYOUTS,
     FAST_INVALID_JIGSAW_LAYOUTS.slice(0, 20),
     VALID_JIGSAW_BOX_LAYOUTS.slice(0, 10));
-  const result = await runValidateLayout(cases, onFailure);
+  const result = await PuzzleRunner.runValidateLayout(cases, onFailure);
   result.collection = 'Jigsaw layouts';
   return [result];
 };
@@ -173,7 +191,7 @@ const runValidateLayoutTests = async (onFailure) => {
 const runSolveTests = async (onFailure) => {
   const results = [];
   let result = null;
-  result = await runAllWithChecks([
+  result = await PuzzleRunner.runAllWithChecks([
     'Thermosudoku',
     'Classic sudoku',
     'Classic sudoku, hard',
@@ -220,7 +238,7 @@ const runSolveTests = async (onFailure) => {
   result.collection = '9x9';
   results.push(result);
 
-  result = await runAllWithChecks([
+  result = await PuzzleRunner.runAllWithChecks([
     '16x16',
     '16x16: Sudoku X',
     '16x16: Sudoku X, hard',
@@ -239,12 +257,12 @@ const runAllTests = async () => {
   console.log(results);
   const stats = results.map(
     r => ({ collection: r.collection, ...r.stats.total }));
-  addTotalToStats(stats);
+  PuzzleRunner.addTotalToStats(stats);
   console.table(stats);
 };
 
 const runAll = async (puzzles) => {
-  const result = await runAllWithChecks(puzzles);
+  const result = await PuzzleRunner.runAllWithChecks(puzzles);
   console.table(result.stats);
   return result;
 };
