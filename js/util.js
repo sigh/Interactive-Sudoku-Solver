@@ -217,6 +217,10 @@ const isIterable = (obj) => {
   return obj && typeof obj[Symbol.iterator] === 'function';
 };
 
+const isPlainObject = (obj) => {
+  return obj && obj.constructor === Object;
+};
+
 const localTimestamp = () => {
   const tzOffset = (new Date()).getTimezoneOffset() * 60000; //offset in milliseconds
   return (new Date(Date.now() - tzOffset)).toISOString().slice(0, -1);

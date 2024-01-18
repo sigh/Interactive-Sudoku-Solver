@@ -16,7 +16,7 @@ const loadInput = (puzzleCfg) => {
 }
 
 const puzzleFromCfg = (puzzleCfg) => {
-  if (typeof puzzleCfg === 'object') {
+  if (isPlainObject(puzzleCfg)) {
     return { name: puzzleCfg.input, ...puzzleCfg };
   }
 
@@ -122,6 +122,23 @@ class PuzzleRunner {
   }
 
   static async runFnWithChecks(puzzles, fn, onFailure) {
+    if (isPlainObject(puzzles)) {
+      const solutions = [];
+      const stats = [];
+      for (const [name, collection] of Object.entries(puzzles)) {
+        const result = await this.runFnWithChecks(collection, fn, onFailure);
+        solutions.push(result.solution);
+        stats.push(
+          { collection: name, ...result.stats.total });
+      }
+      this.addTotalToStats(stats);
+
+      return {
+        solutions,
+        stats,
+      };
+    }
+
     let numFailures = 0;
     const failTest = (puzzle, result) => {
       numFailures++;
@@ -138,16 +155,10 @@ class PuzzleRunner {
     const solutions = [];
     const stats = [];
     for (const puzzleCfg of puzzles) {
-      if (Array.isArray(puzzleCfg)) {
-        const result = await this.runFnWithChecks(puzzleCfg, fn, onFailure);
-        solutions.push(result.solutions);
-        stats.push(result.stats.total);
-      } else {
-        const puzzle = puzzleFromCfg(puzzleCfg);
-        const result = await this._runFnWithChecksSinglePuzzle(puzzle, fn, failTest);
-        solutions.push(result.solution);
-        stats.push(result.stats);
-      }
+      const puzzle = puzzleFromCfg(puzzleCfg);
+      const result = await this._runFnWithChecksSinglePuzzle(puzzle, fn, failTest);
+      solutions.push(result.solution);
+      stats.push(result.stats);
     }
 
     if (numFailures > 0) {
@@ -156,6 +167,7 @@ class PuzzleRunner {
 
     this.addTotalToStats(stats);
 
+    console.log(stats);
     return {
       solutions,
       stats,
