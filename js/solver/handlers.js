@@ -133,7 +133,7 @@ SudokuConstraintHandler._CommonHandlerUtil = class _CommonHandlerUtil {
     const maxJ = numCells - 1;
     const maxIndex = ((a - maxI) * maxI >> 1) + maxJ;
     for (let i = 0; i < maxIndex; i++) {
-      conflictMap[i] = [];
+      conflictMap.push([]);
     }
 
     // Find all pairwise conflicts.
@@ -154,6 +154,32 @@ SudokuConstraintHandler._CommonHandlerUtil = class _CommonHandlerUtil {
     conflictMap[0] = new Uint8Array(globalConflicts);
 
     return conflictMap;
+  }
+
+  static enforceRequiredValueConflicts(grid, cells, value, conflictMap) {
+    // Loop through and find the location of the cells that contain `value`.
+    // `conflictIndex` is updated such that if there are exactly two locations
+    // it will be the index of that pair into `conflictMap`.
+    let conflictIndex = 0;
+    let cellCount = 0;
+    const numCells = cells.length;
+    const a = (numCells << 1) - 3;
+    for (let i = 0; i < numCells; i++) {
+      if (grid[cells[i]] & value) {
+        conflictIndex = ((a - conflictIndex) * conflictIndex >> 1) + i;
+        cellCount++;
+      }
+    }
+    // If there are more than 2 cells, then use the global conflictMap.
+    if (cellCount > 2) conflictIndex = 0;
+
+    // Remove the conflicts.
+    const conflictCells = conflictMap[conflictIndex];
+    for (let i = 0; i < conflictCells.length; i++) {
+      if (!(grid[conflictCells[i]] &= ~value)) return false;
+    }
+
+    return true;
   }
 }
 
@@ -304,8 +330,8 @@ SudokuConstraintHandler.BinaryPairwise = class BinaryPairwise extends SudokuCons
     this._exposeHiddenSingles = null;
     this._conflictMap = [];
 
-    this._populateConflictMap = (
-      SudokuConstraintHandler._CommonHandlerUtil.populatePairwiseConflictMap);
+    this._enforceRequiredValueConflicts = (
+      SudokuConstraintHandler._CommonHandlerUtil.enforceRequiredValueConflicts);
 
     // Ensure we dedupe binary constraints.
     this.idStr = [this.constructor.name, key, ...cells].join('-');
@@ -427,7 +453,8 @@ SudokuConstraintHandler.BinaryPairwise = class BinaryPairwise extends SudokuCons
         this._key, shape.numValues, this.cells.length);
     }
 
-    this._populateConflictMap(this.cells, this._conflictMap, cellConflicts);
+    SudokuConstraintHandler._CommonHandlerUtil.populatePairwiseConflictMap(
+      this.cells, this._conflictMap, cellConflicts);
 
     // If no values are legal at the start, then this constraint is invalid.
     return this._table[lookupTables.allValues] !== 0;
@@ -462,26 +489,8 @@ SudokuConstraintHandler.BinaryPairwise = class BinaryPairwise extends SudokuCons
     while (nonUniqueRequired) {
       let v = nonUniqueRequired & -nonUniqueRequired;
       nonUniqueRequired ^= v;
-      // Loop through and find the location of the cells that contain v.
-      // conflictIndex is updated such that if there are exactly two locations
-      // it will be the index of that pair into conflictMap.
-      let cellCount = 0;
-      let conflictIndex = 0;
-      const a = (numCells << 1) - 3;
-      for (let i = 0; i < numCells; i++) {
-        if (grid[cells[i]] & v) {
-          cellCount++;
-          conflictIndex = ((a - conflictIndex) * conflictIndex >> 1) + i;
-        }
-      }
-      // If there are more than 2 cells, then use the global conflictMap.
-      if (cellCount > 2) conflictIndex = 0;
-
-      // Remove the conflicts.
-      const conflictCells = this._conflictMap[conflictIndex];
-      for (let j = 0; j < conflictCells.length; j++) {
-        if (!(grid[conflictCells[j]] &= ~v)) return false;
-      }
+      if (!this._enforceRequiredValueConflicts(
+        grid, cells, v, this._conflictMap)) return false;
     }
 
     return true;
@@ -2162,6 +2171,9 @@ SudokuConstraintHandler.LocalEntropy = class LocalEntropy extends SudokuConstrai
   constructor(cells) {
     super(cells);
     this._conflictMap = [];
+
+    this._enforceRequiredValueConflicts = (
+      SudokuConstraintHandler._CommonHandlerUtil.enforceRequiredValueConflicts);
   }
 
   static _valuesBuffer = new Uint16Array(SHAPE_MAX.numValues);
@@ -2174,35 +2186,9 @@ SudokuConstraintHandler.LocalEntropy = class LocalEntropy extends SudokuConstrai
     LookupTables.fromValuesArray([4, 5, 6]),
     LookupTables.fromValuesArray([7, 8, 9])];
 
-  _populateConflictMap(conflictMap, cellConflicts) {
-    const numCells = this.cells.length;
-
-    // Indexing scheme for conflictMap:
-    // - conflictMap[2*i+j|i<j] = [cells which conflict with both i and j].
-    // - conflictMap[0] = [cells which conflict with all four cells].
-    // We don't care about 3-way conflicts, as we can just use the 4-way
-    // set as a conservative approximation.
-    for (let i = 0; i <= 2 * (numCells - 1) + numCells; i++) {
-      conflictMap.push(null);
-    }
-
-    // Add all pairwise conflicts.
-    for (let i = 0; i < numCells; i++) {
-      for (let j = i + 1; j < numCells; j++) {
-        const conflicts = setIntersection(
-          cellConflicts[this.cells[i]], cellConflicts[this.cells[j]]);
-        conflictMap[2 * i + j] = new Uint8Array(conflicts);
-      }
-    }
-    // Add cells which conflict with the whole region.
-    // Find the intersection of cell{0,1} and cell{2,3}
-    const conflictWithAll = arrayIntersect(
-      conflictMap[2 * 0 + 1], conflictMap[2 * 2 + 3]);
-    conflictMap[0] = new Uint8Array(conflictWithAll);
-  }
-
   initialize(initialGrid, cellConflicts, shape) {
-    this._populateConflictMap(this._conflictMap, cellConflicts);
+    SudokuConstraintHandler._CommonHandlerUtil.populatePairwiseConflictMap(
+      this.cells, this._conflictMap, cellConflicts);
 
     return true;
   }
@@ -2230,25 +2216,8 @@ SudokuConstraintHandler.LocalEntropy = class LocalEntropy extends SudokuConstrai
         continue;
       }
       // Now we know `triadValue` is a required value and is in multiple cells.
-
-      // Find the cells which contain `triadValue`, and the index into
-      // conflictMap in case the cellCount is 2.
-      let conflictIndex = 0;
-      let cellCount = 0;
-      for (let j = 0; j < numCells; j++) {
-        if (grid[cells[j]] & triadValue) {
-          conflictIndex = conflictIndex * 2 + j;
-          cellCount++;
-        }
-      }
-      // If there are 3 or 4 cells, we use the full conflict set.
-      if (cellCount > 2) conflictIndex = 0;
-
-      // Remove triadValue from all the conflicts.
-      const conflictCells = this._conflictMap[conflictIndex];
-      for (let j = 0; j < conflictCells.length; j++) {
-        if (!(grid[conflictCells[j]] &= ~triadValue)) return false;
-      }
+      if (!this._enforceRequiredValueConflicts(
+        grid, cells, triadValue, this._conflictMap)) return false;
     }
 
     return true;
