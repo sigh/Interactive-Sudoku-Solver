@@ -261,9 +261,9 @@ SudokuConstraintHandler.BinaryPairwise = class BinaryPairwise extends SudokuCons
   constructor(key, ...cells) {
     super(cells);
     this._key = key;
-    this._tables = [];
+    this._table = null;
     this._isAllDifferent = false;
-    this._validCombinations = null;
+    this._validCombinationInfo = null;
     this._exposeHiddenSingles = null;
 
     // Ensure we dedupe binary constraints.
@@ -283,6 +283,10 @@ SudokuConstraintHandler.BinaryPairwise = class BinaryPairwise extends SudokuCons
     return true;
   }
 
+  // _exactCombinationsTable says whether a combination is valid.
+  //  - `key` must be an all-different constraint.
+  //  - Rows with `n` bits set represent the n-cell constraints.
+  //  - The values are only 1 or 0 to indicate validity.
   static _exactCombinationsTable = memoize((key, numValues) => {
     const table = LookupTables.get(numValues).forBinaryKey(key)[0];
     if (!this._isAllDifferent(table, numValues)) throw 'Not implemented';
@@ -315,72 +319,91 @@ SudokuConstraintHandler.BinaryPairwise = class BinaryPairwise extends SudokuCons
     return exactCombinations;
   });
 
-  static _validCombinationsTable = memoize((key, numValues, numCells) => {
+  // _validCombinationInfoTable gives information about valid combinations.
+  //  - `key` must be an all-different constraint.
+  //  - The lower 16 bits of each row are the valid values.
+  //  - The higher 16 bits of each row are the required values.
+  static _validCombinationInfoTable = memoize((key, numValues, numCells) => {
     const exactCombinations = this._exactCombinationsTable(key, numValues);
 
     const combinations = 1 << numValues;
-    const validCombinations = new Uint32Array(combinations);
+    const validCombinationInfo = new Uint32Array(combinations);
     for (let i = 0; i < combinations; i++) {
       const count = countOnes16bit(i);
       // If we don't have enough cells we can't be valid.
       if (count < numCells) continue;
+      // If we have the right number of cells then initialize the row.
       if (count == numCells) {
         if (exactCombinations[i]) {
-          validCombinations[i] = (i << 16) | i;
+          validCombinationInfo[i] = (i << 16) | i;
         }
         continue;
       }
 
       // Otherwise combine all the valid subsets.
-      validCombinations[i] = 0xffff << 16;
+      validCombinationInfo[i] = 0xffff << 16;
       let iBits = i;
       while (iBits) {
         const iBit = iBits & -iBits;
         iBits ^= iBit;
-        if (validCombinations[i ^ iBit]) {
-          validCombinations[i] |= validCombinations[i ^ iBit] & 0xffff;
-          validCombinations[i] &= validCombinations[i ^ iBit] | 0xffff;
+        if (validCombinationInfo[i ^ iBit]) {
+          validCombinationInfo[i] |= validCombinationInfo[i ^ iBit] & 0xffff;
+          validCombinationInfo[i] &= validCombinationInfo[i ^ iBit] | 0xffff;
         }
       }
+      // Clear if there were no valid values.
+      if (!validCombinationInfo[i] & 0xffff) validCombinationInfo[i] = 0;
     }
 
-    return validCombinations;
+    return validCombinationInfo;
   });
 
   initialize(initialGrid, cellConflicts, shape) {
     const lookupTables = LookupTables.get(shape.numValues);
-    this._tables = lookupTables.forBinaryKey(this._key);
+    // The key must be symmetric, so we just need the one table.
+    this._table = lookupTables.forBinaryKey(this._key)[0];
     this._isAllDifferent = this.constructor._isAllDifferent(
-      this._tables[0], shape.numValues);
+      this._table, shape.numValues);
     if (this._isAllDifferent) {
-      this._validCombinations = this.constructor._validCombinationsTable(
+      // Only apply this for all-different constraints for now. Can generalize
+      // in the future if required.
+      this._validCombinationInfo = this.constructor._validCombinationInfoTable(
         this._key, shape.numValues, this.cells.length);
     }
 
     // If no values are legal at the start, then this constraint is invalid.
-    return this._tables[0][lookupTables.allValues] !== 0;
+    return this._table[lookupTables.allValues] !== 0;
   }
 
   enforceConsistency(grid, handlerAccumulator) {
     const cells = this.cells;
     const numCells = cells.length;
 
-    const [table0, table1] = this._tables;
+    const table = this._table;
 
+    // Naively enforce all pairs of constraints until we reach a fixed point.
+    // The key must be symmetric, so we don't need to check both orders.
     let changed = 0;
     let newChanged = 1;
     while (newChanged) {
       newChanged = 0;
       for (let i = 0; i < numCells; i++) {
+        let v0 = grid[cells[i]];
         for (let j = i + 1; j < numCells; j++) {
-          const v0 = grid[cells[i]];
           const v1 = grid[cells[j]];
-          const v0New = grid[cells[i]] = v0 & table1[v1];
-          const v1New = grid[cells[j]] = v1 & table0[v0];
+          const v0New = v0 & table[v1];
+          const v1New = v1 & table[v0];
           if (!(v0New && v1New)) return false;
-          if (v0 != v0New) newChanged |= 1 << i;
-          if (v1 != v1New) newChanged |= 1 << j;
+          if (v0 != v0New) {
+            newChanged |= 1 << i;
+            v0 = v0New;
+          }
+          if (v1 != v1New) {
+            newChanged |= 1 << j;
+            grid[cells[j]] = v1New;
+          }
         }
+        grid[cells[i]] = v0;
       }
       changed |= newChanged;
     }
@@ -403,7 +426,7 @@ SudokuConstraintHandler.BinaryPairwise = class BinaryPairwise extends SudokuCons
       allValues |= grid[cells[i]];
     }
 
-    const validCombinationInfo = this._validCombinations[allValues];
+    const validCombinationInfo = this._validCombinationInfo[allValues];
     const validValues = validCombinationInfo & 0xffff;
     if (!validValues) return false;
     if (validValues != allValues) {
