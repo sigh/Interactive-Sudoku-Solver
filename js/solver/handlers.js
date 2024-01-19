@@ -760,7 +760,7 @@ SudokuConstraintHandler._SumHandlerUtil = class _SumHandlerUtil {
     return true;
   }
 
-  restrictCellsSingleConflictSet(grid, sum, cells) {
+  restrictCellsSingleConflictSet(grid, sum, cells, pairConflictMap) {
     const numCells = cells.length;
 
     // Check that we can make the current sum with the unfixed values remaining.
@@ -786,7 +786,7 @@ SudokuConstraintHandler._SumHandlerUtil = class _SumHandlerUtil {
     }
 
     const unfixedValues = allValues & ~fixedValues;
-    let requiredUniques = allValues & ~nonUniqueValues;
+    let requiredValues = allValues;
     const numUnfixed = cells.length - countOnes16bit(fixedValues);
 
     let possibilities = 0;
@@ -795,7 +795,7 @@ SudokuConstraintHandler._SumHandlerUtil = class _SumHandlerUtil {
       const o = options[i];
       if ((o & unfixedValues) == o) {
         possibilities |= o;
-        requiredUniques &= o;
+        requiredValues &= o;
       }
     }
     if (!possibilities) return false;
@@ -810,10 +810,25 @@ SudokuConstraintHandler._SumHandlerUtil = class _SumHandlerUtil {
       }
     }
 
-    // requiredUniques are values that appear in all possible solutions AND
-    // are unique. Thus, we can enforce these values.
-    if (requiredUniques) {
-      if (!this._exposeHiddenSingles(grid, cells, requiredUniques)) {
+    // requiredValues are values that appear in all possible solutions.
+    // Those that are unique are hidden singles.
+    const hiddenSingles = requiredValues & ~nonUniqueValues & ~fixedValues;
+    if (hiddenSingles) {
+      if (!this._exposeHiddenSingles(grid, cells, hiddenSingles)) {
+        return false;
+      }
+    }
+
+    // Only enforce required value conflicts if we have the conflict map
+    // passed in.
+    if (!pairConflictMap) return true;
+
+    let nonUniqueRequired = requiredValues & nonUniqueValues;
+    while (nonUniqueRequired) {
+      let v = nonUniqueRequired & -nonUniqueRequired;
+      nonUniqueRequired ^= v;
+      if (!SudokuConstraintHandler._CommonHandlerUtil.enforceRequiredValueConflicts(
+        grid, cells, v, pairConflictMap)) {
         return false;
       }
     }
@@ -1051,6 +1066,7 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
     super(cells);
     this._sum = +sum;
     this._positiveCells = cells;
+    this._pairConflictMap = null;
 
     this.idStr = [this.constructor.name, cells, sum].join('-');
   }
@@ -1100,6 +1116,12 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
     this._conflictSets.forEach(
       (s, i) => s.forEach(
         c => this._conflictMap[this.cells.indexOf(c)] = i));
+
+    if (!this._negativeCells.length) {
+      this._pairConflictMap = [];
+      SudokuConstraintHandler._CommonHandlerUtil.populatePairwiseConflictMap(
+        this.cells, this._pairConflictMap, cellConflicts);
+    }
 
     // Ensure that _complementCells is null.
     // undefined is used by the optimizer to know that a value has not been
@@ -1251,7 +1273,7 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
 
     if (this._conflictSets.length == 1) {
       if (!this._util.restrictCellsSingleConflictSet(
-        grid, this._sum, cells)) return false;
+        grid, this._sum, cells, this._pairConflictMap)) return false;
     } else {
       if (!this._util.restrictCellsMultiConflictSet(
         grid, sum, this._conflictSets, 0)) return false;
@@ -1977,7 +1999,7 @@ SudokuConstraintHandler.RegionSumLine = class RegionSumLine extends SudokuConstr
         // We know the sum, and cells should always be in a single box
         // (by definition).
         if (!this._util.restrictCellsSingleConflictSet(
-          grid, globalMin, cells)) return false;
+          grid, globalMin, cells, null)) return false;
       }
     }
 
@@ -2078,6 +2100,10 @@ SudokuConstraintHandler.XSum = class XSum extends SudokuConstraintHandler {
   initialize(initialGrid, cellConflicts, shape) {
     this._internalSumHandler.initialize(
       initialGrid, cellConflicts, shape);
+    // X-Sum messes with the cell-length, so pairConflict won't be accurate.
+    // TODO: Make this robust and less error-prone.
+    this._internalSumHandler._pairConflictMap = null;
+
     this._scratchGrid = initialGrid.slice();
     this._resultGrid = initialGrid.slice();
     this._lookupTables = LookupTables.get(shape.numValues);
