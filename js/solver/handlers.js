@@ -451,7 +451,7 @@ SudokuConstraintHandler.BinaryPairwise = class BinaryPairwise extends SudokuCons
 
     // Run exposeHiddenSingles if we've been asked (and we had some
     // required values previously).
-    const requiredValues = validCombinationInfo >> 16;
+    const requiredValues = (validCombinationInfo >> 16) & 0xffff;
     if (this._exposeHiddenSingles && requiredValues) {
       let allValues = 0;
       let nonUniqueValues = 0;
