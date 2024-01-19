@@ -463,6 +463,7 @@ SudokuConstraintHandler.BinaryPairwise = class BinaryPairwise extends SudokuCons
   _enforceRequiredValues(grid, cells, requiredValues) {
     const numCells = cells.length;
 
+    // Calculate the information required to constraint requiredValues.
     let allValues = 0;
     let nonUniqueValues = 0;
     let fixedValues = 0;
@@ -475,6 +476,8 @@ SudokuConstraintHandler.BinaryPairwise = class BinaryPairwise extends SudokuCons
 
     if (allValues == fixedValues) return true;
 
+    // Run exposeHiddenSingles if we've been asked.
+    // (At the moment this isn't a net win for all constraints).
     if (this._exposeHiddenSingles) {
       const hiddenSingles = requiredValues & ~nonUniqueValues & ~fixedValues;
       if (hiddenSingles) {
@@ -504,11 +507,11 @@ SudokuConstraintHandler.BinaryPairwise = class BinaryPairwise extends SudokuCons
 
     // Naively enforce all pairs of constraints until we reach a fixed point.
     // The key must be symmetric, so we don't need to check both orders.
-    let changed = 0;
+    let allChanged = 0;
     let newChanged = 1;
     while (newChanged) {
       newChanged = 0;
-      for (let i = 0; i < numCells; i++) {
+      for (let i = 0; i < numCells - 1; i++) {
         let v0 = grid[cells[i]];
         for (let j = i + 1; j < numCells; j++) {
           const v1 = grid[cells[j]];
@@ -526,20 +529,20 @@ SudokuConstraintHandler.BinaryPairwise = class BinaryPairwise extends SudokuCons
         }
         grid[cells[i]] = v0;
       }
-      changed |= newChanged;
+      allChanged |= newChanged;
     }
 
     // Add any changed cells to the accumulator.
     // This seems to help for the direct pass, but not the all-different
     // pass.
-    while (changed) {
-      const next = changed & -changed;
-      changed ^= next;
+    while (allChanged) {
+      const changed = allChanged & -allChanged;
+      allChanged ^= changed;
       handlerAccumulator.addForCell(cells[
-        LookupTables.toIndex(next)]);
+        LookupTables.toIndex(changed)]);
     }
 
-    // The rest of the different is for when the values must be unqiue.
+    // The rest of the different is for when the values must be unique.
     if (!this._isAllDifferent) return true;
 
     let allValues = 0;
@@ -547,6 +550,7 @@ SudokuConstraintHandler.BinaryPairwise = class BinaryPairwise extends SudokuCons
       allValues |= grid[cells[i]];
     }
 
+    // Filter out values which aren't in any valid combination.
     const validCombinationInfo = this._validCombinationInfo[allValues];
     const validValues = validCombinationInfo & 0xffff;
     if (!validValues) return false;
@@ -556,8 +560,8 @@ SudokuConstraintHandler.BinaryPairwise = class BinaryPairwise extends SudokuCons
       }
     }
 
-    // Run exposeHiddenSingles if we've been asked (and we had some
-    // required values previously).
+    // Enforce any required values that exist (values in every valid
+    // combination).
     const requiredValues = (validCombinationInfo >> 16) & 0xffff;
     if (requiredValues) {
       if (!this._enforceRequiredValues(grid, cells, requiredValues)) {
