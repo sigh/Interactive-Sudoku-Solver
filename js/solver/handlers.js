@@ -264,9 +264,14 @@ SudokuConstraintHandler.BinaryPairwise = class BinaryPairwise extends SudokuCons
     this._tables = [];
     this._isAllDifferent = false;
     this._validCombinations = null;
+    this._exposeHiddenSingles = null;
 
     // Ensure we dedupe binary constraints.
     this.idStr = [this.constructor.name, key, ...cells].join('-');
+  }
+
+  enableHiddenSingles() {
+    this._exposeHiddenSingles = SudokuConstraintHandler._CommonHandlerUtil.exposeHiddenSingles;
   }
 
   static _isAllDifferent(table, numValues) {
@@ -314,25 +319,27 @@ SudokuConstraintHandler.BinaryPairwise = class BinaryPairwise extends SudokuCons
     const exactCombinations = this._exactCombinationsTable(key, numValues);
 
     const combinations = 1 << numValues;
-    const validCombinations = new Uint16Array(combinations);
+    const validCombinations = new Uint32Array(combinations);
     for (let i = 0; i < combinations; i++) {
       const count = countOnes16bit(i);
       // If we don't have enough cells we can't be valid.
       if (count < numCells) continue;
       if (count == numCells) {
         if (exactCombinations[i]) {
-          validCombinations[i] = i;
+          validCombinations[i] = (i << 16) | i;
         }
         continue;
       }
 
       // Otherwise combine all the valid subsets.
+      validCombinations[i] = 0xffff << 16;
       let iBits = i;
       while (iBits) {
         const iBit = iBits & -iBits;
         iBits ^= iBit;
         if (validCombinations[i ^ iBit]) {
-          validCombinations[i] |= validCombinations[i ^ iBit];
+          validCombinations[i] |= validCombinations[i ^ iBit] & 0xffff;
+          validCombinations[i] &= validCombinations[i ^ iBit] | 0xffff;
         }
       }
     }
@@ -388,105 +395,42 @@ SudokuConstraintHandler.BinaryPairwise = class BinaryPairwise extends SudokuCons
         LookupTables.toIndex(next)]);
     }
 
-    if (this._isAllDifferent) {
-      let allValues = 0;
-      for (let i = 0; i < numCells; i++) {
-        allValues |= grid[cells[i]];
-      }
-      const validValues = this._validCombinations[allValues];
-      if (!validValues) return false;
-      if (validValues != allValues) {
-        for (let i = 0; i < numCells; i++) {
-          if (!(grid[cells[i]] &= validValues)) return false;
-        }
-      }
-    }
-
-    return true;
-  }
-}
-
-
-SudokuConstraintHandler.AllContiguous = class AllContiguous extends SudokuConstraintHandler {
-  constructor(cells) {
-    super(cells);
-    this._exposeHiddenSingles = SudokuConstraintHandler._CommonHandlerUtil.exposeHiddenSingles;
-    this._minMax8Bit = null;
-  }
-
-  initialize(initialGrid, cellConflicts, shape) {
-    this._minMax8Bit = LookupTables.get(shape.numValues).minMax8Bit;
-    return true;
-  }
-
-  conflictSet() {
-    return this.cells;
-  }
-
-  enforceConsistency(grid, handlerAccumulator) {
-    const cells = this.cells;
-    const numCells = cells.length;
+    // The rest of the different is for when the values must be unqiue.
+    if (!this._isAllDifferent) return true;
 
     let allValues = 0;
-    let nonUniqueValues = 0;
-    let fixedValues = 0;
-    let allMins = 0;
-    let allMaxs = 0;
     for (let i = 0; i < numCells; i++) {
-      const v = grid[cells[i]];
-      nonUniqueValues |= allValues & v;
-      allValues |= v;
-      fixedValues |= !(v & (v - 1)) * v; // Avoid branching.
-      allMins |= v & -v;
-      allMaxs |= LookupTables.fromValue(LookupTables.maxValue(v));
+      allValues |= grid[cells[i]];
     }
 
-    // Find the possible starting values of contiguous ranges.
-    let squishedValues = allValues;
-    for (let i = 1; i < numCells; i++) {
-      squishedValues &= allValues >> i;
-    }
-    if (!squishedValues) return false;
-
-    // Expand out possible contiguous ranges.
-    let possibleValues = squishedValues;
-    for (let i = 1; i < numCells; i++) {
-      possibleValues |= squishedValues << i;
-    }
-    if (fixedValues == possibleValues) return true;
-
-    // Constraint possibleValues from being too high or too low based on the
-    // maximum/minimum values individual cells can take.
-    // NOTE: This can be simplified to be direct bitwise ops, but keeping
-    // this for readability.
-    const tooHigh = LookupTables.minValue(allMaxs) + numCells;
-    const tooLow = LookupTables.maxValue(allMins) - numCells;
-    possibleValues &= LookupTables.fromValue(tooHigh) - 1;
-    if (tooLow > 0) {
-      possibleValues &= -LookupTables.fromValue(tooLow + 1);
-    }
-
-    if (allValues & ~possibleValues) {
-      // If there are values outside the mask, remove them.
+    const validCombinationInfo = this._validCombinations[allValues];
+    const validValues = validCombinationInfo & 0xffff;
+    if (!validValues) return false;
+    if (validValues != allValues) {
       for (let i = 0; i < numCells; i++) {
-        if (!(grid[cells[i]] &= possibleValues)) return false;
-        handlerAccumulator.addForCell(cells[i]);
+        if (!(grid[cells[i]] &= validValues)) return false;
       }
     }
 
-    // Try to find values which must be contained in the contiguous ranges.
-    const minMax = this._minMax8Bit[squishedValues];
-    const min = minMax >> 8;
-    const max = minMax & 0xff;
-    // Min and max are too far, there are no required values.
-    if (max - min >= numCells) return true;
-    // We must contain all values from [max, min+numCells).
-    const mustContain = ((1 << (min + numCells)) - (1 << max)) >> 1;
+    // Run exposeHiddenSingles if we've been asked (and we had some
+    // required values previously).
+    const requiredValues = validCombinationInfo >> 16;
+    if (this._exposeHiddenSingles && requiredValues) {
+      let allValues = 0;
+      let nonUniqueValues = 0;
+      let fixedValues = 0;
+      for (let i = 0; i < numCells; i++) {
+        const v = grid[cells[i]];
+        nonUniqueValues |= allValues & v;
+        allValues |= v;
+        fixedValues |= (!(v & (v - 1))) * v;  // Avoid branching.
+      }
 
-    const hiddenSingles = mustContain & ~nonUniqueValues & ~fixedValues;
-    if (hiddenSingles) {
-      if (!this._exposeHiddenSingles(grid, cells, hiddenSingles)) {
-        return false;
+      const hiddenSingles = requiredValues & ~nonUniqueValues & ~fixedValues;
+      if (hiddenSingles) {
+        if (!this._exposeHiddenSingles(grid, cells, hiddenSingles)) {
+          return false;
+        }
       }
     }
 

@@ -464,6 +464,12 @@ class SudokuConstraint {
       super(arguments);
       this.cells = cells;
     }
+
+    static fnKey = memoize((numCells, numValues) =>
+      SudokuConstraint.Binary.fnToKey(
+        (a, b) => Math.abs(a - b) < numCells && a != b,
+        numValues)
+    );
   }
 
   static RegionSumLine = class RegionSumLine extends SudokuConstraint {
@@ -1181,7 +1187,13 @@ class SudokuBuilder {
 
         case 'Renban':
           cells = constraint.cells.map(c => shape.parseCellId(c).cell);
-          yield new SudokuConstraintHandler.AllContiguous(cells);
+          {
+            const handler = new SudokuConstraintHandler.BinaryPairwise(
+              SudokuConstraint.Renban.fnKey(cells.length, shape.numValues),
+              ...cells);
+            handler.enableHiddenSingles();
+            yield handler;
+          }
           break;
 
         case 'RegionSumLine':
