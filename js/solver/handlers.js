@@ -263,6 +263,7 @@ SudokuConstraintHandler.BinaryPairwise = class BinaryPairwise extends SudokuCons
     this._key = key;
     this._tables = [];
     this._isAllDifferent = false;
+    this._validCombinations = null;
 
     // Ensure we dedupe binary constraints.
     this.idStr = [this.constructor.name, key, ...cells].join('-');
@@ -277,11 +278,77 @@ SudokuConstraintHandler.BinaryPairwise = class BinaryPairwise extends SudokuCons
     return true;
   }
 
+  static _exactCombinationsTable = memoize((key, numValues) => {
+    const table = LookupTables.get(numValues).forBinaryKey(key)[0];
+    if (!this._isAllDifferent(table, numValues)) throw 'Not implemented';
+
+    const combinations = 1 << numValues;
+    const exactCombinations = new Uint8Array(combinations);
+    // Seed the table with all valid pairs.
+    for (let i = 0; i < combinations; i++) {
+      for (let j = 0; j < numValues; j++) {
+        const v = (1 << i) | (1 << j);
+        if (table[v]) {
+          exactCombinations[v] = 1;
+        }
+      }
+    }
+
+    // Build up the rest of the table.
+    for (let i = 0; i < combinations; i++) {
+      if (countOnes16bit(i) < 3) continue;
+      let iMin = i & -i;
+      let iRest = i ^ iMin;
+      // If it's not valid with one less value, adding more cells won't help.
+      if (!exactCombinations[iRest]) continue;
+      // Ensure iBit is consistent with the rest.
+      if (!(iRest & ~table[iMin])) {
+        exactCombinations[i] = 1;
+      }
+    }
+
+    return exactCombinations;
+  });
+
+  static _validCombinationsTable = memoize((key, numValues, numCells) => {
+    const exactCombinations = this._exactCombinationsTable(key, numValues);
+
+    const combinations = 1 << numValues;
+    const validCombinations = new Uint16Array(combinations);
+    for (let i = 0; i < combinations; i++) {
+      const count = countOnes16bit(i);
+      // If we don't have enough cells we can't be valid.
+      if (count < numCells) continue;
+      if (count == numCells) {
+        if (exactCombinations[i]) {
+          validCombinations[i] = i;
+        }
+        continue;
+      }
+
+      // Otherwise combine all the valid subsets.
+      let iBits = i;
+      while (iBits) {
+        const iBit = iBits & -iBits;
+        iBits ^= iBit;
+        if (validCombinations[i ^ iBit]) {
+          validCombinations[i] |= validCombinations[i ^ iBit];
+        }
+      }
+    }
+
+    return validCombinations;
+  });
+
   initialize(initialGrid, cellConflicts, shape) {
     const lookupTables = LookupTables.get(shape.numValues);
     this._tables = lookupTables.forBinaryKey(this._key);
     this._isAllDifferent = this.constructor._isAllDifferent(
       this._tables[0], shape.numValues);
+    if (this._isAllDifferent) {
+      this._validCombinations = this.constructor._validCombinationsTable(
+        this._key, shape.numValues, this.cells.length);
+    }
 
     // If no values are legal at the start, then this constraint is invalid.
     return this._tables[0][lookupTables.allValues] !== 0;
@@ -293,10 +360,10 @@ SudokuConstraintHandler.BinaryPairwise = class BinaryPairwise extends SudokuCons
 
     const [table0, table1] = this._tables;
 
-    let queue = (1 << numCells) - 1;
     let changed = 0;
-    while (queue) {
-      queue = 0;
+    let newChanged = 1;
+    while (newChanged) {
+      newChanged = 0;
       for (let i = 0; i < numCells; i++) {
         for (let j = i + 1; j < numCells; j++) {
           const v0 = grid[cells[i]];
@@ -304,11 +371,21 @@ SudokuConstraintHandler.BinaryPairwise = class BinaryPairwise extends SudokuCons
           const v0New = grid[cells[i]] = v0 & table1[v1];
           const v1New = grid[cells[j]] = v1 & table0[v0];
           if (!(v0New && v1New)) return false;
-          if (v0 != v0New) queue |= 1 << i;
-          if (v1 != v1New) queue |= 1 << j;
+          if (v0 != v0New) newChanged |= 1 << i;
+          if (v1 != v1New) newChanged |= 1 << j;
         }
       }
-      changed |= queue;
+      changed |= newChanged;
+    }
+
+    // Add any changed cells to the accumulator.
+    // This seems to help for the direct pass, but not the all-different
+    // pass.
+    while (changed) {
+      const next = changed & -changed;
+      changed ^= next;
+      handlerAccumulator.addForCell(cells[
+        LookupTables.toIndex(next)]);
     }
 
     if (this._isAllDifferent) {
@@ -316,14 +393,13 @@ SudokuConstraintHandler.BinaryPairwise = class BinaryPairwise extends SudokuCons
       for (let i = 0; i < numCells; i++) {
         allValues |= grid[cells[i]];
       }
-      if (countOnes16bit(allValues) < numCells) return false;
-    }
-
-    while (changed) {
-      const next = changed & -changed;
-      changed ^= next;
-      handlerAccumulator.addForCell(cells[
-        LookupTables.toIndex(next)]);
+      const validValues = this._validCombinations[allValues];
+      if (!validValues) return false;
+      if (validValues != allValues) {
+        for (let i = 0; i < numCells; i++) {
+          if (!(grid[cells[i]] &= validValues)) return false;
+        }
+      }
     }
 
     return true;
