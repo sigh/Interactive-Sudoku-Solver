@@ -466,7 +466,7 @@ class SudokuConstraint {
     }
 
     static fnKey = memoize((numCells, numValues) =>
-      SudokuConstraint.Binary.fnToKey(
+      SudokuConstraint.BinaryX.fnToKey(
         (a, b) => Math.abs(a - b) < numCells && a != b,
         numValues)
     );

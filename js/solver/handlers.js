@@ -274,6 +274,17 @@ SudokuConstraintHandler.BinaryPairwise = class BinaryPairwise extends SudokuCons
     this._exposeHiddenSingles = SudokuConstraintHandler._CommonHandlerUtil.exposeHiddenSingles;
   }
 
+  static _isKeySymmetric = memoize((key, numValues) => {
+    const [table0, table1] = LookupTables.get(numValues).forBinaryKey(key);
+    for (let i = 0; i < numValues; i++) {
+      for (let j = i + 1; j < numValues; j++) {
+        const v = 1 << i | 1 << j;
+        if (table0[v] != table1[v]) return false;
+      }
+    }
+    return true;
+  });
+
   static _isAllDifferent(table, numValues) {
     for (let i = 0; i < numValues; i++) {
       const v = 1 << i;
@@ -360,6 +371,9 @@ SudokuConstraintHandler.BinaryPairwise = class BinaryPairwise extends SudokuCons
 
   initialize(initialGrid, cellConflicts, shape) {
     const lookupTables = LookupTables.get(shape.numValues);
+    if (!this.constructor._isKeySymmetric(this._key, shape.numValues)) {
+      throw 'Function for BinaryPairwise must be symmetric. Key: ' + this._key;
+    }
     // The key must be symmetric, so we just need the one table.
     this._table = lookupTables.forBinaryKey(this._key)[0];
     this._isAllDifferent = this.constructor._isAllDifferent(
