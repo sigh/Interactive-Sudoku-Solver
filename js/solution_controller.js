@@ -195,12 +195,15 @@ class DebugManager {
       option.value = name;
       datalist.appendChild(option);
     }
-    const puzzleLists = new Map([
-      ['TAREK_ALL', TAREK_ALL],
-      ['EXTREME_KILLERS', EXTREME_KILLERS],
-      ['HARD_THERMOS', HARD_THERMOS],
-      ['MATHEMAGIC_KILLERS', MATHEMAGIC_KILLERS]]);
-    for (const [listName, list] of puzzleLists) {
+    const puzzleLists = {
+      TAREK_ALL,
+      EXTREME_KILLERS,
+      HARD_THERMOS,
+      MATHEMAGIC_KILLERS,
+      HARD_RENBAN,
+      ZERO_SOLUTION_PUZZLES,
+    };
+    for (const [listName, list] of Object.entries(puzzleLists)) {
       for (let i = 0; i < list.length; i++) {
         const option = document.createElement('option');
         option.value = `${listName}[${i}]`;
@@ -222,7 +225,7 @@ class DebugManager {
         return;
       }
       let [_, puzzleListName, indexStr] = name.match(/(\w+)\[(\d+)\]/);
-      const list = puzzleLists.get(puzzleListName);
+      const list = puzzleLists[puzzleListName];
       const index = parseInt(indexStr);
       if (list && Number.isInteger(index)) {
         loadInput(list[index]);
