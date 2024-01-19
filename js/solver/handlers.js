@@ -118,6 +118,43 @@ SudokuConstraintHandler._CommonHandlerUtil = class _CommonHandlerUtil {
     }
     return true;
   }
+
+  static populatePairwiseConflictMap(cells, conflictMap, cellConflicts) {
+    const numCells = cells.length;
+
+    // Indexing scheme for conflictMap:
+    // - conflictMap[0] =
+    //     [cells which conflict with the entire constraint]
+    // - conflictMap[((n<<1)-3 - i)*(i>>1) + j | i < j]
+    //     [cells which conflict with both cells[i] and cells[j]]
+    // where n = numCells.
+    const a = (numCells << 1) - 3;
+    const maxI = numCells - 2;
+    const maxJ = numCells - 1;
+    const maxIndex = ((a - maxI) * maxI >> 1) + maxJ;
+    for (let i = 0; i < maxIndex; i++) {
+      conflictMap[i] = [];
+    }
+
+    // Find all pairwise conflicts.
+    for (let i = 0; i < numCells; i++) {
+      for (let j = i + 1; j < numCells; j++) {
+        const conflicts = setIntersection(
+          cellConflicts[cells[i]], cellConflicts[cells[j]]);
+        conflictMap[((a - i) * i >> 1) + j] = new Uint8Array(conflicts);
+      }
+    }
+
+    // Find the global conflicts.
+    let globalConflicts = cellConflicts[cells[0]];
+    for (let i = 1; i < numCells && globalConflicts.size; i++) {
+      globalConflicts = setIntersection(
+        globalConflicts, cellConflicts[cells[i]]);
+    }
+    conflictMap[0] = new Uint8Array(globalConflicts);
+
+    return conflictMap;
+  }
 }
 
 SudokuConstraintHandler.House = class House extends SudokuConstraintHandler {
@@ -265,6 +302,10 @@ SudokuConstraintHandler.BinaryPairwise = class BinaryPairwise extends SudokuCons
     this._isAllDifferent = false;
     this._validCombinationInfo = null;
     this._exposeHiddenSingles = null;
+    this._conflictMap = [];
+
+    this._populateConflictMap = (
+      SudokuConstraintHandler._CommonHandlerUtil.populatePairwiseConflictMap);
 
     // Ensure we dedupe binary constraints.
     this.idStr = [this.constructor.name, key, ...cells].join('-');
@@ -374,6 +415,7 @@ SudokuConstraintHandler.BinaryPairwise = class BinaryPairwise extends SudokuCons
     if (!this.constructor._isKeySymmetric(this._key, shape.numValues)) {
       throw 'Function for BinaryPairwise must be symmetric. Key: ' + this._key;
     }
+
     // The key must be symmetric, so we just need the one table.
     this._table = lookupTables.forBinaryKey(this._key)[0];
     this._isAllDifferent = this.constructor._isAllDifferent(
@@ -385,8 +427,64 @@ SudokuConstraintHandler.BinaryPairwise = class BinaryPairwise extends SudokuCons
         this._key, shape.numValues, this.cells.length);
     }
 
+    this._populateConflictMap(this.cells, this._conflictMap, cellConflicts);
+
     // If no values are legal at the start, then this constraint is invalid.
     return this._table[lookupTables.allValues] !== 0;
+  }
+
+  _enforceRequiredValues(grid, cells, requiredValues) {
+    const numCells = cells.length;
+
+    let allValues = 0;
+    let nonUniqueValues = 0;
+    let fixedValues = 0;
+    for (let i = 0; i < numCells; i++) {
+      const v = grid[cells[i]];
+      nonUniqueValues |= allValues & v;
+      allValues |= v;
+      fixedValues |= (!(v & (v - 1))) * v;  // Avoid branching.
+    }
+
+    if (allValues == fixedValues) return true;
+
+    if (this._exposeHiddenSingles) {
+      const hiddenSingles = requiredValues & ~nonUniqueValues & ~fixedValues;
+      if (hiddenSingles) {
+        if (!this._exposeHiddenSingles(grid, cells, hiddenSingles)) {
+          return false;
+        }
+      }
+    }
+
+    // Loop through and enforce all the non-unique required values.
+    let nonUniqueRequired = requiredValues & nonUniqueValues;
+    while (nonUniqueRequired) {
+      let v = nonUniqueRequired & -nonUniqueRequired;
+      nonUniqueRequired ^= v;
+      // Loop through and find the location of the cells that contain v.
+      // conflictIndex is updated such that if there are exactly two locations
+      // it will be the index of that pair into conflictMap.
+      let cellCount = 0;
+      let conflictIndex = 0;
+      const a = (numCells << 1) - 3;
+      for (let i = 0; i < numCells; i++) {
+        if (grid[cells[i]] & v) {
+          cellCount++;
+          conflictIndex = ((a - conflictIndex) * conflictIndex >> 1) + i;
+        }
+      }
+      // If there are more than 2 cells, then use the global conflictMap.
+      if (cellCount > 2) conflictIndex = 0;
+
+      // Remove the conflicts.
+      const conflictCells = this._conflictMap[conflictIndex];
+      for (let j = 0; j < conflictCells.length; j++) {
+        if (!(grid[conflictCells[j]] &= ~v)) return false;
+      }
+    }
+
+    return true;
   }
 
   enforceConsistency(grid, handlerAccumulator) {
@@ -452,22 +550,9 @@ SudokuConstraintHandler.BinaryPairwise = class BinaryPairwise extends SudokuCons
     // Run exposeHiddenSingles if we've been asked (and we had some
     // required values previously).
     const requiredValues = (validCombinationInfo >> 16) & 0xffff;
-    if (this._exposeHiddenSingles && requiredValues) {
-      let allValues = 0;
-      let nonUniqueValues = 0;
-      let fixedValues = 0;
-      for (let i = 0; i < numCells; i++) {
-        const v = grid[cells[i]];
-        nonUniqueValues |= allValues & v;
-        allValues |= v;
-        fixedValues |= (!(v & (v - 1))) * v;  // Avoid branching.
-      }
-
-      const hiddenSingles = requiredValues & ~nonUniqueValues & ~fixedValues;
-      if (hiddenSingles) {
-        if (!this._exposeHiddenSingles(grid, cells, hiddenSingles)) {
-          return false;
-        }
+    if (requiredValues) {
+      if (!this._enforceRequiredValues(grid, cells, requiredValues)) {
+        return false;
       }
     }
 
