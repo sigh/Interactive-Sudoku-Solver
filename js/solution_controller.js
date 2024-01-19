@@ -1257,6 +1257,7 @@ class SolutionController {
     this._showIterationControls(false);
     this._currentModeHandler = null;
     this._altClickHandler = null;
+    clearDOMNode(this._elements.error);
   }
 
   async _solve(constraints) {
@@ -1276,20 +1277,27 @@ class SolutionController {
 
     const handler = new this._modeHandlers[mode]();
 
-    const newSolverPromise = SudokuBuilder.buildInWorker(
-      constraints,
-      s => {
-        this._stateDisplay.setState(s);
-        if (s.extra && s.extra.solutions) {
-          handler.add(...s.extra.solutions);
-        }
-        if (s.done) { handler.setDone(); }
-      },
-      this._solveStatusChanged.bind(this),
-      this.debugManager);
-    this._solverPromises.push(newSolverPromise);
+    let newSolver = null;
+    try {
+      const newSolverPromise = SudokuBuilder.buildInWorker(
+        constraints,
+        s => {
+          this._stateDisplay.setState(s);
+          if (s.extra && s.extra.solutions) {
+            handler.add(...s.extra.solutions);
+          }
+          if (s.done) { handler.setDone(); }
+        },
+        this._solveStatusChanged.bind(this),
+        this.debugManager);
+      this._solverPromises.push(newSolverPromise);
 
-    const newSolver = await newSolverPromise;
+      newSolver = await newSolverPromise;
+    } catch (e) {
+      this._elements.error.textContent = e.toString();
+      this._stateDisplay.setSolveStatus(false, 'terminate');
+      return;
+    }
 
     if (newSolver.isTerminated()) return;
 
