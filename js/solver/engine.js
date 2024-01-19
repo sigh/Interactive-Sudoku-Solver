@@ -1327,6 +1327,10 @@ class LookupTables {
     return 32 - Math.clz32(v & -v);
   };
 
+  static toIndex(v) {
+    return 31 - Math.clz32(v);
+  };
+
   static toValuesArray(values) {
     let result = [];
     while (values) {

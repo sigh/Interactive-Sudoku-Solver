@@ -1270,13 +1270,12 @@ class SudokuBuilder {
         case 'BinaryX':
           for (const g of SudokuConstraint.Binary.parseGroups(constraint.items)) {
             cells = g.cells.map(c => c && shape.parseCellId(c).cell);
-            // This assumes that the key is already symmetric.
-            for (let i = 0; i < cells.length; i++) {
-              for (let j = i + 1; j < cells.length; j++) {
-                yield new SudokuConstraintHandler.BinaryConstraint(
-                  cells[i], cells[j],
-                  constraint.key);
-              }
+            if (cells.length == 2) {
+              yield new SudokuConstraintHandler.BinaryConstraint(
+                ...cells, constraint.key);
+            } else {
+              yield new SudokuConstraintHandler.BinaryPairwise(
+                constraint.key, ...cells);
             }
           }
           break;

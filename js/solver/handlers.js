@@ -257,6 +257,80 @@ SudokuConstraintHandler.BinaryConstraint = class BinaryConstraint extends Sudoku
   }
 }
 
+SudokuConstraintHandler.BinaryPairwise = class BinaryPairwise extends SudokuConstraintHandler {
+  constructor(key, ...cells) {
+    super(cells);
+    this._key = key;
+    this._tables = [];
+    this._isAllDifferent = false;
+
+    // Ensure we dedupe binary constraints.
+    this.idStr = [this.constructor.name, key, ...cells].join('-');
+  }
+
+  static _isAllDifferent(table, numValues) {
+    for (let i = 0; i < numValues; i++) {
+      const v = 1 << i;
+      // Check if both cells having the same value is legal.
+      if (table[v] & v) return false;
+    }
+    return true;
+  }
+
+  initialize(initialGrid, cellConflicts, shape) {
+    const lookupTables = LookupTables.get(shape.numValues);
+    this._tables = lookupTables.forBinaryKey(this._key);
+    this._isAllDifferent = this.constructor._isAllDifferent(
+      this._tables[0], shape.numValues);
+
+    // If no values are legal at the start, then this constraint is invalid.
+    return this._tables[0][lookupTables.allValues] !== 0;
+  }
+
+  enforceConsistency(grid, handlerAccumulator) {
+    const cells = this.cells;
+    const numCells = cells.length;
+
+    const [table0, table1] = this._tables;
+
+    let queue = (1 << numCells) - 1;
+    let changed = 0;
+    while (queue) {
+      queue = 0;
+      for (let i = 0; i < numCells; i++) {
+        for (let j = i + 1; j < numCells; j++) {
+          const v0 = grid[cells[i]];
+          const v1 = grid[cells[j]];
+          const v0New = grid[cells[i]] = v0 & table1[v1];
+          const v1New = grid[cells[j]] = v1 & table0[v0];
+          if (!(v0New && v1New)) return false;
+          if (v0 != v0New) queue |= 1 << i;
+          if (v1 != v1New) queue |= 1 << j;
+        }
+      }
+      changed |= queue;
+    }
+
+    if (this._isAllDifferent) {
+      let allValues = 0;
+      for (let i = 0; i < numCells; i++) {
+        allValues |= grid[cells[i]];
+      }
+      if (countOnes16bit(allValues) < numCells) return false;
+    }
+
+    while (changed) {
+      const next = changed & -changed;
+      changed ^= next;
+      handlerAccumulator.addForCell(cells[
+        LookupTables.toIndex(next)]);
+    }
+
+    return true;
+  }
+}
+
+
 SudokuConstraintHandler.AllContiguous = class AllContiguous extends SudokuConstraintHandler {
   constructor(cells) {
     super(cells);
