@@ -166,18 +166,18 @@ class SudokuConstraintOptimizer {
     return [newHandler];
   }
 
-  // Add house handlers for any AllDifferentHandler which have 9 cells.
+  // Add house handlers for any AllDifferentHandler which have numValues cells.
   _addHouseHandlers(handlerSet, shape) {
     for (const h of
       handlerSet.getAllofType(SudokuConstraintHandler.AllDifferent)) {
       const cells = h.exclusionCells();
-      if (cells.length == shape.gridSize) {
+      if (cells.length == shape.numValues) {
         handlerSet.add(new SudokuConstraintHandler.House(cells));
       }
     }
   }
 
-  // Find {1-3}-cell sum constraints and replace them dedicated handlers.
+  // Find {1-2}-cell sum constraints and replace them dedicated handlers.
   _replaceSizeSpecificSumHandlers(handlerSet, cellExclusions, shape) {
     const sumHandlers = handlerSet.getAllofType(SudokuConstraintHandler.Sum);
     for (const h of sumHandlers) {
