@@ -119,66 +119,33 @@ SudokuConstraintHandler._CommonHandlerUtil = class _CommonHandlerUtil {
     return true;
   }
 
-  static populatePairwiseExclusions(pairwiseExclusions, cells, cellExclusions) {
-    const cellExclusionSets = cellExclusions.getSets();
-    const numCells = cells.length;
-
-    // Indexing scheme for pairwiseExclusions:
-    // - pairwiseExclusions[0] =
-    //     [cells which are exclusive with every cell in cells]
-    // - pairwiseExclusions[((n<<1)-3 - i)*(i>>1) + j | i < j]
-    //     [cells which are exclusive with both cells[i] and cells[j]]
-    // where n = numCells.
-    const a = (numCells << 1) - 3;
-    const maxI = numCells - 2;
-    const maxJ = numCells - 1;
-    const maxIndex = ((a - maxI) * maxI >> 1) + maxJ;
-    for (let i = 0; i < maxIndex; i++) {
-      pairwiseExclusions.push([]);
-    }
-
-    // Find all pairwise exclusions.
-    for (let i = 0; i < numCells; i++) {
-      for (let j = i + 1; j < numCells; j++) {
-        const exclusionSet = setIntersection(
-          cellExclusionSets[cells[i]], cellExclusionSets[cells[j]]);
-        pairwiseExclusions[((a - i) * i >> 1) + j] = (
-          new Uint8Array(exclusionSet));
-      }
-    }
-
-    // Find the intersection of all exclusions.
-    let allCellExclusions = cellExclusionSets[cells[0]];
-    for (let i = 1; i < numCells && allCellExclusions.size; i++) {
-      allCellExclusions = setIntersection(
-        allCellExclusions, cellExclusionSets[cells[i]]);
-    }
-    pairwiseExclusions[0] = new Uint8Array(allCellExclusions);
-
-    return pairwiseExclusions;
-  }
-
-  static enforceRequiredValueExclusions(grid, cells, value, pairwiseExclusions) {
+  static enforceRequiredValueExclusions(grid, cells, value, cellExclusions) {
     // Loop through and find the location of the cells that contain `value`.
     // `pairIndex` is updated such that if there are exactly two locations
-    // it will be the index of that pair into `pairwiseExclusions`.
+    // it will be the index of that pair into `cellExclusions`.
     let pairIndex = 0;
     let cellCount = 0;
     const numCells = cells.length;
-    const a = (numCells << 1) - 3;
     for (let i = 0; i < numCells; i++) {
       if (grid[cells[i]] & value) {
-        pairIndex = ((a - pairIndex) * pairIndex >> 1) + i;
+        pairIndex = (pairIndex << 8) | cells[i];
         cellCount++;
       }
     }
-    // If there are more than 2 cells, then use the all-cell exclusions.
-    if (cellCount > 2) pairIndex = 0;
 
-    // Remove the value from the exclusion cells.
-    const exclusionCells = pairwiseExclusions[pairIndex];
-    for (let i = 0; i < exclusionCells.length; i++) {
-      if (!(grid[exclusionCells[i]] &= ~value)) return false;
+    // Lookup the exclusion cells.
+    // If there are more than 2 we use the intersection of the entire list.
+    const exclusionCells = (cellCount == 2)
+      ? cellExclusions.getPairExclusions(pairIndex)
+      : (cellCount == 1)
+        ? cellExclusions.getArray(pairIndex)
+        : cellExclusions.getListExclusions(cells);
+
+    if (exclusionCells && exclusionCells.length) {
+      // Remove the value from the exclusion cells.
+      for (let i = 0; i < exclusionCells.length; i++) {
+        if (!(grid[exclusionCells[i]] &= ~value)) return false;
+      }
     }
 
     return true;
@@ -330,7 +297,7 @@ SudokuConstraintHandler.BinaryPairwise = class BinaryPairwise extends SudokuCons
     this._isAllDifferent = false;
     this._validCombinationInfo = null;
     this._exposeHiddenSingles = null;
-    this._pairwiseExclusions = [];
+    this._cellExclusions = null;
 
     this._enforceRequiredValueExclusions = (
       SudokuConstraintHandler._CommonHandlerUtil.enforceRequiredValueExclusions);
@@ -453,10 +420,10 @@ SudokuConstraintHandler.BinaryPairwise = class BinaryPairwise extends SudokuCons
       // in the future if required.
       this._validCombinationInfo = this.constructor._validCombinationInfoTable(
         this._key, shape.numValues, this.cells.length);
-    }
 
-    SudokuConstraintHandler._CommonHandlerUtil.populatePairwiseExclusions(
-      this._pairwiseExclusions, this.cells, cellExclusions);
+      this._cellExclusions = cellExclusions;
+      cellExclusions.cacheCellTuples(this.cells);
+    }
 
     // If no values are legal at the start, then this constraint is invalid.
     return this._table[lookupTables.allValues] !== 0;
@@ -495,7 +462,7 @@ SudokuConstraintHandler.BinaryPairwise = class BinaryPairwise extends SudokuCons
       let v = nonUniqueRequired & -nonUniqueRequired;
       nonUniqueRequired ^= v;
       if (!this._enforceRequiredValueExclusions(
-        grid, cells, v, this._pairwiseExclusions)) return false;
+        grid, cells, v, this._cellExclusions)) return false;
     }
 
     return true;
@@ -762,7 +729,7 @@ SudokuConstraintHandler._SumHandlerUtil = class _SumHandlerUtil {
     return true;
   }
 
-  restrictCellsSingleExclusionGroup(grid, sum, cells, pairwiseExclusions) {
+  restrictCellsSingleExclusionGroup(grid, sum, cells, cellExclusions) {
     const numCells = cells.length;
 
     // Check that we can make the current sum with the unfixed values remaining.
@@ -823,14 +790,14 @@ SudokuConstraintHandler._SumHandlerUtil = class _SumHandlerUtil {
 
     // Only enforce required value exclusions if we have pairwise exclusions
     // passed in.
-    if (!pairwiseExclusions) return true;
+    if (!cellExclusions) return true;
 
     let nonUniqueRequired = requiredValues & nonUniqueValues;
     while (nonUniqueRequired) {
       let v = nonUniqueRequired & -nonUniqueRequired;
       nonUniqueRequired ^= v;
       if (!SudokuConstraintHandler._CommonHandlerUtil.enforceRequiredValueExclusions(
-        grid, cells, v, pairwiseExclusions)) {
+        grid, cells, v, cellExclusions)) {
         return false;
       }
     }
@@ -1056,6 +1023,7 @@ SudokuConstraintHandler._SumHandlerUtil = class _SumHandlerUtil {
 SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
   _exclusionGroups;
   _exclusionIndexes;
+  _cellExclusions = null;
   _sum;
   _complementCells;
   _positiveCells = [];
@@ -1068,7 +1036,6 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
     super(cells);
     this._sum = +sum;
     this._positiveCells = cells;
-    this._pairwiseExclusions = null;
 
     this.idStr = [this.constructor.name, cells, sum].join('-');
   }
@@ -1120,9 +1087,8 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
         c => this._exclusionIndexes[this.cells.indexOf(c)] = i));
 
     if (!this._negativeCells.length) {
-      this._pairwiseExclusions = [];
-      SudokuConstraintHandler._CommonHandlerUtil.populatePairwiseExclusions(
-        this._pairwiseExclusions, this.cells, cellExclusions);
+      this._cellExclusions = cellExclusions;
+      cellExclusions.cacheCellTuples(this.cells);
     }
 
     // Ensure that _complementCells is null.
@@ -1275,7 +1241,7 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
 
     if (this._exclusionGroups.length == 1) {
       if (!this._util.restrictCellsSingleExclusionGroup(
-        grid, this._sum, cells, this._pairwiseExclusions)) return false;
+        grid, this._sum, cells, this._cellExclusions)) return false;
     } else {
       if (!this._util.restrictCellsMultiExclusionGroups(
         grid, sum, this._exclusionGroups, 0)) return false;
@@ -2202,7 +2168,7 @@ SudokuConstraintHandler.XSum = class XSum extends SudokuConstraintHandler {
 SudokuConstraintHandler.LocalEntropy = class LocalEntropy extends SudokuConstraintHandler {
   constructor(cells) {
     super(cells);
-    this._pairwiseExclusions = [];
+    this._cellExclusions = null;
 
     this._enforceRequiredValueExclusions = (
       SudokuConstraintHandler._CommonHandlerUtil.enforceRequiredValueExclusions);
@@ -2219,8 +2185,8 @@ SudokuConstraintHandler.LocalEntropy = class LocalEntropy extends SudokuConstrai
     LookupTables.fromValuesArray([7, 8, 9])];
 
   initialize(initialGrid, cellExclusions, shape) {
-    SudokuConstraintHandler._CommonHandlerUtil.populatePairwiseExclusions(
-      this._pairwiseExclusions, this.cells, cellExclusions);
+    this._cellExclusions = cellExclusions;
+    cellExclusions.cacheCellTuples(this.cells);
 
     return true;
   }
@@ -2249,7 +2215,7 @@ SudokuConstraintHandler.LocalEntropy = class LocalEntropy extends SudokuConstrai
       }
       // Now we know `triadValue` is a required value and is in multiple cells.
       if (!this._enforceRequiredValueExclusions(
-        grid, cells, triadValue, this._pairwiseExclusions)) return false;
+        grid, cells, triadValue, this._cellExclusions)) return false;
     }
 
     return true;
