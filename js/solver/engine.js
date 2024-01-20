@@ -1288,6 +1288,14 @@ SudokuSolver.CellExclusions = class {
     this._cellExclusionArrays = (
       this._cellExclusionSets.map(c => new Uint8Array(c)));
     this._cellExclusionArrays.forEach(c => c.sort((a, b) => a - b));
+
+    // Indexing of pairs:
+    //   pairExclusions[(i << 8) | j] = [cells which are excluded by both i and j]
+    this._pairExclusions = new Map();
+    // Indexing of lists:
+    //   listExclusions[obj] = [cells which are excluded by all cells in obj]
+    //   obj must match exactly.
+    this._listExclusions = new Map();
   }
 
   static _makeCellExclusionSets(handlerSet, shape) {
@@ -1308,16 +1316,70 @@ SudokuSolver.CellExclusions = class {
     return cellExclusionSets;
   }
 
-  getSets() {
-    return this._cellExclusionSets;
-  }
-
   isMutuallyExclusive(cell1, cell2) {
     return this._cellExclusionSets[cell1].has(cell2);
   }
 
   getArray(cell) {
     return this._cellExclusionArrays[cell];
+  }
+
+  getPairExclusions(pairIndex) {
+    return this._pairExclusions.get(pairIndex);
+  }
+
+  getListExclusions(cells) {
+    return this._listExclusions.get(cells);
+  }
+
+  cacheCellTuples(cells) {
+    const numCells = cells.length;
+
+    for (let i = 0; i < numCells; i++) {
+      for (let j = i + 1; j < numCells; j++) {
+        this._cachePair(cells[i], cells[j]);
+      }
+    }
+
+    this._cacheList(cells);
+  }
+
+  _cacheList(cells) {
+    const numCells = cells.length;
+
+    // Find the intersection of all exclusions.
+    let allCellExclusions = this._cellExclusionSets[cells[0]];
+    for (let i = 1; i < numCells && allCellExclusions.size; i++) {
+      allCellExclusions = setIntersection(
+        allCellExclusions, this._cellExclusionSets[cells[i]]);
+    }
+
+    // Only add it if it's not empty.
+    if (allCellExclusions.size) {
+      this._listExclusions.set(cells, new Uint8Array(allCellExclusions));
+    }
+  }
+
+  _cachePair(cell0, cell1) {
+    const key = (cell0 << 8) | cell1;
+
+    // Check if we've already cached the pair.
+    if (this._pairExclusions.has(key)) return;
+
+    // If we've cached the reverse order, then use that.
+    const revKey = (cell1 << 8) | cell0;
+    if (this._pairExclusions.has(revKey)) {
+      this._pairExclusions.set(key, this._pairExclusions.get(revKey));
+      return;
+    }
+
+    // Otherwise, calculate the intersection.
+    const exclusionSet = setIntersection(
+      this._cellExclusionSets[cell0],
+      this._cellExclusionSets[cell1]);
+    this._pairExclusions.set(key, new Uint8Array(exclusionSet));
+
+    return;
   }
 }
 
