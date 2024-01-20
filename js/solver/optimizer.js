@@ -6,12 +6,12 @@ class SudokuConstraintOptimizer {
     this._logDebug = debugLogger || null;
   }
 
-  optimize(handlerSet, cellExclusionSets, shape) {
+  optimize(handlerSet, cellExclusions, shape) {
     const hasBoxes = handlerSet.getAllofType(SudokuConstraintHandler.NoBoxes).length == 0;
 
     this._addHouseHandlers(handlerSet, shape);
 
-    this._optimizeSums(handlerSet, cellExclusionSets, hasBoxes, shape);
+    this._optimizeSums(handlerSet, cellExclusions, hasBoxes, shape);
 
     this._addSumComplementCells(handlerSet);
 
@@ -89,7 +89,7 @@ class SudokuConstraintOptimizer {
     return [nonOverlappingHandlers, cellsIncluded];
   }
 
-  _optimizeSums(handlerSet, cellExclusionSets, hasBoxes, shape) {
+  _optimizeSums(handlerSet, cellExclusions, hasBoxes, shape) {
     // TODO: Consider how this interacts with fixed cells.
     let sumHandlers = handlerSet.getAllofType(SudokuConstraintHandler.Sum);
     if (sumHandlers.length == 0) return;
@@ -102,7 +102,7 @@ class SudokuConstraintOptimizer {
 
     handlerSet.add(...this._makeHiddenCageHandlers(handlerSet, sumHandlers, shape));
 
-    this._replaceSizeSpecificSumHandlers(handlerSet, cellExclusionSets, shape);
+    this._replaceSizeSpecificSumHandlers(handlerSet, cellExclusions, shape);
 
     return;
   }
@@ -178,7 +178,7 @@ class SudokuConstraintOptimizer {
   }
 
   // Find {1-3}-cell sum constraints and replace them dedicated handlers.
-  _replaceSizeSpecificSumHandlers(handlerSet, cellExclusionSets, shape) {
+  _replaceSizeSpecificSumHandlers(handlerSet, cellExclusions, shape) {
     const sumHandlers = handlerSet.getAllofType(SudokuConstraintHandler.Sum);
     for (const h of sumHandlers) {
       let newHandler;
@@ -190,7 +190,7 @@ class SudokuConstraintOptimizer {
 
         case 2:
           const mutuallyExclusive = (
-            cellExclusionSets[h.cells[0]].has(h.cells[1]));
+            cellExclusions.isMutuallyExclusive(...h.cells));
           newHandler = new SudokuConstraintHandler.BinaryConstraint(
             h.cells[0], h.cells[1],
             SudokuConstraint.Binary.fnToKey(
