@@ -1341,10 +1341,10 @@ SudokuSolver.CellExclusions = class {
       }
     }
 
-    this._cacheList(cells);
+    this.cacheCellList(cells);
   }
 
-  _cacheList(cells) {
+  cacheCellList(cells) {
     const numCells = cells.length;
 
     // Find the intersection of all exclusions.

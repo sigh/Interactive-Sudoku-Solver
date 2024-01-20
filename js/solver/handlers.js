@@ -2068,9 +2068,6 @@ SudokuConstraintHandler.XSum = class XSum extends SudokuConstraintHandler {
   initialize(initialGrid, cellExclusions, shape) {
     this._internalSumHandler.initialize(
       initialGrid, cellExclusions, shape);
-    // X-Sum messes with the cell-length, so _pairwiseExclusions won't be accurate.
-    // TODO: Make this robust and less error-prone.
-    this._internalSumHandler._pairwiseExclusions = null;
 
     this._scratchGrid = initialGrid.slice();
     this._resultGrid = initialGrid.slice();
@@ -2080,6 +2077,8 @@ SudokuConstraintHandler.XSum = class XSum extends SudokuConstraintHandler {
     let array = [];
     for (let i = 0; i < shape.gridSize; i++) {
       array.push(this.cells.slice(0, i + 1));
+      // Cache the cell lists so that the required values enforcer will find them.
+      cellExclusions.cacheCellList(array[i]);
     }
     this._cellArrays = array;
     return true;
