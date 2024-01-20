@@ -1303,18 +1303,18 @@ class SudokuBuilder {
     }
   }
 
-  static * _antiHandlers(shape, conflictFn) {
+  static * _antiHandlers(shape, exclusionFn) {
     const gridSize = shape.gridSize;
 
     for (let r = 0; r < gridSize; r++) {
       for (let c = 0; c < gridSize; c++) {
-        let cell = shape.cellIndex(r, c);
+        const cell = shape.cellIndex(r, c);
         // We only need half the constraints, as the other half will be
-        // added by the conflict cell.
-        for (const [rr, cc] of conflictFn(r, c)) {
+        // added by the corresponding exclusion cell.
+        for (const [rr, cc] of exclusionFn(r, c)) {
           if (rr < 0 || rr >= gridSize || cc < 0 || cc >= gridSize) continue;
-          let conflict = shape.cellIndex(rr, cc);
-          yield new SudokuConstraintHandler.AllDifferent([cell, conflict]);
+          const exclusionCell = shape.cellIndex(rr, cc);
+          yield new SudokuConstraintHandler.AllDifferent([cell, exclusionCell]);
         }
       }
     }
@@ -1342,9 +1342,9 @@ class SudokuBuilder {
   }
 
   static * _antiConsecutiveHandlers(shape) {
-    for (const [cell, conflict] of this._adjacentCellPairs(shape)) {
+    for (const [cell, exclusionCell] of this._adjacentCellPairs(shape)) {
       yield new SudokuConstraintHandler.BinaryConstraint(
-        cell, conflict,
+        cell, exclusionCell,
         SudokuConstraint.AntiConsecutive.fnKey(shape.numValues));
     }
   }

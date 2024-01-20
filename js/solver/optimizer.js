@@ -6,12 +6,12 @@ class SudokuConstraintOptimizer {
     this._logDebug = debugLogger || null;
   }
 
-  optimize(handlerSet, cellConflictSets, shape) {
+  optimize(handlerSet, cellExclusionSets, shape) {
     const hasBoxes = handlerSet.getAllofType(SudokuConstraintHandler.NoBoxes).length == 0;
 
     this._addHouseHandlers(handlerSet, shape);
 
-    this._optimizeSums(handlerSet, cellConflictSets, hasBoxes, shape);
+    this._optimizeSums(handlerSet, cellExclusionSets, hasBoxes, shape);
 
     this._addSumComplementCells(handlerSet);
 
@@ -74,9 +74,9 @@ class SudokuConstraintOptimizer {
     }
     handlersByOverlaps.sort((a, b) => a[1] - b[1]);
 
-    // Take non-conflicting handlers starting with the ones with least
-    // overlaps.
-    // This means that we avoid the ones which conflict with many cells.
+    // Find a set of mutually non-overlapping handlers.
+    // Start with the handlers with the least overlaps as they restrict future
+    // choices the least.
     // i.e. greedy bin-packing.
     const cellsIncluded = new Set();
     const nonOverlappingHandlers = [];
@@ -89,7 +89,7 @@ class SudokuConstraintOptimizer {
     return [nonOverlappingHandlers, cellsIncluded];
   }
 
-  _optimizeSums(handlerSet, cellConflictSets, hasBoxes, shape) {
+  _optimizeSums(handlerSet, cellExclusionSets, hasBoxes, shape) {
     // TODO: Consider how this interacts with fixed cells.
     let sumHandlers = handlerSet.getAllofType(SudokuConstraintHandler.Sum);
     if (sumHandlers.length == 0) return;
@@ -102,7 +102,7 @@ class SudokuConstraintOptimizer {
 
     handlerSet.add(...this._makeHiddenCageHandlers(handlerSet, sumHandlers, shape));
 
-    this._replaceSizeSpecificSumHandlers(handlerSet, cellConflictSets, shape);
+    this._replaceSizeSpecificSumHandlers(handlerSet, cellExclusionSets, shape);
 
     return;
   }
@@ -170,15 +170,15 @@ class SudokuConstraintOptimizer {
   _addHouseHandlers(handlerSet, shape) {
     for (const h of
       handlerSet.getAllofType(SudokuConstraintHandler.AllDifferent)) {
-      const c = h.conflictSet();
-      if (c.length == shape.gridSize) {
-        handlerSet.add(new SudokuConstraintHandler.House(c));
+      const cells = h.exclusionCells();
+      if (cells.length == shape.gridSize) {
+        handlerSet.add(new SudokuConstraintHandler.House(cells));
       }
     }
   }
 
   // Find {1-3}-cell sum constraints and replace them dedicated handlers.
-  _replaceSizeSpecificSumHandlers(handlerSet, cellConflictSets, shape) {
+  _replaceSizeSpecificSumHandlers(handlerSet, cellExclusionSets, shape) {
     const sumHandlers = handlerSet.getAllofType(SudokuConstraintHandler.Sum);
     for (const h of sumHandlers) {
       let newHandler;
@@ -189,11 +189,12 @@ class SudokuConstraintOptimizer {
           break;
 
         case 2:
-          const hasConflict = cellConflictSets[h.cells[0]].has(h.cells[1]);
+          const mutuallyExclusive = (
+            cellExclusionSets[h.cells[0]].has(h.cells[1]));
           newHandler = new SudokuConstraintHandler.BinaryConstraint(
             h.cells[0], h.cells[1],
             SudokuConstraint.Binary.fnToKey(
-              (a, b) => a + b == h.sum() && (!hasConflict || a != b),
+              (a, b) => a + b == h.sum() && (!mutuallyExclusive || a != b),
               shape.numValues));
           break;
       }
@@ -675,7 +676,7 @@ class SudokuConstraintOptimizer {
       }
       if ([...h.valueCounts.values()].some(c => c > 2)) {
         // There can't be more than 2 of each value, as the cells must be in
-        // a 2x2 box. Hence each cell conflicts with 2 others.
+        // a 2x2 box. Hence each cell is mutually-exclusive with 2 others.
         handlerSet.replace(h, new SudokuConstraintHandler.False(h.cells));
         if (this._logDebug) {
           this._logDebug({
