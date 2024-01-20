@@ -297,7 +297,7 @@ SudokuSolver.InternalSolver = class {
     const priorities = new Int32Array(this._shape.numCells);
 
     // TODO: Determine priorities in a more principled way.
-    //  - Add one for each conflict cell.
+    //  - Add one for each exclusion cell.
     //  - Add custom priorities for each constraint based on how restrictive it
     //    is.
 
@@ -329,22 +329,22 @@ SudokuSolver.InternalSolver = class {
     return priorities;
   }
 
-  static _findCellConflicts(handlers, shape) {
-    const cellConflictSets = [];
+  static _findCellExclusionSets(handlers, shape) {
+    const cellExclusionSets = [];
     for (let i = 0; i < shape.numCells; i++) {
-      cellConflictSets.push(new Set());
+      cellExclusionSets.push(new Set());
     }
 
     for (const h of handlers) {
-      const conflictSet = h.conflictSet();
-      for (const c of conflictSet) {
-        for (const d of conflictSet) {
-          if (c != d) cellConflictSets[c].add(d);
+      const exclusionCells = h.exclusionCells();
+      for (const c of exclusionCells) {
+        for (const d of exclusionCells) {
+          if (c != d) cellExclusionSets[c].add(d);
         }
       }
     }
 
-    return cellConflictSets;
+    return cellExclusionSets;
   }
 
   // Invalidate the grid, given the handler which said it was impossible.
@@ -353,8 +353,8 @@ SudokuSolver.InternalSolver = class {
   _invalidateGrid(grid, handler) {
     // Try to use the handler cells.
     let cells = handler.cells;
-    // Otherwise the cells in the conflict set.
-    if (!cells.length) cells = handler.conflictSet();
+    // Otherwise use the exclusionCells.
+    if (!cells.length) cells = handler.exclusionCells();
     cells.forEach(c => grid[c] = 0);
 
     // Otherwise just set the entire grid to 0.
@@ -386,27 +386,27 @@ SudokuSolver.InternalSolver = class {
       return aCells.localeCompare(bCells);
     });
 
-    const cellConflictSets = this.constructor._findCellConflicts(handlers, this._shape);
-
-    // Set cell conflicts so that they are unique.
-    // Sort them, so they are in a predictable order.
-    this._cellConflicts = cellConflictSets.map(c => new Uint8Array(c));
-    this._cellConflicts.forEach(c => c.sort((a, b) => a - b));
+    // Create cell exclusions. The set version is passed to handlers for
+    // efficient lookups.
+    const cellExclusionSets = this.constructor._findCellExclusionSets(handlers, this._shape);
+    // Sort them so they are in a predictable order.
+    this._cellExclusions = cellExclusionSets.map(c => new Uint8Array(c));
+    this._cellExclusions.forEach(c => c.sort((a, b) => a - b));
 
     const handlerSet = new HandlerSet(handlers, this._shape);
 
     // Optimize handlers.
     new SudokuConstraintOptimizer(this._logDebug).optimize(
-      handlerSet, cellConflictSets, this._shape);
+      handlerSet, cellExclusionSets, this._shape);
 
     for (const handler of handlerSet) {
-      if (!handler.initialize(this._initialGrid, cellConflictSets, this._shape)) {
+      if (!handler.initialize(this._initialGrid, cellExclusionSets, this._shape)) {
         this._invalidateGrid(this._initialGrid, handler);
       }
     }
 
     for (const handler of handlerSet.getAux()) {
-      if (!handler.initialize(this._initialGrid, cellConflictSets, this._shape)) {
+      if (!handler.initialize(this._initialGrid, cellExclusionSets, this._shape)) {
         this._invalidateGrid(this._initialGrid, handler);
       }
     }
@@ -495,8 +495,8 @@ SudokuSolver.InternalSolver = class {
     return false;
   }
 
-  _logEnforceValue(grid, cell, value, conflicts) {
-    const changedCells = conflicts.filter(c => grid[c] & value);
+  _logEnforceValue(grid, cell, value, exclusionCells) {
+    const changedCells = exclusionCells.filter(c => grid[c] & value);
     this._logDebug({
       loc: '_enforceValue',
       msg: 'Enforcing value',
@@ -523,17 +523,17 @@ SudokuSolver.InternalSolver = class {
   _enforceValue(grid, cell, handlerAccumulator) {
     let value = grid[cell];
 
-    const conflicts = this._cellConflicts[cell];
-    const numConflicts = conflicts.length;
+    const exclusionCells = this._cellExclusions[cell];
+    const numExclusions = exclusionCells.length;
     const logSteps = this._stepState !== null && this._stepState.logSteps;
     if (logSteps) {
-      this._logEnforceValue(grid, cell, value, conflicts);
+      this._logEnforceValue(grid, cell, value, exclusionCells);
     }
-    for (let i = 0; i < numConflicts; i++) {
-      const conflict = conflicts[i];
-      if (grid[conflict] & value) {
-        if (!(grid[conflict] ^= value)) return false;
-        handlerAccumulator.addForCell(conflict);
+    for (let i = 0; i < numExclusions; i++) {
+      const exclusionCell = exclusionCells[i];
+      if (grid[exclusionCell] & value) {
+        if (!(grid[exclusionCell] ^= value)) return false;
+        handlerAccumulator.addForCell(exclusionCell);
       }
     }
 
@@ -1075,7 +1075,7 @@ SudokuSolver.CandidateSelector = class CandidateSelector {
   }
 
   _selectBestCell(grid, cellOrder, cellDepth) {
-    // Choose cells based on value count and number of conflicts encountered.
+    // Choose cells based on value count and number of backtracks it caused.
     // NOTE: The constraint handlers are written such that they detect domain
     // wipeouts (0 values), so we should never find them here. Even if they
     // exist, it just means we do a few more useless forced cell resolutions.

@@ -16,11 +16,11 @@ class SudokuConstraintHandler {
     return true;
   }
 
-  conflictSet() {
+  exclusionCells() {
     return [];
   }
 
-  initialize(initialGrid, cellConflicts, shape) {
+  initialize(initialGrid, cellExclusionSets, shape) {
     return true;
   }
 
@@ -60,7 +60,7 @@ SudokuConstraintHandler.False = class False extends SudokuConstraintHandler {
     if (cells.length === 0) throw 'False needs cells to be effective.';
   }
 
-  initialize(initialGrid, cellConflicts, shape) {
+  initialize(initialGrid, cellExclusionSets, shape) {
     return false;
   }
   enforceConsistency(grid, handlerAccumulator) { return false; }
@@ -86,19 +86,19 @@ SudokuConstraintHandler.GivenCandidates = class GivenCandidates extends SudokuCo
 }
 
 SudokuConstraintHandler.AllDifferent = class AllDifferent extends SudokuConstraintHandler {
-  constructor(conflictCells) {
+  constructor(exclusionCells) {
     super();
-    conflictCells = conflictCells.slice();
-    conflictCells.sort((a, b) => a - b);
-    this._conflictCells = conflictCells;
+    exclusionCells = exclusionCells.slice();
+    exclusionCells.sort((a, b) => a - b);
+    this._exclusionCells = exclusionCells;
   }
 
-  initialize(initialGrid, cellConflicts, shape) {
-    return this._conflictCells.length <= shape.numValues;
+  initialize(initialGrid, cellExclusionSets, shape) {
+    return this._exclusionCells.length <= shape.numValues;
   }
 
-  conflictSet() {
-    return this._conflictCells;
+  exclusionCells() {
+    return this._exclusionCells;
   }
 }
 
@@ -119,64 +119,65 @@ SudokuConstraintHandler._CommonHandlerUtil = class _CommonHandlerUtil {
     return true;
   }
 
-  static populatePairwiseConflictMap(cells, conflictMap, cellConflicts) {
+  static populatePairwiseExclusions(pairwiseExclusions, cells, cellExclusionSets) {
     const numCells = cells.length;
 
-    // Indexing scheme for conflictMap:
-    // - conflictMap[0] =
-    //     [cells which conflict with the entire constraint]
-    // - conflictMap[((n<<1)-3 - i)*(i>>1) + j | i < j]
-    //     [cells which conflict with both cells[i] and cells[j]]
+    // Indexing scheme for pairwiseExclusions:
+    // - pairwiseExclusions[0] =
+    //     [cells which are exclusive with every cell in cells]
+    // - pairwiseExclusions[((n<<1)-3 - i)*(i>>1) + j | i < j]
+    //     [cells which are exclusive with both cells[i] and cells[j]]
     // where n = numCells.
     const a = (numCells << 1) - 3;
     const maxI = numCells - 2;
     const maxJ = numCells - 1;
     const maxIndex = ((a - maxI) * maxI >> 1) + maxJ;
     for (let i = 0; i < maxIndex; i++) {
-      conflictMap.push([]);
+      pairwiseExclusions.push([]);
     }
 
-    // Find all pairwise conflicts.
+    // Find all pairwise exclusions.
     for (let i = 0; i < numCells; i++) {
       for (let j = i + 1; j < numCells; j++) {
-        const conflicts = setIntersection(
-          cellConflicts[cells[i]], cellConflicts[cells[j]]);
-        conflictMap[((a - i) * i >> 1) + j] = new Uint8Array(conflicts);
+        const exclusionSet = setIntersection(
+          cellExclusionSets[cells[i]], cellExclusionSets[cells[j]]);
+        pairwiseExclusions[((a - i) * i >> 1) + j] = (
+          new Uint8Array(exclusionSet));
       }
     }
 
-    // Find the global conflicts.
-    let globalConflicts = cellConflicts[cells[0]];
-    for (let i = 1; i < numCells && globalConflicts.size; i++) {
-      globalConflicts = setIntersection(
-        globalConflicts, cellConflicts[cells[i]]);
+    // Find the intersection of all exclusions.
+    let allCellExclusions = cellExclusionSets[cells[0]];
+    for (let i = 1; i < numCells && allCellExclusions.size; i++) {
+      allCellExclusions = setIntersection(
+        allCellExclusions, cellExclusionSets[cells[i]]);
     }
-    conflictMap[0] = new Uint8Array(globalConflicts);
+    pairwiseExclusions[0] = new Uint8Array(allCellExclusions);
 
-    return conflictMap;
+    return pairwiseExclusions;
   }
 
-  static enforceRequiredValueConflicts(grid, cells, value, conflictMap) {
+  static enforceRequiredValueExclusions(grid, cells, value, pairwiseExclusions) {
     // Loop through and find the location of the cells that contain `value`.
-    // `conflictIndex` is updated such that if there are exactly two locations
-    // it will be the index of that pair into `conflictMap`.
-    let conflictIndex = 0;
+    // `pairIndex` is updated such that if there are exactly two locations
+    // it will be the index of that pair into `pairwiseExclusions`.
+    let pairIndex = 0;
     let cellCount = 0;
     const numCells = cells.length;
     const a = (numCells << 1) - 3;
     for (let i = 0; i < numCells; i++) {
       if (grid[cells[i]] & value) {
-        conflictIndex = ((a - conflictIndex) * conflictIndex >> 1) + i;
+        pairIndex = ((a - pairIndex) * pairIndex >> 1) + i;
         cellCount++;
       }
     }
-    // If there are more than 2 cells, then use the global conflictMap.
-    if (cellCount > 2) conflictIndex = 0;
+    // If there are more than 2 cells, then use the all-cell exclusions.
+    if (cellCount > 2) pairIndex = 0;
 
-    // Remove the conflicts.
-    const conflictCells = conflictMap[conflictIndex];
-    for (let i = 0; i < conflictCells.length; i++) {
-      if (!(grid[conflictCells[i]] &= ~value)) return false;
+    // Remove the value from the exclusion cells.
+    const exclusionCells = pairwiseExclusions[pairIndex];
+    for (let i = 0; i < exclusionCells.length; i++) {
+      if (!(grid[exclusionCells[i]] &= ~value)) return false;
     }
 
     return true;
@@ -191,7 +192,7 @@ SudokuConstraintHandler.House = class House extends SudokuConstraintHandler {
     this._lookupTables = null;
   }
 
-  initialize(initialGrid, cellConflicts, shape) {
+  initialize(initialGrid, cellExclusionSets, shape) {
     this._shape = shape;
     this._lookupTables = LookupTables.get(shape.numValues);
 
@@ -283,7 +284,7 @@ SudokuConstraintHandler.House = class House extends SudokuConstraintHandler {
     return this._enforceNakedPairs(grid, cells);
   }
 
-  conflictSet() {
+  exclusionCells() {
     return this.cells;
   }
 }
@@ -298,7 +299,7 @@ SudokuConstraintHandler.BinaryConstraint = class BinaryConstraint extends Sudoku
     this.idStr = [this.constructor.name, key, cell1, cell2].join('-');
   }
 
-  initialize(initialGrid, cellConflicts, shape) {
+  initialize(initialGrid, cellExclusionSets, shape) {
     const lookupTables = LookupTables.get(shape.numValues);
     this._tables = lookupTables.forBinaryKey(this._key);
 
@@ -328,10 +329,10 @@ SudokuConstraintHandler.BinaryPairwise = class BinaryPairwise extends SudokuCons
     this._isAllDifferent = false;
     this._validCombinationInfo = null;
     this._exposeHiddenSingles = null;
-    this._conflictMap = [];
+    this._pairwiseExclusions = [];
 
-    this._enforceRequiredValueConflicts = (
-      SudokuConstraintHandler._CommonHandlerUtil.enforceRequiredValueConflicts);
+    this._enforceRequiredValueExclusions = (
+      SudokuConstraintHandler._CommonHandlerUtil.enforceRequiredValueExclusions);
 
     // Ensure we dedupe binary constraints.
     this.idStr = [this.constructor.name, key, ...cells].join('-');
@@ -436,7 +437,7 @@ SudokuConstraintHandler.BinaryPairwise = class BinaryPairwise extends SudokuCons
     return validCombinationInfo;
   });
 
-  initialize(initialGrid, cellConflicts, shape) {
+  initialize(initialGrid, cellExclusionSets, shape) {
     const lookupTables = LookupTables.get(shape.numValues);
     if (!this.constructor._isKeySymmetric(this._key, shape.numValues)) {
       throw 'Function for BinaryPairwise must be symmetric. Key: ' + this._key;
@@ -453,8 +454,8 @@ SudokuConstraintHandler.BinaryPairwise = class BinaryPairwise extends SudokuCons
         this._key, shape.numValues, this.cells.length);
     }
 
-    SudokuConstraintHandler._CommonHandlerUtil.populatePairwiseConflictMap(
-      this.cells, this._conflictMap, cellConflicts);
+    SudokuConstraintHandler._CommonHandlerUtil.populatePairwiseExclusions(
+      this._pairwiseExclusions, this.cells, cellExclusionSets);
 
     // If no values are legal at the start, then this constraint is invalid.
     return this._table[lookupTables.allValues] !== 0;
@@ -492,8 +493,8 @@ SudokuConstraintHandler.BinaryPairwise = class BinaryPairwise extends SudokuCons
     while (nonUniqueRequired) {
       let v = nonUniqueRequired & -nonUniqueRequired;
       nonUniqueRequired ^= v;
-      if (!this._enforceRequiredValueConflicts(
-        grid, cells, v, this._conflictMap)) return false;
+      if (!this._enforceRequiredValueExclusions(
+        grid, cells, v, this._pairwiseExclusions)) return false;
     }
 
     return true;
@@ -664,66 +665,66 @@ SudokuConstraintHandler._SumHandlerUtil = class _SumHandlerUtil {
     })();
   }
 
-  // Partition the cells into subsets where all cells must be unique.
-  static findConflictSets(cells, cellConflicts) {
-    let bestConflictSetsScore = 0;
-    let bestConflictSets = [];
+  // Partition the cells into groups where members are all unique.
+  static findExclusionGroups(cells, cellExclusionSets) {
+    let bestExclusionGroupsScore = 0;
+    let bestExclusionGroups = [];
     let randomGen = new RandomIntGenerator(0);
 
     const NUM_TRIALS = 5;
 
     // Choose `NUM_TRIALS` random orderings of the cells and find the one that
-    // generates the best conflict sets.
+    // generates the best exclusion groups.
     // NOTE: The first ordering is the original (sorted) ordering. This ordering
     //       should work well for little killers and other linear regions.
     cells = cells.slice();
     for (let i = 0; i < NUM_TRIALS; i++) {
-      let conflictSets = this.findConflictSetsGreedy(cells, cellConflicts);
-      // If there is only one conflict set, then we can't do any better.
-      if (conflictSets.length == 1) return conflictSets;
+      let exclusionGroups = this.findExclusionGroupsGreedy(cells, cellExclusionSets);
+      // If there is only one exclusion group, then we can't do any better.
+      if (exclusionGroups.length == 1) return exclusionGroups;
 
       // Optimize for the sum of triangle numbers.
-      let conflictSetsScore = conflictSets.reduce(
+      let exclusionGroupsScore = exclusionGroups.reduce(
         (acc, cs) => cs.length * (cs.length + 1) / 2 + acc, 0);
-      if (conflictSetsScore > bestConflictSetsScore) {
-        bestConflictSetsScore = conflictSetsScore;
-        bestConflictSets = conflictSets;
+      if (exclusionGroupsScore > bestExclusionGroupsScore) {
+        bestExclusionGroupsScore = exclusionGroupsScore;
+        bestExclusionGroups = exclusionGroups;
       }
 
       shuffleArray(cells, randomGen);
     }
 
-    return bestConflictSets;
+    return bestExclusionGroups;
   }
 
-  // Partition the cells into subsets where all cells must be unique.
+  // Partition the cells into groups where members are all unique.
   // Applies a greedy algorithm by, each iteration, choosing a cell and adding
-  // as many remaining cells to it as possible to create the next set.
-  static findConflictSetsGreedy(cells, cellConflicts) {
-    let conflictSets = [];
+  // as many remaining cells to it as possible to create the next group.
+  static findExclusionGroupsGreedy(cells, cellExclusionSets) {
+    let exclusionGroups = [];
     let unassignedCells = new Set(cells)
 
     while (unassignedCells.size > 0) {
-      let currentSet = [];
+      let currentGroup = [];
       for (const unassignedCell of unassignedCells) {
-        // Determine if this cell is in a conflict set with every cell in the
-        // current set. If so, then add it to the current set.
+        // Determine if this cell is mutually exclusive with every cell in the
+        // current group. If so, then add it to the current group.
         let addToCurrentSet = true;
-        for (const conflictCell of currentSet) {
-          if (!cellConflicts[unassignedCell].has(conflictCell)) {
+        for (const exclusionCell of currentGroup) {
+          if (!cellExclusionSets[unassignedCell].has(exclusionCell)) {
             addToCurrentSet = false;
             break;
           }
         }
         if (addToCurrentSet) {
-          currentSet.push(unassignedCell);
+          currentGroup.push(unassignedCell);
           unassignedCells.delete(unassignedCell);
         }
       }
-      conflictSets.push(currentSet);
+      exclusionGroups.push(currentGroup);
     }
 
-    return conflictSets;
+    return exclusionGroups;
   }
 
   restrictValueRange(grid, cells, sumMinusMin, maxMinusSum) {
@@ -760,7 +761,7 @@ SudokuConstraintHandler._SumHandlerUtil = class _SumHandlerUtil {
     return true;
   }
 
-  restrictCellsSingleConflictSet(grid, sum, cells, pairConflictMap) {
+  restrictCellsSingleExclusionGroup(grid, sum, cells, pairwiseExclusions) {
     const numCells = cells.length;
 
     // Check that we can make the current sum with the unfixed values remaining.
@@ -819,16 +820,16 @@ SudokuConstraintHandler._SumHandlerUtil = class _SumHandlerUtil {
       }
     }
 
-    // Only enforce required value conflicts if we have the conflict map
+    // Only enforce required value exclusions if we have pairwise exclusions
     // passed in.
-    if (!pairConflictMap) return true;
+    if (!pairwiseExclusions) return true;
 
     let nonUniqueRequired = requiredValues & nonUniqueValues;
     while (nonUniqueRequired) {
       let v = nonUniqueRequired & -nonUniqueRequired;
       nonUniqueRequired ^= v;
-      if (!SudokuConstraintHandler._CommonHandlerUtil.enforceRequiredValueConflicts(
-        grid, cells, v, pairConflictMap)) {
+      if (!SudokuConstraintHandler._CommonHandlerUtil.enforceRequiredValueExclusions(
+        grid, cells, v, pairwiseExclusions)) {
         return false;
       }
     }
@@ -842,8 +843,8 @@ SudokuConstraintHandler._SumHandlerUtil = class _SumHandlerUtil {
 
   // Restricts cell values to only the ranges that are possible taking into
   // account uniqueness constraints between values.
-  restrictCellsMultiConflictSet(grid, sum, conflictSets) {
-    const numSets = conflictSets.length;
+  restrictCellsMultiExclusionGroups(grid, sum, exclusionGroups) {
+    const numSets = exclusionGroups.length;
 
     // Find a set of minimum and maximum unique values which can be set,
     // taking into account uniqueness within constraint sets.
@@ -859,7 +860,7 @@ SudokuConstraintHandler._SumHandlerUtil = class _SumHandlerUtil {
     const allValues = this._lookupTables.allValues;
 
     for (let s = 0; s < numSets; s++) {
-      let set = conflictSets[s];
+      let set = exclusionGroups[s];
       let seenMin = 0;
       let seenMax = 0;
 
@@ -921,7 +922,7 @@ SudokuConstraintHandler._SumHandlerUtil = class _SumHandlerUtil {
       // If the value mask could potentially remove some values, then apply
       // the mask to the values in the set.
       if (~valueMask & allValues) {
-        const set = conflictSets[s];
+        const set = exclusionGroups[s];
         for (let i = 0; i < set.length; i++) {
           if (!(grid[set[i]] &= valueMask)) {
             return false;
@@ -933,7 +934,7 @@ SudokuConstraintHandler._SumHandlerUtil = class _SumHandlerUtil {
     return true;
   }
 
-  _enforceThreeCellConsistency(grid, cells, sum, conflictMap) {
+  _enforceThreeCellConsistency(grid, cells, sum, exclusionIndexes) {
     const numValues = this._numValues;
 
     let v0 = grid[cells[0]];
@@ -946,14 +947,14 @@ SudokuConstraintHandler._SumHandlerUtil = class _SumHandlerUtil {
     let sums0 = this._pairwiseSums[(v1 << numValues) | v2] << 2;
 
     // If the cell values are possibly repeated, then handle that.
-    if (conflictMap[0] !== conflictMap[1] || conflictMap[0] !== conflictMap[2]) {
-      if (conflictMap[0] != conflictMap[1]) {
+    if (exclusionIndexes[0] !== exclusionIndexes[1] || exclusionIndexes[0] !== exclusionIndexes[2]) {
+      if (exclusionIndexes[0] != exclusionIndexes[1]) {
         sums2 |= this._doubles[v0 & v1];
       }
-      if (conflictMap[0] != conflictMap[2]) {
+      if (exclusionIndexes[0] != exclusionIndexes[2]) {
         sums1 |= this._doubles[v0 & v2];
       }
-      if (conflictMap[1] != conflictMap[2]) {
+      if (exclusionIndexes[1] != exclusionIndexes[2]) {
         sums0 |= this._doubles[v1 & v2];
       }
     }
@@ -978,7 +979,7 @@ SudokuConstraintHandler._SumHandlerUtil = class _SumHandlerUtil {
   }
 
   static _valueBuffer = new Uint16Array(SHAPE_MAX.numValues);
-  static _conflictMapBuffer = new Uint8Array(SHAPE_MAX.numValues);
+  static _exclusionIndexesBuffer = new Uint8Array(SHAPE_MAX.numValues);
   static _cellBuffer = new Uint8Array(SHAPE_MAX.numValues);
 
   // Determines if enforceFewRemainingCells() can be run.
@@ -991,10 +992,10 @@ SudokuConstraintHandler._SumHandlerUtil = class _SumHandlerUtil {
   // REQUIRES that:
   //  - The number of unfixed cells is accurate.
   //  - None of the values are zero.
-  enforceFewRemainingCells(grid, targetSum, numUnfixed, cells, conflictMap) {
+  enforceFewRemainingCells(grid, targetSum, numUnfixed, cells, exclusionIndexes) {
     const cellBuffer = this.constructor._cellBuffer;
     const valueBuffer = this.constructor._valueBuffer;
-    const conflictMapBuffer = this.constructor._conflictMapBuffer;
+    const exclusionIndexesBuffer = this.constructor._exclusionIndexesBuffer;
 
     const gridSize = this._numValues | 0;
 
@@ -1003,7 +1004,7 @@ SudokuConstraintHandler._SumHandlerUtil = class _SumHandlerUtil {
       const c = cells[i];
       const v = grid[c];
       if (v & (v - 1)) {
-        conflictMapBuffer[j] = conflictMap[i];
+        exclusionIndexesBuffer[j] = exclusionIndexes[i];
         cellBuffer[j] = c;
         valueBuffer[j] = v;
         j++;
@@ -1026,10 +1027,10 @@ SudokuConstraintHandler._SumHandlerUtil = class _SumHandlerUtil {
         v1 &= (this._lookupTables.reverse[v0] << (targetSum - 1)) >> gridSize;
         v0 &= (this._lookupTables.reverse[v1] << (targetSum - 1)) >> gridSize;
 
-        // If the cells are in the same conflict set, also ensure the sum is
-        // distinct values.
+        // If the cells are in the same exclusion group, also ensure the sum
+        // uses distinct values.
         if ((targetSum & 1) == 0 &&
-          conflictMapBuffer[0] === conflictMapBuffer[1]) {
+          exclusionIndexesBuffer[0] === exclusionIndexesBuffer[1]) {
           // targetSum/2 can't be valid value.
           const mask = ~(1 << ((targetSum >> 1) - 1));
           v0 &= mask;
@@ -1045,15 +1046,15 @@ SudokuConstraintHandler._SumHandlerUtil = class _SumHandlerUtil {
 
       case 3: {
         return this._enforceThreeCellConsistency(
-          grid, cellBuffer, targetSum, conflictMapBuffer);
+          grid, cellBuffer, targetSum, exclusionIndexesBuffer);
       }
     }
   }
 }
 
 SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
-  _conflictSets;
-  _conflictMap;
+  _exclusionGroups;
+  _exclusionIndexes;
   _sum;
   _complementCells;
   _positiveCells = [];
@@ -1066,7 +1067,7 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
     super(cells);
     this._sum = +sum;
     this._positiveCells = cells;
-    this._pairConflictMap = null;
+    this._pairwiseExclusions = null;
 
     this.idStr = [this.constructor.name, cells, sum].join('-');
   }
@@ -1089,7 +1090,7 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
     return this._shape.gridSize * 2 - this.cells.length;
   }
 
-  initialize(initialGrid, cellConflicts, shape) {
+  initialize(initialGrid, cellExclusionSets, shape) {
     this._shape = shape;
 
     this._lookupTables = LookupTables.get(shape.numValues);
@@ -1103,24 +1104,24 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
 
     this._util = SudokuConstraintHandler._SumHandlerUtil.get(shape.numValues);
 
-    this._conflictSets = (
-      SudokuConstraintHandler._SumHandlerUtil.findConflictSets(
-        this._positiveCells, cellConflicts));
+    this._exclusionGroups = (
+      SudokuConstraintHandler._SumHandlerUtil.findExclusionGroups(
+        this._positiveCells, cellExclusionSets));
     if (this._negativeCells.length) {
-      this._conflictSets.push(
-        ...SudokuConstraintHandler._SumHandlerUtil.findConflictSets(
-          this._negativeCells, cellConflicts));
+      this._exclusionGroups.push(
+        ...SudokuConstraintHandler._SumHandlerUtil.findExclusionGroups(
+          this._negativeCells, cellExclusionSets));
     }
 
-    this._conflictMap = new Uint8Array(this.cells.length);
-    this._conflictSets.forEach(
+    this._exclusionIndexes = new Uint8Array(this.cells.length);
+    this._exclusionGroups.forEach(
       (s, i) => s.forEach(
-        c => this._conflictMap[this.cells.indexOf(c)] = i));
+        c => this._exclusionIndexes[this.cells.indexOf(c)] = i));
 
     if (!this._negativeCells.length) {
-      this._pairConflictMap = [];
-      SudokuConstraintHandler._CommonHandlerUtil.populatePairwiseConflictMap(
-        this.cells, this._pairConflictMap, cellConflicts);
+      this._pairwiseExclusions = [];
+      SudokuConstraintHandler._CommonHandlerUtil.populatePairwiseExclusions(
+        this._pairwiseExclusions, this.cells, cellExclusionSets);
     }
 
     // Ensure that _complementCells is null.
@@ -1133,17 +1134,17 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
     // Check for valid sums.
     const sum = this._sum;
     if (!Number.isInteger(sum) || sum < 0) return false;
-    if (this._conflictSets.length == 1
+    if (this._exclusionGroups.length == 1
       && sum > SudokuConstraintHandler._SumHandlerUtil.maxCageSum(shape.numValues)) {
       return false;
     }
-    // Ensure each conflict set is not too large. This only matters if we remove
-    // standard regions.
-    for (const conflictSet of this._conflictSets) {
-      if (conflictSet.length > shape.numValues) {
-        // The UI should not allow users to create such sets, and the
+    // Ensure each exclusion group is not too large. This only matters if we
+    // remove standard regions.
+    for (const exclusionGroup of this._exclusionGroups) {
+      if (exclusionGroup.length > shape.numValues) {
+        // The UI should not allow users to create such groups, and the
         // optimizer should avoid them as well.
-        throw ('Conflict set is too large.');
+        throw ('Exclusion group is too large.');
       }
     }
 
@@ -1236,7 +1237,7 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
     if (sum < minSum || maxSum < sum) return false;
     // We've reached the target sum exactly.
     // NOTE: Uniqueness constraint is already enforced by the solver via
-    //       conflictCells.
+    //       exclusionCells.
     if (minSum == maxSum) return true;
 
     const numUnfixed = numCells - (rangeInfoSum >> 24);
@@ -1250,7 +1251,7 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
       // If there are few remaining cells then handle them explicitly.
       const fixedSum = (rangeInfoSum >> 16) & 0xff;
       const targetSum = sum - fixedSum;
-      if (!this._util.enforceFewRemainingCells(grid, targetSum, numUnfixed, this.cells, this._conflictMap)) {
+      if (!this._util.enforceFewRemainingCells(grid, targetSum, numUnfixed, this.cells, this._exclusionIndexes)) {
         return false;
       }
     } else {
@@ -1271,12 +1272,12 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
     // If enforceFewRemainingCells has run, then we've already done all we can.
     if (hasFewUnfixed) return true;
 
-    if (this._conflictSets.length == 1) {
-      if (!this._util.restrictCellsSingleConflictSet(
-        grid, this._sum, cells, this._pairConflictMap)) return false;
+    if (this._exclusionGroups.length == 1) {
+      if (!this._util.restrictCellsSingleExclusionGroup(
+        grid, this._sum, cells, this._pairwiseExclusions)) return false;
     } else {
-      if (!this._util.restrictCellsMultiConflictSet(
-        grid, sum, this._conflictSets, 0)) return false;
+      if (!this._util.restrictCellsMultiExclusionGroups(
+        grid, sum, this._exclusionGroups, 0)) return false;
     }
 
     return true;
@@ -1308,7 +1309,7 @@ SudokuConstraintHandler.SumWithNegative = class SumWithNegative extends SudokuCo
     this._positiveCells = positiveCells;
     this._negativeCells = [negativeCell];
     this._negativeCell = negativeCell;
-    this._conflictSets = null;
+    this._exclusionGroups = null;
 
     // IMPORTANT: Complement cells don't work for this currently, because
     // we can't guarantee that reversed negativeCells is a unique value.
@@ -1316,9 +1317,9 @@ SudokuConstraintHandler.SumWithNegative = class SumWithNegative extends SudokuCo
     this._complementCells = null;
   }
 
-  initialize(initialGrid, cellConflicts, shape) {
+  initialize(initialGrid, cellExclusionSets, shape) {
     this._sum += shape.numValues + 1;
-    return super.initialize(initialGrid, cellConflicts, shape);
+    return super.initialize(initialGrid, cellExclusionSets, shape);
   }
 
   setComplementCells() { }
@@ -1347,7 +1348,7 @@ SudokuConstraintHandler.Skyscraper = class Skyscraper extends SudokuConstraintHa
     }
   }
 
-  initialize(initialGrid, cellConflicts, shape) {
+  initialize(initialGrid, cellExclusionSets, shape) {
     const cells = this.cells;
     const lookupTables = LookupTables.get(shape.numValues);
     this._lookupTables = lookupTables;
@@ -1356,7 +1357,7 @@ SudokuConstraintHandler.Skyscraper = class Skyscraper extends SudokuConstraintHa
     // Check that all cells are unique.
     for (let i = 0; i < cells.length; i++) {
       for (let j = 0; j < i; j++) {
-        if (!cellConflicts[cells[i]].has(cells[j])) {
+        if (!cellExclusionSets[cells[i]].has(cells[j])) {
           throw ('Skyscraper handler requires all cells to be distinct.');
         }
       }
@@ -1629,7 +1630,7 @@ SudokuConstraintHandler.Sandwich = class Sandwich extends SudokuConstraintHandle
     this._sum = +sum;
   }
 
-  initialize(initialGrid, cellConflicts, shape) {
+  initialize(initialGrid, cellExclusionSets, shape) {
     // Sanity check.
     if (this.cells.length != shape.numValues) return false;
     // Check that the sum is feasible.
@@ -1893,7 +1894,7 @@ SudokuConstraintHandler.RegionSumLine = class RegionSumLine extends SudokuConstr
     super(cells);
   }
 
-  initialize(initialGrid, cellConflicts, shape) {
+  initialize(initialGrid, cellExclusionSets, shape) {
     // Map cells to box regions.
     const cellToBox = new Map();
     for (const boxRegion of SudokuConstraint.boxRegions(shape)) {
@@ -1931,7 +1932,7 @@ SudokuConstraintHandler.RegionSumLine = class RegionSumLine extends SudokuConstr
       for (const cells of this._multi) {
         const arrow = new SudokuConstraintHandler.SumWithNegative(
           cells, single, 0);
-        arrow.initialize(initialGrid, cellConflicts, shape);
+        arrow.initialize(initialGrid, cellExclusionSets, shape);
         this._arrows.push(arrow);
       }
       this._multi = [];
@@ -1998,7 +1999,7 @@ SudokuConstraintHandler.RegionSumLine = class RegionSumLine extends SudokuConstr
       if (globalMin == globalMax) {
         // We know the sum, and cells should always be in a single box
         // (by definition).
-        if (!this._util.restrictCellsSingleConflictSet(
+        if (!this._util.restrictCellsSingleExclusionGroup(
           grid, globalMin, cells, null)) return false;
       }
     }
@@ -2030,23 +2031,23 @@ SudokuConstraintHandler.Between = class Between extends SudokuConstraintHandler 
     this._mids = cells.slice(1, cells.length - 1)
   }
 
-  initialize(initialGrid, cellConflicts, shape) {
+  initialize(initialGrid, cellExclusionSets, shape) {
     this._minMax8Bit = LookupTables.get(shape.numValues).minMax8Bit;
 
-    const conflictSets = SudokuConstraintHandler._SumHandlerUtil.findConflictSets(
-      this._mids, cellConflicts);
-    const maxConflictSize = Math.max(0, ...conflictSets.map(a => a.length));
-    const minEndsDelta = maxConflictSize ? maxConflictSize + 1 : 0;
+    const exclusionGroups = SudokuConstraintHandler._SumHandlerUtil.findExclusionGroups(
+      this._mids, cellExclusionSets);
+    const maxGroupSize = Math.max(0, ...exclusionGroups.map(a => a.length));
+    const minEndsDelta = maxGroupSize ? maxGroupSize + 1 : 0;
 
     this._binaryConstraint = new SudokuConstraintHandler.BinaryConstraint(
       ...this._ends,
       SudokuConstraint.Binary.fnToKey(
         (a, b) => Math.abs(a - b) >= minEndsDelta,
         shape.numValues));
-    return this._binaryConstraint.initialize(initialGrid, cellConflicts, shape);
+    return this._binaryConstraint.initialize(initialGrid, cellExclusionSets, shape);
   }
 
-  conflictSet() {
+  exclusionCells() {
     // The ends must be unique if there are any cells in the middle.
     return this._mids.length ? this._ends : [];
   }
@@ -2097,12 +2098,12 @@ SudokuConstraintHandler.XSum = class XSum extends SudokuConstraintHandler {
       this.cells.slice(), this._sum);
   }
 
-  initialize(initialGrid, cellConflicts, shape) {
+  initialize(initialGrid, cellExclusionSets, shape) {
     this._internalSumHandler.initialize(
-      initialGrid, cellConflicts, shape);
-    // X-Sum messes with the cell-length, so pairConflict won't be accurate.
+      initialGrid, cellExclusionSets, shape);
+    // X-Sum messes with the cell-length, so _pairwiseExclusions won't be accurate.
     // TODO: Make this robust and less error-prone.
-    this._internalSumHandler._pairConflictMap = null;
+    this._internalSumHandler._pairwiseExclusions = null;
 
     this._scratchGrid = initialGrid.slice();
     this._resultGrid = initialGrid.slice();
@@ -2200,10 +2201,10 @@ SudokuConstraintHandler.XSum = class XSum extends SudokuConstraintHandler {
 SudokuConstraintHandler.LocalEntropy = class LocalEntropy extends SudokuConstraintHandler {
   constructor(cells) {
     super(cells);
-    this._conflictMap = [];
+    this._pairwiseExclusions = [];
 
-    this._enforceRequiredValueConflicts = (
-      SudokuConstraintHandler._CommonHandlerUtil.enforceRequiredValueConflicts);
+    this._enforceRequiredValueExclusions = (
+      SudokuConstraintHandler._CommonHandlerUtil.enforceRequiredValueExclusions);
   }
 
   static _valuesBuffer = new Uint16Array(SHAPE_MAX.numValues);
@@ -2216,9 +2217,9 @@ SudokuConstraintHandler.LocalEntropy = class LocalEntropy extends SudokuConstrai
     LookupTables.fromValuesArray([4, 5, 6]),
     LookupTables.fromValuesArray([7, 8, 9])];
 
-  initialize(initialGrid, cellConflicts, shape) {
-    SudokuConstraintHandler._CommonHandlerUtil.populatePairwiseConflictMap(
-      this.cells, this._conflictMap, cellConflicts);
+  initialize(initialGrid, cellExclusionSets, shape) {
+    SudokuConstraintHandler._CommonHandlerUtil.populatePairwiseExclusions(
+      this._pairwiseExclusions, this.cells, cellExclusionSets);
 
     return true;
   }
@@ -2246,8 +2247,8 @@ SudokuConstraintHandler.LocalEntropy = class LocalEntropy extends SudokuConstrai
         continue;
       }
       // Now we know `triadValue` is a required value and is in multiple cells.
-      if (!this._enforceRequiredValueConflicts(
-        grid, cells, triadValue, this._conflictMap)) return false;
+      if (!this._enforceRequiredValueExclusions(
+        grid, cells, triadValue, this._pairwiseExclusions)) return false;
     }
 
     return true;
