@@ -461,7 +461,9 @@ SudokuConstraintHandler.BinaryPairwise = class BinaryPairwise extends SudokuCons
     }
 
     // Enforce all the non-unique required values.
-    const nonUniqueRequired = requiredValues & nonUniqueValues;
+    // Exclude fixedValues, they will be handled by the main solver loop,
+    // which will also propagate the changes.
+    const nonUniqueRequired = requiredValues & nonUniqueValues & ~fixedValues;
     if (!this._commonUtil.enforceRequiredValueExclusions(
       grid, cells, nonUniqueRequired, this._cellExclusions)) return false;
 
@@ -792,7 +794,7 @@ SudokuConstraintHandler._SumHandlerUtil = class _SumHandlerUtil {
     // passed in.
     if (!cellExclusions) return true;
 
-    const nonUniqueRequired = requiredValues & nonUniqueValues;
+    const nonUniqueRequired = requiredValues & nonUniqueValues & ~fixedValues;
     if (!this._commonUtil.enforceRequiredValueExclusions(
       grid, cells, nonUniqueRequired, cellExclusions)) {
       return false;
