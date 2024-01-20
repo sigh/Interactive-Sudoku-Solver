@@ -329,24 +329,6 @@ SudokuSolver.InternalSolver = class {
     return priorities;
   }
 
-  static _findCellExclusionSets(handlers, shape) {
-    const cellExclusionSets = [];
-    for (let i = 0; i < shape.numCells; i++) {
-      cellExclusionSets.push(new Set());
-    }
-
-    for (const h of handlers) {
-      const exclusionCells = h.exclusionCells();
-      for (const c of exclusionCells) {
-        for (const d of exclusionCells) {
-          if (c != d) cellExclusionSets[c].add(d);
-        }
-      }
-    }
-
-    return cellExclusionSets;
-  }
-
   // Invalidate the grid, given the handler which said it was impossible.
   // We invalidate the grid by setting cells to zero. We want to set the
   // most meaningful cells to the user.
@@ -386,27 +368,25 @@ SudokuSolver.InternalSolver = class {
       return aCells.localeCompare(bCells);
     });
 
-    // Create cell exclusions. The set version is passed to handlers for
-    // efficient lookups.
-    const cellExclusionSets = this.constructor._findCellExclusionSets(handlers, this._shape);
-    // Sort them so they are in a predictable order.
-    this._cellExclusions = cellExclusionSets.map(c => new Uint8Array(c));
-    this._cellExclusions.forEach(c => c.sort((a, b) => a - b));
-
     const handlerSet = new HandlerSet(handlers, this._shape);
+
+    // Create lookups for which cells must have mutually exclusive values.
+    const cellExclusions = new SudokuSolver.CellExclusions(
+      handlerSet, this._shape);
+    this._cellExclusions = cellExclusions;
 
     // Optimize handlers.
     new SudokuConstraintOptimizer(this._logDebug).optimize(
-      handlerSet, cellExclusionSets, this._shape);
+      handlerSet, cellExclusions, this._shape);
 
     for (const handler of handlerSet) {
-      if (!handler.initialize(this._initialGrid, cellExclusionSets, this._shape)) {
+      if (!handler.initialize(this._initialGrid, cellExclusions, this._shape)) {
         this._invalidateGrid(this._initialGrid, handler);
       }
     }
 
     for (const handler of handlerSet.getAux()) {
-      if (!handler.initialize(this._initialGrid, cellExclusionSets, this._shape)) {
+      if (!handler.initialize(this._initialGrid, cellExclusions, this._shape)) {
         this._invalidateGrid(this._initialGrid, handler);
       }
     }
@@ -523,7 +503,7 @@ SudokuSolver.InternalSolver = class {
   _enforceValue(grid, cell, handlerAccumulator) {
     let value = grid[cell];
 
-    const exclusionCells = this._cellExclusions[cell];
+    const exclusionCells = this._cellExclusions.getArray(cell);
     const numExclusions = exclusionCells.length;
     const logSteps = this._stepState !== null && this._stepState.logSteps;
     if (logSteps) {
@@ -1295,6 +1275,49 @@ SudokuSolver.HandlerAccumulator = class {
     this._linkedList[oldHead] = -2;
 
     return this._handlers[oldHead];
+  }
+}
+
+SudokuSolver.CellExclusions = class {
+  constructor(handlerSet, shape) {
+    this._cellExclusionSets = this.constructor._makeCellExclusionSets(
+      handlerSet, shape);
+
+    // Store an array version for fast iteration.
+    // Sort the cells so they are in predictable order.
+    this._cellExclusionArrays = (
+      this._cellExclusionSets.map(c => new Uint8Array(c)));
+    this._cellExclusionArrays.forEach(c => c.sort((a, b) => a - b));
+  }
+
+  static _makeCellExclusionSets(handlerSet, shape) {
+    const cellExclusionSets = [];
+    for (let i = 0; i < shape.numCells; i++) {
+      cellExclusionSets.push(new Set());
+    }
+
+    for (const h of handlerSet) {
+      const exclusionCells = h.exclusionCells();
+      for (const c of exclusionCells) {
+        for (const d of exclusionCells) {
+          if (c != d) cellExclusionSets[c].add(d);
+        }
+      }
+    }
+
+    return cellExclusionSets;
+  }
+
+  getSets() {
+    return this._cellExclusionSets;
+  }
+
+  isMutuallyExclusive(cell1, cell2) {
+    return this._cellExclusionSets[cell1].has(cell2);
+  }
+
+  getArray(cell) {
+    return this._cellExclusionArrays[cell];
   }
 }
 

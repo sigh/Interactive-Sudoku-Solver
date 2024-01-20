@@ -20,7 +20,7 @@ class SudokuConstraintHandler {
     return [];
   }
 
-  initialize(initialGrid, cellExclusionSets, shape) {
+  initialize(initialGrid, cellExclusions, shape) {
     return true;
   }
 
@@ -60,7 +60,7 @@ SudokuConstraintHandler.False = class False extends SudokuConstraintHandler {
     if (cells.length === 0) throw 'False needs cells to be effective.';
   }
 
-  initialize(initialGrid, cellExclusionSets, shape) {
+  initialize(initialGrid, cellExclusions, shape) {
     return false;
   }
   enforceConsistency(grid, handlerAccumulator) { return false; }
@@ -93,7 +93,7 @@ SudokuConstraintHandler.AllDifferent = class AllDifferent extends SudokuConstrai
     this._exclusionCells = exclusionCells;
   }
 
-  initialize(initialGrid, cellExclusionSets, shape) {
+  initialize(initialGrid, cellExclusions, shape) {
     return this._exclusionCells.length <= shape.numValues;
   }
 
@@ -119,7 +119,8 @@ SudokuConstraintHandler._CommonHandlerUtil = class _CommonHandlerUtil {
     return true;
   }
 
-  static populatePairwiseExclusions(pairwiseExclusions, cells, cellExclusionSets) {
+  static populatePairwiseExclusions(pairwiseExclusions, cells, cellExclusions) {
+    const cellExclusionSets = cellExclusions.getSets();
     const numCells = cells.length;
 
     // Indexing scheme for pairwiseExclusions:
@@ -192,7 +193,7 @@ SudokuConstraintHandler.House = class House extends SudokuConstraintHandler {
     this._lookupTables = null;
   }
 
-  initialize(initialGrid, cellExclusionSets, shape) {
+  initialize(initialGrid, cellExclusions, shape) {
     this._shape = shape;
     this._lookupTables = LookupTables.get(shape.numValues);
 
@@ -299,7 +300,7 @@ SudokuConstraintHandler.BinaryConstraint = class BinaryConstraint extends Sudoku
     this.idStr = [this.constructor.name, key, cell1, cell2].join('-');
   }
 
-  initialize(initialGrid, cellExclusionSets, shape) {
+  initialize(initialGrid, cellExclusions, shape) {
     const lookupTables = LookupTables.get(shape.numValues);
     this._tables = lookupTables.forBinaryKey(this._key);
 
@@ -437,7 +438,7 @@ SudokuConstraintHandler.BinaryPairwise = class BinaryPairwise extends SudokuCons
     return validCombinationInfo;
   });
 
-  initialize(initialGrid, cellExclusionSets, shape) {
+  initialize(initialGrid, cellExclusions, shape) {
     const lookupTables = LookupTables.get(shape.numValues);
     if (!this.constructor._isKeySymmetric(this._key, shape.numValues)) {
       throw 'Function for BinaryPairwise must be symmetric. Key: ' + this._key;
@@ -455,7 +456,7 @@ SudokuConstraintHandler.BinaryPairwise = class BinaryPairwise extends SudokuCons
     }
 
     SudokuConstraintHandler._CommonHandlerUtil.populatePairwiseExclusions(
-      this._pairwiseExclusions, this.cells, cellExclusionSets);
+      this._pairwiseExclusions, this.cells, cellExclusions);
 
     // If no values are legal at the start, then this constraint is invalid.
     return this._table[lookupTables.allValues] !== 0;
@@ -666,7 +667,7 @@ SudokuConstraintHandler._SumHandlerUtil = class _SumHandlerUtil {
   }
 
   // Partition the cells into groups where members are all unique.
-  static findExclusionGroups(cells, cellExclusionSets) {
+  static findExclusionGroups(cells, cellExclusions) {
     let bestExclusionGroupsScore = 0;
     let bestExclusionGroups = [];
     let randomGen = new RandomIntGenerator(0);
@@ -679,7 +680,7 @@ SudokuConstraintHandler._SumHandlerUtil = class _SumHandlerUtil {
     //       should work well for little killers and other linear regions.
     cells = cells.slice();
     for (let i = 0; i < NUM_TRIALS; i++) {
-      let exclusionGroups = this.findExclusionGroupsGreedy(cells, cellExclusionSets);
+      let exclusionGroups = this.findExclusionGroupsGreedy(cells, cellExclusions);
       // If there is only one exclusion group, then we can't do any better.
       if (exclusionGroups.length == 1) return exclusionGroups;
 
@@ -700,7 +701,7 @@ SudokuConstraintHandler._SumHandlerUtil = class _SumHandlerUtil {
   // Partition the cells into groups where members are all unique.
   // Applies a greedy algorithm by, each iteration, choosing a cell and adding
   // as many remaining cells to it as possible to create the next group.
-  static findExclusionGroupsGreedy(cells, cellExclusionSets) {
+  static findExclusionGroupsGreedy(cells, cellExclusions) {
     let exclusionGroups = [];
     let unassignedCells = new Set(cells)
 
@@ -711,7 +712,7 @@ SudokuConstraintHandler._SumHandlerUtil = class _SumHandlerUtil {
         // current group. If so, then add it to the current group.
         let addToCurrentSet = true;
         for (const exclusionCell of currentGroup) {
-          if (!cellExclusionSets[unassignedCell].has(exclusionCell)) {
+          if (!cellExclusions.isMutuallyExclusive(unassignedCell, exclusionCell)) {
             addToCurrentSet = false;
             break;
           }
@@ -1090,7 +1091,7 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
     return this._shape.gridSize * 2 - this.cells.length;
   }
 
-  initialize(initialGrid, cellExclusionSets, shape) {
+  initialize(initialGrid, cellExclusions, shape) {
     this._shape = shape;
 
     this._lookupTables = LookupTables.get(shape.numValues);
@@ -1106,11 +1107,11 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
 
     this._exclusionGroups = (
       SudokuConstraintHandler._SumHandlerUtil.findExclusionGroups(
-        this._positiveCells, cellExclusionSets));
+        this._positiveCells, cellExclusions));
     if (this._negativeCells.length) {
       this._exclusionGroups.push(
         ...SudokuConstraintHandler._SumHandlerUtil.findExclusionGroups(
-          this._negativeCells, cellExclusionSets));
+          this._negativeCells, cellExclusions));
     }
 
     this._exclusionIndexes = new Uint8Array(this.cells.length);
@@ -1121,7 +1122,7 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
     if (!this._negativeCells.length) {
       this._pairwiseExclusions = [];
       SudokuConstraintHandler._CommonHandlerUtil.populatePairwiseExclusions(
-        this._pairwiseExclusions, this.cells, cellExclusionSets);
+        this._pairwiseExclusions, this.cells, cellExclusions);
     }
 
     // Ensure that _complementCells is null.
@@ -1317,9 +1318,9 @@ SudokuConstraintHandler.SumWithNegative = class SumWithNegative extends SudokuCo
     this._complementCells = null;
   }
 
-  initialize(initialGrid, cellExclusionSets, shape) {
+  initialize(initialGrid, cellExclusions, shape) {
     this._sum += shape.numValues + 1;
-    return super.initialize(initialGrid, cellExclusionSets, shape);
+    return super.initialize(initialGrid, cellExclusions, shape);
   }
 
   setComplementCells() { }
@@ -1348,7 +1349,7 @@ SudokuConstraintHandler.Skyscraper = class Skyscraper extends SudokuConstraintHa
     }
   }
 
-  initialize(initialGrid, cellExclusionSets, shape) {
+  initialize(initialGrid, cellExclusions, shape) {
     const cells = this.cells;
     const lookupTables = LookupTables.get(shape.numValues);
     this._lookupTables = lookupTables;
@@ -1357,7 +1358,7 @@ SudokuConstraintHandler.Skyscraper = class Skyscraper extends SudokuConstraintHa
     // Check that all cells are unique.
     for (let i = 0; i < cells.length; i++) {
       for (let j = 0; j < i; j++) {
-        if (!cellExclusionSets[cells[i]].has(cells[j])) {
+        if (!cellExclusions.isMutuallyExclusive(cells[i], cells[j])) {
           throw ('Skyscraper handler requires all cells to be distinct.');
         }
       }
@@ -1630,7 +1631,7 @@ SudokuConstraintHandler.Sandwich = class Sandwich extends SudokuConstraintHandle
     this._sum = +sum;
   }
 
-  initialize(initialGrid, cellExclusionSets, shape) {
+  initialize(initialGrid, cellExclusions, shape) {
     // Sanity check.
     if (this.cells.length != shape.numValues) return false;
     // Check that the sum is feasible.
@@ -1894,7 +1895,7 @@ SudokuConstraintHandler.RegionSumLine = class RegionSumLine extends SudokuConstr
     super(cells);
   }
 
-  initialize(initialGrid, cellExclusionSets, shape) {
+  initialize(initialGrid, cellExclusions, shape) {
     // Map cells to box regions.
     const cellToBox = new Map();
     for (const boxRegion of SudokuConstraint.boxRegions(shape)) {
@@ -1932,7 +1933,7 @@ SudokuConstraintHandler.RegionSumLine = class RegionSumLine extends SudokuConstr
       for (const cells of this._multi) {
         const arrow = new SudokuConstraintHandler.SumWithNegative(
           cells, single, 0);
-        arrow.initialize(initialGrid, cellExclusionSets, shape);
+        arrow.initialize(initialGrid, cellExclusions, shape);
         this._arrows.push(arrow);
       }
       this._multi = [];
@@ -2031,11 +2032,11 @@ SudokuConstraintHandler.Between = class Between extends SudokuConstraintHandler 
     this._mids = cells.slice(1, cells.length - 1)
   }
 
-  initialize(initialGrid, cellExclusionSets, shape) {
+  initialize(initialGrid, cellExclusions, shape) {
     this._minMax8Bit = LookupTables.get(shape.numValues).minMax8Bit;
 
     const exclusionGroups = SudokuConstraintHandler._SumHandlerUtil.findExclusionGroups(
-      this._mids, cellExclusionSets);
+      this._mids, cellExclusions);
     const maxGroupSize = Math.max(0, ...exclusionGroups.map(a => a.length));
     const minEndsDelta = maxGroupSize ? maxGroupSize + 1 : 0;
 
@@ -2044,7 +2045,7 @@ SudokuConstraintHandler.Between = class Between extends SudokuConstraintHandler 
       SudokuConstraint.Binary.fnToKey(
         (a, b) => Math.abs(a - b) >= minEndsDelta,
         shape.numValues));
-    return this._binaryConstraint.initialize(initialGrid, cellExclusionSets, shape);
+    return this._binaryConstraint.initialize(initialGrid, cellExclusions, shape);
   }
 
   exclusionCells() {
@@ -2098,9 +2099,9 @@ SudokuConstraintHandler.XSum = class XSum extends SudokuConstraintHandler {
       this.cells.slice(), this._sum);
   }
 
-  initialize(initialGrid, cellExclusionSets, shape) {
+  initialize(initialGrid, cellExclusions, shape) {
     this._internalSumHandler.initialize(
-      initialGrid, cellExclusionSets, shape);
+      initialGrid, cellExclusions, shape);
     // X-Sum messes with the cell-length, so _pairwiseExclusions won't be accurate.
     // TODO: Make this robust and less error-prone.
     this._internalSumHandler._pairwiseExclusions = null;
@@ -2217,9 +2218,9 @@ SudokuConstraintHandler.LocalEntropy = class LocalEntropy extends SudokuConstrai
     LookupTables.fromValuesArray([4, 5, 6]),
     LookupTables.fromValuesArray([7, 8, 9])];
 
-  initialize(initialGrid, cellExclusionSets, shape) {
+  initialize(initialGrid, cellExclusions, shape) {
     SudokuConstraintHandler._CommonHandlerUtil.populatePairwiseExclusions(
-      this._pairwiseExclusions, this.cells, cellExclusionSets);
+      this._pairwiseExclusions, this.cells, cellExclusions);
 
     return true;
   }
