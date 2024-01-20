@@ -946,7 +946,11 @@ SudokuConstraintHandler._SumHandlerUtil = class _SumHandlerUtil {
 
   static _valueBuffer = new Uint16Array(SHAPE_MAX.numValues);
   static _exclusionIndexesBuffer = new Uint8Array(SHAPE_MAX.numValues);
-  static _cellBuffer = new Uint8Array(SHAPE_MAX.numValues);
+  // Create a cellBuffer for each possible number of unfixed cells that
+  // enforceFewRemainingCells() can be called with.
+  // This allows calls ot functions like restrictCellsSingleExclusionGroup()
+  // to rely on the array length.
+  static _cellBuffers = [...Array(4).keys()].map(i => new Uint8Array(i));
 
   // Determines if enforceFewRemainingCells() can be run.
   hasFewRemainingCells(numUnfixed) {
@@ -958,15 +962,16 @@ SudokuConstraintHandler._SumHandlerUtil = class _SumHandlerUtil {
   // REQUIRES that:
   //  - The number of unfixed cells is accurate.
   //  - None of the values are zero.
-  enforceFewRemainingCells(grid, targetSum, numUnfixed, cells, exclusionIndexes) {
-    const cellBuffer = this.constructor._cellBuffer;
+  enforceFewRemainingCells(
+    grid, targetSum, numUnfixed, cells, exclusionIndexes, cellExclusions) {
+    const cellBuffer = this.constructor._cellBuffers[numUnfixed];
     const valueBuffer = this.constructor._valueBuffer;
     const exclusionIndexesBuffer = this.constructor._exclusionIndexesBuffer;
 
     const gridSize = this._numValues | 0;
 
     let j = 0;
-    for (let i = cells.length - 1; i >= 0; i--) {
+    for (let i = 0; i < cells.length; i++) {
       const c = cells[i];
       const v = grid[c];
       if (v & (v - 1)) {
@@ -1007,6 +1012,16 @@ SudokuConstraintHandler._SumHandlerUtil = class _SumHandlerUtil {
 
         grid[cellBuffer[0]] = v0;
         grid[cellBuffer[1]] = v1;
+
+        // If there are two remaining values, and they can be in either cell
+        // (both cells have the same candidates) then they are both required
+        // values.
+        // NOTE: We can also do this for count == 1, but it results are slightly
+        //       worse.
+        if (cellExclusions && v0 === v1 && countOnes16bit(v0) == 2) {
+          if (!this._commonUtil.enforceRequiredValueExclusions(
+            grid, cellBuffer, v0, cellExclusions)) return false;
+        }
         return true;
       }
 
@@ -1088,6 +1103,10 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
         c => this._exclusionIndexes[this.cells.indexOf(c)] = i));
 
     if (!this._negativeCells.length) {
+      // We can't use cell exclusions because the cell values have been changed.
+      // Thus it can't be used to exclude the value from other cells.
+      // TODO: Find a robust way of handling this so that we still get the
+      //       benefit for positive cells.
       this._cellExclusions = cellExclusions;
       cellExclusions.cacheCellTuples(this.cells);
     }
@@ -1211,7 +1230,9 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
     const numUnfixed = numCells - (rangeInfoSum >> 24);
     // A large fixed value indicates a cell has a 0, hence is already
     // unsatisfiable.
-    if (numUnfixed < 0) return false;
+    // If all cells were fixed, then we would have returned already - so this
+    // can also only occur when there is a 0.
+    if (numUnfixed <= 0) return false;
 
     const hasFewUnfixed = this._sumUtil.hasFewRemainingCells(numUnfixed);
 
@@ -1219,7 +1240,7 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
       // If there are few remaining cells then handle them explicitly.
       const fixedSum = (rangeInfoSum >> 16) & 0xff;
       const targetSum = sum - fixedSum;
-      if (!this._sumUtil.enforceFewRemainingCells(grid, targetSum, numUnfixed, this.cells, this._exclusionIndexes)) {
+      if (!this._sumUtil.enforceFewRemainingCells(grid, targetSum, numUnfixed, this.cells, this._exclusionIndexes, this._cellExclusions)) {
         return false;
       }
     } else {
