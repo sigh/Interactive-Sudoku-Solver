@@ -516,26 +516,33 @@ SudokuSolver.InternalSolver = class {
     }
   }
 
-  _enforceValue(grid, cell, handlerAccumulator) {
-    let value = grid[cell];
-
-    const exclusionCells = this._cellExclusions.getArray(cell);
-    const numExclusions = exclusionCells.length;
+  _enforceValue(grid, enforceCells, handlerAccumulator) {
     const logSteps = this._stepState !== null && this._stepState.logSteps;
-    if (logSteps) {
-      this._logEnforceValue(grid, cell, value, exclusionCells);
-    }
-    for (let i = 0; i < numExclusions; i++) {
-      const exclusionCell = exclusionCells[i];
-      if (grid[exclusionCell] & value) {
-        if (!(grid[exclusionCell] ^= value)) return false;
-        handlerAccumulator.addForCell(exclusionCell);
+
+    for (let i = 0; i < enforceCells.length; i++) {
+      const cell = enforceCells[i];
+      let value = grid[cell];
+      if ((value & (value - 1))) throw ('wtf');
+
+      const exclusionCells = this._cellExclusions.getArray(cell);
+      const numExclusions = exclusionCells.length;
+      if (logSteps) {
+        this._logEnforceValue(grid, cell, value, exclusionCells);
+      }
+      for (let i = 0; i < numExclusions; i++) {
+        const exclusionCell = exclusionCells[i];
+        if (grid[exclusionCell] & value) {
+          if (!(grid[exclusionCell] ^= value)) return false;
+          handlerAccumulator.addForCell(exclusionCell);
+        }
       }
     }
 
-    // Only enforce aux handlers for the current cell.
-    if (!this._enforceAuxHandlers(grid, cell, handlerAccumulator, logSteps)) {
-      return false;
+    // Only enforce aux handlers for the current cells.
+    for (let i = 0; i < enforceCells.length; i++) {
+      if (!this._enforceAuxHandlers(grid, enforceCells[i], handlerAccumulator, logSteps)) {
+        return false;
+      }
     }
 
     return this._enforceConstraints(grid, handlerAccumulator, logSteps);
@@ -732,10 +739,12 @@ SudokuSolver.InternalSolver = class {
         counters.nodesSearched++;
       }
 
-      const [cell, value, count] = this._candidateSelector.selectNextCandidate(
-        cellDepth, grid, this._stepState, wasNewNode);
+      const [nextCells, value, count] =
+        this._candidateSelector.selectNextCandidate(
+          cellDepth, grid, this._stepState, wasNewNode);
       if (count === 0) continue;
 
+      const cell = nextCells[0];
       if (yieldEveryStep) {
         this._stepState.oldGrid.set(grid);
       }
@@ -747,7 +756,7 @@ SudokuSolver.InternalSolver = class {
         this._progressRemainingStack[recDepth] -= progressDelta;
 
         counters.valuesTried++;
-        iterationCounterForUpdates++
+        iterationCounterForUpdates++;
       }
       if ((iterationCounterForUpdates & backtrackDecayMask) === 0) {
         // Exponentially decay the counts.
@@ -775,11 +784,14 @@ SudokuSolver.InternalSolver = class {
       }
       // NOTE: Set this even when count == 1 to allow for other candidate
       //       selection methods.
+      // TODO: Just get the candidateSelector to do this?
       grid[cell] = value;
 
       const handlerAccumulator = this._handlerAccumulator;
       handlerAccumulator.clear();
-      handlerAccumulator.addForCell(cell);
+      for (let i = 0; i < nextCells.length; i++) {
+        handlerAccumulator.addForCell(nextCells[i]);
+      }
       // Queue up extra constraints based on prior backtracks. The idea being
       // that constraints that apply this the contradiction cell are likely
       // to turn up a contradiction here if it exists.
@@ -792,7 +804,7 @@ SudokuSolver.InternalSolver = class {
       }
 
       // Propagate constraints.
-      let hasContradiction = !this._enforceValue(grid, cell, handlerAccumulator);
+      let hasContradiction = !this._enforceValue(grid, nextCells, handlerAccumulator);
       if (hasContradiction) {
         // Store the current cells, so that the level immediately above us
         // can act on this information to run extra constraints.
@@ -842,7 +854,7 @@ SudokuSolver.InternalSolver = class {
       }
 
       // Recurse to the new cell.
-      recStack[recDepth++] = cellDepth + 1;
+      recStack[recDepth++] = cellDepth + nextCells.length;
       isNewNode = true;
     }
 
@@ -1003,13 +1015,56 @@ SudokuSolver.CandidateSelector = class CandidateSelector {
         }
       }
     }
-    const cell = cellOrder[cellOffset];
 
-    // Update cellOrder.
-    [cellOrder[cellOffset], cellOrder[cellDepth]] =
-      [cellOrder[cellDepth], cellOrder[cellOffset]];
+    const nextCellDepth = this._updateCellOrder(
+      cellDepth, cellOffset, count, grid);
 
-    return [cell, value, count];
+    // TODO: Remove after development, as it will be implicit.
+    if (stepState && stepState.logSteps) {
+      this._logDebug({
+        loc: 'selectNextCandidate',
+        msg: 'TEMP: Next cell depth: ' + nextCellDepth,
+      });
+    }
+
+    return [cellOrder.subarray(cellDepth, nextCellDepth), value, count];
+  }
+
+  _updateCellOrder(cellDepth, cellOffset, count, grid) {
+    const cellOrder = this._cellOrder;
+    let frontOffset = cellDepth;
+
+    // Swap cellOffset into the next position, so that it will be processed
+    // next.
+    [cellOrder[cellOffset], cellOrder[frontOffset]] =
+      [cellOrder[frontOffset], cellOrder[cellOffset]];
+    frontOffset++;
+    cellOffset++;
+
+    // If count was greater than 1, there were no singletons.
+    if (count > 1) return frontOffset;
+
+    // Move all singletons to the front of the cellOrder.
+    const numCells = grid.length;
+
+    // First skip past any values which are already at the front.
+    while (cellOffset == frontOffset && cellOffset < numCells) {
+      const v = grid[cellOrder[cellOffset++]];
+      if (!(v & (v - 1))) frontOffset++;
+    }
+
+    // Find the rest of the values which are singletons.
+    while (cellOffset < numCells) {
+      const v = grid[cellOrder[cellOffset]];
+      if (!(v & (v - 1))) {
+        [cellOrder[cellOffset], cellOrder[frontOffset]] =
+          [cellOrder[frontOffset], cellOrder[cellOffset]];
+        frontOffset++;
+      }
+      cellOffset++;
+    }
+
+    return frontOffset;
   }
 
   _logSelectNextCandidate(msg, cell, value, count, cellDepth) {
