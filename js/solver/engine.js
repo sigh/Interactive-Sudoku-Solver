@@ -516,7 +516,7 @@ SudokuSolver.InternalSolver = class {
     }
   }
 
-  _enforceValue(grid, enforceCells, handlerAccumulator) {
+  _enforceValue(grid, enforceCells, gridIsComplete, handlerAccumulator) {
     const logSteps = this._stepState !== null && this._stepState.logSteps;
 
     for (let i = 0; i < enforceCells.length; i++) {
@@ -537,14 +537,17 @@ SudokuSolver.InternalSolver = class {
       }
     }
 
-    // Only enforce aux handlers for the current cells.
-    for (let i = 0; i < enforceCells.length; i++) {
-      if (!this._enforceAuxHandlers(grid, enforceCells[i], handlerAccumulator, logSteps)) {
-        return false;
+    // Only enforce aux handlers for the current cells, if the grid is not yet
+    // complete.
+    if (!gridIsComplete) {
+      for (let i = 0; i < enforceCells.length; i++) {
+        if (!this._enforceAuxHandlers(grid, enforceCells[i], handlerAccumulator, logSteps)) {
+          return false;
+        }
       }
     }
 
-    return this._enforceConstraints(grid, handlerAccumulator, logSteps);
+    return this._enforceConstraints(grid, gridIsComplete, handlerAccumulator, logSteps);
   }
 
   static _debugGridBuffer = new Uint16Array(SHAPE_MAX.numCells);
@@ -606,12 +609,13 @@ SudokuSolver.InternalSolver = class {
     return true;
   }
 
-  _enforceConstraints(grid, handlerAccumulator, logSteps) {
+  _enforceConstraints(grid, gridIsComplete, handlerAccumulator, logSteps) {
     const counters = this.counters;
 
     while (handlerAccumulator.hasConstraints()) {
       counters.constraintsProcessed++;
       const c = handlerAccumulator.popConstraint();
+      if (gridIsComplete && !c.required) continue;
       if (logSteps) {
         if (!this._debugEnforceConsistency('_enforceConstraints', grid, c, handlerAccumulator)) {
           return false;
@@ -677,7 +681,7 @@ SudokuSolver.InternalSolver = class {
       handlerAccumulator.clear();
       for (let i = 0; i < this._numCells; i++) handlerAccumulator.addForCell(i);
       const logSteps = this._stepState !== null && this._stepState.logSteps;
-      this._enforceConstraints(this._grids[0], handlerAccumulator, logSteps);
+      this._enforceConstraints(this._grids[0], false, handlerAccumulator, logSteps);
     }
 
     if (yieldEveryStep) {
@@ -805,7 +809,9 @@ SudokuSolver.InternalSolver = class {
       }
 
       // Propagate constraints.
-      let hasContradiction = !this._enforceValue(grid, nextCells, handlerAccumulator);
+      const gridIsComplete = (nextDepth == this._numCells);
+      const hasContradiction = !this._enforceValue(
+        grid, nextCells, gridIsComplete, handlerAccumulator);
       if (hasContradiction) {
         // Store the current cells, so that the level immediately above us
         // can act on this information to run extra constraints.
