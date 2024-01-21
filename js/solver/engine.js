@@ -408,18 +408,6 @@ SudokuSolver.InternalSolver = class {
       }
     }
 
-    for (const handler of handlerSet.getAux()) {
-      if (!handler.initialize(this._initialGrid, cellExclusions, this._shape)) {
-        this._invalidateGrid(this._initialGrid, handler);
-      }
-    }
-
-    for (const handler of handlerSet.getExclusionHandlers()) {
-      if (!handler.initialize(this._initialGrid, cellExclusions, this._shape)) {
-        this._invalidateGrid(this._initialGrid, handler);
-      }
-    }
-
     return handlerSet;
   }
 
