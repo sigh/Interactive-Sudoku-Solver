@@ -6,6 +6,7 @@ class SudokuConstraintHandler {
   constructor(cells) {
     // This constraint is enforced whenever these cells are touched.
     this.cells = new Uint8Array(cells || []);
+    this.required = true;
 
     const id = this.constructor._defaultId++;
     // By default every id is unique.
@@ -163,6 +164,9 @@ SudokuConstraintHandler.House = class House extends SudokuConstraintHandler {
     this._shape = null;
     this._lookupTables = null;
     this._commonUtil = SudokuConstraintHandler._CommonHandlerUtil;
+    // This is never required as the exclusion cells is sufficient.
+    // TODO: Still, let the optimizer make this choice.
+    this.required = false;
   }
 
   initialize(initialGrid, cellExclusions, shape) {
