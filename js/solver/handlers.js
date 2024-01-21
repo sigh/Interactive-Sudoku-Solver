@@ -15,14 +15,22 @@ class SudokuConstraintHandler {
     this.idStr = this.constructor.name + '-' + id.toString();
   }
 
+  // Enforce the constraint on the grid and return:
+  // - `false` if the grid is invalid.
+  // - `true` if the grid is valid.
+  // - `true` if there are still unknown values and the grid
+  //          might be valid.
   enforceConsistency(grid, handlerAccumulator) {
     return true;
   }
 
+  // List of cells which must not have the same values as each other.
   exclusionCells() {
     return [];
   }
 
+  // Initialize the grid before solving starts.
+  // Return `false` if the grid is invalid, `true` otherwise.
   initialize(initialGrid, cellExclusions, shape) {
     return true;
   }
