@@ -1326,6 +1326,7 @@ SudokuSolver.HandlerAccumulator = class {
     this._linkedList = new Int16Array(this._handlers.length);
     this._linkedList.fill(-2);  // -2 = Not in list.
     this._head = -1;  // -1 = null pointer.
+    this._tail = -1;  // If list is empty, tail can be any value.
   }
 
   addForCell(cell) {
@@ -1334,8 +1335,13 @@ SudokuSolver.HandlerAccumulator = class {
     for (let j = 0; j < numHandlers; j++) {
       const i = indexes[j];
       if (this._linkedList[i] < -1) {
-        this._linkedList[i] = this._head;
-        this._head = i;
+        if (this._head == -1) {
+          this._head = i;
+        } else {
+          this._linkedList[this._tail] = i;
+        }
+        this._tail = i;
+        this._linkedList[i] = -1;
       }
     }
   }
