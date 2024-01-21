@@ -395,6 +395,13 @@ SudokuSolver.InternalSolver = class {
     new SudokuConstraintOptimizer(this._logDebug).optimize(
       handlerSet, cellExclusions, this._shape);
 
+    // Add the exclusion handlers.
+    for (let i = 0; i < this._numCells; i++) {
+      handlerSet.addExclusionHandlers(
+        new SudokuConstraintHandler.ExclusionEnforcer(i));
+    }
+
+    // Initialize handlers.
     for (const handler of handlerSet) {
       if (!handler.initialize(this._initialGrid, cellExclusions, this._shape)) {
         this._invalidateGrid(this._initialGrid, handler);
@@ -402,6 +409,12 @@ SudokuSolver.InternalSolver = class {
     }
 
     for (const handler of handlerSet.getAux()) {
+      if (!handler.initialize(this._initialGrid, cellExclusions, this._shape)) {
+        this._invalidateGrid(this._initialGrid, handler);
+      }
+    }
+
+    for (const handler of handlerSet.getExclusionHandlers()) {
       if (!handler.initialize(this._initialGrid, cellExclusions, this._shape)) {
         this._invalidateGrid(this._initialGrid, handler);
       }
@@ -521,18 +534,15 @@ SudokuSolver.InternalSolver = class {
 
     for (let i = 0; i < enforceCells.length; i++) {
       const cell = enforceCells[i];
-      const value = grid[cell];
-
-      const exclusionCells = this._cellExclusions.getArray(cell);
-      const numExclusions = exclusionCells.length;
+      const handler = this._handlerSet.lookupExclusionHandler(cell);
       if (logSteps) {
-        this._logEnforceValue(grid, cell, value, exclusionCells);
-      }
-      for (let i = 0; i < numExclusions; i++) {
-        const exclusionCell = exclusionCells[i];
-        if (grid[exclusionCell] & value) {
-          if (!(grid[exclusionCell] ^= value)) return false;
-          handlerAccumulator.addForCell(exclusionCell);
+        if (!this._debugEnforceConsistency(
+          '_enforceValue', grid, handler, handlerAccumulator)) {
+          return false;
+        }
+      } else {
+        if (!handler.enforceConsistency(grid, handlerAccumulator)) {
+          return false;
         }
       }
     }
