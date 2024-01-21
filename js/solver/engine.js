@@ -521,8 +521,7 @@ SudokuSolver.InternalSolver = class {
 
     for (let i = 0; i < enforceCells.length; i++) {
       const cell = enforceCells[i];
-      let value = grid[cell];
-      if ((value & (value - 1))) throw ('wtf');
+      const value = grid[cell];
 
       const exclusionCells = this._cellExclusions.getArray(cell);
       const numExclusions = exclusionCells.length;
@@ -715,8 +714,6 @@ SudokuSolver.InternalSolver = class {
       if (isNewNode) {
         isNewNode = false;
 
-        // TODO: Handle fixed cells.
-
         // We've reached the end, so output a solution!
         if (cellDepth == this._shape.numCells) {
           counters.progressRatio += progressDelta;
@@ -744,6 +741,8 @@ SudokuSolver.InternalSolver = class {
           cellDepth, grid, this._stepState, wasNewNode);
       if (count === 0) continue;
 
+      const nextDepth = cellDepth + nextCells.length;
+      // The first nextCell maybe a guess, but the rest are singletons.
       const cell = nextCells[0];
       if (yieldEveryStep) {
         this._stepState.oldGrid.set(grid);
@@ -755,16 +754,19 @@ SudokuSolver.InternalSolver = class {
         progressDelta = this._progressRemainingStack[recDepth] / count;
         this._progressRemainingStack[recDepth] -= progressDelta;
 
-        counters.valuesTried++;
+
+        // We are enforcing several values at once.
+        counters.valuesTried += nextCells.length;
+
         iterationCounterForUpdates++;
-      }
-      if ((iterationCounterForUpdates & backtrackDecayMask) === 0) {
-        // Exponentially decay the counts.
-        for (let i = 0; i < this._numCells; i++) {
-          this._backtrackTriggers[i] >>= 1;
+        if ((iterationCounterForUpdates & backtrackDecayMask) === 0) {
+          // Exponentially decay the counts.
+          for (let i = 0; i < this._numCells; i++) {
+            this._backtrackTriggers[i] >>= 1;
+          }
+          // Ensure that the counter doesn't overflow.
+          iterationCounterForUpdates &= (1 << 30) - 1;
         }
-        // Ensure that the counter doesn't overflow.
-        iterationCounterForUpdates &= (1 << 30) - 1;
       }
 
       if (count !== 1) {
@@ -784,7 +786,6 @@ SudokuSolver.InternalSolver = class {
       }
       // NOTE: Set this even when count == 1 to allow for other candidate
       //       selection methods.
-      // TODO: Just get the candidateSelector to do this?
       grid[cell] = value;
 
       const handlerAccumulator = this._handlerAccumulator;
@@ -853,8 +854,8 @@ SudokuSolver.InternalSolver = class {
         }
       }
 
-      // Recurse to the new cell.
-      recStack[recDepth++] = cellDepth + nextCells.length;
+      // Recurse to the new cell, skipping past all the cells we enforced.
+      recStack[recDepth++] = nextDepth;
       isNewNode = true;
     }
 
@@ -990,6 +991,17 @@ SudokuSolver.CandidateSelector = class CandidateSelector {
     return this._cellOrder.subarray(0, upto);
   }
 
+  // selectNextCandidate find the next candidate to try.
+  // Returns [nextCells, value, count]:
+  //   nextCells[0]: The cell which contains the next candidate.
+  //   value: The candidate value in the nextCells[0].
+  //   count: The number of options we selected from:
+  //      - If `count` == 1, then this is a known value and the solver will
+  //        not return to this node.
+  //      - Most of the time, `count` will equal the number of values in
+  //        nextCells[0], but it may be less if we are branching on something
+  //        other than the cell (e.g. a digit within a house).
+  //   nextCells[1:]: Singleton cells which can be enforced at the same time.
   selectNextCandidate(cellDepth, grid, stepState, isNewNode) {
     const cellOrder = this._cellOrder;
     let [cellOffset, value, count] = this._selectBestCandidate(
@@ -1018,14 +1030,6 @@ SudokuSolver.CandidateSelector = class CandidateSelector {
 
     const nextCellDepth = this._updateCellOrder(
       cellDepth, cellOffset, count, grid);
-
-    // TODO: Remove after development, as it will be implicit.
-    if (stepState && stepState.logSteps) {
-      this._logDebug({
-        loc: 'selectNextCandidate',
-        msg: 'TEMP: Next cell depth: ' + nextCellDepth,
-      });
-    }
 
     return [cellOrder.subarray(cellDepth, nextCellDepth), value, count];
   }
