@@ -272,6 +272,9 @@ class SudokuTextParser {
   static parseGridLayout(rawText) {
     if (rawText.length < SHAPE_9x9.numCells * 2) return null;
 
+    // Only allow digits, dots, spaces and separators.
+    if (rawText.search(/[^\d\s.|_-]/) != -1) return null;
+
     const parts = [...rawText.matchAll(/[.]|\d+/g)];
     const numParts = parts.length;
 
