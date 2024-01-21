@@ -140,6 +140,10 @@ SudokuConstraintHandler.ExclusionEnforcer = class ExclusionEnforcer extends Sudo
 
     return true;
   }
+
+  priority() {
+    return 0;
+  }
 }
 
 SudokuConstraintHandler._CommonHandlerUtil = class _CommonHandlerUtil {
@@ -1926,6 +1930,10 @@ SudokuConstraintHandler.SameValues = class SameValues extends SudokuConstraintHa
 
     return true;
   }
+
+  priority() {
+    return 0;
+  }
 }
 
 SudokuConstraintHandler.RegionSumLine = class RegionSumLine extends SudokuConstraintHandler {
@@ -2513,17 +2521,17 @@ SudokuConstraintHandler.Quadruple = class Quadruple extends SudokuConstraintHand
 
 class HandlerSet {
   constructor(handlers, shape) {
-    this._handlers = [];
+    this._allHandlers = [];
     this._seen = new Map();
     this._indexLookup = new Map();
 
     this._auxHandlers = [];
     this._exclusionHandlers = [];
 
-    this._cellMap = [];
+    this._ordinaryHandlerCellMap = [];
     this._auxHandlerLookup = [];
     for (let i = 0; i < shape.numCells; i++) {
-      this._cellMap.push([]);
+      this._ordinaryHandlerCellMap.push([]);
       this._auxHandlerLookup.push([]);
     }
 
@@ -2531,15 +2539,11 @@ class HandlerSet {
   }
 
   getAllofType(type) {
-    return this._handlers.filter(h => h.constructor === type);
+    return this._allHandlers.filter(h => h.constructor === type);
   }
 
   getAll() {
-    return this._handlers;
-  }
-
-  getAux() {
-    return this._auxHandlers;
+    return this._allHandlers;
   }
 
   lookupAux(cell) {
@@ -2547,14 +2551,14 @@ class HandlerSet {
   }
 
   getCellMap() {
-    return this._cellMap;
+    return this._ordinaryHandlerCellMap;
   }
 
   getIntersectingIndexes(handler) {
     const handlerIndex = this._indexLookup.get(handler);
     const intersectingHandlers = new Set();
     for (const c of handler.cells) {
-      this._cellMap[c].forEach(i => intersectingHandlers.add(i));
+      this._ordinaryHandlerCellMap[c].forEach(i => intersectingHandlers.add(i));
     }
     intersectingHandlers.delete(handlerIndex);
     return intersectingHandlers;
@@ -2565,7 +2569,7 @@ class HandlerSet {
   }
 
   getHandler(index) {
-    return this._handlers[index];
+    return this._allHandlers[index];
   }
 
   getExclusionHandlers() {
@@ -2579,35 +2583,41 @@ class HandlerSet {
   replace(oldHandler, newHandler) {
     newHandler.essential = oldHandler.essential;
 
-    const index = this._handlers.indexOf(oldHandler);
+    const index = this._allHandlers.indexOf(oldHandler);
 
     if (!arraysAreEqual(oldHandler.cells, newHandler.cells)) {
       this._remove(index);
       this._add(newHandler, index);
     } else {
-      this._handlers[index] = newHandler;
+      this._allHandlers[index] = newHandler;
     }
   }
 
   _remove(index) {
-    const handler = this._handlers[index];
+    const handler = this._allHandlers[index];
     for (const c of handler.cells) {
-      const indexInMap = this._cellMap[c].indexOf(index);
-      this._cellMap[c].splice(indexInMap, 1);
+      const indexInMap = this._ordinaryHandlerCellMap[c].indexOf(index);
+      this._ordinaryHandlerCellMap[c].splice(indexInMap, 1);
     }
-    this._handlers[index] = null;
+    this._allHandlers[index] = null;
   }
 
   _add(handler, index) {
-    handler.cells.forEach(c => this._cellMap[c].push(index));
-    this._handlers[index] = handler;
+    if (index === undefined) {
+      index = this._allHandlers.length;
+      this._allHandlers.push(handler);
+    } else {
+      this._allHandlers[index] = handler;
+    }
+
+    handler.cells.forEach(c => this._ordinaryHandlerCellMap[c].push(index));
     this._indexLookup.set(handler, index);
   }
 
   add(...handlers) {
     for (const h of handlers) {
       if (!this._addToSeen(h)) continue;
-      this._add(h, this._handlers.length);
+      this._add(h);
     }
   }
 
@@ -2615,7 +2625,7 @@ class HandlerSet {
     for (const h of handlers) {
       h.essential = false;
       if (!this._addToSeen(h)) continue;
-      this._add(h, this._handlers.length);
+      this._add(h);
     }
   }
 
@@ -2634,6 +2644,7 @@ class HandlerSet {
         throw ('Exclusion handlers must be added in order');
       }
       this._exclusionHandlers.push(h);
+      this._allHandlers.push(h);
     }
   }
 
@@ -2653,11 +2664,12 @@ class HandlerSet {
 
   _addAux(handler) {
     this._auxHandlers.push(handler);
+    this._allHandlers.push(handler);
     handler.cells.forEach(
       c => this._auxHandlerLookup[c].push(handler));
   }
 
   [Symbol.iterator]() {
-    return this._handlers[Symbol.iterator]();
+    return this._allHandlers[Symbol.iterator]();
   }
 }
