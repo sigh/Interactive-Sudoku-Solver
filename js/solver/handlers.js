@@ -113,6 +113,35 @@ SudokuConstraintHandler.AllDifferent = class AllDifferent extends SudokuConstrai
   }
 }
 
+SudokuConstraintHandler.ExclusionEnforcer = class ExclusionEnforcer extends SudokuConstraintHandler {
+  constructor(cell) {
+    super([cell]);
+    this._cell = cell;
+    this._cellExclusions = null;
+  }
+
+  initialize(initialGrid, cellExclusions, shape) {
+    this._cellExclusions = cellExclusions.getArray(this._cell);
+    return true;
+  }
+
+  enforceConsistency(grid, handlerAccumulator) {
+    const exclusionCells = this._cellExclusions;
+    const numExclusions = exclusionCells.length;
+    const value = grid[this._cell];
+
+    for (let i = 0; i < numExclusions; i++) {
+      const exclusionCell = exclusionCells[i];
+      if (grid[exclusionCell] & value) {
+        if (!(grid[exclusionCell] ^= value)) return false;
+        handlerAccumulator.addForCell(exclusionCell);
+      }
+    }
+
+    return true;
+  }
+}
+
 SudokuConstraintHandler._CommonHandlerUtil = class _CommonHandlerUtil {
   static exposeHiddenSingles(grid, cells, hiddenSingles) {
     hiddenSingles = hiddenSingles | 0;
@@ -2489,6 +2518,7 @@ class HandlerSet {
     this._indexLookup = new Map();
 
     this._auxHandlers = [];
+    this._exclusionHandlers = [];
 
     this._cellMap = [];
     this._auxHandlerLookup = [];
@@ -2536,6 +2566,14 @@ class HandlerSet {
 
   getHandler(index) {
     return this._handlers[index];
+  }
+
+  getExclusionHandlers() {
+    return this._exclusionHandlers;
+  }
+
+  lookupExclusionHandler(cell) {
+    return this._exclusionHandlers[cell];
   }
 
   replace(oldHandler, newHandler) {
@@ -2586,6 +2624,16 @@ class HandlerSet {
       h.essential = false;
       if (!this._addToSeen(h)) continue;
       this._addAux(h);
+    }
+  }
+
+  addExclusionHandlers(...handlers) {
+    for (const h of handlers) {
+      if (!this._addToSeen(h)) continue;
+      if (h.cells[0] != this._exclusionHandlers.length) {
+        throw ('Exclusion handlers must be added in order');
+      }
+      this._exclusionHandlers.push(h);
     }
   }
 
