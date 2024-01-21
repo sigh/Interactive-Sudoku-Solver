@@ -55,9 +55,11 @@ class SudokuConstraintOptimizer {
     const jigsawHandler = jigsawHandlers[0];
 
 
-    handlerSet.add(...this._makeJigsawIntersections(handlerSet));
+    handlerSet.addNonEssential(
+      ...this._makeJigsawIntersections(handlerSet));
 
-    handlerSet.add(...this._makeJigsawLawOfLeftoverHandlers(jigsawHandler, hasBoxes, shape));
+    handlerSet.addNonEssential(
+      ...this._makeJigsawLawOfLeftoverHandlers(jigsawHandler, hasBoxes, shape));
   }
 
   // Find a non-overlapping set of handlers.
@@ -96,11 +98,14 @@ class SudokuConstraintOptimizer {
 
     let [filteredSumHandlers, sumCells] = this._findNonOverlappingSubset(sumHandlers, handlerSet);
 
-    handlerSet.add(...this._fillInSumGap(filteredSumHandlers, sumCells, shape));
+    handlerSet.addNonEssential(
+      ...this._fillInSumGap(filteredSumHandlers, sumCells, shape));
 
-    handlerSet.add(...this._makeInnieOutieSumHandlers(filteredSumHandlers, hasBoxes, shape));
+    handlerSet.addNonEssential(
+      ...this._makeInnieOutieSumHandlers(filteredSumHandlers, hasBoxes, shape));
 
-    handlerSet.add(...this._makeHiddenCageHandlers(handlerSet, sumHandlers, shape));
+    handlerSet.addNonEssential(
+      ...this._makeHiddenCageHandlers(handlerSet, sumHandlers, shape));
 
     this._replaceSizeSpecificSumHandlers(handlerSet, cellExclusions, shape);
 
@@ -172,7 +177,8 @@ class SudokuConstraintOptimizer {
       handlerSet.getAllofType(SudokuConstraintHandler.AllDifferent)) {
       const cells = h.exclusionCells();
       if (cells.length == shape.numValues) {
-        handlerSet.add(new SudokuConstraintHandler.House(cells));
+        handlerSet.addNonEssential(
+          new SudokuConstraintHandler.House(cells));
       }
     }
   }

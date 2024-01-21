@@ -615,7 +615,7 @@ SudokuSolver.InternalSolver = class {
     while (handlerAccumulator.hasConstraints()) {
       counters.constraintsProcessed++;
       const c = handlerAccumulator.popConstraint();
-      if (gridIsComplete && !c.required) continue;
+      if (gridIsComplete && !c.essential) continue;
       if (logSteps) {
         if (!this._debugEnforceConsistency('_enforceConstraints', grid, c, handlerAccumulator)) {
           return false;

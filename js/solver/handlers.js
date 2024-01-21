@@ -6,7 +6,9 @@ class SudokuConstraintHandler {
   constructor(cells) {
     // This constraint is enforced whenever these cells are touched.
     this.cells = new Uint8Array(cells || []);
-    this.required = true;
+    // By default all constraints are essential for correctness.
+    // The optimizer may add non-essential constraints to improve performance.
+    this.essential = true;
 
     const id = this.constructor._defaultId++;
     // By default every id is unique.
@@ -164,9 +166,6 @@ SudokuConstraintHandler.House = class House extends SudokuConstraintHandler {
     this._shape = null;
     this._lookupTables = null;
     this._commonUtil = SudokuConstraintHandler._CommonHandlerUtil;
-    // This is never required as the exclusion cells is sufficient.
-    // TODO: Still, let the optimizer make this choice.
-    this.required = false;
   }
 
   initialize(initialGrid, cellExclusions, shape) {
@@ -2478,7 +2477,7 @@ SudokuConstraintHandler.Quadruple = class Quadruple extends SudokuConstraintHand
 class HandlerSet {
   constructor(handlers, shape) {
     this._handlers = [];
-    this._seen = new Set();
+    this._seen = new Map();
     this._indexLookup = new Map();
 
     this._auxHandlers = [];
@@ -2532,6 +2531,8 @@ class HandlerSet {
   }
 
   replace(oldHandler, newHandler) {
+    newHandler.essential = oldHandler.essential;
+
     const index = this._handlers.indexOf(oldHandler);
 
     if (!arraysAreEqual(oldHandler.cells, newHandler.cells)) {
@@ -2559,26 +2560,39 @@ class HandlerSet {
 
   add(...handlers) {
     for (const h of handlers) {
-      // Don't add duplicate handlers.
-      if (this._seen.has(h.idStr)) {
-        continue;
-      }
-      this._seen.add(h.idStr);
+      if (!this._addToSeen(h)) continue;
+      this._add(h, this._handlers.length);
+    }
+  }
 
+  addNonEssential(...handlers) {
+    for (const h of handlers) {
+      h.essential = false;
+      if (!this._addToSeen(h)) continue;
       this._add(h, this._handlers.length);
     }
   }
 
   addAux(...handlers) {
     for (const h of handlers) {
-      // Don't add duplicate handlers.
-      if (this._seen.has(h.idStr)) {
-        continue;
-      }
-      this._seen.add(h.idStr);
-
+      h.essential = false;
+      if (!this._addToSeen(h)) continue;
       this._addAux(h);
     }
+  }
+
+  // Return:
+  //   true if we added it to see.
+  //   false if it already existed.
+  _addToSeen(h) {
+    if (this._seen.has(h.idStr)) {
+      // Make sure we mark the handler as essential if either
+      // is essential.
+      this._seen.get(h.idStr).essential ||= h.essential;
+      return false;
+    }
+    this._seen.set(h.idStr, h);
+    return true;
   }
 
   _addAux(handler) {
