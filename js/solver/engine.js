@@ -404,7 +404,7 @@ SudokuSolver.InternalSolver = class {
     // Add the exclusion handlers.
     for (let i = 0; i < this._numCells; i++) {
       handlerSet.addExclusionHandlers(
-        new SudokuConstraintHandler.ExclusionEnforcer(i));
+        new SudokuConstraintHandler.UniqueValueExclusion(i));
     }
 
     // Initialize handlers.
@@ -1292,9 +1292,30 @@ SudokuSolver.HandlerAccumulator = class {
     this._setSkipNonEssentialFlag(false);
   }
 
+  // Reset and clear the accumulator.
+  // If `skipNonEssential` is set then only essential handlers will be
+  // accumulated. This is useful when only fixed values remain.
   reset(skipNonEssential) {
     this._setSkipNonEssentialFlag(skipNonEssential);
     this._clear();
+  }
+
+  // Add handlers for a fixed cell (cell with a known/single value).
+  addForFixedCell(cell) {
+    // Push exclusion handlers to the front of the queue.
+    this._pushIndex(this._exclusionHandlers[cell]);
+    // Push aux handlers if we are not skipping non-essentials.
+    // Aux handlers are only added when we are fixing a cell.
+    if (!this._skipNonEssential) {
+      this._enqueueIndexes(this._auxHandlers[cell]);
+    }
+    // Add the ordinary handlers.
+    this._enqueueIndexes(this._ordinaryHandlers[cell]);
+  }
+
+  // Add handlers for ordinary updates to a cell.
+  addForCell(cell) {
+    this._enqueueIndexes(this._ordinaryHandlers[cell]);
   }
 
   _setSkipNonEssentialFlag(skipNonEssential) {
@@ -1314,20 +1335,6 @@ SudokuSolver.HandlerAccumulator = class {
     this._head = -1;
   }
 
-  addForFixedCell(cell) {
-    // Push exclusion handlers to the front of the queue.
-    this._pushIndex(this._exclusionHandlers[cell]);
-    // Push aux handlers if we are not skipping non-essentials.
-    if (!this._skipNonEssential) {
-      this._enqueueIndexes(this._auxHandlers[cell]);
-    }
-    // Add the ordinary handlers.
-    this._enqueueIndexes(this._ordinaryHandlers[cell]);
-  }
-
-  addForCell(cell) {
-    this._enqueueIndexes(this._ordinaryHandlers[cell]);
-  }
 
   // Enqueue indexes to the back of the queue.
   _enqueueIndexes(indexes) {
