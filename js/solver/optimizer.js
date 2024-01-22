@@ -116,7 +116,7 @@ class SudokuConstraintOptimizer {
     const houseHandlers = (
       handlerSet.getAllofType(SudokuConstraintHandler.House).map(
         h => handlerSet.getIndex(h)));
-    const cellMap = handlerSet.getCellMap();
+    const cellMap = handlerSet.getOrdinaryHandlerMap();
 
     const findCommonHandler = (cells) => {
       let commonHandlers = houseHandlers;

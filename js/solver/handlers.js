@@ -2525,14 +2525,13 @@ class HandlerSet {
     this._seen = new Map();
     this._indexLookup = new Map();
 
-    this._auxHandlers = [];
     this._exclusionHandlers = [];
 
-    this._ordinaryHandlerCellMap = [];
-    this._auxHandlerLookup = [];
+    this._ordinaryHandlerMap = [];
+    this._auxHandlerMap = [];
     for (let i = 0; i < shape.numCells; i++) {
-      this._ordinaryHandlerCellMap.push([]);
-      this._auxHandlerLookup.push([]);
+      this._ordinaryHandlerMap.push([]);
+      this._auxHandlerMap.push([]);
     }
 
     this.add(...handlers);
@@ -2546,19 +2545,19 @@ class HandlerSet {
     return this._allHandlers;
   }
 
-  lookupAux(cell) {
-    return this._auxHandlerLookup[cell];
+  getOrdinaryHandlerMap() {
+    return this._ordinaryHandlerMap;
   }
 
-  getCellMap() {
-    return this._ordinaryHandlerCellMap;
+  getAuxHandlerMap() {
+    return this._auxHandlerMap;
   }
 
   getIntersectingIndexes(handler) {
     const handlerIndex = this._indexLookup.get(handler);
     const intersectingHandlers = new Set();
     for (const c of handler.cells) {
-      this._ordinaryHandlerCellMap[c].forEach(i => intersectingHandlers.add(i));
+      this._ordinaryHandlerMap[c].forEach(i => intersectingHandlers.add(i));
     }
     intersectingHandlers.delete(handlerIndex);
     return intersectingHandlers;
@@ -2596,8 +2595,8 @@ class HandlerSet {
   _remove(index) {
     const handler = this._allHandlers[index];
     for (const c of handler.cells) {
-      const indexInMap = this._ordinaryHandlerCellMap[c].indexOf(index);
-      this._ordinaryHandlerCellMap[c].splice(indexInMap, 1);
+      const indexInMap = this._ordinaryHandlerMap[c].indexOf(index);
+      this._ordinaryHandlerMap[c].splice(indexInMap, 1);
     }
     this._allHandlers[index] = null;
   }
@@ -2610,7 +2609,7 @@ class HandlerSet {
       this._allHandlers[index] = handler;
     }
 
-    handler.cells.forEach(c => this._ordinaryHandlerCellMap[c].push(index));
+    handler.cells.forEach(c => this._ordinaryHandlerMap[c].push(index));
     this._indexLookup.set(handler, index);
   }
 
@@ -2663,10 +2662,10 @@ class HandlerSet {
   }
 
   _addAux(handler) {
-    this._auxHandlers.push(handler);
+    const index = this._allHandlers.length;
     this._allHandlers.push(handler);
     handler.cells.forEach(
-      c => this._auxHandlerLookup[c].push(handler));
+      c => this._auxHandlerMap[c].push(index));
   }
 
   [Symbol.iterator]() {
