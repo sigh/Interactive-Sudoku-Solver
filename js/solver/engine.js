@@ -498,31 +498,6 @@ SudokuSolver.InternalSolver = class {
     return false;
   }
 
-  _logEnforceValue(grid, cell, value, exclusionCells) {
-    const changedCells = exclusionCells.filter(c => grid[c] & value);
-    this._debugLogger.log({
-      loc: '_enforceValue',
-      msg: 'Enforcing value',
-      args: {
-        cell: this._shape.makeCellIdFromIndex(cell),
-        value: LookupTables.toValue(value),
-        cellsChanged: changedCells.length
-      },
-      cells: changedCells,
-    });
-
-    if (changedCells.length) {
-      const emptyCells = changedCells.filter(c => !(grid[c] & ~value));
-      if (emptyCells.length) {
-        this._debugLogger.log({
-          loc: '_enforceValue',
-          msg: 'Enforcing value caused wipeout',
-          cells: emptyCells,
-        });
-      }
-    }
-  }
-
   _enforceValue(grid, enforceCells, gridIsComplete, handlerAccumulator) {
     const logSteps = this._debugLogger.enableStepLogs;
 
