@@ -113,7 +113,10 @@ SudokuConstraintHandler.AllDifferent = class AllDifferent extends SudokuConstrai
   }
 }
 
-SudokuConstraintHandler.ExclusionEnforcer = class ExclusionEnforcer extends SudokuConstraintHandler {
+// UniqueValueExclusion handles the case when a cell is set to a specific value.
+// It removes that value from all cells which share an all-different constraint
+// with this cell.
+SudokuConstraintHandler.UniqueValueExclusion = class UniqueValueExclusion extends SudokuConstraintHandler {
   constructor(cell) {
     super([cell]);
     this._cell = cell;
