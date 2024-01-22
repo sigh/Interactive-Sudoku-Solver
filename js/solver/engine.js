@@ -2,12 +2,11 @@
 
 class SudokuSolver {
   constructor(handlers, shape, debugOptions) {
-    this._debugger = new SudokuSolver.Debugger(this, debugOptions);
-    this._logDebug = this._debugger.getLogDebugFn();
+    this._debugLogger = new SudokuSolver.DebugLogger(this, debugOptions);
     this._shape = shape;
 
     this._internalSolver = new SudokuSolver.InternalSolver(
-      handlers, shape, this._debugger.getLogDebugFn());
+      handlers, shape, this._debugLogger);
 
     this._progressExtraStateFn = null;
     this._progressCallback = null;
@@ -117,8 +116,8 @@ class SudokuSolver {
     if (yieldEveryStep) {
       this._internalSolver.setStepState({
         stepGuides: stepGuides,
-        logSteps: false,
       });
+      this._debugLogger.enableStepLogs = false;
     }
 
     // Iterate until we have seen n steps.
@@ -126,9 +125,9 @@ class SudokuSolver {
     this._timer.runTimed(() => {
       do {
         // Only show debug logs for the target step.
-        if (yieldEveryStep && this._logDebug && iter.count == n - 1) {
-          this._internalSolver.setStepState({ logSteps: true });
-          this._logDebug({
+        if (yieldEveryStep && this._debugLogger.enableLogs && iter.count == n - 1) {
+          this._debugLogger.enableStepLogs = true;
+          this._debugLogger.log({
             loc: 'nthStep',
             msg: 'Step ' + iter.count,
             important: true
@@ -181,7 +180,7 @@ class SudokuSolver {
   }
 
   debugState() {
-    return this._debugger.getDebugState();
+    return this._debugLogger.getDebugState();
   }
 
   state() {
@@ -233,15 +232,15 @@ SudokuSolver.Util = class {
   }
 };
 
-SudokuSolver.Debugger = class {
+SudokuSolver.DebugLogger = class {
   constructor(solver, debugOptions) {
     this._solver = solver;
     this._debugOptions = {
       enableLogs: false,
+      enableStepLogs: false,
       exportBacktrackCounts: false,
     };
     this._hasAnyDebugging = false;
-    this._logDebug = null;
     this._pendingDebugLogs = [];
 
     if (debugOptions) {
@@ -254,10 +253,17 @@ SudokuSolver.Debugger = class {
       }
     }
 
-    if (this._debugOptions.enableLogs) {
-      this._logDebug = (data) => {
-        this._pendingDebugLogs.push(data);
-      };
+    this.enableLogs = this._debugOptions.enableLogs;
+    this.enableStepLogs = this._debugOptions.enableStepLogs;
+  }
+
+  log(data) {
+    if (this.enableLogs) {
+      this._pendingDebugLogs.push(data);
+    } else {
+      // We throw so we catch accidentally checked calls to log() because
+      // they would hurt performance (even just creating the data object).
+      throw ('Debug logs are not enabled');
     }
   }
 
@@ -273,10 +279,6 @@ SudokuSolver.Debugger = class {
     }
     return result;
   }
-
-  getLogDebugFn() {
-    return this._logDebug;
-  }
 };
 
 SudokuSolver.InternalSolver = class {
@@ -284,7 +286,7 @@ SudokuSolver.InternalSolver = class {
   constructor(handlerGen, shape, debugLogger) {
     this._shape = shape;
     this._numCells = this._shape.numCells;
-    this._logDebug = debugLogger;
+    this._debugLogger = debugLogger;
 
     this._initGrid();
     this._recStack = new Uint16Array(shape.numCells + 1);
@@ -330,8 +332,8 @@ SudokuSolver.InternalSolver = class {
       }
     }
 
-    if (this._logDebug) {
-      this._logDebug({
+    if (this._debugLogger.enableLogs) {
+      this._debugLogger.log({
         loc: '_initCellPriorities',
         msg: 'Hover for values',
         args: {
@@ -392,7 +394,7 @@ SudokuSolver.InternalSolver = class {
     this._cellExclusions = cellExclusions;
 
     // Optimize handlers.
-    new SudokuConstraintOptimizer(this._logDebug).optimize(
+    new SudokuConstraintOptimizer(this._debugLogger).optimize(
       handlerSet, cellExclusions, this._shape);
 
     // Add the exclusion handlers.
@@ -494,7 +496,7 @@ SudokuSolver.InternalSolver = class {
 
   _logEnforceValue(grid, cell, value, exclusionCells) {
     const changedCells = exclusionCells.filter(c => grid[c] & value);
-    this._logDebug({
+    this._debugLogger.log({
       loc: '_enforceValue',
       msg: 'Enforcing value',
       args: {
@@ -508,7 +510,7 @@ SudokuSolver.InternalSolver = class {
     if (changedCells.length) {
       const emptyCells = changedCells.filter(c => !(grid[c] & ~value));
       if (emptyCells.length) {
-        this._logDebug({
+        this._debugLogger.log({
           loc: '_enforceValue',
           msg: 'Enforcing value caused wipeout',
           cells: emptyCells,
@@ -518,7 +520,7 @@ SudokuSolver.InternalSolver = class {
   }
 
   _enforceValue(grid, enforceCells, gridIsComplete, handlerAccumulator) {
-    const logSteps = this._stepState !== null && this._stepState.logSteps;
+    const logSteps = this._debugLogger.enableStepLogs;
 
     for (let i = 0; i < enforceCells.length; i++) {
       const cell = enforceCells[i];
@@ -535,7 +537,7 @@ SudokuSolver.InternalSolver = class {
       }
     }
 
-    return this._enforceConstraints(grid, gridIsComplete, handlerAccumulator, logSteps);
+    return this._enforceConstraints(grid, gridIsComplete, handlerAccumulator);
   }
 
   static _debugGridBuffer = new Uint16Array(SHAPE_MAX.numCells);
@@ -559,21 +561,21 @@ SudokuSolver.InternalSolver = class {
     const SHOW_ALL_HANDLERS = false;
 
     if (hasDiff) {
-      this._logDebug({
+      this._debugLogger.log({
         loc: loc,
         msg: `${handler.constructor.name} removed: `,
         args: diff,
         cells: handler.cells,
       });
     } else if (SHOW_ALL_HANDLERS) {
-      this._logDebug({
+      this._debugLogger.log({
         loc: loc,
         msg: `${handler.constructor.name} ran`,
         cells: handler.cells,
       });
     }
     if (!result) {
-      this._logDebug({
+      this._debugLogger.log({
         loc: loc,
         msg: `${handler.constructor.name} returned false`,
         cells: handler.cells,
@@ -583,8 +585,9 @@ SudokuSolver.InternalSolver = class {
     return result;
   }
 
-  _enforceConstraints(grid, gridIsComplete, handlerAccumulator, logSteps) {
+  _enforceConstraints(grid, gridIsComplete, handlerAccumulator) {
     const counters = this.counters;
+    const logSteps = this._debugLogger.enableStepLogs;
 
     while (!handlerAccumulator.isEmpty()) {
       counters.constraintsProcessed++;
@@ -609,7 +612,6 @@ SudokuSolver.InternalSolver = class {
     if (this._stepState == null) {
       this._stepState = {
         stepGuides: null,
-        logSteps: false,
         step: 0,
         oldGrid: new Uint16Array(this._numCells),
       };
@@ -654,8 +656,7 @@ SudokuSolver.InternalSolver = class {
       const handlerAccumulator = this._handlerAccumulator;
       handlerAccumulator.clear();
       for (let i = 0; i < this._numCells; i++) handlerAccumulator.addForCell(i);
-      const logSteps = this._stepState !== null && this._stepState.logSteps;
-      this._enforceConstraints(this._grids[0], false, handlerAccumulator, logSteps);
+      this._enforceConstraints(this._grids[0], false, handlerAccumulator);
     }
 
     if (yieldEveryStep) {
@@ -923,7 +924,7 @@ SudokuSolver.InternalSolver = class {
     // Run the final search until we find a solution or prove that one doesn't
     // exist.
     let result = false;
-    for (const result of this.run()) { result = true; break; }
+    for (const _ of this.run()) { result = true; break; }
 
     this.done = true;
     return result;
@@ -944,7 +945,7 @@ SudokuSolver.CandidateSelector = class CandidateSelector {
     this._shape = shape;
     this._cellOrder = new Uint8Array(shape.numCells);
     this._backtrackTriggers = null;
-    this._logDebug = debugLogger;
+    this._debugLogger = debugLogger;
 
     this._candidateSelectionState = [];
     for (let i = 0; i < shape.numCells; i++) {
@@ -993,7 +994,7 @@ SudokuSolver.CandidateSelector = class CandidateSelector {
 
     // Adjust the value for step-by-step.
     if (stepState) {
-      if (stepState.logSteps) {
+      if (this._debugLogger.enableStepLogs) {
         this._logSelectNextCandidate(
           'Best candidate:', cellOrder[cellOffset], value, count, cellDepth);
       }
@@ -1005,7 +1006,7 @@ SudokuSolver.CandidateSelector = class CandidateSelector {
       if (adjusted) {
         count = countOnes16bit(grid[cellOrder[cellOffset]]);
         this._candidateSelectionState[cellDepth] = null;
-        if (stepState.logSteps) {
+        if (this._debugLogger.enableStepLogs) {
           this._logSelectNextCandidate(
             'Adjusted by user:', cellOrder[cellOffset], value, count, cellDepth);
         }
@@ -1015,9 +1016,9 @@ SudokuSolver.CandidateSelector = class CandidateSelector {
     const nextCellDepth = this._updateCellOrder(
       cellDepth, cellOffset, count, grid);
 
-    if (stepState && stepState.logSteps) {
+    if (this._debugLogger.enableStepLogs) {
       if (nextCellDepth != cellDepth + 1) {
-        this._logDebug({
+        this._debugLogger.log({
           loc: 'selectNextCandidate',
           msg: 'Found extra singles',
           args: {
@@ -1069,7 +1070,7 @@ SudokuSolver.CandidateSelector = class CandidateSelector {
   }
 
   _logSelectNextCandidate(msg, cell, value, count, cellDepth) {
-    this._logDebug({
+    this._debugLogger.log({
       loc: 'selectNextCandidate',
       msg: msg,
       args: {

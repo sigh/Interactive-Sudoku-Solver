@@ -3,7 +3,10 @@ class SudokuConstraintOptimizer {
   _MAX_SUM_SIZE = 6;
 
   constructor(debugLogger) {
-    this._logDebug = debugLogger || null;
+    this._debugLogger = null;
+    if (debugLogger.enableLogs) {
+      this._debugLogger = debugLogger;
+    }
   }
 
   optimize(handlerSet, cellExclusions, shape) {
@@ -37,8 +40,8 @@ class SudokuConstraintOptimizer {
           arrayDifference(houseHandlers[j].cells, houseHandlers[i].cells),
           true);
         handlerSet.addAux(newHandler);
-        if (this._logDebug) {
-          this._logDebug({
+        if (this._debugLogger) {
+          this._debugLogger.log({
             loc: '_addHouseIntersections',
             msg: `Add: ${newHandler.constructor.name} (aux)`,
             cells: newHandler.cells,
@@ -159,8 +162,8 @@ class SudokuConstraintOptimizer {
     sumHandlers.push(newHandler);
     remainingCells.forEach(c => sumCells.add(c));
 
-    if (this._logDebug) {
-      this._logDebug({
+    if (this._debugLogger) {
+      this._debugLogger.log({
         loc: '_fillInSumGap',
         msg: 'Add: ' + newHandler.constructor.name,
         args: { sum: remainingSum },
@@ -207,8 +210,8 @@ class SudokuConstraintOptimizer {
 
       if (newHandler) {
         handlerSet.replace(h, newHandler);
-        if (this._logDebug) {
-          this._logDebug({
+        if (this._debugLogger) {
+          this._debugLogger.log({
             loc: '_replaceSizeSpecificSumHandlers',
             msg: 'Replace with: ' + newHandler.constructor.name,
             cells: newHandler.cells,
@@ -305,10 +308,10 @@ class SudokuConstraintOptimizer {
 
       const MIN_SUM_SKEW = 2;
       if (sumSkew < MIN_SUM_SKEW) {
-        if (this._logDebug) {
+        if (this._debugLogger) {
           const cellsArray = Array.from(cells);
           const cellString = cellsArray.map(c => shape.makeCellIdFromIndex(c)).join('~');
-          this._logDebug({
+          this._debugLogger.log({
             loc: '_addSumIntersectionHandler',
             msg: 'Discarded inferred handler: ' +
               `.Sum~${totalSum}~${cellString}`,
@@ -324,11 +327,11 @@ class SudokuConstraintOptimizer {
     const handler = new SudokuConstraintHandler.Sum(
       Array.from(cells), totalSum);
 
-    if (this._logDebug) {
+    if (this._debugLogger) {
       let args = { sum: handler.sum(), size: handler.cells.length };
       if (usedExtraHouses) args.usedExtraHouses = usedExtraHouses;
       if (removedExtraHouses) args.removedExtraHouses = removedExtraHouses;
-      this._logDebug({
+      this._debugLogger.log({
         loc: '_addSumIntersectionHandler',
         msg: 'Add: ' + handler.constructor.name,
         args: args,
@@ -415,8 +418,8 @@ class SudokuConstraintOptimizer {
           remainingCells, extraCells[0], remainingSum);
         newHandlers.push(handler);
 
-        if (this._logDebug) {
-          this._logDebug({
+        if (this._debugLogger) {
+          this._debugLogger.log({
             loc: '_makeHiddenCageHandlers',
             msg: 'Add: ' + handler.constructor.name,
             args: { offset: remainingSum, negativeCells: [...extraCells] },
@@ -437,8 +440,8 @@ class SudokuConstraintOptimizer {
         complementCells, complementSum);
       complementHandler.setComplementCells(constrainedCells);
       newHandlers.push(complementHandler);
-      if (this._logDebug) {
-        this._logDebug({
+      if (this._debugLogger) {
+        this._debugLogger.log({
           loc: '_makeHiddenCageHandlers',
           msg: 'Add: ' + complementHandler.constructor.name,
           args: { sum: complementSum },
@@ -471,8 +474,8 @@ class SudokuConstraintOptimizer {
         const handler = new SudokuConstraintHandler.SameValues(
           diff0, diff1, true);
         newHandlers.push(handler);
-        if (this._logDebug) {
-          this._logDebug({
+        if (this._debugLogger) {
+          this._debugLogger.log({
             loc: '_makeJigsawIntersections',
             msg: 'Add: SameValues',
             cells: handler.cells,
@@ -552,8 +555,8 @@ class SudokuConstraintOptimizer {
       const newHandler = new SudokuConstraintHandler.SameValues(
         [...diffA], [...diffB], false);
       newHandlers.push(newHandler);
-      if (this._logDebug) {
-        this._logDebug({
+      if (this._debugLogger) {
+        this._debugLogger.log({
           loc: '_makeJigsawLawOfLeftoverHandlers',
           msg: 'Add: ' + newHandler.constructor.name,
           cells: newHandler.cells,
@@ -630,8 +633,8 @@ class SudokuConstraintOptimizer {
       }
 
       newHandlers.push(newHandler);
-      if (this._logDebug) {
-        this._logDebug({
+      if (this._debugLogger) {
+        this._debugLogger.log({
           loc: '_makeInnieOutieSumHandlers',
           msg: 'Add: ' + newHandler.constructor.name,
           args: args,
@@ -659,8 +662,8 @@ class SudokuConstraintOptimizer {
         // if there are repeats.
         handlerSet.add(new SudokuConstraintHandler.GivenCandidates(
           new Map([...h.cells].map(c => [c, h.values]))));
-        if (this._logDebug) {
-          this._logDebug({
+        if (this._debugLogger) {
+          this._debugLogger.log({
             loc: '_optimizeQuadruple',
             msg: 'Add: GivenCandidates',
             cells: h.cells,
@@ -671,8 +674,8 @@ class SudokuConstraintOptimizer {
       if (h.valueCounts.size == 4) {
         // If there are 4 different values, then the cells must be different.
         handlerSet.add(new SudokuConstraintHandler.AllDifferent(h.cells));
-        if (this._logDebug) {
-          this._logDebug({
+        if (this._debugLogger) {
+          this._debugLogger.log({
             loc: '_optimizeQuadruple',
             msg: 'Add: AllDifferent',
             cells: h.cells,
@@ -684,8 +687,8 @@ class SudokuConstraintOptimizer {
         // There can't be more than 2 of each value, as the cells must be in
         // a 2x2 box. Hence each cell is mutually-exclusive with 2 others.
         handlerSet.replace(h, new SudokuConstraintHandler.False(h.cells));
-        if (this._logDebug) {
-          this._logDebug({
+        if (this._debugLogger) {
+          this._debugLogger.log({
             loc: '_optimizeQuadruple',
             msg: 'Replace with: False',
             cells: h.cells,
