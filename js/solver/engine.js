@@ -1015,6 +1015,19 @@ SudokuSolver.CandidateSelector = class CandidateSelector {
     const nextCellDepth = this._updateCellOrder(
       cellDepth, cellOffset, count, grid);
 
+    if (stepState && stepState.logSteps) {
+      if (nextCellDepth != cellDepth + 1) {
+        this._logDebug({
+          loc: 'selectNextCandidate',
+          msg: 'Found extra singles',
+          args: {
+            count: nextCellDepth - cellDepth - 1,
+          },
+          cells: cellOrder.subarray(cellDepth + 1, nextCellDepth),
+        });
+      }
+    }
+
     return [cellOrder.subarray(cellDepth, nextCellDepth), value, count];
   }
 
