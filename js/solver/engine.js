@@ -498,27 +498,6 @@ SudokuSolver.InternalSolver = class {
     return false;
   }
 
-  _enforceValue(grid, enforceCells, gridIsComplete, handlerAccumulator) {
-    const logSteps = this._debugLogger.enableStepLogs;
-
-    for (let i = 0; i < enforceCells.length; i++) {
-      const cell = enforceCells[i];
-      const handler = this._handlerSet.lookupExclusionHandler(cell);
-      if (logSteps) {
-        if (!this._debugEnforceConsistency(
-          '_enforceValue', grid, handler, handlerAccumulator)) {
-          return false;
-        }
-      } else {
-        if (!handler.enforceConsistency(grid, handlerAccumulator)) {
-          return false;
-        }
-      }
-    }
-
-    return this._enforceConstraints(grid, gridIsComplete, handlerAccumulator);
-  }
-
   static _debugGridBuffer = new Uint16Array(SHAPE_MAX.numCells);
 
   _debugEnforceConsistency(loc, grid, handler, handlerAccumulator) {
@@ -748,8 +727,9 @@ SudokuSolver.InternalSolver = class {
       const handlerAccumulator = this._handlerAccumulator;
       handlerAccumulator.clear();
       for (let i = 0; i < nextCells.length; i++) {
+        handlerAccumulator.addForFixedCell(nextCells[i]);
         if (!gridIsComplete) {
-          handlerAccumulator.addForFixedCell(nextCells[i]);
+          handlerAccumulator.addAuxForCell(nextCells[i]);
         }
         handlerAccumulator.addForCell(nextCells[i]);
       }
@@ -765,8 +745,8 @@ SudokuSolver.InternalSolver = class {
       }
 
       // Propagate constraints.
-      const hasContradiction = !this._enforceValue(
-        grid, nextCells, gridIsComplete, handlerAccumulator);
+      const hasContradiction = !this._enforceConstraints(
+        grid, gridIsComplete, handlerAccumulator);
       if (hasContradiction) {
         // Store the current cells, so that the level immediately above us
         // can act on this information to run extra constraints.
@@ -1293,6 +1273,8 @@ SudokuSolver.HandlerAccumulator = class {
     this._handlers = handlerSet.getAll();
     this._ordinaryHandlers = handlerSet.getOrdinaryHandlerMap();
     this._auxHandlers = handlerSet.getAuxHandlerMap();
+    this._exclusionHandlers = new Uint16Array(
+      handlerSet.getExclusionHandlerMap());
 
     this._linkedList = new Int16Array(this._handlers.length);
     this._linkedList.fill(-2);  // -2 = Not in list.
@@ -1301,6 +1283,11 @@ SudokuSolver.HandlerAccumulator = class {
   }
 
   addForFixedCell(cell) {
+    // Push exclusion handlers to the front of the queue.
+    this._pushIndex(this._exclusionHandlers[cell]);
+  }
+
+  addAuxForCell(cell) {
     this._enqueueIndexes(this._auxHandlers[cell]);
   }
 
@@ -1321,6 +1308,16 @@ SudokuSolver.HandlerAccumulator = class {
         this._tail = i;
         this._linkedList[i] = -1;
       }
+    }
+  }
+
+  _pushIndex(index) {
+    if (this._linkedList[index] < -1) {
+      if (this._head == -1) {
+        this._tail = index;
+      }
+      this._linkedList[index] = this._head;
+      this._head = index;
     }
   }
 

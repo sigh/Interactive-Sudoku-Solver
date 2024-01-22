@@ -2523,15 +2523,15 @@ class HandlerSet {
   constructor(handlers, shape) {
     this._allHandlers = [];
     this._seen = new Map();
-    this._indexLookup = new Map();
+    this._ordinaryIndexLookup = new Map();
 
-    this._exclusionHandlers = [];
-
+    this._exclusionHandlerMap = [];
     this._ordinaryHandlerMap = [];
     this._auxHandlerMap = [];
     for (let i = 0; i < shape.numCells; i++) {
       this._ordinaryHandlerMap.push([]);
       this._auxHandlerMap.push([]);
+      this._exclusionHandlerMap.push(-1);
     }
 
     this.add(...handlers);
@@ -2554,7 +2554,7 @@ class HandlerSet {
   }
 
   getIntersectingIndexes(handler) {
-    const handlerIndex = this._indexLookup.get(handler);
+    const handlerIndex = this._ordinaryIndexLookup.get(handler);
     const intersectingHandlers = new Set();
     for (const c of handler.cells) {
       this._ordinaryHandlerMap[c].forEach(i => intersectingHandlers.add(i));
@@ -2564,19 +2564,15 @@ class HandlerSet {
   }
 
   getIndex(handler) {
-    return this._indexLookup.get(handler);
+    return this._ordinaryIndexLookup.get(handler);
   }
 
   getHandler(index) {
     return this._allHandlers[index];
   }
 
-  getExclusionHandlers() {
-    return this._exclusionHandlers;
-  }
-
-  lookupExclusionHandler(cell) {
-    return this._exclusionHandlers[cell];
+  getExclusionHandlerMap() {
+    return this._exclusionHandlerMap;
   }
 
   replace(oldHandler, newHandler) {
@@ -2585,14 +2581,14 @@ class HandlerSet {
     const index = this._allHandlers.indexOf(oldHandler);
 
     if (!arraysAreEqual(oldHandler.cells, newHandler.cells)) {
-      this._remove(index);
-      this._add(newHandler, index);
+      this._removeOrdinary(index);
+      this._addOrdinary(newHandler, index);
     } else {
       this._allHandlers[index] = newHandler;
     }
   }
 
-  _remove(index) {
+  _removeOrdinary(index) {
     const handler = this._allHandlers[index];
     for (const c of handler.cells) {
       const indexInMap = this._ordinaryHandlerMap[c].indexOf(index);
@@ -2601,22 +2597,21 @@ class HandlerSet {
     this._allHandlers[index] = null;
   }
 
-  _add(handler, index) {
+  _addOrdinary(handler, index) {
     if (index === undefined) {
-      index = this._allHandlers.length;
-      this._allHandlers.push(handler);
+      index = this._addToAll(handler);
     } else {
       this._allHandlers[index] = handler;
     }
 
     handler.cells.forEach(c => this._ordinaryHandlerMap[c].push(index));
-    this._indexLookup.set(handler, index);
+    this._ordinaryIndexLookup.set(handler, index);
   }
 
   add(...handlers) {
     for (const h of handlers) {
       if (!this._addToSeen(h)) continue;
-      this._add(h);
+      this._addOrdinary(h);
     }
   }
 
@@ -2624,7 +2619,7 @@ class HandlerSet {
     for (const h of handlers) {
       h.essential = false;
       if (!this._addToSeen(h)) continue;
-      this._add(h);
+      this._addOrdinary(h);
     }
   }
 
@@ -2638,12 +2633,12 @@ class HandlerSet {
 
   addExclusionHandlers(...handlers) {
     for (const h of handlers) {
-      if (!this._addToSeen(h)) continue;
-      if (h.cells[0] != this._exclusionHandlers.length) {
-        throw ('Exclusion handlers must be added in order');
+      if (!this._addToSeen(h)) {
+        throw ('Exclusion handlers must be unique');
       }
-      this._exclusionHandlers.push(h);
-      this._allHandlers.push(h);
+
+      const index = this._addToAll(h);
+      this._exclusionHandlerMap[h.cells[0]] = index;
     }
   }
 
@@ -2662,10 +2657,15 @@ class HandlerSet {
   }
 
   _addAux(handler) {
-    const index = this._allHandlers.length;
-    this._allHandlers.push(handler);
+    const index = this._addToAll(handler);
     handler.cells.forEach(
       c => this._auxHandlerMap[c].push(index));
+  }
+
+  _addToAll(handler) {
+    const index = this._allHandlers.length;
+    this._allHandlers.push(handler);
+    return index;
   }
 
   [Symbol.iterator]() {
