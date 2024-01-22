@@ -1071,7 +1071,7 @@ SudokuSolver.CandidateSelector = class CandidateSelector {
     //  - Have non-zero backtrackTriggers (and thus score).
     if (isNewNode && count > 2 && this._backtrackTriggers[cell] > 0) {
       const score = this._backtrackTriggers[cell] / count;
-      let result = this._findCandidatesByHouse(grid, score);
+      const result = this._findCandidatesByHouse(grid, score);
       if (result.score >= score) {
         count = 2;
         value = result.value;
@@ -1179,9 +1179,14 @@ SudokuSolver.CandidateSelector = class CandidateSelector {
 
   _findCandidatesByHouse(grid, score) {
     const numCells = grid.length;
+    // Create a scaled score so that we don't have to do divisions when scoring
+    // houses.
+    // Subtract a small amount so that we will replace the result if the score
+    // is equal.
+    const scaledScore = score * 2 - 0.0001;
 
     // Add all handlers with cells which can potentially beat the current score.
-    const minBt = Math.ceil(score * 2) | 0;
+    const minBt = Math.ceil(scaledScore) | 0;
     const backtrackTriggers = this._backtrackTriggers;
     const handlerAccumulator = this._houseHandlerAccumulator;
     for (let i = 0; i < numCells; i++) {
@@ -1195,7 +1200,7 @@ SudokuSolver.CandidateSelector = class CandidateSelector {
 
     // Find all candidates with exactly two values.
     let bestResult = {
-      score: -1,
+      score: scaledScore,
       value: 0,
       cell0: 0,
       cell1: 0,
@@ -1219,17 +1224,16 @@ SudokuSolver.CandidateSelector = class CandidateSelector {
       while (exactlyTwo) {
         let v = exactlyTwo & -exactlyTwo;
         exactlyTwo ^= v;
-        const result = this._scoreHouseCandidateValue(grid, cells, v);
-        if (result.score > bestResult.score) {
-          bestResult = result;
-        }
+        this._scoreHouseCandidateValue(grid, cells, v, bestResult);
       }
     }
+
+    bestResult.score /= 2;
 
     return bestResult;
   }
 
-  _scoreHouseCandidateValue(grid, cells, v) {
+  _scoreHouseCandidateValue(grid, cells, v, bestResult) {
     let numCells = cells.length;
     let cell0 = 0;
     let cell1 = 0;
@@ -1241,22 +1245,23 @@ SudokuSolver.CandidateSelector = class CandidateSelector {
 
     let bt0 = this._backtrackTriggers[cell0];
     let bt1 = this._backtrackTriggers[cell1];
-    // Make bt0 the larger of the two.
-    // Also make cell0 the cell with the larger backtrack trigger, since cell0
-    // is searched first. NOTE: This turns out ot be a bit faster, but means
-    // we usually find the solution later in the search.
-    if (bt0 < bt1) {
-      [bt0, bt1] = [bt1, bt0];
-      [cell0, cell1] = [cell1, cell0];
-    }
-    const score = bt0 / 2;  // max(bt[cell_i]) / numCells
 
-    return {
-      value: v,
-      score: score,
-      cell0: cell0,
-      cell1: cell1,
-    };
+    // If either of the cells beat the current score.
+    if (bt0 > bestResult.score || bt1 > bestResult.score) {
+      // Make bt0 the larger of the two.
+      // Also make cell0 the cell with the larger backtrack trigger, since cell0
+      // is searched first. NOTE: This turns out ot be a bit faster, but means
+      // we usually find the solution later in the search.
+      if (bt0 < bt1) {
+        [bt0, bt1] = [bt1, bt0];
+        [cell0, cell1] = [cell1, cell0];
+      }
+
+      bestResult.score = bt0; // max(bt[cell_i])
+      bestResult.value = v;
+      bestResult.cell0 = cell0;
+      bestResult.cell1 = cell1;
+    }
   }
 }
 
