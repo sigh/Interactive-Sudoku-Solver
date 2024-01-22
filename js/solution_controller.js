@@ -93,9 +93,9 @@ class DebugManager {
     this._shape = null;
     this._infoOverlay = new InfoOverlay(displayContainer);;
     this._checkboxes = [
-      ['enableLogs', document.getElementById('debug-logs-checkbox')],
       ['exportBacktrackCounts', document.getElementById('backtrack-heatmap-checkbox')]
     ];
+    this._logLevelElem = document.getElementById('debug-log-level');
 
     this._debugCellHighlighter = displayContainer.createHighlighter('highlighted-cell');
 
@@ -163,6 +163,16 @@ class DebugManager {
       element.onchange = () => {
         localStorage.setItem(key, element.checked);
       }
+    }
+
+    // Log level selector.
+    {
+      const logLevelElem = this._logLevelElem;
+      const value = localStorage.getItem('logLevel');
+      logLevelElem.value = value || '0';
+      logLevelElem.onchange = () => {
+        localStorage.setItem('logLevel', logLevelElem.value);
+      };
     }
 
     // Setup hover elements.
@@ -236,11 +246,13 @@ class DebugManager {
 
   getOptions() {
     if (!this._enabled) return null;
-    return Object.fromEntries(
+    const options = Object.fromEntries(
       this._checkboxes.map(
         ([k, v]) => [k, v.checked]
       )
     );
+    options.logLevel = parseInt(this._logLevelElem.value);
+    return options;
   }
 
   getCallback() {
