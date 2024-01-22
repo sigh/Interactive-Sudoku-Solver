@@ -207,9 +207,8 @@ class InfoTextDisplay extends DisplayItem {
 }
 
 class CellValueDisplay extends DisplayItem {
-  MULTI_VALUE_CLASS = 'multi-value';
-  SINGLE_VALUE_CLASS = 'single-value';
-  VERTICAL_OFFSET = 0;
+  MULTI_VALUE_CLASS = 'cell-multi-value';
+  SINGLE_VALUE_CLASS = 'cell-single-value';
 
   constructor(svg) {
     super(svg);
@@ -217,11 +216,11 @@ class CellValueDisplay extends DisplayItem {
   }
 
   _renderGridValues(grid) {
+    this.clear();
     const svg = this.getSvg();
-    clearDOMNode(svg);
 
     const LINE_HEIGHT = this._shape.gridSize == SHAPE_9x9.gridSize ? 17 : 10;
-    const START_OFFSET = -DisplayItem.CELL_SIZE / 2 + this.VERTICAL_OFFSET;
+    const START_OFFSET = -DisplayItem.CELL_SIZE / 2 + 2;
     for (let i = 0; i < grid.length; i++) {
       const value = grid[i];
       if (!value) continue;
@@ -242,7 +241,7 @@ class CellValueDisplay extends DisplayItem {
     }
   }
 
-  _makeTemplateArray = memoize((shape) => {
+  static _makeTemplateArray = memoize((shape) => {
     const charsPerLine = 2 * shape.boxSize - 1;
 
     let charCount = 0;
@@ -264,7 +263,7 @@ class CellValueDisplay extends DisplayItem {
   });
 
   _formatMultiSolution(values) {
-    const slots = [...this._makeTemplateArray(this._shape)];
+    const slots = [...this.constructor._makeTemplateArray(this._shape)];
     for (const v of values) {
       slots[v * 2 - 2] = v;
     }
@@ -277,10 +276,6 @@ class CellValueDisplay extends DisplayItem {
 }
 
 class SolutionDisplay extends CellValueDisplay {
-  MULTI_VALUE_CLASS = 'solution-multi-value';
-  SINGLE_VALUE_CLASS = 'solution-value';
-  VERTICAL_OFFSET = 2;
-
   constructor(svg) {
     super(svg);
     this._currentSolution = [];
@@ -318,7 +313,6 @@ class SolutionDisplay extends CellValueDisplay {
   setSolution(solution) {
     solution = solution || [];
     this._currentSolution = solution.slice();
-    const svg = this.getSvg();
 
     // If we have no solution, just hide it instead.
     // However, we wait a bit so that we don't flicker if the solution is updated
@@ -327,7 +321,7 @@ class SolutionDisplay extends CellValueDisplay {
       window.setTimeout(() => {
         // Ensure there is still no solution.
         if (this._currentSolution.length == 0) {
-          svg.classList.add('hidden-solution');
+          this.clear();
           this._copyElem.disabled = true;
         }
       }, 10);
@@ -347,15 +341,10 @@ class SolutionDisplay extends CellValueDisplay {
 
     this._copyElem.disabled = (
       !this._currentSolution.every(v => v && isFinite(v)));
-
-    svg.classList.remove('hidden-solution');
   }
 }
 
 class GivensDisplay extends CellValueDisplay {
-  MULTI_VALUE_CLASS = 'given-multi-value';
-  SINGLE_VALUE_CLASS = 'given-single-value';
-
   drawGivens(givensMap) {
     // Quickly clear the givens display if there are no givens.
     if (!givensMap.size) {

@@ -960,6 +960,7 @@ ModeHandler.StepByStep = class extends ModeHandler {
       this._numSteps = i;
       return {
         description: `Step ${i} [Done]`,
+        diff: [],
         solution: null,
         statusElem: null,
         highlightCells: [],
@@ -992,6 +993,7 @@ ModeHandler.StepByStep = class extends ModeHandler {
     }
     return {
       solution: result.pencilmarks,
+      diff: result.diffPencilmarks || [],
       statusElem: statusElem,
       description: `Step ${i}`,
       highlightCells: result.latestCell ? [result.latestCell] : [],
@@ -1057,6 +1059,10 @@ class SolutionController {
     this._solutionDisplay = new SolutionDisplay(
       displayContainer.getNewGroup('solution-group'));
     constraintManager.addReshapeListener(this._solutionDisplay);
+
+    this._diffDisplay = new CellValueDisplay(
+      displayContainer.getNewGroup('diff-group'));
+    constraintManager.addReshapeListener(this._diffDisplay);
 
     this._isSolving = false;
     this._constraintManager = constraintManager;
@@ -1254,6 +1260,7 @@ class SolutionController {
     this._terminateSolver();
     this._stepHighlighter.setCells([]);
     this._solutionDisplay.setSolution();
+    this._diffDisplay.clear();
     this._stateDisplay.clear();
     this._setValidateResult();
     this.debugManager.clear();
@@ -1355,6 +1362,10 @@ class SolutionController {
         }
       }
       this._solutionDisplay.setSolution(currentSolution);
+
+      if (result.diff) {
+        this._diffDisplay._renderGridValues(result.diff);
+      }
 
       if (handler.ITERATION_CONTROLS) {
         let minIndex = handler.minIndex();
