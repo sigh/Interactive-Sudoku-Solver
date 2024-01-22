@@ -540,13 +540,12 @@ SudokuSolver.InternalSolver = class {
     return result;
   }
 
-  _enforceConstraints(grid, gridIsComplete, handlerAccumulator) {
+  _enforceConstraints(grid, handlerAccumulator) {
     const counters = this.counters;
     const logSteps = this._debugLogger.enableStepLogs;
 
     while (!handlerAccumulator.isEmpty()) {
       const c = handlerAccumulator.takeNext();
-      if (gridIsComplete && !c.essential) continue;
       counters.constraintsProcessed++;
       if (logSteps) {
         if (!this._debugEnforceConsistency('_enforceConstraints', grid, c, handlerAccumulator)) {
@@ -609,9 +608,9 @@ SudokuSolver.InternalSolver = class {
     {
       // Enforce constraints for all cells.
       const handlerAccumulator = this._handlerAccumulator;
-      handlerAccumulator.clear();
+      handlerAccumulator.reset(false);
       for (let i = 0; i < this._numCells; i++) handlerAccumulator.addForCell(i);
-      this._enforceConstraints(this._grids[0], false, handlerAccumulator);
+      this._enforceConstraints(this._grids[0], handlerAccumulator);
     }
 
     if (yieldEveryStep) {
@@ -722,16 +721,10 @@ SudokuSolver.InternalSolver = class {
       //       selection methods.
       grid[cell] = value;
 
-      const gridIsComplete = (nextDepth == this._numCells);
-
       const handlerAccumulator = this._handlerAccumulator;
-      handlerAccumulator.clear();
+      handlerAccumulator.reset(nextDepth == this._numCells);
       for (let i = 0; i < nextCells.length; i++) {
         handlerAccumulator.addForFixedCell(nextCells[i]);
-        if (!gridIsComplete) {
-          handlerAccumulator.addAuxForCell(nextCells[i]);
-        }
-        handlerAccumulator.addForCell(nextCells[i]);
       }
       // Queue up extra constraints based on prior backtracks. The idea being
       // that constraints that apply this the contradiction cell are likely
@@ -746,7 +739,7 @@ SudokuSolver.InternalSolver = class {
 
       // Propagate constraints.
       const hasContradiction = !this._enforceConstraints(
-        grid, gridIsComplete, handlerAccumulator);
+        grid, handlerAccumulator);
       if (hasContradiction) {
         // Store the current cells, so that the level immediately above us
         // can act on this information to run extra constraints.
@@ -1270,58 +1263,47 @@ SudokuSolver.CandidateSelector = class CandidateSelector {
 SudokuSolver.HandlerAccumulator = class {
   // NOTE: This is intended to be created once, and reused.
   constructor(handlerSet) {
-    this._handlers = handlerSet.getAll();
-    this._ordinaryHandlers = handlerSet.getOrdinaryHandlerMap();
+    this._allHandlers = handlerSet.getAll();
     this._auxHandlers = handlerSet.getAuxHandlerMap();
     this._exclusionHandlers = new Uint16Array(
       handlerSet.getExclusionHandlerMap());
 
-    this._linkedList = new Int16Array(this._handlers.length);
+    const allOrdinaryHandlers = handlerSet.getOrdinaryHandlerMap();
+    // Create a mapping of just the essential ordinary handlers.
+    const essentialOrdinaryHandlers = [];
+    for (let i = 0; i < allOrdinaryHandlers.length; i++) {
+      const list = allOrdinaryHandlers[i];
+      essentialOrdinaryHandlers.push(
+        list.filter(index => this._allHandlers[index].essential));
+    }
+
+    // We have two lookups for ordinary handlers, depending on whether we want
+    // to include non-essential handlers.
+    this._ordinaryHandlersByEssential = [
+      allOrdinaryHandlers,
+      essentialOrdinaryHandlers,
+    ];
+
+    this._linkedList = new Int16Array(this._allHandlers.length);
     this._linkedList.fill(-2);  // -2 = Not in list.
     this._head = -1;  // -1 = null pointer.
     this._tail = -1;  // If list is empty, tail can be any value.
+
+    this._setSkipNonEssentialFlag(false);
   }
 
-  addForFixedCell(cell) {
-    // Push exclusion handlers to the front of the queue.
-    this._pushIndex(this._exclusionHandlers[cell]);
+  reset(skipNonEssential) {
+    this._setSkipNonEssentialFlag(skipNonEssential);
+    this._clear();
   }
 
-  addAuxForCell(cell) {
-    this._enqueueIndexes(this._auxHandlers[cell]);
+  _setSkipNonEssentialFlag(skipNonEssential) {
+    this._skipNonEssential = !!skipNonEssential;
+    this._ordinaryHandlers = this._ordinaryHandlersByEssential[
+      +this._skipNonEssential];
   }
 
-  addForCell(cell) {
-    this._enqueueIndexes(this._ordinaryHandlers[cell]);
-  }
-
-  _enqueueIndexes(indexes) {
-    const numHandlers = indexes.length;
-    for (let j = 0; j < numHandlers; j++) {
-      const i = indexes[j];
-      if (this._linkedList[i] < -1) {
-        if (this._head == -1) {
-          this._head = i;
-        } else {
-          this._linkedList[this._tail] = i;
-        }
-        this._tail = i;
-        this._linkedList[i] = -1;
-      }
-    }
-  }
-
-  _pushIndex(index) {
-    if (this._linkedList[index] < -1) {
-      if (this._head == -1) {
-        this._tail = index;
-      }
-      this._linkedList[index] = this._head;
-      this._head = index;
-    }
-  }
-
-  clear() {
+  _clear() {
     const ll = this._linkedList;
     let head = this._head;
     while (head >= 0) {
@@ -1330,6 +1312,49 @@ SudokuSolver.HandlerAccumulator = class {
       head = newHead;
     }
     this._head = -1;
+  }
+
+  addForFixedCell(cell) {
+    // Push exclusion handlers to the front of the queue.
+    this._pushIndex(this._exclusionHandlers[cell]);
+    // Push aux handlers if we are not skipping non-essentials.
+    if (!this._skipNonEssential) {
+      this._enqueueIndexes(this._auxHandlers[cell]);
+    }
+    // Add the ordinary handlers.
+    this._enqueueIndexes(this._ordinaryHandlers[cell]);
+  }
+
+  addForCell(cell) {
+    this._enqueueIndexes(this._ordinaryHandlers[cell]);
+  }
+
+  // Enqueue indexes to the back of the queue.
+  _enqueueIndexes(indexes) {
+    const numHandlers = indexes.length;
+    for (let j = 0; j < numHandlers; j++) {
+      const i = indexes[j];
+      if (this._linkedList[i] != -2) continue;
+
+      if (this._head == -1) {
+        this._head = i;
+      } else {
+        this._linkedList[this._tail] = i;
+      }
+      this._tail = i;
+      this._linkedList[i] = -1;
+    }
+  }
+
+  // Push an index to the front of the queue.
+  _pushIndex(index) {
+    if (this._linkedList[index] < -1) {
+      if (this._head == -1) {
+        this._tail = index;
+      }
+      this._linkedList[index] = this._head;
+      this._head = index;
+    }
   }
 
   isEmpty() {
@@ -1341,7 +1366,7 @@ SudokuSolver.HandlerAccumulator = class {
     this._head = this._linkedList[oldHead];
     this._linkedList[oldHead] = -2;
 
-    return this._handlers[oldHead];
+    return this._allHandlers[oldHead];
   }
 }
 
