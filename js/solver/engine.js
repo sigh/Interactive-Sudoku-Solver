@@ -236,7 +236,7 @@ SudokuSolver.DebugLogger = class {
   constructor(solver, debugOptions) {
     this._solver = solver;
     this._debugOptions = {
-      enableLogs: false,
+      logLevel: 0,
       enableStepLogs: false,
       exportBacktrackCounts: false,
     };
@@ -248,23 +248,27 @@ SudokuSolver.DebugLogger = class {
       for (const key of Object.keys(debugOptions)) {
         if (key in this._debugOptions) {
           this._debugOptions[key] = debugOptions[key];
-          this._hasAnyDebugging ||= debugOptions[key];
+          this._hasAnyDebugging ||= !!debugOptions[key];
         }
       }
     }
 
-    this.enableLogs = this._debugOptions.enableLogs;
+    this.logLevel = +this._debugOptions.logLevel;
+    this.enableLogs = this.logLevel > 0;
     this.enableStepLogs = this._debugOptions.enableStepLogs;
   }
 
-  log(data) {
-    if (this.enableLogs) {
-      this._pendingDebugLogs.push(data);
-    } else {
+  log(data, level) {
+    if (!this.enableLogs) {
       // We throw so we catch accidentally checked calls to log() because
       // they would hurt performance (even just creating the data object).
       throw ('Debug logs are not enabled');
     }
+
+    level ||= 1;
+    if (level > this.logLevel) return;
+
+    this._pendingDebugLogs.push(data);
   }
 
   getDebugState() {
@@ -557,9 +561,6 @@ SudokuSolver.InternalSolver = class {
       }
     }
 
-    // TODO: Make this a debug option.
-    const SHOW_ALL_HANDLERS = false;
-
     if (hasDiff) {
       this._debugLogger.log({
         loc: loc,
@@ -567,12 +568,12 @@ SudokuSolver.InternalSolver = class {
         args: diff,
         cells: handler.cells,
       });
-    } else if (SHOW_ALL_HANDLERS) {
+    } else if (this._debugLogger.logLevel >= 2) {
       this._debugLogger.log({
         loc: loc,
         msg: `${handler.constructor.name} ran`,
         cells: handler.cells,
-      });
+      }, 2);
     }
     if (!result) {
       this._debugLogger.log({

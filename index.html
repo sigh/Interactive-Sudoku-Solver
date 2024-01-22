@@ -109,8 +109,12 @@ layout: null
     <div id="debug-logs"></div>
     <div id="debug-panel">
       <label>
-        <input checked type="checkbox" id="debug-logs-checkbox">
-        Debug logs
+        Log level
+        <select id="debug-log-level">
+          <option value="0">None</option>
+          <option value="1">1</option>
+          <option value="2">2</option>
+        </select>
       </label>
       <label>
         <input type="checkbox" id="backtrack-heatmap-checkbox">
