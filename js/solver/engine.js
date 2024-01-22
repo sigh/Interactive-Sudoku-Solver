@@ -545,9 +545,9 @@ SudokuSolver.InternalSolver = class {
     const logSteps = this._debugLogger.enableStepLogs;
 
     while (!handlerAccumulator.isEmpty()) {
-      counters.constraintsProcessed++;
       const c = handlerAccumulator.takeNext();
       if (gridIsComplete && !c.essential) continue;
+      counters.constraintsProcessed++;
       if (logSteps) {
         if (!this._debugEnforceConsistency('_enforceConstraints', grid, c, handlerAccumulator)) {
           return false;
