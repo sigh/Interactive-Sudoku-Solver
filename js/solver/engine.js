@@ -896,10 +896,10 @@ SudokuSolver.CandidateSelector = class CandidateSelector {
     this._backtrackTriggers = null;
     this._debugLogger = debugLogger;
 
-    this._candidateSelectionState = [];
-    for (let i = 0; i < shape.numCells; i++) {
-      this._candidateSelectionState.push(null);
-    }
+    this._candidateSelectionStates = this._initCandidateSelectionStates(shape);
+    // _candidateSelectionFlags is used to track whether the
+    // _candidateSelectionStates entry is valid.
+    this._candidateSelectionFlags = new Uint8Array(shape.numCells);
 
     const houseHandlerSet = new HandlerSet(
       handlerSet.getAllofType(SudokuConstraintHandler.House), shape);
@@ -917,7 +917,7 @@ SudokuSolver.CandidateSelector = class CandidateSelector {
 
     this._backtrackTriggers = backtrackTriggers;
 
-    this._candidateSelectionState.fill(null);
+    this._candidateSelectionFlags.fill(0);
   }
 
   getCellOrder(upto) {
@@ -954,7 +954,7 @@ SudokuSolver.CandidateSelector = class CandidateSelector {
 
       if (adjusted) {
         count = countOnes16bit(grid[cellOrder[cellOffset]]);
-        this._candidateSelectionState[cellDepth] = null;
+        this._candidateSelectionFlags[cellDepth] = 0;
         if (this._debugLogger.enableStepLogs) {
           this._logSelectNextCandidate(
             'Adjusted by user:', cellOrder[cellOffset], value, count, cellDepth);
@@ -1027,7 +1027,9 @@ SudokuSolver.CandidateSelector = class CandidateSelector {
         value: LookupTables.toValue(value),
         numOptions: count,
         cellDepth: cellDepth,
-        state: this._candidateSelectionState[cellDepth],
+        state: (
+          this._candidateSelectionFlags[cellDepth] ?
+            this._candidateSelectionStates[cellDepth] : null),
       },
       cells: [cell],
     });
@@ -1036,9 +1038,9 @@ SudokuSolver.CandidateSelector = class CandidateSelector {
   _selectBestCandidate(grid, cellOrder, cellDepth, isNewNode) {
     // If we have a special candidate state, then use that.
     // It will always be a singleton.
-    if (this._candidateSelectionState[cellDepth] !== null) {
-      const state = this._candidateSelectionState[cellDepth];
-      this._candidateSelectionState[cellDepth] = null;
+    if (this._candidateSelectionFlags[cellDepth]) {
+      const state = this._candidateSelectionStates[cellDepth];
+      this._candidateSelectionFlags[cellDepth] = 0;
       return [cellOrder.indexOf(state.cell1), state.value, 1];
     }
 
@@ -1071,12 +1073,13 @@ SudokuSolver.CandidateSelector = class CandidateSelector {
     //  - Have non-zero backtrackTriggers (and thus score).
     if (isNewNode && count > 2 && this._backtrackTriggers[cell] > 0) {
       const score = this._backtrackTriggers[cell] / count;
-      const result = this._findCandidatesByHouse(grid, score);
-      if (result.score >= score) {
+
+      const state = this._candidateSelectionStates[cellDepth];
+      if (this._findCandidatesByHouse(grid, score, state)) {
         count = 2;
-        value = result.value;
-        cellOffset = cellOrder.indexOf(result.cell0);
-        this._candidateSelectionState[cellDepth] = result;
+        value = state.value;
+        cellOffset = cellOrder.indexOf(state.cell0);
+        this._candidateSelectionFlags[cellDepth] = 1;
       }
     }
 
@@ -1177,16 +1180,13 @@ SudokuSolver.CandidateSelector = class CandidateSelector {
     return [cellOffset, value, adjusted];
   }
 
-  _findCandidatesByHouse(grid, score) {
+  _findCandidatesByHouse(grid, score, result) {
     const numCells = grid.length;
-    // Create a scaled score so that we don't have to do divisions when scoring
-    // houses.
-    // Subtract a small amount so that we will replace the result if the score
-    // is equal.
-    const scaledScore = score * 2 - 0.0001;
+    // Determine the minimum value that backtrackTriggers can take to beat the
+    // current score.
+    const minBt = Math.ceil(score * 2) | 0;
 
     // Add all handlers with cells which can potentially beat the current score.
-    const minBt = Math.ceil(scaledScore) | 0;
     const backtrackTriggers = this._backtrackTriggers;
     const handlerAccumulator = this._houseHandlerAccumulator;
     for (let i = 0; i < numCells; i++) {
@@ -1198,13 +1198,10 @@ SudokuSolver.CandidateSelector = class CandidateSelector {
       }
     }
 
+    // Subtract 1 so that we will replace the result if the score is equal.
+    result.bt = minBt - 1;
+
     // Find all candidates with exactly two values.
-    let bestResult = {
-      score: scaledScore,
-      value: 0,
-      cell0: 0,
-      cell1: 0,
-    };
     while (!handlerAccumulator.isEmpty()) {
       const handler = handlerAccumulator.takeNext();
       const cells = handler.cells;
@@ -1224,13 +1221,11 @@ SudokuSolver.CandidateSelector = class CandidateSelector {
       while (exactlyTwo) {
         let v = exactlyTwo & -exactlyTwo;
         exactlyTwo ^= v;
-        this._scoreHouseCandidateValue(grid, cells, v, bestResult);
+        this._scoreHouseCandidateValue(grid, cells, v, result);
       }
     }
 
-    bestResult.score /= 2;
-
-    return bestResult;
+    return result.bt >= minBt;
   }
 
   _scoreHouseCandidateValue(grid, cells, v, bestResult) {
@@ -1247,7 +1242,7 @@ SudokuSolver.CandidateSelector = class CandidateSelector {
     let bt1 = this._backtrackTriggers[cell1];
 
     // If either of the cells beat the current score.
-    if (bt0 > bestResult.score || bt1 > bestResult.score) {
+    if (bt0 > bestResult.bt || bt1 > bestResult.bt) {
       // Make bt0 the larger of the two.
       // Also make cell0 the cell with the larger backtrack trigger, since cell0
       // is searched first. NOTE: This turns out ot be a bit faster, but means
@@ -1257,11 +1252,25 @@ SudokuSolver.CandidateSelector = class CandidateSelector {
         [cell0, cell1] = [cell1, cell0];
       }
 
-      bestResult.score = bt0; // max(bt[cell_i])
+      bestResult.bt = bt0; // max(bt[cell_i])
       bestResult.value = v;
       bestResult.cell0 = cell0;
       bestResult.cell1 = cell1;
     }
+  }
+
+  // This needs to match the fields populated by _scoreHouseCandidateValue.
+  _initCandidateSelectionStates(shape) {
+    const candidateSelectionStates = [];
+    for (let i = 0; i < shape.numCells; i++) {
+      candidateSelectionStates.push({
+        bt: 0,
+        value: 0,
+        cell0: 0,
+        cell1: 0
+      });
+    }
+    return candidateSelectionStates;
   }
 }
 
