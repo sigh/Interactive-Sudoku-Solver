@@ -53,7 +53,7 @@ class SudokuSolver {
       for (const result of this._getIter()) {
         // Only store a sample solution if we don't have one.
         if (sampleSolution == null) {
-          sampleSolution = this.constructor._gridToSolution(result.grid);
+          sampleSolution = SudokuSolver.Util.gridToSolution(result.grid);
         }
       }
     });
@@ -70,24 +70,32 @@ class SudokuSolver {
     let result = this._nthIteration(n, false);
     if (!result) return null;
 
-    return this.constructor._gridToSolution(result.grid);
+    return SudokuSolver.Util.gridToSolution(result.grid);
   }
 
   nthStep(n, stepGuides) {
-    let result = this._nthIteration(n, stepGuides);
+    const result = this._nthIteration(n, stepGuides);
     if (!result) return null;
 
-    let pencilmarks = this.constructor._makePencilmarks(result.grid);
+    const pencilmarks = SudokuSolver.Util.makePencilmarks(result.grid);
     for (const cell of result.cellOrder) {
       pencilmarks[cell] = LookupTables.toValue(result.grid[cell]);
     }
 
-    let latestCell = result.cellOrder.length ?
+    let diffPencilmarks = null;
+    if (result.oldGrid) {
+      const diff = SudokuSolver.Util.gridDifference(
+        result.oldGrid, result.grid);
+      diffPencilmarks = SudokuSolver.Util.makePencilmarks(result.oldGrid);
+    }
+
+    const latestCell = result.cellOrder.length ?
       this._shape.makeCellIdFromIndex(
         result.cellOrder[result.cellOrder.length - 1]) : null;
 
     return {
       pencilmarks: pencilmarks,
+      diffPencilmarks: diffPencilmarks,
       latestCell: latestCell,
       isSolution: result.isSolution,
       hasContradiction: result.hasContradiction,
@@ -146,7 +154,7 @@ class SudokuSolver {
       if (!solutions.length) return null;
       return {
         solutions: solutions.splice(0).map(
-          s => this.constructor._gridToSolution(s)),
+          s => SudokuSolver.Util.gridToSolution(s)),
       };
     };
 
@@ -158,7 +166,7 @@ class SudokuSolver {
     this._sendProgress();
     this._progressExtraStateFn = null;
 
-    return this.constructor._makePencilmarks(valuesInSolutions);
+    return SudokuSolver.Util.makePencilmarks(valuesInSolutions);
   }
 
   validateLayout() {
@@ -202,12 +210,14 @@ class SudokuSolver {
 
     return this._iter.iter;
   }
+}
 
-  static _gridToSolution(grid) {
+SudokuSolver.Util = class {
+  static gridToSolution(grid) {
     return grid.map(value => LookupTables.toValue(value));
   }
 
-  static _makePencilmarks(grid) {
+  static makePencilmarks(grid) {
     const pencilmarks = [];
     for (let i = 0; i < grid.length; i++) {
       pencilmarks.push(new Set(
@@ -215,7 +225,13 @@ class SudokuSolver {
     }
     return pencilmarks;
   }
-}
+
+  static gridDifference(gridA, gridB) {
+    for (let i = 0; i < gridA.length; i++) {
+      gridA[i] &= ~gridB[i];
+    }
+  }
+};
 
 SudokuSolver.Debugger = class {
   constructor(solver, debugOptions) {
@@ -605,15 +621,18 @@ SudokuSolver.InternalSolver = class {
     return true;
   }
 
-  setStepState(keys) {
+  setStepState(updates) {
     if (this._stepState == null) {
       this._stepState = {
         stepGuides: null,
         logSteps: false,
         step: 0,
+        oldGrid: new Uint16Array(this._numCells),
       };
     }
-    this._stepState = { ...this._stepState, ...keys };
+    for (const [key, value] of Object.entries(updates)) {
+      this._stepState[key] = value;
+    }
   }
 
   static YIELD_ON_SOLUTION = 0;
@@ -659,6 +678,7 @@ SudokuSolver.InternalSolver = class {
       this.setStepState({});
       yield {
         grid: this._grids[0],
+        oldGrid: null,
         isSolution: false,
         cellOrder: [],
         values: 0,
@@ -716,7 +736,9 @@ SudokuSolver.InternalSolver = class {
         cellDepth, grid, this._stepState, wasNewNode);
       if (count === 0) continue;
 
-      const originalValues = grid[cell];
+      if (yieldEveryStep) {
+        this._stepState.oldGrid.set(grid);
+      }
 
       {
         // Assume the remaining progress is evenly distributed among the value
@@ -800,9 +822,10 @@ SudokuSolver.InternalSolver = class {
         grid[cell] = value;
         yield {
           grid: grid,
+          oldGrid: this._stepState.oldGrid,
           isSolution: false,
           cellOrder: this._candidateSelector.getCellOrder(cellDepth + 1),
-          values: originalValues,
+          values: this._stepState.oldGrid[cell],
           hasContradiction: hasContradiction,
         };
         checkRunCounter();

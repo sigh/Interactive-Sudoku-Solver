@@ -15,52 +15,43 @@ body {
   left: 0;
 }
 
-.given-single-value {
+.cell-single-value {
   font-size: 30px;
-  font-family: sans-serif;
+  font-family: monospace;
+
   text-anchor: middle;
   dominant-baseline: middle;
 }
 
-.given-multi-value {
+.cell-multi-value {
   font-size: 15px;
   font-family: monospace;
 
+  text-anchor: middle;
+  dominant-baseline: hanging;
+  white-space: pre;
+}
+
+.size-16x16 .cell-multi-value {
+  font-size: 9px;
+}
+
+#solution-group {
+  fill: rgb(0, 128, 255);
+}
+
+#givens-group .cell-multi-value {
   fill: lightgrey;
   stroke: rgb(255, 255, 255);
-
-  text-anchor: middle;
-  dominant-baseline: hanging;
-  white-space: pre;
+  transform: translate(0px, -1.5px);
 }
 
-.size-16x16 .given-multi-value {
-  font-size: 9px;
+#givens-group .cell-single-value {
+  font-family: sans-serif;
 }
 
-.solution-value {
-  font-size: 30px;
-  font-family: monospace;
-
-  fill: rgb(0, 128, 255);
-
-  text-anchor: middle;
-  dominant-baseline: middle;
-}
-
-.solution-multi-value {
-  font-size: 15px;
-  font-family: monospace;
-
-  fill: rgb(0, 128, 255);
-
-  text-anchor: middle;
-  dominant-baseline: hanging;
-  white-space: pre;
-}
-
-.size-16x16 .solution-multi-value {
-  font-size: 9px;
+#diff-group {
+  fill: rgb(200, 120, 120);
 }
 
 .info-overlay-item {
@@ -82,10 +73,6 @@ body {
 
 .size-16x16 .quad-value {
   font-size: 7px;
-}
-
-.hidden-solution {
-  visibility: hidden;
 }
 
 body {
