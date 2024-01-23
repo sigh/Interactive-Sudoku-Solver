@@ -1,18 +1,24 @@
 class GridShape {
   static _registry = new Map();
   static _numCellsLookup = new Map();
+  static _numPencilmarksLookup = new Map();
   static _register(shape) {
     this._registry.set(shape.name, shape);
     this._numCellsLookup.set(shape.numCells, shape);
+    this._numPencilmarksLookup.set(shape.numPencilmarks, shape);
   }
   static get(name) { return this._registry.get(name); }
   static fromNumCells(numCells) { return this._numCellsLookup.get(numCells); }
+  static fromNumPencilmarks(numPencilmarks) {
+    return this._numPencilmarksLookup.get(numPencilmarks);
+  }
 
   constructor(gridSize, boxSize) {
     this.boxSize = boxSize;
     this.gridSize = gridSize;
     this.numValues = gridSize;
     this.numCells = gridSize * gridSize;
+    this.numPencilmarks = this.numCells * this.numValues;
 
     this.name = `${gridSize}x${gridSize}`;
 
@@ -278,10 +284,8 @@ class SudokuTextParser {
     const parts = [...rawText.matchAll(/[.]|\d+/g)];
     const numParts = parts.length;
 
-    let shape = null;
-    if (numParts == SHAPE_9x9.numCells) { shape = SHAPE_9x9; }
-    else if (numParts == SHAPE_16x16.numCells) { shape = SHAPE_16x16; }
-    else { return; }
+    const shape = GridShape.fromNumCells(numParts);
+    if (!shape) return null;
 
     let fixedValues = [];
     for (let i = 0; i < numParts; i++) {
@@ -293,6 +297,33 @@ class SudokuTextParser {
     return new SudokuConstraint.Set([
       new SudokuConstraint.Shape(shape.name),
       new SudokuConstraint.Givens(...fixedValues),
+    ]);
+  }
+
+  static parsePencilmarks(text) {
+    const shape = GridShape.fromNumPencilmarks(text.length);
+    if (!shape) return null;
+
+    // Only allow digits, and dots.
+    if (text.search(/[^\d.]/) != -1) return null;
+
+    const numValues = shape.numValues;
+
+    // Split into segments of 9 characters.
+    const pencilmarks = [];
+    for (let i = 0; i < shape.numCells; i++) {
+      const cellId = shape.makeCellIdFromIndex(i);
+      const values = (
+        text.substr(i * numValues, numValues)
+          .split('')
+          .filter(c => c != '.')
+          .join('_'));
+      pencilmarks.push(`${cellId}_${values}`);
+    }
+
+    return new SudokuConstraint.Set([
+      new SudokuConstraint.Shape(shape.name),
+      new SudokuConstraint.Givens(...pencilmarks),
     ]);
   }
 
@@ -318,6 +349,9 @@ class SudokuTextParser {
     if (constraint) return constraint;
 
     constraint = this.parseGridLayout(rawText);
+    if (constraint) return constraint;
+
+    constraint = this.parsePencilmarks(text);
     if (constraint) return constraint;
 
     return null;
