@@ -167,6 +167,7 @@ class ExampleHandler {
     'Global entropy',
     'Quadruple X',
     'Nabner thermo',
+    'Pencilmark sudoku',
     '16x16',
     '16x16: Sudoku X, hard',
     '16x16: Jigsaw',
