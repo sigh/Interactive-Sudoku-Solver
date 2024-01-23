@@ -297,8 +297,10 @@ class SolutionDisplay extends CellValueDisplay {
   }
 
   setNewConstraints(constraintManager) {
-    // Update fixed cell indexes, as we can cache them as long as the constraints
-    // remain the same.
+    // Update fixed cell indexes, as we can cache them as long as the
+    // constraints remain the same.
+    // We need to know them to avoid displaying a solution value over these
+    // cells.
     this._fixedCellIndexes = [];
     const fixedCells = constraintManager.getFixedCells();
     for (const cellId of fixedCells) {

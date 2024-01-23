@@ -1318,6 +1318,7 @@ class GivenCandidates {
     inputManager.onNewDigit(this._inputDigit.bind(this));
     inputManager.onSetValue(this._replaceValue.bind(this));
     inputManager.onSetValuesMultiCell(this._replaceValuesMultiCell.bind(this));
+    inputManager.setGivenLookup((cell) => this._givensMap.get(cell));
   }
 
   reshape(shape) { this._shape = shape; }
@@ -1440,6 +1441,8 @@ class GridInputManager {
   onSetValue(fn) { this._callbacks.onSetValue.push(fn); }
   onSetValuesMultiCell(fn) { this._callbacks.onSetValuesMultiCell.push(fn); }
   onSelection(fn) { this._callbacks.onSelection.push(fn); }
+
+  setGivenLookup(fn) { this._multiValueInputManager.setGivenLookup(fn); }
 
   addSelectionPreserver(obj) {
     this._selection.addSelectionPreserver(obj);
@@ -1688,13 +1691,18 @@ class MultiValueInputManager extends DropdownInputManager {
     super(inputManager, 'multi-value-cell-input');
     this._listElem = this._dropdownElem.getElementsByClassName('dropdown-body')[0];
     this._onChange = onChange;
+    this._givenLookup = (cell) => undefined;
 
     this._setUp();
   }
 
+  setGivenLookup(fn) { this._givenLookup = fn; }
+
   updateSelection(selection) {
     this._currentSelection = [];
-    this._clearForm();
+    if (selection.length) {
+      this._updateForm(this._givenLookup(selection[0]) || 0);
+    }
     super.updateSelection(selection);
   };
 
@@ -1737,10 +1745,14 @@ class MultiValueInputManager extends DropdownInputManager {
     return setValues;
   }
 
-  _clearForm() {
+  _updateForm(values) {
     const inputs = this._containerElem.elements;
     for (let i = 0; i < inputs.length; i++) {
       inputs[i].checked = false;
+    }
+    if (!values) return;
+    for (const value of values) {
+      inputs[value - 1].checked = true;
     }
   }
 }
