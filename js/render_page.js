@@ -1701,7 +1701,7 @@ class MultiValueInputManager extends DropdownInputManager {
   updateSelection(selection) {
     this._currentSelection = [];
     if (selection.length) {
-      this._updateForm(this._givenLookup(selection[0]) || 0);
+      this._updateForm(this._givenLookup(selection[0]) || []);
     }
     super.updateSelection(selection);
   };
@@ -1742,15 +1742,18 @@ class MultiValueInputManager extends DropdownInputManager {
         setValues.push(i + 1);
       }
     }
+    if (setValues.length == inputs.length) return [];
     return setValues;
   }
 
   _updateForm(values) {
     const inputs = this._containerElem.elements;
+    // When the list is empty, check all the boxes as that aligns with the
+    // default state.
+    const defaultChecked = values.length == 0;
     for (let i = 0; i < inputs.length; i++) {
-      inputs[i].checked = false;
+      inputs[i].checked = defaultChecked;
     }
-    if (!values) return;
     for (const value of values) {
       inputs[value - 1].checked = true;
     }
