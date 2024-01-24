@@ -151,7 +151,8 @@ body {
   margin: 5px 0;
 }
 
-button {
+button,
+.button {
   font-size: 16px;
   border-radius: 5px;
   color: #ffffff;
@@ -165,7 +166,8 @@ button {
   margin: 5px 0px;
 }
 
-button:hover:enabled {
+button:hover:enabled,
+.button:hover {
   background: linear-gradient(to bottom, #0688fa 5%, #2dabf9 100%);
   background-color: #0688fa;
 }
@@ -914,6 +916,28 @@ select {
 
 #multi-value-cell-input .dropdown-body {
   z-index: 3;
+  justify-items: center;
+  text-align: center;
+}
+
+.multi-value-input-option {
+  width: 100%;
+}
+
+.multi-value-input-option .button {
+  margin: 5px;
+  padding: 5px;
+  width: 100%;
+}
+
+.multi-value-input-option input:not(:checked)+.button {
+  /* Emulate opacity(0.5) without making it transparent. */
+  filter: contrast(0.333) brightness(1.5);
+}
+
+
+.multi-value-input-option input {
+  display: none;
 }
 
 .dropdown-container.disabled .dropdown-body {
