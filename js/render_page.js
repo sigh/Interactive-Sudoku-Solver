@@ -1689,7 +1689,7 @@ class CustomBinaryConstraintManager extends DropdownInputManager {
 class MultiValueInputManager extends DropdownInputManager {
   constructor(inputManager, onChange) {
     super(inputManager, 'multi-value-cell-input');
-    this._listElem = this._dropdownElem.getElementsByClassName('dropdown-body')[0];
+    this._dropdownBody = this._dropdownElem.getElementsByClassName('dropdown-body')[0];
     this._onChange = onChange;
     this._givenLookup = (cell) => undefined;
 
@@ -1707,19 +1707,21 @@ class MultiValueInputManager extends DropdownInputManager {
   };
 
   reshape(shape) {
-    clearDOMNode(this._listElem);
+    clearDOMNode(this._dropdownBody);
     for (let i = 0; i < shape.numValues; i++) {
-      const li = document.createElement('li');
       const label = document.createElement('label');
+      label.classList.add('multi-value-input-option');
       const input = document.createElement('input');
       input.setAttribute('type', 'checkbox');
       label.appendChild(input);
-      label.appendChild(document.createTextNode(i + 1));
-      li.appendChild(label);
-      this._listElem.appendChild(li);
+      const span = document.createElement('span');
+      span.classList.add('button');
+      span.appendChild(document.createTextNode(i + 1));
+      label.appendChild(span);
+      this._dropdownBody.appendChild(label);
     }
 
-    this._listElem.style.setProperty(
+    this._dropdownBody.style.setProperty(
       'grid-template-columns', `repeat(${shape.boxSize}, 1fr)`);
   }
 
