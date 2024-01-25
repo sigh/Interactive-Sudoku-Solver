@@ -451,6 +451,11 @@ button.icon-button {
   visibility: hidden;
 }
 
+#state-output span.number-gap {
+  display: inline-block;
+  width: 1px;
+}
+
 @media screen and (max-width: 600px) {
   #display-panel {
     width: unset;
