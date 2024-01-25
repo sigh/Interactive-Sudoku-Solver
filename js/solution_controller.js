@@ -694,22 +694,48 @@ class SolverStateDisplay {
       let text;
       switch (v) {
         case 'solutions':
-          text = counters.solutions + (searchComplete ? '' : '+');
+          this._renderNumberWithGaps(this._stateVars[v], counters[v]);
+          if (!searchComplete) {
+            this._stateVars[v].appendChild(document.createTextNode('+'));
+          }
           break;
         case 'puzzleSetupTime':
           text = state.puzzleSetupTime ? formatTimeMs(state.puzzleSetupTime) : '?';
+          this._stateVars[v].textContent = text;
           break;
         case 'runtime':
           text = formatTimeMs(state.timeMs);
+          this._stateVars[v].textContent = text;
           break;
         case 'searchSpaceExplored':
           text = (counters.progressRatio * 100).toPrecision(3) + '%';
           if (searchComplete) text = '100%';
+          this._stateVars[v].textContent = text;
           break;
         default:
-          text = counters[v];
+          this._renderNumberWithGaps(this._stateVars[v], counters[v]);
       }
-      this._stateVars[v].textContent = text;
+    }
+  }
+
+  _TEMPLATE_GAP_SPAN = (() => {
+    const span = document.createElement('span');
+    span.classList.add('number-gap');
+    return span;
+  })();
+
+  _renderNumberWithGaps(container, number) {
+    clearDOMNode(container);
+    const numberStr = number.toString();
+
+    let index = (numberStr.length % 3) || 3;
+    container.appendChild(document.createTextNode(
+      numberStr.substring(0, index)));
+    while (index < numberStr.length) {
+      container.appendChild(this._TEMPLATE_GAP_SPAN.cloneNode());
+      container.appendChild(document.createTextNode(
+        numberStr.substring(index, index + 3)));
+      index += 3;
     }
   }
 
