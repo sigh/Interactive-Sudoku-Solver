@@ -973,9 +973,9 @@ class SudokuBuilder {
       debugOptions);
   }
 
-  // Ask for a state update every 2**14 iterations.
+  // Ask for a state update every 2**13 iterations.
   // NOTE: Using a non-power of 10 makes the display look faster :)
-  static LOG_UPDATE_FREQUENCY = 14;
+  static LOG_UPDATE_FREQUENCY = 13;
 
   static _unusedWorkers = [];
 
