@@ -1189,6 +1189,7 @@ SudokuSolver.CandidateSelector = class CandidateSelector {
     // Add all handlers with cells which can potentially beat the current score.
     const backtrackTriggers = this._backtrackTriggers;
     const handlerAccumulator = this._houseHandlerAccumulator;
+    handlerAccumulator.resetActiveHandler();
     for (let i = 0; i < numCells; i++) {
       if (backtrackTriggers[i] >= minBt) {
         const v = grid[i];
@@ -1303,6 +1304,11 @@ SudokuSolver.HandlerAccumulator = class {
     this._head = -1;  // -1 = null pointer.
     this._tail = -1;  // If list is empty, tail can be any value.
 
+    // The index of the last handler returned by takeNext().
+    // This is stored so that we can avoid adding it back to the queue while
+    // it is being processed.
+    this._activeHandlerIndex = -1;
+
     this._setSkipNonEssentialFlag(false);
   }
 
@@ -1312,6 +1318,12 @@ SudokuSolver.HandlerAccumulator = class {
   reset(skipNonEssential) {
     this._setSkipNonEssentialFlag(skipNonEssential);
     this._clear();
+    this.resetActiveHandler();
+  }
+
+  // Use this when we know that the list is already empty.
+  resetActiveHandler() {
+    this._activeHandlerIndex = -1;
   }
 
   // Add handlers for a fixed cell (cell with a known/single value).
@@ -1321,15 +1333,17 @@ SudokuSolver.HandlerAccumulator = class {
     // Push aux handlers if we are not skipping non-essentials.
     // Aux handlers are only added when we are fixing a cell.
     if (!this._skipNonEssential) {
-      this._enqueueIndexes(this._auxHandlers[cell]);
+      this._enqueueIndexes(this._auxHandlers[cell], -1);
     }
     // Add the ordinary handlers.
-    this._enqueueIndexes(this._ordinaryHandlers[cell]);
+    this._enqueueIndexes(this._ordinaryHandlers[cell], -1);
   }
 
   // Add handlers for ordinary updates to a cell.
   addForCell(cell) {
-    this._enqueueIndexes(this._ordinaryHandlers[cell]);
+    this._enqueueIndexes(
+      this._ordinaryHandlers[cell],
+      this._activeHandlerIndex);
   }
 
   _setSkipNonEssentialFlag(skipNonEssential) {
@@ -1351,11 +1365,11 @@ SudokuSolver.HandlerAccumulator = class {
 
 
   // Enqueue indexes to the back of the queue.
-  _enqueueIndexes(indexes) {
+  _enqueueIndexes(indexes, ignore) {
     const numHandlers = indexes.length;
     for (let j = 0; j < numHandlers; j++) {
       const i = indexes[j];
-      if (this._linkedList[i] != -2) continue;
+      if (i === ignore || this._linkedList[i] !== -2) continue;
 
       if (this._head == -1) {
         this._head = i;
@@ -1386,6 +1400,7 @@ SudokuSolver.HandlerAccumulator = class {
     const oldHead = this._head;
     this._head = this._linkedList[oldHead];
     this._linkedList[oldHead] = -2;
+    this._activeHandlerIndex = oldHead;
 
     return this._allHandlers[oldHead];
   }
