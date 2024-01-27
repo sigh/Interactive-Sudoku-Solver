@@ -1313,7 +1313,7 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
         grid, this._sum, cells, this._cellExclusions)) return false;
     } else {
       if (!this._sumUtil.restrictCellsMultiExclusionGroups(
-        grid, sum, this._exclusionGroups, 0)) return false;
+        grid, sum, this._exclusionGroups)) return false;
     }
 
     return true;
