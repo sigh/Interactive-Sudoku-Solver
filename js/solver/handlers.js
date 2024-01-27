@@ -1185,7 +1185,7 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
     return true;
   }
 
-  _enforceCombinationsWithComplement(grid) {
+  _enforceCombinationsWithComplement(grid, handlerAccumulator) {
     const set0 = this.cells;
     const set1 = this._complementCells;
     const sum = this._sum;
@@ -1225,13 +1225,19 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
     const valuesToRemove0 = values0 & ~possibilities0;
     if (valuesToRemove0) {
       for (let i = 0; i < set0.length; i++) {
-        if (!(grid[set0[i]] &= ~valuesToRemove0)) return false;
+        if (grid[set0[i]] & valuesToRemove0) {
+          if (!(grid[set0[i]] &= ~valuesToRemove0)) return false;
+          handlerAccumulator.addForCell(set0[i]);
+        }
       }
     }
     const valuesToRemove1 = values1 & ~possibilities1;
     if (valuesToRemove1) {
       for (let i = 0; i < set1.length; i++) {
-        if (!(grid[set1[i]] &= ~valuesToRemove1)) return false;
+        if (grid[set1[i]] & valuesToRemove1) {
+          if (!(grid[set1[i]] &= ~valuesToRemove1)) return false;
+          handlerAccumulator.addForCell(set1[i]);
+        }
       }
     }
 
@@ -1302,7 +1308,7 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
     }
 
     if (this._complementCells !== null) {
-      return this._enforceCombinationsWithComplement(grid);
+      return this._enforceCombinationsWithComplement(grid, handlerAccumulator);
     }
 
     // If enforceFewRemainingCells has run, then we've already done all we can.
