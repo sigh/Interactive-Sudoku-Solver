@@ -80,6 +80,7 @@ const NABNER = [
 
 const ZERO_SOLUTION_PUZZLES = [
   '.Renban~R7C2~R8C1~R9C2~R8C3.Renban~R7C5~R8C6~R9C5~R8C4.Renban~R8C7~R9C8~R8C9~R7C8.Renban~R6C8~R5C9~R4C8~R5C7.Renban~R3C2~R2C1~R1C2~R2C3.Renban~R3C5~R2C4~R1C5~R2C6.Renban~R2C7~R1C8~R2C9~R3C8.Renban~R5C4~R4C5~R5C6~R6C5.Renban~R4C2~R5C1~R6C2~R5C3.',
+  '.LittleKiller~49~R1C9.LittleKiller~49~R1C8.LittleKiller~49~R9C2.LittleKiller~49~R9C3.LittleKiller~49~R7C9.LittleKiller~49~R1C1.LittleKiller~49~R2C1.LittleKiller~49~R3C1.',
 ];
 
 const PENCILMARKS = [
