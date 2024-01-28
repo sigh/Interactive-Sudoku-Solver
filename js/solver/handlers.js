@@ -611,7 +611,10 @@ SudokuConstraintHandler.BinaryPairwise = class BinaryPairwise extends SudokuCons
     if (!validValues) return false;
     if (validValues != allValues) {
       for (let i = 0; i < numCells; i++) {
-        if (!(grid[cells[i]] &= validValues)) return false;
+        if (grid[cells[i]] & ~validValues) {
+          if (!(grid[cells[i]] &= validValues)) return false;
+          handlerAccumulator.addForCell(cells[i]);
+        }
       }
     }
 
