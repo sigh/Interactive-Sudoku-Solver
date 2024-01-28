@@ -166,7 +166,7 @@ SudokuConstraintHandler._CommonHandlerUtil = class _CommonHandlerUtil {
     return true;
   }
 
-  static enforceRequiredValueExclusions(grid, cells, values, cellExclusions) {
+  static enforceRequiredValueExclusions(grid, cells, values, cellExclusions, handlerAccumulator) {
     while (values) {
       const value = values & -values;
       values ^= value;
@@ -195,7 +195,10 @@ SudokuConstraintHandler._CommonHandlerUtil = class _CommonHandlerUtil {
       if (exclusionCells && exclusionCells.length) {
         // Remove the value from the exclusion cells.
         for (let i = 0; i < exclusionCells.length; i++) {
-          if (!(grid[exclusionCells[i]] &= ~value)) return false;
+          if (grid[exclusionCells[i]] & value) {
+            if (!(grid[exclusionCells[i]] ^= value)) return false;
+            if (handlerAccumulator) handlerAccumulator.addForCell(exclusionCells[i]);
+          }
         }
       }
     }
@@ -480,7 +483,7 @@ SudokuConstraintHandler.BinaryPairwise = class BinaryPairwise extends SudokuCons
     return this._table[lookupTables.allValues] !== 0;
   }
 
-  _enforceRequiredValues(grid, cells, requiredValues) {
+  _enforceRequiredValues(grid, cells, requiredValues, handlerAccumulator) {
     const numCells = cells.length;
 
     // Calculate the information required to constraint requiredValues.
@@ -512,7 +515,7 @@ SudokuConstraintHandler.BinaryPairwise = class BinaryPairwise extends SudokuCons
     // which will also propagate the changes.
     const nonUniqueRequired = requiredValues & nonUniqueValues & ~fixedValues;
     if (!this._commonUtil.enforceRequiredValueExclusions(
-      grid, cells, nonUniqueRequired, this._cellExclusions)) return false;
+      grid, cells, nonUniqueRequired, this._cellExclusions, handlerAccumulator)) return false;
 
     return true;
   }
@@ -616,7 +619,7 @@ SudokuConstraintHandler.BinaryPairwise = class BinaryPairwise extends SudokuCons
     // combination).
     const requiredValues = (validCombinationInfo >> 16) & 0xffff;
     if (requiredValues) {
-      if (!this._enforceRequiredValues(grid, cells, requiredValues)) {
+      if (!this._enforceRequiredValues(grid, cells, requiredValues, handlerAccumulator)) {
         return false;
       }
     }
