@@ -2337,7 +2337,7 @@ SudokuConstraintHandler.LocalEntropy = class LocalEntropy extends SudokuConstrai
     return true;
   }
 
-  _enforceRequiredValues(grid) {
+  _enforceRequiredValues(grid, handlerAccumulator) {
     const cells = this.cells;
     const numCells = this.cells.length;
 
@@ -2361,7 +2361,7 @@ SudokuConstraintHandler.LocalEntropy = class LocalEntropy extends SudokuConstrai
       }
       // Now we know `triadValue` is a required value and is in multiple cells.
       if (!this._commonUtil.enforceRequiredValueExclusions(
-        grid, cells, triadValue, this._cellExclusions)) return false;
+        grid, cells, triadValue, this._cellExclusions, handlerAccumulator)) return false;
     }
 
     return true;
@@ -2434,7 +2434,7 @@ SudokuConstraintHandler.LocalEntropy = class LocalEntropy extends SudokuConstrai
       }
     }
 
-    return this._enforceRequiredValues(grid);
+    return this._enforceRequiredValues(grid, handlerAccumulator);
   }
 }
 
