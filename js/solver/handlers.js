@@ -824,7 +824,7 @@ SudokuConstraintHandler._SumHandlerUtil = class _SumHandlerUtil {
     return true;
   }
 
-  restrictCellsSingleExclusionGroup(grid, sum, cells, cellExclusions) {
+  restrictCellsSingleExclusionGroup(grid, sum, cells, cellExclusions, handlerAccumulator) {
     const numCells = cells.length;
 
     // Check that we can make the current sum with the unfixed values remaining.
@@ -889,7 +889,7 @@ SudokuConstraintHandler._SumHandlerUtil = class _SumHandlerUtil {
 
     const nonUniqueRequired = requiredValues & nonUniqueValues & ~fixedValues;
     if (!this._commonUtil.enforceRequiredValueExclusions(
-      grid, cells, nonUniqueRequired, cellExclusions)) {
+      grid, cells, nonUniqueRequired, cellExclusions, handlerAccumulator)) {
       return false;
     }
 
@@ -1362,7 +1362,7 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
 
     if (this._exclusionGroups.length == 1) {
       if (!this._sumUtil.restrictCellsSingleExclusionGroup(
-        grid, this._sum, cells, this._cellExclusions)) return false;
+        grid, this._sum, cells, this._cellExclusions, handlerAccumulator)) return false;
     } else {
       if (!this._sumUtil.restrictCellsMultiExclusionGroups(
         grid, sum, this._exclusionGroups)) return false;
@@ -2107,7 +2107,7 @@ SudokuConstraintHandler.RegionSumLine = class RegionSumLine extends SudokuConstr
         // We know the sum, and cells should always be in a single box
         // (by definition).
         if (!this._sumUtil.restrictCellsSingleExclusionGroup(
-          grid, globalMin, cells, null)) return false;
+          grid, globalMin, cells, null, handlerAccumulator)) return false;
       }
     }
 
@@ -2292,7 +2292,9 @@ SudokuConstraintHandler.XSum = class XSum extends SudokuConstraintHandler {
       // NOTE: This can be optimized to use a smaller (cell.length size) grid.
       scratchGrid.set(grid);
       scratchGrid[controlCell] = value;
-      if (sumHandler.enforceConsistency(scratchGrid, handlerAccumulator)) {
+      // NOTE: We shouldn't pass in handlerAccumulator as it will add cells
+      // which haven't necessarily been constrained.
+      if (sumHandler.enforceConsistency(scratchGrid, null)) {
         // This is a valid setting so add it to the possible candidates.
         for (let j = 0; j < minControl; j++) {
           resultGrid[cells[j]] |= scratchGrid[cells[j]];
