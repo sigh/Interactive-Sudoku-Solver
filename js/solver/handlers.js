@@ -517,6 +517,37 @@ SudokuConstraintHandler.BinaryPairwise = class BinaryPairwise extends SudokuCons
     return true;
   }
 
+  // Check if unique values in a cell depend on unique values in the same
+  // cell for support.
+  _enforceCellUniqueValues(grid, cells, uniqueValues, allValues) {
+    const numCells = cells.length;
+    const validCombinationInfo = this._validCombinationInfo;
+
+    for (let i = 0; i < numCells; i++) {
+      const v = grid[cells[i]];
+      // Find the unique values in this cell.
+      const cellUniqueValues = v & uniqueValues;
+      if (!(cellUniqueValues & (cellUniqueValues - 1))) continue;
+      // We have multiple unique values, so we can check if each is valid.
+      let values = cellUniqueValues;
+      while (values) {
+        const value = values & -values;
+        values ^= value;
+        // Since the unique values are mutually exclusive we can check the valid
+        // combinations without the other cellUniqueValues.
+        const info = validCombinationInfo[allValues ^ (cellUniqueValues ^ value)];
+        // Check if the value is still part of a valid combination.
+        if (!(info & value)) {
+          if (!(grid[cells[i]] &= ~value)) {
+            return false;
+          }
+        }
+      }
+    }
+
+    return true;
+  }
+
   enforceConsistency(grid, handlerAccumulator) {
     const cells = this.cells;
     const numCells = cells.length;
@@ -564,8 +595,11 @@ SudokuConstraintHandler.BinaryPairwise = class BinaryPairwise extends SudokuCons
     if (!this._isAllDifferent) return true;
 
     let allValues = 0;
+    let nonUniqueValues = 0;
     for (let i = 0; i < numCells; i++) {
-      allValues |= grid[cells[i]];
+      const v = grid[cells[i]];
+      nonUniqueValues |= allValues & v;
+      allValues |= v;
     }
 
     // Filter out values which aren't in any valid combination.
@@ -583,6 +617,15 @@ SudokuConstraintHandler.BinaryPairwise = class BinaryPairwise extends SudokuCons
     const requiredValues = (validCombinationInfo >> 16) & 0xffff;
     if (requiredValues) {
       if (!this._enforceRequiredValues(grid, cells, requiredValues)) {
+        return false;
+      }
+    }
+
+    // Check if unique values in a cell depend on unique values in the same
+    // cell for support.
+    const uniqueValues = validValues & ~nonUniqueValues;
+    if (uniqueValues & (uniqueValues - 1)) {
+      if (!this._enforceCellUniqueValues(grid, cells, uniqueValues, validValues)) {
         return false;
       }
     }
