@@ -574,6 +574,7 @@ class StateHistoryDisplay {
 
   _makeChart(ctx, ...yAxis) {
     const options = {
+      normalized: true,
       responsive: true,
       maintainAspectRatio: false,
       pointRadius: 0,
