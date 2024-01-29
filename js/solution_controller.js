@@ -488,10 +488,11 @@ class StateHistoryDisplay {
   }
 
   _updateCharts() {
-    if (!this._visible) {
+    if (!this._visible || !this._charts.length) {
       return;
     }
 
+    this._eventReplayFn();
     for (const chart of this._charts) {
       chart.update('none');
     }
@@ -545,6 +546,8 @@ class StateHistoryDisplay {
       'searchedPercentage', 'skippedPercentage');
     this._addChartDisplay(this._statsContainer,
       'Guesses', 'guesses');
+
+    this._eventReplayFn = this._syncToolTips(this._charts);
   }
 
   _setUpStatsWindow(container) {
@@ -574,6 +577,7 @@ class StateHistoryDisplay {
 
   _makeChart(ctx, ...yAxis) {
     const options = {
+      events: [], // We will manually implement hover.
       normalized: true,
       responsive: true,
       maintainAspectRatio: false,
@@ -581,10 +585,6 @@ class StateHistoryDisplay {
       animation: false,
       parsing: {
         xAxisKey: 'timeMs',
-      },
-      interaction: {
-        mode: 'index',
-        intersect: false,
       },
       elements: {
         line: { borderWidth: 1 },
@@ -616,9 +616,6 @@ class StateHistoryDisplay {
         legend: {
           display: false,
         },
-        tooltip: {
-          mode: 'index',
-        },
       }
     };
     const data = {
@@ -640,6 +637,51 @@ class StateHistoryDisplay {
     const chart = new Chart(ctx, config);
     this._charts.push(chart);
     return chart;
+  }
+
+  _syncToolTips(charts) {
+    let currentIndex = -1;
+    let lastCall = null;
+
+    const onMouseMouse = (e, currentChart) => {
+      lastCall = [e, currentChart];
+
+      // Find the nearest points.
+      const points = currentChart.getElementsAtEventForMode(
+        e, 'index', { intersect: false }, true);
+
+      // If it is the currently active index, then nothing needs to change.
+      const index = points.length ? points[0].index : -1;
+      if (index == currentIndex) return;
+
+      // Update the active elements for all the charts.
+      currentIndex = index;
+      for (const chart of charts) {
+        const activeElements = [];
+        if (points.length) {
+          const numDatasets = chart.data.datasets.length;
+          for (let i = 0; i < numDatasets; i++) {
+            activeElements.push({
+              index: index,
+              datasetIndex: i,
+            });
+          }
+        }
+        chart.tooltip.setActiveElements(activeElements);
+        chart.setActiveElements(activeElements);
+        chart.render();
+      }
+    };
+
+    // Setup all charts.
+    for (const chart of charts) {
+      chart.canvas.onmousemove = e => onMouseMouse(e, chart);
+    }
+
+    // Pass back a function that will allow us to replay the last call.
+    // This is used when the chart is updated to ensure the tooltip is updated
+    // if the point under the mouse changes.
+    return () => { lastCall && onMouseMouse(...lastCall); };
   }
 }
 
