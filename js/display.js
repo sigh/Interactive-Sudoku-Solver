@@ -1404,16 +1404,16 @@ class KillerCageDisplay extends DisplayItem {
   _chooseKillerCageColor(cellIds) {
     const shape = this._shape;
     // Use a greedy algorithm to choose the graph color.
-    const conflictingCells = [];
+    const adjacentCells = [];
     for (const cellId of cellIds) {
       let { row, col } = shape.parseCellId(cellId);
       // Lookup all adjacent cells, it doesn't matter if they valid or not.
-      conflictingCells.push(shape.makeCellId(row, col + 1));
-      conflictingCells.push(shape.makeCellId(row, col - 1));
-      conflictingCells.push(shape.makeCellId(row + 1, col));
-      conflictingCells.push(shape.makeCellId(row - 1, col));
+      adjacentCells.push(shape.makeCellId(row, col + 1));
+      adjacentCells.push(shape.makeCellId(row, col - 1));
+      adjacentCells.push(shape.makeCellId(row + 1, col));
+      adjacentCells.push(shape.makeCellId(row - 1, col));
     }
-    return this._killerCellColors.pickColor(null, conflictingCells);
+    return this._killerCellColors.pickColor(null, adjacentCells);
   }
 }
 
@@ -1439,23 +1439,23 @@ class ColorPicker {
 
   // Pick a color:
   // - If there is already a color for the given key then use that.
-  // - Otherwise pick a color that is not used by any of the conflicting keys.
-  // - If conflicting keys is not set then avoid all used keys.
-  pickColor(key, conflictingKeys) {
+  // - Otherwise pick a color that is not used by any of the avoidKeys.
+  // - If avoidKeys is not set then avoid all used keys.
+  pickColor(key, avoidKeys) {
     if (key != null && this._keyToColors.has(key)) {
       return this._keyToColors.get(key);
     }
 
-    let conflictingColors = null;
-    if (!conflictingKeys) {
-      conflictingColors = new Set(this._keyToColors.values());
+    let avoidColors = null;
+    if (!avoidKeys) {
+      avoidColors = new Set(this._keyToColors.values());
     } else {
-      conflictingColors = new Set(
-        conflictingKeys.map(k => this._keyToColors.get(k)));
+      avoidColors = new Set(
+        avoidKeys.map(k => this._keyToColors.get(k)));
     }
 
     for (const color of this.COLOR_LIST) {
-      if (!conflictingColors.has(color)) return color;
+      if (!avoidColors.has(color)) return color;
     }
 
     return this.constructor._randomColor();
