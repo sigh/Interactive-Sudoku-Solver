@@ -215,7 +215,7 @@ class CellValueDisplay extends DisplayItem {
     this._applyGridOffset(svg);
   }
 
-  _renderGridValues(grid) {
+  renderGridValues(grid) {
     this.clear();
     const svg = this.getSvg();
 
@@ -339,7 +339,7 @@ class SolutionDisplay extends CellValueDisplay {
       }
     }
 
-    this._renderGridValues(solution);
+    this.renderGridValues(solution);
 
     this._copyElem.disabled = (
       !this._currentSolution.every(v => v && isFinite(v)));
@@ -363,7 +363,7 @@ class GivensDisplay extends CellValueDisplay {
     // NOTE: We re-render the entire grid each time, but we already do this for
     // solutions which is much more common.
     // This allows us to share code with the solution display.
-    this._renderGridValues(grid);
+    this.renderGridValues(grid);
   }
 
   _multiSolutionToLines(slots) {

@@ -91,13 +91,15 @@ class DebugManager {
     this._logOutput = document.getElementById('debug-logs');
     this._enabled = false;
     this._shape = null;
-    this._infoOverlay = new InfoOverlay(displayContainer);;
+    this._infoOverlay = null;
+    this._candidateDisplay = null;
     this._checkboxes = [
       ['exportBacktrackCounts', document.getElementById('backtrack-heatmap-checkbox')]
     ];
     this._logLevelElem = document.getElementById('debug-log-level');
 
-    this._debugCellHighlighter = displayContainer.createHighlighter('highlighted-cell');
+    this._debugCellHighlighter = null;
+    this._displayContainer = displayContainer;
 
     this._initializeState();
   }
@@ -154,6 +156,12 @@ class DebugManager {
   _deferredSetup(loaderPromise) {
     // Things setup only when the debugger is actually loaded.
 
+    // Setup elements.
+    this._debugCellHighlighter = this._displayContainer.createHighlighter('highlighted-cell');
+    this._infoOverlay = new InfoOverlay(this._displayContainer);
+    this._candidateDisplay = new CellValueDisplay(
+      this._displayContainer.getNewGroup('debug-candidate-group'));
+
     // Initialize options checkboxes.
     for (const [key, element] of this._checkboxes) {
       const value = localStorage.getItem(key);
@@ -196,6 +204,11 @@ class DebugManager {
         this._loadDebugPuzzleInput();
       });
     });
+
+    // Call reshape so that all dependencies are initialized with the shape.
+    if (this._shape) {
+      this.reshape(this._shape);
+    }
   }
 
   _loadDebugPuzzleInput() {
@@ -262,12 +275,13 @@ class DebugManager {
   reshape(shape) {
     this.clear();
     this._shape = shape;
-    this._infoOverlay.reshape(shape);
+    this._infoOverlay?.reshape(shape);
+    this._candidateDisplay?.reshape(shape);
   }
 
   clear() {
     this._logOutput.textContent = '';
-    this._infoOverlay.clear();
+    this._infoOverlay?.clear();
 
     this._logDedupe = {
       lastKey: '',
@@ -355,13 +369,22 @@ class DebugManager {
   _addLogMouseOver(elem, data) {
     const shape = this._shape;
 
-    if (data.cells && data.cells.length) {
+    if (data.cells?.length) {
       const cellIds = [...data.cells].map(c => shape.makeCellIdFromIndex(c));
       elem.addEventListener('mouseover', () => {
         this._debugCellHighlighter.setCells(cellIds);
       });
       elem.addEventListener('mouseout', () => {
         this._debugCellHighlighter.clear();
+      });
+    }
+
+    if (data.candidates) {
+      elem.addEventListener('mouseover', () => {
+        this._candidateDisplay.renderGridValues(data.candidates);
+      });
+      elem.addEventListener('mouseout', () => {
+        this._candidateDisplay.clear();
       });
     }
 
@@ -1402,7 +1425,7 @@ class SolutionController {
       this._solutionDisplay.setSolution(currentSolution);
 
       if (result.diff) {
-        this._diffDisplay._renderGridValues(result.diff);
+        this._diffDisplay.renderGridValues(result.diff);
       }
 
       if (handler.ITERATION_CONTROLS) {

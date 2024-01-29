@@ -54,6 +54,11 @@ body {
   fill: rgb(200, 120, 120);
 }
 
+#debug-candidate-group {
+  fill: rgb(230, 50, 50);
+  font-weight: bold;
+}
+
 .info-overlay-item {
   font-size: 12;
 }

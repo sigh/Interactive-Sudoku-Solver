@@ -501,26 +501,28 @@ SudokuSolver.InternalSolver = class {
   static _debugGridBuffer = new Uint16Array(SHAPE_MAX.numCells);
 
   _debugEnforceConsistency(loc, grid, handler, handlerAccumulator) {
-    const oldGrid = this.constructor._debugGridBuffer;
+    const oldGrid = this.constructor._debugGridBuffer.subarray(0, grid.length);
     oldGrid.set(grid);
 
     const result = handler.enforceConsistency(grid, handlerAccumulator);
-    const diff = {};
-    let hasDiff = false;
-    for (let i = 0; i < grid.length; i++) {
-      if (oldGrid[i] != grid[i]) {
-        diff[this._shape.makeCellIdFromIndex(i)] = (
-          LookupTables.toValuesArray(oldGrid[i] & ~grid[i]));
-        hasDiff = true;
-      }
-    }
 
-    if (hasDiff) {
+    if (!arraysAreEqual(oldGrid, grid)) {
+      const diff = {};
+      const candidates = new Array(grid.length);
+      candidates.fill(null);
+      for (let i = 0; i < grid.length; i++) {
+        if (oldGrid[i] != grid[i]) {
+          candidates[i] = LookupTables.toValuesArray(oldGrid[i] & ~grid[i]);
+          diff[this._shape.makeCellIdFromIndex(i)] = candidates[i];
+        }
+      }
+
       this._debugLogger.log({
         loc: loc,
         msg: `${handler.constructor.name} removed: `,
         args: diff,
         cells: handler.cells,
+        candidates: candidates,
       });
     } else if (this._debugLogger.logLevel >= 2) {
       this._debugLogger.log({
