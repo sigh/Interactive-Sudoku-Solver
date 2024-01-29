@@ -604,6 +604,7 @@ class StateHistoryDisplay {
         y: {
           stacked: true,
           afterFit: (axis) => { axis.width = this.AXIS_WIDTH; },
+          beginAtZero: true,
           ticks: {
             font: { size: 10 },
             callback: formatNumberMetric,
