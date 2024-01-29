@@ -991,10 +991,10 @@ class SudokuBuilder {
 
     const solverProxy = new SolverProxy(
       worker, stateHandler, statusHandler,
-      debugHandler && debugHandler.getCallback());
+      debugHandler?.getCallback());
     await solverProxy.init(
       constraints, this.LOG_UPDATE_FREQUENCY,
-      debugHandler && debugHandler.getOptions());
+      debugHandler?.getOptions());
     return solverProxy;
   }
 
