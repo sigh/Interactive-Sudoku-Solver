@@ -1432,8 +1432,7 @@ SudokuConstraintHandler.Skyscraper = class Skyscraper extends SudokuConstraintHa
   constructor(cells, numVisible) {
     super(cells);
     this._numVisible = +numVisible;
-    this._lookupTables = null;
-    this._maxHeight = null;
+    this._stateMatrix = null;
 
     if (0 >= this._numVisible) {
       throw ('Skyscraper visibility target must be > 0');
@@ -1441,276 +1440,107 @@ SudokuConstraintHandler.Skyscraper = class Skyscraper extends SudokuConstraintHa
   }
 
   initialize(initialGrid, cellExclusions, shape) {
-    const cells = this.cells;
-    const lookupTables = LookupTables.get(shape.numValues);
-    this._lookupTables = lookupTables;
-    this._maxHeight = shape.numValues;
-
-    // Check that all cells are unique.
-    for (let i = 0; i < cells.length; i++) {
-      for (let j = 0; j < i; j++) {
-        if (!cellExclusions.isMutuallyExclusive(cells[i], cells[j])) {
-          throw ('Skyscraper handler requires all cells to be distinct.');
-        }
-      }
-    }
-
+    this._stateMatrix = this.constructor._makeStateMatrix(shape.numValues);
     return true;
   }
 
-  // Set up temporary storage for states.
-  static _statesBuffer = (() => {
-    let states = [];
-    for (let i = 0; i < SHAPE_MAX.numValues; i++) {
-      states.push({
-        minVisible: 0,
-        maxVisible: 0,
-        currentHeightForMin: 0,
-        currentHeightForMax: 0,
-      });
+  static _baseBuffer = new Uint16Array(
+    (SHAPE_MAX.numValues + 1) * SHAPE_MAX.numValues);
+
+  static _makeStateMatrix(numValues) {
+    const buffer = this._baseBuffer;
+    const matrix = [];
+    for (let i = 0; i < numValues + 1; i++) {
+      matrix.push(buffer.subarray(i * numValues, (i + 1) * numValues));
     }
-    return states;
-  })();
+    return matrix;
+  }
 
   enforceConsistency(grid, handlerAccumulator) {
     const cells = this.cells;
-    const maxHeight = this._maxHeight;
-    const maxHeightValue = LookupTables.fromValue(maxHeight);
     const target = this._numVisible;
-    const states = this.constructor._statesBuffer;
+    const stateMatrix = this._stateMatrix;
+    const numCells = cells.length;
+    const maxValue = LookupTables.fromValue(numCells);
 
-    // Pass 1a (forward pass - part a)
-    //  - Calculate min/max visibility state at each index.
-    //  - Constraint values which would cause minVisibility to be too high.
-    // It continues until we reach the first viable max-height cell.
-    let currentHeightForMax = 0;
-    let currentHeightForMin = 0;
-    // Track whether there are cells with small values which might be pruned.
-    // This is used to determine if we should run the backward pass.
-    let hasSmallerValues = 0;
-    // Start minVisible and maxVisible at 1, to avoid explicitly counting
-    // the max-height cell.
-    let maxVisible = 1;
-    let minVisible = 1;
-    let index = 0;
-    let startAllFixed = true;
-    for (; index < cells.length; index++) {
-      let v = grid[cells[index]];
+    // All the values in the first cell are valid for visibility == 1.
+    stateMatrix[0][0] = grid[cells[0]];
 
-      if (v & maxHeightValue) {
-        v ^= maxHeightValue;
-        // We found our first max-height cell.
-        if (maxVisible >= target) {
-          if (v) hasSmallerValues = true;
-          break;
-        }
-
-        // Otherwise max-height is not a valid value.
-        if (!(grid[cells[index]] = v)) {
-          return false;
-        }
-      }
-
-      // If we are already at the target for minVisible then we can't increase
-      // it anymore.
-      if (minVisible === target) {
-        const mask = LookupTables.fromValue(currentHeightForMin) - 1;
-        if (!(grid[cells[index]] &= mask)) {
-          return false;
-        }
-      }
-
-      const minMax = this._lookupTables.minMax8Bit[grid[cells[index]]];
-      const min = minMax >> 8;
-      const max = minMax & 0xff;
-      if (min != max) startAllFixed = false;
-
-      // If there are any values larger than currentHeightForMax then we can use
-      // this cell to increase visibility.
-      if (max > currentHeightForMax) {
-        maxVisible++;
-        if (min > currentHeightForMax) {
-          // If the min is larger, then visibility forced anyway, and the min
-          // leaves us with the most leeway.
-          currentHeightForMax = min;
-        } else {
-          // If min is not larger, then we can only increment
-          // currentHeightForMax.
-          // A previous or future cell to be used to get a lower height than
-          // the values just in this cell.
-          currentHeightForMax++;
-          hasSmallerValues = true;
-        }
-      }
-
-      // currentHeightForMin is the max of all values that we've seen.
-      // If the min is greater than currentHeightForMin then this cell must be
-      // visible. Even if min is equal, then we must still use this cell
-      // as it must be distinct from the previous currentHeightForMin.
-      if (min >= currentHeightForMin) minVisible++;
-      // Even if we don't use this cell, we must update the currentHeightForMin
-      // because it may be the case that we could have used this cell rather
-      // than the previous max.
-      if (max > currentHeightForMin) currentHeightForMin = max;
-
-      {
-        // Save the states for the backward pass.
-        const state = states[index];
-        state.minVisible = minVisible;
-        state.maxVisible = maxVisible;
-        state.currentHeightForMin = currentHeightForMin;
-        state.currentHeightForMax = currentHeightForMax;
-      }
-    }
-
-    // If we didn't find any max-height cells, then the constraint is not valid.
-    // Similarly if minVisible was already too high when we reached the target.
-    if (index == cells.length || minVisible > target) return false;
-
-    // Pass 1b (forward pass - part b)
-    //  - Find all valid max-height cells and remove the max-height value from
-    //    the rest.
-    const firstMaxHeightIndex = index;
-    let lastMaxHeightIndex = index;
-    for (; index < cells.length; index++) {
-      // If minVisible is already too high, then just keep clearing the
-      // max-height value without any other processing.
-      if (minVisible > target) {
-        if (!(grid[cells[index]] &= ~maxHeightValue)) return false;
-        continue;
-      }
-
-      const v = grid[cells[index]];
-      const minMax = this._lookupTables.minMax8Bit[v];
-      const min = minMax >> 8;
-      let max = minMax & 0xff;
-
-      if (max == maxHeight) {
-        lastMaxHeightIndex = index;
-        // If this max-height is the only valid value then the rest of the cells
-        // can't be max-height.
-        if (min == maxHeight) break;
-        // Exclude the max-height from the minVisible calculation.
-        max = LookupTables.maxValue(v ^ maxHeightValue);
-      }
-
-      // Update minVisible as in the first part of the forward pass.
-      if (min >= currentHeightForMin) minVisible++;
-      if (max > currentHeightForMin) currentHeightForMin = max;
-    }
-
-    // If all the initial values are fixed don't both running anymore passes.
-    if (startAllFixed) return true;
-
-    // Pass 2 (backward pass)
-    // Given knowledge of the last max-height cell, restrict the maximum values
-    // of cells if they don't leave enough space to reach the target.
-    // NOTE: This covers the naive initialization of the constraint where
-    // high values are removed from the first cells.
-    {
-      // `valuesUntilLastMaxHeight` tells us which values are available to help
-      // increase the visibility.
-      let valuesUntilLastMaxHeight = 0;
-      for (index = lastMaxHeightIndex - 1; index >= firstMaxHeightIndex; index--) {
-        valuesUntilLastMaxHeight |= grid[cells[index]];
-      }
-      valuesUntilLastMaxHeight &= ~maxHeightValue;
-
-      // These variables are incrementally updated to ensure the
-      // calculation is linear-time.
-      // - `minForbiddenValue` is the smallest value which is forbidden as it
-      // prevent us reaching the target visibility.
-      // - `forbiddenCount` is the number of values which are forbidden.
-      let minForbiddenValue = maxHeightValue;
-      let forbiddenCount = 0;
-
-      for (; index >= 0; index--) {
-        const state = states[index];
-
-        let shortfall = target - state.maxVisible;
-        if (shortfall > 0) {
-          // Accumulate forbidden values until we have enough to cover the
-          // shortfall.
-          while (forbiddenCount < shortfall && minForbiddenValue > 1) {
-            minForbiddenValue >>= 1;
-            if (valuesUntilLastMaxHeight & minForbiddenValue) {
-              forbiddenCount++;
-            }
-          }
-
-          // `minForbiddenValue - 1` creates a mask of all values below
-          // the forbidden value.
-          if (!(grid[cells[index]] &= minForbiddenValue - 1)) {
-            return false;
-          }
-        }
-        valuesUntilLastMaxHeight |= grid[cells[index]];
-      }
-    }
-
-    // We only need to do the backward pass if the cells which must be visible
-    // had smaller values which might be constrained.
-    if (!hasSmallerValues) return true;
-
-    // Pass 3 (backward pass)
-    // Determines which cells *must* be visible, and we can remove values
-    // which would prevent that.
-    //  - Attempts to reduce the checks to sub-problems when we know
-    //    a cell is forced to be visible.
-    //  - Constrains the minimum values of cells, unlike the forward pass
-    //    which constrained the maximum values.
-    //  - Only constrains up to the first max-height cell because after
-    //    that the cells could potentially take any value.
-    //  - Still constrains the first max-height cell, because it is either
-    //    max-height or it must be valid for a later max-height.
-    //  - Doesn't constrain the first cell because its minimum is never
-    //    restricted.
-    let subMaxHeight = maxHeight;
-    let lastSubMaxHeightIndex = lastMaxHeightIndex;
-    let subTarget = target;
-    for (let i = firstMaxHeightIndex; i > 0; i--) {
-      const state = states[i - 1];
-
-      // Check if we any leeway to reach the current subTarget before we
-      // reach the sub-max-height cell.
-      // If not then we must force this cell to be visible.
-      const cellsRemaining = lastSubMaxHeightIndex - i;
-      const visRemaining = subTarget - state.maxVisible;
-      if (visRemaining == cellsRemaining) {
-        // Constrain this cell to be above the current minimum height for
-        // maximum visibility.
-        const minHeight = state.currentHeightForMax;
-        const mask = ~(LookupTables.fromValue(minHeight + 1) - 1);
-        if (!(grid[cells[i]] &= mask)) {
-          return false;
-        }
-      }
-
-      // Check if this cell is always visible.
-      // If so then we can make this the new subTarget.
+    for (let i = 1; i < numCells; i++) {
       const v = grid[cells[i]];
-      const cellMin = LookupTables.minValue(v);
-      if (cellMin > state.currentHeightForMin) {
-        // We need to err on the side of reducing subTarget by at least as much
-        // as required (err on the side of smaller subTarget).
-        // However, we can take the minimum of two conservative estimates:
-        //  - The number of cells since the last subTarget
-        //    (assuming all of them would be visible).
-        //  - The number of heights to to the last subTarget
-        //    (assuming all of them are used). We must use cellMin, since this
-        //    is the worst case.
-        const heightDelta = subMaxHeight - cellMin;
-        const indexDelta = lastSubMaxHeightIndex - i;
-        const targetReduction = (
-          heightDelta < indexDelta ? heightDelta : indexDelta);
-        subTarget -= targetReduction;
-        if (subTarget < 0) break;
+      const minV = LookupTables.minValue(v);
 
-        const cellMax = LookupTables.maxValue(v);
-        subMaxHeight = cellMax;
-        lastSubMaxHeightIndex = i;
+      stateMatrix[i].fill(0);
+      for (let j = 0; j <= i && j < target; j++) {
+        // Case 1: cells[i] is visible.
+        //  - Visibility increments.
+        //  - The only valid values are those that are higher than the previous
+        //    state.
+        if (j > 0 && stateMatrix[i - 1][j - 1]) {
+          const minS = LookupTables.minValue(stateMatrix[i - 1][j - 1]);
+          stateMatrix[i][j] |= v & ~((1 << minS) - 1);
+        }
+        // Case 2: cells[i] is not visible.
+        //  - Visibility stays the same.
+        //  - Only keep those states which are higher than our minimum value.
+        stateMatrix[i][j] |= stateMatrix[i - 1][j] & ~((1 << minV) - 1);
       }
     }
+
+    // Filter down the final states to just the target visibility.
+    // Final state must be our maximum height (e.g. 9 for a 9x9).
+    {
+      const finalStates = stateMatrix[numCells - 1];
+      if (!(finalStates[target - 1] & maxValue)) return false;
+      finalStates.fill(0);
+      finalStates[target - 1] = maxValue;
+    }
+
+    const newStates = stateMatrix[numCells];  // Intentional extra space.
+    for (let i = numCells - 1; i > 0; i--) {
+      newStates.fill(0);
+      let valueMask = 0;
+      for (let j = 0; j < target; j++) {
+        // Skip this state if it is not possible.
+        if (!stateMatrix[i][j]) continue;
+
+        // Case 1: cells[i] is visible.
+        //  - Visibility has incremented.
+        //  - Previous states are only valid if they are lower than our maximum
+        //    value.
+        if (j > 0) {
+          const maxS = LookupTables.maxValue(stateMatrix[i][j]);
+          const validStates = stateMatrix[i - 1][j - 1] & ((1 << (maxS - 1)) - 1);
+          if (validStates) {
+            newStates[j - 1] |= validStates;
+            // This grid value must be visible.
+            // The valid values are the current state.
+            valueMask |= stateMatrix[i][j];
+          }
+        }
+
+        // Case 2: cells[i] is not visible.
+        //  - Visibility stays the same.
+        //  - Keep those states which are the same as the current cell.
+        //  - Must be above the minimum value for this cell.
+        {
+          const validStates = stateMatrix[i - 1][j] & stateMatrix[i][j];
+          if (validStates) {
+            newStates[j] |= validStates;
+            // The grid value must be hidden.
+            // We can only have grid values lower than the maximum state.
+            const maxS = LookupTables.maxValue(validStates);
+            valueMask |= (1 << (maxS - 1)) - 1;
+          }
+        }
+      }
+
+      stateMatrix[i - 1].set(newStates);
+      if (!(grid[cells[i]] &= valueMask)) return false;
+    }
+
+    // The first cell is all those values for which visibility == 1 is valid.
+    if (!(grid[cells[0]] &= stateMatrix[0][0])) return false;
 
     return true;
   }
