@@ -1432,7 +1432,8 @@ SudokuConstraintHandler.Skyscraper = class Skyscraper extends SudokuConstraintHa
   constructor(cells, numVisible) {
     super(cells);
     this._numVisible = +numVisible;
-    this._stateMatrix = null;
+    this._forwardStates = null;
+    this._backwardStates = null;
 
     if (0 >= this._numVisible) {
       throw ('Skyscraper visibility target must be > 0');
@@ -1440,82 +1441,102 @@ SudokuConstraintHandler.Skyscraper = class Skyscraper extends SudokuConstraintHa
   }
 
   initialize(initialGrid, cellExclusions, shape) {
-    this._stateMatrix = this.constructor._makeStateMatrix(shape.numValues);
+    if (this._numVisible > shape.numValues) return false;
+
+    [this._forwardStates, this._backwardStates] = (
+      this.constructor._makeStateMatrix(shape.numValues, this._numVisible));
     return true;
   }
 
   static _baseBuffer = new Uint16Array(
-    (SHAPE_MAX.numValues + 1) * SHAPE_MAX.numValues);
+    (SHAPE_MAX.numValues * 2) * SHAPE_MAX.numValues);
 
-  static _makeStateMatrix(numValues) {
+  static _makeStateMatrix(numValues, target) {
     const buffer = this._baseBuffer;
-    const matrix = [];
-    for (let i = 0; i < numValues + 1; i++) {
-      matrix.push(buffer.subarray(i * numValues, (i + 1) * numValues));
+    const matrix0 = [];
+    const matrix1 = [];
+    for (let i = 0; i < numValues; i++) {
+      matrix0.push(buffer.subarray(i * target, (i + 1) * target));
+      matrix1.push(buffer.subarray(
+        (numValues + i) * target, (numValues + i + 1) * target));
     }
-    return matrix;
+    return [matrix0, matrix1];
   }
 
   enforceConsistency(grid, handlerAccumulator) {
     const cells = this.cells;
     const target = this._numVisible;
-    const stateMatrix = this._stateMatrix;
     const numCells = cells.length;
     const maxValue = LookupTables.fromValue(numCells);
 
-    // All the values in the first cell are valid for visibility == 1.
-    stateMatrix[0][0] = grid[cells[0]];
+    // This resets the states for both the forward and backward pass.
+    this.constructor._baseBuffer.fill(0);
 
+    // forwardStates records the possible max heights at each visibility.
+    // `forwardStates[i][v] & (1 << (h-1)) == 1` means that:
+    //   For the when v cells are visible up to the ith cell, then h is a valid
+    //   height for the current highest cell.
+    // backwardStates is the same, but is used in the backward pass to avoid
+    // having to have a temporary buffer and clear it each time.
+    const forwardStates = this._forwardStates;
+
+    // All the values in the first cell are valid for visibility == 1.
+    forwardStates[0][0] = grid[cells[0]];
+
+    // Forward pass to determine the possible heights for each visibility.
     for (let i = 1; i < numCells; i++) {
       const v = grid[cells[i]];
-      const minV = LookupTables.minValue(v);
+      const higherThanV = ~((1 << LookupTables.minValue(v)) - 1);
 
-      stateMatrix[i].fill(0);
       for (let j = 0; j <= i && j < target; j++) {
         // Case 1: cells[i] is visible.
         //  - Visibility increments.
         //  - The only valid values are those that are higher than the previous
         //    state.
-        if (j > 0 && stateMatrix[i - 1][j - 1]) {
-          const minS = LookupTables.minValue(stateMatrix[i - 1][j - 1]);
-          stateMatrix[i][j] |= v & ~((1 << minS) - 1);
+        if (j > 0 && forwardStates[i - 1][j - 1]) {
+          const minS = LookupTables.minValue(forwardStates[i - 1][j - 1]);
+          forwardStates[i][j] |= v & ~((1 << minS) - 1);
         }
         // Case 2: cells[i] is not visible.
         //  - Visibility stays the same.
         //  - Only keep those states which are higher than our minimum value.
-        stateMatrix[i][j] |= stateMatrix[i - 1][j] & ~((1 << minV) - 1);
+        forwardStates[i][j] |= forwardStates[i - 1][j] & higherThanV;
       }
     }
 
-    // Filter down the final states to just the target visibility.
+    // Set the final state to just the target visibility.
     // Final state must be our maximum height (e.g. 9 for a 9x9).
+    // Updated states are collected into backwardStates.
+    const backwardStates = this._backwardStates;
     {
-      const finalStates = stateMatrix[numCells - 1];
-      if (!(finalStates[target - 1] & maxValue)) return false;
-      finalStates.fill(0);
-      finalStates[target - 1] = maxValue;
+      if (!(forwardStates[numCells - 1][target - 1] & maxValue)) return false;
+      backwardStates[numCells - 1][target - 1] = maxValue;
     }
 
-    const newStates = stateMatrix[numCells];  // Intentional extra space.
+    // Backward pass to constraint the states that we found based on our
+    // knowledge of what the terminal state must be.
     for (let i = numCells - 1; i > 0; i--) {
-      newStates.fill(0);
+      // Each iteration determines the possible values for cells[i] while
+      // calculating the states for backwardStates[i-1].
+      const newStates = backwardStates[i - 1];
       let valueMask = 0;
       for (let j = 0; j < target; j++) {
+        const currentState = backwardStates[i][j];
         // Skip this state if it is not possible.
-        if (!stateMatrix[i][j]) continue;
+        if (!currentState) continue;
 
         // Case 1: cells[i] is visible.
         //  - Visibility has incremented.
         //  - Previous states are only valid if they are lower than our maximum
         //    value.
         if (j > 0) {
-          const maxS = LookupTables.maxValue(stateMatrix[i][j]);
-          const validStates = stateMatrix[i - 1][j - 1] & ((1 << (maxS - 1)) - 1);
+          const maxS = LookupTables.maxValue(currentState);
+          const validStates = forwardStates[i - 1][j - 1] & ((1 << (maxS - 1)) - 1);
           if (validStates) {
             newStates[j - 1] |= validStates;
             // This grid value must be visible.
             // The valid values are the current state.
-            valueMask |= stateMatrix[i][j];
+            valueMask |= currentState;
           }
         }
 
@@ -1524,7 +1545,7 @@ SudokuConstraintHandler.Skyscraper = class Skyscraper extends SudokuConstraintHa
         //  - Keep those states which are the same as the current cell.
         //  - Must be above the minimum value for this cell.
         {
-          const validStates = stateMatrix[i - 1][j] & stateMatrix[i][j];
+          const validStates = forwardStates[i - 1][j] & currentState;
           if (validStates) {
             newStates[j] |= validStates;
             // The grid value must be hidden.
@@ -1535,12 +1556,11 @@ SudokuConstraintHandler.Skyscraper = class Skyscraper extends SudokuConstraintHa
         }
       }
 
-      stateMatrix[i - 1].set(newStates);
       if (!(grid[cells[i]] &= valueMask)) return false;
     }
 
     // The first cell is all those values for which visibility == 1 is valid.
-    if (!(grid[cells[0]] &= stateMatrix[0][0])) return false;
+    if (!(grid[cells[0]] &= backwardStates[0][0])) return false;
 
     return true;
   }
