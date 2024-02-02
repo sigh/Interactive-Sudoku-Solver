@@ -1434,6 +1434,7 @@ SudokuConstraintHandler.Skyscraper = class Skyscraper extends SudokuConstraintHa
     this._numVisible = +numVisible;
     this._forwardStates = null;
     this._backwardStates = null;
+    this._allStates = null;
 
     if (0 >= this._numVisible) {
       throw ('Skyscraper visibility target must be > 0');
@@ -1441,17 +1442,23 @@ SudokuConstraintHandler.Skyscraper = class Skyscraper extends SudokuConstraintHa
   }
 
   initialize(initialGrid, cellExclusions, shape) {
+    // We need this to avoid overflowing the buffer.
     if (this._numVisible > shape.numValues) return false;
 
-    [this._forwardStates, this._backwardStates] = (
-      this.constructor._makeStateMatrix(shape.numValues, this._numVisible));
+    [this._forwardStates, this._backwardStates, this._allStates] = (
+      this.constructor._makeStateArrays(shape.numValues, this._numVisible));
     return true;
   }
 
   static _baseBuffer = new Uint16Array(
     (SHAPE_MAX.numValues * 2) * SHAPE_MAX.numValues);
 
-  static _makeStateMatrix(numValues, target) {
+  // The state arrays are all backed by a single buffer.
+  // - We have two so that separate forward and backward states can be kept to
+  //   avoid having to clear arrays in the middle of the algorithm.
+  // - We also return a buffer covering all the states so that it can easily
+  //   be cleared at the start of the algorithm.
+  static _makeStateArrays(numValues, target) {
     const buffer = this._baseBuffer;
     const matrix0 = [];
     const matrix1 = [];
@@ -1460,7 +1467,7 @@ SudokuConstraintHandler.Skyscraper = class Skyscraper extends SudokuConstraintHa
       matrix1.push(buffer.subarray(
         (numValues + i) * target, (numValues + i + 1) * target));
     }
-    return [matrix0, matrix1];
+    return [matrix0, matrix1, buffer.subarray(0, numValues * 2 * target)];
   }
 
   enforceConsistency(grid, handlerAccumulator) {
@@ -1470,7 +1477,7 @@ SudokuConstraintHandler.Skyscraper = class Skyscraper extends SudokuConstraintHa
     const maxValue = LookupTables.fromValue(numCells);
 
     // This resets the states for both the forward and backward pass.
-    this.constructor._baseBuffer.fill(0);
+    this._allStates.fill(0);
 
     // forwardStates records the possible max heights at each visibility.
     // `forwardStates[i][v] & (1 << (h-1)) == 1` means that:
@@ -1484,6 +1491,7 @@ SudokuConstraintHandler.Skyscraper = class Skyscraper extends SudokuConstraintHa
     forwardStates[0][0] = grid[cells[0]];
 
     // Forward pass to determine the possible heights for each visibility.
+    let lastMaxHeightIndex = numCells - 1;
     for (let i = 1; i < numCells; i++) {
       const v = grid[cells[i]];
       const higherThanV = ~((1 << LookupTables.minValue(v)) - 1);
@@ -1502,6 +1510,18 @@ SudokuConstraintHandler.Skyscraper = class Skyscraper extends SudokuConstraintHa
         //  - Only keep those states which are higher than our minimum value.
         forwardStates[i][j] |= forwardStates[i - 1][j] & higherThanV;
       }
+
+      // If the maxValue cell is known, then nothing afterwards matters.
+      // This is an optimizations.
+      if (v === maxValue) {
+        lastMaxHeightIndex = i;
+        break;
+      }
+    }
+
+    // Anything after the first maxValue can't also be a maxValue.
+    for (let i = lastMaxHeightIndex + 1; i < numCells; i++) {
+      if (!(grid[cells[i]] &= ~maxValue)) return false;
     }
 
     // Set the final state to just the target visibility.
@@ -1509,13 +1529,13 @@ SudokuConstraintHandler.Skyscraper = class Skyscraper extends SudokuConstraintHa
     // Updated states are collected into backwardStates.
     const backwardStates = this._backwardStates;
     {
-      if (!(forwardStates[numCells - 1][target - 1] & maxValue)) return false;
-      backwardStates[numCells - 1][target - 1] = maxValue;
+      if (!(forwardStates[lastMaxHeightIndex][target - 1] & maxValue)) return false;
+      backwardStates[lastMaxHeightIndex][target - 1] = maxValue;
     }
 
     // Backward pass to constraint the states that we found based on our
     // knowledge of what the terminal state must be.
-    for (let i = numCells - 1; i > 0; i--) {
+    for (let i = lastMaxHeightIndex; i > 0; i--) {
       // Each iteration determines the possible values for cells[i] while
       // calculating the states for backwardStates[i-1].
       const newStates = backwardStates[i - 1];
