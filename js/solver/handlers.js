@@ -1493,25 +1493,32 @@ SudokuConstraintHandler.Skyscraper = class Skyscraper extends SudokuConstraintHa
     // Forward pass to determine the possible heights for each visibility.
     let lastMaxHeightIndex = numCells - 1;
     for (let i = 1; i < numCells; i++) {
-      const v = grid[cells[i]];
-      const higherThanV = ~((v & -v) - 1) << 1;
+      const prevStates = forwardStates[i - 1];
+      const currStates = forwardStates[i];
 
-      for (let j = 0; j <= i && j < target; j++) {
-        // Case 1: cells[i] is visible.
+      const v = grid[cells[i]];
+      const higherThanMinV = ~((v & -v) - 1) << 1;
+
+      {
+        // Unroll j = 0, since only Case 1 applies.
+        currStates[0] = prevStates[0] & higherThanMinV;
+      }
+      for (let j = 1; j <= i && j < target; j++) {
+        // Case 1: cells[i] is not visible.
+        //  - Visibility stays the same.
+        //  - Only keep those states which are higher than our minimum value.
+        let newState = prevStates[j] & higherThanMinV;
+
+        // Case 2: cells[i] is visible.
         //  - Visibility increments.
         //  - The only valid values are those that are higher than the previous
         //    state.
-        if (j > 0) {
-          const s = forwardStates[i - 1][j - 1];
-          if (s) {
-            const minS = LookupTables.minValue(s);
-            forwardStates[i][j] |= v & ~((1 << minS) - 1);
-          }
+        {
+          const s = prevStates[j - 1];
+          const higherThanMinS = ~((s & -s) - 1) << 1;
+          newState |= v & higherThanMinS;
         }
-        // Case 2: cells[i] is not visible.
-        //  - Visibility stays the same.
-        //  - Only keep those states which are higher than our minimum value.
-        forwardStates[i][j] |= forwardStates[i - 1][j] & higherThanV;
+        currStates[j] = newState;
       }
 
       // If the maxValue cell is known, then nothing afterwards matters.
@@ -1542,39 +1549,41 @@ SudokuConstraintHandler.Skyscraper = class Skyscraper extends SudokuConstraintHa
       // Each iteration determines the possible values for cells[i] while
       // calculating the states for backwardStates[i-1].
       const newStates = backwardStates[i - 1];
+      const oldStates = forwardStates[i - 1];
+
       let valueMask = 0;
       for (let j = 0; j < target; j++) {
         const currentState = backwardStates[i][j];
         // Skip this state if it is not possible.
         if (!currentState) continue;
 
-        // Case 1: cells[i] is visible.
-        //  - Visibility has incremented.
-        //  - Previous states are only valid if they are lower than our maximum
-        //    value.
-        if (j > 0) {
-          const maxS = LookupTables.maxValue(currentState);
-          const validStates = forwardStates[i - 1][j - 1] & ((1 << (maxS - 1)) - 1);
-          if (validStates) {
-            newStates[j - 1] |= validStates;
-            // This grid value must be visible.
-            // The valid values are the current state.
-            valueMask |= currentState;
-          }
-        }
-
-        // Case 2: cells[i] is not visible.
+        // Case 1: cells[i] is not visible.
         //  - Visibility stays the same.
         //  - Keep those states which are the same as the current cell.
-        //  - Must be above the minimum value for this cell.
+        //  - Grid values must below the maximum state.
         {
-          const validStates = forwardStates[i - 1][j] & currentState;
+          const validStates = oldStates[j] & currentState;
           if (validStates) {
             newStates[j] |= validStates;
             // The grid value must be hidden.
             // We can only have grid values lower than the maximum state.
             const maxS = LookupTables.maxValue(validStates);
             valueMask |= (1 << (maxS - 1)) - 1;
+          }
+        }
+
+        // Case 2: cells[i] is visible.
+        //  - Visibility has incremented.
+        //  - Previous states are only valid if they are lower than our maximum
+        //    value.
+        if (j > 0) {
+          const maxS = LookupTables.maxValue(currentState);
+          const validStates = oldStates[j - 1] & ((1 << (maxS - 1)) - 1);
+          if (validStates) {
+            newStates[j - 1] |= validStates;
+            // This grid value must be visible.
+            // The valid values are the current state.
+            valueMask |= currentState;
           }
         }
       }
