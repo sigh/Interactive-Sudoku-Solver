@@ -1494,16 +1494,19 @@ SudokuConstraintHandler.Skyscraper = class Skyscraper extends SudokuConstraintHa
     let lastMaxHeightIndex = numCells - 1;
     for (let i = 1; i < numCells; i++) {
       const v = grid[cells[i]];
-      const higherThanV = ~((1 << LookupTables.minValue(v)) - 1);
+      const higherThanV = ~((v & -v) - 1) << 1;
 
       for (let j = 0; j <= i && j < target; j++) {
         // Case 1: cells[i] is visible.
         //  - Visibility increments.
         //  - The only valid values are those that are higher than the previous
         //    state.
-        if (j > 0 && forwardStates[i - 1][j - 1]) {
-          const minS = LookupTables.minValue(forwardStates[i - 1][j - 1]);
-          forwardStates[i][j] |= v & ~((1 << minS) - 1);
+        if (j > 0) {
+          const s = forwardStates[i - 1][j - 1];
+          if (s) {
+            const minS = LookupTables.minValue(s);
+            forwardStates[i][j] |= v & ~((1 << minS) - 1);
+          }
         }
         // Case 2: cells[i] is not visible.
         //  - Visibility stays the same.
