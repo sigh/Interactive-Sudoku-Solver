@@ -415,7 +415,7 @@ class SudokuConstraintOptimizer {
         const extraCells = arrayDifference(o.cells, h.cells);
         const remainingSum = complementSum - o.sum();
         const handler = new SudokuConstraintHandler.SumWithNegative(
-          remainingCells, extraCells[0], remainingSum);
+          remainingCells, [extraCells[0]], remainingSum);
         newHandlers.push(handler);
 
         if (this._debugLogger) {
@@ -601,7 +601,7 @@ class SudokuConstraintOptimizer {
 
       // We can only do negative sum constraints when the diff is 1.
       // We can only do sum constraints when the diff is 0.
-      if (diffA.size > 1 && diffB.size > 1) return;
+      if (diffA.size > 2 && diffB.size > 2) return;
 
       if (!(hasCellsWithoutSum(diffA) || hasCellsWithoutSum(diffB))) {
         // If all cells in the diff overlap with a piece, then limit the size of
@@ -626,10 +626,10 @@ class SudokuConstraintOptimizer {
         newHandler = new SudokuConstraintHandler.Sum([...diffB], sumDelta);
         args = { sum: sumDelta };
       } else {
-        const negativeCell = [...diffA][0];
+        const negativeCells = [...diffA];
         newHandler = new SudokuConstraintHandler.SumWithNegative(
-          [...diffB], negativeCell, sumDelta);
-        args = { sum: sumDelta, negativeCell: negativeCell };
+          [...diffB], negativeCells, sumDelta);
+        args = { sum: sumDelta, negativeCells: negativeCells };
       }
 
       newHandlers.push(newHandler);

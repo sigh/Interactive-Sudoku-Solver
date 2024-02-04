@@ -1392,23 +1392,26 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
 // Note that `B` is still a value in the same range as `b`, so the Sum handler
 // does not need to be made more general.
 SudokuConstraintHandler.SumWithNegative = class SumWithNegative extends SudokuConstraintHandler.Sum {
-  constructor(positiveCells, negativeCell, sum) {
+  constructor(positiveCells, negativeCells, sum) {
     positiveCells = positiveCells.slice();
     positiveCells.sort((a, b) => a - b);
-    super([...positiveCells, negativeCell], sum);
+    negativeCells = negativeCells.slice();
+    negativeCells.sort((a, b) => a - b);
+    super([...positiveCells, ...negativeCells], sum);
 
     this._positiveCells = positiveCells;
-    this._negativeCells = [negativeCell];
-    this._negativeCell = negativeCell;
+    this._negativeCells = negativeCells;
 
     // IMPORTANT: Complement cells don't work for this, because
     // we can't guarantee that reversed negativeCells is a unique value.
     // This will stop anyone adding them.
     this._complementCells = null;
+
+    this.idStr = [this.constructor.name, positiveCells, negativeCells, sum].join('-');
   }
 
   initialize(initialGrid, cellExclusions, shape) {
-    this._sum += shape.numValues + 1;
+    this._sum += (shape.numValues + 1) * this._negativeCells.length;
     return super.initialize(initialGrid, cellExclusions, shape);
   }
 
@@ -1416,13 +1419,20 @@ SudokuConstraintHandler.SumWithNegative = class SumWithNegative extends SudokuCo
 
   enforceConsistency(grid, handlerAccumulator) {
     const reverse = this._lookupTables.reverse;
-    grid[this._negativeCell] = reverse[grid[this._negativeCell]];
+
+    const negativeCells = this._negativeCells;
+    const numNegCells = negativeCells.length;
+    for (let i = 0; i < numNegCells; i++) {
+      grid[negativeCells[i]] = reverse[grid[negativeCells[i]]];
+    }
 
     const result = super.enforceConsistency(grid, handlerAccumulator);
 
     // Reverse the value back even if we fail to make the output and debugging
     // easier.
-    grid[this._negativeCell] = reverse[grid[this._negativeCell]];
+    for (let i = 0; i < numNegCells; i++) {
+      grid[negativeCells[i]] = reverse[grid[negativeCells[i]]];
+    }
 
     return result;
   }
@@ -1923,7 +1933,7 @@ SudokuConstraintHandler.RegionSumLine = class RegionSumLine extends SudokuConstr
       const single = this._singles[0];
       for (const cells of this._multi) {
         const arrow = new SudokuConstraintHandler.SumWithNegative(
-          cells, single, 0);
+          cells, [single], 0);
         arrow.initialize(initialGrid, cellExclusions, shape);
         this._arrows.push(arrow);
       }
