@@ -1111,7 +1111,7 @@ class SudokuBuilder {
 
           if (constraint.cells.length <= gridSize) {
             yield new SudokuConstraintHandler.SumWithNegative(
-              positiveCells, negativeCell, 0);
+              positiveCells, [negativeCell], 0);
           } else if (positiveCells.length == gridSize) {
             let valueMap = new Map();
             for (const cell of positiveCells) valueMap.set(cell, 1);
