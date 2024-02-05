@@ -415,14 +415,14 @@ class SudokuConstraintOptimizer {
         const extraCells = arrayDifference(o.cells, h.cells);
         const remainingSum = complementSum - o.sum();
         const handler = new SudokuConstraintHandler.SumWithNegative(
-          remainingCells, [extraCells[0]], remainingSum);
+          remainingCells, extraCells, remainingSum);
         newHandlers.push(handler);
 
         if (this._debugLogger) {
           this._debugLogger.log({
             loc: '_makeHiddenCageHandlers',
             msg: 'Add: ' + handler.constructor.name,
-            args: { offset: remainingSum, negativeCells: [...extraCells] },
+            args: { offset: remainingSum, negativeCells: extraCells },
             cells: handler.cells
           });
         }
