@@ -288,3 +288,21 @@ const printGrid = (grid) => {
   }
   console.table(matrix);
 }
+
+const progressBenchmarks = async () => {
+  const puzzleSets = {
+    MATHEMAGIC_KILLERS,
+    EXTREME_KILLERS,
+    TAREK_ALL,
+    HARD_THERMOS,
+    HARD_RENBAN,
+  };
+  const results = await runAll(puzzleSets);
+
+  const parts = [];
+  for (const s of results.stats) {
+    parts.push(s.guesses, s.constraintsProcessed, Math.round(s.rumtimeMs));
+  }
+
+  console.log(parts.join('\t'));
+}
