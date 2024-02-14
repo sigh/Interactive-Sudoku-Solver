@@ -292,7 +292,12 @@ SudokuSolver.InternalSolver = class {
     this._numCells = this._shape.numCells;
     this._debugLogger = debugLogger;
 
-    this._initStack();
+    this._recStack = this._initStack();
+    {
+      this._initialGrid = this._recStack[0].grid.slice();
+      const allValues = LookupTables.get(this._shape.numValues).allValues;
+      this._initialGrid.fill(allValues);
+    }
 
     this._runCounter = 0;
     this._progress = {
@@ -462,31 +467,6 @@ SudokuSolver.InternalSolver = class {
     return this._backtrackTriggers.slice();
   }
 
-  _initStack() {
-    const numCells = this._numCells;
-
-    const gridBuffer = new ArrayBuffer(
-      (numCells + 1) * numCells * Uint16Array.BYTES_PER_ELEMENT);
-
-    this._recStack = [];
-    for (let i = 0; i < numCells + 1; i++) {
-      this._recStack.push({
-        cellDepth: 0,
-        progressRemaining: 1.0,
-        lastContradictionCell: -1,
-        newNode: true,
-        grid: new Uint16Array(
-          gridBuffer,
-          i * numCells * Uint16Array.BYTES_PER_ELEMENT,
-          numCells),
-      });
-    }
-
-    this._initialGrid = new Uint16Array(numCells);
-    const allValues = LookupTables.get(this._shape.numValues).allValues;
-    this._initialGrid.fill(allValues);
-  }
-
   _hasInterestingSolutions(grid, uninterestingValues) {
     // We need to check all cells because we maybe validating a cell above
     // us, or finding a value for a cell below us.
@@ -552,7 +532,6 @@ SudokuSolver.InternalSolver = class {
           return false;
         }
       } else {
-        // TODO: Avoid c being added to handlerAccumulator during this time.
         if (!c.enforceConsistency(grid, handlerAccumulator)) {
           return false;
         }
@@ -575,6 +554,29 @@ SudokuSolver.InternalSolver = class {
     }
   }
 
+  _initStack() {
+    const numCells = this._numCells;
+
+    const gridBuffer = new ArrayBuffer(
+      (numCells + 1) * numCells * Uint16Array.BYTES_PER_ELEMENT);
+
+    const recStack = [];
+    for (let i = 0; i < numCells + 1; i++) {
+      recStack.push({
+        cellDepth: 0,
+        progressRemaining: 1.0,
+        lastContradictionCell: -1,
+        newNode: true,
+        grid: new Uint16Array(
+          gridBuffer,
+          i * numCells * Uint16Array.BYTES_PER_ELEMENT,
+          numCells),
+      });
+    }
+
+    return recStack;
+  }
+
   static YIELD_ON_SOLUTION = 0;
   static YIELD_ON_STEP = 1;
 
@@ -592,7 +594,7 @@ SudokuSolver.InternalSolver = class {
     // Set up iterator validation.
     if (!this._atStart) throw ('State is not in initial state.');
     this._atStart = false;
-    let runCounter = ++this._runCounter;
+    const runCounter = ++this._runCounter;
     const checkRunCounter = () => {
       if (runCounter != this._runCounter) throw ('Iterator no longer valid');
     };
@@ -607,41 +609,40 @@ SudokuSolver.InternalSolver = class {
     let iterationCounterForUpdates = 0;
 
     const recStack = this._recStack;
+    let recDepth = 0;
     {
-      const initialRecFrame = recStack[0];
+      // Setup initial recursion frame.
+      const initialRecFrame = recStack[recDepth];
       initialRecFrame.grid.set(this._initialGrid);
       initialRecFrame.cellDepth = 0;
       initialRecFrame.lastContradictionCell = -1;
       initialRecFrame.progressRemaining = 1.0;
       initialRecFrame.newNode = true;
-    }
 
-    {
       // Enforce constraints for all cells.
       const handlerAccumulator = this._handlerAccumulator;
       handlerAccumulator.reset(false);
       for (let i = 0; i < this._numCells; i++) handlerAccumulator.addForCell(i);
-      this._enforceConstraints(recStack[0].grid, handlerAccumulator);
-    }
+      this._enforceConstraints(initialRecFrame.grid, handlerAccumulator);
 
-    if (yieldEveryStep) {
-      this.setStepState({});
-      yield {
-        grid: recStack[0].grid,
-        oldGrid: null,
-        isSolution: false,
-        cellOrder: [],
-        values: 0,
-        hasContradiction: false,
+      if (yieldEveryStep) {
+        this.setStepState({});
+        yield {
+          grid: initialRecFrame.grid,
+          oldGrid: null,
+          isSolution: false,
+          cellOrder: [],
+          values: 0,
+          hasContradiction: false,
+        }
+        checkRunCounter();
+        this._stepState.step = 1;
       }
-      checkRunCounter();
-      this._stepState.step = 1;
+
+      counters.nodesSearched++;
     }
 
-    // Ensure root node is counted.
-    counters.nodesSearched++;
-
-    let recDepth = 1;
+    recDepth++;
     while (recDepth) {
       let recFrame = recStack[--recDepth];
 
