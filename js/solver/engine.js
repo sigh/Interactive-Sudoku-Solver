@@ -445,34 +445,21 @@ SudokuSolver.InternalSolver = class {
     this._backtrackTriggers = this._cellPriorities.slice();
     this._uninterestingValues = null;
 
-    this._resetStack();
+    this._resetRun();
+  }
+
+  _resetRun() {
+    // Preserve backtrack triggers between runs (since this is currently only
+    // used internally).
+    // Candidate selector must be made aware of the new backtrack triggers.
+    this._candidateSelector.reset(this._backtrackTriggers);
+
+    this.done = false;
+    this._atStart = true;
   }
 
   getBacktrackTriggers() {
     return this._backtrackTriggers.slice();
-  }
-
-  _resetStack() {
-    // Candidate selector must be reset each time, because backtrackTriggers
-    // object may have changed.
-    this._candidateSelector.reset(this._backtrackTriggers);
-
-    // If we are at the start anyway, then there is nothing else to do.
-    if (this._atStart) return;
-
-    this._runCounter++;
-
-    this.done = false;
-    this._atStart = true;
-
-    // Resetting the grid must be before run() is called since callers may
-    // want to adjust the grid themselves beforehand.
-    const recStack = this._recStack;
-    recStack[0].grid.set(this._initialGrid);
-    recStack[0].cellDepth = 0;
-    recStack[0].lastContradictionCell = -1;
-    recStack[0].progressRemaining = 1.0;
-    recStack[0].newNode = true;
   }
 
   _initStack() {
@@ -610,6 +597,7 @@ SudokuSolver.InternalSolver = class {
       if (runCounter != this._runCounter) throw ('Iterator no longer valid');
     };
 
+    // This is required because we may call run multiple times.
     const counters = this.counters;
     counters.progressRatioPrev += counters.progressRatio;
     counters.progressRatio = 0;
@@ -619,6 +607,14 @@ SudokuSolver.InternalSolver = class {
     let iterationCounterForUpdates = 0;
 
     const recStack = this._recStack;
+    {
+      const initialRecFrame = recStack[0];
+      initialRecFrame.grid.set(this._initialGrid);
+      initialRecFrame.cellDepth = 0;
+      initialRecFrame.lastContradictionCell = -1;
+      initialRecFrame.progressRemaining = 1.0;
+      initialRecFrame.newNode = true;
+    }
 
     {
       // Enforce constraints for all cells.
@@ -814,12 +810,20 @@ SudokuSolver.InternalSolver = class {
   }
 
   validateLayout() {
+    const originalInitialGrid = this._initialGrid.slice();
+    const result = this._validateLayout(originalInitialGrid);
+    this._initialGrid = originalInitialGrid;
+    return result;
+  }
+
+  _validateLayout(originalInitialGrid) {
     // Choose just the house handlers.
     const houseHandlers = this._handlerSet.getAllofType(SudokuConstraintHandler.House);
 
     // Function to fill a house with all values.
     const fillHouse = (house) => {
-      house.cells.forEach((c, i) => this._recStack[0].grid[c] = 1 << i);
+      this._initialGrid.set(originalInitialGrid);
+      house.cells.forEach((c, i) => this._initialGrid[c] = 1 << i);
     };
 
     const attemptLog = [];
@@ -829,7 +833,7 @@ SudokuSolver.InternalSolver = class {
 
     // Function to attempt to solve with one house fixed.
     const attempt = (house) => {
-      this._resetStack();
+      this._resetRun();
 
       fillHouse(house);
       // Reduce backtrack triggers so that we don't weight the last runs too
@@ -868,7 +872,7 @@ SudokuSolver.InternalSolver = class {
     attemptLog.sort((a, b) => b[1] - a[1]);
     const bestHouse = attemptLog[0][0];
 
-    this._resetStack();
+    this._resetRun();
     fillHouse(bestHouse);
 
     // Run the final search until we find a solution or prove that one doesn't
