@@ -472,6 +472,7 @@ SudokuSolver.InternalSolver = class {
     recStack[0].cellDepth = 0;
     recStack[0].lastContradictionCell = -1;
     recStack[0].progressRemaining = 1.0;
+    recStack[0].newNode = true;
   }
 
   _initStack() {
@@ -486,6 +487,7 @@ SudokuSolver.InternalSolver = class {
         cellDepth: 0,
         progressRemaining: 0.0,
         lastContradictionCell: -1,
+        newNode: true,
         grid: new Uint16Array(
           gridBuffer,
           i * numCells * Uint16Array.BYTES_PER_ELEMENT,
@@ -642,7 +644,6 @@ SudokuSolver.InternalSolver = class {
       this._stepState.step = 1;
     }
 
-    let isNewNode = true;
     let progressDelta = 1.0;
 
     while (recDepth) {
@@ -652,10 +653,10 @@ SudokuSolver.InternalSolver = class {
 
       let grid = recFrame.grid;
 
-      const wasNewNode = isNewNode;
+      const wasNewNode = recFrame.newNode;
 
-      if (isNewNode) {
-        isNewNode = false;
+      if (recFrame.newNode) {
+        recFrame.newNode = false;
 
         // We've reached the end, so output a solution!
         if (cellDepth == this._shape.numCells) {
@@ -798,8 +799,9 @@ SudokuSolver.InternalSolver = class {
       }
 
       // Recurse to the new cell, skipping past all the cells we enforced.
-      recStack[recDepth++].cellDepth = nextDepth;
-      isNewNode = true;
+      recFrame.cellDepth = nextDepth;
+      recFrame.newNode = true;
+      recDepth++;
     }
 
     this.done = true;
