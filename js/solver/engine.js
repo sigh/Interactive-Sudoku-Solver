@@ -666,6 +666,7 @@ SudokuSolver.InternalSolver = class {
         }
 
         this._progressRemainingStack[recDepth] = progressDelta;
+        lastContradictionCell[recDepth] = -1;
 
         // Update counters.
         counters.nodesSearched++;
@@ -731,12 +732,8 @@ SudokuSolver.InternalSolver = class {
       // Queue up extra constraints based on prior backtracks. The idea being
       // that constraints that apply this the contradiction cell are likely
       // to turn up a contradiction here if it exists.
-      if (lastContradictionCell[cellDepth] >= 0) {
-        handlerAccumulator.addForCell(lastContradictionCell[cellDepth]);
-        // If this is the last value at this level, clear the
-        // lastContradictionCell as the next time we reach this level won't be
-        // from the same subtree that caused the contradiction.
-        if (count === 1) lastContradictionCell[cellDepth] = -1;
+      if (lastContradictionCell[recDepth] >= 0) {
+        handlerAccumulator.addForCell(lastContradictionCell[recDepth]);
       }
 
       // Propagate constraints.
@@ -745,7 +742,9 @@ SudokuSolver.InternalSolver = class {
       if (hasContradiction) {
         // Store the current cells, so that the level immediately above us
         // can act on this information to run extra constraints.
-        if (cellDepth > 0) lastContradictionCell[cellDepth - 1] = cell;
+        if (recDepth > 0) {
+          lastContradictionCell[recDepth - 1] = cell;
+        }
         counters.progressRatio += progressDelta;
         counters.backtracks++;
         this._backtrackTriggers[cell]++;
