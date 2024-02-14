@@ -293,8 +293,14 @@ SudokuSolver.InternalSolver = class {
     this._debugLogger = debugLogger;
 
     this._initGrid();
-    this._recStack = new Uint16Array(shape.numCells + 1);
-    this._progressRemainingStack = Array.from(this._recStack).fill(0.0);
+    this._recStack = [];
+    for (let i = 0; i < shape.numCells + 1; i++) {
+      this._recStack.push({
+        cellDepth: 0,
+        progressRemaining: 0.0,
+        lastContradictionCell: -1,
+      });
+    }
 
     this._runCounter = 0;
     this._progress = {
@@ -467,7 +473,6 @@ SudokuSolver.InternalSolver = class {
     this.done = false;
     this._atStart = true;
     this._grids[0].set(this._initialGrid);
-    this._progressRemainingStack[0] = 1.0;
   }
 
   _initGrid() {
@@ -631,16 +636,18 @@ SudokuSolver.InternalSolver = class {
 
     let recDepth = 0;
     const recStack = this._recStack;
-    recStack[recDepth++] = 0;
+    recStack[recDepth].cellDepth = 0;
+    recStack[recDepth].lastContradictionCell = -1;
+    recStack[recDepth].progressRemaining = 1.0;
+    recDepth++;
+
     let isNewNode = true;
     let progressDelta = 1.0;
-    // The last cell which caused a contradiction at each level.
-    const lastContradictionCell = new Int16Array(this._numCells);
-    lastContradictionCell.fill(-1);
 
     while (recDepth) {
       recDepth--;
-      const cellDepth = recStack[recDepth];
+      let recFrame = recStack[recDepth];
+      const cellDepth = recFrame.cellDepth;
 
       let grid = this._grids[recDepth];
 
@@ -665,8 +672,8 @@ SudokuSolver.InternalSolver = class {
           continue;
         }
 
-        this._progressRemainingStack[recDepth] = progressDelta;
-        lastContradictionCell[recDepth] = -1;
+        recFrame.progressRemaining = progressDelta;
+        recFrame.lastContradictionCell = -1;
 
         // Update counters.
         counters.nodesSearched++;
@@ -687,9 +694,8 @@ SudokuSolver.InternalSolver = class {
       {
         // Assume the remaining progress is evenly distributed among the value
         // options.
-        progressDelta = this._progressRemainingStack[recDepth] / count;
-        this._progressRemainingStack[recDepth] -= progressDelta;
-
+        progressDelta = recFrame.progressRemaining / count;
+        recFrame.progressRemaining -= progressDelta;
 
         // We are enforcing several values at once.
         counters.valuesTried += nextCells.length;
@@ -710,6 +716,7 @@ SudokuSolver.InternalSolver = class {
         // one value to try.
 
         recDepth++;
+        recFrame = recStack[recDepth];
         counters.guesses++;
 
         // Remove the value from our set of candidates.
@@ -732,8 +739,8 @@ SudokuSolver.InternalSolver = class {
       // Queue up extra constraints based on prior backtracks. The idea being
       // that constraints that apply this the contradiction cell are likely
       // to turn up a contradiction here if it exists.
-      if (lastContradictionCell[recDepth] >= 0) {
-        handlerAccumulator.addForCell(lastContradictionCell[recDepth]);
+      if (recFrame.lastContradictionCell >= 0) {
+        handlerAccumulator.addForCell(recFrame.lastContradictionCell);
       }
 
       // Propagate constraints.
@@ -743,7 +750,7 @@ SudokuSolver.InternalSolver = class {
         // Store the current cells, so that the level immediately above us
         // can act on this information to run extra constraints.
         if (recDepth > 0) {
-          lastContradictionCell[recDepth - 1] = cell;
+          recStack[recDepth - 1].lastContradictionCell = cell;
         }
         counters.progressRatio += progressDelta;
         counters.backtracks++;
@@ -790,7 +797,7 @@ SudokuSolver.InternalSolver = class {
       }
 
       // Recurse to the new cell, skipping past all the cells we enforced.
-      recStack[recDepth++] = nextDepth;
+      recStack[recDepth++].cellDepth = nextDepth;
       isNewNode = true;
     }
 
