@@ -485,7 +485,7 @@ SudokuSolver.InternalSolver = class {
     for (let i = 0; i < numCells + 1; i++) {
       this._recStack.push({
         cellDepth: 0,
-        progressRemaining: 0.0,
+        progressRemaining: 1.0,
         lastContradictionCell: -1,
         newNode: true,
         grid: new Uint16Array(
@@ -618,9 +618,7 @@ SudokuSolver.InternalSolver = class {
     const backtrackDecayMask = (1 << this.constructor._LOG_BACKTRACK_DECAY_INTERVAL) - 1;
     let iterationCounterForUpdates = 0;
 
-    let recDepth = 0;
     const recStack = this._recStack;
-    recDepth++;
 
     {
       // Enforce constraints for all cells.
@@ -644,46 +642,20 @@ SudokuSolver.InternalSolver = class {
       this._stepState.step = 1;
     }
 
-    let progressDelta = 1.0;
+    // Ensure root node is counted.
+    counters.nodesSearched++;
 
+    let recDepth = 1;
     while (recDepth) {
-      recDepth--;
-      let recFrame = recStack[recDepth];
+      let recFrame = recStack[--recDepth];
+
       const cellDepth = recFrame.cellDepth;
-
       let grid = recFrame.grid;
-
-      const wasNewNode = recFrame.newNode;
-
-      if (recFrame.newNode) {
-        recFrame.newNode = false;
-
-        // We've reached the end, so output a solution!
-        if (cellDepth == this._shape.numCells) {
-          counters.progressRatio += progressDelta;
-          // We've set all the values, and we haven't found a contradiction.
-          // This is a solution!
-          counters.solutions++;
-          yield {
-            grid: grid,
-            isSolution: true,
-            cellOrder: this._candidateSelector.getCellOrder(),
-            hasContradiction: false,
-          };
-          checkRunCounter();
-          continue;
-        }
-
-        recFrame.progressRemaining = progressDelta;
-        recFrame.lastContradictionCell = -1;
-
-        // Update counters.
-        counters.nodesSearched++;
-      }
 
       const [nextCells, value, count] =
         this._candidateSelector.selectNextCandidate(
-          cellDepth, grid, this._stepState, wasNewNode);
+          cellDepth, grid, this._stepState, recFrame.newNode);
+      recFrame.newNode = false;
       if (count === 0) continue;
 
       const nextDepth = cellDepth + nextCells.length;
@@ -693,12 +665,12 @@ SudokuSolver.InternalSolver = class {
         this._stepState.oldGrid.set(grid);
       }
 
-      {
-        // Assume the remaining progress is evenly distributed among the value
-        // options.
-        progressDelta = recFrame.progressRemaining / count;
-        recFrame.progressRemaining -= progressDelta;
+      // Assume the remaining progress is evenly distributed among the value
+      // options.
+      const progressDelta = recFrame.progressRemaining / count;
+      recFrame.progressRemaining -= progressDelta;
 
+      {
         // We are enforcing several values at once.
         counters.valuesTried += nextCells.length;
 
@@ -717,8 +689,7 @@ SudokuSolver.InternalSolver = class {
         // We only need to start a new recursion frame when there is more than
         // one value to try.
 
-        recDepth++;
-        recFrame = recStack[recDepth];
+        recFrame = recStack[++recDepth];
         counters.guesses++;
 
         // Remove the value from our set of candidates.
@@ -798,9 +769,28 @@ SudokuSolver.InternalSolver = class {
         }
       }
 
+      // If we've enforced all cells, then we have a solution!
+      if (nextDepth === this._shape.numCells) {
+        counters.progressRatio += progressDelta;
+        // We've set all the values, and we haven't found a contradiction.
+        // This is a solution!
+        counters.solutions++;
+        yield {
+          grid: grid,
+          isSolution: true,
+          cellOrder: this._candidateSelector.getCellOrder(),
+          hasContradiction: false,
+        };
+        checkRunCounter();
+        continue;
+      }
+
       // Recurse to the new cell, skipping past all the cells we enforced.
+      counters.nodesSearched++;
       recFrame.cellDepth = nextDepth;
       recFrame.newNode = true;
+      recFrame.progressRemaining = progressDelta;
+      recFrame.lastContradictionCell = -1;
       recDepth++;
     }
 
