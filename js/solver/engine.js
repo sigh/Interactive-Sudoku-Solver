@@ -292,15 +292,7 @@ SudokuSolver.InternalSolver = class {
     this._numCells = this._shape.numCells;
     this._debugLogger = debugLogger;
 
-    this._initGrid();
-    this._recStack = [];
-    for (let i = 0; i < shape.numCells + 1; i++) {
-      this._recStack.push({
-        cellDepth: 0,
-        progressRemaining: 0.0,
-        lastContradictionCell: -1,
-      });
-    }
+    this._initStack();
 
     this._runCounter = 0;
     this._progress = {
@@ -472,24 +464,36 @@ SudokuSolver.InternalSolver = class {
 
     this.done = false;
     this._atStart = true;
-    this._grids[0].set(this._initialGrid);
+
+    // Resetting the grid must be before run() is called since callers may
+    // want to adjust the grid themselves beforehand.
+    const recStack = this._recStack;
+    recStack[0].grid.set(this._initialGrid);
+    recStack[0].cellDepth = 0;
+    recStack[0].lastContradictionCell = -1;
+    recStack[0].progressRemaining = 1.0;
   }
 
-  _initGrid() {
+  _initStack() {
     const numCells = this._numCells;
 
-    let buffer = new ArrayBuffer(
+    const gridBuffer = new ArrayBuffer(
       (numCells + 1) * numCells * Uint16Array.BYTES_PER_ELEMENT);
 
-    this._grids = [];
+    this._recStack = [];
     for (let i = 0; i < numCells + 1; i++) {
-      this._grids.push(new Uint16Array(
-        buffer,
-        i * numCells * Uint16Array.BYTES_PER_ELEMENT,
-        numCells));
+      this._recStack.push({
+        cellDepth: 0,
+        progressRemaining: 0.0,
+        lastContradictionCell: -1,
+        grid: new Uint16Array(
+          gridBuffer,
+          i * numCells * Uint16Array.BYTES_PER_ELEMENT,
+          numCells),
+      });
     }
-    this._initialGrid = new Uint16Array(numCells);
 
+    this._initialGrid = new Uint16Array(numCells);
     const allValues = LookupTables.get(this._shape.numValues).allValues;
     this._initialGrid.fill(allValues);
   }
@@ -612,18 +616,22 @@ SudokuSolver.InternalSolver = class {
     const backtrackDecayMask = (1 << this.constructor._LOG_BACKTRACK_DECAY_INTERVAL) - 1;
     let iterationCounterForUpdates = 0;
 
+    let recDepth = 0;
+    const recStack = this._recStack;
+    recDepth++;
+
     {
       // Enforce constraints for all cells.
       const handlerAccumulator = this._handlerAccumulator;
       handlerAccumulator.reset(false);
       for (let i = 0; i < this._numCells; i++) handlerAccumulator.addForCell(i);
-      this._enforceConstraints(this._grids[0], handlerAccumulator);
+      this._enforceConstraints(recStack[0].grid, handlerAccumulator);
     }
 
     if (yieldEveryStep) {
       this.setStepState({});
       yield {
-        grid: this._grids[0],
+        grid: recStack[0].grid,
         oldGrid: null,
         isSolution: false,
         cellOrder: [],
@@ -634,13 +642,6 @@ SudokuSolver.InternalSolver = class {
       this._stepState.step = 1;
     }
 
-    let recDepth = 0;
-    const recStack = this._recStack;
-    recStack[recDepth].cellDepth = 0;
-    recStack[recDepth].lastContradictionCell = -1;
-    recStack[recDepth].progressRemaining = 1.0;
-    recDepth++;
-
     let isNewNode = true;
     let progressDelta = 1.0;
 
@@ -649,7 +650,7 @@ SudokuSolver.InternalSolver = class {
       let recFrame = recStack[recDepth];
       const cellDepth = recFrame.cellDepth;
 
-      let grid = this._grids[recDepth];
+      let grid = recFrame.grid;
 
       const wasNewNode = isNewNode;
 
@@ -724,8 +725,8 @@ SudokuSolver.InternalSolver = class {
         //       stack frame.
         grid[cell] ^= value;
 
-        this._grids[recDepth].set(grid);
-        grid = this._grids[recDepth];
+        recFrame.grid.set(grid);
+        grid = recFrame.grid;
       }
       // NOTE: Set this even when count == 1 to allow for other candidate
       //       selection methods.
@@ -826,7 +827,7 @@ SudokuSolver.InternalSolver = class {
 
     // Function to fill a house with all values.
     const fillHouse = (house) => {
-      house.cells.forEach((c, i) => this._grids[0][c] = 1 << i);
+      house.cells.forEach((c, i) => this._recStack[0].grid[c] = 1 << i);
     };
 
     const attemptLog = [];
