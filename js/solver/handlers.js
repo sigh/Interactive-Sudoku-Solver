@@ -1491,8 +1491,8 @@ SudokuConstraintHandler.Skyscraper = class Skyscraper extends SudokuConstraintHa
     this._allStates.fill(0);
 
     // forwardStates records the possible max heights at each visibility.
-    // `forwardStates[i][v] & (1 << (h-1)) == 1` means that:
-    //   For the when v cells are visible up to the ith cell, then h is a valid
+    // `forwardStates[i][vis] & (1 << (h-1)) == 1` means that:
+    //   When vis cells are visible up to the ith cell, then h is a valid
     //   height for the current highest cell.
     // backwardStates is the same, but is used in the backward pass to avoid
     // having to have a temporary buffer and clear it each time.
@@ -1526,6 +1526,8 @@ SudokuConstraintHandler.Skyscraper = class Skyscraper extends SudokuConstraintHa
         //    state.
         {
           const s = prevStates[j - 1];
+          // NOTE: s == 0 => higherThanMinS == 0, so we don't need to special
+          // case 0.
           const higherThanMinS = ~((s & -s) - 1) << 1;
           newState |= v & higherThanMinS;
         }
@@ -1585,16 +1587,19 @@ SudokuConstraintHandler.Skyscraper = class Skyscraper extends SudokuConstraintHa
 
         // Case 2: cells[i] is visible.
         //  - Visibility has incremented.
+        //  - The current state must be one of the current grid values.
         //  - Previous states are only valid if they are lower than our maximum
         //    value.
         if (j > 0) {
-          const maxS = LookupTables.maxValue(currentState);
-          const validStates = oldStates[j - 1] & ((1 << (maxS - 1)) - 1);
+          const visibleCurrentState = currentState & grid[cells[i]];
+          const maxS = LookupTables.maxValue(visibleCurrentState);
+          // NOTE: maxS == 0 => validStates == 0
+          const validStates = oldStates[j - 1] & (((1 << maxS) - 1) >> 1);
           if (validStates) {
             newStates[j - 1] |= validStates;
             // This grid value must be visible.
             // The valid values are the current state.
-            valueMask |= currentState;
+            valueMask |= visibleCurrentState;
           }
         }
       }
