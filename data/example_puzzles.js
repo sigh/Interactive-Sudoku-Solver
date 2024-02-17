@@ -315,6 +315,10 @@ const EXAMPLES = {
     src: 'http://forum.enjoysudoku.com/new-killer-setter-t38092-15.html#p306873',
     input: '.Cage~7~R2C2~R3C2~R4C2.Cage~5~R2C6~R2C7.Cage~6~R3C7~R3C8.Cage~6~R4C6~R4C7.Cage~15~R7C9~R6C9.Cage~3~R9C7~R9C6.Cage~17~R8C3~R7C3.Cage~23~R6C3~R6C4~R7C4.',
   },
+  'Skyscaper 2-3': {
+    // From gracefu.
+    input: '.Skyscraper~C8~3~2.Skyscraper~R6~2~3.Skyscraper~R8~~3.Skyscraper~C7~~3.Skyscraper~C4~~3.Skyscraper~C5~~3.Skyscraper~C2~~3.Skyscraper~C3~3~2.Skyscraper~R2~3~2.Skyscraper~R1~3~3.Skyscraper~R4~3~.Skyscraper~C1~2~3.Skyscraper~R9~3~.Skyscraper~R7~2~3.Skyscraper~C6~3~.Skyscraper~C9~3~.Skyscraper~R5~~3.Skyscraper~R3~2~2.',
+  },
 
   // Extreme killers.
   'Wecoc #1': {
