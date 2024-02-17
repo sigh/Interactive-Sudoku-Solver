@@ -225,6 +225,8 @@ class DebugManager {
       MATHEMAGIC_KILLERS,
       HARD_RENBAN,
       ZERO_SOLUTION_PUZZLES,
+      PENCILMARKS,
+      HARD_PENCILMARKS,
     };
     for (const [listName, list] of Object.entries(puzzleLists)) {
       for (let i = 0; i < list.length; i++) {
