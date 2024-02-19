@@ -272,17 +272,6 @@ class JigsawManager {
     this._regionPanel.innerHTML = '';
   }
 
-  isValidJigsawPiece(selection) {
-    if (selection.length != this._shape.gridSize) return false;
-
-    // Check that we aren't overlapping an existing tile.
-    if (selection.some(c => this._piecesMap[this._shape.parseCellId(c).cell] != 0)) {
-      return false;
-    }
-
-    return true;
-  }
-
   removePiece(config) {
     this._display.removeItem(config.displayElem);
     config.panelItem.parentNode.removeChild(config.panelItem);
@@ -542,25 +531,6 @@ class ConstraintManager {
     return this._shape;
   }
 
-  _cellsAre2x2Square(cells) {
-    if (cells.length != 4) return false;
-    cells = cells.map(
-      c => this._shape.parseCellId(c)).sort((a, b) => a.cell - b.cell);
-    let { row, col } = cells[0];
-    return (
-      (cells[1].row == row && cells[1].col == col + 1) &&
-      (cells[2].row == row + 1 && cells[2].col == col) &&
-      (cells[3].row == row + 1 && cells[3].col == col + 1));
-  }
-
-  _cellsAreAdjacent(cells) {
-    if (cells.length != 2) return false;
-    // Manhattan distance is exactly 1.
-    let cell0 = this._shape.parseCellId(cells[0]);
-    let cell1 = this._shape.parseCellId(cells[1]);
-    return 1 == Math.abs(cell0.row - cell1.row) + Math.abs(cell0.col - cell1.col);
-  }
-
   _setUpPanel(inputManager, displayContainer) {
     this._constraintPanel = document.getElementById('displayed-constraints');
     this._panelItemHighlighter = displayContainer.createHighlighter('highlighted-cell');
@@ -581,44 +551,11 @@ class ConstraintManager {
     inputManager.addSelectionPreserver(selectionForm);
 
     selectionForm.onsubmit = e => {
-      this._addConstraintFromForm(selectionForm, inputManager);
+      this._addMultiCellConstraint(selectionForm, inputManager);
       return false;
     };
 
-    // Selecting anything in the constraint cage will select it and focus on
-    // the input box.
-    selectionForm['multi-cell-constraint-cage'].onchange = () => {
-      selectionForm['cage-sum'].select();
-    };
-    selectionForm['cage-sum'].onfocus = () => {
-      selectionForm['multi-cell-constraint-cage'].checked = true;
-    };
-    // Selecting anything in the constraint sum will select it and focus on
-    // the input box.
-    selectionForm['multi-cell-constraint-sum'].onchange = () => {
-      selectionForm['plain-sum'].select();
-    };
-    selectionForm['plain-sum'].onfocus = () => {
-      selectionForm['multi-cell-constraint-sum'].checked = true;
-    };
-
-    // Selecting anything in the whisper constraint will select it and focus on
-    // the input box.
-    selectionForm['multi-cell-constraint-whisper'].onchange = () => {
-      selectionForm['whisper-difference'].select();
-    };
-    selectionForm['whisper-difference'].onfocus = () => {
-      selectionForm['multi-cell-constraint-whisper'].checked = true;
-    };
-
-    // Selecting anything in the whisper constraint will select it and focus on
-    // the input box.
-    selectionForm['multi-cell-constraint-quad'].onchange = () => {
-      selectionForm['quad-values'].select();
-    };
-    selectionForm['quad-values'].onfocus = () => {
-      selectionForm['multi-cell-constraint-quad'].checked = true;
-    };
+    this._setUpMultiCellConstraints(selectionForm);
 
     // Custom binary.
     this._customBinaryConstraints = new CustomBinaryConstraintManager(
@@ -687,70 +624,43 @@ class ConstraintManager {
   _onNewSelection(selection, selectionForm) {
     // Only enable the selection panel if the selection is long enough.
     const disabled = (selection.length < 2);
-    selectionForm.firstElementChild.disabled = disabled;
-    if (disabled) return;
-
-    // Multi-cell selections.
-    const adjacentOnlyConstraints = [
-      'multi-cell-constraint-white-dot',
-      'multi-cell-constraint-black-dot',
-      'multi-cell-constraint-x',
-      'multi-cell-constraint-v',
-    ];
+    selectionForm['add-constraint'].disabled = disabled;
+    if (disabled) {
+      // Reenable all the options, so that the user can select them and see
+      // their descriptions.
+      for (const [_, config] of Object.entries(this._MULTI_CELL_CONSTRAINTS)) {
+        config.elem.disabled = false;
+      }
+      selectionForm.classList.add('disabled');
+      return;
+    } else {
+      selectionForm.classList.remove('disabled');
+    }
 
     // Enable/disable the adjacent only constraints.
-    let cellsAreAdjacent = this._cellsAreAdjacent(selection);
-    for (const c of adjacentOnlyConstraints) {
-      const elem = selectionForm[c];
-      if (cellsAreAdjacent) {
-        elem.disabled = false;
-      } else {
-        elem.checked = false;
-        elem.disabled = true;
+    for (const [_, config] of Object.entries(this._MULTI_CELL_CONSTRAINTS)) {
+      if (config.validateFn) {
+        const isValid = config.validateFn(selection, this._shape);
+        config.elem.disabled = !isValid;
       }
-    }
-
-    // Sum constraints can only be of size 16 or less.
-    {
-      const sumDisabled = (selection.length > 16);
-      selectionForm['multi-cell-constraint-sum'].disabled = sumDisabled;
-      selectionForm['multi-cell-constraint-sum-input'].disabled = sumDisabled;
-      if (sumDisabled) {
-        selectionForm['multi-cell-constraint-sum'].checked = false;
-      }
-    }
-
-    // Quad constraint must have exactly 4 cells, and they must be in a grid.
-    {
-      const quadDisabled = !(selection.length == 4 && this._cellsAre2x2Square(selection));
-      selectionForm['multi-cell-constraint-quad'].disabled = quadDisabled;
-      selectionForm['multi-cell-constraint-quad-input'].disabled = quadDisabled;
-      if (quadDisabled) {
-        selectionForm['multi-cell-constraint-quad'].checked = false;
-      }
-    }
-
-    if (this._jigsawManager.isValidJigsawPiece(selection)) {
-      selectionForm['multi-cell-constraint-jigsaw'].disabled = false;
-      selectionForm['multi-cell-constraint-jigsaw'].checked = true;
-    } else {
-      selectionForm['multi-cell-constraint-jigsaw'].disabled = true;
     }
 
     // Focus on the the form so we can immediately press enter.
-    //   - If the cage is selected then focus on the text box for easy input.
-    //   - If the whisper is selected then focus on the text box for easy input.
+    //   - If the value input is enabled then focus on it to make it easy to
+    //     input a value.
     //   - Otherwise just focus on the submit button.
-    if (selectionForm['multi-cell-constraint-cage'].checked) {
-      selectionForm['cage-sum'].select();
-    } else if (selectionForm['multi-cell-constraint-sum'].checked) {
-      selectionForm['plain-sum'].select();
-    } else if (selectionForm['multi-cell-constraint-whisper'].checked) {
-      selectionForm['whisper-difference'].select();
-    } else if (selectionForm['multi-cell-constraint-quad'].checked) {
-      selectionForm['quad-values'].select();
+    const valueInput = selectionForm['value'];
+    if (!valueInput.disabled) {
+      valueInput.focus();
     } else {
-      selectionForm.querySelector('button[type=submit]').focus();
+      selectionForm['add-constraint'].focus();
+    }
+
+    // Disable the add button if the current value is not valid.
+    const type = selectionForm['constraint-type'].value;
+    const config = this._MULTI_CELL_CONSTRAINTS[type];
+    if (config.elem.disabled) {
+      selectionForm['add-constraint'].disabled = true;
     }
   }
 
@@ -966,80 +876,220 @@ class ConstraintManager {
     this.runUpdateCallback();
   }
 
-  _addConstraintFromForm(selectionForm, inputManager) {
+  static _cellsAre2x2Square(cells, shape) {
+    if (cells.length != 4) return false;
+    cells = cells.map(
+      c => shape.parseCellId(c)).sort((a, b) => a.cell - b.cell);
+    let { row, col } = cells[0];
+    return (
+      (cells[1].row == row && cells[1].col == col + 1) &&
+      (cells[2].row == row + 1 && cells[2].col == col) &&
+      (cells[3].row == row + 1 && cells[3].col == col + 1));
+  }
+
+  static _cellsAreAdjacent(cells, shape) {
+    if (cells.length != 2) return false;
+    // Manhattan distance is exactly 1.
+    let cell0 = shape.parseCellId(cells[0]);
+    let cell1 = shape.parseCellId(cells[1]);
+    return 1 == Math.abs(cell0.row - cell1.row) + Math.abs(cell0.col - cell1.col);
+  }
+
+  static _cellsAreValidJigsawPiece(cells, shape) {
+    if (cells.length != shape.gridSize) return false;
+    // Check that we aren't overlapping an existing tile.
+    if (cells.some(c => this._piecesMap[shape.parseCellId(c).cell] != 0)) {
+      return false;
+    }
+    return true;
+  }
+
+  _MULTI_CELL_CONSTRAINTS = {
+    cage: {
+      value: 'sum',
+      constraintClass: SudokuConstraint.Cage,
+      validateFn: (cells, shape) => cells.length <= shape.numValues,
+      text: 'Cage',
+      description:
+        "Values must add up to the given sum. All values must be unique.",
+    },
+    sum: {
+      value: 'sum',
+      constraintClass: SudokuConstraint.Sum,
+      validateFn: (cells, shape) => cells.length <= 16,
+      text: 'Sum',
+      description:
+        "Values must add up to the given sum. Values don't need to be unique. Only up to 16 cells are allowed.",
+    },
+    arrow: {
+      constraintClass: SudokuConstraint.Arrow,
+      text: 'Arrow',
+      description:
+        "Values along the arrow must sum to the value in the circle.",
+    },
+    thermo: {
+      constraintClass: SudokuConstraint.Thermo,
+      text: 'Thermometer',
+      description:
+        "Values must be in increasing order starting at the bulb.",
+    },
+    jigsaw: {
+      constraintClass: SudokuConstraint.Jigsaw,
+      validateFn: ConstraintManager._cellsAreValidJigsawPiece,
+      text: 'Jigsaw Piece',
+      description:
+        "Values inside the jigsaw piece can't repeat. Pieces must contain 9 cells, and cannot overlap.",
+    },
+    whisper: {
+      value: 'difference',
+      constraintClass: SudokuConstraint.Whisper,
+      text: 'Whisper',
+      description:
+        "Adjacent values on the line must differ by at least this amount."
+    },
+    renban: {
+      constraintClass: SudokuConstraint.Renban,
+      text: 'Renban',
+      description:
+        "Digits on the line must be consecutive and non-repeating, in any order."
+    },
+    'region-sum': {
+      constraintClass: SudokuConstraint.RegionSumLine,
+      text: 'Region Sum Line',
+      description:
+        `
+          Values on the line have an equal sum N within each
+          box it passes through. If a line passes through the
+          same box more than once, each individual segment of
+          such a line within that box sums to N separately.
+
+          Has no effect if 'No Boxes' is set.`,
+    },
+    between: {
+      constraintClass: SudokuConstraint.Between,
+      text: 'Between',
+      description:
+        "Values on the line must be strictly between the values in the circles."
+    },
+    palindrome: {
+      constraintClass: SudokuConstraint.Palindrome,
+      text: 'Palindrome',
+      description:
+        "The values along the line form a palindrome."
+    },
+    'white-dot': {
+      constraintClass: SudokuConstraint.WhiteDot,
+      validateFn: ConstraintManager._cellsAreAdjacent,
+      text: '○ ±1',
+      description:
+        "Kropki white dot: values must be consecutive. Adjacent cells only.",
+    },
+    'black-dot': {
+      constraintClass: SudokuConstraint.BlackDot,
+      validateFn: ConstraintManager._cellsAreAdjacent,
+      text: '● ×÷2',
+      description:
+        "Kropki black dot: one value must be double the other. Adjacent cells only."
+    },
+    x: {
+      constraintClass: SudokuConstraint.X,
+      validateFn: ConstraintManager._cellsAreAdjacent,
+      text: 'x: 10Σ',
+      description:
+        "x: values must add to 10. Adjacent cells only."
+    },
+    v: {
+      constraintClass: SudokuConstraint.V,
+      validateFn: ConstraintManager._cellsAreAdjacent,
+      text: 'v: 5Σ',
+      description:
+        "v: values must add to 5. Adjacent cells only."
+    },
+    quad: {
+      value: 'values',
+      constraintClass: SudokuConstraint.Quad,
+      validateFn: ConstraintManager._cellsAre2x2Square,
+      text: 'Quadruple',
+      description:
+        `
+        All the given values must be present in the surrounding 2x2 square.
+        Select a 2x2 square to enable.`,
+    },
+  }
+
+  _setUpMultiCellConstraints(selectionForm) {
+    const selectElem = selectionForm['constraint-type'];
+    selectionForm.classList.add('disabled');
+
+    // Create the options.
+    for (const [name, config] of Object.entries(this._MULTI_CELL_CONSTRAINTS)) {
+      let option = document.createElement('option');
+      option.value = name;
+      option.textContent = config.text;
+      option.title = config.description.replace(/\s+/g, ' ').replace(/^\s/, '');
+      selectElem.appendChild(option);
+
+      config.elem = option;
+    }
+
+    // Update the form based on the selected constraint.
+    const descriptionElem = document.getElementById('multi-cell-constraint-description');
+    const valueElem = selectionForm['value'];
+    selectElem.onchange = () => {
+      const value = selectElem.value;
+      const config = this._MULTI_CELL_CONSTRAINTS[value];
+      if (!config) return;
+
+      if (config.value) {
+        valueElem.disabled = false;
+        valueElem.placeholder = config.value;
+        valueElem.style.visibility = 'visible';
+        valueElem.focus();
+      } else {
+        valueElem.disabled = true;
+        valueElem.style.visibility = 'hidden';
+      }
+      valueElem.value = '';
+
+      descriptionElem.textContent = config.description;
+
+      if (!selectionForm.classList.contains('disabled')) {
+        selectionForm['add-constraint'].disabled = config.elem.disabled;
+      }
+    }
+
+    // Ensure select is initialized.
+    selectElem.onchange();
+    valueElem.blur();
+  }
+
+  _addMultiCellConstraint(selectionForm, inputManager) {
     const cells = inputManager.getSelection();
     if (cells.length < 2) throw ('Selection too short.');
 
-    let formData = new FormData(selectionForm);
+    const formData = new FormData(selectionForm);
+    const type = formData.get('constraint-type');
 
-    let constraint;
-    switch (formData.get('constraint-type')) {
-      case 'arrow':
-        constraint = new SudokuConstraint.Arrow(...cells);
+    const config = this._MULTI_CELL_CONSTRAINTS[type];
+    if (!config) throw ('Unknown constraint type: ' + type);
+    if (config.elem.disabled) throw ('Invalid selection for ' + type);
+
+    if (type === 'quad') {
+      const valuesStr = formData.get('value');
+      const values = valuesStr.split(/[, ]+/).map(v => +v).filter(
+        v => Number.isInteger(v) && v >= 1 && v <= this._shape.numValues);
+      if (values.length) {
+        cells.sort();
+        const constraint = new SudokuConstraint.Quad(cells[0], ...values);
         this.loadConstraint(constraint);
-        break;
-      case 'cage':
-        constraint = new SudokuConstraint.Cage(+formData.get('cage-sum'), ...cells);
-        this.loadConstraint(constraint);
-        break;
-      case 'sum':
-        constraint = new SudokuConstraint.Sum(+formData.get('plain-sum'), ...cells);
-        this.loadConstraint(constraint);
-        break;
-      case 'thermo':
-        constraint = new SudokuConstraint.Thermo(...cells);
-        this.loadConstraint(constraint);
-        break;
-      case 'jigsaw':
-        this._jigsawManager.addPiece(cells);
-        break;
-      case 'whisper':
-        let difference = +formData.get('whisper-difference');
-        constraint = new SudokuConstraint.Whisper(difference, ...cells);
-        this.loadConstraint(constraint);
-        break;
-      case 'renban':
-        constraint = new SudokuConstraint.Renban(...cells);
-        this.loadConstraint(constraint);
-        break;
-      case 'region-sum':
-        constraint = new SudokuConstraint.RegionSumLine(...cells);
-        this.loadConstraint(constraint);
-        break;
-      case 'between':
-        constraint = new SudokuConstraint.Between(...cells);
-        this.loadConstraint(constraint);
-        break;
-      case 'palindrome':
-        constraint = new SudokuConstraint.Palindrome(...cells);
-        this.loadConstraint(constraint);
-        break;
-      case 'white-dot':
-        constraint = new SudokuConstraint.WhiteDot(...cells);
-        this.loadConstraint(constraint);
-        break;
-      case 'black-dot':
-        constraint = new SudokuConstraint.BlackDot(...cells);
-        this.loadConstraint(constraint);
-        break;
-      case 'x':
-        constraint = new SudokuConstraint.X(...cells);
-        this.loadConstraint(constraint);
-        break;
-      case 'v':
-        constraint = new SudokuConstraint.V(...cells);
-        this.loadConstraint(constraint);
-        break;
-      case 'quad':
-        let valuesStr = formData.get('quad-values');
-        let values = valuesStr.split(/[, ]+/).map(v => +v).filter(
-          v => Number.isInteger(v) && v >= 1 && v <= this._shape.numValues);
-        if (values.length) {
-          cells.sort();
-          constraint = new SudokuConstraint.Quad(cells[0], ...values);
-          this.loadConstraint(constraint);
-        }
-        break;
+      }
+    } else if (config.value) {
+      const value = formData.get('value');
+      this.loadConstraint(
+        new config.constraintClass(+value, ...cells));
+    } else {
+      this.loadConstraint(
+        new config.constraintClass(...cells));
     }
 
     inputManager.setSelection([]);

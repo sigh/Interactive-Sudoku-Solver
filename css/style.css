@@ -348,10 +348,6 @@ input:invalid {
   outline: 2px solid red;
 }
 
-#multi-cell-constraint-quad-input {
-  width: 80px;
-}
-
 fieldset {
   border-radius: 10px;
   width: fit-content;
@@ -530,7 +526,19 @@ select {
 #multi-cell-constraint-input>fieldset {
   border: none;
   background: rgb(0, 0, 255, 0.1);
-  width: fit-content;
+  width: 160px;
+}
+
+#multi-cell-constraint-input button {
+  margin-left: 10px;
+}
+
+#multi-cell-constraint-input select {
+  width: 100%;
+}
+
+#multi-cell-constraint-input.disabled {
+  color: grey;
 }
 
 .description {
