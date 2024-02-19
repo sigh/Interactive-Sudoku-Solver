@@ -214,136 +214,19 @@ layout: null
       <div class="two-column">
         <div>
           <form id="multi-cell-constraint-input">
-            <fieldset tabindex="0" disabled>
+            <fieldset tabindex="0">
               <h2>Create from selection</h2>
               <div>
-                <input type="radio" id="multi-cell-constraint-cage" name="constraint-type" value="cage" checked>
-                <label for="multi-cell-constraint-cage">
-                  Cage
-                  <input type="number" name="cage-sum" min=0 placeholder="sum">
-                  <span class="tooltip" data-text="Values must add up to the given sum. All values must be unique.">
-                  </span>
-                </label>
+                <select id="multi-cell-constraint-select" name="constraint-type">
+                </select>
+              </div>
+              <div id="multi-cell-constraint-description" class="description">
               </div>
               <div>
-                <input type="radio" id="multi-cell-constraint-sum" name="constraint-type" value="sum">
-                <label for="multi-cell-constraint-sum">
-                  Sum
-                  <input type="number" id="multi-cell-constraint-sum-input" name="plain-sum" min=0 placeholder="sum">
-                  <span class="tooltip"
-                    data-text="Values must add up to the given sum. Values don't need to be unique. Only up to 16 cells are allowed.">
-                  </span>
-                </label>
-              </div>
-              <div>
-                <input type="radio" id="multi-cell-constraint-jigsaw" name="constraint-type" value="jigsaw">
-                <label for="multi-cell-constraint-jigsaw">Jigsaw Piece</label>
-                <span class="tooltip"
-                  data-text="Values inside the jigsaw piece can't repeat. Pieces must contain 9 cells, and cannot overlap.">
-                </span>
-              </div>
-              <div>
-                <input type="radio" id="multi-cell-constraint-thermo" name="constraint-type" value="thermo">
-                <label for="multi-cell-constraint-thermo">Thermometer</label>
-                <span class="tooltip" data-text="Values must be in increasing order starting at the bulb.">
-                </span>
-              </div>
-              <div>
-                <input type="radio" id="multi-cell-constraint-arrow" name="constraint-type" value="arrow">
-                <label for="multi-cell-constraint-arrow">Arrow Sum</label>
-                <span class="tooltip" data-text="Values along the arrow must sum to the value in the circle.">
-                </span>
-              </div>
-              <div>
-                <input type="radio" id="multi-cell-constraint-palindrome" name="constraint-type" value="palindrome">
-                <label for="multi-cell-constraint-palindrome">Palindrome</label>
-                <span class="tooltip" data-text="The values along the line form a palindrome.">
-                </span>
-              </div>
-              <div>
-                <input type="radio" id="multi-cell-constraint-whisper" name="constraint-type" value="whisper">
-                <label for="multi-cell-constraint-whisper">
-                  Whisper
-                  <input type="number" name="whisper-difference" min=1 max=8 value="5">
-                  <span class="tooltip" data-text="Adjacent values on the line must differ by at least this amount.">
-                  </span>
-                </label>
-              </div>
-              <div>
-                <input type="radio" id="multi-cell-constraint-renban" name="constraint-type" value="renban">
-                <label for="multi-cell-constraint-renban">Renban</label>
-                <span class="tooltip"
-                  data-text="Digits on the line must be consecutive and non-repeating, in any order.">
-                </span>
-              </div>
-              <div>
-                <input type="radio" id="multi-cell-constraint-between" name="constraint-type" value="between">
-                <label for="multi-cell-constraint-between">Between Line</label>
-                <span class="tooltip"
-                  data-text="Values on the line must be strictly between the values in the circles.">
-                </span>
-              </div>
-              <div>
-                <input type="radio" id="multi-cell-constraint-region-sum" name="constraint-type" value="region-sum">
-                <label for="multi-cell-constraint-region-sum">Region Sum Line</label>
-                <span class="tooltip" data-text="Values on the line have an equal sum N within each
-                           box it passes through. If a line passes through the
-                           same box more than once, each individual segment of
-                           such a line within that box sums to N separately.
-
-                           Has no effect if 'No Boxes' is set.">
-                </span>
-              </div>
-              <div class="two-column panel-edge-constraints">
-                <div>
-                  <div>
-                    <input type="radio" id="multi-cell-constraint-white-dot" name="constraint-type" value="white-dot">
-                    <label for="multi-cell-constraint-white-dot">&plusmn;1 &#9675;</label>
-                    <span class="tooltip"
-                      data-text="Kropki white dot: values must be consecutive. Adjacent cells only.">
-                    </span>
-                  </div>
-                  <div>
-                    <input type="radio" id="multi-cell-constraint-v" name="constraint-type" value="v">
-                    <label for="multi-cell-constraint-v">v: 5&#931;</label>
-                    <span class="tooltip" data-text="v: values must add to 5. Adjacent cells only.">
-                    </span>
-                  </div>
-                </div>
-                <div>
-                  <div>
-                    <input type="radio" id="multi-cell-constraint-black-dot" name="constraint-type" value="black-dot">
-                    <label for="multi-cell-constraint-black-dot">
-                      <span class="muldiv"><span>&times;</span><span>&divide;</span></span>
-                      2 &#9679;
-                    </label>
-                    <span class="tooltip"
-                      data-text="Kropki black dot: one value must be double the other. Adjacent cells only.">
-                    </span>
-                  </div>
-                  <div>
-                    <input type="radio" id="multi-cell-constraint-x" name="constraint-type" value="x">
-                    <label for="multi-cell-constraint-x">x: 10&#931</label>
-                    <span class="tooltip" data-text="x: values must add to 10. Adjacent cells only.">
-                    </span>
-                  </div>
-                </div>
-              </div>
-              <div>
-                <input type="radio" id="multi-cell-constraint-quad" name="constraint-type" value="quad">
-                <label for="multi-cell-constraint-quad">
-                  Quad
-                  <input type="text" id="multi-cell-constraint-quad-input" name="quad-values" ,
-                    pattern="\d+([, ]*\d+){0,3}[, ]*" />
-                  <span class="tooltip" data-text="
-                    All the given values must be present in the surrounding 2x2 square.
-                    Select a 2x2 square to enable.
-                  ">
-                  </span>
-                </label>
-              </div>
-              <div>
-                <button type="submit" title="Add constraint">Add</button>
+                <input type="text" name="value" size="10">
+                <button type="submit" name="add-constraint" title="Add constraint" disabled>
+                  Add
+                </button>
               </div>
             </fieldset>
           </form>
