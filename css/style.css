@@ -302,19 +302,27 @@ button.image-button>img {
   color: #bc3315;
 }
 
+#constraint-panel,
+#constraint-panel .constraint-subpanel {
+  line-height: 1.8;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
 #constraint-panel h1 {
   font-size: 20px;
   line-height: 1;
 }
 
-#constraint-panel {
-  line-height: 1.8;
+#constraint-panel form {
+  margin: 0;
 }
 
 #constraint-panel>div:first-child {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 10px;
 }
 
 #constraint-panel .panel-edge-constraints {
@@ -348,6 +356,12 @@ input:invalid {
   outline: 2px solid red;
 }
 
+.constraint-group {
+  border-radius: 10px;
+  border: 2px solid #aaa;
+  padding: 5px;
+}
+
 fieldset {
   border-radius: 10px;
   width: fit-content;
@@ -362,10 +376,15 @@ textarea {
   font-size: 12px;
 }
 
+#sudoku-grid-with-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
 .control-panel {
   display: flex;
   align-items: center;
-  margin-top: 10px;
   gap: 10px;
 }
 

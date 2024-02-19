@@ -212,7 +212,7 @@ layout: null
       </div>
 
       <div class="two-column">
-        <div>
+        <div class="constraint-subpanel">
           <form id="multi-cell-constraint-input">
             <fieldset tabindex="0">
               <h2>Create from selection</h2>
@@ -230,6 +230,42 @@ layout: null
               </div>
             </fieldset>
           </form>
+
+          <div class="constraint-group">
+            <h2>Global constraints</h2>
+
+            <div>
+              <input type="checkbox" id="anti-consecutive-input">
+              <label for="anti-consecutive-input">Anti-Consecutive</label>
+              <span class="tooltip" data-text="No adjacent cells can have consecutive values.">
+              </span>
+            </div>
+
+            <div>
+              <input type="checkbox" id="strict-kropki-input">
+              <label for="strict-kropki-input">Strict Kropki</label>
+              <span class="tooltip"
+                data-text="Only explicitly marked cell pairs satisfy Kropki (black/white dot) constraints.">
+              </span>
+            </div>
+
+            <div>
+              <input type="checkbox" id="strict-xv-input">
+              <label for="strict-xv-input">Strict XV</label>
+              <span class="tooltip" data-text="Only explicitly marked cell pairs satisfy XV constraints.">
+              </span>
+            </div>
+
+            <div>
+              <input type="checkbox" id="global-entropy-input">
+              <label for="global-entropy-input">Global Entropy</label>
+              <span class="tooltip"
+                data-text="Each 2x2 box in the grid has to contain a low digit (1, 2, 3), a middle digit (4, 5, 6) and a high digit (7, 8, 9).">
+              </span>
+            </div>
+          </div>
+
+
           <form id="multi-value-cell-input">
             <div class="dropdown-container disabled">
               <span class="dropdown-anchor">Set multiple values</span>
@@ -239,104 +275,79 @@ layout: null
         </div>
 
         <div>
-          <h2>Layout</h2>
-          <div>
-            <select id="shape-select">
-              <option value="9x9">9x9</option>
-              <option value="16x16">16x16</option>
-            </select>
-            <span class="tooltip" data-text="Change the grid size."></span>
-          </div>
-          <div>
-            <input type="checkbox" id="anti-knight-input">
-            <label for="anti-knight-input">Anti-Knight</label>
-            <span class="tooltip" data-text="Cells which are a knight's move away cannot have the same value.">
-            </span>
-          </div>
+          <div class="constraint-group">
+            <h2>Layout constraints</h2>
 
-          <div>
-            <input type="checkbox" id="anti-king-input">
-            <label for="anti-king-input">Anti-King</label>
-            <span class="tooltip" data-text="Cells which are a king's move away cannot have the same value.">
-            </span>
-          </div>
-
-          <div>
-            <input type="checkbox" id="diagonal-plus-input">
-            <label for="diagonal-plus-input">&#10187; Diagonal</label>
-            <span class="tooltip" data-text="Values along the positive diagonal must be unique.">
-            </span>
-          </div>
-
-          <div>
-            <input type="checkbox" id="diagonal-minus-input">
-            <label for="diagonal-minus-input">&#10189; Diagonal</label>
-            <span class="tooltip" data-text="Values along the negative diagonal must be unique.">
-            </span>
-          </div>
-
-          <div>
-            <input type="checkbox" id="windoku-input">
-            <label for="windoku-input">Windoku</label>
-            <span class="tooltip" data-text="Values in the 3x3 windoku boxes must be uniques.">
-            </span>
-          </div>
-
-          <div>
-            <input type="checkbox" id="disjoint-sets">
-            <label for="disjoint-sets">Disjoint Sets</label>
-            <span class="tooltip" data-text="No digit may appear in the same position in any two boxes.">
-            </span>
-          </div>
-
-          <div>
-            <input type="checkbox" id="no-boxes-input">
-            <label for="no-boxes-input">No Boxes</label>
-            <span class="tooltip" data-text="No standard 3x3 box constraints.">
-            </span>
-          </div>
-
-          <div id="displayed-regions"></div>
-
-          <div id="validate-layout-container">
             <div>
-              <button id="validate-layout-button" title="Validate layout">Validate layout</button>
+              <select id="shape-select">
+                <option value="9x9">9x9</option>
+                <option value="16x16">16x16</option>
+              </select>
+              <span class="tooltip" data-text="Change the grid shape."></span>
             </div>
+
             <div>
-              <span id="validate-result-output" class="result"></span>
+              <input type="checkbox" id="anti-knight-input">
+              <label for="anti-knight-input">Anti-Knight</label>
+              <span class="tooltip" data-text="Cells which are a knight's move away cannot have the same value.">
+              </span>
             </div>
-          </div>
 
-          <div>
-            <input type="checkbox" id="anti-consecutive-input">
-            <label for="anti-consecutive-input">Anti-Consecutive</label>
-            <span class="tooltip" data-text="No adjacent cells can have consecutive values.">
-            </span>
-          </div>
+            <div>
+              <input type="checkbox" id="anti-king-input">
+              <label for="anti-king-input">Anti-King</label>
+              <span class="tooltip" data-text="Cells which are a king's move away cannot have the same value.">
+              </span>
+            </div>
 
-          <div>
-            <input type="checkbox" id="strict-kropki-input">
-            <label for="strict-kropki-input">Strict Kropki</label>
-            <span class="tooltip"
-              data-text="Only explicitly marked cell pairs satisfy Kropki (black/white dot) constraints.">
-            </span>
-          </div>
+            <div>
+              <input type="checkbox" id="diagonal-plus-input">
+              <label for="diagonal-plus-input">&#10187; Diagonal</label>
+              <span class="tooltip" data-text="Values along the positive diagonal must be unique.">
+              </span>
+            </div>
 
-          <div>
-            <input type="checkbox" id="strict-xv-input">
-            <label for="strict-xv-input">Strict XV</label>
-            <span class="tooltip" data-text="Only explicitly marked cell pairs satisfy XV constraints.">
-            </span>
-          </div>
+            <div>
+              <input type="checkbox" id="diagonal-minus-input">
+              <label for="diagonal-minus-input">&#10189; Diagonal</label>
+              <span class="tooltip" data-text="Values along the negative diagonal must be unique.">
+              </span>
+            </div>
 
-          <div>
-            <input type="checkbox" id="global-entropy-input">
-            <label for="global-entropy-input">Global Entropy</label>
-            <span class="tooltip"
-              data-text="Each 2x2 box in the grid has to contain a low digit (1, 2, 3), a middle digit (4, 5, 6) and a high digit (7, 8, 9).">
-            </span>
-          </div>
+            <div>
+              <input type="checkbox" id="windoku-input">
+              <label for="windoku-input">Windoku</label>
+              <span class="tooltip" data-text="Values in the 3x3 windoku boxes must be uniques.">
+              </span>
+            </div>
 
+            <div>
+              <input type="checkbox" id="disjoint-sets">
+              <label for="disjoint-sets">Disjoint Sets</label>
+              <span class="tooltip" data-text="No digit may appear in the same position in any two boxes.">
+              </span>
+            </div>
+
+            <div>
+              <input type="checkbox" id="no-boxes-input">
+              <label for="no-boxes-input">No Boxes</label>
+              <span class="tooltip" data-text="No standard 3x3 box constraints.">
+              </span>
+            </div>
+
+            <div id="displayed-regions"></div>
+
+            <div id="validate-layout-container">
+              <div>
+                <button id="validate-layout-button" title="Validate layout">Validate layout</button>
+              </div>
+              <div>
+                <span id="validate-result-output" class="result"></span>
+              </div>
+            </div>
+
+
+          </div>
         </div>
       </div>
 
