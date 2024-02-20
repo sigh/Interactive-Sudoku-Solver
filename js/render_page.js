@@ -328,7 +328,7 @@ class ShapeManager {
   }
 
   loadConstraintShape(constraint) {
-    const shape = SudokuConstraint.getShape(constraint);
+    const shape = SudokuConstraintBase.getShape(constraint);
     this._select.value = shape.name;
     this.reshape(shape);
   }
@@ -612,7 +612,7 @@ class ConstraintManager {
   }
 
   _loadFromText(input) {
-    const constraint = SudokuConstraint.fromText(input);
+    const constraint = SudokuConstraintBase.fromText(input);
 
     this.clear();
     this._shapeManager.loadConstraintShape(constraint);

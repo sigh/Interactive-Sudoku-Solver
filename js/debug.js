@@ -52,10 +52,10 @@ class PuzzleRunner {
 
   static async _runFnWithChecksSinglePuzzle(puzzle, fn, onFailure) {
     // Set up solver.
-    const constraint = SudokuConstraint.fromText(puzzle.input);
+    const constraint = SudokuConstraintBase.fromText(puzzle.input);
     const solver = await SudokuBuilder.buildInWorker(
       constraint, this._stateHandler.bind(this));
-    const shape = SudokuConstraint.getShape(constraint);
+    const shape = SudokuConstraintBase.getShape(constraint);
 
     // Log a fixed string so the progress gets collapsed to a single line.
     // Do this after the worker has started to ensure a nice output.

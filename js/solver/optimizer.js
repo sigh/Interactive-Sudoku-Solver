@@ -488,8 +488,8 @@ class SudokuConstraintOptimizer {
   }
 
   _overlapRegions = memoize((shape) => {
-    const rowRegions = SudokuConstraint.rowRegions(shape);
-    const colRegions = SudokuConstraint.colRegions(shape);
+    const rowRegions = SudokuConstraintBase.rowRegions(shape);
+    const colRegions = SudokuConstraintBase.colRegions(shape);
     return [
       rowRegions,
       rowRegions.slice().reverse(),
@@ -501,7 +501,7 @@ class SudokuConstraintOptimizer {
   _overlapRegionsWithBox = memoize((shape) => {
     return [
       ...this._overlapRegions(shape),
-      SudokuConstraint.boxRegions(shape),
+      SudokuConstraintBase.boxRegions(shape),
     ];
   });
 

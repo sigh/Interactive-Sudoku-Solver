@@ -1910,7 +1910,7 @@ SudokuConstraintHandler.RegionSumLine = class RegionSumLine extends SudokuConstr
   initialize(initialGrid, cellExclusions, shape) {
     // Map cells to box regions.
     const cellToBox = new Map();
-    for (const boxRegion of SudokuConstraint.boxRegions(shape)) {
+    for (const boxRegion of SudokuConstraintBase.boxRegions(shape)) {
       for (const cell of boxRegion) cellToBox.set(cell, boxRegion);
     }
 
