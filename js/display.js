@@ -1054,7 +1054,6 @@ class OutsideArrowDisplay extends DisplayItem {
     inputManager.addSelectionPreserver(svg);
 
     const form = document.forms['outside-arrow-input'];
-    const selectionForm = document.forms['multi-cell-constraint-input'].firstElementChild;
 
     let selectedArrow = null;
     inputManager.onSelection((cells) => {
@@ -1073,7 +1072,6 @@ class OutsideArrowDisplay extends DisplayItem {
       const arrow = this._outsideArrowMap.get(lineId);
 
       inputManager.setSelection(cells);
-      selectionForm.disabled = true;
       form.firstElementChild.disabled = false;
       form.id.value = lineId;
       form.value.select();
