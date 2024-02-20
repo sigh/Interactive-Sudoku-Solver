@@ -442,9 +442,10 @@ class SudokuConstraintBase {
     if (!shape) throw ('Unknown shape: ' + shape);
     return shape;
   }
-  static getShape(constraint) {
-    const [_, metaConstraints] = this.toLists(constraint);
-    return this.getShapeFromMeta(this.getMetaConfig(metaConstraints));
+  getShape() {
+    const constructor = this.constructor;
+    const [_, metaConstraints] = constructor.toLists(this);
+    return constructor.getShapeFromMeta(constructor.getMetaConfig(metaConstraints));
   }
 
   static _makeRegions(fn, gridSize) {

@@ -55,7 +55,7 @@ class PuzzleRunner {
     const constraint = SudokuConstraintBase.fromText(puzzle.input);
     const solver = await SudokuBuilder.buildInWorker(
       constraint, this._stateHandler.bind(this));
-    const shape = SudokuConstraintBase.getShape(constraint);
+    const shape = constraint.getShape();
 
     // Log a fixed string so the progress gets collapsed to a single line.
     // Do this after the worker has started to ensure a nice output.
