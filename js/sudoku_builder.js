@@ -408,7 +408,7 @@ class SudokuConstraintBase {
     return new SudokuConstraint.Set(constraints);
   }
 
-  static toLists(constraint) {
+  toLists() {
     const constraints = [];
     const metaConstraints = [];
 
@@ -421,7 +421,7 @@ class SudokuConstraintBase {
         constraints.push(c);
       }
     };
-    toListRec(constraint);
+    toListRec(this);
 
     return [constraints, metaConstraints];
   }
@@ -444,7 +444,7 @@ class SudokuConstraintBase {
   }
   getShape() {
     const constructor = this.constructor;
-    const [_, metaConstraints] = constructor.toLists(this);
+    const [_, metaConstraints] = this.toLists();
     return constructor.getShapeFromMeta(constructor.getMetaConfig(metaConstraints));
   }
 
@@ -968,7 +968,7 @@ SudokuConstraintBase.DEFAULT_CONSTRAINT = SudokuConstraint.Givens;
 
 class SudokuBuilder {
   static build(constraint, debugOptions) {
-    const [constraints, metaConstraints] = SudokuConstraintBase.toLists(constraint);
+    const [constraints, metaConstraints] = constraint.toLists();
     const metaConfig = SudokuConstraintBase.getMetaConfig(metaConstraints);
     const shape = SudokuConstraintBase.getShapeFromMeta(metaConfig);
 
