@@ -238,7 +238,7 @@ class JigsawManager {
   getConstraint() {
     if (this._piecesMap.every(x => x == 0)) return new SudokuConstraint.Set([]);
 
-    const baseCharCode = SudokuTextParser.SHAPE_TO_BASE_CHAR_CODE.get(this._shape);
+    const baseCharCode = SudokuParser.SHAPE_TO_BASE_CHAR_CODE.get(this._shape);
 
     const indexMap = new Map();
     const grid = Array(this._shape.numCells).fill('-');
@@ -612,7 +612,7 @@ class ConstraintManager {
   }
 
   _loadFromText(input) {
-    const constraint = SudokuConstraintBase.fromText(input);
+    const constraint = SudokuParser.parseText(input);
 
     this.clear();
     this._shapeManager.loadConstraintShape(constraint);
