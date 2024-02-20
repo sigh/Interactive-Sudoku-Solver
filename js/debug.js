@@ -52,7 +52,7 @@ class PuzzleRunner {
 
   static async _runFnWithChecksSinglePuzzle(puzzle, fn, onFailure) {
     // Set up solver.
-    const constraint = SudokuConstraintBase.fromText(puzzle.input);
+    const constraint = SudokuParser.parseText(puzzle.input);
     const solver = await SudokuBuilder.buildInWorker(
       constraint, this._stateHandler.bind(this));
     const shape = constraint.getShape();

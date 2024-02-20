@@ -78,7 +78,7 @@ const SHAPE_9x9 = new GridShape(9, 3);
 const SHAPE_16x16 = new GridShape(16, 4);
 const SHAPE_MAX = SHAPE_16x16;
 
-class SudokuTextParser {
+class SudokuParser {
   static parseShortKillerFormat(text) {
     // Reference for format:
     // http://forum.enjoysudoku.com/understandable-snarfable-killer-cages-t6119.html
@@ -327,7 +327,7 @@ class SudokuTextParser {
     ]);
   }
 
-  static parseText(rawText) {
+  static parseTextLine(rawText) {
     // Remove all whitespace.
     const text = rawText.replace(/\s+/g, '');
 
@@ -356,17 +356,23 @@ class SudokuTextParser {
 
     return null;
   }
-}
 
-class SudokuConstraintBase {
-  static DEFAULT_SHAPE = SHAPE_9x9;
-
-  constructor(args) {
-    this.args = args ? [...args] : [];
-    this.type = this.constructor.name;
+  static parseText(rawText) {
+    const constraints = [];
+    // Parse sections separated by a blank line separately,
+    // and then merge their constraints.
+    for (const part of rawText.split(/\n\s*\n/)) {
+      let constraint = this.parseTextLine(part);
+      if (!constraint) {
+        constraint = this.parseString(part);
+      }
+      constraints.push(constraint);
+    }
+    if (constraints.length == 1) return constraints[0];
+    return new SudokuConstraint.Set(constraints);
   }
 
-  static fromString(str) {
+  static parseString(str) {
     str = str.replace(/\s+/g, '');
     let items = str.split('.');
     if (items[0]) throw (
@@ -377,7 +383,7 @@ class SudokuConstraintBase {
     for (const item of items) {
       let args = item.split('~');
       let type = args.shift();
-      if (!type) type = this.DEFAULT_CONSTRAINT.name;
+      if (!type) type = SudokuConstraint.Givens.name;
       if (!SudokuConstraint[type]) {
         throw ('Unknown constraint type: ' + type);
       }
@@ -385,27 +391,21 @@ class SudokuConstraintBase {
     }
     return new SudokuConstraint.Set(constraints);
   }
+}
+
+class SudokuConstraintBase {
+  static DEFAULT_SHAPE = SHAPE_9x9;
+
+  constructor(args) {
+    this.args = args ? [...args] : [];
+    this.type = this.constructor.name;
+  }
 
   toString() {
     let type = this.type;
-    if (this.constructor == this.constructor.DEFAULT_CONSTRAINT) type = '';
+    if (this.constructor == SudokuConstraint.Givens) type = '';
     let arr = [type, ...this.args];
     return '.' + arr.join('~');
-  }
-
-  static fromText(rawText) {
-    const constraints = [];
-    // Parse sections separated by a blank line separately,
-    // and then merge their constraints.
-    for (const part of rawText.split(/\n\s*\n/)) {
-      let constraint = SudokuTextParser.parseText(part);
-      if (!constraint) {
-        constraint = SudokuConstraintBase.fromString(part);
-      }
-      constraints.push(constraint);
-    }
-    if (constraints.length == 1) return constraints[0];
-    return new SudokuConstraint.Set(constraints);
   }
 
   toLists() {
@@ -964,8 +964,6 @@ class SudokuConstraint {
   }
 }
 
-SudokuConstraintBase.DEFAULT_CONSTRAINT = SudokuConstraint.Givens;
-
 class SudokuBuilder {
   static build(constraint, debugOptions) {
     const [constraints, metaConstraints] = constraint.toLists();
@@ -1523,7 +1521,7 @@ class SolverProxy {
 };
 
 const toShortSolution = (solution, shape) => {
-  const baseCharCode = SudokuTextParser.SHAPE_TO_BASE_CHAR_CODE.get(shape);
+  const baseCharCode = SudokuParser.SHAPE_TO_BASE_CHAR_CODE.get(shape);
   const DEFAULT_VALUE = '.';
 
   const result = new Array(solution.length).fill(DEFAULT_VALUE);
