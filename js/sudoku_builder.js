@@ -984,6 +984,14 @@ class SudokuBuilder {
 
   static _unusedWorkers = [];
 
+  static resolveConstraint(constraint) {
+    let args = constraint.args;
+    if (constraint.type === 'Set') {
+      args[0] = constraint.args[0].map(a => this.resolveConstraint(a));
+    }
+    return new SudokuConstraint[constraint.type](...args);
+  }
+
   static async buildInWorker(constraints, stateHandler, statusHandler, debugHandler) {
     // Ensure any pending terminations are enacted.
     await new Promise(r => setTimeout(r, 0));
