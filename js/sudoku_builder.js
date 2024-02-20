@@ -358,7 +358,7 @@ class SudokuTextParser {
   }
 }
 
-class SudokuConstraint {
+class SudokuConstraintBase {
   static DEFAULT_SHAPE = SHAPE_9x9;
 
   constructor(args) {
@@ -377,7 +377,7 @@ class SudokuConstraint {
     for (const item of items) {
       let args = item.split('~');
       let type = args.shift();
-      if (!type) type = this.DEFAULT.name;
+      if (!type) type = this.DEFAULT_CONSTRAINT.name;
       if (!SudokuConstraint[type]) {
         throw ('Unknown constraint type: ' + type);
       }
@@ -388,7 +388,7 @@ class SudokuConstraint {
 
   toString() {
     let type = this.type;
-    if (this.constructor == this.constructor.DEFAULT) type = '';
+    if (this.constructor == this.constructor.DEFAULT_CONSTRAINT) type = '';
     let arr = [type, ...this.args];
     return '.' + arr.join('~');
   }
@@ -400,7 +400,7 @@ class SudokuConstraint {
     for (const part of rawText.split(/\n\s*\n/)) {
       let constraint = SudokuTextParser.parseText(part);
       if (!constraint) {
-        constraint = SudokuConstraint.fromString(part);
+        constraint = SudokuConstraintBase.fromString(part);
       }
       constraints.push(constraint);
     }
@@ -447,7 +447,70 @@ class SudokuConstraint {
     return this.getShapeFromMeta(this.getMetaConfig(metaConstraints));
   }
 
-  static Set = class Set extends SudokuConstraint {
+  static _makeRegions(fn, gridSize) {
+    const regions = [];
+    for (let r = 0; r < gridSize; r++) {
+      const cells = [];
+      for (let i = 0; i < gridSize; i++) {
+        cells.push(fn(r, i));
+      }
+      regions.push(cells);
+    }
+    return regions;
+  }
+
+  static rowRegions = memoize((shape) => {
+    const gridSize = shape.gridSize;
+    return this._makeRegions((r, i) => r * gridSize + i, gridSize);
+  });
+  static colRegions = memoize((shape) => {
+    const gridSize = shape.gridSize;
+    return this._makeRegions((c, i) => i * gridSize + c, gridSize);
+  });
+  static boxRegions = memoize((shape) => {
+    const gridSize = shape.gridSize;
+    const boxSize = shape.boxSize;
+    return this._makeRegions(
+      (r, i) => ((r / boxSize | 0) * boxSize + (i % boxSize | 0)) * gridSize
+        + (r % boxSize | 0) * boxSize + (i / boxSize | 0), gridSize);
+  });
+  static disjointSetRegions = memoize((shape) => {
+    const gridSize = shape.gridSize;
+    const boxSize = shape.boxSize;
+    return this._makeRegions(
+      (r, i) => ((i / boxSize | 0) * boxSize + (r % boxSize | 0)) * gridSize
+        + (i % boxSize | 0) * boxSize + (r / boxSize | 0), gridSize);
+  });
+
+  static fullLineCellMap = memoize((shape) => {
+    let map = new Map();
+    const gridSize = shape.gridSize;
+
+    const rowRegions = this.rowRegions(shape);
+    for (let row = 0; row < gridSize; row++) {
+      const cells = rowRegions[row].map(c => shape.makeCellIdFromIndex(c));
+      map.set(`R${row + 1},1`, cells);
+      map.set(`R${row + 1},-1`, cells.slice().reverse());
+    }
+    const colRegions = this.colRegions(shape);
+    for (let col = 0; col < gridSize; col++) {
+      const cells = colRegions[col].map(c => shape.makeCellIdFromIndex(c));
+      map.set(`C${col + 1},1`, cells);
+      map.set(`C${col + 1},-1`, cells.slice().reverse());
+    }
+
+    return map;
+  });
+
+  static _Meta = class _Meta extends SudokuConstraintBase {
+    constructor(...args) { super(args); }
+    isMeta = true;
+  }
+}
+
+class SudokuConstraint {
+
+  static Set = class Set extends SudokuConstraintBase {
     constructor(constraints) {
       super(arguments);
       this.constraints = constraints;
@@ -458,14 +521,14 @@ class SudokuConstraint {
     }
   }
 
-  static Jigsaw = class Jigsaw extends SudokuConstraint {
+  static Jigsaw = class Jigsaw extends SudokuConstraintBase {
     constructor(grid) {
       super(arguments);
       this.grid = grid;
     }
   }
 
-  static Thermo = class Thermo extends SudokuConstraint {
+  static Thermo = class Thermo extends SudokuConstraintBase {
     constructor(...cells) {
       super(arguments);
       this.cells = cells;
@@ -476,7 +539,7 @@ class SudokuConstraint {
     );
   }
 
-  static Whisper = class Whisper extends SudokuConstraint {
+  static Whisper = class Whisper extends SudokuConstraintBase {
     constructor(difference, ...cells) {
       // German whisper lines omit the difference, so the
       // first argument is actually a cell
@@ -496,7 +559,7 @@ class SudokuConstraint {
     );
   }
 
-  static Renban = class Renban extends SudokuConstraint {
+  static Renban = class Renban extends SudokuConstraintBase {
     constructor(...cells) {
       super(arguments);
       this.cells = cells;
@@ -509,21 +572,21 @@ class SudokuConstraint {
     );
   }
 
-  static RegionSumLine = class RegionSumLine extends SudokuConstraint {
+  static RegionSumLine = class RegionSumLine extends SudokuConstraintBase {
     constructor(...cells) {
       super(arguments);
       this.cells = cells;
     }
   }
 
-  static Between = class Between extends SudokuConstraint {
+  static Between = class Between extends SudokuConstraintBase {
     constructor(...cells) {
       super(arguments);
       this.cells = cells;
     }
   }
 
-  static Palindrome = class Palindrome extends SudokuConstraint {
+  static Palindrome = class Palindrome extends SudokuConstraintBase {
     constructor(...cells) {
       super(arguments);
       this.cells = cells;
@@ -534,33 +597,29 @@ class SudokuConstraint {
     );
   }
 
-  static _Meta = class _Meta extends SudokuConstraint {
-    constructor(...args) { super(args); }
-    isMeta = true;
-  }
-  static NoBoxes = class NoBoxes extends SudokuConstraint._Meta { }
-  static StrictKropki = class StrictKropki extends SudokuConstraint._Meta {
+  static NoBoxes = class NoBoxes extends SudokuConstraintBase._Meta { }
+  static StrictKropki = class StrictKropki extends SudokuConstraintBase._Meta {
     static fnKey = memoize((numValues) =>
       SudokuConstraint.Binary.fnToKey(
         (a, b) => a != b * 2 && b != a * 2 && b != a - 1 && b != a + 1,
         numValues)
     );
   }
-  static StrictXV = class StrictXV extends SudokuConstraint._Meta {
+  static StrictXV = class StrictXV extends SudokuConstraintBase._Meta {
     static fnKey = memoize((numValues) =>
       SudokuConstraint.Binary.fnToKey(
         (a, b) => a + b != 5 && a + b != 10,
         numValues)
     );
   }
-  static Shape = class Shape extends SudokuConstraint._Meta {
+  static Shape = class Shape extends SudokuConstraintBase._Meta {
     toString() {
       if (this.args[0] === SHAPE_9x9.name) return '';
       return super.toString();
     }
   }
 
-  static Windoku = class Windoku extends SudokuConstraint {
+  static Windoku = class Windoku extends SudokuConstraintBase {
     static regions = memoize((shape) => {
       const gridSize = shape.gridSize;
       const boxSize = shape.boxSize;
@@ -583,13 +642,13 @@ class SudokuConstraint {
     });
   }
 
-  static DisjointSets = class DisjointSets extends SudokuConstraint { }
+  static DisjointSets = class DisjointSets extends SudokuConstraintBase { }
 
-  static AntiKnight = class AntiKnight extends SudokuConstraint { }
+  static AntiKnight = class AntiKnight extends SudokuConstraintBase { }
 
-  static AntiKing = class AntiKing extends SudokuConstraint { }
+  static AntiKing = class AntiKing extends SudokuConstraintBase { }
 
-  static AntiConsecutive = class AntiConsecutive extends SudokuConstraint {
+  static AntiConsecutive = class AntiConsecutive extends SudokuConstraintBase {
     static fnKey = memoize((numValues) =>
       SudokuConstraint.Binary.fnToKey(
         (a, b) => (a != b + 1 && a != b - 1 && a != b),
@@ -597,7 +656,7 @@ class SudokuConstraint {
     );
   }
 
-  static GlobalEntropy = class GlobalEntropy extends SudokuConstraint {
+  static GlobalEntropy = class GlobalEntropy extends SudokuConstraintBase {
     static regions = memoize((shape) => {
       const gridSize = shape.gridSize;
       const regions = [];
@@ -617,14 +676,14 @@ class SudokuConstraint {
     });
   }
 
-  static Diagonal = class Diagonal extends SudokuConstraint {
+  static Diagonal = class Diagonal extends SudokuConstraintBase {
     constructor(direction) {
       super(arguments);
       this.direction = direction;
     }
   }
 
-  static WhiteDot = class WhiteDot extends SudokuConstraint {
+  static WhiteDot = class WhiteDot extends SudokuConstraintBase {
     constructor(...cells) {
       super(arguments);
       this.cells = cells;
@@ -637,7 +696,7 @@ class SudokuConstraint {
     );
   }
 
-  static BlackDot = class BlackDot extends SudokuConstraint {
+  static BlackDot = class BlackDot extends SudokuConstraintBase {
     constructor(...cells) {
       super(arguments);
       this.cells = cells;
@@ -650,28 +709,28 @@ class SudokuConstraint {
     );
   }
 
-  static X = class X extends SudokuConstraint {
+  static X = class X extends SudokuConstraintBase {
     constructor(...cells) {
       super(arguments);
       this.cells = cells;
     }
   }
 
-  static V = class V extends SudokuConstraint {
+  static V = class V extends SudokuConstraintBase {
     constructor(...cells) {
       super(arguments);
       this.cells = cells;
     }
   }
 
-  static Arrow = class Arrow extends SudokuConstraint {
+  static Arrow = class Arrow extends SudokuConstraintBase {
     constructor(...cells) {
       super(arguments);
       this.cells = cells;
     }
   }
 
-  static Cage = class Cage extends SudokuConstraint {
+  static Cage = class Cage extends SudokuConstraintBase {
     constructor(sum, ...cells) {
       super(arguments);
       this.cells = cells;
@@ -679,7 +738,7 @@ class SudokuConstraint {
     }
   }
 
-  static Sum = class Sum extends SudokuConstraint {
+  static Sum = class Sum extends SudokuConstraintBase {
     constructor(sum, ...cells) {
       super(arguments);
       this.cells = cells;
@@ -687,7 +746,7 @@ class SudokuConstraint {
     }
   }
 
-  static LittleKiller = class LittleKiller extends SudokuConstraint {
+  static LittleKiller = class LittleKiller extends SudokuConstraintBase {
     constructor(sum, id) {
       super(arguments);
       this.id = id;
@@ -720,7 +779,7 @@ class SudokuConstraint {
     });
   }
 
-  static XSum = class XSum extends SudokuConstraint {
+  static XSum = class XSum extends SudokuConstraintBase {
     constructor(rowCol, sumInc, sumDec) {
       super(arguments);
       this.rowCol = rowCol.toUpperCase();
@@ -733,7 +792,7 @@ class SudokuConstraint {
     }
   }
 
-  static Sandwich = class Sandwich extends SudokuConstraint {
+  static Sandwich = class Sandwich extends SudokuConstraintBase {
     constructor(sum, id) {
       super(arguments);
       this.id = id;
@@ -741,7 +800,7 @@ class SudokuConstraint {
     }
   }
 
-  static Skyscraper = class Skyscraper extends SudokuConstraint {
+  static Skyscraper = class Skyscraper extends SudokuConstraintBase {
     constructor(rowCol, countInc, countDec) {
       super(arguments);
       this.rowCol = rowCol.toUpperCase();
@@ -754,14 +813,14 @@ class SudokuConstraint {
     }
   }
 
-  static AllDifferent = class AllDifferent extends SudokuConstraint {
+  static AllDifferent = class AllDifferent extends SudokuConstraintBase {
     constructor(...cells) {
       super(arguments);
       this.cells = cells;
     }
   }
 
-  static Quad = class Quad extends SudokuConstraint {
+  static Quad = class Quad extends SudokuConstraintBase {
     constructor(topLeftCell, ...values) {
       super(arguments);
       this.topLeftCell = topLeftCell;
@@ -780,7 +839,7 @@ class SudokuConstraint {
     }
   }
 
-  static Binary = class Binary extends SudokuConstraint {
+  static Binary = class Binary extends SudokuConstraintBase {
     constructor(key, ...items) {
       super(arguments);
       this.key = key;
@@ -887,7 +946,7 @@ class SudokuConstraint {
     }
   }
 
-  static Givens = class Givens extends SudokuConstraint {
+  static Givens = class Givens extends SudokuConstraintBase {
     constructor(...values) {
       super(arguments);
       this.values = values;
@@ -895,77 +954,22 @@ class SudokuConstraint {
   }
   static FixedValues = this.Givens;  // For backwards compatibility.
 
-  static Priority = class Priority extends SudokuConstraint {
+  static Priority = class Priority extends SudokuConstraintBase {
     constructor(priority, ...cells) {
       super(arguments);
       this.cells = cells;
       this.priority = priority;
     }
   }
-
-  static DEFAULT = this.Givens;
-
-  static _makeRegions(fn, gridSize) {
-    const regions = [];
-    for (let r = 0; r < gridSize; r++) {
-      const cells = [];
-      for (let i = 0; i < gridSize; i++) {
-        cells.push(fn(r, i));
-      }
-      regions.push(cells);
-    }
-    return regions;
-  }
-
-  static rowRegions = memoize((shape) => {
-    const gridSize = shape.gridSize;
-    return this._makeRegions((r, i) => r * gridSize + i, gridSize);
-  });
-  static colRegions = memoize((shape) => {
-    const gridSize = shape.gridSize;
-    return this._makeRegions((c, i) => i * gridSize + c, gridSize);
-  });
-  static boxRegions = memoize((shape) => {
-    const gridSize = shape.gridSize;
-    const boxSize = shape.boxSize;
-    return this._makeRegions(
-      (r, i) => ((r / boxSize | 0) * boxSize + (i % boxSize | 0)) * gridSize
-        + (r % boxSize | 0) * boxSize + (i / boxSize | 0), gridSize);
-  });
-  static disjointSetRegions = memoize((shape) => {
-    const gridSize = shape.gridSize;
-    const boxSize = shape.boxSize;
-    return this._makeRegions(
-      (r, i) => ((i / boxSize | 0) * boxSize + (r % boxSize | 0)) * gridSize
-        + (i % boxSize | 0) * boxSize + (r / boxSize | 0), gridSize);
-  });
-
-  static fullLineCellMap = memoize((shape) => {
-    let map = new Map();
-    const gridSize = shape.gridSize;
-
-    const rowRegions = this.rowRegions(shape);
-    for (let row = 0; row < gridSize; row++) {
-      const cells = rowRegions[row].map(c => shape.makeCellIdFromIndex(c));
-      map.set(`R${row + 1},1`, cells);
-      map.set(`R${row + 1},-1`, cells.slice().reverse());
-    }
-    const colRegions = this.colRegions(shape);
-    for (let col = 0; col < gridSize; col++) {
-      const cells = colRegions[col].map(c => shape.makeCellIdFromIndex(c));
-      map.set(`C${col + 1},1`, cells);
-      map.set(`C${col + 1},-1`, cells.slice().reverse());
-    }
-
-    return map;
-  });
 }
+
+SudokuConstraintBase.DEFAULT_CONSTRAINT = SudokuConstraint.Givens;
 
 class SudokuBuilder {
   static build(constraint, debugOptions) {
-    const [constraints, metaConstraints] = SudokuConstraint.toLists(constraint);
-    const metaConfig = SudokuConstraint.getMetaConfig(metaConstraints);
-    const shape = SudokuConstraint.getShapeFromMeta(metaConfig);
+    const [constraints, metaConstraints] = SudokuConstraintBase.toLists(constraint);
+    const metaConfig = SudokuConstraintBase.getMetaConfig(metaConstraints);
+    const shape = SudokuConstraintBase.getShapeFromMeta(metaConfig);
 
     return new SudokuSolver(
       this._handlers(constraints, shape, metaConfig),
@@ -1024,16 +1028,16 @@ class SudokuBuilder {
   }
 
   static *_rowColHandlers(shape) {
-    for (const cells of SudokuConstraint.rowRegions(shape)) {
+    for (const cells of SudokuConstraintBase.rowRegions(shape)) {
       yield new SudokuConstraintHandler.AllDifferent(cells);
     }
-    for (const cells of SudokuConstraint.colRegions(shape)) {
+    for (const cells of SudokuConstraintBase.colRegions(shape)) {
       yield new SudokuConstraintHandler.AllDifferent(cells);
     }
   }
 
   static *_boxHandlers(shape) {
-    for (const cells of SudokuConstraint.boxRegions(shape)) {
+    for (const cells of SudokuConstraintBase.boxRegions(shape)) {
       yield new SudokuConstraintHandler.AllDifferent(cells);
     }
   }
@@ -1153,7 +1157,7 @@ class SudokuBuilder {
           break;
 
         case 'XSum':
-          cells = SudokuConstraint.fullLineCellMap(shape)
+          cells = SudokuConstraintBase.fullLineCellMap(shape)
             .get([constraint.rowCol, 1].toString()).map(
               c => shape.parseCellId(c).cell);
           if (constraint.sumInc) {
@@ -1168,14 +1172,14 @@ class SudokuBuilder {
           break;
 
         case 'Sandwich':
-          cells = SudokuConstraint.fullLineCellMap(shape)
+          cells = SudokuConstraintBase.fullLineCellMap(shape)
             .get([constraint.id, 1].toString()).map(
               c => shape.parseCellId(c).cell);
           yield new SudokuConstraintHandler.Sandwich(cells, constraint.sum);
           break;
 
         case 'Skyscraper':
-          cells = SudokuConstraint.fullLineCellMap(shape)
+          cells = SudokuConstraintBase.fullLineCellMap(shape)
             .get([constraint.rowCol, 1].toString()).map(
               c => shape.parseCellId(c).cell);
           if (constraint.countInc) {
@@ -1287,7 +1291,7 @@ class SudokuBuilder {
           break;
 
         case 'DisjointSets':
-          for (const cells of SudokuConstraint.disjointSetRegions(shape)) {
+          for (const cells of SudokuConstraintBase.disjointSetRegions(shape)) {
             yield new SudokuConstraintHandler.AllDifferent(cells);
           }
           break;

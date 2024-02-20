@@ -1110,7 +1110,7 @@ class OutsideArrowDisplay extends DisplayItem {
       this._addArrowSvg('diagonal-arrow', lineId, littleKillerCellMap[lineId]);
       this._outsideArrowMap.get(lineId).constraintTypes.push('LittleKiller');
     }
-    for (const [lineId, cells] of SudokuConstraint.fullLineCellMap(shape)) {
+    for (const [lineId, cells] of SudokuConstraintBase.fullLineCellMap(shape)) {
       this._addArrowSvg('full-line-arrow', lineId, cells);
       if (lineId.endsWith(',1')) {
         this._outsideArrowMap.get(lineId).constraintTypes.push('Sandwich');
