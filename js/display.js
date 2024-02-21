@@ -450,8 +450,6 @@ class ConstraintDisplay extends DisplayItem {
     this._diagonalDisplay = new DiagonalDisplay(
       displayContainer.getNewGroup('diagonal-group'));
 
-    this._customBinaryGroup = displayContainer.getNewGroup('custom-binary-group');
-    this._applyGridOffset(this._customBinaryGroup);
     this._customBinaryColors = new ColorPicker();
 
     this._quadGroup = displayContainer.getNewGroup('quad-group');
@@ -508,7 +506,6 @@ class ConstraintDisplay extends DisplayItem {
     clearDOMNode(this._lineConstraintGroup);
     clearDOMNode(this._adjConstraintGroup);
 
-    clearDOMNode(this._customBinaryGroup);
     this._customBinaryColors.clear();
 
     this._givensDisplay.clear();
@@ -570,40 +567,20 @@ class ConstraintDisplay extends DisplayItem {
   }
 
   drawCustomBinary(cells, key, type) {
-    const g = createSvgElement('g');
-    this._customBinaryGroup.append(g);
-
-    const LINE_WIDTH = 2;
-
-    g.setAttribute('stroke-width', LINE_WIDTH);
-
     const colorKey = `${key}-${type}`;
     const color = this._customBinaryColors.pickColor(colorKey);
-    this._customBinaryColors.addItem(g, color, colorKey);
-    g.setAttribute('fill', color);
-    g.setAttribute('stroke', color);
 
-    const centers = cells.map(c => this.cellIdCenter(c));
+    const elem = this._drawConstraintLine(
+      cells, {
+      color,
+      width: LineOptions.THIN_LINE_WIDTH,
+      nodeMarker: LineOptions.SMALL_FULL_CIRCLE_MARKER,
+      startMarker: (type !== 'BinaryX') ? LineOptions.SMALL_EMPTY_CIRCLE_MARKER : undefined,
+      dashed: true,
+    });
+    this._customBinaryColors.addItem(elem, color, colorKey);
 
-    // Draw the line.
-    const path = this._makePath(centers);
-    path.setAttribute('stroke-dasharray', '2');
-    g.appendChild(path);
-
-    // Draw the circles.
-    for (let i = 0; i < cells.length; i++) {
-      const circle = this._makeCircle(cells[i]);
-      if (i == 0 && type != 'BinaryX') {
-        circle.setAttribute('r', LINE_WIDTH * 2);
-        circle.setAttribute('fill', 'transparent');
-        circle.setAttribute('stroke-width', 1);
-      } else {
-        circle.setAttribute('r', LINE_WIDTH);
-      }
-      g.appendChild(circle);
-    }
-
-    return g;
+    return elem;
   }
 
   drawXV(cells, letter) {
@@ -639,8 +616,7 @@ class ConstraintDisplay extends DisplayItem {
 
   _CIRCLE_RADIUS = 15;
 
-  _makeCircle(cell) {
-    const [x, y] = this.cellIdCenter(cell);
+  _makeCircleAtPoint([x, y]) {
     let circle = createSvgElement('circle');
     circle.setAttribute('cx', x);
     circle.setAttribute('cy', y);
@@ -649,141 +625,163 @@ class ConstraintDisplay extends DisplayItem {
     return circle;
   }
 
-  _removeCircleFromLine(p0, p1) {
+  _removeCircleFromPath(p0, p1) {
     const [dx, dy] = [p1[0] - p0[0], p1[1] - p0[1]];
     const frac = this._CIRCLE_RADIUS / Math.sqrt(dx * dx + dy * dy);
     p0[0] += dx * frac;
     p0[1] += dy * frac;
   }
 
-  drawArrow(cells) {
-    if (cells.length < 2) throw (`Arrow too short: ${cells}`)
-
-    let arrow = createSvgElement('g');
-    arrow.setAttribute('fill', 'transparent');
-    arrow.setAttribute('stroke', 'rgb(200, 200, 200)');
-    arrow.setAttribute('stroke-width', 3);
-    arrow.setAttribute('stroke-linecap', 'round');
-
-    // Draw the circle.
-    arrow.appendChild(this._makeCircle(cells[0]));
-
-    const points = cells.map(c => this.cellIdCenter(c));
-    this._removeCircleFromLine(points[0], points[1])
-
-    // Draw the line.
-    const path = this._makePath(points);
-    path.setAttribute('marker-end', 'url(#arrowhead)');
-
-    arrow.appendChild(path);
-
-    this._lineConstraintGroup.append(arrow);
-
-    return arrow;
+  _drawConstraintLineMarker(marker, point, adjPoint) {
+    switch (marker) {
+      case LineOptions.EMPTY_CIRCLE_MARKER:
+        if (!adjPoint) {
+          throw (`Empty circle marker must have an adjacent point: ${point}`);
+        }
+        {
+          const circle = this._makeCircleAtPoint(point);
+          circle.setAttribute('fill', 'transparent');
+          this._removeCircleFromPath(point, adjPoint);
+          return circle;
+        }
+      case LineOptions.FULL_CIRCLE_MARKER:
+        {
+          const circle = this._makeCircleAtPoint(point);
+          circle.setAttribute('stroke-width', 0);
+          return circle;
+        }
+      case LineOptions.SMALL_EMPTY_CIRCLE_MARKER:
+        {
+          const circle = this._makeCircleAtPoint(point);
+          circle.setAttribute('r', LineOptions.THIN_LINE_WIDTH * 2);
+          circle.setAttribute('fill', 'transparent');
+          circle.setAttribute('stroke-width', 1);
+          return circle;
+        }
+      case LineOptions.SMALL_FULL_CIRCLE_MARKER:
+        {
+          const circle = this._makeCircleAtPoint(point);
+          circle.setAttribute('r', LineOptions.THIN_LINE_WIDTH);
+          return circle;
+        }
+      default:
+        throw (`Unknown marker: ${marker}`);
+    }
   }
 
-  drawDoubleArrow(cells) {
-    if (cells.length < 2) throw (`Arrow too short: ${cells}`)
-
-    let arrow = createSvgElement('g');
-    arrow.setAttribute('fill', 'transparent');
-    arrow.setAttribute('stroke', 'rgb(200, 200, 200)');
-    arrow.setAttribute('stroke-width', 3);
-    arrow.setAttribute('stroke-linecap', 'round');
-
-    // Draw the circles.
-    arrow.appendChild(this._makeCircle(cells[0]));
-    arrow.appendChild(this._makeCircle(
-      cells[cells.length - 1]));
-
-    const points = cells.map(c => this.cellIdCenter(c));
-    this._removeCircleFromLine(points[0], points[1])
-    this._removeCircleFromLine(
-      points[points.length - 2], points[points.length - 1])
-
-    // Draw the line.
-    const path = this._makePath(points);
-
-    arrow.appendChild(path);
-
-    this._lineConstraintGroup.append(arrow);
-
-    return arrow;
-  }
-
-  _drawConstraintLine(cells, color) {
-    if (cells.length < 2) throw (`Line too short: ${cells}`)
-
-    const line = this._makePath(cells.map(c => this.cellIdCenter(c)));
-    line.setAttribute('stroke', color);
-    line.setAttribute('stroke-width', 5);
-    line.setAttribute('stroke-linecap', 'round');
-
-    this._lineConstraintGroup.append(line);
-
-    return line;
-  }
-
-  drawWhisper(cells) {
-    return this._drawConstraintLine(cells, 'rgb(255, 200, 255)');
-  }
-
-  drawRenban(cells) {
-    return this._drawConstraintLine(cells, 'rgb(230, 190, 155)');
-  }
-
-  drawRegionSumLine(cells) {
-    return this._drawConstraintLine(cells, 'rgb(100, 255, 100)');
-  }
-
-  drawBetween(cells) {
+  _drawConstraintLine(cells, options, container) {
     const len = cells.length;
     if (len < 2) throw (`Line too short: ${cells}`)
 
-    let between = createSvgElement('g');
-    between.setAttribute('stroke', 'rgb(200, 200, 255)');
-    between.setAttribute('stroke-width', 3);
-    between.setAttribute('stroke-linecap', 'round');
-    between.setAttribute('fill', 'transparent');
-
-    // Draw the circle.
-    between.appendChild(this._makeCircle(cells[0]));
-    between.appendChild(this._makeCircle(cells[len - 1]));
+    if (options.constructor != LineOptions) {
+      options = new LineOptions(options);
+    }
+    const g = createSvgElement('g');
+    g.setAttribute('stroke', options.color);
+    g.setAttribute('fill', options.color);
+    g.setAttribute('stroke-width', options.width);
+    g.setAttribute('stroke-linecap', 'round');
 
     const points = cells.map(c => this.cellIdCenter(c));
-    this._removeCircleFromLine(points[0], points[1])
-    this._removeCircleFromLine(points[len - 1], points[len - 2])
+
+    // Default start and end markers to nodeMarker if not provided.
+    let { startMarker, endMarker, nodeMarker } = options;
+    if (nodeMarker) {
+      startMarker ||= nodeMarker;
+      endMarker ||= nodeMarker;
+    }
+
+    // Add the markers.
+    if (startMarker) {
+      g.append(this._drawConstraintLineMarker(
+        startMarker, points[0], points[1]));
+    }
+    if (endMarker) {
+      g.append(this._drawConstraintLineMarker(
+        endMarker, points[len - 1], points[len - 2]));
+    }
+    if (nodeMarker) {
+      for (let i = 1; i < len - 1; i++) {
+        g.append(this._drawConstraintLineMarker(
+          nodeMarker, points[i]));
+      }
+    }
+
+    // Make and style the path.
     const path = this._makePath(points);
-    between.appendChild(path);
+    if (options.arrow) {
+      path.setAttribute('marker-end', 'url(#arrowhead)');
+    }
+    if (options.dashed) {
+      path.setAttribute(
+        'stroke-dasharray',
+        (options.width / 2) + ' ' + (options.width * 2));
+    }
+    g.append(path);
 
-    this._lineConstraintGroup.append(between);
+    container ||= this._lineConstraintGroup;
+    container.append(g);
 
-    return between;
+    return g;
+  }
+
+  drawArrow(cells) {
+    return this._drawConstraintLine(
+      cells,
+      {
+        startMarker: LineOptions.EMPTY_CIRCLE_MARKER,
+        width: LineOptions.THIN_LINE_WIDTH,
+        arrow: true
+      }
+    );
+  }
+
+  drawDoubleArrow(cells) {
+    return this._drawConstraintLine(
+      cells,
+      {
+        width: LineOptions.THIN_LINE_WIDTH,
+        startMarker: LineOptions.EMPTY_CIRCLE_MARKER,
+        endMarker: LineOptions.EMPTY_CIRCLE_MARKER
+      });
+  }
+
+  drawWhisper(cells) {
+    return this._drawConstraintLine(cells, { color: 'rgb(255, 200, 255)' });
+  }
+
+  drawRenban(cells) {
+    return this._drawConstraintLine(cells, { color: 'rgb(230, 190, 155)' });
+  }
+
+  drawRegionSumLine(cells) {
+    return this._drawConstraintLine(cells, { color: 'rgb(100, 255, 100)' });
+  }
+
+  drawBetween(cells) {
+    return this._drawConstraintLine(
+      cells,
+      {
+        color: 'rgb(200, 200, 255)',
+        width: LineOptions.THIN_LINE_WIDTH,
+        startMarker: LineOptions.EMPTY_CIRCLE_MARKER,
+        endMarker: LineOptions.EMPTY_CIRCLE_MARKER
+      });
   }
 
   drawPalindrome(cells) {
-    return this._drawConstraintLine(cells, 'rgb(200, 200, 255)');
+    return this._drawConstraintLine(cells, { color: 'rgb(200, 200, 255)' });
   }
 
   drawThermometer(cells) {
-    if (cells.length < 2) throw (`Thermo too short: ${cells}`)
-
-    let thermo = createSvgElement('g');
-    thermo.setAttribute('fill', 'rgb(220, 220, 220)');
-    thermo.setAttribute('stroke', 'rgb(220, 220, 220)');
-
-    // Draw the circle.
-    thermo.appendChild(this._makeCircle(cells[0]));
-
-    // Draw the line.
-    const path = this._makePath(cells.map(c => this.cellIdCenter(c)));
-    path.setAttribute('stroke-width', 15);
-    path.setAttribute('stroke-linecap', 'round');
-    thermo.appendChild(path);
-
-    this._thermoGroup.append(thermo);
-
-    return thermo;
+    return this._drawConstraintLine(
+      cells,
+      {
+        color: 'rgb(220, 220, 220)',
+        width: LineOptions.THICK_LINE_WIDTH,
+        startMarker: LineOptions.FULL_CIRCLE_MARKER,
+      },
+      this._thermoGroup);
   }
 
   drawQuad(topLeftCell, values) {
@@ -1528,3 +1526,27 @@ class ColorPicker {
     this._keyToItems.clear();
   }
 };
+
+class LineOptions {
+  color = 'rgb(200, 200, 200)';
+  width = 5;
+  startMarker;
+  endMarker;
+  nodeMarker;
+  arrow = false;
+  dashed = false;
+
+  static DEFAULT_COLOR = 'rgb(200, 200, 200)';
+  static THIN_LINE_WIDTH = 2;
+  static THICK_LINE_WIDTH = 15;
+
+  static FULL_CIRCLE_MARKER = 1;
+  static EMPTY_CIRCLE_MARKER = 2;
+  static SMALL_FULL_CIRCLE_MARKER = 3;
+  static SMALL_EMPTY_CIRCLE_MARKER = 4;
+
+  constructor(options) {
+    Object.assign(this, options);
+  }
+
+}
