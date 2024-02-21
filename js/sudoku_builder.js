@@ -731,6 +731,13 @@ class SudokuConstraint {
     }
   }
 
+  static DoubleArrow = class DoubleArrow extends SudokuConstraintBase {
+    constructor(...cells) {
+      super(arguments);
+      this.cells = cells;
+    }
+  }
+
   static Cage = class Cage extends SudokuConstraintBase {
     constructor(sum, ...cells) {
       super(arguments);
@@ -1117,25 +1124,33 @@ class SudokuBuilder {
           break;
 
         case 'Arrow':
-          const [negativeCell, ...positiveCells] = (
-            constraint.cells.map(c => shape.parseCellId(c).cell));
+          {
+            const [negativeCell, ...positiveCells] = (
+              constraint.cells.map(c => shape.parseCellId(c).cell));
 
-          if (constraint.cells.length <= gridSize) {
-            yield new SudokuConstraintHandler.SumWithNegative(
-              positiveCells, [negativeCell], 0);
-          } else if (positiveCells.length == gridSize) {
-            let valueMap = new Map();
-            for (const cell of positiveCells) valueMap.set(cell, 1);
-            valueMap.set(negativeCell, gridSize);
-            yield new SudokuConstraintHandler.GivenCandidates(valueMap);
-          } else {
-            // Sum can't handle more than gridSize cells.
-            // Arrows can't have more than gridSize cells in the stem
-            // to make the final sum.
-            yield new SudokuConstraintHandler.False(
-              [negativeCell, ...positiveCells]);
+            if (constraint.cells.length <= 16) {
+              yield new SudokuConstraintHandler.SumWithNegative(
+                positiveCells, [negativeCell], 0);
+            } else {
+              throw ('Arrow can\'t have more than 16 cells');
+            }
           }
+          break;
 
+        case 'DoubleArrow':
+          {
+            const cells = (
+              constraint.cells.map(c => shape.parseCellId(c).cell));
+            const negativeCells = [cells[0], cells[cells.length - 1]];
+            const positiveCells = cells.slice(1, -1);
+
+            if (constraint.cells.length <= 16) {
+              yield new SudokuConstraintHandler.SumWithNegative(
+                positiveCells, negativeCells, 0);
+            } else {
+              throw ('DoubleArrow can\'t have more than 16 cells');
+            }
+          }
           break;
 
         case 'Cage':

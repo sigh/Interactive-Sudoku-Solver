@@ -216,6 +216,7 @@ const runSolveTests = async (onFailure) => {
     'Anti-knight Anti-king',
     'Anti-knight, Anti-consecutive',
     'Arrow sudoku',
+    'Double arrow sudoku',
     'Arrow killer sudoku',
     'Kropki sudoku',
     'Little killer',
