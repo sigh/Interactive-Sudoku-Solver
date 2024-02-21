@@ -682,6 +682,35 @@ class ConstraintDisplay extends DisplayItem {
     return arrow;
   }
 
+  drawDoubleArrow(cells) {
+    if (cells.length < 2) throw (`Arrow too short: ${cells}`)
+
+    let arrow = createSvgElement('g');
+    arrow.setAttribute('fill', 'transparent');
+    arrow.setAttribute('stroke', 'rgb(200, 200, 200)');
+    arrow.setAttribute('stroke-width', 3);
+    arrow.setAttribute('stroke-linecap', 'round');
+
+    // Draw the circles.
+    arrow.appendChild(this._makeCircle(cells[0]));
+    arrow.appendChild(this._makeCircle(
+      cells[cells.length - 1]));
+
+    const points = cells.map(c => this.cellIdCenter(c));
+    this._removeCircleFromLine(points[0], points[1])
+    this._removeCircleFromLine(
+      points[points.length - 2], points[points.length - 1])
+
+    // Draw the line.
+    const path = this._makePath(points);
+
+    arrow.appendChild(path);
+
+    this._lineConstraintGroup.append(arrow);
+
+    return arrow;
+  }
+
   _drawConstraintLine(cells, color) {
     if (cells.length < 2) throw (`Line too short: ${cells}`)
 
@@ -712,7 +741,7 @@ class ConstraintDisplay extends DisplayItem {
     if (len < 2) throw (`Line too short: ${cells}`)
 
     let between = createSvgElement('g');
-    between.setAttribute('stroke', 'rgb(200, 200, 200)');
+    between.setAttribute('stroke', 'rgb(200, 200, 255)');
     between.setAttribute('stroke-width', 3);
     between.setAttribute('stroke-linecap', 'round');
     between.setAttribute('fill', 'transparent');

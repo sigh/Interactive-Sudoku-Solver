@@ -146,6 +146,7 @@ class ExampleHandler {
     'Killer sudoku',
     'Killer sudoku, hard',
     'Arrow sudoku',
+    'Double arrow sudoku',
     'Anti-knight, Anti-consecutive',
     'Little killer',
     'Sudoku X',
@@ -728,6 +729,16 @@ class ConstraintManager {
         this._addToPanel(config);
         this._configs.push(config);
         break;
+      case 'DoubleArrow':
+        config = {
+          cells: constraint.cells,
+          name: 'Double Arrow',
+          constraint: constraint,
+          displayElem: this._display.drawDoubleArrow(constraint.cells),
+        };
+        this._addToPanel(config);
+        this._configs.push(config);
+        break;
       case 'Thermo':
         config = {
           cells: constraint.cells,
@@ -932,9 +943,17 @@ class ConstraintManager {
       },
       arrow: {
         constraintClass: SudokuConstraint.Arrow,
+        validateFn: (cells, shape) => cells.length <= 16,
         text: 'Arrow',
         description:
           "Values along the arrow must sum to the value in the circle.",
+      },
+      'double-arrow': {
+        constraintClass: SudokuConstraint.DoubleArrow,
+        validateFn: (cells, shape) => cells.length > 2 && cells.length <= 16,
+        text: 'Double Arrow',
+        description:
+          "The sum of the values along the line equal the sum of the values in the circles.",
       },
       thermo: {
         constraintClass: SudokuConstraint.Thermo,
