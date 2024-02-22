@@ -2103,6 +2103,69 @@ SudokuConstraintHandler.Between = class Between extends SudokuConstraintHandler 
   }
 }
 
+SudokuConstraintHandler.Lockout = class Lockout extends SudokuConstraintHandler {
+  constructor(cells) {
+    super(cells);
+    this._ends = [cells[0], cells[cells.length - 1]]
+    this._mids = cells.slice(1, cells.length - 1)
+    this._lookupTables = null;
+    this._binaryConstraint = null;
+  }
+
+  initialize(initialGrid, cellExclusions, shape) {
+    this._lookupTables = LookupTables.get(shape.numValues);
+
+    const minEndsDelta = 4;
+    this._binaryConstraint = new SudokuConstraintHandler.BinaryConstraint(
+      ...this._ends,
+      SudokuConstraint.Binary.fnToKey(
+        (a, b) => Math.abs(a - b) >= minEndsDelta,
+        shape.numValues));
+    return this._binaryConstraint.initialize(initialGrid, cellExclusions, shape);
+  }
+
+  exclusionCells() {
+    return this._ends;
+  }
+
+  enforceConsistency(grid, handlerAccumulator) {
+    // Constrain the ends to be consistent with each other.
+    if (!this._binaryConstraint.enforceConsistency(grid, handlerAccumulator)) {
+      return false;
+    }
+    const allValues = this._lookupTables.allValues;
+
+    const minMax0 = this._lookupTables.minMax8Bit[
+      grid[this._ends[0]]];
+    const minMax1 = this._lookupTables.minMax8Bit[
+      grid[this._ends[1]]];
+    const min0 = minMax0 >> 8;
+    const max0 = minMax0 & 0xff;
+    const min1 = minMax1 >> 8;
+    const max1 = minMax1 & 0xff;
+
+    let mask = 0;
+    if (min0 > max1) {
+      // Case 1: cell 0 is the larger cell.
+      mask |= ((1 << (max1 - 1)) - 1) | ~((1 << min0) - 1);
+    } else if (min1 > max0) {
+      // Case 2: cell 1 is the larger cell.
+      mask |= ((1 << (max0 - 1)) - 1) | ~((1 << min1) - 1);
+    } else {
+      mask |= allValues;
+    }
+    // Constrain the mids by only allowing values that aren't locked out.
+    if (allValues & ~mask) {
+      for (let i = 0; i < this._mids.length; i++) {
+        const v = (grid[this._mids[i]] &= mask);
+        if (!v) return false;
+      }
+    }
+
+    return true;
+  }
+}
+
 SudokuConstraintHandler.XSum = class XSum extends SudokuConstraintHandler {
   constructor(cells, sum) {
     super(cells);

@@ -156,6 +156,7 @@ class ExampleHandler {
     'International whispers',
     'Renban',
     'Between lines',
+    'Lockout lines',
     'Palindromes',
     'Jigsaw',
     'X-Windoku',
@@ -792,6 +793,16 @@ class ConstraintManager {
         this._addToPanel(config);
         this._configs.push(config);
         break;
+      case 'Lockout':
+        config = {
+          cells: constraint.cells,
+          name: 'Lockout',
+          constraint: constraint,
+          displayElem: this._display.drawLockout(constraint.cells),
+        };
+        this._addToPanel(config);
+        this._configs.push(config);
+        break;
       case 'RegionSumLine':
         config = {
           cells: constraint.cells,
@@ -995,9 +1006,17 @@ class ConstraintManager {
       },
       between: {
         constraintClass: SudokuConstraint.Between,
-        text: 'Between',
+        text: 'Between Line',
         description:
           "Values on the line must be strictly between the values in the circles."
+      },
+      lockout: {
+        constraintClass: SudokuConstraint.Lockout,
+        text: 'Lockout Line',
+        description:
+          `
+          Values on the line must be not be between the values in the diamonds.
+          The values in the diamonds must differ by at least 4.`,
       },
       palindrome: {
         constraintClass: SudokuConstraint.Palindrome,
