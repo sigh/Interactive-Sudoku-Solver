@@ -227,6 +227,7 @@ const runSolveTests = async (onFailure) => {
     'International whispers',
     'Renban',
     'Between lines',
+    'Lockout lines',
     'Palindromes',
     'Jigsaw',
     'Jigsaw boxes, disconnected',

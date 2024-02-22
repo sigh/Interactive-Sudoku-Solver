@@ -614,7 +614,8 @@ class ConstraintDisplay extends DisplayItem {
     return text;
   }
 
-  _CIRCLE_RADIUS = 15;
+  _CIRCLE_RADIUS = 16;
+  _DIAMOND_SIZE = 20;
 
   _makeCircleAtPoint([x, y]) {
     let circle = createSvgElement('circle');
@@ -623,6 +624,21 @@ class ConstraintDisplay extends DisplayItem {
     circle.setAttribute('r', this._CIRCLE_RADIUS);
 
     return circle;
+  }
+
+  _makeDiamondAtPoint([x, y]) {
+    let diamond = createSvgElement('path');
+    let size = this._DIAMOND_SIZE;
+    let parts = [
+      'M', x, y - size,
+      'L', x + size, y,
+      'L', x, y + size,
+      'L', x - size, y,
+      'Z'
+    ];
+    diamond.setAttribute('d', parts.join(' '));
+
+    return diamond;
   }
 
   _removeCircleFromPath(p0, p1) {
@@ -663,6 +679,12 @@ class ConstraintDisplay extends DisplayItem {
           const circle = this._makeCircleAtPoint(point);
           circle.setAttribute('r', LineOptions.THIN_LINE_WIDTH);
           return circle;
+        }
+      case LineOptions.DIAMOND_MARKER:
+        {
+          const diamond = this._makeDiamondAtPoint(point);
+          diamond.setAttribute('stroke-width', 0);
+          return diamond;
         }
       default:
         throw (`Unknown marker: ${marker}`);
@@ -763,9 +785,18 @@ class ConstraintDisplay extends DisplayItem {
       cells,
       {
         color: 'rgb(200, 200, 255)',
-        width: LineOptions.THIN_LINE_WIDTH,
         startMarker: LineOptions.EMPTY_CIRCLE_MARKER,
         endMarker: LineOptions.EMPTY_CIRCLE_MARKER
+      });
+  }
+
+  drawLockout(cells) {
+    return this._drawConstraintLine(
+      cells,
+      {
+        color: 'rgb(200, 200, 255)',
+        startMarker: LineOptions.DIAMOND_MARKER,
+        endMarker: LineOptions.DIAMOND_MARKER
       });
   }
 
@@ -1544,6 +1575,7 @@ class LineOptions {
   static EMPTY_CIRCLE_MARKER = 2;
   static SMALL_FULL_CIRCLE_MARKER = 3;
   static SMALL_EMPTY_CIRCLE_MARKER = 4;
+  static DIAMOND_MARKER = 5;
 
   constructor(options) {
     Object.assign(this, options);

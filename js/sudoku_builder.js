@@ -587,6 +587,13 @@ class SudokuConstraint {
     }
   }
 
+  static Lockout = class Lockout extends SudokuConstraintBase {
+    constructor(...cells) {
+      super(arguments);
+      this.cells = cells;
+    }
+  }
+
   static Palindrome = class Palindrome extends SudokuConstraintBase {
     constructor(...cells) {
       super(arguments);
@@ -1270,6 +1277,11 @@ class SudokuBuilder {
         case 'Between':
           cells = constraint.cells.map(c => shape.parseCellId(c).cell);
           yield new SudokuConstraintHandler.Between(cells);
+          break;
+
+        case 'Lockout':
+          cells = constraint.cells.map(c => shape.parseCellId(c).cell);
+          yield new SudokuConstraintHandler.Lockout(cells);
           break;
 
         case 'Palindrome':
