@@ -49,7 +49,8 @@ class SudokuSolver {
     };
 
     this._timer.runTimed(() => {
-      for (const result of this._getIter()) {
+      for (const result of this._internalSolver.run(
+        SudokuSolver.InternalSolver.YIELD_ON_SOLUTION)) {
         // Only store a sample solution if we don't have one.
         if (sampleSolution == null) {
           sampleSolution = SudokuSolver.Util.gridToSolution(result.grid);
