@@ -560,6 +560,12 @@ select {
   color: grey;
 }
 
+#multi-cell-constraint-input>fieldset>div:last-child {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
 .description {
   line-height: 1;
   font-size: 12px;
