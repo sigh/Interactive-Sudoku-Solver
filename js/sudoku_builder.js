@@ -588,9 +588,10 @@ class SudokuConstraint {
   }
 
   static Lockout = class Lockout extends SudokuConstraintBase {
-    constructor(...cells) {
+    constructor(minDiff, ...cells) {
       super(arguments);
       this.cells = cells;
+      this.minDiff = minDiff;
     }
   }
 
@@ -1281,7 +1282,7 @@ class SudokuBuilder {
 
         case 'Lockout':
           cells = constraint.cells.map(c => shape.parseCellId(c).cell);
-          yield new SudokuConstraintHandler.Lockout(cells);
+          yield new SudokuConstraintHandler.Lockout(constraint.minDiff, cells);
           break;
 
         case 'Palindrome':

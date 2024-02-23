@@ -1011,6 +1011,7 @@ class ConstraintManager {
           "Values on the line must be strictly between the values in the circles."
       },
       lockout: {
+        value: 'min diff',
         constraintClass: SudokuConstraint.Lockout,
         text: 'Lockout Line',
         description:
