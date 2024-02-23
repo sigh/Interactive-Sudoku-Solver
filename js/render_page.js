@@ -795,7 +795,7 @@ class ConstraintManager {
       case 'Lockout':
         config = {
           cells: constraint.cells,
-          name: 'Lockout',
+          name: `Lockout (${constraint.minDiff})`,
           constraint: constraint,
           displayElem: this._display.drawLockout(constraint.cells),
         };
