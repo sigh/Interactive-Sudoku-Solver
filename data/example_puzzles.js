@@ -146,7 +146,7 @@ const EXAMPLES = {
   },
   'Lockout lines': {
     src: 'https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?id=000CM1',
-    input: '.Lockout~R1C2~R2C2~R3C2~R4C2.Lockout~R4C2~R3C3~R2C3~R1C2.Lockout~R2C5~R2C4~R3C4~R3C5~R4C5~R4C4.Lockout~R4C6~R3C6~R2C6~R1C6~R2C7~R1C8~R2C8~R3C8~R4C8.Lockout~R6C3~R6C4~R7C4~R7C3~R8C3~R8C4.Lockout~R8C5~R8C6~R8C7~R7C6~R6C7~R6C6~R6C5.~R3C1_2~R3C9_8~R5C4_5~R6C1_3~R9C7_9~R9C2_1',
+    input: '.Lockout~4~R1C2~R2C2~R3C2~R4C2.Lockout~4~R4C2~R3C3~R2C3~R1C2.Lockout~4~R2C5~R2C4~R3C4~R3C5~R4C5~R4C4.Lockout~4~R4C6~R3C6~R2C6~R1C6~R2C7~R1C8~R2C8~R3C8~R4C8.Lockout~4~R6C3~R6C4~R7C4~R7C3~R8C3~R8C4.Lockout~4~R8C5~R8C6~R8C7~R7C6~R6C7~R6C6~R6C5.~R3C1_2~R3C9_8~R5C4_5~R6C1_3~R9C7_9~R9C2_1',
     solution: '563814729489752316271693548627189453148536297395427861934271685752968134816345972',
   },
   'Region sum lines': {
@@ -329,6 +329,11 @@ const EXAMPLES = {
   'Skyscaper 2-3': {
     // From gracefu.
     input: '.Skyscraper~C8~3~2.Skyscraper~R6~2~3.Skyscraper~R8~~3.Skyscraper~C7~~3.Skyscraper~C4~~3.Skyscraper~C5~~3.Skyscraper~C2~~3.Skyscraper~C3~3~2.Skyscraper~R2~3~2.Skyscraper~R1~3~3.Skyscraper~R4~3~.Skyscraper~C1~2~3.Skyscraper~R9~3~.Skyscraper~R7~2~3.Skyscraper~C6~3~.Skyscraper~C9~3~.Skyscraper~R5~~3.Skyscraper~R3~2~2.',
+  },
+  'Lockout double arrows': {
+    src: 'https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?id=000GVU',
+    input: '.Lockout~4~R1C2~R1C3~R2C3~R2C4~R3C4~R3C5.DoubleArrow~R3C5~R3C4~R2C4~R2C3~R1C3~R1C2.DoubleArrow~R3C1~R3C2~R4C2.DoubleArrow~R4C2~R5C2~R6C2~R7C2.DoubleArrow~R4C2~R4C3~R4C4~R4C5.DoubleArrow~R4C5~R4C6~R3C6~R3C7.DoubleArrow~R3C7~R2C7~R1C7~R1C8.DoubleArrow~R4C5~R5C5~R6C5~R7C5~R8C5.DoubleArrow~R9C5~R9C4~R9C3~R8C3.DoubleArrow~R7C8~R8C8~R8C7~R7C7.DoubleArrow~R7C7~R6C7~R6C8~R5C8.Lockout~4~R3C7~R2C7~R1C7~R1C8.Lockout~4~R4C5~R4C6~R3C6~R3C7.Lockout~4~R7C8~R8C8~R8C7~R7C7.Lockout~4~R7C7~R6C7~R6C8~R5C8.Lockout~4~R8C5~R7C5~R6C5~R5C5~R4C5.Lockout~4~R9C5~R9C4~R9C3~R8C3.Lockout~4~R7C2~R6C2~R5C2~R4C2.Lockout~4~R4C2~R4C3~R4C4~R4C5.Lockout~4~R4C2~R3C2~R3C1.',
+    solution: '794261385153478962682359471529183647418796523376524819965812734237645198841937256',
   },
 
   // Extreme killers.

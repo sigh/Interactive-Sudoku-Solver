@@ -2104,8 +2104,9 @@ SudokuConstraintHandler.Between = class Between extends SudokuConstraintHandler 
 }
 
 SudokuConstraintHandler.Lockout = class Lockout extends SudokuConstraintHandler {
-  constructor(cells) {
+  constructor(minDiff, cells) {
     super(cells);
+    this._minDiff = +minDiff;
     this._ends = [cells[0], cells[cells.length - 1]]
     this._mids = cells.slice(1, cells.length - 1)
     this._lookupTables = null;
@@ -2115,11 +2116,10 @@ SudokuConstraintHandler.Lockout = class Lockout extends SudokuConstraintHandler 
   initialize(initialGrid, cellExclusions, shape) {
     this._lookupTables = LookupTables.get(shape.numValues);
 
-    const minEndsDelta = 4;
     this._binaryConstraint = new SudokuConstraintHandler.BinaryConstraint(
       ...this._ends,
       SudokuConstraint.Binary.fnToKey(
-        (a, b) => Math.abs(a - b) >= minEndsDelta,
+        (a, b) => Math.abs(a - b) >= this._minDiff,
         shape.numValues));
     return this._binaryConstraint.initialize(initialGrid, cellExclusions, shape);
   }
@@ -2157,8 +2157,7 @@ SudokuConstraintHandler.Lockout = class Lockout extends SudokuConstraintHandler 
     // Constrain the mids by only allowing values that aren't locked out.
     if (allValues & ~mask) {
       for (let i = 0; i < this._mids.length; i++) {
-        const v = (grid[this._mids[i]] &= mask);
-        if (!v) return false;
+        if (!(grid[this._mids[i]] &= mask)) return false;
       }
     }
 
