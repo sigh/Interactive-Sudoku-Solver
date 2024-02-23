@@ -655,22 +655,21 @@ class ConstraintManager {
       }
     }
 
-    // Focus on the the form so we can immediately press enter.
-    //   - If the value input is enabled then focus on it to make it easy to
-    //     input a value.
-    //   - Otherwise just focus on the submit button.
-    const valueInput = selectionForm['value'];
-    if (!valueInput.disabled) {
-      valueInput.focus();
-    } else {
-      selectionForm['add-constraint'].focus();
-    }
-
     // Disable the add button if the current value is not valid.
     const type = selectionForm['constraint-type'].value;
     const config = this._multiCellConstraints[type];
     if (config.elem.disabled) {
       selectionForm['add-constraint'].disabled = true;
+    } else {
+      // Focus on the the form so we can immediately press enter.
+      //   - If the value input is enabled then focus on it to make it easy to
+      //     input a value.
+      //   - Otherwise just focus on the submit button.
+      if (config.value.elem) {
+        config.value.elem.focus();
+      } else {
+        selectionForm['add-constraint'].focus();
+      }
     }
   }
 
@@ -937,7 +936,9 @@ class ConstraintManager {
   _setUpMultiCellConstraints(selectionForm) {
     this._multiCellConstraints = {
       cage: {
-        value: 'sum',
+        value: {
+          placeholder: 'sum',
+        },
         constraintClass: SudokuConstraint.Cage,
         validateFn: (cells, shape) => cells.length <= shape.numValues,
         text: 'Cage',
@@ -945,7 +946,9 @@ class ConstraintManager {
           "Values must add up to the given sum. All values must be unique.",
       },
       sum: {
-        value: 'sum',
+        value: {
+          placeholder: 'sum',
+        },
         constraintClass: SudokuConstraint.Sum,
         validateFn: (cells, shape) => cells.length <= 16,
         text: 'Sum',
@@ -980,7 +983,10 @@ class ConstraintManager {
           "Values inside the jigsaw piece can't repeat. Pieces must contain 9 cells, and cannot overlap.",
       },
       whisper: {
-        value: 'difference',
+        value: {
+          placeholder: 'difference',
+          default: 5,
+        },
         constraintClass: SudokuConstraint.Whisper,
         text: 'Whisper',
         description:
@@ -1011,13 +1017,16 @@ class ConstraintManager {
           "Values on the line must be strictly between the values in the circles."
       },
       lockout: {
-        value: 'min diff',
+        value: {
+          placeholder: 'min diff',
+          default: 4,
+        },
         constraintClass: SudokuConstraint.Lockout,
         text: 'Lockout Line',
         description:
           `
           Values on the line must be not be between the values in the diamonds.
-          The values in the diamonds must differ by at least 4.`,
+          The values in the diamonds must differ by the difference given.`,
       },
       palindrome: {
         constraintClass: SudokuConstraint.Palindrome,
@@ -1054,7 +1063,9 @@ class ConstraintManager {
           "v: values must add to 5. Adjacent cells only."
       },
       quad: {
-        value: 'values',
+        value: {
+          placeholder: 'values',
+        },
         constraintClass: SudokuConstraint.Quad,
         validateFn: ConstraintManager._cellsAre2x2Square,
         text: 'Quadruple',
@@ -1067,36 +1078,51 @@ class ConstraintManager {
 
     const selectElem = selectionForm['constraint-type'];
     selectionForm.classList.add('disabled');
+    const valueContainer = document.getElementById('multi-cell-constraint-value-container');
+    const valueElems = [];
 
     // Create the options.
     for (const [name, config] of Object.entries(this._multiCellConstraints)) {
-      let option = document.createElement('option');
+      const option = document.createElement('option');
       option.value = name;
       option.textContent = config.text;
       option.title = config.description.replace(/\s+/g, ' ').replace(/^\s/, '');
       selectElem.appendChild(option);
-
       config.elem = option;
+
+      if (config.value) {
+        const input = document.createElement('input');
+        input.setAttribute('type', 'text');
+        input.setAttribute('size', '10');
+        input.setAttribute('name', name + '-value');
+        input.setAttribute('placeholder', config.value.placeholder);
+        if (config.value.default !== undefined) {
+          input.setAttribute('value', config.value.default);
+        }
+        input.style.display = 'none';
+        valueContainer.appendChild(input);
+        config.value.elem = input;
+        valueElems.push(input);
+      }
     }
 
     // Update the form based on the selected constraint.
     const descriptionElem = document.getElementById('multi-cell-constraint-description');
-    const valueElem = selectionForm['value'];
     selectElem.onchange = () => {
       const value = selectElem.value;
       const config = this._multiCellConstraints[value];
       if (!config) return;
 
       if (config.value) {
-        valueElem.disabled = false;
-        valueElem.placeholder = config.value;
-        valueElem.style.visibility = 'visible';
-        valueElem.focus();
+        valueContainer.style.visibility = 'visible';
+        for (const elem of valueElems) {
+          elem.style.display = 'none';
+        }
+        config.value.elem.style.display = 'inline';
+        config.value.elem.focus();
       } else {
-        valueElem.disabled = true;
-        valueElem.style.visibility = 'hidden';
+        valueContainer.style.visibility = 'hidden';
       }
-      valueElem.value = '';
 
       descriptionElem.textContent = config.description;
 
@@ -1105,9 +1131,9 @@ class ConstraintManager {
       }
     }
 
-    // Ensure select is initialized.
+    // Ensure select is initialized (but not selected).
     selectElem.onchange();
-    valueElem.blur();
+    document.activeElement?.blur();
   }
 
   _addMultiCellConstraint(selectionForm, inputManager) {
@@ -1122,7 +1148,7 @@ class ConstraintManager {
     if (config.elem.disabled) throw ('Invalid selection for ' + type);
 
     if (type === 'quad') {
-      const valuesStr = formData.get('value');
+      const valuesStr = formData.get(type + '-value');
       const values = valuesStr.split(/[, ]+/).map(v => +v).filter(
         v => Number.isInteger(v) && v >= 1 && v <= this._shape.numValues);
       if (values.length) {
@@ -1133,7 +1159,7 @@ class ConstraintManager {
     } else if (type === 'jigsaw') {
       this._jigsawManager.addPiece(cells);
     } else if (config.value) {
-      const value = formData.get('value');
+      const value = formData.get(type + '-value');
       this.loadConstraint(
         new config.constraintClass(+value, ...cells));
     } else {
