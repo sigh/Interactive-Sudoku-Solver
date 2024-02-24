@@ -746,6 +746,13 @@ class SudokuConstraint {
     }
   }
 
+  static PillArrow = class PillArrow extends SudokuConstraintBase {
+    constructor(...cells) {
+      super(arguments);
+      this.cells = cells;
+    }
+  }
+
   static Cage = class Cage extends SudokuConstraintBase {
     constructor(sum, ...cells) {
       super(arguments);
@@ -1157,6 +1164,22 @@ class SudokuBuilder {
                 positiveCells, negativeCells, 0);
             } else {
               throw ('DoubleArrow can\'t have more than 16 cells');
+            }
+          }
+          break;
+
+        case 'PillArrow':
+          {
+            const cells = (
+              constraint.cells.map(c => shape.parseCellId(c).cell));
+
+            if (cells.length <= 17) {
+              const tens = Math.min(cells[0], cells[1]);
+              const ones = Math.max(cells[0], cells[1]);
+              yield new SudokuConstraintHandler.PillArrow(
+                ones, tens, cells.slice(2));
+            } else {
+              throw ('PillArrow can\'t have more than 17 cells');
             }
           }
           break;
