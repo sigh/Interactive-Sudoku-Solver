@@ -571,13 +571,15 @@ class ConstraintDisplay extends DisplayItem {
     const color = this._customBinaryColors.pickColor(colorKey);
 
     const elem = this._drawConstraintLine(
-      cells, {
-      color,
-      width: LineOptions.THIN_LINE_WIDTH,
-      nodeMarker: LineOptions.SMALL_FULL_CIRCLE_MARKER,
-      startMarker: (type !== 'BinaryX') ? LineOptions.SMALL_EMPTY_CIRCLE_MARKER : undefined,
-      dashed: true,
-    });
+      cells,
+      {
+        color,
+        width: LineOptions.THIN_LINE_WIDTH,
+        nodeMarker: LineOptions.SMALL_FULL_CIRCLE_MARKER,
+        startMarker: (type !== 'BinaryX') ? LineOptions.SMALL_EMPTY_CIRCLE_MARKER : undefined,
+        dashed: true,
+      },
+      this._lineConstraintGroup);
     this._customBinaryColors.addItem(elem, color, colorKey);
 
     return elem;
@@ -727,6 +729,10 @@ class ConstraintDisplay extends DisplayItem {
     }
   }
 
+  drawLineConstraint(cells, options) {
+    return this._drawConstraintLine(cells, options, this._lineConstraintGroup);
+  }
+
   _drawConstraintLine(cells, options, container) {
     const len = cells.length;
     if (len < 2) throw (`Line too short: ${cells}`)
@@ -777,80 +783,9 @@ class ConstraintDisplay extends DisplayItem {
     }
     g.append(path);
 
-    container ||= this._lineConstraintGroup;
     container.append(g);
 
     return g;
-  }
-
-  drawArrow(cells) {
-    return this._drawConstraintLine(
-      cells,
-      {
-        startMarker: LineOptions.EMPTY_CIRCLE_MARKER,
-        arrow: true
-      }
-    );
-  }
-
-  drawDoubleArrow(cells) {
-    return this._drawConstraintLine(
-      cells,
-      {
-        startMarker: LineOptions.EMPTY_CIRCLE_MARKER,
-        endMarker: LineOptions.EMPTY_CIRCLE_MARKER
-      });
-  }
-
-  drawPillArrow(cells) {
-    return this._drawConstraintLine(
-      cells,
-      {
-        startMarker: LineOptions.EMPTY_PILL_MARKER,
-        arrow: true,
-      });
-  }
-
-  drawWhisper(cells) {
-    return this._drawConstraintLine(cells, { color: 'rgb(255, 200, 255)' });
-  }
-
-  drawRenban(cells) {
-    return this._drawConstraintLine(cells, { color: 'rgb(230, 190, 155)' });
-  }
-
-  drawModular(cells) {
-    return this._drawConstraintLine(
-      cells,
-      { color: 'rgb(100, 255, 100)', dashed: true });
-  }
-
-  drawRegionSumLine(cells) {
-    return this._drawConstraintLine(cells, { color: 'rgb(100, 255, 100)' });
-  }
-
-  drawBetween(cells) {
-    return this._drawConstraintLine(
-      cells,
-      {
-        color: 'rgb(200, 200, 255)',
-        startMarker: LineOptions.EMPTY_CIRCLE_MARKER,
-        endMarker: LineOptions.EMPTY_CIRCLE_MARKER
-      });
-  }
-
-  drawLockout(cells) {
-    return this._drawConstraintLine(
-      cells,
-      {
-        color: 'rgb(200, 200, 255)',
-        startMarker: LineOptions.DIAMOND_MARKER,
-        endMarker: LineOptions.DIAMOND_MARKER
-      });
-  }
-
-  drawPalindrome(cells) {
-    return this._drawConstraintLine(cells, { color: 'rgb(200, 200, 255)' });
   }
 
   drawThermometer(cells) {

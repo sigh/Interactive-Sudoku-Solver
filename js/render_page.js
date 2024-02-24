@@ -722,34 +722,27 @@ class ConstraintManager {
         this._configs.push(config);
         break;
       case 'Arrow':
-        config = {
-          cells: constraint.cells,
-          name: 'Arrow',
-          constraint: constraint,
-          displayElem: this._display.drawArrow(constraint.cells),
-        };
-        this._addToPanel(config);
-        this._configs.push(config);
-        break;
       case 'DoubleArrow':
-        config = {
-          cells: constraint.cells,
-          name: 'Double Arrow',
-          constraint: constraint,
-          displayElem: this._display.drawDoubleArrow(constraint.cells),
-        };
-        this._addToPanel(config);
-        this._configs.push(config);
-        break;
       case 'PillArrow':
-        config = {
-          cells: constraint.cells,
-          name: 'Pill Arrow',
-          constraint: constraint,
-          displayElem: this._display.drawPillArrow(constraint.cells),
-        };
-        this._addToPanel(config);
-        this._configs.push(config);
+      case 'Renban':
+      case 'Whisper':
+      case 'Modular':
+      case 'Palindrome':
+      case 'Between':
+      case 'Lockout':
+      case 'RegionSumLine':
+        {
+          const uiConfig = this._multiCellConstraints[constraint.type];
+          config = {
+            cells: constraint.cells,
+            name: uiConfig.panelText?.(constraint) || uiConfig.text,
+            constraint: constraint,
+            displayElem: this._display.drawLineConstraint(
+              constraint.cells, uiConfig.displayConfig),
+          };
+          this._addToPanel(config);
+          this._configs.push(config);
+        }
         break;
       case 'Thermo':
         config = {
@@ -763,76 +756,6 @@ class ConstraintManager {
         break;
       case 'Jigsaw':
         this._jigsawManager.setConstraint(constraint);
-        break;
-      case 'Whisper':
-        config = {
-          cells: constraint.cells,
-          name: `Whisper (${constraint.difference})`,
-          constraint: constraint,
-          displayElem: this._display.drawWhisper(constraint.cells),
-        };
-        this._addToPanel(config);
-        this._configs.push(config);
-        break;
-      case 'Renban':
-        config = {
-          cells: constraint.cells,
-          name: 'Renban',
-          constraint: constraint,
-          displayElem: this._display.drawRenban(constraint.cells),
-        };
-        this._addToPanel(config);
-        this._configs.push(config);
-        break;
-      case 'Modular':
-        config = {
-          cells: constraint.cells,
-          name: 'Modular',
-          constraint: constraint,
-          displayElem: this._display.drawModular(constraint.cells),
-        };
-        this._addToPanel(config);
-        this._configs.push(config);
-        break;
-      case 'Palindrome':
-        config = {
-          cells: constraint.cells,
-          name: 'Palindrome',
-          constraint: constraint,
-          displayElem: this._display.drawPalindrome(constraint.cells),
-        };
-        this._addToPanel(config);
-        this._configs.push(config);
-        break;
-      case 'Between':
-        config = {
-          cells: constraint.cells,
-          name: 'Between',
-          constraint: constraint,
-          displayElem: this._display.drawBetween(constraint.cells),
-        };
-        this._addToPanel(config);
-        this._configs.push(config);
-        break;
-      case 'Lockout':
-        config = {
-          cells: constraint.cells,
-          name: `Lockout (${constraint.minDiff})`,
-          constraint: constraint,
-          displayElem: this._display.drawLockout(constraint.cells),
-        };
-        this._addToPanel(config);
-        this._configs.push(config);
-        break;
-      case 'RegionSumLine':
-        config = {
-          cells: constraint.cells,
-          name: 'RegionSumLine',
-          constraint: constraint,
-          displayElem: this._display.drawRegionSumLine(constraint.cells),
-        };
-        this._addToPanel(config);
-        this._configs.push(config);
         break;
       case 'Cage':
         config = {
@@ -975,18 +898,30 @@ class ConstraintManager {
       },
       Arrow: {
         validateFn: (cells, shape) => cells.length <= 16,
+        displayConfig: {
+          startMarker: LineOptions.EMPTY_CIRCLE_MARKER,
+          arrow: true
+        },
         description:
           "Values along the arrow must sum to the value in the circle.",
       },
       DoubleArrow: {
         validateFn: (cells, shape) => cells.length > 2 && cells.length <= 16,
         text: 'Double Arrow',
+        displayConfig: {
+          startMarker: LineOptions.EMPTY_CIRCLE_MARKER,
+          endMarker: LineOptions.EMPTY_CIRCLE_MARKER
+        },
         description:
           "The sum of the values along the line equal the sum of the values in the circles.",
       },
       PillArrow: {
         validateFn: (cells, shape) => cells.length > 2 && cells.length <= 17,
         text: 'Pill Arrow',
+        displayConfig: {
+          startMarker: LineOptions.EMPTY_PILL_MARKER,
+          arrow: true,
+        },
         description:
           `
           The sum of the values along the line equal the 2-digit number in the pill.
@@ -1010,10 +945,13 @@ class ConstraintManager {
           placeholder: 'difference',
           default: 5,
         },
+        panelText: (constraint) => `Whisper (${constraint.difference})`,
+        displayConfig: { color: 'rgb(255, 200, 255)' },
         description:
           "Adjacent values on the line must differ by at least this amount."
       },
       Renban: {
+        displayConfig: { color: 'rgb(230, 190, 155)' },
         description:
           "Digits on the line must be consecutive and non-repeating, in any order."
       },
@@ -1023,6 +961,8 @@ class ConstraintManager {
           default: 3,
         },
         text: 'Modular Line',
+        panelText: (constraint) => `Modular (${constraint.mod})`,
+        displayConfig: { color: 'rgb(100, 255, 100)', dashed: true },
         description:
           `
           Every group of sequential 'mod' cells on a the line must have
@@ -1033,6 +973,7 @@ class ConstraintManager {
       },
       RegionSumLine: {
         text: 'Region Sum Line',
+        displayConfig: { color: 'rgb(100, 255, 100)' },
         description:
           `
           Values on the line have an equal sum N within each
@@ -1044,6 +985,11 @@ class ConstraintManager {
       },
       Between: {
         text: 'Between Line',
+        displayConfig: {
+          color: 'rgb(200, 200, 255)',
+          startMarker: LineOptions.EMPTY_CIRCLE_MARKER,
+          endMarker: LineOptions.EMPTY_CIRCLE_MARKER
+        },
         description:
           "Values on the line must be strictly between the values in the circles."
       },
@@ -1053,6 +999,12 @@ class ConstraintManager {
           default: 4,
         },
         text: 'Lockout Line',
+        panelText: (constraint) => `Lockout (${constraint.minDiff})`,
+        displayConfig: {
+          color: 'rgb(200, 200, 255)',
+          startMarker: LineOptions.DIAMOND_MARKER,
+          endMarker: LineOptions.DIAMOND_MARKER
+        },
         description:
           `
           Values on the line must be not be between the values in the diamonds.
@@ -1060,6 +1012,7 @@ class ConstraintManager {
       },
       Palindrome: {
         text: 'Palindrome',
+        displayConfig: { color: 'rgb(200, 200, 255)' },
         description:
           "The values along the line form a palindrome."
       },
