@@ -421,6 +421,7 @@ class OutsideArrowConstraints {
       case 'XSum':
       case 'Skyscraper':
       case 'NumberedRoom':
+      case 'FullRank':
         {
           const values = constraint.values();
           if (values[0]) {
@@ -466,6 +467,7 @@ class OutsideArrowConstraints {
       case 'XSum':
       case 'Skyscraper':
       case 'NumberedRoom':
+      case 'FullRank':
         return new SudokuConstraint[type](
           rowCol,
           dir == 1 ? value : '',
@@ -481,7 +483,7 @@ class OutsideArrowConstraints {
     const constraints = [];
     for (const constraint of this._constraints.values()) {
       const type = constraint.type;
-      if (type == 'Skyscraper' || type == 'XSum' || type == 'NumberedRoom') {
+      if (type == 'Skyscraper' || type == 'XSum' || type == 'NumberedRoom' || type == 'FullRank') {
         const key = `${type}|${constraint.rowCol}`;
         if (seen.has(key)) {
           // Merge with the previous.
@@ -830,6 +832,7 @@ class ConstraintManager {
       case 'XSum':
       case 'Skyscraper':
       case 'NumberedRoom':
+      case 'FullRank':
         this._outsideArrowConstraints.addConstraint(constraint);
         break;
       case 'AntiKnight':

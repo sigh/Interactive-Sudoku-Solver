@@ -2888,6 +2888,149 @@ SudokuConstraintHandler.NumberedRoom = class NumberedRoom extends SudokuConstrai
   }
 }
 
+SudokuConstraintHandler.FullRank = class FullRank extends SudokuConstraintHandler {
+  constructor(numGridCells, line, rankInc, rankDec) {
+    const allCells = Uint8Array.from({ length: numGridCells }, (_, i) => i);
+    super(allCells);
+
+    this._entries = [];
+    this._clueSets = [];
+    this._rankSets = [];
+    if (rankInc) {
+      this._clueSets.push({
+        rank: rankInc,
+        cell0: line[0],
+        cell1: line[1],
+      });
+    }
+    if (rankDec) {
+      this._clueSets.push({
+        rank: rankDec,
+        cell0: line[line.length - 1],
+        cell1: line[line.length - 2],
+      });
+    }
+  }
+
+  initialize(initialGrid, cellExclusions, shape) {
+    const gridSize = shape.gridSize;
+    for (let i = 0; i < gridSize; i++) {
+      const row = Uint8Array.from(
+        { length: gridSize }, (_, j) => i * gridSize + j);
+      this._entries.push(row);
+      this._entries.push(row.slice().reverse());
+      const col = Uint8Array.from(
+        { length: gridSize }, (_, j) => j * gridSize + i);
+      this._entries.push(col);
+      this._entries.push(col.slice().reverse());
+    }
+
+    const rankIndex = new Map();
+    for (let i = 0; i < this._clueSets.length; i++) {
+      const clueSet = this._clueSets[i];
+      const value = LookupTables.fromValue((clueSet.rank + 3) >> 2);
+      if (!rankIndex.has(value)) {
+        rankIndex.set(value, []);
+      }
+      rankIndex.get(value).push({
+        index: (clueSet.rank + 3) & 3,
+        entry: this._entries.find(
+          e => e[0] == clueSet.cell0 && e[1] == clueSet.cell1),
+      });
+      if (!(initialGrid[clueSet.cell0] &= value)) {
+        return false;
+      }
+    }
+
+    for (const [value, givens] of rankIndex) {
+      this._rankSets.push({
+        value: value,
+        givens: givens,
+      });
+    }
+    return true;
+  }
+
+  _enforceSingleGiven(grid, handlerAccumulator, viableEntries, given) {
+    const { index, entry } = given;
+
+    const less = [];
+    const greater = [];
+    const either = [];
+
+    for (let i = 0; i < viableEntries.length; i++) {
+      const e = viableEntries[i];
+      if (e === entry) continue;
+      let maybeLess = false;
+      let maybeGreater = false;
+      for (let j = 1; j < e.length; j++) {
+        const ev = grid[e[j]];
+        const entryv = grid[entry[j]];
+        if (LookupTables.maxValue(ev) > LookupTables.minValue(entryv)) {
+          maybeGreater = true;
+        }
+        if (LookupTables.minValue(ev) < LookupTables.maxValue(entryv)) {
+          maybeLess = true;
+        }
+        if (maybeLess && maybeGreater) break;
+
+        if (LookupTables.minValue(ev) > LookupTables.maxValue(entryv)) {
+          break;
+        } else if (LookupTables.maxValue(ev) < LookupTables.minValue(entryv)) {
+          break;
+        }
+      }
+      if (maybeLess && maybeGreater) {
+        either.push(e);
+      } else if (maybeLess) {
+        less.push(e);
+      } else if (maybeGreater) {
+        greater.push(e);
+      }
+    }
+
+    if (either.length + less.length < index) return false;
+    if (either.length + greater.length < 3 - index) return false;
+
+    return true;
+  }
+
+  _enforceSingleRankSet(grid, handlerAccumulator, rankSet) {
+    const value = rankSet.value;
+    const entries = this._entries;
+
+    const viableEntries = [];
+    for (let i = 0; i < entries.length; i++) {
+      if (grid[entries[i][0]] & value) {
+        viableEntries.push(entries[i]);
+      }
+    }
+
+    if (viableEntries.length > 4) return true;
+    if (viableEntries.length < 4) return false;
+
+    const givens = rankSet.givens;
+    for (let i = 0; i < givens.length; i++) {
+      if (!this._enforceSingleGiven(grid, handlerAccumulator, viableEntries, givens[i])) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  enforceConsistency(grid, handlerAccumulator) {
+    for (let i = 0; i < this._rankSets.length; i++) {
+      if (!this._enforceSingleRankSet(
+        grid, handlerAccumulator, this._rankSets[i])) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+}
+
 class HandlerSet {
   constructor(handlers, shape) {
     this._allHandlers = [];

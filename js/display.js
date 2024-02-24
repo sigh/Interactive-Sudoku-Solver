@@ -1207,6 +1207,7 @@ class OutsideArrowDisplay extends DisplayItem {
       ['XSum', document.getElementById('xsum-option')],
       ['Skyscraper', document.getElementById('skyscraper-option')],
       ['NumberedRoom', document.getElementById('numbered-room-option')],
+      ['FullRank', document.getElementById('full-rank-option')],
     ]);
 
     this._handleClick = (lineId, cells) => {
@@ -1257,6 +1258,7 @@ class OutsideArrowDisplay extends DisplayItem {
       this._outsideArrowMap.get(lineId).constraintTypes.push('XSum');
       this._outsideArrowMap.get(lineId).constraintTypes.push('Skyscraper');
       this._outsideArrowMap.get(lineId).constraintTypes.push('NumberedRoom');
+      this._outsideArrowMap.get(lineId).constraintTypes.push('FullRank');
     }
   }
 
@@ -1300,6 +1302,9 @@ class OutsideArrowDisplay extends DisplayItem {
           break;
         case 'NumberedRoom':
           valueStr = `:${value}:`;
+          break;
+        case 'FullRank':
+          valueStr = `#${value}`;
           break;
       }
       valueStrings.push(valueStr);

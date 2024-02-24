@@ -136,7 +136,7 @@ const INDEXING_PUZZLES = [
   },
 ];
 
-NUMBERED_ROOMS_PUZZLES = [
+const NUMBERED_ROOMS_PUZZLES = [
   '6x6: Numbered rooms',
   {
     'src': 'https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?id=000CR0',
@@ -147,6 +147,19 @@ NUMBERED_ROOMS_PUZZLES = [
     'src': 'https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?id=000B8L',
     'input': '.NumberedRoom~C1~1~1.NumberedRoom~C2~1~5.NumberedRoom~C3~3~7.NumberedRoom~C4~3~.NumberedRoom~C5~5~.NumberedRoom~R1~4~4.NumberedRoom~R3~8~.NumberedRoom~R4~2~.NumberedRoom~R9~6~6.NumberedRoom~C6~7~.NumberedRoom~C7~7~7.NumberedRoom~C8~9~5.NumberedRoom~C9~9~9.NumberedRoom~R7~~2.NumberedRoom~R6~~8.',
     'solution': '817593642532416879496827513658172394974365281321984765783249156145638927269751438',
+  }
+];
+
+const FULL_ROOM_PUZZLES = [
+  {
+    'src': 'https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?id=000DHO',
+    'input': '.FullRank~C1~33~.FullRank~C2~30~.FullRank~C3~26~.FullRank~C4~24~.FullRank~C5~13~.FullRank~R4~1~.FullRank~R5~17~.FullRank~R6~~36.FullRank~C6~~35.',
+    'solution': '987642153621835974345971628179283546568794312234156789852367491496518237713429865',
+  },
+  {
+    'src': 'https://discord.com/channels/709370620642852885/709373384437268530/1249572584211611688',
+    'input': '.FullRank~C2~9~.FullRank~C3~1~.FullRank~R6~24~..Shape~6x6',
+    'solution': '531246426315342561165432214653653124',
   }
 ];
 
