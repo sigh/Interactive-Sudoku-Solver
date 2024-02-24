@@ -230,6 +230,7 @@ const runSolveTests = async (onFailure) => {
     'Between lines',
     'Lockout lines',
     'Palindromes',
+    'Modular lines',
     'Jigsaw',
     'Jigsaw boxes, disconnected',
     'Windoku',

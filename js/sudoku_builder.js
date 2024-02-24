@@ -573,6 +573,20 @@ class SudokuConstraint {
     );
   }
 
+  static Modular = class Modular extends SudokuConstraintBase {
+    constructor(mod, ...cells) {
+      super(arguments);
+      this.cells = cells;
+      this.mod = mod;
+    }
+
+    static fnKey = memoize((mod, numValues) =>
+      SudokuConstraint.BinaryX.fnToKey(
+        (a, b) => (a % mod) != (b % mod),
+        numValues)
+    );
+  }
+
   static RegionSumLine = class RegionSumLine extends SudokuConstraintBase {
     constructor(...cells) {
       super(arguments);
@@ -1287,6 +1301,23 @@ class SudokuBuilder {
               ...cells);
             handler.enableHiddenSingles();
             yield handler;
+          }
+          break;
+
+        case 'Modular':
+          cells = constraint.cells.map(c => shape.parseCellId(c).cell);
+          if (cells.length < constraint.mod) {
+            const handler = new SudokuConstraintHandler.BinaryPairwise(
+              SudokuConstraint.Modular.fnKey(constraint.mod, shape.numValues),
+              ...cells);
+            yield handler;
+          } else {
+            for (let i = constraint.mod; i <= cells.length; i++) {
+              const handler = new SudokuConstraintHandler.BinaryPairwise(
+                SudokuConstraint.Modular.fnKey(constraint.mod, shape.numValues),
+                ...cells.slice(i - constraint.mod, i));
+              yield handler;
+            }
           }
           break;
 
