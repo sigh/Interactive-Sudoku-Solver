@@ -668,7 +668,7 @@ class ConstraintManager {
       //     input a value.
       //   - Otherwise just focus on the submit button.
       if (config.value) {
-        config.value.elem.focus();
+        config.value.elem.select();
       } else {
         selectionForm['add-constraint'].focus();
       }
