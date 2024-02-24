@@ -939,6 +939,18 @@ class SudokuConstraint {
     }
   }
 
+  static FullRank = class FullRank extends SudokuConstraintBase {
+    constructor(rowCol, rankInc, rankDec) {
+      super(arguments);
+      this.rowCol = rowCol.toUpperCase();
+      this.rankInc = +rankInc;
+      this.rankDec = +rankDec;
+    }
+
+    values() {
+      return [this.rankInc, this.rankDec];
+    }
+  }
 
   static AllDifferent = class AllDifferent extends SudokuConstraintBase {
     constructor(...cells) {
@@ -1605,6 +1617,16 @@ class SudokuBuilder {
             yield new SudokuConstraintHandler.Indexing(
               controlCell.cell, cells, value);
           }
+          break;
+
+        case 'FullRank':
+          yield new SudokuConstraintHandler.FullRank(
+            shape.numCells,
+            SudokuConstraintBase.fullLineCellMap(shape)
+              .get([constraint.rowCol, 1].toString()).map(
+                c => shape.parseCellId(c).cell),
+            constraint.rankInc,
+            constraint.rankDec);
           break;
 
         case 'Priority':
