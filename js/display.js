@@ -614,7 +614,7 @@ class ConstraintDisplay extends DisplayItem {
     return text;
   }
 
-  _CIRCLE_RADIUS = 16;
+  _CIRCLE_RADIUS = 20;
   _DIAMOND_SIZE = 20;
 
   _makeCircleAtPoint([x, y]) {
@@ -788,7 +788,6 @@ class ConstraintDisplay extends DisplayItem {
       cells,
       {
         startMarker: LineOptions.EMPTY_CIRCLE_MARKER,
-        width: LineOptions.THIN_LINE_WIDTH,
         arrow: true
       }
     );
@@ -798,7 +797,6 @@ class ConstraintDisplay extends DisplayItem {
     return this._drawConstraintLine(
       cells,
       {
-        width: LineOptions.THIN_LINE_WIDTH,
         startMarker: LineOptions.EMPTY_CIRCLE_MARKER,
         endMarker: LineOptions.EMPTY_CIRCLE_MARKER
       });
@@ -808,7 +806,6 @@ class ConstraintDisplay extends DisplayItem {
     return this._drawConstraintLine(
       cells,
       {
-        width: LineOptions.THIN_LINE_WIDTH,
         startMarker: LineOptions.EMPTY_PILL_MARKER,
         arrow: true,
       });
