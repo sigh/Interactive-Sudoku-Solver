@@ -955,44 +955,36 @@ class ConstraintManager {
     return true;
   }
 
-  _setUpMultiCellConstraints(selectionForm) {
-    this._multiCellConstraints = {
-      cage: {
+  _makeMultiCellConstraintConfig() {
+    return {
+      Cage: {
         value: {
           placeholder: 'sum',
         },
-        constraintClass: SudokuConstraint.Cage,
         validateFn: (cells, shape) => cells.length <= shape.numValues,
-        text: 'Cage',
         description:
           "Values must add up to the given sum. All values must be unique.",
       },
-      sum: {
+      Sum: {
         value: {
           placeholder: 'sum',
         },
-        constraintClass: SudokuConstraint.Sum,
         validateFn: (cells, shape) => cells.length <= 16,
-        text: 'Sum',
         description:
           "Values must add up to the given sum. Values don't need to be unique. Only up to 16 cells are allowed.",
       },
-      arrow: {
-        constraintClass: SudokuConstraint.Arrow,
+      Arrow: {
         validateFn: (cells, shape) => cells.length <= 16,
-        text: 'Arrow',
         description:
           "Values along the arrow must sum to the value in the circle.",
       },
-      'double-arrow': {
-        constraintClass: SudokuConstraint.DoubleArrow,
+      DoubleArrow: {
         validateFn: (cells, shape) => cells.length > 2 && cells.length <= 16,
         text: 'Double Arrow',
         description:
           "The sum of the values along the line equal the sum of the values in the circles.",
       },
-      'pill-arrow': {
-        constraintClass: SudokuConstraint.PillArrow,
+      PillArrow: {
         validateFn: (cells, shape) => cells.length > 2 && cells.length <= 17,
         text: 'Pill Arrow',
         description:
@@ -1001,41 +993,35 @@ class ConstraintManager {
           Numbers in pills are read from left to right, top to bottom.
           `,
       },
-      thermo: {
-        constraintClass: SudokuConstraint.Thermo,
+      Thermo: {
         text: 'Thermometer',
         description:
           "Values must be in increasing order starting at the bulb.",
       },
-      jigsaw: {
+      Jigsaw: {
         validateFn: (cells, shape) =>
           this._jigsawManager.cellsAreValidJigsawPiece(cells, shape),
         text: 'Jigsaw Piece',
         description:
           "Values inside the jigsaw piece can't repeat. Pieces must contain 9 cells, and cannot overlap.",
       },
-      whisper: {
+      Whisper: {
         value: {
           placeholder: 'difference',
           default: 5,
         },
-        constraintClass: SudokuConstraint.Whisper,
-        text: 'Whisper',
         description:
           "Adjacent values on the line must differ by at least this amount."
       },
-      renban: {
-        constraintClass: SudokuConstraint.Renban,
-        text: 'Renban',
+      Renban: {
         description:
           "Digits on the line must be consecutive and non-repeating, in any order."
       },
-      modular: {
+      Modular: {
         value: {
           placeholder: 'mod',
           default: 3,
         },
-        constraintClass: SudokuConstraint.Modular,
         text: 'Modular Line',
         description:
           `
@@ -1045,8 +1031,7 @@ class ConstraintManager {
           digit from the group 147, one from 258, and one from 369.
           `
       },
-      'region-sum': {
-        constraintClass: SudokuConstraint.RegionSumLine,
+      RegionSumLine: {
         text: 'Region Sum Line',
         description:
           `
@@ -1057,63 +1042,55 @@ class ConstraintManager {
 
           Has no effect if 'No Boxes' is set.`,
       },
-      between: {
-        constraintClass: SudokuConstraint.Between,
+      Between: {
         text: 'Between Line',
         description:
           "Values on the line must be strictly between the values in the circles."
       },
-      lockout: {
+      Lockout: {
         value: {
           placeholder: 'min diff',
           default: 4,
         },
-        constraintClass: SudokuConstraint.Lockout,
         text: 'Lockout Line',
         description:
           `
           Values on the line must be not be between the values in the diamonds.
           The values in the diamonds must differ by the difference given.`,
       },
-      palindrome: {
-        constraintClass: SudokuConstraint.Palindrome,
+      Palindrome: {
         text: 'Palindrome',
         description:
           "The values along the line form a palindrome."
       },
-      'white-dot': {
-        constraintClass: SudokuConstraint.WhiteDot,
+      WhiteDot: {
         validateFn: ConstraintManager._cellsAreAdjacent,
         text: '○ ±1',
         description:
           "Kropki white dot: values must be consecutive. Adjacent cells only.",
       },
-      'black-dot': {
-        constraintClass: SudokuConstraint.BlackDot,
+      BlackDot: {
         validateFn: ConstraintManager._cellsAreAdjacent,
         text: '● ×÷2',
         description:
           "Kropki black dot: one value must be double the other. Adjacent cells only."
       },
-      x: {
-        constraintClass: SudokuConstraint.X,
+      X: {
         validateFn: ConstraintManager._cellsAreAdjacent,
         text: 'x: 10Σ',
         description:
           "x: values must add to 10. Adjacent cells only."
       },
-      v: {
-        constraintClass: SudokuConstraint.V,
+      V: {
         validateFn: ConstraintManager._cellsAreAdjacent,
         text: 'v: 5Σ',
         description:
           "v: values must add to 5. Adjacent cells only."
       },
-      quad: {
+      Quad: {
         value: {
           placeholder: 'values',
         },
-        constraintClass: SudokuConstraint.Quad,
         validateFn: ConstraintManager._cellsAre2x2Square,
         text: 'Quadruple',
         description:
@@ -1122,14 +1099,28 @@ class ConstraintManager {
         Select a 2x2 square to enable.`,
       },
     };
+  }
+
+  _setUpMultiCellConstraints(selectionForm) {
+    this._multiCellConstraints = this._makeMultiCellConstraintConfig();
 
     const selectElem = selectionForm['constraint-type'];
     selectionForm.classList.add('disabled');
     const valueContainer = document.getElementById('multi-cell-constraint-value-container');
     const valueElems = [];
 
+    // Initialize defaults.
+    for (const [name, config] of Object.entries(this._multiCellConstraints)) {
+      config.text ||= name;
+      config.constraintClass = SudokuConstraint[name];
+      if (!config.constraintClass) {
+        throw ('Unknown constraint class: ' + name);
+      }
+    }
+
     // Create the options.
     for (const [name, config] of Object.entries(this._multiCellConstraints)) {
+
       const option = document.createElement('option');
       option.value = name;
       option.textContent = config.text;
@@ -1195,7 +1186,7 @@ class ConstraintManager {
     if (!config) throw ('Unknown constraint type: ' + type);
     if (config.elem.disabled) throw ('Invalid selection for ' + type);
 
-    if (type === 'quad') {
+    if (config.constraintClass === SudokuConstraint.Quad) {
       const valuesStr = formData.get(type + '-value');
       const values = valuesStr.split(/[, ]+/).map(v => +v).filter(
         v => Number.isInteger(v) && v >= 1 && v <= this._shape.numValues);
@@ -1204,7 +1195,7 @@ class ConstraintManager {
         const constraint = new SudokuConstraint.Quad(cells[0], ...values);
         this.loadConstraint(constraint);
       }
-    } else if (type === 'jigsaw') {
+    } else if (config.constraintClass === SudokuConstraint.Jigsaw) {
       this._jigsawManager.addPiece(cells);
     } else if (config.value) {
       const value = formData.get(type + '-value');
