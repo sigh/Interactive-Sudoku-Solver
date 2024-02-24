@@ -665,7 +665,7 @@ class ConstraintManager {
       //   - If the value input is enabled then focus on it to make it easy to
       //     input a value.
       //   - Otherwise just focus on the submit button.
-      if (config.value.elem) {
+      if (config.value) {
         config.value.elem.focus();
       } else {
         selectionForm['add-constraint'].focus();
