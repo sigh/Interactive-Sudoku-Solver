@@ -985,7 +985,10 @@ class ConstraintManager {
         validateFn: (cells, shape) => cells.length > 2 && cells.length <= 17,
         text: 'Pill Arrow',
         description:
-          "The sum of the values along the line equal the 2-digit number in the pill.",
+          `
+          The sum of the values along the line equal the 2-digit number in the pill.
+          Numbers in pills are read from left to right, top to bottom.
+          `,
       },
       thermo: {
         constraintClass: SudokuConstraint.Thermo,
