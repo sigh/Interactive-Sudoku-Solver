@@ -1132,6 +1132,7 @@ class ConstraintManager {
     }
 
     // Ensure select is initialized (but not selected).
+    autoSaveField(selectElem);
     selectElem.onchange();
     document.activeElement?.blur();
   }
