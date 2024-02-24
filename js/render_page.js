@@ -170,6 +170,7 @@ class ExampleHandler {
     'Global entropy',
     'Quadruple X',
     'Nabner thermo',
+    'Modular lines',
     'Pencilmark sudoku',
     '16x16',
     '16x16: Sudoku X, hard',
@@ -783,6 +784,16 @@ class ConstraintManager {
         this._addToPanel(config);
         this._configs.push(config);
         break;
+      case 'Modular':
+        config = {
+          cells: constraint.cells,
+          name: 'Modular',
+          constraint: constraint,
+          displayElem: this._display.drawModular(constraint.cells),
+        };
+        this._addToPanel(config);
+        this._configs.push(config);
+        break;
       case 'Palindrome':
         config = {
           cells: constraint.cells,
@@ -1018,6 +1029,21 @@ class ConstraintManager {
         text: 'Renban',
         description:
           "Digits on the line must be consecutive and non-repeating, in any order."
+      },
+      modular: {
+        value: {
+          placeholder: 'mod',
+          default: 3,
+        },
+        constraintClass: SudokuConstraint.Modular,
+        text: 'Modular Line',
+        description:
+          `
+          Every group of sequential 'mod' cells on a the line must have
+          different values when taken modulo 'mod'.
+          If mod = 3, then every group of three cells on the line must contain a
+          digit from the group 147, one from 258, and one from 369.
+          `
       },
       'region-sum': {
         constraintClass: SudokuConstraint.RegionSumLine,

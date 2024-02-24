@@ -819,6 +819,12 @@ class ConstraintDisplay extends DisplayItem {
     return this._drawConstraintLine(cells, { color: 'rgb(230, 190, 155)' });
   }
 
+  drawModular(cells) {
+    return this._drawConstraintLine(
+      cells,
+      { color: 'rgb(100, 255, 100)', dashed: true });
+  }
+
   drawRegionSumLine(cells) {
     return this._drawConstraintLine(cells, { color: 'rgb(100, 255, 100)' });
   }
