@@ -265,7 +265,7 @@ const autoSaveField = (element) => {
 
   const key = `autoSave-${element.id}`;
   const savedValue = sessionStorage.getItem(key);
-  if (savedValue !== undefined) {
+  if (savedValue !== null) {
     element.value = savedValue;
   }
 
