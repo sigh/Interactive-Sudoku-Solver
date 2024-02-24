@@ -1400,6 +1400,7 @@ SudokuConstraintHandler.SumWithNegative = class SumWithNegative extends SudokuCo
 
     this._positiveCells = positiveCells;
     this._negativeCells = negativeCells;
+    this._offsetForNegative = 0;
 
     // IMPORTANT: Complement cells don't work for this, because
     // we can't guarantee that reversed negativeCells is a unique value.
@@ -1409,8 +1410,13 @@ SudokuConstraintHandler.SumWithNegative = class SumWithNegative extends SudokuCo
     this.idStr = [this.constructor.name, positiveCells, negativeCells, sum].join('-');
   }
 
+  setSum(sum) {
+    this._sum = sum + this._offsetForNegative;
+  }
+
   initialize(initialGrid, cellExclusions, shape) {
-    this._sum += (shape.numValues + 1) * this._negativeCells.length;
+    this._offsetForNegative = (shape.numValues + 1) * this._negativeCells.length;
+    this._sum += this._offsetForNegative;
     return super.initialize(initialGrid, cellExclusions, shape);
   }
 
@@ -1434,6 +1440,76 @@ SudokuConstraintHandler.SumWithNegative = class SumWithNegative extends SudokuCo
     }
 
     return result;
+  }
+}
+
+SudokuConstraintHandler.PillArrow = class PillArrow extends SudokuConstraintHandler {
+  constructor(onesCell, tensCell, arrowCells) {
+    super([onesCell, tensCell, ...arrowCells]);
+    this._controlCell = tensCell;
+    this._internalSumHandler = new SudokuConstraintHandler.SumWithNegative(
+      arrowCells, [onesCell], 0);
+    this._scratchGrid = null;
+    this._resultGrid = null;
+  }
+
+  initialize(initialGrid, cellExclusions, shape) {
+    this._internalSumHandler.initialize(
+      initialGrid, cellExclusions, shape);
+
+    const maxSum = (this.cells.length - 2) * shape.numValues;
+    const maxTens = maxSum / 10 | 0;
+    initialGrid[this._controlCell] = (1 << maxTens) - 1;
+
+    this._scratchGrid = initialGrid.slice();
+    this._resultGrid = initialGrid.slice();
+
+    return true;
+  }
+
+  enforceConsistency(grid, handlerAccumulator) {
+    const sumHandler = this._internalSumHandler;
+    const cells = this.cells;
+    const controlCell = this._controlCell;
+
+    let values = grid[controlCell];
+    const numControl = countOnes16bit(values);
+    if (numControl == 1) {
+      // There is a single value, so we can just enforce the sum directly.
+      sumHandler.setSum(10 * LookupTables.toValue(values));
+      return sumHandler.enforceConsistency(grid, handlerAccumulator);
+    }
+
+    // For each possible value of the control cell, enforce the sum.
+    // In practice there should only be a few value control values.
+    const scratchGrid = this._scratchGrid;
+    const resultGrid = this._resultGrid;
+    resultGrid.fill(0);
+    while (values) {
+      const value = values & -values;
+      values ^= value;
+
+      sumHandler.setSum(10 * LookupTables.toValue(value));
+
+      // NOTE: This can be optimized to use a smaller (cell.length size) grid.
+      scratchGrid.set(grid);
+      scratchGrid[controlCell] = value;
+      // NOTE: We shouldn't pass in handlerAccumulator as it will add cells
+      // which haven't necessarily been constrained.
+      if (sumHandler.enforceConsistency(scratchGrid, null)) {
+        // This is a valid setting so add it to the possible candidates.
+        for (let j = 0; j < cells.length; j++) {
+          resultGrid[cells[j]] |= scratchGrid[cells[j]];
+        }
+      }
+    }
+
+    // Copy over all the valid values to the real grid.
+    for (let j = 0; j < cells.length; j++) {
+      grid[cells[j]] = resultGrid[cells[j]];
+    }
+
+    return grid[controlCell] !== 0;
   }
 }
 
@@ -2212,7 +2288,6 @@ SudokuConstraintHandler.XSum = class XSum extends SudokuConstraintHandler {
       const minMax = minMaxLookup[grid[cells[i]]];
       minSum += minMax >> 8;
       maxSum += minMax & 0xff;
-      // NOTE: We can uniqueness to restrict this even more.
 
       if (minSum > sum || maxSum < sum) {
         // This count isn't possible, so remove it from the control.

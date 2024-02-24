@@ -626,6 +626,28 @@ class ConstraintDisplay extends DisplayItem {
     return circle;
   }
 
+  _makePillAtPoints([x0, y0], [x1, y1]) {
+    const radius = this._CIRCLE_RADIUS;
+
+    // Normalize the direction vector
+    const [dx, dy] = [x1 - x0, y1 - y0];
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const [nx, ny] = [dx / dist, dy / dist];
+
+    // Create the path.
+    const d = [
+      `M ${x0 - radius * ny} ${y0 + radius * nx}`,
+      `A ${radius} ${radius} 0 0 1 ${x0 + radius * ny} ${y0 - radius * nx}`,
+      `L ${x1 + radius * ny} ${y1 - radius * nx}`,
+      `A ${radius} ${radius} 0 0 1 ${x1 - radius * ny} ${y1 + radius * nx}`,
+      `Z`
+    ].join(' ');
+    const path = createSvgElement('path');
+    path.setAttribute('d', d);
+
+    return path;
+  }
+
   _makeDiamondAtPoint([x, y]) {
     let diamond = createSvgElement('path');
     let size = this._DIAMOND_SIZE;
@@ -648,16 +670,19 @@ class ConstraintDisplay extends DisplayItem {
     p0[1] += dy * frac;
   }
 
-  _drawConstraintLineMarker(marker, point, adjPoint) {
+  _drawConstraintLineMarker(marker, points, index) {
+    const point = points[index];
     switch (marker) {
       case LineOptions.EMPTY_CIRCLE_MARKER:
-        if (!adjPoint) {
-          throw (`Empty circle marker must have an adjacent point: ${point}`);
-        }
         {
           const circle = this._makeCircleAtPoint(point);
           circle.setAttribute('fill', 'transparent');
-          this._removeCircleFromPath(point, adjPoint);
+          if (index > 0) {
+            this._removeCircleFromPath(point, points[index - 1]);
+          }
+          if (index < points.length - 1) {
+            this._removeCircleFromPath(point, points[index + 1]);
+          }
           return circle;
         }
       case LineOptions.FULL_CIRCLE_MARKER:
@@ -685,6 +710,17 @@ class ConstraintDisplay extends DisplayItem {
           const diamond = this._makeDiamondAtPoint(point);
           diamond.setAttribute('stroke-width', 0);
           return diamond;
+        }
+      case LineOptions.EMPTY_PILL_MARKER:
+        if (index != 0) {
+          throw (`Empty pill marker must be at the start of the line`);
+        }
+        {
+          const pill = this._makePillAtPoints(point, points[index + 1]);
+          pill.setAttribute('fill', 'transparent');
+          this._removeCircleFromPath(points[1], points[2]);
+          points[0] = points[1];
+          return pill;
         }
       default:
         throw (`Unknown marker: ${marker}`);
@@ -716,16 +752,16 @@ class ConstraintDisplay extends DisplayItem {
     // Add the markers.
     if (startMarker) {
       g.append(this._drawConstraintLineMarker(
-        startMarker, points[0], points[1]));
+        startMarker, points, 0));
     }
     if (endMarker) {
       g.append(this._drawConstraintLineMarker(
-        endMarker, points[len - 1], points[len - 2]));
+        endMarker, points, len - 1));
     }
     if (nodeMarker) {
       for (let i = 1; i < len - 1; i++) {
         g.append(this._drawConstraintLineMarker(
-          nodeMarker, points[i]));
+          nodeMarker, points, i));
       }
     }
 
@@ -765,6 +801,16 @@ class ConstraintDisplay extends DisplayItem {
         width: LineOptions.THIN_LINE_WIDTH,
         startMarker: LineOptions.EMPTY_CIRCLE_MARKER,
         endMarker: LineOptions.EMPTY_CIRCLE_MARKER
+      });
+  }
+
+  drawPillArrow(cells) {
+    return this._drawConstraintLine(
+      cells,
+      {
+        width: LineOptions.THIN_LINE_WIDTH,
+        startMarker: LineOptions.EMPTY_PILL_MARKER,
+        arrow: true,
       });
   }
 
@@ -1576,6 +1622,7 @@ class LineOptions {
   static SMALL_FULL_CIRCLE_MARKER = 3;
   static SMALL_EMPTY_CIRCLE_MARKER = 4;
   static DIAMOND_MARKER = 5;
+  static EMPTY_PILL_MARKER = 6;
 
   constructor(options) {
     Object.assign(this, options);

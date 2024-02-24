@@ -146,7 +146,6 @@ class ExampleHandler {
     'Killer sudoku',
     'Killer sudoku, hard',
     'Arrow sudoku',
-    'Double arrow sudoku',
     'Anti-knight, Anti-consecutive',
     'Little killer',
     'Sudoku X',
@@ -166,6 +165,8 @@ class ExampleHandler {
     'X-Sum',
     'Odd even',
     'Odd-even thermo',
+    'Double arrow',
+    'Pill arrow',
     'Global entropy',
     'Quadruple X',
     'Nabner thermo',
@@ -739,6 +740,16 @@ class ConstraintManager {
         this._addToPanel(config);
         this._configs.push(config);
         break;
+      case 'PillArrow':
+        config = {
+          cells: constraint.cells,
+          name: 'Pill Arrow',
+          constraint: constraint,
+          displayElem: this._display.drawPillArrow(constraint.cells),
+        };
+        this._addToPanel(config);
+        this._configs.push(config);
+        break;
       case 'Thermo':
         config = {
           cells: constraint.cells,
@@ -968,6 +979,13 @@ class ConstraintManager {
         text: 'Double Arrow',
         description:
           "The sum of the values along the line equal the sum of the values in the circles.",
+      },
+      'pill-arrow': {
+        constraintClass: SudokuConstraint.PillArrow,
+        validateFn: (cells, shape) => cells.length > 2 && cells.length <= 17,
+        text: 'Pill Arrow',
+        description:
+          "The sum of the values along the line equal the 2-digit number in the pill.",
       },
       thermo: {
         constraintClass: SudokuConstraint.Thermo,
