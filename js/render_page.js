@@ -171,6 +171,7 @@ class ExampleHandler {
     'Quadruple X',
     'Nabner thermo',
     'Modular lines',
+    'Entropic connections',
     'Pencilmark sudoku',
     '16x16',
     '16x16: Sudoku X, hard',
@@ -727,6 +728,7 @@ class ConstraintManager {
       case 'Renban':
       case 'Whisper':
       case 'Modular':
+      case 'Entropic':
       case 'Palindrome':
       case 'Between':
       case 'Lockout':
@@ -965,10 +967,19 @@ class ConstraintManager {
         displayConfig: { color: 'rgb(100, 255, 100)', dashed: true },
         description:
           `
-          Every group of sequential 'mod' cells on a the line must have
+          Every sequential group of 'mod' cells on a the line must have
           different values when taken modulo 'mod'.
           If mod = 3, then every group of three cells on the line must contain a
           digit from the group 147, one from 258, and one from 369.
+          `
+      },
+      Entropic: {
+        text: 'Entropic Line',
+        displayConfig: { color: 'rgb(255, 100, 255)', dashed: true },
+        description:
+          `
+          Every sequential group of 3 cells on a the line must have different
+          values from the groups {1,2,3}, {4,5,6}, and {7,8,9}.
           `
       },
       RegionSumLine: {
