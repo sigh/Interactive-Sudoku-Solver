@@ -587,6 +587,19 @@ class SudokuConstraint {
     );
   }
 
+  static Entropic = class Entropic extends SudokuConstraintBase {
+    constructor(...cells) {
+      super(arguments);
+      this.cells = cells;
+    }
+
+    static fnKey = memoize((numValues) =>
+      SudokuConstraint.BinaryX.fnToKey(
+        (a, b) => (((a - 1) / 3) | 0) != (((b - 1) / 3) | 0),
+        numValues)
+    );
+  }
+
   static RegionSumLine = class RegionSumLine extends SudokuConstraintBase {
     constructor(...cells) {
       super(arguments);
@@ -1320,6 +1333,24 @@ class SudokuBuilder {
             }
           }
           break;
+
+        case 'Entropic':
+          cells = constraint.cells.map(c => shape.parseCellId(c).cell);
+          if (cells.length < 3) {
+            const handler = new SudokuConstraintHandler.BinaryPairwise(
+              SudokuConstraint.Entropic.fnKey(shape.numValues),
+              ...cells);
+            yield handler;
+          } else {
+            for (let i = 3; i <= cells.length; i++) {
+              const handler = new SudokuConstraintHandler.BinaryPairwise(
+                SudokuConstraint.Entropic.fnKey(shape.numValues),
+                ...cells.slice(i - 3, i));
+              yield handler;
+            }
+          }
+          break;
+
 
         case 'RegionSumLine':
           // Region sum lines only makes sense when we have boxes.

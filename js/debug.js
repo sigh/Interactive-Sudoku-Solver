@@ -231,6 +231,7 @@ const runSolveTests = async (onFailure) => {
     'Lockout lines',
     'Palindromes',
     'Modular lines',
+    'Entropic connections',
     'Jigsaw',
     'Jigsaw boxes, disconnected',
     'Windoku',
