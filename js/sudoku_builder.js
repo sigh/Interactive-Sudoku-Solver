@@ -206,6 +206,7 @@ class SudokuParser {
   }
 
   static SHAPE_TO_BASE_CHAR_CODE = new Map([
+    [SHAPE_6x6, '1'.charCodeAt(0)],
     [SHAPE_9x9, '1'.charCodeAt(0)],
     [SHAPE_16x16, 'A'.charCodeAt(0)],
   ])
