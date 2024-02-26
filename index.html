@@ -133,8 +133,10 @@ layout: null
   <div id="sudoku-container">
 
     <div id="sudoku-grid-with-controls">
-      <div id="sudoku-grid">
-        <input id="fake-input" inputmode="numeric" type="text" value="x">
+      <div id="sudoku-grid-container">
+        <div id="sudoku-grid">
+          <input id="fake-input" inputmode="numeric" type="text" value="x">
+        </div>
       </div>
       <div id="grid-control-buttons" class="control-panel">
         <div id="solution-control-panel">
@@ -280,8 +282,8 @@ layout: null
 
             <div>
               <select id="shape-select">
-                <option value="9x9">9x9</option>
                 <option value="6x6">6x6</option>
+                <option value="9x9" selected>9x9</option>
                 <option value="16x16">16x16</option>
               </select>
               <span class="tooltip" data-text="Change the grid shape."></span>
