@@ -242,7 +242,7 @@ class CellValueDisplay extends DisplayItem {
   }
 
   static _makeTemplateArray = memoize((shape) => {
-    const charsPerLine = 2 * shape.boxSize - 1;
+    const charsPerLine = 2 * shape.boxWidth - 1;
 
     let charCount = 0;
     const slots = [];
@@ -935,14 +935,16 @@ class DefaultRegions extends DisplayItem {
     const gridSizePixels = cellSize * shape.gridSize;
     const svg = this.getSvg();
 
-    for (let i = shape.boxSize; i < shape.gridSize; i += shape.boxSize) {
-      svg.appendChild(this._makePath([
-        [0, i * cellSize],
-        [gridSizePixels, i * cellSize],
-      ]));
+    for (let i = shape.boxWidth; i < shape.gridSize; i += shape.boxWidth) {
       svg.appendChild(this._makePath([
         [i * cellSize, 0],
         [i * cellSize, gridSizePixels],
+      ]));
+    }
+    for (let i = shape.boxHeight; i < shape.gridSize; i += shape.boxHeight) {
+      svg.appendChild(this._makePath([
+        [0, i * cellSize],
+        [gridSizePixels, i * cellSize],
       ]));
     }
   }

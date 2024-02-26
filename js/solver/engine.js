@@ -396,6 +396,16 @@ SudokuSolver.InternalSolver = class {
 
     const handlerSet = new HandlerSet(handlers, this._shape);
 
+    if (this._debugLogger?.logLevel >= 2) {
+      for (const h of handlerSet) {
+        this._debugLogger.log({
+          loc: '_setUpHandlers',
+          msg: 'Handler: ' + h.constructor.name,
+          cells: h.cells,
+        }, 2);
+      }
+    }
+
     // Create lookups for which cells must have mutually exclusive values.
     const cellExclusions = new SudokuSolver.CellExclusions(
       handlerSet, this._shape);

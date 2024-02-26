@@ -13,8 +13,10 @@ class GridShape {
     return this._numPencilmarksLookup.get(numPencilmarks);
   }
 
-  constructor(gridSize, boxSize) {
-    this.boxSize = boxSize;
+  constructor(gridSize, boxWidth, boxHeight) {
+    this.boxWidth = boxWidth;
+    this.boxHeight = boxHeight;
+    this.boxSize = boxWidth;
     this.gridSize = gridSize;
     this.numValues = gridSize;
     this.numCells = gridSize * gridSize;
@@ -74,8 +76,9 @@ class GridShape {
   }
 }
 
-const SHAPE_9x9 = new GridShape(9, 3);
-const SHAPE_16x16 = new GridShape(16, 4);
+const SHAPE_6x6 = new GridShape(6, 3, 2);
+const SHAPE_9x9 = new GridShape(9, 3, 3);
+const SHAPE_16x16 = new GridShape(16, 4, 4);
 const SHAPE_MAX = SHAPE_16x16;
 
 class SudokuParser {
@@ -215,6 +218,7 @@ class SudokuParser {
     const gridSize = shape.gridSize;
 
     const baseCharCode = this.SHAPE_TO_BASE_CHAR_CODE.get(shape);
+    if (!baseCharCode) return null;
 
     let fixedValues = [];
     let nonValueCharacters = [];
@@ -470,17 +474,19 @@ class SudokuConstraintBase {
   });
   static boxRegions = memoize((shape) => {
     const gridSize = shape.gridSize;
-    const boxSize = shape.boxSize;
+    const boxWidth = shape.boxWidth;
+    const boxHeight = shape.boxHeight;
     return this._makeRegions(
-      (r, i) => ((r / boxSize | 0) * boxSize + (i % boxSize | 0)) * gridSize
-        + (r % boxSize | 0) * boxSize + (i / boxSize | 0), gridSize);
+      (r, i) => ((r / boxHeight | 0) * boxHeight + (i % boxHeight | 0)) * gridSize
+        + (r % boxHeight | 0) * boxWidth + (i / boxHeight | 0), gridSize);
   });
   static disjointSetRegions = memoize((shape) => {
     const gridSize = shape.gridSize;
-    const boxSize = shape.boxSize;
+    const boxWidth = shape.boxWidth;
+    const boxHeight = shape.boxHeight;
     return this._makeRegions(
-      (r, i) => ((i / boxSize | 0) * boxSize + (r % boxSize | 0)) * gridSize
-        + (i % boxSize | 0) * boxSize + (r / boxSize | 0), gridSize);
+      (r, i) => ((i / boxHeight | 0) * boxHeight + (r % boxHeight | 0)) * gridSize
+        + (i % boxHeight | 0) * boxWidth + (r / boxHeight | 0), gridSize);
   });
 
   static fullLineCellMap = memoize((shape) => {
@@ -658,16 +664,17 @@ class SudokuConstraint {
   static Windoku = class Windoku extends SudokuConstraintBase {
     static regions = memoize((shape) => {
       const gridSize = shape.gridSize;
-      const boxSize = shape.boxSize;
+      const boxWidth = shape.boxWidth;
+      const boxHeight = shape.boxHeight;
 
       const regions = [];
 
-      for (let i = 1; i < gridSize; i += boxSize + 1) {
-        for (let j = 1; j < gridSize; j += boxSize + 1) {
+      for (let i = 1; i + boxWidth < gridSize; i += boxWidth + 1) {
+        for (let j = 1; j + boxHeight < gridSize; j += boxHeight + 1) {
           const cells = [];
           for (let k = 0; k < gridSize; k++) {
-            const row = i + (k % boxSize | 0);
-            const col = j + (k / boxSize | 0);
+            const row = j + (k % boxHeight | 0);
+            const col = i + (k / boxHeight | 0);
             cells.push(shape.cellIndex(row, col));
           }
           regions.push(cells);
