@@ -1850,7 +1850,7 @@ class MultiValueInputManager extends DropdownInputManager {
     }
 
     this._dropdownBody.style.setProperty(
-      'grid-template-columns', `repeat(${shape.boxSize}, 1fr)`);
+      'grid-template-columns', `repeat(${shape.boxWidth}, 1fr)`);
   }
 
   _setUp() {

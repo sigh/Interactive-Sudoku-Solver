@@ -34,7 +34,7 @@ class SudokuConstraintOptimizer {
       for (let j = 0; j < i; j++) {
         const intersectionSize = arrayIntersectSize(
           houseHandlers[i].cells, houseHandlers[j].cells);
-        if (intersectionSize !== shape.boxSize) continue;
+        if (intersectionSize !== shape.boxWidth && intersectionSize !== shape.boxHeight) continue;
         const newHandler = new SudokuConstraintHandler.SameValues(
           arrayDifference(houseHandlers[i].cells, houseHandlers[j].cells),
           arrayDifference(houseHandlers[j].cells, houseHandlers[i].cells),
