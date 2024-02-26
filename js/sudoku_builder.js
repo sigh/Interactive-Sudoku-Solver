@@ -16,7 +16,6 @@ class GridShape {
   constructor(gridSize, boxWidth, boxHeight) {
     this.boxWidth = boxWidth;
     this.boxHeight = boxHeight;
-    this.boxSize = boxWidth;
     this.gridSize = gridSize;
     this.numValues = gridSize;
     this.numCells = gridSize * gridSize;
