@@ -219,7 +219,7 @@ class CellValueDisplay extends DisplayItem {
     this.clear();
     const svg = this.getSvg();
 
-    const LINE_HEIGHT = this._shape.gridSize == SHAPE_9x9.gridSize ? 17 : 10;
+    const LINE_HEIGHT = this._shape.gridSize <= SHAPE_9x9.gridSize ? 17 : 10;
     const START_OFFSET = -DisplayItem.CELL_SIZE / 2 + 2;
     for (let i = 0; i < grid.length; i++) {
       const value = grid[i];
