@@ -264,9 +264,8 @@ const runSolveTests = async (onFailure) => {
   result.collection = '16x16';
   results.push(result);
 
-  result = await PuzzleRunner.runAllWithChecks([
-    '6x6',
-  ], onFailure);
+  result = await PuzzleRunner.runAllWithChecks(
+    SHAPE_6x6_PUZZLES, onFailure);
   result.collection = 'Other sizes';
   results.push(result);
 
