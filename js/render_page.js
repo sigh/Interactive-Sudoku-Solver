@@ -177,6 +177,7 @@ class ExampleHandler {
     '16x16: Sudoku X, hard',
     '16x16: Jigsaw',
     '16x16: Windoku',
+    '6x6',
   ];
 
   constructor(constraintManager) {
