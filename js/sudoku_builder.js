@@ -639,6 +639,13 @@ class SudokuConstraint {
     );
   }
 
+  static Zipper = class Zipper extends SudokuConstraintBase {
+    constructor(...cells) {
+      super(arguments);
+      this.cells = cells;
+    }
+  }
+
   static NoBoxes = class NoBoxes extends SudokuConstraintBase._Meta { }
   static StrictKropki = class StrictKropki extends SudokuConstraintBase._Meta {
     static fnKey = memoize((numValues) =>
@@ -1384,6 +1391,37 @@ class SudokuBuilder {
             yield new SudokuConstraintHandler.BinaryConstraint(
               cells[i], cells[numCells - 1 - i],
               SudokuConstraint.Palindrome.fnKey(shape.numValues));
+          }
+          break;
+        case 'Zipper':
+          cells = constraint.cells.map(c => shape.parseCellId(c).cell);
+          {
+            const pairs = [];
+            const numCells = cells.length;
+            for (let i = 0; i < ((numCells / 2) | 0); i++) {
+              pairs.push([cells[i], cells[numCells - 1 - i]]);
+            }
+            if (numCells % 2 == 1) {
+              // If there are an odd numbers of cells, then treat this as a
+              // set of arrows from the center cell to each pair.
+              // We don't bother to also add constraints between each pair, as
+              // the constraint on the total sum should propagate through the
+              // center cell.
+              const centerCell = [cells[(numCells / 2) | 0]];
+              for (const pair of pairs) {
+                yield new SudokuConstraintHandler.SumWithNegative(
+                  pair, centerCell, 0);
+              }
+            } else {
+              // Otherwise create an equal sum constraint between each pair.
+              const numPairs = pairs.length;
+              for (let i = 1; i < numPairs; i++) {
+                for (let j = 0; j < i; j++) {
+                  yield new SudokuConstraintHandler.SumWithNegative(
+                    pairs[i], pairs[j], 0);
+                }
+              }
+            }
           }
           break;
 
