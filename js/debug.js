@@ -251,6 +251,7 @@ const runSolveTests = async (onFailure) => {
     'Quadruple - repeated values',
     'Odd-even thermo',
     'Nabner thermo - easy',
+    'Zipper lines - easy',
   ], onFailure);
   result.collection = '9x9';
   results.push(result);

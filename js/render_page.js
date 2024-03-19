@@ -157,6 +157,7 @@ class ExampleHandler {
     'Between lines',
     'Lockout lines',
     'Palindromes',
+    'Zipper lines',
     'Jigsaw',
     'X-Windoku',
     'Region sum lines',
@@ -731,6 +732,7 @@ class ConstraintManager {
       case 'Modular':
       case 'Entropic':
       case 'Palindrome':
+      case 'Zipper':
       case 'Between':
       case 'Lockout':
       case 'RegionSumLine':
@@ -1024,9 +1026,22 @@ class ConstraintManager {
       },
       Palindrome: {
         text: 'Palindrome',
-        displayConfig: { color: 'rgb(200, 200, 255)' },
+        displayConfig: {
+          color: 'rgb(200, 200, 255)'
+        },
         description:
           "The values along the line form a palindrome."
+      },
+      Zipper: {
+        text: 'Zipper Line',
+        displayConfig: {
+          color: 'rgb(200, 200, 255)',
+        },
+        description:
+          `
+          Digits which are equal distance from the center of the zipper have the
+          same sum. For odd length lines, the center digit is the sum.
+          `
       },
       WhiteDot: {
         validateFn: ConstraintManager._cellsAreAdjacent,
