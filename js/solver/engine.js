@@ -1616,11 +1616,6 @@ class LookupTables {
       return table;
     })();
 
-    // The maximum number of cells in a sum is 16 so that it can the count
-    // can be stored in 4 bits. This is important for the layout of
-    // isFixed in rangeInfo.
-    this.MAX_CELLS_IN_SUM = 16;
-
     // Combines useful info about the range of numbers in a cell.
     // Designed to be summed, so that the aggregate stats can be found.
     // Layout: [isFixed: 4 bits, fixed: 8 bits, min: 8 bits, max: 8 bits]
