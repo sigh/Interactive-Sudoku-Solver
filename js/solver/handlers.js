@@ -901,8 +901,8 @@ SudokuConstraintHandler._SumHandlerUtil = class _SumHandlerUtil {
   }
 
   // Scratch buffers for reuse so we don't have to create arrays at runtime.
-  static _seenMins = new Uint16Array(SHAPE_MAX.numValues);
-  static _seenMaxs = new Uint16Array(SHAPE_MAX.numValues);
+  static _seenMins = new Uint16Array(SHAPE_MAX.numCells);
+  static _seenMaxs = new Uint16Array(SHAPE_MAX.numCells);
 
   // Restricts cell values to only the ranges that are possible taking into
   // account uniqueness constraints between values.
@@ -1302,25 +1302,25 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
     const sum = this._sum | 0;
     const gridSize = this._shape.gridSize | 0;
 
-    // Determine how much headroom there is in the range between the extreme
-    // values and the target sum.
+    // Calculate stats in batches of 15 since rangeInfo counts myst be stored
+    // in 4 bits.
+    let maxSum = 0;
+    let minSum = 0;
+    let numUnfixed = numCells;
+    let fixedSum = 0;
     const rangeInfo = this._lookupTables.rangeInfo;
-    let rangeInfoSum = 0;
-    for (let i = 0; i < numCells; i++) {
-      rangeInfoSum += rangeInfo[grid[cells[i]]];
-    }
+    for (let i = 0; i < numCells;) {
+      let rangeInfoSum = 0;
+      let lim = i + 15;
+      if (lim > numCells) lim = numCells;
+      for (; i < lim; i++) {
+        rangeInfoSum += rangeInfo[grid[cells[i]]];
+      }
 
-    let maxSum = rangeInfoSum & 0xff;
-    let minSum = (rangeInfoSum >> 8) & 0xff;
-
-    if (maxSum === 0) {
-      // This can only happen if there are 16 16s. This is rare, so special
-      // handling is fine.
-      maxSum = 1 << 8;
-      minSum -= 1;
-      // If both minSum and maxSum are 0, then we have a fixed list of 16s.
-      // So just return if the sum is equal.
-      if (minSum == 0) return sum === 1 << 8;
+      maxSum += rangeInfoSum & 0xff;
+      minSum += (rangeInfoSum >> 8) & 0xff;
+      numUnfixed -= rangeInfoSum >> 24;
+      fixedSum += (rangeInfoSum >> 16) & 0xff;
     }
 
     // It is impossible to make the target sum.
@@ -1330,7 +1330,6 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
     //       exclusionCells.
     if (minSum == maxSum) return true;
 
-    const numUnfixed = numCells - (rangeInfoSum >> 24);
     // A large fixed value indicates a cell has a 0, hence is already
     // unsatisfiable.
     // If all cells were fixed, then we would have returned already - so this
@@ -1341,7 +1340,6 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
 
     if (hasFewUnfixed) {
       // If there are few remaining cells then handle them explicitly.
-      const fixedSum = (rangeInfoSum >> 16) & 0xff;
       const targetSum = sum - fixedSum;
       if (!this._sumUtil.enforceFewRemainingCells(grid, targetSum, numUnfixed, this.cells, this._exclusionIndexes, this._cellExclusions)) {
         return false;
@@ -1458,8 +1456,8 @@ SudokuConstraintHandler.PillArrow = class PillArrow extends SudokuConstraintHand
       initialGrid, cellExclusions, shape);
 
     const maxSum = (this.cells.length - 2) * shape.numValues;
-    const maxTens = maxSum / 10 | 0;
-    initialGrid[this._controlCell] = (1 << maxTens) - 1;
+    const maxTens = Math.min(maxSum / 10 | 0, shape.numValues);
+    initialGrid[this._controlCell] = ((1 << maxTens) - 1);
 
     this._scratchGrid = initialGrid.slice();
     this._resultGrid = initialGrid.slice();

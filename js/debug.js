@@ -252,6 +252,7 @@ const runSolveTests = async (onFailure) => {
     'Odd-even thermo',
     'Nabner thermo - easy',
     'Zipper lines - easy',
+    LONG_SUMS[0],
   ], onFailure);
   result.collection = '9x9';
   results.push(result);

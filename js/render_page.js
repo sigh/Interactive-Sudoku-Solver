@@ -897,12 +897,10 @@ class ConstraintManager {
         value: {
           placeholder: 'sum',
         },
-        validateFn: (cells, shape) => cells.length <= 16,
         description:
           "Values must add up to the given sum. Values don't need to be unique. Only up to 16 cells are allowed.",
       },
       Arrow: {
-        validateFn: (cells, shape) => cells.length <= 16,
         displayConfig: {
           startMarker: LineOptions.EMPTY_CIRCLE_MARKER,
           arrow: true
@@ -911,7 +909,7 @@ class ConstraintManager {
           "Values along the arrow must sum to the value in the circle.",
       },
       DoubleArrow: {
-        validateFn: (cells, shape) => cells.length > 2 && cells.length <= 16,
+        validateFn: (cells, shape) => cells.length > 2,
         text: 'Double Arrow',
         displayConfig: {
           startMarker: LineOptions.EMPTY_CIRCLE_MARKER,
@@ -921,7 +919,7 @@ class ConstraintManager {
           "The sum of the values along the line equal the sum of the values in the circles.",
       },
       PillArrow: {
-        validateFn: (cells, shape) => cells.length > 2 && cells.length <= 17,
+        validateFn: (cells, shape) => cells.length > 2,
         text: 'Pill Arrow',
         displayConfig: {
           startMarker: LineOptions.EMPTY_PILL_MARKER,

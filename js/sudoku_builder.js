@@ -1184,12 +1184,8 @@ class SudokuBuilder {
             const [negativeCell, ...positiveCells] = (
               constraint.cells.map(c => shape.parseCellId(c).cell));
 
-            if (constraint.cells.length <= 16) {
-              yield new SudokuConstraintHandler.SumWithNegative(
-                positiveCells, [negativeCell], 0);
-            } else {
-              throw ('Arrow can\'t have more than 16 cells');
-            }
+            yield new SudokuConstraintHandler.SumWithNegative(
+              positiveCells, [negativeCell], 0);
           }
           break;
 
@@ -1200,12 +1196,8 @@ class SudokuBuilder {
             const negativeCells = [cells[0], cells[cells.length - 1]];
             const positiveCells = cells.slice(1, -1);
 
-            if (constraint.cells.length <= 16) {
-              yield new SudokuConstraintHandler.SumWithNegative(
-                positiveCells, negativeCells, 0);
-            } else {
-              throw ('DoubleArrow can\'t have more than 16 cells');
-            }
+            yield new SudokuConstraintHandler.SumWithNegative(
+              positiveCells, negativeCells, 0);
           }
           break;
 
@@ -1214,14 +1206,10 @@ class SudokuBuilder {
             const cells = (
               constraint.cells.map(c => shape.parseCellId(c).cell));
 
-            if (cells.length <= 17) {
-              const tens = Math.min(cells[0], cells[1]);
-              const ones = Math.max(cells[0], cells[1]);
-              yield new SudokuConstraintHandler.PillArrow(
-                ones, tens, cells.slice(2));
-            } else {
-              throw ('PillArrow can\'t have more than 17 cells');
-            }
+            const tens = Math.min(cells[0], cells[1]);
+            const ones = Math.max(cells[0], cells[1]);
+            yield new SudokuConstraintHandler.PillArrow(
+              ones, tens, cells.slice(2));
           }
           break;
 
