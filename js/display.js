@@ -792,6 +792,20 @@ class ConstraintDisplay extends DisplayItem {
     return g;
   }
 
+  drawPillArrow(cells, pillSize) {
+    let options = {
+      arrow: true,
+    };
+    if (pillSize == 2) {
+      options.startMarker = LineOptions.EMPTY_PILL_MARKER;
+    } else {
+      options.dashed = true;
+    }
+    // For now, render a 3-pill arrow without a pill.
+    return this._drawConstraintLine(
+      cells, options, this._lineConstraintGroup);
+  }
+
   drawThermometer(cells) {
     return this._drawConstraintLine(
       cells,

@@ -1442,72 +1442,126 @@ SudokuConstraintHandler.SumWithNegative = class SumWithNegative extends SudokuCo
 }
 
 SudokuConstraintHandler.PillArrow = class PillArrow extends SudokuConstraintHandler {
-  constructor(onesCell, tensCell, arrowCells) {
-    super([onesCell, tensCell, ...arrowCells]);
-    this._controlCell = tensCell;
+  constructor(pillCells, arrowCells) {
+    super([...pillCells, ...arrowCells]);
+    const pillSize = pillCells.length;
+    const numControl = pillSize - 1;
+    this._controlCells = pillCells.slice(0, numControl);
     this._internalSumHandler = new SudokuConstraintHandler.SumWithNegative(
-      arrowCells, [onesCell], 0);
+      arrowCells, [pillCells[pillSize - 1]], 0);
     this._scratchGrid = null;
     this._resultGrid = null;
+    this._remainingValuesStack = new Uint16Array(numControl);
+    this._currentValueStack = new Uint16Array(numControl);
   }
 
   initialize(initialGrid, cellExclusions, shape) {
     this._internalSumHandler.initialize(
       initialGrid, cellExclusions, shape);
 
-    const maxSum = (this.cells.length - 2) * shape.numValues;
-    const maxTens = Math.min(maxSum / 10 | 0, shape.numValues);
-    initialGrid[this._controlCell] &= ((1 << maxTens) - 1);
+    // Constrain the most significant digit of the control cells.
+    const numControl = this._controlCells.length;
+    const maxSum = (this.cells.length - numControl - 1) * shape.numValues;
+    const maxControlUnit = Math.pow(10, numControl);
+    const maxControlValue = Math.min(
+      maxSum / maxControlUnit | 0, shape.numValues);
+    initialGrid[this._controlCells[0]] &= ((1 << maxControlValue) - 1);
 
     this._scratchGrid = initialGrid.slice();
     this._resultGrid = initialGrid.slice();
 
-    return true;
+    return maxControlValue > 0;
   }
 
   enforceConsistency(grid, handlerAccumulator) {
     const sumHandler = this._internalSumHandler;
-    const cells = this.cells;
-    const controlCell = this._controlCell;
+    const controlCells = this._controlCells;
+    const numControlCells = controlCells.length;
 
-    let values = grid[controlCell];
-    const numControl = countOnes16bit(values);
-    if (numControl == 1) {
-      // There is a single value, so we can just enforce the sum directly.
-      sumHandler.setSum(10 * LookupTables.toValue(values));
-      return sumHandler.enforceConsistency(grid, handlerAccumulator);
+    {
+      // Check if there is a single control value, so we can just enforce the
+      // sum directly.
+      // Not necessary, but it improves performance.
+      let isUnique = true;
+      let controlSum = 0;
+      for (let i = 0; i < numControlCells; i++) {
+        const values = grid[controlCells[i]];
+        if (values & (values - 1)) {
+          isUnique = false;
+          break;
+        }
+        controlSum = (controlSum + LookupTables.toValue(values)) * 10;
+      }
+      if (isUnique) {
+        sumHandler.setSum(controlSum);
+        return sumHandler.enforceConsistency(grid, handlerAccumulator);
+      }
     }
 
     // For each possible value of the control cell, enforce the sum.
     // In practice there should only be a few value control values.
+    // scratchGrid is where the enforcement will happen, and valid values
+    // will be copied to the resultGrid.
     const scratchGrid = this._scratchGrid;
     const resultGrid = this._resultGrid;
     resultGrid.fill(0);
-    while (values) {
-      const value = values & -values;
-      values ^= value;
 
-      sumHandler.setSum(10 * LookupTables.toValue(value));
+    const cells = this.cells;
+    const remainingValuesStack = this._remainingValuesStack;
+    const currentValueStack = this._currentValueStack;
 
-      // NOTE: This can be optimized to use a smaller (cell.length size) grid.
-      scratchGrid.set(grid);
-      scratchGrid[controlCell] = value;
-      // NOTE: We shouldn't pass in handlerAccumulator as it will add cells
-      // which haven't necessarily been constrained.
-      if (sumHandler.enforceConsistency(scratchGrid, null)) {
-        // This is a valid setting so add it to the possible candidates.
-        for (let j = 0; j < cells.length; j++) {
-          resultGrid[cells[j]] |= scratchGrid[cells[j]];
-        }
+    let controlSum = 0;
+    let stackDepth = 0;
+    remainingValuesStack[stackDepth] = grid[controlCells[stackDepth]];
+    stackDepth++;
+    while (stackDepth) {
+      stackDepth--;
+      let values = remainingValuesStack[stackDepth];
+      if (!values) {
+        controlSum = (controlSum / 10) | 0;
+        continue;
       }
+
+      const value = values & -values;
+      remainingValuesStack[stackDepth] ^= value;
+      currentValueStack[stackDepth] = value;
+
+      controlSum = controlSum * 10 + LookupTables.toValue(value);
+
+      if (stackDepth + 1 == numControlCells) {
+        sumHandler.setSum(controlSum * 10);
+
+        // NOTE: This can be optimized to use a smaller (cell.length size) grid.
+        scratchGrid.set(grid);
+        for (let i = 0; i < numControlCells; i++) {
+          scratchGrid[controlCells[i]] = currentValueStack[i];
+        }
+        // NOTE: We shouldn't pass in handlerAccumulator as it will add cells
+        // which haven't necessarily been constrained.
+        if (sumHandler.enforceConsistency(scratchGrid, null)) {
+          // This is a valid setting so add it to the possible candidates.
+          for (let i = 0; i < cells.length; i++) {
+            resultGrid[cells[i]] |= scratchGrid[cells[i]];
+          }
+        }
+        controlSum = (controlSum / 10) | 0;
+      } else {
+        stackDepth++;
+        remainingValuesStack[stackDepth] = grid[controlCells[stackDepth]];
+      }
+      stackDepth++;
     }
+
+    // If there were no valid values then the result grid will still be empty.
+    if (!resultGrid[cells[0]]) return false;
 
     // Copy over all the valid values to the real grid.
-    for (let j = 0; j < cells.length; j++) {
-      grid[cells[j]] = resultGrid[cells[j]];
+    for (let i = 0; i < cells.length; i++) {
+      const cell = cells[i];
+      grid[cell] = resultGrid[cell];
     }
 
-    return grid[controlCell] !== 0;
+    return true;
   }
 }
 
