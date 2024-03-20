@@ -836,7 +836,7 @@ class SudokuConstraint {
       this.pillSize = +pillSize;
       this.cells = cells;
       // Backward compatibility.
-      if (!/^[234]$/.test(pillSize)) {
+      if (!/^\d+$/.test(pillSize)) {
         this.pillSize = 2;
         this.cells.unshift(pillSize);
       }
@@ -1252,14 +1252,17 @@ class SudokuBuilder {
 
         case 'PillArrow':
           {
-            if (constraint.pillSize != 2) throw ('Only pill size 2 is supported');
+            const pillSize = constraint.pillSize;
+            if (pillSize != 2 && pillSize != 3) {
+              throw ('Pill size must be 2 or 3');
+            }
             const cells = (
               constraint.cells.map(c => shape.parseCellId(c).cell));
 
-            const tens = Math.min(cells[0], cells[1]);
-            const ones = Math.max(cells[0], cells[1]);
+            const pillCells = cells.slice(0, pillSize);
+            pillCells.sort((a, b) => a - b);
             yield new SudokuConstraintHandler.PillArrow(
-              ones, tens, cells.slice(2));
+              pillCells, cells.slice(pillSize));
           }
           break;
 

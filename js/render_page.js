@@ -727,7 +727,6 @@ class ConstraintManager {
         break;
       case 'Arrow':
       case 'DoubleArrow':
-      case 'PillArrow':
       case 'Renban':
       case 'Whisper':
       case 'Modular':
@@ -751,6 +750,17 @@ class ConstraintManager {
           this._addToPanel(config);
           this._configs.push(config);
         }
+        break;
+      case 'PillArrow':
+        config = {
+          cells: constraint.cells,
+          name: this._multiCellConstraints[constraint.type].text,
+          constraint: constraint,
+          displayElem: this._display.drawPillArrow(
+            constraint.cells, constraint.pillSize),
+        };
+        this._addToPanel(config);
+        this._configs.push(config);
         break;
       case 'Thermo':
         config = {
@@ -924,10 +934,6 @@ class ConstraintManager {
       PillArrow: {
         validateFn: (cells, shape) => cells.length > 2,
         text: 'Pill Arrow',
-        displayConfig: {
-          startMarker: LineOptions.EMPTY_PILL_MARKER,
-          arrow: true,
-        },
         description:
           `
           The sum of the values along the line equal the 2-digit number in the pill.

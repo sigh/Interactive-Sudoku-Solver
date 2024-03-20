@@ -218,6 +218,7 @@ const runSolveTests = async (onFailure) => {
     'Arrow sudoku',
     'Double arrow',
     'Pill arrow',
+    '3-digit pill arrow',
     'Arrow killer sudoku',
     'Kropki sudoku',
     'Little killer',
