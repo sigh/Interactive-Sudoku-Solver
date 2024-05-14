@@ -2616,6 +2616,65 @@ SudokuConstraintHandler.Quadruple = class Quadruple extends SudokuConstraintHand
   }
 }
 
+SudokuConstraintHandler.TenLine = class TenLine extends SudokuConstraintHandler {
+  constructor(cells, sum) {
+    super(cells);
+    this._sum = +sum;
+    this._states = null;
+  }
+
+  initialize(initialGrid, cellExclusions, shape) {
+    this._shape = shape;
+
+    const states = new Uint16Array(this.cells.length + 1);
+    states[0] = 1;
+    states[this.cells.length] = 1 << this._sum;
+    this._states = states;
+
+    return true;
+  }
+
+  enforceConsistency(grid, handlerAccumulator) {
+    const cells = this.cells;
+    const sum = this._sum;
+    const shape = this._shape;
+    const states = this._states;
+
+    for (let i = 0; i < cells.length - 1; i++) {
+      let nextState = 0;
+
+      for (let digit = 0; digit < shape.numValues; digit++) {
+        if (grid[cells[i]] & (1 << digit)) {
+          nextState |= states[i] << (digit + 1);
+        }
+      }
+
+      nextState &= (1 << (sum + 1)) - 1;
+      nextState |= nextState >> sum;
+      states[i + 1] = nextState;
+    }
+
+    for (let i = cells.length - 1; i >= 0; i--) {
+      let newBefore = 0;
+      
+      for (let digit = 0; digit < shape.numValues; digit++) {
+        if (!(grid[cells[i]] & (1 << digit))) continue;
+
+        const possibleBefore = states[i + 1] >> (digit + 1);
+        newBefore |= possibleBefore;
+        if (!(possibleBefore & states[i])) {
+          if (!(grid[cells[i]] &= ~(1 << digit))) return false;
+        }
+      }
+
+      newBefore |= newBefore << sum;
+      states[i] &= newBefore;
+    }
+
+    return true;
+  }
+}
+
 class HandlerSet {
   constructor(handlers, shape) {
     this._allHandlers = [];

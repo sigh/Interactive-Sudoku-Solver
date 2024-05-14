@@ -733,6 +733,7 @@ class ConstraintManager {
       case 'Entropic':
       case 'Palindrome':
       case 'Zipper':
+      case 'TenLine':
       case 'Between':
       case 'Lockout':
       case 'RegionSumLine':
@@ -1041,6 +1042,19 @@ class ConstraintManager {
           Digits which are equal distance from the center of the zipper have the
           same sum. For odd length lines, the center digit is the sum.
           `
+      },
+      TenLine: {
+        text: 'Ten Line',
+        value: {
+          placeholder: 'sum',
+          default: 10
+        },
+        panelText: (constraint) => `Ten Line (${constraint.sum})`,
+        displayConfig: {
+          color: 'rgb(200, 200, 255)',
+        },
+        description:
+          "The line can be divided into segments that each sum to the given sum."
       },
       WhiteDot: {
         validateFn: ConstraintManager._cellsAreAdjacent,
