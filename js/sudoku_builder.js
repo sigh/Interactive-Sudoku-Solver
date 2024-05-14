@@ -646,6 +646,14 @@ class SudokuConstraint {
     }
   }
 
+  static TenLine = class TenLine extends SudokuConstraintBase {
+    constructor(sum, ...cells) {
+      super(arguments);
+      this.cells = cells;
+      this.sum = sum;
+    }
+  }
+
   static NoBoxes = class NoBoxes extends SudokuConstraintBase._Meta { }
   static StrictKropki = class StrictKropki extends SudokuConstraintBase._Meta {
     static fnKey = memoize((numValues) =>
@@ -1411,6 +1419,12 @@ class SudokuBuilder {
               }
             }
           }
+          break;
+
+        case 'TenLine':
+          let sum = constraint.sum;
+          cells = constraint.cells.map(c => shape.parseCellId(c).cell);
+          yield new SudokuConstraintHandler.TenLine(cells, sum);
           break;
 
         case 'WhiteDot':
