@@ -1350,6 +1350,14 @@ class Highlight {
     }
   }
 
+  removeCell(cell) {
+    const path = this._cells.get(cell);
+    if (path) {
+      this._display.removeHighlight(path);
+      this._cells.delete(cell);
+    }
+  }
+
   clear() {
     for (const path of this._cells.values()) {
       this._display.removeHighlight(path)
@@ -1384,7 +1392,7 @@ class Selection {
     this._highlight.setCells(cellIds);
     this._runCallback();
   }
-  getCells(cellIds) { return this._highlight.getCells(cellIds); }
+  getCells() { return this._highlight.getCells(); }
   size() { return this._highlight.size; }
 
   cellIdCenter(cellId) {
@@ -1399,7 +1407,8 @@ class Selection {
 
     let currCell = null;
     let currCenter = null;
-    const pointerMoveFn = e => {
+    let isDeselecting = false;
+    const pointerMoveFn = (e) => {
       const target = this._clickInterceptor.cellAt(e.offsetX, e.offsetY);
       if (target === null || target === currCell) return;
 
@@ -1409,9 +1418,18 @@ class Selection {
       const dy = Math.abs(e.offsetY - currCenter[1]);
       if (Math.max(dx, dy) < cellFuzziness) return;
 
+      if (currCell === null) {
+        isDeselecting = this._highlight.getCells().some(cell => cell === target);
+      }
+
       currCell = target;
       currCenter = this._clickInterceptor.cellIdCenter(currCell);
-      this._highlight.addCell(currCell);
+      
+      if (isDeselecting) {
+        this._highlight.removeCell(currCell);
+      } else {
+        this._highlight.addCell(currCell);
+      }
     };
     const outsideClickListener = e => {
       // Don't do anything if the click is inside one of the elements where
