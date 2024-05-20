@@ -1033,7 +1033,8 @@ class ConstraintManager {
       Zipper: {
         text: 'Zipper Line',
         displayConfig: {
-          color: 'rgb(200, 200, 255)',
+          color: 'rgb(180, 180, 255)',
+          dashed: true,
         },
         description:
           `
@@ -1424,7 +1425,7 @@ class Selection {
 
       currCell = target;
       currCenter = this._clickInterceptor.cellIdCenter(currCell);
-      
+
       if (isDeselecting) {
         this._highlight.removeCell(currCell);
       } else {
