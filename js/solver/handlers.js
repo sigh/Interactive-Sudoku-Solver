@@ -2640,21 +2640,23 @@ SudokuConstraintHandler.SumLine = class SumLine extends SudokuConstraintHandler 
   enforceConsistency(grid, handlerAccumulator) {
     const cells = this.cells;
     const sum = this._sum;
-    const shape = this._shape;
     const states = this._states;
+    const sumMask = (1 << (sum + 1)) - 1;
 
     // Forward pass to determine the possible partial sums at each cell
     // boundary, based on what came before on the line.
-    for (let i = 0; i < cells.length - 1; i++) {
+    states[1] = grid[cells[0]] << 1;
+    for (let i = 1; i < cells.length - 1; i++) {
       let nextState = 0;
 
-      for (let digit = 0; digit < shape.numValues; digit++) {
-        if (grid[cells[i]] & (1 << digit)) {
-          nextState |= states[i] << (digit + 1);
-        }
+      let values = grid[cells[i]];
+      while (values) {
+        const v = values & -values;
+        values ^= v;
+        nextState |= states[i] << LookupTables.toValue(v);
       }
 
-      nextState &= (1 << (sum + 1)) - 1;
+      nextState &= sumMask;
       nextState |= nextState >> sum;
       states[i + 1] = nextState;
     }
@@ -2665,16 +2667,21 @@ SudokuConstraintHandler.SumLine = class SumLine extends SudokuConstraintHandler 
     // sums at either boundary.
     for (let i = cells.length - 1; i >= 0; i--) {
       let newBefore = 0;
-      
-      for (let digit = 0; digit < shape.numValues; digit++) {
-        if (!(grid[cells[i]] & (1 << digit))) continue;
 
-        const possibleBefore = states[i + 1] >> (digit + 1);
+      let values = grid[cells[i]];
+      let possibleValues = 0;
+      while (values) {
+        const v = values & -values;
+        values ^= v;
+
+        const possibleBefore = states[i + 1] >> LookupTables.toValue(v);
         newBefore |= possibleBefore;
-        if (!(possibleBefore & states[i])) {
-          if (!(grid[cells[i]] &= ~(1 << digit))) return false;
+        if ((possibleBefore & states[i])) {
+          possibleValues |= v;
         }
       }
+      if (!possibleValues) return false;
+      grid[cells[i]] = possibleValues;
 
       newBefore |= newBefore << sum;
       states[i] &= newBefore;
