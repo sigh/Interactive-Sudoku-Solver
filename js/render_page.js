@@ -158,6 +158,7 @@ class ExampleHandler {
     'Lockout lines',
     'Palindromes',
     'Zipper lines',
+    'Sum lines',
     'Jigsaw',
     'X-Windoku',
     'Region sum lines',
