@@ -158,6 +158,7 @@ class ExampleHandler {
     'Lockout lines',
     'Palindromes',
     'Zipper lines',
+    'Sum lines',
     'Jigsaw',
     'X-Windoku',
     'Region sum lines',
@@ -733,6 +734,7 @@ class ConstraintManager {
       case 'Entropic':
       case 'Palindrome':
       case 'Zipper':
+      case 'SumLine':
       case 'Between':
       case 'Lockout':
       case 'RegionSumLine':
@@ -1041,6 +1043,19 @@ class ConstraintManager {
           Digits which are equal distance from the center of the zipper have the
           same sum. For odd length lines, the center digit is the sum.
           `
+      },
+      SumLine: {
+        text: 'Sum Line',
+        value: {
+          placeholder: 'sum',
+          default: 10
+        },
+        panelText: (constraint) => `Sum Line (${constraint.sum})`,
+        displayConfig: {
+          color: 'rgb(200, 200, 255)',
+        },
+        description:
+          "The line can be divided into segments that each sum to the given sum."
       },
       WhiteDot: {
         validateFn: ConstraintManager._cellsAreAdjacent,
