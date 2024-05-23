@@ -2626,6 +2626,9 @@ SudokuConstraintHandler.SumLine = class SumLine extends SudokuConstraintHandler 
   initialize(initialGrid, cellExclusions, shape) {
     this._shape = shape;
 
+    // Each state is a mask that represents the possible partial sums of a
+    // segment at a particular point. The i-th state corresponds to the
+    // cell boundary before the i-th cell.
     const states = new Uint16Array(this.cells.length + 1);
     states[0] = 1;
     states[this.cells.length] = 1 << this._sum;
@@ -2640,6 +2643,8 @@ SudokuConstraintHandler.SumLine = class SumLine extends SudokuConstraintHandler 
     const shape = this._shape;
     const states = this._states;
 
+    // Forward pass to determine the possible partial sums at each cell
+    // boundary, based on what came before on the line.
     for (let i = 0; i < cells.length - 1; i++) {
       let nextState = 0;
 
@@ -2654,6 +2659,10 @@ SudokuConstraintHandler.SumLine = class SumLine extends SudokuConstraintHandler 
       states[i + 1] = nextState;
     }
 
+    // Backward pass to determine the possible partial sums at each cell
+    // boundary, based on what came after on the line. Simultaneously,
+    // eliminate cell values that are inconsistent with the possible partial
+    // sums at either boundary.
     for (let i = cells.length - 1; i >= 0; i--) {
       let newBefore = 0;
       
