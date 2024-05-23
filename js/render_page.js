@@ -967,7 +967,7 @@ class ConstraintManager {
         },
         text: 'Modular Line',
         panelText: (constraint) => `Modular (${constraint.mod})`,
-        displayConfig: { color: 'rgb(100, 255, 100)', dashed: true },
+        displayConfig: { color: 'rgb(230, 190, 155)', dashed: true },
         description:
           `
           Every sequential group of 'mod' cells on a the line must have
@@ -987,7 +987,7 @@ class ConstraintManager {
       },
       RegionSumLine: {
         text: 'Region Sum Line',
-        displayConfig: { color: 'rgb(100, 255, 100)' },
+        displayConfig: { color: 'rgb(100, 200, 100)' },
         description:
           `
           Values on the line have an equal sum N within each
@@ -996,6 +996,20 @@ class ConstraintManager {
           such a line within that box sums to N separately.
 
           Has no effect if 'No Boxes' is set.`,
+      },
+      SumLine: {
+        text: 'Sum Line',
+        value: {
+          placeholder: 'sum',
+          default: 10
+        },
+        panelText: (constraint) => `Sum Line (${constraint.sum})`,
+        displayConfig: {
+          color: 'rgb(100, 200, 100)',
+          dashed: true,
+        },
+        description:
+          "The line can be divided into segments that each sum to the given sum."
       },
       Between: {
         text: 'Between Line',
@@ -1043,19 +1057,6 @@ class ConstraintManager {
           Digits which are equal distance from the center of the zipper have the
           same sum. For odd length lines, the center digit is the sum.
           `
-      },
-      SumLine: {
-        text: 'Sum Line',
-        value: {
-          placeholder: 'sum',
-          default: 10
-        },
-        panelText: (constraint) => `Sum Line (${constraint.sum})`,
-        displayConfig: {
-          color: 'rgb(200, 200, 255)',
-        },
-        description:
-          "The line can be divided into segments that each sum to the given sum."
       },
       WhiteDot: {
         validateFn: ConstraintManager._cellsAreAdjacent,
