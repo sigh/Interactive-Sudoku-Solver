@@ -2621,6 +2621,11 @@ SudokuConstraintHandler.SumLine = class SumLine extends SudokuConstraintHandler 
     super(cells);
     this._sum = +sum;
     this._states = null;
+
+    if (this._sum > 30) {
+      // A sum of 30 fits within a 32-bit state.
+      throw ('SumLine sum must at most 30');
+    }
   }
 
   initialize(initialGrid, cellExclusions, shape) {
@@ -2629,7 +2634,7 @@ SudokuConstraintHandler.SumLine = class SumLine extends SudokuConstraintHandler 
     // Each state is a mask that represents the possible partial sums of a
     // segment at a particular point. The i-th state corresponds to the
     // cell boundary before the i-th cell.
-    const states = new Uint16Array(this.cells.length + 1);
+    const states = new Uint32Array(this.cells.length + 1);
     states[0] = 1;
     states[this.cells.length] = 1 << this._sum;
     this._states = states;
