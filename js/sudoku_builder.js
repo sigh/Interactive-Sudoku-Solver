@@ -646,7 +646,7 @@ class SudokuConstraint {
     }
   }
 
-  static TenLine = class TenLine extends SudokuConstraintBase {
+  static SumLine = class SumLine extends SudokuConstraintBase {
     constructor(sum, ...cells) {
       super(arguments);
       this.cells = cells;
@@ -1421,10 +1421,10 @@ class SudokuBuilder {
           }
           break;
 
-        case 'TenLine':
+        case 'SumLine':
           let sum = constraint.sum;
           cells = constraint.cells.map(c => shape.parseCellId(c).cell);
-          yield new SudokuConstraintHandler.TenLine(cells, sum);
+          yield new SudokuConstraintHandler.SumLine(cells, sum);
           break;
 
         case 'WhiteDot':

@@ -2616,7 +2616,7 @@ SudokuConstraintHandler.Quadruple = class Quadruple extends SudokuConstraintHand
   }
 }
 
-SudokuConstraintHandler.TenLine = class TenLine extends SudokuConstraintHandler {
+SudokuConstraintHandler.SumLine = class SumLine extends SudokuConstraintHandler {
   constructor(cells, sum) {
     super(cells);
     this._sum = +sum;

@@ -733,7 +733,7 @@ class ConstraintManager {
       case 'Entropic':
       case 'Palindrome':
       case 'Zipper':
-      case 'TenLine':
+      case 'SumLine':
       case 'Between':
       case 'Lockout':
       case 'RegionSumLine':
@@ -1043,13 +1043,13 @@ class ConstraintManager {
           same sum. For odd length lines, the center digit is the sum.
           `
       },
-      TenLine: {
-        text: 'Ten Line',
+      SumLine: {
+        text: 'Sum Line',
         value: {
           placeholder: 'sum',
           default: 10
         },
-        panelText: (constraint) => `Ten Line (${constraint.sum})`,
+        panelText: (constraint) => `Sum Line (${constraint.sum})`,
         displayConfig: {
           color: 'rgb(200, 200, 255)',
         },
