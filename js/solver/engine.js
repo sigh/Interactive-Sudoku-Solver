@@ -693,6 +693,21 @@ SudokuSolver.InternalSolver = class {
         }
       }
 
+      // Determine the set of cells/constraints to enforce next.
+      const handlerAccumulator = this._handlerAccumulator;
+      handlerAccumulator.reset(nextDepth == this._numCells);
+      for (let i = 0; i < nextCells.length; i++) {
+        handlerAccumulator.addForFixedCell(nextCells[i]);
+      }
+      // Queue up extra constraints based on prior backtracks. The idea being
+      // that constraints that apply this the contradiction cell are likely
+      // to turn up a contradiction here if it exists.
+      // NOTE: This must use the value of lastContradictionCell before recFrame
+      //       is updated.
+      if (recFrame.lastContradictionCell >= 0) {
+        handlerAccumulator.addForCell(recFrame.lastContradictionCell);
+      }
+
       if (count !== 1) {
         // We only need to start a new recursion frame when there is more than
         // one value to try.
@@ -711,18 +726,6 @@ SudokuSolver.InternalSolver = class {
       // NOTE: Set this even when count == 1 to allow for other candidate
       //       selection methods.
       grid[cell] = value;
-
-      const handlerAccumulator = this._handlerAccumulator;
-      handlerAccumulator.reset(nextDepth == this._numCells);
-      for (let i = 0; i < nextCells.length; i++) {
-        handlerAccumulator.addForFixedCell(nextCells[i]);
-      }
-      // Queue up extra constraints based on prior backtracks. The idea being
-      // that constraints that apply this the contradiction cell are likely
-      // to turn up a contradiction here if it exists.
-      if (recFrame.lastContradictionCell >= 0) {
-        handlerAccumulator.addForCell(recFrame.lastContradictionCell);
-      }
 
       // Propagate constraints.
       const hasContradiction = !this._enforceConstraints(
