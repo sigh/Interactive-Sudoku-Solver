@@ -2617,41 +2617,34 @@ SudokuConstraintHandler.Quadruple = class Quadruple extends SudokuConstraintHand
 }
 
 SudokuConstraintHandler.SumLine = class SumLine extends SudokuConstraintHandler {
-  constructor(cells, sum) {
+  constructor(cells, loop, sum) {
     super(cells);
     this._sum = +sum;
-    this._states = null;
 
     if (this._sum > 30) {
       // A sum of 30 fits within a 32-bit state.
       throw ('SumLine sum must at most 30');
     }
-  }
-
-  initialize(initialGrid, cellExclusions, shape) {
-    this._shape = shape;
 
     // Each state is a mask that represents the possible partial sums of a
     // segment at a particular point. The i-th state corresponds to the
     // cell boundary before the i-th cell.
-    const states = new Uint32Array(this.cells.length + 1);
-    states[0] = 1;
-    states[this.cells.length] = 1 << this._sum;
-    this._states = states;
+    this._states = new Uint32Array(this.cells.length + 1);
 
-    return true;
+    // In a loop, all partial sums are valid initial states.
+    // In a line, the partial sum must start at 0.
+    this._initialState = loop ? (1 << sum) - 1 : 1;
   }
 
-  enforceConsistency(grid, handlerAccumulator) {
+  _singlePass(grid) {
     const cells = this.cells;
+    const numCells = cells.length;
     const sum = this._sum;
     const states = this._states;
-    const sumMask = (1 << (sum + 1)) - 1;
 
     // Forward pass to determine the possible partial sums at each cell
     // boundary, based on what came before on the line.
-    states[1] = grid[cells[0]] << 1;
-    for (let i = 1; i < cells.length - 1; i++) {
+    for (let i = 0; i < numCells; i++) {
       let nextState = 0;
 
       let values = grid[cells[i]];
@@ -2661,16 +2654,17 @@ SudokuConstraintHandler.SumLine = class SumLine extends SudokuConstraintHandler 
         nextState |= states[i] << LookupTables.toValue(v);
       }
 
-      nextState &= sumMask;
-      nextState |= nextState >> sum;
+      nextState |= (nextState >> sum) & 1;
       states[i + 1] = nextState;
     }
+
+    states[0] = (states[numCells] &= states[0]);
 
     // Backward pass to determine the possible partial sums at each cell
     // boundary, based on what came after on the line. Simultaneously,
     // eliminate cell values that are inconsistent with the possible partial
     // sums at either boundary.
-    for (let i = cells.length - 1; i >= 0; i--) {
+    for (let i = numCells - 1; i >= 0; i--) {
       let newBefore = 0;
 
       let values = grid[cells[i]];
@@ -2679,7 +2673,8 @@ SudokuConstraintHandler.SumLine = class SumLine extends SudokuConstraintHandler 
         const v = values & -values;
         values ^= v;
 
-        const possibleBefore = states[i + 1] >> LookupTables.toValue(v);
+        const afterState = states[i + 1];
+        const possibleBefore = (afterState | ((afterState & 1) << sum)) >> LookupTables.toValue(v);
         newBefore |= possibleBefore;
         if ((possibleBefore & states[i])) {
           possibleValues |= v;
@@ -2688,8 +2683,25 @@ SudokuConstraintHandler.SumLine = class SumLine extends SudokuConstraintHandler 
       if (!possibleValues) return false;
       grid[cells[i]] = possibleValues;
 
-      newBefore |= newBefore << sum;
       states[i] &= newBefore;
+    }
+
+    return true;
+  }
+
+  enforceConsistency(grid, handlerAccumulator) {
+    const states = this._states;
+    const numCells = this.cells.length;
+
+    states[0] = this._initialState;
+    // Initialize final state to be different from initial state.
+    states[numCells] = 0;
+
+    // Keep iterating while the final state is not consistent with the initial
+    // state. This means that the backward pass eliminated some possibilities
+    // thus another iteration is needed.
+    while (states[0] != states[numCells]) {
+      if (!this._singlePass(grid)) return false;
     }
 
     return true;
