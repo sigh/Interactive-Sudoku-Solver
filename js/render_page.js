@@ -735,7 +735,6 @@ class ConstraintManager {
       case 'Palindrome':
       case 'Zipper':
       case 'SumLine':
-      case 'SumLineLoop':
       case 'Between':
       case 'Lockout':
       case 'RegionSumLine':
@@ -746,7 +745,8 @@ class ConstraintManager {
             name: uiConfig.panelText?.(constraint) || uiConfig.text,
             constraint: constraint,
             displayElem: this._display.drawLineConstraint(
-              constraint.cells, uiConfig.displayConfig),
+              new CellArgs(constraint.cells, constraint.type),
+              uiConfig.displayConfig),
           };
           this._addToPanel(config);
           this._configs.push(config);
@@ -1007,20 +1007,6 @@ class ConstraintManager {
         panelText: (constraint) => `Sum Line (${constraint.sum})`,
         displayConfig: {
           color: 'rgb(100, 200, 100)',
-          dashed: true,
-        },
-        description:
-          "The line can be divided into segments that each sum to the given sum."
-      },
-      SumLineLoop: {
-        text: 'Sum Line Loop',
-        value: {
-          placeholder: 'sum',
-          default: 10
-        },
-        panelText: (constraint) => `Sum Line Loop (${constraint.sum})`,
-        displayConfig: {
-          color: 'rgb(0, 150, 50)',
           dashed: true,
         },
         description:

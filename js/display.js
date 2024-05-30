@@ -729,7 +729,11 @@ class ConstraintDisplay extends DisplayItem {
     }
   }
 
-  drawLineConstraint(cells, options) {
+  drawLineConstraint(cellArgs, options) {
+    const cells = cellArgs.cells().slice();
+    if (cellArgs.isLoop()) {
+      cells.push(cells[0]);
+    }
     return this._drawConstraintLine(cells, options, this._lineConstraintGroup);
   }
 
