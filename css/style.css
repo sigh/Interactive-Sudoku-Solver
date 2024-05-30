@@ -571,6 +571,10 @@ select {
   justify-content: space-between;
 }
 
+#multi-cell-constraint-loop-container {
+  margin-bottom: -10px;
+}
+
 .description {
   line-height: 1;
   font-size: 12px;
