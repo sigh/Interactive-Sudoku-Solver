@@ -397,8 +397,41 @@ class SudokuParser {
   }
 }
 
+class CellArgs {
+  constructor(args, type) {
+    const numArgs = args.length;
+    if (!numArgs) {
+      throw ('No cells provided for ' + type);
+    }
+
+    this._isLoop = false;
+    if (args[numArgs - 1] == 'LOOP') {
+      if (!SudokuConstraint[type].LOOPS_ALLOWED) {
+        throw ('Loops are not allowed for ' + type);
+      }
+      args.pop();
+      this._isLoop = true;
+    }
+
+    this._cells = args;
+  }
+
+  isLoop() {
+    return this._isLoop;
+  }
+
+  cells() {
+    return this._cells;
+  }
+
+  cellIds(shape) {
+    return this._cells.map(c => shape.parseCellId(c).cell);
+  }
+}
+
 class SudokuConstraintBase {
   static DEFAULT_SHAPE = SHAPE_9x9;
+  static LOOPS_ALLOWED = false;
 
   constructor(args) {
     this.args = args ? [...args] : [];
@@ -647,14 +680,8 @@ class SudokuConstraint {
   }
 
   static SumLine = class SumLine extends SudokuConstraintBase {
-    constructor(sum, ...cells) {
-      super(arguments);
-      this.cells = cells;
-      this.sum = sum;
-    }
-  }
+    static LOOPS_ALLOWED = true;
 
-  static SumLineLoop = class SumLineLoop extends SudokuConstraintBase {
     constructor(sum, ...cells) {
       super(arguments);
       this.cells = cells;
@@ -1430,13 +1457,9 @@ class SudokuBuilder {
           break;
 
         case 'SumLine':
-          cells = constraint.cells.map(c => shape.parseCellId(c).cell);
-          yield new SudokuConstraintHandler.SumLine(cells, false, constraint.sum);
-          break;
-
-        case 'SumLineLoop':
-          cells = constraint.cells.map(c => shape.parseCellId(c).cell);
-          yield new SudokuConstraintHandler.SumLine(cells, true, constraint.sum);
+          cells = new CellArgs(constraint.cells, constraint.type);
+          yield new SudokuConstraintHandler.SumLine(
+            cells.cellIds(shape), cells.isLoop(), constraint.sum);
           break;
 
         case 'WhiteDot':
