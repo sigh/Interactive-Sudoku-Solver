@@ -2620,6 +2620,7 @@ SudokuConstraintHandler.SumLine = class SumLine extends SudokuConstraintHandler 
   constructor(cells, loop, sum) {
     super(cells);
     this._sum = +sum;
+    this._minMax8Bit = null;
 
     if (this._sum > 30) {
       // A sum of 30 fits within a 32-bit state.
@@ -2634,6 +2635,11 @@ SudokuConstraintHandler.SumLine = class SumLine extends SudokuConstraintHandler 
     // In a loop, all partial sums are valid initial states.
     // In a line, the partial sum must start at 0.
     this._initialState = loop ? (1 << sum) - 1 : 1;
+  }
+
+  initialize(initialGrid, cellExclusions, shape) {
+    this._minMax8Bit = LookupTables.get(shape.numValues).minMax8Bit;
+    return true;
   }
 
   _singlePass(grid) {
@@ -2689,6 +2695,31 @@ SudokuConstraintHandler.SumLine = class SumLine extends SudokuConstraintHandler 
     return true;
   }
 
+  _checkTotalSum(grid) {
+    const cells = this.cells;
+    const numCells = cells.length;
+    const sum = this._sum;
+
+    // If there are multiple possible partial sums, then initial and final
+    // states may be inconsistent.
+    // In this case check that the totalSum == 0 (mod sum), which is equivalent
+    // to checking that the partialSum is consistent.
+    const minMax8Bit = this._minMax8Bit;
+    let minMax = 0;
+    for (let i = 0; i < numCells; i++) {
+      minMax += minMax8Bit[grid[cells[i]]];
+    }
+    const min = minMax >> 8;
+    // If the minimum sum is a multiple of the sum, then we know this is valid.
+    const minRemainder = min % sum;
+    if (minRemainder == 0) return true;
+
+    // Otherwise for the total to be a multiple of sum, the min and max must be
+    // different integers when divided by sum.
+    const max = minMax & 0xff;
+    return max - (min - minRemainder) >= sum;
+  }
+
   enforceConsistency(grid, handlerAccumulator) {
     const states = this._states;
     const numCells = this.cells.length;
@@ -2704,7 +2735,13 @@ SudokuConstraintHandler.SumLine = class SumLine extends SudokuConstraintHandler 
       if (!this._singlePass(grid)) return false;
     }
 
-    return true;
+    const partialSums = states[0];
+    // If partialSum is unique, this must have a valid solution.
+    if (!(partialSums & (partialSums - 1))) {
+      return true;
+    }
+
+    return this._checkTotalSum(grid);
   }
 }
 
