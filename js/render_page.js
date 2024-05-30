@@ -1105,6 +1105,9 @@ class ConstraintManager {
     const valueContainer = document.getElementById('multi-cell-constraint-value-container');
     const valueElems = [];
 
+    const loopContainer = document.getElementById('multi-cell-constraint-loop-container');
+    loopContainer.style.display = 'none';
+
     // Initialize defaults.
     for (const [name, config] of Object.entries(this._multiCellConstraints)) {
       config.text ||= name;
@@ -1158,6 +1161,12 @@ class ConstraintManager {
         valueContainer.style.visibility = 'hidden';
       }
 
+      if (config.constraintClass.LOOPS_ALLOWED) {
+        loopContainer.style.display = 'block';
+      } else {
+        loopContainer.style.display = 'none';
+      }
+
       descriptionElem.textContent = config.description;
 
       if (!selectionForm.classList.contains('disabled')) {
@@ -1181,6 +1190,10 @@ class ConstraintManager {
     const config = this._multiCellConstraints[type];
     if (!config) throw ('Unknown constraint type: ' + type);
     if (config.elem.disabled) throw ('Invalid selection for ' + type);
+
+    if (config.constraintClass.LOOPS_ALLOWED && formData.get('is-loop')) {
+      cells.push('LOOP');
+    }
 
     if (config.constraintClass === SudokuConstraint.Quad) {
       const valuesStr = formData.get(type + '-value');
