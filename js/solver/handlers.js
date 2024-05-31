@@ -1457,7 +1457,7 @@ SudokuConstraintHandler.PillArrow = class PillArrow extends SudokuConstraintHand
 
     const maxSum = (this.cells.length - 2) * shape.numValues;
     const maxTens = Math.min(maxSum / 10 | 0, shape.numValues);
-    initialGrid[this._controlCell] = ((1 << maxTens) - 1);
+    initialGrid[this._controlCell] &= ((1 << maxTens) - 1);
 
     this._scratchGrid = initialGrid.slice();
     this._resultGrid = initialGrid.slice();
