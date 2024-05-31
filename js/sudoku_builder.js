@@ -831,9 +831,15 @@ class SudokuConstraint {
   }
 
   static PillArrow = class PillArrow extends SudokuConstraintBase {
-    constructor(...cells) {
+    constructor(pillSize, ...cells) {
       super(arguments);
+      this.pillSize = +pillSize;
       this.cells = cells;
+      // Backward compatibility.
+      if (!/^[234]$/.test(pillSize)) {
+        this.pillSize = 2;
+        this.cells.unshift(pillSize);
+      }
     }
   }
 
@@ -1246,6 +1252,7 @@ class SudokuBuilder {
 
         case 'PillArrow':
           {
+            if (constraint.pillSize != 2) throw ('Only pill size 2 is supported');
             const cells = (
               constraint.cells.map(c => shape.parseCellId(c).cell));
 

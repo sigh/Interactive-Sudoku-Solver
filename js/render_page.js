@@ -1206,6 +1206,9 @@ class ConstraintManager {
       }
     } else if (config.constraintClass === SudokuConstraint.Jigsaw) {
       this._jigsawManager.addPiece(cells);
+    } else if (config.constraintClass === SudokuConstraint.PillArrow) {
+      this.loadConstraint(
+        new config.constraintClass(2, ...cells));
     } else if (config.value) {
       const value = formData.get(type + '-value');
       this.loadConstraint(
