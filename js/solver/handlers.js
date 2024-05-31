@@ -2700,24 +2700,63 @@ SudokuConstraintHandler.SumLine = class SumLine extends SudokuConstraintHandler 
     const numCells = cells.length;
     const sum = this._sum;
 
+    // Check that the totalSum == 0 (mod sum), which is equivalent
+    // to checking that the partialSum is the same at the start and the end
+    // (because partialSums are all distinct modulo sum).
+
+    // Calculate stats in batches of 15 to avoid overflowing minMax8bit.
+    let maxTotal = 0;
+    let minTotal = 0;
+    const minMax8Bit = this._minMax8Bit;
+    for (let i = 0; i < numCells;) {
+      let minMax = 0;
+      let lim = i + 15;
+      if (lim > numCells) lim = numCells;
+      for (; i < lim; i++) {
+        minMax += minMax8Bit[grid[cells[i]]];
+      }
+
+      maxTotal += minMax & 0xff;
+      minTotal += minMax >> 8;
+    }
+
+    // Check if it possible to reach the sum.
+    if (maxTotal < sum) return false;
+    // If the maximum sum is a multiple of the sum, then we know this is valid.
+    const maxRemainder = maxTotal % sum;
+
+    // Otherwise for the total to be a multiple of sum, the min and max must be
+    // different integers when divided by sum.
+    return minTotal < maxTotal - maxRemainder;
+  }
+
+  __checkTotalSum(grid) {
+    const cells = this.cells;
+    const numCells = cells.length;
+    const sum = this._sum;
+
     // If there are multiple possible partial sums, then initial and final
     // states may be inconsistent.
     // In this case check that the totalSum == 0 (mod sum), which is equivalent
     // to checking that the partialSum is consistent.
-    const minMax8Bit = this._minMax8Bit;
-    let minMax = 0;
+    let maxTotal = 0;
     for (let i = 0; i < numCells; i++) {
-      minMax += minMax8Bit[grid[cells[i]]];
+      maxTotal += LookupTables.maxValue(grid[cells[i]]);
     }
-    const min = minMax >> 8;
-    // If the minimum sum is a multiple of the sum, then we know this is valid.
-    const minRemainder = min % sum;
-    if (minRemainder == 0) return true;
+    // Check if it possible to reach the sum.
+    if (maxTotal < sum) return false;
+    // If the maximum sum is a multiple of the sum, then we know this is valid.
+    const maxRemainder = maxTotal % sum;
+    if (maxRemainder == 0) return true;
+
+    let minTotal = 0;
+    for (let i = 0; i < numCells; i++) {
+      minTotal += LookupTables.minValue(grid[cells[i]]);
+    }
 
     // Otherwise for the total to be a multiple of sum, the min and max must be
     // different integers when divided by sum.
-    const max = minMax & 0xff;
-    return max - (min - minRemainder) >= sum;
+    return minTotal < maxTotal - maxRemainder;
   }
 
   enforceConsistency(grid, handlerAccumulator) {
@@ -2741,6 +2780,9 @@ SudokuConstraintHandler.SumLine = class SumLine extends SudokuConstraintHandler 
       return true;
     }
 
+    // If there are multiple possible partial sums, then initial and final
+    // states may be inconsistent. In this case, check that the total is
+    // a multiple of sum.
     return this._checkTotalSum(grid);
   }
 }
