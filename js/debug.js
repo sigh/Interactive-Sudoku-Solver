@@ -254,6 +254,7 @@ const runSolveTests = async (onFailure) => {
     'Zipper lines - easy',
     'Sum lines',
     'Sum lines, with loop',
+    'Sum lines - long loop',
     LONG_SUMS[0],
   ], onFailure);
   result.collection = '9x9';
