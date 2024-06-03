@@ -628,28 +628,6 @@ class ConstraintDisplay extends DisplayItem {
     return circle;
   }
 
-  _makePillAtPoints([x0, y0], [x1, y1]) {
-    const radius = this._CIRCLE_RADIUS;
-
-    // Normalize the direction vector
-    const [dx, dy] = [x1 - x0, y1 - y0];
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    const [nx, ny] = [dx / dist, dy / dist];
-
-    // Create the path.
-    const d = [
-      `M ${x0 - radius * ny} ${y0 + radius * nx}`,
-      `A ${radius} ${radius} 0 0 1 ${x0 + radius * ny} ${y0 - radius * nx}`,
-      `L ${x1 + radius * ny} ${y1 - radius * nx}`,
-      `A ${radius} ${radius} 0 0 1 ${x1 - radius * ny} ${y1 + radius * nx}`,
-      `Z`
-    ].join(' ');
-    const path = createSvgElement('path');
-    path.setAttribute('d', d);
-
-    return path;
-  }
-
   _makeDiamondAtPoint([x, y]) {
     let diamond = createSvgElement('path');
     let size = this._DIAMOND_SIZE;
@@ -712,17 +690,6 @@ class ConstraintDisplay extends DisplayItem {
           const diamond = this._makeDiamondAtPoint(point);
           diamond.setAttribute('stroke-width', 0);
           return diamond;
-        }
-      case LineOptions.EMPTY_PILL_MARKER:
-        if (index != 0) {
-          throw (`Empty pill marker must be at the start of the line`);
-        }
-        {
-          const pill = this._makePillAtPoints(point, points[index + 1]);
-          pill.setAttribute('fill', 'transparent');
-          this._removeCircleFromPath(points[1], points[2]);
-          points[0] = points[1];
-          return pill;
         }
       default:
         throw (`Unknown marker: ${marker}`);
@@ -793,17 +760,62 @@ class ConstraintDisplay extends DisplayItem {
   }
 
   drawPillArrow(cells, pillSize) {
-    let options = {
-      arrow: true,
-    };
-    if (pillSize == 2) {
-      options.startMarker = LineOptions.EMPTY_PILL_MARKER;
-    } else {
-      options.dashed = true;
+    const pillWidth = this._CIRCLE_RADIUS * 2;
+
+    // Create with default line options.
+    const options = new LineOptions();
+    const g = createSvgElement('g');
+    g.setAttribute('stroke', options.color);
+    g.setAttribute('fill', options.color);
+    g.setAttribute('stroke-width', options.width);
+    g.setAttribute('stroke-linecap', 'round');
+
+    const points = cells.map(c => this.cellIdCenter(c));
+    const pillPoints = points.slice(0, pillSize);
+
+    // Make the mask for the inside of the pill.
+    const maskId = 'pill-mask-' + Math.random();
+    {
+      const mask = createSvgElement('mask');
+      mask.setAttribute('id', maskId);
+      mask.setAttribute('maskUnits', 'userSpaceOnUse');
+
+      const maxX = Math.max(...points.map(p => p[0]));
+      const maxY = Math.max(...points.map(p => p[1]));
+
+      const rect = createSvgElement('rect');
+      rect.setAttribute('fill', 'white');
+      rect.setAttribute('stroke-width', 0);
+      rect.setAttribute('width', maxX + pillWidth * 2);
+      rect.setAttribute('height', maxY + pillWidth * 2);
+      mask.append(rect);
+
+      const pillInside = this._makePath(pillPoints);
+      pillInside.setAttribute('stroke-width', pillWidth - 2 * options.width);
+      pillInside.setAttribute('stroke', 'black');
+      mask.append(pillInside);
+      g.append(mask);
     }
-    // For now, render a 3-pill arrow without a pill.
-    return this._drawConstraintLine(
-      cells, options, this._lineConstraintGroup);
+
+    // Draw the pill.
+    {
+      const pill = this._makePath(pillPoints);
+      pill.setAttribute('stroke-width', pillWidth);
+      pill.setAttribute('mask', `url(#${maskId})`);
+      g.append(pill);
+    }
+
+    // Draw the arrow.
+    {
+      const arrow = this._makePath(points.slice(pillSize - 1));
+      arrow.setAttribute('marker-end', 'url(#arrowhead)');
+      arrow.setAttribute('mask', `url(#${maskId})`);
+      g.append(arrow);
+    }
+
+    this._lineConstraintGroup.append(g);
+
+    return g;
   }
 
   drawThermometer(cells) {
@@ -1580,7 +1592,6 @@ class LineOptions {
   static SMALL_FULL_CIRCLE_MARKER = 3;
   static SMALL_EMPTY_CIRCLE_MARKER = 4;
   static DIAMOND_MARKER = 5;
-  static EMPTY_PILL_MARKER = 6;
 
   constructor(options) {
     Object.assign(this, options);
