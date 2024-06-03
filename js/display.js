@@ -759,6 +759,7 @@ class ConstraintDisplay extends DisplayItem {
     return g;
   }
 
+  _nextMaskId = 0;
   drawPillArrow(cells, pillSize) {
     const pillWidth = this._CIRCLE_RADIUS * 2;
 
@@ -774,7 +775,7 @@ class ConstraintDisplay extends DisplayItem {
     const pillPoints = points.slice(0, pillSize);
 
     // Make the mask for the inside of the pill.
-    const maskId = 'pill-mask-' + Math.random();
+    const maskId = 'pill-mask-' + this._nextMaskId++;
     {
       const mask = createSvgElement('mask');
       mask.setAttribute('id', maskId);

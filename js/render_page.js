@@ -933,11 +933,16 @@ class ConstraintManager {
       },
       PillArrow: {
         validateFn: (cells, shape) => cells.length > 2,
+        value: {
+          placeholder: 'pill size',
+          default: 2,
+        },
         text: 'Pill Arrow',
         description:
           `
-          The sum of the values along the line equal the 2-digit number in the pill.
-          Numbers in pills are read from left to right, top to bottom.
+          The sum of the values along the line equal the 2-digit or 3-digit
+          number in the pill.
+          Numbers in the pill are read from left to right, top to bottom.
           `,
       },
       Thermo: {
@@ -1212,9 +1217,6 @@ class ConstraintManager {
       }
     } else if (config.constraintClass === SudokuConstraint.Jigsaw) {
       this._jigsawManager.addPiece(cells);
-    } else if (config.constraintClass === SudokuConstraint.PillArrow) {
-      this.loadConstraint(
-        new config.constraintClass(2, ...cells));
     } else if (config.value) {
       const value = formData.get(type + '-value');
       this.loadConstraint(
