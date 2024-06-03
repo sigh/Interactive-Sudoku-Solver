@@ -2778,35 +2778,7 @@ SudokuConstraintHandler.SumLine = class SumLine extends SudokuConstraintHandler 
     if (maxTotal < sum) return false;
     // If the maximum sum is a multiple of the sum, then we know this is valid.
     const maxRemainder = maxTotal % sum;
-
-    // Otherwise for the total to be a multiple of sum, the min and max must be
-    // different integers when divided by sum.
-    return minTotal < maxTotal - maxRemainder;
-  }
-
-  __checkTotalSum(grid) {
-    const cells = this.cells;
-    const numCells = cells.length;
-    const sum = this._sum;
-
-    // If there are multiple possible partial sums, then initial and final
-    // states may be inconsistent.
-    // In this case check that the totalSum == 0 (mod sum), which is equivalent
-    // to checking that the partialSum is consistent.
-    let maxTotal = 0;
-    for (let i = 0; i < numCells; i++) {
-      maxTotal += LookupTables.maxValue(grid[cells[i]]);
-    }
-    // Check if it possible to reach the sum.
-    if (maxTotal < sum) return false;
-    // If the maximum sum is a multiple of the sum, then we know this is valid.
-    const maxRemainder = maxTotal % sum;
     if (maxRemainder == 0) return true;
-
-    let minTotal = 0;
-    for (let i = 0; i < numCells; i++) {
-      minTotal += LookupTables.minValue(grid[cells[i]]);
-    }
 
     // Otherwise for the total to be a multiple of sum, the min and max must be
     // different integers when divided by sum.
