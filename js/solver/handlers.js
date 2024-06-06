@@ -2813,6 +2813,48 @@ SudokuConstraintHandler.SumLine = class SumLine extends SudokuConstraintHandler 
   }
 }
 
+SudokuConstraintHandler.Indexing = class Indexing extends SudokuConstraintHandler {
+  constructor(controlCell, indexedCells, indexedValue) {
+    super([controlCell]);
+    this._controlCell = controlCell;
+    this._indexedCells = indexedCells;
+    this._indexedValue = LookupTables.fromValue(+indexedValue);
+    console.log(controlCell, indexedCells, indexedValue, this._indexedValue);
+  }
+
+  enforceConsistency(grid, handlerAccumulator) {
+    const cells = this._indexedCells;
+    const controlCell = this._controlCell
+    const numCells = cells.length;
+    const indexedValue = this._indexedValue;
+
+    let controlValue = grid[controlCell];
+    for (let i = 0, v = 1; i < numCells; i++, v <<= 1) {
+      if (controlValue & v) {
+        // If the control cell has can take this value, then the corresponding
+        // indexed cell must have the indexed value.
+        if (!(grid[cells[i]] & indexedValue)) {
+          controlValue &= ~v;
+        }
+      } else {
+        // If the control cell can't take this value, then the corresponding
+        // indexed cell must not have the indexed value.
+        if (grid[cells[i]] & indexedValue) {
+          if (!(grid[cells[i]] &= ~indexedValue)) return false;
+          handlerAccumulator.addForCell(cells[i]);
+        }
+      }
+    }
+
+    if (controlValue !== grid[controlCell]) {
+      if (!(grid[controlCell] = controlValue)) return false;
+      handlerAccumulator.addForCell(controlCell);
+    }
+
+    return true;
+  }
+}
+
 class HandlerSet {
   constructor(handlers, shape) {
     this._allHandlers = [];
