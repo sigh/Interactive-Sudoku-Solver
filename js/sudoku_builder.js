@@ -1059,6 +1059,17 @@ class SudokuConstraint {
     }
   }
 
+  static Indexing = class Indexing extends SudokuConstraintBase {
+    ROW_INDEXING = 'R';
+    COL_INDEXING = 'C';
+
+    constructor(indexType, ...cells) {
+      super(arguments);
+      this.indexType = indexType;
+      this.cells = cells;
+    }
+  }
+
   static Givens = class Givens extends SudokuConstraintBase {
     constructor(...values) {
       super(arguments);
@@ -1542,6 +1553,26 @@ class SudokuBuilder {
               yield new SudokuConstraintHandler.BinaryPairwise(
                 constraint.key, ...cells);
             }
+          }
+          break;
+
+        case 'Indexing':
+          for (let i = 0; i < constraint.cells.length; i++) {
+            const controlCell = shape.parseCellId(constraint.cells[i]);
+            const value = constraint.indexType == constraint.ROW_INDEXING
+              ? controlCell.row + 1 : controlCell.col + 1;
+
+            const cells = [];
+            for (let i = 0; i < shape.gridSize; i++) {
+              if (constraint.indexType == constraint.ROW_INDEXING) {
+                cells.push(shape.cellIndex(i, controlCell.col));
+              } else {
+                cells.push(shape.cellIndex(controlCell.row, i));
+              }
+            }
+
+            yield new SudokuConstraintHandler.Indexing(
+              controlCell.cell, cells, value);
           }
           break;
 
