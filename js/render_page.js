@@ -855,6 +855,22 @@ class ConstraintManager {
       case 'Windoku':
         this._checkboxConstraints.check('windoku');
         break;
+      case 'Indexing':
+        {
+          const type =
+            constraint.indexType == SudokuConstraint.Indexing.ROW_INDEXING
+              ? 'Row' : 'Column';
+          config = {
+            cells: constraint.cells,
+            name: `Indexing (${type})`,
+            constraint: constraint,
+            displayElem: this._display.drawIndexing(
+              constraint.cells, constraint.indexType),
+          };
+          this._addToPanel(config);
+          this._configs.push(config);
+        }
+        break;
       case 'Set':
         constraint.constraints.forEach(c => this.loadConstraint(c));
         break;

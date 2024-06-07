@@ -141,7 +141,7 @@ class DisplayItem {
   }
 
   _makeDiagonalPattern(id, color) {
-    let pattern = createSvgElement('pattern');
+    const pattern = createSvgElement('pattern');
     pattern.id = id;
     const hatchWidth = '10';
     pattern.setAttribute('width', hatchWidth);
@@ -158,6 +158,34 @@ class DisplayItem {
 
     return pattern;
   }
+
+  _makeCheckeredPattern(id, color) {
+    const pattern = createSvgElement('pattern');
+    pattern.id = id;
+    const hatchWidth = DisplayItem.CELL_SIZE / 5;
+    pattern.setAttribute('width', hatchWidth * 2);
+    pattern.setAttribute('height', hatchWidth * 2);
+    pattern.setAttribute('patternUnits', 'userSpaceOnUse');
+
+    let rect = createSvgElement('rect');
+    rect.setAttribute('width', hatchWidth);
+    rect.setAttribute('height', hatchWidth);
+    rect.setAttribute('x', 0);
+    rect.setAttribute('y', 0);
+    rect.setAttribute('fill', color);
+    pattern.appendChild(rect);
+
+    rect = createSvgElement('rect');
+    rect.setAttribute('width', hatchWidth);
+    rect.setAttribute('height', hatchWidth);
+    rect.setAttribute('x', hatchWidth);
+    rect.setAttribute('y', hatchWidth);
+    rect.setAttribute('fill', color);
+    pattern.appendChild(rect);
+
+    return pattern;
+  }
+
 
   clear() {
     clearDOMNode(this._svg);
@@ -438,6 +466,11 @@ class ConstraintDisplay extends DisplayItem {
     this._jigsawRegions = new JigsawRegionDisplay(
       displayContainer.getNewGroup('jigsaw-region-group'));
 
+
+    this._indexingGroup = displayContainer.getNewGroup('indexing-group');
+    this._applyGridOffset(this._indexingGroup);
+    this._initIndexingPatterns(displayContainer);
+
     this._thermoGroup = displayContainer.getNewGroup('thermo-group');
     this._applyGridOffset(this._thermoGroup);
     this._lineConstraintGroup = displayContainer.getNewGroup('line-constraint-group');
@@ -505,6 +538,7 @@ class ConstraintDisplay extends DisplayItem {
     clearDOMNode(this._quadGroup);
     clearDOMNode(this._lineConstraintGroup);
     clearDOMNode(this._adjConstraintGroup);
+    clearDOMNode(this._indexingGroup);
 
     this._customBinaryColors.clear();
 
@@ -881,6 +915,37 @@ class ConstraintDisplay extends DisplayItem {
 
   enableWindokuRegion(enable) {
     this._windokuRegions.enableWindokuRegion(enable);
+  }
+
+  _INDEXING_COL_PATTERN_ID = 'col-indexing-pattern';
+  _INDEXING_ROW_PATTERN_ID = 'row-indexing-pattern';
+  _initIndexingPatterns(displayContainer) {
+    displayContainer.addElement(
+      this._makeCheckeredPattern(
+        this._INDEXING_COL_PATTERN_ID, 'rgb(255, 150, 150)'));
+    displayContainer.addElement(
+      this._makeCheckeredPattern(
+        this._INDEXING_ROW_PATTERN_ID, 'rgb(50, 200, 50)'));
+  }
+
+  drawIndexing(cells, indexType) {
+    const g = createSvgElement('g');
+
+    const patternId = indexType == SudokuConstraint.Indexing.ROW_INDEXING ?
+      this._INDEXING_ROW_PATTERN_ID : this._INDEXING_COL_PATTERN_ID;
+    const fill = `url(#${patternId})`
+
+    for (const cellId of cells) {
+      const path = this._makeCellSquare(
+        this._shape.parseCellId(cellId).cell);
+      path.setAttribute('fill', fill);
+      path.setAttribute('opacity', '0.2');
+
+      g.appendChild(path);
+    }
+
+    this._indexingGroup.append(g);
+    return g;
   }
 }
 

@@ -1060,8 +1060,8 @@ class SudokuConstraint {
   }
 
   static Indexing = class Indexing extends SudokuConstraintBase {
-    ROW_INDEXING = 'R';
-    COL_INDEXING = 'C';
+    static ROW_INDEXING = 'R';
+    static COL_INDEXING = 'C';
 
     constructor(indexType, ...cells) {
       super(arguments);
@@ -1559,12 +1559,13 @@ class SudokuBuilder {
         case 'Indexing':
           for (let i = 0; i < constraint.cells.length; i++) {
             const controlCell = shape.parseCellId(constraint.cells[i]);
-            const value = constraint.indexType == constraint.ROW_INDEXING
-              ? controlCell.row + 1 : controlCell.col + 1;
+            const value =
+              constraint.indexType == SudokuConstraint.Indexing.ROW_INDEXING
+                ? controlCell.row + 1 : controlCell.col + 1;
 
             const cells = [];
             for (let i = 0; i < shape.gridSize; i++) {
-              if (constraint.indexType == constraint.ROW_INDEXING) {
+              if (constraint.indexType == SudokuConstraint.Indexing.ROW_INDEXING) {
                 cells.push(shape.cellIndex(i, controlCell.col));
               } else {
                 cells.push(shape.cellIndex(controlCell.row, i));
