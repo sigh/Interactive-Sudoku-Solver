@@ -2819,7 +2819,6 @@ SudokuConstraintHandler.Indexing = class Indexing extends SudokuConstraintHandle
     this._controlCell = controlCell;
     this._indexedCells = indexedCells;
     this._indexedValue = LookupTables.fromValue(+indexedValue);
-    console.log(controlCell, indexedCells, indexedValue, this._indexedValue);
   }
 
   enforceConsistency(grid, handlerAccumulator) {
