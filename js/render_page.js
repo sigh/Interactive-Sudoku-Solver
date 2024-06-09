@@ -660,8 +660,10 @@ class ConstraintManager {
       if (config.validateFn) {
         const isValid = config.validateFn(selection, this._shape);
         config.elem.disabled = !isValid;
-      } else if (isSingleCell) {
-        config.elem.disabled = true;
+      } else {
+        // Unless explicitly allowed by validateFn, we don't allow single cell
+        // selections.
+        config.elem.disabled = isSingleCell;
       }
     }
 
