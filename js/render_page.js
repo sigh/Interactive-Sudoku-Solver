@@ -174,6 +174,7 @@ class ExampleHandler {
     'Nabner thermo',
     'Modular lines',
     'Entropic connections',
+    'Indexing',
     'Pencilmark sudoku',
     '16x16',
     '16x16: Sudoku X, hard',
