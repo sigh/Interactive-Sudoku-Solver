@@ -957,7 +957,10 @@ class ConstraintManager {
         validateFn: (cells, shape) => cells.length > 2,
         value: {
           placeholder: 'pill size',
-          default: 2,
+          options: [
+            ['2-digit', 2],
+            ['3-digit', 3]
+          ],
         },
         text: 'Pill Arrow',
         description:
