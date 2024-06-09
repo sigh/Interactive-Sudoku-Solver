@@ -1240,7 +1240,7 @@ class ConstraintManager {
 
   _addMultiCellConstraint(selectionForm, inputManager) {
     const cells = inputManager.getSelection();
-    if (cells.length < 2) throw ('Selection too short.');
+    if (cells.length < 1) throw ('Selection too short.');
 
     const formData = new FormData(selectionForm);
     const type = formData.get('constraint-type');
