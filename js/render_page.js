@@ -675,7 +675,7 @@ class ConstraintManager {
       //   - If the value input is enabled then focus on it to make it easy to
       //     input a value.
       //   - Otherwise just focus on the submit button.
-      if (config.value) {
+      if (config.value && config.value.elem.select) {
         config.value.elem.select();
       } else {
         selectionForm['add-constraint'].focus();
@@ -1128,8 +1128,10 @@ class ConstraintManager {
       },
       Indexing: {
         value: {
-          placeholder: 'type',
-          default: SudokuConstraint.Indexing.ROW_INDEXING,
+          options: [
+            ['Column', SudokuConstraint.Indexing.COL_INDEXING],
+            ['Row', SudokuConstraint.Indexing.ROW_INDEXING],
+          ],
         },
         validateFn: (cells, shape) => cells.length > 0,
         description: `
@@ -1173,11 +1175,22 @@ class ConstraintManager {
       config.elem = option;
 
       if (config.value) {
-        const input = document.createElement('input');
-        input.setAttribute('type', 'text');
-        input.setAttribute('size', '10');
+        let input;
+        if (config.value.options) {
+          input = document.createElement('select');
+          for (const [text, value] of config.value.options) {
+            const option = document.createElement('option');
+            option.value = value;
+            option.textContent = text;
+            input.appendChild(option);
+          }
+        } else {
+          input = document.createElement('input');
+          input.setAttribute('type', 'text');
+          input.setAttribute('size', '10');
+          input.setAttribute('placeholder', config.value.placeholder);
+        }
         input.setAttribute('name', name + '-value');
-        input.setAttribute('placeholder', config.value.placeholder);
         if (config.value.default !== undefined) {
           input.setAttribute('value', config.value.default);
         }
@@ -1254,7 +1267,7 @@ class ConstraintManager {
     } else if (config.value) {
       const value = formData.get(type + '-value');
       this.loadConstraint(
-        new config.constraintClass(+value, ...cells));
+        new config.constraintClass(value, ...cells));
     } else {
       this.loadConstraint(
         new config.constraintClass(...cells));
