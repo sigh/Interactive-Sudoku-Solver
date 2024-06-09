@@ -257,6 +257,8 @@ const runSolveTests = async (onFailure) => {
     'Sum lines, with loop',
     'Sum lines - long loop',
     LONG_SUMS[0],
+    'Indexing',
+    INDEXING_PUZZLES[4],
   ], onFailure);
   result.collection = '9x9';
   results.push(result);
