@@ -639,7 +639,7 @@ class ConstraintManager {
 
   _onNewSelection(selection, selectionForm) {
     // Only enable the selection panel if the selection is long enough.
-    const disabled = (selection.length < 2);
+    const disabled = (selection.length == 0);
     selectionForm['add-constraint'].disabled = disabled;
     if (disabled) {
       // Reenable all the options, so that the user can select them and see
@@ -653,11 +653,14 @@ class ConstraintManager {
       selectionForm.classList.remove('disabled');
     }
 
-    // Enable/disable the adjacent only constraints.
+    const isSingleCell = selection.length == 1;
+
     for (const [_, config] of Object.entries(this._multiCellConstraints)) {
       if (config.validateFn) {
         const isValid = config.validateFn(selection, this._shape);
         config.elem.disabled = !isValid;
+      } else if (isSingleCell) {
+        config.elem.disabled = true;
       }
     }
 
@@ -666,8 +669,9 @@ class ConstraintManager {
     const config = this._multiCellConstraints[type];
     if (config.elem.disabled) {
       selectionForm['add-constraint'].disabled = true;
-    } else {
-      // Focus on the the form so we can immediately press enter.
+    } else if (!isSingleCell) {
+      // Focus on the the form so we can immediately press enter, but
+      // only if the selection is not a single cell.
       //   - If the value input is enabled then focus on it to make it easy to
       //     input a value.
       //   - Otherwise just focus on the submit button.
@@ -918,7 +922,8 @@ class ConstraintManager {
         value: {
           placeholder: 'sum',
         },
-        validateFn: (cells, shape) => cells.length <= shape.numValues,
+        validateFn: (cells, shape) => (
+          cells.length <= shape.numValues && cells.length > 1),
         description:
           "Values must add up to the given sum. All values must be unique.",
       },
@@ -1120,6 +1125,19 @@ class ConstraintManager {
           `
         All the given values must be present in the surrounding 2x2 square.
         Select a 2x2 square to enable.`,
+      },
+      Indexing: {
+        value: {
+          placeholder: 'type',
+          default: SudokuConstraint.Indexing.ROW_INDEXING,
+        },
+        validateFn: (cells, shape) => cells.length > 0,
+        description: `
+          Column indexing: For a cell in column C, the value (V) of the cell
+          tells where the value C is placed in that row. Specifically, if the
+          cell has coordinates (R, C) and value V, then cell (R, V) has the
+          value C.Row indexing is the same, but for rows.
+        `,
       },
     };
   }
@@ -1632,7 +1650,7 @@ class GridInputManager {
     this._selection.addCallback(cellIds => {
       this._multiValueInputManager.updateSelection(cellIds);
       if (cellIds.length == 1) {
-        this._runCallbacks(this._callbacks.onSelection, []);
+        this._runCallbacks(this._callbacks.onSelection, cellIds);
         const [x, y] = this._selection.cellIdCenter(cellIds[0]);
         fakeInput.style.top = y + 'px';
         fakeInput.style.left = x + 'px';
