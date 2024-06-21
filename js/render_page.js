@@ -181,6 +181,7 @@ class ExampleHandler {
     '16x16: Jigsaw',
     '16x16: Windoku',
     '6x6',
+    '6x6: Numbered rooms',
   ];
 
   constructor(constraintManager) {
@@ -419,6 +420,7 @@ class OutsideArrowConstraints {
         break;
       case 'XSum':
       case 'Skyscraper':
+      case 'NumberedRoom':
         {
           const values = constraint.values();
           if (values[0]) {
@@ -463,6 +465,7 @@ class OutsideArrowConstraints {
         return new SudokuConstraint.Sandwich(value, rowCol);
       case 'XSum':
       case 'Skyscraper':
+      case 'NumberedRoom':
         return new SudokuConstraint[type](
           rowCol,
           dir == 1 ? value : '',
@@ -478,7 +481,7 @@ class OutsideArrowConstraints {
     const constraints = [];
     for (const constraint of this._constraints.values()) {
       const type = constraint.type;
-      if (type == 'Skyscraper' || type == 'XSum') {
+      if (type == 'Skyscraper' || type == 'XSum' || type == 'NumberedRoom') {
         const key = `${type}|${constraint.rowCol}`;
         if (seen.has(key)) {
           // Merge with the previous.
@@ -826,6 +829,7 @@ class ConstraintManager {
       case 'Sandwich':
       case 'XSum':
       case 'Skyscraper':
+      case 'NumberedRoom':
         this._outsideArrowConstraints.addConstraint(constraint);
         break;
       case 'AntiKnight':

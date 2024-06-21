@@ -229,6 +229,7 @@ class DebugManager {
       HARD_PENCILMARKS,
       INDEXING_PUZZLES,
       LONG_SUMS,
+      NUMBERED_ROOMS_PUZZLES,
     };
     for (const [listName, list] of Object.entries(puzzleLists)) {
       for (let i = 0; i < list.length; i++) {

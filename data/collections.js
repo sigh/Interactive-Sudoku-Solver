@@ -136,6 +136,20 @@ const INDEXING_PUZZLES = [
   },
 ];
 
+NUMBERED_ROOMS_PUZZLES = [
+  '6x6: Numbered rooms',
+  {
+    'src': 'https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?id=000CR0',
+    'input': '.Modular~2~R1C2~R2C2~R3C2~R4C2~R5C2~R6C2~R7C2.Modular~2~R1C8~R2C8~R3C8~R4C8~R5C8~R6C8~R7C8.Modular~2~R1C3~R2C4~R1C5~R2C6~R1C7.Modular~2~R5C3~R4C4~R5C5~R4C6~R5C7.Modular~2~R6C3~R7C3~R8C4~R7C5~R6C5.Modular~2~R6C7~R7C7~R8C6~R7C5.NumberedRoom~C1~1~1.NumberedRoom~R1~1~1.NumberedRoom~R4~1~1.NumberedRoom~C9~1~1.NumberedRoom~C3~2~.NumberedRoom~C5~2~.NumberedRoom~C7~2~.NumberedRoom~C4~~8.NumberedRoom~R5~5~9.',
+    'solution': '924365871813947526567182934752498163481536792396721485245679318639814257178253649',
+  },
+  {
+    'src': 'https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?id=000B8L',
+    'input': '.NumberedRoom~C1~1~1.NumberedRoom~C2~1~5.NumberedRoom~C3~3~7.NumberedRoom~C4~3~.NumberedRoom~C5~5~.NumberedRoom~R1~4~4.NumberedRoom~R3~8~.NumberedRoom~R4~2~.NumberedRoom~R9~6~6.NumberedRoom~C6~7~.NumberedRoom~C7~7~7.NumberedRoom~C8~9~5.NumberedRoom~C9~9~9.NumberedRoom~R7~~2.NumberedRoom~R6~~8.',
+    'solution': '817593642532416879496827513658172394974365281321984765783249156145638927269751438',
+  }
+];
+
 // 1 to 42 from: http://rcbroughton.co.uk/sudoku/forum/viewtopic.php?f=3&t=434#p2453
 const TAREK_ALL = [
   'G<<L<K<L<^G>^>^E^^>^IJ<G^<G^>^^I^<>^HC<C^<B^N^^G^<>^>^^E^<DF<^PG^<>^^J<^^<H<<>^>^',
@@ -237,6 +251,7 @@ const HARD_PENCILMARKS = [
 
 const SHAPE_6x6_PUZZLES = [
   '6x6',
+  '6x6: Numbered rooms',
   {
     src: 'https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?chlang=en&id=000ED6',
     input: '.Between~R6C3~R5C2~R4C2.Between~R3C1~R2C2~R3C3~R3C4.Between~R1C3~R2C4~R3C3~R4C3.Between~R4C6~R4C5~R5C4~R5C3~R6C4.~R4C3_2_4_6~R1C3_2_4_6~R6C4_2_4_6~R4C6_2_4_6~R2C2_2_4_6~R2C3_2_4_6~R3C1_1_3_5~R3C4_1_3_5~R2C4_1_3_5~R2C5_1_3_5~R4C2_1_3_5~R6C3_1_3_5.Shape~6x6',
@@ -246,5 +261,5 @@ const SHAPE_6x6_PUZZLES = [
     src: 'https://www.youtube.com/watch?v=V-iY2ISw6tE',
     input: '.LittleKiller~8~R1C4.LittleKiller~9~R3C1.LittleKiller~26~R5C6.LittleKiller~17~R6C2..Shape~6x6',
     solution: '462135513624236541145362321456654213',
-  }
+  },
 ]

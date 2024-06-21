@@ -499,6 +499,11 @@ const EXAMPLES = {
     src: 'http://forum.enjoysudoku.com/6x6-su-dokus-how-hard-can-they-be-t2053.html',
     input: '.~R1C5_4~R2C2_1~R2C4_3~R2C6_5~R3C4_2~R4C3_3~R5C1_6~R5C3_2~R5C5_5~R6C2_5.Shape~6x6',
     solution: '325146416325541263263514632451154632',
-  }
+  },
+  '6x6: Numbered rooms': {
+    'src': 'https://discord.com/channels/709370620642852885/721090566481510732/1253331176685568112',
+    'input': '.NumberedRoom~C1~1~6.NumberedRoom~R1~1~6.NumberedRoom~C2~6~1.NumberedRoom~C3~1~3.NumberedRoom~C4~6~6.NumberedRoom~C5~3~1.NumberedRoom~C6~3~6.NumberedRoom~R2~3~1.NumberedRoom~R4~3~6.NumberedRoom~R5~3~1.NumberedRoom~R6~3~6.NumberedRoom~R3~1~3..Shape~6x6',
+    'solution': '143562625143351426462315234651516234',
+  },
 };
 
