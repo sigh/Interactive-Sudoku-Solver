@@ -926,6 +926,20 @@ class SudokuConstraint {
     }
   }
 
+  static NumberedRoom = class NumberedRoom extends SudokuConstraintBase {
+    constructor(rowCol, clueInc, clueDec) {
+      super(arguments);
+      this.rowCol = rowCol.toUpperCase();
+      this.clueInc = +clueInc;
+      this.clueDec = +clueDec;
+    }
+
+    values() {
+      return [this.clueInc, this.clueDec];
+    }
+  }
+
+
   static AllDifferent = class AllDifferent extends SudokuConstraintBase {
     constructor(...cells) {
       super(arguments);
@@ -1338,6 +1352,22 @@ class SudokuBuilder {
               cells, constraint.countDec);
           }
           break;
+
+        case 'NumberedRoom':
+          cells = SudokuConstraintBase.fullLineCellMap(shape)
+            .get([constraint.rowCol, 1].toString()).map(
+              c => shape.parseCellId(c).cell);
+          if (constraint.clueInc) {
+            yield new SudokuConstraintHandler.NumberedRoom(
+              cells, constraint.clueInc);
+          }
+          if (constraint.clueDec) {
+            cells = cells.slice().reverse();
+            yield new SudokuConstraintHandler.NumberedRoom(
+              cells, constraint.clueDec);
+          }
+          break;
+
 
         case 'AllDifferent':
           cells = constraint.cells.map(c => shape.parseCellId(c).cell);

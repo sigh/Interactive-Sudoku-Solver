@@ -2854,6 +2854,40 @@ SudokuConstraintHandler.Indexing = class Indexing extends SudokuConstraintHandle
   }
 }
 
+SudokuConstraintHandler.NumberedRoom = class NumberedRoom extends SudokuConstraintHandler {
+  constructor(cells, value) {
+    super([cells[0]]);
+    this._cells = new Uint8Array(cells);
+    this._value = LookupTables.fromValue(+value);
+  }
+
+  enforceConsistency(grid, handlerAccumulator) {
+    const cells = this._cells;
+    const numCells = cells.length;
+    const clueValue = this._value;
+
+    let controlV = grid[this.cells[0]];
+    for (let i = 0, iv = 1; i < numCells; i++, iv <<= 1) {
+      const v = grid[cells[i]];
+      if (v & clueValue) {
+        if (!(controlV & iv)) {
+          // This cell can't have the clue value because the control
+          // cell is not set.
+          if (!(grid[cells[i]] &= ~clueValue)) return false;
+        }
+      } else {
+        // The control value can't have this index because the cell doesn't
+        // allow the clue value.
+        if (!(controlV &= ~iv)) return false;
+      }
+    }
+
+    grid[cells[0]] = controlV;
+
+    return true;
+  }
+}
+
 class HandlerSet {
   constructor(handlers, shape) {
     this._allHandlers = [];
