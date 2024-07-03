@@ -63,6 +63,9 @@ SudokuConstraintHandler.Priority = class Priority extends SudokuConstraintHandle
   }
 }
 
+SudokuConstraintHandler.True = class True extends SudokuConstraintHandler {
+}
+
 SudokuConstraintHandler.False = class False extends SudokuConstraintHandler {
   constructor(cells) {
     // The cells with which to associate the failure.
@@ -2889,27 +2892,36 @@ SudokuConstraintHandler.NumberedRoom = class NumberedRoom extends SudokuConstrai
 }
 
 SudokuConstraintHandler.FullRank = class FullRank extends SudokuConstraintHandler {
-  constructor(numGridCells, line, rankInc, rankDec) {
+  constructor(numGridCells, items) {
     const allCells = Uint8Array.from({ length: numGridCells }, (_, i) => i);
     super(allCells);
 
     this._entries = [];
     this._clueSets = [];
     this._rankSets = [];
-    if (rankInc) {
-      this._clueSets.push({
-        rank: rankInc,
-        cell0: line[0],
-        cell1: line[1],
-      });
+    this._items = items;
+
+    for (let i = 0; i < items.length; i++) {
+      const [line, rankInc, rankDec] = items[i];
+      if (rankInc) {
+        this._clueSets.push({
+          rank: rankInc,
+          cell0: line[0],
+          cell1: line[1],
+        });
+      }
+      if (rankDec) {
+        this._clueSets.push({
+          rank: rankDec,
+          cell0: line[line.length - 1],
+          cell1: line[line.length - 2],
+        });
+      }
     }
-    if (rankDec) {
-      this._clueSets.push({
-        rank: rankDec,
-        cell0: line[line.length - 1],
-        cell1: line[line.length - 2],
-      });
-    }
+  }
+
+  items() {
+    return this._items;
   }
 
   initialize(initialGrid, cellExclusions, shape) {

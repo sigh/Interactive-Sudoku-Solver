@@ -1622,11 +1622,15 @@ class SudokuBuilder {
         case 'FullRank':
           yield new SudokuConstraintHandler.FullRank(
             shape.numCells,
-            SudokuConstraintBase.fullLineCellMap(shape)
-              .get([constraint.rowCol, 1].toString()).map(
-                c => shape.parseCellId(c).cell),
-            constraint.rankInc,
-            constraint.rankDec);
+            [
+              [
+                SudokuConstraintBase.fullLineCellMap(shape)
+                  .get([constraint.rowCol, 1].toString()).map(
+                    c => shape.parseCellId(c).cell),
+                constraint.rankInc,
+                constraint.rankDec
+              ]
+            ]);
           break;
 
         case 'Priority':
