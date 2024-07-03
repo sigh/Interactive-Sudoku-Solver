@@ -22,6 +22,8 @@ class SudokuConstraintOptimizer {
 
     this._optimizeQuadruple(handlerSet, shape);
 
+    this._optimizeFullRank(handlerSet, shape);
+
     if (hasBoxes) {
       this._addHouseIntersections(handlerSet, shape);
     }
@@ -697,5 +699,30 @@ class SudokuConstraintOptimizer {
         continue;
       }
     }
+  }
+
+  _optimizeFullRank(handlerSet, shape) {
+    const rankHandlers = handlerSet.getAllofType(SudokuConstraintHandler.FullRank);
+    if (rankHandlers.length == 0) return;
+
+    const items = [];
+    for (const h of rankHandlers) {
+      items.push(...h.items());
+      handlerSet.replace(h, new SudokuConstraintHandler.True());
+    }
+
+    const handler = new SudokuConstraintHandler.FullRank(
+      shape.numCells, items);
+    handlerSet.add(handler);
+
+    if (this._debugLogger) {
+      this._debugLogger.log({
+        loc: '_optimizeFullRank',
+        msg: 'Combine: ' + handler.constructor.name,
+        args: { numHandlers: rankHandlers.length },
+        cells: handler.cells
+      });
+    }
+
   }
 }
