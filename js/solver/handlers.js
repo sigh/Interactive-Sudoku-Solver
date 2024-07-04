@@ -2945,8 +2945,8 @@ SudokuConstraintHandler.FullRank = class FullRank extends SudokuConstraintHandle
         rankIndex.set(value, []);
       }
       rankIndex.get(value).push({
-        index: (clueSet.rank + 3) & 3,
-        entry: this._entries.find(
+        rankIndex: (clueSet.rank + 3) & 3,
+        entryIndex: this._entries.findIndex(
           e => e[0] == clueSet.cell0 && e[1] == clueSet.cell1),
       });
       if (!(initialGrid[clueSet.cell0] &= value)) {
@@ -2963,52 +2963,114 @@ SudokuConstraintHandler.FullRank = class FullRank extends SudokuConstraintHandle
     return true;
   }
 
-  _enforceSingleGiven(grid, handlerAccumulator, viableEntries, given) {
-    const { index, entry } = given;
+  _viableEntriesBuffer = new Int16Array(SHAPE_MAX.gridSize * 4 + 1);
+  _flagsBuffer = new Uint8Array(SHAPE_MAX.gridSize * 4);
+
+  _enforceSingleGiven(grid, handlerAccumulator, viableEntries, numViableEntries, given) {
+    const { rankIndex, entryIndex } = given;
     const entries = this._entries;
+    const entry = entries[entryIndex];
+    const initialV = grid[entry[0]];
 
-    let less = 0;
-    let greater = 0;
-    let either = 0;
+    const flagsBuffer = this._flagsBuffer;
+    const IS_SET_FLAG = 1;
+    const IS_LESS_FLAG = 2;
+    const IS_GREATER_FLAG = 4;
 
-    for (let i = 0; viableEntries[i] >= 0; i++) {
+    let maybeLessCount = 0;
+    let maybeGreaterCount = 0;
+    let fixedLessCount = 0;
+    let fixedGreaterCount = 0;
+
+    for (let i = 0; i < numViableEntries; i++) {
+      if (viableEntries[i] === entryIndex) {
+        flagsBuffer[i] = 0;
+        continue;
+      }
       const e = entries[viableEntries[i]];
-      if (e === entry) continue;
       let maybeLess = false;
       let maybeGreater = false;
+      let initialIsFixed = grid[e[0]] === initialV;
+      flagsBuffer[i] = initialIsFixed ? IS_SET_FLAG : 0;
       for (let j = 1; j < e.length; j++) {
-        const ev = grid[e[j]];
-        const entryv = grid[entry[j]];
-        if (LookupTables.maxValue(ev) > LookupTables.minValue(entryv)) {
+        const eV = grid[e[j]];
+        const entryV = grid[entry[j]];
+
+        const minE = LookupTables.minValue(eV);
+        const maxE = LookupTables.maxValue(eV);
+        const minEntry = LookupTables.minValue(entryV);
+        const maxEntry = LookupTables.maxValue(entryV);
+
+        if (maxE > minEntry) {
+          flagsBuffer[i] |= IS_GREATER_FLAG;
           maybeGreater = true;
         }
-        if (LookupTables.minValue(ev) < LookupTables.maxValue(entryv)) {
+        if (minE < maxEntry) {
+          flagsBuffer[i] |= IS_LESS_FLAG;
           maybeLess = true;
         }
         if (maybeLess && maybeGreater) break;
 
-        if (LookupTables.minValue(ev) > LookupTables.maxValue(entryv)) {
+        if (minE > maxEntry) {
           break;
-        } else if (LookupTables.maxValue(ev) < LookupTables.minValue(entryv)) {
+        }
+        if (maxE < minEntry) {
           break;
         }
       }
-      if (maybeLess && maybeGreater) {
-        either++;
-      } else if (maybeLess) {
-        less++;
-      } else if (maybeGreater) {
-        greater++;
+      if (maybeGreater) {
+        maybeGreaterCount++;
+        if (!maybeLess && initialIsFixed) {
+          fixedGreaterCount++;
+        }
+      }
+      if (maybeLess) {
+        maybeLessCount++;
+        if (!maybeGreater && initialIsFixed) {
+          fixedLessCount++;
+        }
       }
     }
 
-    if (either + less < index) return false;
-    if (either + greater < 3 - index) return false;
+    const requiredLess = rankIndex;
+    const requiredGreater = 3 - rankIndex;
+
+    // Check we have enough entries.
+    if (maybeLessCount < requiredLess) return false;
+    // If all viable entries are required, then they are forced to be included.
+    if (maybeLessCount == requiredLess && fixedLessCount < requiredLess) {
+      for (let i = 0; i < numViableEntries; i++) {
+        if (flagsBuffer[i] & IS_LESS_FLAG) {
+          grid[entries[viableEntries[i]][0]] = initialV;
+        }
+      }
+      // If all viable set entries fill up the required slots, then any other
+      // viable entries must be excluded.
+    } else if (fixedLessCount === requiredLess && maybeLessCount > requiredLess) {
+      for (let i = 0; i < numViableEntries; i++) {
+        if (flagsBuffer[i] === IS_LESS_FLAG) {
+          grid[entries[viableEntries[i]][0]] &= ~initialV;
+        }
+      }
+    }
+
+    if (maybeGreaterCount < requiredGreater) return false;
+    if (maybeGreaterCount == requiredGreater && fixedGreaterCount < requiredGreater) {
+      for (let i = 0; i < numViableEntries; i++) {
+        if (flagsBuffer[i] & IS_GREATER_FLAG) {
+          grid[entries[viableEntries[i]][0]] = initialV;
+        }
+      }
+    } else if (fixedGreaterCount === requiredGreater && maybeGreaterCount > requiredGreater) {
+      for (let i = 0; i < numViableEntries; i++) {
+        if (flagsBuffer[i] === IS_GREATER_FLAG) {
+          grid[entries[viableEntries[i]][0]] &= ~initialV;
+        }
+      }
+    }
 
     return true;
   }
-
-  _viableEntriesBuffer = new Int16Array(SHAPE_MAX.gridSize * 4 + 1);
 
   _enforceSingleRankSet(grid, handlerAccumulator, rankSet) {
     const value = rankSet.value;
@@ -3021,13 +3083,12 @@ SudokuConstraintHandler.FullRank = class FullRank extends SudokuConstraintHandle
         viableEntries[numViableEntries++] = i;
       }
     }
-    viableEntries[numViableEntries] = -1;
 
     if (numViableEntries < 4) return false;
 
     const givens = rankSet.givens;
     for (let i = 0; i < givens.length; i++) {
-      if (!this._enforceSingleGiven(grid, handlerAccumulator, viableEntries, givens[i])) {
+      if (!this._enforceSingleGiven(grid, handlerAccumulator, viableEntries, numViableEntries, givens[i])) {
         return false;
       }
     }
