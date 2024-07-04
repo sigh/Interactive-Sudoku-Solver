@@ -2965,13 +2965,14 @@ SudokuConstraintHandler.FullRank = class FullRank extends SudokuConstraintHandle
 
   _enforceSingleGiven(grid, handlerAccumulator, viableEntries, given) {
     const { index, entry } = given;
+    const entries = this._entries;
 
-    const less = [];
-    const greater = [];
-    const either = [];
+    let less = 0;
+    let greater = 0;
+    let either = 0;
 
-    for (let i = 0; i < viableEntries.length; i++) {
-      const e = viableEntries[i];
+    for (let i = 0; viableEntries[i] >= 0; i++) {
+      const e = entries[viableEntries[i]];
       if (e === entry) continue;
       let maybeLess = false;
       let maybeGreater = false;
@@ -2993,33 +2994,36 @@ SudokuConstraintHandler.FullRank = class FullRank extends SudokuConstraintHandle
         }
       }
       if (maybeLess && maybeGreater) {
-        either.push(e);
+        either++;
       } else if (maybeLess) {
-        less.push(e);
+        less++;
       } else if (maybeGreater) {
-        greater.push(e);
+        greater++;
       }
     }
 
-    if (either.length + less.length < index) return false;
-    if (either.length + greater.length < 3 - index) return false;
+    if (either + less < index) return false;
+    if (either + greater < 3 - index) return false;
 
     return true;
   }
+
+  _viableEntriesBuffer = new Int16Array(SHAPE_MAX.gridSize * 4 + 1);
 
   _enforceSingleRankSet(grid, handlerAccumulator, rankSet) {
     const value = rankSet.value;
     const entries = this._entries;
 
-    const viableEntries = [];
+    let numViableEntries = 0;
+    const viableEntries = this._viableEntriesBuffer;
     for (let i = 0; i < entries.length; i++) {
       if (grid[entries[i][0]] & value) {
-        viableEntries.push(entries[i]);
+        viableEntries[numViableEntries++] = i;
       }
     }
+    viableEntries[numViableEntries] = -1;
 
-    if (viableEntries.length > 4) return true;
-    if (viableEntries.length < 4) return false;
+    if (numViableEntries < 4) return false;
 
     const givens = rankSet.givens;
     for (let i = 0; i < givens.length; i++) {
