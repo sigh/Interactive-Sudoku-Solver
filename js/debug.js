@@ -259,6 +259,7 @@ const runSolveTests = async (onFailure) => {
     LONG_SUMS[0],
     'Indexing',
     INDEXING_PUZZLES[4],
+    'Full rank',
   ], onFailure);
   result.collection = '9x9';
   results.push(result);

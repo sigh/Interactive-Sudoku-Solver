@@ -151,6 +151,7 @@ const NUMBERED_ROOMS_PUZZLES = [
 ];
 
 const FULL_RANK_PUZZLES = [
+  'Full rank',
   {
     'src': 'https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?id=000DHO',
     'input': '.FullRank~C1~33~.FullRank~C2~30~.FullRank~C3~26~.FullRank~C4~24~.FullRank~C5~13~.FullRank~R4~1~.FullRank~R5~17~.FullRank~R6~~36.FullRank~C6~~35.',
@@ -162,11 +163,6 @@ const FULL_RANK_PUZZLES = [
     'solution': '531246426315342561165432214653653124',
   },
   {
-    'src': 'https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?chlang=en&id=000EDA',
-    'input': '.FullRank~C2~26~.FullRank~C4~32~.FullRank~C6~6~.FullRank~C8~35~.FullRank~R1~17~.FullRank~R3~13~.FullRank~R5~10~.FullRank~R7~21~.FullRank~C3~~12.FullRank~C5~~19.FullRank~C7~~2.FullRank~C9~~14.FullRank~R8~~23.FullRank~R6~~20.FullRank~R4~~34.FullRank~R2~~11.',
-    'solution': '576832491829514763431769852768125349354698217192473685615347928247981536983256174',
-  },
-  {
     'src': 'https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?id=0001RM',
     'input': '.FullRank~C1~6~20.FullRank~C2~22~9.FullRank~R1~5~11.FullRank~R2~26~8.FullRank~R5~4~18.FullRank~R8~33~3.FullRank~R9~17~27.FullRank~C5~19~13.FullRank~C8~15~7.FullRank~C9~10~25.~R4C5_7~R6C5_3',
     'solution': '268957143715483692349216758652174839183692475497538216871329564924765381536841927',
@@ -175,6 +171,12 @@ const FULL_RANK_PUZZLES = [
     'src': 'https://www.youtube.com/watch?v=74G7E0EW3-o',
     'input': '.FullRank~C1~10~23.FullRank~C2~16~34.FullRank~C3~22~27.FullRank~C4~35~2.FullRank~C5~3~12.FullRank~C6~18~32.FullRank~C7~30~5.FullRank~C8~8~17.FullRank~C9~25~15.FullRank~R1~9~26.FullRank~R2~20~4.FullRank~R3~33~19.FullRank~R4~28~6.FullRank~R5~7~11.FullRank~R6~14~31.FullRank~R7~1~36.FullRank~R8~29~21.FullRank~R9~24~13.~R3C4_7~R4C4_8~R5C5_9~R6C6_6~R7C6_4',
     'solution': '346915827572683491918742635763851942281497563459326178135264789824579316697138254',
+  },
+  {
+    // Full rank snipe by sigh: https://sudokutheory.com/wiki/index.php?title=Snipes#Full_Rank
+    'src': 'https://discord.com/channels/709370620642852885/721090566481510732/1258800235594125352',
+    'input': '.FullRank~R5~17~.FullRank~R4~1~.FullRank~C2~32~.FullRank~C3~28~.FullRank~C4~23~.FullRank~R1~34~.',
+    'solution': '987624153654381972231975648179842536568793214423156789845267391396518427712439865',
   }
 ];
 
