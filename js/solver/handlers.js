@@ -2954,11 +2954,13 @@ SudokuConstraintHandler.FullRank = class FullRank extends SudokuConstraintHandle
     const entries = this._entries;
     const entry = entries[entryIndex];
     const initialV = grid[entry[0]];
+    const entryLength = entry.length;
 
     const flagsBuffer = this._flagsBuffer;
     const IS_SET_FLAG = 1;
     const IS_LESS_FLAG = 2;
     const IS_GREATER_FLAG = 4;
+    const IS_BOTH_FLAGS = IS_LESS_FLAG | IS_GREATER_FLAG;
 
     let maybeLessCount = 0;
     let maybeGreaterCount = 0;
@@ -2966,16 +2968,15 @@ SudokuConstraintHandler.FullRank = class FullRank extends SudokuConstraintHandle
     let fixedGreaterCount = 0;
 
     for (let i = 0; i < numViableEntries; i++) {
+      // Don't compare the current entry to itself.
       if (viableEntries[i] === entryIndex) {
         flagsBuffer[i] = 0;
         continue;
       }
+
       const e = entries[viableEntries[i]];
-      let maybeLess = false;
-      let maybeGreater = false;
-      let initialIsFixed = grid[e[0]] === initialV;
-      flagsBuffer[i] = initialIsFixed ? IS_SET_FLAG : 0;
-      for (let j = 1; j < e.length; j++) {
+      let flags = grid[e[0]] === initialV ? IS_SET_FLAG : 0;
+      for (let j = 1; j < entryLength; j++) {
         const eV = grid[e[j]];
         const entryV = grid[entry[j]];
 
@@ -2984,29 +2985,25 @@ SudokuConstraintHandler.FullRank = class FullRank extends SudokuConstraintHandle
         const minEntry = LookupTables.minValue(entryV);
         const maxEntry = LookupTables.maxValue(entryV);
 
-        if (maxE > minEntry) {
-          flagsBuffer[i] |= IS_GREATER_FLAG;
-          maybeGreater = true;
-        }
-        if (minE < maxEntry) {
-          flagsBuffer[i] |= IS_LESS_FLAG;
-          maybeLess = true;
-        }
+        if (maxE > minEntry) flags |= IS_GREATER_FLAG;
+        if (minE < maxEntry) flags |= IS_LESS_FLAG;
+
         // Break if we've:
         //  - found both possibilities;
         //  -  or found that this cell forces a direction.
-        if (maybeLess && maybeGreater) break;
+        if ((flags & IS_BOTH_FLAGS) === IS_BOTH_FLAGS) break;
         if (minE > maxEntry || maxE < minEntry) break;
       }
-      if (maybeGreater) {
+      flagsBuffer[i] = flags;
+      if (flags & IS_GREATER_FLAG) {
         maybeGreaterCount++;
-        if (!maybeLess && initialIsFixed) {
+        if (flags === (IS_GREATER_FLAG | IS_SET_FLAG)) {
           fixedGreaterCount++;
         }
       }
-      if (maybeLess) {
+      if (flags & IS_LESS_FLAG) {
         maybeLessCount++;
-        if (!maybeGreater && initialIsFixed) {
+        if (flags === (IS_LESS_FLAG | IS_SET_FLAG)) {
           fixedLessCount++;
         }
       }
@@ -3017,40 +3014,93 @@ SudokuConstraintHandler.FullRank = class FullRank extends SudokuConstraintHandle
 
     // Check we have enough entries.
     if (maybeLessCount < requiredLess) return false;
-    // If all viable entries are required, then they are forced to be included.
+    // Check if we have too many entries.
+    if (fixedLessCount > requiredLess) return false;
     if (maybeLessCount == requiredLess && fixedLessCount < requiredLess) {
+      // If all viable entries are required, then they are forced to be included.
       for (let i = 0; i < numViableEntries; i++) {
         if (flagsBuffer[i] & IS_LESS_FLAG) {
-          grid[entries[viableEntries[i]][0]] = initialV;
+          const cell = entries[viableEntries[i]][0];
+          grid[cell] = initialV;
+          handlerAccumulator.addForCell(cell);
         }
       }
+    } else if (fixedLessCount === requiredLess && maybeLessCount > requiredLess) {
       // If all viable set entries fill up the required slots, then any other
       // viable entries must be excluded.
-    } else if (fixedLessCount === requiredLess && maybeLessCount > requiredLess) {
       for (let i = 0; i < numViableEntries; i++) {
         if (flagsBuffer[i] === IS_LESS_FLAG) {
-          grid[entries[viableEntries[i]][0]] &= ~initialV;
+          // This entry only had the invalid direction, so we can exclude it.
+          const cell = entries[viableEntries[i]][0];
+          grid[cell] &= ~initialV;
+          handlerAccumulator.addForCell(cell);
+        } else if (flagsBuffer[i] === (IS_LESS_FLAG | IS_GREATER_FLAG | IS_SET_FLAG)) {
+          // This entry must be included, but currently allows both directions.
+          // Try to constraint it to just the valid direction.
+          this._filterInternalValues(grid, handlerAccumulator,
+            entry, entries[viableEntries[i]]);
         }
       }
     }
 
     // Repeat for the greater direction.
     if (maybeGreaterCount < requiredGreater) return false;
+    if (fixedGreaterCount > requiredGreater) return false;
     if (maybeGreaterCount == requiredGreater && fixedGreaterCount < requiredGreater) {
       for (let i = 0; i < numViableEntries; i++) {
         if (flagsBuffer[i] & IS_GREATER_FLAG) {
-          grid[entries[viableEntries[i]][0]] = initialV;
+          const cell = entries[viableEntries[i]][0];
+          grid[cell] = initialV;
+          handlerAccumulator.addForCell(cell);
         }
       }
     } else if (fixedGreaterCount === requiredGreater && maybeGreaterCount > requiredGreater) {
       for (let i = 0; i < numViableEntries; i++) {
         if (flagsBuffer[i] === IS_GREATER_FLAG) {
-          grid[entries[viableEntries[i]][0]] &= ~initialV;
+          const cell = entries[viableEntries[i]][0];
+          grid[cell] &= ~initialV;
+          handlerAccumulator.addForCell(cell);
+        } else if (flagsBuffer[i] === (IS_LESS_FLAG | IS_GREATER_FLAG | IS_SET_FLAG)) {
+          this._filterInternalValues(grid, handlerAccumulator,
+            entries[viableEntries[i]], entry);
         }
       }
     }
 
     return true;
+  }
+
+  _filterInternalValues(grid, handlerAccumulator, lowEntry, highEntry) {
+    // We know that lowEntry must be lower then highEntry, and are known to
+    // be in the same rank set.
+    // Algorithm:
+    //  - Keep iterating until we find the first cell where the entries could
+    //    possibly differ, i.e. when are not equal fixed values.
+    //  - For that cell only, filter out any values which would cause lowEntry
+    //    to be higher than highEntry. Equal is ok, as ties may be broken by
+    //    later cells.
+    //  - Stop if the cells are still not equal fixed values.
+    const entryLength = lowEntry.length;
+    for (let i = 1; i < entryLength; i++) {
+      let lowV = grid[lowEntry[i]];
+      let highV = grid[highEntry[i]];
+      // If both are set, and equal, then keep looking.
+      if (lowV === highV && !(lowV & (lowV - 1))) continue;
+      const maxEntryV = LookupTables.maxValue(highV);
+      if (LookupTables.maxValue(lowV) < maxEntryV) {
+        const mask = (1 << maxEntryV) - 1;
+        grid[lowEntry[i]] = (lowV &= mask);
+        handlerAccumulator.addForCell(lowEntry[i]);
+      }
+      const minV = LookupTables.minValue(lowV);
+      if (LookupTables.minValue(highV) < minV) {
+        const mask = ~((1 << (minV - 1)) - 1);
+        grid[highEntry[i]] = (highV &= mask);
+        handlerAccumulator.addForCell(highEntry[i]);
+      }
+      // If the cells are now equal and fixed, then we can keep constraining.
+      if (!(lowV === highV && !(lowV & (lowV - 1)))) break;
+    }
   }
 
   _enforceSingleRankSet(grid, handlerAccumulator, rankSet) {
