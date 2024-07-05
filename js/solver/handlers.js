@@ -2892,39 +2892,21 @@ SudokuConstraintHandler.NumberedRoom = class NumberedRoom extends SudokuConstrai
 }
 
 SudokuConstraintHandler.FullRank = class FullRank extends SudokuConstraintHandler {
-  constructor(numGridCells, items) {
+  constructor(numGridCells, clues) {
     const allCells = Uint8Array.from({ length: numGridCells }, (_, i) => i);
     super(allCells);
 
     this._entries = [];
-    this._clueSets = [];
     this._rankSets = [];
-    this._items = items;
-
-    for (let i = 0; i < items.length; i++) {
-      const [line, rankInc, rankDec] = items[i];
-      if (rankInc) {
-        this._clueSets.push({
-          rank: rankInc,
-          cell0: line[0],
-          cell1: line[1],
-        });
-      }
-      if (rankDec) {
-        this._clueSets.push({
-          rank: rankDec,
-          cell0: line[line.length - 1],
-          cell1: line[line.length - 2],
-        });
-      }
-    }
+    this._clues = clues;
   }
 
-  items() {
-    return this._items;
+  clues() {
+    return this._clues;
   }
 
   initialize(initialGrid, cellExclusions, shape) {
+    // Initialize entries.
     const gridSize = shape.gridSize;
     for (let i = 0; i < gridSize; i++) {
       const row = Uint8Array.from(
@@ -2937,24 +2919,25 @@ SudokuConstraintHandler.FullRank = class FullRank extends SudokuConstraintHandle
       this._entries.push(col.slice().reverse());
     }
 
-    const rankIndex = new Map();
-    for (let i = 0; i < this._clueSets.length; i++) {
-      const clueSet = this._clueSets[i];
-      const value = LookupTables.fromValue((clueSet.rank + 3) >> 2);
-      if (!rankIndex.has(value)) {
-        rankIndex.set(value, []);
+    // Group entries with the same initial values.
+    // i.e. the same int((rank+3)/4)
+    const rankMap = new Map();
+    for (const clue of this._clues) {
+      const value = LookupTables.fromValue((clue.rank + 3) >> 2);
+      if (!rankMap.has(value)) {
+        rankMap.set(value, []);
       }
-      rankIndex.get(value).push({
-        rankIndex: (clueSet.rank + 3) & 3,
+      rankMap.get(value).push({
+        rankIndex: (clue.rank + 3) & 3,
         entryIndex: this._entries.findIndex(
-          e => e[0] == clueSet.cell0 && e[1] == clueSet.cell1),
+          e => e[0] === clue.line[0] && e[1] === clue.line[1]),
       });
-      if (!(initialGrid[clueSet.cell0] &= value)) {
+      if (!(initialGrid[clue.line[0]] &= value)) {
         return false;
       }
     }
 
-    for (const [value, givens] of rankIndex) {
+    for (const [value, givens] of rankMap) {
       this._rankSets.push({
         value: value,
         givens: givens,
@@ -3009,14 +2992,11 @@ SudokuConstraintHandler.FullRank = class FullRank extends SudokuConstraintHandle
           flagsBuffer[i] |= IS_LESS_FLAG;
           maybeLess = true;
         }
+        // Break if we've:
+        //  - found both possibilities;
+        //  -  or found that this cell forces a direction.
         if (maybeLess && maybeGreater) break;
-
-        if (minE > maxEntry) {
-          break;
-        }
-        if (maxE < minEntry) {
-          break;
-        }
+        if (minE > maxEntry || maxE < minEntry) break;
       }
       if (maybeGreater) {
         maybeGreaterCount++;
@@ -3054,6 +3034,7 @@ SudokuConstraintHandler.FullRank = class FullRank extends SudokuConstraintHandle
       }
     }
 
+    // Repeat for the greater direction.
     if (maybeGreaterCount < requiredGreater) return false;
     if (maybeGreaterCount == requiredGreater && fixedGreaterCount < requiredGreater) {
       for (let i = 0; i < numViableEntries; i++) {
@@ -3073,7 +3054,7 @@ SudokuConstraintHandler.FullRank = class FullRank extends SudokuConstraintHandle
   }
 
   _enforceSingleRankSet(grid, handlerAccumulator, rankSet) {
-    const value = rankSet.value;
+    const { value, givens } = rankSet;
     const entries = this._entries;
 
     let numViableEntries = 0;
@@ -3086,7 +3067,6 @@ SudokuConstraintHandler.FullRank = class FullRank extends SudokuConstraintHandle
 
     if (numViableEntries < 4) return false;
 
-    const givens = rankSet.givens;
     for (let i = 0; i < givens.length; i++) {
       if (!this._enforceSingleGiven(grid, handlerAccumulator, viableEntries, numViableEntries, givens[i])) {
         return false;
