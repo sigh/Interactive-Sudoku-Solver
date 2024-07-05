@@ -175,6 +175,7 @@ class ExampleHandler {
     'Modular lines',
     'Entropic connections',
     'Indexing',
+    'Full rank',
     'Pencilmark sudoku',
     '16x16',
     '16x16: Sudoku X, hard',

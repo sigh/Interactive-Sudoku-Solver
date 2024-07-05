@@ -230,6 +230,7 @@ class DebugManager {
       INDEXING_PUZZLES,
       LONG_SUMS,
       NUMBERED_ROOMS_PUZZLES,
+      FULL_RANK_PUZZLES,
     };
     for (const [listName, list] of Object.entries(puzzleLists)) {
       for (let i = 0; i < list.length; i++) {

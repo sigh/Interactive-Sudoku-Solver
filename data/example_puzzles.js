@@ -342,6 +342,21 @@ const EXAMPLES = {
     'input': '.~R2C2_4~R2C3_9~R2C4_7~R1C6_3~R1C8_5~R3C6_5~R3C7_1~R3C8_2~R4C2_2~R4C4_6~R5C3_7~R7C2_6~R7C3_3~R7C4_8~R6C6_8~R5C7_8~R6C8_6~R8C6_9~R8C7_5~R8C8_3~R9C2_7~R9C4_2.Indexing~C~R1C1~R2C1~R3C1~R4C1~R5C1~R6C1~R7C1~R8C1~R9C1~R1C5~R2C5~R3C5~R4C5~R5C5~R6C5~R7C5~R8C5~R9C5~R1C9~R2C9~R3C9~R4C9~R5C9~R6C9~R7C9~R8C9~R9C9',
     'solution': '216483957549712683738965124824697315657321849391548762963854271482179536175236498',
   },
+  'Lockout double arrows': {
+    src: 'https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?id=000GVU',
+    input: '.Lockout~4~R1C2~R1C3~R2C3~R2C4~R3C4~R3C5.DoubleArrow~R3C5~R3C4~R2C4~R2C3~R1C3~R1C2.DoubleArrow~R3C1~R3C2~R4C2.DoubleArrow~R4C2~R5C2~R6C2~R7C2.DoubleArrow~R4C2~R4C3~R4C4~R4C5.DoubleArrow~R4C5~R4C6~R3C6~R3C7.DoubleArrow~R3C7~R2C7~R1C7~R1C8.DoubleArrow~R4C5~R5C5~R6C5~R7C5~R8C5.DoubleArrow~R9C5~R9C4~R9C3~R8C3.DoubleArrow~R7C8~R8C8~R8C7~R7C7.DoubleArrow~R7C7~R6C7~R6C8~R5C8.Lockout~4~R3C7~R2C7~R1C7~R1C8.Lockout~4~R4C5~R4C6~R3C6~R3C7.Lockout~4~R7C8~R8C8~R8C7~R7C7.Lockout~4~R7C7~R6C7~R6C8~R5C8.Lockout~4~R8C5~R7C5~R6C5~R5C5~R4C5.Lockout~4~R9C5~R9C4~R9C3~R8C3.Lockout~4~R7C2~R6C2~R5C2~R4C2.Lockout~4~R4C2~R4C3~R4C4~R4C5.Lockout~4~R4C2~R3C2~R3C1.',
+    solution: '794261385153478962682359471529183647418796523376524819965812734237645198841937256',
+  },
+  'Ahhhh, look at the pretty colors': {
+    src: 'https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?id=000GCP',
+    input: '.Entropic~R2C4~R1C4~R1C5~R1C6~R2C6.Entropic~R4C8~R4C9~R5C9~R6C9~R6C8.Entropic~R8C6~R9C6~R9C5~R9C4~R8C4.Entropic~R4C1~R5C1~R6C1.Modular~2~R8C7~R8C8~R7C8.Modular~2~R1C2~R1C1~R2C1.Modular~2~R6C3~R7C3~R7C4.Modular~3~R8C1~R9C1~R9C2.Modular~3~R2C7~R2C8~R3C8.Modular~3~R3C4~R3C3~R4C3.Modular~4~R1C8~R1C9~R2C9.Modular~4~R7C6~R7C7~R6C7.Modular~4~R7C2~R8C2~R8C3.Binary~gH8gH8A4BP4BP~~R9C8~R9C9~R8C9~~R3C6~R3C7~R4C7~~R2C3~R2C2~R3C2~R4C2.~R1C1_1~R2C2_2~R3C3_5~R1C5_2~R1C9_6~R2C8_5~R3C7_2~R5C9_7~R9C9_9~R8C8_2~R7C7_6~R9C5_1~R7C3_1~R8C2_3~R9C1_2~R5C1_8',
+    solution: '143529786629784153785136294516378942892451367374962815951243678438697521267815439',
+  },
+  'Full rank': {
+    'src': 'https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?chlang=en&id=000EDA',
+    'input': '.FullRank~C2~26~.FullRank~C4~32~.FullRank~C6~6~.FullRank~C8~35~.FullRank~R1~17~.FullRank~R3~13~.FullRank~R5~10~.FullRank~R7~21~.FullRank~C3~~12.FullRank~C5~~19.FullRank~C7~~2.FullRank~C9~~14.FullRank~R8~~23.FullRank~R6~~20.FullRank~R4~~34.FullRank~R2~~11.',
+    'solution': '576832491829514763431769852768125349354698217192473685615347928247981536983256174',
+  },
 
   // Classic grids that used to be slow. 3 and 4 used to take 2+ seconds.
   'Classic sudoku, was slow (1)': {
@@ -383,16 +398,6 @@ const EXAMPLES = {
   'Skyscaper 2-3': {
     // From gracefu.
     input: '.Skyscraper~C8~3~2.Skyscraper~R6~2~3.Skyscraper~R8~~3.Skyscraper~C7~~3.Skyscraper~C4~~3.Skyscraper~C5~~3.Skyscraper~C2~~3.Skyscraper~C3~3~2.Skyscraper~R2~3~2.Skyscraper~R1~3~3.Skyscraper~R4~3~.Skyscraper~C1~2~3.Skyscraper~R9~3~.Skyscraper~R7~2~3.Skyscraper~C6~3~.Skyscraper~C9~3~.Skyscraper~R5~~3.Skyscraper~R3~2~2.',
-  },
-  'Lockout double arrows': {
-    src: 'https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?id=000GVU',
-    input: '.Lockout~4~R1C2~R1C3~R2C3~R2C4~R3C4~R3C5.DoubleArrow~R3C5~R3C4~R2C4~R2C3~R1C3~R1C2.DoubleArrow~R3C1~R3C2~R4C2.DoubleArrow~R4C2~R5C2~R6C2~R7C2.DoubleArrow~R4C2~R4C3~R4C4~R4C5.DoubleArrow~R4C5~R4C6~R3C6~R3C7.DoubleArrow~R3C7~R2C7~R1C7~R1C8.DoubleArrow~R4C5~R5C5~R6C5~R7C5~R8C5.DoubleArrow~R9C5~R9C4~R9C3~R8C3.DoubleArrow~R7C8~R8C8~R8C7~R7C7.DoubleArrow~R7C7~R6C7~R6C8~R5C8.Lockout~4~R3C7~R2C7~R1C7~R1C8.Lockout~4~R4C5~R4C6~R3C6~R3C7.Lockout~4~R7C8~R8C8~R8C7~R7C7.Lockout~4~R7C7~R6C7~R6C8~R5C8.Lockout~4~R8C5~R7C5~R6C5~R5C5~R4C5.Lockout~4~R9C5~R9C4~R9C3~R8C3.Lockout~4~R7C2~R6C2~R5C2~R4C2.Lockout~4~R4C2~R4C3~R4C4~R4C5.Lockout~4~R4C2~R3C2~R3C1.',
-    solution: '794261385153478962682359471529183647418796523376524819965812734237645198841937256',
-  },
-  'Ahhhh, look at the pretty colors': {
-    src: 'https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?id=000GCP',
-    input: '.Entropic~R2C4~R1C4~R1C5~R1C6~R2C6.Entropic~R4C8~R4C9~R5C9~R6C9~R6C8.Entropic~R8C6~R9C6~R9C5~R9C4~R8C4.Entropic~R4C1~R5C1~R6C1.Modular~2~R8C7~R8C8~R7C8.Modular~2~R1C2~R1C1~R2C1.Modular~2~R6C3~R7C3~R7C4.Modular~3~R8C1~R9C1~R9C2.Modular~3~R2C7~R2C8~R3C8.Modular~3~R3C4~R3C3~R4C3.Modular~4~R1C8~R1C9~R2C9.Modular~4~R7C6~R7C7~R6C7.Modular~4~R7C2~R8C2~R8C3.Binary~gH8gH8A4BP4BP~~R9C8~R9C9~R8C9~~R3C6~R3C7~R4C7~~R2C3~R2C2~R3C2~R4C2.~R1C1_1~R2C2_2~R3C3_5~R1C5_2~R1C9_6~R2C8_5~R3C7_2~R5C9_7~R9C9_9~R8C8_2~R7C7_6~R9C5_1~R7C3_1~R8C2_3~R9C1_2~R5C1_8',
-    solution: '143529786629784153785136294516378942892451367374962815951243678438697521267815439',
   },
 
   // Extreme killers.
