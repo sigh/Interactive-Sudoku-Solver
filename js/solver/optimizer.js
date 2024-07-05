@@ -705,14 +705,14 @@ class SudokuConstraintOptimizer {
     const rankHandlers = handlerSet.getAllofType(SudokuConstraintHandler.FullRank);
     if (rankHandlers.length == 0) return;
 
-    const items = [];
+    const clues = [];
     for (const h of rankHandlers) {
-      items.push(...h.items());
+      clues.push(...h.clues());
       handlerSet.replace(h, new SudokuConstraintHandler.True());
     }
 
     const handler = new SudokuConstraintHandler.FullRank(
-      shape.numCells, items);
+      shape.numCells, clues);
     handlerSet.add(handler);
 
     if (this._debugLogger) {

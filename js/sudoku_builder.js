@@ -1620,17 +1620,23 @@ class SudokuBuilder {
           break;
 
         case 'FullRank':
-          yield new SudokuConstraintHandler.FullRank(
-            shape.numCells,
-            [
-              [
-                SudokuConstraintBase.fullLineCellMap(shape)
-                  .get([constraint.rowCol, 1].toString()).map(
-                    c => shape.parseCellId(c).cell),
-                constraint.rankInc,
-                constraint.rankDec
-              ]
-            ]);
+          {
+            const line = SudokuConstraintBase.fullLineCellMap(shape)
+              .get([constraint.rowCol, 1].toString()).map(
+                c => shape.parseCellId(c).cell);
+            const items = [];
+            if (constraint.rankInc) items.push({
+              rank: constraint.rankInc,
+              line: line
+            });
+            if (constraint.rankDec) items.push({
+              rank: constraint.rankDec,
+              line: line.slice().reverse()
+            });
+            yield new SudokuConstraintHandler.FullRank(
+              shape.numCells,
+              items);
+          }
           break;
 
         case 'Priority':
