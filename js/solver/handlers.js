@@ -2896,7 +2896,7 @@ SudokuConstraintHandler.FullRank = class FullRank extends SudokuConstraintHandle
     const allCells = Uint8Array.from({ length: numGridCells }, (_, i) => i);
     super(allCells);
 
-    this._entries = [];
+    this._uncluedEntries = [];
     this._rankSets = [];
     this._clues = clues;
   }
@@ -2908,15 +2908,16 @@ SudokuConstraintHandler.FullRank = class FullRank extends SudokuConstraintHandle
   initialize(initialGrid, cellExclusions, shape) {
     // Initialize entries.
     const gridSize = shape.gridSize;
+    const entries = [];
     for (let i = 0; i < gridSize; i++) {
       const row = Uint8Array.from(
         { length: gridSize }, (_, j) => i * gridSize + j);
-      this._entries.push(row);
-      this._entries.push(row.slice().reverse());
+      entries.push(row);
+      entries.push(row.slice().reverse());
       const col = Uint8Array.from(
         { length: gridSize }, (_, j) => j * gridSize + i);
-      this._entries.push(col);
-      this._entries.push(col.slice().reverse());
+      entries.push(col);
+      entries.push(col.slice().reverse());
     }
 
     // Group entries with the same initial values.
@@ -2927,17 +2928,33 @@ SudokuConstraintHandler.FullRank = class FullRank extends SudokuConstraintHandle
       if (!rankMap.has(value)) {
         rankMap.set(value, []);
       }
+      const entryIndex = entries.findIndex(
+        e => e[0] === clue.line[0] && e[1] === clue.line[1]);
       rankMap.get(value).push({
         rankIndex: (clue.rank + 3) & 3,
-        entryIndex: this._entries.findIndex(
-          e => e[0] === clue.line[0] && e[1] === clue.line[1]),
+        entry: entries.splice(entryIndex, 1)[0],
+        requiredLess: 0,
+        requiredGreater: 0,
       });
       if (!(initialGrid[clue.line[0]] &= value)) {
         return false;
       }
     }
+    this._uncluedEntries = entries;
 
     for (const [value, givens] of rankMap) {
+      // Sort givens by rank.
+      givens.sort((a, b) => a.rankIndex - b.rankIndex);
+      // Determine the number of unclued entries required to be less and greater
+      // than this given.
+      const numGivens = givens.length;
+      for (let i = 0; i < givens.length; i++) {
+        const given = givens[i];
+        const rankIndex = given.rankIndex;
+        given.requiredLess = rankIndex - i;
+        given.requiredGreater = (3 - rankIndex) - (numGivens - i - 1);
+      }
+      // Make the rankSet.
       this._rankSets.push({
         value: value,
         givens: givens,
@@ -2949,10 +2966,10 @@ SudokuConstraintHandler.FullRank = class FullRank extends SudokuConstraintHandle
   _viableEntriesBuffer = new Int16Array(SHAPE_MAX.gridSize * 4 + 1);
   _flagsBuffer = new Uint8Array(SHAPE_MAX.gridSize * 4);
 
-  _enforceSingleGiven(grid, handlerAccumulator, viableEntries, numViableEntries, given) {
-    const { rankIndex, entryIndex } = given;
-    const entries = this._entries;
-    const entry = entries[entryIndex];
+  _enforceUncluedEntriesForGiven(
+    grid, handlerAccumulator, viableEntries, numViableEntries, given) {
+    const { entry, requiredLess, requiredGreater } = given;
+    const entries = this._uncluedEntries;
     const initialV = grid[entry[0]];
     const entryLength = entry.length;
 
@@ -2968,12 +2985,6 @@ SudokuConstraintHandler.FullRank = class FullRank extends SudokuConstraintHandle
     let fixedGreaterCount = 0;
 
     for (let i = 0; i < numViableEntries; i++) {
-      // Don't compare the current entry to itself.
-      if (viableEntries[i] === entryIndex) {
-        flagsBuffer[i] = 0;
-        continue;
-      }
-
       const e = entries[viableEntries[i]];
       let flags = grid[e[0]] === initialV ? IS_SET_FLAG : 0;
       for (let j = 1; j < entryLength; j++) {
@@ -3009,9 +3020,6 @@ SudokuConstraintHandler.FullRank = class FullRank extends SudokuConstraintHandle
       }
     }
 
-    const requiredLess = rankIndex;
-    const requiredGreater = 3 - rankIndex;
-
     // Check we have enough entries.
     if (maybeLessCount < requiredLess) return false;
     // Check if we have too many entries.
@@ -3037,7 +3045,7 @@ SudokuConstraintHandler.FullRank = class FullRank extends SudokuConstraintHandle
         } else if (flagsBuffer[i] === (IS_LESS_FLAG | IS_GREATER_FLAG | IS_SET_FLAG)) {
           // This entry must be included, but currently allows both directions.
           // Try to constraint it to just the valid direction.
-          this._filterInternalValues(grid, handlerAccumulator,
+          this._enforceEntriesWithKnownOrder(grid, handlerAccumulator,
             entry, entries[viableEntries[i]]);
         }
       }
@@ -3061,7 +3069,7 @@ SudokuConstraintHandler.FullRank = class FullRank extends SudokuConstraintHandle
           grid[cell] &= ~initialV;
           handlerAccumulator.addForCell(cell);
         } else if (flagsBuffer[i] === (IS_LESS_FLAG | IS_GREATER_FLAG | IS_SET_FLAG)) {
-          this._filterInternalValues(grid, handlerAccumulator,
+          this._enforceEntriesWithKnownOrder(grid, handlerAccumulator,
             entries[viableEntries[i]], entry);
         }
       }
@@ -3070,9 +3078,9 @@ SudokuConstraintHandler.FullRank = class FullRank extends SudokuConstraintHandle
     return true;
   }
 
-  _filterInternalValues(grid, handlerAccumulator, lowEntry, highEntry) {
-    // We know that lowEntry must be lower then highEntry, and are known to
-    // be in the same rank set.
+  _enforceEntriesWithKnownOrder(grid, handlerAccumulator, lowEntry, highEntry) {
+    // We know that lowEntry must be lower then highEntry, and are in the same
+    // rank set.
     // Algorithm:
     //  - Keep iterating until we find the first cell where the entries could
     //    possibly differ, i.e. when are not equal fixed values.
@@ -3098,15 +3106,30 @@ SudokuConstraintHandler.FullRank = class FullRank extends SudokuConstraintHandle
         grid[highEntry[i]] = (highV &= mask);
         handlerAccumulator.addForCell(highEntry[i]);
       }
+      if (!lowV || !highV) return false;
       // If the cells are now equal and fixed, then we can keep constraining.
       if (!(lowV === highV && !(lowV & (lowV - 1)))) break;
     }
+    return true;
   }
 
   _enforceSingleRankSet(grid, handlerAccumulator, rankSet) {
     const { value, givens } = rankSet;
-    const entries = this._entries;
+    const numGivens = givens.length;
 
+    // First constraint the clued ranks against each other.
+    for (let i = 1; i < numGivens; i++) {
+      if (!this._enforceEntriesWithKnownOrder(grid, handlerAccumulator,
+        givens[i - 1].entry, givens[i].entry)) {
+        return false;
+      }
+    }
+
+    // If all ranks are clued, then we are done.
+    if (numGivens == 4) return true;
+
+    // Find all unclued entries that are viable.
+    const entries = this._uncluedEntries;
     let numViableEntries = 0;
     const viableEntries = this._viableEntriesBuffer;
     for (let i = 0; i < entries.length; i++) {
@@ -3115,10 +3138,13 @@ SudokuConstraintHandler.FullRank = class FullRank extends SudokuConstraintHandle
       }
     }
 
-    if (numViableEntries < 4) return false;
+    // Return false if we don't have enough viable entries.
+    if (numViableEntries < 4 - numGivens) return false;
 
-    for (let i = 0; i < givens.length; i++) {
-      if (!this._enforceSingleGiven(grid, handlerAccumulator, viableEntries, numViableEntries, givens[i])) {
+    // Enforce the unclued entries.
+    for (let i = 0; i < numGivens; i++) {
+      if (!this._enforceUncluedEntriesForGiven(
+        grid, handlerAccumulator, viableEntries, numViableEntries, givens[i])) {
         return false;
       }
     }
