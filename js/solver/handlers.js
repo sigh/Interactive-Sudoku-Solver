@@ -2987,9 +2987,14 @@ SudokuConstraintHandler.FullRank = class FullRank extends SudokuConstraintHandle
     for (let i = 0; i < numViableEntries; i++) {
       const e = entries[viableEntries[i]];
       let flags = grid[e[0]] === initialV ? IS_SET_FLAG : 0;
+      // Mask out values which are assumed to be fixed (equal) in the preceding
+      // cells. At each iteration, we are assuming that all previous values
+      // are equal between the two entries, and the current cell is a
+      // tie-breaker.
+      let equalValuesMask = ~initialV;
       for (let j = 1; j < entryLength; j++) {
-        const eV = grid[e[j]];
-        const entryV = grid[entry[j]];
+        const eV = grid[e[j]] & equalValuesMask;
+        const entryV = grid[entry[j]] & equalValuesMask;
 
         const minE = LookupTables.minValue(eV);
         const maxE = LookupTables.maxValue(eV);
@@ -3004,6 +3009,14 @@ SudokuConstraintHandler.FullRank = class FullRank extends SudokuConstraintHandle
         //  -  or found that this cell forces a direction.
         if ((flags & IS_BOTH_FLAGS) === IS_BOTH_FLAGS) break;
         if (minE > maxEntry || maxE < minEntry) break;
+
+        // If we are continuing then we are attempting to break a tie assuming
+        // that the entries are equal.
+        // There must be exactly one value in the intersection (otherwise
+        // both the IS_LESS_FLAG and IS_GREATER_FLAG would be set).
+        // Thus if we take the intersection, we know that value can't appear in
+        // future cells.
+        equalValuesMask &= ~(eV & entryV);
       }
       flagsBuffer[i] = flags;
       if (flags & IS_GREATER_FLAG) {
@@ -3045,8 +3058,10 @@ SudokuConstraintHandler.FullRank = class FullRank extends SudokuConstraintHandle
         } else if (flagsBuffer[i] === (IS_LESS_FLAG | IS_GREATER_FLAG | IS_SET_FLAG)) {
           // This entry must be included, but currently allows both directions.
           // Try to constraint it to just the valid direction.
-          this._enforceEntriesWithKnownOrder(grid, handlerAccumulator,
-            entry, entries[viableEntries[i]]);
+          if (!this._enforceEntriesWithKnownOrder(grid, handlerAccumulator,
+            entry, entries[viableEntries[i]])) {
+            return false;
+          }
         }
       }
     }
@@ -3069,8 +3084,10 @@ SudokuConstraintHandler.FullRank = class FullRank extends SudokuConstraintHandle
           grid[cell] &= ~initialV;
           handlerAccumulator.addForCell(cell);
         } else if (flagsBuffer[i] === (IS_LESS_FLAG | IS_GREATER_FLAG | IS_SET_FLAG)) {
-          this._enforceEntriesWithKnownOrder(grid, handlerAccumulator,
-            entries[viableEntries[i]], entry);
+          if (!this._enforceEntriesWithKnownOrder(grid, handlerAccumulator,
+            entries[viableEntries[i]], entry)) {
+            return false;
+          }
         }
       }
     }
@@ -3088,27 +3105,35 @@ SudokuConstraintHandler.FullRank = class FullRank extends SudokuConstraintHandle
     //    to be higher than highEntry. Equal is ok, as ties may be broken by
     //    later cells.
     //  - Stop if the cells are still not equal fixed values.
+
+    // Keep track of which fixed values we've seen. These can be removed from
+    // future cells.
+    let equalValuesMask = ~(grid[lowEntry[0]] & grid[highEntry[0]]);
     const entryLength = lowEntry.length;
     for (let i = 1; i < entryLength; i++) {
-      let lowV = grid[lowEntry[i]];
-      let highV = grid[highEntry[i]];
+      let lowV = grid[lowEntry[i]] & equalValuesMask;
+      let highV = grid[highEntry[i]] & equalValuesMask;
       // If both are set, and equal, then keep looking.
-      if (lowV === highV && !(lowV & (lowV - 1))) continue;
+      if (lowV === highV && !(lowV & (lowV - 1))) {
+        equalValuesMask &= ~lowV;
+        continue;
+      }
       const maxEntryV = LookupTables.maxValue(highV);
       if (LookupTables.maxValue(lowV) < maxEntryV) {
         const mask = (1 << maxEntryV) - 1;
-        grid[lowEntry[i]] = (lowV &= mask);
+        grid[lowEntry[i]] = (lowV &= mask & equalValuesMask);
         handlerAccumulator.addForCell(lowEntry[i]);
       }
       const minV = LookupTables.minValue(lowV);
       if (LookupTables.minValue(highV) < minV) {
         const mask = ~((1 << (minV - 1)) - 1);
-        grid[highEntry[i]] = (highV &= mask);
+        grid[highEntry[i]] = (highV &= mask & equalValuesMask);
         handlerAccumulator.addForCell(highEntry[i]);
       }
       if (!lowV || !highV) return false;
       // If the cells are now equal and fixed, then we can keep constraining.
       if (!(lowV === highV && !(lowV & (lowV - 1)))) break;
+      equalValuesMask &= ~lowV;
     }
     return true;
   }
