@@ -1442,7 +1442,7 @@ class Highlight {
   }
 
   getCells() {
-    return this._cells.keys();
+    return Array.from(this._cells.keys());
   }
 
   addCell(cell) {
