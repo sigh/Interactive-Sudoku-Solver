@@ -199,7 +199,10 @@ class ClickInterceptor extends DisplayItem {
 
     super(svg);
 
-    this._applyGridOffset(svg);
+    // Note: _applyGridOffset won't work here because this is a DOM element
+    // not an element inside the svg (breaks in Safari).
+    const padding = DisplayItem.SVG_PADDING;
+    svg.style.transform = `translate(${padding}px,${padding}px)`;
   }
 
   reshape(shape) {
