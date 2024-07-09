@@ -920,6 +920,14 @@ class SudokuConstraint {
     }
   }
 
+  static Lunchbox = class Lunchbox extends SudokuConstraintBase {
+    constructor(sum, ...cells) {
+      super(arguments);
+      this.cells = cells;
+      this.sum = sum;
+    }
+  }
+
   static Skyscraper = class Skyscraper extends SudokuConstraintBase {
     constructor(rowCol, countInc, countDec) {
       super(arguments);
@@ -1350,6 +1358,11 @@ class SudokuBuilder {
             .get([constraint.id, 1].toString()).map(
               c => shape.parseCellId(c).cell);
           yield new SudokuConstraintHandler.Sandwich(cells, constraint.sum);
+          break;
+
+        case 'Lunchbox':
+          cells = constraint.cells.map(c => shape.parseCellId(c).cell);
+          yield new SudokuConstraintHandler.Lunchbox(cells, constraint.sum);
           break;
 
         case 'Skyscraper':
