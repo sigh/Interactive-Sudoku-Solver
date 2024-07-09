@@ -705,6 +705,7 @@ class ConstraintManager {
       case 'Between':
       case 'Lockout':
       case 'RegionSumLine':
+      case 'Lunchbox':
         {
           const uiConfig = this._multiCellConstraints[constraint.type];
           config = {
@@ -1039,6 +1040,17 @@ class ConstraintManager {
           `
           Values on the line must be not be between the values in the diamonds.
           The values in the diamonds must differ by the difference given.`,
+      },
+      Lunchbox: {
+        value: {
+          placeholder: 'sum',
+          default: 0,
+        },
+        panelText: (constraint) => `Lunchbox (${constraint.sum})`,
+        displayConfig: { color: 'rgb(220, 220, 230)' },
+        description:
+          `The numbers sandwiched between the smallest number and the largest
+           number of the line adds up to the given sum.`
       },
       Palindrome: {
         text: 'Palindrome',

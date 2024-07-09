@@ -1780,6 +1780,10 @@ SudokuConstraintHandler.Sandwich = class Sandwich extends SudokuConstraintHandle
     return true;
   }
 
+  exclusionCells() {
+    return this.cells;
+  }
+
   static _borderMask(shape) {
     return 1 | (1 << (shape.gridSize - 1));
   }
@@ -1939,6 +1943,110 @@ SudokuConstraintHandler.Sandwich = class Sandwich extends SudokuConstraintHandle
           validSettings[k++] |= v;
           while (k < j) validSettings[k++] |= innerPossibilities;
           validSettings[k++] |= vRev;
+          while (k < numCells) validSettings[k++] |= outerPossibilities;
+        }
+      }
+    }
+
+    for (let i = 0; i < numCells; i++) {
+      if (!(grid[cells[i]] &= validSettings[i])) return false;
+    }
+
+    return true;
+  }
+}
+
+SudokuConstraintHandler.Lunchbox = class Lunchbox extends SudokuConstraintHandler.Sandwich {
+  initialize(initialGrid, cellExclusions, shape) {
+    const sum = this._sum;
+    const lookupTables = LookupTables.get(shape.numValues);
+
+    this._gridSize = shape.gridSize;
+    this._minMax8Bit = lookupTables.minMax8Bit;
+
+    this._distances = SudokuConstraintHandler.Sandwich._distanceRange(shape)[sum];
+    this._combinations = SudokuConstraintHandler.Sandwich._combinations(shape)[sum];
+
+    return true;
+  }
+
+  // Scratch buffers for reuse so we don't have to create arrays at runtime.
+  static _validSettings = new Uint16Array(SHAPE_MAX.gridSize);
+  static _cellValues = new Uint16Array(SHAPE_MAX.gridSize);
+
+  enforceConsistency(grid, handlerAccumulator) {
+    const cells = this.cells;
+    const numCells = this.cells.length;
+
+    // Cache the grid values for faster lookup.
+    let values = SudokuConstraintHandler.Lunchbox._cellValues;
+    for (let i = 0; i < numCells; i++) {
+      values[i] = grid[cells[i]];
+    }
+
+    // Build up a set of valid cell values.
+    let validSettings = SudokuConstraintHandler.Lunchbox._validSettings;
+    validSettings.fill(0);
+
+    // Iterate over each possible starting index for the first sentinel.
+    // Check if the other values are consistent with the required sum.
+    // Given that the values must form a house, this is sufficient to ensure
+    // that the constraint is fully satisfied.
+    const [minDist, maxDist] = this._distances;
+    const maxIndex = numCells - minDist;
+    let prefixValues = 0;
+    let pPrefix = 0;
+    for (let i = 0; i < maxIndex; i++) {
+      let vi = values[i];
+
+      // For each possible gap:
+      //  - Determine the currently possible values inside the gap.
+      //  - Find every valid combination that can be made from these values.
+      //  - Use them to determine the possible inside and outside values.
+      let innerValues = 0;
+      let pInner = i + 1;
+      for (let j = i + minDist; j <= i + maxDist && j < numCells; j++) {
+        const vj = values[j];
+        const minSentinel = LookupTables.minValue(vi | vj);
+        const maxSentinel = LookupTables.maxValue(vi | vj);
+        // Value mask for values that are strictly between the sentinels.
+        const valueMask = ~((1 << minSentinel) - 1) & ((1 << (maxSentinel - 1)) - 1);
+
+        while (pInner < j) innerValues |= values[pInner++];
+        while (pPrefix < i) prefixValues |= values[pPrefix++];
+        let outerValues = prefixValues;
+        for (let k = pInner + 1; k < numCells; k++) outerValues |= values[k];
+        outerValues &= valueMask;
+        const numOuterCells = numCells - (j - i) - 1;
+
+        let combinations = this._combinations[j - i];
+        let innerPossibilities = 0;
+        let outerPossibilities = 0;
+        const innerValuesMask = ~(innerValues & valueMask);
+        let innerRanges = -1;
+        for (let k = 0; k < combinations.length; k++) {
+          let c = combinations[k];
+          // Check if the inner values can create the combination.
+          // TODO: Optimize conditional
+          // TODO: Exclude outer range too?
+          if (!(innerValuesMask & c) && countOnes16bit(~c & outerValues) >= numOuterCells) {
+            innerPossibilities |= c;
+            outerPossibilities |= ~c;
+            const minC = LookupTables.minValue(c);
+            const maxC = LookupTables.maxValue(c);
+            innerRanges &= ~((1 << (minC - 1)) - 1) & ((1 << maxC) - 1);
+          }
+        }
+        outerPossibilities &= valueMask & outerValues;
+        // If we have either innerPossibilities or outerPossibilities it means
+        // we have at least one valid setting. Either maybe empty if there
+        // are 0 cells in the inner or outer range.
+        if (innerPossibilities || outerPossibilities) {
+          let k = 0;
+          while (k < i) validSettings[k++] |= outerPossibilities;
+          validSettings[k++] |= vi & ~innerRanges;
+          while (k < j) validSettings[k++] |= innerPossibilities;
+          validSettings[k++] |= vj & ~innerRanges;
           while (k < numCells) validSettings[k++] |= outerPossibilities;
         }
       }
