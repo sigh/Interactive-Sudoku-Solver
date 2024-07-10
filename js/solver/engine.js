@@ -424,6 +424,14 @@ SudokuSolver.InternalSolver = class {
     // Initialize handlers.
     for (const handler of handlerSet) {
       if (!handler.initialize(this._initialGrid, cellExclusions, this._shape)) {
+        if (this._debugLogger.enableLogs) {
+          this._debugLogger.log({
+            loc: '_setUpHandlers',
+            msg: handler.constructor.name + ' returned false',
+            cells: handler.cells,
+          });
+        }
+
         this._invalidateGrid(this._initialGrid, handler);
       }
     }
