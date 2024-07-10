@@ -1183,13 +1183,6 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
 
     this._lookupTables = LookupTables.get(shape.numValues);
 
-    if (this.cells.length > this._lookupTables.MAX_CELLS_IN_SUM) {
-      // This isn't an invalid grid,
-      // we just can't handle it because rangeInfo might overflow.
-      throw ('Number of cells in the sum' +
-        `can't exceed ${this._lookupTables.MAX_CELLS_IN_SUM}`);
-    }
-
     this._sumUtil = SudokuConstraintHandler._SumHandlerUtil.get(shape.numValues);
 
     this._exclusionGroups = (
