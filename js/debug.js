@@ -260,6 +260,7 @@ const runSolveTests = async (onFailure) => {
     'Indexing',
     INDEXING_PUZZLES[4],
     'Full rank',
+    'Duplicate cell sums',
   ], onFailure);
   result.collection = '9x9';
   results.push(result);

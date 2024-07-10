@@ -98,10 +98,15 @@ class SudokuConstraintOptimizer {
 
   _optimizeSums(handlerSet, cellExclusions, hasBoxes, shape) {
     // TODO: Consider how this interacts with fixed cells.
-    let sumHandlers = handlerSet.getAllofType(SudokuConstraintHandler.Sum);
-    if (sumHandlers.length == 0) return;
+    const allSumHandlers = handlerSet.getAllofType(SudokuConstraintHandler.Sum);
+    if (allSumHandlers.length == 0) return;
+    // Exclude any handlers with duplicate cells from any of the optimizations.
+    // TODO: Check which optimizations are still valid.
+    const safeSumHandlers = allSumHandlers.filter(
+      h => h.cells.length == new Set(h.cells).size);
 
-    let [filteredSumHandlers, sumCells] = this._findNonOverlappingSubset(sumHandlers, handlerSet);
+    const [filteredSumHandlers, sumCells] =
+      this._findNonOverlappingSubset(safeSumHandlers, handlerSet);
 
     handlerSet.addNonEssential(
       ...this._fillInSumGap(filteredSumHandlers, sumCells, shape));
@@ -110,7 +115,7 @@ class SudokuConstraintOptimizer {
       ...this._makeInnieOutieSumHandlers(filteredSumHandlers, hasBoxes, shape));
 
     handlerSet.addNonEssential(
-      ...this._makeHiddenCageHandlers(handlerSet, sumHandlers, shape));
+      ...this._makeHiddenCageHandlers(handlerSet, safeSumHandlers, shape));
 
     this._replaceSizeSpecificSumHandlers(handlerSet, cellExclusions, shape);
 
@@ -135,6 +140,9 @@ class SudokuConstraintOptimizer {
     const process = (type, cellsFn) => {
       for (const h of handlerSet.getAllofType(type)) {
         if (h.hasComplementCells()) continue;
+        // If there are any repeated cells, then we can't infer the complement
+        // sum.
+        if (h.cells.length !== new Set(h.cells).size) continue;
 
         const cells = cellsFn(h);
         const commonHandler = findCommonHandler(cells);

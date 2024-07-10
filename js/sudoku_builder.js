@@ -1307,12 +1307,7 @@ class SudokuBuilder {
           cells = constraint.cells.map(c => shape.parseCellId(c).cell);
           // A sum of 0 means any sum is ok - i.e. the same as AllDifferent.
           if (constraint.sum != 0) {
-            if (cells.length <= gridSize) {
-              yield new SudokuConstraintHandler.Sum(cells, constraint.sum);
-            } else {
-              // Sum can't handle more than gridSize cells.
-              yield new SudokuConstraintHandler.False(cells);
-            }
+            yield new SudokuConstraintHandler.Sum(cells, constraint.sum);
           }
           yield new SudokuConstraintHandler.AllDifferent(cells);
           break;

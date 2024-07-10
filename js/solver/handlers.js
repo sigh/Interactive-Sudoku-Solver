@@ -102,7 +102,7 @@ SudokuConstraintHandler.GivenCandidates = class GivenCandidates extends SudokuCo
 SudokuConstraintHandler.AllDifferent = class AllDifferent extends SudokuConstraintHandler {
   constructor(exclusionCells) {
     super();
-    exclusionCells = exclusionCells.slice();
+    exclusionCells = Array.from(new Set(exclusionCells));
     exclusionCells.sort((a, b) => a - b);
     this._exclusionCells = exclusionCells;
   }
@@ -772,9 +772,10 @@ SudokuConstraintHandler._SumHandlerUtil = class _SumHandlerUtil {
   // as many remaining cells to it as possible to create the next group.
   static findExclusionGroupsGreedy(cells, cellExclusions) {
     let exclusionGroups = [];
-    let unassignedCells = new Set(cells)
+    let unassignedCells = cells;
+    let remainingUnassignedCells = [];
 
-    while (unassignedCells.size > 0) {
+    while (unassignedCells.length > 0) {
       let currentGroup = [];
       for (const unassignedCell of unassignedCells) {
         // Determine if this cell is mutually exclusive with every cell in the
@@ -788,10 +789,13 @@ SudokuConstraintHandler._SumHandlerUtil = class _SumHandlerUtil {
         }
         if (addToCurrentSet) {
           currentGroup.push(unassignedCell);
-          unassignedCells.delete(unassignedCell);
+        } else {
+          remainingUnassignedCells.push(unassignedCell);
         }
       }
       exclusionGroups.push(currentGroup);
+      unassignedCells = remainingUnassignedCells;
+      remainingUnassignedCells = [];
     }
 
     return exclusionGroups;
@@ -1198,9 +1202,14 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
     }
 
     this._exclusionIndexes = new Uint8Array(this.cells.length);
+    const nextIndex = new Map();
     this._exclusionGroups.forEach(
       (s, i) => s.forEach(
-        c => this._exclusionIndexes[this.cells.indexOf(c)] = i));
+        c => {
+          const index = this.cells.indexOf(c, nextIndex.get(c));
+          this._exclusionIndexes[index] = i;
+          nextIndex.set(c, index + 1);
+        }));
 
     if (!this._negativeCells.length) {
       // We can't use cell exclusions because the cell values have been changed.
