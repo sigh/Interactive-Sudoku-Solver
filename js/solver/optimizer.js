@@ -300,11 +300,6 @@ class SudokuConstraintOptimizer {
 
     if (cells.size == 0) return null;
 
-    // Can't have too many cells in the sum.
-    if (cells.size > LookupTables.get(shape.numValues).MAX_CELLS_IN_SUM) {
-      return null;
-    }
-
     // Don't add sums with too many cells, as they are less likely to be
     // restrictive and useful.
     // Make an exception for when the total sum is closer to an extreme
