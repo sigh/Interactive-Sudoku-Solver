@@ -1617,7 +1617,7 @@ class ColorPicker {
   }
 
   addItem(item, color, ...keys) {
-    this._itemToKeys.set(item, keys);
+    this._itemToKeys.set(item, new Set(keys));
     for (const key of keys) {
       this._keyToColors.set(key, color);
 
