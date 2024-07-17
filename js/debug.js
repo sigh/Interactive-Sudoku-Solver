@@ -256,9 +256,9 @@ const runSolveTests = async (onFailure) => {
     'Sum lines',
     'Sum lines, with loop',
     'Sum lines - long loop',
-    LONG_SUMS[0],
+    'Long sums 1',
     'Indexing',
-    INDEXING_PUZZLES[4],
+    '2D 1-5-9',
     'Full rank',
     'Duplicate cell sums',
   ], onFailure);
@@ -274,8 +274,12 @@ const runSolveTests = async (onFailure) => {
   result.collection = '16x16';
   results.push(result);
 
-  result = await PuzzleRunner.runAllWithChecks(
-    SHAPE_6x6_PUZZLES, onFailure);
+  result = await PuzzleRunner.runAllWithChecks([
+    '6x6',
+    '6x6: Numbered rooms',
+    '6x6: Between Odd and Even',
+    '6x6: Little Killer',
+  ], onFailure);
   result.collection = 'Other sizes';
   results.push(result);
 

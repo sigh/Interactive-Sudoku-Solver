@@ -225,13 +225,8 @@ class DebugManager {
       HARD_THERMOS,
       MATHEMAGIC_KILLERS,
       HARD_RENBAN,
-      ZERO_SOLUTION_PUZZLES,
-      PENCILMARKS,
       HARD_PENCILMARKS,
-      INDEXING_PUZZLES,
-      LONG_SUMS,
-      NUMBERED_ROOMS_PUZZLES,
-      FULL_RANK_PUZZLES,
+      HS_KILLERS,
     };
     for (const [listName, list] of Object.entries(puzzleLists)) {
       for (let i = 0; i < list.length; i++) {
