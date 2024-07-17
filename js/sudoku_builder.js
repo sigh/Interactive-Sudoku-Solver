@@ -395,6 +395,13 @@ class SudokuParser {
     }
     return new SudokuConstraint.Set(constraints);
   }
+
+  static extractConstraintTypes(str) {
+    const types = str.matchAll(/[.]([^.~]+)/g);
+    const uniqueTypes = new Set();
+    for (const type of types) uniqueTypes.add(type[1]);
+    return [...uniqueTypes];
+  }
 }
 
 class CellArgs {

@@ -20,7 +20,7 @@ const puzzleFromCfg = (puzzleCfg) => {
     return { name: puzzleCfg.input, ...puzzleCfg };
   }
 
-  const puzzle = EXAMPLES[puzzleCfg];
+  const puzzle = PUZZLE_INDEX.get(puzzleCfg);
   if (puzzle) return { name: puzzleCfg, ...puzzle };
 
   return { name: puzzleCfg, input: puzzleCfg };
