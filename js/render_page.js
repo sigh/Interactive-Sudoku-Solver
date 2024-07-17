@@ -705,7 +705,6 @@ class ConstraintManager {
       case 'Between':
       case 'Lockout':
       case 'RegionSumLine':
-      case 'Lunchbox':
         {
           const uiConfig = this._multiCellConstraints[constraint.type];
           config = {
@@ -745,26 +744,20 @@ class ConstraintManager {
         this._jigsawManager.setConstraint(constraint);
         break;
       case 'Cage':
-        config = {
-          cells: constraint.cells,
-          name: `Cage (${constraint.sum})`,
-          constraint: constraint,
-          displayElem: this._display.drawKillerCage(
-            constraint.cells, constraint.sum),
-        };
-        this._addToPanel(config);
-        this._configs.push(config);
-        break;
       case 'Sum':
-        config = {
-          cells: constraint.cells,
-          name: `Sum (${constraint.sum})`,
-          constraint: constraint,
-          displayElem: this._display.drawKillerCage(
-            constraint.cells, constraint.sum, true),
-        };
-        this._addToPanel(config);
-        this._configs.push(config);
+      case 'Lunchbox':
+        {
+          const uiConfig = this._multiCellConstraints[constraint.type];
+          config = {
+            cells: constraint.cells,
+            name: `${constraint.type} (${constraint.sum})`,
+            constraint: constraint,
+            displayElem: this._display.drawKillerCage(
+              constraint.cells, constraint.sum, uiConfig.displayConfig),
+          };
+          this._addToPanel(config);
+          this._configs.push(config);
+        }
         break;
       case 'Quad':
         config = {
@@ -889,6 +882,7 @@ class ConstraintManager {
         value: {
           placeholder: 'sum',
         },
+        displayConfig: {},
         validateFn: (cells, shape) => (
           cells.length <= shape.numValues && cells.length > 1),
         description:
@@ -897,6 +891,9 @@ class ConstraintManager {
       Sum: {
         value: {
           placeholder: 'sum',
+        },
+        displayConfig: {
+          patterned: true,
         },
         description:
           "Values must add up to the given sum. Values don't need to be unique. Only up to 16 cells are allowed.",
@@ -1047,7 +1044,9 @@ class ConstraintManager {
           default: 0,
         },
         panelText: (constraint) => `Lunchbox (${constraint.sum})`,
-        displayConfig: { color: 'rgb(220, 220, 230)' },
+        displayConfig: {
+          lineConfig: { color: 'rgba(100, 100, 100, 0.2)' },
+        },
         description:
           `The numbers sandwiched between the smallest number and the largest
            number of the line adds up to the given sum.`
