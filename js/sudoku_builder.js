@@ -1357,7 +1357,7 @@ class SudokuBuilder {
           cells = SudokuConstraintBase.fullLineCellMap(shape)
             .get([constraint.id, 1].toString()).map(
               c => shape.parseCellId(c).cell);
-          yield new SudokuConstraintHandler.Sandwich(cells, constraint.sum);
+          yield new SudokuConstraintHandler.Lunchbox(cells, constraint.sum);
           break;
 
         case 'Lunchbox':

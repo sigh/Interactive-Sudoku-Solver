@@ -1745,37 +1745,36 @@ SudokuConstraintHandler.Skyscraper = class Skyscraper extends SudokuConstraintHa
   }
 }
 
-SudokuConstraintHandler.Sandwich = class Sandwich extends SudokuConstraintHandler {
-  _gridSize = 0;
+SudokuConstraintHandler.Lunchbox = class Lunchbox extends SudokuConstraintHandler {
   _borderMask = 0;
   _valueMask = 0;
   _minMax8Bit = null;
   _distances = null;
   _combinations = null;
+  _isHouse = false;
 
   constructor(cells, sum) {
     super(cells);
-    this._sum = +sum;
+    sum = +sum;
+    if (!Number.isInteger(sum) || sum < 0) {
+      throw ('Invalid sum for sandwich constraint: ' + sum);
+    }
+
+    this._sum = sum;
   }
 
   initialize(initialGrid, cellExclusions, shape) {
-    // Sanity check.
-    if (this.cells.length != shape.numValues) return false;
-    // Check that the sum is feasible.
     const sum = this._sum;
-    if (!Number.isInteger(sum) || sum < 0 || sum > this.constructor._maxSum(shape)) {
-      return false;
-    }
+    this._isHouse = this.cells.length === shape.gridSize;
 
     const lookupTables = LookupTables.get(shape.numValues);
 
-    this._gridSize = shape.gridSize;
-    this._borderMask = SudokuConstraintHandler.Sandwich._borderMask(shape);
+    this._borderMask = SudokuConstraintHandler.Lunchbox._borderMask(shape);
     this._valueMask = ~this._borderMask & lookupTables.allValues;
     this._minMax8Bit = lookupTables.minMax8Bit;
 
-    this._distances = SudokuConstraintHandler.Sandwich._distanceRange(shape)[sum];
-    this._combinations = SudokuConstraintHandler.Sandwich._combinations(shape)[sum];
+    this._distances = SudokuConstraintHandler.Lunchbox._distanceRange(shape)[sum];
+    this._combinations = SudokuConstraintHandler.Lunchbox._combinations(shape)[sum];
 
     return true;
   }
@@ -1849,155 +1848,76 @@ SudokuConstraintHandler.Sandwich = class Sandwich extends SudokuConstraintHandle
   static _cellValues = new Uint16Array(SHAPE_MAX.gridSize);
 
   enforceConsistency(grid, handlerAccumulator) {
+    const isHouse = this._isHouse;
     const cells = this.cells;
-    const borderMask = this._borderMask | 0;
     const numCells = this.cells.length;
+    const borderMask = this._borderMask;
 
     // Cache the grid values for faster lookup.
-    let values = SudokuConstraintHandler.Sandwich._cellValues;
-    let numBorders = 0;
+    const values = SudokuConstraintHandler.Lunchbox._cellValues;
     for (let i = 0; i < numCells; i++) {
-      let v = values[i] = grid[cells[i]];
-      if (v & borderMask) numBorders++;
+      values[i] = grid[cells[i]];
     }
 
-    // If there are exactly two borders, then we know exactly which cells
-    // form the sum. Perform a range check.
-    // NOTE: This doesn't save any consistency checks, but does short-circuit
-    // all the extra work below, so saves a small bit of time.
-    if (numBorders < 2) return false;
-    if (numBorders === 2) {
-      let i = 0;
-      let minMaxSum = 0;
-      while (!(values[i++] & borderMask));
-      while (!(values[i] & borderMask)) {
-        // NOTE: 8 bits is fine here because we can have at most (numValues-2) cells.
-        // For 16x16, 16*14 = 224 < 8 bits.
-        minMaxSum += this._minMax8Bit[values[i]];
-        i++;
+    if (isHouse) {
+      // We are using all the digits. This means we know the sentinels are the
+      // extreme values, so we can do more aggressive checks.
+
+      // Count the number of border cells.
+      let numBorders = 0;
+      for (let i = 0; i < numCells; i++) {
+        if (values[i] & borderMask) numBorders++;
       }
 
-      const sum = this._sum;
-      const minSum = minMaxSum >> 8;
-      const maxSum = minMaxSum & 0xff;
-      // It is impossible to make the target sum.
-      if (sum < minSum || maxSum < sum) return false;
-      // We've reached the target sum exactly.
-      if (minSum == maxSum) return true;
+      // If there are exactly two borders, then we know exactly which cells
+      // form the sum. Perform a range check.
+      // NOTE: This doesn't save any consistency checks, but does short-circuit
+      // all the extra work below, so saves a small bit of time.
+      if (numBorders < 2) return false;
+      if (numBorders === 2) {
+        let i = 0;
+        let minMaxSum = 0;
+        while (!(values[i++] & borderMask));
+        while (!(values[i] & borderMask)) {
+          // NOTE: 8 bits is fine here because we can have at most (numValues-2) cells.
+          // For 16x16, 16*14 = 224 < 8 bits.
+          minMaxSum += this._minMax8Bit[values[i]];
+          i++;
+        }
+
+        const sum = this._sum;
+        const minSum = minMaxSum >> 8;
+        const maxSum = minMaxSum & 0xff;
+        // It is impossible to make the target sum.
+        if (sum < minSum || maxSum < sum) return false;
+        // We've reached the target sum exactly.
+        if (minSum == maxSum) return true;
+      }
     }
 
     // Build up a set of valid cell values.
-    let validSettings = SudokuConstraintHandler.Sandwich._validSettings;
+    const validSettings = SudokuConstraintHandler.Lunchbox._validSettings;
     validSettings.fill(0);
 
     // Iterate over each possible starting index for the first sentinel.
     // Check if the other values are consistent with the required sum.
     // Given that the values must form a house, this is sufficient to ensure
     // that the constraint is fully satisfied.
-    const valueMask = this._valueMask;
+    let valueMask = this._valueMask;
     const [minDist, maxDist] = this._distances;
     const maxIndex = numCells - minDist;
     const shift = numCells - 1;
     let prefixValues = 0;
     let pPrefix = 0;
-    for (let i = 0; i < maxIndex; i++) {
-      let v = values[i];
-      // If we don't have a sentinel, move onto the next index.
-      if (!(v &= borderMask)) continue;
-      // Determine what the matching sentinel value needs to be.
-      const vRev = borderMask & ((v >> shift) | (v << shift));
-
-      // For each possible gap:
-      //  - Determine the currently possible values inside the gap.
-      //  - Find every valid combination that can be made from these values.
-      //  - Use them to determine the possible inside and outside values.
-      let innerValues = 0;
-      let pInner = i + 1;
-      for (let j = i + minDist; j <= i + maxDist && j < numCells; j++) {
-        if (!(values[j] & vRev)) continue;
-
-        while (pInner < j) innerValues |= values[pInner++];
-        while (pPrefix < i) prefixValues |= values[pPrefix++];
-        let outerValues = prefixValues;
-        for (let k = pInner + 1; k < numCells; k++) outerValues |= values[k];
-
-        let combinations = this._combinations[j - i];
-        let innerPossibilities = 0;
-        let outerPossibilities = 0;
-        for (let k = 0; k < combinations.length; k++) {
-          let c = combinations[k];
-          // Check if the inner values can create the combination, and the
-          // outer values can create the complement.
-          if (!((~innerValues & c) | (~outerValues & ~c & valueMask))) {
-            innerPossibilities |= c;
-            outerPossibilities |= ~c;
-          }
-        }
-        outerPossibilities &= valueMask;
-        // If we have either innerPossibilities or outerPossibilities it means
-        // we have at least one valid setting. Either maybe empty if there
-        // are 0 cells in the inner or outer range.
-        if (innerPossibilities || outerPossibilities) {
-          let k = 0;
-          while (k < i) validSettings[k++] |= outerPossibilities;
-          validSettings[k++] |= v;
-          while (k < j) validSettings[k++] |= innerPossibilities;
-          validSettings[k++] |= vRev;
-          while (k < numCells) validSettings[k++] |= outerPossibilities;
-        }
-      }
-    }
-
-    for (let i = 0; i < numCells; i++) {
-      if (!(grid[cells[i]] &= validSettings[i])) return false;
-    }
-
-    return true;
-  }
-}
-
-SudokuConstraintHandler.Lunchbox = class Lunchbox extends SudokuConstraintHandler.Sandwich {
-  initialize(initialGrid, cellExclusions, shape) {
-    const sum = this._sum;
-    const lookupTables = LookupTables.get(shape.numValues);
-
-    this._gridSize = shape.gridSize;
-    this._minMax8Bit = lookupTables.minMax8Bit;
-
-    this._distances = SudokuConstraintHandler.Sandwich._distanceRange(shape)[sum];
-    this._combinations = SudokuConstraintHandler.Sandwich._combinations(shape)[sum];
-
-    return true;
-  }
-
-  // Scratch buffers for reuse so we don't have to create arrays at runtime.
-  static _validSettings = new Uint16Array(SHAPE_MAX.gridSize);
-  static _cellValues = new Uint16Array(SHAPE_MAX.gridSize);
-
-  enforceConsistency(grid, handlerAccumulator) {
-    const cells = this.cells;
-    const numCells = this.cells.length;
-
-    // Cache the grid values for faster lookup.
-    let values = SudokuConstraintHandler.Lunchbox._cellValues;
-    for (let i = 0; i < numCells; i++) {
-      values[i] = grid[cells[i]];
-    }
-
-    // Build up a set of valid cell values.
-    let validSettings = SudokuConstraintHandler.Lunchbox._validSettings;
-    validSettings.fill(0);
-
-    // Iterate over each possible starting index for the first sentinel.
-    // Check if the other values are consistent with the required sum.
-    // Given that the values must form a house, this is sufficient to ensure
-    // that the constraint is fully satisfied.
-    const [minDist, maxDist] = this._distances;
-    const maxIndex = numCells - minDist;
-    let prefixValues = 0;
-    let pPrefix = 0;
+    let vRev = 0;
     for (let i = 0; i < maxIndex; i++) {
       let vi = values[i];
+      if (isHouse) {
+        // If we don't have a sentinel, move onto the next index.
+        if (!(vi &= borderMask)) continue;
+        // Determine what the matching sentinel value needs to be.
+        vRev = borderMask & ((vi >> shift) | (vi << shift));
+      }
 
       // For each possible gap:
       //  - Determine the currently possible values inside the gap.
@@ -2006,11 +1926,15 @@ SudokuConstraintHandler.Lunchbox = class Lunchbox extends SudokuConstraintHandle
       let innerValues = 0;
       let pInner = i + 1;
       for (let j = i + minDist; j <= i + maxDist && j < numCells; j++) {
-        const vj = values[j];
-        const minSentinel = LookupTables.minValue(vi | vj);
-        const maxSentinel = LookupTables.maxValue(vi | vj);
-        // Value mask for values that are strictly between the sentinels.
-        const valueMask = ~((1 << minSentinel) - 1) & ((1 << (maxSentinel - 1)) - 1);
+        let vj = values[j];
+        if (isHouse) {
+          if (!(vj &= vRev)) continue;
+        } else {
+          const minSentinel = LookupTables.minValue(vi | vj);
+          const maxSentinel = LookupTables.maxValue(vi | vj);
+          // Value mask for values that are strictly between the sentinels.
+          valueMask = ~((1 << minSentinel) - 1) & ((1 << (maxSentinel - 1)) - 1);
+        }
 
         while (pInner < j) innerValues |= values[pInner++];
         while (pPrefix < i) prefixValues |= values[pPrefix++];
@@ -2023,37 +1947,57 @@ SudokuConstraintHandler.Lunchbox = class Lunchbox extends SudokuConstraintHandle
         let innerPossibilities = 0;
         let outerPossibilities = 0;
         const innerValuesMask = ~(innerValues & valueMask);
-        let innerRanges = -1;
+        let innerRanges = valueMask;
         for (let k = 0; k < combinations.length; k++) {
           let c = combinations[k];
           // Check if the inner values can create the combination.
-          // TODO: Optimize conditional
-          // TODO: Exclude outer range too?
-          if (!(innerValuesMask & c) && countOnes16bit(~c & outerValues) >= numOuterCells) {
-            innerPossibilities |= c;
-            outerPossibilities |= ~c;
-            const minC = LookupTables.minValue(c);
-            const maxC = LookupTables.maxValue(c);
-            innerRanges &= ~((1 << (minC - 1)) - 1) & ((1 << maxC) - 1);
+          if (!((innerValuesMask & c))) {
+            if (isHouse) {
+              // Check if the outer values can create the complement.
+              // TODO: Can we use this when outerValues == numOuterCells?
+              if (!(~outerValues & ~c & valueMask)) {
+                innerPossibilities |= c;
+                outerPossibilities |= ~c;
+              }
+            } else {
+              // Check if there are enough outer values for all the outer cells.
+              // TODO: Optimize conditional
+              // TODO: Exclude outer range too?
+              // TODO: Range lookup?
+              if (countOnes16bit(~c & outerValues) >= numOuterCells) {
+                innerPossibilities |= c;
+                outerPossibilities |= ~c;
+                const minC = LookupTables.minValue(c);
+                const maxC = LookupTables.maxValue(c);
+                innerRanges &= ~((1 << (minC - 1)) - 1) & ((1 << maxC) - 1);
+              }
+            }
           }
-        }
-        outerPossibilities &= valueMask & outerValues;
-        // If we have either innerPossibilities or outerPossibilities it means
-        // we have at least one valid setting. Either maybe empty if there
-        // are 0 cells in the inner or outer range.
-        if (innerPossibilities || outerPossibilities) {
-          let k = 0;
-          while (k < i) validSettings[k++] |= outerPossibilities;
-          validSettings[k++] |= vi & ~innerRanges;
-          while (k < j) validSettings[k++] |= innerPossibilities;
-          validSettings[k++] |= vj & ~innerRanges;
-          while (k < numCells) validSettings[k++] |= outerPossibilities;
+
+          outerPossibilities &= outerValues;
+          // If we have either innerPossibilities or outerPossibilities it means
+          // we have at least one valid setting. Either maybe empty if there
+          // are 0 cells in the inner or outer range.
+          if (innerPossibilities || outerPossibilities) {
+            let k = 0;
+            while (k < i) validSettings[k++] |= outerPossibilities;
+            validSettings[k++] |= vi & ~innerRanges;
+            while (k < j) validSettings[k++] |= innerPossibilities;
+            validSettings[k++] |= vj & ~innerRanges;
+            while (k < numCells) validSettings[k++] |= outerPossibilities;
+          }
         }
       }
     }
 
     for (let i = 0; i < numCells; i++) {
-      if (!(grid[cells[i]] &= validSettings[i])) return false;
+      const v = grid[cells[i]];
+      const newV = v & validSettings[i];
+      if (!newV) return false;
+      if (v !== newV) {
+        grid[cells[i]] = newV;
+        handlerAccumulator.addForCell(cells[i]);
+      }
     }
 
     return true;
