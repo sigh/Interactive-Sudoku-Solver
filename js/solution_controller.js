@@ -211,13 +211,14 @@ class DebugManager {
     }
   }
 
-  _loadDebugPuzzleInput() {
-    const datalist = document.getElementById('debug-puzzles');
-    for (const name of Object.keys(EXAMPLES)) {
-      const option = document.createElement('option');
-      option.value = name;
-      datalist.appendChild(option);
+  static _makeDebugIndex() {
+    const index = new Map();
+    for (const puzzle of PUZZLE_INDEX.values()) {
+      const constraintTypes = SudokuParser.extractConstraintTypes(puzzle.input);
+      const title = `${puzzle.name || ''} [${constraintTypes.join(',')}]`;
+      index.set(title, puzzle);
     }
+
     const puzzleLists = {
       TAREK_ALL,
       EXTREME_KILLERS,
@@ -234,10 +235,22 @@ class DebugManager {
     };
     for (const [listName, list] of Object.entries(puzzleLists)) {
       for (let i = 0; i < list.length; i++) {
-        const option = document.createElement('option');
-        option.value = `${listName}[${i}]`;
-        datalist.appendChild(option);
+        const puzzle = list[i];
+        const name = `${listName}[${i}]`;
+        index.set(name, puzzle);
       }
+    }
+
+    return index;
+  }
+
+  _loadDebugPuzzleInput() {
+    const debugIndex = this.constructor._makeDebugIndex();
+    const datalist = document.getElementById('debug-puzzles');
+    for (const name of debugIndex.keys()) {
+      const option = document.createElement('option');
+      option.value = name;
+      datalist.appendChild(option);
     }
 
     const input = document.getElementById('debug-puzzle-input');
@@ -249,16 +262,9 @@ class DebugManager {
         input.value = '';
       }, 300);
 
-      if (name in EXAMPLES) {
-        loadInput(name);
-        return;
-      }
-      let [_, puzzleListName, indexStr] = name.match(/(\w+)\[(\d+)\]/);
-      const list = puzzleLists[puzzleListName];
-      const index = parseInt(indexStr);
-      if (list && Number.isInteger(index)) {
-        loadInput(list[index]);
-        return;
+      const puzzle = debugIndex.get(name);
+      if (puzzle) {
+        loadInput(puzzle);
       }
     };
   }

@@ -140,51 +140,6 @@ class CheckboxConstraints {
 }
 
 class ExampleHandler {
-  static _EXAMPLES = [
-    'Classic sudoku',
-    'Thermosudoku',
-    'Killer sudoku',
-    'Killer sudoku, hard',
-    'Arrow sudoku',
-    'Anti-knight, Anti-consecutive',
-    'Little killer',
-    'Sudoku X',
-    'XV-kropki',
-    'Sandwich sudoku',
-    'German whispers',
-    'International whispers',
-    'Renban',
-    'Between lines',
-    'Lockout lines',
-    'Palindromes',
-    'Zipper lines',
-    'Jigsaw',
-    'X-Windoku',
-    'Region sum lines',
-    'Sum lines, with loop',
-    'Disjoint little killer',
-    'Skyscraper',
-    'X-Sum',
-    'Odd even',
-    'Odd-even thermo',
-    'Double arrow',
-    'Pill arrow',
-    'Global entropy',
-    'Quadruple X',
-    'Nabner thermo',
-    'Modular lines',
-    'Entropic connections',
-    'Indexing',
-    'Full rank',
-    'Pencilmark sudoku',
-    '16x16',
-    '16x16: Sudoku X, hard',
-    '16x16: Jigsaw',
-    '16x16: Windoku',
-    '6x6',
-    '6x6: Numbered rooms',
-  ];
-
   constructor(constraintManager) {
     this._ignoreConstraintChanges = false;
     this._exampleSelect = this._setUp();
@@ -194,22 +149,22 @@ class ExampleHandler {
   _setUp() {
     let exampleSelect = document.getElementById('example-select');
 
-    for (const example of ExampleHandler._EXAMPLES) {
-      if (!EXAMPLES[example]) throw ('Unknown example: ' + example);
+    for (const example of DISPLAYED_EXAMPLES) {
       let option = document.createElement('option');
-      option.textContent = example;
+      option.textContent = example.name;
       exampleSelect.appendChild(option);
     }
 
     let link = exampleSelect.nextElementSibling;
     exampleSelect.onchange = () => {
       if (exampleSelect.selectedIndex) {
-        let example = exampleSelect.options[exampleSelect.selectedIndex].text;
-        link.href = EXAMPLES[example].src;
+        const exampleName = exampleSelect.options[exampleSelect.selectedIndex].text;
+        const example = PUZZLE_INDEX.get(exampleName);
+        link.href = example.src;
         link.style.display = 'inline-block';
 
         this._ignoreConstraintChanges = true;
-        this._constraintManager.loadUnsafeFromText(EXAMPLES[example].input);
+        this._constraintManager.loadUnsafeFromText(example.input);
         this._ignoreConstraintChanges = false;
       } else {
         link.style.display = 'none';
