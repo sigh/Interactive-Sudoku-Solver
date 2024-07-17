@@ -577,8 +577,15 @@ class ConstraintDisplay extends DisplayItem {
     this._outsideArrows.removeOutsideArrow(constraintType, lineId);
   }
 
-  drawKillerCage(cells, sum, patterned) {
-    return this._killerCageDisplay.drawKillerCage(cells, sum, patterned);
+  drawKillerCage(cells, sum, config) {
+    const patterned = config && config.patterned;
+    const cage = this._killerCageDisplay.drawKillerCage(cells, sum, patterned);
+
+    if (config?.lineConfig) {
+      this._drawConstraintLine(cells, config.lineConfig, cage);
+    }
+
+    return cage;
   }
 
   drawDot(cells, fillColor) {
@@ -1525,11 +1532,10 @@ class KillerCageDisplay extends DisplayItem {
     this._killerCellColors.addItem(cage, color, ...cells);
 
     // Draw the sum in the top-left most cell. Luckily, this is the sort order.
-    cells.sort();
-    [x, y] = this.cellIdTopLeftCorner(cells[0]);
+    const topLeftCell = cells.reduce((a, b) => a < b ? a : b);
+    [x, y] = this.cellIdTopLeftCorner(topLeftCell);
 
-    const text = this.makeTextNode(
-      sum, x, y, 'killer-cage-sum');
+    const text = this.makeTextNode(sum, x, y, 'killer-cage-sum');
     cage.append(text);
     this.getSvg().append(cage);
 
