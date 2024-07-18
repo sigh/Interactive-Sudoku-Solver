@@ -1855,8 +1855,9 @@ SudokuConstraintHandler.Lunchbox = class Lunchbox extends SudokuConstraintHandle
 
     // Cache the grid values for faster lookup.
     const values = SudokuConstraintHandler.Lunchbox._cellValues;
+    let allValues = 0;
     for (let i = 0; i < numCells; i++) {
-      values[i] = grid[cells[i]];
+      allValues |= (values[i] = grid[cells[i]]);
     }
 
     if (isHouse) {
@@ -1877,11 +1878,12 @@ SudokuConstraintHandler.Lunchbox = class Lunchbox extends SudokuConstraintHandle
       if (numBorders === 2) {
         let i = 0;
         let minMaxSum = 0;
+        let minMax8Bit = this._minMax8Bit;
         while (!(values[i++] & borderMask));
         while (!(values[i] & borderMask)) {
           // NOTE: 8 bits is fine here because we can have at most (numValues-2) cells.
           // For 16x16, 16*14 = 224 < 8 bits.
-          minMaxSum += this._minMax8Bit[values[i]];
+          minMaxSum += minMax8Bit[values[i]];
           i++;
         }
 
@@ -1894,6 +1896,8 @@ SudokuConstraintHandler.Lunchbox = class Lunchbox extends SudokuConstraintHandle
         if (minSum == maxSum) return true;
       }
     }
+
+    const allValuesUsed = countOnes16bit(allValues) == numCells;
 
     // Build up a set of valid cell values.
     const validSettings = SudokuConstraintHandler.Lunchbox._validSettings;
@@ -1930,10 +1934,8 @@ SudokuConstraintHandler.Lunchbox = class Lunchbox extends SudokuConstraintHandle
         if (isHouse) {
           if (!(vj &= vRev)) continue;
         } else {
-          const minSentinel = LookupTables.minValue(vi | vj);
-          const maxSentinel = LookupTables.maxValue(vi | vj);
-          // Value mask for values that are strictly between the sentinels.
-          valueMask = ~((1 << minSentinel) - 1) & ((1 << (maxSentinel - 1)) - 1);
+          // Value mask for values that must be between the sentinels.
+          valueMask = LookupTables.valueRangeMaskExclusive(vi | vj);
         }
 
         while (pInner < j) innerValues |= values[pInner++];
@@ -1947,29 +1949,24 @@ SudokuConstraintHandler.Lunchbox = class Lunchbox extends SudokuConstraintHandle
         let innerPossibilities = 0;
         let outerPossibilities = 0;
         const innerValuesMask = ~(innerValues & valueMask);
+        const outerValuesMask = ~outerValues & valueMask & allValues;
         let innerRanges = valueMask;
         for (let k = 0; k < combinations.length; k++) {
           let c = combinations[k];
           // Check if the inner values can create the combination.
           if (!((innerValuesMask & c))) {
-            if (isHouse) {
+            if (allValuesUsed) {
               // Check if the outer values can create the complement.
-              // TODO: Can we use this when outerValues == numOuterCells?
-              if (!(~outerValues & ~c & valueMask)) {
+              if (!(outerValuesMask & ~c)) {
                 innerPossibilities |= c;
                 outerPossibilities |= ~c;
               }
             } else {
               // Check if there are enough outer values for all the outer cells.
-              // TODO: Optimize conditional
-              // TODO: Exclude outer range too?
-              // TODO: Range lookup?
               if (countOnes16bit(~c & outerValues) >= numOuterCells) {
                 innerPossibilities |= c;
                 outerPossibilities |= ~c;
-                const minC = LookupTables.minValue(c);
-                const maxC = LookupTables.maxValue(c);
-                innerRanges &= ~((1 << (minC - 1)) - 1) & ((1 << maxC) - 1);
+                innerRanges &= LookupTables.valueRangeMaskInclusive(c);
               }
             }
           }
@@ -2226,13 +2223,10 @@ SudokuConstraintHandler.Between = class Between extends SudokuConstraintHandler 
     super(cells);
     this._ends = [cells[0], cells[cells.length - 1]]
     this._mids = cells.slice(1, cells.length - 1)
-    this._minMax8Bit = null;
     this._binaryConstraint = null;
   }
 
   initialize(initialGrid, cellExclusions, shape) {
-    this._minMax8Bit = LookupTables.get(shape.numValues).minMax8Bit;
-
     const exclusionGroups = SudokuConstraintHandler._SumHandlerUtil.findExclusionGroups(
       this._mids, cellExclusions);
     const maxGroupSize = Math.max(0, ...exclusionGroups.map(a => a.length));
@@ -2258,14 +2252,9 @@ SudokuConstraintHandler.Between = class Between extends SudokuConstraintHandler 
     }
 
     const endsCombined = grid[this._ends[0]] | grid[this._ends[1]];
-    let minMax = this._minMax8Bit[endsCombined];
-    const endsMin = minMax >> 8;
-    const endsMax = minMax & 0xff;
-    const delta = endsMax - endsMin;
-
     // Constrain the mids by masking out any values that can never be between
     // the ends.
-    let mask = ((1 << (delta - 1)) - 1) << endsMin;
+    let mask = LookupTables.valueRangeMaskExclusive(endsCombined);
     let fixedValues = 0;
     for (let i = 0; i < this._mids.length; i++) {
       const v = (grid[this._mids[i]] &= mask);
@@ -2276,10 +2265,7 @@ SudokuConstraintHandler.Between = class Between extends SudokuConstraintHandler 
     // Constrain the ends by masking out anything which rules out one of the
     // mids.
     if (fixedValues) {
-      minMax = this._minMax8Bit[fixedValues];
-      const cellMin = minMax >> 8;
-      const cellMax = minMax & 0xff;
-      mask = ~(((1 << (cellMax - cellMin + 1)) - 1) << (cellMin - 1));
+      mask = ~LookupTables.valueRangeMaskInclusive(fixedValues);
       if (!(grid[this._ends[0]] &= mask)) return false;
       if (!(grid[this._ends[1]] &= mask)) return false;
     }
