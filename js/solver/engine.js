@@ -1568,6 +1568,14 @@ class LookupTables {
     return 32 - Math.clz32(v & -v);
   };
 
+  static valueRangeMaskInclusive(v) {
+    return ~((1 << (31 - Math.clz32(v & -v))) - 1) & ((1 << (32 - Math.clz32(v))) - 1);
+  };
+
+  static valueRangeMaskExclusive(v) {
+    return ~((1 << (32 - Math.clz32(v & -v))) - 1) & ((1 << (31 - Math.clz32(v))) - 1);
+  };
+
   static toIndex(v) {
     return 31 - Math.clz32(v);
   };

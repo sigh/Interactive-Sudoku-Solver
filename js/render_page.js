@@ -1049,7 +1049,8 @@ class ConstraintManager {
         },
         description:
           `The numbers sandwiched between the smallest number and the largest
-           number of the line adds up to the given sum.`
+           number of the lunchbox adds up to the given sum. Numbers must be
+           distinct.`
       },
       Palindrome: {
         text: 'Palindrome',

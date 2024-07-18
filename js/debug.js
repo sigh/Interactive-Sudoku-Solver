@@ -261,6 +261,7 @@ const runSolveTests = async (onFailure) => {
     '2D 1-5-9',
     'Full rank',
     'Duplicate cell sums',
+    'Lunchbox',
   ], onFailure);
   result.collection = '9x9';
   results.push(result);

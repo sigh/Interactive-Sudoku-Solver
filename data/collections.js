@@ -336,12 +336,6 @@ const EXAMPLES = [
     solution: '123456789456789123798132546215893674364271958879564231531628497682947315947315862',
   },
   {
-    name: 'Normal Lunchbox',
-    src: 'https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?id=0003H4',
-    input: '.Lunchbox~11~R1C2~R1C1~R2C1~R3C1~R4C1.Lunchbox~7~R1C3~R1C4~R1C5~R1C6~R1C7.Lunchbox~4~R1C9~R2C9~R2C8~R3C8~R4C8.Lunchbox~8~R2C7~R2C6~R3C6~R4C6~R5C6.Lunchbox~23~R2C4~R2C3~R3C3~R3C2~R4C2~R5C2.Lunchbox~0~R6C1~R7C1~R7C2~R8C2.Lunchbox~0~R8C4~R8C3~R9C3.Lunchbox~7~R9C6~R9C5~R8C5~R7C5~R7C6~R7C7~R6C7~R6C8.Lunchbox~2~R5C7~R5C8~R5C9.Lunchbox~14~R6C2~R6C3~R6C4~R5C4.Lunchbox~17~R3C5~R4C5~R5C5~R6C5~R6C6.',
-    solution: '812436597375912648964785213581243769437569821296871435648397152759124386123658974',
-  },
-  {
     name: 'Normal Lunchbox 2',
     src: 'https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?id=0003IV',
     input: '.Lunchbox~0~R2C1~R3C1~R4C1~R4C2~R5C2.Lunchbox~5~R1C4~R2C4~R3C4~R3C3.Lunchbox~0~R1C8~R1C9~R2C9~R3C9.Lunchbox~7~R1C7~R1C6~R2C6~R3C6~R3C7.Lunchbox~12~R4C8~R5C8~R5C9~R6C9.Lunchbox~20~R4C7~R4C6~R5C6~R5C5~R6C5.Lunchbox~27~R4C5~R4C4~R5C4~R6C4~R7C4~R7C5~R7C6~R8C6~R8C7.Lunchbox~0~R7C8~R7C9~R8C9~R9C9~R9C8.Lunchbox~16~R8C2~R8C3~R8C4~R9C4~R9C5~R9C6.Lunchbox~21~R8C1~R7C1~R6C1~R6C2~R6C3~R5C3.',
@@ -388,6 +382,13 @@ const EXAMPLES = [
     src: 'https://discord.com/channels/709370620642852885/721090566481510732/1258800235594125352',
     input: '.FullRank~R5~17~.FullRank~R4~1~.FullRank~C2~32~.FullRank~C3~28~.FullRank~C4~23~.FullRank~R1~34~.',
     solution: '987624153654381972231975648179842536568793214423156789845267391396518427712439865',
+  },
+  {
+    // https://sudokutheory.com/wiki/index.php?title=Snipes#Sandwich
+    name: 'Sandwich snipe 18',
+    src: 'https://www.f-puzzles.com/?load=N4IgzglgXgpiBcBOANCA5gJwgEwQbT2AF9ljSSzKLryBdZQmq8l54+x1p7rjtn/nQaCR3PgIm9hk0UM6zR4rssX1wAQwB22AO4QAxgAswAVwC2+UPpgAbGwhAAlAAwBhAIwhUAN3U2TcPAg7gAcIBQg1nYOLq4ATF4gvv6BwWERUfZBsQDMickBDqHhpJG2WU5uACz5foVBxRnlMW4ArLUpRemlmS2uAOwd9WklVs3Z7q7OQ6mNPeNOcVMzXaNl0dk5yz51s91jG05V20m7q02Hjq0nBXtrvdkAbDdnDfvrFbGIK2/htERAA',
+    input: '.Sandwich~18~C1.Sandwich~18~C2.Sandwich~18~C3.Sandwich~18~R1.Sandwich~18~R2.Sandwich~18~R3.Sandwich~18~R4.Sandwich~18~R5.Sandwich~18~R6.Sandwich~18~C4.Sandwich~18~C5.Sandwich~18~C7.Sandwich~18~C9.',
+    solution: '584137269239684157167592843396751428845923671721846935952478316673219584418365792',
   },
 
   //////////////////////////////////////////////////////////////////////////////
