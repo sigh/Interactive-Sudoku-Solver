@@ -376,6 +376,7 @@ class OutsideArrowConstraints {
         break;
       case 'XSum':
       case 'Skyscraper':
+      case 'HiddenSkyscraper':
       case 'NumberedRoom':
       case 'FullRank':
         {
@@ -422,6 +423,7 @@ class OutsideArrowConstraints {
         return new SudokuConstraint.Sandwich(value, rowCol);
       case 'XSum':
       case 'Skyscraper':
+      case 'HiddenSkyscraper':
       case 'NumberedRoom':
       case 'FullRank':
         return new SudokuConstraint[type](
@@ -439,7 +441,7 @@ class OutsideArrowConstraints {
     const constraints = [];
     for (const constraint of this._constraints.values()) {
       const type = constraint.type;
-      if (type == 'Skyscraper' || type == 'XSum' || type == 'NumberedRoom' || type == 'FullRank') {
+      if (type == 'Skyscraper' || type == 'HiddenSkyscraper' || type == 'XSum' || type == 'NumberedRoom' || type == 'FullRank') {
         const key = `${type}|${constraint.rowCol}`;
         if (seen.has(key)) {
           // Merge with the previous.
@@ -781,6 +783,7 @@ class ConstraintManager {
       case 'Sandwich':
       case 'XSum':
       case 'Skyscraper':
+      case 'HiddenSkyscraper':
       case 'NumberedRoom':
       case 'FullRank':
         this._outsideArrowConstraints.addConstraint(constraint);

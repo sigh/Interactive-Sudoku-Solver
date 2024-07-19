@@ -1212,12 +1212,13 @@ class OutsideArrowDisplay extends DisplayItem {
       form.firstElementChild.disabled = true;
     });
     const formOptions = new Map([
-      ['LittleKiller', document.getElementById('little-killer-option')],
       ['Sandwich', document.getElementById('sandwich-option')],
       ['XSum', document.getElementById('xsum-option')],
       ['Skyscraper', document.getElementById('skyscraper-option')],
+      ['HiddenSkyscraper', document.getElementById('hidden-skyscraper-option')],
       ['NumberedRoom', document.getElementById('numbered-room-option')],
       ['FullRank', document.getElementById('full-rank-option')],
+      ['LittleKiller', document.getElementById('little-killer-option')],
     ]);
 
     this._handleClick = (lineId, cells) => {
@@ -1267,6 +1268,7 @@ class OutsideArrowDisplay extends DisplayItem {
       }
       this._outsideArrowMap.get(lineId).constraintTypes.push('XSum');
       this._outsideArrowMap.get(lineId).constraintTypes.push('Skyscraper');
+      this._outsideArrowMap.get(lineId).constraintTypes.push('HiddenSkyscraper');
       this._outsideArrowMap.get(lineId).constraintTypes.push('NumberedRoom');
       this._outsideArrowMap.get(lineId).constraintTypes.push('FullRank');
     }
@@ -1309,6 +1311,9 @@ class OutsideArrowDisplay extends DisplayItem {
           break;
         case 'Skyscraper':
           valueStr = `[${value}]`;
+          break;
+        case 'HiddenSkyscraper':
+          valueStr = `|${value}|`;
           break;
         case 'NumberedRoom':
           valueStr = `:${value}:`;
