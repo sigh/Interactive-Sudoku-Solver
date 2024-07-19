@@ -1639,7 +1639,7 @@ SudokuConstraintHandler.Skyscraper = class Skyscraper extends SudokuConstraintHa
       const currStates = forwardStates[i];
 
       const v = grid[cells[i]];
-      const higherThanMinV = ~((v & -v) - 1) << 1;
+      const higherThanMinV = -(v & -v) << 1;
 
       {
         // Unroll j = 0, since only Case 1 applies.
@@ -1659,7 +1659,7 @@ SudokuConstraintHandler.Skyscraper = class Skyscraper extends SudokuConstraintHa
           const s = prevStates[j - 1];
           // NOTE: s == 0 => higherThanMinS == 0, so we don't need to special
           // case 0.
-          const higherThanMinS = ~((s & -s) - 1) << 1;
+          const higherThanMinS = -(s & -s) << 1;
           newState |= v & higherThanMinS;
         }
         currStates[j] = newState;
@@ -1761,7 +1761,7 @@ SudokuConstraintHandler.HiddenSkyscraper = class HiddenSkyscraper extends Sudoku
     const cells = this.cells;
     const numCells = cells.length;
     const targetV = this._targetV;
-    const moreThanTarget = ~(targetV - 1) << 1;
+    const moreThanTarget = -targetV << 1;
 
     // The first cell is always visible.
     let allowedSkyscrapers = grid[cells[0]];
@@ -1770,7 +1770,7 @@ SudokuConstraintHandler.HiddenSkyscraper = class HiddenSkyscraper extends Sudoku
     for (; i < numCells; i++) {
       const cell = cells[i];
       let v = grid[cell];
-      const allowedMask = (~((allowedSkyscrapers & -allowedSkyscrapers) - 1) << 1);
+      const allowedMask = -(allowedSkyscrapers & -allowedSkyscrapers) << 1;
 
       if (!firstTargetIndex) {
         // If the this cell has the target, check if it is valid.
@@ -2020,7 +2020,7 @@ SudokuConstraintHandler.Lunchbox = class Lunchbox extends SudokuConstraintHandle
           if (!(vj &= vRev)) continue;
         } else {
           // Value mask for values that must be between the sentinels.
-          valueMask = LookupTables.valueRangeMaskExclusive(vi | vj);
+          valueMask = LookupTables.valueRangeExclusive(vi | vj);
         }
 
         while (pInner < j) innerValues |= values[pInner++];
@@ -2051,7 +2051,7 @@ SudokuConstraintHandler.Lunchbox = class Lunchbox extends SudokuConstraintHandle
               if (countOnes16bit(~c & outerValues) >= numOuterCells) {
                 innerPossibilities |= c;
                 outerPossibilities |= ~c;
-                innerRanges &= LookupTables.valueRangeMaskInclusive(c);
+                innerRanges &= LookupTables.valueRangeInclusive(c);
               }
             }
           }
@@ -2339,7 +2339,7 @@ SudokuConstraintHandler.Between = class Between extends SudokuConstraintHandler 
     const endsCombined = grid[this._ends[0]] | grid[this._ends[1]];
     // Constrain the mids by masking out any values that can never be between
     // the ends.
-    let mask = LookupTables.valueRangeMaskExclusive(endsCombined);
+    let mask = LookupTables.valueRangeExclusive(endsCombined);
     let fixedValues = 0;
     for (let i = 0; i < this._mids.length; i++) {
       const v = (grid[this._mids[i]] &= mask);
@@ -2350,7 +2350,7 @@ SudokuConstraintHandler.Between = class Between extends SudokuConstraintHandler 
     // Constrain the ends by masking out anything which rules out one of the
     // mids.
     if (fixedValues) {
-      mask = ~LookupTables.valueRangeMaskInclusive(fixedValues);
+      mask = ~LookupTables.valueRangeInclusive(fixedValues);
       if (!(grid[this._ends[0]] &= mask)) return false;
       if (!(grid[this._ends[1]] &= mask)) return false;
     }
@@ -3251,7 +3251,7 @@ SudokuConstraintHandler.FullRank = class FullRank extends SudokuConstraintHandle
       }
       const minV = LookupTables.minValue(lowV);
       if (LookupTables.minValue(highV) < minV) {
-        const mask = ~((1 << (minV - 1)) - 1);
+        const mask = -(1 << (minV - 1));
         grid[highEntry[i]] = (highV &= mask & equalValuesMask);
         handlerAccumulator.addForCell(highEntry[i]);
       }
