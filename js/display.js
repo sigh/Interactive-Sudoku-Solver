@@ -495,7 +495,7 @@ class ConstraintDisplay extends DisplayItem {
       displayContainer.getNewGroup('givens-group'));
 
     displayContainer.addElement(this._makeArrowhead());
-    this._outsideArrows = new OutsideArrowDisplay(
+    this._outsideClues = new OutsideClueDisplay(
       displayContainer.getNewGroup('outside-arrow-group'),
       inputManager);
     this._borders = new BorderDisplay(
@@ -510,7 +510,7 @@ class ConstraintDisplay extends DisplayItem {
     this._defaultRegions.reshape(shape);
     this._windokuRegions.reshape(shape);
     this._jigsawRegions.reshape(shape);
-    this._outsideArrows.reshape(shape);
+    this._outsideClues.reshape(shape);
     this._diagonalDisplay.reshape(shape);
     this._borders.reshape(shape);
     this._givensDisplay.reshape(shape);
@@ -569,12 +569,16 @@ class ConstraintDisplay extends DisplayItem {
     item.parentNode.removeChild(item);
   }
 
-  addOutsideArrow(constraintType, lineId, value) {
-    this._outsideArrows.addOutsideArrow(constraintType, lineId, value);
+  configureOutsideClues(configs) {
+    this._outsideClues.configure(configs);
   }
 
-  removeOutsideArrow(constraintType, lineId) {
-    this._outsideArrows.removeOutsideArrow(constraintType, lineId);
+  addOutsideClue(constraintType, lineId, value) {
+    this._outsideClues.addOutsideClue(constraintType, lineId, value);
+  }
+
+  removeOutsideClue(constraintType, lineId) {
+    this._outsideClues.removeOutsideClue(constraintType, lineId);
   }
 
   drawKillerCage(cells, sum, config) {
@@ -1197,10 +1201,11 @@ class JigsawRegionDisplay extends DisplayItem {
   }
 }
 
-class OutsideArrowDisplay extends DisplayItem {
+class OutsideClueDisplay extends DisplayItem {
   constructor(svg, inputManager) {
     super(svg);
     this._applyGridOffset(svg);
+    this._configs = {};
     inputManager.addSelectionPreserver(svg);
 
     const form = document.forms['outside-arrow-input'];
@@ -1211,15 +1216,6 @@ class OutsideArrowDisplay extends DisplayItem {
       selectedArrow = null;
       form.firstElementChild.disabled = true;
     });
-    const formOptions = new Map([
-      ['Sandwich', document.getElementById('sandwich-option')],
-      ['XSum', document.getElementById('xsum-option')],
-      ['Skyscraper', document.getElementById('skyscraper-option')],
-      ['HiddenSkyscraper', document.getElementById('hidden-skyscraper-option')],
-      ['NumberedRoom', document.getElementById('numbered-room-option')],
-      ['FullRank', document.getElementById('full-rank-option')],
-      ['LittleKiller', document.getElementById('little-killer-option')],
-    ]);
 
     this._handleClick = (lineId, cells) => {
       const arrow = this._outsideArrowMap.get(lineId);
@@ -1229,18 +1225,24 @@ class OutsideArrowDisplay extends DisplayItem {
       form.id.value = lineId;
       form.value.select();
 
-      const types = arrow.constraintTypes;
-      for (let [type, option] of formOptions) {
-        option.disabled = !types.includes(type);
+      const clueTypes = arrow.clueTypes;
+      const configs = this._configs;
+      for (const config of Object.values(configs)) {
+        config.elem.disabled = !arrow.clueTypes.has(config.clueType);
       }
 
       // Ensure that the selected type is valid for this arrow.
-      if (!types.includes(form.type.value)) {
+      if (!clueTypes.has(configs[form.type.value]?.clueType)) {
         // If possible, select an arrow type that is already present.
         if (arrow.currentValues.size) {
           form.type.value = arrow.currentValues.keys().next().value;
         } else {
-          form.type.value = types[0];
+          for (const [type, config] of Object.entries(configs)) {
+            if (clueTypes.has(config.clueType)) {
+              form.type.value = type;
+              break;
+            }
+          }
         }
       }
 
@@ -1256,30 +1258,62 @@ class OutsideArrowDisplay extends DisplayItem {
     this.clear();
     this._outsideArrowMap = new Map();
 
-    const littleKillerCellMap = SudokuConstraint.LittleKiller.cellMap(shape);
-    for (const lineId in littleKillerCellMap) {
-      this._addArrowSvg('diagonal-arrow', lineId, littleKillerCellMap[lineId]);
-      this._outsideArrowMap.get(lineId).constraintTypes.push('LittleKiller');
+    const diagonalCellMap = SudokuConstraint.LittleKiller.cellMap(shape);
+    for (const lineId in diagonalCellMap) {
+      this._addArrowSvg(
+        'diagonal-arrow', lineId, diagonalCellMap[lineId],
+        [OutsideClueConstraints.CLUE_TYPE_DIAGONAL]);
     }
     for (const [lineId, cells] of SudokuConstraintBase.fullLineCellMap(shape)) {
-      this._addArrowSvg('full-line-arrow', lineId, cells);
+      const clueTypes = [OutsideClueConstraints.CLUE_TYPE_DOUBLE_LINE];
       if (lineId.endsWith(',1')) {
-        this._outsideArrowMap.get(lineId).constraintTypes.push('Sandwich');
+        clueTypes.push(OutsideClueConstraints.CLUE_TYPE_SINGLE_LINE);
       }
-      this._outsideArrowMap.get(lineId).constraintTypes.push('XSum');
-      this._outsideArrowMap.get(lineId).constraintTypes.push('Skyscraper');
-      this._outsideArrowMap.get(lineId).constraintTypes.push('HiddenSkyscraper');
-      this._outsideArrowMap.get(lineId).constraintTypes.push('NumberedRoom');
-      this._outsideArrowMap.get(lineId).constraintTypes.push('FullRank');
+      this._addArrowSvg('full-line-arrow', lineId, cells, clueTypes);
     }
   }
 
-  addOutsideArrow(constraintType, arrowId, value) {
+  static _makeOutsideClueForm(container, configs) {
+    clearDOMNode(container);
+    for (const [type, config] of Object.entries(configs)) {
+      const div = document.createElement('div');
+
+      const id = `${type}-option`;
+
+      const input = document.createElement('input');
+      input.id = id;
+      input.type = 'radio';
+      input.name = 'type';
+      input.value = type;
+      div.appendChild(input);
+
+      const label = document.createElement('label');
+      label.setAttribute('for', id);
+      label.textContent = type + ' ';
+      const tooltip = document.createElement('span');
+      tooltip.classList.add('tooltip');
+      tooltip.setAttribute('data-text', config.description);
+      label.appendChild(tooltip);
+      div.appendChild(label);
+
+      config.elem = input;
+
+      container.appendChild(div);
+    }
+  }
+
+  configure(configs) {
+    this._configs = configs;
+    this.constructor._makeOutsideClueForm(
+      document.getElementById('outside-arrow-type-options'), configs);
+  }
+
+  addOutsideClue(constraintType, arrowId, value) {
     this._outsideArrowMap.get(arrowId).currentValues.set(constraintType, value);
     this._updateArrowValues(arrowId);
   }
 
-  removeOutsideArrow(constraintType, arrowId) {
+  removeOutsideClue(constraintType, arrowId) {
     this._outsideArrowMap.get(arrowId).currentValues.delete(constraintType);
     this._updateArrowValues(arrowId);
   }
@@ -1302,27 +1336,11 @@ class OutsideArrowDisplay extends DisplayItem {
     elem.classList.add('active-arrow');
 
     // Construct the output strings.
+    const configs = this._configs;
     const valueStrings = [];
     for (const [type, value] of arrow.currentValues) {
-      let valueStr = value;
-      switch (type) {
-        case 'XSum':
-          valueStr = `⟨${value}⟩`;
-          break;
-        case 'Skyscraper':
-          valueStr = `[${value}]`;
-          break;
-        case 'HiddenSkyscraper':
-          valueStr = `|${value}|`;
-          break;
-        case 'NumberedRoom':
-          valueStr = `:${value}:`;
-          break;
-        case 'FullRank':
-          valueStr = `#${value}`;
-          break;
-      }
-      valueStrings.push(valueStr);
+      valueStrings.push(
+        configs[type].strTemplate.replace('$CLUE', value));
     }
     if (numValues == 1 || !arrowId.includes(',') || arrowId.startsWith('C')) {
       // For little killers and for columns, the values can be shown
@@ -1357,7 +1375,7 @@ class OutsideArrowDisplay extends DisplayItem {
     textNode.setAttribute('style', `font-size: ${fontSize}px`);
   }
 
-  _addArrowSvg(arrowType, arrowId, cells) {
+  _addArrowSvg(arrowType, arrowId, cells, clueTypes) {
     const shape = this._shape;
 
     const cell0 = shape.parseCellId(cells[0]);
@@ -1371,7 +1389,7 @@ class OutsideArrowDisplay extends DisplayItem {
 
     this._outsideArrowMap.set(
       arrowId,
-      { svg: arrowSvg, constraintTypes: [], currentValues: new Map() });
+      { svg: arrowSvg, clueTypes: new Set(clueTypes), currentValues: new Map() });
     arrowSvg.onclick = () => this._handleClick(arrowId, cells);
     arrowSvg.classList.add(arrowType);
   };
