@@ -941,6 +941,19 @@ class SudokuConstraint {
     }
   }
 
+  static HiddenSkyscraper = class HiddenSkyscraper extends SudokuConstraintBase {
+    constructor(rowCol, valueInc, valueDec) {
+      super(arguments);
+      this.rowCol = rowCol.toUpperCase();
+      this.valueInc = +valueInc;
+      this.valueDec = +valueDec;
+    }
+
+    values() {
+      return [this.valueInc, this.valueDec];
+    }
+  }
+
   static NumberedRoom = class NumberedRoom extends SudokuConstraintBase {
     constructor(rowCol, clueInc, clueDec) {
       super(arguments);
@@ -1377,6 +1390,21 @@ class SudokuBuilder {
             cells = cells.slice().reverse();
             yield new SudokuConstraintHandler.Skyscraper(
               cells, constraint.countDec);
+          }
+          break;
+
+        case 'HiddenSkyscraper':
+          cells = SudokuConstraintBase.fullLineCellMap(shape)
+            .get([constraint.rowCol, 1].toString()).map(
+              c => shape.parseCellId(c).cell);
+          if (constraint.valueInc) {
+            yield new SudokuConstraintHandler.HiddenSkyscraper(
+              cells, constraint.valueInc);
+          }
+          if (constraint.valueDec) {
+            cells = cells.slice().reverse();
+            yield new SudokuConstraintHandler.HiddenSkyscraper(
+              cells, constraint.valueDec);
           }
           break;
 

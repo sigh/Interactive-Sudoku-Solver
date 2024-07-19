@@ -350,7 +350,12 @@ const EXAMPLES = [
     name: 'Extreme Lunchbox 2',
     src: 'https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?id=0004JX',
     input: '.Lunchbox~19~R1C3~R1C2~R2C2~R2C1~R3C1.Lunchbox~14~R1C6~R1C7~R1C8~R1C9.Lunchbox~5~R2C4~R2C5~R2C6~R3C6~R3C7~R4C7.Lunchbox~16~R3C8~R4C8~R5C8~R5C7~R5C6.Lunchbox~8~R3C4~R4C4~R4C5~R5C5.Lunchbox~17~R7C1~R7C2~R7C3~R8C3~R9C3.Lunchbox~0~R8C4~R9C4~R9C5.Lunchbox~11~R7C6~R7C7~R8C7~R9C7.Lunchbox~6~R7C5~R6C5~R6C6~R6C7.Lunchbox~15~R6C9~R7C9~R8C9~R9C9~R9C8.Lunchbox~13~R3C3~R4C3~R5C3~R5C2.',
-    soltution: '172349865483651792965872314826534971397218456541796283254187639618923547739465128',
+    solution: '172349865483651792965872314826534971397218456541796283254187639618923547739465128',
+  },
+  {
+    name: 'Unbidden First Hidden',
+    src: 'https://sudokupad.app/1i71uad30f',
+    input: '.HiddenSkyscraper~C4~8~.HiddenSkyscraper~C5~8~.HiddenSkyscraper~C6~8~.HiddenSkyscraper~C7~6~.HiddenSkyscraper~R2~2~2.HiddenSkyscraper~R7~~5.HiddenSkyscraper~C2~~6.HiddenSkyscraper~C3~~7.HiddenSkyscraper~R1~3~.HiddenSkyscraper~R3~1~.HiddenSkyscraper~R4~7~.HiddenSkyscraper~R5~7~.HiddenSkyscraper~R6~7~.',
   },
 
   //////////////////////////////////////////////////////////////////////////////

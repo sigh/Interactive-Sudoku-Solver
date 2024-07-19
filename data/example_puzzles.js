@@ -151,6 +151,12 @@ const DISPLAYED_EXAMPLES = [
     solution: '147932658826145937359678412678419325592783164413256789765891243234567891981324576',
   },
   {
+    name: 'Hidden skyscrapers',
+    src: 'https://www.youtube.com/watch?v=f1QKEzZpKL8',
+    input: '.HiddenSkyscraper~R8~7~4.HiddenSkyscraper~R9~5~3.HiddenSkyscraper~C9~7~5.HiddenSkyscraper~C8~8~5.HiddenSkyscraper~C7~6~1.HiddenSkyscraper~C6~5~3.HiddenSkyscraper~C5~4~5.HiddenSkyscraper~C4~5~5.HiddenSkyscraper~C3~1~6.HiddenSkyscraper~C2~6~8.HiddenSkyscraper~C1~7~5.HiddenSkyscraper~R7~1~2.HiddenSkyscraper~R6~2~3.HiddenSkyscraper~R5~8~2.HiddenSkyscraper~R4~3~6.HiddenSkyscraper~R3~5~1.HiddenSkyscraper~R2~4~7.HiddenSkyscraper~R1~3~5.',
+    soluton: '638417592941625783752938614173592468569841327824763951416389275387256149295174836',
+  },
+  {
     name: 'X-Sum',
     src: 'https://www.youtube.com/watch?v=fnCzYnsC4Ow',
     input: '.XSum~C2~27~27.XSum~C4~11~11.XSum~C6~21~0.XSum~C7~16~16.XSum~R2~8~8.XSum~R4~17~17.XSum~R6~30~30.XSum~R8~28~28.',

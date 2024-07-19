@@ -1745,6 +1745,78 @@ SudokuConstraintHandler.Skyscraper = class Skyscraper extends SudokuConstraintHa
   }
 }
 
+SudokuConstraintHandler.HiddenSkyscraper = class HiddenSkyscraper extends SudokuConstraintHandler {
+  constructor(cells, firstHiddenValue) {
+    super(cells);
+    this._targetV = LookupTables.fromValue(+firstHiddenValue);
+  }
+
+  initialize(initialGrid, cellExclusions, shape) {
+    // If the hidden value is first it will always be visible.
+    if (!(initialGrid[this.cells[0]] &= ~this._targetV)) return false;
+    return true;
+  }
+
+  enforceConsistency(grid, handlerAccumulator) {
+    const cells = this.cells;
+    const numCells = cells.length;
+    const targetV = this._targetV;
+    const moreThanTarget = ~(targetV - 1) << 1;
+
+    // The first cell is always visible.
+    let allowedSkyscrapers = grid[cells[0]];
+    let seenTarget = false;
+    let i = 1;
+    for (; i < numCells; i++) {
+      const cell = cells[i];
+      let v = grid[cell];
+      const allowedMask = (~((allowedSkyscrapers & -allowedSkyscrapers) - 1) << 1);
+
+      if (!seenTarget) {
+        // If the this cell has the target, check if it is valid.
+        // Otherwise remove it.
+        if (v & targetV) {
+          if ((allowedSkyscrapers & moreThanTarget)) {
+            seenTarget = true;
+          } else {
+            // We can't populate the target yet.
+            v &= ~targetV;
+          }
+        }
+
+        // The only valid values are those which are higher than the previous state.
+        v &= allowedMask | targetV;
+      }
+
+      if (grid[cell] !== v) {
+        if (!v) return false;
+        grid[cell] = v;
+        handlerAccumulator.addForCell(cell);
+      }
+
+      // Add any values which are higher than the previous state.
+      allowedSkyscrapers = v & ~targetV & allowedMask;
+
+      // We've reached the last valid target.
+      if (!allowedSkyscrapers) break;
+    }
+
+    // If we never saw the target, the grid is invalid.
+    if (!seenTarget) return false;
+
+    // Clear the target from all future cells.
+    while (++i < numCells) {
+      const cell = cells[i];
+      if (grid[cell] & targetV) {
+        if (!(grid[cell] &= ~targetV)) return false;
+        handlerAccumulator.addForCell(cell);
+      }
+    }
+
+    return true;
+  }
+}
+
 SudokuConstraintHandler.Lunchbox = class Lunchbox extends SudokuConstraintHandler {
   _borderMask = 0;
   _valueMask = 0;

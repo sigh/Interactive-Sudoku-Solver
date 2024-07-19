@@ -418,14 +418,6 @@ layout: null
 
             <div id="outside-arrow-type-options">
               <div>
-                <input type="radio" id="little-killer-option" name="type" value="LittleKiller">
-                <label for="little-killer-option">
-                  Little Killer
-                  <span class="tooltip" data-text="Values along diagonal must add to the given sum. Values may repeat.">
-                  </span>
-                </label>
-              </div>
-              <div>
                 <input type="radio" id="sandwich-option" name="type" value="Sandwich">
                 <label for="sandwich-option">
                   Sandwich
@@ -459,13 +451,13 @@ layout: null
                 </label>
               </div>
               <div>
-                <input type="radio" id="numbered-room-option" name="type" value="NumberedRoom">
-                <label for="numbered-room-option">
-                  Numbered Room
+                <input type="radio" id="hidden-skyscraper-option" name="type" value="HiddenSkyscraper">
+                <label for="hidden-skyscraper-option">
+                  Hidden Skyscraper
                   <span class="tooltip" data-text="
-                    Clues outside the grid indicate the digit which has to be
-                    placed in the Nth cell in the corresponding direction, where
-                    N is the digit placed in the first cell in that direction.
+                    Digits in the grid represent skyscrapers of that height.
+                    Higher skyscrapers obscure smaller ones.
+                    Clues outside the grid show the first hidden skyscraper in that row/column from the clue's direction of view.
                   ">
                   </span>
                 </label>
@@ -479,6 +471,26 @@ layout: null
                     direction of the clue and ranked from lowest (1) to highest,
                     a clue represents where in the ranking that row/column lies.
                   ">
+                  </span>
+                </label>
+              </div>
+              <div>
+                <input type="radio" id="numbered-room-option" name="type" value="NumberedRoom">
+                <label for="numbered-room-option">
+                  Numbered Room
+                  <span class="tooltip" data-text="
+                    Clues outside the grid indicate the digit which has to be
+                    placed in the Nth cell in the corresponding direction, where
+                    N is the digit placed in the first cell in that direction.
+                  ">
+                  </span>
+                </label>
+              </div>
+              <div>
+                <input type="radio" id="little-killer-option" name="type" value="LittleKiller">
+                <label for="little-killer-option">
+                  Little Killer
+                  <span class="tooltip" data-text="Values along diagonal must add to the given sum. Values may repeat.">
                   </span>
                 </label>
               </div>
