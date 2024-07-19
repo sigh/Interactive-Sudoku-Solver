@@ -1475,11 +1475,11 @@ class SolutionController {
       }
       this._solutionDisplay.setSolution(currentSolution);
 
-      if (result.diff) {
+      if (result?.diff) {
         this._diffDisplay.renderGridValues(result.diff);
       }
 
-      if (handler.ITERATION_CONTROLS) {
+      if (result && handler.ITERATION_CONTROLS) {
         let minIndex = handler.minIndex();
         this._elements.forward.disabled = (index >= handler.count());
         this._elements.back.disabled = (index == minIndex);
