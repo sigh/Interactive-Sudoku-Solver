@@ -1765,19 +1765,19 @@ SudokuConstraintHandler.HiddenSkyscraper = class HiddenSkyscraper extends Sudoku
 
     // The first cell is always visible.
     let allowedSkyscrapers = grid[cells[0]];
-    let seenTarget = false;
     let i = 1;
+    let firstTargetIndex = 0;
     for (; i < numCells; i++) {
       const cell = cells[i];
       let v = grid[cell];
       const allowedMask = (~((allowedSkyscrapers & -allowedSkyscrapers) - 1) << 1);
 
-      if (!seenTarget) {
+      if (!firstTargetIndex) {
         // If the this cell has the target, check if it is valid.
         // Otherwise remove it.
         if (v & targetV) {
           if ((allowedSkyscrapers & moreThanTarget)) {
-            seenTarget = true;
+            firstTargetIndex = i;
           } else {
             // We can't populate the target yet.
             v &= ~targetV;
@@ -1789,8 +1789,7 @@ SudokuConstraintHandler.HiddenSkyscraper = class HiddenSkyscraper extends Sudoku
       }
 
       if (grid[cell] !== v) {
-        if (!v) return false;
-        grid[cell] = v;
+        if (!(grid[cell] = v)) return false;
         handlerAccumulator.addForCell(cell);
       }
 
@@ -1802,15 +1801,29 @@ SudokuConstraintHandler.HiddenSkyscraper = class HiddenSkyscraper extends Sudoku
     }
 
     // If we never saw the target, the grid is invalid.
-    if (!seenTarget) return false;
+    if (!firstTargetIndex) return false;
 
-    // Clear the target from all future cells.
+    // Clear the target from all later cells.
     while (++i < numCells) {
       const cell = cells[i];
       if (grid[cell] & targetV) {
         if (!(grid[cell] &= ~targetV)) return false;
         handlerAccumulator.addForCell(cell);
       }
+    }
+
+    // Backward pass to filter out early values which are too large.
+    // That is, skyscrapers which would force the height to increase
+    // too fast to reach the target.
+    allowedSkyscrapers = -1;
+    for (let j = firstTargetIndex - 1; j >= 0; j--) {
+      const v = grid[cells[j]];
+      const newV = v & allowedSkyscrapers;
+      if (newV !== v) {
+        if (!(grid[cells[j]] = newV)) return false;
+        handlerAccumulator.addForCell(cells[j]);
+      }
+      allowedSkyscrapers = (1 << (LookupTables.maxValue(newV) - 1)) - 1;
     }
 
     return true;
