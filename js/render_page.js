@@ -309,9 +309,11 @@ class ShapeManager {
   }
 }
 
-class OutsideArrowConstraints {
+class OutsideClueConstraints {
   constructor(inputManager, display, onChange) {
     this._display = display;
+    this._configs = this.constructor._constraintConfigs();
+    display.configureOutsideClues(this._configs);
     this._setUp(inputManager);
     this._onChange = onChange;
   }
@@ -320,21 +322,88 @@ class OutsideArrowConstraints {
     return `${type}|${lineId}`;
   }
 
-  static _isValidValue(value, type) {
+  static _isValidValue(value, config) {
     if (value == '' || value != +value) return false;
-    if (type != 'Sandwich' && +value == 0) return false;
+    if (+value === 0 && !config.zeroOk) return false;
     return true;
+  }
+
+  static CLUE_TYPE_DOUBLE_LINE = 'double-line';
+  static CLUE_TYPE_DIAGONAL = 'diagonal';
+  static CLUE_TYPE_SINGLE_LINE = 'single-line';
+
+  static _constraintConfigs() {
+    return {
+      Sandwich: {
+        clueType: this.CLUE_TYPE_SINGLE_LINE,
+        strTemplate: '$CLUE',
+        zeroOk: true,
+        description:
+          `Values between the 1 and the 9 in the row or column must add to the
+          given sum.`,
+      },
+      XSum: {
+        clueType: this.CLUE_TYPE_DOUBLE_LINE,
+        strTemplate: '⟨$CLUE⟩',
+        description:
+          `The sum of the first X numbers must add up to the given sum.
+          X is the number in the first cell in the direction of the row or
+          column.`,
+      },
+      Skyscraper: {
+        clueType: this.CLUE_TYPE_DOUBLE_LINE,
+        strTemplate: '[$CLUE]',
+        description:
+          `Digits in the grid represent skyscrapers of that height.
+          Higher skyscrapers obscure smaller ones.
+          Clues outside the grid show the number of visible skyscrapers in that
+          row/column from the clue's direction of view.`,
+      },
+      HiddenSkyscraper: {
+        clueType: this.CLUE_TYPE_DOUBLE_LINE,
+        strTemplate: '|$CLUE|',
+        description:
+          `Digits in the grid represent skyscrapers of that height.
+          Higher skyscrapers obscure smaller ones.
+          Clues outside the grid show the first hidden skyscraper in that
+          row/column from the clue's direction of view.`,
+      },
+      FullRank: {
+        clueType: this.CLUE_TYPE_DOUBLE_LINE,
+        strTemplate: '#$CLUE',
+        elementId: 'full-rank-option',
+        description:
+          `Considering all rows and columns as numbers read from the direction
+          of the clue and ranked from lowest (1) to highest, a clue represents
+          where in the ranking that row/column lies.`,
+      },
+      NumberedRoom: {
+        clueType: this.CLUE_TYPE_DOUBLE_LINE,
+        strTemplate: ':$CLUE:',
+        elementId: 'numbered-room-option',
+        description:
+          `Clues outside the grid indicate the digit which has to be placed in
+          the Nth cell in the corresponding direction, where N is the digit
+          placed in the first cell in that direction.`,
+      },
+      LittleKiller: {
+        clueType: this.CLUE_TYPE_DIAGONAL,
+        strTemplate: '$CLUE',
+        description:
+          `Values along diagonal must add to the given sum. Values may repeat.`,
+      },
+    };
   }
 
   _setUp(inputManager) {
     this._constraints = new Map();
 
     let outsideArrowForm = document.forms['outside-arrow-input'];
-    const clearOutsideArrow = () => {
+    const clearOutsideClue = () => {
       let formData = new FormData(outsideArrowForm);
       const lineId = formData.get('id');
       const type = formData.get('type');
-      this._display.removeOutsideArrow(type, lineId);
+      this._display.removeOutsideClue(type, lineId);
       this._constraints.delete(this.constructor._mapKey(type, lineId));
       inputManager.setSelection([]);
       this._onChange();
@@ -344,15 +413,17 @@ class OutsideArrowConstraints {
       let type = formData.get('type');
       let lineId = formData.get('id');
 
+      const config = this._configs[type];
       let value = formData.get('value');
-      if (!this.constructor._isValidValue(value, type)) {
-        clearOutsideArrow();
+      if (!this.constructor._isValidValue(value, config)) {
+        clearOutsideClue();
         return false;
       }
       value = +value;
 
       this._addConstraint(
-        this.constructor._makeConstraint(type, lineId, value),
+        this.constructor._makeConstraint(
+          type, config, lineId, value),
         lineId,
         value);
 
@@ -362,35 +433,33 @@ class OutsideArrowConstraints {
     };
     inputManager.addSelectionPreserver(outsideArrowForm);
 
-    document.getElementById('outside-arrow-clear').onclick = clearOutsideArrow;
+    document.getElementById('outside-arrow-clear').onclick = clearOutsideClue;
   }
 
   addConstraint(constraint) {
     const type = constraint.type;
-    switch (type) {
-      case 'LittleKiller':
+    const config = this._configs[type];
+
+    switch (config.clueType) {
+      case OutsideClueConstraints.CLUE_TYPE_DIAGONAL:
         this._addConstraint(constraint, constraint.id, constraint.sum);
         break;
-      case 'Sandwich':
+      case OutsideClueConstraints.CLUE_TYPE_SINGLE_LINE:
         this._addConstraint(constraint, constraint.id + ',1', constraint.sum);
         break;
-      case 'XSum':
-      case 'Skyscraper':
-      case 'HiddenSkyscraper':
-      case 'NumberedRoom':
-      case 'FullRank':
+      case OutsideClueConstraints.CLUE_TYPE_DOUBLE_LINE:
         {
           const values = constraint.values();
           if (values[0]) {
             const lineId = constraint.rowCol + ',1';
             this._addConstraint(
-              this.constructor._makeConstraint(type, lineId, values[0]),
+              this.constructor._makeConstraint(type, config, lineId, values[0]),
               lineId, values[0]);
           }
           if (values[1]) {
             const lineId = constraint.rowCol + ',-1';
             this._addConstraint(
-              this.constructor._makeConstraint(type, lineId, values[1]),
+              this.constructor._makeConstraint(type, config, lineId, values[1]),
               lineId, values[1]);
           }
         }
@@ -403,35 +472,32 @@ class OutsideArrowConstraints {
   _addConstraint(constraint, lineId, value) {
     this._constraints.set(
       this.constructor._mapKey(constraint.type, lineId), constraint);
-    this._display.addOutsideArrow(constraint.type, lineId, value);
+    this._display.addOutsideClue(constraint.type, lineId, value);
   }
 
   clear() {
     for (const [key, _] of this._constraints) {
       const [type, lineId] = key.split('|');
-      this._display.removeOutsideArrow(type, lineId);
+      this._display.removeOutsideClue(type, lineId);
     }
     this._constraints = new Map();
   }
 
-  static _makeConstraint(type, lineId, value) {
+  static _makeConstraint(type, config, lineId, value) {
     let [rowCol, dir] = lineId.split(',');
-    switch (type) {
-      case 'LittleKiller':
-        return new SudokuConstraint.LittleKiller(value, lineId);
-      case 'Sandwich':
-        return new SudokuConstraint.Sandwich(value, rowCol);
-      case 'XSum':
-      case 'Skyscraper':
-      case 'HiddenSkyscraper':
-      case 'NumberedRoom':
-      case 'FullRank':
+
+    switch (config?.clueType) {
+      case OutsideClueConstraints.CLUE_TYPE_DIAGONAL:
+        return new SudokuConstraint[type](value, lineId);
+      case OutsideClueConstraints.CLUE_TYPE_SINGLE_LINE:
+        return new SudokuConstraint[type](value, rowCol);
+      case OutsideClueConstraints.CLUE_TYPE_DOUBLE_LINE:
         return new SudokuConstraint[type](
           rowCol,
           dir == 1 ? value : '',
           dir == 1 ? '' : value);
       default:
-        throw ('Unknown type: ' + type);
+        throw ('Unknown arg type for type: ' + type);
     }
   }
 
@@ -441,7 +507,7 @@ class OutsideArrowConstraints {
     const constraints = [];
     for (const constraint of this._constraints.values()) {
       const type = constraint.type;
-      if (type == 'Skyscraper' || type == 'HiddenSkyscraper' || type == 'XSum' || type == 'NumberedRoom' || type == 'FullRank') {
+      if (this._configs[type].clueType === OutsideClueConstraints.CLUE_TYPE_DOUBLE_LINE) {
         const key = `${type}|${constraint.rowCol}`;
         if (seen.has(key)) {
           // Merge with the previous.
@@ -544,7 +610,7 @@ class ConstraintManager {
     this.addReshapeListener(this._customBinaryConstraints);
 
     // Outside arrows.
-    this._outsideArrowConstraints = new OutsideArrowConstraints(
+    this._outsideClueConstraints = new OutsideClueConstraints(
       inputManager, this._display, this.runUpdateCallback.bind(this));
 
     // Load examples.
@@ -786,7 +852,7 @@ class ConstraintManager {
       case 'HiddenSkyscraper':
       case 'NumberedRoom':
       case 'FullRank':
-        this._outsideArrowConstraints.addConstraint(constraint);
+        this._outsideClueConstraints.addConstraint(constraint);
         break;
       case 'AntiKnight':
         this._checkboxConstraints.check('antiKnight');
@@ -1367,7 +1433,7 @@ class ConstraintManager {
     let constraints = this._configs.map(c => c.constraint);
     constraints.push(this._jigsawManager.getConstraint());
     constraints.push(this._checkboxConstraints.getConstraint());
-    constraints.push(...this._outsideArrowConstraints.getConstraints());
+    constraints.push(...this._outsideClueConstraints.getConstraints());
     constraints.push(...this._customBinaryConstraints.getConstraints());
     constraints.push(this._givenCandidates.getConstraint());
     constraints.push(new SudokuConstraint.Shape(this._shape.name));
@@ -1384,7 +1450,7 @@ class ConstraintManager {
     this._display.clear();
     this._constraintPanel.innerHTML = '';
     this._checkboxConstraints.uncheckAll();
-    this._outsideArrowConstraints.clear();
+    this._outsideClueConstraints.clear();
     this._customBinaryConstraints.clear();
     this._configs = [];
     this._jigsawManager.clear();
