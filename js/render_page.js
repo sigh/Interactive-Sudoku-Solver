@@ -827,6 +827,20 @@ class ConstraintManager {
           this._configs.push(config);
         }
         break;
+      case 'Required':
+        {
+          const uiConfig = this._multiCellConstraints[constraint.type];
+          config = {
+            cells: constraint.cells,
+            name: `Required (${constraint.values})`,
+            constraint: constraint,
+            displayElem: this._display.drawKillerCage(
+              constraint.cells, constraint.values, uiConfig.displayConfig),
+          };
+          this._addToPanel(config);
+          this._configs.push(config);
+        }
+        break;
       case 'Quad':
         config = {
           cells: constraint.cells(),
@@ -1176,6 +1190,17 @@ class ConstraintManager {
         All the given values must be present in the surrounding 2x2 square.
         Select a 2x2 square to enable.`,
       },
+      Required: {
+        value: {
+          placeholder: 'values',
+        },
+        displayConfig: {
+          patterned: true,
+        },
+        text: 'Required Values',
+        description:
+          `All the given values must be present in the selected squares.`,
+      },
       Indexing: {
         value: {
           options: [
@@ -1310,6 +1335,14 @@ class ConstraintManager {
       if (values.length) {
         cells.sort();
         const constraint = new SudokuConstraint.Quad(cells[0], ...values);
+        this.loadConstraint(constraint);
+      }
+    } else if (config.constraintClass === SudokuConstraint.Required) {
+      const valuesStr = formData.get(type + '-value');
+      const values = valuesStr.split(/[, ]+/).map(v => +v).filter(
+        v => Number.isInteger(v) && v >= 1 && v <= this._shape.numValues);
+      if (values.length) {
+        const constraint = new SudokuConstraint.Required(values.join('_'), ...cells);
         this.loadConstraint(constraint);
       }
     } else if (config.constraintClass === SudokuConstraint.Jigsaw) {

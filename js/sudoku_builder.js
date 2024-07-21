@@ -987,12 +987,21 @@ class SudokuConstraint {
     }
   }
 
+  static Required = class Required extends SudokuConstraintBase {
+    constructor(values, ...cells) {
+      super(arguments);
+      this.cells = cells;
+      this.values = values;
+    }
+  }
+
   static Quad = class Quad extends SudokuConstraintBase {
     constructor(topLeftCell, ...values) {
       super(arguments);
       this.topLeftCell = topLeftCell;
       this.values = values;
     }
+
 
     cells() {
       const shape = SHAPE_MAX;
@@ -1608,6 +1617,12 @@ class SudokuBuilder {
           for (const cells of SudokuConstraint.GlobalEntropy.regions(shape)) {
             yield new SudokuConstraintHandler.LocalEntropy(cells);
           }
+          break;
+
+        case 'Required':
+          yield new SudokuConstraintHandler.RequiredValues(
+            constraint.cells.map(c => shape.parseCellId(c).cell),
+            constraint.values.split('_').map(v => +v));
           break;
 
         case 'Quad':
