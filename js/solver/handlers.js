@@ -2638,6 +2638,123 @@ SudokuConstraintHandler.LocalEntropy = class LocalEntropy extends SudokuConstrai
   }
 }
 
+SudokuConstraintHandler.RequiredValues = class RequiredValues extends SudokuConstraintHandler {
+  constructor(cells, values) {
+    super(cells);
+    this.values = values;
+
+    this.valueCounts = new Map(values.map(v => [v, 0]));
+    for (const v of values) {
+      this.valueCounts.set(v, this.valueCounts.get(v) + 1);
+    }
+
+    this._valueMask = LookupTables.fromValuesArray(values);
+    // Repeated values is an array of masks [v_n, otherValues_n, ...]
+    this._repeatedValues = [];
+    for (const [value, count] of this.valueCounts) {
+      if (count > 1) {
+        this._repeatedValues.push(
+          LookupTables.fromValue(value),
+          count);
+      }
+    }
+
+    this._commonUtil = SudokuConstraintHandler._CommonHandlerUtil;
+  }
+
+  _enforceRepeatedValues(grid, handlerAccumulator) {
+    const repeatedValues = this._repeatedValues;
+    const cells = this.cells;
+    const numCells = cells.length;
+
+    for (let i = 0; i < repeatedValues.length; i += 2) {
+      const target = repeatedValues[i];
+      const targetCount = repeatedValues[i + 1];
+
+      let count = 0;
+      let fixedCount = 0;
+      for (let j = 0; j < numCells; j++) {
+        const v = grid[cells[j]];
+        count += !!(v & target);
+        fixedCount += v === target;
+      }
+
+      if (count < targetCount) return false;
+      if (count == targetCount && fixedCount !== targetCount) {
+        for (let j = 0; j < numCells; j++) {
+          if (grid[cells[j]] & target) {
+            grid[cells[j]] = target;
+          }
+        }
+      }
+    }
+
+    return true;
+  }
+
+  enforceConsistency(grid, handlerAccumulator) {
+    const cells = this.cells;
+    const numCells = cells.length;
+    const hasRepeatedValues = this._repeatedValues.length > 0;
+
+    if (hasRepeatedValues) {
+      // NOTE: This must happen before the valueMask & ~fixedValues
+      // check as that can return true even if all repeated values aren't
+      // satisfied.
+      if (!this._enforceRepeatedValues(grid, handlerAccumulator)) return false;
+    }
+
+    let allValues = 0;
+    let nonUniqueValues = 0;
+    let fixedValues = 0;
+    let numFixed = 0;
+    for (let i = 0; i < numCells; i++) {
+      let v = grid[cells[i]];
+      if (!(v & (v - 1))) {
+        fixedValues |= v;
+        numFixed++;
+      }
+      nonUniqueValues |= allValues & v;
+      allValues |= v;
+    }
+
+    const valuesMask = this._valueMask;
+    if (valuesMask & ~allValues) return false;
+    if (!(valuesMask & ~fixedValues)) return true;
+
+    if (!hasRepeatedValues) {
+      // Only check for hidden singles when we don't have a repeated value.
+      const hiddenSingles = valuesMask & ~nonUniqueValues & ~fixedValues;
+      if (hiddenSingles) {
+        if (!this._commonUtil.exposeHiddenSingles(grid, cells, hiddenSingles)) {
+          return false;
+        }
+      }
+      fixedValues |= hiddenSingles;
+      numFixed += countOnes16bit(hiddenSingles);
+    }
+
+    const remainingValues = valuesMask & ~fixedValues;
+    const numRemainingCells = numCells - numFixed;
+    if (countOnes16bit(remainingValues) == numRemainingCells) {
+      // The number of remaining cell is exactly the number of remaining values.
+      // We can constrain the remaining cells to the remaining values.
+      for (let i = 0; i < numCells; i++) {
+        const v = grid[cells[i]];
+        // If this cell is fixed, skip it.
+        if (!(v & ~fixedValues)) continue;
+        // Otherwise if there are unwanted values, remove them.
+        if (v & ~remainingValues) {
+          if (!(grid[cells[i]] = v & remainingValues)) return false;
+        }
+      }
+    }
+
+    return true;
+  }
+}
+
+
 SudokuConstraintHandler.Quadruple = class Quadruple extends SudokuConstraintHandler {
   constructor(topLeftCell, gridSize, values) {
     // NOTE: Ordered so that the diagonals are next to each other.
@@ -2712,6 +2829,8 @@ SudokuConstraintHandler.Quadruple = class Quadruple extends SudokuConstraintHand
         }
       }
     }
+
+    return true;
   }
 
   enforceConsistency(grid, handlerAccumulator) {
@@ -2724,7 +2843,7 @@ SudokuConstraintHandler.Quadruple = class Quadruple extends SudokuConstraintHand
       // NOTE: This must happen before the valueMask & ~fixedValues
       // check as that can return true even if all repeated values aren't
       // satisfied.
-      this._enforceRepeatedValues(grid, handlerAccumulator);
+      if (!this._enforceRepeatedValues(grid, handlerAccumulator)) return false;
     }
 
     let allValues = 0;
