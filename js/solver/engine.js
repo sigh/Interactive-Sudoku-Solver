@@ -1568,6 +1568,16 @@ class LookupTables {
     return 32 - Math.clz32(v & -v);
   };
 
+  // Combines min and max into a single integer:
+  // Layout: [min: 16 bits, max: 16 bits]
+  // The extra bits allow these values to be summed to determine the total
+  // of mins and maxs.
+  // 16-bits ensures we won't overflow.
+  // (since we only support 16x16 grids,the max sum is 16x16x16 = 4096)
+  static minMax16bitValue(v) {
+    return 0x200020 - (Math.clz32(v & -v) << 16) - Math.clz32(v);
+  }
+
   static valueRangeInclusive(v) {
     return (1 << (32 - Math.clz32(v))) - (v & -v);
   };
@@ -1607,48 +1617,20 @@ class LookupTables {
       return table;
     })();
 
-    // Combines min and max into a single integer:
-    // Layout: [min: 8 bits, max: 8 bits]
-    //
-    // The extra bits allow these values to be summed to determine the total
-    // of mins and maxs.
-    //
-    // NOTE: This is faster than calling LookupTables.minValue and
-    // LookupTables.maxValue separately, but only if both are required.
-    this.minMax8Bit = (() => {
-      // Initialize the table with MAXs.
-      const table = new Uint16Array(combinations);
-      table[1] = LookupTables.toValue(1);
-      for (let i = 2; i < combinations; i++) {
-        // MAX is greater than the max when everything has been decreased by
-        // 1.
-        table[i] = 1 + table[i >> 1];
-      }
-
-      // Add the MINs.
-      for (let i = 1; i < combinations; i++) {
-        // MIN is the value of the last bit set.
-        const min = LookupTables.toValue(i & -i);
-        table[i] |= min << 8;
-      }
-
-      return table;
-    })();
-
     // Combines useful info about the range of numbers in a cell.
     // Designed to be summed, so that the aggregate stats can be found.
     // Layout: [isFixed: 4 bits, fixed: 8 bits, min: 8 bits, max: 8 bits]
     //
     // Sum of isFixed gives the number of fixed cells.
     // Sum of fixed gives the sum of fixed cells.
-    // Min and max as a in minMax.
     this.rangeInfo = (() => {
       const table = new Uint32Array(combinations);
       for (let i = 1; i < combinations; i++) {
-        const minMax = this.minMax8Bit[i];
-        const fixed = countOnes16bit(i) == 1 ? LookupTables.toValue(i) : 0;
+        const max = LookupTables.maxValue(i);
+        const min = LookupTables.minValue(i);
+        const fixed = (i & (i - 1)) ? 0 : LookupTables.toValue(i);
         const isFixed = fixed ? 1 : 0;
-        table[i] = (isFixed << 24) | (fixed << 16) | minMax;
+        table[i] = ((isFixed << 24) | (fixed << 16) | (min << 8) | max);
       }
       // If there are no values, set a high value for isFixed to indicate the
       // result is invalid. This is intended to be detectable after summing.
