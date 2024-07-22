@@ -20,8 +20,6 @@ class SudokuConstraintOptimizer {
 
     this._optimizeJigsaw(handlerSet, hasBoxes, shape);
 
-    this._optimizeQuadruple(handlerSet, shape);
-
     this._optimizeFullRank(handlerSet, shape);
 
     if (hasBoxes) {
@@ -656,52 +654,6 @@ class SudokuConstraintOptimizer {
     }
 
     return newHandlers;
-  }
-
-  _optimizeQuadruple(handlerSet) {
-    const quadHandlers = handlerSet.getAllofType(SudokuConstraintHandler.Quadruple);
-
-    for (const h of quadHandlers) {
-      if (h.values.length == 4) {
-        // If there are four values, then all the givens are restricted, even
-        // if there are repeats.
-        handlerSet.add(new SudokuConstraintHandler.GivenCandidates(
-          new Map([...h.cells].map(c => [c, h.values]))));
-        if (this._debugLogger) {
-          this._debugLogger.log({
-            loc: '_optimizeQuadruple',
-            msg: 'Add: GivenCandidates',
-            cells: h.cells,
-          });
-        }
-      }
-
-      if (h.valueCounts.size == 4) {
-        // If there are 4 different values, then the cells must be different.
-        handlerSet.add(new SudokuConstraintHandler.AllDifferent(h.cells));
-        if (this._debugLogger) {
-          this._debugLogger.log({
-            loc: '_optimizeQuadruple',
-            msg: 'Add: AllDifferent',
-            cells: h.cells,
-          });
-        }
-        continue;
-      }
-      if ([...h.valueCounts.values()].some(c => c > 2)) {
-        // There can't be more than 2 of each value, as the cells must be in
-        // a 2x2 box. Hence each cell is mutually-exclusive with 2 others.
-        handlerSet.replace(h, new SudokuConstraintHandler.False(h.cells));
-        if (this._debugLogger) {
-          this._debugLogger.log({
-            loc: '_optimizeQuadruple',
-            msg: 'Replace with: False',
-            cells: h.cells,
-          });
-        }
-        continue;
-      }
-    }
   }
 
   _optimizeFullRank(handlerSet, shape) {

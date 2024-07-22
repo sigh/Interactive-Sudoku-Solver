@@ -987,7 +987,7 @@ class SudokuConstraint {
     }
   }
 
-  static Required = class Required extends SudokuConstraintBase {
+  static ContainExact = class ContainExact extends SudokuConstraintBase {
     constructor(values, ...cells) {
       super(arguments);
       this.cells = cells;
@@ -1003,11 +1003,11 @@ class SudokuConstraint {
     }
 
 
-    cells() {
+    static cells(topLeftCell) {
       const shape = SHAPE_MAX;
-      const { row, col } = shape.parseCellId(this.topLeftCell);
+      const { row, col } = shape.parseCellId(topLeftCell);
       return [
-        this.topLeftCell,
+        topLeftCell,
         shape.makeCellId(row, col + 1),
         shape.makeCellId(row + 1, col),
         shape.makeCellId(row + 1, col + 1),
@@ -1619,17 +1619,19 @@ class SudokuBuilder {
           }
           break;
 
-        case 'Required':
+        case 'ContainExact':
           yield new SudokuConstraintHandler.RequiredValues(
             constraint.cells.map(c => shape.parseCellId(c).cell),
-            constraint.values.split('_').map(v => +v));
+            constraint.values.split('_').map(v => +v),
+            true);
           break;
 
         case 'Quad':
-          yield new SudokuConstraintHandler.Quadruple(
-            shape.parseCellId(constraint.topLeftCell).cell,
-            shape.gridSize,
-            constraint.values.map(v => +v));
+          yield new SudokuConstraintHandler.RequiredValues(
+            SudokuConstraint.Quad.cells(
+              constraint.topLeftCell).map(c => shape.parseCellId(c).cell),
+            constraint.values.map(v => +v),
+            false);
           break;
 
         case 'Binary':
