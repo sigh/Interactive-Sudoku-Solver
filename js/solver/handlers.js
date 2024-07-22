@@ -827,7 +827,8 @@ SudokuConstraintHandler._SumHandlerUtil = class _SumHandlerUtil {
         // take their maximum values, these are too small.
         //  where x = maxValue(v) - maxMinusSum;
         // NOTE: Inline calls since this is a heavily used function.
-        if (!(v &= -(1 << (31 - clz32v - maxMinusSum)))) return false;
+        // NOTE: -0x80000000 = -1 << 31
+        if (!(v &= -0x80000000 >> (clz32v + maxMinusSum))) return false;
         grid[cells[i]] = v;
       }
     }
@@ -943,7 +944,7 @@ SudokuConstraintHandler._SumHandlerUtil = class _SumHandlerUtil {
         seenMin |= x & -x;
         // Set the largest unset value <= max.
         // NOTE: seenMax will be reversed.
-        x = ~(seenMax | ((1 << (numValues - (32 - Math.clz32(v)))) - 1));
+        x = ~seenMax & ((-1 << (numValues - (32 - Math.clz32(v)))));
         seenMax |= x & -x;
       }
 
@@ -1862,7 +1863,7 @@ SudokuConstraintHandler.Lunchbox = class Lunchbox extends SudokuConstraintHandle
   }
 
   static _borderMask(shape) {
-    return 1 | (1 << (shape.gridSize - 1));
+    return 1 | LookupTables.fromValue(shape.gridSize);
   }
 
   // Max sum within the sandwich.
@@ -2351,13 +2352,10 @@ SudokuConstraintHandler.Lockout = class Lockout extends SudokuConstraintHandler 
     this._minDiff = +minDiff;
     this._ends = [cells[0], cells[cells.length - 1]]
     this._mids = cells.slice(1, cells.length - 1)
-    this._allValues = 0;
     this._binaryConstraint = null;
   }
 
   initialize(initialGrid, cellExclusions, shape) {
-    this._allValues = LookupTables.get(shape.numValues).allValues;
-
     this._binaryConstraint = new SudokuConstraintHandler.BinaryConstraint(
       ...this._ends,
       SudokuConstraint.Binary.fnToKey(
@@ -2375,7 +2373,6 @@ SudokuConstraintHandler.Lockout = class Lockout extends SudokuConstraintHandler 
     if (!this._binaryConstraint.enforceConsistency(grid, handlerAccumulator)) {
       return false;
     }
-    const allValues = this._allValues;
 
     const ve0 = grid[this._ends[0]];
     const ve1 = grid[this._ends[1]];
@@ -2387,18 +2384,18 @@ SudokuConstraintHandler.Lockout = class Lockout extends SudokuConstraintHandler 
     let mask = 0;
     if (min0 > max1) {
       // Case 1: cell 0 is the larger cell.
-      mask |= ((1 << (max1 - 1)) - 1) | -(1 << min0);
+      mask = ~(-1 << (max1 - 1)) | (-1 << min0);
     } else if (min1 > max0) {
       // Case 2: cell 1 is the larger cell.
-      mask |= ((1 << (max0 - 1)) - 1) | -(1 << min1);
+      mask = ~(-1 << (max0 - 1)) | (-1 << min1);
     } else {
-      mask |= allValues;
+      // We can't constrain the values.
+      return true;
     }
+
     // Constrain the mids by only allowing values that aren't locked out.
-    if (allValues & ~mask) {
-      for (let i = 0; i < this._mids.length; i++) {
-        if (!(grid[this._mids[i]] &= mask)) return false;
-      }
+    for (let i = 0; i < this._mids.length; i++) {
+      if (!(grid[this._mids[i]] &= mask)) return false;
     }
 
     return true;
@@ -3222,7 +3219,7 @@ SudokuConstraintHandler.FullRank = class FullRank extends SudokuConstraintHandle
       }
       const minV = LookupTables.minValue(lowV);
       if (LookupTables.minValue(highV) < minV) {
-        const mask = -(1 << (minV - 1));
+        const mask = -1 << (minV - 1);
         grid[highEntry[i]] = (highV &= mask & equalValuesMask);
         handlerAccumulator.addForCell(highEntry[i]);
       }

@@ -1573,7 +1573,7 @@ class LookupTables {
   // The extra bits allow these values to be summed to determine the total
   // of mins and maxs.
   // 16-bits ensures we won't overflow.
-  // (since we only support 16x16 grids,the max sum is 16x16x16 = 4096)
+  // (Since we only support 16x16 grids,the max sum is 16*16*16 = 4096)
   static minMax16bitValue(v) {
     return 0x200020 - (Math.clz32(v & -v) << 16) - Math.clz32(v);
   }
@@ -1640,12 +1640,12 @@ class LookupTables {
 
     this.reverse = (() => {
       let table = new Uint16Array(combinations);
-      for (let i = 0; i < combinations; i++) {
-        let rev = 0;
-        for (let j = 0; j < numValues; j++) {
-          rev |= ((i >> j) & 1) << (numValues - 1 - j);
-        }
-        table[i] = rev;
+      for (let i = 1; i <= numValues; i++) {
+        table[LookupTables.fromValue(i)] =
+          LookupTables.fromValue(numValues + 1 - i);
+      }
+      for (let i = 1; i < combinations; i++) {
+        table[i] = table[i & (i - 1)] | table[i & -i];
       }
       return table;
     })();
