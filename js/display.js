@@ -47,6 +47,10 @@ class DisplayItem {
   static SVG_PADDING = 27;
   static CELL_SIZE = 52;
 
+  static DIAGONAL_PATTERN = 'diagonal-pattern';
+  static SQUARE_PATTERN = 'square-pattern';
+  static CHECKERED_PATTERN = 'checked-pattern';
+
   constructor(svg) {
     this._svg = svg;
     this._shape = null;
@@ -138,6 +142,25 @@ class DisplayItem {
     line.setAttribute('d', parts.join(' '));
     line.setAttribute('fill', 'transparent');
     return line;
+  }
+
+  _makeSquarePattern(id, color) {
+    const pattern = createSvgElement('pattern');
+    pattern.id = id;
+    const squareSize = DisplayItem.CELL_SIZE / 10;
+    pattern.setAttribute('width', squareSize * 2);
+    pattern.setAttribute('height', squareSize * 2);
+    pattern.setAttribute('patternUnits', 'userSpaceOnUse');
+
+    let rect = createSvgElement('rect');
+    rect.setAttribute('width', squareSize);
+    rect.setAttribute('height', squareSize);
+    rect.setAttribute('x', squareSize / 2);
+    rect.setAttribute('y', squareSize / 2);
+    rect.setAttribute('fill', color);
+    pattern.appendChild(rect);
+
+    return pattern;
   }
 
   _makeDiagonalPattern(id, color) {
@@ -480,7 +503,7 @@ class ConstraintDisplay extends DisplayItem {
     this._applyGridOffset(this._lineConstraintGroup);
     this._adjConstraintGroup = displayContainer.getNewGroup('adj-constraint-group');
     this._applyGridOffset(this._adjConstraintGroup);
-    this._killerCageDisplay = new KillerCageDisplay(
+    this._shadedRegionDisplay = new ShadedRegionDisplay(
       displayContainer.getNewGroup('killer-cage-group'));
 
     this._diagonalDisplay = new DiagonalDisplay(
@@ -514,7 +537,7 @@ class ConstraintDisplay extends DisplayItem {
     this._diagonalDisplay.reshape(shape);
     this._borders.reshape(shape);
     this._givensDisplay.reshape(shape);
-    this._killerCageDisplay.reshape(shape);
+    this._shadedRegionDisplay.reshape(shape);
   }
 
   // Reusable arrowhead marker.
@@ -551,7 +574,7 @@ class ConstraintDisplay extends DisplayItem {
 
     this._jigsawRegions.clear();
 
-    this._killerCageDisplay.clear();
+    this._shadedRegionDisplay.clear();
 
     this.enableWindokuRegion(false);
     this.useDefaultRegions(true);
@@ -564,7 +587,7 @@ class ConstraintDisplay extends DisplayItem {
   removeItem(item) {
     if (!item) return;
     if (this._jigsawRegions.removeItem(item)) return;
-    if (this._killerCageDisplay.removeCage(item)) return;
+    if (this._shadedRegionDisplay.removeRegion(item)) return;
     this._customBinaryColors.removeItem(item);
     item.parentNode.removeChild(item);
   }
@@ -581,15 +604,14 @@ class ConstraintDisplay extends DisplayItem {
     this._outsideClues.removeOutsideClue(constraintType, lineId);
   }
 
-  drawKillerCage(cells, sum, config) {
-    const patterned = config && config.patterned;
-    const cage = this._killerCageDisplay.drawKillerCage(cells, sum, patterned);
+  drawShadedRegion(cells, label, config) {
+    const region = this._shadedRegionDisplay.drawShadedRegion(cells, label, config?.pattern);
 
     if (config?.lineConfig) {
-      this._drawConstraintLine(cells, config.lineConfig, cage);
+      this._drawConstraintLine(cells, config.lineConfig, region);
     }
 
-    return cage;
+    return region;
   }
 
   drawDot(cells, fillColor) {
@@ -935,10 +957,10 @@ class ConstraintDisplay extends DisplayItem {
   _INDEXING_ROW_PATTERN_ID = 'row-indexing-pattern';
   _initIndexingPatterns(displayContainer) {
     displayContainer.addElement(
-      this._makeCheckeredPattern(
+      this._makeSquarePattern(
         this._INDEXING_COL_PATTERN_ID, 'rgb(255, 150, 150)'));
     displayContainer.addElement(
-      this._makeCheckeredPattern(
+      this._makeSquarePattern(
         this._INDEXING_ROW_PATTERN_ID, 'rgb(50, 200, 50)'));
   }
 
@@ -1506,66 +1528,80 @@ class DiagonalDisplay extends DisplayItem {
   }
 }
 
-class KillerCageDisplay extends DisplayItem {
+class ShadedRegionDisplay extends DisplayItem {
   constructor(svg) {
     super(svg);
     this._applyGridOffset(svg);
     this._unusedPatternId = 0;
-    this._killerCellColors = new ColorPicker();
+    this._cellColors = new ColorPicker();
 
     this.clear();
   }
 
   clear() {
     super.clear();
-    this._killerCellColors.clear();
+    this._cellColors.clear();
   }
 
-  removeCage(item) {
-    if (this._killerCellColors.removeItem(item)) {
+  removeRegion(item) {
+    if (this._cellColors.removeItem(item)) {
       item.parentNode.removeChild(item);
       return true;
     }
     return false;
   }
 
-  drawKillerCage(cells, sum, patterned) {
+  drawShadedRegion(cells, label, pattern) {
     let x, y;
 
-    const cage = createSvgElement('g');
-    const color = this._chooseKillerCageColor(cells);
+    const region = createSvgElement('g');
+    const color = this._chooseCellColor(cells);
 
     let patternId = null;
-    if (patterned) {
-      patternId = 'sum-pattern-' + this._unusedPatternId++;
-      cage.appendChild(this._makeDiagonalPattern(patternId, color));
+    if (pattern) {
+      patternId = 'shaded-region-' + this._unusedPatternId++;
+      let patternSvg = null;
+      switch (pattern) {
+        case DisplayItem.SQUARE_PATTERN:
+          patternSvg = this._makeSquarePattern(patternId, color);
+          break;
+        case DisplayItem.DIAGONAL_PATTERN:
+          patternSvg = this._makeDiagonalPattern(patternId, color);
+          break;
+        case DisplayItem.CHECKERED_PATTERN:
+          patternSvg = this._makeCheckeredPattern(patternId, color);
+          break;
+        default:
+          throw `Unknown pattern: ${pattern}`;
+      }
+      region.appendChild(patternSvg);
     }
 
     for (const cellId of cells) {
       const path = this._makeCellSquare(this._shape.parseCellId(cellId).cell);
-      if (patterned) {
+      if (pattern) {
         path.setAttribute('fill', `url(#${patternId})`);
       } else {
         path.setAttribute('fill', color);
       }
       path.setAttribute('opacity', '0.1');
 
-      cage.appendChild(path);
+      region.appendChild(path);
     }
-    this._killerCellColors.addItem(cage, color, ...cells);
+    this._cellColors.addItem(region, color, ...cells);
 
     // Draw the sum in the top-left most cell. Luckily, this is the sort order.
     const topLeftCell = cells.reduce((a, b) => a < b ? a : b);
     [x, y] = this.cellIdTopLeftCorner(topLeftCell);
 
-    const text = this.makeTextNode(sum, x, y, 'killer-cage-sum');
-    cage.append(text);
-    this.getSvg().append(cage);
+    const text = this.makeTextNode(label, x, y, 'shaded-region-label');
+    region.append(text);
+    this.getSvg().append(region);
 
     let textBackground = this.constructor._addTextBackground(text);
     textBackground.setAttribute('fill', 'rgb(200, 200, 200)');
 
-    return cage;
+    return region;
   }
 
   static _addTextBackground(elem) {
@@ -1581,7 +1617,7 @@ class KillerCageDisplay extends DisplayItem {
     return rect;
   }
 
-  _chooseKillerCageColor(cellIds) {
+  _chooseCellColor(cellIds) {
     const shape = this._shape;
     // Use a greedy algorithm to choose the graph color.
     const adjacentCells = [];
@@ -1593,7 +1629,7 @@ class KillerCageDisplay extends DisplayItem {
       adjacentCells.push(shape.makeCellId(row + 1, col));
       adjacentCells.push(shape.makeCellId(row - 1, col));
     }
-    return this._killerCellColors.pickColor(null, adjacentCells);
+    return this._cellColors.pickColor(null, adjacentCells);
   }
 }
 

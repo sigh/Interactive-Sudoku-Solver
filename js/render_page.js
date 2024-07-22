@@ -820,7 +820,7 @@ class ConstraintManager {
             cells: constraint.cells,
             name: `${constraint.type} (${constraint.sum})`,
             constraint: constraint,
-            displayElem: this._display.drawKillerCage(
+            displayElem: this._display.drawShadedRegion(
               constraint.cells, constraint.sum, uiConfig.displayConfig),
           };
           this._addToPanel(config);
@@ -830,12 +830,13 @@ class ConstraintManager {
       case 'Required':
         {
           const uiConfig = this._multiCellConstraints[constraint.type];
+          const valueStr = constraint.values.replace(/_/g, ',');
           config = {
             cells: constraint.cells,
-            name: `Required (${constraint.values})`,
+            name: `Required (${valueStr})`,
             constraint: constraint,
-            displayElem: this._display.drawKillerCage(
-              constraint.cells, constraint.values, uiConfig.displayConfig),
+            displayElem: this._display.drawShadedRegion(
+              constraint.cells, valueStr, uiConfig.displayConfig),
           };
           this._addToPanel(config);
           this._configs.push(config);
@@ -976,7 +977,7 @@ class ConstraintManager {
           placeholder: 'sum',
         },
         displayConfig: {
-          patterned: true,
+          pattern: DisplayItem.CHECKERED_PATTERN,
         },
         description:
           "Values must add up to the given sum. Values don't need to be unique. Only up to 16 cells are allowed.",
@@ -1195,7 +1196,7 @@ class ConstraintManager {
           placeholder: 'values',
         },
         displayConfig: {
-          patterned: true,
+          pattern: DisplayItem.DIAGONAL_PATTERN,
         },
         text: 'Required Values',
         description:
