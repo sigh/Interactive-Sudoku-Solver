@@ -1965,7 +1965,7 @@ SudokuConstraintHandler.Lunchbox = class Lunchbox extends SudokuConstraintHandle
 
         const sum = this._sum;
         const minSum = minMaxSum >> 16;
-        const maxSum = minMaxSum & 0xff;
+        const maxSum = minMaxSum & 0xffff;
         // It is impossible to make the target sum.
         if (sum < minSum || maxSum < sum) return false;
         // We've reached the target sum exactly.
@@ -2243,7 +2243,7 @@ SudokuConstraintHandler.RegionSumLine = class RegionSumLine extends SudokuConstr
       }
       minMaxs[i] = minMax;
       const sumMin = minMax >> 16;
-      const sumMax = minMax & 0xff;
+      const sumMax = minMax & 0xffff;
       globalMin = Math.max(sumMin, globalMin);
       globalMax = Math.min(sumMax, globalMax);
     }
@@ -2254,8 +2254,8 @@ SudokuConstraintHandler.RegionSumLine = class RegionSumLine extends SudokuConstr
     for (let i = 0; i < this._multi.length; i++) {
       const cells = this._multi[i];
       const minMax = minMaxs[i];
-      const sumMin = minMax >> 8;
-      const sumMax = minMax & 0xff;
+      const sumMin = minMax >> 16;
+      const sumMax = minMax & 0xffff;
       const sumMinusMin = globalMax - sumMin;
       const maxMinusSum = sumMax - globalMin;
       if (!this._sumUtil.restrictValueRange(grid, cells, sumMinusMin, maxMinusSum)) {
@@ -2867,7 +2867,7 @@ SudokuConstraintHandler.SumLine = class SumLine extends SudokuConstraintHandler 
       minMax += LookupTables.minMax16bitValue(grid[cells[i]]);
     }
 
-    const maxTotal = minMax & 0xff;
+    const maxTotal = minMax & 0xffff;
     const minTotal = minMax >> 16;
 
     // Check if it possible to reach the sum.
