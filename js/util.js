@@ -39,6 +39,12 @@ const arrayIntersectSize = (a, b) => {
   return a.reduce((p, v) => p + b.includes(v), 0);
 }
 
+const arrayRemoveValue = (a, value) => {
+  const index = a.indexOf(value);
+  if (index > -1) a.splice(index, 1);
+  return a;
+}
+
 const arraysAreEqual = (a, b) => {
   if (a.length != b.length) return false;
   for (let i = 0; i < a.length; i++) {

@@ -263,6 +263,7 @@ const runSolveTests = async (onFailure) => {
     'Duplicate cell sums',
     'Lunchbox',
     'Hidden skyscrapers',
+    'Look-and-say',
   ], onFailure);
   result.collection = '9x9';
   results.push(result);

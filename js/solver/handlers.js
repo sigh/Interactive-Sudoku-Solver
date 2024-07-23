@@ -2649,20 +2649,15 @@ SudokuConstraintHandler.RequiredValues = class RequiredValues extends SudokuCons
       this._valueCounts.set(v, this._valueCounts.get(v) + 1);
     }
 
-    this._valueMask = LookupTables.fromValuesArray(values);
-    this._singleValues = LookupTables.fromValuesArray(
-      values.filter(v => this._valueCounts.get(v) == 1));
-    // Repeated values is an array of masks [v_n, otherValues_n, ...]
-    this._repeatedValues = [];
-    for (const [value, count] of this._valueCounts) {
-      if (count > 1) {
-        const v = LookupTables.fromValue(value);
-        this._repeatedValues.push(v, count, this._valueMask & ~v);
-      }
-    }
-
     this._commonUtil = SudokuConstraintHandler._CommonHandlerUtil;
-    this._quadCells = null;
+  }
+
+  valueCounts() {
+    return this._valueCounts;
+  }
+
+  values() {
+    return this._values;
   }
 
   exclusionCells() {
@@ -2674,26 +2669,37 @@ SudokuConstraintHandler.RequiredValues = class RequiredValues extends SudokuCons
   }
 
   initialize(initialGrid, cellExclusions, shape) {
-    if (this._values.length == this.cells.length) {
-      const valueMask = LookupTables.fromValuesArray(this._values);
-      for (const cell of this.cells) {
-        if (!(initialGrid[cell] &= valueMask)) return false;
+    this._cellExclusions = cellExclusions;
+    const cells = this.cells;
+
+    this._valueMask = LookupTables.fromValuesArray(this._values);
+    this._singleValues = LookupTables.fromValuesArray(
+      this._values.filter(v => this._valueCounts.get(v) == 1));
+    // Repeated values is an array of masks [v_n, otherValues_n, ...]
+    this._repeatedValues = [];
+    for (const [value, count] of this._valueCounts) {
+      if (count > 1) {
+        const v = LookupTables.fromValue(value);
+        this._repeatedValues.push(v, count, this._valueMask & ~v);
       }
     }
 
-    if (this.cells.length == 4) {
-      const quadCells = this.cells.slice();
-      quadCells.sort((a, b) => a - b);
-      if (quadCells[0] + 1 == quadCells[1] &&
-        quadCells[0] + shape.gridSize == quadCells[2] &&
-        quadCells[2] + 1 == quadCells[3] &&
-        quadCells[1] % shape.gridSize !== 0) {
-        // NOTE: Ordered so that the diagonals are next to each other.
-        // This makes it easier to constraint repeated values (which must
-        // lie on the diagonal).
-        [quadCells[1], quadCells[3]] = [quadCells[3], quadCells[1]];
-        this._quadCells = quadCells;
+    // If the size is exact, then there can be no other values in the cells.
+    if (this._values.length == this.cells.length) {
+      for (const cell of this.cells) {
+        if (!(initialGrid[cell] &= this._valueMask)) return false;
       }
+    }
+
+    // Find any cells which are mutually exclusive with the entire
+    // constraint and remove the values from them.
+    let commonExclusions = cellExclusions.getArray(cells[0]);
+    for (let i = 0; i < cells.length; i++) {
+      commonExclusions = arrayIntersect(
+        commonExclusions, cellExclusions.getArray(cells[i]));
+    }
+    for (const cell of commonExclusions) {
+      if (!(initialGrid[cell] &= ~this._valueMask)) return false;
     }
 
     return true;
@@ -2731,52 +2737,6 @@ SudokuConstraintHandler.RequiredValues = class RequiredValues extends SudokuCons
     return true;
   }
 
-  // Optimization specifically quadruples.
-  _enforceQuadRepeatedValues(grid, handlerAccumulator) {
-    const cells = this._quadCells;
-
-    const repeatedValues = this._repeatedValues;
-    const d1And = grid[cells[0]] & grid[cells[1]];
-    const d2And = grid[cells[2]] & grid[cells[3]];
-    for (let i = 0; i < repeatedValues.length; i += 3) {
-      const value = repeatedValues[i];
-      const otherValues = repeatedValues[i + 2];
-
-      // A repeated value must lie on a diagonal.
-      // If both cells in a diagonal don't contain the value, we can
-      // constrain the cells.
-
-      if (value & ~d1And) {
-        const d1Or = grid[cells[0]] | grid[cells[1]];
-        // Other values must be on this diagonal.
-        if (otherValues & ~d1Or) return false;
-        // value is not in d1. Then it must be in d2.
-        if (!(grid[cells[2]] &= value)) return false;
-        if (!(grid[cells[3]] &= value)) return false;
-        // If the value is in one of the cells, remove it from the other.
-        if (d1Or & value) {
-          if (!(grid[cells[0]] &= ~value)) return false;
-          if (!(grid[cells[1]] &= ~value)) return false;
-        }
-      } else if (value & ~d2And) {
-        const d2Or = grid[cells[2]] | grid[cells[3]];
-        // Other values must be on this diagonal.
-        if (otherValues & ~d2Or) return false;
-        // value is not in d2. Then it must be in d1.
-        if (!(grid[cells[0]] &= value)) return false;
-        if (!(grid[cells[1]] &= value)) return false;
-        // If the value is in one of the cells, remove it from the other.
-        if (d2Or & value) {
-          if (!(grid[cells[2]] &= ~value)) return false;
-          if (!(grid[cells[3]] &= ~value)) return false;
-        }
-      }
-    }
-
-    return true;
-  }
-
-
   enforceConsistency(grid, handlerAccumulator) {
     const cells = this.cells;
     const numCells = cells.length;
@@ -2786,11 +2746,7 @@ SudokuConstraintHandler.RequiredValues = class RequiredValues extends SudokuCons
       // NOTE: This must happen before the valueMask & ~fixedValues
       // check as that can return true even if all repeated values aren't
       // satisfied.
-      if (this._quadCells !== null) {
-        if (!this._enforceQuadRepeatedValues(grid, handlerAccumulator)) return false;
-      } else {
-        if (!this._enforceRepeatedValues(grid, handlerAccumulator)) return false;
-      }
+      if (!this._enforceRepeatedValues(grid, handlerAccumulator)) return false;
     }
 
     let allValues = 0;
@@ -3417,6 +3373,10 @@ class HandlerSet {
     } else {
       this._allHandlers[index] = newHandler;
     }
+  }
+
+  delete(handler) {
+    this.replace(handler, new SudokuConstraintHandler.True());
   }
 
   _removeOrdinary(index) {
