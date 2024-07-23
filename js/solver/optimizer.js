@@ -22,6 +22,8 @@ class SudokuConstraintOptimizer {
 
     this._optimizeFullRank(handlerSet, shape);
 
+    this._optimizeRequiredValues(handlerSet, cellExclusions, shape);
+
     if (hasBoxes) {
       this._addHouseIntersections(handlerSet, shape);
     }
@@ -120,20 +122,22 @@ class SudokuConstraintOptimizer {
     return;
   }
 
+  _findCommonHandlers(cells, handlerSet, houseHandlerIndexes) {
+    const cellMap = handlerSet.getOrdinaryHandlerMap();
+
+    let commonHandlers = houseHandlerIndexes;
+    for (const c of cells) {
+      commonHandlers = arrayIntersect(commonHandlers, cellMap[c]);
+      if (commonHandlers.length == 0) return commonHandlers;
+    }
+
+    return commonHandlers;
+  }
+
   _addSumComplementCells(handlerSet) {
     const houseHandlers = (
       handlerSet.getAllofType(SudokuConstraintHandler.House).map(
         h => handlerSet.getIndex(h)));
-    const cellMap = handlerSet.getOrdinaryHandlerMap();
-
-    const findCommonHandler = (cells) => {
-      let commonHandlers = houseHandlers;
-      for (const c of cells) {
-        commonHandlers = arrayIntersect(commonHandlers, cellMap[c]);
-        if (commonHandlers.length == 0) return;
-      }
-      return handlerSet.getHandler(commonHandlers[0]);
-    };
 
     const process = (type, cellsFn) => {
       for (const h of handlerSet.getAllofType(type)) {
@@ -143,8 +147,10 @@ class SudokuConstraintOptimizer {
         if (h.cells.length !== new Set(h.cells).size) continue;
 
         const cells = cellsFn(h);
-        const commonHandler = findCommonHandler(cells);
-        if (!commonHandler) continue;
+        const commonHandlers = this._findCommonHandlers(
+          cells, handlerSet, houseHandlers);
+        if (commonHandlers.length === 0) continue;
+        const commonHandler = handlerSet.getHandler(commonHandlers[0]);
 
         const complementCells = arrayDifference(commonHandler.cells, cells);
         h.setComplementCells(complementCells);
@@ -678,6 +684,121 @@ class SudokuConstraintOptimizer {
         cells: handler.cells
       });
     }
+  }
 
+  _findKnownRequiredValues(cells, value, count, cellExclusions, restrictions) {
+    const numCells = cells.length;
+    const v = LookupTables.fromValue(value);
+    const occurrences = new Uint8Array(numCells);
+    let numCombinations = 0;
+
+    const stack = new Int16Array(numCells);
+    stack[0] = -1;
+    let stackDepth = 1;
+
+    while (stackDepth > 0) {
+      let cellIndex = stack[--stackDepth] + 1;
+      if (stackDepth > 0) {
+        const prevCell = cells[stack[stackDepth - 1]];
+        while (cellIndex < numCells
+          && cellExclusions.isMutuallyExclusive(cells[cellIndex], prevCell)) {
+          cellIndex++;
+        }
+      }
+      if (cellIndex >= numCells) continue;
+      stack[stackDepth++] = cellIndex;
+      if (stackDepth === count) {
+        for (let i = 0; i < stackDepth; i++) {
+          occurrences[stack[i]]++;
+        }
+        numCombinations++;
+      } else {
+        stack[stackDepth++] = cellIndex;
+      }
+    }
+
+    const addRestriction = (cell, values) => {
+      restrictions.set(cell, (restrictions.get(cell) || -1) & values);
+    }
+
+    for (let i = 0; i < numCells; i++) {
+      if (occurrences[i] === numCombinations) {
+        addRestriction(cells[i], v);
+      } else if (occurrences[i] == 0) {
+        addRestriction(cells[i], ~v);
+      }
+    }
+  }
+
+  _optimizeRequiredValues(handlerSet, cellExclusions, shape) {
+    const requiredValueHandlers = handlerSet.getAllofType(SudokuConstraintHandler.RequiredValues);
+    if (requiredValueHandlers.length == 0) return;
+
+    const allValues = LookupTables.get(shape.numValues).allValues;
+
+    for (const h of requiredValueHandlers) {
+      const restrictions = new Map();
+
+      // Brute force search for values which are restricted certain cells.
+      for (const [value, count] of h.valueCounts().entries()) {
+        if (count > 1) {
+          this._findKnownRequiredValues(
+            h.cells, value, count, cellExclusions, restrictions);
+        }
+      }
+
+      // If there are restrictions, then apply then.
+      if (restrictions.size > 0) {
+        const newValues = [...h.values()];
+        const newCells = [...h.cells];
+
+        // Update restrictions and values.
+        for (const [cell, v] of restrictions) {
+          const values = LookupTables.toValuesArray(v & allValues);
+          restrictions.set(cell, values);
+          if (values.length == 1) {
+            arrayRemoveValue(newValues, values[0]);
+            arrayRemoveValue(newCells, cell);
+          }
+        }
+
+        // Create a handler to restrict the values.
+        const newHandler = new SudokuConstraintHandler.GivenCandidates(
+          restrictions);
+        handlerSet.add(newHandler);
+        if (this._debugLogger) {
+          this._debugLogger.log({
+            loc: '_optimizeRequiredValues',
+            msg: 'Add: ' + newHandler.constructor.name,
+            args: { restrictions: Object.fromEntries(restrictions.entries()) },
+            cells: h.cells,
+          });
+        }
+
+        // Replace the old handler if we can remove some cells.
+        if (newValues.length === 0) {
+          handlerSet.delete(h);
+          if (this._debugLogger) {
+            this._debugLogger.log({
+              loc: '_optimizeRequiredValues',
+              msg: 'Delete (no more values): ' + newHandler.constructor.name,
+              cells: h.cells,
+            });
+          }
+        } else if (newCells.length !== h.cells.length) {
+          const newHandler = new SudokuConstraintHandler.RequiredValues(
+            newCells, newValues);
+          handlerSet.replace(h, newHandler);
+          if (this._debugLogger) {
+            this._debugLogger.log({
+              loc: '_optimizeRequiredValues',
+              msg: 'Replace with: ' + newHandler.constructor.name,
+              args: { newValues },
+              cells: newHandler.cells,
+            });
+          }
+        }
+      }
+    }
   }
 }
