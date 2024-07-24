@@ -358,12 +358,6 @@ const EXAMPLES = [
     input: '.HiddenSkyscraper~C4~8~.HiddenSkyscraper~C5~8~.HiddenSkyscraper~C6~8~.HiddenSkyscraper~C7~6~.HiddenSkyscraper~R2~2~2.HiddenSkyscraper~R7~~5.HiddenSkyscraper~C2~~6.HiddenSkyscraper~C3~~7.HiddenSkyscraper~R1~3~.HiddenSkyscraper~R3~1~.HiddenSkyscraper~R4~7~.HiddenSkyscraper~R5~7~.HiddenSkyscraper~R6~7~.',
   },
   {
-    name: 'Look-and-say',
-    src: 'https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?id=0007CP',
-    input: '.ContainExact~6_7~R3C1~R2C1~R1C1.ContainExact~3_4_4~R1C3~R2C3~R2C4~R1C4.ContainExact~1~R1C7~R1C8.ContainExact~9_3~R2C9~R2C8~R3C8~R3C7~R3C6.ContainExact~5_5_5_8~R3C9~R4C9~R5C9~R5C8~R5C7~R6C7~R6C6.ContainExact~1_2~R7C9~R7C8~R8C8~R8C7~R9C7.ContainExact~3_3_1~R7C4~R8C4~R8C3~R8C2~R7C2.ContainExact~6_6~R7C5~R6C5~R6C4~R5C4.ContainExact~1_1_3~R6C2~R6C1~R7C1.ContainExact~8_8~R7C7~R7C6~R8C6~R9C6.ContainExact~4_2_2~R5C5~R4C5~R4C4~R4C3.ContainExact~9_9_9~R5C1~R6C2~R7C3~R8C4~R9C5.ContainExact~6_6~R6C9~R7C8~R8C7~R9C6.',
-    solution: '893456712654217983721839465562741398948623571317985246179362854435178629286594137',
-  },
-  {
     name: 'Look-and-Say 2',
     src: 'https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?chlang=en&id=0008M1',
     input: '.ContainExact~2~R1C2~R2C2~R3C2~R3C3.ContainExact~6_7~R2C7~R3C7~R3C8.ContainExact~5_5~R6C9~R7C9~R7C8.ContainExact~7_7~R8C2~R8C3~R9C3~R9C4~R9C2.ContainExact~1_1_2_2~R6C2~R7C2~R7C3~R7C4~R8C4.ContainExact~4_4_2~R5C5~R6C5~R7C5~R8C5~R7C6.ContainExact~3_3_3~R4C6~R4C7~R5C7~R6C7~R7C7~R6C8~R5C8.ContainExact~1~R1C7~R2C8~R3C9.ContainExact~8_8~R4C9~R3C8~R2C7~R1C6.ContainExact~4_4~R6C9~R5C8~R4C7~R3C6~R2C5~R1C4.ContainExact~3_3_3~R1C9~R2C8~R3C7~R4C6~R5C5~R6C4~R7C3~R8C2~R9C1.ContainExact~2~R1C1~R2C2~R3C3~R4C4~R5C5~R6C6~R7C7~R8C8~R9C9.ContainExact~1_1_1~R3C1~R4C2~R5C3~R6C4~R7C5~R8C6~R9C7.ContainExact~9~R4C1~R5C2~R6C3~R7C4~R8C5~R9C6.ContainExact~3~R1C4~R2C3~R3C2~R4C1.ContainExact~9_9~R1C6~R2C5~R3C4~R4C3~R5C2~R6C1.ContainExact~8_8_8~R1C7~R2C6~R3C5~R4C4~R5C3~R6C2~R7C1.',
