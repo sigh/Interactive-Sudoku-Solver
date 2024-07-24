@@ -1081,6 +1081,10 @@ SudokuSolver.HandlerAccumulator = class {
   }
 }
 
+SudokuSolver.DummyHandlerAccumulator = class {
+  addForCell(cell) { }
+}
+
 SudokuSolver.CellExclusions = class {
   constructor(handlerSet, shape) {
     this._cellExclusionSets = [];

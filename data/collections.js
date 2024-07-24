@@ -610,6 +610,20 @@ const EXAMPLES = [
     input: '.LittleKiller~8~R1C4.LittleKiller~9~R3C1.LittleKiller~26~R5C6.LittleKiller~17~R6C2..Shape~6x6',
     solution: '462135513624236541145362321456654213',
   },
+
+  //////////////////////////////////////////////////////////////////////////////
+  // Or
+  //////////////////////////////////////////////////////////////////////////////
+  {
+    name: 'Hidden Skyscraper - Full Odd',
+    src: 'https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?id=00037K',
+    input: `
+      .HiddenSkyscraper~C3~1~.HiddenSkyscraper~C4~1~.HiddenSkyscraper~R1~7~.HiddenSkyscraper~R3~7~.HiddenSkyscraper~R6~5~.HiddenSkyscraper~R5~1~1.HiddenSkyscraper~R8~1~1.HiddenSkyscraper~C1~~3.HiddenSkyscraper~C2~~1.HiddenSkyscraper~C5~~1.HiddenSkyscraper~C8~5~1.HiddenSkyscraper~R9~~3.HiddenSkyscraper~R2~~1.HiddenSkyscraper~C6~3~
+      .Or.HiddenSkyscraper~R1~~2.HiddenSkyscraper~R1~~4.HiddenSkyscraper~R1~~6.HiddenSkyscraper~R1~~8.End.Or.HiddenSkyscraper~R3~~2.HiddenSkyscraper~R3~~4.HiddenSkyscraper~R3~~6.HiddenSkyscraper~R3~~8.End.Or.HiddenSkyscraper~R4~~2.HiddenSkyscraper~R4~~4.HiddenSkyscraper~R4~~6.HiddenSkyscraper~R4~~8.End.Or.HiddenSkyscraper~R6~~2.HiddenSkyscraper~R6~~4.HiddenSkyscraper~R6~~6.HiddenSkyscraper~R6~~8.End.Or.HiddenSkyscraper~R7~~2.HiddenSkyscraper~R7~~4.HiddenSkyscraper~R7~~6.HiddenSkyscraper~R7~~8.End.Or.HiddenSkyscraper~C3~~2.HiddenSkyscraper~C3~~4.HiddenSkyscraper~C3~~6.HiddenSkyscraper~C3~~8.End.Or.HiddenSkyscraper~C4~~2.HiddenSkyscraper~C4~~4.HiddenSkyscraper~C4~~6.HiddenSkyscraper~C4~~8.End.Or.HiddenSkyscraper~C6~~2.HiddenSkyscraper~C6~~4.HiddenSkyscraper~C6~~6.HiddenSkyscraper~C6~~8.End.Or.HiddenSkyscraper~C7~~2.HiddenSkyscraper~C7~~4.HiddenSkyscraper~C7~~6.HiddenSkyscraper~C7~~8.End.Or.HiddenSkyscraper~C9~~2.HiddenSkyscraper~C9~~4.HiddenSkyscraper~C9~~6.HiddenSkyscraper~C9~~8.End
+      .Or.HiddenSkyscraper~C1~2~.HiddenSkyscraper~C1~4~.HiddenSkyscraper~C1~6~.HiddenSkyscraper~C1~8~.End.Or.HiddenSkyscraper~C2~2~.HiddenSkyscraper~C2~4~.HiddenSkyscraper~C2~6~.HiddenSkyscraper~C2~8~.End.Or.HiddenSkyscraper~C5~2~.HiddenSkyscraper~C5~4~.HiddenSkyscraper~C5~6~.HiddenSkyscraper~C5~8~.End.Or.HiddenSkyscraper~C7~2~.HiddenSkyscraper~C7~4~.HiddenSkyscraper~C7~6~.HiddenSkyscraper~C7~8~.End.Or.HiddenSkyscraper~C9~2~.HiddenSkyscraper~C9~4~.HiddenSkyscraper~C9~6~.HiddenSkyscraper~C9~8~.End.Or.HiddenSkyscraper~R2~2~.HiddenSkyscraper~R2~4~.HiddenSkyscraper~R2~6~.HiddenSkyscraper~R2~8~.End.Or.HiddenSkyscraper~R4~2~.HiddenSkyscraper~R4~4~.HiddenSkyscraper~R4~6~.HiddenSkyscraper~R4~8~.End.Or.HiddenSkyscraper~R7~2~.HiddenSkyscraper~R7~4~.HiddenSkyscraper~R7~6~.HiddenSkyscraper~R7~8~.End.Or.HiddenSkyscraper~R9~2~.HiddenSkyscraper~R9~4~.HiddenSkyscraper~R9~6~.HiddenSkyscraper~R9~8~.End
+    `,
+    solution: '973645281426198753158723694761489325234567819895231476582314967319876542647952138',
+  },
 ];
 
 for (const puzzle of EXAMPLES) {
