@@ -827,13 +827,14 @@ class ConstraintManager {
           this._configs.push(config);
         }
         break;
+      case 'ContainAtLeast':
       case 'ContainExact':
         {
           const uiConfig = this._multiCellConstraints[constraint.type];
           const valueStr = constraint.values.replace(/_/g, ',');
           config = {
             cells: constraint.cells,
-            name: `ContainExact (${valueStr})`,
+            name: `${constraint.type} (${valueStr})`,
             constraint: constraint,
             displayElem: this._display.drawShadedRegion(
               constraint.cells, valueStr, uiConfig.displayConfig),
@@ -1200,8 +1201,21 @@ class ConstraintManager {
         },
         text: 'Contain Exact',
         description:
-          `All the given values must be present in the selected squares.
+          `The comma-separated values must be present in the selected squares.
            If value is must be contained exactly as many times as is
+           repeated in the list.`,
+      },
+      ContainAtLeast: {
+        value: {
+          placeholder: 'values',
+        },
+        displayConfig: {
+          pattern: DisplayItem.DIAGONAL_PATTERN,
+        },
+        text: 'Contain At Least',
+        description:
+          `The comma-separated values must be present in the selected squares.
+           If value is must be contained at least as many times as is
            repeated in the list.`,
       },
       Indexing: {
@@ -1340,12 +1354,14 @@ class ConstraintManager {
         const constraint = new SudokuConstraint.Quad(cells[0], ...values);
         this.loadConstraint(constraint);
       }
-    } else if (config.constraintClass === SudokuConstraint.ContainExact) {
+    } else if (
+      config.constraintClass === SudokuConstraint.ContainExact ||
+      config.constraintClass === SudokuConstraint.ContainAtLeast) {
       const valuesStr = formData.get(type + '-value');
       const values = valuesStr.split(/[, ]+/).map(v => +v).filter(
         v => Number.isInteger(v) && v >= 1 && v <= this._shape.numValues);
       if (values.length) {
-        const constraint = new SudokuConstraint.ContainExact(values.join('_'), ...cells);
+        const constraint = new config.constraintClass(values.join('_'), ...cells);
         this.loadConstraint(constraint);
       }
     } else if (config.constraintClass === SudokuConstraint.Jigsaw) {

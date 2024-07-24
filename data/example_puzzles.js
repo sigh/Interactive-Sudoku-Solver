@@ -236,6 +236,12 @@ const DISPLAYED_EXAMPLES = [
     solution: '278569413916384752435127968123496587894275136567831249759643821642718395381952674',
   },
   {
+    name: 'Look-and-say',
+    src: 'https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?id=0007CP',
+    input: '.ContainExact~6_7~R3C1~R2C1~R1C1.ContainExact~3_4_4~R1C3~R2C3~R2C4~R1C4.ContainExact~1~R1C7~R1C8.ContainExact~9_3~R2C9~R2C8~R3C8~R3C7~R3C6.ContainExact~5_5_5_8~R3C9~R4C9~R5C9~R5C8~R5C7~R6C7~R6C6.ContainExact~1_2~R7C9~R7C8~R8C8~R8C7~R9C7.ContainExact~3_3_1~R7C4~R8C4~R8C3~R8C2~R7C2.ContainExact~6_6~R7C5~R6C5~R6C4~R5C4.ContainExact~1_1_3~R6C2~R6C1~R7C1.ContainExact~8_8~R7C7~R7C6~R8C6~R9C6.ContainExact~4_2_2~R5C5~R4C5~R4C4~R4C3.ContainExact~9_9_9~R5C1~R6C2~R7C3~R8C4~R9C5.ContainExact~6_6~R6C9~R7C8~R8C7~R9C6.',
+    solution: '893456712654217983721839465562741398948623571317985246179362854435178629286594137',
+  },
+  {
     name: '16x16',
     src: 'http://forum.enjoysudoku.com/symmertic-16x16-grid-t38266.html#p295157',
     input: `

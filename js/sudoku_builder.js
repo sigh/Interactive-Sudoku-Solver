@@ -987,13 +987,15 @@ class SudokuConstraint {
     }
   }
 
-  static ContainExact = class ContainExact extends SudokuConstraintBase {
+  static ContainAtLeast = class ContainAtLeast extends SudokuConstraintBase {
     constructor(values, ...cells) {
       super(arguments);
       this.cells = cells;
       this.values = values;
     }
   }
+
+  static ContainExact = class ContainExact extends SudokuConstraint.ContainAtLeast { };
 
   static Quad = class Quad extends SudokuConstraintBase {
     constructor(topLeftCell, ...values) {
@@ -1619,11 +1621,18 @@ class SudokuBuilder {
           }
           break;
 
+        case 'ContainAtLeast':
+          yield new SudokuConstraintHandler.RequiredValues(
+            constraint.cells.map(c => shape.parseCellId(c).cell),
+            constraint.values.split('_').map(v => +v),
+            /* strict = */ false);
+          break;
+
         case 'ContainExact':
           yield new SudokuConstraintHandler.RequiredValues(
             constraint.cells.map(c => shape.parseCellId(c).cell),
             constraint.values.split('_').map(v => +v),
-            true);
+            /* strict = */ true);
           break;
 
         case 'Quad':
@@ -1631,7 +1640,7 @@ class SudokuBuilder {
             SudokuConstraint.Quad.cells(
               constraint.topLeftCell).map(c => shape.parseCellId(c).cell),
             constraint.values.map(v => +v),
-            false);
+            /* strict = */ false);
           break;
 
         case 'Binary':
