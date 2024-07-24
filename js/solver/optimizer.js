@@ -751,6 +751,7 @@ class SudokuConstraintOptimizer {
       if (restrictions.size > 0) {
         const newValues = [...h.values()];
         const newCells = [...h.cells];
+        const valueMask = LookupTables.fromValuesArray(h.values());
 
         // Update restrictions and values.
         for (const [cell, v] of restrictions) {
@@ -758,6 +759,9 @@ class SudokuConstraintOptimizer {
           restrictions.set(cell, values);
           if (values.length == 1) {
             arrayRemoveValue(newValues, values[0]);
+            arrayRemoveValue(newCells, cell);
+          }
+          if (!(v & valueMask)) {
             arrayRemoveValue(newCells, cell);
           }
         }
