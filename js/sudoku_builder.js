@@ -407,6 +407,23 @@ class SudokuParser {
     return new SudokuConstraint.Set(constraints);
   }
 
+  static _collectGroups(revConstraints, groupType) {
+    const items = [];
+
+    while (revConstraints.length) {
+      const c = revConstraints.pop();
+      if (c.type === 'End') break;
+
+      if (c.constructor.IS_GROUP) {
+        items.push(
+          this._collectGroups(revConstraints, c.constructor.name));
+      } else {
+        items.push(c);
+      }
+    }
+    return new SudokuConstraint[groupType](items);
+  }
+
   static parseString(str) {
     str = str.replace(/\s+/g, '');
     let items = str.split('.');
@@ -414,17 +431,18 @@ class SudokuParser {
       'Invalid constraint string: Constraint must start with a "."');
     items.shift();
 
-    let constraints = [];
+    const constraints = [];
     for (const item of items) {
-      let args = item.split('~');
-      let type = args.shift();
-      if (!type) type = SudokuConstraint.Givens.name;
-      if (!SudokuConstraint[type]) {
+      const args = item.split('~');
+      const type = args.shift() || SudokuConstraint.Givens.name;
+      const cls = SudokuConstraint[type];
+      if (!cls) {
         throw ('Unknown constraint type: ' + type);
       }
-      constraints.push(new SudokuConstraint[type](...args));
+      constraints.push(new cls(...args));
     }
-    return new SudokuConstraint.Set(constraints);
+
+    return this._collectGroups(constraints.reverse(), 'Set');
   }
 
   static extractConstraintTypes(str) {
@@ -474,6 +492,7 @@ class CellArgs {
 
 class SudokuConstraintBase {
   static LOOPS_ALLOWED = false;
+  static IS_GROUP = false;
   static COLLECTOR_CLASS = 'Invisible';
 
   constructor(args) {
@@ -582,6 +601,8 @@ class SudokuConstraintBase {
 class SudokuConstraint {
 
   static Set = class Set extends SudokuConstraintBase {
+    static IS_GROUP = true;
+
     constructor(constraints) {
       super(arguments);
       this.constraints = constraints;
@@ -591,6 +612,25 @@ class SudokuConstraint {
       return this.constraints.map(c => c.toString()).join('');
     }
   }
+
+  static Or = class Or extends SudokuConstraintBase {
+    static IS_GROUP = true;
+
+    constructor(constraints) {
+      super(arguments);
+      this.constraints = constraints || [];
+    }
+
+    toString() {
+      return [
+        '.Or',
+        ...this.constraints.map(c => c.toString()),
+        '.End',
+      ].join('');
+    }
+  }
+
+  static End = class End extends SudokuConstraintBase { }
 
   static Jigsaw = class Jigsaw extends SudokuConstraintBase {
     static COLLECTOR_CLASS = 'Jigsaw';
@@ -1350,11 +1390,13 @@ class SudokuBuilder {
   static _unusedWorkers = [];
 
   static resolveConstraint(constraint) {
-    let args = constraint.args;
-    if (constraint.type === 'Set') {
+    const args = constraint.args;
+    const cls = SudokuConstraint[constraint.type];
+
+    if (cls.IS_GROUP) {
       args[0] = constraint.args[0].map(a => this.resolveConstraint(a));
     }
-    return new SudokuConstraint[constraint.type](...args);
+    return new cls(...args);
   }
 
   static async buildInWorker(constraints, stateHandler, statusHandler, debugHandler) {
@@ -1929,6 +1971,17 @@ class SudokuBuilder {
         case 'Priority':
           cells = constraint.cells.map(c => shape.parseCellId(c).cell);
           yield new SudokuConstraintHandler.Priority(cells, constraint.priority);
+          break;
+
+        case 'Or':
+          {
+            const handlers = [];
+            for (const c of constraint.constraints) {
+              const cHandlers = [...this._constraintHandlers(c.toMap(), shape)];
+              handlers.push(new SudokuConstraintHandler.And(...cHandlers));
+            }
+            yield new SudokuConstraintHandler.Or(...handlers);
+          }
           break;
 
         case 'NoBoxes':

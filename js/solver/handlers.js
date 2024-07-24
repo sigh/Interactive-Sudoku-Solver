@@ -92,9 +92,16 @@ SudokuConstraintHandler.False = class False extends SudokuConstraintHandler {
 
 SudokuConstraintHandler.And = class And extends SudokuConstraintHandler {
   constructor(...handlers) {
-    const cells = Array.from(new Set(handlers.flatMap(h => [...h.cells])));
+    const cells = [...new Set(handlers.flatMap(h => [...h.cells]))];
     super(cells);
 
+    for (const h of handlers) {
+      const exclusionCells = h.exclusionCells();
+      if (exclusionCells.length) {
+        handlers.push(
+          new SudokuConstraintHandler.AllDifferentEnforcement(exclusionCells));
+      }
+    }
     this._handlers = handlers;
 
     this._debugName = `And(${handlers.map(h => h.debugName()).join(',')})`;
@@ -153,6 +160,34 @@ SudokuConstraintHandler.AllDifferent = class AllDifferent extends SudokuConstrai
 
   exclusionCells() {
     return this._exclusionCells;
+  }
+}
+
+// Special handler for enforcing all-different constraints which are not
+// top-level constraints.
+SudokuConstraintHandler.AllDifferentEnforcement = class AllDifferentEnforcement extends SudokuConstraintHandler {
+  constructor(exclusionCells) {
+    exclusionCells = Array.from(new Set(exclusionCells));
+    exclusionCells.sort((a, b) => a - b);
+    super(exclusionCells);
+  }
+
+  initialize(initialGrid, cellExclusions, shape) {
+    return this.cells.length <= shape.numValues;
+  }
+
+  enforceConsistency(grid, handlerAccumulator) {
+    const cells = this.cells;
+    const numCells = cells.length;
+    for (let i = 0; i < numCells; i++) {
+      const cell = cells[i];
+      const v = grid[cell];
+      if (v & (v - 1)) continue;
+      for (let j = 0; j < numCells; j++) {
+        if (i !== j && (!(grid[cells[j]] &= ~v))) return false;
+      }
+    }
+    return true;
   }
 }
 
@@ -3634,6 +3669,71 @@ SudokuConstraintHandler.FullRank = class FullRank extends SudokuConstraintHandle
     }
 
     return finders;
+  }
+}
+
+SudokuConstraintHandler.Or = class Or extends SudokuConstraintHandler {
+  constructor(...handlers) {
+    const cells = [...new Set(handlers.flatMap(h => [...h.cells]))];
+    super(cells);
+
+    this._scratchGrid = null;
+    this._resultGrid = null;
+    this._handlers = handlers;
+    this._initializations = [];
+    this._dummyHandlerAccumulator = new SudokuSolver.DummyHandlerAccumulator();
+  }
+
+  initialize(initialGrid, cellExclusions, shape) {
+    this._scratchGrid = initialGrid.slice();
+    this._resultGrid = initialGrid.slice();
+
+    // Initialize each handler and store any initialization changes that it
+    // makes.
+    const validHandlers = [];
+    for (const handler of this._handlers) {
+      this._scratchGrid.set(initialGrid);
+      if (!handler.initialize(this._scratchGrid, cellExclusions, shape)) continue;
+
+      const initialization = [];
+      for (let i = 0; i < shape.numCells; i++) {
+        if (this._scratchGrid[i] !== initialGrid[i]) {
+          initialization.push(i, this._scratchGrid[i]);
+        }
+      }
+      validHandlers.push(handler);
+      this._initializations.push(initialization);
+    }
+
+    this._handlers = validHandlers;
+    return validHandlers.length > 0;
+  }
+
+  enforceConsistency(grid, handlerAccumulator) {
+    const resultGrid = this._resultGrid;
+    const scratchGrid = this._scratchGrid;
+    const numCells = resultGrid.length;
+    const dummyHandlerAccumulator = this._dummyHandlerAccumulator;
+    resultGrid.fill(0);
+
+    for (let i = 0; i < this._handlers.length; i++) {
+      const handler = this._handlers[i];
+      const initialization = this._initializations[i];
+
+      // Initialize the scratch grid.
+      scratchGrid.set(grid);
+      for (let j = 0; j < initialization.length; j += 2) {
+        if (!(scratchGrid[initialization[j]] &= initialization[j + 1])) continue;
+      }
+      // Enforce consistency on the scratch grid.
+      if (!handler.enforceConsistency(scratchGrid, dummyHandlerAccumulator)) continue;
+      for (let j = 0; j < numCells; j++) resultGrid[j] |= scratchGrid[j];
+    }
+
+    if (resultGrid[0] === 0) return false;
+
+    grid.set(resultGrid);
+    return true;
   }
 }
 
