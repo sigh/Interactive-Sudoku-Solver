@@ -283,6 +283,7 @@ const runSolveTests = async (onFailure) => {
     '6x6: Numbered rooms',
     '6x6: Between Odd and Even',
     '6x6: Little Killer',
+    '4x4: Counting circles',
   ], onFailure);
   result.collection = 'Other sizes';
   results.push(result);
