@@ -75,6 +75,7 @@ class GridShape {
   }
 }
 
+const SHAPE_4x4 = new GridShape(4, 2, 2);
 const SHAPE_6x6 = new GridShape(6, 3, 2);
 const SHAPE_9x9 = new GridShape(9, 3, 3);
 const SHAPE_16x16 = new GridShape(16, 4, 4);
@@ -206,6 +207,7 @@ class SudokuParser {
 
   static SHAPE_TO_BASE_CHAR_CODE = new Map([
     [SHAPE_6x6, '1'.charCodeAt(0)],
+    [SHAPE_4x4, '1'.charCodeAt(0)],
     [SHAPE_9x9, '1'.charCodeAt(0)],
     [SHAPE_16x16, 'A'.charCodeAt(0)],
   ])

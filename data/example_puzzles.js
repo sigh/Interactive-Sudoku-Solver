@@ -293,9 +293,15 @@ const DISPLAYED_EXAMPLES = [
   },
   {
     name: '6x6: Numbered rooms',
-    'src': 'https://discord.com/channels/709370620642852885/721090566481510732/1253331176685568112',
-    'input': '.NumberedRoom~C1~1~6.NumberedRoom~R1~1~6.NumberedRoom~C2~6~1.NumberedRoom~C3~1~3.NumberedRoom~C4~6~6.NumberedRoom~C5~3~1.NumberedRoom~C6~3~6.NumberedRoom~R2~3~1.NumberedRoom~R4~3~6.NumberedRoom~R5~3~1.NumberedRoom~R6~3~6.NumberedRoom~R3~1~3..Shape~6x6',
-    'solution': '143562625143351426462315234651516234',
+    src: 'https://discord.com/channels/709370620642852885/721090566481510732/1253331176685568112',
+    input: '.NumberedRoom~C1~1~6.NumberedRoom~R1~1~6.NumberedRoom~C2~6~1.NumberedRoom~C3~1~3.NumberedRoom~C4~6~6.NumberedRoom~C5~3~1.NumberedRoom~C6~3~6.NumberedRoom~R2~3~1.NumberedRoom~R4~3~6.NumberedRoom~R5~3~1.NumberedRoom~R6~3~6.NumberedRoom~R3~1~3..Shape~6x6',
+    solution: '143562625143351426462315234651516234',
+  },
+  {
+    name: '4x4: Counting circles',
+    src: 'https://sudokupad.app/etg05f8sm8',
+    input: '.CountingCircles~R1C1~R1C2~R2C2~R3C1~R4C1~R4C2~R4C4~R2C3~R2C4..Shape~4x4',
+    solution: '3421124341322314',
   },
 ];
 
