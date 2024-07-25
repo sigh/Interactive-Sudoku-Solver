@@ -208,6 +208,73 @@ SudokuConstraintHandler._CommonHandlerUtil = class _CommonHandlerUtil {
 
     return true;
   }
+
+  // Partition the cells into groups where members are all unique.
+  static findExclusionGroups(cells, cellExclusions) {
+    let bestExclusionGroupsScore = 0;
+    let bestExclusionGroups = [];
+    let randomGen = new RandomIntGenerator(0);
+
+    const NUM_TRIALS = 5;
+
+    // Choose `NUM_TRIALS` random orderings of the cells and find the one that
+    // generates the best exclusion groups.
+    // NOTE: The first ordering is the original (sorted) ordering. This ordering
+    //       should work well for little killers and other linear regions.
+    cells = cells.slice();
+    for (let i = 0; i < NUM_TRIALS; i++) {
+      let exclusionGroups = this._findExclusionGroupsGreedy(cells, cellExclusions);
+      // If there is only one exclusion group, then we can't do any better.
+      if (exclusionGroups.length == 1) return exclusionGroups;
+
+      // Optimize for the sum of triangle numbers.
+      let exclusionGroupsScore = exclusionGroups.reduce(
+        (acc, cs) => cs.length * (cs.length + 1) / 2 + acc, 0);
+      if (exclusionGroupsScore > bestExclusionGroupsScore) {
+        bestExclusionGroupsScore = exclusionGroupsScore;
+        bestExclusionGroups = exclusionGroups;
+      }
+
+      shuffleArray(cells, randomGen);
+    }
+
+    return bestExclusionGroups;
+  }
+
+  // Partition the cells into groups where members are all unique.
+  // Applies a greedy algorithm by, each iteration, choosing a cell and adding
+  // as many remaining cells to it as possible to create the next group.
+  static _findExclusionGroupsGreedy(cells, cellExclusions) {
+    let exclusionGroups = [];
+    let unassignedCells = cells;
+    let remainingUnassignedCells = [];
+
+    while (unassignedCells.length > 0) {
+      let currentGroup = [];
+      for (const unassignedCell of unassignedCells) {
+        // Determine if this cell is mutually exclusive with every cell in the
+        // current group. If so, then add it to the current group.
+        let addToCurrentSet = true;
+        for (const exclusionCell of currentGroup) {
+          if (!cellExclusions.isMutuallyExclusive(unassignedCell, exclusionCell)) {
+            addToCurrentSet = false;
+            break;
+          }
+        }
+        if (addToCurrentSet) {
+          currentGroup.push(unassignedCell);
+        } else {
+          remainingUnassignedCells.push(unassignedCell);
+        }
+      }
+      exclusionGroups.push(currentGroup);
+      unassignedCells = remainingUnassignedCells;
+      remainingUnassignedCells = [];
+    }
+
+    return exclusionGroups;
+  }
+
 }
 
 SudokuConstraintHandler.House = class House extends SudokuConstraintHandler {
@@ -735,72 +802,6 @@ SudokuConstraintHandler._SumHandlerUtil = class _SumHandlerUtil {
     })();
   }
 
-  // Partition the cells into groups where members are all unique.
-  static findExclusionGroups(cells, cellExclusions) {
-    let bestExclusionGroupsScore = 0;
-    let bestExclusionGroups = [];
-    let randomGen = new RandomIntGenerator(0);
-
-    const NUM_TRIALS = 5;
-
-    // Choose `NUM_TRIALS` random orderings of the cells and find the one that
-    // generates the best exclusion groups.
-    // NOTE: The first ordering is the original (sorted) ordering. This ordering
-    //       should work well for little killers and other linear regions.
-    cells = cells.slice();
-    for (let i = 0; i < NUM_TRIALS; i++) {
-      let exclusionGroups = this.findExclusionGroupsGreedy(cells, cellExclusions);
-      // If there is only one exclusion group, then we can't do any better.
-      if (exclusionGroups.length == 1) return exclusionGroups;
-
-      // Optimize for the sum of triangle numbers.
-      let exclusionGroupsScore = exclusionGroups.reduce(
-        (acc, cs) => cs.length * (cs.length + 1) / 2 + acc, 0);
-      if (exclusionGroupsScore > bestExclusionGroupsScore) {
-        bestExclusionGroupsScore = exclusionGroupsScore;
-        bestExclusionGroups = exclusionGroups;
-      }
-
-      shuffleArray(cells, randomGen);
-    }
-
-    return bestExclusionGroups;
-  }
-
-  // Partition the cells into groups where members are all unique.
-  // Applies a greedy algorithm by, each iteration, choosing a cell and adding
-  // as many remaining cells to it as possible to create the next group.
-  static findExclusionGroupsGreedy(cells, cellExclusions) {
-    let exclusionGroups = [];
-    let unassignedCells = cells;
-    let remainingUnassignedCells = [];
-
-    while (unassignedCells.length > 0) {
-      let currentGroup = [];
-      for (const unassignedCell of unassignedCells) {
-        // Determine if this cell is mutually exclusive with every cell in the
-        // current group. If so, then add it to the current group.
-        let addToCurrentSet = true;
-        for (const exclusionCell of currentGroup) {
-          if (!cellExclusions.isMutuallyExclusive(unassignedCell, exclusionCell)) {
-            addToCurrentSet = false;
-            break;
-          }
-        }
-        if (addToCurrentSet) {
-          currentGroup.push(unassignedCell);
-        } else {
-          remainingUnassignedCells.push(unassignedCell);
-        }
-      }
-      exclusionGroups.push(currentGroup);
-      unassignedCells = remainingUnassignedCells;
-      remainingUnassignedCells = [];
-    }
-
-    return exclusionGroups;
-  }
-
   restrictValueRange(grid, cells, sumMinusMin, maxMinusSum) {
     // Remove any values which aren't possible because they would cause the sum
     // to be too high.
@@ -1182,11 +1183,11 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
     this._sumUtil = SudokuConstraintHandler._SumHandlerUtil.get(shape.numValues);
 
     this._exclusionGroups = (
-      SudokuConstraintHandler._SumHandlerUtil.findExclusionGroups(
+      SudokuConstraintHandler._CommonHandlerUtil.findExclusionGroups(
         this._positiveCells, cellExclusions));
     if (this._negativeCells.length) {
       this._exclusionGroups.push(
-        ...SudokuConstraintHandler._SumHandlerUtil.findExclusionGroups(
+        ...SudokuConstraintHandler._CommonHandlerUtil.findExclusionGroups(
           this._negativeCells, cellExclusions));
     }
 
@@ -2299,7 +2300,7 @@ SudokuConstraintHandler.Between = class Between extends SudokuConstraintHandler 
   }
 
   initialize(initialGrid, cellExclusions, shape) {
-    const exclusionGroups = SudokuConstraintHandler._SumHandlerUtil.findExclusionGroups(
+    const exclusionGroups = SudokuConstraintHandler._CommonHandlerUtil.findExclusionGroups(
       this._mids, cellExclusions);
     const maxGroupSize = Math.max(0, ...exclusionGroups.map(a => a.length));
     const minEndsDelta = maxGroupSize ? maxGroupSize + 1 : 0;
@@ -2999,7 +3000,7 @@ SudokuConstraintHandler.CountingCircles = class CountingCircles extends SudokuCo
     if (!combinations) return false;
 
     const exclusionGroups = (
-      SudokuConstraintHandler._SumHandlerUtil.findExclusionGroups(
+      SudokuConstraintHandler._CommonHandlerUtil.findExclusionGroups(
         this.cells, cellExclusions));
 
     // Restrict values to the possible sums.
