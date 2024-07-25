@@ -994,6 +994,7 @@ class SudokuConstraint {
       super(arguments);
       this.cells = cells;
       this.values = values;
+      this.valueStr = values.replace(/_/g, ',');
     }
   }
 
@@ -1134,6 +1135,11 @@ class SudokuConstraint {
       super(arguments);
       this.indexType = indexType;
       this.cells = cells;
+    }
+
+    indexTypeStr() {
+      return SudokuConstraint.Indexing.ROW_INDEXING
+        ? 'Row' : 'Column';
     }
   }
 

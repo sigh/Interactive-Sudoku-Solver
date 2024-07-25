@@ -257,7 +257,7 @@ class JigsawManager {
       pieceId: pieceId,
       cells: cells,
       name: '',
-      displayElem: this._display.drawRegion(cells),
+      displayElem: this._display.drawItem({ cells }, ConstraintDisplays.Jigsaw, null),
     };
     this._addToRegionPanel(config);
   }
@@ -722,45 +722,9 @@ class ConstraintManager {
         this._givenCandidates.setValueIds(constraint.values);
         break;
       case 'X':
-        config = {
-          cells: constraint.cells,
-          name: 'x',
-          constraint: constraint,
-          displayElem: this._display.drawXV(constraint.cells, 'x'),
-        };
-        this._addToPanel(config);
-        this._configs.push(config);
-        break;
       case 'V':
-        config = {
-          cells: constraint.cells,
-          name: 'v',
-          constraint: constraint,
-          displayElem: this._display.drawXV(constraint.cells, 'v'),
-        };
-        this._addToPanel(config);
-        this._configs.push(config);
-        break;
       case 'BlackDot':
-        config = {
-          cells: constraint.cells,
-          name: '&#9679',
-          constraint: constraint,
-          displayElem: this._display.drawDot(constraint.cells, 'black'),
-        };
-        this._addToPanel(config);
-        this._configs.push(config);
-        break;
       case 'WhiteDot':
-        config = {
-          cells: constraint.cells,
-          name: '&#9675',
-          constraint: constraint,
-          displayElem: this._display.drawDot(constraint.cells, 'white'),
-        };
-        this._addToPanel(config);
-        this._configs.push(config);
-        break;
       case 'Arrow':
       case 'DoubleArrow':
       case 'Renban':
@@ -773,103 +737,46 @@ class ConstraintManager {
       case 'Between':
       case 'Lockout':
       case 'RegionSumLine':
+      case 'PillArrow':
+      case 'Thermo':
+      case 'Cage':
+      case 'Sum':
+      case 'Lunchbox':
+      case 'CountingCircles':
+      case 'ContainAtLeast':
+      case 'ContainExact':
+      case 'Indexing':
         {
           const uiConfig = this._multiCellConstraints[constraint.type];
           config = {
             cells: constraint.cells,
             name: uiConfig.panelText?.(constraint) || uiConfig.text,
             constraint: constraint,
-            displayElem: this._display.drawLineConstraint(
-              new CellArgs(constraint.cells, constraint.type),
+            displayElem: this._display.drawItem(
+              constraint,
+              uiConfig.displayClass,
               uiConfig.displayConfig),
           };
           this._addToPanel(config);
           this._configs.push(config);
         }
         break;
-      case 'PillArrow':
-        config = {
-          cells: constraint.cells,
-          name: this._multiCellConstraints[constraint.type].text,
-          constraint: constraint,
-          displayElem: this._display.drawPillArrow(
-            constraint.cells, constraint.pillSize),
-        };
-        this._addToPanel(config);
-        this._configs.push(config);
-        break;
-      case 'Thermo':
-        config = {
-          cells: constraint.cells,
-          name: 'Thermo',
-          constraint: constraint,
-          displayElem: this._display.drawThermometer(constraint.cells),
-        };
-        this._addToPanel(config);
-        this._configs.push(config);
-        break;
       case 'Jigsaw':
         this._jigsawManager.setConstraint(constraint);
-        break;
-      case 'Cage':
-      case 'Sum':
-      case 'Lunchbox':
-        {
-          const uiConfig = this._multiCellConstraints[constraint.type];
-          config = {
-            cells: constraint.cells,
-            name: `${constraint.type} (${constraint.sum})`,
-            constraint: constraint,
-            displayElem: this._display.drawShadedRegion(
-              constraint.cells, constraint.sum, uiConfig.displayConfig),
-          };
-          this._addToPanel(config);
-          this._configs.push(config);
-        }
-        break;
-      case 'CountingCircles':
-        {
-          config = {
-            cells: constraint.cells,
-            name: `Counting Circles (${constraint.cells.length})`,
-            constraint: constraint,
-            displayElem: this._display.drawCountingCircles(constraint.cells),
-          };
-          this._addToPanel(config);
-          this._configs.push(config);
-        }
-        break;
-      case 'ContainAtLeast':
-      case 'ContainExact':
-        {
-          const uiConfig = this._multiCellConstraints[constraint.type];
-          const valueStr = constraint.values.replace(/_/g, ',');
-          config = {
-            cells: constraint.cells,
-            name: `${constraint.type} (${valueStr})`,
-            constraint: constraint,
-            displayElem: this._display.drawShadedRegion(
-              constraint.cells, valueStr, uiConfig.displayConfig),
-          };
-          this._addToPanel(config);
-          this._configs.push(config);
-        }
         break;
       case 'Quad':
         config = {
           cells: SudokuConstraint.Quad.cells(constraint.topLeftCell),
           name: `Quad (${constraint.values.join(',')})`,
           constraint: constraint,
-          displayElem: this._display.drawQuad(
-            constraint.topLeftCell, constraint.values),
+          displayElem: this._display.drawItem(
+            constraint, ConstraintDisplays.Quad, null),
           replaceKey: `Quad-${constraint.topLeftCell}`,
         };
         this._addToPanel(config);
         this._configs.push(config);
         break;
       case 'Binary':
-        this._customBinaryConstraints.addConstraint(constraint);
-        break;
       case 'BinaryX':
         this._customBinaryConstraints.addConstraint(constraint);
         break;
@@ -915,22 +822,6 @@ class ConstraintManager {
         break;
       case 'Windoku':
         this._checkboxConstraints.check('windoku');
-        break;
-      case 'Indexing':
-        {
-          const type =
-            constraint.indexType == SudokuConstraint.Indexing.ROW_INDEXING
-              ? 'Row' : 'Column';
-          config = {
-            cells: constraint.cells,
-            name: `Indexing (${type})`,
-            constraint: constraint,
-            displayElem: this._display.drawIndexing(
-              constraint.cells, constraint.indexType),
-          };
-          this._addToPanel(config);
-          this._configs.push(config);
-        }
         break;
       case 'Set':
         constraint.constraints.forEach(c => this.loadConstraint(c));
@@ -979,7 +870,11 @@ class ConstraintManager {
         value: {
           placeholder: 'sum',
         },
-        displayConfig: {},
+        panelText: (constraint) => `Cage (${constraint.sum})`,
+        displayClass: ConstraintDisplays.ShadedRegion,
+        displayConfig: {
+          labelField: 'sum',
+        },
         validateFn: (cells, shape) => (
           cells.length <= shape.numValues && cells.length > 1),
         description:
@@ -989,13 +884,17 @@ class ConstraintManager {
         value: {
           placeholder: 'sum',
         },
+        panelText: (constraint) => `Sum (${constraint.sum})`,
+        displayClass: ConstraintDisplays.ShadedRegion,
         displayConfig: {
           pattern: DisplayItem.CHECKERED_PATTERN,
+          labelField: 'sum',
         },
         description:
           "Values must add up to the given sum. Values don't need to be unique. Only up to 16 cells are allowed.",
       },
       Arrow: {
+        displayClass: ConstraintDisplays.GenericLine,
         displayConfig: {
           startMarker: LineOptions.EMPTY_CIRCLE_MARKER,
           arrow: true
@@ -1006,6 +905,7 @@ class ConstraintManager {
       DoubleArrow: {
         validateFn: (cells, shape) => cells.length > 2,
         text: 'Double Arrow',
+        displayClass: ConstraintDisplays.GenericLine,
         displayConfig: {
           startMarker: LineOptions.EMPTY_CIRCLE_MARKER,
           endMarker: LineOptions.EMPTY_CIRCLE_MARKER
@@ -1015,6 +915,7 @@ class ConstraintManager {
       },
       PillArrow: {
         validateFn: (cells, shape) => cells.length > 2,
+        displayClass: ConstraintDisplays.PillArrow,
         value: {
           placeholder: 'pill size',
           options: [
@@ -1034,6 +935,12 @@ class ConstraintManager {
         text: 'Thermometer',
         description:
           "Values must be in increasing order starting at the bulb.",
+        displayClass: ConstraintDisplays.Thermo,
+        displayConfig: {
+          color: 'rgb(220, 220, 220)',
+          width: LineOptions.THICK_LINE_WIDTH,
+          startMarker: LineOptions.FULL_CIRCLE_MARKER,
+        },
       },
       Jigsaw: {
         validateFn: (cells, shape) =>
@@ -1041,6 +948,7 @@ class ConstraintManager {
         text: 'Jigsaw Piece',
         description:
           "Values inside the jigsaw piece can't repeat. Pieces must contain 9 cells, and cannot overlap.",
+        displayClass: ConstraintDisplays.Jigsaw,
       },
       Whisper: {
         value: {
@@ -1048,11 +956,13 @@ class ConstraintManager {
           default: 5,
         },
         panelText: (constraint) => `Whisper (${constraint.difference})`,
+        displayClass: ConstraintDisplays.GenericLine,
         displayConfig: { color: 'rgb(255, 200, 255)' },
         description:
           "Adjacent values on the line must differ by at least this amount."
       },
       Renban: {
+        displayClass: ConstraintDisplays.GenericLine,
         displayConfig: { color: 'rgb(230, 190, 155)' },
         description:
           "Digits on the line must be consecutive and non-repeating, in any order."
@@ -1064,6 +974,7 @@ class ConstraintManager {
         },
         text: 'Modular Line',
         panelText: (constraint) => `Modular (${constraint.mod})`,
+        displayClass: ConstraintDisplays.GenericLine,
         displayConfig: { color: 'rgb(230, 190, 155)', dashed: true },
         description:
           `
@@ -1075,6 +986,7 @@ class ConstraintManager {
       },
       Entropic: {
         text: 'Entropic Line',
+        displayClass: ConstraintDisplays.GenericLine,
         displayConfig: { color: 'rgb(255, 100, 255)', dashed: true },
         description:
           `
@@ -1084,6 +996,7 @@ class ConstraintManager {
       },
       RegionSumLine: {
         text: 'Region Sum Line',
+        displayClass: ConstraintDisplays.GenericLine,
         displayConfig: { color: 'rgb(100, 200, 100)' },
         description:
           `
@@ -1101,6 +1014,7 @@ class ConstraintManager {
           default: 10
         },
         panelText: (constraint) => `Sum Line (${constraint.sum})`,
+        displayClass: ConstraintDisplays.GenericLine,
         displayConfig: {
           color: 'rgb(100, 200, 100)',
           dashed: true,
@@ -1110,6 +1024,7 @@ class ConstraintManager {
       },
       Between: {
         text: 'Between Line',
+        displayClass: ConstraintDisplays.GenericLine,
         displayConfig: {
           color: 'rgb(200, 200, 255)',
           startMarker: LineOptions.EMPTY_CIRCLE_MARKER,
@@ -1125,6 +1040,7 @@ class ConstraintManager {
         },
         text: 'Lockout Line',
         panelText: (constraint) => `Lockout (${constraint.minDiff})`,
+        displayClass: ConstraintDisplays.GenericLine,
         displayConfig: {
           color: 'rgb(200, 200, 255)',
           startMarker: LineOptions.DIAMOND_MARKER,
@@ -1141,8 +1057,10 @@ class ConstraintManager {
           default: 0,
         },
         panelText: (constraint) => `Lunchbox (${constraint.sum})`,
+        displayClass: ConstraintDisplays.ShadedRegion,
         displayConfig: {
           lineConfig: { color: 'rgba(100, 100, 100, 0.2)' },
+          labelField: 'sum',
         },
         description:
           `The numbers sandwiched between the smallest number and the largest
@@ -1151,6 +1069,7 @@ class ConstraintManager {
       },
       Palindrome: {
         text: 'Palindrome',
+        displayClass: ConstraintDisplays.GenericLine,
         displayConfig: {
           color: 'rgb(200, 200, 255)'
         },
@@ -1159,6 +1078,7 @@ class ConstraintManager {
       },
       Zipper: {
         text: 'Zipper Line',
+        displayClass: ConstraintDisplays.GenericLine,
         displayConfig: {
           color: 'rgb(180, 180, 255)',
           dashed: true,
@@ -1171,25 +1091,35 @@ class ConstraintManager {
       },
       WhiteDot: {
         validateFn: ConstraintManager._cellsAreAdjacent,
+        displayClass: ConstraintDisplays.Dot,
+        displayConfig: { color: 'white' },
         text: '○ ±1',
+        panelText: (constraint) => `○ [${constraint.cells}]`,
         description:
           "Kropki white dot: values must be consecutive. Adjacent cells only.",
       },
       BlackDot: {
         validateFn: ConstraintManager._cellsAreAdjacent,
+        displayClass: ConstraintDisplays.Dot,
+        displayConfig: { color: 'black' },
         text: '● ×÷2',
+        panelText: (constraint) => `● [${constraint.cells}]`,
         description:
           "Kropki black dot: one value must be double the other. Adjacent cells only."
       },
       X: {
         validateFn: ConstraintManager._cellsAreAdjacent,
+        displayClass: ConstraintDisplays.Letter,
         text: 'x: 10Σ',
+        panelText: (constraint) => `X [${constraint.cells}]`,
         description:
           "x: values must add to 10. Adjacent cells only."
       },
       V: {
         validateFn: ConstraintManager._cellsAreAdjacent,
+        displayClass: ConstraintDisplays.Letter,
         text: 'v: 5Σ',
+        panelText: (constraint) => `V [${constraint.cells}]`,
         description:
           "v: values must add to 5. Adjacent cells only."
       },
@@ -1199,6 +1129,8 @@ class ConstraintManager {
         },
         validateFn: ConstraintManager._cellsAre2x2Square,
         text: 'Quadruple',
+        displayClass: ConstraintDisplays.Quad,
+        panelText: (constraint) => `Quad (${constraint.values.join(',')})`,
         description:
           `
         All the given values must be present in the surrounding 2x2 square.
@@ -1208,8 +1140,11 @@ class ConstraintManager {
         value: {
           placeholder: 'values',
         },
+        panelText: (constraint) => `Contain Exact (${constraint.valueStr})`,
+        displayClass: ConstraintDisplays.ShadedRegion,
         displayConfig: {
           pattern: DisplayItem.DIAGONAL_PATTERN,
+          labelField: 'valueStr',
         },
         text: 'Contain Exact',
         description:
@@ -1221,8 +1156,11 @@ class ConstraintManager {
         value: {
           placeholder: 'values',
         },
+        panelText: (constraint) => `Contain At Least (${constraint.valueStr})`,
+        displayClass: ConstraintDisplays.ShadedRegion,
         displayConfig: {
           pattern: DisplayItem.DIAGONAL_PATTERN,
+          labelField: 'valueStr',
         },
         text: 'Contain At Least',
         description:
@@ -1231,6 +1169,8 @@ class ConstraintManager {
            repeated in the list.`,
       },
       CountingCircles: {
+        panelText: (constraint) => `Counting Circles (${constraint.cells.length})`,
+        displayClass: ConstraintDisplays.CountingCircles,
         displayConfig: {
           pattern: DisplayItem.CHECKERED_PATTERN,
         },
@@ -1246,7 +1186,9 @@ class ConstraintManager {
             ['Row', SudokuConstraint.Indexing.ROW_INDEXING],
           ],
         },
+        panelText: (constraint) => `Indexing (${constraint.indexTypeStr()})`,
         validateFn: (cells, shape) => cells.length > 0,
+        displayClass: ConstraintDisplays.Indexing,
         description: `
           Column indexing: For a cell in column C, the value (V) of the cell
           tells where the value C is placed in that row. Specifically, if the
@@ -2029,7 +1971,8 @@ class CustomBinaryConstraintManager extends DropdownInputManager {
       type: type,
       isCustomBinary: true,
       mapKey: `${type}-${key}`,
-      displayElem: this._display.drawCustomBinary(cells, key, type),
+      displayElem: this._display.drawItem(
+        { cells, key, type }, ConstraintDisplays.CustomBinary, null),
     };
     this._addToPanel(config);
 
