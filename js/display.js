@@ -129,6 +129,16 @@ class DisplayItem {
     return path;
   }
 
+  _CIRCLE_RADIUS = 20;
+
+  _makeCircleAtPoint([x, y]) {
+    let circle = createSvgElement('circle');
+    circle.setAttribute('cx', x);
+    circle.setAttribute('cy', y);
+    circle.setAttribute('r', this._CIRCLE_RADIUS);
+
+    return circle;
+  }
 
   _makePath(coords) {
     const line = createSvgElement('path');
@@ -505,6 +515,8 @@ class ConstraintDisplay extends DisplayItem {
     this._applyGridOffset(this._adjConstraintGroup);
     this._shadedRegionDisplay = new ShadedRegionDisplay(
       displayContainer.getNewGroup('killer-cage-group'));
+    this._countingCircleDisplay = new CountingCirclesDisplay(
+      displayContainer.getNewGroup('counting-circle-group'));
 
     this._diagonalDisplay = new DiagonalDisplay(
       displayContainer.getNewGroup('diagonal-group'));
@@ -538,6 +550,7 @@ class ConstraintDisplay extends DisplayItem {
     this._borders.reshape(shape);
     this._givensDisplay.reshape(shape);
     this._shadedRegionDisplay.reshape(shape);
+    this._countingCircleDisplay.reshape(shape);
   }
 
   // Reusable arrowhead marker.
@@ -576,6 +589,8 @@ class ConstraintDisplay extends DisplayItem {
 
     this._shadedRegionDisplay.clear();
 
+    this._countingCircleDisplay.clear();
+
     this.enableWindokuRegion(false);
     this.useDefaultRegions(true);
   }
@@ -588,6 +603,7 @@ class ConstraintDisplay extends DisplayItem {
     if (!item) return;
     if (this._jigsawRegions.removeItem(item)) return;
     if (this._shadedRegionDisplay.removeRegion(item)) return;
+    if (this._countingCircleDisplay.removeCircles(item)) return;
     this._customBinaryColors.removeItem(item);
     item.parentNode.removeChild(item);
   }
@@ -612,6 +628,10 @@ class ConstraintDisplay extends DisplayItem {
     }
 
     return region;
+  }
+
+  drawCountingCircles(cells) {
+    return this._countingCircleDisplay.drawCircles(cells);
   }
 
   drawDot(cells, fillColor) {
@@ -686,17 +706,7 @@ class ConstraintDisplay extends DisplayItem {
     return text;
   }
 
-  _CIRCLE_RADIUS = 20;
   _DIAMOND_SIZE = 20;
-
-  _makeCircleAtPoint([x, y]) {
-    let circle = createSvgElement('circle');
-    circle.setAttribute('cx', x);
-    circle.setAttribute('cy', y);
-    circle.setAttribute('r', this._CIRCLE_RADIUS);
-
-    return circle;
-  }
 
   _makeDiamondAtPoint([x, y]) {
     let diamond = createSvgElement('path');
@@ -1528,6 +1538,48 @@ class DiagonalDisplay extends DisplayItem {
   }
 }
 
+class CountingCirclesDisplay extends DisplayItem {
+  constructor(svg) {
+    super(svg);
+    this._applyGridOffset(svg);
+    this._circleColors = new ColorPicker();
+  }
+
+  clear() {
+    super.clear();
+    this._circleColors.clear();
+  }
+
+  drawCircles(cells) {
+    const region = createSvgElement('g');
+    const color = this._circleColors.pickColor();
+
+    for (const cellId of cells) {
+      const point = this.cellIdCenter(cellId);
+      const circle = this._makeCircleAtPoint(point);
+      circle.setAttribute('stroke', color);
+      circle.setAttribute('fill', 'transparent');
+      circle.setAttribute('stroke-width', 2);
+      circle.setAttribute('opacity', '0.3');
+
+      region.appendChild(circle);
+    }
+
+    this._circleColors.addItem(region, color, ...cells);
+    this.getSvg().append(region);
+
+    return region;
+  }
+
+  removeCircles(item) {
+    if (this._circleColors.removeItem(item)) {
+      item.parentNode.removeChild(item);
+      return true;
+    }
+    return false;
+  }
+}
+
 class ShadedRegionDisplay extends DisplayItem {
   constructor(svg) {
     super(svg);
@@ -1594,12 +1646,15 @@ class ShadedRegionDisplay extends DisplayItem {
     const topLeftCell = cells.reduce((a, b) => a < b ? a : b);
     [x, y] = this.cellIdTopLeftCorner(topLeftCell);
 
-    const text = this.makeTextNode(label, x, y, 'shaded-region-label');
-    region.append(text);
     this.getSvg().append(region);
 
-    let textBackground = this.constructor._addTextBackground(text);
-    textBackground.setAttribute('fill', 'rgb(200, 200, 200)');
+    if (label !== undefined) {
+      const text = this.makeTextNode(label, x, y, 'shaded-region-label');
+      region.append(text);
+
+      let textBackground = this.constructor._addTextBackground(text);
+      textBackground.setAttribute('fill', 'rgb(200, 200, 200)');
+    }
 
     return region;
   }
@@ -1638,13 +1693,13 @@ class ColorPicker {
   COLOR_LIST = [
     'green',
     'red',
-    'blue',
     'orange',
     'cyan',
     'brown',
     'black',
     'purple',
     'gold',
+    'lightblue',
   ];
 
   constructor() {

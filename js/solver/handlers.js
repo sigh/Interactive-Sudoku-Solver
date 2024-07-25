@@ -2974,6 +2974,141 @@ SudokuConstraintHandler.Indexing = class Indexing extends SudokuConstraintHandle
   }
 }
 
+SudokuConstraintHandler.CountingCircles = class CountingCircles extends SudokuConstraintHandler {
+  constructor(cells) {
+    super(cells);
+  }
+
+  static _sumCombinations = memoize((shape) => {
+    const maxSum = shape.maxSum;
+    const lookupTables = LookupTables.get(shape.numValues);
+
+    const combinations = [];
+    for (let i = 0; i < maxSum + 1; i++) combinations.push([]);
+
+    for (let i = 0; i < lookupTables.combinations; i++) {
+      combinations[lookupTables.sum[i]].push(i);
+    }
+
+    return combinations;
+  });
+
+  initialize(initialGrid, cellExclusions, shape) {
+    const numCells = this.cells.length;
+    const combinations = this.constructor._sumCombinations(shape)[numCells];
+    if (!combinations) return false;
+
+    const exclusionGroups = (
+      SudokuConstraintHandler._SumHandlerUtil.findExclusionGroups(
+        this.cells, cellExclusions));
+
+    // Restrict values to the possible sums.
+    // We can't have more values than exclusion groups.
+    let allowedValues = combinations.reduce((a, b) => a | b, 0);
+    allowedValues &= (1 << exclusionGroups.length) - 1;
+
+    for (let i = 0; i < numCells; i++) {
+      if (!(initialGrid[this.cells[i]] &= allowedValues)) return false;
+    }
+    this._combinations = new Uint8Array(combinations);
+    this._numValues = shape.numValues;
+
+    this._exclusionMap = new Uint16Array(this.cells.length);
+    for (let i = 0; i < exclusionGroups.length; i++) {
+      for (const cell of exclusionGroups[i]) {
+        this._exclusionMap[this.cells.indexOf(cell)] = 1 << i;
+      }
+    }
+
+    return true;
+  }
+
+  enforceConsistency(grid, handlerAccumulator) {
+    const cells = this.cells;
+    const numCells = cells.length;
+
+    // Find all the current values.
+    let allValues = 0;
+    let fixedValues = 0;
+    let unfixedValues = 0;
+    for (let i = 0; i < numCells; i++) {
+      let v = grid[cells[i]];
+      allValues |= v;
+      if (!(v & (v - 1))) {
+        fixedValues |= v;
+      } else {
+        unfixedValues |= v;
+      }
+    }
+
+    // Find which combinations are valid.
+    let requiredValues = allValues;
+    let allowedValues = 0;
+    {
+      const combinations = this._combinations;
+      const numCombinations = combinations.length;
+      for (let i = 0; i < numCombinations; i++) {
+        const c = combinations[i];
+        // If c doesn't contain all fixed values or contains any values not
+        // in allValues, then it can't be a valid combination.
+        if (fixedValues & ~c) continue;
+        if (c & ~allValues) continue;
+        allowedValues |= c;
+        requiredValues &= c;
+      }
+      if (!allowedValues) return false;
+    }
+
+    // Restrict values to be valid if required.
+    if (allowedValues !== allValues) {
+      for (let i = 0; i < numCells; i++) {
+        if (!(grid[cells[i]] &= allowedValues)) return false;
+      }
+    }
+
+    // Count each possible value and restrict cells.
+    const numValues = this._numValues;
+    const exclusionMap = this._exclusionMap;
+    for (let j = 1; j < numValues + 1; j++) {
+      const v = LookupTables.fromValue(j);
+      if (!(v & allowedValues)) continue;
+
+      let totalCount = 0;
+      let fixedCount = 0;
+      let exclusionGroups = 0;
+      for (let i = 0; i < numCells; i++) {
+        if (grid[cells[i]] & v) {
+          totalCount++;
+          fixedCount += (grid[cells[i]] === v);
+          exclusionGroups |= exclusionMap[i];
+        }
+      }
+      const numExclusionGroups = countOnes16bit(exclusionGroups);
+
+      if (fixedCount > j) {
+        return false;
+      }
+      if (numExclusionGroups < j) {
+        if (v & requiredValues) {
+          return false;
+        } else {
+          for (let i = 0; i < numCells; i++) {
+            if (!(grid[cells[i]] &= ~v)) return false;
+          }
+        }
+      } else if (totalCount === j && (v & requiredValues & unfixedValues)) {
+        for (let i = 0; i < numCells; i++) {
+          if (grid[cells[i]] & v) {
+            grid[cells[i]] = v;
+          }
+        }
+      }
+    }
+
+    return true;
+  }
+}
+
 SudokuConstraintHandler.NumberedRoom = class NumberedRoom extends SudokuConstraintHandler {
   constructor(cells, value) {
     super([cells[0]]);

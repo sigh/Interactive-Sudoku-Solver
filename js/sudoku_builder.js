@@ -1135,6 +1135,13 @@ class SudokuConstraint {
     }
   }
 
+  static CountingCircles = class CountingCircles extends SudokuConstraintBase {
+    constructor(...cells) {
+      super(arguments);
+      this.cells = cells;
+    }
+  }
+
   static Givens = class Givens extends SudokuConstraintBase {
     constructor(...values) {
       super(arguments);
@@ -1706,6 +1713,12 @@ class SudokuBuilder {
               shape.numCells,
               items);
           }
+          break;
+
+        case 'CountingCircles':
+          cells = new CellArgs(constraint.cells, constraint.type);
+          yield new SudokuConstraintHandler.CountingCircles(
+            cells.cellIds(shape));
           break;
 
         case 'Priority':

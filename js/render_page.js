@@ -827,6 +827,18 @@ class ConstraintManager {
           this._configs.push(config);
         }
         break;
+      case 'CountingCircles':
+        {
+          config = {
+            cells: constraint.cells,
+            name: `Counting Circles (${constraint.cells.length})`,
+            constraint: constraint,
+            displayElem: this._display.drawCountingCircles(constraint.cells),
+          };
+          this._addToPanel(config);
+          this._configs.push(config);
+        }
+        break;
       case 'ContainAtLeast':
       case 'ContainExact':
         {
@@ -1217,6 +1229,15 @@ class ConstraintManager {
           `The comma-separated values must be present in the selected squares.
            If value is must be contained at least as many times as is
            repeated in the list.`,
+      },
+      CountingCircles: {
+        displayConfig: {
+          pattern: DisplayItem.CHECKERED_PATTERN,
+        },
+        text: 'Counting Circles',
+        description:
+          `The value in a circles counts the number of circles with the same
+           value. Each set of circles is independent.`,
       },
       Indexing: {
         value: {
