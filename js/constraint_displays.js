@@ -1,6 +1,8 @@
 class ConstraintDisplays {
   static displayOrder() {
     return [
+      this.DefaultRegionsInverted,
+      this.Windoku,
       this.Jigsaw,
       this.Indexing,
       this.Thermo,
@@ -13,6 +15,7 @@ class ConstraintDisplays {
       this.Dot,
       this.Letter,
       this.Quad,
+      this.Diagonal,
     ]
   }
 }
@@ -23,10 +26,13 @@ class BaseConstraintDisplayItem extends DisplayItem {
   }
 
   drawItem(constraint, options) { throw 'Unimplemented'; }
+
   removeItem(item) {
     item.parentNode.removeChild(item);
     return true;
   }
+
+  toggleItem(constraint, enable) { throw 'Unimplemented'; }
 
   _removeCircleFromPath(p0, p1) {
     const [dx, dy] = [p1[0] - p0[0], p1[1] - p0[1]];
@@ -677,5 +683,146 @@ ConstraintDisplays.Quad = class Quad extends BaseConstraintDisplayItem {
 
     return quad;
   }
+}
 
+ConstraintDisplays.Diagonal = class Diagonal extends BaseConstraintDisplayItem {
+  DIRECTIONS = [1, -1];
+
+  constructor(svg) {
+    super(svg);
+    this._diagonals = [null, null];
+
+    svg.setAttribute('stroke-width', 1);
+    svg.setAttribute('stroke', 'rgb(255, 0, 0)');
+  }
+
+  _directionIndex(direction) {
+    return direction > 0;
+  }
+
+  toggleItem(constraint, enable) {
+    if (enable) {
+      this._drawDiagonal(constraint.direction);
+    } else {
+      this._removeDiagonal(constraint.direction);
+    }
+  }
+
+  _drawDiagonal(direction) {
+    const index = this._directionIndex(direction);
+    if (this._diagonals[index]) return this._diagonals[index];
+
+    const shape = this._shape;
+
+    const size = DisplayItem.CELL_SIZE * shape.gridSize;
+    const line = this._makePath([
+      [0, direction > 0 ? size : 0],
+      [size, direction > 0 ? 0 : size],
+    ]);
+
+    this.getSvg().appendChild(line);
+    this._diagonals[index] = line;
+
+    return line;
+  }
+
+  _removeDiagonal(direction) {
+    const index = this._directionIndex(direction);
+    let item = this._diagonals[index];
+    if (item) item.parentNode.removeChild(item);
+    this._diagonals[index] = null;
+  }
+
+  clear() {
+    for (const direction of this.DIRECTIONS) {
+      this._removeDiagonal(direction);
+    }
+  }
+
+  reshape(shape) {
+    super.reshape(shape);
+
+    // Redraw the diagonals with the correct shape.
+    for (const direction of this.DIRECTIONS) {
+      const index = this._directionIndex(direction);
+      if (this._diagonals[index]) {
+        this._removeDiagonal(direction);
+        this._drawDiagonal(direction);
+      }
+    }
+  }
+}
+
+ConstraintDisplays.Windoku = class Windoku extends BaseConstraintDisplayItem {
+  constructor(svg) {
+    super(svg);
+
+    svg.setAttribute('fill', 'rgb(255, 0, 255)');
+    svg.setAttribute('opacity', '0.1');
+
+    this.clear();
+  }
+
+  clear() {
+    this.toggleItem(null, false);
+  }
+
+  reshape(shape) {
+    super.reshape(shape);
+    super.clear();
+
+    const svg = this.getSvg();
+
+    for (const region of SudokuConstraint.Windoku.regions(shape)) {
+      for (const cell of region) {
+        svg.append(this._makeCellSquare(cell));
+      }
+    }
+  }
+
+  toggleItem(_, enable) {
+    this.getSvg().setAttribute('display', enable ? null : 'none');
+  }
+}
+
+ConstraintDisplays.DefaultRegionsInverted = class DefaultRegionsInverted extends BaseConstraintDisplayItem {
+  constructor(svg) {
+    super(svg);
+
+    svg.setAttribute('stroke-width', 2);
+    svg.setAttribute('stroke', 'rgb(0, 0, 0)');
+    svg.setAttribute('stroke-linecap', 'round');
+
+    this.clear();
+  }
+
+  clear() {
+    this.toggleItem(null, false);
+  }
+
+  reshape(shape) {
+    super.reshape(shape);
+    super.clear();
+
+    const cellSize = DisplayItem.CELL_SIZE;
+    const gridSizePixels = cellSize * shape.gridSize;
+    const svg = this.getSvg();
+
+    for (let i = shape.boxWidth; i < shape.gridSize; i += shape.boxWidth) {
+      svg.appendChild(this._makePath([
+        [i * cellSize, 0],
+        [i * cellSize, gridSizePixels],
+      ]));
+    }
+    for (let i = shape.boxHeight; i < shape.gridSize; i += shape.boxHeight) {
+      svg.appendChild(this._makePath([
+        [0, i * cellSize],
+        [gridSizePixels, i * cellSize],
+      ]));
+    }
+  }
+
+  toggleItem(_, enable) {
+    this.getSvg().setAttribute('display', enable ? 'none' : null);
+  }
 }
