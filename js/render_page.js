@@ -17,99 +17,120 @@ const initPage = () => {
 
 class CheckboxConstraints {
   constructor(display, onChange) {
-    this._checkboxes = {
-      antiKnight: {
-        id: 'anti-knight-input',
-        constraint: new SudokuConstraint.AntiKnight(),
-        isLayout: true,
+    const layoutConstraints = {
+      AntiKnight: {
+        text: 'Anti-Knight',
+        description: `Cells which are a knight's move away cannot have the same value.`,
       },
-      antiKing: {
-        id: 'anti-king-input',
-        constraint: new SudokuConstraint.AntiKing(),
-        isLayout: true,
+      AntiKing: {
+        text: 'Anti-King',
+        description: `Cells which are a king's move away cannot have the same value.`,
       },
-      antiConsecutive: {
-        id: 'anti-consecutive-input',
-        constraint: new SudokuConstraint.AntiConsecutive(),
-        isLayout: false,
+      Diagonal: {
+        description: `Values along the diagonal must be unique.`,
+        value: {
+          options: [
+            { text: '⟋', value: 1 },
+            { text: '⟍', value: -1 },
+          ],
+        },
+        displayClass: ConstraintDisplays.Diagonal,
       },
-      strictKropki: {
-        id: 'strict-kropki-input',
-        constraint: new SudokuConstraint.StrictKropki(),
-        isLayout: false,
+      Windoku: {
+        description: `Values in the 3x3 windoku boxes must be uniques.`,
+        displayClass: ConstraintDisplays.Windoku,
       },
-      strictXV: {
-        id: 'strict-xv-input',
-        constraint: new SudokuConstraint.StrictXV(),
-        isLayout: false,
+      DisjointSets: {
+        text: 'Disjoint Sets',
+        description: `No digit may appear in the same position in any two boxes.`,
       },
-      disjointSets: {
-        id: 'disjoint-sets',
-        constraint: new SudokuConstraint.DisjointSets(),
-        isLayout: false,
+      NoBoxes: {
+        text: 'No Boxes',
+        description: `No standard 3x3 box sudoku constraints.`,
+        displayClass: ConstraintDisplays.DefaultRegionsInverted,
       },
-      globalEntropy: {
-        id: 'global-entropy-input',
-        constraint: new SudokuConstraint.GlobalEntropy(),
-        isLayout: false,
+    };
+    const globalConstraints = {
+      AntiConsecutive: {
+        text: 'Anti-Consecutive',
+        description: `No adjacent cells can have consecutive values.`,
       },
-      diagonalPlus: {
-        id: 'diagonal-plus-input',
-        constraint: new SudokuConstraint.Diagonal(1),
-        isLayout: true,
+      StrictKropki: {
+        text: 'Strict Kropki',
+        description: `Only explicitly marked cell pairs satisfy Kropki (black/white dot) constraints.`,
       },
-      diagonalMinus: {
-        id: 'diagonal-minus-input',
-        constraint: new SudokuConstraint.Diagonal(-1),
-        isLayout: true,
+      StrictXV: {
+        text: 'Strict XV',
+        description: `Only explicitly marked cell pairs satisfy XV constraints.`,
       },
-      windoku: {
-        id: 'windoku-input',
-        constraint: new SudokuConstraint.Windoku(),
-        isLayout: true,
-      },
-      noBoxes: {
-        id: 'no-boxes-input',
-        constraint: new SudokuConstraint.NoBoxes(),
-        isLayout: true,
+      GlobalEntropy: {
+        text: 'Global Entropy',
+        description: `Each 2x2 box in the grid has to contain a low digit (1, 2, 3), a middle digit (4, 5, 6) and a high digit (7, 8, 9).`,
       },
     };
 
-    // Setup the elements.
-    for (const item of Object.values(this._checkboxes)) {
-      item.element = document.getElementById(item.id);
-      item.element.onchange = onChange;
-    }
+    this._checkboxes = new Map();
+    const initSingleCheckbox = (type, config, container, isLayout, option) => {
+      const constraint = new SudokuConstraint[type](...(option ? [option.value] : []));
+      const name = constraint.toString();
+      const checkboxId = `checkbox-input-${this._checkboxes.size}`;
 
-    this._checkboxes.diagonalPlus.element.onchange = e => {
-      if (this._checkboxes.diagonalPlus.element.checked) {
-        display.drawDiagonal(1);
-      } else {
-        display.removeDiagonal(1);
+      const div = document.createElement('div');
+      const input = document.createElement('input');
+      input.type = 'checkbox';
+      input.id = checkboxId;
+      input.onchange = () => {
+        if (config.displayClass) {
+          display.toggleItem(constraint, input.checked, config.displayClass);
+        }
+        onChange();
+      };
+      div.appendChild(input);
+
+      const label = document.createElement('label');
+      label.htmlFor = checkboxId;
+      label.textContent = `${config.text || type} ${option?.text || ''} `;
+      div.appendChild(label);
+
+      const tooltip = document.createElement('span');
+      tooltip.className = 'tooltip';
+      tooltip.setAttribute('data-text', config.description);
+      div.appendChild(tooltip);
+
+      container.appendChild(div);
+
+      this._checkboxes.set(name, {
+        element: input,
+        constraint,
+        isLayout,
+      });
+    };
+
+    const initCheckboxes = (configs, container, isLayout) => {
+      for (const [type, config] of Object.entries(configs)) {
+        if (config?.value?.options) {
+          for (const option of config.value.options) {
+            initSingleCheckbox(type, config, container, isLayout, option);
+          }
+        } else {
+          initSingleCheckbox(type, config, container, isLayout, null);
+        }
       }
-      onChange();
-    }
-    this._checkboxes.diagonalMinus.element.onchange = e => {
-      if (this._checkboxes.diagonalMinus.element.checked) {
-        display.drawDiagonal(-1);
-      } else {
-        display.removeDiagonal(-1);
-      }
-      onChange();
-    }
-    this._checkboxes.noBoxes.element.onchange = e => {
-      display.useDefaultRegions(!this._checkboxes.noBoxes.element.checked);
-      onChange();
-    }
-    this._checkboxes.windoku.element.onchange = e => {
-      display.enableWindokuRegion(this._checkboxes.windoku.element.checked);
-      onChange();
-    }
+    };
+
+    initCheckboxes(
+      layoutConstraints,
+      document.getElementById('layout-constraint-checkboxes'),
+      true);
+    initCheckboxes(
+      globalConstraints,
+      document.getElementById('global-constraint-checkboxes'),
+      false);
   }
 
   _getConstraint(layout) {
     let constraints = [];
-    for (const item of Object.values(this._checkboxes)) {
+    for (const item of this._checkboxes.values()) {
       if (layout && !item.isLayout) continue;
 
       if (item.element.checked && !item.element.disabled) {
@@ -127,13 +148,14 @@ class CheckboxConstraints {
     return this._getConstraint(true);
   }
 
-  check(name) {
-    this._checkboxes[name].element.checked = true;
-    this._checkboxes[name].element.dispatchEvent(new Event('change'));
+  check(c) {
+    const element = this._checkboxes.get(c.toString()).element;
+    element.checked = true;
+    element.dispatchEvent(new Event('change'));
   }
 
-  uncheckAll() {
-    for (const item of Object.values(this._checkboxes)) {
+  clear() {
+    for (const item of this._checkboxes.values()) {
       item.element.checked = false;
     }
   }
@@ -319,7 +341,7 @@ class OutsideClueConstraints {
   }
 
   static _mapKey(type, lineId) {
-    return `${type}|${lineId}`;
+    return `${type}| ${lineId} `;
   }
 
   static _isValidValue(value, config) {
@@ -348,7 +370,7 @@ class OutsideClueConstraints {
         description:
           `The sum of the first X numbers must add up to the given sum.
           X is the number in the first cell in the direction of the row or
-          column.`,
+      column.`,
       },
       Skyscraper: {
         clueType: this.CLUE_TYPE_DOUBLE_LINE,
@@ -357,7 +379,7 @@ class OutsideClueConstraints {
           `Digits in the grid represent skyscrapers of that height.
           Higher skyscrapers obscure smaller ones.
           Clues outside the grid show the number of visible skyscrapers in that
-          row/column from the clue's direction of view.`,
+      row / column from the clue's direction of view.`,
       },
       HiddenSkyscraper: {
         clueType: this.CLUE_TYPE_DOUBLE_LINE,
@@ -535,7 +557,6 @@ class ConstraintManager {
   constructor(inputManager, displayContainer) {
     this._configs = [];
     this._shape = null;
-    this._checkboxes = {};
 
     this._invisibleConstraints = [];
     this._shapeManager = new ShapeManager();
@@ -790,38 +811,16 @@ class ConstraintManager {
         this._outsideClueConstraints.addConstraint(constraint);
         break;
       case 'AntiKnight':
-        this._checkboxConstraints.check('antiKnight');
-        break;
       case 'AntiKing':
-        this._checkboxConstraints.check('antiKing');
-        break;
       case 'AntiConsecutive':
-        this._checkboxConstraints.check('antiConsecutive');
-        break;
       case 'StrictKropki':
-        this._checkboxConstraints.check('strictKropki');
-        break;
       case 'StrictXV':
-        this._checkboxConstraints.check('strictXV');
-        break;
       case 'DisjointSets':
-        this._checkboxConstraints.check('disjointSets');
-        break;
       case 'GlobalEntropy':
-        this._checkboxConstraints.check('globalEntropy');
-        break;
-      case 'Diagonal':
-        if (constraint.direction > 0) {
-          this._checkboxConstraints.check('diagonalPlus');
-        } else {
-          this._checkboxConstraints.check('diagonalMinus');
-        }
-        break;
       case 'NoBoxes':
-        this._checkboxConstraints.check('noBoxes');
-        break;
       case 'Windoku':
-        this._checkboxConstraints.check('windoku');
+      case 'Diagonal':
+        this._checkboxConstraints.check(constraint);
         break;
       case 'Set':
         constraint.constraints.forEach(c => this.loadConstraint(c));
@@ -919,8 +918,8 @@ class ConstraintManager {
         value: {
           placeholder: 'pill size',
           options: [
-            ['2-digit', 2],
-            ['3-digit', 3]
+            { text: '2-digit', value: 2 },
+            { text: '3-digit', value: 3 },
           ],
         },
         text: 'Pill Arrow',
@@ -1182,8 +1181,8 @@ class ConstraintManager {
       Indexing: {
         value: {
           options: [
-            ['Column', SudokuConstraint.Indexing.COL_INDEXING],
-            ['Row', SudokuConstraint.Indexing.ROW_INDEXING],
+            { text: 'Column', value: SudokuConstraint.Indexing.COL_INDEXING },
+            { text: 'Row', value: SudokuConstraint.Indexing.ROW_INDEXING },
           ],
         },
         panelText: (constraint) => `Indexing (${constraint.indexTypeStr()})`,
@@ -1233,7 +1232,7 @@ class ConstraintManager {
         let input;
         if (config.value.options) {
           input = document.createElement('select');
-          for (const [text, value] of config.value.options) {
+          for (const { text, value } of config.value.options) {
             const option = document.createElement('option');
             option.value = value;
             option.textContent = text;
@@ -1464,7 +1463,7 @@ class ConstraintManager {
   clear() {
     this._display.clear();
     this._constraintPanel.innerHTML = '';
-    this._checkboxConstraints.uncheckAll();
+    this._checkboxConstraints.clear();
     this._outsideClueConstraints.clear();
     this._customBinaryConstraints.clear();
     this._configs = [];

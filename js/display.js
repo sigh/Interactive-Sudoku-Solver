@@ -494,11 +494,6 @@ class ConstraintDisplay extends DisplayItem {
     this._gridDisplay = new GridDisplay(
       displayContainer.getNewGroup('base-grid-group'));
 
-    this._defaultRegions = new DefaultRegions(
-      displayContainer.getNewGroup('default-region-group'));
-    this._windokuRegions = new WindokuRegionDisplay(
-      displayContainer.getNewGroup('windoku-region-group'));
-
     this._constraintDisplays = new Map();
     for (const displayClass of ConstraintDisplays.displayOrder()) {
       const name = displayClass.name;
@@ -507,9 +502,6 @@ class ConstraintDisplay extends DisplayItem {
       this._constraintDisplays.set(name, new displayClass(group));
       this._applyGridOffset(group);
     }
-
-    this._diagonalDisplay = new DiagonalDisplay(
-      displayContainer.getNewGroup('diagonal-group'));
 
     this._givensDisplay = new GivensDisplay(
       displayContainer.getNewGroup('givens-group'));
@@ -527,13 +519,10 @@ class ConstraintDisplay extends DisplayItem {
   reshape(shape) {
     this._shape = shape;
     this._gridDisplay.reshape(shape);
-    this._defaultRegions.reshape(shape);
-    this._windokuRegions.reshape(shape);
     for (const display of this._constraintDisplays.values()) {
       display.reshape(shape);
     }
     this._outsideClues.reshape(shape);
-    this._diagonalDisplay.reshape(shape);
     this._borders.reshape(shape);
     this._givensDisplay.reshape(shape);
   }
@@ -560,14 +549,9 @@ class ConstraintDisplay extends DisplayItem {
   clear() {
     this._givensDisplay.clear();
 
-    this._diagonalDisplay.clear();
-
     for (const display of this._constraintDisplays.values()) {
       display.clear();
     }
-
-    this.enableWindokuRegion(false);
-    this.useDefaultRegions(true);
   }
 
   removeItem(item) {
@@ -596,24 +580,13 @@ class ConstraintDisplay extends DisplayItem {
       displayClass.name).drawItem(constraint, config);
   }
 
-  drawDiagonal(direction) {
-    this._diagonalDisplay.drawDiagonal(direction);
-  }
-
-  removeDiagonal(direction) {
-    this._diagonalDisplay.removeDiagonal(direction);
+  toggleItem(constraint, enable, displayClass) {
+    return this._constraintDisplays.get(
+      displayClass.name).toggleItem(constraint, enable);
   }
 
   drawGivens(givensMap) {
     this._givensDisplay.drawGivens(givensMap);
-  }
-
-  useDefaultRegions(enable) {
-    this._defaultRegions.enable(enable);
-  }
-
-  enableWindokuRegion(enable) {
-    this._windokuRegions.enableWindokuRegion(enable);
   }
 }
 
@@ -678,72 +651,6 @@ class BorderDisplay extends DisplayItem {
     ]);
     if (this._fill) path.setAttribute('fill', this._fill);
     this.getSvg().append(path);
-  }
-}
-
-class DefaultRegions extends DisplayItem {
-  constructor(svg) {
-    super(svg);
-
-    this._applyGridOffset(svg);
-    svg.setAttribute('stroke-width', 2);
-    svg.setAttribute('stroke', 'rgb(0, 0, 0)');
-    svg.setAttribute('stroke-linecap', 'round');
-  }
-
-  reshape(shape) {
-    super.reshape(shape);
-    this.clear();
-
-    const cellSize = DisplayItem.CELL_SIZE;
-    const gridSizePixels = cellSize * shape.gridSize;
-    const svg = this.getSvg();
-
-    for (let i = shape.boxWidth; i < shape.gridSize; i += shape.boxWidth) {
-      svg.appendChild(this._makePath([
-        [i * cellSize, 0],
-        [i * cellSize, gridSizePixels],
-      ]));
-    }
-    for (let i = shape.boxHeight; i < shape.gridSize; i += shape.boxHeight) {
-      svg.appendChild(this._makePath([
-        [0, i * cellSize],
-        [gridSizePixels, i * cellSize],
-      ]));
-    }
-  }
-
-  enable(enable) {
-    this.getSvg().setAttribute('display', enable ? null : 'none');
-  }
-}
-
-class WindokuRegionDisplay extends DisplayItem {
-  constructor(svg) {
-    super(svg);
-    this._applyGridOffset(svg);
-
-    svg.setAttribute('fill', 'rgb(255, 0, 255)');
-    svg.setAttribute('opacity', '0.1');
-
-    this.enableWindokuRegion(false);
-  }
-
-  reshape(shape) {
-    super.reshape(shape);
-    this.clear();
-
-    const svg = this.getSvg();
-
-    for (const region of SudokuConstraint.Windoku.regions(shape)) {
-      for (const cell of region) {
-        svg.append(this._makeCellSquare(cell));
-      }
-    }
-  }
-
-  enableWindokuRegion(enable) {
-    this.getSvg().setAttribute('display', enable ? null : 'none');
   }
 }
 
@@ -989,67 +896,6 @@ class OutsideClueDisplay extends DisplayItem {
 
     return arrow;
   };
-}
-
-class DiagonalDisplay extends DisplayItem {
-  DIRECTIONS = [1, -1];
-
-  constructor(svg) {
-    super(svg);
-    this._applyGridOffset(svg);
-    this._diagonals = [null, null];
-
-    svg.setAttribute('stroke-width', 1);
-    svg.setAttribute('stroke', 'rgb(255, 0, 0)');
-  }
-
-  _directionIndex(direction) {
-    return direction > 0;
-  }
-
-  drawDiagonal(direction) {
-    const index = this._directionIndex(direction);
-    if (this._diagonals[index]) return this._diagonals[index];
-
-    const shape = this._shape;
-
-    const size = DisplayItem.CELL_SIZE * shape.gridSize;
-    const line = this._makePath([
-      [0, direction > 0 ? size : 0],
-      [size, direction > 0 ? 0 : size],
-    ]);
-
-    this.getSvg().appendChild(line);
-    this._diagonals[index] = line;
-
-    return line;
-  }
-
-  removeDiagonal(direction) {
-    const index = this._directionIndex(direction);
-    let item = this._diagonals[index];
-    if (item) item.parentNode.removeChild(item);
-    this._diagonals[index] = null;
-  }
-
-  clear() {
-    for (const direction of this.DIRECTIONS) {
-      this.removeDiagonal(direction);
-    }
-  }
-
-  reshape(shape) {
-    super.reshape(shape);
-
-    // Redraw the diagonals with the correct shape.
-    for (const direction of this.DIRECTIONS) {
-      const index = this._directionIndex(direction);
-      if (this._diagonals[index]) {
-        this.removeDiagonal(direction);
-        this.drawDiagonal(direction);
-      }
-    }
-  }
 }
 
 class ColorPicker {
