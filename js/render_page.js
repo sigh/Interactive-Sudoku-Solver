@@ -341,7 +341,7 @@ class OutsideClueConstraints {
   }
 
   static _mapKey(type, lineId) {
-    return `${type}| ${lineId} `;
+    return `${type}|${lineId}`;
   }
 
   static _isValidValue(value, config) {
