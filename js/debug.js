@@ -265,6 +265,7 @@ const runSolveTests = async (onFailure) => {
     'Hidden skyscrapers',
     'Look-and-say',
     'Counting circles',
+    'Anti-taxicab',
   ], onFailure);
   result.collection = '9x9';
   results.push(result);

@@ -219,15 +219,21 @@ const DISPLAYED_EXAMPLES = [
   },
   {
     name: 'Indexing',
-    'src': 'https://www.youtube.com/watch?v=J0OVDew3Hg4',
-    'input': '.~R2C2_4~R2C3_9~R2C4_7~R1C6_3~R1C8_5~R3C6_5~R3C7_1~R3C8_2~R4C2_2~R4C4_6~R5C3_7~R7C2_6~R7C3_3~R7C4_8~R6C6_8~R5C7_8~R6C8_6~R8C6_9~R8C7_5~R8C8_3~R9C2_7~R9C4_2.Indexing~C~R1C1~R2C1~R3C1~R4C1~R5C1~R6C1~R7C1~R8C1~R9C1~R1C5~R2C5~R3C5~R4C5~R5C5~R6C5~R7C5~R8C5~R9C5~R1C9~R2C9~R3C9~R4C9~R5C9~R6C9~R7C9~R8C9~R9C9',
-    'solution': '216483957549712683738965124824697315657321849391548762963854271482179536175236498',
+    src: 'https://www.youtube.com/watch?v=J0OVDew3Hg4',
+    input: '.~R2C2_4~R2C3_9~R2C4_7~R1C6_3~R1C8_5~R3C6_5~R3C7_1~R3C8_2~R4C2_2~R4C4_6~R5C3_7~R7C2_6~R7C3_3~R7C4_8~R6C6_8~R5C7_8~R6C8_6~R8C6_9~R8C7_5~R8C8_3~R9C2_7~R9C4_2.Indexing~C~R1C1~R2C1~R3C1~R4C1~R5C1~R6C1~R7C1~R8C1~R9C1~R1C5~R2C5~R3C5~R4C5~R5C5~R6C5~R7C5~R8C5~R9C5~R1C9~R2C9~R3C9~R4C9~R5C9~R6C9~R7C9~R8C9~R9C9',
+    solution: '216483957549712683738965124824697315657321849391548762963854271482179536175236498',
   },
   {
     name: 'Full rank',
-    'src': 'https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?chlang=en&id=000EDA',
-    'input': '.FullRank~C2~26~.FullRank~C4~32~.FullRank~C6~6~.FullRank~C8~35~.FullRank~R1~17~.FullRank~R3~13~.FullRank~R5~10~.FullRank~R7~21~.FullRank~C3~~12.FullRank~C5~~19.FullRank~C7~~2.FullRank~C9~~14.FullRank~R8~~23.FullRank~R6~~20.FullRank~R4~~34.FullRank~R2~~11.',
-    'solution': '576832491829514763431769852768125349354698217192473685615347928247981536983256174',
+    src: 'https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?chlang=en&id=000EDA',
+    input: '.FullRank~C2~26~.FullRank~C4~32~.FullRank~C6~6~.FullRank~C8~35~.FullRank~R1~17~.FullRank~R3~13~.FullRank~R5~10~.FullRank~R7~21~.FullRank~C3~~12.FullRank~C5~~19.FullRank~C7~~2.FullRank~C9~~14.FullRank~R8~~23.FullRank~R6~~20.FullRank~R4~~34.FullRank~R2~~11.',
+    solution: '576832491829514763431769852768125349354698217192473685615347928247981536983256174',
+  },
+  {
+    name: 'Anti-taxicab',
+    src: 'https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?id=0003OG',
+    input: '.Diagonal~1.Diagonal~-1.AntiTaxicab.~R1C1_2~R2C1_3~R1C3_4~R2C3_1~R4C4_1~R5C2_2~R5C1_4~R7C1_6~R7C3_9~R9C2_4~R9C5_3~R8C6_4~R6C6_9~R1C6_1~R1C5_8~R2C5_9~R4C8_8~R7C9_7',
+    solution: '264581793351697248798423165975146382426378951813259674639815427182764539547932816',
   },
   {
     name: 'Pencilmark sudoku',

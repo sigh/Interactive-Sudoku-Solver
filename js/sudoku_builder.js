@@ -748,6 +748,28 @@ class SudokuConstraint {
 
   static AntiKing = class AntiKing extends SudokuConstraintBase { }
 
+  static AntiTaxicab = class AntiTaxicab extends SudokuConstraintBase {
+    static taxicabCells(row, col, dist, shape) {
+      const cells = [];
+      const gridSize = shape.gridSize;
+
+      for (let r = 0; r < gridSize; r++) {
+        const rDist = Math.abs(r - row);
+        if (rDist === 0 || rDist >= dist) continue;
+
+        const cDist = dist - rDist;
+        if (col - cDist >= 0) {
+          cells.push(shape.cellIndex(r, col - cDist));
+        }
+        if (col + cDist < gridSize) {
+          cells.push(shape.cellIndex(r, col + cDist));
+        }
+      }
+
+      return cells;
+    }
+  }
+
   static AntiConsecutive = class AntiConsecutive extends SudokuConstraintBase {
     static fnKey = memoize((numValues) =>
       SudokuConstraint.Binary.fnToKey(
@@ -1287,6 +1309,21 @@ class SudokuBuilder {
 
         case 'AntiConsecutive':
           yield* this._antiConsecutiveHandlers(shape);
+          break;
+
+        case 'AntiTaxicab':
+          {
+            for (let i = 0; i < shape.numCells; i++) {
+              const valueMap = [];
+              for (let d = 1; d <= shape.numValues; d++) {
+                const [r, c] = shape.splitCellIndex(i);
+                valueMap.push(
+                  SudokuConstraint.AntiTaxicab.taxicabCells(r, c, d, shape));
+              }
+              yield new SudokuConstraintHandler.ValueDependentUniqueValueExclusion(
+                i, valueMap);
+            }
+          }
           break;
 
         case 'Jigsaw':
