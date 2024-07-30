@@ -67,6 +67,15 @@ class CheckboxConstraints {
         text: 'Global Entropy',
         description: `Each 2x2 box in the grid has to contain a low digit (1, 2, 3), a middle digit (4, 5, 6) and a high digit (7, 8, 9).`,
       },
+      AntiTaxicab: {
+        text: 'Anti-Taxicab',
+        description: `
+          A cell that contains a digit x can't have a taxicab distance of
+          exactly x from another cell with the digit x.
+          A taxicab distance from cell A to cell B is the minimum
+          possible distance from cell A to cell B when traversed only through
+          adjacent cells.`,
+      },
     };
 
     this._checkboxes = new Map();
@@ -825,6 +834,7 @@ class ConstraintManager {
       case 'NoBoxes':
       case 'Windoku':
       case 'Diagonal':
+      case 'AntiTaxicab':
         this._checkboxConstraints.check(constraint);
         break;
       case 'Set':

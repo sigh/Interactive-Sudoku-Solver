@@ -152,6 +152,49 @@ SudokuConstraintHandler.UniqueValueExclusion = class UniqueValueExclusion extend
   }
 }
 
+SudokuConstraintHandler.ValueDependentUniqueValueExclusion = class ValueDependentUniqueValueExclusion extends SudokuConstraintHandler {
+  constructor(cell, valueToCellMap) {
+    super([cell]);
+    this._cell = cell;
+    this._valueToCellMap = valueToCellMap;
+  }
+
+  initialize(initialGrid, cellExclusions, shape) {
+    // Remove cellExclusions, as it would be redundant.
+    const exclusions = new Set(cellExclusions.getArray(this._cell));
+    for (let i = 0; i < shape.numValues; i++) {
+      this._valueToCellMap[i] = new Uint8Array(
+        this._valueToCellMap[i].filter(c => !exclusions.has(c)));
+    }
+    return true;
+  }
+
+  enforceConsistency(grid, handlerAccumulator) {
+    const v = grid[this._cell];
+    // Ignore if cell is not a singleton yet.
+    if (v & (v - 1)) return true;
+
+    const value = LookupTables.toValue(v);
+
+    const exclusionCells = this._valueToCellMap[value - 1];
+    const numExclusions = exclusionCells.length;
+    for (let i = 0; i < numExclusions; i++) {
+      const exclusionCell = exclusionCells[i];
+      if (grid[exclusionCell] & v) {
+        if (!(grid[exclusionCell] ^= v)) return false;
+        handlerAccumulator.addForCell(exclusionCell);
+      }
+    }
+
+    return true;
+  }
+
+  priority() {
+    return 0;
+  }
+}
+
+
 SudokuConstraintHandler._CommonHandlerUtil = class _CommonHandlerUtil {
   static exposeHiddenSingles(grid, cells, hiddenSingles) {
     hiddenSingles = hiddenSingles | 0;
