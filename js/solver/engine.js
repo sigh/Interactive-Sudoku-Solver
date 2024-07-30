@@ -38,24 +38,21 @@ class SudokuSolver {
 
     // Add a sample solution to the state updates, but only if a different
     // solution is ready.
-    let sampleSolution = null;
+    this._internalSolver.unsetSampleSolution();
     this._progressExtraStateFn = () => {
+      const sampleSolution = this._internalSolver.getSampleSolution();
       let result = null;
       if (sampleSolution) {
-        result = { solutions: [sampleSolution] };
-        sampleSolution = null;
+        result = {
+          solutions: [SudokuSolver.Util.gridToSolution(sampleSolution)]
+        };
+        this._internalSolver.unsetSampleSolution();
       }
       return result;
     };
 
     this._timer.runTimed(() => {
-      for (const result of this._internalSolver.run(
-        SudokuSolver.InternalSolver.YIELD_ON_SOLUTION)) {
-        // Only store a sample solution if we don't have one.
-        if (sampleSolution == null) {
-          sampleSolution = SudokuSolver.Util.gridToSolution(result.grid);
-        }
-      }
+      this._internalSolver.run(SudokuSolver.InternalSolver.YIELD_NEVER).next();
     });
 
     // Send progress one last time to ensure the last solution is sent.
@@ -478,12 +475,23 @@ SudokuSolver.InternalSolver = class {
     // Candidate selector must be made aware of the new backtrack triggers.
     this._candidateSelector.reset(this._backtrackTriggers);
 
+    // Setup sample solution so that we create new ones by default.
+    this._sampleSolution = this._initialGrid.slice();
+
     this.done = false;
     this._atStart = true;
   }
 
   getBacktrackTriggers() {
     return this._backtrackTriggers.slice();
+  }
+
+  getSampleSolution() {
+    return this._sampleSolution[0] ? this._sampleSolution : null;
+  }
+
+  unsetSampleSolution() {
+    this._sampleSolution[0] = 0;
   }
 
   _hasInterestingSolutions(grid, uninterestingValues) {
@@ -598,6 +606,7 @@ SudokuSolver.InternalSolver = class {
 
   static YIELD_ON_SOLUTION = 0;
   static YIELD_ON_STEP = 1;
+  static YIELD_NEVER = -1;
 
   static _LOG_BACKTRACK_DECAY_INTERVAL = 14;
 
@@ -794,12 +803,17 @@ SudokuSolver.InternalSolver = class {
         // We've set all the values, and we haven't found a contradiction.
         // This is a solution!
         counters.solutions++;
-        yield {
-          grid: grid,
-          isSolution: true,
-          cellOrder: this._candidateSelector.getCellOrder(),
-          hasContradiction: false,
-        };
+        if (this._sampleSolution[0] === 0) {
+          this._sampleSolution.set(grid);
+        }
+        if (yieldWhen !== this.constructor.YIELD_NEVER) {
+          yield {
+            grid: grid,
+            isSolution: true,
+            cellOrder: this._candidateSelector.getCellOrder(),
+            hasContradiction: false,
+          };
+        }
         checkRunCounter();
         continue;
       }
