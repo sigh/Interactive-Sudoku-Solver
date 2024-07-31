@@ -8,6 +8,7 @@ class GridShape {
     this._numPencilmarksLookup.set(shape.numPencilmarks, shape);
   }
   static get(name) { return this._registry.get(name); }
+  static allShapes() { return [...this._registry.values()]; }
   static fromNumCells(numCells) { return this._numCellsLookup.get(numCells); }
   static fromNumPencilmarks(numPencilmarks) {
     return this._numPencilmarksLookup.get(numPencilmarks);
@@ -205,12 +206,9 @@ class SudokuParser {
     return new SudokuConstraint.Set(constraints);
   }
 
-  static SHAPE_TO_BASE_CHAR_CODE = new Map([
-    [SHAPE_6x6, '1'.charCodeAt(0)],
-    [SHAPE_4x4, '1'.charCodeAt(0)],
-    [SHAPE_9x9, '1'.charCodeAt(0)],
-    [SHAPE_16x16, 'A'.charCodeAt(0)],
-  ])
+  static shapeToBaseCharCode(shape) {
+    return shape.numValues < 10 ? '1'.charCodeAt(0) : 'A'.charCodeAt(0);
+  }
 
   static parsePlainSudoku(text) {
     const shape = GridShape.fromNumCells(text.length);
@@ -219,7 +217,7 @@ class SudokuParser {
     const numCells = shape.numCells;
     const gridSize = shape.gridSize;
 
-    const baseCharCode = this.SHAPE_TO_BASE_CHAR_CODE.get(shape);
+    const baseCharCode = this.shapeToBaseCharCode(shape);
     if (!baseCharCode) return null;
 
     let fixedValues = [];
@@ -1910,7 +1908,7 @@ class SolverProxy {
 };
 
 const toShortSolution = (solution, shape) => {
-  const baseCharCode = SudokuParser.SHAPE_TO_BASE_CHAR_CODE.get(shape);
+  const baseCharCode = SudokuParser.shapeToBaseCharCode(shape);
   const DEFAULT_VALUE = '.';
 
   const result = new Array(solution.length).fill(DEFAULT_VALUE);

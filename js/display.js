@@ -742,7 +742,7 @@ class OutsideClueDisplay extends DisplayItem {
 
       const label = document.createElement('label');
       label.setAttribute('for', id);
-      label.textContent = type + ' ';
+      label.textContent = (config.text || type) + ' ';
       const tooltip = document.createElement('span');
       tooltip.classList.add('tooltip');
       tooltip.setAttribute('data-text', config.description);

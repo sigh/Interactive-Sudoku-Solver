@@ -226,7 +226,7 @@ class JigsawManager {
   getConstraint() {
     if (this._piecesMap.every(x => x == 0)) return new SudokuConstraint.Set([]);
 
-    const baseCharCode = SudokuParser.SHAPE_TO_BASE_CHAR_CODE.get(this._shape);
+    const baseCharCode = SudokuParser.shapeToBaseCharCode(this._shape);
 
     const indexMap = new Map();
     const grid = Array(this._shape.numCells).fill('-');
@@ -365,6 +365,7 @@ class OutsideClueConstraints {
           given sum.`,
       },
       XSum: {
+        text: 'X-Sum',
         clueType: this.CLUE_TYPE_DOUBLE_LINE,
         strTemplate: '⟨$CLUE⟩',
         description:
@@ -382,6 +383,7 @@ class OutsideClueConstraints {
       row / column from the clue's direction of view.`,
       },
       HiddenSkyscraper: {
+        text: 'Hidden Skyscraper',
         clueType: this.CLUE_TYPE_DOUBLE_LINE,
         strTemplate: '|$CLUE|',
         description:
@@ -391,6 +393,7 @@ class OutsideClueConstraints {
           row/column from the clue's direction of view.`,
       },
       FullRank: {
+        text: 'Full Rank',
         clueType: this.CLUE_TYPE_DOUBLE_LINE,
         strTemplate: '#$CLUE',
         elementId: 'full-rank-option',
@@ -400,6 +403,7 @@ class OutsideClueConstraints {
           where in the ranking that row/column lies.`,
       },
       NumberedRoom: {
+        text: 'Numbered Room',
         clueType: this.CLUE_TYPE_DOUBLE_LINE,
         strTemplate: ':$CLUE:',
         elementId: 'numbered-room-option',
@@ -409,6 +413,7 @@ class OutsideClueConstraints {
           placed in the first cell in that direction.`,
       },
       LittleKiller: {
+        text: 'Little Killer',
         clueType: this.CLUE_TYPE_DIAGONAL,
         strTemplate: '$CLUE',
         description:
