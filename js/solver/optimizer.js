@@ -24,6 +24,8 @@ class SudokuConstraintOptimizer {
 
     this._optimizeRequiredValues(handlerSet, cellExclusions, shape);
 
+    this._optimizeTaxicab(handlerSet, cellExclusions, shape);
+
     if (hasBoxes) {
       this._addHouseIntersections(handlerSet, shape);
     }
@@ -802,6 +804,38 @@ class SudokuConstraintOptimizer {
             });
           }
         }
+      }
+    }
+  }
+
+  _optimizeTaxicab(handlerSet, cellExclusions, shape) {
+    const taxicabHandlers = handlerSet.getAllofType(
+      SudokuConstraintHandler.ValueDependentUniqueValueExclusion);
+    if (taxicabHandlers.length == 0) return;
+
+    const valueCellExclusions = [];
+    for (let i = 1; i <= shape.numValues; i++) {
+      const valueCellExclusion = cellExclusions.clone();
+      valueCellExclusions.push(valueCellExclusion);
+      for (const h of taxicabHandlers) {
+        const cell = h.cells[0];
+        for (const otherCell of h.getValueCellExclusions(i)) {
+          valueCellExclusion.addMutualExclusion(cell, otherCell);
+        }
+      }
+    }
+
+    const houseHandlers = handlerSet.getAllofType(SudokuConstraintHandler.House);
+    for (const h of houseHandlers) {
+      const newHandler = new SudokuConstraintHandler.ValueDependentUniqueValueExclusionHouse(
+        h.cells, valueCellExclusions);
+      handlerSet.add(newHandler);
+      if (this._debugLogger) {
+        this._debugLogger.log({
+          loc: '_optimizeTaxicab',
+          msg: 'Add: ' + newHandler.constructor.name,
+          cells: newHandler.cells,
+        });
       }
     }
   }

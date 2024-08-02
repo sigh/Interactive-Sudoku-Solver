@@ -159,6 +159,10 @@ SudokuConstraintHandler.ValueDependentUniqueValueExclusion = class ValueDependen
     this._valueToCellMap = valueToCellMap;
   }
 
+  getValueCellExclusions(value) {
+    return this._valueToCellMap[value - 1];
+  }
+
   initialize(initialGrid, cellExclusions, shape) {
     // Remove cellExclusions, as it would be redundant.
     const exclusions = new Set(cellExclusions.getArray(this._cell));
@@ -194,6 +198,65 @@ SudokuConstraintHandler.ValueDependentUniqueValueExclusion = class ValueDependen
   }
 }
 
+SudokuConstraintHandler.ValueDependentUniqueValueExclusionHouse = class ValueDependentUniqueValueExclusionHouse extends SudokuConstraintHandler {
+  constructor(cells, valueCellExclusions) {
+    super(cells);
+    this._valueCellExclusions = valueCellExclusions;
+  }
+
+  _handleExactlyTwo(grid, v, handlerAccumulator) {
+    const cells = this.cells;
+    const numCells = cells.length;
+
+    let pairIndex = 0;
+    for (let i = 0; i < numCells; i++) {
+      if (grid[cells[i]] & v) {
+        pairIndex = (pairIndex << 8) | cells[i];
+      }
+    }
+
+    const value = LookupTables.toValue(v);
+    const exclusionCells = this._valueCellExclusions[value - 1].getPairExclusions(
+      pairIndex);
+
+    if (exclusionCells && exclusionCells.length) {
+      // Remove the value from the exclusion cells.
+      for (let i = 0; i < exclusionCells.length; i++) {
+        if (grid[exclusionCells[i]] & v) {
+          if (!(grid[exclusionCells[i]] ^= v)) return false;
+          if (handlerAccumulator) handlerAccumulator.addForCell(exclusionCells[i]);
+        }
+      }
+    }
+
+    return true;
+  }
+
+  enforceConsistency(grid, handlerAccumulator) {
+    const cells = this.cells;
+    const numCells = cells.length;
+
+    let allValues = 0;
+    let moreThanOne = 0;
+    let moreThanTwo = 0;
+    for (let i = 0; i < numCells; i++) {
+      const v = grid[cells[i]];
+      moreThanTwo |= moreThanOne & v;
+      moreThanOne |= allValues & v;
+      allValues |= v;
+    }
+
+    let exactlyTwo = moreThanOne & ~moreThanTwo;
+    while (exactlyTwo) {
+      let v = exactlyTwo & -exactlyTwo;
+      exactlyTwo ^= v;
+      if (!this._handleExactlyTwo(grid, v, handlerAccumulator)) {
+        return false;
+      }
+    }
+    return true;
+  }
+}
 
 SudokuConstraintHandler._CommonHandlerUtil = class _CommonHandlerUtil {
   static exposeHiddenSingles(grid, cells, hiddenSingles) {
@@ -590,7 +653,6 @@ SudokuConstraintHandler.BinaryPairwise = class BinaryPairwise extends SudokuCons
         this._key, shape.numValues, this.cells.length);
 
       this._cellExclusions = cellExclusions;
-      cellExclusions.cacheCellTuples(this.cells);
     }
 
     // If no values are legal at the start, then this constraint is invalid.
@@ -1250,7 +1312,6 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
       // TODO: Find a robust way of handling this so that we still get the
       //       benefit for positive cells.
       this._cellExclusions = cellExclusions;
-      cellExclusions.cacheCellTuples(this.cells);
     }
 
     // Ensure that _complementCells is null.
@@ -2469,8 +2530,6 @@ SudokuConstraintHandler.XSum = class XSum extends SudokuConstraintHandler {
     let array = [];
     for (let i = 0; i < shape.gridSize; i++) {
       array.push(this.cells.slice(0, i + 1));
-      // Cache the cell lists so that the required values enforcer will find them.
-      cellExclusions.cacheCellList(array[i]);
     }
     this._cellArrays = array;
     return true;
@@ -2576,7 +2635,6 @@ SudokuConstraintHandler.LocalEntropy = class LocalEntropy extends SudokuConstrai
 
   initialize(initialGrid, cellExclusions, shape) {
     this._cellExclusions = cellExclusions;
-    cellExclusions.cacheCellTuples(this.cells);
 
     return true;
   }

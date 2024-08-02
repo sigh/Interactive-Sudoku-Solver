@@ -1450,14 +1450,13 @@ SudokuSolver.HandlerAccumulator = class {
 
 SudokuSolver.CellExclusions = class {
   constructor(handlerSet, shape) {
-    this._cellExclusionSets = this.constructor._makeCellExclusionSets(
-      handlerSet, shape);
+    this._cellExclusionSets = [];
+    if (handlerSet !== null) {
+      this._cellExclusionSets = this.constructor._makeCellExclusionSets(
+        handlerSet, shape);
+    }
 
-    // Store an array version for fast iteration.
-    // Sort the cells so they are in predictable order.
-    this._cellExclusionArrays = (
-      this._cellExclusionSets.map(c => new Uint8Array(c)));
-    this._cellExclusionArrays.forEach(c => c.sort((a, b) => a - b));
+    this._cellExclusionArrays = [];
 
     // Indexing of pairs:
     //   pairExclusions[(i << 8) | j] = [cells which are excluded by both i and j]
@@ -1466,6 +1465,12 @@ SudokuSolver.CellExclusions = class {
     //   listExclusions[obj] = [cells which are excluded by all cells in obj]
     //   obj must match exactly.
     this._listExclusions = new Map();
+  }
+
+  clone() {
+    const clone = new SudokuSolver.CellExclusions(null, null);
+    clone._cellExclusionSets = this._cellExclusionSets.map(s => new Set(s));
+    return clone;
   }
 
   static _makeCellExclusionSets(handlerSet, shape) {
@@ -1486,35 +1491,49 @@ SudokuSolver.CellExclusions = class {
     return cellExclusionSets;
   }
 
+  addMutualExclusion(cell1, cell2) {
+    if (this._cellExclusionArrays.length > 0) {
+      throw ('Cannot add exclusions after caching.');
+    }
+    this._cellExclusionSets[cell1].add(cell2);
+  }
+
   isMutuallyExclusive(cell1, cell2) {
     return this._cellExclusionSets[cell1].has(cell2);
   }
 
   getArray(cell) {
+    if (this._cellExclusionArrays.length === 0) {
+      // Store an array version for fast iteration.
+      // Sort the cells so they are in predictable order.
+      this._cellExclusionArrays = (
+        this._cellExclusionSets.map(c => new Uint8Array(c)));
+      this._cellExclusionArrays.forEach(c => c.sort((a, b) => a - b));
+    }
+
     return this._cellExclusionArrays[cell];
   }
 
   getPairExclusions(pairIndex) {
-    return this._pairExclusions.get(pairIndex);
+    let result = this._pairExclusions.get(pairIndex);
+    if (result === undefined) {
+      result = this._computePairExclusions(pairIndex >> 8, pairIndex & 0xff);
+      this._pairExclusions.set(pairIndex, result);
+    }
+
+    return result;
   }
 
   getListExclusions(cells) {
-    return this._listExclusions.get(cells);
-  }
-
-  cacheCellTuples(cells) {
-    const numCells = cells.length;
-
-    for (let i = 0; i < numCells; i++) {
-      for (let j = i + 1; j < numCells; j++) {
-        this._cachePair(cells[i], cells[j]);
-      }
+    let result = this._listExclusions.get(cells);
+    if (result === undefined) {
+      result = this._computeListExclusions(cells);
+      this._listExclusions.set(cells, result);
     }
-
-    this.cacheCellList(cells);
+    return result;
   }
 
-  cacheCellList(cells) {
+  _computeListExclusions(cells) {
     const numCells = cells.length;
 
     // Find the intersection of all exclusions.
@@ -1524,32 +1543,21 @@ SudokuSolver.CellExclusions = class {
         allCellExclusions, this._cellExclusionSets[cells[i]]);
     }
 
-    // Only add it if it's not empty.
-    if (allCellExclusions.size) {
-      this._listExclusions.set(cells, new Uint8Array(allCellExclusions));
-    }
+    return new Uint8Array(allCellExclusions);
   }
 
-  _cachePair(cell0, cell1) {
-    const key = (cell0 << 8) | cell1;
-
-    // Check if we've already cached the pair.
-    if (this._pairExclusions.has(key)) return;
-
+  _computePairExclusions(cell0, cell1) {
     // If we've cached the reverse order, then use that.
     const revKey = (cell1 << 8) | cell0;
     if (this._pairExclusions.has(revKey)) {
-      this._pairExclusions.set(key, this._pairExclusions.get(revKey));
-      return;
+      return this._pairExclusions.get(revKey);
     }
 
     // Otherwise, calculate the intersection.
     const exclusionSet = setIntersection(
       this._cellExclusionSets[cell0],
       this._cellExclusionSets[cell1]);
-    this._pairExclusions.set(key, new Uint8Array(exclusionSet));
-
-    return;
+    return new Uint8Array(exclusionSet);
   }
 }
 
