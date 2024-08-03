@@ -30,8 +30,8 @@ class CheckboxConstraints {
         description: `Values along the diagonal must be unique.`,
         value: {
           options: [
-            { text: '⟋', value: 1 },
-            { text: '⟍', value: -1 },
+            { text: '╱', value: 1 },
+            { text: '╲', value: -1 },
           ],
         },
         displayClass: ConstraintDisplays.Diagonal,
