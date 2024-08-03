@@ -414,7 +414,7 @@ SudokuSolver.InternalSolver = class {
 
     // Add the exclusion handlers.
     for (let i = 0; i < this._numCells; i++) {
-      handlerSet.addExclusionHandlers(
+      handlerSet.addSingletonHandlers(
         new SudokuConstraintHandler.UniqueValueExclusion(i));
     }
 
@@ -510,6 +510,7 @@ SudokuSolver.InternalSolver = class {
     oldGrid.set(grid);
 
     const result = handler.enforceConsistency(grid, handlerAccumulator);
+    const handlerName = handler.debugName();
 
     if (!arraysAreEqual(oldGrid, grid)) {
       const diff = {};
@@ -524,7 +525,7 @@ SudokuSolver.InternalSolver = class {
 
       this._debugLogger.log({
         loc: loc,
-        msg: `${handler.constructor.name} removed: `,
+        msg: `${handlerName} removed: `,
         args: diff,
         cells: handler.cells,
         candidates: candidates,
@@ -532,14 +533,14 @@ SudokuSolver.InternalSolver = class {
     } else if (this._debugLogger.logLevel >= 2) {
       this._debugLogger.log({
         loc: loc,
-        msg: `${handler.constructor.name} ran`,
+        msg: `${handlerName} ran`,
         cells: handler.cells,
       }, 2);
     }
     if (!result) {
       this._debugLogger.log({
         loc: loc,
-        msg: `${handler.constructor.name} returned false`,
+        msg: `${handlerName} returned false`,
         cells: handler.cells,
       });
     }
@@ -1322,8 +1323,18 @@ SudokuSolver.HandlerAccumulator = class {
   constructor(handlerSet) {
     this._allHandlers = handlerSet.getAll();
     this._auxHandlers = handlerSet.getAuxHandlerMap();
-    this._exclusionHandlers = new Uint16Array(
-      handlerSet.getExclusionHandlerMap());
+
+    const singletonMap = handlerSet.getSingletonHandlerMap();
+    this._singletonHandlers = new Uint16Array(singletonMap.length);
+    for (let i = 0; i < singletonMap.length; i++) {
+      const handlers = singletonMap[i];
+      const index = handlers[0];
+      this._singletonHandlers[i] = index;
+      if (handlers.length > 1) {
+        this._allHandlers[index] = new SudokuConstraintHandler.And(
+          ...handlers.map(i => this._allHandlers[i]));
+      }
+    }
 
     const allOrdinaryHandlers = handlerSet.getOrdinaryHandlerMap();
     // Create a mapping of just the essential ordinary handlers.
@@ -1371,7 +1382,7 @@ SudokuSolver.HandlerAccumulator = class {
   // Add handlers for a fixed cell (cell with a known/single value).
   addForFixedCell(cell) {
     // Push exclusion handlers to the front of the queue.
-    this._pushIndex(this._exclusionHandlers[cell]);
+    this._pushIndex(this._singletonHandlers[cell]);
     // Push aux handlers if we are not skipping non-essentials.
     // Aux handlers are only added when we are fixing a cell.
     if (!this._skipNonEssential) {
