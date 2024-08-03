@@ -54,11 +54,11 @@ const arraysAreEqual = (a, b) => {
 }
 
 // `a` must be a set, `b` must be iterable.
-const setIntersection = (a, b) => {
-  const intersection = new Set()
+const setIntersectionToArray = (a, b) => {
+  const intersection = [];
   for (const elem of b) {
     if (a.has(elem)) {
-      intersection.add(elem)
+      intersection.push(elem)
     }
   }
   return intersection;

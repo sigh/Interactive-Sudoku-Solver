@@ -78,7 +78,7 @@ class SudokuConstraintOptimizer {
     const handlersByOverlaps = [];
     for (const h of handlers) {
       const overlapIndexes = fullHandlerSet.getIntersectingIndexes(h);
-      const numOverlap = setIntersection(overlapIndexes, handlerIndexes);
+      const numOverlap = setIntersectSize(overlapIndexes, handlerIndexes);
       handlersByOverlaps.push([h, numOverlap]);
     }
     handlersByOverlaps.sort((a, b) => a[1] - b[1]);
@@ -366,22 +366,21 @@ class SudokuConstraintOptimizer {
     for (const h of houseHandlers) {
       // Find sum constraints which overlap this house.
       let intersectingHandlers = handlerSet.getIntersectingIndexes(h);
-      const currentHouseSumIndexes = setIntersection(
+      const currentHouseSumIndexes = setIntersectionToArray(
         intersectingHandlers, allSumHandlerIndexes);
-      if (!currentHouseSumIndexes.size) continue;
+      if (currentHouseSumIndexes.length === 0) continue;
 
       // For the sum intersection, we need to ensure that the sum handlers don't
       // overlap themselves.
       // We do this separately for each house so that we can don't have to
       // force the same handle to be used in every house it intersects.
       const [filteredSumHandlers, _] = this._findNonOverlappingSubset(
-        Array.from(currentHouseSumIndexes).map(
-          i => handlerSet.getHandler(i)),
+        currentHouseSumIndexes.map(i => handlerSet.getHandler(i)),
         handlerSet);
 
       {
-        const intersectingHouseHandlers = Array.from(
-          setIntersection(intersectingHandlers, houseHandlerIndexes)).map(
+        const intersectingHouseHandlers = (
+          setIntersectionToArray(intersectingHandlers, houseHandlerIndexes)).map(
             i => handlerSet.getHandler(i));
         const sumIntersectionHandler = this._addSumIntersectionHandler(
           h, filteredSumHandlers, intersectingHouseHandlers, houseHandlers,
