@@ -1507,7 +1507,7 @@ SudokuSolver.CellExclusions = class {
       // Store an array version for fast iteration.
       // Sort the cells so they are in predictable order.
       this._cellExclusionArrays = (
-        this._cellExclusionSets.map(c => new Uint8Array(c)));
+        this._cellExclusionSets.map(c => [...c]));
       this._cellExclusionArrays.forEach(c => c.sort((a, b) => a - b));
     }
 
@@ -1537,13 +1537,13 @@ SudokuSolver.CellExclusions = class {
     const numCells = cells.length;
 
     // Find the intersection of all exclusions.
-    let allCellExclusions = this._cellExclusionSets[cells[0]];
-    for (let i = 1; i < numCells && allCellExclusions.size; i++) {
-      allCellExclusions = setIntersection(
-        allCellExclusions, this._cellExclusionSets[cells[i]]);
+    let allCellExclusions = [...this._cellExclusionSets[cells[0]]];
+    for (let i = 1; i < numCells && allCellExclusions.length; i++) {
+      allCellExclusions = setIntersectionToArray(
+        this._cellExclusionSets[cells[i]], allCellExclusions);
     }
 
-    return new Uint8Array(allCellExclusions);
+    return allCellExclusions;
   }
 
   _computePairExclusions(cell0, cell1) {
@@ -1554,10 +1554,9 @@ SudokuSolver.CellExclusions = class {
     }
 
     // Otherwise, calculate the intersection.
-    const exclusionSet = setIntersection(
+    return setIntersectionToArray(
       this._cellExclusionSets[cell0],
       this._cellExclusionSets[cell1]);
-    return new Uint8Array(exclusionSet);
   }
 }
 
