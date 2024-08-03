@@ -1,6 +1,8 @@
 "use strict";
 
 class SudokuConstraintHandler {
+  static SINGLETON_HANDLER = false;
+
   static _defaultId = 0;
 
   constructor(cells) {
@@ -38,6 +40,10 @@ class SudokuConstraintHandler {
   priority() {
     // By default, constraints which constrain more cells have higher priority.
     return this.cells.length;
+  }
+
+  debugName() {
+    return this.constructor.name;
   }
 }
 
@@ -80,6 +86,36 @@ SudokuConstraintHandler.False = class False extends SudokuConstraintHandler {
   enforceConsistency(grid, handlerAccumulator) { return false; }
 }
 
+SudokuConstraintHandler.And = class And extends SudokuConstraintHandler {
+  constructor(...handlers) {
+    const cells = Array.from(new Set(handlers.flatMap(h => h.cells)));
+    super(cells);
+
+    this._handlers = handlers;
+
+    this._debugName = `And(${handlers.map(h => h.debugName()).join(',')})`;
+  }
+
+  debugName() {
+    return this._debugName;
+  }
+
+  initialize(initialGrid, cellExclusions, shape) {
+    for (const h of this._handlers) {
+      if (!h.initialize(initialGrid, cellExclusions, shape)) return false;
+    }
+    return true;
+  }
+
+  enforceConsistency(grid, handlerAccumulator) {
+    const handlers = this._handlers;
+    for (let i = 0; i < handlers.length; i++) {
+      if (!handlers[i].enforceConsistency(grid, handlerAccumulator)) return false;
+    }
+    return true;
+  }
+}
+
 SudokuConstraintHandler.GivenCandidates = class GivenCandidates extends SudokuConstraintHandler {
   constructor(valueMap) {
     super();
@@ -120,6 +156,8 @@ SudokuConstraintHandler.AllDifferent = class AllDifferent extends SudokuConstrai
 // It removes that value from all cells which share an all-different constraint
 // with this cell.
 SudokuConstraintHandler.UniqueValueExclusion = class UniqueValueExclusion extends SudokuConstraintHandler {
+  static SINGLETON_HANDLER = true;
+
   constructor(cell) {
     super([cell]);
     this._cell = cell;
@@ -153,6 +191,8 @@ SudokuConstraintHandler.UniqueValueExclusion = class UniqueValueExclusion extend
 }
 
 SudokuConstraintHandler.ValueDependentUniqueValueExclusion = class ValueDependentUniqueValueExclusion extends SudokuConstraintHandler {
+  static SINGLETON_HANDLER = true;
+
   constructor(cell, valueToCellMap) {
     super([cell]);
     this._cell = cell;
@@ -175,12 +215,10 @@ SudokuConstraintHandler.ValueDependentUniqueValueExclusion = class ValueDependen
 
   enforceConsistency(grid, handlerAccumulator) {
     const v = grid[this._cell];
-    // Ignore if cell is not a singleton yet.
-    if (v & (v - 1)) return true;
 
-    const value = LookupTables.toValue(v);
+    const index = LookupTables.toIndex(v);
 
-    const exclusionCells = this._valueToCellMap[value - 1];
+    const exclusionCells = this._valueToCellMap[index];
     const numExclusions = exclusionCells.length;
     for (let i = 0; i < numExclusions; i++) {
       const exclusionCell = exclusionCells[i];
@@ -215,16 +253,16 @@ SudokuConstraintHandler.ValueDependentUniqueValueExclusionHouse = class ValueDep
       }
     }
 
-    const value = LookupTables.toValue(v);
-    const exclusionCells = this._valueCellExclusions[value - 1].getPairExclusions(
+    const index = LookupTables.toIndex(v);
+    const exclusionCells = this._valueCellExclusions[index].getPairExclusions(
       pairIndex);
 
-    if (exclusionCells && exclusionCells.length) {
+    if (exclusionCells.length > 0) {
       // Remove the value from the exclusion cells.
       for (let i = 0; i < exclusionCells.length; i++) {
         if (grid[exclusionCells[i]] & v) {
           if (!(grid[exclusionCells[i]] ^= v)) return false;
-          if (handlerAccumulator) handlerAccumulator.addForCell(exclusionCells[i]);
+          handlerAccumulator.addForCell(exclusionCells[i]);
         }
       }
     }
@@ -248,7 +286,7 @@ SudokuConstraintHandler.ValueDependentUniqueValueExclusionHouse = class ValueDep
 
     let exactlyTwo = moreThanOne & ~moreThanTwo;
     while (exactlyTwo) {
-      let v = exactlyTwo & -exactlyTwo;
+      const v = exactlyTwo & -exactlyTwo;
       exactlyTwo ^= v;
       if (!this._handleExactlyTwo(grid, v, handlerAccumulator)) {
         return false;
@@ -3549,13 +3587,13 @@ class HandlerSet {
     this._seen = new Map();
     this._ordinaryIndexLookup = new Map();
 
-    this._exclusionHandlerMap = [];
+    this._singletonHandlerMap = [];
     this._ordinaryHandlerMap = [];
     this._auxHandlerMap = [];
     for (let i = 0; i < shape.numCells; i++) {
       this._ordinaryHandlerMap.push([]);
       this._auxHandlerMap.push([]);
-      this._exclusionHandlerMap.push(-1);
+      this._singletonHandlerMap.push([]);
     }
 
     this.add(...handlers);
@@ -3595,8 +3633,8 @@ class HandlerSet {
     return this._allHandlers[index];
   }
 
-  getExclusionHandlerMap() {
-    return this._exclusionHandlerMap;
+  getSingletonHandlerMap() {
+    return this._singletonHandlerMap;
   }
 
   replace(oldHandler, newHandler) {
@@ -3638,8 +3676,12 @@ class HandlerSet {
 
   add(...handlers) {
     for (const h of handlers) {
-      if (!this._addToSeen(h)) continue;
-      this._addOrdinary(h);
+      if (h.constructor.SINGLETON_HANDLER) {
+        this.addSingletonHandlers(h);
+      } else {
+        if (!this._addToSeen(h)) continue;
+        this._addOrdinary(h);
+      }
     }
   }
 
@@ -3659,14 +3701,14 @@ class HandlerSet {
     }
   }
 
-  addExclusionHandlers(...handlers) {
+  addSingletonHandlers(...handlers) {
     for (const h of handlers) {
       if (!this._addToSeen(h)) {
-        throw ('Exclusion handlers must be unique');
+        throw ('Singleton handlers must be unique');
       }
 
       const index = this._addToAll(h);
-      this._exclusionHandlerMap[h.cells[0]] = index;
+      this._singletonHandlerMap[h.cells[0]].push(index);
     }
   }
 
