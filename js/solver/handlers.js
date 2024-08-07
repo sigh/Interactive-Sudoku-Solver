@@ -42,6 +42,10 @@ class SudokuConstraintHandler {
     return this.cells.length;
   }
 
+  candidateFinders(shape) {
+    return [];
+  }
+
   debugName() {
     return this.constructor.name;
   }
@@ -3578,6 +3582,94 @@ SudokuConstraintHandler.FullRank = class FullRank extends SudokuConstraintHandle
     }
 
     return true;
+  }
+
+  candidateFinders(grid, shape) {
+    const selectors = [];
+    const gridSize = shape.gridSize;
+
+    for (const rankSet of this._rankSets) {
+      const value = rankSet.value;
+
+      // Determine which edges don't have clues.
+      const flags = [1, 1, 1, 1];
+      for (const given of rankSet.givens) {
+        const cell0 = given.entry[0];
+        const [row, col] = shape.splitCellIndex(cell0);
+        if (row === 0) flags[0] = 0;
+        if (col === 0) flags[1] = 0;
+        if (row === gridSize - 1) flags[2] = 0;
+        if (col === gridSize - 1) flags[3] = 0;
+      }
+
+      // Create a multiplier than prioritizes rankSets which have more clues.
+      const multiplier = 4 - (flags[0] + flags[1] + flags[2] + flags[3]);
+
+      // Add a candidate finder for each remaining edge.
+      if (flags[0]) {
+        selectors.push(new ValueSpecificCandidateFinder(
+          SudokuConstraintBase.rowRegions(shape)[0], value, multiplier));
+      }
+      if (flags[1]) {
+        selectors.push(new ValueSpecificCandidateFinder(
+          SudokuConstraintBase.colRegions(shape)[0], value, multiplier));
+      }
+      if (flags[2]) {
+        selectors.push(new ValueSpecificCandidateFinder(
+          SudokuConstraintBase.rowRegions(shape)[gridSize - 1], value, multiplier));
+      }
+      if (flags[3]) {
+        selectors.push(new ValueSpecificCandidateFinder(
+          SudokuConstraintBase.colRegions(shape)[gridSize - 1], value, multiplier));
+      }
+    }
+
+    return selectors;
+  }
+}
+
+// TODO: Make this extend from it's own class instead of being a hacky handler.
+class ValueSpecificCandidateFinder extends SudokuConstraintHandler {
+  constructor(cells, value, multiplier) {
+    super(cells);
+    this._multiplier = multiplier || 1;
+    this._value = value;
+  }
+
+  maybeFindCandidate(grid, backtrackTriggers, result) {
+    const cells = this.cells;
+    const numCells = cells.length;
+    const value = this._value;
+
+    // Count the valid cells (ones which contain the value).
+    // Track the maximum bt for determining the score.
+    let count = 0;
+    let maxBt = 0;
+    for (let i = 0; i < numCells; i++) {
+      if (grid[cells[i]] & value) {
+        count++;
+        const cellBt = backtrackTriggers[cells[i]];
+        if (cellBt > maxBt) maxBt = cellBt;
+      }
+    }
+    // If count is 1, this is value is already resolved.
+    // Don't bother limiting the maximum count, as the score will
+    // naturally be lower in that case.
+    if (count < 2) return;
+
+    const score = maxBt * this._multiplier / count;
+    if (score > result.score) {
+      result.score = score;
+      result.value = value
+
+      const resultCells = result.cells;
+      resultCells.length = 0;
+      for (let i = 0; i < numCells; i++) {
+        if (grid[cells[i]] & value) {
+          resultCells.push(cells[i]);
+        }
+      }
+    }
   }
 }
 
