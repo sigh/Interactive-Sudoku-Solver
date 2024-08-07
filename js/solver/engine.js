@@ -948,6 +948,12 @@ SudokuSolver.CandidateSelector = class CandidateSelector {
       handlerSet.getAllofType(SudokuConstraintHandler.House), shape);
     this._houseHandlerAccumulator = new SudokuSolver.HandlerAccumulator(
       houseHandlerSet);
+    const selectors = [];
+    for (const h of handlerSet) {
+      selectors.push(...h.candidateFinders(null, shape));
+    }
+    this._candidateSelectorAccumulator = new SudokuSolver.HandlerAccumulator(
+      new HandlerSet(selectors, shape));
   }
 
   reset(backtrackTriggers) {
@@ -1083,8 +1089,11 @@ SudokuSolver.CandidateSelector = class CandidateSelector {
     // It will always be a singleton.
     if (this._candidateSelectionFlags[cellDepth]) {
       const state = this._candidateSelectionStates[cellDepth];
-      this._candidateSelectionFlags[cellDepth] = 0;
-      return [cellOrder.indexOf(state.cell1), state.value, 1];
+      const count = state.cells.length;
+      if (count === 1) {
+        this._candidateSelectionFlags[cellDepth] = 0;
+      }
+      return [cellOrder.indexOf(state.cells.pop()), state.value, count];
     }
 
     // Quick check - if the first value is a singleton, then just return without
@@ -1115,14 +1124,23 @@ SudokuSolver.CandidateSelector = class CandidateSelector {
     //  - Currently exploring a cell with more than 2 values.
     //  - Have non-zero backtrackTriggers (and thus score).
     if (isNewNode && count > 2 && this._backtrackTriggers[cell] > 0) {
-      const score = this._backtrackTriggers[cell] / count;
+      let score = this._backtrackTriggers[cell] / count;
 
       const state = this._candidateSelectionStates[cellDepth];
       if (this._findCandidatesByHouse(grid, score, state)) {
-        count = 2;
+        count = state.cells.length;
         value = state.value;
-        cellOffset = cellOrder.indexOf(state.cell0);
+        const cell = state.cells.pop();
+        cellOffset = cellOrder.indexOf(cell);
         this._candidateSelectionFlags[cellDepth] = 1;
+        score = state.bt / count;
+      }
+      if (this._findCandidatesByHandler(grid, score, state)) {
+        count = state.cells.length;
+        value = state.value;
+        const cell = state.cells.pop();
+        cellOffset = cellOrder.indexOf(cell);
+        this._candidateSelectionFlags[cellDepth] = 1
       }
     }
 
@@ -1223,6 +1241,38 @@ SudokuSolver.CandidateSelector = class CandidateSelector {
     return [cellOffset, value, adjusted];
   }
 
+  _findCandidatesByHandler(grid, score, result) {
+    const numCells = grid.length;
+    // Determine the minimum value that backtrackTriggers can take to beat the
+    // current score.
+    const minBt = Math.ceil(score * 2) | 0;
+
+    // Add all handlers with cells which can potentially beat the current score.
+    const backtrackTriggers = this._backtrackTriggers;
+    const selectorAccumulator = this._candidateSelectorAccumulator;
+    selectorAccumulator.resetActiveHandler();
+    for (let i = 0; i < numCells; i++) {
+      if (backtrackTriggers[i] >= minBt) {
+        const v = grid[i];
+        if (v & (v - 1)) {
+          selectorAccumulator.addForCell(i);
+        }
+      }
+    }
+
+    // Take epsilon to the score so that we will replace the result if the score
+    // is equal.
+    result.score = score - 0.001;
+
+    while (!selectorAccumulator.isEmpty()) {
+      const selector = selectorAccumulator.takeNext();
+
+      selector.maybeFindCandidate(grid, this._backtrackTriggers, result);
+    }
+
+    return result.score >= score;
+  }
+
   _findCandidatesByHouse(grid, score, result) {
     const numCells = grid.length;
     // Determine the minimum value that backtrackTriggers can take to beat the
@@ -1298,8 +1348,7 @@ SudokuSolver.CandidateSelector = class CandidateSelector {
 
       bestResult.bt = bt0; // max(bt[cell_i])
       bestResult.value = v;
-      bestResult.cell0 = cell0;
-      bestResult.cell1 = cell1;
+      bestResult.cells = [cell1, cell0];
     }
   }
 
@@ -1309,9 +1358,9 @@ SudokuSolver.CandidateSelector = class CandidateSelector {
     for (let i = 0; i < shape.numCells; i++) {
       candidateSelectionStates.push({
         bt: 0,
+        score: 0.0,
         value: 0,
-        cell0: 0,
-        cell1: 0
+        cells: [],
       });
     }
     return candidateSelectionStates;
