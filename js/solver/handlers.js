@@ -529,6 +529,10 @@ SudokuConstraintHandler.House = class House extends SudokuConstraintHandler {
   exclusionCells() {
     return this.cells;
   }
+
+  candidateFinders(grid, shape) {
+    return [new CandidateFinders.House(this.cells)];
+  }
 }
 
 SudokuConstraintHandler.BinaryConstraint = class BinaryConstraint extends SudokuConstraintHandler {
@@ -3607,69 +3611,24 @@ SudokuConstraintHandler.FullRank = class FullRank extends SudokuConstraintHandle
 
       // Add a candidate finder for each remaining edge.
       if (flags[0]) {
-        selectors.push(new ValueSpecificCandidateFinder(
+        selectors.push(new CandidateFinders.RequiredValue(
           SudokuConstraintBase.rowRegions(shape)[0], value, multiplier));
       }
       if (flags[1]) {
-        selectors.push(new ValueSpecificCandidateFinder(
+        selectors.push(new CandidateFinders.RequiredValue(
           SudokuConstraintBase.colRegions(shape)[0], value, multiplier));
       }
       if (flags[2]) {
-        selectors.push(new ValueSpecificCandidateFinder(
+        selectors.push(new CandidateFinders.RequiredValue(
           SudokuConstraintBase.rowRegions(shape)[gridSize - 1], value, multiplier));
       }
       if (flags[3]) {
-        selectors.push(new ValueSpecificCandidateFinder(
+        selectors.push(new CandidateFinders.RequiredValue(
           SudokuConstraintBase.colRegions(shape)[gridSize - 1], value, multiplier));
       }
     }
 
     return selectors;
-  }
-}
-
-// TODO: Make this extend from it's own class instead of being a hacky handler.
-class ValueSpecificCandidateFinder extends SudokuConstraintHandler {
-  constructor(cells, value, multiplier) {
-    super(cells);
-    this._multiplier = multiplier || 1;
-    this._value = value;
-  }
-
-  maybeFindCandidate(grid, backtrackTriggers, result) {
-    const cells = this.cells;
-    const numCells = cells.length;
-    const value = this._value;
-
-    // Count the valid cells (ones which contain the value).
-    // Track the maximum bt for determining the score.
-    let count = 0;
-    let maxBt = 0;
-    for (let i = 0; i < numCells; i++) {
-      if (grid[cells[i]] & value) {
-        count++;
-        const cellBt = backtrackTriggers[cells[i]];
-        if (cellBt > maxBt) maxBt = cellBt;
-      }
-    }
-    // If count is 1, this is value is already resolved.
-    // Don't bother limiting the maximum count, as the score will
-    // naturally be lower in that case.
-    if (count < 2) return;
-
-    const score = maxBt * this._multiplier / count;
-    if (score > result.score) {
-      result.score = score;
-      result.value = value
-
-      const resultCells = result.cells;
-      resultCells.length = 0;
-      for (let i = 0; i < numCells; i++) {
-        if (grid[cells[i]] & value) {
-          resultCells.push(cells[i]);
-        }
-      }
-    }
   }
 }
 

@@ -1,4 +1,5 @@
 const debugFilesLoaded = Promise.all([
+  loadJSFile('js/solver/candidate_selector.js'),
   loadJSFile('js/solver/engine.js'),
   loadJSFile('js/solver/handlers.js'),
   loadJSFile('js/solver/optimizer.js'),
@@ -266,6 +267,7 @@ const runSolveTests = async (onFailure) => {
     'Look-and-say',
     'Counting circles',
     'Anti-taxicab',
+    'Full rank - 6 clue snipe',
   ], onFailure);
   result.collection = '9x9';
   results.push(result);
