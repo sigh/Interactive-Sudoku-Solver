@@ -5,6 +5,7 @@ const START_INIT_WORKER = performance.now();
   self.importScripts(
     'util.js' + versionParam,
     'sudoku_builder.js' + versionParam,
+    'solver/candidate_selector.js' + versionParam,
     'solver/engine.js' + versionParam,
     'solver/handlers.js' + versionParam,
     'solver/optimizer.js' + versionParam);
