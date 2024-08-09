@@ -174,6 +174,11 @@ class CandidateSelector {
     let value = values & -values;
     let count = countOnes16bit(values);
 
+    // Wait until our first guess to initialize the candidate finder set.
+    if (count > 1 && !this._candidateFinderSet.initialized) {
+      this._candidateFinderSet.initialize(grid);
+    }
+
     // Optionally explore custom candidates nominated by constraints.
     //  - Exploring this node for the first time. If we have backtracked here
     //    it is less likely that this will yield a better candidate.
@@ -184,11 +189,11 @@ class CandidateSelector {
       let score = this._backtrackTriggers[cell] / count;
 
       const state = this._candidateSelectionStates[cellDepth];
-      if (this._findCustomCandidates(grid, score, state)) {
+      state.score = score;
+      if (this._findCustomCandidates(grid, cellOrder, cellDepth, state)) {
         count = state.cells.length;
         value = state.value;
-        const cell = state.cells.pop();
-        cellOffset = cellOrder.indexOf(cell);
+        cellOffset = cellOrder.indexOf(state.cells.pop());
         this._candidateSelectionFlags[cellDepth] = 1
       }
     }
@@ -290,40 +295,41 @@ class CandidateSelector {
     return [cellOffset, value, adjusted];
   }
 
-  _findCustomCandidates(grid, score, result) {
-    const numCells = grid.length;
-
-    // Determine the minimum value that the cellScore can take to beat the
-    // current score.
-    const minCS = Math.ceil(score * 2) | 0;
-    // Take epsilon to the score so that we will replace the result if the score
-    // is equal.
-    result.score = score - 0.001;
-
+  _findCustomCandidates(grid, cellOrder, cellDepth, result) {
     const cellScores = this._backtrackTriggers;
     const finderSet = this._candidateFinderSet;
     finderSet.clearMarks();
-    // TODO: Use cellOrder to avoid scanning the whole grid.
-    for (let i = 0; i < numCells; i++) {
-      // Ignore cells which are too low in priority.
-      if (cellScores[i] < minCS) continue;
 
-      // Ignore singleton cells.
-      const v = grid[i];
-      if (!(v & (v - 1))) continue;
+    // Determine the minimum value that the cellScore can take to beat the
+    // current score.
+    let minCS = Math.ceil(result.score * 2) | 0;
+
+    const numCells = cellOrder.length;
+    let foundCandidate = false;
+    for (let i = cellDepth; i < numCells; i++) {
+      const cell = cellOrder[i];
+      // Ignore cells which are too low in priority.
+      if (cellScores[cell] < minCS) continue;
 
       // Score finders for this cell.
-      const indexes = finderSet.getIndexesForCell(i);
+      const indexes = finderSet.getIndexesForCell(cell);
       for (let j = 0; j < indexes.length; j++) {
         if (!finderSet.isMarked(indexes[j])) {
           const finder = finderSet.getAndMark(indexes[j]);
-          finder.maybeFindCandidate(grid, cellScores, result);
-          // TODO: Update minCS if we find a better score.
+          if (finder.maybeFindCandidate(grid, cellScores, result)) {
+            minCS = Math.ceil(result.score * 2) | 0;
+            foundCandidate = true;
+          }
         }
       }
     }
 
-    return result.score >= score;
+    if (!foundCandidate) return false;
+
+    // Sort cells so that the highest scoring cells are last,  and hence
+    // searched first.
+    result.cells.sort((a, b) => cellScores[a] - cellScores[b]);
+    return true;
   }
 
   // This needs to match the fields populated by the CandidateFinders.
@@ -342,24 +348,33 @@ class CandidateSelector {
 
 CandidateSelector.CandidateFinderSet = class CandidateFinderSet {
   constructor(handlerSet, shape) {
+    this._handlerSet = handlerSet;
+    this._shape = shape;
+    this.initialized = false;
+
+    const indexesByCell = [];
+    for (let i = 0; i < shape.numCells; i++) indexesByCell.push([]);
+    this._indexesByCell = indexesByCell;
+    this._marked = null;
+  }
+
+  initialize(grid) {
+    const shape = this._shape;
     const finders = [];
-    for (const h of handlerSet) {
-      finders.push(...h.candidateFinders(null, shape));
+    for (const h of this._handlerSet) {
+      finders.push(...h.candidateFinders(grid, shape));
     }
     this._finders = finders;
 
-    const numCells = shape.numCells;
-    const indexesByCell = [];
-    for (let i = 0; i < numCells; i++) indexesByCell.push([]);
-
+    const indexesByCell = this._indexesByCell;
     for (let i = 0; i < finders.length; i++) {
       const finder = finders[i];
       for (const cell of finder.cells) {
         indexesByCell[cell].push(i);
       }
     }
-    this._indexesByCell = indexesByCell;
     this._marked = new Uint8Array(finders.length);
+    this.initialized = true;
   }
 
   getIndexesForCell(cell) {
@@ -386,11 +401,25 @@ CandidateSelector.CandidateFinderBase = class CandidateFinderBase {
   }
 
   maybeFindCandidate(grid, cellScores, result) {
-    return;
+    return false;
   }
 }
 
-const CandidateFinders = {};
+class CandidateFinders {
+  static filterCellsByValue(cells, grid, valueMask) {
+    let numCells = cells.length;
+    let result = [];
+    for (let i = 0; i < numCells; i++) {
+      const v = grid[cells[i]];
+      // Include the cell if it is contained in the mask and is not fixed.
+      if ((v & valueMask) && (v & (v - 1))) {
+        result.push(cells[i]);
+      }
+    }
+    if (result.length === 1) result.pop();
+    return result;
+  }
+}
 
 CandidateFinders.RequiredValue = class RequiredValue extends CandidateSelector.CandidateFinderBase {
   constructor(cells, value, multiplier) {
@@ -421,18 +450,20 @@ CandidateFinders.RequiredValue = class RequiredValue extends CandidateSelector.C
     if (count < 2) return;
 
     const score = maxCS * this._multiplier / count;
-    if (score > result.score) {
-      result.score = score;
-      result.value = value
+    // NOTE: We replace the result if the score is equal.
+    // It is better on the benchmarks.
+    if (score < result.score) return false;
 
-      const resultCells = result.cells;
-      resultCells.length = 0;
-      for (let i = 0; i < numCells; i++) {
-        if (grid[cells[i]] & value) {
-          resultCells.push(cells[i]);
-        }
+    result.score = score;
+    result.value = value
+    const resultCells = result.cells;
+    resultCells.length = 0;
+    for (let i = 0; i < numCells; i++) {
+      if (grid[cells[i]] & value) {
+        resultCells.push(cells[i]);
       }
     }
+    return true;
   }
 }
 
@@ -446,30 +477,26 @@ CandidateFinders.House = class House extends CandidateSelector.CandidateFinderBa
     const numCells = cells.length;
     let cell0 = 0;
     let cell1 = 0;
+    let maxCS = 0;
     for (let i = 0; i < numCells; i++) {
       if (grid[cells[i]] & v) {
         [cell0, cell1] = [cell1, cells[i]];
+        if (cellScores[cell1] > maxCS) {
+          maxCS = cellScores[cell1];
+        }
       }
     }
 
-    let score0 = cellScores[cell0] * 0.5;
-    let score1 = cellScores[cell1] * 0.5;
+    const score = maxCS * 0.5;
+    // NOTE: We replace the result if the score is equal.
+    // It is better on the benchmarks.
+    if (score < result.score) return false;
 
-    // If either of the cells beat the current score.
-    if (score0 > result.score || score1 > result.score) {
-      // Make score0 the larger of the two.
-      // Also make cell0 the cell with the larger backtrack trigger, since cell0
-      // is searched first. NOTE: This turns out to be a bit faster, but means
-      // we usually find the solution later in the search.
-      if (score0 < score1) {
-        [score0, score1] = [score1, score0];
-        [cell0, cell1] = [cell1, cell0];
-      }
-
-      result.score = score0;
-      result.value = v;
-      result.cells = [cell1, cell0];
-    }
+    result.score = score;
+    result.value = v;
+    result.cells.length = 0;
+    result.cells.push(cell1, cell0);
+    return true;
   }
 
   maybeFindCandidate(grid, cellScores, result) {
@@ -487,10 +514,12 @@ CandidateFinders.House = class House extends CandidateSelector.CandidateFinderBa
     }
 
     let exactlyTwo = moreThanOne & ~moreThanTwo;
+    let foundCandidate = false;
     while (exactlyTwo) {
       let v = exactlyTwo & -exactlyTwo;
       exactlyTwo ^= v;
-      this._scoreValue(grid, v, cellScores, result);
+      foundCandidate = this._scoreValue(grid, v, cellScores, result) || foundCandidate;
     }
+    return foundCandidate;
   }
 }
