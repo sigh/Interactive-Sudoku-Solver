@@ -335,13 +335,13 @@ button.image-button>img {
   gap: 2px;
 }
 
-#outside-arrow-input {
+#outside-clue-input {
   /* Hack, because for some reason `vertical-align: text-top` moves the tooltip
      down for just the little killer:( */
   line-height: 1;
 }
 
-#outside-arrow-input>fieldset>div:last-child {
+#outside-clue-input>fieldset>div:last-child {
   display: flex;
   align-items: center;
   column-gap: 15px;

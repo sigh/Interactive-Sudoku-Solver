@@ -44,7 +44,7 @@ class DisplayContainer {
 }
 
 class DisplayItem {
-  static SVG_PADDING = 27;
+  static SVG_PADDING = 29;
   static CELL_SIZE = 52;
 
   static DIAGONAL_PATTERN = 'diagonal-pattern';
@@ -661,7 +661,7 @@ class OutsideClueDisplay extends DisplayItem {
     this._configs = {};
     inputManager.addSelectionPreserver(svg);
 
-    const form = document.forms['outside-arrow-input'];
+    const form = document.forms['outside-clue-input'];
 
     let selectedArrow = null;
     inputManager.onSelection((cells) => {
@@ -753,6 +753,9 @@ class OutsideClueDisplay extends DisplayItem {
 
       container.appendChild(div);
     }
+
+    const form = document.forms['outside-clue-input'];
+    autoSaveField(form, 'type');
   }
 
   configure(configs) {
@@ -882,7 +885,7 @@ class OutsideClueDisplay extends DisplayItem {
     hitbox.setAttribute('fill', 'transparent');
 
     let text = createSvgElement('text');
-    let textOffsetFactor = dx * dy ? 0.6 : 0;
+    let textOffsetFactor = dx * dy ? 0.6 : 0.4;
     text.setAttribute('x', arrowX - dx * textOffsetFactor);
     text.setAttribute('y', arrowY - dy * textOffsetFactor);
     text.setAttribute('text-anchor', 'middle');

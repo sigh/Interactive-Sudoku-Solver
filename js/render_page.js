@@ -404,7 +404,7 @@ class OutsideClueConstraints {
       FullRank: {
         text: 'Full Rank',
         clueType: this.CLUE_TYPE_DOUBLE_LINE,
-        strTemplate: '#$CLUE',
+        strTemplate: '#$CLUE ',
         elementId: 'full-rank-option',
         description:
           `Considering all rows and columns as numbers read from the direction
@@ -434,7 +434,7 @@ class OutsideClueConstraints {
   _setUp(inputManager) {
     this._constraints = new Map();
 
-    let outsideArrowForm = document.forms['outside-arrow-input'];
+    let outsideArrowForm = document.forms['outside-clue-input'];
     const clearOutsideClue = () => {
       let formData = new FormData(outsideArrowForm);
       const lineId = formData.get('id');
