@@ -42,7 +42,7 @@ class SudokuConstraintHandler {
     return this.cells.length;
   }
 
-  candidateFinders(shape) {
+  candidateFinders(grid, shape) {
     return [];
   }
 
@@ -531,7 +531,9 @@ SudokuConstraintHandler.House = class House extends SudokuConstraintHandler {
   }
 
   candidateFinders(grid, shape) {
-    return [new CandidateFinders.House(this.cells)];
+    return [
+      new CandidateFinders.House(this.cells, grid, -1)
+    ];
   }
 }
 
@@ -3589,7 +3591,7 @@ SudokuConstraintHandler.FullRank = class FullRank extends SudokuConstraintHandle
   }
 
   candidateFinders(grid, shape) {
-    const selectors = [];
+    const finders = [];
     const gridSize = shape.gridSize;
 
     for (const rankSet of this._rankSets) {
@@ -3609,26 +3611,28 @@ SudokuConstraintHandler.FullRank = class FullRank extends SudokuConstraintHandle
       // Create a multiplier than prioritizes rankSets which have more clues.
       const multiplier = 4 - (flags[0] + flags[1] + flags[2] + flags[3]);
 
+      const addFinder = (cells) => {
+        finders.push(new CandidateFinders.RequiredValue(
+          CandidateFinders.filterCellsByValue(cells, grid, value),
+          value, multiplier));
+      };
+
       // Add a candidate finder for each remaining edge.
       if (flags[0]) {
-        selectors.push(new CandidateFinders.RequiredValue(
-          SudokuConstraintBase.rowRegions(shape)[0], value, multiplier));
+        addFinder(SudokuConstraintBase.rowRegions(shape)[0]);
       }
       if (flags[1]) {
-        selectors.push(new CandidateFinders.RequiredValue(
-          SudokuConstraintBase.colRegions(shape)[0], value, multiplier));
+        addFinder(SudokuConstraintBase.colRegions(shape)[0]);
       }
       if (flags[2]) {
-        selectors.push(new CandidateFinders.RequiredValue(
-          SudokuConstraintBase.rowRegions(shape)[gridSize - 1], value, multiplier));
+        addFinder(SudokuConstraintBase.rowRegions(shape)[gridSize - 1]);
       }
       if (flags[3]) {
-        selectors.push(new CandidateFinders.RequiredValue(
-          SudokuConstraintBase.colRegions(shape)[gridSize - 1], value, multiplier));
+        addFinder(SudokuConstraintBase.colRegions(shape)[gridSize - 1]);
       }
     }
 
-    return selectors;
+    return finders;
   }
 }
 
