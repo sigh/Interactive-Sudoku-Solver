@@ -263,20 +263,25 @@ const shuffleArray = (arr, randomGenerator) => {
   }
 };
 
-const autoSaveField = (element) => {
+const autoSaveField = (element, field) => {
   if (!element.id) {
     console.error('Auto-save field must have an ID.');
     return;
   }
 
-  const key = `autoSave-${element.id}`;
+  const elementId = element.getAttribute('id');
+
+  const keySuffix = field ? `-${field}` : '';
+  const key = `autoSave-${elementId}${keySuffix}`;
   const savedValue = sessionStorage.getItem(key);
+
+  const input = field ? element[field] : element;
   if (savedValue) {
-    element.value = savedValue;
+    input.value = savedValue;
   }
 
   element.addEventListener('change', () => {
-    sessionStorage.setItem(key, element.value);
+    sessionStorage.setItem(key, input.value);
   });
 };
 
