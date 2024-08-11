@@ -185,7 +185,7 @@ class PuzzleRunner {
 
   static async runValidateLayout(cases, onFailure) {
     return await this.runFnWithChecks(cases, async (solver) => {
-      return await solver.validateLayout();
+      return (await solver.validateLayout()) !== null;
     }, onFailure);
   }
 }

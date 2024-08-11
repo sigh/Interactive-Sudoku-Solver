@@ -81,8 +81,7 @@ class SudokuSolver {
 
     let diffPencilmarks = null;
     if (result.oldGrid) {
-      const diff = SudokuSolver.Util.gridDifference(
-        result.oldGrid, result.grid);
+      SudokuSolver.Util.removeGridValues(result.oldGrid, result.grid);
       diffPencilmarks = SudokuSolver.Util.makePencilmarks(result.oldGrid);
     }
 
@@ -169,7 +168,7 @@ class SudokuSolver {
   validateLayout() {
     this._reset();
 
-    let result = false;
+    let result = null;
     this._timer.runTimed(() => {
       result = this._internalSolver.validateLayout();
     });
@@ -223,7 +222,7 @@ SudokuSolver.Util = class {
     return pencilmarks;
   }
 
-  static gridDifference(gridA, gridB) {
+  static removeGridValues(gridA, gridB) {
     for (let i = 0; i < gridA.length; i++) {
       gridA[i] &= ~gridB[i];
     }
@@ -869,6 +868,14 @@ SudokuSolver.InternalSolver = class {
     // stuck for too long.
     const SEARCH_LIMIT = 200;
 
+    const finalize = (result) => {
+      this.done = true;
+      if (!result) return null;
+
+      this.counters.branchesIgnored = 1 - this.counters.progressRatio;
+      return SudokuSolver.Util.gridToSolution(result.grid);
+    };
+
     // Function to attempt to solve with one house fixed.
     const attempt = (house) => {
       this._resetRun();
@@ -883,13 +890,12 @@ SudokuSolver.InternalSolver = class {
 
       for (const result of this.run(SEARCH_LIMIT)) {
         if (result.isSolution) {
-          this.counters.branchesIgnored = 1 - this.counters.progressRatio;
-          return true;
+          return result;
         }
         attemptLog.push([house, this.counters.progressRatio]);
         return undefined;
       }
-      return false;
+      return null;
     };
 
     // Try doing a short search from every house.
@@ -897,8 +903,7 @@ SudokuSolver.InternalSolver = class {
       const result = attempt(house);
       // If the search completed, then we can return the result immediately.
       if (result !== undefined) {
-        this.done = true;
-        return result;
+        return finalize(result);
       }
     }
 
@@ -915,11 +920,11 @@ SudokuSolver.InternalSolver = class {
 
     // Run the final search until we find a solution or prove that one doesn't
     // exist.
-    let result = false;
-    for (const _ of this.run()) { result = true; break; }
+    for (const result of this.run()) {
+      return finalize(result);
+    }
 
-    this.done = true;
-    return result;
+    return finalize(null);
   }
 
   setProgressCallback(callback, logFrequency) {
