@@ -12,15 +12,24 @@ class ConstraintDisplays {
       this.ShadedRegion,
       this.CountingCircles,
       // Note: Diagonal should go before quad, dots or letters.
+      this.Diagonal,
       this.Dot,
       this.Letter,
       this.Quad,
-      this.Diagonal,
     ]
   }
 }
 
 class BaseConstraintDisplayItem extends DisplayItem {
+  static IS_LAYOUT = false;
+
+  constructor(svg) {
+    super(svg);
+
+    svg.classList.add(
+      this.constructor.IS_LAYOUT ? 'layout-constraint' : 'non-layout-constraint');
+  }
+
   clear() {
     clearDOMNode(this._svg);
   }
@@ -161,6 +170,8 @@ class BaseConstraintDisplayItem extends DisplayItem {
 }
 
 ConstraintDisplays.Jigsaw = class Jigsaw extends BaseConstraintDisplayItem {
+  static IS_LAYOUT = true;
+
   constructor(svg) {
     super(svg);
 
@@ -686,6 +697,7 @@ ConstraintDisplays.Quad = class Quad extends BaseConstraintDisplayItem {
 }
 
 ConstraintDisplays.Diagonal = class Diagonal extends BaseConstraintDisplayItem {
+  static IS_LAYOUT = true;
   DIRECTIONS = [1, -1];
 
   constructor(svg) {
@@ -754,6 +766,8 @@ ConstraintDisplays.Diagonal = class Diagonal extends BaseConstraintDisplayItem {
 }
 
 ConstraintDisplays.Windoku = class Windoku extends BaseConstraintDisplayItem {
+  static IS_LAYOUT = true;
+
   constructor(svg) {
     super(svg);
 
@@ -786,6 +800,8 @@ ConstraintDisplays.Windoku = class Windoku extends BaseConstraintDisplayItem {
 }
 
 ConstraintDisplays.DefaultRegionsInverted = class DefaultRegionsInverted extends BaseConstraintDisplayItem {
+  static IS_LAYOUT = true;
+
   constructor(svg) {
     super(svg);
 

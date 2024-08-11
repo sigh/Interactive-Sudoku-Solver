@@ -85,6 +85,11 @@ body {
   font-size: 7px;
 }
 
+.layout-view>.non-layout-constraint,
+.layout-view>#outside-arrow-group text {
+  filter: opacity(50%) blur(2px);
+}
+
 body {
   font-family: sans-serif;
   margin-left: 20px;

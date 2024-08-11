@@ -23,6 +23,10 @@ class DisplayContainer {
     this._clickInterceptor.reshape(shape);
   }
 
+  toggleLayoutView(enable) {
+    this._mainSvg.classList.toggle('layout-view', enable);
+  }
+
   createHighlighter(cssClass) {
     return new Highlight(this._highlightDisplay, cssClass);
   }
@@ -410,6 +414,11 @@ class SolutionDisplay extends CellValueDisplay {
 }
 
 class GivensDisplay extends CellValueDisplay {
+  constructor(svg) {
+    super(svg);
+    svg.classList.add('non-layout-constraint');
+  }
+
   drawGivens(givensMap) {
     // Quickly clear the givens display if there are no givens.
     if (!givensMap.size) {
