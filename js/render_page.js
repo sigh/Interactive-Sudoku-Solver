@@ -1449,7 +1449,7 @@ class ConstraintManager {
     this._constraintPanel.appendChild(this._makePanelItem(config));
   }
 
-  getLayoutConstraint() {
+  getLayoutConstraints() {
     const constraints = [];
     constraints.push(this._jigsawManager.getConstraint());
     constraints.push(this._checkboxConstraints.getLayoutConstraint());
