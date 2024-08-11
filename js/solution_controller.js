@@ -1173,6 +1173,7 @@ class SolutionController {
     this._shape = null;
     constraintManager.addReshapeListener(this);
 
+    this._displayContainer = displayContainer;
     this._solutionDisplay = new SolutionDisplay(
       displayContainer.getNewGroup('solution-group'));
     constraintManager.addReshapeListener(this._solutionDisplay);
@@ -1363,6 +1364,8 @@ class SolutionController {
     // Remove mode if it is the default.
     if (mode == 'all-possibilities') params.mode = undefined;
     this._historyHandler.update(params);
+
+    this._displayContainer.toggleLayoutView(mode === 'validate-layout');
 
     let description = SolutionController._MODE_DESCRIPTIONS[mode];
     this._elements.modeDescription.textContent = description;
