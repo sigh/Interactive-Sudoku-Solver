@@ -441,6 +441,7 @@ button.icon-button {
   text-align: left;
   overflow: visible;
   white-space: nowrap;
+  min-height: 1.2em;
 }
 
 #fake-input {
@@ -731,12 +732,6 @@ input:checked+span:before {
 
 #solve-mode-description {
   max-width: 160px;
-}
-
-#validate-layout-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
 }
 
 .muldiv {

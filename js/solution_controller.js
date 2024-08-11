@@ -888,8 +888,11 @@ class ModeHandler {
   }
 
   async get(i) {
+    const count = this.count();
+    if (count == 0) return {};
+
     let description = `Solution ${i}`;
-    if (this.count() == 1 && this.done()) description = 'Unique solution';
+    if (count == 1 && this.done()) description = 'Unique solution';
     return {
       solution: this._solutions[i - 1],
       description: description,
@@ -1137,6 +1140,8 @@ ModeHandler.CountSolutions = class extends ModeHandler {
 }
 
 ModeHandler.ValidateLayout = class extends ModeHandler {
+  ITERATION_CONTROLS = true;
+
   constructor() {
     super();
     this._result = null;
@@ -1150,9 +1155,9 @@ ModeHandler.ValidateLayout = class extends ModeHandler {
   }
 
   async get() {
-    if (this._result === null) return null;
+    if (this._result === null) return {};
     return {
-      validateResult: this._result ? 'Valid layout' : 'Invalid layout'
+      description: this._result ? 'Valid layout' : 'Invalid layout'
     };
   }
 }
@@ -1206,10 +1211,8 @@ class SolutionController {
       mode: document.getElementById('solve-mode-input'),
       modeDescription: document.getElementById('solve-mode-description'),
       error: document.getElementById('error-output'),
-      validateResult: document.getElementById('validate-result-output'),
       stop: document.getElementById('stop-solver'),
       solve: document.getElementById('solve-button'),
-      validate: document.getElementById('validate-layout-button'),
       autoSolve: document.getElementById('auto-solve-input'),
       download: document.getElementById('download-solutions-button'),
     }
@@ -1217,7 +1220,6 @@ class SolutionController {
     this._elements.mode.onchange = () => this._update();
     this._elements.stop.onclick = () => this._terminateSolver();
     this._elements.solve.onclick = () => this._solve();
-    this._elements.validate.onclick = () => this._validateLayout();
 
     this._setUpAutoSolve();
     this._setUpKeyBindings(displayContainer);
@@ -1342,16 +1344,20 @@ class SolutionController {
     'count-solutions':
       'Count the total number of solutions by iterating over all solutions.',
     'step-by-step':
-      'Step through the solving process. ' +
-      'Alt-click on a cell to force the solver to resolve it next.',
+      `Step through the solving process.
+      Alt-click on a cell to force the solver to resolve it next.`,
+    'validate-layout':
+      `Check if there are any possible solutions given the current layout
+       constraints. Non-layout constraints are ignored.`,
   };
 
   async _update() {
     this._solutionDisplay.setSolution();
     this._solutionDisplay.setNewConstraints(this._constraintManager);
-    let constraints = this._constraintManager.getConstraints();
     let mode = this._elements.mode.value;
     let auto = this._elements.autoSolve.checked;
+
+    const constraints = this._constraintManager.getConstraints();
 
     let params = { mode: mode, q: constraints };
     // Remove mode if it is the default.
@@ -1362,7 +1368,10 @@ class SolutionController {
     this._elements.modeDescription.textContent = description;
 
     if (auto || mode === 'step-by-step') {
-      this._solve(constraints);
+      const solverConstraints = mode === 'validate-layout'
+        ? this._constraintManager.getLayoutConstraints()
+        : constraints;
+      this._solve(solverConstraints);
     } else {
       this._resetSolver();
     }
@@ -1374,7 +1383,6 @@ class SolutionController {
     this._solutionDisplay.setSolution();
     this._diffDisplay.clear();
     this._stateDisplay.clear();
-    this._setValidateResult();
     this.debugManager.clear();
     this._showIterationControls(false);
     this._currentModeHandler = null;
@@ -1387,13 +1395,10 @@ class SolutionController {
     this._replaceAndRunSolver(mode, constraints);
   }
 
-  async _validateLayout() {
-    const constraints = this._constraintManager.getLayoutConstraint();
-    this._replaceAndRunSolver('validate-layout', constraints);
-  }
-
   async _replaceAndRunSolver(mode, constraints) {
-    constraints ||= this._constraintManager.getConstraints();
+    constraints ||= mode === 'validate-layout'
+      ? this._constraintManager.getLayoutConstraints()
+      : this._constraintManager.getConstraints();
 
     this._resetSolver();
 
@@ -1426,10 +1431,6 @@ class SolutionController {
     // Run the handler.
     this._currentModeHandler = handler;
     this._runModeHandler(handler, newSolver);
-  }
-
-  _setValidateResult(text) {
-    this._elements.validateResult.textContent = text || '';
   }
 
   _solveStatusChanged(isSolving, method) {
@@ -1466,9 +1467,6 @@ class SolutionController {
         currentSolution = null;
       } else {
         currentSolution = result.solution;
-        if (result.validateResult) {
-          this._setValidateResult(result.validateResult);
-        }
         if (result.highlightCells) {
           this._stepHighlighter.setCells(result.highlightCells);
         }
