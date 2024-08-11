@@ -3520,15 +3520,15 @@ SudokuConstraintHandler.FullRank = class FullRank extends SudokuConstraintHandle
         equalValuesMask &= ~lowV;
         continue;
       }
-      const maxEntryV = LookupTables.maxValue(highV);
-      if (LookupTables.maxValue(lowV) < maxEntryV) {
-        const mask = (1 << maxEntryV) - 1;
+      const maxHighV = LookupTables.maxValue(highV);
+      if (LookupTables.maxValue(lowV) > maxHighV) {
+        const mask = (1 << maxHighV) - 1;
         grid[lowEntry[i]] = (lowV &= mask & equalValuesMask);
         handlerAccumulator.addForCell(lowEntry[i]);
       }
-      const minV = LookupTables.minValue(lowV);
-      if (LookupTables.minValue(highV) < minV) {
-        const mask = -1 << (minV - 1);
+      const minLowV = LookupTables.minValue(lowV);
+      if (LookupTables.minValue(highV) < minLowV) {
+        const mask = -1 << (minLowV - 1);
         grid[highEntry[i]] = (highV &= mask & equalValuesMask);
         handlerAccumulator.addForCell(highEntry[i]);
       }
