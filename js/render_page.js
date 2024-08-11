@@ -1453,6 +1453,7 @@ class ConstraintManager {
     const constraints = [];
     constraints.push(this._jigsawManager.getConstraint());
     constraints.push(this._checkboxConstraints.getLayoutConstraint());
+    constraints.push(new SudokuConstraint.Shape(this._shape.name));
     return new SudokuConstraint.Set(constraints);
   }
 

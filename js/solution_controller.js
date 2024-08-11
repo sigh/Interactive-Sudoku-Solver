@@ -1141,6 +1141,7 @@ ModeHandler.CountSolutions = class extends ModeHandler {
 
 ModeHandler.ValidateLayout = class extends ModeHandler {
   ITERATION_CONTROLS = true;
+  ALLOW_DOWNLOAD = true;
 
   constructor() {
     super();
@@ -1155,9 +1156,13 @@ ModeHandler.ValidateLayout = class extends ModeHandler {
   }
 
   async get() {
-    if (this._result === null) return {};
+    if (!this._done) return {};
     return {
-      description: this._result ? 'Valid layout' : 'Invalid layout'
+      solution: this._result,
+      overrideGivens: true,
+      description: this._result
+        ? 'Valid layout [Sample solution]'
+        : 'Invalid layout'
     };
   }
 }
@@ -1349,7 +1354,8 @@ class SolutionController {
       Alt-click on a cell to force the solver to resolve it next.`,
     'validate-layout':
       `Check if there are any possible solutions given the current layout
-       constraints. Non-layout constraints are ignored.`,
+       constraints, especially jigsaw pieces.
+       Non-layout constraints are ignored (including givens).`,
   };
 
   async _update() {
@@ -1365,13 +1371,14 @@ class SolutionController {
     if (mode == 'all-possibilities') params.mode = undefined;
     this._historyHandler.update(params);
 
-    this._displayContainer.toggleLayoutView(mode === 'validate-layout');
+    const isLayoutMode = mode === 'validate-layout';
+    this._displayContainer.toggleLayoutView(isLayoutMode);
 
     let description = SolutionController._MODE_DESCRIPTIONS[mode];
     this._elements.modeDescription.textContent = description;
 
     if (auto || mode === 'step-by-step') {
-      const solverConstraints = mode === 'validate-layout'
+      const solverConstraints = isLayoutMode
         ? this._constraintManager.getLayoutConstraints()
         : constraints;
       this._solve(solverConstraints);
@@ -1474,7 +1481,8 @@ class SolutionController {
           this._stepHighlighter.setCells(result.highlightCells);
         }
       }
-      this._solutionDisplay.setSolution(currentSolution);
+      this._solutionDisplay.setSolution(
+        currentSolution, result?.overrideGivens);
 
       if (result?.diff) {
         this._diffDisplay.renderGridValues(result.diff);

@@ -379,7 +379,7 @@ class SolutionDisplay extends CellValueDisplay {
   // Display solution on grid.
   //  - If solution cell contains a container then it will be displayed as
   //    pencilmarks.
-  setSolution(solution) {
+  setSolution(solution, overrideGivens) {
     solution = solution || [];
     this._currentSolution = solution.slice();
 
@@ -399,7 +399,7 @@ class SolutionDisplay extends CellValueDisplay {
 
     // We don't want to show anything for cells where the value was
     // fixed.
-    if (this._fixedCellIndexes.length) {
+    if (this._fixedCellIndexes.length && !overrideGivens) {
       solution = solution.slice();
       for (const index of this._fixedCellIndexes) {
         solution[index] = null;
