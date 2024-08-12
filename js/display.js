@@ -17,7 +17,10 @@ class DisplayContainer {
     const sideLength = DisplayItem.CELL_SIZE * shape.gridSize + padding * 2;
     this._mainSvg.setAttribute('height', sideLength);
     this._mainSvg.setAttribute('width', sideLength);
-    this._mainSvg.setAttribute('class', `size-${shape.name}`);
+    this._mainSvg.setAttribute(
+      'class',
+      shape.gridSize <= SHAPE_9x9.gridSize
+        ? 'grid-size-small' : 'grid-size-large');
 
     this._highlightDisplay.reshape(shape);
     this._clickInterceptor.reshape(shape);
@@ -309,7 +312,8 @@ class CellValueDisplay extends DisplayItem {
   }
 
   static _makeTemplateArray = memoize((shape) => {
-    const charsPerLine = 2 * shape.boxWidth - 1;
+    const numbersPerLine = Math.ceil(Math.sqrt(shape.numValues));
+    const charsPerLine = 2 * numbersPerLine - 1;
 
     let charCount = 0;
     const slots = [];
@@ -727,6 +731,7 @@ class OutsideClueDisplay extends DisplayItem {
         [OutsideClueConstraints.CLUE_TYPE_DIAGONAL]);
     }
     for (const [lineId, cells] of SudokuConstraintBase.fullLineCellMap(shape)) {
+      if (cells.length <= 1) continue;
       const clueTypes = [OutsideClueConstraints.CLUE_TYPE_DOUBLE_LINE];
       if (lineId.endsWith(',1')) {
         clueTypes.push(OutsideClueConstraints.CLUE_TYPE_SINGLE_LINE);

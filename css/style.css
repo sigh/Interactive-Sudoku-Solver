@@ -37,7 +37,7 @@ body {
   white-space: pre;
 }
 
-.size-16x16 .cell-multi-value {
+.grid-size-large .cell-multi-value {
   font-size: 9px;
 }
 
@@ -81,7 +81,7 @@ body {
   dominant-baseline: middle;
 }
 
-.size-16x16 .quad-value {
+.grid-size-large .quad-value {
   font-size: 7px;
 }
 
