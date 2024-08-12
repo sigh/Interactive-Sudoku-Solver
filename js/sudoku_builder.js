@@ -1,4 +1,7 @@
 class GridShape {
+  static MIN_SIZE = 1;
+  static MAX_SIZE = 16;
+
   static _registry = new Map();
   static _numCellsLookup = new Map();
   static _numPencilmarksLookup = new Map();
@@ -7,17 +10,15 @@ class GridShape {
     this._numCellsLookup.set(shape.numCells, shape);
     this._numPencilmarksLookup.set(shape.numPencilmarks, shape);
   }
-  static get(name) { return this._registry.get(name); }
   static allShapes() { return [...this._registry.values()]; }
   static fromNumCells(numCells) { return this._numCellsLookup.get(numCells); }
   static fromNumPencilmarks(numPencilmarks) {
     return this._numPencilmarksLookup.get(numPencilmarks);
   }
 
-  constructor(gridSize, boxWidth, boxHeight) {
-    this.boxWidth = boxWidth;
-    this.boxHeight = boxHeight;
+  constructor(gridSize) {
     this.gridSize = gridSize;
+    [this.boxHeight, this.boxWidth] = this.constructor._boxDims(gridSize);
     this.numValues = gridSize;
     this.numCells = gridSize * gridSize;
     this.numPencilmarks = this.numCells * this.numValues;
@@ -33,6 +34,15 @@ class GridShape {
 
     Object.freeze(this);
     this.constructor._register(this);
+  }
+
+  static _boxDims(gridSize) {
+    for (let i = Math.sqrt(gridSize) | 0; i >= 1; i--) {
+      if (gridSize % i === 0) {
+        return [i, gridSize / i];
+      }
+    }
+    throw ('Invalid grid size: ' + gridSize);
   }
 
   makeValueId = (cellIndex, n) => {
@@ -74,13 +84,30 @@ class GridShape {
       col: col,
     };
   }
+
+  static get(name) {
+    if (this._registry.has(name)) return this._registry.get(name);
+    return this._makeFromGridSpec(name);
+  }
+
+  static _makeFromGridSpec(gridSpec) {
+    const parts = gridSpec.split('x');
+    const gridSize = parseInt(parts[0]);
+    if (parts.length != 2 || parts[0] !== parts[1] ||
+      gridSize.toString() !== parts[0]) {
+      throw ('Invalid grid spec format: ' + gridSpec);
+    }
+
+    if (gridSize < this.MIN_SIZE || gridSize > this.MAX_SIZE) {
+      throw ('Invalid grid size: ' + gridSize);
+    }
+
+    return new GridShape(gridSize);
+  }
 }
 
-const SHAPE_4x4 = new GridShape(4, 2, 2);
-const SHAPE_6x6 = new GridShape(6, 3, 2);
-const SHAPE_9x9 = new GridShape(9, 3, 3);
-const SHAPE_16x16 = new GridShape(16, 4, 4);
-const SHAPE_MAX = SHAPE_16x16;
+const SHAPE_MAX = new GridShape(GridShape.MAX_SIZE);
+const SHAPE_9x9 = GridShape.get('9x9');
 
 class SudokuParser {
   static parseShortKillerFormat(text) {
@@ -437,7 +464,6 @@ class CellArgs {
 }
 
 class SudokuConstraintBase {
-  static DEFAULT_SHAPE = SHAPE_9x9;
   static LOOPS_ALLOWED = false;
 
   constructor(args) {
@@ -474,15 +500,15 @@ class SudokuConstraintBase {
     const metaConfig = new Map();
 
     for (const c of metaConstraints) {
-      metaConfig.set(c.type, c.args);
+      metaConfig.set(c.type, c);
     }
 
     return metaConfig;
   }
 
   static getShapeFromMeta(metaConstraint) {
-    const shapeArgs = metaConstraint.get('Shape');
-    const shape = shapeArgs ? GridShape.get(shapeArgs[0]) : this.DEFAULT_SHAPE;
+    const c = metaConstraint.get('Shape');
+    const shape = SudokuConstraint.Shape.getShapeFromGridSpec(c?.gridSpec);
     if (!shape) throw ('Unknown shape: ' + shape);
     return shape;
   }
@@ -712,9 +738,19 @@ class SudokuConstraint {
     );
   }
   static Shape = class Shape extends SudokuConstraintBase._Meta {
+    constructor(gridSpec) {
+      super(gridSpec);
+      this.gridSpec = gridSpec;
+    }
+
     toString() {
-      if (this.args[0] === SHAPE_9x9.name) return '';
+      if (this.gridSpec === SHAPE_9x9.name) return '';
       return super.toString();
+    }
+
+    static getShapeFromGridSpec(gridSpec) {
+      if (!gridSpec) return SHAPE_9x9;
+      return GridShape.get(gridSpec);
     }
   }
 
@@ -905,7 +941,7 @@ class SudokuConstraint {
           row += dr, col += dc) {
           cells.push(shape.makeCellId(row, col));
         }
-        map[cells[0]] = cells;
+        if (cells.length > 1) map[cells[0]] = cells;
       };
 
       // Left side.
