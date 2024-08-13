@@ -1574,10 +1574,11 @@ class Selection {
 
   setCells(cellIds) {
     this._highlight.setCells(cellIds);
+    if (cellIds.length > 0) this._maybeAddOutsideClickListener();
     this._runCallback();
   }
   getCells() { return this._highlight.getCells(); }
-  size() { return this._highlight.size; }
+  size() { return this._highlight.size(); }
 
   cellIdCenter(cellId) {
     return this._clickInterceptor.cellIdCenter(cellId);
@@ -1615,23 +1616,13 @@ class Selection {
         this._highlight.addCell(currCell);
       }
     };
-    const outsideClickListener = e => {
-      // Don't do anything if the click is inside one of the elements where
-      // we want to retain clicks.
-      for (const elem of this._selectionPreservers) {
-        if (elem.contains(e.target)) return;
-      }
-      // Otherwise clear the selection.
-      this.setCells([]);
-      document.body.removeEventListener('click', outsideClickListener);
-    };
     container.addEventListener('pointerdown', e => {
       // If the shift key is pressed, continue adding to the selection.
       if (!e.shiftKey) {
         this.setCells([]);
       }
       container.addEventListener('pointermove', pointerMoveFn);
-      document.body.addEventListener('click', outsideClickListener);
+      this._maybeAddOutsideClickListener();
       currCell = null;
       currCenter = [Infinity, Infinity];
       pointerMoveFn(e);
@@ -1645,6 +1636,27 @@ class Selection {
     container.addEventListener('touchmove', e => {
       if (e.touches.length == 1) e.preventDefault();
     });
+
+    {
+      let outsideClickListenerEnabled = false;
+      const outsideClickListener = e => {
+        // Don't do anything if the click is inside one of the elements where
+        // we want to retain clicks.
+        for (const elem of this._selectionPreservers) {
+          if (elem.contains(e.target)) return;
+        }
+        // Otherwise clear the selection.
+        this.setCells([]);
+        document.body.removeEventListener('click', outsideClickListener);
+        outsideClickListenerEnabled = false;
+      };
+      this._maybeAddOutsideClickListener = () => {
+        if (!outsideClickListenerEnabled) {
+          document.body.addEventListener('click', outsideClickListener);
+          outsideClickListenerEnabled = true;
+        }
+      }
+    }
   }
 
   addSelectionPreserver(elem) {
