@@ -1836,13 +1836,11 @@ class SudokuBuilder {
 
     const gridSize = shape.gridSize;
 
-    // Only look at adjacent cells with larger indexes.
-    const adjacentCellsFn = (r, c) => [[r + 1, c], [r, c + 1]];
-
     for (let r = 0; r < gridSize; r++) {
       for (let c = 0; c < gridSize; c++) {
         let cell = shape.cellIndex(r, c);
-        for (const [rr, cc] of adjacentCellsFn(r, c)) {
+        // Only look at adjacent cells with larger indexes.
+        for (const [rr, cc] of [[r + 1, c], [r, c + 1]]) {
           if (rr < 0 || rr >= gridSize || cc < 0 || cc >= gridSize) continue;
           pairs.push([cell, shape.cellIndex(rr, cc)]);
         }
