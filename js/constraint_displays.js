@@ -185,10 +185,13 @@ ConstraintDisplays.Jigsaw = class Jigsaw extends BaseConstraintDisplayItem {
     this._missingRegion.setAttribute('opacity', '0.05');
     svg.append(this._missingRegion);
 
+    this._colorPicker = new ColorPicker();
+
     this.clear();
   }
 
   clear() {
+    this._colorPicker.clear();
     clearDOMNode(this._regionGroup);
     this._regionElems = new Map();
     this._updateMissingRegion();
@@ -196,6 +199,7 @@ ConstraintDisplays.Jigsaw = class Jigsaw extends BaseConstraintDisplayItem {
 
   removeItem(item) {
     if (this._regionElems.has(item)) {
+      this._colorPicker.removeItem();
       item.parentNode.removeChild(item);
       this._regionElems.delete(item);
       this._updateMissingRegion();
@@ -206,7 +210,9 @@ ConstraintDisplays.Jigsaw = class Jigsaw extends BaseConstraintDisplayItem {
 
   drawItem(constraint, _) {
     const region = constraint.cells;
-    const cellSet = new Set(region.map(c => this._shape.parseCellId(c).cell));
+    const shape = this._shape;
+    const cellSet = new Set(region.map(c => shape.parseCellId(c).cell));
+    const graph = GridGraph.get(shape);
 
     const g = createSvgElement('g');
     g.setAttribute('stroke-width', 2);
@@ -216,37 +222,44 @@ ConstraintDisplays.Jigsaw = class Jigsaw extends BaseConstraintDisplayItem {
     const cellSize = DisplayItem.CELL_SIZE;
 
     for (const cell of cellSet) {
-      const [row, col] = this._shape.splitCellIndex(cell);
+      const edges = graph.cellEdges(cell);
+      const [row, col] = shape.splitCellIndex(cell);
 
-      const cellUp = this._shape.cellIndex(row - 1, col);
-      const cellDown = this._shape.cellIndex(row + 1, col);
-      const cellLeft = this._shape.cellIndex(row, col - 1);
-      const cellRight = this._shape.cellIndex(row, col + 1);
-
-      if (!cellSet.has(cellLeft)) {
+      if (!cellSet.has(edges[GridGraph.LEFT])) {
         g.appendChild(this._makePath([
           [col * cellSize, row * cellSize],
           [col * cellSize, (row + 1) * cellSize],
         ]));
       }
-      if (!cellSet.has(cellRight)) {
+      if (!cellSet.has(edges[GridGraph.RIGHT])) {
         g.appendChild(this._makePath([
           [(col + 1) * cellSize, row * cellSize],
           [(col + 1) * cellSize, (row + 1) * cellSize],
         ]));
       }
-      if (!cellSet.has(cellUp)) {
+      if (!cellSet.has(edges[GridGraph.UP])) {
         g.appendChild(this._makePath([
           [col * cellSize, row * cellSize],
           [(col + 1) * cellSize, row * cellSize],
         ]));
       }
-      if (!cellSet.has(cellDown)) {
+      if (!cellSet.has(edges[GridGraph.DOWN])) {
         g.appendChild(this._makePath([
           [col * cellSize, (row + 1) * cellSize],
           [(col + 1) * cellSize, (row + 1) * cellSize],
         ]));
       }
+    }
+
+    if (!graph.cellsAreConnected(cellSet)) {
+      const color = this._colorPicker.pickColor();
+      for (const cell of cellSet) {
+        const path = this._makeCellSquare(cell);
+        path.setAttribute('fill', color);
+        path.setAttribute('opacity', 0.1);
+        g.appendChild(path);
+      }
+      this._colorPicker.addItem(region, color, ...cellSet);
     }
 
     this._regionGroup.appendChild(g);
@@ -535,7 +548,9 @@ ConstraintDisplays.ShadedRegion = class ShadedRegion extends BaseConstraintDispl
     let x, y;
 
     const region = createSvgElement('g');
-    const color = this._chooseCellColor(cells);
+
+    const cellIndexes = cells.map(c => this._shape.parseCellId(c).cell);
+    const color = this._chooseCellColor(cellIndexes);
 
     let patternId = null;
     if (pattern) {
@@ -557,8 +572,8 @@ ConstraintDisplays.ShadedRegion = class ShadedRegion extends BaseConstraintDispl
       region.appendChild(patternSvg);
     }
 
-    for (const cellId of cells) {
-      const path = this._makeCellSquare(this._shape.parseCellId(cellId).cell);
+    for (const cell of cellIndexes) {
+      const path = this._makeCellSquare(cell);
       if (pattern) {
         path.setAttribute('fill', `url(#${patternId})`);
       } else {
@@ -568,7 +583,7 @@ ConstraintDisplays.ShadedRegion = class ShadedRegion extends BaseConstraintDispl
 
       region.appendChild(path);
     }
-    this._cellColors.addItem(region, color, ...cells);
+    this._cellColors.addItem(region, color, ...cellIndexes);
 
     // Draw the sum in the top-left most cell. Luckily, this is the sort order.
     const topLeftCell = cells.reduce((a, b) => a < b ? a : b);
@@ -604,13 +619,11 @@ ConstraintDisplays.ShadedRegion = class ShadedRegion extends BaseConstraintDispl
     const shape = this._shape;
     // Use a greedy algorithm to choose the graph color.
     const adjacentCells = [];
-    for (const cellId of cellIds) {
-      let { row, col } = shape.parseCellId(cellId);
-      // Lookup all adjacent cells, it doesn't matter if they valid or not.
-      adjacentCells.push(shape.makeCellId(row, col + 1));
-      adjacentCells.push(shape.makeCellId(row, col - 1));
-      adjacentCells.push(shape.makeCellId(row + 1, col));
-      adjacentCells.push(shape.makeCellId(row - 1, col));
+    const graph = GridGraph.get(shape);
+    for (const cell of cellIds) {
+      for (const adjCell of graph.cellEdges(cell)) {
+        if (adjCell !== null) adjacentCells.push(adjCell);
+      }
     }
     return this._cellColors.pickColor(null, adjacentCells);
   }

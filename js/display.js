@@ -1024,3 +1024,63 @@ class LineOptions {
   }
 
 }
+
+class GridGraph {
+  static LEFT = 0;
+  static RIGHT = 1;
+  static UP = 2;
+  static DOWN = 3;
+
+  static get = memoize((shape) => {
+    return new this(true, shape);
+  });
+
+  constructor(do_not_call, shape) {
+    if (!do_not_call) throw ('Use GridGraph.get(shape)');
+
+    const graph = [];
+    for (let i = 0; i < shape.numCells; i++) {
+      graph.push([null, null, null, null]);
+    }
+
+    const gridSize = shape.gridSize;
+    const cls = this.constructor;
+
+    for (let row = 0; row < gridSize; row++) {
+      for (let col = 0; col < gridSize; col++) {
+        const cell = shape.cellIndex(row, col);
+        const adj = graph[cell];
+
+        if (row > 0) adj[cls.UP] = shape.cellIndex(row - 1, col);
+        if (row < gridSize - 1) adj[cls.DOWN] = shape.cellIndex(row + 1, col);
+        if (col > 0) adj[cls.LEFT] = shape.cellIndex(row, col - 1);
+        if (col < gridSize - 1) adj[cls.RIGHT] = shape.cellIndex(row, col + 1);
+      }
+    }
+
+    this._graph = graph;
+  }
+
+  cellEdges(cell) {
+    return this._graph[cell];
+  }
+
+  cellsAreConnected(cellSet) {
+    const seen = new Set();
+    const stack = [cellSet.values().next().value];
+    const graph = this._graph;
+    seen.add(stack[0]);
+
+    while (stack.length > 0) {
+      const cell = stack.pop();
+
+      for (const adjCell of graph[cell]) {
+        if (adjCell === null || seen.has(adjCell) || !cellSet.has(adjCell)) continue;
+        stack.push(adjCell);
+        seen.add(adjCell);
+      }
+    }
+
+    return seen.size === cellSet.size;
+  }
+}
