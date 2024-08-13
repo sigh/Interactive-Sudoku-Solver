@@ -15,6 +15,9 @@ class GridShape {
   static fromNumPencilmarks(numPencilmarks) {
     return this._numPencilmarksLookup.get(numPencilmarks);
   }
+  static makeName(gridSize) {
+    return `${gridSize}x${gridSize}`;
+  }
 
   constructor(gridSize) {
     this.gridSize = gridSize;
@@ -23,7 +26,7 @@ class GridShape {
     this.numCells = gridSize * gridSize;
     this.numPencilmarks = this.numCells * this.numValues;
 
-    this.name = `${gridSize}x${gridSize}`;
+    this.name = this.constructor.makeName(gridSize);
 
     this._valueBase = this.numValues + 1;
 

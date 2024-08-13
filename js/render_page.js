@@ -308,8 +308,23 @@ class ShapeManager {
     this._shape = null;
     this._reshapeListeners = [];
 
-    this._select = document.getElementById('shape-select');
-    this._select.onchange = () => { this.reloadShape(); };
+    this._setUp();
+  }
+
+  _setUp() {
+    const select = document.getElementById('shape-select');
+
+    for (let i = GridShape.MIN_SIZE; i <= GridShape.MAX_SIZE; i++) {
+      const name = GridShape.makeName(i);
+      const option = document.createElement('option');
+      option.textContent = name;
+      option.value = name;
+      select.appendChild(option);
+    }
+
+    select.value = SHAPE_9x9.name;
+    select.onchange = () => { this.reloadShape(); };
+    this._select = select;
   }
 
   reshape(shape) {
