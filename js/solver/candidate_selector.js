@@ -71,6 +71,10 @@ class CandidateSelector {
     const nextCellDepth = this._updateCellOrder(
       cellDepth, cellOffset, count, grid);
 
+    if (nextCellDepth === 0) {
+      return [cellOrder, 0, 0];
+    }
+
     if (this._debugLogger.enableStepLogs) {
       if (nextCellDepth != cellDepth + 1) {
         this._debugLogger.log({
@@ -107,13 +111,17 @@ class CandidateSelector {
     // First skip past any values which are already at the front.
     while (cellOffset == frontOffset && cellOffset < numCells) {
       const v = grid[cellOrder[cellOffset++]];
-      if (!(v & (v - 1))) frontOffset++;
+      if ((v & (v - 1)) === 0) {
+        frontOffset++;
+        if (v === 0) return 0;
+      }
     }
 
     // Find the rest of the values which are singletons.
     while (cellOffset < numCells) {
       const v = grid[cellOrder[cellOffset]];
-      if (!(v & (v - 1))) {
+      if ((v & (v - 1)) === 0) {
+        if (v === 0) return 0;
         [cellOrder[cellOffset], cellOrder[frontOffset]] =
           [cellOrder[frontOffset], cellOrder[cellOffset]];
         frontOffset++;
@@ -447,7 +455,7 @@ CandidateFinders.RequiredValue = class RequiredValue extends CandidateSelector.C
     // If count is 1, this is value is already resolved.
     // Don't bother limiting the maximum count, as the score will
     // naturally be lower in that case.
-    if (count < 2) return;
+    if (count < 2) return false;
 
     const score = maxCS * this._multiplier / count;
     // NOTE: We replace the result if the score is equal.
