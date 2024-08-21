@@ -3160,7 +3160,7 @@ SudokuConstraintHandler.CountingCircles = class CountingCircles extends SudokuCo
     for (let i = 0; i < numCells; i++) {
       if (!(initialGrid[this.cells[i]] &= allowedValues)) return false;
     }
-    this._combinations = new Uint8Array(combinations);
+    this._combinations = new Uint16Array(combinations);
     this._numValues = shape.numValues;
 
     this._exclusionMap = new Uint16Array(this.cells.length);
