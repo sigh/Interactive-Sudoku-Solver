@@ -651,7 +651,11 @@ SudokuSolver.InternalSolver = class {
       const handlerAccumulator = this._handlerAccumulator;
       handlerAccumulator.reset(false);
       for (let i = 0; i < this._numCells; i++) handlerAccumulator.addForCell(i);
-      this._enforceConstraints(initialRecFrame.grid, handlerAccumulator);
+      if (!this._enforceConstraints(initialRecFrame.grid, handlerAccumulator)) {
+        // If the initial grid is invalid, then ensure it has a zero so that the
+        // initial iteration will fail.
+        if (initialRecFrame.grid.indexOf(0) == -1) initialRecFrame.grid.fill(0);
+      }
 
       if (yieldEveryStep) {
         this.setStepState({});
@@ -661,7 +665,7 @@ SudokuSolver.InternalSolver = class {
           isSolution: false,
           cellOrder: [],
           values: 0,
-          hasContradiction: false,
+          hasContradiction: initialRecFrame.grid.indexOf(0) != -1,
         }
         checkRunCounter();
         this._stepState.step = 1;
