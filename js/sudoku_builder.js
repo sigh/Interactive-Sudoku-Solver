@@ -481,44 +481,34 @@ class SudokuConstraintBase {
     return '.' + arr.join('~');
   }
 
-  toLists() {
-    const constraints = [];
-    const metaConstraints = [];
-
-    const toListRec = (c) => {
-      if (c.type === 'Set') {
-        c.constraints.forEach(toListRec);
-      } else if (c.isMeta) {
-        metaConstraints.push(c);
-      } else {
-        constraints.push(c);
-      }
-    };
-    toListRec(this);
-
-    return [constraints, metaConstraints];
-  }
-
-  static getMetaConfig(metaConstraints) {
-    const metaConfig = new Map();
-
-    for (const c of metaConstraints) {
-      metaConfig.set(c.type, c);
+  _forEach(fn) {
+    if (this.type === 'Set') {
+      this.constraints.forEach(c => c._forEach(fn));
+    } else {
+      fn(this);
     }
-
-    return metaConfig;
   }
 
-  static getShapeFromMeta(metaConstraint) {
-    const c = metaConstraint.get('Shape');
-    const shape = SudokuConstraint.Shape.getShapeFromGridSpec(c?.gridSpec);
+  toMap() {
+    const cMap = new Map();
+
+    this._forEach(c => {
+      if (!cMap.has(c.type)) cMap.set(c.type, []);
+      cMap.get(c.type).push(c);
+    });
+
+    return cMap;
+  }
+
+  getShape() {
+    let gridSpec = null;
+    this._forEach(c => {
+      if (c.type === 'Shape') gridSpec = c.gridSpec;
+    });
+
+    const shape = SudokuConstraint.Shape.getShapeFromGridSpec(gridSpec);
     if (!shape) throw ('Unknown shape: ' + shape);
     return shape;
-  }
-  getShape() {
-    const constructor = this.constructor;
-    const [_, metaConstraints] = this.toLists();
-    return constructor.getShapeFromMeta(constructor.getMetaConfig(metaConstraints));
   }
 
   static _makeRegions(fn, gridSize) {
@@ -577,11 +567,6 @@ class SudokuConstraintBase {
 
     return map;
   });
-
-  static _Meta = class _Meta extends SudokuConstraintBase {
-    constructor(...args) { super(args); }
-    isMeta = true;
-  }
 }
 
 class SudokuConstraint {
@@ -725,24 +710,24 @@ class SudokuConstraint {
     }
   }
 
-  static NoBoxes = class NoBoxes extends SudokuConstraintBase._Meta { }
-  static StrictKropki = class StrictKropki extends SudokuConstraintBase._Meta {
+  static NoBoxes = class NoBoxes extends SudokuConstraintBase { }
+  static StrictKropki = class StrictKropki extends SudokuConstraintBase {
     static fnKey = memoize((numValues) =>
       SudokuConstraint.Binary.fnToKey(
         (a, b) => a != b * 2 && b != a * 2 && b != a - 1 && b != a + 1,
         numValues)
     );
   }
-  static StrictXV = class StrictXV extends SudokuConstraintBase._Meta {
+  static StrictXV = class StrictXV extends SudokuConstraintBase {
     static fnKey = memoize((numValues) =>
       SudokuConstraint.Binary.fnToKey(
         (a, b) => a + b != 5 && a + b != 10,
         numValues)
     );
   }
-  static Shape = class Shape extends SudokuConstraintBase._Meta {
+  static Shape = class Shape extends SudokuConstraintBase {
     constructor(gridSpec) {
-      super(gridSpec);
+      super(arguments);
       this.gridSpec = gridSpec;
     }
 
@@ -1228,12 +1213,10 @@ class SudokuConstraint {
 
 class SudokuBuilder {
   static build(constraint, debugOptions) {
-    const [constraints, metaConstraints] = constraint.toLists();
-    const metaConfig = SudokuConstraintBase.getMetaConfig(metaConstraints);
-    const shape = SudokuConstraintBase.getShapeFromMeta(metaConfig);
+    const shape = constraint.getShape();
 
     return new SudokuSolver(
-      this._handlers(constraints, shape, metaConfig),
+      this._handlers(constraint, shape),
       shape,
       debugOptions);
   }
@@ -1271,29 +1254,16 @@ class SudokuBuilder {
     return solverProxy;
   }
 
-  static *_handlers(constraints, shape, metaConfig) {
-    const noBoxes = metaConfig.has('NoBoxes');
-    yield* SudokuBuilder._rowColHandlers(shape);
-    yield* SudokuBuilder._constraintHandlers(constraints, shape, noBoxes);
-    if (noBoxes) {
+  static *_handlers(constraint, shape) {
+    const constraintMap = constraint.toMap();
+
+    yield* this._rowColHandlers(shape);
+    if (constraintMap.has('NoBoxes')) {
       yield new SudokuConstraintHandler.NoBoxes();
     } else {
-      yield* SudokuBuilder._boxHandlers(shape);
+      yield* this._boxHandlers(shape);
     }
-    if (metaConfig.has('StrictKropki')) {
-      const types = ['BlackDot', 'WhiteDot'];
-      yield* SudokuBuilder._strictAdjHandlers(
-        constraints.filter(x => types.includes(x.type)),
-        shape,
-        SudokuConstraint.StrictKropki.fnKey(shape.numValues));
-    }
-    if (metaConfig.has('StrictXV')) {
-      const types = ['X', 'V'];
-      yield* SudokuBuilder._strictAdjHandlers(
-        constraints.filter(x => types.includes(x.type)),
-        shape,
-        SudokuConstraint.StrictXV.fnKey(shape.numValues));
-    }
+    yield* this._constraintHandlers(constraintMap, shape);
   }
 
   static *_rowColHandlers(shape) {
@@ -1331,8 +1301,10 @@ class SudokuBuilder {
     }
   }
 
-  static * _constraintHandlers(constraints, shape, noBoxes) {
+  static * _constraintHandlers(constraintMap, shape) {
     const gridSize = shape.gridSize;
+
+    const constraints = [].concat(...constraintMap.values());
 
     for (const constraint of constraints) {
       let cells;
@@ -1605,9 +1577,11 @@ class SudokuBuilder {
 
         case 'RegionSumLine':
           // Region sum lines only makes sense when we have boxes.
-          if (!noBoxes) {
+          if (!constraintMap.has('NoBoxes')) {
             cells = constraint.cells.map(c => shape.parseCellId(c).cell);
             yield new SudokuConstraintHandler.RegionSumLine(cells);
+          } else {
+            throw 'RegionSumLine requires boxes';
           }
           break;
 
@@ -1803,9 +1777,34 @@ class SudokuBuilder {
             cells.cellIds(shape));
           break;
 
+        case 'StrictKropki':
+          {
+            const types = ['BlackDot', 'WhiteDot'];
+            yield* SudokuBuilder._strictAdjHandlers(
+              types.flatMap(t => constraintMap.get(t) || []),
+              shape,
+              SudokuConstraint.StrictKropki.fnKey(shape.numValues));
+          }
+          break;
+
+        case 'StrictXV':
+          {
+            const types = ['X', 'V'];
+            yield* SudokuBuilder._strictAdjHandlers(
+              types.flatMap(t => constraintMap.get(t) || []),
+              shape,
+              SudokuConstraint.StrictXV.fnKey(shape.numValues));
+          }
+          break;
+
         case 'Priority':
           cells = constraint.cells.map(c => shape.parseCellId(c).cell);
           yield new SudokuConstraintHandler.Priority(cells, constraint.priority);
+          break;
+
+        case 'NoBoxes':
+        case 'Shape':
+          // Nothing to do here.
           break;
 
         default:
