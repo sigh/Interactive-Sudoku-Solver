@@ -837,9 +837,7 @@ ConstraintDisplays.DefaultRegionsInverted = class DefaultRegionsInverted extends
     const gridSizePixels = cellSize * shape.gridSize;
     const svg = this.getSvg();
 
-    // Don't draw boxes if they are lines, as that is redundant with the
-    // default sudoku row or col constraints.
-    if (shape.boxHeight == 1 || shape.boxWidth == 1) return;
+    if (shape.noDefaultBoxes) return;
 
     for (let i = shape.boxWidth; i < shape.gridSize; i += shape.boxWidth) {
       svg.appendChild(this._makePath([

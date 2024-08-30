@@ -2308,30 +2308,31 @@ SudokuConstraintHandler.SameValues = class SameValues extends SudokuConstraintHa
 }
 
 SudokuConstraintHandler.RegionSumLine = class RegionSumLine extends SudokuConstraintHandler {
-  constructor(cells) {
+  constructor(cells, regions) {
     super(cells);
     this._sumUtil = null;
     this._singles = null;
     this._multi = null;
     this._minMaxCache = null;
     this._arrows = [];
+    this._regions = regions;
   }
 
   initialize(initialGrid, cellExclusions, shape) {
-    // Map cells to box regions.
-    const cellToBox = new Map();
-    for (const boxRegion of SudokuConstraintBase.boxRegions(shape)) {
-      for (const cell of boxRegion) cellToBox.set(cell, boxRegion);
+    // Map cells to regions.
+    const cellToRegion = new Map();
+    for (const region of this._regions) {
+      for (const cell of region) cellToRegion.set(cell, region);
     }
 
     // Split cells into sections of equal sum.
     const cellSets = [];
     let curSet = null;
-    let curBox = null;
+    let curRegion = null;
     for (const cell of this.cells) {
-      const newBox = cellToBox.get(cell);
-      if (newBox !== curBox) {
-        curBox = newBox;
+      const newRegion = cellToRegion.get(cell);
+      if (newRegion !== curRegion) {
+        curRegion = newRegion;
         curSet = [];
         cellSets.push(curSet);
       }
@@ -2416,7 +2417,7 @@ SudokuConstraintHandler.RegionSumLine = class RegionSumLine extends SudokuConstr
       }
 
       if (globalMin == globalMax) {
-        // We know the sum, and cells should always be in a single box
+        // We know the sum, and cells should always be in a single region
         // (by definition).
         if (!this._sumUtil.restrictCellsSingleExclusionGroup(
           grid, globalMin, cells, null, handlerAccumulator)) return false;

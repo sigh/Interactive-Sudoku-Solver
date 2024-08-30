@@ -25,6 +25,7 @@ class GridShape {
     this.numValues = gridSize;
     this.numCells = gridSize * gridSize;
     this.numPencilmarks = this.numCells * this.numValues;
+    this.noDefaultBoxes = this.boxHeight === 1 || this.boxWidth === 1;
 
     this.name = this.constructor.makeName(gridSize);
 
@@ -532,9 +533,12 @@ class SudokuConstraintBase {
     return this._makeRegions((c, i) => i * gridSize + c, gridSize);
   });
   static boxRegions = memoize((shape) => {
+    if (shape.noDefaultBoxes) return [];
+
     const gridSize = shape.gridSize;
     const boxWidth = shape.boxWidth;
     const boxHeight = shape.boxHeight;
+
     return this._makeRegions(
       (r, i) => ((r / boxHeight | 0) * boxHeight + (i % boxHeight | 0)) * gridSize
         + (r % boxHeight | 0) * boxWidth + (i / boxHeight | 0), gridSize);
@@ -586,6 +590,17 @@ class SudokuConstraint {
     constructor(grid) {
       super(arguments);
       this.grid = grid;
+    }
+
+    regions() {
+      const grid = this.grid;
+      const map = new Map();
+      for (let i = 0; i < grid.length; i++) {
+        const v = grid[i];
+        if (!map.has(v)) map.set(v, []);
+        map.get(v).push(i);
+      }
+      return [...map.values()];
     }
   }
 
@@ -1338,22 +1353,18 @@ class SudokuBuilder {
           break;
 
         case 'Jigsaw':
-          const grid = constraint.grid;
-          const map = new Map();
-          for (let i = 0; i < grid.length; i++) {
-            const v = grid[i];
-            if (!map.has(v)) map.set(v, []);
-            map.get(v).push(i);
-          }
+          {
+            const regions = constraint.regions();
 
-          for (const [_, cells] of map) {
-            if (cells.length == gridSize) {
-              yield new SudokuConstraintHandler.AllDifferent(cells);
+            for (const cells of regions) {
+              if (cells.length == gridSize) {
+                yield new SudokuConstraintHandler.AllDifferent(cells);
+              }
             }
-          }
 
-          // Just to let the solver know that this is a jigsaw puzzle.
-          yield new SudokuConstraintHandler.Jigsaw([...map.values()]);
+            // Just to let the solver know that this is a jigsaw puzzle.
+            yield new SudokuConstraintHandler.Jigsaw(regions);
+          }
           break;
 
         case 'Diagonal':
@@ -1576,12 +1587,23 @@ class SudokuBuilder {
 
 
         case 'RegionSumLine':
-          // Region sum lines only makes sense when we have boxes.
-          if (!constraintMap.has('NoBoxes')) {
+          {
             cells = constraint.cells.map(c => shape.parseCellId(c).cell);
-            yield new SudokuConstraintHandler.RegionSumLine(cells);
-          } else {
-            throw 'RegionSumLine requires boxes';
+            if (!constraintMap.has('NoBoxes') && !shape.noDefaultBoxes) {
+              // Default boxes.
+              const regions = SudokuConstraintBase.boxRegions(shape);
+              yield new SudokuConstraintHandler.RegionSumLine(cells, regions);
+            } else if (constraintMap.has('Jigsaw')) {
+              // If no boxes is set, try to use the jigsaw regions.
+              const jigsawConstraints = constraintMap.get('Jigsaw');
+              if (jigsawConstraints.length !== 1) {
+                throw ('Jigsaw constraint must be unique');
+              }
+              const regions = jigsawConstraints[0].regions();
+              yield new SudokuConstraintHandler.RegionSumLine(cells, regions);
+            } else {
+              // There are no regions, so the constraint is trivially satisfied.
+            }
           }
           break;
 

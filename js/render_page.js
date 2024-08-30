@@ -1034,7 +1034,8 @@ class ConstraintManager {
           same box more than once, each individual segment of
           such a line within that box sums to N separately.
 
-          Has no effect if 'No Boxes' is set.`,
+          If the grid has no boxes, then jigsaw regions are used instead.
+          `
       },
       SumLine: {
         text: 'Sum Line',
