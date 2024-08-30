@@ -268,6 +268,7 @@ const runSolveTests = async (onFailure) => {
     'Counting circles',
     'Anti-taxicab',
     'Full rank - 6 clue snipe',
+    'Irregular region sum line',
   ], onFailure);
   result.collection = '9x9';
   results.push(result);
