@@ -45,8 +45,9 @@ class HistoryHandler {
   }
 
   _incrementHistory(delta) {
+    const index = this._historyLocation + delta;
+    if (index >= this._history.length) return;
     let q = this._history[this._historyLocation + delta];
-    if (q === undefined) return;
     this._historyLocation += delta;
     this._updateButtons();
 
@@ -1233,13 +1234,11 @@ class SolutionController {
     this._stateDisplay = new SolverStateDisplay(this._solutionDisplay);
 
     this._historyHandler = new HistoryHandler((params) => {
-      let mode = params.get('mode');
+      const mode = params.get('mode');
       if (mode) this._elements.mode.value = mode;
 
-      let constraintsText = params.get('q');
-      if (constraintsText) {
-        this._constraintManager.loadUnsafeFromText(constraintsText);
-      }
+      const constraintsText = params.get('q') || '.';
+      this._constraintManager.loadUnsafeFromText(constraintsText);
     });
 
     this._update();
@@ -1366,9 +1365,10 @@ class SolutionController {
 
     const constraints = this._constraintManager.getConstraints();
 
-    let params = { mode: mode, q: constraints };
+    let params = { mode: mode, q: constraints.toString() };
     // Remove mode if it is the default.
-    if (mode == 'all-possibilities') params.mode = undefined;
+    if (mode === 'all-possibilities') params.mode = undefined;
+    if (params.q === '.') params.q = undefined;
     this._historyHandler.update(params);
 
     const isLayoutMode = mode === 'validate-layout';
