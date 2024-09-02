@@ -15,8 +15,63 @@ const initPage = () => {
   controller = new SolutionController(constraintManager, displayContainer);
 };
 
-class CheckboxConstraints {
+class ConstraintCollector {
+  constructor() { }
+
+  addConstraint(constraint) {
+    throw ('Not implemented');
+  }
+
+  getConstraints() {
+    throw ('Not implemented');
+  }
+  getLayoutConstraints() { return []; }
+
+  clear() { }
+
+  reshape(shape) { }
+}
+
+ConstraintCollector.Shape = class Shape extends ConstraintCollector {
+  constructor() {
+    super();
+    this._shape = null;
+  }
+
+  reshape(shape) {
+    this._shape = shape;
+  }
+
+  getConstraints() {
+    return [new SudokuConstraint.Shape(this._shape.name)];
+  }
+
+  getLayoutConstraints() { return this.getConstraints(); }
+}
+
+ConstraintCollector.Invisible = class Invisible extends ConstraintCollector {
+  constructor() {
+    super();
+    this._constraints = [];
+  }
+
+  clear() {
+    this._constraints = [];
+  }
+
+  addConstraint(constraint) {
+    this._constraints.push(constraint);
+  }
+
+  getConstraints() {
+    return this._constraints;
+  }
+}
+
+ConstraintCollector.Checkbox = class Checkbox extends ConstraintCollector {
   constructor(display, onChange) {
+    super();
+
     const layoutConstraints = {
       AntiKnight: {
         text: 'Anti-Knight',
@@ -137,7 +192,7 @@ class CheckboxConstraints {
       false);
   }
 
-  _getConstraint(layout) {
+  _getConstraints(layout) {
     let constraints = [];
     for (const item of this._checkboxes.values()) {
       if (layout && !item.isLayout) continue;
@@ -146,18 +201,18 @@ class CheckboxConstraints {
         constraints.push(item.constraint);
       }
     }
-    return new SudokuConstraint.Set(constraints);
+    return constraints;
   }
 
-  getConstraint() {
-    return this._getConstraint(false);
+  getConstraints() {
+    return this._getConstraints(false);
   }
 
-  getLayoutConstraint() {
-    return this._getConstraint(true);
+  getLayoutConstraints() {
+    return this._getConstraints(true);
   }
 
-  check(c) {
+  addConstraint(c) {
     const element = this._checkboxes.get(c.toString()).element;
     element.checked = true;
     element.dispatchEvent(new Event('change'));
@@ -167,6 +222,61 @@ class CheckboxConstraints {
     for (const item of this._checkboxes.values()) {
       item.element.checked = false;
     }
+  }
+}
+
+ConstraintCollector.DefaultMultiCell = class DefaultMultiCell extends ConstraintCollector {
+  constructor(display, constraintConfigs, addToPanel) {
+    super();
+    this._panelConfigs = [];
+    this._display = display;
+    this._constraintConfigs = constraintConfigs;
+    this._addToPanel = addToPanel;
+  }
+
+  addConstraint(constraint) {
+    let config = null;
+    if (constraint.type === 'Quad') {
+      config = {
+        cells: SudokuConstraint.Quad.cells(constraint.topLeftCell),
+        name: `Quad (${constraint.values.join(',')})`,
+        constraint: constraint,
+        displayElem: this._display.drawItem(
+          constraint, ConstraintDisplays.Quad, null),
+        replaceKey: `Quad-${constraint.topLeftCell}`,
+      };
+      for (const other of this._panelConfigs) {
+        if (config.replaceKey == other.replaceKey) {
+          other.removeFromePanel();
+          break;
+        }
+      }
+    } else {
+      const uiConfig = this._constraintConfigs[constraint.type];
+      config = {
+        cells: constraint.cells,
+        name: uiConfig.panelText?.(constraint) || uiConfig.text,
+        constraint: constraint,
+        displayElem: this._display.drawItem(
+          constraint,
+          uiConfig.displayClass,
+          uiConfig.displayConfig),
+      };
+    }
+    this._addToPanel(config, this._removeConstraint.bind(this));
+    this._panelConfigs.push(config);
+  }
+
+  _removeConstraint(config) {
+    arrayRemoveValue(this._panelConfigs, config);
+  }
+
+  getConstraints() {
+    return this._panelConfigs.map(c => c.constraint);
+  }
+
+  clear() {
+    this._panelConfigs = [];
   }
 }
 
@@ -215,8 +325,9 @@ class ExampleHandler {
   }
 }
 
-class JigsawManager {
+ConstraintCollector.Jigsaw = class Jigsaw extends ConstraintCollector {
   constructor(display, inputManager, makePanelItem, onUpdate) {
+    super();
     this._display = display;
     this._shape = null;
     this._makePanelItem = makePanelItem;
@@ -256,8 +367,8 @@ class JigsawManager {
     return this._piecesMap.every(x => x == 0);
   }
 
-  getConstraint() {
-    if (this._isEmpty()) return new SudokuConstraint.Set([]);
+  getConstraints() {
+    if (this._isEmpty()) return [];
 
     const baseCharCode = SudokuParser.shapeToBaseCharCode(this._shape);
 
@@ -268,10 +379,12 @@ class JigsawManager {
       grid[i] = String.fromCharCode(
         baseCharCode + indexMap.get(p));
     });
-    return new SudokuConstraint.Jigsaw(grid.join(''));
+    return [new SudokuConstraint.Jigsaw(grid.join(''))];
   }
 
-  setConstraint(constraint) {
+  getLayoutConstraints() { return this.getConstraints(); }
+
+  addConstraint(constraint) {
     const grid = constraint.grid;
     const map = new Map();
     const shape = this._shape;
@@ -294,9 +407,6 @@ class JigsawManager {
   }
 
   _removePiece(config) {
-    this._display.removeItem(config.displayElem);
-    config.panelItem.parentNode.removeChild(config.panelItem);
-
     config.cells.forEach(c => this._piecesMap[this._shape.parseCellId(c).cell] = 0);
   }
 
@@ -381,8 +491,9 @@ class ShapeManager {
   }
 }
 
-class OutsideClueConstraints {
+ConstraintCollector.OutsideClue = class OutsideClue extends ConstraintCollector {
   constructor(inputManager, display, onChange) {
+    super();
     this._display = display;
     this._configs = this.constructor._constraintConfigs();
     display.configureOutsideClues(this._configs);
@@ -518,13 +629,13 @@ class OutsideClueConstraints {
     const config = this._configs[type];
 
     switch (config.clueType) {
-      case OutsideClueConstraints.CLUE_TYPE_DIAGONAL:
+      case ConstraintCollector.OutsideClue.CLUE_TYPE_DIAGONAL:
         this._addConstraint(constraint, constraint.id, constraint.sum);
         break;
-      case OutsideClueConstraints.CLUE_TYPE_SINGLE_LINE:
+      case ConstraintCollector.OutsideClue.CLUE_TYPE_SINGLE_LINE:
         this._addConstraint(constraint, constraint.id + ',1', constraint.sum);
         break;
-      case OutsideClueConstraints.CLUE_TYPE_DOUBLE_LINE:
+      case ConstraintCollector.OutsideClue.CLUE_TYPE_DOUBLE_LINE:
         {
           const values = constraint.values();
           if (values[0]) {
@@ -564,11 +675,11 @@ class OutsideClueConstraints {
     let [rowCol, dir] = lineId.split(',');
 
     switch (config?.clueType) {
-      case OutsideClueConstraints.CLUE_TYPE_DIAGONAL:
+      case ConstraintCollector.OutsideClue.CLUE_TYPE_DIAGONAL:
         return new SudokuConstraint[type](value, lineId);
-      case OutsideClueConstraints.CLUE_TYPE_SINGLE_LINE:
+      case ConstraintCollector.OutsideClue.CLUE_TYPE_SINGLE_LINE:
         return new SudokuConstraint[type](value, rowCol);
-      case OutsideClueConstraints.CLUE_TYPE_DOUBLE_LINE:
+      case ConstraintCollector.OutsideClue.CLUE_TYPE_DOUBLE_LINE:
         return new SudokuConstraint[type](
           rowCol,
           dir == 1 ? value : '',
@@ -584,7 +695,7 @@ class OutsideClueConstraints {
     const constraints = [];
     for (const constraint of this._constraints.values()) {
       const type = constraint.type;
-      if (this._configs[type].clueType === OutsideClueConstraints.CLUE_TYPE_DOUBLE_LINE) {
+      if (this._configs[type].clueType === ConstraintCollector.OutsideClue.CLUE_TYPE_DOUBLE_LINE) {
         const key = `${type}|${constraint.rowCol}`;
         if (seen.has(key)) {
           // Merge with the previous.
@@ -610,31 +721,32 @@ class OutsideClueConstraints {
 
 class ConstraintManager {
   constructor(inputManager, displayContainer) {
-    this._configs = [];
     this._shape = null;
 
-    this._invisibleConstraints = [];
     this._shapeManager = new ShapeManager();
     this._shapeManager.addReshapeListener(this);
 
     this._display = new ConstraintDisplay(
       inputManager, displayContainer);
     this.addReshapeListener(this._display);
+    this._constraintCollectors = new Map();
     this._setUpPanel(inputManager, displayContainer);
-    this._givenCandidates = new GivenCandidates(
-      inputManager, this._display, this.runUpdateCallback.bind(this));
-    this.addReshapeListener(this._givenCandidates);
+    this._addConstraintCollector(new ConstraintCollector.DefaultMultiCell(
+      this._display, this._multiCellConstraints, this._addToPanel.bind(this)));
+    this._addConstraintCollector(new ConstraintCollector.GivenCandidates(
+      inputManager, this._display, this.runUpdateCallback.bind(this)));
+    this._addConstraintCollector(new ConstraintCollector.Invisible());
 
     this.setUpdateCallback();
   }
 
   reshape(shape) {
     // Keep the checkbox constraints, since they are shape-agnostic.
-    const checkboxes = this._checkboxConstraints.getConstraint();
+    const checkboxes = this._constraintCollectors.get('Checkbox').getConstraints();
 
     this.clear();
     this._shape = shape;
-    this.loadConstraint(checkboxes);
+    checkboxes.forEach(c => this.loadConstraint(c));
   }
   addReshapeListener(listener) {
     this._shapeManager.addReshapeListener(listener);
@@ -653,21 +765,28 @@ class ConstraintManager {
     return this._shape;
   }
 
+  _addConstraintCollector(collector) {
+    this._constraintCollectors.set(collector.constructor.name, collector);
+    this.addReshapeListener(collector);
+  }
+
   _setUpPanel(inputManager, displayContainer) {
     this._constraintPanel = document.getElementById('displayed-constraints');
     this._panelItemHighlighter = displayContainer.createHighlighter('highlighted-cell');
 
+    // Shape constraint.
+    this._addConstraintCollector(new ConstraintCollector.Shape());
+
     // Checkbox constraints.
-    this._checkboxConstraints = new CheckboxConstraints(
-      this._display, this.runUpdateCallback.bind(this));
+    this._addConstraintCollector(new ConstraintCollector.Checkbox(
+      this._display, this.runUpdateCallback.bind(this)));
 
     // Jigsaw constraints
-    this._jigsawManager = new JigsawManager(
+    this._addConstraintCollector(new ConstraintCollector.Jigsaw(
       this._display,
       inputManager,
       this._makePanelItem.bind(this),
-      this.runUpdateCallback.bind(this));
-    this.addReshapeListener(this._jigsawManager);
+      this.runUpdateCallback.bind(this)));
 
     // Multi-cell constraints.
     const selectionForm = document.forms['multi-cell-constraint-input'];
@@ -683,14 +802,13 @@ class ConstraintManager {
     this._setUpMultiCellConstraints(selectionForm);
 
     // Custom binary.
-    this._customBinaryConstraints = new CustomBinaryConstraintManager(
+    this._addConstraintCollector(new ConstraintCollector.CustomBinary(
       inputManager, this._display, this._addToPanel.bind(this),
-      this.runUpdateCallback.bind(this));
-    this.addReshapeListener(this._customBinaryConstraints);
+      this.runUpdateCallback.bind(this)));
 
     // Outside arrows.
-    this._outsideClueConstraints = new OutsideClueConstraints(
-      inputManager, this._display, this.runUpdateCallback.bind(this));
+    this._addConstraintCollector(new ConstraintCollector.OutsideClue(
+      inputManager, this._display, this.runUpdateCallback.bind(this)));
 
     // Load examples.
     this._exampleHandler = new ExampleHandler(this);
@@ -805,7 +923,7 @@ class ConstraintManager {
     let config;
     switch (constraint.type) {
       case 'Givens':
-        this._givenCandidates.setValueIds(constraint.values);
+        this._constraintCollectors.get('GivenCandidates').addConstraint(constraint);
         break;
       case 'X':
       case 'V':
@@ -832,39 +950,15 @@ class ConstraintManager {
       case 'ContainAtLeast':
       case 'ContainExact':
       case 'Indexing':
-        {
-          const uiConfig = this._multiCellConstraints[constraint.type];
-          config = {
-            cells: constraint.cells,
-            name: uiConfig.panelText?.(constraint) || uiConfig.text,
-            constraint: constraint,
-            displayElem: this._display.drawItem(
-              constraint,
-              uiConfig.displayClass,
-              uiConfig.displayConfig),
-          };
-          this._addToPanel(config);
-          this._configs.push(config);
-        }
+      case 'Quad':
+        this._constraintCollectors.get('DefaultMultiCell').addConstraint(constraint);
         break;
       case 'Jigsaw':
-        this._jigsawManager.setConstraint(constraint);
-        break;
-      case 'Quad':
-        config = {
-          cells: SudokuConstraint.Quad.cells(constraint.topLeftCell),
-          name: `Quad (${constraint.values.join(',')})`,
-          constraint: constraint,
-          displayElem: this._display.drawItem(
-            constraint, ConstraintDisplays.Quad, null),
-          replaceKey: `Quad-${constraint.topLeftCell}`,
-        };
-        this._addToPanel(config);
-        this._configs.push(config);
+        this._constraintCollectors.get('Jigsaw').addConstraint(constraint);
         break;
       case 'Binary':
       case 'BinaryX':
-        this._customBinaryConstraints.addConstraint(constraint);
+        this._constraintCollectors.get('CustomBinary').addConstraint(constraint);
         break;
       case 'LittleKiller':
       case 'Sandwich':
@@ -873,7 +967,7 @@ class ConstraintManager {
       case 'HiddenSkyscraper':
       case 'NumberedRoom':
       case 'FullRank':
-        this._outsideClueConstraints.addConstraint(constraint);
+        this._constraintCollectors.get('OutsideClue').addConstraint(constraint);
         break;
       case 'AntiKnight':
       case 'AntiKing':
@@ -886,7 +980,7 @@ class ConstraintManager {
       case 'Windoku':
       case 'Diagonal':
       case 'AntiTaxicab':
-        this._checkboxConstraints.check(constraint);
+        this._constraintCollectors.get('Checkbox').addConstraint(constraint);
         break;
       case 'Set':
         constraint.constraints.forEach(c => this.loadConstraint(c));
@@ -895,7 +989,7 @@ class ConstraintManager {
         // Nothing to do, but ensure it is not added to invisible constraints.
         break;
       default:
-        this._invisibleConstraints.push(constraint);
+        this._constraintCollectors.get('Invisible').addConstraint(constraint);
         break;
     }
     this.runUpdateCallback();
@@ -1399,14 +1493,8 @@ class ConstraintManager {
   }
 
   _removePanelConstraint(config) {
-    if (config.isCustomBinary) {
-      this._customBinaryConstraints.removeConstraint(config);
-    } else {
-      const index = this._configs.indexOf(config);
-      this._configs.splice(index, 1);
-    }
-    this._display.removeItem(config.displayElem);
-    config.panelItem.parentNode.removeChild(config.panelItem);
+    const configs = this._constraintCollectors.get('DefaultMultiCell')._panelConfigs;
+    arrayRemoveValue(configs, config);
   }
 
   _makePanelItem(config, removeFn) {
@@ -1425,7 +1513,7 @@ class ConstraintManager {
 
     config.panelItem = panelItem;
     panelButton.addEventListener('click', () => {
-      removeFn(config);
+      config.removeFromePanel();
       this._panelItemHighlighter.clear();
       this.runUpdateCallback();
     });
@@ -1437,15 +1525,11 @@ class ConstraintManager {
       this._panelItemHighlighter.clear();
     });
 
-    if (config.replaceKey) {
-      for (const other of this._configs) {
-        if (config.replaceKey == other.replaceKey) {
-          this._removePanelConstraint(other);
-          this._panelItemHighlighter.clear();
-          break;
-        }
-      }
-    }
+    config.removeFromePanel = () => {
+      removeFn(config);
+      this._display.removeItem(config.displayElem);
+      config.panelItem.parentNode.removeChild(config.panelItem);
+    };
 
     return panelItem;
   }
@@ -1483,48 +1567,41 @@ class ConstraintManager {
     return svg;
   }
 
-  _addToPanel(config) {
+  _addToPanel(config, removeFn) {
+    removeFn ||= this._removePanelConstraint.bind(this);
     this._constraintPanel.appendChild(
-      this._makePanelItem(config, this._removePanelConstraint.bind(this, config)));
+      this._makePanelItem(config, removeFn));
   }
 
   getLayoutConstraints() {
     const constraints = [];
-    constraints.push(this._jigsawManager.getConstraint());
-    constraints.push(this._checkboxConstraints.getLayoutConstraint());
-    constraints.push(new SudokuConstraint.Shape(this._shape.name));
+    for (const collector of this._constraintCollectors.values()) {
+      constraints.push(...collector.getLayoutConstraints());
+    }
     return new SudokuConstraint.Set(constraints);
   }
 
   getConstraints() {
     if (!this._shape) this._shapeManager.reloadShape();
 
-    let constraints = this._configs.map(c => c.constraint);
-    constraints.push(this._jigsawManager.getConstraint());
-    constraints.push(this._checkboxConstraints.getConstraint());
-    constraints.push(...this._outsideClueConstraints.getConstraints());
-    constraints.push(...this._customBinaryConstraints.getConstraints());
-    constraints.push(this._givenCandidates.getConstraint());
-    constraints.push(new SudokuConstraint.Shape(this._shape.name));
-    constraints.push(...this._invisibleConstraints);
+    const constraints = [];
+    for (const collector of this._constraintCollectors.values()) {
+      constraints.push(...collector.getConstraints());
+    }
 
     return new SudokuConstraint.Set(constraints);
   }
 
   getFixedCells() {
-    return this._givenCandidates.getFixedCells();
+    return this._constraintCollectors.get('GivenCandidates').getFixedCells();
   }
 
   clear() {
     this._display.clear();
     this._constraintPanel.innerHTML = '';
-    this._checkboxConstraints.clear();
-    this._outsideClueConstraints.clear();
-    this._customBinaryConstraints.clear();
-    this._configs = [];
-    this._jigsawManager.clear();
-    this._givenCandidates.unsafeClear();  // OK because display is cleared.
-    this._invisibleConstraints = [];
+    for (const collector of this._constraintCollectors.values()) {
+      collector.clear();
+    }
     this.runUpdateCallback();
   }
 }
@@ -1688,8 +1765,9 @@ class Selection {
   }
 }
 
-class GivenCandidates {
+ConstraintCollector.GivenCandidates = class GivenCandidates extends ConstraintCollector {
   constructor(inputManager, display, onChange) {
+    super();
     this._shape = null;
     this._givensMap = new Map();
     this._display = display;
@@ -1741,7 +1819,8 @@ class GivenCandidates {
     }
   }
 
-  setValueIds(valueIds) {
+  addConstraint(constraint) {
+    const valueIds = constraint.values;
     for (const valueId of valueIds) {
       const parsed = this._shape.parseValueId(valueId);
       this._replaceValuesNoUpdate(parsed.cellId, parsed.values);
@@ -1754,12 +1833,12 @@ class GivenCandidates {
     this._onChange();
   }
 
-  getConstraint() {
+  getConstraints() {
     const valueIds = [];
     for (const [cell, values] of this._givensMap) {
       valueIds.push(`${cell}_${values.join('_')}`);
     }
-    return new SudokuConstraint.Givens(...valueIds);
+    return [new SudokuConstraint.Givens(...valueIds)];
   }
 
   getFixedCells() {
@@ -1770,8 +1849,9 @@ class GivenCandidates {
     return cells;
   }
 
-  unsafeClear() {
+  clear() {
     this._givensMap = new Map();
+    this._display.drawGivens(this._givensMap);
   }
 }
 
@@ -1961,14 +2041,25 @@ class DropdownInputManager {
       }
     }, 100);
   };
+
+  currentSelection() {
+    return this._currentSelection.slice();
+  }
+
+  containerElem() {
+    return this._containerElem;
+  }
 }
 
-class CustomBinaryConstraintManager extends DropdownInputManager {
+ConstraintCollector.CustomBinary = class CustomBinary extends ConstraintCollector {
   constructor(inputManager, display, addToPanel, onChange) {
-    super(inputManager, 'custom-binary-input');
+    super();
+
+    this._dropDownInputManager = new DropdownInputManager(
+      inputManager, 'custom-binary-input');
 
     inputManager.onSelection(
-      (selection) => this.updateSelection(selection));
+      (selection) => this._dropDownInputManager.updateSelection(selection));
 
     this._addToPanel = addToPanel;
     this._onChange = onChange;
@@ -1984,7 +2075,7 @@ class CustomBinaryConstraintManager extends DropdownInputManager {
   }
 
   _setUp() {
-    const form = this._containerElem;
+    const form = this._dropDownInputManager.containerElem();
     const errorElem = document.getElementById(
       'custom-binary-input-function-error');
     form.onsubmit = e => {
@@ -2004,7 +2095,7 @@ class CustomBinaryConstraintManager extends DropdownInputManager {
         return false;
       }
 
-      this._add(key, name, this._currentSelection.slice(), type);
+      this._add(key, name, this._dropDownInputManager.currentSelection(), type);
       this._onChange();
 
       return false;
@@ -2036,19 +2127,18 @@ class CustomBinaryConstraintManager extends DropdownInputManager {
       key: key,
       cells: cells,
       type: type,
-      isCustomBinary: true,
       mapKey: `${type}-${key}`,
       displayElem: this._display.drawItem(
         { cells, key, type }, ConstraintDisplays.CustomBinary, null),
     };
-    this._addToPanel(config);
+    this._addToPanel(config, this._removeConstraint.bind(this));
 
     const mapKey = config.mapKey;
     if (!this._configs.has(mapKey)) this._configs.set(mapKey, []);
     this._configs.get(mapKey).push(config);
   }
 
-  removeConstraint(config) {
+  _removeConstraint(config) {
     const keyConfigs = this._configs.get(config.mapKey);
     const index = keyConfigs.indexOf(config);
     keyConfigs.splice(index, 1);
