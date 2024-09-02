@@ -728,13 +728,13 @@ class OutsideClueDisplay extends DisplayItem {
     for (const lineId in diagonalCellMap) {
       this._addArrowSvg(
         'diagonal-arrow', lineId, diagonalCellMap[lineId],
-        [OutsideClueConstraints.CLUE_TYPE_DIAGONAL]);
+        [ConstraintCollector.OutsideClue.CLUE_TYPE_DIAGONAL]);
     }
     for (const [lineId, cells] of SudokuConstraintBase.fullLineCellMap(shape)) {
       if (cells.length <= 1) continue;
-      const clueTypes = [OutsideClueConstraints.CLUE_TYPE_DOUBLE_LINE];
+      const clueTypes = [ConstraintCollector.OutsideClue.CLUE_TYPE_DOUBLE_LINE];
       if (lineId.endsWith(',1')) {
-        clueTypes.push(OutsideClueConstraints.CLUE_TYPE_SINGLE_LINE);
+        clueTypes.push(ConstraintCollector.OutsideClue.CLUE_TYPE_SINGLE_LINE);
       }
       this._addArrowSvg('full-line-arrow', lineId, cells, clueTypes);
     }
