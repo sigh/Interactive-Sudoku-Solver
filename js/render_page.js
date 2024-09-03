@@ -216,7 +216,7 @@ class ExampleHandler {
 }
 
 class JigsawManager {
-  constructor(display, makePanelItem) {
+  constructor(display, inputManager, makePanelItem, onUpdate) {
     this._display = display;
     this._shape = null;
     this._makePanelItem = makePanelItem;
@@ -225,6 +225,26 @@ class JigsawManager {
 
     this._piecesMap = [];
     this._maxPieceId = 0;
+
+    this._setUpButton(inputManager, onUpdate);
+  }
+
+  _setUpButton(inputManager, onUpdate) {
+    const button = document.getElementById('add-jigsaw-button');
+    button.onclick = () => {
+      const cells = inputManager.getSelection();
+      this._addPiece(cells);
+      onUpdate();
+    };
+
+    button.disabled = true;
+    inputManager.onSelection((selection) => {
+      const isValid = this._cellsAreValidJigsawPiece(selection);
+      button.disabled = !isValid;
+      if (isValid && !this._isEmpty()) {
+        button.focus();
+      }
+    });
   }
 
   reshape(shape) {
@@ -232,8 +252,12 @@ class JigsawManager {
     this._piecesMap = Array(shape.numCells).fill(0);
   }
 
+  _isEmpty() {
+    return this._piecesMap.every(x => x == 0);
+  }
+
   getConstraint() {
-    if (this._piecesMap.every(x => x == 0)) return new SudokuConstraint.Set([]);
+    if (this._isEmpty()) return new SudokuConstraint.Set([]);
 
     const baseCharCode = SudokuParser.shapeToBaseCharCode(this._shape);
 
@@ -259,7 +283,7 @@ class JigsawManager {
 
     for (const [_, cells] of map) {
       if (cells.length == shape.gridSize) {
-        this.addPiece(cells.map(c => shape.makeCellIdFromIndex(c)));
+        this._addPiece(cells.map(c => shape.makeCellIdFromIndex(c)));
       }
     }
   }
@@ -269,7 +293,7 @@ class JigsawManager {
     this._regionPanel.innerHTML = '';
   }
 
-  removePiece(config) {
+  _removePiece(config) {
     this._display.removeItem(config.displayElem);
     config.panelItem.parentNode.removeChild(config.panelItem);
 
@@ -277,14 +301,15 @@ class JigsawManager {
   }
 
   _addToRegionPanel(config) {
-    this._regionPanel.appendChild(this._makePanelItem(config));
+    this._regionPanel.appendChild(
+      this._makePanelItem(config, this._removePiece.bind(this, config)));
   }
 
-  addPiece(cells) {
+  _addPiece(cells) {
+    if (cells.length != this._shape.gridSize) return;
     const pieceId = ++this._maxPieceId;
     cells.forEach(c => this._piecesMap[this._shape.parseCellId(c).cell] = pieceId);
     const config = {
-      isJigsaw: true,
       pieceId: pieceId,
       cells: cells,
       name: '',
@@ -293,7 +318,8 @@ class JigsawManager {
     this._addToRegionPanel(config);
   }
 
-  cellsAreValidJigsawPiece(cells, shape) {
+  _cellsAreValidJigsawPiece(cells) {
+    const shape = this._shape;
     if (cells.length != shape.gridSize) return false;
     // Check that we aren't overlapping an existing tile.
     if (cells.some(c => this._piecesMap[shape.parseCellId(c).cell] != 0)) {
@@ -637,7 +663,10 @@ class ConstraintManager {
 
     // Jigsaw constraints
     this._jigsawManager = new JigsawManager(
-      this._display, this._makePanelItem.bind(this));
+      this._display,
+      inputManager,
+      this._makePanelItem.bind(this),
+      this.runUpdateCallback.bind(this));
     this.addReshapeListener(this._jigsawManager);
 
     // Multi-cell constraints.
@@ -753,14 +782,21 @@ class ConstraintManager {
       selectionForm['add-constraint'].disabled = true;
     } else if (!isSingleCell) {
       // Focus on the the form so we can immediately press enter, but
-      // only if the selection is not a single cell.
+      // only if the selection is not a single cell and if the focus has not
+      // been set yet.
       //   - If the value input is enabled then focus on it to make it easy to
       //     input a value.
       //   - Otherwise just focus on the submit button.
-      if (config.value && config.value.elem.select) {
-        config.value.elem.select();
-      } else {
-        selectionForm['add-constraint'].focus();
+      const hasNoFocus = (
+        document.activeElement === document.body ||
+        document.activeElement === null);
+
+      if (hasNoFocus) {
+        if (config.value && config.value.elem.select) {
+          config.value.elem.select();
+        } else {
+          selectionForm['add-constraint'].focus();
+        }
       }
     }
   }
@@ -970,14 +1006,6 @@ class ConstraintManager {
           width: LineOptions.THICK_LINE_WIDTH,
           startMarker: LineOptions.FULL_CIRCLE_MARKER,
         },
-      },
-      Jigsaw: {
-        validateFn: (cells, shape) =>
-          this._jigsawManager.cellsAreValidJigsawPiece(cells, shape),
-        text: 'Jigsaw Piece',
-        description:
-          "Values inside the jigsaw piece can't repeat. Pieces must contain 9 cells, and cannot overlap.",
-        displayClass: ConstraintDisplays.Jigsaw,
       },
       Whisper: {
         value: {
@@ -1357,8 +1385,6 @@ class ConstraintManager {
         const constraint = new config.constraintClass(values.join('_'), ...cells);
         this.loadConstraint(constraint);
       }
-    } else if (config.constraintClass === SudokuConstraint.Jigsaw) {
-      this._jigsawManager.addPiece(cells);
     } else if (config.value) {
       const value = formData.get(type + '-value');
       this.loadConstraint(
@@ -1373,23 +1399,17 @@ class ConstraintManager {
   }
 
   _removePanelConstraint(config) {
-    if (config.isJigsaw) {
-      this._jigsawManager.removePiece(config);
+    if (config.isCustomBinary) {
+      this._customBinaryConstraints.removeConstraint(config);
     } else {
-      if (config.isCustomBinary) {
-        this._customBinaryConstraints.removeConstraint(config);
-      } else {
-        const index = this._configs.indexOf(config);
-        this._configs.splice(index, 1);
-      }
-      this._display.removeItem(config.displayElem);
-      config.panelItem.parentNode.removeChild(config.panelItem);
+      const index = this._configs.indexOf(config);
+      this._configs.splice(index, 1);
     }
-
-    this._panelItemHighlighter.clear();
+    this._display.removeItem(config.displayElem);
+    config.panelItem.parentNode.removeChild(config.panelItem);
   }
 
-  _makePanelItem(config) {
+  _makePanelItem(config, removeFn) {
     let panelItem = document.createElement('div');
     panelItem.className = 'constraint-item';
 
@@ -1405,7 +1425,8 @@ class ConstraintManager {
 
     config.panelItem = panelItem;
     panelButton.addEventListener('click', () => {
-      this._removePanelConstraint(config);
+      removeFn(config);
+      this._panelItemHighlighter.clear();
       this.runUpdateCallback();
     });
 
@@ -1420,6 +1441,7 @@ class ConstraintManager {
       for (const other of this._configs) {
         if (config.replaceKey == other.replaceKey) {
           this._removePanelConstraint(other);
+          this._panelItemHighlighter.clear();
           break;
         }
       }
@@ -1462,7 +1484,8 @@ class ConstraintManager {
   }
 
   _addToPanel(config) {
-    this._constraintPanel.appendChild(this._makePanelItem(config));
+    this._constraintPanel.appendChild(
+      this._makePanelItem(config, this._removePanelConstraint.bind(this, config)));
   }
 
   getLayoutConstraints() {
@@ -1770,15 +1793,16 @@ class GridInputManager {
     this._selection = new Selection(displayContainer);
     this._selection.addCallback(cellIds => {
       this._multiValueInputManager.updateSelection(cellIds);
+      // Blur the active selection, so that callbacks can tell if something
+      // has already set the focus.
+      document.activeElement.blur();
       if (cellIds.length == 1) {
-        this._runCallbacks(this._callbacks.onSelection, cellIds);
         const [x, y] = this._selection.cellIdCenter(cellIds[0]);
         fakeInput.style.top = y + 'px';
         fakeInput.style.left = x + 'px';
         fakeInput.select();
-      } else {
-        this._runCallbacks(this._callbacks.onSelection, cellIds);
       }
+      this._runCallbacks(this._callbacks.onSelection, cellIds);
     });
 
     this._setUpKeyBindings();

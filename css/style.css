@@ -259,6 +259,10 @@ button.image-button>img {
   line-height: 1.2em;
 }
 
+#jigsaw-container {
+  text-align: center;
+}
+
 #displayed-regions {
   display: flex;
   flex-direction: column;
@@ -266,17 +270,9 @@ button.image-button>img {
   background: rgba(0, 0, 255, 0.1);
   border-radius: 10px;
 
-  margin-top: 10px;
-
-  height: 100px;
+  height: 90px;
   overflow-y: auto;
   overflow-x: hidden;
-}
-
-#displayed-regions:empty:before {
-  content: 'Jigsaw pieces';
-  color: grey;
-  text-align: center;
 }
 
 .constraint-item {
@@ -843,6 +839,12 @@ progress {
 
 h2 {
   font-size: 16px;
+  font-weight: normal;
+  margin: 0;
+}
+
+h3 {
+  font-size: 14px;
   font-weight: normal;
   margin: 0;
 }
