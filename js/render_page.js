@@ -15,6 +15,7 @@ const initPage = () => {
 
 class ConstraintCollector {
   IS_LAYOUT = false;
+  IS_SHAPE_AGNOSTIC = false;
 
   constructor() { }
 
@@ -44,11 +45,45 @@ ConstraintCollector.Shape = class Shape extends ConstraintCollector {
 
   constructor() {
     super();
-    this._shape = null;
+    this._shape = SHAPE_9x9;
+
+    this._setUp();
   }
 
-  reshape(shape) {
+  _setUp() {
+    const select = document.getElementById('shape-select');
+
+    for (let i = GridShape.MIN_SIZE; i <= GridShape.MAX_SIZE; i++) {
+      const name = GridShape.makeName(i);
+      const option = document.createElement('option');
+      option.textContent = name;
+      option.value = name;
+      select.appendChild(option);
+    }
+
+    select.value = this._shape.name;
+    select.onchange = () => {
+      const shapeName = select.value;
+      const shape = GridShape.get(shapeName);
+      if (!shape) throw ('Invalid shape: ' + shapeName);
+      this._reshape(shape);
+    };
+    this._select = select;
+  }
+
+  _reshape(shape) {
     this._shape = shape;
+    this.runUpdateCallback();
+  }
+
+  addConstraint(constraint) {
+    const shape = constraint.getShape(constraint);
+    this._select.value = shape.name;
+    this._reshape(shape);
+  }
+
+  getShape() {
+    return this._shape;
   }
 
   getConstraints() {
@@ -76,6 +111,8 @@ ConstraintCollector.Invisible = class Invisible extends ConstraintCollector {
 }
 
 ConstraintCollector._Checkbox = class _Checkbox extends ConstraintCollector {
+  IS_SHAPE_AGNOSTIC = true;
+
   constructor(display, containerId, constraintConfigs) {
     super();
 
@@ -977,59 +1014,6 @@ ConstraintCollector.Jigsaw = class Jigsaw extends ConstraintCollector {
   }
 }
 
-class ShapeManager {
-  constructor() {
-    this._shape = null;
-    this._reshapeListeners = [];
-
-    this._setUp();
-  }
-
-  _setUp() {
-    const select = document.getElementById('shape-select');
-
-    for (let i = GridShape.MIN_SIZE; i <= GridShape.MAX_SIZE; i++) {
-      const name = GridShape.makeName(i);
-      const option = document.createElement('option');
-      option.textContent = name;
-      option.value = name;
-      select.appendChild(option);
-    }
-
-    select.value = SHAPE_9x9.name;
-    select.onchange = () => { this.reloadShape(); };
-    this._select = select;
-  }
-
-  reshape(shape) {
-    if (this._shape === shape) return;
-
-    this._shape = shape;
-    for (const listener of this._reshapeListeners) {
-      listener.reshape(shape);
-    }
-  }
-
-  addReshapeListener(listener) {
-    this._reshapeListeners.push(listener);
-    return listener;
-  }
-
-  reloadShape() {
-    const shapeSelect = this._select;
-    const shapeName = shapeSelect.value;
-    const shape = GridShape.get(shapeName);
-    if (!shape) throw ('Invalid shape: ' + shapeName);
-    this.reshape(shape);
-  }
-
-  loadConstraintShape(constraint) {
-    const shape = constraint.getShape(constraint);
-    this._select.value = shape.name;
-    this.reshape(shape);
-  }
-}
-
 ConstraintCollector.OutsideClue = class OutsideClue extends ConstraintCollector {
   constructor(inputManager, display) {
     super();
@@ -1260,9 +1244,9 @@ ConstraintCollector.OutsideClue = class OutsideClue extends ConstraintCollector 
 class ConstraintManager {
   constructor(inputManager, displayContainer) {
     this._shape = null;
+    this._reshapeListeners = [];
+    this.setUpdateCallback();
 
-    this._shapeManager = new ShapeManager();
-    this.addReshapeListener(this);
     this.addReshapeListener(displayContainer);
     this.addReshapeListener(inputManager);
 
@@ -1271,21 +1255,33 @@ class ConstraintManager {
     this._constraintCollectors = new Map();
     this._setUp(inputManager, displayContainer);
 
-    this.setUpdateCallback();
+    // Initialize the shape.
+    const shapeCollector = this._constraintCollectors.get('Shape');
+    shapeCollector.setUpdateCallback(() => {
+      this._reshape(shapeCollector.getShape());
+      this.runUpdateCallback();
+    });
+    this._reshape(shapeCollector.getShape());
   }
 
-  reshape(shape) {
-    // Keep the checkbox constraints, since they are shape-agnostic.
-    const checkboxes = [
-      ...this._constraintCollectors.get('LayoutCheckbox').getConstraints(),
-      ...this._constraintCollectors.get('GlobalCheckbox').getConstraints()];
+  _reshape(shape) {
+    if (this._shape === shape) return;
+
+    const preservedConstraints = this._getShapeAgnosticConstraints();
 
     this.clear();
     this._shape = shape;
-    checkboxes.forEach(c => this.loadConstraint(c));
+    for (const listener of this._reshapeListeners) {
+      listener.reshape(shape);
+    }
+
+    this._loadConstraint(preservedConstraints);
   }
   addReshapeListener(listener) {
-    return this._shapeManager.addReshapeListener(listener);
+    this._reshapeListeners.push(listener);
+    // Ensure the listener is initialized with the current shape if it exists.
+    if (this._shape) listener.reshape(this._shape);
+    return listener;
   }
 
   setUpdateCallback(fn) {
@@ -1377,13 +1373,13 @@ class ConstraintManager {
     const constraint = SudokuParser.parseText(input);
 
     this.clear();
-    this._shapeManager.loadConstraintShape(constraint);
-    this.loadConstraint(constraint);
+    this._constraintCollectors.get('Shape').addConstraint(constraint);
+    this._loadConstraint(constraint);
 
     this.runUpdateCallback();
   }
 
-  loadConstraint(constraint) {
+  _loadConstraint(constraint) {
     switch (constraint.type) {
       case 'Givens':
         this._constraintCollectors.get('GivenCandidates').addConstraint(constraint);
@@ -1448,7 +1444,7 @@ class ConstraintManager {
         this._constraintCollectors.get('LayoutCheckbox').addConstraint(constraint);
         break;
       case 'Set':
-        constraint.constraints.forEach(c => this.loadConstraint(c));
+        constraint.constraints.forEach(c => this._loadConstraint(c));
         break;
       case 'Shape':
         // Nothing to do, but ensure it is not added to invisible constraints.
@@ -1479,6 +1475,16 @@ class ConstraintManager {
     return 1 == Math.abs(cell0.row - cell1.row) + Math.abs(cell0.col - cell1.col);
   }
 
+  _getShapeAgnosticConstraints() {
+    const constraints = [];
+    for (const collector of this._constraintCollectors.values()) {
+      if (collector.IS_SHAPE_AGNOSTIC) {
+        constraints.push(...collector.getConstraints());
+      }
+    }
+    return new SudokuConstraint.Set(constraints);
+  }
+
   getLayoutConstraints() {
     const constraints = [];
     for (const collector of this._constraintCollectors.values()) {
@@ -1490,8 +1496,6 @@ class ConstraintManager {
   }
 
   getConstraints() {
-    if (!this._shape) this._shapeManager.reloadShape();
-
     const constraints = [];
     for (const collector of this._constraintCollectors.values()) {
       constraints.push(...collector.getConstraints());
