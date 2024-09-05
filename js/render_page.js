@@ -28,6 +28,14 @@ class ConstraintCollector {
   clear() { }
 
   reshape(shape) { }
+
+  setUpdateCallback(fn) {
+    this._updateCallback = fn || (() => { });
+  }
+
+  runUpdateCallback() {
+    this._updateCallback();
+  }
 }
 
 ConstraintCollector.Shape = class Shape extends ConstraintCollector {
@@ -67,7 +75,7 @@ ConstraintCollector.Invisible = class Invisible extends ConstraintCollector {
 }
 
 ConstraintCollector.Checkbox = class Checkbox extends ConstraintCollector {
-  constructor(display, onChange) {
+  constructor(display) {
     super();
 
     const layoutConstraints = {
@@ -145,7 +153,7 @@ ConstraintCollector.Checkbox = class Checkbox extends ConstraintCollector {
         if (config.displayClass) {
           display.toggleItem(constraint, input.checked, config.displayClass);
         }
-        onChange();
+        this.runUpdateCallback();
       };
       div.appendChild(input);
 
@@ -224,13 +232,12 @@ ConstraintCollector.Checkbox = class Checkbox extends ConstraintCollector {
 }
 
 ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
-  constructor(display, panel, inputManager, onUpdate) {
+  constructor(display, panel, inputManager) {
     super();
     this._panelConfigs = [];
     this._display = display;
     this._constraintConfigs = this._makeMultiCellConstraintConfig();
     this._panel = panel;
-    this._onUpdate = onUpdate;
     this._shape = null;
 
     const selectionForm = document.forms['multi-cell-constraint-input'];
@@ -669,7 +676,7 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
     }
 
     inputManager.setSelection([]);
-    this._onUpdate();
+    this.runUpdateCallback();
   }
 
   _setUp(selectionForm, constraintConfigs) {
@@ -865,7 +872,7 @@ class ExampleHandler {
 }
 
 ConstraintCollector.Jigsaw = class Jigsaw extends ConstraintCollector {
-  constructor(display, inputManager, panel, onUpdate) {
+  constructor(display, inputManager, panel) {
     super();
     this._display = display;
     this._shape = null;
@@ -874,15 +881,15 @@ ConstraintCollector.Jigsaw = class Jigsaw extends ConstraintCollector {
     this._piecesMap = [];
     this._maxPieceId = 0;
 
-    this._setUpButton(inputManager, onUpdate);
+    this._setUpButton(inputManager);
   }
 
-  _setUpButton(inputManager, onUpdate) {
+  _setUpButton(inputManager) {
     const button = document.getElementById('add-jigsaw-button');
     button.onclick = () => {
       const cells = inputManager.getSelection();
       this._addPiece(cells);
-      onUpdate();
+      this.runUpdateCallback();
     };
 
     button.disabled = true;
@@ -1026,13 +1033,12 @@ class ShapeManager {
 }
 
 ConstraintCollector.OutsideClue = class OutsideClue extends ConstraintCollector {
-  constructor(inputManager, display, onChange) {
+  constructor(inputManager, display) {
     super();
     this._display = display;
     this._configs = this.constructor._constraintConfigs();
     display.configureOutsideClues(this._configs);
     this._setUp(inputManager);
-    this._onChange = onChange;
   }
 
   static _mapKey(type, lineId) {
@@ -1128,7 +1134,7 @@ ConstraintCollector.OutsideClue = class OutsideClue extends ConstraintCollector 
       this._display.removeOutsideClue(type, lineId);
       this._constraints.delete(this.constructor._mapKey(type, lineId));
       inputManager.setSelection([]);
-      this._onChange();
+      this.runUpdateCallback();
     };
     outsideArrowForm.onsubmit = e => {
       let formData = new FormData(outsideArrowForm);
@@ -1150,7 +1156,7 @@ ConstraintCollector.OutsideClue = class OutsideClue extends ConstraintCollector 
         value);
 
       inputManager.setSelection([]);
-      this._onChange();
+      this.runUpdateCallback();
       return false;
     };
     inputManager.addSelectionPreserver(outsideArrowForm);
@@ -1283,21 +1289,12 @@ class ConstraintManager {
   }
 
   setUpdateCallback(fn) {
-    this.updateCallback = fn || (() => { });
+    this._updateCallback = fn || (() => { });
   }
 
   runUpdateCallback() {
     this._exampleHandler.newConstraintLoaded();
-    this.updateCallback(this);
-  }
-
-  getShape() {
-    return this._shape;
-  }
-
-  _addConstraintCollector(collector) {
-    this._constraintCollectors.set(collector.constructor.name, collector);
-    this.addReshapeListener(collector);
+    this._updateCallback(this);
   }
 
   _setUp(inputManager, displayContainer) {
@@ -1306,37 +1303,30 @@ class ConstraintManager {
         document.getElementById('displayed-constraints'),
         this._display, displayContainer, this.runUpdateCallback.bind(this)));
 
-    // Shape constraint.
-    this._addConstraintCollector(new ConstraintCollector.Shape());
-
-    // Checkbox constraints.
-    this._addConstraintCollector(new ConstraintCollector.Checkbox(
-      this._display, this.runUpdateCallback.bind(this)));
-
-    // Jigsaw constraints
     const jigsawPanel = this.addReshapeListener(
       new ConstraintPanel(
         document.getElementById('displayed-regions'),
         this._display, displayContainer, this.runUpdateCallback.bind(this)));
-    this._addConstraintCollector(new ConstraintCollector.Jigsaw(
-      this._display, inputManager, jigsawPanel,
-      this.runUpdateCallback.bind(this)));
 
-    // Multi-cell constraints.
-    this._addConstraintCollector(new ConstraintCollector.MultiCell(
-      this._display, this._constraintPanel,
-      inputManager, this.runUpdateCallback.bind(this)));
+    const collectors = [
+      new ConstraintCollector.Shape(),
+      new ConstraintCollector.Checkbox(this._display),
+      new ConstraintCollector.Jigsaw(
+        this._display, inputManager, jigsawPanel),
+      new ConstraintCollector.MultiCell(
+        this._display, this._constraintPanel, inputManager),
+      new ConstraintCollector.CustomBinary(
+        inputManager, this._display, this._constraintPanel),
+      new ConstraintCollector.OutsideClue(inputManager, this._display),
+      new ConstraintCollector.GivenCandidates(inputManager, this._display),
+      new ConstraintCollector.Invisible(),
+    ];
 
-    // Other constraint collectors.
-    this._addConstraintCollector(new ConstraintCollector.CustomBinary(
-      inputManager, this._display,
-      this._constraintPanel,
-      this.runUpdateCallback.bind(this)));
-    this._addConstraintCollector(new ConstraintCollector.OutsideClue(
-      inputManager, this._display, this.runUpdateCallback.bind(this)));
-    this._addConstraintCollector(new ConstraintCollector.GivenCandidates(
-      inputManager, this._display, this.runUpdateCallback.bind(this)));
-    this._addConstraintCollector(new ConstraintCollector.Invisible());
+    for (const collector of collectors) {
+      this._constraintCollectors.set(collector.constructor.name, collector);
+      this.addReshapeListener(collector);
+      collector.setUpdateCallback(this.runUpdateCallback.bind(this));
+    }
 
     // Load examples.
     this._exampleHandler = new ExampleHandler(this);
@@ -1484,15 +1474,6 @@ class ConstraintManager {
     let cell0 = shape.parseCellId(cells[0]);
     let cell1 = shape.parseCellId(cells[1]);
     return 1 == Math.abs(cell0.row - cell1.row) + Math.abs(cell0.col - cell1.col);
-  }
-
-  static _cellsAreValidJigsawPiece(cells, shape) {
-    if (cells.length != shape.gridSize) return false;
-    // Check that we aren't overlapping an existing tile.
-    if (cells.some(c => this._piecesMap[shape.parseCellId(c).cell] != 0)) {
-      return false;
-    }
-    return true;
   }
 
   getLayoutConstraints() {
@@ -1781,12 +1762,11 @@ class Selection {
 }
 
 ConstraintCollector.GivenCandidates = class GivenCandidates extends ConstraintCollector {
-  constructor(inputManager, display, onChange) {
+  constructor(inputManager, display) {
     super();
     this._shape = null;
     this._givensMap = new Map();
     this._display = display;
-    this._onChange = onChange;
 
     inputManager.onNewDigit(this._inputDigit.bind(this));
     inputManager.onSetValue(this._replaceValue.bind(this));
@@ -1845,7 +1825,7 @@ ConstraintCollector.GivenCandidates = class GivenCandidates extends ConstraintCo
 
   _givensUpdated() {
     this._display.drawGivens(this._givensMap);
-    this._onChange();
+    this.runUpdateCallback();
   }
 
   getConstraints() {
@@ -2067,7 +2047,7 @@ class DropdownInputManager {
 }
 
 ConstraintCollector.CustomBinary = class CustomBinary extends ConstraintCollector {
-  constructor(inputManager, display, panel, onChange) {
+  constructor(inputManager, display, panel) {
     super();
 
     this._dropDownInputManager = new DropdownInputManager(
@@ -2076,7 +2056,6 @@ ConstraintCollector.CustomBinary = class CustomBinary extends ConstraintCollecto
     inputManager.onSelection(
       (selection) => this._dropDownInputManager.updateSelection(selection));
 
-    this._onChange = onChange;
     this._configs = new Map();
     this._shape = null;
     this._display = display;
@@ -2111,7 +2090,7 @@ ConstraintCollector.CustomBinary = class CustomBinary extends ConstraintCollecto
       }
 
       this._add(key, name, this._dropDownInputManager.currentSelection(), type);
-      this._onChange();
+      this.runUpdateCallback();
 
       return false;
     };
