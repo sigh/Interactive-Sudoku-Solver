@@ -14,6 +14,8 @@ const initPage = () => {
 };
 
 class ConstraintCollector {
+  IS_LAYOUT = false;
+
   constructor() { }
 
   addConstraint(constraint) {
@@ -23,7 +25,6 @@ class ConstraintCollector {
   getConstraints() {
     throw ('Not implemented');
   }
-  getLayoutConstraints() { return []; }
 
   clear() { }
 
@@ -39,6 +40,8 @@ class ConstraintCollector {
 }
 
 ConstraintCollector.Shape = class Shape extends ConstraintCollector {
+  IS_LAYOUT = true;
+
   constructor() {
     super();
     this._shape = null;
@@ -51,8 +54,6 @@ ConstraintCollector.Shape = class Shape extends ConstraintCollector {
   getConstraints() {
     return [new SudokuConstraint.Shape(this._shape.name)];
   }
-
-  getLayoutConstraints() { return this.getConstraints(); }
 }
 
 ConstraintCollector.Invisible = class Invisible extends ConstraintCollector {
@@ -74,76 +75,15 @@ ConstraintCollector.Invisible = class Invisible extends ConstraintCollector {
   }
 }
 
-ConstraintCollector.Checkbox = class Checkbox extends ConstraintCollector {
-  constructor(display) {
+ConstraintCollector._Checkbox = class _Checkbox extends ConstraintCollector {
+  constructor(display, containerId, constraintConfigs) {
     super();
 
-    const layoutConstraints = {
-      AntiKnight: {
-        text: 'Anti-Knight',
-        description: `Cells which are a knight's move away cannot have the same value.`,
-      },
-      AntiKing: {
-        text: 'Anti-King',
-        description: `Cells which are a king's move away cannot have the same value.`,
-      },
-      Diagonal: {
-        description: `Values along the diagonal must be unique.`,
-        value: {
-          options: [
-            { text: '╱', value: 1 },
-            { text: '╲', value: -1 },
-          ],
-        },
-        displayClass: ConstraintDisplays.Diagonal,
-      },
-      Windoku: {
-        description: `Values in the 3x3 windoku boxes must be uniques.`,
-        displayClass: ConstraintDisplays.Windoku,
-      },
-      DisjointSets: {
-        text: 'Disjoint Sets',
-        description: `No digit may appear in the same position in any two boxes.`,
-      },
-      NoBoxes: {
-        text: 'No Boxes',
-        description: `No standard 3x3 box sudoku constraints.`,
-        displayClass: ConstraintDisplays.DefaultRegionsInverted,
-      },
-    };
-    const globalConstraints = {
-      AntiConsecutive: {
-        text: 'Anti-Consecutive',
-        description: `No adjacent cells can have consecutive values.`,
-      },
-      StrictKropki: {
-        text: 'Strict Kropki',
-        description: `Only explicitly marked cell pairs satisfy Kropki (black/white dot) constraints.`,
-      },
-      StrictXV: {
-        text: 'Strict XV',
-        description: `Only explicitly marked cell pairs satisfy XV constraints.`,
-      },
-      GlobalEntropy: {
-        text: 'Global Entropy',
-        description: `Each 2x2 box in the grid has to contain a low digit (1, 2, 3), a middle digit (4, 5, 6) and a high digit (7, 8, 9).`,
-      },
-      AntiTaxicab: {
-        text: 'Anti-Taxicab',
-        description: `
-          A cell that contains a digit x can't have a taxicab distance of
-          exactly x from another cell with the digit x.
-          A taxicab distance from cell A to cell B is the minimum
-          possible distance from cell A to cell B when traversed only through
-          adjacent cells.`,
-      },
-    };
-
     this._checkboxes = new Map();
-    const initSingleCheckbox = (type, config, container, isLayout, option) => {
+    const initSingleCheckbox = (type, config, container, option) => {
       const constraint = new SudokuConstraint[type](...(option ? [option.value] : []));
       const name = constraint.toString();
-      const checkboxId = `checkbox-input-${this._checkboxes.size}`;
+      const checkboxId = `${containerId}-input-${this._checkboxes.size}`;
 
       const div = document.createElement('div');
       const input = document.createElement('input');
@@ -172,50 +112,30 @@ ConstraintCollector.Checkbox = class Checkbox extends ConstraintCollector {
       this._checkboxes.set(name, {
         element: input,
         constraint,
-        isLayout,
       });
     };
 
-    const initCheckboxes = (configs, container, isLayout) => {
-      for (const [type, config] of Object.entries(configs)) {
-        if (config?.value?.options) {
-          for (const option of config.value.options) {
-            initSingleCheckbox(type, config, container, isLayout, option);
-          }
-        } else {
-          initSingleCheckbox(type, config, container, isLayout, null);
+    const container = document.getElementById(containerId);
+    for (const [type, config] of Object.entries(constraintConfigs)) {
+      if (config?.value?.options) {
+        for (const option of config.value.options) {
+          initSingleCheckbox(type, config, container, option);
         }
+      } else {
+        initSingleCheckbox(type, config, container, null);
       }
-    };
-
-    initCheckboxes(
-      layoutConstraints,
-      document.getElementById('layout-constraint-checkboxes'),
-      true);
-    initCheckboxes(
-      globalConstraints,
-      document.getElementById('global-constraint-checkboxes'),
-      false);
+    }
   }
 
-  _getConstraints(layout) {
+  getConstraints() {
     let constraints = [];
     for (const item of this._checkboxes.values()) {
-      if (layout && !item.isLayout) continue;
 
       if (item.element.checked && !item.element.disabled) {
         constraints.push(item.constraint);
       }
     }
     return constraints;
-  }
-
-  getConstraints() {
-    return this._getConstraints(false);
-  }
-
-  getLayoutConstraints() {
-    return this._getConstraints(true);
   }
 
   addConstraint(c) {
@@ -228,6 +148,84 @@ ConstraintCollector.Checkbox = class Checkbox extends ConstraintCollector {
     for (const item of this._checkboxes.values()) {
       item.element.checked = false;
     }
+  }
+}
+
+ConstraintCollector.GlobalCheckbox = class GlobalCheckbox extends ConstraintCollector._Checkbox {
+  constructor(display) {
+    super(
+      display,
+      'global-constraint-checkboxes',
+      {
+        AntiConsecutive: {
+          text: 'Anti-Consecutive',
+          description: `No adjacent cells can have consecutive values.`,
+        },
+        StrictKropki: {
+          text: 'Strict Kropki',
+          description: `Only explicitly marked cell pairs satisfy Kropki (black/white dot) constraints.`,
+        },
+        StrictXV: {
+          text: 'Strict XV',
+          description: `Only explicitly marked cell pairs satisfy XV constraints.`,
+        },
+        GlobalEntropy: {
+          text: 'Global Entropy',
+          description: `Each 2x2 box in the grid has to contain a low digit (1, 2, 3), a middle digit (4, 5, 6) and a high digit (7, 8, 9).`,
+        },
+        AntiTaxicab: {
+          text: 'Anti-Taxicab',
+          description: `
+          A cell that contains a digit x can't have a taxicab distance of
+          exactly x from another cell with the digit x.
+          A taxicab distance from cell A to cell B is the minimum
+          possible distance from cell A to cell B when traversed only through
+          adjacent cells.`,
+        },
+      });
+  }
+}
+
+ConstraintCollector.LayoutCheckbox = class LayoutCheckbox extends ConstraintCollector._Checkbox {
+  IS_LAYOUT = true;
+
+  constructor(display) {
+    super(
+      display,
+      'layout-constraint-checkboxes',
+      {
+        AntiKnight: {
+          text: 'Anti-Knight',
+          description: `Cells which are a knight's move away cannot have the same value.`,
+        },
+        AntiKing: {
+          text: 'Anti-King',
+          description: `Cells which are a king's move away cannot have the same value.`,
+        },
+        Diagonal: {
+          description: `Values along the diagonal must be unique.`,
+          value: {
+            options: [
+              { text: '╱', value: 1 },
+              { text: '╲', value: -1 },
+            ],
+          },
+          displayClass: ConstraintDisplays.Diagonal,
+        },
+        Windoku: {
+          description: `Values in the 3x3 windoku boxes must be uniques.`,
+          displayClass: ConstraintDisplays.Windoku,
+        },
+        DisjointSets: {
+          text: 'Disjoint Sets',
+          description: `No digit may appear in the same position in any two boxes.`,
+        },
+        NoBoxes: {
+          text: 'No Boxes',
+          description: `No standard 3x3 box sudoku constraints.`,
+          displayClass: ConstraintDisplays.DefaultRegionsInverted,
+        },
+      });
   }
 }
 
@@ -872,6 +870,8 @@ class ExampleHandler {
 }
 
 ConstraintCollector.Jigsaw = class Jigsaw extends ConstraintCollector {
+  IS_LAYOUT = true;
+
   constructor(display, inputManager, panel) {
     super();
     this._display = display;
@@ -925,8 +925,6 @@ ConstraintCollector.Jigsaw = class Jigsaw extends ConstraintCollector {
     });
     return [new SudokuConstraint.Jigsaw(grid.join(''))];
   }
-
-  getLayoutConstraints() { return this.getConstraints(); }
 
   addConstraint(constraint) {
     const grid = constraint.grid;
@@ -1278,7 +1276,9 @@ class ConstraintManager {
 
   reshape(shape) {
     // Keep the checkbox constraints, since they are shape-agnostic.
-    const checkboxes = this._constraintCollectors.get('Checkbox').getConstraints();
+    const checkboxes = [
+      ...this._constraintCollectors.get('LayoutCheckbox').getConstraints(),
+      ...this._constraintCollectors.get('GlobalCheckbox').getConstraints()];
 
     this.clear();
     this._shape = shape;
@@ -1310,7 +1310,8 @@ class ConstraintManager {
 
     const collectors = [
       new ConstraintCollector.Shape(),
-      new ConstraintCollector.Checkbox(this._display),
+      new ConstraintCollector.GlobalCheckbox(this._display),
+      new ConstraintCollector.LayoutCheckbox(this._display),
       new ConstraintCollector.Jigsaw(
         this._display, inputManager, jigsawPanel),
       new ConstraintCollector.MultiCell(
@@ -1431,18 +1432,20 @@ class ConstraintManager {
       case 'FullRank':
         this._constraintCollectors.get('OutsideClue').addConstraint(constraint);
         break;
-      case 'AntiKnight':
-      case 'AntiKing':
       case 'AntiConsecutive':
       case 'StrictKropki':
       case 'StrictXV':
-      case 'DisjointSets':
       case 'GlobalEntropy':
+      case 'AntiTaxicab':
+        this._constraintCollectors.get('GlobalCheckbox').addConstraint(constraint);
+        break;
+      case 'AntiKnight':
+      case 'AntiKing':
+      case 'DisjointSets':
       case 'NoBoxes':
       case 'Windoku':
       case 'Diagonal':
-      case 'AntiTaxicab':
-        this._constraintCollectors.get('Checkbox').addConstraint(constraint);
+        this._constraintCollectors.get('LayoutCheckbox').addConstraint(constraint);
         break;
       case 'Set':
         constraint.constraints.forEach(c => this.loadConstraint(c));
@@ -1479,7 +1482,9 @@ class ConstraintManager {
   getLayoutConstraints() {
     const constraints = [];
     for (const collector of this._constraintCollectors.values()) {
-      constraints.push(...collector.getLayoutConstraints());
+      if (collector.IS_LAYOUT) {
+        constraints.push(...collector.getConstraints());
+      }
     }
     return new SudokuConstraint.Set(constraints);
   }
