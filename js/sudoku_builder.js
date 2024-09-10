@@ -469,6 +469,7 @@ class CellArgs {
 
 class SudokuConstraintBase {
   static LOOPS_ALLOWED = false;
+  static COLLECTOR_CLASS = 'Invisible';
 
   constructor(args) {
     this.args = args ? [...args] : [];
@@ -587,6 +588,8 @@ class SudokuConstraint {
   }
 
   static Jigsaw = class Jigsaw extends SudokuConstraintBase {
+    static COLLECTOR_CLASS = 'Jigsaw';
+
     constructor(grid) {
       super(arguments);
       this.grid = grid;
@@ -605,6 +608,8 @@ class SudokuConstraint {
   }
 
   static Thermo = class Thermo extends SudokuConstraintBase {
+    static COLLECTOR_CLASS = 'MultiCell';
+
     constructor(...cells) {
       super(arguments);
       this.cells = cells;
@@ -616,6 +621,8 @@ class SudokuConstraint {
   }
 
   static Whisper = class Whisper extends SudokuConstraintBase {
+    static COLLECTOR_CLASS = 'MultiCell';
+
     constructor(difference, ...cells) {
       // German whisper lines omit the difference, so the
       // first argument is actually a cell
@@ -636,6 +643,8 @@ class SudokuConstraint {
   }
 
   static Renban = class Renban extends SudokuConstraintBase {
+    static COLLECTOR_CLASS = 'MultiCell';
+
     constructor(...cells) {
       super(arguments);
       this.cells = cells;
@@ -649,6 +658,8 @@ class SudokuConstraint {
   }
 
   static Modular = class Modular extends SudokuConstraintBase {
+    static COLLECTOR_CLASS = 'MultiCell';
+
     constructor(mod, ...cells) {
       super(arguments);
       this.cells = cells;
@@ -663,6 +674,8 @@ class SudokuConstraint {
   }
 
   static Entropic = class Entropic extends SudokuConstraintBase {
+    static COLLECTOR_CLASS = 'MultiCell';
+
     constructor(...cells) {
       super(arguments);
       this.cells = cells;
@@ -676,6 +689,8 @@ class SudokuConstraint {
   }
 
   static RegionSumLine = class RegionSumLine extends SudokuConstraintBase {
+    static COLLECTOR_CLASS = 'MultiCell';
+
     constructor(...cells) {
       super(arguments);
       this.cells = cells;
@@ -683,6 +698,8 @@ class SudokuConstraint {
   }
 
   static Between = class Between extends SudokuConstraintBase {
+    static COLLECTOR_CLASS = 'MultiCell';
+
     constructor(...cells) {
       super(arguments);
       this.cells = cells;
@@ -690,6 +707,8 @@ class SudokuConstraint {
   }
 
   static Lockout = class Lockout extends SudokuConstraintBase {
+    static COLLECTOR_CLASS = 'MultiCell';
+
     constructor(minDiff, ...cells) {
       super(arguments);
       this.cells = cells;
@@ -698,6 +717,8 @@ class SudokuConstraint {
   }
 
   static Palindrome = class Palindrome extends SudokuConstraintBase {
+    static COLLECTOR_CLASS = 'MultiCell';
+
     constructor(...cells) {
       super(arguments);
       this.cells = cells;
@@ -709,6 +730,8 @@ class SudokuConstraint {
   }
 
   static Zipper = class Zipper extends SudokuConstraintBase {
+    static COLLECTOR_CLASS = 'MultiCell';
+
     constructor(...cells) {
       super(arguments);
       this.cells = cells;
@@ -716,6 +739,8 @@ class SudokuConstraint {
   }
 
   static SumLine = class SumLine extends SudokuConstraintBase {
+    static COLLECTOR_CLASS = 'MultiCell';
+
     static LOOPS_ALLOWED = true;
 
     constructor(sum, ...cells) {
@@ -725,8 +750,13 @@ class SudokuConstraint {
     }
   }
 
-  static NoBoxes = class NoBoxes extends SudokuConstraintBase { }
+  static NoBoxes = class NoBoxes extends SudokuConstraintBase {
+    static COLLECTOR_CLASS = 'LayoutCheckbox';
+  }
+
   static StrictKropki = class StrictKropki extends SudokuConstraintBase {
+    static COLLECTOR_CLASS = 'GlobalCheckbox';
+
     static fnKey = memoize((numValues) =>
       SudokuConstraint.Binary.fnToKey(
         (a, b) => a != b * 2 && b != a * 2 && b != a - 1 && b != a + 1,
@@ -734,6 +764,8 @@ class SudokuConstraint {
     );
   }
   static StrictXV = class StrictXV extends SudokuConstraintBase {
+    static COLLECTOR_CLASS = 'GlobalCheckbox';
+
     static fnKey = memoize((numValues) =>
       SudokuConstraint.Binary.fnToKey(
         (a, b) => a + b != 5 && a + b != 10,
@@ -741,6 +773,8 @@ class SudokuConstraint {
     );
   }
   static Shape = class Shape extends SudokuConstraintBase {
+    static COLLECTOR_CLASS = 'Shape';
+
     constructor(gridSpec) {
       super(arguments);
       this.gridSpec = gridSpec;
@@ -758,6 +792,8 @@ class SudokuConstraint {
   }
 
   static Windoku = class Windoku extends SudokuConstraintBase {
+    static COLLECTOR_CLASS = 'LayoutCheckbox';
+
     static regions = memoize((shape) => {
       const gridSize = shape.gridSize;
       const boxWidth = shape.boxWidth;
@@ -781,13 +817,21 @@ class SudokuConstraint {
     });
   }
 
-  static DisjointSets = class DisjointSets extends SudokuConstraintBase { }
+  static DisjointSets = class DisjointSets extends SudokuConstraintBase {
+    static COLLECTOR_CLASS = 'LayoutCheckbox';
+  }
 
-  static AntiKnight = class AntiKnight extends SudokuConstraintBase { }
+  static AntiKnight = class AntiKnight extends SudokuConstraintBase {
+    static COLLECTOR_CLASS = 'LayoutCheckbox';
+  }
 
-  static AntiKing = class AntiKing extends SudokuConstraintBase { }
+  static AntiKing = class AntiKing extends SudokuConstraintBase {
+    static COLLECTOR_CLASS = 'LayoutCheckbox';
+  }
 
   static AntiTaxicab = class AntiTaxicab extends SudokuConstraintBase {
+    static COLLECTOR_CLASS = 'GlobalCheckbox';
+
     static taxicabCells(row, col, dist, shape) {
       const cells = [];
       const gridSize = shape.gridSize;
@@ -810,6 +854,8 @@ class SudokuConstraint {
   }
 
   static AntiConsecutive = class AntiConsecutive extends SudokuConstraintBase {
+    static COLLECTOR_CLASS = 'GlobalCheckbox';
+
     static fnKey = memoize((numValues) =>
       SudokuConstraint.Binary.fnToKey(
         (a, b) => (a != b + 1 && a != b - 1 && a != b),
@@ -818,6 +864,8 @@ class SudokuConstraint {
   }
 
   static GlobalEntropy = class GlobalEntropy extends SudokuConstraintBase {
+    static COLLECTOR_CLASS = 'GlobalCheckbox';
+
     static regions = memoize((shape) => {
       const gridSize = shape.gridSize;
       const regions = [];
@@ -838,6 +886,8 @@ class SudokuConstraint {
   }
 
   static Diagonal = class Diagonal extends SudokuConstraintBase {
+    static COLLECTOR_CLASS = 'LayoutCheckbox';
+
     constructor(direction) {
       super(arguments);
       this.direction = direction;
@@ -845,6 +895,8 @@ class SudokuConstraint {
   }
 
   static WhiteDot = class WhiteDot extends SudokuConstraintBase {
+    static COLLECTOR_CLASS = 'MultiCell';
+
     constructor(...cells) {
       super(arguments);
       this.cells = cells;
@@ -858,6 +910,8 @@ class SudokuConstraint {
   }
 
   static BlackDot = class BlackDot extends SudokuConstraintBase {
+    static COLLECTOR_CLASS = 'MultiCell';
+
     constructor(...cells) {
       super(arguments);
       this.cells = cells;
@@ -871,6 +925,8 @@ class SudokuConstraint {
   }
 
   static X = class X extends SudokuConstraintBase {
+    static COLLECTOR_CLASS = 'MultiCell';
+
     constructor(...cells) {
       super(arguments);
       this.cells = cells;
@@ -878,6 +934,8 @@ class SudokuConstraint {
   }
 
   static V = class V extends SudokuConstraintBase {
+    static COLLECTOR_CLASS = 'MultiCell';
+
     constructor(...cells) {
       super(arguments);
       this.cells = cells;
@@ -885,6 +943,8 @@ class SudokuConstraint {
   }
 
   static Arrow = class Arrow extends SudokuConstraintBase {
+    static COLLECTOR_CLASS = 'MultiCell';
+
     constructor(...cells) {
       super(arguments);
       this.cells = cells;
@@ -892,6 +952,8 @@ class SudokuConstraint {
   }
 
   static DoubleArrow = class DoubleArrow extends SudokuConstraintBase {
+    static COLLECTOR_CLASS = 'MultiCell';
+
     constructor(...cells) {
       super(arguments);
       this.cells = cells;
@@ -899,6 +961,8 @@ class SudokuConstraint {
   }
 
   static PillArrow = class PillArrow extends SudokuConstraintBase {
+    static COLLECTOR_CLASS = 'MultiCell';
+
     constructor(pillSize, ...cells) {
       super(arguments);
       this.pillSize = +pillSize;
@@ -912,6 +976,8 @@ class SudokuConstraint {
   }
 
   static Cage = class Cage extends SudokuConstraintBase {
+    static COLLECTOR_CLASS = 'MultiCell';
+
     constructor(sum, ...cells) {
       super(arguments);
       this.cells = cells;
@@ -920,6 +986,8 @@ class SudokuConstraint {
   }
 
   static Sum = class Sum extends SudokuConstraintBase {
+    static COLLECTOR_CLASS = 'MultiCell';
+
     constructor(sum, ...cells) {
       super(arguments);
       this.cells = cells;
@@ -928,6 +996,8 @@ class SudokuConstraint {
   }
 
   static LittleKiller = class LittleKiller extends SudokuConstraintBase {
+    static COLLECTOR_CLASS = 'OutsideClue';
+
     constructor(sum, id) {
       super(arguments);
       this.id = id;
@@ -961,6 +1031,8 @@ class SudokuConstraint {
   }
 
   static XSum = class XSum extends SudokuConstraintBase {
+    static COLLECTOR_CLASS = 'OutsideClue';
+
     constructor(rowCol, sumInc, sumDec) {
       super(arguments);
       this.rowCol = rowCol.toUpperCase();
@@ -974,6 +1046,8 @@ class SudokuConstraint {
   }
 
   static Sandwich = class Sandwich extends SudokuConstraintBase {
+    static COLLECTOR_CLASS = 'OutsideClue';
+
     constructor(sum, id) {
       super(arguments);
       this.id = id;
@@ -982,6 +1056,8 @@ class SudokuConstraint {
   }
 
   static Lunchbox = class Lunchbox extends SudokuConstraintBase {
+    static COLLECTOR_CLASS = 'MultiCell';
+
     constructor(sum, ...cells) {
       super(arguments);
       this.cells = cells;
@@ -990,6 +1066,8 @@ class SudokuConstraint {
   }
 
   static Skyscraper = class Skyscraper extends SudokuConstraintBase {
+    static COLLECTOR_CLASS = 'OutsideClue';
+
     constructor(rowCol, countInc, countDec) {
       super(arguments);
       this.rowCol = rowCol.toUpperCase();
@@ -1003,6 +1081,8 @@ class SudokuConstraint {
   }
 
   static HiddenSkyscraper = class HiddenSkyscraper extends SudokuConstraintBase {
+    static COLLECTOR_CLASS = 'OutsideClue';
+
     constructor(rowCol, valueInc, valueDec) {
       super(arguments);
       this.rowCol = rowCol.toUpperCase();
@@ -1016,6 +1096,8 @@ class SudokuConstraint {
   }
 
   static NumberedRoom = class NumberedRoom extends SudokuConstraintBase {
+    static COLLECTOR_CLASS = 'OutsideClue';
+
     constructor(rowCol, clueInc, clueDec) {
       super(arguments);
       this.rowCol = rowCol.toUpperCase();
@@ -1029,6 +1111,8 @@ class SudokuConstraint {
   }
 
   static FullRank = class FullRank extends SudokuConstraintBase {
+    static COLLECTOR_CLASS = 'OutsideClue';
+
     constructor(rowCol, rankInc, rankDec) {
       super(arguments);
       this.rowCol = rowCol.toUpperCase();
@@ -1049,6 +1133,8 @@ class SudokuConstraint {
   }
 
   static ContainAtLeast = class ContainAtLeast extends SudokuConstraintBase {
+    static COLLECTOR_CLASS = 'MultiCell';
+
     constructor(values, ...cells) {
       super(arguments);
       this.cells = cells;
@@ -1057,9 +1143,13 @@ class SudokuConstraint {
     }
   }
 
-  static ContainExact = class ContainExact extends SudokuConstraint.ContainAtLeast { };
+  static ContainExact = class ContainExact extends SudokuConstraint.ContainAtLeast {
+    static COLLECTOR_CLASS = 'MultiCell';
+  };
 
   static Quad = class Quad extends SudokuConstraintBase {
+    static COLLECTOR_CLASS = 'MultiCell';
+
     constructor(topLeftCell, ...values) {
       super(arguments);
       this.topLeftCell = topLeftCell;
@@ -1080,6 +1170,8 @@ class SudokuConstraint {
   }
 
   static Binary = class Binary extends SudokuConstraintBase {
+    static COLLECTOR_CLASS = 'CustomBinary';
+
     constructor(key, ...items) {
       super(arguments);
       this.key = key;
@@ -1178,6 +1270,8 @@ class SudokuConstraint {
   }
 
   static BinaryX = class BinaryX extends SudokuConstraint.Binary {
+    static COLLECTOR_CLASS = 'CustomBinary';
+
     static fnToKey(fn, numValues) {
       // Make the function symmetric.
       return super.fnToKey(
@@ -1187,6 +1281,8 @@ class SudokuConstraint {
   }
 
   static Indexing = class Indexing extends SudokuConstraintBase {
+    static COLLECTOR_CLASS = 'MultiCell';
+
     static ROW_INDEXING = 'R';
     static COL_INDEXING = 'C';
 
@@ -1203,6 +1299,8 @@ class SudokuConstraint {
   }
 
   static CountingCircles = class CountingCircles extends SudokuConstraintBase {
+    static COLLECTOR_CLASS = 'MultiCell';
+
     constructor(...cells) {
       super(arguments);
       this.cells = cells;
@@ -1210,6 +1308,8 @@ class SudokuConstraint {
   }
 
   static Givens = class Givens extends SudokuConstraintBase {
+    static COLLECTOR_CLASS = 'GivenCandidates';
+
     constructor(...values) {
       super(arguments);
       this.values = values;

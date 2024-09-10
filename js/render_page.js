@@ -1276,7 +1276,10 @@ class ConstraintManager {
     }
 
     this._loadConstraint(preservedConstraints);
+
+    this.runUpdateCallback();
   }
+
   addReshapeListener(listener) {
     this._reshapeListeners.push(listener);
     // Ensure the listener is initialized with the current shape if it exists.
@@ -1381,68 +1384,6 @@ class ConstraintManager {
 
   _loadConstraint(constraint) {
     switch (constraint.type) {
-      case 'Givens':
-        this._constraintCollectors.get('GivenCandidates').addConstraint(constraint);
-        break;
-      case 'X':
-      case 'V':
-      case 'BlackDot':
-      case 'WhiteDot':
-      case 'Arrow':
-      case 'DoubleArrow':
-      case 'Renban':
-      case 'Whisper':
-      case 'Modular':
-      case 'Entropic':
-      case 'Palindrome':
-      case 'Zipper':
-      case 'SumLine':
-      case 'Between':
-      case 'Lockout':
-      case 'RegionSumLine':
-      case 'PillArrow':
-      case 'Thermo':
-      case 'Cage':
-      case 'Sum':
-      case 'Lunchbox':
-      case 'CountingCircles':
-      case 'ContainAtLeast':
-      case 'ContainExact':
-      case 'Indexing':
-      case 'Quad':
-        this._constraintCollectors.get('MultiCell').addConstraint(constraint);
-        break;
-      case 'Jigsaw':
-        this._constraintCollectors.get('Jigsaw').addConstraint(constraint);
-        break;
-      case 'Binary':
-      case 'BinaryX':
-        this._constraintCollectors.get('CustomBinary').addConstraint(constraint);
-        break;
-      case 'LittleKiller':
-      case 'Sandwich':
-      case 'XSum':
-      case 'Skyscraper':
-      case 'HiddenSkyscraper':
-      case 'NumberedRoom':
-      case 'FullRank':
-        this._constraintCollectors.get('OutsideClue').addConstraint(constraint);
-        break;
-      case 'AntiConsecutive':
-      case 'StrictKropki':
-      case 'StrictXV':
-      case 'GlobalEntropy':
-      case 'AntiTaxicab':
-        this._constraintCollectors.get('GlobalCheckbox').addConstraint(constraint);
-        break;
-      case 'AntiKnight':
-      case 'AntiKing':
-      case 'DisjointSets':
-      case 'NoBoxes':
-      case 'Windoku':
-      case 'Diagonal':
-        this._constraintCollectors.get('LayoutCheckbox').addConstraint(constraint);
-        break;
       case 'Set':
         constraint.constraints.forEach(c => this._loadConstraint(c));
         break;
@@ -1450,10 +1391,12 @@ class ConstraintManager {
         // Nothing to do, but ensure it is not added to invisible constraints.
         break;
       default:
-        this._constraintCollectors.get('Invisible').addConstraint(constraint);
+        {
+          const collectorClass = constraint.constructor.COLLECTOR_CLASS;
+          this._constraintCollectors.get(collectorClass).addConstraint(constraint);
+        }
         break;
     }
-    this.runUpdateCallback();
   }
 
   static _cellsAre2x2Square(cells, shape) {
