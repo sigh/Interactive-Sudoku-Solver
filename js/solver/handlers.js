@@ -92,7 +92,7 @@ SudokuConstraintHandler.False = class False extends SudokuConstraintHandler {
 
 SudokuConstraintHandler.And = class And extends SudokuConstraintHandler {
   constructor(...handlers) {
-    const cells = Array.from(new Set(handlers.flatMap(h => h.cells)));
+    const cells = Array.from(new Set(handlers.flatMap(h => [...h.cells])));
     super(cells);
 
     this._handlers = handlers;
