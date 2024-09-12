@@ -430,7 +430,12 @@ class SudokuParser {
   static extractConstraintTypes(str) {
     const types = str.matchAll(/[.]([^.~]+)/g);
     const uniqueTypes = new Set();
-    for (const type of types) uniqueTypes.add(type[1]);
+    for (const type of types) {
+      const value = type[1].trim();
+      if (SudokuConstraint[value]) {
+        uniqueTypes.add(value);
+      }
+    }
     return [...uniqueTypes];
   }
 }
