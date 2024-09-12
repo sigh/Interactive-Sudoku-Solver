@@ -270,6 +270,7 @@ const runSolveTests = async (onFailure) => {
     'Anti-taxicab',
     'Full rank - 6 clue snipe',
     'Irregular region sum line',
+    'Numbered Rooms vs X-Sums',
   ], onFailure);
   result.collection = '9x9';
   results.push(result);
