@@ -92,21 +92,33 @@ ConstraintCollector.Shape = class Shape extends ConstraintCollector {
 }
 
 ConstraintCollector.Invisible = class Invisible extends ConstraintCollector {
-  constructor() {
+  constructor(panel) {
     super();
-    this._constraints = [];
+    this._panel = panel;
+    this._panelConfigs = [];
   }
 
   clear() {
-    this._constraints = [];
+    this._panelConfigs = [];
+  }
+
+  _removeConstraint(config) {
+    arrayRemoveValue(this._panelConfigs, config);
   }
 
   addConstraint(constraint) {
-    this._constraints.push(constraint);
+    const config = {
+      cells: [],
+      name: constraint.toString().replace(/[.]/g, ' '),
+      constraint: constraint,
+      removeFn: () => { this._removeConstraint(config); },
+    };
+    this._panelConfigs.push(config);
+    this._panel.addItem(config);
   }
 
   getConstraints() {
-    return this._constraints;
+    return this._panelConfigs.map(c => c.constraint);
   }
 }
 
@@ -1324,7 +1336,7 @@ class ConstraintManager {
         inputManager, this._display, this._constraintPanel),
       new ConstraintCollector.OutsideClue(inputManager, this._display),
       new ConstraintCollector.GivenCandidates(inputManager, this._display),
-      new ConstraintCollector.Invisible(),
+      new ConstraintCollector.Invisible(this._constraintPanel),
     ];
 
     for (const collector of collectors) {
@@ -1502,7 +1514,9 @@ class ConstraintPanel {
     panelButton.innerHTML = '&#x00D7;';
     panelItem.appendChild(panelButton);
 
-    panelItem.append(this._makePanelIcon(config));
+    if (config.displayElem) {
+      panelItem.append(this._makePanelIcon(config.displayElem));
+    }
 
     let panelLabel = document.createElement('span');
     panelLabel.innerHTML = config.name;
@@ -1527,7 +1541,7 @@ class ConstraintPanel {
 
   _PANEL_ICON_SIZE_PX = 28;
 
-  _makePanelIcon(config) {
+  _makePanelIcon(displayElem) {
     const svg = createSvgElement('svg');
 
     const borders = createSvgElement('g');
@@ -1544,7 +1558,7 @@ class ConstraintPanel {
     borders.setAttribute('transform', transform);
     borders.setAttribute('stoke-width', 0);
 
-    const elem = config.displayElem.cloneNode(true);
+    const elem = displayElem.cloneNode(true);
     elem.setAttribute('transform', transform);
     elem.setAttribute('stroke-width', 15);
     elem.setAttribute('opacity', 1);

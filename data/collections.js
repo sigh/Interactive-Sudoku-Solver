@@ -624,6 +624,12 @@ const EXAMPLES = [
     `,
     solution: '973645281426198753158723694761489325234567819895231476582314967319876542647952138',
   },
+  {
+    name: 'Numbered Rooms vs X-Sums',
+    src: 'https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?id=0009YA',
+    input: '.~R2C2_8~R1C3_3~R1C5_2~R1C7_4~R4C9_2~R7C3_2~R8C7_9~R8C4_6.Or.NumberedRoom~R2~8~.XSum~R2~8~.End.Or.NumberedRoom~R3~8~.XSum~R3~8~.End.Or.NumberedRoom~R4~~8.XSum~R4~~8.End.Or.NumberedRoom~R4~5~.XSum~R4~5~.End.Or.NumberedRoom~R5~~8.XSum~R5~~8.End.Or.NumberedRoom~R5~2~.XSum~R5~2~.End.Or.NumberedRoom~R8~~1.XSum~R8~~1.End.Or.NumberedRoom~R8~8~.XSum~R8~8~.End.Or.NumberedRoom~C2~~8.XSum~C2~~8.End.Or.NumberedRoom~C4~~5.XSum~C4~~5.End.Or.NumberedRoom~C7~~8.XSum~C7~~8.End.Or.NumberedRoom~C7~8~.XSum~C7~8~.End.Or.NumberedRoom~C9~~7.XSum~C9~~7.End.Or.NumberedRoom~R6~~8.XSum~R6~~8.End.Or.NumberedRoom~C6~8~.XSum~C6~8~.End.Or.NumberedRoom~C5~6~.XSum~C5~6~.End.Or.NumberedRoom~C3~8~.XSum~C3~8~.End',
+    solution: '753826419281947356964531278375194862498265137126378594612459783547683921839712645',
+  },
 ];
 
 for (const puzzle of EXAMPLES) {
