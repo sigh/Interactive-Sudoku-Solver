@@ -1721,8 +1721,7 @@ ConstraintCollector.GivenCandidates = class GivenCandidates extends ConstraintCo
     this._display = display;
 
     inputManager.onNewDigit(this._inputDigit.bind(this));
-    inputManager.onSetValue(this._replaceValue.bind(this));
-    inputManager.onSetValuesMultiCell(this._replaceValuesMultiCell.bind(this));
+    inputManager.onSetValues(this._setValues.bind(this));
     inputManager.setGivenLookup((cell) => this._givensMap.get(cell));
   }
 
@@ -1741,22 +1740,17 @@ ConstraintCollector.GivenCandidates = class GivenCandidates extends ConstraintCo
       if (newValue > numValues) newValue = digit;
     }
 
-    this._replaceValue(cell, newValue);
+    this._setValues([cell], [newValue]);
   }
 
-  _replaceValuesMultiCell(cells, values) {
+  _setValues(cells, values) {
     for (const cell of cells) {
-      this._replaceValuesNoUpdate(cell, values);
+      this._setValuesNoUpdate(cell, values);
     }
     this._givensUpdated();
   }
 
-  _replaceValue(cell, value) {
-    this._replaceValuesNoUpdate(cell, [value]);
-    this._givensUpdated();
-  }
-
-  _replaceValuesNoUpdate(cell, values) {
+  _setValuesNoUpdate(cell, values) {
     const numValues = this._shape.numValues;
     values = values.filter(v => v && v > 0 && v <= numValues);
     if (values && values.length) {
@@ -1770,7 +1764,7 @@ ConstraintCollector.GivenCandidates = class GivenCandidates extends ConstraintCo
     const valueIds = constraint.values;
     for (const valueId of valueIds) {
       const parsed = this._shape.parseValueId(valueId);
-      this._replaceValuesNoUpdate(parsed.cellId, parsed.values);
+      this._setValuesNoUpdate(parsed.cellId, parsed.values);
     }
     this._givensUpdated();
   }
@@ -1808,8 +1802,7 @@ class GridInputManager {
 
     this._callbacks = {
       onNewDigit: [],
-      onSetValue: [],
-      onSetValuesMultiCell: [],
+      onSetValues: [],
       onSelection: [],
     };
     // fake-input is an invisible text input which is used to ensure that
@@ -1836,7 +1829,7 @@ class GridInputManager {
     this._multiValueInputManager = new MultiValueInputManager(
       this,
       (...args) => {
-        this._runCallbacks(this._callbacks.onSetValuesMultiCell, ...args)
+        this._runCallbacks(this._callbacks.onSetValues, ...args)
       });
   }
 
@@ -1846,8 +1839,7 @@ class GridInputManager {
   }
 
   onNewDigit(fn) { this._callbacks.onNewDigit.push(fn); }
-  onSetValue(fn) { this._callbacks.onSetValue.push(fn); }
-  onSetValuesMultiCell(fn) { this._callbacks.onSetValuesMultiCell.push(fn); }
+  onSetValues(fn) { this._callbacks.onSetValues.push(fn); }
   onSelection(fn) { this._callbacks.onSelection.push(fn); }
 
   setGivenLookup(fn) { this._multiValueInputManager.setGivenLookup(fn); }
@@ -1880,7 +1872,7 @@ class GridInputManager {
       if (!cell) return;
 
       if (value == '') {
-        this._runCallbacks(this._callbacks.onSetValue, cell, null);
+        this._runCallbacks(this._callbacks.onSetValues, [cell], []);
         return;
       }
 
@@ -1939,15 +1931,14 @@ class GridInputManager {
         document.activeElement.tagName === 'INPUT') return;
       if (this._selection.size() == 0) return;
       switch (event.key) {
-        case 'c':
-          for (const cell of this._selection.getCells()) {
-            this._runCallbacks(this._callbacks.onSetValue, cell, null);
-          }
+        case 'Backspace':
+          this._runCallbacks(
+            this._callbacks.onSetValues, this._selection.getCells(), []);
           break;
         case 'f':
           let i = 1;
           for (const cell of this._selection.getCells()) {
-            this._runCallbacks(this._callbacks.onSetValue, cell, i++);
+            this._runCallbacks(this._callbacks.onSetValues, [cell], [i++]);
           }
           break;
       }
@@ -1956,9 +1947,10 @@ class GridInputManager {
 }
 
 class DropdownInputManager {
-  constructor(inputManager, containerId) {
+  constructor(inputManager, containerId, onDropdownOpen) {
     this._containerElem = document.getElementById(containerId);
     this._dropdownElem = this._containerElem.getElementsByClassName('dropdown-container')[0];
+    this._onDropdownOpen = onDropdownOpen;
 
     this._setUpDropdownInputManager(inputManager);
   }
@@ -1985,6 +1977,7 @@ class DropdownInputManager {
         this._dropdownElem.classList.add('disabled');
       } else {
         this._dropdownElem.classList.remove('disabled');
+        this._onDropdownOpen(this._currentSelection);
       }
     }, 100);
   };
@@ -2003,7 +1996,8 @@ ConstraintCollector.CustomBinary = class CustomBinary extends ConstraintCollecto
     super();
 
     this._dropDownInputManager = new DropdownInputManager(
-      inputManager, 'custom-binary-input');
+      inputManager, 'custom-binary-input',
+      this._onDropdownOpen.bind(this));
 
     inputManager.onSelection(
       (selection) => this._dropDownInputManager.updateSelection(selection));
@@ -2018,6 +2012,13 @@ ConstraintCollector.CustomBinary = class CustomBinary extends ConstraintCollecto
 
   reshape(shape) {
     this._shape = shape;
+  }
+
+  _onDropdownOpen(selection) {
+    if (selection.length > 1) {
+      const form = this._dropDownInputManager.containerElem();
+      form['add-constraint'].focus();
+    }
   }
 
   _setUp() {
@@ -2107,7 +2108,7 @@ ConstraintCollector.CustomBinary = class CustomBinary extends ConstraintCollecto
 
 class MultiValueInputManager extends DropdownInputManager {
   constructor(inputManager, onChange) {
-    super(inputManager, 'multi-value-cell-input');
+    super(inputManager, 'multi-value-cell-input', () => { });
     this._dropdownBody = this._dropdownElem.getElementsByClassName('dropdown-body')[0];
     this._onChange = onChange;
     this._givenLookup = (cell) => undefined;
