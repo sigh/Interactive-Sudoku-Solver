@@ -101,6 +101,7 @@ class DebugManager {
 
     this._debugCellHighlighter = null;
     this._displayContainer = displayContainer;
+    this._debugPuzzleSrc = document.getElementById('debug-puzzle-src');
 
     this._initializeState();
   }
@@ -259,9 +260,22 @@ class DebugManager {
       }, 300);
 
       const puzzle = debugIndex.get(name);
-      if (puzzle) {
-        loadInput(puzzle);
-      }
+      if (!puzzle) return;
+
+      loadInput(puzzle);
+
+      window.setTimeout(() => {
+        const debugPuzzleSrc = this._debugPuzzleSrc;
+        clearDOMNode(debugPuzzleSrc);
+        if (puzzle.src) {
+          const link = document.createElement('a');
+          link.href = puzzle.src;
+          link.textContent = puzzle.name;
+          debugPuzzleSrc.appendChild(link);
+        } else {
+          debugPuzzleSrc.textContent = puzzle.name;
+        }
+      }, 0);
     };
   }
 
@@ -290,6 +304,7 @@ class DebugManager {
   clear() {
     this._logOutput.textContent = '';
     this._infoOverlay?.clear();
+    clearDOMNode(this._debugPuzzleSrc);
 
     this._logDedupe = {
       lastKey: '',
