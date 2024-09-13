@@ -1131,6 +1131,8 @@ class SudokuConstraint {
   }
 
   static AllDifferent = class AllDifferent extends SudokuConstraintBase {
+    static COLLECTOR_CLASS = 'MultiCell';
+
     constructor(...cells) {
       super(arguments);
       this.cells = cells;

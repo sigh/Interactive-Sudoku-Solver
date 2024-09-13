@@ -270,6 +270,11 @@ const EXAMPLES = [
     solution: '215647398368952174794381652586274931142593867973816425821739546659428713437165289',
   },
   {
+    name: 'Killer sudoku, with alldiff',
+    input: '.Cage~3~R1C1~R1C2.Cage~15~R1C3~R1C4~R1C5.Cage~17~R2C3~R2C4.Cage~22~R1C6~R2C5~R2C6~R3C5.Cage~4~R1C7~R2C7.Cage~16~R1C8~R2C8.Cage~15~R1C9~R2C9~R3C9~R4C9.Cage~8~R3C6~R4C6~R5C6.Cage~6~R4C1~R5C1.Cage~6~R6C3~R7C2~R7C3.Cage~27~R6C1~R7C1~R8C1~R9C1.Cage~8~R8C2~R9C2.Cage~16~R8C3~R9C3.Cage~10~R7C5~R8C4~R8C5~R9C4.Cage~12~R5C9~R6C9.Cage~6~R6C7~R6C8.Cage~20~R6C6~R7C6~R7C7.Cage~15~R8C6~R8C7.Cage~14~R7C8~R7C9~R8C8~R8C9.Cage~13~R9C5~R9C6~R9C7.Cage~17~R9C8~R9C9.AllDifferent~R5C4~R5C3~R5C2~R6C2.Cage~0~R3C7~R3C8~R4C8.',
+    solution: '215647398368952174794381652586274931142593867973816425821739546659428713437165289',
+  },
+  {
     name: 'Killer sudoku, with 0 cage, hard',
     src: 'http://forum.enjoysudoku.com/fast-web-based-solver-for-sudoku-variants-t39332.html#p312474',
     input: 'Z<<<<W<<<^0<<>^X<T>^j>>>^>^c^^<<>>^T^<<<^>>>^^S<<^<<0^>^L<<<^^<^>^U<>>^Q>>>^>>>>^',

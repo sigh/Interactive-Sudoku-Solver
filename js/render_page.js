@@ -585,6 +585,11 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
            If value is must be contained at least as many times as is
            repeated in the list.`,
       },
+      AllDifferent: {
+        displayClass: ConstraintDisplays.ShadedRegion,
+        text: 'All Different',
+        description: `Values must be unique.`,
+      },
       CountingCircles: {
         panelText: (constraint) => `Counting Circles (${constraint.cells.length})`,
         displayClass: ConstraintDisplays.CountingCircles,

@@ -533,7 +533,7 @@ ConstraintDisplays.ShadedRegion = class ShadedRegion extends BaseConstraintDispl
 
   drawItem(constraint, options) {
     const cells = constraint.cells;
-    const label = constraint[options.labelField];
+    const label = constraint[options?.labelField];
 
     const region = this._drawRegion(cells, label, options?.pattern);
 
