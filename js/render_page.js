@@ -2112,6 +2112,7 @@ class MultiValueInputManager extends DropdownInputManager {
     this._dropdownBody = this._dropdownElem.getElementsByClassName('dropdown-body')[0];
     this._onChange = onChange;
     this._givenLookup = (cell) => undefined;
+    this._allValues = [];
 
     this._setUp();
   }
@@ -2121,14 +2122,18 @@ class MultiValueInputManager extends DropdownInputManager {
   updateSelection(selection) {
     this._currentSelection = [];
     if (selection.length) {
-      this._updateForm(this._givenLookup(selection[0]) || []);
+      this._updateForm(
+        this._givenLookup(selection[0]) || this._allValues);
     }
     super.updateSelection(selection);
   };
 
   reshape(shape) {
-    clearDOMNode(this._dropdownBody);
-    for (let i = 0; i < shape.numValues; i++) {
+    clearDOMNode(this._inputContainer);
+
+    this._allValues = Array.from({ length: shape.numValues }, (_, i) => i + 1);
+
+    for (let i = 0; i < this._allValues.length; i++) {
       const label = document.createElement('label');
       label.classList.add('multi-value-input-option');
       const input = document.createElement('input');
@@ -2136,13 +2141,14 @@ class MultiValueInputManager extends DropdownInputManager {
       label.appendChild(input);
       const span = document.createElement('span');
       span.classList.add('button');
-      span.appendChild(document.createTextNode(i + 1));
+      span.appendChild(document.createTextNode(this._allValues[i]));
       label.appendChild(span);
-      this._dropdownBody.appendChild(label);
+      this._inputContainer.appendChild(label);
     }
 
-    this._dropdownBody.style.setProperty(
-      'grid-template-columns', `repeat(${shape.boxWidth}, 1fr)`);
+    const numbersPerLine = Math.ceil(Math.sqrt(shape.numValues));
+    this._inputContainer.style.setProperty(
+      'grid-template-columns', `repeat(${numbersPerLine}, 1fr)`);
   }
 
   _setUp() {
@@ -2154,27 +2160,53 @@ class MultiValueInputManager extends DropdownInputManager {
         this._currentSelection,
         this._getCheckedValues());
     };
+
+    const dropdownBody = this._dropdownBody;
+
+    this._inputContainer = document.createElement('div');
+    dropdownBody.append(this._inputContainer);
+
+    dropdownBody.append(document.createElement('hr'));
+
+    const buttonContainer = document.createElement('div');
+    buttonContainer.style.setProperty(
+      'grid-template-columns', `repeat(2, 1fr)`);
+    dropdownBody.append(buttonContainer);
+    const addButton = (text, valueFilter) => {
+      const button = document.createElement('button');
+      button.textContent = text;
+      button.onclick = () => {
+        this._updateForm(this._allValues.filter(valueFilter));
+        this._containerElem.dispatchEvent(new Event('change'));
+        return false;
+      }
+      button.classList.add('multi-value-input-control');
+      buttonContainer.append(button);
+    };
+
+    addButton('None', _ => false);
+    addButton('All', _ => true);
+    addButton('Odd', v => v % 2 == 1);
+    addButton('Even', v => v % 2 == 0);
   }
 
   _getCheckedValues() {
     const inputs = this._containerElem.elements;
+    const numValues = this._allValues.length;
     const setValues = [];
-    for (let i = 0; i < inputs.length; i++) {
+    for (let i = 0; i < numValues; i++) {
       if (inputs[i].checked) {
-        setValues.push(i + 1);
+        setValues.push(this._allValues[i]);
       }
     }
-    if (setValues.length == inputs.length) return [];
+    if (setValues.length === numValues) return [];
     return setValues;
   }
 
   _updateForm(values) {
     const inputs = this._containerElem.elements;
-    // When the list is empty, check all the boxes as that aligns with the
-    // default state.
-    const defaultChecked = values.length == 0;
-    for (let i = 0; i < inputs.length; i++) {
-      inputs[i].checked = defaultChecked;
+    for (let i = 0; i < this._allValues.length; i++) {
+      inputs[i].checked = false;
     }
     for (const value of values) {
       inputs[value - 1].checked = true;

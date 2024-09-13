@@ -974,6 +974,11 @@ select {
   text-align: center;
 }
 
+#multi-value-cell-input .dropdown-body>div {
+  display: grid;
+  width: 100%;
+}
+
 .multi-value-input-option {
   width: 100%;
 }
@@ -982,6 +987,11 @@ select {
   margin: 5px;
   padding: 5px;
   width: 100%;
+}
+
+.multi-value-input-control {
+  margin: 5px 10px;
+  padding: 5px;
 }
 
 .multi-value-input-option input:not(:checked)+.button {
