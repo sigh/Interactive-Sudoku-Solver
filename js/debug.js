@@ -213,6 +213,7 @@ const runSolveTests = async (onFailure) => {
     'Killer sudoku, with overlap',
     'Killer sudoku, with gaps',
     'Killer sudoku, with 0 cage',
+    'Killer sudoku, with alldiff',
     'Sudoku X',
     'Anti-knight Anti-king',
     'Anti-knight, Anti-consecutive',
