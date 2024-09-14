@@ -493,7 +493,7 @@ class CellArgs {
 class SudokuConstraintBase {
   static LOOPS_ALLOWED = false;
   static IS_GROUP = false;
-  static COLLECTOR_CLASS = 'Invisible';
+  static COLLECTOR_CLASS = 'Experimental';
 
   constructor(args) {
     this.args = args ? [...args] : [];
@@ -507,9 +507,9 @@ class SudokuConstraintBase {
     return '.' + arr.join('~');
   }
 
-  _forEach(fn) {
+  forEachTopLevel(fn) {
     if (this.type === 'Set') {
-      this.constraints.forEach(c => c._forEach(fn));
+      this.constraints.forEach(c => c.forEachTopLevel(fn));
     } else {
       fn(this);
     }
@@ -518,7 +518,7 @@ class SudokuConstraintBase {
   toMap() {
     const cMap = new Map();
 
-    this._forEach(c => {
+    this.forEachTopLevel(c => {
       if (!cMap.has(c.type)) cMap.set(c.type, []);
       cMap.get(c.type).push(c);
     });
@@ -528,7 +528,7 @@ class SudokuConstraintBase {
 
   getShape() {
     let gridSpec = null;
-    this._forEach(c => {
+    this.forEachTopLevel(c => {
       if (c.type === 'Shape') gridSpec = c.gridSpec;
     });
 
@@ -601,6 +601,7 @@ class SudokuConstraintBase {
 class SudokuConstraint {
 
   static Set = class Set extends SudokuConstraintBase {
+    static COLLECTOR_CLASS = null;
     static IS_GROUP = true;
 
     constructor(constraints) {
@@ -624,6 +625,23 @@ class SudokuConstraint {
     toString() {
       return [
         '.Or',
+        ...this.constraints.map(c => c.toString()),
+        '.End',
+      ].join('');
+    }
+  }
+
+  static And = class And extends SudokuConstraintBase {
+    static IS_GROUP = true;
+
+    constructor(constraints) {
+      super(arguments);
+      this.constraints = constraints || [];
+    }
+
+    toString() {
+      return [
+        '.And',
         ...this.constraints.map(c => c.toString()),
         '.End',
       ].join('');
@@ -1983,6 +2001,11 @@ class SudokuBuilder {
             yield new SudokuConstraintHandler.Or(...handlers);
           }
           break;
+
+        case 'And':
+          for (const c of constraint.constraints) {
+            yield* this._constraintHandlers(c.toMap(), shape);
+          }
 
         case 'NoBoxes':
         case 'Shape':

@@ -91,7 +91,7 @@ ConstraintCollector.Shape = class Shape extends ConstraintCollector {
   }
 }
 
-ConstraintCollector.Invisible = class Invisible extends ConstraintCollector {
+ConstraintCollector.Experimental = class Experimental extends ConstraintCollector {
   constructor(panel) {
     super();
     this._panel = panel;
@@ -1336,7 +1336,7 @@ class ConstraintManager {
         inputManager, this._display, this._constraintPanel),
       new ConstraintCollector.OutsideClue(inputManager, this._display),
       new ConstraintCollector.GivenCandidates(inputManager, this._display),
-      new ConstraintCollector.Invisible(this._constraintPanel),
+      new ConstraintCollector.Experimental(this._constraintPanel),
     ];
 
     for (const collector of collectors) {
@@ -1363,12 +1363,20 @@ class ConstraintManager {
     // Free-form.
     const form = document.forms['freeform-constraint-input'];
     const errorElem = document.getElementById('freeform-constraint-input-error');
+    const warningElem = document.getElementById('freeform-constraint-input-warning');
     const inputElem = form['freeform-input'];
+
+    const clearMessages = () => {
+      errorElem.textContent = '';
+      warningElem.textContent = '';
+    };
 
     // Allow loading free-form input from other locations.
     this.loadUnsafeFromText = (input) => {
       try {
-        this._loadFromText(input);
+        const constraint = this._loadFromText(input);
+        clearMessages();
+        warningElem.textContent = this._experimentalConstraintWarning(constraint);
       } catch (e) {
         errorElem.textContent = e;
         // If we were called from outside the form, then put the value in the
@@ -1379,14 +1387,26 @@ class ConstraintManager {
 
     form.onsubmit = e => {
       e.preventDefault();
+      clearMessages();
       const input = inputElem.value;
       this.loadUnsafeFromText(input);
       return false;
     };
-    inputElem.oninput = () => {
-      errorElem.textContent = '';
-    };
     autoSaveField(inputElem);
+  }
+
+  _experimentalConstraintWarning(constraint) {
+    const experimentalConstraints = new Set();
+    constraint.forEachTopLevel(c => {
+      if (c.constructor.COLLECTOR_CLASS === 'Experimental') {
+        experimentalConstraints.add(c.type);
+      }
+    });
+    if (experimentalConstraints.size === 0) return '';
+
+    return (
+      `Warning: ${[...experimentalConstraints]} constraints are experimental.
+       They may not work in all situations.`);
   }
 
   _loadFromText(input) {
@@ -1397,6 +1417,8 @@ class ConstraintManager {
     this._loadConstraint(constraint);
 
     this.runUpdateCallback();
+
+    return constraint;
   }
 
   _loadConstraint(constraint) {
@@ -1405,7 +1427,7 @@ class ConstraintManager {
         constraint.constraints.forEach(c => this._loadConstraint(c));
         break;
       case 'Shape':
-        // Nothing to do, but ensure it is not added to invisible constraints.
+        // Nothing to do, but ensure it is not handle by its collector.
         break;
       default:
         {

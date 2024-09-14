@@ -366,7 +366,8 @@ const EXAMPLES = [
   {
     name: 'Unbidden First Hidden',
     src: 'https://sudokupad.app/1i71uad30f',
-    input: '.HiddenSkyscraper~C4~8~.HiddenSkyscraper~C5~8~.HiddenSkyscraper~C6~8~.HiddenSkyscraper~C7~6~.HiddenSkyscraper~R2~2~2.HiddenSkyscraper~R7~~5.HiddenSkyscraper~C2~~6.HiddenSkyscraper~C3~~7.HiddenSkyscraper~R1~3~.HiddenSkyscraper~R3~1~.HiddenSkyscraper~R4~7~.HiddenSkyscraper~R5~7~.HiddenSkyscraper~R6~7~.',
+    input: '.HiddenSkyscraper~C4~8~.HiddenSkyscraper~C5~8~.HiddenSkyscraper~C6~8~.HiddenSkyscraper~C7~6~.HiddenSkyscraper~R2~2~2.HiddenSkyscraper~R7~~5.HiddenSkyscraper~C2~~6.HiddenSkyscraper~C3~~7.HiddenSkyscraper~R1~3~.HiddenSkyscraper~R3~1~.HiddenSkyscraper~R4~7~.HiddenSkyscraper~R5~7~.HiddenSkyscraper~R6~7~..Or.And.HiddenSkyscraper~R9~~1.HiddenSkyscraper~C9~~1.End.And.HiddenSkyscraper~R9~~2.HiddenSkyscraper~C9~~2.End.And.HiddenSkyscraper~R9~~3.HiddenSkyscraper~C9~~3.End.And.HiddenSkyscraper~R9~~4.HiddenSkyscraper~C9~~4.End.And.HiddenSkyscraper~R9~~5.HiddenSkyscraper~C9~~5.End.And.HiddenSkyscraper~R9~~6.HiddenSkyscraper~C9~~6.End.And.HiddenSkyscraper~R9~~7.HiddenSkyscraper~C9~~7.End.And.HiddenSkyscraper~R9~~8.HiddenSkyscraper~C9~~8.End.And.HiddenSkyscraper~R9~~9.HiddenSkyscraper~C9~~9.End.End',
+    solution: '835194276679285431214376598123469785497538612568721349386942157752813964941657823',
   },
   {
     name: 'Look-and-Say 2',
