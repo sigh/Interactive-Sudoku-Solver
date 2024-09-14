@@ -265,12 +265,13 @@ const runSolveTests = async (onFailure) => {
     'Duplicate cell sums',
     'Lunchbox',
     'Hidden skyscrapers',
+    'Unbidden First Hidden', // And constraint
     'Look-and-say',
     'Counting circles',
     'Anti-taxicab',
     'Full rank - 6 clue snipe',
     'Irregular region sum line',
-    'Numbered Rooms vs X-Sums',
+    'Numbered Rooms vs X-Sums', // Or constraint
   ], onFailure);
   result.collection = '9x9';
   results.push(result);

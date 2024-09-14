@@ -148,7 +148,8 @@ body {
   padding: 2px 0px 35px 2px;
 }
 
-#freeform-constraint-input-error {
+#freeform-constraint-input-error,
+#freeform-constraint-input-warning {
   font-size: small;
   position: absolute;
 }
@@ -238,6 +239,11 @@ button.image-button>img {
 
 .error {
   color: rgb(200, 0, 0);
+  font-weight: bold;
+}
+
+.warning {
+  color: rgb(200, 100, 0);
   font-weight: bold;
 }
 
