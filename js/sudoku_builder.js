@@ -1,20 +1,26 @@
 class GridShape {
   static MIN_SIZE = 1;
   static MAX_SIZE = 16;
+  static isValidGridSize(size) {
+    return Number.isInteger(size) && size >= this.MIN_SIZE && size <= this.MAX_SIZE;
+  }
 
   static _registry = new Map();
-  static _numCellsLookup = new Map();
-  static _numPencilmarksLookup = new Map();
   static _register(shape) {
     this._registry.set(shape.name, shape);
-    this._numCellsLookup.set(shape.numCells, shape);
-    this._numPencilmarksLookup.set(shape.numPencilmarks, shape);
   }
-  static allShapes() { return [...this._registry.values()]; }
-  static fromNumCells(numCells) { return this._numCellsLookup.get(numCells); }
+
+  static fromNumCells(numCells) {
+    const gridSize = Math.sqrt(numCells);
+    if (!this.isValidGridSize(gridSize)) return null;
+    return this.get(this.makeName(gridSize));
+  }
   static fromNumPencilmarks(numPencilmarks) {
-    return this._numPencilmarksLookup.get(numPencilmarks);
+    const gridSize = Math.cbrt(numPencilmarks);
+    if (!this.isValidGridSize(gridSize)) return null;
+    return this.get(this.makeName(gridSize));
   }
+
   static makeName(gridSize) {
     return `${gridSize}x${gridSize}`;
   }
@@ -102,7 +108,7 @@ class GridShape {
       throw ('Invalid grid spec format: ' + gridSpec);
     }
 
-    if (gridSize < this.MIN_SIZE || gridSize > this.MAX_SIZE) {
+    if (!this.isValidGridSize(gridSize)) {
       throw ('Invalid grid size: ' + gridSize);
     }
 
@@ -311,8 +317,6 @@ class SudokuParser {
   }
 
   static parseGridLayout(rawText) {
-    if (rawText.length < SHAPE_9x9.numCells * 2) return null;
-
     // Only allow digits, dots, spaces and separators.
     if (rawText.search(/[^\d\s.|_-]/) != -1) return null;
 
@@ -367,6 +371,9 @@ class SudokuParser {
     const text = rawText.replace(/\s+/g, '');
 
     let constraint;
+
+    // Need this to void parsing this as a 1x1 grid.
+    if (text.length === 1) return null;
 
     constraint = this.parseShortKillerFormat(text);
     if (constraint) return constraint;
