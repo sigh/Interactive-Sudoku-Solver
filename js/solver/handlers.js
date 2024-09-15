@@ -3162,6 +3162,12 @@ SudokuConstraintHandler.Indexing = class Indexing extends SudokuConstraintHandle
 
 SudokuConstraintHandler.CountingCircles = class CountingCircles extends SudokuConstraintHandler {
   constructor(cells) {
+    // Ensure that cells are sorted:
+    // - Makes sure that the constraint performance is independent of the sort
+    //   order of the cells.
+    // - Required for exclusion grouping to work optimally.
+    cells = cells.slice();
+    cells.sort((a, b) => a - b);
     super(cells);
   }
 
@@ -3200,11 +3206,16 @@ SudokuConstraintHandler.CountingCircles = class CountingCircles extends SudokuCo
     this._numValues = shape.numValues;
 
     this._exclusionMap = new Uint16Array(this.cells.length);
+    this._exclusionGroups = exclusionGroups;
     for (let i = 0; i < exclusionGroups.length; i++) {
       for (const cell of exclusionGroups[i]) {
         this._exclusionMap[this.cells.indexOf(cell)] = 1 << i;
       }
     }
+
+    // Complements to the exclusions groups.
+    this._exclusionComplements = exclusionGroups.map(
+      g => cellExclusions.getListExclusions(g));
 
     return true;
   }
@@ -3255,26 +3266,30 @@ SudokuConstraintHandler.CountingCircles = class CountingCircles extends SudokuCo
     // Count each possible value and restrict cells.
     const numValues = this._numValues;
     const exclusionMap = this._exclusionMap;
-    for (let j = 1; j < numValues + 1; j++) {
+    // Iterate in reverse order as larger numbers are more constrained.
+    for (let j = numValues; j > 0; j--) {
       const v = LookupTables.fromValue(j);
       if (!(v & allowedValues)) continue;
 
       let totalCount = 0;
       let fixedCount = 0;
-      let exclusionGroups = 0;
+      let vExclusionGroups = 0;
       for (let i = 0; i < numCells; i++) {
         if (grid[cells[i]] & v) {
           totalCount++;
           fixedCount += (grid[cells[i]] === v);
-          exclusionGroups |= exclusionMap[i];
+          vExclusionGroups |= exclusionMap[i];
         }
       }
-      const numExclusionGroups = countOnes16bit(exclusionGroups);
+      const numExclusionGroups = countOnes16bit(vExclusionGroups);
 
       if (fixedCount > j) {
+        // There are too many fixed values.
         return false;
       }
       if (numExclusionGroups < j) {
+        // If there are too few exclusion groups, then we can't have this value.
+        // If the value is required, then this is a conflict.
         if (v & requiredValues) {
           return false;
         } else {
@@ -3282,10 +3297,43 @@ SudokuConstraintHandler.CountingCircles = class CountingCircles extends SudokuCo
             if (!(grid[cells[i]] &= ~v)) return false;
           }
         }
-      } else if (totalCount === j && (v & requiredValues & unfixedValues)) {
-        for (let i = 0; i < numCells; i++) {
-          if (grid[cells[i]] & v) {
-            grid[cells[i]] = v;
+      } else if (totalCount === j) {
+        // If we have the exact count and the value is required,
+        // then we can fix the values.
+        if (v & requiredValues & unfixedValues) {
+          for (let i = 0; i < numCells; i++) {
+            if (grid[cells[i]] & v) {
+              grid[cells[i]] = v;
+            }
+          }
+        }
+      } else if (numExclusionGroups === j && (v & requiredValues & unfixedValues)) {
+        // If there is an exact number of exclusion groups, then check if
+        // any have just a single cell and hence can be fixed.
+        while (vExclusionGroups) {
+          const vGroup = vExclusionGroups & -vExclusionGroups;
+          vExclusionGroups ^= vGroup;
+          const groupIndex = LookupTables.toIndex(vGroup);
+          const group = this._exclusionGroups[groupIndex];
+          let uniqueCell = 0;
+          let count = 0;
+          for (let k = 0; k < group.length; k++) {
+            const cell = group[k];
+            if (grid[cell] & v) {
+              if (++count > 1) break;
+              uniqueCell = cell;
+            }
+          }
+
+          if (count === 1) {
+            // If it's unique, then we can fix the value.
+            grid[uniqueCell] = v;
+          } else {
+            // Otherwise remove it from complement groups.
+            const complement = this._exclusionComplements[groupIndex];
+            for (let k = 0; k < complement.length; k++) {
+              if (!(grid[complement[k]] &= ~v)) return false;
+            }
           }
         }
       }

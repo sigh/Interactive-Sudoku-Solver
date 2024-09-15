@@ -268,6 +268,7 @@ const runSolveTests = async (onFailure) => {
     'Unbidden First Hidden', // And constraint
     'Look-and-say',
     'Counting circles',
+    'Bubble Tornado',
     'Anti-taxicab',
     'Full rank - 6 clue snipe',
     'Irregular region sum line',
