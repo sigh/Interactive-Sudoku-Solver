@@ -10,7 +10,9 @@ class SudokuConstraintOptimizer {
   }
 
   optimize(handlerSet, cellExclusions, shape) {
-    const hasBoxes = handlerSet.getAllofType(SudokuConstraintHandler.NoBoxes).length == 0;
+    const hasBoxes = (
+      handlerSet.getAllofType(SudokuConstraintHandler.NoBoxes).length == 0
+      && !shape.noDefaultBoxes);
 
     this._addHouseHandlers(handlerSet, shape);
 
