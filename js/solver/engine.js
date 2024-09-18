@@ -141,8 +141,7 @@ class SudokuSolver {
   solveAllPossibilities() {
     this._reset();
 
-    let valuesInSolutions = new Uint16Array(this._shape.numCells);
-    let solutions = [];
+    const solutions = [];
 
     // Send the current values with the progress update, if there have
     // been any changes.
@@ -154,8 +153,10 @@ class SudokuSolver {
       };
     };
 
+    let valuesInSolutions = null;
     this._timer.runTimed(() => {
-      this._internalSolver.solveAllPossibilities(solutions, valuesInSolutions);
+      valuesInSolutions = this._internalSolver.solveAllPossibilities(
+        solutions);
     });
 
     // Send progress one last time to ensure all the solutions are sent.
@@ -494,10 +495,21 @@ SudokuSolver.InternalSolver = class {
   }
 
   _hasInterestingSolutions(grid, uninterestingValues) {
+    const valuesInSolutions = uninterestingValues.valuesInSolutions;
+    // Check the last cell which was interesting, in case it is still
+    // interesting.
+    {
+      const cell = uninterestingValues.lastInterestingCell;
+      if (grid[cell] & ~valuesInSolutions[cell]) return true;
+    }
+
     // We need to check all cells because we maybe validating a cell above
     // us, or finding a value for a cell below us.
     for (let cell = 0; cell < this._numCells; cell++) {
-      if (grid[cell] & ~uninterestingValues[cell]) return true;
+      if (grid[cell] & ~valuesInSolutions[cell]) {
+        uninterestingValues.lastInterestingCell = cell;
+        return true;
+      }
     }
     return false;
   }
@@ -834,8 +846,10 @@ SudokuSolver.InternalSolver = class {
     this.done = true;
   }
 
-  solveAllPossibilities(solutions, valuesInSolutions) {
+  solveAllPossibilities(solutions) {
     const counters = this.counters;
+
+    const valuesInSolutions = new Uint16Array(this._numCells);
 
     for (const result of this.run()) {
       result.grid.forEach((c, i) => { valuesInSolutions[i] |= c; });
@@ -845,9 +859,13 @@ SudokuSolver.InternalSolver = class {
       // duplicating existing solution (up to this point, every branch is
       // interesting).
       if (counters.solutions == 2) {
-        this._uninterestingValues = valuesInSolutions;
+        this._uninterestingValues = {
+          valuesInSolutions: valuesInSolutions,
+          lastInterestingCell: 0,
+        };
       }
     }
+    return valuesInSolutions;
   }
 
   validateLayout() {
