@@ -14,6 +14,8 @@ class SudokuConstraintHandler {
     // The optimizer may add non-essential constraints to improve performance.
     this.essential = true;
 
+    this.extraStateStart = 0;
+
     const id = this.constructor._defaultId++;
     // By default every id is unique.
     this.idStr = this.constructor.name + '-' + id.toString();
@@ -50,6 +52,17 @@ class SudokuConstraintHandler {
 
   debugName() {
     return this.constructor.name;
+  }
+
+  extraStateSize() {
+    return 0;
+  }
+
+  allocateExtraState(provider) {
+    const size = this.extraStateSize();
+    if (size) {
+      this.extraStateStart = provider.allocate(size);
+    }
   }
 }
 
@@ -130,6 +143,13 @@ SudokuConstraintHandler.And = class And extends SudokuConstraintHandler {
     }
     return true;
   }
+
+  allocateExtraState(provider) {
+    for (const handler of this._handlers) {
+      handler.allocateExtraState(provider);
+    }
+  }
+
 }
 
 SudokuConstraintHandler.GivenCandidates = class GivenCandidates extends SudokuConstraintHandler {
@@ -1612,6 +1632,11 @@ SudokuConstraintHandler.PillArrow = class PillArrow extends SudokuConstraintHand
     const controlCells = this._controlCells;
     const numControlCells = controlCells.length;
 
+    if (grid.length !== this._scratchGrid.length) {
+      this._scratchGrid = grid.slice();
+      this._resultGrid = grid.slice();
+    }
+
     {
       // Check if there is a single control value, so we can just enforce the
       // sum directly.
@@ -2592,6 +2617,10 @@ SudokuConstraintHandler.XSum = class XSum extends SudokuConstraintHandler {
 
   enforceConsistency(grid, handlerAccumulator) {
     if (!this._restrictControlCell(grid)) return false;
+    if (grid.length !== this._scratchGrid.length) {
+      this._scratchGrid = grid.slice();
+      this._resultGrid = grid.slice();
+    }
 
     const sumHandler = this._internalSumHandler;
     const cells = this.cells;
@@ -3685,7 +3714,27 @@ SudokuConstraintHandler.Or = class Or extends SudokuConstraintHandler {
     this._resultGrid = null;
     this._handlers = handlers;
     this._initializations = [];
+    this._numGridCells = 0;
     this._dummyHandlerAccumulator = new SudokuSolver.DummyHandlerAccumulator();
+  }
+
+  extraStateSize() {
+    throw 'Unused';
+  }
+
+  allocateExtraState(provider) {
+    for (const handler of this._handlers) {
+      handler.allocateExtraState(provider);
+    }
+    this.extraStateStart = provider.allocate((this._handlers.length >> 4) + 1);
+  }
+
+  _markAsInvalid(grid, handlerIndex) {
+    grid[this.extraStateStart + (handlerIndex >> 4)] |= 1 << (handlerIndex & 15);
+  }
+
+  _isInvalid(grid, handlerIndex) {
+    return 0 !== (grid[this.extraStateStart + (handlerIndex >> 4)] & (1 << (handlerIndex & 15)));
   }
 
   initialize(initialGrid, cellExclusions, shape) {
@@ -3696,9 +3745,14 @@ SudokuConstraintHandler.Or = class Or extends SudokuConstraintHandler {
     // makes.
     const initializationCells = new Set();
     const validHandlers = [];
-    for (const handler of this._handlers) {
+    for (let h = 0; h < this._handlers.length; h++) {
+      const handler = this._handlers[h];
+
       this._scratchGrid.set(initialGrid);
-      if (!handler.initialize(this._scratchGrid, cellExclusions, shape)) continue;
+      if (!handler.initialize(this._scratchGrid, cellExclusions, shape)) {
+        this._markAsInvalid(grid, h);
+        continue;
+      }
 
       const initialization = [];
       for (let i = 0; i < shape.numCells; i++) {
@@ -3707,12 +3761,15 @@ SudokuConstraintHandler.Or = class Or extends SudokuConstraintHandler {
           initializationCells.add(i);
         }
       }
+
       validHandlers.push(handler);
       this._initializations.push(initialization);
     }
 
-    this._handlers = validHandlers;
     if (validHandlers.length == 0) return false;
+
+    this._handlers = validHandlers;
+    this._numGridCells = shape.numCells;
 
     // If initialization changed any cells we may need to updated the watched
     // cells.
@@ -3729,29 +3786,54 @@ SudokuConstraintHandler.Or = class Or extends SudokuConstraintHandler {
   }
 
   enforceConsistency(grid, handlerAccumulator) {
+    if (this._scratchGrid.length !== grid.length) {
+      this._scratchGrid = grid.slice();
+      this._resultGrid = grid.slice();
+    }
+
+    const numGridCells = this._numGridCells;
+
     const resultGrid = this._resultGrid;
     const scratchGrid = this._scratchGrid;
-    const numCells = resultGrid.length;
     const dummyHandlerAccumulator = this._dummyHandlerAccumulator;
     resultGrid.fill(0);
 
     for (let i = 0; i < this._handlers.length; i++) {
+      if (this._isInvalid(grid, i)) continue;
+
       const handler = this._handlers[i];
       const initialization = this._initializations[i];
 
       // Initialize the scratch grid.
       scratchGrid.set(grid);
       for (let j = 0; j < initialization.length; j += 2) {
-        if (!(scratchGrid[initialization[j]] &= initialization[j + 1])) continue;
+        if (!(scratchGrid[initialization[j]] &= initialization[j + 1])) {
+          this._markAsInvalid(grid, i);
+          continue;
+        }
       }
       // Enforce consistency on the scratch grid.
-      if (!handler.enforceConsistency(scratchGrid, dummyHandlerAccumulator)) continue;
-      for (let j = 0; j < numCells; j++) resultGrid[j] |= scratchGrid[j];
+      if (!handler.enforceConsistency(scratchGrid, dummyHandlerAccumulator)) {
+        this._markAsInvalid(grid, i);
+        continue;
+      }
+
+      for (let j = 0; j < numGridCells; j++) {
+        resultGrid[j] |= scratchGrid[j];
+      }
+      // Extra state is written directly to the grid.
+      for (let j = numGridCells; j < grid.length; j++) {
+        grid[j] = scratchGrid[j];
+      }
     }
 
+    // Quickly check if there were no valid handlers.
     if (resultGrid[0] === 0) return false;
 
-    grid.set(resultGrid);
+    // Only copy the cells. The state has already been directly copied.
+    for (let j = 0; j < numGridCells; j++) {
+      grid[j] = resultGrid[j];
+    }
     return true;
   }
 }
