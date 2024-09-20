@@ -290,9 +290,8 @@ SudokuSolver.InternalSolver = class {
     this._numCells = this._shape.numCells;
     this._debugLogger = debugLogger;
 
-    this._recStack = this._initStack();
     {
-      this._initialGrid = this._recStack[0].grid.slice();
+      this._initialGrid = new Uint16Array(shape.numCells);
       const allValues = LookupTables.get(this._shape.numValues).allValues;
       this._initialGrid.fill(allValues);
     }
@@ -310,6 +309,8 @@ SudokuSolver.InternalSolver = class {
       shape, this._handlerSet, debugLogger);
 
     this._cellPriorities = this._initCellPriorities();
+
+    this._recStack = this._initStack();
 
     this.reset();
   }
@@ -524,20 +525,21 @@ SudokuSolver.InternalSolver = class {
 
   static _debugGridBuffer = new Uint16Array(SHAPE_MAX.numCells);
 
-  _debugEnforceConsistency(loc, grid, handler, handlerAccumulator) {
-    const oldGrid = this.constructor._debugGridBuffer.subarray(0, grid.length);
-    oldGrid.set(grid);
+  _debugEnforceConsistency(loc, gridState, handler, handlerAccumulator) {
+    const oldGridState = this.constructor._debugGridBuffer.subarray(0, gridState.length);
+    oldGridState.set(gridState);
 
-    const result = handler.enforceConsistency(grid, handlerAccumulator);
+    const result = handler.enforceConsistency(gridState, handlerAccumulator);
     const handlerName = handler.debugName();
 
-    if (!arraysAreEqual(oldGrid, grid)) {
+    if (!arraysAreEqual(oldGridState, gridState)) {
       const diff = {};
-      const candidates = new Array(grid.length);
+      const numCells = this._numCells;
+      const candidates = new Array(numCells);
       candidates.fill(null);
-      for (let i = 0; i < grid.length; i++) {
-        if (oldGrid[i] != grid[i]) {
-          candidates[i] = LookupTables.toValuesArray(oldGrid[i] & ~grid[i]);
+      for (let i = 0; i < numCells; i++) {
+        if (oldGridState[i] != gridState[i]) {
+          candidates[i] = LookupTables.toValuesArray(oldGridState[i] & ~gridState[i]);
           diff[this._shape.makeCellIdFromIndex(i)] = candidates[i];
         }
       }
@@ -567,7 +569,7 @@ SudokuSolver.InternalSolver = class {
     return result;
   }
 
-  _enforceConstraints(grid, handlerAccumulator) {
+  _enforceConstraints(gridState, handlerAccumulator) {
     const counters = this.counters;
     const logSteps = this._debugLogger.enableStepLogs;
 
@@ -575,11 +577,11 @@ SudokuSolver.InternalSolver = class {
       const c = handlerAccumulator.takeNext();
       counters.constraintsProcessed++;
       if (logSteps) {
-        if (!this._debugEnforceConsistency('_enforceConstraints', grid, c, handlerAccumulator)) {
+        if (!this._debugEnforceConsistency('_enforceConstraints', gridState, c, handlerAccumulator)) {
           return false;
         }
       } else {
-        if (!c.enforceConsistency(grid, handlerAccumulator)) {
+        if (!c.enforceConsistency(gridState, handlerAccumulator)) {
           return false;
         }
       }
@@ -604,8 +606,14 @@ SudokuSolver.InternalSolver = class {
   _initStack() {
     const numCells = this._numCells;
 
-    const gridBuffer = new ArrayBuffer(
-      (numCells + 1) * numCells * Uint16Array.BYTES_PER_ELEMENT);
+    const extraStateProvider = new SudokuSolver.ExtraStateProvider(numCells);
+    for (const handler of this._handlerSet) {
+      handler.allocateExtraState(extraStateProvider);
+    }
+    const stateSize = numCells + extraStateProvider.totalSize();
+
+    const stateBuffer = new ArrayBuffer(
+      (numCells + 1) * stateSize * Uint16Array.BYTES_PER_ELEMENT);
 
     const recStack = [];
     for (let i = 0; i < numCells + 1; i++) {
@@ -614,9 +622,14 @@ SudokuSolver.InternalSolver = class {
         progressRemaining: 1.0,
         lastContradictionCell: -1,
         newNode: true,
-        grid: new Uint16Array(
-          gridBuffer,
-          i * numCells * Uint16Array.BYTES_PER_ELEMENT,
+        gridState: new Uint16Array(
+          stateBuffer,
+          i * stateSize * Uint16Array.BYTES_PER_ELEMENT,
+          stateSize),
+        // Grid is a subset of state.
+        gridCells: new Uint16Array(
+          stateBuffer,
+          i * stateSize * Uint16Array.BYTES_PER_ELEMENT,
           numCells),
       });
     }
@@ -661,7 +674,8 @@ SudokuSolver.InternalSolver = class {
     {
       // Setup initial recursion frame.
       const initialRecFrame = recStack[recDepth];
-      initialRecFrame.grid.set(this._initialGrid);
+      initialRecFrame.gridState.fill(0);
+      initialRecFrame.gridCells.set(this._initialGrid);
       initialRecFrame.cellDepth = 0;
       initialRecFrame.lastContradictionCell = -1;
       initialRecFrame.progressRemaining = 1.0;
@@ -671,21 +685,21 @@ SudokuSolver.InternalSolver = class {
       const handlerAccumulator = this._handlerAccumulator;
       handlerAccumulator.reset(false);
       for (let i = 0; i < this._numCells; i++) handlerAccumulator.addForCell(i);
-      if (!this._enforceConstraints(initialRecFrame.grid, handlerAccumulator)) {
+      if (!this._enforceConstraints(initialRecFrame.gridState, handlerAccumulator)) {
         // If the initial grid is invalid, then ensure it has a zero so that the
         // initial iteration will fail.
-        if (initialRecFrame.grid.indexOf(0) == -1) initialRecFrame.grid.fill(0);
+        if (initialRecFrame.gridCells.indexOf(0) == -1) initialRecFrame.gridCells.fill(0);
       }
 
       if (yieldEveryStep) {
         this.setStepState({});
         yield {
-          grid: initialRecFrame.grid,
+          grid: initialRecFrame.gridCells,
           oldGrid: null,
           isSolution: false,
           cellOrder: [],
           values: 0,
-          hasContradiction: initialRecFrame.grid.indexOf(0) != -1,
+          hasContradiction: initialRecFrame.gridCells.indexOf(0) != -1,
         }
         checkRunCounter();
         this._stepState.step = 1;
@@ -699,7 +713,7 @@ SudokuSolver.InternalSolver = class {
       let recFrame = recStack[--recDepth];
 
       const cellDepth = recFrame.cellDepth;
-      let grid = recFrame.grid;
+      let grid = recFrame.gridCells;
 
       const [nextCells, value, count] =
         this._candidateSelector.selectNextCandidate(
@@ -753,6 +767,7 @@ SudokuSolver.InternalSolver = class {
         // We only need to start a new recursion frame when there is more than
         // one value to try.
 
+        const oldGridState = recFrame.gridState;
         recFrame = recStack[++recDepth];
         counters.guesses++;
 
@@ -761,8 +776,8 @@ SudokuSolver.InternalSolver = class {
         //       stack frame.
         grid[cell] ^= value;
 
-        recFrame.grid.set(grid);
-        grid = recFrame.grid;
+        recFrame.gridState.set(oldGridState);
+        grid = recFrame.gridCells;
       }
       // NOTE: Set this even when count == 1 to allow for other candidate
       //       selection methods.
@@ -770,7 +785,7 @@ SudokuSolver.InternalSolver = class {
 
       // Propagate constraints.
       const hasContradiction = !this._enforceConstraints(
-        grid, handlerAccumulator);
+        recFrame.gridState, handlerAccumulator);
       if (hasContradiction) {
         // Store the current cells, so that the level immediately above us
         // can act on this information to run extra constraints.
@@ -1220,6 +1235,24 @@ SudokuSolver.CellExclusions = class {
     return setIntersectionToArray(
       this._cellExclusionSets[cell0],
       this._cellExclusionSets[cell1]);
+  }
+}
+
+SudokuSolver.ExtraStateProvider = class {
+  _totalSize = 0;
+
+  constructor(numCells) {
+    this._offset = numCells;
+  }
+
+  allocate(size) {
+    const start = this._totalSize + this._offset;
+    this._totalSize += size;
+    return start;
+  }
+
+  totalSize() {
+    return this._totalSize;
   }
 }
 

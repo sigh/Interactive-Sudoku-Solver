@@ -4,6 +4,7 @@ class CandidateSelector {
     this._cellOrder = new Uint8Array(shape.numCells);
     this._backtrackTriggers = null;
     this._debugLogger = debugLogger;
+    this._numCells = shape.numCells;
 
     this._candidateSelectionStates = this._initCandidateSelectionStates(shape);
     // _candidateSelectionFlags is used to track whether the
@@ -42,10 +43,10 @@ class CandidateSelector {
   //        nextCells[0], but it may be less if we are branching on something
   //        other than the cell (e.g. a digit within a house).
   //   nextCells[1:]: Singleton cells which can be enforced at the same time.
-  selectNextCandidate(cellDepth, grid, stepState, isNewNode) {
+  selectNextCandidate(cellDepth, gridState, stepState, isNewNode) {
     const cellOrder = this._cellOrder;
     let [cellOffset, value, count] = this._selectBestCandidate(
-      grid, cellOrder, cellDepth, isNewNode);
+      gridState, cellOrder, cellDepth, isNewNode);
 
     // Adjust the value for step-by-step.
     if (stepState) {
@@ -56,10 +57,10 @@ class CandidateSelector {
 
       let adjusted = false;
       [cellOffset, value, adjusted] = this._adjustForStepState(
-        stepState, grid, cellOrder, cellDepth, cellOffset, value);
+        stepState, gridState, cellOrder, cellDepth, cellOffset, value);
 
       if (adjusted) {
-        count = countOnes16bit(grid[cellOrder[cellOffset]]);
+        count = countOnes16bit(gridState[cellOrder[cellOffset]]);
         this._candidateSelectionFlags[cellDepth] = 0;
         if (this._debugLogger.enableStepLogs) {
           this._logSelectNextCandidate(
@@ -69,7 +70,7 @@ class CandidateSelector {
     }
 
     const nextCellDepth = this._updateCellOrder(
-      cellDepth, cellOffset, count, grid);
+      cellDepth, cellOffset, count, gridState);
 
     if (nextCellDepth === 0) {
       return [cellOrder, 0, 0];
@@ -106,7 +107,7 @@ class CandidateSelector {
     if (count > 1) return frontOffset;
 
     // Move all singletons to the front of the cellOrder.
-    const numCells = grid.length;
+    const numCells = this._numCells;
 
     // First skip past any values which are already at the front.
     while (cellOffset == frontOffset && cellOffset < numCells) {
@@ -149,7 +150,7 @@ class CandidateSelector {
     });
   }
 
-  _selectBestCandidate(grid, cellOrder, cellDepth, isNewNode) {
+  _selectBestCandidate(gridState, cellOrder, cellDepth, isNewNode) {
     // If we have a special candidate state, then use that.
     // TODO: Try relax the condition that we *must* use this when it is not a singleton.
     if (this._candidateSelectionFlags[cellDepth]) {
@@ -164,27 +165,27 @@ class CandidateSelector {
     // Quick check - if the first value is a singleton, then just return without
     // the extra bookkeeping.
     {
-      const firstValue = grid[cellOrder[cellDepth]];
+      const firstValue = gridState[cellOrder[cellDepth]];
       if ((firstValue & (firstValue - 1)) === 0) {
         return [cellDepth, firstValue, firstValue !== 0 ? 1 : 0];
       }
     }
 
     // Find the best cell to explore next.
-    let cellOffset = this._selectBestCell(grid, cellOrder, cellDepth);
+    let cellOffset = this._selectBestCell(gridState, cellOrder, cellDepth);
     const cell = cellOrder[cellOffset];
 
     // Find the next smallest value to try.
     // NOTE: We will always have a value because:
     //        - we would have returned earlier on domain wipeout.
     //        - we don't add to the stack on the final value in a cell.
-    let values = grid[cell];
+    let values = gridState[cell];
     let value = values & -values;
     let count = countOnes16bit(values);
 
     // Wait until our first guess to initialize the candidate finder set.
     if (count > 1 && !this._candidateFinderSet.initialized) {
-      this._candidateFinderSet.initialize(grid);
+      this._candidateFinderSet.initialize(gridState);
     }
 
     // Optionally explore custom candidates nominated by constraints.
@@ -198,7 +199,7 @@ class CandidateSelector {
 
       const state = this._candidateSelectionStates[cellDepth];
       state.score = score;
-      if (this._findCustomCandidates(grid, cellOrder, cellDepth, state)) {
+      if (this._findCustomCandidates(gridState, cellOrder, cellDepth, state)) {
         count = state.cells.length;
         value = state.value;
         cellOffset = cellOrder.indexOf(state.cells.pop());
@@ -209,7 +210,7 @@ class CandidateSelector {
     return [cellOffset, value, count];
   }
 
-  _selectBestCell(grid, cellOrder, cellDepth) {
+  _selectBestCell(gridState, cellOrder, cellDepth) {
     // Choose cells based on value count and number of backtracks it caused.
     // NOTE: The constraint handlers are written such that they detect domain
     // wipeouts (0 values), so we should never find them here. Even if they
@@ -217,7 +218,7 @@ class CandidateSelector {
     // NOTE: If the scoring is more complicated, it can be useful
     // to do an initial pass to detect 1 or 0 value cells (!(v&(v-1))).
 
-    const numCells = grid.length;
+    const numCells = this._numCells;
     const backtrackTriggers = this._backtrackTriggers;
 
     // Find the cell with the minimum score.
@@ -226,7 +227,7 @@ class CandidateSelector {
 
     for (let i = cellDepth; i < numCells; i++) {
       const cell = cellOrder[i];
-      const count = countOnes16bit(grid[cell]);
+      const count = countOnes16bit(gridState[cell]);
       // If we have a single value then just use it - as it will involve no
       // guessing.
       // NOTE: We could use more efficient check for count() < 1, but it's not
@@ -253,18 +254,19 @@ class CandidateSelector {
       //
       // Looping over the cells again is not a concern since this is rare. It is
       // better to take it out of the main loop.
-      bestOffset = this._minCountCellIndex(grid, cellOrder, cellDepth);
+      bestOffset = this._minCountCellIndex(gridState, cellOrder, cellDepth);
     }
 
     return bestOffset;
   }
 
   // Find the cell index with the minimum score. Return the index into cellOrder.
-  _minCountCellIndex(grid, cellOrder, cellDepth) {
+  _minCountCellIndex(gridState, cellOrder, cellDepth) {
     let minCount = 1 << 16;
     let bestOffset = 0;
-    for (let i = cellDepth; i < grid.length; i++) {
-      const count = countOnes16bit(grid[cellOrder[i]]);
+    const numCells = this._numCells;
+    for (let i = cellDepth; i < numCells; i++) {
+      const count = countOnes16bit(gridState[cellOrder[i]]);
       if (count < minCount) {
         bestOffset = i;
         minCount = count;
@@ -273,7 +275,7 @@ class CandidateSelector {
     return bestOffset;
   }
 
-  _adjustForStepState(stepState, grid, cellOrder, cellDepth, cellOffset, value) {
+  _adjustForStepState(stepState, gridState, cellOrder, cellDepth, cellOffset, value) {
     const step = stepState.step;
     const guide = stepState.stepGuides.get(step) || {};
     let adjusted = false;
@@ -287,7 +289,7 @@ class CandidateSelector {
       }
     }
 
-    const cellValues = grid[cellOrder[cellOffset]];
+    const cellValues = gridState[cellOrder[cellOffset]];
 
     if (guide.value) {
       // Use the value from the guide.
@@ -303,7 +305,7 @@ class CandidateSelector {
     return [cellOffset, value, adjusted];
   }
 
-  _findCustomCandidates(grid, cellOrder, cellDepth, result) {
+  _findCustomCandidates(gridState, cellOrder, cellDepth, result) {
     const cellScores = this._backtrackTriggers;
     const finderSet = this._candidateFinderSet;
     finderSet.clearMarks();
@@ -324,7 +326,7 @@ class CandidateSelector {
       for (let j = 0; j < indexes.length; j++) {
         if (!finderSet.isMarked(indexes[j])) {
           const finder = finderSet.getAndMark(indexes[j]);
-          if (finder.maybeFindCandidate(grid, cellScores, result)) {
+          if (finder.maybeFindCandidate(gridState, cellScores, result)) {
             minCS = Math.ceil(result.score * 2) | 0;
             foundCandidate = true;
           }
@@ -366,11 +368,11 @@ CandidateSelector.CandidateFinderSet = class CandidateFinderSet {
     this._marked = null;
   }
 
-  initialize(grid) {
+  initialize(gridState) {
     const shape = this._shape;
     const finders = [];
     for (const h of this._handlerSet) {
-      finders.push(...h.candidateFinders(grid, shape));
+      finders.push(...h.candidateFinders(gridState, shape));
     }
     this._finders = finders;
 
