@@ -463,68 +463,12 @@ SudokuConstraintHandler._CommonHandlerUtil = class _CommonHandlerUtil {
 SudokuConstraintHandler.House = class House extends SudokuConstraintHandler {
   constructor(cells) {
     super(cells);
-    this._shape = null;
-    this._lookupTables = null;
+    this._allValues = 0;
     this._commonUtil = SudokuConstraintHandler._CommonHandlerUtil;
   }
 
   initialize(initialGrid, cellExclusions, shape) {
-    this._shape = shape;
-    this._lookupTables = LookupTables.get(shape.numValues);
-
-    return true;
-  }
-
-  static _seenPairs = new Uint16Array(SHAPE_MAX.numValues);
-  static _pairLocations = new Uint16Array(SHAPE_MAX.numValues);
-
-  _enforceNakedPairs(grid, cells, handlerAccumulator) {
-    const numCells = cells.length;
-
-    let numPairs = 0 | 0;
-    const seenPairs = this.constructor._seenPairs;
-    const pairLocations = this.constructor._pairLocations;
-    for (let i = 0; i < numCells; i++) {
-      const v = grid[cells[i]];
-      if (countOnes16bit(v) != 2) continue;
-      seenPairs[numPairs] = v;
-      pairLocations[numPairs] = i;
-      numPairs++;
-    }
-
-    for (let i = 1; i < numPairs; i++) {
-      const v = seenPairs[i];
-      for (let j = 0; j < i; j++) {
-        if (v !== seenPairs[j]) continue;
-
-        // We found a matching pair.
-        const pi = pairLocations[i];
-        const pj = pairLocations[j];
-        // Remove the pair from all other entries.
-        for (let k = 0; k < numCells; k++) {
-          if (k == pi || k == pj) continue;
-
-          // If there is anything to remove, try to remove it.
-          // If that eliminates this cell then return false.
-          let kv = grid[cells[k]];
-          if (!(kv & v)) continue;
-          if (!(kv &= ~v)) return false;
-          grid[cells[k]] = kv;
-          handlerAccumulator.addForCell(cells[k]);
-
-          // If removing values made this a naked pair then add it to the list.
-          if (countOnes16bit(kv) == 2) {
-            seenPairs[numPairs] = kv;
-            pairLocations[numPairs] = k;
-            numPairs++;
-          }
-        }
-
-        // If we found a match for this pair, then we won't find another one
-        // for the same pair.
-        break;
-      }
-    }
+    this._allValues = LookupTables.get(shape.numValues).allValues;
 
     return true;
   }
@@ -534,19 +478,19 @@ SudokuConstraintHandler.House = class House extends SudokuConstraintHandler {
     const numCells = cells.length;
 
     let allValues = 0;
-    let nonUniqueValues = 0;
+    let atLeastTwo = 0;
     let fixedValues = 0;
     for (let i = 0; i < numCells; i++) {
       const v = grid[cells[i]];
-      nonUniqueValues |= allValues & v;
+      atLeastTwo |= allValues & v;
       allValues |= v;
       fixedValues |= (!(v & (v - 1))) * v;  // Avoid branching.
     }
 
-    if (allValues != this._lookupTables.allValues) return false;
-    if (fixedValues == this._lookupTables.allValues) return true;
+    if (allValues != this._allValues) return false;
+    if (fixedValues == this._allValues) return true;
 
-    const hiddenSingles = allValues & ~nonUniqueValues & ~fixedValues;
+    const hiddenSingles = allValues & ~atLeastTwo & ~fixedValues;
     if (hiddenSingles) {
       if (!this._commonUtil.exposeHiddenSingles(grid, cells, hiddenSingles)) {
         return false;
@@ -554,11 +498,7 @@ SudokuConstraintHandler.House = class House extends SudokuConstraintHandler {
       fixedValues |= hiddenSingles;
     }
 
-    // Check for naked pairs.
-    // We won't have anything useful to do unless we have at least 2 free cells.
-    if (numCells - countOnes16bit(fixedValues) <= 2) return true;
-
-    return this._enforceNakedPairs(grid, cells, handlerAccumulator);
+    return true;
   }
 
   exclusionCells() {
