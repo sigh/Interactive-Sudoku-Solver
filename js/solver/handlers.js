@@ -14,8 +14,6 @@ class SudokuConstraintHandler {
     // The optimizer may add non-essential constraints to improve performance.
     this.essential = true;
 
-    this.extraStateStart = 0;
-
     const id = this.constructor._defaultId++;
     // By default every id is unique.
     this.idStr = this.constructor.name + '-' + id.toString();
@@ -37,9 +35,13 @@ class SudokuConstraintHandler {
 
   // Initialize the grid before solving starts.
   // Return `false` if the grid is invalid, `true` otherwise.
-  initialize(initialGrid, cellExclusions, shape) {
+  initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
     return true;
   }
+
+  // Run after all handlers have been initialized and initialGridCells is populated
+  // and includes the full state.
+  postInitialize(initialGridState) { }
 
   priority() {
     // By default, constraints which constrain more cells have higher priority.
@@ -52,17 +54,6 @@ class SudokuConstraintHandler {
 
   debugName() {
     return this.constructor.name;
-  }
-
-  extraStateSize() {
-    return 0;
-  }
-
-  allocateExtraState(provider) {
-    const size = this.extraStateSize();
-    if (size) {
-      this.extraStateStart = provider.allocate(size);
-    }
   }
 }
 
@@ -99,7 +90,7 @@ SudokuConstraintHandler.False = class False extends SudokuConstraintHandler {
     if (cells.length === 0) throw 'False needs cells to be effective.';
   }
 
-  initialize(initialGrid, cellExclusions, shape) {
+  initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
     return false;
   }
   enforceConsistency(grid, handlerAccumulator) { return false; }
@@ -129,11 +120,17 @@ SudokuConstraintHandler.And = class And extends SudokuConstraintHandler {
     return this._debugName;
   }
 
-  initialize(initialGrid, cellExclusions, shape) {
+  initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
     for (const h of this._handlers) {
-      if (!h.initialize(initialGrid, cellExclusions, shape)) return false;
+      if (!h.initialize(initialGridCells, cellExclusions, shape, stateAllocator)) return false;
     }
     return true;
+  }
+
+  postInitialize(initialGridState) {
+    for (const h of this._handlers) {
+      h.postInitialize(initialGridState);
+    }
   }
 
   enforceConsistency(grid, handlerAccumulator) {
@@ -143,13 +140,6 @@ SudokuConstraintHandler.And = class And extends SudokuConstraintHandler {
     }
     return true;
   }
-
-  allocateExtraState(provider) {
-    for (const handler of this._handlers) {
-      handler.allocateExtraState(provider);
-    }
-  }
-
 }
 
 SudokuConstraintHandler.GivenCandidates = class GivenCandidates extends SudokuConstraintHandler {
@@ -158,12 +148,12 @@ SudokuConstraintHandler.GivenCandidates = class GivenCandidates extends SudokuCo
     this._valueMap = valueMap;
   }
 
-  initialize(initialGrid) {
+  initialize(initialGridCells, stateAllocator) {
     for (const [cell, value] of this._valueMap) {
       if (isIterable(value)) {
-        initialGrid[cell] &= LookupTables.fromValuesArray(value);
+        initialGridCells[cell] &= LookupTables.fromValuesArray(value);
       } else {
-        initialGrid[cell] &= LookupTables.fromValue(value);
+        initialGridCells[cell] &= LookupTables.fromValue(value);
       }
     }
 
@@ -179,7 +169,7 @@ SudokuConstraintHandler.AllDifferent = class AllDifferent extends SudokuConstrai
     this._exclusionCells = exclusionCells;
   }
 
-  initialize(initialGrid, cellExclusions, shape) {
+  initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
     return this._exclusionCells.length <= shape.numValues;
   }
 
@@ -197,7 +187,7 @@ SudokuConstraintHandler.AllDifferentEnforcement = class AllDifferentEnforcement 
     super(exclusionCells);
   }
 
-  initialize(initialGrid, cellExclusions, shape) {
+  initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
     return this.cells.length <= shape.numValues;
   }
 
@@ -228,7 +218,7 @@ SudokuConstraintHandler.UniqueValueExclusion = class UniqueValueExclusion extend
     this._cellExclusions = null;
   }
 
-  initialize(initialGrid, cellExclusions, shape) {
+  initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
     this._cellExclusions = cellExclusions.getArray(this._cell);
     return true;
   }
@@ -267,7 +257,7 @@ SudokuConstraintHandler.ValueDependentUniqueValueExclusion = class ValueDependen
     return this._valueToCellMap[value - 1];
   }
 
-  initialize(initialGrid, cellExclusions, shape) {
+  initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
     // Remove cellExclusions, as it would be redundant.
     const exclusions = new Set(cellExclusions.getArray(this._cell));
     for (let i = 0; i < shape.numValues; i++) {
@@ -492,7 +482,7 @@ SudokuConstraintHandler.House = class House extends SudokuConstraintHandler {
     this._commonUtil = SudokuConstraintHandler._CommonHandlerUtil;
   }
 
-  initialize(initialGrid, cellExclusions, shape) {
+  initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
     this._allValues = LookupTables.get(shape.numValues).allValues;
 
     return true;
@@ -547,7 +537,7 @@ SudokuConstraintHandler.BinaryConstraint = class BinaryConstraint extends Sudoku
     this.idStr = [this.constructor.name, key, cell1, cell2].join('-');
   }
 
-  initialize(initialGrid, cellExclusions, shape) {
+  initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
     const lookupTables = LookupTables.get(shape.numValues);
     this._tables = lookupTables.forBinaryKey(this._key);
 
@@ -684,7 +674,7 @@ SudokuConstraintHandler.BinaryPairwise = class BinaryPairwise extends SudokuCons
     return validCombinationInfo;
   });
 
-  initialize(initialGrid, cellExclusions, shape) {
+  initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
     const lookupTables = LookupTables.get(shape.numValues);
     if (!this.constructor._isKeySymmetric(this._key, shape.numValues)) {
       throw 'Function for BinaryPairwise must be symmetric. Key: ' + this._key;
@@ -1328,7 +1318,7 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
     return this._shape.gridSize * 2 - this.cells.length;
   }
 
-  initialize(initialGrid, cellExclusions, shape) {
+  initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
     this._shape = shape;
 
     this._lookupTables = LookupTables.get(shape.numValues);
@@ -1566,10 +1556,10 @@ SudokuConstraintHandler.SumWithNegative = class SumWithNegative extends SudokuCo
     this._sum = sum + this._offsetForNegative;
   }
 
-  initialize(initialGrid, cellExclusions, shape) {
+  initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
     this._offsetForNegative = (shape.numValues + 1) * this._negativeCells.length;
     this._sum += this._offsetForNegative;
-    return super.initialize(initialGrid, cellExclusions, shape);
+    return super.initialize(initialGridCells, cellExclusions, shape, stateAllocator);
   }
 
   setComplementCells() { }
@@ -1609,9 +1599,9 @@ SudokuConstraintHandler.PillArrow = class PillArrow extends SudokuConstraintHand
     this._currentValueStack = new Uint16Array(numControl);
   }
 
-  initialize(initialGrid, cellExclusions, shape) {
+  initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
     this._internalSumHandler.initialize(
-      initialGrid, cellExclusions, shape);
+      initialGridCells, cellExclusions, shape, stateAllocator);
 
     // Constrain the most significant digit of the control cells.
     const numControl = this._controlCells.length;
@@ -1619,23 +1609,20 @@ SudokuConstraintHandler.PillArrow = class PillArrow extends SudokuConstraintHand
     const maxControlUnit = Math.pow(10, numControl);
     const maxControlValue = Math.min(
       maxSum / maxControlUnit | 0, shape.numValues);
-    initialGrid[this._controlCells[0]] &= ((1 << maxControlValue) - 1);
-
-    this._scratchGrid = initialGrid.slice();
-    this._resultGrid = initialGrid.slice();
+    initialGridCells[this._controlCells[0]] &= ((1 << maxControlValue) - 1);
 
     return maxControlValue > 0;
+  }
+
+  postInitialize(initialGridState) {
+    this._scratchGrid = initialGridState.slice();
+    this._resultGrid = initialGridState.slice();
   }
 
   enforceConsistency(grid, handlerAccumulator) {
     const sumHandler = this._internalSumHandler;
     const controlCells = this._controlCells;
     const numControlCells = controlCells.length;
-
-    if (grid.length !== this._scratchGrid.length) {
-      this._scratchGrid = grid.slice();
-      this._resultGrid = grid.slice();
-    }
 
     {
       // Check if there is a single control value, so we can just enforce the
@@ -1737,7 +1724,7 @@ SudokuConstraintHandler.Skyscraper = class Skyscraper extends SudokuConstraintHa
     }
   }
 
-  initialize(initialGrid, cellExclusions, shape) {
+  initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
     // We need this to avoid overflowing the buffer.
     if (this._numVisible > shape.numValues) return false;
 
@@ -1905,9 +1892,9 @@ SudokuConstraintHandler.HiddenSkyscraper = class HiddenSkyscraper extends Sudoku
     this._targetV = LookupTables.fromValue(+firstHiddenValue);
   }
 
-  initialize(initialGrid, cellExclusions, shape) {
+  initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
     // If the hidden value is first it will always be visible.
-    if (!(initialGrid[this.cells[0]] &= ~this._targetV)) return false;
+    if (!(initialGridCells[this.cells[0]] &= ~this._targetV)) return false;
     return true;
   }
 
@@ -2001,7 +1988,7 @@ SudokuConstraintHandler.Lunchbox = class Lunchbox extends SudokuConstraintHandle
     this._sum = sum;
   }
 
-  initialize(initialGrid, cellExclusions, shape) {
+  initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
     const sum = this._sum;
     this._isHouse = this.cells.length === shape.gridSize;
 
@@ -2323,7 +2310,7 @@ SudokuConstraintHandler.RegionSumLine = class RegionSumLine extends SudokuConstr
     this._regions = regions;
   }
 
-  initialize(initialGrid, cellExclusions, shape) {
+  initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
     // Map cells to regions.
     const cellToRegion = new Map();
     for (const region of this._regions) {
@@ -2358,7 +2345,7 @@ SudokuConstraintHandler.RegionSumLine = class RegionSumLine extends SudokuConstr
       for (const cells of this._multi) {
         const arrow = new SudokuConstraintHandler.SumWithNegative(
           cells, [single], 0);
-        arrow.initialize(initialGrid, cellExclusions, shape);
+        arrow.initialize(initialGridCells, cellExclusions, shape, stateAllocator);
         this._arrows.push(arrow);
       }
       this._multi = [];
@@ -2457,7 +2444,7 @@ SudokuConstraintHandler.Between = class Between extends SudokuConstraintHandler 
     this._binaryConstraint = null;
   }
 
-  initialize(initialGrid, cellExclusions, shape) {
+  initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
     const exclusionGroups = SudokuConstraintHandler._CommonHandlerUtil.findExclusionGroups(
       this._mids, cellExclusions);
     const maxGroupSize = Math.max(0, ...exclusionGroups.map(a => a.length));
@@ -2468,7 +2455,7 @@ SudokuConstraintHandler.Between = class Between extends SudokuConstraintHandler 
       SudokuConstraint.Binary.fnToKey(
         (a, b) => Math.abs(a - b) >= minEndsDelta,
         shape.numValues));
-    return this._binaryConstraint.initialize(initialGrid, cellExclusions, shape);
+    return this._binaryConstraint.initialize(initialGridCells, cellExclusions, shape, stateAllocator);
   }
 
   exclusionCells() {
@@ -2514,13 +2501,13 @@ SudokuConstraintHandler.Lockout = class Lockout extends SudokuConstraintHandler 
     this._binaryConstraint = null;
   }
 
-  initialize(initialGrid, cellExclusions, shape) {
+  initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
     this._binaryConstraint = new SudokuConstraintHandler.BinaryConstraint(
       ...this._ends,
       SudokuConstraint.Binary.fnToKey(
         (a, b) => Math.abs(a - b) >= this._minDiff,
         shape.numValues));
-    return this._binaryConstraint.initialize(initialGrid, cellExclusions, shape);
+    return this._binaryConstraint.initialize(initialGridCells, cellExclusions, shape, stateAllocator);
   }
 
   exclusionCells() {
@@ -2573,12 +2560,9 @@ SudokuConstraintHandler.XSum = class XSum extends SudokuConstraintHandler {
     this._cellArrays = [];
   }
 
-  initialize(initialGrid, cellExclusions, shape) {
+  initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
     this._internalSumHandler.initialize(
-      initialGrid, cellExclusions, shape);
-
-    this._scratchGrid = initialGrid.slice();
-    this._resultGrid = initialGrid.slice();
+      initialGridCells, cellExclusions, shape, stateAllocator);
 
     // Cache the partial cell arrays to make it easier to pass into the sumHandler.
     let array = [];
@@ -2587,6 +2571,12 @@ SudokuConstraintHandler.XSum = class XSum extends SudokuConstraintHandler {
     }
     this._cellArrays = array;
     return true;
+  }
+
+  postInitialize(initialGridState) {
+    this._internalSumHandler.postInitialize(initialGridState);
+    this._scratchGrid = initialGridState.slice();
+    this._resultGrid = initialGridState.slice();
   }
 
   // Determine and restrict the range of acceptable values for the control cell.
@@ -2617,10 +2607,6 @@ SudokuConstraintHandler.XSum = class XSum extends SudokuConstraintHandler {
 
   enforceConsistency(grid, handlerAccumulator) {
     if (!this._restrictControlCell(grid)) return false;
-    if (grid.length !== this._scratchGrid.length) {
-      this._scratchGrid = grid.slice();
-      this._resultGrid = grid.slice();
-    }
 
     const sumHandler = this._internalSumHandler;
     const cells = this.cells;
@@ -2691,7 +2677,7 @@ SudokuConstraintHandler.LocalEntropy = class LocalEntropy extends SudokuConstrai
     LookupTables.fromValuesArray([4, 5, 6]),
     LookupTables.fromValuesArray([7, 8, 9])];
 
-  initialize(initialGrid, cellExclusions, shape) {
+  initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
     this._cellExclusions = cellExclusions;
 
     return true;
@@ -2828,7 +2814,7 @@ SudokuConstraintHandler.RequiredValues = class RequiredValues extends SudokuCons
     return [];
   }
 
-  initialize(initialGrid, cellExclusions, shape) {
+  initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
     this._cellExclusions = cellExclusions;
     const cells = this.cells;
 
@@ -2847,7 +2833,7 @@ SudokuConstraintHandler.RequiredValues = class RequiredValues extends SudokuCons
     // If the size is exact, then there can be no other values in the cells.
     if (this._values.length == this.cells.length) {
       for (const cell of this.cells) {
-        if (!(initialGrid[cell] &= this._valueMask)) return false;
+        if (!(initialGridCells[cell] &= this._valueMask)) return false;
       }
     }
 
@@ -2859,7 +2845,7 @@ SudokuConstraintHandler.RequiredValues = class RequiredValues extends SudokuCons
         commonExclusions, cellExclusions.getArray(cells[i]));
     }
     for (const cell of commonExclusions) {
-      if (!(initialGrid[cell] &= ~this._valueMask)) return false;
+      if (!(initialGridCells[cell] &= ~this._valueMask)) return false;
     }
 
     return true;
@@ -2980,7 +2966,7 @@ SudokuConstraintHandler.SumLine = class SumLine extends SudokuConstraintHandler 
     this._initialState = loop ? (1 << sum) - 1 : 1;
   }
 
-  initialize(initialGrid, cellExclusions, shape) {
+  initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
     return true;
   }
 
@@ -3159,7 +3145,7 @@ SudokuConstraintHandler.CountingCircles = class CountingCircles extends SudokuCo
     return combinations;
   });
 
-  initialize(initialGrid, cellExclusions, shape) {
+  initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
     const numCells = this.cells.length;
     const combinations = this.constructor._sumCombinations(shape)[numCells];
     if (!combinations) return false;
@@ -3174,7 +3160,7 @@ SudokuConstraintHandler.CountingCircles = class CountingCircles extends SudokuCo
     allowedValues &= (1 << exclusionGroups.length) - 1;
 
     for (let i = 0; i < numCells; i++) {
-      if (!(initialGrid[this.cells[i]] &= allowedValues)) return false;
+      if (!(initialGridCells[this.cells[i]] &= allowedValues)) return false;
     }
     this._combinations = new Uint16Array(combinations);
     this._numValues = shape.numValues;
@@ -3365,7 +3351,7 @@ SudokuConstraintHandler.FullRank = class FullRank extends SudokuConstraintHandle
     return this._clues;
   }
 
-  initialize(initialGrid, cellExclusions, shape) {
+  initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
     // Initialize entries.
     const gridSize = shape.gridSize;
     const entries = [];
@@ -3396,7 +3382,7 @@ SudokuConstraintHandler.FullRank = class FullRank extends SudokuConstraintHandle
         requiredLess: 0,
         requiredGreater: 0,
       });
-      if (!(initialGrid[clue.line[0]] &= value)) {
+      if (!(initialGridCells[clue.line[0]] &= value)) {
         return false;
       }
     }
@@ -3715,31 +3701,20 @@ SudokuConstraintHandler.Or = class Or extends SudokuConstraintHandler {
     this._handlers = handlers;
     this._initializations = [];
     this._numGridCells = 0;
+    this._stateAllocator = 0;
     this._dummyHandlerAccumulator = new SudokuSolver.DummyHandlerAccumulator();
   }
 
-  extraStateSize() {
-    throw 'Unused';
-  }
-
-  allocateExtraState(provider) {
-    for (const handler of this._handlers) {
-      handler.allocateExtraState(provider);
-    }
-    this.extraStateStart = provider.allocate((this._handlers.length >> 4) + 1);
-  }
-
   _markAsInvalid(grid, handlerIndex) {
-    grid[this.extraStateStart + (handlerIndex >> 4)] |= 1 << (handlerIndex & 15);
+    grid[this._stateOffset + (handlerIndex >> 4)] |= 1 << (handlerIndex & 15);
   }
 
   _isInvalid(grid, handlerIndex) {
-    return 0 !== (grid[this.extraStateStart + (handlerIndex >> 4)] & (1 << (handlerIndex & 15)));
+    return 0 !== (grid[this._stateOffset + (handlerIndex >> 4)] & (1 << (handlerIndex & 15)));
   }
 
-  initialize(initialGrid, cellExclusions, shape) {
-    this._scratchGrid = initialGrid.slice();
-    this._resultGrid = initialGrid.slice();
+  initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
+    const scratchGrid = initialGridCells.slice();
 
     // Initialize each handler and store any initialization changes that it
     // makes.
@@ -3748,16 +3723,16 @@ SudokuConstraintHandler.Or = class Or extends SudokuConstraintHandler {
     for (let h = 0; h < this._handlers.length; h++) {
       const handler = this._handlers[h];
 
-      this._scratchGrid.set(initialGrid);
-      if (!handler.initialize(this._scratchGrid, cellExclusions, shape)) {
+      scratchGrid.set(initialGridCells);
+      if (!handler.initialize(scratchGrid, cellExclusions, shape, stateAllocator)) {
         this._markAsInvalid(grid, h);
         continue;
       }
 
       const initialization = [];
       for (let i = 0; i < shape.numCells; i++) {
-        if (this._scratchGrid[i] !== initialGrid[i]) {
-          initialization.push(i, this._scratchGrid[i]);
+        if (scratchGrid[i] !== initialGridCells[i]) {
+          initialization.push(i, scratchGrid[i]);
           initializationCells.add(i);
         }
       }
@@ -3770,6 +3745,10 @@ SudokuConstraintHandler.Or = class Or extends SudokuConstraintHandler {
 
     this._handlers = validHandlers;
     this._numGridCells = shape.numCells;
+
+    this._stateOffset = stateAllocator.allocate(
+      new Array((this._handlers.length >> 4) + 1).fill(0));
+
 
     // If initialization changed any cells we may need to updated the watched
     // cells.
@@ -3785,12 +3764,15 @@ SudokuConstraintHandler.Or = class Or extends SudokuConstraintHandler {
     return true;
   }
 
-  enforceConsistency(grid, handlerAccumulator) {
-    if (this._scratchGrid.length !== grid.length) {
-      this._scratchGrid = grid.slice();
-      this._resultGrid = grid.slice();
+  postInitialize(initialGridState) {
+    for (const h of this._handlers) {
+      h.postInitialize(initialGridState);
     }
+    this._scratchGrid = initialGridState.slice();
+    this._resultGrid = initialGridState.slice();
+  }
 
+  enforceConsistency(grid, handlerAccumulator) {
     const numGridCells = this._numGridCells;
 
     const resultGrid = this._resultGrid;

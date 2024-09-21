@@ -290,12 +290,6 @@ SudokuSolver.InternalSolver = class {
     this._numCells = this._shape.numCells;
     this._debugLogger = debugLogger;
 
-    {
-      this._initialGrid = new Uint16Array(shape.numCells);
-      const allValues = LookupTables.get(this._shape.numValues).allValues;
-      this._initialGrid.fill(allValues);
-    }
-
     this._runCounter = 0;
     this._progress = {
       frequencyMask: -1,
@@ -353,20 +347,6 @@ SudokuSolver.InternalSolver = class {
     return priorities;
   }
 
-  // Invalidate the grid, given the handler which said it was impossible.
-  // We invalidate the grid by setting cells to zero. We want to set the
-  // most meaningful cells to the user.
-  _invalidateGrid(grid, handler) {
-    // Try to use the handler cells.
-    let cells = handler.cells;
-    // Otherwise use the exclusionCells.
-    if (!cells.length) cells = handler.exclusionCells();
-    cells.forEach(c => grid[c] = 0);
-
-    // Otherwise just set the entire grid to 0.
-    if (!cells.length) grid.fill(0);
-  }
-
   _setUpHandlers(handlers) {
     // Sort initial handlers so that the solver performance doesn't
     // depend on the input order.
@@ -419,10 +399,12 @@ SudokuSolver.InternalSolver = class {
         new SudokuConstraintHandler.UniqueValueExclusion(i));
     }
 
+    const stateAllocator = new SudokuSolver.GridStateAllocator(this._shape);
+
     // Initialize handlers.
     for (const handler of handlerSet) {
       const initialCells = handler.cells;
-      if (!handler.initialize(this._initialGrid, cellExclusions, this._shape)) {
+      if (!handler.initialize(stateAllocator.mutableGridCells(), cellExclusions, this._shape, stateAllocator)) {
         if (this._debugLogger.enableLogs) {
           this._debugLogger.log({
             loc: '_setUpHandlers',
@@ -431,7 +413,7 @@ SudokuSolver.InternalSolver = class {
           });
         }
 
-        this._invalidateGrid(this._initialGrid, handler);
+        stateAllocator.invalidateGrid(handler);
       }
 
       if (initialCells !== handler.cells) {
@@ -440,6 +422,12 @@ SudokuSolver.InternalSolver = class {
           initialCells,
           handler.cells);
       }
+    }
+
+    this._initialGridState = stateAllocator.makeGridState();
+
+    for (const handler of handlerSet) {
+      handler.postInitialize(this._initialGridState);
     }
 
     return handlerSet;
@@ -485,7 +473,7 @@ SudokuSolver.InternalSolver = class {
     this._candidateSelector.reset(this._backtrackTriggers);
 
     // Setup sample solution so that we create new ones by default.
-    this._sampleSolution = this._initialGrid.slice();
+    this._sampleSolution = this._initialGridState.slice(0, this._numCells);
 
     this.done = false;
     this._atStart = true;
@@ -605,15 +593,10 @@ SudokuSolver.InternalSolver = class {
 
   _initStack() {
     const numCells = this._numCells;
-
-    const extraStateProvider = new SudokuSolver.ExtraStateProvider(numCells);
-    for (const handler of this._handlerSet) {
-      handler.allocateExtraState(extraStateProvider);
-    }
-    const stateSize = numCells + extraStateProvider.totalSize();
+    const gridStateSize = this._initialGridState.length;
 
     const stateBuffer = new ArrayBuffer(
-      (numCells + 1) * stateSize * Uint16Array.BYTES_PER_ELEMENT);
+      (numCells + 1) * gridStateSize * Uint16Array.BYTES_PER_ELEMENT);
 
     const recStack = [];
     for (let i = 0; i < numCells + 1; i++) {
@@ -624,12 +607,12 @@ SudokuSolver.InternalSolver = class {
         newNode: true,
         gridState: new Uint16Array(
           stateBuffer,
-          i * stateSize * Uint16Array.BYTES_PER_ELEMENT,
-          stateSize),
+          i * gridStateSize * Uint16Array.BYTES_PER_ELEMENT,
+          gridStateSize),
         // Grid is a subset of state.
         gridCells: new Uint16Array(
           stateBuffer,
-          i * stateSize * Uint16Array.BYTES_PER_ELEMENT,
+          i * gridStateSize * Uint16Array.BYTES_PER_ELEMENT,
           numCells),
       });
     }
@@ -674,8 +657,7 @@ SudokuSolver.InternalSolver = class {
     {
       // Setup initial recursion frame.
       const initialRecFrame = recStack[recDepth];
-      initialRecFrame.gridState.fill(0);
-      initialRecFrame.gridCells.set(this._initialGrid);
+      initialRecFrame.gridState.set(this._initialGridState);
       initialRecFrame.cellDepth = 0;
       initialRecFrame.lastContradictionCell = -1;
       initialRecFrame.progressRemaining = 1.0;
@@ -892,20 +874,20 @@ SudokuSolver.InternalSolver = class {
   }
 
   validateLayout() {
-    const originalInitialGrid = this._initialGrid.slice();
-    const result = this._validateLayout(originalInitialGrid);
-    this._initialGrid = originalInitialGrid;
+    const originalInitialGridState = this._initialGridState.slice();
+    const result = this._validateLayout(originalInitialGridState);
+    this._initialGridState = originalInitialGridState;
     return result;
   }
 
-  _validateLayout(originalInitialGrid) {
+  _validateLayout(originalInitialGridState) {
     // Choose just the house handlers.
     const houseHandlers = this._handlerSet.getAllofType(SudokuConstraintHandler.House);
 
     // Function to fill a house with all values.
     const fillHouse = (house) => {
-      this._initialGrid.set(originalInitialGrid);
-      house.cells.forEach((c, i) => this._initialGrid[c] = 1 << i);
+      this._initialGridState.set(originalInitialGridState);
+      house.cells.forEach((c, i) => this._initialGridState[c] = 1 << i);
     };
 
     const attemptLog = [];
@@ -1238,21 +1220,48 @@ SudokuSolver.CellExclusions = class {
   }
 }
 
-SudokuSolver.ExtraStateProvider = class {
-  _totalSize = 0;
+SudokuSolver.GridStateAllocator = class {
+  constructor(shape) {
+    this._offset = shape.numCells;
+    this._extraState = [];
 
-  constructor(numCells) {
-    this._offset = numCells;
+    this._gridCells = new Uint16Array(shape.numCells);
+    const allValues = LookupTables.get(shape.numValues).allValues
+    this._gridCells.fill(allValues);
   }
 
-  allocate(size) {
-    const start = this._totalSize + this._offset;
-    this._totalSize += size;
+  allocate(state) {
+    const start = this._offset + this._extraState.length;
+    this._extraState.push(...state);
     return start;
   }
 
-  totalSize() {
-    return this._totalSize;
+  mutableGridCells() {
+    return this._gridCells;
+  }
+
+  // Invalidate the grid, given the handler which said it was impossible.
+  // We invalidate the grid by setting cells to zero. We want to set the
+  // most meaningful cells to the user.
+  invalidateGrid(handler) {
+    // Try to use the handler cells.
+    let cells = handler.cells;
+    // Otherwise use the exclusionCells.
+    if (!cells.length) cells = handler.exclusionCells();
+    cells.forEach(c => this._gridCells[c] = 0);
+
+    // Otherwise just set the entire grid to 0.
+    if (!cells.length) this._gridCells.fill(0);
+  }
+
+
+  makeGridState() {
+    const gridCells = this._gridCells;
+    const gridState = new gridCells.constructor(
+      gridCells.length + this._extraState.length);
+    gridState.set(gridCells);
+    gridState.set(this._extraState, gridCells.length);
+    return gridState;
   }
 }
 
