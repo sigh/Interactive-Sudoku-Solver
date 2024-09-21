@@ -41,7 +41,9 @@ class SudokuConstraintHandler {
 
   // Run after all handlers have been initialized and initialGridCells is populated
   // and includes the full state.
-  postInitialize(initialGridState) { }
+  // readonlyGridState must not be written to! This will lead to incorrect
+  // results if the handler is used from within an Or constraint.
+  postInitialize(readonlyGridState) { }
 
   priority() {
     // By default, constraints which constrain more cells have higher priority.
@@ -127,9 +129,9 @@ SudokuConstraintHandler.And = class And extends SudokuConstraintHandler {
     return true;
   }
 
-  postInitialize(initialGridState) {
+  postInitialize(readonlyGridState) {
     for (const h of this._handlers) {
-      h.postInitialize(initialGridState);
+      h.postInitialize(readonlyGridState);
     }
   }
 
@@ -1614,9 +1616,9 @@ SudokuConstraintHandler.PillArrow = class PillArrow extends SudokuConstraintHand
     return maxControlValue > 0;
   }
 
-  postInitialize(initialGridState) {
-    this._scratchGrid = initialGridState.slice();
-    this._resultGrid = initialGridState.slice();
+  postInitialize(readonlyGridState) {
+    this._scratchGrid = readonlyGridState.slice();
+    this._resultGrid = readonlyGridState.slice();
   }
 
   enforceConsistency(grid, handlerAccumulator) {
@@ -2573,10 +2575,10 @@ SudokuConstraintHandler.XSum = class XSum extends SudokuConstraintHandler {
     return true;
   }
 
-  postInitialize(initialGridState) {
-    this._internalSumHandler.postInitialize(initialGridState);
-    this._scratchGrid = initialGridState.slice();
-    this._resultGrid = initialGridState.slice();
+  postInitialize(readonlyGridState) {
+    this._internalSumHandler.postInitialize(readonlyGridState);
+    this._scratchGrid = readonlyGridState.slice();
+    this._resultGrid = readonlyGridState.slice();
   }
 
   // Determine and restrict the range of acceptable values for the control cell.
@@ -3701,16 +3703,51 @@ SudokuConstraintHandler.Or = class Or extends SudokuConstraintHandler {
     this._handlers = handlers;
     this._initializations = [];
     this._numGridCells = 0;
-    this._stateAllocator = 0;
+    this._stateOffset = 0;
+    this._numHandlerStates = 0;
     this._dummyHandlerAccumulator = new SudokuSolver.DummyHandlerAccumulator();
   }
 
   _markAsInvalid(grid, handlerIndex) {
-    grid[this._stateOffset + (handlerIndex >> 4)] |= 1 << (handlerIndex & 15);
+    const offset = this._stateOffset;
+    grid[offset + 1 + (handlerIndex >> 4)] &= ~(1 << (handlerIndex & 15));
+    if ((--grid[offset]) === 1) {
+      this._setFinalHandler(grid, offset);
+    }
+  }
+
+  static _FLAG_FINAL = 1 << 15;
+
+  _setFinalHandler(state, offset) {
+    // We've reached the final handler.
+    // Mark the state as final.
+    state[offset] = this.constructor._FLAG_FINAL;
+    // Find the final handler.
+    const numHandlerStates = this._numHandlerStates;
+    for (let i = 0; i < numHandlerStates; i++) {
+      const flags = state[offset + 1 + i];
+      if (flags) {
+        const handlerIndex = i * 16 + LookupTables.toIndex(flags);
+        state[offset] |= handlerIndex;
+        return;
+      }
+    }
+
+    throw ('Fatal error in Or constraint handler.');
   }
 
   _isInvalid(grid, handlerIndex) {
-    return 0 !== (grid[this._stateOffset + (handlerIndex >> 4)] & (1 << (handlerIndex & 15)));
+    return 0 === (grid[this._stateOffset + 1 + (handlerIndex >> 4)] & (1 << (handlerIndex & 15)));
+  }
+
+  _assignInitializations(grid, handlerIndex) {
+    const initialization = this._initializations[handlerIndex];
+    for (let i = 0; i < initialization.length; i += 2) {
+      if (!(grid[initialization[i]] &= initialization[i + 1])) {
+        return false;
+      }
+    }
+    return true;
   }
 
   initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
@@ -3725,7 +3762,6 @@ SudokuConstraintHandler.Or = class Or extends SudokuConstraintHandler {
 
       scratchGrid.set(initialGridCells);
       if (!handler.initialize(scratchGrid, cellExclusions, shape, stateAllocator)) {
-        this._markAsInvalid(grid, h);
         continue;
       }
 
@@ -3746,9 +3782,21 @@ SudokuConstraintHandler.Or = class Or extends SudokuConstraintHandler {
     this._handlers = validHandlers;
     this._numGridCells = shape.numCells;
 
-    this._stateOffset = stateAllocator.allocate(
-      new Array((this._handlers.length >> 4) + 1).fill(0));
-
+    // state = [finalHandlerIndex|numRemainingHandlers, ...handlerStates]
+    // For state[0] The 16th bit is a flag which determine if we are counting
+    // handlers or if we've reached the final handler.
+    // THe handlerStates show which handlers are still valid.
+    this._numHandlerStates = (this._handlers.length + 15) >> 4;
+    const state = new Array(1 + this._numHandlerStates).fill(0);
+    for (let i = 0; i < this._handlers.length; i++) {
+      state[1 + (i >> 4)] |= 1 << (i & 15);
+    }
+    if (this._handlers.length === 1) {
+      this._setFinalHandler(state, 0);
+    } else {
+      state[0] = this._handlers.length;
+    }
+    this._stateOffset = stateAllocator.allocate(state);
 
     // If initialization changed any cells we may need to updated the watched
     // cells.
@@ -3764,15 +3812,27 @@ SudokuConstraintHandler.Or = class Or extends SudokuConstraintHandler {
     return true;
   }
 
-  postInitialize(initialGridState) {
+  postInitialize(readonlyGridState) {
     for (const h of this._handlers) {
-      h.postInitialize(initialGridState);
+      h.postInitialize(readonlyGridState);
     }
-    this._scratchGrid = initialGridState.slice();
-    this._resultGrid = initialGridState.slice();
+    this._scratchGrid = readonlyGridState.slice();
+    this._resultGrid = readonlyGridState.slice();
   }
 
   enforceConsistency(grid, handlerAccumulator) {
+    // Check if we only have one handler left, and if so, enforce it directly.
+    if ((grid[this._stateOffset] & this.constructor._FLAG_FINAL)) {
+      const handlerIndex = grid[this._stateOffset] & ~this.constructor._FLAG_FINAL;
+
+      // Initialization is needed because we might be in an Or handler which
+      // means that it is not persistent.
+      if (!this._assignInitializations(grid, handlerIndex)) return false;
+
+      return this._handlers[handlerIndex].enforceConsistency(
+        grid, handlerAccumulator);
+    }
+
     const numGridCells = this._numGridCells;
 
     const resultGrid = this._resultGrid;
@@ -3784,15 +3844,12 @@ SudokuConstraintHandler.Or = class Or extends SudokuConstraintHandler {
       if (this._isInvalid(grid, i)) continue;
 
       const handler = this._handlers[i];
-      const initialization = this._initializations[i];
 
       // Initialize the scratch grid.
       scratchGrid.set(grid);
-      for (let j = 0; j < initialization.length; j += 2) {
-        if (!(scratchGrid[initialization[j]] &= initialization[j + 1])) {
-          this._markAsInvalid(grid, i);
-          continue;
-        }
+      if (!this._assignInitializations(scratchGrid, i)) {
+        this._markAsInvalid(grid, i);
+        continue;
       }
       // Enforce consistency on the scratch grid.
       if (!handler.enforceConsistency(scratchGrid, dummyHandlerAccumulator)) {
