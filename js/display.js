@@ -698,16 +698,21 @@ class OutsideClueDisplay extends DisplayItem {
       }
 
       // Ensure that the selected type is valid for this arrow.
-      if (!clueTypes.has(configs[form.type.value]?.clueType)) {
-        // If possible, select an arrow type that is already present.
-        if (arrow.currentValues.size) {
+      const currentClueTypeSelection = configs[form.type.value]?.clueType;
+      if (arrow.currentValues.size) {
+        // If we have existing clues, then make sure the selection matches ones
+        // of them.
+        if (!arrow.currentValues.has(currentClueTypeSelection)) {
           form.type.value = arrow.currentValues.keys().next().value;
-        } else {
-          for (const [type, config] of Object.entries(configs)) {
-            if (clueTypes.has(config.clueType)) {
-              form.type.value = type;
-              break;
-            }
+          form.dispatchEvent(new Event('change'));
+        }
+      } else if (!clueTypes.has(currentClueTypeSelection)) {
+        // Otherwise then select any valid clue type.
+        for (const [type, config] of Object.entries(configs)) {
+          if (clueTypes.has(config.clueType)) {
+            form.type.value = type;
+            form.dispatchEvent(new Event('change'));
+            break;
           }
         }
       }
