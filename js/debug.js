@@ -273,6 +273,9 @@ const runSolveTests = async (onFailure) => {
     'Full rank - 6 clue snipe',
     'Irregular region sum line',
     'Numbered Rooms vs X-Sums', // Or constraint
+    'Or with Givens', // Or constraint (update watched cells)
+    'And with AllDifferent', // And constraint (with cellExclusions)
+    'Or with AllDifferent', // Or constraint (with cellExclusions)
   ], onFailure);
   result.collection = '9x9';
   results.push(result);
