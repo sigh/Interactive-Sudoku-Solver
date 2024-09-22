@@ -106,7 +106,9 @@ SudokuConstraintHandler.And = class And extends SudokuConstraintHandler {
       const exclusionCells = h.exclusionCells();
       if (exclusionCells.length) {
         handlers.push(
-          new SudokuConstraintHandler.AllDifferentEnforcement(exclusionCells));
+          new SudokuConstraintHandler.AllDifferent(
+            exclusionCells,
+            SudokuConstraintHandler.AllDifferent.PROPAGATE_WITH_ENFORCER));
       }
     }
 
@@ -164,8 +166,18 @@ SudokuConstraintHandler.GivenCandidates = class GivenCandidates extends SudokuCo
 }
 
 SudokuConstraintHandler.AllDifferent = class AllDifferent extends SudokuConstraintHandler {
-  constructor(exclusionCells) {
-    super();
+  static PROPAGATE_WITH_EXCLUSION_CELLS = 0;
+  // Used by Or/And constraint to enforce when it can't be directly accessed by
+  // the engine.
+  static PROPAGATE_WITH_ENFORCER = 1;
+
+  constructor(exclusionCells, enforcementType) {
+    enforcementType ||= SudokuConstraintHandler.AllDifferent.PROPAGATE_WITH_EXCLUSION_CELLS;
+    super(enforcementType === SudokuConstraintHandler.AllDifferent.PROPAGATE_WITH_ENFORCER
+      ? exclusionCells : []);
+
+    this._enforcementType = enforcementType;
+
     exclusionCells = Array.from(new Set(exclusionCells));
     exclusionCells.sort((a, b) => a - b);
     this._exclusionCells = exclusionCells;
@@ -176,24 +188,15 @@ SudokuConstraintHandler.AllDifferent = class AllDifferent extends SudokuConstrai
   }
 
   exclusionCells() {
-    return this._exclusionCells;
-  }
-}
-
-// Special handler for enforcing all-different constraints which are not
-// top-level constraints.
-SudokuConstraintHandler.AllDifferentEnforcement = class AllDifferentEnforcement extends SudokuConstraintHandler {
-  constructor(exclusionCells) {
-    exclusionCells = Array.from(new Set(exclusionCells));
-    exclusionCells.sort((a, b) => a - b);
-    super(exclusionCells);
-  }
-
-  initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
-    return this.cells.length <= shape.numValues;
+    return this._enforcementType === this.constructor.PROPAGATE_WITH_EXCLUSION_CELLS
+      ? this._exclusionCells : [];
   }
 
   enforceConsistency(grid, handlerAccumulator) {
+    // NOTE: This is only called when enforcementType is
+    // ENFORCE_WITH_PROPAGATION.
+    // Currently a very simple, naive implementation.
+
     const cells = this.cells;
     const numCells = cells.length;
     for (let i = 0; i < numCells; i++) {
