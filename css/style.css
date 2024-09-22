@@ -790,7 +790,7 @@ input:checked+span:before {
   gap: 10px;
 }
 
-.debug-hover {
+.debug-checkbox+label {
   padding: 5px;
   width: fit-content;
 
@@ -801,9 +801,13 @@ input:checked+span:before {
   border-radius: 5px;
 }
 
-.debug-hover:hover {
+.debug-checkbox:checked+label {
   color: white;
   background-color: #888;
+}
+
+.debug-checkbox {
+  display: none;
 }
 
 #close-debug-button {
