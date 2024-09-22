@@ -185,19 +185,19 @@ class DebugManager {
       };
     }
 
-    // Setup hover elements.
-    const elements = [
+    // Setup debug checkboxes.
+    const debugCheckboxes = [
       ['debug-cell-id', (index) => this._shape.makeCellIdFromIndex(index)],
       ['debug-cell-index', (index) => index],
     ];
 
-    for (const [id, fn] of elements) {
+    for (const [id, fn] of debugCheckboxes) {
       const element = document.getElementById(id);
       const overlayValuesFn = () => {
         const numCells = this._shape.numCells;
         return [...new Array(numCells).keys()].map(fn);
       };
-      this._setInfoOverlayOnHover(element, overlayValuesFn);
+      this._setInfoOverlayOnCheck(element, overlayValuesFn);
     }
 
     // Debug puzzle loader.
@@ -416,11 +416,22 @@ class DebugManager {
     }
   }
 
+  _setInfoOverlayOnCheck(elem, data) {
+    elem.addEventListener('change', () => {
+      if (elem.checked) {
+        let values = data;
+        if (typeof data === 'function') values = data();
+        this._infoOverlay.setValues(
+          values, () => elem.checked = false);
+      } else {
+        this._infoOverlay.setValues();
+      }
+    });
+  }
+
   _setInfoOverlayOnHover(elem, data) {
     elem.addEventListener('mouseover', () => {
-      let values = data;
-      if (typeof data === 'function') values = data();
-      this._infoOverlay.setValues(values);
+      this._infoOverlay.setValues(data);
     });
     elem.addEventListener('mouseout', () => {
       this._infoOverlay.setValues();

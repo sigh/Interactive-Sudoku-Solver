@@ -2263,6 +2263,8 @@ class InfoOverlay {
     this._heatmap = displayContainer.createHighlighter();
     this._textInfo = new InfoTextDisplay(
       displayContainer.getNewGroup('text-info-group'));
+
+    this._onNextTextChangeFn = null;
   }
 
   reshape(shape) {
@@ -2274,7 +2276,15 @@ class InfoOverlay {
 
   clear() {
     this._heatmap.clear();
+    this._clearTextInfo();
+  }
+
+  _clearTextInfo() {
     this._textInfo.clear();
+    if (this._onNextTextChangeFn) {
+      this._onNextTextChangeFn();
+      this._onNextTextChangeFn = null;
+    }
   }
 
   setHeatmapValues(values) {
@@ -2289,9 +2299,10 @@ class InfoOverlay {
     }
   }
 
-  setValues(values) {
+  setValues(values, onChange) {
     const shape = this._shape;
-    this._textInfo.clear();
+    this._clearTextInfo();
+    if (onChange) this._onNextTextChangeFn = onChange;
 
     if (!values) return;
 
