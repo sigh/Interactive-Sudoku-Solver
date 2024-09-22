@@ -420,6 +420,7 @@ SudokuSolver.InternalSolver = class {
 
     // Initialize handlers.
     for (const handler of handlerSet) {
+      const initialCells = handler.cells;
       if (!handler.initialize(this._initialGrid, cellExclusions, this._shape)) {
         if (this._debugLogger.enableLogs) {
           this._debugLogger.log({
@@ -430,6 +431,13 @@ SudokuSolver.InternalSolver = class {
         }
 
         this._invalidateGrid(this._initialGrid, handler);
+      }
+
+      if (initialCells !== handler.cells) {
+        handlerSet.updateCells(
+          handlerSet.getIndex(handler),
+          initialCells,
+          handler.cells);
       }
     }
 

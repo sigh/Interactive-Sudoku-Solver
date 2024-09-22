@@ -637,6 +637,22 @@ const EXAMPLES = [
     input: '.~R2C2_8~R1C3_3~R1C5_2~R1C7_4~R4C9_2~R7C3_2~R8C7_9~R8C4_6.Or.NumberedRoom~R2~8~.XSum~R2~8~.End.Or.NumberedRoom~R3~8~.XSum~R3~8~.End.Or.NumberedRoom~R4~~8.XSum~R4~~8.End.Or.NumberedRoom~R4~5~.XSum~R4~5~.End.Or.NumberedRoom~R5~~8.XSum~R5~~8.End.Or.NumberedRoom~R5~2~.XSum~R5~2~.End.Or.NumberedRoom~R8~~1.XSum~R8~~1.End.Or.NumberedRoom~R8~8~.XSum~R8~8~.End.Or.NumberedRoom~C2~~8.XSum~C2~~8.End.Or.NumberedRoom~C4~~5.XSum~C4~~5.End.Or.NumberedRoom~C7~~8.XSum~C7~~8.End.Or.NumberedRoom~C7~8~.XSum~C7~8~.End.Or.NumberedRoom~C9~~7.XSum~C9~~7.End.Or.NumberedRoom~R6~~8.XSum~R6~~8.End.Or.NumberedRoom~C6~8~.XSum~C6~8~.End.Or.NumberedRoom~C5~6~.XSum~C5~6~.End.Or.NumberedRoom~C3~8~.XSum~C3~8~.End',
     solution: '753826419281947356964531278375194862498265137126378594612459783547683921839712645',
   },
+  {
+    // Ensure we handle the case where a handler doesn't register cells.
+    name: 'Or with Givens',
+    input: '.~R1C1_5~R1C2_3~R2C1_6~R2C6_5~R3C2_9~R3C3_8~R3C8_6~R7C2_6~R8C6_9~R8C9_5~R9C8_7~R9C5_8~R8C4_4~R7C7_2~R7C8_8~R5C9_1~R4C9_3~R4C5_6~R6C5_2~R5C4_8~R5C1_4~R4C1_8.Or.~R6C1_7.~R6C1_1.End',
+    solution: '534678912672195348198342567859761423426853791713924856961537284287419635345286179',
+  },
+  {
+    name: 'And with AllDifferent',
+    input: '.And.AllDifferent~R3C8~R4C7.End.~R1C1_5~R1C2_3~R2C1_6~R2C6_5~R3C2_9~R3C3_8~R7C2_6~R8C6_9~R8C9_5~R9C8_7~R9C5_8~R8C4_4~R7C7_2~R7C8_8~R5C9_1~R4C9_3~R4C5_6~R6C5_2~R5C4_8~R5C1_4~R4C1_8~R6C1_7~R1C5_9~R5C8_9~R7C4_5~R3C1_1~R1C4_2',
+    solution: '534298617672315948198746532859167423426853791713924856967531284281479365345682179',
+  },
+  {
+    name: 'Or with AllDifferent',
+    input: '.Or.AllDifferent~R3C8~R4C7.End.~R1C1_5~R1C2_3~R2C1_6~R2C6_5~R3C2_9~R3C3_8~R7C2_6~R8C6_9~R8C9_5~R9C8_7~R9C5_8~R8C4_4~R7C7_2~R7C8_8~R5C9_1~R4C9_3~R4C5_6~R6C5_2~R5C4_8~R5C1_4~R4C1_8~R6C1_7~R1C5_9~R5C8_9~R7C4_5~R3C1_1~R1C4_2',
+    solution: '534298617672315948198746532859167423426853791713924856967531284281479365345682179',
+  },
 ];
 
 for (const puzzle of EXAMPLES) {

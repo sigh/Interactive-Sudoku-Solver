@@ -7,6 +7,8 @@ class SudokuConstraintHandler {
 
   constructor(cells) {
     // This constraint is enforced whenever these cells are touched.
+    // cells must not be written to. They can be updated during initialization,
+    // but it must replace the array, not modify it.
     this.cells = new Uint8Array(cells || []);
     // By default all constraints are essential for correctness.
     // The optimizer may add non-essential constraints to improve performance.
@@ -92,9 +94,8 @@ SudokuConstraintHandler.False = class False extends SudokuConstraintHandler {
 
 SudokuConstraintHandler.And = class And extends SudokuConstraintHandler {
   constructor(...handlers) {
-    const cells = [...new Set(handlers.flatMap(h => [...h.cells]))];
-    super(cells);
-
+    // Exclusion cells need special handlings since they can't be handled
+    // directly by the engine.
     for (const h of handlers) {
       const exclusionCells = h.exclusionCells();
       if (exclusionCells.length) {
@@ -102,6 +103,10 @@ SudokuConstraintHandler.And = class And extends SudokuConstraintHandler {
           new SudokuConstraintHandler.AllDifferentEnforcement(exclusionCells));
       }
     }
+
+    const cells = [...new Set(handlers.flatMap(h => [...h.cells]))];
+    super(cells);
+
     this._handlers = handlers;
 
     this._debugName = `And(${handlers.map(h => h.debugName()).join(',')})`;
@@ -3662,6 +3667,17 @@ SudokuConstraintHandler.FullRank = class FullRank extends SudokuConstraintHandle
 
 SudokuConstraintHandler.Or = class Or extends SudokuConstraintHandler {
   constructor(...handlers) {
+    // Exclusion cells need special handlings since they can't be handled
+    // directly by the engine.
+    for (let i = 0; i < handlers.length; i++) {
+      const handler = handlers[i];
+      const exclusionCells = handler.exclusionCells();
+      if (exclusionCells.length) {
+        // The 'And' handler takes care of exclusion cells.
+        handlers[i] = new SudokuConstraintHandler.And(handler);
+      }
+    }
+
     const cells = [...new Set(handlers.flatMap(h => [...h.cells]))];
     super(cells);
 
@@ -3678,6 +3694,7 @@ SudokuConstraintHandler.Or = class Or extends SudokuConstraintHandler {
 
     // Initialize each handler and store any initialization changes that it
     // makes.
+    const initializationCells = new Set();
     const validHandlers = [];
     for (const handler of this._handlers) {
       this._scratchGrid.set(initialGrid);
@@ -3687,6 +3704,7 @@ SudokuConstraintHandler.Or = class Or extends SudokuConstraintHandler {
       for (let i = 0; i < shape.numCells; i++) {
         if (this._scratchGrid[i] !== initialGrid[i]) {
           initialization.push(i, this._scratchGrid[i]);
+          initializationCells.add(i);
         }
       }
       validHandlers.push(handler);
@@ -3694,7 +3712,20 @@ SudokuConstraintHandler.Or = class Or extends SudokuConstraintHandler {
     }
 
     this._handlers = validHandlers;
-    return validHandlers.length > 0;
+    if (validHandlers.length == 0) return false;
+
+    // If initialization changed any cells we may need to updated the watched
+    // cells.
+    if (initializationCells.size) {
+      const watchedCells = initializationCells;
+      for (const cell of this.cells) {
+        watchedCells.add(cell);
+      }
+
+      this.cells = this.cells.constructor.from(watchedCells);
+    }
+
+    return true;
   }
 
   enforceConsistency(grid, handlerAccumulator) {
@@ -3786,25 +3817,22 @@ class HandlerSet {
 
     const index = this._allHandlers.indexOf(oldHandler);
 
+    this._allHandlers[index] = newHandler;
     if (!arraysAreEqual(oldHandler.cells, newHandler.cells)) {
-      this._removeOrdinary(index);
-      this._addOrdinary(newHandler, index);
-    } else {
-      this._allHandlers[index] = newHandler;
+      this.updateCells(index, oldHandler.cells, newHandler.cells);
     }
+  }
+
+  updateCells(index, oldCells, newCells) {
+    for (const c of oldCells) {
+      const indexInMap = this._ordinaryHandlerMap[c].indexOf(index);
+      this._ordinaryHandlerMap[c].splice(indexInMap, 1);
+    }
+    newCells.forEach(c => this._ordinaryHandlerMap[c].push(index));
   }
 
   delete(handler) {
     this.replace(handler, new SudokuConstraintHandler.True());
-  }
-
-  _removeOrdinary(index) {
-    const handler = this._allHandlers[index];
-    for (const c of handler.cells) {
-      const indexInMap = this._ordinaryHandlerMap[c].indexOf(index);
-      this._ordinaryHandlerMap[c].splice(indexInMap, 1);
-    }
-    this._allHandlers[index] = null;
   }
 
   _addOrdinary(handler, index) {
