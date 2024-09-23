@@ -676,6 +676,10 @@ class OutsideClueDisplay extends DisplayItem {
 
     const form = document.forms['outside-clue-input'];
 
+    this._collapsibleContainer = new CollapsibleContainer(
+      form.firstElementChild);
+    this._collapsibleContainer.toggleOpen(false);
+
     let selectedArrow = null;
     inputManager.onSelection((cells) => {
       if (selectedArrow) selectedArrow.classList.remove('selected-arrow');
@@ -685,6 +689,8 @@ class OutsideClueDisplay extends DisplayItem {
 
     this._handleClick = (lineId, cells) => {
       const arrow = this._outsideArrowMap.get(lineId);
+
+      this._collapsibleContainer.toggleOpen(true);
 
       inputManager.setSelection(cells);
       form.firstElementChild.disabled = false;

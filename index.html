@@ -49,7 +49,7 @@ layout: null
           To set a value, select a cell and type a number.
         </p>
         <p>
-          To add a multi-cell constraint, select and drag; or shift-click.
+          To add a line or region constraint, select and drag; or shift-click.
         </p>
         <p>
           To add a Little Killer
@@ -58,24 +58,7 @@ layout: null
           constraint, select a diagonal arrow outside the grid.
         </p>
         <p>
-          To add a
-          Sandwich
-          <span class="tooltip"
-            data-text="Values between the 1 and the 9 in the row or column must add to the given sum.">
-          </span>,
-          X-Sum
-          <span class="tooltip" data-text="
-            The sum of the first X numbers must add up to the given sum.
-            X is the number in the first cell in the direction of the row
-            or column.
-          "></span>,
-          or Skyscraper
-          <span class="tooltip" data-text="
-            Digits in the grid represent skyscrapers of that height.
-            Higher skyscrapers obscure smaller ones.
-            Clues outside the grid show the number of visible skyscrapers in that row/column from the clue's direction of view.
-          "></span>
-          constraint, select a row/column arrow outside the grid.
+          To add other outside clue constraints, select a row or column arrow outside the grid.
         </p>
       </div>
     </div>
@@ -224,23 +207,28 @@ layout: null
       <div class="two-column">
         <div class="constraint-subpanel">
           <form id="multi-cell-constraint-input">
-            <fieldset tabindex="0">
-              <h2>Create from selection</h2>
-              <div>
-                <select id="multi-cell-constraint-select" name="constraint-type">
-                </select>
-              </div>
-              <div id="multi-cell-constraint-description" class="description">
-              </div>
-              <div id="multi-cell-constraint-loop-container">
-                <input type="checkbox" name="is-loop" id="multi-cell-constraint-loop-input"></input>
-                <label for="multi-cell-constraint-loop-input">Loop</label>
-              </div>
-              <div>
-                <div id="multi-cell-constraint-value-container"></div>
-                <button type="submit" name="add-constraint" title="Add constraint" disabled>
-                  Add
-                </button>
+            <fieldset tabindex="0" class="constraint-group">
+              <h2>Lines & Regions</h2>
+              <div id="multi-cell-constraint-body">
+                <span class="description">
+                  Select cells by dragging or shift-clicking.
+                </span>
+                <div>
+                  <select id="multi-cell-constraint-select" name="constraint-type">
+                  </select>
+                </div>
+                <div id="multi-cell-constraint-description" class="description">
+                </div>
+                <div id="multi-cell-constraint-loop-container">
+                  <input type="checkbox" name="is-loop" id="multi-cell-constraint-loop-input"></input>
+                  <label for="multi-cell-constraint-loop-input">Loop</label>
+                </div>
+                <div>
+                  <div id="multi-cell-constraint-value-container"></div>
+                  <button type="submit" name="add-constraint" title="Add constraint" disabled>
+                    Add
+                  </button>
+                </div>
               </div>
             </fieldset>
           </form>
@@ -251,7 +239,7 @@ layout: null
           </div>
 
           <form id="multi-value-cell-input">
-            <fieldset tabindex="0" disabled>
+            <fieldset tabindex="0" class="constraint-group" disabled>
               <h2>Set multiple values</h2>
               <div></div>
             </fieldset>
@@ -259,37 +247,37 @@ layout: null
         </div>
 
         <div>
-          <div class="constraint-group">
-            <h2>Layout constraints</h2>
-
+          <div id="layout-constraint-container" class="constraint-group">
+            <h2>Layout</h2>
             <div>
-              <select id="shape-select"></select>
-              <span class="tooltip" data-text="Change the grid shape."></span>
+              <div>
+                <select id="shape-select"></select>
+                <span class="tooltip" data-text="Change the grid shape."></span>
+              </div>
+
+              <div id="layout-constraint-checkboxes"></div>
+
+              <hr>
+              <div id="jigsaw-container">
+                <h3>
+                  Jigsaw Pieces
+                  <span class="tooltip"
+                    data-text="Values inside the jigsaw piece can't repeat. Pieces cannot overlap and must contain a cell for each different value (i.e. 9 cells for a 9x9 grid)."></span>
+                </h3>
+
+                <div id="displayed-regions"></div>
+                <button type="submit" id="add-jigsaw-button" title="Add Piece">
+                  Add Piece
+                </button>
+              </div>
             </div>
-
-            <div id="layout-constraint-checkboxes"></div>
-
-            <hr>
-            <div id="jigsaw-container">
-              <h3>
-                Jigsaw Pieces
-                <span class="tooltip"
-                  data-text="Values inside the jigsaw piece can't repeat. Pieces cannot overlap and must contain a cell for each different value (i.e. 9 cells for a 9x9 grid)."></span>
-              </h3>
-
-              <div id="displayed-regions"></div>
-              <button type="submit" id="add-jigsaw-button" title="Add Piece">
-                Add Piece
-              </button>
-            </div>
-
           </div>
         </div>
       </div>
 
       <form id="custom-binary-input">
-        <fieldset tabindex="0" disabled>
-          <h2>Custom binary constraint</h2>
+        <fieldset tabindex="0" class="constraint-group" disabled>
+          <h2>Custom binary constraints</h2>
           <div>
             <div>
               <div class="description">
@@ -344,14 +332,20 @@ layout: null
 
       <div>
         <form id="outside-clue-input">
-          <fieldset tabindex="0" disabled>
-            <input type="hidden" name="id">
-            <div id="outside-arrow-type-options"></div>
-            <div>
-              <input type="number" name="value" min=0 placeholder="value">
-              <button type="submit" title="Set constraint">Set</button>
-              <button type="button" id="outside-arrow-clear" class="danger-button"
-                title="Clear constraint">Clear</button>
+          <fieldset tabindex="0" class="constraint-group" disabled>
+            <h2>Outside clues</h2>
+            <div id="outside-clue-input-body">
+              <span class="description">
+                Select a row, column or diagonal arrow outside the grid.
+              </span>
+              <input type="hidden" name="id">
+              <div id="outside-arrow-type-options"></div>
+              <div>
+                <input type="number" name="value" min=0 placeholder="value">
+                <button type="submit" title="Set constraint">Set</button>
+                <button type="button" id="outside-arrow-clear" class="danger-button"
+                  title="Clear constraint">Clear</button>
+              </div>
             </div>
           </fieldset>
         </form>
