@@ -272,12 +272,12 @@ const shuffleArray = (arr, randomGenerator) => {
 };
 
 const autoSaveField = (element, field) => {
-  if (!element.id) {
+  const elementId = element.getAttribute('id');
+
+  if (!elementId) {
     console.error('Auto-save field must have an ID.');
     return;
   }
-
-  const elementId = element.getAttribute('id');
 
   const keySuffix = field ? `-${field}` : '';
   const key = `autoSave-${elementId}${keySuffix}`;
@@ -291,6 +291,26 @@ const autoSaveField = (element, field) => {
   element.addEventListener('change', () => {
     sessionStorage.setItem(key, input.value);
   });
+};
+
+const sessionAndLocalStorage = {
+  getItem: (key) => {
+    const sessionValue = sessionStorage.getItem(key);
+    if (sessionValue !== null) return sessionValue;
+
+    const localValue = localStorage.getItem(key);
+    if (localValue !== null) {
+      // Make sure the value is persisted in the current session.
+      sessionStorage.setItem(key, localValue);
+      return localValue;
+    }
+
+    return null;
+  },
+  setItem: (key, value) => {
+    sessionStorage.setItem(key, value);
+    localStorage.setItem(key, value);
+  }
 };
 
 // Random number generator which allows seeding.

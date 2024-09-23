@@ -20,6 +20,11 @@ layout: null
 
     gtag('config', 'G-2SQH4BL89R');
   </script>
+  <style type="text/css" media="screen">
+    .hide-until-load {
+      display: none !important;
+    }
+  </style>
 
   <script defer src="{{ '/data/example_puzzles.js?v=' | append: site.github.build_revision | relative_url }}"></script>
   <script defer src="{{ '/js/util.js?v=' | append: site.github.build_revision | relative_url }}"></script>
@@ -204,7 +209,7 @@ layout: null
         </div>
       </div>
 
-      <div class="two-column">
+      <div class="two-column hide-until-load">
         <div class="constraint-subpanel">
           <form id="multi-cell-constraint-input">
             <fieldset tabindex="0" class="constraint-group">
@@ -275,8 +280,8 @@ layout: null
         </div>
       </div>
 
-      <form id="custom-binary-input">
-        <fieldset tabindex="0" class="constraint-group" disabled>
+      <form id="custom-binary-input" class="hide-until-load">
+        <fieldset tabindex=" 0" class="constraint-group" disabled>
           <h2>Custom binary constraints</h2>
           <div>
             <div>
@@ -330,7 +335,7 @@ layout: null
         </fieldset>
       </form>
 
-      <div>
+      <div class="hide-until-load">
         <form id="outside-clue-input">
           <fieldset tabindex="0" class="constraint-group" disabled>
             <h2>Outside clues</h2>

@@ -166,22 +166,22 @@ class DebugManager {
 
     // Initialize options checkboxes.
     for (const [key, element] of this._checkboxes) {
-      const value = localStorage.getItem(key);
+      const value = sessionAndLocalStorage.getItem(key);
       if (value !== undefined) {
         element.checked = (value === 'true');
       }
       element.onchange = () => {
-        localStorage.setItem(key, element.checked);
+        sessionAndLocalStorage.setItem(key, element.checked);
       }
     }
 
     // Log level selector.
     {
       const logLevelElem = this._logLevelElem;
-      const value = localStorage.getItem('logLevel');
+      const value = sessionAndLocalStorage.getItem('logLevel');
       logLevelElem.value = value || '0';
       logLevelElem.onchange = () => {
-        localStorage.setItem('logLevel', logLevelElem.value);
+        sessionAndLocalStorage.setItem('logLevel', logLevelElem.value);
       };
     }
 
@@ -1279,11 +1279,11 @@ class SolutionController {
 
   _setUpAutoSolve() {
     this._elements.autoSolve.checked = (
-      localStorage.getItem('autoSolve') !== 'false');
+      sessionAndLocalStorage.getItem('autoSolve') !== 'false');
 
     this._elements.autoSolve.onchange = () => {
       let isChecked = this._elements.autoSolve.checked ? true : false;
-      localStorage.setItem('autoSolve', isChecked);
+      sessionAndLocalStorage.setItem('autoSolve', isChecked);
       // If we have enabled auto-solve, then start solving! Unless
       // we are already solving.
       if (isChecked && !this._isSolving) this._update();
