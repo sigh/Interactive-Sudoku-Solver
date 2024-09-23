@@ -453,6 +453,7 @@ button.icon-button {
   font-size: 25px;
   font-weight: bold;
   padding: 0px;
+  line-height: 1.2em;
 }
 
 #solution-iteration-state {

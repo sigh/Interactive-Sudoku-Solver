@@ -11,6 +11,10 @@ const initPage = () => {
     inputManager, displayContainer);
 
   controller = new SolutionController(constraintManager, displayContainer);
+
+  const hiddenElements = Array.from(
+    document.getElementsByClassName('hide-until-load'));
+  hiddenElements.forEach(e => e.classList.remove('hide-until-load'));
 };
 
 class ConstraintCollector {
@@ -203,7 +207,7 @@ ConstraintCollector._Checkbox = class _Checkbox extends ConstraintCollector {
 ConstraintCollector.GlobalCheckbox = class GlobalCheckbox extends ConstraintCollector._Checkbox {
   constructor(display) {
     const element = document.getElementById('global-constraints-container');
-    const container = new CollapsibleContainer(element);
+    const container = new CollapsibleContainer(element, true);
 
     super(
       display,
@@ -243,7 +247,7 @@ ConstraintCollector.LayoutCheckbox = class LayoutCheckbox extends ConstraintColl
 
   constructor(display) {
     const element = document.getElementById('layout-constraint-container');
-    new CollapsibleContainer(element);
+    new CollapsibleContainer(element, true);
 
     super(
       display,
@@ -297,7 +301,7 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
     this._setUp(selectionForm, this._constraintConfigs);
 
     this._collapsibleContainer = new CollapsibleContainer(
-      selectionForm.firstElementChild);
+      selectionForm.firstElementChild, true);
 
     inputManager.onSelection(
       (selection) => this._onNewSelection(selection, selectionForm));
@@ -2000,12 +2004,12 @@ class GridInputManager {
 }
 
 class CollapsibleContainer {
-  constructor(element) {
+  constructor(element, defaultOpen) {
     this._element = element;
-    this._setUp();
+    this._setUp(defaultOpen);
   }
 
-  _setUp() {
+  _setUp(defaultOpen) {
     const element = this._element;
     element.classList.add('collapsible-container');
 
@@ -2017,7 +2021,17 @@ class CollapsibleContainer {
     body.classList.add('collapsible-body');
     this._bodyElement = body;
 
-    this.toggleOpen(true);
+    this._element.classList.toggle('container-open', defaultOpen);
+
+    // Handle auto-save.
+    const autoSaveId = element.getAttribute('id') || element.parentNode.getAttribute('id');
+    if (!autoSaveId) {
+      console.error('Collapsible container must have an id attribute.');
+      return;
+    }
+    this._autoSaveKey = `autoSave-collapsible-${autoSaveId}`;
+    const savedValue = sessionAndLocalStorage.getItem(this._autoSaveKey);
+    if (savedValue) this.toggleOpen(savedValue === 'true');
   }
 
   isOpen() {
@@ -2025,7 +2039,11 @@ class CollapsibleContainer {
   }
 
   toggleOpen(open) {
-    this._element.classList.toggle('container-open', open);
+    const oldIsOpen = this.isOpen();
+    const newIsOpen = this._element.classList.toggle('container-open', open);
+    if (oldIsOpen !== newIsOpen) {
+      sessionAndLocalStorage.setItem(this._autoSaveKey, newIsOpen.toString());
+    }
   }
 
   element() {
@@ -2043,8 +2061,7 @@ ConstraintCollector.CustomBinary = class CustomBinary extends ConstraintCollecto
 
     this._form = document.getElementById('custom-binary-input');
     this._collapsibleContainer = new CollapsibleContainer(
-      this._form.firstElementChild);
-    this._collapsibleContainer.toggleOpen(false);
+      this._form.firstElementChild, false);
     inputManager.addSelectionPreserver(this._form);
 
     inputManager.onSelection(
@@ -2065,7 +2082,7 @@ ConstraintCollector.CustomBinary = class CustomBinary extends ConstraintCollecto
 
   _onSelection(selection) {
     const form = this._form;
-    toggleDisabled(this._collapsibleContainer.element(), selection.length == 0);
+    toggleDisabled(this._collapsibleContainer.element(), selection.length <= 1);
     if (selection.length > 1 && this._collapsibleContainer.isOpen()) {
       form['add-constraint'].focus();
     }
@@ -2160,8 +2177,7 @@ class MultiValueInputManager {
   constructor(inputManager, onChange) {
     this._form = document.getElementById('multi-value-cell-input');
     this._collapsibleContainer = new CollapsibleContainer(
-      this._form.firstElementChild);
-    this._collapsibleContainer.toggleOpen(false);
+      this._form.firstElementChild, false);
 
     inputManager.addSelectionPreserver(this._form);
     this._inputManager = inputManager;

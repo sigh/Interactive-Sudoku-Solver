@@ -677,8 +677,7 @@ class OutsideClueDisplay extends DisplayItem {
     const form = document.forms['outside-clue-input'];
 
     this._collapsibleContainer = new CollapsibleContainer(
-      form.firstElementChild);
-    this._collapsibleContainer.toggleOpen(false);
+      form.firstElementChild, false);
 
     let selectedArrow = null;
     inputManager.onSelection((cells) => {
