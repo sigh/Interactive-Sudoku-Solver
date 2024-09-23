@@ -1987,48 +1987,36 @@ class GridInputManager {
   }
 }
 
-class DropdownInputManager {
-  constructor(inputManager, containerId, onDropdownOpen) {
-    this._containerElem = document.getElementById(containerId);
-    this._dropdownElem = this._containerElem.getElementsByClassName('dropdown-container')[0];
-    this._onDropdownOpen = onDropdownOpen;
-
-    this._setUpDropdownInputManager(inputManager);
+class CollapsibleContainer {
+  constructor(element) {
+    this._element = element;
+    this._setUp();
   }
 
-  _setUpDropdownInputManager(inputManager) {
-    const dropdown = this._dropdownElem;
-    dropdown.getElementsByClassName('dropdown-anchor')[0].onclick = (e) => {
-      if (this._currentSelection.length == 0) return;
-      dropdown.classList.toggle('visible');
+  _setUp() {
+    const element = this._element;
+    element.classList.add('collapsible-container');
+
+    const anchor = element.firstElementChild;
+    anchor.classList.add('collapsible-anchor');
+    anchor.onclick = (e) => {
+      element.classList.toggle('container-open');
     };
-
-    inputManager.addSelectionPreserver(this._containerElem);
-
-    this._currentSelection = [];
+    const body = anchor.nextElementSibling;
+    body.classList.add('collapsible-body');
+    this._bodyElement = body;
   }
 
-  updateSelection(selection) {
-    this._currentSelection = selection;
-    // Add a delay so that the display doesn't flicker.
-    // We don't have to worry about consistency as it uses the
-    // latest value of _currentSelection.
-    window.setTimeout(() => {
-      if (this._currentSelection.length == 0) {
-        this._dropdownElem.classList.add('disabled');
-      } else {
-        this._dropdownElem.classList.remove('disabled');
-        this._onDropdownOpen(this._currentSelection);
-      }
-    }, 100);
-  };
-
-  currentSelection() {
-    return this._currentSelection.slice();
+  isOpen() {
+    return this._element.classList.contains('container-open');
   }
 
-  containerElem() {
-    return this._containerElem;
+  element() {
+    return this._element;
+  }
+
+  bodyElement() {
+    return this._bodyElement;
   }
 }
 
@@ -2036,17 +2024,19 @@ ConstraintCollector.CustomBinary = class CustomBinary extends ConstraintCollecto
   constructor(inputManager, display, panel) {
     super();
 
-    this._dropDownInputManager = new DropdownInputManager(
-      inputManager, 'custom-binary-input',
-      this._onDropdownOpen.bind(this));
+    this._form = document.getElementById('custom-binary-input');
+    this._collapsibleContainer = new CollapsibleContainer(
+      this._form.firstElementChild);
+    inputManager.addSelectionPreserver(this._form);
 
     inputManager.onSelection(
-      (selection) => this._dropDownInputManager.updateSelection(selection));
+      deferUntilAnimationFrame(this._onSelection.bind(this)));
 
     this._configs = new Map();
     this._shape = null;
     this._display = display;
     this._panel = panel;
+    this._inputManager = inputManager;
 
     this._setUp();
   }
@@ -2055,15 +2045,16 @@ ConstraintCollector.CustomBinary = class CustomBinary extends ConstraintCollecto
     this._shape = shape;
   }
 
-  _onDropdownOpen(selection) {
-    if (selection.length > 1) {
-      const form = this._dropDownInputManager.containerElem();
+  _onSelection(selection) {
+    const form = this._form;
+    toggleDisabled(this._collapsibleContainer.element(), selection.length == 0);
+    if (selection.length > 1 && this._collapsibleContainer.isOpen()) {
       form['add-constraint'].focus();
     }
   }
 
   _setUp() {
-    const form = this._dropDownInputManager.containerElem();
+    const form = this._form;
     const errorElem = document.getElementById(
       'custom-binary-input-function-error');
     form.onsubmit = e => {
@@ -2083,7 +2074,7 @@ ConstraintCollector.CustomBinary = class CustomBinary extends ConstraintCollecto
         return false;
       }
 
-      this._add(key, name, this._dropDownInputManager.currentSelection(), type);
+      this._add(key, name, this._inputManager.getSelection(), type);
       this.runUpdateCallback();
 
       return false;
@@ -2147,10 +2138,16 @@ ConstraintCollector.CustomBinary = class CustomBinary extends ConstraintCollecto
   }
 }
 
-class MultiValueInputManager extends DropdownInputManager {
+class MultiValueInputManager {
   constructor(inputManager, onChange) {
-    super(inputManager, 'multi-value-cell-input', () => { });
-    this._dropdownBody = this._dropdownElem.getElementsByClassName('dropdown-body')[0];
+    this._form = document.getElementById('multi-value-cell-input');
+    this._collapsibleContainer = new CollapsibleContainer(
+      this._form.firstElementChild);
+    inputManager.addSelectionPreserver(this._form);
+    this._inputManager = inputManager;
+    this.updateSelection = deferUntilAnimationFrame(
+      this.updateSelection.bind(this));
+
     this._onChange = onChange;
     this._givenLookup = (cell) => undefined;
     this._allValues = [];
@@ -2161,16 +2158,18 @@ class MultiValueInputManager extends DropdownInputManager {
   setGivenLookup(fn) { this._givenLookup = fn; }
 
   updateSelection(selection) {
-    this._currentSelection = [];
+    toggleDisabled(this._collapsibleContainer.element(), selection.length == 0);
     if (selection.length) {
       this._updateForm(
         this._givenLookup(selection[0]) || this._allValues);
+    } else {
+      this._updateForm([]);
     }
-    super.updateSelection(selection);
   };
 
   reshape(shape) {
     clearDOMNode(this._inputContainer);
+    this._valueButtons = [];
 
     this._allValues = Array.from({ length: shape.numValues }, (_, i) => i + 1);
 
@@ -2185,6 +2184,7 @@ class MultiValueInputManager extends DropdownInputManager {
       span.appendChild(document.createTextNode(this._allValues[i]));
       label.appendChild(span);
       this._inputContainer.appendChild(label);
+      this._valueButtons.push(input);
     }
 
     const numbersPerLine = Math.ceil(Math.sqrt(shape.numValues));
@@ -2193,32 +2193,32 @@ class MultiValueInputManager extends DropdownInputManager {
   }
 
   _setUp() {
-    const form = this._containerElem;
+    const form = this._form;
     form.onchange = () => {
-      if (this._currentSelection.length == 0) return;
+      const selection = this._inputManager.getSelection();
+      if (selection.length == 0) return;
 
-      this._onChange(
-        this._currentSelection,
-        this._getCheckedValues());
+      this._onChange(selection, this._getCheckedValues());
     };
 
-    const dropdownBody = this._dropdownBody;
+    const collapsibleBody = this._collapsibleContainer.bodyElement();
 
     this._inputContainer = document.createElement('div');
-    dropdownBody.append(this._inputContainer);
+    collapsibleBody.append(this._inputContainer);
+    this._valueButtons = [];
 
-    dropdownBody.append(document.createElement('hr'));
+    collapsibleBody.append(document.createElement('hr'));
 
     const buttonContainer = document.createElement('div');
     buttonContainer.style.setProperty(
       'grid-template-columns', `repeat(2, 1fr)`);
-    dropdownBody.append(buttonContainer);
+    collapsibleBody.append(buttonContainer);
     const addButton = (text, valueFilter) => {
       const button = document.createElement('button');
       button.textContent = text;
       button.onclick = () => {
         this._updateForm(this._allValues.filter(valueFilter));
-        this._containerElem.dispatchEvent(new Event('change'));
+        this._form.dispatchEvent(new Event('change'));
         return false;
       }
       button.classList.add('multi-value-input-control');
@@ -2232,11 +2232,10 @@ class MultiValueInputManager extends DropdownInputManager {
   }
 
   _getCheckedValues() {
-    const inputs = this._containerElem.elements;
     const numValues = this._allValues.length;
     const setValues = [];
     for (let i = 0; i < numValues; i++) {
-      if (inputs[i].checked) {
+      if (this._valueButtons[i].checked) {
         setValues.push(this._allValues[i]);
       }
     }
@@ -2245,12 +2244,11 @@ class MultiValueInputManager extends DropdownInputManager {
   }
 
   _updateForm(values) {
-    const inputs = this._containerElem.elements;
     for (let i = 0; i < this._allValues.length; i++) {
-      inputs[i].checked = false;
+      this._valueButtons[i].checked = false;
     }
     for (const value of values) {
-      inputs[value - 1].checked = true;
+      this._valueButtons[value - 1].checked = true;
     }
   }
 }
