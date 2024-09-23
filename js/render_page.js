@@ -202,9 +202,12 @@ ConstraintCollector._Checkbox = class _Checkbox extends ConstraintCollector {
 
 ConstraintCollector.GlobalCheckbox = class GlobalCheckbox extends ConstraintCollector._Checkbox {
   constructor(display) {
+    const element = document.getElementById('global-constraints-container');
+    const container = new CollapsibleContainer(element);
+
     super(
       display,
-      'global-constraint-checkboxes',
+      container.bodyElement().id,
       {
         AntiConsecutive: {
           text: 'Anti-Consecutive',
@@ -239,6 +242,9 @@ ConstraintCollector.LayoutCheckbox = class LayoutCheckbox extends ConstraintColl
   IS_LAYOUT = true;
 
   constructor(display) {
+    const element = document.getElementById('layout-constraint-container');
+    new CollapsibleContainer(element);
+
     super(
       display,
       'layout-constraint-checkboxes',
@@ -289,6 +295,9 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
 
     const selectionForm = document.forms['multi-cell-constraint-input'];
     this._setUp(selectionForm, this._constraintConfigs);
+
+    this._collapsibleContainer = new CollapsibleContainer(
+      selectionForm.firstElementChild);
 
     inputManager.onSelection(
       (selection) => this._onNewSelection(selection, selectionForm));
@@ -826,6 +835,8 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
     // Only enable the selection panel if the selection is long enough.
     const disabled = (selection.length == 0);
     selectionForm['add-constraint'].disabled = disabled;
+    selectionForm.classList.toggle('disabled', disabled);
+
     if (disabled) {
       // Reenable all the options, so that the user can select them and see
       // their descriptions.
@@ -1125,9 +1136,10 @@ ConstraintCollector.OutsideClue = class OutsideClue extends ConstraintCollector 
   _setUp(inputManager) {
     this._constraints = new Map();
 
-    let outsideArrowForm = document.forms['outside-clue-input'];
+    const outsideClueForm = document.forms['outside-clue-input'];
+
     const clearOutsideClue = () => {
-      let formData = new FormData(outsideArrowForm);
+      let formData = new FormData(outsideClueForm);
       const lineId = formData.get('id');
       const type = formData.get('type');
       this._display.removeOutsideClue(type, lineId);
@@ -1135,8 +1147,8 @@ ConstraintCollector.OutsideClue = class OutsideClue extends ConstraintCollector 
       inputManager.setSelection([]);
       this.runUpdateCallback();
     };
-    outsideArrowForm.onsubmit = e => {
-      let formData = new FormData(outsideArrowForm);
+    outsideClueForm.onsubmit = e => {
+      let formData = new FormData(outsideClueForm);
       let type = formData.get('type');
       let lineId = formData.get('id');
 
@@ -1158,7 +1170,7 @@ ConstraintCollector.OutsideClue = class OutsideClue extends ConstraintCollector 
       this.runUpdateCallback();
       return false;
     };
-    inputManager.addSelectionPreserver(outsideArrowForm);
+    inputManager.addSelectionPreserver(outsideClueForm);
 
     document.getElementById('outside-arrow-clear').onclick = clearOutsideClue;
   }
@@ -1999,16 +2011,21 @@ class CollapsibleContainer {
 
     const anchor = element.firstElementChild;
     anchor.classList.add('collapsible-anchor');
-    anchor.onclick = (e) => {
-      element.classList.toggle('container-open');
-    };
+    anchor.onclick = (e) => this.toggleOpen();
+
     const body = anchor.nextElementSibling;
     body.classList.add('collapsible-body');
     this._bodyElement = body;
+
+    this.toggleOpen(true);
   }
 
   isOpen() {
     return this._element.classList.contains('container-open');
+  }
+
+  toggleOpen(open) {
+    this._element.classList.toggle('container-open', open);
   }
 
   element() {
@@ -2027,6 +2044,7 @@ ConstraintCollector.CustomBinary = class CustomBinary extends ConstraintCollecto
     this._form = document.getElementById('custom-binary-input');
     this._collapsibleContainer = new CollapsibleContainer(
       this._form.firstElementChild);
+    this._collapsibleContainer.toggleOpen(false);
     inputManager.addSelectionPreserver(this._form);
 
     inputManager.onSelection(
@@ -2143,6 +2161,8 @@ class MultiValueInputManager {
     this._form = document.getElementById('multi-value-cell-input');
     this._collapsibleContainer = new CollapsibleContainer(
       this._form.firstElementChild);
+    this._collapsibleContainer.toggleOpen(false);
+
     inputManager.addSelectionPreserver(this._form);
     this._inputManager = inputManager;
     this.updateSelection = deferUntilAnimationFrame(

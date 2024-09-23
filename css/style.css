@@ -322,9 +322,17 @@ button.image-button>img {
   gap: 10px;
 }
 
+#constraint-panel .constraint-subpanel {
+  width: 180px;
+}
+
 #constraint-panel h1 {
   font-size: 20px;
   line-height: 1;
+}
+
+#layout-constraint-container {
+  width: 140px;
 }
 
 #constraint-panel form {
@@ -348,7 +356,11 @@ button.image-button>img {
   line-height: 1;
 }
 
-#outside-clue-input>fieldset>div:last-child {
+#outside-clue-input-body .description {
+  padding: 5px 0px;
+}
+
+#outside-clue-input-body>div:last-child {
   display: flex;
   align-items: center;
   column-gap: 15px;
@@ -371,16 +383,16 @@ input:invalid {
 .constraint-group {
   border-radius: 10px;
   border: 2px solid #aaa;
-  padding: 5px;
+  padding: 0;
+  margin: 0;
 }
 
-fieldset {
-  border-radius: 10px;
-  border: 2px solid #aaa;
-  width: fit-content;
+.constraint-group>* {
+  padding: 0px 5px;
 }
 
-fieldset[disabled] {
+fieldset[disabled],
+.disabled {
   color: darkgrey;
 }
 
@@ -559,7 +571,7 @@ select {
 #multi-cell-constraint-input>fieldset {
   border: none;
   background: rgb(0, 0, 255, 0.1);
-  width: 160px;
+  width: 100%;
 }
 
 #multi-cell-constraint-input button {
@@ -570,11 +582,7 @@ select {
   width: 100%;
 }
 
-#multi-cell-constraint-input.disabled {
-  color: grey;
-}
-
-#multi-cell-constraint-input>fieldset>div:last-child {
+#multi-cell-constraint-body>div:last-child {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -599,6 +607,7 @@ hr {
   border: 0;
   height: 1px;
   background-image: linear-gradient(to right, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.75), rgba(0, 0, 0, 0));
+  width: 100%;
 }
 
 #example-select+a {
@@ -908,6 +917,7 @@ h3 {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  line-height: 1em;
 }
 
 #custom-binary-input select {
@@ -934,16 +944,15 @@ h3 {
   position: relative;
   font-size: 14px;
   user-select: none;
-  line-height: 1.2em;
   margin: 0px;
-  padding: 0px;
 }
 
 .collapsible-container .collapsible-anchor {
   cursor: pointer;
   display: block;
-  padding: 5px 0px;
+  padding: 5px 10px;
   text-align: center;
+  line-height: 1.2em;
 }
 
 .collapsible-container .collapsible-anchor:after {
@@ -962,13 +971,12 @@ h3 {
 
 .collapsible-container .collapsible-body {
   display: none;
-  padding: 0;
-  margin: 0;
 }
 
 #multi-value-cell-input .collapsible-body {
   justify-items: center;
   text-align: center;
+  line-height: 1.2em;
 }
 
 #multi-value-cell-input .collapsible-body>div {
@@ -1001,11 +1009,7 @@ h3 {
   display: none;
 }
 
-.collapsible-container .collapsible-body li {
-  list-style: none;
-}
-
-.collapsible-container label {
+.multi-value-input-option {
   display: inline-flex;
   align-items: center;
   gap: 5px;
