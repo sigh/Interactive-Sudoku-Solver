@@ -219,6 +219,14 @@ const clearDOMNode = (node) => {
   }
 };
 
+const toggleDisabled = (element, disabled) => {
+  if (disabled) {
+    element.setAttribute('disabled', '');
+  } else {
+    element.removeAttribute('disabled');
+  }
+};
+
 const isIterable = (obj) => {
   return obj && typeof obj[Symbol.iterator] === 'function';
 };
