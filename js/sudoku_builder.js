@@ -414,21 +414,21 @@ class SudokuParser {
     return new SudokuConstraint.Set(constraints);
   }
 
-  static _collectGroups(revConstraints, groupType) {
+  static _resolveCompositeConstraints(revConstraints, compositeType) {
     const items = [];
 
     while (revConstraints.length) {
       const c = revConstraints.pop();
       if (c.type === 'End') break;
 
-      if (c.constructor.IS_GROUP) {
+      if (c.constructor.IS_COMPOSITE) {
         items.push(
-          this._collectGroups(revConstraints, c.constructor.name));
+          this._resolveCompositeConstraints(revConstraints, c.constructor.name));
       } else {
         items.push(c);
       }
     }
-    return new SudokuConstraint[groupType](items);
+    return new SudokuConstraint[compositeType](items);
   }
 
   static parseString(str) {
@@ -449,7 +449,7 @@ class SudokuParser {
       constraints.push(new cls(...args));
     }
 
-    return this._collectGroups(constraints.reverse(), 'Set');
+    return this._resolveCompositeConstraints(constraints.reverse(), 'Set');
   }
 
   static extractConstraintTypes(str) {
@@ -499,7 +499,7 @@ class CellArgs {
 
 class SudokuConstraintBase {
   static LOOPS_ALLOWED = false;
-  static IS_GROUP = false;
+  static IS_COMPOSITE = false;
   static COLLECTOR_CLASS = 'Experimental';
 
   constructor(args) {
@@ -609,7 +609,7 @@ class SudokuConstraint {
 
   static Set = class Set extends SudokuConstraintBase {
     static COLLECTOR_CLASS = null;
-    static IS_GROUP = true;
+    static IS_COMPOSITE = true;
 
     constructor(constraints) {
       super(arguments);
@@ -622,7 +622,7 @@ class SudokuConstraint {
   }
 
   static Or = class Or extends SudokuConstraintBase {
-    static IS_GROUP = true;
+    static IS_COMPOSITE = true;
 
     constructor(constraints) {
       super(arguments);
@@ -639,7 +639,7 @@ class SudokuConstraint {
   }
 
   static And = class And extends SudokuConstraintBase {
-    static IS_GROUP = true;
+    static IS_COMPOSITE = true;
 
     constructor(constraints) {
       super(arguments);
@@ -1418,7 +1418,7 @@ class SudokuBuilder {
     const args = constraint.args;
     const cls = SudokuConstraint[constraint.type];
 
-    if (cls.IS_GROUP) {
+    if (cls.IS_COMPOSITE) {
       args[0] = constraint.args[0].map(a => this.resolveConstraint(a));
     }
     return new cls(...args);
