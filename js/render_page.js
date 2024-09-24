@@ -279,7 +279,7 @@ ConstraintCollector.LayoutCheckbox = class LayoutCheckbox extends ConstraintColl
         },
         NoBoxes: {
           text: 'No Boxes',
-          description: `No standard 3x3 box sudoku constraints.`,
+          description: `No standard box regions.`,
           displayClass: ConstraintDisplays.DefaultRegionsInverted,
         },
       });
@@ -782,7 +782,7 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
         } else {
           input = document.createElement('input');
           input.setAttribute('type', 'text');
-          input.setAttribute('size', '10');
+          input.setAttribute('size', '8');
           input.setAttribute('placeholder', config.value.placeholder);
         }
         input.setAttribute('name', name + '-value');
@@ -2100,7 +2100,13 @@ ConstraintCollector.CustomBinary = class CustomBinary extends ConstraintCollecto
     const form = this._form;
     toggleDisabled(this._collapsibleContainer.element(), selection.length <= 1);
     if (selection.length > 1 && this._collapsibleContainer.isOpen()) {
-      form['add-constraint'].focus();
+      // If the function is empty, focus on it. Otherwise focus on the
+      // add button.
+      if (form['function'].value === '') {
+        form['function'].focus();
+      } else {
+        form['add-constraint'].focus();
+      }
     }
   }
 
