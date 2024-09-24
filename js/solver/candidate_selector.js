@@ -32,9 +32,15 @@ class CandidateSelector {
     return this._cellOrder.subarray(0, upto);
   }
 
+  getCellAtDepth(cellDepth) {
+    return this._cellOrder[cellDepth];
+  }
+
   // selectNextCandidate find the next candidate to try.
-  // Returns [nextCells, value, count]:
-  //   nextCells[0]: The cell which contains the next candidate.
+  // cellOrder will be updated such that cellOrder[cellDepth] is the next cell
+  // to explore.
+  // Returns [nextDepth, value, count]:
+  //   nextDepth: Index into cellOrder passing all singletons.
   //   value: The candidate value in the nextCells[0].
   //   count: The number of options we selected from:
   //      - If `count` == 1, then this is a known value and the solver will
@@ -42,7 +48,6 @@ class CandidateSelector {
   //      - Most of the time, `count` will equal the number of values in
   //        nextCells[0], but it may be less if we are branching on something
   //        other than the cell (e.g. a digit within a house).
-  //   nextCells[1:]: Singleton cells which can be enforced at the same time.
   selectNextCandidate(cellDepth, gridState, stepState, isNewNode) {
     const cellOrder = this._cellOrder;
     let [cellOffset, value, count] = this._selectBestCandidate(
@@ -89,7 +94,7 @@ class CandidateSelector {
       }
     }
 
-    return [cellOrder.subarray(cellDepth, nextCellDepth), value, count];
+    return [nextCellDepth, value, count];
   }
 
   _updateCellOrder(cellDepth, cellOffset, count, grid) {
