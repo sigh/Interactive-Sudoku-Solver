@@ -252,7 +252,8 @@ button.image-button>img {
   font-weight: bold;
 }
 
-#displayed-constraints {
+#displayed-composite-constraints,
+#displayed-ordinary-constraints {
   display: grid;
   grid-template-columns: 1fr 1fr;
 
@@ -263,6 +264,10 @@ button.image-button>img {
   width: min-content;
   min-width: 100%;
   line-height: 1.2em;
+}
+
+#displayed-composite-constraints {
+  grid-template-columns: 1fr;
 }
 
 #jigsaw-container {
@@ -314,18 +319,17 @@ button.image-button>img {
 }
 
 #constraint-panel {
-  width: 370px;
-}
-
-#constraint-panel,
-#constraint-panel .constraint-subpanel {
   line-height: 1.8;
   display: flex;
   flex-direction: column;
   gap: 10px;
+  width: 370px;
 }
 
-#constraint-panel .constraint-subpanel {
+#constraint-panel>.two-column>div {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
   width: 180px;
 }
 

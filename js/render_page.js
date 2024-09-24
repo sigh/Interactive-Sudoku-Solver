@@ -126,6 +126,37 @@ ConstraintCollector.Experimental = class Experimental extends ConstraintCollecto
   }
 }
 
+ConstraintCollector.Composite = class Composite extends ConstraintCollector {
+  constructor(panel) {
+    super();
+    this._panel = panel;
+    this._panelConfigs = [];
+  }
+
+  clear() {
+    this._panelConfigs = [];
+  }
+
+  _removeConstraint(config) {
+    arrayRemoveValue(this._panelConfigs, config);
+  }
+
+  addConstraint(constraint) {
+    const config = {
+      cells: [],
+      name: constraint.toString().replace(/[.]/g, ' '),
+      constraint: constraint,
+      removeFn: () => { this._removeConstraint(config); },
+    };
+    this._panelConfigs.push(config);
+    this._panel.addItem(config);
+  }
+
+  getConstraints() {
+    return this._panelConfigs.map(c => c.constraint);
+  }
+}
+
 ConstraintCollector._Checkbox = class _Checkbox extends ConstraintCollector {
   IS_SHAPE_AGNOSTIC = true;
 
@@ -1330,9 +1361,14 @@ class ConstraintManager {
   }
 
   _setUp(inputManager, displayContainer) {
-    this._constraintPanel = this.addReshapeListener(
+    this._ordinaryConstraintPanel = this.addReshapeListener(
       new ConstraintPanel(
-        document.getElementById('displayed-constraints'),
+        document.getElementById('displayed-ordinary-constraints'),
+        this._display, displayContainer, this.runUpdateCallback.bind(this)));
+
+    this._compositeConstraintPanel = this.addReshapeListener(
+      new ConstraintPanel(
+        document.getElementById('displayed-composite-constraints'),
         this._display, displayContainer, this.runUpdateCallback.bind(this)));
 
     const jigsawPanel = this.addReshapeListener(
@@ -1353,12 +1389,13 @@ class ConstraintManager {
       new ConstraintCollector.Jigsaw(
         this._display, inputManager, jigsawPanel),
       new ConstraintCollector.MultiCell(
-        this._display, this._constraintPanel, inputManager),
+        this._display, this._ordinaryConstraintPanel, inputManager),
       new ConstraintCollector.CustomBinary(
-        inputManager, this._display, this._constraintPanel),
+        inputManager, this._display, this._ordinaryConstraintPanel),
       new ConstraintCollector.OutsideClue(inputManager, this._display),
       new ConstraintCollector.GivenCandidates(inputManager, this._display),
-      new ConstraintCollector.Experimental(this._constraintPanel),
+      new ConstraintCollector.Experimental(this._ordinaryConstraintPanel),
+      new ConstraintCollector.Composite(this._compositeConstraintPanel),
     ];
 
     for (const collector of collectors) {
@@ -1420,7 +1457,8 @@ class ConstraintManager {
   _experimentalConstraintWarning(constraint) {
     const experimentalConstraints = new Set();
     constraint.forEachTopLevel(c => {
-      if (c.constructor.COLLECTOR_CLASS === 'Experimental') {
+      if (c.constructor.COLLECTOR_CLASS === 'Experimental'
+        || c.constructor.COLLECTOR_CLASS === 'Composite') {
         experimentalConstraints.add(c.type);
       }
     });
@@ -1515,7 +1553,8 @@ class ConstraintManager {
   clear() {
     this._display.clear();
     GroupHighlighter.clear();
-    this._constraintPanel.clear();
+    this._ordinaryConstraintPanel.clear();
+    this._compositeConstraintPanel.clear();
     for (const collector of this._constraintCollectors.values()) {
       collector.clear();
     }
