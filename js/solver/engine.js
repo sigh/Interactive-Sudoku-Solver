@@ -697,15 +697,13 @@ SudokuSolver.InternalSolver = class {
       const cellDepth = recFrame.cellDepth;
       let grid = recFrame.gridCells;
 
-      const [nextCells, value, count] =
+      const [nextDepth, value, count] =
         this._candidateSelector.selectNextCandidate(
           cellDepth, grid, this._stepState, recFrame.newNode);
       recFrame.newNode = false;
       if (count === 0) continue;
 
-      const nextDepth = cellDepth + nextCells.length;
       // The first nextCell maybe a guess, but the rest are singletons.
-      const cell = nextCells[0];
       if (yieldEveryStep) {
         this._stepState.oldGrid.set(grid);
       }
@@ -717,7 +715,7 @@ SudokuSolver.InternalSolver = class {
 
       {
         // We are enforcing several values at once.
-        counters.valuesTried += nextCells.length;
+        counters.valuesTried += nextDepth - cellDepth;
 
         iterationCounterForUpdates++;
         if ((iterationCounterForUpdates & backtrackDecayMask) === 0) {
@@ -732,9 +730,10 @@ SudokuSolver.InternalSolver = class {
 
       // Determine the set of cells/constraints to enforce next.
       const handlerAccumulator = this._handlerAccumulator;
-      handlerAccumulator.reset(nextDepth == this._numCells);
-      for (let i = 0; i < nextCells.length; i++) {
-        handlerAccumulator.addForFixedCell(nextCells[i]);
+      handlerAccumulator.reset(nextDepth === this._numCells);
+      for (let i = cellDepth; i < nextDepth; i++) {
+        handlerAccumulator.addForFixedCell(
+          this._candidateSelector.getCellAtDepth(i));
       }
       // Queue up extra constraints based on prior backtracks. The idea being
       // that constraints that apply this the contradiction cell are likely
@@ -745,6 +744,7 @@ SudokuSolver.InternalSolver = class {
         handlerAccumulator.addForCell(recFrame.lastContradictionCell);
       }
 
+      const cell = this._candidateSelector.getCellAtDepth(cellDepth);
       if (count !== 1) {
         // We only need to start a new recursion frame when there is more than
         // one value to try.
