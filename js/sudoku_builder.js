@@ -622,6 +622,7 @@ class SudokuConstraint {
   }
 
   static Or = class Or extends SudokuConstraintBase {
+    static COLLECTOR_CLASS = 'Composite';
     static IS_COMPOSITE = true;
 
     constructor(constraints) {
@@ -639,6 +640,7 @@ class SudokuConstraint {
   }
 
   static And = class And extends SudokuConstraintBase {
+    static COLLECTOR_CLASS = 'Composite';
     static IS_COMPOSITE = true;
 
     constructor(constraints) {
