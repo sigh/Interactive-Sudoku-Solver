@@ -391,6 +391,11 @@ input:invalid {
   padding: 0px 5px;
 }
 
+.constraint-group-highlight:not(.container-open) {
+  border-color: rgb(150 150 255);
+  box-shadow: 0 0 8px rgb(150 150 255);
+}
+
 fieldset[disabled],
 .disabled {
   color: darkgrey;

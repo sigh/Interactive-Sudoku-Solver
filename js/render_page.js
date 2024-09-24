@@ -146,6 +146,7 @@ ConstraintCollector._Checkbox = class _Checkbox extends ConstraintCollector {
         if (config.displayClass) {
           display.toggleItem(constraint, input.checked, config.displayClass);
         }
+        GroupHighlighter.toggleHighlightForElement(input, input.checked);
         this.runUpdateCallback();
       };
       div.appendChild(input);
@@ -246,9 +247,6 @@ ConstraintCollector.LayoutCheckbox = class LayoutCheckbox extends ConstraintColl
   IS_LAYOUT = true;
 
   constructor(display) {
-    const element = document.getElementById('layout-constraint-container');
-    new CollapsibleContainer(element, true);
-
     super(
       display,
       'layout-constraint-checkboxes',
@@ -1019,6 +1017,7 @@ ConstraintCollector.Jigsaw = class Jigsaw extends ConstraintCollector {
 
   _removePiece(config) {
     config.cells.forEach(c => this._piecesMap[this._shape.parseCellId(c).cell] = 0);
+    GroupHighlighter.toggleHighlightForElement(this._panel.element(), false);
   }
 
   _addPiece(cells) {
@@ -1032,6 +1031,7 @@ ConstraintCollector.Jigsaw = class Jigsaw extends ConstraintCollector {
       displayElem: this._display.drawItem({ cells }, ConstraintDisplays.Jigsaw, null),
       removeFn: () => { this._removePiece(config); },
     };
+    GroupHighlighter.toggleHighlightForElement(this._panel.element(), true);
     this._panel.addItem(config);
   }
 
@@ -1340,6 +1340,12 @@ class ConstraintManager {
         document.getElementById('displayed-regions'),
         this._display, displayContainer, this.runUpdateCallback.bind(this)));
 
+    {
+      const layoutContainer = new CollapsibleContainer(
+        document.getElementById('layout-constraint-container'), true);
+      inputManager.addSelectionPreserver(layoutContainer.anchorElement());
+    }
+
     const collectors = [
       new ConstraintCollector.Shape(),
       new ConstraintCollector.GlobalCheckbox(this._display),
@@ -1508,6 +1514,7 @@ class ConstraintManager {
 
   clear() {
     this._display.clear();
+    GroupHighlighter.clear();
     this._constraintPanel.clear();
     for (const collector of this._constraintCollectors.values()) {
       collector.clear();
@@ -1527,6 +1534,10 @@ class ConstraintPanel {
 
   reshape(shape) {
     this._shape = shape;
+  }
+
+  element() {
+    return this._panelElement;
   }
 
   addItem(config) {
@@ -2016,6 +2027,7 @@ class CollapsibleContainer {
     const anchor = element.firstElementChild;
     anchor.classList.add('collapsible-anchor');
     anchor.onclick = (e) => this.toggleOpen();
+    this._anchorElement = anchor;
 
     const body = anchor.nextElementSibling;
     body.classList.add('collapsible-body');
@@ -2052,6 +2064,10 @@ class CollapsibleContainer {
 
   bodyElement() {
     return this._bodyElement;
+  }
+
+  anchorElement() {
+    return this._anchorElement;
   }
 }
 
@@ -2343,6 +2359,37 @@ class InfoOverlay {
     for (let i = 0; i < values.length; i++) {
       const cellId = shape.makeCellIdFromIndex(i);
       this._textInfo.setText(cellId, values[i]);
+    }
+  }
+}
+
+class GroupHighlighter {
+  static highlightMap = new Map();
+
+  static _HIGHLIGHT_CLASS = 'constraint-group-highlight';
+
+  static toggleHighlightForElement(element, enable) {
+    const group = element.closest('.constraint-group');
+    if (!this.highlightMap.has(group)) {
+      this.highlightMap.set(group, new Set());
+    }
+    const groupSet = this.highlightMap.get(group);
+
+    if (enable) {
+      group.classList.add(this._HIGHLIGHT_CLASS);
+      groupSet.add(element);
+    } else {
+      groupSet.delete(element);
+      if (groupSet.size === 0) {
+        group.classList.remove(this._HIGHLIGHT_CLASS);
+      }
+    }
+  }
+
+  static clear() {
+    for (const [group, elements] of this.highlightMap) {
+      group.classList.remove(this._HIGHLIGHT_CLASS);
+      elements.clear();
     }
   }
 }
