@@ -270,15 +270,14 @@ button.image-button>img {
 }
 
 #displayed-regions {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
 
   background: rgba(0, 0, 255, 0.1);
   border-radius: 10px;
+  margin-bottom: 5px;
 
-  height: 90px;
-  overflow-y: auto;
-  overflow-x: hidden;
+  min-height: 4em;
 }
 
 .constraint-item {
@@ -314,6 +313,10 @@ button.image-button>img {
   color: #bc3315;
 }
 
+#constraint-panel {
+  width: 370px;
+}
+
 #constraint-panel,
 #constraint-panel .constraint-subpanel {
   line-height: 1.8;
@@ -329,10 +332,6 @@ button.image-button>img {
 #constraint-panel h1 {
   font-size: 20px;
   line-height: 1;
-}
-
-#layout-constraint-container {
-  width: 140px;
 }
 
 #constraint-panel form {
@@ -527,10 +526,13 @@ select {
   margin: 10px 0;
 }
 
+#shape-container {
+  border-color: transparent;
+}
+
 #shape-select {
   padding: 0px 5px 0px 10px;
-  margin: 0;
-  margin-right: 2px;
+  margin: 0 5px;
 }
 
 .two-column {
@@ -572,30 +574,6 @@ select {
   grid-template-columns: repeat(2, 1fr);
   column-gap: 10px;
   row-gap: 5px;
-}
-
-#multi-cell-constraint-input>fieldset {
-  border: none;
-  background: rgb(0, 0, 255, 0.1);
-  width: 100%;
-}
-
-#multi-cell-constraint-input button {
-  margin-left: 10px;
-}
-
-#multi-cell-constraint-input select {
-  width: 100%;
-}
-
-#multi-cell-constraint-body>div:last-child {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-#multi-cell-constraint-loop-container {
-  margin-bottom: -10px;
 }
 
 .description {
@@ -914,10 +892,6 @@ h3 {
   color: black;
 }
 
-#custom-binary-input {
-  width: 350px;
-}
-
 #custom-binary-input .collapsible-body>div {
   margin: 5px;
   display: flex;
@@ -951,6 +925,7 @@ h3 {
   font-size: 14px;
   user-select: none;
   margin: 0px;
+  width: 100%;
 }
 
 .collapsible-container .collapsible-anchor {
@@ -975,8 +950,30 @@ h3 {
   transform: translateY(5px) rotate(45deg);
 }
 
-.collapsible-container .collapsible-body {
+.collapsible-container:not(.container-open) .collapsible-body {
   display: none;
+}
+
+#multi-cell-constraint-input>.collapsible-container {
+  background: rgb(0, 0, 255, 0.1);
+}
+
+#multi-cell-constraint-input button {
+  margin-left: 10px;
+}
+
+#multi-cell-constraint-input select {
+  width: 100%;
+}
+
+#multi-cell-constraint-body>div:last-child {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+#multi-cell-constraint-loop-container {
+  margin-bottom: -10px;
 }
 
 #multi-value-cell-input .collapsible-body {
@@ -1019,14 +1016,6 @@ h3 {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-}
-
-.collapsible-container {
-  width: 100%;
-}
-
-.collapsible-container.container-open .collapsible-body {
-  display: grid;
 }
 
 .duplicate-log-line {

@@ -211,6 +211,14 @@ layout: null
 
       <div class="two-column hide-until-load">
         <div class="constraint-subpanel">
+
+          <form id="multi-value-cell-input">
+            <fieldset tabindex="0" class="constraint-group" disabled>
+              <h2>Set multiple values</h2>
+              <div></div>
+            </fieldset>
+          </form>
+
           <form id="multi-cell-constraint-input">
             <fieldset tabindex="0" class="constraint-group">
               <h2>Lines & Regions</h2>
@@ -237,45 +245,47 @@ layout: null
               </div>
             </fieldset>
           </form>
+        </div>
+
+        <div class="constraint-subpanel">
+          <div id="shape-container" class="constraint-group">
+            <h2>
+              Shape
+              <select id="shape-select"></select>
+              <span class="tooltip" data-text="
+              Change the grid shape.
+              Box regions are made as close to square as possible.
+              Prime numbered grid sizes have no boxes.">
+              </span>
+            </h2>
+            </h2>
+          </div>
 
           <div class="constraint-group" id="global-constraints-container">
             <h2>Global constraints</h2>
             <div id="global-constraint-checkboxes"></div>
           </div>
-
-          <form id="multi-value-cell-input">
-            <fieldset tabindex="0" class="constraint-group" disabled>
-              <h2>Set multiple values</h2>
-              <div></div>
-            </fieldset>
-          </form>
         </div>
 
-        <div>
-          <div id="layout-constraint-container" class="constraint-group">
-            <h2>Layout</h2>
+      </div>
+
+      <div id="layout-constraint-container" class="constraint-group hide-until-load">
+        <h2>Layout constraints</h2>
+        <div class="two-column">
+
+          <div id="layout-constraint-checkboxes"></div>
+
+          <div id="jigsaw-container">
             <div>
-              <div>
-                <select id="shape-select"></select>
-                <span class="tooltip" data-text="Change the grid shape."></span>
-              </div>
+              <button type="submit" id="add-jigsaw-button" title="Add Piece">
+                Add Jigsaw Piece
+              </button>
+              <span class="tooltip"
+                data-text="Values inside the jigsaw piece can't repeat. Pieces cannot overlap and must contain a cell for each different value (i.e. 9 cells for a 9x9 grid)."></span>
 
-              <div id="layout-constraint-checkboxes"></div>
-
-              <hr>
-              <div id="jigsaw-container">
-                <h3>
-                  Jigsaw Pieces
-                  <span class="tooltip"
-                    data-text="Values inside the jigsaw piece can't repeat. Pieces cannot overlap and must contain a cell for each different value (i.e. 9 cells for a 9x9 grid)."></span>
-                </h3>
-
-                <div id="displayed-regions"></div>
-                <button type="submit" id="add-jigsaw-button" title="Add Piece">
-                  Add Piece
-                </button>
-              </div>
             </div>
+
+            <div id="displayed-regions"></div>
           </div>
         </div>
       </div>
@@ -340,9 +350,9 @@ layout: null
           <fieldset tabindex="0" class="constraint-group" disabled>
             <h2>Outside clues</h2>
             <div id="outside-clue-input-body">
-              <span class="description">
+              <div class="description">
                 Select a row, column or diagonal arrow outside the grid.
-              </span>
+              </div>
               <input type="hidden" name="id">
               <div id="outside-arrow-type-options"></div>
               <div>
