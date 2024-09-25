@@ -459,6 +459,7 @@ class HighlightDisplay extends DisplayItem {
 
     this._shape = null;
     this._applyGridOffset(svg);
+    this._groups = new Map();
   }
 
   static makeRadialGradient(id) {
@@ -482,21 +483,30 @@ class HighlightDisplay extends DisplayItem {
     return gradient;
   }
 
+  _getGroup(cssClass) {
+    if (this._groups.has(cssClass)) return this._groups.get(cssClass);
+
+    const group = createSvgElement('g');
+    group.setAttribute('class', cssClass);
+    this._svg.append(group);
+    this._groups.set(cssClass, group);
+
+    return group;
+  }
+
   highlightCell(cellId, cssClass) {
     const parsed = this._shape.parseCellId(cellId);
 
     const path = this._makeCellSquare(parsed.cell);
-    if (cssClass) {
-      path.setAttribute('class', cssClass);
-    }
+    const svg = cssClass ? this._getGroup(cssClass) : this._svg;
 
-    this._svg.appendChild(path);
+    svg.appendChild(path);
 
     return path;
   }
 
   removeHighlight(path) {
-    this._svg.removeChild(path);
+    path.parentNode.removeChild(path);
   }
 }
 

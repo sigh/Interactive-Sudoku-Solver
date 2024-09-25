@@ -559,11 +559,11 @@ class SudokuConstraintBase {
   static _directionStr(rowCol, clueInc, clueDec) {
     const parts = [];
     if (rowCol[0] == 'C') {
-      if (clueInc) parts.push(`↓ ${clueInc}`);
-      if (clueDec) parts.push(`↑ ${clueDec}`);
+      if (clueInc) parts.push(`↓${clueInc}`);
+      if (clueDec) parts.push(`↑${clueDec}`);
     } else {
-      if (clueInc) parts.push(`→ ${clueInc}`);
-      if (clueDec) parts.push(`← ${clueDec}`);
+      if (clueInc) parts.push(`→${clueInc}`);
+      if (clueDec) parts.push(`←${clueDec}`);
     }
     return parts.join(' ');
   }
@@ -1051,11 +1051,6 @@ class SudokuConstraint {
     constructor(direction) {
       super(arguments);
       this.direction = direction;
-    }
-
-    chipLabel() {
-      const suffix = this.direction < 0 ? '╲' : '╱';
-      return `Diagonal ${suffix}`;
     }
   }
 
