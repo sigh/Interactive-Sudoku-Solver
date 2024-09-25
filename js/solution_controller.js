@@ -304,6 +304,7 @@ class DebugManager {
   clear() {
     this._logOutput.textContent = '';
     this._infoOverlay?.clear();
+    this._debugCellHighlighter?.clear();
     clearDOMNode(this._debugPuzzleSrc);
 
     this._logDedupe = {

@@ -180,7 +180,8 @@ ConstraintCollector._Checkbox = class _Checkbox extends ConstraintCollector {
 
       const label = document.createElement('label');
       label.htmlFor = checkboxId;
-      label.textContent = constraint.chipLabel() + ' ';
+      const displayName = constraint.constructor.displayName();
+      label.textContent = `${displayName} ${option?.text || ''} `;
       div.appendChild(label);
 
       const tooltip = document.createElement('span');
@@ -283,8 +284,8 @@ ConstraintCollector.LayoutCheckbox = class LayoutCheckbox extends ConstraintColl
           description: `Values along the diagonal must be unique.`,
           value: {
             options: [
-              { value: 1 },
-              { value: -1 },
+              { text: '╱', value: 1 },
+              { text: '╲', value: -1 },
             ],
           },
           displayClass: ConstraintDisplays.Diagonal,
@@ -991,7 +992,6 @@ ConstraintCollector.Jigsaw = class Jigsaw extends ConstraintCollector {
 
   clear() {
     this._piecesMap.fill(0);
-    this._chipView.clear();
   }
 
   _removePiece(config) {
@@ -1313,20 +1313,15 @@ class ConstraintManager {
   }
 
   _setUp(inputManager, displayContainer) {
-    this._ordinaryChipView = this.addReshapeListener(
-      new ConstraintChipView(
-        document.getElementById('ordinary-chip-view'),
-        this._display, displayContainer, this.runUpdateCallback.bind(this)));
-
-    this._compositeChipView = this.addReshapeListener(
-      new ConstraintChipView(
-        document.getElementById('composite-chip-view'),
-        this._display, displayContainer, this.runUpdateCallback.bind(this)));
-
-    const jigsawChipView = this.addReshapeListener(
-      new ConstraintChipView(
-        document.getElementById('jigsaw-chip-view'),
-        this._display, displayContainer, this.runUpdateCallback.bind(this)));
+    const chipViews = new Map();
+    for (const type of ['ordinary', 'composite', 'jigsaw']) {
+      const chipView = this.addReshapeListener(
+        new ConstraintChipView(
+          document.getElementById(`${type}-chip-view`),
+          this._display, displayContainer, this.runUpdateCallback.bind(this)));
+      chipViews.set(type, chipView);
+    };
+    this._chipViews = chipViews;
 
     {
       const layoutContainer = new CollapsibleContainer(
@@ -1339,15 +1334,15 @@ class ConstraintManager {
       new ConstraintCollector.GlobalCheckbox(this._display),
       new ConstraintCollector.LayoutCheckbox(this._display),
       new ConstraintCollector.Jigsaw(
-        this._display, inputManager, jigsawChipView),
+        this._display, inputManager, chipViews.get('jigsaw')),
       new ConstraintCollector.MultiCell(
-        this._display, this._ordinaryChipView, inputManager),
+        this._display, chipViews.get('ordinary'), inputManager),
       new ConstraintCollector.CustomBinary(
-        inputManager, this._display, this._ordinaryChipView),
+        inputManager, this._display, chipViews.get('ordinary')),
       new ConstraintCollector.OutsideClue(inputManager, this._display),
       new ConstraintCollector.GivenCandidates(inputManager, this._display),
-      new ConstraintCollector.Experimental(this._ordinaryChipView),
-      new ConstraintCollector.Composite(this._compositeChipView),
+      new ConstraintCollector.Experimental(chipViews.get('ordinary')),
+      new ConstraintCollector.Composite(chipViews.get('composite')),
     ];
 
     for (const collector of collectors) {
@@ -1505,8 +1500,9 @@ class ConstraintManager {
   clear() {
     this._display.clear();
     GroupHighlighter.clear();
-    this._ordinaryChipView.clear();
-    this._compositeChipView.clear();
+    for (const chipView of this._chipViews.values()) {
+      chipView.clear();
+    }
     for (const collector of this._constraintCollectors.values()) {
       collector.clear();
     }
@@ -1573,10 +1569,13 @@ class ConstraintChipView {
       this._onUpdate();
     });
 
-    chip.addEventListener('mouseover', () => {
-      this._chipHighlighter.setCells(constraint.displayCells(this._shape));
+    chip.addEventListener('mouseover', (e) => {
+      if (e.target.closest('.chip') !== chip) return;
+      if (this._chipHighlighter.key() === chip) return;
+      this._chipHighlighter.setCells(
+        constraint.displayCells(this._shape), chip);
     });
-    chip.addEventListener('mouseout', () => {
+    chip.addEventListener('mouseleave', () => {
       this._chipHighlighter.clear();
     });
 
@@ -1637,11 +1636,18 @@ class Highlight {
     this._cssClass = cssClass;
 
     this._display = display;
+    this._key = undefined;
   }
 
-  setCells(cellIds) {
+  key() {
+    return this._key;
+  }
+
+  setCells(cellIds, key) {
+    if (key && key === this._key) return;
     this.clear();
     for (const cellId of cellIds) this.addCell(cellId);
+    this._key = key;
   }
 
   size() {
@@ -1673,6 +1679,7 @@ class Highlight {
       this._display.removeHighlight(path)
     }
     this._cells.clear();
+    this._key = undefined;
   }
 }
 
