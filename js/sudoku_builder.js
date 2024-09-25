@@ -657,10 +657,6 @@ class SudokuConstraint {
         '.End',
       ].join('');
     }
-
-    chipLabel() {
-      return this.toString().replace(/[.]/g, ' ');
-    }
   }
 
   static And = class And extends SudokuConstraintBase {
@@ -678,10 +674,6 @@ class SudokuConstraint {
         ...this.constraints.map(c => c.toString()),
         '.End',
       ].join('');
-    }
-
-    chipLabel() {
-      return this.toString().replace(/[.]/g, ' ');
     }
   }
 
