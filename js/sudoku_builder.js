@@ -544,6 +544,26 @@ class SudokuConstraintBase {
     return shape;
   }
 
+  static displayName() {
+    return this.name.replace(/([a-z])([A-Z])/g, '$1 $2');
+  }
+
+  chipLabel() {
+    return this.constructor.displayName();
+  }
+
+  static _directionStr(rowCol, clueInc, clueDec) {
+    const parts = [];
+    if (rowCol[0] == 'C') {
+      if (clueInc) parts.push(`↓ ${clueInc}`);
+      if (clueDec) parts.push(`↑ ${clueDec}`);
+    } else {
+      if (clueInc) parts.push(`→ ${clueInc}`);
+      if (clueDec) parts.push(`← ${clueDec}`);
+    }
+    return parts.join(' ');
+  }
+
   static _makeRegions(fn, gridSize) {
     const regions = [];
     for (let r = 0; r < gridSize; r++) {
@@ -637,6 +657,10 @@ class SudokuConstraint {
         '.End',
       ].join('');
     }
+
+    chipLabel() {
+      return this.toString().replace(/[.]/g, ' ');
+    }
   }
 
   static And = class And extends SudokuConstraintBase {
@@ -655,6 +679,10 @@ class SudokuConstraint {
         '.End',
       ].join('');
     }
+
+    chipLabel() {
+      return this.toString().replace(/[.]/g, ' ');
+    }
   }
 
   static End = class End extends SudokuConstraintBase { }
@@ -665,6 +693,10 @@ class SudokuConstraint {
     constructor(grid) {
       super(arguments);
       this.grid = grid;
+    }
+
+    chipLabel() {
+      return '';
     }
 
     regions() {
@@ -690,6 +722,10 @@ class SudokuConstraint {
     static fnKey = memoize((numValues) =>
       SudokuConstraint.Binary.fnToKey((a, b) => a < b, numValues)
     );
+
+    static displayName() {
+      return 'Thermometer';
+    }
   }
 
   static Whisper = class Whisper extends SudokuConstraintBase {
@@ -712,6 +748,10 @@ class SudokuConstraint {
         (a, b) => a >= b + difference || a <= b - difference,
         numValues)
     );
+
+    chipLabel() {
+      return `Whisper (${this.difference})`;
+    }
   }
 
   static Renban = class Renban extends SudokuConstraintBase {
@@ -738,6 +778,14 @@ class SudokuConstraint {
       this.mod = mod;
     }
 
+    static displayName() {
+      return 'Modular Line';
+    }
+
+    chipLabel() {
+      return `Modular (${this.mod})`;
+    }
+
     static fnKey = memoize((mod, numValues) =>
       SudokuConstraint.BinaryX.fnToKey(
         (a, b) => (a % mod) != (b % mod),
@@ -751,6 +799,10 @@ class SudokuConstraint {
     constructor(...cells) {
       super(arguments);
       this.cells = cells;
+    }
+
+    static displayName() {
+      return 'Entropic Line';
     }
 
     static fnKey = memoize((numValues) =>
@@ -786,6 +838,14 @@ class SudokuConstraint {
       this.cells = cells;
       this.minDiff = minDiff;
     }
+
+    static displayName() {
+      return 'Lockout Line';
+    }
+
+    chipLabel() {
+      return `Lockout (${this.minDiff})`;
+    }
   }
 
   static Palindrome = class Palindrome extends SudokuConstraintBase {
@@ -819,6 +879,10 @@ class SudokuConstraint {
       super(arguments);
       this.cells = cells;
       this.sum = sum;
+    }
+
+    chipLabel() {
+      return `Sum Line (${this.sum})`;
     }
   }
 
@@ -895,14 +959,26 @@ class SudokuConstraint {
 
   static AntiKnight = class AntiKnight extends SudokuConstraintBase {
     static COLLECTOR_CLASS = 'LayoutCheckbox';
+
+    static displayName() {
+      return 'Anti-Knight';
+    }
   }
 
   static AntiKing = class AntiKing extends SudokuConstraintBase {
     static COLLECTOR_CLASS = 'LayoutCheckbox';
+
+    static displayName() {
+      return 'Anti-King';
+    }
   }
 
   static AntiTaxicab = class AntiTaxicab extends SudokuConstraintBase {
     static COLLECTOR_CLASS = 'GlobalCheckbox';
+
+    static displayName() {
+      return 'Anti-Taxicab';
+    }
 
     static taxicabCells(row, col, dist, shape) {
       const cells = [];
@@ -933,6 +1009,10 @@ class SudokuConstraint {
         (a, b) => (a != b + 1 && a != b - 1 && a != b),
         numValues)
     );
+
+    static displayName() {
+      return 'Anti-Consecutive';
+    }
   }
 
   static GlobalEntropy = class GlobalEntropy extends SudokuConstraintBase {
@@ -964,6 +1044,11 @@ class SudokuConstraint {
       super(arguments);
       this.direction = direction;
     }
+
+    chipLabel() {
+      const suffix = this.direction < 0 ? '╲' : '╱';
+      return `Diagonal ${suffix}`;
+    }
   }
 
   static WhiteDot = class WhiteDot extends SudokuConstraintBase {
@@ -979,6 +1064,14 @@ class SudokuConstraint {
         (a, b) => a == b + 1 || a == b - 1,
         numValues)
     );
+
+    static displayName() {
+      return '○ ±1';
+    }
+
+    chipLabel() {
+      return `○ [${this.cells}]`;
+    }
   }
 
   static BlackDot = class BlackDot extends SudokuConstraintBase {
@@ -987,6 +1080,14 @@ class SudokuConstraint {
     constructor(...cells) {
       super(arguments);
       this.cells = cells;
+    }
+
+    static displayName() {
+      return '● ×÷2';
+    }
+
+    chipLabel() {
+      return `● [${this.cells}]`;
     }
 
     static fnKey = memoize((numValues) =>
@@ -1003,6 +1104,14 @@ class SudokuConstraint {
       super(arguments);
       this.cells = cells;
     }
+
+    static displayName() {
+      return 'X: 10Σ';
+    }
+
+    chipLabel() {
+      return `X [${this.cells}]`;
+    }
   }
 
   static V = class V extends SudokuConstraintBase {
@@ -1011,6 +1120,14 @@ class SudokuConstraint {
     constructor(...cells) {
       super(arguments);
       this.cells = cells;
+    }
+
+    static displayName() {
+      return 'V: 5Σ';
+    }
+
+    chipLabel() {
+      return `V [${this.cells}]`;
     }
   }
 
@@ -1055,6 +1172,10 @@ class SudokuConstraint {
       this.cells = cells;
       this.sum = sum;
     }
+
+    chipLabel() {
+      return `Cage (${this.sum})`;
+    }
   }
 
   static Sum = class Sum extends SudokuConstraintBase {
@@ -1065,6 +1186,10 @@ class SudokuConstraint {
       this.cells = cells;
       this.sum = sum;
     }
+
+    chipLabel() {
+      return `Sum (${this.sum})`;
+    }
   }
 
   static LittleKiller = class LittleKiller extends SudokuConstraintBase {
@@ -1074,6 +1199,10 @@ class SudokuConstraint {
       super(arguments);
       this.id = id;
       this.sum = sum;
+    }
+
+    chipLabel() {
+      return `Little Killer (${this.sum})`;
     }
 
     static cellMap = memoize((shape) => {
@@ -1112,6 +1241,17 @@ class SudokuConstraint {
       this.sumInc = +sumInc;
     }
 
+    static displayName() {
+      return 'X-Sum';
+    }
+
+    chipLabel() {
+      const dirStr = this.constructor._directionStr(
+        this.rowCol, this.sumInc, this.sumDec);
+
+      return `${this.constructor.displayName()} (${dirStr})`;
+    }
+
     values() {
       return [this.sumInc, this.sumDec];
     }
@@ -1125,6 +1265,10 @@ class SudokuConstraint {
       this.id = id;
       this.sum = sum;
     }
+
+    chipLabel() {
+      return `Sandwich (${this.sum})`;
+    }
   }
 
   static Lunchbox = class Lunchbox extends SudokuConstraintBase {
@@ -1134,6 +1278,10 @@ class SudokuConstraint {
       super(arguments);
       this.cells = cells;
       this.sum = sum;
+    }
+
+    chipLabel() {
+      return `Lunchbox (${this.sum})`;
     }
   }
 
@@ -1150,6 +1298,13 @@ class SudokuConstraint {
     values() {
       return [this.countInc, this.countDec];
     }
+
+    chipLabel() {
+      const dirStr = this.constructor._directionStr(
+        this.rowCol, this.countInc, this.countDec);
+
+      return `${this.constructor.displayName()} (${dirStr})`;
+    }
   }
 
   static HiddenSkyscraper = class HiddenSkyscraper extends SudokuConstraintBase {
@@ -1164,6 +1319,13 @@ class SudokuConstraint {
 
     values() {
       return [this.valueInc, this.valueDec];
+    }
+
+    chipLabel() {
+      const dirStr = this.constructor._directionStr(
+        this.rowCol, this.valueInc, this.valueDec);
+
+      return `${this.constructor.displayName()} (${dirStr})`;
     }
   }
 
@@ -1180,6 +1342,13 @@ class SudokuConstraint {
     values() {
       return [this.clueInc, this.clueDec];
     }
+
+    chipLabel() {
+      const dirStr = this.constructor._directionStr(
+        this.rowCol, this.clueInc, this.clueDec);
+
+      return `${this.constructor.displayName()} (${dirStr})`;
+    }
   }
 
   static FullRank = class FullRank extends SudokuConstraintBase {
@@ -1190,6 +1359,13 @@ class SudokuConstraint {
       this.rowCol = rowCol.toUpperCase();
       this.rankInc = +rankInc;
       this.rankDec = +rankDec;
+    }
+
+    chipLabel() {
+      const dirStr = this.constructor._directionStr(
+        this.rowCol, this.rankInc, this.rankDec);
+
+      return `${this.constructor.displayName()} (${dirStr})`;
     }
 
     values() {
@@ -1215,10 +1391,18 @@ class SudokuConstraint {
       this.values = values;
       this.valueStr = values.replace(/_/g, ',');
     }
+
+    chipLabel() {
+      return `ContainAtLeast (${this.valueStr})`;
+    }
   }
 
   static ContainExact = class ContainExact extends SudokuConstraint.ContainAtLeast {
     static COLLECTOR_CLASS = 'MultiCell';
+
+    chipLabel() {
+      return `ContainExact (${this.valueStr})`;
+    }
   };
 
   static Quad = class Quad extends SudokuConstraintBase {
@@ -1230,6 +1414,9 @@ class SudokuConstraint {
       this.values = values;
     }
 
+    chipLabel() {
+      return `Quad (${this.values.join(',')})`;
+    }
 
     static cells(topLeftCell) {
       const shape = SHAPE_MAX;
@@ -1250,6 +1437,11 @@ class SudokuConstraint {
       super(arguments);
       this.key = key;
       this.items = items;
+    }
+
+    chipLabel() {
+      const groups = [...this.constructor.parseGroups(this.items, true)];
+      return groups.map(g => g.name || 'Custom').join(', ');
     }
 
     static makeFromGroups(key, groups) {
@@ -1366,6 +1558,10 @@ class SudokuConstraint {
       this.cells = cells;
     }
 
+    chipLabel() {
+      return `${this.indexTypeStr()} Indexing`;
+    }
+
     indexTypeStr() {
       return SudokuConstraint.Indexing.ROW_INDEXING
         ? 'Row' : 'Column';
@@ -1379,6 +1575,10 @@ class SudokuConstraint {
       super(arguments);
       this.cells = cells;
     }
+
+    chipLabel() {
+      return `Counting Circles (${this.cells.length})`;
+    }
   }
 
   static Givens = class Givens extends SudokuConstraintBase {
@@ -1388,7 +1588,12 @@ class SudokuConstraint {
       super(arguments);
       this.values = values;
     }
+
+    chipLabel() {
+      return `Givens [${this.values.join(',')}]`;
+    }
   }
+
   static FixedValues = this.Givens;  // For backwards compatibility.
 
   static Priority = class Priority extends SudokuConstraintBase {

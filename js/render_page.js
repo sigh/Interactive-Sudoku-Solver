@@ -113,7 +113,6 @@ ConstraintCollector.Experimental = class Experimental extends ConstraintCollecto
   addConstraint(constraint) {
     const config = {
       cells: [],
-      name: constraint.toString().replace(/[.]/g, ' '),
       constraint: constraint,
       removeFn: () => { this._removeConstraint(config); },
     };
@@ -144,7 +143,6 @@ ConstraintCollector.Composite = class Composite extends ConstraintCollector {
   addConstraint(constraint) {
     const config = {
       cells: [],
-      name: constraint.toString().replace(/[.]/g, ' '),
       constraint: constraint,
       removeFn: () => { this._removeConstraint(config); },
     };
@@ -166,7 +164,7 @@ ConstraintCollector._Checkbox = class _Checkbox extends ConstraintCollector {
     this._checkboxes = new Map();
     const initSingleCheckbox = (type, config, container, option) => {
       const constraint = new SudokuConstraint[type](...(option ? [option.value] : []));
-      const name = constraint.toString();
+      const key = constraint.toString();
       const checkboxId = `${containerId}-input-${this._checkboxes.size}`;
 
       const div = document.createElement('div');
@@ -184,7 +182,7 @@ ConstraintCollector._Checkbox = class _Checkbox extends ConstraintCollector {
 
       const label = document.createElement('label');
       label.htmlFor = checkboxId;
-      label.textContent = `${config.text || type} ${option?.text || ''} `;
+      label.textContent = constraint.chipLabel() + ' ';
       div.appendChild(label);
 
       const tooltip = document.createElement('span');
@@ -194,7 +192,7 @@ ConstraintCollector._Checkbox = class _Checkbox extends ConstraintCollector {
 
       container.appendChild(div);
 
-      this._checkboxes.set(name, {
+      this._checkboxes.set(key, {
         element: input,
         constraint,
       });
@@ -246,23 +244,18 @@ ConstraintCollector.GlobalCheckbox = class GlobalCheckbox extends ConstraintColl
       container.bodyElement().id,
       {
         AntiConsecutive: {
-          text: 'Anti-Consecutive',
           description: `No adjacent cells can have consecutive values.`,
         },
         StrictKropki: {
-          text: 'Strict Kropki',
           description: `Only explicitly marked cell pairs satisfy Kropki (black/white dot) constraints.`,
         },
         StrictXV: {
-          text: 'Strict XV',
           description: `Only explicitly marked cell pairs satisfy XV constraints.`,
         },
         GlobalEntropy: {
-          text: 'Global Entropy',
           description: `Each 2x2 box in the grid has to contain a low digit (1, 2, 3), a middle digit (4, 5, 6) and a high digit (7, 8, 9).`,
         },
         AntiTaxicab: {
-          text: 'Anti-Taxicab',
           description: `
           A cell that contains a digit x can't have a taxicab distance of
           exactly x from another cell with the digit x.
@@ -283,19 +276,17 @@ ConstraintCollector.LayoutCheckbox = class LayoutCheckbox extends ConstraintColl
       'layout-constraint-checkboxes',
       {
         AntiKnight: {
-          text: 'Anti-Knight',
           description: `Cells which are a knight's move away cannot have the same value.`,
         },
         AntiKing: {
-          text: 'Anti-King',
           description: `Cells which are a king's move away cannot have the same value.`,
         },
         Diagonal: {
           description: `Values along the diagonal must be unique.`,
           value: {
             options: [
-              { text: '╱', value: 1 },
-              { text: '╲', value: -1 },
+              { value: 1 },
+              { value: -1 },
             ],
           },
           displayClass: ConstraintDisplays.Diagonal,
@@ -305,11 +296,9 @@ ConstraintCollector.LayoutCheckbox = class LayoutCheckbox extends ConstraintColl
           displayClass: ConstraintDisplays.Windoku,
         },
         DisjointSets: {
-          text: 'Disjoint Sets',
           description: `No digit may appear in the same position in any two boxes.`,
         },
         NoBoxes: {
-          text: 'No Boxes',
           description: `No standard box regions.`,
           displayClass: ConstraintDisplays.DefaultRegionsInverted,
         },
@@ -348,7 +337,6 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
         value: {
           placeholder: 'sum',
         },
-        chipLabel: (constraint) => `Cage (${constraint.sum})`,
         displayClass: ConstraintDisplays.ShadedRegion,
         displayConfig: {
           labelField: 'sum',
@@ -362,7 +350,6 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
         value: {
           placeholder: 'sum',
         },
-        chipLabel: (constraint) => `Sum (${constraint.sum})`,
         displayClass: ConstraintDisplays.ShadedRegion,
         displayConfig: {
           pattern: DisplayItem.CHECKERED_PATTERN,
@@ -382,7 +369,6 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
       },
       DoubleArrow: {
         validateFn: (cells, shape) => cells.length > 2,
-        text: 'Double Arrow',
         displayClass: ConstraintDisplays.GenericLine,
         displayConfig: {
           startMarker: LineOptions.EMPTY_CIRCLE_MARKER,
@@ -401,7 +387,6 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
             { text: '3-digit', value: 3 },
           ],
         },
-        text: 'Pill Arrow',
         description:
           `
           The sum of the values along the line equal the 2-digit or 3-digit
@@ -410,7 +395,6 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
           `,
       },
       Thermo: {
-        text: 'Thermometer',
         description:
           "Values must be in increasing order starting at the bulb.",
         displayClass: ConstraintDisplays.Thermo,
@@ -425,7 +409,6 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
           placeholder: 'difference',
           default: 5,
         },
-        chipLabel: (constraint) => `Whisper (${constraint.difference})`,
         displayClass: ConstraintDisplays.GenericLine,
         displayConfig: { color: 'rgb(255, 200, 255)' },
         description:
@@ -442,8 +425,6 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
           placeholder: 'mod',
           default: 3,
         },
-        text: 'Modular Line',
-        chipLabel: (constraint) => `Modular (${constraint.mod})`,
         displayClass: ConstraintDisplays.GenericLine,
         displayConfig: { color: 'rgb(230, 190, 155)', dashed: true },
         description:
@@ -455,7 +436,6 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
           `
       },
       Entropic: {
-        text: 'Entropic Line',
         displayClass: ConstraintDisplays.GenericLine,
         displayConfig: { color: 'rgb(255, 100, 255)', dashed: true },
         description:
@@ -465,7 +445,6 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
           `
       },
       RegionSumLine: {
-        text: 'Region Sum Line',
         displayClass: ConstraintDisplays.GenericLine,
         displayConfig: { color: 'rgb(100, 200, 100)' },
         description:
@@ -479,12 +458,10 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
           `
       },
       SumLine: {
-        text: 'Sum Line',
         value: {
           placeholder: 'sum',
           default: 10
         },
-        chipLabel: (constraint) => `Sum Line (${constraint.sum})`,
         displayClass: ConstraintDisplays.GenericLine,
         displayConfig: {
           color: 'rgb(100, 200, 100)',
@@ -494,7 +471,6 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
           "The line can be divided into segments that each sum to the given sum."
       },
       Between: {
-        text: 'Between Line',
         displayClass: ConstraintDisplays.GenericLine,
         displayConfig: {
           color: 'rgb(200, 200, 255)',
@@ -509,8 +485,6 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
           placeholder: 'min diff',
           default: 4,
         },
-        text: 'Lockout Line',
-        chipLabel: (constraint) => `Lockout (${constraint.minDiff})`,
         displayClass: ConstraintDisplays.GenericLine,
         displayConfig: {
           color: 'rgb(200, 200, 255)',
@@ -527,7 +501,6 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
           placeholder: 'sum',
           default: 0,
         },
-        chipLabel: (constraint) => `Lunchbox (${constraint.sum})`,
         displayClass: ConstraintDisplays.ShadedRegion,
         displayConfig: {
           lineConfig: { color: 'rgba(100, 100, 100, 0.2)' },
@@ -539,7 +512,6 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
            distinct.`
       },
       Palindrome: {
-        text: 'Palindrome',
         displayClass: ConstraintDisplays.GenericLine,
         displayConfig: {
           color: 'rgb(200, 200, 255)'
@@ -548,7 +520,6 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
           "The values along the line form a palindrome."
       },
       Zipper: {
-        text: 'Zipper Line',
         displayClass: ConstraintDisplays.GenericLine,
         displayConfig: {
           color: 'rgb(180, 180, 255)',
@@ -564,8 +535,6 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
         validateFn: ConstraintManager._cellsAreAdjacent,
         displayClass: ConstraintDisplays.Dot,
         displayConfig: { color: 'white' },
-        text: '○ ±1',
-        chipLabel: (constraint) => `○ [${constraint.cells}]`,
         description:
           "Kropki white dot: values must be consecutive. Adjacent cells only.",
       },
@@ -573,24 +542,18 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
         validateFn: ConstraintManager._cellsAreAdjacent,
         displayClass: ConstraintDisplays.Dot,
         displayConfig: { color: 'black' },
-        text: '● ×÷2',
-        chipLabel: (constraint) => `● [${constraint.cells}]`,
         description:
           "Kropki black dot: one value must be double the other. Adjacent cells only."
       },
       X: {
         validateFn: ConstraintManager._cellsAreAdjacent,
         displayClass: ConstraintDisplays.Letter,
-        text: 'x: 10Σ',
-        chipLabel: (constraint) => `X [${constraint.cells}]`,
         description:
           "x: values must add to 10. Adjacent cells only."
       },
       V: {
         validateFn: ConstraintManager._cellsAreAdjacent,
         displayClass: ConstraintDisplays.Letter,
-        text: 'v: 5Σ',
-        chipLabel: (constraint) => `V [${constraint.cells}]`,
         description:
           "v: values must add to 5. Adjacent cells only."
       },
@@ -599,9 +562,7 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
           placeholder: 'values',
         },
         validateFn: ConstraintManager._cellsAre2x2Square,
-        text: 'Quadruple',
         displayClass: ConstraintDisplays.Quad,
-        chipLabel: (constraint) => `Quad (${constraint.values.join(',')})`,
         description:
           `
         All the given values must be present in the surrounding 2x2 square.
@@ -611,13 +572,11 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
         value: {
           placeholder: 'values',
         },
-        chipLabel: (constraint) => `Contain Exact (${constraint.valueStr})`,
         displayClass: ConstraintDisplays.ShadedRegion,
         displayConfig: {
           pattern: DisplayItem.DIAGONAL_PATTERN,
           labelField: 'valueStr',
         },
-        text: 'Contain Exact',
         description:
           `The comma-separated values must be present in the selected squares.
            If value is must be contained exactly as many times as is
@@ -627,13 +586,11 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
         value: {
           placeholder: 'values',
         },
-        chipLabel: (constraint) => `Contain At Least (${constraint.valueStr})`,
         displayClass: ConstraintDisplays.ShadedRegion,
         displayConfig: {
           pattern: DisplayItem.DIAGONAL_PATTERN,
           labelField: 'valueStr',
         },
-        text: 'Contain At Least',
         description:
           `The comma-separated values must be present in the selected squares.
            If value is must be contained at least as many times as is
@@ -641,16 +598,13 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
       },
       AllDifferent: {
         displayClass: ConstraintDisplays.ShadedRegion,
-        text: 'All Different',
         description: `Values must be unique.`,
       },
       CountingCircles: {
-        chipLabel: (constraint) => `Counting Circles (${constraint.cells.length})`,
         displayClass: ConstraintDisplays.CountingCircles,
         displayConfig: {
           pattern: DisplayItem.CHECKERED_PATTERN,
         },
-        text: 'Counting Circles',
         description:
           `The value in a circles counts the number of circles with the same
            value. Each set of circles is independent.`,
@@ -662,7 +616,6 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
             { text: 'Row', value: SudokuConstraint.Indexing.ROW_INDEXING },
           ],
         },
-        chipLabel: (constraint) => `Indexing (${constraint.indexTypeStr()})`,
         validateFn: (cells, shape) => cells.length > 0,
         displayClass: ConstraintDisplays.Indexing,
         description: `
@@ -680,7 +633,6 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
     if (constraint.type === 'Quad') {
       config = {
         cells: SudokuConstraint.Quad.cells(constraint.topLeftCell),
-        name: `Quad (${constraint.values.join(',')})`,
         constraint: constraint,
         displayElem: this._display.drawItem(
           constraint, ConstraintDisplays.Quad, null),
@@ -697,7 +649,6 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
       const uiConfig = this._constraintConfigs[constraint.type];
       config = {
         cells: constraint.cells,
-        name: uiConfig.chipLabel?.(constraint) || uiConfig.text,
         constraint: constraint,
         displayElem: this._display.drawItem(
           constraint,
@@ -792,10 +743,11 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
     }
 
     // Create the options.
-    for (const [name, config] of Object.entries(constraintConfigs)) {
+    for (const [type, config] of Object.entries(constraintConfigs)) {
       const option = document.createElement('option');
-      option.value = name;
-      option.textContent = config.text;
+      const cls = config.constraintClass;
+      option.value = type;
+      option.textContent = cls.displayName();
       option.title = config.description.replace(/\s+/g, ' ').replace(/^\s/, '');
       selectElem.appendChild(option);
       config.elem = option;
@@ -816,7 +768,7 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
           input.setAttribute('size', '8');
           input.setAttribute('placeholder', config.value.placeholder);
         }
-        input.setAttribute('name', name + '-value');
+        input.setAttribute('name', type + '-value');
         if (config.value.default !== undefined) {
           input.setAttribute('value', config.value.default);
         }
@@ -1056,9 +1008,9 @@ ConstraintCollector.Jigsaw = class Jigsaw extends ConstraintCollector {
     const pieceId = ++this._maxPieceId;
     cells.forEach(c => this._piecesMap[this._shape.parseCellId(c).cell] = pieceId);
     const config = {
+      constraint: new SudokuConstraint.Jigsaw(),  // Dummy constraint.
       pieceId: pieceId,
       cells: cells,
-      name: '',
       displayElem: this._display.drawItem({ cells }, ConstraintDisplays.Jigsaw, null),
       removeFn: () => { this._removePiece(config); },
     };
@@ -1111,7 +1063,6 @@ ConstraintCollector.OutsideClue = class OutsideClue extends ConstraintCollector 
           given sum.`,
       },
       XSum: {
-        text: 'X-Sum',
         clueType: this.CLUE_TYPE_DOUBLE_LINE,
         strTemplate: '⟨$CLUE⟩',
         description:
@@ -1129,7 +1080,6 @@ ConstraintCollector.OutsideClue = class OutsideClue extends ConstraintCollector 
       row / column from the clue's direction of view.`,
       },
       HiddenSkyscraper: {
-        text: 'Hidden Skyscraper',
         clueType: this.CLUE_TYPE_DOUBLE_LINE,
         strTemplate: '|$CLUE|',
         description:
@@ -1139,7 +1089,6 @@ ConstraintCollector.OutsideClue = class OutsideClue extends ConstraintCollector 
           row/column from the clue's direction of view.`,
       },
       FullRank: {
-        text: 'Full Rank',
         clueType: this.CLUE_TYPE_DOUBLE_LINE,
         strTemplate: '#$CLUE ',
         elementId: 'full-rank-option',
@@ -1149,7 +1098,6 @@ ConstraintCollector.OutsideClue = class OutsideClue extends ConstraintCollector 
           where in the ranking that row/column lies.`,
       },
       NumberedRoom: {
-        text: 'Numbered Room',
         clueType: this.CLUE_TYPE_DOUBLE_LINE,
         strTemplate: ':$CLUE:',
         elementId: 'numbered-room-option',
@@ -1159,7 +1107,6 @@ ConstraintCollector.OutsideClue = class OutsideClue extends ConstraintCollector 
           placed in the first cell in that direction.`,
       },
       LittleKiller: {
-        text: 'Little Killer',
         clueType: this.CLUE_TYPE_DIAGONAL,
         strTemplate: '$CLUE',
         description:
@@ -1607,7 +1554,7 @@ class ConstraintChipView {
     }
 
     const chipLabel = document.createElement('span');
-    chipLabel.innerHTML = config.name;
+    chipLabel.innerHTML = config.constraint.chipLabel();
     chip.appendChild(chipLabel);
 
     config.chip = chip;
@@ -2197,8 +2144,8 @@ ConstraintCollector.CustomBinary = class CustomBinary extends ConstraintCollecto
     }
 
     const config = {
-      name: name || 'Custom',
-      originalName: name,
+      constraint: SudokuConstraint[type].makeFromGroups(key, [{ name, cells }]),
+      name: name,
       key: key,
       cells: cells,
       type: type,
@@ -2226,9 +2173,7 @@ ConstraintCollector.CustomBinary = class CustomBinary extends ConstraintCollecto
       if (!configs.length) continue;
       const { key, type } = configs[0];
       constraints.push(
-        SudokuConstraint[type].makeFromGroups(
-          key,
-          configs.map(c => ({ name: c.originalName, cells: c.cells }))));
+        SudokuConstraint[type].makeFromGroups(key, configs));
     }
     return constraints;
   }
