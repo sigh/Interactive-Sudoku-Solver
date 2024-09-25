@@ -307,6 +307,12 @@ button.image-button>img {
   color: #bc3315;
 }
 
+.chip .chip-view {
+  width: fit-content;
+  min-width: unset;
+  grid-template-columns: 1fr;
+}
+
 #constraint-panel {
   line-height: 1.8;
   display: flex;

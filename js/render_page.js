@@ -1533,7 +1533,9 @@ class ConstraintChipView {
 
   removeItem(config) {
     config.removeFn();
-    this._display.removeItem(config.displayElem);
+    if (config.displayElem) {
+      this._display.removeItem(config.displayElem);
+    }
     config.chip.parentNode.removeChild(config.chip);
   }
 
@@ -1542,6 +1544,8 @@ class ConstraintChipView {
   }
 
   _makeChip(config) {
+    const constraint = config.constraint;
+
     const chip = document.createElement('div');
     chip.className = 'chip';
 
@@ -1554,7 +1558,7 @@ class ConstraintChipView {
     }
 
     const chipLabel = document.createElement('span');
-    chipLabel.innerHTML = config.constraint.chipLabel();
+    chipLabel.innerHTML = constraint.chipLabel();
     chip.appendChild(chipLabel);
 
     config.chip = chip;
@@ -1570,6 +1574,21 @@ class ConstraintChipView {
     chip.addEventListener('mouseout', () => {
       this._chipHighlighter.clear();
     });
+
+    if (constraint.constructor.IS_COMPOSITE) {
+      const subView = document.createElement('div');
+      subView.className = 'chip-view';
+      for (const subConstraint of constraint.constraints) {
+        subView.appendChild(this._makeChip({
+          constraint: subConstraint,
+          cells: [],
+          removeFn: () => {
+            arrayRemoveValue(constraint.constraints, subConstraint);
+          },
+        }));
+      }
+      chip.appendChild(subView);
+    }
 
     return chip;
   }
