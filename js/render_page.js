@@ -96,18 +96,18 @@ ConstraintCollector.Shape = class Shape extends ConstraintCollector {
 }
 
 ConstraintCollector.Experimental = class Experimental extends ConstraintCollector {
-  constructor(panel) {
+  constructor(chipView) {
     super();
-    this._panel = panel;
-    this._panelConfigs = [];
+    this._chipView = chipView;
+    this._chipConfigs = [];
   }
 
   clear() {
-    this._panelConfigs = [];
+    this._chipConfigs = [];
   }
 
   _removeConstraint(config) {
-    arrayRemoveValue(this._panelConfigs, config);
+    arrayRemoveValue(this._chipConfigs, config);
   }
 
   addConstraint(constraint) {
@@ -117,28 +117,28 @@ ConstraintCollector.Experimental = class Experimental extends ConstraintCollecto
       constraint: constraint,
       removeFn: () => { this._removeConstraint(config); },
     };
-    this._panelConfigs.push(config);
-    this._panel.addItem(config);
+    this._chipConfigs.push(config);
+    this._chipView.addItem(config);
   }
 
   getConstraints() {
-    return this._panelConfigs.map(c => c.constraint);
+    return this._chipConfigs.map(c => c.constraint);
   }
 }
 
 ConstraintCollector.Composite = class Composite extends ConstraintCollector {
-  constructor(panel) {
+  constructor(chipView) {
     super();
-    this._panel = panel;
-    this._panelConfigs = [];
+    this._chipView = chipView;
+    this._chipConfigs = [];
   }
 
   clear() {
-    this._panelConfigs = [];
+    this._chipConfigs = [];
   }
 
   _removeConstraint(config) {
-    arrayRemoveValue(this._panelConfigs, config);
+    arrayRemoveValue(this._chipConfigs, config);
   }
 
   addConstraint(constraint) {
@@ -148,12 +148,12 @@ ConstraintCollector.Composite = class Composite extends ConstraintCollector {
       constraint: constraint,
       removeFn: () => { this._removeConstraint(config); },
     };
-    this._panelConfigs.push(config);
-    this._panel.addItem(config);
+    this._chipConfigs.push(config);
+    this._chipView.addItem(config);
   }
 
   getConstraints() {
-    return this._panelConfigs.map(c => c.constraint);
+    return this._chipConfigs.map(c => c.constraint);
   }
 }
 
@@ -318,12 +318,12 @@ ConstraintCollector.LayoutCheckbox = class LayoutCheckbox extends ConstraintColl
 }
 
 ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
-  constructor(display, panel, inputManager) {
+  constructor(display, chipView, inputManager) {
     super();
-    this._panelConfigs = [];
+    this._chipConfigs = [];
     this._display = display;
     this._constraintConfigs = this._makeMultiCellConstraintConfig();
-    this._panel = panel;
+    this._chipView = chipView;
     this._shape = null;
 
     const selectionForm = document.forms['multi-cell-constraint-input'];
@@ -348,7 +348,7 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
         value: {
           placeholder: 'sum',
         },
-        panelText: (constraint) => `Cage (${constraint.sum})`,
+        chipLabel: (constraint) => `Cage (${constraint.sum})`,
         displayClass: ConstraintDisplays.ShadedRegion,
         displayConfig: {
           labelField: 'sum',
@@ -362,7 +362,7 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
         value: {
           placeholder: 'sum',
         },
-        panelText: (constraint) => `Sum (${constraint.sum})`,
+        chipLabel: (constraint) => `Sum (${constraint.sum})`,
         displayClass: ConstraintDisplays.ShadedRegion,
         displayConfig: {
           pattern: DisplayItem.CHECKERED_PATTERN,
@@ -425,7 +425,7 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
           placeholder: 'difference',
           default: 5,
         },
-        panelText: (constraint) => `Whisper (${constraint.difference})`,
+        chipLabel: (constraint) => `Whisper (${constraint.difference})`,
         displayClass: ConstraintDisplays.GenericLine,
         displayConfig: { color: 'rgb(255, 200, 255)' },
         description:
@@ -443,7 +443,7 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
           default: 3,
         },
         text: 'Modular Line',
-        panelText: (constraint) => `Modular (${constraint.mod})`,
+        chipLabel: (constraint) => `Modular (${constraint.mod})`,
         displayClass: ConstraintDisplays.GenericLine,
         displayConfig: { color: 'rgb(230, 190, 155)', dashed: true },
         description:
@@ -484,7 +484,7 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
           placeholder: 'sum',
           default: 10
         },
-        panelText: (constraint) => `Sum Line (${constraint.sum})`,
+        chipLabel: (constraint) => `Sum Line (${constraint.sum})`,
         displayClass: ConstraintDisplays.GenericLine,
         displayConfig: {
           color: 'rgb(100, 200, 100)',
@@ -510,7 +510,7 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
           default: 4,
         },
         text: 'Lockout Line',
-        panelText: (constraint) => `Lockout (${constraint.minDiff})`,
+        chipLabel: (constraint) => `Lockout (${constraint.minDiff})`,
         displayClass: ConstraintDisplays.GenericLine,
         displayConfig: {
           color: 'rgb(200, 200, 255)',
@@ -527,7 +527,7 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
           placeholder: 'sum',
           default: 0,
         },
-        panelText: (constraint) => `Lunchbox (${constraint.sum})`,
+        chipLabel: (constraint) => `Lunchbox (${constraint.sum})`,
         displayClass: ConstraintDisplays.ShadedRegion,
         displayConfig: {
           lineConfig: { color: 'rgba(100, 100, 100, 0.2)' },
@@ -565,7 +565,7 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
         displayClass: ConstraintDisplays.Dot,
         displayConfig: { color: 'white' },
         text: '○ ±1',
-        panelText: (constraint) => `○ [${constraint.cells}]`,
+        chipLabel: (constraint) => `○ [${constraint.cells}]`,
         description:
           "Kropki white dot: values must be consecutive. Adjacent cells only.",
       },
@@ -574,7 +574,7 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
         displayClass: ConstraintDisplays.Dot,
         displayConfig: { color: 'black' },
         text: '● ×÷2',
-        panelText: (constraint) => `● [${constraint.cells}]`,
+        chipLabel: (constraint) => `● [${constraint.cells}]`,
         description:
           "Kropki black dot: one value must be double the other. Adjacent cells only."
       },
@@ -582,7 +582,7 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
         validateFn: ConstraintManager._cellsAreAdjacent,
         displayClass: ConstraintDisplays.Letter,
         text: 'x: 10Σ',
-        panelText: (constraint) => `X [${constraint.cells}]`,
+        chipLabel: (constraint) => `X [${constraint.cells}]`,
         description:
           "x: values must add to 10. Adjacent cells only."
       },
@@ -590,7 +590,7 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
         validateFn: ConstraintManager._cellsAreAdjacent,
         displayClass: ConstraintDisplays.Letter,
         text: 'v: 5Σ',
-        panelText: (constraint) => `V [${constraint.cells}]`,
+        chipLabel: (constraint) => `V [${constraint.cells}]`,
         description:
           "v: values must add to 5. Adjacent cells only."
       },
@@ -601,7 +601,7 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
         validateFn: ConstraintManager._cellsAre2x2Square,
         text: 'Quadruple',
         displayClass: ConstraintDisplays.Quad,
-        panelText: (constraint) => `Quad (${constraint.values.join(',')})`,
+        chipLabel: (constraint) => `Quad (${constraint.values.join(',')})`,
         description:
           `
         All the given values must be present in the surrounding 2x2 square.
@@ -611,7 +611,7 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
         value: {
           placeholder: 'values',
         },
-        panelText: (constraint) => `Contain Exact (${constraint.valueStr})`,
+        chipLabel: (constraint) => `Contain Exact (${constraint.valueStr})`,
         displayClass: ConstraintDisplays.ShadedRegion,
         displayConfig: {
           pattern: DisplayItem.DIAGONAL_PATTERN,
@@ -627,7 +627,7 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
         value: {
           placeholder: 'values',
         },
-        panelText: (constraint) => `Contain At Least (${constraint.valueStr})`,
+        chipLabel: (constraint) => `Contain At Least (${constraint.valueStr})`,
         displayClass: ConstraintDisplays.ShadedRegion,
         displayConfig: {
           pattern: DisplayItem.DIAGONAL_PATTERN,
@@ -645,7 +645,7 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
         description: `Values must be unique.`,
       },
       CountingCircles: {
-        panelText: (constraint) => `Counting Circles (${constraint.cells.length})`,
+        chipLabel: (constraint) => `Counting Circles (${constraint.cells.length})`,
         displayClass: ConstraintDisplays.CountingCircles,
         displayConfig: {
           pattern: DisplayItem.CHECKERED_PATTERN,
@@ -662,7 +662,7 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
             { text: 'Row', value: SudokuConstraint.Indexing.ROW_INDEXING },
           ],
         },
-        panelText: (constraint) => `Indexing (${constraint.indexTypeStr()})`,
+        chipLabel: (constraint) => `Indexing (${constraint.indexTypeStr()})`,
         validateFn: (cells, shape) => cells.length > 0,
         displayClass: ConstraintDisplays.Indexing,
         description: `
@@ -687,9 +687,9 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
         replaceKey: `Quad-${constraint.topLeftCell}`,
         removeFn: () => { this._removeConstraint(config); },
       };
-      for (const other of this._panelConfigs) {
+      for (const other of this._chipConfigs) {
         if (config.replaceKey == other.replaceKey) {
-          this._panel.removeItem(other);
+          this._chipView.removeItem(other);
           break;
         }
       }
@@ -697,7 +697,7 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
       const uiConfig = this._constraintConfigs[constraint.type];
       config = {
         cells: constraint.cells,
-        name: uiConfig.panelText?.(constraint) || uiConfig.text,
+        name: uiConfig.chipLabel?.(constraint) || uiConfig.text,
         constraint: constraint,
         displayElem: this._display.drawItem(
           constraint,
@@ -706,20 +706,20 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
         removeFn: () => { this._removeConstraint(config); },
       };
     }
-    this._panel.addItem(config);
-    this._panelConfigs.push(config);
+    this._chipView.addItem(config);
+    this._chipConfigs.push(config);
   }
 
   _removeConstraint(config) {
-    arrayRemoveValue(this._panelConfigs, config);
+    arrayRemoveValue(this._chipConfigs, config);
   }
 
   getConstraints() {
-    return this._panelConfigs.map(c => c.constraint);
+    return this._chipConfigs.map(c => c.constraint);
   }
 
   clear() {
-    this._panelConfigs = [];
+    this._chipConfigs = [];
   }
 
   reshape(shape) {
@@ -970,11 +970,11 @@ class ExampleHandler {
 ConstraintCollector.Jigsaw = class Jigsaw extends ConstraintCollector {
   IS_LAYOUT = true;
 
-  constructor(display, inputManager, panel) {
+  constructor(display, inputManager, chipView) {
     super();
     this._display = display;
     this._shape = null;
-    this._panel = panel;
+    this._chipView = chipView;
 
     this._piecesMap = [];
     this._maxPieceId = 0;
@@ -1043,12 +1043,12 @@ ConstraintCollector.Jigsaw = class Jigsaw extends ConstraintCollector {
 
   clear() {
     this._piecesMap.fill(0);
-    this._panel.clear();
+    this._chipView.clear();
   }
 
   _removePiece(config) {
     config.cells.forEach(c => this._piecesMap[this._shape.parseCellId(c).cell] = 0);
-    GroupHighlighter.toggleHighlightForElement(this._panel.element(), false);
+    GroupHighlighter.toggleHighlightForElement(this._chipView.element(), false);
   }
 
   _addPiece(cells) {
@@ -1062,8 +1062,8 @@ ConstraintCollector.Jigsaw = class Jigsaw extends ConstraintCollector {
       displayElem: this._display.drawItem({ cells }, ConstraintDisplays.Jigsaw, null),
       removeFn: () => { this._removePiece(config); },
     };
-    GroupHighlighter.toggleHighlightForElement(this._panel.element(), true);
-    this._panel.addItem(config);
+    GroupHighlighter.toggleHighlightForElement(this._chipView.element(), true);
+    this._chipView.addItem(config);
   }
 
   _cellsAreValidJigsawPiece(cells) {
@@ -1361,19 +1361,19 @@ class ConstraintManager {
   }
 
   _setUp(inputManager, displayContainer) {
-    this._ordinaryConstraintPanel = this.addReshapeListener(
-      new ConstraintPanel(
-        document.getElementById('displayed-ordinary-constraints'),
+    this._ordinaryChipView = this.addReshapeListener(
+      new ConstraintChipView(
+        document.getElementById('ordinary-chip-view'),
         this._display, displayContainer, this.runUpdateCallback.bind(this)));
 
-    this._compositeConstraintPanel = this.addReshapeListener(
-      new ConstraintPanel(
-        document.getElementById('displayed-composite-constraints'),
+    this._compositeChipView = this.addReshapeListener(
+      new ConstraintChipView(
+        document.getElementById('composite-chip-view'),
         this._display, displayContainer, this.runUpdateCallback.bind(this)));
 
-    const jigsawPanel = this.addReshapeListener(
-      new ConstraintPanel(
-        document.getElementById('displayed-regions'),
+    const jigsawChipView = this.addReshapeListener(
+      new ConstraintChipView(
+        document.getElementById('jigsaw-chip-view'),
         this._display, displayContainer, this.runUpdateCallback.bind(this)));
 
     {
@@ -1387,15 +1387,15 @@ class ConstraintManager {
       new ConstraintCollector.GlobalCheckbox(this._display),
       new ConstraintCollector.LayoutCheckbox(this._display),
       new ConstraintCollector.Jigsaw(
-        this._display, inputManager, jigsawPanel),
+        this._display, inputManager, jigsawChipView),
       new ConstraintCollector.MultiCell(
-        this._display, this._ordinaryConstraintPanel, inputManager),
+        this._display, this._ordinaryChipView, inputManager),
       new ConstraintCollector.CustomBinary(
-        inputManager, this._display, this._ordinaryConstraintPanel),
+        inputManager, this._display, this._ordinaryChipView),
       new ConstraintCollector.OutsideClue(inputManager, this._display),
       new ConstraintCollector.GivenCandidates(inputManager, this._display),
-      new ConstraintCollector.Experimental(this._ordinaryConstraintPanel),
-      new ConstraintCollector.Composite(this._compositeConstraintPanel),
+      new ConstraintCollector.Experimental(this._ordinaryChipView),
+      new ConstraintCollector.Composite(this._compositeChipView),
     ];
 
     for (const collector of collectors) {
@@ -1553,8 +1553,8 @@ class ConstraintManager {
   clear() {
     this._display.clear();
     GroupHighlighter.clear();
-    this._ordinaryConstraintPanel.clear();
-    this._compositeConstraintPanel.clear();
+    this._ordinaryChipView.clear();
+    this._compositeChipView.clear();
     for (const collector of this._constraintCollectors.values()) {
       collector.clear();
     }
@@ -1562,10 +1562,10 @@ class ConstraintManager {
   }
 }
 
-class ConstraintPanel {
-  constructor(panelElement, display, displayContainer, onUpdate) {
-    this._panelElement = panelElement;
-    this._panelItemHighlighter = displayContainer.createHighlighter('highlighted-cell');
+class ConstraintChipView {
+  constructor(chipViewElement, display, displayContainer, onUpdate) {
+    this._chipViewElement = chipViewElement;
+    this._chipHighlighter = displayContainer.createHighlighter('highlighted-cell');
     this._display = display;
     this._shape = null;
     this._onUpdate = onUpdate;
@@ -1576,60 +1576,60 @@ class ConstraintPanel {
   }
 
   element() {
-    return this._panelElement;
+    return this._chipViewElement;
   }
 
   addItem(config) {
-    this._panelElement.appendChild(
-      this._makePanelItem(config));
+    this._chipViewElement.appendChild(
+      this._makeChip(config));
   }
 
   removeItem(config) {
     config.removeFn();
     this._display.removeItem(config.displayElem);
-    config.panelItem.parentNode.removeChild(config.panelItem);
+    config.chip.parentNode.removeChild(config.chip);
   }
 
   clear() {
-    this._panelElement.innerHTML = '';
+    this._chipViewElement.innerHTML = '';
   }
 
-  _makePanelItem(config) {
-    let panelItem = document.createElement('div');
-    panelItem.className = 'constraint-item';
+  _makeChip(config) {
+    const chip = document.createElement('div');
+    chip.className = 'chip';
 
-    let panelButton = document.createElement('button');
-    panelButton.innerHTML = '&#x00D7;';
-    panelItem.appendChild(panelButton);
+    const removeChipButton = document.createElement('button');
+    removeChipButton.innerHTML = '&#x00D7;';
+    chip.appendChild(removeChipButton);
 
     if (config.displayElem) {
-      panelItem.append(this._makePanelIcon(config.displayElem));
+      chip.append(this._makeChipIcon(config.displayElem));
     }
 
-    let panelLabel = document.createElement('span');
-    panelLabel.innerHTML = config.name;
-    panelItem.appendChild(panelLabel);
+    const chipLabel = document.createElement('span');
+    chipLabel.innerHTML = config.name;
+    chip.appendChild(chipLabel);
 
-    config.panelItem = panelItem;
-    panelButton.addEventListener('click', () => {
+    config.chip = chip;
+    removeChipButton.addEventListener('click', () => {
       this.removeItem(config);
-      this._panelItemHighlighter.clear();
+      this._chipHighlighter.clear();
       this._onUpdate();
     });
 
-    panelItem.addEventListener('mouseover', () => {
-      this._panelItemHighlighter.setCells(config.cells);
+    chip.addEventListener('mouseover', () => {
+      this._chipHighlighter.setCells(config.cells);
     });
-    panelItem.addEventListener('mouseout', () => {
-      this._panelItemHighlighter.clear();
+    chip.addEventListener('mouseout', () => {
+      this._chipHighlighter.clear();
     });
 
-    return panelItem;
+    return chip;
   }
 
-  _PANEL_ICON_SIZE_PX = 28;
+  _CHIP_ICON_SIZE_PX = 28;
 
-  _makePanelIcon(displayElem) {
+  _makeChipIcon(displayElem) {
     const svg = createSvgElement('svg');
 
     const borders = createSvgElement('g');
@@ -1640,7 +1640,7 @@ class ConstraintPanel {
 
     // Determine the correct scale to fit our icon size.
     const gridSizePixels = borderDisplay.gridSizePixels();
-    const scale = this._PANEL_ICON_SIZE_PX / gridSizePixels;
+    const scale = this._CHIP_ICON_SIZE_PX / gridSizePixels;
     const transform = `scale(${scale})`;
 
     borders.setAttribute('transform', transform);
@@ -1652,8 +1652,8 @@ class ConstraintPanel {
     elem.setAttribute('opacity', 1);
 
     svg.append(elem);
-    svg.style.height = this._PANEL_ICON_SIZE_PX + 'px';
-    svg.style.width = this._PANEL_ICON_SIZE_PX + 'px';
+    svg.style.height = this._CHIP_ICON_SIZE_PX + 'px';
+    svg.style.width = this._CHIP_ICON_SIZE_PX + 'px';
     // Undo the opacity (for killer cages).
     svg.style.filter = 'saturate(100)';
 
@@ -2111,7 +2111,7 @@ class CollapsibleContainer {
 }
 
 ConstraintCollector.CustomBinary = class CustomBinary extends ConstraintCollector {
-  constructor(inputManager, display, panel) {
+  constructor(inputManager, display, chipView) {
     super();
 
     this._form = document.getElementById('custom-binary-input');
@@ -2125,7 +2125,7 @@ ConstraintCollector.CustomBinary = class CustomBinary extends ConstraintCollecto
     this._configs = new Map();
     this._shape = null;
     this._display = display;
-    this._panel = panel;
+    this._chipView = chipView;
     this._inputManager = inputManager;
 
     this._setUp();
@@ -2207,7 +2207,7 @@ ConstraintCollector.CustomBinary = class CustomBinary extends ConstraintCollecto
         { cells, key, type }, ConstraintDisplays.CustomBinary, null),
       removeFn: () => { this._removeConstraint(config); },
     };
-    this._panel.addItem(config);
+    this._chipView.addItem(config);
 
     const mapKey = config.mapKey;
     if (!this._configs.has(mapKey)) this._configs.set(mapKey, []);

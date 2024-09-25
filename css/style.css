@@ -252,8 +252,7 @@ button.image-button>img {
   font-weight: bold;
 }
 
-#displayed-composite-constraints,
-#displayed-ordinary-constraints {
+.chip-view {
   display: grid;
   grid-template-columns: 1fr 1fr;
 
@@ -266,26 +265,16 @@ button.image-button>img {
   line-height: 1.2em;
 }
 
-#displayed-composite-constraints {
+#composite-chip-view {
   grid-template-columns: 1fr;
 }
 
-#jigsaw-container {
-  text-align: center;
-}
-
-#displayed-regions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-
-  background: rgba(0, 0, 255, 0.1);
-  border-radius: 10px;
+#jigsaw-chip-view {
   margin-bottom: 5px;
-
   min-height: 4em;
 }
 
-.constraint-item {
+.chip {
   cursor: default;
   display: flex;
   align-items: center;
@@ -294,12 +283,12 @@ button.image-button>img {
   margin: 3px;
 }
 
-.constraint-item span {
+.chip span {
   margin-right: 5px;
   margin-left: 10px;
 }
 
-.constraint-item button {
+.chip button {
   border: 0px;
   color: #d0451b;
   background: transparent;
@@ -309,11 +298,11 @@ button.image-button>img {
   padding: 2px 10px;
 }
 
-.constraint-item:hover {
+.chip:hover {
   background: rgba(255, 255, 0, 0.8);
 }
 
-.constraint-item button:hover {
+.chip button:hover {
   background: none;
   color: #bc3315;
 }
