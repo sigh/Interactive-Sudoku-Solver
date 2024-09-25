@@ -552,6 +552,10 @@ class SudokuConstraintBase {
     return this.constructor.displayName();
   }
 
+  displayCells(shape) {
+    return this.cells || [];
+  }
+
   static _directionStr(rowCol, clueInc, clueDec) {
     const parts = [];
     if (rowCol[0] == 'C') {
@@ -639,6 +643,10 @@ class SudokuConstraint {
     toString() {
       return this.constraints.map(c => c.toString()).join('');
     }
+
+    displayCells(shape) {
+      return this.constraints.flatMap(c => c.cells(shape));
+    }
   }
 
   static Or = class Or extends SudokuConstraintBase {
@@ -657,6 +665,10 @@ class SudokuConstraint {
         '.End',
       ].join('');
     }
+
+    displayCells(shape) {
+      return this.constraints.flatMap(c => c.displayCells(shape));
+    }
   }
 
   static And = class And extends SudokuConstraintBase {
@@ -674,6 +686,10 @@ class SudokuConstraint {
         ...this.constraints.map(c => c.toString()),
         '.End',
       ].join('');
+    }
+
+    displayCells(shape) {
+      return this.constraints.flatMap(c => c.displayCells(shape));
     }
   }
 
@@ -1197,6 +1213,10 @@ class SudokuConstraint {
       return `Little Killer (${this.sum})`;
     }
 
+    displayCells(shape) {
+      return this.constructor.cellMap(shape)[this.id];
+    }
+
     static cellMap = memoize((shape) => {
       let map = {};
       const gridSize = shape.gridSize;
@@ -1244,6 +1264,10 @@ class SudokuConstraint {
       return `${this.constructor.displayName()} (${dirStr})`;
     }
 
+    displayCells(shape) {
+      return this.constructor.fullLineCellMap(shape).get(this.rowCol + ',1');
+    }
+
     values() {
       return [this.sumInc, this.sumDec];
     }
@@ -1260,6 +1284,10 @@ class SudokuConstraint {
 
     chipLabel() {
       return `Sandwich (${this.sum})`;
+    }
+
+    displayCells(shape) {
+      return this.constructor.fullLineCellMap(shape).get(this.id + ',1');
     }
   }
 
@@ -1297,6 +1325,10 @@ class SudokuConstraint {
 
       return `${this.constructor.displayName()} (${dirStr})`;
     }
+
+    displayCells(shape) {
+      return this.constructor.fullLineCellMap(shape).get(this.rowCol + ',1');
+    }
   }
 
   static HiddenSkyscraper = class HiddenSkyscraper extends SudokuConstraintBase {
@@ -1318,6 +1350,10 @@ class SudokuConstraint {
         this.rowCol, this.valueInc, this.valueDec);
 
       return `${this.constructor.displayName()} (${dirStr})`;
+    }
+
+    displayCells(shape) {
+      return this.constructor.fullLineCellMap(shape).get(this.rowCol + ',1');
     }
   }
 
@@ -1341,6 +1377,10 @@ class SudokuConstraint {
 
       return `${this.constructor.displayName()} (${dirStr})`;
     }
+
+    displayCells(shape) {
+      return this.constructor.fullLineCellMap(shape).get(this.rowCol + ',1');
+    }
   }
 
   static FullRank = class FullRank extends SudokuConstraintBase {
@@ -1362,6 +1402,10 @@ class SudokuConstraint {
 
     values() {
       return [this.rankInc, this.rankDec];
+    }
+
+    displayCells(shape) {
+      return this.constructor.fullLineCellMap(shape).get(this.rowCol + ',1');
     }
   }
 
@@ -1419,6 +1463,10 @@ class SudokuConstraint {
         shape.makeCellId(row + 1, col),
         shape.makeCellId(row + 1, col + 1),
       ];
+    }
+
+    displayCells(shape) {
+      return this.constructor.cells(this.topLeftCell);
     }
   }
 
@@ -1525,6 +1573,11 @@ class SudokuConstraint {
       } catch (e) { }
       return displayName;
     }
+
+    displayCells(shape) {
+      const groups = this.constructor.parseGroups(this.items, false)
+      return groups.flatMap(g => g.cells);
+    }
   }
 
   static BinaryX = class BinaryX extends SudokuConstraint.Binary {
@@ -1583,6 +1636,10 @@ class SudokuConstraint {
 
     chipLabel() {
       return `Givens [${this.values.join(',')}]`;
+    }
+
+    displayCells(shape) {
+      return this.values.map(v => shape.parseValueId(v).cellId);
     }
   }
 
