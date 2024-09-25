@@ -112,12 +112,11 @@ ConstraintCollector.Experimental = class Experimental extends ConstraintCollecto
 
   addConstraint(constraint) {
     const config = {
-      cells: [],
       constraint: constraint,
       removeFn: () => { this._removeConstraint(config); },
     };
     this._chipConfigs.push(config);
-    this._chipView.addItem(config);
+    this._chipView.addChip(config);
   }
 
   getConstraints() {
@@ -142,12 +141,11 @@ ConstraintCollector.Composite = class Composite extends ConstraintCollector {
 
   addConstraint(constraint) {
     const config = {
-      cells: [],
       constraint: constraint,
       removeFn: () => { this._removeConstraint(config); },
     };
     this._chipConfigs.push(config);
-    this._chipView.addItem(config);
+    this._chipView.addChip(config);
   }
 
   getConstraints() {
@@ -632,7 +630,6 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
     let config = null;
     if (constraint.type === 'Quad') {
       config = {
-        cells: SudokuConstraint.Quad.cells(constraint.topLeftCell),
         constraint: constraint,
         displayElem: this._display.drawItem(
           constraint, ConstraintDisplays.Quad, null),
@@ -641,14 +638,13 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
       };
       for (const other of this._chipConfigs) {
         if (config.replaceKey == other.replaceKey) {
-          this._chipView.removeItem(other);
+          this._chipView.removeChip(other);
           break;
         }
       }
     } else {
       const uiConfig = this._constraintConfigs[constraint.type];
       config = {
-        cells: constraint.cells,
         constraint: constraint,
         displayElem: this._display.drawItem(
           constraint,
@@ -657,7 +653,7 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
         removeFn: () => { this._removeConstraint(config); },
       };
     }
-    this._chipView.addItem(config);
+    this._chipView.addChip(config);
     this._chipConfigs.push(config);
   }
 
@@ -999,7 +995,7 @@ ConstraintCollector.Jigsaw = class Jigsaw extends ConstraintCollector {
   }
 
   _removePiece(config) {
-    config.cells.forEach(c => this._piecesMap[this._shape.parseCellId(c).cell] = 0);
+    config.constraint.cells.forEach(c => this._piecesMap[this._shape.parseCellId(c).cell] = 0);
     GroupHighlighter.toggleHighlightForElement(this._chipView.element(), false);
   }
 
@@ -1008,14 +1004,13 @@ ConstraintCollector.Jigsaw = class Jigsaw extends ConstraintCollector {
     const pieceId = ++this._maxPieceId;
     cells.forEach(c => this._piecesMap[this._shape.parseCellId(c).cell] = pieceId);
     const config = {
-      constraint: new SudokuConstraint.Jigsaw(),  // Dummy constraint.
+      constraint: new ConstraintCollector.Jigsaw.JigsawPiece(...cells),
       pieceId: pieceId,
-      cells: cells,
       displayElem: this._display.drawItem({ cells }, ConstraintDisplays.Jigsaw, null),
       removeFn: () => { this._removePiece(config); },
     };
     GroupHighlighter.toggleHighlightForElement(this._chipView.element(), true);
-    this._chipView.addItem(config);
+    this._chipView.addChip(config);
   }
 
   _cellsAreValidJigsawPiece(cells) {
@@ -1027,6 +1022,16 @@ ConstraintCollector.Jigsaw = class Jigsaw extends ConstraintCollector {
     }
     return true;
   }
+}
+
+// Fake constraint for collecting jigsaw pieces.
+ConstraintCollector.Jigsaw.JigsawPiece = class JigsawPiece extends SudokuConstraintBase {
+  constructor(...cells) {
+    super(arguments);
+    this.cells = cells;
+  }
+
+  static displayName() { return ''; }
 }
 
 ConstraintCollector.OutsideClue = class OutsideClue extends ConstraintCollector {
@@ -1526,12 +1531,12 @@ class ConstraintChipView {
     return this._chipViewElement;
   }
 
-  addItem(config) {
+  addChip(config) {
     this._chipViewElement.appendChild(
       this._makeChip(config));
   }
 
-  removeItem(config) {
+  removeChip(config) {
     config.removeFn();
     if (config.displayElem) {
       this._display.removeItem(config.displayElem);
@@ -1563,13 +1568,13 @@ class ConstraintChipView {
 
     config.chip = chip;
     removeChipButton.addEventListener('click', () => {
-      this.removeItem(config);
+      this.removeChip(config);
       this._chipHighlighter.clear();
       this._onUpdate();
     });
 
     chip.addEventListener('mouseover', () => {
-      this._chipHighlighter.setCells(config.cells);
+      this._chipHighlighter.setCells(constraint.displayCells(this._shape));
     });
     chip.addEventListener('mouseout', () => {
       this._chipHighlighter.clear();
@@ -1581,7 +1586,6 @@ class ConstraintChipView {
       for (const subConstraint of constraint.constraints) {
         subView.appendChild(this._makeChip({
           constraint: subConstraint,
-          cells: [],
           removeFn: () => {
             arrayRemoveValue(constraint.constraints, subConstraint);
           },
@@ -2164,16 +2168,16 @@ ConstraintCollector.CustomBinary = class CustomBinary extends ConstraintCollecto
 
     const config = {
       constraint: SudokuConstraint[type].makeFromGroups(key, [{ name, cells }]),
+      cells: cells,
       name: name,
       key: key,
-      cells: cells,
       type: type,
       mapKey: `${type}-${key}`,
       displayElem: this._display.drawItem(
         { cells, key, type }, ConstraintDisplays.CustomBinary, null),
       removeFn: () => { this._removeConstraint(config); },
     };
-    this._chipView.addItem(config);
+    this._chipView.addChip(config);
 
     const mapKey = config.mapKey;
     if (!this._configs.has(mapKey)) this._configs.set(mapKey, []);
