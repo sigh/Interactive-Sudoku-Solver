@@ -159,7 +159,7 @@ class DebugManager {
     // Things setup only when the debugger is actually loaded.
 
     // Setup elements.
-    this._debugCellHighlighter = this._displayContainer.createHighlighter('highlighted-cell');
+    this._debugCellHighlighter = this._displayContainer.createHighlighter('highlighted-cells');
     this._infoOverlay = new InfoOverlay(this._displayContainer);
     this._candidateDisplay = new CellValueDisplay(
       this._displayContainer.getNewGroup('debug-candidate-group'));

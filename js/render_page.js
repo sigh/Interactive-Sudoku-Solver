@@ -1314,11 +1314,17 @@ class ConstraintManager {
 
   _setUp(inputManager, displayContainer) {
     const chipViews = new Map();
+    this._chipHighlighter = displayContainer.createHighlighter(
+      'highlighted-cells');
+    this._constraintSelector = this.addReshapeListener(
+      new ConstraintSelector(displayContainer));
+
     for (const type of ['ordinary', 'composite', 'jigsaw']) {
       const chipView = this.addReshapeListener(
         new ConstraintChipView(
           document.getElementById(`${type}-chip-view`),
-          this._display, displayContainer, this.runUpdateCallback.bind(this)));
+          this._display, this._chipHighlighter, this._constraintSelector,
+          this.runUpdateCallback.bind(this)));
       chipViews.set(type, chipView);
     };
     this._chipViews = chipViews;
@@ -1503,6 +1509,8 @@ class ConstraintManager {
     for (const chipView of this._chipViews.values()) {
       chipView.clear();
     }
+    this._chipHighlighter.clear();
+    this._constraintSelector.clear();
     for (const collector of this._constraintCollectors.values()) {
       collector.clear();
     }
@@ -1511,9 +1519,10 @@ class ConstraintManager {
 }
 
 class ConstraintChipView {
-  constructor(chipViewElement, display, displayContainer, onUpdate) {
+  constructor(chipViewElement, display, chipHighlighter, constraintSelector, onUpdate) {
     this._chipViewElement = chipViewElement;
-    this._chipHighlighter = displayContainer.createHighlighter('highlighted-cell');
+    this._chipHighlighter = chipHighlighter;
+    this._constraintSelector = constraintSelector;
     this._display = display;
     this._shape = null;
     this._onUpdate = onUpdate;
@@ -1563,10 +1572,23 @@ class ConstraintChipView {
     chip.appendChild(chipLabel);
 
     config.chip = chip;
-    removeChipButton.addEventListener('click', () => {
-      this.removeChip(config);
-      this._chipHighlighter.clear();
-      this._onUpdate();
+
+    chip.addEventListener('click', (e) => {
+      // If the remove button is clicked then remove the chip.
+      if (e.target.closest('button') === removeChipButton) {
+        if (this._constraintSelector.currentSelection() === constraint) {
+          this._constraintSelector.clear();
+        }
+        this.removeChip(config);
+        this._chipHighlighter.clear();
+        this._onUpdate();
+        return;
+      }
+
+      // Otherwise if we are looking at the current chip then toggle the
+      // selection.
+      if (e.target.closest('.chip') !== chip) return;
+      this._constraintSelector.toggle(constraint, chip);
     });
 
     chip.addEventListener('mouseover', (e) => {
@@ -1630,6 +1652,51 @@ class ConstraintChipView {
   }
 }
 
+class ConstraintSelector {
+  static _SELECTED_CHIP_CLASS = 'selected-chip';
+
+  constructor(displayContainer) {
+    this._highlighter = displayContainer.createHighlighter('selected-constraint-cells');
+    this._currentSelection = null;
+    this._shape = null;
+  }
+
+  reshape(shape) {
+    this._shape = shape;
+  }
+
+  select(constraint, chip) {
+    this.clear();
+    this._currentSelection = { chip, constraint };
+    chip.classList.add(ConstraintSelector._SELECTED_CHIP_CLASS);
+    this._highlighter.setCells(constraint.displayCells(this._shape));
+  }
+
+  toggle(constraint, chip) {
+    if (constraint === this.currentSelection()) {
+      this.clear();
+    } else {
+      this.select(constraint, chip);
+    }
+  }
+
+  currentSelection() {
+    if (this._currentSelection) {
+      return this._currentSelection.constraint;
+    }
+    return null;
+  }
+
+  clear() {
+    if (this._currentSelection) {
+      this._currentSelection.chip.classList.remove(
+        ConstraintSelector._SELECTED_CHIP_CLASS);
+      this._highlighter.clear();
+      this._currentSelection = null;
+    }
+  }
+}
+
 class Highlight {
   constructor(display, cssClass) {
     this._cells = new Map();
@@ -1685,7 +1752,7 @@ class Highlight {
 
 class Selection {
   constructor(displayContainer) {
-    this._highlight = displayContainer.createHighlighter('selected-cell');
+    this._highlight = displayContainer.createHighlighter('selected-cells');
 
     this._clickInterceptor = displayContainer.getClickInterceptor();
 
