@@ -125,10 +125,11 @@ ConstraintCollector.Experimental = class Experimental extends ConstraintCollecto
 }
 
 ConstraintCollector.Composite = class Composite extends ConstraintCollector {
-  constructor(chipView) {
+  constructor(display, chipView) {
     super();
     this._chipView = chipView;
     this._chipConfigs = [];
+    this._display = display;
   }
 
   clear() {
@@ -142,6 +143,8 @@ ConstraintCollector.Composite = class Composite extends ConstraintCollector {
   addConstraint(constraint) {
     const config = {
       constraint: constraint,
+      displayElem: this._display.drawItem(
+        constraint, ConstraintDisplays.Composite, null),
       removeFn: () => { this._removeConstraint(config); },
     };
     this._chipConfigs.push(config);
@@ -1348,7 +1351,7 @@ class ConstraintManager {
       new ConstraintCollector.OutsideClue(inputManager, this._display),
       new ConstraintCollector.GivenCandidates(inputManager, this._display),
       new ConstraintCollector.Experimental(chipViews.get('ordinary')),
-      new ConstraintCollector.Composite(chipViews.get('composite')),
+      new ConstraintCollector.Composite(this._display, chipViews.get('composite')),
     ];
 
     for (const collector of collectors) {
@@ -1563,12 +1566,19 @@ class ConstraintChipView {
     removeChipButton.innerHTML = '&#x00D7;';
     chip.appendChild(removeChipButton);
 
+    const chipLabel = document.createElement('div');
+    chipLabel.className = 'chip-label';
+    chipLabel.textContent = constraint.chipLabel();
+
     if (config.displayElem) {
-      chip.append(this._makeChipIcon(config.displayElem));
+      const chipIcon = this._makeChipIcon(config.displayElem);
+      if (constraint.constructor.IS_COMPOSITE) {
+        chipLabel.appendChild(chipIcon);
+      } else {
+        chip.append(chipIcon);
+      }
     }
 
-    const chipLabel = document.createElement('span');
-    chipLabel.innerHTML = constraint.chipLabel();
     chip.appendChild(chipLabel);
 
     config.chip = chip;
@@ -1622,6 +1632,7 @@ class ConstraintChipView {
 
   _makeChipIcon(displayElem) {
     const svg = createSvgElement('svg');
+    svg.classList.add('chip-icon');
 
     const borders = createSvgElement('g');
     const borderDisplay = new BorderDisplay(

@@ -654,6 +654,12 @@ const EXAMPLES = [
     input: '.Or.AllDifferent~R3C8~R4C7.End.~R1C1_5~R1C2_3~R2C1_6~R2C6_5~R3C2_9~R3C3_8~R7C2_6~R8C6_9~R8C9_5~R9C8_7~R9C5_8~R8C4_4~R7C7_2~R7C8_8~R5C9_1~R4C9_3~R4C5_6~R6C5_2~R5C4_8~R5C1_4~R4C1_8~R6C1_7~R1C5_9~R5C8_9~R7C4_5~R3C1_1~R1C4_2',
     solution: '534298617672315948198746532859167423426853791713924856967531284281479365345682179',
   },
+  {
+    name: 'City Planning',
+    src: 'https://www.youtube.com/watch?v=-StX1t2laPE',
+    input: '.Or.~R5C2_5.Skyscraper~C2~5~.End.Or.~R3C3_3.Skyscraper~C3~3~.End.Or.~R3C3_7.Skyscraper~C3~~7.End.Or.~R1C4_1.Skyscraper~C4~1~.End.Or.~R3C4_7.Skyscraper~C4~~7.End.Or.~R9C7_9.Skyscraper~C7~9~.End.Or.~R4C9_4.Skyscraper~C9~4~.End.Or.~R7C9_3.Skyscraper~C9~~3.End.Or.~R3C1_9.Skyscraper~R3~~9.End.Or.~R6C9_1.Skyscraper~R6~~1.End.Or.~R6C8_8.Skyscraper~R6~8~.End.Or.~R7C4_6.Skyscraper~R7~~6.End.Or.~R7C6_6.Skyscraper~R7~6~.End.Or.~R8C6_4.Skyscraper~R8~~4.End.Or.~R2C6_8.Skyscraper~C6~~8.End.Or.~R9C5_5.Skyscraper~R9~5~.End.Or.~R4C2_2.Skyscraper~R4~2~.End.Or.~R2C2_2.Skyscraper~R2~2~.End.Or.~R1C4_1.~R6C9_1.End.Or.Skyscraper~C4~1~.Skyscraper~R6~~1.End.Or.~R4C2_2.~R2C2_2.End.Or.Skyscraper~R4~2~.Skyscraper~R2~2~.End.Or.~R3C3_3.~R7C9_3.End.Or.Skyscraper~C3~3~.Skyscraper~C9~~3.End.Or.~R4C9_4.~R8C6_4.End.Or.Skyscraper~C9~4~.Skyscraper~R8~~4.End.Or.~R5C2_5.~R9C5_5.End.Or.Skyscraper~C2~5~.Skyscraper~R9~5~.End.Or.~R7C4_6.~R7C6_6.End.Or.Skyscraper~R7~~6.Skyscraper~R7~6~.End.Or.~R3C3_7.~R3C4_7.End.Or.Skyscraper~C3~~7.Skyscraper~C4~~7.End.Or.~R6C8_8.~R2C6_8.End.Or.Skyscraper~R6~8~.Skyscraper~C6~~8.End.Or.~R9C7_9.~R3C1_9.End.Or.Skyscraper~C7~9~.Skyscraper~R3~~9.End',
+    solution: '563127498412938675987654321726819534859743216134562789298476153671395842345281967',
+  }
 ];
 
 for (const puzzle of EXAMPLES) {
