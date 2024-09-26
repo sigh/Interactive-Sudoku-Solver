@@ -556,7 +556,7 @@ class SudokuConstraintBase {
     return this.cells || [];
   }
 
-  static _directionStr(rowCol, clueInc, clueDec) {
+  static _outsideClueChipLabel(rowCol, clueInc, clueDec) {
     const parts = [];
     if (rowCol[0] == 'C') {
       if (clueInc) parts.push(`↓${clueInc}`);
@@ -565,7 +565,8 @@ class SudokuConstraintBase {
       if (clueInc) parts.push(`→${clueInc}`);
       if (clueDec) parts.push(`←${clueDec}`);
     }
-    return parts.join(' ');
+
+    return `${this.displayName()} [${rowCol} ${parts.join(' ')}]`;
   }
 
   static _makeRegions(fn, gridSize) {
@@ -1253,10 +1254,8 @@ class SudokuConstraint {
     }
 
     chipLabel() {
-      const dirStr = this.constructor._directionStr(
+      return this.constructor._outsideClueChipLabel(
         this.rowCol, this.sumInc, this.sumDec);
-
-      return `${this.constructor.displayName()} (${dirStr})`;
     }
 
     displayCells(shape) {
@@ -1278,7 +1277,7 @@ class SudokuConstraint {
     }
 
     chipLabel() {
-      return `Sandwich (${this.sum})`;
+      return `Sandwich [${this.id} ${this.sum}]`;
     }
 
     displayCells(shape) {
@@ -1315,10 +1314,8 @@ class SudokuConstraint {
     }
 
     chipLabel() {
-      const dirStr = this.constructor._directionStr(
+      return this.constructor._outsideClueChipLabel(
         this.rowCol, this.countInc, this.countDec);
-
-      return `${this.constructor.displayName()} (${dirStr})`;
     }
 
     displayCells(shape) {
@@ -1341,10 +1338,8 @@ class SudokuConstraint {
     }
 
     chipLabel() {
-      const dirStr = this.constructor._directionStr(
+      return this.constructor._outsideClueChipLabel(
         this.rowCol, this.valueInc, this.valueDec);
-
-      return `${this.constructor.displayName()} (${dirStr})`;
     }
 
     displayCells(shape) {
@@ -1367,10 +1362,8 @@ class SudokuConstraint {
     }
 
     chipLabel() {
-      const dirStr = this.constructor._directionStr(
+      return this.constructor._outsideClueChipLabel(
         this.rowCol, this.clueInc, this.clueDec);
-
-      return `${this.constructor.displayName()} (${dirStr})`;
     }
 
     displayCells(shape) {
@@ -1389,10 +1382,8 @@ class SudokuConstraint {
     }
 
     chipLabel() {
-      const dirStr = this.constructor._directionStr(
+      return this.constructor._outsideClueChipLabel(
         this.rowCol, this.rankInc, this.rankDec);
-
-      return `${this.constructor.displayName()} (${dirStr})`;
     }
 
     values() {
@@ -1630,15 +1621,30 @@ class SudokuConstraint {
     }
 
     chipLabel() {
-      return `Givens [${this.values.join(',')}]`;
+      const shape = SHAPE_MAX;
+      const parts = [];
+      for (const valueId of this.values) {
+        const { cellId, values } = shape.parseValueId(valueId);
+        let valueStr = values.join(',');
+        if (values.length !== 1) valueStr = `[${valueStr}]`;
+        parts.push(`${cellId}: ${valueStr}`);
+      }
+      return `Givens {${parts.join(', ')}}`;
     }
 
     displayCells(shape) {
       return this.values.map(v => shape.parseValueId(v).cellId);
     }
-  }
 
-  static FixedValues = this.Givens;  // For backwards compatibility.
+    valueMap(shape) {
+      const valueMap = new Map();
+      for (const valueId of constraint.values) {
+        const { cell, values } = shape.parseValueId(valueId);
+        valueMap.set(cell, values);
+      }
+      return valueMap;
+    }
+  }
 
   static Priority = class Priority extends SudokuConstraintBase {
     constructor(priority, ...cells) {

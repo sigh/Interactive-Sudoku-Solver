@@ -34,9 +34,9 @@ class DisplayContainer {
     return new Highlight(this._highlightDisplay, cssClass);
   }
 
-  getNewGroup(groupName) {
+  getNewGroup(groupClass) {
     const group = createSvgElement('g');
-    group.id = groupName;
+    group.classList.add(groupClass);
     this._mainSvg.append(group);
     return group;
   }
@@ -520,8 +520,8 @@ class ConstraintDisplay extends DisplayItem {
     this._constraintDisplays = new Map();
     for (const displayClass of ConstraintDisplays.displayOrder()) {
       const name = displayClass.name;
-      const groupName = name.toLowerCase() + '-group';
-      const group = displayContainer.getNewGroup(groupName);
+      const groupClass = name.toLowerCase() + '-group';
+      const group = displayContainer.getNewGroup(groupClass);
       this._constraintDisplays.set(name, new displayClass(group));
       this._applyGridOffset(group);
     }
