@@ -173,7 +173,7 @@ ConstraintCollector._Checkbox = class _Checkbox extends ConstraintCollector {
         if (config.displayClass) {
           display.toggleItem(constraint, input.checked, config.displayClass);
         }
-        GroupHighlighter.toggleHighlightForElement(input, input.checked);
+        PanelHighlighter.toggleHighlightForElement(input, input.checked);
         this.runUpdateCallback();
       };
       div.appendChild(input);
@@ -996,7 +996,7 @@ ConstraintCollector.Jigsaw = class Jigsaw extends ConstraintCollector {
 
   _removePiece(config) {
     config.constraint.cells.forEach(c => this._piecesMap[this._shape.parseCellId(c).cell] = 0);
-    GroupHighlighter.toggleHighlightForElement(this._chipView.element(), false);
+    PanelHighlighter.toggleHighlightForElement(this._chipView.element(), false);
   }
 
   _addPiece(cells) {
@@ -1009,7 +1009,7 @@ ConstraintCollector.Jigsaw = class Jigsaw extends ConstraintCollector {
       displayElem: this._display.drawItem({ cells }, ConstraintDisplays.Jigsaw, null),
       removeFn: () => { this._removePiece(config); },
     };
-    GroupHighlighter.toggleHighlightForElement(this._chipView.element(), true);
+    PanelHighlighter.toggleHighlightForElement(this._chipView.element(), true);
     this._chipView.addChip(config);
   }
 
@@ -1505,7 +1505,7 @@ class ConstraintManager {
 
   clear() {
     this._display.clear();
-    GroupHighlighter.clear();
+    PanelHighlighter.clear();
     for (const chipView of this._chipViews.values()) {
       chipView.clear();
     }
@@ -2450,13 +2450,13 @@ class InfoOverlay {
   }
 }
 
-class GroupHighlighter {
+class PanelHighlighter {
   static highlightMap = new Map();
 
-  static _HIGHLIGHT_CLASS = 'constraint-group-highlight';
+  static _HIGHLIGHT_CLASS = 'constraint-panel-highlight';
 
   static toggleHighlightForElement(element, enable) {
-    const group = element.closest('.constraint-group');
+    const group = element.closest('.constraint-panel');
     if (!this.highlightMap.has(group)) {
       this.highlightMap.set(group, new Set());
     }

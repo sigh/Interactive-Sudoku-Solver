@@ -194,7 +194,7 @@ layout: null
       </div>
     </div>
 
-    <div id="constraint-panel">
+    <div id="constraint-panel-container">
       <div>
         <h1>Constraints</h1>
 
@@ -213,14 +213,14 @@ layout: null
         <div>
 
           <form id="multi-value-cell-input">
-            <fieldset tabindex="0" class="constraint-group" disabled>
+            <fieldset tabindex="0" class="constraint-panel" disabled>
               <h2>Set multiple values</h2>
               <div></div>
             </fieldset>
           </form>
 
           <form id="multi-cell-constraint-input">
-            <fieldset tabindex="0" class="constraint-group">
+            <fieldset tabindex="0" class="constraint-panel">
               <h2>Lines & Regions</h2>
               <div id="multi-cell-constraint-body">
                 <span class="description">
@@ -248,7 +248,7 @@ layout: null
         </div>
 
         <div>
-          <div id="shape-container" class="constraint-group">
+          <div id="shape-container" class="constraint-panel">
             <h2>
               Shape
               <select id="shape-select"></select>
@@ -261,7 +261,7 @@ layout: null
             </h2>
           </div>
 
-          <div class="constraint-group" id="global-constraints-container">
+          <div class="constraint-panel" id="global-constraints-container">
             <h2>Global constraints</h2>
             <div id="global-constraint-checkboxes"></div>
           </div>
@@ -269,7 +269,7 @@ layout: null
 
       </div>
 
-      <div id="layout-constraint-container" class="constraint-group hide-until-load">
+      <div id="layout-constraint-container" class="constraint-panel hide-until-load">
         <h2>Layout constraints</h2>
         <div class="two-column">
 
@@ -291,7 +291,7 @@ layout: null
       </div>
 
       <form id="custom-binary-input" class="hide-until-load">
-        <fieldset tabindex=" 0" class="constraint-group" disabled>
+        <fieldset tabindex=" 0" class="constraint-panel" disabled>
           <h2>Custom binary constraints</h2>
           <div>
             <div>
@@ -347,7 +347,7 @@ layout: null
 
       <div class="hide-until-load">
         <form id="outside-clue-input">
-          <fieldset tabindex="0" class="constraint-group" disabled>
+          <fieldset tabindex="0" class="constraint-panel" disabled>
             <h2>Outside clues</h2>
             <div id="outside-clue-input-body">
               <div class="description">

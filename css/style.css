@@ -41,25 +41,25 @@ body {
   font-size: 9px;
 }
 
-#solution-group {
+.solution-group {
   fill: rgb(0, 128, 255);
 }
 
-#givens-group .cell-multi-value {
+.givens-group .cell-multi-value {
   fill: lightgrey;
   stroke: rgb(255, 255, 255);
   transform: translate(0px, -1.5px);
 }
 
-#givens-group .cell-single-value {
+.givens-group .cell-single-value {
   font-family: sans-serif;
 }
 
-#diff-group {
+.diff-group {
   fill: rgb(200, 120, 120);
 }
 
-#debug-candidate-group {
+.debug-candidate-group {
   fill: rgb(230, 50, 50);
   font-weight: bold;
 }
@@ -86,7 +86,7 @@ body {
 }
 
 .layout-view>.non-layout-constraint,
-.layout-view>#outside-arrow-group text {
+.layout-view>.outside-arrow-group text {
   filter: opacity(50%) blur(2px);
 }
 
@@ -340,7 +340,7 @@ button.image-button>img {
   background: none;
 }
 
-#constraint-panel {
+#constraint-panel-container {
   line-height: 1.8;
   display: flex;
   flex-direction: column;
@@ -348,29 +348,29 @@ button.image-button>img {
   width: 370px;
 }
 
-#constraint-panel>.two-column>div {
+#constraint-panel-container>.two-column>div {
   display: flex;
   flex-direction: column;
   gap: 10px;
   width: 180px;
 }
 
-#constraint-panel h1 {
+#constraint-panel-container h1 {
   font-size: 20px;
   line-height: 1;
 }
 
-#constraint-panel form {
+#constraint-panel-container form {
   margin: 0;
 }
 
-#constraint-panel>div:first-child {
+#constraint-panel-container>div:first-child {
   display: flex;
   align-items: center;
   gap: 10px;
 }
 
-#constraint-panel .panel-edge-constraints {
+#constraint-panel-container .panel-edge-constraints {
   margin-right: 10px;
   gap: 2px;
 }
@@ -405,18 +405,18 @@ input:invalid {
   outline: 2px solid red;
 }
 
-.constraint-group {
+.constraint-panel {
   border-radius: 10px;
   border: 2px solid #aaa;
   padding: 0;
   margin: 0;
 }
 
-.constraint-group>* {
+.constraint-panel>* {
   padding: 0px 5px;
 }
 
-.constraint-group-highlight:not(.container-open) {
+.constraint-panel-highlight:not(.container-open) {
   border-color: rgb(150 150 255);
   box-shadow: 0 0 8px rgb(150 150 255);
 }
