@@ -4,6 +4,7 @@ class ConstraintDisplays {
       this.DefaultRegionsInverted,
       this.Windoku,
       this.Jigsaw,
+      this.Composite,
       this.Indexing,
       this.Thermo,
       this.PillArrow,
@@ -167,6 +168,44 @@ class BaseConstraintDisplayItem extends DisplayItem {
 
     return g;
   }
+
+  _makeRegionBorder(graph, cellSet, shape) {
+    const g = createSvgElement('g');
+
+    const cellSize = DisplayItem.CELL_SIZE;
+
+    for (const cell of cellSet) {
+      const edges = graph.cellEdges(cell);
+      const [row, col] = shape.splitCellIndex(cell);
+
+      if (!cellSet.has(edges[GridGraph.LEFT])) {
+        g.appendChild(this._makePath([
+          [col * cellSize, row * cellSize],
+          [col * cellSize, (row + 1) * cellSize],
+        ]));
+      }
+      if (!cellSet.has(edges[GridGraph.RIGHT])) {
+        g.appendChild(this._makePath([
+          [(col + 1) * cellSize, row * cellSize],
+          [(col + 1) * cellSize, (row + 1) * cellSize],
+        ]));
+      }
+      if (!cellSet.has(edges[GridGraph.UP])) {
+        g.appendChild(this._makePath([
+          [col * cellSize, row * cellSize],
+          [(col + 1) * cellSize, row * cellSize],
+        ]));
+      }
+      if (!cellSet.has(edges[GridGraph.DOWN])) {
+        g.appendChild(this._makePath([
+          [col * cellSize, (row + 1) * cellSize],
+          [(col + 1) * cellSize, (row + 1) * cellSize],
+        ]));
+      }
+    }
+
+    return g;
+  }
 }
 
 ConstraintDisplays.Jigsaw = class Jigsaw extends BaseConstraintDisplayItem {
@@ -214,42 +253,10 @@ ConstraintDisplays.Jigsaw = class Jigsaw extends BaseConstraintDisplayItem {
     const cellSet = new Set(region.map(c => shape.parseCellId(c).cell));
     const graph = GridGraph.get(shape);
 
-    const g = createSvgElement('g');
+    const g = this._makeRegionBorder(graph, cellSet, shape);
     g.setAttribute('stroke-width', 2);
     g.setAttribute('stroke', 'rgb(100, 100, 100)');
     g.setAttribute('stroke-linecap', 'round');
-
-    const cellSize = DisplayItem.CELL_SIZE;
-
-    for (const cell of cellSet) {
-      const edges = graph.cellEdges(cell);
-      const [row, col] = shape.splitCellIndex(cell);
-
-      if (!cellSet.has(edges[GridGraph.LEFT])) {
-        g.appendChild(this._makePath([
-          [col * cellSize, row * cellSize],
-          [col * cellSize, (row + 1) * cellSize],
-        ]));
-      }
-      if (!cellSet.has(edges[GridGraph.RIGHT])) {
-        g.appendChild(this._makePath([
-          [(col + 1) * cellSize, row * cellSize],
-          [(col + 1) * cellSize, (row + 1) * cellSize],
-        ]));
-      }
-      if (!cellSet.has(edges[GridGraph.UP])) {
-        g.appendChild(this._makePath([
-          [col * cellSize, row * cellSize],
-          [(col + 1) * cellSize, row * cellSize],
-        ]));
-      }
-      if (!cellSet.has(edges[GridGraph.DOWN])) {
-        g.appendChild(this._makePath([
-          [col * cellSize, (row + 1) * cellSize],
-          [(col + 1) * cellSize, (row + 1) * cellSize],
-        ]));
-      }
-    }
 
     if (!graph.cellsAreConnected(cellSet)) {
       const color = this._colorPicker.pickColor();
@@ -855,5 +862,30 @@ ConstraintDisplays.DefaultRegionsInverted = class DefaultRegionsInverted extends
 
   toggleItem(_, enable) {
     this.getSvg().setAttribute('display', enable ? 'none' : null);
+  }
+}
+
+ConstraintDisplays.Composite = class Composite extends BaseConstraintDisplayItem {
+  constructor(svg) {
+    super(svg);
+    this._items = [];
+    svg.setAttribute('opacity', '0.2');
+  }
+
+  drawItem(constraint, _) {
+    const shape = this._shape;
+
+    const cells = constraint.displayCells(shape);
+    const cellSet = new Set(cells.map(c => shape.parseCellId(c).cell));
+    const graph = GridGraph.get(shape);
+
+    const g = this._makeRegionBorder(graph, cellSet, shape);
+    g.setAttribute('stroke-width', 5);
+    g.setAttribute('stroke', 'rgb(50, 50, 50)');
+    g.setAttribute('stroke-dasharray', '8 2');
+
+    this._svg.append(g);
+
+    return g;
   }
 }
