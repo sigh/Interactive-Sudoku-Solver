@@ -583,6 +583,7 @@ class ConstraintDisplay extends DisplayItem {
     if (this._constraintDisplays.get('ShadedRegion').removeItem(item)) return;
     if (this._constraintDisplays.get('CustomBinary').removeItem(item)) return;
     if (this._constraintDisplays.get('CountingCircles').removeItem(item)) return;
+    if (this._constraintDisplays.get('BorderedRegion').removeItem(item)) return;
     item.parentNode.removeChild(item);
   }
 
@@ -1083,6 +1084,15 @@ class GridGraph {
 
   cellEdges(cell) {
     return this._graph[cell];
+  }
+
+  adjacent(cell, dir) {
+    return this._graph[cell][dir];
+  }
+
+  diagonal(cell, dir0, dir1) {
+    const cell1 = this._graph[cell][dir0];
+    return cell1 && this._graph[cell1][dir1];
   }
 
   cellsAreConnected(cellSet) {

@@ -144,7 +144,12 @@ ConstraintCollector.Composite = class Composite extends ConstraintCollector {
     const config = {
       constraint: constraint,
       displayElem: this._display.drawItem(
-        constraint, ConstraintDisplays.Composite, null),
+        constraint,
+        ConstraintDisplays.BorderedRegion,
+        {
+          opacity: 0.2,
+          dashed: true,
+        }),
       removeFn: () => { this._removeConstraint(config); },
     };
     this._chipConfigs.push(config);
@@ -612,9 +617,9 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
             return options;
           },
         },
-        displayClass: ConstraintDisplays.ShadedRegion,
+        displayClass: ConstraintDisplays.BorderedRegion,
         displayConfig: {
-          pattern: DisplayItem.DIAGONAL_PATTERN,
+          splitFn: (constraint) => constraint.splitCells(),
         },
         description:
           `The cells are taken as a series of sets of the same size.

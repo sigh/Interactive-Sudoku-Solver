@@ -4,7 +4,7 @@ class ConstraintDisplays {
       this.DefaultRegionsInverted,
       this.Windoku,
       this.Jigsaw,
-      this.Composite,
+      this.BorderedRegion,
       this.Indexing,
       this.Thermo,
       this.PillArrow,
@@ -169,38 +169,68 @@ class BaseConstraintDisplayItem extends DisplayItem {
     return g;
   }
 
-  _makeRegionBorder(graph, cellSet, shape) {
+  static _isStrictDiagonal(graph, cellSet, cell, dir0, dir1) {
+    return (
+      !cellSet.has(graph.adjacent(cell, dir0))
+      && !cellSet.has(graph.adjacent(cell, dir1))
+      && cellSet.has(graph.diagonal(cell, dir0, dir1)));
+  }
+
+  _makeRegionBorder(graph, cellSet, shape, cutSize) {
     const g = createSvgElement('g');
 
     const cellSize = DisplayItem.CELL_SIZE;
+    cutSize ||= 0;
+    const cls = this.constructor;
+
+    const borderEdgeParts = (cell, row, col, edgeType) => {
+      // Points with any offsets applied.
+      const parts = [
+        [col * cellSize, row * cellSize],
+        [col * cellSize, row * cellSize]];
+
+      // Apply offsets to create the basic border.
+      const direction = (edgeType == GridGraph.RIGHT || edgeType == GridGraph.DOWN) ? 1 : 0;
+      const orientation = (edgeType == GridGraph.UP || edgeType == GridGraph.DOWN) ? 1 : 0;
+      parts[0][orientation] += direction * cellSize;
+      parts[1][orientation] += direction * cellSize;
+      parts[1][1 - orientation] += cellSize;
+
+      // If we don't need to cut across to diagonals, we're done.
+      if (cutSize == 0) return parts;
+
+      const rowOffset = direction ? cutSize : -cutSize;
+      const diagStartType = orientation ? GridGraph.LEFT : GridGraph.UP;
+      const diagEndType = orientation ? GridGraph.RIGHT : GridGraph.DOWN;
+
+      // NOTE: The diagonal extended from the LEFT/RIGHT edges.
+      if (cls._isStrictDiagonal(graph, cellSet, cell, edgeType, diagEndType)) {
+        parts[1][1 - orientation] -= cutSize;
+        if (orientation == 0) {
+          parts.push([parts[1][0] + rowOffset, parts[1][1] + cutSize]);
+        }
+      }
+      // Update the start second, otherwise the indexes are messed up if we
+      // unshift.
+      if (cls._isStrictDiagonal(graph, cellSet, cell, edgeType, diagStartType)) {
+        parts[0][1 - orientation] += cutSize;
+        if (orientation == 0) {
+          parts.unshift([parts[0][0] + rowOffset, parts[0][1] - cutSize]);
+        }
+      }
+
+      return parts;
+    }
 
     for (const cell of cellSet) {
       const edges = graph.cellEdges(cell);
       const [row, col] = shape.splitCellIndex(cell);
-
-      if (!cellSet.has(edges[GridGraph.LEFT])) {
-        g.appendChild(this._makePath([
-          [col * cellSize, row * cellSize],
-          [col * cellSize, (row + 1) * cellSize],
-        ]));
-      }
-      if (!cellSet.has(edges[GridGraph.RIGHT])) {
-        g.appendChild(this._makePath([
-          [(col + 1) * cellSize, row * cellSize],
-          [(col + 1) * cellSize, (row + 1) * cellSize],
-        ]));
-      }
-      if (!cellSet.has(edges[GridGraph.UP])) {
-        g.appendChild(this._makePath([
-          [col * cellSize, row * cellSize],
-          [(col + 1) * cellSize, row * cellSize],
-        ]));
-      }
-      if (!cellSet.has(edges[GridGraph.DOWN])) {
-        g.appendChild(this._makePath([
-          [col * cellSize, (row + 1) * cellSize],
-          [(col + 1) * cellSize, (row + 1) * cellSize],
-        ]));
+      for (let edgeType = 0; edgeType < edges.length; edgeType++) {
+        if (!cellSet.has(edges[edgeType])) {
+          g.appendChild(
+            this._makePath(
+              borderEdgeParts(cell, row, col, edgeType)));
+        }
       }
     }
 
@@ -238,7 +268,7 @@ ConstraintDisplays.Jigsaw = class Jigsaw extends BaseConstraintDisplayItem {
 
   removeItem(item) {
     if (this._regionElems.has(item)) {
-      this._colorPicker.removeItem();
+      this._colorPicker.removeItem(item);
       item.parentNode.removeChild(item);
       this._regionElems.delete(item);
       this._updateMissingRegion();
@@ -266,7 +296,7 @@ ConstraintDisplays.Jigsaw = class Jigsaw extends BaseConstraintDisplayItem {
         path.setAttribute('opacity', 0.1);
         g.appendChild(path);
       }
-      this._colorPicker.addItem(region, color, ...cellSet);
+      this._colorPicker.addItem(g, color, ...cellSet);
     }
 
     this._regionGroup.appendChild(g);
@@ -865,25 +895,53 @@ ConstraintDisplays.DefaultRegionsInverted = class DefaultRegionsInverted extends
   }
 }
 
-ConstraintDisplays.Composite = class Composite extends BaseConstraintDisplayItem {
+ConstraintDisplays.BorderedRegion = class BorderedRegion extends BaseConstraintDisplayItem {
   constructor(svg) {
     super(svg);
     this._items = [];
-    svg.setAttribute('opacity', '0.2');
+    this._colorPicker = new ColorPicker();
   }
 
-  drawItem(constraint, _) {
+  clear() {
+    super.clear();
+    this._colorPicker.clear();
+  }
+
+  removeItem(item) {
+    if (this._colorPicker.removeItem(item)) {
+      item.parentNode.removeChild(item);
+      return true;
+    }
+    return false;
+  }
+
+  drawItem(constraint, options) {
     const shape = this._shape;
-
-    const cells = constraint.displayCells(shape);
-    const cellSet = new Set(cells.map(c => shape.parseCellId(c).cell));
     const graph = GridGraph.get(shape);
+    const color = this._colorPicker.pickColor();
 
-    const g = this._makeRegionBorder(graph, cellSet, shape);
+    let groups = null;
+    if (options.splitFn) {
+      groups = options.splitFn(constraint);
+    } else {
+      groups = [constraint.displayCells(shape)];
+    }
+
+    const g = createSvgElement('g');
+
+    for (const group of groups) {
+      const cellSet = new Set(group.map(c => shape.parseCellId(c).cell));
+
+      const border = this._makeRegionBorder(graph, cellSet, shape, 10);
+      g.append(border);
+    }
+
     g.setAttribute('stroke-width', 5);
-    g.setAttribute('stroke', 'rgb(50, 50, 50)');
-    g.setAttribute('stroke-dasharray', '8 2');
+    g.setAttribute('stroke', color);
+    if (options.dashed) g.setAttribute('stroke-dasharray', '8 2');
+    g.setAttribute('opacity', options.opacity || 0.4);
 
+    this._colorPicker.addItem(g, color, 1);
     this._svg.append(g);
 
     return g;
