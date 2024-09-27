@@ -318,7 +318,7 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
     this._shape = null;
 
     const selectionForm = document.forms['multi-cell-constraint-input'];
-    this._setUp(selectionForm, this._constraintConfigs);
+    this._setUp(selectionForm, this._constraintConfigs, inputManager);
 
     this._collapsibleContainer = new CollapsibleContainer(
       selectionForm.firstElementChild, true);
@@ -598,6 +598,29 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
            If value is must be contained at least as many times as is
            repeated in the list.`,
       },
+      SameValues: {
+        value: {
+          placeholder: 'numSets',
+          default: 2,
+          options: (cells) => {
+            const options = [];
+            for (let i = 2; i <= cells.length; i++) {
+              if (cells.length % i == 0) {
+                options.push({ text: `${i} sets`, value: i });
+              }
+            }
+            return options;
+          },
+        },
+        displayClass: ConstraintDisplays.ShadedRegion,
+        displayConfig: {
+          pattern: DisplayItem.DIAGONAL_PATTERN,
+        },
+        description:
+          `The cells are taken as a series of sets of the same size.
+          Each set must contain the same values, including counts if values are
+          repeated.`,
+      },
       AllDifferent: {
         displayClass: ConstraintDisplays.ShadedRegion,
         description: `Values must be unique.`,
@@ -724,7 +747,7 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
     this.runUpdateCallback();
   }
 
-  _setUp(selectionForm, constraintConfigs) {
+  _setUp(selectionForm, constraintConfigs, inputManager) {
     const selectElem = selectionForm['constraint-type'];
     selectionForm.classList.add('disabled');
     const valueContainer = document.getElementById('multi-cell-constraint-value-container');
@@ -742,6 +765,8 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
       }
     }
 
+    this._dynamicOptionsFn = new Map();
+
     // Create the options.
     for (const [type, config] of Object.entries(constraintConfigs)) {
       const option = document.createElement('option');
@@ -756,11 +781,18 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
         let input;
         if (config.value.options) {
           input = document.createElement('select');
-          for (const { text, value } of config.value.options) {
-            const option = document.createElement('option');
-            option.value = value;
-            option.textContent = text;
-            input.appendChild(option);
+          if (isIterable(config.value.options)) {
+            for (const { text, value } of config.value.options) {
+              const option = document.createElement('option');
+              option.value = value;
+              option.textContent = text;
+              input.appendChild(option);
+            }
+          } else if (config.value.options instanceof Function) {
+            config.value.dynamicOptionsFn = this._setUpDynamicOptions(
+              input, config.value.options);
+          } else {
+            throw ('Invalid options for ' + type);
           }
         } else {
           input = document.createElement('input');
@@ -792,6 +824,9 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
           elem.style.display = 'none';
         }
         config.value.elem.style.display = 'inline';
+        if (config.value.dynamicOptionsFn) {
+          config.value.dynamicOptionsFn(inputManager.getSelection());
+        }
         config.value.elem.focus();
       } else {
         valueContainer.style.visibility = 'hidden';
@@ -814,6 +849,21 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
     autoSaveField(selectElem);
     selectElem.onchange();
     document.activeElement?.blur();
+  }
+
+  _setUpDynamicOptions(input, optionsFn) {
+    return (cells) => {
+      const options = optionsFn(cells);
+      if (!options.length) options.push({ text: 'Sets', value: '' });
+      clearDOMNode(input);
+      for (const { text, value } of options) {
+        const option = document.createElement('option');
+        option.value = value;
+        option.textContent = text;
+        input.appendChild(option);
+      }
+      input.disabled = cells.length == 0;
+    };
   }
 
   _onNewSelection(selection, selectionForm) {
@@ -870,6 +920,10 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
           selectionForm['add-constraint'].focus();
         }
       }
+    }
+    // Update dynamic options if needed.
+    if (config.value?.dynamicOptionsFn) {
+      config.value.dynamicOptionsFn(selection);
     }
   }
 }

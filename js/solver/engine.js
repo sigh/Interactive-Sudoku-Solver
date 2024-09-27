@@ -1162,6 +1162,17 @@ SudokuSolver.CellExclusions = class {
     return this._cellExclusionSets[cell1].has(cell2);
   }
 
+  areMutuallyExclusive(cells) {
+    const numCells = cells.length;
+    for (let i = 0; i < numCells; i++) {
+      const iSet = this._cellExclusionSets[cells[i]];
+      for (let j = i + 1; j < numCells; j++) {
+        if (!iSet.has(cells[j])) return false;
+      }
+    }
+    return true;
+  }
+
   getArray(cell) {
     if (this._cellExclusionArrays.length === 0) {
       // Store an array version for fast iteration.

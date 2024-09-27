@@ -272,6 +272,7 @@ const runSolveTests = async (onFailure) => {
     'Anti-taxicab',
     'Full rank - 6 clue snipe',
     'Irregular region sum line',
+    'Copycat, easy',  // Same value - 2 sets, repeated values
     'Numbered Rooms vs X-Sums', // Or constraint
     'Or with Givens', // Or constraint (update watched cells)
     'And with AllDifferent', // And constraint (with cellExclusions)

@@ -43,8 +43,7 @@ class SudokuConstraintOptimizer {
         if (intersectionSize !== shape.boxWidth && intersectionSize !== shape.boxHeight) continue;
         const newHandler = new SudokuConstraintHandler.SameValues(
           arrayDifference(houseHandlers[i].cells, houseHandlers[j].cells),
-          arrayDifference(houseHandlers[j].cells, houseHandlers[i].cells),
-          true);
+          arrayDifference(houseHandlers[j].cells, houseHandlers[i].cells));
         handlerSet.addAux(newHandler);
         if (this._debugLogger) {
           this._debugLogger.log({
@@ -483,8 +482,7 @@ class SudokuConstraintOptimizer {
         const diff1 = arrayDifference(h1.cells, h0.cells);
 
         // TODO: Optimize the diff0.length == 1 case (and 2?).
-        const handler = new SudokuConstraintHandler.SameValues(
-          diff0, diff1, true);
+        const handler = new SudokuConstraintHandler.SameValues(diff0, diff1);
         newHandlers.push(handler);
         if (this._debugLogger) {
           this._debugLogger.log({
@@ -564,8 +562,7 @@ class SudokuConstraintOptimizer {
       if (diffA.size >= shape.gridSize) return;
 
       // All values in the set differences must be the same.
-      const newHandler = new SudokuConstraintHandler.SameValues(
-        [...diffA], [...diffB], false);
+      const newHandler = new SudokuConstraintHandler.SameValues(diffA, diffB);
       newHandlers.push(newHandler);
       if (this._debugLogger) {
         this._debugLogger.log({
