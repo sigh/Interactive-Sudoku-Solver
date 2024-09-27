@@ -542,6 +542,10 @@ SudokuConstraintHandler.BinaryConstraint = class BinaryConstraint extends Sudoku
     this.idStr = [this.constructor.name, key, cell1, cell2].join('-');
   }
 
+  key() {
+    return this._key;
+  }
+
   initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
     const lookupTables = LookupTables.get(shape.numValues);
     this._tables = lookupTables.forBinaryKey(this._key);
@@ -578,6 +582,10 @@ SudokuConstraintHandler.BinaryPairwise = class BinaryPairwise extends SudokuCons
 
     // Ensure we dedupe binary constraints.
     this.idStr = [this.constructor.name, key, ...cells].join('-');
+  }
+
+  key() {
+    return this._key;
   }
 
   enableHiddenSingles() {
@@ -2250,7 +2258,8 @@ SudokuConstraintHandler.SameValues = class SameValues extends SudokuConstraintHa
     super(cellSets.flat());
     this._cellSets = cellSets;
     this._valuesAreDistinct = false;
-    this._minExclusionSets = setLen;
+    this._numExclusionSets = setLen;
+    this._maxExclusionSize = 1;
 
     this.idStr = [this.constructor.name, ...cellSets].join('-');
   }
@@ -2259,7 +2268,8 @@ SudokuConstraintHandler.SameValues = class SameValues extends SudokuConstraintHa
     // Determine if the cell values much be unique.
     for (const set of this._cellSets) {
       if (cellExclusions.areMutuallyExclusive(set)) {
-        this._minExclusionSets = 1;
+        this._numExclusionSets = 1;
+        this._maxExclusionSize = set.length;
         return true;
       }
     }
@@ -2268,8 +2278,14 @@ SudokuConstraintHandler.SameValues = class SameValues extends SudokuConstraintHa
     for (const set of this._cellSets) {
       const exclusionGroups = SudokuConstraintHandler._CommonHandlerUtil.findExclusionGroups(
         set, cellExclusions);
-      if (exclusionGroups.length < this._minExclusionSets) {
-        this._minExclusionSets = exclusionGroups.length;
+      // The number of exclusion sets is the minimum for any set, since this
+      // constraints all the other sets.
+      if (exclusionGroups.length < this._numExclusionSets) {
+        this._numExclusionSets = exclusionGroups.length;
+      }
+      const largestGroup = Math.max(...exclusionGroups.map(g => g.length));
+      if (largestGroup > this._maxExclusionSize) {
+        this._maxExclusionSize = largestGroup;
       }
     }
 
@@ -2303,13 +2319,8 @@ SudokuConstraintHandler.SameValues = class SameValues extends SudokuConstraintHa
       valueIntersection &= values;
     }
 
-    if (this._minExclusionSets === 1) {
-      // Check if there are any values to filter from either side.
-      if (diff === 0) return true;
-
-      // Check if we have enough values.
-      if (countOnes16bit(valueIntersection) < setLen) return false;
-    }
+    // We need at least enough values to fill the largest exclusion set.
+    if (countOnes16bit(valueIntersection) < this._maxExclusionSize) return false;
 
     // Enforce the constrained value set.
     if (diff) {
@@ -2326,12 +2337,18 @@ SudokuConstraintHandler.SameValues = class SameValues extends SudokuConstraintHa
     }
 
     // If all values are distinct, then we can't do any more filtering.
-    if (this._minExclusionSets === 1) return true;
+    if (this._numExclusionSets === 1) return true;
 
-    let minTotals = 0;
+    return this._enforceCounts(grid, handlerAccumulator, valueIntersection);
+  }
 
+  _enforceCounts(grid, handlerAccumulator, valueIntersection) {
+    const numSets = this._cellSets.length;
+    const setLen = this._cellSets[0].length;
     const countBuffer = this.constructor._buffer1;
     const requiredBuffer = this.constructor._buffer2;
+
+    let minTotals = 0;
 
     // Check each value to see if the counts are consistent.
     while (valueIntersection) {
@@ -2339,6 +2356,7 @@ SudokuConstraintHandler.SameValues = class SameValues extends SudokuConstraintHa
       valueIntersection ^= v;
 
       // Determine the count and number of required cells for the value.
+      // (A value is required if it is fixed).
       let minCount = setLen;
       let maxRequired = 0;
       for (let i = 0; i < numSets; i++) {
@@ -2356,13 +2374,18 @@ SudokuConstraintHandler.SameValues = class SameValues extends SudokuConstraintHa
         requiredBuffer[i] = numRequired;
       }
 
-      if (maxRequired > this._minExclusionSets) return false;
+      if (maxRequired > this._numExclusionSets) return false;
       if (maxRequired > minCount) return false;
 
-      if (minCount === maxRequired) {
+      // TODO: Also check (maxRequired === this._numExclusionSets)?
+      //       Currently can't find puzzles where this has any impact, but don't
+      //       have a proof that it is unnecessary.
+      if (maxRequired === minCount) {
+        // If minCount === maxRequired, then we have one set where all the
+        // cells with this value are fixed, hence we know the exact count.
         for (let i = 0; i < numSets; i++) {
           const s = this._cellSets[i];
-          if (requiredBuffer[i] === maxRequired && countBuffer[i] > minCount) {
+          if (requiredBuffer[i] === maxRequired && countBuffer[i] > maxRequired) {
             // Remove unfixed values from require is at the max.
             for (let j = 0; j < setLen; j++) {
               if ((grid[s[j]] & v) && grid[s[j]] !== v) {
@@ -2370,8 +2393,8 @@ SudokuConstraintHandler.SameValues = class SameValues extends SudokuConstraintHa
                 handlerAccumulator.addForCell(s[j]);
               }
             }
-          } else if (countBuffer[i] === minCount && requiredBuffer[i] < maxRequired) {
-            // Set fixed values when count is equal to min.
+          } else if (countBuffer[i] === maxRequired && requiredBuffer[i] < maxRequired) {
+            // Set fixed values when count is already equal to the maxRequired.
             for (let j = 0; j < setLen; j++) {
               if ((grid[s[j]] & v) && grid[s[j]] !== v) {
                 grid[s[j]] = v;
@@ -2391,9 +2414,20 @@ SudokuConstraintHandler.SameValues = class SameValues extends SudokuConstraintHa
   }
 
   priority() {
-    // Hack so that SameValues used for house constraints don't mess with the
-    // priorities.
-    return this._minExclusionSets === 1 ? 0 : this.cells.length;
+    // Otherwise double the usual priority (seems helpful empirically).
+    return super.priority() * 2;
+  }
+}
+
+SudokuConstraintHandler.SameValuesIgnoreCount = class SameValuesIgnoreCount extends SudokuConstraintHandler.SameValues {
+  priority() {
+    // This version is only used by the optimizer, so ensure it doesn't inflate
+    // the priority unnecessarily.
+    return 0;
+  }
+
+  _enforceCounts(grid, handlerAccumulator, valueIntersection) {
+    return true;
   }
 }
 

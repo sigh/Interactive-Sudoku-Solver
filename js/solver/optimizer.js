@@ -14,6 +14,8 @@ class SudokuConstraintOptimizer {
       handlerSet.getAllofType(SudokuConstraintHandler.NoBoxes).length == 0
       && !shape.noDefaultBoxes);
 
+    this._addExtraCellExclusions(handlerSet, cellExclusions, shape);
+
     this._addHouseHandlers(handlerSet, shape);
 
     this._optimizeSums(handlerSet, cellExclusions, hasBoxes, shape);
@@ -33,6 +35,31 @@ class SudokuConstraintOptimizer {
     }
   }
 
+  static _equalsKey = memoize((numValues) => SudokuConstraint.Binary.fnToKey(
+    (a, b) => a == b, numValues));
+
+  _addExtraCellExclusions(handlerSet, cellExclusions, shape) {
+    // If two cells must have the same value, then they have to share the same
+    // cell exclusions.
+    // This will allow Palindrome and SameValue constraints to propagate their
+    // restrictions better.
+    const binaryHandlers = [
+      ...handlerSet.getAllofType(
+        SudokuConstraintHandler.BinaryConstraint),
+      ...handlerSet.getAllofType(
+        SudokuConstraintHandler.BinaryPairwise)];
+    const equalsKey = SudokuConstraintOptimizer._equalsKey(shape.numValues);
+
+    for (const h of binaryHandlers) {
+      if (h.key() !== equalsKey) continue;
+      for (let i = 1; i < h.cells.length; i++) {
+        for (let j = 0; j < i; j++) {
+          cellExclusions.areSameValue(h.cells[i], h.cells[j]);
+        }
+      }
+    }
+  }
+
   _addHouseIntersections(handlerSet, shape) {
     const houseHandlers = handlerSet.getAllofType(SudokuConstraintHandler.House);
     const numHandlers = houseHandlers.length;
@@ -41,7 +68,7 @@ class SudokuConstraintOptimizer {
         const intersectionSize = arrayIntersectSize(
           houseHandlers[i].cells, houseHandlers[j].cells);
         if (intersectionSize !== shape.boxWidth && intersectionSize !== shape.boxHeight) continue;
-        const newHandler = new SudokuConstraintHandler.SameValues(
+        const newHandler = new SudokuConstraintHandler.SameValuesIgnoreCount(
           arrayDifference(houseHandlers[i].cells, houseHandlers[j].cells),
           arrayDifference(houseHandlers[j].cells, houseHandlers[i].cells));
         handlerSet.addAux(newHandler);
@@ -482,12 +509,12 @@ class SudokuConstraintOptimizer {
         const diff1 = arrayDifference(h1.cells, h0.cells);
 
         // TODO: Optimize the diff0.length == 1 case (and 2?).
-        const handler = new SudokuConstraintHandler.SameValues(diff0, diff1);
+        const handler = new SudokuConstraintHandler.SameValuesIgnoreCount(diff0, diff1);
         newHandlers.push(handler);
         if (this._debugLogger) {
           this._debugLogger.log({
             loc: '_makeJigsawIntersections',
-            msg: 'Add: SameValues',
+            msg: 'Add: ' + handler.constructor.name,
             cells: handler.cells,
           });
         }
@@ -562,7 +589,7 @@ class SudokuConstraintOptimizer {
       if (diffA.size >= shape.gridSize) return;
 
       // All values in the set differences must be the same.
-      const newHandler = new SudokuConstraintHandler.SameValues(diffA, diffB);
+      const newHandler = new SudokuConstraintHandler.SameValuesIgnoreCount(diffA, diffB);
       newHandlers.push(newHandler);
       if (this._debugLogger) {
         this._debugLogger.log({

@@ -273,6 +273,7 @@ const runSolveTests = async (onFailure) => {
     'Full rank - 6 clue snipe',
     'Irregular region sum line',
     'Copycat, easy',  // Same value - 2 sets, repeated values
+    'Clone sudoku', // Same value - single cell sets
     'Numbered Rooms vs X-Sums', // Or constraint
     'Or with Givens', // Or constraint (update watched cells)
     'And with AllDifferent', // And constraint (with cellExclusions)
