@@ -1443,6 +1443,18 @@ class SudokuConstraint {
     chipLabel() {
       return `Same Value Sets (${this.numSets} sets)`;
     }
+
+    splitCells() {
+      const setSize = this.cells.length / this.numSets;
+      if (!Number.isInteger(setSize)) {
+        throw ('Number of cells must be a multiple of the number of sets');
+      }
+      const sets = [];
+      for (let i = 0; i < this.numSets; i++) {
+        sets.push(this.cells.slice(i * setSize, (i + 1) * setSize));
+      }
+      return sets;
+    }
   }
 
   static Quad = class Quad extends SudokuConstraintBase {
@@ -1652,15 +1664,6 @@ class SudokuConstraint {
 
     displayCells(shape) {
       return this.values.map(v => shape.parseValueId(v).cellId);
-    }
-
-    valueMap(shape) {
-      const valueMap = new Map();
-      for (const valueId of constraint.values) {
-        const { cell, values } = shape.parseValueId(valueId);
-        valueMap.set(cell, values);
-      }
-      return valueMap;
     }
   }
 
@@ -2171,15 +2174,8 @@ class SudokuBuilder {
 
         case 'SameValues':
           {
-            cells = constraint.cells.map(c => shape.parseCellId(c).cell);
-            const setSize = cells.length / constraint.numSets;
-            if (!Number.isInteger(setSize)) {
-              throw ('Number of cells must be a multiple of the number of sets');
-            }
-            const sets = [];
-            for (let i = 0; i < constraint.numSets; i++) {
-              sets.push(cells.slice(i * setSize, (i + 1) * setSize));
-            }
+            let sets = constraint.splitCells();
+            sets = sets.map(cells => cells.map(c => shape.parseCellId(c).cell));
             yield new SudokuConstraintHandler.SameValues(...sets);
           }
           break;
