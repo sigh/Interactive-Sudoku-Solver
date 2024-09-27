@@ -2237,70 +2237,163 @@ SudokuConstraintHandler.Jigsaw = class Jigsaw extends SudokuConstraintHandler {
 }
 
 SudokuConstraintHandler.SameValues = class SameValues extends SudokuConstraintHandler {
-  constructor(cells0, cells1, isUnique) {
-    if (cells0.length != cells1.length) {
-      // Throw, because same values are only created by our code.
+  constructor(...cellSets) {
+    // Sort to canonicalize the order.
+    // NOTE: We must copy before sorting (to avoid messing up order for the caller).
+    cellSets = cellSets.map(s => [...s].sort((a, b) => a - b));
+
+    const setLen = cellSets[0].length;
+    if (!cellSets.every(s => s.length === setLen)) {
       throw ('SameValues must use sets of the same length.');
     }
 
-    // NOTE: We must copy before sorting (to avoid messing up order for the caller).
-    cells0 = new Uint8Array(cells0);
-    cells1 = new Uint8Array(cells1);
+    super(cellSets.flat());
+    this._cellSets = cellSets;
+    this._valuesAreDistinct = false;
+    this._minExclusionSets = setLen;
 
-    cells0.sort((a, b) => a - b);
-    cells1.sort((a, b) => a - b);
-
-    super([...cells0, ...cells1]);
-    // TODO: Figure out automatically?
-    this._isUnique = isUnique;
-    this._cells0 = cells0;
-    this._cells1 = cells1;
-
-    this.idStr = [this.constructor.name, cells0, cells1].join('-');
+    this.idStr = [this.constructor.name, ...cellSets].join('-');
   }
 
-  enforceConsistency(grid, handlerAccumulator) {
-    const cells0 = this._cells0;
-    const cells1 = this._cells1;
-    const numCells = cells0.length;
-
-    let values0 = 0;
-    let values1 = 0;
-    for (let i = numCells - 1; i >= 0; i--) {
-      values0 |= grid[cells0[i]];
-      values1 |= grid[cells1[i]];
-    }
-
-    if (values1 === values0) return true;
-
-    const values = values1 & values0;
-
-    // Check if we have enough values.
-    if (this._isUnique && countOnes16bit(values) < numCells) return false;
-
-    // Enforce the constrained value set.
-    if (values0 !== values) {
-      for (let i = numCells - 1; i >= 0; i--) {
-        if (grid[cells0[i]] & ~values) {
-          if (!(grid[cells0[i]] &= values)) return false;
-          handlerAccumulator.addForCell(cells0[i]);
-        }
+  initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
+    // Determine if the cell values much be unique.
+    for (const set of this._cellSets) {
+      if (cellExclusions.areMutuallyExclusive(set)) {
+        this._minExclusionSets = 1;
+        return true;
       }
     }
-    if (values1 !== values) {
-      for (let i = numCells - 1; i >= 0; i--) {
-        if (grid[cells1[i]] & ~values) {
-          if (!(grid[cells1[i]] &= values)) return false;
-          handlerAccumulator.addForCell(cells1[i]);
-        }
+
+    // If they are not unique, find the number of exclusion sets.
+    for (const set of this._cellSets) {
+      const exclusionGroups = SudokuConstraintHandler._CommonHandlerUtil.findExclusionGroups(
+        set, cellExclusions);
+      if (exclusionGroups.length < this._minExclusionSets) {
+        this._minExclusionSets = exclusionGroups.length;
       }
     }
 
     return true;
   }
 
+  static _buffer1 = new Uint16Array(SHAPE_MAX.gridSize);
+  static _buffer2 = new Uint16Array(SHAPE_MAX.gridSize);
+
+  enforceConsistency(grid, handlerAccumulator) {
+    const numSets = this._cellSets.length;
+    const setLen = this._cellSets[0].length;
+    const valueBuffer = this.constructor._buffer1;
+
+    // Determine the possible values for each set.
+    for (let i = 0; i < numSets; i++) {
+      const s = this._cellSets[i];
+      let values = 0;
+      for (let j = 0; j < setLen; j++) {
+        values |= grid[s[j]];
+      }
+      valueBuffer[i] = values;
+    }
+
+    // Determine the intersection of all the values.
+    let valueIntersection = valueBuffer[0];
+    let diff = 0;
+    for (let i = 1; i < numSets; i++) {
+      const values = valueBuffer[i];
+      diff |= values ^ valueIntersection;
+      valueIntersection &= values;
+    }
+
+    if (this._minExclusionSets === 1) {
+      // Check if there are any values to filter from either side.
+      if (diff === 0) return true;
+
+      // Check if we have enough values.
+      if (countOnes16bit(valueIntersection) < setLen) return false;
+    }
+
+    // Enforce the constrained value set.
+    if (diff) {
+      for (let i = 0; i < numSets; i++) {
+        if (valueBuffer[i] === valueIntersection) continue;
+        const s = this._cellSets[i];
+        for (let j = setLen - 1; j >= 0; j--) {
+          if (grid[s[j]] & ~valueIntersection) {
+            if (!(grid[s[j]] &= valueIntersection)) return false;
+            handlerAccumulator.addForCell(s[j]);
+          }
+        }
+      }
+    }
+
+    // If all values are distinct, then we can't do any more filtering.
+    if (this._minExclusionSets === 1) return true;
+
+    let minTotals = 0;
+
+    const countBuffer = this.constructor._buffer1;
+    const requiredBuffer = this.constructor._buffer2;
+
+    // Check each value to see if the counts are consistent.
+    while (valueIntersection) {
+      const v = valueIntersection & -valueIntersection;
+      valueIntersection ^= v;
+
+      // Determine the count and number of required cells for the value.
+      let minCount = setLen;
+      let maxRequired = 0;
+      for (let i = 0; i < numSets; i++) {
+        const s = this._cellSets[i];
+        let count = 0;
+        let numRequired = 0;
+        for (let j = 0; j < setLen; j++) {
+          const gv = grid[s[j]];
+          count += (gv & v) !== 0;
+          numRequired += gv === v;
+        }
+        if (count < minCount) minCount = count;
+        if (numRequired > maxRequired) maxRequired = numRequired;
+        countBuffer[i] = count;
+        requiredBuffer[i] = numRequired;
+      }
+
+      if (maxRequired > this._minExclusionSets) return false;
+      if (maxRequired > minCount) return false;
+
+      if (minCount === maxRequired) {
+        for (let i = 0; i < numSets; i++) {
+          const s = this._cellSets[i];
+          if (requiredBuffer[i] === maxRequired && countBuffer[i] > minCount) {
+            // Remove unfixed values from require is at the max.
+            for (let j = 0; j < setLen; j++) {
+              if ((grid[s[j]] & v) && grid[s[j]] !== v) {
+                grid[s[j]] &= ~v;
+                handlerAccumulator.addForCell(s[j]);
+              }
+            }
+          } else if (countBuffer[i] === minCount && requiredBuffer[i] < maxRequired) {
+            // Set fixed values when count is equal to min.
+            for (let j = 0; j < setLen; j++) {
+              if ((grid[s[j]] & v) && grid[s[j]] !== v) {
+                grid[s[j]] = v;
+                handlerAccumulator.addForCell(s[j]);
+              }
+            }
+          }
+        }
+      }
+
+      minTotals += minCount;
+    }
+
+    if (minTotals < setLen) return false;
+
+    return true;
+  }
+
   priority() {
-    return 0;
+    // Hack so that SameValues used for house constraints don't mess with the
+    // priorities.
+    return this._minExclusionSets === 1 ? 0 : this.cells.length;
   }
 }
 

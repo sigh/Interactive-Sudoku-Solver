@@ -1427,6 +1427,24 @@ class SudokuConstraint {
     }
   };
 
+  static SameValues = class SameValues extends SudokuConstraintBase {
+    static COLLECTOR_CLASS = 'MultiCell';
+
+    constructor(numSets, ...cells) {
+      super(arguments);
+      this.cells = cells;
+      this.numSets = numSets;
+    }
+
+    static displayName() {
+      return 'Same Value Sets';
+    }
+
+    chipLabel() {
+      return `Same Value Sets (${this.numSets} sets)`;
+    }
+  }
+
   static Quad = class Quad extends SudokuConstraintBase {
     static COLLECTOR_CLASS = 'MultiCell';
 
@@ -2149,6 +2167,21 @@ class SudokuBuilder {
             constraint.cells.map(c => shape.parseCellId(c).cell),
             constraint.values.split('_').map(v => +v),
             /* strict = */ true);
+          break;
+
+        case 'SameValues':
+          {
+            cells = constraint.cells.map(c => shape.parseCellId(c).cell);
+            const setSize = cells.length / constraint.numSets;
+            if (!Number.isInteger(setSize)) {
+              throw ('Number of cells must be a multiple of the number of sets');
+            }
+            const sets = [];
+            for (let i = 0; i < constraint.numSets; i++) {
+              sets.push(cells.slice(i * setSize, (i + 1) * setSize));
+            }
+            yield new SudokuConstraintHandler.SameValues(...sets);
+          }
           break;
 
         case 'Quad':
