@@ -1158,6 +1158,19 @@ SudokuSolver.CellExclusions = class {
     this._cellExclusionSets[cell1].add(cell2);
   }
 
+  // Assume cell0 and cell1 are the same value, and hence can share exclusions.
+  areSameValue(cell0, cell1) {
+    if (cell0 == cell1) return;
+    if (this._cellExclusionArrays.length > 0) {
+      throw ('Cannot add exclusions after caching.');
+    }
+    const union = this._cellExclusionSets[cell0];
+    for (const c of this._cellExclusionSets[cell1]) {
+      union.add(c);
+    }
+    this._cellExclusionSets[cell1] = union;
+  }
+
   isMutuallyExclusive(cell1, cell2) {
     return this._cellExclusionSets[cell1].has(cell2);
   }

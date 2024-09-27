@@ -941,7 +941,7 @@ ConstraintDisplays.BorderedRegion = class BorderedRegion extends BaseConstraintD
     if (options.dashed) g.setAttribute('stroke-dasharray', '8 2');
     g.setAttribute('opacity', options.opacity || 0.4);
 
-    this._colorPicker.addItem(g, color, 1);
+    this._colorPicker.addItem(g, color, groups.flat());
     this._svg.append(g);
 
     return g;

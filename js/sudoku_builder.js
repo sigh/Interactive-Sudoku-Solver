@@ -1455,6 +1455,10 @@ class SudokuConstraint {
       }
       return sets;
     }
+
+    static fnKey = memoize((numValues) => {
+      return SudokuConstraint.Binary.fnToKey((a, b) => a == b, numValues);
+    });
   }
 
   static Quad = class Quad extends SudokuConstraintBase {
@@ -2174,9 +2178,22 @@ class SudokuBuilder {
 
         case 'SameValues':
           {
-            let sets = constraint.splitCells();
-            sets = sets.map(cells => cells.map(c => shape.parseCellId(c).cell));
-            yield new SudokuConstraintHandler.SameValues(...sets);
+            if (constraint.numSets < constraint.cells.length) {
+              let sets = constraint.splitCells();
+              sets = sets.map(cells => cells.map(c => shape.parseCellId(c).cell));
+              yield new SudokuConstraintHandler.SameValues(...sets);
+            } else {
+              // All cells must have the same value, use binary constraints.
+              const cells = constraint.cells.map(c => shape.parseCellId(c).cell);
+              const key = SudokuConstraint.SameValues.fnKey(shape.numValues);
+              if (cells.length == 2) {
+                yield new SudokuConstraintHandler.BinaryConstraint(
+                  ...cells, key);
+              } else {
+                yield new SudokuConstraintHandler.BinaryPairwise(
+                  key, ...cells);
+              }
+            }
           }
           break;
 
