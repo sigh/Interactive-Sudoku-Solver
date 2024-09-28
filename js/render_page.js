@@ -1713,8 +1713,13 @@ class ConstraintChipView {
     elem.setAttribute('opacity', 1);
 
     svg.append(elem);
-    svg.style.height = this._CHIP_ICON_SIZE_PX + 'px';
-    svg.style.width = this._CHIP_ICON_SIZE_PX + 'px';
+
+    // Set the size (as well as minSize so it doesn't get squished).
+    const cssSize = this._CHIP_ICON_SIZE_PX + 'px';
+    svg.style.height = cssSize;
+    svg.style.width = cssSize;
+    svg.style.minHeight = cssSize;
+    svg.style.minWidth = cssSize;
     // Undo the opacity (for killer cages).
     svg.style.filter = 'saturate(100)';
 

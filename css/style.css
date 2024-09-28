@@ -312,7 +312,7 @@ button.image-button>img {
 }
 
 .chip-label {
-  margin: 5px;
+  margin: 0 5px;
   display: flex;
   flex-direction: column;
   align-items: center;
