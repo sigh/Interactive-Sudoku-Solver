@@ -20,8 +20,6 @@ class SudokuConstraintOptimizer {
 
     this._optimizeSums(handlerSet, cellExclusions, hasBoxes, shape);
 
-    this._addSumComplementCells(handlerSet);
-
     this._optimizeJigsaw(handlerSet, hasBoxes, shape);
 
     this._optimizeFullRank(handlerSet, shape);
@@ -132,9 +130,7 @@ class SudokuConstraintOptimizer {
     if (allSumHandlers.length == 0) return;
     // Exclude any handlers with duplicate cells from any of the optimizations.
     // TODO: Check which optimizations are still valid.
-    // TODO: Remove duplicate check.
-    const safeSumHandlers = allSumHandlers.filter(
-      h => h.cells.length == new Set(h.cells).size && h.onlyUnitCoeffs());
+    const safeSumHandlers = allSumHandlers.filter(h => h.onlyUnitCoeffs());
 
     const [filteredSumHandlers, sumCells] =
       this._findNonOverlappingSubset(safeSumHandlers, handlerSet);
@@ -149,6 +145,10 @@ class SudokuConstraintOptimizer {
       ...this._makeHiddenCageHandlers(handlerSet, safeSumHandlers, shape));
 
     this._replaceSizeSpecificSumHandlers(handlerSet, cellExclusions, shape);
+
+    // Don't pass in the sum handlers so that this phase can operate on all the
+    // new sum handlers that were added.
+    this._addSumComplementCells(handlerSet);
 
     return;
   }
@@ -170,28 +170,18 @@ class SudokuConstraintOptimizer {
       handlerSet.getAllofType(SudokuConstraintHandler.House).map(
         h => handlerSet.getIndex(h)));
 
-    // TODO: Inline function.
-    const process = (type, cellsFn) => {
-      for (const h of handlerSet.getAllofType(type)) {
-        if (!h.onlyUnitCoeffs()) continue;
+    for (const h of handlerSet.getAllofType(SudokuConstraintHandler.Sum)) {
+      if (!h.onlyUnitCoeffs()) continue;
 
-        if (h.hasComplementCells()) continue;
-        // If there are any repeated cells, then we can't infer the complement
-        // sum.
-        if (h.cells.length !== new Set(h.cells).size) continue;
+      const cells = h.cells;
+      const commonHandlers = this._findCommonHandlers(
+        cells, handlerSet, houseHandlers);
+      if (commonHandlers.length === 0) continue;
+      const commonHandler = handlerSet.getHandler(commonHandlers[0]);
 
-        const cells = cellsFn(h);
-        const commonHandlers = this._findCommonHandlers(
-          cells, handlerSet, houseHandlers);
-        if (commonHandlers.length === 0) continue;
-        const commonHandler = handlerSet.getHandler(commonHandlers[0]);
-
-        const complementCells = arrayDifference(commonHandler.cells, cells);
-        h.setComplementCells(complementCells);
-      }
-    };
-
-    process(SudokuConstraintHandler.Sum, h => h.cells);
+      const complementCells = arrayDifference(commonHandler.cells, cells);
+      h.setComplementCells(complementCells);
+    }
   }
 
   _fillInSumGap(sumHandlers, sumCells, shape) {
@@ -238,24 +228,35 @@ class SudokuConstraintOptimizer {
   _replaceSizeSpecificSumHandlers(handlerSet, cellExclusions, shape) {
     const sumHandlers = handlerSet.getAllofType(SudokuConstraintHandler.Sum);
     for (const h of sumHandlers) {
-      // TODO: Make general.
-      if (!h.onlyUnitCoeffs()) continue;
-
       let newHandler;
       switch (h.cells.length) {
         case 1:
-          newHandler = new SudokuConstraintHandler.GivenCandidates(
-            new Map([[h.cells[0], h.sum()]]));
+          {
+            const sum = h.sum();
+            const coeff = h.coefficients()[0];
+            if (sum % coeff) {
+              newHandler = new SudokuConstraintHandler.False(h.cells);
+            } else {
+              newHandler = new SudokuConstraintHandler.GivenCandidates(
+                new Map([[h.cells[0], sum / coeff]]));
+            }
+          }
           break;
 
         case 2:
-          const mutuallyExclusive = (
-            cellExclusions.isMutuallyExclusive(...h.cells));
-          newHandler = new SudokuConstraintHandler.BinaryConstraint(
-            h.cells[0], h.cells[1],
-            SudokuConstraint.Binary.fnToKey(
-              (a, b) => a + b == h.sum() && (!mutuallyExclusive || a != b),
-              shape.numValues));
+          {
+            const cells = h.cells;
+            const mutuallyExclusive = (
+              cellExclusions.isMutuallyExclusive(...cells));
+            const sum = h.sum();
+            const [c0, c1] = h.coefficients();
+
+            newHandler = new SudokuConstraintHandler.BinaryConstraint(
+              ...cells,
+              SudokuConstraint.Binary.fnToKey(
+                (a, b) => a * c0 + b * c1 == sum && (!mutuallyExclusive || a != b),
+                shape.numValues));
+          }
           break;
       }
 
@@ -459,15 +460,18 @@ class SudokuConstraintOptimizer {
 
         const extraCells = arrayDifference(o.cells, h.cells);
         const remainingSum = complementSum - o.sum();
-        const handler = new SudokuConstraintHandler.SumWithNegative(
-          remainingCells, extraCells, remainingSum);
+        const handlerCells = [...remainingCells, ...extraCells];
+        const coeffs = handlerCells.map(
+          (_, i) => i < remainingCells.length ? 1 : -1);
+        const handler = new SudokuConstraintHandler.Sum(
+          handlerCells, remainingSum, coeffs);
         newHandlers.push(handler);
 
         if (this._debugLogger) {
           this._debugLogger.log({
             loc: '_makeHiddenCageHandlers',
             msg: 'Add: ' + handler.constructor.name,
-            args: { offset: remainingSum, negativeCells: extraCells },
+            args: { offset: remainingSum, negativeCells: [...extraCells] },
             cells: handler.cells
           });
         }
@@ -669,10 +673,11 @@ class SudokuConstraintOptimizer {
         newHandler = new SudokuConstraintHandler.Sum([...diffB], sumDelta);
         args = { sum: sumDelta };
       } else {
-        const negativeCells = [...diffA];
-        newHandler = new SudokuConstraintHandler.SumWithNegative(
-          [...diffB], negativeCells, sumDelta);
-        args = { sum: sumDelta, negativeCells: negativeCells };
+        const newHandlerCells = [...diffB, ...diffA];
+        const coeffs = newHandlerCells.map((_, i) => i < diffB.size ? 1 : -1);
+        newHandler = new SudokuConstraintHandler.Sum(
+          newHandlerCells, sumDelta, coeffs);
+        args = { sum: sumDelta, negativeCells: [...diffA] };
       }
 
       newHandlers.push(newHandler);

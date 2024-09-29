@@ -258,7 +258,7 @@ const runSolveTests = async (onFailure) => {
     'Sum lines',
     'Sum lines, with loop',
     'Sum lines - long loop',
-    'Long sums 1',
+    'Long sums 3',
     'Indexing',
     '2D 1-5-9',
     'Full rank',
