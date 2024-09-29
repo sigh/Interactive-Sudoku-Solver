@@ -2275,13 +2275,8 @@ class SudokuBuilder {
               // All cells must have the same value, use binary constraints.
               const cells = constraint.cells.map(c => shape.parseCellId(c).cell);
               const key = SudokuConstraint.SameValues.fnKey(shape.numValues);
-              if (cells.length == 2) {
-                yield new SudokuConstraintHandler.BinaryConstraint(
-                  ...cells, key);
-              } else {
-                yield new SudokuConstraintHandler.BinaryPairwise(
-                  key, ...cells);
-              }
+              yield new SudokuConstraintHandler.BinaryPairwise(
+                key, ...cells);
             }
           }
           break;
@@ -2308,13 +2303,8 @@ class SudokuBuilder {
         case 'BinaryX':
           for (const g of SudokuConstraint.Binary.parseGroups(constraint.items)) {
             cells = g.cells.map(c => c && shape.parseCellId(c).cell);
-            if (cells.length == 2) {
-              yield new SudokuConstraintHandler.BinaryConstraint(
-                ...cells, constraint.key);
-            } else {
-              yield new SudokuConstraintHandler.BinaryPairwise(
-                constraint.key, ...cells);
-            }
+            yield new SudokuConstraintHandler.BinaryPairwise(
+              constraint.key, ...cells);
           }
           break;
 
