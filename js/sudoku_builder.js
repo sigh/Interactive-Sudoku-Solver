@@ -1890,8 +1890,15 @@ class SudokuBuilder {
 
             const pillCells = cells.slice(0, pillSize);
             pillCells.sort((a, b) => a - b);
-            yield new SudokuConstraintHandler.PillArrow(
-              pillCells, cells.slice(pillSize));
+
+            cells.splice(0, pillSize, ...pillCells);
+            const coeffs = cells.map(_ => 1);
+            for (let i = 0; i < pillSize; i++) {
+              cells[i] = pillCells[i];
+              coeffs[i] = -Math.pow(10, pillSize - i - 1);
+            }
+
+            yield new SudokuConstraintHandler.Sum(cells, 0, coeffs);
           }
           break;
 
