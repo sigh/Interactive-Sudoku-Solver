@@ -1772,6 +1772,31 @@ class SudokuBuilder {
     }
   }
 
+  // Helper to create a given handler for a single cell/value pair.
+  static _givenHandler(cell, value) {
+    const givensMap = new Map();
+    givensMap.set(cell, [value]);
+    return new SudokuConstraintHandler.GivenCandidates(givensMap);
+  }
+
+  static _xSumHandler(cells, sum) {
+    const controlCell = cells[0];
+
+    if (sum === 1) {
+      return this._givenHandler(controlCell, 1);
+    }
+
+    const handlers = [];
+    for (let i = 2; i <= cells.length; i++) {
+      const sumRem = sum - i;
+      if (sumRem <= 0) break;
+      handlers.push(new SudokuConstraintHandler.And(
+        this._givenHandler(controlCell, i),
+        new SudokuConstraintHandler.Sum(cells.slice(1, i), sumRem)));
+    }
+    return new SudokuConstraintHandler.Or(...handlers);
+  }
+
   static * _constraintHandlers(constraintMap, shape) {
     const gridSize = shape.gridSize;
 
@@ -1891,17 +1916,16 @@ class SudokuBuilder {
           break;
 
         case 'XSum':
-          cells = SudokuConstraintBase.fullLineCellMap(shape)
-            .get([constraint.rowCol, 1].toString()).map(
-              c => shape.parseCellId(c).cell);
-          if (constraint.sumInc) {
-            yield new SudokuConstraintHandler.XSum(
-              cells, constraint.sumInc);
-          }
-          if (constraint.sumDec) {
-            cells = cells.slice().reverse();
-            yield new SudokuConstraintHandler.XSum(
-              cells, constraint.sumDec);
+          {
+            cells = SudokuConstraintBase.fullLineCellMap(shape)
+              .get([constraint.rowCol, 1].toString()).map(
+                c => shape.parseCellId(c).cell);
+            if (constraint.sumInc) {
+              yield this._xSumHandler(cells, constraint.sumInc);
+            }
+            if (constraint.sumDec) {
+              yield this._xSumHandler(cells.slice().reverse(), constraint.sumDec);
+            }
           }
           break;
 
