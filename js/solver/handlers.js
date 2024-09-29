@@ -1098,7 +1098,7 @@ SudokuConstraintHandler._SumHandlerUtil = class _SumHandlerUtil {
 
     let index = 0;
     for (let i = 0; i < coeffGroups.length; i++) {
-      let { absCoeff, exclusionGroups } = coeffGroups[i];
+      let { coeff, exclusionGroups } = coeffGroups[i];
       for (let s = 0; s < exclusionGroups.length; s++) {
         let set = exclusionGroups[s];
         let seenMin = 0;
@@ -1124,16 +1124,16 @@ SudokuConstraintHandler._SumHandlerUtil = class _SumHandlerUtil {
         const minSum = this._lookupTables.sum[seenMin];
         const maxSum = this._lookupTables.sum[seenMax];
 
-        if (absCoeff === 1) {
+        if (coeff === 1) {
           strictMax += maxSum;
           strictMin += minSum;
         } else {
-          if (absCoeff > 0) {
-            strictMax += absCoeff * maxSum;
-            strictMin += absCoeff * minSum;
+          if (coeff > 0) {
+            strictMax += coeff * maxSum;
+            strictMin += coeff * minSum;
           } else {
-            strictMin += absCoeff * maxSum;
-            strictMax += absCoeff * minSum;
+            strictMin += coeff * maxSum;
+            strictMax += coeff * minSum;
           }
         }
 
@@ -1153,10 +1153,10 @@ SudokuConstraintHandler._SumHandlerUtil = class _SumHandlerUtil {
 
     index = 0;
     for (let i = 0; i < coeffGroups.length; i++) {
-      const { absCoeff, exclusionGroups } = coeffGroups[i];
+      const { coeff, exclusionGroups } = coeffGroups[i];
       // TODO: Can we reduce this by 1?
       //       Or even more by looking at the minimum set size.
-      const dofLim = (numValues - 1) * absCoeff;
+      const dofLim = (numValues - 1) * Math.abs(coeff);
       // If dofLim is too small, then we can stop, because the ceoffs are
       // ordered from largest to smallest.
       // TODO: Can we be more restrictive here by using >
@@ -1164,16 +1164,16 @@ SudokuConstraintHandler._SumHandlerUtil = class _SumHandlerUtil {
 
       let minDofSet = minDof;
       let maxDofSet = maxDof;
-      if (absCoeff !== 1) {
+      if (coeff !== 1) {
         // Scale the dof limits by the coefficient.
         // We always take the floor since we need to stay with the range.
         // Truncation (| 0) is fine here since the result is always positive.
-        if (absCoeff > 0) {
-          const invCoeff = 1 / absCoeff;
+        if (coeff > 0) {
+          const invCoeff = 1 / coeff;
           minDofSet = (minDofSet * invCoeff) | 0;
           maxDofSet = (maxDofSet * invCoeff) | 0;
         } else {
-          const invCoeff = -1 / absCoeff;
+          const invCoeff = -1 / coeff;
           [maxDofSet, minDofSet] = [
             (minDofSet * invCoeff) | 0,
             (maxDofSet * invCoeff) | 0];
@@ -1265,11 +1265,11 @@ SudokuConstraintHandler._SumHandlerUtil = class _SumHandlerUtil {
     return true;
   }
 
-  static _valueBuffer = new Uint16Array(SHAPE_MAX.numValues);
-  static _exclusionIdsBuffer = new Uint8Array(SHAPE_MAX.numValues);
+  static _exclusionIdsBuffer = new Uint8Array(3);
+  static _reversedCellsBuffer = new Uint8Array(3);
   // Create a cellBuffer for each possible number of unfixed cells that
   // enforceFewRemainingCells() can be called with.
-  // This allows calls ot functions like restrictCellsSingleExclusionGroup()
+  // This allows calls to functions like restrictCellsSingleExclusionGroup()
   // to rely on the array length.
   static _cellBuffers = [...Array(4).keys()].map(i => new Uint8Array(i));
 
@@ -1278,46 +1278,69 @@ SudokuConstraintHandler._SumHandlerUtil = class _SumHandlerUtil {
     return numUnfixed <= (this._pairwiseSums ? 3 : 2);
   }
 
+  // Treat this as a special as a we can handle any coefficients.
+  enforceOneRemainingCell(grid, targetSum, cells, coeffs) {
+    for (let i = 0; i < cells.length; i++) {
+      const c = cells[i];
+      const v = grid[c];
+      if (!(v & (v - 1))) continue;
+
+      const coeff = coeffs[i];
+
+      // Fast path for when the coefficient is 1.
+      if (coeff === 1) {
+        return targetSum > 0 && !!(grid[c] = v & (1 << (targetSum - 1)));
+      }
+
+      // targetSum must be a multiple of the coefficient.
+      if (coeff !== -1 && targetSum % coeff) return false;
+      const required = targetSum / coeff;
+      return required > 0 && !!(grid[c] = v & LookupTables.fromValue(required));
+    }
+
+    return false;
+  }
+
   // Solve small cases exactly and efficiently.
   // Call hasFewRemainingCells() to determine if it can be run.
   // REQUIRES that:
   //  - The number of unfixed cells is accurate.
   //  - None of the values are zero.
   enforceFewRemainingCells(
-    grid, targetSum, numUnfixed, cells, exclusionIds, cellExclusions) {
+    grid, targetSum, numUnfixed, cells, exclusionIds, cellExclusions, coeffs) {
     const cellBuffer = this.constructor._cellBuffers[numUnfixed];
-    const valueBuffer = this.constructor._valueBuffer;
     const exclusionIdsBuffer = this.constructor._exclusionIdsBuffer;
 
-    const gridSize = this._numValues | 0;
+    const numValues = this._numValues;
 
     let j = 0;
+    // For whatever reason, making this a global object slows it down.
+    const reversed = [];
     for (let i = 0; i < cells.length; i++) {
       const c = cells[i];
       const v = grid[c];
       if (v & (v - 1)) {
         exclusionIdsBuffer[j] = exclusionIds[i];
         cellBuffer[j] = c;
-        valueBuffer[j] = v;
+        if (coeffs[i] < 0) {
+          grid[c] = this._lookupTables.reverse[v];
+          targetSum -= (numValues + 1) * coeffs[i];
+          reversed.push(c);
+        }
         j++;
       }
     }
 
+    let result = false;
     switch (numUnfixed) {
-      case 1: {
-        // Set value to the target sum exactly.
-        const v = valueBuffer[0] & (1 << (targetSum - 1));
-        return (grid[cellBuffer[0]] = v);
-      }
-
       case 2: {
-        let v0 = valueBuffer[0];
-        let v1 = valueBuffer[1];
+        let v0 = grid[cellBuffer[0]];
+        let v1 = grid[cellBuffer[1]];
 
         // Remove any values which don't have their counterpart value to add to
         // targetSum.
-        v1 &= (this._lookupTables.reverse[v0] << (targetSum - 1)) >> gridSize;
-        v0 &= (this._lookupTables.reverse[v1] << (targetSum - 1)) >> gridSize;
+        v1 &= (this._lookupTables.reverse[v0] << (targetSum - 1)) >> numValues;
+        v0 &= (this._lookupTables.reverse[v1] << (targetSum - 1)) >> numValues;
 
         // If the cells are in the same exclusion group, also ensure the sum
         // uses distinct values.
@@ -1329,7 +1352,10 @@ SudokuConstraintHandler._SumHandlerUtil = class _SumHandlerUtil {
           v1 &= mask;
         }
 
-        if (!(v1 && v0)) return false;
+        if (!(v1 && v0)) {
+          result = false;
+          break;
+        }
 
         grid[cellBuffer[0]] = v0;
         grid[cellBuffer[1]] = v1;
@@ -1341,16 +1367,31 @@ SudokuConstraintHandler._SumHandlerUtil = class _SumHandlerUtil {
         //       worse.
         if (cellExclusions && v0 === v1 && countOnes16bit(v0) == 2) {
           if (!this._commonUtil.enforceRequiredValueExclusions(
-            grid, cellBuffer, v0, cellExclusions)) return false;
+            grid, cellBuffer, v0, cellExclusions)) {
+            result = false;
+            break;
+          }
         }
-        return true;
+
+        result = true;
       }
+        break;
 
       case 3: {
-        return this._enforceThreeCellConsistency(
+        result = this._enforceThreeCellConsistency(
           grid, cellBuffer, targetSum, exclusionIdsBuffer);
       }
+        break;
+
+      default:
+        throw Error('Unexpected number of cells: ' + numUnfixed);
     }
+
+    for (let i = reversed.length - 1; i >= 0; i--) {
+      const c = reversed[i];
+      grid[c] = this._lookupTables.reverse[grid[c]];
+    }
+    return result;
   }
 }
 
@@ -1366,10 +1407,9 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
   _lookupTables = null;
   _coeffGroups = [];
   // TODO: Combine these into flags or enum.
-  _hasNegative = true;
-  _onlyUnitCoeffs = false;
   _onlyAbsUnitCoeffs = false;
   _isCage = false;
+  _coeffs = [];
 
   constructor(cells, sum, coeffs) {
     const cellSet = new Set(cells);
@@ -1379,7 +1419,7 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
     if (cellSet.size === cells.length && !coeffs) {
       // Shortcut the common case.
       this._coeffGroups.push(
-        { coeff: 1, absCoeff: 1, cells: [...cells], exclusionGroups: [] });
+        { coeff: 1, cells: [...cells], exclusionGroups: [] });
     } else {
       coeffs = coeffs || Array(cells.length).fill(1);
 
@@ -1411,9 +1451,7 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
         coeffMap.get(coeff).push(cells[i]);
       }
       for (let [coeff, coeffCells] of coeffMap) {
-        // TODO: Remove absCoeff.
-        const absCoeff = Math.abs(coeff);
-        this._coeffGroups.push({ coeff, absCoeff, cells: coeffCells, exclusionGroups: [] });
+        this._coeffGroups.push({ coeff, cells: coeffCells, exclusionGroups: [] });
       }
     }
 
@@ -1453,14 +1491,6 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
     const numValues = shape.numValues;
     this._numValues = numValues;
 
-    // sum needs to be adjusted for negative coefficients.
-    // TODO: Remove once we handle negatives natively.
-    for (const g of this._coeffGroups) {
-      if (g.coeff < 0) {
-        this._sum += (numValues + 1) * g.cells.length * g.absCoeff;
-      }
-    }
-
     // TODO: Remove and replace with just numValues.
     this._lookupTables = LookupTables.get(numValues);
 
@@ -1499,7 +1529,7 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
             const eg = egs[egs.length - 1];
             newEgs = newCells = eg.splice(0, MAX_GROUP_SIZE);
           }
-          this._coeffGroups.push({ coeff: g.coeff, absCoeff: g.absCoeff, cells: newCells, exclusionGroups: newEgs });
+          this._coeffGroups.push({ coeff: g.coeff, cells: newCells, exclusionGroups: newEgs });
           newCells.forEach(c => cellSet.delete(c));
         }
 
@@ -1514,27 +1544,33 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
 
     {
       this._exclusionIds = new Uint8Array(this.cells.length);
-      let exclusionId = 1;
+      this._coeffs = new Array(this.cells.length);
+      const cellLookup = new Uint8Array(shape.numCells);
+      this.cells.forEach((c, i) => cellLookup[c] = i);
+
+      let exclusionId = 0;
       for (let i = 0; i < this._coeffGroups.length; i++) {
         const g = this._coeffGroups[i];
         for (let j = 0; j < g.exclusionGroups.length; j++) {
           for (const cell of g.exclusionGroups[j]) {
-            // TODO: Optimize this by using a map.
-            this._exclusionIds[this.cells.indexOf(cell)] = exclusionId;
+            const index = cellLookup[cell];
+            this._exclusionIds[index] = exclusionId;
+            this._coeffs[index] = g.coeff;
           }
           exclusionId++;
         }
       }
     }
 
-    this._hasNegative = this._coeffGroups.some(g => g.coeff < 0);
-    this._onlyUnitCoeffs = this._coeffGroups.every(g => g.coeff === 1);
-    this._onlyAbsUnitCoeffs = this._coeffGroups.every(g => g.absCoeff === 1);
+    const onlyUnitCoeffs = this._coeffGroups.every(g => g.coeff === 1);
+    this._onlyAbsUnitCoeffs = this._coeffGroups.every(g => Math.abs(g.coeff) === 1);
     this._isCage = (
-      this._onlyUnitCoeffs
+      onlyUnitCoeffs
       && this._coeffGroups.length == 1
       && this._coeffGroups[0].exclusionGroups.length == 1);
-    if (!this._hasNegative) {
+
+    const hasNegative = this._coeffGroups.some(g => g.coeff < 0);
+    if (!hasNegative) {
       // We can't use cell exclusions because the cell values have been changed.
       // Thus it can't be used to exclude the value from other cells.
       // TODO: Find a robust way of handling this so that we still get the
@@ -1548,7 +1584,7 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
     // IMPORTANT: Complement cells don't work for this, because
     // we can't guarantee that reversed negativeCells is a unique value.
     // This will stop anyone adding them.
-    if (!this._onlyUnitCoeffs || this._complementCells === undefined) {
+    if (!onlyUnitCoeffs || this._complementCells === undefined) {
       this._complementCells = null;
     }
 
@@ -1625,36 +1661,6 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
   }
 
   enforceConsistency(grid, handlerAccumulator) {
-    if (!this._hasNegative) {
-      return this._enforceConsistencyPositive(grid, handlerAccumulator);
-    }
-
-    const reverse = this._lookupTables.reverse;
-
-    for (let g = 0; g < this._coeffGroups.length; g++) {
-      if (this._coeffGroups[g].coeff > 0) continue;
-      const negativeCells = this._coeffGroups[g].cells;
-      for (let i = 0; i < negativeCells.length; i++) {
-        grid[negativeCells[i]] = reverse[grid[negativeCells[i]]];
-      }
-    }
-
-    const result = this._enforceConsistencyPositive(grid, handlerAccumulator);
-
-    // Reverse the value back even if we fail to make the output and debugging
-    // easier.
-    for (let g = 0; g < this._coeffGroups.length; g++) {
-      if (this._coeffGroups[g].coeff > 0) continue;
-      const negativeCells = this._coeffGroups[g].cells;
-      for (let i = 0; i < negativeCells.length; i++) {
-        grid[negativeCells[i]] = reverse[grid[negativeCells[i]]];
-      }
-    }
-
-    return result;
-  }
-
-  _enforceConsistencyPositive(grid, handlerAccumulator) {
     const sum = this._sum;
     const coeffGroups = this._coeffGroups;
     const rangeInfo = this._lookupTables.rangeInfo;
@@ -1666,21 +1672,21 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
     let numUnfixed = this.cells.length;
     let fixedSum = 0;
     for (let g = 0; g < coeffGroups.length; g++) {
-      const { absCoeff, cells } = coeffGroups[g];
+      const { coeff, cells } = coeffGroups[g];
 
       let rangeInfoSum = 0;
       for (let i = 0; i < cells.length; i++) {
         rangeInfoSum += rangeInfo[grid[cells[i]]];
       }
-      if (absCoeff > 0) {
-        maxSum += absCoeff * (rangeInfoSum & 0xff);
-        minSum += absCoeff * ((rangeInfoSum >> 8) & 0xff);
+      if (coeff > 0) {
+        maxSum += coeff * (rangeInfoSum & 0xff);
+        minSum += coeff * ((rangeInfoSum >> 8) & 0xff);
       } else {
-        minSum += absCoeff * (rangeInfoSum & 0xff);
-        maxSum += absCoeff * ((rangeInfoSum >> 8) & 0xff);
+        minSum += coeff * (rangeInfoSum & 0xff);
+        maxSum += coeff * ((rangeInfoSum >> 8) & 0xff);
       }
       numUnfixed -= rangeInfoSum >> 24;
-      fixedSum += absCoeff * ((rangeInfoSum >> 16) & 0xff);
+      fixedSum += coeff * ((rangeInfoSum >> 16) & 0xff);
     }
 
     // It is impossible to make the target sum.
@@ -1696,12 +1702,20 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
     // can also only occur when there is a 0.
     if (numUnfixed <= 0) return false;
 
+    if (numUnfixed === 1) {
+      let result = this._sumUtil.enforceOneRemainingCell(grid, sum - fixedSum, this.cells, this._coeffs);
+      if (this._complementCells !== null) {
+        return this._enforceCombinationsWithComplement(grid, handlerAccumulator);
+      }
+      return result;
+    }
+
     const hasFewUnfixed = this._onlyAbsUnitCoeffs && this._sumUtil.hasFewRemainingCells(numUnfixed);
 
     if (hasFewUnfixed) {
       // If there are few remaining cells then handle them explicitly.
       const targetSum = sum - fixedSum;
-      if (!this._sumUtil.enforceFewRemainingCells(grid, targetSum, numUnfixed, this.cells, this._exclusionIds, this._cellExclusions)) {
+      if (!this._sumUtil.enforceFewRemainingCells(grid, targetSum, numUnfixed, this.cells, this._exclusionIds, this._cellExclusions, this._coeffs)) {
         return false;
       }
     } else {
@@ -1709,14 +1723,14 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
       // Restrict the possible range of values in each cell based on whether they
       // will cause the sum to be too large or too small.
       for (let g = 0; g < coeffGroups.length; g++) {
-        const { absCoeff, cells } = coeffGroups[g];
-        const dofLim = numValues * absCoeff;
+        const { coeff, cells } = coeffGroups[g];
+        const dofLim = numValues * Math.abs(coeff);
         // If dofLim is too small, then we can stop, because the ceoffs are
         // ordered from largest to smallest.
         // TODO: Can we be more restrictive here by using >
         if (sum - minSum >= dofLim && maxSum - sum >= dofLim) break;
 
-        if (!this._sumUtil.restrictValueRange(grid, cells, absCoeff,
+        if (!this._sumUtil.restrictValueRange(grid, cells, coeff,
           sum - minSum, maxSum - sum)) {
           return false;
         }
