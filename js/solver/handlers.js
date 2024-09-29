@@ -1291,6 +1291,7 @@ SudokuConstraintHandler._SumHandlerUtil = class _SumHandlerUtil {
 }
 
 SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
+  // TODO: Remove unused variables.
   _exclusionGroups = [];
   _exclusionIndexes = [];
   _cellExclusions = null;
@@ -1301,6 +1302,7 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
   _sumUtil = null;
   _shape = null;
   _lookupTables = null;
+  _offsetForNegative = 0;
 
   constructor(cells, sum) {
     cells = cells.slice();
@@ -1314,11 +1316,21 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
   }
 
   setComplementCells(cells) {
-    this._complementCells = cells;
+    // IMPORTANT: Complement cells don't work for this, because
+    // we can't guarantee that reversed negativeCells is a unique value.
+    // This will stop anyone adding them.
+    // TODO: They also don't work with any other coefficients other than 1.
+    if (this._negativeCells.length == 0) {
+      this._complementCells = cells;
+    }
   }
 
   hasComplementCells(cells) {
     this._complementCells !== undefined;
+  }
+
+  setSum(sum) {
+    this._sum = sum + this._offsetForNegative;
   }
 
   sum() {
@@ -1332,8 +1344,10 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
   }
 
   initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
-    this._shape = shape;
+    this._offsetForNegative = (shape.numValues + 1) * this._negativeCells.length;
+    this._sum += this._offsetForNegative;
 
+    this._shape = shape;
     this._lookupTables = LookupTables.get(shape.numValues);
 
     this._sumUtil = SudokuConstraintHandler._SumHandlerUtil.get(shape.numValues);
@@ -1454,6 +1468,30 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
   }
 
   enforceConsistency(grid, handlerAccumulator) {
+    if (!this._negativeCells.length) {
+      return this._enforceConsistencyPositive(grid, handlerAccumulator);
+    }
+
+    const reverse = this._lookupTables.reverse;
+
+    const negativeCells = this._negativeCells;
+    const numNegCells = negativeCells.length;
+    for (let i = 0; i < numNegCells; i++) {
+      grid[negativeCells[i]] = reverse[grid[negativeCells[i]]];
+    }
+
+    const result = this._enforceConsistencyPositive(grid, handlerAccumulator);
+
+    // Reverse the value back even if we fail to make the output and debugging
+    // easier.
+    for (let i = 0; i < numNegCells; i++) {
+      grid[negativeCells[i]] = reverse[grid[negativeCells[i]]];
+    }
+
+    return result;
+  }
+
+  _enforceConsistencyPositive(grid, handlerAccumulator) {
     const cells = this.cells;
     const numCells = cells.length;
     const sum = this._sum | 0;
@@ -1555,46 +1593,8 @@ SudokuConstraintHandler.SumWithNegative = class SumWithNegative extends SudokuCo
 
     this._positiveCells = positiveCells;
     this._negativeCells = negativeCells;
-    this._offsetForNegative = 0;
-
-    // IMPORTANT: Complement cells don't work for this, because
-    // we can't guarantee that reversed negativeCells is a unique value.
-    // This will stop anyone adding them.
-    this._complementCells = null;
 
     this.idStr = [this.constructor.name, positiveCells, negativeCells, sum].join('-');
-  }
-
-  setSum(sum) {
-    this._sum = sum + this._offsetForNegative;
-  }
-
-  initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
-    this._offsetForNegative = (shape.numValues + 1) * this._negativeCells.length;
-    this._sum += this._offsetForNegative;
-    return super.initialize(initialGridCells, cellExclusions, shape, stateAllocator);
-  }
-
-  setComplementCells() { }
-
-  enforceConsistency(grid, handlerAccumulator) {
-    const reverse = this._lookupTables.reverse;
-
-    const negativeCells = this._negativeCells;
-    const numNegCells = negativeCells.length;
-    for (let i = 0; i < numNegCells; i++) {
-      grid[negativeCells[i]] = reverse[grid[negativeCells[i]]];
-    }
-
-    const result = super.enforceConsistency(grid, handlerAccumulator);
-
-    // Reverse the value back even if we fail to make the output and debugging
-    // easier.
-    for (let i = 0; i < numNegCells; i++) {
-      grid[negativeCells[i]] = reverse[grid[negativeCells[i]]];
-    }
-
-    return result;
   }
 }
 
