@@ -414,6 +414,9 @@ SudokuConstraintHandler._CommonHandlerUtil = class _CommonHandlerUtil {
 
   // Partition the cells into groups where members are all unique.
   static findExclusionGroups(cells, cellExclusions) {
+    if (cells.length == 1) return [cells];
+    if (cells.length < 4) return this._findExclusionGroupsGreedy(cells, cellExclusions);
+
     let bestExclusionGroupsScore = 0;
     let bestExclusionGroups = [];
     let randomGen = new RandomIntGenerator(0);
@@ -1149,17 +1152,16 @@ SudokuConstraintHandler._SumHandlerUtil = class _SumHandlerUtil {
     let maxDof = strictMax - sum;
     if (minDof < 0 || maxDof < 0) return false;
 
-    // TODO: Track which sets we can skip (because they had no degrees of freedom).
-
     index = 0;
     for (let i = 0; i < coeffGroups.length; i++) {
       const { coeff, exclusionGroups } = coeffGroups[i];
-      // TODO: Can we reduce this by 1?
-      //       Or even more by looking at the minimum set size.
+      // TODO: Can we be even more restrictive by subtracting the min set size.
+      //       This didn't seem to work. Why?
+      //       Also consider if the check below should use > instead.
+      //       This also interacts with the bounds on the mask generation.
       const dofLim = (numValues - 1) * Math.abs(coeff);
       // If dofLim is too small, then we can stop, because the ceoffs are
       // ordered from largest to smallest.
-      // TODO: Can we be more restrictive here by using >
       if (minDof >= dofLim && maxDof >= dofLim) break;
 
       let minDofSet = minDof;
@@ -1191,8 +1193,6 @@ SudokuConstraintHandler._SumHandlerUtil = class _SumHandlerUtil {
 
         let valueMask = -1;
 
-        // TODO: Can we do this without a loop, by making the range from:
-        //       min(seenMin) to max(seenMin)+minDofSet
         if (minDofSet < numValues - 1) {
           for (let j = minDofSet; j--;) seenMin |= seenMin << 1;
           valueMask = seenMin;
@@ -1202,8 +1202,6 @@ SudokuConstraintHandler._SumHandlerUtil = class _SumHandlerUtil {
           for (let j = maxDofSet; j--;) seenMax |= seenMax >> 1;
           valueMask &= seenMax;
         }
-
-        // TODO: Try being more aggressive as setting it on every cell.
 
         // If the value mask could potentially remove some values, then apply
         // the mask to the values in the set.
@@ -1278,7 +1276,7 @@ SudokuConstraintHandler._SumHandlerUtil = class _SumHandlerUtil {
     return numUnfixed <= (this._pairwiseSums ? 3 : 2);
   }
 
-  // Treat this as a special as a we can handle any coefficients.
+  // Treat this as a special case as we can handle any coefficients.
   enforceOneRemainingCell(grid, targetSum, cells, coeffs) {
     for (let i = 0; i < cells.length; i++) {
       const c = cells[i];
@@ -1294,8 +1292,8 @@ SudokuConstraintHandler._SumHandlerUtil = class _SumHandlerUtil {
 
       // targetSum must be a multiple of the coefficient.
       if (coeff !== -1 && targetSum % coeff) return false;
-      const required = targetSum / coeff;
-      return required > 0 && !!(grid[c] = v & LookupTables.fromValue(required));
+      const targetValue = targetSum / coeff;
+      return targetValue > 0 && !!(grid[c] = v & LookupTables.fromValue(targetValue));
     }
 
     return false;
@@ -1306,6 +1304,9 @@ SudokuConstraintHandler._SumHandlerUtil = class _SumHandlerUtil {
   // REQUIRES that:
   //  - The number of unfixed cells is accurate.
   //  - None of the values are zero.
+  //  - The targetSum is bounds-consistent with the current values.
+  //    This is mostly to ensure that the targetSum is not negative after
+  //    adjusting for negative coefficients.
   enforceFewRemainingCells(
     grid, targetSum, numUnfixed, cells, exclusionIds, cellExclusions, coeffs) {
     const cellBuffer = this.constructor._cellBuffers[numUnfixed];
@@ -1313,20 +1314,35 @@ SudokuConstraintHandler._SumHandlerUtil = class _SumHandlerUtil {
 
     const numValues = this._numValues;
 
+    // Track how many cells are reversed, for handing negative cells.
+    //
+    // If a cell has a negative coefficient, we reverse the bitset `b` to get
+    // the values:
+    //   B = N+1 - b where `N` is the number of values.
+    // If we then adjust the targetSum by (N+1), then the rest of the code
+    // can work the same as for positive coefficients since the set of valid
+    // values is the same.
+    //
+    // The cells are reversed back at the end.
+    // (We do this even if enforcement fails to ensure the step-by-step view
+    //  looks sensible).
+    let numReversed = 0;
+
     let j = 0;
-    // For whatever reason, making this a global object slows it down.
-    const reversed = [];
     for (let i = 0; i < cells.length; i++) {
       const c = cells[i];
       const v = grid[c];
       if (v & (v - 1)) {
         exclusionIdsBuffer[j] = exclusionIds[i];
         cellBuffer[j] = c;
-        if (coeffs[i] < 0) {
+        if (coeffs[i] === -1) {
           grid[c] = this._lookupTables.reverse[v];
-          targetSum -= (numValues + 1) * coeffs[i];
-          reversed.push(c);
+          targetSum += (numValues + 1);
+          this.constructor._reversedCellsBuffer[numReversed++] = c;
+        } else if (coeffs[i] !== 1) {
+          throw Error('enforceFewRemainingCells only handles +-1 coefficients');
         }
+
         j++;
       }
     }
@@ -1387,26 +1403,25 @@ SudokuConstraintHandler._SumHandlerUtil = class _SumHandlerUtil {
         throw Error('Unexpected number of cells: ' + numUnfixed);
     }
 
-    for (let i = reversed.length - 1; i >= 0; i--) {
-      const c = reversed[i];
+    // Un-reverse the reversed cells.
+    for (let i = 0; i < numReversed; i++) {
+      const c = this.constructor._reversedCellsBuffer[i];
       grid[c] = this._lookupTables.reverse[grid[c]];
     }
+
     return result;
   }
 }
 
 SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
-  // TODO: Remove unused variables.
   _exclusionIds = [];
   _cellExclusions = null;
   _sum = 0;
-  // TODO: Don't require differentiating between undefined and null.
-  _complementCells;
+  _complementCells = null;
   _sumUtil = null;
   _numValues = 0;
   _lookupTables = null;
   _coeffGroups = [];
-  // TODO: Combine these into flags or enum.
   _onlyAbsUnitCoeffs = false;
   _isCage = false;
   _coeffs = [];
@@ -1420,11 +1435,12 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
       // Shortcut the common case.
       this._coeffGroups.push(
         { coeff: 1, cells: [...cells], exclusionGroups: [] });
+      this._coeffs = new Array(this.cells.length).fill(1);
     } else {
       coeffs = coeffs || Array(cells.length).fill(1);
 
       if (coeffs.length !== cells.length) {
-        throw new Error('Invalid number of coefficients: ' + this._coeffs.length);
+        throw new Error('Invalid number of coefficients: ' + coeffs.length);
       }
       if (!coeffs.every(c => Number.isInteger(c))) {
         throw new Error('Coefficients must be integers');
@@ -1453,6 +1469,8 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
       for (let [coeff, coeffCells] of coeffMap) {
         this._coeffGroups.push({ coeff, cells: coeffCells, exclusionGroups: [] });
       }
+
+      this._coeffs = coeffs;
     }
 
     // Sort cells for consistent idStr and exclusion cell performance.
@@ -1470,11 +1488,14 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
   }
 
   setComplementCells(cells) {
+    if (!this.onlyUnitCoeffs()) {
+      throw Error("Can't use complementCells with non-unit coefficients.");
+    }
     this._complementCells = cells;
   }
 
-  hasComplementCells(cells) {
-    this._complementCells !== undefined;
+  coefficients() {
+    return this._coeffs;
   }
 
   sum() {
@@ -1484,20 +1505,18 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
   priority() {
     // We want smaller cages to have higher priority, but we still want all sums
     // to have a high priority.
-    return this._numValues * 2 - this.cells.length;
+    return Math.max(this._numValues * 2 - this.cells.length, this._numValues);
   }
 
   initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
     const numValues = shape.numValues;
     this._numValues = numValues;
 
-    // TODO: Remove and replace with just numValues.
     this._lookupTables = LookupTables.get(numValues);
 
     this._sumUtil = SudokuConstraintHandler._SumHandlerUtil.get(numValues);
 
     for (const g of this._coeffGroups) {
-      // TODO: Optimize findExclusionGroups for 1 or 2 cells.
       g.exclusionGroups = SudokuConstraintHandler._CommonHandlerUtil.findExclusionGroups(
         g.cells, cellExclusions);
     }
@@ -1544,7 +1563,6 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
 
     {
       this._exclusionIds = new Uint8Array(this.cells.length);
-      this._coeffs = new Array(this.cells.length);
       const cellLookup = new Uint8Array(shape.numCells);
       this.cells.forEach((c, i) => cellLookup[c] = i);
 
@@ -1555,7 +1573,6 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
           for (const cell of g.exclusionGroups[j]) {
             const index = cellLookup[cell];
             this._exclusionIds[index] = exclusionId;
-            this._coeffs[index] = g.coeff;
           }
           exclusionId++;
         }
@@ -1573,19 +1590,8 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
     if (!hasNegative) {
       // We can't use cell exclusions because the cell values have been changed.
       // Thus it can't be used to exclude the value from other cells.
-      // TODO: Find a robust way of handling this so that we still get the
-      //       benefit for positive cells.
+      // (This is only relevant for calls to enforceFewRemainingCells).
       this._cellExclusions = cellExclusions;
-    }
-
-    // Ensure that _complementCells is null.
-    // undefined is used by the optimizer to know that a value has not been
-    // set yet.
-    // IMPORTANT: Complement cells don't work for this, because
-    // we can't guarantee that reversed negativeCells is a unique value.
-    // This will stop anyone adding them.
-    if (!onlyUnitCoeffs || this._complementCells === undefined) {
-      this._complementCells = null;
     }
 
     // Check for valid sums.
@@ -1727,7 +1733,6 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
         const dofLim = numValues * Math.abs(coeff);
         // If dofLim is too small, then we can stop, because the ceoffs are
         // ordered from largest to smallest.
-        // TODO: Can we be more restrictive here by using >
         if (sum - minSum >= dofLim && maxSum - sum >= dofLim) break;
 
         if (!this._sumUtil.restrictValueRange(grid, cells, coeff,
@@ -1753,35 +1758,6 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
     }
 
     return true;
-  }
-}
-
-// SumWithNegative allows cells in the sum to be negative.
-//
-// How this works
-// --------------
-// The initial constraint is:
-//   a1+a2+...+an - b1-b2-...-bm = s
-// If we reverse the bitset for the `b` cells, then we get the value:
-//   Bx = N+1 - bx where `N` is the number of values.
-// This gives a new constraint which is a sum of positives:
-//   a1+a2+...+an + B1+B2+...+Bm = s + (N+1)*m;
-// Thus we can reverse `b` then use the Sum handler with the updated sum.
-//
-// Note that `Bx` is still a value in the same range as `bx`, so the Sum handler
-// does not need to be made more general.
-SudokuConstraintHandler.SumWithNegative = class SumWithNegative extends SudokuConstraintHandler.Sum {
-  constructor(positiveCells, negativeCells, sum, coeffs) {
-    positiveCells = positiveCells.slice();
-    positiveCells.sort((a, b) => a - b);
-    negativeCells = negativeCells.slice();
-    negativeCells.sort((a, b) => a - b);
-
-    const cells = [...positiveCells, ...negativeCells];
-    coeffs ||= cells.map((_, i) => i < positiveCells.length ? 1 : -1);
-    super(cells, sum, coeffs);
-
-    this.idStr = [this.constructor.name, positiveCells, negativeCells, sum].join('-');
   }
 }
 
@@ -2536,8 +2512,9 @@ SudokuConstraintHandler.RegionSumLine = class RegionSumLine extends SudokuConstr
       // area by treating it as the stem of an arrow.
       const single = this._singles[0];
       for (const cells of this._multi) {
-        const arrow = new SudokuConstraintHandler.SumWithNegative(
-          cells, [single], 0);
+        const sumCells = [single, ...cells];
+        const coeffs = sumCells.map((_, i) => i < 1 ? -1 : 1);
+        const arrow = new SudokuConstraintHandler.Sum(sumCells, 0, coeffs);
         arrow.initialize(initialGridCells, cellExclusions, shape, stateAllocator);
         this._arrows.push(arrow);
       }

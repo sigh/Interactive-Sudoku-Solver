@@ -1859,11 +1859,11 @@ class SudokuBuilder {
 
         case 'Arrow':
           {
-            const [negativeCell, ...positiveCells] = (
+            const cells = (
               constraint.cells.map(c => shape.parseCellId(c).cell));
 
-            yield new SudokuConstraintHandler.SumWithNegative(
-              positiveCells, [negativeCell], 0);
+            const coeffs = cells.map((_, i) => i < 1 ? -1 : 1);
+            yield new SudokuConstraintHandler.Sum(cells, 0, coeffs);
           }
           break;
 
@@ -1871,11 +1871,10 @@ class SudokuBuilder {
           {
             const cells = (
               constraint.cells.map(c => shape.parseCellId(c).cell));
-            const negativeCells = [cells[0], cells[cells.length - 1]];
-            const positiveCells = cells.slice(1, -1);
 
-            yield new SudokuConstraintHandler.SumWithNegative(
-              positiveCells, negativeCells, 0);
+            const coeffs = cells.map(_ => 1);
+            coeffs[0] = coeffs[coeffs.length - 1] = -1;
+            yield new SudokuConstraintHandler.Sum(cells, 0, coeffs);
           }
           break;
 
@@ -2127,18 +2126,20 @@ class SudokuBuilder {
               // We don't bother to also add constraints between each pair, as
               // the constraint on the total sum should propagate through the
               // center cell.
-              const centerCell = [cells[(numCells / 2) | 0]];
+              const centerCell = cells[(numCells / 2) | 0];
+              const coeffs = [-1, 1, 1];
               for (const pair of pairs) {
-                yield new SudokuConstraintHandler.SumWithNegative(
-                  pair, centerCell, 0);
+                yield new SudokuConstraintHandler.Sum(
+                  [centerCell, ...pair], 0, coeffs);
               }
             } else {
               // Otherwise create an equal sum constraint between each pair.
               const numPairs = pairs.length;
+              const coeffs = [-1, -1, 1, 1];
               for (let i = 1; i < numPairs; i++) {
                 for (let j = 0; j < i; j++) {
-                  yield new SudokuConstraintHandler.SumWithNegative(
-                    pairs[i], pairs[j], 0);
+                  yield new SudokuConstraintHandler.Sum(
+                    [...pairs[i], ...pairs[j]], 0, coeffs);
                 }
               }
             }
