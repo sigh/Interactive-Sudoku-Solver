@@ -132,8 +132,9 @@ class SudokuConstraintOptimizer {
     if (allSumHandlers.length == 0) return;
     // Exclude any handlers with duplicate cells from any of the optimizations.
     // TODO: Check which optimizations are still valid.
+    // TODO: Remove duplicate check.
     const safeSumHandlers = allSumHandlers.filter(
-      h => h.cells.length == new Set(h.cells).size);
+      h => h.cells.length == new Set(h.cells).size && h.onlyUnitCoeffs());
 
     const [filteredSumHandlers, sumCells] =
       this._findNonOverlappingSubset(safeSumHandlers, handlerSet);
@@ -169,8 +170,11 @@ class SudokuConstraintOptimizer {
       handlerSet.getAllofType(SudokuConstraintHandler.House).map(
         h => handlerSet.getIndex(h)));
 
+    // TODO: Inline function.
     const process = (type, cellsFn) => {
       for (const h of handlerSet.getAllofType(type)) {
+        if (!h.onlyUnitCoeffs()) continue;
+
         if (h.hasComplementCells()) continue;
         // If there are any repeated cells, then we can't infer the complement
         // sum.
@@ -234,6 +238,9 @@ class SudokuConstraintOptimizer {
   _replaceSizeSpecificSumHandlers(handlerSet, cellExclusions, shape) {
     const sumHandlers = handlerSet.getAllofType(SudokuConstraintHandler.Sum);
     for (const h of sumHandlers) {
+      // TODO: Make general.
+      if (!h.onlyUnitCoeffs()) continue;
+
       let newHandler;
       switch (h.cells.length) {
         case 1:
