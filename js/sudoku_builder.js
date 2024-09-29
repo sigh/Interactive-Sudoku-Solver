@@ -1797,6 +1797,63 @@ class SudokuBuilder {
     return new SudokuConstraintHandler.Or(...handlers);
   }
 
+  static * _regionSumLineHandlers(cells, regions, numValues) {
+    // Map cells to regions.
+    const cellToRegion = new Map();
+    for (const region of regions) {
+      for (const cell of region) cellToRegion.set(cell, region);
+    }
+
+    // Split cells into sections of equal sum.
+    const cellSets = [];
+    let curSet = null;
+    let curRegion = null;
+    for (const cell of cells) {
+      const newRegion = cellToRegion.get(cell);
+      if (newRegion !== curRegion) {
+        curRegion = newRegion;
+        curSet = [];
+        cellSets.push(curSet);
+      }
+      curSet.push(cell);
+    }
+
+    const singles = cellSets.filter(s => s.length == 1).map(s => s[0]);
+    const multis = cellSets.filter(s => s.length > 1);
+
+    if (singles.length > 1) {
+      const key = SudokuConstraint.SameValues.fnKey(numValues);
+      yield new SudokuConstraintHandler.BinaryPairwise(
+        key, ...singles);
+    }
+
+    if (singles.length > 0) {
+      // If there are any singles, then use it to constrain every
+      // multi. The viable sums can propagate through any of the
+      // singles.
+      const singleCell = singles[0];
+      for (let i = 0; i < multis.length; i++) {
+        const cells = [singleCell, ...multis[i]];
+        const coeffs = cells.map((_, i) => i < 1 ? -1 : 1);
+        yield new SudokuConstraintHandler.Sum(cells, 0, coeffs);
+      }
+    } else {
+      // Otherwise set up an equal sum constraint between every
+      // pair of multis.
+      for (let i = 1; i < multis.length; i++) {
+        for (let j = 0; j < i; j++) {
+          let cells0 = multis[i];
+          let cells1 = multis[j];
+          // Ensure cell0 is the shortest, it will be our negative cells.
+          if (cells0.length > cells1.length) [cells0, cells1] = [cells1, cells0];
+          const cells = [...cells0, ...cells1];
+          const coeffs = cells.map((_, i) => i < cells0.length ? -1 : 1);
+          yield new SudokuConstraintHandler.Sum(cells, 0, coeffs);
+        }
+      }
+    }
+  }
+
   static * _constraintHandlers(constraintMap, shape) {
     const gridSize = shape.gridSize;
 
@@ -2078,7 +2135,7 @@ class SudokuBuilder {
             if (!constraintMap.has('NoBoxes') && !shape.noDefaultBoxes) {
               // Default boxes.
               const regions = SudokuConstraintBase.boxRegions(shape);
-              yield new SudokuConstraintHandler.RegionSumLine(cells, regions);
+              yield* this._regionSumLineHandlers(cells, regions, shape.numValues);
             } else if (constraintMap.has('Jigsaw')) {
               // If no boxes is set, try to use the jigsaw regions.
               const jigsawConstraints = constraintMap.get('Jigsaw');
@@ -2086,7 +2143,7 @@ class SudokuBuilder {
                 throw ('Jigsaw constraint must be unique');
               }
               const regions = jigsawConstraints[0].regions();
-              yield new SudokuConstraintHandler.RegionSumLine(cells, regions);
+              yield* this._regionSumLineHandlers(cells, regions, shape.numValues);
             } else {
               // There are no regions, so the constraint is trivially satisfied.
             }
