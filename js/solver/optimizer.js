@@ -28,6 +28,8 @@ class SudokuConstraintOptimizer {
 
     this._optimizeTaxicab(handlerSet, cellExclusions, shape);
 
+    this._optimizeBinaryPairwise(handlerSet);
+
     if (hasBoxes) {
       this._addHouseIntersections(handlerSet, shape);
     }
@@ -513,7 +515,13 @@ class SudokuConstraintOptimizer {
         if (h0 === h1) continue;
 
         const diff0 = arrayDifference(h0.cells, h1.cells);
-        if (diff0.length > this._MAX_SUM_SIZE || diff0.length == 0) continue;
+        if (
+          // Skip empty diffs.
+          diff0.length == 0
+          // Also diffs that are too large.
+          || diff0.length > this._MAX_SUM_SIZE
+          // Ensure overlap is more than one cell.
+          || diff0.length == h0.cells.length - 1) continue;
 
         // We have some overlapping cells!
         // This means diff0 and diff1 must contain the same values.
@@ -871,6 +879,25 @@ class SudokuConstraintOptimizer {
         this._debugLogger.log({
           loc: '_optimizeTaxicab',
           msg: 'Add: ' + newHandler.constructor.name,
+          cells: newHandler.cells,
+        });
+      }
+    }
+  }
+
+  // Replace 2-cell BinaryPairwise handlers with a direct BinaryConstraint
+  // handler. This has less overhead both during runtime and initialization.
+  _optimizeBinaryPairwise(handlerSet) {
+    const handlers = handlerSet.getAllofType(SudokuConstraintHandler.BinaryPairwise);
+    for (const h of handlers) {
+      if (h.cells.length !== 2) continue;
+      const newHandler = new SudokuConstraintHandler.BinaryConstraint(
+        ...h.cells, h.key());
+      handlerSet.replace(h, newHandler);
+      if (this._debugLogger) {
+        this._debugLogger.log({
+          loc: '_optimizeBinaryPairwise',
+          msg: 'Replace with: ' + newHandler.constructor.name,
           cells: newHandler.cells,
         });
       }

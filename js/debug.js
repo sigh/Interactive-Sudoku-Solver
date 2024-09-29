@@ -272,7 +272,7 @@ const runSolveTests = async (onFailure) => {
     'Anti-taxicab',
     'Full rank - 6 clue snipe',
     'Irregular region sum line',
-    'Event horizon', // Dupicate cell in sum
+    'Event horizon', // Duplicate cell in sum, BinaryPairwise optimization.
     'Copycat, easy',  // Same value - 2 sets, repeated values
     'Clone sudoku', // Same value - single cell sets
     'Numbered Rooms vs X-Sums', // Or constraint
