@@ -1,16 +1,20 @@
 body {
   font-size: 14px;
+  font-family: sans-serif;
+  width: fit-content;
+
+  margin: 8px;
+  margin-left: 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
-#sudoku-grid-container {
-  display: flex;
-  justify-content: center;
-}
 
 #sudoku-grid {
   position: relative;
-
   box-shadow: 3px 3px 10px;
+  align-self: center;
 }
 
 .click-interceptor-svg {
@@ -90,14 +94,8 @@ body {
   filter: opacity(50%) blur(2px);
 }
 
-body {
-  font-family: sans-serif;
-  margin-left: 20px;
-}
-
 #instruction-panel {
   display: flex;
-  flex-wrap: wrap;
   align-items: flex-start;
   gap: 15px;
 }
@@ -105,6 +103,10 @@ body {
 #instruction-panel>div {
   max-width: 400px;
   display: flex;
+}
+
+#instruction-panel>div:first-child {
+  min-width: 400px;
 }
 
 #example-select {
@@ -152,13 +154,12 @@ body {
 #freeform-constraint-input-warning {
   font-size: small;
   position: absolute;
+  min-width: 300px;
 }
 
 #sudoku-container {
   display: flex;
-  flex-wrap: wrap;
   gap: 20px;
-  margin: 15px 0;
 }
 
 #state-buttons {
@@ -434,6 +435,13 @@ textarea {
   font-size: 12px;
 }
 
+#sudoku-grid-and-stats-container {
+  display: flex;
+  gap: 15px;
+  position: sticky;
+  top: 10px;
+}
+
 #sudoku-grid-with-controls {
   display: flex;
   flex-direction: column;
@@ -509,7 +517,7 @@ button.icon-button {
 }
 
 #display-panel {
-  width: 160px;
+  width: 140px;
 }
 
 #state-output {
@@ -534,17 +542,6 @@ button.icon-button {
 #state-output span.number-gap {
   display: inline-block;
   width: 1px;
-}
-
-@media screen and (max-width: 600px) {
-  #display-panel {
-    width: unset;
-    order: -1;
-  }
-
-  #state-output {
-    flex-direction: unset;
-  }
 }
 
 select {
@@ -757,7 +754,8 @@ input:checked+span:before {
 }
 
 #solve-mode-input {
-  margin-right: 10px;
+  margin: 0;
+  margin-bottom: 10px;
 }
 
 #solve-mode-description {
