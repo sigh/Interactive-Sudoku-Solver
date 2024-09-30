@@ -882,8 +882,6 @@ class SolverStateDisplay {
     let vars = [
       'solutions',
       'guesses',
-      'backtracks',
-      'nodesSearched',
       'valuesTried',
       'constraintsProcessed',
       'searchSpaceExplored',

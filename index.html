@@ -127,72 +127,76 @@ layout: null
   </div>
 
   <div id="sudoku-container">
-
-    <div id="sudoku-grid-with-controls">
-      <div id="sudoku-grid-container">
-        <div id="sudoku-grid">
-          <input id="fake-input" inputmode="numeric" type="text" value="x">
-        </div>
-      </div>
-      <div id="grid-control-buttons" class="control-panel">
-        <div id="solution-control-panel">
-          <div id="solution-iteration-state"></div>
-          <div id="solution-control-buttons">
-            <button id="solution-start" class="icon-button" title="start (s)">&#171;</button>
-            <button id="solution-back" class="icon-button" title="previous (p)">&#8249;</button>
-            <button id="solution-forward" class="icon-button" title="next (n)">&#8250;</button>
-            <button id="solution-end" class="icon-button" title="end">&#187;</button>
+    <div>
+      <div id="sudoku-grid-and-stats-container">
+        <div id="display-panel">
+          <div id="stats-container">
+            <div id="stats-header">
+              <h2>Stats by runtime</h2>
+              <button id="chart-close-button" class="danger-button" title="Close chart view">&#10006;</button>
+            </div>
+          </div>
+          <div id="solve-mode-input-container">
+            <select id="solve-mode-input">
+              <option value="all-possibilities" checked>All possibilities</option>
+              <option value="solutions">Solutions</option>
+              <option value="count-solutions">Count solutions</option>
+              <option value="step-by-step">Step-by-step</option>
+              <option value="validate-layout">Validate layout</option>
+            </select>
+            <div id="solve-mode-description" class="description"></div>
+          </div>
+          <div id="state-output"></div>
+          <div>
+            <div id="progress-container">
+              <progress value=0 id="solve-progress"></progress>
+              <span id="solve-status"></span>
+              <span id="solve-percentage"></span>
+            </div>
+            <div id="state-buttons">
+              <button id="copy-solution-button" title="Copy solution to clipboard" class="image-button" disabled>
+                <img src="img/copy-48.png" alt="Copy">
+              </button>
+              <button id="download-solutions-button" title="Download solutions" class="image-button" disabled>
+                <img src="img/download-48.png" alt="Download">
+              </button>
+              <button id="chart-button" title="Show stats charts" class="image-button" disabled>
+                <img src="img/chart-48.png" alt="Chart">
+              </button>
+            </div>
+            <span id="error-output" class="error"></span>
           </div>
         </div>
-        <div class="switch">
-          <label>
-            <input id="auto-solve-input" type="checkbox" checked>
-            <span></span>
-          </label>
-          Auto-solve
-        </div>
-        <button id="solve-button" class="big-button" title="solve">Solve</button>
-        <button id="stop-solver" class="big-button danger-button" title="abort">Abort</button>
-      </div>
-    </div>
 
-    <div id="display-panel">
-      <div id="stats-container">
-        <div id="stats-header">
-          <h2>Stats by runtime</h2>
-          <button id="chart-close-button" class="danger-button" title="Close chart view">&#10006;</button>
+        <div id="sudoku-grid-with-controls">
+          <div id="sudoku-grid">
+            <input id="fake-input" inputmode="numeric" type="text" value="x">
+          </div>
+          <div id="grid-control-buttons" class="control-panel">
+            <div id="solution-control-panel">
+              <div id="solution-iteration-state"></div>
+              <div id="solution-control-buttons">
+                <button id="solution-start" class="icon-button" title="start (s)">&#171;</button>
+                <button id="solution-back" class="icon-button" title="previous (p)">&#8249;</button>
+                <button id="solution-forward" class="icon-button" title="next (n)">&#8250;</button>
+                <button id="solution-end" class="icon-button" title="end">&#187;</button>
+              </div>
+            </div>
+            <div class="control-panel">
+              <div class="switch">
+                <label>
+                  <input id="auto-solve-input" type="checkbox" checked>
+                  <span></span>
+                </label>
+                Auto-solve
+              </div>
+              <button id="solve-button" class="big-button" title="solve">Solve</button>
+              <button id="stop-solver" class="big-button danger-button" title="abort">Abort</button>
+            </div>
+          </div>
         </div>
       </div>
-      <div id="solve-mode-input-container">
-        <select id="solve-mode-input">
-          <option value="all-possibilities" checked>All possibilities</option>
-          <option value="solutions">Solutions</option>
-          <option value="count-solutions">Count solutions</option>
-          <option value="step-by-step">Step-by-step</option>
-          <option value="validate-layout">Validate layout</option>
-        </select>
-        <div id="solve-mode-description" class="description"></div>
-      </div>
-      <div id="state-output"></div>
-      <div>
-        <div id="progress-container">
-          <progress value=0 id="solve-progress"></progress>
-          <span id="solve-status"></span>
-          <span id="solve-percentage"></span>
-        </div>
-        <div id="state-buttons">
-          <button id="copy-solution-button" title="Copy solution to clipboard" class="image-button" disabled>
-            <img src="img/copy-48.png" alt="Copy">
-          </button>
-          <button id="download-solutions-button" title="Download solutions" class="image-button" disabled>
-            <img src="img/download-48.png" alt="Download">
-          </button>
-          <button id="chart-button" title="Show stats charts" class="image-button" disabled>
-            <img src="img/chart-48.png" alt="Chart">
-          </button>
-        </div>
-        <span id="error-output" class="error"></span>
-      </div>
+
     </div>
 
     <div id="constraint-panel-container">
