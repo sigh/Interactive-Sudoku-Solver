@@ -17,6 +17,13 @@ class HistoryHandler {
     this._undoButton.onclick = () => this._incrementHistory(-1);
     this._redoButton = document.getElementById('redo-button');
     this._redoButton.onclick = () => this._incrementHistory(+1);
+    // ctrl-z/shift-ctrl-z are shortcuts for undo/redo,
+    window.addEventListener('keydown', event => {
+      if (document.activeElement.tagName === 'TEXTAREA') return;
+      if (event.key === 'z' && (event.metaKey || event.ctrlKey)) {
+        this._incrementHistory(event.shiftKey ? 1 : -1);
+      }
+    });
 
     window.onpopstate = this._reloadFromUrl.bind(this);
     this._reloadFromUrl();
@@ -46,7 +53,7 @@ class HistoryHandler {
 
   _incrementHistory(delta) {
     const index = this._historyLocation + delta;
-    if (index >= this._history.length) return;
+    if (index < 0 || index >= this._history.length) return;
     let q = this._history[this._historyLocation + delta];
     this._historyLocation += delta;
     this._updateButtons();
