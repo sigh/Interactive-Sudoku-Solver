@@ -197,7 +197,7 @@ class SudokuConstraintOptimizer {
     const remainingCells = new Set(shape.allCells);
     sumHandlers.forEach(h => h.cells.forEach(c => remainingCells.delete(c)));
     const newHandler = new SudokuConstraintHandler.Sum(
-      new Uint8Array(remainingCells), remainingSum);
+      [...remainingCells], remainingSum);
 
     sumHandlers.push(newHandler);
     remainingCells.forEach(c => sumCells.add(c));
@@ -358,7 +358,7 @@ class SudokuConstraintOptimizer {
       const MIN_SUM_SKEW = 2;
       if (sumSkew < MIN_SUM_SKEW) {
         if (this._debugLogger) {
-          const cellsArray = Array.from(cells);
+          const cellsArray = [...cells];
           const cellString = cellsArray.map(c => shape.makeCellIdFromIndex(c)).join('~');
           this._debugLogger.log({
             loc: '_addSumIntersectionHandler',
@@ -373,8 +373,7 @@ class SudokuConstraintOptimizer {
       }
     }
 
-    const handler = new SudokuConstraintHandler.Sum(
-      Array.from(cells), totalSum);
+    const handler = new SudokuConstraintHandler.Sum([...cells], totalSum);
 
     if (this._debugLogger) {
       let args = { sum: handler.sum(), size: handler.cells.length };
