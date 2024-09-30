@@ -181,6 +181,10 @@ class SudokuSolver {
     return this._debugLogger.getDebugState();
   }
 
+  incDebugCounter(name, value) {
+    this._debugLogger.incCounter(name, value);
+  }
+
   state() {
     const counters = { ...this._internalSolver.counters };
 
@@ -240,6 +244,7 @@ SudokuSolver.DebugLogger = class {
     };
     this._hasAnyDebugging = false;
     this._pendingDebugLogs = [];
+    this._adhHocCounters = new Map();
 
     if (debugOptions) {
       // Only copy over options for known values.
@@ -254,6 +259,12 @@ SudokuSolver.DebugLogger = class {
     this.logLevel = +this._debugOptions.logLevel;
     this.enableLogs = this.logLevel > 0;
     this.enableStepLogs = this._debugOptions.enableStepLogs;
+  }
+
+  incCounter(name, value) {
+    if (value === undefined) value = 1;
+    this._adhHocCounters.set(
+      name, (this._adhHocCounters.get(name) || 0) + value);
   }
 
   log(data, level) {
@@ -278,6 +289,9 @@ SudokuSolver.DebugLogger = class {
     }
     if (this._debugOptions.exportBacktrackCounts) {
       result.backtrackCounts = this._solver._internalSolver.getBacktrackTriggers();
+    }
+    if (this._adhHocCounters.size) {
+      result.counters = this._adhHocCounters;
     }
     return result;
   }

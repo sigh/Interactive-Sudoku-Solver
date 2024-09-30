@@ -50,6 +50,10 @@ const handleWorkerMethod = (method, payload) => {
   throw (`Unknown method ${method}`);
 };
 
+const debugCount = (key, value) => {
+  workerSolver.incDebugCounter(key, value);
+}
+
 const sendState = (extraState) => {
   const state = workerSolver.state();
   state.extra = extraState;

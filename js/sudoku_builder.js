@@ -2496,7 +2496,7 @@ class SolverProxy {
         this._stateHandler(data.state);
         break;
       case 'debug':
-        this._debugHandler(data.data);
+        this._debugHandler(data.data, data.counters);
         break;
     }
   }

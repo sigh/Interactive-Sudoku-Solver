@@ -96,7 +96,8 @@ class DebugManager {
 
   constructor(displayContainer) {
     this._container = document.getElementById('debug-container');
-    this._logOutput = document.getElementById('debug-logs');
+    this._logView = document.getElementById('debug-logs');
+    this._counterView = document.getElementById('debug-counters');
     this._enabled = false;
     this._shape = null;
     this._infoOverlay = null;
@@ -298,7 +299,7 @@ class DebugManager {
   }
 
   getCallback() {
-    return (data => this._update(data));
+    return this._update.bind(this);
   }
 
   reshape(shape) {
@@ -309,7 +310,8 @@ class DebugManager {
   }
 
   clear() {
-    this._logOutput.textContent = '';
+    clearDOMNode(this._logView);
+    clearDOMNode(this._counterView);
     this._infoOverlay?.clear();
     this._debugCellHighlighter?.clear();
     clearDOMNode(this._debugPuzzleSrc);
@@ -324,19 +326,37 @@ class DebugManager {
   _update(data) {
     if (!this._enabled) return;
 
-
     if (data.logs) {
-      const isScrolledToBottom = this._isScrolledToBottom(this._logOutput);
+      const isScrolledToBottom = this._isScrolledToBottom(this._logView);
 
       data.logs.forEach(l => this._addLog(l));
 
       if (isScrolledToBottom) {
-        this._scrollToBottom(this._logOutput);
+        this._scrollToBottom(this._logView);
       }
     }
 
     if (data.backtrackCounts) {
       this._infoOverlay.setHeatmapValues(data.backtrackCounts);
+    }
+
+    if (data.counters) {
+      const counterView = this._counterView;
+      clearDOMNode(counterView);
+
+      for (const key of [...data.counters.keys()].sort()) {
+        const value = data.counters.get(key);
+
+        const elem = document.createElement('div');
+        const label = document.createElement('span');
+        label.className = 'description';
+        label.textContent = key;
+        const count = document.createElement('span');
+        count.textContent = value;
+        elem.appendChild(label);
+        elem.appendChild(count);
+        counterView.appendChild(elem);
+      }
     }
   }
 
@@ -352,7 +372,7 @@ class DebugManager {
       this._logDedupe.count = 1;
       this._logDedupe.currentSpan = document.createElement('span');
       this._logDedupe.currentSpan.classList.add('duplicate-log-line');
-      this._logOutput.append(this._logDedupe.currentSpan);
+      this._logView.append(this._logDedupe.currentSpan);
     }
     const span = this._logDedupe.currentSpan;
     const count = ++this._logDedupe.count;
@@ -394,7 +414,7 @@ class DebugManager {
 
     this._addLogMouseOver(elem, data);
 
-    this._logOutput.append(elem);
+    this._logView.append(elem);
   }
 
   _addLogMouseOver(elem, data) {
