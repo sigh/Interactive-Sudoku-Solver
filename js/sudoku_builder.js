@@ -1833,22 +1833,14 @@ class SudokuBuilder {
       // singles.
       const singleCell = singles[0];
       for (let i = 0; i < multis.length; i++) {
-        const cells = [singleCell, ...multis[i]];
-        const coeffs = cells.map((_, i) => i < 1 ? -1 : 1);
-        yield new SudokuConstraintHandler.Sum(cells, 0, coeffs);
+        yield SudokuConstraintHandler.Sum.makeEqual([singleCell], multis[i]);
       }
     } else {
       // Otherwise set up an equal sum constraint between every
       // pair of multis.
       for (let i = 1; i < multis.length; i++) {
         for (let j = 0; j < i; j++) {
-          let cells0 = multis[i];
-          let cells1 = multis[j];
-          // Ensure cell0 is the shortest, it will be our negative cells.
-          if (cells0.length > cells1.length) [cells0, cells1] = [cells1, cells0];
-          const cells = [...cells0, ...cells1];
-          const coeffs = cells.map((_, i) => i < cells0.length ? -1 : 1);
-          yield new SudokuConstraintHandler.Sum(cells, 0, coeffs);
+          yield SudokuConstraintHandler.Sum.makeEqual(multis[i], multis[j]);
         }
       }
     }
@@ -1918,9 +1910,8 @@ class SudokuBuilder {
           {
             const cells = (
               constraint.cells.map(c => shape.parseCellId(c).cell));
-
-            const coeffs = cells.map((_, i) => i < 1 ? -1 : 1);
-            yield new SudokuConstraintHandler.Sum(cells, 0, coeffs);
+            yield SudokuConstraintHandler.Sum.makeEqual(
+              [cells[0]], cells.slice(1));
           }
           break;
 
@@ -1929,9 +1920,8 @@ class SudokuBuilder {
             const cells = (
               constraint.cells.map(c => shape.parseCellId(c).cell));
 
-            const coeffs = cells.map(_ => 1);
-            coeffs[0] = coeffs[coeffs.length - 1] = -1;
-            yield new SudokuConstraintHandler.Sum(cells, 0, coeffs);
+            const center = cells.splice(1, cells.length - 2);
+            yield SudokuConstraintHandler.Sum.makeEqual(cells, center);
           }
           break;
 
@@ -2183,20 +2173,16 @@ class SudokuBuilder {
               // We don't bother to also add constraints between each pair, as
               // the constraint on the total sum should propagate through the
               // center cell.
-              const centerCell = cells[(numCells / 2) | 0];
-              const coeffs = [-1, 1, 1];
+              const centerCell = [cells[(numCells / 2) | 0]];
               for (const pair of pairs) {
-                yield new SudokuConstraintHandler.Sum(
-                  [centerCell, ...pair], 0, coeffs);
+                yield SudokuConstraintHandler.Sum.makeEqual(centerCell, pair);
               }
             } else {
               // Otherwise create an equal sum constraint between each pair.
               const numPairs = pairs.length;
-              const coeffs = [-1, -1, 1, 1];
               for (let i = 1; i < numPairs; i++) {
                 for (let j = 0; j < i; j++) {
-                  yield new SudokuConstraintHandler.Sum(
-                    [...pairs[i], ...pairs[j]], 0, coeffs);
+                  yield SudokuConstraintHandler.Sum.makeEqual(pairs[i], pairs[j]);
                 }
               }
             }

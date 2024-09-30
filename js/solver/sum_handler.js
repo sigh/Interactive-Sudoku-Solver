@@ -10,6 +10,14 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
   static _FLAG_ONLY_ABS_UNIT_COEFF = 0b1;
   static _FLAG_CAGE = 0b10;
 
+  static makeEqual(cells0, cells1) {
+    // Make cell0 the longer array, as it will be the positive cells.
+    if (cells0.length < cells1.length) [cells0, cells1] = [cells1, cells0];
+    const cells = [...cells0, ...cells1];
+    const coeffs = cells.map((_, i) => i < cells0.length ? 1 : -1);
+    return new this(cells, 0, coeffs);
+  }
+
   constructor(cells, sum, coeffs) {
     const cellSet = new Set(cells);
     super(cellSet);

@@ -255,7 +255,7 @@ const runSolveTests = async (onFailure) => {
     'Quadruple - repeated values',
     'Odd-even thermo',
     'Nabner thermo - easy',
-    'Zipper lines - easy',
+    'Zipper lines - tutorial',  // Zipper both odd and even length.
     'Sum lines',
     'Sum lines, with loop',
     'Sum lines - long loop',
