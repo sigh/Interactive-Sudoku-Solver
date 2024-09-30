@@ -2,6 +2,7 @@ const debugFilesLoaded = Promise.all([
   loadJSFile('js/solver/candidate_selector.js'),
   loadJSFile('js/solver/engine.js'),
   loadJSFile('js/solver/handlers.js'),
+  loadJSFile('js/solver/sum_handler.js'),
   loadJSFile('js/solver/optimizer.js'),
   loadJSFile('data/collections.js'),
   loadJSFile('data/jigsaw_layouts.js'),
