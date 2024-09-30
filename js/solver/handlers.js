@@ -355,7 +355,7 @@ SudokuConstraintHandler.ValueDependentUniqueValueExclusionHouse = class ValueDep
   }
 }
 
-SudokuConstraintHandler._CommonHandlerUtil = class _CommonHandlerUtil {
+SudokuConstraintHandler._Util = class _Util {
   static exposeHiddenSingles(grid, cells, hiddenSingles) {
     hiddenSingles = hiddenSingles | 0;
     const numCells = cells.length;
@@ -487,7 +487,6 @@ SudokuConstraintHandler.House = class House extends SudokuConstraintHandler {
   constructor(cells) {
     super(cells);
     this._allValues = 0;
-    this._commonUtil = SudokuConstraintHandler._CommonHandlerUtil;
   }
 
   initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
@@ -515,7 +514,7 @@ SudokuConstraintHandler.House = class House extends SudokuConstraintHandler {
 
     const hiddenSingles = allValues & ~atLeastTwo & ~fixedValues;
     if (hiddenSingles) {
-      if (!this._commonUtil.exposeHiddenSingles(grid, cells, hiddenSingles)) {
+      if (!SudokuConstraintHandler._Util.exposeHiddenSingles(grid, cells, hiddenSingles)) {
         return false;
       }
       fixedValues |= hiddenSingles;
@@ -580,8 +579,6 @@ SudokuConstraintHandler.BinaryPairwise = class BinaryPairwise extends SudokuCons
     this._validCombinationInfo = null;
     this._cellExclusions = null;
     this._enableHiddenSingles = false;
-
-    this._commonUtil = SudokuConstraintHandler._CommonHandlerUtil;
 
     // Ensure we dedupe binary constraints.
     this.idStr = [this.constructor.name, key, ...cells].join('-');
@@ -734,7 +731,7 @@ SudokuConstraintHandler.BinaryPairwise = class BinaryPairwise extends SudokuCons
     if (this._enableHiddenSingles) {
       const hiddenSingles = requiredValues & ~nonUniqueValues & ~fixedValues;
       if (hiddenSingles) {
-        if (!this._commonUtil.exposeHiddenSingles(grid, cells, hiddenSingles)) {
+        if (!SudokuConstraintHandler._Util.exposeHiddenSingles(grid, cells, hiddenSingles)) {
           return false;
         }
       }
@@ -744,7 +741,7 @@ SudokuConstraintHandler.BinaryPairwise = class BinaryPairwise extends SudokuCons
     // Exclude fixedValues, they will be handled by the main solver loop,
     // which will also propagate the changes.
     const nonUniqueRequired = requiredValues & nonUniqueValues & ~fixedValues;
-    if (!this._commonUtil.enforceRequiredValueExclusions(
+    if (!SudokuConstraintHandler._Util.enforceRequiredValueExclusions(
       grid, cells, nonUniqueRequired, this._cellExclusions, handlerAccumulator)) return false;
 
     return true;
@@ -1422,7 +1419,7 @@ SudokuConstraintHandler.SameValues = class SameValues extends SudokuConstraintHa
 
     // If they are not unique, find the number of exclusion sets.
     for (const set of this._cellSets) {
-      const exclusionGroups = SudokuConstraintHandler._CommonHandlerUtil.findExclusionGroups(
+      const exclusionGroups = SudokuConstraintHandler._Util.findExclusionGroups(
         set, cellExclusions);
       // The number of exclusion sets is the minimum for any set, since this
       // constraints all the other sets.
@@ -1586,7 +1583,7 @@ SudokuConstraintHandler.Between = class Between extends SudokuConstraintHandler 
   }
 
   initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
-    const exclusionGroups = SudokuConstraintHandler._CommonHandlerUtil.findExclusionGroups(
+    const exclusionGroups = SudokuConstraintHandler._Util.findExclusionGroups(
       this._mids, cellExclusions);
     const maxGroupSize = Math.max(0, ...exclusionGroups.map(a => a.length));
     const minEndsDelta = maxGroupSize ? maxGroupSize + 1 : 0;
@@ -1694,8 +1691,6 @@ SudokuConstraintHandler.LocalEntropy = class LocalEntropy extends SudokuConstrai
   constructor(cells) {
     super(cells);
     this._cellExclusions = null;
-
-    this._commonUtil = SudokuConstraintHandler._CommonHandlerUtil;
   }
 
   static _valuesBuffer = new Uint16Array(SHAPE_MAX.numValues);
@@ -1737,7 +1732,7 @@ SudokuConstraintHandler.LocalEntropy = class LocalEntropy extends SudokuConstrai
         continue;
       }
       // Now we know `triadValue` is a required value and is in multiple cells.
-      if (!this._commonUtil.enforceRequiredValueExclusions(
+      if (!SudokuConstraintHandler._Util.enforceRequiredValueExclusions(
         grid, cells, triadValue, this._cellExclusions, handlerAccumulator)) return false;
     }
 
@@ -1825,8 +1820,6 @@ SudokuConstraintHandler.RequiredValues = class RequiredValues extends SudokuCons
     for (const v of values) {
       this._valueCounts.set(v, this._valueCounts.get(v) + 1);
     }
-
-    this._commonUtil = SudokuConstraintHandler._CommonHandlerUtil;
   }
 
   valueCounts() {
@@ -1950,7 +1943,7 @@ SudokuConstraintHandler.RequiredValues = class RequiredValues extends SudokuCons
     // Only check for hidden singles when we don't have a repeated value.
     const hiddenSingles = this._singleValues & ~nonUniqueValues & ~fixedValues;
     if (hiddenSingles) {
-      if (!this._commonUtil.exposeHiddenSingles(grid, cells, hiddenSingles)) {
+      if (!SudokuConstraintHandler._Util.exposeHiddenSingles(grid, cells, hiddenSingles)) {
         return false;
       }
       fixedValues |= hiddenSingles;
@@ -2182,7 +2175,7 @@ SudokuConstraintHandler.CountingCircles = class CountingCircles extends SudokuCo
     if (!combinations) return false;
 
     const exclusionGroups = (
-      SudokuConstraintHandler._CommonHandlerUtil.findExclusionGroups(
+      SudokuConstraintHandler._Util.findExclusionGroups(
         this.cells, cellExclusions));
 
     // Restrict values to the possible sums.
