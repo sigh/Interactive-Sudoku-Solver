@@ -833,6 +833,28 @@ input:checked+span:before {
   display: none;
 }
 
+#debug-counters {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  width: 150px;
+  padding-left: 5px;
+}
+
+#debug-counters:empty {
+  width: 0;
+}
+
+#debug-counters>div {
+  display: flex;
+  justify-content: space-between;
+}
+
+#debug-counters span {
+  padding: 0 5px;
+  font-size: 12px;
+}
+
 #close-debug-button {
   width: fit-content;
   font-size: 14px;
