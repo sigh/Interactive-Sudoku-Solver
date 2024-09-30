@@ -8,6 +8,7 @@ const START_INIT_WORKER = performance.now();
     'solver/candidate_selector.js' + versionParam,
     'solver/engine.js' + versionParam,
     'solver/handlers.js' + versionParam,
+    'solver/sum_handler.js' + versionParam,
     'solver/optimizer.js' + versionParam);
 }
 
