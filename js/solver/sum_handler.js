@@ -533,14 +533,12 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
   }
 
   // Scratch buffers for reuse so we don't have to create arrays at runtime.
-  static _seenMins = new Uint16Array(SHAPE_MAX.numCells);
-  static _seenMaxs = new Uint16Array(SHAPE_MAX.numCells);
+  static _seenMinMaxs = new Uint32Array(SHAPE_MAX.numCells);
 
   // Restricts cell values to only the ranges that are possible taking into
   // account uniqueness constraints between values.
   _restrictCellsWithCoefficients(grid, sum, coeffGroups) {
-    let seenMins = this.constructor._seenMins;
-    let seenMaxs = this.constructor._seenMaxs;
+    let seenMinMaxs = this.constructor._seenMinMaxs;
     let strictMin = 0;
     let strictMax = 0;
 
@@ -553,11 +551,14 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
     for (let i = 0; i < coeffGroups.length; i++) {
       let { coeff, exclusionGroups } = coeffGroups[i];
       for (let s = 0; s < exclusionGroups.length; s++) {
-        let set = exclusionGroups[s];
-        let seenMin = 0;
-        let seenMax = 0;
+        const set = exclusionGroups[s];
 
-        for (let j = 0; j < set.length; j++) {
+        const v0 = grid[set[0]];
+        let seenMin = v0 & -v0;
+        // NOTE: seenMax is reversed.
+        let seenMax = (allValues + 1) >> (32 - Math.clz32(v0));
+
+        for (let j = 1; j < set.length; j++) {
           const v = grid[set[j]];
 
           // Set the smallest unset value >= min.
@@ -567,11 +568,13 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
           seenMin |= x & -x;
           // Set the largest unset value <= max.
           // NOTE: seenMax will be reversed.
-          x = ~seenMax & ((-1 << (numValues - (32 - Math.clz32(v)))));
+          x = ~seenMax & (-1 << (numValues - (32 - Math.clz32(v))));
           seenMax |= x & -x;
         }
 
-        if (seenMin > allValues || seenMax > allValues) return false;
+        // Check if seenMin or seenMax have exceeded the bounds. This means
+        // that they require values that are not possible.
+        if ((seenMin | seenMax) > allValues) return false;
 
         seenMax = reverseTable[seenMax];
         const minSum = sumTable[seenMin];
@@ -580,18 +583,19 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
         if (coeff === 1) {
           strictMax += maxSum;
           strictMin += minSum;
+        } else if (coeff > 0) {
+          strictMax += coeff * maxSum;
+          strictMin += coeff * minSum;
         } else {
-          if (coeff > 0) {
-            strictMax += coeff * maxSum;
-            strictMin += coeff * minSum;
-          } else {
-            strictMin += coeff * maxSum;
-            strictMax += coeff * minSum;
-          }
+          strictMin += coeff * maxSum;
+          strictMax += coeff * minSum;
         }
 
-        seenMins[index] = seenMin;
-        seenMaxs[index] = seenMax;
+        // Save for later to determine which values can be removed.
+        // If seenMin == seenMax, then this is already constrained, so set it to
+        // 0  so we can easily skip it.
+        seenMinMaxs[index] = (
+          (seenMin != seenMax) ? seenMin | (seenMax << 16) : 0);
         index++;
       }
     }
@@ -633,13 +637,14 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
       }
 
       for (let s = 0; s < exclusionGroups.length; s++) {
-        let seenMin = seenMins[index];
-        let seenMax = seenMaxs[index];
+        const seenMinMax = seenMinMaxs[index];
         index++;
 
-        // If min and max are the same, then the values can't be constrained
-        // anymore (and a positive dof guarantees that they are ok).
-        if (seenMin == seenMax) continue;
+        // This entry has already been marked as not interesting.
+        if (seenMinMax === 0) continue;
+
+        let seenMin = seenMinMax;  // Upper bits are not valid.
+        let seenMax = seenMinMax >> 16;
 
         let valueMask = -1;
 
