@@ -556,19 +556,6 @@ class SudokuConstraintBase {
     return this.cells || [];
   }
 
-  static _outsideClueChipLabel(rowCol, clueInc, clueDec) {
-    const parts = [];
-    if (rowCol[0] == 'C') {
-      if (clueInc) parts.push(`↓${clueInc}`);
-      if (clueDec) parts.push(`↑${clueDec}`);
-    } else {
-      if (clueInc) parts.push(`→${clueInc}`);
-      if (clueDec) parts.push(`←${clueDec}`);
-    }
-
-    return `${this.displayName()} [${rowCol} ${parts.join(' ')}]`;
-  }
-
   static _makeRegions(fn, gridSize) {
     const regions = [];
     for (let r = 0; r < gridSize; r++) {
@@ -628,6 +615,84 @@ class SudokuConstraintBase {
 
     return map;
   });
+}
+
+class OutsideConstraintBase extends SudokuConstraintBase {
+  static CLUE_TYPE_DOUBLE_LINE = 'double-line';
+  static CLUE_TYPE_DIAGONAL = 'diagonal';
+  static CLUE_TYPE_SINGLE_LINE = 'single-line';
+
+  static ZERO_VALUE_OK = false;
+  static CLUE_TYPE = '';
+  static DISPLAY_TEMPLATE = '$CLUE';
+
+  static makeFromArrowId(arrowId, value) {
+    let [rowCol, dir] = arrowId.split(',');
+
+    switch (this.CLUE_TYPE) {
+      case OutsideConstraintBase.CLUE_TYPE_DIAGONAL:
+        return new this(value, arrowId);
+      case OutsideConstraintBase.CLUE_TYPE_SINGLE_LINE:
+        return new this(value, rowCol);
+      case OutsideConstraintBase.CLUE_TYPE_DOUBLE_LINE:
+        return new this(
+          rowCol,
+          dir == 1 ? value : '',
+          dir == 1 ? '' : value);
+      default:
+        throw ('Unknown arg type for type: ' + type);
+    }
+  }
+
+  split() {
+    const clues = this.clues();
+    if (clues.length === 1) return [this];
+    return clues.map(c => this.constructor.makeFromArrowId(c.arrowId, c.value));
+  }
+
+  chipLabel() {
+    if (this.constructor.CLUE_TYPE === this.constructor.CLUE_TYPE_DOUBLE_LINE) {
+      const rowCol = this.rowCol;
+      const [clueInc, clueDec] = this.values();
+
+      const parts = [];
+      if (rowCol[0] == 'C') {
+        if (clueInc) parts.push(`↓${clueInc}`);
+        if (clueDec) parts.push(`↑${clueDec}`);
+      } else {
+        if (clueInc) parts.push(`→${clueInc}`);
+        if (clueDec) parts.push(`←${clueDec}`);
+      }
+
+      return `${this.constructor.displayName()} [${rowCol} ${parts.join(' ')}]`;
+    } else {
+      return super.chipLabel();
+    }
+  }
+
+  values() {
+    throw Error('Not implemented');
+  }
+
+  clues() {
+    const values = this.values();
+    switch (this.constructor.CLUE_TYPE) {
+      case this.constructor.CLUE_TYPE_DOUBLE_LINE:
+        const clues = [];
+        if (values[0]) clues.push(
+          { value: values[0], arrowId: this.rowCol + ',1' });
+        if (values[1]) clues.push({
+          value: values[1], arrowId: this.rowCol + ',-1'
+        });
+        return clues;
+      case this.constructor.CLUE_TYPE_DIAGONAL:
+        return [{ value: values[0], arrowId: this.id }];
+      case this.constructor.CLUE_TYPE_SINGLE_LINE:
+        return [{ value: values[0], arrowId: this.id + ',1' }];
+      default:
+        throw Error('Unknown clue type');
+    }
+  }
 }
 
 class SudokuConstraint {
@@ -1196,8 +1261,9 @@ class SudokuConstraint {
     }
   }
 
-  static LittleKiller = class LittleKiller extends SudokuConstraintBase {
+  static LittleKiller = class LittleKiller extends OutsideConstraintBase {
     static COLLECTOR_CLASS = 'OutsideClue';
+    static CLUE_TYPE = OutsideConstraintBase.CLUE_TYPE_DIAGONAL;
 
     constructor(sum, id) {
       super(arguments);
@@ -1211,6 +1277,10 @@ class SudokuConstraint {
 
     displayCells(shape) {
       return this.constructor.cellMap(shape)[this.id];
+    }
+
+    values() {
+      return [this.sum];
     }
 
     static cellMap = memoize((shape) => {
@@ -1239,8 +1309,10 @@ class SudokuConstraint {
     });
   }
 
-  static XSum = class XSum extends SudokuConstraintBase {
+  static XSum = class XSum extends OutsideConstraintBase {
     static COLLECTOR_CLASS = 'OutsideClue';
+    static CLUE_TYPE = OutsideConstraintBase.CLUE_TYPE_DOUBLE_LINE;
+    static DISPLAY_TEMPLATE = '⟨$CLUE⟩';
 
     constructor(rowCol, sumInc, sumDec) {
       super(arguments);
@@ -1253,11 +1325,6 @@ class SudokuConstraint {
       return 'X-Sum';
     }
 
-    chipLabel() {
-      return this.constructor._outsideClueChipLabel(
-        this.rowCol, this.sumInc, this.sumDec);
-    }
-
     displayCells(shape) {
       return this.constructor.fullLineCellMap(shape).get(this.rowCol + ',1');
     }
@@ -1267,8 +1334,10 @@ class SudokuConstraint {
     }
   }
 
-  static Sandwich = class Sandwich extends SudokuConstraintBase {
+  static Sandwich = class Sandwich extends OutsideConstraintBase {
     static COLLECTOR_CLASS = 'OutsideClue';
+    static CLUE_TYPE = OutsideConstraintBase.CLUE_TYPE_SINGLE_LINE;
+    static ZERO_VALUE_OK = true;
 
     constructor(sum, id) {
       super(arguments);
@@ -1282,6 +1351,10 @@ class SudokuConstraint {
 
     displayCells(shape) {
       return this.constructor.fullLineCellMap(shape).get(this.id + ',1');
+    }
+
+    values() {
+      return [this.sum];
     }
   }
 
@@ -1299,8 +1372,10 @@ class SudokuConstraint {
     }
   }
 
-  static Skyscraper = class Skyscraper extends SudokuConstraintBase {
+  static Skyscraper = class Skyscraper extends OutsideConstraintBase {
     static COLLECTOR_CLASS = 'OutsideClue';
+    static CLUE_TYPE = OutsideConstraintBase.CLUE_TYPE_DOUBLE_LINE;
+    static DISPLAY_TEMPLATE = '[$CLUE]';
 
     constructor(rowCol, countInc, countDec) {
       super(arguments);
@@ -1313,18 +1388,15 @@ class SudokuConstraint {
       return [this.countInc, this.countDec];
     }
 
-    chipLabel() {
-      return this.constructor._outsideClueChipLabel(
-        this.rowCol, this.countInc, this.countDec);
-    }
-
     displayCells(shape) {
       return this.constructor.fullLineCellMap(shape).get(this.rowCol + ',1');
     }
   }
 
-  static HiddenSkyscraper = class HiddenSkyscraper extends SudokuConstraintBase {
+  static HiddenSkyscraper = class HiddenSkyscraper extends OutsideConstraintBase {
     static COLLECTOR_CLASS = 'OutsideClue';
+    static CLUE_TYPE = OutsideConstraintBase.CLUE_TYPE_DOUBLE_LINE;
+    static DISPLAY_TEMPLATE = '|$CLUE|';
 
     constructor(rowCol, valueInc, valueDec) {
       super(arguments);
@@ -1337,18 +1409,15 @@ class SudokuConstraint {
       return [this.valueInc, this.valueDec];
     }
 
-    chipLabel() {
-      return this.constructor._outsideClueChipLabel(
-        this.rowCol, this.valueInc, this.valueDec);
-    }
-
     displayCells(shape) {
       return this.constructor.fullLineCellMap(shape).get(this.rowCol + ',1');
     }
   }
 
-  static NumberedRoom = class NumberedRoom extends SudokuConstraintBase {
+  static NumberedRoom = class NumberedRoom extends OutsideConstraintBase {
     static COLLECTOR_CLASS = 'OutsideClue';
+    static CLUE_TYPE = OutsideConstraintBase.CLUE_TYPE_DOUBLE_LINE;
+    static DISPLAY_TEMPLATE = ':$CLUE:';
 
     constructor(rowCol, clueInc, clueDec) {
       super(arguments);
@@ -1361,29 +1430,21 @@ class SudokuConstraint {
       return [this.clueInc, this.clueDec];
     }
 
-    chipLabel() {
-      return this.constructor._outsideClueChipLabel(
-        this.rowCol, this.clueInc, this.clueDec);
-    }
-
     displayCells(shape) {
       return this.constructor.fullLineCellMap(shape).get(this.rowCol + ',1');
     }
   }
 
-  static FullRank = class FullRank extends SudokuConstraintBase {
+  static FullRank = class FullRank extends OutsideConstraintBase {
     static COLLECTOR_CLASS = 'OutsideClue';
+    static CLUE_TYPE = OutsideConstraintBase.CLUE_TYPE_DOUBLE_LINE;
+    static DISPLAY_TEMPLATE = '#$CLUE';
 
     constructor(rowCol, rankInc, rankDec) {
       super(arguments);
       this.rowCol = rowCol.toUpperCase();
       this.rankInc = +rankInc;
       this.rankDec = +rankDec;
-    }
-
-    chipLabel() {
-      return this.constructor._outsideClueChipLabel(
-        this.rowCol, this.rankInc, this.rankDec);
     }
 
     values() {

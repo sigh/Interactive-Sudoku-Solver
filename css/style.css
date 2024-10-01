@@ -599,7 +599,7 @@ select {
   opacity: 0;
 }
 
-#outside-arrow-type-options {
+.outside-arrow-clue-types {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   column-gap: 10px;
