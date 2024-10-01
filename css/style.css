@@ -435,7 +435,7 @@ textarea {
   font-size: 12px;
 }
 
-#sudoku-grid-and-stats-container {
+#sudoku-grid-and-state {
   display: flex;
   gap: 15px;
   position: sticky;
@@ -550,6 +550,10 @@ select {
   text-align: center;
   text-align-last: center;
   margin: 10px 0;
+
+  background-color: white;
+  border: 1px solid #aaa;
+  border-radius: 2px;
 }
 
 #shape-container {
