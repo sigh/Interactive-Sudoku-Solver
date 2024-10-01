@@ -128,14 +128,8 @@ layout: null
 
   <div id="sudoku-container">
     <div>
-      <div id="sudoku-grid-and-stats-container">
+      <div id="sudoku-grid-and-state">
         <div id="display-panel">
-          <div id="stats-container">
-            <div id="stats-header">
-              <h2>Stats by runtime</h2>
-              <button id="chart-close-button" class="danger-button" title="Close chart view">&#10006;</button>
-            </div>
-          </div>
           <div id="solve-mode-input-container">
             <select id="solve-mode-input">
               <option value="all-possibilities" checked>All possibilities</option>
@@ -154,17 +148,25 @@ layout: null
               <span id="solve-percentage"></span>
             </div>
             <div id="state-buttons">
-              <button id="copy-solution-button" title="Copy solution to clipboard" class="image-button" disabled>
-                <img src="img/copy-48.png" alt="Copy">
+              <button id="chart-button" title="Show stats charts" class="image-button" disabled>
+                <img src="img/chart-48.png" alt="Chart">
               </button>
               <button id="download-solutions-button" title="Download solutions" class="image-button" disabled>
                 <img src="img/download-48.png" alt="Download">
               </button>
-              <button id="chart-button" title="Show stats charts" class="image-button" disabled>
-                <img src="img/chart-48.png" alt="Chart">
+              <button id="copy-solution-button" title="Copy solution to clipboard" class="image-button" disabled>
+                <img src="img/copy-48.png" alt="Copy">
               </button>
             </div>
             <span id="error-output" class="error"></span>
+            <div>
+              <div id="stats-container">
+                <div id="stats-header">
+                  <h2>Stats by runtime</h2>
+                  <button id="chart-close-button" class="danger-button" title="Close chart view">&#10006;</button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -377,12 +379,14 @@ layout: null
   </div>
 
   <footer>
+    Solver runs fastest on Chrome.
+    <a href="https://github.com/sigh/Interactive-Sudoku-Solver/issues">
+      [File a bug]</a>
+    <a href="javascript:loadDebug()">[Load debug mode]</a>
+    <br>
     Code at
     <a href="https://github.com/sigh/Interactive-Sudoku-Solver">
       https://github.com/sigh/Interactive-Sudoku-Solver</a>.
-    Solver runs fastest on Chrome.
-    <a href="javascript:loadDebug()">[Load debug mode]</a>
-    <br>
     More projects at <a href="https://sigh.github.io/">sigh.github.io</a>.
   </footer>
 
