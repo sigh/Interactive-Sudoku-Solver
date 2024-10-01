@@ -587,16 +587,12 @@ class ConstraintDisplay extends DisplayItem {
     item.parentNode.removeChild(item);
   }
 
-  configureOutsideClues(configs) {
-    this._outsideClues.configure(configs);
+  addOutsideClue(constraint) {
+    this._outsideClues.addOutsideClue(constraint);
   }
 
-  addOutsideClue(constraintType, lineId, value) {
-    this._outsideClues.addOutsideClue(constraintType, lineId, value);
-  }
-
-  removeOutsideClue(constraintType, lineId) {
-    this._outsideClues.removeOutsideClue(constraintType, lineId);
+  removeOutsideClue(constraint) {
+    this._outsideClues.removeOutsideClue(constraint);
   }
 
   drawItem(constraint, displayClass, config) {
@@ -682,57 +678,20 @@ class OutsideClueDisplay extends DisplayItem {
   constructor(svg, inputManager) {
     super(svg);
     this._applyGridOffset(svg);
-    this._configs = {};
     inputManager.addSelectionPreserver(svg);
-
-    const form = document.forms['outside-clue-input'];
-
-    this._collapsibleContainer = new CollapsibleContainer(
-      form.firstElementChild, false);
 
     let selectedArrow = null;
     inputManager.onSelection((cells) => {
       if (selectedArrow) selectedArrow.classList.remove('selected-arrow');
       selectedArrow = null;
-      form.firstElementChild.disabled = true;
+      inputManager.updateOutsideArrowSelection(null);
     });
 
-    this._handleClick = (lineId, cells) => {
-      const arrow = this._outsideArrowMap.get(lineId);
-
-      this._collapsibleContainer.toggleOpen(true);
-
+    this._handleClick = (arrowId, cells) => {
       inputManager.setSelection(cells);
-      form.firstElementChild.disabled = false;
-      form.id.value = lineId;
-      form.value.select();
+      inputManager.updateOutsideArrowSelection(arrowId);
 
-      const clueTypes = arrow.clueTypes;
-      const configs = this._configs;
-      for (const config of Object.values(configs)) {
-        config.elem.disabled = !arrow.clueTypes.has(config.clueType);
-      }
-
-      // Ensure that the selected type is valid for this arrow.
-      const currentClueTypeSelection = configs[form.type.value]?.clueType;
-      if (arrow.currentValues.size) {
-        // If we have existing clues, then make sure the selection matches ones
-        // of them.
-        if (!arrow.currentValues.has(currentClueTypeSelection)) {
-          form.type.value = arrow.currentValues.keys().next().value;
-          form.dispatchEvent(new Event('change'));
-        }
-      } else if (!clueTypes.has(currentClueTypeSelection)) {
-        // Otherwise then select any valid clue type.
-        for (const [type, config] of Object.entries(configs)) {
-          if (clueTypes.has(config.clueType)) {
-            form.type.value = type;
-            form.dispatchEvent(new Event('change'));
-            break;
-          }
-        }
-      }
-
+      const arrow = this._outsideArrowMap.get(arrowId);
       selectedArrow = arrow.svg;
       selectedArrow.classList.add('selected-arrow');
     };
@@ -746,66 +705,38 @@ class OutsideClueDisplay extends DisplayItem {
     this._outsideArrowMap = new Map();
 
     const diagonalCellMap = SudokuConstraint.LittleKiller.cellMap(shape);
-    for (const lineId in diagonalCellMap) {
+    for (const arrowId in diagonalCellMap) {
       this._addArrowSvg(
-        'diagonal-arrow', lineId, diagonalCellMap[lineId],
-        [ConstraintCollector.OutsideClue.CLUE_TYPE_DIAGONAL]);
+        'diagonal-arrow', arrowId, diagonalCellMap[arrowId]);
     }
-    for (const [lineId, cells] of SudokuConstraintBase.fullLineCellMap(shape)) {
-      if (cells.length <= 1) continue;
-      const clueTypes = [ConstraintCollector.OutsideClue.CLUE_TYPE_DOUBLE_LINE];
-      if (lineId.endsWith(',1')) {
-        clueTypes.push(ConstraintCollector.OutsideClue.CLUE_TYPE_SINGLE_LINE);
+    for (const [arrowId, cells] of SudokuConstraintBase.fullLineCellMap(shape)) {
+      if (cells.length > 1) {
+        this._addArrowSvg('full-line-arrow', arrowId, cells);
       }
-      this._addArrowSvg('full-line-arrow', lineId, cells, clueTypes);
     }
   }
 
-  static _makeOutsideClueForm(container, configs) {
-    clearDOMNode(container);
-    for (const [type, config] of Object.entries(configs)) {
-      const div = document.createElement('div');
-
-      const id = `${type}-option`;
-
-      const input = document.createElement('input');
-      input.id = id;
-      input.type = 'radio';
-      input.name = 'type';
-      input.value = type;
-      div.appendChild(input);
-
-      const label = document.createElement('label');
-      label.setAttribute('for', id);
-      label.textContent = (config.text || type) + ' ';
-      const tooltip = document.createElement('span');
-      tooltip.classList.add('tooltip');
-      tooltip.setAttribute('data-text', config.description);
-      label.appendChild(tooltip);
-      div.appendChild(label);
-
-      config.elem = input;
-
-      container.appendChild(div);
+  addOutsideClue(constraint) {
+    const clues = constraint.clues();
+    if (clues.length !== 1) {
+      throw Error(
+        'Constraints passed to OutsideClueDisplay must have exactly one clue');
     }
+    const { value, arrowId } = clues[0];
 
-    const form = document.forms['outside-clue-input'];
-    autoSaveField(form, 'type');
-  }
-
-  configure(configs) {
-    this._configs = configs;
-    this.constructor._makeOutsideClueForm(
-      document.getElementById('outside-arrow-type-options'), configs);
-  }
-
-  addOutsideClue(constraintType, arrowId, value) {
-    this._outsideArrowMap.get(arrowId).currentValues.set(constraintType, value);
+    this._outsideArrowMap.get(arrowId).currentValues.set(constraint.type, value);
     this._updateArrowValues(arrowId);
   }
 
-  removeOutsideClue(constraintType, arrowId) {
-    this._outsideArrowMap.get(arrowId).currentValues.delete(constraintType);
+  removeOutsideClue(constraint) {
+    const clues = constraint.clues();
+    if (clues.length !== 1) {
+      throw Error(
+        'Constraints passed to OutsideClueDisplay must have exactly one clue');
+    }
+    const { arrowId } = clues[0];
+
+    this._outsideArrowMap.get(arrowId).currentValues.delete(constraint.type);
     this._updateArrowValues(arrowId);
   }
 
@@ -827,11 +758,10 @@ class OutsideClueDisplay extends DisplayItem {
     elem.classList.add('active-arrow');
 
     // Construct the output strings.
-    const configs = this._configs;
     const valueStrings = [];
     for (const [type, value] of arrow.currentValues) {
       valueStrings.push(
-        configs[type].strTemplate.replace('$CLUE', value));
+        SudokuConstraint[type].DISPLAY_TEMPLATE.replace('$CLUE', value));
     }
     if (numValues == 1 || !arrowId.includes(',') || arrowId.startsWith('C')) {
       // For little killers and for columns, the values can be shown
@@ -866,7 +796,7 @@ class OutsideClueDisplay extends DisplayItem {
     textNode.setAttribute('style', `font-size: ${fontSize}px`);
   }
 
-  _addArrowSvg(arrowType, arrowId, cells, clueTypes) {
+  _addArrowSvg(arrowType, arrowId, cells) {
     const shape = this._shape;
 
     const cell0 = shape.parseCellId(cells[0]);
@@ -880,7 +810,7 @@ class OutsideClueDisplay extends DisplayItem {
 
     this._outsideArrowMap.set(
       arrowId,
-      { svg: arrowSvg, clueTypes: new Set(clueTypes), currentValues: new Map() });
+      { svg: arrowSvg, currentValues: new Map() });
     arrowSvg.onclick = () => this._handleClick(arrowId, cells);
     arrowSvg.classList.add(arrowType);
   };

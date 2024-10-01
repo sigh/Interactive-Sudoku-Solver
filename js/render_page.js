@@ -1101,45 +1101,31 @@ ConstraintCollector.OutsideClue = class OutsideClue extends ConstraintCollector 
     super();
     this._display = display;
     this._configs = this.constructor._constraintConfigs();
-    display.configureOutsideClues(this._configs);
     this._setUp(inputManager);
+    this._outsideArrowMap = new Map();
+    this._constraints = new Map();
   }
 
-  static _mapKey(type, lineId) {
-    return `${type}|${lineId}`;
-  }
-
-  static _isValidValue(value, config) {
+  static _isValidValue(value, zeroOk) {
     if (value == '' || value != +value) return false;
-    if (+value === 0 && !config.zeroOk) return false;
+    if (+value === 0 && !zeroOk) return false;
     return true;
   }
 
-  static CLUE_TYPE_DOUBLE_LINE = 'double-line';
-  static CLUE_TYPE_DIAGONAL = 'diagonal';
-  static CLUE_TYPE_SINGLE_LINE = 'single-line';
-
   static _constraintConfigs() {
-    return {
+    const configs = {
       Sandwich: {
-        clueType: this.CLUE_TYPE_SINGLE_LINE,
-        strTemplate: '$CLUE',
-        zeroOk: true,
         description:
           `Values between the 1 and the 9 in the row or column must add to the
           given sum.`,
       },
       XSum: {
-        clueType: this.CLUE_TYPE_DOUBLE_LINE,
-        strTemplate: '⟨$CLUE⟩',
         description:
           `The sum of the first X numbers must add up to the given sum.
           X is the number in the first cell in the direction of the row or
       column.`,
       },
       Skyscraper: {
-        clueType: this.CLUE_TYPE_DOUBLE_LINE,
-        strTemplate: '[$CLUE]',
         description:
           `Digits in the grid represent skyscrapers of that height.
           Higher skyscrapers obscure smaller ones.
@@ -1147,8 +1133,6 @@ ConstraintCollector.OutsideClue = class OutsideClue extends ConstraintCollector 
       row / column from the clue's direction of view.`,
       },
       HiddenSkyscraper: {
-        clueType: this.CLUE_TYPE_DOUBLE_LINE,
-        strTemplate: '|$CLUE|',
         description:
           `Digits in the grid represent skyscrapers of that height.
           Higher skyscrapers obscure smaller ones.
@@ -1156,136 +1140,206 @@ ConstraintCollector.OutsideClue = class OutsideClue extends ConstraintCollector 
           row/column from the clue's direction of view.`,
       },
       FullRank: {
-        clueType: this.CLUE_TYPE_DOUBLE_LINE,
-        strTemplate: '#$CLUE ',
-        elementId: 'full-rank-option',
         description:
           `Considering all rows and columns as numbers read from the direction
           of the clue and ranked from lowest (1) to highest, a clue represents
           where in the ranking that row/column lies.`,
       },
       NumberedRoom: {
-        clueType: this.CLUE_TYPE_DOUBLE_LINE,
-        strTemplate: ':$CLUE:',
-        elementId: 'numbered-room-option',
         description:
           `Clues outside the grid indicate the digit which has to be placed in
           the Nth cell in the corresponding direction, where N is the digit
           placed in the first cell in that direction.`,
       },
       LittleKiller: {
-        clueType: this.CLUE_TYPE_DIAGONAL,
-        strTemplate: '$CLUE',
         description:
           `Values along diagonal must add to the given sum. Values may repeat.`,
       },
     };
+
+    for (const [type, config] of Object.entries(configs)) {
+      config.class = SudokuConstraint[type];
+    }
+
+    return configs;
+  }
+
+  reshape(shape) {
+    super.reshape(shape);
+    this._outsideArrowMap.clear();
+    const diagonalCellMap = SudokuConstraint.LittleKiller.cellMap(shape);
+    for (const arrowId in diagonalCellMap) {
+      this._outsideArrowMap.set(
+        arrowId,
+        [OutsideConstraintBase.CLUE_TYPE_DIAGONAL]);
+    }
+    for (const [arrowId, cells] of SudokuConstraintBase.fullLineCellMap(shape)) {
+      if (cells.length <= 1) continue;
+      const clueTypes = [OutsideConstraintBase.CLUE_TYPE_DOUBLE_LINE];
+      if (arrowId.endsWith(',1')) {
+        clueTypes.push(OutsideConstraintBase.CLUE_TYPE_SINGLE_LINE);
+      }
+      this._outsideArrowMap.set(arrowId, clueTypes);
+    }
   }
 
   _setUp(inputManager) {
-    this._constraints = new Map();
-
     const outsideClueForm = document.forms['outside-clue-input'];
+    this._outsideClueForm = outsideClueForm;
+
+    this._collapsibleContainer = new CollapsibleContainer(
+      outsideClueForm.firstElementChild, false);
+
+    this._populateOutsideClueForm(
+      outsideClueForm, this._configs);
 
     const clearOutsideClue = () => {
       let formData = new FormData(outsideClueForm);
-      const lineId = formData.get('id');
+      const arrowId = formData.get('id');
       const type = formData.get('type');
-      this._display.removeOutsideClue(type, lineId);
-      this._constraints.delete(this.constructor._mapKey(type, lineId));
+      this._removeConstraint(type, arrowId);
       inputManager.setSelection([]);
       this.runUpdateCallback();
     };
     outsideClueForm.onsubmit = e => {
       let formData = new FormData(outsideClueForm);
       let type = formData.get('type');
-      let lineId = formData.get('id');
+      let arrowId = formData.get('id');
 
       const config = this._configs[type];
       let value = formData.get('value');
-      if (!this.constructor._isValidValue(value, config)) {
+      const zeroOk = SudokuConstraint[type].ZERO_VALUE_OK;
+      if (!this.constructor._isValidValue(value, zeroOk)) {
         clearOutsideClue();
         return false;
       }
       value = +value;
 
       this._addConstraint(
-        this.constructor._makeConstraint(
-          type, config, lineId, value),
-        lineId,
-        value);
+        SudokuConstraint[type].makeFromArrowId(arrowId, value));
 
       inputManager.setSelection([]);
       this.runUpdateCallback();
       return false;
     };
     inputManager.addSelectionPreserver(outsideClueForm);
+    inputManager.onOutsideArrowSelection(
+      this._handleOutsideArrowSelection.bind(this));
 
     document.getElementById('outside-arrow-clear').onclick = clearOutsideClue;
   }
 
-  addConstraint(constraint) {
-    const type = constraint.type;
-    const config = this._configs[type];
+  _handleOutsideArrowSelection(arrowId) {
+    const form = this._outsideClueForm;
+    if (arrowId === null) {
+      form.firstElementChild.disabled = true;
+      return;
+    }
 
-    switch (config.clueType) {
-      case ConstraintCollector.OutsideClue.CLUE_TYPE_DIAGONAL:
-        this._addConstraint(constraint, constraint.id, constraint.sum);
-        break;
-      case ConstraintCollector.OutsideClue.CLUE_TYPE_SINGLE_LINE:
-        this._addConstraint(constraint, constraint.id + ',1', constraint.sum);
-        break;
-      case ConstraintCollector.OutsideClue.CLUE_TYPE_DOUBLE_LINE:
-        {
-          const values = constraint.values();
-          if (values[0]) {
-            const lineId = constraint.rowCol + ',1';
-            this._addConstraint(
-              this.constructor._makeConstraint(type, config, lineId, values[0]),
-              lineId, values[0]);
-          }
-          if (values[1]) {
-            const lineId = constraint.rowCol + ',-1';
-            this._addConstraint(
-              this.constructor._makeConstraint(type, config, lineId, values[1]),
-              lineId, values[1]);
-          }
+    this._collapsibleContainer.toggleOpen(true);
+
+    form.firstElementChild.disabled = false;
+    form.id.value = arrowId;
+    form.value.select();
+
+    const clueTypes = this._outsideArrowMap.get(arrowId);
+
+    const configs = this._configs;
+    for (const config of Object.values(configs)) {
+      config.elem.disabled = !clueTypes.includes(config.class.CLUE_TYPE);
+    }
+
+    // Ensure that the selected type is valid for this arrow.
+    if (this._constraints.has(arrowId)) {
+      // If we have existing clues, then make sure the selection matches ones
+      // of them.
+      const activeConstraintTypes = this._constraints.get(arrowId);
+      if (!activeConstraintTypes.has(form.type.value)) {
+        form.type.value = activeConstraintTypes.keys().next().value;
+        form.dispatchEvent(new Event('change'));
+      }
+    } else if (!clueTypes.includes(configs[form.type.value]?.class.CLUE_TYPE)) {
+      // Otherwise then select any valid clue type.
+      for (const [type, config] of Object.entries(configs)) {
+        if (clueTypes.includes(config.class.CLUE_TYPE)) {
+          form.type.value = type;
+          form.dispatchEvent(new Event('change'));
+          break;
         }
-        break;
-      default:
-        throw ('Unknown type: ' + type);
+      }
     }
   }
 
-  _addConstraint(constraint, lineId, value) {
-    this._constraints.set(
-      this.constructor._mapKey(constraint.type, lineId), constraint);
-    this._display.addOutsideClue(constraint.type, lineId, value);
+  _populateOutsideClueForm(form, configs) {
+    const container = form.getElementsByClassName(
+      'outside-arrow-clue-types')[0];
+
+    for (const [type, config] of Object.entries(configs)) {
+      const div = document.createElement('div');
+
+      const id = `${type}-option`;
+
+      const input = document.createElement('input');
+      input.id = id;
+      input.type = 'radio';
+      input.name = 'type';
+      input.value = type;
+      div.appendChild(input);
+
+      const label = document.createElement('label');
+      label.setAttribute('for', id);
+      label.textContent = (config.text || type) + ' ';
+      const tooltip = document.createElement('span');
+      tooltip.classList.add('tooltip');
+      tooltip.setAttribute('data-text', config.description);
+      label.appendChild(tooltip);
+      div.appendChild(label);
+
+      config.elem = input;
+
+      container.appendChild(div);
+    }
+
+    autoSaveField(form, 'type');
+  }
+
+
+  addConstraint(constraint) {
+    for (const splitConstraint of constraint.split()) {
+      this._addConstraint(splitConstraint);
+    }
+  }
+
+  _addConstraint(constraint) {
+    const clues = constraint.clues();
+    if (clues.length !== 1) {
+      throw ('_addConstraint must be called with a single-valued constraint.');
+    }
+    const arrowId = clues[0].arrowId;
+    const type = constraint.type;
+    if (!this._constraints.has(arrowId)) {
+      this._constraints.set(arrowId, new Map());
+    }
+    this._constraints.get(arrowId).set(type, constraint);
+    this._display.addOutsideClue(constraint);
+  }
+
+  _removeConstraint(type, arrowId) {
+    const lineMap = this._constraints.get(arrowId);
+    const constraint = lineMap?.get(type);
+    if (constraint) {
+      this._display.removeOutsideClue(constraint);
+
+      lineMap.delete(type);
+      if (!lineMap.size) this._constraints.delete(arrowId);
+    }
   }
 
   clear() {
-    for (const [key, _] of this._constraints) {
-      const [type, lineId] = key.split('|');
-      this._display.removeOutsideClue(type, lineId);
-    }
-    this._constraints = new Map();
-  }
-
-  static _makeConstraint(type, config, lineId, value) {
-    let [rowCol, dir] = lineId.split(',');
-
-    switch (config?.clueType) {
-      case ConstraintCollector.OutsideClue.CLUE_TYPE_DIAGONAL:
-        return new SudokuConstraint[type](value, lineId);
-      case ConstraintCollector.OutsideClue.CLUE_TYPE_SINGLE_LINE:
-        return new SudokuConstraint[type](value, rowCol);
-      case ConstraintCollector.OutsideClue.CLUE_TYPE_DOUBLE_LINE:
-        return new SudokuConstraint[type](
-          rowCol,
-          dir == 1 ? value : '',
-          dir == 1 ? '' : value);
-      default:
-        throw ('Unknown arg type for type: ' + type);
+    for (const [arrowId, arrowIdMap] of this._constraints.entries()) {
+      for (const type of arrowIdMap.keys()) {
+        this._removeConstraint(type, arrowId);
+      }
     }
   }
 
@@ -1293,27 +1347,29 @@ ConstraintCollector.OutsideClue = class OutsideClue extends ConstraintCollector 
     const seen = new Map();
 
     const constraints = [];
-    for (const constraint of this._constraints.values()) {
-      const type = constraint.type;
-      if (this._configs[type].clueType === ConstraintCollector.OutsideClue.CLUE_TYPE_DOUBLE_LINE) {
-        const key = `${type}|${constraint.rowCol}`;
-        if (seen.has(key)) {
-          // Merge with the previous.
-          const index = seen.get(key);
-          const existingConstraint = constraints[index];
-          constraints[index] = new SudokuConstraint[type](
-            constraint.rowCol,
-            existingConstraint.values()[0] || constraint.values()[0],
-            existingConstraint.values()[1] || constraint.values()[1]);
-          // We can skip adding another constraint.
-          continue;
-        } else {
-          // Add to the seen list.
-          seen.set(key, constraints.length);
+    for (const lineMap of this._constraints.values()) {
+      for (const constraint of lineMap.values()) {
+        const type = constraint.type;
+        if (constraint.constructor.CLUE_TYPE === OutsideConstraintBase.CLUE_TYPE_DOUBLE_LINE) {
+          const key = `${type}|${constraint.rowCol}`;
+          if (seen.has(key)) {
+            // Merge with the previous.
+            const index = seen.get(key);
+            const existingConstraint = constraints[index];
+            constraints[index] = new SudokuConstraint[type](
+              constraint.rowCol,
+              existingConstraint.values()[0] || constraint.values()[0],
+              existingConstraint.values()[1] || constraint.values()[1]);
+            // We can skip adding another constraint.
+            continue;
+          } else {
+            // Add to the seen list.
+            seen.set(key, constraints.length);
+          }
         }
-      }
 
-      constraints.push(constraint);
+        constraints.push(constraint);
+      }
     };
     return constraints;
   }
@@ -2030,6 +2086,7 @@ class GridInputManager {
       onNewDigit: [],
       onSetValues: [],
       onSelection: [],
+      onOutsideArrowSelection: [],
     };
     // fake-input is an invisible text input which is used to ensure that
     // numbers can be entered on mobile.
@@ -2067,8 +2124,13 @@ class GridInputManager {
   onNewDigit(fn) { this._callbacks.onNewDigit.push(fn); }
   onSetValues(fn) { this._callbacks.onSetValues.push(fn); }
   onSelection(fn) { this._callbacks.onSelection.push(fn); }
+  onOutsideArrowSelection(fn) { this._callbacks.onOutsideArrowSelection.push(fn); }
 
   setGivenLookup(fn) { this._multiValueInputManager.setGivenLookup(fn); }
+
+  updateOutsideArrowSelection(arrowId) {
+    this._runCallbacks(this._callbacks.onOutsideArrowSelection, arrowId);
+  }
 
   addSelectionPreserver(obj) {
     this._selection.addSelectionPreserver(obj);
