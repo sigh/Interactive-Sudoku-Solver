@@ -595,11 +595,6 @@ class ConstraintDisplay extends DisplayItem {
     this._outsideClues.removeOutsideClue(constraint);
   }
 
-  drawItem(constraint, displayClass, config) {
-    return this._constraintDisplays.get(
-      displayClass.name).drawItem(constraint, config);
-  }
-
   drawConstraint(constraint) {
     const config = constraint.constructor.DISPLAY_CONFIG;
     return this._constraintDisplays.get(

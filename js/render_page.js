@@ -2229,39 +2229,61 @@ ConstraintCollector.CustomBinary = class CustomBinary extends ConstraintCollecto
       return false;
     }
 
+    const displayConstraint = new ConstraintCollector.CustomBinary.CustomBinaryLine(
+      type, key, name, ...cells);
     const config = {
-      constraint: SudokuConstraint[type].makeFromGroups(key, [{ name, cells }]),
-      cells: cells,
-      name: name,
-      key: key,
-      type: type,
-      mapKey: `${type}-${key}`,
-      displayElem: this._display.drawItem(
-        { cells, key, type }, ConstraintDisplays.CustomBinary, null),
-      removeFn: () => { this._removeConstraint(config); },
+      constraint: displayConstraint,
+      displayElem: this._display.drawConstraint(displayConstraint),
+      removeFn: () => { this._removeConstraint(displayConstraint); },
     };
     this._chipView.addChip(config);
 
-    const mapKey = config.mapKey;
-    if (!this._configs.has(mapKey)) this._configs.set(mapKey, []);
-    this._configs.get(mapKey).push(config);
+    const groupId = displayConstraint.groupId();
+    if (!this._configs.has(groupId)) this._configs.set(groupId, []);
+    this._configs.get(groupId).push(config);
   }
 
-  _removeConstraint(config) {
-    const keyConfigs = this._configs.get(config.mapKey);
-    const index = keyConfigs.indexOf(config);
-    keyConfigs.splice(index, 1);
+  _removeConstraint(displayConstraint) {
+    const groupId = displayConstraint.groupId();
+    const keyConfigs = this._configs.get(groupId);
+    arrayRemoveValue(keyConfigs, displayConstraint);
   }
 
   getConstraints() {
     const constraints = [];
     for (const configs of this._configs.values()) {
       if (!configs.length) continue;
-      const { key, type } = configs[0];
+      const displayConstraints = configs.map(c => c.constraint);
+      const { key, type } = displayConstraints[0];
       constraints.push(
-        SudokuConstraint[type].makeFromGroups(key, configs));
+        SudokuConstraint[type].makeFromGroups(
+          key, displayConstraints));
     }
     return constraints;
+  }
+}
+
+// Dummy constraint for displaying custom binary constraints.
+ConstraintCollector.CustomBinary.CustomBinaryLine = class CustomBinaryLine extends SudokuConstraintBase {
+  static DISPLAY_CONFIG = {
+    displayClass: 'CustomBinary',
+  }
+
+  constructor(type, key, name, ...cells) {
+    super(arguments);
+    this.type = type;
+    this.key = key;
+    this.name = name;
+    this.cells = cells;
+  }
+
+  groupId() {
+    return `${this.type}-${this.key}`;
+  }
+
+  chipLabel() {
+    if (this.name) return `"${this.name}"`;
+    return 'Custom';
   }
 }
 
