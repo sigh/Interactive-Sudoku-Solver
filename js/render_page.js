@@ -42,6 +42,15 @@ class ConstraintCollector {
   runUpdateCallback() {
     this._updateCallback();
   }
+
+  // Find all constraint types that are associated with this collector.
+  static constraintClasses() {
+    const name = this.name;
+    const classes = [...Object.values(SudokuConstraint)].filter(
+      t => t.COLLECTOR_CLASS === name);
+    classes.sort((a, b) => a.name.localeCompare(b.name));
+    return classes;
+  }
 }
 
 ConstraintCollector.Shape = class Shape extends ConstraintCollector {
@@ -158,12 +167,12 @@ ConstraintCollector.Composite = class Composite extends ConstraintCollector {
 ConstraintCollector._Checkbox = class _Checkbox extends ConstraintCollector {
   IS_SHAPE_AGNOSTIC = true;
 
-  constructor(display, containerId, constraintConfigs) {
+  constructor(display, containerId) {
     super();
 
     this._checkboxes = new Map();
-    const initSingleCheckbox = (type, container, option) => {
-      const constraint = new SudokuConstraint[type](...(option ? [option.value] : []));
+    const initSingleCheckbox = (constraintClass, container, option) => {
+      const constraint = new constraintClass(...(option ? [option.value] : []));
       const constraintCls = constraint.constructor;
       const key = constraint.toString();
       const checkboxId = `${containerId}-input-${this._checkboxes.size}`;
@@ -205,13 +214,14 @@ ConstraintCollector._Checkbox = class _Checkbox extends ConstraintCollector {
     };
 
     const container = document.getElementById(containerId);
-    for (const [type, config] of Object.entries(constraintConfigs)) {
-      if (config?.value?.options) {
-        for (const option of config.value.options) {
-          initSingleCheckbox(type, container, option);
+    const constraintClasses = this.constructor.constraintClasses();
+    for (const constraintClass of constraintClasses) {
+      if (constraintClass.ARGUMENT_CONFIG) {
+        for (const option of constraintClass.ARGUMENT_CONFIG.options) {
+          initSingleCheckbox(constraintClass, container, option);
         }
       } else {
-        initSingleCheckbox(type, container, null);
+        initSingleCheckbox(constraintClass, container, null);
       }
     }
   }
@@ -245,16 +255,7 @@ ConstraintCollector.GlobalCheckbox = class GlobalCheckbox extends ConstraintColl
     const element = document.getElementById('global-constraints-container');
     const container = new CollapsibleContainer(element, true);
 
-    super(
-      display,
-      container.bodyElement().id,
-      {
-        AntiConsecutive: {},
-        StrictKropki: {},
-        StrictXV: {},
-        GlobalEntropy: {},
-        AntiTaxicab: {},
-      });
+    super(display, container.bodyElement().id);
   }
 }
 
@@ -262,24 +263,7 @@ ConstraintCollector.LayoutCheckbox = class LayoutCheckbox extends ConstraintColl
   IS_LAYOUT = true;
 
   constructor(display) {
-    super(
-      display,
-      'layout-constraint-checkboxes',
-      {
-        AntiKnight: {},
-        AntiKing: {},
-        Diagonal: {
-          value: {
-            options: [
-              { text: '╱', value: 1 },
-              { text: '╲', value: -1 },
-            ],
-          },
-        },
-        Windoku: {},
-        DisjointSets: {},
-        NoBoxes: {},
-      });
+    super(display, 'layout-constraint-checkboxes');
   }
 }
 
@@ -870,34 +854,19 @@ ConstraintCollector.OutsideClue = class OutsideClue extends ConstraintCollector 
   constructor(inputManager, display) {
     super();
     this._display = display;
-    this._configs = this.constructor._constraintConfigs();
-    this._setUp(inputManager);
+    this._radioElements = [];
     this._outsideArrowMap = new Map();
     this._constraints = new Map();
+
+    this._constraintClasses = this.constructor.constraintClasses();
+
+    this._setUp(inputManager);
   }
 
   static _isValidValue(value, zeroOk) {
     if (value == '' || value != +value) return false;
     if (+value === 0 && !zeroOk) return false;
     return true;
-  }
-
-  static _constraintConfigs() {
-    const configs = {
-      Sandwich: {},
-      XSum: {},
-      Skyscraper: {},
-      HiddenSkyscraper: {},
-      FullRank: {},
-      NumberedRoom: {},
-      LittleKiller: {},
-    };
-
-    for (const [type, config] of Object.entries(configs)) {
-      config.class = SudokuConstraint[type];
-    }
-
-    return configs;
   }
 
   reshape(shape) {
@@ -926,8 +895,7 @@ ConstraintCollector.OutsideClue = class OutsideClue extends ConstraintCollector 
     this._collapsibleContainer = new CollapsibleContainer(
       outsideClueForm.firstElementChild, false);
 
-    this._populateOutsideClueForm(
-      outsideClueForm, this._configs);
+    this._populateOutsideClueForm(outsideClueForm);
 
     const clearOutsideClue = () => {
       let formData = new FormData(outsideClueForm);
@@ -942,7 +910,6 @@ ConstraintCollector.OutsideClue = class OutsideClue extends ConstraintCollector 
       let type = formData.get('type');
       let arrowId = formData.get('id');
 
-      const config = this._configs[type];
       let value = formData.get('value');
       const zeroOk = SudokuConstraint[type].ZERO_VALUE_OK;
       if (!this.constructor._isValidValue(value, zeroOk)) {
@@ -980,9 +947,9 @@ ConstraintCollector.OutsideClue = class OutsideClue extends ConstraintCollector 
 
     const clueTypes = this._outsideArrowMap.get(arrowId);
 
-    const configs = this._configs;
-    for (const config of Object.values(configs)) {
-      config.elem.disabled = !clueTypes.includes(config.class.CLUE_TYPE);
+    for (const input of this._radioElements) {
+      const constraintClass = SudokuConstraint[input.value];
+      input.disabled = !clueTypes.includes(constraintClass.CLUE_TYPE);
     }
 
     // Ensure that the selected type is valid for this arrow.
@@ -994,11 +961,12 @@ ConstraintCollector.OutsideClue = class OutsideClue extends ConstraintCollector 
         form.type.value = activeConstraintTypes.keys().next().value;
         form.dispatchEvent(new Event('change'));
       }
-    } else if (!clueTypes.includes(configs[form.type.value]?.class.CLUE_TYPE)) {
+    } else if (!clueTypes.includes(SudokuConstraint[form.type.value]?.CLUE_TYPE)) {
       // Otherwise then select any valid clue type.
-      for (const [type, config] of Object.entries(configs)) {
-        if (clueTypes.includes(config.class.CLUE_TYPE)) {
-          form.type.value = type;
+      // TODO: Use the list of classes directly.
+      for (const constraintClass of this._constraintClasses) {
+        if (clueTypes.includes(constraintClass.CLUE_TYPE)) {
+          form.type.value = constraintClass.name;
           form.dispatchEvent(new Event('change'));
           break;
         }
@@ -1006,11 +974,12 @@ ConstraintCollector.OutsideClue = class OutsideClue extends ConstraintCollector 
     }
   }
 
-  _populateOutsideClueForm(form, configs) {
+  _populateOutsideClueForm(form) {
     const container = form.getElementsByClassName(
       'outside-arrow-clue-types')[0];
 
-    for (const type of Object.keys(configs)) {
+    for (const constraintClass of this._constraintClasses) {
+      const type = constraintClass.name;
       const div = document.createElement('div');
 
       const id = `${type}-option`;
@@ -1022,18 +991,16 @@ ConstraintCollector.OutsideClue = class OutsideClue extends ConstraintCollector 
       input.value = type;
       div.appendChild(input);
 
-      const constraintCls = SudokuConstraint[type];
-
       const label = document.createElement('label');
       label.setAttribute('for', id);
-      label.textContent = constraintCls.displayName() + ' ';
+      label.textContent = constraintClass.displayName() + ' ';
       const tooltip = document.createElement('span');
       tooltip.classList.add('tooltip');
-      tooltip.setAttribute('data-text', constraintCls.DESCRIPTION);
+      tooltip.setAttribute('data-text', constraintClass.DESCRIPTION);
       label.appendChild(tooltip);
       div.appendChild(label);
 
-      configs[type].elem = input;
+      this._radioElements.push(input);
 
       container.appendChild(div);
     }
