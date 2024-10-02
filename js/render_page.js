@@ -143,13 +143,7 @@ ConstraintCollector.Composite = class Composite extends ConstraintCollector {
   addConstraint(constraint) {
     const config = {
       constraint: constraint,
-      displayElem: this._display.drawItem(
-        constraint,
-        ConstraintDisplays.BorderedRegion,
-        {
-          opacity: 0.2,
-          dashed: true,
-        }),
+      displayElem: this._display.drawConstraint(constraint),
       removeFn: () => { this._removeConstraint(config); },
     };
     this._chipConfigs.push(config);
@@ -168,8 +162,9 @@ ConstraintCollector._Checkbox = class _Checkbox extends ConstraintCollector {
     super();
 
     this._checkboxes = new Map();
-    const initSingleCheckbox = (type, config, container, option) => {
+    const initSingleCheckbox = (type, container, option) => {
       const constraint = new SudokuConstraint[type](...(option ? [option.value] : []));
+      const constraintCls = constraint.constructor;
       const key = constraint.toString();
       const checkboxId = `${containerId}-input-${this._checkboxes.size}`;
 
@@ -178,8 +173,12 @@ ConstraintCollector._Checkbox = class _Checkbox extends ConstraintCollector {
       input.type = 'checkbox';
       input.id = checkboxId;
       input.onchange = () => {
-        if (config.displayClass) {
-          display.toggleItem(constraint, input.checked, config.displayClass);
+        const displayClass = constraintCls.DISPLAY_CONFIG?.displayClass;
+        if (displayClass) {
+          display.toggleItem(
+            constraint,
+            input.checked,
+            ConstraintDisplays[displayClass]);
         }
         PanelHighlighter.toggleHighlightForElement(input, input.checked);
         this.runUpdateCallback();
@@ -188,13 +187,13 @@ ConstraintCollector._Checkbox = class _Checkbox extends ConstraintCollector {
 
       const label = document.createElement('label');
       label.htmlFor = checkboxId;
-      const displayName = constraint.constructor.displayName();
+      const displayName = constraintCls.displayName();
       label.textContent = `${displayName} ${option?.text || ''} `;
       div.appendChild(label);
 
       const tooltip = document.createElement('span');
       tooltip.className = 'tooltip';
-      tooltip.setAttribute('data-text', config.description);
+      tooltip.setAttribute('data-text', constraintCls.DESCRIPTION);
       div.appendChild(tooltip);
 
       container.appendChild(div);
@@ -209,10 +208,10 @@ ConstraintCollector._Checkbox = class _Checkbox extends ConstraintCollector {
     for (const [type, config] of Object.entries(constraintConfigs)) {
       if (config?.value?.options) {
         for (const option of config.value.options) {
-          initSingleCheckbox(type, config, container, option);
+          initSingleCheckbox(type, container, option);
         }
       } else {
-        initSingleCheckbox(type, config, container, null);
+        initSingleCheckbox(type, container, null);
       }
     }
   }
@@ -250,26 +249,11 @@ ConstraintCollector.GlobalCheckbox = class GlobalCheckbox extends ConstraintColl
       display,
       container.bodyElement().id,
       {
-        AntiConsecutive: {
-          description: `No adjacent cells can have consecutive values.`,
-        },
-        StrictKropki: {
-          description: `Only explicitly marked cell pairs satisfy Kropki (black/white dot) constraints.`,
-        },
-        StrictXV: {
-          description: `Only explicitly marked cell pairs satisfy XV constraints.`,
-        },
-        GlobalEntropy: {
-          description: `Each 2x2 box in the grid has to contain a low digit (1, 2, 3), a middle digit (4, 5, 6) and a high digit (7, 8, 9).`,
-        },
-        AntiTaxicab: {
-          description: `
-          A cell that contains a digit x can't have a taxicab distance of
-          exactly x from another cell with the digit x.
-          A taxicab distance from cell A to cell B is the minimum
-          possible distance from cell A to cell B when traversed only through
-          adjacent cells.`,
-        },
+        AntiConsecutive: {},
+        StrictKropki: {},
+        StrictXV: {},
+        GlobalEntropy: {},
+        AntiTaxicab: {},
       });
   }
 }
@@ -282,33 +266,19 @@ ConstraintCollector.LayoutCheckbox = class LayoutCheckbox extends ConstraintColl
       display,
       'layout-constraint-checkboxes',
       {
-        AntiKnight: {
-          description: `Cells which are a knight's move away cannot have the same value.`,
-        },
-        AntiKing: {
-          description: `Cells which are a king's move away cannot have the same value.`,
-        },
+        AntiKnight: {},
+        AntiKing: {},
         Diagonal: {
-          description: `Values along the diagonal must be unique.`,
           value: {
             options: [
               { text: '╱', value: 1 },
               { text: '╲', value: -1 },
             ],
           },
-          displayClass: ConstraintDisplays.Diagonal,
         },
-        Windoku: {
-          description: `Values in the 3x3 windoku boxes must be uniques.`,
-          displayClass: ConstraintDisplays.Windoku,
-        },
-        DisjointSets: {
-          description: `No digit may appear in the same position in any two boxes.`,
-        },
-        NoBoxes: {
-          description: `No standard box regions.`,
-          displayClass: ConstraintDisplays.DefaultRegionsInverted,
-        },
+        Windoku: {},
+        DisjointSets: {},
+        NoBoxes: {},
       });
   }
 }
@@ -344,49 +314,20 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
         value: {
           placeholder: 'sum',
         },
-        displayClass: ConstraintDisplays.ShadedRegion,
-        displayConfig: {
-          labelField: 'sum',
-        },
         validateFn: (cells, shape) => (
           cells.length <= shape.numValues && cells.length > 1),
-        description:
-          "Values must add up to the given sum. All values must be unique.",
       },
       Sum: {
         value: {
           placeholder: 'sum',
         },
-        displayClass: ConstraintDisplays.ShadedRegion,
-        displayConfig: {
-          pattern: DisplayItem.CHECKERED_PATTERN,
-          labelField: 'sum',
-        },
-        description:
-          "Values must add up to the given sum. Values don't need to be unique. Only up to 16 cells are allowed.",
       },
-      Arrow: {
-        displayClass: ConstraintDisplays.GenericLine,
-        displayConfig: {
-          startMarker: LineOptions.EMPTY_CIRCLE_MARKER,
-          arrow: true
-        },
-        description:
-          "Values along the arrow must sum to the value in the circle.",
-      },
+      Arrow: {},
       DoubleArrow: {
         validateFn: (cells, shape) => cells.length > 2,
-        displayClass: ConstraintDisplays.GenericLine,
-        displayConfig: {
-          startMarker: LineOptions.EMPTY_CIRCLE_MARKER,
-          endMarker: LineOptions.EMPTY_CIRCLE_MARKER
-        },
-        description:
-          "The sum of the values along the line equal the sum of the values in the circles.",
       },
       PillArrow: {
         validateFn: (cells, shape) => cells.length > 2,
-        displayClass: ConstraintDisplays.PillArrow,
         value: {
           placeholder: 'pill size',
           options: [
@@ -394,214 +335,71 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
             { text: '3-digit', value: 3 },
           ],
         },
-        description:
-          `
-          The sum of the values along the line equal the 2-digit or 3-digit
-          number in the pill.
-          Numbers in the pill are read from left to right, top to bottom.
-          `,
       },
-      Thermo: {
-        description:
-          "Values must be in increasing order starting at the bulb.",
-        displayClass: ConstraintDisplays.Thermo,
-        displayConfig: {
-          color: 'rgb(220, 220, 220)',
-          width: LineOptions.THICK_LINE_WIDTH,
-          startMarker: LineOptions.FULL_CIRCLE_MARKER,
-        },
-      },
+      Thermo: {},
       Whisper: {
         value: {
           placeholder: 'difference',
           default: 5,
         },
-        displayClass: ConstraintDisplays.GenericLine,
-        displayConfig: { color: 'rgb(255, 200, 255)' },
-        description:
-          "Adjacent values on the line must differ by at least this amount."
       },
-      Renban: {
-        displayClass: ConstraintDisplays.GenericLine,
-        displayConfig: { color: 'rgb(230, 190, 155)' },
-        description:
-          "Digits on the line must be consecutive and non-repeating, in any order."
-      },
+      Renban: {},
       Modular: {
         value: {
           placeholder: 'mod',
           default: 3,
         },
-        displayClass: ConstraintDisplays.GenericLine,
-        displayConfig: { color: 'rgb(230, 190, 155)', dashed: true },
-        description:
-          `
-          Every sequential group of 'mod' cells on a the line must have
-          different values when taken modulo 'mod'.
-          If mod = 3, then every group of three cells on the line must contain a
-          digit from the group 147, one from 258, and one from 369.
-          `
       },
-      Entropic: {
-        displayClass: ConstraintDisplays.GenericLine,
-        displayConfig: { color: 'rgb(255, 100, 255)', dashed: true },
-        description:
-          `
-          Every sequential group of 3 cells on a the line must have different
-          values from the groups {1,2,3}, {4,5,6}, and {7,8,9}.
-          `
-      },
-      RegionSumLine: {
-        displayClass: ConstraintDisplays.GenericLine,
-        displayConfig: { color: 'rgb(100, 200, 100)' },
-        description:
-          `
-          Values on the line have an equal sum N within each
-          box it passes through. If a line passes through the
-          same box more than once, each individual segment of
-          such a line within that box sums to N separately.
-
-          If the grid has no boxes, then jigsaw regions are used instead.
-          `
-      },
+      Entropic: {},
+      RegionSumLine: {},
       SumLine: {
         value: {
           placeholder: 'sum',
           default: 10
         },
-        displayClass: ConstraintDisplays.GenericLine,
-        displayConfig: {
-          color: 'rgb(100, 200, 100)',
-          dashed: true,
-        },
-        description:
-          "The line can be divided into segments that each sum to the given sum."
       },
-      Between: {
-        displayClass: ConstraintDisplays.GenericLine,
-        displayConfig: {
-          color: 'rgb(200, 200, 255)',
-          startMarker: LineOptions.EMPTY_CIRCLE_MARKER,
-          endMarker: LineOptions.EMPTY_CIRCLE_MARKER
-        },
-        description:
-          "Values on the line must be strictly between the values in the circles."
-      },
+      Between: {},
       Lockout: {
         value: {
           placeholder: 'min diff',
           default: 4,
         },
-        displayClass: ConstraintDisplays.GenericLine,
-        displayConfig: {
-          color: 'rgb(200, 200, 255)',
-          startMarker: LineOptions.DIAMOND_MARKER,
-          endMarker: LineOptions.DIAMOND_MARKER
-        },
-        description:
-          `
-          Values on the line must be not be between the values in the diamonds.
-          The values in the diamonds must differ by the difference given.`,
       },
       Lunchbox: {
         value: {
           placeholder: 'sum',
           default: 0,
         },
-        displayClass: ConstraintDisplays.ShadedRegion,
-        displayConfig: {
-          lineConfig: { color: 'rgba(100, 100, 100, 0.2)' },
-          labelField: 'sum',
-        },
-        description:
-          `The numbers sandwiched between the smallest number and the largest
-           number of the lunchbox adds up to the given sum. Numbers must be
-           distinct.`
       },
-      Palindrome: {
-        displayClass: ConstraintDisplays.GenericLine,
-        displayConfig: {
-          color: 'rgb(200, 200, 255)'
-        },
-        description:
-          "The values along the line form a palindrome."
-      },
-      Zipper: {
-        displayClass: ConstraintDisplays.GenericLine,
-        displayConfig: {
-          color: 'rgb(180, 180, 255)',
-          dashed: true,
-        },
-        description:
-          `
-          Digits which are equal distance from the center of the zipper have the
-          same sum. For odd length lines, the center digit is the sum.
-          `
-      },
+      Palindrome: {},
+      Zipper: {},
       WhiteDot: {
         validateFn: ConstraintManager._cellsAreAdjacent,
-        displayClass: ConstraintDisplays.Dot,
-        displayConfig: { color: 'white' },
-        description:
-          "Kropki white dot: values must be consecutive. Adjacent cells only.",
       },
       BlackDot: {
         validateFn: ConstraintManager._cellsAreAdjacent,
-        displayClass: ConstraintDisplays.Dot,
-        displayConfig: { color: 'black' },
-        description:
-          "Kropki black dot: one value must be double the other. Adjacent cells only."
       },
       X: {
         validateFn: ConstraintManager._cellsAreAdjacent,
-        displayClass: ConstraintDisplays.Letter,
-        description:
-          "x: values must add to 10. Adjacent cells only."
       },
       V: {
         validateFn: ConstraintManager._cellsAreAdjacent,
-        displayClass: ConstraintDisplays.Letter,
-        description:
-          "v: values must add to 5. Adjacent cells only."
       },
       Quad: {
         value: {
           placeholder: 'values',
         },
         validateFn: ConstraintManager._cellsAre2x2Square,
-        displayClass: ConstraintDisplays.Quad,
-        description:
-          `
-        All the given values must be present in the surrounding 2x2 square.
-        Select a 2x2 square to enable.`,
       },
       ContainExact: {
         value: {
           placeholder: 'values',
         },
-        displayClass: ConstraintDisplays.ShadedRegion,
-        displayConfig: {
-          pattern: DisplayItem.DIAGONAL_PATTERN,
-          labelField: 'valueStr',
-        },
-        description:
-          `The comma-separated values must be present in the selected squares.
-           If value is must be contained exactly as many times as is
-           repeated in the list.`,
       },
       ContainAtLeast: {
         value: {
           placeholder: 'values',
         },
-        displayClass: ConstraintDisplays.ShadedRegion,
-        displayConfig: {
-          pattern: DisplayItem.DIAGONAL_PATTERN,
-          labelField: 'valueStr',
-        },
-        description:
-          `The comma-separated values must be present in the selected squares.
-           If value is must be contained at least as many times as is
-           repeated in the list.`,
       },
       SameValues: {
         value: {
@@ -617,28 +415,9 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
             return options;
           },
         },
-        displayClass: ConstraintDisplays.BorderedRegion,
-        displayConfig: {
-          splitFn: (constraint) => constraint.splitCells(),
-        },
-        description:
-          `The cells are taken as a series of sets of the same size.
-          Each set must contain the same values, including counts if values are
-          repeated.`,
       },
-      AllDifferent: {
-        displayClass: ConstraintDisplays.ShadedRegion,
-        description: `Values must be unique.`,
-      },
-      CountingCircles: {
-        displayClass: ConstraintDisplays.CountingCircles,
-        displayConfig: {
-          pattern: DisplayItem.CHECKERED_PATTERN,
-        },
-        description:
-          `The value in a circles counts the number of circles with the same
-           value. Each set of circles is independent.`,
-      },
+      AllDifferent: {},
+      CountingCircles: {},
       Indexing: {
         value: {
           options: [
@@ -647,13 +426,6 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
           ],
         },
         validateFn: (cells, shape) => cells.length > 0,
-        displayClass: ConstraintDisplays.Indexing,
-        description: `
-          Column indexing: For a cell in column C, the value (V) of the cell
-          tells where the value C is placed in that row. Specifically, if the
-          cell has coordinates (R, C) and value V, then cell (R, V) has the
-          value C.Row indexing is the same, but for rows.
-        `,
       },
     };
   }
@@ -663,8 +435,7 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
     if (constraint.type === 'Quad') {
       config = {
         constraint: constraint,
-        displayElem: this._display.drawItem(
-          constraint, ConstraintDisplays.Quad, null),
+        displayElem: this._display.drawConstraint(constraint),
         replaceKey: `Quad-${constraint.topLeftCell}`,
         removeFn: () => { this._removeConstraint(config); },
       };
@@ -675,13 +446,9 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
         }
       }
     } else {
-      const uiConfig = this._constraintConfigs[constraint.type];
       config = {
         constraint: constraint,
-        displayElem: this._display.drawItem(
-          constraint,
-          uiConfig.displayClass,
-          uiConfig.displayConfig),
+        displayElem: this._display.drawConstraint(constraint),
         removeFn: () => { this._removeConstraint(config); },
       };
     }
@@ -778,7 +545,7 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
       const cls = config.constraintClass;
       option.value = type;
       option.textContent = cls.displayName();
-      option.title = config.description.replace(/\s+/g, ' ').replace(/^\s/, '');
+      option.title = cls.DESCRIPTION.replace(/\s+/g, ' ').replace(/^\s/, '');
       selectElem.appendChild(option);
       config.elem = option;
 
@@ -843,7 +610,7 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
         loopContainer.style.display = 'none';
       }
 
-      descriptionElem.textContent = config.description;
+      descriptionElem.textContent = config.constraintClass.DESCRIPTION;
 
       if (!selectionForm.classList.contains('disabled')) {
         selectionForm['add-constraint'].disabled = config.elem.disabled;
@@ -1065,10 +832,11 @@ ConstraintCollector.Jigsaw = class Jigsaw extends ConstraintCollector {
     if (cells.length != this._shape.gridSize) return;
     const pieceId = ++this._maxPieceId;
     cells.forEach(c => this._piecesMap[this._shape.parseCellId(c).cell] = pieceId);
+    const pieceConstraint = new ConstraintCollector.Jigsaw.JigsawPiece(...cells);
     const config = {
-      constraint: new ConstraintCollector.Jigsaw.JigsawPiece(...cells),
+      constraint: pieceConstraint,
       pieceId: pieceId,
-      displayElem: this._display.drawItem({ cells }, ConstraintDisplays.Jigsaw, null),
+      displayElem: this._display.drawConstraint(pieceConstraint),
       removeFn: () => { this._removePiece(config); },
     };
     PanelHighlighter.toggleHighlightForElement(this._chipView.element(), true);
@@ -1088,6 +856,8 @@ ConstraintCollector.Jigsaw = class Jigsaw extends ConstraintCollector {
 
 // Fake constraint for collecting jigsaw pieces.
 ConstraintCollector.Jigsaw.JigsawPiece = class JigsawPiece extends SudokuConstraintBase {
+  static DISPLAY_CONFIG = { displayClass: 'Jigsaw' };
+
   constructor(...cells) {
     super(arguments);
     this.cells = cells;
@@ -1114,47 +884,13 @@ ConstraintCollector.OutsideClue = class OutsideClue extends ConstraintCollector 
 
   static _constraintConfigs() {
     const configs = {
-      Sandwich: {
-        description:
-          `Values between the 1 and the 9 in the row or column must add to the
-          given sum.`,
-      },
-      XSum: {
-        description:
-          `The sum of the first X numbers must add up to the given sum.
-          X is the number in the first cell in the direction of the row or
-      column.`,
-      },
-      Skyscraper: {
-        description:
-          `Digits in the grid represent skyscrapers of that height.
-          Higher skyscrapers obscure smaller ones.
-          Clues outside the grid show the number of visible skyscrapers in that
-      row / column from the clue's direction of view.`,
-      },
-      HiddenSkyscraper: {
-        description:
-          `Digits in the grid represent skyscrapers of that height.
-          Higher skyscrapers obscure smaller ones.
-          Clues outside the grid show the first hidden skyscraper in that
-          row/column from the clue's direction of view.`,
-      },
-      FullRank: {
-        description:
-          `Considering all rows and columns as numbers read from the direction
-          of the clue and ranked from lowest (1) to highest, a clue represents
-          where in the ranking that row/column lies.`,
-      },
-      NumberedRoom: {
-        description:
-          `Clues outside the grid indicate the digit which has to be placed in
-          the Nth cell in the corresponding direction, where N is the digit
-          placed in the first cell in that direction.`,
-      },
-      LittleKiller: {
-        description:
-          `Values along diagonal must add to the given sum. Values may repeat.`,
-      },
+      Sandwich: {},
+      XSum: {},
+      Skyscraper: {},
+      HiddenSkyscraper: {},
+      FullRank: {},
+      NumberedRoom: {},
+      LittleKiller: {},
     };
 
     for (const [type, config] of Object.entries(configs)) {
@@ -1274,7 +1010,7 @@ ConstraintCollector.OutsideClue = class OutsideClue extends ConstraintCollector 
     const container = form.getElementsByClassName(
       'outside-arrow-clue-types')[0];
 
-    for (const [type, config] of Object.entries(configs)) {
+    for (const type of Object.keys(configs)) {
       const div = document.createElement('div');
 
       const id = `${type}-option`;
@@ -1286,16 +1022,18 @@ ConstraintCollector.OutsideClue = class OutsideClue extends ConstraintCollector 
       input.value = type;
       div.appendChild(input);
 
+      const constraintCls = SudokuConstraint[type];
+
       const label = document.createElement('label');
       label.setAttribute('for', id);
-      label.textContent = (config.text || type) + ' ';
+      label.textContent = constraintCls.displayName() + ' ';
       const tooltip = document.createElement('span');
       tooltip.classList.add('tooltip');
-      tooltip.setAttribute('data-text', config.description);
+      tooltip.setAttribute('data-text', constraintCls.DESCRIPTION);
       label.appendChild(tooltip);
       div.appendChild(label);
 
-      config.elem = input;
+      configs[type].elem = input;
 
       container.appendChild(div);
     }

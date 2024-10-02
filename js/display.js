@@ -600,6 +600,12 @@ class ConstraintDisplay extends DisplayItem {
       displayClass.name).drawItem(constraint, config);
   }
 
+  drawConstraint(constraint) {
+    const config = constraint.constructor.DISPLAY_CONFIG;
+    return this._constraintDisplays.get(
+      config.displayClass).drawItem(constraint, config);
+  }
+
   toggleItem(constraint, enable, displayClass) {
     return this._constraintDisplays.get(
       displayClass.name).toggleItem(constraint, enable);
@@ -950,31 +956,6 @@ class ColorPicker {
     this._keyToItems.clear();
   }
 };
-
-class LineOptions {
-  color = 'rgb(200, 200, 200)';
-  width = 5;
-  startMarker;
-  endMarker;
-  nodeMarker;
-  arrow = false;
-  dashed = false;
-
-  static DEFAULT_COLOR = 'rgb(200, 200, 200)';
-  static THIN_LINE_WIDTH = 2;
-  static THICK_LINE_WIDTH = 15;
-
-  static FULL_CIRCLE_MARKER = 1;
-  static EMPTY_CIRCLE_MARKER = 2;
-  static SMALL_FULL_CIRCLE_MARKER = 3;
-  static SMALL_EMPTY_CIRCLE_MARKER = 4;
-  static DIAMOND_MARKER = 5;
-
-  constructor(options) {
-    Object.assign(this, options);
-  }
-
-}
 
 class GridGraph {
   static LEFT = 0;
