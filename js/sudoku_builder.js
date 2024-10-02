@@ -498,9 +498,11 @@ class CellArgs {
 }
 
 class SudokuConstraintBase {
+  static DESCRIPTION = '';
+  static COLLECTOR_CLASS = 'Experimental';
+  static DISPLAY_CONFIG = null;
   static LOOPS_ALLOWED = false;
   static IS_COMPOSITE = false;
-  static COLLECTOR_CLASS = 'Experimental';
 
   constructor(args) {
     this.args = args ? [...args] : [];
@@ -617,6 +619,43 @@ class SudokuConstraintBase {
   });
 }
 
+class LineOptions {
+  color = 'rgb(200, 200, 200)';
+  width = 5;
+  startMarker;
+  endMarker;
+  nodeMarker;
+  arrow = false;
+  dashed = false;
+
+  static DEFAULT_COLOR = 'rgb(200, 200, 200)';
+  static THIN_LINE_WIDTH = 2;
+  static THICK_LINE_WIDTH = 15;
+
+  static FULL_CIRCLE_MARKER = 1;
+  static EMPTY_CIRCLE_MARKER = 2;
+  static SMALL_FULL_CIRCLE_MARKER = 3;
+  static SMALL_EMPTY_CIRCLE_MARKER = 4;
+  static DIAMOND_MARKER = 5;
+
+  constructor(options) {
+    Object.assign(this, options);
+  }
+}
+
+class ShadedRegionOptions {
+  labelField;
+  pattern;
+
+  static DIAGONAL_PATTERN = 'diagonal-pattern';
+  static SQUARE_PATTERN = 'square-pattern';
+  static CHECKERED_PATTERN = 'checked-pattern';
+
+  constructor(options) {
+    Object.assign(this, options);
+  }
+}
+
 class OutsideConstraintBase extends SudokuConstraintBase {
   static CLUE_TYPE_DOUBLE_LINE = 'double-line';
   static CLUE_TYPE_DIAGONAL = 'diagonal';
@@ -718,6 +757,11 @@ class SudokuConstraint {
   static Or = class Or extends SudokuConstraintBase {
     static COLLECTOR_CLASS = 'Composite';
     static IS_COMPOSITE = true;
+    static DISPLAY_CONFIG = {
+      displayClass: 'BorderedRegion',
+      opacity: 0.2,
+      dashed: true,
+    };
 
     constructor(constraints) {
       super(arguments);
@@ -740,6 +784,11 @@ class SudokuConstraint {
   static And = class And extends SudokuConstraintBase {
     static COLLECTOR_CLASS = 'Composite';
     static IS_COMPOSITE = true;
+    static DISPLAY_CONFIG = {
+      displayClass: 'BorderedRegion',
+      opacity: 0.2,
+      dashed: true,
+    };
 
     constructor(constraints) {
       super(arguments);
@@ -786,7 +835,15 @@ class SudokuConstraint {
   }
 
   static Thermo = class Thermo extends SudokuConstraintBase {
+    static DESCRIPTION = (
+      "Values must be in increasing order starting at the bulb.");
     static COLLECTOR_CLASS = 'MultiCell';
+    static DISPLAY_CONFIG = {
+      displayClass: 'Thermo',
+      color: 'rgb(220, 220, 220)',
+      width: LineOptions.THICK_LINE_WIDTH,
+      startMarker: LineOptions.FULL_CIRCLE_MARKER,
+    };
 
     constructor(...cells) {
       super(arguments);
@@ -803,7 +860,13 @@ class SudokuConstraint {
   }
 
   static Whisper = class Whisper extends SudokuConstraintBase {
+    static DESCRIPTION = (
+      "Adjacent values on the line must differ by at least the given difference.");
     static COLLECTOR_CLASS = 'MultiCell';
+    static DISPLAY_CONFIG = {
+      displayClass: 'GenericLine',
+      color: 'rgb(255, 200, 255)',
+    };
 
     constructor(difference, ...cells) {
       // German whisper lines omit the difference, so the
@@ -829,7 +892,13 @@ class SudokuConstraint {
   }
 
   static Renban = class Renban extends SudokuConstraintBase {
+    static DESCRIPTION = (
+      "Digits on the line must be consecutive and non-repeating, in any order.");
     static COLLECTOR_CLASS = 'MultiCell';
+    static DISPLAY_CONFIG = {
+      displayClass: 'GenericLine',
+      color: 'rgb(230, 190, 155)',
+    };
 
     constructor(...cells) {
       super(arguments);
@@ -844,7 +913,17 @@ class SudokuConstraint {
   }
 
   static Modular = class Modular extends SudokuConstraintBase {
+    static DESCRIPTION = (
+      `Every sequential group of 'mod' cells on a the line must have
+       different values when taken modulo 'mod'.
+       If mod = 3, then every group of three cells on the line must contain a
+       digit from the group 147, one from 258, and one from 369.`);
     static COLLECTOR_CLASS = 'MultiCell';
+    static DISPLAY_CONFIG = {
+      displayClass: 'GenericLine',
+      color: 'rgb(230, 190, 155)',
+      dashed: true,
+    };
 
     constructor(mod, ...cells) {
       super(arguments);
@@ -868,7 +947,15 @@ class SudokuConstraint {
   }
 
   static Entropic = class Entropic extends SudokuConstraintBase {
+    static DESCRIPTION = (`
+      Every sequential group of 3 cells on a the line must have different
+      values from the groups {1,2,3}, {4,5,6}, and {7,8,9}.`)
     static COLLECTOR_CLASS = 'MultiCell';
+    static DISPLAY_CONFIG = {
+      displayClass: 'GenericLine',
+      color: 'rgb(255, 100, 255)',
+      dashed: true,
+    };
 
     constructor(...cells) {
       super(arguments);
@@ -887,7 +974,18 @@ class SudokuConstraint {
   }
 
   static RegionSumLine = class RegionSumLine extends SudokuConstraintBase {
+    static DESCRIPTION = (`
+      Values on the line have an equal sum N within each
+      box it passes through. If a line passes through the
+      same box more than once, each individual segment of
+      such a line within that box sums to N separately.
+
+      If the grid has no boxes, then jigsaw regions are used instead.`);
     static COLLECTOR_CLASS = 'MultiCell';
+    static DISPLAY_CONFIG = {
+      displayClass: 'GenericLine',
+      color: 'rgb(100, 200, 100)',
+    };
 
     constructor(...cells) {
       super(arguments);
@@ -896,7 +994,15 @@ class SudokuConstraint {
   }
 
   static Between = class Between extends SudokuConstraintBase {
+    static DESCRIPTION = (`
+        Values on the line must be strictly between the values in the circles.`);
     static COLLECTOR_CLASS = 'MultiCell';
+    static DISPLAY_CONFIG = {
+      displayClass: 'GenericLine',
+      color: 'rgb(200, 200, 255)',
+      startMarker: LineOptions.EMPTY_CIRCLE_MARKER,
+      endMarker: LineOptions.EMPTY_CIRCLE_MARKER
+    };
 
     constructor(...cells) {
       super(arguments);
@@ -905,7 +1011,16 @@ class SudokuConstraint {
   }
 
   static Lockout = class Lockout extends SudokuConstraintBase {
+    static DESCRIPTION = (`
+      Values on the line must be not be between the values in the diamonds.
+      The values in the diamonds must differ by the difference given.`);
     static COLLECTOR_CLASS = 'MultiCell';
+    static DISPLAY_CONFIG = {
+      displayClass: 'GenericLine',
+      color: 'rgb(200, 200, 255)',
+      startMarker: LineOptions.DIAMOND_MARKER,
+      endMarker: LineOptions.DIAMOND_MARKER
+    };
 
     constructor(minDiff, ...cells) {
       super(arguments);
@@ -923,7 +1038,13 @@ class SudokuConstraint {
   }
 
   static Palindrome = class Palindrome extends SudokuConstraintBase {
+    static DESCRIPTION = (`
+      The values along the line form a palindrome.`);
     static COLLECTOR_CLASS = 'MultiCell';
+    static DISPLAY_CONFIG = {
+      displayClass: 'GenericLine',
+      color: 'rgb(200, 200, 255)',
+    };
 
     constructor(...cells) {
       super(arguments);
@@ -936,7 +1057,15 @@ class SudokuConstraint {
   }
 
   static Zipper = class Zipper extends SudokuConstraintBase {
+    static DESCRIPTION = (`
+      Digits which are equal distance from the center of the zipper have the
+      same sum. For odd length lines, the center digit is the sum.`);
     static COLLECTOR_CLASS = 'MultiCell';
+    static DISPLAY_CONFIG = {
+      displayClass: 'GenericLine',
+      color: 'rgb(180, 180, 255)',
+      dashed: true,
+    };
 
     constructor(...cells) {
       super(arguments);
@@ -945,7 +1074,14 @@ class SudokuConstraint {
   }
 
   static SumLine = class SumLine extends SudokuConstraintBase {
+    static DESCRIPTION = (`
+      The line can be divided into segments that each sum to the given sum.`);
     static COLLECTOR_CLASS = 'MultiCell';
+    static DISPLAY_CONFIG = {
+      displayClass: 'GenericLine',
+      color: 'rgb(100, 200, 100)',
+      dashed: true,
+    };
 
     static LOOPS_ALLOWED = true;
 
@@ -961,10 +1097,16 @@ class SudokuConstraint {
   }
 
   static NoBoxes = class NoBoxes extends SudokuConstraintBase {
+    static DESCRIPTION = (`
+      No standard box regions.`);
     static COLLECTOR_CLASS = 'LayoutCheckbox';
+    static DISPLAY_CONFIG = { displayClass: 'DefaultRegionsInverted' };
   }
 
   static StrictKropki = class StrictKropki extends SudokuConstraintBase {
+    static DESCRIPTION = (`
+      Only explicitly marked cell pairs satisfy Kropki (black/white dot)
+      constraints.`);
     static COLLECTOR_CLASS = 'GlobalCheckbox';
 
     static fnKey = memoize((numValues) =>
@@ -974,6 +1116,8 @@ class SudokuConstraint {
     );
   }
   static StrictXV = class StrictXV extends SudokuConstraintBase {
+    static DESCRIPTION = (`
+      Only explicitly marked cell pairs satisfy XV constraints.`);
     static COLLECTOR_CLASS = 'GlobalCheckbox';
 
     static fnKey = memoize((numValues) =>
@@ -1002,7 +1146,10 @@ class SudokuConstraint {
   }
 
   static Windoku = class Windoku extends SudokuConstraintBase {
+    static DESCRIPTION = (`
+      Values in the 3x3 windoku boxes must be uniques.`);
     static COLLECTOR_CLASS = 'LayoutCheckbox';
+    static DISPLAY_CONFIG = { displayClass: 'Windoku' };
 
     static regions = memoize((shape) => {
       const gridSize = shape.gridSize;
@@ -1028,10 +1175,14 @@ class SudokuConstraint {
   }
 
   static DisjointSets = class DisjointSets extends SudokuConstraintBase {
+    static DESCRIPTION = (`
+      No digit may appear in the same position in any two boxes.`);
     static COLLECTOR_CLASS = 'LayoutCheckbox';
   }
 
   static AntiKnight = class AntiKnight extends SudokuConstraintBase {
+    static DESCRIPTION = (`
+      Cells which are a knight's move away cannot have the same value.`);
     static COLLECTOR_CLASS = 'LayoutCheckbox';
 
     static displayName() {
@@ -1040,6 +1191,8 @@ class SudokuConstraint {
   }
 
   static AntiKing = class AntiKing extends SudokuConstraintBase {
+    static DESCRIPTION = (`
+      Cells which are a king's move away cannot have the same value.`);
     static COLLECTOR_CLASS = 'LayoutCheckbox';
 
     static displayName() {
@@ -1048,6 +1201,13 @@ class SudokuConstraint {
   }
 
   static AntiTaxicab = class AntiTaxicab extends SudokuConstraintBase {
+    static DESCRIPTION = (`
+      A cell that contains a digit x can't have a taxicab distance of
+
+      exactly x from another cell with the digit x.
+      A taxicab distance from cell A to cell B is the minimum
+      possible distance from cell A to cell B when traversed only through
+      adjacent cells.`);
     static COLLECTOR_CLASS = 'GlobalCheckbox';
 
     static displayName() {
@@ -1076,6 +1236,8 @@ class SudokuConstraint {
   }
 
   static AntiConsecutive = class AntiConsecutive extends SudokuConstraintBase {
+    static DESCRIPTION = (`
+      No adjacent cells can have consecutive values.`);
     static COLLECTOR_CLASS = 'GlobalCheckbox';
 
     static fnKey = memoize((numValues) =>
@@ -1090,6 +1252,9 @@ class SudokuConstraint {
   }
 
   static GlobalEntropy = class GlobalEntropy extends SudokuConstraintBase {
+    static DESCRIPTION = (`
+      Each 2x2 box in the grid has to contain a low digit (1, 2, 3),
+      a middle digit (4, 5, 6) and a high digit (7, 8, 9).`);
     static COLLECTOR_CLASS = 'GlobalCheckbox';
 
     static regions = memoize((shape) => {
@@ -1112,7 +1277,10 @@ class SudokuConstraint {
   }
 
   static Diagonal = class Diagonal extends SudokuConstraintBase {
+    static DESCRIPTION = (`
+      Values along the diagonal must be unique.`);
     static COLLECTOR_CLASS = 'LayoutCheckbox';
+    static DISPLAY_CONFIG = { displayClass: 'Diagonal' };
 
     constructor(direction) {
       super(arguments);
@@ -1121,7 +1289,13 @@ class SudokuConstraint {
   }
 
   static WhiteDot = class WhiteDot extends SudokuConstraintBase {
+    static DESCRIPTION = (`
+      Kropki white dot: values must be consecutive. Adjacent cells only."`);
     static COLLECTOR_CLASS = 'MultiCell';
+    static DISPLAY_CONFIG = {
+      displayClass: 'Dot',
+      color: 'white',
+    };
 
     constructor(...cells) {
       super(arguments);
@@ -1144,7 +1318,13 @@ class SudokuConstraint {
   }
 
   static BlackDot = class BlackDot extends SudokuConstraintBase {
+    static DESCRIPTION = (`
+      Kropki black dot: one value must be double the other. Adjacent cells only.`);
     static COLLECTOR_CLASS = 'MultiCell';
+    static DISPLAY_CONFIG = {
+      displayClass: 'Dot',
+      color: 'black',
+    };
 
     constructor(...cells) {
       super(arguments);
@@ -1167,7 +1347,12 @@ class SudokuConstraint {
   }
 
   static X = class X extends SudokuConstraintBase {
+    static DESCRIPTION = (`
+      Values must add to 10. Adjacent cells only.`);
     static COLLECTOR_CLASS = 'MultiCell';
+    static DISPLAY_CONFIG = {
+      displayClass: 'Letter',
+    };
 
     constructor(...cells) {
       super(arguments);
@@ -1184,7 +1369,12 @@ class SudokuConstraint {
   }
 
   static V = class V extends SudokuConstraintBase {
+    static DESCRIPTION = (`
+      Values must add to 5. Adjacent cells only.`);
     static COLLECTOR_CLASS = 'MultiCell';
+    static DISPLAY_CONFIG = {
+      displayClass: 'Letter',
+    };
 
     constructor(...cells) {
       super(arguments);
@@ -1201,7 +1391,14 @@ class SudokuConstraint {
   }
 
   static Arrow = class Arrow extends SudokuConstraintBase {
+    static DESCRIPTION = (`
+      Values along the arrow must sum to the value in the circle.`);
     static COLLECTOR_CLASS = 'MultiCell';
+    static DISPLAY_CONFIG = {
+      displayClass: 'GenericLine',
+      startMarker: LineOptions.EMPTY_CIRCLE_MARKER,
+      arrow: true
+    };
 
     constructor(...cells) {
       super(arguments);
@@ -1210,7 +1407,15 @@ class SudokuConstraint {
   }
 
   static DoubleArrow = class DoubleArrow extends SudokuConstraintBase {
+    static DESCRIPTION = (`
+      The sum of the values along the line equal the sum of the values in the
+      circles.`);
     static COLLECTOR_CLASS = 'MultiCell';
+    static DISPLAY_CONFIG = {
+      displayClass: 'GenericLine',
+      startMarker: LineOptions.EMPTY_CIRCLE_MARKER,
+      endMarker: LineOptions.EMPTY_CIRCLE_MARKER
+    };
 
     constructor(...cells) {
       super(arguments);
@@ -1219,7 +1424,14 @@ class SudokuConstraint {
   }
 
   static PillArrow = class PillArrow extends SudokuConstraintBase {
+    static DESCRIPTION = (`
+      The sum of the values along the line equal the 2-digit or 3-digit
+      number in the pill.
+      Numbers in the pill are read from left to right, top to bottom.`);
     static COLLECTOR_CLASS = 'MultiCell';
+    static DISPLAY_CONFIG = {
+      displayClass: 'PillArrow',
+    };
 
     constructor(pillSize, ...cells) {
       super(arguments);
@@ -1234,7 +1446,13 @@ class SudokuConstraint {
   }
 
   static Cage = class Cage extends SudokuConstraintBase {
+    static DESCRIPTION = (`
+      Values must add up to the given sum. All values must be unique.`);
     static COLLECTOR_CLASS = 'MultiCell';
+    static DISPLAY_CONFIG = {
+      displayClass: 'ShadedRegion',
+      labelField: 'sum',
+    };
 
     constructor(sum, ...cells) {
       super(arguments);
@@ -1248,7 +1466,14 @@ class SudokuConstraint {
   }
 
   static Sum = class Sum extends SudokuConstraintBase {
+    static DESCRIPTION = (`
+      Values must add up to the given sum. Values don't need to be unique. Only up to 16 cells are allowed.`);
     static COLLECTOR_CLASS = 'MultiCell';
+    static DISPLAY_CONFIG = {
+      displayClass: 'ShadedRegion',
+      pattern: ShadedRegionOptions.CHECKERED_PATTERN,
+      labelField: 'sum',
+    };
 
     constructor(sum, ...cells) {
       super(arguments);
@@ -1262,6 +1487,8 @@ class SudokuConstraint {
   }
 
   static LittleKiller = class LittleKiller extends OutsideConstraintBase {
+    static DESCRIPTION = (`
+      Values along diagonal must add to the given sum. Values may repeat.`);
     static COLLECTOR_CLASS = 'OutsideClue';
     static CLUE_TYPE = OutsideConstraintBase.CLUE_TYPE_DIAGONAL;
 
@@ -1310,6 +1537,10 @@ class SudokuConstraint {
   }
 
   static XSum = class XSum extends OutsideConstraintBase {
+    static DESCRIPTION = (`
+      The sum of the first X numbers must add up to the given sum.
+      X is the number in the first cell in the direction of the row or
+      column.`);
     static COLLECTOR_CLASS = 'OutsideClue';
     static CLUE_TYPE = OutsideConstraintBase.CLUE_TYPE_DOUBLE_LINE;
     static DISPLAY_TEMPLATE = '⟨$CLUE⟩';
@@ -1335,6 +1566,9 @@ class SudokuConstraint {
   }
 
   static Sandwich = class Sandwich extends OutsideConstraintBase {
+    static DESCRIPTION = (`
+      Values between the 1 and the 9 in the row or column must add to the
+      given sum.`);
     static COLLECTOR_CLASS = 'OutsideClue';
     static CLUE_TYPE = OutsideConstraintBase.CLUE_TYPE_SINGLE_LINE;
     static ZERO_VALUE_OK = true;
@@ -1359,7 +1593,16 @@ class SudokuConstraint {
   }
 
   static Lunchbox = class Lunchbox extends SudokuConstraintBase {
+    static DESCRIPTION = (`
+      The numbers sandwiched between the smallest number and the largest
+      number of the lunchbox adds up to the given sum. Numbers must be
+      distinct.`);
     static COLLECTOR_CLASS = 'MultiCell';
+    static DISPLAY_CONFIG = {
+      displayClass: 'ShadedRegion',
+      lineConfig: { color: 'rgba(100, 100, 100, 0.2)' },
+      labelField: 'sum',
+    };
 
     constructor(sum, ...cells) {
       super(arguments);
@@ -1373,6 +1616,11 @@ class SudokuConstraint {
   }
 
   static Skyscraper = class Skyscraper extends OutsideConstraintBase {
+    static DESCRIPTION = (`
+      Digits in the grid represent skyscrapers of that height.
+      Higher skyscrapers obscure smaller ones.
+      Clues outside the grid show the number of visible skyscrapers in that
+      row / column from the clue's direction of view.`);
     static COLLECTOR_CLASS = 'OutsideClue';
     static CLUE_TYPE = OutsideConstraintBase.CLUE_TYPE_DOUBLE_LINE;
     static DISPLAY_TEMPLATE = '[$CLUE]';
@@ -1394,6 +1642,11 @@ class SudokuConstraint {
   }
 
   static HiddenSkyscraper = class HiddenSkyscraper extends OutsideConstraintBase {
+    static DESCRIPTION = (`
+      Digits in the grid represent skyscrapers of that height.
+      Higher skyscrapers obscure smaller ones.
+      Clues outside the grid show the first hidden skyscraper in that
+      row/column from the clue's direction of view.`);
     static COLLECTOR_CLASS = 'OutsideClue';
     static CLUE_TYPE = OutsideConstraintBase.CLUE_TYPE_DOUBLE_LINE;
     static DISPLAY_TEMPLATE = '|$CLUE|';
@@ -1415,6 +1668,10 @@ class SudokuConstraint {
   }
 
   static NumberedRoom = class NumberedRoom extends OutsideConstraintBase {
+    static DESCRIPTION = (`
+      Clues outside the grid indicate the digit which has to be placed in
+      the Nth cell in the corresponding direction, where N is the digit
+      placed in the first cell in that direction.`);
     static COLLECTOR_CLASS = 'OutsideClue';
     static CLUE_TYPE = OutsideConstraintBase.CLUE_TYPE_DOUBLE_LINE;
     static DISPLAY_TEMPLATE = ':$CLUE:';
@@ -1436,6 +1693,10 @@ class SudokuConstraint {
   }
 
   static FullRank = class FullRank extends OutsideConstraintBase {
+    static DESCRIPTION = (`
+      Considering all rows and columns as numbers read from the direction
+      of the clue and ranked from lowest (1) to highest, a clue represents
+      where in the ranking that row/column lies.`);
     static COLLECTOR_CLASS = 'OutsideClue';
     static CLUE_TYPE = OutsideConstraintBase.CLUE_TYPE_DOUBLE_LINE;
     static DISPLAY_TEMPLATE = '#$CLUE';
@@ -1457,7 +1718,12 @@ class SudokuConstraint {
   }
 
   static AllDifferent = class AllDifferent extends SudokuConstraintBase {
+    static DESCRIPTION = (`
+      Values must be unique.`);
     static COLLECTOR_CLASS = 'MultiCell';
+    static DISPLAY_CONFIG = {
+      displayClass: 'ShadedRegion',
+    };
 
     constructor(...cells) {
       super(arguments);
@@ -1466,7 +1732,16 @@ class SudokuConstraint {
   }
 
   static ContainAtLeast = class ContainAtLeast extends SudokuConstraintBase {
+    static DESCRIPTION = (`
+      The comma-separated values must be present in the selected squares.
+      If value is must be contained at least as many times as is
+      repeated in the list.`);
     static COLLECTOR_CLASS = 'MultiCell';
+    static DISPLAY_CONFIG = {
+      displayClass: 'ShadedRegion',
+      pattern: ShadedRegionOptions.DIAGONAL_PATTERN,
+      labelField: 'valueStr',
+    };
 
     constructor(values, ...cells) {
       super(arguments);
@@ -1481,7 +1756,16 @@ class SudokuConstraint {
   }
 
   static ContainExact = class ContainExact extends SudokuConstraint.ContainAtLeast {
+    static DESCRIPTION = (`
+      The comma-separated values must be present in the selected squares.
+      If value is must be contained exactly as many times as is
+      repeated in the list.`);
     static COLLECTOR_CLASS = 'MultiCell';
+    static DISPLAY_CONFIG = {
+      displayClass: 'ShadedRegion',
+      pattern: ShadedRegionOptions.DIAGONAL_PATTERN,
+      labelField: 'valueStr',
+    };
 
     chipLabel() {
       return `ContainExact (${this.valueStr})`;
@@ -1489,7 +1773,15 @@ class SudokuConstraint {
   };
 
   static SameValues = class SameValues extends SudokuConstraintBase {
+    static DESCRIPTION = (`
+      The cells are taken as a series of sets of the same size.
+      Each set must contain the same values, including counts if values are
+      repeated.`);
     static COLLECTOR_CLASS = 'MultiCell';
+    static DISPLAY_CONFIG = {
+      displayClass: 'BorderedRegion',
+      splitFn: (constraint) => constraint.splitCells(),
+    };
 
     constructor(numSets, ...cells) {
       super(arguments);
@@ -1523,7 +1815,13 @@ class SudokuConstraint {
   }
 
   static Quad = class Quad extends SudokuConstraintBase {
+    static DESCRIPTION = (`
+      All the given values must be present in the surrounding 2x2 square.
+      Select a 2x2 square to enable.`);
     static COLLECTOR_CLASS = 'MultiCell';
+    static DISPLAY_CONFIG = {
+      displayClass: 'Quad',
+    };
 
     constructor(topLeftCell, ...values) {
       super(arguments);
@@ -1673,7 +1971,15 @@ class SudokuConstraint {
   }
 
   static Indexing = class Indexing extends SudokuConstraintBase {
+    static DESCRIPTION = (`
+      Column indexing: For a cell in column C, the value (V) of the cell
+      tells where the value C is placed in that row. Specifically, if the
+      cell has coordinates (R, C) and value V, then cell (R, V) has the
+      value C.Row indexing is the same, but for rows.`);
     static COLLECTOR_CLASS = 'MultiCell';
+    static DISPLAY_CONFIG = {
+      displayClass: 'Indexing',
+    };
 
     static ROW_INDEXING = 'R';
     static COL_INDEXING = 'C';
@@ -1695,7 +2001,13 @@ class SudokuConstraint {
   }
 
   static CountingCircles = class CountingCircles extends SudokuConstraintBase {
+    static DESCRIPTION = (`
+      The value in a circles counts the number of circles with the same
+      value. Each set of circles is independent.`);
     static COLLECTOR_CLASS = 'MultiCell';
+    static DISPLAY_CONFIG = {
+      displayClass: 'CountingCircles',
+    };
 
     constructor(...cells) {
       super(arguments);

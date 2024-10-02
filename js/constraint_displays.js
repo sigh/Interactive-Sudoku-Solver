@@ -12,7 +12,6 @@ class ConstraintDisplays {
       this.CustomBinary,
       this.ShadedRegion,
       this.CountingCircles,
-      // Note: Diagonal should go before quad, dots or letters.
       this.Diagonal,
       this.Dot,
       this.Letter,
