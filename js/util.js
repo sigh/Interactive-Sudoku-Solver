@@ -240,30 +240,6 @@ const localTimestamp = () => {
   return (new Date(Date.now() - tzOffset)).toISOString().slice(0, -1);
 };
 
-const makeDraggable = (element, handle) => {
-  let offsetX = 0;
-  let offsetY = 0;
-
-  const handleMouseDown = (event) => {
-    offsetX = event.clientX - element.offsetLeft;
-    offsetY = event.clientY - element.offsetTop;
-    document.addEventListener('mouseup', handleMouseUp);
-    document.addEventListener('mousemove', handleMouseMove);
-  };
-
-  const handleMouseUp = () => {
-    document.removeEventListener('mouseup', handleMouseUp);
-    document.removeEventListener('mousemove', handleMouseMove);
-  };
-
-  const handleMouseMove = (event) => {
-    element.style.left = (event.clientX - offsetX) + 'px';
-    element.style.top = (event.clientY - offsetY) + 'px';
-  };
-
-  handle.addEventListener('mousedown', handleMouseDown);
-};
-
 const shuffleArray = (arr, randomGenerator) => {
   for (let i = arr.length - 1; i > 0; i--) {
     const j = randomGenerator.randomInt(i);

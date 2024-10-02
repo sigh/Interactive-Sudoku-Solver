@@ -98,8 +98,6 @@ layout: null
   <hr>
 
   <div id="debug-container" class="hidden">
-    <div id="debug-logs"></div>
-    <div id="debug-counters"></div>
     <div id="debug-panel">
       <label>
         Log level
@@ -124,6 +122,8 @@ layout: null
       <label for="debug-cell-index">Show cell index</label>
       <button id="close-debug-button" class="danger-button" title="Close debug">Close debug</button>
     </div>
+    <div id="debug-counters"></div>
+    <div id="debug-logs"></div>
   </div>
 
   <div id="sudoku-container">
@@ -159,14 +159,6 @@ layout: null
               </button>
             </div>
             <span id="error-output" class="error"></span>
-            <div>
-              <div id="stats-container">
-                <div id="stats-header">
-                  <h2>Stats by runtime</h2>
-                  <button id="chart-close-button" class="danger-button" title="Close chart view">&#10006;</button>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
 
@@ -201,180 +193,190 @@ layout: null
 
     </div>
 
-    <div id="constraint-panel-container">
-      <div>
-        <h1>Constraints</h1>
-
-        <div class="control-panel">
-          <button id="copy-constraints-button" title="Copy constraint to clipboard" class="image-button">
-            <img src="img/copy-48.png" alt="Copy constraint">
-          </button>
-          <button id="clear-constraints-button" class="danger-button" title="Clear all constraints">Clear All</button>
-          <button id="undo-button" class="icon-button" title="undo" disabled>&#10554;</button>
-          <button id="redo-button" class="icon-button" title="redo" disabled
-            style="transform:rotateY(180deg)">&#10554;</button>
+    <div>
+      <div id="stats-container">
+        <div id="stats-header">
+          <h2>Stats by runtime</h2>
+          <button id="chart-close-button" class="danger-button" title="Close chart view">&#10006;</button>
         </div>
       </div>
 
-      <div class="two-column hide-until-load">
+      <div id="constraint-panel-container">
+
         <div>
+          <h1>Constraints</h1>
 
-          <form id="multi-value-cell-input">
-            <fieldset tabindex="0" class="constraint-panel" disabled>
-              <h2>Set multiple values</h2>
-              <div></div>
-            </fieldset>
-          </form>
-
-          <form id="multi-cell-constraint-input">
-            <fieldset tabindex="0" class="constraint-panel">
-              <h2>Lines & Regions</h2>
-              <div id="multi-cell-constraint-body">
-                <span class="description">
-                  Select cells by dragging or shift-clicking.
-                </span>
-                <div>
-                  <select id="multi-cell-constraint-select" name="constraint-type">
-                  </select>
-                </div>
-                <div id="multi-cell-constraint-description" class="description">
-                </div>
-                <div id="multi-cell-constraint-loop-container">
-                  <input type="checkbox" name="is-loop" id="multi-cell-constraint-loop-input"></input>
-                  <label for="multi-cell-constraint-loop-input">Loop</label>
-                </div>
-                <div>
-                  <div id="multi-cell-constraint-value-container"></div>
-                  <button type="submit" name="add-constraint" title="Add constraint" disabled>
-                    Add
-                  </button>
-                </div>
-              </div>
-            </fieldset>
-          </form>
+          <div class="control-panel">
+            <button id="copy-constraints-button" title="Copy constraint to clipboard" class="image-button">
+              <img src="img/copy-48.png" alt="Copy constraint">
+            </button>
+            <button id="clear-constraints-button" class="danger-button" title="Clear all constraints">Clear All</button>
+            <button id="undo-button" class="icon-button" title="undo" disabled>&#10554;</button>
+            <button id="redo-button" class="icon-button" title="redo" disabled
+              style="transform:rotateY(180deg)">&#10554;</button>
+          </div>
         </div>
 
-        <div>
-          <div id="shape-container" class="constraint-panel">
-            <h2>
-              Shape
-              <select id="shape-select"></select>
-              <span class="tooltip" data-text="
+        <div class="two-column hide-until-load">
+          <div>
+
+            <form id="multi-value-cell-input">
+              <fieldset tabindex="0" class="constraint-panel" disabled>
+                <h2>Set multiple values</h2>
+                <div></div>
+              </fieldset>
+            </form>
+
+            <form id="multi-cell-constraint-input">
+              <fieldset tabindex="0" class="constraint-panel">
+                <h2>Lines & Regions</h2>
+                <div id="multi-cell-constraint-body">
+                  <span class="description">
+                    Select cells by dragging or shift-clicking.
+                  </span>
+                  <div>
+                    <select id="multi-cell-constraint-select" name="constraint-type">
+                    </select>
+                  </div>
+                  <div id="multi-cell-constraint-description" class="description">
+                  </div>
+                  <div id="multi-cell-constraint-loop-container">
+                    <input type="checkbox" name="is-loop" id="multi-cell-constraint-loop-input"></input>
+                    <label for="multi-cell-constraint-loop-input">Loop</label>
+                  </div>
+                  <div>
+                    <div id="multi-cell-constraint-value-container"></div>
+                    <button type="submit" name="add-constraint" title="Add constraint" disabled>
+                      Add
+                    </button>
+                  </div>
+                </div>
+              </fieldset>
+            </form>
+          </div>
+
+          <div>
+            <div id="shape-container" class="constraint-panel">
+              <h2>
+                Shape
+                <select id="shape-select"></select>
+                <span class="tooltip" data-text="
               Change the grid shape.
               Box regions are made as close to square as possible.
               Prime numbered grid sizes have no boxes.">
-              </span>
-            </h2>
-            </h2>
-          </div>
-
-          <div class="constraint-panel" id="global-constraints-container">
-            <h2>Global constraints</h2>
-            <div id="global-constraint-checkboxes"></div>
-          </div>
-        </div>
-
-      </div>
-
-      <div id="layout-constraint-container" class="constraint-panel hide-until-load">
-        <h2>Layout constraints</h2>
-        <div class="two-column">
-
-          <div id="layout-constraint-checkboxes"></div>
-
-          <div id="jigsaw-container">
-            <div>
-              <button type="submit" id="add-jigsaw-button" title="Add Piece">
-                Add Jigsaw Piece
-              </button>
-              <span class="tooltip"
-                data-text="Values inside the jigsaw piece can't repeat. Pieces cannot overlap and must contain a cell for each different value (i.e. 9 cells for a 9x9 grid)."></span>
-
+                </span>
+              </h2>
+              </h2>
             </div>
 
-            <div id="jigsaw-chip-view" class="chip-view"></div>
+            <div class="constraint-panel" id="global-constraints-container">
+              <h2>Global constraints</h2>
+              <div id="global-constraint-checkboxes"></div>
+            </div>
+          </div>
+
+        </div>
+
+        <div id="layout-constraint-container" class="constraint-panel hide-until-load">
+          <h2>Layout constraints</h2>
+          <div class="two-column">
+
+            <div id="layout-constraint-checkboxes"></div>
+
+            <div id="jigsaw-container">
+              <div>
+                <button type="submit" id="add-jigsaw-button" title="Add Piece">
+                  Add Jigsaw Piece
+                </button>
+                <span class="tooltip"
+                  data-text="Values inside the jigsaw piece can't repeat. Pieces cannot overlap and must contain a cell for each different value (i.e. 9 cells for a 9x9 grid)."></span>
+
+              </div>
+
+              <div id="jigsaw-chip-view" class="chip-view"></div>
+            </div>
           </div>
         </div>
-      </div>
 
-      <form id="custom-binary-input" class="hide-until-load">
-        <fieldset tabindex=" 0" class="constraint-panel" disabled>
-          <h2>Custom binary constraints</h2>
-          <div>
+        <form id="custom-binary-input" class="hide-until-load">
+          <fieldset tabindex=" 0" class="constraint-panel" disabled>
+            <h2>Custom binary constraints</h2>
             <div>
-              <div class="description">
-                <p>
-                  Create a constraint between two cells by providing a custom
-                  JavaScript function.
-                </p>
-                <p>
-                  The function takes the two cell values as input and should
-                  return true or false to indicate if the pair of values is
-                  valid.
-                </p>
-                <p>
-                  Example: <code>a &lt; b</code> will emulate a thermometer
-                  constraint.
-                </p>
-              </div>
               <div>
-                Name:
-                <input type="text" name="name" placeholder="optional" maxlength="20" columns="20">
-              </div>
-              <div>
-                Chain handling
-                <span class="tooltip" data-text="
+                <div class="description">
+                  <p>
+                    Create a constraint between two cells by providing a custom
+                    JavaScript function.
+                  </p>
+                  <p>
+                    The function takes the two cell values as input and should
+                    return true or false to indicate if the pair of values is
+                    valid.
+                  </p>
+                  <p>
+                    Example: <code>a &lt; b</code> will emulate a thermometer
+                    constraint.
+                  </p>
+                </div>
+                <div>
+                  Name:
+                  <input type="text" name="name" placeholder="optional" maxlength="20" columns="20">
+                </div>
+                <div>
+                  Chain handling
+                  <span class="tooltip" data-text="
                   Select how to handle chains of more than two cells. e.g. for
                   a chain of cells [A, B, C] 'Consecutive pairs' will create
                   constraints on [A, B] and [B, C] while 'All pairs' will create
                   constraints on [A, B], [A, C], [B, A], [B, C], [C, A]
                   and [C, B].">
-                </span>:
-                <select name="chain-mode">
-                  <option value="Binary">Consecutive pairs</option>
-                  <option value="BinaryX">All pairs</option>
-                </select>
-              </div>
-              <div>
-                <div id="custom-binary-input-function">
-                  Constraint: <code>(a,b) =></code>
-                  <textarea rows="3" name="function"></textarea>
+                  </span>:
+                  <select name="chain-mode">
+                    <option value="Binary">Consecutive pairs</option>
+                    <option value="BinaryX">All pairs</option>
+                  </select>
                 </div>
-                <div id="custom-binary-input-function-error" class="error"></div>
-              </div>
-              <div>
-                <button type="submit" title="Add constraint" name="add-constraint">
-                  Add
-                </button>
-              </div>
-            </div>
-          </div>
-        </fieldset>
-      </form>
-
-      <div class="hide-until-load">
-        <form id="outside-clue-input">
-          <fieldset tabindex="0" class="constraint-panel" disabled>
-            <h2>Outside clues</h2>
-            <div id="outside-clue-input-body">
-              <div class="description">
-                Select a row, column or diagonal arrow outside the grid.
-              </div>
-              <input type="hidden" name="id">
-              <div class="outside-arrow-clue-types"></div>
-              <div>
-                <input type="number" name="value" min=0 placeholder="value">
-                <button type="submit" title="Set constraint">Set</button>
-                <button type="button" id="outside-arrow-clear" class="danger-button"
-                  title="Clear constraint">Clear</button>
+                <div>
+                  <div id="custom-binary-input-function">
+                    Constraint: <code>(a,b) =></code>
+                    <textarea rows="3" name="function"></textarea>
+                  </div>
+                  <div id="custom-binary-input-function-error" class="error"></div>
+                </div>
+                <div>
+                  <button type="submit" title="Add constraint" name="add-constraint">
+                    Add
+                  </button>
+                </div>
               </div>
             </div>
           </fieldset>
         </form>
-      </div>
 
-      <div id="ordinary-chip-view" class="chip-view"></div>
-      <div id="composite-chip-view" class="chip-view"></div>
+        <div class="hide-until-load">
+          <form id="outside-clue-input">
+            <fieldset tabindex="0" class="constraint-panel" disabled>
+              <h2>Outside clues</h2>
+              <div id="outside-clue-input-body">
+                <div class="description">
+                  Select a row, column or diagonal arrow outside the grid.
+                </div>
+                <input type="hidden" name="id">
+                <div class="outside-arrow-clue-types"></div>
+                <div>
+                  <input type="number" name="value" min=0 placeholder="value">
+                  <button type="submit" title="Set constraint">Set</button>
+                  <button type="button" id="outside-arrow-clear" class="danger-button"
+                    title="Clear constraint">Clear</button>
+                </div>
+              </div>
+            </fieldset>
+          </form>
+        </div>
+
+        <div id="ordinary-chip-view" class="chip-view"></div>
+        <div id="composite-chip-view" class="chip-view"></div>
+      </div>
     </div>
   </div>
 
