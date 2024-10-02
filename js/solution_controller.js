@@ -478,7 +478,6 @@ class DebugManager {
 
 class StateHistoryDisplay {
   CHART_HEIGHT = 120;
-  CONTAINER_WIDTH = 400;
   AXIS_WIDTH = 50;
   MAX_NUM_STATES = 1000;
 
@@ -614,11 +613,9 @@ class StateHistoryDisplay {
 
   _setUpStatsWindow(container) {
     document.getElementById('chart-close-button').onclick = () => {
+      this._visible = false;
       container.style.display = 'none';
     }
-    container.style.width = this.CONTAINER_WIDTH + 'px';
-
-    makeDraggable(container, document.getElementById('stats-header'));
   }
 
   _addChartDisplay(container, title, ...yAxis) {
