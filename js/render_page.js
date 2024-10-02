@@ -2004,10 +2004,17 @@ ConstraintCollector.GivenCandidates = class GivenCandidates extends ConstraintCo
 
     inputManager.onNewDigit(this._inputDigit.bind(this));
     inputManager.onSetValues(this._setValues.bind(this));
-    inputManager.setGivenLookup((cell) => this._givensMap.get(cell));
+
+    this._multiValueInputPanel = new MultiValueInputPanel(
+      inputManager,
+      this._setValues.bind(this),
+      (cell) => this._givensMap.get(cell));
   }
 
-  reshape(shape) { this._shape = shape; }
+  reshape(shape) {
+    this._shape = shape;
+    this._multiValueInputPanel.reshape(shape);
+  }
 
   _inputDigit(cell, digit) {
     const values = this._givensMap.get(cell) || [];
@@ -2022,6 +2029,7 @@ ConstraintCollector.GivenCandidates = class GivenCandidates extends ConstraintCo
       if (newValue > numValues) newValue = digit;
     }
 
+    this._multiValueInputPanel.updateFromCells([cell]);
     this._setValues([cell], [newValue]);
   }
 
@@ -2078,6 +2086,123 @@ ConstraintCollector.GivenCandidates = class GivenCandidates extends ConstraintCo
   }
 }
 
+class MultiValueInputPanel {
+  constructor(inputManager, onChange, givenLookup) {
+    this._form = document.getElementById('multi-value-cell-input');
+    this._collapsibleContainer = new CollapsibleContainer(
+      this._form.firstElementChild, false);
+
+    this._inputManager = inputManager;
+
+    inputManager.addSelectionPreserver(this._form);
+    this.updateFromCells = deferUntilAnimationFrame(
+      this.updateFromCells.bind(this));
+    inputManager.onSelection(
+      this.updateFromCells.bind(this));
+
+    this._onChange = onChange;
+    this._givenLookup = givenLookup;
+    this._allValues = [];
+
+    this._setUp();
+  }
+
+  updateFromCells(selection) {
+    toggleDisabled(this._collapsibleContainer.element(), selection.length == 0);
+    if (selection.length) {
+      this._updateForm(
+        this._givenLookup(selection[0]) || this._allValues);
+    } else {
+      this._updateForm([]);
+    }
+  };
+
+  reshape(shape) {
+    clearDOMNode(this._inputContainer);
+    this._valueButtons = [];
+
+    this._allValues = Array.from({ length: shape.numValues }, (_, i) => i + 1);
+
+    for (let i = 0; i < this._allValues.length; i++) {
+      const label = document.createElement('label');
+      label.classList.add('multi-value-input-option');
+      const input = document.createElement('input');
+      input.setAttribute('type', 'checkbox');
+      label.appendChild(input);
+      const span = document.createElement('span');
+      span.classList.add('button');
+      span.appendChild(document.createTextNode(this._allValues[i]));
+      label.appendChild(span);
+      this._inputContainer.appendChild(label);
+      this._valueButtons.push(input);
+    }
+
+    const numbersPerLine = Math.ceil(Math.sqrt(shape.numValues));
+    this._inputContainer.style.setProperty(
+      'grid-template-columns', `repeat(${numbersPerLine}, 1fr)`);
+  }
+
+  _setUp() {
+    const form = this._form;
+    form.onchange = () => {
+      const selection = this._inputManager.getSelection();
+      if (selection.length == 0) return;
+
+      this._onChange(selection, this._getCheckedValues());
+    };
+
+    const collapsibleBody = this._collapsibleContainer.bodyElement();
+
+    this._inputContainer = document.createElement('div');
+    collapsibleBody.append(this._inputContainer);
+    this._valueButtons = [];
+
+    collapsibleBody.append(document.createElement('hr'));
+
+    const buttonContainer = document.createElement('div');
+    buttonContainer.style.setProperty(
+      'grid-template-columns', `repeat(2, 1fr)`);
+    collapsibleBody.append(buttonContainer);
+    const addButton = (text, valueFilter) => {
+      const button = document.createElement('button');
+      button.textContent = text;
+      button.onclick = () => {
+        this._updateForm(this._allValues.filter(valueFilter));
+        this._form.dispatchEvent(new Event('change'));
+        return false;
+      }
+      button.classList.add('multi-value-input-control');
+      buttonContainer.append(button);
+    };
+
+    addButton('None', _ => false);
+    addButton('All', _ => true);
+    addButton('Odd', v => v % 2 == 1);
+    addButton('Even', v => v % 2 == 0);
+  }
+
+  _getCheckedValues() {
+    const numValues = this._allValues.length;
+    const setValues = [];
+    for (let i = 0; i < numValues; i++) {
+      if (this._valueButtons[i].checked) {
+        setValues.push(this._allValues[i]);
+      }
+    }
+    if (setValues.length === numValues) return [];
+    return setValues;
+  }
+
+  _updateForm(values) {
+    for (let i = 0; i < this._allValues.length; i++) {
+      this._valueButtons[i].checked = false;
+    }
+    for (const value of values) {
+      this._valueButtons[value - 1].checked = true;
+    }
+  }
+}
+
 class GridInputManager {
   constructor(displayContainer) {
     this._shape = null;
@@ -2095,7 +2220,6 @@ class GridInputManager {
 
     this._selection = new Selection(displayContainer);
     this._selection.addCallback(cellIds => {
-      this._multiValueInputManager.updateSelection(cellIds);
       // Blur the active selection, so that callbacks can tell if something
       // has already set the focus.
       document.activeElement.blur();
@@ -2109,24 +2233,14 @@ class GridInputManager {
     });
 
     this._setUpKeyBindings();
-    this._multiValueInputManager = new MultiValueInputManager(
-      this,
-      (...args) => {
-        this._runCallbacks(this._callbacks.onSetValues, ...args)
-      });
   }
 
-  reshape(shape) {
-    this._shape = shape;
-    this._multiValueInputManager.reshape(shape);
-  }
+  reshape(shape) { this._shape = shape; }
 
   onNewDigit(fn) { this._callbacks.onNewDigit.push(fn); }
   onSetValues(fn) { this._callbacks.onSetValues.push(fn); }
   onSelection(fn) { this._callbacks.onSelection.push(fn); }
   onOutsideArrowSelection(fn) { this._callbacks.onOutsideArrowSelection.push(fn); }
-
-  setGivenLookup(fn) { this._multiValueInputManager.setGivenLookup(fn); }
 
   updateOutsideArrowSelection(arrowId) {
     this._runCallbacks(this._callbacks.onOutsideArrowSelection, arrowId);
@@ -2410,122 +2524,6 @@ ConstraintCollector.CustomBinary = class CustomBinary extends ConstraintCollecto
         SudokuConstraint[type].makeFromGroups(key, configs));
     }
     return constraints;
-  }
-}
-
-class MultiValueInputManager {
-  constructor(inputManager, onChange) {
-    this._form = document.getElementById('multi-value-cell-input');
-    this._collapsibleContainer = new CollapsibleContainer(
-      this._form.firstElementChild, false);
-
-    inputManager.addSelectionPreserver(this._form);
-    this._inputManager = inputManager;
-    this.updateSelection = deferUntilAnimationFrame(
-      this.updateSelection.bind(this));
-
-    this._onChange = onChange;
-    this._givenLookup = (cell) => undefined;
-    this._allValues = [];
-
-    this._setUp();
-  }
-
-  setGivenLookup(fn) { this._givenLookup = fn; }
-
-  updateSelection(selection) {
-    toggleDisabled(this._collapsibleContainer.element(), selection.length == 0);
-    if (selection.length) {
-      this._updateForm(
-        this._givenLookup(selection[0]) || this._allValues);
-    } else {
-      this._updateForm([]);
-    }
-  };
-
-  reshape(shape) {
-    clearDOMNode(this._inputContainer);
-    this._valueButtons = [];
-
-    this._allValues = Array.from({ length: shape.numValues }, (_, i) => i + 1);
-
-    for (let i = 0; i < this._allValues.length; i++) {
-      const label = document.createElement('label');
-      label.classList.add('multi-value-input-option');
-      const input = document.createElement('input');
-      input.setAttribute('type', 'checkbox');
-      label.appendChild(input);
-      const span = document.createElement('span');
-      span.classList.add('button');
-      span.appendChild(document.createTextNode(this._allValues[i]));
-      label.appendChild(span);
-      this._inputContainer.appendChild(label);
-      this._valueButtons.push(input);
-    }
-
-    const numbersPerLine = Math.ceil(Math.sqrt(shape.numValues));
-    this._inputContainer.style.setProperty(
-      'grid-template-columns', `repeat(${numbersPerLine}, 1fr)`);
-  }
-
-  _setUp() {
-    const form = this._form;
-    form.onchange = () => {
-      const selection = this._inputManager.getSelection();
-      if (selection.length == 0) return;
-
-      this._onChange(selection, this._getCheckedValues());
-    };
-
-    const collapsibleBody = this._collapsibleContainer.bodyElement();
-
-    this._inputContainer = document.createElement('div');
-    collapsibleBody.append(this._inputContainer);
-    this._valueButtons = [];
-
-    collapsibleBody.append(document.createElement('hr'));
-
-    const buttonContainer = document.createElement('div');
-    buttonContainer.style.setProperty(
-      'grid-template-columns', `repeat(2, 1fr)`);
-    collapsibleBody.append(buttonContainer);
-    const addButton = (text, valueFilter) => {
-      const button = document.createElement('button');
-      button.textContent = text;
-      button.onclick = () => {
-        this._updateForm(this._allValues.filter(valueFilter));
-        this._form.dispatchEvent(new Event('change'));
-        return false;
-      }
-      button.classList.add('multi-value-input-control');
-      buttonContainer.append(button);
-    };
-
-    addButton('None', _ => false);
-    addButton('All', _ => true);
-    addButton('Odd', v => v % 2 == 1);
-    addButton('Even', v => v % 2 == 0);
-  }
-
-  _getCheckedValues() {
-    const numValues = this._allValues.length;
-    const setValues = [];
-    for (let i = 0; i < numValues; i++) {
-      if (this._valueButtons[i].checked) {
-        setValues.push(this._allValues[i]);
-      }
-    }
-    if (setValues.length === numValues) return [];
-    return setValues;
-  }
-
-  _updateForm(values) {
-    for (let i = 0; i < this._allValues.length; i++) {
-      this._valueButtons[i].checked = false;
-    }
-    for (const value of values) {
-      this._valueButtons[value - 1].checked = true;
-    }
   }
 }
 
