@@ -504,6 +504,10 @@ class SudokuConstraintBase {
   static LOOPS_ALLOWED = false;
   static IS_COMPOSITE = false;
 
+  // Determine if a list of cells is valid for this constraint class.
+  // Used by MultiCell constraints. Takes (cells, shape) arguments.
+  static VALIDATE_CELLS_FN = null;
+
   constructor(args) {
     this.args = args ? [...args] : [];
     this.type = this.constructor.name;
@@ -617,6 +621,25 @@ class SudokuConstraintBase {
 
     return map;
   });
+
+  static _cellsAreAdjacent(cells, shape) {
+    if (cells.length != 2) return false;
+    // Manhattan distance is exactly 1.
+    let cell0 = shape.parseCellId(cells[0]);
+    let cell1 = shape.parseCellId(cells[1]);
+    return 1 == Math.abs(cell0.row - cell1.row) + Math.abs(cell0.col - cell1.col);
+  }
+
+  static _cellsAre2x2Square(cells, shape) {
+    if (cells.length != 4) return false;
+    cells = cells.map(
+      c => shape.parseCellId(c)).sort((a, b) => a.cell - b.cell);
+    let { row, col } = cells[0];
+    return (
+      (cells[1].row == row && cells[1].col == col + 1) &&
+      (cells[2].row == row + 1 && cells[2].col == col) &&
+      (cells[3].row == row + 1 && cells[3].col == col + 1));
+  }
 }
 
 class LineOptions {
@@ -845,6 +868,11 @@ class SudokuConstraint {
       displayClass: 'GenericLine',
       color: 'rgb(255, 200, 255)',
     };
+    static ARGUMENT_CONFIG = {
+      label: 'difference',
+      default: 5,
+    };
+
 
     constructor(difference, ...cells) {
       // German whisper lines omit the difference, so the
@@ -901,6 +929,10 @@ class SudokuConstraint {
       displayClass: 'GenericLine',
       color: 'rgb(230, 190, 155)',
       dashed: true,
+    };
+    static ARGUMENT_CONFIG = {
+      label: 'mod',
+      default: 5,
     };
 
     constructor(mod, ...cells) {
@@ -999,6 +1031,10 @@ class SudokuConstraint {
       startMarker: LineOptions.DIAMOND_MARKER,
       endMarker: LineOptions.DIAMOND_MARKER
     };
+    static ARGUMENT_CONFIG = {
+      label: 'min diff',
+      default: 4,
+    };
 
     constructor(minDiff, ...cells) {
       super(arguments);
@@ -1059,6 +1095,10 @@ class SudokuConstraint {
       displayClass: 'GenericLine',
       color: 'rgb(100, 200, 100)',
       dashed: true,
+    };
+    static ARGUMENT_CONFIG = {
+      label: 'sum',
+      default: 10,
     };
 
     static LOOPS_ALLOWED = true;
@@ -1280,6 +1320,7 @@ class SudokuConstraint {
       displayClass: 'Dot',
       color: 'white',
     };
+    static VALIDATE_CELLS_FN = this._cellsAreAdjacent;
 
     constructor(...cells) {
       super(arguments);
@@ -1309,6 +1350,7 @@ class SudokuConstraint {
       displayClass: 'Dot',
       color: 'black',
     };
+    static VALIDATE_CELLS_FN = this._cellsAreAdjacent;
 
     constructor(...cells) {
       super(arguments);
@@ -1337,6 +1379,7 @@ class SudokuConstraint {
     static DISPLAY_CONFIG = {
       displayClass: 'Letter',
     };
+    static VALIDATE_CELLS_FN = this._cellsAreAdjacent;
 
     constructor(...cells) {
       super(arguments);
@@ -1359,6 +1402,7 @@ class SudokuConstraint {
     static DISPLAY_CONFIG = {
       displayClass: 'Letter',
     };
+    static VALIDATE_CELLS_FN = this._cellsAreAdjacent;
 
     constructor(...cells) {
       super(arguments);
@@ -1400,6 +1444,7 @@ class SudokuConstraint {
       startMarker: LineOptions.EMPTY_CIRCLE_MARKER,
       endMarker: LineOptions.EMPTY_CIRCLE_MARKER
     };
+    static VALIDATE_CELLS_FN = (cells, shape) => cells.length > 2;
 
     constructor(...cells) {
       super(arguments);
@@ -1416,6 +1461,13 @@ class SudokuConstraint {
     static DISPLAY_CONFIG = {
       displayClass: 'PillArrow',
     };
+    static ARGUMENT_CONFIG = {
+      options: [
+        { value: 2, text: '2-digit' },
+        { value: 3, text: '3-digit' },
+      ],
+    };
+    static VALIDATE_CELLS_FN = (cells, shape) => cells.length > 2;
 
     constructor(pillSize, ...cells) {
       super(arguments);
@@ -1437,6 +1489,11 @@ class SudokuConstraint {
       displayClass: 'ShadedRegion',
       labelField: 'sum',
     };
+    static ARGUMENT_CONFIG = {
+      label: 'sum',
+    };
+    static VALIDATE_CELLS_FN = (cells, shape) => (
+      cells.length <= shape.numValues && cells.length > 1);
 
     constructor(sum, ...cells) {
       super(arguments);
@@ -1447,16 +1504,24 @@ class SudokuConstraint {
     chipLabel() {
       return `Cage (${this.sum})`;
     }
+
+    static validateCells(cells, shape) {
+      cells.length <= shape.numValues && cells.length > 1;
+    }
   }
 
   static Sum = class Sum extends SudokuConstraintBase {
     static DESCRIPTION = (`
-      Values must add up to the given sum. Values don't need to be unique. Only up to 16 cells are allowed.`);
+      Values must add up to the given sum.
+      Values don't need to be unique (use 'Cage' for uniqueness).`);
     static COLLECTOR_CLASS = 'MultiCell';
     static DISPLAY_CONFIG = {
       displayClass: 'ShadedRegion',
       pattern: ShadedRegionOptions.CHECKERED_PATTERN,
       labelField: 'sum',
+    };
+    static ARGUMENT_CONFIG = {
+      label: 'sum',
     };
 
     constructor(sum, ...cells) {
@@ -1586,6 +1651,10 @@ class SudokuConstraint {
       displayClass: 'ShadedRegion',
       lineConfig: { color: 'rgba(100, 100, 100, 0.2)' },
       labelField: 'sum',
+    };
+    static ARGUMENT_CONFIG = {
+      label: 'sum',
+      default: 0,
     };
 
     constructor(sum, ...cells) {
@@ -1726,6 +1795,9 @@ class SudokuConstraint {
       pattern: ShadedRegionOptions.DIAGONAL_PATTERN,
       labelField: 'valueStr',
     };
+    static ARGUMENT_CONFIG = {
+      label: 'values',
+    };
 
     constructor(values, ...cells) {
       super(arguments);
@@ -1744,12 +1816,6 @@ class SudokuConstraint {
       The comma-separated values must be present in the selected squares.
       If value is must be contained exactly as many times as is
       repeated in the list.`);
-    static COLLECTOR_CLASS = 'MultiCell';
-    static DISPLAY_CONFIG = {
-      displayClass: 'ShadedRegion',
-      pattern: ShadedRegionOptions.DIAGONAL_PATTERN,
-      labelField: 'valueStr',
-    };
 
     chipLabel() {
       return `ContainExact (${this.valueStr})`;
@@ -1765,6 +1831,19 @@ class SudokuConstraint {
     static DISPLAY_CONFIG = {
       displayClass: 'BorderedRegion',
       splitFn: (constraint) => constraint.splitCells(),
+    };
+    static ARGUMENT_CONFIG = {
+      label: 'num sets',
+      default: 2,
+      options: (cells) => {
+        const options = [];
+        for (let i = 2; i <= cells.length; i++) {
+          if (cells.length % i == 0) {
+            options.push({ text: `${i} sets`, value: i });
+          }
+        }
+        return options;
+      },
     };
 
     constructor(numSets, ...cells) {
@@ -1806,6 +1885,10 @@ class SudokuConstraint {
     static DISPLAY_CONFIG = {
       displayClass: 'Quad',
     };
+    static ARGUMENT_CONFIG = {
+      label: 'values',
+    };
+    static VALIDATE_CELLS_FN = this._cellsAre2x2Square;
 
     constructor(topLeftCell, ...values) {
       super(arguments);
@@ -1964,9 +2047,16 @@ class SudokuConstraint {
     static DISPLAY_CONFIG = {
       displayClass: 'Indexing',
     };
+    static VALIDATE_CELLS_FN = (cells, shape) => cells.length > 0;
 
     static ROW_INDEXING = 'R';
     static COL_INDEXING = 'C';
+    static ARGUMENT_CONFIG = {
+      options: [
+        { value: this.COL_INDEXING, text: 'Column' },
+        { value: this.ROW_INDEXING, text: 'Row' },
+      ],
+    }
 
     constructor(indexType, ...cells) {
       super(arguments);
