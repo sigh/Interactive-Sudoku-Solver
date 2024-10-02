@@ -48,7 +48,7 @@ class ConstraintCollector {
     const name = this.name;
     const classes = [...Object.values(SudokuConstraint)].filter(
       t => t.COLLECTOR_CLASS === name);
-    classes.sort((a, b) => a.name.localeCompare(b.name));
+    classes.sort((a, b) => a.displayName().localeCompare(b.displayName()));
     return classes;
   }
 }
@@ -268,16 +268,21 @@ ConstraintCollector.LayoutCheckbox = class LayoutCheckbox extends ConstraintColl
 }
 
 ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
+  static DEFAULT_TYPE = 'Cage';
+
   constructor(display, chipView, inputManager) {
     super();
     this._chipConfigs = [];
     this._display = display;
-    this._constraintConfigs = this._makeMultiCellConstraintConfig();
     this._chipView = chipView;
     this._shape = null;
 
+    this._constraintClasses = this.constructor.constraintClasses();
+    this._typeMap = new Map();
+    this._validationFns = new Map();
+
     const selectionForm = document.forms['multi-cell-constraint-input'];
-    this._setUp(selectionForm, this._constraintConfigs, inputManager);
+    this._setUp(selectionForm, this._constraintClasses, inputManager);
 
     this._collapsibleContainer = new CollapsibleContainer(
       selectionForm.firstElementChild, true);
@@ -289,128 +294,6 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
     selectionForm.onsubmit = e => {
       this._handleSelection(selectionForm, inputManager);
       return false;
-    };
-  }
-
-  _makeMultiCellConstraintConfig() {
-    return {
-      Cage: {
-        value: {
-          placeholder: 'sum',
-        },
-        validateFn: (cells, shape) => (
-          cells.length <= shape.numValues && cells.length > 1),
-      },
-      Sum: {
-        value: {
-          placeholder: 'sum',
-        },
-      },
-      Arrow: {},
-      DoubleArrow: {
-        validateFn: (cells, shape) => cells.length > 2,
-      },
-      PillArrow: {
-        validateFn: (cells, shape) => cells.length > 2,
-        value: {
-          placeholder: 'pill size',
-          options: [
-            { text: '2-digit', value: 2 },
-            { text: '3-digit', value: 3 },
-          ],
-        },
-      },
-      Thermo: {},
-      Whisper: {
-        value: {
-          placeholder: 'difference',
-          default: 5,
-        },
-      },
-      Renban: {},
-      Modular: {
-        value: {
-          placeholder: 'mod',
-          default: 3,
-        },
-      },
-      Entropic: {},
-      RegionSumLine: {},
-      SumLine: {
-        value: {
-          placeholder: 'sum',
-          default: 10
-        },
-      },
-      Between: {},
-      Lockout: {
-        value: {
-          placeholder: 'min diff',
-          default: 4,
-        },
-      },
-      Lunchbox: {
-        value: {
-          placeholder: 'sum',
-          default: 0,
-        },
-      },
-      Palindrome: {},
-      Zipper: {},
-      WhiteDot: {
-        validateFn: ConstraintManager._cellsAreAdjacent,
-      },
-      BlackDot: {
-        validateFn: ConstraintManager._cellsAreAdjacent,
-      },
-      X: {
-        validateFn: ConstraintManager._cellsAreAdjacent,
-      },
-      V: {
-        validateFn: ConstraintManager._cellsAreAdjacent,
-      },
-      Quad: {
-        value: {
-          placeholder: 'values',
-        },
-        validateFn: ConstraintManager._cellsAre2x2Square,
-      },
-      ContainExact: {
-        value: {
-          placeholder: 'values',
-        },
-      },
-      ContainAtLeast: {
-        value: {
-          placeholder: 'values',
-        },
-      },
-      SameValues: {
-        value: {
-          placeholder: 'numSets',
-          default: 2,
-          options: (cells) => {
-            const options = [];
-            for (let i = 2; i <= cells.length; i++) {
-              if (cells.length % i == 0) {
-                options.push({ text: `${i} sets`, value: i });
-              }
-            }
-            return options;
-          },
-        },
-      },
-      AllDifferent: {},
-      CountingCircles: {},
-      Indexing: {
-        value: {
-          options: [
-            { text: 'Column', value: SudokuConstraint.Indexing.COL_INDEXING },
-            { text: 'Row', value: SudokuConstraint.Indexing.ROW_INDEXING },
-          ],
-        },
-        validateFn: (cells, shape) => cells.length > 0,
-      },
     };
   }
 
@@ -463,15 +346,16 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
     const formData = new FormData(selectionForm);
     const type = formData.get('constraint-type');
 
-    const config = this._constraintConfigs[type];
-    if (!config) throw ('Unknown constraint type: ' + type);
-    if (config.elem.disabled) throw ('Invalid selection for ' + type);
+    const constraintClass = SudokuConstraint[type];
+    const typeData = this._typeMap.get(type);
+    if (!typeData) throw ('Unknown constraint type: ' + type);
+    if (typeData.elem.disabled) throw ('Invalid selection for ' + type);
 
-    if (config.constraintClass.LOOPS_ALLOWED && formData.get('is-loop')) {
+    if (constraintClass.LOOPS_ALLOWED && formData.get('is-loop')) {
       cells.push('LOOP');
     }
 
-    if (config.constraintClass === SudokuConstraint.Quad) {
+    if (constraintClass === SudokuConstraint.Quad) {
       const valuesStr = formData.get(type + '-value');
       const values = valuesStr.split(/[, ]+/).map(v => +v).filter(
         v => Number.isInteger(v) && v >= 1 && v <= this._shape.numValues);
@@ -481,29 +365,29 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
         this.addConstraint(constraint);
       }
     } else if (
-      config.constraintClass === SudokuConstraint.ContainExact ||
-      config.constraintClass === SudokuConstraint.ContainAtLeast) {
+      constraintClass === SudokuConstraint.ContainExact ||
+      constraintClass === SudokuConstraint.ContainAtLeast) {
       const valuesStr = formData.get(type + '-value');
       const values = valuesStr.split(/[, ]+/).map(v => +v).filter(
         v => Number.isInteger(v) && v >= 1 && v <= this._shape.numValues);
       if (values.length) {
-        const constraint = new config.constraintClass(values.join('_'), ...cells);
+        const constraint = new constraintClass(values.join('_'), ...cells);
         this.addConstraint(constraint);
       }
-    } else if (config.value) {
+    } else if (constraintClass.ARGUMENT_CONFIG) {
       const value = formData.get(type + '-value');
       this.addConstraint(
-        new config.constraintClass(value, ...cells));
+        new constraintClass(value, ...cells));
     } else {
       this.addConstraint(
-        new config.constraintClass(...cells));
+        new constraintClass(...cells));
     }
 
     inputManager.setSelection([]);
     this.runUpdateCallback();
   }
 
-  _setUp(selectionForm, constraintConfigs, inputManager) {
+  _setUp(selectionForm, constraintClasses, inputManager) {
     const selectElem = selectionForm['constraint-type'];
     selectionForm.classList.add('disabled');
     const valueContainer = document.getElementById('multi-cell-constraint-value-container');
@@ -512,41 +396,34 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
     const loopContainer = document.getElementById('multi-cell-constraint-loop-container');
     loopContainer.style.display = 'none';
 
-    // Initialize defaults.
-    for (const [name, config] of Object.entries(constraintConfigs)) {
-      config.text ||= name;
-      config.constraintClass = SudokuConstraint[name];
-      if (!config.constraintClass) {
-        throw ('Unknown constraint class: ' + name);
-      }
-    }
-
-    this._dynamicOptionsFn = new Map();
-
     // Create the options.
-    for (const [type, config] of Object.entries(constraintConfigs)) {
-      const option = document.createElement('option');
-      const cls = config.constraintClass;
-      option.value = type;
-      option.textContent = cls.displayName();
-      option.title = cls.DESCRIPTION.replace(/\s+/g, ' ').replace(/^\s/, '');
-      selectElem.appendChild(option);
-      config.elem = option;
+    for (const constraintClass of constraintClasses) {
+      const type = constraintClass.name;
+      const typeData = {};
+      this._typeMap.set(constraintClass.name, typeData);
 
-      if (config.value) {
+      const option = document.createElement('option');
+      option.value = type;
+      option.textContent = constraintClass.displayName();
+      option.title = constraintClass.DESCRIPTION.replace(/\s+/g, ' ').replace(/^\s/, '');
+      selectElem.appendChild(option);
+      typeData.elem = option;
+
+      if (constraintClass.ARGUMENT_CONFIG) {
+        const argConfig = constraintClass.ARGUMENT_CONFIG;
         let input;
-        if (config.value.options) {
+        if (argConfig.options) {
           input = document.createElement('select');
-          if (isIterable(config.value.options)) {
-            for (const { text, value } of config.value.options) {
+          if (isIterable(argConfig.options)) {
+            for (const { text, value } of argConfig.options) {
               const option = document.createElement('option');
               option.value = value;
               option.textContent = text;
               input.appendChild(option);
             }
-          } else if (config.value.options instanceof Function) {
-            config.value.dynamicOptionsFn = this._setUpDynamicOptions(
-              input, config.value.options);
+          } else if (argConfig.options instanceof Function) {
+            typeData.dynamicOptionsFn = this._setUpDynamicOptions(
+              input, argConfig.options);
           } else {
             throw ('Invalid options for ' + type);
           }
@@ -554,52 +431,64 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
           input = document.createElement('input');
           input.setAttribute('type', 'text');
           input.setAttribute('size', '8');
-          input.setAttribute('placeholder', config.value.placeholder);
+          input.setAttribute('placeholder', argConfig.label);
         }
         input.setAttribute('name', type + '-value');
-        if (config.value.default !== undefined) {
-          input.setAttribute('value', config.value.default);
+        if (argConfig.default !== undefined) {
+          input.setAttribute('value', argConfig.default);
         }
         input.style.display = 'none';
         valueContainer.appendChild(input);
-        config.value.elem = input;
+        typeData.valueElem = input;
         valueElems.push(input);
       }
+
+      // Validation functions are grouped so that each only needs to be
+      // called once.
+      const validationFn = constraintClass.VALIDATE_CELLS_FN;
+      if (!this._validationFns.has(validationFn)) {
+        this._validationFns.set(validationFn, []);
+      }
+      this._validationFns.get(validationFn).push(option);
     }
 
     // Update the form based on the selected constraint.
     const descriptionElem = document.getElementById('multi-cell-constraint-description');
     selectElem.onchange = () => {
-      const value = selectElem.value;
-      const config = constraintConfigs[value];
-      if (!config) return;
+      const type = selectElem.value;
+      const typeData = this._typeMap.get(type);
+      if (!typeData) return;
 
-      if (config.value) {
+      if (typeData.valueElem) {
         valueContainer.style.visibility = 'visible';
         for (const elem of valueElems) {
           elem.style.display = 'none';
         }
-        config.value.elem.style.display = 'inline';
-        if (config.value.dynamicOptionsFn) {
-          config.value.dynamicOptionsFn(inputManager.getSelection());
+        typeData.valueElem.style.display = 'inline';
+        if (typeData.dynamicOptionsFn) {
+          typeData.dynamicOptionsFn(inputManager.getSelection());
         }
-        config.value.elem.focus();
+        typeData.valueElem.focus();
       } else {
         valueContainer.style.visibility = 'hidden';
       }
 
-      if (config.constraintClass.LOOPS_ALLOWED) {
+      const constraintClass = SudokuConstraint[type];
+      if (constraintClass.LOOPS_ALLOWED) {
         loopContainer.style.display = 'block';
       } else {
         loopContainer.style.display = 'none';
       }
 
-      descriptionElem.textContent = config.constraintClass.DESCRIPTION;
+      descriptionElem.textContent = constraintClass.DESCRIPTION;
 
       if (!selectionForm.classList.contains('disabled')) {
-        selectionForm['add-constraint'].disabled = config.elem.disabled;
+        selectionForm['add-constraint'].disabled = typeData.elem.disabled;
       }
-    }
+    };
+
+    // Set cage as the default.
+    this._typeMap.get(this.constructor.DEFAULT_TYPE).elem.selected = true;
 
     // Ensure select is initialized (but not selected).
     autoSaveField(selectElem);
@@ -631,8 +520,8 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
     if (disabled) {
       // Reenable all the options, so that the user can select them and see
       // their descriptions.
-      for (const [_, config] of Object.entries(this._constraintConfigs)) {
-        config.elem.disabled = false;
+      for (const typeData of this._typeMap.values()) {
+        typeData.elem.disabled = false;
       }
       selectionForm.classList.add('disabled');
       return;
@@ -642,21 +531,19 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
 
     const isSingleCell = selection.length == 1;
 
-    for (const [_, config] of Object.entries(this._constraintConfigs)) {
-      if (config.validateFn) {
-        const isValid = config.validateFn(selection, this._shape);
-        config.elem.disabled = !isValid;
-      } else {
-        // Unless explicitly allowed by validateFn, we don't allow single cell
-        // selections.
-        config.elem.disabled = isSingleCell;
-      }
+    for (const [validationFn, elems] of this._validationFns) {
+      // Call the validation function, or by default disallow single cell
+      // selections.
+      const isValid = (
+        validationFn ? validationFn(selection, this._shape) : !isSingleCell);
+
+      for (const elem of elems) elem.disabled = !isValid;
     }
 
     // Disable the add button if the current value is not valid.
     const type = selectionForm['constraint-type'].value;
-    const config = this._constraintConfigs[type];
-    if (config.elem.disabled) {
+    const typeData = this._typeMap.get(type);
+    if (typeData.elem.disabled) {
       selectionForm['add-constraint'].disabled = true;
     } else if (!isSingleCell) {
       // Focus on the the form so we can immediately press enter, but
@@ -670,16 +557,16 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
         document.activeElement === null);
 
       if (hasNoFocus) {
-        if (config.value && config.value.elem.select) {
-          config.value.elem.select();
+        if (typeData.valueElem?.select) {
+          typeData.valueElem.select();
         } else {
           selectionForm['add-constraint'].focus();
         }
       }
     }
     // Update dynamic options if needed.
-    if (config.value?.dynamicOptionsFn) {
-      config.value.dynamicOptionsFn(selection);
+    if (typeData.dynamicOptionsFn) {
+      typeData.dynamicOptionsFn(selection);
     }
   }
 }
@@ -1272,25 +1159,6 @@ class ConstraintManager {
         }
         break;
     }
-  }
-
-  static _cellsAre2x2Square(cells, shape) {
-    if (cells.length != 4) return false;
-    cells = cells.map(
-      c => shape.parseCellId(c)).sort((a, b) => a.cell - b.cell);
-    let { row, col } = cells[0];
-    return (
-      (cells[1].row == row && cells[1].col == col + 1) &&
-      (cells[2].row == row + 1 && cells[2].col == col) &&
-      (cells[3].row == row + 1 && cells[3].col == col + 1));
-  }
-
-  static _cellsAreAdjacent(cells, shape) {
-    if (cells.length != 2) return false;
-    // Manhattan distance is exactly 1.
-    let cell0 = shape.parseCellId(cells[0]);
-    let cell1 = shape.parseCellId(cells[1]);
-    return 1 == Math.abs(cell0.row - cell1.row) + Math.abs(cell0.col - cell1.col);
   }
 
   _getShapeAgnosticConstraints() {
