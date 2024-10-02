@@ -766,9 +766,28 @@ class CompositeConstraintBase extends SudokuConstraintBase {
     dashed: true,
   };
 
+  // Create an allow-list for the types of constraints that can be inside a
+  // composite.
+  // Other types of constraints either:
+  //  - Don't make sense to next inside one (such as Shape)
+  //  - Interact with other constraints that make them difficult to implement
+  //    such as StrictKropki or constraints that define regions.
+  //  - Or would just be a bit confusing to include given the above two caveats
+  //    (such as Anti-knight). It is easier to ban everything in the layout
+  //    panel.
+  static ALLOWED_COLLECTOR_CLASSES = new Set(
+    ['MultiCell', 'GivenCandidates', 'OutsideClue', 'Composite', 'CustomBinary']);
+
   constructor(constraints) {
     super(arguments);
     this.constraints = constraints || [];
+
+    const allowedCollectors = this.constructor.ALLOWED_COLLECTOR_CLASSES;
+    for (const c of this.constraints) {
+      if (!allowedCollectors.has(c.constructor.COLLECTOR_CLASS)) {
+        throw ('Invalid constraint type in composite: ' + c.type);
+      }
+    }
   }
 
   toString() {
@@ -2172,8 +2191,28 @@ class SudokuBuilder {
     return solverProxy;
   }
 
+  static _validateCompositeOrThrow(constraintMap) {
+    let hasComposite = false;
+    for (const key of constraintMap.keys()) {
+      if (SudokuConstraint[key].IS_COMPOSITE) {
+        hasComposite = true;
+      }
+    }
+    if (!hasComposite) return;
+
+    // We have a composite. Disallow any constraints which can have bad
+    // interactions. The strict constraints won't be accurate if there
+    // are dots or x/v constraints inside the composite.
+    if (constraintMap.has('StrictKropki') || constraintMap.has('StrictXV')) {
+      throw Error(
+        'Cannot have composite constraints with StrictKropki or StrictXV');
+    }
+  }
+
   static *_handlers(constraint, shape) {
     const constraintMap = constraint.toMap();
+
+    this._validateCompositeOrThrow(constraintMap);
 
     yield* this._rowColHandlers(shape);
     if (constraintMap.has('NoBoxes')) {
