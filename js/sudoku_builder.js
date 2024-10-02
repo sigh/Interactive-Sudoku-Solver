@@ -734,6 +734,34 @@ class OutsideConstraintBase extends SudokuConstraintBase {
   }
 }
 
+class CompositeConstraintBase extends SudokuConstraintBase {
+  static COLLECTOR_CLASS = 'Composite';
+  static IS_COMPOSITE = true;
+  static DISPLAY_CONFIG = {
+    displayClass: 'BorderedRegion',
+    opacity: 0.2,
+    dashed: true,
+  };
+
+  constructor(constraints) {
+    super(arguments);
+    this.constraints = constraints || [];
+  }
+
+  toString() {
+    return [
+      '.',
+      this.type,
+      ...this.constraints.map(c => c.toString()),
+      '.End',
+    ].join('');
+  }
+
+  displayCells(shape) {
+    return this.constraints.flatMap(c => c.displayCells(shape));
+  }
+}
+
 class SudokuConstraint {
 
   static Set = class Set extends SudokuConstraintBase {
@@ -754,59 +782,9 @@ class SudokuConstraint {
     }
   }
 
-  static Or = class Or extends SudokuConstraintBase {
-    static COLLECTOR_CLASS = 'Composite';
-    static IS_COMPOSITE = true;
-    static DISPLAY_CONFIG = {
-      displayClass: 'BorderedRegion',
-      opacity: 0.2,
-      dashed: true,
-    };
+  static Or = class Or extends CompositeConstraintBase { }
 
-    constructor(constraints) {
-      super(arguments);
-      this.constraints = constraints || [];
-    }
-
-    toString() {
-      return [
-        '.Or',
-        ...this.constraints.map(c => c.toString()),
-        '.End',
-      ].join('');
-    }
-
-    displayCells(shape) {
-      return this.constraints.flatMap(c => c.displayCells(shape));
-    }
-  }
-
-  static And = class And extends SudokuConstraintBase {
-    static COLLECTOR_CLASS = 'Composite';
-    static IS_COMPOSITE = true;
-    static DISPLAY_CONFIG = {
-      displayClass: 'BorderedRegion',
-      opacity: 0.2,
-      dashed: true,
-    };
-
-    constructor(constraints) {
-      super(arguments);
-      this.constraints = constraints || [];
-    }
-
-    toString() {
-      return [
-        '.And',
-        ...this.constraints.map(c => c.toString()),
-        '.End',
-      ].join('');
-    }
-
-    displayCells(shape) {
-      return this.constraints.flatMap(c => c.displayCells(shape));
-    }
-  }
+  static And = class And extends CompositeConstraintBase { }
 
   static End = class End extends SudokuConstraintBase { }
 
@@ -1281,6 +1259,12 @@ class SudokuConstraint {
       Values along the diagonal must be unique.`);
     static COLLECTOR_CLASS = 'LayoutCheckbox';
     static DISPLAY_CONFIG = { displayClass: 'Diagonal' };
+    static ARGUMENT_CONFIG = {
+      options: [
+        { value: 1, text: '╱' },
+        { value: -1, text: '╲' },
+      ],
+    };
 
     constructor(direction) {
       super(arguments);
