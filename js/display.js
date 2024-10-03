@@ -277,12 +277,53 @@ class InfoTextDisplay extends DisplayItem {
 }
 
 class CellValueDisplay extends DisplayItem {
-  MULTI_VALUE_CLASS = 'cell-multi-value';
-  SINGLE_VALUE_CLASS = 'cell-single-value';
+  static MULTI_VALUE_CLASS = 'cell-multi-value';
+  static SINGLE_VALUE_CLASS = 'cell-single-value';
 
-  constructor(svg) {
+  static GIVENS_MASK_ID = 'givens-mask';
+
+  constructor(svg, valueFn) {
     super(svg);
     this._applyGridOffset(svg);
+
+    this._valueFn = valueFn || (v => v);
+    this._valueMap = [];
+  }
+
+  reshape(shape) {
+    super.reshape(shape);
+    this._valueMap = [];
+    for (let i = 0; i <= shape.numValues; i++) {
+      this._valueMap.push(this._valueFn(i));
+    }
+  }
+
+  static makeGivensMask() {
+    const mask = createSvgElement('mask');
+    mask.id = this.GIVENS_MASK_ID;
+    mask.setAttribute('maskUnits', 'userSpaceOnUse');
+    mask.setAttribute('class', 'non-layout-constraint');
+    return mask;
+  }
+
+  updateMask(valueIds) {
+    if (!this._shape) return;
+
+    const mask = document.getElementById(this.constructor.GIVENS_MASK_ID);
+    clearDOMNode(mask);
+    const rect = createSvgElement('rect');
+    rect.setAttribute('width', '100%');
+    rect.setAttribute('height', '100%');
+    rect.setAttribute('fill', 'white');
+    mask.append(rect);
+
+    for (const valueId of valueIds) {
+      const { cell, values } = this._shape.parseValueId(valueId);
+      if (values.length != 1) continue;
+      const square = this._makeCellSquare(cell);
+      square.setAttribute('fill', 'black');
+      mask.append(square);
+    }
   }
 
   renderGridValues(grid) {
@@ -301,12 +342,12 @@ class CellValueDisplay extends DisplayItem {
         let offset = START_OFFSET;
         for (const line of this._formatMultiSolution(value)) {
           svg.append(this.makeTextNode(
-            line, x, y + offset, this.MULTI_VALUE_CLASS));
+            line, x, y + offset, this.constructor.MULTI_VALUE_CLASS));
           offset += LINE_HEIGHT;
         }
       } else if (value) {
         svg.append(this.makeTextNode(
-          value, x, y, this.SINGLE_VALUE_CLASS));
+          value, x, y, this.constructor.SINGLE_VALUE_CLASS));
       }
     }
   }
@@ -334,14 +375,11 @@ class CellValueDisplay extends DisplayItem {
   });
 
   _formatMultiSolution(values) {
+    const valueMap = this._valueMap;
     const slots = [...this.constructor._makeTemplateArray(this._shape)];
     for (const v of values) {
-      slots[v * 2 - 2] = v;
+      slots[v * 2 - 2] = valueMap[v];
     }
-    return this._multiSolutionToLines(slots);
-  }
-
-  _multiSolutionToLines(slots) {
     return slots.join('').split(/\n/);
   }
 }
@@ -357,7 +395,8 @@ class SolutionDisplay extends CellValueDisplay {
       const solutionText = toShortSolution(this._currentSolution, this._shape);
       navigator.clipboard.writeText(solutionText);
     };
-    this._fixedCellIndexes = [];
+
+    svg.setAttribute('mask', `url(#${this.constructor.GIVENS_MASK_ID})`);
   }
 
   reshape(shape) {
@@ -367,23 +406,10 @@ class SolutionDisplay extends CellValueDisplay {
     super.reshape(shape);
   }
 
-  setNewConstraints(constraintManager) {
-    // Update fixed cell indexes, as we can cache them as long as the
-    // constraints remain the same.
-    // We need to know them to avoid displaying a solution value over these
-    // cells.
-    this._fixedCellIndexes = [];
-    const fixedCells = constraintManager.getFixedCells();
-    for (const cellId of fixedCells) {
-      const index = this._shape.parseCellId(cellId).cell;
-      this._fixedCellIndexes.push(index);
-    }
-  }
-
   // Display solution on grid.
   //  - If solution cell contains a container then it will be displayed as
   //    pencilmarks.
-  setSolution(solution, overrideGivens) {
+  setSolution(solution) {
     solution = solution || [];
     this._currentSolution = solution.slice();
 
@@ -401,55 +427,10 @@ class SolutionDisplay extends CellValueDisplay {
       return;
     }
 
-    // We don't want to show anything for cells where the value was
-    // fixed.
-    if (this._fixedCellIndexes.length && !overrideGivens) {
-      solution = solution.slice();
-      for (const index of this._fixedCellIndexes) {
-        solution[index] = null;
-      }
-    }
-
     this.renderGridValues(solution);
 
     this._copyElem.disabled = (
       !this._currentSolution.every(v => v && isFinite(v)));
-  }
-}
-
-class GivensDisplay extends CellValueDisplay {
-  constructor(svg) {
-    super(svg);
-    svg.classList.add('non-layout-constraint');
-  }
-
-  drawGivens(givensMap) {
-    // Quickly clear the givens display if there are no givens.
-    if (!givensMap.size) {
-      clearDOMNode(this.getSvg());
-      return;
-    }
-
-    let grid = new Array(this._shape.numCells).fill(null);
-    for (const [cell, values] of givensMap) {
-      const index = this._shape.parseCellId(cell).cell;
-      grid[index] = values.length == 1 ? values[0] : values;
-    }
-
-    // NOTE: We re-render the entire grid each time, but we already do this for
-    // solutions which is much more common.
-    // This allows us to share code with the solution display.
-    this.renderGridValues(grid);
-  }
-
-  _multiSolutionToLines(slots) {
-    const REPLACE_CHAR = '●';
-    slots = slots.map(v => {
-      if (typeof v !== 'number') return v;
-      if (v < 10) return REPLACE_CHAR;
-      return REPLACE_CHAR + ' ';
-    });
-    return super._multiSolutionToLines(slots);
   }
 }
 
@@ -517,6 +498,7 @@ class ConstraintDisplay extends DisplayItem {
     this._currentConstraints = new Map();
 
     displayContainer.addElement(this._makeArrowhead());
+    displayContainer.addElement(CellValueDisplay.makeGivensMask());
 
     this._gridDisplay = new GridDisplay(
       displayContainer.getNewGroup('base-grid-group'));
@@ -531,9 +513,6 @@ class ConstraintDisplay extends DisplayItem {
       this._applyGridOffset(group);
     }
 
-    this._givensDisplay = new GivensDisplay(
-      displayContainer.getNewGroup('givens-group'));
-
     this._borders = new BorderDisplay(
       displayContainer.getNewGroup('border-group'));
 
@@ -547,7 +526,6 @@ class ConstraintDisplay extends DisplayItem {
       display.reshape(shape);
     }
     this._borders.reshape(shape);
-    this._givensDisplay.reshape(shape);
   }
 
   // Reusable arrowhead marker.
@@ -570,8 +548,6 @@ class ConstraintDisplay extends DisplayItem {
   }
 
   clear() {
-    this._givensDisplay.clear();
-
     for (const display of this._constraintDisplays.values()) {
       display.clear();
     }
@@ -592,6 +568,11 @@ class ConstraintDisplay extends DisplayItem {
     const item = this._constraintDisplays.get(
       config.displayClass).drawItem(constraint, config);
     this._currentConstraints.set(constraint, item);
+    if (this._currentConstraints.size === 1000) {
+      // Note: We should never reach this, and would indicate a leak.
+      // TODO: Remove this after we've verified that there are no leaks.
+      console.log('Warning: high number of constraints');
+    }
     return item;
   }
 
@@ -599,10 +580,6 @@ class ConstraintDisplay extends DisplayItem {
     const displayClass = constraint.constructor.DISPLAY_CONFIG.displayClass;
     return this._constraintDisplays.get(
       displayClass).toggleItem(constraint, enable);
-  }
-
-  drawGivens(givensMap) {
-    this._givensDisplay.drawGivens(givensMap);
   }
 }
 

@@ -16,6 +16,7 @@ class ConstraintDisplays {
       this.Dot,
       this.Letter,
       this.Quad,
+      this.Givens,
       this.OutsideClue,
     ]
   }
@@ -1162,4 +1163,46 @@ ConstraintDisplays.OutsideClue = class OutsideClue extends BaseConstraintDisplay
 
     return arrow;
   };
+}
+
+ConstraintDisplays.Givens = class Givens extends BaseConstraintDisplayItem {
+  constructor(svg) {
+    super(svg);
+
+    const REPLACE_CHAR = '●';
+    const valueFn = v => {
+      return REPLACE_CHAR + (v < 10 ? '' : ' ');
+    };
+
+    this._cellDisplay = new CellValueDisplay(svg, valueFn);
+  }
+
+  reshape(shape) {
+    super.reshape(shape);
+    this._cellDisplay.reshape(shape);
+  }
+
+  drawItem(constraint) {
+    const grid = new Array(this._shape.numCells).fill(null);
+    for (const valueIds of constraint.values) {
+      const { cell, values } = this._shape.parseValueId(valueIds);
+      grid[cell] = values.length == 1 ? values[0] : values;
+    }
+
+    this._cellDisplay.renderGridValues(grid);
+    this._cellDisplay.updateMask(constraint.values);
+
+    return {};
+  }
+
+  removeItem(_) {
+    // TODO: Make this class more general, so that it can handle adding multiple
+    //       givens.
+    this.clear();
+  }
+
+  clear() {
+    super.clear();
+    this._cellDisplay.updateMask([]);
+  }
 }
