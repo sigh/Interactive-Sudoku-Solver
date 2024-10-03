@@ -90,7 +90,7 @@ body {
 }
 
 .layout-view>.non-layout-constraint,
-.layout-view>.outside-arrow-group text {
+.layout-view>.outsideclue-group text {
   filter: opacity(50%) blur(2px);
 }
 

@@ -184,10 +184,7 @@ ConstraintCollector._Checkbox = class _Checkbox extends ConstraintCollector {
       input.onchange = () => {
         const displayClass = constraintCls.DISPLAY_CONFIG?.displayClass;
         if (displayClass) {
-          display.toggleItem(
-            constraint,
-            input.checked,
-            ConstraintDisplays[displayClass]);
+          display.toggleConstraint(constraint, input.checked);
         }
         PanelHighlighter.toggleHighlightForElement(input, input.checked);
         this.runUpdateCallback();
@@ -909,21 +906,28 @@ ConstraintCollector.OutsideClue = class OutsideClue extends ConstraintCollector 
     }
     const arrowId = clues[0].arrowId;
     const type = constraint.type;
+
+    // First ensure the existing constraint is removed.
+    this._removeConstraint(type, arrowId);
+
+    // Ensure the map exists.
     if (!this._constraints.has(arrowId)) {
       this._constraints.set(arrowId, new Map());
     }
+
+    // Add the new constraint.
     this._constraints.get(arrowId).set(type, constraint);
-    this._display.addOutsideClue(constraint);
+    this._display.drawConstraint(constraint);
   }
 
   _removeConstraint(type, arrowId) {
-    const lineMap = this._constraints.get(arrowId);
-    const constraint = lineMap?.get(type);
+    const arrowMap = this._constraints.get(arrowId);
+    const constraint = arrowMap?.get(type);
     if (constraint) {
-      this._display.removeOutsideClue(constraint);
+      this._display.removeConstraint(constraint);
 
-      lineMap.delete(type);
-      if (!lineMap.size) this._constraints.delete(arrowId);
+      arrowMap.delete(type);
+      if (!arrowMap.size) this._constraints.delete(arrowId);
     }
   }
 
@@ -1235,7 +1239,7 @@ class ConstraintChipView {
   removeChip(config) {
     config.removeFn();
     if (config.displayElem) {
-      this._display.removeItem(config.displayElem);
+      this._display.removeConstraint(config.constraint);
     }
     config.chip.parentNode.removeChild(config.chip);
   }

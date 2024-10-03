@@ -686,7 +686,6 @@ class OutsideConstraintBase extends SudokuConstraintBase {
 
   static ZERO_VALUE_OK = false;
   static CLUE_TYPE = '';
-  static DISPLAY_TEMPLATE = '$CLUE';
 
   static makeFromArrowId(arrowId, value) {
     let [rowCol, dir] = arrowId.split(',');
@@ -1558,6 +1557,10 @@ class SudokuConstraint {
     static DESCRIPTION = (`
       Values along diagonal must add to the given sum. Values may repeat.`);
     static COLLECTOR_CLASS = 'OutsideClue';
+    static DISPLAY_CONFIG = {
+      displayClass: 'OutsideClue',
+      clueTemplate: '$CLUE',
+    };
     static CLUE_TYPE = OutsideConstraintBase.CLUE_TYPE_DIAGONAL;
 
     constructor(sum, id) {
@@ -1610,8 +1613,11 @@ class SudokuConstraint {
       X is the number in the first cell in the direction of the row or
       column.`);
     static COLLECTOR_CLASS = 'OutsideClue';
+    static DISPLAY_CONFIG = {
+      displayClass: 'OutsideClue',
+      clueTemplate: '⟨$CLUE⟩',
+    };
     static CLUE_TYPE = OutsideConstraintBase.CLUE_TYPE_DOUBLE_LINE;
-    static DISPLAY_TEMPLATE = '⟨$CLUE⟩';
 
     constructor(rowCol, sumInc, sumDec) {
       super(arguments);
@@ -1638,6 +1644,10 @@ class SudokuConstraint {
       Values between the 1 and the 9 in the row or column must add to the
       given sum.`);
     static COLLECTOR_CLASS = 'OutsideClue';
+    static DISPLAY_CONFIG = {
+      displayClass: 'OutsideClue',
+      clueTemplate: '$CLUE',
+    };
     static CLUE_TYPE = OutsideConstraintBase.CLUE_TYPE_SINGLE_LINE;
     static ZERO_VALUE_OK = true;
 
@@ -1694,8 +1704,11 @@ class SudokuConstraint {
       Clues outside the grid show the number of visible skyscrapers in that
       row / column from the clue's direction of view.`);
     static COLLECTOR_CLASS = 'OutsideClue';
+    static DISPLAY_CONFIG = {
+      displayClass: 'OutsideClue',
+      clueTemplate: '[$CLUE]',
+    };
     static CLUE_TYPE = OutsideConstraintBase.CLUE_TYPE_DOUBLE_LINE;
-    static DISPLAY_TEMPLATE = '[$CLUE]';
 
     constructor(rowCol, countInc, countDec) {
       super(arguments);
@@ -1720,8 +1733,11 @@ class SudokuConstraint {
       Clues outside the grid show the first hidden skyscraper in that
       row/column from the clue's direction of view.`);
     static COLLECTOR_CLASS = 'OutsideClue';
+    static DISPLAY_CONFIG = {
+      displayClass: 'OutsideClue',
+      clueTemplate: '|$CLUE|',
+    };
     static CLUE_TYPE = OutsideConstraintBase.CLUE_TYPE_DOUBLE_LINE;
-    static DISPLAY_TEMPLATE = '|$CLUE|';
 
     constructor(rowCol, valueInc, valueDec) {
       super(arguments);
@@ -1745,8 +1761,11 @@ class SudokuConstraint {
       the Nth cell in the corresponding direction, where N is the digit
       placed in the first cell in that direction.`);
     static COLLECTOR_CLASS = 'OutsideClue';
+    static DISPLAY_CONFIG = {
+      displayClass: 'OutsideClue',
+      clueTemplate: ':$CLUE:',
+    };
     static CLUE_TYPE = OutsideConstraintBase.CLUE_TYPE_DOUBLE_LINE;
-    static DISPLAY_TEMPLATE = ':$CLUE:';
 
     constructor(rowCol, clueInc, clueDec) {
       super(arguments);
@@ -1770,8 +1789,11 @@ class SudokuConstraint {
       of the clue and ranked from lowest (1) to highest, a clue represents
       where in the ranking that row/column lies.`);
     static COLLECTOR_CLASS = 'OutsideClue';
+    static DISPLAY_CONFIG = {
+      displayClass: 'OutsideClue',
+      clueTemplate: '#$CLUE',
+    };
     static CLUE_TYPE = OutsideConstraintBase.CLUE_TYPE_DOUBLE_LINE;
-    static DISPLAY_TEMPLATE = '#$CLUE';
 
     constructor(rowCol, rankInc, rankDec) {
       super(arguments);
