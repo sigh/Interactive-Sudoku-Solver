@@ -1194,10 +1194,6 @@ class ConstraintManager {
     return new SudokuConstraint.Set(constraints);
   }
 
-  getFixedCells() {
-    return this._constraintCollectors.get('GivenCandidates').getFixedCells();
-  }
-
   clear() {
     this._display.clear();
     PanelHighlighter.clear();
@@ -1586,6 +1582,8 @@ ConstraintCollector.GivenCandidates = class GivenCandidates extends ConstraintCo
       inputManager,
       this._setValues.bind(this),
       (cell) => this._givensMap.get(cell));
+
+    this._constraint = null;
   }
 
   reshape(shape) {
@@ -1637,29 +1635,29 @@ ConstraintCollector.GivenCandidates = class GivenCandidates extends ConstraintCo
   }
 
   _givensUpdated() {
-    this._display.drawGivens(this._givensMap);
-    this.runUpdateCallback();
-  }
+    if (this._constraint) {
+      this._display.removeConstraint(this._constraint);
+    }
 
-  getConstraints() {
     const valueIds = [];
     for (const [cell, values] of this._givensMap) {
       valueIds.push(`${cell}_${values.join('_')}`);
     }
-    return [new SudokuConstraint.Givens(...valueIds)];
+
+    this._constraint = new SudokuConstraint.Givens(...valueIds);
+    this._display.drawConstraint(this._constraint);
+
+    this.runUpdateCallback();
   }
 
-  getFixedCells() {
-    let cells = [];
-    for (const [cell, values] of this._givensMap) {
-      if (values.length === 1) cells.push(cell);
-    }
-    return cells;
+  getConstraints() {
+    return this._constraint ? [this._constraint] : [];
   }
 
   clear() {
-    this._givensMap = new Map();
-    this._display.drawGivens(this._givensMap);
+    this._display.removeConstraint(this._constraint);
+    this._givensMap.clear();
+    this._constraint = null;
   }
 }
 

@@ -94,6 +94,10 @@ body {
   filter: opacity(50%) blur(2px);
 }
 
+.layout-view>#givens-mask * {
+  fill: white;
+}
+
 #instruction-panel {
   display: flex;
   align-items: flex-start;

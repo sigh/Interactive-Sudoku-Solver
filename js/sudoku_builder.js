@@ -2136,6 +2136,7 @@ class SudokuConstraint {
 
   static Givens = class Givens extends SudokuConstraintBase {
     static COLLECTOR_CLASS = 'GivenCandidates';
+    static DISPLAY_CONFIG = { displayClass: 'Givens' };
 
     constructor(...values) {
       super(arguments);

@@ -1209,7 +1209,6 @@ ModeHandler.ValidateLayout = class extends ModeHandler {
     if (!this._done) return {};
     return {
       solution: this._result,
-      overrideGivens: true,
       description: this._result
         ? 'Valid layout [Sample solution]'
         : 'Invalid layout'
@@ -1408,7 +1407,6 @@ class SolutionController {
 
   async _update() {
     this._solutionDisplay.setSolution();
-    this._solutionDisplay.setNewConstraints(this._constraintManager);
     let mode = this._elements.mode.value;
     let auto = this._elements.autoSolve.checked;
 
@@ -1530,8 +1528,7 @@ class SolutionController {
           this._stepHighlighter.setCells(result.highlightCells);
         }
       }
-      this._solutionDisplay.setSolution(
-        currentSolution, result?.overrideGivens);
+      this._solutionDisplay.setSolution(currentSolution);
 
       if (result?.diff) {
         this._diffDisplay.renderGridValues(result.diff);
