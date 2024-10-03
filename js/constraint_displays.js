@@ -16,6 +16,7 @@ class ConstraintDisplays {
       this.Dot,
       this.Letter,
       this.Quad,
+      this.OutsideClue,
     ]
   }
 }
@@ -34,6 +35,10 @@ class BaseConstraintDisplayItem extends DisplayItem {
     clearDOMNode(this._svg);
   }
 
+  // drawItem should return an item that can be passed to removeItem to remove
+  // the item from the display.
+  // If the item can be displayed as an icon, the returned value should be an
+  // svg element.
   drawItem(constraint, options) { throw 'Unimplemented'; }
 
   removeItem(item) {
@@ -945,4 +950,216 @@ ConstraintDisplays.BorderedRegion = class BorderedRegion extends BaseConstraintD
 
     return g;
   }
+}
+
+ConstraintDisplays.OutsideClue = class OutsideClue extends BaseConstraintDisplayItem {
+  constructor(svg, inputManager) {
+    super(svg);
+    inputManager.addSelectionPreserver(svg);
+
+    let selectedArrow = null;
+    inputManager.onSelection((cells) => {
+      if (selectedArrow) selectedArrow.classList.remove('selected-arrow');
+      selectedArrow = null;
+      inputManager.updateOutsideArrowSelection(null);
+    });
+
+    this._handleClick = (arrowId, cells) => {
+      inputManager.setSelection(cells);
+      inputManager.updateOutsideArrowSelection(arrowId);
+
+      const arrow = this._outsideArrowMap.get(arrowId);
+      selectedArrow = arrow.svg;
+      selectedArrow.classList.add('selected-arrow');
+    };
+
+    this._outsideArrowMap = new Map();
+  }
+
+  clear() {
+    for (const [arrowId, config] of this._outsideArrowMap) {
+      if (config.currentValues.length) {
+        config.currentValues = [];
+        this._updateArrowValues(arrowId);
+      }
+    }
+  }
+
+  reshape(shape) {
+    super.reshape(shape);
+    super.clear();
+    this._outsideArrowMap.clear();
+
+    const diagonalCellMap = SudokuConstraint.LittleKiller.cellMap(shape);
+    for (const arrowId in diagonalCellMap) {
+      this._addArrowSvg(
+        'diagonal-arrow', arrowId, diagonalCellMap[arrowId]);
+    }
+    for (const [arrowId, cells] of SudokuConstraintBase.fullLineCellMap(shape)) {
+      if (cells.length > 1) {
+        this._addArrowSvg('full-line-arrow', arrowId, cells);
+      }
+    }
+  }
+
+  static _valueString(constraint) {
+    const clues = constraint.clues();
+    if (clues.length !== 1) {
+      throw Error(
+        'Constraints passed to OutsideClueDisplay must have exactly one clue');
+    }
+    const value = clues[0].value;
+    const type = constraint.type;
+
+    return SudokuConstraint[type].DISPLAY_CONFIG.clueTemplate.replace(
+      '$CLUE', value);
+  }
+
+  drawItem(constraint, displayConfig) {
+    const clues = constraint.clues();
+    if (clues.length !== 1) {
+      throw Error(
+        'Constraints passed to OutsideClueDisplay must have exactly one clue');
+    }
+    const { arrowId, value } = clues[0];
+
+    const valueString = displayConfig.clueTemplate.replace('$CLUE', value);
+
+    this._outsideArrowMap.get(arrowId).currentValues.push(valueString);
+    this._updateArrowValues(arrowId);
+
+    return { arrowId, valueString };
+  }
+
+  removeItem(item) {
+    const { arrowId, valueString } = item;
+
+    arrayRemoveValue(
+      this._outsideArrowMap.get(arrowId).currentValues,
+      valueString);
+    this._updateArrowValues(arrowId);
+
+    return true;
+  }
+
+  _updateArrowValues(arrowId) {
+    const arrow = this._outsideArrowMap.get(arrowId);
+    const elem = arrow.svg;
+
+    // Remove all the old values.
+    const textNode = elem.lastChild;
+    clearDOMNode(textNode);
+
+    // If there are no values, set it inactive and stop.
+    const numValues = arrow.currentValues.length;
+    if (!numValues) {
+      elem.classList.remove('active-arrow');
+      return;
+    }
+
+    elem.classList.add('active-arrow');
+
+    // Construct the output strings.
+    const valueStrings = arrow.currentValues;
+    if (numValues == 1 || !arrowId.includes(',') || arrowId.startsWith('C')) {
+      // For little killers and for columns, the values can be shown
+      // horizontally. (For little killers, its because we know there can only
+      // be one).
+      // This is also trivially true for single values.
+      const text = valueStrings.join('');
+      textNode.appendChild(document.createTextNode(text));
+    } else {
+      // For rows, we need to show the values vertically.
+
+      // Set the x position to the default for the text element.
+      // This is as if we were positioning a single value.
+      const x = textNode.getAttribute('x');
+      // The spacing between each value (in line-height units).
+      const spacingEm = 1.2;
+      // The initial y value needs to be adjusted for the fact we have
+      // multiple lines. We are adjusting from a baseline of a single line.
+      const initialDyEm = -spacingEm * (numValues - 1) / 2;
+      for (let i = 0; i < numValues; i++) {
+        const str = valueStrings[i];
+        const tspan = createSvgElement('tspan');
+        tspan.setAttribute('x', x);
+        tspan.setAttribute('dy', (i == 0 ? initialDyEm : spacingEm) + 'em');
+        tspan.appendChild(document.createTextNode(str));
+        textNode.appendChild(tspan);
+      }
+    }
+
+    // Choose font size based on the number of values.
+    const fontSize = 17 - 2 * numValues;
+    textNode.setAttribute('style', `font-size: ${fontSize}px`);
+  }
+
+  _addArrowSvg(arrowType, arrowId, cells) {
+    const shape = this._shape;
+
+    const cell0 = shape.parseCellId(cells[0]);
+    const cell1 = shape.parseCellId(cells[1]);
+
+    const arrowSvg = this._makeArrow(
+      cell0.row, cell0.col,
+      cell1.row - cell0.row,
+      cell1.col - cell0.col);
+    this.getSvg().appendChild(arrowSvg);
+
+    this._outsideArrowMap.set(
+      arrowId,
+      { svg: arrowSvg, currentValues: [] });
+    arrowSvg.onclick = () => this._handleClick(arrowId, cells);
+    arrowSvg.classList.add(arrowType);
+  };
+
+  _makeArrow(row, col, dr, dc) {
+    const shape = this._shape;
+
+    const [x, y] = this.cellIdCenter(shape.makeCellId(row, col));
+    const cellSize = DisplayItem.CELL_SIZE;
+
+    const arrowLen = 0.2;
+    const arrowX = x - dc * cellSize * (0.5 + arrowLen);
+    const arrowY = y - dr * cellSize * (0.5 + arrowLen);
+    const d = cellSize * arrowLen - 1;
+    const dx = dc * d;
+    const dy = dr * d;
+
+    let directions = [
+      'M', arrowX, arrowY,
+      'L', arrowX + dx, arrowY + dy,
+    ];
+    let path = createSvgElement('path');
+    path.setAttribute('d', directions.join(' '));
+
+    path.setAttribute('marker-end', 'url(#arrowhead)');
+    path.setAttribute('fill', 'transparent');
+    path.setAttribute('stroke', 'rgb(200, 200, 200)');
+    path.setAttribute('stroke-width', 3);
+    path.setAttribute('stroke-linecap', 'round');
+
+    let hitboxSize = d + 8;
+    let hitbox = createSvgElement('rect');
+    hitbox.setAttribute('x', arrowX + dx / 2 - hitboxSize / 2);
+    hitbox.setAttribute('y', arrowY + dy / 2 - hitboxSize / 2);
+    hitbox.setAttribute('height', hitboxSize);
+    hitbox.setAttribute('width', hitboxSize);
+    hitbox.setAttribute('fill', 'transparent');
+
+    let text = createSvgElement('text');
+    let textOffsetFactor = dx * dy ? 0.6 : 0.4;
+    text.setAttribute('x', arrowX - dx * textOffsetFactor);
+    text.setAttribute('y', arrowY - dy * textOffsetFactor);
+    text.setAttribute('text-anchor', 'middle');
+    text.setAttribute('dominant-baseline', 'middle');
+
+    let arrow = createSvgElement('g');
+    arrow.appendChild(hitbox);
+    arrow.appendChild(path);
+    arrow.appendChild(text);
+    arrow.classList.add('outside-arrow');
+
+    return arrow;
+  };
 }
