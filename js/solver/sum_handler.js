@@ -688,9 +688,11 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
       fixedValues |= (!(v & (v - 1))) * v; // Avoid branching.
     }
     const fixedSum = this._sumData.lookupTables.sum[fixedValues];
-    // This should have been caught by the range checks, but we
-    // could have restricted cells in the meantime.
-    if (fixedSum > sum) return false;
+    // Note: We have already check that this is fine earlier, but be defensive
+    //       here because we use it to index into killerCageSums.
+    if (fixedSum > sum) {
+      return false;
+    }
 
     // Check if we have enough unique values.
     if (countOnes16bit(allValues) < numCells) return false
@@ -700,16 +702,16 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
     }
 
     const unfixedValues = allValues & ~fixedValues;
-    let requiredValues = allValues;
+    let requiredUnfixed = unfixedValues;
     const numUnfixed = cells.length - countOnes16bit(fixedValues);
 
     let possibilities = 0;
     const options = this._sumData.killerCageSums[numUnfixed][sum - fixedSum];
-    for (let i = options.length - 1; i >= 0; i--) {
+    for (let i = 0; i < options.length; i++) {
       const o = options[i];
-      if ((o & unfixedValues) == o) {
+      if (!(o & ~unfixedValues)) {
         possibilities |= o;
-        requiredValues &= o;
+        requiredUnfixed &= o;
       }
     }
     if (!possibilities) return false;
@@ -726,7 +728,7 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
 
     // requiredValues are values that appear in all possible solutions.
     // Those that are unique are hidden singles.
-    const hiddenSingles = requiredValues & ~nonUniqueValues & ~fixedValues;
+    const hiddenSingles = requiredUnfixed & ~nonUniqueValues;
     if (hiddenSingles) {
       if (!SudokuConstraintHandler._Util.exposeHiddenSingles(
         grid, cells, hiddenSingles)) {
@@ -738,10 +740,12 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
     // passed in.
     if (!this._cellExclusions) return true;
 
-    const nonUniqueRequired = requiredValues & nonUniqueValues & ~fixedValues;
-    if (!SudokuConstraintHandler._Util.enforceRequiredValueExclusions(
-      grid, cells, nonUniqueRequired, this._cellExclusions, handlerAccumulator)) {
-      return false;
+    const nonUniqueRequired = requiredUnfixed & nonUniqueValues;
+    if (nonUniqueRequired) {
+      if (!SudokuConstraintHandler._Util.enforceRequiredValueExclusions(
+        grid, cells, nonUniqueRequired, this._cellExclusions, handlerAccumulator)) {
+        return false;
+      }
     }
 
     return true;

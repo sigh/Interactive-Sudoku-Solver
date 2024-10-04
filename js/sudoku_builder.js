@@ -2454,6 +2454,14 @@ class SudokuBuilder {
             }
 
             yield new SudokuConstraintHandler.Sum(cells, 0, coeffs);
+
+            if (shape.numValues > 9) {
+              // Limit pill values to 1-9, other than the first cell.
+              const values = [...Array(9).keys()].map(i => i + 1);
+              for (let i = 1; i < pillSize; i++) {
+                yield this._givenHandler(pillCells[i], values);
+              }
+            }
           }
           break;
 

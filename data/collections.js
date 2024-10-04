@@ -689,7 +689,26 @@ const EXAMPLES = [
     src: 'https://www.youtube.com/watch?v=-StX1t2laPE',
     input: '.Or.~R5C2_5.Skyscraper~C2~5~.End.Or.~R3C3_3.Skyscraper~C3~3~.End.Or.~R3C3_7.Skyscraper~C3~~7.End.Or.~R1C4_1.Skyscraper~C4~1~.End.Or.~R3C4_7.Skyscraper~C4~~7.End.Or.~R9C7_9.Skyscraper~C7~9~.End.Or.~R4C9_4.Skyscraper~C9~4~.End.Or.~R7C9_3.Skyscraper~C9~~3.End.Or.~R3C1_9.Skyscraper~R3~~9.End.Or.~R6C9_1.Skyscraper~R6~~1.End.Or.~R6C8_8.Skyscraper~R6~8~.End.Or.~R7C4_6.Skyscraper~R7~~6.End.Or.~R7C6_6.Skyscraper~R7~6~.End.Or.~R8C6_4.Skyscraper~R8~~4.End.Or.~R2C6_8.Skyscraper~C6~~8.End.Or.~R9C5_5.Skyscraper~R9~5~.End.Or.~R4C2_2.Skyscraper~R4~2~.End.Or.~R2C2_2.Skyscraper~R2~2~.End.Or.~R1C4_1.~R6C9_1.End.Or.Skyscraper~C4~1~.Skyscraper~R6~~1.End.Or.~R4C2_2.~R2C2_2.End.Or.Skyscraper~R4~2~.Skyscraper~R2~2~.End.Or.~R3C3_3.~R7C9_3.End.Or.Skyscraper~C3~3~.Skyscraper~C9~~3.End.Or.~R4C9_4.~R8C6_4.End.Or.Skyscraper~C9~4~.Skyscraper~R8~~4.End.Or.~R5C2_5.~R9C5_5.End.Or.Skyscraper~C2~5~.Skyscraper~R9~5~.End.Or.~R7C4_6.~R7C6_6.End.Or.Skyscraper~R7~~6.Skyscraper~R7~6~.End.Or.~R3C3_7.~R3C4_7.End.Or.Skyscraper~C3~~7.Skyscraper~C4~~7.End.Or.~R6C8_8.~R2C6_8.End.Or.Skyscraper~R6~8~.Skyscraper~C6~~8.End.Or.~R9C7_9.~R3C1_9.End.Or.Skyscraper~C7~9~.Skyscraper~R3~~9.End',
     solution: '563127498412938675987654321726819534859743216134562789298476153671395842345281967',
-  }
+  },
+  {
+    name: 'Killer lunchboxes',
+    src: 'https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?print=true&chlang=en&id=0003OO',
+    input: '.Or.Cage~3~R1C1~R2C1~R2C2~R3C2~R4C2~R4C3.Lunchbox~3~R1C1~R2C1~R2C2~R3C2~R4C2~R4C3.End.Or.Cage~8~R1C3~R1C4~R2C4.Lunchbox~8~R1C3~R1C4~R2C4.End.Or.Cage~11~R1C5~R1C6~R1C7~R1C8.Lunchbox~11~R1C5~R1C6~R1C7~R1C8.End.Or.Cage~16~R4C4~R3C4~R3C5~R3C6~R4C6.Lunchbox~16~R4C4~R3C4~R3C5~R3C6~R4C6.End.Or.Cage~6~R5C2~R5C3~R6C3.Lunchbox~6~R5C2~R5C3~R6C3.End.Or.Cage~10~R6C4~R5C4~R5C5~R5C6.Lunchbox~10~R6C4~R5C4~R5C5~R5C6.End.Or.Cage~7~R4C7~R5C7~R6C7.Lunchbox~7~R4C7~R5C7~R6C7.End.Or.Cage~6~R4C8~R5C8~R5C9.Lunchbox~6~R4C8~R5C8~R5C9.End.Or.Lunchbox~0~R9C7~R9C8~R9C9.End.Or.Cage~13~R7C7~R7C6~R8C6~R8C5.Lunchbox~13~R7C7~R7C6~R8C6~R8C5.End.Or.Lunchbox~0~R6C5~R7C5~R7C4~R8C4~R9C4.End.Or.Cage~8~R7C2~R7C3~R8C3.Lunchbox~8~R7C2~R7C3~R8C3.End.Or.Cage~15~R7C1~R8C1~R9C1~R9C2.Lunchbox~15~R7C1~R8C1~R9C1~R9C2.End.Or.Cage~7~R4C1~R5C1~R6C1.Lunchbox~7~R4C1~R5C1~R6C1.End',
+    solution: '974835216312976845568421379187653924456289731239147658625394187841762593793518462',
+  },
+  {
+    // As above, but 'Or' constraints have been resolved.
+    name: 'Killer lunchboxes, resolved',
+    src: 'https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?print=true&chlang=en&id=0003OO',
+    input: '.Lunchbox~3~R1C1~R2C1~R2C2~R3C2~R4C2~R4C3.Lunchbox~8~R1C3~R1C4~R2C4.Cage~11~R1C5~R1C6~R1C7~R1C8.Cage~16~R4C4~R3C4~R3C5~R3C6~R4C6.Lunchbox~6~R5C2~R5C3~R6C3.Lunchbox~10~R6C4~R5C4~R5C5~R5C6.Lunchbox~7~R4C7~R5C7~R6C7.Cage~6~R4C8~R5C8~R5C9.Lunchbox~0~R9C7~R9C8~R9C9.Cage~13~R7C7~R7C6~R8C6~R8C5.Cage~8~R7C2~R7C3~R8C3.Lunchbox~15~R7C1~R8C1~R9C1~R9C2.Cage~7~R4C1~R5C1~R6C1.Lunchbox~0~R6C5~R7C5~R7C4~R8C4~R9C4.',
+    solution: '974835216312976845568421379187653924456289731239147658625394187841762593793518462',
+  },
+  {
+    name: 'Ambiguous Arrows',
+    src: 'https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?chlang=en&id=000A06',
+    input: '.Or.Arrow~R2C1~R1C2~R1C3~R2C3.Arrow~R1C2~R1C3~R2C3~R2C1.Arrow~R1C3~R2C3~R2C1~R1C2.Arrow~R2C3~R2C1~R1C2~R1C3.End.Or.Arrow~R3C1~R2C2~R3C3.Arrow~R2C2~R3C3~R3C1.Arrow~R3C3~R3C1~R2C2.End.Or.Arrow~R2C4~R1C4~R1C5~R1C6.Arrow~R1C4~R1C5~R1C6~R2C4.Arrow~R1C5~R1C6~R2C4~R1C4.Arrow~R1C6~R2C4~R1C4~R1C5.End.Or.Arrow~R4C4~R3C4~R2C5~R2C6.Arrow~R3C4~R2C5~R2C6~R4C4.Arrow~R2C5~R2C6~R4C4~R3C4.Arrow~R2C6~R4C4~R3C4~R2C5.End.Or.Arrow~R3C5~R3C6~R4C6.Arrow~R3C6~R4C6~R3C5.Arrow~R4C6~R3C5~R3C6.End.Or.Arrow~R1C9~R1C8~R2C7~R3C8.Arrow~R1C8~R2C7~R3C8~R1C9.Arrow~R2C7~R3C8~R1C9~R1C8.Arrow~R3C8~R1C9~R1C8~R2C7.End.Or.Arrow~R4C9~R4C8~R5C7~R6C8.Arrow~R4C8~R5C7~R6C8~R4C9.Arrow~R5C7~R6C8~R4C9~R4C8.Arrow~R6C8~R4C9~R4C8~R5C7.End.Or.Arrow~R4C7~R5C6~R6C6~R7C6.Arrow~R5C6~R6C6~R7C6~R4C7.Arrow~R6C6~R7C6~R4C7~R5C6.Arrow~R7C6~R4C7~R5C6~R6C6.End.Or.Arrow~R7C4~R6C4~R5C4~R4C3.Arrow~R6C4~R5C4~R4C3~R7C4.Arrow~R5C4~R4C3~R7C4~R6C4.Arrow~R4C3~R7C4~R6C4~R5C4.End.Or.Arrow~R4C1~R4C2~R5C3~R6C3.Arrow~R4C2~R5C3~R6C3~R4C1.Arrow~R5C3~R6C3~R4C1~R4C2.Arrow~R6C3~R4C1~R4C2~R5C3.End.Or.Arrow~R6C2~R7C1~R8C1~R9C1.Arrow~R7C1~R8C1~R9C1~R6C2.Arrow~R8C1~R9C1~R6C2~R7C1.Arrow~R9C1~R6C2~R7C1~R8C1.End.Or.Arrow~R6C1~R7C2~R8C2.Arrow~R7C2~R8C2~R6C1.Arrow~R8C2~R6C1~R7C2.End.Or.Arrow~R9C6~R8C6~R7C7.Arrow~R8C6~R7C7~R9C6.Arrow~R7C7~R9C6~R8C6.End.Or.Arrow~R9C7~R8C8~R9C9.Arrow~R8C8~R9C9~R9C7.Arrow~R9C9~R9C7~R8C8.End',
+    solution: '815923674369417258274586913583172469692854137741369825957241386426738591138695742',
+  },
 ];
 
 for (const puzzle of EXAMPLES) {
