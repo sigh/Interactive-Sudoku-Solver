@@ -260,6 +260,12 @@ const DISPLAYED_EXAMPLES = [
     solution: '463915827591728346872463591189674235234159678657832914346597182725381469918246753',
   },
   {
+    name: 'Magic square',
+    src: 'https://www.youtube.com/watch?v=hAyZ9K2EBF0',
+    input: '.AntiKnight.Diagonal~1.Diagonal~-1.Cage~15~R4C6~R5C6~R6C6.Cage~15~R4C4~R5C4~R6C4.Cage~15~R4C4~R4C5~R4C6.Cage~15~R6C4~R6C5~R6C6.Cage~15~R5C4~R5C5~R5C6.Cage~15~R4C5~R5C5~R6C5.Cage~15~R6C4~R5C5~R4C6.Cage~15~R4C4~R5C5~R6C6.~R4C1_3~R4C2_8~R4C3_4~R9C9_2',
+    solution: '843567219275913846619428375384672951726159483951834627537286194462791538198345762',
+  },
+  {
     name: '16x16',
     src: 'http://forum.enjoysudoku.com/symmertic-16x16-grid-t38266.html#p295157',
     input: `

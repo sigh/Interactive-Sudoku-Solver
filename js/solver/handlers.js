@@ -1274,8 +1274,6 @@ SudokuConstraintHandler.Lunchbox = class Lunchbox extends SudokuConstraintHandle
       }
     }
 
-    const allValuesUsed = countOnes16bit(allValues) == numCells;
-
     // Build up a set of valid cell values.
     const validSettings = SudokuConstraintHandler.Lunchbox._validSettings;
     validSettings.fill(0);
@@ -1322,29 +1320,21 @@ SudokuConstraintHandler.Lunchbox = class Lunchbox extends SudokuConstraintHandle
         outerValues &= valueMask;
         const numOuterCells = numCells - (j - i) - 1;
 
-        let combinations = this._combinations[j - i];
+        const combinations = this._combinations[j - i];
         let innerPossibilities = 0;
         let outerPossibilities = 0;
-        const innerValuesMask = ~(innerValues & valueMask);
-        const outerValuesMask = ~outerValues & valueMask & allValues;
+        const disallowedInside = ~(innerValues & valueMask);
+
         let innerRanges = valueMask;
         for (let k = 0; k < combinations.length; k++) {
           let c = combinations[k];
           // Check if the inner values can create the combination.
-          if (!((innerValuesMask & c))) {
-            if (allValuesUsed) {
-              // Check if the outer values can create the complement.
-              if (!(outerValuesMask & ~c)) {
-                innerPossibilities |= c;
-                outerPossibilities |= ~c;
-              }
-            } else {
-              // Check if there are enough outer values for all the outer cells.
-              if (countOnes16bit(~c & outerValues) >= numOuterCells) {
-                innerPossibilities |= c;
-                outerPossibilities |= ~c;
-                innerRanges &= LookupTables.valueRangeInclusive(c);
-              }
+          if (!((disallowedInside & c))) {
+            // Check if there are enough outer values for all the outer cells.
+            if (countOnes16bit(~c & outerValues) >= numOuterCells) {
+              innerPossibilities |= c;
+              outerPossibilities |= ~c;
+              innerRanges &= LookupTables.valueRangeInclusive(c);
             }
           }
 

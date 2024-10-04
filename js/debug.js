@@ -264,7 +264,8 @@ const runSolveTests = async (onFailure) => {
     '2D 1-5-9',
     'Full rank',
     'Duplicate cell sums',
-    'Lunchbox',
+    'Lunchbox',  // Lunchbox
+    'Killer lunchboxes, resolved', // Lunchbox with 0
     'Hidden skyscrapers',
     'Unbidden First Hidden', // And constraint
     'Look-and-say',
