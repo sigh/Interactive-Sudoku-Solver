@@ -6,7 +6,7 @@ layout: null
 
 <head>
   <title>Interactive Sudoku Solver</title>
-  <meta name="description" content="Fast interactive Sudoku solver. Supports many variants including 16x16 grids.">
+  <meta name="description" content="Fast interactive Sudoku solver. Supports many variants and up to 16x16 grids.">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="icon" href="{{ 'img/favicon.png' | relative_url }}">
   <link rel="canonical" href="https://sigh.github.io/Interactive-Sudoku-Solver/" />
@@ -45,7 +45,7 @@ layout: null
 </head>
 
 <body>
-  <h1>Interactive Sudoku Solver</h1>
+  <h1>Interactive Sudoku Solver (ISS)</h1>
 
   <div id="instruction-panel">
     <div>
@@ -229,7 +229,7 @@ layout: null
 
             <form id="multi-cell-constraint-input">
               <fieldset tabindex="0" class="constraint-panel">
-                <h2>Lines & Regions</h2>
+                <h2>Lines & Sets</h2>
                 <div id="multi-cell-constraint-body">
                   <span class="description">
                     Select cells by dragging or shift-clicking.

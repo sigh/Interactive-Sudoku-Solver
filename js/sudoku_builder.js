@@ -761,7 +761,7 @@ class CompositeConstraintBase extends SudokuConstraintBase {
   static IS_COMPOSITE = true;
   static DISPLAY_CONFIG = {
     displayClass: 'BorderedRegion',
-    opacity: 0.2,
+    opacity: 0.35,
     dashed: true,
   };
 
