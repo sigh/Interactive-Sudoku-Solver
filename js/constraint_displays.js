@@ -42,6 +42,23 @@ class BaseConstraintDisplayItem extends DisplayItem {
   // svg element.
   drawItem(constraint, options) { throw 'Unimplemented'; }
 
+  // By default, makeIcon returns a shaded grey region for the cells in the
+  // constraint.
+  makeIcon(constraint, options) {
+    const cells = constraint.displayCells(this._shape);
+    if (!cells.length) return null;
+    const cellIds = cells.map(c => this._shape.parseCellId(c).cell);
+
+    const g = createSvgElement('g');
+
+    g.setAttribute('fill', 'lightgray');
+    for (const cell of cellIds) {
+      g.appendChild(this._makeCellSquare(cell));
+    }
+
+    return g;
+  }
+
   removeItem(item) {
     item.parentNode.removeChild(item);
     return true;
@@ -73,7 +90,7 @@ class BaseConstraintDisplayItem extends DisplayItem {
     return diamond;
   }
 
-  _drawConstraintLineMarker(marker, points, index) {
+  _makeConstraintLineMarker(marker, points, index) {
     const point = points[index];
     switch (marker) {
       case LineOptions.EMPTY_CIRCLE_MARKER:
@@ -119,7 +136,7 @@ class BaseConstraintDisplayItem extends DisplayItem {
     }
   }
 
-  _drawConstraintLine(cells, options, container) {
+  _makeConstraintLine(cells, options) {
     const len = cells.length;
     if (len < 2) throw (`Line too short: ${cells}`)
 
@@ -143,16 +160,16 @@ class BaseConstraintDisplayItem extends DisplayItem {
 
     // Add the markers.
     if (startMarker) {
-      g.append(this._drawConstraintLineMarker(
+      g.append(this._makeConstraintLineMarker(
         startMarker, points, 0));
     }
     if (endMarker) {
-      g.append(this._drawConstraintLineMarker(
+      g.append(this._makeConstraintLineMarker(
         endMarker, points, len - 1));
     }
     if (nodeMarker) {
       for (let i = 1; i < len - 1; i++) {
-        g.append(this._drawConstraintLineMarker(
+        g.append(this._makeConstraintLineMarker(
           nodeMarker, points, i));
       }
     }
@@ -168,8 +185,6 @@ class BaseConstraintDisplayItem extends DisplayItem {
         (options.width / 2) + ' ' + (options.width * 2));
     }
     g.append(path);
-
-    container.append(g);
 
     return g;
   }
@@ -371,13 +386,25 @@ ConstraintDisplays.Indexing = class Indexing extends BaseConstraintDisplayItem {
 
 ConstraintDisplays.GenericLine = class GenericLine extends BaseConstraintDisplayItem {
   drawItem(constraint, options) {
+    const item = this._makeItem(constraint, options);
+    this._svg.append(item);
+
+    return item;
+  }
+
+  makeIcon(constraint, options) {
+    return this._makeItem(constraint, options);
+  }
+
+  _makeItem(constraint, options) {
     // TODO: Inline cellArgs.
     const cellArgs = new CellArgs(constraint.cells, constraint.type);
     const cells = cellArgs.cells().slice();
     if (cellArgs.isLoop()) {
       cells.push(cells[0]);
     }
-    return this._drawConstraintLine(cells, options, this._svg);
+
+    return this._makeConstraintLine(cells, options);
   }
 }
 
@@ -402,13 +429,18 @@ ConstraintDisplays.CustomBinary = class CustomBinary extends ConstraintDisplays.
     return false;
   }
 
-  drawItem(constraint, _) {
+  // NOTE: We have no makeIcon method as CustomBinary does not have a
+  // displayClass (only the dummy class does).
+  // Implementing icons is trickier as the constraint can contain multiple
+  // different lines.
+
+  drawItem(constraint, options) {
     const cells = constraint.cells;
 
     const colorKey = `${constraint.key}-${constraint.type}`;
     const color = this._colorPicker.pickColor(colorKey);
 
-    const elem = this._drawConstraintLine(
+    const elem = this._makeConstraintLine(
       cells,
       {
         color,
@@ -416,9 +448,11 @@ ConstraintDisplays.CustomBinary = class CustomBinary extends ConstraintDisplays.
         nodeMarker: LineOptions.SMALL_FULL_CIRCLE_MARKER,
         startMarker: (constraint.type !== 'BinaryX') ? LineOptions.SMALL_EMPTY_CIRCLE_MARKER : undefined,
         dashed: true,
-      },
-      this._svg);
+      });
+
     this._colorPicker.addItem(elem, color, colorKey);
+
+    this._svg.append(elem);
 
     return elem;
   }
@@ -428,6 +462,16 @@ ConstraintDisplays.PillArrow = class PillArrow extends ConstraintDisplays.Generi
   _nextMaskId = 0;
 
   drawItem(constraint, _) {
+    const item = this._makeItem(constraint, false);
+    this._svg.append(item);
+    return item;
+  }
+
+  makeIcon(constraint, _) {
+    return this._makeItem(constraint, true);
+  }
+
+  _makeItem(constraint, isIcon) {
     const cells = constraint.cells;
     const pillSize = constraint.pillSize;
 
@@ -451,14 +495,11 @@ ConstraintDisplays.PillArrow = class PillArrow extends ConstraintDisplays.Generi
       mask.setAttribute('id', maskId);
       mask.setAttribute('maskUnits', 'userSpaceOnUse');
 
-      const maxX = Math.max(...points.map(p => p[0]));
-      const maxY = Math.max(...points.map(p => p[1]));
-
       const rect = createSvgElement('rect');
       rect.setAttribute('fill', 'white');
       rect.setAttribute('stroke-width', 0);
-      rect.setAttribute('width', maxX + pillWidth * 2);
-      rect.setAttribute('height', maxY + pillWidth * 2);
+      rect.setAttribute('width', '100%');
+      rect.setAttribute('height', '100%');
       mask.append(rect);
 
       const pillInside = this._makePath(pillPoints);
@@ -472,7 +513,9 @@ ConstraintDisplays.PillArrow = class PillArrow extends ConstraintDisplays.Generi
     {
       const pill = this._makePath(pillPoints);
       pill.setAttribute('stroke-width', pillWidth);
-      pill.setAttribute('mask', `url(#${maskId})`);
+      if (!isIcon) {
+        pill.setAttribute('mask', `url(#${maskId})`);
+      }
       g.append(pill);
     }
 
@@ -480,11 +523,11 @@ ConstraintDisplays.PillArrow = class PillArrow extends ConstraintDisplays.Generi
     {
       const arrow = this._makePath(points.slice(pillSize - 1));
       arrow.setAttribute('marker-end', 'url(#arrowhead)');
-      arrow.setAttribute('mask', `url(#${maskId})`);
+      if (!isIcon) {
+        arrow.setAttribute('mask', `url(#${maskId})`);
+      }
       g.append(arrow);
     }
-
-    this._svg.append(g);
 
     return g;
   }
@@ -574,25 +617,37 @@ ConstraintDisplays.ShadedRegion = class ShadedRegion extends BaseConstraintDispl
   }
 
   drawItem(constraint, options) {
+    const item = this._makeItem(constraint, options, null);
+    this._svg.append(item);
+    return item;
+  }
+
+  makeIcon(constraint, options) {
+    return this._makeItem(constraint, options, 'blue');
+  }
+
+  _makeItem(constraint, options, colorOverride) {
     const cells = constraint.cells;
     const label = constraint[options?.labelField];
 
-    const region = this._drawRegion(cells, label, options?.pattern);
+    const region = this._makeRegion(
+      cells, label, options?.pattern, colorOverride);
 
     if (options?.lineConfig) {
-      this._drawConstraintLine(cells, options.lineConfig, region);
+      const line = this._makeConstraintLine(cells, options.lineConfig);
+      region.append(line);
     }
 
     return region;
   }
 
-  _drawRegion(cells, label, pattern) {
+  _makeRegion(cells, label, pattern, colorOverride) {
     let x, y;
 
     const region = createSvgElement('g');
 
     const cellIndexes = cells.map(c => this._shape.parseCellId(c).cell);
-    const color = this._chooseCellColor(cellIndexes);
+    const color = colorOverride || this._chooseCellColor(cellIndexes);
 
     let patternId = null;
     if (pattern) {
@@ -625,13 +680,14 @@ ConstraintDisplays.ShadedRegion = class ShadedRegion extends BaseConstraintDispl
 
       region.appendChild(path);
     }
-    this._cellColors.addItem(region, color, ...cellIndexes);
+
+    if (!colorOverride) {
+      this._cellColors.addItem(region, color, ...cellIndexes);
+    }
 
     // Draw the sum in the top-left most cell. Luckily, this is the sort order.
     const topLeftCell = cells.reduce((a, b) => a < b ? a : b);
     [x, y] = this.cellIdTopLeftCorner(topLeftCell);
-
-    this.getSvg().append(region);
 
     if (label !== undefined) {
       const text = this.makeTextNode(label, x, y, 'shaded-region-label');
@@ -691,9 +747,19 @@ ConstraintDisplays.CountingCircles = class CountingCircles extends BaseConstrain
   }
 
   drawItem(constraint, _) {
+    const item = this._makeItem(constraint, null);
+    this._svg.append(item);
+    return item;
+  }
+
+  makeIcon(constraint, _) {
+    return this._makeItem(constraint, 'blue');
+  }
+
+  _makeItem(constraint, colorOverride) {
     const cells = constraint.cells;
     const region = createSvgElement('g');
-    const color = this._circleColors.pickColor();
+    const color = colorOverride || this._circleColors.pickColor();
 
     for (const cellId of cells) {
       const point = this.cellIdCenter(cellId);
@@ -706,8 +772,9 @@ ConstraintDisplays.CountingCircles = class CountingCircles extends BaseConstrain
       region.appendChild(circle);
     }
 
-    this._circleColors.addItem(region, color, ...cells);
-    this.getSvg().append(region);
+    if (!colorOverride) {
+      this._circleColors.addItem(region, color, ...cells);
+    }
 
     return region;
   }
@@ -921,9 +988,19 @@ ConstraintDisplays.BorderedRegion = class BorderedRegion extends BaseConstraintD
   }
 
   drawItem(constraint, options) {
+    const item = this._makeItem(constraint, options, null);
+    this._svg.append(item);
+    return item;
+  }
+
+  makeIcon(constraint, options) {
+    return this._makeItem(constraint, options, 'gray');
+  }
+
+  _makeItem(constraint, options, colorOverride) {
     const shape = this._shape;
     const graph = GridGraph.get(shape);
-    const color = this._colorPicker.pickColor();
+    const color = colorOverride || this._colorPicker.pickColor();
 
     let groups = null;
     if (options.splitFn) {
@@ -946,8 +1023,9 @@ ConstraintDisplays.BorderedRegion = class BorderedRegion extends BaseConstraintD
     if (options.dashed) g.setAttribute('stroke-dasharray', '8 2');
     g.setAttribute('opacity', options.opacity || 0.4);
 
-    this._colorPicker.addItem(g, color, groups.flat());
-    this._svg.append(g);
+    if (!colorOverride) {
+      this._colorPicker.addItem(g, color, groups.flat());
+    }
 
     return g;
   }
@@ -1098,8 +1176,10 @@ ConstraintDisplays.OutsideClue = class OutsideClue extends BaseConstraintDisplay
   _addArrowSvg(arrowType, arrowId, cells) {
     const shape = this._shape;
 
-    const cell0 = shape.parseCellId(cells[0]);
-    const cell1 = shape.parseCellId(cells[1]);
+    const parsedCells = cells.map(c => shape.parseCellId(c));
+
+    const cell0 = parsedCells[0];
+    const cell1 = parsedCells[1];
 
     const arrowSvg = this._makeArrow(
       cell0.row, cell0.col,
@@ -1109,7 +1189,7 @@ ConstraintDisplays.OutsideClue = class OutsideClue extends BaseConstraintDisplay
 
     this._outsideArrowMap.set(
       arrowId,
-      { svg: arrowSvg, currentValues: [] });
+      { svg: arrowSvg, cells: parsedCells.map(p => p.cell), currentValues: [] });
     arrowSvg.onclick = () => this._handleClick(arrowId, cells);
     arrowSvg.classList.add(arrowType);
   };

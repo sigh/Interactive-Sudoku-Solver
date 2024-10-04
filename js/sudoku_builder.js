@@ -2062,7 +2062,7 @@ class SudokuConstraint {
     }
 
     displayCells(shape) {
-      const groups = this.constructor.parseGroups(this.items, false)
+      const groups = [...this.constructor.parseGroups(this.items, false)];
       return groups.flatMap(g => g.cells);
     }
   }

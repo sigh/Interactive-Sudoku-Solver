@@ -1258,8 +1258,9 @@ class ConstraintChipView {
     chipLabel.className = 'chip-label';
     chipLabel.textContent = constraint.chipLabel();
 
-    if (config.displayElem) {
-      const chipIcon = this._makeChipIcon(config.displayElem);
+    if (config.displayElem || config.iconElem) {
+      const iconElem = config.iconElem || config.displayElem.cloneNode(true);
+      const chipIcon = this._makeChipIcon(iconElem);
       if (constraint.constructor.IS_COMPOSITE) {
         chipLabel.appendChild(chipIcon);
       } else {
@@ -1305,6 +1306,7 @@ class ConstraintChipView {
       for (const subConstraint of constraint.constraints) {
         subView.appendChild(this._makeChip({
           constraint: subConstraint,
+          iconElem: this._display.makeConstraintIcon(subConstraint),
           removeFn: () => {
             arrayRemoveValue(constraint.constraints, subConstraint);
           },
@@ -1318,7 +1320,7 @@ class ConstraintChipView {
 
   _CHIP_ICON_SIZE_PX = 28;
 
-  _makeChipIcon(displayElem) {
+  _makeChipIcon(elem) {
     const svg = createSvgElement('svg');
     svg.classList.add('chip-icon');
 
@@ -1336,7 +1338,6 @@ class ConstraintChipView {
     borders.setAttribute('transform', transform);
     borders.setAttribute('stoke-width', 0);
 
-    const elem = displayElem.cloneNode(true);
     elem.setAttribute('transform', transform);
     elem.setAttribute('stroke-width', 15);
     elem.setAttribute('opacity', 1);
