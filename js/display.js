@@ -576,6 +576,13 @@ class ConstraintDisplay extends DisplayItem {
     return item;
   }
 
+  makeConstraintIcon(constraint) {
+    const config = constraint.constructor.DISPLAY_CONFIG;
+    if (!config) return null;
+    return this._constraintDisplays.get(
+      config.displayClass).makeIcon(constraint, config);
+  }
+
   toggleConstraint(constraint, enable) {
     const displayClass = constraint.constructor.DISPLAY_CONFIG.displayClass;
     return this._constraintDisplays.get(
