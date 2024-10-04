@@ -1519,6 +1519,7 @@ class Selection {
       } else {
         this._highlight.addCell(currCell);
       }
+      this._runCallback();
     };
     container.addEventListener('pointerdown', e => {
       // If the shift key is pressed, continue adding to the selection.
@@ -1534,7 +1535,7 @@ class Selection {
     });
     container.addEventListener('pointerup', e => {
       container.removeEventListener('pointermove', pointerMoveFn);
-      this._runCallback();
+      // this._runCallback();
       e.preventDefault();
     });
     container.addEventListener('touchmove', e => {

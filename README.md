@@ -1,4 +1,6 @@
-Interactive Sudoku Solver (ISS) is a web-based solver written in JavaScript.
+# Interactive Sudoku Solver (ISS)
+
+A fast web-based solver written in JavaScript.
 
 It solve sudoku puzzles including a large number of variants,
 while making it easy to explore the solution space including:
