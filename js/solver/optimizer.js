@@ -84,17 +84,14 @@ class SudokuConstraintOptimizer {
   }
 
   _optimizeJigsaw(handlerSet, hasBoxes, shape) {
-    const jigsawHandlers = handlerSet.getAllofType(SudokuConstraintHandler.Jigsaw);
-    if (jigsawHandlers.length == 0) return;
-    if (jigsawHandlers.length > 1) throw ('Multiple jigsaw handlers');
-    const jigsawHandler = jigsawHandlers[0];
-
+    const jigsawPieces = handlerSet.getAllofType(SudokuConstraintHandler.JigsawPiece);
+    if (jigsawPieces.length == 0) return;
 
     handlerSet.addNonEssential(
       ...this._makeJigsawIntersections(handlerSet));
 
     handlerSet.addNonEssential(
-      ...this._makeJigsawLawOfLeftoverHandlers(jigsawHandler, hasBoxes, shape));
+      ...this._makeJigsawLawOfLeftoverHandlers(jigsawPieces, hasBoxes, shape));
   }
 
   // Find a non-overlapping set of handlers.
@@ -592,7 +589,7 @@ class SudokuConstraintOptimizer {
     }
   }
 
-  _makeJigsawLawOfLeftoverHandlers(jigsawHandler, hasBoxes, shape) {
+  _makeJigsawLawOfLeftoverHandlers(jigsawPieces, hasBoxes, shape) {
     const newHandlers = [];
 
     const handleOverlap = (superRegion, piecesRegion, usedPieces) => {
@@ -622,7 +619,7 @@ class SudokuConstraintOptimizer {
       hasBoxes ? this._overlapRegionsWithBox(shape) : this._overlapRegions(shape));
     for (const r of overlapRegions) {
       this._generalRegionOverlapProcessor(
-        r, jigsawHandler.regions, shape.gridSize, handleOverlap);
+        r, jigsawPieces.map(p => p.cells), shape.gridSize, handleOverlap);
     }
 
     return newHandlers;

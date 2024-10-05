@@ -247,6 +247,27 @@ const shuffleArray = (arr, randomGenerator) => {
   }
 };
 
+const groupSortedBy = function* (iterable, keyFunc) {
+  let group = [];
+  let currentKey;
+
+  for (const item of iterable) {
+    const key = keyFunc(item);
+    if (key !== currentKey) {
+      if (group.length > 0) {
+        yield group;
+        group = [];
+      }
+      currentKey = key;
+    }
+    group.push(item);
+  }
+
+  if (group.length > 0) {
+    yield group;
+  }
+};
+
 const autoSaveField = (element, field) => {
   const elementId = element.getAttribute('id');
 

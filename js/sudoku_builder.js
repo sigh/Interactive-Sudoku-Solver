@@ -10,10 +10,13 @@ class GridShape {
     this._registry.set(shape.name, shape);
   }
 
-  static fromNumCells(numCells) {
-    const gridSize = Math.sqrt(numCells);
+  static fromGridSize(gridSize) {
     if (!this.isValidGridSize(gridSize)) return null;
     return this.get(this.makeName(gridSize));
+  }
+  static fromNumCells(numCells) {
+    const gridSize = Math.sqrt(numCells);
+    return this.fromGridSize(gridSize);
   }
   static fromNumPencilmarks(numPencilmarks) {
     const gridSize = Math.cbrt(numPencilmarks);
@@ -294,7 +297,7 @@ class SudokuParser {
 
     return new SudokuConstraint.Set([
       new SudokuConstraint.Shape(shape.name),
-      new SudokuConstraint.Jigsaw(text),
+      ...SudokuConstraint.Jigsaw.makeFromArgs(text),
       new SudokuConstraint.NoBoxes(),
     ]);
   }
@@ -414,7 +417,10 @@ class SudokuParser {
     return new SudokuConstraint.Set(constraints);
   }
 
-  static _resolveCompositeConstraints(revConstraints, compositeType) {
+  static _resolveCompositeConstraints(revConstraints, compositeClass) {
+    // NOTE: The constraints are reversed so we can efficiently pop them off the
+    // end. The result will be that everything is in the original order.
+
     const items = [];
 
     while (revConstraints.length) {
@@ -422,13 +428,19 @@ class SudokuParser {
       if (c.type === 'End') break;
 
       if (c.constructor.IS_COMPOSITE) {
-        items.push(
-          this._resolveCompositeConstraints(revConstraints, c.constructor.name));
+        const resolvedComposite = this._resolveCompositeConstraints(
+          revConstraints, c.constructor);
+        if (compositeClass.CAN_ABSORB.includes(c.constructor.name)) {
+          // We can directly add the sub-constraints to this composite.
+          items.push(...resolvedComposite.constraints);
+        } else {
+          items.push(resolvedComposite);
+        }
       } else {
         items.push(c);
       }
     }
-    return new SudokuConstraint[compositeType](items);
+    return new compositeClass(items);
   }
 
   static parseString(str) {
@@ -446,10 +458,25 @@ class SudokuParser {
       if (!cls) {
         throw ('Unknown constraint type: ' + type);
       }
-      constraints.push(new cls(...args));
+      const constraintParts = [...cls.makeFromArgs(...args)];
+      if (constraintParts.length > 1
+        && CompositeConstraintBase.allowedConstraintClass(cls)) {
+        // If this item was split into multiple constraints, then we wrap it
+        // in an 'And' constraint, since they may need to be treated as a unit
+        // when nested in an 'Or'.
+        // We only need to do this for constraints that are allowed inside
+        // composite constraints.
+        constraints.push(
+          new SudokuConstraint.And(),
+          ...constraintParts,
+          new SudokuConstraint.End());
+      } else {
+        constraints.push(...constraintParts);
+      }
     }
 
-    return this._resolveCompositeConstraints(constraints.reverse(), 'Set');
+    return this._resolveCompositeConstraints(
+      constraints.reverse(), SudokuConstraint.Set);
   }
 
   static extractConstraintTypes(str) {
@@ -513,11 +540,28 @@ class SudokuConstraintBase {
     this.type = this.constructor.name;
   }
 
-  toString() {
-    let type = this.type;
-    if (this.constructor == SudokuConstraint.Givens) type = '';
-    let arr = [type, ...this.args];
+  static *makeFromArgs(...args) {
+    yield new this(...args);
+  }
+
+  // Generate a string for all the passed in constraints combined.
+  // All constraints will be of the current type.
+  // IMPORTANT: Serialize should not return more constraints than the input, as
+  //            the output maybe included in an 'Or'.
+  static serialize(constraints) {
+    return constraints.map(
+      c => this._argsToString(...c.args)).join('');
+  }
+
+  static _argsToString(...args) {
+    let type = this.name;
+    if (this == SudokuConstraint.Givens) type = '';
+    const arr = [type, ...args];
     return '.' + arr.join('~');
+  }
+
+  toString() {
+    return this.constructor.serialize([this]);
   }
 
   forEachTopLevel(fn) {
@@ -558,7 +602,9 @@ class SudokuConstraintBase {
     return this.constructor.displayName();
   }
 
-  displayCells(shape) {
+  // Get the cells associated with this constraints.
+  // Mainly for display purposes.
+  getCells(shape) {
     return this.cells || [];
   }
 
@@ -687,72 +733,105 @@ class OutsideConstraintBase extends SudokuConstraintBase {
   static ZERO_VALUE_OK = false;
   static CLUE_TYPE = '';
 
-  static makeFromArrowId(arrowId, value) {
-    let [rowCol, dir] = arrowId.split(',');
+  constructor(arrowId, value) {
+    super(arguments);
+    arrowId = arrowId.toUpperCase();
 
-    switch (this.CLUE_TYPE) {
-      case OutsideConstraintBase.CLUE_TYPE_DIAGONAL:
-        return new this(value, arrowId);
-      case OutsideConstraintBase.CLUE_TYPE_SINGLE_LINE:
-        return new this(value, rowCol);
-      case OutsideConstraintBase.CLUE_TYPE_DOUBLE_LINE:
-        return new this(
-          rowCol,
-          dir == 1 ? value : '',
-          dir == 1 ? '' : value);
-      default:
-        throw ('Unknown arg type for type: ' + type);
+    this.arrowId = arrowId;
+    this.value = parseInt(value);
+
+    if (!Number.isInteger(this.value)) {
+      throw Error('Invalid clue value: ' + value);
     }
+    if (!this.constructor.ZERO_VALUE_OK && this.value === 0) {
+      throw Error("Clue value can't be 0");
+    }
+
+    const idParts = arrowId.split(',');
+    this.id = idParts[0];
+    this.dir = idParts.length > 1 ? +idParts[1] : 0;
   }
 
-  split() {
-    const clues = this.clues();
-    if (clues.length === 1) return [this];
-    return clues.map(c => this.constructor.makeFromArrowId(c.arrowId, c.value));
+  getCells(shape) {
+    const cls = this.constructor;
+    switch (cls.CLUE_TYPE) {
+      case cls.CLUE_TYPE_DOUBLE_LINE:
+        return cls.fullLineCellMap(shape).get(this.arrowId);
+      case cls.CLUE_TYPE_DIAGONAL:
+        return cls.cellMap(shape)[this.id];
+      case cls.CLUE_TYPE_SINGLE_LINE:
+        return cls.fullLineCellMap(shape).get(this.arrowId);
+      default:
+        throw Error('Unknown clue type');
+    }
   }
 
   chipLabel() {
     if (this.constructor.CLUE_TYPE === this.constructor.CLUE_TYPE_DOUBLE_LINE) {
-      const rowCol = this.rowCol;
-      const [clueInc, clueDec] = this.values();
+      const dir = this.dir;
+      const arrowId = this.arrowId;
 
-      const parts = [];
-      if (rowCol[0] == 'C') {
-        if (clueInc) parts.push(`↓${clueInc}`);
-        if (clueDec) parts.push(`↑${clueDec}`);
+      let dirStr = '';
+      if (arrowId[0] == 'C') {
+        dirStr = dir > 0 ? '↓' : '↑';
       } else {
-        if (clueInc) parts.push(`→${clueInc}`);
-        if (clueDec) parts.push(`←${clueDec}`);
+        dirStr = dir > 0 ? '→' : '←';
       }
 
-      return `${this.constructor.displayName()} [${rowCol} ${parts.join(' ')}]`;
+      return `${this.constructor.displayName()} [${this.id} ${dirStr}${this.value}]`;
     } else {
       return super.chipLabel();
     }
   }
 
-  values() {
-    throw Error('Not implemented');
-  }
-
-  clues() {
-    const values = this.values();
-    switch (this.constructor.CLUE_TYPE) {
-      case this.constructor.CLUE_TYPE_DOUBLE_LINE:
-        const clues = [];
-        if (values[0]) clues.push(
-          { value: values[0], arrowId: this.rowCol + ',1' });
-        if (values[1]) clues.push({
-          value: values[1], arrowId: this.rowCol + ',-1'
-        });
-        return clues;
-      case this.constructor.CLUE_TYPE_DIAGONAL:
-        return [{ value: values[0], arrowId: this.id }];
-      case this.constructor.CLUE_TYPE_SINGLE_LINE:
-        return [{ value: values[0], arrowId: this.id + ',1' }];
+  static *makeFromArgs(...args) {
+    switch (this.CLUE_TYPE) {
+      case this.CLUE_TYPE_DOUBLE_LINE:
+        const rowCol = args[0];
+        if (args[1]) {
+          yield new this(rowCol + ',1', args[1]);
+        }
+        if (args[2]) {
+          yield new this(rowCol + ',-1', args[2]);
+        }
+        break;
+      case this.CLUE_TYPE_DIAGONAL:
+        yield new this(args[1], args[0]);
+        break;
+      case this.CLUE_TYPE_SINGLE_LINE:
+        yield new this(args[1] + ',1', args[0]);
+        break;
       default:
         throw Error('Unknown clue type');
     }
+  }
+
+  static serialize(constraints) {
+    const clueType = this.CLUE_TYPE;
+
+    if (clueType != this.CLUE_TYPE_DOUBLE_LINE) {
+      return constraints.map(
+        c => this._argsToString(c.value, c.id)).join('');
+    }
+
+    // Combine double line parts.
+    const seenIds = new Map();
+    for (const part of constraints) {
+      const { id, arrowId, value } = part;
+      let [_, dir] = arrowId.split(',');
+      const index = dir === '1' ? 1 : 2;
+
+      if (seenIds.has(id)) {
+        seenIds.get(id)[index] = value;
+      } else {
+        const args = [id, '', ''];
+        args[index] = value;
+        seenIds.set(id, args);
+      }
+    }
+
+    return [...seenIds.values()].map(
+      args => this._argsToString(...args)).join('');
   }
 }
 
@@ -774,32 +853,43 @@ class CompositeConstraintBase extends SudokuConstraintBase {
   //  - Or would just be a bit confusing to include given the above two caveats
   //    (such as Anti-knight). It is easier to ban everything in the layout
   //    panel.
-  static ALLOWED_COLLECTOR_CLASSES = new Set(
+  static _ALLOWED_COLLECTOR_CLASSES = new Set(
     ['MultiCell', 'GivenCandidates', 'OutsideClue', 'Composite', 'CustomBinary']);
+
+  static allowedConstraintClass(constraintClass) {
+    return this._ALLOWED_COLLECTOR_CLASSES.has(constraintClass.COLLECTOR_CLASS);
+  }
 
   constructor(constraints) {
     super(arguments);
     this.constraints = constraints || [];
-
-    const allowedCollectors = this.constructor.ALLOWED_COLLECTOR_CLASSES;
     for (const c of this.constraints) {
-      if (!allowedCollectors.has(c.constructor.COLLECTOR_CLASS)) {
-        throw ('Invalid constraint type in composite: ' + c.type);
+      if (!this.constructor.allowedConstraintClass(c.constructor)) {
+        throw Error(
+          `Invalid constraint type in '${this.constructor.name}': ${c.type}`);
       }
     }
   }
 
-  toString() {
-    return [
-      '.',
-      this.type,
-      ...this.constraints.map(c => c.toString()),
-      '.End',
-    ].join('');
+  getCells(shape) {
+    return this.constraints.flatMap(c => c.getCells(shape));
   }
 
-  displayCells(shape) {
-    return this.constraints.flatMap(c => c.displayCells(shape));
+  static _isSingleConstraint(constraints, serialized) {
+    // Check if we only had one constraint to serialize.
+    // This handles nested composites.
+    if (constraints.length === 1 && constraints[0].constraints.length === 1) {
+      return true;
+    }
+
+    // Otherwise check if there is a new constraint that is started after the
+    // first one.
+    // This handles ordinary constraints which have been combined.
+    if (serialized.indexOf('.', 1) === -1) {
+      return true;
+    }
+
+    return false;
   }
 }
 
@@ -808,48 +898,147 @@ class SudokuConstraint {
   static Set = class Set extends SudokuConstraintBase {
     static COLLECTOR_CLASS = null;
     static IS_COMPOSITE = true;
+    static CAN_ABSORB = ['Set', 'And'];
 
     constructor(constraints) {
       super(arguments);
       this.constraints = constraints;
     }
 
-    toString() {
-      return this.constraints.map(c => c.toString()).join('');
+    static serialize(constraints) {
+      const constraintMap = new Map();
+      for (const c of constraints) {
+        for (const cc of c.constraints) {
+          const cls = cc.constructor;
+          if (!constraintMap.has(cls)) constraintMap.set(cls, []);
+          constraintMap.get(cls).push(cc);
+        }
+      }
+
+      const parts = [];
+      for (const [cls, constraints] of constraintMap) {
+        parts.push(cls.serialize(constraints));
+      }
+      return parts.join('');
     }
 
-    displayCells(shape) {
+    getCells(shape) {
       return this.constraints.flatMap(c => c.cells(shape));
     }
   }
 
-  static Or = class Or extends CompositeConstraintBase { }
+  static Or = class Or extends CompositeConstraintBase {
+    static CAN_ABSORB = ['Or'];
 
-  static And = class And extends CompositeConstraintBase { }
+    static _serializeSingle(constraint) {
+      const parts = [];
+      // We can't combine any constraints within an 'Or'.
+      for (const c of constraint.constraints) {
+        parts.push(c.constructor.serialize([c]));
+      }
+
+      const innerStr = parts.join('');
+      if (this._isSingleConstraint([constraint], innerStr)) {
+        return innerStr;
+      }
+      return `.${this.name}${innerStr}.End`;
+    }
+
+    static serialize(constraints) {
+      return constraints.map(c => this._serializeSingle(c)).join('');
+    }
+  }
+
+  static And = class And extends CompositeConstraintBase {
+    static CAN_ABSORB = ['Set', 'And'];
+
+    static serialize(constraints) {
+      // For 'And' we can combine all the constraints.
+      const constraintMap = new Map();
+      for (const c of constraints) {
+        for (const cc of c.constraints) {
+          const cls = cc.constructor;
+          if (!constraintMap.has(cls)) constraintMap.set(cls, []);
+          constraintMap.get(cls).push(cc);
+        }
+      }
+
+      const parts = [];
+      for (const [cls, constraints] of constraintMap) {
+        parts.push(cls.serialize(constraints));
+      }
+
+      const innerStr = parts.join('');
+      if (this._isSingleConstraint(constraints, innerStr)) {
+        return innerStr;
+      }
+      return `.${this.name}${innerStr}.End`;
+    }
+  }
 
   static End = class End extends SudokuConstraintBase { }
 
   static Jigsaw = class Jigsaw extends SudokuConstraintBase {
     static COLLECTOR_CLASS = 'Jigsaw';
+    static DISPLAY_CONFIG = { displayClass: 'Jigsaw' };
 
-    constructor(grid) {
+    constructor(...cells) {
       super(arguments);
-      this.grid = grid;
+      this.cells = cells;
     }
 
-    chipLabel() {
-      return '';
-    }
+    chipLabel() { return ''; }
 
-    regions() {
-      const grid = this.grid;
+    static *makeFromArgs(...args) {
+      const grid = args[0];
+      const shape = GridShape.fromNumCells(grid.length);
+      if (!shape) throw Error('Invalid jigsaw regions');
+
       const map = new Map();
       for (let i = 0; i < grid.length; i++) {
         const v = grid[i];
         if (!map.has(v)) map.set(v, []);
         map.get(v).push(i);
       }
-      return [...map.values()];
+
+      for (const region of map.values()) {
+        if (region.length === shape.gridSize) {
+          yield new this(
+            ...region.map(c => shape.makeCellIdFromIndex(c)));
+        }
+      }
+    }
+
+    static serialize(parts) {
+      if (!parts.length) return [];
+
+      const shape = GridShape.fromGridSize(parts[0].cells.length);
+
+      // Fill parts grid such that each cell has a reference to the part.
+      const partsGrid = new Array(shape.numCells).fill(null);
+      for (const part of parts) {
+        for (const cellId of part.cells) {
+          const { cell } = shape.parseCellId(cellId);
+          partsGrid[cell] = part;
+        }
+      }
+
+      // Create an indexMap by iterating the cells in order.
+      // This ensures that we create a consistent index independent of the
+      // order of the parts or cells inside the parts.
+      const indexMap = new Map();
+      const baseCharCode = SudokuParser.shapeToBaseCharCode(shape);
+      partsGrid.forEach((part) => {
+        // Create a new index when we first encounter a part.
+        if (!indexMap.has(part)) {
+          const char = String.fromCharCode(baseCharCode + indexMap.size);
+          indexMap.set(part, char);
+        }
+      });
+
+      const layoutStr = partsGrid.map(part => indexMap.get(part)).join('');
+
+      return this._argsToString(layoutStr);
     }
   }
 
@@ -1170,9 +1359,12 @@ class SudokuConstraint {
       this.gridSpec = gridSpec;
     }
 
-    toString() {
-      if (this.gridSpec === SHAPE_9x9.name) return '';
-      return super.toString();
+    static serialize(constraints) {
+      if (constraints.length != 1) {
+        throw Error('Only one Shape constraint is allowed');
+      }
+      if (constraints[0].gridSpec === SHAPE_9x9.name) return '';
+      return super.serialize(constraints);
     }
 
     static getShapeFromGridSpec(gridSpec) {
@@ -1491,11 +1683,10 @@ class SudokuConstraint {
       super(arguments);
       this.pillSize = +pillSize;
       this.cells = cells;
-      // Backward compatibility.
-      if (!/^\d+$/.test(pillSize)) {
-        this.pillSize = 2;
-        this.cells.unshift(pillSize);
-      }
+    }
+
+    chipLabel() {
+      return `Pill Arrow (${this.pillSize}-digit)`;
     }
   }
 
@@ -1563,22 +1754,8 @@ class SudokuConstraint {
     };
     static CLUE_TYPE = OutsideConstraintBase.CLUE_TYPE_DIAGONAL;
 
-    constructor(sum, id) {
-      super(arguments);
-      this.id = id;
-      this.sum = sum;
-    }
-
     chipLabel() {
-      return `Little Killer (${this.sum})`;
-    }
-
-    displayCells(shape) {
-      return this.constructor.cellMap(shape)[this.id];
-    }
-
-    values() {
-      return [this.sum];
+      return `Little Killer (${this.value})`;
     }
 
     static cellMap = memoize((shape) => {
@@ -1619,23 +1796,8 @@ class SudokuConstraint {
     };
     static CLUE_TYPE = OutsideConstraintBase.CLUE_TYPE_DOUBLE_LINE;
 
-    constructor(rowCol, sumInc, sumDec) {
-      super(arguments);
-      this.rowCol = rowCol.toUpperCase();
-      this.sumDec = +sumDec;
-      this.sumInc = +sumInc;
-    }
-
     static displayName() {
       return 'X-Sum';
-    }
-
-    displayCells(shape) {
-      return this.constructor.fullLineCellMap(shape).get(this.rowCol + ',1');
-    }
-
-    values() {
-      return [this.sumInc, this.sumDec];
     }
   }
 
@@ -1651,22 +1813,8 @@ class SudokuConstraint {
     static CLUE_TYPE = OutsideConstraintBase.CLUE_TYPE_SINGLE_LINE;
     static ZERO_VALUE_OK = true;
 
-    constructor(sum, id) {
-      super(arguments);
-      this.id = id;
-      this.sum = sum;
-    }
-
     chipLabel() {
-      return `Sandwich [${this.id} ${this.sum}]`;
-    }
-
-    displayCells(shape) {
-      return this.constructor.fullLineCellMap(shape).get(this.id + ',1');
-    }
-
-    values() {
-      return [this.sum];
+      return `Sandwich [${this.id} ${this.value}]`;
     }
   }
 
@@ -1709,21 +1857,6 @@ class SudokuConstraint {
       clueTemplate: '[$CLUE]',
     };
     static CLUE_TYPE = OutsideConstraintBase.CLUE_TYPE_DOUBLE_LINE;
-
-    constructor(rowCol, countInc, countDec) {
-      super(arguments);
-      this.rowCol = rowCol.toUpperCase();
-      this.countInc = +countInc;
-      this.countDec = +countDec;
-    }
-
-    values() {
-      return [this.countInc, this.countDec];
-    }
-
-    displayCells(shape) {
-      return this.constructor.fullLineCellMap(shape).get(this.rowCol + ',1');
-    }
   }
 
   static HiddenSkyscraper = class HiddenSkyscraper extends OutsideConstraintBase {
@@ -1738,21 +1871,6 @@ class SudokuConstraint {
       clueTemplate: '|$CLUE|',
     };
     static CLUE_TYPE = OutsideConstraintBase.CLUE_TYPE_DOUBLE_LINE;
-
-    constructor(rowCol, valueInc, valueDec) {
-      super(arguments);
-      this.rowCol = rowCol.toUpperCase();
-      this.valueInc = +valueInc;
-      this.valueDec = +valueDec;
-    }
-
-    values() {
-      return [this.valueInc, this.valueDec];
-    }
-
-    displayCells(shape) {
-      return this.constructor.fullLineCellMap(shape).get(this.rowCol + ',1');
-    }
   }
 
   static NumberedRoom = class NumberedRoom extends OutsideConstraintBase {
@@ -1766,21 +1884,6 @@ class SudokuConstraint {
       clueTemplate: ':$CLUE:',
     };
     static CLUE_TYPE = OutsideConstraintBase.CLUE_TYPE_DOUBLE_LINE;
-
-    constructor(rowCol, clueInc, clueDec) {
-      super(arguments);
-      this.rowCol = rowCol.toUpperCase();
-      this.clueInc = +clueInc;
-      this.clueDec = +clueDec;
-    }
-
-    values() {
-      return [this.clueInc, this.clueDec];
-    }
-
-    displayCells(shape) {
-      return this.constructor.fullLineCellMap(shape).get(this.rowCol + ',1');
-    }
   }
 
   static FullRank = class FullRank extends OutsideConstraintBase {
@@ -1794,21 +1897,6 @@ class SudokuConstraint {
       clueTemplate: '#$CLUE',
     };
     static CLUE_TYPE = OutsideConstraintBase.CLUE_TYPE_DOUBLE_LINE;
-
-    constructor(rowCol, rankInc, rankDec) {
-      super(arguments);
-      this.rowCol = rowCol.toUpperCase();
-      this.rankInc = +rankInc;
-      this.rankDec = +rankDec;
-    }
-
-    values() {
-      return [this.rankInc, this.rankDec];
-    }
-
-    displayCells(shape) {
-      return this.constructor.fullLineCellMap(shape).get(this.rowCol + ',1');
-    }
   }
 
   static AllDifferent = class AllDifferent extends SudokuConstraintBase {
@@ -1952,71 +2040,91 @@ class SudokuConstraint {
       ];
     }
 
-    displayCells(shape) {
+    getCells(shape) {
       return this.constructor.cells(this.topLeftCell);
     }
   }
 
   static Binary = class Binary extends SudokuConstraintBase {
     static COLLECTOR_CLASS = 'CustomBinary';
+    static DISPLAY_CONFIG = {
+      displayClass: 'CustomBinary',
+      startMarker: LineOptions.SMALL_EMPTY_CIRCLE_MARKER,
+    };
 
-    constructor(key, ...items) {
+    constructor(key, name, ...cells) {
       super(arguments);
       this.key = key;
-      this.items = items;
+      this.name = name;
+      this.cells = cells;
+    }
+
+    groupId() {
+      return `${this.type}-${this.key}`;
     }
 
     chipLabel() {
-      const groups = [...this.constructor.parseGroups(this.items, true)];
-      return groups.map(g => g.name || 'Custom').join(', ');
+      if (this.name) return `"${this.name}"`;
+      return 'Custom';
     }
 
-    static makeFromGroups(key, groups) {
-      const items = [];
-      let currentName = '';
-      // Sort so that all names appear together.
-      groups.sort((a, b) => a.name.localeCompare(b.name));
+    static serialize(constraints) {
+      const parts = [];
 
-      for (const group of groups) {
-        if (group.name == currentName) {
-          items.push('');
-        } else {
-          currentName = group.name;
-          items.push('_' + this.encodeName(currentName));
+      // Sort so that all keys appear together, and names within keys.
+      constraints.sort(
+        (a, b) => a.key.localeCompare(b.key) || a.name.localeCompare(b.name));
+
+      for (const keyGroup of groupSortedBy(constraints, c => c.key)) {
+        const key = keyGroup[0].key;
+        const items = [];
+
+        for (const nameGroup of groupSortedBy(keyGroup, c => c.name)) {
+          let first = true;
+          for (const part of nameGroup) {
+            if (first) {
+              items.push('_' + this.encodeName(part.name));
+              first = false;
+            } else {
+              items.push('');
+            }
+            items.push(...part.cells);
+          }
         }
-        items.push(...group.cells);
+
+        parts.push(this._argsToString(key, ...items));
       }
 
-      return new this(key, ...items);
+      return parts.join('');
     }
 
-    static *parseGroups(items, includeNames) {
+    static *makeFromArgs(...args) {
+      const [key, ...items] = args;
+
       let currentName = '';
-      let currentGroup = {
-        cells: [],
-        name: currentName,
-      };
+      let currentCells = [];
       for (const item of items) {
-        if (item.length && item[0] == 'R' || item[0] == 'r') {
+        if (item.length && 'R' === item[0].toUpperCase()) {
           // This is a cell.
-          currentGroup.cells.push(item);
+          currentCells.push(item);
           continue;
         }
         // Otherwise we are starting a new group. Yield the current one.
-        if (currentGroup.cells.length) yield currentGroup;
+        if (currentCells.length) {
+          yield new this(key, currentName, ...currentCells);
+        }
 
         // Update the name if it has been replaced.
-        if (item.length && includeNames) {
+        if (item.length) {
           currentName = this.decodeName(item.substring(1));
         }
 
-        currentGroup = {
-          cells: [],
-          name: currentName,
-        };
+        currentCells = [];
       }
 
-      if (currentGroup.cells.length) yield currentGroup;
+      if (currentCells.length) {
+        yield new this(key, currentName, ...currentCells);
+      }
     }
 
     static fnToKey(fn, numValues) {
@@ -2060,15 +2168,14 @@ class SudokuConstraint {
       } catch (e) { }
       return displayName;
     }
-
-    displayCells(shape) {
-      const groups = [...this.constructor.parseGroups(this.items, false)];
-      return groups.flatMap(g => g.cells);
-    }
   }
 
   static BinaryX = class BinaryX extends SudokuConstraint.Binary {
     static COLLECTOR_CLASS = 'CustomBinary';
+    static DISPLAY_CONFIG = {
+      displayClass: 'CustomBinary',
+      startMarker: LineOptions.SMALL_FULL_CIRCLE_MARKER,
+    };
 
     static fnToKey(fn, numValues) {
       // Make the function symmetric.
@@ -2155,7 +2262,7 @@ class SudokuConstraint {
       return `Givens {${parts.join(', ')}}`;
     }
 
-    displayCells(shape) {
+    getCells(shape) {
       return this.values.map(v => shape.parseValueId(v).cellId);
     }
   }
@@ -2214,28 +2321,8 @@ class SudokuBuilder {
     return solverProxy;
   }
 
-  static _validateCompositeOrThrow(constraintMap) {
-    let hasComposite = false;
-    for (const key of constraintMap.keys()) {
-      if (SudokuConstraint[key].IS_COMPOSITE) {
-        hasComposite = true;
-      }
-    }
-    if (!hasComposite) return;
-
-    // We have a composite. Disallow any constraints which can have bad
-    // interactions. The strict constraints won't be accurate if there
-    // are dots or x/v constraints inside the composite.
-    if (constraintMap.has('StrictKropki') || constraintMap.has('StrictXV')) {
-      throw Error(
-        'Cannot have composite constraints with StrictKropki or StrictXV');
-    }
-  }
-
   static *_handlers(constraint, shape) {
     const constraintMap = constraint.toMap();
-
-    this._validateCompositeOrThrow(constraintMap);
 
     yield* this._rowColHandlers(shape);
     if (constraintMap.has('NoBoxes')) {
@@ -2286,24 +2373,6 @@ class SudokuBuilder {
     const givensMap = new Map();
     givensMap.set(cell, [value]);
     return new SudokuConstraintHandler.GivenCandidates(givensMap);
-  }
-
-  static _xSumHandler(cells, sum) {
-    const controlCell = cells[0];
-
-    if (sum === 1) {
-      return this._givenHandler(controlCell, 1);
-    }
-
-    const handlers = [];
-    for (let i = 2; i <= cells.length; i++) {
-      const sumRem = sum - i;
-      if (sumRem <= 0) break;
-      handlers.push(new SudokuConstraintHandler.And(
-        this._givenHandler(controlCell, i),
-        new SudokuConstraintHandler.Sum(cells.slice(1, i), sumRem)));
-    }
-    return new SudokuConstraintHandler.Or(...handlers);
   }
 
   static * _regionSumLineHandlers(cells, regions, numValues) {
@@ -2393,16 +2462,10 @@ class SudokuBuilder {
 
         case 'Jigsaw':
           {
-            const regions = constraint.regions();
-
-            for (const cells of regions) {
-              if (cells.length == gridSize) {
-                yield new SudokuConstraintHandler.AllDifferent(cells);
-              }
-            }
-
+            cells = constraint.cells.map(c => shape.parseCellId(c).cell);
+            yield new SudokuConstraintHandler.AllDifferent(cells);
             // Just to let the solver know that this is a jigsaw puzzle.
-            yield new SudokuConstraintHandler.Jigsaw(regions);
+            yield new SudokuConstraintHandler.JigsawPiece(cells);
           }
           break;
 
@@ -2480,30 +2543,41 @@ class SudokuBuilder {
           break;
 
         case 'LittleKiller':
-          cells = SudokuConstraint.LittleKiller
-            .cellMap(shape)[constraint.id].map(c => shape.parseCellId(c).cell);
-          yield new SudokuConstraintHandler.Sum(cells, constraint.sum);
+          cells = constraint.getCells(shape).map(
+            c => shape.parseCellId(c).cell);
+          yield new SudokuConstraintHandler.Sum(
+            cells, constraint.value);
           break;
 
         case 'XSum':
           {
-            cells = SudokuConstraintBase.fullLineCellMap(shape)
-              .get([constraint.rowCol, 1].toString()).map(
-                c => shape.parseCellId(c).cell);
-            if (constraint.sumInc) {
-              yield this._xSumHandler(cells, constraint.sumInc);
+            const cells = constraint.getCells(shape).map(
+              c => shape.parseCellId(c).cell);
+            const sum = constraint.value;
+
+            const controlCell = cells[0];
+
+            if (sum === 1) {
+              yield this._givenHandler(controlCell, 1);
+              break;
             }
-            if (constraint.sumDec) {
-              yield this._xSumHandler(cells.slice().reverse(), constraint.sumDec);
+
+            const handlers = [];
+            for (let i = 2; i <= cells.length; i++) {
+              const sumRem = sum - i;
+              if (sumRem <= 0) break;
+              handlers.push(new SudokuConstraintHandler.And(
+                this._givenHandler(controlCell, i),
+                new SudokuConstraintHandler.Sum(cells.slice(1, i), sumRem)));
             }
+            yield new SudokuConstraintHandler.Or(...handlers);
           }
           break;
 
         case 'Sandwich':
-          cells = SudokuConstraintBase.fullLineCellMap(shape)
-            .get([constraint.id, 1].toString()).map(
-              c => shape.parseCellId(c).cell);
-          yield new SudokuConstraintHandler.Lunchbox(cells, constraint.sum);
+          cells = constraint.getCells(shape).map(
+            c => shape.parseCellId(c).cell);
+          yield new SudokuConstraintHandler.Lunchbox(cells, constraint.value);
           break;
 
         case 'Lunchbox':
@@ -2512,50 +2586,25 @@ class SudokuBuilder {
           break;
 
         case 'Skyscraper':
-          cells = SudokuConstraintBase.fullLineCellMap(shape)
-            .get([constraint.rowCol, 1].toString()).map(
-              c => shape.parseCellId(c).cell);
-          if (constraint.countInc) {
-            yield new SudokuConstraintHandler.Skyscraper(
-              cells, constraint.countInc);
-          }
-          if (constraint.countDec) {
-            cells = cells.slice().reverse();
-            yield new SudokuConstraintHandler.Skyscraper(
-              cells, constraint.countDec);
-          }
+          cells = constraint.getCells(shape).map(
+            c => shape.parseCellId(c).cell);
+          yield new SudokuConstraintHandler.Skyscraper(
+            cells, constraint.value);
           break;
 
         case 'HiddenSkyscraper':
-          cells = SudokuConstraintBase.fullLineCellMap(shape)
-            .get([constraint.rowCol, 1].toString()).map(
-              c => shape.parseCellId(c).cell);
-          if (constraint.valueInc) {
-            yield new SudokuConstraintHandler.HiddenSkyscraper(
-              cells, constraint.valueInc);
-          }
-          if (constraint.valueDec) {
-            cells = cells.slice().reverse();
-            yield new SudokuConstraintHandler.HiddenSkyscraper(
-              cells, constraint.valueDec);
-          }
+          cells = constraint.getCells(shape).map(
+            c => shape.parseCellId(c).cell);
+          yield new SudokuConstraintHandler.HiddenSkyscraper(
+            cells, constraint.value);
           break;
 
         case 'NumberedRoom':
-          cells = SudokuConstraintBase.fullLineCellMap(shape)
-            .get([constraint.rowCol, 1].toString()).map(
-              c => shape.parseCellId(c).cell);
-          if (constraint.clueInc) {
-            yield new SudokuConstraintHandler.NumberedRoom(
-              cells, constraint.clueInc);
-          }
-          if (constraint.clueDec) {
-            cells = cells.slice().reverse();
-            yield new SudokuConstraintHandler.NumberedRoom(
-              cells, constraint.clueDec);
-          }
+          cells = constraint.getCells(shape).map(
+            c => shape.parseCellId(c).cell);
+          yield new SudokuConstraintHandler.NumberedRoom(
+            cells, constraint.value);
           break;
-
 
         case 'AllDifferent':
           cells = constraint.cells.map(c => shape.parseCellId(c).cell);
@@ -2646,10 +2695,8 @@ class SudokuBuilder {
             } else if (constraintMap.has('Jigsaw')) {
               // If no boxes is set, try to use the jigsaw regions.
               const jigsawConstraints = constraintMap.get('Jigsaw');
-              if (jigsawConstraints.length !== 1) {
-                throw ('Jigsaw constraint must be unique');
-              }
-              const regions = jigsawConstraints[0].regions();
+              const regions = jigsawConstraints.map(
+                c => c.cells.map(c => shape.parseCellId(c).cell));
               yield* this._regionSumLineHandlers(cells, regions, shape.numValues);
             } else {
               // There are no regions, so the constraint is trivially satisfied.
@@ -2793,8 +2840,8 @@ class SudokuBuilder {
           break;
 
         case 'Binary':
-          for (const g of SudokuConstraint.Binary.parseGroups(constraint.items)) {
-            cells = g.cells.map(c => c && shape.parseCellId(c).cell);
+          {
+            cells = constraint.cells.map(c => c && shape.parseCellId(c).cell);
             for (let i = 1; i < cells.length; i++) {
               yield new SudokuConstraintHandler.BinaryConstraint(
                 cells[i - 1], cells[i],
@@ -2804,8 +2851,8 @@ class SudokuBuilder {
           break;
 
         case 'BinaryX':
-          for (const g of SudokuConstraint.Binary.parseGroups(constraint.items)) {
-            cells = g.cells.map(c => c && shape.parseCellId(c).cell);
+          {
+            cells = constraint.cells.map(c => c && shape.parseCellId(c).cell);
             yield new SudokuConstraintHandler.BinaryPairwise(
               constraint.key, ...cells);
           }
@@ -2834,21 +2881,10 @@ class SudokuBuilder {
 
         case 'FullRank':
           {
-            const line = SudokuConstraintBase.fullLineCellMap(shape)
-              .get([constraint.rowCol, 1].toString()).map(
-                c => shape.parseCellId(c).cell);
-            const items = [];
-            if (constraint.rankInc) items.push({
-              rank: constraint.rankInc,
-              line: line
-            });
-            if (constraint.rankDec) items.push({
-              rank: constraint.rankDec,
-              line: line.slice().reverse()
-            });
+            const line = constraint.getCells(shape).map(
+              c => shape.parseCellId(c).cell);
             yield new SudokuConstraintHandler.FullRank(
-              shape.numCells,
-              items);
+              shape.numCells, [{ rank: constraint.value, line }]);
           }
           break;
 
