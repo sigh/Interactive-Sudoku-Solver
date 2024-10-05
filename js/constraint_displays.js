@@ -45,7 +45,7 @@ class BaseConstraintDisplayItem extends DisplayItem {
   // By default, makeIcon returns a shaded grey region for the cells in the
   // constraint.
   makeIcon(constraint, options) {
-    const cells = constraint.displayCells(this._shape);
+    const cells = constraint.getCells(this._shape);
     if (!cells.length) return null;
     const cellIds = cells.map(c => this._shape.parseCellId(c).cell);
 
@@ -429,15 +429,21 @@ ConstraintDisplays.CustomBinary = class CustomBinary extends ConstraintDisplays.
     return false;
   }
 
-  // NOTE: We have no makeIcon method as CustomBinary does not have a
-  // displayClass (only the dummy class does).
-  // Implementing icons is trickier as the constraint can contain multiple
-  // different lines.
+  makeIcon(constraint, options) {
+    return this._makeItem(constraint, options);
+  }
 
   drawItem(constraint, options) {
+    const item = this._makeItem(constraint, options);
+    this._svg.append(item);
+    return item;
+  }
+
+  _makeItem(constraint, options) {
     const cells = constraint.cells;
 
     const colorKey = `${constraint.key}-${constraint.type}`;
+    // Note: We want the colors to be consistent, even for makeIcon.
     const color = this._colorPicker.pickColor(colorKey);
 
     const elem = this._makeConstraintLine(
@@ -446,13 +452,11 @@ ConstraintDisplays.CustomBinary = class CustomBinary extends ConstraintDisplays.
         color,
         width: LineOptions.THIN_LINE_WIDTH,
         nodeMarker: LineOptions.SMALL_FULL_CIRCLE_MARKER,
-        startMarker: (constraint.type !== 'BinaryX') ? LineOptions.SMALL_EMPTY_CIRCLE_MARKER : undefined,
+        startMarker: options.startMarker,
         dashed: true,
       });
 
     this._colorPicker.addItem(elem, color, colorKey);
-
-    this._svg.append(elem);
 
     return elem;
   }
@@ -1006,7 +1010,7 @@ ConstraintDisplays.BorderedRegion = class BorderedRegion extends BaseConstraintD
     if (options.splitFn) {
       groups = options.splitFn(constraint);
     } else {
-      groups = [constraint.displayCells(shape)];
+      groups = [constraint.getCells(shape)];
     }
 
     const g = createSvgElement('g');
@@ -1081,26 +1085,8 @@ ConstraintDisplays.OutsideClue = class OutsideClue extends BaseConstraintDisplay
     }
   }
 
-  static _valueString(constraint) {
-    const clues = constraint.clues();
-    if (clues.length !== 1) {
-      throw Error(
-        'Constraints passed to OutsideClueDisplay must have exactly one clue');
-    }
-    const value = clues[0].value;
-    const type = constraint.type;
-
-    return SudokuConstraint[type].DISPLAY_CONFIG.clueTemplate.replace(
-      '$CLUE', value);
-  }
-
   drawItem(constraint, displayConfig) {
-    const clues = constraint.clues();
-    if (clues.length !== 1) {
-      throw Error(
-        'Constraints passed to OutsideClueDisplay must have exactly one clue');
-    }
-    const { arrowId, value } = clues[0];
+    const { arrowId, value } = constraint;
 
     const valueString = displayConfig.clueTemplate.replace('$CLUE', value);
 

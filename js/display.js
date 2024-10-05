@@ -571,7 +571,7 @@ class ConstraintDisplay extends DisplayItem {
     if (this._currentConstraints.size === 1000) {
       // Note: We should never reach this, and would indicate a leak.
       // TODO: Remove this after we've verified that there are no leaks.
-      console.log('Warning: high number of constraints');
+      console.error('Warning: high number of constraints');
     }
     return item;
   }

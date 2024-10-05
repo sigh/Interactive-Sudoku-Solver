@@ -137,30 +137,30 @@ ConstraintCollector.Composite = class Composite extends ConstraintCollector {
   constructor(display, chipView) {
     super();
     this._chipView = chipView;
-    this._chipConfigs = [];
+    this._constraints = [];
     this._display = display;
   }
 
   clear() {
-    this._chipConfigs = [];
+    this._constraints = [];
   }
 
-  _removeConstraint(config) {
-    arrayRemoveValue(this._chipConfigs, config);
+  _removeConstraint(constraint) {
+    arrayRemoveValue(this._constraints, constraint);
   }
 
   addConstraint(constraint) {
     const config = {
       constraint: constraint,
       displayElem: this._display.drawConstraint(constraint),
-      removeFn: () => { this._removeConstraint(config); },
+      removeFn: () => { this._removeConstraint(constraint); },
     };
-    this._chipConfigs.push(config);
+    this._constraints.push(constraint);
     this._chipView.addChip(config);
   }
 
   getConstraints() {
-    return this._chipConfigs.map(c => c.constraint);
+    return this._constraints;
   }
 }
 
@@ -622,8 +622,8 @@ ConstraintCollector.Jigsaw = class Jigsaw extends ConstraintCollector {
     this._shape = null;
     this._chipView = chipView;
 
-    this._piecesMap = [];
-    this._maxPieceId = 0;
+    this._seenCells = new Set();
+    this._constraints = [];
 
     this._setUpButton(inputManager);
   }
@@ -632,7 +632,8 @@ ConstraintCollector.Jigsaw = class Jigsaw extends ConstraintCollector {
     const button = document.getElementById('add-jigsaw-button');
     button.onclick = () => {
       const cells = inputManager.getSelection();
-      this._addPiece(cells);
+      this.addConstraint(
+        new SudokuConstraint.Jigsaw(...cells));
       this.runUpdateCallback();
     };
 
@@ -648,90 +649,53 @@ ConstraintCollector.Jigsaw = class Jigsaw extends ConstraintCollector {
 
   reshape(shape) {
     this._shape = shape;
-    this._piecesMap = Array(shape.numCells).fill(0);
+    this.clear();
   }
 
   _isEmpty() {
-    return this._piecesMap.every(x => x == 0);
+    return this._constraints.length == 0;
   }
 
   getConstraints() {
-    if (this._isEmpty()) return [];
-
-    const baseCharCode = SudokuParser.shapeToBaseCharCode(this._shape);
-
-    const indexMap = new Map();
-    const grid = Array(this._shape.numCells).fill('-');
-    this._piecesMap.forEach((p, i) => {
-      if (!indexMap.has(p)) indexMap.set(p, indexMap.size);
-      grid[i] = String.fromCharCode(
-        baseCharCode + indexMap.get(p));
-    });
-    return [new SudokuConstraint.Jigsaw(grid.join(''))];
-  }
-
-  addConstraint(constraint) {
-    const grid = constraint.grid;
-    const map = new Map();
-    const shape = this._shape;
-    for (let i = 0; i < grid.length; i++) {
-      const v = grid[i];
-      if (!map.has(v)) map.set(v, []);
-      map.get(v).push(i);
-    }
-
-    for (const [_, cells] of map) {
-      if (cells.length == shape.gridSize) {
-        this._addPiece(cells.map(c => shape.makeCellIdFromIndex(c)));
-      }
-    }
+    return this._constraints;
   }
 
   clear() {
-    this._piecesMap.fill(0);
+    this._seenCells.clear();
+    this._constraints = [];
   }
 
-  _removePiece(config) {
-    config.constraint.cells.forEach(c => this._piecesMap[this._shape.parseCellId(c).cell] = 0);
-    PanelHighlighter.toggleHighlightForElement(this._chipView.element(), false);
+  _removeConstraint(constraint) {
+    constraint.cells.forEach(c => this._seenCells.delete(c));
+    arrayRemoveValue(this._constraints, constraint);
+    if (this._isEmpty()) {
+      PanelHighlighter.toggleHighlightForElement(
+        this._chipView.element(), false);
+    }
   }
 
-  _addPiece(cells) {
-    if (cells.length != this._shape.gridSize) return;
-    const pieceId = ++this._maxPieceId;
-    cells.forEach(c => this._piecesMap[this._shape.parseCellId(c).cell] = pieceId);
-    const pieceConstraint = new ConstraintCollector.Jigsaw.JigsawPiece(...cells);
+  addConstraint(constraint) {
+    const cells = constraint.cells;
+    cells.forEach(c => this._seenCells.add(c));
     const config = {
-      constraint: pieceConstraint,
-      pieceId: pieceId,
-      displayElem: this._display.drawConstraint(pieceConstraint),
-      removeFn: () => { this._removePiece(config); },
+      constraint: constraint,
+      displayElem: this._display.drawConstraint(constraint),
+      removeFn: () => { this._removeConstraint(constraint); },
     };
     PanelHighlighter.toggleHighlightForElement(this._chipView.element(), true);
     this._chipView.addChip(config);
+    this._constraints.push(constraint);
   }
 
   _cellsAreValidJigsawPiece(cells) {
     const shape = this._shape;
     if (cells.length != shape.gridSize) return false;
     // Check that we aren't overlapping an existing tile.
-    if (cells.some(c => this._piecesMap[shape.parseCellId(c).cell] != 0)) {
+    if (cells.some(c => this._seenCells.has(c))) {
       return false;
     }
     return true;
   }
-}
-
-// Fake constraint for collecting jigsaw pieces.
-ConstraintCollector.Jigsaw.JigsawPiece = class JigsawPiece extends SudokuConstraintBase {
-  static DISPLAY_CONFIG = { displayClass: 'Jigsaw' };
-
-  constructor(...cells) {
-    super(arguments);
-    this.cells = cells;
-  }
-
-  static displayName() { return ''; }
 }
 
 ConstraintCollector.OutsideClue = class OutsideClue extends ConstraintCollector {
@@ -795,15 +759,15 @@ ConstraintCollector.OutsideClue = class OutsideClue extends ConstraintCollector 
       let arrowId = formData.get('id');
 
       let value = formData.get('value');
-      const zeroOk = SudokuConstraint[type].ZERO_VALUE_OK;
+      const constraintClass = SudokuConstraint[type];
+      const zeroOk = constraintClass.ZERO_VALUE_OK;
       if (!this.constructor._isValidValue(value, zeroOk)) {
         clearOutsideClue();
         return false;
       }
       value = +value;
 
-      this._addConstraint(
-        SudokuConstraint[type].makeFromArrowId(arrowId, value));
+      this.addConstraint(new constraintClass(arrowId, value));
 
       inputManager.setSelection([]);
       this.runUpdateCallback();
@@ -847,7 +811,6 @@ ConstraintCollector.OutsideClue = class OutsideClue extends ConstraintCollector 
       }
     } else if (!clueTypes.includes(SudokuConstraint[form.type.value]?.CLUE_TYPE)) {
       // Otherwise then select any valid clue type.
-      // TODO: Use the list of classes directly.
       for (const constraintClass of this._constraintClasses) {
         if (clueTypes.includes(constraintClass.CLUE_TYPE)) {
           form.type.value = constraintClass.name;
@@ -894,17 +857,7 @@ ConstraintCollector.OutsideClue = class OutsideClue extends ConstraintCollector 
 
 
   addConstraint(constraint) {
-    for (const splitConstraint of constraint.split()) {
-      this._addConstraint(splitConstraint);
-    }
-  }
-
-  _addConstraint(constraint) {
-    const clues = constraint.clues();
-    if (clues.length !== 1) {
-      throw ('_addConstraint must be called with a single-valued constraint.');
-    }
-    const arrowId = clues[0].arrowId;
+    const arrowId = constraint.arrowId;
     const type = constraint.type;
 
     // First ensure the existing constraint is removed.
@@ -940,33 +893,10 @@ ConstraintCollector.OutsideClue = class OutsideClue extends ConstraintCollector 
   }
 
   getConstraints() {
-    const seen = new Map();
-
     const constraints = [];
-    for (const lineMap of this._constraints.values()) {
-      for (const constraint of lineMap.values()) {
-        const type = constraint.type;
-        if (constraint.constructor.CLUE_TYPE === OutsideConstraintBase.CLUE_TYPE_DOUBLE_LINE) {
-          const key = `${type}|${constraint.rowCol}`;
-          if (seen.has(key)) {
-            // Merge with the previous.
-            const index = seen.get(key);
-            const existingConstraint = constraints[index];
-            constraints[index] = new SudokuConstraint[type](
-              constraint.rowCol,
-              existingConstraint.values()[0] || constraint.values()[0],
-              existingConstraint.values()[1] || constraint.values()[1]);
-            // We can skip adding another constraint.
-            continue;
-          } else {
-            // Add to the seen list.
-            seen.set(key, constraints.length);
-          }
-        }
-
-        constraints.push(constraint);
-      }
-    };
+    for (const arrowMap of this._constraints.values()) {
+      constraints.push(...arrowMap.values());
+    }
     return constraints;
   }
 }
@@ -1294,7 +1224,7 @@ class ConstraintChipView {
       if (e.target.closest('.chip') !== chip) return;
       if (this._chipHighlighter.key() === chip) return;
       this._chipHighlighter.setCells(
-        constraint.displayCells(this._shape), chip);
+        constraint.getCells(this._shape), chip);
     });
     chip.addEventListener('mouseleave', () => {
       this._chipHighlighter.clear();
@@ -1374,7 +1304,7 @@ class ConstraintSelector {
     this.clear();
     this._currentSelection = { chip, constraint };
     chip.classList.add(ConstraintSelector._SELECTED_CHIP_CLASS);
-    this._highlighter.setCells(constraint.displayCells(this._shape));
+    this._highlighter.setCells(constraint.getCells(this._shape));
   }
 
   toggle(constraint, chip) {
@@ -1994,7 +1924,7 @@ ConstraintCollector.CustomBinary = class CustomBinary extends ConstraintCollecto
     inputManager.onSelection(
       deferUntilAnimationFrame(this._onSelection.bind(this)));
 
-    this._constraintsByKey = new Map();
+    this._constraints = [];
     this._shape = null;
     this._display = display;
     this._chipView = chipView;
@@ -2031,18 +1961,20 @@ ConstraintCollector.CustomBinary = class CustomBinary extends ConstraintCollecto
       const type = formData.get('chain-mode');
       const fnStr = formData.get('function');
 
+      const typeCls = SudokuConstraint[type];
+
       let key = null;
       try {
         const fn = Function(
           `return ((a,b)=>${fnStr})`)();
-        key = SudokuConstraint[type].fnToKey(
-          fn, this._shape.numValues);
+        key = typeCls.fnToKey(fn, this._shape.numValues);
       } catch (e) {
         errorElem.textContent = e;
         return false;
       }
 
-      this._add(key, name, this._inputManager.getSelection(), type);
+      const cells = this._inputManager.getSelection();
+      this.addConstraint(new typeCls(key, name, ...cells));
       this.runUpdateCallback();
 
       return false;
@@ -2053,75 +1985,25 @@ ConstraintCollector.CustomBinary = class CustomBinary extends ConstraintCollecto
   }
 
   clear() {
-    this._constraintsByKey.clear();
+    this._constraints = [];
   }
 
   addConstraint(constraint) {
-    for (const { name, cells } of
-      SudokuConstraint.Binary.parseGroups(constraint.items, true)) {
-      this._add(constraint.key, name, cells, constraint.type);
-    }
-  }
-
-  _add(key, name, cells, type) {
-    if (type != 'Binary' && type != 'BinaryX') {
-      return false;
-    }
-
-    const displayConstraint = new ConstraintCollector.CustomBinary.CustomBinaryLine(
-      type, key, name, ...cells);
     const config = {
-      constraint: displayConstraint,
-      displayElem: this._display.drawConstraint(displayConstraint),
-      removeFn: () => { this._removeConstraint(displayConstraint); },
+      constraint: constraint,
+      displayElem: this._display.drawConstraint(constraint),
+      removeFn: () => { this._removeConstraint(constraint); },
     };
     this._chipView.addChip(config);
-
-    const groupId = displayConstraint.groupId();
-    if (!this._constraintsByKey.has(groupId)) this._constraintsByKey.set(groupId, []);
-    this._constraintsByKey.get(groupId).push(config.constraint);
+    this._constraints.push(constraint);
   }
 
-  _removeConstraint(displayConstraint) {
-    const groupId = displayConstraint.groupId();
-    const keyConstraints = this._constraintsByKey.get(groupId);
-    arrayRemoveValue(keyConstraints, displayConstraint);
+  _removeConstraint(constraint) {
+    arrayRemoveValue(this._constraints, constraint);
   }
 
   getConstraints() {
-    const constraints = [];
-    for (const displayConstraints of this._constraintsByKey.values()) {
-      if (!displayConstraints.length) continue;
-      const { key, type } = displayConstraints[0];
-      constraints.push(
-        SudokuConstraint[type].makeFromGroups(
-          key, displayConstraints));
-    }
-    return constraints;
-  }
-}
-
-// Dummy constraint for displaying custom binary constraints.
-ConstraintCollector.CustomBinary.CustomBinaryLine = class CustomBinaryLine extends SudokuConstraintBase {
-  static DISPLAY_CONFIG = {
-    displayClass: 'CustomBinary',
-  }
-
-  constructor(type, key, name, ...cells) {
-    super(arguments);
-    this.type = type;
-    this.key = key;
-    this.name = name;
-    this.cells = cells;
-  }
-
-  groupId() {
-    return `${this.type}-${this.key}`;
-  }
-
-  chipLabel() {
-    if (this.name) return `"${this.name}"`;
-    return 'Custom';
+    return this._constraints;
   }
 }
 

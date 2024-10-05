@@ -1370,10 +1370,10 @@ SudokuConstraintHandler.Lunchbox = class Lunchbox extends SudokuConstraintHandle
 
 // This only exists to let the solver know this is a jigsaw puzzle, and
 // optimize for it.
-SudokuConstraintHandler.Jigsaw = class Jigsaw extends SudokuConstraintHandler {
-  constructor(regions) {
+SudokuConstraintHandler.JigsawPiece = class JigsawPiece extends SudokuConstraintHandler {
+  constructor(cells) {
     super();
-    this.regions = regions;
+    this.cells = cells;
   }
 }
 

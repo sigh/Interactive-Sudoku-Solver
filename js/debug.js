@@ -282,6 +282,7 @@ const runSolveTests = async (onFailure) => {
     'Or with Givens', // Or constraint (update watched cells)
     'And with AllDifferent', // And constraint (with cellExclusions)
     'Or with AllDifferent', // Or constraint (with cellExclusions)
+    'Elided And and Or', // And and Or constraint which are both simplified out.
   ], onFailure);
   result.collection = '9x9';
   results.push(result);
