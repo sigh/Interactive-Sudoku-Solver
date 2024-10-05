@@ -1994,7 +1994,7 @@ ConstraintCollector.CustomBinary = class CustomBinary extends ConstraintCollecto
     inputManager.onSelection(
       deferUntilAnimationFrame(this._onSelection.bind(this)));
 
-    this._configs = new Map();
+    this._constraintsByKey = new Map();
     this._shape = null;
     this._display = display;
     this._chipView = chipView;
@@ -2053,7 +2053,7 @@ ConstraintCollector.CustomBinary = class CustomBinary extends ConstraintCollecto
   }
 
   clear() {
-    this._configs.clear();
+    this._constraintsByKey.clear();
   }
 
   addConstraint(constraint) {
@@ -2078,21 +2078,20 @@ ConstraintCollector.CustomBinary = class CustomBinary extends ConstraintCollecto
     this._chipView.addChip(config);
 
     const groupId = displayConstraint.groupId();
-    if (!this._configs.has(groupId)) this._configs.set(groupId, []);
-    this._configs.get(groupId).push(config);
+    if (!this._constraintsByKey.has(groupId)) this._constraintsByKey.set(groupId, []);
+    this._constraintsByKey.get(groupId).push(config.constraint);
   }
 
   _removeConstraint(displayConstraint) {
     const groupId = displayConstraint.groupId();
-    const keyConfigs = this._configs.get(groupId);
-    arrayRemoveValue(keyConfigs, displayConstraint);
+    const keyConstraints = this._constraintsByKey.get(groupId);
+    arrayRemoveValue(keyConstraints, displayConstraint);
   }
 
   getConstraints() {
     const constraints = [];
-    for (const configs of this._configs.values()) {
-      if (!configs.length) continue;
-      const displayConstraints = configs.map(c => c.constraint);
+    for (const displayConstraints of this._constraintsByKey.values()) {
+      if (!displayConstraints.length) continue;
       const { key, type } = displayConstraints[0];
       constraints.push(
         SudokuConstraint[type].makeFromGroups(
