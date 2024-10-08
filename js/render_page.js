@@ -285,7 +285,8 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
       selectionForm.firstElementChild, true);
 
     inputManager.onSelection(
-      (selection) => this._onNewSelection(selection, selectionForm));
+      (selection, finishedSelecting) =>
+        this._onNewSelection(selection, selectionForm, finishedSelecting));
     inputManager.addSelectionPreserver(selectionForm);
 
     selectionForm.onsubmit = e => {
@@ -508,7 +509,7 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
     };
   }
 
-  _onNewSelection(selection, selectionForm) {
+  _onNewSelection(selection, selectionForm, finishedSelecting) {
     // Only enable the selection panel if the selection is long enough.
     const disabled = (selection.length == 0);
     selectionForm['add-constraint'].disabled = disabled;
@@ -542,7 +543,7 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
     const typeData = this._typeMap.get(type);
     if (typeData.elem.disabled) {
       selectionForm['add-constraint'].disabled = true;
-    } else if (!isSingleCell) {
+    } else if (!isSingleCell && finishedSelecting) {
       // Focus on the the form so we can immediately press enter, but
       // only if the selection is not a single cell and if the focus has not
       // been set yet.
@@ -638,10 +639,10 @@ ConstraintCollector.Jigsaw = class Jigsaw extends ConstraintCollector {
     };
 
     button.disabled = true;
-    inputManager.onSelection((selection) => {
+    inputManager.onSelection((selection, finishedSelecting) => {
       const isValid = this._cellsAreValidJigsawPiece(selection);
       button.disabled = !isValid;
-      if (isValid && !this._isEmpty()) {
+      if (finishedSelecting && isValid && !this._isEmpty()) {
         button.focus();
       }
     });
@@ -1402,15 +1403,15 @@ class Selection {
     this._callbacks.push(fn);
   }
 
-  _runCallback() {
+  _runCallback(finishedSelecting) {
     this._callbacks.forEach(fn => fn(
-      [...this._highlight.getCells()]));
+      [...this._highlight.getCells()], finishedSelecting));
   }
 
   setCells(cellIds) {
     this._highlight.setCells(cellIds);
     if (cellIds.length > 0) this._maybeAddOutsideClickListener();
-    this._runCallback();
+    this._runCallback(false);
   }
   getCells() { return this._highlight.getCells(); }
   size() { return this._highlight.size(); }
@@ -1450,7 +1451,7 @@ class Selection {
       } else {
         this._highlight.addCell(currCell);
       }
-      this._runCallback();
+      this._runCallback(false);
     };
     container.addEventListener('pointerdown', e => {
       // If the shift key is pressed, continue adding to the selection.
@@ -1466,7 +1467,7 @@ class Selection {
     });
     container.addEventListener('pointerup', e => {
       container.removeEventListener('pointermove', pointerMoveFn);
-      // this._runCallback();
+      this._runCallback(true);
       e.preventDefault();
     });
     container.addEventListener('touchmove', e => {
@@ -1726,17 +1727,22 @@ class GridInputManager {
     this._fakeInput = fakeInput;
 
     this._selection = new Selection(displayContainer);
-    this._selection.addCallback(cellIds => {
+    this._selection.addCallback((cellIds, finishedSelecting) => {
       // Blur the active selection, so that callbacks can tell if something
       // has already set the focus.
-      document.activeElement.blur();
+      if (finishedSelecting) {
+        document.activeElement.blur();
+      }
       if (cellIds.length == 1) {
         const [x, y] = this._selection.cellIdCenter(cellIds[0]);
         fakeInput.style.top = y + 'px';
         fakeInput.style.left = x + 'px';
-        fakeInput.select();
+        if (finishedSelecting) {
+          fakeInput.select();
+        }
       }
-      this._runCallbacks(this._callbacks.onSelection, cellIds);
+      this._runCallbacks(
+        this._callbacks.onSelection, cellIds, finishedSelecting);
     });
 
     this._setUpKeyBindings();
@@ -1937,10 +1943,12 @@ ConstraintCollector.CustomBinary = class CustomBinary extends ConstraintCollecto
     this._shape = shape;
   }
 
-  _onSelection(selection) {
+  _onSelection(selection, finishedSelecting) {
     const form = this._form;
     toggleDisabled(this._collapsibleContainer.element(), selection.length <= 1);
-    if (selection.length > 1 && this._collapsibleContainer.isOpen()) {
+    if (finishedSelecting
+      && selection.length > 1
+      && this._collapsibleContainer.isOpen()) {
       // If the function is empty, focus on it. Otherwise focus on the
       // add button.
       if (form['function'].value === '') {
