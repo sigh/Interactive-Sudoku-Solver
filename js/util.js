@@ -360,3 +360,35 @@ class Base64Codec {
     return Math.ceil(numBits / 6);
   }
 };
+
+class MultiMap {
+  constructor() {
+    this._map = new Map();
+  }
+
+  add(key, value) {
+    let values = this._map.get(key);
+    if (values === undefined) {
+      values = [];
+      this._map.set(key, values);
+    }
+    values.push(value);
+  }
+
+  get(key) {
+    return this._map.get(key) || [];
+  }
+
+  delete(key, value) {
+    const values = this._map.get(key);
+    if (values === undefined) return;
+    arrayRemoveValue(values, value);
+    if (values.length === 0) {
+      this._map.delete(key);
+    }
+  }
+
+  clear() {
+    this._map.clear();
+  }
+}
