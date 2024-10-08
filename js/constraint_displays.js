@@ -64,8 +64,6 @@ class BaseConstraintDisplayItem extends DisplayItem {
     return true;
   }
 
-  toggleItem(constraint, enable) { throw 'Unimplemented'; }
-
   _removeCircleFromPath(p0, p1) {
     const [dx, dy] = [p1[0] - p0[0], p1[1] - p0[1]];
     const frac = this._CIRCLE_RADIUS / Math.sqrt(dx * dx + dy * dy);
@@ -828,28 +826,13 @@ ConstraintDisplays.Diagonal = class Diagonal extends BaseConstraintDisplayItem {
 
   constructor(svg) {
     super(svg);
-    this._diagonals = [null, null];
 
     svg.setAttribute('stroke-width', 1);
     svg.setAttribute('stroke', 'rgb(255, 0, 0)');
   }
 
-  _directionIndex(direction) {
-    return direction > 0;
-  }
-
-  toggleItem(constraint, enable) {
-    if (enable) {
-      this._drawDiagonal(constraint.direction);
-    } else {
-      this._removeDiagonal(constraint.direction);
-    }
-  }
-
-  _drawDiagonal(direction) {
-    const index = this._directionIndex(direction);
-    if (this._diagonals[index]) return this._diagonals[index];
-
+  drawItem(constraint, _) {
+    const direction = constraint.direction;
     const shape = this._shape;
 
     const size = DisplayItem.CELL_SIZE * shape.gridSize;
@@ -859,35 +842,12 @@ ConstraintDisplays.Diagonal = class Diagonal extends BaseConstraintDisplayItem {
     ]);
 
     this.getSvg().appendChild(line);
-    this._diagonals[index] = line;
 
     return line;
   }
 
-  _removeDiagonal(direction) {
-    const index = this._directionIndex(direction);
-    let item = this._diagonals[index];
-    if (item) item.parentNode.removeChild(item);
-    this._diagonals[index] = null;
-  }
-
   clear() {
-    for (const direction of this.DIRECTIONS) {
-      this._removeDiagonal(direction);
-    }
-  }
-
-  reshape(shape) {
-    super.reshape(shape);
-
-    // Redraw the diagonals with the correct shape.
-    for (const direction of this.DIRECTIONS) {
-      const index = this._directionIndex(direction);
-      if (this._diagonals[index]) {
-        this._removeDiagonal(direction);
-        this._drawDiagonal(direction);
-      }
-    }
+    super.clear();
   }
 }
 
@@ -904,7 +864,7 @@ ConstraintDisplays.Windoku = class Windoku extends BaseConstraintDisplayItem {
   }
 
   clear() {
-    this.toggleItem(null, false);
+    this.removeItem(null);
   }
 
   reshape(shape) {
@@ -920,8 +880,13 @@ ConstraintDisplays.Windoku = class Windoku extends BaseConstraintDisplayItem {
     }
   }
 
-  toggleItem(_, enable) {
-    this.getSvg().setAttribute('display', enable ? null : 'none');
+  drawItem(constraint, _) {
+    this.getSvg().setAttribute('display', null);
+    return {};
+  }
+
+  removeItem(item) {
+    this.getSvg().setAttribute('display', 'none');
   }
 }
 
@@ -939,7 +904,7 @@ ConstraintDisplays.DefaultRegionsInverted = class DefaultRegionsInverted extends
   }
 
   clear() {
-    this.toggleItem(null, false);
+    this.removeItem(null);
   }
 
   reshape(shape) {
@@ -966,8 +931,13 @@ ConstraintDisplays.DefaultRegionsInverted = class DefaultRegionsInverted extends
     }
   }
 
-  toggleItem(_, enable) {
-    this.getSvg().setAttribute('display', enable ? 'none' : null);
+  drawItem(constraint, _) {
+    this.getSvg().setAttribute('display', 'none');
+    return {};
+  }
+
+  removeItem(_) {
+    this.getSvg().setAttribute('display', null);
   }
 }
 
@@ -1240,6 +1210,8 @@ ConstraintDisplays.Givens = class Givens extends BaseConstraintDisplayItem {
       return REPLACE_CHAR + (v < 10 ? '' : ' ');
     };
 
+    this._maskMap = new Map();
+
     this._cellDisplay = new CellValueDisplay(svg, valueFn);
   }
 
@@ -1249,26 +1221,34 @@ ConstraintDisplays.Givens = class Givens extends BaseConstraintDisplayItem {
   }
 
   drawItem(constraint) {
-    const grid = new Array(this._shape.numCells).fill(null);
-    for (const valueIds of constraint.values) {
-      const { cell, values } = this._shape.parseValueId(valueIds);
-      grid[cell] = values.length == 1 ? values[0] : values;
+    const values = constraint.values;
+    const item = this._cellDisplay.makeGridValue(
+      this._shape.parseCellId(constraint.cell).cell,
+      values.length == 1 ? values[0] : values);
+    this._svg.append(item);
+
+    if (values.length === 1) {
+      // TODO: Write the maskCell function.
+      this._maskMap.set(
+        item, this._cellDisplay.maskCell(constraint.cell));
     }
 
-    this._cellDisplay.renderGridValues(grid);
-    this._cellDisplay.updateMask(constraint.values);
-
-    return {};
+    return item;
   }
 
-  removeItem(_) {
-    // TODO: Make this class more general, so that it can handle adding multiple
-    //       givens.
-    this.clear();
+  removeItem(item) {
+    super.removeItem(item);
+
+    const maskItem = this._maskMap.get(item);
+    if (maskItem) {
+      maskItem.parentNode?.removeChild(maskItem);
+      this._maskMap.delete(item);
+    }
   }
 
   clear() {
     super.clear();
-    this._cellDisplay.updateMask([]);
+    this._cellDisplay.constructor.clearMask();
+    this._maskMap.clear();
   }
 }

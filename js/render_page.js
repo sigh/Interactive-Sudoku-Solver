@@ -18,18 +18,16 @@ const initPage = () => {
 };
 
 class ConstraintCollector {
-  IS_LAYOUT = false;
-  IS_SHAPE_AGNOSTIC = false;
+  static IS_LAYOUT = false;
+  static IS_SHAPE_AGNOSTIC = false;
 
-  constructor() { }
-
-  addConstraint(constraint) {
-    throw ('Not implemented');
+  constructor(router) {
+    this.router = router;
   }
 
-  getConstraints() {
-    throw ('Not implemented');
-  }
+  // listeners for when constraints are added or removed.
+  onAddConstraint(constraint) { }
+  onRemoveConstraint(constraint) { }
 
   clear() { }
 
@@ -39,6 +37,7 @@ class ConstraintCollector {
     this._updateCallback = fn || (() => { });
   }
 
+  // TODO: Do we need this?
   runUpdateCallback() {
     this._updateCallback();
   }
@@ -54,11 +53,10 @@ class ConstraintCollector {
 }
 
 ConstraintCollector.Shape = class Shape extends ConstraintCollector {
-  IS_LAYOUT = true;
+  static IS_LAYOUT = true;
 
-  constructor() {
-    super();
-    this._shape = SHAPE_9x9;
+  constructor(router) {
+    super(router);
 
     this._setUp();
   }
@@ -74,101 +72,30 @@ ConstraintCollector.Shape = class Shape extends ConstraintCollector {
       select.appendChild(option);
     }
 
-    select.value = this._shape.name;
     select.onchange = () => {
       const shapeName = select.value;
       const shape = GridShape.get(shapeName);
       if (!shape) throw ('Invalid shape: ' + shapeName);
-      this._reshape(shape);
+      this.router.setShape(shape);
     };
     this._select = select;
   }
 
-  _reshape(shape) {
-    this._shape = shape;
-    this.runUpdateCallback();
-  }
-
-  addConstraint(constraint) {
-    const shape = constraint.getShape(constraint);
+  reshape(shape) {
     this._select.value = shape.name;
-    this._reshape(shape);
-  }
-
-  getShape() {
-    return this._shape;
-  }
-
-  getConstraints() {
-    return [new SudokuConstraint.Shape(this._shape.name)];
   }
 }
 
 ConstraintCollector.Experimental = class Experimental extends ConstraintCollector {
-  constructor(chipView) {
-    super();
-    this._chipView = chipView;
-    this._chipConfigs = [];
-  }
-
-  clear() {
-    this._chipConfigs = [];
-  }
-
-  _removeConstraint(config) {
-    arrayRemoveValue(this._chipConfigs, config);
-  }
-
-  addConstraint(constraint) {
-    const config = {
-      constraint: constraint,
-      removeFn: () => { this._removeConstraint(config); },
-    };
-    this._chipConfigs.push(config);
-    this._chipView.addChip(config);
-  }
-
-  getConstraints() {
-    return this._chipConfigs.map(c => c.constraint);
-  }
 }
 
-ConstraintCollector.Composite = class Composite extends ConstraintCollector {
-  constructor(display, chipView) {
-    super();
-    this._chipView = chipView;
-    this._constraints = [];
-    this._display = display;
-  }
-
-  clear() {
-    this._constraints = [];
-  }
-
-  _removeConstraint(constraint) {
-    arrayRemoveValue(this._constraints, constraint);
-  }
-
-  addConstraint(constraint) {
-    const config = {
-      constraint: constraint,
-      displayElem: this._display.drawConstraint(constraint),
-      removeFn: () => { this._removeConstraint(constraint); },
-    };
-    this._constraints.push(constraint);
-    this._chipView.addChip(config);
-  }
-
-  getConstraints() {
-    return this._constraints;
-  }
-}
+ConstraintCollector.Composite = class Composite extends ConstraintCollector { }
 
 ConstraintCollector._Checkbox = class _Checkbox extends ConstraintCollector {
-  IS_SHAPE_AGNOSTIC = true;
+  static IS_SHAPE_AGNOSTIC = true;
 
-  constructor(display, containerId) {
-    super();
+  constructor(router, containerId) {
+    super(router);
 
     this._checkboxes = new Map();
     const initSingleCheckbox = (constraintClass, container, option) => {
@@ -182,12 +109,20 @@ ConstraintCollector._Checkbox = class _Checkbox extends ConstraintCollector {
       input.type = 'checkbox';
       input.id = checkboxId;
       input.onchange = () => {
-        const displayClass = constraintCls.DISPLAY_CONFIG?.displayClass;
-        if (displayClass) {
-          display.toggleConstraint(constraint, input.checked);
+        if (input.checked) {
+          this.router.onAddConstraint(constraint);
+        } else {
+          // We need to remove the exact constraint objects (not necessarily
+          // the constraint we store ourselves).
+          for (const uniquenessKey of constraint.uniquenessKeys()) {
+            for (const c of this.router.getConstraintsByKey(uniquenessKey)) {
+              if (c.type === constraint.type) {
+                this.router.onRemoveConstraint(c);
+              }
+            }
+          }
         }
         PanelHighlighter.toggleHighlightForElement(input, input.checked);
-        this.runUpdateCallback();
       };
       div.appendChild(input);
 
@@ -223,21 +158,18 @@ ConstraintCollector._Checkbox = class _Checkbox extends ConstraintCollector {
     }
   }
 
-  getConstraints() {
-    let constraints = [];
-    for (const item of this._checkboxes.values()) {
-
-      if (item.element.checked && !item.element.disabled) {
-        constraints.push(item.constraint);
-      }
-    }
-    return constraints;
+  onAddConstraint(c) {
+    const checkbox = this._checkboxes.get(c.toString());
+    const element = checkbox.element;
+    element.checked = true;
+    // TODO: Consolidate
+    PanelHighlighter.toggleHighlightForElement(element, true);
   }
 
-  addConstraint(c) {
+  onRemoveConstraint(c) {
     const element = this._checkboxes.get(c.toString()).element;
-    element.checked = true;
-    element.dispatchEvent(new Event('change'));
+    element.checked = false;
+    PanelHighlighter.toggleHighlightForElement(element, false);
   }
 
   clear() {
@@ -248,30 +180,27 @@ ConstraintCollector._Checkbox = class _Checkbox extends ConstraintCollector {
 }
 
 ConstraintCollector.GlobalCheckbox = class GlobalCheckbox extends ConstraintCollector._Checkbox {
-  constructor(display) {
+  constructor(router) {
     const element = document.getElementById('global-constraints-container');
     const container = new CollapsibleContainer(element, true);
 
-    super(display, container.bodyElement().id);
+    super(router, container.bodyElement().id);
   }
 }
 
 ConstraintCollector.LayoutCheckbox = class LayoutCheckbox extends ConstraintCollector._Checkbox {
-  IS_LAYOUT = true;
+  static IS_LAYOUT = true;
 
-  constructor(display) {
-    super(display, 'layout-constraint-checkboxes');
+  constructor(router) {
+    super(router, 'layout-constraint-checkboxes');
   }
 }
 
-ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
+ConstraintCollector.LinesAndSets = class LinesAndSets extends ConstraintCollector {
   static DEFAULT_TYPE = 'Cage';
 
-  constructor(display, chipView, inputManager) {
-    super();
-    this._chipConfigs = [];
-    this._display = display;
-    this._chipView = chipView;
+  constructor(router, inputManager) {
+    super(router);
     this._shape = null;
 
     this._constraintClasses = this.constructor.constraintClasses();
@@ -293,44 +222,6 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
       this._handleSelection(selectionForm, inputManager);
       return false;
     };
-  }
-
-  addConstraint(constraint) {
-    let config = null;
-    if (constraint.type === 'Quad') {
-      config = {
-        constraint: constraint,
-        displayElem: this._display.drawConstraint(constraint),
-        replaceKey: `Quad-${constraint.topLeftCell}`,
-        removeFn: () => { this._removeConstraint(config); },
-      };
-      for (const other of this._chipConfigs) {
-        if (config.replaceKey == other.replaceKey) {
-          this._chipView.removeChip(other);
-          break;
-        }
-      }
-    } else {
-      config = {
-        constraint: constraint,
-        displayElem: this._display.drawConstraint(constraint),
-        removeFn: () => { this._removeConstraint(config); },
-      };
-    }
-    this._chipView.addChip(config);
-    this._chipConfigs.push(config);
-  }
-
-  _removeConstraint(config) {
-    arrayRemoveValue(this._chipConfigs, config);
-  }
-
-  getConstraints() {
-    return this._chipConfigs.map(c => c.constraint);
-  }
-
-  clear() {
-    this._chipConfigs = [];
   }
 
   reshape(shape) {
@@ -360,7 +251,7 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
       if (values.length) {
         cells.sort();
         const constraint = new SudokuConstraint.Quad(cells[0], ...values);
-        this.addConstraint(constraint);
+        this.router.onAddConstraint(constraint);
       }
     } else if (
       constraintClass === SudokuConstraint.ContainExact ||
@@ -370,14 +261,14 @@ ConstraintCollector.MultiCell = class MultiCell extends ConstraintCollector {
         v => Number.isInteger(v) && v >= 1 && v <= this._shape.numValues);
       if (values.length) {
         const constraint = new constraintClass(values.join('_'), ...cells);
-        this.addConstraint(constraint);
+        this.router.onAddConstraint(constraint);
       }
     } else if (constraintClass.ARGUMENT_CONFIG) {
       const value = formData.get(type + '-value');
-      this.addConstraint(
+      this.router.onAddConstraint(
         new constraintClass(value, ...cells));
     } else {
-      this.addConstraint(
+      this.router.onAddConstraint(
         new constraintClass(...cells));
     }
 
@@ -615,16 +506,12 @@ class ExampleHandler {
 }
 
 ConstraintCollector.Jigsaw = class Jigsaw extends ConstraintCollector {
-  IS_LAYOUT = true;
+  static IS_LAYOUT = true;
 
-  constructor(display, inputManager, chipView) {
-    super();
-    this._display = display;
+  constructor(router, inputManager, chipView) {
+    super(router);
     this._shape = null;
     this._chipView = chipView;
-
-    this._seenCells = new Set();
-    this._constraints = [];
 
     this._setUpButton(inputManager);
   }
@@ -633,7 +520,7 @@ ConstraintCollector.Jigsaw = class Jigsaw extends ConstraintCollector {
     const button = document.getElementById('add-jigsaw-button');
     button.onclick = () => {
       const cells = inputManager.getSelection();
-      this.addConstraint(
+      this.router.onAddConstraint(
         new SudokuConstraint.Jigsaw(...cells));
       this.runUpdateCallback();
     };
@@ -654,60 +541,40 @@ ConstraintCollector.Jigsaw = class Jigsaw extends ConstraintCollector {
   }
 
   _isEmpty() {
-    return this._constraints.length == 0;
+    return this._chipView.isEmpty();
   }
 
-  getConstraints() {
-    return this._constraints;
-  }
-
-  clear() {
-    this._seenCells.clear();
-    this._constraints = [];
-  }
-
-  _removeConstraint(constraint) {
-    constraint.cells.forEach(c => this._seenCells.delete(c));
-    arrayRemoveValue(this._constraints, constraint);
+  onRemoveConstraint(_) {
     if (this._isEmpty()) {
       PanelHighlighter.toggleHighlightForElement(
         this._chipView.element(), false);
     }
   }
 
-  addConstraint(constraint) {
-    const cells = constraint.cells;
-    cells.forEach(c => this._seenCells.add(c));
-    const config = {
-      constraint: constraint,
-      displayElem: this._display.drawConstraint(constraint),
-      removeFn: () => { this._removeConstraint(constraint); },
-    };
+  onAddConstraint(_) {
     PanelHighlighter.toggleHighlightForElement(this._chipView.element(), true);
-    this._chipView.addChip(config);
-    this._constraints.push(constraint);
   }
 
   _cellsAreValidJigsawPiece(cells) {
     const shape = this._shape;
     if (cells.length != shape.gridSize) return false;
-    // Check that we aren't overlapping an existing tile.
-    if (cells.some(c => this._seenCells.has(c))) {
-      return false;
+
+    // Check that we don't conflict with any existing constraints.
+    for (const cell of cells) {
+      if (this.router.getConstraintsByKey(cell).some(
+        c => c.constructor.COLLECTOR_CLASS === this.constructor.name)) {
+        return false;
+      }
     }
+
     return true;
   }
 }
 
 ConstraintCollector.OutsideClue = class OutsideClue extends ConstraintCollector {
-  constructor(inputManager, display) {
-    super();
-    this._display = display;
-    this._radioElements = [];
+  constructor(router, inputManager) {
+    super(router);
     this._outsideArrowMap = new Map();
-    this._constraints = new Map();
-
-    this._constraintClasses = this.constructor.constraintClasses();
 
     this._setUp(inputManager);
   }
@@ -750,9 +617,12 @@ ConstraintCollector.OutsideClue = class OutsideClue extends ConstraintCollector 
       let formData = new FormData(outsideClueForm);
       const arrowId = formData.get('id');
       const type = formData.get('type');
-      this._removeConstraint(type, arrowId);
+      const constraints = this.router.getConstraintsByKey(arrowId).filter(
+        c => c.type === type);
+      for (const constraint of constraints) {
+        this.router.onRemoveConstraint(constraint);
+      }
       inputManager.setSelection([]);
-      this.runUpdateCallback();
     };
     outsideClueForm.onsubmit = e => {
       let formData = new FormData(outsideClueForm);
@@ -768,7 +638,7 @@ ConstraintCollector.OutsideClue = class OutsideClue extends ConstraintCollector 
       }
       value = +value;
 
-      this.addConstraint(new constraintClass(arrowId, value));
+      this.router.onAddConstraint(new constraintClass(arrowId, value));
 
       inputManager.setSelection([]);
       this.runUpdateCallback();
@@ -796,23 +666,28 @@ ConstraintCollector.OutsideClue = class OutsideClue extends ConstraintCollector 
 
     const clueTypes = this._outsideArrowMap.get(arrowId);
 
-    for (const input of this._radioElements) {
+    // Enable only constraint types which are valid for this arrow.
+    for (const input of form.type) {
       const constraintClass = SudokuConstraint[input.value];
       input.disabled = !clueTypes.includes(constraintClass.CLUE_TYPE);
     }
 
+    // Find all existing constraints for this arrow.
+    const constraintsForArrow = this.router.getConstraintsByKey(arrowId).filter(
+      c => c.constructor.COLLECTOR_CLASS === this.constructor.name);
+
     // Ensure that the selected type is valid for this arrow.
-    if (this._constraints.has(arrowId)) {
+    if (constraintsForArrow.length) {
       // If we have existing clues, then make sure the selection matches ones
       // of them.
-      const activeConstraintTypes = this._constraints.get(arrowId);
-      if (!activeConstraintTypes.has(form.type.value)) {
-        form.type.value = activeConstraintTypes.keys().next().value;
+      if (!constraintsForArrow.some(c => c.type === form.type.value)) {
+        form.type.value = constraintsForArrow[0].type;
         form.dispatchEvent(new Event('change'));
       }
     } else if (!clueTypes.includes(SudokuConstraint[form.type.value]?.CLUE_TYPE)) {
       // Otherwise then select any valid clue type.
-      for (const constraintClass of this._constraintClasses) {
+      for (const input of form.type) {
+        const constraintClass = SudokuConstraint[input.value];
         if (clueTypes.includes(constraintClass.CLUE_TYPE)) {
           form.type.value = constraintClass.name;
           form.dispatchEvent(new Event('change'));
@@ -826,7 +701,7 @@ ConstraintCollector.OutsideClue = class OutsideClue extends ConstraintCollector 
     const container = form.getElementsByClassName(
       'outside-arrow-clue-types')[0];
 
-    for (const constraintClass of this._constraintClasses) {
+    for (const constraintClass of this.constructor.constraintClasses()) {
       const type = constraintClass.name;
       const div = document.createElement('div');
 
@@ -848,57 +723,19 @@ ConstraintCollector.OutsideClue = class OutsideClue extends ConstraintCollector 
       label.appendChild(tooltip);
       div.appendChild(label);
 
-      this._radioElements.push(input);
-
       container.appendChild(div);
     }
 
     autoSaveField(form, 'type');
   }
+}
 
-
-  addConstraint(constraint) {
-    const arrowId = constraint.arrowId;
-    const type = constraint.type;
-
-    // First ensure the existing constraint is removed.
-    this._removeConstraint(type, arrowId);
-
-    // Ensure the map exists.
-    if (!this._constraints.has(arrowId)) {
-      this._constraints.set(arrowId, new Map());
-    }
-
-    // Add the new constraint.
-    this._constraints.get(arrowId).set(type, constraint);
-    this._display.drawConstraint(constraint);
-  }
-
-  _removeConstraint(type, arrowId) {
-    const arrowMap = this._constraints.get(arrowId);
-    const constraint = arrowMap?.get(type);
-    if (constraint) {
-      this._display.removeConstraint(constraint);
-
-      arrowMap.delete(type);
-      if (!arrowMap.size) this._constraints.delete(arrowId);
-    }
-  }
-
-  clear() {
-    for (const [arrowId, arrowIdMap] of this._constraints.entries()) {
-      for (const type of arrowIdMap.keys()) {
-        this._removeConstraint(type, arrowId);
-      }
-    }
-  }
-
-  getConstraints() {
-    const constraints = [];
-    for (const arrowMap of this._constraints.values()) {
-      constraints.push(...arrowMap.values());
-    }
-    return constraints;
+class ConstraintRouter {
+  constructor(fns, uniquenessKeySet) {
+    this.onAddConstraint = fns.onAddConstraint;
+    this.onRemoveConstraint = fns.onRemoveConstraint;
+    this.getConstraintsByKey = (key) => uniquenessKeySet.getKey(key);
+    this.setShape = fns.setShape;
   }
 }
 
@@ -917,12 +754,7 @@ class ConstraintManager {
     this._setUp(inputManager, displayContainer);
 
     // Initialize the shape.
-    const shapeCollector = this._constraintCollectors.get('Shape');
-    shapeCollector.setUpdateCallback(() => {
-      this._reshape(shapeCollector.getShape());
-      this.runUpdateCallback();
-    });
-    this._reshape(shapeCollector.getShape());
+    this._reshape(SudokuConstraint.Shape.DEFAULT_SHAPE);
   }
 
   _reshape(shape) {
@@ -980,20 +812,82 @@ class ConstraintManager {
       inputManager.addSelectionPreserver(layoutContainer.anchorElement());
     }
 
+    this._constraints = new Map();
+    const uniquenessKeySet = new ConstraintManager.UniquenessKeySet();
+    this._uniquenessKeySet = uniquenessKeySet;
+    const constraintRouter = new ConstraintRouter({
+      onAddConstraint: (constraint) => {
+        if (this._constraints.has(constraint)) return;
+
+        const constraintState = {};
+
+        const matches = this._uniquenessKeySet.matchConstraint(constraint);
+        for (const match of matches) {
+          this.removeConstraint(match);
+        }
+
+        if (constraint.constructor.DISPLAY_CONFIG) {
+          constraintState.displayElem = this._display.drawConstraint(constraint);
+        }
+        const chipView = this._chipViewForConstraint(constraint);
+        if (chipView) {
+          constraintState.chip = chipView.addChip(
+            constraint,
+            constraintState.displayElem?.cloneNode(true),
+            () => { this.removeConstraint(constraint); },
+          );
+        }
+        this._constraints.set(constraint, constraintState);
+        this._uniquenessKeySet.addConstraint(constraint);
+        this._constraintCollectors.get(
+          constraint.constructor.COLLECTOR_CLASS).onAddConstraint(
+            constraint);
+        this.runUpdateCallback();
+      },
+      onRemoveConstraint: (constraint) => {
+        if (!this._constraints.has(constraint)) return;
+        const constraintState = this._constraints.get(constraint);
+        if (constraintState.chip) {
+          ConstraintChipView.removeChip(constraintState.chip);
+        }
+        if (constraintState.displayElem) {
+          this._display.removeConstraint(constraint);
+        }
+        this._constraints.delete(constraint);
+        this._uniquenessKeySet.removeConstraint(constraint);
+        this._constraintCollectors.get(
+          constraint.constructor.COLLECTOR_CLASS).onRemoveConstraint(
+            constraint);
+        // TODO: Make run update callback only get called by the user
+        // interactions.
+        this.runUpdateCallback();
+      },
+      setShape: (shape) => {
+        this._reshape(shape);
+        this._constraintRouter.onAddConstraint(
+          new SudokuConstraint.Shape(shape.name));
+      },
+    },
+      uniquenessKeySet);
+    this._constraintRouter = constraintRouter;
+
     const collectors = [
-      new ConstraintCollector.Shape(),
-      new ConstraintCollector.GlobalCheckbox(this._display),
-      new ConstraintCollector.LayoutCheckbox(this._display),
+      new ConstraintCollector.Shape(constraintRouter),
+      new ConstraintCollector.GlobalCheckbox(constraintRouter),
+      new ConstraintCollector.LayoutCheckbox(constraintRouter),
       new ConstraintCollector.Jigsaw(
-        this._display, inputManager, chipViews.get('jigsaw')),
-      new ConstraintCollector.MultiCell(
-        this._display, chipViews.get('ordinary'), inputManager),
+        constraintRouter, inputManager, chipViews.get('jigsaw')),
+      new ConstraintCollector.LinesAndSets(
+        constraintRouter, inputManager),
       new ConstraintCollector.CustomBinary(
-        inputManager, this._display, chipViews.get('ordinary')),
-      new ConstraintCollector.OutsideClue(inputManager, this._display),
-      new ConstraintCollector.GivenCandidates(inputManager, this._display),
-      new ConstraintCollector.Experimental(chipViews.get('ordinary')),
-      new ConstraintCollector.Composite(this._display, chipViews.get('composite')),
+        constraintRouter, inputManager),
+      new ConstraintCollector.OutsideClue(
+        constraintRouter, inputManager),
+      new ConstraintCollector.GivenCandidates(
+        constraintRouter, inputManager, this._display),
+      new ConstraintCollector.Experimental(
+        constraintRouter),
+      new ConstraintCollector.Composite(constraintRouter),
     ];
 
     for (const collector of collectors) {
@@ -1014,6 +908,21 @@ class ConstraintManager {
     document.getElementById('copy-constraints-button').onclick = () => {
       navigator.clipboard.writeText(this.getConstraints());
     };
+  }
+
+  _chipViewForConstraint(constraint) {
+    switch (constraint.constructor.COLLECTOR_CLASS) {
+      case 'LinesAndSets':
+      case 'CustomBinary':
+      case 'Experimental':
+        return this._chipViews.get('ordinary');
+      case 'Jigsaw':
+        return this._chipViews.get('jigsaw');
+      case 'Composite':
+        return this._chipViews.get('composite');
+    }
+
+    return null;
   }
 
   _setUpFreeFormInput() {
@@ -1071,12 +980,17 @@ class ConstraintManager {
     const constraint = SudokuParser.parseText(input);
 
     this.clear();
-    this._constraintCollectors.get('Shape').addConstraint(constraint);
+
+    this._constraintRouter.setShape(constraint.getShape());
     this._loadConstraint(constraint);
 
     this.runUpdateCallback();
 
     return constraint;
+  }
+
+  removeConstraint(constraint) {
+    this._constraintRouter.onRemoveConstraint(constraint);
   }
 
   _loadConstraint(constraint) {
@@ -1089,40 +1003,34 @@ class ConstraintManager {
         break;
       default:
         {
-          const collectorClass = constraint.constructor.COLLECTOR_CLASS;
-          this._constraintCollectors.get(collectorClass).addConstraint(constraint);
+          this._constraintRouter.onAddConstraint(constraint);
         }
         break;
     }
   }
 
-  _getShapeAgnosticConstraints() {
+  _getConstraints(filterFn) {
     const constraints = [];
-    for (const collector of this._constraintCollectors.values()) {
-      if (collector.IS_SHAPE_AGNOSTIC) {
-        constraints.push(...collector.getConstraints());
+    for (const constraint of this._constraints.keys()) {
+      if (filterFn(constraint)) {
+        constraints.push(constraint);
       }
     }
     return new SudokuConstraint.Set(constraints);
+  }
+
+  _getShapeAgnosticConstraints() {
+    return this._getConstraints(
+      c => ConstraintCollector[c.constructor.COLLECTOR_CLASS].IS_SHAPE_AGNOSTIC);
   }
 
   getLayoutConstraints() {
-    const constraints = [];
-    for (const collector of this._constraintCollectors.values()) {
-      if (collector.IS_LAYOUT) {
-        constraints.push(...collector.getConstraints());
-      }
-    }
-    return new SudokuConstraint.Set(constraints);
+    return this._getConstraints(
+      c => ConstraintCollector[c.constructor.COLLECTOR_CLASS].IS_LAYOUT);
   }
 
   getConstraints() {
-    const constraints = [];
-    for (const collector of this._constraintCollectors.values()) {
-      constraints.push(...collector.getConstraints());
-    }
-
-    return new SudokuConstraint.Set(constraints);
+    return this._getConstraints(_ => true);
   }
 
   clear() {
@@ -1136,7 +1044,51 @@ class ConstraintManager {
     for (const collector of this._constraintCollectors.values()) {
       collector.clear();
     }
+    this._constraints.clear();
+    this._uniquenessKeySet.clear();
     this.runUpdateCallback();
+  }
+}
+
+ConstraintManager.UniquenessKeySet = class UniquenessKeySet {
+  constructor() {
+    this._uniquenessKeys = new MultiMap();
+  }
+
+  matchConstraint(constraint) {
+    const keys = constraint.uniquenessKeys();
+    const matches = [];
+    for (const key of keys) {
+      for (const c of this._uniquenessKeys.get(key)) {
+        if (c.type === constraint.type) {
+          matches.push(c);
+        }
+      }
+    }
+
+    return matches;
+  }
+
+  addConstraint(constraint) {
+    const keys = constraint.uniquenessKeys();
+    for (const key of keys) {
+      this._uniquenessKeys.add(key, constraint);
+    }
+  }
+
+  removeConstraint(constraint) {
+    const keys = constraint.uniquenessKeys();
+    for (const key of keys) {
+      this._uniquenessKeys.delete(key, constraint);
+    }
+  }
+
+  getKey(key) {
+    return this._uniquenessKeys.get(key) || [];
+  }
+
+  clear() {
+    this._uniquenessKeys.clear();
   }
 }
 
@@ -1158,26 +1110,26 @@ class ConstraintChipView {
     return this._chipViewElement;
   }
 
-  addChip(config) {
-    this._chipViewElement.appendChild(
-      this._makeChip(config));
+  addChip(constraint, iconElem, removeFn) {
+    const chip = this._makeChip(constraint, iconElem, removeFn);
+    this._chipViewElement.appendChild(chip);
+    return chip;
   }
 
-  removeChip(config) {
-    config.removeFn();
-    if (config.displayElem) {
-      this._display.removeConstraint(config.constraint);
-    }
-    config.chip.parentNode.removeChild(config.chip);
+  static removeChip(chip) {
+    // Remove chip if it hasn't already been removed.
+    chip.parentNode?.removeChild(chip);
   }
 
   clear() {
-    this._chipViewElement.innerHTML = '';
+    clearDOMNode(this._chipViewElement);
   }
 
-  _makeChip(config) {
-    const constraint = config.constraint;
+  isEmpty() {
+    return !this._chipViewElement.hasChildNodes();
+  }
 
+  _makeChip(constraint, iconElem, removeFn) {
     const chip = document.createElement('div');
     chip.className = 'chip';
 
@@ -1189,8 +1141,7 @@ class ConstraintChipView {
     chipLabel.className = 'chip-label';
     chipLabel.textContent = constraint.chipLabel();
 
-    if (config.displayElem || config.iconElem) {
-      const iconElem = config.iconElem || config.displayElem.cloneNode(true);
+    if (iconElem) {
       const chipIcon = this._makeChipIcon(iconElem);
       if (constraint.constructor.IS_COMPOSITE) {
         chipLabel.appendChild(chipIcon);
@@ -1201,16 +1152,15 @@ class ConstraintChipView {
 
     chip.appendChild(chipLabel);
 
-    config.chip = chip;
-
     chip.addEventListener('click', (e) => {
       // If the remove button is clicked then remove the chip.
       if (e.target.closest('button') === removeChipButton) {
         if (this._constraintSelector.currentSelection() === constraint) {
           this._constraintSelector.clear();
         }
-        this.removeChip(config);
+        removeFn();
         this._chipHighlighter.clear();
+        this.constructor.removeChip(chip);
         this._onUpdate();
         return;
       }
@@ -1235,13 +1185,13 @@ class ConstraintChipView {
       const subView = document.createElement('div');
       subView.className = 'chip-view';
       for (const subConstraint of constraint.constraints) {
-        subView.appendChild(this._makeChip({
-          constraint: subConstraint,
-          iconElem: this._display.makeConstraintIcon(subConstraint),
-          removeFn: () => {
+        const chip = this._makeChip(
+          subConstraint,
+          this._display.makeConstraintIcon(subConstraint),
+          () => {
             arrayRemoveValue(constraint.constraints, subConstraint);
-          },
-        }));
+          });
+        subView.appendChild(chip);
       }
       chip.appendChild(subView);
     }
@@ -1502,21 +1452,25 @@ class Selection {
 }
 
 ConstraintCollector.GivenCandidates = class GivenCandidates extends ConstraintCollector {
-  constructor(inputManager, display) {
-    super();
+  constructor(router, inputManager) {
+    super(router);
     this._shape = null;
-    this._givensMap = new Map();
-    this._display = display;
 
     inputManager.onNewDigit(this._inputDigit.bind(this));
-    inputManager.onSetValues(this._setValues.bind(this));
 
     this._multiValueInputPanel = new MultiValueInputPanel(
       inputManager,
       this._setValues.bind(this),
-      (cell) => this._givensMap.get(cell));
+      (cell) => this._getCellValues(cell));
+  }
 
-    this._constraint = null;
+  _getCellConstraints(cell) {
+    return this.router.getConstraintsByKey(cell).filter(
+      c => c.constructor.COLLECTOR_CLASS === this.constructor.name);
+  }
+
+  _getCellValues(cell) {
+    return this._getCellConstraints(cell).flatMap(c => c.values);
   }
 
   reshape(shape) {
@@ -1525,7 +1479,7 @@ ConstraintCollector.GivenCandidates = class GivenCandidates extends ConstraintCo
   }
 
   _inputDigit(cell, digit) {
-    const values = this._givensMap.get(cell) || [];
+    const values = this._getCellValues(cell);
     const currValue = values.length == 1 ? values[0] : 0;
 
     let newValue;
@@ -1538,59 +1492,20 @@ ConstraintCollector.GivenCandidates = class GivenCandidates extends ConstraintCo
     }
 
     this._multiValueInputPanel.updateFromCells([cell]);
-    this._setValues([cell], [newValue]);
+    this._setValues([cell], newValue ? [newValue] : []);
   }
 
   _setValues(cells, values) {
     for (const cell of cells) {
-      this._setValuesNoUpdate(cell, values);
+      if (values.length) {
+        this.router.onAddConstraint(
+          new SudokuConstraint.Given(cell, ...values));
+      } else {
+        for (const c of this._getCellConstraints(cell)) {
+          this.router.onRemoveConstraint(c);
+        }
+      }
     }
-    this._givensUpdated();
-  }
-
-  _setValuesNoUpdate(cell, values) {
-    const numValues = this._shape.numValues;
-    values = values.filter(v => v && v > 0 && v <= numValues);
-    if (values && values.length) {
-      this._givensMap.set(cell, values);
-    } else {
-      this._givensMap.delete(cell);
-    }
-  }
-
-  addConstraint(constraint) {
-    const valueIds = constraint.values;
-    for (const valueId of valueIds) {
-      const parsed = this._shape.parseValueId(valueId);
-      this._setValuesNoUpdate(parsed.cellId, parsed.values);
-    }
-    this._givensUpdated();
-  }
-
-  _givensUpdated() {
-    if (this._constraint) {
-      this._display.removeConstraint(this._constraint);
-    }
-
-    const valueIds = [];
-    for (const [cell, values] of this._givensMap) {
-      valueIds.push(`${cell}_${values.join('_')}`);
-    }
-
-    this._constraint = new SudokuConstraint.Givens(...valueIds);
-    this._display.drawConstraint(this._constraint);
-
-    this.runUpdateCallback();
-  }
-
-  getConstraints() {
-    return this._constraint ? [this._constraint] : [];
-  }
-
-  clear() {
-    this._display.removeConstraint(this._constraint);
-    this._givensMap.clear();
-    this._constraint = null;
   }
 }
 
@@ -1618,8 +1533,9 @@ class MultiValueInputPanel {
   updateFromCells(selection) {
     toggleDisabled(this._collapsibleContainer.element(), selection.length == 0);
     if (selection.length) {
+      const values = this._givenLookup(selection[0]);
       this._updateForm(
-        this._givenLookup(selection[0]) || this._allValues);
+        values.length ? values : this._allValues);
     } else {
       this._updateForm([]);
     }
@@ -1717,7 +1633,6 @@ class GridInputManager {
 
     this._callbacks = {
       onNewDigit: [],
-      onSetValues: [],
       onSelection: [],
       onOutsideArrowSelection: [],
     };
@@ -1751,7 +1666,6 @@ class GridInputManager {
   reshape(shape) { this._shape = shape; }
 
   onNewDigit(fn) { this._callbacks.onNewDigit.push(fn); }
-  onSetValues(fn) { this._callbacks.onSetValues.push(fn); }
   onSelection(fn) { this._callbacks.onSelection.push(fn); }
   onOutsideArrowSelection(fn) { this._callbacks.onOutsideArrowSelection.push(fn); }
 
@@ -1787,7 +1701,7 @@ class GridInputManager {
       if (!cell) return;
 
       if (value == '') {
-        this._runCallbacks(this._callbacks.onSetValues, [cell], []);
+        this._runCallbacks(this._callbacks.onNewDigit, cell, null);
         return;
       }
 
@@ -1848,12 +1762,14 @@ class GridInputManager {
       switch (event.key) {
         case 'Backspace':
           this._runCallbacks(
-            this._callbacks.onSetValues, this._selection.getCells(), []);
+            this._callbacks.onNewDigit, this._selection.getCells(), null);
           break;
         case 'f':
           let i = 1;
           for (const cell of this._selection.getCells()) {
-            this._runCallbacks(this._callbacks.onSetValues, [cell], [i++]);
+            this._runCallbacks(this._callbacks.onNewDigit, cell, i / 10 | 0);
+            this._runCallbacks(this._callbacks.onNewDigit, cell, i % 10);
+            i++;
           }
           break;
       }
@@ -1919,8 +1835,8 @@ class CollapsibleContainer {
 }
 
 ConstraintCollector.CustomBinary = class CustomBinary extends ConstraintCollector {
-  constructor(inputManager, display, chipView) {
-    super();
+  constructor(router, inputManager) {
+    super(router);
 
     this._form = document.getElementById('custom-binary-input');
     this._collapsibleContainer = new CollapsibleContainer(
@@ -1930,10 +1846,7 @@ ConstraintCollector.CustomBinary = class CustomBinary extends ConstraintCollecto
     inputManager.onSelection(
       deferUntilAnimationFrame(this._onSelection.bind(this)));
 
-    this._constraints = [];
     this._shape = null;
-    this._display = display;
-    this._chipView = chipView;
     this._inputManager = inputManager;
 
     this._setUp();
@@ -1982,36 +1895,13 @@ ConstraintCollector.CustomBinary = class CustomBinary extends ConstraintCollecto
       }
 
       const cells = this._inputManager.getSelection();
-      this.addConstraint(new typeCls(key, name, ...cells));
-      this.runUpdateCallback();
+      this.router.onAddConstraint(new typeCls(key, name, ...cells));
 
       return false;
     };
     form['function'].oninput = () => {
       errorElem.textContent = '';
     };
-  }
-
-  clear() {
-    this._constraints = [];
-  }
-
-  addConstraint(constraint) {
-    const config = {
-      constraint: constraint,
-      displayElem: this._display.drawConstraint(constraint),
-      removeFn: () => { this._removeConstraint(constraint); },
-    };
-    this._chipView.addChip(config);
-    this._constraints.push(constraint);
-  }
-
-  _removeConstraint(constraint) {
-    arrayRemoveValue(this._constraints, constraint);
-  }
-
-  getConstraints() {
-    return this._constraints;
   }
 }
 

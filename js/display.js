@@ -303,53 +303,68 @@ class CellValueDisplay extends DisplayItem {
     mask.id = this.GIVENS_MASK_ID;
     mask.setAttribute('maskUnits', 'userSpaceOnUse');
     mask.setAttribute('class', 'non-layout-constraint');
+    mask.append(this._makeMaskRect());
     return mask;
   }
 
-  updateMask(valueIds) {
-    if (!this._shape) return;
+  static clearMask() {
+    const mask = document.getElementById(this.GIVENS_MASK_ID);
+    if (!mask) return;
 
-    const mask = document.getElementById(this.constructor.GIVENS_MASK_ID);
     clearDOMNode(mask);
+    mask.append(this._makeMaskRect());
+  }
+
+  static _makeMaskRect() {
     const rect = createSvgElement('rect');
     rect.setAttribute('width', '100%');
     rect.setAttribute('height', '100%');
     rect.setAttribute('fill', 'white');
-    mask.append(rect);
+    return rect;
+  }
 
-    for (const valueId of valueIds) {
-      const { cell, values } = this._shape.parseValueId(valueId);
-      if (values.length != 1) continue;
-      const square = this._makeCellSquare(cell);
-      square.setAttribute('fill', 'black');
-      mask.append(square);
-    }
+  maskCell(cellId) {
+    const mask = document.getElementById(this.constructor.GIVENS_MASK_ID);
+
+    const { cell } = this._shape.parseCellId(cellId);
+    const square = this._makeCellSquare(cell);
+    square.setAttribute('fill', 'black');
+    mask.append(square);
+    return square;
   }
 
   renderGridValues(grid) {
     this.clear();
     const svg = this.getSvg();
 
-    const LINE_HEIGHT = this._shape.gridSize <= SHAPE_9x9.gridSize ? 17 : 10;
-    const START_OFFSET = -DisplayItem.CELL_SIZE / 2 + 2;
     for (let i = 0; i < grid.length; i++) {
       const value = grid[i];
       if (!value) continue;
-
-      const [x, y] = this.cellIndexCenter(i);
-
-      if (isIterable(value)) {
-        let offset = START_OFFSET;
-        for (const line of this._formatMultiSolution(value)) {
-          svg.append(this.makeTextNode(
-            line, x, y + offset, this.constructor.MULTI_VALUE_CLASS));
-          offset += LINE_HEIGHT;
-        }
-      } else if (value) {
-        svg.append(this.makeTextNode(
-          value, x, y, this.constructor.SINGLE_VALUE_CLASS));
-      }
+      svg.append(this.makeGridValue(i, value));
     }
+  }
+
+  makeGridValue(cellIndex, value) {
+    const [x, y] = this.cellIndexCenter(cellIndex);
+
+    if (isIterable(value)) {
+      const LINE_HEIGHT = this._shape.gridSize <= SHAPE_9x9.gridSize ? 17 : 10;
+      const START_OFFSET = -DisplayItem.CELL_SIZE / 2 + 2;
+
+      const g = createSvgElement('g');
+      let offset = START_OFFSET;
+      for (const line of this._formatMultiSolution(value)) {
+        g.append(this.makeTextNode(
+          line, x, y + offset, this.constructor.MULTI_VALUE_CLASS));
+        offset += LINE_HEIGHT;
+      }
+      return g;
+    } else if (value) {
+      return this.makeTextNode(
+        value, x, y, this.constructor.SINGLE_VALUE_CLASS);
+    }
+
+    return null;
   }
 
   static _makeTemplateArray = memoize((shape) => {
@@ -564,6 +579,12 @@ class ConstraintDisplay extends DisplayItem {
   }
 
   drawConstraint(constraint) {
+    // This is mostly for checkbox constraints which don't track if they have
+    // already added the constraint.
+    if (this._currentConstraints.has(constraint)) {
+      return this._currentConstraints.get(constraint);
+    }
+
     const config = constraint.constructor.DISPLAY_CONFIG;
     const item = this._constraintDisplays.get(
       config.displayClass).drawItem(constraint, config);
@@ -581,12 +602,6 @@ class ConstraintDisplay extends DisplayItem {
     if (!config) return null;
     return this._constraintDisplays.get(
       config.displayClass).makeIcon(constraint, config);
-  }
-
-  toggleConstraint(constraint, enable) {
-    const displayClass = constraint.constructor.DISPLAY_CONFIG.displayClass;
-    return this._constraintDisplays.get(
-      displayClass).toggleItem(constraint, enable);
   }
 }
 
