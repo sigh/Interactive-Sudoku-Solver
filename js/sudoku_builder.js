@@ -886,6 +886,14 @@ class CompositeConstraintBase extends SudokuConstraintBase {
     }
   }
 
+  addChild(constraint) {
+    this.constraints.push(constraint);
+  }
+
+  removeChild(constraint) {
+    arrayRemoveValue(this.constraints, constraint);
+  }
+
   getCells(shape) {
     return this.constraints.flatMap(c => c.getCells(shape));
   }

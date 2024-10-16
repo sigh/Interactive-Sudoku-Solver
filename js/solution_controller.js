@@ -1246,7 +1246,7 @@ class SolutionController {
     constraintManager.addReshapeListener(this.debugManager);
 
     this._update = deferUntilAnimationFrame(this._update.bind(this));
-    constraintManager.setUpdateCallback(this._update.bind(this));
+    constraintManager.addUpdateListener(this._update.bind(this));
 
     this._modeHandlers = {
       'all-possibilities': ModeHandler.AllPossibilities,
