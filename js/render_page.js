@@ -793,7 +793,7 @@ class ConstraintManager {
     this._chipHighlighter = displayContainer.createHighlighter(
       'highlighted-cells');
     this._constraintSelector = this.addReshapeListener(
-      new ConstraintSelector(displayContainer));
+      new ConstraintSelector(displayContainer, this._display));
 
     for (const type of ['ordinary', 'composite', 'jigsaw']) {
       const chipView = this.addReshapeListener(
@@ -1250,7 +1250,7 @@ class ConstraintChipView {
 
   static addSubChipView(chip) {
     const subViewElem = document.createElement('div');
-    subViewElem.className = 'chip-view';
+    subViewElem.className = 'chip-view sub-chip-view';
     chip.appendChild(subViewElem);
     return subViewElem;
   }
@@ -1303,10 +1303,11 @@ class ConstraintChipView {
 }
 
 class ConstraintSelector {
-  static _SELECTED_CHIP_CLASS = 'selected-chip';
+  static _SELECTED_CONSTRAINT_CLASS = 'selected-constraint';
 
-  constructor(displayContainer) {
+  constructor(displayContainer, display) {
     this._highlighter = displayContainer.createHighlighter('selected-constraint-cells');
+    this._display = display;
     this._currentSelection = null;
     this._shape = null;
   }
@@ -1315,11 +1316,20 @@ class ConstraintSelector {
     this._shape = shape;
   }
 
+  _isInSubChipView(chip) {
+    return chip.closest('.sub-chip-view') !== null;
+  }
+
   select(constraint, chip) {
     this.clear();
     this._currentSelection = { chip, constraint };
-    chip.classList.add(ConstraintSelector._SELECTED_CHIP_CLASS);
+    chip.classList.add(ConstraintSelector._SELECTED_CONSTRAINT_CLASS);
     this._highlighter.setCells(constraint.getCells(this._shape));
+    if (this._isInSubChipView(chip)) {
+      const item = this._display.drawConstraint(constraint);
+      item.classList.add(ConstraintSelector._SELECTED_CONSTRAINT_CLASS);
+      this._currentSelection.displayed = true;
+    }
   }
 
   toggle(constraint, chip) {
@@ -1340,8 +1350,11 @@ class ConstraintSelector {
   clear() {
     if (this._currentSelection) {
       this._currentSelection.chip.classList.remove(
-        ConstraintSelector._SELECTED_CHIP_CLASS);
+        ConstraintSelector._SELECTED_CONSTRAINT_CLASS);
       this._highlighter.clear();
+      if (this._currentSelection.displayed) {
+        this._display.removeConstraint(this._currentSelection.constraint);
+      }
       this._currentSelection = null;
     }
   }

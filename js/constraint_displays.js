@@ -38,8 +38,7 @@ class BaseConstraintDisplayItem extends DisplayItem {
 
   // drawItem should return an item that can be passed to removeItem to remove
   // the item from the display.
-  // If the item can be displayed as an icon, the returned value should be an
-  // svg element.
+  // The returned item should be an svg element.
   drawItem(constraint, options) { throw 'Unimplemented'; }
 
   // By default, makeIcon returns a shaded grey region for the cells in the
@@ -61,7 +60,6 @@ class BaseConstraintDisplayItem extends DisplayItem {
 
   removeItem(item) {
     item.parentNode.removeChild(item);
-    return true;
   }
 
   _removeCircleFromPath(p0, p1) {
@@ -290,9 +288,7 @@ ConstraintDisplays.Jigsaw = class Jigsaw extends BaseConstraintDisplayItem {
       item.parentNode.removeChild(item);
       this._regionElems.delete(item);
       this._updateMissingRegion();
-      return true;
     }
-    return false;
   }
 
   drawItem(constraint, _) {
@@ -422,9 +418,7 @@ ConstraintDisplays.CustomBinary = class CustomBinary extends ConstraintDisplays.
   removeItem(item) {
     if (this._colorPicker.removeItem(item)) {
       item.parentNode.removeChild(item);
-      return true;
     }
-    return false;
   }
 
   makeIcon(constraint, options) {
@@ -613,9 +607,7 @@ ConstraintDisplays.ShadedRegion = class ShadedRegion extends BaseConstraintDispl
   removeItem(item) {
     if (this._cellColors.removeItem(item)) {
       item.parentNode.removeChild(item);
-      return true;
     }
-    return false;
   }
 
   drawItem(constraint, options) {
@@ -743,9 +735,7 @@ ConstraintDisplays.CountingCircles = class CountingCircles extends BaseConstrain
   removeItem(item) {
     if (this._circleColors.removeItem(item)) {
       item.parentNode.removeChild(item);
-      return true;
     }
-    return false;
   }
 
   drawItem(constraint, _) {
@@ -882,7 +872,7 @@ ConstraintDisplays.Windoku = class Windoku extends BaseConstraintDisplayItem {
 
   drawItem(constraint, _) {
     this.getSvg().setAttribute('display', null);
-    return {};
+    return this.getSvg();
   }
 
   removeItem(item) {
@@ -933,7 +923,7 @@ ConstraintDisplays.DefaultRegionsInverted = class DefaultRegionsInverted extends
 
   drawItem(constraint, _) {
     this.getSvg().setAttribute('display', 'none');
-    return {};
+    return this.getSvg();
   }
 
   removeItem(_) {
@@ -956,9 +946,7 @@ ConstraintDisplays.BorderedRegion = class BorderedRegion extends BaseConstraintD
   removeItem(item) {
     if (this._colorPicker.removeItem(item)) {
       item.parentNode.removeChild(item);
-      return true;
     }
-    return false;
   }
 
   drawItem(constraint, options) {
@@ -1030,11 +1018,10 @@ ConstraintDisplays.OutsideClue = class OutsideClue extends BaseConstraintDisplay
   }
 
   clear() {
-    for (const [arrowId, config] of this._outsideArrowMap) {
-      if (config.currentValues.length) {
-        config.currentValues = [];
-        this._updateArrowValues(arrowId);
-      }
+    for (const arrowId of this._outsideArrowMap.keys()) {
+      const textNode = this._getArrowTextElement(arrowId);
+      clearDOMNode(textNode);
+      this._updateValueLayout(textNode);
     }
   }
 
@@ -1059,52 +1046,46 @@ ConstraintDisplays.OutsideClue = class OutsideClue extends BaseConstraintDisplay
     const { arrowId, value } = constraint;
 
     const valueString = displayConfig.clueTemplate.replace('$CLUE', value);
+    const tspan = createSvgElement('tspan');
+    tspan.appendChild(document.createTextNode(valueString));
 
-    this._outsideArrowMap.get(arrowId).currentValues.push(valueString);
-    this._updateArrowValues(arrowId);
+    const textNode = this._getArrowTextElement(arrowId);
+    textNode.appendChild(tspan);
 
-    return { arrowId, valueString };
+    this._updateValueLayout(textNode);
+
+    return tspan;
   }
 
   removeItem(item) {
-    const { arrowId, valueString } = item;
-
-    arrayRemoveValue(
-      this._outsideArrowMap.get(arrowId).currentValues,
-      valueString);
-    this._updateArrowValues(arrowId);
-
-    return true;
+    const textNode = item.parentNode;
+    if (textNode) {
+      textNode.removeChild(item);
+      this._updateValueLayout(textNode);
+    }
   }
 
-  _updateArrowValues(arrowId) {
-    const arrow = this._outsideArrowMap.get(arrowId);
-    const elem = arrow.svg;
+  _getArrowTextElement(arrowId) {
+    return this._outsideArrowMap.get(arrowId).svg.lastChild;
+  }
 
-    // Remove all the old values.
-    const textNode = elem.lastChild;
-    clearDOMNode(textNode);
+  _updateValueLayout(textNode) {
+    const tspans = textNode.childNodes;
 
-    // If there are no values, set it inactive and stop.
-    const numValues = arrow.currentValues.length;
-    if (!numValues) {
-      elem.classList.remove('active-arrow');
-      return;
+    {
+      const elem = textNode.parentNode;
+      // If there are no values, set it inactive and stop.
+      if (!tspans.length) {
+        elem.classList.remove('active-arrow');
+        return;
+      }
+
+      elem.classList.add('active-arrow');
     }
 
-    elem.classList.add('active-arrow');
-
-    // Construct the output strings.
-    const valueStrings = arrow.currentValues;
-    if (numValues == 1 || !arrowId.includes(',') || arrowId.startsWith('C')) {
-      // For little killers and for columns, the values can be shown
-      // horizontally. (For little killers, its because we know there can only
-      // be one).
-      // This is also trivially true for single values.
-      const text = valueStrings.join('');
-      textNode.appendChild(document.createTextNode(text));
-    } else {
+    if (textNode.classList.contains('vertical-text')) {
       // For rows, we need to show the values vertically.
+      // Adjust the tspan positions.
 
       // Set the x position to the default for the text element.
       // This is as if we were positioning a single value.
@@ -1113,19 +1094,16 @@ ConstraintDisplays.OutsideClue = class OutsideClue extends BaseConstraintDisplay
       const spacingEm = 1.2;
       // The initial y value needs to be adjusted for the fact we have
       // multiple lines. We are adjusting from a baseline of a single line.
-      const initialDyEm = -spacingEm * (numValues - 1) / 2;
-      for (let i = 0; i < numValues; i++) {
-        const str = valueStrings[i];
-        const tspan = createSvgElement('tspan');
+      const initialDyEm = -spacingEm * (tspans.length - 1) / 2;
+      for (let i = 0; i < tspans.length; i++) {
+        const tspan = tspans[i];
         tspan.setAttribute('x', x);
         tspan.setAttribute('dy', (i == 0 ? initialDyEm : spacingEm) + 'em');
-        tspan.appendChild(document.createTextNode(str));
-        textNode.appendChild(tspan);
       }
     }
 
     // Choose font size based on the number of values.
-    const fontSize = 17 - 2 * numValues;
+    const fontSize = 17 - 2 * tspans.length;
     textNode.setAttribute('style', `font-size: ${fontSize}px`);
   }
 
@@ -1145,7 +1123,7 @@ ConstraintDisplays.OutsideClue = class OutsideClue extends BaseConstraintDisplay
 
     this._outsideArrowMap.set(
       arrowId,
-      { svg: arrowSvg, cells: parsedCells.map(p => p.cell), currentValues: [] });
+      { svg: arrowSvg, cells: parsedCells.map(p => p.cell) });
     arrowSvg.onclick = () => this._handleClick(arrowId, cells);
     arrowSvg.classList.add(arrowType);
   };
@@ -1190,6 +1168,7 @@ ConstraintDisplays.OutsideClue = class OutsideClue extends BaseConstraintDisplay
     text.setAttribute('y', arrowY - dy * textOffsetFactor);
     text.setAttribute('text-anchor', 'middle');
     text.setAttribute('dominant-baseline', 'middle');
+    if (dr == 0) text.classList.add('vertical-text');
 
     let arrow = createSvgElement('g');
     arrow.appendChild(hitbox);
