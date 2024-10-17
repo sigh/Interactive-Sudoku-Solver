@@ -4,10 +4,10 @@ class HistoryHandler {
 
   constructor(onUpdate) {
     this._blockHistoryUpdates = false;
-    this._onUpdate = (params) => {
+    this._onUpdate = params => {
+      // Block history updates until we have reloaded.
       this._blockHistoryUpdates = true;
       onUpdate(params);
-      this._blockHistoryUpdates = false;
     }
 
     this._history = [];
@@ -23,6 +23,7 @@ class HistoryHandler {
       if (event.key === 'z' && (event.metaKey || event.ctrlKey)) {
         this._incrementHistory(event.shiftKey ? 1 : -1);
       }
+      return false;
     });
 
     window.onpopstate = this._reloadFromUrl.bind(this);
@@ -30,7 +31,10 @@ class HistoryHandler {
   }
 
   update(params) {
-    if (this._blockHistoryUpdates) return;
+    if (this._blockHistoryUpdates) {
+      this._blockHistoryUpdates = false;
+      return;
+    }
     let q = '' + (params.q || '');
 
     this._addToHistory(q);
