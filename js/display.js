@@ -589,11 +589,6 @@ class ConstraintDisplay extends DisplayItem {
     const item = this._constraintDisplays.get(
       config.displayClass).drawItem(constraint, config);
     this._currentConstraints.set(constraint, item);
-    if (this._currentConstraints.size === 1000) {
-      // Note: We should never reach this, and would indicate a leak.
-      // TODO: Remove this after we've verified that there are no leaks.
-      console.error('Warning: high number of constraints');
-    }
     return item;
   }
 

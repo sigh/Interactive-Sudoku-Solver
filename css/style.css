@@ -303,12 +303,18 @@ button.image-button>img {
   background: rgba(230, 230, 230);
 }
 
-.chip.selected-chip {
+.chip.selected-constraint {
   background-color: yellow;
 }
 
-.chip.selected-chip:hover {
+.chip.selected-constraint:hover {
   background-color: rgb(240, 240, 20);
+}
+
+text.selected-constraint,
+tspan.selected-constraint {
+  fill: yellow;
+  filter: drop-shadow(0 0 1px black) drop-shadow(0 0 2px black);
 }
 
 .chip-icon {
