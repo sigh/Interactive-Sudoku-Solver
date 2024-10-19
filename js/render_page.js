@@ -212,7 +212,8 @@ ConstraintCollector.LinesAndSets = class LinesAndSets extends ConstraintCollecto
     this._setUp(selectionForm, this._constraintClasses, inputManager);
 
     this._collapsibleContainer = new CollapsibleContainer(
-      selectionForm.firstElementChild, /* defaultOpen= */ true);
+      selectionForm.firstElementChild,
+      /* defaultOpen= */ true).allowInComposite();
 
     inputManager.onSelection(
       (selection, finishedSelecting) =>
@@ -602,7 +603,8 @@ ConstraintCollector.OutsideClue = class OutsideClue extends ConstraintCollector 
     this._outsideClueForm = outsideClueForm;
 
     this._collapsibleContainer = new CollapsibleContainer(
-      outsideClueForm.firstElementChild, /* defaultOpen= */ false);
+      outsideClueForm.firstElementChild,
+      /* defaultOpen= */ false).allowInComposite();
 
     this._populateOutsideClueForm(outsideClueForm);
 
@@ -730,6 +732,43 @@ class ConstraintRouter {
     this.updateConstraint = fns.updateConstraint;
     this.getConstraintsByKey = (key) => uniquenessKeySet.getKey(key);
     this.setShape = fns.setShape;
+    this.getRouterForComposite = fns.getRouterForComposite;
+  }
+}
+
+// Allows `addConstraint` calls to be redirected to a different router.
+class SelectedConstraintRouter {
+  constructor(rootRouter) {
+    this._rootRouter = rootRouter;
+    this._currentRouter = rootRouter;
+  }
+
+  setRouter(router) {
+    this._currentRouter = router || this._rootRouter;
+  }
+
+  isSelected() {
+    return this._currentRouter !== this._rootRouter;
+  }
+
+  addConstraint(constraint) {
+    if (this.isSelected() && CompositeConstraintBase.allowedConstraintClass(constraint.constructor)) {
+      this._currentRouter.addConstraint(constraint);
+    } else {
+      this._rootRouter.addConstraint(constraint);
+    }
+  }
+
+  removeConstraint(constraint) {
+    this._rootRouter.removeConstraint(constraint);
+  }
+
+  setShape(shape) {
+    this._rootRouter.setShape(shape);
+  }
+
+  getConstraintsByKey(key) {
+    return this._rootRouter.getConstraintsByKey(key);
   }
 }
 
@@ -751,6 +790,9 @@ class ConstraintManager {
 
     // Initialize the shape.
     this._reshape(SudokuConstraint.Shape.DEFAULT_SHAPE);
+
+    this._constraintPanel = document.getElementById(
+      'constraint-panel-container');
   }
 
   _reshape(shape) {
@@ -788,12 +830,28 @@ class ConstraintManager {
     }
   }
 
+  _routerSelected(router) {
+    if (!router) {
+      // Reset back to the root router.
+      this._selectedConstraintRouter.setRouter();
+      this._constraintPanel.classList.remove('composite-constraint-selected');
+    } else {
+      // Enable adding to the given router.
+      this._selectedConstraintRouter.setRouter(router);
+      this._constraintPanel.classList.add('composite-constraint-selected');
+    }
+  }
+
   _setUp(inputManager, displayContainer) {
     const chipViews = new Map();
     this._chipHighlighter = displayContainer.createHighlighter(
       'highlighted-cells');
     this._constraintSelector = this.addReshapeListener(
-      new ConstraintSelector(displayContainer, this._display));
+      new ConstraintSelector(
+        displayContainer, this._display,
+        this._routerSelected.bind(this)));
+    this.addUpdateListener(
+      () => this._constraintSelector.onConstraintsUpdated());
 
     for (const type of ['ordinary', 'composite', 'jigsaw']) {
       const chipView = this.addReshapeListener(
@@ -839,8 +897,10 @@ class ConstraintManager {
             constraintState.displayElem?.cloneNode(true),
             this._constraintRouter);
           if (constraint.constructor.IS_COMPOSITE) {
-            this._addCompositeConstraintView(
-              constraint, constraintState.chip, this._constraintRouter);
+            const subView = this._makeCompositeConstraintView(
+              constraintState.chip);
+            constraintState.router = this._makeCompositeConstraintRouter(
+              constraint, subView, this._constraintRouter);
           }
         }
         this._constraints.set(constraint, constraintState);
@@ -891,27 +951,34 @@ class ConstraintManager {
         this._constraintRouter.addConstraint(
           new SudokuConstraint.Shape(shape.name));
       },
+      getRouterForComposite: (c) => {
+        return this._constraints.get(c)?.router;
+      }
     },
       uniquenessKeySet);
     this._constraintRouter = constraintRouter;
 
+    const selectedConstraintRouter = new SelectedConstraintRouter(
+      constraintRouter);
+    this._selectedConstraintRouter = selectedConstraintRouter;
+
     const collectors = [
-      new ConstraintCollector.Shape(constraintRouter),
+      new ConstraintCollector.Shape(selectedConstraintRouter),
       new ConstraintCollector.GlobalCheckbox(
-        constraintRouter, this.addUpdateListener.bind(this)),
-      new ConstraintCollector.LayoutCheckbox(constraintRouter),
+        selectedConstraintRouter, this.addUpdateListener.bind(this)),
+      new ConstraintCollector.LayoutCheckbox(selectedConstraintRouter),
       new ConstraintCollector.Jigsaw(
-        constraintRouter, inputManager, chipViews.get('jigsaw')),
+        selectedConstraintRouter, inputManager, chipViews.get('jigsaw')),
       new ConstraintCollector.LinesAndSets(
-        constraintRouter, inputManager),
+        selectedConstraintRouter, inputManager),
       new ConstraintCollector.CustomBinary(
-        constraintRouter, inputManager),
+        selectedConstraintRouter, inputManager),
       new ConstraintCollector.OutsideClue(
-        constraintRouter, inputManager),
+        selectedConstraintRouter, inputManager),
       new ConstraintCollector.GivenCandidates(
-        constraintRouter, inputManager),
-      new ConstraintCollector.Experimental(constraintRouter),
-      new ConstraintCollector.Composite(constraintRouter),
+        selectedConstraintRouter, inputManager),
+      new ConstraintCollector.Experimental(selectedConstraintRouter),
+      new ConstraintCollector.Composite(selectedConstraintRouter),
     ];
 
     for (const collector of collectors) {
@@ -931,7 +998,7 @@ class ConstraintManager {
     };
   }
 
-  _addCompositeConstraintView(constraint, chip, parentRouter) {
+  _makeCompositeConstraintView(chip) {
     const subViewElem = ConstraintChipView.addSubChipView(chip);
     const subView = new ConstraintChipView(
       subViewElem, this._display, this._chipHighlighter,
@@ -939,8 +1006,7 @@ class ConstraintManager {
       this.runUpdateCallback.bind(this));
     // Shape is constant for composite constraints.
     subView.reshape(this._shape);
-    this._makeCompositeConstraintRouter(
-      constraint, subView, parentRouter);
+    return subView;
   }
 
   _makeCompositeConstraintRouter(
@@ -950,10 +1016,12 @@ class ConstraintManager {
     const addWithoutUpdate = (c) => {
       const chip = chipView.addChip(
         c, this._display.makeConstraintIcon(c), router);
-      constraintMap.set(c, { chip });
+      const constraintState = { chip };
+      constraintMap.set(c, constraintState);
       if (c.constructor.IS_COMPOSITE) {
-        this._addCompositeConstraintView(
-          c, chip, router);
+        const subView = this._makeCompositeConstraintView(chip);
+        constraintState.router = this._makeCompositeConstraintRouter(
+          c, subView, router);
       }
     }
 
@@ -985,6 +1053,9 @@ class ConstraintManager {
       },
       setShape: () => {
         throw ('Cannot set shape on composite constraint.');
+      },
+      getRouterForComposite: (c) => {
+        return constraintMap.get(c)?.router;
       }
     },
       new ConstraintManager.UniquenessKeySet());
@@ -1232,7 +1303,8 @@ class ConstraintChipView {
       // Otherwise if we are looking at the current chip then toggle the
       // selection.
       if (e.target.closest('.chip') !== chip) return;
-      this._constraintSelector.toggle(constraint, chip);
+      this._constraintSelector.toggle(
+        constraint, chip, router.getRouterForComposite(constraint));
     });
 
     chip.addEventListener('mouseover', (e) => {
@@ -1305,22 +1377,36 @@ class ConstraintChipView {
 class ConstraintSelector {
   static _SELECTED_CONSTRAINT_CLASS = 'selected-constraint';
 
-  constructor(displayContainer, display) {
+  constructor(displayContainer, display, onRouterSelectCallback) {
     this._highlighter = displayContainer.createHighlighter('selected-constraint-cells');
     this._display = display;
     this._currentSelection = null;
     this._shape = null;
+
+    this._runOnRouterSelect = onRouterSelectCallback || (() => { });
   }
 
   reshape(shape) {
     this._shape = shape;
   }
 
+  onConstraintsUpdated() {
+    if (!this._currentSelection) return;
+
+    // Update the cells in the highlighter, since the current cells for the
+    // current selection may have changed (for composite constraints).
+    // This is simpler than listening for updates to individual constraints.
+    //   - Most of the time, nothing is selected so no updates are required.
+    //   - This will only be called once per update action.
+    const constraint = this._currentSelection.constraint;
+    this._highlighter.setCells(constraint.getCells(this._shape));
+  }
+
   _isInSubChipView(chip) {
     return chip.closest('.sub-chip-view') !== null;
   }
 
-  select(constraint, chip) {
+  select(constraint, chip, router) {
     this.clear();
     this._currentSelection = { chip, constraint };
     chip.classList.add(ConstraintSelector._SELECTED_CONSTRAINT_CLASS);
@@ -1330,13 +1416,16 @@ class ConstraintSelector {
       item.classList.add(ConstraintSelector._SELECTED_CONSTRAINT_CLASS);
       this._currentSelection.displayed = true;
     }
+    if (router) {
+      this._runOnRouterSelect(router);
+    }
   }
 
-  toggle(constraint, chip) {
+  toggle(constraint, chip, router) {
     if (constraint === this.currentSelection()) {
       this.clear();
     } else {
-      this.select(constraint, chip);
+      this.select(constraint, chip, router);
     }
   }
 
@@ -1356,6 +1445,7 @@ class ConstraintSelector {
         this._display.removeConstraint(this._currentSelection.constraint);
       }
       this._currentSelection = null;
+      this._runOnRouterSelect(null);
     }
   }
 }
@@ -1590,7 +1680,8 @@ class MultiValueInputPanel {
   constructor(inputManager, onChange, givenLookup) {
     this._form = document.getElementById('multi-value-cell-input');
     this._collapsibleContainer = new CollapsibleContainer(
-      this._form.firstElementChild, /* defaultOpen= */ false);
+      this._form.firstElementChild,
+      /* defaultOpen= */ false).allowInComposite();
 
     this._inputManager = inputManager;
 
@@ -1860,6 +1951,11 @@ class CollapsibleContainer {
     this._setUp(defaultOpen);
   }
 
+  allowInComposite() {
+    this._element.classList.add('allow-in-composite');
+    return this;
+  }
+
   _setUp(defaultOpen) {
     const element = this._element;
     element.classList.add('collapsible-container');
@@ -1939,7 +2035,8 @@ ConstraintCollector.CustomBinary = class CustomBinary extends ConstraintCollecto
 
     this._form = document.getElementById('custom-binary-input');
     this._collapsibleContainer = new CollapsibleContainer(
-      this._form.firstElementChild, /* defaultOpen= */ false);
+      this._form.firstElementChild,
+      /* defaultOpen= */ false).allowInComposite();
     inputManager.addSelectionPreserver(this._form);
 
     inputManager.onSelection(
