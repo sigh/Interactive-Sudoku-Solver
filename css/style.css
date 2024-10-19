@@ -994,6 +994,10 @@ h3 {
   width: 100%;
 }
 
+.composite-constraint-selected .collapsible-container.allow-in-composite {
+  background-color: rgba(255, 255, 0, 0.5);
+}
+
 .collapsible-container .collapsible-anchor {
   cursor: pointer;
   display: block;
