@@ -510,8 +510,6 @@ class ConstraintDisplay extends DisplayItem {
   constructor(inputManager, displayContainer) {
     super();
 
-    this._currentConstraints = new Map();
-
     displayContainer.addElement(this._makeArrowhead());
     displayContainer.addElement(CellValueDisplay.makeGivensMask());
 
@@ -566,29 +564,17 @@ class ConstraintDisplay extends DisplayItem {
     for (const display of this._constraintDisplays.values()) {
       display.clear();
     }
-    this._currentConstraints.clear();
   }
 
-  removeConstraint(constraint) {
-    const item = this._currentConstraints.get(constraint);
-    if (!item) return;
-
-    this._currentConstraints.delete(constraint);
+  removeConstraint(constraint, item) {
     const displayClass = constraint.constructor.DISPLAY_CONFIG.displayClass;
     return this._constraintDisplays.get(displayClass).removeItem(item);
   }
 
   drawConstraint(constraint) {
-    // This is mostly for checkbox constraints which don't track if they have
-    // already added the constraint.
-    if (this._currentConstraints.has(constraint)) {
-      return this._currentConstraints.get(constraint);
-    }
-
     const config = constraint.constructor.DISPLAY_CONFIG;
     const item = this._constraintDisplays.get(
       config.displayClass).drawItem(constraint, config);
-    this._currentConstraints.set(constraint, item);
     return item;
   }
 

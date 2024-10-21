@@ -391,4 +391,12 @@ class MultiMap {
   clear() {
     this._map.clear();
   }
+
+  getMap() {
+    return this._map;
+  }
+
+  [Symbol.iterator]() {
+    return this._map[Symbol.iterator]();
+  }
 }
