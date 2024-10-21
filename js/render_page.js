@@ -788,11 +788,11 @@ class ConstraintManager {
     this._constraintCollectors = new Map();
     this._setUp(inputManager, displayContainer);
 
-    // Initialize the shape.
-    this._reshape(SudokuConstraint.Shape.DEFAULT_SHAPE);
-
     this._constraintPanel = document.getElementById(
       'constraint-panel-container');
+
+    // Initialize the shape.
+    this._reshape(SudokuConstraint.Shape.DEFAULT_SHAPE);
   }
 
   _reshape(shape) {
@@ -844,8 +844,7 @@ class ConstraintManager {
 
   _setUp(inputManager, displayContainer) {
     const chipViews = new Map();
-    this._chipHighlighter = displayContainer.createHighlighter(
-      'highlighted-cells');
+    this._chipHighlighter = displayContainer.createCellHighlighter('chip-hover');
     this._constraintSelector = this.addReshapeListener(
       new ConstraintSelector(
         displayContainer, this._display,
@@ -1023,13 +1022,16 @@ class ConstraintManager {
         constraintState.router = this._makeCompositeConstraintRouter(
           c, subView, router);
       }
+      return constraintState;
     }
 
     const router = new ConstraintRouter({
       addConstraint: (c) => {
         constraint.addChild(c);
-        addWithoutUpdate(c);
+        const constraintState = addWithoutUpdate(c);
         parentRouter.updateConstraint(constraint);
+        this._constraintSelector.updateLatest(
+          c, constraintState.chip);
       },
       removeConstraint: (c) => {
         constraint.removeChild(c);
@@ -1291,9 +1293,6 @@ class ConstraintChipView {
     chip.addEventListener('click', (e) => {
       // If the remove button is clicked then remove the chip.
       if (e.target.closest('button') === removeChipButton) {
-        if (this._constraintSelector.currentSelection() === constraint) {
-          this._constraintSelector.clear();
-        }
         this._chipHighlighter.clear();
         router.removeConstraint(constraint);
         this._onUpdate();
@@ -1374,138 +1373,120 @@ class ConstraintChipView {
   }
 }
 
-class ConstraintSelector {
-  static _SELECTED_CONSTRAINT_CLASS = 'selected-constraint';
-
-  constructor(displayContainer, display, onRouterSelectCallback) {
-    this._highlighter = displayContainer.createHighlighter('selected-constraint-cells');
+class ConstraintHighlighter {
+  constructor(displayContainer, display, cssClass) {
+    this._highlighter = displayContainer.createCellHighlighter(cssClass);
+    this._cssClass = cssClass;
     this._display = display;
-    this._currentSelection = null;
+    this._currentState = null;
     this._shape = null;
-
-    this._runOnRouterSelect = onRouterSelectCallback || (() => { });
   }
 
   reshape(shape) {
     this._shape = shape;
   }
 
-  onConstraintsUpdated() {
-    if (!this._currentSelection) return;
+  _isInSubChipView(chip) {
+    return chip.closest('.sub-chip-view') !== null;
+  }
 
+  setConstraint(constraint, chip) {
+    this.clear();
+    this._currentState = { chip, constraint };
+    chip.classList.add(this._cssClass);
+    this._highlighter.setCells(constraint.getCells(this._shape));
+    if (this._isInSubChipView(chip)) {
+      const item = this._display.drawConstraint(constraint);
+      item.classList.add(this._cssClass);
+      this._currentState.displayed = true;
+    }
+  }
+
+  refreshConstraint() {
+    if (!this._currentState) return;
+
+    const { chip, constraint } = this._currentState;
+
+    // If the chip has been removed, then clear the selection.
+    if (!chip.isConnected) {
+      this.clear();
+      return;
+    }
+
+    // Updated the highlighted cells.
+    this._highlighter.setCells(constraint.getCells(this._shape));
+  }
+
+
+  clear() {
+    if (!this._currentState) return;
+
+    this._currentState.chip.classList.remove(
+      this._cssClass);
+    this._highlighter.clear();
+    if (this._currentState.displayed) {
+      this._display.removeConstraint(this._currentState.constraint);
+    }
+    this._currentState = null;
+  }
+
+  currentConstraint() {
+    return this._currentState?.constraint;
+  }
+}
+
+class ConstraintSelector {
+  constructor(displayContainer, display, onRouterSelectCallback) {
+    this._selectionHighlighter = new ConstraintHighlighter(
+      displayContainer, display, 'selected-constraint');
+    this._latestHighlighter = new ConstraintHighlighter(
+      displayContainer, display, 'latest-constraint');
+    this._runOnRouterSelect = onRouterSelectCallback || (() => { });
+  }
+
+  reshape(shape) {
+    this._selectionHighlighter.reshape(shape);
+    this._latestHighlighter.reshape(shape);
+  }
+
+  onConstraintsUpdated() {
     // Update the cells in the highlighter, since the current cells for the
     // current selection may have changed (for composite constraints).
     // This is simpler than listening for updates to individual constraints.
     //   - Most of the time, nothing is selected so no updates are required.
     //   - This will only be called once per update action.
-    const constraint = this._currentSelection.constraint;
-    this._highlighter.setCells(constraint.getCells(this._shape));
+    this._selectionHighlighter.refreshConstraint();
+    this._latestHighlighter.refreshConstraint();
   }
 
-  _isInSubChipView(chip) {
-    return chip.closest('.sub-chip-view') !== null;
+  updateLatest(constraint, chip) {
+    this._latestHighlighter.setConstraint(constraint, chip);
   }
 
   select(constraint, chip, router) {
-    this.clear();
-    this._currentSelection = { chip, constraint };
-    chip.classList.add(ConstraintSelector._SELECTED_CONSTRAINT_CLASS);
-    this._highlighter.setCells(constraint.getCells(this._shape));
-    if (this._isInSubChipView(chip)) {
-      const item = this._display.drawConstraint(constraint);
-      item.classList.add(ConstraintSelector._SELECTED_CONSTRAINT_CLASS);
-      this._currentSelection.displayed = true;
-    }
-    if (router) {
-      this._runOnRouterSelect(router);
-    }
+    this._selectionHighlighter.setConstraint(constraint, chip);
+    this._runOnRouterSelect(router);
+    this._latestHighlighter.clear();
   }
 
   toggle(constraint, chip, router) {
-    if (constraint === this.currentSelection()) {
+    if (constraint === this._selectionHighlighter.currentConstraint()) {
       this.clear();
     } else {
       this.select(constraint, chip, router);
     }
   }
 
-  currentSelection() {
-    if (this._currentSelection) {
-      return this._currentSelection.constraint;
-    }
-    return null;
-  }
-
   clear() {
-    if (this._currentSelection) {
-      this._currentSelection.chip.classList.remove(
-        ConstraintSelector._SELECTED_CONSTRAINT_CLASS);
-      this._highlighter.clear();
-      if (this._currentSelection.displayed) {
-        this._display.removeConstraint(this._currentSelection.constraint);
-      }
-      this._currentSelection = null;
-      this._runOnRouterSelect(null);
-    }
-  }
-}
-
-class Highlight {
-  constructor(display, cssClass) {
-    this._cells = new Map();
-    this._cssClass = cssClass;
-
-    this._display = display;
-    this._key = undefined;
-  }
-
-  key() {
-    return this._key;
-  }
-
-  setCells(cellIds, key) {
-    if (key && key === this._key) return;
-    this.clear();
-    for (const cellId of cellIds) this.addCell(cellId);
-    this._key = key;
-  }
-
-  size() {
-    return this._cells.size;
-  }
-
-  getCells() {
-    return Array.from(this._cells.keys());
-  }
-
-  addCell(cell) {
-    if (!this._cells.has(cell)) {
-      const path = this._display.highlightCell(cell, this._cssClass);
-      this._cells.set(cell, path);
-      return path;
-    }
-  }
-
-  removeCell(cell) {
-    const path = this._cells.get(cell);
-    if (path) {
-      this._display.removeHighlight(path);
-      this._cells.delete(cell);
-    }
-  }
-
-  clear() {
-    for (const path of this._cells.values()) {
-      this._display.removeHighlight(path)
-    }
-    this._cells.clear();
-    this._key = undefined;
+    this._selectionHighlighter.clear();
+    this._runOnRouterSelect(null);
+    this._latestHighlighter.clear();
   }
 }
 
 class Selection {
   constructor(displayContainer) {
-    this._highlight = displayContainer.createHighlighter('selected-cells');
+    this._highlight = displayContainer.createCellHighlighter('selected-cells');
 
     this._clickInterceptor = displayContainer.getClickInterceptor();
 
@@ -2106,7 +2087,7 @@ class InfoOverlay {
   constructor(displayContainer) {
     this._shape = null;
 
-    this._heatmap = displayContainer.createHighlighter();
+    this._heatmap = displayContainer.createCellHighlighter();
     this._textInfo = new InfoTextDisplay(
       displayContainer.getNewGroup('text-info-group'));
 

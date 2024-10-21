@@ -30,8 +30,8 @@ class DisplayContainer {
     this._mainSvg.classList.toggle('layout-view', enable);
   }
 
-  createHighlighter(cssClass) {
-    return new Highlight(this._highlightDisplay, cssClass);
+  createCellHighlighter(cssClass) {
+    return new CellHighlighter(this._highlightDisplay, cssClass);
   }
 
   getNewGroup(groupClass) {
@@ -483,7 +483,7 @@ class HighlightDisplay extends DisplayItem {
     if (this._groups.has(cssClass)) return this._groups.get(cssClass);
 
     const group = createSvgElement('g');
-    group.setAttribute('class', cssClass);
+    group.classList.add(cssClass);
     this._svg.append(group);
     this._groups.set(cssClass, group);
 
@@ -748,6 +748,59 @@ class ColorPicker {
     this._keyToItems.clear();
   }
 };
+
+class CellHighlighter {
+  constructor(display, cssClass) {
+    this._cells = new Map();
+    this._cssClass = cssClass;
+
+    this._display = display;
+    this._key = undefined;
+  }
+
+  key() {
+    return this._key;
+  }
+
+  setCells(cellIds, key) {
+    if (key && key === this._key) return;
+    this.clear();
+    for (const cellId of cellIds) this.addCell(cellId);
+    this._key = key;
+  }
+
+  size() {
+    return this._cells.size;
+  }
+
+  getCells() {
+    return Array.from(this._cells.keys());
+  }
+
+  addCell(cell) {
+    if (!this._cells.has(cell)) {
+      const path = this._display.highlightCell(cell, this._cssClass);
+      this._cells.set(cell, path);
+      return path;
+    }
+  }
+
+  removeCell(cell) {
+    const path = this._cells.get(cell);
+    if (path) {
+      this._display.removeHighlight(path);
+      this._cells.delete(cell);
+    }
+  }
+
+  clear() {
+    for (const path of this._cells.values()) {
+      this._display.removeHighlight(path)
+    }
+    this._cells.clear();
+    this._key = undefined;
+  }
+}
 
 class GridGraph {
   static LEFT = 0;
