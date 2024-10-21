@@ -171,7 +171,8 @@ class DebugManager {
     // Things setup only when the debugger is actually loaded.
 
     // Setup elements.
-    this._debugCellHighlighter = this._displayContainer.createHighlighter('highlighted-cells');
+    this._debugCellHighlighter = this._displayContainer.createCellHighlighter(
+      'debug-hover');
     this._infoOverlay = new InfoOverlay(this._displayContainer);
     this._candidateDisplay = new CellValueDisplay(
       this._displayContainer.getNewGroup('debug-candidate-group'));
@@ -1242,7 +1243,7 @@ class SolutionController {
 
     this._isSolving = false;
     this._constraintManager = constraintManager;
-    this._stepHighlighter = displayContainer.createHighlighter('highlighted-step-cell');
+    this._stepHighlighter = displayContainer.createCellHighlighter('step-cell');
     displayContainer.addElement(
       HighlightDisplay.makeRadialGradient('highlighted-step-gradient'));
 
