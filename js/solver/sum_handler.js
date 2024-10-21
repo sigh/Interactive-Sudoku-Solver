@@ -51,11 +51,9 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
       }
 
       // Group coefficients by value.
-      const coeffMap = new Map();
+      const coeffMap = new MultiMap();
       for (let i = 0; i < cells.length; i++) {
-        const coeff = coeffs[i];
-        if (!coeffMap.has(coeff)) coeffMap.set(coeff, []);
-        coeffMap.get(coeff).push(cells[i]);
+        coeffMap.add(coeffs[i], cells[i]);
       }
       for (let [coeff, coeffCells] of coeffMap) {
         this._coeffGroups.push({ coeff, cells: coeffCells, exclusionGroups: [] });

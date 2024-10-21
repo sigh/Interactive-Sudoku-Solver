@@ -344,7 +344,7 @@ ConstraintDisplays.Jigsaw = class Jigsaw extends BaseConstraintDisplayItem {
 }
 
 ConstraintDisplays.Indexing = class Indexing extends BaseConstraintDisplayItem {
-  drawItem(constraint) {
+  drawItem(constraint, _) {
     const cells = constraint.cells;
     const g = createSvgElement('g');
 
@@ -1207,7 +1207,6 @@ ConstraintDisplays.Givens = class Givens extends BaseConstraintDisplayItem {
     this._svg.append(item);
 
     if (values.length === 1) {
-      // TODO: Write the maskCell function.
       this._maskMap.set(
         item, this._cellDisplay.maskCell(constraint.cell));
     }

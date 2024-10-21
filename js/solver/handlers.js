@@ -2382,15 +2382,12 @@ SudokuConstraintHandler.FullRank = class FullRank extends SudokuConstraintHandle
 
     // Group entries with the same initial values.
     // i.e. the same int((rank+3)/4)
-    const rankMap = new Map();
+    const rankMap = new MultiMap();
     for (const clue of this._clues) {
       const value = LookupTables.fromValue((clue.rank + 3) >> 2);
-      if (!rankMap.has(value)) {
-        rankMap.set(value, []);
-      }
       const entryIndex = entries.findIndex(
         e => e[0] === clue.line[0] && e[1] === clue.line[1]);
-      rankMap.get(value).push({
+      rankMap.add(value, {
         rankIndex: (clue.rank + 3) & 3,
         entry: entries.splice(entryIndex, 1)[0],
         requiredLess: 0,
