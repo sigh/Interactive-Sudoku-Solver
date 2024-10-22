@@ -1,6 +1,6 @@
 body {
   font-size: 14px;
-  font-family: sans-serif;
+  font-family: "Arial", sans-serif;
   width: fit-content;
 
   margin: 8px;
@@ -133,7 +133,7 @@ body {
 
 #freeform-constraint-input {
   display: inline-block;
-  margin-top: 0px;
+  margin: 0;
 }
 
 #freeform-constraint-text-container {
@@ -154,11 +154,10 @@ body {
   padding: 2px 0px 35px 2px;
 }
 
-#freeform-constraint-input-error,
-#freeform-constraint-input-warning {
+#error-panel {
   font-size: small;
-  position: absolute;
-  min-width: 300px;
+  width: 370px;
+  margin-bottom: 5px;
 }
 
 #sudoku-container {
@@ -261,11 +260,6 @@ button.image-button>img {
   font-weight: bold;
 }
 
-.warning {
-  color: rgb(200, 100, 0);
-  font-weight: bold;
-}
-
 .result {
   color: rgb(0, 0, 200);
   font-weight: bold;
@@ -286,6 +280,8 @@ button.image-button>img {
 
 #composite-chip-view {
   grid-template-columns: 1fr;
+  margin-bottom: 5px;
+  min-height: 4em;
 }
 
 #jigsaw-chip-view {
@@ -303,6 +299,10 @@ button.image-button>img {
 
   border: 1px solid grey;
   box-shadow: 0 2px 2px 0 rgba(0, 0, 0, 0.14), 0 1px 5px 0 rgba(0, 0, 0, 0.12), 0 3px 1px -2px rgba(0, 0, 0, 0.2);
+}
+
+.composite-chip {
+  flex-wrap: wrap;
 }
 
 .chip:hover {
@@ -348,7 +348,7 @@ tspan.latest-constraint {
 }
 
 .chip-label {
-  margin: 0 5px;
+  margin: 5px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -429,6 +429,16 @@ tspan.latest-constraint {
   display: flex;
   align-items: center;
   column-gap: 15px;
+}
+
+#composite-constraint-input .collapsible-body>div:first-child {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+#composite-constraint-input button {
+  text-wrap: nowrap;
 }
 
 input[type=number] {

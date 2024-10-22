@@ -214,9 +214,7 @@ const memoize = (f) => {
 };
 
 const clearDOMNode = (node) => {
-  while (node.lastChild) {
-    node.removeChild(node.lastChild);
-  }
+  node.replaceChildren();
 };
 
 const toggleDisabled = (element, disabled) => {

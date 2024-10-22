@@ -91,7 +91,30 @@ ConstraintCategoryInput.Shape = class Shape extends ConstraintCategoryInput {
 ConstraintCategoryInput.Experimental = class Experimental extends ConstraintCategoryInput {
 }
 
-ConstraintCategoryInput.Composite = class Composite extends ConstraintCategoryInput { }
+ConstraintCategoryInput.Composite = class Composite extends ConstraintCategoryInput {
+  constructor(collection, addUpdateListener) {
+    super(collection);
+    const form = document.forms['composite-constraint-input'];
+    const container = new CollapsibleContainer(
+      form.firstElementChild,
+      /* defaultOpen= */ false).allowInComposite();
+    addUpdateListener(() => container.updateActiveHighlighting());
+
+    this._setUpForm(form, collection);
+  }
+
+  _setUpForm(form, collection) {
+    form['add-or'].onclick = () => {
+      collection.addConstraint(new SudokuConstraint.Or([]));
+      return false;
+    };
+    document.getElementById('add-and-button')
+    form['add-and'].onclick = () => {
+      collection.addConstraint(new SudokuConstraint.And([]));
+      return false;
+    };
+  }
+}
 
 ConstraintCategoryInput._Checkbox = class _Checkbox extends ConstraintCategoryInput {
   static IS_SHAPE_AGNOSTIC = true;
@@ -1071,7 +1094,8 @@ class ConstraintManager {
       new ConstraintCategoryInput.GivenCandidates(
         selectedConstraintCollection, inputManager),
       new ConstraintCategoryInput.Experimental(selectedConstraintCollection),
-      new ConstraintCategoryInput.Composite(selectedConstraintCollection),
+      new ConstraintCategoryInput.Composite(
+        selectedConstraintCollection, this.addUpdateListener.bind(this)),
     ];
 
     for (const categoryInput of categoryInputs) {
@@ -1094,13 +1118,20 @@ class ConstraintManager {
 
   _makeCompositeCollection(constraint, chip, parentCollection) {
     const subView = this._makeCompositeConstraintView(chip);
-    return new CompositeConstraintCollection(
+    const collection = new CompositeConstraintCollection(
       constraint,
       parentCollection,
       subView,
       this._display,
       this._constraintSelector,
       this._makeCompositeCollection.bind(this));
+    // If we create an empty composite collection, then select it.
+    // This makes it easier to immediately add constraints to it.
+    if (constraint.constraints.length == 0) {
+      this._constraintSelector.select(
+        constraint, chip, collection);
+    }
+    return collection;
   }
 
   _makeCompositeConstraintView(chip) {
@@ -1117,21 +1148,15 @@ class ConstraintManager {
   _setUpFreeFormInput() {
     // Free-form.
     const form = document.forms['freeform-constraint-input'];
-    const errorElem = document.getElementById('freeform-constraint-input-error');
-    const warningElem = document.getElementById('freeform-constraint-input-warning');
+    const errorElem = document.getElementById('error-panel').appendChild(
+      document.createElement('div'));
     const inputElem = form['freeform-input'];
-
-    const clearMessages = () => {
-      errorElem.textContent = '';
-      warningElem.textContent = '';
-    };
 
     // Allow loading free-form input from other locations.
     this.loadUnsafeFromText = (input) => {
       try {
-        const constraint = this._loadFromText(input);
-        clearMessages();
-        warningElem.textContent = this._experimentalConstraintWarning(constraint);
+        this._loadFromText(input);
+        clearDOMNode(errorElem);
       } catch (e) {
         errorElem.textContent = e;
         // If we were called from outside the form, then put the value in the
@@ -1142,27 +1167,12 @@ class ConstraintManager {
 
     form.onsubmit = e => {
       e.preventDefault();
-      clearMessages();
+      clearDOMNode(errorElem);
       const input = inputElem.value;
       this.loadUnsafeFromText(input);
       return false;
     };
     autoSaveField(inputElem);
-  }
-
-  _experimentalConstraintWarning(constraint) {
-    const experimentalConstraints = new Set();
-    constraint.forEachTopLevel(c => {
-      if (c.constructor.CATEGORY === 'Experimental'
-        || c.constructor.CATEGORY === 'Composite') {
-        experimentalConstraints.add(c.type);
-      }
-    });
-    if (experimentalConstraints.size === 0) return '';
-
-    return (
-      `Warning: ${[...experimentalConstraints]} constraints are experimental.
-       They may not work in all situations.`);
   }
 
   _loadFromText(input) {
@@ -1299,6 +1309,9 @@ class ConstraintChipView {
   _makeChip(constraint, iconElem, collection) {
     const chip = document.createElement('div');
     chip.className = 'chip';
+    if (constraint.constructor.IS_COMPOSITE) {
+      chip.classList.add('composite-chip');
+    }
 
     const removeChipButton = document.createElement('button');
     removeChipButton.innerHTML = '&#x00D7;';
@@ -1491,6 +1504,8 @@ class ConstraintSelector {
     this._latestHighlighter = new ConstraintHighlighter(
       displayContainer, display, 'latest-constraint');
     this._runOnCollectionSelect = onCollectionSelectCallback || (() => { });
+
+    this._escapeListener = null;
   }
 
   reshape(shape) {
@@ -1505,9 +1520,10 @@ class ConstraintSelector {
     //   - Most of the time, nothing is selected so no updates are required.
     //   - This will only be called once per update action.
     if (!this._selectionHighlighter.refreshConstraint()) {
-      this._runOnCollectionSelect(null);
+      this.clear();
+    } else {
+      this._latestHighlighter.refreshConstraint();
     }
-    this._latestHighlighter.refreshConstraint();
   }
 
   updateLatest(constraint, chip) {
@@ -1518,6 +1534,12 @@ class ConstraintSelector {
     this._selectionHighlighter.setConstraint(constraint, chip);
     this._runOnCollectionSelect(collection);
     this._latestHighlighter.clear();
+
+    if (!this._escapeListener) {
+      this._escapeListener = window.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') this.clear();
+      });
+    }
   }
 
   toggle(constraint, chip, collection) {
@@ -1532,6 +1554,10 @@ class ConstraintSelector {
     this._selectionHighlighter.clear();
     this._runOnCollectionSelect(null);
     this._latestHighlighter.clear();
+    if (this._escapeListener) {
+      window.removeEventListener('keydown', this._escapeListener);
+      this._escapeListener = null;
+    }
   }
 }
 
