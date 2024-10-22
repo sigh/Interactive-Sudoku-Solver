@@ -1426,25 +1426,43 @@ class ConstraintHighlighter {
     chip.classList.add(this._cssClass);
     this._highlighter.setCells(constraint.getCells(this._shape));
     if (this._isInSubChipView(chip)) {
-      const item = this._display.drawConstraint(constraint);
-      item.classList.add(this._cssClass);
-      this._currentState.displayElem = item;
+      this._currentState.displayElem = this._drawConstraint(constraint);
     }
   }
 
+  _drawConstraint(constraint) {
+    const item = this._display.drawConstraint(constraint);
+    item.classList.add(this._cssClass);
+    return item;
+  }
+
   refreshConstraint() {
-    if (!this._currentState) return;
+    if (!this._currentState) return false;
 
     const { chip, constraint } = this._currentState;
 
     // If the chip has been removed, then clear the selection.
     if (!chip.isConnected) {
       this.clear();
-      return;
+      return false;
+    }
+
+    // Check if the constraint cells have changed at all.
+    const cells = constraint.getCells(this._shape);
+    if (arraysAreEqual(cells, this._highlighter.getCells())) {
+      return true;
     }
 
     // Updated the highlighted cells.
-    this._highlighter.setCells(constraint.getCells(this._shape));
+    this._highlighter.setCells(cells);
+    // Update the displayed constraint (if required).
+    if (this._currentState.displayElem) {
+      this._display.removeConstraint(
+        constraint, this._currentState.displayElem);
+      this._currentState.displayElem = this._drawConstraint(constraint);
+    }
+
+    return true;
   }
 
 
@@ -1487,7 +1505,9 @@ class ConstraintSelector {
     // This is simpler than listening for updates to individual constraints.
     //   - Most of the time, nothing is selected so no updates are required.
     //   - This will only be called once per update action.
-    this._selectionHighlighter.refreshConstraint();
+    if (!this._selectionHighlighter.refreshConstraint()) {
+      this._runOnCollectionSelect(null);
+    }
     this._latestHighlighter.refreshConstraint();
   }
 
