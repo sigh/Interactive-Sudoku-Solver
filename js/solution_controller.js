@@ -756,7 +756,6 @@ class SolverStateDisplay {
     this._elements = {
       progressContainer: document.getElementById('progress-container'),
       stateOutput: document.getElementById('state-output'),
-      error: document.getElementById('error-output'),
       progressBar: document.getElementById('solve-progress'),
       progressPercentage: document.getElementById('solve-percentage'),
       solveStatus: document.getElementById('solve-status'),
@@ -1270,7 +1269,8 @@ class SolutionController {
       iterationState: document.getElementById('solution-iteration-state'),
       mode: document.getElementById('solve-mode-input'),
       modeDescription: document.getElementById('solve-mode-description'),
-      error: document.getElementById('error-output'),
+      error: document.getElementById('error-panel').appendChild(
+        document.createElement('div')),
       stop: document.getElementById('stop-solver'),
       solve: document.getElementById('solve-button'),
       autoSolve: document.getElementById('auto-solve-input'),

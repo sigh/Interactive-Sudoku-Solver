@@ -605,7 +605,11 @@ class SudokuConstraintBase {
   }
 
   chipLabel() {
-    return this.constructor.displayName();
+    let label = this.constructor.displayName();
+    if (this.constructor.CATEGORY === 'Experimental') {
+      label += ' (Experimental)';
+    }
+    return label;
   }
 
   uniquenessKeys() {
@@ -907,7 +911,7 @@ class CompositeConstraintBase extends SudokuConstraintBase {
     // Otherwise check if there is a new constraint that is started after the
     // first one.
     // This handles ordinary constraints which have been combined.
-    if (serialized.indexOf('.', 1) === -1) {
+    if (serialized.length > 1 && serialized.indexOf('.', 1) === -1) {
       return true;
     }
 
