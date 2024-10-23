@@ -1214,6 +1214,7 @@ class ConstraintManager {
       categoryInput.clear();
     }
     this._rootCollection.clear();
+    if (this._shape) this._rootCollection.setShape(this._shape);
     this.runUpdateCallback();
   }
 }
