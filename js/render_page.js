@@ -797,6 +797,7 @@ class RootConstraintCollection extends ConstraintCollectionBase {
 
   addConstraint(constraint) {
     if (this._constraintMap.has(constraint)) return;
+    if (constraint.constructor === SudokuConstraint.Shape) return;
 
     const constraintState = {};
 
@@ -866,7 +867,6 @@ class RootConstraintCollection extends ConstraintCollectionBase {
 
   setShape(shape) {
     this._reshapeListener(shape);
-    this.addConstraint(new SudokuConstraint.Shape(shape.name));
   }
 
   getCollectionForComposite(c) {
@@ -957,7 +957,7 @@ class CompositeConstraintCollection extends ConstraintCollectionBase {
 
 class ConstraintManager {
   constructor(inputManager, displayContainer) {
-    this._shape = null;
+    this._shape = SudokuConstraint.Shape.DEFAULT_SHAPE;
     this._reshapeListeners = [];
     this._updateListeners = [];
     this.runUpdateCallback = deferUntilAnimationFrame(
@@ -971,8 +971,7 @@ class ConstraintManager {
     this._constraintCategoryInputs = new Map();
     this._setUp(inputManager, displayContainer);
 
-    // Initialize the shape.
-    this._reshape(SudokuConstraint.Shape.DEFAULT_SHAPE);
+    this.runUpdateCallback();
   }
 
   _reshape(shape) {
@@ -1180,7 +1179,7 @@ class ConstraintManager {
   }
 
   _getConstraints(filterFn) {
-    const constraints = [];
+    const constraints = [new SudokuConstraint.Shape(this._shape.name)];
     for (const constraint of this._rootCollection.constraints()) {
       if (filterFn(constraint)) {
         constraints.push(constraint);
@@ -1214,7 +1213,6 @@ class ConstraintManager {
       categoryInput.clear();
     }
     this._rootCollection.clear();
-    if (this._shape) this._rootCollection.setShape(this._shape);
     this.runUpdateCallback();
   }
 }
@@ -1682,12 +1680,12 @@ ConstraintCategoryInput.GivenCandidates = class GivenCandidates extends Constrai
   _inputDigit(cell, digit) {
     const values = this._getCellValues(cell);
     const currValue = values.length == 1 ? values[0] : 0;
+    const numValues = this._shape.numValues;
 
     let newValue;
-    if (digit === null) {
+    if (digit === null || digit > numValues) {
       newValue = 0;
     } else {
-      const numValues = this._shape.numValues;
       newValue = currValue * 10 + digit;
       if (newValue > numValues) newValue = digit;
     }
@@ -1824,7 +1822,9 @@ class MultiValueInputPanel {
       this._valueButtons[i].checked = false;
     }
     for (const value of values) {
-      this._valueButtons[value - 1].checked = true;
+      const elem = this._valueButtons[value - 1]
+      // Check elem in case the value is out of range.
+      if (elem) elem.checked = true;
     }
   }
 }
