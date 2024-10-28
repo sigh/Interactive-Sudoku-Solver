@@ -59,7 +59,7 @@ class BaseConstraintDisplayItem extends DisplayItem {
   }
 
   removeItem(item) {
-    item.parentNode.removeChild(item);
+    item.parentNode?.removeChild(item);
   }
 
   _removeCircleFromPath(p0, p1) {
@@ -285,7 +285,7 @@ ConstraintDisplays.Jigsaw = class Jigsaw extends BaseConstraintDisplayItem {
   removeItem(item) {
     if (this._regionElems.has(item)) {
       this._colorPicker.removeItem(item);
-      item.parentNode.removeChild(item);
+      item.parentNode?.removeChild(item);
       this._regionElems.delete(item);
       this._updateMissingRegion();
     }
@@ -417,7 +417,7 @@ ConstraintDisplays.CustomBinary = class CustomBinary extends ConstraintDisplays.
 
   removeItem(item) {
     if (this._colorPicker.removeItem(item)) {
-      item.parentNode.removeChild(item);
+      item.parentNode?.removeChild(item);
     }
   }
 
@@ -606,7 +606,7 @@ ConstraintDisplays.ShadedRegion = class ShadedRegion extends BaseConstraintDispl
 
   removeItem(item) {
     if (this._cellColors.removeItem(item)) {
-      item.parentNode.removeChild(item);
+      item.parentNode?.removeChild(item);
     }
   }
 
@@ -734,7 +734,7 @@ ConstraintDisplays.CountingCircles = class CountingCircles extends BaseConstrain
 
   removeItem(item) {
     if (this._circleColors.removeItem(item)) {
-      item.parentNode.removeChild(item);
+      item.parentNode?.removeChild(item);
     }
   }
 
@@ -945,7 +945,7 @@ ConstraintDisplays.BorderedRegion = class BorderedRegion extends BaseConstraintD
 
   removeItem(item) {
     if (this._colorPicker.removeItem(item)) {
-      item.parentNode.removeChild(item);
+      item.parentNode?.removeChild(item);
     }
   }
 

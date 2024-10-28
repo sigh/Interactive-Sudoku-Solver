@@ -1527,7 +1527,9 @@ class ConstraintSelector {
   }
 
   updateLatest(constraint, chip) {
-    this._latestHighlighter.setConstraint(constraint, chip);
+    if (constraint !== this._selectionHighlighter.currentConstraint()) {
+      this._latestHighlighter.setConstraint(constraint, chip);
+    }
   }
 
   select(constraint, chip, collection) {
