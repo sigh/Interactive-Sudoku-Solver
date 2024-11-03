@@ -1642,6 +1642,27 @@ class SudokuConstraint {
     }
   }
 
+  static ValueIndexing = class ValueIndexing extends SudokuConstraintBase {
+    static DESCRIPTION = (`
+      Arrows point from a cell with digit X towards the same digit X,
+      where the digit in the second cell on the line indicates how many cells
+      away the digit X is on the line.`);
+    static CATEGORY = 'LinesAndSets';
+    static DISPLAY_CONFIG = {
+      displayClass: 'GenericLine',
+      startMarker: LineOptions.SMALL_FULL_CIRCLE_MARKER,
+      arrow: true,
+      dashed: true,
+    };
+    static VALIDATE_CELLS_FN = (cells, shape) => cells.length > 2;
+
+    constructor(...cells) {
+      super(arguments);
+      this.cells = cells;
+    }
+  }
+
+
   static V = class V extends SudokuConstraintBase {
     static DESCRIPTION = (`
       Values must add to 5. Adjacent cells only.`);
@@ -2831,6 +2852,13 @@ class SudokuBuilder {
           yield new SudokuConstraintHandler.Sum(cells, 5);
           break;
 
+        case 'ValueIndexing':
+          {
+            const cells = constraint.cells.map(
+              c => shape.parseCellId(c).cell);
+            yield new SudokuConstraintHandler.ValueIndexing(...cells);
+          }
+          break;
         case 'Windoku':
           for (const cells of SudokuConstraint.Windoku.regions(shape)) {
             yield new SudokuConstraintHandler.AllDifferent(cells);

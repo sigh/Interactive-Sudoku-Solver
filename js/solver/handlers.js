@@ -2093,6 +2093,63 @@ SudokuConstraintHandler.SumLine = class SumLine extends SudokuConstraintHandler 
   }
 }
 
+SudokuConstraintHandler.ValueIndexing = class ValueIndexing extends SudokuConstraintHandler {
+  constructor(valueCell, controlCell, ...indexedCells) {
+    super([valueCell, controlCell, ...indexedCells]);
+    this._controlCell = controlCell;
+    this._valueCell = valueCell;
+    this._indexedCells = indexedCells;
+  }
+
+  initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
+    const numCells = this._indexedCells.length;
+    const mask = (1 << numCells) - 1;
+    initialGridCells[this._controlCell] &= mask;
+
+    return !!initialGridCells[this._valueCell];
+  }
+
+  enforceConsistency(grid, handlerAccumulator) {
+    const cells = this._indexedCells;
+    const controlCell = this._controlCell
+    const numCells = cells.length;
+    const valueCell = this._valueCell;
+
+    const originalControl = grid[controlCell];
+    const originalValues = grid[valueCell];
+
+    let possibleValues = 0;
+    let possibleControl = 0;
+    for (let i = 0, v = 1; i < numCells; i++, v <<= 1) {
+      if ((originalControl & v) && (grid[cells[i]] & originalValues)) {
+        possibleValues |= grid[cells[i]] & originalValues;
+        possibleControl |= v;
+      }
+    }
+
+    // If there is a single control value then we can constrain the indexed
+    // cell.
+    if (!(possibleControl & (possibleControl - 1))) {
+      const index = LookupTables.toIndex(possibleControl);
+      const cell = cells[index];
+      grid[cell] = (possibleValues &= grid[cell]);
+      if (grid[cell] === 0) return false;
+    }
+
+    if (originalValues !== possibleValues) {
+      if (!(grid[valueCell] = possibleValues)) return false;
+      handlerAccumulator.addForCell(valueCell);
+    }
+
+    if (possibleControl !== originalControl) {
+      if (!(grid[controlCell] = possibleControl)) return false;
+      handlerAccumulator.addForCell(controlCell);
+    }
+
+    return true;
+  }
+}
+
 SudokuConstraintHandler.Indexing = class Indexing extends SudokuConstraintHandler {
   constructor(controlCell, indexedCells, indexedValue) {
     super([controlCell]);
