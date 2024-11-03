@@ -278,6 +278,7 @@ const runSolveTests = async (onFailure) => {
     'Event horizon', // Duplicate cell in sum, BinaryPairwise optimization.
     'Copycat, easy',  // Same value - 2 sets, repeated values
     'Clone sudoku', // Same value - single cell sets
+    'Slingshot sudoku', // ValueIndexing
     'Numbered Rooms vs X-Sums', // Or constraint
     'Or with Givens', // Or constraint (update watched cells)
     'And with AllDifferent', // And constraint (with cellExclusions)
