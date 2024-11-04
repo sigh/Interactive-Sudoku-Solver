@@ -76,7 +76,7 @@ ConstraintCategoryInput.Shape = class Shape extends ConstraintCategoryInput {
 
     select.onchange = () => {
       const shapeName = select.value;
-      const shape = GridShape.get(shapeName);
+      const shape = GridShape.fromGridSpec(shapeName);
       if (!shape) throw ('Invalid shape: ' + shapeName);
       this.collection.setShape(shape);
     };

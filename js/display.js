@@ -510,7 +510,8 @@ class ConstraintDisplay extends DisplayItem {
   constructor(inputManager, displayContainer) {
     super();
 
-    displayContainer.addElement(this._makeArrowhead());
+    displayContainer.addElement(this.constructor._makeArrowhead());
+    displayContainer.addElement(this.constructor._makeTextBgFilter());
     displayContainer.addElement(CellValueDisplay.makeGivensMask());
 
     this._gridDisplay = new GridDisplay(
@@ -542,15 +543,15 @@ class ConstraintDisplay extends DisplayItem {
   }
 
   // Reusable arrowhead marker.
-  _makeArrowhead() {
-    let arrowhead = createSvgElement('marker');
+  static _makeArrowhead() {
+    const arrowhead = createSvgElement('marker');
     arrowhead.id = 'arrowhead';
     arrowhead.setAttribute('refX', '3');
     arrowhead.setAttribute('refY', '2');
     arrowhead.setAttribute('markerWidth', '4');
     arrowhead.setAttribute('markerHeight', '5');
     arrowhead.setAttribute('orient', 'auto');
-    let arrowPath = createSvgElement('path');
+    const arrowPath = createSvgElement('path');
     arrowPath.setAttribute('d', 'M 0 0 L 3 2 L 0 4');
     arrowPath.setAttribute('fill', 'none');
     arrowPath.setAttribute('stroke-width', 1);
@@ -558,6 +559,26 @@ class ConstraintDisplay extends DisplayItem {
     arrowhead.appendChild(arrowPath);
 
     return arrowhead;
+  }
+
+  static _makeTextBgFilter() {
+    const filter = createSvgElement('filter');
+    filter.setAttribute('x', '0');
+    filter.setAttribute('y', '0');
+    filter.setAttribute('width', '1');
+    filter.setAttribute('height', '1');
+    filter.setAttribute('id', 'text-bg-filter');
+
+    const flood = createSvgElement('feFlood');
+    flood.setAttribute('flood-color', 'rgba(255,255,255,0.6)');
+    filter.appendChild(flood);
+
+    const composite = createSvgElement('feComposite');
+    composite.setAttribute('in', 'SourceGraphic');
+    composite.setAttribute('operator', 'under');
+    filter.appendChild(composite);
+
+    return filter;
   }
 
   clear() {
