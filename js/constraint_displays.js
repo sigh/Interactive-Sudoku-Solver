@@ -686,25 +686,10 @@ ConstraintDisplays.ShadedRegion = class ShadedRegion extends BaseConstraintDispl
     if (label !== undefined) {
       const text = this.makeTextNode(label, x, y, 'shaded-region-label');
       region.append(text);
-
-      let textBackground = this.constructor._addTextBackground(text);
-      textBackground.setAttribute('fill', 'rgb(200, 200, 200)');
+      text.setAttribute('filter', 'url(#text-bg-filter)');
     }
 
     return region;
-  }
-
-  static _addTextBackground(elem) {
-    const bbox = elem.getBBox();
-    const rect = createSvgElement('rect');
-
-    rect.setAttribute('x', bbox.x);
-    rect.setAttribute('y', bbox.y);
-    rect.setAttribute('width', bbox.width);
-    rect.setAttribute('height', bbox.height);
-
-    elem.parentNode.insertBefore(rect, elem);
-    return rect;
   }
 
   _chooseCellColor(cellIds) {
