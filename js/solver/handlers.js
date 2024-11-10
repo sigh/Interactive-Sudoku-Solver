@@ -1676,22 +1676,18 @@ SudokuConstraintHandler.Lockout = class Lockout extends SudokuConstraintHandler 
   }
 }
 
-// Enforce the "Global entropy" constraint for a single 2x2 region.
-SudokuConstraintHandler.LocalEntropy = class LocalEntropy extends SudokuConstraintHandler {
+SudokuConstraintHandler._Squishable2x2 = class _Squishable2x2 extends SudokuConstraintHandler {
+  // Subclasses should override these.
+  static SQUISHED_MASK = 0;
+  static TRIADS = [];
+  static SQUISH_OFFSET = 0;
+
   constructor(cells) {
     super(cells);
     this._cellExclusions = null;
   }
 
   static _valuesBuffer = new Uint16Array(SHAPE_MAX.numValues);
-  static _SQUISHED_MASK = (
-    LookupTables.fromValue(1) |
-    LookupTables.fromValue(4) |
-    LookupTables.fromValue(7));
-  static _TRIADS = [
-    LookupTables.fromValuesArray([1, 2, 3]),
-    LookupTables.fromValuesArray([4, 5, 6]),
-    LookupTables.fromValuesArray([7, 8, 9])];
 
   initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
     this._cellExclusions = cellExclusions;
@@ -1714,7 +1710,7 @@ SudokuConstraintHandler.LocalEntropy = class LocalEntropy extends SudokuConstrai
 
     if (allValues == fixedValues) return true;
 
-    const triads = this.constructor._TRIADS;
+    const triads = this.constructor.TRIADS;
     for (let i = 0; i < triads.length; i++) {
       const triadValue = triads[i] & allValues;
       // Skip triads which have more than one value, or which are already fixed.
@@ -1732,8 +1728,10 @@ SudokuConstraintHandler.LocalEntropy = class LocalEntropy extends SudokuConstrai
   enforceConsistency(grid, handlerAccumulator) {
     const cells = this.cells;
     const numCells = this.cells.length;
-    const squishedMask = this.constructor._SQUISHED_MASK;
+    const squishedMask = this.constructor.SQUISHED_MASK;
     const valuesBuffer = this.constructor._valuesBuffer;
+    const squishOffset = this.constructor.SQUISH_OFFSET;
+    const squishOffset2 = squishOffset << 1;
 
     // This code is very similar to the House handler, but adjusted to
     // collapse the values into 3 sets.
@@ -1743,7 +1741,7 @@ SudokuConstraintHandler.LocalEntropy = class LocalEntropy extends SudokuConstrai
     let fixedValues = 0;
     for (let i = 0; i < numCells; i++) {
       let v = grid[cells[i]];
-      v |= (v >> 1) | (v >> 2);
+      v |= (v >> squishOffset) | (v >> squishOffset2);
       v &= squishedMask;
       valuesBuffer[i] = v;
       atLeastThree |= atLeastTwo & v;
@@ -1765,7 +1763,7 @@ SudokuConstraintHandler.LocalEntropy = class LocalEntropy extends SudokuConstrai
           // has multiple hidden singles, which is a contradiction.
           if (value & (value - 1)) return false;
           // Unsquish the value.
-          const unsquishedValue = value | (value << 1) | (value << 2);
+          const unsquishedValue = value | (value << squishOffset) | (value << squishOffset2);
           const cell = cells[i];
           grid[cell] &= unsquishedValue;
           handlerAccumulator.addForCell(cell);
@@ -1788,7 +1786,7 @@ SudokuConstraintHandler.LocalEntropy = class LocalEntropy extends SudokuConstrai
             // pair.
             // Eliminate all other values from the pair in case it is a
             // hidden pair.
-            const unsquishedValue = v | (v << 1) | (v << 2);
+            const unsquishedValue = v | (v << squishOffset) | (v << squishOffset2);
             grid[cells[i]] &= unsquishedValue;
             grid[cells[j]] &= unsquishedValue;
           }
@@ -1798,6 +1796,27 @@ SudokuConstraintHandler.LocalEntropy = class LocalEntropy extends SudokuConstrai
 
     return this._enforceRequiredValues(grid, handlerAccumulator);
   }
+}
+
+
+// Enforce the "Global entropy" constraint for a single 2x2 region.
+SudokuConstraintHandler.LocalEntropy = class LocalEntropy extends SudokuConstraintHandler._Squishable2x2 {
+  static SQUISHED_MASK = LookupTables.fromValuesArray([1, 4, 7]);
+  static TRIADS = [
+    LookupTables.fromValuesArray([1, 2, 3]),
+    LookupTables.fromValuesArray([4, 5, 6]),
+    LookupTables.fromValuesArray([7, 8, 9])];
+  static SQUISH_OFFSET = 1;
+}
+
+// Enforce the "Global mod 3" constraint for a single 2x2 region.
+SudokuConstraintHandler.LocalMod3 = class LocalMod3 extends SudokuConstraintHandler._Squishable2x2 {
+  static SQUISHED_MASK = LookupTables.fromValuesArray([1, 2, 3]);
+  static TRIADS = [
+    LookupTables.fromValuesArray([1, 4, 7]),
+    LookupTables.fromValuesArray([2, 5, 8]),
+    LookupTables.fromValuesArray([3, 6, 9])];
+  static SQUISH_OFFSET = 3;
 }
 
 SudokuConstraintHandler.RequiredValues = class RequiredValues extends SudokuConstraintHandler {
