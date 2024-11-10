@@ -664,6 +664,23 @@ class SudokuConstraintBase {
       (r, i) => ((i / boxHeight | 0) * boxHeight + (r % boxHeight | 0)) * gridSize
         + (i % boxHeight | 0) * boxWidth + (r / boxHeight | 0), gridSize);
   });
+  static square2x2Regions = memoize((shape) => {
+    const gridSize = shape.gridSize;
+    const regions = [];
+
+    for (let i = 0; i < gridSize - 1; i++) {
+      for (let j = 0; j < gridSize - 1; j++) {
+        regions.push([
+          shape.cellIndex(i, j),
+          shape.cellIndex(i, j + 1),
+          shape.cellIndex(i + 1, j),
+          shape.cellIndex(i + 1, j + 1),
+        ]);
+      }
+    }
+
+    return regions;
+  });
 
   static fullLineCellMap = memoize((shape) => {
     let map = new Map();
@@ -1520,24 +1537,20 @@ class SudokuConstraint {
       a middle digit (4, 5, 6) and a high digit (7, 8, 9).`);
     static CATEGORY = 'GlobalCheckbox';
     static UNIQUENESS_KEY_FIELD = 'type';
+  }
 
-    static regions = memoize((shape) => {
-      const gridSize = shape.gridSize;
-      const regions = [];
+  static GlobalMod = class GlobalMod extends SudokuConstraintBase {
+    // NOTE: This is just called GlobalMod so it can be expanded to other
+    //       moduli in backward-compatible way.
+    static DESCRIPTION = (`
+      Each 2x2 box in the grid has to contain a digit from (1, 4, 7),
+      a digit from (2, 5, 8) and a digit from (3, 6, 9).`);
+    static CATEGORY = 'GlobalCheckbox';
+    static UNIQUENESS_KEY_FIELD = 'type';
 
-      for (let i = 0; i < gridSize - 1; i++) {
-        for (let j = 0; j < gridSize - 1; j++) {
-          regions.push([
-            shape.cellIndex(i, j),
-            shape.cellIndex(i, j + 1),
-            shape.cellIndex(i + 1, j),
-            shape.cellIndex(i + 1, j + 1),
-          ]);
-        }
-      }
-
-      return regions;
-    });
+    static displayName() {
+      return 'Global Mod 3';
+    }
   }
 
   static Diagonal = class Diagonal extends SudokuConstraintBase {
@@ -2872,8 +2885,14 @@ class SudokuBuilder {
           break;
 
         case 'GlobalEntropy':
-          for (const cells of SudokuConstraint.GlobalEntropy.regions(shape)) {
+          for (const cells of SudokuConstraintBase.square2x2Regions(shape)) {
             yield new SudokuConstraintHandler.LocalEntropy(cells);
+          }
+          break;
+
+        case 'GlobalMod':
+          for (const cells of SudokuConstraintBase.square2x2Regions(shape)) {
+            yield new SudokuConstraintHandler.LocalMod3(cells);
           }
           break;
 

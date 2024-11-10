@@ -249,7 +249,8 @@ const runSolveTests = async (onFailure) => {
     'X-Sum little killer',
     'Skyscraper',
     'Skyscraper - all 6',
-    'Global entropy',
+    'Global entropy',  // Global entropy
+    'Global mod 3',  // Global mod
     'Odd even',
     'Quadruple X',
     'Quadruple - repeated values',

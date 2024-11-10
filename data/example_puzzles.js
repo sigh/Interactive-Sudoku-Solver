@@ -194,6 +194,12 @@ const DISPLAYED_EXAMPLES = [
     solution: '891234567534867291672915348315648972948372615726159483459783126183426759267591834',
   },
   {
+    name: 'Global mod 3',
+    src: 'https://sudokupad.app/l74hg3flzp',
+    input: '.GlobalMod.Cage~15~R1C1~R1C2.Cage~6~R1C4~R2C4.Cage~7~R3C1~R4C1.Cage~12~R8C6~R9C6.Cage~8~R8C7~R8C8.X~R1C7~R2C7.X~R5C4~R6C4.X~R5C5~R6C5.X~R8C3~R9C3.V~R4C4~R4C5.V~R5C7~R6C7',
+    solution: '879162354621543798435987216387419562196235487254876139943621875518794623762358941',
+  },
+  {
     name: 'Quadruple X',
     src: 'https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?id=00040T',
     input: '.Diagonal~1.Diagonal~-1..Quad~R1C1~1~4~6~7.Quad~R5C1~2~3.Quad~R6C1~1~2.Quad~R3C3~1~2~4~8.Quad~R6C3~3~5~8~9.Quad~R2C4~6~7.Quad~R7C5~3~6.Quad~R3C6~4~5~8~9.Quad~R6C6~2~3~6~7.Quad~R3C8~1~2.Quad~R4C8~1~5.Quad~R8C8~2~3~4~5',
