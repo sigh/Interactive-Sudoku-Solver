@@ -1632,6 +1632,63 @@ class SudokuConstraint {
     );
   }
 
+  static Comparison = class Comparison extends SudokuConstraintBase {
+    static DESCRIPTION = (`
+      Comparison: compare value between adjacent cells.`);
+    static CATEGORY = 'LinesAndSets';
+    static DISPLAY_CONFIG = {
+      displayClass: 'Comparison',
+    };
+    static ARGUMENT_CONFIG = {
+      label: "mode",
+      options: [
+        { value: '1', text: 'Maximum' },
+        { value: '-1', text: 'Minimum' },
+      ],
+    };
+
+    static VALIDATE_CELLS_FN = ([primary, ...secondaries], shape) => {
+      if (!secondaries.length)
+        return false;
+      for (let secondary of secondaries) {
+        if (!this._cellsAreAdjacent([primary, secondary], shape))
+          return false;
+      }
+      return true;
+    }
+
+    constructor(mode, primaryCell, ...secondaryCells) {
+      secondaryCells.sort();
+      super([mode, primaryCell, ...secondaryCells]);
+      this.mode = +mode;
+      this.primaryCell = primaryCell;
+      this.secondaryCells = secondaryCells;
+    }
+
+    static displayName() {
+      return 'Comparison'
+    }
+
+    _symbol() {
+      switch (this.mode) {
+      case 1:
+        return '>';
+      case -1:
+        return '<';
+      default:
+        throw new Error("Invalid state")
+      }
+    }
+    chipLabel() {
+      return `${this.primaryCell} ${this._symbol()} [${this.secondaryCells}]`;
+    }
+
+    static fnKey = memoize((mode, numValues) =>
+      SudokuConstraint.Binary.fnToKey((a, b) => (mode < 0) ? (a < b) : (a > b), numValues)
+    );
+
+  }
+
   static X = class X extends SudokuConstraintBase {
     static DESCRIPTION = (`
       Values must add to 10. Adjacent cells only.`);
@@ -2864,6 +2921,17 @@ class SudokuBuilder {
           cells = constraint.cells.map(c => shape.parseCellId(c).cell);
           yield new SudokuConstraintHandler.Sum(cells, 5);
           break;
+
+        case 'Comparison': {
+          let mode = constraint.mode;
+          let primaryCell = shape.parseCellId(constraint.primaryCell).cell;
+          let fn = SudokuConstraint.Comparison.fnKey(mode, shape.numValues);
+          for (let secondary of constraint.secondaryCells) {
+            let secondaryCell = shape.parseCellId(secondary).cell;
+            yield new SudokuConstraintHandler.BinaryConstraint(primaryCell, secondaryCell, fn);
+          }
+          break;
+        }
 
         case 'ValueIndexing':
           {

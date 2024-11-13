@@ -18,6 +18,7 @@ class ConstraintDisplays {
       this.Quad,
       this.Givens,
       this.OutsideClue,
+      this.Comparison,
     ]
   }
 }
@@ -553,7 +554,6 @@ ConstraintDisplays.Dot = class Dot extends BaseConstraintDisplayItem {
     return dot;
   }
 }
-
 ConstraintDisplays.Letter = class Letter extends BaseConstraintDisplayItem {
   drawItem(constraint, _) {
     const cells = constraint.cells;
@@ -1228,5 +1228,58 @@ ConstraintDisplays.Givens = class Givens extends BaseConstraintDisplayItem {
     super.clear();
     this._cellDisplay.constructor.clearMask();
     this._maskMap.clear();
+  }
+}
+
+ConstraintDisplays.Comparison = class Comparison extends BaseConstraintDisplayItem {
+  drawItem(constraint, options) {
+    const primaryCell = constraint.primaryCell;
+    const secondaryCells = constraint.secondaryCells;
+
+    let result = createSvgElement("g");
+    let drawDecoration = (primaryCell, secondaryCell) => {
+      // Find the midpoint between the squares.
+      let [x0, y0] = this.cellIdCenter(primaryCell);
+      let [x1, y1] = this.cellIdCenter(secondaryCell);
+      let x = (x0 + x1) / 2;
+      let y = (y0 + y1) / 2;
+      const cellSize = DisplayItem.CELL_SIZE;
+      const comparisonSize = 0.1 * cellSize;
+      const inset = 0;
+      const squash = 0.75;
+      var dC = x0 < x1 ? 1 : (x0 > x1 ? -1 : 0);
+      var dR = y0 < y1 ? 1 : (y0 > y1 ? -1 : 0);
+      let directions;
+      if (dC == 0) {
+        // Vertical comparison
+        if (dR == 0)
+          throw new Error("Whelp this makes no sense")
+        let comparisonDirection = dR * constraint.mode;
+        directions = [
+          'M', x - comparisonSize, y - comparisonDirection * comparisonSize * squash - dR * inset,
+          'L', x                 , y + comparisonDirection * comparisonSize * squash - dR * inset,
+          'L', x + comparisonSize, y - comparisonDirection * comparisonSize * squash - dR * inset,
+        ]
+      } else {
+        if (dC == 0) throw new Error("Whelp this makes no sense")
+        let comparisonDirection = dC * constraint.mode;
+        directions = [
+          'M', x - comparisonDirection * comparisonSize * squash - dC * inset, y - comparisonSize, 
+          'L', x + comparisonDirection * comparisonSize * squash - dC * inset, y,
+          'L', x - comparisonDirection * comparisonSize * squash - dC * inset, y + comparisonSize,
+        ]
+      }
+      let path = createSvgElement('path');
+      path.setAttribute('d', directions.join(' '));
+      path.setAttribute('fill', 'transparent');
+      path.setAttribute('stroke', 'black');
+      path.setAttribute('stroke-width', 1);
+      path.setAttribute('stroke-linecap', 'round');
+      result.appendChild(path);
+    }
+    for (let secondaryCell of secondaryCells)
+      drawDecoration(primaryCell, secondaryCell)
+    this._svg.append(result);
+    return result;
   }
 }
