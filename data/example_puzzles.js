@@ -333,6 +333,12 @@ const DISPLAYED_EXAMPLES = [
     input: '.CountingCircles~R1C1~R1C2~R2C2~R3C1~R4C1~R4C2~R4C4~R2C3~R2C4..Shape~4x4',
     solution: '3421124341322314',
   },
+  {
+    name: 'Doggo Experiment #8',
+    src: 'https://sudokupad.app/vdolg5x93a',
+    input: '.Whisper~5~R7C1~R8C1~R9C1~R9C2~R9C3.Whisper~5~R2C2~R3C3~R4C4~R5C5~R6C6~R7C7~R8C8.Whisper~5~R5C2~R6C2~R5C3~R6C4~R7C5~R8C4~R7C3.Whisper~5~R1C6~R2C6~R3C7~R4C8~R4C9.DisjointSets.Comparison~-1~R5C1~R4C1~R5C2~R6C1.Comparison~1~R2C2~R1C2~R2C1~R2C3~R3C2.Comparison~1~R8C2~R7C2~R8C1~R8C3~R9C2.Comparison~-1~R9C5~R8C5~R9C4~R9C6.Comparison~1~R8C8~R7C8~R8C7~R8C9~R9C8.Comparison~-1~R5C9~R4C9~R5C8~R6C9.Comparison~1~R1C5~R1C4~R1C6~R2C5.Comparison~1~R2C8~R1C8~R2C7~R2C9~R3C8',
+    solution: '375496821496821375281573964934762518568914732712358496649187253153249687827635149'
+  },
 ];
 
 // Index the puzzles by their name in puzzles.
