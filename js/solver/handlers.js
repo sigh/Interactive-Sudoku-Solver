@@ -1819,6 +1819,45 @@ SudokuConstraintHandler.LocalMod3 = class LocalMod3 extends SudokuConstraintHand
   static SQUISH_OFFSET = 3;
 }
 
+SudokuConstraintHandler.DutchFlatmateLine = class DutchFlatmateLine extends SudokuConstraintHandler {
+  constructor(cells) {
+    super(cells);
+    this._mid = LookupTables.fromValue(Math.ceil(cells.length / 2));
+  }
+
+  enforceConsistency(grid, handlerAccumulator) {
+    const cells = this.cells;
+    const numCells = cells.length;
+    const target = this._mid;
+    const above = 1;
+    const below = LookupTables.fromValue(cells.length);
+
+    for (let i = 0; i < numCells; i++) {
+      let v = grid[cells[i]];
+      if (!(v & target)) continue;
+
+      // Check above and below.
+      let ok = 0;
+      if (i > 0 && grid[cells[i - 1]] & above) ok |= 1;
+      if (i < numCells - 1 && grid[cells[i + 1]] & below) ok |= 2;
+
+      if (!ok) {
+        // Not a valid cell for the target.
+        if (!(grid[cells[i]] &= ~target)) return false;
+      } else if (v == target) {
+        // Only one valid flatmate (either above or below).
+        if (ok === 1) {
+          grid[cells[i - 1]] = above;
+        } else if (ok === 2) {
+          grid[cells[i + 1]] = below;
+        }
+      }
+    }
+
+    return true;
+  }
+}
+
 SudokuConstraintHandler.RequiredValues = class RequiredValues extends SudokuConstraintHandler {
   constructor(cells, values, strict) {
     super(cells);

@@ -1541,6 +1541,16 @@ class SudokuConstraint {
     }
   }
 
+  static DutchFlatmates = class DutchFlatmates extends SudokuConstraintBase {
+    static DESCRIPTION = (`
+      All 5's in the grid must have a 1 directly above it or a 9 directly below
+      it. It may have both, but it doesn't need both.
+      For non-9x9 grids, the 5 is replaced by the middle number and 9 by the
+      maximum number.`);
+    static CATEGORY = 'GlobalCheckbox';
+    static UNIQUENESS_KEY_FIELD = 'type';
+  }
+
   static Diagonal = class Diagonal extends SudokuConstraintBase {
     static DESCRIPTION = (`
       Values along the diagonal must be unique.`);
@@ -2881,6 +2891,12 @@ class SudokuBuilder {
         case 'GlobalMod':
           for (const cells of SudokuConstraintBase.square2x2Regions(shape)) {
             yield new SudokuConstraintHandler.LocalMod3(cells);
+          }
+          break;
+
+        case 'DutchFlatmates':
+          for (const cells of SudokuConstraintBase.colRegions(shape)) {
+            yield new SudokuConstraintHandler.DutchFlatmateLine(cells);
           }
           break;
 
