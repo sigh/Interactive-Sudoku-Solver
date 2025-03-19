@@ -200,6 +200,12 @@ const DISPLAYED_EXAMPLES = [
     solution: '879162354621543798435987216387419562196235487254876139943621875518794623762358941',
   },
   {
+    name: 'Dutch Flatmates',
+    src: 'https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?chlang=en&id=000FYS',
+    input: '.DutchFlatmates.BlackDot~R5C1~R6C1.BlackDot~R6C1~R7C1.BlackDot~R7C1~R8C1.BlackDot~R4C2~R4C3.BlackDot~R2C5~R3C5.BlackDot~R3C7~R4C7.BlackDot~R4C8~R4C9.BlackDot~R5C9~R6C9.BlackDot~R6C9~R7C9.BlackDot~R7C9~R8C9.BlackDot~R7C7~R7C8.WhiteDot~R8C7~R9C7.WhiteDot~R9C5~R9C4.WhiteDot~R9C3~R9C4.WhiteDot~R5C3~R6C3.WhiteDot~R5C1~R5C2.WhiteDot~R4C4~R4C5.WhiteDot~R2C2~R3C2.WhiteDot~R1C3~R1C4.WhiteDot~R1C7~R1C8.WhiteDot~R1C8~R1C9',
+    solution: '618792345352864719947531826721985463896243571435617982279158634163479258584326197',
+  },
+  {
     name: 'Quadruple X',
     src: 'https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?id=00040T',
     input: '.Diagonal~1.Diagonal~-1..Quad~R1C1~1~4~6~7.Quad~R5C1~2~3.Quad~R6C1~1~2.Quad~R3C3~1~2~4~8.Quad~R6C3~3~5~8~9.Quad~R2C4~6~7.Quad~R7C5~3~6.Quad~R3C6~4~5~8~9.Quad~R6C6~2~3~6~7.Quad~R3C8~1~2.Quad~R4C8~1~5.Quad~R8C8~2~3~4~5',
