@@ -575,7 +575,6 @@ class ConstraintDisplay extends DisplayItem {
 
     const composite = createSvgElement('feComposite');
     composite.setAttribute('in', 'SourceGraphic');
-    composite.setAttribute('operator', 'under');
     filter.appendChild(composite);
 
     return filter;
