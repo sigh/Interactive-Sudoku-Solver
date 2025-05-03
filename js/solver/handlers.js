@@ -2806,6 +2806,52 @@ SudokuConstraintHandler.FullRank = class FullRank extends SudokuConstraintHandle
   }
 }
 
+SudokuConstraintHandler.Rellik = class Rellik extends SudokuConstraintHandler {
+  constructor(cells, sum) {
+    super(cells);
+    // Use bigints to handle sums larger than 31.
+    // We could optimize for the small sum case if needed.
+    this.sumMask = 1n << BigInt(sum);
+  }
+
+  enforceConsistency(grid, handlerAccumulator) {
+    const cells = this.cells;
+    const numCells = cells.length;
+
+    // Combine the results of optionally subtracting fixed values from the sum.
+    let remainders = this.sumMask;
+    let fixedValues = 0;
+    let unfixedValues = 0;
+    for (let i = 0; i < numCells; i++) {
+      let v = grid[cells[i]];
+      if (!(v & (v - 1))) {
+        remainders |= remainders >> BigInt(LookupTables.toValue(v));
+        fixedValues |= v;
+      } else {
+        unfixedValues |= v;
+      }
+    }
+
+    // Fail remainder of 0 is possible.
+    if (remainders & 1n) return false;
+
+    // Check if any of the unfixed values exactly match the possible remainders.
+    const smallRemainders = Number(BigInt.asUintN(32, remainders)) >> 1;
+    const valuesToRemove = unfixedValues & smallRemainders & ~fixedValues;
+    if (valuesToRemove === 0) return true;
+
+    for (let i = 0; i < numCells; i++) {
+      const cell = cells[i];
+      if (grid[cell] & valuesToRemove) {
+        if (!(grid[cell] &= ~valuesToRemove)) return false;
+        handlerAccumulator.addForCell(cell);
+      }
+    }
+
+    return true;
+  }
+}
+
 SudokuConstraintHandler.Or = class Or extends SudokuConstraintHandler {
   constructor(...handlers) {
     // Exclusion cells need special handlings since they can't be handled
