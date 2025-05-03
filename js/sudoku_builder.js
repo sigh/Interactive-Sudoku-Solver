@@ -2287,8 +2287,9 @@ class SudokuConstraint {
     }
 
     indexTypeStr() {
-      return SudokuConstraint.Indexing.ROW_INDEXING
-        ? 'Row' : 'Column';
+      const option = this.constructor.ARGUMENT_CONFIG.options.find(
+        opt => opt.value === this.indexType);
+      return option ? option.text : 'Unknown';
     }
   }
 
