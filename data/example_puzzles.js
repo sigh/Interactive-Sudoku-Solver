@@ -345,6 +345,12 @@ const DISPLAYED_EXAMPLES = [
     input: '.CountingCircles~R1C1~R1C2~R2C2~R3C1~R4C1~R4C2~R4C4~R2C3~R2C4..Shape~4x4',
     solution: '3421124341322314',
   },
+  {
+    name: '6x6: Rellik cages',
+    src: 'https://sudokupad.app/adventure/480-rellik',
+    input: '.Shape~6x6.RellikCage~5~R1C3~R2C3~R2C2.RellikCage~9~R1C2~R1C1~R2C1.RellikCage~6~R1C4~R2C4~R2C5.RellikCage~4~R3C3~R3C4.RellikCage~4~R4C3~R5C3~R6C3~R5C2.RellikCage~7~R5C1~R6C1~R6C2.RellikCage~5~R6C4~R6C5~R6C6.RellikCage~3~R5C4~R5C5~R5C6~R4C6.RellikCage~8~R1C5~R1C6~R2C6~R3C6',
+    solution: '213564564321641235325146136452452613',
+  },
 ];
 
 // Index the puzzles by their name in puzzles.

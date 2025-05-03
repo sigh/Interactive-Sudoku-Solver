@@ -275,6 +275,7 @@ const runSolveTests = async (onFailure) => {
     'Anti-taxicab',
     'Dutch Flatmates',  // Dutch Flatmates
     'Fortress sudoku',  // GreaterThan
+    '6x6: Rellik cages',  // Rellik cages
     'Full rank - 6 clue snipe',
     'Irregular region sum line',
     'Force non-unit coeff', // Sum with non-unit coeff

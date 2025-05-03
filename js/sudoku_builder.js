@@ -431,11 +431,12 @@ class SudokuParser {
     return new compositeClass(items);
   }
 
-  static parseString(str) {
-    str = str.replace(/\s+/g, '');
+  static parseString(rawStr) {
+    const str = rawStr.replace(/\s+/g, '');
     let items = str.split('.');
     if (items[0]) throw (
-      'Invalid constraint string: Constraint must start with a "."');
+      'Invalid constraint string: Constraint must start with a ".".\n' +
+      rawStr);
     items.shift();
 
     const constraints = [];
@@ -1881,9 +1882,31 @@ class SudokuConstraint {
     chipLabel() {
       return `Cage (${this.sum})`;
     }
+  }
 
-    static validateCells(cells, shape) {
-      cells.length <= shape.numValues && cells.length > 1;
+  static RellikCage = class RellikCage extends SudokuConstraintBase {
+    static DESCRIPTION = (
+      `Any combination of one or more digits within the cage cannot sum to the given value.`);
+    static CATEGORY = 'LinesAndSets';
+    static DISPLAY_CONFIG = {
+      displayClass: 'ShadedRegion',
+      labelField: 'displayLabel',
+    };
+    static ARGUMENT_CONFIG = {
+      label: 'sum',
+    };
+    static VALIDATE_CELLS_FN = (cells, shape) => (
+      cells.length <= shape.numValues && cells.length > 1);
+
+    constructor(sum, ...cells) {
+      super(arguments);
+      this.cells = cells;
+      this.sum = sum;
+      this.displayLabel = `≠${sum}`;
+    }
+
+    chipLabel() {
+      return `Rellik Cage (${this.displayLabel})`;
     }
   }
 
@@ -2714,6 +2737,12 @@ class SudokuBuilder {
           if (constraint.sum != 0) {
             yield new SudokuConstraintHandler.Sum(cells, constraint.sum);
           }
+          yield new SudokuConstraintHandler.AllDifferent(cells);
+          break;
+
+        case 'RellikCage':
+          cells = constraint.cells.map(c => shape.parseCellId(c).cell);
+          yield new SudokuConstraintHandler.Rellik(cells, constraint.sum);
           yield new SudokuConstraintHandler.AllDifferent(cells);
           break;
 
