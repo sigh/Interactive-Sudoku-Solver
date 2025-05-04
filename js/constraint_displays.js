@@ -532,57 +532,59 @@ ConstraintDisplays.PillArrow = class PillArrow extends ConstraintDisplays.Generi
 
 ConstraintDisplays.Dot = class Dot extends BaseConstraintDisplayItem {
   drawItem(constraint, options) {
-    const cells = constraint.cells;
-    if (cells.length != 2) throw (`Dot must be provided two cells: ${cells}`);
+    const g = createSvgElement('g');
+    g.setAttribute('fill', options.color);
+    g.setAttribute('stroke', 'black');
+    g.setAttribute('stroke-width', 1);
 
-    // Find the midpoint between the squares.
-    let [x0, y0] = this.cellIdCenter(cells[0]);
-    let [x1, y1] = this.cellIdCenter(cells[1]);
-    let x = (x0 + x1) / 2;
-    let y = (y0 + y1) / 2;
+    for (const [a, b] of constraint.adjacentPairs(this._shape)) {
+      // Find the midpoint between the squares.
+      let [x0, y0] = this.cellIndexCenter(a);
+      let [x1, y1] = this.cellIndexCenter(b);
+      let x = (x0 + x1) / 2;
+      let y = (y0 + y1) / 2;
 
-    let dot = createSvgElement('circle');
-    dot.setAttribute('fill', options.color);
-    dot.setAttribute('stroke', 'black');
-    dot.setAttribute('stroke-width', 1);
-    dot.setAttribute('cx', x);
-    dot.setAttribute('cy', y);
-    dot.setAttribute('r', 4);
+      let dot = createSvgElement('circle');
+      dot.setAttribute('cx', x);
+      dot.setAttribute('cy', y);
+      dot.setAttribute('r', 4);
+      g.append(dot);
+    }
 
-    this._svg.append(dot);
+    this._svg.append(g);
 
-    return dot;
+    return g;
   }
 }
 ConstraintDisplays.Letter = class Letter extends BaseConstraintDisplayItem {
   drawItem(constraint, _) {
-    const cells = constraint.cells;
     const letter = constraint.type.toLowerCase();
-
-    if (cells.length != 2) throw (`Letter must be provided two cells: ${cells}`);
-
-    // Find the midpoint between the squares.
-    let [x0, y0] = this.cellIdCenter(cells[0]);
-    let [x1, y1] = this.cellIdCenter(cells[1]);
-    let x = (x0 + x1) / 2;
-    let y = (y0 + y1) / 2;
 
     const g = createSvgElement('g');
 
-    // Create a white background using a larger font weight.
-    let text = this.makeTextNode(letter, x, y, 'xv-display');
-    text.setAttribute('text-anchor', 'middle');
-    text.setAttribute('dominant-baseline', 'middle');
-    text.setAttribute('style', 'font-size: 20; font-weight: 900;');
-    text.setAttribute('fill', 'white');
-    g.append(text);
+    for (const [a, b] of constraint.adjacentPairs(this._shape)) {
 
-    // Create the actual text.
-    text = this.makeTextNode(letter, x, y, 'xv-display');
-    text.setAttribute('text-anchor', 'middle');
-    text.setAttribute('dominant-baseline', 'middle');
-    text.setAttribute('style', 'font-size: 20; font-weight: 100;');
-    g.append(text);
+      // Find the midpoint between the squares.
+      let [x0, y0] = this.cellIndexCenter(a);
+      let [x1, y1] = this.cellIndexCenter(b);
+      let x = (x0 + x1) / 2;
+      let y = (y0 + y1) / 2;
+
+      // Create a white background using a larger font weight.
+      let text = this.makeTextNode(letter, x, y, 'xv-display');
+      text.setAttribute('text-anchor', 'middle');
+      text.setAttribute('dominant-baseline', 'middle');
+      text.setAttribute('style', 'font-size: 20; font-weight: 900;');
+      text.setAttribute('fill', 'white');
+      g.append(text);
+
+      // Create the actual text.
+      text = this.makeTextNode(letter, x, y, 'xv-display');
+      text.setAttribute('text-anchor', 'middle');
+      text.setAttribute('dominant-baseline', 'middle');
+      text.setAttribute('style', 'font-size: 20; font-weight: 100;');
+      g.append(text);
+    }
 
     this._svg.append(g);
 
@@ -1218,24 +1220,24 @@ ConstraintDisplays.Givens = class Givens extends BaseConstraintDisplayItem {
 
 ConstraintDisplays.GreaterThan = class GreaterThan extends BaseConstraintDisplayItem {
   drawItem(constraint, options) {
-    const cells = constraint.cells;
-    if (cells.length != 2) throw new Error("GreaterThan must have exactly two cells");
-
     const result = createSvgElement("g");
     result.setAttribute('fill', 'transparent');
     result.setAttribute('stroke', 'black');
     result.setAttribute('stroke-width', 1.5);
     result.setAttribute('stroke-linecap', 'round');
 
-    result.appendChild(this._drawGreaterThanDecoration(cells[0], cells[1]));
+    for (const [cell0, cell1] of constraint.adjacentPairs(this._shape)) {
+      result.appendChild(this._drawGreaterThanDecoration(cell0, cell1));
+    }
+
     this._svg.append(result);
     return result;
   }
 
   _drawGreaterThanDecoration(cell0, cell1) {
     // Find the midpoint between the squares.
-    const [x0, y0] = this.cellIdCenter(cell0);
-    const [x1, y1] = this.cellIdCenter(cell1);
+    const [x0, y0] = this.cellIndexCenter(cell0);
+    const [x1, y1] = this.cellIndexCenter(cell1);
     const x = (x0 + x1) / 2;
     const y = (y0 + y1) / 2;
     const cellSize = DisplayItem.CELL_SIZE;
