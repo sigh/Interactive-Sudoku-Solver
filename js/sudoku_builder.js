@@ -690,12 +690,46 @@ class SudokuConstraintBase {
     return map;
   });
 
-  static _cellsAreAdjacent(cells, shape) {
-    if (cells.length != 2) return false;
-    // Manhattan distance is exactly 1.
-    let cell0 = shape.parseCellId(cells[0]);
-    let cell1 = shape.parseCellId(cells[1]);
-    return 1 == Math.abs(cell0.row - cell1.row) + Math.abs(cell0.col - cell1.col);
+  static _hasAdjacentCells(cells, shape) {
+    // Convert all cells to row/col coordinates
+    const coords = cells.map(c => shape.parseCellId(c));
+    const seen = new Array(coords.length).fill(false);
+
+    // For each cell, check if it has at least one adjacent cell
+    for (let i = 0; i < coords.length; i++) {
+      if (seen[i]) continue;
+
+      const ci = coords[i];
+
+      for (let j = 0; j < coords.length; j++) {
+        if (i === j) continue;
+        const cj = coords[j];
+        if (Math.abs(ci.row - cj.row) + Math.abs(ci.col - cj.col) === 1) {
+          seen[i] = true;
+          seen[j] = true;
+          break;
+        }
+      }
+
+      if (!seen[i]) return false;
+    }
+
+    return true;
+  }
+
+  static _adjacentCellPairs(cells, shape) {
+    const coords = cells.map(c => shape.parseCellId(c));
+    const pairs = [];
+    for (let i = 0; i < coords.length; i++) {
+      const ci = coords[i];
+      for (let j = i + 1; j < coords.length; j++) {
+        const cj = coords[j];
+        if (Math.abs(ci.row - cj.row) + Math.abs(ci.col - cj.col) === 1) {
+          pairs.push([ci.cell, cj.cell]);
+        }
+      }
+    }
+    return pairs;
   }
 
   static _cellsAre2x2Square(cells, shape) {
@@ -1578,7 +1612,7 @@ class SudokuConstraint {
       displayClass: 'Dot',
       color: 'white',
     };
-    static VALIDATE_CELLS_FN = this._cellsAreAdjacent;
+    static VALIDATE_CELLS_FN = this._hasAdjacentCells;
 
     constructor(...cells) {
       super(arguments);
@@ -1596,7 +1630,15 @@ class SudokuConstraint {
     }
 
     chipLabel() {
-      return `○ [${this.cells}]`;
+      if (this.cells.length == 2) {
+        return `○ [${this.cells}]`;
+      } else {
+        return `○ (${this.cells.length} cells)`;
+      }
+    }
+
+    adjacentPairs(shape) {
+      return this.constructor._adjacentCellPairs(this.cells, shape);
     }
   }
 
@@ -1608,7 +1650,7 @@ class SudokuConstraint {
       displayClass: 'Dot',
       color: 'black',
     };
-    static VALIDATE_CELLS_FN = this._cellsAreAdjacent;
+    static VALIDATE_CELLS_FN = this._hasAdjacentCells;
 
     constructor(...cells) {
       super(arguments);
@@ -1620,7 +1662,11 @@ class SudokuConstraint {
     }
 
     chipLabel() {
-      return `● [${this.cells}]`;
+      if (this.cells.length == 2) {
+        return `● [${this.cells}]`;
+      } else {
+        return `● (${this.cells.length} cells)`;
+      }
     }
 
     static fnKey = memoize((numValues) =>
@@ -1628,16 +1674,21 @@ class SudokuConstraint {
         (a, b) => a == b * 2 || b == a * 2,
         numValues)
     );
+
+    adjacentPairs(shape) {
+      return this.constructor._adjacentCellPairs(this.cells, shape);
+    }
   }
 
   static GreaterThan = class GreaterThan extends SudokuConstraintBase {
-    static DESCRIPTION = (`The first cell must be greater than the second cell.`);
+    static DESCRIPTION = (
+      `A cell must be greater than any later adjacent cells.`);
     static CATEGORY = 'LinesAndSets';
     static DISPLAY_CONFIG = {
       displayClass: 'GreaterThan',
     };
 
-    static VALIDATE_CELLS_FN = this._cellsAreAdjacent;
+    static VALIDATE_CELLS_FN = this._hasAdjacentCells;
 
     constructor(...cells) {
       super(arguments);
@@ -1647,6 +1698,19 @@ class SudokuConstraint {
     static fnKey = memoize((numValues) =>
       SudokuConstraint.Binary.fnToKey((a, b) => a > b, numValues)
     );
+
+    adjacentPairs(shape) {
+      return this.constructor._adjacentCellPairs(this.cells, shape);
+    }
+
+    chipLabel() {
+      if (this.cells.length == 2) {
+        return `> [${this.cells}]`;
+      } else {
+        return `> (${this.cells.length} cells)`;
+      }
+    }
+
   }
 
   static X = class X extends SudokuConstraintBase {
@@ -1656,7 +1720,7 @@ class SudokuConstraint {
     static DISPLAY_CONFIG = {
       displayClass: 'Letter',
     };
-    static VALIDATE_CELLS_FN = this._cellsAreAdjacent;
+    static VALIDATE_CELLS_FN = this._hasAdjacentCells;
 
     constructor(...cells) {
       super(arguments);
@@ -1668,7 +1732,15 @@ class SudokuConstraint {
     }
 
     chipLabel() {
-      return `X [${this.cells}]`;
+      if (this.cells.length == 2) {
+        return `X [${this.cells}]`;
+      } else {
+        return `X (${this.cells.length} cells)`;
+      }
+    }
+
+    adjacentPairs(shape) {
+      return this.constructor._adjacentCellPairs(this.cells, shape);
     }
   }
 
@@ -1700,7 +1772,7 @@ class SudokuConstraint {
     static DISPLAY_CONFIG = {
       displayClass: 'Letter',
     };
-    static VALIDATE_CELLS_FN = this._cellsAreAdjacent;
+    static VALIDATE_CELLS_FN = this._hasAdjacentCells;
 
     constructor(...cells) {
       super(arguments);
@@ -1712,7 +1784,15 @@ class SudokuConstraint {
     }
 
     chipLabel() {
-      return `V [${this.cells}]`;
+      if (this.cells.length == 2) {
+        return `V [${this.cells}]`;
+      } else {
+        return `V (${this.cells.length} cells)`;
+      }
+    }
+
+    adjacentPairs(shape) {
+      return this.constructor._adjacentCellPairs(this.cells, shape);
     }
   }
 
@@ -2455,12 +2535,12 @@ class SudokuBuilder {
 
     // Find all the cell pairs that have constraints.
     const cellPairs = constraints
-      .map(x => x.cells.map(c => shape.parseCellId(c).cell));
+      .flatMap(c => c.adjacentPairs(shape));
     cellPairs.forEach(p => p.sort(intCmp));
     const pairIds = new Set(cellPairs.map(pairId));
 
     // Add negative constraints for all other cell pairs.
-    for (const p of this._adjacentCellPairs(shape)) {
+    for (const p of this._allAdjacentCellPairs(shape)) {
       p.sort(intCmp);
       if (pairIds.has(pairId(p))) continue;
       yield new SudokuConstraintHandler.BinaryConstraint(
@@ -2860,34 +2940,37 @@ class SudokuBuilder {
           break;
 
         case 'WhiteDot':
-          cells = constraint.cells.map(c => shape.parseCellId(c).cell);
-          yield new SudokuConstraintHandler.BinaryConstraint(
-            cells[0], cells[1],
-            SudokuConstraint.WhiteDot.fnKey(shape.numValues));
+          for (const [a, b] of constraint.adjacentPairs(shape)) {
+            yield new SudokuConstraintHandler.BinaryConstraint(
+              a, b,
+              SudokuConstraint.WhiteDot.fnKey(shape.numValues));
+          }
           break;
 
         case 'BlackDot':
-          cells = constraint.cells.map(c => shape.parseCellId(c).cell);
-          yield new SudokuConstraintHandler.BinaryConstraint(
-            cells[0], cells[1],
-            SudokuConstraint.BlackDot.fnKey(shape.numValues));
+          for (const [a, b] of constraint.adjacentPairs(shape)) {
+            yield new SudokuConstraintHandler.BinaryConstraint(
+              a, b,
+              SudokuConstraint.BlackDot.fnKey(shape.numValues));
+          }
           break;
 
         case 'X':
-          cells = constraint.cells.map(c => shape.parseCellId(c).cell);
-          yield new SudokuConstraintHandler.Sum(cells, 10);
+          for (const pair of constraint.adjacentPairs(shape)) {
+            yield new SudokuConstraintHandler.Sum(pair, 10);
+          }
           break;
 
         case 'V':
-          cells = constraint.cells.map(c => shape.parseCellId(c).cell);
-          yield new SudokuConstraintHandler.Sum(cells, 5);
+          for (const pair of constraint.adjacentPairs(shape)) {
+            yield new SudokuConstraintHandler.Sum(pair, 5);
+          }
           break;
 
         case 'GreaterThan': {
-          let cells = constraint.cells.map(c => shape.parseCellId(c).cell);
-          let fn = SudokuConstraint.GreaterThan.fnKey(shape.numValues);
-          for (let i = 1; i < cells.length; i++) {
-            yield new SudokuConstraintHandler.BinaryConstraint(cells[0], cells[i], fn);
+          const fn = SudokuConstraint.GreaterThan.fnKey(shape.numValues);
+          for (const [a, b] of constraint.adjacentPairs(shape)) {
+            yield new SudokuConstraintHandler.BinaryConstraint(a, b, fn);
           }
           break;
         }
@@ -3091,7 +3174,7 @@ class SudokuBuilder {
     }
   }
 
-  static _adjacentCellPairs(shape) {
+  static _allAdjacentCellPairs(shape) {
     const pairs = [];
 
     const gridSize = shape.gridSize;
@@ -3111,7 +3194,7 @@ class SudokuBuilder {
   }
 
   static * _antiConsecutiveHandlers(shape) {
-    for (const [cell, exclusionCell] of this._adjacentCellPairs(shape)) {
+    for (const [cell, exclusionCell] of this._allAdjacentCellPairs(shape)) {
       yield new SudokuConstraintHandler.BinaryConstraint(
         cell, exclusionCell,
         SudokuConstraint.AntiConsecutive.fnKey(shape.numValues));
