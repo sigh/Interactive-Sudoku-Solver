@@ -659,6 +659,9 @@ ConstraintDisplays.ShadedRegion = class ShadedRegion extends BaseConstraintDispl
         case DisplayItem.CHECKERED_PATTERN:
           patternSvg = this._makeCheckeredPattern(patternId, color);
           break;
+        case DisplayItem.HORIZONTAL_LINE_PATTERN:
+          patternSvg = this._makeHorizontalLinePattern(patternId, color);
+          break;
         default:
           throw `Unknown pattern: ${pattern}`;
       }

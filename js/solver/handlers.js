@@ -2852,6 +2852,81 @@ SudokuConstraintHandler.Rellik = class Rellik extends SudokuConstraintHandler {
   }
 }
 
+SudokuConstraintHandler.EqualSizePartitions = class EqualSizePartitions extends SudokuConstraintHandler {
+  constructor(cells, partition1, partition2) {
+    if (cells.length % 2 !== 0) {
+      throw new Error("EqualSizePartitions: 'cells' must have an even number of elements.");
+    }
+    super(cells);
+
+    this._mask1 = LookupTables.fromValuesArray(partition1);
+    this._mask2 = LookupTables.fromValuesArray(partition2);
+  }
+
+  initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
+    const cells = this.cells;
+    const excludeValues = ~(this._mask1 | this._mask2);
+    if (excludeValues) {
+      for (const cell of cells) {
+        if (!(initialGridCells[cell] &= ~excludeValues)) return false;
+      }
+    }
+
+    return true;
+  }
+
+  enforceConsistency(grid, handlerAccumulator) {
+    const cells = this.cells;
+    const numCells = cells.length;
+    const mask1 = this._mask1;
+    const mask2 = this._mask2;
+
+    let partition1Count = 0;
+    let partition2Count = 0;
+    let bothCount = 0;
+    for (let i = 0; i < numCells; i += 1) {
+      const cell = cells[i];
+      const v = grid[cell];
+      const in1 = v & mask1;
+      const in2 = v & mask2;
+      if (in1 && in2) {
+        bothCount += 1;
+      } else if (in1) {
+        partition1Count += 1;
+      } else if (in2) {
+        partition2Count += 1;
+      }
+    }
+
+    // The only way we know this constraint is violated is if one partition
+    // has more cells than the target count.
+    const targetCount = numCells >> 1;
+    if (partition1Count > targetCount || partition2Count > targetCount) {
+      return false;
+    }
+
+    // If there is no ambiguity, then we are done.
+    if (bothCount == 0) return true;
+
+    // If one partition has the target count, then all the other cells must
+    // be in the other partition.
+    if (partition1Count === targetCount || partition2Count === targetCount) {
+      const [maskToKeep, maskToRemove] = partition1Count === targetCount ?
+        [mask2, mask1] : [mask1, mask2];
+      for (let i = 0; i < numCells; i += 1) {
+        const cell = cells[i];
+        const v = grid[cell];
+        if (v & maskToKeep) {
+          grid[cell] &= ~maskToRemove;
+          if (v & maskToRemove) handlerAccumulator.addForCell(cell);
+        }
+      }
+    }
+
+    return true;
+  }
+}
+
 SudokuConstraintHandler.Or = class Or extends SudokuConstraintHandler {
   constructor(...handlers) {
     // Exclusion cells need special handlings since they can't be handled

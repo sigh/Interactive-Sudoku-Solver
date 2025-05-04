@@ -743,6 +743,10 @@ class SudokuConstraintBase {
       (cells[2].row == row + 1 && cells[2].col == col) &&
       (cells[3].row == row + 1 && cells[3].col == col + 1));
   }
+
+  static _cellsAreValidCage(cells, shape) {
+    return cells.length > 1 && cells.length <= shape.numValues;
+  }
 }
 
 class LineOptions {
@@ -776,6 +780,7 @@ class ShadedRegionOptions {
   static DIAGONAL_PATTERN = 'diagonal-pattern';
   static SQUARE_PATTERN = 'square-pattern';
   static CHECKERED_PATTERN = 'checked-pattern';
+  static HORIZONTAL_LINE_PATTERN = 'horizontal-line-pattern';
 
   constructor(options) {
     Object.assign(this, options);
@@ -1870,8 +1875,7 @@ class SudokuConstraint {
     static ARGUMENT_CONFIG = {
       label: 'sum',
     };
-    static VALIDATE_CELLS_FN = (cells, shape) => (
-      cells.length <= shape.numValues && cells.length > 1);
+    static VALIDATE_CELLS_FN = this._cellsAreValidCage;
 
     constructor(sum, ...cells) {
       super(arguments);
@@ -1895,8 +1899,7 @@ class SudokuConstraint {
     static ARGUMENT_CONFIG = {
       label: 'sum',
     };
-    static VALIDATE_CELLS_FN = (cells, shape) => (
-      cells.length <= shape.numValues && cells.length > 1);
+    static VALIDATE_CELLS_FN = this._cellsAreValidCage;
 
     constructor(sum, ...cells) {
       super(arguments);
@@ -1907,6 +1910,29 @@ class SudokuConstraint {
 
     chipLabel() {
       return `Rellik Cage (${this.displayLabel})`;
+    }
+  }
+
+  static EqualityCage = class EqualityCage extends SudokuConstraintBase {
+    static DESCRIPTION = (`
+      For a grid size N, cages must have an equal number of low (<= N/2) and
+      high (>= N/2+1) digits AND an equal number of even and odd digits.
+      Equality cages can never contain the middle digit (N/2) when N is odd.
+      Digits may not repeat in a cage.`);
+    static CATEGORY = 'LinesAndSets';
+    static DISPLAY_CONFIG = {
+      displayClass: 'ShadedRegion',
+      pattern: ShadedRegionOptions.HORIZONTAL_LINE_PATTERN,
+    };
+    static VALIDATE_CELLS_FN = this._cellsAreValidCage;
+
+    constructor(...cells) {
+      super(arguments);
+      this.cells = cells;
+    }
+
+    chipLabel() {
+      return `Equality Cage`;
     }
   }
 
@@ -2744,6 +2770,25 @@ class SudokuBuilder {
           cells = constraint.cells.map(c => shape.parseCellId(c).cell);
           yield new SudokuConstraintHandler.Rellik(cells, constraint.sum);
           yield new SudokuConstraintHandler.AllDifferent(cells);
+          break;
+
+        case 'EqualityCage':
+          {
+            cells = constraint.cells.map(c => shape.parseCellId(c).cell);
+            const numValues = constraint.getShape().numValues;
+            const allValues = [...Array(numValues).keys()].map(i => i + 1);
+            yield new SudokuConstraintHandler.AllDifferent(cells);
+            // Odd-even partition.
+            yield new SudokuConstraintHandler.EqualSizePartitions(
+              cells,
+              allValues.filter(v => v % 2 === 0),
+              allValues.filter(v => v % 2 === 1));
+            // Low-high partition.
+            yield new SudokuConstraintHandler.EqualSizePartitions(
+              cells,
+              allValues.filter(v => v <= numValues / 2),
+              allValues.filter(v => v >= numValues / 2 + 1));
+          }
           break;
 
         case 'Sum':

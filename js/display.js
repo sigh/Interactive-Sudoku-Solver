@@ -57,6 +57,7 @@ class DisplayItem {
   static DIAGONAL_PATTERN = 'diagonal-pattern';
   static SQUARE_PATTERN = 'square-pattern';
   static CHECKERED_PATTERN = 'checked-pattern';
+  static HORIZONTAL_LINE_PATTERN = 'horizontal-line-pattern';
 
   constructor(svg) {
     this._svg = svg;
@@ -176,6 +177,24 @@ class DisplayItem {
     rect.setAttribute('y', squareSize / 2);
     rect.setAttribute('fill', color);
     pattern.appendChild(rect);
+
+    return pattern;
+  }
+
+  _makeHorizontalLinePattern(id, color) {
+    const pattern = createSvgElement('pattern');
+    pattern.id = id;
+    const lineSpacing = DisplayItem.CELL_SIZE / 10;
+    pattern.setAttribute('width', lineSpacing);
+    pattern.setAttribute('height', lineSpacing);
+    pattern.setAttribute('patternUnits', 'userSpaceOnUse');
+    let line = createSvgElement('line');
+    line.setAttribute('x1', '0');
+    line.setAttribute('y1', '0');
+    line.setAttribute('x2', lineSpacing);
+    line.setAttribute('y2', '0');
+    line.setAttribute('style', `stroke:${color}; stroke-width:${lineSpacing}`);
+    pattern.appendChild(line);
 
     return pattern;
   }
