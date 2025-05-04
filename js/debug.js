@@ -274,6 +274,7 @@ const runSolveTests = async (onFailure) => {
     'Bubble Tornado',
     'Anti-taxicab',
     'Dutch Flatmates',  // Dutch Flatmates
+    'Fortress sudoku',  // GreaterThan
     'Full rank - 6 clue snipe',
     'Irregular region sum line',
     'Force non-unit coeff', // Sum with non-unit coeff

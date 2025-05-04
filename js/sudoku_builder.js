@@ -1630,6 +1630,25 @@ class SudokuConstraint {
     );
   }
 
+  static GreaterThan = class GreaterThan extends SudokuConstraintBase {
+    static DESCRIPTION = (`The first cell must be greater than the second cell.`);
+    static CATEGORY = 'LinesAndSets';
+    static DISPLAY_CONFIG = {
+      displayClass: 'GreaterThan',
+    };
+
+    static VALIDATE_CELLS_FN = this._cellsAreAdjacent;
+
+    constructor(...cells) {
+      super(arguments);
+      this.cells = cells;
+    }
+
+    static fnKey = memoize((numValues) =>
+      SudokuConstraint.Binary.fnToKey((a, b) => a > b, numValues)
+    );
+  }
+
   static X = class X extends SudokuConstraintBase {
     static DESCRIPTION = (`
       Values must add to 10. Adjacent cells only.`);
@@ -2863,6 +2882,15 @@ class SudokuBuilder {
           cells = constraint.cells.map(c => shape.parseCellId(c).cell);
           yield new SudokuConstraintHandler.Sum(cells, 5);
           break;
+
+        case 'GreaterThan': {
+          let cells = constraint.cells.map(c => shape.parseCellId(c).cell);
+          let fn = SudokuConstraint.GreaterThan.fnKey(shape.numValues);
+          for (let i = 1; i < cells.length; i++) {
+            yield new SudokuConstraintHandler.BinaryConstraint(cells[0], cells[i], fn);
+          }
+          break;
+        }
 
         case 'ValueIndexing':
           {

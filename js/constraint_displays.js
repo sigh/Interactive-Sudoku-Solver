@@ -15,6 +15,7 @@ class ConstraintDisplays {
       this.Diagonal,
       this.Dot,
       this.Letter,
+      this.GreaterThan,
       this.Quad,
       this.Givens,
       this.OutsideClue,
@@ -553,7 +554,6 @@ ConstraintDisplays.Dot = class Dot extends BaseConstraintDisplayItem {
     return dot;
   }
 }
-
 ConstraintDisplays.Letter = class Letter extends BaseConstraintDisplayItem {
   drawItem(constraint, _) {
     const cells = constraint.cells;
@@ -1213,5 +1213,54 @@ ConstraintDisplays.Givens = class Givens extends BaseConstraintDisplayItem {
     super.clear();
     this._cellDisplay.constructor.clearMask();
     this._maskMap.clear();
+  }
+}
+
+ConstraintDisplays.GreaterThan = class GreaterThan extends BaseConstraintDisplayItem {
+  drawItem(constraint, options) {
+    const cells = constraint.cells;
+    if (cells.length != 2) throw new Error("GreaterThan must have exactly two cells");
+
+    const result = createSvgElement("g");
+    result.setAttribute('fill', 'transparent');
+    result.setAttribute('stroke', 'black');
+    result.setAttribute('stroke-width', 1.5);
+    result.setAttribute('stroke-linecap', 'round');
+
+    result.appendChild(this._drawGreaterThanDecoration(cells[0], cells[1]));
+    this._svg.append(result);
+    return result;
+  }
+
+  _drawGreaterThanDecoration(cell0, cell1) {
+    // Find the midpoint between the squares.
+    const [x0, y0] = this.cellIdCenter(cell0);
+    const [x1, y1] = this.cellIdCenter(cell1);
+    const x = (x0 + x1) / 2;
+    const y = (y0 + y1) / 2;
+    const cellSize = DisplayItem.CELL_SIZE;
+    const COMPARISON_SIZE = 0.1 * cellSize;
+    const INSET = 0;
+    const SQUASH = 0.4;
+    const dC = Math.sign(x1 - x0);
+    const dR = Math.sign(y1 - y0);
+    if (dC == 0) {
+      // Vertical comparison
+      if (dR == 0) throw new Error("Can't have self comparison");
+      return this._makePath([
+        [x - COMPARISON_SIZE, y - dR * COMPARISON_SIZE * SQUASH - dR * INSET],
+        [x, y + dR * COMPARISON_SIZE * SQUASH - dR * INSET],
+        [x + COMPARISON_SIZE, y - dR * COMPARISON_SIZE * SQUASH - dR * INSET]
+      ]);
+    } else if (dR == 0) {
+      // Horizontal comparison
+      if (dC == 0) throw new Error("Can't have self comparison");
+      return this._makePath([
+        [x - dC * COMPARISON_SIZE * SQUASH - dC * INSET, y - COMPARISON_SIZE],
+        [x + dC * COMPARISON_SIZE * SQUASH - dC * INSET, y],
+        [x - dC * COMPARISON_SIZE * SQUASH - dC * INSET, y + COMPARISON_SIZE]
+      ]);
+    }
+    throw new Error("Invalid comparison direction");
   }
 }

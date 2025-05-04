@@ -435,6 +435,12 @@ const EXAMPLES = [
     input: '.PillArrow~2~R1C7~R1C6~R1C5~R1C4~R1C3~R1C2.~R1C2_3~R3C8_6~R1C5_2~R6C1_2~R1C3_4~R1C4_6~R1C7_5~R4C9_3~R5C9_1~R8C9_5~R9C9_9~R9C8_2~R8C5_1~R8C6_9~R8C4_4~R7C4_2~R6C4_1~R5C4_5~R5C6_3~R4C1_8~R3C2_5~R7C2_6~R8C2_2~R9C1_7',
     solution: '934621587682795134157348962815962743476583291293174856569237418328419675741856329',
   },
+  {
+    name: 'Doggo Experiment #8',
+    src: 'https://sudokupad.app/vdolg5x93a',
+    input: '.Whisper~5~R7C1~R8C1~R9C1~R9C2~R9C3.Whisper~5~R2C2~R3C3~R4C4~R5C5~R6C6~R7C7~R8C8.Whisper~5~R5C2~R6C2~R5C3~R6C4~R7C5~R8C4~R7C3.Whisper~5~R1C6~R2C6~R3C7~R4C8~R4C9.DisjointSets.GreaterThan~R2C2~R1C2.GreaterThan~R2C2~R2C1.GreaterThan~R2C2~R3C2.GreaterThan~R2C2~R2C3.GreaterThan~R4C1~R5C1.GreaterThan~R5C2~R5C1.GreaterThan~R6C1~R5C1.GreaterThan~R8C2~R7C2.GreaterThan~R8C2~R8C1.GreaterThan~R8C2~R9C2.GreaterThan~R8C2~R8C3.GreaterThan~R1C5~R2C5.GreaterThan~R1C5~R1C4.GreaterThan~R8C5~R9C5.GreaterThan~R9C4~R9C5.GreaterThan~R9C6~R9C5.GreaterThan~R2C8~R1C8.GreaterThan~R2C8~R2C7.GreaterThan~R2C8~R3C8.GreaterThan~R2C8~R2C9.GreaterThan~R4C9~R5C9.GreaterThan~R5C8~R5C9.GreaterThan~R6C9~R5C9.GreaterThan~R8C8~R7C8.GreaterThan~R8C8~R8C7.GreaterThan~R8C8~R9C8.GreaterThan~R8C8~R8C9',
+    solution: '375496821496821375281573964934762518568914732712358496649187253153249687827635149'
+  },
 
   //////////////////////////////////////////////////////////////////////////////
   // Long sums
