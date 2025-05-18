@@ -1,4 +1,4 @@
-const formatTimeMs = (timeMs) => {
+export const formatTimeMs = (timeMs) => {
   if (timeMs < 1e3) {
     return timeMs.toPrecision(3) + ' ms';
   } else if (timeMs < 60e3) {
@@ -9,7 +9,7 @@ const formatTimeMs = (timeMs) => {
   }
 };
 
-const formatNumberMetric = (value) => {
+export const formatNumberMetric = (value) => {
   if (value == 0) return value;
   if (value < 0.001) return value.toExponential(1);
   if (value < 1000) return value;
@@ -18,34 +18,34 @@ const formatNumberMetric = (value) => {
   return (value / 1000000000) + 'G';
 };
 
-const createSvgElement = (tag) => {
+export const createSvgElement = (tag) => {
   return document.createElementNS('http://www.w3.org/2000/svg', tag);
 };
 
-const camelCaseToWords = (text) => {
+export const camelCaseToWords = (text) => {
   text = text.replace(/([A-Z])/g, " $1").toLowerCase();
   return text[0].toUpperCase() + text.slice(1);
 };
 
-const arrayDifference = (a, b) => {
+export const arrayDifference = (a, b) => {
   return a.filter(v => !b.includes(v));
 };
 
-const arrayIntersect = (a, b) => {
+export const arrayIntersect = (a, b) => {
   return a.filter(v => b.includes(v));
 };
 
-const arrayIntersectSize = (a, b) => {
+export const arrayIntersectSize = (a, b) => {
   return a.reduce((p, v) => p + b.includes(v), 0);
 }
 
-const arrayRemoveValue = (a, value) => {
+export const arrayRemoveValue = (a, value) => {
   const index = a.indexOf(value);
   if (index > -1) a.splice(index, 1);
   return a;
 }
 
-const arraysAreEqual = (a, b) => {
+export const arraysAreEqual = (a, b) => {
   if (a.length != b.length) return false;
   for (let i = 0; i < a.length; i++) {
     if (a[i] != b[i]) return false;
@@ -54,7 +54,7 @@ const arraysAreEqual = (a, b) => {
 }
 
 // `a` must be a set, `b` must be iterable.
-const setIntersectionToArray = (a, b) => {
+export const setIntersectionToArray = (a, b) => {
   const intersection = [];
   for (const elem of b) {
     if (a.has(elem)) {
@@ -65,7 +65,7 @@ const setIntersectionToArray = (a, b) => {
 };
 
 // `a` must be a set, `b` must be iterable.
-const setIntersectSize = (a, b) => {
+export const setIntersectSize = (a, b) => {
   let count = 0;
   for (const elem of b) {
     count += a.has(elem);
@@ -73,7 +73,7 @@ const setIntersectSize = (a, b) => {
   return count;
 }
 
-const setDifference = (a, b) => {
+export const setDifference = (a, b) => {
   const diff = new Set(a);
   for (const elem of b) {
     diff.delete(elem);
@@ -81,7 +81,7 @@ const setDifference = (a, b) => {
   return diff;
 };
 
-const countOnes16bit = (x) => {
+export const countOnes16bit = (x) => {
   x -= (x >> 1) & 0x55555555;
   x = (x & 0x33333333) + ((x >> 2) & 0x33333333);
   x = (x + (x >> 4)) & 0x0f0f0f0f;
@@ -90,7 +90,7 @@ const countOnes16bit = (x) => {
   return x & 0x1f;
 };
 
-const deferUntilAnimationFrame = (fn) => {
+export const deferUntilAnimationFrame = (fn) => {
   let lastArgs = null;
   let promise = null;
   let alreadyEnqueued = false;
@@ -119,11 +119,11 @@ const deferUntilAnimationFrame = (fn) => {
 
 // Helper to count operations for debugging.
 let _count = 0;
-const COUNT = () => { _count++; };
+export const COUNT = () => { _count++; };
 
 // A timer which can be paused and unpaused and accumulates the elapsed time.
 // Start paused.
-class Timer {
+export class Timer {
   constructor() {
     this._elapsedMs = 0;
     // The timestamp for the start of the current periods. If null, the timer
@@ -159,7 +159,7 @@ class Timer {
   }
 }
 
-class IteratorWithCount {
+export class IteratorWithCount {
   constructor(iter) {
     this._iter = iter;
     this.count = 0;
@@ -173,9 +173,9 @@ class IteratorWithCount {
   [Symbol.iterator] = () => this;
 }
 
-const loadJSFile = (path) => {
+export const loadJSFile = (path) => {
   const script = document.createElement('script');
-  script.src = path + VERSION_PARAM;
+  script.src = path;
   script.async = false;
   document.head.append(script);
 
@@ -184,7 +184,7 @@ const loadJSFile = (path) => {
   });
 };
 
-const dynamicJSFileLoader = (path) => {
+export const dynamicJSFileLoader = (path) => {
   let loaded = false;
   return async () => {
     if (loaded) return;
@@ -193,14 +193,14 @@ const dynamicJSFileLoader = (path) => {
   };
 };
 
-const withDeadline = (promise, delay, reason) => {
+export const withDeadline = (promise, delay, reason) => {
   const awaitTimeout = new Promise(
     (resolve, reject) => setTimeout((() => reject(reason)), delay));
 
   return Promise.race([promise, awaitTimeout]);
 };
 
-const memoize = (f) => {
+export const memoize = (f) => {
   const map = new Map();
   return (...a) => {
     const key = a.length <= 1 ? a[0] : JSON.stringify(a);
@@ -213,11 +213,11 @@ const memoize = (f) => {
   };
 };
 
-const clearDOMNode = (node) => {
+export const clearDOMNode = (node) => {
   node.replaceChildren();
 };
 
-const toggleDisabled = (element, disabled) => {
+export const toggleDisabled = (element, disabled) => {
   if (disabled) {
     element.setAttribute('disabled', '');
   } else {
@@ -225,27 +225,27 @@ const toggleDisabled = (element, disabled) => {
   }
 };
 
-const isIterable = (obj) => {
+export const isIterable = (obj) => {
   return obj && typeof obj[Symbol.iterator] === 'function';
 };
 
-const isPlainObject = (obj) => {
+export const isPlainObject = (obj) => {
   return obj && obj.constructor === Object;
 };
 
-const localTimestamp = () => {
+export const localTimestamp = () => {
   const tzOffset = (new Date()).getTimezoneOffset() * 60000; //offset in milliseconds
   return (new Date(Date.now() - tzOffset)).toISOString().slice(0, -1);
 };
 
-const shuffleArray = (arr, randomGenerator) => {
+export const shuffleArray = (arr, randomGenerator) => {
   for (let i = arr.length - 1; i > 0; i--) {
     const j = randomGenerator.randomInt(i);
     [arr[i], arr[j]] = [arr[j], arr[i]];
   }
 };
 
-const groupSortedBy = function* (iterable, keyFunc) {
+export const groupSortedBy = function* (iterable, keyFunc) {
   let group = [];
   let currentKey;
 
@@ -266,7 +266,7 @@ const groupSortedBy = function* (iterable, keyFunc) {
   }
 };
 
-const autoSaveField = (element, field) => {
+export const autoSaveField = (element, field) => {
   const elementId = element.getAttribute('id');
 
   if (!elementId) {
@@ -288,7 +288,7 @@ const autoSaveField = (element, field) => {
   });
 };
 
-const sessionAndLocalStorage = {
+export const sessionAndLocalStorage = {
   getItem: (key) => {
     const sessionValue = sessionStorage.getItem(key);
     if (sessionValue !== null) return sessionValue;
@@ -309,7 +309,7 @@ const sessionAndLocalStorage = {
 };
 
 // Random number generator which allows seeding.
-class RandomIntGenerator {
+export class RandomIntGenerator {
   constructor(seed) {
     this._state = seed || 0;
     this._stateMod = 32987;
@@ -327,7 +327,7 @@ class RandomIntGenerator {
   }
 }
 
-class Base64Codec {
+export class Base64Codec {
   static BASE64_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-';
   static BASE64_INDEX = (() => {
     const lookup = new Uint8Array(127);
@@ -359,7 +359,7 @@ class Base64Codec {
   }
 };
 
-class MultiMap {
+export class MultiMap {
   constructor() {
     this._map = new Map();
   }

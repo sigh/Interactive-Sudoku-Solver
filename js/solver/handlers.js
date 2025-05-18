@@ -1,66 +1,14 @@
 "use strict";
 
-class SudokuConstraintHandler {
-  static SINGLETON_HANDLER = false;
-
-  static _defaultId = 0;
-
-  constructor(cells) {
-    // This constraint is enforced whenever these cells are touched.
-    // cells must not be written to. They can be updated during initialization,
-    // but it must replace the array, not modify it.
-    this.cells = new Uint8Array(cells || []);
-    // By default all constraints are essential for correctness.
-    // The optimizer may add non-essential constraints to improve performance.
-    this.essential = true;
-
-    const id = this.constructor._defaultId++;
-    // By default every id is unique.
-    this.idStr = this.constructor.name + '-' + id.toString();
-  }
-
-  // Enforce the constraint on the grid and return:
-  // - `false` if the grid is invalid.
-  // - `true` if the grid is valid.
-  // - `true` if there are still unknown values and the grid
-  //          might be valid.
-  enforceConsistency(grid, handlerAccumulator) {
-    return true;
-  }
-
-  // List of cells which must not have the same values as each other.
-  exclusionCells() {
-    return [];
-  }
-
-  // Initialize the grid before solving starts.
-  // Return `false` if the grid is invalid, `true` otherwise.
-  initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
-    return true;
-  }
-
-  // Run after all handlers have been initialized and initialGridCells is populated
-  // and includes the full state.
-  // readonlyGridState must not be written to! This will lead to incorrect
-  // results if the handler is used from within an Or constraint.
-  postInitialize(readonlyGridState) { }
-
-  priority() {
-    // By default, constraints which constrain more cells have higher priority.
-    return this.cells.length;
-  }
-
-  candidateFinders(grid, shape) {
-    return [];
-  }
-
-  debugName() {
-    return this.constructor.name;
-  }
-}
+const versionParam = self.location.search;
+const { memoize, countOnes16bit, arraysAreEqual, isIterable, arrayIntersect, RandomIntGenerator, shuffleArray, MultiMap } = await import('../util.js' + versionParam);
+const { LookupTables } = await import('./lookup_tables.js' + versionParam);
+const { SudokuConstraintHandler } = await import('./sudoku_constraint_handler.js' + versionParam);
+const { SHAPE_MAX } = await import('../grid_shape.js' + versionParam);
+const { SudokuConstraintBase, SudokuConstraint } = await import('../sudoku_constraint.js' + versionParam);
+const { CandidateFinders } = await import('./candidate_selector.js' + versionParam);
 
 SudokuConstraintHandler.NoBoxes = class NoBoxes extends SudokuConstraintHandler { }
-
 // This handler purely exists to manually adjust the priorities of cells to
 // adjust initial cell selection.
 SudokuConstraintHandler.Priority = class Priority extends SudokuConstraintHandler {
@@ -2927,6 +2875,10 @@ SudokuConstraintHandler.EqualSizePartitions = class EqualSizePartitions extends 
   }
 }
 
+class DummyHandlerAccumulator {
+  addForCell(cell) { }
+}
+
 SudokuConstraintHandler.Or = class Or extends SudokuConstraintHandler {
   constructor(...handlers) {
     // Exclusion cells need special handlings since they can't be handled
@@ -2950,7 +2902,7 @@ SudokuConstraintHandler.Or = class Or extends SudokuConstraintHandler {
     this._numGridCells = 0;
     this._stateOffset = 0;
     this._numHandlerStates = 0;
-    this._dummyHandlerAccumulator = new SudokuSolver.DummyHandlerAccumulator();
+    this._dummyHandlerAccumulator = new DummyHandlerAccumulator();
   }
 
   _markAsInvalid(grid, handlerIndex) {
@@ -3122,7 +3074,7 @@ SudokuConstraintHandler.Or = class Or extends SudokuConstraintHandler {
   }
 }
 
-class HandlerSet {
+export class HandlerSet {
   constructor(handlers, shape) {
     this._allHandlers = [];
     this._seen = new Map();

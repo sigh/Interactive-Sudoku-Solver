@@ -1,3 +1,9 @@
+const versionParam = self.location.search;
+const { memoize, MultiMap, countOnes16bit } = await import('../util.js' + versionParam);
+const { LookupTables } = await import('./lookup_tables.js' + versionParam);
+const { SudokuConstraintHandler } = await import('./sudoku_constraint_handler.js' + versionParam);
+const { SHAPE_MAX, SHAPE_9x9 } = await import('../grid_shape.js' + versionParam);
+
 SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
   _sum = 0;
   _coeffGroups = [];

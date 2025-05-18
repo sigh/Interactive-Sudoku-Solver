@@ -1,13 +1,8 @@
 const debugFilesLoaded = Promise.all([
-  loadJSFile('js/solver/candidate_selector.js'),
-  loadJSFile('js/solver/engine.js'),
-  loadJSFile('js/solver/handlers.js'),
-  loadJSFile('js/solver/sum_handler.js'),
-  loadJSFile('js/solver/optimizer.js'),
-  loadJSFile('data/collections.js'),
-  loadJSFile('data/jigsaw_layouts.js'),
-  loadJSFile('data/invalid_jigsaw_layouts.js'),
-  loadJSFile('data/jigsaw_box_layouts.js'),
+  loadJSFile('data/collections.js' + VERSION_PARAM),
+  loadJSFile('data/jigsaw_layouts.js' + VERSION_PARAM),
+  loadJSFile('data/invalid_jigsaw_layouts.js' + VERSION_PARAM),
+  loadJSFile('data/jigsaw_box_layouts.js' + VERSION_PARAM),
 ]);
 
 var TEST_TIMEOUT_MS = 0;
@@ -55,7 +50,7 @@ class PuzzleRunner {
   static async _runFnWithChecksSinglePuzzle(puzzle, fn, onFailure) {
     // Set up solver.
     const constraint = SudokuParser.parseText(puzzle.input);
-    const solver = await SudokuBuilder.buildInWorker(
+    const solver = await SolverProxy.makeSolver(
       constraint, this._stateHandler.bind(this));
     const shape = constraint.getShape();
 

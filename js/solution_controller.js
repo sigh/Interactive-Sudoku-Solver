@@ -138,7 +138,7 @@ class DebugManager {
       if (debugLoaded) return Promise.resolve();
 
       debugLoaded = true;
-      const loaderPromise = dynamicJSFileLoader('js/debug.js')();
+      const loaderPromise = dynamicJSFileLoader('js/debug.js' + window.VERSION_PARAM)();
 
       this._deferredSetup(loaderPromise);
 
@@ -1468,7 +1468,7 @@ class SolutionController {
 
     let newSolver = null;
     try {
-      const newSolverPromise = SudokuBuilder.buildInWorker(
+      const newSolverPromise = SolverProxy.makeSolver(
         constraints,
         s => {
           this._stateDisplay.setState(s);
@@ -1617,4 +1617,164 @@ class SolutionController {
     elem.click();
     document.body.removeChild(elem);
   }
+}
+
+class SolverProxy {
+  // Ask for a state update every 2**13 iterations.
+  // NOTE: Using a non-power of 10 makes the display look faster :)
+  static LOG_UPDATE_FREQUENCY = 13;
+
+  static _unusedWorkers = [];
+
+  static async makeSolver(constraints, stateHandler, statusHandler, debugHandler) {
+    // Ensure any pending terminations are enacted.
+    await new Promise(r => setTimeout(r, 0));
+
+    if (!this._unusedWorkers.length) {
+      const worker = new Worker('js/worker.js' + VERSION_PARAM);
+      this._unusedWorkers.push(worker);
+    }
+    const worker = this._unusedWorkers.pop();
+    worker.release = () => this._unusedWorkers.push(worker);
+
+    const solverProxy = new SolverProxy(
+      worker, stateHandler, statusHandler,
+      debugHandler?.getCallback());
+    await solverProxy.init(
+      constraints, this.LOG_UPDATE_FREQUENCY,
+      debugHandler?.getOptions());
+    return solverProxy;
+  }
+
+  constructor(worker, stateHandler, statusHandler, debugHandler) {
+    if (!worker) {
+      throw ('Must provide worker');
+    }
+
+    this._worker = worker;
+    this._messageHandler = (msg) => this._handleMessage(msg);
+    this._worker.addEventListener('message', this._messageHandler);
+    this._waiting = null;
+
+    this._initialized = false;
+    this._stateHandler = stateHandler || (() => null);
+    this._debugHandler = debugHandler || (() => null);
+    this._statusHandler = statusHandler || (() => null);
+  }
+
+  async solveAllPossibilities() {
+    return this._callWorker('solveAllPossibilities');
+  }
+
+  async validateLayout() {
+    return this._callWorker('validateLayout');
+  }
+
+  async nthSolution(n) {
+    return this._callWorker('nthSolution', n);
+  }
+
+  async nthStep(n, stepGuides) {
+    return this._callWorker('nthStep', [n, stepGuides]);
+  }
+
+  async countSolutions() {
+    return this._callWorker('countSolutions');
+  }
+
+  _handleMessage(response) {
+    // Solver has been terminated.
+    if (!this._worker) return;
+
+    let data = response.data;
+
+    switch (data.type) {
+      case 'result':
+        this._waiting.resolve(data.result);
+        this._statusHandler(false, this._waiting.method);
+        this._waiting = null;
+        break;
+      case 'exception':
+        this._waiting.reject(data.error);
+        this._statusHandler(false, this._waiting.method);
+        this._waiting = null;
+        break;
+      case 'state':
+        this._stateHandler(data.state);
+        break;
+      case 'debug':
+        this._debugHandler(data.data, data.counters);
+        break;
+    }
+  }
+
+  _callWorker(method, payload) {
+    if (!this._initialized) {
+      throw (`SolverProxy not initialized.`);
+    }
+    if (!this._worker) {
+      throw (`SolverProxy has been terminated.`);
+    }
+    if (this._waiting) {
+      throw (`Can't call worker while a method is in progress. (${this._waiting.method})`);
+    }
+
+    this._statusHandler(true, method);
+
+    let promise = new Promise((resolve, reject) => {
+      this._waiting = {
+        method: method,
+        payload: payload,
+        resolve: resolve,
+        reject: reject,
+      }
+    });
+
+    this._worker.postMessage({
+      method: method,
+      payload: payload,
+    });
+
+    return promise;
+  }
+
+  async init(constraint, logUpdateFrequency, debugOptions) {
+    this._initialized = true;
+    await this._callWorker(
+      'init',
+      { constraint, logUpdateFrequency, debugOptions });
+  }
+
+  terminate() {
+    if (!this._worker) return;
+    const worker = this._worker;
+    this._worker = null;
+
+    worker.removeEventListener('message', this._messageHandler);
+    // If we are waiting, we have to kill it because we don't know how long
+    // we'll be waiting. Otherwise we can just release it to be reused.
+    if (this._waiting) {
+      worker.terminate();
+      this._waiting.reject('Aborted worker running: ' + this._waiting.method);
+      this._statusHandler(false, 'terminate');
+    } else {
+      worker.release();
+    }
+  }
+
+  isTerminated() {
+    return this._worker === null;
+  }
+};
+
+const toShortSolution = (solution, shape) => {
+  const baseCharCode = GridShape.baseCharCode(shape);
+  const DEFAULT_VALUE = '.';
+
+  const result = new Array(solution.length).fill(DEFAULT_VALUE);
+
+  for (let i = 0; i < solution.length; i++) {
+    result[i] = String.fromCharCode(baseCharCode + solution[i] - 1);
+  }
+  return result.join('');
 }

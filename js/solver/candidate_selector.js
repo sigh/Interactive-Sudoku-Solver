@@ -1,4 +1,9 @@
-class CandidateSelector {
+const versionParam = self.location.search;
+
+const { countOnes16bit } = await import('../util.js' + versionParam);
+const { LookupTables } = await import('./lookup_tables.js' + versionParam);
+
+export class CandidateSelector {
   constructor(shape, handlerSet, debugLogger) {
     this._shape = shape;
     this._cellOrder = new Uint8Array(shape.numCells);
@@ -366,6 +371,7 @@ CandidateSelector.CandidateFinderSet = class CandidateFinderSet {
     this._handlerSet = handlerSet;
     this._shape = shape;
     this.initialized = false;
+    this._finders = [];
 
     const indexesByCell = [];
     for (let i = 0; i < shape.numCells; i++) indexesByCell.push([]);
@@ -408,7 +414,7 @@ CandidateSelector.CandidateFinderSet = class CandidateFinderSet {
   clearMarks() {
     this._marked.fill(0);
   }
-}
+};
 
 CandidateSelector.CandidateFinderBase = class CandidateFinderBase {
   constructor(cells) {
@@ -418,9 +424,9 @@ CandidateSelector.CandidateFinderBase = class CandidateFinderBase {
   maybeFindCandidate(grid, cellScores, result) {
     return false;
   }
-}
+};
 
-class CandidateFinders {
+export class CandidateFinders {
   static filterCellsByValue(cells, grid, valueMask) {
     let numCells = cells.length;
     let result = [];
@@ -480,7 +486,7 @@ CandidateFinders.RequiredValue = class RequiredValue extends CandidateSelector.C
     }
     return true;
   }
-}
+};
 
 CandidateFinders.House = class House extends CandidateSelector.CandidateFinderBase {
   constructor(cells) {
@@ -537,4 +543,4 @@ CandidateFinders.House = class House extends CandidateSelector.CandidateFinderBa
     }
     return foundCandidate;
   }
-}
+};
