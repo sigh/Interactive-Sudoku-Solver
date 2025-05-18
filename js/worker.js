@@ -1,17 +1,12 @@
 const START_INIT_WORKER = performance.now();
 
-{
+const loadScripts = (async () => {
   const versionParam = self.location.search;
-  self.importScripts(
-    'util.js' + versionParam,
-    'sudoku_builder.js' + versionParam,
-    'solver/candidate_selector.js' + versionParam,
-    'solver/engine.js' + versionParam,
-    'solver/handlers.js' + versionParam,
-    'solver/sum_handler.js' + versionParam,
-    'solver/optimizer.js' + versionParam);
-}
-
+  const util = await import('./util.js' + versionParam);
+  const sudokuBuilder = await import('./sudoku_builder.js' + versionParam);
+  Object.assign(self, util);
+  Object.assign(self, sudokuBuilder);
+})();
 
 let workerSolver = null;
 let workerSolverSetUpTime = 0;
@@ -71,7 +66,8 @@ const sendState = (extraState) => {
   }
 };
 
-self.onmessage = (msg) => {
+self.onmessage = async (msg) => {
+  await loadScripts;
   try {
     let result = handleWorkerMethod(msg.data.method, msg.data.payload);
     sendState();
