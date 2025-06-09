@@ -1631,7 +1631,8 @@ class SolverProxy {
     await new Promise(r => setTimeout(r, 0));
 
     if (!this._unusedWorkers.length) {
-      const worker = new Worker('js/worker.js' + VERSION_PARAM);
+      const worker = new Worker(
+        'js/worker.js' + VERSION_PARAM, { type: 'module' });
       this._unusedWorkers.push(worker);
     }
     const worker = this._unusedWorkers.pop();
