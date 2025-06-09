@@ -1,56 +1,13 @@
-class DisplayContainer {
-  constructor(container) {
-    const svg = createSvgElement('svg');
+const {
+  createSvgElement,
+  deferUntilAnimationFrame,
+  clearDOMNode,
+  memoize,
+  isIterable
+} = await import('./util.js' + self.VERSION_PARAM);
+const { SHAPE_9x9 } = await import('./grid_shape.js' + self.VERSION_PARAM);
 
-    this._mainSvg = svg;
-    container.append(svg);
-
-    this._highlightDisplay = new HighlightDisplay(
-      this.getNewGroup('highlight-group'));
-
-    this._clickInterceptor = new ClickInterceptor();
-    container.append(this._clickInterceptor.getSvg());
-  }
-
-  reshape(shape) {
-    const padding = DisplayItem.SVG_PADDING;
-    const sideLength = DisplayItem.CELL_SIZE * shape.gridSize + padding * 2;
-    this._mainSvg.setAttribute('height', sideLength);
-    this._mainSvg.setAttribute('width', sideLength);
-    this._mainSvg.setAttribute(
-      'class',
-      shape.gridSize <= SHAPE_9x9.gridSize
-        ? 'grid-size-small' : 'grid-size-large');
-
-    this._highlightDisplay.reshape(shape);
-    this._clickInterceptor.reshape(shape);
-  }
-
-  toggleLayoutView(enable) {
-    this._mainSvg.classList.toggle('layout-view', enable);
-  }
-
-  createCellHighlighter(cssClass) {
-    return new CellHighlighter(this._highlightDisplay, cssClass);
-  }
-
-  getNewGroup(groupClass) {
-    const group = createSvgElement('g');
-    group.classList.add(groupClass);
-    this._mainSvg.append(group);
-    return group;
-  }
-
-  addElement(element) {
-    this._mainSvg.append(element);
-  }
-
-  getClickInterceptor() {
-    return this._clickInterceptor
-  }
-}
-
-class DisplayItem {
+export class DisplayItem {
   static SVG_PADDING = 29;
   static CELL_SIZE = 52;
 
@@ -250,52 +207,7 @@ class DisplayItem {
   }
 }
 
-class ClickInterceptor extends DisplayItem {
-  constructor() {
-    const svg = createSvgElement('svg');
-    svg.classList.add('click-interceptor-svg');
-
-    super(svg);
-
-    // Note: _applyGridOffset won't work here because this is a DOM element
-    // not an element inside the svg (breaks in Safari).
-    const padding = DisplayItem.SVG_PADDING;
-    svg.style.transform = `translate(${padding}px,${padding}px)`;
-  }
-
-  reshape(shape) {
-    super.reshape(shape);
-
-    const sideLength = DisplayItem.CELL_SIZE * shape.gridSize;
-    const svg = this.getSvg();
-    svg.setAttribute('height', sideLength);
-    svg.setAttribute('width', sideLength);
-  }
-
-  cellAt(x, y) {
-    const shape = this._shape;
-    const row = y / DisplayItem.CELL_SIZE | 0;
-    const col = x / DisplayItem.CELL_SIZE | 0;
-    if (row < 0 || row >= shape.gridSize) return null;
-    if (col < 0 || col >= shape.gridSize) return null;
-    return shape.makeCellId(row, col);
-  }
-}
-
-class InfoTextDisplay extends DisplayItem {
-  constructor(svg) {
-    super(svg);
-    this._applyGridOffset(svg);
-  }
-
-  setText(cellId, str) {
-    const [x, y] = this.cellIdBottomLeftCorner(cellId);
-    const textNode = this.makeTextNode(str, x + 2, y - 2, 'info-overlay-item');
-    this._svg.append(textNode);
-  }
-}
-
-class CellValueDisplay extends DisplayItem {
+export class CellValueDisplay extends DisplayItem {
   static MULTI_VALUE_CLASS = 'cell-multi-value';
   static SINGLE_VALUE_CLASS = 'cell-single-value';
 
@@ -418,278 +330,7 @@ class CellValueDisplay extends DisplayItem {
   }
 }
 
-class SolutionDisplay extends CellValueDisplay {
-  constructor(svg) {
-    super(svg);
-    this._currentSolution = [];
-
-    this.setSolution = deferUntilAnimationFrame(this.setSolution.bind(this));
-    this._copyElem = document.getElementById('copy-solution-button');
-    this._copyElem.onclick = () => {
-      const solutionText = toShortSolution(this._currentSolution, this._shape);
-      navigator.clipboard.writeText(solutionText);
-    };
-
-    svg.setAttribute('mask', `url(#${this.constructor.GIVENS_MASK_ID})`);
-  }
-
-  reshape(shape) {
-    // This clears the solution, but importantly it overwrites any pending
-    // setSolution calls.
-    this.setSolution();
-    super.reshape(shape);
-  }
-
-  // Display solution on grid.
-  //  - If solution cell contains a container then it will be displayed as
-  //    pencilmarks.
-  setSolution(solution) {
-    solution = solution || [];
-    this._currentSolution = solution.slice();
-
-    // If we have no solution, just hide it instead.
-    // However, we wait a bit so that we don't flicker if the solution is updated
-    // again immediately.
-    if (!solution.length) {
-      window.setTimeout(() => {
-        // Ensure there is still no solution.
-        if (this._currentSolution.length == 0) {
-          this.clear();
-          this._copyElem.disabled = true;
-        }
-      }, 10);
-      return;
-    }
-
-    this.renderGridValues(solution);
-
-    this._copyElem.disabled = (
-      !this._currentSolution.every(v => v && isFinite(v)));
-  }
-}
-
-class HighlightDisplay extends DisplayItem {
-  constructor(svg) {
-    super(svg);
-
-    this._shape = null;
-    this._applyGridOffset(svg);
-    this._groups = new Map();
-  }
-
-  static makeRadialGradient(id) {
-    const gradient = createSvgElement('radialGradient');
-    gradient.id = id;
-
-    let stop;
-
-    stop = createSvgElement('stop');
-    stop.setAttribute('offset', '70%');
-    stop.setAttribute('stop-opacity', '0');
-    stop.setAttribute('stop-color', 'rgb(0,255,0)');
-    gradient.append(stop);
-
-    stop = createSvgElement('stop');
-    stop.setAttribute('offset', '100%');
-    stop.setAttribute('stop-opacity', '1');
-    stop.setAttribute('stop-color', 'rgb(0,255,0)');
-    gradient.append(stop);
-
-    return gradient;
-  }
-
-  _getGroup(cssClass) {
-    if (this._groups.has(cssClass)) return this._groups.get(cssClass);
-
-    const group = createSvgElement('g');
-    group.classList.add(cssClass);
-    this._svg.append(group);
-    this._groups.set(cssClass, group);
-
-    return group;
-  }
-
-  highlightCell(cellId, cssClass) {
-    const parsed = this._shape.parseCellId(cellId);
-
-    const path = this._makeCellSquare(parsed.cell);
-    const svg = cssClass ? this._getGroup(cssClass) : this._svg;
-
-    svg.appendChild(path);
-
-    return path;
-  }
-
-  removeHighlight(path) {
-    path.parentNode.removeChild(path);
-  }
-}
-
-class ConstraintDisplay extends DisplayItem {
-  constructor(inputManager, displayContainer) {
-    super();
-
-    displayContainer.addElement(this.constructor._makeArrowhead());
-    displayContainer.addElement(this.constructor._makeTextBgFilter());
-    displayContainer.addElement(CellValueDisplay.makeGivensMask());
-
-    this._gridDisplay = new GridDisplay(
-      displayContainer.getNewGroup('base-grid-group'));
-
-    this._constraintDisplays = new Map();
-    for (const displayClass of ConstraintDisplays.displayOrder()) {
-      const name = displayClass.name;
-      const groupClass = name.toLowerCase() + '-group';
-      const group = displayContainer.getNewGroup(groupClass);
-      this._constraintDisplays.set(
-        name, new displayClass(group, inputManager));
-      this._applyGridOffset(group);
-    }
-
-    this._borders = new BorderDisplay(
-      displayContainer.getNewGroup('border-group'));
-
-    this.clear();  // clear() to initialize.
-  }
-
-  reshape(shape) {
-    this._shape = shape;
-    this._gridDisplay.reshape(shape);
-    for (const display of this._constraintDisplays.values()) {
-      display.reshape(shape);
-    }
-    this._borders.reshape(shape);
-  }
-
-  // Reusable arrowhead marker.
-  static _makeArrowhead() {
-    const arrowhead = createSvgElement('marker');
-    arrowhead.id = 'arrowhead';
-    arrowhead.setAttribute('refX', '3');
-    arrowhead.setAttribute('refY', '2');
-    arrowhead.setAttribute('markerWidth', '4');
-    arrowhead.setAttribute('markerHeight', '5');
-    arrowhead.setAttribute('orient', 'auto');
-    const arrowPath = createSvgElement('path');
-    arrowPath.setAttribute('d', 'M 0 0 L 3 2 L 0 4');
-    arrowPath.setAttribute('fill', 'none');
-    arrowPath.setAttribute('stroke-width', 1);
-    arrowPath.setAttribute('stroke', 'rgb(200, 200, 200)');
-    arrowhead.appendChild(arrowPath);
-
-    return arrowhead;
-  }
-
-  static _makeTextBgFilter() {
-    const filter = createSvgElement('filter');
-    filter.setAttribute('x', '0');
-    filter.setAttribute('y', '0');
-    filter.setAttribute('width', '1');
-    filter.setAttribute('height', '1');
-    filter.setAttribute('id', 'text-bg-filter');
-
-    const flood = createSvgElement('feFlood');
-    flood.setAttribute('flood-color', 'rgba(255,255,255,0.6)');
-    filter.appendChild(flood);
-
-    const composite = createSvgElement('feComposite');
-    composite.setAttribute('in', 'SourceGraphic');
-    filter.appendChild(composite);
-
-    return filter;
-  }
-
-  clear() {
-    for (const display of this._constraintDisplays.values()) {
-      display.clear();
-    }
-  }
-
-  removeConstraint(constraint, item) {
-    const displayClass = constraint.constructor.DISPLAY_CONFIG.displayClass;
-    return this._constraintDisplays.get(displayClass).removeItem(item);
-  }
-
-  drawConstraint(constraint) {
-    const config = constraint.constructor.DISPLAY_CONFIG;
-    const item = this._constraintDisplays.get(
-      config.displayClass).drawItem(constraint, config);
-    return item;
-  }
-
-  makeConstraintIcon(constraint) {
-    const config = constraint.constructor.DISPLAY_CONFIG;
-    if (!config) return null;
-    return this._constraintDisplays.get(
-      config.displayClass).makeIcon(constraint, config);
-  }
-}
-
-class GridDisplay extends DisplayItem {
-  constructor(svg) {
-    super(svg);
-
-    this._applyGridOffset(svg);
-    svg.setAttribute('stroke-width', 1);
-    svg.setAttribute('stroke', 'rgb(150, 150, 150)');
-  }
-
-  reshape(shape) {
-    super.reshape(shape);
-    this.clear();
-
-    const cellSize = DisplayItem.CELL_SIZE;
-    const gridSize = cellSize * shape.gridSize;
-
-    const grid = this.getSvg();
-
-    for (let i = 1; i < gridSize; i++) {
-      grid.append(this._makePath([
-        [0, i * cellSize],
-        [gridSize, i * cellSize],
-      ]));
-      grid.append(this._makePath([
-        [i * cellSize, 0],
-        [i * cellSize, gridSize],
-      ]));
-    }
-  }
-}
-
-class BorderDisplay extends DisplayItem {
-  constructor(svg, fill) {
-    super(svg);
-
-    this._applyGridOffset(svg);
-    svg.setAttribute('stroke-width', 2);
-    svg.setAttribute('stroke', 'rgb(0, 0, 0)');
-
-    this._fill = fill;
-  }
-
-  gridSizePixels() {
-    return DisplayItem.CELL_SIZE * this._shape.gridSize;
-  }
-
-  reshape(shape) {
-    super.reshape(shape);
-    this.clear();
-
-    const gridSizePixels = this.gridSizePixels();
-
-    const path = this._makePath([
-      [0, 0],
-      [0, gridSizePixels],
-      [gridSizePixels, gridSizePixels],
-      [gridSizePixels, 0],
-      [0, 0],
-    ]);
-    if (this._fill) path.setAttribute('fill', this._fill);
-    this.getSvg().append(path);
-  }
-}
-
-class ColorPicker {
+export class ColorPicker {
   // Default color list.
   COLOR_LIST = [
     'green',
@@ -774,60 +415,7 @@ class ColorPicker {
   }
 };
 
-class CellHighlighter {
-  constructor(display, cssClass) {
-    this._cells = new Map();
-    this._cssClass = cssClass;
-
-    this._display = display;
-    this._key = undefined;
-  }
-
-  key() {
-    return this._key;
-  }
-
-  setCells(cellIds, key) {
-    if (key && key === this._key) return;
-    this.clear();
-    for (const cellId of cellIds) this.addCell(cellId);
-    this._key = key;
-  }
-
-  size() {
-    return this._cells.size;
-  }
-
-  getCells() {
-    return Array.from(this._cells.keys());
-  }
-
-  addCell(cell) {
-    if (!this._cells.has(cell)) {
-      const path = this._display.highlightCell(cell, this._cssClass);
-      this._cells.set(cell, path);
-      return path;
-    }
-  }
-
-  removeCell(cell) {
-    const path = this._cells.get(cell);
-    if (path) {
-      this._display.removeHighlight(path);
-      this._cells.delete(cell);
-    }
-  }
-
-  clear() {
-    for (const path of this._cells.values()) {
-      this._display.removeHighlight(path)
-    }
-    this._cells.clear();
-    this._key = undefined;
-  }
-}
-
-class GridGraph {
+export class GridGraph {
   static LEFT = 0;
   static RIGHT = 1;
   static UP = 2;
@@ -893,5 +481,327 @@ class GridGraph {
     }
 
     return seen.size === cellSet.size;
+  }
+}
+
+export class DisplayContainer {
+  constructor(container) {
+    const svg = createSvgElement('svg');
+
+    this._mainSvg = svg;
+    container.append(svg);
+
+    this._highlightDisplay = new HighlightDisplay(
+      this.getNewGroup('highlight-group'));
+
+    this._clickInterceptor = new ClickInterceptor();
+    container.append(this._clickInterceptor.getSvg());
+  }
+
+  reshape(shape) {
+    const padding = DisplayItem.SVG_PADDING;
+    const sideLength = DisplayItem.CELL_SIZE * shape.gridSize + padding * 2;
+    this._mainSvg.setAttribute('height', sideLength);
+    this._mainSvg.setAttribute('width', sideLength);
+    this._mainSvg.setAttribute(
+      'class',
+      shape.gridSize <= SHAPE_9x9.gridSize
+        ? 'grid-size-small' : 'grid-size-large');
+
+    this._highlightDisplay.reshape(shape);
+    this._clickInterceptor.reshape(shape);
+  }
+
+  toggleLayoutView(enable) {
+    this._mainSvg.classList.toggle('layout-view', enable);
+  }
+
+  createCellHighlighter(cssClass) {
+    return new CellHighlighter(this._highlightDisplay, cssClass);
+  }
+
+  getNewGroup(groupClass) {
+    const group = createSvgElement('g');
+    group.classList.add(groupClass);
+    this._mainSvg.append(group);
+    return group;
+  }
+
+  addElement(element) {
+    this._mainSvg.append(element);
+  }
+
+  getClickInterceptor() {
+    return this._clickInterceptor
+  }
+}
+
+class ClickInterceptor extends DisplayItem {
+  constructor() {
+    const svg = createSvgElement('svg');
+    svg.classList.add('click-interceptor-svg');
+
+    super(svg);
+
+    // Note: _applyGridOffset won't work here because this is a DOM element
+    // not an element inside the svg (breaks in Safari).
+    const padding = DisplayItem.SVG_PADDING;
+    svg.style.transform = `translate(${padding}px,${padding}px)`;
+  }
+
+  reshape(shape) {
+    super.reshape(shape);
+
+    const sideLength = DisplayItem.CELL_SIZE * shape.gridSize;
+    const svg = this.getSvg();
+    svg.setAttribute('height', sideLength);
+    svg.setAttribute('width', sideLength);
+  }
+
+  cellAt(x, y) {
+    const shape = this._shape;
+    const row = y / DisplayItem.CELL_SIZE | 0;
+    const col = x / DisplayItem.CELL_SIZE | 0;
+    if (row < 0 || row >= shape.gridSize) return null;
+    if (col < 0 || col >= shape.gridSize) return null;
+    return shape.makeCellId(row, col);
+  }
+}
+
+export class InfoTextDisplay extends DisplayItem {
+  constructor(svg) {
+    super(svg);
+    this._applyGridOffset(svg);
+  }
+
+  setText(cellId, str) {
+    const [x, y] = this.cellIdBottomLeftCorner(cellId);
+    const textNode = this.makeTextNode(str, x + 2, y - 2, 'info-overlay-item');
+    this._svg.append(textNode);
+  }
+}
+
+
+export class SolutionDisplay extends CellValueDisplay {
+  constructor(svg) {
+    super(svg);
+    this._currentSolution = [];
+
+    this.setSolution = deferUntilAnimationFrame(this.setSolution.bind(this));
+    this._copyElem = document.getElementById('copy-solution-button');
+    this._copyElem.onclick = () => {
+      const solutionText = toShortSolution(this._currentSolution, this._shape);
+      navigator.clipboard.writeText(solutionText);
+    };
+
+    svg.setAttribute('mask', `url(#${this.constructor.GIVENS_MASK_ID})`);
+  }
+
+  reshape(shape) {
+    // This clears the solution, but importantly it overwrites any pending
+    // setSolution calls.
+    this.setSolution();
+    super.reshape(shape);
+  }
+
+  // Display solution on grid.
+  //  - If solution cell contains a container then it will be displayed as
+  //    pencilmarks.
+  setSolution(solution) {
+    solution = solution || [];
+    this._currentSolution = solution.slice();
+
+    // If we have no solution, just hide it instead.
+    // However, we wait a bit so that we don't flicker if the solution is updated
+    // again immediately.
+    if (!solution.length) {
+      window.setTimeout(() => {
+        // Ensure there is still no solution.
+        if (this._currentSolution.length == 0) {
+          this.clear();
+          this._copyElem.disabled = true;
+        }
+      }, 10);
+      return;
+    }
+
+    this.renderGridValues(solution);
+
+    this._copyElem.disabled = (
+      !this._currentSolution.every(v => v && isFinite(v)));
+  }
+}
+
+export class HighlightDisplay extends DisplayItem {
+  constructor(svg) {
+    super(svg);
+
+    this._shape = null;
+    this._applyGridOffset(svg);
+    this._groups = new Map();
+  }
+
+  static makeRadialGradient(id) {
+    const gradient = createSvgElement('radialGradient');
+    gradient.id = id;
+
+    let stop;
+
+    stop = createSvgElement('stop');
+    stop.setAttribute('offset', '70%');
+    stop.setAttribute('stop-opacity', '0');
+    stop.setAttribute('stop-color', 'rgb(0,255,0)');
+    gradient.append(stop);
+
+    stop = createSvgElement('stop');
+    stop.setAttribute('offset', '100%');
+    stop.setAttribute('stop-opacity', '1');
+    stop.setAttribute('stop-color', 'rgb(0,255,0)');
+    gradient.append(stop);
+
+    return gradient;
+  }
+
+  _getGroup(cssClass) {
+    if (this._groups.has(cssClass)) return this._groups.get(cssClass);
+
+    const group = createSvgElement('g');
+    group.classList.add(cssClass);
+    this._svg.append(group);
+    this._groups.set(cssClass, group);
+
+    return group;
+  }
+
+  highlightCell(cellId, cssClass) {
+    const parsed = this._shape.parseCellId(cellId);
+
+    const path = this._makeCellSquare(parsed.cell);
+    const svg = cssClass ? this._getGroup(cssClass) : this._svg;
+
+    svg.appendChild(path);
+
+    return path;
+  }
+
+  removeHighlight(path) {
+    path.parentNode.removeChild(path);
+  }
+}
+
+export class GridDisplay extends DisplayItem {
+  constructor(svg) {
+    super(svg);
+
+    this._applyGridOffset(svg);
+    svg.setAttribute('stroke-width', 1);
+    svg.setAttribute('stroke', 'rgb(150, 150, 150)');
+  }
+
+  reshape(shape) {
+    super.reshape(shape);
+    this.clear();
+
+    const cellSize = DisplayItem.CELL_SIZE;
+    const gridSize = cellSize * shape.gridSize;
+
+    const grid = this.getSvg();
+
+    for (let i = 1; i < gridSize; i++) {
+      grid.append(this._makePath([
+        [0, i * cellSize],
+        [gridSize, i * cellSize],
+      ]));
+      grid.append(this._makePath([
+        [i * cellSize, 0],
+        [i * cellSize, gridSize],
+      ]));
+    }
+  }
+}
+
+export class BorderDisplay extends DisplayItem {
+  constructor(svg, fill) {
+    super(svg);
+
+    this._applyGridOffset(svg);
+    svg.setAttribute('stroke-width', 2);
+    svg.setAttribute('stroke', 'rgb(0, 0, 0)');
+
+    this._fill = fill;
+  }
+
+  gridSizePixels() {
+    return DisplayItem.CELL_SIZE * this._shape.gridSize;
+  }
+
+  reshape(shape) {
+    super.reshape(shape);
+    this.clear();
+
+    const gridSizePixels = this.gridSizePixels();
+
+    const path = this._makePath([
+      [0, 0],
+      [0, gridSizePixels],
+      [gridSizePixels, gridSizePixels],
+      [gridSizePixels, 0],
+      [0, 0],
+    ]);
+    if (this._fill) path.setAttribute('fill', this._fill);
+    this.getSvg().append(path);
+  }
+}
+
+class CellHighlighter {
+  constructor(display, cssClass) {
+    this._cells = new Map();
+    this._cssClass = cssClass;
+
+    this._display = display;
+    this._key = undefined;
+  }
+
+  key() {
+    return this._key;
+  }
+
+  setCells(cellIds, key) {
+    if (key && key === this._key) return;
+    this.clear();
+    for (const cellId of cellIds) this.addCell(cellId);
+    this._key = key;
+  }
+
+  size() {
+    return this._cells.size;
+  }
+
+  getCells() {
+    return Array.from(this._cells.keys());
+  }
+
+  addCell(cell) {
+    if (!this._cells.has(cell)) {
+      const path = this._display.highlightCell(cell, this._cssClass);
+      this._cells.set(cell, path);
+      return path;
+    }
+  }
+
+  removeCell(cell) {
+    const path = this._cells.get(cell);
+    if (path) {
+      this._display.removeHighlight(path);
+      this._cells.delete(cell);
+    }
+  }
+
+  clear() {
+    for (const path of this._cells.values()) {
+      this._display.removeHighlight(path)
+    }
+    this._cells.clear();
+    this._key = undefined;
   }
 }

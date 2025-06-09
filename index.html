@@ -28,34 +28,13 @@ layout: null
 
   <script defer src="{{ '/data/example_puzzles.js?v=' | append: site.github.build_revision | relative_url }}"></script>
   <script type="module">
-    var VERSION_PARAM = '?v=' + ('{{ site.github.build_revision }}' || Math.random());
-    self.VERSION_PARAM = VERSION_PARAM;
+    self.VERSION_PARAM = '?v=' + ('{{ site.github.build_revision }}' || Math.random());
 
-    // Load modules in dependency order
-    const util = await import('./js/util.js' + VERSION_PARAM);
-    const gridShape = await import('./js/grid_shape.js' + VERSION_PARAM);
-    const sudokuConstraint = await import('./js/sudoku_constraint.js' + VERSION_PARAM);
-    const sudokuParser = await import('./js/sudoku_parser.js' + VERSION_PARAM);
-    const sudokuConstraintHandler = await import('./js/solver/sudoku_constraint_handler.js' + VERSION_PARAM);
-    const handlers = await import('./js/solver/handlers.js' + VERSION_PARAM);
-    const sumHandler = await import('./js/solver/sum_handler.js' + VERSION_PARAM);
+    const renderPage = import('./js/render_page.js' + self.VERSION_PARAM);
 
-    // Make all exports globally available
-    Object.assign(window, util);
-    Object.assign(window, gridShape);
-    Object.assign(window, sudokuConstraint);
-    Object.assign(window, sudokuParser);
-    Object.assign(window, sudokuConstraintHandler);
-    Object.assign(window, handlers);
-    Object.assign(window, sumHandler);
-
-    // Load regular scripts in order
-    await loadJSFile('./js/display.js' + VERSION_PARAM);
-    await loadJSFile('./js/constraint_displays.js' + VERSION_PARAM);
-    await loadJSFile('./js/solution_controller.js' + VERSION_PARAM);
-    await loadJSFile('./js/render_page.js' + VERSION_PARAM);
-
-    window.addEventListener('load', () => initPage());
+    window.addEventListener(
+      'load', async () => (await renderPage).initPage()
+    );
   </script>
   <link rel="stylesheet" href="{{ 'css/style.css?v=' | append: site.github.build_revision | relative_url }}">
 
