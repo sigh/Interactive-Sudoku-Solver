@@ -1,3 +1,15 @@
+const {
+  GridDisplay,
+  BorderDisplay,
+  DisplayItem,
+  ColorPicker,
+  CellValueDisplay,
+  GridGraph
+} = await import('./display.js' + self.VERSION_PARAM);
+const { LineOptions, CellArgs } = await import('./sudoku_constraint.js' + self.VERSION_PARAM);
+const { createSvgElement, clearDOMNode } = await import('./util.js' + self.VERSION_PARAM);
+const { SudokuConstraint, SudokuConstraintBase } = await import('./sudoku_constraint.js' + self.VERSION_PARAM);
+
 class ConstraintDisplays {
   static displayOrder() {
     return [
@@ -1267,5 +1279,105 @@ ConstraintDisplays.GreaterThan = class GreaterThan extends BaseConstraintDisplay
       ]);
     }
     throw new Error("Invalid comparison direction");
+  }
+}
+
+export class ConstraintDisplay extends DisplayItem {
+  constructor(inputManager, displayContainer) {
+    super();
+
+    displayContainer.addElement(this.constructor._makeArrowhead());
+    displayContainer.addElement(this.constructor._makeTextBgFilter());
+    displayContainer.addElement(CellValueDisplay.makeGivensMask());
+
+    this._gridDisplay = new GridDisplay(
+      displayContainer.getNewGroup('base-grid-group'));
+
+    this._constraintDisplays = new Map();
+    for (const displayClass of ConstraintDisplays.displayOrder()) {
+      const name = displayClass.name;
+      const groupClass = name.toLowerCase() + '-group';
+      const group = displayContainer.getNewGroup(groupClass);
+      this._constraintDisplays.set(
+        name, new displayClass(group, inputManager));
+      this._applyGridOffset(group);
+    }
+
+    this._borders = new BorderDisplay(
+      displayContainer.getNewGroup('border-group'));
+
+    this.clear();  // clear() to initialize.
+  }
+
+  reshape(shape) {
+    this._shape = shape;
+    this._gridDisplay.reshape(shape);
+    for (const display of this._constraintDisplays.values()) {
+      display.reshape(shape);
+    }
+    this._borders.reshape(shape);
+  }
+
+  // Reusable arrowhead marker.
+  static _makeArrowhead() {
+    const arrowhead = createSvgElement('marker');
+    arrowhead.id = 'arrowhead';
+    arrowhead.setAttribute('refX', '3');
+    arrowhead.setAttribute('refY', '2');
+    arrowhead.setAttribute('markerWidth', '4');
+    arrowhead.setAttribute('markerHeight', '5');
+    arrowhead.setAttribute('orient', 'auto');
+    const arrowPath = createSvgElement('path');
+    arrowPath.setAttribute('d', 'M 0 0 L 3 2 L 0 4');
+    arrowPath.setAttribute('fill', 'none');
+    arrowPath.setAttribute('stroke-width', 1);
+    arrowPath.setAttribute('stroke', 'rgb(200, 200, 200)');
+    arrowhead.appendChild(arrowPath);
+
+    return arrowhead;
+  }
+
+  static _makeTextBgFilter() {
+    const filter = createSvgElement('filter');
+    filter.setAttribute('x', '0');
+    filter.setAttribute('y', '0');
+    filter.setAttribute('width', '1');
+    filter.setAttribute('height', '1');
+    filter.setAttribute('id', 'text-bg-filter');
+
+    const flood = createSvgElement('feFlood');
+    flood.setAttribute('flood-color', 'rgba(255,255,255,0.6)');
+    filter.appendChild(flood);
+
+    const composite = createSvgElement('feComposite');
+    composite.setAttribute('in', 'SourceGraphic');
+    filter.appendChild(composite);
+
+    return filter;
+  }
+
+  clear() {
+    for (const display of this._constraintDisplays.values()) {
+      display.clear();
+    }
+  }
+
+  removeConstraint(constraint, item) {
+    const displayClass = constraint.constructor.DISPLAY_CONFIG.displayClass;
+    return this._constraintDisplays.get(displayClass).removeItem(item);
+  }
+
+  drawConstraint(constraint) {
+    const config = constraint.constructor.DISPLAY_CONFIG;
+    const item = this._constraintDisplays.get(
+      config.displayClass).drawItem(constraint, config);
+    return item;
+  }
+
+  makeConstraintIcon(constraint) {
+    const config = constraint.constructor.DISPLAY_CONFIG;
+    if (!config) return null;
+    return this._constraintDisplays.get(
+      config.displayClass).makeIcon(constraint, config);
   }
 }

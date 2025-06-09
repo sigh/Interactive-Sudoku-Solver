@@ -1,3 +1,23 @@
+const {
+  formatTimeMs,
+  formatNumberMetric,
+  camelCaseToWords,
+  sessionAndLocalStorage,
+  dynamicJSFileLoader,
+  deferUntilAnimationFrame,
+  clearDOMNode,
+  isIterable,
+  localTimestamp
+} = await import('./util.js' + self.VERSION_PARAM);
+const {
+  HighlightDisplay,
+  SolutionDisplay,
+  InfoTextDisplay,
+  CellValueDisplay
+} = await import('./display.js' + self.VERSION_PARAM);
+const { GridShape } = await import('./grid_shape.js' + self.VERSION_PARAM);
+const { SudokuParser } = await import('./sudoku_parser.js' + self.VERSION_PARAM);
+
 class HistoryHandler {
   MAX_HISTORY = 50;
   HISTORY_ADJUSTMENT = 10;
@@ -138,7 +158,7 @@ class DebugManager {
       if (debugLoaded) return Promise.resolve();
 
       debugLoaded = true;
-      const loaderPromise = dynamicJSFileLoader('js/debug.js' + self.VERSION_PARAM)();
+      const loaderPromise = import('./debug.js' + self.VERSION_PARAM);
 
       this._deferredSetup(loaderPromise);
 
@@ -214,8 +234,9 @@ class DebugManager {
     }
 
     // Debug puzzle loader.
-    loaderPromise.then(() => {
-      debugFilesLoaded.then(() => {
+    loaderPromise.then((debugModule) => {
+      Object.assign(self, debugModule);
+      debugModule.debugFilesLoaded.then(() => {
         this._loadDebugPuzzleInput();
       });
     });
@@ -1220,7 +1241,7 @@ ModeHandler.ValidateLayout = class extends ModeHandler {
   }
 }
 
-class SolutionController {
+export class SolutionController {
   constructor(constraintManager, displayContainer) {
     // Solvers are a list in case we manage to start more than one. This can
     // happen when we are waiting for a worker to initialize.
@@ -1619,7 +1640,7 @@ class SolutionController {
   }
 }
 
-class SolverProxy {
+export class SolverProxy {
   // Ask for a state update every 2**13 iterations.
   // NOTE: Using a non-power of 10 makes the display look faster :)
   static LOG_UPDATE_FREQUENCY = 13;
@@ -1766,9 +1787,67 @@ class SolverProxy {
   isTerminated() {
     return this._worker === null;
   }
-};
+}
 
-const toShortSolution = (solution, shape) => {
+// A info overlay which is lazily loaded.
+class InfoOverlay {
+  constructor(displayContainer) {
+    this._shape = null;
+
+    this._heatmap = displayContainer.createCellHighlighter();
+    this._textInfo = new InfoTextDisplay(
+      displayContainer.getNewGroup('text-info-group'));
+
+    this._onNextTextChangeFn = null;
+  }
+
+  reshape(shape) {
+    this._shape = shape;
+    this.clear();
+
+    this._textInfo.reshape(shape);
+  }
+
+  clear() {
+    this._heatmap.clear();
+    this._clearTextInfo();
+  }
+
+  _clearTextInfo() {
+    this._textInfo.clear();
+    if (this._onNextTextChangeFn) {
+      this._onNextTextChangeFn();
+      this._onNextTextChangeFn = null;
+    }
+  }
+
+  setHeatmapValues(values) {
+    const shape = this._shape;
+    this._heatmap.clear();
+
+    for (let i = 0; i < values.length; i++) {
+      const cellId = shape.makeCellIdFromIndex(i);
+      const path = this._heatmap.addCell(cellId);
+      path.setAttribute('fill', 'rgb(255, 0, 0)');
+      path.setAttribute('opacity', values[i] / 1000);
+    }
+  }
+
+  setValues(values, onChange) {
+    const shape = this._shape;
+    this._clearTextInfo();
+    if (onChange) this._onNextTextChangeFn = onChange;
+
+    if (!values) return;
+
+    for (let i = 0; i < values.length; i++) {
+      const cellId = shape.makeCellIdFromIndex(i);
+      this._textInfo.setText(cellId, values[i]);
+    }
+  }
+}
+
+export const toShortSolution = (solution, shape) => {
   const baseCharCode = GridShape.baseCharCode(shape);
   const DEFAULT_VALUE = '.';
 

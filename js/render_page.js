@@ -1,7 +1,33 @@
-// Make these variables global so that debug functions can access them.
-let constraintManager, controller;
+const {
+  autoSaveField,
+  clearDOMNode,
+  deferUntilAnimationFrame,
+  sessionAndLocalStorage,
+  toggleDisabled,
+  createSvgElement,
+  arraysAreEqual,
+  MultiMap,
+  isIterable
+} = await import('./util.js' + self.VERSION_PARAM);
+const {
+  SudokuConstraint,
+  SudokuConstraintBase,
+  OutsideConstraintBase
+} = await import('./sudoku_constraint.js' + self.VERSION_PARAM);
+const {
+  DisplayContainer,
+  BorderDisplay,
+  DisplayItem
+} = await import('./display.js' + self.VERSION_PARAM);
+const { SudokuParser } = await import('./sudoku_parser.js' + self.VERSION_PARAM);
+const { ConstraintDisplay } = await import('./constraint_display.js' + self.VERSION_PARAM);
+const { GridShape } = await import('./grid_shape.js' + self.VERSION_PARAM);
+const { SolutionController } = await import('./solution_controller.js' + self.VERSION_PARAM);
 
-const initPage = () => {
+// Make these variables global so that debug functions can access them.
+export let constraintManager, controller;
+
+export const initPage = () => {
   // Create grid.
   const container = document.getElementById('sudoku-grid');
   const displayContainer = new DisplayContainer(container);
@@ -2160,63 +2186,5 @@ ConstraintCategoryInput.CustomBinary = class CustomBinary extends ConstraintCate
     form['function'].oninput = () => {
       errorElem.textContent = '';
     };
-  }
-}
-
-// A info overlay which is lazily loaded.
-class InfoOverlay {
-  constructor(displayContainer) {
-    this._shape = null;
-
-    this._heatmap = displayContainer.createCellHighlighter();
-    this._textInfo = new InfoTextDisplay(
-      displayContainer.getNewGroup('text-info-group'));
-
-    this._onNextTextChangeFn = null;
-  }
-
-  reshape(shape) {
-    this._shape = shape;
-    this.clear();
-
-    this._textInfo.reshape(shape);
-  }
-
-  clear() {
-    this._heatmap.clear();
-    this._clearTextInfo();
-  }
-
-  _clearTextInfo() {
-    this._textInfo.clear();
-    if (this._onNextTextChangeFn) {
-      this._onNextTextChangeFn();
-      this._onNextTextChangeFn = null;
-    }
-  }
-
-  setHeatmapValues(values) {
-    const shape = this._shape;
-    this._heatmap.clear();
-
-    for (let i = 0; i < values.length; i++) {
-      const cellId = shape.makeCellIdFromIndex(i);
-      const path = this._heatmap.addCell(cellId);
-      path.setAttribute('fill', 'rgb(255, 0, 0)');
-      path.setAttribute('opacity', values[i] / 1000);
-    }
-  }
-
-  setValues(values, onChange) {
-    const shape = this._shape;
-    this._clearTextInfo();
-    if (onChange) this._onNextTextChangeFn = onChange;
-
-    if (!values) return;
-
-    for (let i = 0; i < values.length; i++) {
-      const cellId = shape.makeCellIdFromIndex(i);
-      this._textInfo.setText(cellId, values[i]);
-    }
   }
 }

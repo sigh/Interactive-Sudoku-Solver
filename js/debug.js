@@ -1,4 +1,13 @@
-const debugFilesLoaded = Promise.all([
+const {
+  loadJSFile,
+  isIterable,
+  isPlainObject,
+  withDeadline
+} = await import('./util.js' + self.VERSION_PARAM);
+const { SudokuParser } = await import('./sudoku_parser.js' + self.VERSION_PARAM);
+const { SolverProxy, toShortSolution } = await import('./solution_controller.js' + self.VERSION_PARAM);
+
+export const debugFilesLoaded = Promise.all([
   loadJSFile('data/collections.js' + self.VERSION_PARAM),
   loadJSFile('data/jigsaw_layouts.js' + self.VERSION_PARAM),
   loadJSFile('data/invalid_jigsaw_layouts.js' + self.VERSION_PARAM),
@@ -7,7 +16,7 @@ const debugFilesLoaded = Promise.all([
 
 var TEST_TIMEOUT_MS = 0;
 
-const loadInput = (puzzleCfg) => {
+export const loadInput = (puzzleCfg) => {
   const puzzle = puzzleFromCfg(puzzleCfg);
   constraintManager.loadUnsafeFromText(puzzle.input);
 }
@@ -186,7 +195,7 @@ class PuzzleRunner {
   }
 }
 
-const runValidateLayoutTests = async (onFailure) => {
+export const runValidateLayoutTests = async (onFailure) => {
   const cases = [].concat(
     VALID_JIGSAW_LAYOUTS.slice(0, 20),
     EASY_INVALID_JIGSAW_LAYOUTS,
@@ -197,7 +206,7 @@ const runValidateLayoutTests = async (onFailure) => {
   return [result];
 };
 
-const runSolveTests = async (onFailure) => {
+export const runSolveTests = async (onFailure) => {
   const results = [];
   let result = null;
   result = await PuzzleRunner.runAllWithChecks([
@@ -310,7 +319,7 @@ const runSolveTests = async (onFailure) => {
   return results;
 };
 
-const runAllTests = async () => {
+export const runAllTests = async () => {
   let results = [];
   results.push(...await runSolveTests());
   results.push(...await runValidateLayoutTests());
@@ -321,13 +330,13 @@ const runAllTests = async () => {
   console.table(stats);
 };
 
-const runAll = async (puzzles) => {
+export const runAll = async (puzzles) => {
   const result = await PuzzleRunner.runAllWithChecks(puzzles);
   console.table(result.stats);
   return result;
 };
 
-const printGrid = (grid) => {
+export const printGrid = (grid) => {
   const gridSize = Math.sqrt(grid.length);
   const matrix = [];
   for (let i = 0; i < gridSize; i++) {
@@ -337,7 +346,7 @@ const printGrid = (grid) => {
   console.table(matrix);
 }
 
-const progressBenchmarks = async () => {
+export const progressBenchmarks = async () => {
   const puzzleSets = {
     MATHEMAGIC_KILLERS,
     EXTREME_KILLERS,
