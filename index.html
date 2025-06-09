@@ -29,7 +29,7 @@ layout: null
   <script defer src="{{ '/data/example_puzzles.js?v=' | append: site.github.build_revision | relative_url }}"></script>
   <script type="module">
     var VERSION_PARAM = '?v=' + ('{{ site.github.build_revision }}' || Math.random());
-    Object.assign(window, { VERSION_PARAM });
+    self.VERSION_PARAM = VERSION_PARAM;
 
     // Load modules in dependency order
     const util = await import('./js/util.js' + VERSION_PARAM);

@@ -1,5 +1,4 @@
-const versionParam = self.location.search;
-const { memoize, Base64Codec } = await import('../util.js' + versionParam);
+const { memoize, Base64Codec } = await import('../util.js' + self.VERSION_PARAM);
 
 export class LookupTables {
   static get = memoize((numValues) => {

@@ -1,9 +1,8 @@
-const versionParam = self.location.search;
-const { SudokuConstraint, SudokuConstraintBase, CellArgs } = await import('./sudoku_constraint.js' + versionParam);
-const { SudokuSolver } = await import('./solver/engine.js' + versionParam);
-const { SudokuConstraintHandler } = await import('./solver/sudoku_constraint_handler.js' + versionParam);
-await import('./solver/handlers.js' + versionParam);
-await import('./solver/sum_handler.js' + versionParam);
+const { SudokuConstraint, SudokuConstraintBase, CellArgs } = await import('./sudoku_constraint.js' + self.VERSION_PARAM);
+const { SudokuSolver } = await import('./solver/engine.js' + self.VERSION_PARAM);
+const { SudokuConstraintHandler } = await import('./solver/sudoku_constraint_handler.js' + self.VERSION_PARAM);
+await import('./solver/handlers.js' + self.VERSION_PARAM);
+await import('./solver/sum_handler.js' + self.VERSION_PARAM);
 
 export class SudokuBuilder {
   static build(constraint, debugOptions) {

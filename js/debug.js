@@ -1,8 +1,8 @@
 const debugFilesLoaded = Promise.all([
-  loadJSFile('data/collections.js' + VERSION_PARAM),
-  loadJSFile('data/jigsaw_layouts.js' + VERSION_PARAM),
-  loadJSFile('data/invalid_jigsaw_layouts.js' + VERSION_PARAM),
-  loadJSFile('data/jigsaw_box_layouts.js' + VERSION_PARAM),
+  loadJSFile('data/collections.js' + self.VERSION_PARAM),
+  loadJSFile('data/jigsaw_layouts.js' + self.VERSION_PARAM),
+  loadJSFile('data/invalid_jigsaw_layouts.js' + self.VERSION_PARAM),
+  loadJSFile('data/jigsaw_box_layouts.js' + self.VERSION_PARAM),
 ]);
 
 var TEST_TIMEOUT_MS = 0;

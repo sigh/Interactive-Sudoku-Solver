@@ -1,12 +1,11 @@
 "use strict";
 
-const versionParam = self.location.search;
-const { memoize, countOnes16bit, arraysAreEqual, isIterable, arrayIntersect, RandomIntGenerator, shuffleArray, MultiMap } = await import('../util.js' + versionParam);
-const { LookupTables } = await import('./lookup_tables.js' + versionParam);
-const { SudokuConstraintHandler } = await import('./sudoku_constraint_handler.js' + versionParam);
-const { SHAPE_MAX } = await import('../grid_shape.js' + versionParam);
-const { SudokuConstraintBase, SudokuConstraint } = await import('../sudoku_constraint.js' + versionParam);
-const { CandidateFinders } = await import('./candidate_selector.js' + versionParam);
+const { memoize, countOnes16bit, arraysAreEqual, isIterable, arrayIntersect, RandomIntGenerator, shuffleArray, MultiMap } = await import('../util.js' + self.VERSION_PARAM);
+const { LookupTables } = await import('./lookup_tables.js' + self.VERSION_PARAM);
+const { SudokuConstraintHandler } = await import('./sudoku_constraint_handler.js' + self.VERSION_PARAM);
+const { SHAPE_MAX } = await import('../grid_shape.js' + self.VERSION_PARAM);
+const { SudokuConstraintBase, SudokuConstraint } = await import('../sudoku_constraint.js' + self.VERSION_PARAM);
+const { CandidateFinders } = await import('./candidate_selector.js' + self.VERSION_PARAM);
 
 SudokuConstraintHandler.NoBoxes = class NoBoxes extends SudokuConstraintHandler { }
 // This handler purely exists to manually adjust the priorities of cells to

@@ -1,5 +1,4 @@
-const versionParam = self.location.search;
-const { memoize } = await import('./util.js' + versionParam);
+const { memoize } = await import('./util.js' + self.VERSION_PARAM);
 
 export class GridShape {
   static MIN_SIZE = 1;

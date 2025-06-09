@@ -12,9 +12,9 @@ self.onmessage = async (msg) => {
 
 const START_INIT_WORKER = performance.now();
 
-const versionParam = self.location.search;
-const { SudokuBuilder } = await import('./sudoku_builder.js' + versionParam);
-const { Timer } = await import('./util.js' + versionParam);
+self.VERSION_PARAM = self.location.search;
+const { SudokuBuilder } = await import('./sudoku_builder.js' + self.VERSION_PARAM);
+const { Timer } = await import('./util.js' + self.VERSION_PARAM);
 
 let workerSolver = null;
 let workerSolverSetUpTime = 0;

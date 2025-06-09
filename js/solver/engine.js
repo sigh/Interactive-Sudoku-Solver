@@ -1,13 +1,12 @@
 "use strict";
 
-const versionParam = self.location.search;
-const { Timer, IteratorWithCount, setIntersectionToArray } = await import('../util.js' + versionParam);
-const { LookupTables } = await import('./lookup_tables.js' + versionParam);
-const { SHAPE_MAX } = await import('../grid_shape.js' + versionParam);
-const { SudokuConstraintHandler } = await import('./sudoku_constraint_handler.js' + versionParam);
-const { SudokuConstraintOptimizer } = await import('./optimizer.js' + versionParam);
-const { HandlerSet } = await import('./handlers.js' + versionParam);
-const { CandidateSelector } = await import('./candidate_selector.js' + versionParam);
+const { Timer, IteratorWithCount, setIntersectionToArray } = await import('../util.js' + self.VERSION_PARAM);
+const { LookupTables } = await import('./lookup_tables.js' + self.VERSION_PARAM);
+const { SHAPE_MAX } = await import('../grid_shape.js' + self.VERSION_PARAM);
+const { SudokuConstraintHandler } = await import('./sudoku_constraint_handler.js' + self.VERSION_PARAM);
+const { SudokuConstraintOptimizer } = await import('./optimizer.js' + self.VERSION_PARAM);
+const { HandlerSet } = await import('./handlers.js' + self.VERSION_PARAM);
+const { CandidateSelector } = await import('./candidate_selector.js' + self.VERSION_PARAM);
 
 export class SudokuSolver {
   constructor(handlers, shape, debugOptions) {

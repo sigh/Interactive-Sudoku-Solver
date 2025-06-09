@@ -1,6 +1,5 @@
-const versionParam = self.location.search;
-const { SudokuConstraint, CompositeConstraintBase } = await import('./sudoku_constraint.js' + versionParam);
-const { GridShape, SHAPE_9x9 } = await import('./grid_shape.js' + versionParam);
+const { SudokuConstraint, CompositeConstraintBase } = await import('./sudoku_constraint.js' + self.VERSION_PARAM);
+const { GridShape, SHAPE_9x9 } = await import('./grid_shape.js' + self.VERSION_PARAM);
 
 export class SudokuParser {
   static parseShortKillerFormat(text) {
