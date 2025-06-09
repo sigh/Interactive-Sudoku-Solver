@@ -1,15 +1,39 @@
+// Set up onmessage handler now so that it can be called immediately (before the
+// worker is fully loaded), but ensure it waits for the worker to load before
+// doing anything else.
+let resolveWorkerLoaded;
+const workerLoadedPromise = new Promise(resolve => {
+  resolveWorkerLoaded = resolve;
+});
+self.onmessage = async (msg) => {
+  await workerLoadedPromise;
+  handleWorkerMessage(msg);
+};
+
 const START_INIT_WORKER = performance.now();
 
-const loadScripts = (async () => {
-  const versionParam = self.location.search;
-  const util = await import('./util.js' + versionParam);
-  const sudokuBuilder = await import('./sudoku_builder.js' + versionParam);
-  Object.assign(self, util);
-  Object.assign(self, sudokuBuilder);
-})();
+const versionParam = self.location.search;
+const { SudokuBuilder } = await import('./sudoku_builder.js' + versionParam);
+const { Timer } = await import('./util.js' + versionParam);
 
 let workerSolver = null;
 let workerSolverSetUpTime = 0;
+
+const handleWorkerMessage = (msg) => {
+  try {
+    let result = handleWorkerMethod(msg.data.method, msg.data.payload);
+    sendState();
+    self.postMessage({
+      type: 'result',
+      result: result,
+    });
+  } catch (e) {
+    self.postMessage({
+      type: 'exception',
+      error: e,
+    });
+  }
+};
 
 const handleWorkerMethod = (method, payload) => {
   switch (method) {
@@ -66,24 +90,10 @@ const sendState = (extraState) => {
   }
 };
 
-self.onmessage = async (msg) => {
-  await loadScripts;
-  try {
-    let result = handleWorkerMethod(msg.data.method, msg.data.payload);
-    sendState();
-    self.postMessage({
-      type: 'result',
-      result: result,
-    });
-  } catch (e) {
-    self.postMessage({
-      type: 'exception',
-      error: e,
-    });
-  }
-};
-
 const END_INIT_WORKER = performance.now();
 const workerSetupMs = Math.ceil(END_INIT_WORKER - START_INIT_WORKER);
 
 console.log(`Worker initialized in ${Math.ceil(workerSetupMs)}ms`);
+
+// Resolve the promise to indicate the worker is fully loaded.
+resolveWorkerLoaded();
