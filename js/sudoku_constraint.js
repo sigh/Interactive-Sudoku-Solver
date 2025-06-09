@@ -1,7 +1,6 @@
-const versionParam = self.location.search;
-const { memoize, MultiMap, arrayRemoveValue, groupSortedBy } = await import('./util.js' + versionParam);
-const { binaryFnToKey } = await import('./solver/lookup_tables.js' + versionParam);
-const { GridShape, SHAPE_9x9, SHAPE_MAX } = await import('./grid_shape.js' + versionParam);
+const { memoize, MultiMap, arrayRemoveValue, groupSortedBy } = await import('./util.js' + self.VERSION_PARAM);
+const { binaryFnToKey } = await import('./solver/lookup_tables.js' + self.VERSION_PARAM);
+const { GridShape, SHAPE_9x9, SHAPE_MAX } = await import('./grid_shape.js' + self.VERSION_PARAM);
 
 export class CellArgs {
   constructor(args, type) {

@@ -1,7 +1,5 @@
-const versionParam = self.location.search;
-
-const { countOnes16bit } = await import('../util.js' + versionParam);
-const { LookupTables } = await import('./lookup_tables.js' + versionParam);
+const { countOnes16bit } = await import('../util.js' + self.VERSION_PARAM);
+const { LookupTables } = await import('./lookup_tables.js' + self.VERSION_PARAM);
 
 export class CandidateSelector {
   constructor(shape, handlerSet, debugLogger) {

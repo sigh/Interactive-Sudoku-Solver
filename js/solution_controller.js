@@ -138,7 +138,7 @@ class DebugManager {
       if (debugLoaded) return Promise.resolve();
 
       debugLoaded = true;
-      const loaderPromise = dynamicJSFileLoader('js/debug.js' + window.VERSION_PARAM)();
+      const loaderPromise = dynamicJSFileLoader('js/debug.js' + self.VERSION_PARAM)();
 
       this._deferredSetup(loaderPromise);
 
@@ -1632,7 +1632,7 @@ class SolverProxy {
 
     if (!this._unusedWorkers.length) {
       const worker = new Worker(
-        'js/worker.js' + VERSION_PARAM, { type: 'module' });
+        'js/worker.js' + self.VERSION_PARAM, { type: 'module' });
       this._unusedWorkers.push(worker);
     }
     const worker = this._unusedWorkers.pop();
