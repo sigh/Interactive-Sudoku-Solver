@@ -10,30 +10,26 @@ const { LineOptions, CellArgs } = await import('./sudoku_constraint.js' + self.V
 const { createSvgElement, clearDOMNode } = await import('./util.js' + self.VERSION_PARAM);
 const { SudokuConstraint, SudokuConstraintBase } = await import('./sudoku_constraint.js' + self.VERSION_PARAM);
 
-class ConstraintDisplays {
-  static displayOrder() {
-    return [
-      this.DefaultRegionsInverted,
-      this.Windoku,
-      this.Jigsaw,
-      this.BorderedRegion,
-      this.Indexing,
-      this.Thermo,
-      this.PillArrow,
-      this.GenericLine,
-      this.CustomBinary,
-      this.ShadedRegion,
-      this.CountingCircles,
-      this.Diagonal,
-      this.Dot,
-      this.Letter,
-      this.GreaterThan,
-      this.Quad,
-      this.Givens,
-      this.OutsideClue,
-    ]
-  }
-}
+const constraintDisplayOrder = () => [
+  DefaultRegionsInverted,
+  Windoku,
+  Jigsaw,
+  BorderedRegion,
+  Indexing,
+  Thermo,
+  PillArrow,
+  GenericLine,
+  CustomBinary,
+  ShadedRegion,
+  CountingCircles,
+  Diagonal,
+  Dot,
+  Letter,
+  GreaterThan,
+  Quad,
+  Givens,
+  OutsideClue,
+];
 
 class BaseConstraintDisplayItem extends DisplayItem {
   static IS_LAYOUT = false;
@@ -267,7 +263,7 @@ class BaseConstraintDisplayItem extends DisplayItem {
   }
 }
 
-ConstraintDisplays.Jigsaw = class Jigsaw extends BaseConstraintDisplayItem {
+class Jigsaw extends BaseConstraintDisplayItem {
   static IS_LAYOUT = true;
 
   constructor(svg) {
@@ -356,7 +352,7 @@ ConstraintDisplays.Jigsaw = class Jigsaw extends BaseConstraintDisplayItem {
   }
 }
 
-ConstraintDisplays.Indexing = class Indexing extends BaseConstraintDisplayItem {
+class Indexing extends BaseConstraintDisplayItem {
   drawItem(constraint, _) {
     const cells = constraint.cells;
     const g = createSvgElement('g');
@@ -391,7 +387,7 @@ ConstraintDisplays.Indexing = class Indexing extends BaseConstraintDisplayItem {
   }
 }
 
-ConstraintDisplays.GenericLine = class GenericLine extends BaseConstraintDisplayItem {
+class GenericLine extends BaseConstraintDisplayItem {
   drawItem(constraint, options) {
     const item = this._makeItem(constraint, options);
     this._svg.append(item);
@@ -415,9 +411,9 @@ ConstraintDisplays.GenericLine = class GenericLine extends BaseConstraintDisplay
   }
 }
 
-ConstraintDisplays.Thermo = class Thermo extends ConstraintDisplays.GenericLine { }
+class Thermo extends GenericLine { }
 
-ConstraintDisplays.CustomBinary = class CustomBinary extends ConstraintDisplays.GenericLine {
+class CustomBinary extends GenericLine {
   constructor(svg) {
     super(svg);
     this._colorPicker = new ColorPicker();
@@ -467,7 +463,7 @@ ConstraintDisplays.CustomBinary = class CustomBinary extends ConstraintDisplays.
   }
 }
 
-ConstraintDisplays.PillArrow = class PillArrow extends ConstraintDisplays.GenericLine {
+class PillArrow extends GenericLine {
   _nextMaskId = 0;
 
   drawItem(constraint, _) {
@@ -542,7 +538,7 @@ ConstraintDisplays.PillArrow = class PillArrow extends ConstraintDisplays.Generi
   }
 }
 
-ConstraintDisplays.Dot = class Dot extends BaseConstraintDisplayItem {
+class Dot extends BaseConstraintDisplayItem {
   drawItem(constraint, options) {
     const g = createSvgElement('g');
     g.setAttribute('fill', options.color);
@@ -568,7 +564,7 @@ ConstraintDisplays.Dot = class Dot extends BaseConstraintDisplayItem {
     return g;
   }
 }
-ConstraintDisplays.Letter = class Letter extends BaseConstraintDisplayItem {
+class Letter extends BaseConstraintDisplayItem {
   drawItem(constraint, _) {
     const letter = constraint.type.toLowerCase();
 
@@ -604,7 +600,7 @@ ConstraintDisplays.Letter = class Letter extends BaseConstraintDisplayItem {
   }
 }
 
-ConstraintDisplays.ShadedRegion = class ShadedRegion extends BaseConstraintDisplayItem {
+class ShadedRegion extends BaseConstraintDisplayItem {
   constructor(svg) {
     super(svg);
     this._unusedPatternId = 0;
@@ -723,7 +719,7 @@ ConstraintDisplays.ShadedRegion = class ShadedRegion extends BaseConstraintDispl
   }
 }
 
-ConstraintDisplays.CountingCircles = class CountingCircles extends BaseConstraintDisplayItem {
+class CountingCircles extends BaseConstraintDisplayItem {
   constructor(svg) {
     super(svg);
     this._circleColors = new ColorPicker();
@@ -774,7 +770,7 @@ ConstraintDisplays.CountingCircles = class CountingCircles extends BaseConstrain
   }
 }
 
-ConstraintDisplays.Quad = class Quad extends BaseConstraintDisplayItem {
+class Quad extends BaseConstraintDisplayItem {
   drawItem(constraint) {
     const topLeftCell = constraint.topLeftCell;
     const values = constraint.values;
@@ -812,7 +808,7 @@ ConstraintDisplays.Quad = class Quad extends BaseConstraintDisplayItem {
   }
 }
 
-ConstraintDisplays.Diagonal = class Diagonal extends BaseConstraintDisplayItem {
+class Diagonal extends BaseConstraintDisplayItem {
   static IS_LAYOUT = true;
   DIRECTIONS = [1, -1];
 
@@ -843,7 +839,7 @@ ConstraintDisplays.Diagonal = class Diagonal extends BaseConstraintDisplayItem {
   }
 }
 
-ConstraintDisplays.Windoku = class Windoku extends BaseConstraintDisplayItem {
+class Windoku extends BaseConstraintDisplayItem {
   static IS_LAYOUT = true;
 
   constructor(svg) {
@@ -882,7 +878,7 @@ ConstraintDisplays.Windoku = class Windoku extends BaseConstraintDisplayItem {
   }
 }
 
-ConstraintDisplays.DefaultRegionsInverted = class DefaultRegionsInverted extends BaseConstraintDisplayItem {
+class DefaultRegionsInverted extends BaseConstraintDisplayItem {
   static IS_LAYOUT = true;
 
   constructor(svg) {
@@ -933,7 +929,7 @@ ConstraintDisplays.DefaultRegionsInverted = class DefaultRegionsInverted extends
   }
 }
 
-ConstraintDisplays.BorderedRegion = class BorderedRegion extends BaseConstraintDisplayItem {
+class BorderedRegion extends BaseConstraintDisplayItem {
   constructor(svg) {
     super(svg);
     this._items = [];
@@ -995,7 +991,7 @@ ConstraintDisplays.BorderedRegion = class BorderedRegion extends BaseConstraintD
   }
 }
 
-ConstraintDisplays.OutsideClue = class OutsideClue extends BaseConstraintDisplayItem {
+class OutsideClue extends BaseConstraintDisplayItem {
   constructor(svg, inputManager) {
     super(svg);
     inputManager.addSelectionPreserver(svg);
@@ -1182,7 +1178,7 @@ ConstraintDisplays.OutsideClue = class OutsideClue extends BaseConstraintDisplay
   };
 }
 
-ConstraintDisplays.Givens = class Givens extends BaseConstraintDisplayItem {
+class Givens extends BaseConstraintDisplayItem {
   constructor(svg) {
     super(svg);
 
@@ -1233,7 +1229,7 @@ ConstraintDisplays.Givens = class Givens extends BaseConstraintDisplayItem {
   }
 }
 
-ConstraintDisplays.GreaterThan = class GreaterThan extends BaseConstraintDisplayItem {
+class GreaterThan extends BaseConstraintDisplayItem {
   drawItem(constraint, options) {
     const result = createSvgElement("g");
     result.setAttribute('fill', 'transparent');
@@ -1294,7 +1290,7 @@ export class ConstraintDisplay extends DisplayItem {
       displayContainer.getNewGroup('base-grid-group'));
 
     this._constraintDisplays = new Map();
-    for (const displayClass of ConstraintDisplays.displayOrder()) {
+    for (const displayClass of constraintDisplayOrder()) {
       const name = displayClass.name;
       const groupClass = name.toLowerCase() + '-group';
       const group = displayContainer.getNewGroup(groupClass);

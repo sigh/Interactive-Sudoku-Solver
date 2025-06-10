@@ -3,9 +3,9 @@
 const { Timer, IteratorWithCount, arraysAreEqual, setIntersectionToArray } = await import('../util.js' + self.VERSION_PARAM);
 const { LookupTables } = await import('./lookup_tables.js' + self.VERSION_PARAM);
 const { SHAPE_MAX } = await import('../grid_shape.js' + self.VERSION_PARAM);
-const { SudokuConstraintHandler } = await import('./handlers.js' + self.VERSION_PARAM);
 const { SudokuConstraintOptimizer } = await import('./optimizer.js' + self.VERSION_PARAM);
 const { CandidateSelector } = await import('./candidate_selector.js' + self.VERSION_PARAM);
+const HandlerModule = await import('./handlers.js' + self.VERSION_PARAM);
 
 export class SudokuSolver {
   constructor(handlers, shape, debugOptions) {
@@ -347,7 +347,7 @@ class InternalSolver {
       }
     }
 
-    for (const handler of this._handlerSet.getAllofType(SudokuConstraintHandler.Priority)) {
+    for (const handler of this._handlerSet.getAllofType(HandlerModule.Priority)) {
       for (const cell of handler.priorityCells()) {
         priorities[cell] = handler.priority();
       }
@@ -417,7 +417,7 @@ class InternalSolver {
     // Add the exclusion handlers.
     for (let i = 0; i < this._numCells; i++) {
       handlerSet.addSingletonHandlers(
-        new SudokuConstraintHandler.UniqueValueExclusion(i));
+        new HandlerModule.UniqueValueExclusion(i));
     }
 
     const stateAllocator = new GridStateAllocator(this._shape);
@@ -903,7 +903,7 @@ class InternalSolver {
 
   _validateLayout(originalInitialGridState) {
     // Choose just the house handlers.
-    const houseHandlers = this._handlerSet.getAllofType(SudokuConstraintHandler.House);
+    const houseHandlers = this._handlerSet.getAllofType(HandlerModule.House);
 
     // Function to fill a house with all values.
     const fillHouse = (house) => {
@@ -997,7 +997,7 @@ class HandlerAccumulator {
       const index = handlers[0];
       this._singletonHandlers[i] = index;
       if (handlers.length > 1) {
-        this._allHandlers[index] = new SudokuConstraintHandler.And(
+        this._allHandlers[index] = new HandlerModule.And(
           ...handlers.map(i => this._allHandlers[i]));
       }
     }
@@ -1382,7 +1382,7 @@ class HandlerSet {
   }
 
   delete(handler) {
-    this.replace(handler, new SudokuConstraintHandler.True());
+    this.replace(handler, new HandlerModule.True());
   }
 
   _addOrdinary(handler, index) {

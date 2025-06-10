@@ -73,10 +73,10 @@ export class SudokuConstraintHandler {
   }
 }
 
-SudokuConstraintHandler.NoBoxes = class NoBoxes extends SudokuConstraintHandler { }
+export class NoBoxes extends SudokuConstraintHandler { }
 // This handler purely exists to manually adjust the priorities of cells to
 // adjust initial cell selection.
-SudokuConstraintHandler.Priority = class Priority extends SudokuConstraintHandler {
+export class Priority extends SudokuConstraintHandler {
   constructor(cells, priority) {
     // Don't register cells, so that this handler doesn't get added to the cells
     // and is not invoked during solving or any other calculations.
@@ -94,10 +94,10 @@ SudokuConstraintHandler.Priority = class Priority extends SudokuConstraintHandle
   }
 }
 
-SudokuConstraintHandler.True = class True extends SudokuConstraintHandler {
+export class True extends SudokuConstraintHandler {
 }
 
-SudokuConstraintHandler.False = class False extends SudokuConstraintHandler {
+export class False extends SudokuConstraintHandler {
   constructor(cells) {
     // The cells with which to associate the failure.
     super(cells);
@@ -111,7 +111,7 @@ SudokuConstraintHandler.False = class False extends SudokuConstraintHandler {
   enforceConsistency(grid, handlerAccumulator) { return false; }
 }
 
-SudokuConstraintHandler.And = class And extends SudokuConstraintHandler {
+export class And extends SudokuConstraintHandler {
   constructor(...handlers) {
     // Exclusion cells need special handlings since they can't be handled
     // directly by the engine.
@@ -119,9 +119,9 @@ SudokuConstraintHandler.And = class And extends SudokuConstraintHandler {
       const exclusionCells = h.exclusionCells();
       if (exclusionCells.length) {
         handlers.push(
-          new SudokuConstraintHandler.AllDifferent(
+          new AllDifferent(
             exclusionCells,
-            SudokuConstraintHandler.AllDifferent.PROPAGATE_WITH_ENFORCER));
+            AllDifferent.PROPAGATE_WITH_ENFORCER));
       }
     }
 
@@ -159,7 +159,7 @@ SudokuConstraintHandler.And = class And extends SudokuConstraintHandler {
   }
 }
 
-SudokuConstraintHandler.GivenCandidates = class GivenCandidates extends SudokuConstraintHandler {
+export class GivenCandidates extends SudokuConstraintHandler {
   constructor(valueMap) {
     super();
     this._valueMap = valueMap;
@@ -178,15 +178,15 @@ SudokuConstraintHandler.GivenCandidates = class GivenCandidates extends SudokuCo
   }
 }
 
-SudokuConstraintHandler.AllDifferent = class AllDifferent extends SudokuConstraintHandler {
+export class AllDifferent extends SudokuConstraintHandler {
   static PROPAGATE_WITH_EXCLUSION_CELLS = 0;
   // Used by Or/And constraint to enforce when it can't be directly accessed by
   // the engine.
   static PROPAGATE_WITH_ENFORCER = 1;
 
   constructor(exclusionCells, enforcementType) {
-    enforcementType ||= SudokuConstraintHandler.AllDifferent.PROPAGATE_WITH_EXCLUSION_CELLS;
-    super(enforcementType === SudokuConstraintHandler.AllDifferent.PROPAGATE_WITH_ENFORCER
+    enforcementType ||= AllDifferent.PROPAGATE_WITH_EXCLUSION_CELLS;
+    super(enforcementType === AllDifferent.PROPAGATE_WITH_ENFORCER
       ? exclusionCells : []);
 
     this._enforcementType = enforcementType;
@@ -227,7 +227,7 @@ SudokuConstraintHandler.AllDifferent = class AllDifferent extends SudokuConstrai
 // UniqueValueExclusion handles the case when a cell is set to a specific value.
 // It removes that value from all cells which share an all-different constraint
 // with this cell.
-SudokuConstraintHandler.UniqueValueExclusion = class UniqueValueExclusion extends SudokuConstraintHandler {
+export class UniqueValueExclusion extends SudokuConstraintHandler {
   static SINGLETON_HANDLER = true;
 
   constructor(cell) {
@@ -262,7 +262,7 @@ SudokuConstraintHandler.UniqueValueExclusion = class UniqueValueExclusion extend
   }
 }
 
-SudokuConstraintHandler.ValueDependentUniqueValueExclusion = class ValueDependentUniqueValueExclusion extends SudokuConstraintHandler {
+export class ValueDependentUniqueValueExclusion extends SudokuConstraintHandler {
   static SINGLETON_HANDLER = true;
 
   constructor(cell, valueToCellMap) {
@@ -308,7 +308,7 @@ SudokuConstraintHandler.ValueDependentUniqueValueExclusion = class ValueDependen
   }
 }
 
-SudokuConstraintHandler.ValueDependentUniqueValueExclusionHouse = class ValueDependentUniqueValueExclusionHouse extends SudokuConstraintHandler {
+export class ValueDependentUniqueValueExclusionHouse extends SudokuConstraintHandler {
   constructor(cells, valueCellExclusions) {
     super(cells);
     this._valueCellExclusions = valueCellExclusions;
@@ -368,7 +368,7 @@ SudokuConstraintHandler.ValueDependentUniqueValueExclusionHouse = class ValueDep
   }
 }
 
-SudokuConstraintHandler._Util = class _Util {
+export class HandlerUtil {
   static exposeHiddenSingles(grid, cells, hiddenSingles) {
     hiddenSingles = hiddenSingles | 0;
     const numCells = cells.length;
@@ -496,7 +496,7 @@ SudokuConstraintHandler._Util = class _Util {
 
 }
 
-SudokuConstraintHandler.House = class House extends SudokuConstraintHandler {
+export class House extends SudokuConstraintHandler {
   constructor(cells) {
     super(cells);
     this._allValues = 0;
@@ -527,7 +527,7 @@ SudokuConstraintHandler.House = class House extends SudokuConstraintHandler {
 
     const hiddenSingles = allValues & ~atLeastTwo & ~fixedValues;
     if (hiddenSingles) {
-      if (!SudokuConstraintHandler._Util.exposeHiddenSingles(grid, cells, hiddenSingles)) {
+      if (!HandlerUtil.exposeHiddenSingles(grid, cells, hiddenSingles)) {
         return false;
       }
       fixedValues |= hiddenSingles;
@@ -547,7 +547,7 @@ SudokuConstraintHandler.House = class House extends SudokuConstraintHandler {
   }
 }
 
-SudokuConstraintHandler.BinaryConstraint = class BinaryConstraint extends SudokuConstraintHandler {
+export class BinaryConstraint extends SudokuConstraintHandler {
   constructor(cell1, cell2, key) {
     super([cell1, cell2]);
     this._key = key;
@@ -583,7 +583,7 @@ SudokuConstraintHandler.BinaryConstraint = class BinaryConstraint extends Sudoku
   }
 }
 
-SudokuConstraintHandler.BinaryPairwise = class BinaryPairwise extends SudokuConstraintHandler {
+export class BinaryPairwise extends SudokuConstraintHandler {
   constructor(key, ...cells) {
     super(cells);
     this._key = key;
@@ -744,7 +744,7 @@ SudokuConstraintHandler.BinaryPairwise = class BinaryPairwise extends SudokuCons
     if (this._enableHiddenSingles) {
       const hiddenSingles = requiredValues & ~nonUniqueValues & ~fixedValues;
       if (hiddenSingles) {
-        if (!SudokuConstraintHandler._Util.exposeHiddenSingles(grid, cells, hiddenSingles)) {
+        if (!HandlerUtil.exposeHiddenSingles(grid, cells, hiddenSingles)) {
           return false;
         }
       }
@@ -754,7 +754,7 @@ SudokuConstraintHandler.BinaryPairwise = class BinaryPairwise extends SudokuCons
     // Exclude fixedValues, they will be handled by the main solver loop,
     // which will also propagate the changes.
     const nonUniqueRequired = requiredValues & nonUniqueValues & ~fixedValues;
-    if (!SudokuConstraintHandler._Util.enforceRequiredValueExclusions(
+    if (!HandlerUtil.enforceRequiredValueExclusions(
       grid, cells, nonUniqueRequired, this._cellExclusions, handlerAccumulator)) return false;
 
     return true;
@@ -880,7 +880,7 @@ SudokuConstraintHandler.BinaryPairwise = class BinaryPairwise extends SudokuCons
   }
 }
 
-SudokuConstraintHandler.Skyscraper = class Skyscraper extends SudokuConstraintHandler {
+export class Skyscraper extends SudokuConstraintHandler {
   constructor(cells, numVisible) {
     super(cells);
     this._numVisible = +numVisible;
@@ -1055,7 +1055,7 @@ SudokuConstraintHandler.Skyscraper = class Skyscraper extends SudokuConstraintHa
   }
 }
 
-SudokuConstraintHandler.HiddenSkyscraper = class HiddenSkyscraper extends SudokuConstraintHandler {
+export class HiddenSkyscraper extends SudokuConstraintHandler {
   constructor(cells, firstHiddenValue) {
     super(cells);
     this._targetV = LookupTables.fromValue(+firstHiddenValue);
@@ -1140,7 +1140,7 @@ SudokuConstraintHandler.HiddenSkyscraper = class HiddenSkyscraper extends Sudoku
   }
 }
 
-SudokuConstraintHandler.Lunchbox = class Lunchbox extends SudokuConstraintHandler {
+export class Lunchbox extends SudokuConstraintHandler {
   _borderMask = 0;
   _valueMask = 0;
   _distances = null;
@@ -1163,11 +1163,11 @@ SudokuConstraintHandler.Lunchbox = class Lunchbox extends SudokuConstraintHandle
 
     const lookupTables = LookupTables.get(shape.numValues);
 
-    this._borderMask = SudokuConstraintHandler.Lunchbox._borderMask(shape);
+    this._borderMask = Lunchbox._borderMask(shape);
     this._valueMask = ~this._borderMask & lookupTables.allValues;
 
-    this._distances = SudokuConstraintHandler.Lunchbox._distanceRange(shape)[sum];
-    this._combinations = SudokuConstraintHandler.Lunchbox._combinations(shape)[sum];
+    this._distances = Lunchbox._distanceRange(shape)[sum];
+    this._combinations = Lunchbox._combinations(shape)[sum];
 
     return true;
   }
@@ -1247,7 +1247,7 @@ SudokuConstraintHandler.Lunchbox = class Lunchbox extends SudokuConstraintHandle
     const borderMask = this._borderMask;
 
     // Cache the grid values for faster lookup.
-    const values = SudokuConstraintHandler.Lunchbox._cellValues;
+    const values = Lunchbox._cellValues;
     let allValues = 0;
     for (let i = 0; i < numCells; i++) {
       allValues |= (values[i] = grid[cells[i]]);
@@ -1288,7 +1288,7 @@ SudokuConstraintHandler.Lunchbox = class Lunchbox extends SudokuConstraintHandle
     }
 
     // Build up a set of valid cell values.
-    const validSettings = SudokuConstraintHandler.Lunchbox._validSettings;
+    const validSettings = Lunchbox._validSettings;
     validSettings.fill(0);
 
     // Iterate over each possible starting index for the first sentinel.
@@ -1383,14 +1383,14 @@ SudokuConstraintHandler.Lunchbox = class Lunchbox extends SudokuConstraintHandle
 
 // This only exists to let the solver know this is a jigsaw puzzle, and
 // optimize for it.
-SudokuConstraintHandler.JigsawPiece = class JigsawPiece extends SudokuConstraintHandler {
+export class JigsawPiece extends SudokuConstraintHandler {
   constructor(cells) {
     super();
     this.cells = cells;
   }
 }
 
-SudokuConstraintHandler.SameValues = class SameValues extends SudokuConstraintHandler {
+export class SameValues extends SudokuConstraintHandler {
   constructor(...cellSets) {
     // Sort to canonicalize the order.
     // NOTE: We must copy before sorting (to avoid messing up order for the caller).
@@ -1422,7 +1422,7 @@ SudokuConstraintHandler.SameValues = class SameValues extends SudokuConstraintHa
 
     // If they are not unique, find the number of exclusion sets.
     for (const set of this._cellSets) {
-      const exclusionGroups = SudokuConstraintHandler._Util.findExclusionGroups(
+      const exclusionGroups = HandlerUtil.findExclusionGroups(
         set, cellExclusions);
       // The number of exclusion sets is the minimum for any set, since this
       // constraints all the other sets.
@@ -1565,7 +1565,7 @@ SudokuConstraintHandler.SameValues = class SameValues extends SudokuConstraintHa
   }
 }
 
-SudokuConstraintHandler.SameValuesIgnoreCount = class SameValuesIgnoreCount extends SudokuConstraintHandler.SameValues {
+export class SameValuesIgnoreCount extends SameValues {
   priority() {
     // This version is only used by the optimizer, so ensure it doesn't inflate
     // the priority unnecessarily.
@@ -1577,7 +1577,7 @@ SudokuConstraintHandler.SameValuesIgnoreCount = class SameValuesIgnoreCount exte
   }
 }
 
-SudokuConstraintHandler.Between = class Between extends SudokuConstraintHandler {
+export class Between extends SudokuConstraintHandler {
   constructor(cells) {
     super(cells);
     this._ends = [cells[0], cells[cells.length - 1]]
@@ -1586,12 +1586,12 @@ SudokuConstraintHandler.Between = class Between extends SudokuConstraintHandler 
   }
 
   initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
-    const exclusionGroups = SudokuConstraintHandler._Util.findExclusionGroups(
+    const exclusionGroups = HandlerUtil.findExclusionGroups(
       this._mids, cellExclusions);
     const maxGroupSize = Math.max(0, ...exclusionGroups.map(a => a.length));
     const minEndsDelta = maxGroupSize ? maxGroupSize + 1 : 0;
 
-    this._binaryConstraint = new SudokuConstraintHandler.BinaryConstraint(
+    this._binaryConstraint = new BinaryConstraint(
       ...this._ends,
       SudokuConstraint.Binary.fnToKey(
         (a, b) => Math.abs(a - b) >= minEndsDelta,
@@ -1633,7 +1633,7 @@ SudokuConstraintHandler.Between = class Between extends SudokuConstraintHandler 
   }
 }
 
-SudokuConstraintHandler.Lockout = class Lockout extends SudokuConstraintHandler {
+export class Lockout extends SudokuConstraintHandler {
   constructor(minDiff, cells) {
     super(cells);
     this._minDiff = +minDiff;
@@ -1643,7 +1643,7 @@ SudokuConstraintHandler.Lockout = class Lockout extends SudokuConstraintHandler 
   }
 
   initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
-    this._binaryConstraint = new SudokuConstraintHandler.BinaryConstraint(
+    this._binaryConstraint = new BinaryConstraint(
       ...this._ends,
       SudokuConstraint.Binary.fnToKey(
         (a, b) => Math.abs(a - b) >= this._minDiff,
@@ -1689,7 +1689,7 @@ SudokuConstraintHandler.Lockout = class Lockout extends SudokuConstraintHandler 
   }
 }
 
-SudokuConstraintHandler._Squishable2x2 = class _Squishable2x2 extends SudokuConstraintHandler {
+class _Squishable2x2 extends SudokuConstraintHandler {
   // Subclasses should override these.
   static SQUISHED_MASK = 0;
   static TRIADS = [];
@@ -1731,7 +1731,7 @@ SudokuConstraintHandler._Squishable2x2 = class _Squishable2x2 extends SudokuCons
         continue;
       }
       // Now we know `triadValue` is a required value and is in multiple cells.
-      if (!SudokuConstraintHandler._Util.enforceRequiredValueExclusions(
+      if (!HandlerUtil.enforceRequiredValueExclusions(
         grid, cells, triadValue, this._cellExclusions, handlerAccumulator)) return false;
     }
 
@@ -1813,7 +1813,7 @@ SudokuConstraintHandler._Squishable2x2 = class _Squishable2x2 extends SudokuCons
 
 
 // Enforce the "Global entropy" constraint for a single 2x2 region.
-SudokuConstraintHandler.LocalEntropy = class LocalEntropy extends SudokuConstraintHandler._Squishable2x2 {
+export class LocalEntropy extends _Squishable2x2 {
   static SQUISHED_MASK = LookupTables.fromValuesArray([1, 4, 7]);
   static TRIADS = [
     LookupTables.fromValuesArray([1, 2, 3]),
@@ -1823,7 +1823,7 @@ SudokuConstraintHandler.LocalEntropy = class LocalEntropy extends SudokuConstrai
 }
 
 // Enforce the "Global mod 3" constraint for a single 2x2 region.
-SudokuConstraintHandler.LocalMod3 = class LocalMod3 extends SudokuConstraintHandler._Squishable2x2 {
+export class LocalMod3 extends _Squishable2x2 {
   static SQUISHED_MASK = LookupTables.fromValuesArray([1, 2, 3]);
   static TRIADS = [
     LookupTables.fromValuesArray([1, 4, 7]),
@@ -1832,7 +1832,7 @@ SudokuConstraintHandler.LocalMod3 = class LocalMod3 extends SudokuConstraintHand
   static SQUISH_OFFSET = 3;
 }
 
-SudokuConstraintHandler.DutchFlatmateLine = class DutchFlatmateLine extends SudokuConstraintHandler {
+export class DutchFlatmateLine extends SudokuConstraintHandler {
   constructor(cells) {
     super(cells);
     this._mid = LookupTables.fromValue(Math.ceil(cells.length / 2));
@@ -1871,7 +1871,7 @@ SudokuConstraintHandler.DutchFlatmateLine = class DutchFlatmateLine extends Sudo
   }
 }
 
-SudokuConstraintHandler.RequiredValues = class RequiredValues extends SudokuConstraintHandler {
+export class RequiredValues extends SudokuConstraintHandler {
   constructor(cells, values, strict) {
     super(cells);
     this._values = values;
@@ -2004,7 +2004,7 @@ SudokuConstraintHandler.RequiredValues = class RequiredValues extends SudokuCons
     // Only check for hidden singles when we don't have a repeated value.
     const hiddenSingles = this._singleValues & ~nonUniqueValues & ~fixedValues;
     if (hiddenSingles) {
-      if (!SudokuConstraintHandler._Util.exposeHiddenSingles(grid, cells, hiddenSingles)) {
+      if (!HandlerUtil.exposeHiddenSingles(grid, cells, hiddenSingles)) {
         return false;
       }
       fixedValues |= hiddenSingles;
@@ -2031,7 +2031,7 @@ SudokuConstraintHandler.RequiredValues = class RequiredValues extends SudokuCons
   }
 }
 
-SudokuConstraintHandler.SumLine = class SumLine extends SudokuConstraintHandler {
+export class SumLine extends SudokuConstraintHandler {
   constructor(cells, loop, sum) {
     super(cells);
     this._sum = +sum;
@@ -2164,7 +2164,7 @@ SudokuConstraintHandler.SumLine = class SumLine extends SudokuConstraintHandler 
   }
 }
 
-SudokuConstraintHandler.ValueIndexing = class ValueIndexing extends SudokuConstraintHandler {
+export class ValueIndexing extends SudokuConstraintHandler {
   constructor(valueCell, controlCell, ...indexedCells) {
     super([valueCell, controlCell, ...indexedCells]);
     this._controlCell = controlCell;
@@ -2221,7 +2221,7 @@ SudokuConstraintHandler.ValueIndexing = class ValueIndexing extends SudokuConstr
   }
 }
 
-SudokuConstraintHandler.Indexing = class Indexing extends SudokuConstraintHandler {
+export class Indexing extends SudokuConstraintHandler {
   constructor(controlCell, indexedCells, indexedValue) {
     super([controlCell]);
     this._controlCell = controlCell;
@@ -2262,7 +2262,7 @@ SudokuConstraintHandler.Indexing = class Indexing extends SudokuConstraintHandle
   }
 }
 
-SudokuConstraintHandler.CountingCircles = class CountingCircles extends SudokuConstraintHandler {
+export class CountingCircles extends SudokuConstraintHandler {
   constructor(cells) {
     // Ensure that cells are sorted:
     // - Makes sure that the constraint performance is independent of the sort
@@ -2293,7 +2293,7 @@ SudokuConstraintHandler.CountingCircles = class CountingCircles extends SudokuCo
     if (!combinations) return false;
 
     const exclusionGroups = (
-      SudokuConstraintHandler._Util.findExclusionGroups(
+      HandlerUtil.findExclusionGroups(
         this.cells, cellExclusions));
 
     // Restrict values to the possible sums.
@@ -2445,7 +2445,7 @@ SudokuConstraintHandler.CountingCircles = class CountingCircles extends SudokuCo
   }
 }
 
-SudokuConstraintHandler.NumberedRoom = class NumberedRoom extends SudokuConstraintHandler {
+export class NumberedRoom extends SudokuConstraintHandler {
   constructor(cells, value) {
     super([cells[0]]);
     this._cells = new Uint8Array(cells);
@@ -2479,7 +2479,7 @@ SudokuConstraintHandler.NumberedRoom = class NumberedRoom extends SudokuConstrai
   }
 }
 
-SudokuConstraintHandler.FullRank = class FullRank extends SudokuConstraintHandler {
+export class FullRank extends SudokuConstraintHandler {
   constructor(numGridCells, clues) {
     const allCells = Uint8Array.from({ length: numGridCells }, (_, i) => i);
     super(allCells);
@@ -2819,7 +2819,7 @@ SudokuConstraintHandler.FullRank = class FullRank extends SudokuConstraintHandle
   }
 }
 
-SudokuConstraintHandler.Rellik = class Rellik extends SudokuConstraintHandler {
+export class Rellik extends SudokuConstraintHandler {
   constructor(cells, sum) {
     super(cells);
     // Use bigints to handle sums larger than 31.
@@ -2865,7 +2865,7 @@ SudokuConstraintHandler.Rellik = class Rellik extends SudokuConstraintHandler {
   }
 }
 
-SudokuConstraintHandler.EqualSizePartitions = class EqualSizePartitions extends SudokuConstraintHandler {
+export class EqualSizePartitions extends SudokuConstraintHandler {
   constructor(cells, partition1, partition2) {
     if (cells.length % 2 !== 0) {
       throw new Error("EqualSizePartitions: 'cells' must have an even number of elements.");
@@ -2944,7 +2944,7 @@ class DummyHandlerAccumulator {
   addForCell(cell) { }
 }
 
-SudokuConstraintHandler.Or = class Or extends SudokuConstraintHandler {
+export class Or extends SudokuConstraintHandler {
   constructor(...handlers) {
     // Exclusion cells need special handlings since they can't be handled
     // directly by the engine.
@@ -2953,7 +2953,7 @@ SudokuConstraintHandler.Or = class Or extends SudokuConstraintHandler {
       const exclusionCells = handler.exclusionCells();
       if (exclusionCells.length) {
         // The 'And' handler takes care of exclusion cells.
-        handlers[i] = new SudokuConstraintHandler.And(handler);
+        handlers[i] = new And(handler);
       }
     }
 
