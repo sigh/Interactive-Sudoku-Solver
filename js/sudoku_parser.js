@@ -367,3 +367,15 @@ export class SudokuParser {
     return [...uniqueTypes];
   }
 }
+
+export const toShortSolution = (solution, shape) => {
+  const baseCharCode = GridShape.baseCharCode(shape);
+  const DEFAULT_VALUE = '.';
+
+  const result = new Array(solution.length).fill(DEFAULT_VALUE);
+
+  for (let i = 0; i < solution.length; i++) {
+    result[i] = String.fromCharCode(baseCharCode + solution[i] - 1);
+  }
+  return result.join('');
+}

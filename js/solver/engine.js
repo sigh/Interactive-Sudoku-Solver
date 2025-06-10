@@ -1,19 +1,18 @@
 "use strict";
 
-const { Timer, IteratorWithCount, setIntersectionToArray } = await import('../util.js' + self.VERSION_PARAM);
+const { Timer, IteratorWithCount, arraysAreEqual, setIntersectionToArray } = await import('../util.js' + self.VERSION_PARAM);
 const { LookupTables } = await import('./lookup_tables.js' + self.VERSION_PARAM);
 const { SHAPE_MAX } = await import('../grid_shape.js' + self.VERSION_PARAM);
-const { SudokuConstraintHandler } = await import('./sudoku_constraint_handler.js' + self.VERSION_PARAM);
+const { SudokuConstraintHandler } = await import('./handlers.js' + self.VERSION_PARAM);
 const { SudokuConstraintOptimizer } = await import('./optimizer.js' + self.VERSION_PARAM);
-const { HandlerSet } = await import('./handlers.js' + self.VERSION_PARAM);
 const { CandidateSelector } = await import('./candidate_selector.js' + self.VERSION_PARAM);
 
 export class SudokuSolver {
   constructor(handlers, shape, debugOptions) {
-    this._debugLogger = new SudokuSolver.DebugLogger(this, debugOptions);
+    this._debugLogger = new DebugLogger(this, debugOptions);
     this._shape = shape;
 
-    this._internalSolver = new SudokuSolver.InternalSolver(
+    this._internalSolver = new InternalSolver(
       handlers, shape, this._debugLogger);
 
     this._progressExtraStateFn = null;
@@ -52,7 +51,7 @@ export class SudokuSolver {
       let result = null;
       if (sampleSolution) {
         result = {
-          solutions: [SudokuSolver.Util.gridToSolution(sampleSolution)]
+          solutions: [SudokuSolverUtil.gridToSolution(sampleSolution)]
         };
         this._internalSolver.unsetSampleSolution();
       }
@@ -60,7 +59,7 @@ export class SudokuSolver {
     };
 
     this._timer.runTimed(() => {
-      this._internalSolver.run(SudokuSolver.InternalSolver.YIELD_NEVER).next();
+      this._internalSolver.run(InternalSolver.YIELD_NEVER).next();
     });
 
     // Send progress one last time to ensure the last solution is sent.
@@ -75,22 +74,22 @@ export class SudokuSolver {
     let result = this._nthIteration(n, false);
     if (!result) return null;
 
-    return SudokuSolver.Util.gridToSolution(result.grid);
+    return SudokuSolverUtil.gridToSolution(result.grid);
   }
 
   nthStep(n, stepGuides) {
     const result = this._nthIteration(n, stepGuides);
     if (!result) return null;
 
-    const pencilmarks = SudokuSolver.Util.makePencilmarks(result.grid);
+    const pencilmarks = SudokuSolverUtil.makePencilmarks(result.grid);
     for (const cell of result.cellOrder) {
       pencilmarks[cell] = LookupTables.toValue(result.grid[cell]);
     }
 
     let diffPencilmarks = null;
     if (result.oldGrid) {
-      SudokuSolver.Util.removeGridValues(result.oldGrid, result.grid);
-      diffPencilmarks = SudokuSolver.Util.makePencilmarks(result.oldGrid);
+      SudokuSolverUtil.removeGridValues(result.oldGrid, result.grid);
+      diffPencilmarks = SudokuSolverUtil.makePencilmarks(result.oldGrid);
     }
 
     const latestCell = result.cellOrder.length ?
@@ -157,7 +156,7 @@ export class SudokuSolver {
       if (!solutions.length) return null;
       return {
         solutions: solutions.splice(0).map(
-          s => SudokuSolver.Util.gridToSolution(s)),
+          s => SudokuSolverUtil.gridToSolution(s)),
       };
     };
 
@@ -171,7 +170,7 @@ export class SudokuSolver {
     this._sendProgress();
     this._progressExtraStateFn = null;
 
-    return SudokuSolver.Util.makePencilmarks(valuesInSolutions);
+    return SudokuSolverUtil.makePencilmarks(valuesInSolutions);
   }
 
   validateLayout() {
@@ -212,8 +211,8 @@ export class SudokuSolver {
         yieldEveryStep: yieldEveryStep,
         iter: new IteratorWithCount(this._internalSolver.run(
           yieldEveryStep
-            ? SudokuSolver.InternalSolver.YIELD_ON_STEP
-            : SudokuSolver.InternalSolver.YIELD_ON_SOLUTION))
+            ? InternalSolver.YIELD_ON_STEP
+            : InternalSolver.YIELD_ON_SOLUTION))
       };
     }
 
@@ -221,7 +220,7 @@ export class SudokuSolver {
   }
 }
 
-SudokuSolver.Util = class {
+class SudokuSolverUtil {
   static gridToSolution(grid) {
     return grid.map(value => LookupTables.toValue(value));
   }
@@ -242,7 +241,7 @@ SudokuSolver.Util = class {
   }
 };
 
-SudokuSolver.DebugLogger = class {
+class DebugLogger {
   constructor(solver, debugOptions) {
     this._solver = solver;
     this._debugOptions = {
@@ -305,7 +304,7 @@ SudokuSolver.DebugLogger = class {
   }
 };
 
-SudokuSolver.InternalSolver = class {
+class InternalSolver {
 
   constructor(handlerGen, shape, debugLogger) {
     this._shape = shape;
@@ -320,7 +319,7 @@ SudokuSolver.InternalSolver = class {
 
     this._handlerSet = this._setUpHandlers(Array.from(handlerGen));
 
-    this._handlerAccumulator = new SudokuSolver.HandlerAccumulator(this._handlerSet);
+    this._handlerAccumulator = new HandlerAccumulator(this._handlerSet);
     this._candidateSelector = new CandidateSelector(
       shape, this._handlerSet, debugLogger);
 
@@ -407,7 +406,7 @@ SudokuSolver.InternalSolver = class {
     }
 
     // Create lookups for which cells must have mutually exclusive values.
-    const cellExclusions = new SudokuSolver.CellExclusions(
+    const cellExclusions = new CellExclusions(
       handlerSet, this._shape);
     this._cellExclusions = cellExclusions;
 
@@ -421,7 +420,7 @@ SudokuSolver.InternalSolver = class {
         new SudokuConstraintHandler.UniqueValueExclusion(i));
     }
 
-    const stateAllocator = new SudokuSolver.GridStateAllocator(this._shape);
+    const stateAllocator = new GridStateAllocator(this._shape);
 
     // Initialize handlers.
     for (const handler of handlerSet) {
@@ -922,7 +921,7 @@ SudokuSolver.InternalSolver = class {
       if (!result) return null;
 
       this.counters.branchesIgnored = 1 - this.counters.progressRatio;
-      return SudokuSolver.Util.gridToSolution(result.grid);
+      return SudokuSolverUtil.gridToSolution(result.grid);
     };
 
     // Function to attempt to solve with one house fixed.
@@ -985,7 +984,7 @@ SudokuSolver.InternalSolver = class {
   }
 }
 
-SudokuSolver.HandlerAccumulator = class {
+class HandlerAccumulator {
   // NOTE: This is intended to be created once, and reused.
   constructor(handlerSet) {
     this._allHandlers = handlerSet.getAll();
@@ -1126,7 +1125,7 @@ SudokuSolver.HandlerAccumulator = class {
   }
 }
 
-SudokuSolver.CellExclusions = class {
+class CellExclusions {
   constructor(handlerSet, shape) {
     this._cellExclusionSets = [];
     if (handlerSet !== null) {
@@ -1146,7 +1145,7 @@ SudokuSolver.CellExclusions = class {
   }
 
   clone() {
-    const clone = new SudokuSolver.CellExclusions(null, null);
+    const clone = new CellExclusions(null, null);
     clone._cellExclusionSets = this._cellExclusionSets.map(s => new Set(s));
     return clone;
   }
@@ -1262,7 +1261,7 @@ SudokuSolver.CellExclusions = class {
   }
 }
 
-SudokuSolver.GridStateAllocator = class {
+class GridStateAllocator {
   constructor(shape) {
     this._offset = shape.numCells;
     this._extraState = [];
@@ -1304,5 +1303,164 @@ SudokuSolver.GridStateAllocator = class {
     gridState.set(gridCells);
     gridState.set(this._extraState, gridCells.length);
     return gridState;
+  }
+}
+
+class HandlerSet {
+  constructor(handlers, shape) {
+    this._allHandlers = [];
+    this._seen = new Map();
+    this._ordinaryIndexLookup = new Map();
+
+    this._singletonHandlerMap = [];
+    this._ordinaryHandlerMap = [];
+    this._auxHandlerMap = [];
+    for (let i = 0; i < shape.numCells; i++) {
+      this._ordinaryHandlerMap.push([]);
+      this._auxHandlerMap.push([]);
+      this._singletonHandlerMap.push([]);
+    }
+
+    this.add(...handlers);
+  }
+
+  getAllofType(type) {
+    return this._allHandlers.filter(h => h.constructor === type);
+  }
+
+  getAll() {
+    return this._allHandlers;
+  }
+
+  getOrdinaryHandlerMap() {
+    return this._ordinaryHandlerMap;
+  }
+
+  getAuxHandlerMap() {
+    return this._auxHandlerMap;
+  }
+
+  getIntersectingIndexes(handler) {
+    const handlerIndex = this._ordinaryIndexLookup.get(handler);
+    const intersectingHandlers = new Set();
+    for (const c of handler.cells) {
+      this._ordinaryHandlerMap[c].forEach(i => intersectingHandlers.add(i));
+    }
+    intersectingHandlers.delete(handlerIndex);
+    return intersectingHandlers;
+  }
+
+  getIndex(handler) {
+    return this._ordinaryIndexLookup.get(handler);
+  }
+
+  getHandler(index) {
+    return this._allHandlers[index];
+  }
+
+  getSingletonHandlerMap() {
+    return this._singletonHandlerMap;
+  }
+
+  replace(oldHandler, newHandler) {
+    newHandler.essential = oldHandler.essential;
+
+    const index = this._allHandlers.indexOf(oldHandler);
+
+    this._allHandlers[index] = newHandler;
+    if (!arraysAreEqual(oldHandler.cells, newHandler.cells)) {
+      this.updateCells(index, oldHandler.cells, newHandler.cells);
+    }
+  }
+
+  updateCells(index, oldCells, newCells) {
+    for (const c of oldCells) {
+      const indexInMap = this._ordinaryHandlerMap[c].indexOf(index);
+      this._ordinaryHandlerMap[c].splice(indexInMap, 1);
+    }
+    newCells.forEach(c => this._ordinaryHandlerMap[c].push(index));
+  }
+
+  delete(handler) {
+    this.replace(handler, new SudokuConstraintHandler.True());
+  }
+
+  _addOrdinary(handler, index) {
+    if (index === undefined) {
+      index = this._addToAll(handler);
+    } else {
+      this._allHandlers[index] = handler;
+    }
+
+    handler.cells.forEach(c => this._ordinaryHandlerMap[c].push(index));
+    this._ordinaryIndexLookup.set(handler, index);
+  }
+
+  add(...handlers) {
+    for (const h of handlers) {
+      if (h.constructor.SINGLETON_HANDLER) {
+        this.addSingletonHandlers(h);
+      } else {
+        if (!this._addToSeen(h)) continue;
+        this._addOrdinary(h);
+      }
+    }
+  }
+
+  addNonEssential(...handlers) {
+    for (const h of handlers) {
+      h.essential = false;
+      if (!this._addToSeen(h)) continue;
+      this._addOrdinary(h);
+    }
+  }
+
+  addAux(...handlers) {
+    for (const h of handlers) {
+      h.essential = false;
+      if (!this._addToSeen(h)) continue;
+      this._addAux(h);
+    }
+  }
+
+  addSingletonHandlers(...handlers) {
+    for (const h of handlers) {
+      if (!this._addToSeen(h)) {
+        throw ('Singleton handlers must be unique');
+      }
+
+      const index = this._addToAll(h);
+      this._singletonHandlerMap[h.cells[0]].push(index);
+    }
+  }
+
+  // Return:
+  //   true if we added it to see.
+  //   false if it already existed.
+  _addToSeen(h) {
+    if (this._seen.has(h.idStr)) {
+      // Make sure we mark the handler as essential if either
+      // is essential.
+      this._seen.get(h.idStr).essential ||= h.essential;
+      return false;
+    }
+    this._seen.set(h.idStr, h);
+    return true;
+  }
+
+  _addAux(handler) {
+    const index = this._addToAll(handler);
+    handler.cells.forEach(
+      c => this._auxHandlerMap[c].push(index));
+  }
+
+  _addToAll(handler) {
+    const index = this._allHandlers.length;
+    this._allHandlers.push(handler);
+    return index;
+  }
+
+  [Symbol.iterator]() {
+    return this._allHandlers[Symbol.iterator]();
   }
 }

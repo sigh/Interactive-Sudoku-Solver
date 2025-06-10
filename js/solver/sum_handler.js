@@ -1,6 +1,6 @@
 const { memoize, MultiMap, countOnes16bit } = await import('../util.js' + self.VERSION_PARAM);
 const { LookupTables } = await import('./lookup_tables.js' + self.VERSION_PARAM);
-const { SudokuConstraintHandler } = await import('./sudoku_constraint_handler.js' + self.VERSION_PARAM);
+const { SudokuConstraintHandler } = await import('./handlers.js' + self.VERSION_PARAM);
 const { SHAPE_MAX, SHAPE_9x9 } = await import('../grid_shape.js' + self.VERSION_PARAM);
 
 SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
