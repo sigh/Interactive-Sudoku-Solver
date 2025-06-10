@@ -173,7 +173,7 @@ export class IteratorWithCount {
   [Symbol.iterator] = () => this;
 }
 
-export const loadJSFile = (path) => {
+const loadJSFile = (path) => {
   const script = document.createElement('script');
   script.src = path;
   script.async = false;

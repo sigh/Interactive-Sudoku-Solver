@@ -23,9 +23,7 @@ const { SudokuParser } = await import('./sudoku_parser.js' + self.VERSION_PARAM)
 const { ConstraintDisplay } = await import('./constraint_display.js' + self.VERSION_PARAM);
 const { GridShape } = await import('./grid_shape.js' + self.VERSION_PARAM);
 const { SolutionController } = await import('./solution_controller.js' + self.VERSION_PARAM);
-
-// Make these variables global so that debug functions can access them.
-export let constraintManager, controller;
+const { DISPLAYED_EXAMPLES, PUZZLE_INDEX } = await import('../data/example_puzzles.js' + self.VERSION_PARAM);
 
 export const initPage = () => {
   // Create grid.
@@ -33,13 +31,13 @@ export const initPage = () => {
   const displayContainer = new DisplayContainer(container);
   const inputManager = new GridInputManager(displayContainer);
 
-  constraintManager = new ConstraintManager(
+  const constraintManager = new ConstraintManager(
     inputManager, displayContainer);
 
   // Load examples.
   const exampleHandler = new ExampleHandler(constraintManager);
 
-  controller = new SolutionController(constraintManager, displayContainer);
+  const controller = new SolutionController(constraintManager, displayContainer);
 
   const hiddenElements = Array.from(
     document.getElementsByClassName('hide-until-load'));

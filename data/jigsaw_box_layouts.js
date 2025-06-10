@@ -2,7 +2,7 @@ const withJigsawBoxLayoutResult = (expectedResult, layouts) => {
   return layouts.map(l => ({ input: '.Jigsaw~' + l, solution: expectedResult }));
 };
 
-const VALID_JIGSAW_BOX_LAYOUTS = withJigsawBoxLayoutResult(true, [
+export const VALID_JIGSAW_BOX_LAYOUTS = withJigsawBoxLayoutResult(true, [
   // From Mathimagics
   // http://forum.enjoysudoku.com/jigsaw-layouts-generate-test-t35712-30.html?sid=6523d33401485a4b2414c1d7cc15a060#p310543
   '111112222333311222333451122364455555366444557666664457889964777888997777888899999',

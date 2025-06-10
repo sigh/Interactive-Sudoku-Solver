@@ -17,6 +17,8 @@ const {
 } = await import('./display.js' + self.VERSION_PARAM);
 const { GridShape } = await import('./grid_shape.js' + self.VERSION_PARAM);
 const { SudokuParser } = await import('./sudoku_parser.js' + self.VERSION_PARAM);
+const { PUZZLE_INDEX } = await import('../data/example_puzzles.js' + self.VERSION_PARAM);
+const PuzzleCollections = await import('../data/collections.js' + self.VERSION_PARAM);
 
 class HistoryHandler {
   MAX_HISTORY = 50;
@@ -118,7 +120,8 @@ class HistoryHandler {
 class DebugManager {
   DEBUG_PARAM_NAME = 'debug';
 
-  constructor(displayContainer) {
+  constructor(displayContainer, constraintManager) {
+    this._constraintManager = constraintManager;
     this._container = document.getElementById('debug-container');
     this._logView = document.getElementById('debug-logs');
     this._counterView = document.getElementById('debug-counters');
@@ -235,6 +238,7 @@ class DebugManager {
 
     // Debug puzzle loader.
     loaderPromise.then((debugModule) => {
+      debugModule.setConstraintManager(this._constraintManager);
       Object.assign(self, debugModule);
       debugModule.debugFilesLoaded.then(() => {
         this._loadDebugPuzzleInput();
@@ -256,13 +260,13 @@ class DebugManager {
     }
 
     const puzzleLists = {
-      TAREK_ALL,
-      EXTREME_KILLERS,
-      HARD_THERMOS,
-      MATHEMAGIC_KILLERS,
-      HARD_RENBAN,
-      HARD_PENCILMARKS,
-      HS_KILLERS,
+      TAREK_ALL: PuzzleCollections.TAREK_ALL,
+      EXTREME_KILLERS: PuzzleCollections.EXTREME_KILLERS,
+      HARD_THERMOS: PuzzleCollections.HARD_THERMOS,
+      MATHEMAGIC_KILLERS: PuzzleCollections.MATHEMAGIC_KILLERS,
+      HARD_RENBAN: PuzzleCollections.HARD_RENBAN,
+      HARD_PENCILMARKS: PuzzleCollections.HARD_PENCILMARKS,
+      HS_KILLERS: PuzzleCollections.HS_KILLERS,
     };
     for (const [listName, list] of Object.entries(puzzleLists)) {
       for (let i = 0; i < list.length; i++) {
@@ -1267,7 +1271,7 @@ export class SolutionController {
     displayContainer.addElement(
       HighlightDisplay.makeRadialGradient('highlighted-step-gradient'));
 
-    this.debugManager = new DebugManager(displayContainer);
+    this.debugManager = new DebugManager(displayContainer, constraintManager);
     constraintManager.addReshapeListener(this.debugManager);
 
     this._update = deferUntilAnimationFrame(this._update.bind(this));

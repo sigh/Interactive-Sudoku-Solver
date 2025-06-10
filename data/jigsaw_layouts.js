@@ -2,7 +2,7 @@ const withJigsawLayoutResult = (expectedResult, layouts) => {
   return layouts.map(l => ({ input: l, solution: expectedResult }));
 };
 
-const EASY_INVALID_JIGSAW_LAYOUTS = withJigsawLayoutResult(null, [
+export const EASY_INVALID_JIGSAW_LAYOUTS = withJigsawLayoutResult(null, [
   // http://forum.enjoysudoku.com/jigsaw-layouts-generate-test-t35712.html#p274998
   '000000001223411101223415111223455556223444566233334566777374566787774566788888888',
   '000000001222304111222344111222344411555333444665553777666553777666583777688888888',
@@ -10,7 +10,7 @@ const EASY_INVALID_JIGSAW_LAYOUTS = withJigsawLayoutResult(null, [
   '.NoBoxes.Jigsaw~000000000000001000000011000000011100222000111332220444333220444333250444355555555.',
 ]);
 
-const FAST_INVALID_JIGSAW_LAYOUTS = withJigsawLayoutResult(null, [
+export const FAST_INVALID_JIGSAW_LAYOUTS = withJigsawLayoutResult(null, [
   // From Mathimagics
   // http://forum.enjoysudoku.com/jigsaw-layouts-generate-test-t35712-30.html?sid=6523d33401485a4b2414c1d7cc15a060#p310543
   'AAAAAAAABACCCCCDBBCCEEDDDBBCCFEEDDBBGGFFEDDBBGGFFEEDHHGGFFFEEHHGGFHHHHHIGIIIIIIII',
@@ -123,7 +123,7 @@ const FAST_INVALID_JIGSAW_LAYOUTS = withJigsawLayoutResult(null, [
   'AAAABBCCCAABBBBCDCAAABBBCDDEEEEFFCCDEGFFFFFCDEGGFFDDDDEEGHHHIIIGEGHHHHIIGGGHHIIII'
 ]);
 
-const HARD_INVALID_JIGSAW_LAYOUTS = withJigsawLayoutResult(null, [
+export const HARD_INVALID_JIGSAW_LAYOUTS = withJigsawLayoutResult(null, [
   // From Mathimagics
   // http://forum.enjoysudoku.com/jigsaw-layouts-generate-test-t35712-30.html?sid=6523d33401485a4b2414c1d7cc15a060#p310543
   //
@@ -284,7 +284,7 @@ const HARD_INVALID_JIGSAW_LAYOUTS = withJigsawLayoutResult(null, [
   'AAABBBCCCDAABBBCEEDDAABBCCEDFFAABCCEDGFFFFFCEDGGHIIFFEDGGHHIIEEDDGHHHIIEGGGHHHIII'
 ]);
 
-const VALID_JIGSAW_LAYOUTS = withJigsawLayoutResult(true, [
+export const VALID_JIGSAW_LAYOUTS = withJigsawLayoutResult(true, [
   // From https://www.sudokuwiki.org/js/jigsaw3.js?ver2.12e
   '111222333111222333111222333444555666444555666444555666777888999777888999777888999', // 0 = SUDOKU
   '111222233111222233114452333144455633444555666774556669777856699778888999778888999',
@@ -2813,7 +2813,7 @@ const VALID_JIGSAW_LAYOUTS = withJigsawLayoutResult(true, [
   '111111122331444122344444222333554262335555566737855666777888886779888966779999999',
 ]);
 
-const SLOW_INVALID_JIGSAW_LAYOUTS = withJigsawLayoutResult(null, [
+export const SLOW_INVALID_JIGSAW_LAYOUTS = withJigsawLayoutResult(null, [
   // From Mathimagics
   // http://forum.enjoysudoku.com/jigsaw-layouts-generate-test-t35712-30.html?sid=6523d33401485a4b2414c1d7cc15a060#p310543
   //
@@ -2866,7 +2866,7 @@ const SLOW_INVALID_JIGSAW_LAYOUTS = withJigsawLayoutResult(null, [
   'AAAAABCCCDAEFABCCCDAEFABGCCDDEFFBGGCDDEEFBBGGHDDEFFBGGHHDEIFBIGHHHEIFBIGHHHEIIIII'
 ]);
 
-const OLD_VERY_SLOW_INVALID_JIGSAW_LAYOUTS = withJigsawLayoutResult(null, [
+export const OLD_VERY_SLOW_INVALID_JIGSAW_LAYOUTS = withJigsawLayoutResult(null, [
   // From Mathimagics
   // http://forum.enjoysudoku.com/jigsaw-layouts-generate-test-t35712-30.html?sid=6523d33401485a4b2414c1d7cc15a060#p310543
   //
