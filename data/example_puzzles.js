@@ -1,4 +1,4 @@
-const DISPLAYED_EXAMPLES = [
+export const DISPLAYED_EXAMPLES = [
   {
     name: 'Classic sudoku',
     src: 'https://en.wikipedia.org/wiki/Sudoku#/media/File:Sudoku_Puzzle_by_L2G-20050714_standardized_layout.svg',
@@ -360,5 +360,5 @@ const DISPLAYED_EXAMPLES = [
 ];
 
 // Index the puzzles by their name in puzzles.
-const PUZZLE_INDEX = new Map(
+export const PUZZLE_INDEX = new Map(
   DISPLAYED_EXAMPLES.map(puzzle => [puzzle.name, puzzle]));

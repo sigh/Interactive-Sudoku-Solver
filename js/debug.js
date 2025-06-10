@@ -1,20 +1,31 @@
 const {
-  loadJSFile,
   isIterable,
   isPlainObject,
   withDeadline
 } = await import('./util.js' + self.VERSION_PARAM);
 const { SudokuParser } = await import('./sudoku_parser.js' + self.VERSION_PARAM);
 const { SolverProxy, toShortSolution } = await import('./solution_controller.js' + self.VERSION_PARAM);
+const { PUZZLE_INDEX } = await import('../data/example_puzzles.js' + self.VERSION_PARAM);
+const { LookupTables } = await import('./solver/lookup_tables.js' + self.VERSION_PARAM);
+
+const loadDataFile = async (name) => {
+  const module = await import(name);
+  Object.assign(window, module);
+};
 
 export const debugFilesLoaded = Promise.all([
-  loadJSFile('data/collections.js' + self.VERSION_PARAM),
-  loadJSFile('data/jigsaw_layouts.js' + self.VERSION_PARAM),
-  loadJSFile('data/invalid_jigsaw_layouts.js' + self.VERSION_PARAM),
-  loadJSFile('data/jigsaw_box_layouts.js' + self.VERSION_PARAM),
+  loadDataFile('../data/collections.js' + self.VERSION_PARAM),
+  loadDataFile('../data/jigsaw_layouts.js' + self.VERSION_PARAM),
+  loadDataFile('../data/invalid_jigsaw_layouts.js' + self.VERSION_PARAM),
+  loadDataFile('../data/jigsaw_box_layouts.js' + self.VERSION_PARAM),
 ]);
 
 var TEST_TIMEOUT_MS = 0;
+
+let constraintManager = null;
+export const setConstraintManager = (newConstraintManager) => {
+  constraintManager = newConstraintManager;
+}
 
 export const loadInput = (puzzleCfg) => {
   const puzzle = puzzleFromCfg(puzzleCfg);
