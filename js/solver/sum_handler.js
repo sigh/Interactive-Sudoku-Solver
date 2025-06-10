@@ -1,9 +1,9 @@
 const { memoize, MultiMap, countOnes16bit } = await import('../util.js' + self.VERSION_PARAM);
 const { LookupTables } = await import('./lookup_tables.js' + self.VERSION_PARAM);
-const { SudokuConstraintHandler } = await import('./handlers.js' + self.VERSION_PARAM);
+const { SudokuConstraintHandler, HandlerUtil } = await import('./handlers.js' + self.VERSION_PARAM);
 const { SHAPE_MAX, SHAPE_9x9 } = await import('../grid_shape.js' + self.VERSION_PARAM);
 
-SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
+export class Sum extends SudokuConstraintHandler {
   _sum = 0;
   _coeffGroups = [];
   _exclusionGroupIds = null;
@@ -130,10 +130,10 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
   }
 
   initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
-    this._sumData = SudokuConstraintHandler.Sum._SumData.get(shape.numValues);
+    this._sumData = SumData.get(shape.numValues);
 
     for (const g of this._coeffGroups) {
-      g.exclusionGroups = SudokuConstraintHandler._Util.findExclusionGroups(
+      g.exclusionGroups = HandlerUtil.findExclusionGroups(
         g.cells, cellExclusions);
     }
 
@@ -301,7 +301,7 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
     // NOTE: We can also do this for count == 1, but it results are slightly
     //       worse.
     if (v0 === v1 && this._cellExclusions && countOnes16bit(v0) == 2) {
-      if (!SudokuConstraintHandler._Util.enforceRequiredValueExclusions(
+      if (!HandlerUtil.enforceRequiredValueExclusions(
         grid, cells, v0, this._cellExclusions)) {
         return false;
       }
@@ -733,7 +733,7 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
     // Those that are unique are hidden singles.
     const hiddenSingles = requiredUnfixed & ~nonUniqueValues;
     if (hiddenSingles) {
-      if (!SudokuConstraintHandler._Util.exposeHiddenSingles(
+      if (!HandlerUtil.exposeHiddenSingles(
         grid, cells, hiddenSingles)) {
         return false;
       }
@@ -745,7 +745,7 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
 
     const nonUniqueRequired = requiredUnfixed & nonUniqueValues;
     if (nonUniqueRequired) {
-      if (!SudokuConstraintHandler._Util.enforceRequiredValueExclusions(
+      if (!HandlerUtil.enforceRequiredValueExclusions(
         grid, cells, nonUniqueRequired, this._cellExclusions, handlerAccumulator)) {
         return false;
       }
@@ -852,14 +852,14 @@ SudokuConstraintHandler.Sum = class Sum extends SudokuConstraintHandler {
 }
 
 // Common data shared between instances of the Sum handler.
-SudokuConstraintHandler.Sum._SumData = class _SumData {
+class SumData {
 
   static get = memoize((numValues) => {
-    return new SudokuConstraintHandler.Sum._SumData(true, numValues);
+    return new SumData(true, numValues);
   });
 
   constructor(do_not_call, numValues) {
-    if (!do_not_call) throw ('Use SudokuConstraintHandler.Sum._SumData.get(shape.numValues)');
+    if (!do_not_call) throw ('Use SumData.get(shape.numValues)');
 
     this.numValues = numValues;
     this.lookupTables = LookupTables.get(numValues);
