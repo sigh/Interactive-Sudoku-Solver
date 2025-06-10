@@ -14,7 +14,7 @@ export class CandidateSelector {
     // _candidateSelectionStates entry is valid.
     this._candidateSelectionFlags = new Uint8Array(shape.numCells);
 
-    this._candidateFinderSet = new CandidateSelector.CandidateFinderSet(handlerSet, shape);
+    this._candidateFinderSet = new CandidateFinderSet(handlerSet, shape);
   }
 
   reset(backtrackTriggers) {
@@ -364,7 +364,7 @@ export class CandidateSelector {
   }
 }
 
-CandidateSelector.CandidateFinderSet = class CandidateFinderSet {
+class CandidateFinderSet {
   constructor(handlerSet, shape) {
     this._handlerSet = handlerSet;
     this._shape = shape;
@@ -414,7 +414,7 @@ CandidateSelector.CandidateFinderSet = class CandidateFinderSet {
   }
 };
 
-CandidateSelector.CandidateFinderBase = class CandidateFinderBase {
+class CandidateFinderBase {
   constructor(cells) {
     this.cells = cells;
   }
@@ -440,7 +440,7 @@ export class CandidateFinders {
   }
 }
 
-CandidateFinders.RequiredValue = class RequiredValue extends CandidateSelector.CandidateFinderBase {
+CandidateFinders.RequiredValue = class RequiredValue extends CandidateFinderBase {
   constructor(cells, value, multiplier) {
     super(cells);
     this._multiplier = multiplier || 1;
@@ -486,7 +486,7 @@ CandidateFinders.RequiredValue = class RequiredValue extends CandidateSelector.C
   }
 };
 
-CandidateFinders.House = class House extends CandidateSelector.CandidateFinderBase {
+CandidateFinders.House = class House extends CandidateFinderBase {
   constructor(cells) {
     super(cells);
   }

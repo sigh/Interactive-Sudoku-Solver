@@ -1,4 +1,4 @@
-const { SudokuConstraintHandler } = await import('./sudoku_constraint_handler.js' + self.VERSION_PARAM);
+const { SudokuConstraintHandler } = await import('./handlers.js' + self.VERSION_PARAM);
 const { memoize, arrayIntersectSize, arrayDifference, setIntersectSize, arrayIntersect, arrayRemoveValue, setIntersectionToArray, setDifference } = await import('../util.js' + self.VERSION_PARAM);
 const { binaryFnToKey, LookupTables } = await import('./lookup_tables.js' + self.VERSION_PARAM);
 const { SudokuConstraintBase } = await import('../sudoku_constraint.js' + self.VERSION_PARAM);

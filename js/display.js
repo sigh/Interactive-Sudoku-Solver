@@ -5,6 +5,7 @@ const {
   memoize,
   isIterable
 } = await import('./util.js' + self.VERSION_PARAM);
+const { toShortSolution } = await import('./sudoku_parser.js' + self.VERSION_PARAM);
 const { SHAPE_9x9 } = await import('./grid_shape.js' + self.VERSION_PARAM);
 
 export class DisplayItem {

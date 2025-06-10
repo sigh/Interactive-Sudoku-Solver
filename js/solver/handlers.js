@@ -1,11 +1,77 @@
 "use strict";
 
-const { memoize, countOnes16bit, arraysAreEqual, isIterable, arrayIntersect, RandomIntGenerator, shuffleArray, MultiMap } = await import('../util.js' + self.VERSION_PARAM);
+const {
+  memoize,
+  countOnes16bit,
+  isIterable,
+  arrayIntersect,
+  RandomIntGenerator,
+  shuffleArray,
+  MultiMap
+} = await import('../util.js' + self.VERSION_PARAM);
 const { LookupTables } = await import('./lookup_tables.js' + self.VERSION_PARAM);
-const { SudokuConstraintHandler } = await import('./sudoku_constraint_handler.js' + self.VERSION_PARAM);
 const { SHAPE_MAX } = await import('../grid_shape.js' + self.VERSION_PARAM);
 const { SudokuConstraintBase, SudokuConstraint } = await import('../sudoku_constraint.js' + self.VERSION_PARAM);
 const { CandidateFinders } = await import('./candidate_selector.js' + self.VERSION_PARAM);
+
+export class SudokuConstraintHandler {
+  static SINGLETON_HANDLER = false;
+
+  static _defaultId = 0;
+
+  constructor(cells) {
+    // This constraint is enforced whenever these cells are touched.
+    // cells must not be written to. They can be updated during initialization,
+    // but it must replace the array, not modify it.
+    this.cells = new Uint8Array(cells || []);
+    // By default all constraints are essential for correctness.
+    // The optimizer may add non-essential constraints to improve performance.
+    this.essential = true;
+
+    const id = this.constructor._defaultId++;
+    // By default every id is unique.
+    this.idStr = this.constructor.name + '-' + id.toString();
+  }
+
+  // Enforce the constraint on the grid and return:
+  // - `false` if the grid is invalid.
+  // - `true` if the grid is valid.
+  // - `true` if there are still unknown values and the grid
+  //          might be valid.
+  enforceConsistency(grid, handlerAccumulator) {
+    return true;
+  }
+
+  // List of cells which must not have the same values as each other.
+  exclusionCells() {
+    return [];
+  }
+
+  // Initialize the grid before solving starts.
+  // Return `false` if the grid is invalid, `true` otherwise.
+  initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
+    return true;
+  }
+
+  // Run after all handlers have been initialized and initialGridCells is populated
+  // and includes the full state.
+  // readonlyGridState must not be written to! This will lead to incorrect
+  // results if the handler is used from within an Or constraint.
+  postInitialize(readonlyGridState) { }
+
+  priority() {
+    // By default, constraints which constrain more cells have higher priority.
+    return this.cells.length;
+  }
+
+  candidateFinders(grid, shape) {
+    return [];
+  }
+
+  debugName() {
+    return this.constructor.name;
+  }
+}
 
 SudokuConstraintHandler.NoBoxes = class NoBoxes extends SudokuConstraintHandler { }
 // This handler purely exists to manually adjust the priorities of cells to
@@ -3070,164 +3136,5 @@ SudokuConstraintHandler.Or = class Or extends SudokuConstraintHandler {
       grid[j] = resultGrid[j];
     }
     return true;
-  }
-}
-
-export class HandlerSet {
-  constructor(handlers, shape) {
-    this._allHandlers = [];
-    this._seen = new Map();
-    this._ordinaryIndexLookup = new Map();
-
-    this._singletonHandlerMap = [];
-    this._ordinaryHandlerMap = [];
-    this._auxHandlerMap = [];
-    for (let i = 0; i < shape.numCells; i++) {
-      this._ordinaryHandlerMap.push([]);
-      this._auxHandlerMap.push([]);
-      this._singletonHandlerMap.push([]);
-    }
-
-    this.add(...handlers);
-  }
-
-  getAllofType(type) {
-    return this._allHandlers.filter(h => h.constructor === type);
-  }
-
-  getAll() {
-    return this._allHandlers;
-  }
-
-  getOrdinaryHandlerMap() {
-    return this._ordinaryHandlerMap;
-  }
-
-  getAuxHandlerMap() {
-    return this._auxHandlerMap;
-  }
-
-  getIntersectingIndexes(handler) {
-    const handlerIndex = this._ordinaryIndexLookup.get(handler);
-    const intersectingHandlers = new Set();
-    for (const c of handler.cells) {
-      this._ordinaryHandlerMap[c].forEach(i => intersectingHandlers.add(i));
-    }
-    intersectingHandlers.delete(handlerIndex);
-    return intersectingHandlers;
-  }
-
-  getIndex(handler) {
-    return this._ordinaryIndexLookup.get(handler);
-  }
-
-  getHandler(index) {
-    return this._allHandlers[index];
-  }
-
-  getSingletonHandlerMap() {
-    return this._singletonHandlerMap;
-  }
-
-  replace(oldHandler, newHandler) {
-    newHandler.essential = oldHandler.essential;
-
-    const index = this._allHandlers.indexOf(oldHandler);
-
-    this._allHandlers[index] = newHandler;
-    if (!arraysAreEqual(oldHandler.cells, newHandler.cells)) {
-      this.updateCells(index, oldHandler.cells, newHandler.cells);
-    }
-  }
-
-  updateCells(index, oldCells, newCells) {
-    for (const c of oldCells) {
-      const indexInMap = this._ordinaryHandlerMap[c].indexOf(index);
-      this._ordinaryHandlerMap[c].splice(indexInMap, 1);
-    }
-    newCells.forEach(c => this._ordinaryHandlerMap[c].push(index));
-  }
-
-  delete(handler) {
-    this.replace(handler, new SudokuConstraintHandler.True());
-  }
-
-  _addOrdinary(handler, index) {
-    if (index === undefined) {
-      index = this._addToAll(handler);
-    } else {
-      this._allHandlers[index] = handler;
-    }
-
-    handler.cells.forEach(c => this._ordinaryHandlerMap[c].push(index));
-    this._ordinaryIndexLookup.set(handler, index);
-  }
-
-  add(...handlers) {
-    for (const h of handlers) {
-      if (h.constructor.SINGLETON_HANDLER) {
-        this.addSingletonHandlers(h);
-      } else {
-        if (!this._addToSeen(h)) continue;
-        this._addOrdinary(h);
-      }
-    }
-  }
-
-  addNonEssential(...handlers) {
-    for (const h of handlers) {
-      h.essential = false;
-      if (!this._addToSeen(h)) continue;
-      this._addOrdinary(h);
-    }
-  }
-
-  addAux(...handlers) {
-    for (const h of handlers) {
-      h.essential = false;
-      if (!this._addToSeen(h)) continue;
-      this._addAux(h);
-    }
-  }
-
-  addSingletonHandlers(...handlers) {
-    for (const h of handlers) {
-      if (!this._addToSeen(h)) {
-        throw ('Singleton handlers must be unique');
-      }
-
-      const index = this._addToAll(h);
-      this._singletonHandlerMap[h.cells[0]].push(index);
-    }
-  }
-
-  // Return:
-  //   true if we added it to see.
-  //   false if it already existed.
-  _addToSeen(h) {
-    if (this._seen.has(h.idStr)) {
-      // Make sure we mark the handler as essential if either
-      // is essential.
-      this._seen.get(h.idStr).essential ||= h.essential;
-      return false;
-    }
-    this._seen.set(h.idStr, h);
-    return true;
-  }
-
-  _addAux(handler) {
-    const index = this._addToAll(handler);
-    handler.cells.forEach(
-      c => this._auxHandlerMap[c].push(index));
-  }
-
-  _addToAll(handler) {
-    const index = this._allHandlers.length;
-    this._allHandlers.push(handler);
-    return index;
-  }
-
-  [Symbol.iterator]() {
-    return this._allHandlers[Symbol.iterator]();
   }
 }

@@ -3,8 +3,8 @@ const {
   isPlainObject,
   withDeadline
 } = await import('./util.js' + self.VERSION_PARAM);
-const { SudokuParser } = await import('./sudoku_parser.js' + self.VERSION_PARAM);
-const { SolverProxy, toShortSolution } = await import('./solution_controller.js' + self.VERSION_PARAM);
+const { SudokuParser, toShortSolution } = await import('./sudoku_parser.js' + self.VERSION_PARAM);
+const { SolverProxy } = await import('./solution_controller.js' + self.VERSION_PARAM);
 const { PUZZLE_INDEX } = await import('../data/example_puzzles.js' + self.VERSION_PARAM);
 const { LookupTables } = await import('./solver/lookup_tables.js' + self.VERSION_PARAM);
 

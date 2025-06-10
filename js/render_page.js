@@ -12,7 +12,8 @@ const {
 const {
   SudokuConstraint,
   SudokuConstraintBase,
-  OutsideConstraintBase
+  OutsideConstraintBase,
+  CompositeConstraintBase
 } = await import('./sudoku_constraint.js' + self.VERSION_PARAM);
 const {
   DisplayContainer,

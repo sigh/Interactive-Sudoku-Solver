@@ -15,8 +15,7 @@ const {
   InfoTextDisplay,
   CellValueDisplay
 } = await import('./display.js' + self.VERSION_PARAM);
-const { GridShape } = await import('./grid_shape.js' + self.VERSION_PARAM);
-const { SudokuParser } = await import('./sudoku_parser.js' + self.VERSION_PARAM);
+const { SudokuParser, toShortSolution } = await import('./sudoku_parser.js' + self.VERSION_PARAM);
 const { PUZZLE_INDEX } = await import('../data/example_puzzles.js' + self.VERSION_PARAM);
 const PuzzleCollections = await import('../data/collections.js' + self.VERSION_PARAM);
 
@@ -1849,16 +1848,4 @@ class InfoOverlay {
       this._textInfo.setText(cellId, values[i]);
     }
   }
-}
-
-export const toShortSolution = (solution, shape) => {
-  const baseCharCode = GridShape.baseCharCode(shape);
-  const DEFAULT_VALUE = '.';
-
-  const result = new Array(solution.length).fill(DEFAULT_VALUE);
-
-  for (let i = 0; i < solution.length; i++) {
-    result[i] = String.fromCharCode(baseCharCode + solution[i] - 1);
-  }
-  return result.join('');
 }
