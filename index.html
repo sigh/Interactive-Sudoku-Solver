@@ -27,13 +27,29 @@ layout: null
   </style>
 
   <script type="module">
+    // Use a VERSION_PARAM for cache busting.
     self.VERSION_PARAM = '?v=' + ('{{ site.github.build_revision }}' || Math.random());
 
-    const renderPage = import('./js/render_page.js' + self.VERSION_PARAM);
+    // Preload modules required for the main thread.
+    import('./js/constraint_display.js' + self.VERSION_PARAM);
+    import('./js/display.js' + self.VERSION_PARAM);
+    import('./js/grid_shape.js' + self.VERSION_PARAM);
+    import('./js/solution_controller.js' + self.VERSION_PARAM);
+    import('./js/sudoku_constraint.js' + self.VERSION_PARAM);
+    import('./js/sudoku_parser.js' + self.VERSION_PARAM);
+    import('./js/util.js' + self.VERSION_PARAM);
 
+    // Run initPage() when the page is loaded.
+    const renderPage = import('./js/render_page.js' + self.VERSION_PARAM);
     window.addEventListener(
       'load', async () => (await renderPage).initPage()
     );
+
+    // Prefetch worker.js (but do NOT execute it)
+    const link = document.createElement('link');
+    link.rel = 'prefetch';
+    link.href = './js/worker.js' + self.VERSION_PARAM;
+    document.head.appendChild(link);
   </script>
   <link rel="stylesheet" href="{{ 'css/style.css?v=' | append: site.github.build_revision | relative_url }}">
 
