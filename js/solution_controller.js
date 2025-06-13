@@ -16,8 +16,6 @@ const {
   CellValueDisplay
 } = await import('./display.js' + self.VERSION_PARAM);
 const { SudokuParser, toShortSolution } = await import('./sudoku_parser.js' + self.VERSION_PARAM);
-const { PUZZLE_INDEX } = await import('../data/example_puzzles.js' + self.VERSION_PARAM);
-const PuzzleCollections = await import('../data/collections.js' + self.VERSION_PARAM);
 
 class HistoryHandler {
   MAX_HISTORY = 50;
@@ -250,13 +248,17 @@ class DebugManager {
     }
   }
 
-  static _makeDebugIndex() {
+  static async _makeDebugIndex() {
     const index = new Map();
+
+    const { PUZZLE_INDEX } = await import('../data/example_puzzles.js' + self.VERSION_PARAM);
     for (const puzzle of PUZZLE_INDEX.values()) {
       const constraintTypes = SudokuParser.extractConstraintTypes(puzzle.input);
       const title = `${puzzle.name || ''} [${constraintTypes.join(',')}]`;
       index.set(title, puzzle);
     }
+
+    const PuzzleCollections = await import('../data/collections.js' + self.VERSION_PARAM);
 
     const puzzleLists = {
       TAREK_ALL: PuzzleCollections.TAREK_ALL,
@@ -278,8 +280,8 @@ class DebugManager {
     return index;
   }
 
-  _loadDebugPuzzleInput() {
-    const debugIndex = this.constructor._makeDebugIndex();
+  async _loadDebugPuzzleInput() {
+    const debugIndex = await this.constructor._makeDebugIndex();
     const datalist = document.getElementById('debug-puzzles');
     for (const name of debugIndex.keys()) {
       const option = document.createElement('option');
