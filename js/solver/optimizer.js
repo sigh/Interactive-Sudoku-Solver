@@ -1,6 +1,6 @@
 const { memoize, arrayIntersectSize, arrayDifference, setIntersectSize, arrayIntersect, arrayRemoveValue, setIntersectionToArray, setDifference } = await import('../util.js' + self.VERSION_PARAM);
-const { binaryFnToKey, LookupTables } = await import('./lookup_tables.js' + self.VERSION_PARAM);
-const { SudokuConstraintBase } = await import('../sudoku_constraint.js' + self.VERSION_PARAM);
+const { LookupTables } = await import('./lookup_tables.js' + self.VERSION_PARAM);
+const { SudokuConstraintBase, SudokuConstraint } = await import('../sudoku_constraint.js' + self.VERSION_PARAM);
 const HandlerModule = await import('./handlers.js' + self.VERSION_PARAM);
 const SumHandlerModule = await import('./sum_handler.js' + self.VERSION_PARAM);
 
@@ -41,7 +41,7 @@ export class SudokuConstraintOptimizer {
     }
   }
 
-  static _equalsKey = memoize((numValues) => binaryFnToKey(
+  static _equalsKey = memoize((numValues) => SudokuConstraint.Binary.fnToKey(
     (a, b) => a == b, numValues));
 
   _addExtraCellExclusions(handlerSet, cellExclusions, shape) {
@@ -258,7 +258,7 @@ export class SudokuConstraintOptimizer {
 
             newHandler = new HandlerModule.BinaryConstraint(
               ...cells,
-              binaryFnToKey(
+              SudokuConstraint.Binary.fnToKey(
                 (a, b) => a * c0 + b * c1 == sum && (!mutuallyExclusive || a != b),
                 shape.numValues));
           }

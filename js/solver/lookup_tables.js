@@ -149,32 +149,3 @@ export class LookupTables {
     });
   }
 }
-
-const binaryFnTo6BitArray = (fn, numValues) => {
-  const NUM_BITS = 6;
-  const array = [];
-
-  let v = 0;
-  let vIndex = 0;
-  for (let i = 1; i <= numValues; i++) {
-    for (let j = 1; j <= numValues; j++) {
-      v |= (!!fn(i, j)) << vIndex;
-      if (++vIndex == NUM_BITS) {
-        array.push(v);
-        vIndex = 0;
-        v = 0;
-      }
-    }
-  }
-  array.push(v);
-
-  // Trim trailing zeros.
-  while (array.length && !array[array.length - 1]) array.pop();
-
-  return array;
-}
-
-export const binaryFnToKey = (fn, numValues) => {
-  const array = binaryFnTo6BitArray(fn, numValues);
-  return Base64Codec.encode6BitArray(array);
-}

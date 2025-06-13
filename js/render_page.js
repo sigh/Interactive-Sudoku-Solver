@@ -24,7 +24,6 @@ const { SudokuParser } = await import('./sudoku_parser.js' + self.VERSION_PARAM)
 const { ConstraintDisplay } = await import('./constraint_display.js' + self.VERSION_PARAM);
 const { GridShape } = await import('./grid_shape.js' + self.VERSION_PARAM);
 const { SolutionController } = await import('./solution_controller.js' + self.VERSION_PARAM);
-const { DISPLAYED_EXAMPLES, PUZZLE_INDEX } = await import('../data/example_puzzles.js' + self.VERSION_PARAM);
 
 export const initPage = () => {
   // Create grid.
@@ -516,15 +515,22 @@ class ExampleHandler {
   }
 
   _setUp() {
-    let exampleSelect = document.getElementById('example-select');
+    const exampleSelect = document.getElementById('example-select');
+    exampleSelect.onchange = () => { };  // Ignore changes until initialized.
+    this._populateExampleSelect(exampleSelect);
+    return exampleSelect;
+  }
+
+  async _populateExampleSelect(exampleSelect) {
+    const { DISPLAYED_EXAMPLES, PUZZLE_INDEX } = await import('../data/example_puzzles.js' + self.VERSION_PARAM);
 
     for (const example of DISPLAYED_EXAMPLES) {
-      let option = document.createElement('option');
+      const option = document.createElement('option');
       option.textContent = example.name;
       exampleSelect.appendChild(option);
     }
 
-    let link = exampleSelect.nextElementSibling;
+    const link = exampleSelect.nextElementSibling;
     exampleSelect.onchange = () => {
       if (exampleSelect.selectedIndex) {
         const exampleName = exampleSelect.options[exampleSelect.selectedIndex].text;
@@ -539,9 +545,8 @@ class ExampleHandler {
         this._ignoreConstraintChanges = true;
       }
     };
+    exampleSelect.disabled = false;
     exampleSelect.onchange();
-
-    return exampleSelect;
   }
 
   newConstraintLoaded() {
