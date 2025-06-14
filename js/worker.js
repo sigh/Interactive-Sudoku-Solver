@@ -25,7 +25,7 @@ Promise.all([
   import('./grid_shape.js' + self.VERSION_PARAM),
   import('./sudoku_constraint.js' + self.VERSION_PARAM),
 ]);
-const { SudokuBuilder } = await import('./sudoku_builder.js' + self.VERSION_PARAM);
+const { SudokuBuilder } = await import('./solver/sudoku_builder.js' + self.VERSION_PARAM);
 const { Timer } = await import('./util.js' + self.VERSION_PARAM);
 
 let workerSolver = null;
