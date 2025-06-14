@@ -51,8 +51,8 @@ export class SudokuConstraintBase {
   // Used by LinesAndSets constraints. Takes (cells, shape) arguments.
   static VALIDATE_CELLS_FN = null;
 
-  constructor(args) {
-    this.args = args ? [...args] : [];
+  constructor(...args) {
+    this.args = args;
     this.type = this.constructor.name;
   }
 
@@ -317,7 +317,7 @@ export class OutsideConstraintBase extends SudokuConstraintBase {
   static CLUE_TYPE = '';
 
   constructor(arrowId, value) {
-    super(arguments);
+    super(arrowId, value);
     arrowId = arrowId.toUpperCase();
 
     this.arrowId = arrowId;
@@ -444,7 +444,7 @@ export class CompositeConstraintBase extends SudokuConstraintBase {
   }
 
   constructor(constraints) {
-    super(arguments);
+    super(constraints);
     this.constraints = constraints || [];
     for (const c of this.constraints) {
       if (!this.constructor.allowedConstraintClass(c.constructor)) {
@@ -492,7 +492,7 @@ export class SudokuConstraint {
     static CAN_ABSORB = ['Set', 'And'];
 
     constructor(constraints) {
-      super(arguments);
+      super(constraints);
       this.constraints = constraints;
     }
 
@@ -571,7 +571,7 @@ export class SudokuConstraint {
     static UNIQUENESS_KEY_FIELD = 'cells';
 
     constructor(...cells) {
-      super(arguments);
+      super(...cells);
       this.cells = cells;
     }
 
@@ -640,7 +640,7 @@ export class SudokuConstraint {
     };
 
     constructor(...cells) {
-      super(arguments);
+      super(...cells);
       this.cells = cells;
     }
 
@@ -666,7 +666,6 @@ export class SudokuConstraint {
       default: 5,
     };
 
-
     constructor(difference, ...cells) {
       // German whisper lines omit the difference, so the
       // first argument is actually a cell
@@ -674,7 +673,7 @@ export class SudokuConstraint {
         cells.unshift(difference);
         difference = 5;
       }
-      super(arguments);
+      super(difference, ...cells);
       this.cells = cells;
       this.difference = +difference;
     }
@@ -700,7 +699,7 @@ export class SudokuConstraint {
     };
 
     constructor(...cells) {
-      super(arguments);
+      super(...cells);
       this.cells = cells;
     }
 
@@ -729,7 +728,7 @@ export class SudokuConstraint {
     };
 
     constructor(mod, ...cells) {
-      super(arguments);
+      super(mod, ...cells);
       this.cells = cells;
       this.mod = mod;
     }
@@ -761,7 +760,7 @@ export class SudokuConstraint {
     };
 
     constructor(...cells) {
-      super(arguments);
+      super(...cells);
       this.cells = cells;
     }
 
@@ -791,7 +790,7 @@ export class SudokuConstraint {
     };
 
     constructor(...cells) {
-      super(arguments);
+      super(...cells);
       this.cells = cells;
     }
   }
@@ -808,7 +807,7 @@ export class SudokuConstraint {
     };
 
     constructor(...cells) {
-      super(arguments);
+      super(...cells);
       this.cells = cells;
     }
   }
@@ -830,7 +829,7 @@ export class SudokuConstraint {
     };
 
     constructor(minDiff, ...cells) {
-      super(arguments);
+      super(minDiff, ...cells);
       this.cells = cells;
       this.minDiff = minDiff;
     }
@@ -854,7 +853,7 @@ export class SudokuConstraint {
     };
 
     constructor(...cells) {
-      super(arguments);
+      super(...cells);
       this.cells = cells;
     }
 
@@ -875,7 +874,7 @@ export class SudokuConstraint {
     };
 
     constructor(...cells) {
-      super(arguments);
+      super(...cells);
       this.cells = cells;
     }
   }
@@ -897,7 +896,7 @@ export class SudokuConstraint {
     static LOOPS_ALLOWED = true;
 
     constructor(sum, ...cells) {
-      super(arguments);
+      super(sum, ...cells);
       this.cells = cells;
       this.sum = sum;
     }
@@ -946,7 +945,7 @@ export class SudokuConstraint {
     static DEFAULT_SHAPE = SHAPE_9x9;
 
     constructor(gridSpec) {
-      super(arguments);
+      super(gridSpec);
       this.gridSpec = gridSpec;
     }
 
@@ -1125,7 +1124,7 @@ export class SudokuConstraint {
     static UNIQUENESS_KEY_FIELD = 'direction';
 
     constructor(direction) {
-      super(arguments);
+      super(direction);
       this.direction = +direction;
     }
   }
@@ -1141,7 +1140,7 @@ export class SudokuConstraint {
     static VALIDATE_CELLS_FN = this._hasAdjacentCells;
 
     constructor(...cells) {
-      super(arguments);
+      super(...cells);
       this.cells = cells;
     }
 
@@ -1179,7 +1178,7 @@ export class SudokuConstraint {
     static VALIDATE_CELLS_FN = this._hasAdjacentCells;
 
     constructor(...cells) {
-      super(arguments);
+      super(...cells);
       this.cells = cells;
     }
 
@@ -1217,7 +1216,7 @@ export class SudokuConstraint {
     static VALIDATE_CELLS_FN = this._hasAdjacentCells;
 
     constructor(...cells) {
-      super(arguments);
+      super(...cells);
       this.cells = cells;
     }
 
@@ -1249,7 +1248,7 @@ export class SudokuConstraint {
     static VALIDATE_CELLS_FN = this._hasAdjacentCells;
 
     constructor(...cells) {
-      super(arguments);
+      super(...cells);
       this.cells = cells;
     }
 
@@ -1285,7 +1284,7 @@ export class SudokuConstraint {
     static VALIDATE_CELLS_FN = (cells, shape) => cells.length > 2;
 
     constructor(...cells) {
-      super(arguments);
+      super(...cells);
       this.cells = cells;
     }
   }
@@ -1301,7 +1300,7 @@ export class SudokuConstraint {
     static VALIDATE_CELLS_FN = this._hasAdjacentCells;
 
     constructor(...cells) {
-      super(arguments);
+      super(...cells);
       this.cells = cells;
     }
 
@@ -1333,7 +1332,7 @@ export class SudokuConstraint {
     };
 
     constructor(...cells) {
-      super(arguments);
+      super(...cells);
       this.cells = cells;
     }
   }
@@ -1351,7 +1350,7 @@ export class SudokuConstraint {
     static VALIDATE_CELLS_FN = (cells, shape) => cells.length > 2;
 
     constructor(...cells) {
-      super(arguments);
+      super(...cells);
       this.cells = cells;
     }
   }
@@ -1374,7 +1373,7 @@ export class SudokuConstraint {
     static VALIDATE_CELLS_FN = (cells, shape) => cells.length > 2;
 
     constructor(pillSize, ...cells) {
-      super(arguments);
+      super(pillSize, ...cells);
       this.pillSize = +pillSize;
       this.cells = cells;
     }
@@ -1398,7 +1397,7 @@ export class SudokuConstraint {
     static VALIDATE_CELLS_FN = this._cellsAreValidCage;
 
     constructor(sum, ...cells) {
-      super(arguments);
+      super(sum, ...cells);
       this.cells = cells;
       this.sum = sum;
     }
@@ -1422,7 +1421,7 @@ export class SudokuConstraint {
     static VALIDATE_CELLS_FN = this._cellsAreValidCage;
 
     constructor(sum, ...cells) {
-      super(arguments);
+      super(sum, ...cells);
       this.cells = cells;
       this.sum = sum;
       this.displayLabel = `≠${sum}`;
@@ -1447,7 +1446,7 @@ export class SudokuConstraint {
     static VALIDATE_CELLS_FN = this._cellsAreValidCage;
 
     constructor(...cells) {
-      super(arguments);
+      super(...cells);
       this.cells = cells;
     }
 
@@ -1471,7 +1470,7 @@ export class SudokuConstraint {
     };
 
     constructor(sum, ...cells) {
-      super(arguments);
+      super(sum, ...cells);
       this.cells = cells;
       this.sum = sum;
     }
@@ -1572,7 +1571,7 @@ export class SudokuConstraint {
     };
 
     constructor(sum, ...cells) {
-      super(arguments);
+      super(sum, ...cells);
       this.cells = cells;
       this.sum = sum;
     }
@@ -1645,7 +1644,7 @@ export class SudokuConstraint {
     };
 
     constructor(...cells) {
-      super(arguments);
+      super(...cells);
       this.cells = cells;
     }
   }
@@ -1666,7 +1665,7 @@ export class SudokuConstraint {
     };
 
     constructor(values, ...cells) {
-      super(arguments);
+      super(values, ...cells);
       this.cells = cells;
       this.values = values;
       this.valueStr = values.replace(/_/g, ',');
@@ -1713,7 +1712,7 @@ export class SudokuConstraint {
     };
 
     constructor(numSets, ...cells) {
-      super(arguments);
+      super(numSets, ...cells);
       this.cells = cells;
       this.numSets = numSets;
     }
@@ -1758,7 +1757,7 @@ export class SudokuConstraint {
     static UNIQUENESS_KEY_FIELD = 'topLeftCell';
 
     constructor(topLeftCell, ...values) {
-      super(arguments);
+      super(topLeftCell, ...values);
       this.topLeftCell = topLeftCell;
       this.values = values;
     }
@@ -1791,7 +1790,7 @@ export class SudokuConstraint {
     };
 
     constructor(key, name, ...cells) {
-      super(arguments);
+      super(key, name, ...cells);
       this.key = key;
       this.name = name;
       this.cells = cells;
@@ -1945,7 +1944,7 @@ export class SudokuConstraint {
     }
 
     constructor(indexType, ...cells) {
-      super(arguments);
+      super(indexType, ...cells);
       this.indexType = indexType;
       this.cells = cells;
     }
@@ -1971,7 +1970,7 @@ export class SudokuConstraint {
     };
 
     constructor(...cells) {
-      super(arguments);
+      super(...cells);
       this.cells = cells;
     }
 
@@ -1986,7 +1985,7 @@ export class SudokuConstraint {
     static UNIQUENESS_KEY_FIELD = 'cell';
 
     constructor(cell, ...values) {
-      super(arguments);
+      super(cell, ...values);
       this.cell = cell;
       this.values = values;
     }
@@ -2018,7 +2017,7 @@ export class SudokuConstraint {
 
   static Priority = class Priority extends SudokuConstraintBase {
     constructor(priority, ...cells) {
-      super(arguments);
+      super(priority, ...cells);
       this.cells = cells;
       this.priority = priority;
     }
