@@ -487,6 +487,7 @@ export class CompositeConstraintBase extends SudokuConstraintBase {
 export class SudokuConstraint {
 
   static Set = class Set extends SudokuConstraintBase {
+    static DESCRIPTION = "Container for constraints. Do not use directly.";
     static CATEGORY = null;
     static IS_COMPOSITE = true;
     static CAN_ABSORB = ['Set', 'And'];
@@ -517,6 +518,8 @@ export class SudokuConstraint {
   }
 
   static Or = class Or extends CompositeConstraintBase {
+    static DESCRIPTION = (
+      "At least one of the contained constraints must be satisfied.");
     static CAN_ABSORB = ['Or'];
 
     static _serializeSingle(constraint) {
@@ -539,6 +542,8 @@ export class SudokuConstraint {
   }
 
   static And = class And extends CompositeConstraintBase {
+    static DESCRIPTION = (
+      "All the contained constraints must be satisfied.");
     static CAN_ABSORB = ['Set', 'And'];
 
     static serialize(constraints) {
@@ -563,9 +568,14 @@ export class SudokuConstraint {
     }
   }
 
-  static End = class End extends SudokuConstraintBase { }
+  static End = class End extends SudokuConstraintBase {
+    static DESCRIPTION = (
+      "Marks the end of a composite constraint group.");
+  }
 
   static Jigsaw = class Jigsaw extends SudokuConstraintBase {
+    static DESCRIPTION = (
+      "An irregular region which must contain all digits without repetition.");
     static CATEGORY = 'Jigsaw';
     static DISPLAY_CONFIG = { displayClass: 'Jigsaw' };
     static UNIQUENESS_KEY_FIELD = 'cells';
@@ -940,6 +950,7 @@ export class SudokuConstraint {
     );
   }
   static Shape = class Shape extends SudokuConstraintBase {
+    static DESCRIPTION = (`The size of the grid.`);
     static CATEGORY = 'Shape';
     static UNIQUENESS_KEY_FIELD = 'type';
     static DEFAULT_SHAPE = SHAPE_9x9;
@@ -1131,7 +1142,7 @@ export class SudokuConstraint {
 
   static WhiteDot = class WhiteDot extends SudokuConstraintBase {
     static DESCRIPTION = (`
-      Kropki white dot: values must be consecutive. Adjacent cells only."`);
+      Kropki white dot: values must be consecutive. Adjacent cells only.`);
     static CATEGORY = 'LinesAndSets';
     static DISPLAY_CONFIG = {
       displayClass: 'Dot',
@@ -1783,6 +1794,8 @@ export class SudokuConstraint {
   }
 
   static Binary = class Binary extends SudokuConstraintBase {
+    static DESCRIPTION = (
+      "Applies a custom binary relationship between consecutive pairs of cells.");
     static CATEGORY = 'CustomBinary';
     static DISPLAY_CONFIG = {
       displayClass: 'CustomBinary',
@@ -1908,6 +1921,8 @@ export class SudokuConstraint {
   }
 
   static BinaryX = class BinaryX extends SudokuConstraint.Binary {
+    static DESCRIPTION = (
+      "Applies a custom binary relationship between all pairs of the given cells.");
     static CATEGORY = 'CustomBinary';
     static DISPLAY_CONFIG = {
       displayClass: 'CustomBinary',
@@ -1919,6 +1934,10 @@ export class SudokuConstraint {
       return super.fnToKey(
         (a, b) => fn(a, b) && fn(b, a),
         numValues);
+    }
+
+    static displayName() {
+      return 'Binary: Pairwise';
     }
   }
 
@@ -1980,6 +1999,8 @@ export class SudokuConstraint {
   }
 
   static Given = class Given extends SudokuConstraintBase {
+    static DESCRIPTION = (
+      "Constrains the initial values for the given cell.");
     static CATEGORY = 'GivenCandidates';
     static DISPLAY_CONFIG = { displayClass: 'Givens' };
     static UNIQUENESS_KEY_FIELD = 'cell';
@@ -2016,6 +2037,8 @@ export class SudokuConstraint {
   }
 
   static Priority = class Priority extends SudokuConstraintBase {
+    static DESCRIPTION = (
+      "Assigns a priority level to cells for solving order.");
     constructor(priority, ...cells) {
       super(priority, ...cells);
       this.cells = cells;
