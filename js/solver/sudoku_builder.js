@@ -1,7 +1,7 @@
-const { SudokuConstraint, SudokuConstraintBase, CellArgs } = await import('./sudoku_constraint.js' + self.VERSION_PARAM);
-const { SudokuSolver } = await import('./solver/engine.js' + self.VERSION_PARAM);
-const HandlerModule = await import('./solver/handlers.js' + self.VERSION_PARAM);
-const SumHandlerModule = await import('./solver/sum_handler.js' + self.VERSION_PARAM);
+const { SudokuConstraint, SudokuConstraintBase, CellArgs } = await import('../sudoku_constraint.js' + self.VERSION_PARAM);
+const { SudokuSolver } = await import('./engine.js' + self.VERSION_PARAM);
+const HandlerModule = await import('./handlers.js' + self.VERSION_PARAM);
+const SumHandlerModule = await import('./sum_handler.js' + self.VERSION_PARAM);
 
 export class SudokuBuilder {
   static build(constraint, debugOptions) {
