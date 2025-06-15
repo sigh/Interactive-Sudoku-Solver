@@ -13,18 +13,21 @@ self.onmessage = async (msg) => {
 const START_INIT_WORKER = performance.now();
 
 self.VERSION_PARAM = self.location.search;
-// Preload all required modules asynchronously.
-Promise.all([
-  import('./util.js' + self.VERSION_PARAM),
-  import('./solver/lookup_tables.js' + self.VERSION_PARAM),
-  import('./solver/handlers.js' + self.VERSION_PARAM),
-  import('./solver/engine.js' + self.VERSION_PARAM),
-  import('./solver/optimizer.js' + self.VERSION_PARAM),
-  import('./solver/candidate_selector.js' + self.VERSION_PARAM),
-  import('./solver/sum_handler.js' + self.VERSION_PARAM),
-  import('./grid_shape.js' + self.VERSION_PARAM),
-  import('./sudoku_constraint.js' + self.VERSION_PARAM),
-]);
+if (!self.navigator.userAgent.includes('Safari/')) {
+  // Preload all required modules asynchronously.
+  // But not on Safari: https://bugs.webkit.org/show_bug.cgi?id=242740
+  Promise.all([
+    import('./util.js' + self.VERSION_PARAM),
+    import('./solver/lookup_tables.js' + self.VERSION_PARAM),
+    import('./solver/handlers.js' + self.VERSION_PARAM),
+    import('./solver/engine.js' + self.VERSION_PARAM),
+    import('./solver/optimizer.js' + self.VERSION_PARAM),
+    import('./solver/candidate_selector.js' + self.VERSION_PARAM),
+    import('./solver/sum_handler.js' + self.VERSION_PARAM),
+    import('./grid_shape.js' + self.VERSION_PARAM),
+    import('./sudoku_constraint.js' + self.VERSION_PARAM),
+  ]);
+}
 const { SudokuBuilder } = await import('./solver/sudoku_builder.js' + self.VERSION_PARAM);
 const { Timer } = await import('./util.js' + self.VERSION_PARAM);
 
