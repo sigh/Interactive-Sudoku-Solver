@@ -29,13 +29,48 @@ layout: null
       <a href="index.html" class="back-link">← Back to Solver</a>
     </div>
 
+    <!-- Table of Contents -->
+    <div class="toc">
+      <h2>Contents</h2>
+      <ul>
+        <li><a href="#overview">Overview</a></li>
+        <li><a href="#categories-overview">Constraint Categories</a></li>
+        <li><a href="#constraints-detail">All Constraints by Category</a></li>
+      </ul>
+    </div>
+
+    <!-- Overview Section -->
     <div class="section-header">
-      <h2>Constraint Categories</h2>
+      <h2 id="overview">Overview</h2>
+    </div>
+    <div>
+      <p>
+        The Interactive Sudoku Solver (ISS) is a solver designed to quickly
+        solve variant sudoku puzzles. It does not use human solving techniques,
+        instead optimizing for speed.
+      </p>
+
+      <p>
+        Use it to find all the solutions, count the solutions, or
+        see all the valid values for each cell in a puzzle.
+      </p>
+
+      <p>
+        Visit the <a href="https://github.com/sigh/Interactive-Sudoku-Solver" target="_blank">github repository</a> to
+        view the source code and <a href="https://github.com/sigh/Interactive-Sudoku-Solver/issues"
+          target="_blank">report bugs</a>.
+      </p>
+    </div>
+
+    <!-- Categories Overview Section -->
+    <div class="section-header">
+      <h2 id="categories-overview">Constraint Categories</h2>
     </div>
     <div id="categories-content"></div>
 
+    <!-- Detailed Constraints Section -->
     <div class="section-header">
-      <h2>All Constraints by Category</h2>
+      <h2 id="constraints-detail">All Constraints by Category</h2>
     </div>
     <div id="constraints-content"></div>
   </div>
