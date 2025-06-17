@@ -31,18 +31,25 @@ layout: null
 
     <!-- Table of Contents -->
     <div class="toc">
-      <h2>Contents</h2>
+      <div class="toc-title">Contents</div>
       <ul>
         <li><a href="#overview">Overview</a></li>
         <li><a href="#categories-overview">Constraint Categories</a></li>
         <li><a href="#constraints-detail">All Constraints by Category</a></li>
+        <li><a href="#recipes">Recipes</a>
+          <ul>
+            <li><a href="#clone">Clone</a></li>
+            <li><a href="#magic-square">3x3 Magic Square</a></li>
+            <li><a href="#odd-even-thermo">Odd/Even Thermo</a></li>
+            <li><a href="#nabner-line">Nabner Line</a></li>
+            <li><a href="#not-renban">Not Renban</a></li>
+          </ul>
+        </li>
       </ul>
     </div>
 
     <!-- Overview Section -->
-    <div class="section-header">
-      <h2 id="overview">Overview</h2>
-    </div>
+    <h2 id="overview">Overview</h2>
     <div>
       <p>
         The Interactive Sudoku Solver (ISS) is a solver designed to quickly
@@ -63,16 +70,109 @@ layout: null
     </div>
 
     <!-- Categories Overview Section -->
-    <div class="section-header">
-      <h2 id="categories-overview">Constraint Categories</h2>
-    </div>
+    <h2 id="categories-overview">Constraint Categories</h2>
     <div id="categories-content"></div>
 
     <!-- Detailed Constraints Section -->
-    <div class="section-header">
-      <h2 id="constraints-detail">All Constraints by Category</h2>
-    </div>
+    <h2 id="constraints-detail">All Constraints by Category</h2>
     <div id="constraints-content"></div>
+
+    <!-- Recipes Section -->
+    <h2 id="recipes">Recipes</h2>
+    <div class="recipes-content">
+      <p>Some constraint types aren't directly supported but can be constructed using combinations of available
+        constraints.</p>
+
+      <h3 id="clone">Clone</h3>
+      <p>
+        <b>Description:</b> Two regions of the same shape and size,
+        which must have the same values in corresponding cells.
+      </p>
+      <p>
+        Use the <code>SameValueSets</code> on every pair of corresponding cells
+        to mark them as equal. Each pair must be a separate constraint.
+      </p>
+
+      <h3 id="magic-square">3x3 Magic Square</h3>
+      <p>
+        <b>Description:</b>
+        A square of cells, where the sum of the values in each row, column,
+        and diagonal is the same.
+      </p>
+      <p>
+        Use the <code>Cage</code> constrain each row, column, and diagonal to
+        sum to 15.
+      </p>
+
+      <h3 id="odd-even-thermo">Odd/Even Thermo</h3>
+      <p>
+        <b>Description:</b>
+        A thermometer (values are strictly increasing) where the values are
+        either all odd or all even.
+      </p>
+      <p>
+        Create a Custom Binary Constraint with the following formula:
+      <pre>
+        a &lt; b &amp;&amp; (a % 2 == b % 2)
+      </pre>
+      </p>
+
+      <h3 id="nabner-line">Nabner Line</h3>
+      <p>
+        <b>Description:</b>
+        No two digits along the line may be be consecutive.
+        ("Nabner" is "Renban" spelled backwards.)
+      </p>
+      <p>
+        Create a Custom Binary Constraint with "Chain handling" set to
+        "All pairs" and use the following formula:
+      </p>
+      <p>
+      <pre>
+        Math.abs(a - b) &gt; 1
+      </pre>
+      </p>
+
+      <h3 id="not-renban">Not Renban</h3>
+      <p>
+        <b>Description:</b>
+        Unlike Naber, this is how to create a set where all the values taken
+        together are not consecutive.
+      </p>
+
+      <p>
+        This requires checking that there is at least one pair of cells which
+        have a difference of at least two, and where none of the other cells
+        have values which are between them.
+        Each pair can be checked with a <code>Lockout</code> constraint, with
+        all the pairs inside an <code>Or</code>.
+        This results in <code>n(n-1)/2</code> constraints inside the
+        <code>Or</code>.
+      </p>
+      <p>
+        Here's how you can generate the constraint
+        (run in the browser developer console):
+      <pre>
+        function makeNotRenban(cells) {
+          const n = cells.length;
+          const constraints = [];
+
+          for (let i = 0; i &lt; n; i++) {
+            for (let j = i+1; j &lt; n; j++) {
+                const line = [...cells];
+                [line[0], line[i]] = [line[i], line[0]];
+                [line[n-1], line[j]] = [line[j], line[n-1]];
+                constraints.push(new SudokuConstraint.Lockout(2, ...line));
+            }
+          }
+
+          return new SudokuConstraint.Or(constraints);
+        }
+
+        console.log(makeNotRenban('R1C1', 'R1C2', 'R1C3').toString());
+      </pre>
+      </p>
+    </div>
   </div>
 </body>
 
