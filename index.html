@@ -29,6 +29,7 @@ layout: null
   <script type="module">
     // Use a VERSION_PARAM for cache busting.
     self.VERSION_PARAM = '?v=' + ('{{ site.github.build_revision }}' || Math.random());
+    const SYNC_PARAM = '&sync';
 
     if (!window.navigator.userAgent.includes('Safari/')) {
       // Preload modules required for the main thread.
@@ -40,19 +41,28 @@ layout: null
       import('./js/sudoku_constraint.js' + self.VERSION_PARAM);
       import('./js/sudoku_parser.js' + self.VERSION_PARAM);
       import('./js/util.js' + self.VERSION_PARAM);
+    } else {
+      // Record the fact that we need to load synchronously.
+      self.VERSION_PARAM += SYNC_PARAM;
     }
 
     // Run initPage() when the page is loaded.
     const renderPage = import('./js/render_page.js' + self.VERSION_PARAM);
     window.addEventListener(
-      'load', async () => (await renderPage).initPage()
+      'load', async () => {
+        try {
+          (await renderPage).initPage();
+        } catch (e) {
+          // Failsafe for preloading bug. Load synchronously with a modified
+          // VERSION_PARAM cache-busting parameter.
+          self.VERSION_PARAM += SYNC_PARAM;
+          (await import('./js/render_page.js' + self.VERSION_PARAM)).initPage();
+        }
+      }
     );
 
     // Prefetch worker.js (but do NOT execute it)
-    const link = document.createElement('link');
-    link.rel = 'prefetch';
-    link.href = './js/worker.js' + self.VERSION_PARAM;
-    document.head.appendChild(link);
+    fetch('./js/worker.js' + self.VERSION_PARAM, { priority: 'low' });
   </script>
   <link rel="stylesheet" href="{{ 'css/style.css?v=' | append: site.github.build_revision | relative_url }}">
 
