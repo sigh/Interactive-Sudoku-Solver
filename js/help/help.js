@@ -163,7 +163,7 @@ const createCategorySection = (category, constraints) => {
   const categorySection = document.createElement('div');
   categorySection.className = 'category-section';
 
-  const categoryTitle = document.createElement('h2');
+  const categoryTitle = document.createElement('h3');
   categoryTitle.id = category;
   categoryTitle.textContent = formatCategoryName(category);
 
