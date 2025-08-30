@@ -1144,6 +1144,9 @@ class ConstraintManager {
     document.getElementById('copy-constraints-button').onclick = () => {
       navigator.clipboard.writeText(this.getConstraints());
     };
+
+    // Dim constraints toggle.
+    this._setUpDimConstraints();
   }
 
   _makeCompositeCollection(constraint, chip, parentCollection) {
@@ -1254,6 +1257,27 @@ class ConstraintManager {
     }
     this._rootCollection.clear();
     this.runUpdateCallback();
+  }
+
+  _setUpDimConstraints() {
+    const dimConstraintsInput = document.getElementById('dim-constraints-input');
+    const sudokuGrid = document.getElementById('sudoku-grid');
+
+    // Load saved state from sessionStorage
+    dimConstraintsInput.checked = (
+      sessionAndLocalStorage.getItem('dimConstraints') === 'true');
+
+    // Apply initial state
+    if (dimConstraintsInput.checked) {
+      sudokuGrid.classList.add('constraints-dimmed');
+    }
+
+    // Handle toggle
+    dimConstraintsInput.onchange = () => {
+      const isChecked = dimConstraintsInput.checked;
+      sessionAndLocalStorage.setItem('dimConstraints', isChecked);
+      sudokuGrid.classList.toggle('constraints-dimmed', isChecked);
+    };
   }
 }
 

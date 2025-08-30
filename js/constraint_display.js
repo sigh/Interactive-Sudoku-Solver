@@ -33,12 +33,17 @@ const constraintDisplayOrder = () => [
 
 class BaseConstraintDisplayItem extends DisplayItem {
   static IS_LAYOUT = false;
+  static IS_DIMMABLE = false;
 
   constructor(svg) {
     super(svg);
 
     svg.classList.add(
       this.constructor.IS_LAYOUT ? 'layout-constraint' : 'non-layout-constraint');
+
+    if (this.constructor.IS_DIMMABLE) {
+      svg.classList.add('dimmable-constraint');
+    }
   }
 
   clear() {
@@ -353,6 +358,8 @@ class Jigsaw extends BaseConstraintDisplayItem {
 }
 
 class Indexing extends BaseConstraintDisplayItem {
+  static IS_DIMMABLE = true;
+
   drawItem(constraint, _) {
     const cells = constraint.cells;
     const g = createSvgElement('g');
@@ -388,6 +395,8 @@ class Indexing extends BaseConstraintDisplayItem {
 }
 
 class GenericLine extends BaseConstraintDisplayItem {
+  static IS_DIMMABLE = true;
+
   drawItem(constraint, options) {
     const item = this._makeItem(constraint, options);
     this._svg.append(item);
@@ -539,6 +548,8 @@ class PillArrow extends GenericLine {
 }
 
 class Dot extends BaseConstraintDisplayItem {
+  static IS_DIMMABLE = true;
+
   drawItem(constraint, options) {
     const g = createSvgElement('g');
     g.setAttribute('fill', options.color);
@@ -565,6 +576,8 @@ class Dot extends BaseConstraintDisplayItem {
   }
 }
 class Letter extends BaseConstraintDisplayItem {
+  static IS_DIMMABLE = true;
+
   drawItem(constraint, _) {
     const letter = constraint.type.toLowerCase();
 
@@ -601,6 +614,8 @@ class Letter extends BaseConstraintDisplayItem {
 }
 
 class ShadedRegion extends BaseConstraintDisplayItem {
+  static IS_DIMMABLE = true;
+
   constructor(svg) {
     super(svg);
     this._unusedPatternId = 0;
@@ -720,6 +735,8 @@ class ShadedRegion extends BaseConstraintDisplayItem {
 }
 
 class CountingCircles extends BaseConstraintDisplayItem {
+  static IS_DIMMABLE = true;
+
   constructor(svg) {
     super(svg);
     this._circleColors = new ColorPicker();
@@ -771,6 +788,8 @@ class CountingCircles extends BaseConstraintDisplayItem {
 }
 
 class Quad extends BaseConstraintDisplayItem {
+  static IS_DIMMABLE = true;
+
   drawItem(constraint) {
     const topLeftCell = constraint.topLeftCell;
     const values = constraint.values;
@@ -930,6 +949,8 @@ class DefaultRegionsInverted extends BaseConstraintDisplayItem {
 }
 
 class BorderedRegion extends BaseConstraintDisplayItem {
+  static IS_DIMMABLE = true;
+
   constructor(svg) {
     super(svg);
     this._items = [];
@@ -1230,6 +1251,8 @@ class Givens extends BaseConstraintDisplayItem {
 }
 
 class GreaterThan extends BaseConstraintDisplayItem {
+  static IS_DIMMABLE = true;
+
   drawItem(constraint, options) {
     const result = createSvgElement("g");
     result.setAttribute('fill', 'transparent');
