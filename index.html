@@ -31,7 +31,10 @@ layout: null
     self.VERSION_PARAM = '?v=' + ('{{ site.github.build_revision }}' || Math.random());
     const SYNC_PARAM = '&sync';
 
-    if (!window.navigator.userAgent.includes('Safari/')) {
+    const userAgent = window.navigator.userAgent;
+    const isSafari = userAgent.includes('Safari/') && !userAgent.includes('Chrome/');
+
+    if (!isSafari) {
       // Preload modules required for the main thread.
       // But not on Safari: https://bugs.webkit.org/show_bug.cgi?id=242740
       import('./js/constraint_display.js' + self.VERSION_PARAM);
