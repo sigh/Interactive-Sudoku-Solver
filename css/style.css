@@ -47,6 +47,12 @@ body {
 
 .solution-group {
   fill: rgb(0, 128, 255);
+  filter: drop-shadow(0px 0px 1px white);
+}
+
+.diff-group {
+  fill: rgb(200, 120, 120);
+  filter: drop-shadow(0px 0px 1px white);
 }
 
 .givens-group .cell-multi-value {
@@ -57,10 +63,6 @@ body {
 
 .givens-group .cell-single-value {
   font-family: sans-serif;
-}
-
-.diff-group {
-  fill: rgb(200, 120, 120);
 }
 
 .debug-candidate-group {
