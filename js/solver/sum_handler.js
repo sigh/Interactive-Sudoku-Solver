@@ -195,14 +195,13 @@ export class Sum extends SudokuConstraintHandler {
       }
     }
 
-    const onlyUnitCoeffs = this._coeffGroups.every(g => g.coeff === 1);
     if (this._coeffGroups.every(g => Math.abs(g.coeff) === 1)) {
       this._flags |= this.constructor._FLAG_ONLY_ABS_UNIT_COEFF;
     }
     if (
-      onlyUnitCoeffs
-      && this._coeffGroups.length == 1
-      && this._coeffGroups[0].exclusionGroups.length == 1) {
+      this.onlyUnitCoeffs()
+      && this._coeffGroups.length === 1
+      && this._coeffGroups[0].exclusionGroups.length === 1) {
       this._flags |= this.constructor._FLAG_CAGE;
     }
 
@@ -217,7 +216,7 @@ export class Sum extends SudokuConstraintHandler {
     // Check for valid sums.
     const sum = this._sum;
     if (!Number.isInteger(sum)) return false;
-    if (this._isCage && sum > this._sumData.maxCageSum) {
+    if ((this._flags & this.constructor._FLAG_CAGE) && sum > this._sumData.maxCageSum) {
       return false;
     }
 
@@ -282,7 +281,7 @@ export class Sum extends SudokuConstraintHandler {
 
     // If the cells are in the same exclusion group, also ensure the sum
     // uses distinct values.
-    if ((targetSum & 1) == 0 &&
+    if ((targetSum & 1) === 0 &&
       exclusionIds[0] === exclusionIds[1]) {
       // targetSum/2 can't be valid value.
       const mask = ~(1 << ((targetSum >> 1) - 1));
@@ -298,9 +297,9 @@ export class Sum extends SudokuConstraintHandler {
     // If there are two remaining values, and they can be in either cell
     // (both cells have the same candidates) then they are both required
     // values.
-    // NOTE: We can also do this for count == 1, but it results are slightly
+    // NOTE: We can also do this for count === 1, but it results are slightly
     //       worse.
-    if (v0 === v1 && this._cellExclusions && countOnes16bit(v0) == 2) {
+    if (v0 === v1 && this._cellExclusions && countOnes16bit(v0) === 2) {
       if (!HandlerUtil.enforceRequiredValueExclusions(
         grid, cells, v0, this._cellExclusions)) {
         return false;
@@ -325,13 +324,13 @@ export class Sum extends SudokuConstraintHandler {
 
     // If the cell values are possibly repeated, then handle that.
     if (exclusionIds[0] !== exclusionIds[1] || exclusionIds[0] !== exclusionIds[2]) {
-      if (exclusionIds[0] != exclusionIds[1]) {
+      if (exclusionIds[0] !== exclusionIds[1]) {
         sums2 |= this._sumData.doubles[v0 & v1];
       }
-      if (exclusionIds[0] != exclusionIds[2]) {
+      if (exclusionIds[0] !== exclusionIds[2]) {
         sums1 |= this._sumData.doubles[v0 & v2];
       }
-      if (exclusionIds[1] != exclusionIds[2]) {
+      if (exclusionIds[1] !== exclusionIds[2]) {
         sums0 |= this._sumData.doubles[v1 & v2];
       }
     }
@@ -595,10 +594,10 @@ export class Sum extends SudokuConstraintHandler {
         }
 
         // Save for later to determine which values can be removed.
-        // If seenMin == seenMax, then this is already constrained, so set it to
+        // If seenMin === seenMax, then this is already constrained, so set it to
         // 0  so we can easily skip it.
         seenMinMaxs[index] = (
-          (seenMin != seenMax) ? seenMin | (seenMax << 16) : 0);
+          (seenMin !== seenMax) ? seenMin | (seenMax << 16) : 0);
         index++;
       }
     }
@@ -698,10 +697,10 @@ export class Sum extends SudokuConstraintHandler {
     }
 
     // Check if we have enough unique values.
-    if (countOnes16bit(allValues) < numCells) return false
+    if (countOnes16bit(allValues) < numCells) return false;
     // Check if we have fixed all the values.
-    if (allValues == fixedValues) {
-      return fixedSum == sum;
+    if (allValues === fixedValues) {
+      return fixedSum === sum;
     }
 
     const unfixedValues = allValues & ~fixedValues;
@@ -795,7 +794,7 @@ export class Sum extends SudokuConstraintHandler {
     // We've reached the target sum exactly.
     // NOTE: Uniqueness constraint is already enforced by the solver via
     //       exclusionCells.
-    if (minSum == maxSum) return true;
+    if (minSum === maxSum) return true;
 
     // A large fixed value indicates a cell has a 0, hence is already
     // unsatisfiable.
