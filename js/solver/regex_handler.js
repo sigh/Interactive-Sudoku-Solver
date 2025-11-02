@@ -6,50 +6,89 @@ const { LookupTables } = await import('./lookup_tables.js' + self.VERSION_PARAM)
 // quantifiers '*', '+', and '?'. Additional operators can be layered on once the
 // solver needs them.
 
-const WILDCARD_SYMBOL = '__ANY__';
 
-const DEFAULT_WILDCARD_ALPHABET = (() => {
-  const chars = [];
-  for (let i = 1; i <= 9; i++) chars.push(String(i));
-  for (let code = 'A'.charCodeAt(0); code <= 'Z'.charCodeAt(0); code++) {
-    chars.push(String.fromCharCode(code));
+const charToValue = (char) => {
+  if (char >= '1' && char <= '9') {
+    return char.charCodeAt(0) - '0'.charCodeAt(0);
   }
-  for (let code = 'a'.charCodeAt(0); code <= 'z'.charCodeAt(0); code++) {
-    chars.push(String.fromCharCode(code));
+  if (char >= 'A' && char <= 'Z') {
+    return char.charCodeAt(0) - 'A'.charCodeAt(0) + 10;
   }
-  return chars;
-})();
+  if (char >= 'a' && char <= 'z') {
+    return char.charCodeAt(0) - 'a'.charCodeAt(0) + 36;
+  }
+  throw new Error(`Unsupported character '${char}' in regex constraint`);
+};
+
+
+const createCharToMask = (numValues) => {
+  return (char) => {
+    const value = charToValue(char);
+    if (value < 1 || value > numValues) {
+      throw new Error(`Character '${char}' exceeds shape value count (${numValues})`);
+    }
+    return LookupTables.fromValue(value);
+  };
+};
+
+class AstNode {
+  static Empty = class { }
+
+  static Literal = class {
+    constructor(value) {
+      this.value = value;
+    }
+  }
+
+  static Wildcard = class { }
+
+  static Charset = class {
+    constructor(chars, negated = false) {
+      this.chars = chars;
+      this.negated = negated;
+    }
+  }
+
+  static Concat = class {
+    constructor(parts) {
+      this.parts = parts;
+    }
+  }
+  static Alternate = class {
+    constructor(options) {
+      this.options = options;
+    }
+  }
+
+  static Star = class {
+    constructor(child) {
+      this.child = child;
+    }
+  }
+
+  static Plus = class {
+    constructor(child) {
+      this.child = child;
+    }
+  }
+
+  static Optional = class {
+    constructor(child) {
+      this.child = child;
+    }
+  }
+}
 
 class RegexCompiler {
-  static compile(pattern) {
+  static compile(pattern, numValues) {
     const parser = new RegexParser(pattern);
     const ast = parser.parse();
-    const nfaBuilder = new NFABuilder();
-    const { start, accept, states, alphabet, usesWildcard, needsComplement } = nfaBuilder.build(ast);
-    const alphabetSet = new Set(alphabet.length ? alphabet : DEFAULT_WILDCARD_ALPHABET);
-    if (usesWildcard) {
-      DEFAULT_WILDCARD_ALPHABET.forEach(ch => alphabetSet.add(ch));
-    }
-    if (needsComplement) {
-      DEFAULT_WILDCARD_ALPHABET.forEach(ch => alphabetSet.add(ch));
-    }
-    const dfaBuilder = new DFABuilder(states, start, accept, alphabetSet, usesWildcard);
+    const charToMask = createCharToMask(numValues);
+    const alphabet = LookupTables.get(numValues).allValues;
+    const nfaBuilder = new NFABuilder(charToMask, alphabet);
+    const { start, accept, states } = nfaBuilder.build(ast);
+    const dfaBuilder = new DFABuilder(states, start, accept, alphabet);
     return dfaBuilder.build();
-  }
-
-  static matches(dfa, input) {
-    let stateIndex = dfa.startState;
-    for (const ch of input) {
-      const state = dfa.states[stateIndex];
-      if (!state) return false;
-      const next = state.transitions.get(ch);
-      if (next === undefined) {
-        return false;
-      }
-      stateIndex = next;
-    }
-    const finalState = dfa.states[stateIndex];
-    return !!finalState?.accepting;
   }
 }
 
@@ -68,14 +107,14 @@ class RegexParser {
   }
 
   _parseExpression() {
-    let node = this._parseSequence();
+    const node = this._parseSequence();
     const alternatives = [node];
     while (this._peek() === '|') {
       this._next();
       alternatives.push(this._parseSequence());
     }
     if (alternatives.length === 1) return node;
-    return { type: 'alternate', options: alternatives };
+    return new AstNode.Alternate(alternatives);
   }
 
   _parseSequence() {
@@ -83,9 +122,9 @@ class RegexParser {
     while (!this._isEOF() && !this._isSequenceTerminator(this._peek())) {
       parts.push(this._parseQuantified());
     }
-    if (!parts.length) return { type: 'empty' };
+    if (!parts.length) return new AstNode.Empty();
     if (parts.length === 1) return parts[0];
-    return { type: 'concat', parts };
+    return new AstNode.Concat(parts);
   }
 
   _parseQuantified() {
@@ -94,13 +133,13 @@ class RegexParser {
       const ch = this._peek();
       if (ch === '*') {
         this._next();
-        node = { type: 'star', child: node };
+        node = new AstNode.Star(node);
       } else if (ch === '+') {
         this._next();
-        node = { type: 'plus', child: node };
+        node = new AstNode.Plus(node);
       } else if (ch === '?') {
         this._next();
-        node = { type: 'optional', child: node };
+        node = new AstNode.Optional(node);
       } else {
         break;
       }
@@ -124,7 +163,7 @@ class RegexParser {
     }
     if (ch === '.') {
       this._next();
-      return { type: 'wildcard' };
+      return new AstNode.Wildcard();
     }
     if (ch === '\\') {
       this._next();
@@ -132,7 +171,7 @@ class RegexParser {
       if (escaped === undefined) {
         throw new Error('Dangling escape at end of pattern');
       }
-      return { type: 'literal', value: escaped };
+      return new AstNode.Literal(escaped);
     }
     if (ch === undefined) {
       throw new Error('Unexpected end of pattern');
@@ -141,7 +180,7 @@ class RegexParser {
       throw new Error(`Unexpected token '${ch}' at position ${this.pos}`);
     }
     this._next();
-    return { type: 'literal', value: ch };
+    return new AstNode.Literal(ch);
   }
 
   _parseCharClass() {
@@ -172,7 +211,7 @@ class RegexParser {
     if (!chars.size) {
       throw new Error('Empty character class');
     }
-    return { type: 'charset', chars: [...chars], negated: isNegated };
+    return new AstNode.Charset([...chars], isNegated);
   }
 
   _consumeClassChar() {
@@ -219,106 +258,107 @@ class RegexParser {
 }
 
 class NFABuilder {
-  constructor() {
+  static _Fragment = class {
+    constructor(start, accept) {
+      this.start = start;
+      this.accept = accept;
+    }
+  };
+
+  constructor(charToMask, alphabet) {
     this.states = [];
-    this.alphabet = new Set();
-    this.usesWildcard = false;
-    this.needsComplement = false;
+    this._charToMask = charToMask;
+    this._alphabet = alphabet;
   }
 
   build(ast) {
-    const { start, accept } = this._buildNode(ast);
+    const fragment = this._buildNode(ast);
     return {
-      start,
-      accept,
+      start: fragment.start.id,
+      accept: fragment.accept.id,
       states: this.states,
-      alphabet: [...this.alphabet],
-      usesWildcard: this.usesWildcard,
-      needsComplement: this.needsComplement,
     };
   }
 
-  _newState() {
-    const state = { id: this.states.length, transitions: new Map(), epsilon: new Set() };
+  _newState(transitionSymbols = 0, transitionState = null) {
+    const state = {
+      id: this.states.length,
+      transitionSymbols,
+      transitionState,
+      epsilon: []
+    };
     this.states.push(state);
     return state;
   }
 
-  _addTransition(from, symbol, to) {
-    const transitions = from.transitions;
+  _newFragment(transitionSymbols = 0) {
+    const acceptState = this._newState();
+    const startState = transitionSymbols
+      ? this._newState(transitionSymbols, acceptState.id)
+      : this._newState();
+    return new NFABuilder._Fragment(startState, acceptState);
+  }
+
+  _addTransition(fragment, symbol) {
+    const transitions = fragment.start.transitions;
     if (!transitions.has(symbol)) {
       transitions.set(symbol, new Set());
     }
-    transitions.get(symbol).add(to.id);
+    transitions.get(symbol).add(fragment.accept.id);
   }
 
-  _addEpsilon(from, to) {
-    from.epsilon.add(to.id);
-  }
-
-  _registerChars(chars) {
-    chars.forEach(ch => this.alphabet.add(ch));
+  _addEpsilon(fromState, toState) {
+    fromState.epsilon.push(toState.id);
   }
 
   _buildNode(node) {
-    switch (node.type) {
-      case 'empty':
+    switch (node.constructor) {
+      case AstNode.Empty:
         return this._buildEmpty();
-      case 'literal':
+      case AstNode.Literal:
         return this._buildLiteral(node.value);
-      case 'wildcard':
+      case AstNode.Wildcard:
         return this._buildWildcard();
-      case 'charset':
+      case AstNode.Charset:
         return this._buildCharset(node.chars, node.negated);
-      case 'concat':
+      case AstNode.Concat:
         return this._buildConcat(node.parts);
-      case 'alternate':
+      case AstNode.Alternate:
         return this._buildAlternate(node.options);
-      case 'star':
+      case AstNode.Star:
         return this._buildStar(node.child);
-      case 'plus':
+      case AstNode.Plus:
         return this._buildPlus(node.child);
-      case 'optional':
+      case AstNode.Optional:
         return this._buildOptional(node.child);
       default:
-        throw new Error(`Unknown AST node: ${node.type}`);
+        throw new Error('Unknown AST node type');
     }
   }
 
   _buildEmpty() {
-    const start = this._newState();
-    const accept = this._newState();
-    this._addEpsilon(start, accept);
-    return { start: start.id, accept: accept.id };
+    const fragment = this._newFragment();
+    this._addEpsilon(fragment.start, fragment.accept);
+    return fragment;
   }
 
   _buildLiteral(char) {
-    this._registerChars([char]);
-    const start = this._newState();
-    const accept = this._newState();
-    this._addTransition(start, char, accept);
-    return { start: start.id, accept: accept.id };
+    return this._newFragment(this._charToMask(char));
   }
 
   _buildWildcard() {
-    this.usesWildcard = true;
-    const start = this._newState();
-    const accept = this._newState();
-    this._addTransition(start, WILDCARD_SYMBOL, accept);
-    return { start: start.id, accept: accept.id };
+    return this._newFragment(this._alphabet);
   }
 
   _buildCharset(chars, negated = false) {
-    this._registerChars(chars);
-    const start = this._newState();
-    const accept = this._newState();
-    if (negated) {
-      this.needsComplement = true;
-      this._addTransition(start, { type: 'negated', exclude: new Set(chars) }, accept);
-    } else {
-      chars.forEach(ch => this._addTransition(start, ch, accept));
+    let mask = 0;
+    for (const char of chars) {
+      mask |= this._charToMask(char);
     }
-    return { start: start.id, accept: accept.id };
+    if (negated) {
+      mask = this._alphabet & ~mask;
+    }
+    return this._newFragment(mask);
   }
 
   _buildConcat(parts) {
@@ -328,130 +368,145 @@ class NFABuilder {
     let currentAccept = first.accept;
     for (let i = 1; i < parts.length; i++) {
       const next = this._buildNode(parts[i]);
-      this._addEpsilon(this.states[currentAccept], this.states[next.start]);
+      this._addEpsilon(currentAccept, next.start);
       currentAccept = next.accept;
     }
-    return { start: currentStart, accept: currentAccept };
+    return new NFABuilder._Fragment(currentStart, currentAccept);
   }
 
   _buildAlternate(options) {
-    const startState = this._newState();
-    const acceptState = this._newState();
-    options.forEach(option => {
-      const fragment = this._buildNode(option);
-      this._addEpsilon(startState, this.states[fragment.start]);
-      this._addEpsilon(this.states[fragment.accept], acceptState);
-    });
-    return { start: startState.id, accept: acceptState.id };
+    const fragment = this._newFragment();
+    for (const option of options) {
+      const optionFragment = this._buildNode(option);
+      this._addEpsilon(fragment.start, optionFragment.start);
+      this._addEpsilon(optionFragment.accept, fragment.accept);
+    }
+    return fragment;
   }
 
   _buildStar(child) {
-    const startState = this._newState();
-    const acceptState = this._newState();
-    const fragment = this._buildNode(child);
-    this._addEpsilon(startState, this.states[fragment.start]);
-    this._addEpsilon(startState, acceptState);
-    this._addEpsilon(this.states[fragment.accept], acceptState);
-    this._addEpsilon(this.states[fragment.accept], this.states[fragment.start]);
-    return { start: startState.id, accept: acceptState.id };
+    const fragment = this._newFragment();
+    const inner = this._buildNode(child);
+    this._addEpsilon(fragment.start, inner.start);
+    this._addEpsilon(fragment.start, fragment.accept);
+    this._addEpsilon(inner.accept, fragment.accept);
+    this._addEpsilon(inner.accept, inner.start);
+    return fragment;
   }
 
   _buildPlus(child) {
     const fragment = this._buildNode(child);
-    const { start, accept } = this._buildStar(child);
-    this._addEpsilon(this.states[fragment.accept], this.states[start]);
-    return { start: fragment.start, accept: accept };
+    const starFragment = this._buildStar(child);
+    this._addEpsilon(fragment.accept, starFragment.start);
+    return new NFABuilder._Fragment(fragment.start, starFragment.accept);
   }
 
   _buildOptional(child) {
     const fragment = this._buildNode(child);
-    const startState = this._newState();
-    const acceptState = this._newState();
-    this._addEpsilon(startState, this.states[fragment.start]);
-    this._addEpsilon(startState, acceptState);
-    this._addEpsilon(this.states[fragment.accept], acceptState);
-    return { start: startState.id, accept: acceptState.id };
+    const outer = this._newFragment();
+    this._addEpsilon(outer.start, fragment.start);
+    this._addEpsilon(outer.start, outer.accept);
+    this._addEpsilon(fragment.accept, outer.accept);
+    return outer;
   }
 }
 
 class DFABuilder {
-  constructor(nfaStates, startId, acceptId, alphabetSet, usesWildcard) {
+  constructor(nfaStates, startId, acceptId, alphabet) {
     this.nfaStates = nfaStates;
     this.startId = startId;
     this.acceptId = acceptId;
-    this.alphabet = [...alphabetSet];
-    this.usesWildcard = usesWildcard;
+    this.alphabet = alphabet;
+    this._singleStateClosures = new Map();
+  }
+
+  static _EpsilonClosure = class {
+    constructor(states) {
+      this.states = [...states].sort((a, b) => a - b);
+      this.key = this.states.join(',');
+    }
+  };
+
+  _epsilonClosure(stateIds) {
+    const combinedStates = new Set();
+    for (const stateId of stateIds) {
+      for (const id of this._stateEpsilonClosure(stateId)) {
+        combinedStates.add(id);
+      }
+    }
+    return new DFABuilder._EpsilonClosure(combinedStates);
+  }
+
+  _stateEpsilonClosure(stateId) {
+    if (this._singleStateClosures.has(stateId)) {
+      return this._singleStateClosures.get(stateId);
+    }
+
+    const stack = [stateId];
+    const visited = new Set(stack);
+    while (stack.length) {
+      const id = stack.pop();
+      const state = this.nfaStates[id];
+      for (const nextId of state.epsilon) {
+        if (!visited.has(nextId)) {
+          visited.add(nextId);
+          stack.push(nextId);
+        }
+      }
+    }
+    this._singleStateClosures.set(stateId, visited);
+    return visited;
   }
 
   build() {
-    const closureCache = new Map();
-    const epsilonClosure = (stateIds) => {
-      const key = stateIds.slice().sort((a, b) => a - b).join(',');
-      if (closureCache.has(key)) return closureCache.get(key);
-      const stack = [...stateIds];
-      const visited = new Set(stateIds);
-      while (stack.length) {
-        const id = stack.pop();
-        const state = this.nfaStates[id];
-        state.epsilon.forEach(nextId => {
-          if (!visited.has(nextId)) {
-            visited.add(nextId);
-            stack.push(nextId);
-          }
-        });
-      }
-      const closure = [...visited].sort((a, b) => a - b);
-      closureCache.set(key, closure);
-      return closure;
-    };
-
-    const startClosure = epsilonClosure([this.startId]);
     const dfaStates = [];
     const stateMap = new Map();
-    const queue = [startClosure];
-    stateMap.set(startClosure.join(','), 0);
-    dfaStates.push(this._makeDFAState(startClosure));
+    const addState = (closure) => {
+      const index = dfaStates.length;
+      stateMap.set(closure.key, index);
+      dfaStates.push(this._makeDFAState(closure.states));
+    }
 
-    while (queue.length) {
-      const currentClosure = queue.shift();
-      const currentKey = currentClosure.join(',');
-      const currentDFAState = dfaStates[stateMap.get(currentKey)];
+    const startClosure = this._epsilonClosure([this.startId]);
+    addState(startClosure);
+    const stack = [startClosure];
 
-      this.alphabet.forEach(symbol => {
+    while (stack.length) {
+      const currentClosure = stack.pop();
+      const currentStates = currentClosure.states;
+      const currentDFAState = dfaStates[stateMap.get(currentClosure.key)];
+      const transitionMap = new Map();
+
+      for (let symbol = 1; symbol < this.alphabet; symbol <<= 1) {
         const moveSet = new Set();
-        currentClosure.forEach(nfaId => {
-          const nfaState = this.nfaStates[nfaId];
-          nfaState.transitions.forEach((targets, key) => {
-            if (key === symbol) {
-              targets.forEach(id => moveSet.add(id));
-              return;
-            }
-            if (key?.type === 'negated') {
-              if (!key.exclude.has(symbol)) {
-                targets.forEach(id => moveSet.add(id));
-              }
-              return;
-            }
-          });
-          if (this.usesWildcard && nfaState.transitions.has(WILDCARD_SYMBOL)) {
-            nfaState.transitions.get(WILDCARD_SYMBOL).forEach(id => moveSet.add(id));
+        for (const currentStateId of currentStates) {
+          const nfaState = this.nfaStates[currentStateId];
+          if (nfaState.transitionSymbols & symbol) {
+            moveSet.add(nfaState.transitionState);
           }
-        });
-        if (!moveSet.size) return;
-        const nextClosure = epsilonClosure([...moveSet]);
-        const key = nextClosure.join(',');
-        if (!stateMap.has(key)) {
-          stateMap.set(key, dfaStates.length);
-          dfaStates.push(this._makeDFAState(nextClosure));
-          queue.push(nextClosure);
         }
-        currentDFAState.transitions.set(symbol, stateMap.get(key));
-      });
+        if (!moveSet.size) continue;
+
+        const nextClosure = this._epsilonClosure(moveSet);
+        if (!stateMap.has(nextClosure.key)) {
+          addState(nextClosure);
+          stack.push(nextClosure);
+        }
+        const nextStateId = stateMap.get(nextClosure.key);
+        transitionMap.set(nextStateId,
+          transitionMap.get(nextStateId) | symbol);
+      }
+
+      for (const [nextStateId, mask] of transitionMap.entries()) {
+        currentDFAState.transitionList.push({
+          state: nextStateId,
+          mask: mask,
+        });
+      }
     }
 
     return {
       alphabet: this.alphabet,
-      usesWildcard: this.usesWildcard,
       startState: 0,
       states: dfaStates,
     };
@@ -460,10 +515,8 @@ class DFABuilder {
   _makeDFAState(nfaStateIds) {
     const isAccepting = nfaStateIds.includes(this.acceptId);
     return {
-      id: null, // filled later if needed
       accepting: isAccepting,
-      transitions: new Map(),
-      nfaStates: nfaStateIds,
+      transitionList: [],
     };
   }
 }
@@ -474,210 +527,96 @@ export class RegexLine extends SudokuConstraintHandler {
   constructor(cells, pattern) {
     super(cells);
     this._pattern = pattern;
-    this._dfa = RegexCompiler.compile(pattern);
-    this._dfaMeta = null;
-    this._numValues = null;
+    this._dfa = null;
+    this._acceptingStates = null;
+    this._statesList = null;
   }
 
   initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
-    this._numValues = shape?.numValues || null;
+    this._dfa = RegexCompiler.compile(this._pattern, shape.numValues);
+    console.log(this._pattern, this._dfa);
+
+    const acceptingStates = new Set();
+    this._dfa.states.forEach((state, index) => {
+      if (state.accepting) acceptingStates.add(index);
+    });
+    this._acceptingStates = acceptingStates;
+    const slots = this.cells.length + 1;
+    this._statesList = Array.from({ length: slots }, () => new Set());
+
     return true;
   }
 
   enforceConsistency(grid, handlerAccumulator) {
-    const numCells = this.cells.length;
-    const cellChars = new Array(numCells);
-    const cellCharMasks = new Array(numCells);
-
-    for (let i = 0; i < numCells; i++) {
-      const cellIndex = this.cells[i];
-      let mask = grid[cellIndex];
-      if (!mask) {
-        return false;
-      }
-
-      const { chars, charToMask } = this._expandCellOptions(mask);
-      if (!chars.length) {
-        return false;
-      }
-
-      cellChars[i] = chars;
-      cellCharMasks[i] = charToMask;
-    }
-
+    const cells = this.cells;
+    const numCells = cells.length;
     const dfa = this._dfa;
-    const { reverseTransitions, acceptingStates } = this._getDfaMetadata();
     const dfaStates = dfa.states;
+    const statesList = this._statesList;
 
-    const forward = new Array(numCells + 1);
-    forward[0] = new Set([dfa.startState]);
+    // Clear all the states. Setting it to an empty set has better performance
+    // than clearing the existing set.
+    for (let i = 0; i < statesList.length; i++) statesList[i] = new Set();
 
-    // Forward pass: compute every DFA state reachable given the current
-    // prefix of candidate characters.
+    // Forward pass: Find all states reachable from the start state.
+    statesList[0].add(dfa.startState);
+
     for (let i = 0; i < numCells; i++) {
-      const nextStates = new Set();
-      const currentStates = forward[i];
-      const chars = cellChars[i];
-      if (!currentStates?.size) return false;
+      const nextStates = statesList[i + 1];
+      const currentStates = statesList[i];
+      const values = grid[cells[i]];
 
       for (const stateIndex of currentStates) {
-        const transitions = dfaStates[stateIndex]?.transitions;
-        if (!transitions) continue;
-        for (const char of chars) {
-          const dest = transitions.get(char);
-          if (dest !== undefined) {
-            nextStates.add(dest);
+        const transitionList = dfaStates[stateIndex].transitionList;
+        for (let j = 0; j < transitionList.length; j++) {
+          const entry = transitionList[j];
+          if (values & entry.mask) {
+            nextStates.add(entry.state);
           }
         }
       }
 
       if (!nextStates.size) return false;
-      forward[i + 1] = nextStates;
     }
 
-    const finalStates = forward[numCells];
-    let hasAccepting = false;
-    for (const stateIndex of finalStates) {
-      if (dfaStates[stateIndex]?.accepting) {
-        hasAccepting = true;
-        break;
-      }
+    // Backward pass: Filter down to only the states that can reach an accepting
+    // state. Prune any unsupported values from the grid.
+    const finalStates = statesList[numCells];
+    for (const state of finalStates) {
+      if (!this._acceptingStates.has(state)) finalStates.delete(state);
     }
-    if (!hasAccepting) return false;
+    if (!finalStates.size) return false;
 
-    const backward = new Array(numCells + 1);
-    backward[numCells] = new Set(acceptingStates);
-
-    // Backward pass: determine which DFA states can still reach an accepting
-    // state, respecting the candidate characters at each position.
     for (let i = numCells - 1; i >= 0; i--) {
-      const reachable = new Set();
-      const nextStates = backward[i + 1];
-      const chars = cellChars[i];
-      if (!nextStates?.size) return false;
+      const currentStates = statesList[i];
+      const nextStates = statesList[i + 1];
+      const cell = this.cells[i];
+      const values = grid[cell];
+      let supportedValues = 0;
 
-      for (const dest of nextStates) {
-        const reverse = reverseTransitions[dest];
-        if (!reverse) continue;
-        for (const char of chars) {
-          const sources = reverse.get(char);
-          if (!sources) continue;
-          for (const src of sources) {
-            reachable.add(src);
-          }
-        }
-      }
-
-      if (!reachable.size) return false;
-      backward[i] = reachable;
-    }
-
-    if (!backward[0].has(dfa.startState)) {
-      return false;
-    }
-
-    for (let i = 0; i < numCells; i++) {
-      const currentStates = forward[i];
-      const nextStates = backward[i + 1];
-      const chars = cellChars[i];
-      const charToMask = cellCharMasks[i];
-      const cellIndex = this.cells[i];
-      let mask = grid[cellIndex];
-
-      for (const char of chars) {
-        const charMask = charToMask.get(char);
-        if (!charMask) continue;
-
-        let supported = false;
-        for (const stateIndex of currentStates) {
-          const transitions = dfaStates[stateIndex]?.transitions;
-          if (!transitions) continue;
-          const dest = transitions.get(char);
-          if (dest !== undefined && nextStates.has(dest)) {
-            supported = true;
-            break;
+      for (const stateIndex of currentStates) {
+        const transitionList = dfaStates[stateIndex].transitionList;
+        let stateSupportedValues = 0;
+        for (let j = 0; j < transitionList.length; j++) {
+          const entry = transitionList[j];
+          const maskedValues = entry.mask & values;
+          if (maskedValues && nextStates.has(entry.state)) {
+            stateSupportedValues |= maskedValues;
           }
         }
 
-        if (!supported) {
-          mask &= ~charMask;
-        }
+        if (!stateSupportedValues) currentStates.delete(stateIndex);
+        supportedValues |= stateSupportedValues;
       }
 
-      if (!mask) return false;
+      if (!supportedValues) return false;
 
-      if (mask !== grid[cellIndex]) {
-        grid[cellIndex] = mask;
-        if (handlerAccumulator) {
-          handlerAccumulator.addForCell(cellIndex);
-        }
+      if (values !== supportedValues) {
+        grid[cell] = supportedValues;
+        handlerAccumulator.addForCell(cell);
       }
     }
 
     return true;
-  }
-
-  _valueToChar(value) {
-    if (value >= 1 && value <= 9) {
-      return String(value);
-    }
-
-    const index = value - 10;
-    if (index >= 0 && index < 26) {
-      return String.fromCharCode('A'.charCodeAt(0) + index);
-    }
-
-    const lowerIndex = index - 26;
-    if (lowerIndex >= 0 && lowerIndex < 26) {
-      return String.fromCharCode('a'.charCodeAt(0) + lowerIndex);
-    }
-
-    // Fallback: use base-36 style encoding beyond supported range.
-    return value.toString();
-  }
-
-  _expandCellOptions(mask) {
-    const values = LookupTables.toValuesArray(mask);
-    const chars = [];
-    const charToMask = new Map();
-    for (const value of values) {
-      const char = this._valueToChar(value);
-      const bit = LookupTables.fromValue(value);
-      const existing = charToMask.get(char);
-      if (existing === undefined) {
-        chars.push(char);
-        charToMask.set(char, bit);
-      } else {
-        charToMask.set(char, existing | bit);
-      }
-    }
-    return { chars, charToMask };
-  }
-
-  _getDfaMetadata() {
-    if (!this._dfaMeta) {
-      const { states } = this._dfa;
-      const reverseTransitions = Array.from({ length: states.length }, () => new Map());
-      const acceptingStates = new Set();
-
-      for (let fromIndex = 0; fromIndex < states.length; fromIndex++) {
-        const transitions = states[fromIndex]?.transitions;
-        if (!transitions) continue;
-        transitions.forEach((toIndex, symbol) => {
-          let sources = reverseTransitions[toIndex].get(symbol);
-          if (!sources) {
-            sources = new Set();
-            reverseTransitions[toIndex].set(symbol, sources);
-          }
-          sources.add(fromIndex);
-        });
-        if (states[fromIndex]?.accepting) {
-          acceptingStates.add(fromIndex);
-        }
-      }
-
-      this._dfaMeta = { reverseTransitions, acceptingStates };
-    }
-    return this._dfaMeta;
   }
 }
