@@ -2,6 +2,7 @@ const { SudokuConstraint, SudokuConstraintBase, CellArgs } = await import('../su
 const { SudokuSolver } = await import('./engine.js' + self.VERSION_PARAM);
 const HandlerModule = await import('./handlers.js' + self.VERSION_PARAM);
 const SumHandlerModule = await import('./sum_handler.js' + self.VERSION_PARAM);
+const RegexHandlerModule = await import('./regex_handler.js' + self.VERSION_PARAM);
 
 export class SudokuBuilder {
   static build(constraint, debugOptions) {
@@ -267,6 +268,14 @@ export class SudokuBuilder {
         case 'Sum':
           cells = constraint.cells.map(c => shape.parseCellId(c).cell);
           yield new SumHandlerModule.Sum(cells, constraint.sum);
+          break;
+
+        case 'Regex':
+          {
+            const cells = constraint.cells.map(c => shape.parseCellId(c).cell);
+            yield new RegexHandlerModule.RegexLine(
+              cells, constraint.pattern);
+          }
           break;
 
         case 'LittleKiller':

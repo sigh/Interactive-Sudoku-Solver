@@ -916,6 +916,58 @@ export class SudokuConstraint {
     }
   }
 
+  static Regex = class Regex extends SudokuConstraintBase {
+    static DESCRIPTION = (`
+      Digits along the line, read in order, must match the provided regular expression.`);
+    static CATEGORY = 'LinesAndSets';
+    static DISPLAY_CONFIG = {
+      displayClass: 'GenericLine',
+      color: 'rgb(120, 120, 220)',
+    };
+    static ARGUMENT_CONFIG = {
+      label: 'pattern',
+    };
+
+    constructor(pattern, ...cells) {
+      pattern = String(pattern ?? '');
+      super(pattern, ...cells);
+      this.pattern = pattern;
+      this.cells = cells;
+    }
+
+    chipLabel() {
+      return `Regex (${this.pattern})`;
+    }
+
+    static encodePattern(pattern) {
+      return encodeURIComponent(pattern)
+        .replace(/~/g, '%7E')
+        .replace(/\./g, '%2E');
+    }
+
+    static decodePattern(encodedPattern) {
+      let decoded = encodedPattern;
+      try {
+        decoded = decodeURIComponent(encodedPattern);
+      } catch (err) {
+        throw ('Invalid encoded regex pattern');
+      }
+      return decoded;
+    }
+
+    static *makeFromArgs(patternToken, ...cells) {
+      const pattern = this.decodePattern(patternToken);
+      yield new this(pattern, ...cells);
+    }
+
+    static serialize(constraints) {
+      return constraints.map(constraint => {
+        const encodedPattern = this.encodePattern(constraint.pattern);
+        return this._argsToString(encodedPattern, ...constraint.cells);
+      }).join('');
+    }
+  }
+
   static NoBoxes = class NoBoxes extends SudokuConstraintBase {
     static DESCRIPTION = (`
       No standard box regions.`);
