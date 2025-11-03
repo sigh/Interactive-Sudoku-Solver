@@ -286,7 +286,8 @@ export class LineOptions {
   static EMPTY_CIRCLE_MARKER = 2;
   static SMALL_FULL_CIRCLE_MARKER = 3;
   static SMALL_EMPTY_CIRCLE_MARKER = 4;
-  static DIAMOND_MARKER = 5;
+  static MEDIUM_FULL_CIRCLE_MARKER = 5;
+  static DIAMOND_MARKER = 6;
 
   constructor(options) {
     Object.assign(this, options);
@@ -921,8 +922,8 @@ export class SudokuConstraint {
       Digits along the line, read in order, must match the provided regular expression.`);
     static CATEGORY = 'LinesAndSets';
     static DISPLAY_CONFIG = {
-      displayClass: 'GenericLine',
-      color: 'rgb(120, 120, 220)',
+      displayClass: 'RegexLine',
+      startMarker: LineOptions.MEDIUM_FULL_CIRCLE_MARKER,
     };
     static ARGUMENT_CONFIG = {
       label: 'pattern',

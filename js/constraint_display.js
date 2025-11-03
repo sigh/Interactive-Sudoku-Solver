@@ -19,6 +19,7 @@ const constraintDisplayOrder = () => [
   Thermo,
   PillArrow,
   GenericLine,
+  RegexLine,
   CustomBinary,
   ShadedRegion,
   CountingCircles,
@@ -133,6 +134,12 @@ class BaseConstraintDisplayItem extends DisplayItem {
         {
           const circle = this._makeCircleAtPoint(point);
           circle.setAttribute('r', LineOptions.THIN_LINE_WIDTH);
+          return circle;
+        }
+      case LineOptions.MEDIUM_FULL_CIRCLE_MARKER:
+        {
+          const circle = this._makeCircleAtPoint(point);
+          circle.setAttribute('r', LineOptions.THIN_LINE_WIDTH * 3);
           return circle;
         }
       case LineOptions.DIAMOND_MARKER:
@@ -1398,5 +1405,41 @@ export class ConstraintDisplay extends DisplayItem {
     if (!config) return null;
     return this._constraintDisplays.get(
       config.displayClass).makeIcon(constraint, config);
+  }
+}
+
+class RegexLine extends GenericLine {
+  constructor(svg) {
+    super(svg);
+    this._colorPicker = new ColorPicker();
+  }
+
+  clear() {
+    super.clear();
+    this._colorPicker.clear();
+  }
+
+  removeItem(item) {
+    if (this._colorPicker.removeItem(item)) {
+      item.parentNode?.removeChild(item);
+    }
+  }
+
+  _makeItem(constraint, options) {
+    const cells = constraint.cells;
+
+    const colorKey = `${constraint.type}-${constraint.pattern}`;
+    const color = this._colorPicker.pickColor(colorKey);
+
+    const elem = this._makeConstraintLine(
+      cells,
+      {
+        color,
+        width: LineOptions.THIN_LINE_WIDTH,
+        startMarker: options.startMarker,
+      });
+
+    this._colorPicker.addItem(elem, color, colorKey);
+    return elem;
   }
 }

@@ -291,6 +291,7 @@ export const runSolveTests = async (onFailure) => {
     'Dutch Flatmates',  // Dutch Flatmates
     'Fortress sudoku',  // GreaterThan
     'Equality cages',  // EqualityCage
+    'Regex line',  // Regex
     'Full rank - 6 clue snipe',
     'Irregular region sum line',
     'Force non-unit coeff', // Sum with non-unit coeff
