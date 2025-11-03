@@ -534,7 +534,6 @@ export class RegexLine extends SudokuConstraintHandler {
 
   initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
     this._dfa = RegexCompiler.compile(this._pattern, shape.numValues);
-    console.log(this._pattern, this._dfa);
 
     const acceptingStates = new Set();
     this._dfa.states.forEach((state, index) => {
