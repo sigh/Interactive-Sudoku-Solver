@@ -1,12 +1,6 @@
 const { SudokuConstraintHandler } = await import('./handlers.js' + self.VERSION_PARAM);
 const { LookupTables } = await import('./lookup_tables.js' + self.VERSION_PARAM);
 
-// NOTE: The compiler below currently supports literals, '.', character classes
-// (with ranges and optional negation), grouping '()', alternation '|', and the
-// quantifiers '*', '+', and '?'. Additional operators can be layered on once the
-// solver needs them.
-
-
 const charToValue = (char) => {
   if (char >= '1' && char <= '9') {
     return char.charCodeAt(0) - '0'.charCodeAt(0);
@@ -15,7 +9,7 @@ const charToValue = (char) => {
     return char.charCodeAt(0) - 'A'.charCodeAt(0) + 10;
   }
   if (char >= 'a' && char <= 'z') {
-    return char.charCodeAt(0) - 'a'.charCodeAt(0) + 36;
+    return char.charCodeAt(0) - 'a'.charCodeAt(0) + 10;
   }
   throw new Error(`Unsupported character '${char}' in regex constraint`);
 };
@@ -79,17 +73,19 @@ class AstNode {
   }
 }
 
-class RegexCompiler {
-  static compile(pattern, numValues) {
-    const parser = new RegexParser(pattern);
-    const ast = parser.parse();
-    const charToMask = createCharToMask(numValues);
-    const alphabet = LookupTables.get(numValues).allValues;
-    const nfaBuilder = new NFABuilder(charToMask, alphabet);
-    const { start, accept, states } = nfaBuilder.build(ast);
-    const dfaBuilder = new DFABuilder(states, start, accept, alphabet);
-    return dfaBuilder.build();
-  }
+// NOTE: The compiler currently supports literals, '.', character classes
+// (with ranges and optional negation), grouping '()', alternation '|', and the
+// quantifiers '*', '+', and '?'. Additional operators can be layered on once the
+// solver needs them.
+const compile_regex = (pattern, numValues) => {
+  const parser = new RegexParser(pattern);
+  const ast = parser.parse();
+  const charToMask = createCharToMask(numValues);
+  const alphabet = LookupTables.get(numValues).allValues;
+  const nfaBuilder = new NFABuilder(charToMask, alphabet);
+  const { start, accept, states } = nfaBuilder.build(ast);
+  const dfaBuilder = new DFABuilder(states, start, accept, alphabet);
+  return dfaBuilder.build();
 }
 
 class RegexParser {
@@ -533,7 +529,7 @@ export class RegexLine extends SudokuConstraintHandler {
   }
 
   initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
-    this._dfa = RegexCompiler.compile(this._pattern, shape.numValues);
+    this._dfa = compile_regex(this._pattern, shape.numValues);
 
     const acceptingStates = new Set();
     this._dfa.states.forEach((state, index) => {
