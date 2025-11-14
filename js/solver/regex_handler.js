@@ -82,12 +82,10 @@ export const compileRegex = memoize((pattern, numValues) => {
   const parser = new RegexParser(pattern);
   const ast = parser.parse();
   const charToMask = createCharToMask(numValues);
-  const alphabet = LookupTables.get(numValues).allValues;
-  const nfaBuilder = new NFABuilder(charToMask, alphabet);
+  const nfaBuilder = new NFABuilder(charToMask, numValues);
   const { start, accept, states } = nfaBuilder.build(ast);
-  const dfaBuilder = new DFABuilder(states, start, accept, alphabet);
-  const dfa = dfaBuilder.build();
-  return collapseZeroTransitionStates(dfa);
+  const dfaBuilder = new DFABuilder(states, start, accept, numValues);
+  return dfaBuilder.build();
 });
 
 class RegexParser {
@@ -263,10 +261,10 @@ class NFABuilder {
     }
   };
 
-  constructor(charToMask, alphabet) {
+  constructor(charToMask, numSymbols) {
     this.states = [];
     this._charToMask = charToMask;
-    this._alphabet = alphabet;
+    this._alphabet = LookupTables.get(numSymbols).allValues;
   }
 
   build(ast) {
@@ -410,11 +408,11 @@ class NFABuilder {
 }
 
 class DFABuilder {
-  constructor(nfaStates, startId, acceptId, alphabet) {
+  constructor(nfaStates, startId, acceptId, numSymbols) {
     this.nfaStates = nfaStates;
     this.startId = startId;
     this.acceptId = acceptId;
-    this.alphabet = alphabet;
+    this.numSymbols = numSymbols;
     this._singleStateClosures = new Map();
   }
 
@@ -457,13 +455,22 @@ class DFABuilder {
   }
 
   build() {
-    const dfaStates = [];
+    const { accepting, transitions } = this._constructDFA();
+    return this._minimize(accepting, transitions);
+  }
+
+  // Phase 1: Build the raw DFA data — a dense transition table and
+  // an "accepting" bit for each state.
+  _constructDFA() {
+    const accepting = [];
+    const transitionTable = [];
     const stateMap = new Map();
     const addState = (closure) => {
-      const index = dfaStates.length;
+      const index = accepting.length;
       stateMap.set(closure.key, index);
-      dfaStates.push(this._makeDFAState(closure.states));
-    }
+      accepting.push(closure.states.includes(this.acceptId));
+      transitionTable.push(new Array(this.numSymbols).fill(-1));
+    };
 
     const startClosure = this._epsilonClosure([this.startId]);
     addState(startClosure);
@@ -472,10 +479,10 @@ class DFABuilder {
     while (stack.length) {
       const currentClosure = stack.pop();
       const currentStates = currentClosure.states;
-      const currentDFAState = dfaStates[stateMap.get(currentClosure.key)];
-      const transitionMap = new Map();
+      const currentTransitionRow = transitionTable[stateMap.get(currentClosure.key)];
 
-      for (let symbol = 1; symbol < this.alphabet; symbol <<= 1) {
+      for (let i = 0; i < this.numSymbols; i++) {
+        const symbol = 1 << i;
         const moveSet = new Set();
         for (const currentStateId of currentStates) {
           const nfaState = this.nfaStates[currentStateId];
@@ -491,89 +498,117 @@ class DFABuilder {
           stack.push(nextClosure);
         }
         const nextStateId = stateMap.get(nextClosure.key);
-        transitionMap.set(nextStateId,
-          transitionMap.get(nextStateId) | symbol);
-      }
-
-      for (const [nextStateId, mask] of transitionMap.entries()) {
-        currentDFAState.transitionList.push({
-          state: nextStateId,
-          mask: mask,
-        });
+        currentTransitionRow[i] = nextStateId;
       }
     }
 
     return {
-      alphabet: this.alphabet,
-      startState: 0,
-      states: dfaStates,
+      accepting,
+      transitions: transitionTable,
     };
   }
 
-  _makeDFAState(nfaStateIds) {
-    const isAccepting = nfaStateIds.includes(this.acceptId);
+  // Phase 2: Minimize the DFA using Moore's partition-refinement algorithm.
+  // 1. Split state indices into accepting vs. other states
+  // 2. Repeatedly refine partitions so states with different successor partitions
+  //    (for any symbol) move into separate blocks.
+  // 3. Collapse each final partition into a single state, synthesizing their
+  //    transition masks directly from the dense transition table.
+  _minimize(accepting, transitions) {
+    const numStates = accepting.length;
+    const numSymbols = this.numSymbols;
+
+    // Tracks which partition each state belongs to so we can compare successors.
+    const partitions = [];
+    const stateToPartition = new Array(numStates).fill(-1);
+    const addPartition = (group, index = -1) => {
+      if (group.length === 0) return;
+      if (index === -1) {
+        index = partitions.length;
+        partitions.push(group);
+      } else {
+        partitions[index] = group;
+      }
+      for (const state of group) {
+        stateToPartition[state] = index;
+      }
+    };
+
+    // Initial partitions: accepting states vs everything else.
+    const initialPartitions = [[], []];
+    for (let i = 0; i < numStates; i++) {
+      initialPartitions[accepting[i] ? 0 : 1].push(i);
+    }
+
+    for (const p of initialPartitions) {
+      addPartition(p);
+    }
+
+    // Refinement loop: split partitions until every state in a block has identical
+    // transition signatures (i.e. leads to the same partitions for all symbols).
+    let changed = true;
+    while (changed) {
+      changed = false;
+
+      for (let partitionIndex = 0; partitionIndex < partitions.length; partitionIndex++) {
+        const group = partitions[partitionIndex];
+        if (group.length <= 1) continue;
+
+        const signatureMap = new Map();
+        for (const state of group) {
+          const signature = transitions[state]
+            .map((target) => (target === -1 ? -1 : stateToPartition[target]))
+            .join(',');
+          if (!signatureMap.has(signature)) signatureMap.set(signature, []);
+          signatureMap.get(signature).push(state);
+        }
+
+        if (signatureMap.size > 1) {
+          const groupsIterator = signatureMap.values();
+          addPartition(groupsIterator.next().value, partitionIndex);
+          for (let next = groupsIterator.next(); !next.done; next = groupsIterator.next()) {
+            addPartition(next.value);
+          }
+          changed = true;
+          break;
+        }
+      }
+    }
+
+    // Collapse each partition to a representative state.
+    const newStates = [];
+
+    for (const group of partitions) {
+      const representative = group[0];
+      const transitionRow = transitions[representative];
+      const partitionMasks = new Map();
+
+      for (let symbol = 0; symbol < numSymbols; symbol++) {
+        const target = transitionRow[symbol];
+        if (target === -1) continue;
+        const partition = stateToPartition[target];
+        const mask = 1 << symbol;
+        partitionMasks.set(partition, (partitionMasks.get(partition) || 0) | mask);
+      }
+
+      const transitionList = [];
+      for (const [partitionIndex, mask] of partitionMasks) {
+        transitionList.push({ state: partitionIndex, mask });
+      }
+
+      newStates.push({
+        accepting: accepting[representative],
+        transitionList,
+      });
+    }
+
     return {
-      accepting: isAccepting,
-      transitionList: [],
+      numSymbols,
+      startState: stateToPartition[0],
+      states: newStates,
     };
   }
 }
-
-const collapseZeroTransitionStates = (dfa) => {
-  const states = dfa.states;
-
-  const acceptingSinks = [];
-
-  for (let i = 0; i < states.length; i++) {
-    const state = states[i];
-    if (state.accepting && !state.transitionList.length) {
-      acceptingSinks.push(i);
-    }
-  }
-
-  if (acceptingSinks.length <= 1) return dfa;
-
-  const canonicalAccepting = acceptingSinks[0];
-  const nonCanonical = new Set();
-  for (let i = 1; i < acceptingSinks.length; i++) {
-    nonCanonical.add(acceptingSinks[i]);
-  }
-
-  const newStates = [];
-  const oldToNew = new Map();
-
-  for (let i = 0; i < states.length; i++) {
-    if (nonCanonical.has(i)) continue;
-    oldToNew.set(i, newStates.length);
-    newStates.push({
-      accepting: states[i].accepting,
-      transitionList: [],
-    });
-  }
-
-  for (let i = 0; i < states.length; i++) {
-    if (nonCanonical.has(i)) continue;
-    const merged = new Map();
-    for (const entry of states[i].transitionList) {
-      const target = nonCanonical.has(entry.state) ? canonicalAccepting : entry.state;
-      const newIndex = oldToNew.get(target);
-      merged.set(newIndex, (merged.get(newIndex) || 0) | entry.mask);
-    }
-    const state = newStates[oldToNew.get(i)];
-    for (const [stateIndex, mask] of merged) {
-      state.transitionList.push({ state: stateIndex, mask });
-    }
-  }
-
-  const startState = oldToNew.get(
-    nonCanonical.has(dfa.startState) ? canonicalAccepting : dfa.startState);
-
-  return {
-    alphabet: dfa.alphabet,
-    startState,
-    states: newStates,
-  };
-};
 
 // Enforces a linear regex constraint by compiling the pattern into a DFA and
 // propagating it across candidate sets to prune unsupported values.
