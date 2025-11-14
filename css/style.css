@@ -569,7 +569,7 @@ button.icon-button {
 }
 
 #display-panel {
-  width: 140px;
+  width: 200px;
 }
 
 #state-output {
@@ -578,6 +578,11 @@ button.icon-button {
   flex-wrap: wrap;
   gap: 12px;
   flex-direction: column;
+}
+
+#state-output sup {
+  font-size: 0.8em;
+  line-height: 0;
 }
 
 #state-output span {

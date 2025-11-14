@@ -516,9 +516,12 @@ class StateHistoryDisplay {
     this._states = [];
     this._statsContainer = null;
     this._visible = false;
+    this._mode = null;
+    this._chartSections = null;
 
     this._setUpChartButton();
     this._charts = [];
+    this._chartSections = {};
 
     this._updateCharts = deferUntilAnimationFrame(
       this._updateCharts.bind(this));
@@ -526,14 +529,22 @@ class StateHistoryDisplay {
     this.clear();
   }
 
+  setMode(mode) {
+    this._mode = mode;
+    this._updateChartVisibility();
+  }
+
   add(state) {
 
+    const estimateStats = state.extra?.estimateSolutionCount;
     const newState = {
       timeMs: state.timeMs / 1000,
       guesses: state.counters.guesses,
       searchedPercentage: state.counters.progressRatio * 100,
       skippedPercentage: state.counters.branchesIgnored * 100,
       solutions: state.counters.solutions,
+      estimatedSolutions: estimateStats?.average ?? null,
+      samples: estimateStats?.runs ?? null,
     };
 
     if (this._states.length && newState.timeMs < this._nextT) {
@@ -631,15 +642,21 @@ class StateHistoryDisplay {
 
     this._setUpStatsWindow(this._statsContainer);
 
+    this._chartSections = {};
     this._addChartDisplay(this._statsContainer,
-      'Solutions', 'solutions');
+      'estimatedSolutions', 'Estimated solutions', 'estimatedSolutions');
     this._addChartDisplay(this._statsContainer,
-      'Progress percentage (searched + skipped)',
+      'samples', 'Samples', 'samples');
+    this._addChartDisplay(this._statsContainer,
+      'solutions', 'Solutions encountered', 'solutions');
+    this._addChartDisplay(this._statsContainer,
+      'progress', 'Progress percentage (searched + skipped)',
       'searchedPercentage', 'skippedPercentage');
     this._addChartDisplay(this._statsContainer,
-      'Guesses', 'guesses');
+      'guesses', 'Guesses', 'guesses');
 
     this._eventReplayFn = this._syncToolTips(this._charts);
+    this._updateChartVisibility();
   }
 
   _setUpStatsWindow(container) {
@@ -649,20 +666,44 @@ class StateHistoryDisplay {
     }
   }
 
-  _addChartDisplay(container, title, ...yAxis) {
+  _addChartDisplay(container, id, title, ...yAxis) {
+    const section = document.createElement('div');
+    section.classList.add('chart-section');
+    container.appendChild(section);
+
     const titleElem = document.createElement('div');
     titleElem.classList.add('description');
     titleElem.textContent = title;
-    container.appendChild(titleElem);
+    section.appendChild(titleElem);
 
     const chartContainer = document.createElement('div');
     chartContainer.style.height = this.CHART_HEIGHT;
-    container.appendChild(chartContainer);
+    section.appendChild(chartContainer);
 
     const ctx = document.createElement('canvas');
     chartContainer.appendChild(ctx);
     this._makeChart(ctx, ...yAxis);
-    return chartContainer;
+    this._chartSections[id] = { section, title: titleElem };
+    return section;
+  }
+
+  _updateChartVisibility() {
+    if (!this._chartSections) return;
+    const isEstimateMode = this._mode === 'estimate-solution-count';
+    const setDisplay = (key, show) => {
+      if (!this._chartSections[key]) return;
+      this._chartSections[key].section.style.display = show ? 'block' : 'none';
+    };
+    setDisplay('estimatedSolutions', isEstimateMode);
+    setDisplay('samples', isEstimateMode);
+    setDisplay('progress', !isEstimateMode);
+    setDisplay('guesses', !isEstimateMode);
+    if (this._chartSections.solutions) {
+      this._chartSections.solutions.section.style.display = 'block';
+      this._chartSections.solutions.title.textContent = isEstimateMode
+        ? 'Solutions encountered'
+        : 'Solutions';
+    }
   }
 
   _makeChart(ctx, ...yAxis) {
@@ -778,6 +819,7 @@ class StateHistoryDisplay {
 class SolverStateDisplay {
   constructor(solutionDisplay) {
     this._solutionDisplay = solutionDisplay;
+    this._mode = null;
 
     this._elements = {
       progressContainer: document.getElementById('progress-container'),
@@ -787,6 +829,7 @@ class SolverStateDisplay {
       solveStatus: document.getElementById('solve-status'),
     };
 
+    this._stateVarContainers = {};
     this._setUpStateOutput();
     this._stateHistory = new StateHistoryDisplay();
 
@@ -805,11 +848,40 @@ class SolverStateDisplay {
     'nthSolution': 'Solving',
     'nthStep': '',
     'countSolutions': 'Counting',
+    'estimateSolutionCount': 'Estimating',
     'validateLayout': 'Validating',
     'terminate': 'Aborted',
   };
 
+  setMode(mode) {
+    this._mode = mode;
+    this._stateHistory.setMode(mode);
+    const hideProgress = mode === 'estimate-solution-count';
+    this._elements.progressBar.style.display = hideProgress ? 'none' : '';
+    this._elements.progressPercentage.style.display = hideProgress ? 'none' : '';
+    if (hideProgress) {
+      this._elements.progressBar.setAttribute('value', 0);
+      this._elements.progressPercentage.textContent = '';
+    }
+    this._elements.solveStatus.style.display = hideProgress ? 'none' : '';
+    if (hideProgress) {
+      this._elements.solveStatus.textContent = '';
+      this._elements.progressContainer.classList.remove('error');
+    }
+    if (this._stateVarContainers.searchSpaceExplored) {
+      this._stateVarContainers.searchSpaceExplored.style.display = hideProgress ? 'none' : '';
+    }
+    if (this._stateVarContainers.samples) {
+      this._stateVarContainers.samples.style.display = hideProgress ? '' : 'none';
+    }
+    if (this._stateVarContainers.solutionsEncountered) {
+      this._stateVarContainers.solutionsEncountered.style.display = hideProgress ? '' : 'none';
+    }
+  }
+
   setSolveStatus(isSolving, method) {
+    if (this._mode === 'estimate-solution-count') return;
+
     if (!isSolving && method == 'terminate') {
       this._elements.solveStatus.textContent = this._METHOD_TO_STATUS[method];
       this._elements.progressContainer.classList.add('error');
@@ -845,15 +917,42 @@ class SolverStateDisplay {
   _displayStateVariables(state) {
     const counters = state.counters;
     const searchComplete = state.done && !counters.branchesIgnored;
+    const estimateStats = state.extra?.estimateSolutionCount;
 
     for (const v in this._stateVars) {
       let text;
       switch (v) {
-        case 'solutions':
-          this._renderNumberWithGaps(this._stateVars[v], counters[v]);
-          if (!searchComplete) {
-            this._stateVars[v].appendChild(document.createTextNode('+'));
+        case 'solutions': {
+          const container = this._stateVars[v];
+          clearDOMNode(container);
+          const showEstimate = this._mode === 'estimate-solution-count';
+          if (showEstimate) {
+            if (estimateStats && estimateStats.runs) {
+              const avg = estimateStats.average || 0;
+              if (avg === 0) {
+                container.appendChild(document.createTextNode('~0'));
+                break;
+              }
+              const expStr = avg.toExponential(3);
+              const [mantissa, exponentPart] = expStr.split('e');
+              const exponent = parseInt(exponentPart, 10);
+              container.appendChild(document.createTextNode(`~${mantissa} × 10`));
+              const sup = document.createElement('sup');
+              sup.textContent = exponent.toString();
+              container.appendChild(sup);
+            } else {
+              container.appendChild(document.createTextNode('~0'));
+            }
+          } else {
+            this._renderNumberWithGaps(container, counters[v]);
+            if (!searchComplete) {
+              container.appendChild(document.createTextNode('+'));
+            }
           }
+          break;
+        }
+        case 'solutionsEncountered':
+          this._renderNumberWithGaps(this._stateVars[v], counters.solutions);
           break;
         case 'puzzleSetupTime':
           text = state.puzzleSetupTime ? formatTimeMs(state.puzzleSetupTime) : '?';
@@ -867,6 +966,13 @@ class SolverStateDisplay {
           text = (counters.progressRatio * 100).toPrecision(3) + '%';
           if (searchComplete) text = '100%';
           this._stateVars[v].textContent = text;
+          break;
+        case 'samples':
+          if (!estimateStats || !estimateStats.runs) {
+            this._stateVars[v].textContent = '';
+            break;
+          }
+          this._renderNumberWithGaps(this._stateVars[v], estimateStats.runs);
           break;
         default:
           this._renderNumberWithGaps(this._stateVars[v], counters[v]);
@@ -896,6 +1002,7 @@ class SolverStateDisplay {
   }
 
   _updateProgressBar(state) {
+    if (this._mode === 'estimate-solution-count') return;
     const progress = state.done
       ? 1
       : state.counters.progressRatio + state.counters.branchesIgnored;
@@ -908,6 +1015,8 @@ class SolverStateDisplay {
     let container = this._elements.stateOutput;
     let vars = [
       'solutions',
+      'samples',
+      'solutionsEncountered',
       'guesses',
       'valuesTried',
       'constraintsProcessed',
@@ -927,7 +1036,12 @@ class SolverStateDisplay {
       elem.appendChild(title);
       container.appendChild(elem);
 
+      if (v === 'samples' || v === 'solutionsEncountered') {
+        elem.style.display = 'none';
+      }
+
       this._stateVars[v] = value;
+      this._stateVarContainers[v] = elem;
     }
   }
 }
@@ -993,6 +1107,8 @@ class ModeHandler {
       throw (e);
     }
   }
+
+  handleExtraState() { }
 }
 
 ModeHandler.AllPossibilities = class extends ModeHandler {
@@ -1219,6 +1335,32 @@ ModeHandler.CountSolutions = class extends ModeHandler {
   }
 }
 
+ModeHandler.EstimateSolutionCount = class extends ModeHandler {
+  async run(solver) {
+    await super.run(solver);
+    this._runner = this._solver.estimateSolutionCount()
+      .catch(this.handleSolverException.bind(this));
+  }
+
+  minIndex() {
+    return 0;
+  }
+
+  add(...solutions) {
+    if (!solutions.length) return;
+    this._solutions = [solutions.pop()];
+    super.add();
+  }
+
+  async get() {
+    if (!this._solutions.length) return {};
+    return {
+      solution: this._solutions[0],
+      description: 'Latest sample',
+    };
+  }
+}
+
 ModeHandler.ValidateLayout = class extends ModeHandler {
   ITERATION_CONTROLS = true;
   ALLOW_DOWNLOAD = true;
@@ -1282,6 +1424,7 @@ export class SolutionController {
       'all-possibilities': ModeHandler.AllPossibilities,
       'solutions': ModeHandler.AllSolutions,
       'count-solutions': ModeHandler.CountSolutions,
+      'estimate-solution-count': ModeHandler.EstimateSolutionCount,
       'step-by-step': ModeHandler.StepByStep,
       'validate-layout': ModeHandler.ValidateLayout,
     };
@@ -1427,6 +1570,8 @@ export class SolutionController {
       'View each solution.',
     'count-solutions':
       'Count the total number of solutions by iterating over all solutions.',
+    'estimate-solution-count':
+      'Estimate the total number of solutions by repeatedly filling the grid with random values.',
     'step-by-step':
       `Step through the solving process.
       Alt-click on a cell to force the solver to resolve it next.`,
@@ -1439,6 +1584,7 @@ export class SolutionController {
   async _update() {
     this._solutionDisplay.setSolution();
     let mode = this._elements.mode.value;
+    this._stateDisplay.setMode(mode);
     let auto = this._elements.autoSolve.checked;
 
     const constraints = this._constraintManager.getConstraints();
@@ -1500,6 +1646,9 @@ export class SolutionController {
           this._stateDisplay.setState(s);
           if (s.extra && s.extra.solutions) {
             handler.add(...s.extra.solutions);
+          }
+          if (s.extra) {
+            handler.handleExtraState(s.extra, s);
           }
           if (s.done) { handler.setDone(); }
         },
@@ -1707,6 +1856,10 @@ export class SolverProxy {
 
   async countSolutions() {
     return this._callWorker('countSolutions');
+  }
+
+  async estimateSolutionCount() {
+    return this._callWorker('estimateSolutionCount');
   }
 
   _handleMessage(response) {
