@@ -956,16 +956,52 @@ export class SudokuConstraint {
       return decoded;
     }
 
-    static *makeFromArgs(patternToken, ...cells) {
+    static *makeFromArgs(patternToken, ...items) {
       const pattern = this.decodePattern(patternToken);
-      yield new this(pattern, ...cells);
+
+      let cells = [];
+      const flush = () => {
+        if (cells.length) {
+          const constraint = new this(pattern, ...cells);
+          cells = [];
+          return constraint;
+        }
+        return null;
+      };
+
+      for (const item of items) {
+        if (!item.length) {
+          const constraint = flush();
+          if (constraint) yield constraint;
+          continue;
+        }
+        cells.push(item);
+      }
+
+      const constraint = flush();
+      if (constraint) yield constraint;
     }
 
     static serialize(constraints) {
-      return constraints.map(constraint => {
-        const encodedPattern = this.encodePattern(constraint.pattern);
-        return this._argsToString(encodedPattern, ...constraint.cells);
-      }).join('');
+      const sortedConstraints = [...constraints].sort();
+
+      const parts = [];
+      for (const group of groupSortedBy(sortedConstraints, c => c.pattern)) {
+        const pattern = group[0].pattern;
+        const encodedPattern = this.encodePattern(pattern);
+
+        const items = [];
+        let first = true;
+        for (const constraint of group) {
+          if (!first) items.push('');
+          items.push(...constraint.cells);
+          first = false;
+        }
+
+        parts.push(this._argsToString(encodedPattern, ...items));
+      }
+
+      return parts.join('');
     }
   }
 
