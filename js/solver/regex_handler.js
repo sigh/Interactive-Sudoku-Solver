@@ -1,5 +1,6 @@
 const { SudokuConstraintHandler } = await import('./handlers.js' + self.VERSION_PARAM);
 const { LookupTables } = await import('./lookup_tables.js' + self.VERSION_PARAM);
+const { memoize } = await import('../util.js' + self.VERSION_PARAM);
 
 const charToValue = (char) => {
   if (char >= '1' && char <= '9') {
@@ -77,7 +78,7 @@ class AstNode {
 // (with ranges and optional negation), grouping '()', alternation '|', and the
 // quantifiers '*', '+', and '?'. Additional operators can be layered on once the
 // solver needs them.
-const compile_regex = (pattern, numValues) => {
+export const compileRegex = memoize((pattern, numValues) => {
   const parser = new RegexParser(pattern);
   const ast = parser.parse();
   const charToMask = createCharToMask(numValues);
@@ -86,7 +87,7 @@ const compile_regex = (pattern, numValues) => {
   const { start, accept, states } = nfaBuilder.build(ast);
   const dfaBuilder = new DFABuilder(states, start, accept, alphabet);
   return dfaBuilder.build();
-}
+});
 
 class RegexParser {
   constructor(pattern) {
@@ -529,7 +530,7 @@ export class RegexLine extends SudokuConstraintHandler {
   }
 
   initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
-    this._dfa = compile_regex(this._pattern, shape.numValues);
+    this._dfa = compileRegex(this._pattern, shape.numValues);
 
     const acceptingStates = new Set();
     this._dfa.states.forEach((state, index) => {
