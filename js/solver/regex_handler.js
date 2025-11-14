@@ -86,7 +86,8 @@ export const compileRegex = memoize((pattern, numValues) => {
   const nfaBuilder = new NFABuilder(charToMask, alphabet);
   const { start, accept, states } = nfaBuilder.build(ast);
   const dfaBuilder = new DFABuilder(states, start, accept, alphabet);
-  return dfaBuilder.build();
+  const dfa = dfaBuilder.build();
+  return collapseZeroTransitionStates(dfa);
 });
 
 class RegexParser {
@@ -517,6 +518,62 @@ class DFABuilder {
     };
   }
 }
+
+const collapseZeroTransitionStates = (dfa) => {
+  const states = dfa.states;
+
+  const acceptingSinks = [];
+
+  for (let i = 0; i < states.length; i++) {
+    const state = states[i];
+    if (state.accepting && !state.transitionList.length) {
+      acceptingSinks.push(i);
+    }
+  }
+
+  if (acceptingSinks.length <= 1) return dfa;
+
+  const canonicalAccepting = acceptingSinks[0];
+  const nonCanonical = new Set();
+  for (let i = 1; i < acceptingSinks.length; i++) {
+    nonCanonical.add(acceptingSinks[i]);
+  }
+
+  const newStates = [];
+  const oldToNew = new Map();
+
+  for (let i = 0; i < states.length; i++) {
+    if (nonCanonical.has(i)) continue;
+    oldToNew.set(i, newStates.length);
+    newStates.push({
+      accepting: states[i].accepting,
+      transitionList: [],
+    });
+  }
+
+  for (let i = 0; i < states.length; i++) {
+    if (nonCanonical.has(i)) continue;
+    const merged = new Map();
+    for (const entry of states[i].transitionList) {
+      const target = nonCanonical.has(entry.state) ? canonicalAccepting : entry.state;
+      const newIndex = oldToNew.get(target);
+      merged.set(newIndex, (merged.get(newIndex) || 0) | entry.mask);
+    }
+    const state = newStates[oldToNew.get(i)];
+    for (const [stateIndex, mask] of merged) {
+      state.transitionList.push({ state: stateIndex, mask });
+    }
+  }
+
+  const startState = oldToNew.get(
+    nonCanonical.has(dfa.startState) ? canonicalAccepting : dfa.startState);
+
+  return {
+    alphabet: dfa.alphabet,
+    startState,
+    states: newStates,
+  };
+};
 
 // Enforces a linear regex constraint by compiling the pattern into a DFA and
 // propagating it across candidate sets to prune unsupported values.
