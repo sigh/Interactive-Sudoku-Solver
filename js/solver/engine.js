@@ -1,6 +1,12 @@
 "use strict";
 
-const { Timer, IteratorWithCount, arraysAreEqual, setIntersectionToArray } = await import('../util.js' + self.VERSION_PARAM);
+const {
+  Timer,
+  IteratorWithCount,
+  arraysAreEqual,
+  setIntersectionToArray,
+  countOnes16bit,
+} = await import('../util.js' + self.VERSION_PARAM);
 const { LookupTables } = await import('./lookup_tables.js' + self.VERSION_PARAM);
 const { SHAPE_MAX } = await import('../grid_shape.js' + self.VERSION_PARAM);
 const { SudokuConstraintOptimizer } = await import('./optimizer.js' + self.VERSION_PARAM);
@@ -68,6 +74,63 @@ export class SudokuSolver {
     this._progressExtraStateFn = null;
 
     return this._internalSolver.counters.solutions;
+  }
+
+  estimateSolutionCount() {
+    this._reset();
+
+    const stats = {
+      runs: 0,
+      successes: 0,
+      sum: 0,
+      totalGuesses: 0,
+      totalValues: 0,
+      lastRun: null,
+      pendingSolutions: [],
+    };
+
+    this._progressExtraStateFn = () => {
+      const average = stats.runs ? stats.sum / stats.runs : 0;
+      const payload = {
+        estimateSolutionCount: {
+          runs: stats.runs,
+          successes: stats.successes,
+          sum: stats.sum,
+          average: average,
+          lastEstimate: stats.lastRun ? stats.lastRun.estimate : null,
+          lastRunSolved: stats.lastRun ? stats.lastRun.solved : null,
+          lastRunGuesses: stats.lastRun ? stats.lastRun.guesses : null,
+        }
+      };
+      if (stats.pendingSolutions.length) {
+        payload.solutions = stats.pendingSolutions.splice(0);
+      }
+      return payload;
+    };
+
+    this._timer.unpause();
+    while (true) {
+      const runResult = this._internalSolver.randomEstimateRun();
+      stats.runs++;
+      stats.sum += runResult.estimate;
+      stats.totalGuesses += runResult.guesses;
+      stats.totalValues += runResult.valuesTried;
+      if (runResult.solved) stats.successes++;
+      stats.lastRun = runResult;
+      if (runResult.solved && runResult.solution) {
+        stats.pendingSolutions.push(runResult.solution);
+      }
+
+      const counters = this._internalSolver.counters;
+      counters.nodesSearched = stats.runs;
+      counters.valuesTried = stats.totalValues;
+      counters.guesses = stats.totalGuesses;
+      counters.solutions = stats.successes;
+      counters.backtracks = 0;
+      counters.progressRatio = 0;
+
+      this._sendProgress();
+    }
   }
 
   nthSolution(n) {
@@ -326,6 +389,8 @@ class InternalSolver {
     this._cellPriorities = this._initCellPriorities();
 
     this._recStack = this._initStack();
+    this._unsolvedCellBuffer = new Uint16Array(this._numCells);
+    this._singletonProcessed = new Uint8Array(this._numCells);
 
     this.reset();
   }
@@ -973,6 +1038,137 @@ class InternalSolver {
     }
 
     return finalize(null);
+  }
+
+  randomEstimateRun() {
+    this._resetRun();
+
+    const recFrame = this._recStack[0];
+    recFrame.gridState.set(this._initialGridState);
+
+    const handlerAccumulator = this._handlerAccumulator;
+    handlerAccumulator.reset(false);
+    for (let i = 0; i < this._numCells; i++) {
+      handlerAccumulator.addForCell(i);
+    }
+
+    if (!this._enforceConstraints(recFrame.gridState, handlerAccumulator)) {
+      return {
+        estimate: 0,
+        solved: false,
+        guesses: 0,
+        valuesTried: 0,
+      };
+    }
+
+    const grid = recFrame.gridCells;
+    const buffer = this._unsolvedCellBuffer;
+    const processedSingles = this._singletonProcessed;
+    processedSingles.fill(0);
+
+    let product = 1;
+    let guesses = 0;
+    let valuesTried = 0;
+
+    const applySingletons = () => {
+      while (true) {
+        let singleCount = 0;
+        for (let cell = 0; cell < this._numCells; cell++) {
+          const value = grid[cell];
+          if (value === 0) return false;
+          if ((value & (value - 1)) === 0 && !processedSingles[cell]) {
+            buffer[singleCount++] = cell;
+            processedSingles[cell] = 1;
+            valuesTried++;
+          }
+        }
+        if (singleCount === 0) return true;
+        handlerAccumulator.reset(false);
+        for (let i = 0; i < singleCount; i++) {
+          handlerAccumulator.addForFixedCell(buffer[i]);
+        }
+        if (!this._enforceConstraints(recFrame.gridState, handlerAccumulator)) {
+          return false;
+        }
+      }
+    };
+
+    while (true) {
+      if (!applySingletons()) {
+        return {
+          estimate: 0,
+          solved: false,
+          guesses,
+          valuesTried,
+        };
+      }
+
+      let cellIndex = -1;
+      let bestCount = Infinity;
+      for (let cell = 0; cell < this._numCells; cell++) {
+        const value = grid[cell];
+        if ((value & (value - 1)) !== 0) {
+          const count = countOnes16bit(value);
+          if (count < bestCount) {
+            bestCount = count;
+            cellIndex = cell;
+            if (bestCount === 2) break;
+          }
+        }
+      }
+
+      if (cellIndex === -1) {
+        return {
+          estimate: product,
+          solved: true,
+          guesses,
+          valuesTried,
+          solution: SudokuSolverUtil.gridToSolution(recFrame.gridCells),
+        };
+      }
+      const candidates = grid[cellIndex];
+      const candidateCount = countOnes16bit(candidates);
+      if (candidateCount === 0) {
+        return {
+          estimate: 0,
+          solved: false,
+          guesses,
+          valuesTried,
+        };
+      }
+
+      if (candidateCount > 1) {
+        product *= candidateCount;
+        guesses++;
+      }
+      valuesTried++;
+
+      const chosenValue = this._pickRandomCandidate(candidates, candidateCount);
+      grid[cellIndex] = chosenValue;
+      processedSingles[cellIndex] = 0;
+
+      handlerAccumulator.reset(false);
+      handlerAccumulator.addForFixedCell(cellIndex);
+
+      if (!this._enforceConstraints(recFrame.gridState, handlerAccumulator)) {
+        return {
+          estimate: 0,
+          solved: false,
+          guesses,
+          valuesTried,
+        };
+      }
+    }
+  }
+
+  _pickRandomCandidate(candidates, count) {
+    let index = Math.floor(Math.random() * count);
+    let mask = candidates;
+    while (index > 0) {
+      mask &= mask - 1;
+      index--;
+    }
+    return mask & -mask;
   }
 
   setProgressCallback(callback, logFrequency) {
