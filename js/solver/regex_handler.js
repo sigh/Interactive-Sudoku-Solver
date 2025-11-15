@@ -599,6 +599,9 @@ class DFABuilder {
       newStates.push({
         accepting: accepting[representative],
         transitionList,
+        // NOTE: We could also store a mask of all symbols that have transitions
+        // to check if we can skip the entire state.
+        // However, it would only trigger a small percentage of time at most.
       });
     }
 
@@ -631,7 +634,9 @@ export class RegexLine extends SudokuConstraintHandler {
     });
     this._acceptingStates = acceptingStates;
     const slots = this.cells.length + 1;
-    this._statesList = Array.from({ length: slots }, () => new BitSet(stateCapacity));
+    const { bitsets, words } = BitSet.allocatePool(stateCapacity, slots);
+    this._stateWords = words;
+    this._statesList = bitsets;
 
     return true;
   }
@@ -644,7 +649,7 @@ export class RegexLine extends SudokuConstraintHandler {
     const statesList = this._statesList;
 
     // Clear all the states so we can reuse the bitsets without reallocating.
-    for (let i = 0; i < statesList.length; i++) statesList[i].clear();
+    this._stateWords.fill(0);
 
     // Forward pass: Find all states reachable from the start state.
     statesList[0].add(dfa.startState);
@@ -731,21 +736,25 @@ export class RegexLine extends SudokuConstraintHandler {
 
 // Minimal bitset implementation for tracking DFA states.
 class BitSet {
-  constructor(capacity) {
-    const wordCount = Math.ceil(capacity / 32);
-    this.words = new Uint32Array(wordCount);
+  static allocatePool(capacity, count) {
+    const wordsPerSet = BitSet._wordCountFor(capacity);
+    const words = new Uint32Array(wordsPerSet * count);
+    const bitsets = new Array(count);
+    for (let i = 0; i < count; i++) {
+      const offset = i * wordsPerSet;
+      bitsets[i] = new BitSet(capacity, words.subarray(offset, offset + wordsPerSet));
+    }
+    return { bitsets, words };
+  }
+
+  constructor(capacity, words = null) {
+    this.words = words || new Uint32Array(BitSet._wordCountFor(capacity));
   }
 
   add(bitIndex) {
     const wordIndex = bitIndex >>> 5;
     const mask = 1 << (bitIndex & 31);
     this.words[wordIndex] |= mask;
-  }
-
-  delete(bitIndex) {
-    const wordIndex = bitIndex >>> 5;
-    const mask = 1 << (bitIndex & 31);
-    this.words[wordIndex] &= ~mask;
   }
 
   has(bitIndex) {
@@ -774,5 +783,9 @@ class BitSet {
   static bitIndex(wordIndex, lowestBit) {
     const bitPosition = 31 - Math.clz32(lowestBit);
     return (wordIndex << 5) + bitPosition;
+  }
+
+  static _wordCountFor(capacity) {
+    return Math.ceil(capacity / 32);
   }
 }
