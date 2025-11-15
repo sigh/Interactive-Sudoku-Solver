@@ -86,6 +86,7 @@ const handleWorkerMethod = (method, payload) => {
 const debugCount = (key, value) => {
   workerSolver.incDebugCounter(key, value);
 }
+globalThis.debugCount = debugCount;
 
 const sendState = (extraState) => {
   const state = workerSolver.state();
