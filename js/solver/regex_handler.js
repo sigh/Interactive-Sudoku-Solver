@@ -624,13 +624,14 @@ export class RegexLine extends SudokuConstraintHandler {
   initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
     this._dfa = compileRegex(this._pattern, shape.numValues);
 
-    const acceptingStates = new Set();
+    const stateCapacity = this._dfa.states.length;
+    const acceptingStates = new BitSet(stateCapacity);
     this._dfa.states.forEach((state, index) => {
       if (state.accepting) acceptingStates.add(index);
     });
     this._acceptingStates = acceptingStates;
     const slots = this.cells.length + 1;
-    this._statesList = Array.from({ length: slots }, () => new Set());
+    this._statesList = Array.from({ length: slots }, () => new BitSet(stateCapacity));
 
     return true;
   }
@@ -642,9 +643,8 @@ export class RegexLine extends SudokuConstraintHandler {
     const dfaStates = dfa.states;
     const statesList = this._statesList;
 
-    // Clear all the states. Setting it to an empty set has better performance
-    // than clearing the existing set.
-    for (let i = 0; i < statesList.length; i++) statesList[i] = new Set();
+    // Clear all the states so we can reuse the bitsets without reallocating.
+    for (let i = 0; i < statesList.length; i++) statesList[i].clear();
 
     // Forward pass: Find all states reachable from the start state.
     statesList[0].add(dfa.startState);
@@ -654,26 +654,33 @@ export class RegexLine extends SudokuConstraintHandler {
       const currentStates = statesList[i];
       const values = grid[cells[i]];
 
-      for (const stateIndex of currentStates) {
-        const transitionList = dfaStates[stateIndex].transitionList;
-        for (let j = 0; j < transitionList.length; j++) {
-          const entry = transitionList[j];
-          if (values & entry.mask) {
-            nextStates.add(entry.state);
+      // Note: We operate directly on the bitset words for performance.
+      // Encapsulating this in methods caused significant overhead.
+      const currentWords = currentStates.words;
+      for (let wordIndex = 0; wordIndex < currentWords.length; wordIndex++) {
+        let word = currentWords[wordIndex];
+        while (word) {
+          const lowestBit = word & -word;
+          word &= ~lowestBit;
+          const stateIndex = BitSet.bitIndex(wordIndex, lowestBit);
+          const transitionList = dfaStates[stateIndex].transitionList;
+          for (let j = 0; j < transitionList.length; j++) {
+            const entry = transitionList[j];
+            if (values & entry.mask) {
+              nextStates.add(entry.state);
+            }
           }
         }
       }
 
-      if (!nextStates.size) return false;
+      if (nextStates.isEmpty()) return false;
     }
 
     // Backward pass: Filter down to only the states that can reach an accepting
     // state. Prune any unsupported values from the grid.
     const finalStates = statesList[numCells];
-    for (const state of finalStates) {
-      if (!this._acceptingStates.has(state)) finalStates.delete(state);
-    }
-    if (!finalStates.size) return false;
+    finalStates.intersect(this._acceptingStates);
+    if (finalStates.isEmpty()) return false;
 
     for (let i = numCells - 1; i >= 0; i--) {
       const currentStates = statesList[i];
@@ -682,19 +689,32 @@ export class RegexLine extends SudokuConstraintHandler {
       const values = grid[cell];
       let supportedValues = 0;
 
-      for (const stateIndex of currentStates) {
-        const transitionList = dfaStates[stateIndex].transitionList;
-        let stateSupportedValues = 0;
-        for (let j = 0; j < transitionList.length; j++) {
-          const entry = transitionList[j];
-          const maskedValues = entry.mask & values;
-          if (maskedValues && nextStates.has(entry.state)) {
-            stateSupportedValues |= maskedValues;
+      // Note: We operate directly on the bitset words for performance.
+      // Encapsulating this in methods caused significant overhead.
+      const currentWords = currentStates.words;
+      for (let wordIndex = 0; wordIndex < currentWords.length; wordIndex++) {
+        let word = currentWords[wordIndex];
+        let keptWord = 0;
+        while (word) {
+          const lowestBit = word & -word;
+          word &= ~lowestBit;
+          const stateIndex = BitSet.bitIndex(wordIndex, lowestBit);
+          const transitionList = dfaStates[stateIndex].transitionList;
+          let stateSupportedValues = 0;
+          for (let j = 0; j < transitionList.length; j++) {
+            const entry = transitionList[j];
+            const maskedValues = entry.mask & values;
+            if (maskedValues && nextStates.has(entry.state)) {
+              stateSupportedValues |= maskedValues;
+            }
+          }
+
+          if (stateSupportedValues) {
+            keptWord |= lowestBit;
+            supportedValues |= stateSupportedValues;
           }
         }
-
-        if (!stateSupportedValues) currentStates.delete(stateIndex);
-        supportedValues |= stateSupportedValues;
+        currentWords[wordIndex] = keptWord;
       }
 
       if (!supportedValues) return false;
@@ -706,5 +726,53 @@ export class RegexLine extends SudokuConstraintHandler {
     }
 
     return true;
+  }
+}
+
+// Minimal bitset implementation for tracking DFA states.
+class BitSet {
+  constructor(capacity) {
+    const wordCount = Math.ceil(capacity / 32);
+    this.words = new Uint32Array(wordCount);
+  }
+
+  add(bitIndex) {
+    const wordIndex = bitIndex >>> 5;
+    const mask = 1 << (bitIndex & 31);
+    this.words[wordIndex] |= mask;
+  }
+
+  delete(bitIndex) {
+    const wordIndex = bitIndex >>> 5;
+    const mask = 1 << (bitIndex & 31);
+    this.words[wordIndex] &= ~mask;
+  }
+
+  has(bitIndex) {
+    const wordIndex = bitIndex >>> 5;
+    const mask = 1 << (bitIndex & 31);
+    return (this.words[wordIndex] & mask) !== 0;
+  }
+
+  clear() {
+    this.words.fill(0);
+  }
+
+  isEmpty() {
+    for (let i = 0; i < this.words.length; i++) {
+      if (this.words[i]) return false;
+    }
+    return true;
+  }
+
+  intersect(other) {
+    for (let i = 0; i < this.words.length; i++) {
+      this.words[i] &= other.words[i];
+    }
+  }
+
+  static bitIndex(wordIndex, lowestBit) {
+    const bitPosition = 31 - Math.clz32(lowestBit);
+    return (wordIndex << 5) + bitPosition;
   }
 }
