@@ -416,6 +416,8 @@ class NFABuilder {
 }
 
 class DFABuilder {
+  static RAW_DFA_START_STATE = 0;
+
   constructor(nfaStates, startId, acceptId, numSymbols) {
     this.nfaStates = nfaStates;
     this.startId = startId;
@@ -436,13 +438,6 @@ class DFABuilder {
       this.nfaStates = nfaStates;
       this.accepting = accepting;
       this.transitions = new Array(numSymbols).fill(-1)
-    }
-  };
-
-  static DFAState = class {
-    constructor(accepting, transitionList) {
-      this.accepting = accepting;
-      this.transitionList = transitionList;
     }
   };
 
@@ -479,7 +474,8 @@ class DFABuilder {
 
   build() {
     const rawDfaStates = this._constructDFA();
-    return this._minimize(rawDfaStates);
+    const minimizedStates = this._minimize(rawDfaStates);
+    return this._flattenStates(minimizedStates);
   }
 
   // Phase 1: Build the raw DFA data — a dense transition table and
@@ -616,22 +612,65 @@ class DFABuilder {
 
       const transitionList = [];
       for (const [partitionIndex, mask] of partitionMasks) {
-        transitionList.push({ state: partitionIndex, mask });
+        transitionList.push(
+          DFABuilder._makeTransitionEntry(mask, partitionIndex));
       }
 
       // NOTE: We could also store a mask of all symbols that have transitions
       // to check if we can skip the entire state.
       // However, it would only trigger a small percentage of time at most.
-      newStates.push(new DFABuilder.DFAState(
-        rawDfaStates[representative].accepting,
+      newStates.push({
+        accepting: rawDfaStates[representative].accepting,
+        starting: group.includes(DFABuilder.RAW_DFA_START_STATE),
         transitionList,
-      ));
+      });
+    }
+
+    return newStates;
+  }
+
+  static _makeTransitionEntry(mask, state) {
+    // Transition entry layout: [mask: 16 bits, state: 16 bits]
+    // This allows us to store the transitions compactly in a single Uint32Array.
+    // The entry can be checked directly against a value since values are
+    // also at most 16 bits.
+    return mask | (state << 16);
+  }
+
+  _flattenStates(states) {
+    const numStates = states.length;
+    if (numStates > (1 << 16)) {
+      throw new Error('Regex DFA has too many states to represent');
+    }
+
+    const acceptingStates = new BitSet(numStates);
+    const startingStates = new BitSet(numStates);
+    const totalTransitions = states.reduce(
+      (acc, state) => acc + state.transitionList.length, 0);
+
+    const transitionBackingArray = new Uint32Array(totalTransitions);
+    const transitionLists = [];
+    let transitionOffset = 0;
+
+    for (let i = 0; i < numStates; i++) {
+      const state = states[i];
+      if (state.accepting) acceptingStates.add(i);
+      if (state.starting) startingStates.add(i);
+
+      const numTransitions = state.transitionList.length;
+      const transitionList = transitionBackingArray.subarray(
+        transitionOffset,
+        transitionOffset + numTransitions);
+      transitionOffset += numTransitions;
+      transitionList.set(state.transitionList);
+      transitionLists.push(transitionList);
     }
 
     return {
-      numSymbols,
-      startState: stateToPartition[0],
-      states: newStates,
+      numStates,
+      acceptingStates,
+      startingStates,
+      transitionLists,
     };
   }
 }
@@ -643,19 +682,13 @@ export class RegexLine extends SudokuConstraintHandler {
     super(cells);
     this._pattern = pattern;
     this._dfa = null;
-    this._acceptingStates = null;
     this._statesList = null;
   }
 
   initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
     this._dfa = compileRegex(this._pattern, shape.numValues);
 
-    const stateCapacity = this._dfa.states.length;
-    const acceptingStates = new BitSet(stateCapacity);
-    this._dfa.states.forEach((state, index) => {
-      if (state.accepting) acceptingStates.add(index);
-    });
-    this._acceptingStates = acceptingStates;
+    const stateCapacity = this._dfa.numStates;
     const slots = this.cells.length + 1;
     const { bitsets, words } = BitSet.allocatePool(stateCapacity, slots);
     this._stateWords = words;
@@ -667,14 +700,15 @@ export class RegexLine extends SudokuConstraintHandler {
   enforceConsistency(grid, handlerAccumulator) {
     const cells = this.cells;
     const numCells = cells.length;
-    const dfaStates = this._dfa.states;
+    const dfa = this._dfa;
+    const transitionLists = dfa.transitionLists;
     const statesList = this._statesList;
 
     // Clear all the states so we can reuse the bitsets without reallocating.
     this._stateWords.fill(0);
 
     // Forward pass: Find all states reachable from the start state.
-    statesList[0].add(this._dfa.startState);
+    statesList[0].copyFrom(dfa.startingStates);
 
     for (let i = 0; i < numCells; i++) {
       const nextStates = statesList[i + 1];
@@ -689,11 +723,11 @@ export class RegexLine extends SudokuConstraintHandler {
           const lowestBit = word & -word;
           word ^= lowestBit;
           const stateIndex = BitSet.bitIndex(wordIndex, lowestBit);
-          const transitionList = dfaStates[stateIndex].transitionList;
+          const transitionList = transitionLists[stateIndex];
           for (let j = 0; j < transitionList.length; j++) {
             const entry = transitionList[j];
-            if (values & entry.mask) {
-              nextStates.add(entry.state);
+            if (values & entry) {
+              nextStates.add(entry >>> 16);
             }
           }
         }
@@ -705,7 +739,7 @@ export class RegexLine extends SudokuConstraintHandler {
     // Backward pass: Filter down to only the states that can reach an accepting
     // state. Prune any unsupported values from the grid.
     const finalStates = statesList[numCells];
-    finalStates.intersect(this._acceptingStates);
+    finalStates.intersect(dfa.acceptingStates);
     if (finalStates.isEmpty()) return false;
 
     for (let i = numCells - 1; i >= 0; i--) {
@@ -723,13 +757,15 @@ export class RegexLine extends SudokuConstraintHandler {
           const lowestBit = word & -word;
           word ^= lowestBit;
           const stateIndex = BitSet.bitIndex(wordIndex, lowestBit);
-          const transitionList = dfaStates[stateIndex].transitionList;
+          const transitionList = transitionLists[stateIndex];
           let stateSupportedValues = 0;
           for (let j = 0; j < transitionList.length; j++) {
             const entry = transitionList[j];
-            const maskedValues = entry.mask & values;
-            if (maskedValues && nextStates.has(entry.state)) {
-              stateSupportedValues |= maskedValues;
+            const maskedValues = values & entry;
+            if (maskedValues) {
+              if (nextStates.has(entry >>> 16)) {
+                stateSupportedValues |= maskedValues;
+              }
             }
           }
 
@@ -797,6 +833,10 @@ class BitSet {
     for (let i = 0; i < this.words.length; i++) {
       this.words[i] &= other.words[i];
     }
+  }
+
+  copyFrom(other) {
+    this.words.set(other.words);
   }
 
   static bitIndex(wordIndex, lowestBit) {
