@@ -850,9 +850,18 @@ class SolverStateDisplay {
       let text;
       switch (v) {
         case 'solutions':
-          this._renderNumberWithGaps(this._stateVars[v], counters[v]);
-          if (!searchComplete) {
-            this._stateVars[v].appendChild(document.createTextNode('+'));
+          {
+            const isEstimate = counters.estimatedSolutions >= 0;
+            if (isEstimate) {
+              this._renderSolutionEstimate(
+                this._stateVars[v], counters.estimatedSolutions, searchComplete);
+            } else {
+              this._renderNumberWithGaps(this._stateVars[v], counters[v]);
+              if (!searchComplete) {
+                this._stateVars[v].appendChild(
+                  document.createTextNode('+'));
+              }
+            }
           }
           break;
         case 'puzzleSetupTime':
@@ -871,6 +880,32 @@ class SolverStateDisplay {
         default:
           this._renderNumberWithGaps(this._stateVars[v], counters[v]);
       }
+    }
+  }
+
+  _renderSolutionEstimate(container, estimatedSolutions, searchComplete) {
+    // Round the estimate, but we know it must be at least 1 if it is non-zero.
+    let intEstimate = Math.round(estimatedSolutions);
+    if (intEstimate === 0 && estimatedSolutions > 0) intEstimate = 1;
+
+    if (intEstimate < 1e6) {
+      this._renderNumberWithGaps(container, intEstimate);
+    } else {
+      const exponent = Math.floor(Math.log10(intEstimate));
+      const mantissa = intEstimate / Math.pow(10, exponent);
+      clearDOMNode(container);
+      container.appendChild(
+        document.createTextNode(mantissa.toFixed(3) + '×10'));
+      const sup = document.createElement('sup');
+      sup.textContent = exponent;
+      container.appendChild(sup);
+    }
+
+    // If we haven't found all the solutions, then show a ~ to indicate
+    // that this is an estimate.
+    if (!searchComplete) {
+      container.insertBefore(
+        document.createTextNode('~'), container.firstChild);
     }
   }
 
@@ -1246,6 +1281,22 @@ ModeHandler.ValidateLayout = class extends ModeHandler {
   }
 }
 
+ModeHandler.EstimatedCountSolutions = class extends ModeHandler {
+  add(...solutions) {
+    this._solutions = [solutions.pop()];
+    super.add(...solutions);
+  }
+
+  async run(solver) {
+    await super.run(solver);
+    await this._solver.estimatedCountSolutions();
+  }
+
+  async get(i) {
+    return { solution: this._solutions[0] }
+  }
+}
+
 export class SolutionController {
   constructor(constraintManager, displayContainer) {
     // Solvers are a list in case we manage to start more than one. This can
@@ -1282,6 +1333,7 @@ export class SolutionController {
       'all-possibilities': ModeHandler.AllPossibilities,
       'solutions': ModeHandler.AllSolutions,
       'count-solutions': ModeHandler.CountSolutions,
+      'estimated-count-solutions': ModeHandler.EstimatedCountSolutions,
       'step-by-step': ModeHandler.StepByStep,
       'validate-layout': ModeHandler.ValidateLayout,
     };
@@ -1427,6 +1479,8 @@ export class SolutionController {
       'View each solution.',
     'count-solutions':
       'Count the total number of solutions by iterating over all solutions.',
+    'estimated-count-solutions':
+      'Estimate the total number of solutions by sampling the search space.',
     'step-by-step':
       `Step through the solving process.
       Alt-click on a cell to force the solver to resolve it next.`,
@@ -1707,6 +1761,10 @@ export class SolverProxy {
 
   async countSolutions() {
     return this._callWorker('countSolutions');
+  }
+
+  async estimatedCountSolutions() {
+    return this._callWorker('estimatedCountSolutions');
   }
 
   _handleMessage(response) {

@@ -79,6 +79,9 @@ const handleWorkerMethod = (method, payload) => {
 
     case 'countSolutions':
       return workerSolver.countSolutions();
+
+    case 'estimatedCountSolutions':
+      return workerSolver.estimatedCountSolutions();
   }
   throw (`Unknown method ${method}`);
 };
