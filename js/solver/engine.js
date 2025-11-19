@@ -4,7 +4,7 @@ const { Timer, IteratorWithCount, arraysAreEqual, setIntersectionToArray } = awa
 const { LookupTables } = await import('./lookup_tables.js' + self.VERSION_PARAM);
 const { SHAPE_MAX } = await import('../grid_shape.js' + self.VERSION_PARAM);
 const { SudokuConstraintOptimizer } = await import('./optimizer.js' + self.VERSION_PARAM);
-const { CandidateSelector } = await import('./candidate_selector.js' + self.VERSION_PARAM);
+const { CandidateSelector, SamplingCandidateSelector } = await import('./candidate_selector.js' + self.VERSION_PARAM);
 const HandlerModule = await import('./handlers.js' + self.VERSION_PARAM);
 
 export class SudokuSolver {
@@ -41,6 +41,20 @@ export class SudokuSolver {
   }
 
   countSolutions() {
+    this._runCountFn(() => {
+      this._internalSolver.run(InternalSolver.YIELD_NEVER).next();
+      return this._internalSolver.counters.solutions;
+    });
+  }
+
+  estimatedCountSolutions() {
+    this._runCountFn(() => {
+      this._internalSolver.estimatedCountSolutions();
+      return this._internalSolver.counters.estimatedSolutions;
+    });
+  }
+
+  _runCountFn(countFn) {
     this._reset();
 
     // Add a sample solution to the state updates, but only if a different
@@ -58,8 +72,9 @@ export class SudokuSolver {
       return result;
     };
 
+    let result = 0;
     this._timer.runTimed(() => {
-      this._internalSolver.run(InternalSolver.YIELD_NEVER).next();
+      result = countFn();
     });
 
     // Send progress one last time to ensure the last solution is sent.
@@ -67,7 +82,7 @@ export class SudokuSolver {
 
     this._progressExtraStateFn = null;
 
-    return this._internalSolver.counters.solutions;
+    return result;
   }
 
   nthSolution(n) {
@@ -467,6 +482,12 @@ class InternalSolver {
       progressRatio: 0,
       progressRatioPrev: 0,
       branchesIgnored: 0,
+      estimatedSolutions: -1,
+    };
+    this._unbiasedCompleteSubtree = {
+      size: 0,
+      depth: 0,
+      solutionCount: 0,
     };
 
     // _backtrackTriggers counts the the number of times a cell is responsible
@@ -484,6 +505,10 @@ class InternalSolver {
     this._backtrackTriggers = this._cellPriorities.slice();
     this._uninterestingValues = null;
 
+    // Setup sample solution in a set state, so that by default we don't
+    // populate it.
+    this._sampleSolution = this._initialGridState.slice(0, this._numCells);
+
     this._resetRun();
   }
 
@@ -493,8 +518,9 @@ class InternalSolver {
     // Candidate selector must be made aware of the new backtrack triggers.
     this._candidateSelector.reset(this._backtrackTriggers);
 
-    // Setup sample solution so that we create new ones by default.
-    this._sampleSolution = this._initialGridState.slice(0, this._numCells);
+    this._unbiasedCompleteSubtree.depth = this._numCells;
+    this._unbiasedCompleteSubtree.solutionCount = 0;
+    this._unbiasedCompleteSubtree.size = 0;
 
     this.done = false;
     this._atStart = true;
@@ -715,6 +741,12 @@ class InternalSolver {
     while (recDepth) {
       let recFrame = recStack[--recDepth];
 
+      if (!recFrame.newNode && recFrame.cellDepth < this._unbiasedCompleteSubtree.depth) {
+        this._unbiasedCompleteSubtree.size = counters.progressRatio;
+        this._unbiasedCompleteSubtree.solutionCount = counters.solutions;
+        this._unbiasedCompleteSubtree.depth = recFrame.cellDepth;
+      }
+
       const cellDepth = recFrame.cellDepth;
       let grid = recFrame.gridCells;
 
@@ -869,6 +901,10 @@ class InternalSolver {
       recDepth++;
     }
 
+    this._unbiasedCompleteSubtree.size = counters.progressRatio;
+    this._unbiasedCompleteSubtree.solutionCount = counters.solutions;
+    this._unbiasedCompleteSubtree.depth = -1;
+
     this.done = true;
   }
 
@@ -980,6 +1016,60 @@ class InternalSolver {
     this._progress.frequencyMask = -1;
     if (callback) {
       this._progress.frequencyMask = (1 << logFrequency) - 1;
+    }
+  }
+
+  estimatedCountSolutions() {
+    // Implement Knuths's algorithm from
+    // Estimating the Efficiency of Backtrack Programs (1975)
+    // https://www.ams.org/journals/mcom/1975-29-129/S0025-5718-1975-0373371-6/S0025-5718-1975-0373371-6.pdf
+
+    const originalSelector = this._candidateSelector;
+    this._candidateSelector = new SamplingCandidateSelector(
+      this._shape, this._handlerSet, this._debugLogger, 0);
+
+    const LOG_ITERATIONS_PER_SAMPLE = 10;
+    // Reduce progress frequency to account for the sampling period, then
+    // reduce it further to account for the fact that sampling is more expensive.
+    const progressFrequencyMask = this._progress.frequencyMask >> (LOG_ITERATIONS_PER_SAMPLE + 1);
+
+    let totalEstimate = 0;
+    let numSamples = 0;
+    let totalProgress = 0;
+    let solutionsFound = 0;
+    this.counters.estimatedSolutions = 0;
+
+    while (true) {
+      // Reset the solver. This doesn't reset the counters (as intended) but
+      // we need to reset the progress ratio to estimate the solution count.
+      this._resetRun();
+      this.counters.progressRatio = 0;
+      this.counters.solutions = 0;
+
+      // Run a search with a limited number of iterations.
+      for (const result of this.run(1 << LOG_ITERATIONS_PER_SAMPLE)) {
+        if (!result.isSolution) break;
+      }
+      numSamples++;
+      totalProgress += this.counters.progressRatio;
+
+      // If the search completed, then stop. This is an exact result.
+      if (this.done) {
+        this.counters.estimatedSolutions = this.counters.solutions;
+        return this.counters.solutions;
+      }
+
+      const solutionsInSample = this._unbiasedCompleteSubtree.solutionCount;
+      if (solutionsInSample > 0) {
+        solutionsFound += solutionsInSample
+        totalEstimate += solutionsInSample / this._unbiasedCompleteSubtree.size;
+      }
+      this.counters.estimatedSolutions = totalEstimate / numSamples;
+
+      // Ensure that there are progress callbacks.
+      if ((numSamples & progressFrequencyMask) === 0) {
+        this._progress.callback();
+      }
     }
   }
 }

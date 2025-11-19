@@ -1,4 +1,4 @@
-const { countOnes16bit } = await import('../util.js' + self.VERSION_PARAM);
+const { countOnes16bit, RandomIntGenerator } = await import('../util.js' + self.VERSION_PARAM);
 const { LookupTables } = await import('./lookup_tables.js' + self.VERSION_PARAM);
 
 export class CandidateSelector {
@@ -542,3 +542,41 @@ CandidateFinders.House = class House extends CandidateFinderBase {
     return foundCandidate;
   }
 };
+
+export class SamplingCandidateSelector extends CandidateSelector {
+  constructor(shape, handlerSet, debugLogger, randomSeed) {
+    super(shape, handlerSet, debugLogger);
+    this._rnd = new RandomIntGenerator(randomSeed);
+  }
+
+  _selectBestCandidate(gridState, cellOrder, cellDepth, isNewNode) {
+    // Quick check - if the first value is a singleton, then just return without
+    // the extra bookkeeping.
+    {
+      const firstValue = gridState[cellOrder[cellDepth]];
+      if ((firstValue & (firstValue - 1)) === 0) {
+        return [cellDepth, firstValue, firstValue !== 0 ? 1 : 0];
+      }
+    }
+
+    // Find the best cell to explore next.
+    // Don't change the selected cell when isNewNode is false.
+    const cellOffset = isNewNode
+      ? this._selectBestCell(gridState, cellOrder, cellDepth)
+      : cellDepth;
+    const cell = cellOrder[cellOffset];
+
+    // Find a random value to try.
+    let values = gridState[cell];
+    const count = countOnes16bit(values);
+
+    // Pick a random nth bit.
+    const n = this._rnd.randomInt(count - 1);
+    for (let i = 0; i < n; i++) {
+      values = values & (values - 1);
+    }
+    const value = values & -values;
+
+    return [cellOffset, value, count];
+  }
+}
