@@ -311,21 +311,31 @@ export const sessionAndLocalStorage = {
 };
 
 // Random number generator which allows seeding.
+// It has 32-bits of state which is sufficient for the current uses in
+// this solver.
 export class RandomIntGenerator {
   constructor(seed) {
     this._state = seed || 0;
-    this._stateMod = 32987;
   }
 
-  _incState() {
-    this._state = ((this._state * 23984982 + 328423) % this._stateMod) | 0;
+  // Advance the state and generate a random 32-bit integer.
+  _next() {
+    // SplitMix32 PRNG.
+    // From https://github.com/bryc/code/blob/master/jshash/PRNGs.md#splitmix32
+    let state = this._state | 0;
+    state = (state + 0x9e3779b9) | 0;
+    this._state = state;
+
+    let t = state ^ (state >>> 16);
+    t = Math.imul(t, 0x21f0aaad);
+    t = t ^ (t >>> 15);
+    t = Math.imul(t, 0x735a2d97);
+    return (t ^ (t >>> 15)) >>> 0;
   }
 
   // Random integer in the range [0, max].
   randomInt(max) {
-    this._incState();
-    const rand = this._state / this._stateMod;
-    return Math.floor(rand * (max + 1));
+    return this._next() % (max + 1);
   }
 }
 
