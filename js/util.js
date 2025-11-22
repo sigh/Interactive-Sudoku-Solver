@@ -1,3 +1,7 @@
+export const clamp = (value, min, max) => {
+  return Math.min(Math.max(value, min), max);
+};
+
 export const formatTimeMs = (timeMs) => {
   if (timeMs < 1e3) {
     return timeMs.toPrecision(3) + ' ms';
