@@ -337,6 +337,7 @@ class InternalSolver {
     this._handlerAccumulator = new HandlerAccumulator(this._handlerSet);
     this._candidateSelector = new CandidateSelector(
       shape, this._handlerSet, debugLogger);
+    this._defaultCandidateSelector = this._candidateSelector;
 
     this._cellPriorities = this._initCellPriorities();
 
@@ -484,11 +485,14 @@ class InternalSolver {
       branchesIgnored: 0,
       estimatedSolutions: -1,
     };
-    this._unbiasedCompleteSubtree = {
+
+    this._firstCompleteSubtree = {
       size: 0,
       depth: 0,
       solutionCount: 0,
     };
+
+    this._candidateSelector = this._defaultCandidateSelector;
 
     // _backtrackTriggers counts the the number of times a cell is responsible
     // for finding a contradiction and causing a backtrack. It is exponentially
@@ -518,12 +522,16 @@ class InternalSolver {
     // Candidate selector must be made aware of the new backtrack triggers.
     this._candidateSelector.reset(this._backtrackTriggers);
 
-    this._unbiasedCompleteSubtree.depth = this._numCells;
-    this._unbiasedCompleteSubtree.solutionCount = 0;
-    this._unbiasedCompleteSubtree.size = 0;
+    this._firstCompleteSubtree.depth = this._numCells;
+    this._firstCompleteSubtree.solutionCount = 0;
+    this._firstCompleteSubtree.size = 0;
 
     this.done = false;
     this._atStart = true;
+  }
+
+  _setCandidateSelector(selector) {
+    this._candidateSelector = selector;
   }
 
   getBacktrackTriggers() {
@@ -741,10 +749,10 @@ class InternalSolver {
     while (recDepth) {
       let recFrame = recStack[--recDepth];
 
-      if (!recFrame.newNode && recFrame.cellDepth < this._unbiasedCompleteSubtree.depth) {
-        this._unbiasedCompleteSubtree.size = counters.progressRatio;
-        this._unbiasedCompleteSubtree.solutionCount = counters.solutions;
-        this._unbiasedCompleteSubtree.depth = recFrame.cellDepth;
+      if (!recFrame.newNode && recFrame.cellDepth < this._firstCompleteSubtree.depth) {
+        this._firstCompleteSubtree.size = counters.progressRatio;
+        this._firstCompleteSubtree.solutionCount = counters.solutions;
+        this._firstCompleteSubtree.depth = recFrame.cellDepth;
       }
 
       const cellDepth = recFrame.cellDepth;
@@ -901,9 +909,9 @@ class InternalSolver {
       recDepth++;
     }
 
-    this._unbiasedCompleteSubtree.size = counters.progressRatio;
-    this._unbiasedCompleteSubtree.solutionCount = counters.solutions;
-    this._unbiasedCompleteSubtree.depth = -1;
+    this._firstCompleteSubtree.size = counters.progressRatio;
+    this._firstCompleteSubtree.solutionCount = counters.solutions;
+    this._firstCompleteSubtree.depth = -1;
 
     this.done = true;
   }
@@ -1020,24 +1028,23 @@ class InternalSolver {
   }
 
   estimatedCountSolutions() {
-    // Implement Knuths's algorithm from
+    // Implement Knuths's algorithm from:
     // Estimating the Efficiency of Backtrack Programs (1975)
     // https://www.ams.org/journals/mcom/1975-29-129/S0025-5718-1975-0373371-6/S0025-5718-1975-0373371-6.pdf
 
-    const originalSelector = this._candidateSelector;
-    this._candidateSelector = new SamplingCandidateSelector(
-      this._shape, this._handlerSet, this._debugLogger, 0);
-
-    const LOG_ITERATIONS_PER_SAMPLE = 10;
-    // Reduce progress frequency to account for the sampling period, then
-    // reduce it further to account for the fact that sampling is more expensive.
-    const progressFrequencyMask = this._progress.frequencyMask >> (LOG_ITERATIONS_PER_SAMPLE + 1);
+    this._setCandidateSelector(
+      new SamplingCandidateSelector(
+        this._shape, this._handlerSet, this._debugLogger, /* seed= */ 0));
 
     let totalEstimate = 0;
     let numSamples = 0;
     let totalProgress = 0;
     let solutionsFound = 0;
     this.counters.estimatedSolutions = 0;
+
+    // Start the number of iterations small, so we get quick samples initially.
+    // Increase it over time for better efficiency.
+    let logIterationsPerSample = 1;
 
     while (true) {
       // Reset the solver. This doesn't reset the counters (as intended) but
@@ -1047,7 +1054,7 @@ class InternalSolver {
       this.counters.solutions = 0;
 
       // Run a search with a limited number of iterations.
-      for (const result of this.run(1 << LOG_ITERATIONS_PER_SAMPLE)) {
+      for (const result of this.run(1 << logIterationsPerSample)) {
         if (!result.isSolution) break;
       }
       numSamples++;
@@ -1059,16 +1066,19 @@ class InternalSolver {
         return this.counters.solutions;
       }
 
-      const solutionsInSample = this._unbiasedCompleteSubtree.solutionCount;
+      const solutionsInSample = this._firstCompleteSubtree.solutionCount;
       if (solutionsInSample > 0) {
         solutionsFound += solutionsInSample
-        totalEstimate += solutionsInSample / this._unbiasedCompleteSubtree.size;
+        totalEstimate += solutionsInSample / this._firstCompleteSubtree.size;
       }
       this.counters.estimatedSolutions = totalEstimate / numSamples;
 
       // Ensure that there are progress callbacks.
-      if ((numSamples & progressFrequencyMask) === 0) {
-        this._progress.callback();
+      this._progress.callback();
+
+      // Keep increasing the number of iterations per sample up to a point.
+      if (this._progress.frequencyMask >> logIterationsPerSample) {
+        logIterationsPerSample++;
       }
     }
   }
