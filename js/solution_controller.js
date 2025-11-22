@@ -7,7 +7,8 @@ const {
   deferUntilAnimationFrame,
   clearDOMNode,
   isIterable,
-  localTimestamp
+  localTimestamp,
+  clamp
 } = await import('./util.js' + self.VERSION_PARAM);
 const {
   HighlightDisplay,
@@ -1056,8 +1057,6 @@ class ModeHandler {
     this._solver = solver;
   }
 
-  minIndex() { return 1; }
-
   setDone() {
     this._done = true;
     this._listener();
@@ -1071,18 +1070,22 @@ class ModeHandler {
     return this._done;
   }
 
-  count() {
+  solutionCount() {
     return this._solutions.length;
   }
 
+  maxIndex() {
+    return Math.max(0, this.solutionCount() - 1);
+  }
+
   async get(i) {
-    const count = this.count();
+    const count = this.solutionCount();
     if (count == 0) return {};
 
-    let description = `Solution ${i}`;
+    let description = `Solution ${i + 1}`;
     if (count == 1 && this.done()) description = 'Unique solution';
     return {
-      solution: this._solutions[i - 1],
+      solution: this._solutions[i],
       description: description,
     }
   }
@@ -1117,10 +1120,11 @@ ModeHandler.AllPossibilities = class extends ModeHandler {
     await this._solver.solveAllPossibilities();
   }
 
-  minIndex() {
-    // If we are done, and there is only one solution, then don't bother
-    // showing the summary.
-    return this.done() && this.count() == 1 ? 1 : 0;
+  maxIndex() {
+    const c = this.solutionCount();
+    // If we have a unique solution, we show it at index 0.
+    // Otherwise, index 0 is the summary, and solutions are at indices 1..c.
+    return (this.done() && c === 1) ? 0 : c;
   }
 
   setDone() {
@@ -1148,11 +1152,20 @@ ModeHandler.AllPossibilities = class extends ModeHandler {
   }
 
   async get(i) {
+    // If we have a unique solution, we want to show it at index 0.
+    // This overrides the default behavior where index 0 is the summary.
+    if (this.done() && this.solutionCount() === 1) {
+      return {
+        solution: this._solutions[0],
+        description: 'Unique solution',
+      };
+    }
+    // Index 0 is the summary view (pencilmarks).
     if (i == 0) return {
       solution: this._pencilmarks,
       description: 'All possibilities',
     }
-    return super.get(i);
+    return super.get(i - 1);
   }
 }
 
@@ -1181,9 +1194,9 @@ ModeHandler.AllSolutions = class extends ModeHandler {
       // We are already waiting for results.
       if (this._pending) return;
       // If we've already reached the target count then return.
-      if (this.count() >= this._targetCount) return;
+      if (this.solutionCount() >= this._targetCount) return;
 
-      this._pending = this._solver.nthSolution(this.count());
+      this._pending = this._solver.nthSolution(this.solutionCount());
       const solution = await this._pending;
       this._pending = null;
 
@@ -1197,7 +1210,7 @@ ModeHandler.AllSolutions = class extends ModeHandler {
 
   async get(i) {
     // Ensure we have at least one past the solution being asked for.
-    this._targetCount = i + 1;
+    this._targetCount = i + 2;
     this._fetchSolutions().catch(this.handleSolverException);
 
     return super.get(i);
@@ -1217,15 +1230,11 @@ ModeHandler.StepByStep = class extends ModeHandler {
 
   setDone() { }
 
-  minIndex() {
-    return 0;
-  }
-
   async run(solver) {
     await super.run(solver);
   }
 
-  count() {
+  maxIndex() {
     return this._numSteps;
   }
 
@@ -1328,9 +1337,6 @@ ModeHandler.CountSolutions = class extends ModeHandler {
 }
 
 ModeHandler.ValidateLayout = class extends ModeHandler {
-  ITERATION_CONTROLS = true;
-  ALLOW_DOWNLOAD = true;
-
   constructor() {
     super();
     this._result = null;
@@ -1668,19 +1674,23 @@ export class SolutionController {
 
     handler.run(session.getSolver()).catch(handler.handleSolverException);
 
-    let index = handler.minIndex();
+    let index = 0;
     let follow = false;
     let currentSolution = null;
 
     const update = async () => {
       if (session.aborted) return;
 
+      // Update index based on mode and bounds
       if (follow) {
-        index = handler.count();
-      } else if (index < handler.minIndex()) {
-        index = handler.minIndex();
+        // In follow mode, set index to the last available view.
+        index = handler.maxIndex();
+      } else {
+        // Clamp index to valid range [0, maxIndex]
+        index = clamp(index, 0, handler.maxIndex());
       }
 
+      // Fetch and display the result
       let result = await handler.get(index).catch(handler.handleSolverException);
       if (session.aborted) return;
 
@@ -1698,14 +1708,18 @@ export class SolutionController {
         this._diffDisplay.renderGridValues(result.diff);
       }
 
-      if (result && handler.ITERATION_CONTROLS) {
-        let minIndex = handler.minIndex();
-        this._elements.forward.disabled = (index >= handler.count());
-        this._elements.back.disabled = (index == minIndex);
-        this._elements.start.disabled = (index == minIndex);
-        this._elements.end.disabled = (index >= handler.count());
+      this._elements.iterationState.textContent = result?.description || '';
 
-        this._elements.iterationState.textContent = result.description;
+      // Update button states
+      if (result && handler.ITERATION_CONTROLS) {
+        const isAtStart = index === 0;
+        const isAtEnd = index >= handler.maxIndex();
+
+        this._elements.back.disabled = isAtStart;
+        this._elements.start.disabled = isAtStart;
+        this._elements.forward.disabled = isAtEnd;
+        this._elements.end.disabled = isAtEnd;
+
         if (result.statusElem) {
           this._elements.iterationState.appendChild(
             document.createTextNode(' '));
@@ -1713,14 +1727,15 @@ export class SolutionController {
         }
       }
 
-      if (follow && handler.count() > index && !session.aborted) {
+      // Continue following if we haven't caught up to the latest view
+      if (follow && index < handler.maxIndex() && !session.aborted) {
         update();
       }
     };
     handler.setUpdateListener(update);
 
     if (handler.ITERATION_CONTROLS) {
-      this._elements.forward.onclick = async () => {
+      this._elements.forward.onclick = () => {
         index++;
         follow = false;
         update();
@@ -1731,7 +1746,7 @@ export class SolutionController {
         update();
       };
       this._elements.start.onclick = () => {
-        index = handler.minIndex();
+        index = 0;
         follow = false;
         update();
       };
