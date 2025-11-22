@@ -4,7 +4,7 @@ const { Timer, IteratorWithCount, arraysAreEqual, setIntersectionToArray } = awa
 const { LookupTables } = await import('./lookup_tables.js' + self.VERSION_PARAM);
 const { SHAPE_MAX } = await import('../grid_shape.js' + self.VERSION_PARAM);
 const { SudokuConstraintOptimizer } = await import('./optimizer.js' + self.VERSION_PARAM);
-const { CandidateSelector, SamplingCandidateSelector } = await import('./candidate_selector.js' + self.VERSION_PARAM);
+const { CandidateSelector, RandomOptionSelector } = await import('./candidate_selector.js' + self.VERSION_PARAM);
 const HandlerModule = await import('./handlers.js' + self.VERSION_PARAM);
 
 export class SudokuSolver {
@@ -337,7 +337,6 @@ class InternalSolver {
     this._handlerAccumulator = new HandlerAccumulator(this._handlerSet);
     this._candidateSelector = new CandidateSelector(
       shape, this._handlerSet, debugLogger);
-    this._defaultCandidateSelector = this._candidateSelector;
 
     this._cellPriorities = this._initCellPriorities();
 
@@ -492,7 +491,7 @@ class InternalSolver {
       solutionCount: 0,
     };
 
-    this._candidateSelector = this._defaultCandidateSelector;
+    this._candidateSelector.setOptionSelector(null);
 
     // _backtrackTriggers counts the the number of times a cell is responsible
     // for finding a contradiction and causing a backtrack. It is exponentially
@@ -753,6 +752,7 @@ class InternalSolver {
         this._firstCompleteSubtree.size = counters.progressRatio;
         this._firstCompleteSubtree.solutionCount = counters.solutions;
         this._firstCompleteSubtree.depth = recFrame.cellDepth;
+        this._candidateSelector.onFirstBranchComplete();
       }
 
       const cellDepth = recFrame.cellDepth;
@@ -1028,19 +1028,21 @@ class InternalSolver {
   }
 
   estimatedCountSolutions() {
-    // Implement Knuths's algorithm from:
+    // Solution count estimate is based on Knuths's algorithm from:
     // Estimating the Efficiency of Backtrack Programs (1975)
     // https://www.ams.org/journals/mcom/1975-29-129/S0025-5718-1975-0373371-6/S0025-5718-1975-0373371-6.pdf
-
-    this._setCandidateSelector(
-      new SamplingCandidateSelector(
-        this._shape, this._handlerSet, this._debugLogger, /* seed= */ 0));
+    //
+    // It is modified so we continue backtracking upto a defined backtrack
+    // limit, then use the statistics for the largest complete subtree we
+    // have searched.
 
     let totalEstimate = 0;
     let numSamples = 0;
     let totalProgress = 0;
     let solutionsFound = 0;
     this.counters.estimatedSolutions = 0;
+
+    const optionSelector = new RandomOptionSelector(/* seed = */ 0);
 
     // Start the number of iterations small, so we get quick samples initially.
     // Increase it over time for better efficiency.
@@ -1052,6 +1054,7 @@ class InternalSolver {
       this._resetRun();
       this.counters.progressRatio = 0;
       this.counters.solutions = 0;
+      this._candidateSelector.setOptionSelector(optionSelector);
 
       // Run a search with a limited number of iterations.
       for (const result of this.run(1 << logIterationsPerSample)) {

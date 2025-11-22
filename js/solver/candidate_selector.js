@@ -8,6 +8,7 @@ export class CandidateSelector {
     this._backtrackTriggers = null;
     this._debugLogger = debugLogger;
     this._numCells = shape.numCells;
+    this._optionSelector = null;
 
     this._candidateSelectionStates = this._initCandidateSelectionStates(shape);
     // _candidateSelectionFlags is used to track whether the
@@ -188,8 +189,11 @@ export class CandidateSelector {
     //        - we would have returned earlier on domain wipeout.
     //        - we don't add to the stack on the final value in a cell.
     let values = gridState[cell];
-    let value = values & -values;
     let count = countOnes16bit(values);
+    let value = values & -values;
+    if (count > 1 && this._optionSelector !== null) {
+      value = this._optionSelector.selectValue(values, count);
+    }
 
     // Wait until our first guess to initialize the candidate finder set.
     if (count > 1 && !this._candidateFinderSet.initialized) {
@@ -210,6 +214,11 @@ export class CandidateSelector {
       if (this._findCustomCandidates(gridState, cellOrder, cellDepth, state)) {
         count = state.cells.length;
         value = state.value;
+        if (count > 1 && this._optionSelector !== null) {
+          const index = this._optionSelector.selectIndex(count);
+          [state.cells[index], state.cells[count - 1]] =
+            [state.cells[count - 1], state.cells[index]];
+        }
         cellOffset = cellOrder.indexOf(state.cells.pop());
         this._candidateSelectionFlags[cellDepth] = 1
       }
@@ -361,6 +370,17 @@ export class CandidateSelector {
       });
     }
     return candidateSelectionStates;
+  }
+
+  setOptionSelector(optionSelector) {
+    this._optionSelector = optionSelector;
+  }
+
+  onFirstBranchComplete() {
+    if (this._optionSelector &&
+      this._optionSelector.FIRST_BRANCH_ONLY) {
+      this._optionSelector = null;
+    }
   }
 }
 
@@ -543,40 +563,23 @@ CandidateFinders.House = class House extends CandidateFinderBase {
   }
 };
 
-export class SamplingCandidateSelector extends CandidateSelector {
-  constructor(shape, handlerSet, debugLogger, randomSeed) {
-    super(shape, handlerSet, debugLogger);
+export class RandomOptionSelector {
+  FIRST_BRANCH_ONLY = true;
+
+  constructor(randomSeed) {
     this._rnd = new RandomIntGenerator(randomSeed);
   }
 
-  _selectBestCandidate(gridState, cellOrder, cellDepth, isNewNode) {
-    // Quick check - if the first value is a singleton, then just return without
-    // the extra bookkeeping.
-    {
-      const firstValue = gridState[cellOrder[cellDepth]];
-      if ((firstValue & (firstValue - 1)) === 0) {
-        return [cellDepth, firstValue, firstValue !== 0 ? 1 : 0];
-      }
-    }
-
-    // Find the best cell to explore next.
-    // Don't change the selected cell when isNewNode is false.
-    const cellOffset = isNewNode
-      ? this._selectBestCell(gridState, cellOrder, cellDepth)
-      : cellDepth;
-    const cell = cellOrder[cellOffset];
-
-    // Find a random value to try.
-    let values = gridState[cell];
-    const count = countOnes16bit(values);
-
+  selectValue(values, count) {
     // Pick a random nth bit.
     const n = this._rnd.randomInt(count - 1);
     for (let i = 0; i < n; i++) {
       values = values & (values - 1);
     }
-    const value = values & -values;
+    return values & -values;
+  }
 
-    return [cellOffset, value, count];
+  selectIndex(count) {
+    return this._rnd.randomInt(count - 1);
   }
 }
