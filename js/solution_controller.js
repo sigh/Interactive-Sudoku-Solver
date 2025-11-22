@@ -864,7 +864,8 @@ class SolverStateDisplay {
 
     if (isSolving) {
       this._elements.solveStatus.textContent = this._METHOD_TO_STATUS[method];
-    } else {
+      this._elements.progressPercentage.style.display =
+        isEstimateMode ? 'none' : 'inline';
       this._elements.solveStatus.textContent = '';
     }
     this._elements.progressContainer.classList.remove('error');
@@ -1332,7 +1333,11 @@ ModeHandler.CountSolutions = class extends ModeHandler {
   }
 
   async get(i) {
-    return { solution: this._solutions[0] }
+    if (this._solutions.length === 0) return {};
+    return {
+      solution: this._solutions[0],
+      description: 'Sample solution',
+    }
   }
 }
 
@@ -1349,7 +1354,7 @@ ModeHandler.ValidateLayout = class extends ModeHandler {
     return this._result;
   }
 
-  async get() {
+  async get(i) {
     if (!this._done) return {};
     return {
       solution: this._result,
@@ -1372,7 +1377,11 @@ ModeHandler.EstimatedCountSolutions = class extends ModeHandler {
   }
 
   async get(i) {
-    return { solution: this._solutions[0] }
+    if (this._solutions.length === 0) return {};
+    return {
+      solution: this._solutions[0],
+      description: 'Sample solution',
+    }
   }
 }
 
@@ -1418,7 +1427,7 @@ export class SolutionController {
       end: document.getElementById('solution-end'),
       forward: document.getElementById('solution-forward'),
       back: document.getElementById('solution-back'),
-      control: document.getElementById('solution-control-panel'),
+      buttonPanel: document.getElementById('solution-control-buttons'),
       iterationState: document.getElementById('solution-iteration-state'),
       mode: document.getElementById('solve-mode-input'),
       modeDescription: document.getElementById('solve-mode-description'),
@@ -1542,7 +1551,7 @@ export class SolutionController {
   }
 
   _showIterationControls(show) {
-    this._elements.control.style.visibility = show ? 'visible' : 'hidden';
+    this._elements.buttonPanel.style.visibility = show ? 'visible' : 'hidden';
   }
 
   static _MODE_DESCRIPTIONS = {
@@ -1609,6 +1618,7 @@ export class SolutionController {
     this._showIterationControls(false);
     this._altClickHandler = null;
     clearDOMNode(this._elements.error);
+    clearDOMNode(this._elements.iterationState);
   }
 
   async _solve(constraints) {
