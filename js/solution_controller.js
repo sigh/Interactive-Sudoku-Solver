@@ -1372,11 +1372,7 @@ ModeHandler.EstimatedCountSolutions = class extends ModeHandler {
 
 export class SolutionController {
   constructor(constraintManager, displayContainer) {
-    // Solvers are a list in case we manage to start more than one. This can
-    // happen when we are waiting for a worker to initialize.
-    this._solverPromises = [];
-
-    this._currentModeHandler = null;
+    this._activeSession = null;
 
     this._shape = null;
     constraintManager.addReshapeListener(this);
@@ -1429,7 +1425,7 @@ export class SolutionController {
     }
 
     this._elements.mode.onchange = () => this._update();
-    this._elements.stop.onclick = () => this._terminateSolver();
+    this._elements.stop.onclick = () => this._terminateActiveSession();
     this._elements.solve.onclick = () => this._solve();
 
     this._setUpAutoSolve();
@@ -1452,7 +1448,7 @@ export class SolutionController {
     // Terminate any runnings solvers ASAP, so they are less
     // likely to cause problems sending stale data.
     this._shape = shape;
-    this._terminateSolver();
+    this._terminateActiveSession();
   }
 
   _setUpAutoSolve() {
@@ -1534,11 +1530,9 @@ export class SolutionController {
     });
   }
 
-  _terminateSolver() {
-    for (const promise of this._solverPromises) {
-      promise.then(solver => solver.terminate());
-    }
-    this._solverPromises = [];
+  _terminateActiveSession() {
+    this._activeSession?.terminate();
+    this._activeSession = null;
   }
 
   _showIterationControls(show) {
@@ -1600,14 +1594,13 @@ export class SolutionController {
   }
 
   _resetSolver() {
-    this._terminateSolver();
+    this._terminateActiveSession();
     this._stepHighlighter.setCells([]);
     this._solutionDisplay.setSolution();
     this._diffDisplay.clear();
     this._stateDisplay.clear();
     this.debugManager.clear();
     this._showIterationControls(false);
-    this._currentModeHandler = null;
     this._altClickHandler = null;
     clearDOMNode(this._elements.error);
   }
@@ -1624,11 +1617,15 @@ export class SolutionController {
 
     this._resetSolver();
 
+    this._terminateActiveSession();
+    const session = new SolverSession();
+    this._activeSession = session;
+
     const handler = new this._modeHandlers[mode]();
 
     let newSolver = null;
     try {
-      const newSolverPromise = SolverProxy.makeSolver(
+      newSolver = await SolverProxy.makeSolver(
         constraints,
         s => {
           this._stateDisplay.setState(s);
@@ -1639,20 +1636,16 @@ export class SolutionController {
         },
         this._solveStatusChanged.bind(this),
         this.debugManager);
-      this._solverPromises.push(newSolverPromise);
-
-      newSolver = await newSolverPromise;
     } catch (e) {
       this._elements.error.textContent = e.toString();
       this._stateDisplay.setSolveStatus(false, 'terminate');
       return;
     }
 
-    if (newSolver.isTerminated()) return;
+    session.setSolver(newSolver);
 
     // Run the handler.
-    this._currentModeHandler = handler;
-    this._runModeHandler(handler, newSolver);
+    this._runModeHandler(handler, session);
   }
 
   _solveStatusChanged(isSolving, method) {
@@ -1670,14 +1663,18 @@ export class SolutionController {
     }
   }
 
-  _runModeHandler(handler, solver) {
-    handler.run(solver).catch(handler.handleSolverException);
+  _runModeHandler(handler, session) {
+    if (session.aborted) return;
+
+    handler.run(session.getSolver()).catch(handler.handleSolverException);
 
     let index = handler.minIndex();
     let follow = false;
     let currentSolution = null;
 
     const update = async () => {
+      if (session.aborted) return;
+
       if (follow) {
         index = handler.count();
       } else if (index < handler.minIndex()) {
@@ -1685,6 +1682,8 @@ export class SolutionController {
       }
 
       let result = await handler.get(index).catch(handler.handleSolverException);
+      if (session.aborted) return;
+
       if (!result) {
         currentSolution = null;
       } else {
@@ -1714,7 +1713,7 @@ export class SolutionController {
         }
       }
 
-      if (follow && handler.count() > index) {
+      if (follow && handler.count() > index && !session.aborted) {
         update();
       }
     };
@@ -1776,6 +1775,37 @@ export class SolutionController {
     document.body.appendChild(elem);
     elem.click();
     document.body.removeChild(elem);
+  }
+}
+
+class SolverSession {
+  constructor() {
+    this._abortController = new AbortController();
+    this._solver = null;
+  }
+
+  get aborted() {
+    return this._abortController.signal.aborted;
+  }
+
+  terminate() {
+    this._abortController.abort();
+    this._solver?.terminate();
+  }
+
+  getSolver() {
+    if (this.aborted) return null;
+    return this._solver;
+  }
+
+  setSolver(solver) {
+    if (this._solver !== null) {
+      throw ('Solver already set for session');
+    }
+    this._solver = solver;
+    if (this.aborted) {
+      solver.terminate();
+    }
   }
 }
 
