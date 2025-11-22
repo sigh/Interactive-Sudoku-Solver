@@ -685,10 +685,10 @@ class InternalSolver {
   // yieldWhen can be:
   //  YIELD_ON_SOLUTION to yielding each solution.
   //  YIELD_ON_STEP to yield every step.
-  //  n > 1 to yield every n contradictions.
+  //  n > 1 to yield every n backtracks, before the backtrack is applied.
   * run(yieldWhen) {
     const yieldEveryStep = yieldWhen === this.constructor.YIELD_ON_STEP;
-    const yieldOnContradiction = yieldWhen > 1 ? yieldWhen : 0;
+    const yieldOnBacktrack = yieldWhen > 1 ? yieldWhen : 0;
 
     // Set up iterator validation.
     if (!this._atStart) throw ('State is not in initial state.');
@@ -840,8 +840,8 @@ class InternalSolver {
         counters.backtracks++;
         this._backtrackTriggers[cell]++;
 
-        if (0 !== yieldOnContradiction &&
-          0 === counters.backtracks % yieldOnContradiction) {
+        if (0 !== yieldOnBacktrack &&
+          0 === counters.backtracks % yieldOnBacktrack) {
           yield {
             grid: grid,
             isSolution: false,
@@ -886,6 +886,7 @@ class InternalSolver {
         // We've set all the values, and we haven't found a contradiction.
         // This is a solution!
         counters.solutions++;
+        counters.backtracks++;
         if (this._sampleSolution[0] === 0) {
           this._sampleSolution.set(grid);
         }
@@ -922,7 +923,7 @@ class InternalSolver {
 
     const valuesInSolutions = new Uint16Array(this._numCells);
 
-    for (const result of this.run()) {
+    for (const result of this.run(InternalSolver.YIELD_ON_SOLUTION)) {
       result.grid.forEach((c, i) => { valuesInSolutions[i] |= c; });
       solutions.push(result.grid.slice(0));
 
@@ -1013,7 +1014,7 @@ class InternalSolver {
 
     // Run the final search until we find a solution or prove that one doesn't
     // exist.
-    for (const result of this.run()) {
+    for (const result of this.run(InternalSolver.YIELD_ON_SOLUTION)) {
       return finalize(result);
     }
 
@@ -1041,33 +1042,36 @@ class InternalSolver {
     let numSamples = 0;
     let totalProgress = 0;
     let solutionsFound = 0;
-    this.counters.estimatedSolutions = 0;
+
+    const counters = this.counters;
+    counters.estimatedSolutions = 0;
 
     const optionSelector = new RandomOptionSelector(/* seed = */ 0);
 
-    // Start the number of iterations small, so we get quick samples initially.
+    // Start the size of the searches small, so we get quick samples initially.
     // Increase it over time for better efficiency.
-    let logIterationsPerSample = 1;
+    let backtrackLimitPerSample = 2;
 
     while (true) {
       // Reset the solver. This doesn't reset the counters (as intended) but
       // we need to reset the progress ratio to estimate the solution count.
       this._resetRun();
-      this.counters.progressRatio = 0;
-      this.counters.solutions = 0;
+      counters.progressRatio = 0;
+      counters.solutions = 0;
+      counters.backtracks = 0;
       this._candidateSelector.setOptionSelector(optionSelector);
 
-      // Run a search with a limited number of iterations.
-      for (const result of this.run(1 << logIterationsPerSample)) {
-        if (!result.isSolution) break;
+      // Run a search with a limited backtrack budget.
+      for (const _ of this.run(backtrackLimitPerSample)) {
+        if (counters.backtracks >= backtrackLimitPerSample) break;
       }
       numSamples++;
-      totalProgress += this.counters.progressRatio;
+      totalProgress += counters.progressRatio;
 
       // If the search completed, then stop. This is an exact result.
       if (this.done) {
-        this.counters.estimatedSolutions = this.counters.solutions;
-        return this.counters.solutions;
+        counters.estimatedSolutions = counters.solutions;
+        return counters.solutions;
       }
 
       const solutionsInSample = this._firstCompleteSubtree.solutionCount;
@@ -1075,14 +1079,16 @@ class InternalSolver {
         solutionsFound += solutionsInSample
         totalEstimate += solutionsInSample / this._firstCompleteSubtree.size;
       }
-      this.counters.estimatedSolutions = totalEstimate / numSamples;
+      counters.estimatedSolutions = totalEstimate / numSamples;
 
       // Ensure that there are progress callbacks.
       this._progress.callback();
 
-      // Keep increasing the number of iterations per sample up to a point.
-      if (this._progress.frequencyMask >> logIterationsPerSample) {
-        logIterationsPerSample++;
+      // Keep increasing the backtracks limit per sample up to a point.
+      // Use progress frequency as that roughly corresponds to how often we
+      // want to send updates to the user.
+      if (this._progress.frequencyMask > backtrackLimitPerSample) {
+        backtrackLimitPerSample <<= 1;
       }
     }
   }
