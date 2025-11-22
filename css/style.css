@@ -608,6 +608,10 @@ select {
   border-radius: 2px;
 }
 
+select#solve-mode-input {
+  padding-left: 5px;
+}
+
 #shape-container {
   border-color: transparent;
 }
