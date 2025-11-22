@@ -516,6 +516,7 @@ class StateHistoryDisplay {
     this._states = [];
     this._statsContainer = null;
     this._visible = false;
+    this._currentMode = null;
 
     this._setUpChartButton();
     this._charts = [];
@@ -527,13 +528,13 @@ class StateHistoryDisplay {
   }
 
   add(state) {
-
     const newState = {
       timeMs: state.timeMs / 1000,
       guesses: state.counters.guesses,
       searchedPercentage: state.counters.progressRatio * 100,
       skippedPercentage: state.counters.branchesIgnored * 100,
       solutions: state.counters.solutions,
+      estimatedSolutions: state.isEstimate ? state.counters.estimatedSolutions : 0,
     };
 
     if (this._states.length && newState.timeMs < this._nextT) {
@@ -547,6 +548,25 @@ class StateHistoryDisplay {
 
     // NOTE: Both of these defer work until it needs to be done.
     this._compressStates(this._states);
+    this._updateCharts();
+  }
+
+  setMode(mode) {
+    this._currentMode = mode;
+    const isEstimateMode = (mode === 'estimate-solutions');
+    for (const chart of this._charts) {
+      const chartContainer = chart.canvas.parentNode.parentNode;
+      const yAxis = chart.data.datasets[0].label;
+      switch (yAxis) {
+        case 'estimatedSolutions':
+          chartContainer.style.display = isEstimateMode ? 'block' : 'none';
+          break;
+        case 'solutions':
+        case 'searchedPercentage':
+          chartContainer.style.display = isEstimateMode ? 'none' : 'block';
+          break;
+      }
+    }
     this._updateCharts();
   }
 
@@ -586,7 +606,7 @@ class StateHistoryDisplay {
 
     this._eventReplayFn();
     for (const chart of this._charts) {
-      chart.update('none');
+      if (chart.canvas.offsetParent !== null) chart.update('none');
     }
   }
 
@@ -634,12 +654,16 @@ class StateHistoryDisplay {
     this._addChartDisplay(this._statsContainer,
       'Solutions', 'solutions');
     this._addChartDisplay(this._statsContainer,
+      'Estimated solutions', 'estimatedSolutions');
+    this._addChartDisplay(this._statsContainer,
       'Progress percentage (searched + skipped)',
       'searchedPercentage', 'skippedPercentage');
     this._addChartDisplay(this._statsContainer,
       'Guesses', 'guesses');
 
     this._eventReplayFn = this._syncToolTips(this._charts);
+
+    this.setMode(this._currentMode);
   }
 
   _setUpStatsWindow(container) {
@@ -650,19 +674,22 @@ class StateHistoryDisplay {
   }
 
   _addChartDisplay(container, title, ...yAxis) {
+    const chartContainer = document.createElement('div');
+    container.appendChild(chartContainer);
+
     const titleElem = document.createElement('div');
     titleElem.classList.add('description');
     titleElem.textContent = title;
-    container.appendChild(titleElem);
+    chartContainer.appendChild(titleElem);
 
-    const chartContainer = document.createElement('div');
-    chartContainer.style.height = this.CHART_HEIGHT;
-    container.appendChild(chartContainer);
+    const canvasContainer = document.createElement('div');
+    canvasContainer.style.height = this.CHART_HEIGHT;
+    chartContainer.appendChild(canvasContainer);
 
     const ctx = document.createElement('canvas');
-    chartContainer.appendChild(ctx);
+    canvasContainer.appendChild(ctx);
     this._makeChart(ctx, ...yAxis);
-    return chartContainer;
+    return canvasContainer;
   }
 
   _makeChart(ctx, ...yAxis) {
@@ -706,6 +733,11 @@ class StateHistoryDisplay {
         legend: {
           display: false,
         },
+        tooltip: {
+          callbacks: {
+            label: StateHistoryDisplay._formatTooltipLabel,
+          }
+        },
       }
     };
     const data = {
@@ -729,11 +761,20 @@ class StateHistoryDisplay {
     return chart;
   }
 
+  static _formatTooltipLabel(context) {
+    const label = context.dataset.label || '';
+    const value = context.parsed.y;
+    const formattedValue = (value > 0 && (value < 0.001 || value > 1e6))
+      ? value.toExponential(3)
+      : value.toLocaleString();
+    return `${label}: ${formattedValue}`;
+  }
+
   _syncToolTips(charts) {
     let currentIndex = -1;
     let lastCall = null;
 
-    const onMouseMouse = (e, currentChart) => {
+    const onMouseMove = (e, currentChart) => {
       lastCall = [e, currentChart];
 
       // Find the nearest points.
@@ -747,6 +788,7 @@ class StateHistoryDisplay {
       // Update the active elements for all the charts.
       currentIndex = index;
       for (const chart of charts) {
+        if (chart.canvas.offsetParent === null) continue;
         const activeElements = [];
         if (points.length) {
           const numDatasets = chart.data.datasets.length;
@@ -765,13 +807,13 @@ class StateHistoryDisplay {
 
     // Setup all charts.
     for (const chart of charts) {
-      chart.canvas.onmousemove = e => onMouseMouse(e, chart);
+      chart.canvas.onmousemove = e => onMouseMove(e, chart);
     }
 
     // Pass back a function that will allow us to replay the last call.
     // This is used when the chart is updated to ensure the tooltip is updated
     // if the point under the mouse changes.
-    return () => { lastCall && onMouseMouse(...lastCall); };
+    return () => { lastCall && onMouseMove(...lastCall); };
   }
 }
 
@@ -832,6 +874,10 @@ class SolverStateDisplay {
     this._stateHistory.add(state);
   }
 
+  setMode(mode) {
+    this._stateHistory.setMode(mode);
+  }
+
   clear() {
     for (const v in this._stateVars) {
       this._stateVars[v].textContent = '';
@@ -846,14 +892,13 @@ class SolverStateDisplay {
   _displayStateVariables(state) {
     const counters = state.counters;
     const searchComplete = state.done && !counters.branchesIgnored;
-    const isEstimate = counters.estimatedSolutions >= 0;
 
     for (const v in this._stateVars) {
       let text;
       switch (v) {
         case 'solutions':
           {
-            if (isEstimate) {
+            if (state.isEstimate) {
               this._renderSolutionEstimate(
                 this._stateVars[v], counters.estimatedSolutions, searchComplete);
             } else {
@@ -874,7 +919,7 @@ class SolverStateDisplay {
           this._stateVars[v].textContent = text;
           break;
         case 'searchSpaceExplored':
-          if (isEstimate) {
+          if (state.isEstimate) {
             this._stateVars[v].textContent = '';
           } else {
             text = (counters.progressRatio * 100).toPrecision(3) + '%';
@@ -936,7 +981,7 @@ class SolverStateDisplay {
   }
 
   _updateProgressBar(state) {
-    if (state.counters.estimatedSolutions >= 0) {
+    if (state.isEstimate) {
       this._elements.progressBar.setAttribute('value', 0);
       this._elements.progressPercentage.textContent = '';
       return;
@@ -1522,6 +1567,7 @@ export class SolutionController {
 
     const isLayoutMode = mode === 'validate-layout';
     this._displayContainer.toggleLayoutView(isLayoutMode);
+    this._stateDisplay.setMode(mode);
 
     let description = SolutionController._MODE_DESCRIPTIONS[mode];
     this._elements.modeDescription.textContent = description;

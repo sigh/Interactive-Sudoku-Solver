@@ -12,10 +12,12 @@ export const formatTimeMs = (timeMs) => {
 export const formatNumberMetric = (value) => {
   if (value == 0) return value;
   if (value < 0.001) return value.toExponential(1);
-  if (value < 1000) return value;
-  if (value < 1000000) return (value / 1000) + 'k';
-  if (value < 1000000000) return (value / 1000000) + 'M';
-  return (value / 1000000000) + 'G';
+  if (value < 1e3) return value;
+  if (value < 1e6) return (value / 1e3) + 'k';
+  if (value < 1e9) return (value / 1e6) + 'M';
+  if (value < 1e12) return (value / 1e9) + 'G';
+  if (value < 1e15) return (value / 1e12) + 'T';
+  return value.toExponential(1);
 };
 
 export const createSvgElement = (tag) => {

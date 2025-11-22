@@ -212,6 +212,7 @@ export class SudokuSolver {
 
     const state = {
       counters: counters,
+      isEstimate: counters.estimatedSolutions >= 0,
       timeMs: this._timer.elapsedMs(),
       done: this._internalSolver.done,
     }
