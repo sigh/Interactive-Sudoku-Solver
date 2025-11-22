@@ -807,6 +807,7 @@ class SolverStateDisplay {
     'countSolutions': 'Counting',
     'validateLayout': 'Validating',
     'terminate': 'Aborted',
+    'estimatedCountSolutions': 'Estimating',
   };
 
   setSolveStatus(isSolving, method) {
@@ -845,13 +846,13 @@ class SolverStateDisplay {
   _displayStateVariables(state) {
     const counters = state.counters;
     const searchComplete = state.done && !counters.branchesIgnored;
+    const isEstimate = counters.estimatedSolutions >= 0;
 
     for (const v in this._stateVars) {
       let text;
       switch (v) {
         case 'solutions':
           {
-            const isEstimate = counters.estimatedSolutions >= 0;
             if (isEstimate) {
               this._renderSolutionEstimate(
                 this._stateVars[v], counters.estimatedSolutions, searchComplete);
@@ -873,9 +874,13 @@ class SolverStateDisplay {
           this._stateVars[v].textContent = text;
           break;
         case 'searchSpaceExplored':
-          text = (counters.progressRatio * 100).toPrecision(3) + '%';
-          if (searchComplete) text = '100%';
-          this._stateVars[v].textContent = text;
+          if (isEstimate) {
+            this._stateVars[v].textContent = '';
+          } else {
+            text = (counters.progressRatio * 100).toPrecision(3) + '%';
+            if (searchComplete) text = '100%';
+            this._stateVars[v].textContent = text;
+          }
           break;
         default:
           this._renderNumberWithGaps(this._stateVars[v], counters[v]);
@@ -931,6 +936,12 @@ class SolverStateDisplay {
   }
 
   _updateProgressBar(state) {
+    if (state.counters.estimatedSolutions >= 0) {
+      this._elements.progressBar.setAttribute('value', 0);
+      this._elements.progressPercentage.textContent = '';
+      return;
+    }
+
     const progress = state.done
       ? 1
       : state.counters.progressRatio + state.counters.branchesIgnored;
@@ -1333,7 +1344,7 @@ export class SolutionController {
       'all-possibilities': ModeHandler.AllPossibilities,
       'solutions': ModeHandler.AllSolutions,
       'count-solutions': ModeHandler.CountSolutions,
-      'estimated-count-solutions': ModeHandler.EstimatedCountSolutions,
+      'estimate-solutions': ModeHandler.EstimatedCountSolutions,
       'step-by-step': ModeHandler.StepByStep,
       'validate-layout': ModeHandler.ValidateLayout,
     };
@@ -1479,7 +1490,7 @@ export class SolutionController {
       'View each solution.',
     'count-solutions':
       'Count the total number of solutions by iterating over all solutions.',
-    'estimated-count-solutions':
+    'estimate-solutions':
       'Estimate the total number of solutions by sampling the search space.',
     'step-by-step':
       `Step through the solving process.
@@ -1490,16 +1501,22 @@ export class SolutionController {
        Non-layout constraints are ignored (including givens).`,
   };
 
+  static DEFAULT_MODE = 'all-possibilities';
+
   async _update() {
     this._solutionDisplay.setSolution();
     let mode = this._elements.mode.value;
+    if (!mode) {
+      mode = SolutionController.DEFAULT_MODE;
+      this._elements.mode.value = mode;
+    }
     let auto = this._elements.autoSolve.checked;
 
     const constraints = this._constraintManager.getConstraints();
 
     let params = { mode: mode, q: constraints.toString() };
     // Remove mode if it is the default.
-    if (mode === 'all-possibilities') params.mode = undefined;
+    if (mode === SolutionController.DEFAULT_MODE) params.mode = undefined;
     if (params.q === '.') params.q = undefined;
     this._historyHandler.update(params);
 
