@@ -599,10 +599,14 @@ export class ConflictScores {
 
   constructor(initialScores) {
     this.scores = initialScores.slice();
+    this._decayCountdown = this.DECAY_FREQUENCY;
   }
 
   increment(cell) {
     this.scores[cell]++;
+    if (--this._decayCountdown === 0) {
+      this.decay();
+    }
   }
 
   decay() {
@@ -610,5 +614,6 @@ export class ConflictScores {
     for (let i = 0; i < scores.length; i++) {
       scores[i] >>= 1;
     }
+    this._decayCountdown = this.DECAY_FREQUENCY;
   }
 }
