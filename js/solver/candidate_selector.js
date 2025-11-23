@@ -5,7 +5,7 @@ export class CandidateSelector {
   constructor(shape, handlerSet, debugLogger) {
     this._shape = shape;
     this._cellOrder = new Uint8Array(shape.numCells);
-    this._backtrackTriggers = null;
+    this._conflictScores = null;
     this._debugLogger = debugLogger;
     this._numCells = shape.numCells;
     this._optionSelector = null;
@@ -18,7 +18,7 @@ export class CandidateSelector {
     this._candidateFinderSet = new CandidateFinderSet(handlerSet, shape);
   }
 
-  reset(backtrackTriggers) {
+  reset(conflictScores) {
     // Re-initialize the cell indexes in the cellOrder.
     // This is not required, but keeps things deterministic.
     const numCells = this._cellOrder.length;
@@ -26,7 +26,7 @@ export class CandidateSelector {
       this._cellOrder[i] = i;
     }
 
-    this._backtrackTriggers = backtrackTriggers;
+    this._conflictScores = conflictScores;
 
     this._candidateSelectionFlags.fill(0);
   }
@@ -200,14 +200,16 @@ export class CandidateSelector {
       this._candidateFinderSet.initialize(gridState);
     }
 
+    const conflictScores = this._conflictScores.scores;
+
     // Optionally explore custom candidates nominated by constraints.
     //  - Exploring this node for the first time. If we have backtracked here
     //    it is less likely that this will yield a better candidate.
     //  - Currently exploring a cell with more than 2 values.
-    //  - Have non-zero backtrackTriggers (and thus score). If the score is 0,
+    //  - Have non-zero conflict scores (and thus score). If the score is 0,
     //    that means that no other cells have a non-zero score.
-    if (isNewNode && count > 2 && this._backtrackTriggers[cell] > 0) {
-      let score = this._backtrackTriggers[cell] / count;
+    if (isNewNode && count > 2 && conflictScores[cell] > 0) {
+      let score = conflictScores[cell] / count;
 
       const state = this._candidateSelectionStates[cellDepth];
       state.score = score;
@@ -236,7 +238,7 @@ export class CandidateSelector {
     // to do an initial pass to detect 1 or 0 value cells (!(v&(v-1))).
 
     const numCells = this._numCells;
-    const backtrackTriggers = this._backtrackTriggers;
+    const conflictScores = this._conflictScores.scores;
 
     // Find the cell with the minimum score.
     let maxScore = -1;
@@ -256,7 +258,7 @@ export class CandidateSelector {
         break;
       }
 
-      let score = backtrackTriggers[cell] / count;
+      let score = conflictScores[cell] / count;
 
       if (score > maxScore) {
         bestOffset = i;
@@ -323,11 +325,11 @@ export class CandidateSelector {
   }
 
   _findCustomCandidates(gridState, cellOrder, cellDepth, result) {
-    const cellScores = this._backtrackTriggers;
+    const conflictScores = this._conflictScores.scores;
     const finderSet = this._candidateFinderSet;
     finderSet.clearMarks();
 
-    // Determine the minimum value that the cellScore can take to beat the
+    // Determine the minimum value that the conflictScore can take to beat the
     // current score.
     let minCS = Math.ceil(result.score * 2) | 0;
 
@@ -336,14 +338,14 @@ export class CandidateSelector {
     for (let i = cellDepth; i < numCells; i++) {
       const cell = cellOrder[i];
       // Ignore cells which are too low in priority.
-      if (cellScores[cell] < minCS) continue;
+      if (conflictScores[cell] < minCS) continue;
 
       // Score finders for this cell.
       const indexes = finderSet.getIndexesForCell(cell);
       for (let j = 0; j < indexes.length; j++) {
         if (!finderSet.isMarked(indexes[j])) {
           const finder = finderSet.getAndMark(indexes[j]);
-          if (finder.maybeFindCandidate(gridState, cellScores, result)) {
+          if (finder.maybeFindCandidate(gridState, conflictScores, result)) {
             minCS = Math.ceil(result.score * 2) | 0;
             foundCandidate = true;
           }
@@ -355,7 +357,7 @@ export class CandidateSelector {
 
     // Sort cells so that the highest scoring cells are last,  and hence
     // searched first.
-    result.cells.sort((a, b) => cellScores[a] - cellScores[b]);
+    result.cells.sort((a, b) => conflictScores[a] - conflictScores[b]);
     return true;
   }
 
@@ -439,7 +441,7 @@ class CandidateFinderBase {
     this.cells = cells;
   }
 
-  maybeFindCandidate(grid, cellScores, result) {
+  maybeFindCandidate(grid, conflictScores, result) {
     return false;
   }
 };
@@ -467,20 +469,20 @@ CandidateFinders.RequiredValue = class RequiredValue extends CandidateFinderBase
     this._value = value;
   }
 
-  maybeFindCandidate(grid, cellScores, result) {
+  maybeFindCandidate(grid, conflictScores, result) {
     const cells = this.cells;
     const numCells = cells.length;
     const value = this._value;
 
     // Count the valid cells (ones which contain the value).
-    // Track the maximum cellScore for determining the score.
+    // Track the maximum conflictScore for determining the score.
     let count = 0;
     let maxCS = 0;
     for (let i = 0; i < numCells; i++) {
       if (grid[cells[i]] & value) {
         count++;
-        const cellScore = cellScores[cells[i]];
-        if (cellScore > maxCS) maxCS = cellScore;
+        const conflictScore = conflictScores[cells[i]];
+        if (conflictScore > maxCS) maxCS = conflictScore;
       }
     }
     // If count is 1, this is value is already resolved.
@@ -511,7 +513,7 @@ CandidateFinders.House = class House extends CandidateFinderBase {
     super(cells);
   }
 
-  _scoreValue(grid, v, cellScores, result) {
+  _scoreValue(grid, v, conflictScores, result) {
     const cells = this.cells;
     const numCells = cells.length;
     let cell0 = 0;
@@ -520,8 +522,8 @@ CandidateFinders.House = class House extends CandidateFinderBase {
     for (let i = 0; i < numCells; i++) {
       if (grid[cells[i]] & v) {
         [cell0, cell1] = [cell1, cells[i]];
-        if (cellScores[cell1] > maxCS) {
-          maxCS = cellScores[cell1];
+        if (conflictScores[cell1] > maxCS) {
+          maxCS = conflictScores[cell1];
         }
       }
     }
@@ -538,7 +540,7 @@ CandidateFinders.House = class House extends CandidateFinderBase {
     return true;
   }
 
-  maybeFindCandidate(grid, cellScores, result) {
+  maybeFindCandidate(grid, conflictScores, result) {
     const cells = this.cells;
     const numCells = cells.length;
 
@@ -557,7 +559,7 @@ CandidateFinders.House = class House extends CandidateFinderBase {
     while (exactlyTwo) {
       let v = exactlyTwo & -exactlyTwo;
       exactlyTwo ^= v;
-      foundCandidate = this._scoreValue(grid, v, cellScores, result) || foundCandidate;
+      foundCandidate = this._scoreValue(grid, v, conflictScores, result) || foundCandidate;
     }
     return foundCandidate;
   }
@@ -581,5 +583,32 @@ export class RandomOptionSelector {
 
   selectIndex(count) {
     return this._rnd.randomInt(count - 1);
+  }
+}
+
+
+// ConflictScores counts the the number of times a cell is responsible
+// for finding a conflict and causing a backtrack. It is exponentially
+// decayed so that the information reflects the most recent search areas.
+// Cells with a high count are the best candidates for searching as we
+// may find the conflict faster. Ideally, this allows the search to
+// learn the critical areas of the grid where it is more valuable to search
+// first.
+export class ConflictScores {
+  DECAY_FREQUENCY = 1 << 14;
+
+  constructor(initialScores) {
+    this.scores = initialScores.slice();
+  }
+
+  increment(cell) {
+    this.scores[cell]++;
+  }
+
+  decay() {
+    const scores = this.scores;
+    for (let i = 0; i < scores.length; i++) {
+      scores[i] >>= 1;
+    }
   }
 }

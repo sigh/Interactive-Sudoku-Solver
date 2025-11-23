@@ -4,7 +4,7 @@ const { Timer, IteratorWithCount, arraysAreEqual, setIntersectionToArray } = awa
 const { LookupTables } = await import('./lookup_tables.js' + self.VERSION_PARAM);
 const { SHAPE_MAX } = await import('../grid_shape.js' + self.VERSION_PARAM);
 const { SudokuConstraintOptimizer } = await import('./optimizer.js' + self.VERSION_PARAM);
-const { CandidateSelector, RandomOptionSelector } = await import('./candidate_selector.js' + self.VERSION_PARAM);
+const { CandidateSelector, RandomOptionSelector, ConflictScores } = await import('./candidate_selector.js' + self.VERSION_PARAM);
 const HandlerModule = await import('./handlers.js' + self.VERSION_PARAM);
 
 export class SudokuSolver {
@@ -263,7 +263,7 @@ class DebugLogger {
     this._debugOptions = {
       logLevel: 0,
       enableStepLogs: false,
-      exportBacktrackCounts: false,
+      exportConflictHeatmap: false,
     };
     this._hasAnyDebugging = false;
     this._pendingDebugLogs = [];
@@ -310,8 +310,9 @@ class DebugLogger {
     if (this._pendingDebugLogs.length) {
       result.logs = this._pendingDebugLogs.splice(0);
     }
-    if (this._debugOptions.exportBacktrackCounts) {
-      result.backtrackCounts = this._solver._internalSolver.getBacktrackTriggers();
+    if (this._debugOptions.exportConflictHeatmap) {
+      result.conflictHeatmap =
+        this._solver._internalSolver.getConflictScores().scores.slice();
     }
     if (this._adhHocCounters.size) {
       result.counters = this._adhHocCounters;
@@ -494,19 +495,12 @@ class InternalSolver {
 
     this._candidateSelector.setOptionSelector(null);
 
-    // _backtrackTriggers counts the the number of times a cell is responsible
-    // for finding a contradiction and causing a backtrack. It is exponentially
-    // decayed so that the information reflects the most recent search areas.
-    // Cells with a high count are the best candidates for searching as we
-    // may find the contradiction faster. Ideally, this allows the search to
-    // learn the critical areas of the grid where it is more valuable to search
-    // first.
-    // _backtrackTriggers are initialized to the cell priorities so that
+    // _conflictScores are initialized to the cell priorities so that
     // so that the initial part of the search is still able to prioritize cells
     // which may lead to a contradiction.
-    // NOTE: _backtrackTriggers must not be reassigned as we pass the reference
+    // NOTE: _conflictScores must not be reassigned as we pass the reference
     // to the candidateSelector.
-    this._backtrackTriggers = this._cellPriorities.slice();
+    this._conflictScores = new ConflictScores(this._cellPriorities);
     this._uninterestingValues = null;
 
     // Setup sample solution in a set state, so that by default we don't
@@ -517,10 +511,10 @@ class InternalSolver {
   }
 
   _resetRun() {
-    // Preserve backtrack triggers between runs (since this is currently only
+    // Preserve conflict scores between runs (since this is currently only
     // used internally).
-    // Candidate selector must be made aware of the new backtrack triggers.
-    this._candidateSelector.reset(this._backtrackTriggers);
+    // Candidate selector must be made aware of the new conflict scores.
+    this._candidateSelector.reset(this._conflictScores);
 
     this._firstCompleteSubtree.depth = this._numCells;
     this._firstCompleteSubtree.solutionCount = 0;
@@ -534,8 +528,8 @@ class InternalSolver {
     this._candidateSelector = selector;
   }
 
-  getBacktrackTriggers() {
-    return this._backtrackTriggers.slice();
+  getConflictScores() {
+    return this._conflictScores;
   }
 
   getSampleSolution() {
@@ -782,9 +776,7 @@ class InternalSolver {
         iterationCounterForUpdates++;
         if ((iterationCounterForUpdates & backtrackDecayMask) === 0) {
           // Exponentially decay the counts.
-          for (let i = 0; i < this._numCells; i++) {
-            this._backtrackTriggers[i] >>= 1;
-          }
+          this._conflictScores.decay();
           // Ensure that the counter doesn't overflow.
           iterationCounterForUpdates &= (1 << 30) - 1;
         }
@@ -838,7 +830,7 @@ class InternalSolver {
         }
         counters.progressRatio += progressDelta;
         counters.backtracks++;
-        this._backtrackTriggers[cell]++;
+        this._conflictScores.increment(cell);
 
         if (0 !== yieldOnBacktrack &&
           0 === counters.backtracks % yieldOnBacktrack) {
@@ -978,9 +970,7 @@ class InternalSolver {
       // Reduce backtrack triggers so that we don't weight the last runs too
       // heavily.
       // TODO: Do this in a more principled way.
-      for (let i = 0; i < this._numCells; i++) {
-        this._backtrackTriggers[i] >>= 1;
-      }
+      this._conflictScores.decay();
 
       for (const result of this.run(SEARCH_LIMIT)) {
         if (result.isSolution) {

@@ -127,7 +127,7 @@ class DebugManager {
     this._infoOverlay = null;
     this._candidateDisplay = null;
     this._checkboxes = [
-      ['exportBacktrackCounts', document.getElementById('backtrack-heatmap-checkbox')]
+      ['exportConflictHeatmap', document.getElementById('conflict-heatmap-checkbox')]
     ];
     this._logLevelElem = document.getElementById('debug-log-level');
 
@@ -367,8 +367,8 @@ class DebugManager {
       }
     }
 
-    if (data.backtrackCounts) {
-      this._infoOverlay.setHeatmapValues(data.backtrackCounts);
+    if (data.conflictHeatmap) {
+      this._infoOverlay.setHeatmapValues(data.conflictHeatmap);
     }
 
     if (data.counters) {
