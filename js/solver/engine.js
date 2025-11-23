@@ -673,8 +673,6 @@ class InternalSolver {
   static YIELD_ON_STEP = 1;
   static YIELD_NEVER = -1;
 
-  static _LOG_BACKTRACK_DECAY_INTERVAL = 14;
-
   // run runs the solve.
   // yieldWhen can be:
   //  YIELD_ON_SOLUTION to yielding each solution.
@@ -698,7 +696,6 @@ class InternalSolver {
     counters.progressRatio = 0;
 
     const progressFrequencyMask = this._progress.frequencyMask;
-    const backtrackDecayMask = (1 << this.constructor._LOG_BACKTRACK_DECAY_INTERVAL) - 1;
     let iterationCounterForUpdates = 0;
 
     const recStack = this._recStack;
@@ -769,18 +766,8 @@ class InternalSolver {
       const progressDelta = recFrame.progressRemaining / count;
       recFrame.progressRemaining -= progressDelta;
 
-      {
-        // We are enforcing several values at once.
-        counters.valuesTried += nextDepth - cellDepth;
-
-        iterationCounterForUpdates++;
-        if ((iterationCounterForUpdates & backtrackDecayMask) === 0) {
-          // Exponentially decay the counts.
-          this._conflictScores.decay();
-          // Ensure that the counter doesn't overflow.
-          iterationCounterForUpdates &= (1 << 30) - 1;
-        }
-      }
+      // We are enforcing several values at once.
+      counters.valuesTried += nextDepth - cellDepth;
 
       // Determine the set of cells/constraints to enforce next.
       const handlerAccumulator = this._handlerAccumulator;
@@ -843,8 +830,10 @@ class InternalSolver {
         }
       }
 
+      iterationCounterForUpdates++;
       if ((iterationCounterForUpdates & progressFrequencyMask) === 0) {
         this._progress.callback();
+        iterationCounterForUpdates &= (1 << 30) - 1;
       }
 
       if (yieldEveryStep) {
