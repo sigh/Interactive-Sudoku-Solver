@@ -1048,6 +1048,8 @@ class InternalSolver {
 
     const optionSelector = new RandomOptionSelector(/* seed = */ 0);
 
+    const MAX_BACKTRACK_LIMIT = 1 << 13;
+
     // Start the size of the searches small, so we get quick samples initially.
     // Increase it over time for better efficiency.
     let backtrackLimitPerSample = 2;
@@ -1087,7 +1089,7 @@ class InternalSolver {
       // Keep increasing the backtracks limit per sample up to a point.
       // Use progress frequency as that roughly corresponds to how often we
       // want to send updates to the user.
-      if (this._progress.frequencyMask > backtrackLimitPerSample) {
+      if (backtrackLimitPerSample < MAX_BACKTRACK_LIMIT) {
         backtrackLimitPerSample <<= 1;
       }
     }
