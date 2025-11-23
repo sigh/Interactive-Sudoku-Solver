@@ -21,6 +21,7 @@ export class SolverStateDisplay {
 
     this._setUpStateOutput();
     this._stateHistory = new StateHistoryDisplay();
+    this._isEstimateMode = false;
 
     this._lazyUpdateState = deferUntilAnimationFrame(
       this._lazyUpdateState.bind(this));
@@ -52,7 +53,7 @@ export class SolverStateDisplay {
     if (isSolving) {
       this._elements.solveStatus.textContent = this._METHOD_TO_STATUS[method];
       this._elements.progressPercentage.style.display =
-        isEstimateMode ? 'none' : 'inline';
+        this._isEstimateMode ? 'none' : 'inline';
       this._elements.solveStatus.textContent = '';
     }
     this._elements.progressContainer.classList.remove('error');
@@ -65,9 +66,9 @@ export class SolverStateDisplay {
     this._stateHistory.add(state);
   }
 
-  setMode(mode) {
-    const isEstimateMode = (mode === 'estimate-solutions');
-    this._stateHistory.setMode(mode);
+  setEstimateMode(isEstimateMode) {
+    this._isEstimateMode = isEstimateMode;
+    this._stateHistory.setEstimateMode(isEstimateMode);
     this._stateVars['estimatedSolutions'].parentNode.style.display =
       isEstimateMode ? 'block' : 'none';
     this._stateVars['estimateSamples'].parentNode.style.display =
@@ -238,7 +239,7 @@ class StateHistoryDisplay {
     this._states = [];
     this._statsContainer = null;
     this._visible = false;
-    this._currentMode = null;
+    this._isEstimateMode = false;
 
     this._setUpChartButton();
     this._charts = [];
@@ -275,9 +276,8 @@ class StateHistoryDisplay {
     this._updateCharts();
   }
 
-  setMode(mode) {
-    this._currentMode = mode;
-    const isEstimateMode = (mode === 'estimate-solutions');
+  setEstimateMode(isEstimateMode) {
+    this._isEstimateMode = isEstimateMode;
     for (const chart of this._charts) {
       const chartContainer = chart.canvas.parentNode.parentNode;
       const yAxis = chart.data.datasets[0].label;
@@ -387,7 +387,7 @@ class StateHistoryDisplay {
 
     this._eventReplayFn = this._syncToolTips(this._charts);
 
-    this.setMode(this._currentMode);
+    this.setEstimateMode(this._isEstimateMode);
   }
 
   _setUpStatsWindow(container) {

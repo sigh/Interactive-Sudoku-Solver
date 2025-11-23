@@ -570,7 +570,11 @@ class ModeHandler {
   }
 }
 
-ModeHandler.AllPossibilities = class extends ModeHandler {
+class AllPossibilitiesModeHandler extends ModeHandler {
+  static NAME = 'all-possibilities';
+  static DESCRIPTION =
+    'Show all values which are present in any valid solution.';
+
   ITERATION_CONTROLS = true;
   ALLOW_DOWNLOAD = true;
 
@@ -633,7 +637,10 @@ ModeHandler.AllPossibilities = class extends ModeHandler {
   }
 }
 
-ModeHandler.AllSolutions = class extends ModeHandler {
+class AllSolutionsModeHandler extends ModeHandler {
+  static NAME = 'solutions';
+  static DESCRIPTION = 'View each solution.';
+
   ITERATION_CONTROLS = true;
   ALLOW_DOWNLOAD = true;
 
@@ -681,7 +688,12 @@ ModeHandler.AllSolutions = class extends ModeHandler {
   }
 }
 
-ModeHandler.StepByStep = class extends ModeHandler {
+class StepByStepModeHandler extends ModeHandler {
+  static NAME = 'step-by-step';
+  static DESCRIPTION = `
+      Step through the solving process.
+      Alt-click on a cell to force the solver to resolve it next.`;
+
   ITERATION_CONTROLS = true;
   ALLOW_ALT_CLICK = true;
 
@@ -784,7 +796,11 @@ ModeHandler.StepByStep = class extends ModeHandler {
   }
 }
 
-ModeHandler.CountSolutions = class extends ModeHandler {
+class CountSolutionsModeHandler extends ModeHandler {
+  static NAME = 'count-solutions';
+  static DESCRIPTION =
+    `Count the total number of solutions by iterating over all solutions.`;
+
   add(...solutions) {
     this._solutions = [solutions.pop()];
     super.add(...solutions);
@@ -804,7 +820,12 @@ ModeHandler.CountSolutions = class extends ModeHandler {
   }
 }
 
-ModeHandler.ValidateLayout = class extends ModeHandler {
+class ValidateLayoutModeHandler extends ModeHandler {
+  static NAME = 'validate-layout';
+  static DESCRIPTION = `Check if there are any possible solutions given the
+      current layout constraints, especially jigsaw pieces.
+      Non-layout constraints are ignored (including givens).`;
+
   constructor() {
     super();
     this._result = null;
@@ -828,7 +849,11 @@ ModeHandler.ValidateLayout = class extends ModeHandler {
   }
 }
 
-ModeHandler.EstimatedCountSolutions = class extends ModeHandler {
+class EstimatedCountSolutionsModeHandler extends ModeHandler {
+  static NAME = 'estimate-solutions';
+  static DESCRIPTION =
+    'Estimate the total number of solutions using monte carlo sampling.';
+
   add(...solutions) {
     this._solutions = [solutions.pop()];
     super.add(...solutions);
@@ -847,6 +872,15 @@ ModeHandler.EstimatedCountSolutions = class extends ModeHandler {
     }
   }
 }
+
+const Modes = {
+  ALL_POSSIBILITIES: AllPossibilitiesModeHandler,
+  SOLUTIONS: AllSolutionsModeHandler,
+  COUNT_SOLUTIONS: CountSolutionsModeHandler,
+  ESTIMATE_SOLUTIONS: EstimatedCountSolutionsModeHandler,
+  STEP_BY_STEP: StepByStepModeHandler,
+  VALIDATE_LAYOUT: ValidateLayoutModeHandler,
+};
 
 export class SolutionController {
   constructor(constraintManager, displayContainer) {
@@ -875,15 +909,6 @@ export class SolutionController {
 
     this._update = deferUntilAnimationFrame(this._update.bind(this));
     constraintManager.addUpdateListener(this._update.bind(this));
-
-    this._modeHandlers = {
-      'all-possibilities': ModeHandler.AllPossibilities,
-      'solutions': ModeHandler.AllSolutions,
-      'count-solutions': ModeHandler.CountSolutions,
-      'estimate-solutions': ModeHandler.EstimatedCountSolutions,
-      'step-by-step': ModeHandler.StepByStep,
-      'validate-layout': ModeHandler.ValidateLayout,
-    };
 
     this._elements = {
       start: document.getElementById('solution-start'),
@@ -1017,25 +1042,14 @@ export class SolutionController {
     this._elements.buttonPanel.style.visibility = show ? 'visible' : 'hidden';
   }
 
-  static _MODE_DESCRIPTIONS = {
-    'all-possibilities':
-      'Show all values which are present in any valid solution.',
-    'solutions':
-      'View each solution.',
-    'count-solutions':
-      'Count the total number of solutions by iterating over all solutions.',
-    'estimate-solutions':
-      'Estimate the total number of solutions using monte carlo sampling.',
-    'step-by-step':
-      `Step through the solving process.
-      Alt-click on a cell to force the solver to resolve it next.`,
-    'validate-layout':
-      `Check if there are any possible solutions given the current layout
-       constraints, especially jigsaw pieces.
-       Non-layout constraints are ignored (including givens).`,
-  };
+  static _getHandlerClass(modeName) {
+    for (const handler of Object.values(Modes)) {
+      if (handler.NAME === modeName) return handler;
+    }
+    return null;
+  }
 
-  static DEFAULT_MODE = 'all-possibilities';
+  static DEFAULT_MODE = Modes.ALL_POSSIBILITIES.NAME;
 
   async _update() {
     this._solutionDisplay.setSolution();
@@ -1054,14 +1068,15 @@ export class SolutionController {
     if (params.q === '.') params.q = undefined;
     this._historyHandler.update(params);
 
-    const isLayoutMode = mode === 'validate-layout';
+    const isLayoutMode = mode === Modes.VALIDATE_LAYOUT.NAME;
     this._displayContainer.toggleLayoutView(isLayoutMode);
-    this._stateDisplay.setMode(mode);
+    const isEstimateMode = mode === Modes.ESTIMATE_SOLUTIONS.NAME;
+    this._stateDisplay.setEstimateMode(isEstimateMode);
 
-    let description = SolutionController._MODE_DESCRIPTIONS[mode];
-    this._elements.modeDescription.textContent = description;
+    const handlerClass = SolutionController._getHandlerClass(mode);
+    this._elements.modeDescription.textContent = handlerClass.DESCRIPTION;
 
-    if (auto || mode === 'step-by-step') {
+    if (auto || mode === Modes.STEP_BY_STEP.NAME) {
       const solverConstraints = isLayoutMode
         ? this._constraintManager.getLayoutConstraints()
         : constraints;
@@ -1090,7 +1105,7 @@ export class SolutionController {
   }
 
   async _replaceAndRunSolver(mode, constraints) {
-    constraints ||= mode === 'validate-layout'
+    constraints ||= mode === Modes.VALIDATE_LAYOUT.NAME
       ? this._constraintManager.getLayoutConstraints()
       : this._constraintManager.getConstraints();
 
@@ -1100,7 +1115,8 @@ export class SolutionController {
     const session = new SolverSession();
     this._activeSession = session;
 
-    const handler = new this._modeHandlers[mode]();
+    const handlerClass = SolutionController._getHandlerClass(mode);
+    const handler = new handlerClass();
 
     let newSolver = null;
     try {
