@@ -941,17 +941,23 @@ export class SudokuConstraint {
     }
 
     static encodePattern(pattern) {
-      return encodeURIComponent(pattern)
-        .replace(/~/g, '%7E')
-        .replace(/\./g, '%2E');
+      // Use Base64 encoding for the pattern.
+      // This creates shorter URLs. They aren't human readable, but any
+      // escaping scheme would have the same issue.
+      return Base64Codec.encodeString(pattern);
     }
 
     static decodePattern(encodedPattern) {
-      let decoded = encodedPattern;
+      let decoded = '';
       try {
-        decoded = decodeURIComponent(encodedPattern);
+        if (encodedPattern.includes('%') || encodedPattern.includes('.')) {
+          // For backward compatibility, keep the old URL-encoded format.
+          decoded = decodeURIComponent(encodedPattern);
+        } else {
+          decoded = Base64Codec.decodeToString(encodedPattern);
+        }
       } catch (err) {
-        throw ('Invalid encoded regex pattern');
+        throw ('Invalid encoded regex pattern. ' + err);
       }
       return decoded;
     }
