@@ -927,6 +927,7 @@ export class SudokuConstraint {
     };
     static ARGUMENT_CONFIG = {
       label: 'pattern',
+      long: true,
     };
 
     constructor(pattern, ...cells) {
