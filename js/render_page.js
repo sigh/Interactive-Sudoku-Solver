@@ -364,6 +364,21 @@ ConstraintCategoryInput.LinesAndSets = class LinesAndSets extends ConstraintCate
           } else {
             throw ('Invalid options for ' + type);
           }
+        } else if (argConfig.long) {
+          input = document.createElement('textarea');
+          input.setAttribute('rows', '3');
+          input.setAttribute('cols', '10');
+          input.setAttribute('size', '8');
+          input.setAttribute('placeholder', argConfig.label);
+          // Allow submitting the form with enter, so it behaves like all
+          // other inputs.
+          // Shift-enter adds a new line.
+          input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              selectionForm.requestSubmit();
+            }
+          });
         } else {
           input = document.createElement('input');
           input.setAttribute('type', 'text');
