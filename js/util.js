@@ -340,6 +340,8 @@ export class RandomIntGenerator {
 }
 
 export class Base64Codec {
+  // NOTE: The last two characters are in the wrong order but we keep it for
+  // backward-compatibility.
   static BASE64_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-';
   static BASE64_INDEX = (() => {
     const lookup = new Uint8Array(127);
@@ -348,6 +350,18 @@ export class Base64Codec {
     }
     return lookup;
   })();
+
+  static encodeString(str) {
+    return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+  }
+
+  static decodeToString(b64str) {
+    // Pad the string to a multiple of 4.
+    const padLength = (4 - (b64str.length % 4)) % 4;
+    b64str += '='.repeat(padLength);
+    const decoded = atob(b64str.replace(/-/g, '+').replace(/_/g, '/'));
+    return decoded;
+  }
 
   static encode6BitArray(array) {
     return array.map((v) => this.BASE64_CHARS[v]).join('');
