@@ -1536,7 +1536,7 @@ export class SolutionController {
     'count-solutions':
       'Count the total number of solutions by iterating over all solutions.',
     'estimate-solutions':
-      'Estimate the total number of solutions by sampling the search space.',
+      'Estimate the total number of solutions using monte carlo sampling.',
     'step-by-step':
       `Step through the solving process.
       Alt-click on a cell to force the solver to resolve it next.`,
