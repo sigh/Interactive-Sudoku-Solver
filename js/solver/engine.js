@@ -48,13 +48,16 @@ export class SudokuSolver {
   }
 
   estimatedCountSolutions() {
+    const estimationCounters = {
+      solutions: 0,
+      samples: 0,
+    };
     this._runCountFn(() => {
-      this._internalSolver.estimatedCountSolutions();
-      return this._internalSolver.counters.estimatedSolutions;
-    });
+      return this._internalSolver.estimatedCountSolutions(estimationCounters);
+    }, estimationCounters);
   }
 
-  _runCountFn(countFn) {
+  _runCountFn(countFn, estimationCounters) {
     this._reset();
 
     // Add a sample solution to the state updates, but only if a different
@@ -62,12 +65,13 @@ export class SudokuSolver {
     this._internalSolver.unsetSampleSolution();
     this._progressExtraStateFn = () => {
       const sampleSolution = this._internalSolver.getSampleSolution();
-      let result = null;
+      let result = {};
       if (sampleSolution) {
-        result = {
-          solutions: [SudokuSolverUtil.gridToSolution(sampleSolution)]
-        };
+        result.solutions = [SudokuSolverUtil.gridToSolution(sampleSolution)];
         this._internalSolver.unsetSampleSolution();
+      }
+      if (estimationCounters) {
+        result.estimate = { ...estimationCounters };
       }
       return result;
     };
@@ -212,7 +216,6 @@ export class SudokuSolver {
 
     const state = {
       counters: counters,
-      isEstimate: counters.estimatedSolutions >= 0,
       timeMs: this._timer.elapsedMs(),
       done: this._internalSolver.done,
     }
@@ -484,7 +487,6 @@ class InternalSolver {
       progressRatio: 0,
       progressRatioPrev: 0,
       branchesIgnored: 0,
-      estimatedSolutions: -1,
     };
 
     // _conflictScores are initialized to the cell priorities so that
@@ -986,16 +988,16 @@ class InternalSolver {
     }
   }
 
-  estimatedCountSolutions() {
+  estimatedCountSolutions(estimationCounters) {
     const originalCandidateSelector = this._candidateSelector;
 
-    let result = this._estimatedCountSolutions();
+    let result = this._estimatedCountSolutions(estimationCounters);
 
     this._candidateSelector = originalCandidateSelector;
     return result;
   }
 
-  _estimatedCountSolutions() {
+  _estimatedCountSolutions(estimationCounters) {
     // Solution count estimate is based on the algorithm from:
     // "Estimating the Efficiency of Backtrack Programs" Knuth (1975)
     // https://www.ams.org/journals/mcom/1975-29-129/S0025-5718-1975-0373371-6/S0025-5718-1975-0373371-6.pdf
@@ -1006,9 +1008,6 @@ class InternalSolver {
     let totalEstimate = 0;
     let numSamples = 0;
 
-    const counters = this.counters;
-    counters.estimatedSolutions = 0;
-
     // Use a fixed seed so the result is deterministic.
     // TODO: Allows us to save and restore the original.
     this._candidateSelector = new SamplingCandidateSelector(
@@ -1016,9 +1015,6 @@ class InternalSolver {
 
     while (true) {
       this._resetRun();
-      counters.progressRatio = 0;
-      counters.solutions = 0;
-      counters.backtracks = 0;
 
       // Run a search and stop after one backtrack.
       for (const result of this.run(InternalSolver.YIELD_EVERY_BACKTRACK)) {
@@ -1029,7 +1025,8 @@ class InternalSolver {
       }
 
       numSamples++;
-      counters.estimatedSolutions = totalEstimate / numSamples;
+      estimationCounters.solutions = totalEstimate / numSamples;
+      estimationCounters.samples = numSamples;
 
       // Ensure that there are progress callbacks.
       // However, we don't want the progress callback to report done.
