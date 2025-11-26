@@ -3,7 +3,7 @@ const { LookupTables } = await import('./solver/lookup_tables.js' + self.VERSION
 export class NFA {
   constructor(startId, acceptIds, states) {
     this.startId = startId;
-    this.acceptIds = new Set(acceptIds);
+    this.acceptIds = new Set(...acceptIds);
     this.states = states;
   }
 
@@ -40,6 +40,33 @@ export const regexToNFA = (pattern, numSymbols) => {
   const charToMask = createCharToMask(numSymbols);
   const builder = new RegexToNFABuilder(charToMask, numSymbols);
   return builder.build(ast);
+};
+
+export const textToNFA = (definition, numSymbols) => {
+  const builder = new TextNFABuilder(definition, numSymbols);
+  return builder.build();
+};
+
+export const NFAToText = (nfa) => {
+  const nameForState = (id) => `s${id}`;
+
+  const lines = [];
+  lines.push(`start: ${nameForState(nfa.startId)}`);
+  lines.push(`accept: ${[...nfa.acceptIds].map(nameForState).join(' ')}`);
+
+  nfa.states.forEach((state, fromId) => {
+    const fromName = nameForState(fromId);
+    state.transitions.forEach(({ symbols, state: toId }) => {
+      const tokens = LookupTables.toValuesArray(symbols).map(String);
+      if (!tokens.length) return;
+      lines.push(`${fromName} -> ${nameForState(toId)}: ${tokens.join(' ')}`);
+    });
+    state.epsilon.forEach((toId) => {
+      lines.push(`${fromName} -> ${nameForState(toId)}`);
+    });
+  });
+
+  return lines.join('\n');
 };
 
 const charToValue = (char) => {
@@ -419,5 +446,130 @@ class RegexToNFABuilder {
     this._addEpsilon(outer.startId, outer.acceptId);
     this._addEpsilon(fragment.acceptId, outer.acceptId);
     return outer;
+  }
+}
+
+class TextNFABuilder {
+  constructor(definition, numSymbols) {
+    if (!Number.isInteger(numSymbols) || numSymbols <= 0) {
+      throw new Error('numSymbols must be a positive integer');
+    }
+
+    this._definition = String(definition ?? '');
+    this._numValues = numSymbols;
+    this._states = [];
+    this._stateIds = new Map();
+    this._startId = null;
+    this._acceptIds = [];
+  }
+
+  build() {
+    const lines = this._definition.split(/\r?\n/);
+    for (let i = 0; i < lines.length; i++) {
+      this._parseLine(lines[i], i + 1);
+    }
+
+    if (this._startId === null) {
+      throw new Error('NFA definition is missing a start state');
+    }
+    if (!this._acceptIds.length) {
+      throw new Error('NFA definition must declare at least one accept state');
+    }
+
+    return new NFA(
+      this._startId,
+      this._acceptIds,
+      this._states,
+    );
+  }
+
+  _parseLine(rawLine, lineNumber) {
+    const commentIndex = rawLine.indexOf('#');
+    const line = (commentIndex === -1 ? rawLine : rawLine.slice(0, commentIndex)).trim();
+    if (!line) return;
+
+    if (line.startsWith('start:')) {
+      const states = this._parseStateList(line.slice(6).trim());
+      if (states.length !== 1 || this._startId !== null) {
+        throw new Error(this._formatError(
+          lineNumber, 'Start state must be a single unique state'));
+      }
+      this._startId = states[0];
+      return;
+    }
+
+    if (line.startsWith('accept:')) {
+      this._acceptIds.push(this._parseStateList(line.slice(7).trim()));
+      return;
+    }
+
+    this._parseTransition(line, lineNumber);
+  }
+
+  _parseStateList(str) {
+    const statesNames = str.split(/[,\s]+/);
+    return statesNames.map(stateName => this._getOrCreateState(stateName));
+  }
+
+  _parseTransition(line, lineNumber) {
+    const parts = line.split(':', 2);
+
+    const stateToState = parts[0].trim();
+    const match = stateToState.match(/^(\w+)\s*--?-?>\s*(\w+)$/);
+    if (!match) {
+      throw new Error(this._formatError(lineNumber, "Expected '->' in transition"));
+    }
+
+    const fromState = this._getOrCreateState(match[1]);
+    const toState = this._getOrCreateState(match[2]);
+
+    // Epsilon transition
+    if (parts.length === 1) {
+      this._states[fromState].addEpsilon(toState);
+      return;
+    }
+
+    const valueListStr = parts[1].trim();
+    let valuesMask = 0;
+    for (const valueSpec of valueListStr.split(/[,\s]+/)) {
+      const match = valueSpec.match(/^(\d+)(?:-(\d+))?$/i);
+      if (!match) {
+        throw new Error(this._formatError(
+          lineNumber, `Invalid value: '${valueSpec}'`));
+      }
+      const rangeStart = this._parseValue(match[1], lineNumber);
+      const rangeEnd = match[2] ? this._parseValue(match[2], lineNumber) : rangeStart;
+
+      valuesMask |= LookupTables.fromValue(rangeEnd + 1) - LookupTables.fromValue(rangeStart);
+    }
+
+    this._states[fromState].addTransition(valuesMask, toState);
+  }
+
+  _parseValue(token, lineNumber) {
+    const value = parseInt(token, 10);
+
+    if (value < 1 || value > this._numValues) {
+      throw new Error(this._formatError(
+        lineNumber,
+        `Value '${token}' is outside the allowed range 1-${this._numValues}`));
+    }
+
+    return value;
+  }
+
+  _getOrCreateState(name) {
+    let id = this._stateIds.get(name);
+    if (id !== undefined) {
+      return id;
+    }
+    id = this._states.length;
+    this._stateIds.set(name, id);
+    this._states.push(new NFA.State());
+    return id;
+  }
+
+  _formatError(lineNumber, message) {
+    return `Line ${lineNumber}: ${message}`;
   }
 }

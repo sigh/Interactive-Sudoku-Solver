@@ -1134,6 +1134,8 @@ class ConstraintManager {
         selectedConstraintCollection, inputManager),
       new ConstraintCategoryInput.CustomBinary(
         selectedConstraintCollection, inputManager),
+      new ConstraintCategoryInput.StateMachine(
+        selectedConstraintCollection, inputManager),
       new ConstraintCategoryInput.OutsideClue(
         selectedConstraintCollection, inputManager),
       new ConstraintCategoryInput.GivenCandidates(
@@ -2227,6 +2229,58 @@ ConstraintCategoryInput.CustomBinary = class CustomBinary extends ConstraintCate
       return false;
     };
     form['function'].oninput = () => {
+      errorElem.textContent = '';
+    };
+  }
+}
+
+ConstraintCategoryInput.StateMachine = class StateMachine extends ConstraintCategoryInput {
+  constructor(collection, inputManager) {
+    super(collection);
+
+    this._form = document.getElementById('state-machine-input');
+    this._collapsibleContainer = new CollapsibleContainer(
+      this._form.firstElementChild,
+      /* defaultOpen= */ false).allowInComposite();
+    inputManager.addSelectionPreserver(this._form);
+
+    inputManager.onSelection(
+      deferUntilAnimationFrame(this._onSelection.bind(this)));
+
+    this._inputManager = inputManager;
+
+    this._setUp();
+  }
+
+  _onSelection(selection, finishedSelecting) {
+    const form = this._form;
+    toggleDisabled(this._collapsibleContainer.element(), selection.length == 0);
+    if (finishedSelecting
+      && selection.length > 0
+      && this._collapsibleContainer.isOpen()) {
+      if (form['definition'].value === '') {
+        form['definition'].focus();
+      } else {
+        form['add-constraint'].focus();
+      }
+    }
+  }
+
+  _setUp() {
+    const form = this._form;
+    const errorElem = document.getElementById(
+      'state-machine-input-definition-error');
+    form.onsubmit = e => {
+      const formData = new FormData(form);
+      const name = formData.get('name');
+      const definition = formData.get('definition');
+
+      const cells = this._inputManager.getSelection();
+      this.collection.addConstraint(new SudokuConstraint.NFA(definition, name, ...cells));
+
+      return false;
+    };
+    form['definition'].oninput = () => {
       errorElem.textContent = '';
     };
   }
