@@ -4,7 +4,7 @@ const { Timer, IteratorWithCount, arraysAreEqual, setIntersectionToArray } = awa
 const { LookupTables } = await import('./lookup_tables.js' + self.VERSION_PARAM);
 const { SHAPE_MAX } = await import('../grid_shape.js' + self.VERSION_PARAM);
 const { SudokuConstraintOptimizer } = await import('./optimizer.js' + self.VERSION_PARAM);
-const { CandidateSelector, RandomOptionSelector, ConflictScores } = await import('./candidate_selector.js' + self.VERSION_PARAM);
+const { CandidateSelector, SamplingCandidateSelector, ConflictScores } = await import('./candidate_selector.js' + self.VERSION_PARAM);
 const HandlerModule = await import('./handlers.js' + self.VERSION_PARAM);
 
 export class SudokuSolver {
@@ -487,14 +487,6 @@ class InternalSolver {
       estimatedSolutions: -1,
     };
 
-    this._firstCompleteSubtree = {
-      size: 0,
-      depth: 0,
-      solutionCount: 0,
-    };
-
-    this._candidateSelector.setOptionSelector(null);
-
     // _conflictScores are initialized to the cell priorities so that
     // so that the initial part of the search is still able to prioritize cells
     // which may lead to a contradiction.
@@ -515,10 +507,6 @@ class InternalSolver {
     // used internally).
     // Candidate selector must be made aware of the new conflict scores.
     this._candidateSelector.reset(this._conflictScores);
-
-    this._firstCompleteSubtree.depth = this._numCells;
-    this._firstCompleteSubtree.solutionCount = 0;
-    this._firstCompleteSubtree.size = 0;
 
     this.done = false;
     this._atStart = true;
@@ -670,8 +658,9 @@ class InternalSolver {
   }
 
   static YIELD_ON_SOLUTION = 0;
-  static YIELD_ON_STEP = 1;
+  static YIELD_ON_STEP = -2;
   static YIELD_NEVER = -1;
+  static YIELD_EVERY_BACKTRACK = 1;
 
   // run runs the solve.
   // yieldWhen can be:
@@ -680,7 +669,7 @@ class InternalSolver {
   //  n > 1 to yield every n backtracks, before the backtrack is applied.
   * run(yieldWhen) {
     const yieldEveryStep = yieldWhen === this.constructor.YIELD_ON_STEP;
-    const yieldOnBacktrack = yieldWhen > 1 ? yieldWhen : 0;
+    const yieldOnBacktrack = yieldWhen > 0 ? yieldWhen : 0;
 
     // Set up iterator validation.
     if (!this._atStart) throw ('State is not in initial state.');
@@ -739,13 +728,6 @@ class InternalSolver {
     recDepth++;
     while (recDepth) {
       let recFrame = recStack[--recDepth];
-
-      if (!recFrame.newNode && recFrame.cellDepth < this._firstCompleteSubtree.depth) {
-        this._firstCompleteSubtree.size = counters.progressRatio;
-        this._firstCompleteSubtree.solutionCount = counters.solutions;
-        this._firstCompleteSubtree.depth = recFrame.cellDepth;
-        this._candidateSelector.onFirstBranchComplete();
-      }
 
       const cellDepth = recFrame.cellDepth;
       let grid = recFrame.gridCells;
@@ -892,10 +874,6 @@ class InternalSolver {
       recDepth++;
     }
 
-    this._firstCompleteSubtree.size = counters.progressRatio;
-    this._firstCompleteSubtree.solutionCount = counters.solutions;
-    this._firstCompleteSubtree.depth = -1;
-
     this.done = true;
   }
 
@@ -1009,9 +987,11 @@ class InternalSolver {
   }
 
   estimatedCountSolutions() {
-    const originalInitialGridState = this._initialGridState.slice();
-    const result = this._estimatedCountSolutions();
-    this._initialGridState = originalInitialGridState;
+    const originalCandidateSelector = this._candidateSelector;
+
+    let result = this._estimatedCountSolutions();
+
+    this._candidateSelector = originalCandidateSelector;
     return result;
   }
 
@@ -1020,143 +1000,41 @@ class InternalSolver {
     // "Estimating the Efficiency of Backtrack Programs" Knuth (1975)
     // https://www.ams.org/journals/mcom/1975-29-129/S0025-5718-1975-0373371-6/S0025-5718-1975-0373371-6.pdf
     //
-    // It is modified so we continue backtracking upto a defined backtrack
-    // limit, then use the statistics for the largest complete subtree we
-    // have searched.
-    //
-    // It is further modified by selecting a cell to expand and exploring
-    // every valid value in that cell. This reduces the variance of the
-    // estimate as suggested by:
-    // "Tree Size by Partial Backtracking" Purdom (1978)
-    // https://scholarworks.iu.edu/dspace/items/5e00ff20-ab58-41fc-a866-d45b2988521c/full
-    //
-    // The cell with the highest conflict score is chosen for this purpose,
-    // as it is likely to lead to the most pruning of the search space.
-    // In addition, if we fully explore the branch, then we can track the exact
-    // solution count for that branch and remove it from all future searches.
+    // For each sample, we run a regular search but randomly select the
+    // candidate values at each step, and stop after one branch.
 
     let totalEstimate = 0;
     let numSamples = 0;
-    let exactSolutions = 0;
 
     const counters = this.counters;
     counters.estimatedSolutions = 0;
 
-    const initialGridState = this._initialGridState;
-
     // Use a fixed seed so the result is deterministic.
-    const optionSelector = new RandomOptionSelector(/* seed = */ 0);
+    // TODO: Allows us to save and restore the original.
+    this._candidateSelector = new SamplingCandidateSelector(
+      this._shape, this._handlerSet, this._debugLogger);
 
-    // Start the size of the searches small, so we get quick samples initially.
-    // Increase it over time for better efficiency.
-    const MAX_BACKTRACK_LIMIT = 1 << 10;
-    let backtrackLimitPerSample = 2;
-
-    const runSearch = (limit) => {
+    while (true) {
       this._resetRun();
       counters.progressRatio = 0;
       counters.solutions = 0;
       counters.backtracks = 0;
-      this._candidateSelector.setOptionSelector(optionSelector);
 
-      // Run a search with a limited backtrack budget.
-      for (const _ of this.run(limit)) {
-        if (counters.backtracks >= limit) break;
-      }
-      return this.done;
-    };
-
-    const bestCellToExpand = () => {
-      // Find the cell with the highest score in this._conflictScores (but
-      // ensure it has more than one valid value).
-
-      // Default to cell 0. If the grid is already solved or invalid (no cells
-      // with > 1 option), we will just process cell 0. This works because we
-      // will iterate over its single value and find the solution (or not) in
-      // the main loop.
-      let bestCell = 0;
-      let maxScore = -1;
-
-      const scores = this._conflictScores.scores;
-      for (let i = 0; i < this._numCells; i++) {
-        const v = initialGridState[i];
-        // Only select cells which have multiple values.
-        if ((v & (v - 1)) !== 0) {
-          if (scores[i] > maxScore) {
-            maxScore = scores[i];
-            bestCell = i;
-          }
+      // Run a search and stop after one backtrack.
+      for (const result of this.run(InternalSolver.YIELD_EVERY_BACKTRACK)) {
+        if (result.isSolution) {
+          totalEstimate += this._candidateSelector.getSolutionWeight();
         }
+        break;
       }
 
-      return bestCell;
-    };
-
-    while (true) {
-      // Choose a cell to expand. For each valid value in the cell, set that
-      // value and run a search to generate a sample.
-
-      const bestCell = bestCellToExpand();
-      let gridValues = initialGridState[bestCell];
-
-      let sampleEstimate = 0;
-
-      let values = gridValues;
-      while (values) {
-        const value = values & -values;
-        values ^= value;
-        initialGridState[bestCell] = value;
-
-        if (runSearch(backtrackLimitPerSample)) {
-          // The search completed, so we have an exact count for this value.
-          // We can record the exact count and remove this value from future
-          // searches.
-          const count = counters.solutions;
-          exactSolutions += count;
-          // Remove the contribution of this value from the running estimate.
-          totalEstimate -= count * numSamples;
-          gridValues &= ~value;
-          // Log these to the debug logger as these are bounded to a small
-          // number.
-          if (this._debugLogger?.logLevel >= 2) {
-            const v = LookupTables.toValue(value);
-            this._debugLogger.log({
-              loc: '_estimatedCountSolutions',
-              msg: `Cell ${bestCell} with value ${v} has exact count ${count}`,
-            });
-          }
-        } else {
-          // The search did not complete, so we use the estimate from the
-          // largest complete subtree.
-          const solutionsInSample = this._firstCompleteSubtree.solutionCount;
-          sampleEstimate += solutionsInSample / this._firstCompleteSubtree.size;
-        }
-      }
-
-      initialGridState[bestCell] = gridValues;
-
-      // If no values remain, then all searches completed.
-      // This means we have an exact solution count, and we can finish.
-      if (!gridValues) {
-        counters.estimatedSolutions = exactSolutions;
-        return exactSolutions;
-      }
-
-      // Otherwise, update the iteration statistics and continue onto the next
-      // iteration.
       numSamples++;
-      totalEstimate += sampleEstimate;
-      counters.estimatedSolutions = exactSolutions + totalEstimate / numSamples;
+      counters.estimatedSolutions = totalEstimate / numSamples;
 
       // Ensure that there are progress callbacks.
       // However, we don't want the progress callback to report done.
       this.done = false;
       this._progress.callback();
-
-      // Keep increasing the backtracks limit per sample up to a point.
-      if (backtrackLimitPerSample < MAX_BACKTRACK_LIMIT) {
-        backtrackLimitPerSample <<= 1;
-      }
     }
   }
 }
