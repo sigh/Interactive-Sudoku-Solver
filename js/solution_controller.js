@@ -528,13 +528,15 @@ class StateHistoryDisplay {
   }
 
   add(state) {
+    const estimate = state.extra?.estimate;
     const newState = {
       timeMs: state.timeMs / 1000,
       guesses: state.counters.guesses,
       searchedPercentage: state.counters.progressRatio * 100,
       skippedPercentage: state.counters.branchesIgnored * 100,
       solutions: state.counters.solutions,
-      estimatedSolutions: state.isEstimate ? state.counters.estimatedSolutions : 0,
+      estimatedSolutions: estimate ? estimate.solutions : 0,
+      estimationSamples: estimate ? estimate.samples : 0,
     };
 
     if (this._states.length && newState.timeMs < this._nextT) {
@@ -875,7 +877,18 @@ class SolverStateDisplay {
   }
 
   setMode(mode) {
+    const isEstimateMode = (mode === 'estimate-solutions');
     this._stateHistory.setMode(mode);
+    this._stateVars['estimatedSolutions'].parentNode.style.display =
+      isEstimateMode ? 'block' : 'none';
+    this._stateVars['estimateSamples'].parentNode.style.display =
+      isEstimateMode ? 'block' : 'none';
+    this._stateVars['searchSpaceExplored'].parentNode.style.display =
+      isEstimateMode ? 'none' : 'block';
+    this._stateVars['solutions'].parentNode.style.display =
+      isEstimateMode ? 'none' : 'block';
+    this._elements.progressPercentage.style.display =
+      isEstimateMode ? 'none' : 'inline';
   }
 
   clear() {
@@ -897,17 +910,22 @@ class SolverStateDisplay {
       let text;
       switch (v) {
         case 'solutions':
-          {
-            if (state.isEstimate) {
-              this._renderSolutionEstimate(
-                this._stateVars[v], counters.estimatedSolutions, searchComplete);
-            } else {
-              this._renderNumberWithGaps(this._stateVars[v], counters[v]);
-              if (!searchComplete) {
-                this._stateVars[v].appendChild(
-                  document.createTextNode('+'));
-              }
-            }
+          this._renderNumberWithGaps(this._stateVars[v], counters[v]);
+          if (!searchComplete) {
+            this._stateVars[v].appendChild(
+              document.createTextNode('+'));
+          }
+          break;
+        case 'estimatedSolutions':
+          if (state.extra?.estimate) {
+            this._renderSolutionEstimate(
+              this._stateVars[v], state.extra.estimate.solutions, searchComplete);
+          }
+          break;
+        case 'estimateSamples':
+          if (state.extra?.estimate) {
+            this._renderNumberWithGaps(
+              this._stateVars[v], state.extra.estimate.samples);
           }
           break;
         case 'puzzleSetupTime':
@@ -919,9 +937,7 @@ class SolverStateDisplay {
           this._stateVars[v].textContent = text;
           break;
         case 'searchSpaceExplored':
-          if (state.isEstimate) {
-            this._stateVars[v].textContent = '';
-          } else {
+          if (!state.extra?.estimate) {
             text = (counters.progressRatio * 100).toPrecision(3) + '%';
             if (searchComplete) text = '100%';
             this._stateVars[v].textContent = text;
@@ -981,12 +997,6 @@ class SolverStateDisplay {
   }
 
   _updateProgressBar(state) {
-    if (state.isEstimate) {
-      this._elements.progressBar.setAttribute('value', 0);
-      this._elements.progressPercentage.textContent = '';
-      return;
-    }
-
     const progress = state.done
       ? 1
       : state.counters.progressRatio + state.counters.branchesIgnored;
@@ -999,6 +1009,8 @@ class SolverStateDisplay {
     let container = this._elements.stateOutput;
     let vars = [
       'solutions',
+      'estimatedSolutions',
+      'estimateSamples',
       'guesses',
       'valuesTried',
       'constraintsProcessed',
@@ -1013,7 +1025,12 @@ class SolverStateDisplay {
       let title = document.createElement('span');
       title.textContent = camelCaseToWords(v);
       title.className = 'description';
-      if (v == 'solutions') title.style.fontSize = '16px';
+      if (v == 'solutions' || v == 'estimatedSolutions') {
+        title.style.fontSize = '16px';
+      }
+      // if (v == 'estimatedSolutions' || v == 'estimateSamples') {
+      //   elem.style.display = 'none';
+      // }
       elem.appendChild(value);
       elem.appendChild(title);
       container.appendChild(elem);
