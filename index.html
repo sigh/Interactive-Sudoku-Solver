@@ -379,6 +379,41 @@ layout: null
           </fieldset>
         </form>
 
+        <form id="state-machine-input" class="hide-until-load">
+          <fieldset tabindex="0" class="constraint-panel" disabled>
+            <h2>State Machine</h2>
+            <div>
+              <div>
+                <div class="description">
+                  <p>
+                    Create a constraint along a line by providing a NFA definition.
+                  </p>
+                  <p>
+                    The definition should be in the format: <code>start_state: (input_char -> next_state), ...</code>
+                  </p>
+                </div>
+                <div>
+                  Name:
+                  <input type="text" name="name" placeholder="optional" maxlength="20" columns="20">
+                </div>
+                <div>
+                  <div id="state-machine-input-definition">
+                    Definition:
+                    <textarea rows="5" name="definition" placeholder="1: (1->2), (2->3)
+2: (3->4)"></textarea>
+                  </div>
+                  <div id="state-machine-input-definition-error" class="error"></div>
+                </div>
+                <div>
+                  <button type="submit" title="Add constraint" name="add-constraint">
+                    Add
+                  </button>
+                </div>
+              </div>
+            </div>
+          </fieldset>
+        </form>
+
         <div class="hide-until-load">
           <form id="outside-clue-input">
             <fieldset tabindex="0" class="constraint-panel" disabled>

@@ -438,7 +438,7 @@ export class CompositeConstraintBase extends SudokuConstraintBase {
   //    (such as Anti-knight). It is easier to ban everything in the layout
   //    panel.
   static _ALLOWED_CATEGORIES = new Set(
-    ['LinesAndSets', 'GivenCandidates', 'OutsideClue', 'Composite', 'CustomBinary']);
+    ['LinesAndSets', 'GivenCandidates', 'OutsideClue', 'Composite', 'CustomBinary', 'StateMachine']);
 
   static allowedConstraintClass(constraintClass) {
     return this._ALLOWED_CATEGORIES.has(constraintClass.CATEGORY);
@@ -1006,6 +1006,99 @@ export class SudokuConstraint {
         }
 
         parts.push(this._argsToString(encodedPattern, ...items));
+      }
+
+      return parts.join('');
+    }
+  }
+
+  static NFA = class NFA extends SudokuConstraintBase {
+    static DESCRIPTION = (`
+      Digits along the line, read in order, must be accepted by the provided NFA.`);
+    static CATEGORY = 'StateMachine';
+    static DISPLAY_CONFIG = {
+      displayClass: 'RegexLine',
+      startMarker: LineOptions.MEDIUM_FULL_CIRCLE_MARKER,
+    };
+    static ARGUMENT_CONFIG = {
+      label: 'definition',
+      long: true,
+    };
+
+    constructor(definition, name, ...cells) {
+      definition = String(definition ?? '');
+      super(definition, name, ...cells);
+      this.definition = definition;
+      this.name = name;
+      this.cells = cells;
+    }
+
+    chipLabel() {
+      if (this.name) return `NFA "${this.name}"`;
+      return `NFA (${this.definition})`;
+    }
+
+    static encodeDefinition(definition) {
+      return Base64Codec.encodeString(definition);
+    }
+
+    static decodeDefinition(encodedDefinition) {
+      return Base64Codec.decodeToString(encodedDefinition);
+    }
+
+    static *makeFromArgs(definitionToken, ...items) {
+      const definition = this.decodeDefinition(definitionToken);
+
+      let currentName = '';
+      let currentCells = [];
+
+      for (const item of items) {
+        if (item.length && 'R' === item[0].toUpperCase()) {
+          currentCells.push(item);
+          continue;
+        }
+
+        if (currentCells.length) {
+          yield new this(definition, currentName, ...currentCells);
+        }
+
+        if (item.length) {
+          currentName = SudokuConstraint.Binary.decodeName(item.substring(1));
+        }
+
+        currentCells = [];
+      }
+
+      if (currentCells.length) {
+        yield new this(definition, currentName, ...currentCells);
+      }
+    }
+
+    static serialize(constraints) {
+      const parts = [];
+
+      constraints.sort(
+        (a, b) => a.definition.localeCompare(b.definition) || a.name.localeCompare(b.name));
+
+      for (const defGroup of groupSortedBy(constraints, c => c.definition)) {
+        const definition = defGroup[0].definition;
+        const encodedDefinition = this.encodeDefinition(definition);
+        const items = [];
+
+        for (const nameGroup of groupSortedBy(defGroup, c => c.name)) {
+          let first = true;
+          for (const part of nameGroup) {
+            if (first) {
+              items.push('_' + SudokuConstraint.Binary.encodeName(part.name));
+              first = false;
+            } else {
+              items.push('');
+            }
+            items.push(...part.cells);
+          }
+        }
+
+        parts.push(this._argsToString(encodedDefinition, ...items));
       }
 
       return parts.join('');
