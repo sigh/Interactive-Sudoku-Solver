@@ -208,7 +208,7 @@ export class CandidateSelector {
     //  - Currently exploring a cell with more than 2 values.
     //  - Have non-zero conflict scores (and thus score). If the score is 0,
     //    that means that no other cells have a non-zero score.
-    if (isNewNode && count > 2 && conflictScores[cell] > 0) {
+    if (isNewNode && count > 2 && conflictScores[cell] > 0 && !this._optionSelector) {
       let score = conflictScores[cell] / count;
 
       const state = this._candidateSelectionStates[cellDepth];
@@ -372,17 +372,6 @@ export class CandidateSelector {
       });
     }
     return candidateSelectionStates;
-  }
-
-  setOptionSelector(optionSelector) {
-    this._optionSelector = optionSelector;
-  }
-
-  onFirstBranchComplete() {
-    if (this._optionSelector &&
-      this._optionSelector.FIRST_BRANCH_ONLY) {
-      this._optionSelector = null;
-    }
   }
 }
 
@@ -565,9 +554,35 @@ CandidateFinders.House = class House extends CandidateFinderBase {
   }
 };
 
-export class RandomOptionSelector {
-  FIRST_BRANCH_ONLY = true;
+// An extension of the candidate selector which chooses values at random
+// from the chosen cell, and only searches a single branch of the tree.
+export class SamplingCandidateSelector extends CandidateSelector {
+  constructor(shape, handlerSet, debugLogger) {
+    super(shape, handlerSet, debugLogger);
+    this._totalWeight = new Float64Array(shape.numCells + 1);
+    this._totalWeight[0] = 1.0;
+    this._optionSelector = new RandomOptionSelector(/* seed = */ 0);
+  }
 
+  selectNextCandidate(cellDepth, gridState, stepState, isNewNode) {
+    if (!isNewNode) {
+      this._candidateSelectionFlags[cellDepth] = 0;
+      return [0, 0, 0];
+    }
+
+    const [nextDepth, value, count] =
+      super.selectNextCandidate(cellDepth, gridState, stepState, isNewNode);
+    this._totalWeight[nextDepth] = this._totalWeight[cellDepth] * count;
+
+    return [nextDepth, value, count];
+  }
+
+  getSolutionWeight() {
+    return this._totalWeight[this._numCells];
+  }
+}
+
+class RandomOptionSelector {
   constructor(randomSeed) {
     this._rnd = new RandomIntGenerator(randomSeed);
   }
@@ -585,7 +600,6 @@ export class RandomOptionSelector {
     return this._rnd.randomInt(count - 1);
   }
 }
-
 
 // ConflictScores counts the the number of times a cell is responsible
 // for finding a conflict and causing a backtrack. It is exponentially
