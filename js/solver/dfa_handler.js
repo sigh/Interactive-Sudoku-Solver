@@ -26,6 +26,32 @@ const createCharToMask = (numValues) => {
   };
 };
 
+export class DFA {
+  constructor(numStates, acceptingStates, startingState, transitionLists) {
+    this.numStates = numStates;
+    this.acceptingStates = acceptingStates;
+    this.startingState = startingState;
+    this.transitionLists = transitionLists;
+  }
+}
+
+export class NFA {
+  constructor(startId, acceptId, states) {
+    this.startId = startId;
+    this.acceptId = acceptId;
+    this.states = states;
+  }
+
+  static State = class {
+    constructor(id, transitionSymbols = 0, transitionState = null) {
+      this.id = id;
+      this.transitionSymbols = transitionSymbols;
+      this.transitionState = transitionState;
+      this.epsilon = [];
+    }
+  }
+}
+
 class AstNode {
   static Empty = class { }
 
@@ -83,8 +109,8 @@ export const compileRegex = memoize((pattern, numValues) => {
   const ast = parser.parse();
   const charToMask = createCharToMask(numValues);
   const nfaBuilder = new NFABuilder(charToMask, numValues);
-  const { start, accept, states } = nfaBuilder.build(ast);
-  const dfaBuilder = new DFABuilder(states, start, accept, numValues);
+  const nfa = nfaBuilder.build(ast);
+  const dfaBuilder = new DFABuilder(nfa, numValues);
   return dfaBuilder.build();
 });
 
@@ -269,24 +295,15 @@ class NFABuilder {
 
   build(ast) {
     const fragment = this._buildNode(ast);
-    return {
-      start: fragment.start.id,
-      accept: fragment.accept.id,
-      states: this.states,
-    };
-  }
-
-  static State = class {
-    constructor(id, transitionSymbols = 0, transitionState = null) {
-      this.id = id;
-      this.transitionSymbols = transitionSymbols;
-      this.transitionState = transitionState;
-      this.epsilon = [];
-    }
+    return new NFA(
+      fragment.start.id,
+      fragment.accept.id,
+      this.states,
+    );
   }
 
   _newState(transitionSymbols = 0, transitionState = null) {
-    const state = new NFABuilder.State(
+    const state = new NFA.State(
       this.states.length,
       transitionSymbols,
       transitionState
@@ -418,10 +435,8 @@ class NFABuilder {
 class DFABuilder {
   static RAW_DFA_START_STATE = 0;
 
-  constructor(nfaStates, startId, acceptId, numSymbols) {
-    this.nfaStates = nfaStates;
-    this.startId = startId;
-    this.acceptId = acceptId;
+  constructor(nfa, numSymbols) {
+    this._nfa = nfa;
     this.numSymbols = numSymbols;
     this._singleStateClosures = new Map();
   }
@@ -460,7 +475,7 @@ class DFABuilder {
     const visited = new Set(stack);
     while (stack.length) {
       const id = stack.pop();
-      const state = this.nfaStates[id];
+      const state = this._nfa.states[id];
       for (const nextId of state.epsilon) {
         if (!visited.has(nextId)) {
           visited.add(nextId);
@@ -491,13 +506,13 @@ class DFABuilder {
       const newRawState =
         new DFABuilder._RawState(
           closure.states,
-          closure.states.includes(this.acceptId),
+          closure.states.includes(this._nfa.acceptId),
           numSymbols);
       rawDfaStates.push(newRawState);
       return newRawState;
     };
 
-    const startClosure = this._epsilonClosure([this.startId]);
+    const startClosure = this._epsilonClosure([this._nfa.startId]);
     const stack = [addRawDfaState(startClosure)];
 
     while (stack.length) {
@@ -509,7 +524,7 @@ class DFABuilder {
         const symbol = 1 << i;
         const moveSet = new Set();
         for (const currentStateId of currentStateIds) {
-          const nfaState = this.nfaStates[currentStateId];
+          const nfaState = this._nfa.states[currentStateId];
           if (nfaState.transitionSymbols & symbol) {
             moveSet.add(nfaState.transitionState);
           }
@@ -644,7 +659,7 @@ class DFABuilder {
     }
 
     const acceptingStates = new BitSet(numStates);
-    const startingStates = new BitSet(numStates);
+    const startingState = new BitSet(numStates);
     const totalTransitions = states.reduce(
       (acc, state) => acc + state.transitionList.length, 0);
 
@@ -655,7 +670,7 @@ class DFABuilder {
     for (let i = 0; i < numStates; i++) {
       const state = states[i];
       if (state.accepting) acceptingStates.add(i);
-      if (state.starting) startingStates.add(i);
+      if (state.starting) startingState.add(i);
 
       const numTransitions = state.transitionList.length;
       const transitionList = transitionBackingArray.subarray(
@@ -666,35 +681,27 @@ class DFABuilder {
       transitionLists.push(transitionList);
     }
 
-    return {
+    return new DFA(
       numStates,
       acceptingStates,
-      startingStates,
+      startingState,
       transitionLists,
-    };
+    );
   }
 }
 
 // Enforces a linear regex constraint by compiling the pattern into a DFA and
 // propagating it across candidate sets to prune unsupported values.
-export class RegexLine extends SudokuConstraintHandler {
-  constructor(cells, pattern) {
+export class DFALine extends SudokuConstraintHandler {
+  constructor(cells, dfa) {
     super(cells);
-    this._pattern = pattern;
-    this._dfa = null;
-    this._statesList = null;
-  }
-
-  initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
-    this._dfa = compileRegex(this._pattern, shape.numValues);
+    this._dfa = dfa;
 
     const stateCapacity = this._dfa.numStates;
     const slots = this.cells.length + 1;
     const { bitsets, words } = BitSet.allocatePool(stateCapacity, slots);
     this._stateWords = words;
     this._statesList = bitsets;
-
-    return true;
   }
 
   enforceConsistency(grid, handlerAccumulator) {
@@ -708,7 +715,7 @@ export class RegexLine extends SudokuConstraintHandler {
     this._stateWords.fill(0);
 
     // Forward pass: Find all states reachable from the start state.
-    statesList[0].copyFrom(dfa.startingStates);
+    statesList[0].copyFrom(dfa.startingState);
 
     for (let i = 0; i < numCells; i++) {
       const nextStates = statesList[i + 1];
