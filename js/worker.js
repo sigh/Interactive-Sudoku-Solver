@@ -23,7 +23,7 @@ if (!self.VERSION_PARAM.endsWith('&sync')) {
   import('./solver/optimizer.js' + self.VERSION_PARAM);
   import('./solver/candidate_selector.js' + self.VERSION_PARAM);
   import('./solver/sum_handler.js' + self.VERSION_PARAM);
-  import('./solver/regex_handler.js' + self.VERSION_PARAM);
+  import('./solver/dfa_handler.js' + self.VERSION_PARAM);
   import('./grid_shape.js' + self.VERSION_PARAM);
   import('./sudoku_constraint.js' + self.VERSION_PARAM);
 }

@@ -7,8 +7,7 @@ const { SudokuParser, toShortSolution } = await import('./sudoku_parser.js' + se
 const { SolverProxy } = await import('./solution_controller.js' + self.VERSION_PARAM);
 const { PUZZLE_INDEX } = await import('../data/example_puzzles.js' + self.VERSION_PARAM);
 const { LookupTables } = await import('./solver/lookup_tables.js' + self.VERSION_PARAM);
-const { SHAPE_9x9 } = await import('./grid_shape.js' + self.VERSION_PARAM);
-const { compileRegex } = await import('./solver/regex_handler.js' + self.VERSION_PARAM);
+const { compileRegex } = await import('./solver/dfa_handler.js' + self.VERSION_PARAM);
 
 const loadDataFile = async (name) => {
   const module = await import(name);
