@@ -36,20 +36,33 @@ export class DFA {
 }
 
 export class NFA {
-  constructor(startId, acceptId, states) {
+  constructor(startId, acceptIds, states) {
     this.startId = startId;
-    this.acceptId = acceptId;
+    this.acceptIds = new Set(acceptIds);
     this.states = states;
   }
 
-  static State = class {
-    constructor(id, transitionSymbols = 0, transitionState = null) {
-      this.id = id;
-      this.transitionSymbols = transitionSymbols;
-      this.transitionState = transitionState;
+  static Transition = class Transition {
+    constructor(symbols, state) {
+      this.symbols = symbols;
+      this.state = state;
+    }
+  };
+
+  static State = class State {
+    constructor() {
+      this.transitions = [];
       this.epsilon = [];
     }
-  }
+
+    addTransition(symbols, state) {
+      this.transitions.push(new NFA.Transition(symbols, state));
+    }
+
+    addEpsilon(state) {
+      this.epsilon.push(state);
+    }
+  };
 }
 
 class AstNode {
@@ -281,9 +294,9 @@ class RegexParser {
 
 class NFABuilder {
   static _Fragment = class {
-    constructor(start, accept) {
-      this.start = start;
-      this.accept = accept;
+    constructor(startId, acceptId) {
+      this.startId = startId;
+      this.acceptId = acceptId;
     }
   };
 
@@ -296,40 +309,30 @@ class NFABuilder {
   build(ast) {
     const fragment = this._buildNode(ast);
     return new NFA(
-      fragment.start.id,
-      fragment.accept.id,
+      fragment.startId,
+      [fragment.acceptId],
       this.states,
     );
   }
 
-  _newState(transitionSymbols = 0, transitionState = null) {
-    const state = new NFA.State(
-      this.states.length,
-      transitionSymbols,
-      transitionState
-    );
+  _newState() {
+    const state = new NFA.State();
+    const id = this.states.length;
     this.states.push(state);
-    return state;
+    return id;
   }
 
   _newFragment(transitionSymbols = 0) {
-    const acceptState = this._newState();
-    const startState = transitionSymbols
-      ? this._newState(transitionSymbols, acceptState.id)
-      : this._newState();
-    return new NFABuilder._Fragment(startState, acceptState);
-  }
-
-  _addTransition(fragment, symbol) {
-    const transitions = fragment.start.transitions;
-    if (!transitions.has(symbol)) {
-      transitions.set(symbol, new Set());
+    const acceptId = this._newState();
+    const startId = this._newState();
+    if (transitionSymbols) {
+      this.states[startId].addTransition(transitionSymbols, acceptId);
     }
-    transitions.get(symbol).add(fragment.accept.id);
+    return new NFABuilder._Fragment(startId, acceptId);
   }
 
-  _addEpsilon(fromState, toState) {
-    fromState.epsilon.push(toState.id);
+  _addEpsilon(fromStateId, toStateId) {
+    this.states[fromStateId].addEpsilon(toStateId);
   }
 
   _buildNode(node) {
@@ -359,7 +362,7 @@ class NFABuilder {
 
   _buildEmpty() {
     const fragment = this._newFragment();
-    this._addEpsilon(fragment.start, fragment.accept);
+    this._addEpsilon(fragment.startId, fragment.acceptId);
     return fragment;
   }
 
@@ -385,22 +388,22 @@ class NFABuilder {
   _buildConcat(parts) {
     if (!parts.length) return this._buildEmpty();
     const first = this._buildNode(parts[0]);
-    let currentStart = first.start;
-    let currentAccept = first.accept;
+    let currentStartId = first.startId;
+    let currentAcceptId = first.acceptId;
     for (let i = 1; i < parts.length; i++) {
       const next = this._buildNode(parts[i]);
-      this._addEpsilon(currentAccept, next.start);
-      currentAccept = next.accept;
+      this._addEpsilon(currentAcceptId, next.startId);
+      currentAcceptId = next.acceptId;
     }
-    return new NFABuilder._Fragment(currentStart, currentAccept);
+    return new NFABuilder._Fragment(currentStartId, currentAcceptId);
   }
 
   _buildAlternate(options) {
     const fragment = this._newFragment();
     for (const option of options) {
       const optionFragment = this._buildNode(option);
-      this._addEpsilon(fragment.start, optionFragment.start);
-      this._addEpsilon(optionFragment.accept, fragment.accept);
+      this._addEpsilon(fragment.startId, optionFragment.startId);
+      this._addEpsilon(optionFragment.acceptId, fragment.acceptId);
     }
     return fragment;
   }
@@ -408,26 +411,26 @@ class NFABuilder {
   _buildStar(child) {
     const fragment = this._newFragment();
     const inner = this._buildNode(child);
-    this._addEpsilon(fragment.start, inner.start);
-    this._addEpsilon(fragment.start, fragment.accept);
-    this._addEpsilon(inner.accept, fragment.accept);
-    this._addEpsilon(inner.accept, inner.start);
+    this._addEpsilon(fragment.startId, inner.startId);
+    this._addEpsilon(fragment.startId, fragment.acceptId);
+    this._addEpsilon(inner.acceptId, fragment.acceptId);
+    this._addEpsilon(inner.acceptId, inner.startId);
     return fragment;
   }
 
   _buildPlus(child) {
     const fragment = this._buildNode(child);
     const starFragment = this._buildStar(child);
-    this._addEpsilon(fragment.accept, starFragment.start);
-    return new NFABuilder._Fragment(fragment.start, starFragment.accept);
+    this._addEpsilon(fragment.acceptId, starFragment.startId);
+    return new NFABuilder._Fragment(fragment.startId, starFragment.acceptId);
   }
 
   _buildOptional(child) {
     const fragment = this._buildNode(child);
     const outer = this._newFragment();
-    this._addEpsilon(outer.start, fragment.start);
-    this._addEpsilon(outer.start, outer.accept);
-    this._addEpsilon(fragment.accept, outer.accept);
+    this._addEpsilon(outer.startId, fragment.startId);
+    this._addEpsilon(outer.startId, outer.acceptId);
+    this._addEpsilon(fragment.acceptId, outer.acceptId);
     return outer;
   }
 }
@@ -503,10 +506,12 @@ class DFABuilder {
     const addRawDfaState = (closure) => {
       const index = rawDfaStates.length;
       closureMap.set(closure.key, index);
+      const isAccepting = closure.states.some((stateId) =>
+        this._nfa.acceptIds.has(stateId));
       const newRawState =
         new DFABuilder._RawState(
           closure.states,
-          closure.states.includes(this._nfa.acceptId),
+          isAccepting,
           numSymbols);
       rawDfaStates.push(newRawState);
       return newRawState;
@@ -525,8 +530,10 @@ class DFABuilder {
         const moveSet = new Set();
         for (const currentStateId of currentStateIds) {
           const nfaState = this._nfa.states[currentStateId];
-          if (nfaState.transitionSymbols & symbol) {
-            moveSet.add(nfaState.transitionState);
+          for (const transition of nfaState.transitions) {
+            if (transition.symbols & symbol) {
+              moveSet.add(transition.state);
+            }
           }
         }
         if (!moveSet.size) continue;
