@@ -1,5 +1,7 @@
 const { SudokuConstraint, SudokuConstraintBase, CellArgs } = await import('../sudoku_constraint.js' + self.VERSION_PARAM);
 const { SudokuSolver } = await import('./engine.js' + self.VERSION_PARAM);
+const { regexToNFA } = await import('../nfa_parser.js' + self.VERSION_PARAM);
+const { memoize } = await import('../util.js' + self.VERSION_PARAM);
 const HandlerModule = await import('./handlers.js' + self.VERSION_PARAM);
 const SumHandlerModule = await import('./sum_handler.js' + self.VERSION_PARAM);
 const DFAHandlerModule = await import('./dfa_handler.js' + self.VERSION_PARAM);
@@ -273,8 +275,7 @@ export class SudokuBuilder {
         case 'Regex':
           {
             const cells = constraint.cells.map(c => shape.parseCellId(c).cell);
-            const dfa = DFAHandlerModule.compileRegex(
-              constraint.pattern, shape.numValues);
+            const dfa = compileRegex(constraint.pattern, shape.numValues);
             yield new DFAHandlerModule.DFALine(cells, dfa);
           }
           break;
@@ -758,3 +759,8 @@ export class SudokuBuilder {
     }
   }
 }
+
+export const compileRegex = memoize((pattern, numValues) => {
+  const nfa = regexToNFA(pattern, numValues);
+  return DFAHandlerModule.NFAToDFA(nfa, numValues);
+});
