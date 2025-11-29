@@ -24,7 +24,6 @@ const { SudokuParser } = await import('./sudoku_parser.js' + self.VERSION_PARAM)
 const { ConstraintDisplay } = await import('./constraint_display.js' + self.VERSION_PARAM);
 const { GridShape } = await import('./grid_shape.js' + self.VERSION_PARAM);
 const { SolutionController } = await import('./solution_controller.js' + self.VERSION_PARAM);
-const { textToNFA, NFASerializer } = await import('./nfa_parser.js' + self.VERSION_PARAM);
 
 export const initPage = () => {
   // Create grid.
@@ -2206,6 +2205,11 @@ ConstraintCategoryInput.CustomBinary = class CustomBinary extends ConstraintCate
     const form = this._form;
     const errorElem = document.getElementById(
       'custom-binary-input-function-error');
+
+    autoSaveField(form, 'name');
+    autoSaveField(form, 'chain-mode');
+    autoSaveField(form, 'function');
+
     form.onsubmit = e => {
       const formData = new FormData(form);
       const name = formData.get('name');
@@ -2250,6 +2254,7 @@ ConstraintCategoryInput.StateMachine = class StateMachine extends ConstraintCate
 
     this._inputManager = inputManager;
     this._shape = null;
+    this._fieldNames = ['start-state', 'transition-body', 'accept-body'];
 
     this._setUp();
   }
@@ -2264,8 +2269,9 @@ ConstraintCategoryInput.StateMachine = class StateMachine extends ConstraintCate
     if (finishedSelecting
       && selection.length > 0
       && this._collapsibleContainer.isOpen()) {
-      if (form['definition'].value === '') {
-        form['definition'].focus();
+      const primaryField = form['start-state'];
+      if (primaryField && primaryField.value.trim() === '') {
+        primaryField.focus();
       } else {
         form['add-constraint'].focus();
       }
@@ -2276,15 +2282,24 @@ ConstraintCategoryInput.StateMachine = class StateMachine extends ConstraintCate
     const form = this._form;
     const errorElem = document.getElementById(
       'state-machine-input-definition-error');
+
+    autoSaveField(form, 'name');
+    autoSaveField(form, 'start-state');
+    autoSaveField(form, 'transition-body');
+    autoSaveField(form, 'accept-body');
+
     form.onsubmit = e => {
       const formData = new FormData(form);
       const name = formData.get('name');
-      const definition = formData.get('definition');
+      const startExpression = formData.get('start-state');
+      const transitionBody = formData.get('transition-body');
+      const acceptBody = formData.get('accept-body');
       const shape = this._shape || SudokuConstraint.Shape.DEFAULT_SHAPE;
       let encodedNFA;
       try {
-        const nfa = textToNFA(definition, shape.numValues);
-        encodedNFA = NFASerializer.serialize(nfa);
+        encodedNFA = SudokuConstraint.NFA.encodeDefinition(
+          { startExpression, transitionBody, acceptBody },
+          shape.numValues);
       } catch (err) {
         errorElem.textContent = err.message || err;
         return false;
@@ -2298,8 +2313,12 @@ ConstraintCategoryInput.StateMachine = class StateMachine extends ConstraintCate
 
       return false;
     };
-    form['definition'].oninput = () => {
-      errorElem.textContent = '';
-    };
+    for (const fieldName of this._fieldNames) {
+      const field = form[fieldName];
+      if (!field) continue;
+      field.addEventListener('input', () => {
+        errorElem.textContent = '';
+      });
+    }
   }
 }

@@ -228,7 +228,7 @@ export class NFASerializer {
     }
 
     const orderedStates = order.map((idx) => states[idx]);
-    const startIsAccept = acceptSet.has(nfa.startId);
+    const startIsAccept = nfa.acceptIds.has(nfa.startId);
     const acceptCount = acceptSet.size;
     return { states: orderedStates, remap, acceptCount, startIsAccept };
   }
@@ -945,5 +945,137 @@ class TextNFABuilder {
 
   _formatError(lineNumber, message) {
     return `Line ${lineNumber}: ${message}`;
+  }
+}
+
+export class JavascriptNFABuilder {
+  static MAX_STATE_COUNT = 1024;
+
+  constructor(definition, numValues) {
+    const { startExpression, transitionBody, acceptBody } = definition;
+    this._startExpression = startExpression.trim();
+    this._transitionBody = transitionBody.trim();
+    this._acceptBody = acceptBody.trim();
+    this._numValues = numValues;
+    this._transitionFn = this._createTransitionFn(this._transitionBody);
+    this._acceptFn = this._createAcceptFn(this._acceptBody);
+    this._stateStrToIndex = new Map();
+    this._states = [];
+  }
+
+  build() {
+    const startStateStr = this._generateStartState(this._startExpression);
+
+    const stack = [];
+
+    stack.push(this._addState(startStateStr));
+
+    while (stack.length) {
+      const index = stack.pop();
+      const record = this._states[index];
+      for (let digit = 1; digit <= this._numValues; digit++) {
+        const nextStateStr = this._transitionFn(record.serialized, digit);
+        if (nextStateStr === undefined) continue;
+        if (!this._stateStrToIndex.has(nextStateStr)) {
+          stack.push(this._addState(nextStateStr));
+        }
+        const targetIndex = this._stateStrToIndex.get(nextStateStr);
+        const mask = record.transitions.get(targetIndex) || 0;
+        record.transitions.set(targetIndex, mask | (1 << (digit - 1)));
+      }
+    }
+
+    return this._toNFA();
+  }
+
+  _generateStartState(startExpression) {
+    try {
+      const value = Function('"use strict"; return (' + startExpression + ');')();
+      return this._stringifyState(value);
+    } catch (err) {
+      throw new Error(`Start state expression threw: ${err?.message || err}`);
+    }
+  }
+
+  _createTransitionFn(transitionBody) {
+    try {
+      const fn = Function('state', 'value', transitionBody);
+      return (stateStr, value) => {
+        const stateValue = this._deserializeState(stateStr);
+        try {
+          const next = fn(stateValue, value);
+          if (next === undefined) return undefined;
+          return this._stringifyState(next);
+        } catch (err) {
+          throw new Error(`Transition function threw for value ${value}: ${err?.message || err}`);
+        }
+      };
+    } catch (err) {
+      throw new Error(`Transition function is invalid: ${err?.message || err}`);
+    }
+  }
+
+  _createAcceptFn(acceptBody) {
+    try {
+      const fn = Function('state', acceptBody);
+      return (stateStr) => {
+        const stateValue = this._deserializeState(stateStr);
+        try {
+          return !!fn(stateValue);
+        } catch (err) {
+          throw new Error(`Accept function threw: ${err?.message || err}`);
+        }
+      };
+    } catch (err) {
+      throw new Error(`Accept function is invalid: ${err?.message || err}`);
+    }
+  }
+
+  _addState(stateStr) {
+    if (this._states.length >= JavascriptNFABuilder.MAX_STATE_COUNT) {
+      throw new Error(
+        `State machine produced more than ${JavascriptNFABuilder.MAX_STATE_COUNT} states`);
+    }
+    const accepting = this._acceptFn(stateStr);
+    const record = {
+      serialized: stateStr,
+      transitions: new Map(),
+      accepting,
+    };
+    const index = this._states.length;
+    this._states.push(record);
+    this._stateStrToIndex.set(stateStr, index);
+    return index;
+  }
+
+  _toNFA() {
+    const nfaStates = this._states.map(() => new NFA.State());
+    const acceptIds = [];
+    this._states.forEach((record, index) => {
+      if (record.accepting) acceptIds.push(index);
+      const nfaState = nfaStates[index];
+      for (const [target, mask] of record.transitions.entries()) {
+        if (mask) {
+          nfaState.addTransition(mask, target);
+        }
+      }
+    });
+    return new NFA(0, acceptIds, nfaStates);
+  }
+
+  _stringifyState(value) {
+    try {
+      const serialized = JSON.stringify(value);
+      if (serialized === undefined) {
+        throw new Error('State machine states must be JSON-serializable values');
+      }
+      return serialized;
+    } catch (err) {
+      throw new Error(`State machine states must be JSON-serializable: ${err?.message || err}`);
+    }
+  }
+
+  _deserializeState(serialized) {
+    return JSON.parse(serialized);
   }
 }
