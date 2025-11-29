@@ -1015,7 +1015,8 @@ export class SudokuConstraint {
 
   static NFA = class NFA extends SudokuConstraintBase {
     static DESCRIPTION = (`
-      Digits along the line, read in order, must be accepted by the provided NFA.`);
+      Digits along the line, read in order, must be accepted by the provided
+      Non-deterministic finite automaton (NFA).`);
     static CATEGORY = 'StateMachine';
     static DISPLAY_CONFIG = {
       displayClass: 'RegexLine',
@@ -1033,9 +1034,14 @@ export class SudokuConstraint {
       this.cells = cells;
     }
 
+    static _countStates = memoize((encodedNFA) => {
+      return NFASerializer.deserialize(encodedNFA).states.length;
+    });
+
     chipLabel() {
-      if (this.name) return `NFA "${this.name}"`;
-      return 'NFA';
+      const name = this.name ? ` "${this.name}"` : '';
+      const numStates = this.constructor._countStates(this.encodedNFA);
+      return `NFA${name} (${numStates} states)`;
     }
 
     static encodeDefinition(definition, numValues) {

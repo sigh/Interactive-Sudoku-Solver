@@ -41,6 +41,14 @@ const CATEGORY_CONFIGS = {
       Cells can also be added and removed by holding down shift while
       clicking.`,
   },
+  'StateMachine': {
+    description: 'Finite-state machine for accepting cell sequences',
+    instructions: `
+      Select cells by click and dragging on the grid, then use the
+      "State machine" panel to define the start state, transition, and accept
+      logic (see panel for guidance).
+      Cells can also be added and removed by holding shift while clicking.`,
+  },
   'Jigsaw': {
     description: 'Irregular grid regions',
     instructions: `

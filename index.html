@@ -325,7 +325,7 @@ layout: null
         </div>
 
         <form id="custom-binary-input" class="hide-until-load">
-          <fieldset tabindex=" 0" class="constraint-panel" disabled>
+          <fieldset tabindex=" 0" class="constraint-panel">
             <h2>Custom binary constraints</h2>
             <div>
               <div>
@@ -365,7 +365,7 @@ layout: null
                 <div>
                   <div id="custom-binary-input-function">
                     Constraint: <code>(a,b) =></code>
-                    <textarea rows="3" name="function"></textarea>
+                    <textarea rows="3" name="function" class="code-input"></textarea>
                   </div>
                   <div id="custom-binary-input-function-error" class="error"></div>
                 </div>
@@ -380,45 +380,60 @@ layout: null
         </form>
 
         <form id="state-machine-input" class="hide-until-load">
-          <fieldset tabindex="0" class="constraint-panel" disabled>
-            <h2>State Machine</h2>
+          <fieldset tabindex="0" class="constraint-panel">
+            <h2>State machine constraints</h2>
             <div>
               <div>
                 <div class="description">
                   <p>
-                    Define an automaton by supplying JavaScript for the start state, a transition function,
-                    and an accept predicate. Each selected cell feeds its digit (1 – shape size) through the transition.
-                  </p>
-                  <p>
-                    The transition body will be wrapped as <code>(state, value) =&gt; { ... }</code> and the accept body
-                    as
-                    <code>(state) =&gt; { ... }</code>. Return <code>undefined</code> from the transition to reject a
-                    value.
+                    Define an finite-state machine using JavaScript transition
+                    and accept functions. The cells in the constraint will
+                    processed in order, and the constraint will be satisfied if
+                    the accept function returns true for the final state.
+                    The state-machine can be non-deterministic, meaning that
+                    a given state and cell value can transition to multiple next
+                    states.
                   </p>
                 </div>
                 <div>
                   Name:
                   <input type="text" name="name" placeholder="optional" maxlength="20" columns="20">
                 </div>
-                <div>
-                  <label for="state-machine-start-state">Start state (expression):</label>
-                  <textarea id="state-machine-start-state" rows="2" name="start-state"
-                    placeholder="({ sum: 0 })"></textarea>
-                </div>
-                <div>
-                  <label for="state-machine-transition-body">
-                    Transition body <code>(state, value) =&gt; { ... }</code>:
-                  </label>
-                  <textarea id="state-machine-transition-body" rows="6" name="transition-body" placeholder="const next = { ...state };
-next.sum = (next.sum || 0) + value;
-return next;"></textarea>
-                </div>
-                <div>
-                  <label for="state-machine-accept-body">
-                    Accept body <code>(state) =&gt; { ... }</code>:
-                  </label>
-                  <textarea id="state-machine-accept-body" rows="4" name="accept-body"
-                    placeholder="return state.sum === 15;"></textarea>
+                <div class="state-machine-code">
+                  <div class="state-machine-code-block">
+                    <div class="description">
+                      <code>// The initial state. States can be any</code>
+                      <code>// JSON-serializable value, except arrays.</code>
+                    </div>
+                    <span>
+                      <code>startState = (</code>
+                      <textarea id="state-machine-start-state" name="start-state" rows="1" placeholder='"start"'
+                        spellcheck="false" class="code-input"></textarea>
+                      <code>);</code>
+                    </span>
+                  </div>
+                  <div class="state-machine-code-block">
+                    <div class="description">
+                      <code>// transition returns a next state, or an array</code>
+                      <code>// of states based on the current state and the</code>
+                      <code>// cell value. Returns undefined or the empty</code>
+                      <code>// array to reject a value.</code>
+                    </div>
+                    <code>function transition(state, value) {</code>
+                    <textarea id="state-machine-transition-body" class="state-machine-code-textarea code-input"
+                      rows="10" name="transition-body" spellcheck="false" placeholder='return "next";'></textarea>
+                    <code>}</code>
+                  </div>
+                  <div class="state-machine-code-block">
+                    <div class="description">
+                      <code>// accept returns true when the state is a valid</code>
+                      <code>// final state.</code>
+                    </div>
+                    <code>function accept(state) {</code>
+                    <textarea id="state-machine-accept-body" class="state-machine-code-textarea code-input" rows="4"
+                      name="accept-body" spellcheck="false" placeholder='return state === "next";'></textarea>
+                    <code>}</code>
+                  </div>
                 </div>
                 <div id="state-machine-input-definition-error" class="error"></div>
                 <div>
