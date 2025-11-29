@@ -1007,7 +1007,8 @@ export class JavascriptNFABuilder {
           if (next === undefined) return undefined;
           return this._stringifyState(next);
         } catch (err) {
-          throw new Error(`Transition function threw for value ${value}: ${err?.message || err}`);
+          throw new Error(
+            `Transition function threw for input (${stateStr}, ${value}): ${err?.message || err}`);
         }
       };
     } catch (err) {
@@ -1023,7 +1024,8 @@ export class JavascriptNFABuilder {
         try {
           return !!fn(stateValue);
         } catch (err) {
-          throw new Error(`Accept function threw: ${err?.message || err}`);
+          throw new Error(
+            `Accept function threw for input ${stateStr}: ${err?.message || err}`);
         }
       };
     } catch (err) {

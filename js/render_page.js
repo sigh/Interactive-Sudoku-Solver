@@ -950,6 +950,7 @@ class RootConstraintCollection extends ConstraintCollectionBase {
       case 'LinesAndSets':
       case 'CustomBinary':
       case 'Experimental':
+      case 'StateMachine':
         return this._chipViews.get('ordinary');
       case 'Jigsaw':
         return this._chipViews.get('jigsaw');
@@ -2170,6 +2171,7 @@ ConstraintCategoryInput.CustomBinary = class CustomBinary extends ConstraintCate
     this._collapsibleContainer = new CollapsibleContainer(
       this._form.firstElementChild,
       /* defaultOpen= */ false).allowInComposite();
+    this._onSelection([], true);  // Set up in disabled state.
     inputManager.addSelectionPreserver(this._form);
 
     inputManager.onSelection(
@@ -2187,9 +2189,11 @@ ConstraintCategoryInput.CustomBinary = class CustomBinary extends ConstraintCate
 
   _onSelection(selection, finishedSelecting) {
     const form = this._form;
-    toggleDisabled(this._collapsibleContainer.element(), selection.length <= 1);
+    const hasEnoughCells = selection.length > 1;
+    form.classList.toggle('disabled', !hasEnoughCells);
+    form['add-constraint'].disabled = !hasEnoughCells;
     if (finishedSelecting
-      && selection.length > 1
+      && hasEnoughCells
       && this._collapsibleContainer.isOpen()) {
       // If the function is empty, focus on it. Otherwise focus on the
       // add button.
@@ -2247,6 +2251,7 @@ ConstraintCategoryInput.StateMachine = class StateMachine extends ConstraintCate
     this._collapsibleContainer = new CollapsibleContainer(
       this._form.firstElementChild,
       /* defaultOpen= */ false).allowInComposite();
+    this._onSelection([], true);  // Set up in disabled state.
     inputManager.addSelectionPreserver(this._form);
 
     inputManager.onSelection(
@@ -2265,9 +2270,11 @@ ConstraintCategoryInput.StateMachine = class StateMachine extends ConstraintCate
 
   _onSelection(selection, finishedSelecting) {
     const form = this._form;
-    toggleDisabled(this._collapsibleContainer.element(), selection.length == 0);
+    const hasSelection = selection.length > 0;
+    form.classList.toggle('disabled', !hasSelection);
+    form['add-constraint'].disabled = !hasSelection;
     if (finishedSelecting
-      && selection.length > 0
+      && selection.length > 1  // Don't auto-focus for single-cell constraints.
       && this._collapsibleContainer.isOpen()) {
       const primaryField = form['start-state'];
       if (primaryField && primaryField.value.trim() === '') {
