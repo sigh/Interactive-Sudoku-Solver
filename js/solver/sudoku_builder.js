@@ -1,6 +1,6 @@
 const { SudokuConstraint, SudokuConstraintBase, CellArgs } = await import('../sudoku_constraint.js' + self.VERSION_PARAM);
 const { SudokuSolver } = await import('./engine.js' + self.VERSION_PARAM);
-const { regexToNFA, textToNFA } = await import('../nfa_parser.js' + self.VERSION_PARAM);
+const { regexToNFA, NFASerializer } = await import('../nfa_parser.js' + self.VERSION_PARAM);
 const { memoize } = await import('../util.js' + self.VERSION_PARAM);
 const HandlerModule = await import('./handlers.js' + self.VERSION_PARAM);
 const SumHandlerModule = await import('./sum_handler.js' + self.VERSION_PARAM);
@@ -283,7 +283,8 @@ export class SudokuBuilder {
         case 'NFA':
           {
             const cells = constraint.cells.map(c => shape.parseCellId(c).cell);
-            const dfa = compileNFA(constraint.definition, shape.numValues);
+            const encodedNFA = constraint.encodedNFA;
+            const dfa = compileNFA(encodedNFA, shape.numValues);
             yield new DFAHandlerModule.DFALine(cells, dfa);
           }
           break;
@@ -773,7 +774,7 @@ export const compileRegex = memoize((pattern, numValues) => {
   return DFAHandlerModule.NFAToDFA(nfa, numValues);
 });
 
-export const compileNFA = memoize((definition, numValues) => {
-  const nfa = textToNFA(definition, numValues);
+export const compileNFA = memoize((encodedNFA, numValues) => {
+  const nfa = NFASerializer.deserialize(encodedNFA);
   return DFAHandlerModule.NFAToDFA(nfa, numValues);
 });

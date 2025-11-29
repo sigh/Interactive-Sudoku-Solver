@@ -1025,29 +1025,19 @@ export class SudokuConstraint {
       long: true,
     };
 
-    constructor(definition, name, ...cells) {
-      definition = String(definition ?? '');
-      super(definition, name, ...cells);
-      this.definition = definition;
+    constructor(encodedNFA, name, ...cells) {
+      super(encodedNFA, name, ...cells);
+      this.encodedNFA = encodedNFA;
       this.name = name;
       this.cells = cells;
     }
 
     chipLabel() {
       if (this.name) return `NFA "${this.name}"`;
-      return `NFA (${this.definition})`;
+      return 'NFA';
     }
 
-    static encodeDefinition(definition) {
-      return Base64Codec.encodeString(definition);
-    }
-
-    static decodeDefinition(encodedDefinition) {
-      return Base64Codec.decodeToString(encodedDefinition);
-    }
-
-    static *makeFromArgs(definitionToken, ...items) {
-      const definition = this.decodeDefinition(definitionToken);
+    static *makeFromArgs(encodedNFA, ...items) {
 
       let currentName = '';
       let currentCells = [];
@@ -1059,7 +1049,7 @@ export class SudokuConstraint {
         }
 
         if (currentCells.length) {
-          yield new this(definition, currentName, ...currentCells);
+          yield new this(encodedNFA, currentName, ...currentCells);
         }
 
         if (item.length) {
@@ -1070,7 +1060,7 @@ export class SudokuConstraint {
       }
 
       if (currentCells.length) {
-        yield new this(definition, currentName, ...currentCells);
+        yield new this(encodedNFA, currentName, ...currentCells);
       }
     }
 
@@ -1078,17 +1068,17 @@ export class SudokuConstraint {
       const parts = [];
 
       constraints.sort(
-        (a, b) => a.definition.localeCompare(b.definition) || a.name.localeCompare(b.name));
+        (a, b) => a.encodedNFA.localeCompare(b.encodedNFA) || a.name.localeCompare(b.name));
 
-      for (const defGroup of groupSortedBy(constraints, c => c.definition)) {
-        const definition = defGroup[0].definition;
-        const encodedDefinition = this.encodeDefinition(definition);
+      for (const defGroup of groupSortedBy(constraints, c => c.encodedNFA)) {
+        const encodedNFA = defGroup[0].encodedNFA;
         const items = [];
 
         for (const nameGroup of groupSortedBy(defGroup, c => c.name)) {
           let first = true;
           for (const part of nameGroup) {
             if (first) {
+              // TODO: Extract function from Binary constraint for encoding names.
               items.push('_' + SudokuConstraint.Binary.encodeName(part.name));
               first = false;
             } else {
@@ -1098,7 +1088,7 @@ export class SudokuConstraint {
           }
         }
 
-        parts.push(this._argsToString(encodedDefinition, ...items));
+        parts.push(this._argsToString(encodedNFA, ...items));
       }
 
       return parts.join('');

@@ -293,6 +293,7 @@ export const runSolveTests = async (onFailure) => {
     'Fortress sudoku',  // GreaterThan
     'Equality cages',  // EqualityCage
     'Regex line',  // Regex
+    'Sequence sudoku', // NFA
     'Full rank - 6 clue snipe',
     'Irregular region sum line',
     'Force non-unit coeff', // Sum with non-unit coeff

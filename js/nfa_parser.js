@@ -1,9 +1,17 @@
 const { LookupTables } = await import('./solver/lookup_tables.js' + self.VERSION_PARAM);
+const {
+  Base64Codec,
+  BitReader,
+  BitWriter,
+  setPeek,
+  countOnes16bit,
+  requiredBits
+} = await import('./util.js' + self.VERSION_PARAM);
 
 export class NFA {
   constructor(startId, acceptIds, states) {
     this.startId = startId;
-    this.acceptIds = new Set(...acceptIds);
+    this.acceptIds = new Set(acceptIds);
     this.states = states;
   }
 
@@ -68,6 +76,372 @@ export const NFAToText = (nfa) => {
 
   return lines.join('\n');
 };
+
+// Serialization format overview:
+//   Header (written once):
+//     * format: 2 bits (plain or packed state encoding, see FORMAT enum)
+//     * stateBitsMinusOne: 4 bits storing (state bit width - 1)
+//     * symbolCountMinusOne: 4 bits storing (alphabet size - 1)
+//     * startIsAccept: 1 bit (1 if state 0 is accepting)
+//     * acceptCount: stateBits bits storing the number of additional accepts
+//   Body (streamed per state until data ends):
+//     Plain format: sequences of (hasMore bit, symbols mask, target) ending with hasMore=0.
+//     Packed format: a bitmask of active symbols followed by state IDs for each set bit.
+// States are ordered with the start state coming first, then all accept states,
+// then all other states.
+// The decoder keeps reading states until the bitstream ends, then trims any
+// trailing padding as long as all referenced targets and accept slots are present.
+export class NFASerializer {
+  static MIN_SYMBOLS = 1;
+  static SYMBOL_COUNT_FIELD_BITS = 4;
+  static MAX_SYMBOLS = 1 << this.SYMBOL_COUNT_FIELD_BITS;
+  static STATE_BITS_FIELD_BITS = 4;
+  static MIN_STATE_BITS = 1;
+  static MAX_STATE_BITS = 1 << this.STATE_BITS_FIELD_BITS;
+  static FORMAT = Object.freeze({
+    PLAIN: 0,
+    PACKED: 1,
+  });
+  static HEADER_FORMAT_BITS = 2;
+
+  static serialize(nfa) {
+    const normalized = this._normalizeStates(nfa);
+    const states = normalized.states;
+    const remap = normalized.remap;
+    const acceptCount = normalized.acceptCount;
+    const startIsAccept = normalized.startIsAccept;
+    const numStates = states.length;
+
+    this._assertNoEpsilonTransitions(states);
+
+    const symbolCount = this._findSymbolCount(states);
+    if (symbolCount > this.MAX_SYMBOLS) {
+      throw new Error(`NFA requires ${symbolCount} symbols but only ${this.MAX_SYMBOLS} are supported`);
+    }
+    const stateBits = Math.max(1, requiredBits(numStates - 1));
+    if (stateBits > this.MAX_STATE_BITS) {
+      throw new Error('NFA exceeds maximum supported state count (1024)');
+    }
+
+    const stateTransitions = states.map((state) => {
+      const transitions = [];
+      for (const { symbols, state: toState } of state.transitions) {
+        const mapped = remap[toState];
+        transitions.push({ symbols: symbols, target: mapped });
+      }
+      return transitions;
+    });
+
+    const formatChoice = this._chooseStateFormat(states, symbolCount, stateBits);
+
+    const writer = new BitWriter();
+    this._writeHeader(writer, formatChoice, symbolCount, stateBits, startIsAccept, acceptCount);
+    if (formatChoice === this.FORMAT.PACKED) {
+      this._writePackedBody(writer, stateTransitions, symbolCount, stateBits);
+    } else {
+      this._writePlainBody(writer, stateTransitions, symbolCount, stateBits);
+    }
+
+    return this._encodeBytes(writer.toUint8Array());
+  }
+
+  static deserialize(serialized) {
+    const bytes = this._decodeBytes(serialized);
+    if (!bytes.length) {
+      throw new Error('Serialized NFA is empty');
+    }
+
+    const reader = new BitReader(bytes);
+    const { format, symbolCount, stateBits, startIsAccept, acceptCount } = this._readHeader(reader);
+    const expectPackedStates = format === this.FORMAT.PACKED;
+
+    let states;
+    let maxTargetSeen;
+    if (expectPackedStates) {
+      ({ states, maxTargetSeen } = this._readPackedBody(reader, symbolCount, stateBits));
+    } else {
+      ({ states, maxTargetSeen } = this._readPlainBody(reader, symbolCount, stateBits));
+    }
+
+    const minimumStates = Math.max(maxTargetSeen + 1, acceptCount + 1, 1);
+    if (states.length < minimumStates) {
+      throw new Error('Serialized NFA ended before all referenced states were defined');
+    }
+    if (states.length > minimumStates) {
+      states.length = minimumStates;
+    }
+
+    reader.skipPadding();
+
+    if (!states.length) {
+      throw new Error('Serialized NFA does not contain any states');
+    }
+
+    const acceptIds = [];
+    if (startIsAccept) acceptIds.push(0);
+    for (let i = 1; i <= acceptCount; i++) {
+      acceptIds.push(i);
+    }
+
+    return new NFA(0, acceptIds, states);
+  }
+
+  static _normalizeStates(nfa) {
+    const states = nfa.states;
+    const numStates = states.length;
+
+    const acceptSet = new Set();
+    const otherSet = new Set();
+    const acceptTerminalSet = new Set();
+    const rejectTerminalSet = new Set();
+    for (let i = 0; i < numStates; i++) {
+      if (i === nfa.startId) continue;
+
+      const isTerminal = this._isTerminalState(states[i]);
+      if (nfa.acceptIds.has(i)) {
+        (isTerminal ? acceptTerminalSet : acceptSet).add(i);
+      } else {
+        (isTerminal ? rejectTerminalSet : otherSet).add(i);
+      }
+    }
+
+    const canonicalAcceptTerminal = setPeek(acceptTerminalSet);
+    if (canonicalAcceptTerminal !== null) {
+      acceptSet.add(canonicalAcceptTerminal);
+    }
+    const canonicalRejectTerminal = setPeek(rejectTerminalSet);
+    if (canonicalRejectTerminal !== null) {
+      otherSet.add(canonicalRejectTerminal);
+    }
+
+    const order = [nfa.startId, ...acceptSet, ...otherSet];
+
+    const remap = new Array(numStates);
+    order.forEach((repIndex, newIndex) => {
+      remap[repIndex] = newIndex;
+    });
+    for (const id of acceptTerminalSet) {
+      remap[id] = remap[canonicalAcceptTerminal];
+    }
+    for (const id of rejectTerminalSet) {
+      remap[id] = remap[canonicalRejectTerminal];
+    }
+
+    const orderedStates = order.map((idx) => states[idx]);
+    const startIsAccept = acceptSet.has(nfa.startId);
+    const acceptCount = acceptSet.size;
+    return { states: orderedStates, remap, acceptCount, startIsAccept };
+  }
+
+  static _isTerminalState(state) {
+    if (!state) return false;
+    const transitionCount = state.transitions?.length ?? 0;
+    const epsilonCount = state.epsilon?.length ?? 0;
+    return transitionCount === 0 && epsilonCount === 0;
+  }
+
+  static _assertNoEpsilonTransitions(states) {
+    for (let i = 0; i < states.length; i++) {
+      if (states[i].epsilon?.length) {
+        throw new Error('NFA serializer does not support epsilon transitions');
+      }
+    }
+  }
+
+  static _findSymbolCount(states) {
+    let allBits = 0;
+    for (const state of states) {
+      for (const { symbols } of state.transitions) {
+        allBits |= symbols;
+      }
+    }
+
+    const maxBit = LookupTables.maxValue(allBits);
+
+    return Math.max(maxBit, this.MIN_SYMBOLS);
+  }
+
+  static _writeHeader(writer, format, symbolCount, stateBits, startIsAccept, acceptCount) {
+    if (!this._isValidFormat(format)) {
+      throw new Error('NFA serialization format is unsupported');
+    }
+    if (symbolCount < this.MIN_SYMBOLS || symbolCount > this.MAX_SYMBOLS) {
+      throw new Error('Symbol count is out of range for header encoding');
+    }
+    if (stateBits < this.MIN_STATE_BITS || stateBits > this.MAX_STATE_BITS) {
+      throw new Error('State bit width is out of range for header encoding');
+    }
+    if (acceptCount >= (1 << stateBits)) {
+      throw new Error('Accept state count exceeds encodable range for header');
+    }
+    writer.writeBits(format, this.HEADER_FORMAT_BITS);
+    writer.writeBits(stateBits - 1, this.STATE_BITS_FIELD_BITS);
+    writer.writeBits(symbolCount - 1, this.SYMBOL_COUNT_FIELD_BITS);
+    writer.writeBits(startIsAccept ? 1 : 0, 1);
+    writer.writeBits(acceptCount, stateBits);
+  }
+
+  static _readHeader(reader) {
+    const format = reader.readBits(this.HEADER_FORMAT_BITS);
+    if (!this._isValidFormat(format)) {
+      throw new Error('Serialized NFA uses an unknown format');
+    }
+    const stateBits = reader.readBits(this.STATE_BITS_FIELD_BITS) + 1;
+    const symbolCount = reader.readBits(this.SYMBOL_COUNT_FIELD_BITS) + 1;
+    const startIsAccept = reader.readBits(1) === 1;
+    const acceptCount = reader.readBits(stateBits);
+    if (stateBits < this.MIN_STATE_BITS || stateBits > this.MAX_STATE_BITS) {
+      throw new Error('State bit width is out of range for header decoding');
+    }
+    if (symbolCount < this.MIN_SYMBOLS || symbolCount > this.MAX_SYMBOLS) {
+      throw new Error('Symbol count is out of range for header decoding');
+    }
+    return { format, symbolCount, stateBits, startIsAccept, acceptCount };
+  }
+
+  static _writePlainBody(writer, stateTransitions, symbolCount, stateBits) {
+    for (const transitions of stateTransitions) {
+      if (!transitions.length) {
+        writer.writeBits(0, 1);
+        continue;
+      }
+
+      for (const { symbols, target } of transitions) {
+        writer.writeBits(1, 1);
+        writer.writeBits(symbols, symbolCount);
+        writer.writeBits(target, stateBits);
+      }
+
+      writer.writeBits(0, 1);
+    }
+  }
+
+  static _writePackedBody(writer, stateTransitions, symbolCount, stateBits) {
+    for (const transitions of stateTransitions) {
+      const symbolTargets = new Map();
+      let seenSymbols = 0;
+      for (let { symbols, target } of transitions) {
+        if (seenSymbols & symbols) {
+          throw new Error('Cannot build packed format: overlapping symbols');
+        }
+        seenSymbols |= symbols;
+
+        while (symbols) {
+          const lowestBit = symbols & -symbols;
+          symbols ^= lowestBit;
+          symbolTargets.set(lowestBit, target);
+        }
+      }
+
+      writer.writeBits(seenSymbols, symbolCount);
+      while (seenSymbols) {
+        const lowestBit = seenSymbols & -seenSymbols;
+        seenSymbols ^= lowestBit;
+        const target = symbolTargets.get(lowestBit);
+        writer.writeBits(target, stateBits);
+      }
+    }
+  }
+
+  static _chooseStateFormat(states, symbolCount, stateBits) {
+    let packedSizeEstimate = 0;
+    let plainSizeEstimate = 0;
+    for (const state of states) {
+      const transitions = state.transitions;
+      plainSizeEstimate += 1; // terminator
+      packedSizeEstimate += symbolCount;
+      let seenSymbols = 0;
+      for (const { symbols } of transitions) {
+        // If any symbols overlap, we can't pack this state.
+        if (symbols & seenSymbols) {
+          return this.FORMAT.PLAIN;
+        }
+        seenSymbols |= symbols;
+        plainSizeEstimate += symbolCount + stateBits + 1;  // +1 for hasMore bit
+        packedSizeEstimate += countOnes16bit(symbols) * stateBits;
+      }
+    }
+
+    return packedSizeEstimate < plainSizeEstimate
+      ? this.FORMAT.PACKED
+      : this.FORMAT.PLAIN;
+  }
+
+  static _isValidFormat(format) {
+    return format === this.FORMAT.PLAIN || format === this.FORMAT.PACKED;
+  }
+
+  static _readPlainBody(reader, symbolCount, stateBits) {
+    const states = [];
+    let maxTargetSeen = 0;
+    while (reader.remainingBits() > 0) {
+      const state = new NFA.State();
+      while (true) {
+        if (reader.remainingBits() === 0) {
+          throw new Error('Serialized NFA plain state is truncated');
+        }
+        const hasMore = reader.readBits(1);
+        if (hasMore === 0) break;
+        if (reader.remainingBits() < symbolCount + stateBits) {
+          throw new Error('Serialized NFA plain state transition data is truncated');
+        }
+        const symbols = reader.readBits(symbolCount);
+        if (symbols === 0) {
+          throw new Error('Serialized NFA contains unsupported epsilon transition');
+        }
+        const target = reader.readBits(stateBits);
+        state.addTransition(symbols, target);
+        if (target > maxTargetSeen) maxTargetSeen = target;
+      }
+      states.push(state);
+    }
+    return { states, maxTargetSeen };
+  }
+
+  static _readPackedBody(reader, symbolCount, stateBits) {
+    const states = [];
+    let maxTargetSeen = 0;
+    while (reader.remainingBits() >= symbolCount) {
+      const state = new NFA.State();
+      const activeMask = reader.readBits(symbolCount);
+      let mask = activeMask;
+      let symbolIndex = 1;
+      while (mask) {
+        if (mask & 1) {
+          if (reader.remainingBits() < stateBits) {
+            throw new Error('Serialized NFA packed state transition data is truncated');
+          }
+          const target = reader.readBits(stateBits);
+          const symbolsMask = 1 << (symbolIndex - 1);
+          state.addTransition(symbolsMask, target);
+          if (target > maxTargetSeen) maxTargetSeen = target;
+        }
+        mask >>>= 1;
+        symbolIndex++;
+      }
+      states.push(state);
+    }
+    return { states, maxTargetSeen };
+  }
+
+  static _encodeBytes(bytes) {
+    let binary = '';
+    const chunkSize = 0x8000;
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+      binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+    }
+    return Base64Codec.encodeString(binary);
+  }
+
+  static _decodeBytes(str) {
+    const binary = Base64Codec.decodeToString(str);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    return bytes;
+  }
+}
 
 const charToValue = (char) => {
   if (char >= '1' && char <= '9') {
@@ -499,7 +873,7 @@ class TextNFABuilder {
     }
 
     if (line.startsWith('accept:')) {
-      this._acceptIds.push(this._parseStateList(line.slice(7).trim()));
+      this._acceptIds.push(...this._parseStateList(line.slice(7).trim()));
       return;
     }
 

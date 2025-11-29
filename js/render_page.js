@@ -24,6 +24,7 @@ const { SudokuParser } = await import('./sudoku_parser.js' + self.VERSION_PARAM)
 const { ConstraintDisplay } = await import('./constraint_display.js' + self.VERSION_PARAM);
 const { GridShape } = await import('./grid_shape.js' + self.VERSION_PARAM);
 const { SolutionController } = await import('./solution_controller.js' + self.VERSION_PARAM);
+const { textToNFA, NFASerializer } = await import('./nfa_parser.js' + self.VERSION_PARAM);
 
 export const initPage = () => {
   // Create grid.
@@ -2248,8 +2249,13 @@ ConstraintCategoryInput.StateMachine = class StateMachine extends ConstraintCate
       deferUntilAnimationFrame(this._onSelection.bind(this)));
 
     this._inputManager = inputManager;
+    this._shape = null;
 
     this._setUp();
+  }
+
+  reshape(shape) {
+    this._shape = shape;
   }
 
   _onSelection(selection, finishedSelecting) {
@@ -2274,9 +2280,21 @@ ConstraintCategoryInput.StateMachine = class StateMachine extends ConstraintCate
       const formData = new FormData(form);
       const name = formData.get('name');
       const definition = formData.get('definition');
+      const shape = this._shape || SudokuConstraint.Shape.DEFAULT_SHAPE;
+      let encodedNFA;
+      try {
+        const nfa = textToNFA(definition, shape.numValues);
+        encodedNFA = NFASerializer.serialize(nfa);
+      } catch (err) {
+        errorElem.textContent = err.message || err;
+        return false;
+      }
 
       const cells = this._inputManager.getSelection();
-      this.collection.addConstraint(new SudokuConstraint.NFA(definition, name, ...cells));
+      this.collection.addConstraint(new SudokuConstraint.NFA(
+        encodedNFA,
+        name,
+        ...cells));
 
       return false;
     };

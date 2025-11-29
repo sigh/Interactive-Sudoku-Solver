@@ -87,6 +87,13 @@ export const setDifference = (a, b) => {
   return diff;
 };
 
+export const setPeek = (a) => {
+  for (const elem of a) {
+    return elem;
+  }
+  return null;
+}
+
 export const countOnes16bit = (x) => {
   x -= (x >> 1) & 0x55555555;
   x = (x & 0x33333333) + ((x >> 2) & 0x33333333);
@@ -95,6 +102,10 @@ export const countOnes16bit = (x) => {
 
   return x & 0x1f;
 };
+
+export const requiredBits = (n) => {
+  return 32 - Math.clz32(n);
+}
 
 export const deferUntilAnimationFrame = (fn) => {
   let lastArgs = null;
@@ -250,6 +261,80 @@ export const shuffleArray = (arr, randomGenerator) => {
     [arr[i], arr[j]] = [arr[j], arr[i]];
   }
 };
+
+export class BitWriter {
+  constructor() {
+    this._bytes = [];
+    this._bitLength = 0;
+  }
+
+  writeBits(value, bitCount) {
+    if (!Number.isInteger(bitCount) || bitCount < 0) {
+      throw new Error('Bit count must be a non-negative integer');
+    }
+    if (bitCount === 0) return;
+    const normalized = value >>> 0;
+    for (let i = bitCount - 1; i >= 0; i--) {
+      const bit = (normalized >>> i) & 1;
+      const byteIndex = this._bitLength >> 3;
+      if (byteIndex === this._bytes.length) {
+        this._bytes.push(0);
+      }
+      const bitIndex = 7 - (this._bitLength & 7);
+      if (bit) {
+        this._bytes[byteIndex] |= (1 << bitIndex);
+      }
+      this._bitLength++;
+    }
+  }
+
+  toUint8Array() {
+    if (!this._bytes.length) {
+      return new Uint8Array(0);
+    }
+    return Uint8Array.from(this._bytes);
+  }
+}
+
+export class BitReader {
+  constructor(bytes) {
+    this._bytes = bytes;
+    this._bitOffset = 0;
+    this._totalBits = bytes.length * 8;
+  }
+
+  readBits(bitCount) {
+    if (!Number.isInteger(bitCount) || bitCount < 0) {
+      throw new Error('Bit count must be a non-negative integer');
+    }
+    if (bitCount === 0) return 0;
+    if (this._bitOffset + bitCount > this._totalBits) {
+      throw new Error('Unexpected end of bit stream');
+    }
+    let value = 0;
+    for (let i = 0; i < bitCount; i++) {
+      const byteIndex = this._bitOffset >> 3;
+      const bitIndex = 7 - (this._bitOffset & 7);
+      const bit = (this._bytes[byteIndex] >> bitIndex) & 1;
+      value = (value << 1) | bit;
+      this._bitOffset++;
+    }
+    return value >>> 0;
+  }
+
+  remainingBits() {
+    return this._totalBits - this._bitOffset;
+  }
+
+  skipPadding() {
+    while (this.remainingBits() > 0) {
+      const chunk = Math.min(32, this.remainingBits());
+      if (this.readBits(chunk) !== 0) {
+        throw new Error('Bit stream contains unexpected trailing data');
+      }
+    }
+  }
+}
 
 export const groupSortedBy = function* (iterable, keyFunc) {
   let group = [];
