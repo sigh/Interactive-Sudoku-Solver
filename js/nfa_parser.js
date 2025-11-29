@@ -50,33 +50,6 @@ export const regexToNFA = (pattern, numSymbols) => {
   return builder.build(ast);
 };
 
-export const textToNFA = (definition, numSymbols) => {
-  const builder = new TextNFABuilder(definition, numSymbols);
-  return builder.build();
-};
-
-export const NFAToText = (nfa) => {
-  const nameForState = (id) => `s${id}`;
-
-  const lines = [];
-  lines.push(`start: ${nameForState(nfa.startId)}`);
-  lines.push(`accept: ${[...nfa.acceptIds].map(nameForState).join(' ')}`);
-
-  nfa.states.forEach((state, fromId) => {
-    const fromName = nameForState(fromId);
-    state.transitions.forEach(({ symbols, state: toId }) => {
-      const tokens = LookupTables.toValuesArray(symbols).map(String);
-      if (!tokens.length) return;
-      lines.push(`${fromName} -> ${nameForState(toId)}: ${tokens.join(' ')}`);
-    });
-    state.epsilon.forEach((toId) => {
-      lines.push(`${fromName} -> ${nameForState(toId)}`);
-    });
-  });
-
-  return lines.join('\n');
-};
-
 // Serialization format overview:
 //   Header (written once):
 //     * format: 2 bits (plain or packed state encoding, see FORMAT enum)
@@ -112,8 +85,6 @@ export class NFASerializer {
     const startIsAccept = normalized.startIsAccept;
     const numStates = states.length;
 
-    this._assertNoEpsilonTransitions(states);
-
     const symbolCount = this._findSymbolCount(states);
     if (symbolCount > this.MAX_SYMBOLS) {
       throw new Error(`NFA requires ${symbolCount} symbols but only ${this.MAX_SYMBOLS} are supported`);
@@ -126,8 +97,15 @@ export class NFASerializer {
     const stateTransitions = states.map((state) => {
       const transitions = [];
       for (const { symbols, state: toState } of state.transitions) {
+        if (!symbols) {
+          throw new Error('NFA transition is missing symbols; use epsilon transitions instead');
+        }
         const mapped = remap[toState];
         transitions.push({ symbols: symbols, target: mapped });
+      }
+      for (const epsilonTarget of state.epsilon) {
+        const mapped = remap[epsilonTarget];
+        transitions.push({ symbols: 0, target: mapped });
       }
       return transitions;
     });
@@ -240,14 +218,6 @@ export class NFASerializer {
     return transitionCount === 0 && epsilonCount === 0;
   }
 
-  static _assertNoEpsilonTransitions(states) {
-    for (let i = 0; i < states.length; i++) {
-      if (states[i].epsilon?.length) {
-        throw new Error('NFA serializer does not support epsilon transitions');
-      }
-    }
-  }
-
   static _findSymbolCount(states) {
     let allBits = 0;
     for (const state of states) {
@@ -347,6 +317,8 @@ export class NFASerializer {
     let packedSizeEstimate = 0;
     let plainSizeEstimate = 0;
     for (const state of states) {
+      if (state.epsilon.length > 0) return this.FORMAT.PLAIN;
+
       const transitions = state.transitions;
       plainSizeEstimate += 1; // terminator
       packedSizeEstimate += symbolCount;
@@ -386,11 +358,12 @@ export class NFASerializer {
           throw new Error('Serialized NFA plain state transition data is truncated');
         }
         const symbols = reader.readBits(symbolCount);
-        if (symbols === 0) {
-          throw new Error('Serialized NFA contains unsupported epsilon transition');
-        }
         const target = reader.readBits(stateBits);
-        state.addTransition(symbols, target);
+        if (symbols === 0) {
+          state.addEpsilon(target);
+        } else {
+          state.addTransition(symbols, target);
+        }
         if (target > maxTargetSeen) maxTargetSeen = target;
       }
       states.push(state);
@@ -823,175 +796,74 @@ class RegexToNFABuilder {
   }
 }
 
-class TextNFABuilder {
-  constructor(definition, numSymbols) {
-    if (!Number.isInteger(numSymbols) || numSymbols <= 0) {
-      throw new Error('numSymbols must be a positive integer');
-    }
-
-    this._definition = String(definition ?? '');
-    this._numValues = numSymbols;
-    this._states = [];
-    this._stateIds = new Map();
-    this._startId = null;
-    this._acceptIds = [];
-  }
-
-  build() {
-    const lines = this._definition.split(/\r?\n/);
-    for (let i = 0; i < lines.length; i++) {
-      this._parseLine(lines[i], i + 1);
-    }
-
-    if (this._startId === null) {
-      throw new Error('NFA definition is missing a start state');
-    }
-    if (!this._acceptIds.length) {
-      throw new Error('NFA definition must declare at least one accept state');
-    }
-
-    return new NFA(
-      this._startId,
-      this._acceptIds,
-      this._states,
-    );
-  }
-
-  _parseLine(rawLine, lineNumber) {
-    const commentIndex = rawLine.indexOf('#');
-    const line = (commentIndex === -1 ? rawLine : rawLine.slice(0, commentIndex)).trim();
-    if (!line) return;
-
-    if (line.startsWith('start:')) {
-      const states = this._parseStateList(line.slice(6).trim());
-      if (states.length !== 1 || this._startId !== null) {
-        throw new Error(this._formatError(
-          lineNumber, 'Start state must be a single unique state'));
-      }
-      this._startId = states[0];
-      return;
-    }
-
-    if (line.startsWith('accept:')) {
-      this._acceptIds.push(...this._parseStateList(line.slice(7).trim()));
-      return;
-    }
-
-    this._parseTransition(line, lineNumber);
-  }
-
-  _parseStateList(str) {
-    const statesNames = str.split(/[,\s]+/);
-    return statesNames.map(stateName => this._getOrCreateState(stateName));
-  }
-
-  _parseTransition(line, lineNumber) {
-    const parts = line.split(':', 2);
-
-    const stateToState = parts[0].trim();
-    const match = stateToState.match(/^(\w+)\s*--?-?>\s*(\w+)$/);
-    if (!match) {
-      throw new Error(this._formatError(lineNumber, "Expected '->' in transition"));
-    }
-
-    const fromState = this._getOrCreateState(match[1]);
-    const toState = this._getOrCreateState(match[2]);
-
-    // Epsilon transition
-    if (parts.length === 1) {
-      this._states[fromState].addEpsilon(toState);
-      return;
-    }
-
-    const valueListStr = parts[1].trim();
-    let valuesMask = 0;
-    for (const valueSpec of valueListStr.split(/[,\s]+/)) {
-      const match = valueSpec.match(/^(\d+)(?:-(\d+))?$/i);
-      if (!match) {
-        throw new Error(this._formatError(
-          lineNumber, `Invalid value: '${valueSpec}'`));
-      }
-      const rangeStart = this._parseValue(match[1], lineNumber);
-      const rangeEnd = match[2] ? this._parseValue(match[2], lineNumber) : rangeStart;
-
-      valuesMask |= LookupTables.fromValue(rangeEnd + 1) - LookupTables.fromValue(rangeStart);
-    }
-
-    this._states[fromState].addTransition(valuesMask, toState);
-  }
-
-  _parseValue(token, lineNumber) {
-    const value = parseInt(token, 10);
-
-    if (value < 1 || value > this._numValues) {
-      throw new Error(this._formatError(
-        lineNumber,
-        `Value '${token}' is outside the allowed range 1-${this._numValues}`));
-    }
-
-    return value;
-  }
-
-  _getOrCreateState(name) {
-    let id = this._stateIds.get(name);
-    if (id !== undefined) {
-      return id;
-    }
-    id = this._states.length;
-    this._stateIds.set(name, id);
-    this._states.push(new NFA.State());
-    return id;
-  }
-
-  _formatError(lineNumber, message) {
-    return `Line ${lineNumber}: ${message}`;
-  }
-}
-
 export class JavascriptNFABuilder {
   static MAX_STATE_COUNT = 1024;
 
   constructor(definition, numValues) {
     const { startExpression, transitionBody, acceptBody } = definition;
-    this._startExpression = startExpression.trim();
-    this._transitionBody = transitionBody.trim();
-    this._acceptBody = acceptBody.trim();
+    this._startExpression = startExpression;
+    this._transitionBody = transitionBody;
+    this._acceptBody = acceptBody;
     this._numValues = numValues;
-    this._transitionFn = this._createTransitionFn(this._transitionBody);
-    this._acceptFn = this._createAcceptFn(this._acceptBody);
     this._stateStrToIndex = new Map();
     this._states = [];
   }
 
   build() {
-    const startStateStr = this._generateStartState(this._startExpression);
+    const transitionFn = this._createTransitionFn(this._transitionBody);
+    const acceptFn = this._createAcceptFn(this._acceptBody);
 
     const stack = [];
 
-    stack.push(this._addState(startStateStr));
+    const startStateStrs = this._generateStartStates(this._startExpression);
+    if (startStateStrs.length === 1) {
+      const startStateStr = startStateStrs[0];
+      stack.push(this._addState(startStateStr, acceptFn(startStateStr)));
+    } else {
+      const startIndex = this._addState('COMBINED_START', false);
+      const combinedStateRecord = this._states[startIndex];
+
+      for (const startStateStr of startStateStrs) {
+        const index = this._addState(startStateStr, acceptFn(startStateStr));
+        stack.push(index);
+        combinedStateRecord.epsilon.push(index);
+      }
+    }
 
     while (stack.length) {
       const index = stack.pop();
       const record = this._states[index];
-      for (let digit = 1; digit <= this._numValues; digit++) {
-        const nextStateStr = this._transitionFn(record.serialized, digit);
-        if (nextStateStr === undefined) continue;
-        if (!this._stateStrToIndex.has(nextStateStr)) {
-          stack.push(this._addState(nextStateStr));
+      for (let value = 1; value <= this._numValues; value++) {
+        const nextStateStrs = transitionFn(record.serialized, value);
+        for (const nextStateStr of nextStateStrs) {
+          if (!this._stateStrToIndex.has(nextStateStr)) {
+            stack.push(this._addState(nextStateStr, acceptFn(nextStateStr)));
+          }
+          const targetIndex = this._stateStrToIndex.get(nextStateStr);
+          const mask = record.transitions.get(targetIndex) || 0;
+          record.transitions.set(targetIndex, mask | LookupTables.fromValue(value));
         }
-        const targetIndex = this._stateStrToIndex.get(nextStateStr);
-        const mask = record.transitions.get(targetIndex) || 0;
-        record.transitions.set(targetIndex, mask | (1 << (digit - 1)));
       }
     }
 
     return this._toNFA();
   }
 
-  _generateStartState(startExpression) {
+  _fnResultToStateArray(result) {
+    if (Array.isArray(result)) return result;
+    if (result !== undefined) return [result];
+    return [];
+  }
+
+  _generateStartStates(startExpression) {
+    if (!startExpression) {
+      throw new Error('Start state is empty');
+    }
+
     try {
-      const value = Function('"use strict"; return (' + startExpression + ');')();
-      return this._stringifyState(value);
+      const result = Function('"use strict"; return (' + startExpression + ');')();
+      const states = this._fnResultToStateArray(result);
+      return states.map(item => this._stringifyState(item));
     } catch (err) {
       throw new Error(`Start state expression threw: ${err?.message || err}`);
     }
@@ -1003,9 +875,9 @@ export class JavascriptNFABuilder {
       return (stateStr, value) => {
         const stateValue = this._deserializeState(stateStr);
         try {
-          const next = fn(stateValue, value);
-          if (next === undefined) return undefined;
-          return this._stringifyState(next);
+          const result = fn(stateValue, value);
+          const nextStates = this._fnResultToStateArray(result);
+          return nextStates.map(item => this._stringifyState(item));
         } catch (err) {
           throw new Error(
             `Transition function threw for input (${stateStr}, ${value}): ${err?.message || err}`);
@@ -1033,16 +905,16 @@ export class JavascriptNFABuilder {
     }
   }
 
-  _addState(stateStr) {
+  _addState(stateStr, accepting) {
     if (this._states.length >= JavascriptNFABuilder.MAX_STATE_COUNT) {
       throw new Error(
         `State machine produced more than ${JavascriptNFABuilder.MAX_STATE_COUNT} states`);
     }
-    const accepting = this._acceptFn(stateStr);
     const record = {
       serialized: stateStr,
       transitions: new Map(),
       accepting,
+      epsilon: [],
     };
     const index = this._states.length;
     this._states.push(record);
@@ -1055,6 +927,9 @@ export class JavascriptNFABuilder {
     const acceptIds = [];
     this._states.forEach((record, index) => {
       if (record.accepting) acceptIds.push(index);
+      for (const epsilonTarget of record.epsilon) {
+        nfaStates[index].addEpsilon(epsilonTarget);
+      }
       const nfaState = nfaStates[index];
       for (const [target, mask] of record.transitions.entries()) {
         if (mask) {
@@ -1065,15 +940,19 @@ export class JavascriptNFABuilder {
     return new NFA(0, acceptIds, nfaStates);
   }
 
-  _stringifyState(value) {
+  _stringifyState(state) {
+    if (Array.isArray(state)) {
+      throw new Error('State must not be an array');
+    }
+
     try {
-      const serialized = JSON.stringify(value);
+      const serialized = JSON.stringify(state);
       if (serialized === undefined) {
-        throw new Error('State machine states must be JSON-serializable values');
+        throw new Error('Could not JSON-serialize');
       }
       return serialized;
     } catch (err) {
-      throw new Error(`State machine states must be JSON-serializable: ${err?.message || err}`);
+      throw new Error(`Invalid state: ${err?.message || err}`);
     }
   }
 
