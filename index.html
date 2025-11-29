@@ -386,10 +386,14 @@ layout: null
               <div>
                 <div class="description">
                   <p>
-                    Create a constraint along a line by providing a NFA definition.
+                    Define an automaton by supplying JavaScript for the start state, a transition function,
+                    and an accept predicate. Each selected cell feeds its digit (1 – shape size) through the transition.
                   </p>
                   <p>
-                    The definition should be in the format: <code>start_state: (input_char -> next_state), ...</code>
+                    The transition body will be wrapped as <code>(state, value) =&gt; { ... }</code> and the accept body
+                    as
+                    <code>(state) =&gt; { ... }</code>. Return <code>undefined</code> from the transition to reject a
+                    value.
                   </p>
                 </div>
                 <div>
@@ -397,13 +401,26 @@ layout: null
                   <input type="text" name="name" placeholder="optional" maxlength="20" columns="20">
                 </div>
                 <div>
-                  <div id="state-machine-input-definition">
-                    Definition:
-                    <textarea rows="5" name="definition" placeholder="1: (1->2), (2->3)
-2: (3->4)"></textarea>
-                  </div>
-                  <div id="state-machine-input-definition-error" class="error"></div>
+                  <label for="state-machine-start-state">Start state (expression):</label>
+                  <textarea id="state-machine-start-state" rows="2" name="start-state"
+                    placeholder="({ sum: 0 })"></textarea>
                 </div>
+                <div>
+                  <label for="state-machine-transition-body">
+                    Transition body <code>(state, value) =&gt; { ... }</code>:
+                  </label>
+                  <textarea id="state-machine-transition-body" rows="6" name="transition-body" placeholder="const next = { ...state };
+next.sum = (next.sum || 0) + value;
+return next;"></textarea>
+                </div>
+                <div>
+                  <label for="state-machine-accept-body">
+                    Accept body <code>(state) =&gt; { ... }</code>:
+                  </label>
+                  <textarea id="state-machine-accept-body" rows="4" name="accept-body"
+                    placeholder="return state.sum === 15;"></textarea>
+                </div>
+                <div id="state-machine-input-definition-error" class="error"></div>
                 <div>
                   <button type="submit" title="Add constraint" name="add-constraint">
                     Add
