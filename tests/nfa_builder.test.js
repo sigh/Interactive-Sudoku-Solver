@@ -170,4 +170,85 @@ await runTest('JavascriptNFABuilder should allow transition fan-out', () => {
   expectRejects(nfa, [2, 3], 'values without initial branch should reject');
 });
 
+await runTest('mergeTransitions should combine transitions to same target', () => {
+  const state = new NFA.State();
+  state.addTransition(LookupTables.fromValue(1), 5);
+  state.addTransition(LookupTables.fromValue(2), 5);
+  state.addTransition(LookupTables.fromValue(3), 7);
+  state.addTransition(LookupTables.fromValue(4), 5);
+
+  state.mergeTransitions();
+
+  assert.equal(state.transitions.length, 2, 'should merge to two distinct targets');
+  const target5 = state.transitions.find(t => t.state === 5);
+  const target7 = state.transitions.find(t => t.state === 7);
+  assert.ok(target5, 'should have transition to state 5');
+  assert.ok(target7, 'should have transition to state 7');
+  const expectedMask5 = LookupTables.fromValuesArray([1, 2, 4]);
+  assert.equal(target5.symbols, expectedMask5, 'should combine symbols for same target');
+  assert.equal(target7.symbols, LookupTables.fromValue(3), 'should keep single symbol unchanged');
+});
+
+await runTest('closeOverEpsilonTransitions should inline reachable transitions', () => {
+  // Build: state0 --epsilon--> state1 --[1]--> state2
+  const states = [new NFA.State(), new NFA.State(), new NFA.State()];
+  states[0].addEpsilon(1);
+  states[1].addTransition(LookupTables.fromValue(1), 2);
+  const nfa = new NFA(0, [2], states);
+
+  nfa.closeOverEpsilonTransitions();
+
+  assert.equal(states[0].epsilon.length, 0, 'epsilon transitions should be removed');
+  assert.equal(states[0].transitions.length, 1, 'should have inlined transition');
+  assert.equal(states[0].transitions[0].state, 2, 'inlined transition should point to state 2');
+  assert.equal(states[0].transitions[0].symbols, LookupTables.fromValue(1), 'should preserve symbol mask');
+});
+
+await runTest('closeOverEpsilonTransitions should propagate accepting status', () => {
+  // Build: state0 --epsilon--> state1 (accepting)
+  const states = [new NFA.State(), new NFA.State()];
+  states[0].addEpsilon(1);
+  const nfa = new NFA(0, [1], states);
+
+  assert.equal(nfa.acceptIds.has(0), false, 'state 0 should not be accepting before closure');
+
+  nfa.closeOverEpsilonTransitions();
+
+  assert.equal(nfa.acceptIds.has(0), true, 'state 0 should become accepting via epsilon');
+  assert.equal(nfa.acceptIds.has(1), true, 'state 1 should remain accepting');
+});
+
+await runTest('closeOverEpsilonTransitions should handle transitive epsilon chains', () => {
+  // Build: state0 --epsilon--> state1 --epsilon--> state2 --[1]--> state3
+  const states = [new NFA.State(), new NFA.State(), new NFA.State(), new NFA.State()];
+  states[0].addEpsilon(1);
+  states[1].addEpsilon(2);
+  states[2].addTransition(LookupTables.fromValue(1), 3);
+  const nfa = new NFA(0, [3], states);
+
+  nfa.closeOverEpsilonTransitions();
+
+  assert.equal(states[0].epsilon.length, 0, 'state 0 epsilon should be cleared');
+  assert.equal(states[0].transitions.length, 1, 'state 0 should have inlined transition');
+  assert.equal(states[0].transitions[0].state, 3, 'state 0 should reach state 3');
+});
+
+await runTest('closeOverEpsilonTransitions should merge duplicate transitions', () => {
+  // Build: state0 --epsilon--> state1, state0 --epsilon--> state2
+  // state1 --[1]--> state3, state2 --[2]--> state3
+  const states = [new NFA.State(), new NFA.State(), new NFA.State(), new NFA.State()];
+  states[0].addEpsilon(1);
+  states[0].addEpsilon(2);
+  states[1].addTransition(LookupTables.fromValue(1), 3);
+  states[2].addTransition(LookupTables.fromValue(2), 3);
+  const nfa = new NFA(0, [3], states);
+
+  nfa.closeOverEpsilonTransitions();
+
+  assert.equal(states[0].transitions.length, 1, 'should merge transitions to same target');
+  const expectedMask = LookupTables.fromValuesArray([1, 2]);
+  assert.equal(states[0].transitions[0].symbols, expectedMask, 'should combine symbol masks');
+  assert.equal(states[0].transitions[0].state, 3, 'should point to state 3');
+});
+
 logSuiteComplete('NFA builder');
