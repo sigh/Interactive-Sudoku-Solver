@@ -160,6 +160,10 @@ class DebugManager {
 
       this._deferredSetup(loaderPromise);
 
+      const hiddenElements = Array.from(
+        document.getElementsByClassName('hide-unless-debug'));
+      hiddenElements.forEach(e => e.classList.remove('hide-unless-debug'));
+
       // Return a promise so that the caller can wait for debug
       // functions to be available.
       return loaderPromise;
