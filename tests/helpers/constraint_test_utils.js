@@ -35,29 +35,44 @@ export const createAccumulator = () => {
   };
 };
 
-export const createCellExclusions = () => ({
-  isMutuallyExclusive: () => true,
+export const createCellExclusions = ({ allUnique = true } = {}) => ({
+  isMutuallyExclusive: allUnique ? () => true : () => false,
   getPairExclusions: () => [],
   getArray: () => [],
   getListExclusions: () => [],
 });
 
+export const applyCandidates = (grid, assignments) => {
+  for (const [cellKey, values] of Object.entries(assignments)) {
+    const cellIndex = Number(cellKey);
+    if (Array.isArray(values)) {
+      grid[cellIndex] = mask(...values);
+    } else if (typeof values === 'number') {
+      grid[cellIndex] = values;
+    } else {
+      throw new TypeError('Assignments must be arrays of values or numeric bitmasks');
+    }
+  }
+  return grid;
+};
+
 export const initializeConstraintHandler = (
   HandlerCtor,
   {
     args = [],
+    context,
     shapeConfig,
     cellExclusions = createCellExclusions(),
     state = {},
   } = {}
 ) => {
-  const { shape, lookupTables, createGrid } = setupConstraintTest(shapeConfig ?? {});
+  const resolvedContext = context ?? setupConstraintTest(shapeConfig ?? {});
   const handler = new HandlerCtor(...args);
-  const initialGrid = createGrid();
+  const initialGrid = resolvedContext.createGrid();
   assert.equal(
-    handler.initialize(initialGrid, cellExclusions, shape, state),
+    handler.initialize(initialGrid, cellExclusions, resolvedContext.shape, state),
     true,
     'constraint handler should initialize'
   );
-  return { handler, lookupTables, shape, createGrid };
+  return { handler, context: resolvedContext };
 };
