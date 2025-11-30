@@ -287,7 +287,6 @@ export class LineOptions {
   static EMPTY_CIRCLE_MARKER = 2;
   static SMALL_FULL_CIRCLE_MARKER = 3;
   static SMALL_EMPTY_CIRCLE_MARKER = 4;
-  static MEDIUM_FULL_CIRCLE_MARKER = 5;
   static DIAMOND_MARKER = 6;
 
   constructor(options) {
@@ -923,8 +922,9 @@ export class SudokuConstraint {
       Digits along the line, read in order, must match the provided regular expression.`);
     static CATEGORY = 'LinesAndSets';
     static DISPLAY_CONFIG = {
-      displayClass: 'RegexLine',
-      startMarker: LineOptions.MEDIUM_FULL_CIRCLE_MARKER,
+      displayClass: 'CustomLine',
+      nodeMarker: LineOptions.SMALL_EMPTY_CIRCLE_MARKER,
+      dashed: '0.5 2 2 2',
     };
     static ARGUMENT_CONFIG = {
       label: 'pattern',
@@ -936,6 +936,10 @@ export class SudokuConstraint {
       super(pattern, ...cells);
       this.pattern = pattern;
       this.cells = cells;
+    }
+
+    displayKey() {
+      return this.pattern;
     }
 
     chipLabel() {
@@ -1019,8 +1023,9 @@ export class SudokuConstraint {
       Non-deterministic finite automaton (NFA).`);
     static CATEGORY = 'StateMachine';
     static DISPLAY_CONFIG = {
-      displayClass: 'RegexLine',
-      startMarker: LineOptions.MEDIUM_FULL_CIRCLE_MARKER,
+      displayClass: 'CustomLine',
+      nodeMarker: LineOptions.SMALL_EMPTY_CIRCLE_MARKER,
+      dashed: '0.5 2 2 2',
     };
     static ARGUMENT_CONFIG = {
       label: 'definition',
@@ -1032,6 +1037,10 @@ export class SudokuConstraint {
       this.encodedNFA = encodedNFA;
       this.name = name;
       this.cells = cells;
+    }
+
+    displayKey() {
+      return this.encodedNFA;
     }
 
     static _countStates = memoize((encodedNFA) => {
@@ -1994,8 +2003,8 @@ export class SudokuConstraint {
       "Applies a custom binary relationship between consecutive pairs of cells.");
     static CATEGORY = 'CustomBinary';
     static DISPLAY_CONFIG = {
-      displayClass: 'CustomBinary',
-      startMarker: LineOptions.SMALL_EMPTY_CIRCLE_MARKER,
+      displayClass: 'CustomLine',
+      nodeMarker: LineOptions.SMALL_EMPTY_CIRCLE_MARKER,
     };
 
     constructor(key, name, ...cells) {
@@ -2003,6 +2012,10 @@ export class SudokuConstraint {
       this.key = key;
       this.name = name;
       this.cells = cells;
+    }
+
+    displayKey() {
+      return this.key;
     }
 
     groupId() {
@@ -2121,8 +2134,8 @@ export class SudokuConstraint {
       "Applies a custom binary relationship between all pairs of the given cells.");
     static CATEGORY = 'CustomBinary';
     static DISPLAY_CONFIG = {
-      displayClass: 'CustomBinary',
-      startMarker: LineOptions.SMALL_FULL_CIRCLE_MARKER,
+      displayClass: 'CustomLine',
+      nodeMarker: LineOptions.SMALL_FULL_CIRCLE_MARKER,
     };
 
     static fnToKey(fn, numValues) {

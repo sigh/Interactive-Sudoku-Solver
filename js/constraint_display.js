@@ -19,8 +19,7 @@ const constraintDisplayOrder = () => [
   Thermo,
   PillArrow,
   GenericLine,
-  RegexLine,
-  CustomBinary,
+  CustomLine,
   ShadedRegion,
   CountingCircles,
   Diagonal,
@@ -136,12 +135,6 @@ class BaseConstraintDisplayItem extends DisplayItem {
           circle.setAttribute('r', LineOptions.THIN_LINE_WIDTH);
           return circle;
         }
-      case LineOptions.MEDIUM_FULL_CIRCLE_MARKER:
-        {
-          const circle = this._makeCircleAtPoint(point);
-          circle.setAttribute('r', LineOptions.THIN_LINE_WIDTH * 3);
-          return circle;
-        }
       case LineOptions.DIAMOND_MARKER:
         {
           const diamond = this._makeDiamondAtPoint(point);
@@ -197,9 +190,9 @@ class BaseConstraintDisplayItem extends DisplayItem {
       path.setAttribute('marker-end', 'url(#arrowhead)');
     }
     if (options.dashed) {
-      path.setAttribute(
-        'stroke-dasharray',
-        (options.width / 2) + ' ' + (options.width * 2));
+      const pattern = options.dashed === true ? '0.5 2' : options.dashed;
+      const parts = pattern.split(' ').map(s => parseFloat(s) * options.width);
+      path.setAttribute('stroke-dasharray', parts.join(' '));
     }
     g.append(path);
 
@@ -429,7 +422,7 @@ class GenericLine extends BaseConstraintDisplayItem {
 
 class Thermo extends GenericLine { }
 
-class CustomBinary extends GenericLine {
+class CustomLine extends GenericLine {
   constructor(svg) {
     super(svg);
     this._colorPicker = new ColorPicker();
@@ -459,7 +452,7 @@ class CustomBinary extends GenericLine {
   _makeItem(constraint, options) {
     const cells = constraint.cells;
 
-    const colorKey = `${constraint.key}-${constraint.type}`;
+    const colorKey = `${constraint.displayKey()}-${constraint.type}`;
     // Note: We want the colors to be consistent, even for makeIcon.
     const color = this._colorPicker.pickColor(colorKey);
 
@@ -468,9 +461,9 @@ class CustomBinary extends GenericLine {
       {
         color,
         width: LineOptions.THIN_LINE_WIDTH,
-        nodeMarker: LineOptions.SMALL_FULL_CIRCLE_MARKER,
-        startMarker: options.startMarker,
-        dashed: true,
+        nodeMarker: options.nodeMarker,
+        startMarker: LineOptions.SMALL_FULL_CIRCLE_MARKER,
+        dashed: options.dashed || true,
       });
 
     this._colorPicker.addItem(elem, color, colorKey);
@@ -1405,41 +1398,5 @@ export class ConstraintDisplay extends DisplayItem {
     if (!config) return null;
     return this._constraintDisplays.get(
       config.displayClass).makeIcon(constraint, config);
-  }
-}
-
-class RegexLine extends GenericLine {
-  constructor(svg) {
-    super(svg);
-    this._colorPicker = new ColorPicker();
-  }
-
-  clear() {
-    super.clear();
-    this._colorPicker.clear();
-  }
-
-  removeItem(item) {
-    if (this._colorPicker.removeItem(item)) {
-      item.parentNode?.removeChild(item);
-    }
-  }
-
-  _makeItem(constraint, options) {
-    const cells = constraint.cells;
-
-    const colorKey = `${constraint.type}-${constraint.pattern}`;
-    const color = this._colorPicker.pickColor(colorKey);
-
-    const elem = this._makeConstraintLine(
-      cells,
-      {
-        color,
-        width: LineOptions.THIN_LINE_WIDTH,
-        startMarker: options.startMarker,
-      });
-
-    this._colorPicker.addItem(elem, color, colorKey);
-    return elem;
   }
 }
