@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 
 import { ensureGlobalEnvironment } from './helpers/test_env.js';
 import { runTest, logSuiteComplete } from './helpers/test_runner.js';
+import { createAccumulator, mask } from './helpers/constraint_test_utils.js';
 
 ensureGlobalEnvironment();
 
@@ -53,16 +54,15 @@ await runTest('DFALine should prune cells to match a regex line', () => {
   const dfa = NFAToDFA(nfa, 4);
   const handler = new DFALine([0, 1], dfa);
 
-  const allValues = LookupTables.fromValuesArray([1, 2, 3, 4]);
+  const allValues = mask(1, 2, 3, 4);
   const grid = new Uint16Array([allValues, allValues]);
-  const touched = new Set();
-  const accumulator = { addForCell(cell) { touched.add(cell); } };
+  const accumulator = createAccumulator();
 
   const result = handler.enforceConsistency(grid, accumulator);
   assert.equal(result, true, 'handler should keep solvable grids valid');
   assert.equal(grid[0], LookupTables.fromValue(1), 'first cell forced to value 1');
   assert.equal(grid[1], LookupTables.fromValue(2), 'second cell forced to value 2');
-  assert.deepEqual([...touched].sort((a, b) => a - b), [0, 1], 'both cells reported as updated');
+  assert.deepEqual([...accumulator.touched].sort((a, b) => a - b), [0, 1], 'both cells reported as updated');
 });
 
 await runTest('DFALine should detect impossible assignments', () => {
