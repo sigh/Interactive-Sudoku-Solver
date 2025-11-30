@@ -1,6 +1,6 @@
 const { SudokuConstraint, SudokuConstraintBase, CellArgs } = await import('../sudoku_constraint.js' + self.VERSION_PARAM);
 const { SudokuSolver } = await import('./engine.js' + self.VERSION_PARAM);
-const { regexToNFA, NFASerializer } = await import('../nfa_parser.js' + self.VERSION_PARAM);
+const { regexToNFA, NFASerializer } = await import('../nfa_builder.js' + self.VERSION_PARAM);
 const { memoize } = await import('../util.js' + self.VERSION_PARAM);
 const HandlerModule = await import('./handlers.js' + self.VERSION_PARAM);
 const SumHandlerModule = await import('./sum_handler.js' + self.VERSION_PARAM);
