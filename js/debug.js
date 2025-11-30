@@ -1,10 +1,10 @@
 const {
   isIterable,
   isPlainObject,
-  withDeadline
+  withDeadline,
+  memoize,
 } = await import('./util.js' + self.VERSION_PARAM);
 const { SudokuParser, toShortSolution } = await import('./sudoku_parser.js' + self.VERSION_PARAM);
-const { SolverProxy } = await import('./solution_controller.js' + self.VERSION_PARAM);
 const { PUZZLE_INDEX } = await import('../data/example_puzzles.js' + self.VERSION_PARAM);
 const { LookupTables } = await import('./solver/lookup_tables.js' + self.VERSION_PARAM);
 const { compileRegex } = await import('./solver/dfa_handler.js' + self.VERSION_PARAM);
@@ -44,7 +44,16 @@ const puzzleFromCfg = (puzzleCfg) => {
   return { name: puzzleCfg, input: puzzleCfg };
 };
 
-class PuzzleRunner {
+export class PuzzleRunner {
+  constructor({ solverFactory, enableConsoleLogs } = {}) {
+    this._solverFactory = solverFactory;
+    if (!this._solverFactory) {
+      throw new Error('PuzzleRunner requires a solverFactory in this environment');
+    }
+    this._log = enableConsoleLogs ? console.log.bind(console) : () => { };
+    this._state = null;
+  }
+
   static _sumObjectValues(first, ...items) {
     if (!first) return {};
     let result = { ...first };
@@ -59,25 +68,26 @@ class PuzzleRunner {
   }
 
   static addTotalToStats(stats) {
-    const totals = this._sumObjectValues(...stats);
+    const totals = PuzzleRunner._sumObjectValues(...stats);
     delete totals.puzzle;
     delete totals.collection;
     stats.total = totals;
   }
 
-  static _state = null;
-  static _stateHandler(s) { this._state = s; };
+  _stateHandler(s) {
+    this._state = s;
+  }
 
-  static async _runFnWithChecksSinglePuzzle(puzzle, fn, onFailure) {
+  async _runFnWithChecksSinglePuzzle(puzzle, fn, onFailure) {
     // Set up solver.
     const constraint = SudokuParser.parseText(puzzle.input);
-    const solver = await SolverProxy.makeSolver(
+    const solver = await this._solverFactory(
       constraint, this._stateHandler.bind(this));
     const shape = constraint.getShape();
 
     // Log a fixed string so the progress gets collapsed to a single line.
     // Do this after the worker has started to ensure a nice output.
-    console.log('solving...');
+    this._log('solving...');
 
     // Start solver with optional timeout.
     let resultPromise = fn(solver);
@@ -139,7 +149,7 @@ class PuzzleRunner {
     };
   }
 
-  static async runFnWithChecks(puzzles, fn, onFailure) {
+  async runFnWithChecks(puzzles, fn, onFailure) {
     if (isPlainObject(puzzles)) {
       const solutions = [];
       const stats = [];
@@ -149,7 +159,7 @@ class PuzzleRunner {
         stats.push(
           { collection: name, ...result.stats.total });
       }
-      this.addTotalToStats(stats);
+      PuzzleRunner.addTotalToStats(stats);
 
       return {
         solutions,
@@ -163,9 +173,9 @@ class PuzzleRunner {
       if (onFailure) {
         onFailure(puzzle, result);
       } else {
-        console.log('Test failed: ' + puzzle.name);
-        console.log('Expected', puzzle.solution);
-        console.log('Got     ', result);
+        console.error('Test failed: ' + puzzle.name);
+        console.error('Expected', puzzle.solution);
+        console.error('Got     ', result);
         throw ('Test failed: ' + puzzle.name);
       }
     };
@@ -183,16 +193,16 @@ class PuzzleRunner {
       console.error(numFailures + ' failures');
     }
 
-    this.addTotalToStats(stats);
+    PuzzleRunner.addTotalToStats(stats);
 
-    console.log(stats);
+    this._log(stats);
     return {
       solutions,
       stats,
     }
   }
 
-  static async runAllWithChecks(puzzles, onFailure) {
+  async runAllWithChecks(puzzles, onFailure) {
     return await this.runFnWithChecks(puzzles, async (solver) => {
       const result = await solver.nthSolution(0);
       await solver.nthSolution(1); // Try to find a second solution to prove uniqueness.
@@ -200,28 +210,44 @@ class PuzzleRunner {
     }, onFailure);
   }
 
-  static async runValidateLayout(cases, onFailure) {
+  async runValidateLayout(cases, onFailure) {
     return await this.runFnWithChecks(cases, async (solver) => {
       return (await solver.validateLayout()) !== null;
     }, onFailure);
   }
 }
 
-export const runValidateLayoutTests = async (onFailure) => {
+const getDefaultPuzzleRunner = memoize(() => {
+  if (typeof document === 'undefined') {
+    throw new Error('PuzzleRunner requires a solverFactory; provide a runner explicitly in non-browser environments.');
+  }
+
+  const solverProxyModulePromise = import('./solution_controller.js' + self.VERSION_PARAM);
+  const solverFactory = async (...args) => {
+    const { SolverProxy } = await solverProxyModulePromise;
+    return SolverProxy.makeSolver(...args);
+  };
+
+  return new PuzzleRunner({ solverFactory, enableConsoleLogs: true });
+});
+
+export const runValidateLayoutTests = async (onFailure, runner) => {
+  const activeRunner = runner || getDefaultPuzzleRunner();
   const cases = [].concat(
     VALID_JIGSAW_LAYOUTS.slice(0, 20),
     EASY_INVALID_JIGSAW_LAYOUTS,
     FAST_INVALID_JIGSAW_LAYOUTS.slice(0, 20),
     VALID_JIGSAW_BOX_LAYOUTS.slice(0, 10));
-  const result = await PuzzleRunner.runValidateLayout(cases, onFailure);
+  const result = await activeRunner.runValidateLayout(cases, onFailure);
   result.collection = 'Jigsaw layouts';
   return [result];
 };
 
-export const runSolveTests = async (onFailure) => {
+export const runSolveTests = async (onFailure, runner) => {
+  const activeRunner = runner || getDefaultPuzzleRunner();
   const results = [];
   let result = null;
-  result = await PuzzleRunner.runAllWithChecks([
+  result = await activeRunner.runAllWithChecks([
     'Thermosudoku',
     'Classic sudoku',
     'Classic sudoku, hard',
@@ -311,7 +337,7 @@ export const runSolveTests = async (onFailure) => {
   result.collection = '9x9';
   results.push(result);
 
-  result = await PuzzleRunner.runAllWithChecks([
+  result = await activeRunner.runAllWithChecks([
     '16x16',
     '16x16: Sudoku X',
     '16x16: Sudoku X, hard',
@@ -320,7 +346,7 @@ export const runSolveTests = async (onFailure) => {
   result.collection = '16x16';
   results.push(result);
 
-  result = await PuzzleRunner.runAllWithChecks([
+  result = await activeRunner.runAllWithChecks([
     '6x6',
     '6x6: Numbered rooms',
     '6x6: Between Odd and Even',
@@ -335,10 +361,11 @@ export const runSolveTests = async (onFailure) => {
   return results;
 };
 
-export const runAllTests = async () => {
+export const runAllTests = async (runner) => {
+  const activeRunner = runner || getDefaultPuzzleRunner();
   let results = [];
-  results.push(...await runSolveTests());
-  results.push(...await runValidateLayoutTests());
+  results.push(...await runSolveTests(undefined, activeRunner));
+  results.push(...await runValidateLayoutTests(undefined, activeRunner));
   console.log(results);
   const stats = results.map(
     r => ({ collection: r.collection, ...r.stats.total }));
@@ -346,8 +373,9 @@ export const runAllTests = async () => {
   console.table(stats);
 };
 
-export const runAll = async (puzzles) => {
-  const result = await PuzzleRunner.runAllWithChecks(puzzles);
+export const runAll = async (puzzles, runner) => {
+  const activeRunner = runner || getDefaultPuzzleRunner();
+  const result = await activeRunner.runAllWithChecks(puzzles);
   console.table(result.stats);
   return result;
 };

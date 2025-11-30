@@ -1,20 +1,6 @@
 import assert from 'node:assert/strict';
 
-const ensureGlobalEnvironment = () => {
-  const g = globalThis;
-  if (!g.self) {
-    g.self = g;
-  }
-  if (typeof g.VERSION_PARAM === 'undefined') {
-    g.VERSION_PARAM = '';
-  }
-  if (typeof g.atob !== 'function') {
-    g.atob = (b64) => Buffer.from(b64, 'base64').toString('binary');
-  }
-  if (typeof g.btoa !== 'function') {
-    g.btoa = (binary) => Buffer.from(binary, 'binary').toString('base64');
-  }
-};
+import { ensureGlobalEnvironment } from './helpers/test_env.js';
 
 ensureGlobalEnvironment();
 
