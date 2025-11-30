@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { performance as perf } from 'node:perf_hooks';
 
 import { ensureGlobalEnvironment } from './helpers/test_env.js';
+import { logSuiteComplete } from './helpers/test_runner.js';
 
 ensureGlobalEnvironment({
   needWindow: true,
@@ -131,4 +132,4 @@ runLayoutResults.forEach((result) => expectStatsStructure(result, 'layout tests'
 console.log('✓ runValidateLayoutTests completed');
 runLayoutResults.forEach((result) => logCollectionSummary(result));
 
-console.log('All end-to-end tests passed.');
+logSuiteComplete('End-to-end');

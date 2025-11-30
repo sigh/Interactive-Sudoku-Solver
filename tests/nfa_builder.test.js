@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 
 import { ensureGlobalEnvironment } from './helpers/test_env.js';
+import { runTest, logSuiteComplete } from './helpers/test_runner.js';
 
 ensureGlobalEnvironment();
 
@@ -72,31 +73,21 @@ const expectFormat = (serialized, expectedFormat, message) => {
   assert.equal(serializationFormat(serialized), expectedFormat, message);
 };
 
-const runTest = async (name, fn) => {
-  try {
-    await fn();
-    console.log(`✓ ${name}`);
-  } catch (error) {
-    console.error(`✗ ${name}`);
-    throw error;
-  }
-};
-
-await runTest('regex literal concatenation', () => {
+await runTest('regex literals should concatenate values', () => {
   const nfa = regexToNFA('12', 9);
   expectAccepts(nfa, [1, 2], '12 should match literal');
   expectRejects(nfa, [1], 'missing final symbol should reject');
   expectRejects(nfa, [1, 3], 'mismatched second symbol should reject');
 });
 
-await runTest('regex charsets and quantifiers', () => {
+await runTest('regex charsets should honor quantifiers', () => {
   const nfa = regexToNFA('[1-3]*4?', 9);
   expectAccepts(nfa, [2, 3, 1], 'star should consume arbitrarily long sequences');
   expectAccepts(nfa, [1, 1, 4], 'optional suffix should match when present');
   expectRejects(nfa, [4, 4], 'second optional symbol should not match');
 });
 
-await runTest('NFA serialization round-trip', () => {
+await runTest('NFA serialization should round-trip plain format', () => {
   const nfa = regexToNFA('(1|2)3+', 9);
   const serialized = NFASerializer.serialize(nfa);
   expectFormat(serialized, NFASerializer.FORMAT.PLAIN, 'epsilon transitions should force plain format');
@@ -106,7 +97,7 @@ await runTest('NFA serialization round-trip', () => {
   expectRejects(restored, [3], 'prefix is required even after round-trip');
 });
 
-await runTest('NFA serialization packed round-trip', () => {
+await runTest('NFA serialization should round-trip packed format', () => {
   const states = [new NFA.State(), new NFA.State()];
   states[0].addTransition(LookupTables.fromValue(1), 1);
   states[0].addTransition(LookupTables.fromValue(2), 1);
@@ -119,7 +110,7 @@ await runTest('NFA serialization packed round-trip', () => {
   expectRejects(restored, [3], 'values outside alphabet should reject');
 });
 
-await runTest('JavascriptNFABuilder parity check', () => {
+await runTest('JavascriptNFABuilder should handle parity checks', () => {
   const builder = new JavascriptNFABuilder({
     startExpression: '({ sum: 0 })',
     transitionBody: `
@@ -135,7 +126,7 @@ await runTest('JavascriptNFABuilder parity check', () => {
   expectRejects(nfa, [1], 'odd parity sequences should reject');
 });
 
-await runTest('JavascriptNFABuilder multiple start states', () => {
+await runTest('JavascriptNFABuilder should support multiple start states', () => {
   const builder = new JavascriptNFABuilder({
     startExpression: '[{ required: 1, seen: false }, { required: 2, seen: false }]',
     transitionBody: `
@@ -154,7 +145,7 @@ await runTest('JavascriptNFABuilder multiple start states', () => {
   expectRejects(nfa, [1, 2], 'additional unmatched input should reject');
 });
 
-await runTest('JavascriptNFABuilder transition fan-out', () => {
+await runTest('JavascriptNFABuilder should allow transition fan-out', () => {
   const builder = new JavascriptNFABuilder({
     startExpression: '({ stage: "START" })',
     transitionBody: `
@@ -179,4 +170,4 @@ await runTest('JavascriptNFABuilder transition fan-out', () => {
   expectRejects(nfa, [2, 3], 'values without initial branch should reject');
 });
 
-console.log('All tests passed.');
+logSuiteComplete('NFA builder');
