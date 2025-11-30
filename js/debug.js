@@ -293,7 +293,8 @@ export const runSolveTests = async (onFailure) => {
     'Fortress sudoku',  // GreaterThan
     'Equality cages',  // EqualityCage
     'Regex line',  // Regex
-    'Sequence sudoku', // NFA
+    'Sequence sudoku', // NFA (simple transitions only)
+    'NFA: Equal sum parition', // NFA (with state bifurcation)
     'Full rank - 6 clue snipe',
     'Irregular region sum line',
     'Force non-unit coeff', // Sum with non-unit coeff
@@ -326,6 +327,7 @@ export const runSolveTests = async (onFailure) => {
     '6x6: Little Killer',
     '4x4: Counting circles',
     '6x6: Rellik cages',  // Rellik cages
+    '6x6: Successor Arrows',  // Regex
   ], onFailure);
   result.collection = 'Other sizes';
   results.push(result);
