@@ -35,7 +35,60 @@ export class NFA {
     addEpsilon(state) {
       this.epsilon.push(state);
     }
+
+    mergeTransitions() {
+      // Compress transitions by merging those with the same target.
+      const transitions = this.transitions;
+      transitions.sort((a, b) => a.state - b.state);
+      let writeIndex = 0;
+      for (let j = 0; j < transitions.length;) {
+        const targetState = transitions[j].state;
+        let symbols = 0;
+        while (j < transitions.length && transitions[j].state === targetState) {
+          symbols |= transitions[j].symbols;
+          j++;
+        }
+        transitions[writeIndex].symbols = symbols;
+        transitions[writeIndex].state = targetState;
+        writeIndex++;
+      }
+      transitions.length = writeIndex;
+    }
   };
+
+  closeOverEpsilonTransitions() {
+    const numStates = this.states.length;
+    for (let i = 0; i < numStates; i++) {
+      const currentState = this.states[i];
+      if (currentState.epsilon.length === 0) continue;
+
+      // Find all states reachable via epsilon transitions.
+      const visited = new Set();
+      const stack = [i];
+      while (stack.length) {
+        const stateId = stack.pop();
+        if (visited.has(stateId)) continue;
+        visited.add(stateId);
+        const state = this.states[stateId];
+        for (const epsilonTarget of state.epsilon) {
+          stack.push(epsilonTarget);
+        }
+      }
+
+      visited.delete(i);  // Remove self
+
+      // Find the closure, then remove epsilon transitions.
+      for (const targetId of visited) {
+        currentState.transitions.push(...this.states[targetId].transitions);
+        if (this.acceptIds.has(targetId)) {
+          this.acceptIds.add(i);
+        }
+      }
+
+      currentState.epsilon = [];
+      currentState.mergeTransitions();
+    }
+  }
 }
 
 // NOTE: The compiler currently supports literals, '.', character classes
