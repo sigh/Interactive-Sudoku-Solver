@@ -53,6 +53,9 @@ layout: null
             <li><a href="#odd-even-thermo">Odd/Even Thermo</a></li>
             <li><a href="#nabner-line">Nabner Line</a></li>
             <li><a href="#not-renban">Not Renban</a></li>
+            <li><a href="#arithmetic-progression">Arithmetic Progression</a></li>
+            <li><a href="#successor-arrows">Successor Arrows</a></li>
+            <li><a href="#flatmates">Flatmates<a></li>
           </ul>
         </li>
       </ul>
@@ -182,6 +185,71 @@ layout: null
         console.log(makeNotRenban('R1C1', 'R1C2', 'R1C3').toString());
       </pre>
       </p>
+
+      <h3 id="arithmetic-progression">Arithmetic Progression</h3>
+      <p>
+        <b>Description:</b>
+        Digits along the line must form an arithmetic progression. That is,
+        the difference between all consecutive digits is same.
+      </p>
+
+      <p>
+        Implement this using the "State machine" panel:
+      <pre>
+        startState = { lastVal: null, diff: null };
+
+        function transition(state, value) {
+          if (state.lastVal == null) {
+            return { lastVal: value, diff: null};
+          }
+
+          const diff = value - state.lastVal;
+
+          if (state.diff == null || state.diff == diff) {
+            return { lastVal: value, diff: diff };
+          }
+        }
+
+        function accept(state) {
+          return true;
+        }
+      </pre>
+      </p>
+
+      <h3 id="successor-arrows">Successor Arrows</h3>
+      <p>
+        <b>Description:</b>
+        If a digit <code>N</code> is placed in an arrow cell, the digit
+        <code>N + 1</code> must appear exactly <code>N</code> cells away in the
+        arrow's direction.
+      </p>
+
+      <p>
+        Select the arrow cells and all the cells along the arrow's direction,
+        then add a <code>Regex</code> constraint from "Line and Sets" panel.
+        The regex pattern should alternate over each possible starting digit:
+      </p>
+      <pre>
+        (12|2.3|3..4|4...5|5....6|6.....7|7......8|8.......9).*
+      </pre>
+
+      <h3 id="flatmates">Flatmates</h3>
+
+      <p>
+        <b>Description:</b>
+        Generalize the "Dutch Flatmates" constraint to apply to an arbitrary
+        center digit <code>D</code>, which must have either digit <code>A</code>
+        above it or digit <code>B</code> below it (or both).
+      </p>
+
+      <p>
+        Use a <code>Regex</code> constraint from the "Line and Sets" panel,
+        applied to every column (replace <code>A</code>, <code>B</code> and
+        <code>D</code>):
+      </p>
+      <pre>
+        .*(AD|DB).*
+      </pre>
     </div>
   </div>
 </body>
