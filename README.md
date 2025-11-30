@@ -19,8 +19,16 @@ It is hosted at <http://sigh.github.io/Interactive-Sudoku-Solver>
 
 Run locally using [Jekyll](https://jekyllrb.com/):
 
-```
+```bash
 jekyll serve
+```
+
+## Tests
+
+Execute the test suite with:
+
+```bash
+npm test
 ```
 
 ## Contributions
