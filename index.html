@@ -24,6 +24,10 @@ layout: null
     .hide-until-load {
       display: none !important;
     }
+
+    .hide-unless-debug {
+      display: none !important;
+    }
   </style>
 
   <script type="module">
@@ -379,7 +383,7 @@ layout: null
           </fieldset>
         </form>
 
-        <form id="state-machine-input" class="hide-until-load">
+        <form id="state-machine-input" class="hide-until-load hide-unless-debug">
           <fieldset tabindex="0" class="constraint-panel">
             <h2>State machine constraints</h2>
             <div>

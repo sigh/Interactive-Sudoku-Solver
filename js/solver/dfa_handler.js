@@ -290,6 +290,10 @@ export class DFALine extends SudokuConstraintHandler {
     this._statesList = bitsets;
   }
 
+  getDFA() {
+    return this._dfa;
+  }
+
   enforceConsistency(grid, handlerAccumulator) {
     const cells = this.cells;
     const numCells = cells.length;
