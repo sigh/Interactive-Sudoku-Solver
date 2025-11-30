@@ -3,6 +3,6 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "test": "node tests/nfa_builder.test.js && node tests/dfa_handler.test.js && node tests/e2e.test.js"
+    "test": "node tests/run_all_tests.js"
   }
 }
