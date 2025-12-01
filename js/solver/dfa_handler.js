@@ -1,4 +1,5 @@
 const { SudokuConstraintHandler } = await import('./handlers.js' + self.VERSION_PARAM);
+const { NFA } = await import('../nfa_builder.js' + self.VERSION_PARAM);
 
 class DFA {
   constructor(numStates, acceptingStates, startingState, transitionLists) {
@@ -20,6 +21,7 @@ class DFABuilder {
   constructor(nfa, numSymbols) {
     this._nfa = nfa;
     this.numSymbols = numSymbols;
+    this._symbols = NFA.Symbol.all(numSymbols);
   }
 
   static _RawState = class {
@@ -71,15 +73,11 @@ class DFABuilder {
       const currentStateIds = currentDfaState.nfaStates;
       const currentTransitionRow = currentDfaState.transitions;
 
-      for (let i = 0; i < numSymbols; i++) {
-        const symbol = 1 << i;
+      for (const symbol of this._symbols) {
         const moveSet = new Set();
         for (const currentStateId of currentStateIds) {
-          const transitions = this._nfa.getTransitions(currentStateId);
-          for (const transition of transitions) {
-            if (transition.symbols & symbol) {
-              moveSet.add(transition.state);
-            }
+          for (const target of this._nfa.getTransitionTargets(currentStateId, symbol)) {
+            moveSet.add(target);
           }
         }
         if (!moveSet.size) continue;
@@ -88,7 +86,7 @@ class DFABuilder {
         if (!closureMap.has(nextKey)) {
           stack.push(addRawDfaState(moveSet));
         }
-        currentTransitionRow[i] = closureMap.get(nextKey);
+        currentTransitionRow[symbol.index] = closureMap.get(nextKey);
       }
     }
 

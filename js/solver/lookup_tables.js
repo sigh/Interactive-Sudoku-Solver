@@ -9,6 +9,10 @@ export class LookupTables {
     return 1 << (i - 1);
   };
 
+  static fromIndex = (i) => {
+    return 1 << i;
+  };
+
   static fromValuesArray = (xs) => {
     let result = 0;
     for (const x of xs) {
