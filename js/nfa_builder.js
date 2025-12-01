@@ -264,6 +264,93 @@ export class NFA {
 
     this._epsilon = [];
   }
+
+  // Creates a reversed NFA where all transitions point backwards.
+  // The reversed NFA has accept states as starts and start states as accepts.
+  _createReversed() {
+    const numStates = this._transitions.length;
+    const reversed = new NFA();
+
+    // Create all states.
+    for (let i = 0; i < numStates; i++) {
+      reversed.addState();
+    }
+
+    // Reverse transitions.
+    for (let stateId = 0; stateId < numStates; stateId++) {
+      const transitions = this._transitions[stateId];
+      for (let symbolIndex = 0; symbolIndex < transitions.length; symbolIndex++) {
+        const targets = transitions[symbolIndex];
+        if (!targets) continue;
+        for (const target of targets) {
+          reversed.addTransition(target, stateId, new NFA.Symbol(symbolIndex + 1));
+        }
+      }
+    }
+
+    // Swap start and accept.
+    for (const acceptId of this._acceptIds) {
+      reversed.addStartId(acceptId);
+    }
+    for (const startId of this._startIds) {
+      reversed.addAcceptId(startId);
+    }
+
+    reversed.seal();
+    return reversed;
+  }
+
+  // Returns the set of states reachable from start states.
+  _reachableFromStart() {
+    const reachable = new Set(this._startIds);
+    const stack = [...this._startIds];
+
+    while (stack.length) {
+      const stateId = stack.pop();
+      const transitions = this._transitions[stateId];
+      for (let symbolIndex = 0; symbolIndex < transitions.length; symbolIndex++) {
+        const targets = transitions[symbolIndex];
+        if (!targets) continue;
+        for (const target of targets) {
+          if (!reachable.has(target)) {
+            reachable.add(target);
+            stack.push(target);
+          }
+        }
+      }
+    }
+
+    return reachable;
+  }
+
+  // Removes dead states - states from which no accept state is reachable.
+  // Must be called after epsilon transitions have been closed over.
+  removeDeadStates() {
+    this._assertSealed();
+    if (this._epsilon.length) {
+      throw new Error('removeDeadStates requires epsilon transitions to be closed first');
+    }
+
+    // States that can reach an accept = states reachable from accepts in reversed NFA.
+    const reversed = this._createReversed();
+    const canReachAccept = reversed._reachableFromStart();
+
+    // Remove transitions to dead states.
+    const numStates = this._transitions.length;
+    for (let stateId = 0; stateId < numStates; stateId++) {
+      const transitions = this._transitions[stateId];
+      for (let symbolIndex = 0; symbolIndex < transitions.length; symbolIndex++) {
+        const targets = transitions[symbolIndex];
+        if (!targets) continue;
+        const filtered = targets.filter(t => canReachAccept.has(t));
+        if (filtered.length === 0) {
+          delete transitions[symbolIndex];
+        } else if (filtered.length !== targets.length) {
+          transitions[symbolIndex] = filtered;
+        }
+      }
+    }
+  }
 }
 
 // NOTE: The compiler currently supports literals, '.', character classes
