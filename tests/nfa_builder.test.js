@@ -708,4 +708,207 @@ await runTest('remapStates should throw if epsilon transitions exist', () => {
   );
 });
 
+await runTest('reduceBySimulation should merge equivalent states', () => {
+  // Two states with identical transitions to same accepting state.
+  // state0 --[1]--> state1, state0 --[2]--> state2
+  // state1 --[3]--> state3 (accepting)
+  // state2 --[3]--> state3 (accepting)
+  // state1 and state2 are simulation-equivalent.
+  const nfa = new NFA();
+  nfa.addState();
+  nfa.addState();
+  nfa.addState();
+  nfa.addState();
+  nfa.addStartId(0);
+  nfa.addAcceptId(3);
+  nfa.addTransition(0, 1, Symbol(1));
+  nfa.addTransition(0, 2, Symbol(2));
+  nfa.addTransition(1, 3, Symbol(3));
+  nfa.addTransition(2, 3, Symbol(3));
+  nfa.seal();
+
+  assert.equal(nfa.numStates(), 4, 'should have 4 states before');
+  nfa.reduceBySimulation();
+  assert.equal(nfa.numStates(), 3, 'should have 3 states after merging equivalent states');
+
+  expectAccepts(nfa, [1, 3], 'should accept via first path');
+  expectAccepts(nfa, [2, 3], 'should accept via second path');
+  expectRejects(nfa, [1, 2], 'wrong sequence should reject');
+});
+
+await runTest('reduceBySimulation should not merge non-equivalent states', () => {
+  // state1 is accepting, state2 is not - they cannot be equivalent.
+  const nfa = new NFA();
+  nfa.addState();
+  nfa.addState();
+  nfa.addState();
+  nfa.addStartId(0);
+  nfa.addAcceptId(1);
+  nfa.addTransition(0, 1, Symbol(1));
+  nfa.addTransition(0, 2, Symbol(2));
+  nfa.seal();
+
+  assert.equal(nfa.numStates(), 3, 'should have 3 states before');
+  nfa.reduceBySimulation();
+  assert.equal(nfa.numStates(), 3, 'should still have 3 states (no equivalent states)');
+
+  expectAccepts(nfa, [1], 'should accept via accepting state');
+  expectRejects(nfa, [2], 'should reject via non-accepting state');
+});
+
+await runTest('reduceBySimulation should handle states with different transitions', () => {
+  // state1 --[2]--> state3, state2 --[3]--> state3
+  // Different transition symbols, so not equivalent.
+  const nfa = new NFA();
+  nfa.addState();
+  nfa.addState();
+  nfa.addState();
+  nfa.addState();
+  nfa.addStartId(0);
+  nfa.addAcceptId(3);
+  nfa.addTransition(0, 1, Symbol(1));
+  nfa.addTransition(0, 2, Symbol(1));
+  nfa.addTransition(1, 3, Symbol(2));
+  nfa.addTransition(2, 3, Symbol(3));  // Different symbol
+  nfa.seal();
+
+  nfa.reduceBySimulation();
+  assert.equal(nfa.numStates(), 4, 'should keep all states (different transitions)');
+});
+
+await runTest('reduceBySimulation should merge multiple equivalent terminal states', () => {
+  // Multiple accepting terminal states with no transitions.
+  const nfa = new NFA();
+  nfa.addState();
+  nfa.addState();
+  nfa.addState();
+  nfa.addState();
+  nfa.addStartId(0);
+  nfa.addAcceptId(1);
+  nfa.addAcceptId(2);
+  nfa.addAcceptId(3);
+  nfa.addTransition(0, 1, Symbol(1));
+  nfa.addTransition(0, 2, Symbol(2));
+  nfa.addTransition(0, 3, Symbol(3));
+  nfa.seal();
+
+  assert.equal(nfa.numStates(), 4, 'should have 4 states before');
+  nfa.reduceBySimulation();
+  assert.equal(nfa.numStates(), 2, 'should have 2 states after (all accepts merged)');
+
+  expectAccepts(nfa, [1], 'should accept symbol 1');
+  expectAccepts(nfa, [2], 'should accept symbol 2');
+  expectAccepts(nfa, [3], 'should accept symbol 3');
+});
+
+await runTest('reduceBySimulation should preserve language with simulation chains', () => {
+  // state0 --[1]--> state1 --[2]--> state2 --[3]--> state3 (accepting)
+  // state0 --[4]--> state4 --[2]--> state2
+  // state1 and state4 both lead to state2 on symbol 2, so they're equivalent.
+  const nfa = new NFA();
+  nfa.addState();
+  nfa.addState();
+  nfa.addState();
+  nfa.addState();
+  nfa.addState();
+  nfa.addStartId(0);
+  nfa.addAcceptId(3);
+  nfa.addTransition(0, 1, Symbol(1));
+  nfa.addTransition(0, 4, Symbol(4));
+  nfa.addTransition(1, 2, Symbol(2));
+  nfa.addTransition(4, 2, Symbol(2));
+  nfa.addTransition(2, 3, Symbol(3));
+  nfa.seal();
+
+  assert.equal(nfa.numStates(), 5, 'should have 5 states before');
+  nfa.reduceBySimulation();
+  assert.equal(nfa.numStates(), 4, 'should have 4 states after');
+
+  expectAccepts(nfa, [1, 2, 3], 'should accept [1,2,3]');
+  expectAccepts(nfa, [4, 2, 3], 'should accept [4,2,3]');
+  expectRejects(nfa, [1, 2], 'should reject incomplete path');
+});
+
+await runTest('reduceBySimulation should prune dominated transitions', () => {
+  // state0 --[1]--> state1 --[2]--> state2 (accepting)
+  //                 state1 --[3]--> state3 (accepting)
+  // state0 --[1]--> state4 --[2]--> state2 (accepting)
+  // state1 simulates state4: both have [2]->state2, but state1 also has [3]->state3.
+  // state4 does NOT simulate state1 (missing [3] transition).
+  // So transition to state4 should be pruned.
+  const nfa = new NFA();
+  nfa.addState();  // 0: start
+  nfa.addState();  // 1: has both [2] and [3]
+  nfa.addState();  // 2: accepting
+  nfa.addState();  // 3: accepting
+  nfa.addState();  // 4: only has [2]
+  nfa.addStartId(0);
+  nfa.addAcceptId(2);
+  nfa.addAcceptId(3);
+  nfa.addTransition(0, 1, Symbol(1));
+  nfa.addTransition(0, 4, Symbol(1));
+  nfa.addTransition(1, 2, Symbol(2));
+  nfa.addTransition(1, 3, Symbol(3));
+  nfa.addTransition(4, 2, Symbol(2));
+  nfa.seal();
+
+  // Before: state0 has 2 targets on symbol 1.
+  assert.equal(nfa.getTransitionTargets(0, Symbol(1)).length, 2, 'should have 2 targets before');
+
+  nfa.reduceBySimulation();
+
+  // After: state1 simulates state4 (but not vice versa), so edge to state4 is pruned.
+  assert.equal(nfa.getTransitionTargets(0, Symbol(1)).length, 1, 'should have 1 target after pruning');
+  expectAccepts(nfa, [1, 2], 'should accept [1,2]');
+  expectAccepts(nfa, [1, 3], 'should accept [1,3]');
+});
+
+await runTest('reduceBySimulation should keep both targets for mutual simulation', () => {
+  // state0 --[1]--> state1 (accepting)
+  // state0 --[1]--> state2 (accepting)
+  // state1 and state2 mutually simulate each other, one is kept.
+  const nfa = new NFA();
+  nfa.addState();
+  nfa.addState();
+  nfa.addState();
+  nfa.addStartId(0);
+  nfa.addAcceptId(1);
+  nfa.addAcceptId(2);
+  nfa.addTransition(0, 1, Symbol(1));
+  nfa.addTransition(0, 2, Symbol(1));
+  nfa.seal();
+
+  nfa.reduceBySimulation();
+
+  // Mutual simulation: states merge, transitions dedupe.
+  assert.equal(nfa.numStates(), 2, 'should have 2 states after merging');
+  expectAccepts(nfa, [1], 'should accept [1]');
+});
+
+await runTest('reduceBySimulation should not prune when neither dominates', () => {
+  // state0 --[1]--> state1 --[2]--> state3 (accepting)
+  // state0 --[1]--> state2 --[3]--> state4 (accepting)
+  // Neither state1 nor state2 simulates the other (different outgoing symbols).
+  const nfa = new NFA();
+  nfa.addState();
+  nfa.addState();
+  nfa.addState();
+  nfa.addState();
+  nfa.addState();
+  nfa.addStartId(0);
+  nfa.addAcceptId(3);
+  nfa.addAcceptId(4);
+  nfa.addTransition(0, 1, Symbol(1));
+  nfa.addTransition(0, 2, Symbol(1));
+  nfa.addTransition(1, 3, Symbol(2));
+  nfa.addTransition(2, 4, Symbol(3));
+  nfa.seal();
+
+  nfa.reduceBySimulation();
+
+  // Both paths should remain since neither dominates.
+  expectAccepts(nfa, [1, 2], 'should accept [1,2]');
+  expectAccepts(nfa, [1, 3], 'should accept [1,3]');
+});
+
 logSuiteComplete('NFA builder');
