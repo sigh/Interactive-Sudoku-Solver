@@ -1,4 +1,3 @@
-const { LookupTables } = await import('./solver/lookup_tables.js' + self.VERSION_PARAM);
 const {
   Base64Codec,
   BitReader,
@@ -196,7 +195,8 @@ export class NFA {
       for (let symbolIndex = 0; symbolIndex < oldTrans.length; symbolIndex++) {
         const targets = oldTrans[symbolIndex];
         if (!targets) continue;
-        newTrans[symbolIndex] = targets.map(t => remap[t]);
+        // Remap and deduplicate targets.
+        newTrans[symbolIndex] = [...new Set(targets.map(t => remap[t]))];
       }
       return newTrans;
     });
@@ -286,7 +286,7 @@ export const regexToNFA = (pattern, numSymbols) => {
 //     * startIsAccept: 1 bit (1 if state 0 is accepting)
 //     * acceptCount: stateBits bits storing the number of additional accepts
 //   Body (streamed per state until data ends):
-//     Plain format: sequences of (hasMore bit, symbols mask, target) ending with hasMore=0.
+//     Plain format: for each state, transitionCount followed by (symbolIndex, target) pairs.
 //     Packed format: a bitmask of active symbols followed by state IDs for each set bit.
 // States are ordered with the start state coming first, then all accept states,
 // then all other states.
@@ -307,6 +307,7 @@ export class NFASerializer {
 
   static serialize(nfa) {
     nfa.reduceStartStates();
+    nfa.closeOverEpsilonTransitions();
     const { acceptCount, startIsAccept } = this._normalizeStates(nfa);
     const numStates = nfa.numStates();
 
@@ -318,33 +319,16 @@ export class NFASerializer {
     if (stateBits > this.MAX_STATE_BITS) {
       throw new Error('NFA exceeds maximum supported state count (1024)');
     }
-
-    const stateTransitions = [];
-    for (let stateId = 0; stateId < numStates; stateId++) {
-      const transitions = [];
-      const rawTransitions = nfa.getStateTransitions(stateId);
-      for (let symbolIndex = 0; symbolIndex < rawTransitions.length; symbolIndex++) {
-        const targets = rawTransitions[symbolIndex];
-        if (!targets) continue;
-        const symbolMask = LookupTables.fromIndex(symbolIndex);
-        for (const target of targets) {
-          transitions.push({ symbolMask, target });
-        }
-      }
-      for (const target of nfa.getEpsilons(stateId)) {
-        transitions.push({ symbolMask: 0, target });
-      }
-      stateTransitions.push(transitions);
-    }
+    const symbolBits = requiredBits(symbolCount - 1);
 
     const formatChoice = this._chooseStateFormat(nfa, symbolCount, stateBits);
 
     const writer = new BitWriter();
     this._writeHeader(writer, formatChoice, symbolCount, stateBits, startIsAccept, acceptCount);
     if (formatChoice === this.FORMAT.PACKED) {
-      this._writePackedBody(writer, stateTransitions, symbolCount, stateBits);
+      this._writePackedBody(writer, nfa, symbolCount, stateBits);
     } else {
-      this._writePlainBody(writer, stateTransitions, symbolCount, stateBits);
+      this._writePlainBody(writer, nfa, symbolBits, stateBits);
     }
 
     return this._encodeBytes(writer.toUint8Array());
@@ -358,13 +342,13 @@ export class NFASerializer {
 
     const reader = new BitReader(bytes);
     const { format, symbolCount, stateBits, startIsAccept, acceptCount } = this._readHeader(reader);
-    const expectPackedStates = format === this.FORMAT.PACKED;
+    const symbolBits = requiredBits(symbolCount - 1);
 
     const nfa = new NFA();
-    if (expectPackedStates) {
+    if (format === this.FORMAT.PACKED) {
       this._readPackedBody(nfa, reader, symbolCount, stateBits);
     } else {
-      this._readPlainBody(nfa, reader, symbolCount, stateBits);
+      this._readPlainBody(nfa, reader, symbolBits, stateBits);
     }
 
     reader.skipPadding();
@@ -490,58 +474,54 @@ export class NFASerializer {
     return { format, symbolCount, stateBits, startIsAccept, acceptCount };
   }
 
-  static _writePlainBody(writer, stateTransitions, symbolCount, stateBits) {
-    for (const transitions of stateTransitions) {
-      if (!transitions.length) {
-        writer.writeBits(0, 1);
-        continue;
+  static _writePlainBody(writer, nfa, symbolBits, stateBits) {
+    for (let stateId = 0; stateId < nfa.numStates(); stateId++) {
+      const transitions = nfa.getStateTransitions(stateId);
+      // Count transitions first.
+      let transitionCount = 0;
+      for (let symbolIndex = 0; symbolIndex < transitions.length; symbolIndex++) {
+        const targets = transitions[symbolIndex];
+        if (targets) transitionCount += targets.length;
       }
-
-      for (const { symbolMask, target } of transitions) {
-        writer.writeBits(1, 1);
-        writer.writeBits(symbolMask, symbolCount);
-        writer.writeBits(target, stateBits);
+      writer.writeBits(transitionCount, symbolBits + stateBits);
+      // Write each (symbolIndex, target) pair.
+      for (let symbolIndex = 0; symbolIndex < transitions.length; symbolIndex++) {
+        const targets = transitions[symbolIndex];
+        if (!targets) continue;
+        for (const target of targets) {
+          writer.writeBits(symbolIndex, symbolBits);
+          writer.writeBits(target, stateBits);
+        }
       }
-
-      writer.writeBits(0, 1);
     }
   }
 
-  static _writePackedBody(writer, stateTransitions, symbolCount, stateBits) {
-    for (const transitions of stateTransitions) {
-      const symbolTargets = new Map();
-      let seenSymbols = 0;
-      for (let { symbolMask, target } of transitions) {
-        if (seenSymbols & symbolMask) {
-          throw new Error('Cannot build packed format: overlapping symbols');
-        }
-        seenSymbols |= symbolMask;
-
-        while (symbolMask) {
-          const lowestBit = symbolMask & -symbolMask;
-          symbolMask ^= lowestBit;
-          symbolTargets.set(lowestBit, target);
+  static _writePackedBody(writer, nfa, symbolCount, stateBits) {
+    for (let stateId = 0; stateId < nfa.numStates(); stateId++) {
+      const transitions = nfa.getStateTransitions(stateId);
+      let symbolMask = 0;
+      for (let symbolIndex = 0; symbolIndex < transitions.length; symbolIndex++) {
+        if (transitions[symbolIndex]?.length) {
+          symbolMask |= 1 << symbolIndex;
         }
       }
-
-      writer.writeBits(seenSymbols, symbolCount);
-      while (seenSymbols) {
-        const lowestBit = seenSymbols & -seenSymbols;
-        seenSymbols ^= lowestBit;
-        const target = symbolTargets.get(lowestBit);
-        writer.writeBits(target, stateBits);
+      writer.writeBits(symbolMask, symbolCount);
+      for (let symbolIndex = 0; symbolIndex < transitions.length; symbolIndex++) {
+        const targets = transitions[symbolIndex];
+        if (targets?.length) {
+          writer.writeBits(targets[0], stateBits);
+        }
       }
     }
   }
 
   static _chooseStateFormat(nfa, symbolCount, stateBits) {
+    const symbolBits = requiredBits(symbolCount - 1);
     let packedSizeEstimate = 0;
     let plainSizeEstimate = 0;
     for (let stateId = 0; stateId < nfa.numStates(); stateId++) {
-      if (nfa.getEpsilons(stateId).length > 0) return this.FORMAT.PLAIN;
-
       const transitions = nfa.getStateTransitions(stateId);
-      plainSizeEstimate += 1; // terminator
+      plainSizeEstimate += symbolBits + stateBits; // transition count
       packedSizeEstimate += symbolCount;
       let transitionCount = 0;
       for (let symbolIndex = 0; symbolIndex < transitions.length; symbolIndex++) {
@@ -553,8 +533,8 @@ export class NFASerializer {
         }
         transitionCount++;
       }
-      plainSizeEstimate += transitionCount * (symbolCount + stateBits + 1);  // +1 for hasMore bit
-      packedSizeEstimate += transitionCount * stateBits;  // One target per symbol
+      plainSizeEstimate += transitionCount * (symbolBits + stateBits);
+      packedSizeEstimate += transitionCount * stateBits;
     }
 
     return packedSizeEstimate < plainSizeEstimate
@@ -566,24 +546,17 @@ export class NFASerializer {
     return format === this.FORMAT.PLAIN || format === this.FORMAT.PACKED;
   }
 
-  static _readPlainBody(nfa, reader, symbolCount, stateBits) {
-    for (let stateId = 0; reader.remainingBits() > 0; stateId++) {
-      while (true) {
-        if (reader.remainingBits() === 0) {
-          throw new Error('Serialized NFA plain state is truncated');
-        }
-        const hasMore = reader.readBits(1);
-        if (hasMore === 0) break;
-        if (reader.remainingBits() < symbolCount + stateBits) {
+  static _readPlainBody(nfa, reader, symbolBits, stateBits) {
+    const countBits = symbolBits + stateBits;
+    for (let stateId = 0; reader.remainingBits() >= countBits; stateId++) {
+      const transitionCount = reader.readBits(countBits);
+      for (let i = 0; i < transitionCount; i++) {
+        if (reader.remainingBits() < symbolBits + stateBits) {
           throw new Error('Serialized NFA plain state transition data is truncated');
         }
-        const symbolsMask = reader.readBits(symbolCount);
+        const symbolIndex = reader.readBits(symbolBits);
         const target = reader.readBits(stateBits);
-        if (symbolsMask === 0) {
-          nfa.addEpsilon(stateId, target);
-        } else {
-          nfa.addTransition(stateId, target, ...this._maskToSymbols(symbolsMask));
-        }
+        nfa.addTransition(stateId, target, new NFA.Symbol(symbolIndex + 1));
       }
     }
   }
@@ -601,10 +574,6 @@ export class NFASerializer {
         }
       }
     }
-  }
-
-  static _maskToSymbols(mask) {
-    return LookupTables.toValuesArray(mask).map(v => new NFA.Symbol(v));
   }
 
   static _encodeBytes(bytes) {
