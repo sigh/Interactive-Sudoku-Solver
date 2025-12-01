@@ -1044,7 +1044,7 @@ export class SudokuConstraint {
     }
 
     static _countStates = memoize((encodedNFA) => {
-      return NFASerializer.deserialize(encodedNFA).states.length;
+      return NFASerializer.deserialize(encodedNFA).numStates();
     });
 
     chipLabel() {
