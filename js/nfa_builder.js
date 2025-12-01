@@ -31,6 +31,12 @@ export class NFA {
     }
   }
 
+  _assertNoEpsilon() {
+    if (this._epsilon.length) {
+      throw new Error('Epsilon transitions must be closed first');
+    }
+  }
+
   seal() {
     this._sealed = true;
   }
@@ -183,35 +189,71 @@ export class NFA {
   }
 
   // Remaps states according to `remap` array, where remap[oldIndex] = newIndex.
-  // Multiple old states can map to the same new index (merging).
-  // The `order` array specifies which old state provides the transitions for each new state.
-  remapStates(remap, order) {
+  // States with undefined remap values are removed (transitions to them are dropped).
+  // When multiple old states map to the same new index (merging), one is chosen
+  // arbitrarily to provide transitions - callers must ensure merged states have
+  // identical transitions (or are terminal states with no transitions).
+  remapStates(remap) {
     this._assertSealed();
+    this._assertNoEpsilon();
+
+    // Build order: for each new index, find an old index that maps to it.
+    // Also detect if merging is happening (multiple old -> same new).
+    const order = [];
+    let merging = false;
+    for (let oldIndex = 0; oldIndex < remap.length; oldIndex++) {
+      const newIndex = remap[oldIndex];
+      if (newIndex === undefined) continue;
+      if (order[newIndex] === undefined) {
+        order[newIndex] = oldIndex;
+      } else {
+        merging = true;
+      }
+    }
+    const newLen = order.length;
 
     // Reorder and remap transitions.
-    const newTransitions = order.map((oldIndex) => {
-      const oldTrans = this._transitions[oldIndex];
+    const newTransitions = new Array(newLen);
+    for (let newIndex = 0; newIndex < newLen; newIndex++) {
+      const oldTrans = this._transitions[order[newIndex]];
       const newTrans = [];
       for (let symbolIndex = 0; symbolIndex < oldTrans.length; symbolIndex++) {
         const targets = oldTrans[symbolIndex];
         if (!targets) continue;
-        // Remap and deduplicate targets.
-        newTrans[symbolIndex] = [...new Set(targets.map(t => remap[t]))];
+        // Remap in place, filtering out undefined (removed states).
+        let writeIndex = 0;
+        for (let i = 0; i < targets.length; i++) {
+          const mapped = remap[targets[i]];
+          if (mapped !== undefined) targets[writeIndex++] = mapped;
+        }
+        if (writeIndex) {
+          targets.length = writeIndex;
+          // Only deduplicate when merging (multiple old states -> same new state).
+          if (merging && writeIndex > 1) {
+            newTrans[symbolIndex] = [...new Set(targets)];
+          } else {
+            newTrans[symbolIndex] = targets;
+          }
+        }
       }
-      return newTrans;
-    });
+      newTransitions[newIndex] = newTrans;
+    }
     this._transitions = newTransitions;
 
-    // Reorder and remap epsilon transitions.
-    const newEpsilon = order.map((oldIndex) => {
-      const eps = this._epsilon[oldIndex];
-      return eps ? eps.map(t => remap[t]) : undefined;
-    });
-    this._epsilon = newEpsilon;
-
     // Remap start and accept IDs.
-    this._startIds = new Set([...this._startIds].map(id => remap[id]));
-    this._acceptIds = new Set([...this._acceptIds].map(id => remap[id]));
+    const newStartIds = new Set();
+    for (const id of this._startIds) {
+      const mapped = remap[id];
+      if (mapped !== undefined) newStartIds.add(mapped);
+    }
+    this._startIds = newStartIds;
+
+    const newAcceptIds = new Set();
+    for (const id of this._acceptIds) {
+      const mapped = remap[id];
+      if (mapped !== undefined) newAcceptIds.add(mapped);
+    }
+    this._acceptIds = newAcceptIds;
   }
 
   closeOverEpsilonTransitions() {
@@ -327,29 +369,25 @@ export class NFA {
   // Must be called after epsilon transitions have been closed over.
   removeDeadStates() {
     this._assertSealed();
-    if (this._epsilon.length) {
-      throw new Error('removeDeadStates requires epsilon transitions to be closed first');
-    }
+    this._assertNoEpsilon();
 
     // States that can reach an accept = states reachable from accepts in reversed NFA.
     const reversed = this._createReversed();
-    const canReachAccept = reversed._reachableFromStart();
+    const liveStates = reversed._reachableFromStart();
 
-    // Remove transitions to dead states.
-    const numStates = this._transitions.length;
-    for (let stateId = 0; stateId < numStates; stateId++) {
-      const transitions = this._transitions[stateId];
-      for (let symbolIndex = 0; symbolIndex < transitions.length; symbolIndex++) {
-        const targets = transitions[symbolIndex];
-        if (!targets) continue;
-        const filtered = targets.filter(t => canReachAccept.has(t));
-        if (filtered.length === 0) {
-          delete transitions[symbolIndex];
-        } else if (filtered.length !== targets.length) {
-          transitions[symbolIndex] = filtered;
-        }
-      }
+    if (liveStates.size === this.numStates()) {
+      // All states are live - nothing to do.
+      return;
     }
+
+    // Build remap: liveStates in order become 0, 1, 2, ...
+    const remap = new Array(this._transitions.length);
+    let newIndex = 0;
+    for (const oldIndex of liveStates) {
+      remap[oldIndex] = newIndex++;
+    }
+
+    this.remapStates(remap);
   }
 }
 
@@ -395,6 +433,12 @@ export class NFASerializer {
   static serialize(nfa) {
     nfa.reduceStartStates();
     nfa.closeOverEpsilonTransitions();
+    nfa.removeDeadStates();
+
+    if (!nfa.numStates()) {
+      return '';
+    }
+
     const { acceptCount, startIsAccept } = this._normalizeStates(nfa);
     const numStates = nfa.numStates();
 
@@ -422,6 +466,13 @@ export class NFASerializer {
   }
 
   static deserialize(serialized) {
+    if (!serialized) {
+      // Empty NFA - no states, rejects everything.
+      const nfa = new NFA();
+      nfa.seal();
+      return nfa;
+    }
+
     const bytes = this._decodeBytes(serialized);
     if (!bytes.length) {
       throw new Error('Serialized NFA is empty');
@@ -460,15 +511,19 @@ export class NFASerializer {
     const acceptSet = new Set();
     const otherSet = new Set();
     const acceptTerminalSet = new Set();
-    const rejectTerminalSet = new Set();
+    // Note: We can't have reject terminal states as those would have been
+    // removed by removeDeadStates().
     for (let i = 0; i < numStates; i++) {
       if (i === nfa.startId) continue;
 
-      const isTerminal = this._isTerminalState(nfa, i);
       if (nfa.isAccepting(i)) {
-        (isTerminal ? acceptTerminalSet : acceptSet).add(i);
+        if (this._isTerminalState(nfa, i)) {
+          acceptTerminalSet.add(i);
+        } else {
+          acceptSet.add(i);
+        }
       } else {
-        (isTerminal ? rejectTerminalSet : otherSet).add(i);
+        otherSet.add(i);
       }
     }
 
@@ -476,30 +531,27 @@ export class NFASerializer {
     if (canonicalAcceptTerminal !== null) {
       acceptSet.add(canonicalAcceptTerminal);
     }
-    const canonicalRejectTerminal = setPeek(rejectTerminalSet);
-    if (canonicalRejectTerminal !== null) {
-      otherSet.add(canonicalRejectTerminal);
-    }
 
-    // order[newIndex] = oldIndex (which state provides transitions)
-    const order = [nfa.startId, ...acceptSet, ...otherSet];
-
-    // remap[oldIndex] = newIndex (handles merging terminal states)
+    // remap[oldIndex] = newIndex
+    // Order: start state first, then accept states, then others.
     const remap = new Array(numStates);
-    order.forEach((oldIndex, newIndex) => {
-      remap[oldIndex] = newIndex;
-    });
+    let nextIndex = 0;
+    remap[nfa.startId] = nextIndex++;
+    for (const id of acceptSet) {
+      remap[id] = nextIndex++;
+    }
+    for (const id of otherSet) {
+      remap[id] = nextIndex++;
+    }
+    // Merge terminal states to their canonical representatives.
     for (const id of acceptTerminalSet) {
       remap[id] = remap[canonicalAcceptTerminal];
-    }
-    for (const id of rejectTerminalSet) {
-      remap[id] = remap[canonicalRejectTerminal];
     }
 
     const startIsAccept = nfa.isAccepting(nfa.startId);
     const acceptCount = acceptSet.size;
 
-    nfa.remapStates(remap, order);
+    nfa.remapStates(remap);
 
     return { acceptCount, startIsAccept };
   }
