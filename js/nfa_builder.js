@@ -643,26 +643,14 @@ export class NFASerializer {
 
     const acceptSet = new Set();
     const otherSet = new Set();
-    const acceptTerminalSet = new Set();
-    // Note: We can't have reject terminal states as those would have been
-    // removed by removeDeadStates().
     for (let i = 0; i < numStates; i++) {
       if (i === nfa.startId) continue;
 
       if (nfa.isAccepting(i)) {
-        if (this._isTerminalState(nfa, i)) {
-          acceptTerminalSet.add(i);
-        } else {
-          acceptSet.add(i);
-        }
+        acceptSet.add(i);
       } else {
         otherSet.add(i);
       }
-    }
-
-    const canonicalAcceptTerminal = setPeek(acceptTerminalSet);
-    if (canonicalAcceptTerminal !== null) {
-      acceptSet.add(canonicalAcceptTerminal);
     }
 
     // remap[oldIndex] = newIndex
@@ -675,10 +663,6 @@ export class NFASerializer {
     }
     for (const id of otherSet) {
       remap[id] = nextIndex++;
-    }
-    // Merge terminal states to their canonical representatives.
-    for (const id of acceptTerminalSet) {
-      remap[id] = remap[canonicalAcceptTerminal];
     }
 
     const startIsAccept = nfa.isAccepting(nfa.startId);
