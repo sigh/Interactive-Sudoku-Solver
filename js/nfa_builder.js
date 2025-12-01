@@ -9,10 +9,115 @@ const {
 } = await import('./util.js' + self.VERSION_PARAM);
 
 export class NFA {
-  constructor(startId, acceptIds, states) {
-    this.startId = startId;
-    this.acceptIds = new Set(acceptIds);
-    this.states = states;
+  constructor() {
+    this._startIds = new Set();
+    this._acceptIds = new Set();
+    this._states = [];
+    this._sealed = false;
+  }
+
+  _assertUnsealed() {
+    if (this._sealed) {
+      throw new Error('NFA has been sealed and cannot be modified');
+    }
+  }
+
+  _assertSealed() {
+    if (!this._sealed) {
+      throw new Error('NFA must be sealed before processing');
+    }
+  }
+
+  seal() {
+    this._sealed = true;
+  }
+
+  addStartId(startId) {
+    this._assertUnsealed();
+    this._startIds.add(startId);
+  }
+
+  addAcceptId(acceptId) {
+    this._assertUnsealed();
+    this._acceptIds.add(acceptId);
+  }
+
+  addState() {
+    this._assertUnsealed();
+    this._states.push(new NFA.State());
+    return this._states.length - 1;
+  }
+
+  // Reduces multiple start states to a single start state by creating
+  // a new state with epsilon transitions to all current start states.
+  reduceStartStates() {
+    this._assertSealed();
+    if (this._startIds.size <= 1) return;
+
+    // Temporarily unseal to add the new start state.
+    this._sealed = false;
+    const newStartId = this.addState();
+    for (const startId of this._startIds) {
+      this.addEpsilon(newStartId, startId);
+    }
+    this._sealed = true;
+
+    this._startIds.clear();
+    this._startIds.add(newStartId);
+  }
+
+  // Returns the single start ID. Throws if there are multiple start states.
+  get startId() {
+    if (this._startIds.size !== 1) {
+      throw new Error(`Expected exactly one start state, but found ${this._startIds.size}`);
+    }
+    return this._startIds.values().next().value;
+  }
+
+  _ensureStateExists(stateId) {
+    while (this._states.length <= stateId) {
+      this.addState();
+    }
+  }
+
+  addTransition(fromStateId, toStateId, symbolMask) {
+    this._assertUnsealed();
+    this._ensureStateExists(fromStateId);
+    this._ensureStateExists(toStateId);
+
+    this._states[fromStateId].addTransition(symbolMask, toStateId);
+  }
+
+  addEpsilon(fromStateId, toStateId) {
+    this._assertUnsealed();
+    this._ensureStateExists(fromStateId);
+    this._ensureStateExists(toStateId);
+
+    this._states[fromStateId].addEpsilon(toStateId);
+  }
+
+  static Symbol(value) {
+    return LookupTables.fromValue(value);
+  }
+
+  isAccepting(stateId) {
+    return this._acceptIds.has(stateId);
+  }
+
+  getStartIds() {
+    return this._startIds;
+  }
+
+  getTransitions(stateId) {
+    return this._states[stateId].transitions;
+  }
+
+  getEpsilons(stateId) {
+    return this._states[stateId].epsilon;
+  }
+
+  numStates() {
+    return this._states.length;
   }
 
   static Transition = class Transition {
@@ -57,9 +162,10 @@ export class NFA {
   };
 
   closeOverEpsilonTransitions() {
-    const numStates = this.states.length;
+    this._assertSealed();
+    const numStates = this._states.length;
     for (let i = 0; i < numStates; i++) {
-      const currentState = this.states[i];
+      const currentState = this._states[i];
       if (currentState.epsilon.length === 0) continue;
 
       // Find all states reachable via epsilon transitions.
@@ -69,7 +175,7 @@ export class NFA {
         const stateId = stack.pop();
         if (visited.has(stateId)) continue;
         visited.add(stateId);
-        const state = this.states[stateId];
+        const state = this._states[stateId];
         for (const epsilonTarget of state.epsilon) {
           stack.push(epsilonTarget);
         }
@@ -79,9 +185,9 @@ export class NFA {
 
       // Find the closure, then remove epsilon transitions.
       for (const targetId of visited) {
-        currentState.transitions.push(...this.states[targetId].transitions);
-        if (this.acceptIds.has(targetId)) {
-          this.acceptIds.add(i);
+        currentState.transitions.push(...this._states[targetId].transitions);
+        if (this._acceptIds.has(targetId)) {
+          this._acceptIds.add(i);
         }
       }
 
@@ -131,6 +237,7 @@ export class NFASerializer {
   static HEADER_FORMAT_BITS = 2;
 
   static serialize(nfa) {
+    nfa.reduceStartStates();
     const normalized = this._normalizeStates(nfa);
     const states = normalized.states;
     const remap = normalized.remap;
@@ -186,40 +293,31 @@ export class NFASerializer {
     const { format, symbolCount, stateBits, startIsAccept, acceptCount } = this._readHeader(reader);
     const expectPackedStates = format === this.FORMAT.PACKED;
 
-    let states;
-    let maxTargetSeen;
+    const nfa = new NFA();
     if (expectPackedStates) {
-      ({ states, maxTargetSeen } = this._readPackedBody(reader, symbolCount, stateBits));
+      this._readPackedBody(nfa, reader, symbolCount, stateBits);
     } else {
-      ({ states, maxTargetSeen } = this._readPlainBody(reader, symbolCount, stateBits));
-    }
-
-    const minimumStates = Math.max(maxTargetSeen + 1, acceptCount + 1, 1);
-    if (states.length < minimumStates) {
-      throw new Error('Serialized NFA ended before all referenced states were defined');
-    }
-    if (states.length > minimumStates) {
-      states.length = minimumStates;
+      this._readPlainBody(nfa, reader, symbolCount, stateBits);
     }
 
     reader.skipPadding();
 
-    if (!states.length) {
+    if (!nfa.numStates()) {
       throw new Error('Serialized NFA does not contain any states');
     }
 
-    const acceptIds = [];
-    if (startIsAccept) acceptIds.push(0);
+    nfa.addStartId(0);
+    if (startIsAccept) nfa.addAcceptId(0);
     for (let i = 1; i <= acceptCount; i++) {
-      acceptIds.push(i);
+      nfa.addAcceptId(i);
     }
 
-    return new NFA(0, acceptIds, states);
+    nfa.seal();
+    return nfa;
   }
 
   static _normalizeStates(nfa) {
-    const states = nfa.states;
-    const numStates = states.length;
+    const numStates = nfa.numStates();
 
     const acceptSet = new Set();
     const otherSet = new Set();
@@ -228,8 +326,8 @@ export class NFASerializer {
     for (let i = 0; i < numStates; i++) {
       if (i === nfa.startId) continue;
 
-      const isTerminal = this._isTerminalState(states[i]);
-      if (nfa.acceptIds.has(i)) {
+      const isTerminal = this._isTerminalState(nfa, i);
+      if (nfa.isAccepting(i)) {
         (isTerminal ? acceptTerminalSet : acceptSet).add(i);
       } else {
         (isTerminal ? rejectTerminalSet : otherSet).add(i);
@@ -258,16 +356,18 @@ export class NFASerializer {
       remap[id] = remap[canonicalRejectTerminal];
     }
 
-    const orderedStates = order.map((idx) => states[idx]);
-    const startIsAccept = nfa.acceptIds.has(nfa.startId);
+    const orderedStates = order.map((idx) => ({
+      transitions: nfa.getTransitions(idx),
+      epsilon: nfa.getEpsilons(idx),
+    }));
+    const startIsAccept = nfa.isAccepting(nfa.startId);
     const acceptCount = acceptSet.size;
     return { states: orderedStates, remap, acceptCount, startIsAccept };
   }
 
-  static _isTerminalState(state) {
-    if (!state) return false;
-    const transitionCount = state.transitions?.length ?? 0;
-    const epsilonCount = state.epsilon?.length ?? 0;
+  static _isTerminalState(nfa, stateId) {
+    const transitionCount = nfa.getTransitions(stateId).length;
+    const epsilonCount = nfa.getEpsilons(stateId).length;
     return transitionCount === 0 && epsilonCount === 0;
   }
 
@@ -396,11 +496,8 @@ export class NFASerializer {
     return format === this.FORMAT.PLAIN || format === this.FORMAT.PACKED;
   }
 
-  static _readPlainBody(reader, symbolCount, stateBits) {
-    const states = [];
-    let maxTargetSeen = 0;
-    while (reader.remainingBits() > 0) {
-      const state = new NFA.State();
+  static _readPlainBody(nfa, reader, symbolCount, stateBits) {
+    for (let stateId = 0; reader.remainingBits() > 0; stateId++) {
       while (true) {
         if (reader.remainingBits() === 0) {
           throw new Error('Serialized NFA plain state is truncated');
@@ -413,41 +510,28 @@ export class NFASerializer {
         const symbols = reader.readBits(symbolCount);
         const target = reader.readBits(stateBits);
         if (symbols === 0) {
-          state.addEpsilon(target);
+          nfa.addEpsilon(stateId, target);
         } else {
-          state.addTransition(symbols, target);
+          nfa.addTransition(stateId, target, symbols);
         }
-        if (target > maxTargetSeen) maxTargetSeen = target;
       }
-      states.push(state);
     }
-    return { states, maxTargetSeen };
   }
 
-  static _readPackedBody(reader, symbolCount, stateBits) {
-    const states = [];
-    let maxTargetSeen = 0;
-    while (reader.remainingBits() >= symbolCount) {
-      const state = new NFA.State();
+  static _readPackedBody(nfa, reader, symbolCount, stateBits) {
+    for (let stateId = 0; reader.remainingBits() >= symbolCount; stateId++) {
       const activeMask = reader.readBits(symbolCount);
-      let mask = activeMask;
-      let symbolIndex = 1;
-      while (mask) {
+      for (let mask = activeMask, symbolIndex = 1; mask; mask >>>= 1, symbolIndex++) {
         if (mask & 1) {
           if (reader.remainingBits() < stateBits) {
             throw new Error('Serialized NFA packed state transition data is truncated');
           }
           const target = reader.readBits(stateBits);
           const symbolsMask = 1 << (symbolIndex - 1);
-          state.addTransition(symbolsMask, target);
-          if (target > maxTargetSeen) maxTargetSeen = target;
+          nfa.addTransition(stateId, target, symbolsMask);
         }
-        mask >>>= 1;
-        symbolIndex++;
       }
-      states.push(state);
     }
-    return { states, maxTargetSeen };
   }
 
   static _encodeBytes(bytes) {
@@ -715,38 +799,34 @@ class RegexToNFABuilder {
   };
 
   constructor(charToMask, numSymbols) {
-    this.states = [];
+    this._nfa = new NFA();
     this._charToMask = charToMask;
     this._alphabet = LookupTables.get(numSymbols).allValues;
   }
 
   build(ast) {
     const fragment = this._buildNode(ast);
-    return new NFA(
-      fragment.startId,
-      [fragment.acceptId],
-      this.states,
-    );
+    this._nfa.addStartId(fragment.startId);
+    this._nfa.addAcceptId(fragment.acceptId);
+    this._nfa.seal();
+    return this._nfa;
   }
 
   _newState() {
-    const state = new NFA.State();
-    const id = this.states.length;
-    this.states.push(state);
-    return id;
+    return this._nfa.addState();
   }
 
   _newFragment(transitionSymbols = 0) {
     const acceptId = this._newState();
     const startId = this._newState();
     if (transitionSymbols) {
-      this.states[startId].addTransition(transitionSymbols, acceptId);
+      this._nfa.addTransition(startId, acceptId, transitionSymbols);
     }
     return new RegexToNFABuilder._Fragment(startId, acceptId);
   }
 
   _addEpsilon(fromStateId, toStateId) {
-    this.states[fromStateId].addEpsilon(toStateId);
+    this._nfa.addEpsilon(fromStateId, toStateId);
   }
 
   _buildNode(node) {
@@ -858,48 +938,54 @@ export class JavascriptNFABuilder {
     this._transitionBody = transitionBody;
     this._acceptBody = acceptBody;
     this._numValues = numValues;
-    this._stateStrToIndex = new Map();
-    this._states = [];
   }
 
   build() {
+    const nfa = new NFA();
+    const stateStrToIndex = new Map();
+    const indexToStateStr = [];
+
+    const addState = (stateStr, accepting) => {
+      if (nfa.numStates() >= JavascriptNFABuilder.MAX_STATE_COUNT) {
+        throw new Error(
+          `State machine produced more than ${JavascriptNFABuilder.MAX_STATE_COUNT} states`);
+      }
+      const index = nfa.addState();
+      stateStrToIndex.set(stateStr, index);
+      indexToStateStr.push(stateStr);
+      if (accepting) nfa.addAcceptId(index);
+      return index;
+    };
+
     const transitionFn = this._createTransitionFn(this._transitionBody);
     const acceptFn = this._createAcceptFn(this._acceptBody);
 
     const stack = [];
 
     const startStateStrs = this._generateStartStates(this._startExpression);
-    if (startStateStrs.length === 1) {
-      const startStateStr = startStateStrs[0];
-      stack.push(this._addState(startStateStr, acceptFn(startStateStr)));
-    } else {
-      const startIndex = this._addState('COMBINED_START', false);
-      const combinedStateRecord = this._states[startIndex];
-
-      for (const startStateStr of startStateStrs) {
-        const index = this._addState(startStateStr, acceptFn(startStateStr));
-        stack.push(index);
-        combinedStateRecord.epsilon.push(index);
-      }
+    for (const startStateStr of startStateStrs) {
+      const index = addState(startStateStr, acceptFn(startStateStr));
+      stack.push(index);
+      nfa.addStartId(index);
     }
 
     while (stack.length) {
       const index = stack.pop();
-      const record = this._states[index];
+      const stateStr = indexToStateStr[index];
       for (let value = 1; value <= this._numValues; value++) {
-        const nextStateStrs = transitionFn(record.serialized, value);
+        const nextStateStrs = transitionFn(stateStr, value);
         for (const nextStateStr of nextStateStrs) {
-          if (!this._stateStrToIndex.has(nextStateStr)) {
-            stack.push(this._addState(nextStateStr, acceptFn(nextStateStr)));
+          if (!stateStrToIndex.has(nextStateStr)) {
+            stack.push(addState(nextStateStr, acceptFn(nextStateStr)));
           }
-          const targetIndex = this._stateStrToIndex.get(nextStateStr);
-          const mask = record.transitions.get(targetIndex) || 0;
-          record.transitions.set(targetIndex, mask | LookupTables.fromValue(value));
+          const targetIndex = stateStrToIndex.get(nextStateStr);
+          nfa.addTransition(index, targetIndex, NFA.Symbol(value));
         }
       }
     }
 
-    return this._toNFA();
+    nfa.seal();
+    return nfa;
   }
 
   _fnResultToStateArray(result) {
@@ -956,41 +1042,6 @@ export class JavascriptNFABuilder {
     } catch (err) {
       throw new Error(`Accept function is invalid: ${err?.message || err}`);
     }
-  }
-
-  _addState(stateStr, accepting) {
-    if (this._states.length >= JavascriptNFABuilder.MAX_STATE_COUNT) {
-      throw new Error(
-        `State machine produced more than ${JavascriptNFABuilder.MAX_STATE_COUNT} states`);
-    }
-    const record = {
-      serialized: stateStr,
-      transitions: new Map(),
-      accepting,
-      epsilon: [],
-    };
-    const index = this._states.length;
-    this._states.push(record);
-    this._stateStrToIndex.set(stateStr, index);
-    return index;
-  }
-
-  _toNFA() {
-    const nfaStates = this._states.map(() => new NFA.State());
-    const acceptIds = [];
-    this._states.forEach((record, index) => {
-      if (record.accepting) acceptIds.push(index);
-      for (const epsilonTarget of record.epsilon) {
-        nfaStates[index].addEpsilon(epsilonTarget);
-      }
-      const nfaState = nfaStates[index];
-      for (const [target, mask] of record.transitions.entries()) {
-        if (mask) {
-          nfaState.addTransition(mask, target);
-        }
-      }
-    });
-    return new NFA(0, acceptIds, nfaStates);
   }
 
   _stringifyState(state) {

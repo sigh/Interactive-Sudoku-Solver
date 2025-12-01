@@ -6,7 +6,6 @@ import { runTest, logSuiteComplete } from './helpers/test_runner.js';
 ensureGlobalEnvironment();
 
 const { regexToNFA, NFASerializer, JavascriptNFABuilder, NFA } = await import('../js/nfa_builder.js');
-const { LookupTables } = await import('../js/solver/lookup_tables.js');
 const { BitReader } = await import('../js/util.js');
 
 const evaluateNfa = (nfa, values) => {
@@ -15,9 +14,8 @@ const evaluateNfa = (nfa, values) => {
     const stack = [...stateIds];
     while (stack.length) {
       const stateId = stack.pop();
-      const state = nfa.states[stateId];
-      if (!state) continue;
-      for (const epsilonTarget of state.epsilon) {
+      if (stateId >= nfa.numStates()) continue;
+      for (const epsilonTarget of nfa.getEpsilons(stateId)) {
         if (!visited.has(epsilonTarget)) {
           visited.add(epsilonTarget);
           stack.push(epsilonTarget);
@@ -27,14 +25,13 @@ const evaluateNfa = (nfa, values) => {
     return visited;
   };
 
-  let activeStates = epsilonClosure([nfa.startId]);
+  let activeStates = epsilonClosure([...nfa.getStartIds()]);
   for (const value of values) {
     const nextStates = new Set();
-    const mask = LookupTables.fromValue(value);
+    const mask = NFA.Symbol(value);
     for (const stateId of activeStates) {
-      const state = nfa.states[stateId];
-      if (!state) continue;
-      for (const transition of state.transitions) {
+      if (stateId >= nfa.numStates()) continue;
+      for (const transition of nfa.getTransitions(stateId)) {
         if (transition.symbols & mask) {
           nextStates.add(transition.state);
         }
@@ -47,7 +44,7 @@ const evaluateNfa = (nfa, values) => {
   }
 
   for (const stateId of activeStates) {
-    if (nfa.acceptIds.has(stateId)) {
+    if (nfa.isAccepting(stateId)) {
       return true;
     }
   }
@@ -98,10 +95,14 @@ await runTest('NFA serialization should round-trip plain format', () => {
 });
 
 await runTest('NFA serialization should round-trip packed format', () => {
-  const states = [new NFA.State(), new NFA.State()];
-  states[0].addTransition(LookupTables.fromValue(1), 1);
-  states[0].addTransition(LookupTables.fromValue(2), 1);
-  const nfa = new NFA(0, [1], states);
+  const nfa = new NFA();
+  nfa.addState();
+  nfa.addState();
+  nfa.addStartId(0);
+  nfa.addAcceptId(1);
+  nfa.addTransition(0, 1, NFA.Symbol(1));
+  nfa.addTransition(0, 1, NFA.Symbol(2));
+  nfa.seal();
   const serialized = NFASerializer.serialize(nfa);
   expectFormat(serialized, NFASerializer.FORMAT.PACKED, 'disjoint symbol transitions should use packed format');
   const restored = NFASerializer.deserialize(serialized);
@@ -172,10 +173,10 @@ await runTest('JavascriptNFABuilder should allow transition fan-out', () => {
 
 await runTest('mergeTransitions should combine transitions to same target', () => {
   const state = new NFA.State();
-  state.addTransition(LookupTables.fromValue(1), 5);
-  state.addTransition(LookupTables.fromValue(2), 5);
-  state.addTransition(LookupTables.fromValue(3), 7);
-  state.addTransition(LookupTables.fromValue(4), 5);
+  state.addTransition(NFA.Symbol(1), 5);
+  state.addTransition(NFA.Symbol(2), 5);
+  state.addTransition(NFA.Symbol(3), 7);
+  state.addTransition(NFA.Symbol(4), 5);
 
   state.mergeTransitions();
 
@@ -184,71 +185,131 @@ await runTest('mergeTransitions should combine transitions to same target', () =
   const target7 = state.transitions.find(t => t.state === 7);
   assert.ok(target5, 'should have transition to state 5');
   assert.ok(target7, 'should have transition to state 7');
-  const expectedMask5 = LookupTables.fromValuesArray([1, 2, 4]);
+  const expectedMask5 = NFA.Symbol(1) | NFA.Symbol(2) | NFA.Symbol(4);
   assert.equal(target5.symbols, expectedMask5, 'should combine symbols for same target');
-  assert.equal(target7.symbols, LookupTables.fromValue(3), 'should keep single symbol unchanged');
+  assert.equal(target7.symbols, NFA.Symbol(3), 'should keep single symbol unchanged');
 });
 
 await runTest('closeOverEpsilonTransitions should inline reachable transitions', () => {
   // Build: state0 --epsilon--> state1 --[1]--> state2
-  const states = [new NFA.State(), new NFA.State(), new NFA.State()];
-  states[0].addEpsilon(1);
-  states[1].addTransition(LookupTables.fromValue(1), 2);
-  const nfa = new NFA(0, [2], states);
+  const nfa = new NFA();
+  nfa.addState();
+  nfa.addState();
+  nfa.addState();
+  nfa.addStartId(0);
+  nfa.addAcceptId(2);
+  nfa.addEpsilon(0, 1);
+  nfa.addTransition(1, 2, NFA.Symbol(1));
 
+  nfa.seal();
   nfa.closeOverEpsilonTransitions();
 
-  assert.equal(states[0].epsilon.length, 0, 'epsilon transitions should be removed');
-  assert.equal(states[0].transitions.length, 1, 'should have inlined transition');
-  assert.equal(states[0].transitions[0].state, 2, 'inlined transition should point to state 2');
-  assert.equal(states[0].transitions[0].symbols, LookupTables.fromValue(1), 'should preserve symbol mask');
+  assert.equal(nfa.getEpsilons(0).length, 0, 'epsilon transitions should be removed');
+  assert.equal(nfa.getTransitions(0).length, 1, 'should have inlined transition');
+  assert.equal(nfa.getTransitions(0)[0].state, 2, 'inlined transition should point to state 2');
+  assert.equal(nfa.getTransitions(0)[0].symbols, NFA.Symbol(1), 'should preserve symbol mask');
 });
 
 await runTest('closeOverEpsilonTransitions should propagate accepting status', () => {
   // Build: state0 --epsilon--> state1 (accepting)
-  const states = [new NFA.State(), new NFA.State()];
-  states[0].addEpsilon(1);
-  const nfa = new NFA(0, [1], states);
+  const nfa = new NFA();
+  nfa.addState();
+  nfa.addState();
+  nfa.addStartId(0);
+  nfa.addAcceptId(1);
+  nfa.addEpsilon(0, 1);
 
-  assert.equal(nfa.acceptIds.has(0), false, 'state 0 should not be accepting before closure');
+  assert.equal(nfa.isAccepting(0), false, 'state 0 should not be accepting before closure');
 
+  nfa.seal();
   nfa.closeOverEpsilonTransitions();
 
-  assert.equal(nfa.acceptIds.has(0), true, 'state 0 should become accepting via epsilon');
-  assert.equal(nfa.acceptIds.has(1), true, 'state 1 should remain accepting');
+  assert.equal(nfa.isAccepting(0), true, 'state 0 should become accepting via epsilon');
+  assert.equal(nfa.isAccepting(1), true, 'state 1 should remain accepting');
 });
 
 await runTest('closeOverEpsilonTransitions should handle transitive epsilon chains', () => {
   // Build: state0 --epsilon--> state1 --epsilon--> state2 --[1]--> state3
-  const states = [new NFA.State(), new NFA.State(), new NFA.State(), new NFA.State()];
-  states[0].addEpsilon(1);
-  states[1].addEpsilon(2);
-  states[2].addTransition(LookupTables.fromValue(1), 3);
-  const nfa = new NFA(0, [3], states);
+  const nfa = new NFA();
+  nfa.addState();
+  nfa.addState();
+  nfa.addState();
+  nfa.addState();
+  nfa.addStartId(0);
+  nfa.addAcceptId(3);
+  nfa.addEpsilon(0, 1);
+  nfa.addEpsilon(1, 2);
+  nfa.addTransition(2, 3, NFA.Symbol(1));
 
+  nfa.seal();
   nfa.closeOverEpsilonTransitions();
 
-  assert.equal(states[0].epsilon.length, 0, 'state 0 epsilon should be cleared');
-  assert.equal(states[0].transitions.length, 1, 'state 0 should have inlined transition');
-  assert.equal(states[0].transitions[0].state, 3, 'state 0 should reach state 3');
+  assert.equal(nfa.getEpsilons(0).length, 0, 'state 0 epsilon should be cleared');
+  assert.equal(nfa.getTransitions(0).length, 1, 'state 0 should have inlined transition');
+  assert.equal(nfa.getTransitions(0)[0].state, 3, 'state 0 should reach state 3');
 });
 
 await runTest('closeOverEpsilonTransitions should merge duplicate transitions', () => {
   // Build: state0 --epsilon--> state1, state0 --epsilon--> state2
   // state1 --[1]--> state3, state2 --[2]--> state3
-  const states = [new NFA.State(), new NFA.State(), new NFA.State(), new NFA.State()];
-  states[0].addEpsilon(1);
-  states[0].addEpsilon(2);
-  states[1].addTransition(LookupTables.fromValue(1), 3);
-  states[2].addTransition(LookupTables.fromValue(2), 3);
-  const nfa = new NFA(0, [3], states);
+  const nfa = new NFA();
+  nfa.addState();
+  nfa.addState();
+  nfa.addState();
+  nfa.addState();
+  nfa.addStartId(0);
+  nfa.addAcceptId(3);
+  nfa.addEpsilon(0, 1);
+  nfa.addEpsilon(0, 2);
+  nfa.addTransition(1, 3, NFA.Symbol(1));
+  nfa.addTransition(2, 3, NFA.Symbol(2));
 
+  nfa.seal();
   nfa.closeOverEpsilonTransitions();
 
-  assert.equal(states[0].transitions.length, 1, 'should merge transitions to same target');
-  const expectedMask = LookupTables.fromValuesArray([1, 2]);
-  assert.equal(states[0].transitions[0].symbols, expectedMask, 'should combine symbol masks');
-  assert.equal(states[0].transitions[0].state, 3, 'should point to state 3');
+  assert.equal(nfa.getTransitions(0).length, 1, 'should merge transitions to same target');
+  const expectedMask = NFA.Symbol(1) | NFA.Symbol(2);
+  assert.equal(nfa.getTransitions(0)[0].symbols, expectedMask, 'should combine symbol masks');
+  assert.equal(nfa.getTransitions(0)[0].state, 3, 'should point to state 3');
+});
+
+await runTest('reduceStartStates should create epsilon transitions from new start', () => {
+  const nfa = new NFA();
+  nfa.addState();
+  nfa.addState();
+  nfa.addState();
+  nfa.addStartId(0);
+  nfa.addStartId(1);
+  nfa.addAcceptId(2);
+  nfa.addTransition(0, 2, NFA.Symbol(1));
+  nfa.addTransition(1, 2, NFA.Symbol(2));
+
+  assert.equal(nfa.getStartIds().size, 2, 'should have two start states before reduction');
+
+  nfa.seal();
+  nfa.reduceStartStates();
+
+  assert.equal(nfa.getStartIds().size, 1, 'should have one start state after reduction');
+  assert.equal(nfa.startId, 3, 'new start state should be the newly added state');
+  assert.equal(nfa.getEpsilons(3).length, 2, 'new start should have epsilon to both original starts');
+  assert.ok(nfa.getEpsilons(3).includes(0), 'new start should have epsilon to state 0');
+  assert.ok(nfa.getEpsilons(3).includes(1), 'new start should have epsilon to state 1');
+});
+
+await runTest('reduceStartStates should be a no-op for single start state', () => {
+  const nfa = new NFA();
+  nfa.addState();
+  nfa.addState();
+  nfa.addStartId(0);
+  nfa.addAcceptId(1);
+  nfa.addTransition(0, 1, NFA.Symbol(1));
+
+  nfa.seal();
+  nfa.reduceStartStates();
+
+  assert.equal(nfa.getStartIds().size, 1, 'should still have one start state');
+  assert.equal(nfa.startId, 0, 'start state should remain unchanged');
+  assert.equal(nfa.numStates(), 2, 'should not add any new states');
 });
 
 logSuiteComplete('NFA builder');

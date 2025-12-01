@@ -31,6 +31,7 @@ class DFABuilder {
   };
 
   build() {
+    this._nfa.seal();
     this._nfa.closeOverEpsilonTransitions();
 
     const rawDfaStates = this._constructDFA();
@@ -52,7 +53,7 @@ class DFABuilder {
       const index = rawDfaStates.length;
       closureMap.set(key, index);
       const isAccepting = [...stateSet].some((stateId) =>
-        this._nfa.acceptIds.has(stateId));
+        this._nfa.isAccepting(stateId));
       const newRawState =
         new DFABuilder._RawState(
           stateSet,
@@ -62,7 +63,7 @@ class DFABuilder {
       return newRawState;
     };
 
-    const startSet = new Set([this._nfa.startId]);
+    const startSet = new Set(this._nfa.getStartIds());
     const stack = [addRawDfaState(startSet)];
 
     while (stack.length) {
@@ -74,8 +75,8 @@ class DFABuilder {
         const symbol = 1 << i;
         const moveSet = new Set();
         for (const currentStateId of currentStateIds) {
-          const nfaState = this._nfa.states[currentStateId];
-          for (const transition of nfaState.transitions) {
+          const transitions = this._nfa.getTransitions(currentStateId);
+          for (const transition of transitions) {
             if (transition.symbols & symbol) {
               moveSet.add(transition.state);
             }
