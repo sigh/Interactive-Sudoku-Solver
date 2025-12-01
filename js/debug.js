@@ -80,10 +80,16 @@ export class PuzzleRunner {
 
   async _runFnWithChecksSinglePuzzle(puzzle, fn, onFailure) {
     // Set up solver.
-    const constraint = SudokuParser.parseText(puzzle.input);
-    const solver = await this._solverFactory(
-      constraint, this._stateHandler.bind(this));
-    const shape = constraint.getShape();
+    let solver, shape;
+    try {
+      const constraint = SudokuParser.parseText(puzzle.input);
+      solver = await this._solverFactory(
+        constraint, this._stateHandler.bind(this));
+      shape = constraint.getShape();
+    } catch (e) {
+      onFailure(puzzle, e);
+      return { stats: { puzzle: puzzle.name } };
+    }
 
     // Log a fixed string so the progress gets collapsed to a single line.
     // Do this after the worker has started to ensure a nice output.
