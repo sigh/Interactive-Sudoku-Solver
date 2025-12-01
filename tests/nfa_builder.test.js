@@ -118,6 +118,25 @@ await runTest('NFA serialization should round-trip packed format', () => {
   expectRejects(restored, [3], 'values outside alphabet should reject');
 });
 
+await runTest('NFA serialization should handle empty NFA', () => {
+  // An NFA with no accept states becomes empty after removeDeadStates
+  const nfa = new NFA();
+  nfa.addState();
+  nfa.addState();
+  nfa.addStartId(0);
+  // No accept states - everything is dead
+  nfa.addTransition(0, 1, Symbol(1));
+  nfa.seal();
+
+  const serialized = NFASerializer.serialize(nfa);
+  assert.equal(serialized, '', 'empty NFA should serialize to empty string');
+
+  const restored = NFASerializer.deserialize(serialized);
+  assert.equal(restored.numStates(), 0, 'restored NFA should have 0 states');
+  expectRejects(restored, [], 'empty NFA should reject empty input');
+  expectRejects(restored, [1], 'empty NFA should reject any input');
+});
+
 await runTest('JavascriptNFABuilder should handle parity checks', () => {
   const builder = new JavascriptNFABuilder({
     startExpression: '({ sum: 0 })',
@@ -372,6 +391,321 @@ await runTest('closeOverEpsilonTransitions with high-index epsilon source', () =
   assert.equal(nfa.getTransitions(0).length, 1, 'state 0 should have transition from epsilon closure');
   // State 4 should be accepting (inherited from state 5)
   assert.ok(nfa.isAccepting(4), 'state 4 should be accepting via epsilon to state 5');
+});
+
+await runTest('removeDeadStates should remove transitions to non-accepting states', () => {
+  // Build: state0 --[1]--> state1, state0 --[2]--> state2 (accepting)
+  // state1 has no outgoing transitions and is not accepting (dead state)
+  const nfa = new NFA();
+  nfa.addState();
+  nfa.addState();
+  nfa.addState();
+  nfa.addStartId(0);
+  nfa.addAcceptId(2);
+  nfa.addTransition(0, 1, Symbol(1));
+  nfa.addTransition(0, 2, Symbol(2));
+
+  assert.equal(nfa.numStates(), 3, 'should have 3 states before');
+
+  nfa.seal();
+  nfa.removeDeadStates();
+
+  assert.equal(nfa.numStates(), 2, 'should have 2 states after removing dead state');
+  // Start state should have exactly one transition (to accept)
+  const startTrans = nfa.getTransitions(nfa.startId);
+  assert.equal(startTrans.length, 1, 'start should only have one transition');
+  assert.equal(startTrans[0].symbol.value, 2, 'remaining transition should be symbol 2');
+  expectAccepts(nfa, [2], 'should still accept valid input');
+  expectRejects(nfa, [1], 'should reject dead path');
+});
+
+await runTest('removeDeadStates should keep states that can reach accept', () => {
+  // Build: state0 --[1]--> state1 --[2]--> state2 (accepting)
+  // state1 is not accepting but can reach state2, so it should be kept
+  const nfa = new NFA();
+  nfa.addState();
+  nfa.addState();
+  nfa.addState();
+  nfa.addStartId(0);
+  nfa.addAcceptId(2);
+  nfa.addTransition(0, 1, Symbol(1));
+  nfa.addTransition(1, 2, Symbol(2));
+
+  nfa.seal();
+  nfa.removeDeadStates();
+
+  assert.equal(nfa.numStates(), 3, 'all states should be kept (all can reach accept)');
+  expectAccepts(nfa, [1, 2], 'should still accept valid input');
+});
+
+await runTest('removeDeadStates should handle multiple targets per symbol', () => {
+  // Build: state0 --[1]--> state1 (dead), state0 --[1]--> state2 (can reach accept)
+  // state2 --[2]--> state3 (accepting)
+  const nfa = new NFA();
+  nfa.addState();
+  nfa.addState();
+  nfa.addState();
+  nfa.addState();
+  nfa.addStartId(0);
+  nfa.addAcceptId(3);
+  nfa.addTransition(0, 1, Symbol(1));  // dead path
+  nfa.addTransition(0, 2, Symbol(1));  // live path
+  nfa.addTransition(2, 3, Symbol(2));
+
+  assert.equal(nfa.numStates(), 4, 'should have 4 states before');
+
+  nfa.seal();
+  nfa.removeDeadStates();
+
+  assert.equal(nfa.numStates(), 3, 'should have 3 states after (dead state 1 removed)');
+  // The NFA should still work correctly
+  expectAccepts(nfa, [1, 2], 'should accept via the live path');
+  expectRejects(nfa, [1], 'single symbol should not reach accept');
+});
+
+await runTest('removeDeadStates should keep accepting terminal states', () => {
+  // Build: state0 --[1]--> state1 (accepting, no outgoing transitions)
+  const nfa = new NFA();
+  nfa.addState();
+  nfa.addState();
+  nfa.addStartId(0);
+  nfa.addAcceptId(1);
+  nfa.addTransition(0, 1, Symbol(1));
+
+  nfa.seal();
+  nfa.removeDeadStates();
+
+  assert.equal(nfa.numStates(), 2, 'should keep both states');
+  assert.equal(nfa.getTransitions(nfa.startId).length, 1, 'start should keep transition to accepting state');
+  expectAccepts(nfa, [1], 'should still accept valid input');
+});
+
+await runTest('removeDeadStates should handle chain of dead states', () => {
+  // Build: state0 --[1]--> state1 --[2]--> state2 (all dead, no accept)
+  //        state0 --[3]--> state3 (accepting)
+  const nfa = new NFA();
+  nfa.addState();
+  nfa.addState();
+  nfa.addState();
+  nfa.addState();
+  nfa.addStartId(0);
+  nfa.addAcceptId(3);
+  nfa.addTransition(0, 1, Symbol(1));
+  nfa.addTransition(1, 2, Symbol(2));
+  nfa.addTransition(0, 3, Symbol(3));
+
+  assert.equal(nfa.numStates(), 4, 'should have 4 states before');
+
+  nfa.seal();
+  nfa.removeDeadStates();
+
+  assert.equal(nfa.numStates(), 2, 'should have 2 states after removing dead chain');
+  expectAccepts(nfa, [3], 'should still accept valid input');
+  expectRejects(nfa, [1], 'dead path should reject');
+  expectRejects(nfa, [1, 2], 'dead chain should reject');
+});
+
+await runTest('removeDeadStates should throw if epsilon transitions exist', () => {
+  const nfa = new NFA();
+  nfa.addState();
+  nfa.addState();
+  nfa.addStartId(0);
+  nfa.addAcceptId(1);
+  nfa.addEpsilon(0, 1);
+  nfa.seal();
+
+  assert.throws(
+    () => nfa.removeDeadStates(),
+    /epsilon/i,
+    'should throw if epsilon transitions exist'
+  );
+});
+
+await runTest('removeDeadStates should handle NFA with no accept states', () => {
+  // All states are dead since nothing can reach an accept state
+  const nfa = new NFA();
+  nfa.addState();
+  nfa.addState();
+  nfa.addStartId(0);
+  // No accept states!
+  nfa.addTransition(0, 1, Symbol(1));
+
+  nfa.seal();
+  nfa.removeDeadStates();
+
+  // All states removed - NFA is empty
+  assert.equal(nfa.numStates(), 0, 'all states should be removed');
+});
+
+await runTest('removeDeadStates should handle start state that is also accepting', () => {
+  // state0 is both start and accept, with transition to dead state
+  const nfa = new NFA();
+  nfa.addState();
+  nfa.addState();
+  nfa.addStartId(0);
+  nfa.addAcceptId(0);  // Start is also accept
+  nfa.addTransition(0, 1, Symbol(1));  // Dead transition
+
+  nfa.seal();
+  nfa.removeDeadStates();
+
+  assert.equal(nfa.numStates(), 1, 'should only have the start/accept state');
+  expectAccepts(nfa, [], 'empty input should still accept');
+  expectRejects(nfa, [1], 'dead transition should be removed');
+});
+
+await runTest('removeDeadStates with cycle that cannot reach accept', () => {
+  // state0 --[1]--> state1 --[2]--> state0 (cycle but no accept)
+  // state0 --[3]--> state2 (accepting)
+  const nfa = new NFA();
+  nfa.addState();
+  nfa.addState();
+  nfa.addState();
+  nfa.addStartId(0);
+  nfa.addAcceptId(2);
+  nfa.addTransition(0, 1, Symbol(1));
+  nfa.addTransition(1, 0, Symbol(2));  // Creates cycle
+  nfa.addTransition(0, 2, Symbol(3));
+
+  nfa.seal();
+  nfa.removeDeadStates();
+
+  // The cycle is not dead because state0 can reach state2
+  // But state1 can only go back to state0, which can reach accept
+  // So state1 is NOT dead - it can reach accept through state0
+  assert.equal(nfa.numStates(), 3, 'all states in cycle should be kept');
+  expectAccepts(nfa, [3], 'direct path to accept should work');
+  expectAccepts(nfa, [1, 2, 3], 'cycle then accept should work');
+});
+
+await runTest('removeDeadStates with self-loop on dead state', () => {
+  // state0 --[1]--> state1 --[1]--> state1 (self-loop, but dead)
+  // state0 --[2]--> state2 (accepting)
+  const nfa = new NFA();
+  nfa.addState();
+  nfa.addState();
+  nfa.addState();
+  nfa.addStartId(0);
+  nfa.addAcceptId(2);
+  nfa.addTransition(0, 1, Symbol(1));
+  nfa.addTransition(1, 1, Symbol(1));  // Self-loop
+  nfa.addTransition(0, 2, Symbol(2));
+
+  assert.equal(nfa.numStates(), 3, 'should have 3 states before');
+
+  nfa.seal();
+  nfa.removeDeadStates();
+
+  assert.equal(nfa.numStates(), 2, 'should have 2 states after removing dead state');
+  expectAccepts(nfa, [2], 'should still accept valid input');
+  expectRejects(nfa, [1], 'dead state path should reject');
+  expectRejects(nfa, [1, 1, 1], 'self-loop on dead state should reject');
+});
+
+await runTest('remapStates should reorder states', () => {
+  // Build: state0 --[1]--> state1 --[2]--> state2 (accepting)
+  const nfa = new NFA();
+  nfa.addState();
+  nfa.addState();
+  nfa.addState();
+  nfa.addStartId(0);
+  nfa.addAcceptId(2);
+  nfa.addTransition(0, 1, Symbol(1));
+  nfa.addTransition(1, 2, Symbol(2));
+  nfa.seal();
+
+  // Remap: 0->2, 1->0, 2->1 (rotate states)
+  nfa.remapStates([2, 0, 1]);
+
+  assert.equal(nfa.numStates(), 3, 'should still have 3 states');
+  assert.equal(nfa.startId, 2, 'start should be remapped to 2');
+  assert.ok(nfa.isAccepting(1), 'accept should be remapped to 1');
+  expectAccepts(nfa, [1, 2], 'should still accept valid input after remap');
+});
+
+await runTest('remapStates should remove states with undefined mapping', () => {
+  // Build: state0 --[1]--> state1, state0 --[2]--> state2 (accepting)
+  const nfa = new NFA();
+  nfa.addState();
+  nfa.addState();
+  nfa.addState();
+  nfa.addStartId(0);
+  nfa.addAcceptId(2);
+  nfa.addTransition(0, 1, Symbol(1));
+  nfa.addTransition(0, 2, Symbol(2));
+  nfa.seal();
+
+  // Remove state1 by mapping it to undefined
+  nfa.remapStates([0, undefined, 1]);
+
+  assert.equal(nfa.numStates(), 2, 'should have 2 states after removal');
+  expectAccepts(nfa, [2], 'should still accept valid input');
+  expectRejects(nfa, [1], 'transition to removed state should be gone');
+});
+
+await runTest('remapStates should merge states', () => {
+  // Build: state0 --[1]--> state1 (accepting), state0 --[2]--> state2 (accepting)
+  const nfa = new NFA();
+  nfa.addState();
+  nfa.addState();
+  nfa.addState();
+  nfa.addStartId(0);
+  nfa.addAcceptId(1);
+  nfa.addAcceptId(2);
+  nfa.addTransition(0, 1, Symbol(1));
+  nfa.addTransition(0, 2, Symbol(2));
+  nfa.seal();
+
+  // Merge state1 and state2 into new state 1
+  nfa.remapStates([0, 1, 1]);
+
+  assert.equal(nfa.numStates(), 2, 'should have 2 states after merge');
+  assert.ok(nfa.isAccepting(1), 'merged state should be accepting');
+  expectAccepts(nfa, [1], 'should accept via first path');
+  expectAccepts(nfa, [2], 'should accept via second path');
+});
+
+await runTest('remapStates should deduplicate targets when merging', () => {
+  // Build: state0 --[1]--> state1, state0 --[1]--> state2 (same symbol, different targets)
+  // state1 --[2]--> state3 (accepting)
+  // state2 --[2]--> state3 (accepting)
+  const nfa = new NFA();
+  nfa.addState();
+  nfa.addState();
+  nfa.addState();
+  nfa.addState();
+  nfa.addStartId(0);
+  nfa.addAcceptId(3);
+  nfa.addTransition(0, 1, Symbol(1));
+  nfa.addTransition(0, 2, Symbol(1));  // Fan-out
+  nfa.addTransition(1, 3, Symbol(2));
+  nfa.addTransition(2, 3, Symbol(2));
+  nfa.seal();
+
+  // Merge state1 and state2 into same state
+  nfa.remapStates([0, 1, 1, 2]);
+
+  assert.equal(nfa.numStates(), 3, 'should have 3 states after merge');
+  // The transition from state0 on symbol 1 should go to state 1 only once
+  const targets = nfa.getTransitionTargets(0, Symbol(1));
+  assert.equal(targets.length, 1, 'targets should be deduplicated after merge');
+  expectAccepts(nfa, [1, 2], 'should still accept');
+});
+
+await runTest('remapStates should throw if epsilon transitions exist', () => {
+  const nfa = new NFA();
+  nfa.addState();
+  nfa.addState();
+  nfa.addStartId(0);
+  nfa.addAcceptId(1);
+  nfa.addEpsilon(0, 1);
+  nfa.seal();
+
+  assert.throws(
+    () => nfa.remapStates([0, 1]),
+    /epsilon/i,
+    'should throw if epsilon transitions exist'
+  );
 });
 
 logSuiteComplete('NFA builder');
