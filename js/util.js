@@ -474,6 +474,72 @@ export class Base64Codec {
   }
 };
 
+// Bit set implementation for efficient set operations on integers.
+export class BitSet {
+  static allocatePool(capacity, count) {
+    const wordsPerSet = BitSet._wordCountFor(capacity);
+    const words = new Uint32Array(wordsPerSet * count);
+    const bitsets = new Array(count);
+    for (let i = 0; i < count; i++) {
+      const offset = i * wordsPerSet;
+      bitsets[i] = new BitSet(capacity, words.subarray(offset, offset + wordsPerSet));
+    }
+    return { bitsets, words };
+  }
+
+  constructor(capacity, words = null) {
+    this.words = words || new Uint32Array(BitSet._wordCountFor(capacity));
+  }
+
+  add(bitIndex) {
+    const wordIndex = bitIndex >>> 5;
+    const mask = 1 << (bitIndex & 31);
+    this.words[wordIndex] |= mask;
+  }
+
+  remove(bitIndex) {
+    const wordIndex = bitIndex >>> 5;
+    const mask = 1 << (bitIndex & 31);
+    this.words[wordIndex] &= ~mask;
+  }
+
+  has(bitIndex) {
+    const wordIndex = bitIndex >>> 5;
+    const mask = 1 << (bitIndex & 31);
+    return (this.words[wordIndex] & mask) !== 0;
+  }
+
+  clear() {
+    this.words.fill(0);
+  }
+
+  isEmpty() {
+    for (let i = 0; i < this.words.length; i++) {
+      if (this.words[i]) return false;
+    }
+    return true;
+  }
+
+  intersect(other) {
+    for (let i = 0; i < this.words.length; i++) {
+      this.words[i] &= other.words[i];
+    }
+  }
+
+  copyFrom(other) {
+    this.words.set(other.words);
+  }
+
+  static bitIndex(wordIndex, lowestBit) {
+    const bitPosition = 31 - Math.clz32(lowestBit);
+    return (wordIndex << 5) + bitPosition;
+  }
+
+  static _wordCountFor(capacity) {
+    return Math.ceil(capacity / 32);
+  }
+}
+
 export class MultiMap {
   constructor() {
     this._map = new Map();

@@ -1,6 +1,7 @@
 const {
   Base64Codec,
   BitReader,
+  BitSet,
   BitWriter,
   memoize,
   setPeek,
@@ -186,6 +187,17 @@ export class NFA {
 
   numStates() {
     return this._transitions.length;
+  }
+
+  // Returns the number of symbols used (max symbol index + 1), or 0 if no transitions.
+  numSymbols() {
+    let max = 0;
+    for (const trans of this._transitions) {
+      if (trans.length > max) {
+        max = trans.length;
+      }
+    }
+    return max;
   }
 
   // Remaps states according to `remap` array, where remap[oldIndex] = newIndex.
@@ -389,6 +401,126 @@ export class NFA {
 
     this.remapStates(remap);
   }
+
+  // Reduces the NFA using forward simulation.
+  // State A simulates state B if A accepts a superset of strings that B accepts.
+  // When A simulates B, transitions to B can be redirected to A.
+  // Must be called after epsilon transitions have been closed over.
+  reduceBySimulation() {
+    this._assertSealed();
+    this._assertNoEpsilon();
+
+    const numStates = this._transitions.length;
+    if (numStates <= 1) return;
+
+    const numSymbols = this.numSymbols();
+    if (numSymbols === 0) return;
+
+    // sim[a] is a BitSet where sim[a].has(b) means "a simulates b" (a ≥ b).
+    // Initialize: a simulates b if accept(b) implies accept(a).
+    const sim = new Array(numStates);
+    for (let a = 0; a < numStates; a++) {
+      sim[a] = new BitSet(numStates);
+      const aAccepts = this._acceptIds.has(a);
+      for (let b = 0; b < numStates; b++) {
+        // a can simulate b only if: b accepting => a accepting
+        if (!this._acceptIds.has(b) || aAccepts) {
+          sim[a].add(b);
+        }
+      }
+    }
+
+    // Iteratively refine: remove pairs that violate simulation conditions.
+    // a simulates b requires: for all symbols s and all b' in delta(b,s),
+    // there exists a' in delta(a,s) such that a' simulates b'.
+    const transitions = this._transitions;
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (let a = 0; a < numStates; a++) {
+        const simA = sim[a];
+        const aTrans = transitions[a];
+
+        for (let b = 0; b < numStates; b++) {
+          if (a === b || !simA.has(b)) continue;
+
+          // Check if a still simulates b.
+          const bTrans = transitions[b];
+
+          for (let s = 0; s < numSymbols; s++) {
+            const bTargets = bTrans[s];
+            if (!bTargets || !bTargets.length) continue;
+
+            const aTargets = aTrans[s];
+            if (!aTargets || !aTargets.length) {
+              // b has transition on s, but a doesn't - a cannot simulate b.
+              simA.remove(b);
+              changed = true;
+              break;
+            }
+
+            // For each b' in bTargets, there must exist a' in aTargets
+            // such that sim[a'].has(b').
+            if (!bTargets.every(
+              bPrime => aTargets.some(aPrime => sim[aPrime].has(bPrime)))) {
+              simA.remove(b);
+              changed = true;
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    // Prune dominated transitions: if A simulates B (but not vice versa),
+    // remove B from target sets. For mutual simulation, keep the smaller index.
+    const dominated = (b, targets) => {
+      const simB = sim[b];
+      for (const a of targets) {
+        if (sim[a].has(b) && (a < b || !simB.has(a))) return true;
+      }
+      return false;
+    };
+    for (let state = 0; state < numStates; state++) {
+      const trans = transitions[state];
+      for (let s = 0; s < numSymbols; s++) {
+        const targets = trans[s];
+        if (!targets || targets.length <= 1) continue;
+        for (let i = targets.length - 1; i >= 0; i--) {
+          if (dominated(targets[i], targets)) {
+            targets.splice(i, 1);
+          }
+        }
+      }
+    }
+
+    // Build remap: for each state, find the smallest state that simulates it
+    // and is simulated by it (i.e., they are simulation-equivalent).
+    // Canonical states map to contiguous indices; others map to their canonical.
+    const remap = new Array(numStates);
+    let nextIndex = 0;
+    for (let b = 0; b < numStates; b++) {
+      // Find smallest equivalent state (could be self).
+      let canonical = b;
+      for (let a = 0; a < b; a++) {
+        if (sim[a].has(b) && sim[b].has(a)) {
+          canonical = a;
+          break;
+        }
+      }
+      if (canonical === b) {
+        // This is a canonical representative.
+        remap[b] = nextIndex++;
+      } else {
+        // Map to canonical's index (already assigned since canonical < b).
+        remap[b] = remap[canonical];
+      }
+    }
+
+    if (nextIndex === numStates) return;  // No merging happened.
+
+    this.remapStates(remap);
+  }
 }
 
 // NOTE: The compiler currently supports literals, '.', character classes
@@ -434,6 +566,7 @@ export class NFASerializer {
     nfa.reduceStartStates();
     nfa.closeOverEpsilonTransitions();
     nfa.removeDeadStates();
+    nfa.reduceBySimulation();
 
     if (!nfa.numStates()) {
       return '';
@@ -442,7 +575,7 @@ export class NFASerializer {
     const { acceptCount, startIsAccept } = this._normalizeStates(nfa);
     const numStates = nfa.numStates();
 
-    const symbolCount = this._findSymbolCount(nfa);
+    const symbolCount = Math.max(nfa.numSymbols(), this.MIN_SYMBOLS);
     if (symbolCount > this.MAX_SYMBOLS) {
       throw new Error(`NFA requires ${symbolCount} symbols but only ${this.MAX_SYMBOLS} are supported`);
     }
@@ -558,21 +691,6 @@ export class NFASerializer {
 
   static _isTerminalState(nfa, stateId) {
     return !nfa.hasTransitions(stateId) && !nfa.getEpsilons(stateId).length;
-  }
-
-  static _findSymbolCount(nfa) {
-    let maxSymbolIndex = -1;
-    for (let stateId = 0; stateId < nfa.numStates(); stateId++) {
-      const transitions = nfa.getStateTransitions(stateId);
-      for (let i = transitions.length - 1; i >= 0; i--) {
-        if (transitions[i]?.length) {
-          maxSymbolIndex = Math.max(maxSymbolIndex, i);
-          break;
-        }
-      }
-    }
-    // symbolIndex is 0-based, value is 1-based
-    return Math.max(maxSymbolIndex + 1, this.MIN_SYMBOLS);
   }
 
   static _writeHeader(writer, format, symbolCount, stateBits, startIsAccept, acceptCount) {
