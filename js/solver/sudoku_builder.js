@@ -771,10 +771,10 @@ export class SudokuBuilder {
 
 export const compileRegex = memoize((pattern, numValues) => {
   const nfa = regexToNFA(pattern, numValues);
-  return DFAHandlerModule.NFAToDFA(nfa, numValues);
+  return DFAHandlerModule.compressNFA(nfa);
 });
 
 export const compileNFA = memoize((encodedNFA, numValues) => {
   const nfa = NFASerializer.deserialize(encodedNFA);
-  return DFAHandlerModule.NFAToDFA(nfa, numValues);
+  return DFAHandlerModule.compressNFA(nfa);
 });

@@ -913,10 +913,10 @@ export class SudokuConstraintOptimizer {
     if (!this._debugLogger) return;
 
     for (const h of handlerSet.getAllofType(DFAModule.DFALine)) {
-      const dfa = h.getDFA();
+      const cnfa = h.getNFA();
       this._debugLogger.log({
         loc: '_logStats',
-        msg: `DFALine with ${dfa.numStates} states`,
+        msg: `DFALine with ${cnfa.numStates} states`,
         cells: h.cells,
       });
     }

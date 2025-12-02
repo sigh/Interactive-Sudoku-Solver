@@ -1,277 +1,123 @@
 const { SudokuConstraintHandler } = await import('./handlers.js' + self.VERSION_PARAM);
-const { NFA } = await import('../nfa_builder.js' + self.VERSION_PARAM);
 const { BitSet } = await import('../util.js' + self.VERSION_PARAM);
 
-class DFA {
-  constructor(numStates, acceptingStates, startingState, transitionLists) {
+class CompressedNFA {
+  constructor(numStates, acceptingStates, startingStates, transitionLists) {
     this.numStates = numStates;
     this.acceptingStates = acceptingStates;
-    this.startingState = startingState;
+    this.startingStates = startingStates;
     this.transitionLists = transitionLists;
   }
-}
 
-export const NFAToDFA = (nfa, numValues) => {
-  const dfaBuilder = new DFABuilder(nfa, numValues);
-  return dfaBuilder.build();
-};
-
-class DFABuilder {
-  static RAW_DFA_START_STATE = 0;
-
-  constructor(nfa, numSymbols) {
-    this._nfa = nfa;
-    this.numSymbols = numSymbols;
-    this._symbols = NFA.Symbol.all(numSymbols);
-  }
-
-  static _RawState = class {
-    constructor(nfaStates, accepting, numSymbols) {
-      this.nfaStates = nfaStates;
-      this.accepting = accepting;
-      this.transitions = new Array(numSymbols).fill(-1)
-    }
-  };
-
-  build() {
-    this._nfa.seal();
-    this._nfa.closeOverEpsilonTransitions();
-
-    const rawDfaStates = this._constructDFA();
-    const minimizedStates = this._minimize(rawDfaStates);
-    return this._flattenStates(minimizedStates);
-  }
-
-  // Phase 1: Build the raw DFA data — a dense transition table and
-  // an "accepting" bit for each state.
-  _constructDFA() {
-    const numSymbols = this.numSymbols;
-    const rawDfaStates = [];
-    const closureMap = new Map();
-
-    const stateSetKey = (states) => [...states].sort((a, b) => a - b).join(',');
-
-    const addRawDfaState = (stateSet) => {
-      const key = stateSetKey(stateSet);
-      const index = rawDfaStates.length;
-      closureMap.set(key, index);
-      const isAccepting = [...stateSet].some((stateId) =>
-        this._nfa.isAccepting(stateId));
-      const newRawState =
-        new DFABuilder._RawState(
-          stateSet,
-          isAccepting,
-          numSymbols);
-      rawDfaStates.push(newRawState);
-      return newRawState;
-    };
-
-    const startSet = new Set(this._nfa.getStartIds());
-    const stack = [addRawDfaState(startSet)];
-
-    while (stack.length) {
-      const currentDfaState = stack.pop();
-      const currentStateIds = currentDfaState.nfaStates;
-      const currentTransitionRow = currentDfaState.transitions;
-
-      for (const symbol of this._symbols) {
-        const moveSet = new Set();
-        for (const currentStateId of currentStateIds) {
-          for (const target of this._nfa.getTransitionTargets(currentStateId, symbol)) {
-            moveSet.add(target);
-          }
-        }
-        if (!moveSet.size) continue;
-
-        const nextKey = stateSetKey(moveSet);
-        if (!closureMap.has(nextKey)) {
-          stack.push(addRawDfaState(moveSet));
-        }
-        currentTransitionRow[symbol.index] = closureMap.get(nextKey);
-      }
-    }
-
-    return rawDfaStates;
-  }
-
-  // Phase 2: Minimize the DFA using Moore's partition-refinement algorithm.
-  // 1. Split state indices into accepting vs. other states
-  // 2. Repeatedly refine partitions so states with different successor partitions
-  //    (for any symbol) move into separate blocks.
-  // 3. Collapse each final partition into a single state, synthesizing their
-  //    transition masks directly from the dense transition table.
-  _minimize(rawDfaStates) {
-    const numStates = rawDfaStates.length;
-    const numSymbols = this.numSymbols;
-
-    // Tracks which partition each state belongs to so we can compare successors.
-    const partitions = [];
-    const stateToPartition = new Array(numStates).fill(-1);
-    const addPartition = (group, index = -1) => {
-      if (group.length === 0) return;
-      if (index === -1) {
-        index = partitions.length;
-        partitions.push(group);
-      } else {
-        partitions[index] = group;
-      }
-      for (const state of group) {
-        stateToPartition[state] = index;
-      }
-    };
-
-    // Initial partitions: accepting states vs everything else.
-    const initialPartitions = [[], []];
-    for (let i = 0; i < numStates; i++) {
-      initialPartitions[rawDfaStates[i].accepting ? 0 : 1].push(i);
-    }
-
-    for (const p of initialPartitions) {
-      addPartition(p);
-    }
-
-    // Refinement loop: split partitions until every state in a block has identical
-    // transition signatures (i.e. leads to the same partitions for all symbols).
-    let changed = true;
-    while (changed) {
-      changed = false;
-
-      for (let partitionIndex = 0; partitionIndex < partitions.length; partitionIndex++) {
-        const group = partitions[partitionIndex];
-        if (group.length <= 1) continue;
-
-        const signatureMap = new Map();
-        for (const state of group) {
-          const signature = rawDfaStates[state].transitions
-            .map((target) => (target === -1 ? -1 : stateToPartition[target]))
-            .join(',');
-          if (!signatureMap.has(signature)) signatureMap.set(signature, []);
-          signatureMap.get(signature).push(state);
-        }
-
-        if (signatureMap.size > 1) {
-          const groupsIterator = signatureMap.values();
-          addPartition(groupsIterator.next().value, partitionIndex);
-          for (let next = groupsIterator.next(); !next.done; next = groupsIterator.next()) {
-            addPartition(next.value);
-          }
-          changed = true;
-          break;
-        }
-      }
-    }
-
-    // Collapse each partition to a representative state.
-    const newStates = [];
-
-    for (const group of partitions) {
-      const representative = group[0];
-      const transitionRow = rawDfaStates[representative].transitions;
-      const partitionMasks = new Map();
-
-      for (let symbol = 0; symbol < numSymbols; symbol++) {
-        const target = transitionRow[symbol];
-        if (target === -1) continue;
-        const partition = stateToPartition[target];
-        const mask = 1 << symbol;
-        partitionMasks.set(partition, (partitionMasks.get(partition) || 0) | mask);
-      }
-
-      const transitionList = [];
-      for (const [partitionIndex, mask] of partitionMasks) {
-        transitionList.push(
-          DFABuilder._makeTransitionEntry(mask, partitionIndex));
-      }
-
-      // NOTE: We could also store a mask of all symbols that have transitions
-      // to check if we can skip the entire state.
-      // However, it would only trigger a small percentage of time at most.
-      newStates.push({
-        accepting: rawDfaStates[representative].accepting,
-        starting: group.includes(DFABuilder.RAW_DFA_START_STATE),
-        transitionList,
-      });
-    }
-
-    return newStates;
-  }
-
-  static _makeTransitionEntry(mask, state) {
-    // Transition entry layout: [mask: 16 bits, state: 16 bits]
+  static makeTransitionEntry(mask, state) {
+    // Transition entry layout: [state: 16 bits, mask: 16 bits]
     // This allows us to store the transitions compactly in a single Uint32Array.
     // The entry can be checked directly against a value since values are
     // also at most 16 bits.
-    return mask | (state << 16);
-  }
-
-  _flattenStates(states) {
-    const numStates = states.length;
-    if (numStates > (1 << 16)) {
-      throw new Error('Regex DFA has too many states to represent');
-    }
-
-    const acceptingStates = new BitSet(numStates);
-    const startingState = new BitSet(numStates);
-    const totalTransitions = states.reduce(
-      (acc, state) => acc + state.transitionList.length, 0);
-
-    const transitionBackingArray = new Uint32Array(totalTransitions);
-    const transitionLists = [];
-    let transitionOffset = 0;
-
-    for (let i = 0; i < numStates; i++) {
-      const state = states[i];
-      if (state.accepting) acceptingStates.add(i);
-      if (state.starting) startingState.add(i);
-
-      const numTransitions = state.transitionList.length;
-      const transitionList = transitionBackingArray.subarray(
-        transitionOffset,
-        transitionOffset + numTransitions);
-      transitionOffset += numTransitions;
-      transitionList.set(state.transitionList);
-      transitionLists.push(transitionList);
-    }
-
-    return new DFA(
-      numStates,
-      acceptingStates,
-      startingState,
-      transitionLists,
-    );
+    return (state << 16) | mask;
   }
 }
+
+export const compressNFA = (nfa) => {
+  nfa.seal();
+  nfa.closeOverEpsilonTransitions();
+
+  const numStates = nfa.numStates();
+  if (numStates > (1 << 16)) {
+    throw new Error('NFA has too many states to represent');
+  }
+
+  const acceptingStates = new BitSet(numStates);
+  const startingStates = new BitSet(numStates);
+
+  for (const id of nfa.getStartIds()) {
+    startingStates.add(id);
+  }
+
+  // Build transition lists with compressed entries.
+  // For each state, group targets by state and combine symbol masks.
+  const transitionListsRaw = [];
+  let totalTransitions = 0;
+
+  for (let stateId = 0; stateId < numStates; stateId++) {
+    if (nfa.isAccepting(stateId)) {
+      acceptingStates.add(stateId);
+    }
+
+    const stateTransitions = nfa.getStateTransitions(stateId);
+    const targetMasks = new Map();
+
+    for (let symbolIndex = 0; symbolIndex < stateTransitions.length; symbolIndex++) {
+      const targets = stateTransitions[symbolIndex];
+      if (!targets) continue;
+      const mask = 1 << symbolIndex;
+      for (const target of targets) {
+        targetMasks.set(target, (targetMasks.get(target) || 0) | mask);
+      }
+    }
+
+    const transitionList = [];
+    for (const [target, mask] of targetMasks) {
+      transitionList.push(CompressedNFA.makeTransitionEntry(mask, target));
+    }
+    transitionListsRaw.push(transitionList);
+    totalTransitions += transitionList.length;
+  }
+
+  // Flatten into a single backing array for memory efficiency.
+  const transitionBackingArray = new Uint32Array(totalTransitions);
+  const transitionLists = [];
+  let transitionOffset = 0;
+
+  for (let i = 0; i < numStates; i++) {
+    const rawList = transitionListsRaw[i];
+    const numTransitions = rawList.length;
+    const transitionList = transitionBackingArray.subarray(
+      transitionOffset,
+      transitionOffset + numTransitions);
+    transitionOffset += numTransitions;
+    transitionList.set(rawList);
+    transitionLists.push(transitionList);
+  }
+
+  return new CompressedNFA(
+    numStates,
+    acceptingStates,
+    startingStates,
+    transitionLists,
+  );
+};
 
 // Enforces a linear regex constraint by compiling the pattern into a DFA and
 // propagating it across candidate sets to prune unsupported values.
 export class DFALine extends SudokuConstraintHandler {
-  constructor(cells, dfa) {
+  constructor(cells, cnfa) {
     super(cells);
-    this._dfa = dfa;
+    this._cnfa = cnfa;
 
-    const stateCapacity = this._dfa.numStates;
+    const stateCapacity = this._cnfa.numStates;
     const slots = this.cells.length + 1;
     const { bitsets, words } = BitSet.allocatePool(stateCapacity, slots);
     this._stateWords = words;
     this._statesList = bitsets;
   }
 
-  getDFA() {
-    return this._dfa;
+  getNFA() {
+    return this._cnfa;
   }
 
   enforceConsistency(grid, handlerAccumulator) {
     const cells = this.cells;
     const numCells = cells.length;
-    const dfa = this._dfa;
-    const transitionLists = dfa.transitionLists;
+    const cnfa = this._cnfa;
+    const transitionLists = cnfa.transitionLists;
     const statesList = this._statesList;
 
     // Clear all the states so we can reuse the bitsets without reallocating.
     this._stateWords.fill(0);
 
     // Forward pass: Find all states reachable from the start state.
-    statesList[0].copyFrom(dfa.startingState);
+    statesList[0].copyFrom(cnfa.startingStates);
 
     for (let i = 0; i < numCells; i++) {
       const nextStates = statesList[i + 1];
@@ -302,7 +148,7 @@ export class DFALine extends SudokuConstraintHandler {
     // Backward pass: Filter down to only the states that can reach an accepting
     // state. Prune any unsupported values from the grid.
     const finalStates = statesList[numCells];
-    finalStates.intersect(dfa.acceptingStates);
+    finalStates.intersect(cnfa.acceptingStates);
     if (finalStates.isEmpty()) return false;
 
     for (let i = numCells - 1; i >= 0; i--) {
