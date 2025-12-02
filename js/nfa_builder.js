@@ -11,6 +11,10 @@ const {
 // Convenience function to create a Symbol.
 export const Symbol = (value) => new NFA.Symbol(value);
 
+// Sentinel value for removed states in remap arrays.
+// Using -1 keeps the array in packed SMI mode in V8.
+const REMOVE_STATE = -1;
+
 export class NFA {
   constructor() {
     this._startIds = new Set();
@@ -187,7 +191,7 @@ export class NFA {
   }
 
   // Remaps states according to `remap` array, where remap[oldIndex] = newIndex.
-  // States with undefined remap values are removed (transitions to them are dropped).
+  // States with REMOVED_STATE (-1) remap values are removed (transitions to them are dropped).
   // When multiple old states map to the same new index (merging), one is chosen
   // arbitrarily to provide transitions - callers must ensure merged states have
   // identical transitions (or are terminal states with no transitions).
@@ -195,46 +199,42 @@ export class NFA {
     this._assertSealed();
     this._assertNoEpsilon();
 
-    // Build order: for each new index, find an old index that maps to it.
-    // Also detect if merging is happening (multiple old -> same new).
-    const order = [];
-    let merging = false;
+    // Reorder and remap transitions (iterate in old order, populate out of order).
+    const newTransitions = [];
     for (let oldIndex = 0; oldIndex < remap.length; oldIndex++) {
       const newIndex = remap[oldIndex];
-      if (newIndex === undefined) continue;
-      if (order[newIndex] === undefined) {
-        order[newIndex] = oldIndex;
-      } else {
-        merging = true;
-      }
-    }
-    const newLen = order.length;
+      // Skip removed states.
+      if (newIndex === REMOVE_STATE) continue;
+      // Skip if already processed (when merging, first old index wins).
+      if (newTransitions[newIndex] !== undefined) continue;
 
-    // Reorder and remap transitions.
-    const newTransitions = new Array(newLen);
-    for (let newIndex = 0; newIndex < newLen; newIndex++) {
-      const oldTrans = this._transitions[order[newIndex]];
-      const newTrans = [];
-      for (let symbolIndex = 0; symbolIndex < oldTrans.length; symbolIndex++) {
-        const targets = oldTrans[symbolIndex];
+      const stateTrans = this._transitions[oldIndex];
+      for (let symbolIndex = 0; symbolIndex < stateTrans.length; symbolIndex++) {
+        const targets = stateTrans[symbolIndex];
         if (!targets) continue;
-        // Remap in place, filtering out undefined (removed states).
+
+        // Remap in place, filtering out removed states and duplicates.
         let writeIndex = 0;
-        for (let i = 0; i < targets.length; i++) {
-          const mapped = remap[targets[i]];
-          if (mapped !== undefined) targets[writeIndex++] = mapped;
-        }
-        if (writeIndex) {
-          targets.length = writeIndex;
-          // Only deduplicate when merging (multiple old states -> same new state).
-          if (merging && writeIndex > 1) {
-            newTrans[symbolIndex] = [...new Set(targets)];
-          } else {
-            newTrans[symbolIndex] = targets;
+        if (targets.length === 1) {
+          // The most common case is a single target, so special-case it.
+          const mapped = remap[targets[0]];
+          if (mapped !== REMOVE_STATE) targets[writeIndex++] = mapped;
+        } else {
+          for (let i = 0; i < targets.length; i++) {
+            const mapped = remap[targets[i]];
+            if (mapped === REMOVE_STATE) continue;
+            // Check for duplicate (scan already-written portion).
+            let isDup = false;
+            for (let j = 0; j < writeIndex; j++) {
+              if (targets[j] === mapped) { isDup = true; break; }
+            }
+            if (!isDup) targets[writeIndex++] = mapped;
           }
         }
+        targets.length = writeIndex;
+
       }
-      newTransitions[newIndex] = newTrans;
+      newTransitions[newIndex] = stateTrans;
     }
     this._transitions = newTransitions;
 
@@ -242,14 +242,14 @@ export class NFA {
     const newStartIds = new Set();
     for (const id of this._startIds) {
       const mapped = remap[id];
-      if (mapped !== undefined) newStartIds.add(mapped);
+      if (mapped !== REMOVE_STATE) newStartIds.add(mapped);
     }
     this._startIds = newStartIds;
 
     const newAcceptIds = new Set();
     for (const id of this._acceptIds) {
       const mapped = remap[id];
-      if (mapped !== undefined) newAcceptIds.add(mapped);
+      if (mapped !== REMOVE_STATE) newAcceptIds.add(mapped);
     }
     this._acceptIds = newAcceptIds;
   }
@@ -398,7 +398,7 @@ export class NFA {
     if (deadStates.size === 0) return;
 
     // Build remap: liveStates in order become 0, 1, 2, ...
-    const remap = new Array(numStates);
+    const remap = new Array(numStates).fill(REMOVE_STATE);
     let newIndex = 0;
     for (let i = 0; i < numStates; i++) {
       if (!deadStates.has(i)) {
@@ -459,6 +459,7 @@ export class NFA {
             if (!bTargets || !bTargets.length) continue;
 
             const aTargets = aTrans[s];
+
             if (!aTargets || !aTargets.length) {
               // b has transition on s, but a doesn't - a cannot simulate b.
               simA.remove(b);
@@ -468,7 +469,14 @@ export class NFA {
 
             // For each b' in bTargets, there must exist a' in aTargets
             // such that sim[a'].has(b').
-            if (!bTargets.every(
+            if (aTargets.length === 1 && bTargets.length === 1) {
+              // Common case: single targets on both sides.
+              if (!sim[aTargets[0]].has(bTargets[0])) {
+                simA.remove(b);
+                changed = true;
+                break;
+              }
+            } else if (!bTargets.every(
               bPrime => aTargets.some(aPrime => sim[aPrime].has(bPrime)))) {
               simA.remove(b);
               changed = true;
@@ -540,9 +548,7 @@ export const regexToNFA = (pattern, numSymbols) => {
   const builder = new RegexToNFABuilder(charToSymbol, numSymbols);
   const nfa = builder.build(ast);
 
-  nfa.closeOverEpsilonTransitions();
-  nfa.removeDeadStates();
-  nfa.reduceBySimulation();
+  optimizeNFA(nfa);
 
   return nfa;
 };
@@ -551,12 +557,16 @@ export const javascriptSpecToNFA = (config, numSymbols) => {
   const builder = new JavascriptNFABuilder(config, numSymbols);
   const nfa = builder.build();
 
-  nfa.closeOverEpsilonTransitions();
-  // Javascript NFA builder never generated states unreachable from the start.
-  nfa.removeDeadStates({ forward: false });
-  nfa.reduceBySimulation();
+  // Javascript NFA builder never generates states unreachable from the start.
+  optimizeNFA(nfa, { allStatesAreReachable: true });
 
   return nfa;
+}
+
+export const optimizeNFA = (nfa, { allStatesAreReachable = false } = {}) => {
+  nfa.closeOverEpsilonTransitions();
+  nfa.removeDeadStates({ forward: !allStatesAreReachable });
+  nfa.reduceBySimulation();
 }
 
 // Serialization format overview:

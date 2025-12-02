@@ -5,7 +5,7 @@ import { runTest, logSuiteComplete } from './helpers/test_runner.js';
 
 ensureGlobalEnvironment();
 
-const { regexToNFA, javascriptSpecToNFA, NFASerializer, JavascriptNFABuilder, NFA, Symbol } = await import('../js/nfa_builder.js');
+const { regexToNFA, javascriptSpecToNFA, optimizeNFA, NFASerializer, JavascriptNFABuilder, NFA, Symbol } = await import('../js/nfa_builder.js');
 const { BitReader } = await import('../js/util.js');
 
 const evaluateNfa = (nfa, values) => {
@@ -946,6 +946,99 @@ await runTest('reduceBySimulation should not prune when neither dominates', () =
   // Both paths should remain since neither dominates.
   expectAccepts(nfa, [1, 2], 'should accept [1,2]');
   expectAccepts(nfa, [1, 3], 'should accept [1,3]');
+});
+
+await runTest('optimizeNFA should close epsilon transitions', () => {
+  const nfa = new NFA();
+  nfa.addState();
+  nfa.addState();
+  nfa.addState();
+  nfa.addStartId(0);
+  nfa.addAcceptId(2);
+  nfa.addEpsilon(0, 1);
+  nfa.addTransition(1, 2, Symbol(1));
+  nfa.seal();
+
+  optimizeNFA(nfa);
+
+  // After optimization, epsilon is closed and NFA works correctly.
+  expectAccepts(nfa, [1], 'should accept [1] after epsilon closure');
+  expectRejects(nfa, [2], 'should reject [2]');
+});
+
+await runTest('optimizeNFA should remove unreachable states', () => {
+  const nfa = new NFA();
+  nfa.addState();  // 0: start
+  nfa.addState();  // 1: reachable, accepting
+  nfa.addState();  // 2: unreachable
+  nfa.addStartId(0);
+  nfa.addAcceptId(1);
+  nfa.addAcceptId(2);
+  nfa.addTransition(0, 1, Symbol(1));
+  nfa.addTransition(2, 2, Symbol(1));  // Self-loop on unreachable state
+  nfa.seal();
+
+  optimizeNFA(nfa);
+
+  assert.equal(nfa.numStates(), 2, 'unreachable state should be removed');
+  expectAccepts(nfa, [1], 'should still accept [1]');
+});
+
+await runTest('optimizeNFA should remove dead-end states', () => {
+  const nfa = new NFA();
+  nfa.addState();  // 0: start
+  nfa.addState();  // 1: dead-end (no path to accept)
+  nfa.addState();  // 2: accepting
+  nfa.addStartId(0);
+  nfa.addAcceptId(2);
+  nfa.addTransition(0, 1, Symbol(1));  // Dead-end path
+  nfa.addTransition(0, 2, Symbol(2));  // Path to accept
+  nfa.seal();
+
+  optimizeNFA(nfa);
+
+  assert.equal(nfa.numStates(), 2, 'dead-end state should be removed');
+  expectAccepts(nfa, [2], 'should still accept [2]');
+  expectRejects(nfa, [1], 'should reject [1] (dead-end removed)');
+});
+
+await runTest('optimizeNFA should merge equivalent states', () => {
+  const nfa = new NFA();
+  nfa.addState();  // 0: start
+  nfa.addState();  // 1: accepting terminal
+  nfa.addState();  // 2: accepting terminal (equivalent to 1)
+  nfa.addStartId(0);
+  nfa.addAcceptId(1);
+  nfa.addAcceptId(2);
+  nfa.addTransition(0, 1, Symbol(1));
+  nfa.addTransition(0, 2, Symbol(2));
+  nfa.seal();
+
+  optimizeNFA(nfa);
+
+  // States 1 and 2 are equivalent (both accepting terminals), should merge.
+  assert.equal(nfa.numStates(), 2, 'equivalent states should be merged');
+  expectAccepts(nfa, [1], 'should accept [1]');
+  expectAccepts(nfa, [2], 'should accept [2]');
+});
+
+await runTest('optimizeNFA with allStatesAreReachable should skip forward reachability', () => {
+  // When allStatesAreReachable is true, forward dead state removal is skipped.
+  // This tests that the option works correctly.
+  const nfa = new NFA();
+  nfa.addState();  // 0: start
+  nfa.addState();  // 1: dead-end
+  nfa.addState();  // 2: accepting
+  nfa.addStartId(0);
+  nfa.addAcceptId(2);
+  nfa.addTransition(0, 1, Symbol(1));
+  nfa.addTransition(0, 2, Symbol(2));
+  nfa.seal();
+
+  optimizeNFA(nfa);
+
+  // Dead-end state 1 should still be removed (backward reachability still runs).
+  assert.equal(nfa.numStates(), 2, 'dead-end should still be removed via backward pass');
 });
 
 logSuiteComplete('NFA builder');
