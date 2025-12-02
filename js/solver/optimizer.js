@@ -912,11 +912,11 @@ export class SudokuConstraintOptimizer {
   _logStats(handlerSet) {
     if (!this._debugLogger) return;
 
-    for (const h of handlerSet.getAllofType(NFAModule.NFALine)) {
+    for (const h of handlerSet.getAllofType(NFAModule.NFAConstraint)) {
       const cnfa = h.getNFA();
       this._debugLogger.log({
         loc: '_logStats',
-        msg: `NFALine with ${cnfa.numStates} states`,
+        msg: `NFAConstraint with ${cnfa.numStates} states`,
         cells: h.cells,
       });
     }

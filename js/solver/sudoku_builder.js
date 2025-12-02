@@ -276,7 +276,7 @@ export class SudokuBuilder {
           {
             const cells = constraint.cells.map(c => shape.parseCellId(c).cell);
             const nfa = compileRegex(constraint.pattern, shape.numValues);
-            yield new NFAHandlerModule.NFALine(cells, nfa);
+            yield new NFAHandlerModule.NFAConstraint(cells, nfa);
           }
           break;
 
@@ -285,7 +285,7 @@ export class SudokuBuilder {
             const cells = constraint.cells.map(c => shape.parseCellId(c).cell);
             const encodedNFA = constraint.encodedNFA;
             const nfa = compileNFA(encodedNFA, shape.numValues);
-            yield new NFAHandlerModule.NFALine(cells, nfa);
+            yield new NFAHandlerModule.NFAConstraint(cells, nfa);
           }
           break;
 
