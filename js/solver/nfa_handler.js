@@ -90,7 +90,7 @@ export const compressNFA = (nfa) => {
 
 // Enforces a linear regex constraint by compiling the pattern into an NFA and
 // propagating it across candidate sets to prune unsupported values.
-export class NFALine extends SudokuConstraintHandler {
+export class NFAConstraint extends SudokuConstraintHandler {
   constructor(cells, cnfa) {
     super(cells);
     this._cnfa = cnfa;

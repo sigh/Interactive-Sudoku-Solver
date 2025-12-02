@@ -8,7 +8,7 @@ ensureGlobalEnvironment();
 
 const { regexToNFA } = await import('../js/nfa_builder.js');
 const { LookupTables } = await import('../js/solver/lookup_tables.js');
-const { compressNFA, NFALine } = await import('../js/solver/nfa_handler.js');
+const { compressNFA, NFAConstraint } = await import('../js/solver/nfa_handler.js');
 
 const findStartingStateIndex = (cnfa) => {
   for (let i = 0; i < cnfa.numStates; i++) {
@@ -108,13 +108,13 @@ await runTest('compressNFA should use compact transition entry format', () => {
 });
 
 // =============================================================================
-// NFALine basic enforcement tests
+// NFAConstraint basic enforcement tests
 // =============================================================================
 
-await runTest('NFALine should prune cells to supported values', () => {
+await runTest('NFAConstraint should prune cells to supported values', () => {
   const nfa = regexToNFA('12', 4);
   const cnfa = compressNFA(nfa);
-  const handler = new NFALine([0, 1], cnfa);
+  const handler = new NFAConstraint([0, 1], cnfa);
 
   const allValues = mask(1, 2, 3, 4);
   const grid = new Uint16Array([allValues, allValues]);
@@ -127,10 +127,10 @@ await runTest('NFALine should prune cells to supported values', () => {
   assert.deepEqual([...accumulator.touched].sort((a, b) => a - b), [0, 1]);
 });
 
-await runTest('NFALine should return false when no valid path exists', () => {
+await runTest('NFAConstraint should return false when no valid path exists', () => {
   const nfa = regexToNFA('12', 4);
   const cnfa = compressNFA(nfa);
-  const handler = new NFALine([0, 1], cnfa);
+  const handler = new NFAConstraint([0, 1], cnfa);
 
   const grid = new Uint16Array([
     mask(2),
@@ -142,10 +142,10 @@ await runTest('NFALine should return false when no valid path exists', () => {
   assert.equal(result, false);
 });
 
-await runTest('NFALine should not touch cells already at supported values', () => {
+await runTest('NFAConstraint should not touch cells already at supported values', () => {
   const nfa = regexToNFA('12', 4);
   const cnfa = compressNFA(nfa);
-  const handler = new NFALine([0, 1], cnfa);
+  const handler = new NFAConstraint([0, 1], cnfa);
 
   const grid = new Uint16Array([
     mask(1),
@@ -158,10 +158,10 @@ await runTest('NFALine should not touch cells already at supported values', () =
   assert.equal(accumulator.touched.size, 0, 'no cells should be touched');
 });
 
-await runTest('NFALine should report only changed cells', () => {
+await runTest('NFAConstraint should report only changed cells', () => {
   const nfa = regexToNFA('12', 4);
   const cnfa = compressNFA(nfa);
-  const handler = new NFALine([0, 1], cnfa);
+  const handler = new NFAConstraint([0, 1], cnfa);
 
   const grid = new Uint16Array([
     mask(1),  // Already constrained
@@ -174,13 +174,13 @@ await runTest('NFALine should report only changed cells', () => {
 });
 
 // =============================================================================
-// NFALine forward pass tests
+// NFAConstraint forward pass tests
 // =============================================================================
 
-await runTest('NFALine forward pass should fail when first cell has no valid transition', () => {
+await runTest('NFAConstraint forward pass should fail when first cell has no valid transition', () => {
   const nfa = regexToNFA('12', 2);
   const cnfa = compressNFA(nfa);
-  const handler = new NFALine([0, 1], cnfa);
+  const handler = new NFAConstraint([0, 1], cnfa);
 
   // First cell only allows 2, but NFA requires 1 first
   const grid = new Uint16Array([
@@ -193,10 +193,10 @@ await runTest('NFALine forward pass should fail when first cell has no valid tra
   assert.equal(result, false);
 });
 
-await runTest('NFALine forward pass should fail when middle cell blocks path', () => {
+await runTest('NFAConstraint forward pass should fail when middle cell blocks path', () => {
   const nfa = regexToNFA('123', 3);
   const cnfa = compressNFA(nfa);
-  const handler = new NFALine([0, 1, 2], cnfa);
+  const handler = new NFAConstraint([0, 1, 2], cnfa);
 
   const grid = new Uint16Array([
     mask(1),
@@ -209,11 +209,11 @@ await runTest('NFALine forward pass should fail when middle cell blocks path', (
   assert.equal(result, false);
 });
 
-await runTest('NFALine forward pass tracks reachable states through NFA', () => {
+await runTest('NFAConstraint forward pass tracks reachable states through NFA', () => {
   // With alternation, multiple states may be reachable
   const nfa = regexToNFA('(12|13)', 3);
   const cnfa = compressNFA(nfa);
-  const handler = new NFALine([0, 1], cnfa);
+  const handler = new NFAConstraint([0, 1], cnfa);
 
   const grid = new Uint16Array([
     mask(1),
@@ -228,13 +228,13 @@ await runTest('NFALine forward pass tracks reachable states through NFA', () => 
 });
 
 // =============================================================================
-// NFALine backward pass tests
+// NFAConstraint backward pass tests
 // =============================================================================
 
-await runTest('NFALine backward pass should fail when final states are not accepting', () => {
+await runTest('NFAConstraint backward pass should fail when final states are not accepting', () => {
   const nfa = regexToNFA('123', 3);
   const cnfa = compressNFA(nfa);
-  const handler = new NFALine([0, 1, 2], cnfa);
+  const handler = new NFAConstraint([0, 1, 2], cnfa);
 
   // Path 121 - reaches a state but not an accepting one
   const grid = new Uint16Array([
@@ -248,10 +248,10 @@ await runTest('NFALine backward pass should fail when final states are not accep
   assert.equal(result, false);
 });
 
-await runTest('NFALine backward pass should prune values not reaching accepting state', () => {
+await runTest('NFAConstraint backward pass should prune values not reaching accepting state', () => {
   const nfa = regexToNFA('(12|34)', 4);
   const cnfa = compressNFA(nfa);
-  const handler = new NFALine([0, 1], cnfa);
+  const handler = new NFAConstraint([0, 1], cnfa);
 
   // Last cell is 2, so first cell must be 1 (not 3)
   const grid = new Uint16Array([
@@ -265,10 +265,10 @@ await runTest('NFALine backward pass should prune values not reaching accepting 
   assert.equal(grid[0], mask(1));
 });
 
-await runTest('NFALine backward pass should prune unreachable states', () => {
+await runTest('NFAConstraint backward pass should prune unreachable states', () => {
   const nfa = regexToNFA('1[23]', 3);
   const cnfa = compressNFA(nfa);
-  const handler = new NFALine([0, 1], cnfa);
+  const handler = new NFAConstraint([0, 1], cnfa);
 
   // Second cell only allows 2
   const grid = new Uint16Array([
@@ -283,13 +283,13 @@ await runTest('NFALine backward pass should prune unreachable states', () => {
 });
 
 // =============================================================================
-// NFALine with different cell configurations
+// NFAConstraint with different cell configurations
 // =============================================================================
 
-await runTest('NFALine should work with non-contiguous cell indices', () => {
+await runTest('NFAConstraint should work with non-contiguous cell indices', () => {
   const nfa = regexToNFA('12', 4);
   const cnfa = compressNFA(nfa);
-  const handler = new NFALine([5, 10], cnfa);
+  const handler = new NFAConstraint([5, 10], cnfa);
 
   const grid = new Uint16Array(15).fill(mask(1, 2, 3, 4));
   const accumulator = createAccumulator();
@@ -302,10 +302,10 @@ await runTest('NFALine should work with non-contiguous cell indices', () => {
   assert.equal(grid[0], mask(1, 2, 3, 4));
 });
 
-await runTest('NFALine should handle single cell', () => {
+await runTest('NFAConstraint should handle single cell', () => {
   const nfa = regexToNFA('[12]', 4);
   const cnfa = compressNFA(nfa);
-  const handler = new NFALine([0], cnfa);
+  const handler = new NFAConstraint([0], cnfa);
 
   const grid = new Uint16Array([mask(1, 2, 3, 4)]);
   const accumulator = createAccumulator();
@@ -315,10 +315,10 @@ await runTest('NFALine should handle single cell', () => {
   assert.equal(grid[0], mask(1, 2));
 });
 
-await runTest('NFALine should handle longer cell sequences', () => {
+await runTest('NFAConstraint should handle longer cell sequences', () => {
   const nfa = regexToNFA('1234', 4);
   const cnfa = compressNFA(nfa);
-  const handler = new NFALine([0, 1, 2, 3], cnfa);
+  const handler = new NFAConstraint([0, 1, 2, 3], cnfa);
 
   const allValues = mask(1, 2, 3, 4);
   const grid = new Uint16Array([allValues, allValues, allValues, allValues]);
@@ -333,13 +333,13 @@ await runTest('NFALine should handle longer cell sequences', () => {
 });
 
 // =============================================================================
-// NFALine state reuse
+// NFAConstraint state reuse
 // =============================================================================
 
-await runTest('NFALine should be reusable across multiple calls', () => {
+await runTest('NFAConstraint should be reusable across multiple calls', () => {
   const nfa = regexToNFA('12', 4);
   const cnfa = compressNFA(nfa);
-  const handler = new NFALine([0, 1], cnfa);
+  const handler = new NFAConstraint([0, 1], cnfa);
 
   // First call
   const grid1 = new Uint16Array([mask(1, 2, 3, 4), mask(1, 2, 3, 4)]);
@@ -361,10 +361,10 @@ await runTest('NFALine should be reusable across multiple calls', () => {
   assert.equal(grid4[0], mask(1));
 });
 
-await runTest('NFALine internal state should be cleared between calls', () => {
+await runTest('NFAConstraint internal state should be cleared between calls', () => {
   const nfa = regexToNFA('(12|21)', 2);
   const cnfa = compressNFA(nfa);
-  const handler = new NFALine([0, 1], cnfa);
+  const handler = new NFAConstraint([0, 1], cnfa);
 
   // First call with specific values
   const grid1 = new Uint16Array([mask(1), mask(2)]);
@@ -376,13 +376,13 @@ await runTest('NFALine internal state should be cleared between calls', () => {
 });
 
 // =============================================================================
-// NFALine getNFA
+// NFAConstraint getNFA
 // =============================================================================
 
-await runTest('NFALine getNFA should return the compressed NFA', () => {
+await runTest('NFAConstraint getNFA should return the compressed NFA', () => {
   const nfa = regexToNFA('12', 4);
   const cnfa = compressNFA(nfa);
-  const handler = new NFALine([0, 1], cnfa);
+  const handler = new NFAConstraint([0, 1], cnfa);
 
   assert.strictEqual(handler.getNFA(), cnfa);
 });
