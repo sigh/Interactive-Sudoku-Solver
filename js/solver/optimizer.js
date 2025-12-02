@@ -912,11 +912,24 @@ export class SudokuConstraintOptimizer {
   _logStats(handlerSet) {
     if (!this._debugLogger) return;
 
+    const mask = (1 << 16) - 1;
+
     for (const h of handlerSet.getAllofType(NFAModule.NFAConstraint)) {
       const cnfa = h.getNFA();
+      let numTransitionEntries = 0;
+      let isDFA = true;
+      for (const transitions of cnfa.transitionLists) {
+        numTransitionEntries += transitions.length;
+        let seen = 0;
+        for (const t of transitions) {
+          if (t & mask & seen) isDFA = false;
+          seen |= t & mask;
+        }
+      }
+      const stateType = isDFA ? ' (DFA)' : '';
       this._debugLogger.log({
         loc: '_logStats',
-        msg: `NFAConstraint with ${cnfa.numStates} states`,
+        msg: `NFAConstraint with ${cnfa.numStates} states, ${numTransitionEntries} transition entries${stateType}`,
         cells: h.cells,
       });
     }
