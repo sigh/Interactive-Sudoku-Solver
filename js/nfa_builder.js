@@ -479,7 +479,6 @@ export class NFA {
       for (const a of targets) {
         if (sim[a].has(b) && (a < b || !simB.has(a))) return true;
       }
-      return false;
     };
     for (let state = 0; state < numStates; state++) {
       const trans = transitions[state];
@@ -532,7 +531,13 @@ export const regexToNFA = (pattern, numSymbols) => {
   const ast = parser.parse();
   const charToSymbol = createCharToSymbol(numSymbols);
   const builder = new RegexToNFABuilder(charToSymbol, numSymbols);
-  return builder.build(ast);
+  const nfa = builder.build(ast);
+
+  nfa.closeOverEpsilonTransitions();
+  nfa.removeDeadStates();
+  nfa.reduceBySimulation();
+
+  return nfa;
 };
 
 // Serialization format overview:

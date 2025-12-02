@@ -336,6 +336,24 @@ await runTest('regex star with alternation should accept correctly', () => {
   expectAccepts(nfa, [1, 2, 1], 'should accept alternating sequence');
 });
 
+await runTest('regexToNFA should return an optimized NFA', () => {
+  // regexToNFA should close epsilons, remove dead states, and reduce by simulation.
+  const nfa = regexToNFA('(1|2)*', 4);
+
+  // Verify no epsilon transitions remain.
+  for (let i = 0; i < nfa.numStates(); i++) {
+    assert.equal(nfa.getEpsilons(i).length, 0, 'no epsilon transitions should remain');
+  }
+
+  // The start state should be accepting (star matches empty string).
+  assert.ok(nfa.isAccepting(nfa.startId), 'start state should be accepting for star');
+
+  // Verify the NFA is functional.
+  expectAccepts(nfa, [], 'should accept empty string');
+  expectAccepts(nfa, [1, 2, 1, 2], 'should accept alternating sequence');
+  expectRejects(nfa, [3], 'should reject values outside the alternation');
+});
+
 await runTest('closeOverEpsilonTransitions should not mutate shared transitions', () => {
   // Regression test: when copying transitions during epsilon closure,
   // the original transitions should not be affected.
