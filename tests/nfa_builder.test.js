@@ -131,6 +131,49 @@ await runTest('NFA serialization should handle empty NFA', () => {
   expectRejects(restored, [1], 'empty NFA should reject any input');
 });
 
+await runTest('NFA serialization should handle multiple start states', () => {
+  // NFA with two start states: one accepts 1, the other accepts 2.
+  const nfa = new NFA();
+  nfa.addState();  // 0: start, accepts on 1
+  nfa.addState();  // 1: start, accepts on 2
+  nfa.addState();  // 2: accept
+  nfa.addStartId(0);
+  nfa.addStartId(1);
+  nfa.addAcceptId(2);
+  nfa.addTransition(0, 2, Symbol(1));
+  nfa.addTransition(1, 2, Symbol(2));
+  nfa.seal();
+
+  const serialized = NFASerializer.serialize(nfa);
+  const restored = NFASerializer.deserialize(serialized);
+
+  assert.equal(restored.getStartIds().size, 2, 'should have 2 start states');
+  expectAccepts(restored, [1], 'path from first start should accept');
+  expectAccepts(restored, [2], 'path from second start should accept');
+  expectRejects(restored, [3], 'no path for value 3');
+});
+
+await runTest('NFA serialization should handle accepting start states', () => {
+  // NFA with two start states, one of which is accepting.
+  const nfa = new NFA();
+  nfa.addState();  // 0: start and accept
+  nfa.addState();  // 1: start, not accept
+  nfa.addState();  // 2: accept
+  nfa.addStartId(0);
+  nfa.addStartId(1);
+  nfa.addAcceptId(0);
+  nfa.addAcceptId(2);
+  nfa.addTransition(1, 2, Symbol(1));
+  nfa.seal();
+
+  const serialized = NFASerializer.serialize(nfa);
+  const restored = NFASerializer.deserialize(serialized);
+
+  assert.equal(restored.getStartIds().size, 2, 'should have 2 start states');
+  expectAccepts(restored, [], 'empty input accepted by accepting start state');
+  expectAccepts(restored, [1], 'path from second start should accept');
+});
+
 await runTest('JavascriptNFABuilder should handle parity checks', () => {
   const builder = new JavascriptNFABuilder({
     startExpression: '({ sum: 0 })',
@@ -199,7 +242,7 @@ await runTest('javascriptSpecToNFA should optimize and return ready NFA', () => 
     acceptBody: 'return state === 0;',
   }, 3);
 
-  // Should have single start state after reduceStartStates.
+  // Parity check has single start state.
   assert.equal(nfa.getStartIds().size, 1, 'should have single start state');
 
   expectAccepts(nfa, [2], 'should accept even sum');
@@ -318,45 +361,6 @@ await runTest('closeOverEpsilonTransitions should inherit transitions from epsil
   }
   assert.equal(symbolsToTarget.get(1), 3, 'symbol 1 should go to state 3');
   assert.equal(symbolsToTarget.get(2), 3, 'symbol 2 should go to state 3');
-});
-
-await runTest('reduceStartStates should create epsilon transitions from new start', () => {
-  const nfa = new NFA();
-  nfa.addState();
-  nfa.addState();
-  nfa.addState();
-  nfa.addStartId(0);
-  nfa.addStartId(1);
-  nfa.addAcceptId(2);
-  nfa.addTransition(0, 2, Symbol(1));
-  nfa.addTransition(1, 2, Symbol(2));
-
-  assert.equal(nfa.getStartIds().size, 2, 'should have two start states before reduction');
-
-  nfa.seal();
-  nfa.reduceStartStates();
-
-  assert.equal(nfa.getStartIds().size, 1, 'should have one start state after reduction');
-  assert.equal(nfa.startId, 3, 'new start state should be the newly added state');
-  assert.equal(nfa.getEpsilons(3).length, 2, 'new start should have epsilon to both original starts');
-  assert.ok(nfa.getEpsilons(3).includes(0), 'new start should have epsilon to state 0');
-  assert.ok(nfa.getEpsilons(3).includes(1), 'new start should have epsilon to state 1');
-});
-
-await runTest('reduceStartStates should be a no-op for single start state', () => {
-  const nfa = new NFA();
-  nfa.addState();
-  nfa.addState();
-  nfa.addStartId(0);
-  nfa.addAcceptId(1);
-  nfa.addTransition(0, 1, Symbol(1));
-
-  nfa.seal();
-  nfa.reduceStartStates();
-
-  assert.equal(nfa.getStartIds().size, 1, 'should still have one start state');
-  assert.equal(nfa.startId, 0, 'start state should remain unchanged');
-  assert.equal(nfa.numStates(), 2, 'should not add any new states');
 });
 
 await runTest('regex star with alternation should accept correctly', () => {
