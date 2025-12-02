@@ -4,7 +4,7 @@ const { regexToNFA, NFASerializer } = await import('../nfa_builder.js' + self.VE
 const { memoize } = await import('../util.js' + self.VERSION_PARAM);
 const HandlerModule = await import('./handlers.js' + self.VERSION_PARAM);
 const SumHandlerModule = await import('./sum_handler.js' + self.VERSION_PARAM);
-const DFAHandlerModule = await import('./dfa_handler.js' + self.VERSION_PARAM);
+const NFAHandlerModule = await import('./nfa_handler.js' + self.VERSION_PARAM);
 
 export class SudokuBuilder {
   static build(constraint, debugOptions) {
@@ -275,8 +275,8 @@ export class SudokuBuilder {
         case 'Regex':
           {
             const cells = constraint.cells.map(c => shape.parseCellId(c).cell);
-            const dfa = compileRegex(constraint.pattern, shape.numValues);
-            yield new DFAHandlerModule.DFALine(cells, dfa);
+            const nfa = compileRegex(constraint.pattern, shape.numValues);
+            yield new NFAHandlerModule.NFALine(cells, nfa);
           }
           break;
 
@@ -284,8 +284,8 @@ export class SudokuBuilder {
           {
             const cells = constraint.cells.map(c => shape.parseCellId(c).cell);
             const encodedNFA = constraint.encodedNFA;
-            const dfa = compileNFA(encodedNFA, shape.numValues);
-            yield new DFAHandlerModule.DFALine(cells, dfa);
+            const nfa = compileNFA(encodedNFA, shape.numValues);
+            yield new NFAHandlerModule.NFALine(cells, nfa);
           }
           break;
 
@@ -771,10 +771,10 @@ export class SudokuBuilder {
 
 export const compileRegex = memoize((pattern, numValues) => {
   const nfa = regexToNFA(pattern, numValues);
-  return DFAHandlerModule.compressNFA(nfa);
+  return NFAHandlerModule.compressNFA(nfa);
 });
 
 export const compileNFA = memoize((encodedNFA, numValues) => {
   const nfa = NFASerializer.deserialize(encodedNFA);
-  return DFAHandlerModule.compressNFA(nfa);
+  return NFAHandlerModule.compressNFA(nfa);
 });

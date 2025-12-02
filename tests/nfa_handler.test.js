@@ -8,7 +8,7 @@ ensureGlobalEnvironment();
 
 const { regexToNFA } = await import('../js/nfa_builder.js');
 const { LookupTables } = await import('../js/solver/lookup_tables.js');
-const { compressNFA, DFALine } = await import('../js/solver/dfa_handler.js');
+const { compressNFA, NFALine } = await import('../js/solver/nfa_handler.js');
 
 const findStartingStateIndex = (cnfa) => {
   for (let i = 0; i < cnfa.numStates; i++) {
@@ -50,10 +50,10 @@ await runTest('compressNFA should preserve NFA structure', () => {
   assert.ok(cnfa.acceptingStates.has(acceptingStates[0]), 'final state must be accepting');
 });
 
-await runTest('DFALine should prune cells to match a regex line', () => {
+await runTest('NFALine should prune cells to match a regex line', () => {
   const nfa = regexToNFA('12', 4);
   const cnfa = compressNFA(nfa);
-  const handler = new DFALine([0, 1], cnfa);
+  const handler = new NFALine([0, 1], cnfa);
 
   const allValues = mask(1, 2, 3, 4);
   const grid = new Uint16Array([allValues, allValues]);
@@ -66,10 +66,10 @@ await runTest('DFALine should prune cells to match a regex line', () => {
   assert.deepEqual([...accumulator.touched].sort((a, b) => a - b), [0, 1], 'both cells reported as updated');
 });
 
-await runTest('DFALine should detect impossible assignments', () => {
+await runTest('NFALine should detect impossible assignments', () => {
   const nfa = regexToNFA('12', 4);
   const cnfa = compressNFA(nfa);
-  const handler = new DFALine([0, 1], cnfa);
+  const handler = new NFALine([0, 1], cnfa);
 
   const grid = new Uint16Array([
     LookupTables.fromValue(2),
@@ -81,4 +81,4 @@ await runTest('DFALine should detect impossible assignments', () => {
   assert.equal(result, false, 'handler should reject grids that cannot satisfy the NFA');
 });
 
-logSuiteComplete('DFA handler');
+logSuiteComplete('NFA handler');
