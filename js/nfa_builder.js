@@ -568,8 +568,10 @@ export const javascriptSpecToNFA = (config, numSymbols) => {
 //     * (if !startIsUnique) startCount: stateBits bits storing number of start states
 //     * startIsAccept: startCount bits (1 bit per start state, in order)
 //     * acceptCount: stateBits bits storing number of additional (non-start) accepts
+//     * (if plain format) transitionCountBits: 4 bits storing bits per transition count
 //   Body (streamed per state until data ends):
-//     Plain format: for each state, transitionCount followed by (symbolIndex, target) pairs.
+//     Plain format: for each state, transitionCount (transitionCountBits) followed by
+//                   (symbolIndex, target) pairs.
 //     Packed format: a bitmask of active symbols followed by state IDs for each set bit.
 // States are ordered with start states first (in order), then non-start accept states,
 // then all other states.
@@ -619,14 +621,14 @@ export class NFASerializer {
     }
     const symbolBits = requiredBits(symbolCount - 1);
 
-    const format = this._chooseStateFormat(nfa, symbolCount, stateBits);
+    const { format, transitionCountBits } = this._chooseStateFormat(nfa, symbolCount, stateBits);
 
     const writer = new BitWriter();
-    this._writeHeader(writer, { format, symbolCount, stateBits, startCount, startIsAccept, acceptCount });
+    this._writeHeader(writer, { format, symbolCount, stateBits, startCount, startIsAccept, acceptCount, transitionCountBits });
     if (format === this.FORMAT.PACKED) {
       this._writePackedBody(writer, nfa, symbolCount, stateBits);
     } else {
-      this._writePlainBody(writer, nfa, symbolBits, stateBits);
+      this._writePlainBody(writer, nfa, transitionCountBits, symbolBits, stateBits);
     }
 
     return this._encodeBytes(writer.toUint8Array());
@@ -646,14 +648,14 @@ export class NFASerializer {
     }
 
     const reader = new BitReader(bytes);
-    const { format, symbolCount, stateBits, startCount, startIsAccept, acceptCount } = this._readHeader(reader);
+    const { format, symbolCount, stateBits, startCount, startIsAccept, acceptCount, transitionCountBits } = this._readHeader(reader);
     const symbolBits = requiredBits(symbolCount - 1);
 
     const nfa = new NFA();
     if (format === this.FORMAT.PACKED) {
       this._readPackedBody(nfa, reader, symbolCount, stateBits);
     } else {
-      this._readPlainBody(nfa, reader, symbolBits, stateBits);
+      this._readPlainBody(nfa, reader, transitionCountBits, symbolBits, stateBits);
     }
 
     reader.skipPadding();
@@ -713,7 +715,7 @@ export class NFASerializer {
     return !nfa.hasTransitions(stateId) && !nfa.getEpsilons(stateId).length;
   }
 
-  static _writeHeader(writer, { format, symbolCount, stateBits, startCount, startIsAccept, acceptCount }) {
+  static _writeHeader(writer, { format, symbolCount, stateBits, startCount, startIsAccept, acceptCount, transitionCountBits }) {
     if (!this._isValidFormat(format)) {
       throw new Error('NFA serialization format is unsupported');
     }
@@ -739,6 +741,9 @@ export class NFASerializer {
     }
     writer.writeBits(startIsAccept, startCount);
     writer.writeBits(acceptCount, stateBits);
+    if (format === this.FORMAT.PLAIN) {
+      writer.writeBits(transitionCountBits, this.SYMBOL_COUNT_FIELD_BITS);
+    }
   }
 
   static _readHeader(reader) {
@@ -758,10 +763,13 @@ export class NFASerializer {
     const startCount = startIsUnique ? 1 : reader.readBits(stateBits);
     const startIsAccept = reader.readBits(startCount);
     const acceptCount = reader.readBits(stateBits);
-    return { format, symbolCount, stateBits, startCount, startIsAccept, acceptCount };
+    const transitionCountBits = format === this.FORMAT.PLAIN
+      ? reader.readBits(this.SYMBOL_COUNT_FIELD_BITS)
+      : 0;
+    return { format, symbolCount, stateBits, startCount, startIsAccept, acceptCount, transitionCountBits };
   }
 
-  static _writePlainBody(writer, nfa, symbolBits, stateBits) {
+  static _writePlainBody(writer, nfa, transitionCountBits, symbolBits, stateBits) {
     for (let stateId = 0; stateId < nfa.numStates(); stateId++) {
       const transitions = nfa.getStateTransitions(stateId);
       // Count transitions first.
@@ -770,7 +778,7 @@ export class NFASerializer {
         const targets = transitions[symbolIndex];
         if (targets) transitionCount += targets.length;
       }
-      writer.writeBits(transitionCount, symbolBits + stateBits);
+      writer.writeBits(transitionCount, transitionCountBits);
       // Write each (symbolIndex, target) pair.
       for (let symbolIndex = 0; symbolIndex < transitions.length; symbolIndex++) {
         const targets = transitions[symbolIndex];
@@ -804,39 +812,49 @@ export class NFASerializer {
 
   static _chooseStateFormat(nfa, symbolCount, stateBits) {
     const symbolBits = requiredBits(symbolCount - 1);
-    let packedSizeEstimate = 0;
-    let plainSizeEstimate = 0;
-    for (let stateId = 0; stateId < nfa.numStates(); stateId++) {
+    const numStates = nfa.numStates();
+
+    // First pass: check if packed is possible and find max transitions.
+    let maxTransitions = 0;
+    let totalTransitions = 0;
+    let canPack = true;
+    for (let stateId = 0; stateId < numStates; stateId++) {
       const transitions = nfa.getStateTransitions(stateId);
-      plainSizeEstimate += symbolBits + stateBits; // transition count
-      packedSizeEstimate += symbolCount;
       let transitionCount = 0;
       for (let symbolIndex = 0; symbolIndex < transitions.length; symbolIndex++) {
         const targets = transitions[symbolIndex];
         if (!targets) continue;
-        // If multiple targets per symbol, we can't pack this state.
-        if (targets.length > 1) {
-          return this.FORMAT.PLAIN;
-        }
-        transitionCount++;
+        // If multiple targets per symbol, we can't pack.
+        if (targets.length > 1) canPack = false;
+        transitionCount += targets.length;
       }
-      plainSizeEstimate += transitionCount * (symbolBits + stateBits);
-      packedSizeEstimate += transitionCount * stateBits;
+      if (transitionCount > maxTransitions) maxTransitions = transitionCount;
+      totalTransitions += transitionCount;
     }
 
-    return packedSizeEstimate < plainSizeEstimate
+    const transitionCountBits = requiredBits(maxTransitions);
+
+    if (!canPack) {
+      return { format: this.FORMAT.PLAIN, transitionCountBits };
+    }
+
+    // Compare sizes.
+    const plainSizeEstimate = numStates * transitionCountBits + totalTransitions * (symbolBits + stateBits);
+    const packedSizeEstimate = numStates * symbolCount + totalTransitions * stateBits;
+
+    const format = packedSizeEstimate < plainSizeEstimate
       ? this.FORMAT.PACKED
       : this.FORMAT.PLAIN;
+    return { format, transitionCountBits };
   }
 
   static _isValidFormat(format) {
     return format === this.FORMAT.PLAIN || format === this.FORMAT.PACKED;
   }
 
-  static _readPlainBody(nfa, reader, symbolBits, stateBits) {
-    const countBits = symbolBits + stateBits;
-    for (let stateId = 0; reader.remainingBits() >= countBits; stateId++) {
-      const transitionCount = reader.readBits(countBits);
+  static _readPlainBody(nfa, reader, transitionCountBits, symbolBits, stateBits) {
+    for (let stateId = 0; reader.remainingBits() >= transitionCountBits; stateId++) {
+      const transitionCount = reader.readBits(transitionCountBits);
       for (let i = 0; i < transitionCount; i++) {
         if (reader.remainingBits() < symbolBits + stateBits) {
           throw new Error('Serialized NFA plain state transition data is truncated');
