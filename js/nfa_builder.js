@@ -58,24 +58,6 @@ export class NFA {
     return this._transitions.length - 1;
   }
 
-  // Reduces multiple start states to a single start state by creating
-  // a new state with epsilon transitions to all current start states.
-  reduceStartStates() {
-    this._assertSealed();
-    if (this._startIds.size <= 1) return;
-
-    // Temporarily unseal to add the new start state.
-    this._sealed = false;
-    const newStartId = this.addState();
-    for (const startId of this._startIds) {
-      this.addEpsilon(newStartId, startId);
-    }
-    this._sealed = true;
-
-    this._startIds.clear();
-    this._startIds.add(newStartId);
-  }
-
   // Returns the single start ID. Throws if there are multiple start states.
   get startId() {
     if (this._startIds.size !== 1) {
@@ -149,6 +131,10 @@ export class NFA {
 
   getStartIds() {
     return this._startIds;
+  }
+
+  getAcceptIds() {
+    return this._acceptIds;
   }
 
   // Returns the raw sparse array of transitions for a state.
@@ -565,7 +551,6 @@ export const javascriptSpecToNFA = (config, numSymbols) => {
   const builder = new JavascriptNFABuilder(config, numSymbols);
   const nfa = builder.build();
 
-  nfa.reduceStartStates();
   nfa.closeOverEpsilonTransitions();
   // Javascript NFA builder never generated states unreachable from the start.
   nfa.removeDeadStates({ forward: false });
@@ -579,12 +564,14 @@ export const javascriptSpecToNFA = (config, numSymbols) => {
 //     * format: 2 bits (plain or packed state encoding, see FORMAT enum)
 //     * stateBitsMinusOne: 4 bits storing (state bit width - 1)
 //     * symbolCountMinusOne: 4 bits storing (alphabet size - 1)
-//     * startIsAccept: 1 bit (1 if state 0 is accepting)
-//     * acceptCount: stateBits bits storing the number of additional accepts
+//     * startIsUnique: 1 bit (1 if there is exactly one start state)
+//     * (if !startIsUnique) startCount: stateBits bits storing number of start states
+//     * startIsAccept: startCount bits (1 bit per start state, in order)
+//     * acceptCount: stateBits bits storing number of additional (non-start) accepts
 //   Body (streamed per state until data ends):
 //     Plain format: for each state, transitionCount followed by (symbolIndex, target) pairs.
 //     Packed format: a bitmask of active symbols followed by state IDs for each set bit.
-// States are ordered with the start state coming first, then all accept states,
+// States are ordered with start states first (in order), then non-start accept states,
 // then all other states.
 // The decoder keeps reading states until the bitstream ends, then trims any
 // trailing padding as long as all referenced targets and accept slots are present.
@@ -606,12 +593,21 @@ export class NFASerializer {
       return '';
     }
 
-    if (nfa.getStartIds().size !== 1) {
-      throw new Error('NFA must have exactly one start state for serialization');
-    }
+    this._normalizeStates(nfa);
 
-    const { acceptCount, startIsAccept } = this._normalizeStates(nfa);
     const numStates = nfa.numStates();
+    const startCount = nfa.getStartIds().size;
+
+    // Build startIsAccept bitmask: bit i is set if start state i is accepting.
+    // After normalization, start states are 0..startCount-1 in order.
+    let startIsAccept = 0;
+    let acceptCount = nfa.getAcceptIds().size;
+    for (let i = 0; i < startCount; i++) {
+      if (nfa.isAccepting(i)) {
+        startIsAccept |= (1 << i);
+        acceptCount--;
+      }
+    }
 
     const symbolCount = Math.max(nfa.numSymbols(), this.MIN_SYMBOLS);
     if (symbolCount > this.MAX_SYMBOLS) {
@@ -623,11 +619,11 @@ export class NFASerializer {
     }
     const symbolBits = requiredBits(symbolCount - 1);
 
-    const formatChoice = this._chooseStateFormat(nfa, symbolCount, stateBits);
+    const format = this._chooseStateFormat(nfa, symbolCount, stateBits);
 
     const writer = new BitWriter();
-    this._writeHeader(writer, formatChoice, symbolCount, stateBits, startIsAccept, acceptCount);
-    if (formatChoice === this.FORMAT.PACKED) {
+    this._writeHeader(writer, { format, symbolCount, stateBits, startCount, startIsAccept, acceptCount });
+    if (format === this.FORMAT.PACKED) {
       this._writePackedBody(writer, nfa, symbolCount, stateBits);
     } else {
       this._writePlainBody(writer, nfa, symbolBits, stateBits);
@@ -650,7 +646,7 @@ export class NFASerializer {
     }
 
     const reader = new BitReader(bytes);
-    const { format, symbolCount, stateBits, startIsAccept, acceptCount } = this._readHeader(reader);
+    const { format, symbolCount, stateBits, startCount, startIsAccept, acceptCount } = this._readHeader(reader);
     const symbolBits = requiredBits(symbolCount - 1);
 
     const nfa = new NFA();
@@ -666,10 +662,14 @@ export class NFASerializer {
       throw new Error('Serialized NFA does not contain any states');
     }
 
-    nfa.addStartId(0);
-    if (startIsAccept) nfa.addAcceptId(0);
-    for (let i = 1; i <= acceptCount; i++) {
-      nfa.addAcceptId(i);
+    for (let i = 0; i < startCount; i++) {
+      nfa.addStartId(i);
+      if (startIsAccept & (1 << i)) {
+        nfa.addAcceptId(i);
+      }
+    }
+    for (let i = 0; i < acceptCount; i++) {
+      nfa.addAcceptId(startCount + i);
     }
 
     nfa.seal();
@@ -678,44 +678,42 @@ export class NFASerializer {
 
   static _normalizeStates(nfa) {
     const numStates = nfa.numStates();
+    const startSet = nfa.getStartIds();
 
-    const acceptSet = new Set();
-    const otherSet = new Set();
+    const acceptIds = [];
+    const otherIds = [];
     for (let i = 0; i < numStates; i++) {
-      if (i === nfa.startId) continue;
+      if (startSet.has(i)) continue;
 
       if (nfa.isAccepting(i)) {
-        acceptSet.add(i);
+        acceptIds.push(i);
       } else {
-        otherSet.add(i);
+        otherIds.push(i);
       }
     }
 
     // remap[oldIndex] = newIndex
-    // Order: start state first, then accept states, then others.
+    // Order: start states first (in order), then non-start accept states, then others.
     const remap = new Array(numStates);
     let nextIndex = 0;
-    remap[nfa.startId] = nextIndex++;
-    for (const id of acceptSet) {
+    for (const id of startSet) {
       remap[id] = nextIndex++;
     }
-    for (const id of otherSet) {
+    for (const id of acceptIds) {
       remap[id] = nextIndex++;
     }
-
-    const startIsAccept = nfa.isAccepting(nfa.startId);
-    const acceptCount = acceptSet.size;
+    for (const id of otherIds) {
+      remap[id] = nextIndex++;
+    }
 
     nfa.remapStates(remap);
-
-    return { acceptCount, startIsAccept };
   }
 
   static _isTerminalState(nfa, stateId) {
     return !nfa.hasTransitions(stateId) && !nfa.getEpsilons(stateId).length;
   }
 
-  static _writeHeader(writer, format, symbolCount, stateBits, startIsAccept, acceptCount) {
+  static _writeHeader(writer, { format, symbolCount, stateBits, startCount, startIsAccept, acceptCount }) {
     if (!this._isValidFormat(format)) {
       throw new Error('NFA serialization format is unsupported');
     }
@@ -728,10 +726,18 @@ export class NFASerializer {
     if (acceptCount >= (1 << stateBits)) {
       throw new Error('Accept state count exceeds encodable range for header');
     }
+    if (startCount < 1 || startCount >= (1 << stateBits)) {
+      throw new Error('Start state count exceeds encodable range for header');
+    }
     writer.writeBits(format, this.HEADER_FORMAT_BITS);
     writer.writeBits(stateBits - 1, this.STATE_BITS_FIELD_BITS);
     writer.writeBits(symbolCount - 1, this.SYMBOL_COUNT_FIELD_BITS);
-    writer.writeBits(startIsAccept ? 1 : 0, 1);
+    const startIsUnique = startCount === 1;
+    writer.writeBits(startIsUnique ? 1 : 0, 1);
+    if (!startIsUnique) {
+      writer.writeBits(startCount, stateBits);
+    }
+    writer.writeBits(startIsAccept, startCount);
     writer.writeBits(acceptCount, stateBits);
   }
 
@@ -742,15 +748,17 @@ export class NFASerializer {
     }
     const stateBits = reader.readBits(this.STATE_BITS_FIELD_BITS) + 1;
     const symbolCount = reader.readBits(this.SYMBOL_COUNT_FIELD_BITS) + 1;
-    const startIsAccept = reader.readBits(1) === 1;
-    const acceptCount = reader.readBits(stateBits);
     if (stateBits < this.MIN_STATE_BITS || stateBits > this.MAX_STATE_BITS) {
       throw new Error('State bit width is out of range for header decoding');
     }
     if (symbolCount < this.MIN_SYMBOLS || symbolCount > this.MAX_SYMBOLS) {
       throw new Error('Symbol count is out of range for header decoding');
     }
-    return { format, symbolCount, stateBits, startIsAccept, acceptCount };
+    const startIsUnique = reader.readBits(1) === 1;
+    const startCount = startIsUnique ? 1 : reader.readBits(stateBits);
+    const startIsAccept = reader.readBits(startCount);
+    const acceptCount = reader.readBits(stateBits);
+    return { format, symbolCount, stateBits, startCount, startIsAccept, acceptCount };
   }
 
   static _writePlainBody(writer, nfa, symbolBits, stateBits) {
