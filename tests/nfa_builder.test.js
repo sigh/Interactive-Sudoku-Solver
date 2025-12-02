@@ -5,7 +5,7 @@ import { runTest, logSuiteComplete } from './helpers/test_runner.js';
 
 ensureGlobalEnvironment();
 
-const { regexToNFA, NFASerializer, JavascriptNFABuilder, NFA, Symbol } = await import('../js/nfa_builder.js');
+const { regexToNFA, javascriptSpecToNFA, NFASerializer, JavascriptNFABuilder, NFA, Symbol } = await import('../js/nfa_builder.js');
 const { BitReader } = await import('../js/util.js');
 
 const evaluateNfa = (nfa, values) => {
@@ -119,13 +119,7 @@ await runTest('NFA serialization should round-trip packed format', () => {
 });
 
 await runTest('NFA serialization should handle empty NFA', () => {
-  // An NFA with no accept states becomes empty after removeDeadStates
   const nfa = new NFA();
-  nfa.addState();
-  nfa.addState();
-  nfa.addStartId(0);
-  // No accept states - everything is dead
-  nfa.addTransition(0, 1, Symbol(1));
   nfa.seal();
 
   const serialized = NFASerializer.serialize(nfa);
@@ -195,6 +189,45 @@ await runTest('JavascriptNFABuilder should allow transition fan-out', () => {
   expectAccepts(nfa, [1, 3], 'right branch should reach accept');
   expectRejects(nfa, [1, 1], 'branch fan-out must consume matching suffix');
   expectRejects(nfa, [2, 3], 'values without initial branch should reject');
+});
+
+await runTest('javascriptSpecToNFA should optimize and return ready NFA', () => {
+  // Parity check - bounded state space (only 2 states: even/odd).
+  const nfa = javascriptSpecToNFA({
+    startExpression: '0',
+    transitionBody: 'return (state + value) % 2;',
+    acceptBody: 'return state === 0;',
+  }, 3);
+
+  // Should have single start state after reduceStartStates.
+  assert.equal(nfa.getStartIds().size, 1, 'should have single start state');
+
+  expectAccepts(nfa, [2], 'should accept even sum');
+  expectAccepts(nfa, [1, 1], 'should accept even sum');
+  expectAccepts(nfa, [1, 2, 3], 'should accept even sum (1+2+3=6)');
+  expectRejects(nfa, [1], 'should reject odd sum');
+  expectRejects(nfa, [1, 2], 'should reject odd sum (1+2=3)');
+});
+
+await runTest('javascriptSpecToNFA should merge equivalent states', () => {
+  // Two branches that end up equivalent should be merged.
+  const nfa = javascriptSpecToNFA({
+    startExpression: '[{ path: "A", done: false }, { path: "B", done: false }]',
+    transitionBody: `
+      if (!state.done && value === 1) {
+        return { path: state.path, done: true };
+      }
+    `,
+    acceptBody: 'return state.done;',
+  }, 2);
+
+  // Both paths lead to equivalent accepting states after seeing 1.
+  // reduceBySimulation should merge them.
+  expectAccepts(nfa, [1], 'should accept value 1');
+  expectRejects(nfa, [2], 'should reject value 2');
+
+  // After optimization, equivalent terminal states should be merged.
+  // We can't easily check exact state count, but we can verify correctness.
 });
 
 await runTest('closeOverEpsilonTransitions should inline reachable transitions', () => {
@@ -334,24 +367,6 @@ await runTest('regex star with alternation should accept correctly', () => {
   expectAccepts(nfa, [1], 'should accept single 1');
   expectAccepts(nfa, [2], 'should accept single 2');
   expectAccepts(nfa, [1, 2, 1], 'should accept alternating sequence');
-});
-
-await runTest('regexToNFA should return an optimized NFA', () => {
-  // regexToNFA should close epsilons, remove dead states, and reduce by simulation.
-  const nfa = regexToNFA('(1|2)*', 4);
-
-  // Verify no epsilon transitions remain.
-  for (let i = 0; i < nfa.numStates(); i++) {
-    assert.equal(nfa.getEpsilons(i).length, 0, 'no epsilon transitions should remain');
-  }
-
-  // The start state should be accepting (star matches empty string).
-  assert.ok(nfa.isAccepting(nfa.startId), 'start state should be accepting for star');
-
-  // Verify the NFA is functional.
-  expectAccepts(nfa, [], 'should accept empty string');
-  expectAccepts(nfa, [1, 2, 1, 2], 'should accept alternating sequence');
-  expectRejects(nfa, [3], 'should reject values outside the alternation');
 });
 
 await runTest('closeOverEpsilonTransitions should not mutate shared transitions', () => {

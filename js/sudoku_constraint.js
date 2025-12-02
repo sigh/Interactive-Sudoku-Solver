@@ -1,6 +1,6 @@
 const { memoize, MultiMap, arrayRemoveValue, groupSortedBy, Base64Codec } = await import('./util.js' + self.VERSION_PARAM);
 const { GridShape, SHAPE_9x9, SHAPE_MAX } = await import('./grid_shape.js' + self.VERSION_PARAM);
-const { NFASerializer, JavascriptNFABuilder } = await import('./nfa_builder.js' + self.VERSION_PARAM);
+const { NFASerializer, javascriptSpecToNFA } = await import('./nfa_builder.js' + self.VERSION_PARAM);
 
 export class CellArgs {
   constructor(args, type) {
@@ -1054,8 +1054,7 @@ export class SudokuConstraint {
     }
 
     static encodeDefinition(definition, numValues) {
-      const builder = new JavascriptNFABuilder(definition, numValues);
-      const nfa = builder.build();
+      const nfa = javascriptSpecToNFA(definition, numValues);
       return NFASerializer.serialize(nfa);
     }
 
