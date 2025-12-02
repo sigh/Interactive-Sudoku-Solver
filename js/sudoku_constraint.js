@@ -932,7 +932,7 @@ export class SudokuConstraint {
     };
 
     constructor(pattern, ...cells) {
-      pattern = String(pattern ?? '');
+      pattern = String(pattern ?? '').replace(/\s/g, '');
       super(pattern, ...cells);
       this.pattern = pattern;
       this.cells = cells;
