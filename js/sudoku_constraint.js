@@ -1053,8 +1053,8 @@ export class SudokuConstraint {
       return `NFA${name} (${numStates} states)`;
     }
 
-    static encodeDefinition(definition, numValues) {
-      const nfa = javascriptSpecToNFA(definition, numValues);
+    static encodeDefinition(spec, numValues) {
+      const nfa = javascriptSpecToNFA(spec, numValues);
       return NFASerializer.serialize(nfa);
     }
 
