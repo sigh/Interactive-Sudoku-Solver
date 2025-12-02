@@ -7,7 +7,6 @@ const {
 const { SudokuParser, toShortSolution } = await import('./sudoku_parser.js' + self.VERSION_PARAM);
 const { PUZZLE_INDEX } = await import('../data/example_puzzles.js' + self.VERSION_PARAM);
 const { LookupTables } = await import('./solver/lookup_tables.js' + self.VERSION_PARAM);
-const { compileRegex } = await import('./solver/dfa_handler.js' + self.VERSION_PARAM);
 
 const loadDataFile = async (name) => {
   const module = await import(name);
@@ -395,23 +394,6 @@ export const printGrid = (grid) => {
   }
   console.table(matrix);
 }
-
-export const debugRegexDFA = (pattern, numValues = 9) => {
-  const dfa = compileRegex(pattern, numValues);
-
-  const states = dfa.states;
-  const totalTransitions = states.reduce((sum, state) => sum + state.transitionList.length, 0);
-  const stats = {
-    states: states.length,
-    acceptingStates: states.filter((state) => state.accepting).length,
-    transitions: totalTransitions,
-    averageTransitions: states.length ? Number((totalTransitions / states.length).toFixed(2)) : 0,
-  };
-
-  console.log(stats);
-
-  return dfa;
-};
 
 export const progressBenchmarks = async () => {
   const puzzleSets = {
