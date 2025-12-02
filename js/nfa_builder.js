@@ -322,6 +322,8 @@ export class NFA {
   // Creates a reversed NFA where all transitions point backwards.
   // The reversed NFA has accept states as starts and start states as accepts.
   _createReversed() {
+    this._assertNoEpsilon();
+
     const numStates = this._transitions.length;
     const reversed = new NFA();
 
@@ -356,6 +358,8 @@ export class NFA {
 
   // Returns the set of states reachable from start states.
   _reachableFromStart() {
+    this._assertNoEpsilon();
+
     const reachable = new Set(this._startIds);
     const stack = [...this._startIds];
 
@@ -379,24 +383,41 @@ export class NFA {
 
   // Removes dead states - states from which no accept state is reachable.
   // Must be called after epsilon transitions have been closed over.
-  removeDeadStates() {
+  removeDeadStates({ forward = true, backward = true } = {}) {
     this._assertSealed();
     this._assertNoEpsilon();
 
-    // States that can reach an accept = states reachable from accepts in reversed NFA.
-    const reversed = this._createReversed();
-    const liveStates = reversed._reachableFromStart();
+    const numStates = this.numStates();
 
-    if (liveStates.size === this.numStates()) {
-      // All states are live - nothing to do.
-      return;
+    let deadStates = new Set();
+    const findDeadStates = (nfa) => {
+      const reachableStates = nfa._reachableFromStart();
+      if (reachableStates.size < this.numStates()) {
+        for (let i = 0; i < numStates; i++) {
+          if (!reachableStates.has(i)) {
+            deadStates.add(i);
+          }
+        }
+      }
+    };
+
+    if (forward) {
+      findDeadStates(this);
     }
 
+    if (backward) {
+      findDeadStates(this._createReversed());
+    }
+
+    if (deadStates.size === 0) return;
+
     // Build remap: liveStates in order become 0, 1, 2, ...
-    const remap = new Array(this._transitions.length);
+    const remap = new Array(numStates);
     let newIndex = 0;
-    for (const oldIndex of liveStates) {
-      remap[oldIndex] = newIndex++;
+    for (let i = 0; i < numStates; i++) {
+      if (!deadStates.has(i)) {
+        remap[i] = newIndex++;
+      }
     }
 
     this.remapStates(remap);
@@ -540,6 +561,19 @@ export const regexToNFA = (pattern, numSymbols) => {
   return nfa;
 };
 
+export const javascriptSpecToNFA = (config, numSymbols) => {
+  const builder = new JavascriptNFABuilder(config, numSymbols);
+  const nfa = builder.build();
+
+  nfa.reduceStartStates();
+  nfa.closeOverEpsilonTransitions();
+  // Javascript NFA builder never generated states unreachable from the start.
+  nfa.removeDeadStates({ forward: false });
+  nfa.reduceBySimulation();
+
+  return nfa;
+}
+
 // Serialization format overview:
 //   Header (written once):
 //     * format: 2 bits (plain or packed state encoding, see FORMAT enum)
@@ -568,13 +602,12 @@ export class NFASerializer {
   static HEADER_FORMAT_BITS = 2;
 
   static serialize(nfa) {
-    nfa.reduceStartStates();
-    nfa.closeOverEpsilonTransitions();
-    nfa.removeDeadStates();
-    nfa.reduceBySimulation();
-
     if (!nfa.numStates()) {
       return '';
+    }
+
+    if (nfa.getStartIds().size !== 1) {
+      throw new Error('NFA must have exactly one start state for serialization');
     }
 
     const { acceptCount, startIsAccept } = this._normalizeStates(nfa);
@@ -1277,6 +1310,7 @@ export class JavascriptNFABuilder {
     }
 
     nfa.seal();
+
     return nfa;
   }
 
