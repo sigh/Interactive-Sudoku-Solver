@@ -1251,10 +1251,10 @@ class RegexToNFABuilder {
 
 export class JavascriptNFABuilder {
   constructor(definition, numValues) {
-    const { startExpression, transitionBody, acceptBody } = definition;
-    this._startExpression = startExpression;
-    this._transitionBody = transitionBody;
-    this._acceptBody = acceptBody;
+    const { startState, transition, accept } = definition;
+    this._startState = startState;
+    this._transitionFn = transition;
+    this._acceptFn = accept;
     this._numValues = numValues;
   }
 
@@ -1271,12 +1271,12 @@ export class JavascriptNFABuilder {
       return index;
     };
 
-    const transitionFn = this._createTransitionFn(this._transitionBody);
-    const acceptFn = this._createAcceptFn(this._acceptBody);
+    const transitionFn = this._wrapTransitionFn(this._transitionFn);
+    const acceptFn = this._wrapAcceptFn(this._acceptFn);
 
     const stack = [];
 
-    const startStateStrs = this._generateStartStates(this._startExpression);
+    const startStateStrs = this._generateStartStatesFromValue(this._startState);
     for (const startStateStr of startStateStrs) {
       const index = addState(startStateStr, acceptFn(startStateStr));
       stack.push(index);
@@ -1309,54 +1309,35 @@ export class JavascriptNFABuilder {
     return [];
   }
 
-  _generateStartStates(startExpression) {
-    if (!startExpression) {
-      throw new Error('Start state is empty');
-    }
-
-    try {
-      const result = Function('"use strict"; return (' + startExpression + ');')();
-      const states = this._fnResultToStateArray(result);
-      return states.map(item => this._stringifyState(item));
-    } catch (err) {
-      throw new Error(`Start state expression threw: ${err?.message || err}`);
-    }
+  _generateStartStatesFromValue(startState) {
+    const states = this._fnResultToStateArray(startState);
+    return states.map(item => this._stringifyState(item));
   }
 
-  _createTransitionFn(transitionBody) {
-    try {
-      const fn = Function('state', 'value', transitionBody);
-      return (stateStr, value) => {
-        const stateValue = this._deserializeState(stateStr);
-        try {
-          const result = fn(stateValue, value);
-          const nextStates = this._fnResultToStateArray(result);
-          return nextStates.map(item => this._stringifyState(item));
-        } catch (err) {
-          throw new Error(
-            `Transition function threw for input (${stateStr}, ${value}): ${err?.message || err}`);
-        }
-      };
-    } catch (err) {
-      throw new Error(`Transition function is invalid: ${err?.message || err}`);
-    }
+  _wrapTransitionFn(fn) {
+    return (stateStr, value) => {
+      const stateValue = this._deserializeState(stateStr);
+      try {
+        const result = fn(stateValue, value);
+        const nextStates = this._fnResultToStateArray(result);
+        return nextStates.map(item => this._stringifyState(item));
+      } catch (err) {
+        throw new Error(
+          `Transition function threw for input (${stateStr}, ${value}): ${err?.message || err}`);
+      }
+    };
   }
 
-  _createAcceptFn(acceptBody) {
-    try {
-      const fn = Function('state', acceptBody);
-      return (stateStr) => {
-        const stateValue = this._deserializeState(stateStr);
-        try {
-          return !!fn(stateValue);
-        } catch (err) {
-          throw new Error(
-            `Accept function threw for input ${stateStr}: ${err?.message || err}`);
-        }
-      };
-    } catch (err) {
-      throw new Error(`Accept function is invalid: ${err?.message || err}`);
-    }
+  _wrapAcceptFn(fn) {
+    return (stateStr) => {
+      const stateValue = this._deserializeState(stateStr);
+      try {
+        return !!fn(stateValue);
+      } catch (err) {
+        throw new Error(
+          `Accept function threw for input ${stateStr}: ${err?.message || err}`);
+      }
+    };
   }
 
   _stringifyState(state) {

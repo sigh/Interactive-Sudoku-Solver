@@ -2259,7 +2259,11 @@ ConstraintCategoryInput.StateMachine = class StateMachine extends ConstraintCate
 
     this._inputManager = inputManager;
     this._shape = null;
-    this._fieldNames = ['start-state', 'transition-body', 'accept-body'];
+    this._codeFieldNames = [
+      'start-state', 'transition-body', 'accept-body', 'unified-code'];
+
+    this._splitContainer = document.getElementById('state-machine-split-input');
+    this._unifiedContainer = document.getElementById('state-machine-unified-input');
 
     this._setUp();
   }
@@ -2276,13 +2280,75 @@ ConstraintCategoryInput.StateMachine = class StateMachine extends ConstraintCate
     if (finishedSelecting
       && selection.length > 1  // Don't auto-focus for single-cell constraints.
       && this._collapsibleContainer.isOpen()) {
-      const primaryField = form['start-state'];
-      if (primaryField && primaryField.value.trim() === '') {
-        primaryField.focus();
-      } else {
-        form['add-constraint'].focus();
-      }
+      form['add-constraint'].focus();
     }
+  }
+
+  _isUnifiedMode() {
+    return this._form['unified-mode'].checked;
+  }
+
+  _tryParse(fn, errorPrefix) {
+    try {
+      return fn();
+    } catch (e) {
+      throw new Error(`${errorPrefix}: ${e.message}`);
+    }
+  }
+
+  // Parse split fields into executable objects.
+  _parseSplitCode(startExpression, transitionBody, acceptBody) {
+    const startState = this._tryParse(
+      () => Function('"use strict"; return (' + startExpression + ');')(),
+      'Start state is invalid');
+    const transition = this._tryParse(
+      () => Function('state', 'value', transitionBody),
+      'Transition function is invalid');
+    const accept = this._tryParse(
+      () => Function('state', acceptBody),
+      'Accept function is invalid');
+
+    return { startState, transition, accept };
+  }
+
+  // Parse unified JavaScript code into executable objects.
+  _parseUnifiedCode(code) {
+    return this._tryParse(
+      () => new Function(`${code}; return {startState, transition, accept};`)(),
+      'Invalid JavaScript');
+  }
+
+  // Extract function body text, removing the 2-space base indent we add.
+  _extractFunctionBody(fn) {
+    const source = fn.toString();
+    const start = source.indexOf('{\n') + 2;
+    const end = source.lastIndexOf('\n}');
+    return source.slice(start, end).replace(/^ {2}/gm, '');
+  }
+
+  // Convert split field values to unified code.
+  _splitToUnified(startExpression, transitionBody, acceptBody) {
+    const indent = (s) => s.replace(/^/gm, '  ');
+    return `
+      startState = ${startExpression};
+
+      function transition(state, value) {
+      ${indent(transitionBody)}
+      }
+
+      function accept(state) {
+      ${indent(acceptBody)}
+      }
+    `.trim().replace(/^ {6}/gm, '');
+  }
+
+  // Convert parsed objects to split field values.
+  _parsedToSplit({ startState, transition, accept }) {
+    return {
+      startExpression: JSON.stringify(startState),
+      transitionBody: this._extractFunctionBody(transition),
+      acceptBody: this._extractFunctionBody(accept),
+    };
   }
 
   _setUp() {
@@ -2291,41 +2357,80 @@ ConstraintCategoryInput.StateMachine = class StateMachine extends ConstraintCate
       'state-machine-input-definition-error');
 
     autoSaveField(form, 'name');
-    autoSaveField(form, 'start-state');
-    autoSaveField(form, 'transition-body');
-    autoSaveField(form, 'accept-body');
+    for (const fieldName of this._codeFieldNames) {
+      autoSaveField(form, fieldName);
+    }
 
-    form.onsubmit = e => {
+    // Load saved state for unified mode toggle.
+    const unifiedModeInput = form['unified-mode'];
+    unifiedModeInput.checked = (
+      sessionAndLocalStorage.getItem('stateMachineUnifiedMode') === 'true');
+
+    const updateModeDisplay = () => {
+      const isUnified = this._isUnifiedMode();
+      this._splitContainer.style.display = isUnified ? 'none' : '';
+      this._unifiedContainer.style.display = isUnified ? '' : 'none';
+    };
+    updateModeDisplay();
+
+    // Handle mode toggle.
+    unifiedModeInput.addEventListener('change', () => {
+      sessionAndLocalStorage.setItem('stateMachineUnifiedMode', unifiedModeInput.checked);
+      const isUnified = this._isUnifiedMode();
+      updateModeDisplay();
+
+      // Sync content when switching modes.
+      try {
+        if (isUnified) {
+          // Split → Unified: just template the text directly.
+          form['unified-code'].value = this._splitToUnified(
+            form['start-state'].value,
+            form['transition-body'].value,
+            form['accept-body'].value);
+        } else {
+          // Unified → Split: parse then extract.
+          const parsed = this._parseUnifiedCode(form['unified-code'].value);
+          const { startExpression, transitionBody, acceptBody } =
+            this._parsedToSplit(parsed);
+          form['start-state'].value = startExpression;
+          form['transition-body'].value = transitionBody;
+          form['accept-body'].value = acceptBody;
+        }
+      } catch (e) {
+        // If parsing fails, keep existing values.
+      }
+      errorElem.textContent = '';
+    });
+
+    form.onsubmit = _ => {
       const formData = new FormData(form);
       const name = formData.get('name');
-      const startExpression = formData.get('start-state');
-      const transitionBody = formData.get('transition-body');
-      const acceptBody = formData.get('accept-body');
-      const shape = this._shape || SudokuConstraint.Shape.DEFAULT_SHAPE;
-      let encodedNFA;
+
       try {
-        encodedNFA = SudokuConstraint.NFA.encodeDefinition(
-          { startExpression, transitionBody, acceptBody },
-          shape.numValues);
+        const spec = this._isUnifiedMode()
+          ? this._parseUnifiedCode(formData.get('unified-code'))
+          : this._parseSplitCode(
+            formData.get('start-state'),
+            formData.get('transition-body'),
+            formData.get('accept-body'));
+
+        const shape = this._shape || SudokuConstraint.Shape.DEFAULT_SHAPE;
+        const encodedNFA = SudokuConstraint.NFA.encodeDefinition(spec, shape.numValues);
+
+        const cells = this._inputManager.getSelection();
+        this.collection.addConstraint(new SudokuConstraint.NFA(
+          encodedNFA, name, ...cells));
       } catch (err) {
         errorElem.textContent = err.message || err;
-        return false;
       }
-
-      const cells = this._inputManager.getSelection();
-      this.collection.addConstraint(new SudokuConstraint.NFA(
-        encodedNFA,
-        name,
-        ...cells));
 
       return false;
     };
-    for (const fieldName of this._fieldNames) {
-      const field = form[fieldName];
-      if (!field) continue;
-      field.addEventListener('input', () => {
-        errorElem.textContent = '';
-      });
+
+    // Clear error on input for all fields.
+    for (const fieldName of this._codeFieldNames) {
+      form[fieldName].addEventListener(
+        'input', () => errorElem.textContent = '');
     }
   }
 }

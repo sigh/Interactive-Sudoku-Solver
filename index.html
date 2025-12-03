@@ -402,18 +402,26 @@ layout: null
                 <div>
                   Name:
                   <input type="text" name="name" placeholder="optional" maxlength="20" columns="20">
+                  <div class="inline-switch switch">
+                    <label>
+                      <input id="unified-mode-input" type="checkbox" name="unified-mode">
+                      <span></span>
+                    </label>
+                    Unified input
+                  </div>
                 </div>
-                <div class="state-machine-code">
+                <div id="state-machine-split-input" class="state-machine-code">
                   <div class="state-machine-code-block">
                     <div class="description">
-                      <code>// The initial state(s). States can be any</code>
+                      <code>// The initial state(s). Each state can be any</code>
                       <code>// JSON-serializable value, except arrays.</code>
+                      <code>// Use an array for multiple start states.</code>
                     </div>
                     <span>
-                      <code>startState = (</code>
+                      <code>startState = </code>
                       <textarea id="state-machine-start-state" name="start-state" rows="1" placeholder='"start"'
                         spellcheck="false" class="code-input"></textarea>
-                      <code>);</code>
+                      <code>;</code>
                     </span>
                   </div>
                   <div class="state-machine-code-block">
@@ -434,10 +442,22 @@ layout: null
                       <code>// final state.</code>
                     </div>
                     <code>function accept(state) {</code>
-                    <textarea id="state-machine-accept-body" class="state-machine-code-textarea code-input" rows="4"
+                    <textarea id="state-machine-accept-body" class="state-machine-code-textarea code-input" rows="2"
                       name="accept-body" spellcheck="false" placeholder='return state === "next";'></textarea>
                     <code>}</code>
                   </div>
+                </div>
+                <div id="state-machine-unified-input" style="display: none;">
+                  <textarea id="state-machine-unified-code" name="unified-code" rows="18" spellcheck="false"
+                    class="code-input" style="width: 100%;" placeholder='startState = "start";
+
+function transition(state, value) {
+  return "next"
+}
+
+function accept(state) {
+  return state == "next";
+}'></textarea>
                 </div>
                 <div id="state-machine-input-definition-error" class="error"></div>
                 <div>
@@ -497,7 +517,7 @@ layout: null
 
         <div id="ordinary-chip-view" class="chip-view"></div>
 
-        <div class="dim-constraints-toggle switch">
+        <div class="inline-switch switch">
           <label>
             <input id="dim-constraints-input" type="checkbox">
             <span></span>
