@@ -948,7 +948,7 @@ class RootConstraintCollection extends ConstraintCollectionBase {
   _chipViewForConstraint(constraint) {
     switch (constraint.constructor.CATEGORY) {
       case 'LinesAndSets':
-      case 'CustomBinary':
+      case 'Pairwise':
       case 'Experimental':
       case 'StateMachine':
         return this._chipViews.get('ordinary');
@@ -1133,7 +1133,7 @@ class ConstraintManager {
         selectedConstraintCollection, inputManager, chipViews.get('jigsaw')),
       new ConstraintCategoryInput.LinesAndSets(
         selectedConstraintCollection, inputManager),
-      new ConstraintCategoryInput.CustomBinary(
+      new ConstraintCategoryInput.Pairwise(
         selectedConstraintCollection, inputManager),
       new ConstraintCategoryInput.StateMachine(
         selectedConstraintCollection, inputManager),
@@ -1153,6 +1153,7 @@ class ConstraintManager {
       categoryInput.setUpdateCallback(this.runUpdateCallback.bind(this));
     }
 
+    this._setUpCustomConstraintTabs();
     this._setUpFreeFormInput();
 
     // Clear button.
@@ -1292,6 +1293,32 @@ class ConstraintManager {
     dimConstraintsInput.onchange = () => {
       sudokuGrid.classList.toggle('constraints-dimmed', dimConstraintsInput.checked);
     };
+  }
+
+  _setUpCustomConstraintTabs() {
+    const panel = document.getElementById('custom-constraint-panel');
+
+    // Set up collapsible behavior.
+    new CollapsibleContainer(panel, /* defaultOpen= */ false).allowInComposite();
+
+    const tabButtons = panel.querySelectorAll('.tab-button');
+    const tabContents = panel.querySelectorAll('.tab-content');
+
+    for (const button of tabButtons) {
+      button.onclick = () => {
+        const tabId = button.dataset.tab;
+        for (const btn of tabButtons) btn.classList.toggle('active', btn === button);
+        for (const content of tabContents) content.classList.toggle('active', content.id === tabId);
+        sessionAndLocalStorage.setItem('custom-constraint-tab', tabId);
+      };
+    }
+
+    // Restore saved tab.
+    const savedTab = sessionAndLocalStorage.getItem('custom-constraint-tab');
+    if (savedTab) {
+      const savedButton = panel.querySelector(`.tab-button[data-tab="${savedTab}"]`);
+      if (savedButton) savedButton.click();
+    }
   }
 }
 
@@ -2159,14 +2186,15 @@ class CollapsibleContainer {
   }
 }
 
-ConstraintCategoryInput.CustomBinary = class CustomBinary extends ConstraintCategoryInput {
-  constructor(collection, inputManager) {
+// Base class for JavaScript constraint inputs that share the tabbed panel.
+ConstraintCategoryInput.JavaScriptConstraint = class JavaScriptConstraint extends ConstraintCategoryInput {
+  constructor(collection, inputManager, tabContentId, addButtonName) {
     super(collection);
 
-    this._form = document.getElementById('custom-binary-input');
-    this._collapsibleContainer = new CollapsibleContainer(
-      this._form.firstElementChild,
-      /* defaultOpen= */ false).allowInComposite();
+    this._form = document.getElementById('custom-constraint-input');
+    this._panel = document.getElementById('custom-constraint-panel');
+    this._tabContent = document.getElementById(tabContentId);
+    this._addButtonName = addButtonName;
     this._onSelection([], true);  // Set up in disabled state.
     inputManager.addSelectionPreserver(this._form);
 
@@ -2175,8 +2203,6 @@ ConstraintCategoryInput.CustomBinary = class CustomBinary extends ConstraintCate
 
     this._shape = null;
     this._inputManager = inputManager;
-
-    this._setUp();
   }
 
   reshape(shape) {
@@ -2184,21 +2210,28 @@ ConstraintCategoryInput.CustomBinary = class CustomBinary extends ConstraintCate
   }
 
   _onSelection(selection, finishedSelecting) {
-    const form = this._form;
     const hasEnoughCells = selection.length > 1;
-    form.classList.toggle('disabled', !hasEnoughCells);
-    form['add-constraint'].disabled = !hasEnoughCells;
-    if (finishedSelecting
-      && hasEnoughCells
-      && this._collapsibleContainer.isOpen()) {
-      // If the function is empty, focus on it. Otherwise focus on the
-      // add button.
-      if (form['function'].value === '') {
-        form['function'].focus();
-      } else {
-        form['add-constraint'].focus();
+    this._tabContent.classList.toggle('disabled', !hasEnoughCells);
+    this._form[this._addButtonName].disabled = !hasEnoughCells;
+
+    // Also toggle disabled styling on the panel (but not the fieldset itself
+    // so that tab switching and toggles still work).
+    this._form.firstElementChild.classList.toggle('disabled', !hasEnoughCells);
+
+    const isActiveTab = this._panel.classList.contains('container-open')
+      && this._tabContent.classList.contains('active');
+    if (isActiveTab) {
+      if (finishedSelecting && hasEnoughCells) {
+        this._form[this._addButtonName].focus();
       }
     }
+  }
+}
+
+ConstraintCategoryInput.Pairwise = class Pairwise extends ConstraintCategoryInput.JavaScriptConstraint {
+  constructor(collection, inputManager) {
+    super(collection, inputManager, 'custom-binary-tab', 'add-binary-constraint');
+    this._setUp();
   }
 
   _setUp() {
@@ -2206,13 +2239,13 @@ ConstraintCategoryInput.CustomBinary = class CustomBinary extends ConstraintCate
     const errorElem = document.getElementById(
       'custom-binary-input-error');
 
-    autoSaveField(form, 'name');
+    autoSaveField(form, 'binary-name');
     autoSaveField(form, 'chain-mode');
     autoSaveField(form, 'function');
 
-    form.onsubmit = e => {
+    form['add-binary-constraint'].onclick = e => {
       const formData = new FormData(form);
-      const name = formData.get('name');
+      const name = formData.get('binary-name');
       const type = formData.get('chain-mode');
       const fnStr = formData.get('function');
 
@@ -2230,6 +2263,7 @@ ConstraintCategoryInput.CustomBinary = class CustomBinary extends ConstraintCate
 
       const cells = this._inputManager.getSelection();
       this.collection.addConstraint(new typeCls(key, name, ...cells));
+      this._inputManager.setSelection([]);
 
       return false;
     };
@@ -2239,22 +2273,10 @@ ConstraintCategoryInput.CustomBinary = class CustomBinary extends ConstraintCate
   }
 }
 
-ConstraintCategoryInput.StateMachine = class StateMachine extends ConstraintCategoryInput {
+ConstraintCategoryInput.StateMachine = class StateMachine extends ConstraintCategoryInput.JavaScriptConstraint {
   constructor(collection, inputManager) {
-    super(collection);
+    super(collection, inputManager, 'state-machine-tab', 'add-state-machine-constraint');
 
-    this._form = document.getElementById('state-machine-input');
-    this._collapsibleContainer = new CollapsibleContainer(
-      this._form.firstElementChild,
-      /* defaultOpen= */ false).allowInComposite();
-    this._onSelection([], true);  // Set up in disabled state.
-    inputManager.addSelectionPreserver(this._form);
-
-    inputManager.onSelection(
-      deferUntilAnimationFrame(this._onSelection.bind(this)));
-
-    this._inputManager = inputManager;
-    this._shape = null;
     this._codeFieldNames = [
       'start-state', 'transition-body', 'accept-body', 'unified-code'];
 
@@ -2262,22 +2284,6 @@ ConstraintCategoryInput.StateMachine = class StateMachine extends ConstraintCate
     this._unifiedContainer = document.getElementById('state-machine-unified-input');
 
     this._setUp();
-  }
-
-  reshape(shape) {
-    this._shape = shape;
-  }
-
-  _onSelection(selection, finishedSelecting) {
-    const form = this._form;
-    const hasSelection = selection.length > 0;
-    form.classList.toggle('disabled', !hasSelection);
-    form['add-constraint'].disabled = !hasSelection;
-    if (finishedSelecting
-      && selection.length > 1  // Don't auto-focus for single-cell constraints.
-      && this._collapsibleContainer.isOpen()) {
-      form['add-constraint'].focus();
-    }
   }
 
   _isUnifiedMode() {
@@ -2352,7 +2358,7 @@ ConstraintCategoryInput.StateMachine = class StateMachine extends ConstraintCate
     const errorElem = document.getElementById(
       'state-machine-input-error');
 
-    autoSaveField(form, 'name');
+    autoSaveField(form, 'state-machine-name');
     autoSaveField(form, 'unified-mode');
     for (const fieldName of this._codeFieldNames) {
       autoSaveField(form, fieldName);
@@ -2395,9 +2401,9 @@ ConstraintCategoryInput.StateMachine = class StateMachine extends ConstraintCate
       errorElem.textContent = '';
     });
 
-    form.onsubmit = _ => {
+    form['add-state-machine-constraint'].onclick = _ => {
       const formData = new FormData(form);
-      const name = formData.get('name');
+      const name = formData.get('state-machine-name');
 
       try {
         const spec = this._isUnifiedMode()
@@ -2408,11 +2414,12 @@ ConstraintCategoryInput.StateMachine = class StateMachine extends ConstraintCate
             formData.get('accept-body'));
 
         const shape = this._shape || SudokuConstraint.Shape.DEFAULT_SHAPE;
-        const encodedNFA = SudokuConstraint.NFA.encodeDefinition(spec, shape.numValues);
+        const encodedNFA = SudokuConstraint.NFA.encodeSpec(spec, shape.numValues);
 
         const cells = this._inputManager.getSelection();
         this.collection.addConstraint(new SudokuConstraint.NFA(
           encodedNFA, name, ...cells));
+        this._inputManager.setSelection([]);
       } catch (err) {
         errorElem.textContent = err.message || err;
       }
