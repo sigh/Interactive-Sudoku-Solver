@@ -370,12 +370,18 @@ export const autoSaveField = (element, field) => {
   const savedValue = sessionStorage.getItem(key);
 
   const input = field ? element[field] : element;
-  if (savedValue) {
-    input.value = savedValue;
+  const isCheckbox = input.type === 'checkbox';
+
+  if (savedValue !== null) {
+    if (isCheckbox) {
+      input.checked = savedValue === 'true';
+    } else {
+      input.value = savedValue;
+    }
   }
 
   element.addEventListener('change', () => {
-    sessionStorage.setItem(key, input.value);
+    sessionStorage.setItem(key, isCheckbox ? input.checked : input.value);
   });
 };
 

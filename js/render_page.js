@@ -1281,9 +1281,7 @@ class ConstraintManager {
     const dimConstraintsInput = document.getElementById('dim-constraints-input');
     const sudokuGrid = document.getElementById('sudoku-grid');
 
-    // Load saved state from sessionStorage
-    dimConstraintsInput.checked = (
-      sessionAndLocalStorage.getItem('dimConstraints') === 'true');
+    autoSaveField(dimConstraintsInput);
 
     // Apply initial state
     if (dimConstraintsInput.checked) {
@@ -1292,9 +1290,7 @@ class ConstraintManager {
 
     // Handle toggle
     dimConstraintsInput.onchange = () => {
-      const isChecked = dimConstraintsInput.checked;
-      sessionAndLocalStorage.setItem('dimConstraints', isChecked);
-      sudokuGrid.classList.toggle('constraints-dimmed', isChecked);
+      sudokuGrid.classList.toggle('constraints-dimmed', dimConstraintsInput.checked);
     };
   }
 }
@@ -2357,14 +2353,12 @@ ConstraintCategoryInput.StateMachine = class StateMachine extends ConstraintCate
       'state-machine-input-definition-error');
 
     autoSaveField(form, 'name');
+    autoSaveField(form, 'unified-mode');
     for (const fieldName of this._codeFieldNames) {
       autoSaveField(form, fieldName);
     }
 
-    // Load saved state for unified mode toggle.
     const unifiedModeInput = form['unified-mode'];
-    unifiedModeInput.checked = (
-      sessionAndLocalStorage.getItem('stateMachineUnifiedMode') === 'true');
 
     const updateModeDisplay = () => {
       const isUnified = this._isUnifiedMode();
@@ -2375,7 +2369,6 @@ ConstraintCategoryInput.StateMachine = class StateMachine extends ConstraintCate
 
     // Handle mode toggle.
     unifiedModeInput.addEventListener('change', () => {
-      sessionAndLocalStorage.setItem('stateMachineUnifiedMode', unifiedModeInput.checked);
       const isUnified = this._isUnifiedMode();
       updateModeDisplay();
 
