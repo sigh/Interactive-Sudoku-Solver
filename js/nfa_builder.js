@@ -4,7 +4,6 @@ const {
   BitSet,
   BitWriter,
   memoize,
-  setPeek,
   requiredBits
 } = await import('./util.js' + self.VERSION_PARAM);
 
@@ -15,13 +14,16 @@ export const Symbol = (value) => new NFA.Symbol(value);
 // Using -1 keeps the array in packed SMI mode in V8.
 const REMOVE_STATE = -1;
 
+const MAX_STATE_COUNT = 1024;
+
 export class NFA {
-  constructor() {
+  constructor({ stateLimit = null } = {}) {
     this._startIds = new Set();
     this._acceptIds = new Set();
     this._transitions = [];
     this._epsilon = [];
     this._sealed = false;
+    this._stateLimit = stateLimit;
   }
 
   _assertUnsealed() {
@@ -58,6 +60,9 @@ export class NFA {
 
   addState() {
     this._assertUnsealed();
+    if (this._stateLimit !== null && this._transitions.length >= this._stateLimit) {
+      throw new Error(`NFA exceeded state limit of ${this._stateLimit}`);
+    }
     this._transitions.push([]);
     return this._transitions.length - 1;
   }
@@ -540,15 +545,17 @@ export class NFA {
 // (with ranges and optional negation), grouping '()', alternation '|', and the
 // quantifiers '*', '+', '?', and '{n}', '{n,}', '{n,m}'.
 export const regexToNFA = (pattern, numSymbols) => {
-  const parser = new RegexParser(pattern);
-  const ast = parser.parse();
-  const charToSymbol = createCharToSymbol(numSymbols);
-  const builder = new RegexToNFABuilder(charToSymbol, numSymbols);
-  const nfa = builder.build(ast);
-
-  optimizeNFA(nfa);
-
-  return nfa;
+  try {
+    const parser = new RegexParser(pattern);
+    const ast = parser.parse();
+    const charToSymbol = createCharToSymbol(numSymbols);
+    const builder = new RegexToNFABuilder(charToSymbol, numSymbols);
+    const nfa = builder.build(ast);
+    optimizeNFA(nfa);
+    return nfa;
+  } catch (e) {
+    throw new Error(`Regex "${pattern}" could not be compiled: ${e.message}`);
+  }
 };
 
 export const javascriptSpecToNFA = (config, numSymbols) => {
@@ -1130,7 +1137,7 @@ export class RegexParser {
 
 class RegexToNFABuilder {
   constructor(charToSymbol, numSymbols) {
-    this._nfa = new NFA();
+    this._nfa = new NFA({ stateLimit: MAX_STATE_COUNT });
     this._charToSymbol = charToSymbol;
     this._numSymbols = numSymbols;
   }
@@ -1243,8 +1250,6 @@ class RegexToNFABuilder {
 }
 
 export class JavascriptNFABuilder {
-  static MAX_STATE_COUNT = 1024;
-
   constructor(definition, numValues) {
     const { startExpression, transitionBody, acceptBody } = definition;
     this._startExpression = startExpression;
@@ -1254,15 +1259,11 @@ export class JavascriptNFABuilder {
   }
 
   build() {
-    const nfa = new NFA();
+    const nfa = new NFA({ stateLimit: MAX_STATE_COUNT });
     const stateStrToIndex = new Map();
     const indexToStateStr = [];
 
     const addState = (stateStr, accepting) => {
-      if (nfa.numStates() >= JavascriptNFABuilder.MAX_STATE_COUNT) {
-        throw new Error(
-          `State machine produced more than ${JavascriptNFABuilder.MAX_STATE_COUNT} states`);
-      }
       const index = nfa.addState();
       stateStrToIndex.set(stateStr, index);
       indexToStateStr.push(stateStr);
