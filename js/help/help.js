@@ -32,11 +32,11 @@ const CATEGORY_CONFIGS = {
       Use the "Set multiple values" panel to set more than one value.
       Select extra cells by dragging, or shift-clicking.`
   },
-  'CustomBinary': {
-    description: 'Custom binary relationships between cells',
+  'Pairwise': {
+    description: 'Custom pairwise relationships between cells',
     instructions: `
       Select cells by click and dragging on the grid then configuring the
-      constraint in the "Custom binary constraints" panel
+      constraint in the "JavaScript constraints" panel using the Pairwise tab
       (see panel for instructions).
       Cells can also be added and removed by holding down shift while
       clicking.`,
@@ -45,8 +45,8 @@ const CATEGORY_CONFIGS = {
     description: 'Finite-state machine for accepting cell sequences',
     instructions: `
       Select cells by click and dragging on the grid, then use the
-      "State machine" panel to define the start state, transition, and accept
-      logic (see panel for guidance).
+      "Custom JavaScript constraints" panel with the State machine tab to define
+      the start state, transition, and accept logic (see panel for guidance).
       Cells can also be added and removed by holding shift while clicking.`,
   },
   'Jigsaw': {

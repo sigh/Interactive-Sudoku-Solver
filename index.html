@@ -328,63 +328,64 @@ layout: null
           </div>
         </div>
 
-        <form id="custom-binary-input" class="constraint-code-form hide-until-load">
-          <fieldset tabindex="0" class="constraint-panel">
-            <h2>Custom binary constraints</h2>
+        <form id="custom-constraint-input" class="hide-until-load">
+          <fieldset id="custom-constraint-panel" tabindex="0" class="constraint-panel">
+            <h2>Custom JavaScript constraints</h2>
             <div>
-              <div>
+              <div class="tab-container">
+                <button type="button" class="tab-button active" data-tab="custom-binary-tab">Pairwise</button>
+                <button type="button" class="tab-button hide-unless-debug" data-tab="state-machine-tab">State
+                  machine</button>
+              </div>
+
+              <div id="custom-binary-tab" class="tab-content active">
                 <div class="description">
                   <p>
                     Create constraints between pairs of cells by providing a
                     custom JavaScript function.
                   </p>
                 </div>
-                <div>
-                  Name:
-                  <input type="text" name="name" placeholder="optional" maxlength="20" columns="20">
-                </div>
-                <div>
-                  Chain handling
-                  <span class="tooltip" data-text="
-                  Select how to handle chains of more than two cells. e.g. for
-                  a chain of cells [A, B, C] 'Consecutive pairs' will create
-                  constraints on [A, B] and [B, C] while 'All pairs' will create
-                  constraints on [A, B], [A, C], [B, A], [B, C], [C, A]
-                  and [C, B].">
-                  </span>:
-                  <select name="chain-mode">
-                    <option value="Binary">Consecutive pairs</option>
-                    <option value="BinaryX">All pairs</option>
-                  </select>
-                </div>
-                <div class="constraint-code">
-                  <div class="constraint-code-block">
-                    <div class="description">
-                      <code>// Return true if the cell values a and b are a</code>
-                      <code>// valid pair.</code>
-                      <code>// Example: a &lt; b (thermometer constraint)</code>
+                <div class="constraint-code-form">
+                  <div>
+                    Name:
+                    <input type="text" name="binary-name" placeholder="optional" maxlength="20" columns="20">
+                  </div>
+                  <div>
+                    Chain handling
+                    <span class="tooltip" data-text="
+                    Select how to handle chains of more than two cells. e.g. for
+                    a chain of cells [A, B, C] 'Consecutive pairs' will create
+                    constraints on [A, B] and [B, C] while 'All pairs' will create
+                    constraints on [A, B], [A, C], [B, A], [B, C], [C, A]
+                    and [C, B].">
+                    </span>:
+                    <select name="chain-mode">
+                      <option value="Binary">Consecutive pairs</option>
+                      <option value="BinaryX">All pairs</option>
+                    </select>
+                  </div>
+                  <div class="constraint-code">
+                    <div class="constraint-code-block">
+                      <div class="description">
+                        <code>// Return true if the cell values a and b are a</code>
+                        <code>// valid pair.</code>
+                        <code>// Example: a &lt; b (thermometer constraint)</code>
+                      </div>
+                      <code>constraintCheck = (a, b) =&gt; </code>
+                      <textarea rows="2" name="function" class="constraint-code-textarea code-input"
+                        spellcheck="false"></textarea>
                     </div>
-                    <code>constraintCheck = (a, b) =&gt; </code>
-                    <textarea rows="2" name="function" class="constraint-code-textarea code-input"
-                      spellcheck="false"></textarea>
+                  </div>
+                  <div id="custom-binary-input-error" class="error"></div>
+                  <div>
+                    <button type="button" title="Add constraint" name="add-binary-constraint">
+                      Add
+                    </button>
                   </div>
                 </div>
-                <div id="custom-binary-input-error" class="error"></div>
-                <div>
-                  <button type="submit" title="Add constraint" name="add-constraint">
-                    Add
-                  </button>
-                </div>
               </div>
-            </div>
-          </fieldset>
-        </form>
 
-        <form id="state-machine-input" class="constraint-code-form hide-until-load hide-unless-debug">
-          <fieldset tabindex="0" class="constraint-panel">
-            <h2>State machine constraints</h2>
-            <div>
-              <div>
+              <div id="state-machine-tab" class="tab-content">
                 <div class="description">
                   <p>
                     Define an finite-state machine using JavaScript transition
@@ -396,57 +397,58 @@ layout: null
                     states.
                   </p>
                 </div>
-                <div>
-                  Name:
-                  <input type="text" name="name" placeholder="optional" maxlength="20" columns="20">
-                  <div class="inline-switch switch">
-                    <label>
-                      <input id="unified-mode-input" type="checkbox" name="unified-mode">
-                      <span></span>
-                    </label>
-                    Unified input
-                  </div>
-                </div>
-                <div id="state-machine-split-input" class="constraint-code">
-                  <div class="constraint-code-block">
-                    <div class="description">
-                      <code>// The initial state(s). Each state can be any</code>
-                      <code>// JSON-serializable value, except arrays.</code>
-                      <code>// Use an array for multiple start states.</code>
+                <div class="constraint-code-form">
+                  <div>
+                    Name:
+                    <input type="text" name="state-machine-name" placeholder="optional" maxlength="20" columns="20">
+                    <div class="inline-switch switch">
+                      <label>
+                        <input id="unified-mode-input" type="checkbox" name="unified-mode">
+                        <span></span>
+                      </label>
+                      Unified input
                     </div>
-                    <span>
-                      <code>startState = </code>
-                      <textarea id="state-machine-start-state" name="start-state" rows="1" placeholder='"start"'
-                        spellcheck="false" class="code-input"></textarea>
-                      <code>;</code>
-                    </span>
                   </div>
-                  <div class="constraint-code-block">
-                    <div class="description">
-                      <code>// transition returns a next state, or an array</code>
-                      <code>// of states based on the current state and the</code>
-                      <code>// cell value. Returns undefined or the empty</code>
-                      <code>// array to reject a value.</code>
+                  <div id="state-machine-split-input" class="constraint-code">
+                    <div class="constraint-code-block">
+                      <div class="description">
+                        <code>// The initial state(s). Each state can be any</code>
+                        <code>// JSON-serializable value, except arrays.</code>
+                        <code>// Use an array for multiple start states.</code>
+                      </div>
+                      <span>
+                        <code>startState = </code>
+                        <textarea id="state-machine-start-state" name="start-state" rows="1" placeholder='"start"'
+                          spellcheck="false" class="code-input"></textarea>
+                        <code>;</code>
+                      </span>
                     </div>
-                    <code>function transition(state, value) {</code>
-                    <textarea id="state-machine-transition-body" class="constraint-code-textarea code-input" rows="10"
-                      name="transition-body" spellcheck="false" placeholder='return "next";'></textarea>
-                    <code>}</code>
-                  </div>
-                  <div class="constraint-code-block">
-                    <div class="description">
-                      <code>// accept returns true when the state is a valid</code>
-                      <code>// final state.</code>
+                    <div class="constraint-code-block">
+                      <div class="description">
+                        <code>// transition returns a next state, or an array</code>
+                        <code>// of states based on the current state and the</code>
+                        <code>// cell value. Returns undefined or the empty</code>
+                        <code>// array to reject a value.</code>
+                      </div>
+                      <code>function transition(state, value) {</code>
+                      <textarea id="state-machine-transition-body" class="constraint-code-textarea code-input" rows="10"
+                        name="transition-body" spellcheck="false" placeholder='return "next";'></textarea>
+                      <code>}</code>
                     </div>
-                    <code>function accept(state) {</code>
-                    <textarea id="state-machine-accept-body" class="constraint-code-textarea code-input" rows="2"
-                      name="accept-body" spellcheck="false" placeholder='return state === "next";'></textarea>
-                    <code>}</code>
+                    <div class="constraint-code-block">
+                      <div class="description">
+                        <code>// accept returns true when the state is a valid</code>
+                        <code>// final state.</code>
+                      </div>
+                      <code>function accept(state) {</code>
+                      <textarea id="state-machine-accept-body" class="constraint-code-textarea code-input" rows="2"
+                        name="accept-body" spellcheck="false" placeholder='return state === "next";'></textarea>
+                      <code>}</code>
+                    </div>
                   </div>
-                </div>
-                <div id="state-machine-unified-input" style="display: none;">
-                  <textarea id="state-machine-unified-code" name="unified-code" rows="18" spellcheck="false"
-                    class="code-input" style="width: 100%;" placeholder='startState = "start";
+                  <div id="state-machine-unified-input" style="display: none;">
+                    <textarea id="state-machine-unified-code" name="unified-code" rows="18" spellcheck="false"
+                      class="code-input constraint-code-textarea" placeholder='startState = "start";
 
 function transition(state, value) {
   return "next"
@@ -455,12 +457,13 @@ function transition(state, value) {
 function accept(state) {
   return state == "next";
 }'></textarea>
-                </div>
-                <div id="state-machine-input-error" class="error"></div>
-                <div>
-                  <button type="submit" title="Add constraint" name="add-constraint">
-                    Add
-                  </button>
+                  </div>
+                  <div id="state-machine-input-error" class="error"></div>
+                  <div>
+                    <button type="button" title="Add constraint" name="add-state-machine-constraint">
+                      Add
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

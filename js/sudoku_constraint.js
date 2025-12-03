@@ -438,7 +438,7 @@ export class CompositeConstraintBase extends SudokuConstraintBase {
   //    (such as Anti-knight). It is easier to ban everything in the layout
   //    panel.
   static _ALLOWED_CATEGORIES = new Set(
-    ['LinesAndSets', 'GivenCandidates', 'OutsideClue', 'Composite', 'CustomBinary', 'StateMachine']);
+    ['LinesAndSets', 'GivenCandidates', 'OutsideClue', 'Composite', 'Pairwise', 'StateMachine']);
 
   static allowedConstraintClass(constraintClass) {
     return this._ALLOWED_CATEGORIES.has(constraintClass.CATEGORY);
@@ -1055,13 +1055,9 @@ export class SudokuConstraint {
       return `NFA${name} (${numStates} states)`;
     }
 
-    static encodeDefinition(spec, numValues) {
+    static encodeSpec(spec, numValues) {
       const nfa = javascriptSpecToNFA(spec, numValues);
       return NFASerializer.serialize(nfa);
-    }
-
-    static decodeDefinition(encodedNFA) {
-      return NFASerializer.deserialize(encodedNFA);
     }
 
     static *makeFromArgs(encodedNFA, ...items) {
@@ -2002,7 +1998,7 @@ export class SudokuConstraint {
   static Binary = class Binary extends SudokuConstraintBase {
     static DESCRIPTION = (
       "Applies a custom binary relationship between consecutive pairs of cells.");
-    static CATEGORY = 'CustomBinary';
+    static CATEGORY = 'Pairwise';
     static DISPLAY_CONFIG = {
       displayClass: 'CustomLine',
       nodeMarker: LineOptions.SMALL_EMPTY_CIRCLE_MARKER,
@@ -2133,7 +2129,7 @@ export class SudokuConstraint {
   static BinaryX = class BinaryX extends SudokuConstraint.Binary {
     static DESCRIPTION = (
       "Applies a custom binary relationship between all pairs of the given cells.");
-    static CATEGORY = 'CustomBinary';
+    static CATEGORY = 'Pairwise';
     static DISPLAY_CONFIG = {
       displayClass: 'CustomLine',
       nodeMarker: LineOptions.SMALL_FULL_CIRCLE_MARKER,
@@ -2147,7 +2143,7 @@ export class SudokuConstraint {
     }
 
     static displayName() {
-      return 'Binary: Pairwise';
+      return 'Binary: All pairs';
     }
   }
 

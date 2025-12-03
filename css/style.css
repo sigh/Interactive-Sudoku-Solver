@@ -1015,7 +1015,7 @@ h3 {
   color: black;
 }
 
-.constraint-code-form .collapsible-body>div {
+.constraint-code-form {
   margin: 5px;
   display: flex;
   flex-direction: column;
@@ -1135,6 +1135,50 @@ h3 {
 .important-log-line {
   font-weight: bold;
   margin: 5px 0;
+}
+
+.tab-container {
+  display: flex;
+  margin-bottom: 10px;
+  border-bottom: 1px solid #ccc;
+}
+
+.tab-button {
+  padding: 0px 12px;
+  margin: 0;
+  border: none;
+  border-radius: 0;
+  background: none;
+  cursor: pointer;
+  font: inherit;
+  color: darkgrey;
+  text-shadow: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1.5px;
+  transition: border-color 0.3s, color 0.3s;
+}
+
+.tab-button:hover,
+.tab-button:hover:enabled {
+  background: none;
+  color: #111;
+}
+
+.tab-button:active {
+  box-shadow: none;
+}
+
+.tab-button.active {
+  color: #000;
+  border-bottom-color: #333;
+}
+
+.tab-content {
+  display: none;
+}
+
+.tab-content.active {
+  display: block;
 }
 
 .constraint-code {
