@@ -220,15 +220,14 @@ export class NFA {
           const mapped = remap[targets[0]];
           if (mapped !== REMOVE_STATE) targets[writeIndex++] = mapped;
         } else {
-          for (let i = 0; i < targets.length; i++) {
+          targetLoop: for (let i = 0; i < targets.length; i++) {
             const mapped = remap[targets[i]];
             if (mapped === REMOVE_STATE) continue;
             // Check for duplicate (scan already-written portion).
-            let isDup = false;
             for (let j = 0; j < writeIndex; j++) {
-              if (targets[j] === mapped) { isDup = true; break; }
+              if (targets[j] === mapped) { continue targetLoop; }
             }
-            if (!isDup) targets[writeIndex++] = mapped;
+            targets[writeIndex++] = mapped;
           }
         }
         targets.length = writeIndex;
