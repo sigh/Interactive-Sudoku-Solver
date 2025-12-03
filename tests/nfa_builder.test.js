@@ -82,6 +82,82 @@ await runTest('regex charsets should honor quantifiers', () => {
   expectRejects(nfa, [4, 4], 'second optional symbol should not match');
 });
 
+await runTest('regex count quantifier {n} exact count', () => {
+  const nfa = regexToNFA('1{3}', 9);
+  expectRejects(nfa, [1, 1], 'fewer than n should reject');
+  expectAccepts(nfa, [1, 1, 1], 'exactly n should accept');
+  expectRejects(nfa, [1, 1, 1, 1], 'more than n should reject');
+});
+
+await runTest('regex count quantifier {n,} unbounded', () => {
+  const nfa = regexToNFA('1{2,}', 9);
+  expectRejects(nfa, [1], 'fewer than min should reject');
+  expectAccepts(nfa, [1, 1], 'exactly min should accept');
+  expectAccepts(nfa, [1, 1, 1], 'more than min should accept');
+  expectAccepts(nfa, [1, 1, 1, 1, 1], 'many more than min should accept');
+});
+
+await runTest('regex count quantifier {n,m} bounded range', () => {
+  const nfa = regexToNFA('1{2,4}', 9);
+  expectRejects(nfa, [1], 'fewer than min should reject');
+  expectAccepts(nfa, [1, 1], 'exactly min should accept');
+  expectAccepts(nfa, [1, 1, 1], 'between min and max should accept');
+  expectAccepts(nfa, [1, 1, 1, 1], 'exactly max should accept');
+  expectRejects(nfa, [1, 1, 1, 1, 1], 'more than max should reject');
+});
+
+await runTest('regex count quantifier {0} matches empty', () => {
+  const nfa = regexToNFA('1{0}2', 9);
+  expectAccepts(nfa, [2], 'should match just the suffix');
+  expectRejects(nfa, [1, 2], 'should reject if prefix present');
+});
+
+await runTest('regex count quantifier {0,n} allows zero', () => {
+  const nfa = regexToNFA('1{0,2}2', 9);
+  expectAccepts(nfa, [2], 'zero occurrences should accept');
+  expectAccepts(nfa, [1, 2], 'one occurrence should accept');
+  expectAccepts(nfa, [1, 1, 2], 'two occurrences should accept');
+  expectRejects(nfa, [1, 1, 1, 2], 'three occurrences should reject');
+});
+
+await runTest('regex count quantifier with groups', () => {
+  const nfa = regexToNFA('(12){2}', 9);
+  expectRejects(nfa, [1, 2], 'single group should reject');
+  expectAccepts(nfa, [1, 2, 1, 2], 'two groups should accept');
+  expectRejects(nfa, [1, 2, 1, 2, 1, 2], 'three groups should reject');
+});
+
+await runTest('regex count quantifier with charset', () => {
+  const nfa = regexToNFA('[12]{3}', 9);
+  expectAccepts(nfa, [1, 2, 1], 'mixed values should accept');
+  expectAccepts(nfa, [2, 2, 2], 'all same values should accept');
+  expectRejects(nfa, [1, 2], 'too short should reject');
+  expectRejects(nfa, [1, 2, 3], 'out of charset should reject');
+});
+
+await runTest('regex count quantifier chained with other quantifiers', () => {
+  const nfa = regexToNFA('1{2}2*3?', 9);
+  expectAccepts(nfa, [1, 1], 'just required count');
+  expectAccepts(nfa, [1, 1, 2, 2, 2], 'count plus star');
+  expectAccepts(nfa, [1, 1, 3], 'count plus optional');
+  expectAccepts(nfa, [1, 1, 2, 3], 'count plus star plus optional');
+  expectRejects(nfa, [1], 'insufficient count should reject');
+});
+
+await runTest('regex count quantifier {1} is identity', () => {
+  const nfa = regexToNFA('1{1}', 9);
+  expectAccepts(nfa, [1], 'single should accept');
+  expectRejects(nfa, [1, 1], 'double should reject');
+  expectRejects(nfa, [], 'empty should reject');
+});
+
+await runTest('regex count quantifier error on invalid syntax', () => {
+  assert.throws(() => regexToNFA('1{,2}', 9), /Expected number/, 'missing min should throw');
+  assert.throws(() => regexToNFA('1{3,2}', 9), /max.*<.*min/i, 'max < min should throw');
+  assert.throws(() => regexToNFA('1{', 9), /Expected number/, 'unclosed brace should throw');
+  assert.throws(() => regexToNFA('1{}', 9), /Expected number/, 'empty braces should throw');
+});
+
 await runTest('NFA serialization should round-trip plain format', () => {
   // Create an NFA where plain format is more efficient than packed.
   // Multiple targets per symbol forces plain format.

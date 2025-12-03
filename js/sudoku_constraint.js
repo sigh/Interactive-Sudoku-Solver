@@ -919,7 +919,9 @@ export class SudokuConstraint {
 
   static Regex = class Regex extends SudokuConstraintBase {
     static DESCRIPTION = (`
-      Digits along the line, read in order, must match the provided regular expression.`);
+      Digits along the line, read in order, must match the provided regular
+      expression. Grouping '()', alternation '|', wildcard '.', and the
+      quantifiers '*', '+', '?', and '{n}', '{n,}', '{n,m}' are supported.`);
     static CATEGORY = 'LinesAndSets';
     static DISPLAY_CONFIG = {
       displayClass: 'CustomLine',
