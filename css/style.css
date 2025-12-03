@@ -794,8 +794,12 @@ footer {
   border-radius: 50%;
 }
 
-.switch.dim-constraints-toggle {
+.switch.inline-switch {
+  display: inline-flex;
   flex-direction: row;
+  vertical-align: middle;
+  align-items: center;
+  margin-left: 5px;
 }
 
 input:checked+span {
@@ -1166,7 +1170,7 @@ h3 {
   display: block;
   width: calc(100% - 1.5rem);
   margin: 4px 0 0 1.5rem;
-  min-height: 5em;
+  min-height: 2em;
   padding: 6px;
   box-sizing: border-box;
   resize: vertical;

@@ -252,13 +252,9 @@ await runTest('NFA serialization should handle accepting start states', () => {
 
 await runTest('JavascriptNFABuilder should handle parity checks', () => {
   const builder = new JavascriptNFABuilder({
-    startExpression: '({ sum: 0 })',
-    transitionBody: `
-      return { sum: (state.sum + value) % 2 };
-    `,
-    acceptBody: `
-      return state.sum === 0;
-    `,
+    startState: { sum: 0 },
+    transition: (state, value) => ({ sum: (state.sum + value) % 2 }),
+    accept: (state) => state.sum === 0,
   }, 4);
   const nfa = builder.build();
   expectAccepts(nfa, [1, 2, 1], 'even parity sequences should accept');
@@ -268,15 +264,13 @@ await runTest('JavascriptNFABuilder should handle parity checks', () => {
 
 await runTest('JavascriptNFABuilder should support multiple start states', () => {
   const builder = new JavascriptNFABuilder({
-    startExpression: '[{ required: 1, seen: false }, { required: 2, seen: false }]',
-    transitionBody: `
+    startState: [{ required: 1, seen: false }, { required: 2, seen: false }],
+    transition: (state, value) => {
       if (!state.seen && value === state.required) {
         return { ...state, seen: true };
       }
-    `,
-    acceptBody: `
-      return state.seen === true;
-    `,
+    },
+    accept: (state) => state.seen === true,
   }, 4);
   const nfa = builder.build();
   expectAccepts(nfa, [1], 'start branch for value 1 should accept');
@@ -287,8 +281,8 @@ await runTest('JavascriptNFABuilder should support multiple start states', () =>
 
 await runTest('JavascriptNFABuilder should allow transition fan-out', () => {
   const builder = new JavascriptNFABuilder({
-    startExpression: '({ stage: "START" })',
-    transitionBody: `
+    startState: { stage: 'START' },
+    transition: (state, value) => {
       if (state.stage === 'START' && value === 1) {
         return [{ stage: 'LEFT' }, { stage: 'RIGHT' }];
       }
@@ -298,10 +292,8 @@ await runTest('JavascriptNFABuilder should allow transition fan-out', () => {
       if (state.stage === 'RIGHT' && value === 3) {
         return { stage: 'ACCEPT' };
       }
-    `,
-    acceptBody: `
-      return state.stage === 'ACCEPT';
-    `,
+    },
+    accept: (state) => state.stage === 'ACCEPT',
   }, 4);
   const nfa = builder.build();
   expectAccepts(nfa, [1, 2], 'left branch should reach accept');
@@ -313,13 +305,13 @@ await runTest('JavascriptNFABuilder should allow transition fan-out', () => {
 await runTest('javascriptSpecToNFA should optimize and return ready NFA', () => {
   // Parity check - bounded state space (only 2 states: even/odd).
   const nfa = javascriptSpecToNFA({
-    startExpression: '0',
-    transitionBody: 'return (state + value) % 2;',
-    acceptBody: 'return state === 0;',
+    startState: 0,
+    transition: (state, value) => (state + value) % 2,
+    accept: (state) => state === 0,
   }, 3);
 
   // Parity check has single start state.
-  assert.equal(nfa.getStartIds().size, 1, 'should have single start state');
+  assert.equal(nfa.getStartIds().size, 1, 'should have single start state');;
 
   expectAccepts(nfa, [2], 'should accept even sum');
   expectAccepts(nfa, [1, 1], 'should accept even sum');
@@ -331,13 +323,13 @@ await runTest('javascriptSpecToNFA should optimize and return ready NFA', () => 
 await runTest('javascriptSpecToNFA should merge equivalent states', () => {
   // Two branches that end up equivalent should be merged.
   const nfa = javascriptSpecToNFA({
-    startExpression: '[{ path: "A", done: false }, { path: "B", done: false }]',
-    transitionBody: `
+    startState: [{ path: "A", done: false }, { path: "B", done: false }],
+    transition: (state, value) => {
       if (!state.done && value === 1) {
         return { path: state.path, done: true };
       }
-    `,
-    acceptBody: 'return state.done;',
+    },
+    accept: (state) => state.done,
   }, 2);
 
   // Both paths lead to equivalent accepting states after seeing 1.
