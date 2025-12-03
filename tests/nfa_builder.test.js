@@ -729,6 +729,92 @@ await runTest('remapStates should deduplicate targets when merging', () => {
   expectAccepts(nfa, [1, 2], 'should still accept');
 });
 
+await runTest('remapStates dedup should preserve targets after duplicate', () => {
+  // This test catches bugs where the dedup loop uses `break` instead of `continue`.
+  // Build: state0 --[1]--> state1, state0 --[1]--> state2, state0 --[1]--> state3
+  // All three targets on the same symbol from state0.
+  // We'll remap state1 and state3 to the same state, but state2 to a different one.
+  // If dedup incorrectly breaks after finding the duplicate, state2 would be lost.
+  const nfa = new NFA();
+  nfa.addState();  // 0
+  nfa.addState();  // 1
+  nfa.addState();  // 2
+  nfa.addState();  // 3
+  nfa.addState();  // 4 (accepting via state2)
+  nfa.addStartId(0);
+  nfa.addAcceptId(4);
+  nfa.addTransition(0, 1, Symbol(1));  // First target
+  nfa.addTransition(0, 2, Symbol(1));  // Second target (middle)
+  nfa.addTransition(0, 3, Symbol(1));  // Third target
+  nfa.addTransition(2, 4, Symbol(2));  // Only state2 leads to accepting
+  nfa.seal();
+
+  // Remap: state1 and state3 both go to new state 1, state2 goes to new state 2
+  // Old states: 0, 1, 2, 3, 4
+  // New states: 0, 1, 2, 1, 3  (state1 and state3 merge to 1, state2 stays distinct as 2)
+  nfa.remapStates([0, 1, 2, 1, 3]);
+
+  // After remap, state0 should have targets [1, 2] on symbol 1
+  // If there's a break-instead-of-continue bug:
+  // - First we see state1 -> maps to 1, write it
+  // - Then state2 -> maps to 2, but if dedup breaks on any duplicate check, we'd lose it
+  // - Then state3 -> maps to 1, duplicate found... if we break here, we already have 2
+  // The bug would manifest if we broke AFTER finding duplicate of 1 (from state1),
+  // preventing us from processing state3.
+  // Actually the ordering matters - let's verify targets are [1, 2].
+  const targets = nfa.getTransitionTargets(0, Symbol(1));
+  assert.equal(targets.length, 2, 'should have 2 distinct targets after dedup');
+  assert.ok(targets.includes(1), 'should include merged state 1');
+  assert.ok(targets.includes(2), 'should include state 2 (path to accepting)');
+
+  // Critical: the NFA should still accept [1, 2] because state2 path is preserved
+  expectAccepts(nfa, [1, 2], 'must still accept via state2 path');
+});
+
+await runTest('remapStates dedup processes all targets when duplicate found early', () => {
+  // Specifically test: targets = [A, B, C] where A=C (map to same), B is unique.
+  // The dedup loop should process: A (write), B (write), C (skip as dup of A).
+  // A break bug on finding C as dup would be fine here since C is last.
+  // But if targets = [A, C, B] and we break on C, we lose B.
+  // Build with that order: state0 --[1]--> state1, state0 --[1]--> state3, state0 --[1]--> state2
+  const nfa = new NFA();
+  nfa.addState();  // 0
+  nfa.addState();  // 1
+  nfa.addState();  // 2
+  nfa.addState();  // 3
+  nfa.addState();  // 4 (accepting)
+  nfa.addStartId(0);
+  nfa.addAcceptId(4);
+  // Add in order so targets array is [1, 3, 2]
+  nfa.addTransition(0, 1, Symbol(1));
+  nfa.addTransition(0, 3, Symbol(1));  // This will be dup with state1 after remap
+  nfa.addTransition(0, 2, Symbol(1));  // This comes AFTER the duplicate
+  nfa.addTransition(2, 4, Symbol(2));  // Only state2 leads to accepting
+  nfa.seal();
+
+  // Remap: state1 and state3 both go to new state 1
+  // state2 goes to new state 2
+  nfa.remapStates([0, 1, 2, 1, 3]);
+
+  // Processing should be:
+  // - targets[0]=1 maps to 1, write it (writeIndex=1)
+  // - targets[1]=3 maps to 1, duplicate of targets[0]=1, CONTINUE (not break!)
+  // - targets[2]=2 maps to 2, no dup, write it (writeIndex=2)
+  // Final: [1, 2]
+  // If we used break instead of continue on the duplicate:
+  // - targets[0]=1 maps to 1, write it
+  // - targets[1]=3 maps to 1, duplicate found, BREAK -> stop processing
+  // Final: [1] only, lost state2!
+
+  const targets = nfa.getTransitionTargets(0, Symbol(1));
+  assert.equal(targets.length, 2, 'should have 2 targets (continue, not break on dedup)');
+  assert.ok(targets.includes(1), 'should have merged state');
+  assert.ok(targets.includes(2), 'should have state2 - must not be lost after dup');
+
+  // This is the critical check: if state2 was lost, this would fail
+  expectAccepts(nfa, [1, 2], 'MUST accept - state2 path must be preserved');
+});
+
 await runTest('remapStates should throw if epsilon transitions exist', () => {
   const nfa = new NFA();
   nfa.addState();
