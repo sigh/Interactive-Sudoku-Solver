@@ -574,10 +574,9 @@ export const optimizeNFA = (nfa, { allStatesAreReachable = false } = {}) => {
 //     * format: 2 bits (plain or packed state encoding, see FORMAT enum)
 //     * stateBitsMinusOne: 4 bits storing (state bit width - 1)
 //     * symbolCountMinusOne: 4 bits storing (alphabet size - 1)
-//     * startIsUnique: 1 bit (1 if there is exactly one start state)
-//     * (if !startIsUnique) startCount: stateBits bits storing number of start states
-//     * startIsAccept: startCount bits (1 bit per start state, in order)
+//     * startCount: stateBits bits storing number of start states
 //     * acceptCount: stateBits bits storing number of additional (non-start) accepts
+//     * startIsAccept: startCount bits (1 bit per start state, in order)
 //     * (if plain format) transitionCountBits: 4 bits storing bits per transition count
 //   Body (streamed per state until data ends):
 //     Plain format: for each state, transitionCount (transitionCountBits) followed by
@@ -744,13 +743,9 @@ export class NFASerializer {
     writer.writeBits(format, this.HEADER_FORMAT_BITS);
     writer.writeBits(stateBits - 1, this.STATE_BITS_FIELD_BITS);
     writer.writeBits(symbolCount - 1, this.SYMBOL_COUNT_FIELD_BITS);
-    const startIsUnique = startCount === 1;
-    writer.writeBits(startIsUnique ? 1 : 0, 1);
-    if (!startIsUnique) {
-      writer.writeBits(startCount, stateBits);
-    }
-    writer.writeBits(startIsAccept, startCount);
+    writer.writeBits(startCount, stateBits);
     writer.writeBits(acceptCount, stateBits);
+    writer.writeBits(startIsAccept, startCount);
     if (format === this.FORMAT.PLAIN) {
       writer.writeBits(transitionCountBits, this.SYMBOL_COUNT_FIELD_BITS);
     }
@@ -769,10 +764,9 @@ export class NFASerializer {
     if (symbolCount < this.MIN_SYMBOLS || symbolCount > this.MAX_SYMBOLS) {
       throw new Error('Symbol count is out of range for header decoding');
     }
-    const startIsUnique = reader.readBits(1) === 1;
-    const startCount = startIsUnique ? 1 : reader.readBits(stateBits);
-    const startIsAccept = reader.readBits(startCount);
+    const startCount = reader.readBits(stateBits);
     const acceptCount = reader.readBits(stateBits);
+    const startIsAccept = reader.readBits(startCount);
     const transitionCountBits = format === this.FORMAT.PLAIN
       ? reader.readBits(this.SYMBOL_COUNT_FIELD_BITS)
       : 0;
