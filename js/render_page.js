@@ -2204,7 +2204,7 @@ ConstraintCategoryInput.CustomBinary = class CustomBinary extends ConstraintCate
   _setUp() {
     const form = this._form;
     const errorElem = document.getElementById(
-      'custom-binary-input-function-error');
+      'custom-binary-input-error');
 
     autoSaveField(form, 'name');
     autoSaveField(form, 'chain-mode');
@@ -2350,7 +2350,7 @@ ConstraintCategoryInput.StateMachine = class StateMachine extends ConstraintCate
   _setUp() {
     const form = this._form;
     const errorElem = document.getElementById(
-      'state-machine-input-definition-error');
+      'state-machine-input-error');
 
     autoSaveField(form, 'name');
     autoSaveField(form, 'unified-mode');

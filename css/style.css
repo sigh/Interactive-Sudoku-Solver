@@ -266,6 +266,10 @@ button.image-button>img {
   font-weight: bold;
 }
 
+.error:empty {
+  display: none;
+}
+
 .result {
   color: rgb(0, 0, 200);
   font-weight: bold;
@@ -1011,7 +1015,7 @@ h3 {
   color: black;
 }
 
-#custom-binary-input .collapsible-body>div {
+.constraint-code-form .collapsible-body>div {
   margin: 5px;
   display: flex;
   flex-direction: column;
@@ -1019,23 +1023,10 @@ h3 {
   line-height: 1em;
 }
 
-#custom-binary-input select {
+.constraint-code-form select {
   margin: 0;
   padding-top: 2px;
   padding-bottom: 2px;
-}
-
-#custom-binary-input-function {
-  display: flex;
-  gap: 10px;
-}
-
-#custom-binary-input-function code {
-  font-size: 12px;
-}
-
-#custom-binary-input-function textarea {
-  margin: 0;
 }
 
 .collapsible-container {
@@ -1146,15 +1137,15 @@ h3 {
   margin: 5px 0;
 }
 
-.state-machine-code {
-  margin: 10px 0;
+.constraint-code {
   line-height: 1.1em;
   font-size: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
 }
 
-.state-machine-code-block {
-  margin-bottom: 12px;
-
+.constraint-code-block {
   code {
     display: block;
   }
@@ -1166,10 +1157,10 @@ h3 {
   }
 }
 
-.state-machine-code-textarea {
+.constraint-code-textarea {
   display: block;
-  width: calc(100% - 1.5rem);
-  margin: 4px 0 0 1.5rem;
+  width: calc(100% - 1rem);
+  margin: 4px 0 0 1rem;
   min-height: 2em;
   padding: 6px;
   box-sizing: border-box;
