@@ -536,10 +536,9 @@ export class NFA {
   }
 }
 
-// NOTE: The compiler currently supports literals, '.', character classes
+// The compiler currently supports literals, '.', character classes
 // (with ranges and optional negation), grouping '()', alternation '|', and the
-// quantifiers '*', '+', and '?'. Additional operators can be layered on once
-// the solver needs them.
+// quantifiers '*', '+', '?', and '{n}', '{n,}', '{n,m}'.
 export const regexToNFA = (pattern, numSymbols) => {
   const parser = new RegexParser(pattern);
   const ast = parser.parse();
@@ -928,16 +927,6 @@ const createCharToSymbol = (numValues) => {
 };
 
 class RegexAstNode {
-  static Empty = class { }
-
-  static Literal = class {
-    constructor(value) {
-      this.value = value;
-    }
-  }
-
-  static Wildcard = class { }
-
   static Charset = class {
     constructor(chars, negated = false) {
       this.chars = chars;
@@ -956,26 +945,20 @@ class RegexAstNode {
     }
   }
 
-  static Star = class {
-    constructor(child) {
+  // Quantifier: {n}, {n,}, {n,m}, and also *, +, ?
+  static Quantifier = class {
+    constructor(child, min, max) {
       this.child = child;
-    }
-  }
-
-  static Plus = class {
-    constructor(child) {
-      this.child = child;
-    }
-  }
-
-  static Optional = class {
-    constructor(child) {
-      this.child = child;
+      this.min = min;       // minimum repetitions
+      this.max = max;       // maximum repetitions (null = unbounded)
     }
   }
 }
 
 export class RegexParser {
+  static SEQUENCE_TERMINATORS = "|)";
+  static QUANTIFIERS = "*+?{";
+
   constructor(pattern) {
     this.pattern = pattern;
     this.pos = 0;
@@ -1002,10 +985,9 @@ export class RegexParser {
 
   _parseSequence() {
     const parts = [];
-    while (!this._isEOF() && !this._isSequenceTerminator(this._peek())) {
+    while (!this._isEOF() && !RegexParser.SEQUENCE_TERMINATORS.includes(this._peek())) {
       parts.push(this._parseQuantified());
     }
-    if (!parts.length) return new RegexAstNode.Empty();
     if (parts.length === 1) return parts[0];
     return new RegexAstNode.Concat(parts);
   }
@@ -1016,18 +998,55 @@ export class RegexParser {
       const ch = this._peek();
       if (ch === '*') {
         this._next();
-        node = new RegexAstNode.Star(node);
+        node = new RegexAstNode.Quantifier(node, 0, null);
       } else if (ch === '+') {
         this._next();
-        node = new RegexAstNode.Plus(node);
+        node = new RegexAstNode.Quantifier(node, 1, null);
       } else if (ch === '?') {
         this._next();
-        node = new RegexAstNode.Optional(node);
+        node = new RegexAstNode.Quantifier(node, 0, 1);
+      } else if (ch === '{') {
+        node = this._parseBraceQuantifier(node);
       } else {
         break;
       }
     }
     return node;
+  }
+
+  _parseBraceQuantifier(node) {
+    const startPos = this.pos;
+    this._expect('{');
+
+    const min = this._parseNumber();
+    if (min === null) {
+      throw new Error(`Expected number after '{' at position ${startPos}`);
+    }
+
+    let max = min;
+    if (this._peek() === ',') {
+      this._next();
+      max = this._peek() === '}' ? null : this._parseNumber();
+      if (max === undefined) {
+        throw new Error(`Expected number or '}' after ',' at position ${this.pos}`);
+      }
+      if (max !== null && max < min) {
+        throw new Error(`Invalid quantifier: max (${max}) < min (${min}) at position ${startPos}`);
+      }
+    }
+
+    this._expect('}');
+
+    return new RegexAstNode.Quantifier(node, min, max);
+  }
+
+  _parseNumber() {
+    let numStr = '';
+    while (this._peek() >= '0' && this._peek() <= '9') {
+      numStr += this._next();
+    }
+    if (!numStr) return null;
+    return parseInt(numStr, 10);
   }
 
   _parsePrimary() {
@@ -1046,24 +1065,16 @@ export class RegexParser {
     }
     if (ch === '.') {
       this._next();
-      return new RegexAstNode.Wildcard();
-    }
-    if (ch === '\\') {
-      this._next();
-      const escaped = this._next();
-      if (escaped === undefined) {
-        throw new Error('Dangling escape at end of pattern');
-      }
-      return new RegexAstNode.Literal(escaped);
+      return new RegexAstNode.Charset([], true);  // Negated empty = all symbols
     }
     if (ch === undefined) {
       throw new Error('Unexpected end of pattern');
     }
-    if (this._isQuantifier(ch) || ch === '|' || ch === ')') {
+    if (RegexParser.QUANTIFIERS.includes(ch) || RegexParser.SEQUENCE_TERMINATORS.includes(ch)) {
       throw new Error(`Unexpected token '${ch}' at position ${this.pos}`);
     }
     this._next();
-    return new RegexAstNode.Literal(ch);
+    return new RegexAstNode.Charset([ch]);
   }
 
   _parseCharClass() {
@@ -1074,10 +1085,10 @@ export class RegexParser {
     }
     const chars = new Set();
     while (!this._isEOF() && this._peek() !== ']') {
-      let start = this._consumeClassChar();
-      if (this._peek() === '-' && this._lookAhead(1) !== ']') {
+      const start = this._next();
+      if (this._peek() === '-') {
         this._next();
-        const end = this._consumeClassChar();
+        const end = this._next();
         const startCode = start.charCodeAt(0);
         const endCode = end.charCodeAt(0);
         if (endCode < startCode) {
@@ -1097,29 +1108,10 @@ export class RegexParser {
     return new RegexAstNode.Charset([...chars], isNegated);
   }
 
-  _consumeClassChar() {
-    let ch = this._next();
-    if (ch === '\\') {
-      ch = this._next();
-      if (ch === undefined) throw new Error('Dangling escape in character class');
-    }
-    if (ch === undefined) throw new Error('Unexpected end of character class');
-    return ch;
-  }
-
-  _isSequenceTerminator(ch) {
-    return ch === '|' || ch === ')' || ch === undefined;
-  }
-
-  _isQuantifier(ch) {
-    return ch === '*' || ch === '+' || ch === '?';
-  }
-
   _expect(ch) {
-    if (this._peek() !== ch) {
-      throw new Error(`Expected '${ch}' at position ${this.pos}`);
+    if (this._next() !== ch) {
+      throw new Error(`Expected '${ch}' at position ${this.pos - 1}`);
     }
-    this._next();
   }
 
   _peek() {
@@ -1131,16 +1123,18 @@ export class RegexParser {
     return this.pattern[this.pos++];
   }
 
-  _lookAhead(offset) {
-    return this.pattern[this.pos + offset];
-  }
-
   _isEOF() {
     return this.pos >= this.pattern.length;
   }
 }
 
 class RegexToNFABuilder {
+  constructor(charToSymbol, numSymbols) {
+    this._nfa = new NFA();
+    this._charToSymbol = charToSymbol;
+    this._numSymbols = numSymbols;
+  }
+
   static _Fragment = class {
     constructor(startId, acceptId) {
       this.startId = startId;
@@ -1148,10 +1142,8 @@ class RegexToNFABuilder {
     }
   };
 
-  constructor(charToSymbol, numSymbols) {
-    this._nfa = new NFA();
-    this._charToSymbol = charToSymbol;
-    this._numSymbols = numSymbols;
+  _newFragment(startId, acceptId) {
+    return new RegexToNFABuilder._Fragment(startId, acceptId);
   }
 
   build(ast) {
@@ -1162,124 +1154,91 @@ class RegexToNFABuilder {
     return this._nfa;
   }
 
-  _newState() {
-    return this._nfa.addState();
-  }
-
-  _newFragment(symbols = null) {
-    const acceptId = this._newState();
-    const startId = this._newState();
-    if (symbols && symbols.length) {
-      this._nfa.addTransition(startId, acceptId, ...symbols);
-    }
-    return new RegexToNFABuilder._Fragment(startId, acceptId);
-  }
-
-  _addEpsilon(fromStateId, toStateId) {
-    this._nfa.addEpsilon(fromStateId, toStateId);
-  }
-
   _buildNode(node) {
     switch (node.constructor) {
-      case RegexAstNode.Empty:
-        return this._buildEmpty();
-      case RegexAstNode.Literal:
-        return this._buildLiteral(node.value);
-      case RegexAstNode.Wildcard:
-        return this._buildWildcard();
       case RegexAstNode.Charset:
         return this._buildCharset(node.chars, node.negated);
       case RegexAstNode.Concat:
         return this._buildConcat(node.parts);
       case RegexAstNode.Alternate:
         return this._buildAlternate(node.options);
-      case RegexAstNode.Star:
-        return this._buildStar(node.child);
-      case RegexAstNode.Plus:
-        return this._buildPlus(node.child);
-      case RegexAstNode.Optional:
-        return this._buildOptional(node.child);
+      case RegexAstNode.Quantifier:
+        return this._buildQuantifier(node.child, node.min, node.max);
       default:
         throw new Error('Unknown AST node type');
     }
   }
 
   _buildEmpty() {
-    const fragment = this._newFragment();
-    this._addEpsilon(fragment.startId, fragment.acceptId);
-    return fragment;
-  }
-
-  _buildLiteral(char) {
-    return this._newFragment([this._charToSymbol(char)]);
-  }
-
-  _buildWildcard() {
-    return this._newFragment(NFA.Symbol.all(this._numSymbols));
+    const stateId = this._nfa.addState();
+    return this._newFragment(stateId, stateId);
   }
 
   _buildCharset(chars, negated = false) {
-    const charSymbolSet = new Set();
-    for (const char of chars) {
-      charSymbolSet.add(this._charToSymbol(char).index);
+    const startId = this._nfa.addState();
+    const acceptId = this._nfa.addState();
+    let symbols;
+    if (negated) {
+      const excludeIndices = new Set(chars.map(c => this._charToSymbol(c).index));
+      symbols = NFA.Symbol.all(this._numSymbols).filter(s => !excludeIndices.has(s.index));
+    } else {
+      symbols = chars.map(c => this._charToSymbol(c));
     }
-    const symbols = [];
-    for (const symbol of NFA.Symbol.all(this._numSymbols)) {
-      const inSet = charSymbolSet.has(symbol.index);
-      if (negated ? !inSet : inSet) {
-        symbols.push(symbol);
-      }
-    }
-    return this._newFragment(symbols);
+    this._nfa.addTransition(startId, acceptId, ...symbols);
+    return this._newFragment(startId, acceptId);
   }
 
   _buildConcat(parts) {
     if (!parts.length) return this._buildEmpty();
     const first = this._buildNode(parts[0]);
-    let currentStartId = first.startId;
-    let currentAcceptId = first.acceptId;
+    let acceptId = first.acceptId;
     for (let i = 1; i < parts.length; i++) {
       const next = this._buildNode(parts[i]);
-      this._addEpsilon(currentAcceptId, next.startId);
-      currentAcceptId = next.acceptId;
+      this._nfa.addEpsilon(acceptId, next.startId);
+      acceptId = next.acceptId;
     }
-    return new RegexToNFABuilder._Fragment(currentStartId, currentAcceptId);
+    return this._newFragment(first.startId, acceptId);
   }
 
   _buildAlternate(options) {
-    const fragment = this._newFragment();
+    const startId = this._nfa.addState();
+    const acceptId = this._nfa.addState();
     for (const option of options) {
       const optionFragment = this._buildNode(option);
-      this._addEpsilon(fragment.startId, optionFragment.startId);
-      this._addEpsilon(optionFragment.acceptId, fragment.acceptId);
+      this._nfa.addEpsilon(startId, optionFragment.startId);
+      this._nfa.addEpsilon(optionFragment.acceptId, acceptId);
     }
-    return fragment;
+    return this._newFragment(startId, acceptId);
   }
 
-  _buildStar(child) {
-    const fragment = this._newFragment();
-    const inner = this._buildNode(child);
-    this._addEpsilon(fragment.startId, inner.startId);
-    this._addEpsilon(fragment.startId, fragment.acceptId);
-    this._addEpsilon(inner.acceptId, fragment.acceptId);
-    this._addEpsilon(inner.acceptId, inner.startId);
-    return fragment;
-  }
+  _buildQuantifier(child, min, max) {
+    // Start with an empty fragment if min is 0, otherwise build first required copy.
+    let result = min === 0 ? this._buildEmpty() : this._buildNode(child);
 
-  _buildPlus(child) {
-    const fragment = this._buildNode(child);
-    const starFragment = this._buildStar(child);
-    this._addEpsilon(fragment.acceptId, starFragment.startId);
-    return new RegexToNFABuilder._Fragment(fragment.startId, starFragment.acceptId);
-  }
+    // Build remaining required copies (indices 1 to min-1).
+    for (let i = 1; i < min; i++) {
+      const next = this._buildNode(child);
+      this._nfa.addEpsilon(result.acceptId, next.startId);
+      result = this._newFragment(result.startId, next.acceptId);
+    }
 
-  _buildOptional(child) {
-    const fragment = this._buildNode(child);
-    const outer = this._newFragment();
-    this._addEpsilon(outer.startId, fragment.startId);
-    this._addEpsilon(outer.startId, outer.acceptId);
-    this._addEpsilon(fragment.acceptId, outer.acceptId);
-    return outer;
+    if (max === null) {
+      // Unbounded: can optionally match more copies with a self-loop.
+      const inner = this._buildNode(child);
+      this._nfa.addEpsilon(result.acceptId, inner.startId);  // Optionally enter loop
+      this._nfa.addEpsilon(inner.acceptId, inner.startId);   // Loop for more
+      this._nfa.addEpsilon(inner.acceptId, result.acceptId); // Exit loop back to accept
+    } else {
+      // Bounded: append (max - min) optional copies.
+      for (let i = min; i < max; i++) {
+        const inner = this._buildNode(child);
+        this._nfa.addEpsilon(result.acceptId, inner.startId);
+        this._nfa.addEpsilon(result.acceptId, inner.acceptId);  // Skip (optional)
+        result = this._newFragment(result.startId, inner.acceptId);
+      }
+    }
+
+    return result;
   }
 }
 
