@@ -279,9 +279,12 @@ export class SudokuParser {
 
   static parseText(rawText) {
     const constraints = [];
+    // Replace comment lines starting with #
+    const uncommentedText = rawText.replace(/^#.*$/gm, '');
+
     // Parse sections separated by a blank line separately,
     // and then merge their constraints.
-    for (const part of rawText.split(/\n\s*\n/)) {
+    for (const part of uncommentedText.split(/\n\s*\n/)) {
       let constraint = this.parseTextLine(part);
       if (!constraint) {
         constraint = this.parseString(part);

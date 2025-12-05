@@ -255,7 +255,8 @@ class DebugManager {
 
     const { PUZZLE_INDEX } = await import('../data/example_puzzles.js' + self.VERSION_PARAM);
     for (const puzzle of PUZZLE_INDEX.values()) {
-      const constraintTypes = SudokuParser.extractConstraintTypes(puzzle.input);
+      const constraintTypes = puzzle.constraintTypes
+        || SudokuParser.extractConstraintTypes(puzzle.input);
       const title = `${puzzle.name || ''} [${constraintTypes.join(',')}]`;
       index.set(title, puzzle);
     }
@@ -292,7 +293,7 @@ class DebugManager {
     }
 
     const input = document.getElementById('debug-puzzle-input');
-    input.onchange = () => {
+    input.onchange = async () => {
       const name = input.value;
       // Clear the input after a short time so the user can still notice
       // what was selected.
@@ -303,7 +304,7 @@ class DebugManager {
       const puzzle = debugIndex.get(name);
       if (!puzzle) return;
 
-      loadInput(puzzle);
+      await loadInput(puzzle);
 
       window.setTimeout(() => {
         const debugPuzzleSrc = this._debugPuzzleSrc;
