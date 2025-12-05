@@ -1,6 +1,40 @@
+:root {
+  /* Colors - Primary */
+  --color-primary: #2dabf9;
+  --color-primary-dark: #0688fa;
+  --color-primary-border: #124d77;
+  --color-primary-text-shadow: #263666;
+
+  /* Colors - Danger */
+  --color-danger: #d0451b;
+  --color-danger-dark: #bc3315;
+  --color-danger-border: #942911;
+  --color-danger-text-shadow: #854629;
+
+  /* Colors - Semantic */
+  --color-error: rgb(200, 0, 0);
+  --color-result: rgb(0, 0, 200);
+  --color-selection: yellow;
+  --color-selection-hover: rgb(240, 240, 20);
+  --color-highlight: lime;
+  --color-highlight-hover: limegreen;
+
+  /* Colors - Neutral */
+  --color-border: #aaa;
+  --color-border-light: #ccc;
+  --color-disabled: darkgrey;
+  --color-text-muted: grey;
+
+  /* Typography */
+  --font-family-base: "Arial", sans-serif;
+  --font-family-mono: monospace;
+  --font-size-base: 14px;
+  --font-size-small: 12px;
+}
+
 body {
-  font-size: 14px;
-  font-family: "Arial", sans-serif;
+  font-size: var(--font-size-base);
+  font-family: var(--font-family-base);
   width: fit-content;
 
   margin: 8px;
@@ -26,7 +60,7 @@ body {
 
 .cell-single-value {
   font-size: 30px;
-  font-family: monospace;
+  font-family: var(--font-family-mono);
 
   text-anchor: middle;
   dominant-baseline: middle;
@@ -34,7 +68,7 @@ body {
 
 .cell-multi-value {
   font-size: 15px;
-  font-family: monospace;
+  font-family: var(--font-family-mono);
 
   text-anchor: middle;
   dominant-baseline: hanging;
@@ -76,7 +110,7 @@ body {
 
 .shaded-region-label {
   font-size: 10px;
-  font-family: monospace;
+  font-family: var(--font-family-mono);
   font-weight: bold;
   dominant-baseline: hanging;
 }
@@ -131,7 +165,7 @@ body {
 }
 
 #instruction-panel span.description {
-  font-size: 14px;
+  font-size: var(--font-size-base);
   font-weight: bold;
   margin-right: 15px;
   margin-top: 0.5em;
@@ -148,7 +182,7 @@ body {
 
 #freeform-constraint-text-container button {
   position: absolute;
-  font-size: 14px;
+  font-size: var(--font-size-base);
   margin: 5px;
   bottom: 0;
   right: 0;
@@ -161,7 +195,7 @@ body {
 }
 
 #error-panel {
-  font-size: small;
+  font-size: var(--font-size-small);
   width: 370px;
   margin-bottom: 5px;
 }
@@ -183,10 +217,10 @@ button,
   border-radius: 5px;
   color: #ffffff;
 
-  border: 1px solid #124d77;
-  background: linear-gradient(to bottom, #2dabf9 5%, #0688fa 100%);
-  background-color: #2dabf9;
-  text-shadow: 0px 1px 0px #263666;
+  border: 1px solid var(--color-primary-border);
+  background: linear-gradient(to bottom, var(--color-primary) 5%, var(--color-primary-dark) 100%);
+  background-color: var(--color-primary);
+  text-shadow: 0px 1px 0px var(--color-primary-text-shadow);
 
   padding: 5px 15px;
   margin: 5px 0px;
@@ -194,8 +228,8 @@ button,
 
 button:hover:enabled,
 .button:hover {
-  background: linear-gradient(to bottom, #0688fa 5%, #2dabf9 100%);
-  background-color: #0688fa;
+  background: linear-gradient(to bottom, var(--color-primary-dark) 5%, var(--color-primary) 100%);
+  background-color: var(--color-primary-dark);
 }
 
 button:disabled {
@@ -208,15 +242,15 @@ button:active {
 }
 
 button.danger-button {
-  border-color: #942911;
-  background: linear-gradient(to bottom, #d0451b 5%, #bc3315 100%);
-  background-color: #d0451b;
-  text-shadow: 0px 1px 0px #854629;
+  border-color: var(--color-danger-border);
+  background: linear-gradient(to bottom, var(--color-danger) 5%, var(--color-danger-dark) 100%);
+  background-color: var(--color-danger);
+  text-shadow: 0px 1px 0px var(--color-danger-text-shadow);
 }
 
 button.danger-button:hover:enabled {
-  background: linear-gradient(to bottom, #bc3315 5%, #d0451b 100%);
-  background-color: #bc3315;
+  background: linear-gradient(to bottom, var(--color-danger-dark) 5%, var(--color-danger) 100%);
+  background-color: var(--color-danger-dark);
 }
 
 button.image-button {
@@ -245,13 +279,13 @@ button.image-button>img {
 }
 
 .highlight-group>.selected-constraint {
-  fill: yellow;
+  fill: var(--color-selection);
   opacity: 0.7;
   filter: drop-shadow(0 0 5px black);
 }
 
 .highlight-group>.latest-constraint {
-  fill: lime;
+  fill: var(--color-highlight);
   opacity: 0.7;
   filter: drop-shadow(0 0 5px black);
 }
@@ -262,7 +296,7 @@ button.image-button>img {
 }
 
 .error {
-  color: rgb(200, 0, 0);
+  color: var(--color-error);
   font-weight: bold;
 }
 
@@ -271,7 +305,7 @@ button.image-button>img {
 }
 
 .result {
-  color: rgb(0, 0, 200);
+  color: var(--color-result);
   font-weight: bold;
 }
 
@@ -282,7 +316,7 @@ button.image-button>img {
   background: rgba(220, 220, 255);
   border-radius: 10px;
 
-  font-size: 12px;
+  font-size: var(--font-size-small);
   width: min-content;
   min-width: 100%;
   line-height: 1.2em;
@@ -307,7 +341,7 @@ button.image-button>img {
   background: white;
   margin: 3px;
 
-  border: 1px solid grey;
+  border: 1px solid var(--color-text-muted);
   box-shadow: 0 2px 2px 0 rgba(0, 0, 0, 0.14), 0 1px 5px 0 rgba(0, 0, 0, 0.12), 0 3px 1px -2px rgba(0, 0, 0, 0.2);
 }
 
@@ -321,32 +355,32 @@ button.image-button>img {
 }
 
 .chip.selected-constraint {
-  background-color: yellow;
+  background-color: var(--color-selection);
 }
 
 .chip.selected-constraint:hover {
-  background-color: rgb(240, 240, 20);
+  background-color: var(--color-selection-hover);
 }
 
 text.selected-constraint,
 tspan.selected-constraint {
-  fill: yellow;
+  fill: var(--color-selection);
   paint-order: stroke;
   stroke: black;
   stroke-width: 2px;
 }
 
 .chip.latest-constraint {
-  background-color: lime;
+  background-color: var(--color-highlight);
 }
 
 .chip.latest-constraint:hover {
-  background-color: limegreen;
+  background-color: var(--color-highlight-hover);
 }
 
 text.latest-constraint,
 tspan.latest-constraint {
-  fill: lime;
+  fill: var(--color-highlight);
   paint-order: stroke;
   stroke: black;
   stroke-width: 2px;
@@ -374,12 +408,12 @@ tspan.latest-constraint {
   cursor: pointer;
   margin: 0px;
   padding: 2px 10px;
-  font-family: monospace;
+  font-family: var(--font-family-mono);
 }
 
 .chip>button:hover {
   background: none;
-  color: #d0451b;
+  color: var(--color-danger);
 }
 
 .chip .chip-view {
@@ -457,7 +491,7 @@ input[type=number] {
 }
 
 input[disabled]+label {
-  color: grey;
+  color: var(--color-disabled);
 }
 
 input:invalid {
@@ -467,7 +501,7 @@ input:invalid {
 
 .constraint-panel {
   border-radius: 10px;
-  border: 2px solid #aaa;
+  border: 2px solid var(--color-border);
   padding: 0;
   margin: 0;
 }
@@ -483,12 +517,12 @@ input:invalid {
 
 fieldset[disabled],
 .disabled {
-  color: darkgrey;
+  color: var(--color-disabled);
 }
 
 textarea {
   margin: 10px 0px;
-  font-size: 12px;
+  font-size: var(--font-size-small);
 }
 
 #sudoku-grid-and-state {
@@ -577,7 +611,7 @@ button.icon-button {
 }
 
 #state-output {
-  font-size: 12px;
+  font-size: var(--font-size-small);
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
@@ -601,14 +635,14 @@ button.icon-button {
 }
 
 select {
-  font-size: 14px;
+  font-size: var(--font-size-base);
   padding: 5px 5px 5px 10px;
   text-align: center;
   text-align-last: center;
   margin: 10px 0;
 
   background-color: white;
-  border: 1px solid #aaa;
+  border: 1px solid var(--color-border);
   border-radius: 2px;
 }
 
@@ -668,8 +702,8 @@ select#solve-mode-input {
 
 .description {
   line-height: 1;
-  font-size: 12px;
-  color: grey;
+  font-size: var(--font-size-small);
+  color: var(--color-text-muted);
   max-width: 450px;
 }
 
@@ -686,7 +720,7 @@ hr {
 
 #example-select+a {
   margin: 0 10px;
-  font-size: 12px;
+  font-size: var(--font-size-small);
 }
 
 a {
@@ -698,9 +732,9 @@ a:hover {
 }
 
 footer {
-  color: grey;
+  color: var(--color-text-muted);
   font-family: sans-serif;
-  font-size: 12px;
+  font-size: var(--font-size-small);
 }
 
 .tooltip {
@@ -742,7 +776,7 @@ footer {
 
   line-height: 1;
   color: black;
-  font-size: 12px;
+  font-size: var(--font-size-small);
   max-width: 200px;
 
   z-index: 1000;
@@ -779,8 +813,8 @@ footer {
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: #ccc;
-  transition: .1s;
+  background-color: var(--color-border-light);
+  transition: 0.1s;
 
   border-radius: 50px;
 }
@@ -793,7 +827,7 @@ footer {
   left: 3px;
   bottom: 3px;
   background-color: white;
-  transition: .1s;
+  transition: 0.1s;
 
   border-radius: 50%;
 }
@@ -848,7 +882,7 @@ input:checked+span:before {
 #debug-container {
   display: flex;
   flex-direction: row;
-  border-bottom: 1px solid grey;
+  border-bottom: 1px solid var(--color-text-muted);
 }
 
 #debug-container.hidden {
@@ -868,7 +902,7 @@ input:checked+span:before {
 }
 
 #debug-logs>div>span:first-child {
-  color: grey;
+  color: var(--color-text-muted);
 }
 
 #debug-log-level {
@@ -895,7 +929,7 @@ input:checked+span:before {
   cursor: pointer;
   color: black;
   background-color: #f0f0f0;
-  border: 1px solid #ccc;
+  border: 1px solid var(--color-border-light);
   border-radius: 5px;
 }
 
@@ -926,12 +960,12 @@ input:checked+span:before {
 
 #debug-counters span {
   padding: 0 5px;
-  font-size: 12px;
+  font-size: var(--font-size-small);
 }
 
 #close-debug-button {
   width: fit-content;
-  font-size: 14px;
+  font-size: var(--font-size-base);
 }
 
 #progress-container {
@@ -981,7 +1015,7 @@ h3 {
 #stats-container {
   display: none;
 
-  border: 1px solid grey;
+  border: 1px solid var(--color-text-muted);
 
   padding: 5px;
   box-shadow: #00000029 2px 2px 5px 2px;
@@ -1032,7 +1066,7 @@ h3 {
 .collapsible-container {
   display: inline-block;
   position: relative;
-  font-size: 14px;
+  font-size: var(--font-size-base);
   user-select: none;
   margin: 0px;
   width: 100%;
@@ -1140,7 +1174,7 @@ h3 {
 .tab-container {
   display: flex;
   margin-bottom: 10px;
-  border-bottom: 1px solid #ccc;
+  border-bottom: 1px solid var(--color-border-light);
 }
 
 .tab-button {
@@ -1151,7 +1185,7 @@ h3 {
   background: none;
   cursor: pointer;
   font: inherit;
-  color: darkgrey;
+  color: var(--color-disabled);
   text-shadow: none;
   border-bottom: 2px solid transparent;
   margin-bottom: -1.5px;
@@ -1183,7 +1217,7 @@ h3 {
 
 .constraint-code {
   line-height: 1.1em;
-  font-size: 12px;
+  font-size: var(--font-size-small);
   display: flex;
   flex-direction: column;
   gap: 5px;
@@ -1212,7 +1246,7 @@ h3 {
 }
 
 .code-input {
-  font-family: Consolas, monospace;
-  font-size: 12px;
+  font-family: Consolas, var(--font-family-mono);
+  font-size: var(--font-size-small);
   flex-grow: 1;
 }
