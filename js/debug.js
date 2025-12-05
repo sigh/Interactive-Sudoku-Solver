@@ -27,12 +27,24 @@ export const setConstraintManager = (newConstraintManager) => {
   constraintManager = newConstraintManager;
 }
 
-export const loadInput = (puzzleCfg) => {
-  const puzzle = puzzleFromCfg(puzzleCfg);
+export const loadInput = async (puzzleCfg) => {
+  const puzzle = await puzzleFromCfg(puzzleCfg);
   constraintManager.loadUnsafeFromText(puzzle.input);
 }
 
-const puzzleFromCfg = (puzzleCfg) => {
+const puzzleFromCfg = async (puzzleCfg) => {
+  const puzzle = puzzleFromCfgSync(puzzleCfg);
+
+  // Lazily fetch input from file if it's a path.
+  if (puzzle.input.startsWith('/')) {
+    const response = await fetch('..' + puzzle.input);
+    puzzle.input = await response.text();
+  }
+
+  return puzzle;
+};
+
+const puzzleFromCfgSync = (puzzleCfg) => {
   if (isPlainObject(puzzleCfg)) {
     return { name: puzzleCfg.input, ...puzzleCfg };
   }
@@ -188,7 +200,7 @@ export class PuzzleRunner {
     const solutions = [];
     const stats = [];
     for (const puzzleCfg of puzzles) {
-      const puzzle = puzzleFromCfg(puzzleCfg);
+      const puzzle = await puzzleFromCfg(puzzleCfg);
       const result = await this._runFnWithChecksSinglePuzzle(puzzle, fn, failTest);
       solutions.push(result.solution);
       stats.push(result.stats);

@@ -459,6 +459,7 @@ export const EXAMPLES = [
     src: 'https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?chlang=en&id=000MIE',
     input: '/data/large_state_machine.iss',
     solution: '138657429645298731792341568521934876879126354463875192954712683216583947387469215',
+    constraintTypes: ['NFA'],
   },
 
   //////////////////////////////////////////////////////////////////////////////
