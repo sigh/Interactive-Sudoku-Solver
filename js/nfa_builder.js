@@ -14,7 +14,9 @@ export const Symbol = (value) => new NFA.Symbol(value);
 // Using -1 keeps the array in packed SMI mode in V8.
 const REMOVE_STATE = -1;
 
-const MAX_STATE_COUNT = 1024;
+// Have a maximum state count to prevent unbounded state growth.
+// This must be at most (1 << 16) to work with the constraint handler.
+const MAX_STATE_COUNT = 1 << 12;
 
 export class NFA {
   constructor({ stateLimit = null } = {}) {
@@ -631,7 +633,7 @@ export class NFASerializer {
     }
     const stateBits = Math.max(1, requiredBits(numStates - 1));
     if (stateBits > this.MAX_STATE_BITS) {
-      throw new Error('NFA exceeds maximum supported state count (1024)');
+      throw new Error(`NFA exceeds maximum supported state count (${1 << this.MAX_STATE_BITS})`);
     }
     const symbolBits = requiredBits(symbolCount - 1);
 
