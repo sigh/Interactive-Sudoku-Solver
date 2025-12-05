@@ -361,7 +361,7 @@ export const autoSaveField = (element, field) => {
   const elementId = element.getAttribute('id');
 
   if (!elementId) {
-    console.error('Auto-save field must have an ID.');
+    console.error('Auto-save field must have an ID.', element);
     return;
   }
 
