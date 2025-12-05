@@ -527,7 +527,7 @@ class ExampleHandler {
   }
 
   _setUp() {
-    const exampleSelect = document.getElementById('example-select');
+    const exampleSelect = document.querySelector('#example-select-container select');
     exampleSelect.onchange = () => { };  // Ignore changes until initialized.
     this._populateExampleSelect(exampleSelect);
     return exampleSelect;
@@ -1094,7 +1094,7 @@ class ConstraintManager {
     for (const type of ['ordinary', 'composite', 'jigsaw']) {
       const chipView = this.addReshapeListener(
         new ConstraintChipView(
-          document.getElementById(`${type}-chip-view`),
+          document.querySelector(`.chip-view[data-chip-view-type="${type}"]`),
           this._display, this._chipHighlighter, this._constraintSelector,
           this.runUpdateCallback.bind(this)));
       chipViews.set(type, chipView);
@@ -1219,7 +1219,7 @@ class ConstraintManager {
       this.loadUnsafeFromText(input);
       return false;
     };
-    autoSaveField(inputElem);
+    autoSaveField(form, 'freeform-input');
   }
 
   _loadFromText(input) {
@@ -1296,7 +1296,7 @@ class ConstraintManager {
     // Set up collapsible behavior.
     new CollapsibleContainer(panel, /* defaultOpen= */ false).allowInComposite();
 
-    const tabButtons = panel.querySelectorAll('.tab-button');
+    const tabButtons = panel.querySelectorAll('.tab-container button');
     const tabContents = panel.querySelectorAll('.tab-content');
 
     for (const button of tabButtons) {
@@ -1311,7 +1311,7 @@ class ConstraintManager {
     // Restore saved tab.
     const savedTab = sessionAndLocalStorage.getItem('custom-constraint-tab');
     if (savedTab) {
-      const savedButton = panel.querySelector(`.tab-button[data-tab="${savedTab}"]`);
+      const savedButton = panel.querySelector(`.tab-container button[data-tab="${savedTab}"]`);
       if (savedButton) savedButton.click();
     }
   }

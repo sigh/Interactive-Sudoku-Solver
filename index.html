@@ -103,7 +103,7 @@ layout: null
       <span class="description">OR</span>
 
       <span id="example-select-container">
-        <select id="example-select" disabled>
+        <select disabled>
           <option>-- Load an example --</option>
         </select>
         <a style="display:none">(Source)</a>
@@ -114,8 +114,8 @@ layout: null
       <span class="description">OR</span>
 
       <form id="freeform-constraint-input">
-        <span id="freeform-constraint-text-container">
-          <textarea id="freeform-constraint-text" name="freeform-input" rows="3"></textarea>
+        <span>
+          <textarea name="freeform-input" rows="3"></textarea>
           <button type="submit" title="Load from text">Load from text</button>
         </span>
       </form>
@@ -194,7 +194,7 @@ layout: null
           <div id="sudoku-grid">
             <input id="fake-input" inputmode="numeric" type="text" value="x">
           </div>
-          <div id="grid-control-buttons" class="control-panel">
+          <div class="control-panel control-panel-spread">
             <div id="solution-control-panel">
               <div id="solution-iteration-state"></div>
               <div id="solution-control-buttons">
@@ -260,7 +260,7 @@ layout: null
             <form id="multi-cell-constraint-input">
               <fieldset tabindex="0" class="constraint-panel">
                 <h2>Lines & Sets</h2>
-                <div id="multi-cell-constraint-body">
+                <div>
                   <span class="description">
                     Select cells by dragging or shift-clicking.
                   </span>
@@ -274,7 +274,7 @@ layout: null
                     <input type="checkbox" name="is-loop" id="multi-cell-constraint-loop-input"></input>
                     <label for="multi-cell-constraint-loop-input">Loop</label>
                   </div>
-                  <div>
+                  <div class="multi-cell-constraint-footer">
                     <div id="multi-cell-constraint-value-container"></div>
                     <button type="submit" name="add-constraint" title="Add constraint" disabled>
                       Add
@@ -286,7 +286,7 @@ layout: null
           </div>
 
           <div>
-            <div id="shape-container" class="constraint-panel">
+            <div class="constraint-panel constraint-panel-borderless">
               <h2>
                 Shape
                 <select id="shape-select"></select>
@@ -323,7 +323,7 @@ layout: null
 
               </div>
 
-              <div id="jigsaw-chip-view" class="chip-view"></div>
+              <div class="chip-view" data-chip-view-type="jigsaw"></div>
             </div>
           </div>
         </div>
@@ -333,9 +333,8 @@ layout: null
             <h2>Custom JavaScript constraints</h2>
             <div>
               <div class="tab-container">
-                <button type="button" class="tab-button active" data-tab="custom-binary-tab">Pairwise</button>
-                <button type="button" class="tab-button" data-tab="state-machine-tab">State
-                  machine</button>
+                <button type="button" class="active" data-tab="custom-binary-tab">Pairwise</button>
+                <button type="button" data-tab="state-machine-tab">State machine</button>
               </div>
 
               <div id="custom-binary-tab" class="tab-content active">
@@ -365,15 +364,14 @@ layout: null
                     </select>
                   </div>
                   <div class="constraint-code">
-                    <div class="constraint-code-block">
+                    <div>
                       <div class="description">
                         <code>// Return true if the cell values a and b are a</code>
                         <code>// valid pair.</code>
                         <code>// Example: a &lt; b (thermometer constraint)</code>
                       </div>
                       <code>constraintCheck = (a, b) =&gt; </code>
-                      <textarea rows="2" name="function" class="constraint-code-textarea code-input"
-                        spellcheck="false"></textarea>
+                      <textarea rows="2" name="function" spellcheck="false"></textarea>
                     </div>
                   </div>
                   <div id="custom-binary-input-error" class="error"></div>
@@ -410,7 +408,7 @@ layout: null
                     </div>
                   </div>
                   <div id="state-machine-split-input" class="constraint-code">
-                    <div class="constraint-code-block">
+                    <div>
                       <div class="description">
                         <code>// The initial state(s). Each state can be any</code>
                         <code>// JSON-serializable value, except arrays.</code>
@@ -419,11 +417,11 @@ layout: null
                       <span>
                         <code>startState = </code>
                         <textarea id="state-machine-start-state" name="start-state" rows="1" placeholder='"start"'
-                          spellcheck="false" class="code-input"></textarea>
+                          spellcheck="false" class="inline-code"></textarea>
                         <code>;</code>
                       </span>
                     </div>
-                    <div class="constraint-code-block">
+                    <div>
                       <div class="description">
                         <code>// transition returns a next state, or an array</code>
                         <code>// of states based on the current state and the</code>
@@ -431,24 +429,24 @@ layout: null
                         <code>// array to reject a value.</code>
                       </div>
                       <code>function transition(state, value) {</code>
-                      <textarea id="state-machine-transition-body" class="constraint-code-textarea code-input" rows="10"
-                        name="transition-body" spellcheck="false" placeholder='return "next";'></textarea>
+                      <textarea id="state-machine-transition-body" rows="10" name="transition-body" spellcheck="false"
+                        placeholder='return "next";'></textarea>
                       <code>}</code>
                     </div>
-                    <div class="constraint-code-block">
+                    <div>
                       <div class="description">
                         <code>// accept returns true when the state is a valid</code>
                         <code>// final state.</code>
                       </div>
                       <code>function accept(state) {</code>
-                      <textarea id="state-machine-accept-body" class="constraint-code-textarea code-input" rows="2"
-                        name="accept-body" spellcheck="false" placeholder='return state === "next";'></textarea>
+                      <textarea id="state-machine-accept-body" rows="2" name="accept-body" spellcheck="false"
+                        placeholder='return state === "next";'></textarea>
                       <code>}</code>
                     </div>
                   </div>
-                  <div id="state-machine-unified-input" style="display: none;">
+                  <div id="state-machine-unified-input" class="constraint-code" style="display: none;">
                     <textarea id="state-machine-unified-code" name="unified-code" rows="18" spellcheck="false"
-                      class="code-input constraint-code-textarea" placeholder='startState = "start";
+                      placeholder='startState = "start";
 
 function transition(state, value) {
   return "next"
@@ -474,13 +472,13 @@ function accept(state) {
           <form id="outside-clue-input">
             <fieldset tabindex="0" class="constraint-panel" disabled>
               <h2>Outside clues</h2>
-              <div id="outside-clue-input-body">
+              <div>
                 <div class="description">
                   Select a row, column or diagonal arrow outside the grid.
                 </div>
                 <input type="hidden" name="id">
                 <div class="outside-arrow-clue-types"></div>
-                <div>
+                <div class="outside-clue-input-footer">
                   <input type="number" name="value" min=0 placeholder="value">
                   <button type="submit" title="Set constraint">Set</button>
                   <button type="button" id="outside-arrow-clear" class="danger-button"
@@ -509,13 +507,13 @@ function accept(state) {
                     + And
                   </button>
                 </div>
-                <div id="composite-chip-view" class="chip-view"></div>
+                <div class="chip-view" data-chip-view-type="composite"></div>
               </div>
             </fieldset>
           </form>
         </div>
 
-        <div id="ordinary-chip-view" class="chip-view"></div>
+        <div class="chip-view" data-chip-view-type="ordinary"></div>
 
         <div class="inline-switch switch">
           <label>
