@@ -255,6 +255,7 @@ ConstraintCategoryInput.LinesAndSets = class LinesAndSets extends ConstraintCate
     this._validationFns = new MultiMap();
 
     const selectionForm = document.forms['multi-cell-constraint-input'];
+    this._selectionForm = selectionForm;
     this._setUp(selectionForm, this._constraintClasses, inputManager);
 
     this._collapsibleContainer = new CollapsibleContainer(
@@ -262,14 +263,31 @@ ConstraintCategoryInput.LinesAndSets = class LinesAndSets extends ConstraintCate
       /* defaultOpen= */ true).allowInComposite();
 
     inputManager.onSelection(
-      (selection, finishedSelecting) =>
-        this._onNewSelection(selection, selectionForm, finishedSelecting));
+      (selection) => this._onNewSelection(selection, selectionForm));
     inputManager.addSelectionPreserver(selectionForm);
+    inputManager.registerFocusPanel(
+      selectionForm, () => this._getFocusTarget());
 
     selectionForm.onsubmit = e => {
       this._handleSelection(selectionForm, inputManager);
       return false;
     };
+  }
+
+  _getFocusTarget() {
+    // Focus on the form so we can immediately press enter.
+    //   - If the value input is enabled then focus on it to make it easy to
+    //     input a value.
+    //   - Otherwise just focus on the submit button.
+    const form = this._selectionForm;
+    if (form['add-constraint'].disabled) return null;
+
+    const type = form['constraint-type'].value;
+    const typeData = this._typeMap.get(type);
+    if (typeData?.valueElem && !typeData.valueElem.disabled) {
+      return typeData.valueElem;
+    }
+    return form['add-constraint'];
   }
 
   reshape(shape) {
@@ -460,7 +478,7 @@ ConstraintCategoryInput.LinesAndSets = class LinesAndSets extends ConstraintCate
     };
   }
 
-  _onNewSelection(selection, selectionForm, finishedSelecting) {
+  _onNewSelection(selection, selectionForm) {
     // Only enable the selection panel if the selection is long enough.
     const disabled = (selection.length == 0);
     selectionForm['add-constraint'].disabled = disabled;
@@ -472,10 +490,7 @@ ConstraintCategoryInput.LinesAndSets = class LinesAndSets extends ConstraintCate
       for (const typeData of this._typeMap.values()) {
         typeData.elem.disabled = false;
       }
-      selectionForm.classList.add('disabled');
       return;
-    } else {
-      selectionForm.classList.remove('disabled');
     }
 
     const isSingleCell = selection.length == 1;
@@ -494,24 +509,6 @@ ConstraintCategoryInput.LinesAndSets = class LinesAndSets extends ConstraintCate
     const typeData = this._typeMap.get(type);
     if (typeData.elem.disabled) {
       selectionForm['add-constraint'].disabled = true;
-    } else if (!isSingleCell && finishedSelecting) {
-      // Focus on the the form so we can immediately press enter, but
-      // only if the selection is not a single cell and if the focus has not
-      // been set yet.
-      //   - If the value input is enabled then focus on it to make it easy to
-      //     input a value.
-      //   - Otherwise just focus on the submit button.
-      const hasNoFocus = (
-        document.activeElement === document.body ||
-        document.activeElement === null);
-
-      if (hasNoFocus) {
-        if (typeData.valueElem?.select) {
-          typeData.valueElem.select();
-        } else {
-          selectionForm['add-constraint'].focus();
-        }
-      }
     }
     // Update dynamic options if needed.
     if (typeData.dynamicOptionsFn) {
@@ -581,12 +578,13 @@ ConstraintCategoryInput.Jigsaw = class Jigsaw extends ConstraintCategoryInput {
     super(collection);
     this._shape = null;
     this._chipView = chipView;
+    this._button = document.getElementById('add-jigsaw-button');
 
     this._setUpButton(inputManager);
   }
 
   _setUpButton(inputManager) {
-    const button = document.getElementById('add-jigsaw-button');
+    const button = this._button;
     button.onclick = () => {
       const cells = inputManager.getSelection();
       this.collection.addConstraint(
@@ -595,22 +593,20 @@ ConstraintCategoryInput.Jigsaw = class Jigsaw extends ConstraintCategoryInput {
     };
 
     button.disabled = true;
-    inputManager.onSelection((selection, finishedSelecting) => {
+    inputManager.onSelection((selection) => {
       const isValid = this._cellsAreValidJigsawPiece(selection);
       button.disabled = !isValid;
-      if (finishedSelecting && isValid && !this._isEmpty()) {
-        button.focus();
-      }
     });
+
+    // Register for focus restoration.
+    inputManager.registerFocusPanel(
+      button.closest('fieldset') || button.parentElement,
+      () => !button.disabled ? button : null);
   }
 
   reshape(shape) {
     this._shape = shape;
     this.clear();
-  }
-
-  _isEmpty() {
-    return this._chipView.isEmpty();
   }
 
   _cellsAreValidJigsawPiece(cells) {
@@ -1087,7 +1083,6 @@ class ConstraintManager {
         displayContainer, this._display,
         (collection) => {
           selectedConstraintCollection.setCollection(collection);
-          this._constraintPanel
           constraintPanel.classList.toggle(
             'composite-constraint-selected', !!collection);
         }));
@@ -1966,26 +1961,49 @@ class GridInputManager {
     let fakeInput = document.getElementById('fake-input');
     this._fakeInput = fakeInput;
 
+    this._setUpPanelFocusTracking();
+
     this._selection = new Selection(displayContainer);
     this._selection.addCallback((cellIds, finishedSelecting) => {
-      // Blur the active selection, so that callbacks can tell if something
-      // has already set the focus.
-      if (finishedSelecting) {
-        document.activeElement.blur();
-      }
       if (cellIds.length == 1) {
         const [x, y] = this._selection.cellIdCenter(cellIds[0]);
         fakeInput.style.top = y + 'px';
         fakeInput.style.left = x + 'px';
-        if (finishedSelecting) {
-          fakeInput.select();
-        }
       }
+      // Run callbacks first so panels can update their state.
       this._runCallbacks(
         this._callbacks.onSelection, cellIds, finishedSelecting);
+      // Then restore focus based on the updated state.
+      if (finishedSelecting) {
+        if (cellIds.length == 1) {
+          fakeInput.select();
+        } else {
+          // For multi-cell selections, restore focus to the last active panel.
+          this._restorePanelFocus();
+        }
+      }
     });
 
     this._setUpKeyBindings();
+  }
+
+  // Track which panel the user last interacted with, so we can restore focus
+  // after grid selection. Panels register with a container and a function that
+  // returns the element to focus (or null if focus shouldn't be restored).
+  _setUpPanelFocusTracking() {
+    this._getSelectionFocusTarget = null;
+
+    // Clear on any click within the constraint panel (capture phase).
+    // Panel-specific handlers then set it if the click is within them.
+    const constraintPanel = document.getElementById('constraint-panel-container');
+    constraintPanel.addEventListener('click', () => {
+      this._getSelectionFocusTarget = null;
+    }, /* useCapture= */ true);
+  }
+
+  _restorePanelFocus() {
+    const target = this._getSelectionFocusTarget && this._getSelectionFocusTarget();
+    if (target) target.select ? target.select() : target.focus();
   }
 
   reshape(shape) { this._shape = shape; }
@@ -2000,6 +2018,11 @@ class GridInputManager {
 
   addSelectionPreserver(obj) {
     this._selection.addSelectionPreserver(obj);
+  }
+  registerFocusPanel(container, getFocusTarget) {
+    container.addEventListener('click', () => {
+      this._getSelectionFocusTarget = getFocusTarget;
+    });
   }
   setSelection(cells) {
     this._selection.setCells(cells);
@@ -2195,11 +2218,17 @@ ConstraintCategoryInput.JavaScriptConstraint = class JavaScriptConstraint extend
     this._panel = document.getElementById('custom-constraint-panel');
     this._tabContent = document.getElementById(tabContentId);
     this._addButtonName = addButtonName;
-    this._onSelection([], true);  // Set up in disabled state.
+    this._onSelection([]);  // Set up in disabled state.
     inputManager.addSelectionPreserver(this._form);
 
     inputManager.onSelection(
       deferUntilAnimationFrame(this._onSelection.bind(this)));
+
+    // Register for focus restoration. Only return a focus target if this
+    // specific tab is active and the panel is open.
+    inputManager.registerFocusPanel(
+      this._tabContent,
+      () => this._getFocusTarget());
 
     this._shape = null;
     this._inputManager = inputManager;
@@ -2209,7 +2238,18 @@ ConstraintCategoryInput.JavaScriptConstraint = class JavaScriptConstraint extend
     this._shape = shape;
   }
 
-  _onSelection(selection, finishedSelecting) {
+  _getFocusTarget() {
+    const isPanelOpen = this._panel.classList.contains('container-open');
+    const isActiveTab = this._tabContent.classList.contains('active');
+    const isEnabled = !this._form[this._addButtonName].disabled;
+
+    if (isPanelOpen && isActiveTab && isEnabled) {
+      return this._form[this._addButtonName];
+    }
+    return null;
+  }
+
+  _onSelection(selection) {
     const hasEnoughCells = selection.length > 1;
     this._tabContent.classList.toggle('disabled', !hasEnoughCells);
     this._form[this._addButtonName].disabled = !hasEnoughCells;
@@ -2217,14 +2257,6 @@ ConstraintCategoryInput.JavaScriptConstraint = class JavaScriptConstraint extend
     // Also toggle disabled styling on the panel (but not the fieldset itself
     // so that tab switching and toggles still work).
     this._form.firstElementChild.classList.toggle('disabled', !hasEnoughCells);
-
-    const isActiveTab = this._panel.classList.contains('container-open')
-      && this._tabContent.classList.contains('active');
-    if (isActiveTab) {
-      if (finishedSelecting && hasEnoughCells) {
-        this._form[this._addButtonName].focus();
-      }
-    }
   }
 }
 
