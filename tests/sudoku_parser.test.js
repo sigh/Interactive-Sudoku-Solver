@@ -298,9 +298,7 @@ await runTest('parseString should parse Cage', () => {
 
   assert.ok(result);
   const cage = findConstraint(result, 'Cage');
-  // parseString keeps sum as string (unlike short/long killer formats)
-  assert.equal(cage.sum, '15');
-  assert.equal(typeof cage.sum, 'string');
+  assert.equal(cage.sum, 15);
   assert.deepEqual(cage.cells, ['R1C1', 'R1C2', 'R1C3']);
 });
 

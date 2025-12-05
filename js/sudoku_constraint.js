@@ -1612,7 +1612,7 @@ export class SudokuConstraint {
     constructor(sum, ...cells) {
       super(sum, ...cells);
       this.cells = cells;
-      this.sum = sum;
+      this.sum = +sum;
     }
 
     chipLabel() {
