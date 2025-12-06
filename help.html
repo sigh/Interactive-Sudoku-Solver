@@ -124,11 +124,9 @@ layout: null
         either all odd or all even.
       </p>
       <p>
-        Create a constraint using the "JavaScript constraints" panel
-        (Pairwise tab) with the following formula:
-      <pre>
-        a &lt; b &amp;&amp; (a % 2 == b % 2)
-      </pre>
+        Create a pairwise constraint in the "Custom JavaScript constraints"
+        panel with the following condition:
+      <pre>a &lt; b &amp;&amp; (a % 2 == b % 2)</pre>
       </p>
 
       <h3 id="nabner-line">Nabner Line</h3>
@@ -138,14 +136,12 @@ layout: null
         ("Nabner" is "Renban" spelled backwards.)
       </p>
       <p>
-        Create a constraint using the "JavaScript constraints" panel
-        (Pairwise tab) with "Chain handling" set to
-        "All pairs" and use the following formula:
+        Create a pairwise constraint in the "Custom JavaScript constraints"
+        panel with "Chain handling" set to "All pairs" and use the following
+        condition:
       </p>
       <p>
-      <pre>
-        Math.abs(a - b) &gt; 1
-      </pre>
+      <pre>Math.abs(a - b) &gt; 1</pre>
       </p>
 
       <h3 id="not-renban">Not Renban</h3>
@@ -168,24 +164,23 @@ layout: null
         Here's how you can generate the constraint
         (run in the browser developer console):
       <pre>
-        function makeNotRenban(cells) {
-          const n = cells.length;
-          const constraints = [];
+function makeNotRenban(cells) {
+  const n = cells.length;
+  const constraints = [];
 
-          for (let i = 0; i &lt; n; i++) {
-            for (let j = i+1; j &lt; n; j++) {
-                const line = [...cells];
-                [line[0], line[i]] = [line[i], line[0]];
-                [line[n-1], line[j]] = [line[j], line[n-1]];
-                constraints.push(new SudokuConstraint.Lockout(2, ...line));
-            }
-          }
+  for (let i = 0; i &lt; n; i++) {
+    for (let j = i+1; j &lt; n; j++) {
+        const line = [...cells];
+        [line[0], line[i]] = [line[i], line[0]];
+        [line[n-1], line[j]] = [line[j], line[n-1]];
+        constraints.push(new SudokuConstraint.Lockout(2, ...line));
+    }
+  }
 
-          return new SudokuConstraint.Or(constraints);
-        }
+  return new SudokuConstraint.Or(constraints);
+}
 
-        console.log(makeNotRenban('R1C1', 'R1C2', 'R1C3').toString());
-      </pre>
+console.log(makeNotRenban('R1C1', 'R1C2', 'R1C3').toString());</pre>
       </p>
 
       <h3 id="arithmetic-progression">Arithmetic Progression</h3>
@@ -196,27 +191,26 @@ layout: null
       </p>
 
       <p>
-        Implement this using the "JavaScript constraints" panel
-        (State machine tab):
+        Implement this by configuring a state machine in the
+        "Custom JavaScript constraints" panel:
       <pre>
-        startState = { lastVal: null, diff: null };
+startState = { lastVal: null, diff: null };
 
-        function transition(state, value) {
-          if (state.lastVal == null) {
-            return { lastVal: value, diff: null};
-          }
+function transition(state, value) {
+  if (state.lastVal == null) {
+    return { lastVal: value, diff: null};
+  }
 
-          const diff = value - state.lastVal;
+  const diff = value - state.lastVal;
 
-          if (state.diff == null || state.diff == diff) {
-            return { lastVal: value, diff: diff };
-          }
-        }
+  if (state.diff == null || state.diff == diff) {
+    return { lastVal: value, diff: diff };
+  }
+}
 
-        function accept(state) {
-          return true;
-        }
-      </pre>
+function accept(state) {
+  return true;
+}</pre>
       </p>
 
       <h3 id="successor-arrows">Successor Arrows</h3>
@@ -232,9 +226,7 @@ layout: null
         then add a <code>Regex</code> constraint from "Line and Sets" panel.
         The regex pattern should alternate over each possible starting digit:
       </p>
-      <pre>
-        (12|2.3|3.{2}4|4.{3}5|5.{4}6|6.{5}7|7.{6}8|8.{7}9).*
-      </pre>
+      <pre>(12|2.3|3.{2}4|4.{3}5|5.{4}6|6.{5}7|7.{6}8|8.{7}9).*</pre>
 
       <h3 id="flatmates">Flatmates</h3>
 
@@ -250,9 +242,7 @@ layout: null
         applied to every column (replace <code>A</code>, <code>B</code> and
         <code>D</code>):
       </p>
-      <pre>
-        .*(AD|DB).*
-      </pre>
+      <pre>.*(AD|DB).*</pre>
     </div>
   </div>
 </body>
