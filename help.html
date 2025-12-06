@@ -147,40 +147,77 @@ layout: null
       <h3 id="not-renban">Not Renban</h3>
       <p>
         <b>Description:</b>
-        Unlike Naber, this is how to create a set where all the values taken
+        Unlike Nabner, this is how to create a set where all the values taken
         together are not consecutive.
       </p>
 
       <p>
-        This requires checking that there is at least one pair of cells which
-        have a difference of at least two, and where none of the other cells
-        have values which are between them.
-        Each pair can be checked with a <code>Lockout</code> constraint, with
-        all the pairs inside an <code>Or</code>.
-        This results in <code>n(n-1)/2</code> constraints inside the
-        <code>Or</code>.
-      </p>
-      <p>
-        Here's how you can generate the constraint
-        (run in the browser developer console):
+        Implement this by configuring a state machine in the
+        "Custom JavaScript constraints" panel. The NFA tracks the minimum and
+        maximum values seen, accepting if <code>max - min != count - 1</code>
+        (i.e., the values are not all consecutive). If you know all the
+        <b>values are distinct</b>, then this is sufficient:
       <pre>
-function makeNotRenban(cells) {
-  const n = cells.length;
-  const constraints = [];
+NUM_CELLS = 3;  // Number of cells in the set
+startState = { min: 16, max: -1 };
 
-  for (let i = 0; i &lt; n; i++) {
-    for (let j = i+1; j &lt; n; j++) {
-        const line = [...cells];
-        [line[0], line[i]] = [line[i], line[0]];
-        [line[n-1], line[j]] = [line[j], line[n-1]];
-        constraints.push(new SudokuConstraint.Lockout(2, ...line));
-    }
-  }
-
-  return new SudokuConstraint.Or(constraints);
+function transition(state, value) {
+  return {
+    min: Math.min(state.min, value),
+    max: Math.max(state.max, value),
+  };
 }
 
-console.log(makeNotRenban('R1C1', 'R1C2', 'R1C3').toString());</pre>
+function accept(state) {
+  return state.max - state.min !== NUM_CELLS - 1;
+}</pre>
+      </p>
+      <p>
+        If the values may not be distinct, then you need to also need to check
+        for duplicates. This can be done efficiently by using non-deterministic
+        branches to check each digit:
+      <pre>
+NUM_CELLS = 3;  // Number of cells in the set
+startState = {type: 'start'};
+
+function transition(state, value) {
+  if (state.type === 'start') {
+    return [
+      { type: "rangeCheck", min: value, max: value },
+      { type: "duplicateCheck", value },
+    ];
+  }
+  if (state.type === 'rangeCheck') {
+    return [{
+      type: "rangeCheck",
+      min: Math.min(state.min, value),
+      max: Math.max(state.max, value),
+    }];
+  }
+  if (state.type === 'duplicateCheck') {
+    if (value === state.value) {
+      return [{ type: 'hasDuplicate' }];
+    } else {
+      return [
+        state,
+        { type: 'duplicateCheck', value }
+      ];
+    }
+  }
+  if (state.type === 'hasDuplicate') return [state];
+}
+
+function accept(state) {
+  if (state.type == 'rangeCheck') {
+    return state.max - state.min !== NUM_CELLS - 1;
+  }
+  return (state.type === 'hasDuplicate');
+}</pre>
+      </p>
+
+      <p>
+        You can generalize this to a single state machine that works for any
+        number of cells, but it becomes a larger and less efficient.
       </p>
 
       <h3 id="arithmetic-progression">Arithmetic Progression</h3>
