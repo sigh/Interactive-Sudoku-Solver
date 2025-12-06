@@ -2,7 +2,7 @@ import { CodeJar } from '../../lib/codejar.min.js';
 import { SudokuConstraint } from '../sudoku_constraint.js';
 import { SudokuParser } from '../sudoku_parser.js';
 import { autoSaveField } from '../util.js';
-import './env.js';
+import { SANDBOX_GLOBALS } from './env.js';
 import { DEFAULT_CODE, EXAMPLES } from './examples.js';
 
 class Sandbox {
@@ -98,8 +98,10 @@ class Sandbox {
     console.warn = (...args) => logs.push('WARN: ' + args.map(formatArg).join(' '));
 
     try {
-      const asyncFn = new Function(`return (async () => { ${code} })();`);
-      const result = await asyncFn();
+      const keys = Object.keys(SANDBOX_GLOBALS);
+      const values = Object.values(SANDBOX_GLOBALS);
+      const asyncFn = new Function(...keys, `return (async () => { ${code} })();`);
+      const result = await asyncFn(...values);
 
       this.outputElement.textContent = logs.join('\n') || 'No console output';
       this.outputElement.className = 'output';
