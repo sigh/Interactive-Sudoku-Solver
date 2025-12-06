@@ -1,9 +1,13 @@
 /* Sandbox page styles */
 
+/* Override style.css body width: fit-content */
+body {
+  width: unset;
+}
+
 .sandbox-container {
-  max-width: 1400px;
-  margin: 0 auto;
-  padding: 20px;
+  margin: 20px;
+  max-width: 1200px;
 }
 
 .help-header {
@@ -35,6 +39,11 @@ p code {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 20px;
+}
+
+.editor-panel,
+.output-panel {
+  min-width: 0;
 }
 
 /* Panel headers */

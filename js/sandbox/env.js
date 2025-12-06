@@ -3,8 +3,15 @@ import { GridShape, SHAPE_9x9, SHAPE_MAX } from '../grid_shape.js';
 import { javascriptSpecToNFA, NFASerializer } from '../nfa_builder.js';
 
 const HELP_TEXT = `
+=== Constraint Sandbox Help ===
+
+Return values:
+  - A SudokuConstraint object (e.g. new SudokuConstraint.Cage(...))
+  - A constraint string (e.g. ".Cage~12~R1C1_R1C2_R1C3")
+  - An array of constraints or constraint strings
+
 Available globals:
-  SudokuConstraint  - Create constraint objects (Renban, Cage, Thermo, etc.)
+  SudokuConstraint  - Create constraint objects
   GridShape         - Define grid dimensions
   SHAPE_9x9         - Standard 9x9 grid shape
   SHAPE_MAX         - Maximum supported grid shape (16x16)
@@ -34,15 +41,12 @@ NFA spec format:
     accept: (state) => <boolean>
   }
 
-Usage:
-  Return a constraint object or string to generate the constraint.
-  Use console.log() for debug output.
-
-Examples: Use the "Load example..." dropdown to see working examples.
-`;
+Use console.log() for debug output.
+Use help() function to display this message.
+`.trim();
 
 function help() {
-  console.log(HELP_TEXT.trim());
+  console.log(HELP_TEXT);
 }
 
 // Export globals to window

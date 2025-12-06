@@ -1,4 +1,7 @@
-import { CodeJar } from '../../lib/codejar.js';
+import { CodeJar } from '../../lib/codejar.min.js';
+import { SudokuConstraint } from '../sudoku_constraint.js';
+import { SudokuParser } from '../sudoku_parser.js';
+import { autoSaveField } from '../util.js';
 import './env.js';
 import { DEFAULT_CODE, EXAMPLES } from './examples.js';
 
@@ -15,6 +18,16 @@ class Sandbox {
     this._initEventListeners();
   }
 
+  _resultToConstraintStr(result) {
+    if (Array.isArray(result)) {
+      const parsed = result.map(item =>
+        typeof item === 'string' ? SudokuParser.parseString(item) : item
+      );
+      return String(new SudokuConstraint.Set(parsed));
+    }
+    return String(result);
+  }
+
   _initEditor() {
     const highlight = (editor) => {
       const code = editor.textContent;
@@ -24,12 +37,12 @@ class Sandbox {
     this.jar = CodeJar(this.editorElement, highlight, { tab: '  ' });
 
     // Load saved code or use default
-    const savedCode = localStorage.getItem('sandbox-code');
-    this.jar.updateCode(savedCode || DEFAULT_CODE);
+    autoSaveField(this.editorElement);
+    this.jar.updateCode(this.editorElement.textContent || DEFAULT_CODE);
 
     // Save code on changes
     this.jar.onUpdate((code) => {
-      localStorage.setItem('sandbox-code', code);
+      this.editorElement.dispatchEvent(new Event('change'));
     });
   }
 
@@ -92,7 +105,7 @@ class Sandbox {
       this.outputElement.className = 'output';
 
       if (result) {
-        const constraintStr = String(result);
+        const constraintStr = this._resultToConstraintStr(result);
         this.constraintElement.textContent = constraintStr;
 
         const url = `./?q=${encodeURIComponent(constraintStr)}`;
