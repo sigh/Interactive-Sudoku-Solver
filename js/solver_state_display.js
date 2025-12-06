@@ -191,8 +191,10 @@ export class SolverStateDisplay {
       ? 1
       : state.counters.progressRatio + state.counters.branchesIgnored;
     const percent = Math.round(progress * 100);
-    this._elements.progressBar.setAttribute('value', progress);
-    this._elements.progressPercentage.textContent = percent + '%';
+    if (!this._isEstimateMode) {
+      this._elements.progressBar.setAttribute('value', progress);
+      this._elements.progressPercentage.textContent = percent + '%';
+    }
   }
 
   _setUpStateOutput() {
