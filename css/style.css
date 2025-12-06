@@ -655,18 +655,29 @@ textarea {
 
 select {
   font-size: var(--font-size-base);
-  padding: 5px 5px 5px 10px;
+  padding: 5px 25px 5px 10px;
   text-align: center;
   text-align-last: center;
-  margin: 10px 0;
+  margin: 0;
 
   background-color: white;
   border: 1px solid var(--color-border);
   border-radius: 2px;
+  cursor: pointer;
+
+  /* Safari has an annoying default select style so we create our own styling */
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='none' stroke='%23333' stroke-width='1' d='M1 1l4 4 4-4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px bottom 45%;
+
+  &.thin-select {
+    padding-top: 2px;
+    padding-bottom: 2px;
+  }
 }
 
 #shape-select {
-  padding: 0px 5px 0px 10px;
   margin: 0 5px;
 }
 
@@ -894,12 +905,6 @@ footer {
     }
   }
 
-  #debug-log-level {
-    padding: 0px 5px 0px 10px;
-    margin: 0;
-    margin-left: 5px;
-  }
-
   #debug-panel {
     display: flex;
     flex-direction: column;
@@ -913,6 +918,12 @@ footer {
     #close-debug-button {
       width: fit-content;
       font-size: var(--font-size-base);
+    }
+
+    label {
+      display: flex;
+      align-items: center;
+      gap: 10px;
     }
   }
 
@@ -1030,20 +1041,6 @@ h3 {
   }
 }
 
-.constraint-code-form {
-  margin: 5px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  line-height: 1em;
-
-  select {
-    margin: 0;
-    padding-top: 2px;
-    padding-bottom: 2px;
-  }
-}
-
 .collapsible-container {
   display: inline-block;
   position: relative;
@@ -1089,10 +1086,6 @@ h3 {
 }
 
 #multi-cell-constraint-input {
-  button {
-    margin-left: 10px;
-  }
-
   select {
     width: 100%;
   }
@@ -1105,6 +1098,12 @@ h3 {
 
   #multi-cell-constraint-loop-container {
     margin-bottom: -10px;
+  }
+
+  .collapsible-body>div {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
   }
 }
 
@@ -1188,6 +1187,19 @@ h3 {
 
   &.active {
     display: block;
+  }
+}
+
+.constraint-code-form {
+  margin: 5px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  line-height: 1em;
+
+  input {
+    /* Required for firefox. */
+    width: 20ch;
   }
 }
 

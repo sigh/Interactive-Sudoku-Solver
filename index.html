@@ -129,7 +129,7 @@ layout: null
     <div id="debug-panel">
       <label>
         Log level
-        <select id="debug-log-level">
+        <select id="debug-log-level" class="thin-select">
           <option value="0">None</option>
           <option value="1">1</option>
           <option value="2">2</option>
@@ -261,24 +261,26 @@ layout: null
               <fieldset tabindex="0" class="constraint-panel">
                 <h2>Lines & Sets</h2>
                 <div>
-                  <span class="description">
-                    Select cells by dragging or shift-clicking.
-                  </span>
                   <div>
-                    <select id="multi-cell-constraint-select" name="constraint-type">
-                    </select>
-                  </div>
-                  <div id="multi-cell-constraint-description" class="description">
-                  </div>
-                  <div id="multi-cell-constraint-loop-container">
-                    <input type="checkbox" name="is-loop" id="multi-cell-constraint-loop-input"></input>
-                    <label for="multi-cell-constraint-loop-input">Loop</label>
-                  </div>
-                  <div class="multi-cell-constraint-footer">
-                    <div id="multi-cell-constraint-value-container"></div>
-                    <button type="submit" name="add-constraint" title="Add constraint" disabled>
-                      Add
-                    </button>
+                    <span class="description">
+                      Select cells by dragging or shift-clicking.
+                    </span>
+                    <div>
+                      <select id="multi-cell-constraint-select" name="constraint-type">
+                      </select>
+                    </div>
+                    <div id="multi-cell-constraint-description" class="description">
+                    </div>
+                    <div id="multi-cell-constraint-loop-container">
+                      <input type="checkbox" name="is-loop" id="multi-cell-constraint-loop-input"></input>
+                      <label for="multi-cell-constraint-loop-input">Loop</label>
+                    </div>
+                    <div class="multi-cell-constraint-footer">
+                      <div id="multi-cell-constraint-value-container"></div>
+                      <button type="submit" name="add-constraint" title="Add constraint" disabled>
+                        Add
+                      </button>
+                    </div>
                   </div>
                 </div>
               </fieldset>
@@ -289,7 +291,7 @@ layout: null
             <div class="constraint-panel constraint-panel-borderless">
               <h2>
                 Shape
-                <select id="shape-select"></select>
+                <select id="shape-select" class="thin-select"></select>
                 <span class="tooltip" data-text="
               Change the grid shape.
               Box regions are made as close to square as possible.
@@ -358,8 +360,8 @@ layout: null
                     constraints on [A, B], [A, C], [B, A], [B, C], [C, A]
                     and [C, B].">
                     </span>:
-                    <select name="chain-mode">
-                      <option value="Binary">Consecutive pairs</option>
+                    <select name="chain-mode" class="thin-select">
+                      <option value=" Binary">Consecutive pairs</option>
                       <option value="BinaryX">All pairs</option>
                     </select>
                   </div>
