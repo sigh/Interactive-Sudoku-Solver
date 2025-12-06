@@ -11,6 +11,8 @@ const constraint = new SudokuConstraint.Renban(...cells);
 return constraint;`;
 
 export const EXAMPLES = {
+  'Default Template': DEFAULT_CODE,
+
   'Simple Renban': `// Simple Renban line
 const cells = ['R1C1', 'R1C2', 'R1C3'];
 return new SudokuConstraint.Renban(...cells);`,

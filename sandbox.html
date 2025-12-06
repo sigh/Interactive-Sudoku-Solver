@@ -25,10 +25,30 @@ layout: null
 
 <body>
   <div class="sandbox-container">
-    <div class="sandbox-header">
+    <div class="help-header">
       <h1>Interactive Sudoku Solver (ISS) – Constraint Sandbox</h1>
-      <a href="index.html">← Back to Solver</a>
+      <a href="index.html" class="back-link">← Back to Solver</a>
     </div>
+
+    <p>
+      Write JavaScript to generate constraints.
+    </p>
+
+    <p>
+      Return a constraint or an array of constraints. A constraint can either
+      be an instance of <code>SudokuConstraint</code> or a constraint string.
+    </p>
+
+    <p>
+      <code>console.log()</code> output will be displayed in the
+      "Console Output" panel. <code>help()</code> will display detailed help.
+    </p>
+
+    <p>
+      Visit the <a href="https://github.com/sigh/Interactive-Sudoku-Solver" target="_blank">github repository</a> to
+      view the source code and <a href="https://github.com/sigh/Interactive-Sudoku-Solver/issues" target="_blank">report
+        bugs</a>.
+    </p>
 
     <div class="editor-container">
       <div class="editor-panel">
@@ -37,15 +57,11 @@ layout: null
             <select id="examples-select">
               <option value="">Load example...</option>
             </select>
-            <button id="clear-btn">Clear</button>
+            <button id="clear-btn" class="danger-button">Clear</button>
             <button id="run-btn">▶ Run (Ctrl+Enter)</button>
           </div>
         </div>
         <div id="editor" class="editor language-javascript"></div>
-        <p class="help-text">
-          Globals: <code>SudokuConstraint</code>, <code>GridShape</code>, <code>SHAPE_9x9</code>.
-          Return a constraint. Click output to copy.
-        </p>
       </div>
 
       <div class="output-panel">
@@ -55,14 +71,16 @@ layout: null
         <div id="output" class="output"></div>
 
         <div class="result-section">
-          <h3>Constraint String (click to copy)</h3>
-          <div id="constraint-string" class="result-box"></div>
-        </div>
-
-        <div class="result-section">
-          <h3>Puzzle URL (click to copy)</h3>
-          <div id="puzzle-url" class="result-box"></div>
-          <a id="puzzle-url-link" href="#" target="_blank" class="url-link" style="display: none;">Open in Solver →</a>
+          <div class="panel-header">
+            <h2>Constraint String</h2>
+            <a id="open-solver-link" href="#" target="_blank" style="display: none;">Open in Solver →</a>
+          </div>
+          <div class="result-box">
+            <span id="constraint-string"></span>
+            <button id="copy-btn" class="copy-button" title="Copy to clipboard">
+              <img src="img/copy-48.png" alt="Copy">
+            </button>
+          </div>
         </div>
       </div>
     </div>

@@ -1,53 +1,51 @@
-:root {
-  --sandbox-success: #2e7d32;
-  --sandbox-copied-bg: #e8f5e9;
-  --sandbox-code-bg: #f5f5f5;
-  --sandbox-editor-bg: #2d2d44;
-  --sandbox-font-mono: 'Fira Code', 'Monaco', 'Consolas', var(--font-family-mono);
-}
-
-body {
-  padding: 10px;
-}
+/* Sandbox page styles */
 
 .sandbox-container {
-  max-width: 1200px;
+  max-width: 1400px;
   margin: 0 auto;
+  padding: 20px;
 }
 
-.sandbox-header {
+.help-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 20px;
 }
 
-.sandbox-header h1 {
+.help-header h1 {
   margin: 0;
   font-size: 1.5em;
 }
 
+p {
+  color: var(--color-text-muted);
+  line-height: 1.4;
+}
+
+p code {
+  background: #f5f5f5;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-family: var(--font-family-mono);
+}
+
+/* Two-column layout using grid */
 .editor-container {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 20px;
-  flex-wrap: wrap;
 }
 
-.editor-panel {
-  flex: 1;
-  min-width: 400px;
-}
-
-.output-panel {
-  flex: 1;
-  min-width: 300px;
-}
-
+/* Panel headers */
 .panel-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 8px;
   margin-bottom: 10px;
+  min-height: 28px;
 }
 
 .panel-header h2 {
@@ -56,49 +54,52 @@ body {
   color: var(--color-text-muted);
 }
 
+/* Button group */
+.btn-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  align-items: center;
+}
+
+.btn-group button {
+  white-space: nowrap;
+}
+
+/* Code editor */
 .editor {
-  font-family: var(--sandbox-font-mono);
+  font-family: var(--font-family-mono);
   font-size: var(--font-size-base);
   line-height: 1.5;
   padding: 15px;
   border-radius: 5px;
   border: 1px solid var(--color-border);
-  background: var(--sandbox-editor-bg);
+  background: #2d2d44;
   color: #f8f8f2;
-  min-height: 400px;
-  max-height: 600px;
+  height: 400px;
   overflow: auto;
   tab-size: 2;
   white-space: pre-wrap;
   word-wrap: break-word;
+  resize: vertical;
 }
 
 .editor:focus {
   outline: 2px solid var(--color-primary);
 }
 
-.btn-group {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-.output,
-.result-box {
+/* Console output */
+.output {
   background: white;
   border: 1px solid var(--color-border);
   border-radius: 5px;
   padding: 15px;
-  font-family: var(--sandbox-font-mono);
+  font-family: var(--font-family-mono);
   font-size: var(--font-size-small);
   white-space: pre-wrap;
-  word-break: break-all;
+  word-break: break-word;
   overflow: auto;
-}
-
-.output {
-  min-height: 150px;
-  max-height: 300px;
+  height: 200px;
 }
 
 .output.error {
@@ -106,49 +107,64 @@ body {
 }
 
 .output.success {
-  color: var(--sandbox-success);
+  color: #2e7d32;
 }
 
+/* Constraint string section */
 .result-section {
   margin-top: 15px;
 }
 
-.result-section h3 {
-  font-size: var(--font-size-small);
-  color: var(--color-text-muted);
-  margin: 0 0 8px 0;
-}
-
 .result-box {
-  background: var(--sandbox-code-bg);
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  background: #f5f5f5;
+  border: 1px solid var(--color-border);
+  border-radius: 5px;
   padding: 10px;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.result-box:hover {
-  filter: brightness(0.95);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-small);
+  min-height: 40px;
+  overflow: hidden;
 }
 
 .result-box.copied {
-  background: var(--sandbox-copied-bg);
+  background: #e8f5e9;
 }
 
-.url-link {
-  display: inline-block;
-  margin-top: 8px;
+#constraint-string {
+  flex: 1;
+  min-width: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow: hidden;
 }
 
-.help-text {
-  font-size: var(--font-size-small);
-  color: var(--color-text-muted);
-  margin-top: 15px;
-  line-height: 1.6;
+/* Copy button */
+.copy-button {
+  flex-shrink: 0;
+  background: transparent;
+  border: none;
+  padding: 4px;
+  margin: -4px -4px -4px 4px;
+  cursor: pointer;
+  opacity: 0.5;
+  border-radius: 4px;
+  transition: opacity 0.2s, background-color 0.2s;
+  text-shadow: none;
+  box-shadow: none;
 }
 
-.help-text code {
-  background: var(--sandbox-code-bg);
-  padding: 2px 6px;
-  border-radius: 3px;
-  font-family: var(--sandbox-font-mono);
+.copy-button:hover,
+.copy-button:hover:enabled {
+  opacity: 1;
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.copy-button img {
+  width: 16px;
+  height: 16px;
+  display: block;
+  filter: none;
 }
