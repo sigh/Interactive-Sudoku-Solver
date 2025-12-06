@@ -1,26 +1,13 @@
 import { CodeJar } from '../../lib/codejar.js';
-import { SudokuConstraint } from '../sudoku_constraint.js';
-import { GridShape, SHAPE_9x9, SHAPE_MAX } from '../grid_shape.js';
-import { javascriptSpecToNFA, NFASerializer } from '../nfa_builder.js';
+import './env.js';
 import { DEFAULT_CODE, EXAMPLES } from './examples.js';
-
-// Make these available globally for sandbox code.
-Object.assign(window, {
-  SudokuConstraint,
-  GridShape,
-  SHAPE_9x9,
-  SHAPE_MAX,
-  javascriptSpecToNFA,
-  NFASerializer,
-});
 
 class Sandbox {
   constructor() {
     this.editorElement = document.getElementById('editor');
     this.outputElement = document.getElementById('output');
     this.constraintElement = document.getElementById('constraint-string');
-    this.urlElement = document.getElementById('puzzle-url');
-    this.urlLinkElement = document.getElementById('puzzle-url-link');
+    this.solverLinkElement = document.getElementById('open-solver-link');
     this.examplesSelect = document.getElementById('examples-select');
 
     this._initEditor();
@@ -55,6 +42,7 @@ class Sandbox {
   _initEventListeners() {
     document.getElementById('run-btn').addEventListener('click', () => this.runCode());
     document.getElementById('clear-btn').addEventListener('click', () => this.clear());
+    document.getElementById('copy-btn').addEventListener('click', () => this._copyConstraint());
 
     this.editorElement.addEventListener('keydown', (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
@@ -63,9 +51,6 @@ class Sandbox {
       }
     });
 
-    this.constraintElement.addEventListener('click', () => this._copyToClipboard(this.constraintElement));
-    this.urlElement.addEventListener('click', () => this._copyToClipboard(this.urlElement));
-
     this.examplesSelect.addEventListener('change', () => {
       const name = this.examplesSelect.value;
       if (name) this.jar.updateCode(EXAMPLES[name]);
@@ -73,10 +58,14 @@ class Sandbox {
     });
   }
 
-  _copyToClipboard(element) {
-    navigator.clipboard.writeText(element.textContent);
-    element.classList.add('copied');
-    setTimeout(() => element.classList.remove('copied'), 1000);
+  _copyConstraint() {
+    const text = this.constraintElement.textContent;
+    if (text && text !== '(no constraint returned)' && text !== '(error)') {
+      navigator.clipboard.writeText(text);
+      const resultBox = this.constraintElement.parentElement;
+      resultBox.classList.add('copied');
+      setTimeout(() => resultBox.classList.remove('copied'), 1000);
+    }
   }
 
   async runCode() {
@@ -106,10 +95,9 @@ class Sandbox {
         const constraintStr = String(result);
         this.constraintElement.textContent = constraintStr;
 
-        const url = `${location.origin}${location.pathname.replace('sandbox.html', 'index.html')}#${constraintStr}`;
-        this.urlElement.textContent = url;
-        this.urlLinkElement.href = url;
-        this.urlLinkElement.style.display = 'inline-block';
+        const url = `./?q=${encodeURIComponent(constraintStr)}`;
+        this.solverLinkElement.href = url;
+        this.solverLinkElement.style.display = 'inline-block';
 
         this.outputElement.className = 'output success';
         if (logs.length === 0) {
@@ -117,14 +105,14 @@ class Sandbox {
         }
       } else {
         this.constraintElement.textContent = '(no constraint returned)';
-        this.urlLinkElement.style.display = 'none';
+        this.solverLinkElement.style.display = 'none';
       }
     } catch (err) {
       const errorOutput = logs.length > 0 ? logs.join('\n') + '\n\n' : '';
       this.outputElement.textContent = `${errorOutput}Error: ${err.message}\n\n${err.stack || ''}`;
       this.outputElement.className = 'output error';
       this.constraintElement.textContent = '(error)';
-      this.urlLinkElement.style.display = 'none';
+      this.solverLinkElement.style.display = 'none';
     } finally {
       Object.assign(console, originalConsole);
     }
@@ -134,8 +122,7 @@ class Sandbox {
     this.jar.updateCode('');
     this.outputElement.textContent = '';
     this.constraintElement.textContent = '';
-    this.urlElement.textContent = '';
-    this.urlLinkElement.style.display = 'none';
+    this.solverLinkElement.style.display = 'none';
   }
 }
 
