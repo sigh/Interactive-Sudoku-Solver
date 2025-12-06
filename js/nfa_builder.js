@@ -52,11 +52,13 @@ export class NFA {
 
   addStartId(startId) {
     this._assertUnsealed();
+    this._ensureStateExists(startId);
     this._startIds.add(startId);
   }
 
   addAcceptId(acceptId) {
     this._assertUnsealed();
+    this._ensureStateExists(acceptId);
     this._acceptIds.add(acceptId);
   }
 
@@ -637,7 +639,7 @@ export class NFASerializer {
     }
     const symbolBits = requiredBits(symbolCount - 1);
 
-    const { format, transitionCountBits } = this._chooseStateFormat(nfa, symbolCount, stateBits);
+    const { format, transitionCountBits } = this._chooseStateFormat(nfa, symbolCount, symbolBits, stateBits);
 
     const writer = new BitWriter();
     this._writeHeader(writer, { format, symbolCount, stateBits, startCount, startIsAccept, acceptCount, transitionCountBits });
@@ -675,10 +677,6 @@ export class NFASerializer {
     }
 
     reader.skipPadding();
-
-    if (!nfa.numStates()) {
-      throw new Error('Serialized NFA does not contain any states');
-    }
 
     for (let i = 0; i < startCount; i++) {
       nfa.addStartId(i);
@@ -821,8 +819,7 @@ export class NFASerializer {
     }
   }
 
-  static _chooseStateFormat(nfa, symbolCount, stateBits) {
-    const symbolBits = requiredBits(symbolCount - 1);
+  static _chooseStateFormat(nfa, symbolCount, symbolBits, stateBits) {
     const numStates = nfa.numStates();
 
     // First pass: check if packed is possible and find max transitions.
@@ -864,6 +861,7 @@ export class NFASerializer {
   }
 
   static _readPlainBody(nfa, reader, transitionCountBits, symbolBits, stateBits) {
+    if (transitionCountBits === 0) return;
     for (let stateId = 0; reader.remainingBits() >= transitionCountBits; stateId++) {
       const transitionCount = reader.readBits(transitionCountBits);
       for (let i = 0; i < transitionCount; i++) {
@@ -878,6 +876,7 @@ export class NFASerializer {
   }
 
   static _readPackedBody(nfa, reader, symbolCount, stateBits) {
+    if (symbolCount < 1) throw new Error('symbolCount must be at least 1');
     for (let stateId = 0; reader.remainingBits() >= symbolCount; stateId++) {
       const activeMask = reader.readBits(symbolCount);
       for (let mask = activeMask, value = 1; mask; mask >>>= 1, value++) {

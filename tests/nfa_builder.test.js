@@ -207,6 +207,25 @@ await runTest('NFA serialization should handle empty NFA', () => {
   expectRejects(restored, [1], 'empty NFA should reject any input');
 });
 
+await runTest('NFA serialization should handle NFA with no transitions', () => {
+  // NFA with states but no transitions - transitionCountBits will be 0.
+  // This tests that deserialization doesn't infinite loop.
+  const nfa = new NFA();
+  nfa.addState();  // 0: start and accept
+  nfa.addStartId(0);
+  nfa.addAcceptId(0);
+  nfa.seal();
+
+  const serialized = NFASerializer.serialize(nfa);
+  const restored = NFASerializer.deserialize(serialized);
+
+  assert.equal(restored.numStates(), 1, 'restored NFA should have 1 state');
+  assert.equal(restored.getStartIds().size, 1, 'should have 1 start state');
+  assert.ok(restored.isAccepting(0), 'state 0 should be accepting');
+  expectAccepts(restored, [], 'should accept empty input');
+  expectRejects(restored, [1], 'should reject any symbol (no transitions)');
+});
+
 await runTest('NFA serialization should handle multiple start states', () => {
   // NFA with two start states: one accepts 1, the other accepts 2.
   const nfa = new NFA();
@@ -300,6 +319,68 @@ await runTest('JavascriptNFABuilder should allow transition fan-out', () => {
   expectAccepts(nfa, [1, 3], 'right branch should reach accept');
   expectRejects(nfa, [1, 1], 'branch fan-out must consume matching suffix');
   expectRejects(nfa, [2, 3], 'values without initial branch should reject');
+});
+
+await runTest('JavascriptNFABuilder with transition always returning undefined', () => {
+  // Transition returns undefined for all inputs - no transitions, single state.
+  const nfa = javascriptSpecToNFA({
+    startState: 0,
+    transition: () => undefined,
+    accept: (state) => state === 0,
+  }, 4);
+
+  assert.equal(nfa.numStates(), 1, 'should have only 1 state');
+  expectAccepts(nfa, [], 'empty input should accept (start is accepting)');
+  expectRejects(nfa, [1], 'any input should reject (no transitions)');
+  expectRejects(nfa, [1, 2, 3], 'any input should reject (no transitions)');
+
+  // Round-trip through serializer.
+  const serialized = NFASerializer.serialize(nfa);
+  const restored = NFASerializer.deserialize(serialized);
+  assert.equal(restored.numStates(), 1, 'restored should have 1 state');
+  expectAccepts(restored, [], 'restored should accept empty input');
+  expectRejects(restored, [1], 'restored should reject any input');
+});
+
+await runTest('JavascriptNFABuilder with accept always returning false', () => {
+  // Accept always returns false - no accepting states.
+  // Use a bounded state space to avoid infinite states.
+  const nfa = javascriptSpecToNFA({
+    startState: 0,
+    transition: (state) => (state + 1) % 3,  // Cycles through 0, 1, 2
+    accept: () => false,
+  }, 2);
+
+  // All states are dead (can't reach accept), so NFA should be empty after optimization.
+  assert.equal(nfa.numStates(), 0, 'should have 0 states after optimization');
+  expectRejects(nfa, [], 'empty input should reject');
+  expectRejects(nfa, [1], 'any input should reject');
+
+  // Round-trip through serializer (empty NFA).
+  const serialized = NFASerializer.serialize(nfa);
+  assert.equal(serialized, '', 'empty NFA should serialize to empty string');
+  const restored = NFASerializer.deserialize(serialized);
+  assert.equal(restored.numStates(), 0, 'restored should have 0 states');
+  expectRejects(restored, [], 'restored should reject empty input');
+});
+
+await runTest('JavascriptNFABuilder with non-accepting start and no transitions', () => {
+  // Start state is not accepting, and no transitions exist.
+  const nfa = javascriptSpecToNFA({
+    startState: 0,
+    transition: () => undefined,
+    accept: () => false,
+  }, 4);
+
+  assert.equal(nfa.numStates(), 0, 'should have 0 states after optimization');
+  expectRejects(nfa, [], 'empty input should reject');
+  expectRejects(nfa, [1], 'any input should reject');
+
+  // Round-trip through serializer (empty NFA).
+  const serialized = NFASerializer.serialize(nfa);
+  assert.equal(serialized, '', 'empty NFA should serialize to empty string');
+  const restored = NFASerializer.deserialize(serialized);
+  assert.equal(restored.numStates(), 0, 'restored should have 0 states');
 });
 
 await runTest('javascriptSpecToNFA should optimize and return ready NFA', () => {
