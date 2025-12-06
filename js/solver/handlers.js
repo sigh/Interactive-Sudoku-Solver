@@ -592,6 +592,7 @@ export class BinaryPairwise extends SudokuConstraintHandler {
     this._validCombinationInfo = null;
     this._cellExclusions = null;
     this._enableHiddenSingles = false;
+    this._prefixCache = null;
 
     // Ensure we dedupe binary constraints.
     this.idStr = [this.constructor.name, key, ...cells].join('-');
@@ -719,6 +720,10 @@ export class BinaryPairwise extends SudokuConstraintHandler {
       this._cellExclusions = cellExclusions;
     }
 
+    // Allocate prefix cache for O(n) pairwise constraint enforcement.
+    this._prefixCache = new Uint16Array(this.cells.length + 1);
+    this._prefixCache[0] = lookupTables.allValues;
+
     // If no values are legal at the start, then this constraint is invalid.
     return this._table[lookupTables.allValues] !== 0;
   }
@@ -797,29 +802,35 @@ export class BinaryPairwise extends SudokuConstraintHandler {
 
     const table = this._table;
 
-    // Naively enforce all pairs of constraints until we reach a fixed point.
-    // The key must be symmetric, so we don't need to check both orders.
+    // Use prefix cache to enforce all pairwise constraints in O(n) per iteration.
+    // Forward pass: build prefix[i] = table[v0] & table[v1] & ... & table[v_{i-1}]
+    // Backward pass: accumulate suffix while enforcing constraints.
+    // For cell i, the valid values are: v_i & prefix[i] & suffix
+    const prefix = this._prefixCache;
+
     let allChanged = 0;
     let newChanged = 1;
     while (newChanged) {
+      const firstCell = LookupTables.toIndex(newChanged & -newChanged);
       newChanged = 0;
-      for (let i = 0; i < numCells - 1; i++) {
-        let v0 = grid[cells[i]];
-        for (let j = i + 1; j < numCells; j++) {
-          const v1 = grid[cells[j]];
-          const v0New = v0 & table[v1];
-          const v1New = v1 & table[v0];
-          if (!(v0New && v1New)) return false;
-          if (v0 != v0New) {
-            newChanged |= 1 << i;
-            v0 = v0New;
+
+      // Forward pass: build prefix cache.
+      for (let i = firstCell; i < numCells; i++) {
+        prefix[i + 1] = prefix[i] & table[grid[cells[i]]];
+      }
+
+      // Backward pass: accumulate suffix and enforce constraints.
+      let suffix = prefix[0];
+      for (let i = numCells - 1; i >= 0; i--) {
+        const v = grid[cells[i]];
+        const vNew = v & prefix[i] & suffix;
+        if (v !== vNew) {
+          if (!(grid[cells[i]] = vNew)) {
+            return false;
           }
-          if (v1 != v1New) {
-            newChanged |= 1 << j;
-            grid[cells[j]] = v1New;
-          }
+          newChanged |= 1 << i;
         }
-        grid[cells[i]] = v0;
+        suffix &= table[v];
       }
       allChanged |= newChanged;
     }
