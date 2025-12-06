@@ -1,0 +1,72 @@
+---
+layout: null
+---
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Constraint Sandbox - Interactive Sudoku Solver</title>
+  <meta name="description" content="Code sandbox for testing constraint generation">
+  <link rel="icon" href="{{ 'img/favicon.png' | relative_url }}">
+  <link rel="canonical" href="https://sigh.github.io/Interactive-Sudoku-Solver/sandbox">
+
+  <link rel="stylesheet" href="{{ 'css/style.css?v=' | append: site.github.build_revision | relative_url }}">
+  <link rel="stylesheet" href="{{ 'css/sandbox.css?v=' | append: site.github.build_revision | relative_url }}">
+  <link rel="stylesheet" href="{{ 'lib/prism-tomorrow.min.css' | relative_url }}">
+
+  <script src="{{ 'lib/prism.min.js' | relative_url }}"></script>
+  <script src="{{ 'lib/prism-javascript.min.js' | relative_url }}"></script>
+  <script>self.VERSION_PARAM = '?v=' + ('{{ site.github.build_revision }}' || Math.random());</script>
+  <script type="module"
+    src="{{ 'js/sandbox/sandbox.js?v=' | append: site.github.build_revision | relative_url }}"></script>
+</head>
+
+<body>
+  <div class="sandbox-container">
+    <div class="sandbox-header">
+      <h1>Interactive Sudoku Solver (ISS) – Constraint Sandbox</h1>
+      <a href="index.html">← Back to Solver</a>
+    </div>
+
+    <div class="editor-container">
+      <div class="editor-panel">
+        <div class="panel-header">
+          <div class="btn-group">
+            <select id="examples-select">
+              <option value="">Load example...</option>
+            </select>
+            <button id="clear-btn">Clear</button>
+            <button id="run-btn">▶ Run (Ctrl+Enter)</button>
+          </div>
+        </div>
+        <div id="editor" class="editor language-javascript"></div>
+        <p class="help-text">
+          Globals: <code>SudokuConstraint</code>, <code>GridShape</code>, <code>SHAPE_9x9</code>.
+          Return a constraint. Click output to copy.
+        </p>
+      </div>
+
+      <div class="output-panel">
+        <div class="panel-header">
+          <h2>Console Output</h2>
+        </div>
+        <div id="output" class="output"></div>
+
+        <div class="result-section">
+          <h3>Constraint String (click to copy)</h3>
+          <div id="constraint-string" class="result-box"></div>
+        </div>
+
+        <div class="result-section">
+          <h3>Puzzle URL (click to copy)</h3>
+          <div id="puzzle-url" class="result-box"></div>
+          <a id="puzzle-url-link" href="#" target="_blank" class="url-link" style="display: none;">Open in Solver →</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+
+</html>
