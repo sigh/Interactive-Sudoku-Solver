@@ -1,14 +1,15 @@
-export const DEFAULT_CODE = `// Available globals:
-// - SudokuConstraint, GridShape, SHAPE_9x9, SHAPE_MAX
-// - javascriptSpecToNFA, NFASerializer
-//
-// Return a constraint or constraint string.
-// Use console.log() for debug output.
+export const DEFAULT_CODE = `
+// Create a killer cage with sum 15
+const sum = 15;
+const cells = ['R1C1', 'R1C2', 'R2C1', 'R2C2'];
+const constraint = new SudokuConstraint.Cage(sum, ...cells);
 
-const cells = ['R1C1', 'R1C2', 'R1C3'];
-const constraint = new SudokuConstraint.Renban(...cells);
+console.log('Created cage with', cells.length, 'cells');
+console.log();
 
-return constraint;`;
+help();  // Usage instructions
+
+return constraint;`.trim();
 
 export const EXAMPLES = {
   'Default Template': DEFAULT_CODE,
