@@ -2,10 +2,9 @@ export const DEFAULT_CODE = `
 // Create a killer cage with sum 15
 const sum = 15;
 const cells = ['R1C1', 'R1C2', 'R2C1', 'R2C2'];
-const constraint = new SudokuConstraint.Cage(sum, ...cells);
+const constraint = new Cage(sum, ...cells);
 
-console.log('Created cage with', cells.length, 'cells');
-console.log();
+console.log('Created cage with', cells.length, 'cells', '\\n');
 
 help();  // Usage instructions
 
@@ -16,12 +15,12 @@ export const EXAMPLES = {
 
   'Simple Renban': `// Simple Renban line
 const cells = ['R1C1', 'R1C2', 'R1C3'];
-return new SudokuConstraint.Renban(...cells);`,
+return new Renban(...cells);`,
 
   'Killer Cage': `// Killer cage with sum
 const sum = 15;
 const cells = ['R1C1', 'R1C2', 'R2C1', 'R2C2'];
-return new SudokuConstraint.Cage(sum, ...cells);`,
+return new Cage(sum, ...cells);`,
 
   'Not-Renban NFA': `// Not-Renban: values must NOT be consecutive
 // Uses NFA to track min/max
@@ -35,20 +34,20 @@ function makeNotRenban(cells) {
     }),
     accept: (state) => state.max - state.min !== count - 1,
   };
-  const encodedNFA = SudokuConstraint.NFA.encodeSpec(spec, 9);
-  return new SudokuConstraint.NFA(encodedNFA, '', ...cells);
+  const encodedNFA = NFA.encodeSpec(spec, 9);
+  return new NFA(encodedNFA, '', ...cells);
 }
 
 return makeNotRenban(['R1C1', 'R1C2', 'R1C3']);`,
 
   'Multiple Constraints': `// Combine multiple constraints
 const constraints = [
-  new SudokuConstraint.Thermo('R1C1', 'R2C1', 'R3C1'),
-  new SudokuConstraint.Thermo('R1C2', 'R2C2', 'R3C2'),
-  new SudokuConstraint.AntiKnight(),
+  new Thermo('R1C1', 'R2C1', 'R3C1'),
+  new Thermo('R1C2', 'R2C2', 'R3C2'),
+  new AntiKnight(),
 ];
 
-return new SudokuConstraint.Set(constraints);`,
+return new Set(constraints);`,
 
   'Arithmetic Progression': `// Arithmetic progression NFA
 // All differences between consecutive cells must be equal
@@ -69,8 +68,8 @@ const spec = {
   accept: () => true,
 };
 
-const encodedNFA = SudokuConstraint.NFA.encodeSpec(spec, 9);
-return new SudokuConstraint.NFA(encodedNFA, 'AP', ...cells);`,
+const encodedNFA = NFA.encodeSpec(spec, 9);
+return new NFA(encodedNFA, 'AP', ...cells);`,
 
   'Grid Generation': `// Generate constraints for entire grid
 const constraints = [];
@@ -81,9 +80,9 @@ for (let row = 1; row <= 3; row++) {
   for (let col = 1; col <= 3; col++) {
     cells.push(\`R\${row}C\${col}\`);
   }
-  constraints.push(new SudokuConstraint.Thermo(...cells));
+  constraints.push(new Thermo(...cells));
 }
 
 console.log(\`Generated \${constraints.length} thermos\`);
-return new SudokuConstraint.Set(constraints);`,
+return new Set(constraints);`,
 };

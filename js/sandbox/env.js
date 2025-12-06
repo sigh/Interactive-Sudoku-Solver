@@ -1,61 +1,95 @@
 import { SudokuConstraint } from '../sudoku_constraint.js';
 import { GridShape, SHAPE_9x9, SHAPE_MAX } from '../grid_shape.js';
-import { javascriptSpecToNFA, NFASerializer } from '../nfa_builder.js';
 
 const HELP_TEXT = `
 === Constraint Sandbox Help ===
 
-Return values:
-  - A SudokuConstraint object (e.g. new SudokuConstraint.Cage(...))
-  - A constraint string (e.g. ".Cage~12~R1C1_R1C2_R1C3")
-  - An array of constraints or constraint strings
+ACCEPTED RETURN VALUES
 
-Available globals:
-  SudokuConstraint  - Create constraint objects
-  GridShape         - Define grid dimensions
-  SHAPE_9x9         - Standard 9x9 grid shape
-  SHAPE_MAX         - Maximum supported grid shape (16x16)
-  javascriptSpecToNFA - Convert JS spec to NFA for custom constraints
-  NFASerializer     - Serialize NFA for use in constraints
+  Your code should return one of the following:
+    - A constraint object (e.g. new Cage(...))
+    - A constraint string (e.g. ".Cage~12~R1C1_R1C2_R1C3")
+    - An array of constraints or constraint strings
 
-SudokuConstraint types:
-  new SudokuConstraint.Renban(...cells)
-  new SudokuConstraint.Thermo(...cells)
-  new SudokuConstraint.Cage(sum, ...cells)
-  new SudokuConstraint.Arrow(circleCell, ...lineCells)
-  new SudokuConstraint.Killer(sum, ...cells)
-  new SudokuConstraint.AntiKnight()
-  new SudokuConstraint.AntiKing()
-  new SudokuConstraint.DiagonalPlus()
-  new SudokuConstraint.DiagonalMinus()
-  new SudokuConstraint.Set(constraintsArray)
-  new SudokuConstraint.NFA(encodedNFA, label, ...cells)
-  ... and more
+CELL IDENTIFIERS
 
-Cell format: 'R1C1' (row 1, column 1) through 'R9C9'
+  Cells are identified using 'R{row}C{col}' format, with rows and columns
+  starting at 1.
+  e.g. 'R1C1' is the top-left cell, 'R9C9' is the bottom-right cell in a 9x9 grid
 
-NFA spec format:
-  {
-    startState: <initial state>,
-    transition: (state, value) => <new state or undefined to reject>,
-    accept: (state) => <boolean>
-  }
+  The following convenience functions are available for working with cell IDs:
+    parseCellId('R3C4')  => { row: 3, col: 4 }
+    makeCellId(3, 4)     => 'R3C4'
 
-Use console.log() for debug output.
-Use help() function to display this message.
+CONSTRAINT OBJECTS
+
+  Constraint class names match their serialization names. For example:
+    new Cage(sum, ...cells)
+    new Thermo(...cells)
+
+  Use help('<ConstraintName>') for details on a specific constraint.
+
+UTILITIES
+
+  Use console.log() for debug output.
+  Use help() function to display this message.
 `.trim();
 
-function help() {
-  console.log(HELP_TEXT);
-}
+const getConstraintList = () => {
+  const byCategory = {};
+  for (const [name, cls] of Object.entries(SudokuConstraint)) {
+    if (typeof cls !== 'function') continue;
+    if (!cls.CATEGORY || cls.CATEGORY === 'Experimental') continue;
+    (byCategory[cls.CATEGORY] ||= []).push(name);
+  }
 
-// Export globals to window
-Object.assign(window, {
-  SudokuConstraint,
-  GridShape,
+  let output = '\nCONSTRAINTS BY CATEGORY\n';
+  for (const [category, names] of Object.entries(byCategory).sort()) {
+    output += `\n  ${category}:\n`;
+    output += '    ' + names.sort().join(', ') + '\n';
+  }
+  return output;
+};
+
+const getConstructorArgs = (cls) => {
+  const match = String(cls).match(/constructor\s*\(([^)]*)\)/);
+  return match?.[1]?.trim() || '';
+};
+
+const help = (arg) => {
+  const cls = arg && SudokuConstraint[arg];
+  if (cls) {
+    const args = getConstructorArgs(cls);
+    console.log(`${arg}${args ? `(${args})` : ''}`);
+    if (cls.DESCRIPTION) {
+      console.log('\n  ' + cls.DESCRIPTION.trim().replace(/\s+/g, ' '));
+    }
+    if (cls.CATEGORY) {
+      console.log(`\n  Category: ${cls.CATEGORY}`);
+    }
+  } else {
+    if (arg) {
+      console.error(`Unknown constraint: '${arg}'\n`);
+    }
+    console.log(HELP_TEXT);
+    console.log(getConstraintList());
+  }
+  console.log();
+};
+
+const parseCellId = (cellId) => ({
+  row: parseInt(cellId[1], 10),
+  col: parseInt(cellId[3], 10),
+});
+
+const makeCellId = (row, col) => `R${row}C${col}`;
+
+export const SANDBOX_GLOBALS = {
+  parseCellId,
+  makeCellId,
+  help,
   SHAPE_9x9,
   SHAPE_MAX,
-  javascriptSpecToNFA,
-  NFASerializer,
-  help,
-});
+  GridShape,
+  ...SudokuConstraint,
+};
