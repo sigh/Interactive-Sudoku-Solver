@@ -82,7 +82,7 @@ const COMPOSITE_CONSTRAINT_FN = () => {
   }
   const orConstraint = new Or(orParts);
 
-  // Example of just extra existing serialized constraints.
+  // Example of adding extra serialized constraints.
   // (For example, copied from the ISS UI).
   const base = '.HiddenSkyscraper~C4~8~.HiddenSkyscraper~C5~8~.HiddenSkyscraper~C6~8~.HiddenSkyscraper~C7~6~.HiddenSkyscraper~R2~2~2.HiddenSkyscraper~R7~~5.HiddenSkyscraper~C2~~6.HiddenSkyscraper~C3~~7.HiddenSkyscraper~R1~3~.HiddenSkyscraper~R3~1~.HiddenSkyscraper~R4~7~.HiddenSkyscraper~R5~7~.HiddenSkyscraper~R6~7~';
 
