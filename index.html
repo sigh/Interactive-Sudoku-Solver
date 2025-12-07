@@ -389,12 +389,9 @@ layout: null
                 <div class="description">
                   <p>
                     Define an finite-state machine using JavaScript transition
-                    and accept functions. The cells in the constraint will
-                    processed in order, and the constraint will be satisfied if
-                    the accept function returns true for the final state.
-                    The state-machine can be non-deterministic, meaning that
-                    a given state and cell value can transition to multiple next
-                    states.
+                    and accept functions. The constraint will be satisfied
+                    the state-machine reaches an accept state after processing
+                    the cells in order.
                   </p>
                   <p>
                     Tip: You can use <code>console.log</code> to debug your
@@ -429,10 +426,10 @@ layout: null
                     </div>
                     <div>
                       <div class="description">
-                        <code>// transition returns a next state, or an array</code>
-                        <code>// of states based on the current state and the</code>
-                        <code>// cell value. Returns undefined or the empty</code>
-                        <code>// array to reject a value.</code>
+                        <code>// transition takes the current state and cell</code>
+                        <code>// value and returns the next state, or an array</code>
+                        <code>// of states. Returning undefined or the empty</code>
+                        <code>// array generates no next states.</code>
                       </div>
                       <code>function transition(state, value) {</code>
                       <textarea id="state-machine-transition-body" rows="10" name="transition-body" spellcheck="false"
