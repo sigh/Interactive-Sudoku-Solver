@@ -1,4 +1,6 @@
 import { SudokuConstraint } from '../sudoku_constraint.js';
+import { SudokuParser } from '../sudoku_parser.js';
+import { SudokuBuilder } from '../solver/sudoku_builder.js';
 import { GridShape, SHAPE_9x9, SHAPE_MAX } from '../grid_shape.js';
 
 const HELP_TEXT = `
@@ -26,6 +28,11 @@ CONSTRAINT OBJECTS
   Constraint class names match their serialization names. For example:
     new Cage(sum, ...cells)
     new Thermo(...cells)
+
+  The type of a constraint instance c can be found with c.type.
+
+  parseConstraint(constraintString) can parse a constraint string into an array
+  of constraint objects. e.g. parseConstraint('.Cage~10~R1C1~R1C2')  => [Cage]
 
   Use help('<ConstraintName>') for details on a specific constraint.
 
@@ -84,7 +91,15 @@ const parseCellId = (cellId) => ({
 
 const makeCellId = (row, col) => `R${row}C${col}`;
 
+const parseConstraint = (str) => {
+  const parsed = SudokuParser.parseString(str);
+  const resolved = SudokuBuilder.resolveConstraint(parsed);
+  if (resolved.type === 'Set') return resolved.constraints;
+  return [resolved];
+};
+
 export const SANDBOX_GLOBALS = {
+  parseConstraint,
   parseCellId,
   makeCellId,
   help,
