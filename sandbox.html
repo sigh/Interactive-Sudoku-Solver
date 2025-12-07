@@ -30,25 +30,24 @@ layout: null
       <a href="index.html" class="back-link">← Back to Solver</a>
     </div>
 
-    <p>
-      Write JavaScript to generate constraints.
-    </p>
+    <div class="intro">
+      <p>
+        Write JavaScript to generate constraints.
+      </p>
 
-    <p>
-      Return a constraint or an array of constraints. A constraint can either
-      be an instance of <code>SudokuConstraint</code> or a constraint string.
-    </p>
+      <p>
+        Return a constraint or an array of constraints. A constraint can either
+        be an instance of <code>SudokuConstraint</code> or a constraint string.
+      </p>
 
-    <p>
-      <code>console.log()</code> output will be displayed in the
-      "Console Output" panel. <code>help()</code> will display detailed help.
-    </p>
-
-    <p>
-      Visit the <a href="https://github.com/sigh/Interactive-Sudoku-Solver" target="_blank">github repository</a> to
-      view the source code and <a href="https://github.com/sigh/Interactive-Sudoku-Solver/issues" target="_blank">report
-        bugs</a>.
-    </p>
+      <p>
+        <code>help()</code> will display detailed help.
+        Visit the <a href="https://github.com/sigh/Interactive-Sudoku-Solver" target="_blank">github repository</a> to
+        view the source code and <a href="https://github.com/sigh/Interactive-Sudoku-Solver/issues"
+          target="_blank">report
+          bugs</a>.
+      </p>
+    </div>
 
     <div class="editor-container">
       <div class="editor-panel">
@@ -66,14 +65,15 @@ layout: null
 
       <div class="output-panel">
         <div class="panel-header">
-          <h2>Console Output</h2>
+          <h2>Console Output – use <code>console.log()</code></h2>
         </div>
         <div id="output" class="output"></div>
 
         <div class="result-section">
           <div class="panel-header">
             <h2>Constraint String</h2>
-            <a id="open-solver-link" href="#" target="_blank" style="display: none;">Open in Solver →</a>
+            <a id="open-solver-link" href="#" target="_blank" style="display: none;">Open in Solver
+              →</a>
           </div>
           <div class="result-box">
             <span id="constraint-string"></span>

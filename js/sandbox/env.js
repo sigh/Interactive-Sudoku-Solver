@@ -84,12 +84,15 @@ const help = (arg) => {
   console.log();
 };
 
-const parseCellId = (cellId) => ({
-  row: parseInt(cellId[1], 10),
-  col: parseInt(cellId[3], 10),
-});
+const parseCellId = (cellId) => {
+  const parsed = SHAPE_MAX.parseCellId(cellId);
+  return {
+    row: parsed.row + 1,
+    col: parsed.col + 1,
+  };
+};
 
-const makeCellId = (row, col) => `R${row}C${col}`;
+const makeCellId = (row, col) => SHAPE_MAX.makeCellId(row - 1, col - 1);
 
 const parseConstraint = (str) => {
   const parsed = SudokuParser.parseString(str);
