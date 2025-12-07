@@ -3,6 +3,7 @@ const {
   BitReader,
   BitSet,
   BitWriter,
+  canonicalJSON,
   memoize,
   requiredBits
 } = await import('./util.js' + self.VERSION_PARAM);
@@ -1347,7 +1348,7 @@ export class JavascriptNFABuilder {
     }
 
     try {
-      const serialized = JSON.stringify(state);
+      const serialized = canonicalJSON(state);
       if (serialized === undefined) {
         throw new Error('Could not JSON-serialize');
       }

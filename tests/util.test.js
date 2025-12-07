@@ -32,6 +32,7 @@ const {
   BitSet,
   MultiMap,
   RandomIntGenerator,
+  canonicalJSON,
 } = await import('../js/util.js');
 
 // ============================================================================
@@ -484,6 +485,48 @@ await runTest('RandomIntGenerator should produce values in range', () => {
     const value = rng.randomInt(10);
     assert.ok(value >= 0 && value <= 10, `Value ${value} out of range`);
   }
+});
+
+// ============================================================================
+// canonicalJSON
+// ============================================================================
+
+await runTest('canonicalJSON should sort object keys alphabetically', () => {
+  const obj = { z: 1, a: 2, m: 3 };
+  assert.equal(canonicalJSON(obj), '{"a":2,"m":3,"z":1}');
+});
+
+await runTest('canonicalJSON should produce same output regardless of key insertion order', () => {
+  const obj1 = { b: 1, a: 2 };
+  const obj2 = { a: 2, b: 1 };
+  assert.equal(canonicalJSON(obj1), canonicalJSON(obj2));
+});
+
+await runTest('canonicalJSON should handle nested objects', () => {
+  const obj = { z: { b: 1, a: 2 }, a: 3 };
+  assert.equal(canonicalJSON(obj), '{"a":3,"z":{"a":2,"b":1}}');
+});
+
+await runTest('canonicalJSON should preserve array order', () => {
+  const obj = { arr: [3, 1, 2] };
+  assert.equal(canonicalJSON(obj), '{"arr":[3,1,2]}');
+});
+
+await runTest('canonicalJSON should handle arrays of objects', () => {
+  const obj = { items: [{ z: 1, a: 2 }, { b: 3 }] };
+  assert.equal(canonicalJSON(obj), '{"items":[{"a":2,"z":1},{"b":3}]}');
+});
+
+await runTest('canonicalJSON should handle primitives', () => {
+  assert.equal(canonicalJSON(42), '42');
+  assert.equal(canonicalJSON('hello'), '"hello"');
+  assert.equal(canonicalJSON(null), 'null');
+  assert.equal(canonicalJSON(true), 'true');
+});
+
+await runTest('canonicalJSON should handle empty objects and arrays', () => {
+  assert.equal(canonicalJSON({}), '{}');
+  assert.equal(canonicalJSON([]), '[]');
 });
 
 logSuiteComplete('util');
