@@ -590,3 +590,19 @@ export class MultiMap {
     return this._map[Symbol.iterator]();
   }
 }
+
+// Canonical JSON serialization with sorted object keys for consistent output.
+// This ensures the same object always produces the same string, regardless of
+// the order in which properties were added.
+export const canonicalJSON = (value) => {
+  const replacer = (key, val) => {
+    if (val && typeof val === 'object' && !Array.isArray(val)) {
+      const sortedEntries = Object.entries(val).sort(
+        (a, b) => a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0
+      );
+      return Object.fromEntries(sortedEntries);
+    }
+    return val;
+  };
+  return JSON.stringify(value, replacer);
+};
