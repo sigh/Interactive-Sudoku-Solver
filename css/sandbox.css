@@ -3,6 +3,12 @@
 /* Override style.css body width: fit-content */
 body {
   width: unset;
+  /* Have space at the bottom to make it easier to expand the editor. */
+  margin-bottom: 120px;
+}
+
+.intro {
+  max-width: 600px;
 }
 
 .sandbox-container {
@@ -34,22 +40,25 @@ p code {
   font-family: var(--font-family-mono);
 }
 
-/* Two-column layout using grid */
+/* Two-column layout using flexbox for natural wrapping */
 .editor-container {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  display: flex;
+  flex-wrap: wrap;
   gap: 20px;
 }
 
-.editor-panel,
+.editor-panel {
+  flex: 0 0 auto;
+}
+
 .output-panel {
-  min-width: 0;
+  flex: 1 1 300px;
+  min-width: 300px;
 }
 
 /* Panel headers */
 .panel-header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
   flex-wrap: wrap;
   gap: 4px 8px;
@@ -78,19 +87,20 @@ p code {
 /* Code editor */
 .editor {
   font-family: var(--font-family-mono);
-  font-size: var(--font-size-base);
+  font-size: var(--font-size-small);
   line-height: 1.5;
   padding: 15px;
   border-radius: 5px;
   border: 1px solid var(--color-border);
   background: #2d2d44;
   color: #f8f8f2;
-  height: 400px;
   overflow: auto;
   tab-size: 2;
   white-space: pre-wrap;
   word-wrap: break-word;
   resize: vertical;
+  width: 80ch;
+  height: 400px;
 }
 
 .editor:focus {

@@ -187,8 +187,10 @@ const CHECKERBOARD_FN = () => {
   return constraints;
 };
 
+export const DEFAULT_CODE = fnToCode(DEFAULT_CODE_FN);
+
 export const EXAMPLES = {
-  'Default Template': fnToCode(DEFAULT_CODE_FN),
+  'Default Template': DEFAULT_CODE,
   'Shape': fnToCode(SHAPE_FN),
   'Column constraints': fnToCode(COLUMN_CONSTRAINTS_FN),
   'Composite constraint': fnToCode(COMPOSITE_CONSTRAINT_FN),
@@ -196,5 +198,3 @@ export const EXAMPLES = {
   'Modifying constraints': fnToCode(MODIFYING_CONSTRAINTS_FN),
   'Checkerboard min/max': fnToCode(CHECKERBOARD_FN),
 };
-
-export const DEFAULT_CODE = EXAMPLES['Default Template'];
