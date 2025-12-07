@@ -23,6 +23,7 @@ export class SudokuBuilder {
     if (cls.IS_COMPOSITE) {
       args[0] = constraint.args[0].map(a => this.resolveConstraint(a));
     }
+
     return new cls(...args);
   }
 
