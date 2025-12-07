@@ -37,7 +37,7 @@ const puzzleFromCfg = async (puzzleCfg) => {
 
   // Lazily fetch input from file if it's a path.
   if (puzzle.input.startsWith('/')) {
-    const response = await fetch('..' + puzzle.input);
+    const response = await fetch('.' + puzzle.input);
     puzzle.input = await response.text();
   }
 
