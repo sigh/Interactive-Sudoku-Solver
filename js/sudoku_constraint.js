@@ -741,7 +741,7 @@ export class SudokuConstraint {
     constructor(mod, ...cells) {
       super(mod, ...cells);
       this.cells = cells;
-      this.mod = mod;
+      this.mod = +mod;
     }
 
     static displayName() {
@@ -752,9 +752,15 @@ export class SudokuConstraint {
       return `Modular (${this.mod})`;
     }
 
-    static fnKey = memoize((mod, numValues) =>
+    static neqFnKey = memoize((mod, numValues) =>
       SudokuConstraint.BinaryX.fnToKey(
         (a, b) => (a % mod) != (b % mod),
+        numValues)
+    );
+
+    static eqFnKey = memoize((mod, numValues) =>
+      SudokuConstraint.BinaryX.fnToKey(
+        (a, b) => (a % mod) == (b % mod),
         numValues)
     );
   }
