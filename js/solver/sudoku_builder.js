@@ -400,17 +400,24 @@ export class SudokuBuilder {
 
         case 'Modular':
           cells = constraint.cells.map(c => shape.parseCellId(c).cell);
-          if (cells.length < constraint.mod) {
+          {
+            const mod = constraint.mod;
+            // First `mod` cells must all be different mod n.
+            const firstCells = cells.slice(0, mod);
             const handler = new HandlerModule.BinaryPairwise(
-              SudokuConstraint.Modular.fnKey(constraint.mod, shape.numValues),
-              ...cells);
+              SudokuConstraint.Modular.neqFnKey(mod, shape.numValues),
+              ...firstCells);
             yield handler;
-          } else {
-            for (let i = constraint.mod; i <= cells.length; i++) {
-              const handler = new HandlerModule.BinaryPairwise(
-                SudokuConstraint.Modular.fnKey(constraint.mod, shape.numValues),
-                ...cells.slice(i - constraint.mod, i));
-              yield handler;
+            // Cells at positions i, i+mod, i+2*mod, ... must all be equal mod n.
+            const eqKey = SudokuConstraint.Modular.eqFnKey(mod, shape.numValues);
+            for (let i = 0; i < mod; i++) {
+              const equalCells = [];
+              for (let j = i; j < cells.length; j += mod) {
+                equalCells.push(cells[j]);
+              }
+              if (equalCells.length > 1) {
+                yield new HandlerModule.BinaryPairwise(eqKey, ...equalCells);
+              }
             }
           }
           break;
