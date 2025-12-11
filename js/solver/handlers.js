@@ -1944,6 +1944,17 @@ export class RequiredValues extends SudokuConstraintHandler {
       if (!(initialGridCells[cell] &= ~this._valueMask)) return false;
     }
 
+    // Find the maximum valid count for any repeated value, based on the
+    // exclusions.
+    const exclusionGroups = HandlerUtil.findExclusionGroups(
+      this.cells, cellExclusions);
+    const maxCount = exclusionGroups.length;
+    for (const count of this._valueCounts.values()) {
+      if (count > maxCount) {
+        return false;
+      }
+    }
+
     return true;
   }
 

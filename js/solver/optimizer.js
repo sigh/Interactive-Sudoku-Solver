@@ -748,7 +748,11 @@ export class SudokuConstraintOptimizer {
     stack[0] = -1;
     let stackDepth = 1;
 
+    const MAX_ITERATIONS = 720; // Enough for 6-cell combinations.
+    let iterations = 0;
+
     while (stackDepth > 0) {
+      if (++iterations > MAX_ITERATIONS) return;
       let cellIndex = stack[--stackDepth] + 1;
       if (stackDepth > 0) {
         const prevCell = cells[stack[stackDepth - 1]];
@@ -791,7 +795,7 @@ export class SudokuConstraintOptimizer {
     for (const h of requiredValueHandlers) {
       const restrictions = new Map();
 
-      // Brute force search for values which are restricted certain cells.
+      // Brute force search for values which are restricted to certain cells.
       for (const [value, count] of h.valueCounts().entries()) {
         if (count > 1) {
           this._findKnownRequiredValues(
