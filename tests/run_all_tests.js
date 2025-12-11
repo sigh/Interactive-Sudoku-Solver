@@ -9,8 +9,20 @@ const largeTests = [
   'e2e.test.js',
 ];
 
-const discoveredTests = (await readdir(testsDirPath))
-  .filter((name) => name.endsWith('.test.js'));
+const findTests = async (dir, relativePath = '') => {
+  const entries = await readdir(dir, { withFileTypes: true });
+  const tests = [];
+  for (const entry of entries) {
+    if (entry.isDirectory()) {
+      tests.push(...await findTests(join(dir, entry.name), join(relativePath, entry.name)));
+    } else if (entry.name.endsWith('.test.js')) {
+      tests.push(join(relativePath, entry.name));
+    }
+  }
+  return tests;
+};
+
+const discoveredTests = await findTests(testsDirPath);
 
 const orderedTests = [
   ...discoveredTests

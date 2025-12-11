@@ -1,6 +1,6 @@
 "use strict";
 
-const { Timer, IteratorWithCount, arraysAreEqual, setIntersectionToArray } = await import('../util.js' + self.VERSION_PARAM);
+const { Timer, IteratorWithCount, arraysAreEqual, setIntersectionToArray, BitSet } = await import('../util.js' + self.VERSION_PARAM);
 const { LookupTables } = await import('./lookup_tables.js' + self.VERSION_PARAM);
 const { SHAPE_MAX } = await import('../grid_shape.js' + self.VERSION_PARAM);
 const { SudokuConstraintOptimizer } = await import('./optimizer.js' + self.VERSION_PARAM);
@@ -1177,7 +1177,7 @@ class HandlerAccumulator {
   }
 }
 
-class CellExclusions {
+export class CellExclusions {
   constructor(handlerSet, shape) {
     this._cellExclusionSets = [];
     if (handlerSet !== null) {
@@ -1194,11 +1194,14 @@ class CellExclusions {
     //   listExclusions[obj] = [cells which are excluded by all cells in obj]
     //   obj must match exactly.
     this._listExclusions = new Map();
+
+    this._sealed = false;
   }
 
   clone() {
     const clone = new CellExclusions(null, null);
     clone._cellExclusionSets = this._cellExclusionSets.map(s => new Set(s));
+    clone._sealed = this._sealed;
     return clone;
   }
 
@@ -1221,7 +1224,7 @@ class CellExclusions {
   }
 
   addMutualExclusion(cell1, cell2) {
-    if (this._cellExclusionArrays.length > 0) {
+    if (this._sealed) {
       throw ('Cannot add exclusions after caching.');
     }
     this._cellExclusionSets[cell1].add(cell2);
@@ -1230,7 +1233,7 @@ class CellExclusions {
   // Assume cell0 and cell1 are the same value, and hence can share exclusions.
   areSameValue(cell0, cell1) {
     if (cell0 == cell1) return;
-    if (this._cellExclusionArrays.length > 0) {
+    if (this._sealed) {
       throw ('Cannot add exclusions after caching.');
     }
     const union = this._cellExclusionSets[cell0];
@@ -1257,6 +1260,7 @@ class CellExclusions {
 
   getArray(cell) {
     if (this._cellExclusionArrays.length === 0) {
+      this._sealed = true;
       // Store an array version for fast iteration.
       // Sort the cells so they are in predictable order.
       this._cellExclusionArrays = (
@@ -1267,7 +1271,23 @@ class CellExclusions {
     return this._cellExclusionArrays[cell];
   }
 
+  getBitSet(cell) {
+    if (!this._cellExclusionBitSets) {
+      this._sealed = true;
+      this._cellExclusionBitSets = new Array(this._cellExclusionSets.length);
+    }
+    if (!this._cellExclusionBitSets[cell]) {
+      const bitSet = new BitSet(this._cellExclusionSets.length);
+      for (const c of this._cellExclusionSets[cell]) {
+        bitSet.add(c);
+      }
+      this._cellExclusionBitSets[cell] = bitSet;
+    }
+    return this._cellExclusionBitSets[cell];
+  }
+
   getPairExclusions(pairIndex) {
+    this._sealed = true;
     let result = this._pairExclusions.get(pairIndex);
     if (result === undefined) {
       result = this._computePairExclusions(pairIndex >> 8, pairIndex & 0xff);
@@ -1278,6 +1298,7 @@ class CellExclusions {
   }
 
   getListExclusions(cells) {
+    this._sealed = true;
     let result = this._listExclusions.get(cells);
     if (result === undefined) {
       result = this._computeListExclusions(cells);
@@ -1358,7 +1379,7 @@ class GridStateAllocator {
   }
 }
 
-class HandlerSet {
+export class HandlerSet {
   constructor(handlers, shape) {
     this._allHandlers = [];
     this._seen = new Map();

@@ -537,6 +537,12 @@ export class BitSet {
     }
   }
 
+  union(other) {
+    for (let i = 0; i < this.words.length; i++) {
+      this.words[i] |= other.words[i];
+    }
+  }
+
   copyFrom(other) {
     this.words.set(other.words);
   }
