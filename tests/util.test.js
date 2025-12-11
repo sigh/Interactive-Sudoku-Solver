@@ -403,6 +403,22 @@ await runTest('BitSet should intersect with another set', () => {
   assert.equal(a.has(4), false);
 });
 
+await runTest('BitSet should union with another set', () => {
+  const a = new BitSet(64);
+  a.add(1);
+  a.add(2);
+
+  const b = new BitSet(64);
+  b.add(2);
+  b.add(3);
+
+  a.union(b);
+  assert.equal(a.has(1), true);
+  assert.equal(a.has(2), true);
+  assert.equal(a.has(3), true);
+  assert.equal(a.has(4), false);
+});
+
 await runTest('BitSet should copy from another set', () => {
   const a = new BitSet(64);
   a.add(5);

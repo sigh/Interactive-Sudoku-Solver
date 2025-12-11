@@ -1,4 +1,4 @@
-const { memoize, arrayIntersectSize, arrayDifference, setIntersectSize, arrayIntersect, arrayRemoveValue, setIntersectionToArray, setDifference } = await import('../util.js' + self.VERSION_PARAM);
+const { memoize, arrayIntersectSize, arrayDifference, setIntersectSize, arrayIntersect, arrayRemoveValue, setIntersectionToArray, setDifference, BitSet } = await import('../util.js' + self.VERSION_PARAM);
 const { LookupTables } = await import('./lookup_tables.js' + self.VERSION_PARAM);
 const { SudokuConstraintBase, SudokuConstraint } = await import('../sudoku_constraint.js' + self.VERSION_PARAM);
 const HandlerModule = await import('./handlers.js' + self.VERSION_PARAM);
@@ -14,6 +14,7 @@ export class SudokuConstraintOptimizer {
     if (debugLogger.enableLogs) {
       this._debugLogger = debugLogger;
     }
+    this._forbiddenStackPool = null;
   }
 
   optimize(handlerSet, cellExclusions, shape) {
@@ -738,10 +739,25 @@ export class SudokuConstraintOptimizer {
     }
   }
 
+  _getForbiddenStack(numWords, count) {
+    if (!this._forbiddenStackPool ||
+      this._forbiddenStackPool.numWords !== numWords ||
+      this._forbiddenStackPool.count < count) {
+      this._forbiddenStackPool = BitSet.allocatePool(numWords * 32, count);
+      this._forbiddenStackPool.numWords = numWords;
+      this._forbiddenStackPool.count = count;
+    }
+    return this._forbiddenStackPool.bitsets;
+  }
+
+  // Find values which must or must not be in certain cells.
+  // Returns false if there are no possible combinations, true otherwise.
   _findKnownRequiredValues(cells, value, count, cellExclusions, restrictions) {
     const numCells = cells.length;
+    if (count > numCells) return false;
+
     const v = LookupTables.fromValue(value);
-    const occurrences = new Uint8Array(numCells);
+    const occurrences = new Array(numCells).fill(0);
     let numCombinations = 0;
 
     const stack = new Int16Array(numCells);
@@ -751,16 +767,20 @@ export class SudokuConstraintOptimizer {
     const MAX_ITERATIONS = 720; // Enough for 6-cell combinations.
     let iterations = 0;
 
+    // Use BitSets for O(1) checks.
+    const numWords = cellExclusions.getBitSet(cells[0]).words.length;
+    const forbiddenStack = this._getForbiddenStack(numWords, count + 1);
+    forbiddenStack[0].clear();
+
     while (stackDepth > 0) {
-      if (++iterations > MAX_ITERATIONS) return;
+      if (++iterations > MAX_ITERATIONS) return true;
       let cellIndex = stack[--stackDepth] + 1;
-      if (stackDepth > 0) {
-        const prevCell = cells[stack[stackDepth - 1]];
-        while (cellIndex < numCells
-          && cellExclusions.isMutuallyExclusive(cells[cellIndex], prevCell)) {
-          cellIndex++;
-        }
+
+      const forbidden = forbiddenStack[stackDepth];
+      while (cellIndex < numCells && forbidden.has(cells[cellIndex])) {
+        cellIndex++;
       }
+
       if (cellIndex >= numCells) continue;
       stack[stackDepth++] = cellIndex;
       if (stackDepth === count) {
@@ -769,9 +789,14 @@ export class SudokuConstraintOptimizer {
         }
         numCombinations++;
       } else {
+        const nextForbidden = forbiddenStack[stackDepth];
+        nextForbidden.copyFrom(forbidden);
+        nextForbidden.union(cellExclusions.getBitSet(cells[cellIndex]));
         stack[stackDepth++] = cellIndex;
       }
     }
+
+    if (numCombinations == 0) return false;
 
     const addRestriction = (cell, values) => {
       restrictions.set(cell, (restrictions.get(cell) || -1) & values);
@@ -784,6 +809,8 @@ export class SudokuConstraintOptimizer {
         addRestriction(cells[i], ~v);
       }
     }
+
+    return true;
   }
 
   _optimizeRequiredValues(handlerSet, cellExclusions, shape) {
@@ -798,8 +825,19 @@ export class SudokuConstraintOptimizer {
       // Brute force search for values which are restricted to certain cells.
       for (const [value, count] of h.valueCounts().entries()) {
         if (count > 1) {
-          this._findKnownRequiredValues(
-            h.cells, value, count, cellExclusions, restrictions);
+          if (!this._findKnownRequiredValues(
+            h.cells, value, count, cellExclusions, restrictions)) {
+            // There were NO combinations found, so this handler is invalid.
+            const newHandler = new HandlerModule.False(h.cells);
+            handlerSet.replace(h, newHandler);
+            if (this._debugLogger) {
+              this._debugLogger.log({
+                loc: '_optimizeRequiredValues',
+                msg: 'Replace with: ' + newHandler.constructor.name,
+                cells: newHandler.cells,
+              });
+            }
+          }
         }
       }
 
