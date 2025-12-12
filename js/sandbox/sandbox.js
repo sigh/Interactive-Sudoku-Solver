@@ -1,9 +1,7 @@
 import { CodeJar } from '../../lib/codejar.min.js';
-import { SudokuConstraint } from '../sudoku_constraint.js';
-import { SudokuParser } from '../sudoku_parser.js';
 import { autoSaveField } from '../util.js';
-import { SANDBOX_GLOBALS } from './env.js';
 import { DEFAULT_CODE, EXAMPLES } from './examples.js';
+import { UserScriptExecutor } from '../user_script_executor.js';
 
 class Sandbox {
   constructor() {
@@ -13,19 +11,11 @@ class Sandbox {
     this.solverLinkElement = document.getElementById('open-solver-link');
     this.examplesSelect = document.getElementById('examples-select');
 
+    this._userScriptExecutor = new UserScriptExecutor();
+
     this._initEditor();
     this._initExamples();
     this._initEventListeners();
-  }
-
-  _resultToConstraintStr(result) {
-    if (Array.isArray(result)) {
-      const parsed = result.map(item =>
-        typeof item === 'string' ? SudokuParser.parseString(item) : item
-      );
-      return String(new SudokuConstraint.Set(parsed));
-    }
-    return String(result);
   }
 
   _initEditor() {
@@ -83,31 +73,14 @@ class Sandbox {
 
   async runCode() {
     const code = this.jar.toString();
-    const logs = [];
-    const originalConsole = {
-      log: console.log,
-      error: console.error,
-      warn: console.warn,
-    };
-
-    const formatArg = (a) =>
-      typeof a === 'object' ? JSON.stringify(a, null, 2) : String(a);
-
-    console.log = (...args) => logs.push(args.map(formatArg).join(' '));
-    console.error = (...args) => logs.push('ERROR: ' + args.map(formatArg).join(' '));
-    console.warn = (...args) => logs.push('WARN: ' + args.map(formatArg).join(' '));
 
     try {
-      const keys = Object.keys(SANDBOX_GLOBALS);
-      const values = Object.values(SANDBOX_GLOBALS);
-      const asyncFn = new Function(...keys, `return (async () => { ${code} })();`);
-      const result = await asyncFn(...values);
+      const { constraintStr, logs } = await this._userScriptExecutor.runSandboxCode(code);
 
       this.outputElement.textContent = logs.join('\n') || 'No console output';
       this.outputElement.className = 'output';
 
-      if (result) {
-        const constraintStr = this._resultToConstraintStr(result);
+      if (constraintStr) {
         this.constraintElement.textContent = constraintStr;
 
         const url = `./?q=${encodeURIComponent(constraintStr)}`;
@@ -123,13 +96,13 @@ class Sandbox {
         this.solverLinkElement.style.display = 'none';
       }
     } catch (err) {
+      // If we have logs from the worker, show them.
+      const logs = err.logs || [];
       const errorOutput = logs.length > 0 ? logs.join('\n') + '\n\n' : '';
-      this.outputElement.textContent = `${errorOutput}Error: ${err.message}\n\n${err.stack || ''}`;
+      this.outputElement.textContent = `${errorOutput}Error: ${err.message}`;
       this.outputElement.className = 'output error';
       this.constraintElement.textContent = '(error)';
       this.solverLinkElement.style.display = 'none';
-    } finally {
-      Object.assign(console, originalConsole);
     }
   }
 

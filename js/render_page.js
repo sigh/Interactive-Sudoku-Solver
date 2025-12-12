@@ -24,6 +24,7 @@ const { SudokuParser } = await import('./sudoku_parser.js' + self.VERSION_PARAM)
 const { ConstraintDisplay } = await import('./constraint_display.js' + self.VERSION_PARAM);
 const { GridShape } = await import('./grid_shape.js' + self.VERSION_PARAM);
 const { SolutionController } = await import('./solution_controller.js' + self.VERSION_PARAM);
+const { UserScriptExecutor } = await import('./user_script_executor.js' + self.VERSION_PARAM);
 
 export const initPage = () => {
   // Create grid.
@@ -1034,6 +1035,7 @@ class ConstraintManager {
     this._display = this.addReshapeListener(new ConstraintDisplay(
       inputManager, displayContainer));
     this._constraintCategoryInputs = new Map();
+    this._userScriptExecutor = new UserScriptExecutor();
     this._setUp(inputManager, displayContainer);
 
     this.runUpdateCallback();
@@ -1129,9 +1131,9 @@ class ConstraintManager {
       new ConstraintCategoryInput.LinesAndSets(
         selectedConstraintCollection, inputManager),
       new ConstraintCategoryInput.Pairwise(
-        selectedConstraintCollection, inputManager),
+        selectedConstraintCollection, inputManager, this._userScriptExecutor),
       new ConstraintCategoryInput.StateMachine(
-        selectedConstraintCollection, inputManager),
+        selectedConstraintCollection, inputManager, this._userScriptExecutor),
       new ConstraintCategoryInput.OutsideClue(
         selectedConstraintCollection, inputManager),
       new ConstraintCategoryInput.GivenCandidates(
@@ -2261,8 +2263,9 @@ ConstraintCategoryInput.JavaScriptConstraint = class JavaScriptConstraint extend
 }
 
 ConstraintCategoryInput.Pairwise = class Pairwise extends ConstraintCategoryInput.JavaScriptConstraint {
-  constructor(collection, inputManager) {
+  constructor(collection, inputManager, userScriptExecutor) {
     super(collection, inputManager, 'custom-binary-tab', 'add-binary-constraint');
+    this._userScriptExecutor = userScriptExecutor;
     this._setUp();
   }
 
@@ -2275,7 +2278,7 @@ ConstraintCategoryInput.Pairwise = class Pairwise extends ConstraintCategoryInpu
     autoSaveField(form, 'chain-mode');
     autoSaveField(form, 'function');
 
-    form['add-binary-constraint'].onclick = e => {
+    form['add-binary-constraint'].onclick = async e => {
       const formData = new FormData(form);
       const name = formData.get('binary-name');
       const type = formData.get('chain-mode');
@@ -2285,9 +2288,8 @@ ConstraintCategoryInput.Pairwise = class Pairwise extends ConstraintCategoryInpu
 
       let key = null;
       try {
-        const fn = Function(
-          `return ((a,b)=>${fnStr})`)();
-        key = typeCls.fnToKey(fn, this._shape.numValues);
+        key = await this._userScriptExecutor.compilePairwise(
+          type, fnStr, this._shape.numValues);
       } catch (e) {
         errorElem.textContent = e;
         return false;
@@ -2306,8 +2308,9 @@ ConstraintCategoryInput.Pairwise = class Pairwise extends ConstraintCategoryInpu
 }
 
 ConstraintCategoryInput.StateMachine = class StateMachine extends ConstraintCategoryInput.JavaScriptConstraint {
-  constructor(collection, inputManager) {
+  constructor(collection, inputManager, userScriptExecutor) {
     super(collection, inputManager, 'state-machine-tab', 'add-state-machine-constraint');
+    this._userScriptExecutor = userScriptExecutor;
 
     this._codeFieldNames = [
       'start-state', 'transition-body', 'accept-body', 'unified-code'];
@@ -2320,44 +2323,6 @@ ConstraintCategoryInput.StateMachine = class StateMachine extends ConstraintCate
 
   _isUnifiedMode() {
     return this._form['unified-mode'].checked;
-  }
-
-  _tryParse(fn, errorPrefix) {
-    try {
-      return fn();
-    } catch (e) {
-      throw new Error(`${errorPrefix}: ${e.message}`);
-    }
-  }
-
-  // Parse split fields into executable objects.
-  _parseSplitCode(startExpression, transitionBody, acceptBody) {
-    const startState = this._tryParse(
-      () => Function('"use strict"; return (' + startExpression + ');')(),
-      'Start state is invalid');
-    const transition = this._tryParse(
-      () => Function('state', 'value', transitionBody),
-      'Transition function is invalid');
-    const accept = this._tryParse(
-      () => Function('state', acceptBody),
-      'Accept function is invalid');
-
-    return { startState, transition, accept };
-  }
-
-  // Parse unified JavaScript code into executable objects.
-  _parseUnifiedCode(code) {
-    return this._tryParse(
-      () => new Function(`${code}; return {startState, transition, accept};`)(),
-      'Invalid JavaScript');
-  }
-
-  // Extract function body text, removing the 2-space base indent we add.
-  _extractFunctionBody(fn) {
-    const source = fn.toString();
-    const start = source.indexOf('{\n') + 2;
-    const end = source.lastIndexOf('\n}');
-    return source.slice(start, end).replace(/^ {2}/gm, '');
   }
 
   // Convert split field values to unified code.
@@ -2374,15 +2339,6 @@ ConstraintCategoryInput.StateMachine = class StateMachine extends ConstraintCate
       ${indent(acceptBody)}
       }
     `.trim().replace(/^ {6}/gm, '');
-  }
-
-  // Convert parsed objects to split field values.
-  _parsedToSplit({ startState, transition, accept }) {
-    return {
-      startExpression: JSON.stringify(startState),
-      transitionBody: this._extractFunctionBody(transition),
-      acceptBody: this._extractFunctionBody(accept),
-    };
   }
 
   _setUp() {
@@ -2406,7 +2362,7 @@ ConstraintCategoryInput.StateMachine = class StateMachine extends ConstraintCate
     updateModeDisplay();
 
     // Handle mode toggle.
-    unifiedModeInput.addEventListener('change', () => {
+    unifiedModeInput.addEventListener('change', async () => {
       const isUnified = this._isUnifiedMode();
       updateModeDisplay();
 
@@ -2420,9 +2376,9 @@ ConstraintCategoryInput.StateMachine = class StateMachine extends ConstraintCate
             form['accept-body'].value);
         } else {
           // Unified → Split: parse then extract.
-          const parsed = this._parseUnifiedCode(form['unified-code'].value);
           const { startExpression, transitionBody, acceptBody } =
-            this._parsedToSplit(parsed);
+            await this._userScriptExecutor.convertUnifiedToSplit(
+              form['unified-code'].value);
           form['start-state'].value = startExpression;
           form['transition-body'].value = transitionBody;
           form['accept-body'].value = acceptBody;
@@ -2433,20 +2389,23 @@ ConstraintCategoryInput.StateMachine = class StateMachine extends ConstraintCate
       errorElem.textContent = '';
     });
 
-    form['add-state-machine-constraint'].onclick = _ => {
+    form['add-state-machine-constraint'].onclick = async _ => {
       const formData = new FormData(form);
       const name = formData.get('state-machine-name');
 
       try {
-        const spec = this._isUnifiedMode()
-          ? this._parseUnifiedCode(formData.get('unified-code'))
-          : this._parseSplitCode(
-            formData.get('start-state'),
-            formData.get('transition-body'),
-            formData.get('accept-body'));
+        const isUnified = this._isUnifiedMode();
+        const spec = isUnified
+          ? formData.get('unified-code')
+          : {
+            startExpression: formData.get('start-state'),
+            transitionBody: formData.get('transition-body'),
+            acceptBody: formData.get('accept-body')
+          };
 
         const shape = this._shape || SudokuConstraint.Shape.DEFAULT_SHAPE;
-        const encodedNFA = SudokuConstraint.NFA.encodeSpec(spec, shape.numValues);
+        const encodedNFA = await this._userScriptExecutor.compileStateMachine(
+          spec, shape.numValues, isUnified);
 
         const cells = this._inputManager.getSelection();
         this.collection.addConstraint(new SudokuConstraint.NFA(
