@@ -391,7 +391,11 @@ export const autoSaveField = (element, field) => {
     } else if (isContentEditable) {
       input.textContent = savedValue;
     } else {
+      const originalValue = input.value;
       input.value = savedValue;
+      if (input.checkValidity && !input.checkValidity()) {
+        input.value = originalValue;
+      }
     }
   }
 
