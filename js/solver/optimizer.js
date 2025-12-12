@@ -1,4 +1,4 @@
-const { memoize, arrayIntersectSize, arrayDifference, setIntersectSize, arrayIntersect, arrayRemoveValue, setIntersectionToArray, setDifference, BitSet } = await import('../util.js' + self.VERSION_PARAM);
+const { memoize, arrayIntersectSize, arrayDifference, setIntersectSize, arrayIntersect, arrayRemoveValue, setIntersectionToArray, setDifference, BitSet, elementarySymmetricSum } = await import('../util.js' + self.VERSION_PARAM);
 const { LookupTables } = await import('./lookup_tables.js' + self.VERSION_PARAM);
 const { SudokuConstraintBase, SudokuConstraint } = await import('../sudoku_constraint.js' + self.VERSION_PARAM);
 const HandlerModule = await import('./handlers.js' + self.VERSION_PARAM);
@@ -752,47 +752,90 @@ export class SudokuConstraintOptimizer {
 
   // Find values which must or must not be in certain cells.
   // Returns false if there are no possible combinations, true otherwise.
-  _findKnownRequiredValues(cells, value, count, cellExclusions, restrictions) {
+  _findKnownRequiredValues(cells, value, count, cellExclusions, restrictions, exclusionGroups) {
     const numCells = cells.length;
-    if (count > numCells) return false;
+    if (count > exclusionGroups.length) return false;
 
-    const v = LookupTables.fromValue(value);
-    const occurrences = new Array(numCells).fill(0);
+    // Estimate complexity to avoid running too long.
+    const groupSizes = exclusionGroups.map(g => g.length);
+    const MAX_NODES = 120;
+    if (elementarySymmetricSum(groupSizes, count) > MAX_NODES) return true;
+
+    const occurrences = new Int16Array(numCells);
     let numCombinations = 0;
 
-    const stack = new Int16Array(numCells);
-    stack[0] = -1;
-    let stackDepth = 1;
+    const numGroups = exclusionGroups.length;
+    const stack = new Int16Array(numGroups);
 
-    const MAX_ITERATIONS = 720; // Enough for 6-cell combinations.
-    let iterations = 0;
+    // Values in stack are initialized to -2.
+    // The first increment results in -1 (SKIP).
+    // If skipping is not allowed, we increment again to 0 (first item).
+    const STATE_INITIAL = -2;
+    const STATE_SKIP = -1;
+
+    if (numGroups > 0) stack[0] = STATE_INITIAL;
+    let stackDepth = 0;
+
+    const pickedCounts = new Int16Array(numGroups + 1);
 
     // Use BitSets for O(1) checks.
     const numWords = cellExclusions.getBitSet(cells[0]).words.length;
-    const forbiddenStack = this._getForbiddenStack(numWords, count + 1);
+    const forbiddenStack = this._getForbiddenStack(numWords, numGroups + 1);
     forbiddenStack[0].clear();
 
-    while (stackDepth > 0) {
-      if (++iterations > MAX_ITERATIONS) return true;
-      let cellIndex = stack[--stackDepth] + 1;
+    while (stackDepth >= 0) {
+      const groupIndex = stackDepth;
+      const group = exclusionGroups[groupIndex];
 
-      const forbidden = forbiddenStack[stackDepth];
-      while (cellIndex < numCells && forbidden.has(cells[cellIndex])) {
-        cellIndex++;
+      let choice = stack[stackDepth];
+      choice++;
+
+      if (choice === STATE_SKIP) {
+        const remainingGroups = numGroups - 1 - stackDepth;
+        if (pickedCounts[stackDepth] + remainingGroups < count) {
+          choice++;
+        }
       }
 
-      if (cellIndex >= numCells) continue;
-      stack[stackDepth++] = cellIndex;
-      if (stackDepth === count) {
-        for (let i = 0; i < stackDepth; i++) {
-          occurrences[stack[i]]++;
+      if (choice >= 0) {
+        const forbidden = forbiddenStack[stackDepth];
+        while (choice < group.length) {
+          if (!forbidden.has(cells[group[choice]])) break;
+          choice++;
         }
+      }
+
+      if (choice >= group.length) {
+        stackDepth--;
+        continue;
+      }
+
+      stack[stackDepth] = choice;
+
+      let nextPickedCount = pickedCounts[stackDepth];
+      if (choice >= 0) nextPickedCount++;
+
+      if (nextPickedCount === count) {
         numCombinations++;
+        for (let i = 0; i <= stackDepth; i++) {
+          const c = stack[i];
+          if (c >= 0) {
+            occurrences[exclusionGroups[i][c]]++;
+          }
+        }
       } else {
-        const nextForbidden = forbiddenStack[stackDepth];
-        nextForbidden.copyFrom(forbidden);
-        nextForbidden.union(cellExclusions.getBitSet(cells[cellIndex]));
-        stack[stackDepth++] = cellIndex;
+        const nextDepth = stackDepth + 1;
+        if (nextDepth < numGroups) {
+          pickedCounts[nextDepth] = nextPickedCount;
+          const nextForbidden = forbiddenStack[nextDepth];
+          nextForbidden.copyFrom(forbiddenStack[stackDepth]);
+          if (choice >= 0) {
+            nextForbidden.union(cellExclusions.getBitSet(cells[group[choice]]));
+          }
+
+          stack[nextDepth] = STATE_INITIAL;
+          stackDepth++;
+        }
       }
     }
 
@@ -802,6 +845,7 @@ export class SudokuConstraintOptimizer {
       restrictions.set(cell, (restrictions.get(cell) || -1) & values);
     }
 
+    const v = LookupTables.fromValue(value);
     for (let i = 0; i < numCells; i++) {
       if (occurrences[i] === numCombinations) {
         addRestriction(cells[i], v);
@@ -821,12 +865,16 @@ export class SudokuConstraintOptimizer {
 
     for (const h of requiredValueHandlers) {
       const restrictions = new Map();
+      const exclusionGroups = HandlerModule.HandlerUtil.findMappedExclusionGroups(h.cells, cellExclusions);
+      // Sort groups by size to optimize search order.
+      // Smallest first makes it more likely we can skip larger groups.
+      exclusionGroups.sort((a, b) => a.length - b.length);
 
       // Brute force search for values which are restricted to certain cells.
       for (const [value, count] of h.valueCounts().entries()) {
         if (count > 1) {
           if (!this._findKnownRequiredValues(
-            h.cells, value, count, cellExclusions, restrictions)) {
+            h.cells, value, count, cellExclusions, restrictions, exclusionGroups)) {
             // There were NO combinations found, so this handler is invalid.
             const newHandler = new HandlerModule.False(h.cells);
             handlerSet.replace(h, newHandler);

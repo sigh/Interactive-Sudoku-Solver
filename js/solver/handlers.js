@@ -494,6 +494,16 @@ export class HandlerUtil {
     return exclusionGroups;
   }
 
+  static findMappedExclusionGroups(cells, cellExclusions) {
+    const exclusionGroups = this.findExclusionGroups(
+      cells, cellExclusions);
+
+    const cellToIndex = new Map();
+    for (let i = 0; i < cells.length; i++) cellToIndex.set(cells[i], i);
+
+    return exclusionGroups.map(
+      group => group.map(c => cellToIndex.get(c)));
+  }
 }
 
 export class House extends SudokuConstraintHandler {

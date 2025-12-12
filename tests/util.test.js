@@ -15,6 +15,7 @@ const {
   arrayIntersectSize,
   arrayRemoveValue,
   arraysAreEqual,
+  elementarySymmetricSum,
   setIntersectionToArray,
   setIntersectSize,
   setDifference,
@@ -141,6 +142,25 @@ await runTest('arraysAreEqual should return false for different arrays', () => {
 
 await runTest('arraysAreEqual should return false for different lengths', () => {
   assert.equal(arraysAreEqual([1, 2], [1, 2, 3]), false);
+});
+
+// ============================================================================
+// elementarySymmetricSum
+// ============================================================================
+
+await runTest('elementarySymmetricSum should return correct sum for small inputs', () => {
+  // e_1(2, 2) = 2 + 2 = 4
+  assert.equal(elementarySymmetricSum([2, 2], 1), 4);
+  // e_2(2, 2) = 2 * 2 = 4
+  assert.equal(elementarySymmetricSum([2, 2], 2), 4);
+});
+
+await runTest('elementarySymmetricSum should return 0 if k > n', () => {
+  assert.equal(elementarySymmetricSum([1, 2], 3), 0);
+});
+
+await runTest('elementarySymmetricSum should return 1 for k=0', () => {
+  assert.equal(elementarySymmetricSum([1, 2, 3], 0), 1);
 });
 
 // ============================================================================
