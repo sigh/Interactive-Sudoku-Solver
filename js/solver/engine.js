@@ -428,7 +428,6 @@ class InternalSolver {
     // Create lookups for which cells must have mutually exclusive values.
     const cellExclusions = new CellExclusions(
       handlerSet, this._shape);
-    this._cellExclusions = cellExclusions;
 
     // Optimize handlers.
     new SudokuConstraintOptimizer(this._debugLogger).optimize(

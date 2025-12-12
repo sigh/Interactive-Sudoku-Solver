@@ -59,6 +59,18 @@ export const arraysAreEqual = (a, b) => {
   return true;
 }
 
+export const elementarySymmetricSum = (values, k) => {
+  const dp = new Float64Array(k + 1);
+  dp[0] = 1;
+
+  for (const value of values) {
+    for (let i = k; i >= 1; i--) {
+      dp[i] += dp[i - 1] * value;
+    }
+  }
+  return dp[k];
+};
+
 // `a` must be a set, `b` must be iterable.
 export const setIntersectionToArray = (a, b) => {
   const intersection = [];
