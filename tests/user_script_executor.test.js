@@ -30,7 +30,7 @@ class MockWorker {
 globalThis.Worker = MockWorker;
 
 // Import UserScriptExecutor
-const { UserScriptExecutor } = await import('../js/user_script_executor.js');
+const { UserScriptExecutor } = await import('../js/sudoku_constraint.js');
 
 // Test
 {
