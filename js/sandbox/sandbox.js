@@ -1,7 +1,7 @@
 import { CodeJar } from '../../lib/codejar.min.js';
 import { autoSaveField } from '../util.js';
 import { DEFAULT_CODE, EXAMPLES } from './examples.js';
-import { UserScriptExecutor } from '../user_script_executor.js';
+import { UserScriptExecutor } from '../sudoku_constraint.js';
 
 class Sandbox {
   constructor() {
