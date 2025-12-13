@@ -47,12 +47,12 @@ class Sandbox {
     document.getElementById('clear-btn').addEventListener('click', () => this.clear());
     document.getElementById('copy-btn').addEventListener('click', () => this._copyConstraint());
 
-    this.editorElement.addEventListener('keydown', (e) => {
+    document.addEventListener('keydown', (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
         e.preventDefault();
         this.runCode();
       }
-    });
+    }, { capture: true });
 
     this.examplesSelect.addEventListener('change', () => {
       const name = this.examplesSelect.value;
