@@ -194,6 +194,11 @@ export class SudokuParser {
     return new SudokuConstraint.Set([layout, fixedValues]);
   }
 
+  static parseSolution(text) {
+    if (!text.startsWith('=')) return null;
+    return this.parsePlainSudoku(text.substring(1));
+  }
+
   static parseGridLayout(rawText) {
     // Only allow digits, dots, spaces and separators.
     if (rawText.search(/[^\d\s.|_-]/) != -1) return null;
@@ -250,8 +255,11 @@ export class SudokuParser {
 
     let constraint;
 
-    // Need this to void parsing this as a 1x1 grid.
+    // Need this to avoid parsing this as a 1x1 grid.
     if (text.length === 1) return null;
+
+    constraint = this.parseSolution(text);
+    if (constraint) return constraint;
 
     constraint = this.parseShortKillerFormat(text);
     if (constraint) return constraint;
