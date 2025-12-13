@@ -528,4 +528,32 @@ await runTest('parseShortKillerFormat should detect loop', () => {
   );
 });
 
+//////////////////////////////////////////////////////////////////////////////
+// Solution parsing
+//////////////////////////////////////////////////////////////////////////////
+
+await runTest('parseSolution should parse dense solution string', () => {
+  const input = '=' + '123456789'.repeat(9);
+  const result = SudokuParser.parseSolution(input);
+
+  assert.ok(result);
+  assertShape(result, '9x9');
+  assertConstraintCount(result, 'Given', 81);
+});
+
+await runTest('parseTextLine should parse solution string with spaces', () => {
+  const input = '= ' + '1 2 3 4 5 6 7 8 9 '.repeat(9);
+  const result = SudokuParser.parseTextLine(input);
+
+  assert.ok(result);
+  assertShape(result, '9x9');
+  assertConstraintCount(result, 'Given', 81);
+});
+
+await runTest('parseSolution should return null if no equals sign', () => {
+  const input = '123456789'.repeat(9);
+  const result = SudokuParser.parseSolution(input);
+  assert.equal(result, null);
+});
+
 logSuiteComplete('SudokuParser');
