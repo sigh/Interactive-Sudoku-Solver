@@ -63,103 +63,104 @@ layout: null
       </ul>
     </div>
 
-    <!-- Overview Section -->
-    <h2 id="overview">Overview</h2>
-    <div>
-      <p>
-        The Interactive Sudoku Solver (ISS) is a solver designed to quickly
-        solve variant sudoku puzzles. It does not use human solving techniques,
-        instead optimizing for speed.
-      </p>
+    <div class="help-content">
+      <!-- Overview Section -->
+      <h2 id="overview">Overview</h2>
+      <div>
+        <p>
+          The Interactive Sudoku Solver (ISS) is a solver designed to quickly
+          solve variant sudoku puzzles. It does not use human solving techniques,
+          instead optimizing for speed.
+        </p>
 
-      <p>
-        Use it to find all the solutions, count the solutions, or
-        see all the valid values for each cell in a puzzle.
-      </p>
+        <p>
+          Use it to find all the solutions, count the solutions, or
+          see all the valid values for each cell in a puzzle.
+        </p>
 
-      <p>
-        Visit the <a href="https://github.com/sigh/Interactive-Sudoku-Solver" target="_blank">github repository</a> to
-        view the source code and <a href="https://github.com/sigh/Interactive-Sudoku-Solver/issues"
-          target="_blank">report bugs</a>.
-      </p>
-    </div>
+        <p>
+          Visit the <a href="https://github.com/sigh/Interactive-Sudoku-Solver" target="_blank">github repository</a> to
+          view the source code and <a href="https://github.com/sigh/Interactive-Sudoku-Solver/issues"
+            target="_blank">report bugs</a>.
+        </p>
+      </div>
 
-    <!-- Categories Overview Section -->
-    <h2 id="categories-overview">Constraint Categories</h2>
-    <div id="categories-content"></div>
+      <!-- Categories Overview Section -->
+      <h2 id="categories-overview">Constraint Categories</h2>
+      <div id="categories-content"></div>
 
-    <!-- Detailed Constraints Section -->
-    <h2 id="constraints-detail">All Constraints by Category</h2>
-    <div id="constraints-content"></div>
+      <!-- Detailed Constraints Section -->
+      <h2 id="constraints-detail">All Constraints by Category</h2>
+      <div id="constraints-content"></div>
 
-    <!-- Recipes Section -->
-    <h2 id="recipes">Recipes</h2>
-    <div class="recipes-content">
-      <p>Some constraint types aren't directly supported but can be constructed using combinations of available
-        constraints.</p>
+      <!-- Recipes Section -->
+      <h2 id="recipes">Recipes</h2>
+      <div class="recipes-content">
+        <p>Some constraint types aren't directly supported but can be constructed using combinations of available
+          constraints.</p>
 
-      <h3 id="clone">Clone</h3>
-      <p>
-        <b>Description:</b> Two regions of the same shape and size,
-        which must have the same values in corresponding cells.
-      </p>
-      <p>
-        Use the <code>SameValueSets</code> on every pair of corresponding cells
-        to mark them as equal. Each pair must be a separate constraint.
-      </p>
+        <h3 id="clone">Clone</h3>
+        <p>
+          <b>Description:</b> Two regions of the same shape and size,
+          which must have the same values in corresponding cells.
+        </p>
+        <p>
+          Use the <code>SameValueSets</code> on every pair of corresponding cells
+          to mark them as equal. Each pair must be a separate constraint.
+        </p>
 
-      <h3 id="magic-square">3x3 Magic Square</h3>
-      <p>
-        <b>Description:</b>
-        A square of cells, where the sum of the values in each row, column,
-        and diagonal is the same.
-      </p>
-      <p>
-        Use the <code>Cage</code> constrain each row, column, and diagonal to
-        sum to 15.
-      </p>
+        <h3 id="magic-square">3x3 Magic Square</h3>
+        <p>
+          <b>Description:</b>
+          A square of cells, where the sum of the values in each row, column,
+          and diagonal is the same.
+        </p>
+        <p>
+          Use the <code>Cage</code> constrain each row, column, and diagonal to
+          sum to 15.
+        </p>
 
-      <h3 id="odd-even-thermo">Odd/Even Thermo</h3>
-      <p>
-        <b>Description:</b>
-        A thermometer (values are strictly increasing) where the values are
-        either all odd or all even.
-      </p>
-      <p>
-        Create a pairwise constraint in the "Custom JavaScript constraints"
-        panel with the following condition:
-      <pre>a &lt; b &amp;&amp; (a % 2 == b % 2)</pre>
-      </p>
+        <h3 id="odd-even-thermo">Odd/Even Thermo</h3>
+        <p>
+          <b>Description:</b>
+          A thermometer (values are strictly increasing) where the values are
+          either all odd or all even.
+        </p>
+        <p>
+          Create a pairwise constraint in the "Custom JavaScript constraints"
+          panel with the following condition:
+        <pre>a &lt; b &amp;&amp; (a % 2 == b % 2)</pre>
+        </p>
 
-      <h3 id="nabner-line">Nabner Line</h3>
-      <p>
-        <b>Description:</b>
-        No two digits along the line may be be consecutive.
-        ("Nabner" is "Renban" spelled backwards.)
-      </p>
-      <p>
-        Create a pairwise constraint in the "Custom JavaScript constraints"
-        panel with "Chain handling" set to "All pairs" and use the following
-        condition:
-      </p>
-      <p>
-      <pre>Math.abs(a - b) &gt; 1</pre>
-      </p>
+        <h3 id="nabner-line">Nabner Line</h3>
+        <p>
+          <b>Description:</b>
+          No two digits along the line may be be consecutive.
+          ("Nabner" is "Renban" spelled backwards.)
+        </p>
+        <p>
+          Create a pairwise constraint in the "Custom JavaScript constraints"
+          panel with "Chain handling" set to "All pairs" and use the following
+          condition:
+        </p>
+        <p>
+        <pre>Math.abs(a - b) &gt; 1</pre>
+        </p>
 
-      <h3 id="not-renban">Not Renban</h3>
-      <p>
-        <b>Description:</b>
-        Unlike Nabner, this is how to create a set where all the values taken
-        together are not consecutive.
-      </p>
+        <h3 id="not-renban">Not Renban</h3>
+        <p>
+          <b>Description:</b>
+          Unlike Nabner, this is how to create a set where all the values taken
+          together are not consecutive.
+        </p>
 
-      <p>
-        Implement this by configuring a state machine in the
-        "Custom JavaScript constraints" panel. The NFA tracks the minimum and
-        maximum values seen, accepting if <code>max - min != count - 1</code>
-        (i.e., the values are not all consecutive). If you know all the
-        <b>values are distinct</b>, then this is sufficient:
-      <pre>
+        <p>
+          Implement this by configuring a state machine in the
+          "Custom JavaScript constraints" panel. The NFA tracks the minimum and
+          maximum values seen, accepting if <code>max - min != count - 1</code>
+          (i.e., the values are not all consecutive). If you know all the
+          <b>values are distinct</b>, then this is sufficient:
+        <pre>
 NUM_CELLS = 3;  // Number of cells in the set
 startState = { min: 16, max: -1 };
 
@@ -173,12 +174,12 @@ function transition(state, value) {
 function accept(state) {
   return state.max - state.min !== NUM_CELLS - 1;
 }</pre>
-      </p>
-      <p>
-        If the values may not be distinct, then you need to also need to check
-        for duplicates. This can be done efficiently by using non-deterministic
-        branches to check each digit:
-      <pre>
+        </p>
+        <p>
+          If the values may not be distinct, then you need to also need to check
+          for duplicates. This can be done efficiently by using non-deterministic
+          branches to check each digit:
+        <pre>
 NUM_CELLS = 3;  // Number of cells in the set
 startState = {type: 'start'};
 
@@ -215,24 +216,24 @@ function accept(state) {
   }
   return (state.type === 'hasDuplicate');
 }</pre>
-      </p>
+        </p>
 
-      <p>
-        You can generalize this to a single state machine that works for any
-        number of cells, but it becomes a larger and less efficient.
-      </p>
+        <p>
+          You can generalize this to a single state machine that works for any
+          number of cells, but it becomes a larger and less efficient.
+        </p>
 
-      <h3 id="arithmetic-progression">Arithmetic Progression</h3>
-      <p>
-        <b>Description:</b>
-        Digits along the line must form an arithmetic progression. That is,
-        the difference between all consecutive digits is same.
-      </p>
+        <h3 id="arithmetic-progression">Arithmetic Progression</h3>
+        <p>
+          <b>Description:</b>
+          Digits along the line must form an arithmetic progression. That is,
+          the difference between all consecutive digits is same.
+        </p>
 
-      <p>
-        Implement this by configuring a state machine in the
-        "Custom JavaScript constraints" panel:
-      <pre>
+        <p>
+          Implement this by configuring a state machine in the
+          "Custom JavaScript constraints" panel:
+        <pre>
 startState = { lastVal: null, diff: null };
 
 function transition(state, value) {
@@ -250,54 +251,54 @@ function transition(state, value) {
 function accept(state) {
   return true;
 }</pre>
-      </p>
+        </p>
 
-      <h3 id="successor-arrows">Successor Arrows</h3>
-      <p>
-        <b>Description:</b>
-        If a digit <code>N</code> is placed in an arrow cell, the digit
-        <code>N + 1</code> must appear exactly <code>N</code> cells away in the
-        arrow's direction.
-      </p>
+        <h3 id="successor-arrows">Successor Arrows</h3>
+        <p>
+          <b>Description:</b>
+          If a digit <code>N</code> is placed in an arrow cell, the digit
+          <code>N + 1</code> must appear exactly <code>N</code> cells away in the
+          arrow's direction.
+        </p>
 
-      <p>
-        Select the arrow cells and all the cells along the arrow's direction,
-        then add a <code>Regex</code> constraint from "Line and Sets" panel.
-        The regex pattern should alternate over each possible starting digit:
-      </p>
-      <pre>(12|2.3|3.{2}4|4.{3}5|5.{4}6|6.{5}7|7.{6}8|8.{7}9).*</pre>
+        <p>
+          Select the arrow cells and all the cells along the arrow's direction,
+          then add a <code>Regex</code> constraint from "Line and Sets" panel.
+          The regex pattern should alternate over each possible starting digit:
+        </p>
+        <pre>(12|2.3|3.{2}4|4.{3}5|5.{4}6|6.{5}7|7.{6}8|8.{7}9).*</pre>
 
-      <h3 id="flatmates">Flatmates</h3>
+        <h3 id="flatmates">Flatmates</h3>
 
-      <p>
-        <b>Description:</b>
-        Generalize the "Dutch Flatmates" constraint to apply to an arbitrary
-        center digit <code>D</code>, which must have either digit <code>A</code>
-        above it or digit <code>B</code> below it (or both).
-      </p>
+        <p>
+          <b>Description:</b>
+          Generalize the "Dutch Flatmates" constraint to apply to an arbitrary
+          center digit <code>D</code>, which must have either digit <code>A</code>
+          above it or digit <code>B</code> below it (or both).
+        </p>
 
-      <p>
-        Use a <code>Regex</code> constraint from the "Line and Sets" panel,
-        applied to every column (replace <code>A</code>, <code>B</code> and
-        <code>D</code>):
-      </p>
-      <pre>.*(AD|DB).*</pre>
+        <p>
+          Use a <code>Regex</code> constraint from the "Line and Sets" panel,
+          applied to every column (replace <code>A</code>, <code>B</code> and
+          <code>D</code>):
+        </p>
+        <pre>.*(AD|DB).*</pre>
 
-      <h3 id="odd-even-lots">Odd/Even Lots</h3>
+        <h3 id="odd-even-lots">Odd/Even Lots</h3>
 
-      <p>
-        <b>Description:</b>
-        A digit in a marked cell indicates the number of Odd/Even digits which
-        appear along the attached line, including itself.
-      </p>
+        <p>
+          <b>Description:</b>
+          A digit in a marked cell indicates the number of Odd/Even digits which
+          appear along the attached line, including itself.
+        </p>
 
-      <p>
-        Implement this by configuring a state machine in the
-        "Custom JavaScript constraints" panel. Select the cells in the line
-        so that the marked cell is first, the order of the rest don't matter.
-        The following code implements Odd Lots, but change to the
-        <code>isEven</code> function for Even Lots:
-      <pre>
+        <p>
+          Implement this by configuring a state machine in the
+          "Custom JavaScript constraints" panel. Select the cells in the line
+          so that the marked cell is first, the order of the rest don't matter.
+          The following code implements Odd Lots, but change to the
+          <code>isEven</code> function for Even Lots:
+        <pre>
 startState = { remaining: null };
 
 function transition(state, value) {
@@ -319,23 +320,24 @@ function transition(state, value) {
 function accept(state) {
   return state.remaining == 0;
 }</pre>
-      </p>
-    </div>
+        </p>
+      </div>
 
-    <!-- Constraint Sandbox Section -->
-    <h2 id="constraint-sandbox">Constraint Sandbox</h2>
-    <div>
-      <p>
-        For more complex constraint generation, use the
-        <a href="sandbox">Constraint Sandbox</a> to write JavaScript code
-        that programmatically creates constraints.
-      </p>
-      <p>
-        The sandbox provides access to all constraint types and utility
-        functions for working with cell IDs. You can generate constraints
-        dynamically, parse and modify existing constraints, or create
-        constraints that would be tedious to add manually.
-      </p>
+      <!-- Constraint Sandbox Section -->
+      <h2 id="constraint-sandbox">Constraint Sandbox</h2>
+      <div>
+        <p>
+          For more complex constraint generation, use the
+          <a href="sandbox">Constraint Sandbox</a> to write JavaScript code
+          that programmatically creates constraints.
+        </p>
+        <p>
+          The sandbox provides access to all constraint types and utility
+          functions for working with cell IDs. You can generate constraints
+          dynamically, parse and modify existing constraints, or create
+          constraints that would be tedious to add manually.
+        </p>
+      </div>
     </div>
   </div>
 </body>
