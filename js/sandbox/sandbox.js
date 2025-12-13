@@ -72,6 +72,12 @@ class Sandbox {
   }
 
   async runCode() {
+    const btn = document.getElementById('run-btn');
+    const spinner = btn.querySelector('.spinner');
+
+    btn.disabled = true;
+    spinner.classList.add('active');
+
     const code = this.jar.toString();
 
     try {
@@ -103,6 +109,9 @@ class Sandbox {
       this.outputElement.className = 'output error';
       this.constraintElement.textContent = '(error)';
       this.solverLinkElement.style.display = 'none';
+    } finally {
+      btn.disabled = false;
+      spinner.classList.remove('active');
     }
   }
 

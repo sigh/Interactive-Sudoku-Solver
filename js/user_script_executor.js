@@ -8,8 +8,9 @@ export class UserScriptExecutor {
 
   _initWorker() {
     this._worker = new Worker('js/user_script_worker.js' + self.VERSION_PARAM);
-    this._readyPromise = new Promise((resolve) => {
+    this._readyPromise = new Promise((resolve, reject) => {
       this._resolveReady = resolve;
+      this._rejectReady = reject;
     });
 
     this._worker.onmessage = (e) => {
@@ -17,6 +18,11 @@ export class UserScriptExecutor {
 
       if (type === 'ready') {
         this._resolveReady();
+        return;
+      }
+
+      if (type === 'initError') {
+        this._rejectReady(new Error(error));
         return;
       }
 
