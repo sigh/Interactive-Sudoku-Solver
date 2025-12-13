@@ -519,7 +519,18 @@ function accept(state) {
           </form>
         </div>
 
-        <div class="chip-view" data-chip-view-type="ordinary"></div>
+        <div id="ordinary-constraint-panel" class="constraint-panel constraint-panel-borderless">
+          <div id="ordinary-constraints-wrapper" class="expandable-panel">
+            <div class="expandable-panel-content">
+              <button id="ordinary-constraints-toggle" class="icon-button" title="Expand" style="display: none">
+                <svg viewBox="0 0 24 24" width="24" height="24">
+                  <path d="M16.59 8.59L12 13.17 7.41 8.59 6 10l6 6 6-6z" />
+                </svg>
+              </button>
+              <div class="chip-view" data-chip-view-type="ordinary"></div>
+            </div>
+          </div>
+        </div>
 
         <div class="inline-switch switch">
           <label>
