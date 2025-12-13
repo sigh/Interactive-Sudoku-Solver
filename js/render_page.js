@@ -2240,6 +2240,21 @@ ConstraintCategoryInput.JavaScriptConstraint = class JavaScriptConstraint extend
     this._shape = shape;
   }
 
+  async _runWithSpinner(task) {
+    const btn = this._form[this._addButtonName];
+    const spinner = btn.querySelector('.spinner');
+
+    btn.disabled = true;
+    if (spinner) spinner.classList.add('active');
+
+    try {
+      await task();
+    } finally {
+      if (spinner) spinner.classList.remove('active');
+      this._onSelection(this._inputManager.getSelection());
+    }
+  }
+
   _getFocusTarget() {
     const isPanelOpen = this._panel.classList.contains('container-open');
     const isActiveTab = this._tabContent.classList.contains('active');
@@ -2279,27 +2294,29 @@ ConstraintCategoryInput.Pairwise = class Pairwise extends ConstraintCategoryInpu
     autoSaveField(form, 'function');
 
     form['add-binary-constraint'].onclick = async e => {
-      const formData = new FormData(form);
-      const name = formData.get('binary-name');
-      const type = formData.get('chain-mode');
-      const fnStr = formData.get('function');
+      return this._runWithSpinner(async () => {
+        const formData = new FormData(form);
+        const name = formData.get('binary-name');
+        const type = formData.get('chain-mode');
+        const fnStr = formData.get('function');
 
-      const typeCls = SudokuConstraint[type];
+        const typeCls = SudokuConstraint[type];
 
-      let key = null;
-      try {
-        key = await this._userScriptExecutor.compilePairwise(
-          type, fnStr, this._shape.numValues);
-      } catch (e) {
-        errorElem.textContent = e;
+        let key = null;
+        try {
+          key = await this._userScriptExecutor.compilePairwise(
+            type, fnStr, this._shape.numValues);
+        } catch (e) {
+          errorElem.textContent = e;
+          return false;
+        }
+
+        const cells = this._inputManager.getSelection();
+        this.collection.addConstraint(new typeCls(key, name, ...cells));
+        this._inputManager.setSelection([]);
+
         return false;
-      }
-
-      const cells = this._inputManager.getSelection();
-      this.collection.addConstraint(new typeCls(key, name, ...cells));
-      this._inputManager.setSelection([]);
-
-      return false;
+      });
     };
     form['function'].oninput = () => {
       errorElem.textContent = '';
@@ -2390,32 +2407,34 @@ ConstraintCategoryInput.StateMachine = class StateMachine extends ConstraintCate
     });
 
     form['add-state-machine-constraint'].onclick = async _ => {
-      const formData = new FormData(form);
-      const name = formData.get('state-machine-name');
+      return this._runWithSpinner(async () => {
+        const formData = new FormData(form);
+        const name = formData.get('state-machine-name');
 
-      try {
-        const isUnified = this._isUnifiedMode();
-        const spec = isUnified
-          ? formData.get('unified-code')
-          : {
-            startExpression: formData.get('start-state'),
-            transitionBody: formData.get('transition-body'),
-            acceptBody: formData.get('accept-body')
-          };
+        try {
+          const isUnified = this._isUnifiedMode();
+          const spec = isUnified
+            ? formData.get('unified-code')
+            : {
+              startExpression: formData.get('start-state'),
+              transitionBody: formData.get('transition-body'),
+              acceptBody: formData.get('accept-body')
+            };
 
-        const shape = this._shape || SudokuConstraint.Shape.DEFAULT_SHAPE;
-        const encodedNFA = await this._userScriptExecutor.compileStateMachine(
-          spec, shape.numValues, isUnified);
+          const shape = this._shape || SudokuConstraint.Shape.DEFAULT_SHAPE;
+          const encodedNFA = await this._userScriptExecutor.compileStateMachine(
+            spec, shape.numValues, isUnified);
 
-        const cells = this._inputManager.getSelection();
-        this.collection.addConstraint(new SudokuConstraint.NFA(
-          encodedNFA, name, ...cells));
-        this._inputManager.setSelection([]);
-      } catch (err) {
-        errorElem.textContent = err.message || err;
-      }
+          const cells = this._inputManager.getSelection();
+          this.collection.addConstraint(new SudokuConstraint.NFA(
+            encodedNFA, name, ...cells));
+          this._inputManager.setSelection([]);
+        } catch (err) {
+          errorElem.textContent = err.message || err;
+        }
 
-      return false;
+        return false;
+      });
     };
 
     // Clear error on input for all fields.
