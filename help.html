@@ -55,7 +55,8 @@ layout: null
             <li><a href="#not-renban">Not Renban</a></li>
             <li><a href="#arithmetic-progression">Arithmetic Progression</a></li>
             <li><a href="#successor-arrows">Successor Arrows</a></li>
-            <li><a href="#flatmates">Flatmates<a></li>
+            <li><a href="#flatmates">Flatmates</a></li>
+            <li><a href="#odd-even-lots">Odd/Even Lots</a></li>
           </ul>
         </li>
         <li><a href="#constraint-sandbox">Constraint Sandbox</a></li>
@@ -281,6 +282,44 @@ function accept(state) {
         <code>D</code>):
       </p>
       <pre>.*(AD|DB).*</pre>
+
+      <h3 id="odd-even-lots">Odd/Even Lots</h3>
+
+      <p>
+        <b>Description:</b>
+        A digit in a marked cell indicates the number of Odd/Even digits which
+        appear along the attached line, including itself.
+      </p>
+
+      <p>
+        Implement this by configuring a state machine in the
+        "Custom JavaScript constraints" panel. Select the cells in the line
+        so that the marked cell is first, the order of the rest don't matter.
+        The following code implements Odd Lots, but change to the
+        <code>isEven</code> function for Even Lots:
+      <pre>
+startState = { remaining: null };
+
+function transition(state, value) {
+  const isOdd = x => x%2 == 1;
+  const isEven = x => x%2 == 0;
+
+  let remaining = state.remaining;
+
+  // If we are starting, then initialize the count of remaining values.
+  if (remaining == null) remaining = value;
+
+  // Update remaining count if we see a matching value.
+  if (isOdd(value)) remaining = remaining - 1;
+
+  // Only return a new state if it is valid.
+  if (remaining >= 0) return { remaining: remaining };
+}
+
+function accept(state) {
+  return state.remaining == 0;
+}</pre>
+      </p>
     </div>
 
     <!-- Constraint Sandbox Section -->
