@@ -716,12 +716,21 @@ function accept(state) {
                       add constraints to it. Panels which allow constraints to be
                       added to the composite will be highlighted in yellow.
                     </span>
-                    <button type="button" name="add-or" title="Add 'Or'">
-                      + Or
-                    </button>
-                    <button type="button" name="add-and" title="Add 'And'">
-                      + And
-                    </button>
+                    <div class="vstack">
+                      <div class="hstack">
+                        <button type="button" name="add-or" title="Add 'Or'">
+                          + Or
+                        </button>
+                        <button type="button" name="add-and" title="Add 'And'">
+                          + And
+                        </button>
+                      </div>
+                      <div>
+                        <button type="button" name="add-replicate" title="Add 'Replicate'">
+                          + Replicate
+                        </button>
+                      </div>
+                    </div>
                   </div>
                   <div class="chip-view" data-chip-view-type="composite"></div>
                 </div>

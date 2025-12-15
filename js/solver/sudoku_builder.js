@@ -21,11 +21,11 @@ export class SudokuBuilder {
   }
 
   static resolveConstraint(constraint) {
-    const args = constraint.args;
     const cls = SudokuConstraint[constraint.type];
+    const args = (constraint.args || []).slice();
 
     if (cls.IS_COMPOSITE) {
-      args[0] = constraint.args[0].map(a => this.resolveConstraint(a));
+      args[0] = (constraint.constraints || []).map(c => this.resolveConstraint(c));
     }
 
     return new cls(...args);
@@ -881,6 +881,44 @@ export class SudokuBuilder {
             const branches = constraint.constraints.map(
               c => [...this._constraintHandlers(c.toMap(), shape)]);
             yield* this._yieldOr(branches);
+          }
+          break;
+
+        case 'Replicate':
+          {
+            if (constraint.constraints.length === 0) break;
+
+            const targets = SudokuConstraint.Replicate.decodeTargetCells(
+              constraint.targetBitset, shape.totalCells());
+
+            if (targets.length === 0) break;
+
+            // Children define a template anchored at the subgraph origin.
+            // For each target, shift all children as a unit so that the
+            // subgraph origin maps to that target. All targets must be in
+            // the same subgraph.
+            const graph = shape.cellGraph();
+            const subgraphOrigin = graph.cellPosition(targets[0])[2];
+
+            if (targets.some(t => graph.cellPosition(t)[2] !== subgraphOrigin)) {
+              throw new Error('Replicate targets span multiple subgraphs.');
+            }
+
+            for (const targetBaseCell of targets) {
+              const shiftFn = cellId => {
+                const cell = shape.parseCellId(cellId).cell;
+                const cellPos = graph.cellPosition(cell);
+                if (!cellPos || cellPos[2] !== subgraphOrigin) {
+                  throw new Error('Cannot shift cell: ' + cellId);
+                }
+                const newCell = graph.traverse(targetBaseCell, cellPos[0], cellPos[1]);
+                if (newCell === null) throw new Error('Shifted cell is out of bounds.');
+                return shape.makeCellIdFromIndex(newCell);
+              };
+              for (const child of constraint.constraints) {
+                yield* this._constraintHandlers(child.makeShifted(shiftFn).toMap(), shape);
+              }
+            }
           }
           break;
 

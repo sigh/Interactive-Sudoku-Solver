@@ -366,16 +366,23 @@ ConstraintCategoryInput.Experimental = class Experimental extends ConstraintCate
 }
 
 ConstraintCategoryInput.Composite = class Composite extends ConstraintCategoryInput {
-  constructor(collection, addUpdateListener) {
+  constructor(collection, addUpdateListener, inputManager) {
     super(collection);
+    this._inputManager = inputManager;
+    this._shape = null;
     const form = document.forms['composite-constraint-input'];
     this._form = form;
     this._collapsibleContainer = new CollapsibleContainer(
       form.firstElementChild,
       /* defaultOpen= */ false).allowInComposite();
     addUpdateListener(() => this._collapsibleContainer.updateActiveHighlighting());
+    inputManager.addSelectionPreserver(form);
 
     this._setUpForm(form, collection);
+  }
+
+  reshape(shape) {
+    this._shape = shape;
   }
 
   _setUpForm(form, collection) {
@@ -383,9 +390,15 @@ ConstraintCategoryInput.Composite = class Composite extends ConstraintCategoryIn
       collection.addConstraint(new SudokuConstraint.Or([]));
       return false;
     };
-    document.getElementById('add-and-button')
     form['add-and'].onclick = () => {
       collection.addConstraint(new SudokuConstraint.And([]));
+      return false;
+    };
+
+    form['add-replicate'].onclick = () => {
+      const selectedCells = this._inputManager?.getSelection?.() || [];
+      const bitset = SudokuConstraint.Replicate.encodeTargetCells(selectedCells, this._shape);
+      collection.addConstraint(new SudokuConstraint.Replicate([], bitset));
       return false;
     };
   }
@@ -396,6 +409,9 @@ ConstraintCategoryInput.Composite = class Composite extends ConstraintCategoryIn
     }
     if (constraintClass === SudokuConstraint.And) {
       return this._form['add-and'];
+    }
+    if (constraintClass === SudokuConstraint.Replicate) {
+      return this._form['add-replicate'];
     }
     return null;
   }

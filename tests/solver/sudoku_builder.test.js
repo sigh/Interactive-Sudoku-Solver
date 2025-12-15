@@ -81,6 +81,10 @@ await runTest('resolveConstraint resolves composite Container', () => {
       { type: 'Given', args: ['R1C1', 5] },
       { type: 'Given', args: ['R1C2', 3] },
     ]],
+    constraints: [
+      { type: 'Given', args: ['R1C1', 5] },
+      { type: 'Given', args: ['R1C2', 3] },
+    ],
   };
   const resolved = SudokuBuilder.resolveConstraint(raw);
   assert.ok(resolved instanceof SudokuConstraint.Container);

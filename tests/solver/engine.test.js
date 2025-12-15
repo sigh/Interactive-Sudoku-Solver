@@ -42,13 +42,10 @@ const EASY_SOLUTION = [5, 3, 4, 6, 7, 8, 9, 1, 2, 6, 7, 2, 1, 9, 5, 3, 4, 8, 1, 
 
 // 4x4 with one given — has multiple solutions.
 const makeMultiSolutionConstraint = () => {
-  return SudokuBuilder.resolveConstraint({
-    type: 'Container',
-    args: [[
-      { type: 'Shape', args: ['4x4'] },
-      { type: 'Given', args: ['R1C1', 1] },
-    ]],
-  });
+  return new SudokuConstraint.Container([
+    new SudokuConstraint.Shape('4x4'),
+    new SudokuConstraint.Given('R1C1', 1),
+  ]);
 };
 
 // Contradictory puzzle: two givens in same cell.

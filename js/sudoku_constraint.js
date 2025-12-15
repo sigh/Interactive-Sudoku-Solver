@@ -169,6 +169,41 @@ export class SudokuConstraintBase {
     return [];
   }
 
+  // Return a new constraint shifted so that its first cell lands on
+  // baseCellId. Each cell's offset from getCells(shape)[0] is preserved.
+  shiftCells(baseCellId, shape) {
+    const cells = this.getCells(shape);
+    if (cells.length === 0) return this;
+    const graph = shape.cellGraph();
+    const baseCell = shape.parseCellId(cells[0]).cell;
+    const targetCell = shape.parseCellId(baseCellId).cell;
+    if (baseCell === targetCell) return this;
+    const basePos = graph.cellPosition(baseCell);
+    return this.makeShifted(cellId => {
+      const cell = shape.parseCellId(cellId).cell;
+      const cellPos = graph.cellPosition(cell);
+      if (!cellPos || cellPos[2] !== basePos[2]) {
+        throw new Error('Cannot shift cell: ' + cellId);
+      }
+      const shifted = graph.traverse(
+        targetCell, cellPos[0] - basePos[0], cellPos[1] - basePos[1]);
+      if (shifted === null) {
+        throw new Error('Shifted cell is out of bounds.');
+      }
+      return shape.makeCellIdFromIndex(shifted);
+    });
+  }
+
+  makeShifted(shiftFn) {
+    const newArgs = this.args.slice();
+    const config = this.constructor.ARGUMENT_CONFIG;
+    const start = config ? (config.numArgs ?? 1) : 0;
+    for (let i = start; i < newArgs.length; i++) {
+      newArgs[i] = shiftFn(newArgs[i]);
+    }
+    return new this.constructor(...newArgs);
+  }
+
   static _makeRegions(fn, numRegions, regionSize) {
     const regions = [];
     for (let r = 0; r < numRegions; r++) {
@@ -500,8 +535,14 @@ export class CompositeConstraintBase extends SudokuConstraintBase {
     return this._ALLOWED_CATEGORIES.has(constraintClass.CATEGORY);
   }
 
-  constructor(constraints) {
-    super(constraints);
+  static *makeFromArgs(...args) {
+    // Composite constraints may have header arguments. We always store children
+    // as the first argument and header args after.
+    yield new this([], ...args);
+  }
+
+  constructor(constraints, ...headerArgs) {
+    super(constraints, ...headerArgs);
     this.constraints = constraints || [];
     for (const c of this.constraints) {
       if (!this.constructor.allowedConstraintClass(c.constructor)) {
@@ -521,6 +562,12 @@ export class CompositeConstraintBase extends SudokuConstraintBase {
 
   getCells(shape) {
     return this.constraints.flatMap(c => c.getCells(shape));
+  }
+
+  makeShifted(shiftFn) {
+    const shiftedChildren = this.constraints.map(
+      c => c.makeShifted(shiftFn));
+    return new this.constructor(shiftedChildren, ...this.args.slice(1));
   }
 
 }
@@ -639,6 +686,95 @@ export class SudokuConstraint {
       }
 
       return `.${this.name}${parts.join('')}.End`;
+    }
+  }
+
+  static Replicate = class Replicate extends CompositeConstraintBase {
+    static DESCRIPTION = (
+      "Replicates the contained constraints onto target cell groups. " +
+      "The children define a template anchored at the subgraph origin; for each target cell " +
+      "in the bitset, the entire template is shifted so that the origin maps to that cell. " +
+      "All targets must be within the same subgraph. " +
+      "The first argument is a base64 encoded numCells-length bitset selecting the target cells."
+    );
+    static _ALLOWED_CATEGORIES = new Set(
+      [...super._ALLOWED_CATEGORIES].filter(c => c !== 'OutsideClue'));
+
+    constructor(constraints, targetBitset) {
+      super(constraints || [], targetBitset);
+      this.targetBitset = String(targetBitset || '');
+    }
+
+    chipLabel() {
+      return 'Replicate';
+    }
+
+    getCells(shape) {
+      try {
+        return this.constructor.decodeTargetCells(this.targetBitset, shape.totalCells())
+          .map(c => shape.makeCellIdFromIndex(c));
+      } catch {
+        return [];
+      }
+    }
+
+    static decodeTargetCells(encoded, numCells) {
+      const capacity = Base64Codec.lengthOf6BitArray(numCells);
+      const arr = new Uint8Array(capacity);
+
+      if (encoded) {
+        try {
+          Base64Codec.decodeTo6BitArray(String(encoded), arr);
+        } catch (e) {
+          throw new Error('Invalid Replicate bitset: ' + e);
+        }
+      }
+
+      const cells = [];
+      for (let i = 0; i < numCells; i++) {
+        const word = arr[i / 6 | 0];
+        if (word & (1 << (i % 6))) cells.push(i);
+      }
+      return cells;
+    }
+
+    static encodeTargetCells(cellIds, shape) {
+      const numCells = shape.totalCells();
+      const len = Base64Codec.lengthOf6BitArray(numCells);
+      const arr = new Uint8Array(len);
+
+      for (const cellId of cellIds) {
+        const idx = shape.parseCellId(cellId).cell;
+        const wordIndex = (idx / 6) | 0;
+        const bitIndex = idx % 6;
+        arr[wordIndex] |= (1 << bitIndex);
+      }
+
+      // Trim trailing zeros for a shorter token.
+      let end = arr.length;
+      while (end > 0 && arr[end - 1] === 0) end--;
+      return Base64Codec.encode6BitArray(Array.from(arr.slice(0, end)));
+    }
+
+    static _serializeSingle(constraint) {
+      // Like And, combine child constraints by type; unlike And, always wrap
+      // because replication changes semantics.
+      const constraintMap = new MultiMap();
+      for (const cc of constraint.constraints) {
+        constraintMap.add(cc.constructor, cc);
+      }
+
+      const parts = [];
+      for (const [cls, constraints] of constraintMap) {
+        parts.push(cls.serialize(constraints));
+      }
+
+      const innerStr = parts.join('');
+      return `.${this.name}~${constraint.targetBitset}${innerStr}.End`;
+    }
+
+    static serialize(constraints) {
+      return constraints.map(c => this._serializeSingle(c)).join('');
     }
   }
 
@@ -1140,8 +1276,7 @@ export class SudokuConstraint {
       dashed: '0.5 2 2 2',
     };
     static ARGUMENT_CONFIG = {
-      label: 'definition',
-      long: true,
+      numArgs: 2,
     };
 
     constructor(encodedNFA, name, ...cells) {
@@ -2307,6 +2442,10 @@ export class SudokuConstraint {
       this.values = values;
     }
 
+    makeShifted(shiftFn) {
+      return new this.constructor(shiftFn(this.topLeftCell), ...this.values);
+    }
+
     chipLabel() {
       return `Quad (${this.values.join(',')})`;
     }
@@ -2376,6 +2515,9 @@ export class SudokuConstraint {
     static DISPLAY_CONFIG = {
       displayClass: 'CustomLine',
       nodeMarker: LineOptions.SMALL_EMPTY_CIRCLE_MARKER,
+    };
+    static ARGUMENT_CONFIG = {
+      numArgs: 2,
     };
 
     constructor(key, name, ...cells) {
@@ -2547,6 +2689,10 @@ export class SudokuConstraint {
       return `${displayCell}: ${valueStr}`;
     }
 
+    makeShifted(shiftFn) {
+      return new this.constructor(shiftFn(this.cell), ...this.values);
+    }
+
     getCells(shape) {
       return [this.cell];
     }
@@ -2555,6 +2701,9 @@ export class SudokuConstraint {
   static Priority = class Priority extends SudokuConstraintBase {
     static DESCRIPTION = (
       "Assigns a priority level to cells for solving order.");
+    static ARGUMENT_CONFIG = {
+      numArgs: 1,
+    }
     constructor(priority, ...cells) {
       super(priority, ...cells);
       this.cells = cells;

@@ -769,7 +769,7 @@ class ConstraintManager {
         selectedConstraintCollection, inputManager),
       new ConstraintCategoryInput.Experimental(selectedConstraintCollection),
       new ConstraintCategoryInput.Composite(
-        selectedConstraintCollection, this.addUpdateListener.bind(this)),
+        selectedConstraintCollection, this.addUpdateListener.bind(this), inputManager),
     ];
 
     for (const categoryInput of categoryInputs) {

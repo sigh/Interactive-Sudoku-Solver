@@ -563,6 +563,185 @@ await runTest('Jigsaw round-trips for 16x16 grid', () => {
   }
 });
 
+// ============================================================================
+// shiftCells / makeShifted
+// ============================================================================
+
+const shape9x9 = GridShape.fromGridSize(9);
+
+await runTest('shiftCells shifts a simple constraint', () => {
+  // Thermo at R1C1, R1C2 shifted to base R2C3.
+  const thermo = new SudokuConstraint.Thermo('R1C1', 'R1C2');
+  const shifted = thermo.shiftCells('R2C3', shape9x9);
+
+  assert.notEqual(shifted, thermo);
+  assert.deepEqual(shifted.cells, ['R2C3', 'R2C4']);
+  assert.equal(shifted.type, 'Thermo');
+});
+
+await runTest('shiftCells returns this when delta is zero', () => {
+  const thermo = new SudokuConstraint.Thermo('R3C3', 'R3C4');
+  const shifted = thermo.shiftCells('R3C3', shape9x9);
+  assert.equal(shifted, thermo);
+});
+
+await runTest('shiftCells returns this for constraints with no cells', () => {
+  const noBoxes = new SudokuConstraint.NoBoxes();
+  const shifted = noBoxes.shiftCells('R1C1', shape9x9);
+  assert.equal(shifted, noBoxes);
+});
+
+await runTest('shiftCells throws when shifted cell is out of bounds', () => {
+  const thermo = new SudokuConstraint.Thermo('R1C1', 'R1C2');
+  // Shift to R9C9 would push R1C2 to R9C10 which is out of bounds.
+  assert.throws(
+    () => thermo.shiftCells('R9C9', shape9x9),
+    /out of bounds/
+  );
+});
+
+await runTest('shiftCells throws when base cell is an extra cell without graph', () => {
+  // $0 is not in the graph on a plain 9x9 shape (no var cells registered).
+  const given = new SudokuConstraint.Given('$0', 5);
+  assert.throws(
+    () => given.shiftCells('R1C1', shape9x9),
+    /Cannot shift cell/
+  );
+});
+
+await runTest('shiftCells shifts grid constraint to var cell target', () => {
+  const shape = GridShape.fromGridSize(4);
+  shape.addVarCellsForConstraints([{
+    getVarCellGroups: () => [{ prefix: 'VA', count: 4, label: 'test', columns: 2 }],
+  }]);
+
+  // Thermo R1C1→R1C2 shifted to target VA1.
+  // R1C1 offset [0,0] → traverse(VA1, 0, 0) = VA1
+  // R1C2 offset [0,1] → traverse(VA1, 0, 1) = VA2
+  const thermo = new SudokuConstraint.Thermo('R1C1', 'R1C2');
+  const shifted = thermo.shiftCells('VA1', shape);
+
+  assert.deepEqual(shifted.cells, ['VA1', 'VA2']);
+});
+
+await runTest('shiftCells throws when target subgraph is too small', () => {
+  const shape = GridShape.fromGridSize(4);
+  shape.addVarCellsForConstraints([{
+    getVarCellGroups: () => [{ prefix: 'VA', count: 2, label: 'test', columns: 2 }],
+  }]);
+
+  // Thermo R1C1→R2C1 has offset [1,0]. VA group is 1 row, so DOWN fails.
+  const thermo = new SudokuConstraint.Thermo('R1C1', 'R2C1');
+  assert.throws(
+    () => thermo.shiftCells('VA1', shape),
+    /out of bounds/
+  );
+});
+
+await runTest('shiftCells shifts entirely within var cell group', () => {
+  const shape = GridShape.fromGridSize(4);
+  shape.addVarCellsForConstraints([{
+    getVarCellGroups: () => [{ prefix: 'VA', count: 4, label: 'test', columns: 2 }],
+  }]);
+
+  // VA1→VA2 is one step RIGHT. Base=VA1, target=VA3 is one step DOWN.
+  // So dRow=1, dCol=0.
+  // VA1 → VA3 (DOWN), VA2 → VA4 (DOWN).
+  const thermo = new SudokuConstraint.Thermo('VA1', 'VA2');
+  const shifted = thermo.shiftCells('VA3', shape);
+
+  assert.deepEqual(shifted.cells, ['VA3', 'VA4']);
+});
+
+await runTest('shiftCells shifts var cells downward', () => {
+  const shape = GridShape.fromGridSize(4);
+  shape.addVarCellsForConstraints([{
+    getVarCellGroups: () => [{ prefix: 'VA', count: 6, label: 'test', columns: 2 }],
+  }]);
+
+  // 2-column, 3-row layout: VA1 VA2 / VA3 VA4 / VA5 VA6
+  // Base=VA1, target=VA3 → dRow=1, dCol=0.
+  // VA2 → VA4 (DOWN).
+  const thermo = new SudokuConstraint.Thermo('VA1', 'VA2');
+  const shifted = thermo.shiftCells('VA3', shape);
+
+  assert.deepEqual(shifted.cells, ['VA3', 'VA4']);
+});
+
+await runTest('shiftCells shifts var cell constraint to grid target', () => {
+  const shape = GridShape.fromGridSize(4);
+  shape.addVarCellsForConstraints([{
+    getVarCellGroups: () => [{ prefix: 'VA', count: 4, label: 'test', columns: 2 }],
+  }]);
+
+  // Thermo VA1→VA2 shifted to R1C1.
+  // VA1 offset [0,0] → traverse(R1C1, 0, 0) = R1C1
+  // VA2 offset [0,1] → traverse(R1C1, 0, 1) = R1C2
+  const thermo = new SudokuConstraint.Thermo('VA1', 'VA2');
+  const shifted = thermo.shiftCells('R1C1', shape);
+
+  assert.deepEqual(shifted.cells, ['R1C1', 'R1C2']);
+});
+
+await runTest('shiftCells throws for cross-subgraph constraint cells', () => {
+  const shape = GridShape.fromGridSize(4);
+  shape.addVarCellsForConstraints([{
+    getVarCellGroups: () => [{ prefix: 'VA', count: 4, label: 'test', columns: 2 }],
+  }]);
+
+  // Constraint spans grid + var cells. VA1's offset from R1C1 is wrong
+  // (both at [0,0] in their subgraphs) so validation catches it.
+  const thermo = new SudokuConstraint.Thermo('R1C1', 'VA1');
+  assert.throws(
+    () => thermo.shiftCells('R1C2', shape),
+    /Cannot shift cell/
+  );
+});
+
+await runTest('shiftCells preserves ARGUMENT_CONFIG args', () => {
+  // Whisper has a leading 'difference' argument.
+  const whisper = new SudokuConstraint.Whisper(7, 'R1C1', 'R1C2', 'R1C3');
+  const shifted = whisper.shiftCells('R2C2', shape9x9);
+
+  assert.equal(shifted.difference, 7);
+  assert.deepEqual(shifted.cells, ['R2C2', 'R2C3', 'R2C4']);
+});
+
+await runTest('makeShifted on Quad shifts topLeftCell only', () => {
+  const quad = new SudokuConstraint.Quad('R1C1', 1, 2);
+  const shifted = quad.makeShifted(cellId => {
+    assert.equal(cellId, 'R1C1');
+    return 'R3C3';
+  });
+
+  assert.equal(shifted.topLeftCell, 'R3C3');
+  assert.deepEqual(shifted.values, [1, 2]);
+});
+
+await runTest('makeShifted on Given shifts cell only', () => {
+  const given = new SudokuConstraint.Given('R1C1', 5, 6);
+  const shifted = given.makeShifted(cellId => {
+    assert.equal(cellId, 'R1C1');
+    return 'R4C4';
+  });
+
+  assert.equal(shifted.cell, 'R4C4');
+  assert.deepEqual(shifted.values, [5, 6]);
+});
+
+await runTest('shiftCells on And shifts all children', () => {
+  const and = new SudokuConstraint.And([
+    new SudokuConstraint.Thermo('R1C1', 'R1C2'),
+    new SudokuConstraint.Given('R1C1', 3),
+  ]);
+  const shifted = and.shiftCells('R2C2', shape9x9);
+
+  assert.equal(shifted.constraints.length, 2);
+  assert.deepEqual(shifted.constraints[0].cells, ['R2C2', 'R2C3']);
+  assert.equal(shifted.constraints[1].cell, 'R2C2');
+  assert.deepEqual(shifted.constraints[1].values, [3]);
+});
+
 logSuiteComplete('SudokuConstraintBase');
 
 // ============================================================================

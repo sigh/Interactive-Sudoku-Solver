@@ -473,6 +473,30 @@ await runTest('CellGraph.diagonal returns null at edge', () => {
   assert.equal(graph.diagonal(corner, CellGraph.LEFT, CellGraph.UP), null);
 });
 
+await runTest('CellGraph.cellPosition returns grid row, col, and origin', () => {
+  const shape = GridShape.fromGridSize(9);
+  const graph = shape.cellGraph();
+
+  assert.deepEqual(graph.cellPosition(shape.cellIndex(0, 0)), [0, 0, shape.cellIndex(0, 0)]);
+  assert.deepEqual(graph.cellPosition(shape.cellIndex(4, 5)), [4, 5, shape.cellIndex(0, 0)]);
+  assert.deepEqual(graph.cellPosition(shape.cellIndex(8, 8)), [8, 8, shape.cellIndex(0, 0)]);
+});
+
+await runTest('CellGraph.cellPosition computes lazily and caches per cell', () => {
+  const shape = GridShape.fromGridSize(4);
+  const graph = shape.cellGraph();
+  const cell = shape.cellIndex(2, 3);
+
+  assert.equal(graph._positionCache[cell], undefined);
+
+  const pos0 = graph.cellPosition(cell);
+  const pos1 = graph.cellPosition(cell);
+
+  assert.deepEqual(pos0, [2, 3, shape.cellIndex(0, 0)]);
+  assert.equal(pos0, pos1);
+  assert.equal(graph._positionCache[cell], pos0);
+});
+
 logSuiteComplete('CellGraph');
 
 // ============================================================================
@@ -557,6 +581,24 @@ await runTest('cellGraph: multi-row group has UP/DOWN edges', () => {
   assert.equal(e0[CellGraph.UP], null);
   assert.equal(e0[CellGraph.RIGHT], cells[1]);
   assert.equal(e0[CellGraph.DOWN], cells[3]);
+});
+
+await runTest('cellGraph: cellPosition tracks row, col, and origin within var-cell groups', () => {
+  const shape = makeShapeWithGroups(4, [
+    { prefix: 'A', label: 'a', count: 4, columns: 2 },
+    { prefix: 'B', label: 'b', count: 3 },
+  ]);
+  const graph = shape.cellGraph();
+  const aCells = shape.varCellsForGroup('A');
+  const bCells = shape.varCellsForGroup('B');
+
+  assert.deepEqual(graph.cellPosition(aCells[0]), [0, 0, aCells[0]]);
+  assert.deepEqual(graph.cellPosition(aCells[3]), [1, 1, aCells[0]]);
+  assert.deepEqual(graph.cellPosition(bCells[0]), [0, 0, bCells[0]]);
+  assert.deepEqual(graph.cellPosition(bCells[2]), [0, 2, bCells[0]]);
+  assert.equal(graph.cellPosition(aCells[3])[2], aCells[0]);
+  assert.equal(graph.cellPosition(bCells[2])[2], bCells[0]);
+  assert.notEqual(graph.cellPosition(aCells[3])[2], graph.cellPosition(bCells[2])[2]);
 });
 
 await runTest('cellGraph: no edges between different groups', () => {

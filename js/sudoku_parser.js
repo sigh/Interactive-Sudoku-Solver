@@ -69,7 +69,7 @@ export class SudokuParser {
 
       if (cls.IS_COMPOSITE) {
         const childConstraints = this._resolveNodes(n.children, cls, shape);
-        result.push(new cls(childConstraints));
+        result.push(new cls(childConstraints, ...n.args));
         continue;
       }
 

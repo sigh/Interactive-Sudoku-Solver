@@ -394,6 +394,7 @@ export class CellGraph {
 
   constructor(graph) {
     this._graph = graph;
+    this._positionCache = [];
   }
 
   cellEdges(cell) {
@@ -402,6 +403,59 @@ export class CellGraph {
 
   adjacent(cell, dir) {
     return this._graph[cell][dir];
+  }
+
+  traverse(cell, dRow, dCol) {
+    const rowDir = dRow > 0 ? CellGraph.DOWN : CellGraph.UP;
+    const colDir = dCol > 0 ? CellGraph.RIGHT : CellGraph.LEFT;
+    for (let i = Math.abs(dRow); i > 0; i--) {
+      cell = this._graph[cell][rowDir];
+      if (cell === null) return null;
+    }
+    for (let i = Math.abs(dCol); i > 0; i--) {
+      cell = this._graph[cell][colDir];
+      if (cell === null) return null;
+    }
+    return cell;
+  }
+
+  // Returns [row, col, origin] where origin is the top-left cell of the
+  // subgraph. Two cells share a subgraph iff their origins match.
+  cellPosition(cell) {
+    if (!this._graph[cell]) return null;
+    const cached = this._positionCache[cell];
+    if (cached) return cached;
+
+    let current = cell;
+    let dRow = 0;
+    let dCol = 0;
+    while (true) {
+      const currentCached = this._positionCache[current];
+      if (currentCached) {
+        return this._positionCache[cell] = [
+          currentCached[0] + dRow,
+          currentCached[1] + dCol,
+          currentCached[2],
+        ];
+      }
+
+      const edges = this._graph[current];
+      const left = edges[CellGraph.LEFT];
+      if (left !== null) {
+        dCol++;
+        current = left;
+        continue;
+      }
+
+      const up = edges[CellGraph.UP];
+      if (up !== null) {
+        dRow++;
+        current = up;
+        continue;
+      }
+
+      return this._positionCache[cell] = [dRow, dCol, current];
+    }
   }
 
   diagonal(cell, dir0, dir1) {
