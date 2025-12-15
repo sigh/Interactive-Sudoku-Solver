@@ -1,4 +1,11 @@
-const { memoize, MultiMap, arrayRemoveValue, groupSortedBy, Base64Codec } = await import('./util.js' + self.VERSION_PARAM);
+const {
+  memoize,
+  MultiMap,
+  arrayRemoveValue,
+  groupSortedBy,
+  Base64Codec,
+  LegacyBase64Codec
+} = await import('./util.js' + self.VERSION_PARAM);
 const { GridShape, SHAPE_9x9, SHAPE_MAX } = await import('./grid_shape.js' + self.VERSION_PARAM);
 const { NFASerializer, javascriptSpecToNFA } = await import('./nfa_builder.js' + self.VERSION_PARAM);
 
@@ -2115,7 +2122,7 @@ export class SudokuConstraint {
 
     static fnToKey(fn, numValues) {
       const array = this._binaryFnTo6BitArray(fn, numValues);
-      return Base64Codec.encode6BitArray(array);
+      return LegacyBase64Codec.encode6BitArray(array);
     }
 
     static encodeName(displayName) {
