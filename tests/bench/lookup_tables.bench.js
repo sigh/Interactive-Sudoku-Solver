@@ -4,7 +4,6 @@ import { bench, benchGroup, runIfMain } from './bench_harness.js';
 ensureGlobalEnvironment();
 
 const { LookupTables } = await import('../../js/solver/lookup_tables.js' + self.VERSION_PARAM);
-const { Base64Codec } = await import('../../js/util.js' + self.VERSION_PARAM);
 
 // Keep this file focused on hot primitives and stable inputs.
 // As the suite grows, prefer adding new *.bench.js files per module.
@@ -90,25 +89,6 @@ const consume = (x) => { sink ^= (x | 0); };
 const valueArraysSparse = Array.from(masksSparse, (m) => LookupTables.toValuesArray(m));
 const valueArraysHalf = Array.from(masksHalf, (m) => LookupTables.toValuesArray(m));
 const valueArraysDense = Array.from(masksDense, (m) => LookupTables.toValuesArray(m));
-
-const KEY_LEN = Base64Codec.lengthOf6BitArray(NUM_VALUES * NUM_VALUES);
-const makeBinaryKey = (seed) => {
-  const r = makeLCG(seed);
-  const sixBits = new Array(KEY_LEN);
-  for (let i = 0; i < KEY_LEN; i++) {
-    sixBits[i] = r() & 63;
-  }
-  return Base64Codec.encode6BitArray(sixBits);
-};
-
-const binaryKeyHit = makeBinaryKey(0xBADF00D);
-const binaryKeysCold = (() => {
-  const keys = new Array(16384);
-  for (let i = 0; i < keys.length; i++) {
-    keys[i] = makeBinaryKey((0x12345678 + i) >>> 0);
-  }
-  return keys;
-})();
 
 benchGroup('lookup_tables', () => {
   // ---------------------------------------------------------------------------

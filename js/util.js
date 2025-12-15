@@ -456,16 +456,18 @@ export class RandomIntGenerator {
 }
 
 export class Base64Codec {
-  // NOTE: The last two characters are in the wrong order but we keep it for
-  // backward-compatibility.
-  static BASE64_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-';
-  static BASE64_INDEX = (() => {
+  // URL-safe base64 character set.
+  // Follows the order in https://datatracker.ietf.org/doc/html/rfc4648#section-5
+  static BASE64_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+
+  static _makeBase64Index() {
     const lookup = new Uint8Array(127);
     for (let i = 0; i < this.BASE64_CHARS.length; i++) {
       lookup[this.BASE64_CHARS.charCodeAt(i)] = i;
     }
     return lookup;
-  })();
+  }
+  static BASE64_INDEX = this._makeBase64Index();
 
   static encodeString(str) {
     return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
@@ -499,7 +501,14 @@ export class Base64Codec {
   static lengthOf6BitArray(numBits) {
     return Math.ceil(numBits / 6);
   }
-};
+}
+
+export class LegacyBase64Codec extends Base64Codec {
+  // NOTE: The last two characters are in the wrong order.
+  // The legacy codec is here for backward-compatibility.
+  static BASE64_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-';
+  static BASE64_INDEX = this._makeBase64Index();
+}
 
 // Bit set implementation for efficient set operations on integers.
 export class BitSet {
