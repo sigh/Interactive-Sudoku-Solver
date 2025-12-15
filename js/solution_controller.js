@@ -1331,7 +1331,7 @@ export class SolverProxy {
 
     if (!this._unusedWorkers.length) {
       const worker = new Worker(
-        'js/worker.js' + self.VERSION_PARAM, { type: 'module' });
+        'js/solver_worker.js' + self.VERSION_PARAM, { type: 'module' });
       this._unusedWorkers.push(worker);
     }
     const worker = this._unusedWorkers.pop();
