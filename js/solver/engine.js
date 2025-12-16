@@ -493,7 +493,9 @@ class InternalSolver {
     // which may lead to a contradiction.
     // NOTE: _conflictScores must not be reassigned as we pass the reference
     // to the candidateSelector.
-    this._conflictScores = new ConflictScores(this._cellPriorities);
+    this._conflictScores = new ConflictScores(
+      this._cellPriorities,
+      this._shape.numValues);
     this._uninterestingValues = null;
 
     // Setup sample solution in a set state, so that by default we don't
@@ -800,7 +802,7 @@ class InternalSolver {
         }
         counters.progressRatio += progressDelta;
         counters.backtracks++;
-        this._conflictScores.increment(cell);
+        this._conflictScores.increment(cell, value);
 
         if (0 !== yieldOnBacktrack &&
           0 === counters.backtracks % yieldOnBacktrack) {
