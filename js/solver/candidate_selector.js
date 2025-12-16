@@ -240,6 +240,10 @@ export class CandidateSelector {
     const numCells = this._numCells;
     const conflictScores = this._conflictScores.scores;
 
+    const valueInfo = this._conflictScores.getMaxValueScore();
+    const maxValue = valueInfo.value;
+    const maxValueScore = valueInfo.score;
+
     // Find the cell with the minimum score.
     let maxScore = -1;
     let bestOffset = 0;
@@ -258,11 +262,18 @@ export class CandidateSelector {
         break;
       }
 
-      let score = conflictScores[cell] / count;
+      let scoreUnnormalized = conflictScores[cell];
 
-      if (score > maxScore) {
+      // If a value has been particularly conflict-prone recently, prefer
+      // searching cells that contain that value.
+      if (gridState[cell] & maxValue) {
+        scoreUnnormalized += (maxValueScore * 0.2);
+      }
+
+      if (scoreUnnormalized > maxScore * count) {
         bestOffset = i;
-        maxScore = score;
+        // Don't divide until we have to.
+        maxScore = scoreUnnormalized / count;
       }
     }
 
@@ -611,13 +622,19 @@ class RandomOptionSelector {
 export class ConflictScores {
   DECAY_FREQUENCY = 1 << 14;
 
-  constructor(initialScores) {
+  constructor(initialScores, numValues) {
     this.scores = initialScores.slice();
+    this._valueScores = new Uint32Array(numValues);
+
+    this._numValues = numValues;
     this._decayCountdown = this.DECAY_FREQUENCY;
   }
 
-  increment(cell) {
+  increment(cell, valueMask) {
     this.scores[cell]++;
+
+    this._valueScores[(LookupTables.toIndex(valueMask))]++;
+
     if (--this._decayCountdown === 0) {
       this.decay();
     }
@@ -628,6 +645,41 @@ export class ConflictScores {
     for (let i = 0; i < scores.length; i++) {
       scores[i] >>= 1;
     }
+
+    // Decay value score faster as they should be more volatile.
+    const valueScores = this._valueScores;
+    for (let i = 0; i < valueScores.length; i++) {
+      valueScores[i] >>= 2;
+    }
+
     this._decayCountdown = this.DECAY_FREQUENCY;
+  }
+
+  // Returns { value, score }.
+  // value = value bit mask (0 if none / insufficient spread)
+  // score = score (0 if none / insufficient spread)
+  getMaxValueScore() {
+    const valueScores = this._valueScores;
+    let max = 0;
+    let value = 0;
+    let min = 0x7fffffff;
+    for (let i = 0; i < valueScores.length; i++) {
+      const s = valueScores[i];
+      if (s > max) {
+        max = s;
+        value = 1 << i;
+      }
+      if (s && s < min) {
+        min = s;
+      }
+    }
+
+    // Only return a value if there is a sufficient spread (max > 1.5 * min),
+    // and the max is significant compared to the number of cells.
+    if (max < this._numValues || (max << 1) <= min * 3) {
+      return { value: 0, score: 0 };
+    }
+
+    return { value, score: max };
   }
 }
