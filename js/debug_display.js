@@ -13,8 +13,6 @@ const { SudokuParser } = await import('./sudoku_parser.js' + self.VERSION_PARAM)
 const debugModule = await import('./debug.js' + self.VERSION_PARAM);
 
 export class DebugManager {
-  DEBUG_PARAM_NAME = 'debug';
-
   constructor(displayContainer, constraintManager) {
     this._constraintManager = constraintManager;
     this._container = document.getElementById('debug-container');
@@ -44,12 +42,13 @@ export class DebugManager {
     // Import debug module functions into the window scope.
     Object.assign(self, debugModule);
 
-    // Setup elements.
+    // UI wiring.
+    this._infoOverlay = new InfoOverlay(this._displayContainer);
+    this._stackTraceView.setInfoOverlay(this._infoOverlay);
     this._debugCellHighlighter = this._displayContainer.createCellHighlighter(
       'debug-hover');
     this._stackTraceView.setHighlighter(this._debugCellHighlighter);
     this._stackTraceView.activate();
-    this._infoOverlay = new InfoOverlay(this._displayContainer);
     this._candidateDisplay = new CellValueDisplay(
       this._displayContainer.getNewGroup('debug-candidate-group'));
 
@@ -64,7 +63,8 @@ export class DebugManager {
       }
     }
 
-    // Stack trace checkbox controls UI visibility only.
+    // Stack trace checkbox controls only whether the footer is visible.
+    // Whether the solver exports stack traces is decided at solve start via getOptions().
     {
       const element = this._stackTraceCheckbox;
       const value = sessionAndLocalStorage.getItem('showStackTrace') ??
@@ -110,7 +110,7 @@ export class DebugManager {
       this._loadDebugPuzzleInput();
     });
 
-    // Unhide any debug-only elements.
+    // Once debug UI is loaded, reveal any debug-only UI elements.
     const hiddenElements = Array.from(
       document.getElementsByClassName('hide-unless-debug'));
     hiddenElements.forEach(e => e.classList.remove('hide-unless-debug'));
@@ -200,9 +200,9 @@ export class DebugManager {
         ([k, v]) => [k, v.checked]
       )
     );
-    options.logLevel = parseInt(this._logLevelElem.value);
+    options.logLevel = parseInt(this._logLevelElem.value, 10);
     // Only request stack traces if enabled when the solve starts.
-    options.exportStackTrace = !!this._stackTraceCheckbox?.checked;
+    options.exportStackTrace = this._stackTraceCheckbox.checked;
     return options;
   }
 
@@ -214,15 +214,15 @@ export class DebugManager {
     this.clear();
     this._shape = shape;
     this._stackTraceView.reshape(shape);
-    this._infoOverlay?.reshape(shape);
-    this._candidateDisplay?.reshape(shape);
+    this._infoOverlay.reshape(shape);
+    this._candidateDisplay.reshape(shape);
   }
 
   clear() {
     clearDOMNode(this._logView);
     clearDOMNode(this._counterView);
-    this._infoOverlay?.clear();
-    this._debugCellHighlighter?.clear();
+    this._infoOverlay.clear();
+    this._debugCellHighlighter.clear();
     clearDOMNode(this._debugPuzzleSrc);
 
     this._logDedupe = {
@@ -364,27 +364,27 @@ export class DebugManager {
       if (elem.checked) {
         let values = data;
         if (typeof data === 'function') values = data();
-        this._infoOverlay.setValues(
+        this._infoOverlay.setAnnotations(
           values, () => elem.checked = false);
       } else {
-        this._infoOverlay.setValues();
+        this._infoOverlay.setAnnotations();
       }
     });
   }
 
   _setInfoOverlayOnHover(elem, data) {
     elem.addEventListener('mouseover', () => {
-      this._infoOverlay.setValues(data);
+      this._infoOverlay.setAnnotations(data);
     });
     elem.addEventListener('mouseout', () => {
-      this._infoOverlay.setValues();
+      this._infoOverlay.setAnnotations();
     });
   }
 
   enable(enable) {
     if (enable === undefined) enable = true;
 
-    // Reset the container.
+    // Show/hide the debug panel. When disabling, we also clear the UI.
     this._enabled = enable;
     this._container.classList.toggle('hidden', !enable);
 
@@ -392,14 +392,23 @@ export class DebugManager {
   }
 }
 
-// A info overlay which is lazily loaded.
+// Renders per-cell overlays on the grid.
+//
+// There are two independent text channels:
+// - Annotations: controlled by debug checkboxes / hover overlays (e.g. show cell id/index).
+// - Values: reserved for stack-trace hover (shows the value at each step's prefix).
+//
+// Keeping these separate ensures stack-trace hover never interferes with annotation toggles.
 export class InfoOverlay {
   constructor(displayContainer) {
     this._shape = null;
 
     this._heatmap = displayContainer.createCellHighlighter();
-    this._textInfo = new InfoTextDisplay(
-      displayContainer.getNewGroup('text-info-group'));
+    this._annotationText = new InfoTextDisplay(
+      displayContainer.getNewGroup('debug-info-group'));
+    const valueGroup = displayContainer.getNewGroup('debug-value-group');
+    valueGroup.classList.add('solution-group');
+    this._valueDisplay = new CellValueDisplay(valueGroup);
 
     this._onNextTextChangeFn = null;
   }
@@ -408,20 +417,26 @@ export class InfoOverlay {
     this._shape = shape;
     this.clear();
 
-    this._textInfo.reshape(shape);
+    this._annotationText.reshape(shape);
+    this._valueDisplay.reshape(shape);
   }
 
   clear() {
     this._heatmap.clear();
-    this._clearTextInfo();
+    this._clearAnnotationText();
+    this._clearValueText();
   }
 
-  _clearTextInfo() {
-    this._textInfo.clear();
+  _clearAnnotationText() {
+    this._annotationText.clear();
     if (this._onNextTextChangeFn) {
       this._onNextTextChangeFn();
       this._onNextTextChangeFn = null;
     }
+  }
+
+  _clearValueText() {
+    this._valueDisplay.clear();
   }
 
   setHeatmapValues(values) {
@@ -436,17 +451,28 @@ export class InfoOverlay {
     }
   }
 
-  setValues(values, onChange) {
+  // Sets the annotation overlay text.
+  // If onChange is provided, it will be called the next time annotations are cleared.
+  // (Used by checkbox-driven overlays so they can auto-uncheck.)
+  setAnnotations(values, onChange) {
     const shape = this._shape;
-    this._clearTextInfo();
+    this._clearAnnotationText();
     if (onChange) this._onNextTextChangeFn = onChange;
 
     if (!values) return;
 
     for (let i = 0; i < values.length; i++) {
+      const value = values[i];
       const cellId = shape.makeCellIdFromIndex(i);
-      this._textInfo.setText(cellId, values[i]);
+      this._annotationText.setText(cellId, value);
     }
+  }
+
+  setValues(gridValues) {
+    this._clearValueText();
+    if (!gridValues) return;
+
+    this._valueDisplay.renderGridValues(gridValues);
   }
 }
 
@@ -455,6 +481,7 @@ export class DebugStackTraceView {
     this._container = containerElem;
     this._shape = null;
     this._highlighter = null;
+    this._infoOverlay = null;
 
     // Active means the debug UI has been loaded (so it's worth allocating DOM).
     this._active = false;
@@ -471,7 +498,8 @@ export class DebugStackTraceView {
 
     this._slots = null;
     this._renderedLen = 0;
-    this._hoverCells = [null];
+
+    this._hoverStepIndex = null;
 
     if (this._container) {
       this._container.hidden = true;
@@ -480,6 +508,10 @@ export class DebugStackTraceView {
 
   setHighlighter(highlighter) {
     this._highlighter = highlighter;
+  }
+
+  setInfoOverlay(infoOverlay) {
+    this._infoOverlay = infoOverlay;
   }
 
   activate() {
@@ -494,7 +526,7 @@ export class DebugStackTraceView {
     this._enabled = !!enabled;
     this._syncVisibility();
     if (!this._enabled) {
-      this._highlighter?.clear();
+      this._setHoverStepIndex(null);
       return;
     }
 
@@ -520,31 +552,27 @@ export class DebugStackTraceView {
     this._highlighter?.clear();
   }
 
+  _resetTrace() {
+    this._lastCells = null;
+    this._lastValues = null;
+
+    this._setHoverStepIndex(null);
+
+    this._prev = null;
+    this._counts.length = 0;
+    this._lastStableLen = 0;
+
+    this._clearRenderedSpans();
+  }
+
   update(stack) {
-    if (!stack) {
-      this._lastCells = null;
-      this._lastValues = null;
+    if (!stack) return this._resetTrace();
 
-      this._prev = null;
-      this._counts.length = 0;
-      this._lastStableLen = 0;
-      this._clearRenderedSpans();
-      this._highlighter?.clear();
-      return;
-    }
-
-    const next = (stack.cells && stack.cells.length) ? stack.cells : null;
+    const next = (stack.cells?.length) ? stack.cells : null;
     this._lastCells = next;
     this._lastValues = next ? stack.values : null;
 
-    if (!next) {
-      this._prev = null;
-      this._counts.length = 0;
-      this._lastStableLen = 0;
-      this._clearRenderedSpans();
-      this._highlighter?.clear();
-      return;
-    }
+    if (!next) return this._resetTrace();
 
     const prev = this._prev;
     const counts = this._counts;
@@ -578,6 +606,9 @@ export class DebugStackTraceView {
 
     this._lastStableLen = stableLen;
     this._renderIfVisible();
+
+    // If the user is hovering a step, keep hover effects in sync with new data.
+    this._syncHover();
   }
 
   _syncVisibility() {
@@ -604,20 +635,18 @@ export class DebugStackTraceView {
 
     clearDOMNode(this._container);
 
-    const numCells = this._shape?.numCells ?? 0;
+    const numCells = this._shape.numCells;
     const slots = new Array(numCells);
 
     for (let i = 0; i < numCells; i++) {
       const span = document.createElement('span');
       span.hidden = true;
       span.onmouseover = () => {
-        if (!this._highlighter) return;
-        const cellId = span.dataset.cellId;
-        if (!cellId) return;
-        this._hoverCells[0] = cellId;
-        this._highlighter.setCells(this._hoverCells);
+        this._setHoverStepIndex(i);
       };
-      span.onmouseout = () => this._highlighter?.clear();
+      span.onmouseout = () => {
+        this._setHoverStepIndex(null);
+      };
       slots[i] = span;
       this._container.appendChild(span);
       this._container.appendChild(document.createTextNode(' '));
@@ -625,6 +654,43 @@ export class DebugStackTraceView {
 
     this._slots = slots;
     this._renderedLen = 0;
+  }
+
+  _setHoverStepIndex(stepIndex) {
+    this._hoverStepIndex = stepIndex;
+    this._syncHover();
+  }
+
+  _syncHover() {
+    const highlighter = this._highlighter;
+    const infoOverlay = this._infoOverlay;
+    const shape = this._shape;
+    const stepIndex = this._hoverStepIndex;
+    const cells = this._lastCells;
+
+    if (!shape || stepIndex === null || !cells?.length) {
+      highlighter?.clear();
+      infoOverlay?.setValues();
+      return;
+    }
+
+    const idx = Math.min(stepIndex, cells.length - 1);
+
+    // Highlight the hovered step's cell.
+    if (highlighter) {
+      const cellId = shape.makeCellIdFromIndex(cells[idx]);
+      highlighter.setCells([cellId]);
+    }
+
+    // Show values up to (and including) the hovered step.
+    if (infoOverlay) {
+      const values = this._lastValues;
+      const gridValues = new Array(shape.numCells);
+      for (let i = 0; i <= idx; i++) {
+        gridValues[cells[i]] = values[i];
+      }
+      infoOverlay.setValues(gridValues);
+    }
   }
 
   _clearRenderedSpans() {
@@ -647,7 +713,7 @@ export class DebugStackTraceView {
       const cellId = this._shape.makeCellIdFromIndex(cellIndex);
       const span = this._slots[i];
 
-      const value = values ? values[i] : 0;
+      const value = values[i];
       const prevValue = span.dataset.v ? +span.dataset.v : 0;
 
       span.hidden = false;
@@ -655,7 +721,7 @@ export class DebugStackTraceView {
       if (span.dataset.cellId !== cellId || prevValue !== value) {
         span.dataset.cellId = cellId;
         span.dataset.v = '' + value;
-        span.textContent = `${cellId}=${value || '?'}`;
+        span.textContent = `${cellId}=${value}`;
       }
     }
 

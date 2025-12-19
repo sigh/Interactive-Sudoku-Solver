@@ -62,7 +62,7 @@ class LazyDebugManager {
     if (closeButton) closeButton.onclick = () => toggleDebug(false);
 
     const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get(DEBUG_PARAM_NAME) !== null) {
+    if (urlParams.has(DEBUG_PARAM_NAME)) {
       toggleDebug(true);
     }
   }
@@ -91,12 +91,12 @@ class LazyDebugManager {
       });
     }
 
-    return await this._realPromise;
+    return this._realPromise;
   }
 
   async get() {
     if (!this._enabled) return null;
-    return await this._ensureLoaded();
+    return this._ensureLoaded();
   }
 
   reshape(shape) {

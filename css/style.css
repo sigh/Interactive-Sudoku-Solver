@@ -113,6 +113,12 @@ body {
   font-size: var(--font-size-small);
 }
 
+.debug-value-group {
+  opacity: 0.50;
+  fill: rgb(255, 0, 225);
+  filter: drop-shadow(0px 0px 1px white);
+}
+
 .shaded-region-label {
   font-size: 10px;
   font-family: var(--font-family-mono);
@@ -966,6 +972,10 @@ footer {
     padding: 4px 6px;
     overflow-x: auto;
     white-space: nowrap;
+
+    span {
+      cursor: pointer;
+    }
 
     &:empty {
       display: none;
