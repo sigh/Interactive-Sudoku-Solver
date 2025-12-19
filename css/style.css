@@ -874,11 +874,16 @@ footer {
 
 #debug-container {
   display: flex;
-  flex-direction: row;
+  flex-direction: column;
   border-bottom: 1px solid var(--color-text-muted);
 
   &.hidden {
     display: none;
+  }
+
+  .debug-main {
+    display: flex;
+    flex-direction: row;
   }
 
   #debug-logs {
@@ -925,6 +930,13 @@ footer {
       align-items: center;
       gap: 10px;
     }
+
+    .debug-toggle-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
+    }
   }
 
   #debug-counters {
@@ -945,6 +957,18 @@ footer {
     span {
       padding: 0 5px;
       font-size: var(--font-size-small);
+    }
+  }
+
+  .debug-stack-trace {
+    border-top: 1px solid var(--color-text-muted);
+    font-size: var(--font-size-small);
+    padding: 4px 6px;
+    overflow-x: auto;
+    white-space: nowrap;
+
+    &:empty {
+      display: none;
     }
   }
 }
