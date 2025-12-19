@@ -13,7 +13,101 @@ const {
 } = await import('./display.js' + self.VERSION_PARAM);
 const { toShortSolution } = await import('./sudoku_parser.js' + self.VERSION_PARAM);
 const { SolverStateDisplay } = await import('./solver_state_display.js' + self.VERSION_PARAM);
-const { DebugManager } = await import('./debug_display.js' + self.VERSION_PARAM);
+
+class LazyDebugManager {
+  constructor(displayContainer, constraintManager) {
+    this._displayContainer = displayContainer;
+    this._constraintManager = constraintManager;
+    this._shape = null;
+
+    this._enabled = false;
+    this._real = null;
+    this._realPromise = null;
+
+    this._setUpDebugLoadingControls();
+  }
+
+  _setUpDebugLoadingControls() {
+    const DEBUG_PARAM_NAME = 'debug';
+
+    const updateURL = (enable) => {
+      const url = new URL(window.location);
+      if (enable) {
+        url.searchParams.set(DEBUG_PARAM_NAME, 1);
+      } else {
+        url.searchParams.delete(DEBUG_PARAM_NAME);
+      }
+      window.history.pushState(null, null, url);
+    };
+
+    const toggleDebug = async (enabled) => {
+      this._enabled = (enabled !== undefined) ? enabled : !this._enabled;
+
+      this._real?.enable(this._enabled);
+      updateURL(this._enabled);
+      if (this._enabled) {
+        await this._ensureLoaded();
+      }
+    };
+
+    window.loadDebug = () => toggleDebug(true);
+
+    document.addEventListener('keydown', (event) => {
+      if (event.ctrlKey && event.key === 'd') {
+        toggleDebug();
+      }
+    });
+
+    const closeButton = document.getElementById('close-debug-button');
+    if (closeButton) closeButton.onclick = () => toggleDebug(false);
+
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get(DEBUG_PARAM_NAME) !== null) {
+      toggleDebug(true);
+    }
+  }
+
+  async _ensureLoaded() {
+    if (this._real) return this._real;
+
+    if (!this._realPromise) {
+      this._realPromise = (async () => {
+        const debugDisplay = await import('./debug_display.js' + self.VERSION_PARAM);
+        const real = new debugDisplay.DebugManager(
+          this._displayContainer,
+          this._constraintManager);
+
+        if (this._shape) real.reshape(this._shape);
+        real.enable(this._enabled);
+
+        this._real = real;
+        return real;
+      })();
+
+      // If the load fails, allow a retry.
+      this._realPromise.catch((e) => {
+        console.error('Failed to load debug module:', e);
+        this._realPromise = null;
+      });
+    }
+
+    return await this._realPromise;
+  }
+
+  async get() {
+    if (!this._enabled) return null;
+    return await this._ensureLoaded();
+  }
+
+  reshape(shape) {
+    this._shape = shape;
+    this._real?.reshape(shape);
+  }
+
+  clear() {
+    this._real?.clear();
+  }
+}
 
 class HistoryHandler {
   MAX_HISTORY = 50;
@@ -511,7 +605,7 @@ export class SolutionController {
     displayContainer.addElement(
       HighlightDisplay.makeRadialGradient('highlighted-step-gradient'));
 
-    this._debugManager = new DebugManager(displayContainer, constraintManager);
+    this._debugManager = new LazyDebugManager(displayContainer, constraintManager);
     constraintManager.addReshapeListener(this._debugManager);
 
     this._update = deferUntilAnimationFrame(this._update.bind(this));
@@ -727,6 +821,7 @@ export class SolutionController {
 
     let newSolver = null;
     try {
+      const debugHandler = await this._debugManager.get();
       newSolver = await SolverProxy.makeSolver(
         constraints,
         s => {
@@ -737,7 +832,7 @@ export class SolutionController {
           if (s.done) { handler.setDone(); }
         },
         this._solveStatusChanged.bind(this),
-        this._debugManager);
+        debugHandler);
     } catch (e) {
       this._elements.error.textContent = e.toString();
       this._stateDisplay.setSolveStatus(false, 'terminate');
