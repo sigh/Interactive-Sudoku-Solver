@@ -4,7 +4,7 @@ const { Timer, IteratorWithCount, arraysAreEqual, setIntersectionToArray, BitSet
 const { LookupTables } = await import('./lookup_tables.js' + self.VERSION_PARAM);
 const { SHAPE_MAX } = await import('../grid_shape.js' + self.VERSION_PARAM);
 const { SudokuConstraintOptimizer } = await import('./optimizer.js' + self.VERSION_PARAM);
-const { CandidateSelector, SamplingCandidateSelector, ConflictScores } = await import('./candidate_selector.js' + self.VERSION_PARAM);
+const { CandidateSelector, SamplingCandidateSelector, ConflictScores, SeenCandidateSet } = await import('./candidate_selector.js' + self.VERSION_PARAM);
 const HandlerModule = await import('./handlers.js' + self.VERSION_PARAM);
 
 export class SudokuSolver {
@@ -344,9 +344,11 @@ class InternalSolver {
 
     this._handlerSet = this._setUpHandlers(Array.from(handlerGen));
 
+    this._seenCandidateSet = new SeenCandidateSet(shape.numCells);
+
     this._handlerAccumulator = new HandlerAccumulator(this._handlerSet);
     this._candidateSelector = new CandidateSelector(
-      shape, this._handlerSet, debugLogger);
+      shape, this._handlerSet, debugLogger, this._seenCandidateSet);
 
     this._cellPriorities = this._initCellPriorities();
 
@@ -502,7 +504,7 @@ class InternalSolver {
     this._conflictScores = new ConflictScores(
       this._cellPriorities,
       this._shape.numValues);
-    this._uninterestingValues = null;
+    this._seenCandidateSet.reset();
 
     // Setup sample solution in a set state, so that by default we don't
     // populate it.
@@ -551,26 +553,6 @@ class InternalSolver {
 
   unsetSampleSolution() {
     this._sampleSolution[0] = 0;
-  }
-
-  _hasInterestingSolutions(grid, uninterestingValues) {
-    const valuesInSolutions = uninterestingValues.valuesInSolutions;
-    // Check the last cell which was interesting, in case it is still
-    // interesting.
-    {
-      const cell = uninterestingValues.lastInterestingCell;
-      if (grid[cell] & ~valuesInSolutions[cell]) return true;
-    }
-
-    // We need to check all cells because we maybe validating a cell above
-    // us, or finding a value for a cell below us.
-    for (let cell = 0; cell < this._numCells; cell++) {
-      if (grid[cell] & ~valuesInSolutions[cell]) {
-        uninterestingValues.lastInterestingCell = cell;
-        return true;
-      }
-    }
-    return false;
   }
 
   static _debugGridBuffer = new Uint16Array(SHAPE_MAX.numCells);
@@ -863,8 +845,8 @@ class InternalSolver {
 
       if (hasContradiction) continue;
 
-      if (this._uninterestingValues) {
-        if (!this._hasInterestingSolutions(grid, this._uninterestingValues)) {
+      if (this._seenCandidateSet.enabledInSolver) {
+        if (!this._seenCandidateSet.hasInterestingSolutions(grid)) {
           counters.branchesIgnored += progressDelta;
           continue;
         }
@@ -908,23 +890,22 @@ class InternalSolver {
   solveAllPossibilities(solutions) {
     const counters = this.counters;
 
-    const valuesInSolutions = new Uint16Array(this._numCells);
+    const seenCandidateSet = this._seenCandidateSet;
+    const candidates = seenCandidateSet.candidates;
+    candidates.fill(0);
 
     for (const result of this.run(InternalSolver.YIELD_ON_SOLUTION)) {
-      result.grid.forEach((c, i) => { valuesInSolutions[i] |= c; });
+      seenCandidateSet.addSolutionGrid(result.grid);
       solutions.push(result.grid.slice(0));
 
       // Once we have 2 solutions, then start ignoring branches which maybe
       // duplicating existing solution (up to this point, every branch is
       // interesting).
       if (counters.solutions == 2) {
-        this._uninterestingValues = {
-          valuesInSolutions: valuesInSolutions,
-          lastInterestingCell: 0,
-        };
+        seenCandidateSet.enabledInSolver = true;
       }
     }
-    return valuesInSolutions;
+    return candidates;
   }
 
   validateLayout() {
@@ -1037,7 +1018,7 @@ class InternalSolver {
     // Use a fixed seed so the result is deterministic.
     // TODO: Allows us to save and restore the original.
     this._candidateSelector = new SamplingCandidateSelector(
-      this._shape, this._handlerSet, this._debugLogger);
+      this._shape, this._handlerSet, this._debugLogger, this._seenCandidateSet);
 
     while (true) {
       this._resetRun();

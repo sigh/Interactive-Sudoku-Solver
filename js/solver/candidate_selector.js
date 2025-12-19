@@ -1,14 +1,59 @@
 const { countOnes16bit, RandomIntGenerator } = await import('../util.js' + self.VERSION_PARAM);
 const { LookupTables } = await import('./lookup_tables.js' + self.VERSION_PARAM);
 
+export class SeenCandidateSet {
+  constructor(numCells) {
+    this.enabledInSolver = false;
+    this.candidates = new Uint16Array(numCells);
+    this._lastInterestingCell = 0;
+  }
+
+  reset() {
+    this.enabledInSolver = false;
+    this.candidates.fill(0);
+    this._lastInterestingCell = 0;
+  }
+
+  addSolutionGrid(grid) {
+    const candidates = this.candidates;
+    const numCells = candidates.length;
+    for (let i = 0; i < numCells; i++) {
+      candidates[i] |= grid[i];
+    }
+  }
+
+  hasInterestingSolutions(grid) {
+    const candidates = this.candidates;
+
+    // Check the last cell which was interesting, in case it is still
+    // interesting.
+    {
+      const cell = this._lastInterestingCell;
+      if (grid[cell] & ~candidates[cell]) return true;
+    }
+
+    // We need to check all cells because we maybe validating a cell above
+    // us, or finding a value for a cell below us.
+    const numCells = candidates.length;
+    for (let cell = 0; cell < numCells; cell++) {
+      if (grid[cell] & ~candidates[cell]) {
+        this._lastInterestingCell = cell;
+        return true;
+      }
+    }
+    return false;
+  }
+}
+
 export class CandidateSelector {
-  constructor(shape, handlerSet, debugLogger) {
+  constructor(shape, handlerSet, debugLogger, seenCandidateSet) {
     this._shape = shape;
     this._cellOrder = new Uint8Array(shape.numCells);
     this._conflictScores = null;
     this._debugLogger = debugLogger;
     this._numCells = shape.numCells;
     this._optionSelector = null;
+    this._seenCandidateSet = seenCandidateSet;
 
     this._candidateSelectionStates = this._initCandidateSelectionStates(shape);
     // _candidateSelectionFlags is used to track whether the
@@ -190,14 +235,21 @@ export class CandidateSelector {
     //        - we don't add to the stack on the final value in a cell.
     let values = gridState[cell];
     let count = countOnes16bit(values);
-    let value = values & -values;
-    if (count > 1 && this._optionSelector !== null) {
-      value = this._optionSelector.selectValue(values, count);
-    }
 
-    // Wait until our first guess to initialize the candidate finder set.
-    if (count > 1 && !this._candidateFinderSet.initialized) {
-      this._candidateFinderSet.initialize(gridState);
+    let value = values;
+    if (count > 1) {
+      // We only need to make choices if there are multiple values.
+      if (this._optionSelector !== null) {
+        // If we have an option selector, then use it to select a value.
+        value = this._optionSelector.selectValue(values, count);
+      } else {
+        value = values & -values;
+      }
+
+      // Wait until our first guess to initialize the candidate finder set.
+      if (!this._candidateFinderSet.initialized) {
+        this._candidateFinderSet.initialize(gridState);
+      }
     }
 
     const conflictScores = this._conflictScores.scores;
@@ -221,6 +273,7 @@ export class CandidateSelector {
           [state.cells[index], state.cells[count - 1]] =
             [state.cells[count - 1], state.cells[index]];
         }
+
         cellOffset = cellOrder.indexOf(state.cells.pop());
         this._candidateSelectionFlags[cellDepth] = 1
       }
@@ -568,8 +621,8 @@ CandidateFinders.House = class House extends CandidateFinderBase {
 // An extension of the candidate selector which chooses values at random
 // from the chosen cell, and only searches a single branch of the tree.
 export class SamplingCandidateSelector extends CandidateSelector {
-  constructor(shape, handlerSet, debugLogger) {
-    super(shape, handlerSet, debugLogger);
+  constructor(shape, handlerSet, debugLogger, seenCandidateSet) {
+    super(shape, handlerSet, debugLogger, seenCandidateSet);
     this._totalWeight = new Float64Array(shape.numCells + 1);
     this._totalWeight[0] = 1.0;
     this._optionSelector = new RandomOptionSelector(/* seed = */ 0);
