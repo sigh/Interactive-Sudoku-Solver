@@ -267,6 +267,7 @@ class DebugLogger {
       logLevel: 0,
       enableStepLogs: false,
       exportConflictHeatmap: false,
+      exportStackTrace: false,
     };
     this._hasAnyDebugging = false;
     this._pendingDebugLogs = [];
@@ -316,6 +317,12 @@ class DebugLogger {
     if (this._debugOptions.exportConflictHeatmap) {
       result.conflictHeatmap =
         this._solver._internalSolver.getConflictScores().scores.slice();
+    }
+    if (this._debugOptions.exportStackTrace) {
+      const stackTrace = this._solver._internalSolver.getStackTrace();
+      if (stackTrace) {
+        result.stackTrace = stackTrace;
+      }
     }
     if (this._adhHocCounters.size) {
       result.counters = this._adhHocCounters;
@@ -476,6 +483,7 @@ class InternalSolver {
   reset() {
     this._iter = null;
     this._stepState = null;
+    this._currentRecFrame = null;
     this.counters = {
       valuesTried: 0,
       nodesSearched: 0,
@@ -513,6 +521,22 @@ class InternalSolver {
 
     this.done = false;
     this._atStart = true;
+  }
+
+  static _debugValueBuffer = new Uint16Array(SHAPE_MAX.numCells);
+  getStackTrace() {
+    if (this._atStart || this.done) return null;
+
+    const stackFrame = this._currentRecFrame;
+    const cellDepth = stackFrame.cellDepth;
+    const values = this.constructor._debugValueBuffer.subarray(0, cellDepth);
+
+    const cells = this._candidateSelector.getCellOrder(cellDepth);
+    for (let i = 0; i < cellDepth; i++) {
+      values[i] = LookupTables.toValue(stackFrame.gridCells[cells[i]]);
+    }
+
+    return { cells, values };
   }
 
   _setCandidateSelector(selector) {
@@ -677,6 +701,7 @@ class InternalSolver {
     // Set up iterator validation.
     if (!this._atStart) throw ('State is not in initial state.');
     this._atStart = false;
+
     const runCounter = ++this._runCounter;
     const checkRunCounter = () => {
       if (runCounter != this._runCounter) throw ('Iterator no longer valid');
@@ -733,6 +758,7 @@ class InternalSolver {
       let recFrame = recStack[--recDepth];
 
       const cellDepth = recFrame.cellDepth;
+      this._currentRecFrame = recFrame;
       let grid = recFrame.gridCells;
 
       const [nextDepth, value, count] =
@@ -877,6 +903,7 @@ class InternalSolver {
       recDepth++;
     }
 
+    this._currentRecFrame = null;
     this.done = true;
   }
 

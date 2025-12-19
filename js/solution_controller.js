@@ -112,6 +112,224 @@ class HistoryHandler {
   }
 }
 
+class DebugStackTraceView {
+  constructor(containerElem) {
+    this._container = containerElem;
+    this._shape = null;
+    this._highlighter = null;
+
+    // Active means the debug UI has been loaded (so it's worth allocating DOM).
+    this._active = false;
+
+    this._enabled = false;
+
+    this._prev = null;
+    this._counts = [];
+    this._minStableCount = 4;
+
+    this._lastCells = null;
+    this._lastValues = null;
+    this._lastStableLen = 0;
+
+    this._slots = null;
+    this._renderedLen = 0;
+    this._hoverCells = [null];
+
+    if (this._container) {
+      this._container.hidden = true;
+    }
+  }
+
+  setHighlighter(highlighter) {
+    this._highlighter = highlighter;
+  }
+
+  activate() {
+    if (this._active) return;
+    this._active = true;
+    this._syncVisibility();
+    this._ensureSlots();
+    this._renderIfVisible();
+  }
+
+  setEnabled(enabled) {
+    this._enabled = !!enabled;
+    this._syncVisibility();
+    if (!this._enabled) {
+      this._highlighter?.clear();
+      return;
+    }
+
+    this._ensureSlots();
+    this._renderIfVisible();
+  }
+
+  reshape(shape) {
+    this._shape = shape;
+    this._ensureSlots();
+    this.clear();
+  }
+
+  clear() {
+    this._prev = null;
+    this._counts.length = 0;
+
+    this._lastCells = null;
+    this._lastValues = null;
+    this._lastStableLen = 0;
+
+    this._clearRenderedSpans();
+    this._highlighter?.clear();
+  }
+
+  update(stack) {
+    if (!stack) {
+      this._lastCells = null;
+      this._lastValues = null;
+
+      this._prev = null;
+      this._counts.length = 0;
+      this._lastStableLen = 0;
+      this._clearRenderedSpans();
+      this._highlighter?.clear();
+      return;
+    }
+
+    const next = (stack.cells && stack.cells.length) ? stack.cells : null;
+    this._lastCells = next;
+    this._lastValues = next ? stack.values : null;
+
+    if (!next) {
+      this._prev = null;
+      this._counts.length = 0;
+      this._lastStableLen = 0;
+      this._clearRenderedSpans();
+      this._highlighter?.clear();
+      return;
+    }
+
+    const prev = this._prev;
+    const counts = this._counts;
+
+    if (!prev) {
+      this._prev = next;
+      counts.length = next.length;
+      counts.fill(1);
+    } else {
+      let commonPrefixLen = 0;
+      const minLen = Math.min(prev.length, next.length);
+      while (commonPrefixLen < minLen && prev[commonPrefixLen] === next[commonPrefixLen]) {
+        commonPrefixLen++;
+      }
+
+      counts.length = next.length;
+      for (let i = 0; i < commonPrefixLen; i++) {
+        counts[i] = (counts[i] ?? 1) + 1;
+      }
+      for (let i = commonPrefixLen; i < next.length; i++) {
+        counts[i] = 1;
+      }
+
+      this._prev = next;
+    }
+
+    let stableLen = 0;
+    while (stableLen < next.length && counts[stableLen] >= this._minStableCount) {
+      stableLen++;
+    }
+
+    this._lastStableLen = stableLen;
+    this._renderIfVisible();
+  }
+
+  _syncVisibility() {
+    if (!this._container) return;
+    // Visibility is controlled solely by the checkbox.
+    this._container.hidden = !this._enabled;
+  }
+
+  _renderIfVisible() {
+    if (!this._active || !this._enabled) return;
+    if (!this._shape) return;
+    if (!this._slots) return;
+
+    if (this._lastCells) {
+      this._renderPrefix(this._lastCells, this._lastValues, this._lastStableLen);
+    } else {
+      this._clearRenderedSpans();
+    }
+  }
+
+  _ensureSlots() {
+    if (!this._active || !this._shape || !this._container) return;
+    if (this._slots?.length === this._shape.numCells) return;
+
+    clearDOMNode(this._container);
+
+    const numCells = this._shape?.numCells ?? 0;
+    const slots = new Array(numCells);
+
+    for (let i = 0; i < numCells; i++) {
+      const span = document.createElement('span');
+      span.hidden = true;
+      span.onmouseover = () => {
+        if (!this._highlighter) return;
+        const cellId = span.dataset.cellId;
+        if (!cellId) return;
+        this._hoverCells[0] = cellId;
+        this._highlighter.setCells(this._hoverCells);
+      };
+      span.onmouseout = () => this._highlighter?.clear();
+      slots[i] = span;
+      this._container.appendChild(span);
+      this._container.appendChild(document.createTextNode(' '));
+    }
+
+    this._slots = slots;
+    this._renderedLen = 0;
+  }
+
+  _clearRenderedSpans() {
+    if (!this._slots || !this._renderedLen) return;
+    for (let i = 0; i < this._renderedLen; i++) {
+      this._slots[i].hidden = true;
+    }
+    this._renderedLen = 0;
+  }
+
+  _renderPrefix(cells, values, len = 0) {
+    if (!this._slots) return;
+
+    const prevLen = this._renderedLen;
+    const nextLen = len;
+
+    // Update visible prefix spans.
+    for (let i = 0; i < nextLen; i++) {
+      const cellIndex = cells[i];
+      const cellId = this._shape.makeCellIdFromIndex(cellIndex);
+      const span = this._slots[i];
+
+      const value = values ? values[i] : 0;
+      const prevValue = span.dataset.v ? +span.dataset.v : 0;
+
+      span.hidden = false;
+
+      if (span.dataset.cellId !== cellId || prevValue !== value) {
+        span.dataset.cellId = cellId;
+        span.dataset.v = '' + value;
+        span.textContent = `${cellId}=${value || '?'}`;
+      }
+    }
+
+    // Hide any spans that are no longer part of the rendered prefix.
+    for (let i = nextLen; i < prevLen; i++) {
+      this._slots[i].hidden = true;
+    }
+
+    this._renderedLen = nextLen;
+  }
+}
+
 class DebugManager {
   DEBUG_PARAM_NAME = 'debug';
 
@@ -125,13 +343,17 @@ class DebugManager {
     this._infoOverlay = null;
     this._candidateDisplay = null;
     this._checkboxes = [
-      ['exportConflictHeatmap', document.getElementById('conflict-heatmap-checkbox')]
+      ['exportConflictHeatmap', document.getElementById('conflict-heatmap-checkbox')],
     ];
+    this._stackTraceCheckbox = document.getElementById('stack-trace-checkbox');
     this._logLevelElem = document.getElementById('debug-log-level');
 
     this._debugCellHighlighter = null;
     this._displayContainer = displayContainer;
     this._debugPuzzleSrc = document.getElementById('debug-puzzle-src');
+
+    this._stackTraceView = new DebugStackTraceView(
+      this._container.querySelector('.debug-stack-trace'));
 
     this._initializeState();
   }
@@ -195,6 +417,8 @@ class DebugManager {
     // Setup elements.
     this._debugCellHighlighter = this._displayContainer.createCellHighlighter(
       'debug-hover');
+    this._stackTraceView.setHighlighter(this._debugCellHighlighter);
+    this._stackTraceView.activate();
     this._infoOverlay = new InfoOverlay(this._displayContainer);
     this._candidateDisplay = new CellValueDisplay(
       this._displayContainer.getNewGroup('debug-candidate-group'));
@@ -208,6 +432,21 @@ class DebugManager {
       element.onchange = () => {
         sessionAndLocalStorage.setItem(key, element.checked);
       }
+    }
+
+    // Stack trace checkbox controls UI visibility only.
+    {
+      const element = this._stackTraceCheckbox;
+      const value = sessionAndLocalStorage.getItem('showStackTrace') ??
+        sessionAndLocalStorage.getItem('exportStackTrace');
+      if (value !== undefined) {
+        element.checked = (value === 'true');
+      }
+      this._stackTraceView.setEnabled(element.checked);
+      element.onchange = () => {
+        sessionAndLocalStorage.setItem('showStackTrace', element.checked);
+        this._stackTraceView.setEnabled(element.checked);
+      };
     }
 
     // Log level selector.
@@ -329,6 +568,8 @@ class DebugManager {
       )
     );
     options.logLevel = parseInt(this._logLevelElem.value);
+    // Only request stack traces if enabled when the solve starts.
+    options.exportStackTrace = !!this._stackTraceCheckbox?.checked;
     return options;
   }
 
@@ -339,6 +580,7 @@ class DebugManager {
   reshape(shape) {
     this.clear();
     this._shape = shape;
+    this._stackTraceView.reshape(shape);
     this._infoOverlay?.reshape(shape);
     this._candidateDisplay?.reshape(shape);
   }
@@ -355,6 +597,8 @@ class DebugManager {
       count: 0,
       currentSpan: null,
     };
+
+    this._stackTraceView.clear();
   }
 
   _update(data) {
@@ -391,6 +635,10 @@ class DebugManager {
         elem.appendChild(count);
         counterView.appendChild(elem);
       }
+    }
+
+    if (data.stackTrace !== undefined) {
+      this._stackTraceView.update(data.stackTrace);
     }
   }
 
