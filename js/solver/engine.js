@@ -320,9 +320,7 @@ class DebugLogger {
     }
     if (this._debugOptions.exportStackTrace) {
       const stackTrace = this._solver._internalSolver.getStackTrace();
-      if (stackTrace) {
-        result.stackTrace = stackTrace;
-      }
+      result.stackTrace = stackTrace;
     }
     if (this._adhHocCounters.size) {
       result.counters = this._adhHocCounters;
@@ -525,7 +523,7 @@ class InternalSolver {
 
   static _debugValueBuffer = new Uint16Array(SHAPE_MAX.numCells);
   getStackTrace() {
-    if (this._atStart || this.done) return null;
+    if (this._atStart || this.done || !this._currentRecFrame) return null;
 
     const stackFrame = this._currentRecFrame;
     const cellDepth = stackFrame.cellDepth;

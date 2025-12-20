@@ -972,6 +972,7 @@ footer {
     padding: 4px 6px;
     overflow-x: auto;
     white-space: nowrap;
+    min-height: 1.2em;
 
     span {
       cursor: pointer;
