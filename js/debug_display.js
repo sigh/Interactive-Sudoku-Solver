@@ -16,7 +16,10 @@
 
 const {
   sessionAndLocalStorage,
+  deferUntilAnimationFrame,
+  createSvgElement,
   clearDOMNode,
+  memoize,
 } = await import('./util.js' + self.VERSION_PARAM);
 
 const {
@@ -26,30 +29,47 @@ const {
 
 const { SudokuParser } = await import('./sudoku_parser.js' + self.VERSION_PARAM);
 
+const { FlameGraphStore } = await import('./flame_graph_store.js' + self.VERSION_PARAM);
+
 const debugModule = await import('./debug.js' + self.VERSION_PARAM);
 
 export class DebugManager {
   constructor(displayContainer, constraintManager) {
+    // External dependencies.
+    this._displayContainer = displayContainer;
     this._constraintManager = constraintManager;
+
+    // DOM.
     this._container = document.getElementById('debug-container');
     this._logView = document.getElementById('debug-logs');
     this._counterView = document.getElementById('debug-counters');
-    this._enabled = false;
-    this._shape = null;
-    this._infoOverlay = null;
-    this._candidateDisplay = null;
+    this._debugPuzzleSrc = document.getElementById('debug-puzzle-src');
+    this._stackTraceCheckbox = document.getElementById('stack-trace-checkbox');
+    this._logLevelElem = document.getElementById('debug-log-level');
     this._checkboxes = [
       ['exportConflictHeatmap', document.getElementById('conflict-heatmap-checkbox')],
     ];
-    this._stackTraceCheckbox = document.getElementById('stack-trace-checkbox');
-    this._logLevelElem = document.getElementById('debug-log-level');
 
-    this._debugCellHighlighter = null;
-    this._displayContainer = displayContainer;
-    this._debugPuzzleSrc = document.getElementById('debug-puzzle-src');
+    // State.
+    this._enabled = false;
+    this._shape = null;
 
+    // UI helpers.
+    this._infoOverlay = new InfoOverlay(this._displayContainer);
+    this._debugCellHighlighter = this._displayContainer.createCellHighlighter(
+      'debug-hover');
+    this._candidateDisplay = null;
+
+    // Views.
     this._stackTraceView = new DebugStackTraceView(
-      this._container.querySelector('.debug-stack-trace'));
+      this._container.querySelector('.debug-stack-trace'), {
+      infoOverlay: this._infoOverlay,
+      highlighter: this._debugCellHighlighter,
+    });
+    this._flameGraphView = new DebugFlameGraphView(this._stackTraceView.getContainer(), {
+      infoOverlay: this._infoOverlay,
+      highlighter: this._debugCellHighlighter,
+    });
 
     this._initialize();
   }
@@ -59,12 +79,6 @@ export class DebugManager {
     Object.assign(self, debugModule);
 
     // UI wiring.
-    this._infoOverlay = new InfoOverlay(this._displayContainer);
-    this._stackTraceView.setInfoOverlay(this._infoOverlay);
-    this._debugCellHighlighter = this._displayContainer.createCellHighlighter(
-      'debug-hover');
-    this._stackTraceView.setHighlighter(this._debugCellHighlighter);
-    this._stackTraceView.activate();
     this._candidateDisplay = new CellValueDisplay(
       this._displayContainer.getNewGroup('debug-candidate-group'));
 
@@ -82,17 +96,42 @@ export class DebugManager {
     // Stack trace checkbox controls only whether the footer is visible.
     // Whether the solver exports stack traces is decided at solve start via getOptions().
     {
-      const element = this._stackTraceCheckbox;
-      const value = sessionAndLocalStorage.getItem('showStackTrace') ??
-        sessionAndLocalStorage.getItem('exportStackTrace');
-      if (value !== undefined) {
-        element.checked = (value === 'true');
+      const stackTraceCheckbox = this._stackTraceCheckbox;
+
+      const stackTraceFooter = document.getElementById('debug-stack-trace-footer');
+      const flameToggleButton = document.getElementById('debug-flame-toggle');
+
+      const showStackTraceKey = 'showStackTrace';
+      const flameExpandedKey = 'debugFlameExpanded';
+
+      const savedShowStackTrace = sessionAndLocalStorage.getItem(showStackTraceKey);
+      if (savedShowStackTrace !== undefined) {
+        stackTraceCheckbox.checked = (savedShowStackTrace === 'true');
       }
-      this._stackTraceView.setEnabled(element.checked);
-      element.onchange = () => {
-        sessionAndLocalStorage.setItem('showStackTrace', element.checked);
-        this._stackTraceView.setEnabled(element.checked);
+
+      const applyFlameExpanded = (expanded) => {
+        flameToggleButton.classList.toggle('expanded', expanded);
+        this._flameGraphView.setCollapsed(!expanded);
+        sessionAndLocalStorage.setItem(flameExpandedKey, expanded.toString());
       };
+
+      // Flame graph is visible by default.
+      const savedFlameExpanded = sessionAndLocalStorage.getItem(flameExpandedKey);
+      applyFlameExpanded(savedFlameExpanded === undefined ? true : (savedFlameExpanded === 'true'));
+
+      flameToggleButton.addEventListener('click', () => {
+        applyFlameExpanded(!flameToggleButton.classList.contains('expanded'));
+      });
+
+      const applyStackTraceEnabled = (enabled) => {
+        this._stackTraceView.setEnabled(enabled);
+        this._flameGraphView.setEnabled(enabled);
+        stackTraceFooter.hidden = !enabled;
+        sessionAndLocalStorage.setItem(showStackTraceKey, enabled.toString());
+      };
+
+      applyStackTraceEnabled(stackTraceCheckbox.checked);
+      stackTraceCheckbox.onchange = () => applyStackTraceEnabled(stackTraceCheckbox.checked);
     }
 
     // Log level selector.
@@ -230,6 +269,7 @@ export class DebugManager {
     this.clear();
     this._shape = shape;
     this._stackTraceView.reshape(shape);
+    this._flameGraphView.reshape(shape);
     this._infoOverlay.reshape(shape);
     this._candidateDisplay.reshape(shape);
   }
@@ -248,6 +288,7 @@ export class DebugManager {
     };
 
     this._stackTraceView.clear();
+    this._flameGraphView.clear();
   }
 
   _update(data) {
@@ -287,7 +328,8 @@ export class DebugManager {
     }
 
     if (data.stackTrace !== undefined) {
-      this._stackTraceView.update(data.stackTrace);
+      const stableLen = this._stackTraceView.update(data.stackTrace);
+      this._flameGraphView.update(data.stackTrace, stableLen);
     }
   }
 
@@ -493,49 +535,57 @@ export class InfoOverlay {
 }
 
 export class DebugStackTraceView {
-  constructor(containerElem) {
+  constructor(containerElem, { highlighter, infoOverlay }) {
+    // DOM.
     this._container = containerElem;
+
+    // Dependencies.
     this._shape = null;
-    this._highlighter = null;
-    this._infoOverlay = null;
+    this._highlighter = highlighter;
+    this._infoOverlay = infoOverlay;
 
-    // Active means the debug UI has been loaded (so it's worth allocating DOM).
-    this._active = false;
-
+    // Lifecycle.
     this._enabled = false;
 
-    this._prev = null;
-    this._counts = [];
-    this._minStableCount = 4;
-
+    // Trace state.
     this._lastCells = null;
     this._lastValues = null;
     this._lastStableLen = 0;
 
+    this._prev = null;
+    this._counts = [];
+
+    // Render state.
     this._slots = null;
     this._renderedLen = 0;
 
+    // Hover state.
     this._hoverStepIndex = null;
 
-    if (this._container) {
-      this._container.hidden = true;
-    }
+    // Hover updates only on mouse movement; DOM updates should not affect it.
+    this._container.onmousemove = (e) => {
+      if (!this._enabled) return;
+
+      const target = e.target;
+      const el = (target instanceof Element) ? target : target?.parentElement;
+      const span = el?.closest?.('span');
+      if (!span || !this._container.contains(span) || span.hidden) {
+        this._setHoverStepIndex(null);
+        return;
+      }
+
+      const idx = parseInt(span.dataset.stepIndex || '', 10);
+      this._setHoverStepIndex(Number.isFinite(idx) ? idx : null);
+    };
+    this._container.onmouseleave = () => {
+      this._setHoverStepIndex(null);
+    };
+
+    this._container.hidden = true;
   }
 
-  setHighlighter(highlighter) {
-    this._highlighter = highlighter;
-  }
-
-  setInfoOverlay(infoOverlay) {
-    this._infoOverlay = infoOverlay;
-  }
-
-  activate() {
-    if (this._active) return;
-    this._active = true;
-    this._syncVisibility();
-    this._ensureSlots();
-    this._renderIfVisible();
+  getContainer() {
+    return this._container;
   }
 
   setEnabled(enabled) {
@@ -565,7 +615,7 @@ export class DebugStackTraceView {
     this._lastStableLen = 0;
 
     this._clearRenderedSpans();
-    this._highlighter?.clear();
+    this._highlighter.clear();
   }
 
   _resetTrace() {
@@ -582,13 +632,19 @@ export class DebugStackTraceView {
   }
 
   update(stack) {
-    if (!stack) return this._resetTrace();
+    if (!stack) {
+      this._resetTrace();
+      return 0;
+    }
 
     const next = (stack.cells?.length) ? stack.cells : null;
     this._lastCells = next;
     this._lastValues = next ? stack.values : null;
 
-    if (!next) return this._resetTrace();
+    if (!next) {
+      this._resetTrace();
+      return 0;
+    }
 
     const prev = this._prev;
     const counts = this._counts;
@@ -616,25 +672,24 @@ export class DebugStackTraceView {
     }
 
     let stableLen = 0;
-    while (stableLen < next.length && counts[stableLen] >= this._minStableCount) {
+    const minStableCount = 4;
+    while (stableLen < next.length && counts[stableLen] >= minStableCount) {
       stableLen++;
     }
 
     this._lastStableLen = stableLen;
     this._renderIfVisible();
 
-    // If the user is hovering a step, keep hover effects in sync with new data.
-    this._syncHover();
+    return stableLen;
   }
 
   _syncVisibility() {
-    if (!this._container) return;
     // Visibility is controlled solely by the checkbox.
     this._container.hidden = !this._enabled;
   }
 
   _renderIfVisible() {
-    if (!this._active || !this._enabled) return;
+    if (!this._enabled) return;
     if (!this._shape) return;
     if (!this._slots) return;
 
@@ -646,7 +701,7 @@ export class DebugStackTraceView {
   }
 
   _ensureSlots() {
-    if (!this._active || !this._shape || !this._container) return;
+    if (!this._shape) return;
     if (this._slots?.length === this._shape.numCells) return;
 
     clearDOMNode(this._container);
@@ -657,15 +712,9 @@ export class DebugStackTraceView {
     for (let i = 0; i < numCells; i++) {
       const span = document.createElement('span');
       span.hidden = true;
-      span.onmouseover = () => {
-        this._setHoverStepIndex(i);
-      };
-      span.onmouseout = () => {
-        this._setHoverStepIndex(null);
-      };
+      span.dataset.stepIndex = i;
       slots[i] = span;
       this._container.appendChild(span);
-      this._container.appendChild(document.createTextNode(' '));
     }
 
     this._slots = slots;
@@ -673,40 +722,35 @@ export class DebugStackTraceView {
   }
 
   _setHoverStepIndex(stepIndex) {
+    if (this._hoverStepIndex === stepIndex) return;
     this._hoverStepIndex = stepIndex;
     this._syncHover();
   }
 
   _syncHover() {
-    const highlighter = this._highlighter;
-    const infoOverlay = this._infoOverlay;
     const shape = this._shape;
     const stepIndex = this._hoverStepIndex;
     const cells = this._lastCells;
 
     if (!shape || stepIndex === null || !cells?.length) {
-      highlighter?.clear();
-      infoOverlay?.setValues();
+      this._highlighter.clear();
+      this._infoOverlay.setValues();
       return;
     }
 
     const idx = Math.min(stepIndex, cells.length - 1);
 
     // Highlight the hovered step's cell.
-    if (highlighter) {
-      const cellId = shape.makeCellIdFromIndex(cells[idx]);
-      highlighter.setCells([cellId]);
-    }
+    const cellId = shape.makeCellIdFromIndex(cells[idx]);
+    this._highlighter.setCells([cellId]);
 
     // Show values up to (and including) the hovered step.
-    if (infoOverlay) {
-      const values = this._lastValues;
-      const gridValues = new Array(shape.numCells);
-      for (let i = 0; i <= idx; i++) {
-        gridValues[cells[i]] = values[i];
-      }
-      infoOverlay.setValues(gridValues);
+    const values = this._lastValues;
+    const gridValues = new Array(shape.numCells);
+    for (let i = 0; i <= idx; i++) {
+      gridValues[cells[i]] = values[i];
     }
+    this._infoOverlay.setValues(gridValues);
   }
 
   _clearRenderedSpans() {
@@ -734,9 +778,12 @@ export class DebugStackTraceView {
 
       span.hidden = false;
 
+      // Match flame-graph colors for easier visual association.
+      span.style.backgroundColor = getColorForValue(value, this._shape.numValues);
+
       if (span.dataset.cellId !== cellId || prevValue !== value) {
         span.dataset.cellId = cellId;
-        span.dataset.v = '' + value;
+        span.dataset.v = value;
         span.textContent = `${cellId}=${value}`;
       }
     }
@@ -749,3 +796,371 @@ export class DebugStackTraceView {
     this._renderedLen = nextLen;
   }
 }
+
+export class DebugFlameGraphView {
+  constructor(stackTraceElem, { highlighter, infoOverlay }) {
+    // Dependencies.
+    this._shape = null;
+    this._highlighter = highlighter;
+    this._infoOverlay = infoOverlay;
+
+    // Lifecycle.
+    this._enabled = false;
+    this._collapsed = false;
+
+    // Data.
+    this._store = new FlameGraphStore();
+
+    // Render scheduling.
+    // Centralize gating here so callers can always just call `_render()`.
+    const renderDeferred = deferUntilAnimationFrame(this._renderImpl.bind(this));
+    this._render = () => {
+      if (!this._enabled || this._collapsed) return;
+      renderDeferred();
+    };
+
+    this._hover = {
+      depth: null,
+      sampleIndex: null,
+
+      nodeOutline: null,
+      segRect: null,
+    };
+
+
+    const flameContainer = document.createElement('div');
+    flameContainer.className = 'debug-flame-graph';
+    flameContainer.hidden = true;
+
+    const tooltip = document.createElement('div');
+    tooltip.className = 'debug-flame-tooltip';
+    tooltip.hidden = true;
+    // Prevent the tooltip from breaking hover hit-testing.
+    tooltip.style.pointerEvents = 'none';
+    flameContainer.appendChild(tooltip);
+    this._tooltip = tooltip;
+
+    const header = stackTraceElem.closest('.debug-stack-trace-header');
+    header.insertAdjacentElement('afterend', flameContainer);
+    this._container = flameContainer;
+
+    // Allocate the SVG.
+    {
+      const svg = createSvgElement('svg');
+      svg.setAttribute('width', '100%');
+      svg.setAttribute('height', '100%');
+
+      this._container.appendChild(svg);
+      this._svg = svg;
+    }
+
+    // Hover uses event delegation on the SVG rather than document.elementFromPoint().
+    this._svg.addEventListener('pointermove', (e) => this._syncHoverFromEvent(e), { passive: true });
+    this._svg.addEventListener('pointerleave', () => this._clearHover(), { passive: true });
+
+    this._syncVisibility();
+
+    // Re-render on resize even if data didn't change.
+    this._svgRect = this._svg.getBoundingClientRect();
+    this._resizeObserver = new ResizeObserver(() => {
+      this._svgRect = this._svg.getBoundingClientRect();
+      this._render()
+    });
+    this._resizeObserver.observe(this._container);
+  }
+
+  setEnabled(enabled) {
+    this._enabled = !!enabled;
+    this._syncVisibility();
+    if (!this._enabled) {
+      this._clearHover();
+      return;
+    }
+
+    this._render();
+  }
+
+  setCollapsed(collapsed) {
+    this._collapsed = !!collapsed;
+    this._syncVisibility();
+    if (this._collapsed) {
+      this._clearHover();
+      return;
+    }
+    this._render();
+  }
+
+  reshape(shape) {
+    this._shape = shape;
+
+    this._render();
+  }
+
+  clear() {
+    this._store.clear();
+    this._clearHover();
+
+    clearDOMNode(this._svg);
+
+    this._render();
+  }
+
+  update(stackTrace, stableLen) {
+    if (this._store.appendFromStackTrace(stackTrace, stableLen)) {
+      this._render();
+    }
+  }
+
+  _syncVisibility() {
+    this._container.hidden = !this._enabled || this._collapsed;
+  }
+
+  _renderImpl() {
+    const width = this._svgRect.width;
+    const height = this._svgRect.height;
+    if (!width || !height) return;
+    const numSamples = this._store.getNumSamples();
+    if (!numSamples) return;
+    if (!this._shape) return;
+
+    const ROW_HEIGHT = 16;
+    const maxDepth = Math.max(1, Math.floor(height / ROW_HEIGHT));
+    const MIN_LABEL_WIDTH = 34;
+    const scale = width / numSamples;
+
+    clearDOMNode(this._svg);
+
+    // Render into two groups so overlays always sit on top.
+    const segLayer = createSvgElement('g');
+    const overlayLayer = createSvgElement('g');
+    this._svg.append(segLayer);
+    this._svg.append(overlayLayer);
+
+    const nodesByDepth = this._store.nodesByDepth;
+    const maxDepthAvail = Math.min(maxDepth, nodesByDepth.length);
+
+    for (let depth = 0; depth < maxDepthAvail; depth++) {
+      const row = nodesByDepth[depth];
+      if (!row?.length) continue;
+
+      const y = depth * ROW_HEIGHT;
+      const h = ROW_HEIGHT - 1;
+
+      for (let i = 0; i < row.length; i++) {
+        const node = row[i];
+
+        const nodeX0 = node.start * scale;
+        const nodeX1 = node.end * scale;
+        const nodeW = nodeX1 - nodeX0;
+        if (nodeW <= 0) continue;
+
+        const outline = createSvgElement('path');
+        outline.classList.add('debug-flame-node-outline');
+        // Overlays should not intercept hover hit-testing.
+        outline.style.pointerEvents = 'none';
+        outline.setAttribute('d', `M ${nodeX0} ${y} V ${y + h} H ${nodeX0 + nodeW} V ${y} H ${nodeX0} Z`);
+        outline.setAttribute('stroke-dasharray', `${h} 100000`);
+        outline.dataset.flameDepth = node.depth;
+        outline.dataset.flameSampleIndex = node.start;
+        overlayLayer.appendChild(outline);
+
+        if (nodeW >= MIN_LABEL_WIDTH) {
+          const cellId = this._shape.makeCellIdFromIndex(node.cellIndex);
+          const text = createSvgElement('text');
+          text.classList.add('debug-flame-label');
+          text.style.pointerEvents = 'none';
+          text.setAttribute('x', nodeX0 + 2);
+          text.setAttribute('y', y + h - 3);
+          text.textContent = cellId;
+          overlayLayer.appendChild(text);
+        }
+
+        const segs = node.segments;
+        for (let j = 0; j < segs.length; j++) {
+          const seg = segs[j];
+          const x0 = seg.start * scale;
+          const x1 = seg.end * scale;
+          const w = x1 - x0;
+          if (w <= 0) continue;
+
+          const color = getColorForValue(seg.value, this._shape.numValues);
+
+          const rect = createSvgElement('rect');
+          rect.classList.add('debug-flame-rect');
+          rect.setAttribute('x', x0);
+          rect.setAttribute('y', y);
+          rect.setAttribute('width', w);
+          rect.setAttribute('height', h);
+          rect.setAttribute('fill', color);
+          rect.setAttribute('stroke', color);
+          rect.dataset.flameDepth = depth;
+          rect.dataset.flameSampleIndex = seg.start;
+          segLayer.appendChild(rect);
+        }
+      }
+    }
+
+    // Hover/tooltip only update on mousemove/mouseleave.
+    // But re-apply hover styling after re-render so it doesn't disappear.
+    if (this._hover.sampleIndex !== null) {
+      this._reapplyHoverStylesAfterRender();
+    }
+  }
+
+  _syncHoverFromEvent(e) {
+    if (!this._enabled) return;
+
+    const rect = e.target.closest('rect.debug-flame-rect');
+    if (!rect) {
+      this._clearHover();
+      return;
+    }
+
+    const depth = parseInt(rect.dataset.flameDepth, 10);
+    const sampleIndex = parseInt(rect.dataset.flameSampleIndex, 10);
+    const entry = this._store.getDepthEntryAtSample(depth, sampleIndex);
+    if (!entry) {
+      this._clearHover();
+      return;
+    }
+
+    this._setHover(depth, sampleIndex, rect, { clientX: e.clientX, clientY: e.clientY });
+  }
+
+  _setHover(depth, sampleIndex, rectEl, pointer) {
+    const hover = this._hover;
+    if (sampleIndex !== hover?.sampleIndex || depth !== hover?.depth) {
+      hover.depth = depth;
+      hover.sampleIndex = sampleIndex;
+      this._syncHover();
+      this._applyHoverStyles(rectEl);
+    }
+
+    this._updateTooltip(pointer);
+  }
+
+  _updateTooltip(pointer) {
+    if (!this._shape) return;
+
+    const tooltip = this._tooltip;
+
+    const hover = this._hover;
+    if (hover.sampleIndex === null) return;
+    const entry = this._store.getDepthEntryAtSample(hover.depth, hover.sampleIndex);
+    if (!entry) return;
+
+    const cellId = this._shape.makeCellIdFromIndex(entry.node.cellIndex);
+    const span = entry.segment.end - entry.segment.start;
+    tooltip.textContent = `${cellId}=${entry.segment.value} | span ${span}`;
+    tooltip.hidden = false;
+
+    const container = this._container;
+    const containerRect = container.getBoundingClientRect();
+    const OFFSET_PX = 10;
+    const EDGE_PADDING_PX = 2;
+
+    const desiredLeft = (pointer.clientX - containerRect.left) + OFFSET_PX;
+    const desiredTop = (pointer.clientY - containerRect.top) + OFFSET_PX;
+
+    const maxLeft = container.clientWidth - tooltip.offsetWidth - EDGE_PADDING_PX;
+    const maxTop = container.clientHeight - tooltip.offsetHeight - EDGE_PADDING_PX;
+
+    const left = Math.min(
+      Math.max(desiredLeft, EDGE_PADDING_PX),
+      Math.max(EDGE_PADDING_PX, maxLeft),
+    );
+    const top = Math.min(
+      Math.max(desiredTop, EDGE_PADDING_PX),
+      Math.max(EDGE_PADDING_PX, maxTop),
+    );
+
+    tooltip.style.left = left + 'px';
+    tooltip.style.top = top + 'px';
+  }
+
+  _clearHover() {
+    const hover = this._hover;
+    if (hover.sampleIndex === null) return;
+    hover.depth = null;
+    hover.sampleIndex = null;
+
+    this._clearHoverStyles();
+    this._highlighter.clear();
+    this._infoOverlay.setValues();
+    this._tooltip.hidden = true;
+  }
+
+  _syncHover() {
+    const hover = this._hover;
+    if (!this._shape || hover.sampleIndex === null) return;
+    const entry = this._store.getDepthEntryAtSample(hover.depth, hover.sampleIndex);
+    if (!entry) return;
+
+    const cellId = this._shape.makeCellIdFromIndex(entry.node.cellIndex);
+    this._highlighter.setCells([cellId]);
+
+    // Show values up to (and including) the hovered depth at the hovered time.
+    const hoverDepth = hover.depth;
+    const hoverSampleIndex = hover.sampleIndex;
+
+    const stackSegs = this._store.getStackSegmentsAtSample(hoverSampleIndex, hoverDepth);
+    const gridValues = new Array(this._shape.numCells);
+    for (let i = 0; i < stackSegs.length; i++) {
+      const s = stackSegs[i];
+      gridValues[s.node.cellIndex] = s.segment.value;
+    }
+    this._infoOverlay.setValues(gridValues);
+  }
+
+  _clearHoverStyles() {
+    const hover = this._hover;
+    if (hover.nodeOutline) {
+      hover.nodeOutline.classList.remove('debug-flame-node-hover');
+      hover.nodeOutline = null;
+    }
+
+    if (hover.segRect) {
+      hover.segRect.classList.remove('debug-flame-seg-hover');
+      hover.segRect = null;
+    }
+  }
+
+  _applyHoverStyles(rectEl) {
+    this._clearHoverStyles();
+    const hover = this._hover;
+    if (hover.sampleIndex === null) return;
+
+    const entry = this._store.getDepthEntryAtSample(hover.depth, hover.sampleIndex);
+    if (!entry) return;
+
+    // Highlight the whole cell-node via its outline element.
+    const outline = this._svg.querySelector(
+      `.debug-flame-node-outline[data-flame-depth="${entry.node.depth}"][data-flame-sample-index="${entry.node.start}"]`);
+    if (outline) {
+      outline.classList.add('debug-flame-node-hover');
+      hover.nodeOutline = outline;
+    }
+
+    // Highlight the specific hovered value segment.
+    if (rectEl) {
+      rectEl.classList.add('debug-flame-seg-hover');
+      hover.segRect = rectEl;
+    }
+  }
+
+  _reapplyHoverStylesAfterRender() {
+    const hover = this._hover;
+    if (hover.sampleIndex === null) return;
+    // Re-apply without changing the current hover selection (no hit-testing).
+    const rect = this._svg.querySelector(
+      `rect.debug-flame-rect[data-flame-depth="${hover.depth}"][data-flame-sample-index="${hover.sampleIndex}"]`);
+    this._applyHoverStyles(rect);
+  }
+}
+
+const getColorForValue = memoize((value, numValues) => {
+  const idx = ((value - 1) % numValues + numValues) % numValues;
+  const hue = (idx / numValues) * 360;
+  const lightness = idx % 2 ? 90 : 95;
+  return `hsl(${hue}, 80%, ${lightness}%)`;
+});

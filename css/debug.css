@@ -4,9 +4,9 @@
 }
 
 .debug-value-group {
-  opacity: 0.50;
+  opacity: 0.9;
   fill: rgb(255, 0, 225);
-  filter: drop-shadow(0px 0px 1px white);
+  filter: drop-shadow(0px 0px 2px white);
 }
 
 .highlight-group {
@@ -101,20 +101,138 @@
     }
   }
 
-  .debug-stack-trace {
+  .debug-stack-trace-footer {
     border-top: 1px solid var(--color-text-muted);
     font-size: var(--font-size-small);
     padding: 4px 6px;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    min-height: 1.2em;
+    gap: 4px;
+
+    &:empty {
+      display: none;
+    }
+  }
+
+  .debug-stack-trace-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  #debug-flame-toggle {
+    width: 1em;
+    height: 1em;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    box-shadow: none;
+    color: black;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+
+    &:hover,
+    &:active {
+      background: none;
+      box-shadow: none;
+    }
+
+    &:focus {
+      outline: none;
+    }
+
+    &:after {
+      content: "";
+      width: 6px;
+      height: 6px;
+      border-left: 1px solid currentColor;
+      border-top: 1px solid currentColor;
+      transform: rotate(-135deg);
+      pointer-events: none;
+    }
+
+    &.expanded:after {
+      transform: rotate(45deg);
+    }
+  }
+
+  .debug-stack-trace {
+    flex: 1;
+    min-width: 0;
+    padding: 0;
     overflow-x: auto;
     white-space: nowrap;
     min-height: 1.2em;
 
     span {
       cursor: pointer;
+      padding: 0 2px;
     }
 
     &:empty {
       display: none;
+    }
+  }
+
+  .debug-flame-graph {
+    position: relative;
+    height: 160px;
+    box-sizing: border-box;
+
+    svg {
+      display: block;
+    }
+
+    rect.debug-flame-rect {
+      stroke-opacity: 0.22;
+      shape-rendering: crispEdges;
+    }
+
+    .debug-flame-node-outline {
+      fill: none;
+      stroke: currentColor;
+      stroke-opacity: 0.35;
+      stroke-width: 1.5;
+      shape-rendering: crispEdges;
+      pointer-events: none;
+    }
+
+    text.debug-flame-label {
+      fill: currentColor;
+      opacity: 0.75;
+      font-size: 10px;
+      pointer-events: none;
+    }
+
+    .debug-flame-node-outline.debug-flame-node-hover {
+      stroke-opacity: 0.55;
+      stroke-width: 1.5;
+      stroke-dasharray: none;
+      filter: drop-shadow(0 0 5px black);
+    }
+
+    rect.debug-flame-rect.debug-flame-seg-hover {
+      filter: brightness(80%);
+    }
+
+    .debug-flame-tooltip {
+      position: absolute;
+      pointer-events: none;
+      z-index: 1;
+      padding: 2px 6px;
+      background: white;
+      border: 1px solid var(--color-border-light);
+      border-radius: 4px;
+      color: black;
+      font-size: 12px;
+      white-space: nowrap;
     }
   }
 }
