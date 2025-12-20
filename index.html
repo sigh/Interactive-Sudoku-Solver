@@ -127,7 +127,7 @@ layout: null
   <hr>
 
   <div id="debug-container" class="hide-unless-debug">
-    <div class=" debug-main">
+    <div class="debug-main">
       <div id="debug-panel">
         <label>
           Log level
@@ -162,7 +162,13 @@ layout: null
       <div id="debug-counters"></div>
       <div id="debug-logs"></div>
     </div>
-    <div class="debug-stack-trace"></div>
+    <div id="debug-stack-trace-footer" class="debug-stack-trace-footer">
+      <div class="debug-stack-trace-header">
+        <button type="button" id="debug-flame-toggle" class="expanded" title="Collapse flame graph"
+          aria-label="Toggle flame graph"></button>
+        <div class="debug-stack-trace"></div>
+      </div>
+    </div>
   </div>
 
   <div id="sudoku-container">
@@ -532,7 +538,8 @@ function accept(state) {
         <div id="ordinary-constraint-panel" class="constraint-panel constraint-panel-borderless">
           <div id="ordinary-constraints-wrapper" class="expandable-panel">
             <div class="expandable-panel-content">
-              <button id="ordinary-constraints-toggle" class="icon-button" title="Expand" style="display: none">
+              <button id="ordinary-constraints-toggle" class="icon-button collapse-arrow-toggle" title="Expand"
+                style="display: none">
                 <svg viewBox="0 0 24 24" width="24" height="24">
                   <path d="M16.59 8.59L12 13.17 7.41 8.59 6 10l6 6 6-6z" />
                 </svg>
