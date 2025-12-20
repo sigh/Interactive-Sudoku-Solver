@@ -1,3 +1,19 @@
+(() => {
+  // Load debug CSS once.
+
+  if (typeof document === 'undefined' || !document.head) return;
+
+  const id = 'debug-stylesheet';
+  if (document.getElementById(id)) return;
+
+  const href = new URL('../css/debug.css' + self.VERSION_PARAM, import.meta.url).toString();
+  const link = document.createElement('link');
+  link.id = id;
+  link.rel = 'stylesheet';
+  link.href = href;
+  document.head.appendChild(link);
+})();
+
 const {
   sessionAndLocalStorage,
   clearDOMNode,
