@@ -43,6 +43,17 @@ export class SeenCandidateSet {
     }
     return false;
   }
+
+  // Returns true if any already-fixed cell (those before cellDepth in
+  // cellOrder) contains an interesting value.
+  hasInterestingPrefix(grid, cellOrder, cellDepth) {
+    const candidates = this.candidates;
+    for (let i = 0; i < cellDepth; i++) {
+      const cell = cellOrder[i];
+      if (grid[cell] & ~candidates[cell]) return true;
+    }
+    return false;
+  }
 }
 
 export class CandidateSelector {
@@ -157,6 +168,9 @@ export class CandidateSelector {
     frontOffset++;
     cellOffset++;
 
+    // A 0-domain cell is an immediate contradiction.
+    if (count === 0) return 0;
+
     // If count was greater than 1, there were no singletons.
     if (count > 1) return frontOffset;
 
@@ -226,7 +240,18 @@ export class CandidateSelector {
     }
 
     // Find the best cell to explore next.
-    let cellOffset = this._selectBestCell(gridState, cellOrder, cellDepth);
+    const seenCandidateSet = this._seenCandidateSet;
+
+    // Determine if we should only select interesting cells.
+    // We only do this on new nodes, otherwise we degrade to probing.
+    const selectOnlyInterestingCells = (
+      isNewNode &&
+      seenCandidateSet.enabledInSolver &&
+      seenCandidateSet.hasInterestingPrefix(gridState, cellOrder, cellDepth)
+    );
+
+    let cellOffset = this._selectBestCell(
+      gridState, cellOrder, cellDepth, selectOnlyInterestingCells);
     const cell = cellOrder[cellOffset];
 
     // Find the next smallest value to try.
@@ -243,7 +268,14 @@ export class CandidateSelector {
         // If we have an option selector, then use it to select a value.
         value = this._optionSelector.selectValue(values, count);
       } else {
-        value = values & -values;
+        // If we already have solutions, prefer exploring a value that may lead
+        // to a new (interesting) solution first.
+        let choiceValues = values;
+        if (seenCandidateSet.enabledInSolver) {
+          const interesting = values & ~seenCandidateSet.candidates[cell];
+          if (interesting) choiceValues = interesting;
+        }
+        value = choiceValues & -choiceValues;
       }
 
       // Wait until our first guess to initialize the candidate finder set.
@@ -265,7 +297,7 @@ export class CandidateSelector {
 
       const state = this._candidateSelectionStates[cellDepth];
       state.score = score;
-      if (this._findCustomCandidates(gridState, cellOrder, cellDepth, state)) {
+      if (this._findCustomCandidates(gridState, cellOrder, cellDepth, selectOnlyInterestingCells, state)) {
         count = state.cells.length;
         value = state.value;
         if (count > 1 && this._optionSelector !== null) {
@@ -282,7 +314,7 @@ export class CandidateSelector {
     return [cellOffset, value, count];
   }
 
-  _selectBestCell(gridState, cellOrder, cellDepth) {
+  _selectBestCell(gridState, cellOrder, cellDepth, selectOnlyInterestingCells) {
     // Choose cells based on value count and number of backtracks it caused.
     // NOTE: The constraint handlers are written such that they detect domain
     // wipeouts (0 values), so we should never find them here. Even if they
@@ -293,16 +325,23 @@ export class CandidateSelector {
     const numCells = this._numCells;
     const conflictScores = this._conflictScores.scores;
 
+    const seenCandidates = selectOnlyInterestingCells
+      ? this._seenCandidateSet.candidates
+      : null;
+
     const valueInfo = this._conflictScores.getMaxValueScore();
     const maxValue = valueInfo.value;
     const maxValueScore = valueInfo.score;
 
     // Find the cell with the minimum score.
     let maxScore = -1;
-    let bestOffset = 0;
+    let bestOffset = -1;
 
     for (let i = cellDepth; i < numCells; i++) {
       const cell = cellOrder[i];
+      if (seenCandidates !== null) {
+        if ((gridState[cell] & ~seenCandidates[cell]) === 0) continue;
+      }
       const count = countOnes16bit(gridState[cell]);
       // If we have a single value then just use it - as it will involve no
       // guessing.
@@ -330,6 +369,13 @@ export class CandidateSelector {
       }
     }
 
+    // If we were filtering to interesting cells and found none, fall back to
+    // the default selection.
+    if (bestOffset === -1) {
+      return this._selectBestCell(
+        gridState, cellOrder, cellDepth, /* selectOnlyInterestingCells= */ false);
+    }
+
     if (maxScore === 0) {
       // It's rare that maxScore is 0 since all backtrack triggers must be 0.
       // However, in this case we can run a special loop to find the cell with
@@ -337,18 +383,26 @@ export class CandidateSelector {
       //
       // Looping over the cells again is not a concern since this is rare. It is
       // better to take it out of the main loop.
-      bestOffset = this._minCountCellIndex(gridState, cellOrder, cellDepth);
+      bestOffset = this._minCountCellIndex(
+        gridState, cellOrder, cellDepth, selectOnlyInterestingCells);
     }
 
     return bestOffset;
   }
 
   // Find the cell index with the minimum score. Return the index into cellOrder.
-  _minCountCellIndex(gridState, cellOrder, cellDepth) {
+  _minCountCellIndex(gridState, cellOrder, cellDepth, selectOnlyInterestingCells) {
+    const seenCandidates = selectOnlyInterestingCells ? this._seenCandidateSet.candidates : null;
+
     let minCount = 1 << 16;
-    let bestOffset = 0;
+    // We should always find something. -1 ensures we fail loudly if not.
+    let bestOffset = -1;
     const numCells = this._numCells;
     for (let i = cellDepth; i < numCells; i++) {
+      if (selectOnlyInterestingCells) {
+        const cell = cellOrder[i];
+        if ((gridState[cell] & ~seenCandidates[cell]) === 0) continue;
+      }
       const count = countOnes16bit(gridState[cellOrder[i]]);
       if (count < minCount) {
         bestOffset = i;
@@ -388,9 +442,10 @@ export class CandidateSelector {
     return [cellOffset, value, adjusted];
   }
 
-  _findCustomCandidates(gridState, cellOrder, cellDepth, result) {
+  _findCustomCandidates(gridState, cellOrder, cellDepth, selectOnlyInterestingCells, result) {
     const conflictScores = this._conflictScores.scores;
     const finderSet = this._candidateFinderSet;
+    const seenCandidates = this._seenCandidateSet.candidates;
     finderSet.clearMarks();
 
     // Determine the minimum value that the conflictScore can take to beat the
@@ -403,6 +458,11 @@ export class CandidateSelector {
       const cell = cellOrder[i];
       // Ignore cells which are too low in priority.
       if (conflictScores[cell] < minCS) continue;
+      if (selectOnlyInterestingCells) {
+        if ((gridState[cell] & ~seenCandidates[cell]) === 0) {
+          continue;
+        }
+      }
 
       // Score finders for this cell.
       const indexes = finderSet.getIndexesForCell(cell);
@@ -418,10 +478,34 @@ export class CandidateSelector {
     }
 
     if (!foundCandidate) return false;
+    // This shouldn't happen, but protect against candidate finder bugs.
+    if (result.cells.length < 2) return false;
 
     // Sort cells so that the highest scoring cells are last,  and hence
     // searched first.
     result.cells.sort((a, b) => conflictScores[a] - conflictScores[b]);
+
+
+    // If the highest scoring cell and value is not interesting, then discard this candidate.
+    // NOTE: The candidate finders can return arbitrary cells, so its hard
+    // to pre-filter in the main loop.
+    // We could do be smarter about this, but this is sufficient for now.
+    if (selectOnlyInterestingCells) {
+      let hasInterestingCell = false;
+
+      const value = result.value;
+      const lastIndex = result.cells.length - 1;
+      for (let i = lastIndex; i >= 0; i--) {
+        if (value & ~seenCandidates[result.cells[i]]) {
+          hasInterestingCell = true;
+          [result.cells[i], result.cells[lastIndex]] =
+            [result.cells[lastIndex], result.cells[i]];
+          break;
+        }
+      }
+      if (!hasInterestingCell) return false;
+    }
+
     return true;
   }
 
