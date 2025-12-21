@@ -3,10 +3,10 @@ const {
   isPlainObject,
   withDeadline,
   memoize,
-} = await import('./util.js' + self.VERSION_PARAM);
-const { SudokuParser, toShortSolution } = await import('./sudoku_parser.js' + self.VERSION_PARAM);
-const { PUZZLE_INDEX } = await import('../data/example_puzzles.js' + self.VERSION_PARAM);
-const { LookupTables } = await import('./solver/lookup_tables.js' + self.VERSION_PARAM);
+} = await import('../util.js' + self.VERSION_PARAM);
+const { SudokuParser, toShortSolution } = await import('../sudoku_parser.js' + self.VERSION_PARAM);
+const { PUZZLE_INDEX } = await import('../../data/example_puzzles.js' + self.VERSION_PARAM);
+const { LookupTables } = await import('../solver/lookup_tables.js' + self.VERSION_PARAM);
 
 const loadDataFile = async (name) => {
   const module = await import(name);
@@ -14,10 +14,10 @@ const loadDataFile = async (name) => {
 };
 
 export const debugFilesLoaded = Promise.all([
-  loadDataFile('../data/collections.js' + self.VERSION_PARAM),
-  loadDataFile('../data/jigsaw_layouts.js' + self.VERSION_PARAM),
-  loadDataFile('../data/invalid_jigsaw_layouts.js' + self.VERSION_PARAM),
-  loadDataFile('../data/jigsaw_box_layouts.js' + self.VERSION_PARAM),
+  loadDataFile('../../data/collections.js' + self.VERSION_PARAM),
+  loadDataFile('../../data/jigsaw_layouts.js' + self.VERSION_PARAM),
+  loadDataFile('../../data/invalid_jigsaw_layouts.js' + self.VERSION_PARAM),
+  loadDataFile('../../data/jigsaw_box_layouts.js' + self.VERSION_PARAM),
 ]);
 
 var TEST_TIMEOUT_MS = 0;
@@ -239,7 +239,7 @@ const getDefaultPuzzleRunner = memoize(() => {
     throw new Error('PuzzleRunner requires a solverFactory; provide a runner explicitly in non-browser environments.');
   }
 
-  const solverProxyModulePromise = import('./solution_controller.js' + self.VERSION_PARAM);
+  const solverProxyModulePromise = import('../solution_controller.js' + self.VERSION_PARAM);
   const solverFactory = async (...args) => {
     const { SolverProxy } = await solverProxyModulePromise;
     return SolverProxy.makeSolver(...args);

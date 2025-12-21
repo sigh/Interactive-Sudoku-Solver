@@ -5,7 +5,7 @@ import { runTest, logSuiteComplete } from './helpers/test_runner.js';
 
 ensureGlobalEnvironment();
 
-import { FlameGraphStore } from '../js/flame_graph_store.js';
+import { FlameGraphStore } from '../js/debug/flame_graph.js';
 
 const st = (cells, values) => ({ cells, values });
 const segInfo = (seg) => ({ start: seg.start, end: seg.end, value: seg.value });
