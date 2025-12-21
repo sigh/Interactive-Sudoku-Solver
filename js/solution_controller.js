@@ -72,7 +72,7 @@ class LazyDebugManager {
 
     if (!this._realPromise) {
       this._realPromise = (async () => {
-        const debugDisplay = await import('./debug_display.js' + self.VERSION_PARAM);
+        const debugDisplay = await import('./debug/debug_display.js' + self.VERSION_PARAM);
         const real = new debugDisplay.DebugManager(
           this._displayContainer,
           this._constraintManager);

@@ -11,7 +11,7 @@ ensureGlobalEnvironment({
   performance: perf,
 });
 
-const debugModule = await import('../js/debug.js');
+const debugModule = await import('../js/debug/debug.js');
 const {
   debugFilesLoaded,
   runSolveTests,
