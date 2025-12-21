@@ -464,6 +464,42 @@ await runTest('forBinaryKey equals with 9 values', () => {
 });
 
 // =============================================================================
+// binaryKeyIsTransitive
+// =============================================================================
+
+await runTest('binaryKeyIsTransitive should return true for equals', () => {
+  const tables = LookupTables.get(9);
+  const key = binaryKey((a, b) => a === b, 9);
+  assert.equal(tables.binaryKeyIsTransitive(key), true);
+});
+
+await runTest('binaryKeyIsTransitive should return true for less-than', () => {
+  const tables = LookupTables.get(9);
+  const key = binaryKey((a, b) => a < b, 9);
+  assert.equal(tables.binaryKeyIsTransitive(key), true);
+});
+
+await runTest('binaryKeyIsTransitive should return false for not-equal', () => {
+  const tables = LookupTables.get(9);
+  const key = binaryKey((a, b) => a !== b, 9);
+  assert.equal(tables.binaryKeyIsTransitive(key), false);
+});
+
+await runTest('binaryKeyIsTransitive should return false for difference>=2', () => {
+  const tables = LookupTables.get(9);
+  const key = binaryKey((a, b) => Math.abs(a - b) >= 2, 9);
+  assert.equal(tables.binaryKeyIsTransitive(key), false);
+});
+
+await runTest('binaryKeyIsTransitive should return true for always-true and always-false', () => {
+  const tables = LookupTables.get(9);
+  const keyTrue = binaryKey(() => true, 9);
+  const keyFalse = binaryKey(() => false, 9);
+  assert.equal(tables.binaryKeyIsTransitive(keyTrue), true);
+  assert.equal(tables.binaryKeyIsTransitive(keyFalse), true);
+});
+
+// =============================================================================
 // LookupTables.get memoization
 // =============================================================================
 

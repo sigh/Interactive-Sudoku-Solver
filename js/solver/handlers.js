@@ -412,13 +412,22 @@ export class HandlerUtil {
           : cellExclusions.getListExclusions(cells);
 
       if (exclusionCells && exclusionCells.length) {
-        // Remove the value from the exclusion cells.
-        for (let i = 0; i < exclusionCells.length; i++) {
-          if (grid[exclusionCells[i]] & value) {
-            if (!(grid[exclusionCells[i]] ^= value)) return false;
-            if (handlerAccumulator) handlerAccumulator.addForCell(exclusionCells[i]);
-          }
+        if (!this.removeRequiredValueExclusions(
+          grid, exclusionCells, value, handlerAccumulator)) {
+          return false;
         }
+      }
+    }
+
+    return true;
+  }
+
+  static removeRequiredValueExclusions(grid, exclusionCells, value, handlerAccumulator) {
+    // Remove the value from the exclusion cells.
+    for (let i = 0; i < exclusionCells.length; i++) {
+      if (grid[exclusionCells[i]] & value) {
+        if (!(grid[exclusionCells[i]] ^= value)) return false;
+        if (handlerAccumulator) handlerAccumulator.addForCell(exclusionCells[i]);
       }
     }
 
@@ -574,6 +583,21 @@ export class BinaryConstraint extends SudokuConstraintHandler {
   initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
     const lookupTables = LookupTables.get(shape.numValues);
     this._tables = lookupTables.forBinaryKey(this._key);
+    this._cellExclusions = cellExclusions;
+
+    this._exclusionsCellsForRequiredValues = null;
+
+    // If the key is transitive, then there will never be required value.
+    // This is a sufficient but not necessary condition. However, it is
+    // enough to identify that Thermo can't be optimized this way.
+    const isTransitive = lookupTables.binaryKeyIsTransitive(this._key);
+    if (!isTransitive) {
+      const pairIndex = (this.cells[0] << 8) | this.cells[1];
+      const exclusionsCells = cellExclusions.getPairExclusions(pairIndex);
+      if (exclusionsCells?.length) {
+        this._exclusionsCellsForRequiredValues = exclusionsCells;
+      }
+    }
 
     // If no values are legal at the start, then this constraint is invalid.
     return this._tables[0][lookupTables.allValues] !== 0;
@@ -589,6 +613,38 @@ export class BinaryConstraint extends SudokuConstraintHandler {
     if (!(v0New && v1New)) return false;
     if (v0 != v0New) handlerAccumulator.addForCell(this.cells[0]);
     if (v1 != v1New) handlerAccumulator.addForCell(this.cells[1]);
+
+    // If transitive, then required value exclusion is not possible.
+    if (this._exclusionsCellsForRequiredValues === null) return true;
+
+    // Require value exclusion is only needed if neither cell is fixed.
+    if ((v0New & (v0New - 1)) === 0 || (v1New & (v1New - 1)) === 0) return true;
+
+    // Check values that appear in both cells.
+    let values = v0New & v1New;
+    let requiredValues = 0;
+    while (values) {
+      const value = values & -values;
+      values ^= value;
+
+      // Check if this value is required if the other cell doesn't have it.
+      // Checking in one direction is sufficient, since this proves that no
+      // valid pair exists.
+      if ((this._tables[0][v0New ^ value] & v1New) === value) {
+        requiredValues |= value;
+      }
+    }
+
+    // Remove required value exclusions.
+    while (requiredValues) {
+      const value = requiredValues & -requiredValues;
+      requiredValues ^= value;
+      if (!HandlerUtil.removeRequiredValueExclusions(
+        grid, this._exclusionsCellsForRequiredValues, value, handlerAccumulator)) {
+        return false;
+      }
+    }
+
     return true;
   }
 }
