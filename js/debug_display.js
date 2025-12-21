@@ -19,6 +19,8 @@ const {
   deferUntilAnimationFrame,
   createSvgElement,
   clearDOMNode,
+  formatTimeMs,
+  formatFixedTruncated,
   memoize,
 } = await import('./util.js' + self.VERSION_PARAM);
 
@@ -328,8 +330,8 @@ export class DebugManager {
     }
 
     if (data.stackTrace !== undefined) {
-      const stableLen = this._stackTraceView.update(data.stackTrace);
-      this._flameGraphView.update(data.stackTrace, stableLen);
+      this._stackTraceView.update(data.stackTrace);
+      this._flameGraphView.update(data.stackTrace, data.timeMs);
     }
   }
 
@@ -649,10 +651,14 @@ export class DebugStackTraceView {
     const prev = this._prev;
     const counts = this._counts;
 
+    const MIN_STABLE_COUNT = 4;
+
     if (!prev) {
       this._prev = next;
       counts.length = next.length;
-      counts.fill(1);
+      // Start with the minimum stable count so that first sample can show
+      // something.
+      counts.fill(MIN_STABLE_COUNT);
     } else {
       let commonPrefixLen = 0;
       const minLen = Math.min(prev.length, next.length);
@@ -672,8 +678,7 @@ export class DebugStackTraceView {
     }
 
     let stableLen = 0;
-    const minStableCount = 4;
-    while (stableLen < next.length && counts[stableLen] >= minStableCount) {
+    while (stableLen < next.length && counts[stableLen] >= MIN_STABLE_COUNT) {
       stableLen++;
     }
 
@@ -861,11 +866,7 @@ export class DebugFlameGraphView {
     this._syncVisibility();
 
     // Re-render on resize even if data didn't change.
-    this._svgRect = this._svg.getBoundingClientRect();
-    this._resizeObserver = new ResizeObserver(() => {
-      this._svgRect = this._svg.getBoundingClientRect();
-      this._render()
-    });
+    this._resizeObserver = new ResizeObserver(() => this._render());
     this._resizeObserver.observe(this._container);
   }
 
@@ -905,8 +906,8 @@ export class DebugFlameGraphView {
     this._render();
   }
 
-  update(stackTrace, stableLen) {
-    if (this._store.appendFromStackTrace(stackTrace, stableLen)) {
+  update(stackTrace, timeMs) {
+    if (this._store.appendFromStackTrace(stackTrace, timeMs)) {
       this._render();
     }
   }
@@ -916,41 +917,76 @@ export class DebugFlameGraphView {
   }
 
   _renderImpl() {
-    const width = this._svgRect.width;
-    const height = this._svgRect.height;
+    const svgRect = this._svg.getBoundingClientRect();
+    const width = svgRect.width;
+    const height = svgRect.height;
     if (!width || !height) return;
+
     const numSamples = this._store.getNumSamples();
     if (!numSamples) return;
     if (!this._shape) return;
 
+    const AXIS_HEIGHT = 14;
     const ROW_HEIGHT = 16;
-    const maxDepth = Math.max(1, Math.floor(height / ROW_HEIGHT));
+    const maxDepth = Math.max(1, Math.ceil((height - AXIS_HEIGHT) / ROW_HEIGHT));
     const MIN_LABEL_WIDTH = 34;
-    const scale = width / numSamples;
+    const MIN_DISPLAY_NODE_SAMPLES = 2;
+
+    const nodesByDepth = this._store.nodesByDepth;
+    const endTimeMs = this._store.getEndTimeMs();
+    if (!endTimeMs) return;
+    const scale = width / endTimeMs;
 
     clearDOMNode(this._svg);
 
     // Render into two groups so overlays always sit on top.
+    const axisLayer = createSvgElement('g');
     const segLayer = createSvgElement('g');
     const overlayLayer = createSvgElement('g');
+    this._svg.append(axisLayer);
     this._svg.append(segLayer);
     this._svg.append(overlayLayer);
 
-    const nodesByDepth = this._store.nodesByDepth;
+    // Time axis labels at the top (no tick marks).
+    {
+      const approxLabelCount = 10;
+      const rawStep = endTimeMs / approxLabelCount;
+      const pow10 = Math.pow(10, Math.floor(Math.log10(rawStep)));
+      const f = rawStep / pow10;
+      const niceF = (f <= 1) ? 1 : (f <= 2) ? 2 : (f <= 5) ? 5 : 10;
+      const step = niceF * pow10;
+
+      for (let t = 0; t <= endTimeMs; t += step) {
+        const x = t * scale;
+
+        const label = createSvgElement('text');
+        label.classList.add('debug-flame-label');
+        label.style.pointerEvents = 'none';
+        label.setAttribute('x', x);
+        label.setAttribute('y', AXIS_HEIGHT - 2);
+        label.setAttribute('text-anchor', 'start');
+        label.textContent = formatTick(t);
+        axisLayer.appendChild(label);
+      }
+    }
+
     const maxDepthAvail = Math.min(maxDepth, nodesByDepth.length);
 
     for (let depth = 0; depth < maxDepthAvail; depth++) {
       const row = nodesByDepth[depth];
       if (!row?.length) continue;
 
-      const y = depth * ROW_HEIGHT;
+      const y = AXIS_HEIGHT + depth * ROW_HEIGHT;
       const h = ROW_HEIGHT - 1;
 
       for (let i = 0; i < row.length; i++) {
         const node = row[i];
 
-        const nodeX0 = node.start * scale;
-        const nodeX1 = node.end * scale;
+        // Always show root nodes even if small, otherwise skip small nodes.
+        if (depth > 0 && node.end - node.start < MIN_DISPLAY_NODE_SAMPLES) continue;
+
+        const nodeX0 = node.startTimeMs * scale;
+        const nodeX1 = node.endTimeMs * scale;
         const nodeW = nodeX1 - nodeX0;
         if (nodeW <= 0) continue;
 
@@ -978,8 +1014,8 @@ export class DebugFlameGraphView {
         const segs = node.segments;
         for (let j = 0; j < segs.length; j++) {
           const seg = segs[j];
-          const x0 = seg.start * scale;
-          const x1 = seg.end * scale;
+          const x0 = seg.startTimeMs * scale;
+          const x1 = seg.endTimeMs * scale;
           const w = x1 - x0;
           if (w <= 0) continue;
 
@@ -1050,8 +1086,13 @@ export class DebugFlameGraphView {
     if (!entry) return;
 
     const cellId = this._shape.makeCellIdFromIndex(entry.node.cellIndex);
-    const span = entry.segment.end - entry.segment.start;
-    tooltip.textContent = `${cellId}=${entry.segment.value} | span ${span}`;
+    const startTimeMs = entry.segment.startTimeMs;
+    const endTimeMs = entry.segment.endTimeMs;
+    const durationMs = (Number.isFinite(startTimeMs) && Number.isFinite(endTimeMs))
+      ? Math.max(0, endTimeMs - startTimeMs)
+      : null;
+    const durationText = (durationMs === null) ? '?' : formatTimeMs(durationMs);
+    tooltip.textContent = `${cellId}=${entry.segment.value} | ${durationText}`;
     tooltip.hidden = false;
 
     const container = this._container;
@@ -1162,5 +1203,12 @@ const getColorForValue = memoize((value, numValues) => {
   const idx = ((value - 1) % numValues + numValues) % numValues;
   const hue = (idx / numValues) * 360;
   const lightness = idx % 2 ? 90 : 95;
-  return `hsl(${hue}, 80%, ${lightness}%)`;
+  return `hsl(${hue}, 70%, ${lightness}%)`;
 });
+
+const formatTick = (ms) => {
+  if (ms === 0) return '0 s';
+  if (ms < 1e3) return `${ms} ms`;
+  if (ms < 60e3) return `${formatFixedTruncated(ms / 1e3, 3)} s`;
+  return `${formatFixedTruncated(ms / 60e3, 3)} m`;
+};

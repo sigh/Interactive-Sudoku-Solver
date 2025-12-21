@@ -101,6 +101,7 @@ const sendState = (extraState) => {
   });
   const debugState = workerSolver.debugState();
   if (debugState && Object.keys(debugState).length) {
+    debugState.timeMs = state.timeMs;
     self.postMessage({
       type: 'debug',
       data: debugState,

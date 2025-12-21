@@ -108,6 +108,7 @@
     display: flex;
     flex-direction: column;
     align-items: stretch;
+    contain: inline-size;
     min-height: 1.2em;
     gap: 4px;
 
@@ -164,16 +165,26 @@
   }
 
   .debug-stack-trace {
+    display: flex;
+    flex-wrap: wrap;
     flex: 1;
+    align-items: flex-start;
+    align-content: flex-start;
     min-width: 0;
     padding: 0;
     overflow-x: auto;
     white-space: nowrap;
-    min-height: 1.2em;
+    height: 1.5em;
+    resize: both;
 
     span {
       cursor: pointer;
       padding: 0 2px;
+      line-height: 1.2em;
+
+      &:hover {
+        filter: saturate(3) brightness(0.95);
+      }
     }
 
     &:empty {
@@ -185,6 +196,8 @@
     position: relative;
     height: 160px;
     box-sizing: border-box;
+    resize: vertical;
+    overflow: auto;
 
     svg {
       display: block;
@@ -193,13 +206,14 @@
     rect.debug-flame-rect {
       stroke-opacity: 0.22;
       shape-rendering: crispEdges;
+      cursor: pointer;
     }
 
     .debug-flame-node-outline {
       fill: none;
       stroke: currentColor;
-      stroke-opacity: 0.35;
-      stroke-width: 1.5;
+      stroke-opacity: 0.5;
+      stroke-width: 0.5;
       shape-rendering: crispEdges;
       pointer-events: none;
     }
@@ -219,7 +233,7 @@
     }
 
     rect.debug-flame-rect.debug-flame-seg-hover {
-      filter: brightness(80%);
+      filter: saturate(3) brightness(0.95);
     }
 
     .debug-flame-tooltip {

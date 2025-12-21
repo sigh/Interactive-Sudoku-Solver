@@ -18,6 +18,13 @@ export class FlameGraphStore {
     return this._numSamples;
   }
 
+  // Returns the end time (ms) of the stored timeline.
+  getEndTimeMs() {
+    const rootRow = this._nodesByDepth[0];
+    if (!rootRow?.length) return null;
+    return rootRow[rootRow.length - 1].endTimeMs;
+  }
+
   get nodesByDepth() {
     return this._nodesByDepth;
   }
@@ -66,18 +73,33 @@ export class FlameGraphStore {
     this._activeNodesByDepth.length = 0;
   }
 
-  appendFromStackTrace(stackTrace, stableLen) {
+  // If timeMs is provided, nodes/segments will also track:
+  // - node.startTimeMs / node.endTimeMs
+  // - segment.startTimeMs / segment.endTimeMs
+  appendFromStackTrace(stackTrace, timeMs) {
     if (!stackTrace?.cells?.length) return false;
-    if (!stableLen) return false;
+
+    // Flame graph samples are expected to have real time.
+    // If time is missing/invalid, drop the sample.
+    if (!Number.isFinite(timeMs)) return false;
+
+    // Update end time of all active nodes.
+    const activeNodes = this._activeNodesByDepth;
+    for (let depth = 0; depth < activeNodes.length; depth++) {
+      const node = activeNodes[depth];
+      node.endTimeMs = timeMs;
+      const segs = node.segments;
+      const lastSeg = segs[segs.length - 1];
+      lastSeg.endTimeMs = timeMs;
+    }
 
     const cells = stackTrace.cells;
     const values = stackTrace.values;
-    const len = Math.min(stableLen, cells.length, values?.length ?? 0);
-    if (len <= 0) return false;
+    const len = Math.min(cells.length, values.length);
+    if (!len) return false;
 
     // Append-only, sample-ordered nodes; each node contains sample-ordered segments.
     const sampleIndex = this._numSamples;
-    const activeNodes = this._activeNodesByDepth;
     for (let depth = 0; depth < len; depth++) {
       const cellIndex = cells[depth];
       const value = values[depth];
@@ -106,20 +128,37 @@ export class FlameGraphStore {
           this._nodesByDepth[depth] = row;
         }
 
-        node = { start: sampleIndex, end: sampleIndex + 1, cellIndex, depth, segments: [] };
+        node = {
+          start: sampleIndex,
+          end: sampleIndex + 1,
+          cellIndex,
+          depth,
+          segments: [],
+          startTimeMs: timeMs,
+          endTimeMs: timeMs,
+        };
         row.push(node);
         this._allNodes.push(node);
         activeNodes[depth] = node;
       } else {
         node.end = sampleIndex + 1;
+        node.endTimeMs = timeMs;
       }
 
       const segs = node.segments;
       const lastSeg = segs[segs.length - 1];
       if (lastSeg && lastSeg.end === sampleIndex && lastSeg.value === value) {
         lastSeg.end = sampleIndex + 1;
+        lastSeg.endTimeMs = timeMs;
       } else {
-        segs.push({ start: sampleIndex, end: sampleIndex + 1, value });
+        const seg = {
+          start: sampleIndex,
+          end: sampleIndex + 1,
+          value,
+          startTimeMs: timeMs,
+          endTimeMs: timeMs,
+        };
+        segs.push(seg);
       }
     }
     this._numSamples = sampleIndex + 1;
@@ -149,10 +188,11 @@ export class FlameGraphStore {
     // Sort all nodes once, then walk the list collecting droppables.
     const nodes = this._allNodes;
     nodes.sort((a, b) => {
-      const as = a.end - a.start;
-      const bs = b.end - b.start;
+      const as = a.endTimeMs - a.startTimeMs;
+      const bs = b.endTimeMs - b.startTimeMs;
       if (as !== bs) return as - bs; // smallest span first
-      return b.depth - a.depth; // tie-break: deeper first
+      if (a.depth !== b.depth) return b.depth - a.depth; // deeper first
+      return a.endTimeMs - b.endTimeMs; // tie-break: oldest first
     });
 
     let remaining = totalNodeCount;
