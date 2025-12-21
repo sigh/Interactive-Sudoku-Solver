@@ -68,6 +68,10 @@ await runTest('formatTimeMs should format minutes', () => {
   assert.equal(formatTimeMs(125000), '2 min 5 s');
 });
 
+await runTest('formatTimeMs should format 0 s', () => {
+  assert.equal(formatTimeMs(0), '0 s');
+});
+
 // ============================================================================
 // formatNumberMetric
 // ============================================================================

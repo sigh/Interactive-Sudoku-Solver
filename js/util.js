@@ -3,6 +3,7 @@ export const clamp = (value, min, max) => {
 };
 
 export const formatTimeMs = (timeMs) => {
+  if (timeMs == 0) return '0 s';
   if (timeMs < 1e3) {
     return timeMs.toPrecision(3) + ' ms';
   } else if (timeMs < 60e3) {
@@ -11,6 +12,10 @@ export const formatTimeMs = (timeMs) => {
     const timeS = timeMs / 1e3 | 0;
     return (timeS / 60 | 0) + ' min ' + (timeS % 60) + ' s';
   }
+};
+
+export const formatFixedTruncated = (n, digits) => {
+  return n.toFixed(digits).replace(/\.?0+$/, '');
 };
 
 export const formatNumberMetric = (value) => {
