@@ -151,5 +151,26 @@ export class LookupTables {
       }
       return [table, tableInv];
     });
+
+    // Checks that if (X, V) is a valid pair and (V, Y) is valid, then
+    // (X, Y) is valid.
+    this.binaryKeyIsTransitive = memoize((key) => {
+      const [t0, t1] = this.forBinaryKey(key);
+      for (let i = 0; i < numValues; i++) {
+        const v = 1 << i;
+        let validPred = t1[v];
+        const validSucc = t0[v];
+
+        while (validPred) {
+          const x = validPred & -validPred;
+          validPred ^= x;
+          if ((validSucc & ~t0[x]) !== 0) {
+            return false;
+          }
+        }
+      }
+
+      return true;
+    });
   }
 }

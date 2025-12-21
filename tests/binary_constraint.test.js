@@ -411,4 +411,66 @@ await runTest('asymmetric constraint: should prune correctly given fixed value',
   assert.equal(grid[0], LookupTables.fromValue(2), '2*2 = 4');
 });
 
+// =============================================================================
+// enforceConsistency - required value exclusions
+// =============================================================================
+
+await runTest('required values: should remove required values from pair exclusions (a !== b)', () => {
+  const context = setupConstraintTest({ numValues: 3, numCells: 3 });
+  const key = binaryKey((a, b) => a !== b, 3);
+  const handler = new BinaryConstraint(0, 1, key);
+
+  const pairIndex01 = (0 << 8) | 1;
+  const cellExclusions = {
+    ...createCellExclusions(),
+    getPairExclusions(pairIndex) {
+      return pairIndex === pairIndex01 ? [2] : [];
+    },
+  };
+
+  handler.initialize(context.createGrid(), cellExclusions, context.shape, {});
+
+  const grid = new Uint16Array(3);
+  grid[0] = mask(1, 2);
+  grid[1] = mask(1, 2);
+  grid[2] = mask(1, 2, 3);
+  const acc = createAccumulator();
+
+  const result = handler.enforceConsistency(grid, acc);
+
+  assert.equal(result, true);
+  assert.equal(grid[0], mask(1, 2));
+  assert.equal(grid[1], mask(1, 2));
+  assert.equal(grid[2], mask(3), 'values required in (0,1) should be excluded from cell 2');
+  assert.ok(acc.touched.has(2), 'exclusion cell should be marked touched');
+});
+
+await runTest('required values: should not run required-value exclusions for transitive key (a === b)', () => {
+  const context = setupConstraintTest({ numValues: 3, numCells: 3 });
+  const key = binaryKey((a, b) => a === b, 3);
+  const handler = new BinaryConstraint(0, 1, key);
+
+  const pairIndex01 = (0 << 8) | 1;
+  const cellExclusions = {
+    ...createCellExclusions(),
+    getPairExclusions(pairIndex) {
+      return pairIndex === pairIndex01 ? [2] : [];
+    },
+  };
+
+  handler.initialize(context.createGrid(), cellExclusions, context.shape, {});
+
+  const grid = new Uint16Array(3);
+  grid[0] = mask(1, 2);
+  grid[1] = mask(1, 2);
+  grid[2] = mask(1, 2, 3);
+  const acc = createAccumulator();
+
+  const result = handler.enforceConsistency(grid, acc);
+
+  assert.equal(result, true);
+  assert.equal(grid[2], mask(1, 2, 3), 'transitive keys should skip required-value exclusions');
+  assert.equal(acc.touched.size, 0, 'no cells should be touched');
+});
+
 logSuiteComplete('BinaryConstraint handler');
