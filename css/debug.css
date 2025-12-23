@@ -9,263 +9,263 @@
   filter: drop-shadow(0px 0px 2px white);
 }
 
-.highlight-group {
-  >.debug-hover {
-    fill: rgba(250, 250, 250);
-    opacity: 0.9;
-    filter: drop-shadow(0 0 5px black);
-  }
+.highlight-group {}
+
+.highlight-group>.debug-hover {
+  fill: rgb(250, 250, 250);
+  opacity: 0.9;
+  filter: drop-shadow(0 0 5px black);
 }
 
 #debug-container {
   display: flex;
   flex-direction: column;
   border-bottom: 1px solid var(--color-text-muted);
+}
 
-  .debug-main {
-    display: flex;
-    flex-direction: row;
-  }
+#debug-container .debug-main {
+  display: flex;
+  flex-direction: row;
+}
 
-  #debug-logs {
-    resize: both;
-    overflow: auto;
-    height: 210px;
-    width: 900px;
-    box-shadow: inset 0px 0px 3px #555;
-    padding: 3px;
-    margin-bottom: 10px;
-    cursor: pointer;
+#debug-container #debug-logs {
+  resize: both;
+  overflow: auto;
+  height: 210px;
+  width: 900px;
+  box-shadow: inset 0px 0px 3px #555;
+  padding: 3px;
+  margin-bottom: 10px;
+  cursor: pointer;
+}
 
-    >div>span:first-child {
-      color: var(--color-text-muted);
-    }
+#debug-container #debug-logs>div>span:first-child {
+  color: var(--color-text-muted);
+}
 
-    .duplicate-log-line {
-      margin-left: 50px;
-    }
+#debug-container #debug-logs .duplicate-log-line {
+  margin-left: 50px;
+}
 
-    .important-log-line {
-      font-weight: bold;
-      margin: 5px 0;
-    }
-  }
+#debug-container #debug-logs .important-log-line {
+  font-weight: bold;
+  margin: 5px 0;
+}
 
-  #debug-panel {
-    display: flex;
-    flex-direction: column;
-    width: 200px;
-    gap: 10px;
+#debug-container #debug-panel {
+  display: flex;
+  flex-direction: column;
+  width: 200px;
+  gap: 10px;
+}
 
-    #debug-puzzle-input {
-      width: 95%;
-    }
+#debug-container #debug-panel #debug-puzzle-input {
+  width: 95%;
+}
 
-    #close-debug-button {
-      width: fit-content;
-      font-size: var(--font-size-base);
-    }
+#debug-container #debug-panel #close-debug-button {
+  width: fit-content;
+  font-size: var(--font-size-base);
+}
 
-    label {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
+#debug-container #debug-panel label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
 
-    .debug-toggle-row {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: 6px;
-    }
-  }
+#debug-container #debug-panel .debug-toggle-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
 
-  #debug-counters {
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-    width: 150px;
+#debug-container #debug-counters {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  width: 150px;
+}
 
-    &:empty {
-      width: 0;
-    }
+#debug-container #debug-counters:empty {
+  width: 0;
+}
 
-    >div {
-      display: flex;
-      justify-content: space-between;
-    }
+#debug-container #debug-counters>div {
+  display: flex;
+  justify-content: space-between;
+}
 
-    span {
-      padding: 0 5px;
-      font-size: var(--font-size-small);
-    }
-  }
+#debug-container #debug-counters span {
+  padding: 0 5px;
+  font-size: var(--font-size-small);
+}
 
-  .debug-stack-trace-footer {
-    border-top: 1px solid var(--color-text-muted);
-    font-size: var(--font-size-small);
-    padding: 4px 6px;
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    contain: inline-size;
-    min-height: 1.2em;
-    gap: 4px;
+#debug-container .debug-stack-trace-footer {
+  border-top: 1px solid var(--color-text-muted);
+  font-size: var(--font-size-small);
+  padding: 4px 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  contain: inline-size;
+  min-height: 1.2em;
+  gap: 4px;
+}
 
-    &:empty {
-      display: none;
-    }
-  }
+#debug-container .debug-stack-trace-footer:empty {
+  display: none;
+}
 
-  .debug-stack-trace-header {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    min-width: 0;
-  }
+#debug-container .debug-stack-trace-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
 
-  #debug-flame-toggle {
-    width: 1em;
-    height: 1em;
-    margin: 0;
-    padding: 0;
-    border: 0;
-    background: none;
-    box-shadow: none;
-    color: black;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
+#debug-container #debug-flame-toggle {
+  width: 1em;
+  height: 1em;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  color: black;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
 
-    &:hover,
-    &:active {
-      background: none;
-      box-shadow: none;
-    }
+#debug-container #debug-flame-toggle:hover,
+#debug-container #debug-flame-toggle:active {
+  background: none;
+  box-shadow: none;
+}
 
-    &:focus {
-      outline: none;
-    }
+#debug-container #debug-flame-toggle:focus {
+  outline: none;
+}
 
-    &:after {
-      content: "";
-      width: 6px;
-      height: 6px;
-      border-left: 1px solid currentColor;
-      border-top: 1px solid currentColor;
-      transform: rotate(-135deg);
-      pointer-events: none;
-    }
+#debug-container #debug-flame-toggle:after {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-left: 1px solid currentColor;
+  border-top: 1px solid currentColor;
+  transform: rotate(-135deg);
+  pointer-events: none;
+}
 
-    &.expanded:after {
-      transform: rotate(45deg);
-    }
-  }
+#debug-container #debug-flame-toggle.expanded:after {
+  transform: rotate(45deg);
+}
 
-  .debug-stack-trace {
-    display: flex;
-    flex-wrap: wrap;
-    flex: 1;
-    align-items: flex-start;
-    align-content: flex-start;
-    min-width: 0;
-    padding: 0;
-    overflow-x: auto;
-    white-space: nowrap;
-    height: 1.5em;
-    resize: both;
+#debug-container .debug-stack-trace {
+  display: flex;
+  flex-wrap: wrap;
+  flex: 1;
+  align-items: flex-start;
+  align-content: flex-start;
+  min-width: 0;
+  padding: 0;
+  overflow-x: auto;
+  white-space: nowrap;
+  height: 1.5em;
+  resize: both;
+}
 
-    span {
-      cursor: pointer;
-      padding: 0 2px;
-      line-height: 1.2em;
+#debug-container .debug-stack-trace span {
+  cursor: pointer;
+  padding: 0 2px;
+  line-height: 1.2em;
+}
 
-      &:hover {
-        filter: saturate(3) brightness(0.95);
-      }
-    }
+#debug-container .debug-stack-trace span:hover {
+  filter: saturate(3) brightness(0.95);
+}
 
-    &:empty {
-      display: none;
-    }
-  }
+#debug-container .debug-stack-trace:empty {
+  display: none;
+}
 
-  .debug-flame-graph {
-    position: relative;
-    height: 160px;
-    box-sizing: border-box;
-    resize: vertical;
-    overflow: auto;
+#debug-container .debug-flame-graph {
+  position: relative;
+  height: 160px;
+  box-sizing: border-box;
+  resize: vertical;
+  overflow: auto;
+}
 
-    svg {
-      display: block;
-    }
+#debug-container .debug-flame-graph svg {
+  display: block;
+}
 
-    rect.debug-flame-rect {
-      stroke-opacity: 0.22;
-      shape-rendering: crispEdges;
-      cursor: pointer;
-    }
+#debug-container .debug-flame-graph rect.debug-flame-rect {
+  stroke-opacity: 0.22;
+  shape-rendering: crispEdges;
+  cursor: pointer;
+}
 
-    .debug-flame-node-outline {
-      fill: none;
-      stroke: currentColor;
-      stroke-opacity: 0.5;
-      stroke-width: 0.5;
-      shape-rendering: crispEdges;
-      pointer-events: none;
-    }
+#debug-container .debug-flame-graph .debug-flame-node-outline {
+  fill: none;
+  stroke: currentColor;
+  stroke-opacity: 0.5;
+  stroke-width: 0.5;
+  shape-rendering: crispEdges;
+  pointer-events: none;
+}
 
-    text.debug-flame-label {
-      fill: currentColor;
-      opacity: 0.75;
-      font-size: 10px;
-      pointer-events: none;
-    }
+#debug-container .debug-flame-graph text.debug-flame-label {
+  fill: currentColor;
+  opacity: 0.75;
+  font-size: 10px;
+  pointer-events: none;
+}
 
-    .debug-flame-node-outline.debug-flame-node-hover {
-      stroke-opacity: 0.55;
-      stroke-width: 1.5;
-      stroke-dasharray: none;
-      filter: drop-shadow(0 0 5px black);
-    }
+#debug-container .debug-flame-graph .debug-flame-node-outline.debug-flame-node-hover {
+  stroke-opacity: 0.55;
+  stroke-width: 1.5;
+  stroke-dasharray: none;
+  filter: drop-shadow(0 0 5px black);
+}
 
-    rect.debug-flame-rect.debug-flame-seg-hover {
-      filter: saturate(3) brightness(0.95);
-    }
+#debug-container .debug-flame-graph rect.debug-flame-rect.debug-flame-seg-hover {
+  filter: saturate(3) brightness(0.95);
+}
 
-    .debug-flame-tooltip {
-      position: absolute;
-      pointer-events: none;
-      z-index: 1;
-      padding: 2px 6px;
-      background: white;
-      border: 1px solid var(--color-border-light);
-      border-radius: 4px;
-      color: black;
-      font-size: 12px;
-      white-space: nowrap;
-    }
-  }
+#debug-container .debug-flame-graph .debug-flame-tooltip {
+  position: absolute;
+  pointer-events: none;
+  z-index: 1;
+  padding: 2px 6px;
+  background: white;
+  border: 1px solid var(--color-border-light);
+  border-radius: 4px;
+  color: black;
+  font-size: 12px;
+  white-space: nowrap;
 }
 
 .debug-checkbox {
   display: none;
+}
 
-  &+label {
-    padding: 5px;
-    width: fit-content;
-    cursor: pointer;
-    color: black;
-    background-color: #f0f0f0;
-    border: 1px solid var(--color-border-light);
-    border-radius: 5px;
-  }
+.debug-checkbox+label {
+  padding: 5px;
+  width: fit-content;
+  cursor: pointer;
+  color: black;
+  background-color: #f0f0f0;
+  border: 1px solid var(--color-border-light);
+  border-radius: 5px;
+}
 
-  &:checked+label {
-    color: white;
-    background-color: #888;
-  }
+.debug-checkbox:checked+label {
+  color: white;
+  background-color: #888;
 }
