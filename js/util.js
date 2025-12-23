@@ -50,6 +50,28 @@ export const arrayIntersectSize = (a, b) => {
   return a.reduce((p, v) => p + b.includes(v), 0);
 }
 
+// Merge two sorted, disjoint arrays.
+export const mergeSortedArrays = (a, b) => {
+  const merged = new Array(a.length + b.length);
+  let i = 0;
+  let j = 0;
+  let k = 0;
+  while (i < a.length && j < b.length) {
+    const av = a[i];
+    const bv = b[j];
+    if (av < bv) {
+      merged[k++] = av;
+      i++;
+    } else {
+      merged[k++] = bv;
+      j++;
+    }
+  }
+  while (i < a.length) merged[k++] = a[i++];
+  while (j < b.length) merged[k++] = b[j++];
+  return merged;
+}
+
 export const arrayRemoveValue = (a, value) => {
   const index = a.indexOf(value);
   if (index > -1) a.splice(index, 1);
@@ -604,6 +626,13 @@ export class BitSet {
       count += countOnes32bit(this.words[i] & other.words[i]);
     }
     return count;
+  }
+
+  hasIntersection(other) {
+    for (let i = 0; i < this.words.length; i++) {
+      if (this.words[i] & other.words[i]) return true;
+    }
+    return false;
   }
 
   union(other) {
