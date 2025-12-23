@@ -198,6 +198,7 @@ export class DebugManager {
       HARD_RENBAN: PuzzleCollections.HARD_RENBAN,
       HARD_PENCILMARKS: PuzzleCollections.HARD_PENCILMARKS,
       HS_KILLERS: PuzzleCollections.HS_KILLERS,
+      LITTLE_KILLER_SNIPES: PuzzleCollections.LITTLE_KILLER_SNIPES,
     };
     for (const [listName, list] of Object.entries(puzzleLists)) {
       for (let i = 0; i < list.length; i++) {
