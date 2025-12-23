@@ -9,18 +9,36 @@ if (typeof g.VERSION_PARAM === 'undefined') {
 }
 
 const { LookupTables } = await import('../../js/solver/lookup_tables.js');
+const { GridShape } = await import('../../js/grid_shape.js');
 
 const DEFAULT_NUM_VALUES = 9;
 const DEFAULT_NUM_CELLS = 81;
 
 export const setupConstraintTest = ({
+  gridSize,
   numValues = DEFAULT_NUM_VALUES,
   numCells = DEFAULT_NUM_CELLS,
+  shape,
 } = {}) => {
-  const shape = { numValues, numCells };
-  const lookupTables = LookupTables.get(numValues);
-  const createGrid = () => new Uint16Array(shape.numCells).fill(lookupTables.allValues);
-  return { shape, lookupTables, createGrid };
+  const resolvedShape = (() => {
+    if (shape) return shape;
+    if (typeof gridSize !== 'undefined') {
+      const s = GridShape.fromGridSize(gridSize);
+      if (!s) throw new Error(`Invalid gridSize: ${gridSize}`);
+      return s;
+    }
+
+    const inferredGridSize = Math.sqrt(numCells);
+    if (Number.isInteger(inferredGridSize) && inferredGridSize === numValues) {
+      return GridShape.fromGridSize(inferredGridSize);
+    }
+
+    return { numValues, numCells };
+  })();
+
+  const lookupTables = LookupTables.get(resolvedShape.numValues);
+  const createGrid = () => new Uint16Array(resolvedShape.numCells).fill(lookupTables.allValues);
+  return { shape: resolvedShape, lookupTables, createGrid };
 };
 
 export const mask = (...values) => LookupTables.fromValuesArray(values);
