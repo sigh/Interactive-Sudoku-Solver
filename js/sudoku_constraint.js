@@ -1852,7 +1852,7 @@ export class SudokuConstraint {
     static DESCRIPTION = (`
       Considering all rows and columns as numbers read from the direction
       of the clue and ranked from lowest (1) to highest, a clue represents
-      where in the ranking that row/column lies.`);
+      where in the ranking that row/column lies. Ties are not allowed.`);
     static CATEGORY = 'OutsideClue';
     static DISPLAY_CONFIG = {
       displayClass: 'OutsideClue',

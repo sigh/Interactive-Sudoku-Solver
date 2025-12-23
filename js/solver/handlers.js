@@ -2573,8 +2573,11 @@ export class FullRank extends SudokuConstraintHandler {
     super(allCells);
 
     this._uncluedEntries = [];
+    this._allEntries = [];
     this._rankSets = [];
     this._clues = clues;
+    this._pairBitSetsBuffer = null;
+    this._seenPairsBuffer = null;
   }
 
   clues() {
@@ -2596,16 +2599,26 @@ export class FullRank extends SudokuConstraintHandler {
       entries.push(col.slice().reverse());
     }
 
+    this._allEntries = entries;
+
+    // Buffers used by _rejectFixedTies(). Allocate once per shape so they can
+    // be reused and sorting works naturally.
+    this._seenPairsBuffer = new Uint32Array(shape.gridSize * 4);
+    this._pairBitSetsBuffer = new Uint16Array(shape.numValues);
+
     // Group entries with the same initial values.
     // i.e. the same int((rank+3)/4)
+    const isClued = new Set();
     const rankMap = new MultiMap();
     for (const clue of this._clues) {
       const value = LookupTables.fromValue((clue.rank + 3) >> 2);
       const entryIndex = entries.findIndex(
         e => e[0] === clue.line[0] && e[1] === clue.line[1]);
+      if (entryIndex < 0) return false;
+      isClued.add(entryIndex);
       rankMap.add(value, {
         rankIndex: (clue.rank + 3) & 3,
-        entry: entries.splice(entryIndex, 1)[0],
+        entry: entries[entryIndex],
         requiredLess: 0,
         requiredGreater: 0,
       });
@@ -2613,7 +2626,9 @@ export class FullRank extends SudokuConstraintHandler {
         return false;
       }
     }
-    this._uncluedEntries = entries;
+
+    // Unclued entries are all entries not referenced by any clue.
+    this._uncluedEntries = entries.filter((_, i) => !isClued.has(i));
 
     for (const [value, givens] of rankMap) {
       // Sort givens by rank.
@@ -2633,6 +2648,101 @@ export class FullRank extends SudokuConstraintHandler {
         givens: givens,
       });
     }
+    return true;
+  }
+
+  _enforceUniqueRanks(grid) {
+    // Whole-grid tie-check. Only checks fixed values.
+
+    // For each entry, if the first and last cell is fixed to some value, then
+    // look for duplicates, and do a full comparison if required.
+    // *every* cell in the entry is fixed, reject if another fully-fixed entry
+    // with the same first value has identical digits.
+
+    const allEntries = this._allEntries;
+    const lastIndex = allEntries[0].length - 1;
+    const midIndex = lastIndex >> 1;
+
+    const pairBitSets = this._pairBitSetsBuffer;
+    pairBitSets.fill(0);
+    const seenPairs = this._seenPairsBuffer;
+    seenPairs.fill(0);
+
+    let hasDuplicatePair = false;
+
+    // Go two-by-two since we can process the forward and reverse entries
+    // together.
+    for (let i = 0; i < allEntries.length; i += 2) {
+      const entry = allEntries[i];
+
+      // Ensure the first and last values are fixed.
+      let firstV = grid[entry[0]];
+      if ((firstV & (firstV - 1)) !== 0) continue;
+      let lastV = grid[entry[lastIndex]];
+      if ((lastV & (lastV - 1)) !== 0) continue;
+
+      // We check midIndex as a quick way to skip non-fully-fixed entries.
+      // The endpoint are more likely to be filled in first so they will lead
+      // to many false positives.
+      let midV = grid[entry[midIndex]];
+      if ((midV & (midV - 1)) !== 0) continue;
+
+      let index = i;
+      if (firstV > lastV) {
+        [firstV, lastV] = [lastV, firstV];
+        index = i + 1;
+      }
+      const valueIndex = LookupTables.toIndex(firstV);
+
+      if (pairBitSets[valueIndex] & lastV) {
+        hasDuplicatePair = true;
+      } else {
+        pairBitSets[valueIndex] |= lastV;
+      }
+
+      seenPairs[index] = ((firstV | lastV) << 16) | index;
+    }
+
+    if (!hasDuplicatePair) return true;
+
+    seenPairs.sort(); // Numeric sort on typed array.
+
+    // For each duplicated endpoint-pair, compare fully fixed entries.
+    // Sorting puts unused (0) entries at the start.
+    // Iterate backwards over the valid entries and stop once we hit 0.
+    for (let end = seenPairs.length; end > 0;) {
+      const key = seenPairs[end - 1] >>> 16;
+      if (key === 0) break;
+      let start = end - 1;
+      while (start > 0 && (seenPairs[start - 1] >>> 16) === key) start--;
+
+      if (end - start > 1) {
+        for (let a = start + 1; a < end; a++) {
+          const entryA = allEntries[seenPairs[a] & 0xffff];
+          for (let b = start; b < a; b++) {
+            const entryB = allEntries[seenPairs[b] & 0xffff];
+
+            let isTie = true;
+            // Endpoints are already fixed (or this pair wouldn't be in seenPairs).
+            // Reject only if every interior digit is fixed and equal.
+            for (let j = 1; j < lastIndex; j++) {
+              const vA = grid[entryA[j]];
+              const vB = grid[entryB[j]];
+              // Fixed-only: only reject when every digit is fixed and equal.
+              if (vA !== vB || (vA & (vA - 1)) !== 0) {
+                isTie = false;
+                break;
+              }
+            }
+
+            if (isTie) return false;
+          }
+        }
+      }
+
+      end = start;
+    }
+
     return true;
   }
 
@@ -2775,15 +2885,18 @@ export class FullRank extends SudokuConstraintHandler {
     //  - Keep iterating until we find the first cell where the entries could
     //    possibly differ, i.e. when are not equal fixed values.
     //  - For that cell only, filter out any values which would cause lowEntry
-    //    to be higher than highEntry. Equal is ok, as ties may be broken by
-    //    later cells.
+    //    to be higher than highEntry.
     //  - Stop if the cells are still not equal fixed values.
+    //
+    // NOTE: This ordering is strict. If the entries are forced to be equal in
+    // every compared cell, then the ordering constraint is violated.
 
     // Keep track of which fixed values we've seen. These can be removed from
     // future cells.
     let equalValuesMask = ~(grid[lowEntry[0]] & grid[highEntry[0]]);
     const entryLength = lowEntry.length;
-    for (let i = 1; i < entryLength; i++) {
+    let i = 1;
+    for (; i < entryLength; i++) {
       let lowV = grid[lowEntry[i]] & equalValuesMask;
       let highV = grid[highEntry[i]] & equalValuesMask;
       // If both are set, and equal, then keep looking.
@@ -2808,6 +2921,11 @@ export class FullRank extends SudokuConstraintHandler {
       if (!(lowV === highV && !(lowV & (lowV - 1)))) break;
       equalValuesMask &= ~lowV;
     }
+
+    // If we got through the entire entry without finding a non-equal fixed
+    // position, then the two entries are forced to tie, which is not allowed.
+    if (i === entryLength) return false;
+
     return true;
   }
 
@@ -2858,7 +2976,7 @@ export class FullRank extends SudokuConstraintHandler {
       }
     }
 
-    return true;
+    return this._enforceUniqueRanks(grid);
   }
 
   candidateFinders(grid, shape) {

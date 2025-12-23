@@ -371,6 +371,7 @@ export const runSolveTests = async (onFailure, runner) => {
     '4x4: Counting circles',
     '6x6: Rellik cages',  // Rellik cages
     '6x6: Successor Arrows',  // Regex
+    '6x6: Full rank',  // Full rank (requires enforcing no ties)
   ], onFailure);
   result.collection = 'Other sizes';
   results.push(result);
