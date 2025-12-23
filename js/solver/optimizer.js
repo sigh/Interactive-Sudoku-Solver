@@ -1,4 +1,4 @@
-const { memoize, arrayIntersectSize, arrayDifference, setIntersectSize, arrayIntersect, arrayRemoveValue, setIntersectionToArray, setDifference, BitSet, elementarySymmetricSum } = await import('../util.js' + self.VERSION_PARAM);
+const { memoize, arrayIntersectSize, arrayDifference, setIntersectSize, arrayIntersect, arrayRemoveValue, setIntersectionToArray, setDifference, BitSet, elementarySymmetricSum, mergeSortedArrays } = await import('../util.js' + self.VERSION_PARAM);
 const { LookupTables } = await import('./lookup_tables.js' + self.VERSION_PARAM);
 const { SudokuConstraintBase, SudokuConstraint } = await import('../sudoku_constraint.js' + self.VERSION_PARAM);
 const HandlerModule = await import('./handlers.js' + self.VERSION_PARAM);
@@ -164,6 +164,9 @@ export class SudokuConstraintOptimizer {
     handlerSet.addNonEssential(
       ...this._makeHiddenCageHandlers(handlerSet, safeSumHandlers, cellExclusions, shape));
 
+    handlerSet.addNonEssential(
+      ...this._makeCombinedSumHandlers(safeSumHandlers, cellExclusions, shape));
+
     this._replaceSizeSpecificSumHandlers(handlerSet, cellExclusions, shape);
 
     // Don't pass in the sum handlers so that this phase can operate on all the
@@ -171,6 +174,178 @@ export class SudokuConstraintOptimizer {
     this._addSumComplementCells(handlerSet);
 
     return;
+  }
+
+  _makeCombinedSumHandlers(allSumHandlers, cellExclusions, shape) {
+    // Bounded, greedy merge process:
+    // - Assign a score to each record
+    // - Only merge two records if the merged score is strictly better than BOTH inputs.
+    // - Once merged, the two inputs are removed and only the merged record remains.
+    // This prevents exponential blowup.
+
+    const scoreOf = (groups, dof) => {
+      let score = 0;
+      for (const g of groups) {
+        const k = g.length;
+        // How much "slack" this group provides beyond the dof.
+        score += k * (shape.numValues - k) - dof;
+      }
+      return score;
+    };
+
+    const keyFromSortedCells = (cells) => cells.join(',');
+
+    const recordFromCellsAndSum = (cells, sum, original, key) => {
+      const groups = HandlerModule.HandlerUtil.findExclusionGroupsGreedy(
+        cells, cellExclusions).groups;
+      const { range, min, max } = HandlerModule.HandlerUtil.exclusionGroupSumInfo(
+        groups, shape.numValues);
+      if (sum < min || sum > max) return null;
+
+      const dof = Math.min(sum - min, max - sum);
+      const cellsBitSet = new BitSet(shape.numCells);
+      for (const c of cells) cellsBitSet.add(c);
+
+      return {
+        key: key || keyFromSortedCells(cells),
+        cells, cellsBitSet,
+        sum, range, dof,
+        score: scoreOf(groups, dof),
+        original,
+      };
+    };
+
+    const areRelatedNonOverlapping = (r1, r2) => {
+      // Disallow overlap.
+      if (r1.cellsBitSet.hasIntersection(r2.cellsBitSet)) return false;
+
+      // Related iff there exists at least 6 cells with exclusion edges between
+      // the sets.
+      const MIN_OVERLAP_COUNT = 6;
+      const [small, big] = r2.cells.length < r1.cells.length
+        ? [r2, r1] : [r1, r2];
+      if (small.cells.length < MIN_OVERLAP_COUNT) return false;
+      let count = 0;
+      for (const cell of small.cells) {
+        if (cellExclusions.getBitSet(cell).hasIntersection(big.cellsBitSet)) {
+          if (++count >= MIN_OVERLAP_COUNT) return true;
+        }
+      }
+      return false;
+    };
+
+    const isBetterCandidate = (a, b) => {
+      if (a.score !== b.score) return a.score > b.score;
+      // Deterministic tie-breaker: prefer lexicographically-larger key.
+      return a.key > b.key;
+    };
+
+    // Active pool keyed by sorted cell list.
+    const activeByKey = new Map();
+
+    const candidates = [];
+    const pushCandidate = (r1, r2) => {
+      if (!areRelatedNonOverlapping(r1, r2)) return;
+
+      const combinedCells = mergeSortedArrays(r1.cells, r2.cells);
+      const combinedKey = keyFromSortedCells(combinedCells);
+      if (activeByKey.has(combinedKey)) return;
+
+      const combinedSum = r1.sum + r2.sum;
+      const combinedRecord = recordFromCellsAndSum(
+        combinedCells, combinedSum, false, combinedKey);
+      if (!combinedRecord) return;
+
+      // Accept if strictly better than both inputs, or better than their sum.
+      if (combinedRecord.score <= r1.score || combinedRecord.score <= r2.score) {
+        if (combinedRecord.score <= r1.score + r2.score) return;
+      }
+
+      candidates.push({
+        score: combinedRecord.score,
+        key: combinedKey,
+        r1,
+        r2,
+        combined: combinedRecord,
+      });
+    };
+
+    for (const h of allSumHandlers) {
+      const cells = [...h.cells];
+      cells.sort((a, b) => a - b);
+
+      const r = recordFromCellsAndSum(cells, h.sum(), true);
+      if (!r) continue;
+
+      // Prefer first occurrence if duplicates exist.
+      if (activeByKey.has(r.key)) continue;
+      activeByKey.set(r.key, r);
+    }
+
+    // Initial candidate generation.
+    const initialRecords = [...activeByKey.values()];
+    for (let i = 0; i < initialRecords.length; i++) {
+      for (let j = i + 1; j < initialRecords.length; j++) {
+        pushCandidate(initialRecords[i], initialRecords[j]);
+      }
+    }
+
+    // Apply merges in descending score order.
+    while (true) {
+      let bestIdx = -1;
+      let bestCand = null;
+      for (let i = 0; i < candidates.length; i++) {
+        const cand = candidates[i];
+
+        // Skip invalidated candidates (parents removed or combined already exists).
+        if (activeByKey.get(cand.r1.key) !== cand.r1
+          || activeByKey.get(cand.r2.key) !== cand.r2
+          || activeByKey.has(cand.combined.key)) {
+          // Swap-remove invalid candidate.
+          candidates[i] = candidates[candidates.length - 1];
+          candidates.pop();
+          if (bestIdx === candidates.length) bestIdx = i;
+          i--;
+          continue;
+        }
+
+        if (!bestCand || isBetterCandidate(cand, bestCand)) {
+          bestCand = cand;
+          bestIdx = i;
+        }
+      }
+      if (!bestCand) break;
+
+      // Swap-remove chosen candidate.
+      candidates[bestIdx] = candidates[candidates.length - 1];
+      candidates.pop();
+
+      const best = bestCand.combined;
+      activeByKey.delete(bestCand.r1.key);
+      activeByKey.delete(bestCand.r2.key);
+      activeByKey.set(best.key, best);
+
+      // Only new pairs involving the merged record can become valid.
+      for (const other of activeByKey.values()) {
+        if (other === best) continue;
+        pushCandidate(best, other);
+      }
+    }
+
+    // Instantiate handlers only for inferred sums with sufficient score.
+    const newHandlers = [];
+    for (const r of activeByKey.values()) {
+      if (r.original || r.score <= 0) continue;
+      newHandlers.push(new SumHandlerModule.Sum(r.cells, r.sum));
+      this._debugLogger?.log({
+        loc: '_makeCombinedSumHandlers',
+        msg: 'Add: ' + SumHandlerModule.Sum.name,
+        args: { sum: r.sum, range: r.range, dof: r.dof, score: r.score },
+        cells: r.cells,
+      });
+    }
+
+    return newHandlers;
   }
 
   _findCommonHandlers(cells, handlerSet, houseHandlerIndexes) {

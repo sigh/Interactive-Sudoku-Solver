@@ -15,6 +15,7 @@ const {
   arrayIntersectSize,
   arrayRemoveValue,
   arraysAreEqual,
+  mergeSortedArrays,
   elementarySymmetricSum,
   setIntersectionToArray,
   setIntersectSize,
@@ -147,6 +148,46 @@ await runTest('arraysAreEqual should return false for different arrays', () => {
 
 await runTest('arraysAreEqual should return false for different lengths', () => {
   assert.equal(arraysAreEqual([1, 2], [1, 2, 3]), false);
+});
+
+await runTest('mergeSortedArrays should merge two sorted arrays', () => {
+  assert.deepEqual(
+    mergeSortedArrays([1, 3, 5], [2, 4, 6]),
+    [1, 2, 3, 4, 5, 6]
+  );
+});
+
+await runTest('mergeSortedArrays should handle empty first array', () => {
+  assert.deepEqual(mergeSortedArrays([], [1, 2, 3]), [1, 2, 3]);
+});
+
+await runTest('mergeSortedArrays should handle empty second array', () => {
+  assert.deepEqual(mergeSortedArrays([1, 2, 3], []), [1, 2, 3]);
+});
+
+await runTest('mergeSortedArrays should handle both arrays empty', () => {
+  assert.deepEqual(mergeSortedArrays([], []), []);
+});
+
+await runTest('mergeSortedArrays should handle interleaved elements', () => {
+  assert.deepEqual(
+    mergeSortedArrays([0, 2, 4, 6], [1, 3, 5, 7]),
+    [0, 1, 2, 3, 4, 5, 6, 7]
+  );
+});
+
+await runTest('mergeSortedArrays should handle non-overlapping ranges', () => {
+  assert.deepEqual(
+    mergeSortedArrays([1, 2, 3], [10, 11, 12]),
+    [1, 2, 3, 10, 11, 12]
+  );
+});
+
+await runTest('mergeSortedArrays should handle different length arrays', () => {
+  assert.deepEqual(
+    mergeSortedArrays([1, 5], [2, 3, 4, 6, 7]),
+    [1, 2, 3, 4, 5, 6, 7]
+  );
 });
 
 // ============================================================================
