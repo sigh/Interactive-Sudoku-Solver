@@ -17,8 +17,7 @@ export const getColorForValue = memoize((value, numValues) => {
 const formatTick = (ms) => {
   if (ms === 0) return '0 s';
   if (ms < 1e3) return `${ms} ms`;
-  if (ms < 60e3) return `${formatFixedTruncated(ms / 1e3, 3)} s`;
-  return `${formatFixedTruncated(ms / 60e3, 3)} m`;
+  return `${formatFixedTruncated(ms / 1e3, 3)} s`;
 };
 export class DebugFlameGraphView {
   constructor(stackTraceElem, { highlighter, infoOverlay }) {
