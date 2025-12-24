@@ -57,6 +57,7 @@ layout: null
             <li><a href="#successor-arrows">Successor Arrows</a></li>
             <li><a href="#flatmates">Flatmates</a></li>
             <li><a href="#odd-even-lots">Odd/Even Lots</a></li>
+            <li><a href="#general-skyscraper">General Skyscraper</a></li>
           </ul>
         </li>
         <li><a href="#constraint-sandbox">Constraint Sandbox</a></li>
@@ -319,6 +320,34 @@ function transition(state, value) {
 
 function accept(state) {
   return state.remaining == 0;
+}</pre>
+        </p>
+
+        <h3 id="general-skyscraper">General Skyscraper</h3>
+        <p>
+          <b>Description:</b>
+          Generalize the skyscraper constraint to apply along any line of cells
+          (for example, a diagonal).
+          From the start of the line, there is a target indicate how many
+          "buildings" are visible, where taller buildings block the view of
+          shorter ones behind them.
+        </p>
+        <p>
+          Implement this by configuring a state machine in the
+          "Custom JavaScript constraints" panel. Change the `accept` function
+          to set the target number of visible buildings:
+        <pre>
+startState = { max: 0, seen: 0 };
+
+function transition(state, value) {
+  return {
+    max: Math.max(state.max, value),
+    seen: state.seen + (value > state.max),
+  }
+}
+
+function accept(state) {
+  return state.seen === 5;  // Change to target number of visible buildings
 }</pre>
         </p>
       </div>
