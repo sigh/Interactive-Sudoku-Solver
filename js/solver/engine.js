@@ -797,6 +797,12 @@ class InternalSolver {
       //       selection methods.
       grid[cell] = value;
 
+      iterationCounterForUpdates++;
+      if ((iterationCounterForUpdates & progressFrequencyMask) === 0) {
+        this._progress.callback();
+        iterationCounterForUpdates &= (1 << 30) - 1;
+      }
+
       // Propagate constraints.
       const hasContradiction = !this._enforceConstraints(
         recFrame.gridState, handlerAccumulator);
@@ -819,12 +825,6 @@ class InternalSolver {
             hasContradiction: hasContradiction,
           };
         }
-      }
-
-      iterationCounterForUpdates++;
-      if ((iterationCounterForUpdates & progressFrequencyMask) === 0) {
-        this._progress.callback();
-        iterationCounterForUpdates &= (1 << 30) - 1;
       }
 
       if (yieldEveryStep) {
