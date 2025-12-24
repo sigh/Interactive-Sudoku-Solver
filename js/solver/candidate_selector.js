@@ -219,15 +219,19 @@ export class CandidateSelector {
   }
 
   _selectBestCandidate(gridState, cellOrder, cellDepth, isNewNode) {
-    // If we have a special candidate state, then use that.
-    // TODO: Try relax the condition that we *must* use this when it is not a singleton.
-    if (this._candidateSelectionFlags[cellDepth]) {
-      const state = this._candidateSelectionStates[cellDepth];
-      const count = state.cells.length;
-      if (count === 1) {
-        this._candidateSelectionFlags[cellDepth] = 0;
+    if (isNewNode) {
+      // Clear any previous candidate selection state.
+      this._candidateSelectionFlags[cellDepth] = 0;
+    } else {
+      // If we have a special candidate state, then use that.
+      // TODO: Try relax the condition that we *must* use this when it is not a singleton.
+      if (this._candidateSelectionFlags[cellDepth]) {
+        const state = this._candidateSelectionStates[cellDepth];
+        const count = state.cells.length;
+        if (count) {
+          return [cellOrder.indexOf(state.cells.pop()), state.value, count];
+        }
       }
-      return [cellOrder.indexOf(state.cells.pop()), state.value, count];
     }
 
     // Quick check - if the first value is a singleton, then just return without
@@ -714,7 +718,6 @@ export class SamplingCandidateSelector extends CandidateSelector {
 
   selectNextCandidate(cellDepth, gridState, stepState, isNewNode) {
     if (!isNewNode) {
-      this._candidateSelectionFlags[cellDepth] = 0;
       return [0, 0, 0];
     }
 
