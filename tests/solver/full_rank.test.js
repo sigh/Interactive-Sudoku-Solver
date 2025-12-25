@@ -153,6 +153,31 @@ await runTest('FullRank enforceConsistency should reject forced tie between cons
   assert.equal(handler.enforceConsistency(grid, acc), false);
 });
 
+await runTest('FullRank clued ranks should still reject forced ties when globallyUnique=true', () => {
+  const context = setupConstraintTest({ gridSize: 4 });
+  const clues = [
+    { rank: 1, line: Uint8Array.from([0, 1]) },
+    { rank: 2, line: Uint8Array.from([4, 5]) },
+    { rank: 3, line: Uint8Array.from([8, 9]) },
+    { rank: 4, line: Uint8Array.from([12, 13]) },
+  ];
+
+  const handler = new FullRank(16, clues, true);
+  const grid = context.createGrid();
+  assert.equal(handler.initialize(grid, createCellExclusions(), context.shape, {}), true);
+
+  // Force Row0 and Row1 to tie completely (identical fixed digits).
+  grid[1] = mask(2);
+  grid[2] = mask(3);
+  grid[3] = mask(4);
+  grid[5] = mask(2);
+  grid[6] = mask(3);
+  grid[7] = mask(4);
+
+  const acc = createAccumulator();
+  assert.equal(handler.enforceConsistency(grid, acc), false);
+});
+
 await runTest('FullRank enforceConsistency should fail when not enough viable entries exist', () => {
   const context = setupConstraintTest({ gridSize: 4 });
   const value1 = LookupTables.fromValue(1);
@@ -179,9 +204,56 @@ await runTest('FullRank enforceConsistency should fail when not enough viable en
   assert.equal(handler.enforceConsistency(grid, acc), false);
 });
 
+await runTest('FullRank unclued entry selection should not count forced ties as < or >', () => {
+  const context = setupConstraintTest({ gridSize: 4 });
+  const value1 = LookupTables.fromValue(1);
+  const value2 = LookupTables.fromValue(2);
+
+  // One clue in the value-1 rank set at rankIndex=1 (rank=2).
+  // This requires 1 strictly-less and 2 strictly-greater unclued entries.
+  // If all viable unclued entries are forced ties, the constraint must fail.
+  const handler = new FullRank(16, [{ rank: 2, line: Uint8Array.from([4, 5]) }]);
+  const grid = context.createGrid();
+  assert.equal(handler.initialize(grid, createCellExclusions(), context.shape, {}), true);
+
+  // Fully fix the clued entry (row 1 forward: [4,5,6,7]) to a pattern that allows
+  // us to create forced ties on other entries.
+  // Note: We intentionally allow repeated digits here; these tests are about FullRank
+  // ordering semantics, not Sudoku validity.
+  grid[5] = value2;
+  grid[6] = value2;
+  grid[7] = value1;
+
+  // Make exactly three unclued entries viable (start cell includes value1) and force
+  // each of them to be an exact tie with the clued entry.
+  // Viable unclued entries (by start cell):
+  //  - row 1 reverse starts at 7: [7,6,5,4]
+  //  - row 2 forward starts at 8: [8,9,10,11]
+  //  - row 2 reverse starts at 11: [11,10,9,8]
+  const keptStartCells = new Set([7, 8, 11]);
+
+  // Force row 2 forward to match the clued entry positionally.
+  grid[8] = value1;
+  grid[9] = value2;
+  grid[10] = value2;
+  grid[11] = value1;
+
+  // Remove value1 from all other unclued-entry start cells so only the above three
+  // entries are viable.
+  for (let i = 0; i < handler._uncluedEntries.length; i++) {
+    const startCell = handler._uncluedEntries[i][0];
+    if (keptStartCells.has(startCell)) continue;
+    grid[startCell] &= ~value1;
+  }
+
+  const acc = createAccumulator();
+  // All viable entries are forced ties, so none can satisfy strict < or >.
+  assert.equal(handler.enforceConsistency(grid, acc), false);
+});
+
 await runTest('FullRank should reject whole-entry fixed ties within a rank set', () => {
   const { handler, context } = initializeConstraintHandler(FullRank, {
-    args: [81, []],
+    args: [81, [], true],
     shapeConfig: { gridSize: 9 },
   });
 
@@ -201,8 +273,26 @@ await runTest('FullRank should reject whole-entry fixed ties within a rank set',
   assert.equal(handler.enforceConsistency(grid, acc), false);
 });
 
+await runTest('UniqueFullRanks should reject a row equal to another row reversed', async () => {
+  const base =
+    '.Shape~4x4.' +
+    '.~R1C1_3.~R1C2_4.~R1C3_2.~R1C4_1.' +
+    '.~R2C1_1.~R2C2_2.~R2C3_4.~R2C4_3.';
+
+  const parsed1 = SudokuParser.parseString(base);
+  const resolved1 = SudokuBuilder.resolveConstraint(parsed1);
+  const solver1 = SudokuBuilder.build(resolved1);
+  assert.notEqual(solver1.nthSolution(0), null);
+
+  const parsed2 = SudokuParser.parseString('.Shape~4x4.UniqueFullRanks' + base.slice('.Shape~4x4'.length));
+  const resolved2 = SudokuBuilder.resolveConstraint(parsed2);
+  const solver2 = SudokuBuilder.build(resolved2);
+  assert.equal(solver2.nthSolution(0), null);
+});
+
 await runTest('FullRank 4x4 regression: provided constraint string has no solutions', async () => {
-  const puzzle = '.Shape~4x4.FullRank~C1~10~.FullRank~C2~15~.FullRank~C4~3~.FullRank~C3~~4';
+  const puzzle =
+    '.Shape~4x4.UniqueFullRanks.FullRank~C1~10~.FullRank~C2~15~.FullRank~C4~3~.FullRank~C3~~4.';
 
   const parsed = SudokuParser.parseString(puzzle);
   const resolved = SudokuBuilder.resolveConstraint(parsed);

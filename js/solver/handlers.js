@@ -2568,10 +2568,11 @@ export class NumberedRoom extends SudokuConstraintHandler {
 }
 
 export class FullRank extends SudokuConstraintHandler {
-  constructor(numGridCells, clues) {
+  constructor(numGridCells, clues, globallyUnique = false) {
     const allCells = Uint8Array.from({ length: numGridCells }, (_, i) => i);
     super(allCells);
 
+    this._globallyUnique = globallyUnique;
     this._uncluedEntries = [];
     this._allEntries = [];
     this._rankSets = [];
@@ -2582,6 +2583,10 @@ export class FullRank extends SudokuConstraintHandler {
 
   clues() {
     return this._clues;
+  }
+
+  isGloballyUnique() {
+    return this._globallyUnique;
   }
 
   initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
@@ -2976,7 +2981,7 @@ export class FullRank extends SudokuConstraintHandler {
       }
     }
 
-    return this._enforceUniqueRanks(grid);
+    return this._globallyUnique ? this._enforceUniqueRanks(grid) : true;
   }
 
   candidateFinders(grid, shape) {
