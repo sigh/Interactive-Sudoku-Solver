@@ -1143,7 +1143,7 @@ export class SudokuConstraint {
     static DESCRIPTION = (`
       Only explicitly marked cell pairs satisfy Kropki (black/white dot)
       constraints.`);
-    static CATEGORY = 'GlobalCheckbox';
+    static CATEGORY = 'Global';
     static UNIQUENESS_KEY_FIELD = 'type';
 
     static fnKey = memoize((numValues) =>
@@ -1155,7 +1155,7 @@ export class SudokuConstraint {
   static StrictXV = class StrictXV extends SudokuConstraintBase {
     static DESCRIPTION = (`
       Only explicitly marked cell pairs satisfy XV constraints.`);
-    static CATEGORY = 'GlobalCheckbox';
+    static CATEGORY = 'Global';
     static UNIQUENESS_KEY_FIELD = 'type';
 
     static fnKey = memoize((numValues) =>
@@ -1259,7 +1259,7 @@ export class SudokuConstraint {
       A taxicab distance from cell A to cell B is the minimum
       possible distance from cell A to cell B when traversed only through
       adjacent cells.`);
-    static CATEGORY = 'GlobalCheckbox';
+    static CATEGORY = 'Global';
     static UNIQUENESS_KEY_FIELD = 'type';
 
     static displayName() {
@@ -1290,7 +1290,7 @@ export class SudokuConstraint {
   static AntiConsecutive = class AntiConsecutive extends SudokuConstraintBase {
     static DESCRIPTION = (`
       No adjacent cells can have consecutive values.`);
-    static CATEGORY = 'GlobalCheckbox';
+    static CATEGORY = 'Global';
     static UNIQUENESS_KEY_FIELD = 'type';
 
     static fnKey = memoize((numValues) =>
@@ -1308,7 +1308,7 @@ export class SudokuConstraint {
     static DESCRIPTION = (`
       Each 2x2 box in the grid has to contain a low digit (1, 2, 3),
       a middle digit (4, 5, 6) and a high digit (7, 8, 9).`);
-    static CATEGORY = 'GlobalCheckbox';
+    static CATEGORY = 'Global';
     static UNIQUENESS_KEY_FIELD = 'type';
   }
 
@@ -1318,7 +1318,7 @@ export class SudokuConstraint {
     static DESCRIPTION = (`
       Each 2x2 box in the grid has to contain a digit from (1, 4, 7),
       a digit from (2, 5, 8) and a digit from (3, 6, 9).`);
-    static CATEGORY = 'GlobalCheckbox';
+    static CATEGORY = 'Global';
     static UNIQUENESS_KEY_FIELD = 'type';
 
     static displayName() {
@@ -1326,17 +1326,33 @@ export class SudokuConstraint {
     }
   }
 
-  static UniqueFullRanks = class UniqueFullRanks extends SudokuConstraintBase {
+  static FullRankTies = class FullRankTies extends SudokuConstraintBase {
     static DESCRIPTION = (`
-      All rows and columns are ranked in order when read as numbers, with
-      the forward and reverse directions considered separately.
-      All ranks are considered globally unique regardless of whether they are
-      clued.`);
-    static CATEGORY = 'GlobalCheckbox';
+      Configures when ties are allowed for Full Rank ordering, where all rows
+      and columns are ranked in order when read as numbers, with the forward
+      and reverse directions considered separately.
+      Note that "No ranks can tie" affects the grid even when there are no
+      FullRank clues present.`);
+    static CATEGORY = 'Global';
     static UNIQUENESS_KEY_FIELD = 'type';
+    static ARGUMENT_CONFIG = {
+      inputType: 'select',
+      label: 'FullRank ties',
+      default: 'only-unclued',
+      options: [
+        { value: 'none', text: 'No ranks' },
+        { value: 'only-unclued', text: 'Unclued ranks only' },
+        { value: 'any', text: 'Any rank' },
+      ],
+    };
 
-    static displayName() {
-      return 'Unique Full Ranks';
+    constructor(ties) {
+      super(ties);
+      this.ties = ties;
+
+      if (!this.constructor.ARGUMENT_CONFIG.options.map(o => o.value).includes(ties)) {
+        throw ('Invalid FullRankTies: ' + ties);
+      }
     }
   }
 
@@ -1346,7 +1362,7 @@ export class SudokuConstraint {
       it. It may have both, but it doesn't need both.
       For non-9x9 grids, the 5 is replaced by the middle number and 9 by the
       maximum number.`);
-    static CATEGORY = 'GlobalCheckbox';
+    static CATEGORY = 'Global';
     static UNIQUENESS_KEY_FIELD = 'type';
   }
 
@@ -1866,7 +1882,8 @@ export class SudokuConstraint {
     static DESCRIPTION = (`
       Considering all rows and columns as numbers read from the direction
       of the clue and ranked from lowest (1) to highest, a clue represents
-      where in the ranking that row/column lies. Ties are not allowed.`);
+      where in the ranking that row/column lies. For tie handling, set the
+      Full Rank Mode in the Global constraints.`);
     static CATEGORY = 'OutsideClue';
     static DISPLAY_CONFIG = {
       displayClass: 'OutsideClue',

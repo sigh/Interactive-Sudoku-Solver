@@ -20,9 +20,9 @@ const CATEGORY_CONFIGS = {
     description: 'Layout and structural constraints',
     instructions: `Use checkboxes in the "Layout constraints" panel.`
   },
-  'GlobalCheckbox': {
+  'Global': {
     description: 'Constraints that apply to the entire grid',
-    instructions: `Use checkboxes in the "Global constraints" panel.`
+    instructions: `Use the controls in the "Global constraints" panel.`
   },
   'GivenCandidates': {
     description: 'Restrictions on the initial values of cells',

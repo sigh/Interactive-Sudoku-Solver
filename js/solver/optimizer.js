@@ -721,21 +721,23 @@ export class SudokuConstraintOptimizer {
 
     const clues = [];
     let globallyUnique = false;
+    let permissiveClues = false;
     for (const h of rankHandlers) {
       clues.push(...h.clues());
       globallyUnique ||= h.isGloballyUnique();
+      permissiveClues ||= h.isPermissiveClues();
       handlerSet.replace(h, new HandlerModule.True());
     }
 
     const handler = new HandlerModule.FullRank(
-      shape.numCells, clues, globallyUnique);
+      shape.numCells, clues, globallyUnique, permissiveClues);
     handlerSet.add(handler);
 
     if (this._debugLogger) {
       this._debugLogger.log({
         loc: '_optimizeFullRank',
         msg: 'Combine: ' + handler.constructor.name,
-        args: { numHandlers: rankHandlers.length, globallyUnique },
+        args: { numHandlers: rankHandlers.length, globallyUnique, permissiveClues },
         cells: handler.cells
       });
     }

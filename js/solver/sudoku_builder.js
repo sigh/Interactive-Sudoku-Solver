@@ -581,8 +581,10 @@ export class SudokuBuilder {
           }
           break;
 
-        case 'UniqueFullRanks':
-          yield new HandlerModule.FullRank(shape.numCells, [], true);
+        case 'FullRankTies':
+          if (constraint.ties === 'none') {
+            yield new HandlerModule.FullRank(shape.numCells, [], true, false);
+          }
           break;
 
         case 'DutchFlatmates':
@@ -673,8 +675,12 @@ export class SudokuBuilder {
           {
             const line = constraint.getCells(shape).map(
               c => shape.parseCellId(c).cell);
+
+            const fullRankTies = constraintMap.get('FullRankTies')?.[0].ties || null;
+            const globallyUnique = fullRankTies === 'none';
+            const permissiveClues = fullRankTies === 'any';
             yield new HandlerModule.FullRank(
-              shape.numCells, [{ rank: constraint.value, line }]);
+              shape.numCells, [{ rank: constraint.value, line }], globallyUnique, permissiveClues);
           }
           break;
 

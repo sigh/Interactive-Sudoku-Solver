@@ -707,6 +707,26 @@ export const EXAMPLES = [
     solution: '146532253614635421412356324165561243',
   },
 
+  {
+    // Requires allow ties in clues.
+    name: '4x4: Full Rank - with ties',
+    input: '.Shape~4x4.FullRank~C1~10~.FullRank~C2~15~.FullRank~R4~5~.FullRankTies~any',
+    solution: '3421124341322314',
+  },
+  {
+    // Requires no ties to have a unique solution.
+    name: '4x4: Full Rank - no ties',
+    input: '.Shape~4x4.FullRank~C1~10~.~R3C4_2~R4C3_1.FullRankTies~none',
+    solution: '3421213413424213',
+  },
+  {
+    // Requires clues to be unique, but to allow other ties to have a unique
+    // solution.
+    name: '4x4: Full Rank - unclued ties',
+    input: '.Shape~4x4.FullRank~R4~5~.~R3C2_1',
+    solution: '3241143241232314',
+  },
+
   //////////////////////////////////////////////////////////////////////////////
   // Or
   //////////////////////////////////////////////////////////////////////////////
