@@ -1326,6 +1326,20 @@ export class SudokuConstraint {
     }
   }
 
+  static UniqueFullRanks = class UniqueFullRanks extends SudokuConstraintBase {
+    static DESCRIPTION = (`
+      All rows and columns are ranked in order when read as numbers, with
+      the forward and reverse directions considered separately.
+      All ranks are considered globally unique regardless of whether they are
+      clued.`);
+    static CATEGORY = 'GlobalCheckbox';
+    static UNIQUENESS_KEY_FIELD = 'type';
+
+    static displayName() {
+      return 'Unique Full Ranks';
+    }
+  }
+
   static DutchFlatmates = class DutchFlatmates extends SudokuConstraintBase {
     static DESCRIPTION = (`
       All 5's in the grid must have a 1 directly above it or a 9 directly below

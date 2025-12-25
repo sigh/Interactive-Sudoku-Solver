@@ -581,6 +581,10 @@ export class SudokuBuilder {
           }
           break;
 
+        case 'UniqueFullRanks':
+          yield new HandlerModule.FullRank(shape.numCells, [], true);
+          break;
+
         case 'DutchFlatmates':
           for (const cells of SudokuConstraintBase.colRegions(shape)) {
             yield new HandlerModule.DutchFlatmateLine(cells);

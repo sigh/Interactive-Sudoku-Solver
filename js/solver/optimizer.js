@@ -720,20 +720,22 @@ export class SudokuConstraintOptimizer {
     if (rankHandlers.length == 0) return;
 
     const clues = [];
+    let globallyUnique = false;
     for (const h of rankHandlers) {
       clues.push(...h.clues());
+      globallyUnique ||= h.isGloballyUnique();
       handlerSet.replace(h, new HandlerModule.True());
     }
 
     const handler = new HandlerModule.FullRank(
-      shape.numCells, clues);
+      shape.numCells, clues, globallyUnique);
     handlerSet.add(handler);
 
     if (this._debugLogger) {
       this._debugLogger.log({
         loc: '_optimizeFullRank',
         msg: 'Combine: ' + handler.constructor.name,
-        args: { numHandlers: rankHandlers.length },
+        args: { numHandlers: rankHandlers.length, globallyUnique },
         cells: handler.cells
       });
     }
