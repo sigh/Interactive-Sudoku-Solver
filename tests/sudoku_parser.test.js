@@ -355,6 +355,20 @@ await runTest('parseString should parse multiple constraints', () => {
   assertConstraintCount(result, 'Given', 1);
 });
 
+await runTest('parseString should parse FullRankTies', () => {
+  const result = SudokuParser.parseString('.FullRankTies~none.');
+  assert.ok(result);
+  const ties = findConstraint(result, 'FullRankTies');
+  assert.equal(ties.ties, 'none');
+});
+
+await runTest('parseString should reject invalid FullRankTies value', () => {
+  assert.throws(
+    () => SudokuParser.parseString('.FullRankTies~not-a-mode.'),
+    /Invalid FullRankTies/i,
+  );
+});
+
 await runTest('parseString should throw on unknown constraint', () => {
   assert.throws(
     () => SudokuParser.parseString('.UnknownConstraint.'),

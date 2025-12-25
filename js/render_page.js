@@ -437,7 +437,7 @@ class ConstraintManager {
 
     const categoryInputs = [
       new ConstraintCategoryInput.Shape(selectedConstraintCollection),
-      new ConstraintCategoryInput.GlobalCheckbox(
+      new ConstraintCategoryInput.Global(
         selectedConstraintCollection, this.addUpdateListener.bind(this)),
       new ConstraintCategoryInput.LayoutCheckbox(selectedConstraintCollection),
       new ConstraintCategoryInput.Jigsaw(

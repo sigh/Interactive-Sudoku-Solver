@@ -372,6 +372,9 @@ export const runSolveTests = async (onFailure, runner) => {
     '6x6: Rellik cages',  // Rellik cages
     '6x6: Successor Arrows',  // Regex
     '6x6: Full rank',  // Full rank (requires enforcing no ties)
+    '4x4: Full Rank - no ties',
+    '4x4: Full Rank - with ties',
+    '4x4: Full Rank - unclued ties',
   ], onFailure);
   result.collection = 'Other sizes';
   results.push(result);

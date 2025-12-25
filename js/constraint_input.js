@@ -201,6 +201,20 @@ class CheckboxCategoryInput extends ConstraintCategoryInput {
     super(collection);
 
     this._checkboxes = new Map();
+    this._selects = new Map();
+
+    const removeAllOfType = (constraint) => {
+      // We need to remove the exact constraint objects (not necessarily
+      // the constraint we store ourselves).
+      for (const uniquenessKey of constraint.uniquenessKeys()) {
+        for (const c of this.collection.getConstraintsByKey(uniquenessKey)) {
+          if (c.type === constraint.type) {
+            this.collection.removeConstraint(c);
+          }
+        }
+      }
+    };
+
     const initSingleCheckbox = (constraintClass, container, option) => {
       const constraint = new constraintClass(...(option ? [option.value] : []));
       const constraintCls = constraint.constructor;
@@ -215,15 +229,7 @@ class CheckboxCategoryInput extends ConstraintCategoryInput {
         if (input.checked) {
           this.collection.addConstraint(constraint);
         } else {
-          // We need to remove the exact constraint objects (not necessarily
-          // the constraint we store ourselves).
-          for (const uniquenessKey of constraint.uniquenessKeys()) {
-            for (const c of this.collection.getConstraintsByKey(uniquenessKey)) {
-              if (c.type === constraint.type) {
-                this.collection.removeConstraint(c);
-              }
-            }
-          }
+          removeAllOfType(constraint);
         }
       };
       div.appendChild(input);
@@ -247,10 +253,72 @@ class CheckboxCategoryInput extends ConstraintCategoryInput {
       });
     };
 
+    const initSelectDropdown = (constraintClass, container, argConfig) => {
+      const selectId = `${containerId}-select-${this._selects.size}`;
+
+      // Create a template constraint so we can compute uniqueness keys and type.
+      const defaultValue = argConfig.default ?? argConfig.options?.[0]?.value;
+      if (defaultValue === undefined) {
+        throw new Error(
+          `Select constraint ${constraintClass.name} must define a default or at least one option.`);
+      }
+      const templateConstraint = new constraintClass(defaultValue);
+
+      const div = document.createElement('div');
+
+      const label = document.createElement('label');
+      label.htmlFor = selectId;
+      label.textContent = `${constraintClass.displayName()}: `;
+      div.appendChild(label);
+
+      const tooltip = document.createElement('span');
+      tooltip.className = 'tooltip';
+      tooltip.setAttribute('data-text', constraintClass.DESCRIPTION);
+      div.appendChild(tooltip);
+
+      const select = document.createElement('select');
+      select.id = selectId;
+
+      for (const opt of (argConfig.options || [])) {
+        const option = document.createElement('option');
+        option.value = opt.value;
+        option.textContent = opt.text;
+        select.appendChild(option);
+      }
+
+      // Default selection should reflect default behaviour.
+      // If the selected value matches the default, we keep the constraint unset
+      // (implicit default) to keep serialized strings clean.
+      select.value = defaultValue;
+
+      select.onchange = () => {
+        const value = select.value;
+        removeAllOfType(templateConstraint);
+        if (value !== defaultValue) {
+          this.collection.addConstraint(new constraintClass(value));
+        }
+      };
+      div.appendChild(select);
+
+      container.appendChild(div);
+
+      this._selects.set(templateConstraint.type, {
+        element: select,
+        constraintClass,
+        defaultValue,
+      });
+    };
+
     const container = document.getElementById(containerId);
     const constraintClasses = this.constructor.constraintClasses();
+
+    // Render checkboxes first, then select dropdowns.
+    // This keeps the UI predictable when mixing input types.
     for (const constraintClass of constraintClasses) {
-      if (constraintClass.ARGUMENT_CONFIG) {
+      const argConfig = constraintClass.ARGUMENT_CONFIG;
+      if (argConfig?.inputType === 'select') continue;
+
+      if (argConfig) {
         for (const option of constraintClass.ARGUMENT_CONFIG.options) {
           initSingleCheckbox(constraintClass, container, option);
         }
@@ -258,27 +326,53 @@ class CheckboxCategoryInput extends ConstraintCategoryInput {
         initSingleCheckbox(constraintClass, container, null);
       }
     }
+
+    for (const constraintClass of constraintClasses) {
+      const argConfig = constraintClass.ARGUMENT_CONFIG;
+      if (argConfig?.inputType !== 'select') continue;
+      initSelectDropdown(constraintClass, container, argConfig);
+    }
   }
 
   onAddConstraint(c) {
     const checkbox = this._checkboxes.get(c.toString());
-    const element = checkbox.element;
-    element.checked = true;
+    if (checkbox) {
+      checkbox.element.checked = true;
+      return;
+    }
+
+    const select = this._selects.get(c.type);
+    if (select) {
+      // For select constraints, the first arg is the selected value.
+      select.element.value = c.args[0] ?? select.defaultValue;
+    }
   }
 
   onRemoveConstraint(c) {
-    const element = this._checkboxes.get(c.toString()).element;
-    element.checked = false;
+    const checkbox = this._checkboxes.get(c.toString());
+    if (checkbox) {
+      checkbox.element.checked = false;
+      return;
+    }
+
+    const select = this._selects.get(c.type);
+    if (select) {
+      select.element.value = select.defaultValue;
+    }
   }
 
   clear() {
     for (const item of this._checkboxes.values()) {
       item.element.checked = false;
     }
+
+    for (const item of this._selects.values()) {
+      item.element.value = item.defaultValue;
+    }
   }
 }
 
-ConstraintCategoryInput.GlobalCheckbox = class GlobalCheckbox extends CheckboxCategoryInput {
+ConstraintCategoryInput.Global = class Global extends CheckboxCategoryInput {
   constructor(collection, addUpdateListener) {
     const element = document.getElementById('global-constraints-container');
     const container = new CollapsibleContainer(
