@@ -38,18 +38,28 @@ export const DEFAULT_BENCH_OPTIONS = Object.freeze({
 });
 
 const parseArgs = (argv) => {
-  const args = { name: null, help: false };
+  const args = { name: null, help: false, format: 'pretty' };
   for (let i = 2; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--help' || a === '-h') {
       args.help = true;
     } else if (a === '--name') {
       args.name = argv[++i] ?? '';
+    } else if (a === '--format') {
+      args.format = argv[++i] ?? 'pretty';
     } else if (a.startsWith('--name=')) {
       args.name = a.slice('--name='.length);
+    } else if (a.startsWith('--format=')) {
+      args.format = a.slice('--format='.length);
     }
   }
   return args;
+};
+
+const normalizeFormat = (format) => {
+  const f = String(format || '').trim().toLowerCase();
+  if (f === 'pretty' || f === 'table' || f === 'csv') return f;
+  return 'pretty';
 };
 
 const toNameMatcher = (nameArg) => {
@@ -176,6 +186,42 @@ export const printBenchResult = (b, result) => {
   console.log(`  median/op: ${perOpDisplay} | throughput: ${opsDisplay} | samples: ${sampleCount} | inner: ${inner}`);
 };
 
+const escapeCsv = (value) => {
+  const s = String(value);
+  if (!/[",\n\r]/.test(s)) return s;
+  return `"${s.replace(/"/g, '""')}"`;
+};
+
+export const printBenchResultTableRow = (b, result) => {
+  const perOpNs = result.medianPerOpNs;
+  const opsPerSec = result.opsPerSec;
+  const inner = result.samples[0]?.innerIterations ?? 0;
+
+  // Tab-separated so it's easy to paste into spreadsheets and avoids wrapping
+  // issues in narrow terminals (long `name` is last).
+  const group = String(b.group);
+  const perOpDisplay = formatPerOpNs(perOpNs);
+  const opsDisplay = formatOpsPerSec(opsPerSec);
+  const innerDisplay = formatNumber(inner);
+  const name = String(b.name);
+
+  console.log(`${group}\t${perOpDisplay}\t${opsDisplay}\t${innerDisplay}\t${name}`);
+};
+
+export const printBenchResultCsvRow = (b, result) => {
+  const perOpNs = result.medianPerOpNs;
+  const opsPerSec = result.opsPerSec;
+  const inner = result.samples[0]?.innerIterations ?? 0;
+  const row = [
+    b.group,
+    b.name,
+    perOpNs,
+    opsPerSec,
+    inner,
+  ].map(escapeCsv).join(',');
+  console.log(row);
+};
+
 export const isMain = (importMetaUrl, argv = process.argv) => {
   const mainPath = argv?.[1];
   if (!mainPath) return false;
@@ -191,9 +237,11 @@ export const runIfMain = async (importMetaUrl, argv = process.argv) => {
 
   const args = parseArgs(argv);
   if (args.help) {
-    console.log('Usage: node <file>.bench.js [--name <substring|/regex/>]');
+    console.log('Usage: node <file>.bench.js [--name <substring|/regex/>] [--format pretty|table|csv]');
     process.exit(0);
   }
+
+  const format = normalizeFormat(args.format);
 
   let benches = getRegisteredBenches();
   if (benches.length === 0) {
@@ -213,10 +261,23 @@ export const runIfMain = async (importMetaUrl, argv = process.argv) => {
 
   console.log(`▶ Running ${benches.length} benchmark(s)`);
 
+  if (format === 'table') {
+    console.log('group\tmedian/op\tthroughput\tinner\tname');
+  } else if (format === 'csv') {
+    console.log('group,name,medianPerOpNs,opsPerSec,innerIterations');
+  }
+
   benches.sort((a, b) => (a.group + a.name).localeCompare(b.group + b.name));
   for (const b of benches) {
     const result = await runBench(b);
-    printBenchResult(b, result);
+
+    if (format === 'table') {
+      printBenchResultTableRow(b, result);
+    } else if (format === 'csv') {
+      printBenchResultCsvRow(b, result);
+    } else {
+      printBenchResult(b, result);
+    }
   }
 
   console.log('\n✓ Benchmarks completed');
