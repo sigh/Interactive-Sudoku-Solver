@@ -17,6 +17,23 @@ export class SudokuConstraintOptimizer {
     this._forbiddenStackPool = null;
   }
 
+  _logAddHandler(loc, handler, { args = null, cells = null, aux = false } = {}) {
+    if (!this._debugLogger) return;
+
+    const auxSuffix = aux ? ' (aux)' : '';
+
+    const entry = {
+      loc,
+      msg: 'Add: ' + handler.constructor.name + auxSuffix,
+    };
+
+    if (args) entry.args = args;
+    if (cells) entry.cells = cells;
+    else if (handler.cells) entry.cells = handler.cells;
+
+    this._debugLogger.log(entry);
+  }
+
   optimize(handlerSet, cellExclusions, shape) {
     const hasBoxes = (
       handlerSet.getAllofType(HandlerModule.NoBoxes).length == 0
@@ -82,13 +99,7 @@ export class SudokuConstraintOptimizer {
           arrayDifference(houseHandlers[i].cells, houseHandlers[j].cells),
           arrayDifference(houseHandlers[j].cells, houseHandlers[i].cells));
         handlerSet.addAux(newHandler);
-        if (this._debugLogger) {
-          this._debugLogger.log({
-            loc: '_addHouseIntersections',
-            msg: `Add: ${newHandler.constructor.name} (aux)`,
-            cells: newHandler.cells,
-          });
-        }
+        this._logAddHandler('_addHouseIntersections', newHandler, { aux: true });
       }
     }
   }
@@ -210,11 +221,8 @@ export class SudokuConstraintOptimizer {
     remainingCells.forEach(c => sumCells.add(c));
 
     if (this._debugLogger) {
-      this._debugLogger.log({
-        loc: '_fillInSumGap',
-        msg: 'Add: ' + newHandler.constructor.name,
+      this._logAddHandler('_fillInSumGap', newHandler, {
         args: { sum: remainingSum },
-        cells: newHandler.cells,
       });
     }
 
@@ -386,12 +394,7 @@ export class SudokuConstraintOptimizer {
       let args = { sum: handler.sum(), size: handler.cells.length };
       if (usedExtraHouses) args.usedExtraHouses = usedExtraHouses;
       if (removedExtraHouses) args.removedExtraHouses = removedExtraHouses;
-      this._debugLogger.log({
-        loc: '_addSumIntersectionHandler',
-        msg: 'Add: ' + handler.constructor.name,
-        args: args,
-        cells: handler.cells
-      });
+      this._logAddHandler('_addSumIntersectionHandler', handler, { args });
     }
 
     return handler;
@@ -476,11 +479,8 @@ export class SudokuConstraintOptimizer {
         newHandlers.push(handler);
 
         if (this._debugLogger) {
-          this._debugLogger.log({
-            loc: '_makeHiddenCageHandlers',
-            msg: 'Add: ' + handler.constructor.name,
+          this._logAddHandler('_makeHiddenCageHandlers', handler, {
             args: { offset: remainingSum, negativeCells: [...extraCells] },
-            cells: handler.cells
           });
         }
       }
@@ -498,11 +498,8 @@ export class SudokuConstraintOptimizer {
       complementHandler.setComplementCells(constrainedCells);
       newHandlers.push(complementHandler);
       if (this._debugLogger) {
-        this._debugLogger.log({
-          loc: '_makeHiddenCageHandlers',
-          msg: 'Add: ' + complementHandler.constructor.name,
+        this._logAddHandler('_makeHiddenCageHandlers', complementHandler, {
           args: { sum: complementSum },
-          cells: complementCells
         });
       }
     }
@@ -536,13 +533,7 @@ export class SudokuConstraintOptimizer {
         // TODO: Optimize the diff0.length == 1 case (and 2?).
         const handler = new HandlerModule.SameValuesIgnoreCount(diff0, diff1);
         newHandlers.push(handler);
-        if (this._debugLogger) {
-          this._debugLogger.log({
-            loc: '_makeJigsawIntersections',
-            msg: 'Add: ' + handler.constructor.name,
-            cells: handler.cells,
-          });
-        }
+        this._logAddHandler('_makeJigsawIntersections', handler);
       }
     }
 
@@ -616,13 +607,7 @@ export class SudokuConstraintOptimizer {
       // All values in the set differences must be the same.
       const newHandler = new HandlerModule.SameValuesIgnoreCount(diffA, diffB);
       newHandlers.push(newHandler);
-      if (this._debugLogger) {
-        this._debugLogger.log({
-          loc: '_makeJigsawLawOfLeftoverHandlers',
-          msg: 'Add: ' + newHandler.constructor.name,
-          cells: newHandler.cells,
-        });
-      }
+      this._logAddHandler('_makeJigsawLawOfLeftoverHandlers', newHandler);
     }
 
     const overlapRegions = (
@@ -695,14 +680,7 @@ export class SudokuConstraintOptimizer {
       }
 
       newHandlers.push(newHandler);
-      if (this._debugLogger) {
-        this._debugLogger.log({
-          loc: '_makeInnieOutieSumHandlers',
-          msg: 'Add: ' + newHandler.constructor.name,
-          args: args,
-          cells: newHandler.cells,
-        });
-      }
+      this._logAddHandler('_makeInnieOutieSumHandlers', newHandler, { args });
     };
 
     const overlapRegions = (
@@ -757,14 +735,9 @@ export class SudokuConstraintOptimizer {
           if (a === b) continue;
           const eq = new HandlerModule.BinaryConstraint(a, b, equalsKey);
           handlerSet.add(eq);
-          if (this._debugLogger) {
-            this._debugLogger.log({
-              loc: '_optimizeFullRank',
-              msg: 'Add: ' + eq.constructor.name,
-              args: { rank: clue.rank },
-              cells: eq.cells,
-            });
-          }
+          this._logAddHandler('_optimizeFullRank', eq, {
+            args: { rank: clue.rank },
+          });
         }
         break;
       }
@@ -963,9 +936,7 @@ export class SudokuConstraintOptimizer {
           restrictions);
         handlerSet.add(newHandler);
         if (this._debugLogger) {
-          this._debugLogger.log({
-            loc: '_optimizeRequiredValues',
-            msg: 'Add: ' + newHandler.constructor.name,
+          this._logAddHandler('_optimizeRequiredValues', newHandler, {
             args: { restrictions: Object.fromEntries(restrictions.entries()) },
             cells: h.cells,
           });
@@ -1020,13 +991,7 @@ export class SudokuConstraintOptimizer {
       const newHandler = new HandlerModule.ValueDependentUniqueValueExclusionHouse(
         h.cells, valueCellExclusions);
       handlerSet.add(newHandler);
-      if (this._debugLogger) {
-        this._debugLogger.log({
-          loc: '_optimizeTaxicab',
-          msg: 'Add: ' + newHandler.constructor.name,
-          cells: newHandler.cells,
-        });
-      }
+      this._logAddHandler('_optimizeTaxicab', newHandler);
     }
   }
 

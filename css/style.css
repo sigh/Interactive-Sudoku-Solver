@@ -234,7 +234,6 @@ button,
   text-shadow: 0px 1px 0px var(--color-primary-text-shadow);
 
   padding: 5px 15px;
-  margin: 5px 0px;
 }
 
 button:hover,
@@ -271,7 +270,6 @@ button.image-button,
   height: 30px;
   width: 50px;
   padding: 5px 5px;
-  margin: 0px 0px;
 }
 
 button.image-button>img,
@@ -360,7 +358,6 @@ button.icon-button,
 }
 
 .chip-view[data-chip-view-type="jigsaw"] {
-  margin-bottom: 5px;
   min-height: 4em;
 }
 
@@ -404,7 +401,6 @@ button.icon-button,
   background: none;
   font-size: 25px;
   cursor: pointer;
-  margin: 0px;
   padding: 2px 10px;
   font-family: var(--font-family-mono);
 }
@@ -488,6 +484,12 @@ button.icon-button,
   gap: 2px;
 }
 
+#jigsaw-container {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
 #outside-clue-input {
   /* Hack, because for some reason `vertical-align: text-top` moves the tooltip
      down for just the little killer:( */
@@ -502,6 +504,7 @@ button.icon-button,
   display: flex;
   align-items: center;
   column-gap: 15px;
+  margin-top: 10px;
 }
 
 #composite-constraint-input {}
@@ -932,7 +935,6 @@ h3 {
   height: 20px;
   width: 20px;
   padding: 0;
-  margin: 0;
 }
 
 #stats-container #stats-header {
@@ -1066,7 +1068,6 @@ h3 {
 
 .tab-container button {
   padding: 0px 12px;
-  margin: 0;
   border: none;
   border-radius: 0;
   background: none;
