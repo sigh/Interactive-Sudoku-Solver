@@ -714,6 +714,12 @@ export const EXAMPLES = [
     solution: '3421124341322314',
   },
   {
+    // Requires allow ties in clues, with repeated ranks.
+    name: '4x4: Full Rank - tied clues',
+    input: '.Shape~4x4.FullRank~C1~10~.FullRank~C2~15~.FullRank~R4~5~.FullRank~R3~~5.FullRankTies~any',
+    solution: '3421124341322314',
+  },
+  {
     // Requires no ties to have a unique solution.
     name: '4x4: Full Rank - no ties',
     input: '.Shape~4x4.FullRank~C1~10~.~R3C4_2~R4C3_1.FullRankTies~none',

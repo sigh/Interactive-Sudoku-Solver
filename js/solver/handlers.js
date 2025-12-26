@@ -2568,7 +2568,33 @@ export class NumberedRoom extends SudokuConstraintHandler {
 }
 
 export class FullRank extends SudokuConstraintHandler {
-  constructor(numGridCells, clues, globallyUnique = false, permissiveClues = false) {
+  static TIE_MODE = Object.freeze({
+    NONE: 0,
+    ONLY_UNCLUED: 1,
+    ANY: 2,
+  });
+
+  static buildEntries(gridSize) {
+    const entries = [];
+    for (let i = 0; i < gridSize; i++) {
+      const row = Uint8Array.from(
+        { length: gridSize }, (_, j) => i * gridSize + j);
+      entries.push(row);
+      entries.push(row.slice().reverse());
+      const col = Uint8Array.from(
+        { length: gridSize }, (_, j) => j * gridSize + i);
+      entries.push(col);
+      entries.push(col.slice().reverse());
+    }
+    return entries;
+  }
+
+  static entryFromClue(entries, clue) {
+    return entries.find(
+      e => e[0] === clue.line[0] && e[1] === clue.line[1]);
+  }
+
+  constructor(numGridCells, clues, tieMode = FullRank.TIE_MODE.ONLY_UNCLUED) {
     const allCells = Uint8Array.from({ length: numGridCells }, (_, i) => i);
     super(allCells);
 
@@ -2582,8 +2608,7 @@ export class FullRank extends SudokuConstraintHandler {
       seenRanks.add(clue.rank);
     }
 
-    this._globallyUnique = globallyUnique;
-    this._permissiveClues = permissiveClues;
+    this._tieMode = tieMode;
     this._uncluedEntries = [];
     this._allEntries = [];
     this._rankSets = [];
@@ -2596,28 +2621,14 @@ export class FullRank extends SudokuConstraintHandler {
     return this._clues;
   }
 
-  isGloballyUnique() {
-    return this._globallyUnique;
-  }
-
-  isPermissiveClues() {
-    return this._permissiveClues;
+  tieMode() {
+    return this._tieMode;
   }
 
   initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
     // Initialize entries.
     const gridSize = shape.gridSize;
-    const entries = [];
-    for (let i = 0; i < gridSize; i++) {
-      const row = Uint8Array.from(
-        { length: gridSize }, (_, j) => i * gridSize + j);
-      entries.push(row);
-      entries.push(row.slice().reverse());
-      const col = Uint8Array.from(
-        { length: gridSize }, (_, j) => j * gridSize + i);
-      entries.push(col);
-      entries.push(col.slice().reverse());
-    }
+    const entries = FullRank.buildEntries(gridSize);
 
     this._allEntries = entries;
 
@@ -2632,13 +2643,12 @@ export class FullRank extends SudokuConstraintHandler {
     const rankMap = new MultiMap();
     for (const clue of this._clues) {
       const value = LookupTables.fromValue((clue.rank + 3) >> 2);
-      const entryIndex = entries.findIndex(
-        e => e[0] === clue.line[0] && e[1] === clue.line[1]);
-      if (entryIndex < 0) return false;
-      isClued.add(entryIndex);
+      const entry = FullRank.entryFromClue(entries, clue);
+      if (!entry) return false;
+      isClued.add(entry);
       rankMap.add(value, {
         rankIndex: (clue.rank + 3) & 3,
-        entry: entries[entryIndex],
+        entry,
         numRanksBelow: 0,
         numRanksAbove: 0,
       });
@@ -2648,7 +2658,7 @@ export class FullRank extends SudokuConstraintHandler {
     }
 
     // Unclued entries are all entries not referenced by any clue.
-    this._uncluedEntries = entries.filter((_, i) => !isClued.has(i));
+    this._uncluedEntries = entries.filter(entry => !isClued.has(entry));
 
     for (const [value, givens] of rankMap) {
       // Sort givens by rank.
@@ -2772,7 +2782,7 @@ export class FullRank extends SudokuConstraintHandler {
   _enforceUncluedEntriesForGiven(
     grid, handlerAccumulator, viableEntries, numViableEntries, given) {
     const { entry, numRanksBelow, numRanksAbove } = given;
-    const permissiveClues = this._permissiveClues;
+    const permissiveClues = this._tieMode === FullRank.TIE_MODE.ANY;
     const entries = this._uncluedEntries;
     const initialV = grid[entry[0]];
     const entryLength = entry.length;
@@ -3007,7 +3017,7 @@ export class FullRank extends SudokuConstraintHandler {
       }
     }
 
-    return this._globallyUnique ? this._enforceUniqueRanks(grid) : true;
+    return this._tieMode === FullRank.TIE_MODE.NONE ? this._enforceUniqueRanks(grid) : true;
   }
 
   candidateFinders(grid, shape) {

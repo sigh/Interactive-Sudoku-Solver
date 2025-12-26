@@ -162,7 +162,7 @@ await runTest('FullRank clued ranks should still reject forced ties when globall
     { rank: 4, line: Uint8Array.from([12, 13]) },
   ];
 
-  const handler = new FullRank(16, clues, true);
+  const handler = new FullRank(16, clues, FullRank.TIE_MODE.NONE);
   const grid = context.createGrid();
   assert.equal(handler.initialize(grid, createCellExclusions(), context.shape, {}), true);
 
@@ -305,7 +305,7 @@ await runTest('FullRankTies any should allow missing ">" ranks due to ties', () 
 
   // Strict: requires enough strictly-greater entries for numRanksAbove.
   {
-    const strictHandler = new FullRank(16, [clue], false, false);
+    const strictHandler = new FullRank(16, [clue], FullRank.TIE_MODE.ONLY_UNCLUED);
     const { grid, viableEntries } = makeGridAndViableEntries(strictHandler);
     const given = strictHandler._rankSets[0].givens[0];
     const acc = createAccumulator();
@@ -317,7 +317,7 @@ await runTest('FullRankTies any should allow missing ">" ranks due to ties', () 
 
   // Permissive: allows the shortfall due to ties.
   {
-    const permissiveHandler = new FullRank(16, [clue], false, true);
+    const permissiveHandler = new FullRank(16, [clue], FullRank.TIE_MODE.ANY);
     const { grid, viableEntries } = makeGridAndViableEntries(permissiveHandler);
     const given = permissiveHandler._rankSets[0].givens[0];
     const acc = createAccumulator();
@@ -384,7 +384,7 @@ await runTest('FullRankTies any should allow skipping multiple ranks due to mult
 
   // Strict: requires enough strictly-greater entries for numRanksAbove.
   {
-    const strictHandler = new FullRank(16, [clue], false, false);
+    const strictHandler = new FullRank(16, [clue], FullRank.TIE_MODE.ONLY_UNCLUED);
     const { grid, viableEntries } = makeGridAndViableEntries(strictHandler);
     const given = strictHandler._rankSets[0].givens[0];
     const acc = createAccumulator();
@@ -396,7 +396,7 @@ await runTest('FullRankTies any should allow skipping multiple ranks due to mult
 
   // Permissive: allows the shortfall due to ties consuming multiple ranks.
   {
-    const permissiveHandler = new FullRank(16, [clue], false, true);
+    const permissiveHandler = new FullRank(16, [clue], FullRank.TIE_MODE.ANY);
     const { grid, viableEntries } = makeGridAndViableEntries(permissiveHandler);
     const given = permissiveHandler._rankSets[0].givens[0];
     const acc = createAccumulator();
@@ -417,7 +417,7 @@ await runTest('FullRankTies any should still reject too many forced ">" entries'
   const value4 = LookupTables.fromValue(4);
 
   const clue = { rank: 2, line: Uint8Array.from([4, 5]) }; // row 1 forward
-  const handler = new FullRank(16, [clue], false, true);
+  const handler = new FullRank(16, [clue], FullRank.TIE_MODE.ANY);
   const grid = context.createGrid();
   assert.equal(handler.initialize(grid, createCellExclusions(), context.shape, {}), true);
 
@@ -462,7 +462,7 @@ await runTest('FullRank permissive should exclude extra < candidate only when no
 
   // Clue at rank=2 => rankIndex=1 => numRanksBelow=1.
   const clue = { rank: 2, line: Uint8Array.from([4, 5]) }; // row 1 forward
-  const handler = new FullRank(16, [clue], false, true);
+  const handler = new FullRank(16, [clue], FullRank.TIE_MODE.ANY);
 
   const grid = context.createGrid();
   assert.equal(handler.initialize(grid, createCellExclusions(), context.shape, {}), true);
@@ -509,7 +509,7 @@ await runTest('FullRank permissive should exclude extra > candidate only when no
 
   // Clue at rank=2 => rankIndex=1 => numRanksAbove=2.
   const clue = { rank: 2, line: Uint8Array.from([4, 5]) }; // row 1 forward
-  const handler = new FullRank(16, [clue], false, true);
+  const handler = new FullRank(16, [clue], FullRank.TIE_MODE.ANY);
 
   const grid = context.createGrid();
   assert.equal(handler.initialize(grid, createCellExclusions(), context.shape, {}), true);
@@ -559,7 +559,7 @@ await runTest('FullRank permissive should exclude extra > candidate only when no
 
 await runTest('FullRank should reject whole-entry fixed ties within a rank set', () => {
   const { handler, context } = initializeConstraintHandler(FullRank, {
-    args: [81, [], true],
+    args: [81, [], FullRank.TIE_MODE.NONE],
     shapeConfig: { gridSize: 9 },
   });
 
@@ -632,4 +632,17 @@ await runTest('FullRankTies only-unclued vs any: any can be solvable when only-u
   const resolvedOnly = SudokuBuilder.resolveConstraint(parsedOnly);
   const solverOnly = SudokuBuilder.build(resolvedOnly);
   assert.equal(solverOnly.nthSolution(0), null);
+});
+
+await runTest('FullRank optimizer should dedupe same-rank clues and enforce equality (solver)', async () => {
+  // Two FullRank clues with the same rank imply the corresponding entries are tied,
+  // so the optimizer should add equality constraints and keep only one of them
+  // in the final FullRank handler.
+  const puzzle = '.Shape~4x4.FullRankTies~any.FullRank~R1~1~..FullRank~R2~~1.';
+
+  const parsed = SudokuParser.parseString(puzzle);
+  const resolved = SudokuBuilder.resolveConstraint(parsed);
+  const solver = SudokuBuilder.build(resolved);
+
+  assert.notEqual(solver.nthSolution(0), null);
 });

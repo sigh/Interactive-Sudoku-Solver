@@ -375,6 +375,7 @@ export const runSolveTests = async (onFailure, runner) => {
     '4x4: Full Rank - no ties',
     '4x4: Full Rank - with ties',
     '4x4: Full Rank - unclued ties',
+    '4x4: Full Rank - tied clues',
   ], onFailure);
   result.collection = 'Other sizes';
   results.push(result);

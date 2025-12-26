@@ -582,9 +582,8 @@ export class SudokuBuilder {
           break;
 
         case 'FullRankTies':
-          if (constraint.ties === 'none') {
-            yield new HandlerModule.FullRank(shape.numCells, [], true, false);
-          }
+          yield new HandlerModule.FullRank(
+            shape.numCells, [], fullRankTieMode(constraint));
           break;
 
         case 'DutchFlatmates':
@@ -676,11 +675,10 @@ export class SudokuBuilder {
             const line = constraint.getCells(shape).map(
               c => shape.parseCellId(c).cell);
 
-            const fullRankTies = constraintMap.get('FullRankTies')?.[0].ties || null;
-            const globallyUnique = fullRankTies === 'none';
-            const permissiveClues = fullRankTies === 'any';
             yield new HandlerModule.FullRank(
-              shape.numCells, [{ rank: constraint.value, line }], globallyUnique, permissiveClues);
+              shape.numCells,
+              [{ rank: constraint.value, line }],
+              fullRankTieMode(constraintMap.get('FullRankTies')?.[0]));
           }
           break;
 
@@ -786,6 +784,17 @@ export class SudokuBuilder {
     }
   }
 }
+
+const fullRankTieMode = (fullRankTiesConstraint) => {
+  const fullRankTies = fullRankTiesConstraint?.ties || null;
+  if (fullRankTies === 'none') {
+    return HandlerModule.FullRank.TIE_MODE.NONE;
+  } else if (fullRankTies === 'any') {
+    return HandlerModule.FullRank.TIE_MODE.ANY;
+  } else {
+    return HandlerModule.FullRank.TIE_MODE.ONLY_UNCLUED;
+  }
+};
 
 export const compileRegex = memoize((pattern, numValues) => {
   const nfa = regexToNFA(pattern, numValues);

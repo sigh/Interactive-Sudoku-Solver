@@ -538,7 +538,7 @@ input:invalid {
 }
 
 .constraint-panel>* {
-  padding: 0px 5px;
+  padding: 0px 5px 5px 5px;
 }
 
 .constraint-panel.constraint-panel-highlight:not(.container-open) {
@@ -548,6 +548,10 @@ input:invalid {
 
 .constraint-panel.constraint-panel-borderless {
   border-color: transparent;
+}
+
+.constraint-panel.constraint-panel-borderless>* {
+  padding: 0px 5px;
 }
 
 fieldset[disabled],

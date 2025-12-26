@@ -720,24 +720,70 @@ export class SudokuConstraintOptimizer {
     if (rankHandlers.length == 0) return;
 
     const clues = [];
-    let globallyUnique = false;
-    let permissiveClues = false;
+    let tieMode = HandlerModule.FullRank.TIE_MODE.ANY;
     for (const h of rankHandlers) {
       clues.push(...h.clues());
-      globallyUnique ||= h.isGloballyUnique();
-      permissiveClues ||= h.isPermissiveClues();
+      tieMode = Math.min(tieMode, h.tieMode());
       handlerSet.replace(h, new HandlerModule.True());
     }
 
+    // Reuse FullRank's entry construction so we stay in sync.
+    const entries = HandlerModule.FullRank.buildEntries(shape.gridSize);
+    const equalsKey = SudokuConstraintOptimizer._equalsKey(shape.numValues);
+
+    // Dedupe. Keep the first clue per rank; if we see a duplicate rank,
+    // enforce entry equality against the representative.
+    const dedupedClues = [];
+    const seenRank = new Set();
+    for (const clue of clues) {
+      if (!seenRank.has(clue.rank)) {
+        seenRank.add(clue.rank);
+        dedupedClues.push(clue);
+        continue;
+      }
+
+      // This is a duplicate rank clue, look for the duplicates and stop when
+      // we find it (it is guaranteed to be there).
+      for (const existingClue of dedupedClues) {
+        if (clue.rank !== existingClue.rank) continue;
+
+        const aEntry = HandlerModule.FullRank.entryFromClue(entries, clue);
+        const bEntry = HandlerModule.FullRank.entryFromClue(entries, existingClue);
+        if (!aEntry || !bEntry) break;
+
+        for (let j = 0; j < aEntry.length; j++) {
+          const a = aEntry[j];
+          const b = bEntry[j];
+          if (a === b) continue;
+          const eq = new HandlerModule.BinaryConstraint(a, b, equalsKey);
+          handlerSet.add(eq);
+          if (this._debugLogger) {
+            this._debugLogger.log({
+              loc: '_optimizeFullRank',
+              msg: 'Add: ' + eq.constructor.name,
+              args: { rank: clue.rank },
+              cells: eq.cells,
+            });
+          }
+        }
+        break;
+      }
+    }
+
     const handler = new HandlerModule.FullRank(
-      shape.numCells, clues, globallyUnique, permissiveClues);
+      shape.numCells, dedupedClues, tieMode);
     handlerSet.add(handler);
 
     if (this._debugLogger) {
       this._debugLogger.log({
         loc: '_optimizeFullRank',
         msg: 'Combine: ' + handler.constructor.name,
-        args: { numHandlers: rankHandlers.length, globallyUnique, permissiveClues },
+        args: {
+          numHandlers: rankHandlers.length,
+          numClues: clues.length,
+          numDedupedClues: dedupedClues.length,
+          tieMode,
+        },
         cells: handler.cells
       });
     }
