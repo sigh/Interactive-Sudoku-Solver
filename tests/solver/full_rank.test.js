@@ -557,6 +557,193 @@ await runTest('FullRank permissive should exclude extra > candidate only when no
   assert.equal((grid[8] & value1) !== 0, false);
 });
 
+await runTest('FullRank should not force/exclude a both-sides viable entry (only-unclued)', () => {
+  const context = setupConstraintTest({ gridSize: 4 });
+  const value1 = LookupTables.fromValue(1);
+  const value2 = LookupTables.fromValue(2);
+  const value3 = LookupTables.fromValue(3);
+  const value4 = LookupTables.fromValue(4);
+
+  // Clue at rank=3 => rankIndex=2 => needs 2 entries below, 1 above.
+  // We provide enough viable entries that no entry is forced or excluded.
+  const clue = { rank: 3, line: Uint8Array.from([4, 5]) }; // row 1 forward
+  const handler = new FullRank(16, [clue], FullRank.TIE_MODE.ONLY_UNCLUED);
+  const grid = context.createGrid();
+  assert.equal(handler.initialize(grid, createCellExclusions(), context.shape, {}), true);
+  const given = handler._rankSets[0].givens[0];
+
+  // Fully fix the clued entry (row 1 forward: [4,5,6,7]) to digits [1,3,4,2].
+  grid[5] = value3;
+  grid[6] = value4;
+  grid[7] = value2;
+
+  // Entries:
+  //  - two less-only (ensure maybeLessCount > numRanksBelow so nothing is forced)
+  //  - one both-sides (can be < or >)
+  //  - one greater-only (ensure maybeGreaterCount > numRanksAbove)
+  const idxLess1 = handler._uncluedEntries.findIndex(e => e[0] === 0 && e[1] === 1);    // row 0 forward
+  const idxBoth = handler._uncluedEntries.findIndex(e => e[0] === 8 && e[1] === 9);     // row 2 forward
+  const idxLess2 = handler._uncluedEntries.findIndex(e => e[0] === 12 && e[1] === 13);  // row 3 forward
+  const idxGreater = handler._uncluedEntries.findIndex(e => e[0] === 3 && e[1] === 2);  // row 0 reverse
+  assert.ok(idxLess1 >= 0 && idxBoth >= 0 && idxLess2 >= 0 && idxGreater >= 0);
+
+  const viableEntries = Int16Array.from([idxLess1, idxBoth, idxLess2, idxGreater]);
+
+  // Ensure the start cells can be set to the rank-set value but are NOT fixed.
+  grid[0] = mask(1, 2);
+  grid[8] = mask(1, 2);
+  grid[12] = mask(1, 2);
+  grid[3] = mask(1, 2);
+
+  // Less-only entries: second cell fixed to 2 (< 3).
+  grid[1] = value2;
+  grid[13] = value2;
+
+  // Both-sides entry: second cell can be 2 or 4, so it can be < or > vs 3.
+  grid[9] = mask(2, 4);
+
+  // Greater-only entry (row 0 reverse): its second cell (cell 2) fixed to 4 (> 3).
+  grid[2] = value4;
+
+  const startBefore = grid[8];
+  const acc = createAccumulator();
+  assert.equal(
+    handler._enforceUncluedEntriesForGiven(grid, acc, viableEntries, viableEntries.length, given),
+    true,
+  );
+
+  // Since counts don't force inclusion/exclusion, the both-sides entry start should be unchanged.
+  assert.equal(grid[8], startBefore);
+  assert.equal((grid[8] & value1) !== 0, true);
+  assert.equal((grid[8] & value2) !== 0, true);
+});
+
+await runTest('FullRank should not force/exclude a both-sides viable entry (any)', () => {
+  const context = setupConstraintTest({ gridSize: 4 });
+  const value2 = LookupTables.fromValue(2);
+  const value3 = LookupTables.fromValue(3);
+  const value4 = LookupTables.fromValue(4);
+
+  const clue = { rank: 3, line: Uint8Array.from([4, 5]) }; // row 1 forward
+  const handler = new FullRank(16, [clue], FullRank.TIE_MODE.ANY);
+  const grid = context.createGrid();
+  assert.equal(handler.initialize(grid, createCellExclusions(), context.shape, {}), true);
+  const given = handler._rankSets[0].givens[0];
+
+  // Clued entry digits [1,3,4,2].
+  grid[5] = value3;
+  grid[6] = value4;
+  grid[7] = value2;
+
+  const idxLess1 = handler._uncluedEntries.findIndex(e => e[0] === 0 && e[1] === 1);    // row 0 forward
+  const idxBoth = handler._uncluedEntries.findIndex(e => e[0] === 8 && e[1] === 9);     // row 2 forward
+  const idxLess2 = handler._uncluedEntries.findIndex(e => e[0] === 12 && e[1] === 13);  // row 3 forward
+  const idxGreater = handler._uncluedEntries.findIndex(e => e[0] === 3 && e[1] === 2);  // row 0 reverse
+  assert.ok(idxLess1 >= 0 && idxBoth >= 0 && idxLess2 >= 0 && idxGreater >= 0);
+  const viableEntries = Int16Array.from([idxLess1, idxBoth, idxLess2, idxGreater]);
+
+  // Start cells (not fixed).
+  grid[0] = mask(1, 2);
+  grid[8] = mask(1, 2);
+  grid[12] = mask(1, 2);
+  grid[3] = mask(1, 2);
+
+  // Less-only.
+  grid[1] = value2;
+  grid[13] = value2;
+
+  // Both-sides.
+  grid[9] = mask(2, 4);
+
+  // Greater-only.
+  grid[2] = value4;
+
+  const startBefore = grid[8];
+  const acc = createAccumulator();
+  assert.equal(
+    handler._enforceUncluedEntriesForGiven(grid, acc, viableEntries, viableEntries.length, given),
+    true,
+  );
+
+  assert.equal(grid[8], startBefore);
+});
+
+await runTest('FullRankTies only-unclued should reject an unclued entry forced to tie a clued entry (even if counts are satisfied)', () => {
+  const context = setupConstraintTest({ gridSize: 4 });
+  const value1 = LookupTables.fromValue(1);
+  const value2 = LookupTables.fromValue(2);
+  const value3 = LookupTables.fromValue(3);
+  const value4 = LookupTables.fromValue(4);
+
+  // Clue at rank=2 => rankIndex=1 => needs 1 strictly-less and 2 strictly-greater entries.
+  const clue = { rank: 2, line: Uint8Array.from([4, 5]) }; // row 1 forward
+  const handler = new FullRank(16, [clue], FullRank.TIE_MODE.ONLY_UNCLUED);
+  const grid = context.createGrid();
+  assert.equal(handler.initialize(grid, createCellExclusions(), context.shape, {}), true);
+  const given = handler._rankSets[0].givens[0];
+
+  // Fully fix the clued entry (row 1 forward: [4,5,6,7]) to digits [1,3,4,2].
+  grid[5] = value3;
+  grid[6] = value4;
+  grid[7] = value2;
+
+  // Force one unclued entry to be an exact tie with the clued entry:
+  // row 2 forward: [8,9,10,11]
+  grid[8] = value1;
+  grid[9] = value3;
+  grid[10] = value4;
+  grid[11] = value2;
+
+  // Provide one strictly-less and two strictly-greater entries, without
+  // conflicting with the tie entry.
+  // Less: row 0 forward [0,1,2,3] is 2 < 3 at j=1.
+  grid[0] = value1;
+  grid[1] = value2;
+  grid[2] = value1; // also used as start for the column entry below.
+  grid[3] = value2;
+
+  // Greater #1: row 3 forward [12,13,14,15] is 4 > 3 at j=1.
+  grid[12] = value1;
+  grid[13] = value4;
+  grid[14] = value4;
+  grid[15] = value4;
+
+  // Greater #2: col 2 forward [2,6,10,14] is 4 > 3 at j=1.
+  // (cell 6 is already fixed to 4 by the clued entry)
+  grid[10] = value4;
+  grid[14] = value4;
+
+  const idxTie = handler._uncluedEntries.findIndex(e => e[0] === 8 && e[1] === 9);        // row 2 forward
+  const idxLess = handler._uncluedEntries.findIndex(e => e[0] === 0 && e[1] === 1);       // row 0 forward
+  const idxGreaterRow = handler._uncluedEntries.findIndex(e => e[0] === 12 && e[1] === 13); // row 3 forward
+  const idxGreaterCol = handler._uncluedEntries.findIndex(e => e[0] === 2 && e[1] === 6); // col 2 forward
+  assert.ok(idxTie >= 0 && idxLess >= 0 && idxGreaterRow >= 0 && idxGreaterCol >= 0);
+
+  // Sanity: without the tie entry, the less/greater counts are satisfiable.
+  // This ensures the rejection is specifically due to the forced tie with a
+  // clued entry (which is invalid in ONLY_UNCLUED mode), not due to a generic
+  // lack of viable < or > entries.
+  {
+    const viableNoTie = Int16Array.from([idxLess, idxGreaterRow, idxGreaterCol]);
+    const acc = createAccumulator();
+    assert.equal(
+      handler._enforceUncluedEntriesForGiven(grid, acc, viableNoTie, viableNoTie.length, given),
+      true,
+    );
+  }
+
+  // Adding an unclued entry that is forced to be identical to the clued entry
+  // must be rejected.
+  {
+    const viableWithTie = Int16Array.from([idxTie, idxLess, idxGreaterRow, idxGreaterCol]);
+    const acc = createAccumulator();
+    assert.equal(
+      handler._enforceUncluedEntriesForGiven(grid, acc, viableWithTie, viableWithTie.length, given),
+      false,
+    );
+  }
+});
+
 await runTest('FullRank should reject whole-entry fixed ties within a rank set', () => {
   const { handler, context } = initializeConstraintHandler(FullRank, {
     args: [81, [], FullRank.TIE_MODE.NONE],
@@ -577,6 +764,194 @@ await runTest('FullRank should reject whole-entry fixed ties within a rank set',
 
   const acc = createAccumulator();
   assert.equal(handler.enforceConsistency(grid, acc), false);
+});
+
+await runTest('FullRankTies none should reject a row equal to a column', () => {
+  const context = setupConstraintTest({ gridSize: 4 });
+  const handler = new FullRank(16, [], FullRank.TIE_MODE.NONE);
+  const grid = context.createGrid();
+  assert.equal(handler.initialize(grid, createCellExclusions(), context.shape, {}), true);
+
+  // Make row 0 forward and col 0 forward identical, fully fixed entries.
+  // row0: [0,1,2,3]
+  // col0: [0,4,8,12]
+  const row0 = [0, 1, 2, 3];
+  const col0 = [0, 4, 8, 12];
+  const digits = [1, 2, 3, 4];
+  for (let i = 0; i < 4; i++) {
+    const v = LookupTables.fromValue(digits[i]);
+    grid[row0[i]] = v;
+    grid[col0[i]] = v;
+  }
+
+  const acc = createAccumulator();
+  assert.equal(handler.enforceConsistency(grid, acc), false);
+});
+
+await runTest('FullRankTies none should reject a row equal to a column reversed', () => {
+  const context = setupConstraintTest({ gridSize: 4 });
+  const handler = new FullRank(16, [], FullRank.TIE_MODE.NONE);
+  const grid = context.createGrid();
+  assert.equal(handler.initialize(grid, createCellExclusions(), context.shape, {}), true);
+
+  // Make row 0 forward equal to col 3 reverse.
+  // row0:        [0, 1, 2, 3]
+  // col3 reverse: [15,11,7,3]
+  const row0 = [0, 1, 2, 3];
+  const col3rev = [15, 11, 7, 3];
+  const digits = [1, 2, 3, 4];
+  for (let i = 0; i < 4; i++) {
+    grid[row0[i]] = LookupTables.fromValue(digits[i]);
+    grid[col3rev[i]] = LookupTables.fromValue(digits[i]);
+  }
+
+  const acc = createAccumulator();
+  assert.equal(handler.enforceConsistency(grid, acc), false);
+});
+
+await runTest('FullRankTies none should allow a partial whole-entry tie (not fully fixed)', () => {
+  const context = setupConstraintTest({ gridSize: 4 });
+  const handler = new FullRank(16, [], FullRank.TIE_MODE.NONE);
+  const grid = context.createGrid();
+  assert.equal(handler.initialize(grid, createCellExclusions(), context.shape, {}), true);
+
+  // Two rows share the same fixed endpoints (1 and 4) and the same fixed mid cell.
+  // But they are NOT fully fixed: at least one interior cell remains multi-valued.
+  // This should be considered valid (uniqueness enforcement is fixed-only).
+  // row0 forward: [0,1,2,3]
+  // row1 forward: [4,5,6,7]
+  grid[0] = LookupTables.fromValue(1);
+  grid[1] = LookupTables.fromValue(2);
+  grid[2] = mask(2, 3);
+  grid[3] = LookupTables.fromValue(4);
+
+  grid[4] = LookupTables.fromValue(1);
+  grid[5] = LookupTables.fromValue(2);
+  grid[6] = mask(2, 3);
+  grid[7] = LookupTables.fromValue(4);
+
+  const acc = createAccumulator();
+  assert.equal(handler.enforceConsistency(grid, acc), true);
+});
+
+await runTest('FullRankTies none should allow a partial reversed tie (not fully fixed)', () => {
+  const context = setupConstraintTest({ gridSize: 4 });
+  const handler = new FullRank(16, [], FullRank.TIE_MODE.NONE);
+  const grid = context.createGrid();
+  assert.equal(handler.initialize(grid, createCellExclusions(), context.shape, {}), true);
+
+  // row0 forward: [0,1,2,3] => [1,2,?,4]
+  grid[0] = LookupTables.fromValue(1);
+  grid[1] = LookupTables.fromValue(2);
+  grid[2] = mask(2, 3);
+  grid[3] = LookupTables.fromValue(4);
+
+  // row1 forward: [4,5,6,7] => [4,2,?,1]
+  // Its reverse entry [7,6,5,4] shares endpoints [1,4] and mid fixed.
+  grid[4] = LookupTables.fromValue(4);
+  grid[5] = mask(2, 3);
+  grid[6] = LookupTables.fromValue(2);
+  grid[7] = LookupTables.fromValue(1);
+
+  const acc = createAccumulator();
+  assert.equal(handler.enforceConsistency(grid, acc), true);
+});
+
+await runTest('FullRank should throw when clue ranks are duplicated', () => {
+  assert.throws(() => {
+    new FullRank(16, [
+      { rank: 1, line: Uint8Array.from([0, 1]) },
+      { rank: 1, line: Uint8Array.from([4, 5]) },
+    ]);
+  }, /not unique/i);
+});
+
+await runTest('FullRank initialize should fail when two clues force different rank-set values on the same entry', () => {
+  const context = setupConstraintTest({ gridSize: 4 });
+  const grid = context.createGrid();
+
+  // Two clues point at the same entry start, but belong to different rank sets:
+  // rank 1 => value 1 rank set; rank 5 => value 2 rank set.
+  const handler = new FullRank(16, [
+    { rank: 1, line: Uint8Array.from([0, 1]) },
+    { rank: 5, line: Uint8Array.from([0, 1]) },
+  ]);
+
+  assert.equal(
+    handler.initialize(grid, createCellExclusions(), context.shape, {}),
+    false,
+  );
+});
+
+await runTest('FullRank initialize should fail for out-of-range rank', () => {
+  const context = setupConstraintTest({ gridSize: 4 });
+  const grid = context.createGrid();
+
+  // For a 4x4 grid, ranks are grouped into 4 rank sets of 4 (1..16).
+  // rank 17 implies a rank-set value of 5, which cannot exist.
+  const handler = new FullRank(16, [{ rank: 17, line: Uint8Array.from([0, 1]) }]);
+
+  assert.equal(
+    handler.initialize(grid, createCellExclusions(), context.shape, {}),
+    false,
+  );
+});
+
+await runTest('FullRankTies any should still require enough "<" entries (no shortfall)', () => {
+  const context = setupConstraintTest({ gridSize: 4 });
+  const value1 = LookupTables.fromValue(1);
+  const value2 = LookupTables.fromValue(2);
+  const value3 = LookupTables.fromValue(3);
+  const value4 = LookupTables.fromValue(4);
+
+  // Single clue at rank=3 => rankIndex=2.
+  // This requires TWO strictly-less unclued entries. TIE_MODE.ANY does not
+  // relax the "below" requirement.
+  const clue = { rank: 3, line: Uint8Array.from([4, 5]) }; // row 1 forward
+
+  const handler = new FullRank(16, [clue], FullRank.TIE_MODE.ANY);
+  const grid = context.createGrid();
+  assert.equal(handler.initialize(grid, createCellExclusions(), context.shape, {}), true);
+  const given = handler._rankSets[0].givens[0];
+
+  // Fully fix the clued entry (row 1 forward: [4,5,6,7]) to digits [1,3,4,2].
+  grid[5] = value3;
+  grid[6] = value4;
+  grid[7] = value2;
+
+  // Choose EXACTLY three viable entries:
+  //  - one less-only
+  //  - two forced ties
+  const idxLess = handler._uncluedEntries.findIndex(e => e[0] === 0 && e[1] === 1);   // row 0 forward
+  const idxTie1 = handler._uncluedEntries.findIndex(e => e[0] === 8 && e[1] === 9);   // row 2 forward
+  const idxTie2 = handler._uncluedEntries.findIndex(e => e[0] === 12 && e[1] === 13); // row 3 forward
+  assert.ok(idxLess >= 0 && idxTie1 >= 0 && idxTie2 >= 0);
+
+  const viableEntries = Int16Array.from([idxLess, idxTie1, idxTie2]);
+
+  // Ensure the start cells can be set to the rank-set value.
+  grid[0] |= value1;
+  grid[8] |= value1;
+  grid[12] |= value1;
+
+  // Less-only: row 0 forward => [?,2,2,2] < [?,3,4,2].
+  grid[1] = value2;
+  grid[2] = value2;
+  grid[3] = value2;
+
+  // Ties: rows 2 and 3 forward identical to clued.
+  grid[9] = value3;
+  grid[10] = value4;
+  grid[11] = value2;
+  grid[13] = value3;
+  grid[14] = value4;
+  grid[15] = value2;
+
+  const acc = createAccumulator();
+  assert.equal(
+    handler._enforceUncluedEntriesForGiven(grid, acc, viableEntries, viableEntries.length, given),
+    false,
+  );
 });
 
 await runTest('FullRankTies none should reject a row equal to another row reversed', async () => {

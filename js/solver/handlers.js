@@ -2805,10 +2805,8 @@ export class FullRank extends SudokuConstraintHandler {
 
     for (let i = 0; i < numViableEntries; i++) {
       const e = entries[viableEntries[i]];
+
       let flags = grid[e[0]] === initialV ? IS_SET_FLAG : 0;
-      // TODO: We can utilize IS_NOT_EQUAL better, but for now this is
-      // to ensure that the non-permissive clues work correctly.
-      if (!permissiveClues) flags |= IS_NOT_EQUAL;
 
       // Mask out values which are assumed to be fixed (equal) in the preceding
       // cells. At each iteration, we are assuming that all previous values
@@ -2841,6 +2839,21 @@ export class FullRank extends SudokuConstraintHandler {
         // Thus if we take the intersection, we know that value can't appear in
         // future cells.
         equalValuesMask &= ~(eV & entryV);
+      }
+
+      // In non-permissive modes (i.e. not TIE_MODE.ANY), entries must not tie a
+      // clued entry. If an entry is set into this rank set but is neither
+      // provably <, >, nor provably != the clued entry, then it is a forced
+      // whole-entry tie candidate, which would imply the clued rank is tied.
+      if (!permissiveClues) {
+        if (flags === IS_SET_FLAG) {
+          // (IS_LESS_FLAG | IS_GREATER_FLAG | IS_NOT_EQUAL) === 0
+          return false;
+        }
+
+        // TODO: We can utilize IS_NOT_EQUAL better, but for now this is
+        // to ensure that the non-permissive clues work correctly.
+        flags |= IS_NOT_EQUAL;
       }
 
       flagsBuffer[i] = flags;
