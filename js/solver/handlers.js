@@ -102,7 +102,7 @@ export class False extends SudokuConstraintHandler {
     // The cells with which to associate the failure.
     super(cells);
 
-    if (cells.length === 0) throw 'False needs cells to be effective.';
+    if (cells.length === 0) throw new Error('False needs cells to be effective.');
   }
 
   initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
@@ -698,7 +698,7 @@ export class BinaryPairwise extends SudokuConstraintHandler {
   //  - The values are only 1 or 0 to indicate validity.
   static _exactCombinationsTable = memoize((key, numValues) => {
     const table = LookupTables.get(numValues).forBinaryKey(key)[0];
-    if (!this._isAllDifferent(table, numValues)) throw 'Not implemented';
+    if (!this._isAllDifferent(table, numValues)) throw new Error('Not implemented');
 
     const combinations = 1 << numValues;
     const exactCombinations = new Uint8Array(combinations);
@@ -770,7 +770,7 @@ export class BinaryPairwise extends SudokuConstraintHandler {
   initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
     const lookupTables = LookupTables.get(shape.numValues);
     if (!this.constructor._isKeySymmetric(this._key, shape.numValues)) {
-      throw 'Function for BinaryPairwise must be symmetric. Key: ' + this._key;
+      throw new Error('Function for BinaryPairwise must be symmetric. Key: ' + this._key);
     }
 
     // The key must be symmetric, so we just need the one table.
@@ -966,7 +966,7 @@ export class Skyscraper extends SudokuConstraintHandler {
     this._allStates = null;
 
     if (0 >= this._numVisible) {
-      throw ('Skyscraper visibility target must be > 0');
+      throw new Error('Skyscraper visibility target must be > 0');
     }
   }
 
@@ -1228,7 +1228,7 @@ export class Lunchbox extends SudokuConstraintHandler {
     super(cells);
     sum = +sum;
     if (!Number.isInteger(sum) || sum < 0) {
-      throw ('Invalid sum for sandwich constraint: ' + sum);
+      throw new Error('Invalid sum for sandwich constraint: ' + sum);
     }
 
     this._sum = sum;
@@ -1475,7 +1475,7 @@ export class SameValues extends SudokuConstraintHandler {
 
     const setLen = cellSets[0].length;
     if (!cellSets.every(s => s.length === setLen)) {
-      throw ('SameValues must use sets of the same length.');
+      throw new Error('SameValues must use sets of the same length.');
     }
 
     super(cellSets.flat());
@@ -2126,7 +2126,7 @@ export class SumLine extends SudokuConstraintHandler {
 
     if (this._sum > 30) {
       // A sum of 30 fits within a 32-bit state.
-      throw ('SumLine sum must at most 30');
+      throw new Error('SumLine sum must at most 30');
     }
 
     // Each state is a mask that represents the possible partial sums of a
@@ -2603,7 +2603,7 @@ export class FullRank extends SudokuConstraintHandler {
     const seenRanks = new Set();
     for (const clue of clues) {
       if (seenRanks.has(clue.rank)) {
-        throw (`FullRank clue rank ${clue.rank} is not unique`);
+        throw new Error(`FullRank clue rank ${clue.rank} is not unique`);
       }
       seenRanks.add(clue.rank);
     }
@@ -3242,7 +3242,7 @@ export class Or extends SudokuConstraintHandler {
       }
     }
 
-    throw ('Fatal error in Or constraint handler.');
+    throw new Error('Fatal error in Or constraint handler.');
   }
 
   _isInvalid(grid, handlerIndex) {

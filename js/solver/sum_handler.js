@@ -399,7 +399,7 @@ export class Sum extends SudokuConstraintHandler {
           targetSum += (this._sumData.numValues + 1);
           this.constructor._reversedCellsBuffer[numReversed++] = c;
         } else if (!(exclusionGroupId & this.constructor._GROUP_HAS_UNIT_COEFF)) {
-          throw Error('enforceFewRemainingCells only handles +-1 coefficients');
+          throw new Error('enforceFewRemainingCells only handles +-1 coefficients');
         }
 
         j++;
@@ -858,7 +858,7 @@ class SumData {
   });
 
   constructor(do_not_call, numValues) {
-    if (!do_not_call) throw ('Use SumData.get(shape.numValues)');
+    if (!do_not_call) throw new Error('Use SumData.get(shape.numValues)');
 
     this.numValues = numValues;
     this.lookupTables = LookupTables.get(numValues);
