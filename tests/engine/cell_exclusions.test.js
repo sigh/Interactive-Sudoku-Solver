@@ -72,6 +72,37 @@ await runTest('CellExclusions should return BitSet', () => {
   assert.equal(bitSet.has(2), false);
 });
 
+await runTest('HandlerUtil.findExclusionGroups should return groups/sumOfSquares', () => {
+  const cellExclusions = {
+    isMutuallyExclusive: (a, b) => a !== b,
+  };
+
+  const cells = [0, 1, 2, 3];
+  const result = HandlerModule.HandlerUtil.findExclusionGroups(
+    cells, cellExclusions);
+
+  // With all cells mutually exclusive, greedy should make one group.
+  assert.deepEqual(result, {
+    groups: [cells],
+    sumOfSquares: 4 * 4,
+  });
+});
+
+await runTest('HandlerUtil.findExclusionGroups should work for a single cell', () => {
+  const cellExclusions = {
+    isMutuallyExclusive: (a, b) => a !== b,
+  };
+
+  const cells = [7];
+  const result = HandlerModule.HandlerUtil.findExclusionGroups(
+    cells, cellExclusions);
+
+  assert.deepEqual(result, {
+    groups: [cells],
+    sumOfSquares: 1,
+  });
+});
+
 await runTest('CellExclusions should seal after reading BitSet', () => {
   const handlerSet = createHandlerSet();
   const exclusions = new CellExclusions(handlerSet, SHAPE_9x9);

@@ -134,7 +134,7 @@ export class Sum extends SudokuConstraintHandler {
 
     for (const g of this._coeffGroups) {
       g.exclusionGroups = HandlerUtil.findExclusionGroups(
-        g.cells, cellExclusions);
+        g.cells, cellExclusions).groups;
     }
 
     // Maximum of 15 cells per coefficient group to ensure we don't overflow the

@@ -47,7 +47,7 @@ await runTest('_findKnownRequiredValues: simple exclusion', () => {
   // Cell 0 is in one.
   // Cell 1 is in one.
 
-  const result = optimizer._findKnownRequiredValues(cells, value, count, cellExclusions, restrictions, HandlerModule.HandlerUtil.findMappedExclusionGroups(cells, cellExclusions));
+  const result = optimizer._findKnownRequiredValues(cells, value, count, cellExclusions, restrictions, HandlerModule.HandlerUtil.findMappedExclusionGroups(cells, cellExclusions).groups);
   assert.equal(result, true);
 
   const v = LookupTables.fromValue(value);
@@ -84,7 +84,7 @@ await runTest('_findKnownRequiredValues: forced values', () => {
   // 2 must be v.
   // 1 must NOT be v.
 
-  const result = optimizer._findKnownRequiredValues(cells, value, count, cellExclusions, restrictions, HandlerModule.HandlerUtil.findMappedExclusionGroups(cells, cellExclusions));
+  const result = optimizer._findKnownRequiredValues(cells, value, count, cellExclusions, restrictions, HandlerModule.HandlerUtil.findMappedExclusionGroups(cells, cellExclusions).groups);
   assert.equal(result, true);
 
   const v = LookupTables.fromValue(value);
@@ -111,7 +111,7 @@ await runTest('_findKnownRequiredValues: no restrictions found', () => {
   // No cell is required in ALL.
   // No cell is required in NONE.
 
-  const result = optimizer._findKnownRequiredValues(cells, value, count, cellExclusions, restrictions, HandlerModule.HandlerUtil.findMappedExclusionGroups(cells, cellExclusions));
+  const result = optimizer._findKnownRequiredValues(cells, value, count, cellExclusions, restrictions, HandlerModule.HandlerUtil.findMappedExclusionGroups(cells, cellExclusions).groups);
   assert.equal(result, true);
 
   assert.equal(restrictions.size, 0);
@@ -131,7 +131,7 @@ await runTest('_findKnownRequiredValues: all required', () => {
   // Must pick 3 cells. Only {0, 1, 2} is possible.
   // All cells required.
 
-  const result = optimizer._findKnownRequiredValues(cells, value, count, cellExclusions, restrictions, HandlerModule.HandlerUtil.findMappedExclusionGroups(cells, cellExclusions));
+  const result = optimizer._findKnownRequiredValues(cells, value, count, cellExclusions, restrictions, HandlerModule.HandlerUtil.findMappedExclusionGroups(cells, cellExclusions).groups);
   assert.equal(result, true);
 
   const v = LookupTables.fromValue(value);
@@ -155,7 +155,7 @@ await runTest('_findKnownRequiredValues: impossible combination', () => {
   const count = 2; // Cannot pick 2 from 3 mutually exclusive cells.
   const restrictions = new Map();
 
-  const result = optimizer._findKnownRequiredValues(cells, value, count, cellExclusions, restrictions, HandlerModule.HandlerUtil.findMappedExclusionGroups(cells, cellExclusions));
+  const result = optimizer._findKnownRequiredValues(cells, value, count, cellExclusions, restrictions, HandlerModule.HandlerUtil.findMappedExclusionGroups(cells, cellExclusions).groups);
   assert.equal(result, false);
 });
 
@@ -170,7 +170,7 @@ await runTest('_findKnownRequiredValues: max iterations exceeded', () => {
   const count = 6; // 12C6 = 924 > 720
   const restrictions = new Map();
 
-  const result = optimizer._findKnownRequiredValues(cells, value, count, cellExclusions, restrictions, HandlerModule.HandlerUtil.findMappedExclusionGroups(cells, cellExclusions));
+  const result = optimizer._findKnownRequiredValues(cells, value, count, cellExclusions, restrictions, HandlerModule.HandlerUtil.findMappedExclusionGroups(cells, cellExclusions).groups);
   assert.equal(result, true);
 
   // Should abort and return true, adding no restrictions.
@@ -204,7 +204,7 @@ await runTest('_findKnownRequiredValues: merge existing restrictions', () => {
   // 2 must be v.
   // 1 must NOT be v.
 
-  const result = optimizer._findKnownRequiredValues(cells, value, count, cellExclusions, restrictions, HandlerModule.HandlerUtil.findMappedExclusionGroups(cells, cellExclusions));
+  const result = optimizer._findKnownRequiredValues(cells, value, count, cellExclusions, restrictions, HandlerModule.HandlerUtil.findMappedExclusionGroups(cells, cellExclusions).groups);
   assert.equal(result, true);
 
   // Cell 0: (v | otherVal) & v => v.
@@ -234,7 +234,7 @@ await runTest('_findKnownRequiredValues: partial overlap', () => {
   // Cannot have both 0 and 1.
   // Possible: {0, 2, 3}, {1, 2, 3}.
 
-  const result = optimizer._findKnownRequiredValues(cells, value, count, cellExclusions, restrictions, HandlerModule.HandlerUtil.findMappedExclusionGroups(cells, cellExclusions));
+  const result = optimizer._findKnownRequiredValues(cells, value, count, cellExclusions, restrictions, HandlerModule.HandlerUtil.findMappedExclusionGroups(cells, cellExclusions).groups);
   assert.equal(result, true);
 
   const v = LookupTables.fromValue(value);
@@ -255,7 +255,7 @@ await runTest('_findKnownRequiredValues: count greater than numCells', () => {
   const count = 4;
   const restrictions = new Map();
 
-  const result = optimizer._findKnownRequiredValues(cells, value, count, cellExclusions, restrictions, HandlerModule.HandlerUtil.findMappedExclusionGroups(cells, cellExclusions));
+  const result = optimizer._findKnownRequiredValues(cells, value, count, cellExclusions, restrictions, HandlerModule.HandlerUtil.findMappedExclusionGroups(cells, cellExclusions).groups);
   assert.equal(result, false);
 });
 
@@ -280,7 +280,7 @@ await runTest('_findKnownRequiredValues: count greater than exclusion groups', (
   // Requested count is 3.
   // Should return false.
 
-  const result = optimizer._findKnownRequiredValues(cells, value, count, cellExclusions, restrictions, HandlerModule.HandlerUtil.findMappedExclusionGroups(cells, cellExclusions));
+  const result = optimizer._findKnownRequiredValues(cells, value, count, cellExclusions, restrictions, HandlerModule.HandlerUtil.findMappedExclusionGroups(cells, cellExclusions).groups);
   assert.equal(result, false);
 });
 
@@ -298,7 +298,7 @@ await runTest('_findKnownRequiredValues: must pick from all groups', () => {
   // Must pick 3. Groups are {0}, {1}, {2}.
   // Logic should force picking from {0}, then {1}, then {2}.
 
-  const result = optimizer._findKnownRequiredValues(cells, value, count, cellExclusions, restrictions, HandlerModule.HandlerUtil.findMappedExclusionGroups(cells, cellExclusions));
+  const result = optimizer._findKnownRequiredValues(cells, value, count, cellExclusions, restrictions, HandlerModule.HandlerUtil.findMappedExclusionGroups(cells, cellExclusions).groups);
   assert.equal(result, true);
 
   const v = LookupTables.fromValue(value);

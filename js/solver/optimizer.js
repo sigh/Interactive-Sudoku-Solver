@@ -888,7 +888,8 @@ export class SudokuConstraintOptimizer {
 
     for (const h of requiredValueHandlers) {
       const restrictions = new Map();
-      const exclusionGroups = HandlerModule.HandlerUtil.findMappedExclusionGroups(h.cells, cellExclusions);
+      const exclusionGroups = HandlerModule.HandlerUtil.findMappedExclusionGroups(
+        h.cells, cellExclusions).groups;
       // Sort groups by size to optimize search order.
       // Smallest first makes it more likely we can skip larger groups.
       exclusionGroups.sort((a, b) => a.length - b.length);
