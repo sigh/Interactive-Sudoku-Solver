@@ -8,6 +8,8 @@ const { SudokuConstraintOptimizer } = await import('../js/solver/optimizer.js' +
 const { LookupTables } = await import('../js/solver/lookup_tables.js' + self.VERSION_PARAM);
 const { BitSet } = await import('../js/util.js' + self.VERSION_PARAM);
 const HandlerModule = await import('../js/solver/handlers.js' + self.VERSION_PARAM);
+const SumHandlerModule = await import('../js/solver/sum_handler.js' + self.VERSION_PARAM);
+const { GridShape } = await import('../js/grid_shape.js' + self.VERSION_PARAM);
 
 class MockCellExclusions {
   constructor(numCells) {
@@ -361,6 +363,39 @@ await runTest('_findKnownRequiredValues: empty group', () => {
   const result = optimizer._findKnownRequiredValues(cells, value, count, cellExclusions, restrictions, exclusionGroups);
   assert.equal(result, true);
   assert.equal(restrictions.size, 0);
+});
+
+await runTest('_addSumIntersectionHandler: infeasible inferred sum adds False handler', () => {
+  const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
+  const shape = GridShape.fromGridSize(9);
+  const cellExclusions = new MockCellExclusions(shape.numCells);
+
+  // Force the inferred outside-house cells to be mutually exclusive so their
+  // minimum possible sum is 1+2=3.
+  const extraCells = [9, 10];
+  cellExclusions.addMutualExclusion(extraCells[0], extraCells[1]);
+
+  // Build a case where a sum cage covers the full house plus the extra cells.
+  // Then the inferred outside sum is: totalSum = cageSum - shape.maxSum.
+  // Pick a cageSum that yields totalSum=2, which is below the min=3.
+  const houseCells = Array.from({ length: shape.gridSize }, (_, i) => i);
+  const cageCells = [...houseCells, ...extraCells];
+  const cageSum = shape.maxSum + 2;
+
+  const houseHandler = new HandlerModule.House(houseCells);
+  const sumHandler = new SumHandlerModule.Sum(cageCells, cageSum);
+
+  const result = optimizer._addSumIntersectionHandler(
+    houseHandler,
+    [sumHandler],
+    [],
+    [],
+    cellExclusions,
+    shape);
+
+  assert.ok(result, 'expected a handler (not null)');
+  assert.ok(result instanceof HandlerModule.False, 'expected a False handler');
+  assert.deepEqual([...result.cells].sort((a, b) => a - b), [...extraCells].sort((a, b) => a - b));
 });
 
 logSuiteComplete('optimizer');

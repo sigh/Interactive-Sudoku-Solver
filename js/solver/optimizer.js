@@ -162,7 +162,7 @@ export class SudokuConstraintOptimizer {
       ...this._makeInnieOutieSumHandlers(filteredSumHandlers, hasBoxes, shape));
 
     handlerSet.addNonEssential(
-      ...this._makeHiddenCageHandlers(handlerSet, safeSumHandlers, shape));
+      ...this._makeHiddenCageHandlers(handlerSet, safeSumHandlers, cellExclusions, shape));
 
     this._replaceSizeSpecificSumHandlers(handlerSet, cellExclusions, shape);
 
@@ -293,7 +293,7 @@ export class SudokuConstraintOptimizer {
   // Create a Sum handler out of all the cages sticking out of a house.
   _addSumIntersectionHandler(
     houseHandler, intersectingSumHandlers, intersectingHouseHandlers,
-    allHouseHandlers, shape) {
+    allHouseHandlers, cellExclusions, shape) {
     const gridSize = shape.gridSize;
 
     let totalSum = 0;
@@ -359,39 +359,44 @@ export class SudokuConstraintOptimizer {
 
     if (cells.size == 0) return null;
 
-    // Don't add sums with too many cells, as they are less likely to be
-    // restrictive and useful.
-    // Make an exception for when the total sum is closer to an extreme
-    // (large or small) as that will restrict its values more.
-    if (cells.size > this._MAX_SUM_SIZE) {
-      // If the average value of the sum is close to the middle, then the
-      // values have more leeway. Use this to determine if the sum is worth
-      // keeping.
-      const avgVal = totalSum / cells.size;
-      const sumSkew = Math.abs(avgVal - shape.numValues / 2);
-
-      const MIN_SUM_SKEW = 2;
-      if (sumSkew < MIN_SUM_SKEW) {
-        if (this._debugLogger) {
-          const cellsArray = [...cells];
-          const cellString = cellsArray.map(c => shape.makeCellIdFromIndex(c)).join('~');
-          this._debugLogger.log({
-            loc: '_addSumIntersectionHandler',
-            msg: 'Discarded inferred handler: ' +
-              `.Sum~${totalSum}~${cellString}`,
-            args: { sumSkew: +sumSkew.toFixed(2) },
-            cells: cellsArray,
-          });
-        }
-
-        return null;
-      }
+    // Use mutual-exclusion structure to estimate how restrictive this inferred
+    // sum will be. Prefer sums that imply a narrow range relative to dof.
+    const cellsArray = [...cells];
+    // Sort so that the result is deterministic, and also makes greedy grouping
+    // naturally align on rows.
+    cellsArray.sort((a, b) => a - b);
+    const groups = HandlerModule.HandlerUtil.findExclusionGroupsGreedy(
+      cellsArray, cellExclusions).groups;
+    const { range, min, max } = HandlerModule.HandlerUtil.exclusionGroupSumInfo(
+      groups, shape.numValues);
+    if (totalSum < min || totalSum > max) {
+      // Infeasible sum, fail the puzzle.
+      const handler = new HandlerModule.False(cellsArray);
+      this._logAddHandler(
+        '_addSumIntersectionHandler', handler, { totalSum, min, max });
+      return handler;
     }
 
-    const handler = new SumHandlerModule.Sum([...cells], totalSum);
+    const dof = Math.min(totalSum - min, max - totalSum);
+    if (range == 0 || range <= 4 * dof) {
+      if (this._debugLogger) {
+        this._debugLogger.log({
+          loc: '_addSumIntersectionHandler',
+          msg: 'Skip',
+          args: { sum: totalSum, range: range },
+          cells: cellsArray,
+        });
+      }
+      return null;
+    }
+
+    const handler = new SumHandlerModule.Sum(cellsArray, totalSum);
 
     if (this._debugLogger) {
-      let args = { sum: handler.sum(), size: handler.cells.length };
+      let args = {
+        sum: handler.sum(), size: handler.cells.length,
+        minSum: min, maxSum: max, range
+      };
       if (usedExtraHouses) args.usedExtraHouses = usedExtraHouses;
       if (removedExtraHouses) args.removedExtraHouses = removedExtraHouses;
       this._logAddHandler('_addSumIntersectionHandler', handler, { args });
@@ -401,7 +406,7 @@ export class SudokuConstraintOptimizer {
   }
 
   // Find sets of cells which we can infer have a known sum and unique values.
-  _makeHiddenCageHandlers(handlerSet, allSumHandlers, shape) {
+  _makeHiddenCageHandlers(handlerSet, allSumHandlers, cellExclusions, shape) {
     const houseHandlers = handlerSet.getAllofType(HandlerModule.House);
     const newHandlers = [];
 
@@ -431,7 +436,7 @@ export class SudokuConstraintOptimizer {
             i => handlerSet.getHandler(i));
         const sumIntersectionHandler = this._addSumIntersectionHandler(
           h, filteredSumHandlers, intersectingHouseHandlers, houseHandlers,
-          shape);
+          cellExclusions, shape);
         if (sumIntersectionHandler) newHandlers.push(sumIntersectionHandler);
       }
 

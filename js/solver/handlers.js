@@ -436,7 +436,7 @@ export class HandlerUtil {
 
   // Partition the cells into groups where members are all unique.
   static findExclusionGroups(cells, cellExclusions) {
-    let bestExclusionGroupData = this._findExclusionGroupsGreedy(
+    let bestExclusionGroupData = this.findExclusionGroupsGreedy(
       cells, cellExclusions);
 
     if (cells.length < 4 || bestExclusionGroupData.groups.length == 1) {
@@ -454,15 +454,14 @@ export class HandlerUtil {
     //       This is computed above, so that why we start from i = 1 here.
     cells = cells.slice();
     for (let i = 1; i < NUM_TRIALS; i++) {
-      const data = this._findExclusionGroupsGreedy(cells, cellExclusions);
+      shuffleArray(cells, randomGen);
+      const data = this.findExclusionGroupsGreedy(cells, cellExclusions);
 
       // Score by sum-of-squares of group sizes.
       // Higher is better (it minimizes the implied sum-range).
       if (data.sumOfSquares > bestExclusionGroupData.sumOfSquares) {
         bestExclusionGroupData = data;
       }
-
-      shuffleArray(cells, randomGen);
     }
 
     return bestExclusionGroupData;
@@ -482,10 +481,22 @@ export class HandlerUtil {
     return sumOfSquares;
   }
 
+  static exclusionGroupSumInfo(groups, numValues) {
+    let range = 0;
+    let min = 0;
+    for (const g of groups) {
+      const s = g.length;
+      range += (numValues - s) * s;
+      min += s * (s + 1) >> 1;
+    }
+
+    return { range, min, max: range + min };
+  }
+
   // Partition the cells into groups where members are all unique.
   // Applies a greedy algorithm by, each iteration, choosing a cell and adding
   // as many remaining cells to it as possible to create the next group.
-  static _findExclusionGroupsGreedy(cells, cellExclusions) {
+  static findExclusionGroupsGreedy(cells, cellExclusions) {
     let exclusionGroups = [];
     let unassignedCells = cells;
     let remainingUnassignedCells = [];
