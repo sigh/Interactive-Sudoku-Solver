@@ -436,11 +436,13 @@ export class HandlerUtil {
 
   // Partition the cells into groups where members are all unique.
   static findExclusionGroups(cells, cellExclusions) {
-    if (cells.length == 1) return [cells];
-    if (cells.length < 4) return this._findExclusionGroupsGreedy(cells, cellExclusions);
+    let bestExclusionGroupData = this._findExclusionGroupsGreedy(
+      cells, cellExclusions);
 
-    let bestExclusionGroupsScore = 0;
-    let bestExclusionGroups = [];
+    if (cells.length < 4 || bestExclusionGroupData.groups.length == 1) {
+      return bestExclusionGroupData;
+    }
+
     let randomGen = new RandomIntGenerator(0);
 
     const NUM_TRIALS = 5;
@@ -449,24 +451,35 @@ export class HandlerUtil {
     // generates the best exclusion groups.
     // NOTE: The first ordering is the original (sorted) ordering. This ordering
     //       should work well for little killers and other linear regions.
+    //       This is computed above, so that why we start from i = 1 here.
     cells = cells.slice();
-    for (let i = 0; i < NUM_TRIALS; i++) {
-      let exclusionGroups = this._findExclusionGroupsGreedy(cells, cellExclusions);
-      // If there is only one exclusion group, then we can't do any better.
-      if (exclusionGroups.length == 1) return exclusionGroups;
+    for (let i = 1; i < NUM_TRIALS; i++) {
+      const data = this._findExclusionGroupsGreedy(cells, cellExclusions);
 
-      // Optimize for the sum of triangle numbers.
-      let exclusionGroupsScore = exclusionGroups.reduce(
-        (acc, cs) => cs.length * (cs.length + 1) / 2 + acc, 0);
-      if (exclusionGroupsScore > bestExclusionGroupsScore) {
-        bestExclusionGroupsScore = exclusionGroupsScore;
-        bestExclusionGroups = exclusionGroups;
+      // Score by sum-of-squares of group sizes.
+      // Higher is better (it minimizes the implied sum-range).
+      if (data.sumOfSquares > bestExclusionGroupData.sumOfSquares) {
+        bestExclusionGroupData = data;
       }
 
       shuffleArray(cells, randomGen);
     }
 
-    return bestExclusionGroups;
+    return bestExclusionGroupData;
+  }
+
+  // Use sum-of-squares of group sizes as score for exclusion groups.
+  // This favors fewer, larger groups over many smaller groups.
+  // It also directly optimizes for minimizing the range of possible sums since:
+  //    range = (numCells * numValues) - sumOfSquares.
+  static _exclusionGroupScore(groups) {
+    let sumOfSquares = 0;
+    for (const g of groups) {
+      const s = g.length;
+      sumOfSquares += s * s;
+    }
+
+    return sumOfSquares;
   }
 
   // Partition the cells into groups where members are all unique.
@@ -500,18 +513,20 @@ export class HandlerUtil {
       remainingUnassignedCells = [];
     }
 
-    return exclusionGroups;
+    return { groups: exclusionGroups, sumOfSquares: this._exclusionGroupScore(exclusionGroups) };
   }
 
   static findMappedExclusionGroups(cells, cellExclusions) {
-    const exclusionGroups = this.findExclusionGroups(
+    const exclusionGroupsData = this.findExclusionGroups(
       cells, cellExclusions);
 
     const cellToIndex = new Map();
     for (let i = 0; i < cells.length; i++) cellToIndex.set(cells[i], i);
 
-    return exclusionGroups.map(
-      group => group.map(c => cellToIndex.get(c)));
+    exclusionGroupsData.groups = exclusionGroupsData.groups.map(group =>
+      group.map(c => cellToIndex.get(c)));
+
+    return exclusionGroupsData;
   }
 }
 
@@ -1500,7 +1515,7 @@ export class SameValues extends SudokuConstraintHandler {
     // If they are not unique, find the number of exclusion sets.
     for (const set of this._cellSets) {
       const exclusionGroups = HandlerUtil.findExclusionGroups(
-        set, cellExclusions);
+        set, cellExclusions).groups;
       // The number of exclusion sets is the minimum for any set, since this
       // constraints all the other sets.
       if (exclusionGroups.length < this._numExclusionSets) {
@@ -1664,7 +1679,7 @@ export class Between extends SudokuConstraintHandler {
 
   initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
     const exclusionGroups = HandlerUtil.findExclusionGroups(
-      this._mids, cellExclusions);
+      this._mids, cellExclusions).groups;
     const maxGroupSize = Math.max(0, ...exclusionGroups.map(a => a.length));
     const minEndsDelta = maxGroupSize ? maxGroupSize + 1 : 0;
 
@@ -2013,7 +2028,7 @@ export class RequiredValues extends SudokuConstraintHandler {
     // Find the maximum valid count for any repeated value, based on the
     // exclusions.
     const exclusionGroups = HandlerUtil.findExclusionGroups(
-      this.cells, cellExclusions);
+      this.cells, cellExclusions).groups;
     const maxCount = exclusionGroups.length;
     for (const count of this._valueCounts.values()) {
       if (count > maxCount) {
@@ -2380,9 +2395,8 @@ export class CountingCircles extends SudokuConstraintHandler {
     const combinations = this.constructor._sumCombinations(shape)[numCells];
     if (!combinations) return false;
 
-    const exclusionGroups = (
-      HandlerUtil.findExclusionGroups(
-        this.cells, cellExclusions));
+    const exclusionGroups = HandlerUtil.findExclusionGroups(
+      this.cells, cellExclusions).groups;
 
     // Restrict values to the possible sums.
     // We can't have more values than exclusion groups.
