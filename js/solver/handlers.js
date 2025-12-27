@@ -528,40 +528,25 @@ export class HandlerUtil {
   }
 
   static findExclusionGroupsSmart(cells, cellExclusions) {
-    if (cells.length <= 1) {
-      const groups = cells.length ? [cells.slice()] : [];
-      return { groups, sumOfSquares: this._exclusionGroupScore(groups) };
-    }
-
     // Deterministic ordering for tie-breaks.
     const orderedCells = cells.slice().sort((a, b) => a - b);
     const n = orderedCells.length;
 
-    const isUnassigned = new Uint8Array(n);
-    isUnassigned.fill(1);
-    let remaining = n;
+    const unassigned = new Set();
+    for (let i = 0; i < n; i++) unassigned.add(i);
 
-    // Scratch buffers to reduce allocations inside loops.
-    const scratchA = new Int16Array(n);
-    const scratchB = new Int16Array(n);
-
-    const pickBestCandidate = (candidates, candidateCount) => {
+    const pickBestCandidate = (candidates) => {
       let best = -1;
       let bestScore = -1;
-      for (let idx = 0; idx < candidateCount; idx++) {
-        const c = candidates[idx];
-        if (!isUnassigned[c]) continue;
-
+      for (const c of candidates) {
+        if (!unassigned.has(c)) continue;
         const cellC = orderedCells[c];
 
         // Score = number of edges to other candidates.
         let score = 0;
-        for (let j = 0; j < candidateCount; j++) {
-          const other = candidates[j];
-          if (!isUnassigned[other]) continue;
-          if (cellExclusions.isMutuallyExclusive(cellC, orderedCells[other])) {
-            score++;
-          }
+        for (const other of candidates) {
+          if (!unassigned.has(other)) continue;
+          if (cellExclusions.isMutuallyExclusive(cellC, orderedCells[other])) score++;
         }
 
         // Deterministic tie-break on cell id.
@@ -574,41 +559,29 @@ export class HandlerUtil {
     };
 
     const groups = [];
-    while (remaining > 0) {
+    while (unassigned.size > 0) {
       // Candidates start as all remaining (unassigned) cells.
-      let candidates = scratchA;
-      let candidateCount = 0;
-      for (let i = 0; i < n; i++) {
-        if (isUnassigned[i]) candidates[candidateCount++] = i;
-      }
+      let candidates = [...unassigned];
 
       const group = [];
 
       // Greedily grow the group into a clique.
       // The first picked candidate is the seed.
-      while (candidateCount > 0) {
-        const best = pickBestCandidate(candidates, candidateCount);
+      while (candidates.length > 0) {
+        const best = pickBestCandidate(candidates);
         if (best < 0) break;
 
         group.push(orderedCells[best]);
-        isUnassigned[best] = 0;
-        remaining--;
+        unassigned.delete(best);
 
         // Next candidates are those unassigned cells that are mutually exclusive
         // with the chosen cell (since candidates already represented the
         // intersection of neighbors of the group so far, this preserves clique-ness).
         const bestCell = orderedCells[best];
-        const nextCandidates = (candidates === scratchA) ? scratchB : scratchA;
-        let nextCount = 0;
-        for (let i = 0; i < candidateCount; i++) {
-          const c = candidates[i];
-          if (isUnassigned[c] && cellExclusions.isMutuallyExclusive(bestCell, orderedCells[c])) {
-            nextCandidates[nextCount++] = c;
-          }
-        }
-
-        candidates = nextCandidates;
-        candidateCount = nextCount;
+        candidates = candidates.filter(i => (
+          unassigned.has(i)
+          && cellExclusions.isMutuallyExclusive(bestCell, orderedCells[i])
+        ));
       }
 
       groups.push(group);
