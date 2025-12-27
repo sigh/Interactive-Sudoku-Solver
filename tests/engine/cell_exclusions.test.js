@@ -103,6 +103,75 @@ await runTest('HandlerUtil.findExclusionGroups should work for a single cell', (
   });
 });
 
+await runTest('HandlerUtil.findExclusionGroupsSmart should return clique groups', () => {
+  const handlerSet = createHandlerSet();
+  const exclusions = new CellExclusions(handlerSet, SHAPE_9x9);
+
+  // Build a small mutual-exclusion graph over cells [0..4].
+  // Clique A: 0-1-2, Clique B: 2-3-4, with no edges between {0,1} and {3,4}.
+  const addUndirected = (a, b) => {
+    exclusions.addMutualExclusion(a, b);
+    exclusions.addMutualExclusion(b, a);
+  };
+  addUndirected(0, 1);
+  addUndirected(0, 2);
+  addUndirected(1, 2);
+  addUndirected(2, 3);
+  addUndirected(2, 4);
+  addUndirected(3, 4);
+
+  const cells = [0, 1, 2, 3, 4];
+  const result = HandlerModule.HandlerUtil.findExclusionGroupsSmart(cells, exclusions);
+
+  // Should partition the input cells exactly once.
+  const flattened = result.groups.flat();
+  flattened.sort((a, b) => a - b);
+  assert.deepEqual(flattened, cells);
+
+  // Each group should be a clique.
+  for (const g of result.groups) {
+    assert.equal(exclusions.areMutuallyExclusive(g), true);
+  }
+
+  // In this graph, an optimal partition is a 3-clique + 2-clique.
+  // We don't assert ordering, but we can assert the score.
+  assert.equal(result.sumOfSquares, 3 * 3 + 2 * 2);
+});
+
+await runTest('HandlerUtil.findExclusionGroupsSmart should be deterministic', () => {
+  const handlerSet = createHandlerSet();
+  const exclusions = new CellExclusions(handlerSet, SHAPE_9x9);
+
+  const addUndirected = (a, b) => {
+    exclusions.addMutualExclusion(a, b);
+    exclusions.addMutualExclusion(b, a);
+  };
+  addUndirected(0, 1);
+  addUndirected(0, 2);
+  addUndirected(1, 2);
+  addUndirected(2, 3);
+  addUndirected(2, 4);
+  addUndirected(3, 4);
+
+  const cells = [4, 2, 1, 0, 3];
+  const r1 = HandlerModule.HandlerUtil.findExclusionGroupsSmart(cells, exclusions);
+  const r2 = HandlerModule.HandlerUtil.findExclusionGroupsSmart(cells, exclusions);
+  assert.deepEqual(r1, r2);
+});
+
+await runTest('HandlerUtil.findExclusionGroupsSmart should not seal CellExclusions', () => {
+  const handlerSet = createHandlerSet();
+  const exclusions = new CellExclusions(handlerSet, SHAPE_9x9);
+
+  // Calling findExclusionGroupsSmart should only use isMutuallyExclusive and
+  // must not force caching/sealing.
+  const cells = [0, 1, 2];
+  HandlerModule.HandlerUtil.findExclusionGroupsSmart(cells, exclusions);
+
+  // If sealed, this would throw.
+  exclusions.addMutualExclusion(10, 11);
+});
+
 await runTest('CellExclusions should seal after reading BitSet', () => {
   const handlerSet = createHandlerSet();
   const exclusions = new CellExclusions(handlerSet, SHAPE_9x9);
