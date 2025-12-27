@@ -159,17 +159,16 @@ await runTest('HandlerUtil.findExclusionGroupsSmart should be deterministic', ()
   assert.deepEqual(r1, r2);
 });
 
-await runTest('HandlerUtil.findExclusionGroupsSmart should not seal CellExclusions', () => {
+await runTest('HandlerUtil.findExclusionGroupsSmart should seal CellExclusions', () => {
   const handlerSet = createHandlerSet();
   const exclusions = new CellExclusions(handlerSet, SHAPE_9x9);
 
-  // Calling findExclusionGroupsSmart should only use isMutuallyExclusive and
-  // must not force caching/sealing.
+  // Calling findExclusionGroupsSmart uses getBitSet for performance, which
+  // seals the exclusions cache.
   const cells = [0, 1, 2];
   HandlerModule.HandlerUtil.findExclusionGroupsSmart(cells, exclusions);
 
-  // If sealed, this would throw.
-  exclusions.addMutualExclusion(10, 11);
+  assert.throws(() => exclusions.addMutualExclusion(10, 11), /Cannot add exclusions after caching/);
 });
 
 await runTest('CellExclusions should seal after reading BitSet', () => {

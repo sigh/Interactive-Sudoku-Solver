@@ -133,7 +133,7 @@ export class Sum extends SudokuConstraintHandler {
     this._sumData = SumData.get(shape.numValues);
 
     for (const g of this._coeffGroups) {
-      g.exclusionGroups = HandlerUtil.findExclusionGroupsSmart(
+      g.exclusionGroups = HandlerUtil.findExclusionGroups(
         g.cells, cellExclusions).groups;
     }
 
