@@ -120,6 +120,14 @@ export const countOnes16bit = (x) => {
   return x & 0x1f;
 };
 
+export const countOnes32bit = (x) => {
+  x >>>= 0;
+  x -= (x >>> 1) & 0x55555555;
+  x = (x & 0x33333333) + ((x >>> 2) & 0x33333333);
+  x = (x + (x >>> 4)) & 0x0f0f0f0f;
+  return (x * 0x01010101) >>> 24;
+};
+
 export const requiredBits = (n) => {
   return 32 - Math.clz32(n);
 }
@@ -532,6 +540,10 @@ export class BitSet {
     this.words = words || new Uint32Array(BitSet._wordCountFor(capacity));
   }
 
+  clone() {
+    return new BitSet(this.words.length << 5, this.words.slice());
+  }
+
   add(bitIndex) {
     const wordIndex = bitIndex >>> 5;
     const mask = 1 << (bitIndex & 31);
@@ -561,10 +573,29 @@ export class BitSet {
     return true;
   }
 
+  forEachBit(callback) {
+    for (let wordIndex = 0; wordIndex < this.words.length; wordIndex++) {
+      let word = this.words[wordIndex];
+      while (word) {
+        const lowestBit = word & -word;
+        if (callback(BitSet.bitIndex(wordIndex, lowestBit)) === false) return;
+        word ^= lowestBit;
+      }
+    }
+  }
+
   intersect(other) {
     for (let i = 0; i < this.words.length; i++) {
       this.words[i] &= other.words[i];
     }
+  }
+
+  intersectCount(other) {
+    let count = 0;
+    for (let i = 0; i < this.words.length; i++) {
+      count += countOnes32bit(this.words[i] & other.words[i]);
+    }
+    return count;
   }
 
   union(other) {

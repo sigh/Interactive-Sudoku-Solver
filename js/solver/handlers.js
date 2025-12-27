@@ -7,7 +7,8 @@ const {
   arrayIntersect,
   RandomIntGenerator,
   shuffleArray,
-  MultiMap
+  MultiMap,
+  BitSet
 } = await import('../util.js' + self.VERSION_PARAM);
 const { LookupTables } = await import('./lookup_tables.js' + self.VERSION_PARAM);
 const { SHAPE_MAX } = await import('../grid_shape.js' + self.VERSION_PARAM);
@@ -528,61 +529,46 @@ export class HandlerUtil {
   }
 
   static findExclusionGroupsSmart(cells, cellExclusions) {
-    // Deterministic ordering for tie-breaks.
-    const orderedCells = cells.slice().sort((a, b) => a - b);
-    const n = orderedCells.length;
-
-    const unassigned = new Set();
-    for (let i = 0; i < n; i++) unassigned.add(i);
-
-    const pickBestCandidate = (candidates) => {
-      let best = -1;
-      let bestScore = -1;
-      for (const c of candidates) {
-        if (!unassigned.has(c)) continue;
-        const cellC = orderedCells[c];
-
-        // Score = number of edges to other candidates.
-        let score = 0;
-        for (const other of candidates) {
-          if (!unassigned.has(other)) continue;
-          if (cellExclusions.isMutuallyExclusive(cellC, orderedCells[other])) score++;
-        }
-
-        // Deterministic tie-break on cell id.
-        if (score > bestScore || (score === bestScore && (best < 0 || orderedCells[c] < orderedCells[best]))) {
-          bestScore = score;
-          best = c;
-        }
-      }
-      return best;
-    };
+    // BitSets are in the global cell-id space, but we only ever set bits for
+    // the cells in this `cells` list.
+    const unassigned = new BitSet(Math.max(...cells) + 1);
+    for (const cell of cells) {
+      unassigned.add(cell);
+    }
+    let numUnassigned = cells.length;
 
     const groups = [];
-    while (unassigned.size > 0) {
-      // Candidates start as all remaining (unassigned) cells.
-      let candidates = [...unassigned];
-
+    while (numUnassigned > 0) {
+      const candidates = unassigned.clone();
+      let numCandidates = numUnassigned;
       const group = [];
 
-      // Greedily grow the group into a clique.
-      // The first picked candidate is the seed.
-      while (candidates.length > 0) {
-        const best = pickBestCandidate(candidates);
-        if (best < 0) break;
+      // Greedily grow the group into a clique by choosing the cell which
+      // is mutually exclusive with the most candidates.
+      while (numCandidates > 0) {
+        let bestCell = -1;
+        let bestScore = -1;
+        candidates.forEachBit((cell) => {
+          const score = candidates.intersectCount(cellExclusions.getBitSet(cell));
+          if (score > bestScore || (score === bestScore && cell < bestCell)) {
+            bestScore = score;
+            bestCell = cell;
 
-        group.push(orderedCells[best]);
-        unassigned.delete(best);
+            // Can't do better than excluding all candidates.
+            if (bestScore === numCandidates - 1) return false;
+          }
+        });
 
-        // Next candidates are those unassigned cells that are mutually exclusive
-        // with the chosen cell (since candidates already represented the
-        // intersection of neighbors of the group so far, this preserves clique-ness).
-        const bestCell = orderedCells[best];
-        candidates = candidates.filter(i => (
-          unassigned.has(i)
-          && cellExclusions.isMutuallyExclusive(bestCell, orderedCells[i])
-        ));
+        group.push(bestCell);
+        candidates.remove(bestCell);
+        if (bestScore !== numCandidates - 1) {
+          candidates.intersect(cellExclusions.getBitSet(bestCell));
+        }
+        numCandidates = bestScore;
       }
+
+      for (const cell of group) unassigned.remove(cell);
+      numUnassigned -= group.length;
 
       groups.push(group);
     }

@@ -21,6 +21,7 @@ const {
   setDifference,
   setPeek,
   countOnes16bit,
+  countOnes32bit,
   requiredBits,
   memoize,
   isIterable,
@@ -208,6 +209,15 @@ await runTest('countOnes16bit should count set bits', () => {
   assert.equal(countOnes16bit(0b1111111111111111), 16);
   assert.equal(countOnes16bit(0), 0);
   assert.equal(countOnes16bit(1), 1);
+});
+
+await runTest('countOnes32bit should count set bits', () => {
+  assert.equal(countOnes32bit(0), 0);
+  assert.equal(countOnes32bit(1), 1);
+  assert.equal(countOnes32bit(0xFFFFFFFF), 32);
+  assert.equal(countOnes32bit(0x80000000), 1);
+  assert.equal(countOnes32bit(0x7FFFFFFF), 31);
+  assert.equal(countOnes32bit(0xF0F0F0F0), 16);
 });
 
 await runTest('requiredBits should return number of bits needed', () => {
@@ -462,6 +472,48 @@ await runTest('BitSet.allocatePool should create pool of sets', () => {
   bitsets[0].add(5);
   assert.equal(bitsets[0].has(5), true);
   assert.equal(bitsets[1].has(5), false);
+});
+
+await runTest('BitSet.clone should copy bits', () => {
+  const a = new BitSet(64);
+  a.add(1);
+  a.add(63);
+
+  const b = a.clone();
+  assert.equal(b.has(1), true);
+  assert.equal(b.has(63), true);
+
+  b.remove(1);
+  assert.equal(a.has(1), true);
+  assert.equal(b.has(1), false);
+});
+
+await runTest('BitSet.forEachBit should iterate set bits', () => {
+  const bs = new BitSet(96);
+  bs.add(0);
+  bs.add(1);
+  bs.add(33);
+  bs.add(95);
+
+  const bits = [];
+  bs.forEachBit((b) => bits.push(b));
+  assert.deepEqual(bits, [0, 1, 33, 95]);
+});
+
+await runTest('BitSet.intersectCount should count intersection bits', () => {
+  const a = new BitSet(96);
+  a.add(1);
+  a.add(2);
+  a.add(63);
+  a.add(95);
+
+  const b = new BitSet(96);
+  b.add(2);
+  b.add(63);
+  b.add(64);
+  b.add(95);
+
+  assert.equal(a.intersectCount(b), 3);
 });
 
 // ============================================================================

@@ -10,6 +10,7 @@ if (typeof g.VERSION_PARAM === 'undefined') {
 
 const { LookupTables } = await import('../../js/solver/lookup_tables.js');
 const { GridShape } = await import('../../js/grid_shape.js');
+const { BitSet } = await import('../../js/util.js');
 
 const DEFAULT_NUM_VALUES = 9;
 const DEFAULT_NUM_CELLS = 81;
@@ -53,12 +54,36 @@ export const createAccumulator = () => {
   };
 };
 
-export const createCellExclusions = ({ allUnique = true } = {}) => ({
-  isMutuallyExclusive: allUnique ? () => true : () => false,
-  getPairExclusions: () => [],
-  getArray: () => [],
-  getListExclusions: () => [],
-});
+export const createCellExclusions = ({ allUnique = true, numCells = DEFAULT_NUM_CELLS } = {}) => {
+  const cache = new Array(numCells);
+
+  return {
+    isMutuallyExclusive: allUnique ? (a, b) => a !== b : () => false,
+    getPairExclusions: () => [],
+    getListExclusions: () => [],
+    getArray: (cell) => {
+      if (!allUnique) return [];
+      const out = [];
+      for (let i = 0; i < numCells; i++) {
+        if (i !== cell) out.push(i);
+      }
+      return out;
+    },
+    getBitSet: (cell) => {
+      let bs = cache[cell];
+      if (!bs) {
+        bs = new BitSet(numCells);
+        if (allUnique) {
+          for (let i = 0; i < numCells; i++) {
+            if (i !== cell) bs.add(i);
+          }
+        }
+        cache[cell] = bs;
+      }
+      return bs;
+    },
+  };
+};
 
 export const applyCandidates = (grid, assignments) => {
   for (const [cellKey, values] of Object.entries(assignments)) {
