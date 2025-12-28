@@ -1235,6 +1235,7 @@ export class CellExclusions {
       throw ('Cannot add exclusions after caching.');
     }
     this._cellExclusionSets[cell1].add(cell2);
+    this._cellExclusionSets[cell2].add(cell1);
   }
 
   // Assume cell0 and cell1 are the same value, and hence can share exclusions.
@@ -1243,11 +1244,12 @@ export class CellExclusions {
     if (this._sealed) {
       throw ('Cannot add exclusions after caching.');
     }
-    const union = this._cellExclusionSets[cell0];
-    for (const c of this._cellExclusionSets[cell1]) {
-      union.add(c);
+    for (const c of this._cellExclusionSets[cell0]) {
+      this.addMutualExclusion(c, cell1);
     }
-    this._cellExclusionSets[cell1] = union;
+    for (const c of this._cellExclusionSets[cell1]) {
+      this.addMutualExclusion(c, cell0);
+    }
   }
 
   isMutuallyExclusive(cell1, cell2) {
