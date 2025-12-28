@@ -435,18 +435,26 @@ export class HandlerUtil {
     return true;
   }
 
-  // Partition the cells into groups where members are all unique.
   static findExclusionGroups(cells, cellExclusions) {
+    const bitset = new BitSet(Math.max(...cells) + 1);
+
     let bestExclusionGroupData = this.findExclusionGroupsGreedy(
-      cells, cellExclusions);
+      cells, cellExclusions, bitset);
 
     if (cells.length < 4 || bestExclusionGroupData.groups.length == 1) {
       return bestExclusionGroupData;
     }
 
+    {
+      const data = this.findExclusionGroupsSmart(cells, cellExclusions, bitset);
+      if (data.sumOfSquares > bestExclusionGroupData.sumOfSquares) {
+        bestExclusionGroupData = data;
+      }
+    }
+
     let randomGen = new RandomIntGenerator(0);
 
-    const NUM_TRIALS = 5;
+    const NUM_TRIALS = 4;
 
     // Choose `NUM_TRIALS` random orderings of the cells and find the one that
     // generates the best exclusion groups.
@@ -454,9 +462,9 @@ export class HandlerUtil {
     //       should work well for little killers and other linear regions.
     //       This is computed above, so that why we start from i = 1 here.
     cells = cells.slice();
-    for (let i = 1; i < NUM_TRIALS; i++) {
+    for (let i = 2; i < NUM_TRIALS; i++) {
       shuffleArray(cells, randomGen);
-      const data = this.findExclusionGroupsGreedy(cells, cellExclusions);
+      const data = this.findExclusionGroupsGreedy(cells, cellExclusions, bitset);
 
       // Score by sum-of-squares of group sizes.
       // Higher is better (it minimizes the implied sum-range).
@@ -497,25 +505,25 @@ export class HandlerUtil {
   // Partition the cells into groups where members are all unique.
   // Applies a greedy algorithm by, each iteration, choosing a cell and adding
   // as many remaining cells to it as possible to create the next group.
-  static findExclusionGroupsGreedy(cells, cellExclusions) {
+  static findExclusionGroupsGreedy(cells, cellExclusions, bitset = null) {
     let exclusionGroups = [];
     let unassignedCells = cells;
     let remainingUnassignedCells = [];
 
+    const groupBitSet = bitset || new BitSet(Math.max(...cells) + 1);
+
     while (unassignedCells.length > 0) {
       let currentGroup = [];
+      groupBitSet.clear();
       for (const unassignedCell of unassignedCells) {
         // Determine if this cell is mutually exclusive with every cell in the
         // current group. If so, then add it to the current group.
-        let addToCurrentSet = true;
-        for (const exclusionCell of currentGroup) {
-          if (!cellExclusions.isMutuallyExclusive(unassignedCell, exclusionCell)) {
-            addToCurrentSet = false;
-            break;
-          }
-        }
+        const addToCurrentSet = cellExclusions.getBitSet(unassignedCell)
+          .hasAll(groupBitSet);
+
         if (addToCurrentSet) {
           currentGroup.push(unassignedCell);
+          groupBitSet.add(unassignedCell);
         } else {
           remainingUnassignedCells.push(unassignedCell);
         }
@@ -528,10 +536,8 @@ export class HandlerUtil {
     return { groups: exclusionGroups, sumOfSquares: this._exclusionGroupScore(exclusionGroups) };
   }
 
-  static findExclusionGroupsSmart(cells, cellExclusions) {
-    // BitSets are in the global cell-id space, but we only ever set bits for
-    // the cells in this `cells` list.
-    const unassigned = new BitSet(Math.max(...cells) + 1);
+  static findExclusionGroupsSmart(cells, cellExclusions, bitset = null) {
+    const unassigned = bitset || new BitSet(Math.max(...cells) + 1);
     for (const cell of cells) {
       unassigned.add(cell);
     }
