@@ -1222,7 +1222,9 @@ export class CellExclusions {
       const exclusionCells = h.exclusionCells();
       for (const c of exclusionCells) {
         for (const d of exclusionCells) {
-          if (c != d) cellExclusionSets[c].add(d);
+          if (c == d) break;
+          cellExclusionSets[c].add(d);
+          cellExclusionSets[d].add(c);
         }
       }
     }
@@ -1245,10 +1247,10 @@ export class CellExclusions {
       throw ('Cannot add exclusions after caching.');
     }
     for (const c of this._cellExclusionSets[cell0]) {
-      this.addMutualExclusion(c, cell1);
+      this._cellExclusionSets[cell1].add(c);
     }
     for (const c of this._cellExclusionSets[cell1]) {
-      this.addMutualExclusion(c, cell0);
+      this._cellExclusionSets[cell0].add(c);
     }
   }
 
