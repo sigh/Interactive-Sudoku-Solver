@@ -118,7 +118,7 @@ await runTest('HandlerUtil.findExclusionGroups should work for a single cell', (
   });
 });
 
-await runTest('HandlerUtil.findExclusionGroupsSmart should return clique groups', () => {
+await runTest('HandlerUtil.findExclusionGroupsGreedy(BEST) should return clique groups', () => {
   const handlerSet = createHandlerSet();
   const exclusions = new CellExclusions(handlerSet, SHAPE_9x9);
 
@@ -136,7 +136,10 @@ await runTest('HandlerUtil.findExclusionGroupsSmart should return clique groups'
   addUndirected(3, 4);
 
   const cells = [0, 1, 2, 3, 4];
-  const result = HandlerModule.HandlerUtil.findExclusionGroupsSmart(cells, exclusions);
+  const result = HandlerModule.HandlerUtil.findExclusionGroupsGreedy(
+    cells,
+    exclusions,
+    HandlerModule.HandlerUtil.GREEDY_STRATEGY_BEST);
 
   // Should partition the input cells exactly once.
   const flattened = result.groups.flat();
@@ -153,7 +156,7 @@ await runTest('HandlerUtil.findExclusionGroupsSmart should return clique groups'
   assert.equal(result.sumOfSquares, 3 * 3 + 2 * 2);
 });
 
-await runTest('HandlerUtil.findExclusionGroupsSmart should be deterministic', () => {
+await runTest('HandlerUtil.findExclusionGroupsGreedy should be deterministic for FIRST and BEST', () => {
   const handlerSet = createHandlerSet();
   const exclusions = new CellExclusions(handlerSet, SHAPE_9x9);
 
@@ -169,19 +172,27 @@ await runTest('HandlerUtil.findExclusionGroupsSmart should be deterministic', ()
   addUndirected(3, 4);
 
   const cells = [4, 2, 1, 0, 3];
-  const r1 = HandlerModule.HandlerUtil.findExclusionGroupsSmart(cells, exclusions);
-  const r2 = HandlerModule.HandlerUtil.findExclusionGroupsSmart(cells, exclusions);
-  assert.deepEqual(r1, r2);
+  for (const strategy of [
+    HandlerModule.HandlerUtil.GREEDY_STRATEGY_FIRST,
+    HandlerModule.HandlerUtil.GREEDY_STRATEGY_BEST,
+  ]) {
+    const r1 = HandlerModule.HandlerUtil.findExclusionGroupsGreedy(cells, exclusions, strategy);
+    const r2 = HandlerModule.HandlerUtil.findExclusionGroupsGreedy(cells, exclusions, strategy);
+    assert.deepEqual(r1, r2);
+  }
 });
 
-await runTest('HandlerUtil.findExclusionGroupsSmart should seal CellExclusions', () => {
+await runTest('HandlerUtil.findExclusionGroupsGreedy should seal CellExclusions', () => {
   const handlerSet = createHandlerSet();
   const exclusions = new CellExclusions(handlerSet, SHAPE_9x9);
 
-  // Calling findExclusionGroupsSmart uses getBitSet for performance, which
+  // Calling findExclusionGroupsGreedy uses getBitSet for performance, which
   // seals the exclusions cache.
   const cells = [0, 1, 2];
-  HandlerModule.HandlerUtil.findExclusionGroupsSmart(cells, exclusions);
+  HandlerModule.HandlerUtil.findExclusionGroupsGreedy(
+    cells,
+    exclusions,
+    HandlerModule.HandlerUtil.GREEDY_STRATEGY_BEST);
 
   assert.throws(() => exclusions.addMutualExclusion(10, 11), /Cannot add exclusions after caching/);
 });

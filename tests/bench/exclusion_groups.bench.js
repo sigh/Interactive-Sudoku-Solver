@@ -172,16 +172,24 @@ benchGroup('solver::exclusion_groups', () => {
   {
     const cells = Array.from({ length: 32 }, (_, i) => i);
     const exclusions = buildRandomExclusions({ cells, edgeProbability: 0.25, seed: 0xC0FFEE });
-    bench('findExclusionGroupsSmart(random n=32 p=0.25)', () => {
-      HandlerUtil.findExclusionGroupsSmart(cells, exclusions);
+    const label = 'findExclusionGroupsGreedy(random n=32 p=0.25)';
+    bench(`${label} (FIRST)`, () => {
+      HandlerUtil.findExclusionGroupsGreedy(cells, exclusions, HandlerUtil.GREEDY_STRATEGY_FIRST);
+    }, { innerIterations: 2_000, minSampleTimeMs: 10 });
+    bench(`${label} (BEST)`, () => {
+      HandlerUtil.findExclusionGroupsGreedy(cells, exclusions, HandlerUtil.GREEDY_STRATEGY_BEST);
     }, { innerIterations: 2_000, minSampleTimeMs: 10 });
   }
 
   {
     const cells = Array.from({ length: 81 }, (_, i) => i);
     const exclusions = buildRandomExclusions({ cells, edgeProbability: 0.25, seed: 0xBADC0DE });
-    bench('findExclusionGroupsSmart(random n=81 p=0.25)', () => {
-      HandlerUtil.findExclusionGroupsSmart(cells, exclusions);
+    const label = 'findExclusionGroupsGreedy(random n=81 p=0.25)';
+    bench(`${label} (FIRST)`, () => {
+      HandlerUtil.findExclusionGroupsGreedy(cells, exclusions, HandlerUtil.GREEDY_STRATEGY_FIRST);
+    }, { innerIterations: 300, minSampleTimeMs: 10 });
+    bench(`${label} (BEST)`, () => {
+      HandlerUtil.findExclusionGroupsGreedy(cells, exclusions, HandlerUtil.GREEDY_STRATEGY_BEST);
     }, { innerIterations: 300, minSampleTimeMs: 10 });
   }
 
@@ -201,8 +209,12 @@ benchGroup('solver::exclusion_groups', () => {
       extraP ? `extras=${extraP}` : null,
     ].filter(Boolean).join(' ');
 
-    bench(`findExclusionGroupsSmart(${label})`, () => {
-      HandlerUtil.findExclusionGroupsSmart(regionCells, exclusions);
+    const base = `findExclusionGroupsGreedy(${label})`;
+    bench(`${base} (FIRST)`, () => {
+      HandlerUtil.findExclusionGroupsGreedy(regionCells, exclusions, HandlerUtil.GREEDY_STRATEGY_FIRST);
+    }, { innerIterations: 5_000, minSampleTimeMs: 10 });
+    bench(`${base} (BEST)`, () => {
+      HandlerUtil.findExclusionGroupsGreedy(regionCells, exclusions, HandlerUtil.GREEDY_STRATEGY_BEST);
     }, { innerIterations: 5_000, minSampleTimeMs: 10 });
   };
 

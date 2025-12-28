@@ -439,14 +439,15 @@ export class HandlerUtil {
     const bitset = new BitSet(Math.max(...cells) + 1);
 
     let bestExclusionGroupData = this.findExclusionGroupsGreedy(
-      cells, cellExclusions, bitset);
+      cells, cellExclusions, this.GREEDY_STRATEGY_FIRST, bitset);
 
     if (cells.length < 4 || bestExclusionGroupData.groups.length == 1) {
       return bestExclusionGroupData;
     }
 
     {
-      const data = this.findExclusionGroupsSmart(cells, cellExclusions, bitset);
+      const data = this.findExclusionGroupsGreedy(
+        cells, cellExclusions, this.GREEDY_STRATEGY_BEST, bitset);
       if (data.sumOfSquares > bestExclusionGroupData.sumOfSquares) {
         bestExclusionGroupData = data;
       }
@@ -464,7 +465,8 @@ export class HandlerUtil {
     cells = cells.slice();
     for (let i = 2; i < NUM_TRIALS; i++) {
       shuffleArray(cells, randomGen);
-      const data = this.findExclusionGroupsGreedy(cells, cellExclusions, bitset);
+      const data = this.findExclusionGroupsGreedy(
+        cells, cellExclusions, this.GREEDY_STRATEGY_FIRST, bitset);
 
       // Score by sum-of-squares of group sizes.
       // Higher is better (it minimizes the implied sum-range).
@@ -502,42 +504,14 @@ export class HandlerUtil {
     return { range, min, max: range + min };
   }
 
-  // Partition the cells into groups where members are all unique.
-  // Applies a greedy algorithm by, each iteration, choosing a cell and adding
-  // as many remaining cells to it as possible to create the next group.
-  static findExclusionGroupsGreedy(cells, cellExclusions, bitset = null) {
-    let exclusionGroups = [];
-    let unassignedCells = cells;
-    let remainingUnassignedCells = [];
+  // When choosing a candidate, pick the first in order.
+  static GREEDY_STRATEGY_FIRST = 0;
+  // When choosing a candidate, pick the best fitting (most exclusions).
+  static GREEDY_STRATEGY_BEST = 1;
 
-    const groupBitSet = bitset || new BitSet(Math.max(...cells) + 1);
-
-    while (unassignedCells.length > 0) {
-      let currentGroup = [];
-      groupBitSet.clear();
-      for (const unassignedCell of unassignedCells) {
-        // Determine if this cell is mutually exclusive with every cell in the
-        // current group. If so, then add it to the current group.
-        const addToCurrentSet = cellExclusions.getBitSet(unassignedCell)
-          .hasAll(groupBitSet);
-
-        if (addToCurrentSet) {
-          currentGroup.push(unassignedCell);
-          groupBitSet.add(unassignedCell);
-        } else {
-          remainingUnassignedCells.push(unassignedCell);
-        }
-      }
-      exclusionGroups.push(currentGroup);
-      unassignedCells = remainingUnassignedCells;
-      remainingUnassignedCells = [];
-    }
-
-    return { groups: exclusionGroups, sumOfSquares: this._exclusionGroupScore(exclusionGroups) };
-  }
-
-  static findExclusionGroupsSmart(cells, cellExclusions, bitset = null) {
+  static findExclusionGroupsGreedy(cells, cellExclusions, strategy = HandlerUtil.GREEDY_STRATEGY_BEST, bitset = null) {
     const unassigned = bitset || new BitSet(Math.max(...cells) + 1);
+    unassigned.clear();
     for (const cell of cells) {
       unassigned.add(cell);
     }
@@ -549,21 +523,32 @@ export class HandlerUtil {
       let numCandidates = numUnassigned;
       const group = [];
 
-      // Greedily grow the group into a clique by choosing the cell which
-      // is mutually exclusive with the most candidates.
+      // Greedily grow the group into a clique
       while (numCandidates > 0) {
         let bestCell = -1;
         let bestScore = -1;
-        candidates.forEachBit((cell) => {
-          const score = candidates.intersectCount(cellExclusions.getBitSet(cell));
-          if (score > bestScore || (score === bestScore && cell < bestCell)) {
-            bestScore = score;
-            bestCell = cell;
-
-            // Can't do better than excluding all candidates.
-            if (bestScore === numCandidates - 1) return false;
+        if (strategy === this.GREEDY_STRATEGY_FIRST) {
+          // Choose the first available cell in the order of `cells`.
+          for (const cell of cells) {
+            if (candidates.has(cell)) {
+              bestCell = cell;
+              break;
+            }
           }
-        });
+          bestScore = candidates.intersectCount(cellExclusions.getBitSet(bestCell));
+        } else {
+          // Choose the cell which is mutually exclusive with the most candidates.
+          candidates.forEachBit((cell) => {
+            const score = candidates.intersectCount(cellExclusions.getBitSet(cell));
+            if (score > bestScore || (score === bestScore && cell < bestCell)) {
+              bestScore = score;
+              bestCell = cell;
+
+              // Can't do better than excluding all candidates.
+              if (bestScore === numCandidates - 1) return false;
+            }
+          });
+        }
 
         group.push(bestCell);
         candidates.remove(bestCell);
