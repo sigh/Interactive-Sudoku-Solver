@@ -734,6 +734,8 @@ export class SudokuConstraintOptimizer {
         const bEntry = HandlerModule.FullRank.entryFromClue(entries, existingClue);
         if (!aEntry || !bEntry) break;
 
+        // TODO: These don't benefit for sharing the same exclusion sets,
+        // which is optimized in _addExtraCellExclusions.
         for (let j = 0; j < aEntry.length; j++) {
           const a = aEntry[j];
           const b = bEntry[j];

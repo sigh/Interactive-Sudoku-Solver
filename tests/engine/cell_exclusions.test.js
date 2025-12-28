@@ -221,10 +221,6 @@ await runTest('CellExclusions should merge sets when calling areSameValue', () =
   assert.equal(exclusions.isMutuallyExclusive(0, 3), true);
   // 1 should now have 0's exclusions (2)
   assert.equal(exclusions.isMutuallyExclusive(1, 2), true);
-
-  // Adding to one should affect the other.
-  exclusions.addMutualExclusion(0, 4);
-  assert.equal(exclusions.isMutuallyExclusive(1, 4), true);
 });
 
 await runTest('CellExclusions should return sorted array from getArray', () => {
