@@ -75,6 +75,14 @@ await runTest('CellExclusions should return BitSet', () => {
 await runTest('HandlerUtil.findExclusionGroups should return groups/sumOfSquares', () => {
   const cellExclusions = {
     isMutuallyExclusive: (a, b) => a !== b,
+    getBitSet: (cell) => {
+      // In this test, every distinct pair is mutually exclusive.
+      const bs = new BitSet(SHAPE_9x9.numCells);
+      for (let i = 0; i < SHAPE_9x9.numCells; i++) {
+        if (i !== cell) bs.add(i);
+      }
+      return bs;
+    },
   };
 
   const cells = [0, 1, 2, 3];
@@ -91,6 +99,13 @@ await runTest('HandlerUtil.findExclusionGroups should return groups/sumOfSquares
 await runTest('HandlerUtil.findExclusionGroups should work for a single cell', () => {
   const cellExclusions = {
     isMutuallyExclusive: (a, b) => a !== b,
+    getBitSet: (cell) => {
+      const bs = new BitSet(SHAPE_9x9.numCells);
+      for (let i = 0; i < SHAPE_9x9.numCells; i++) {
+        if (i !== cell) bs.add(i);
+      }
+      return bs;
+    },
   };
 
   const cells = [7];

@@ -562,6 +562,14 @@ export class BitSet {
     return (this.words[wordIndex] & mask) !== 0;
   }
 
+  // Returns true iff this bitset contains every bit set in `other`.
+  hasAll(other) {
+    for (let i = 0; i < this.words.length; i++) {
+      if ((other.words[i] & ~this.words[i]) !== 0) return false;
+    }
+    return true;
+  }
+
   clear() {
     this.words.fill(0);
   }
