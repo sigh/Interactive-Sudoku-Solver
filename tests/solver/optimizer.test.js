@@ -1,15 +1,15 @@
 import assert from 'node:assert/strict';
-import { ensureGlobalEnvironment } from './helpers/test_env.js';
-import { runTest, logSuiteComplete } from './helpers/test_runner.js';
+import { ensureGlobalEnvironment } from '../helpers/test_env.js';
+import { runTest, logSuiteComplete } from '../helpers/test_runner.js';
 
 ensureGlobalEnvironment();
 
-const { SudokuConstraintOptimizer } = await import('../js/solver/optimizer.js' + self.VERSION_PARAM);
-const { LookupTables } = await import('../js/solver/lookup_tables.js' + self.VERSION_PARAM);
-const { BitSet } = await import('../js/util.js' + self.VERSION_PARAM);
-const HandlerModule = await import('../js/solver/handlers.js' + self.VERSION_PARAM);
-const SumHandlerModule = await import('../js/solver/sum_handler.js' + self.VERSION_PARAM);
-const { GridShape } = await import('../js/grid_shape.js' + self.VERSION_PARAM);
+const { SudokuConstraintOptimizer } = await import('../../js/solver/optimizer.js' + self.VERSION_PARAM);
+const { LookupTables } = await import('../../js/solver/lookup_tables.js' + self.VERSION_PARAM);
+const { BitSet } = await import('../../js/util.js' + self.VERSION_PARAM);
+const HandlerModule = await import('../../js/solver/handlers.js' + self.VERSION_PARAM);
+const SumHandlerModule = await import('../../js/solver/sum_handler.js' + self.VERSION_PARAM);
+const { GridShape } = await import('../../js/grid_shape.js' + self.VERSION_PARAM);
 
 class MockCellExclusions {
   constructor(numCells) {

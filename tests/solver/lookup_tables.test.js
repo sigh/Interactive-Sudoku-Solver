@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict';
 
-import { ensureGlobalEnvironment } from './helpers/test_env.js';
-import { runTest, logSuiteComplete } from './helpers/test_runner.js';
+import { ensureGlobalEnvironment } from '../helpers/test_env.js';
+import { runTest, logSuiteComplete } from '../helpers/test_runner.js';
 
 ensureGlobalEnvironment();
 
-const { LookupTables } = await import('../js/solver/lookup_tables.js');
-const { SudokuConstraint } = await import('../js/sudoku_constraint.js');
+const { LookupTables } = await import('../../js/solver/lookup_tables.js');
+const { SudokuConstraint } = await import('../../js/sudoku_constraint.js');
 
 // Helper to create a binary key from a predicate function.
 const binaryKey = (fn, numValues) =>

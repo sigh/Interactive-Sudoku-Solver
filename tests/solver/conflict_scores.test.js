@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
 
-import { ensureGlobalEnvironment } from './helpers/test_env.js';
-import { runTest, logSuiteComplete } from './helpers/test_runner.js';
+import { ensureGlobalEnvironment } from '../helpers/test_env.js';
+import { runTest, logSuiteComplete } from '../helpers/test_runner.js';
 
 ensureGlobalEnvironment();
 
-const { ConflictScores } = await import('../js/solver/candidate_selector.js');
+const { ConflictScores } = await import('../../js/solver/candidate_selector.js');
 
 await runTest('ConflictScores.increment should increment cell and value scores', () => {
   const cs = new ConflictScores([0, 0, 0], /* numValues= */ 16);
