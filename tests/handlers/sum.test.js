@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 
-import { ensureGlobalEnvironment } from './helpers/test_env.js';
-import { runTest, logSuiteComplete } from './helpers/test_runner.js';
+import { ensureGlobalEnvironment } from '../helpers/test_env.js';
+import { runTest, logSuiteComplete } from '../helpers/test_runner.js';
 import {
   setupConstraintTest,
   createCellExclusions,
@@ -9,11 +9,11 @@ import {
   mask,
   applyCandidates,
   initializeConstraintHandler,
-} from './helpers/constraint_test_utils.js';
+} from '../helpers/constraint_test_utils.js';
 
 ensureGlobalEnvironment();
 
-const { Sum } = await import('../js/solver/sum_handler.js');
+const { Sum } = await import('../../js/solver/sum_handler.js');
 
 const defaultContext = setupConstraintTest();
 const uniqueCells = () => createCellExclusions({ allUnique: true });

@@ -1,14 +1,14 @@
 import assert from 'node:assert/strict';
 
-import { ensureGlobalEnvironment } from './helpers/test_env.js';
-import { runTest, logSuiteComplete } from './helpers/test_runner.js';
-import { createAccumulator, mask } from './helpers/constraint_test_utils.js';
+import { ensureGlobalEnvironment } from '../helpers/test_env.js';
+import { runTest, logSuiteComplete } from '../helpers/test_runner.js';
+import { createAccumulator, mask } from '../helpers/constraint_test_utils.js';
 
 ensureGlobalEnvironment();
 
-const { regexToNFA } = await import('../js/nfa_builder.js');
-const { LookupTables } = await import('../js/solver/lookup_tables.js');
-const { compressNFA, NFAConstraint } = await import('../js/solver/nfa_handler.js');
+const { regexToNFA } = await import('../../js/nfa_builder.js');
+const { LookupTables } = await import('../../js/solver/lookup_tables.js');
+const { compressNFA, NFAConstraint } = await import('../../js/solver/nfa_handler.js');
 
 const findStartingStateIndex = (cnfa) => {
   for (let i = 0; i < cnfa.numStates; i++) {
