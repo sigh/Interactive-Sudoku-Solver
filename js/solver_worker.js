@@ -86,10 +86,12 @@ const handleWorkerMethod = (method, payload) => {
   throw (`Unknown method ${method}`);
 };
 
-const debugCount = (key, value) => {
-  workerSolver?.incDebugCounter(key, value);
+globalThis.debugCount = (key, value) => {
+  workerSolver?.debugLogger()?.incCounter(key, value);
 }
-globalThis.debugCount = debugCount;
+globalThis.debugSet = (key, value) => {
+  workerSolver?.debugLogger()?.setCounter(key, value);
+}
 
 const sendState = (extraState) => {
   const state = workerSolver.state();
