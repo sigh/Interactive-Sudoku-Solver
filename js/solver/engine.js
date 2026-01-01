@@ -207,8 +207,8 @@ export class SudokuSolver {
     return this._debugLogger.getDebugState();
   }
 
-  incDebugCounter(name, value) {
-    this._debugLogger.incCounter(name, value);
+  debugLogger() {
+    return this._debugLogger;
   }
 
   state() {
@@ -286,6 +286,10 @@ class DebugLogger {
     this.logLevel = +this._debugOptions.logLevel;
     this.enableLogs = this.logLevel > 0;
     this.enableStepLogs = this._debugOptions.enableStepLogs;
+  }
+
+  setCounter(name, value) {
+    this._adhHocCounters.set(name, value);
   }
 
   incCounter(name, value) {
