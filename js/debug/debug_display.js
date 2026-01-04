@@ -298,7 +298,7 @@ export class DebugManager {
     if (data.logs) {
       const isScrolledToBottom = this._isScrolledToBottom(this._logView);
 
-      data.logs.forEach(l => this._addLog(l));
+      data.logs.forEach(l => this._addLog(l, data.timeMs));
 
       if (isScrolledToBottom) {
         this._scrollToBottom(this._logView);
@@ -358,7 +358,7 @@ export class DebugManager {
     span.append(repeatSpan);
   }
 
-  _addLog(data) {
+  _addLog(data, timeMs = null) {
     const argsStr = JSON.stringify(data.args || '').replaceAll('"', '');
 
     const key = `${data.loc} ${data.msg} ${argsStr}`;
@@ -374,7 +374,13 @@ export class DebugManager {
     }
 
     const locSpan = document.createElement('span');
-    locSpan.textContent = data.loc + ': ';
+    let locText = '';
+    if (timeMs !== null && timeMs > 0) {
+      const seconds = (timeMs / 1000).toFixed(3);
+      locText = `[${seconds}s] `;
+    }
+    locText += data.loc + ': ';
+    locSpan.textContent = locText;
 
     const msgSpan = document.createElement('msg');
     let msg = data.msg || '';
