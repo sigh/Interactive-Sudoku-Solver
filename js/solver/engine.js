@@ -737,6 +737,10 @@ class InternalSolver {
       counters.nodesSearched++;
     }
 
+    if (this._debugLogger.logLevel >= 2) {
+      this._debugLogger.log({ loc: 'run', msg: 'Start run-loop' }, 2);
+    }
+
     recDepth++;
     while (recDepth) {
       let recFrame = recStack[--recDepth];
@@ -889,6 +893,10 @@ class InternalSolver {
 
     this._currentRecFrame = null;
     this.done = true;
+
+    if (this._debugLogger.logLevel >= 2) {
+      this._debugLogger.log({ loc: 'run', msg: 'Done' }, 2);
+    }
   }
 
   solveAllPossibilities(solutions) {

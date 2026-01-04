@@ -112,6 +112,18 @@ export class CandidateSelector {
     const cellOrder = this._cellOrder;
     let [cellOffset, value, count] = this._selectBestCandidate(
       gridState, cellOrder, cellDepth, isNewNode);
+    if (cellDepth == 0 && this._debugLogger.logLevel >= 2) {
+      this._debugLogger.log({
+        loc: 'selectNextCandidate',
+        msg: 'Root node',
+        args: {
+          cell: cellOrder[cellOffset],
+          value: LookupTables.toValue(value),
+          count
+        },
+        cells: [cellOrder[cellOffset]],
+      }, 2);
+    }
 
     // Adjust the value for step-by-step.
     if (stepState) {
