@@ -17,7 +17,7 @@ const { LookupTables } = await import('../../js/solver/lookup_tables.js');
 
 // Helper to create a binary key from a predicate function.
 const binaryKey = (fn, numValues) =>
-  SudokuConstraint.Binary.fnToKey(fn, numValues);
+  SudokuConstraint.Pair.fnToKey(fn, numValues);
 
 // =============================================================================
 // Initialization tests

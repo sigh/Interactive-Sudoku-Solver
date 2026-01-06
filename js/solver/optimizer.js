@@ -62,7 +62,7 @@ export class SudokuConstraintOptimizer {
     this._logStats(handlerSet);
   }
 
-  static _equalsKey = memoize((numValues) => SudokuConstraint.Binary.fnToKey(
+  static _equalsKey = memoize((numValues) => SudokuConstraint.Pair.fnToKey(
     (a, b) => a == b, numValues));
 
   _addExtraCellExclusions(handlerSet, cellExclusions, shape) {
@@ -445,7 +445,7 @@ export class SudokuConstraintOptimizer {
 
             newHandler = new HandlerModule.BinaryConstraint(
               ...cells,
-              SudokuConstraint.Binary.fnToKey(
+              SudokuConstraint.Pair.fnToKey(
                 (a, b) => a * c0 + b * c1 == sum && (!mutuallyExclusive || a != b),
                 shape.numValues));
           }
