@@ -294,7 +294,7 @@ export const runSolveTests = async (onFailure, runner) => {
     'Lockout lines',
     'Palindromes',
     'Modular lines',
-    'Entropic connections',
+    'Entropic connections',  // Entropic Line, Pair
     'Jigsaw',
     'Jigsaw boxes, disconnected',
     'Windoku',
@@ -313,7 +313,7 @@ export const runSolveTests = async (onFailure, runner) => {
     'Odd even',
     'Quadruple X',
     'Quadruple - repeated values',
-    'Odd-even thermo', // Pair
+    'Odd-even thermo',  // Pair
     'Nabner thermo - easy',
     'Zipper lines - tutorial',  // Zipper both odd and even length.
     'Sum lines',

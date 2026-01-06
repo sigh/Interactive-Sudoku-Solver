@@ -1089,7 +1089,7 @@ export class SudokuConstraint {
         }
 
         if (item.length) {
-          currentName = SudokuConstraint.Binary.decodeName(item.substring(1));
+          currentName = SudokuConstraint.Pair.decodeName(item.substring(1));
         }
 
         currentCells = [];
@@ -1115,7 +1115,7 @@ export class SudokuConstraint {
           for (const part of nameGroup) {
             if (first) {
               // TODO: Extract function from Binary constraint for encoding names.
-              items.push('_' + SudokuConstraint.Binary.encodeName(part.name));
+              items.push('_' + SudokuConstraint.Pair.encodeName(part.name));
               first = false;
             } else {
               items.push('');
@@ -2041,6 +2041,35 @@ export class SudokuConstraint {
 
   static Binary = class Binary extends SudokuConstraintBase {
     static DESCRIPTION = (
+      "Legacy: Applies a custom binary relationship between consecutive pairs of cells.");
+    static CATEGORY = null;
+    static DISPLAY_CONFIG = null;
+
+    static *makeFromArgs(...args) {
+      const [key, ...rest] = args;
+      // Convert from LegacyBase64Codec to Base64Codec by swapping - and _.
+      const convertedKey = key.replace(/[-_]/g, c => c === '-' ? '_' : '-');
+      yield* SudokuConstraint.Pair.makeFromArgs(convertedKey, ...rest);
+    }
+  }
+
+  static BinaryX = class BinaryX extends SudokuConstraint.Binary {
+    static DESCRIPTION = (
+      "Legacy: Applies a custom binary relationship between all pairs of the given cells.");
+    static CATEGORY = null;
+    static DISPLAY_CONFIG = null;
+
+    static *makeFromArgs(...args) {
+      const [key, ...rest] = args;
+      // Convert from LegacyBase64Codec to Base64Codec by swapping - and _.
+      const convertedKey = key.replace(/[-_]/g, c => c === '-' ? '_' : '-');
+      yield* SudokuConstraint.PairX.makeFromArgs(convertedKey, ...rest);
+    }
+  }
+
+  // Pair uses the correct Base64Codec encoding.
+  static Pair = class Pair extends SudokuConstraintBase {
+    static DESCRIPTION = (
       "Applies a custom binary relationship between consecutive pairs of cells.");
     static CATEGORY = 'Pairwise';
     static DISPLAY_CONFIG = {
@@ -2153,7 +2182,7 @@ export class SudokuConstraint {
 
     static fnToKey(fn, numValues) {
       const array = this._binaryFnTo6BitArray(fn, numValues);
-      return LegacyBase64Codec.encode6BitArray(array);
+      return Base64Codec.encode6BitArray(array);
     }
 
     static encodeName(displayName) {
@@ -2168,47 +2197,16 @@ export class SudokuConstraint {
       } catch (e) { }
       return displayName;
     }
-  }
-
-  static BinaryX = class BinaryX extends SudokuConstraint.Binary {
-    static DESCRIPTION = (
-      "Applies a custom binary relationship between all pairs of the given cells.");
-    static CATEGORY = 'Pairwise';
-    static DISPLAY_CONFIG = {
-      displayClass: 'CustomLine',
-      nodeMarker: LineOptions.SMALL_FULL_CIRCLE_MARKER,
-    };
-
-    static fnToKey(fn, numValues) {
-      // Make the function symmetric.
-      return super.fnToKey(
-        (a, b) => fn(a, b) && fn(b, a),
-        numValues);
-    }
 
     static displayName() {
-      return 'Binary: All pairs';
+      return 'Pairwise: Consecutive pairs';
     }
   }
 
-  // Pair is like Binary, but uses Base64Codec (correct encoding) instead of
-  // LegacyBase64Codec.
-  static Pair = class Pair extends SudokuConstraint.Binary {
-    static fnToKey(fn, numValues) {
-      const array = this._binaryFnTo6BitArray(fn, numValues);
-      return Base64Codec.encode6BitArray(array);
-    }
-
-    static displayName() {
-      return 'Pair: Consecutive pairs';
-    }
-  }
-
-  // PairX is like BinaryX, but uses Base64Codec (correct encoding).
+  // PairX applies the constraint to all pairs of cells.
   static PairX = class PairX extends SudokuConstraint.Pair {
     static DESCRIPTION = (
       "Applies a custom binary relationship between all pairs of the given cells.");
-    static CATEGORY = 'Pairwise';
     static DISPLAY_CONFIG = {
       displayClass: 'CustomLine',
       nodeMarker: LineOptions.SMALL_FULL_CIRCLE_MARKER,
@@ -2222,7 +2220,7 @@ export class SudokuConstraint {
     }
 
     static displayName() {
-      return 'Pair: All pairs';
+      return 'Pairwise: All pairs';
     }
   }
 

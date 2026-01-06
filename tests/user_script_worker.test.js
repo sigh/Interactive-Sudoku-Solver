@@ -52,13 +52,13 @@ console.log('Worker is ready.');
 {
   console.log('Test: compilePairwise');
   const response = await sendMessage('compilePairwise', {
-    type: 'Binary',
+    type: 'Pair',
     fnStr: 'a !== b',
     numValues: 9
   });
   assert.equal(response.error, undefined);
   assert.ok(response.result);
-  // Binary constraint key for a !== b with 9 values should be a specific string or structure
+  // Pair constraint key for a !== b with 9 values should be a specific string or structure
   // We just check it returns something truthy and looks like a constraint key (usually a string or object)
 }
 
