@@ -176,7 +176,7 @@ layout: null
       <div id="sudoku-grid-and-state">
         <div id="display-panel">
           <div id="solve-mode-input-container">
-            <select id="solve-mode-input">
+            <select id="solve-mode-input" required>
               <option value="all-possibilities" checked>All possibilities</option>
               <option value="solutions">Solutions</option>
               <option value="count-solutions">Count solutions</option>
@@ -283,7 +283,7 @@ layout: null
                       Select cells by dragging or shift-clicking.
                     </span>
                     <div>
-                      <select id="multi-cell-constraint-select" name="constraint-type">
+                      <select id="multi-cell-constraint-select" name="constraint-type" required>
                       </select>
                     </div>
                     <div id="multi-cell-constraint-description" class="description">
@@ -308,7 +308,7 @@ layout: null
             <div class="constraint-panel constraint-panel-borderless">
               <h2>
                 Shape
-                <select id="shape-select" class="thin-select"></select>
+                <select id="shape-select" class="thin-select" required></select>
                 <span class="tooltip" data-text="
               Change the grid shape.
               Box regions are made as close to square as possible.
@@ -377,7 +377,7 @@ layout: null
                     constraints on [A, B], [A, C], [B, A], [B, C], [C, A]
                     and [C, B].">
                     </span>:
-                    <select name="chain-mode" class="thin-select">
+                    <select name="chain-mode" class="thin-select" required>
                       <option value="Binary">Consecutive pairs</option>
                       <option value="BinaryX">All pairs</option>
                     </select>
