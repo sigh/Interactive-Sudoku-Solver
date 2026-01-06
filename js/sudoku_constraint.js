@@ -3,8 +3,7 @@ const {
   MultiMap,
   arrayRemoveValue,
   groupSortedBy,
-  Base64Codec,
-  LegacyBase64Codec
+  Base64Codec
 } = await import('./util.js' + self.VERSION_PARAM);
 const { GridShape, SHAPE_9x9, SHAPE_MAX } = await import('./grid_shape.js' + self.VERSION_PARAM);
 const { NFASerializer, javascriptSpecToNFA } = await import('./nfa_builder.js' + self.VERSION_PARAM);
@@ -1114,7 +1113,7 @@ export class SudokuConstraint {
           let first = true;
           for (const part of nameGroup) {
             if (first) {
-              // TODO: Extract function from Binary constraint for encoding names.
+              // TODO: Extract function from Pair constraint for encoding names.
               items.push('_' + SudokuConstraint.Pair.encodeName(part.name));
               first = false;
             } else {
@@ -2047,7 +2046,7 @@ export class SudokuConstraint {
 
     static *makeFromArgs(...args) {
       const [key, ...rest] = args;
-      // Convert from LegacyBase64Codec to Base64Codec by swapping - and _.
+      // Convert base64url encoding by swapping - and _
       const convertedKey = key.replace(/[-_]/g, c => c === '-' ? '_' : '-');
       yield* SudokuConstraint.Pair.makeFromArgs(convertedKey, ...rest);
     }
@@ -2061,7 +2060,7 @@ export class SudokuConstraint {
 
     static *makeFromArgs(...args) {
       const [key, ...rest] = args;
-      // Convert from LegacyBase64Codec to Base64Codec by swapping - and _.
+      // Convert base64url encoding by swapping - and _
       const convertedKey = key.replace(/[-_]/g, c => c === '-' ? '_' : '-');
       yield* SudokuConstraint.PairX.makeFromArgs(convertedKey, ...rest);
     }

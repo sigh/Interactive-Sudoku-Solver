@@ -314,7 +314,8 @@ export const runSolveTests = async (onFailure, runner) => {
     'Quadruple X',
     'Quadruple - repeated values',
     'Odd-even thermo',  // Pair
-    'Nabner thermo - easy',
+    'Nabner thermo - easy',  // PairX
+    'Knight-arrows',  // Binary (backward compatibility)
     'Zipper lines - tutorial',  // Zipper both odd and even length.
     'Sum lines',
     'Sum lines, with loop',

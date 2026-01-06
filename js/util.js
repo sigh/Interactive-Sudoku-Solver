@@ -538,13 +538,6 @@ export class Base64Codec {
   }
 }
 
-export class LegacyBase64Codec extends Base64Codec {
-  // NOTE: The last two characters are in the wrong order.
-  // The legacy codec is here for backward-compatibility.
-  static BASE64_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-';
-  static BASE64_INDEX = this._makeBase64Index();
-}
-
 // Bit set implementation for efficient set operations on integers.
 export class BitSet {
   static allocatePool(capacity, count) {
