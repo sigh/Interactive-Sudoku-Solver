@@ -1005,7 +1005,7 @@ class JavaScriptCategoryInput extends ConstraintCategoryInput {
 
 ConstraintCategoryInput.Pairwise = class Pairwise extends JavaScriptCategoryInput {
   constructor(collection, inputManager, userScriptExecutor) {
-    super(collection, inputManager, 'custom-binary-tab', 'add-binary-constraint');
+    super(collection, inputManager, 'custom-pairwise-tab', 'add-pairwise-constraint');
     this._userScriptExecutor = userScriptExecutor;
     this._setUp();
   }
@@ -1013,16 +1013,16 @@ ConstraintCategoryInput.Pairwise = class Pairwise extends JavaScriptCategoryInpu
   _setUp() {
     const form = this._form;
     const errorElem = document.getElementById(
-      'custom-binary-input-error');
+      'custom-pairwise-input-error');
 
-    autoSaveField(form, 'binary-name');
+    autoSaveField(form, 'pairwise-name');
     autoSaveField(form, 'chain-mode');
     autoSaveField(form, 'function');
 
-    form['add-binary-constraint'].onclick = async e => {
+    form['add-pairwise-constraint'].onclick = async e => {
       return this._runWithSpinner(async () => {
         const formData = new FormData(form);
-        const name = formData.get('binary-name');
+        const name = formData.get('pairwise-name');
         const type = formData.get('chain-mode');
         const fnStr = formData.get('function');
 

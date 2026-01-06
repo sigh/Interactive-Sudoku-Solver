@@ -630,29 +630,6 @@ export class SudokuBuilder {
             /* strict = */ false);
           break;
 
-        case 'Binary':
-          {
-            cells = constraint.cells.map(c => c && shape.parseCellId(c).cell);
-            // Convert from LegacyBase64Codec to Base64Codec by swapping - and _.
-            const key = constraint.key.replace(/[-_]/g, c => c === '-' ? '_' : '-');
-            for (let i = 1; i < cells.length; i++) {
-              yield new HandlerModule.BinaryConstraint(
-                cells[i - 1], cells[i],
-                key);
-            }
-          }
-          break;
-
-        case 'BinaryX':
-          {
-            cells = constraint.cells.map(c => c && shape.parseCellId(c).cell);
-            // Convert from LegacyBase64Codec to Base64Codec by swapping - and _.
-            const key = constraint.key.replace(/[-_]/g, c => c === '-' ? '_' : '-');
-            yield new HandlerModule.BinaryPairwise(
-              key, ...cells);
-          }
-          break;
-
         case 'Pair':
           {
             cells = constraint.cells.map(c => c && shape.parseCellId(c).cell);

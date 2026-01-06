@@ -352,11 +352,11 @@ layout: null
             <h2>Custom JavaScript constraints</h2>
             <div>
               <div class="tab-container">
-                <button type="button" class="active" data-tab="custom-binary-tab">Pairwise</button>
+                <button type="button" class="active" data-tab="custom-pairwise-tab">Pairwise</button>
                 <button type="button" data-tab="state-machine-tab">State machine</button>
               </div>
 
-              <div id="custom-binary-tab" class="tab-content active">
+              <div id="custom-pairwise-tab" class="tab-content active">
                 <div class="description">
                   <p>
                     Create constraints between pairs of cells by providing a
@@ -366,7 +366,7 @@ layout: null
                 <div class="constraint-code-form">
                   <div>
                     Name:
-                    <input type="text" name="binary-name" placeholder="optional" maxlength="20" columns="20">
+                    <input type="text" name="pairwise-name" placeholder="optional" maxlength="20" columns="20">
                   </div>
                   <div>
                     Chain handling
@@ -393,9 +393,9 @@ layout: null
                       <textarea rows="2" name="function" spellcheck="false"></textarea>
                     </div>
                   </div>
-                  <div id="custom-binary-input-error" class="error"></div>
+                  <div id="custom-pairwise-input-error" class="error"></div>
                   <div>
-                    <button type="button" title="Add constraint" name="add-binary-constraint">
+                    <button type="button" title="Add constraint" name="add-pairwise-constraint">
                       <span class="spinner"></span>
                       <span class="btn-text">Add</span>
                     </button>
