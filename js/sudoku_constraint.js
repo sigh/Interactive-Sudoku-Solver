@@ -2092,8 +2092,9 @@ export class SudokuConstraint {
     }
 
     chipLabel() {
-      if (this.name) return `"${this.name}"`;
-      return 'Custom';
+      let label = 'Pairwise';
+      if (this.name) label += ` "${this.name}"`;
+      return label;
     }
 
     static serialize(constraints) {
@@ -2191,6 +2192,12 @@ export class SudokuConstraint {
       return fnToBinaryKey(
         (a, b) => fn(a, b) && fn(b, a),
         numValues);
+    }
+
+    chipLabel() {
+      let label = 'Pairwise*';
+      if (this.name) label += ` "${this.name}"`;
+      return label;
     }
 
     static displayName() {
