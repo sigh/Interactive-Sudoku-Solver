@@ -663,7 +663,7 @@ export class SudokuConstraint {
     }
 
     static fnKey = memoize((numValues) =>
-      SudokuConstraint.Pair.fnToKey((a, b) => a < b, numValues)
+      fnToBinaryKey((a, b) => a < b, numValues)
     );
 
     static displayName() {
@@ -697,7 +697,7 @@ export class SudokuConstraint {
     }
 
     static fnKey = memoize((difference, numValues) =>
-      SudokuConstraint.Pair.fnToKey(
+      fnToBinaryKey(
         (a, b) => a >= b + difference || a <= b - difference,
         numValues)
     );
@@ -722,7 +722,7 @@ export class SudokuConstraint {
     }
 
     static fnKey = memoize((numCells, numValues) =>
-      SudokuConstraint.PairX.fnToKey(
+      fnToBinaryKey(
         (a, b) => Math.abs(a - b) < numCells && a != b,
         numValues)
     );
@@ -760,13 +760,13 @@ export class SudokuConstraint {
     }
 
     static neqFnKey = memoize((mod, numValues) =>
-      SudokuConstraint.PairX.fnToKey(
+      fnToBinaryKey(
         (a, b) => (a % mod) != (b % mod),
         numValues)
     );
 
     static eqFnKey = memoize((mod, numValues) =>
-      SudokuConstraint.PairX.fnToKey(
+      fnToBinaryKey(
         (a, b) => (a % mod) == (b % mod),
         numValues)
     );
@@ -793,7 +793,7 @@ export class SudokuConstraint {
     }
 
     static fnKey = memoize((numValues) =>
-      SudokuConstraint.PairX.fnToKey(
+      fnToBinaryKey(
         (a, b) => (((a - 1) / 3) | 0) != (((b - 1) / 3) | 0),
         numValues)
     );
@@ -882,7 +882,7 @@ export class SudokuConstraint {
     }
 
     static fnKey = memoize((numValues) =>
-      SudokuConstraint.Pair.fnToKey((a, b) => a == b, numValues)
+      fnToBinaryKey((a, b) => a == b, numValues)
     );
   }
 
@@ -1147,7 +1147,7 @@ export class SudokuConstraint {
     static UNIQUENESS_KEY_FIELD = 'type';
 
     static fnKey = memoize((numValues) =>
-      SudokuConstraint.Pair.fnToKey(
+      fnToBinaryKey(
         (a, b) => a != b * 2 && b != a * 2 && b != a - 1 && b != a + 1,
         numValues)
     );
@@ -1159,7 +1159,7 @@ export class SudokuConstraint {
     static UNIQUENESS_KEY_FIELD = 'type';
 
     static fnKey = memoize((numValues) =>
-      SudokuConstraint.Pair.fnToKey(
+      fnToBinaryKey(
         (a, b) => a + b != 5 && a + b != 10,
         numValues)
     );
@@ -1294,7 +1294,7 @@ export class SudokuConstraint {
     static UNIQUENESS_KEY_FIELD = 'type';
 
     static fnKey = memoize((numValues) =>
-      SudokuConstraint.Pair.fnToKey(
+      fnToBinaryKey(
         (a, b) => (a != b + 1 && a != b - 1 && a != b),
         numValues)
     );
@@ -1401,7 +1401,7 @@ export class SudokuConstraint {
     }
 
     static fnKey = memoize((numValues) =>
-      SudokuConstraint.Pair.fnToKey(
+      fnToBinaryKey(
         (a, b) => a == b + 1 || a == b - 1,
         numValues)
     );
@@ -1451,7 +1451,7 @@ export class SudokuConstraint {
     }
 
     static fnKey = memoize((numValues) =>
-      SudokuConstraint.Pair.fnToKey(
+      fnToBinaryKey(
         (a, b) => a == b * 2 || b == a * 2,
         numValues)
     );
@@ -1477,7 +1477,7 @@ export class SudokuConstraint {
     }
 
     static fnKey = memoize((numValues) =>
-      SudokuConstraint.Pair.fnToKey((a, b) => a > b, numValues)
+      fnToBinaryKey((a, b) => a > b, numValues)
     );
 
     adjacentPairs(shape) {
@@ -1995,7 +1995,7 @@ export class SudokuConstraint {
     }
 
     static fnKey = memoize((numValues) => {
-      return SudokuConstraint.Pair.fnToKey((a, b) => a == b, numValues);
+      return fnToBinaryKey((a, b) => a == b, numValues);
     });
   }
 
@@ -2156,33 +2156,8 @@ export class SudokuConstraint {
       }
     }
 
-    static _binaryFnTo6BitArray(fn, numValues) {
-      const NUM_BITS = 6;
-      const array = [];
-
-      let v = 0;
-      let vIndex = 0;
-      for (let i = 1; i <= numValues; i++) {
-        for (let j = 1; j <= numValues; j++) {
-          v |= (!!fn(i, j)) << vIndex;
-          if (++vIndex == NUM_BITS) {
-            array.push(v);
-            vIndex = 0;
-            v = 0;
-          }
-        }
-      }
-      array.push(v);
-
-      // Trim trailing zeros.
-      while (array.length && !array[array.length - 1]) array.pop();
-
-      return array;
-    }
-
     static fnToKey(fn, numValues) {
-      const array = this._binaryFnTo6BitArray(fn, numValues);
-      return Base64Codec.encode6BitArray(array);
+      return fnToBinaryKey(fn, numValues);
     }
 
     static encodeName(displayName) {
@@ -2214,7 +2189,7 @@ export class SudokuConstraint {
 
     static fnToKey(fn, numValues) {
       // Make the function symmetric.
-      return super.fnToKey(
+      return fnToBinaryKey(
         (a, b) => fn(a, b) && fn(b, a),
         numValues);
     }
@@ -2416,3 +2391,27 @@ export class UserScriptExecutor {
     return this._call('runSandboxCode', { code }, 10000);
   }
 }
+
+export const fnToBinaryKey = (fn, numValues) => {
+  const NUM_BITS = 6;
+  const array = [];
+
+  let v = 0;
+  let vIndex = 0;
+  for (let i = 1; i <= numValues; i++) {
+    for (let j = 1; j <= numValues; j++) {
+      v |= (!!fn(i, j)) << vIndex;
+      if (++vIndex == NUM_BITS) {
+        array.push(v);
+        vIndex = 0;
+        v = 0;
+      }
+    }
+  }
+  array.push(v);
+
+  // Trim trailing zeros.
+  while (array.length && !array[array.length - 1]) array.pop();
+
+  return Base64Codec.encode6BitArray(array);
+};

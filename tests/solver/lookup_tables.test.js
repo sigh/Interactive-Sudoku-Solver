@@ -6,11 +6,11 @@ import { runTest, logSuiteComplete } from '../helpers/test_runner.js';
 ensureGlobalEnvironment();
 
 const { LookupTables } = await import('../../js/solver/lookup_tables.js');
-const { SudokuConstraint } = await import('../../js/sudoku_constraint.js');
+const { fnToBinaryKey } = await import('../../js/sudoku_constraint.js');
 
 // Helper to create a binary key from a predicate function.
 const binaryKey = (fn, numValues) =>
-  SudokuConstraint.Pair.fnToKey(fn, numValues);
+  fnToBinaryKey(fn, numValues);
 
 // =============================================================================
 // Static utility methods

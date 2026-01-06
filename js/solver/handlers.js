@@ -12,7 +12,7 @@ const {
 } = await import('../util.js' + self.VERSION_PARAM);
 const { LookupTables } = await import('./lookup_tables.js' + self.VERSION_PARAM);
 const { SHAPE_MAX } = await import('../grid_shape.js' + self.VERSION_PARAM);
-const { SudokuConstraintBase, SudokuConstraint } = await import('../sudoku_constraint.js' + self.VERSION_PARAM);
+const { SudokuConstraintBase, fnToBinaryKey } = await import('../sudoku_constraint.js' + self.VERSION_PARAM);
 const { CandidateFinders } = await import('./candidate_selector.js' + self.VERSION_PARAM);
 
 export class SudokuConstraintHandler {
@@ -1736,7 +1736,7 @@ export class Between extends SudokuConstraintHandler {
 
     this._binaryConstraint = new BinaryConstraint(
       ...this._ends,
-      SudokuConstraint.Pair.fnToKey(
+      fnToBinaryKey(
         (a, b) => Math.abs(a - b) >= minEndsDelta,
         shape.numValues));
     return this._binaryConstraint.initialize(initialGridCells, cellExclusions, shape, stateAllocator);
@@ -1788,7 +1788,7 @@ export class Lockout extends SudokuConstraintHandler {
   initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
     this._binaryConstraint = new BinaryConstraint(
       ...this._ends,
-      SudokuConstraint.Pair.fnToKey(
+      fnToBinaryKey(
         (a, b) => Math.abs(a - b) >= this._minDiff,
         shape.numValues));
     return this._binaryConstraint.initialize(initialGridCells, cellExclusions, shape, stateAllocator);

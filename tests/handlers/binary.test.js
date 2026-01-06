@@ -11,13 +11,13 @@ import {
 
 ensureGlobalEnvironment();
 
-const { SudokuConstraint } = await import('../../js/sudoku_constraint.js');
+const { fnToBinaryKey } = await import('../../js/sudoku_constraint.js');
 const { BinaryConstraint } = await import('../../js/solver/handlers.js');
 const { LookupTables } = await import('../../js/solver/lookup_tables.js');
 
 // Helper to create a binary key from a predicate function.
 const binaryKey = (fn, numValues) =>
-  SudokuConstraint.Pair.fnToKey(fn, numValues);
+  fnToBinaryKey(fn, numValues);
 
 // =============================================================================
 // Initialization tests
