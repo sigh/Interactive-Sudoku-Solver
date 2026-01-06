@@ -1736,7 +1736,7 @@ export class Between extends SudokuConstraintHandler {
 
     this._binaryConstraint = new BinaryConstraint(
       ...this._ends,
-      SudokuConstraint.Binary.fnToKey(
+      SudokuConstraint.Pair.fnToKey(
         (a, b) => Math.abs(a - b) >= minEndsDelta,
         shape.numValues));
     return this._binaryConstraint.initialize(initialGridCells, cellExclusions, shape, stateAllocator);
@@ -1788,7 +1788,7 @@ export class Lockout extends SudokuConstraintHandler {
   initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
     this._binaryConstraint = new BinaryConstraint(
       ...this._ends,
-      SudokuConstraint.Binary.fnToKey(
+      SudokuConstraint.Pair.fnToKey(
         (a, b) => Math.abs(a - b) >= this._minDiff,
         shape.numValues));
     return this._binaryConstraint.initialize(initialGridCells, cellExclusions, shape, stateAllocator);

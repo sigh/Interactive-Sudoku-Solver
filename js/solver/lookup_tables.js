@@ -1,4 +1,4 @@
-const { memoize, LegacyBase64Codec } = await import('../util.js' + self.VERSION_PARAM);
+const { memoize, Base64Codec } = await import('../util.js' + self.VERSION_PARAM);
 
 export class LookupTables {
   static get = memoize((numValues) => {
@@ -117,14 +117,14 @@ export class LookupTables {
 
     const NUM_BITS_BASE64 = 6;
     const keyArr = new Uint8Array(
-      LegacyBase64Codec.lengthOf6BitArray(numValues * numValues));
+      Base64Codec.lengthOf6BitArray(numValues * numValues));
 
     this.forBinaryKey = memoize((key) => {
       const table = new Uint16Array(combinations);
       const tableInv = new Uint16Array(combinations);
 
       keyArr.fill(0);
-      LegacyBase64Codec.decodeTo6BitArray(key, keyArr);
+      Base64Codec.decodeTo6BitArray(key, keyArr);
 
       // Populate base cases, where there is a single value set.
       let keyIndex = 0;
