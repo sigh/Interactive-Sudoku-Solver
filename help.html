@@ -54,10 +54,11 @@ layout: null
             <li><a href="#nabner-line">Nabner Line</a></li>
             <li><a href="#not-renban">Not Renban</a></li>
             <li><a href="#arithmetic-progression">Arithmetic Progression</a></li>
-            <li><a href="#successor-arrows">Successor Arrows</a></li>
+            <li><a href="#successor-arrow">Successor Arrow</a></li>
             <li><a href="#flatmates">Flatmates</a></li>
             <li><a href="#odd-even-lots">Odd/Even Lots</a></li>
             <li><a href="#general-skyscraper">General Skyscraper</a></li>
+            <li><a href="#ambiguous-arrow">Ambiguous Arrow</a></li>
           </ul>
         </li>
         <li><a href="#constraint-sandbox">Constraint Sandbox</a></li>
@@ -254,7 +255,7 @@ function accept(state) {
 }</pre>
         </p>
 
-        <h3 id="successor-arrows">Successor Arrows</h3>
+        <h3 id="successor-arrow">Successor Arrow</h3>
         <p>
           <b>Description:</b>
           If a digit <code>N</code> is placed in an arrow cell, the digit
@@ -348,6 +349,35 @@ function transition(state, value) {
 
 function accept(state) {
   return state.seen === 5;  // Change to target number of visible buildings
+}</pre>
+        </p>
+
+
+        <h3 id="ambiguous-arrow">Ambiguous Arrow</h3>
+        <p>
+          <b>Description:</b>
+          The greatest cell value must equal the sum of the remaining cells.
+          When applied to a 2x2 square, this is also known as the
+          <b>Quad Sum</b> constraint.
+        </p>
+        <p>
+          Implement this by configuring a state machine in the
+          "Custom JavaScript constraints" panel. This checks that the total
+          sum is twice the maximum value:
+        <pre>
+startState = { max: 0, sum: 0 };
+
+function transition(state, value) {
+  if (state.sum > 18) return;
+
+  return {
+    max: Math.max(state.max, value),
+    sum: state.sum + value
+  }
+}
+
+function accept(state) {
+  return state.sum === 2*state.max;
 }</pre>
         </p>
       </div>
