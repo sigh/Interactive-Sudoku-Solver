@@ -111,3 +111,4 @@ export const SANDBOX_GLOBALS = {
   GridShape,
   ...SudokuConstraint,
 };
+delete SANDBOX_GLOBALS.Set;  // Don't overwrite Set
