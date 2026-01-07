@@ -224,22 +224,29 @@ body {
 
 button,
 .button {
+  --button-border-color: var(--color-primary-border);
+  --button-bg-top: var(--color-primary);
+  --button-bg-bottom: var(--color-primary-dark);
+  --button-text-shadow: var(--color-primary-text-shadow);
+  --button-bg-top-hover: var(--color-primary-dark);
+  --button-bg-bottom-hover: var(--color-primary);
+
   font-size: 16px;
   border-radius: 5px;
   color: #ffffff;
 
-  border: 1px solid var(--color-primary-border);
-  background: linear-gradient(to bottom, var(--color-primary) 5%, var(--color-primary-dark) 100%);
-  background-color: var(--color-primary);
-  text-shadow: 0px 1px 0px var(--color-primary-text-shadow);
+  border: 1px solid var(--button-border-color);
+  background: linear-gradient(to bottom, var(--button-bg-top) 5%, var(--button-bg-bottom) 100%);
+  background-color: var(--button-bg-top);
+  text-shadow: 0px 1px 0px var(--button-text-shadow);
 
   padding: 5px 15px;
 }
 
 button:hover,
 .button:hover {
-  background: linear-gradient(to bottom, var(--color-primary-dark) 5%, var(--color-primary) 100%);
-  background-color: var(--color-primary-dark);
+  background: linear-gradient(to bottom, var(--button-bg-top-hover) 5%, var(--button-bg-bottom-hover) 100%);
+  background-color: var(--button-bg-top-hover);
 }
 
 button:disabled {
@@ -253,16 +260,23 @@ button:active,
 
 button.danger-button,
 .button.danger-button {
-  border-color: var(--color-danger-border);
-  background: linear-gradient(to bottom, var(--color-danger) 5%, var(--color-danger-dark) 100%);
-  background-color: var(--color-danger);
-  text-shadow: 0px 1px 0px var(--color-danger-text-shadow);
+  --button-border-color: var(--color-danger-border);
+  --button-bg-top: var(--color-danger);
+  --button-bg-bottom: var(--color-danger-dark);
+  --button-text-shadow: var(--color-danger-text-shadow);
+  --button-bg-top-hover: var(--color-danger-dark);
+  --button-bg-bottom-hover: var(--color-danger);
 }
 
-button.danger-button:hover,
-.button.danger-button:hover {
-  background: linear-gradient(to bottom, var(--color-danger-dark) 5%, var(--color-danger) 100%);
-  background-color: var(--color-danger-dark);
+button.plain-button,
+.button.plain-button {
+  --button-border-color: var(--color-border);
+  --button-bg-top: white;
+  --button-bg-bottom: var(--color-border-light);
+  --button-text-shadow: transparent;
+  --button-bg-top-hover: var(--color-border-light);
+  --button-bg-bottom-hover: white;
+  color: black;
 }
 
 button.image-button,
@@ -280,6 +294,11 @@ button.image-button>img,
   height: 20px;
   width: 20px;
   filter: invert(1);
+}
+
+button.plain-button.image-button>img,
+.button.plain-button.image-button>img {
+  filter: none;
 }
 
 button.big-button,
