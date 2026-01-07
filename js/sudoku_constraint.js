@@ -2421,3 +2421,30 @@ export const fnToBinaryKey = (fn, numValues) => {
 
   return Base64Codec.encode6BitArray(array);
 };
+
+export const binaryKeyToFnString = (key, numValues) => {
+  const NUM_BITS = 6;
+  const array = Base64Codec.decodeTo6BitArray(key);
+  const lookup = {};
+
+  let keyIndex = 0;
+  let vIndex = 0;
+  for (let i = 1; i <= numValues; i++) {
+    for (let j = 1; j <= numValues; j++) {
+      if (array[keyIndex] & 1) {
+        (lookup[i] ||= []).push(j);
+      }
+      array[keyIndex] >>= 1;
+      if (++vIndex == NUM_BITS) {
+        vIndex = 0;
+        keyIndex++;
+      }
+    }
+  }
+
+  // Format as a JavaScript lookup expression.
+  const entries = Object.entries(lookup)
+    .map(([a, bs]) => `${a}:[${bs.join(',')}]`)
+    .join(',');
+  return `({${entries}})[a]?.includes(b)`;
+};

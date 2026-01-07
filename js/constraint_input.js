@@ -10,7 +10,8 @@ const {
 const {
   SudokuConstraint,
   SudokuConstraintBase,
-  OutsideConstraintBase
+  OutsideConstraintBase,
+  binaryKeyToFnString
 } = await import('./sudoku_constraint.js' + self.VERSION_PARAM);
 const { GridShape } = await import('./grid_shape.js' + self.VERSION_PARAM);
 
@@ -1047,6 +1048,21 @@ ConstraintCategoryInput.Pairwise = class Pairwise extends JavaScriptCategoryInpu
     form['function'].oninput = () => {
       errorElem.textContent = '';
     };
+  }
+
+  populateForm(constraint, numValues) {
+    // Open panel.
+    this._panel.classList.add('container-open');
+
+    // Switch to pairwise tab.
+    const tabButton = this._panel.parentElement.querySelector(
+      '[data-tab="custom-pairwise-tab"]');
+    tabButton?.click();
+
+    // Populate fields.
+    this._form['pairwise-name'].value = constraint.name || '';
+    this._form['chain-mode'].value = constraint.type;
+    this._form['function'].value = binaryKeyToFnString(constraint.key, numValues);
   }
 }
 
