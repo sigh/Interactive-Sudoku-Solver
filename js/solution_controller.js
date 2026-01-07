@@ -592,7 +592,8 @@ export class SolutionController {
 
     this._displayContainer = displayContainer;
     this._solutionDisplay = new SolutionDisplay(
-      displayContainer.getNewGroup('solution-group'));
+      displayContainer.getNewGroup('solution-group'),
+      document.getElementById('copy-solution-button'));
     constraintManager.addReshapeListener(this._solutionDisplay);
 
     this._diffDisplay = new CellValueDisplay(
