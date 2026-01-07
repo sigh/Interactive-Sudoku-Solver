@@ -1,10 +1,11 @@
 import { CodeJar } from '../../lib/codejar.min.js';
-import { autoSaveField, Base64Codec } from '../util.js';
+import { autoSaveField, Base64Codec, sessionAndLocalStorage } from '../util.js';
 import { DEFAULT_CODE, EXAMPLES } from './examples.js';
 import { UserScriptExecutor } from '../sudoku_constraint.js';
-import { DisplayContainer } from '../display.js';
+import { DisplayContainer, SolutionDisplay } from '../display.js';
 import { ConstraintDisplay } from '../constraint_display.js';
 import { SudokuParser } from '../sudoku_parser.js';
+import { SolverProxy, AllPossibilitiesModeHandler } from '../solution_controller.js';
 
 class Sandbox {
   constructor() {
@@ -100,6 +101,8 @@ class Sandbox {
     document.getElementById('clear-btn').addEventListener('click', () => this.clear());
     document.getElementById('copy-btn').addEventListener('click', () => this._copyConstraint());
     document.getElementById('share-btn').addEventListener('click', () => this._copyShareableLink());
+    document.getElementById('solve-btn').addEventListener('click', () => this._gridPreview.solve());
+    document.getElementById('abort-btn').addEventListener('click', () => this._gridPreview.abort());
 
     document.addEventListener('keydown', (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
@@ -186,6 +189,14 @@ class GridPreview {
   constructor(containerElement, previewElement) {
     this._previewElement = previewElement;
     this._displayContainer = new DisplayContainer(containerElement);
+    this._constraintStr = null;
+    this._solver = null;
+
+    this._solveBtn = document.getElementById('solve-btn');
+    this._abortBtn = document.getElementById('abort-btn');
+    this._autoSolveCheckbox = document.getElementById('auto-solve-input');
+
+    this._setUpAutoSolve();
 
     // Provide a no-op input manager stub for read-only display
     const noOpInputManager = {
@@ -195,19 +206,44 @@ class GridPreview {
       updateOutsideArrowSelection: () => { },
     };
     this._constraintDisplay = new ConstraintDisplay(noOpInputManager, this._displayContainer);
+
+    // Solution display (no copy button)
+    this._solutionDisplay = new SolutionDisplay(
+      this._displayContainer.getNewGroup('solution-group'), null);
+  }
+
+  _setUpAutoSolve() {
+    // Use a separate storage key from the main solver
+    this._autoSolveCheckbox.checked = (
+      sessionAndLocalStorage.getItem('sandboxAutoSolve') !== 'false');
+
+    this._autoSolveCheckbox.onchange = () => {
+      const isChecked = this._autoSolveCheckbox.checked;
+      sessionAndLocalStorage.setItem('sandboxAutoSolve', isChecked);
+      // If just enabled and we have a constraint, solve immediately
+      if (isChecked && this._constraintStr && !this._solver) {
+        this.solve();
+      }
+    };
   }
 
   render(constraintStr) {
+    // Abort any existing solve before rendering new constraint
+    this.abort();
+
     try {
       const constraint = SudokuParser.parseText(constraintStr);
+      this._constraintStr = constraintStr;
 
-      // Clear previous constraints
+      // Clear previous state
       this._constraintDisplay.clear();
+      this._solutionDisplay.setSolution();
 
       // Update shape based on constraint
       const shape = constraint.getShape();
       this._displayContainer.reshape(shape);
       this._constraintDisplay.reshape(shape);
+      this._solutionDisplay.reshape(shape);
 
       // Draw each constraint
       constraint.forEachTopLevel(c => {
@@ -217,6 +253,12 @@ class GridPreview {
       });
 
       this._previewElement.style.display = 'block';
+      this._solveBtn.disabled = false;
+
+      // Auto-solve if enabled
+      if (this._autoSolveCheckbox.checked) {
+        this.solve();
+      }
     } catch (e) {
       console.error('Failed to render grid preview:', e);
       this.hide();
@@ -225,6 +267,61 @@ class GridPreview {
 
   hide() {
     this._previewElement.style.display = 'none';
+    this._constraintStr = null;
+    this._solveBtn.disabled = true;
+    this._abortBtn.disabled = true;
+    this.abort();
+  }
+
+  async solve() {
+    if (!this._constraintStr || this._solver) return;
+
+    this._solveBtn.disabled = true;
+    this._abortBtn.disabled = false;
+
+    const handler = new AllPossibilitiesModeHandler();
+    handler.setUpdateListener(() => {
+      handler.get(0).then(result => {
+        if (result.solution) {
+          this._solutionDisplay.setSolution(result.solution);
+        }
+      });
+    });
+
+    try {
+      const constraint = SudokuParser.parseText(this._constraintStr);
+      this._solver = await SolverProxy.makeSolver(
+        constraint,
+        (state) => {
+          if (state.extra?.solutions?.length) {
+            handler.add(...state.extra.solutions);
+          }
+          if (state.done) {
+            handler.setDone();
+          }
+        },
+        () => { }, // status handler
+        null // debug handler
+      );
+
+      await handler.run(this._solver);
+    } catch (e) {
+      if (!e.toString().startsWith('Aborted')) {
+        console.error('Solve failed:', e);
+      }
+    } finally {
+      this._solver?.terminate();
+      this._solver = null;
+      this._solveBtn.disabled = false;
+      this._abortBtn.disabled = true;
+    }
+  }
+
+  abort() {
+    if (this._solver) {
+      this._solver.terminate();
+      this._solver = null;
+    }
   }
 }
 

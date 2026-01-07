@@ -271,7 +271,7 @@ class ModeHandler {
   }
 }
 
-class AllPossibilitiesModeHandler extends ModeHandler {
+export class AllPossibilitiesModeHandler extends ModeHandler {
   static NAME = 'all-possibilities';
   static DESCRIPTION =
     'Show all values which are present in any valid solution.';
