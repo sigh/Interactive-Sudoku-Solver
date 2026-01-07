@@ -268,8 +268,11 @@ button.danger-button:hover,
 button.image-button,
 .button.image-button {
   height: 30px;
-  width: 50px;
-  padding: 5px 5px;
+  width: 40px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 button.image-button>img,
@@ -593,10 +596,6 @@ textarea {
 
 .control-panel button.danger-button {
   padding: 5px 10px;
-}
-
-.control-panel button.image-button {
-  width: 40px;
 }
 
 .control-panel.control-panel-spread {

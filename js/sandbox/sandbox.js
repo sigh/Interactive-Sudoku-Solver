@@ -1,5 +1,5 @@
 import { CodeJar } from '../../lib/codejar.min.js';
-import { autoSaveField } from '../util.js';
+import { autoSaveField, Base64Codec } from '../util.js';
 import { DEFAULT_CODE, EXAMPLES } from './examples.js';
 import { UserScriptExecutor } from '../sudoku_constraint.js';
 
@@ -26,14 +26,60 @@ class Sandbox {
 
     this.jar = CodeJar(this.editorElement, highlight, { tab: '  ' });
 
-    // Load saved code or use default
+    // Load saved code first so it is available as a fallback.
     autoSaveField(this.editorElement);
-    this.jar.updateCode(this.editorElement.textContent || DEFAULT_CODE);
 
-    // Save code on changes
-    this.jar.onUpdate((code) => {
+    const savedCode = this.editorElement.textContent;
+
+    // Load code from URL (if present), otherwise use saved code / default.
+    // If the URL has a code param but it fails to decode, leave the editor empty
+    // and surface the error in the Console Output panel.
+    const url = new URL(window.location);
+    const encoded = url.searchParams.get('code');
+    let shouldClearCodeParamOnFirstEdit = encoded !== null;
+
+    let initialCode;
+    if (encoded === null) {
+      initialCode = savedCode || DEFAULT_CODE;
+    } else {
+      try {
+        initialCode = Base64Codec.decodeToString(encoded);
+      } catch (e) {
+        console.error('Failed to decode code from URL:', e);
+        this.outputElement.textContent = `Failed to decode code from URL: ${e.message}`;
+        this.outputElement.className = 'output error';
+        initialCode = '';
+      }
+    }
+
+    this.jar.updateCode(initialCode);
+
+    // Save code on changes and clear URL code parameter on first edit
+    this.jar.onUpdate(() => {
       this.editorElement.dispatchEvent(new Event('change'));
+      if (shouldClearCodeParamOnFirstEdit) {
+        this._clearCodeFromUrl();
+        shouldClearCodeParamOnFirstEdit = false;
+      }
     });
+  }
+
+  _clearCodeFromUrl() {
+    const url = new URL(window.location);
+    url.searchParams.delete('code');
+    window.history.replaceState({}, '', url);
+  }
+
+  _copyShareableLink() {
+    const code = this.jar.toString();
+    const encoded = Base64Codec.encodeString(code);
+    const url = new URL(window.location);
+    url.searchParams.set('code', encoded);
+    navigator.clipboard.writeText(url.toString());
+
+    const btn = document.getElementById('share-btn');
+    btn.classList.add('copied');
+    setTimeout(() => btn.classList.remove('copied'), 1000);
   }
 
   _initExamples() {
@@ -46,6 +92,7 @@ class Sandbox {
     document.getElementById('run-btn').addEventListener('click', () => this.runCode());
     document.getElementById('clear-btn').addEventListener('click', () => this.clear());
     document.getElementById('copy-btn').addEventListener('click', () => this._copyConstraint());
+    document.getElementById('share-btn').addEventListener('click', () => this._copyShareableLink());
 
     document.addEventListener('keydown', (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
