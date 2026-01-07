@@ -2,6 +2,9 @@ import { CodeJar } from '../../lib/codejar.min.js';
 import { autoSaveField, Base64Codec } from '../util.js';
 import { DEFAULT_CODE, EXAMPLES } from './examples.js';
 import { UserScriptExecutor } from '../sudoku_constraint.js';
+import { DisplayContainer } from '../display.js';
+import { ConstraintDisplay } from '../constraint_display.js';
+import { SudokuParser } from '../sudoku_parser.js';
 
 class Sandbox {
   constructor() {
@@ -12,6 +15,10 @@ class Sandbox {
     this.examplesSelect = document.getElementById('examples-select');
 
     this._userScriptExecutor = new UserScriptExecutor();
+    this._gridPreview = new GridPreview(
+      document.getElementById('grid-preview-container'),
+      document.getElementById('grid-preview')
+    );
 
     this._initEditor();
     this._initExamples();
@@ -144,9 +151,12 @@ class Sandbox {
         if (logs.length === 0) {
           this.outputElement.textContent = 'Constraint generated successfully!';
         }
+
+        this._gridPreview.render(constraintStr);
       } else {
         this.constraintElement.textContent = '(no constraint returned)';
         this.solverLinkElement.style.display = 'none';
+        this._gridPreview.hide();
       }
     } catch (err) {
       // If we have logs from the worker, show them.
@@ -156,6 +166,7 @@ class Sandbox {
       this.outputElement.className = 'output error';
       this.constraintElement.textContent = '(error)';
       this.solverLinkElement.style.display = 'none';
+      this._gridPreview.hide();
     } finally {
       btn.disabled = false;
       spinner.classList.remove('active');
@@ -167,6 +178,53 @@ class Sandbox {
     this.outputElement.textContent = '';
     this.constraintElement.textContent = '';
     this.solverLinkElement.style.display = 'none';
+    this._gridPreview.hide();
+  }
+}
+
+class GridPreview {
+  constructor(containerElement, previewElement) {
+    this._previewElement = previewElement;
+    this._displayContainer = new DisplayContainer(containerElement);
+
+    // Provide a no-op input manager stub for read-only display
+    const noOpInputManager = {
+      addSelectionPreserver: () => { },
+      onSelection: () => { },
+      setSelection: () => { },
+      updateOutsideArrowSelection: () => { },
+    };
+    this._constraintDisplay = new ConstraintDisplay(noOpInputManager, this._displayContainer);
+  }
+
+  render(constraintStr) {
+    try {
+      const constraint = SudokuParser.parseText(constraintStr);
+
+      // Clear previous constraints
+      this._constraintDisplay.clear();
+
+      // Update shape based on constraint
+      const shape = constraint.getShape();
+      this._displayContainer.reshape(shape);
+      this._constraintDisplay.reshape(shape);
+
+      // Draw each constraint
+      constraint.forEachTopLevel(c => {
+        if (c.constructor.DISPLAY_CONFIG) {
+          this._constraintDisplay.drawConstraint(c);
+        }
+      });
+
+      this._previewElement.style.display = 'block';
+    } catch (e) {
+      console.error('Failed to render grid preview:', e);
+      this.hide();
+    }
+  }
+
+  hide() {
+    this._previewElement.style.display = 'none';
   }
 }
 
