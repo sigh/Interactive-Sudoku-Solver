@@ -464,6 +464,18 @@ class ConstraintManager {
       categoryInput.setUpdateCallback(this.runUpdateCallback.bind(this));
     }
 
+    // Wire up populate form callback for custom constraints.
+    const populateFormCallback = (constraint) => {
+      const categoryInput = this._constraintCategoryInputs.get(
+        constraint.constructor.CATEGORY);
+      if (categoryInput?.populateForm) {
+        categoryInput.populateForm(constraint, this._shape.numValues);
+      }
+    };
+    for (const chipView of this._chipViews.values()) {
+      chipView.setPopulateFormCallback(populateFormCallback);
+    }
+
     this._setUpCustomConstraintTabs();
     this._setUpFreeFormInput();
 
@@ -717,6 +729,11 @@ class ConstraintChipView {
     this._display = display;
     this._shape = null;
     this._onUpdate = onUpdate;
+    this._populateFormCallback = null;
+  }
+
+  setPopulateFormCallback(callback) {
+    this._populateFormCallback = callback;
   }
 
   reshape(shape) {
@@ -756,6 +773,23 @@ class ConstraintChipView {
     const removeChipButton = document.createElement('button');
     removeChipButton.innerHTML = '&#x00D7;';
     chip.appendChild(removeChipButton);
+
+    // Add populate form button for custom JavaScript constraints.
+    if (constraint.constructor.CATEGORY === 'Pairwise' ||
+      constraint.constructor.CATEGORY === 'StateMachine') {
+      const loadButton = document.createElement('button');
+      loadButton.className = 'chip-load-button';
+      const icon = document.createElement('img');
+      icon.src = 'img/publish-48.png';
+      icon.alt = 'Load into panel';
+      loadButton.appendChild(icon);
+      loadButton.title = 'Load into panel';
+      loadButton.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this._populateFormCallback?.(constraint);
+      });
+      chip.appendChild(loadButton);
+    }
 
     const chipLabel = document.createElement('div');
     chipLabel.className = 'chip-label';

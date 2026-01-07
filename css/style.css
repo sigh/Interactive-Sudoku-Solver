@@ -423,13 +423,28 @@ button.icon-button,
   background: none;
   font-size: 25px;
   cursor: pointer;
-  padding: 2px 10px;
+  padding: 2px 4px 2px 8px;
   font-family: var(--font-family-mono);
 }
 
 .chip>button:hover {
   background: none;
   color: var(--color-danger);
+}
+
+.chip>button.chip-load-button {
+  padding: 0;
+  opacity: 0.6;
+}
+
+.chip>button.chip-load-button img {
+  width: 16px;
+  height: 16px;
+  vertical-align: middle;
+}
+
+.chip>button.chip-load-button:hover {
+  opacity: 1;
 }
 
 .chip .chip-view {
