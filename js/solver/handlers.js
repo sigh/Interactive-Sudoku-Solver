@@ -535,7 +535,9 @@ export class HandlerUtil {
               break;
             }
           }
-          bestScore = candidates.intersectCount(cellExclusions.getBitSet(bestCell));
+          if (bestCell !== -1) {
+            bestScore = candidates.intersectCount(cellExclusions.getBitSet(bestCell));
+          }
         } else {
           // Choose the cell which is mutually exclusive with the most candidates.
           candidates.forEachBit((cell) => {
@@ -548,6 +550,13 @@ export class HandlerUtil {
               if (bestScore === numCandidates - 1) return false;
             }
           });
+        }
+
+        // This can only happen if there are self-exclusions.
+        // In this case, just give up and add all remaining candidates to the group.
+        if (bestCell === -1) {
+          candidates.forEachBit((cell) => group.push(cell));
+          break;
         }
 
         group.push(bestCell);
