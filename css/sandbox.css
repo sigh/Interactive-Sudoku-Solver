@@ -66,6 +66,16 @@ p code {
   min-height: 28px;
 }
 
+/* Editor header layout: left controls + right share button */
+.editor-panel .panel-header {
+  justify-content: space-between;
+  flex-wrap: nowrap;
+}
+
+.editor-panel .btn-group {
+  flex: 1 1 auto;
+}
+
 .panel-header h2 {
   margin: 0;
   font-size: 1.1em;
