@@ -584,16 +584,18 @@ export class InfoTextDisplay extends DisplayItem {
 
 
 export class SolutionDisplay extends CellValueDisplay {
-  constructor(svg) {
+  constructor(svg, copyElem) {
     super(svg);
     this._currentSolution = [];
 
     this.setSolution = deferUntilAnimationFrame(this.setSolution.bind(this));
-    this._copyElem = document.getElementById('copy-solution-button');
-    this._copyElem.onclick = () => {
-      const solutionText = toShortSolution(this._currentSolution, this._shape);
-      navigator.clipboard.writeText(solutionText);
-    };
+    this._copyElem = copyElem || null;
+    if (this._copyElem) {
+      this._copyElem.onclick = () => {
+        const solutionText = toShortSolution(this._currentSolution, this._shape);
+        navigator.clipboard.writeText(solutionText);
+      };
+    }
 
     svg.setAttribute('mask', `url(#${this.constructor.GIVENS_MASK_ID})`);
   }
@@ -620,7 +622,7 @@ export class SolutionDisplay extends CellValueDisplay {
         // Ensure there is still no solution.
         if (this._currentSolution.length == 0) {
           this.clear();
-          this._copyElem.disabled = true;
+          if (this._copyElem) this._copyElem.disabled = true;
         }
       }, 10);
       return;
@@ -628,8 +630,10 @@ export class SolutionDisplay extends CellValueDisplay {
 
     this.renderGridValues(solution);
 
-    this._copyElem.disabled = (
-      !this._currentSolution.every(v => v && isFinite(v)));
+    if (this._copyElem) {
+      this._copyElem.disabled = (
+        !this._currentSolution.every(v => v && isFinite(v)));
+    }
   }
 }
 
