@@ -12,6 +12,16 @@ layout: null
   <link rel="icon" href="{{ 'img/favicon.png' | relative_url }}">
   <link rel="canonical" href="https://sigh.github.io/Interactive-Sudoku-Solver/sandbox">
 
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-2SQH4BL89R"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag() { dataLayer.push(arguments); }
+    gtag('js', new Date());
+
+    gtag('config', 'G-2SQH4BL89R');
+  </script>
+
   <link rel="stylesheet" href="{{ 'css/style.css?v=' | append: site.github.build_revision | relative_url }}">
   <link rel="stylesheet" href="{{ 'css/sandbox.css?v=' | append: site.github.build_revision | relative_url }}">
   <link rel="stylesheet" href="{{ 'lib/prism-tomorrow.min.css' | relative_url }}">
