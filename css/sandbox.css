@@ -197,3 +197,23 @@ p code {
   display: block;
   filter: none;
 }
+
+/* Grid Preview */
+.grid-preview {
+  margin-top: 15px;
+}
+
+#grid-preview-container {
+  position: relative;
+  pointer-events: none;
+}
+
+#grid-preview-container>svg:first-child {
+  box-shadow: 3px 3px 10px;
+  display: block;
+}
+
+/* Hide inactive outside arrows (only show those with clues) */
+#grid-preview-container .outside-arrow:not(.active-arrow) {
+  display: none;
+}
