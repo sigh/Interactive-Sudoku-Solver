@@ -5,7 +5,7 @@ import { UserScriptExecutor } from '../sudoku_constraint.js';
 import { DisplayContainer, SolutionDisplay } from '../display.js';
 import { ConstraintDisplay } from '../constraint_display.js';
 import { SudokuParser } from '../sudoku_parser.js';
-import { SolverProxy, AllPossibilitiesModeHandler } from '../solution_controller.js';
+import { SolverRunner } from '../solver_runner.js';
 
 class Sandbox {
   constructor() {
@@ -190,7 +190,7 @@ class GridPreview {
     this._previewElement = previewElement;
     this._displayContainer = new DisplayContainer(containerElement);
     this._constraintStr = null;
-    this._solver = null;
+    this._solverRunner = null;
 
     this._solveBtn = document.getElementById('solve-btn');
     this._abortBtn = document.getElementById('abort-btn');
@@ -221,7 +221,7 @@ class GridPreview {
       const isChecked = this._autoSolveCheckbox.checked;
       sessionAndLocalStorage.setItem('sandboxAutoSolve', isChecked);
       // If just enabled and we have a constraint, solve immediately
-      if (isChecked && this._constraintStr && !this._solver) {
+      if (isChecked && this._constraintStr && !this._solverRunner?.isSolving()) {
         this.solve();
       }
     };
@@ -274,54 +274,40 @@ class GridPreview {
   }
 
   async solve() {
-    if (!this._constraintStr || this._solver) return;
+    if (!this._constraintStr || this._solverRunner?.isSolving()) return;
 
     this._solveBtn.disabled = true;
     this._abortBtn.disabled = false;
 
-    const handler = new AllPossibilitiesModeHandler();
-    handler.setUpdateListener(() => {
-      handler.get(0).then(result => {
-        if (result.solution) {
-          this._solutionDisplay.setSolution(result.solution);
-        }
-      });
-    });
-
     try {
       const constraint = SudokuParser.parseText(this._constraintStr);
-      this._solver = await SolverProxy.makeSolver(
-        constraint,
-        (state) => {
-          if (state.extra?.solutions?.length) {
-            handler.add(...state.extra.solutions);
-          }
-          if (state.done) {
-            handler.setDone();
+
+      this._solverRunner = new SolverRunner({
+        onUpdate: (result) => {
+          if (result?.solution) {
+            this._solutionDisplay.setSolution(result.solution);
           }
         },
-        () => { }, // status handler
-        null // debug handler
-      );
+        onError: (error) => {
+          console.error('Solve failed:', error);
+        },
+      });
 
-      await handler.run(this._solver);
+      await this._solverRunner.solve(constraint);
     } catch (e) {
       if (!e.toString().startsWith('Aborted')) {
         console.error('Solve failed:', e);
       }
     } finally {
-      this._solver?.terminate();
-      this._solver = null;
+      this._solverRunner = null;
       this._solveBtn.disabled = false;
       this._abortBtn.disabled = true;
     }
   }
 
   abort() {
-    if (this._solver) {
-      this._solver.terminate();
-      this._solver = null;
-    }
+    this._solverRunner?.abort();
+    this._solverRunner = null;
   }
 }
 

@@ -239,7 +239,7 @@ const getDefaultPuzzleRunner = memoize(() => {
     throw new Error('PuzzleRunner requires a solverFactory; provide a runner explicitly in non-browser environments.');
   }
 
-  const solverProxyModulePromise = import('../solution_controller.js' + self.VERSION_PARAM);
+  const solverProxyModulePromise = import('../solver_runner.js' + self.VERSION_PARAM);
   const solverFactory = async (...args) => {
     const { SolverProxy } = await solverProxyModulePromise;
     return SolverProxy.makeSolver(...args);
