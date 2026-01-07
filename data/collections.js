@@ -489,6 +489,13 @@ export const EXAMPLES = [
     input: '.NFA~VgEX_xhyCSizDTgBgZAVvPPRICsqp_6q5woFVE0v_YJNE82yih_xaZYXWmFz__SJNE82yih_5Zg433E0kf_DFGFAqoml_3Xn4AVlVE_-024qsCsqp_2GU1FVgVlf-uikmoqsCt_z0EUk1FVgX-gikmoqsCf0Uk1FVgR-kmoqsCH01FVgQeoqsCB1VgQGsCAQb-ikmoqsCDv2U1FVgQVo-moqsCD323FVgQVlce4qsCCtB1VgQfe8_ACCsqpx34AQVlcHACCtAQQf_FGFICsqon54wpAVlVOGFICsrAAf_MHOFAqoml_w56JAVlVE-HRICsrgZAVv-JUHG-4mkj_656JAVlVE_PPRICsqp_7ag433E0kf_VXOFAqomkA~_Ambiguous%20Arrow~R2C3~R1C3~R1C2~R2C1~~R3C1~R2C2~R3C3~~R4C1~R4C2~R5C3~R6C3~~R6C2~R7C1~R8C1~R9C1~~R6C1~R7C2~R8C2~~R4C3~R5C4~R6C4~R7C4~~R4C4~R3C4~R2C5~R2C6~~R2C4~R1C4~R1C5~R1C6~~R3C5~R3C6~R4C6~~R9C6~R8C6~R7C7~~R7C6~R6C6~R5C6~R4C7~~R9C7~R8C8~R9C9~~R6C8~R5C7~R4C8~R4C9~~R3C8~R2C7~R1C8~R1C9',
     solution: '815923674369417258274586913583172469692854137741369825957241386426738591138695742',
   },
+  {
+    name: 'Factorial Cages',
+    src: 'https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?id=000JC4',
+    input: '/data/factorial_cages.iss',
+    solution: '153827946274965813896431725415286397382794651769153284627549138538612479941378562',
+    constraintTypes: ['NFA'],
+  },
 
   //////////////////////////////////////////////////////////////////////////////
   // Long sums
