@@ -498,7 +498,7 @@ export class HandlerUtil {
     for (const g of groups) {
       const s = g.length;
       range += (numValues - s) * s;
-      min += s * (s + 1) >> 1;
+      min += (s * (s + 1)) >> 1;
     }
 
     return { range, min, max: range + min };
