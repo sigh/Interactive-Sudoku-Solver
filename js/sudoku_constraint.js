@@ -88,7 +88,7 @@ export class SudokuConstraintBase {
   }
 
   forEachTopLevel(fn) {
-    if (this instanceof SudokuConstraint.Container) {
+    if (this.type === SudokuConstraint.Container.name) {
       this.constraints.forEach(c => c.forEachTopLevel(fn));
     } else {
       fn(this);

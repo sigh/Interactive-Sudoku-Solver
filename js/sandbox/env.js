@@ -97,7 +97,8 @@ const makeCellId = (row, col) => SHAPE_MAX.makeCellId(row - 1, col - 1);
 const parseConstraint = (str) => {
   const parsed = SudokuParser.parseString(str);
   const resolved = SudokuBuilder.resolveConstraint(parsed);
-  if (resolved instanceof SudokuConstraint.Container) {
+  // NOTE: This can't be an instanceof check when run inside the sandbox.
+  if (resolved.type === SudokuConstraint.Container.name) {
     return resolved.constraints;
   }
   return [resolved];
