@@ -53,8 +53,7 @@ class Sandbox {
       try {
         initialCode = Base64Codec.decodeToString(encoded);
       } catch (e) {
-        console.error('Failed to decode code from URL:', e);
-        this.outputElement.textContent = `Failed to decode code from URL: ${e.message}`;
+        this.outputElement.textContent = `Failed to decode code from URL`;
         this.outputElement.className = 'output error';
         initialCode = '';
       }
@@ -120,12 +119,10 @@ class Sandbox {
 
   _copyConstraint() {
     const text = this.constraintElement.textContent;
-    if (text && text !== '(no constraint returned)' && text !== '(error)') {
-      navigator.clipboard.writeText(text);
-      const resultBox = this.constraintElement.parentElement;
-      resultBox.classList.add('copied');
-      setTimeout(() => resultBox.classList.remove('copied'), 1000);
-    }
+    navigator.clipboard.writeText(text);
+    const resultBox = this.constraintElement.parentElement;
+    resultBox.classList.add('copied');
+    setTimeout(() => resultBox.classList.remove('copied'), 1000);
   }
 
   async runCode() {
@@ -134,30 +131,28 @@ class Sandbox {
 
     btn.disabled = true;
     spinner.classList.add('active');
+    this._gridPreview.clearError();
 
     const code = this.jar.toString();
 
     try {
       const { constraintStr, logs } = await this._userScriptExecutor.runSandboxCode(code);
 
-      this.outputElement.textContent = logs.join('\n') || 'No console output';
+      this.outputElement.textContent = logs.join('\n');
       this.outputElement.className = 'output';
 
-      if (constraintStr) {
+      if (constraintStr != null) {
         this.constraintElement.textContent = constraintStr;
 
         const url = `./?q=${encodeURIComponent(constraintStr)}`;
         this.solverLinkElement.href = url;
         this.solverLinkElement.style.display = 'inline-block';
 
-        this.outputElement.className = 'output success';
-        if (logs.length === 0) {
-          this.outputElement.textContent = 'Constraint generated successfully!';
-        }
-
         this._gridPreview.render(constraintStr);
+
+        this.outputElement.className = 'output success';
       } else {
-        this.constraintElement.textContent = '(no constraint returned)';
+        this.constraintElement.textContent = '';
         this.solverLinkElement.style.display = 'none';
         this._gridPreview.hide();
       }
@@ -165,9 +160,9 @@ class Sandbox {
       // If we have logs from the worker, show them.
       const logs = err.logs || [];
       const errorOutput = logs.length > 0 ? logs.join('\n') + '\n\n' : '';
-      this.outputElement.textContent = `${errorOutput}Error: ${err.message}`;
+      this.outputElement.textContent = `${errorOutput}Error: ${err.message || err}`;
       this.outputElement.className = 'output error';
-      this.constraintElement.textContent = '(error)';
+      this.constraintElement.textContent = '';
       this.solverLinkElement.style.display = 'none';
       this._gridPreview.hide();
     } finally {
@@ -179,8 +174,10 @@ class Sandbox {
   clear() {
     this.jar.updateCode('');
     this.outputElement.textContent = '';
+    this.outputElement.className = 'output';
     this.constraintElement.textContent = '';
     this.solverLinkElement.style.display = 'none';
+    this._gridPreview.clearError();
     this._gridPreview.hide();
   }
 }
@@ -188,9 +185,9 @@ class Sandbox {
 class GridPreview {
   constructor(containerElement, previewElement) {
     this._previewElement = previewElement;
+    this._errorElement = document.getElementById('grid-preview-error');
     this._displayContainer = new DisplayContainer(containerElement);
     this._constraintStr = null;
-    this._solverRunner = null;
 
     this._solveBtn = document.getElementById('solve-btn');
     this._abortBtn = document.getElementById('abort-btn');
@@ -210,6 +207,22 @@ class GridPreview {
     // Solution display (no copy button)
     this._solutionDisplay = new SolutionDisplay(
       this._displayContainer.getNewGroup('solution-group'), null);
+
+    // Create SolverRunner once and reuse
+    this._solverRunner = new SolverRunner({
+      onUpdate: (result) => {
+        if (result?.solution) {
+          this._solutionDisplay.setSolution(result.solution);
+        }
+      },
+      onError: (error) => {
+        this._errorElement.textContent = error;
+      },
+      statusHandler: (isSolving) => {
+        this._solveBtn.disabled = isSolving;
+        this._abortBtn.disabled = !isSolving;
+      },
+    });
   }
 
   _setUpAutoSolve() {
@@ -221,7 +234,7 @@ class GridPreview {
       const isChecked = this._autoSolveCheckbox.checked;
       sessionAndLocalStorage.setItem('sandboxAutoSolve', isChecked);
       // If just enabled and we have a constraint, solve immediately
-      if (isChecked && this._constraintStr && !this._solverRunner?.isSolving()) {
+      if (isChecked && this._constraintStr !== null && !this._solverRunner.isSolving()) {
         this.solve();
       }
     };
@@ -229,39 +242,39 @@ class GridPreview {
 
   render(constraintStr) {
     // Abort any existing solve before rendering new constraint
-    this.abort();
+    this._solverRunner.abort();
 
-    try {
-      const constraint = SudokuParser.parseText(constraintStr);
-      this._constraintStr = constraintStr;
+    const constraint = SudokuParser.parseText(constraintStr);
+    this._constraintStr = constraintStr;
 
-      // Clear previous state
-      this._constraintDisplay.clear();
-      this._solutionDisplay.setSolution();
+    // Clear previous state
+    this._constraintDisplay.clear();
+    this._solutionDisplay.setSolution();
 
-      // Update shape based on constraint
-      const shape = constraint.getShape();
-      this._displayContainer.reshape(shape);
-      this._constraintDisplay.reshape(shape);
-      this._solutionDisplay.reshape(shape);
+    // Update shape based on constraint
+    const shape = constraint.getShape();
+    this._displayContainer.reshape(shape);
+    this._constraintDisplay.reshape(shape);
+    this._solutionDisplay.reshape(shape);
 
-      // Draw each constraint
-      constraint.forEachTopLevel(c => {
-        if (c.constructor.DISPLAY_CONFIG) {
-          this._constraintDisplay.drawConstraint(c);
-        }
-      });
-
-      this._previewElement.style.display = 'block';
-      this._solveBtn.disabled = false;
-
-      // Auto-solve if enabled
-      if (this._autoSolveCheckbox.checked) {
-        this.solve();
+    // Draw each constraint
+    constraint.forEachTopLevel(c => {
+      if (c.constructor.DISPLAY_CONFIG) {
+        this._constraintDisplay.drawConstraint(c);
       }
-    } catch (e) {
-      console.error('Failed to render grid preview:', e);
-      this.hide();
+    });
+
+    this._previewElement.style.display = 'block';
+
+    // Update button state - not solving yet
+    if (!this._solverRunner.isSolving()) {
+      this._solveBtn.disabled = false;
+      this._abortBtn.disabled = true;
+    }
+
+    // Auto-solve if enabled
+    if (this._autoSolveCheckbox.checked) {
+      this.solve();
     }
   }
 
@@ -270,44 +283,23 @@ class GridPreview {
     this._constraintStr = null;
     this._solveBtn.disabled = true;
     this._abortBtn.disabled = true;
-    this.abort();
+    this._solverRunner.abort();
+    this.clearError();
+  }
+
+  clearError() {
+    this._errorElement.textContent = '';
   }
 
   async solve() {
-    if (!this._constraintStr || this._solverRunner?.isSolving()) return;
+    if (this._constraintStr == null || this._solverRunner.isSolving()) return;
 
-    this._solveBtn.disabled = true;
-    this._abortBtn.disabled = false;
-
-    try {
-      const constraint = SudokuParser.parseText(this._constraintStr);
-
-      this._solverRunner = new SolverRunner({
-        onUpdate: (result) => {
-          if (result?.solution) {
-            this._solutionDisplay.setSolution(result.solution);
-          }
-        },
-        onError: (error) => {
-          console.error('Solve failed:', error);
-        },
-      });
-
-      await this._solverRunner.solve(constraint);
-    } catch (e) {
-      if (!e.toString().startsWith('Aborted')) {
-        console.error('Solve failed:', e);
-      }
-    } finally {
-      this._solverRunner = null;
-      this._solveBtn.disabled = false;
-      this._abortBtn.disabled = true;
-    }
+    const constraint = SudokuParser.parseText(this._constraintStr);
+    await this._solverRunner.solve(constraint);
   }
 
   abort() {
-    this._solverRunner?.abort();
-    this._solverRunner = null;
+    this._solverRunner.abort();
   }
 }
 
