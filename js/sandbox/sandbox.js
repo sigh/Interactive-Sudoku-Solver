@@ -11,6 +11,7 @@ class Sandbox {
   constructor() {
     this.editorElement = document.getElementById('editor');
     this.outputElement = document.getElementById('output');
+    this.errorElement = document.getElementById('error-output');
     this.constraintElement = document.getElementById('constraint-string');
     this.solverLinkElement = document.getElementById('open-solver-link');
     this.examplesSelect = document.getElementById('examples-select');
@@ -18,7 +19,8 @@ class Sandbox {
     this._userScriptExecutor = new UserScriptExecutor();
     this._gridPreview = new GridPreview(
       document.getElementById('grid-preview-container'),
-      document.getElementById('grid-preview')
+      document.getElementById('grid-preview'),
+      this.errorElement
     );
 
     this._initEditor();
@@ -53,8 +55,7 @@ class Sandbox {
       try {
         initialCode = Base64Codec.decodeToString(encoded);
       } catch (e) {
-        this.outputElement.textContent = `Failed to decode code from URL`;
-        this.outputElement.className = 'output error';
+        this.errorElement.textContent = `Failed to decode code from URL`;
         initialCode = '';
       }
     }
@@ -131,7 +132,8 @@ class Sandbox {
 
     btn.disabled = true;
     spinner.classList.add('active');
-    this._gridPreview.clearError();
+    this.errorElement.textContent = '';
+    this.constraintElement.textContent = '';
 
     const code = this.jar.toString();
 
@@ -139,7 +141,6 @@ class Sandbox {
       const { constraintStr, logs } = await this._userScriptExecutor.runSandboxCode(code);
 
       this.outputElement.textContent = logs.join('\n');
-      this.outputElement.className = 'output';
 
       if (constraintStr != null) {
         this.constraintElement.textContent = constraintStr;
@@ -149,20 +150,15 @@ class Sandbox {
         this.solverLinkElement.style.display = 'inline-block';
 
         this._gridPreview.render(constraintStr);
-
-        this.outputElement.className = 'output success';
       } else {
         this.constraintElement.textContent = '';
         this.solverLinkElement.style.display = 'none';
         this._gridPreview.hide();
       }
     } catch (err) {
-      // If we have logs from the worker, show them.
       const logs = err.logs || [];
-      const errorOutput = logs.length > 0 ? logs.join('\n') + '\n\n' : '';
-      this.outputElement.textContent = `${errorOutput}Error: ${err.message || err}`;
-      this.outputElement.className = 'output error';
-      this.constraintElement.textContent = '';
+      this.outputElement.textContent = logs.join('\n');
+      this.errorElement.textContent = `Error: ${err.message || err}`;
       this.solverLinkElement.style.display = 'none';
       this._gridPreview.hide();
     } finally {
@@ -174,18 +170,17 @@ class Sandbox {
   clear() {
     this.jar.updateCode('');
     this.outputElement.textContent = '';
-    this.outputElement.className = 'output';
+    this.errorElement.textContent = '';
     this.constraintElement.textContent = '';
     this.solverLinkElement.style.display = 'none';
-    this._gridPreview.clearError();
     this._gridPreview.hide();
   }
 }
 
 class GridPreview {
-  constructor(containerElement, previewElement) {
+  constructor(containerElement, previewElement, errorElement) {
     this._previewElement = previewElement;
-    this._errorElement = document.getElementById('grid-preview-error');
+    this._errorElement = errorElement;
     this._displayContainer = new DisplayContainer(containerElement);
     this._constraintStr = null;
 
@@ -284,11 +279,6 @@ class GridPreview {
     this._solveBtn.disabled = true;
     this._abortBtn.disabled = true;
     this._solverRunner.abort();
-    this.clearError();
-  }
-
-  clearError() {
-    this._errorElement.textContent = '';
   }
 
   async solve() {
