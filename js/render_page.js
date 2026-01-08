@@ -403,6 +403,13 @@ class ConstraintManager {
     this.addUpdateListener(
       () => this._constraintSelector.onConstraintsUpdated());
 
+    // Callback for populating the form from a constraint chip.
+    this._populateFormCallback = (constraint) => {
+      const categoryInput = this._constraintCategoryInputs.get(
+        constraint.constructor.CATEGORY);
+      categoryInput.populateForm?.(constraint, this._shape.numValues);
+    };
+
     const chipViews = new Map();
     this._chipHighlighter = displayContainer.createCellHighlighter('chip-hover');
     for (const type of ['ordinary', 'composite', 'jigsaw']) {
@@ -410,7 +417,8 @@ class ConstraintManager {
         new ConstraintChipView(
           document.querySelector(`.chip-view[data-chip-view-type="${type}"]`),
           this._display, this._chipHighlighter, this._constraintSelector,
-          this.runUpdateCallback.bind(this)));
+          this.runUpdateCallback.bind(this),
+          this._populateFormCallback));
       chipViews.set(type, chipView);
     };
     this._chipViews = chipViews;
@@ -462,18 +470,6 @@ class ConstraintManager {
         categoryInput.constructor.name, categoryInput);
       this.addReshapeListener(categoryInput);
       categoryInput.setUpdateCallback(this.runUpdateCallback.bind(this));
-    }
-
-    // Wire up populate form callback for custom constraints.
-    const populateFormCallback = (constraint) => {
-      const categoryInput = this._constraintCategoryInputs.get(
-        constraint.constructor.CATEGORY);
-      if (categoryInput?.populateForm) {
-        categoryInput.populateForm(constraint, this._shape.numValues);
-      }
-    };
-    for (const chipView of this._chipViews.values()) {
-      chipView.setPopulateFormCallback(populateFormCallback);
     }
 
     this._setUpCustomConstraintTabs();
@@ -548,7 +544,8 @@ class ConstraintManager {
     const subView = new ConstraintChipView(
       subViewElem, this._display, this._chipHighlighter,
       this._constraintSelector,
-      this.runUpdateCallback.bind(this));
+      this.runUpdateCallback.bind(this),
+      this._populateFormCallback);
     // Shape is constant for composite constraints.
     subView.reshape(this._shape);
     return subView;
@@ -722,18 +719,14 @@ class UniquenessKeySet {
 }
 
 class ConstraintChipView {
-  constructor(chipViewElement, display, chipHighlighter, constraintSelector, onUpdate) {
+  constructor(chipViewElement, display, chipHighlighter, constraintSelector, onUpdate, populateFormCallback) {
     this._chipViewElement = chipViewElement;
     this._chipHighlighter = chipHighlighter;
     this._constraintSelector = constraintSelector;
     this._display = display;
     this._shape = null;
     this._onUpdate = onUpdate;
-    this._populateFormCallback = null;
-  }
-
-  setPopulateFormCallback(callback) {
-    this._populateFormCallback = callback;
+    this._populateFormCallback = populateFormCallback;
   }
 
   reshape(shape) {
@@ -774,23 +767,6 @@ class ConstraintChipView {
     removeChipButton.innerHTML = '&#x00D7;';
     chip.appendChild(removeChipButton);
 
-    // Add populate form button for custom JavaScript constraints.
-    if (constraint.constructor.CATEGORY === 'Pairwise' ||
-      constraint.constructor.CATEGORY === 'StateMachine') {
-      const loadButton = document.createElement('button');
-      loadButton.className = 'chip-load-button';
-      const icon = document.createElement('img');
-      icon.src = 'img/publish-48.png';
-      icon.alt = 'Load into panel';
-      loadButton.appendChild(icon);
-      loadButton.title = 'Load into panel';
-      loadButton.addEventListener('click', (e) => {
-        e.stopPropagation();
-        this._populateFormCallback?.(constraint);
-      });
-      chip.appendChild(loadButton);
-    }
-
     const chipLabel = document.createElement('div');
     chipLabel.className = 'chip-label';
     chipLabel.textContent = constraint.chipLabel();
@@ -802,6 +778,24 @@ class ConstraintChipView {
       } else {
         chip.append(chipIcon);
       }
+    }
+
+    // Add populate form button for constraints that support it.
+    const categoryClass = ConstraintCategoryInput[constraint.constructor.CATEGORY];
+    if (categoryClass.prototype?.populateForm) {
+      const loadButton = document.createElement('button');
+      loadButton.type = 'button';
+      loadButton.className = 'chip-load-button';
+      const icon = document.createElement('img');
+      icon.src = 'img/publish-48.png';
+      icon.alt = 'Load into panel';
+      loadButton.appendChild(icon);
+      loadButton.title = 'Load into panel';
+      loadButton.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this._populateFormCallback?.(constraint);
+      });
+      chip.appendChild(loadButton);
     }
 
     chip.appendChild(chipLabel);

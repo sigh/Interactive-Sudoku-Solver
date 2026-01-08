@@ -11,7 +11,8 @@ const {
   SudokuConstraint,
   SudokuConstraintBase,
   OutsideConstraintBase,
-  binaryKeyToFnString
+  binaryKeyToFnString,
+  encodedNFAToJsSpec
 } = await import('./sudoku_constraint.js' + self.VERSION_PARAM);
 const { GridShape } = await import('./grid_shape.js' + self.VERSION_PARAM);
 
@@ -1063,6 +1064,7 @@ ConstraintCategoryInput.Pairwise = class Pairwise extends JavaScriptCategoryInpu
     this._form['pairwise-name'].value = constraint.name || '';
     this._form['chain-mode'].value = constraint.type;
     this._form['function'].value = binaryKeyToFnString(constraint.key, numValues);
+    this._form['function'].focus();
   }
 }
 
@@ -1184,6 +1186,28 @@ ConstraintCategoryInput.StateMachine = class StateMachine extends JavaScriptCate
       form[fieldName].addEventListener(
         'input', () => errorElem.textContent = '');
     }
+  }
+
+  populateForm(constraint, numValues) {
+    // Open the Custom JavaScript Constraints panel.
+    this._panel.classList.add('container-open');
+
+    // Switch to the State Machine tab.
+    const tabButton = this._panel.parentElement.querySelector(
+      '[data-tab="state-machine-tab"]');
+    tabButton?.click();
+
+    // Populate name field.
+    this._form['state-machine-name'].value = constraint.name || '';
+
+    // Switch to unified mode to show the generated code.
+    this._form['unified-mode'].checked = true;
+    this._form['unified-mode'].dispatchEvent(new Event('change'));
+
+    // Convert the encoded NFA back to JavaScript and populate unified mode.
+    const jsSpec = encodedNFAToJsSpec(constraint.encodedNFA);
+    this._form['unified-code'].value = jsSpec;
+    this._form['unified-code'].focus();
   }
 }
 

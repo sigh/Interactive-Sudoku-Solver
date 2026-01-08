@@ -573,6 +573,51 @@ export const javascriptSpecToNFA = (config, numSymbols) => {
   return nfa;
 }
 
+// Convert an NFA back to JavaScript code (unified format).
+// This generates code equivalent to the original, but not necessarily identical.
+export const nfaToJavascriptSpec = (nfa) => {
+  const maybeArrayToString = (arr) => {
+    return arr.length === 1 ? `${arr[0]}` : `[${arr.join(', ')}]`;
+  }
+
+  // Build transition table entries.
+  const transitionEntries = [];
+  for (let stateId = 0; stateId < nfa.numStates(); stateId++) {
+    const stateTransitions = nfa.getStateTransitions(stateId);
+    const valueEntries = [];
+    for (let symbolIndex = 0; symbolIndex < stateTransitions.length; symbolIndex++) {
+      const targets = stateTransitions[symbolIndex];
+      if (targets?.length) {
+        const value = symbolIndex + 1;
+        valueEntries.push(`${value}: ${maybeArrayToString(targets)}`);
+      }
+    }
+    if (valueEntries.length) {
+      transitionEntries.push(`    ${stateId}: {${valueEntries.join(', ')}},`);
+    }
+  }
+
+  const acceptIds = [...nfa.getAcceptIds()];
+  const acceptExpr = (
+    acceptIds.length === 0 ? 'false'
+      : acceptIds.length === nfa.numStates() ? 'true'
+        : acceptIds.length === 1 ? `state === ${acceptIds[0]}`
+          : `[${acceptIds.join(', ')}].includes(state)`);
+
+  return `startState = ${maybeArrayToString([...nfa.getStartIds()])};
+
+function transition(state, value) {
+  const transitions = {
+${transitionEntries.join('\n')}
+  };
+  return transitions[state]?.[value];
+}
+
+function accept(state) {
+  return ${acceptExpr};
+}`;
+};
+
 export const optimizeNFA = (nfa, { allStatesAreReachable = false } = {}) => {
   nfa.closeOverEpsilonTransitions();
   nfa.removeDeadStates({ forward: !allStatesAreReachable });
