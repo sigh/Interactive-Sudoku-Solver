@@ -160,3 +160,30 @@ pre {
     margin: 0;
   }
 }
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+  .help-container {
+    grid-template-columns: 1fr;
+    padding: 15px;
+    gap: 20px;
+  }
+
+  .toc {
+    position: static;
+    max-height: none;
+  }
+
+  .category-overview-item {
+    grid-template-columns: 1fr;
+    gap: 15px;
+  }
+
+  .constraint-list {
+    grid-template-columns: 1fr;
+  }
+
+  pre {
+    margin-left: 0;
+  }
+}

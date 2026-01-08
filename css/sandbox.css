@@ -217,3 +217,20 @@ p code {
 #grid-preview-container .outside-arrow:not(.active-arrow) {
   display: none;
 }
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+  .sandbox-container {
+    margin: 15px;
+  }
+
+  .editor {
+    width: 100%;
+    max-width: 80ch;
+    box-sizing: border-box;
+  }
+
+  .editor-panel {
+    width: 100%;
+  }
+}
