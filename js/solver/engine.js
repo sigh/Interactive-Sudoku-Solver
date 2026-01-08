@@ -164,7 +164,7 @@ export class SudokuSolver {
     return result.value;
   }
 
-  solveAllPossibilities() {
+  solveAllPossibilities(threshold) {
     this._reset();
 
     const solutions = [];
@@ -179,17 +179,17 @@ export class SudokuSolver {
       };
     };
 
-    let valuesInSolutions = null;
+    let result = null;
     this._timer.runTimed(() => {
-      valuesInSolutions = this._internalSolver.solveAllPossibilities(
-        solutions);
+      result = this._internalSolver.solveAllPossibilities(
+        solutions, threshold || 1);
     });
 
     // Send progress one last time to ensure all the solutions are sent.
     this._sendProgress();
     this._progressExtraStateFn = null;
 
-    return SudokuSolverUtil.makePencilmarks(valuesInSolutions);
+    return result;
   }
 
   validateLayout() {
@@ -348,7 +348,7 @@ class InternalSolver {
 
     this._handlerSet = this._setUpHandlers(Array.from(handlerGen));
 
-    this._seenCandidateSet = new SeenCandidateSet(shape.numCells);
+    this._seenCandidateSet = new SeenCandidateSet(shape.numCells, shape.numValues);
 
     this._handlerAccumulator = new HandlerAccumulator(this._handlerSet);
     this._candidateSelector = new CandidateSelector(
@@ -899,12 +899,11 @@ class InternalSolver {
     }
   }
 
-  solveAllPossibilities(solutions) {
+  solveAllPossibilities(solutions, threshold) {
     const counters = this.counters;
 
     const seenCandidateSet = this._seenCandidateSet;
-    const candidates = seenCandidateSet.candidates;
-    candidates.fill(0);
+    seenCandidateSet.resetWithThreshold(threshold);
 
     for (const result of this.run(InternalSolver.YIELD_ON_SOLUTION)) {
       seenCandidateSet.addSolutionGrid(result.grid);
@@ -917,7 +916,8 @@ class InternalSolver {
         seenCandidateSet.enabledInSolver = true;
       }
     }
-    return candidates;
+
+    return seenCandidateSet.getCandidateCounts();
   }
 
   validateLayout() {
