@@ -592,7 +592,7 @@ class ConstraintManager {
         constraints.push(constraint);
       }
     }
-    return new SudokuConstraint.Set(constraints);
+    return new SudokuConstraint.Container(constraints);
   }
 
   _getShapeAgnosticConstraints() {

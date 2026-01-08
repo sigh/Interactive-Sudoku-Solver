@@ -84,7 +84,7 @@ export class SudokuParser {
     for (const config of cages.values()) {
       constraints.push(new SudokuConstraint.Cage(config.sum, ...config.cells));
     }
-    return new SudokuConstraint.Set(constraints);
+    return new SudokuConstraint.Container(constraints);
   }
 
   static parseLongKillerFormat(text) {
@@ -122,7 +122,7 @@ export class SudokuParser {
     for (const config of cages.values()) {
       constraints.push(new SudokuConstraint.Cage(config.sum, ...config.cells));
     }
-    return new SudokuConstraint.Set(constraints);
+    return new SudokuConstraint.Container(constraints);
   }
 
   static parsePlainSudoku(text) {
@@ -146,7 +146,7 @@ export class SudokuParser {
       }
     }
     if (new Set(nonValueCharacters).size > 1) return null;
-    return new SudokuConstraint.Set([
+    return new SudokuConstraint.Container([
       new SudokuConstraint.Shape(shape.name),
       ...SudokuConstraint.Given.makeFromArgs(...fixedValues),
     ]);
@@ -170,7 +170,7 @@ export class SudokuParser {
 
     if (Object.values(counter).some(c => c != gridSize)) return null;
 
-    return new SudokuConstraint.Set([
+    return new SudokuConstraint.Container([
       new SudokuConstraint.Shape(shape.name),
       ...SudokuConstraint.Jigsaw.makeFromArgs(text),
       new SudokuConstraint.NoBoxes(),
@@ -191,7 +191,7 @@ export class SudokuParser {
     const fixedValues = this.parsePlainSudoku(text.substr(0, numCells));
     if (fixedValues == null) return null;
 
-    return new SudokuConstraint.Set([layout, fixedValues]);
+    return new SudokuConstraint.Container([layout, fixedValues]);
   }
 
   static parseSolution(text) {
@@ -216,7 +216,7 @@ export class SudokuParser {
       fixedValues.push(shape.makeValueId(i, cell));
     }
 
-    return new SudokuConstraint.Set([
+    return new SudokuConstraint.Container([
       new SudokuConstraint.Shape(shape.name),
       ...SudokuConstraint.Given.makeFromArgs(...fixedValues),
     ]);
@@ -243,7 +243,7 @@ export class SudokuParser {
       pencilmarks.push(`${cellId}_${values}`);
     }
 
-    return new SudokuConstraint.Set([
+    return new SudokuConstraint.Container([
       new SudokuConstraint.Shape(shape.name),
       ...SudokuConstraint.Given.makeFromArgs(...pencilmarks),
     ]);
@@ -300,7 +300,7 @@ export class SudokuParser {
       constraints.push(constraint);
     }
     if (constraints.length == 1) return constraints[0];
-    return new SudokuConstraint.Set(constraints);
+    return new SudokuConstraint.Container(constraints);
   }
 
   static _resolveCompositeConstraints(revConstraints, compositeClass) {
@@ -363,7 +363,7 @@ export class SudokuParser {
     }
 
     return this._resolveCompositeConstraints(
-      constraints.reverse(), SudokuConstraint.Set);
+      constraints.reverse(), SudokuConstraint.Container);
   }
 
   static extractConstraintTypes(str) {
