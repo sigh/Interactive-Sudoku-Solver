@@ -308,6 +308,7 @@ export class SudokuParser {
     // end. The result will be that everything is in the original order.
 
     const items = [];
+    const canAbsorb = compositeClass.CAN_ABSORB();
 
     while (revConstraints.length) {
       const c = revConstraints.pop();
@@ -316,7 +317,7 @@ export class SudokuParser {
       if (c.constructor.IS_COMPOSITE) {
         const resolvedComposite = this._resolveCompositeConstraints(
           revConstraints, c.constructor);
-        if (compositeClass.CAN_ABSORB.includes(c.constructor.name)) {
+        if (canAbsorb.includes(c.constructor)) {
           // We can directly add the sub-constraints to this composite.
           items.push(...resolvedComposite.constraints);
         } else {
