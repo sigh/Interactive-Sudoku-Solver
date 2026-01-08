@@ -88,7 +88,7 @@ export class SudokuConstraintBase {
   }
 
   forEachTopLevel(fn) {
-    if (this.type === 'Container') {
+    if (this instanceof SudokuConstraint.Container) {
       this.constraints.forEach(c => c.forEachTopLevel(fn));
     } else {
       fn(this);
@@ -497,7 +497,7 @@ export class SudokuConstraint {
     static DESCRIPTION = "Container for constraints. Do not use directly.";
     static CATEGORY = null;
     static IS_COMPOSITE = true;
-    static CAN_ABSORB = ['Container', 'And'];
+    static CAN_ABSORB = () => [SudokuConstraint.Container, SudokuConstraint.And];
 
     constructor(constraints) {
       super(constraints);
@@ -527,7 +527,7 @@ export class SudokuConstraint {
   static Or = class Or extends CompositeConstraintBase {
     static DESCRIPTION = (
       "At least one of the contained constraints must be satisfied.");
-    static CAN_ABSORB = ['Or'];
+    static CAN_ABSORB = () => [SudokuConstraint.Or];
 
     static _serializeSingle(constraint) {
       const parts = [];
@@ -551,7 +551,7 @@ export class SudokuConstraint {
   static And = class And extends CompositeConstraintBase {
     static DESCRIPTION = (
       "All the contained constraints must be satisfied.");
-    static CAN_ABSORB = ['Container', 'And'];
+    static CAN_ABSORB = () => [SudokuConstraint.Container, SudokuConstraint.And];
 
     static serialize(constraints) {
       // For 'And' we can combine all the constraints.

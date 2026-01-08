@@ -97,7 +97,9 @@ const makeCellId = (row, col) => SHAPE_MAX.makeCellId(row - 1, col - 1);
 const parseConstraint = (str) => {
   const parsed = SudokuParser.parseString(str);
   const resolved = SudokuBuilder.resolveConstraint(parsed);
-  if (resolved.type === 'Container') return resolved.constraints;
+  if (resolved instanceof SudokuConstraint.Container) {
+    return resolved.constraints;
+  }
   return [resolved];
 };
 
@@ -111,4 +113,3 @@ export const SANDBOX_GLOBALS = {
   GridShape,
   ...SudokuConstraint,
 };
-delete SANDBOX_GLOBALS.Set;  // Don't overwrite Set
