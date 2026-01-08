@@ -6,7 +6,7 @@ const {
   Base64Codec
 } = await import('./util.js' + self.VERSION_PARAM);
 const { GridShape, SHAPE_9x9, SHAPE_MAX } = await import('./grid_shape.js' + self.VERSION_PARAM);
-const { NFASerializer, javascriptSpecToNFA } = await import('./nfa_builder.js' + self.VERSION_PARAM);
+const { NFASerializer, javascriptSpecToNFA, nfaToJavascriptSpec } = await import('./nfa_builder.js' + self.VERSION_PARAM);
 
 export class CellArgs {
   constructor(args, type) {
@@ -2447,4 +2447,9 @@ export const binaryKeyToFnString = (key, numValues) => {
     .map(([a, bs]) => `${a}:[${bs.join(',')}]`)
     .join(',');
   return `({${entries}})[a]?.includes(b)`;
+};
+
+export const encodedNFAToJsSpec = (encodedNFA) => {
+  const nfa = NFASerializer.deserialize(encodedNFA);
+  return nfaToJavascriptSpec(nfa);
 };

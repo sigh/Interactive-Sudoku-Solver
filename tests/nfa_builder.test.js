@@ -5,7 +5,7 @@ import { runTest, logSuiteComplete } from './helpers/test_runner.js';
 
 ensureGlobalEnvironment();
 
-const { regexToNFA, javascriptSpecToNFA, optimizeNFA, NFASerializer, JavascriptNFABuilder, NFA, Symbol } = await import('../js/nfa_builder.js');
+const { regexToNFA, javascriptSpecToNFA, nfaToJavascriptSpec, optimizeNFA, NFASerializer, JavascriptNFABuilder, NFA, Symbol } = await import('../js/nfa_builder.js');
 const { BitReader } = await import('../js/util.js');
 
 const evaluateNfa = (nfa, values) => {
@@ -1274,6 +1274,47 @@ await runTest('optimizeNFA with allStatesAreReachable should skip forward reacha
 
   // Dead-end state 1 should still be removed (backward reachability still runs).
   assert.equal(nfa.numStates(), 2, 'dead-end should still be removed via backward pass');
+});
+
+await runTest('nfaToJavascriptSpec should generate valid code for thermo-like NFA', () => {
+  const spec = {
+    startExpression: '0',
+    transitionBody: 'return value > state ? value : null;',
+    acceptBody: 'return true;'
+  };
+  const nfa = javascriptSpecToNFA(spec, 9);
+  const jsCode = nfaToJavascriptSpec(nfa);
+
+  // Should contain the expected structure.
+  assert.ok(jsCode.includes('startState ='), 'should have startState');
+  assert.ok(jsCode.includes('function transition'), 'should have transition function');
+  assert.ok(jsCode.includes('function accept'), 'should have accept function');
+
+  // Round-trip: recompile and check equivalence.
+  const nfa2 = javascriptSpecToNFA(jsCode, 9);
+  assert.equal(nfa.numStates(), nfa2.numStates(), 'round-trip should preserve state count');
+});
+
+await runTest('nfaToJavascriptSpec should handle empty NFA', () => {
+  const nfa = new NFA();
+  nfa.seal();
+  const jsCode = nfaToJavascriptSpec(nfa);
+
+  assert.ok(jsCode.includes('startState = []'), 'empty NFA should have empty start array');
+  assert.ok(jsCode.includes('return false'), 'empty NFA should reject all');
+});
+
+await runTest('nfaToJavascriptSpec should handle multiple start states', () => {
+  const nfa = new NFA();
+  nfa.addState();  // 0
+  nfa.addState();  // 1
+  nfa.addStartId(0);
+  nfa.addStartId(1);
+  nfa.addAcceptId(1);
+  nfa.seal();
+
+  const jsCode = nfaToJavascriptSpec(nfa);
+  assert.ok(jsCode.includes('[0, 1]') || jsCode.includes('[1, 0]'), 'should have array of start states');
 });
 
 logSuiteComplete('NFA builder');
