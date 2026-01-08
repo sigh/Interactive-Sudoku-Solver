@@ -123,7 +123,7 @@ const runSandboxCode = async ({ SudokuConstraint, SudokuParser }, { code }) => {
         const parsed = result.map(item =>
           typeof item === 'string' ? SudokuParser.parseString(item) : item
         );
-        constraintStr = String(new SudokuConstraint.Set(parsed));
+        constraintStr = String(new SudokuConstraint.Container(parsed));
       } else {
         constraintStr = String(result);
       }

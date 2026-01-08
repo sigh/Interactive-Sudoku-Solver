@@ -21,7 +21,7 @@ const makeEasyClassicConstraint = () => {
     ['R9C5', 8], ['R9C8', 7], ['R9C9', 9],
   ];
 
-  return new SudokuConstraint.Set(
+  return new SudokuConstraint.Container(
     givens.map(([cell, value]) => new SudokuConstraint.Given(cell, value))
   );
 };
