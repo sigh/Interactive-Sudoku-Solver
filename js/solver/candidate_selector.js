@@ -2,24 +2,62 @@ const { countOnes16bit, RandomIntGenerator } = await import('../util.js' + self.
 const { LookupTables } = await import('./lookup_tables.js' + self.VERSION_PARAM);
 
 export class SeenCandidateSet {
-  constructor(numCells) {
+  constructor(numCells, numValues) {
     this.enabledInSolver = false;
     this.candidates = new Uint16Array(numCells);
     this._lastInterestingCell = 0;
+    this._dirty = false;
+
+    this._numCells = numCells;
+    this._numValues = numValues;
+    this._threshold = 1;
+    this._candidateCounts = new Uint8Array(numCells * numValues);
+  }
+
+  getCandidateCounts() {
+    return this._candidateCounts;
   }
 
   reset() {
+    if (!this._dirty) return;
+
+    this._dirty = false;
     this.enabledInSolver = false;
     this.candidates.fill(0);
+    this._candidateCounts.fill(0);
     this._lastInterestingCell = 0;
+  }
+
+  resetWithThreshold(threshold) {
+    if (threshold < 1 || threshold > 255) {
+      throw new Error(`Threshold must be between 1 and 255, got ${threshold}`);
+    }
+    this._threshold = threshold;
+    this.reset();
   }
 
   addSolutionGrid(grid) {
     const candidates = this.candidates;
-    const numCells = candidates.length;
+    const counts = this._candidateCounts;
+    const numCells = this._numCells;
+    const numValues = this._numValues;
+    const threshold = this._threshold;
+
     for (let i = 0; i < numCells; i++) {
-      candidates[i] |= grid[i];
+      const value = grid[i];
+      const countIndex = i * numValues + LookupTables.toIndex(value);
+      const incrementedCount = counts[countIndex] + 1;
+      // Saturate at threshold to avoid overflow.
+      if (incrementedCount <= threshold) {
+        counts[countIndex] = incrementedCount;
+        // Set bitmask when threshold reached (for hasInterestingSolutions).
+        if (incrementedCount === threshold) {
+          candidates[i] |= value;
+        }
+      }
     }
+
+    this._dirty = true;
   }
 
   hasInterestingSolutions(grid) {

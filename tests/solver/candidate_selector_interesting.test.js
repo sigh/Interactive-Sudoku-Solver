@@ -17,7 +17,7 @@ const makeDebugLogger = () => ({
 await runTest('CandidateSelector prefers interesting values when uninterestingValues set', () => {
   const shape = GridShape.fromGridSize(4);
 
-  const seenCandidateSet = new SeenCandidateSet(shape.numCells);
+  const seenCandidateSet = new SeenCandidateSet(shape.numCells, shape.numValues);
   seenCandidateSet.enabledInSolver = true;
   const candidates = seenCandidateSet.candidates;
   // Mark value 1 as already-seen for cell 0.
@@ -55,7 +55,7 @@ await runTest('CandidateSelector prefers interesting values when uninterestingVa
 await runTest('CandidateSelector falls back when no interesting values exist', () => {
   const shape = GridShape.fromGridSize(4);
 
-  const seenCandidateSet = new SeenCandidateSet(shape.numCells);
+  const seenCandidateSet = new SeenCandidateSet(shape.numCells, shape.numValues);
   seenCandidateSet.enabledInSolver = true;
   const candidates = seenCandidateSet.candidates;
   // Mark all values already-seen for cell 0.
@@ -92,7 +92,7 @@ await runTest('CandidateSelector falls back when no interesting values exist', (
 await runTest('CandidateSelector selects only from interesting cells when prefix is interesting', () => {
   const shape = GridShape.fromGridSize(4);
 
-  const seenCandidateSet = new SeenCandidateSet(shape.numCells);
+  const seenCandidateSet = new SeenCandidateSet(shape.numCells, shape.numValues);
   seenCandidateSet.enabledInSolver = true;
 
   const allValues = (1 << shape.numValues) - 1;
@@ -137,7 +137,7 @@ await runTest('CandidateSelector selects only from interesting cells when prefix
 await runTest('CandidateSelector custom candidates pop interesting cell first', () => {
   const shape = GridShape.fromGridSize(4);
 
-  const seenCandidateSet = new SeenCandidateSet(shape.numCells);
+  const seenCandidateSet = new SeenCandidateSet(shape.numCells, shape.numValues);
   seenCandidateSet.enabledInSolver = true;
   const allValues = (1 << shape.numValues) - 1;
 
