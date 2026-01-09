@@ -98,8 +98,8 @@ class ModeHandler {
 
   // Returns true if the threshold change was handled, false if re-solve needed.
   setCandidateSupportThreshold(candidateSupportThreshold) {
-    // Return false by default since this doesn't make a difference for most
-    // modes.
+    // Return true by default since most modes are unaffected and should
+    // *not* trigger a re-solve.
     return true;
   }
 
@@ -192,7 +192,7 @@ class AllPossibilitiesModeHandler extends ModeHandler {
       solution: this._pencilmarks,
       description: 'All possibilities',
       counts: this._counts,
-      threshold: this._displayThreshold,
+      candidateSupportThreshold: this._displayThreshold,
     }
     return super.get(i - 1);
   }
