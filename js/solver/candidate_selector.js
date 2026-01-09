@@ -10,7 +10,7 @@ export class SeenCandidateSet {
 
     this._numCells = numCells;
     this._numValues = numValues;
-    this._threshold = 1;
+    this._candidateSupportThreshold = 1;
     this._candidateCounts = new Uint8Array(numCells * numValues);
   }
 
@@ -28,11 +28,12 @@ export class SeenCandidateSet {
     this._lastInterestingCell = 0;
   }
 
-  resetWithThreshold(threshold) {
-    if (threshold < 1 || threshold > 255) {
-      throw new Error(`Threshold must be between 1 and 255, got ${threshold}`);
+  resetWithThreshold(candidateSupportThreshold) {
+    if (candidateSupportThreshold < 1 || candidateSupportThreshold > 255) {
+      throw new Error(
+        `candidateSupportThreshold must be between 1 and 255, got ${candidateSupportThreshold}`);
     }
-    this._threshold = threshold;
+    this._candidateSupportThreshold = candidateSupportThreshold;
     this.reset();
   }
 
@@ -41,7 +42,7 @@ export class SeenCandidateSet {
     const counts = this._candidateCounts;
     const numCells = this._numCells;
     const numValues = this._numValues;
-    const threshold = this._threshold;
+    const threshold = this._candidateSupportThreshold;
 
     for (let i = 0; i < numCells; i++) {
       const value = grid[i];

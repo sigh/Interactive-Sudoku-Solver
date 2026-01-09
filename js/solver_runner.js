@@ -112,14 +112,16 @@ class AllPossibilitiesModeHandler extends ModeHandler {
   ITERATION_CONTROLS = true;
   ALLOW_DOWNLOAD = true;
 
-  constructor() {
+  constructor(candidateSupportThreshold) {
     super();
     this._pencilmarks = [];
+    this._candidateSupportThreshold = candidateSupportThreshold || 1;
+    this._counts = [];
   }
 
   async run(solver) {
     await super.run(solver);
-    await this._solver.solveAllPossibilities();
+    await this._solver.solveAllPossibilities(this._candidateSupportThreshold);
   }
 
   maxIndex() {
@@ -143,10 +145,15 @@ class AllPossibilitiesModeHandler extends ModeHandler {
 
     if (this._pencilmarks.length == 0) {
       this._pencilmarks = Array.from(solutions[0]).map(() => new Set());
+      const numCells = solutions[0].length;
+      const numValues = Math.max(...solutions[0]);
+      this._counts = Array.from({ length: numCells }, () => new Array(numValues).fill(0));
     }
+
     for (const solution of solutions) {
       for (let i = 0; i < solution.length; i++) {
         this._pencilmarks[i].add(solution[i]);
+        this._counts[i][solution[i] - 1]++;
       }
     }
 
@@ -458,6 +465,7 @@ export class SolverRunner {
 
     const mode = options.mode || DEFAULT_MODE;
     const debugHandler = options.debugHandler || null;
+    const candidateSupportThreshold = options.candidateSupportThreshold || 1;
 
     const session = new SolverSession();
     this._session = session;
@@ -468,7 +476,7 @@ export class SolverRunner {
       return;
     }
 
-    const handler = new handlerClass();
+    const handler = new handlerClass(candidateSupportThreshold);
     this._handler = handler;
 
     // Reset iteration state
@@ -663,8 +671,8 @@ export class SolverProxy {
     this._statusHandler = statusHandler || (() => null);
   }
 
-  async solveAllPossibilities() {
-    return this._callWorker('solveAllPossibilities');
+  async solveAllPossibilities(candidateSupportThreshold) {
+    return this._callWorker('solveAllPossibilities', { candidateSupportThreshold });
   }
 
   async validateLayout() {
