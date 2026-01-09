@@ -185,11 +185,21 @@ layout: null
               <option value="step-by-step">Step-by-step</option>
               <option value="validate-layout">Validate layout</option>
             </select>
-            <div id="solve-mode-description" class="description"></div>
             <div id="candidate-support-threshold-container">
-              <label for="candidate-support-threshold">Min solutions per candidate:</label>
-              <input type="number" id="candidate-support-threshold" min="1" max="255" value="1">
+              <label for="candidate-support-threshold">
+                Value count limit
+                <span class="tooltip" data-text="
+                  Count how many solutions each value appears in, up to this
+                  limit. Values that appear in fewer solutions than this
+                  limit will be colored orange in the grid, and values in
+                  a unique solution will be colored green."></span>:
+              </label>
+              <div>
+                <input type="range" id="candidate-support-threshold" min="1" max="10" value="1">
+                <span>1</span>
+              </div>
             </div>
+            <div id="solve-mode-description" class="description"></div>
           </div>
           <div id="state-output"></div>
           <div>
