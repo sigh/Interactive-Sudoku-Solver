@@ -3,6 +3,7 @@ const {
   deferUntilAnimationFrame,
   clearDOMNode,
   localTimestamp,
+  autoSaveField,
 } = await import('./util.js' + self.VERSION_PARAM);
 const {
   HighlightDisplay,
@@ -259,6 +260,7 @@ export class SolutionController {
       iterationState: document.getElementById('solution-iteration-state'),
       mode: document.getElementById('solve-mode-input'),
       modeDescription: document.getElementById('solve-mode-description'),
+      candidateSupportThreshold: document.getElementById('candidate-support-threshold'),
       error: document.getElementById('error-panel').appendChild(
         document.createElement('div')),
       stop: document.getElementById('stop-solver'),
@@ -268,12 +270,15 @@ export class SolutionController {
     }
 
     this._elements.mode.onchange = () => this._update();
+    this._elements.candidateSupportThreshold.onchange = () => this._update();
     this._elements.stop.onclick = () => this._solverRunner.abort();
     this._elements.solve.onclick = () => this._solve();
 
     this._setUpAutoSolve();
     this._setUpKeyBindings(displayContainer);
     this._setUpIterationControls();
+
+    autoSaveField(this._elements.candidateSupportThreshold);
 
     this._historyHandler = new HistoryHandler((params) => {
       const mode = params.get('mode');
@@ -407,6 +412,10 @@ export class SolutionController {
     const isEstimateMode = mode === Modes.ESTIMATE_SOLUTIONS.NAME;
     this._stateDisplay.setEstimateMode(isEstimateMode);
 
+    // Show candidate support threshold input only for all-possibilities mode.
+    const isAllPossibilitiesMode = mode === Modes.ALL_POSSIBILITIES.NAME;
+    this._elements.candidateSupportThreshold.parentElement.style.display = isAllPossibilitiesMode ? '' : 'none';
+
     this._elements.modeDescription.textContent = getModeDescription(mode);
 
     if (auto || mode === Modes.STEP_BY_STEP.NAME) {
@@ -433,6 +442,7 @@ export class SolutionController {
 
   async _solve(constraints) {
     const mode = this._elements.mode.value;
+    const candidateSupportThreshold = parseInt(this._elements.candidateSupportThreshold.value, 10) || 1;
 
     constraints ||= mode === Modes.VALIDATE_LAYOUT.NAME
       ? this._constraintManager.getLayoutConstraints()
@@ -445,7 +455,7 @@ export class SolutionController {
     // Set up download handler
     this._elements.download.disabled = true;  // Will be enabled after solve starts
 
-    const modeHandler = await this._solverRunner.solve(constraints, { mode, debugHandler });
+    const modeHandler = await this._solverRunner.solve(constraints, { mode, debugHandler, candidateSupportThreshold });
 
     // Update download button based on handler capabilities
     if (modeHandler.ALLOW_DOWNLOAD) {

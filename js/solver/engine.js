@@ -164,7 +164,7 @@ export class SudokuSolver {
     return result.value;
   }
 
-  solveAllPossibilities(threshold) {
+  solveAllPossibilities(candidateSupportThreshold) {
     this._reset();
 
     const solutions = [];
@@ -182,7 +182,7 @@ export class SudokuSolver {
     let result = null;
     this._timer.runTimed(() => {
       result = this._internalSolver.solveAllPossibilities(
-        solutions, threshold || 1);
+        solutions, candidateSupportThreshold || 1);
     });
 
     // Send progress one last time to ensure all the solutions are sent.
@@ -899,11 +899,11 @@ class InternalSolver {
     }
   }
 
-  solveAllPossibilities(solutions, threshold) {
+  solveAllPossibilities(solutions, candidateSupportThreshold) {
     const counters = this.counters;
 
     const seenCandidateSet = this._seenCandidateSet;
-    seenCandidateSet.resetWithThreshold(threshold);
+    seenCandidateSet.resetWithThreshold(candidateSupportThreshold);
 
     for (const result of this.run(InternalSolver.YIELD_ON_SOLUTION)) {
       seenCandidateSet.addSolutionGrid(result.grid);

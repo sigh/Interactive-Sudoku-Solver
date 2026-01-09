@@ -66,7 +66,7 @@ const handleWorkerMethod = (method, payload) => {
       return true;
 
     case 'solveAllPossibilities':
-      return workerSolver.solveAllPossibilities();
+      return workerSolver.solveAllPossibilities(payload.candidateSupportThreshold);
 
     case 'validateLayout':
       return workerSolver.validateLayout();

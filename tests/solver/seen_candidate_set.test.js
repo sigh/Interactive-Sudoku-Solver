@@ -7,7 +7,7 @@ ensureGlobalEnvironment();
 
 const { SeenCandidateSet } = await import('../../js/solver/candidate_selector.js');
 
-await runTest('SeenCandidateSet with threshold=1 sets candidates immediately', () => {
+await runTest('SeenCandidateSet with candidateSupportThreshold=1 sets candidates immediately', () => {
   const numCells = 4;
   const numValues = 4;
   const seenCandidateSet = new SeenCandidateSet(numCells, numValues);
@@ -17,7 +17,7 @@ await runTest('SeenCandidateSet with threshold=1 sets candidates immediately', (
 
   seenCandidateSet.addSolutionGrid(grid);
 
-  // With threshold=1, candidates should be set immediately.
+  // With candidateSupportThreshold=1, candidates should be set immediately.
   assert.equal(seenCandidateSet.candidates[0], 1 << 0);
   assert.equal(seenCandidateSet.candidates[1], 1 << 1);
   assert.equal(seenCandidateSet.candidates[2], 1 << 2);
@@ -31,7 +31,7 @@ await runTest('SeenCandidateSet with threshold=1 sets candidates immediately', (
   assert.equal(counts[3 * numValues + 3], 1);
 });
 
-await runTest('SeenCandidateSet with threshold>1 delays candidate bitmask', () => {
+await runTest('SeenCandidateSet with candidateSupportThreshold>1 delays candidate bitmask', () => {
   const numCells = 4;
   const numValues = 4;
   const seenCandidateSet = new SeenCandidateSet(numCells, numValues);
@@ -55,7 +55,7 @@ await runTest('SeenCandidateSet with threshold>1 delays candidate bitmask', () =
   assert.equal(seenCandidateSet.getCandidateCounts()[0], 3);
 });
 
-await runTest('SeenCandidateSet counts saturate at threshold', () => {
+await runTest('SeenCandidateSet counts saturate at candidateSupportThreshold', () => {
   const numCells = 2;
   const numValues = 4;
   const seenCandidateSet = new SeenCandidateSet(numCells, numValues);
@@ -68,7 +68,7 @@ await runTest('SeenCandidateSet counts saturate at threshold', () => {
     seenCandidateSet.addSolutionGrid(grid);
   }
 
-  // Counts should saturate at threshold (3), not overflow.
+  // Counts should saturate at candidateSupportThreshold (3), not overflow.
   const counts = seenCandidateSet.getCandidateCounts();
   assert.equal(counts[0 * numValues + 0], 3);
   assert.equal(counts[1 * numValues + 1], 3);
@@ -92,33 +92,33 @@ await runTest('SeenCandidateSet reset clears counts and candidates', () => {
   assert.equal(seenCandidateSet.getCandidateCounts()[0], 0);
 });
 
-await runTest('SeenCandidateSet resetWithThreshold sets threshold', () => {
+await runTest('SeenCandidateSet resetWithThreshold sets candidateSupportThreshold', () => {
   const numCells = 4;
   const numValues = 4;
   const seenCandidateSet = new SeenCandidateSet(numCells, numValues);
 
-  // Default threshold is 1.
-  assert.equal(seenCandidateSet._threshold, 1);
+  // Default candidateSupportThreshold is 1.
+  assert.equal(seenCandidateSet._candidateSupportThreshold, 1);
 
   seenCandidateSet.resetWithThreshold(5);
-  assert.equal(seenCandidateSet._threshold, 5);
+  assert.equal(seenCandidateSet._candidateSupportThreshold, 5);
 
   // Also clears data.
   const grid = new Uint16Array([1 << 0, 1 << 1, 1 << 2, 1 << 3]);
   seenCandidateSet.addSolutionGrid(grid);
   seenCandidateSet.resetWithThreshold(10);
-  assert.equal(seenCandidateSet._threshold, 10);
+  assert.equal(seenCandidateSet._candidateSupportThreshold, 10);
   assert.equal(seenCandidateSet.getCandidateCounts()[0], 0);
 });
 
-await runTest('SeenCandidateSet resetWithThreshold throws for invalid threshold', () => {
+await runTest('SeenCandidateSet resetWithThreshold throws for invalid value', () => {
   const numCells = 4;
   const numValues = 4;
   const seenCandidateSet = new SeenCandidateSet(numCells, numValues);
 
-  assert.throws(() => seenCandidateSet.resetWithThreshold(0), /Threshold must be between 1 and 255/);
-  assert.throws(() => seenCandidateSet.resetWithThreshold(-1), /Threshold must be between 1 and 255/);
-  assert.throws(() => seenCandidateSet.resetWithThreshold(256), /Threshold must be between 1 and 255/);
+  assert.throws(() => seenCandidateSet.resetWithThreshold(0), /candidateSupportThreshold must be between 1 and 255/);
+  assert.throws(() => seenCandidateSet.resetWithThreshold(-1), /candidateSupportThreshold must be between 1 and 255/);
+  assert.throws(() => seenCandidateSet.resetWithThreshold(256), /candidateSupportThreshold must be between 1 and 255/);
 });
 
 await runTest('SeenCandidateSet accumulates multiple values per cell', () => {
@@ -138,14 +138,14 @@ await runTest('SeenCandidateSet accumulates multiple values per cell', () => {
   // Cell 1 should have value 2 marked (appeared twice, but saturates at threshold=1).
   assert.equal(seenCandidateSet.candidates[1], 1 << 1);
 
-  // Check counts - with threshold=1, counts saturate at 1.
+  // Check counts - with candidateSupportThreshold=1, counts saturate at 1.
   const counts = seenCandidateSet.getCandidateCounts();
   assert.equal(counts[0 * numValues + 0], 1); // Cell 0, value 1
   assert.equal(counts[0 * numValues + 2], 1); // Cell 0, value 3
   assert.equal(counts[1 * numValues + 1], 1); // Cell 1, value 2 (saturated at 1)
 });
 
-await runTest('SeenCandidateSet hasInterestingSolutions works with threshold', () => {
+await runTest('SeenCandidateSet hasInterestingSolutions works with candidateSupportThreshold', () => {
   const numCells = 4;
   const numValues = 4;
   const seenCandidateSet = new SeenCandidateSet(numCells, numValues);
@@ -155,10 +155,10 @@ await runTest('SeenCandidateSet hasInterestingSolutions works with threshold', (
   const solution1 = new Uint16Array([1 << 0, 1 << 1, 1 << 2, 1 << 3]);
   seenCandidateSet.addSolutionGrid(solution1);
 
-  // Candidates not yet set (threshold=2, count=1).
+  // Candidates not yet set (candidateSupportThreshold=2, count=1).
   assert.equal(seenCandidateSet.candidates[0], 0);
 
-  // A grid with the same values should be interesting (count < threshold).
+  // A grid with the same values should be interesting (count < candidateSupportThreshold).
   const testGrid = new Uint16Array([1 << 0, 1 << 1, 1 << 2, 1 << 3]);
   assert.equal(seenCandidateSet.hasInterestingSolutions(testGrid), true);
 
