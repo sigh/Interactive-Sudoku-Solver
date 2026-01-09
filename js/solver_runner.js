@@ -98,7 +98,9 @@ class ModeHandler {
 
   // Returns true if the threshold change was handled, false if re-solve needed.
   setCandidateSupportThreshold(candidateSupportThreshold) {
-    return false;
+    // Return false by default since this doesn't make a difference for most
+    // modes.
+    return true;
   }
 
   handleSolverException(e) {

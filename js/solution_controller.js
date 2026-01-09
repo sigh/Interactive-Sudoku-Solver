@@ -3,7 +3,6 @@ const {
   deferUntilAnimationFrame,
   clearDOMNode,
   localTimestamp,
-  autoSaveField,
 } = await import('./util.js' + self.VERSION_PARAM);
 const {
   HighlightDisplay,
@@ -269,7 +268,10 @@ export class SolutionController {
       download: document.getElementById('download-solutions-button'),
     }
 
-    this._elements.mode.onchange = () => this._update();
+    this._elements.mode.onchange = () => {
+      this._updateValueCountLimitUrl();
+      this._update();
+    };
     const thresholdInput = this._elements.candidateSupportThreshold;
     const thresholdValue = thresholdInput.nextElementSibling;
     thresholdInput.oninput = () => {
@@ -287,6 +289,9 @@ export class SolutionController {
       const mode = params.get('mode');
       if (mode) this._elements.mode.value = mode;
 
+      const valueCountLimit = params.get('valueCountLimit');
+      if (valueCountLimit) thresholdInput.value = valueCountLimit;
+
       const constraintsText = params.get('q') || '.';
       this._constraintManager.loadUnsafeFromText(constraintsText);
     });
@@ -295,7 +300,6 @@ export class SolutionController {
     constraintManager.addUpdateListener(this._update.bind(this));
 
     // This can trigger an update, so do it last.
-    autoSaveField(thresholdInput);
     thresholdInput.oninput();
 
     this._update();
@@ -448,12 +452,25 @@ export class SolutionController {
   }
 
   _handleThresholdChange() {
-    const candidateSupportThreshold = parseInt(this._elements.candidateSupportThreshold.value, 10) || 1;
+    this._updateValueCountLimitUrl();
 
+    const candidateSupportThreshold = parseInt(
+      this._elements.candidateSupportThreshold.value, 10) || 1;
     // If the solver can't accommodate the new threshold, then resolve.
     if (!this._solverRunner.setCandidateSupportThreshold(candidateSupportThreshold)) {
       this._update();
     }
+  }
+
+  _updateValueCountLimitUrl() {
+    const isAllPossibilitiesMode = this._elements.mode.value === Modes.ALL_POSSIBILITIES.NAME;
+    let valueCountLimit;
+    if (isAllPossibilitiesMode) {
+      const parsedLimit = parseInt(
+        this._elements.candidateSupportThreshold.value, 10) || 1;
+      if (parsedLimit > 1) valueCountLimit = parsedLimit;
+    }
+    this._historyHandler._updateUrl({ valueCountLimit });
   }
 
   async _solve(constraints) {
