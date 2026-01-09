@@ -22,9 +22,11 @@
   /* Colors - Candidate support levels */
 
   /* Green - exactly 1 solution */
-  --color-candidate-unique: #01ad40;
-  /* Orange - < threshold solutions */
-  --color-candidate-rare: #f97316;
+  --color-candidate-unique: rgb(0 173 64);
+  /* Orange - below threshold solutions */
+  --color-candidate-below-limit: rgb(249 115 22);
+  /* Purple - exactly at threshold solutions */
+  --color-candidate-at-limit: rgb(220 0 220);
 
   /* Colors - Neutral */
   --color-border: #aaa;

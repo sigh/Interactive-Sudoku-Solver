@@ -454,8 +454,11 @@ export class SolutionController {
   _handleThresholdChange() {
     this._updateValueCountLimitUrl();
 
-    const candidateSupportThreshold = parseInt(
-      this._elements.candidateSupportThreshold.value, 10) || 1;
+    const valueCountLimit = parseInt(
+      this._elements.candidateSupportThreshold.value, 10) || 0;
+    // candidateSupportThreshold is 1 more than valueCountLimit so that we can
+    // distinguish values at the limit from those above it.
+    const candidateSupportThreshold = 1 + valueCountLimit;
     // If the solver can't accommodate the new threshold, then resolve.
     if (!this._solverRunner.setCandidateSupportThreshold(candidateSupportThreshold)) {
       this._update();
@@ -467,8 +470,8 @@ export class SolutionController {
     let valueCountLimit;
     if (isAllPossibilitiesMode) {
       const parsedLimit = parseInt(
-        this._elements.candidateSupportThreshold.value, 10) || 1;
-      if (parsedLimit > 1) valueCountLimit = parsedLimit;
+        this._elements.candidateSupportThreshold.value, 10) || 0;
+      if (parsedLimit > 0) valueCountLimit = parsedLimit;
     }
     this._historyHandler._updateUrl({ valueCountLimit });
   }
@@ -538,14 +541,17 @@ export class SolutionController {
 
   _makeCandidateColorFn(result) {
     const counts = result.counts;
-    const threshold = result.threshold;
+    const threshold = result.candidateSupportThreshold;
     if (!counts || threshold <= 1) return null;
 
     return (cellIndex, value) => {
       const count = counts[cellIndex]?.[value - 1];
       if (!count || count >= threshold) return null;
       if (count === 1) return 'var(--color-candidate-unique)';
-      return 'var(--color-candidate-rare)';
+      // Note that the threshold is one more than the limit to detect when
+      // we are over the limit.
+      if (count === threshold - 1) return 'var(--color-candidate-at-limit)';
+      return 'var(--color-candidate-below-limit)';
     };
   }
 
