@@ -19,6 +19,13 @@
   --color-highlight: lime;
   --color-highlight-hover: limegreen;
 
+  /* Colors - Candidate support levels */
+
+  /* Green - exactly 1 solution */
+  --color-candidate-unique: #22c55e;
+  /* Orange - < threshold solutions */
+  --color-candidate-rare: #f97316;
+
   /* Colors - Neutral */
   --color-border: #aaa;
   --color-border-light: #ccc;

@@ -67,7 +67,7 @@ export class DisplayItem {
 
   makeTextNode(str, x, y, cls) {
     const text = createSvgElement('text');
-    text.appendChild(document.createTextNode(str));
+    if (str) text.appendChild(document.createTextNode(str));
     text.setAttribute('class', cls);
     text.setAttribute('x', x);
     text.setAttribute('y', y);
@@ -220,6 +220,7 @@ export class CellValueDisplay extends DisplayItem {
 
     this._valueFn = valueFn || (v => v);
     this._valueMap = [];
+    this._valueOffsets = [];
   }
 
   reshape(shape) {
@@ -228,6 +229,29 @@ export class CellValueDisplay extends DisplayItem {
     for (let i = 0; i <= shape.numValues; i++) {
       this._valueMap.push(this._valueFn(i));
     }
+
+    this._valueOffsets = this._calculateMultiValueLayout(shape);
+  }
+
+  _calculateMultiValueLayout(shape) {
+    // Pre-compute multi-value layout parameters.
+    const lineHeight = shape.gridSize <= SHAPE_9x9.gridSize ? 17 : 10;
+    const valuesPerLine = Math.ceil(Math.sqrt(shape.numValues));
+    const yOffset = -DisplayItem.CELL_SIZE / 2 + 2;
+    const charWidth = shape.gridSize <= SHAPE_9x9.gridSize ? 9 : 6;
+    const totalWidth = (valuesPerLine * 2 - 1) * charWidth;
+    const xOffset = (-totalWidth + charWidth) / 2;
+    // Position offsets [dx, dy] for each value (1-indexed).
+    const valueOffsets = [null]; // index 0 unused
+    for (let v = 1; v <= shape.numValues; v++) {
+      const col = (v - 1) % valuesPerLine;
+      const row = (v - 1) / valuesPerLine | 0;
+      valueOffsets.push([
+        xOffset + col * 2 * charWidth,
+        yOffset + row * lineHeight,
+      ]);
+    }
+    return valueOffsets;
   }
 
   static makeGivensMask() {
@@ -265,69 +289,43 @@ export class CellValueDisplay extends DisplayItem {
     return square;
   }
 
-  renderGridValues(grid) {
+  renderGridValues(grid, colorFn) {
     this.clear();
     const svg = this.getSvg();
 
     for (let i = 0; i < grid.length; i++) {
       const value = grid[i];
       if (!value) continue;
-      svg.append(this.makeGridValue(i, value));
+      svg.append(this.makeGridValue(i, value, colorFn));
     }
   }
 
-  makeGridValue(cellIndex, value) {
+  makeGridValue(cellIndex, value, colorFn) {
     const [x, y] = this.cellIndexCenter(cellIndex);
 
     if (isIterable(value)) {
-      const LINE_HEIGHT = this._shape.gridSize <= SHAPE_9x9.gridSize ? 17 : 10;
-      const START_OFFSET = -DisplayItem.CELL_SIZE / 2 + 2;
+      const valueMap = this._valueMap;
+      const valueOffsets = this._valueOffsets;
 
       const g = createSvgElement('g');
-      let offset = START_OFFSET;
-      for (const line of this._formatMultiSolution(value)) {
-        g.append(this.makeTextNode(
-          line, x, y + offset, this.constructor.MULTI_VALUE_CLASS));
-        offset += LINE_HEIGHT;
+      g.classList.add(this.constructor.MULTI_VALUE_CLASS);
+      for (const v of value) {
+        const [dx, dy] = valueOffsets[v];
+        const text = createSvgElement('text');
+        text.setAttribute('x', x + dx);
+        text.setAttribute('y', y + dy);
+        const color = colorFn?.(cellIndex, v);
+        if (color) text.setAttribute('fill', color);
+        text.textContent = valueMap[v];
+        g.append(text);
       }
       return g;
-    } else if (value) {
-      return this.makeTextNode(
-        value, x, y, this.constructor.SINGLE_VALUE_CLASS);
     }
 
+    if (value) {
+      return this.makeTextNode(value, x, y, this.constructor.SINGLE_VALUE_CLASS);
+    }
     return null;
-  }
-
-  static _makeTemplateArray = memoize((shape) => {
-    const numbersPerLine = Math.ceil(Math.sqrt(shape.numValues));
-    const charsPerLine = 2 * numbersPerLine - 1;
-
-    let charCount = 0;
-    const slots = [];
-    for (let i = 1; i <= shape.numValues; i++) {
-      const slot = i < 10 ? ' ' : '  ';
-      slots.push(slot);
-      charCount += slot.length + 1;
-
-      if (charCount >= charsPerLine) {
-        slots.push('\n');
-        charCount = 0;
-      } else {
-        slots.push(' ');
-      }
-    }
-
-    return slots;
-  });
-
-  _formatMultiSolution(values) {
-    const valueMap = this._valueMap;
-    const slots = [...this.constructor._makeTemplateArray(this._shape)];
-    for (const v of values) {
-      slots[v * 2 - 2] = valueMap[v];
-    }
-    return slots.join('').split(/\n/);
   }
 }
 
@@ -610,7 +608,8 @@ export class SolutionDisplay extends CellValueDisplay {
   // Display solution on grid.
   //  - If solution cell contains a container then it will be displayed as
   //    pencilmarks.
-  setSolution(solution) {
+  //  - colorFn(cellIndex, value): optional function returning color for a candidate.
+  setSolution(solution, colorFn) {
     solution = solution || [];
     this._currentSolution = solution.slice();
 
@@ -628,7 +627,7 @@ export class SolutionDisplay extends CellValueDisplay {
       return;
     }
 
-    this.renderGridValues(solution);
+    this.renderGridValues(solution, colorFn);
 
     if (this._copyElem) {
       this._copyElem.disabled = (

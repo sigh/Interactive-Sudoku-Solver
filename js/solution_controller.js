@@ -492,7 +492,8 @@ export class SolutionController {
       return;
     }
 
-    this._solutionDisplay.setSolution(result.solution);
+    const colorFn = this._makeCandidateColorFn(result);
+    this._solutionDisplay.setSolution(result.solution, colorFn);
 
     if (result.highlightCells) {
       this._stepHighlighter.setCells(result.highlightCells);
@@ -501,6 +502,19 @@ export class SolutionController {
     if (result.diff) {
       this._diffDisplay.renderGridValues(result.diff);
     }
+  }
+
+  _makeCandidateColorFn(result) {
+    const counts = result.counts;
+    const threshold = result.threshold;
+    if (!counts || threshold <= 1) return null;
+
+    return (cellIndex, value) => {
+      const count = counts[cellIndex]?.[value - 1];
+      if (!count || count >= threshold) return null;
+      if (count === 1) return 'var(--color-candidate-unique)';
+      return 'var(--color-candidate-rare)';
+    };
   }
 
   _handleIterationChange(state) {
