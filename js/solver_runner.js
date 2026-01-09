@@ -173,6 +173,8 @@ class AllPossibilitiesModeHandler extends ModeHandler {
     if (i == 0) return {
       solution: this._pencilmarks,
       description: 'All possibilities',
+      counts: this._counts,
+      threshold: this._candidateSupportThreshold,
     }
     return super.get(i - 1);
   }
