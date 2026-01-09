@@ -96,6 +96,11 @@ class ModeHandler {
     this._listener = fn;
   }
 
+  // Returns true if the threshold change was handled, false if re-solve needed.
+  setCandidateSupportThreshold(candidateSupportThreshold) {
+    return false;
+  }
+
   handleSolverException(e) {
     // If the solver was terminated, then don't show an error.
     if (!e.toString().startsWith('Aborted')) {
@@ -116,13 +121,23 @@ class AllPossibilitiesModeHandler extends ModeHandler {
   constructor(candidateSupportThreshold) {
     super();
     this._pencilmarks = [];
-    this._candidateSupportThreshold = candidateSupportThreshold || 1;
+    this._solverThreshold = candidateSupportThreshold || 1;
+    this._displayThreshold = this._solverThreshold;
     this._counts = [];
+  }
+
+  setCandidateSupportThreshold(candidateSupportThreshold) {
+    if (candidateSupportThreshold <= this._solverThreshold) {
+      this._displayThreshold = candidateSupportThreshold;
+      this._listener();
+      return true;
+    }
+    return false;
   }
 
   async run(solver) {
     await super.run(solver);
-    await this._solver.solveAllPossibilities(this._candidateSupportThreshold);
+    await this._solver.solveAllPossibilities(this._solverThreshold);
   }
 
   maxIndex() {
@@ -175,7 +190,7 @@ class AllPossibilitiesModeHandler extends ModeHandler {
       solution: this._pencilmarks,
       description: 'All possibilities',
       counts: this._counts,
-      threshold: this._candidateSupportThreshold,
+      threshold: this._displayThreshold,
     }
     return super.get(i - 1);
   }
@@ -195,7 +210,7 @@ class AllSolutionsModeHandler extends ModeHandler {
   }
 
   async run(solver) {
-    super.run(solver);
+    await super.run(solver);
     await this._fetchSolutions();
   }
 
@@ -448,6 +463,7 @@ export class SolverRunner {
     this._session = null;
     this._handler = null;
     this._isSolving = false;
+    this._candidateSupportThreshold = 1;
 
     // Iteration state
     this._index = 0;
@@ -461,6 +477,12 @@ export class SolverRunner {
     return this._isSolving;
   }
 
+  // Returns true if the threshold change was handled, false if re-solve needed.
+  setCandidateSupportThreshold(candidateSupportThreshold) {
+    this._candidateSupportThreshold = candidateSupportThreshold;
+    return this._handler?.setCandidateSupportThreshold(candidateSupportThreshold);
+  }
+
   // --- Solver control ---
 
   async solve(constraints, options = {}) {
@@ -468,7 +490,6 @@ export class SolverRunner {
 
     const mode = options.mode || DEFAULT_MODE;
     const debugHandler = options.debugHandler || null;
-    const candidateSupportThreshold = options.candidateSupportThreshold || 1;
 
     const session = new SolverSession();
     this._session = session;
@@ -479,7 +500,7 @@ export class SolverRunner {
       return;
     }
 
-    const handler = new handlerClass(candidateSupportThreshold);
+    const handler = new handlerClass(this._candidateSupportThreshold);
     this._handler = handler;
 
     // Reset iteration state
@@ -517,8 +538,10 @@ export class SolverRunner {
     // Set up handler update listener
     handler.setUpdateListener(() => this._update());
 
-    // Run the handler
-    handler.run(session.getSolver()).catch(handler.handleSolverException);
+    // Run the handler (if session wasn't aborted during setup)
+    if (!session.isAborted()) {
+      handler.run(solver).catch(handler.handleSolverException);
+    }
 
     // Initial update
     this._update();
