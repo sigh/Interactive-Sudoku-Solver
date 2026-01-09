@@ -107,7 +107,8 @@ class ModeHandler {
 class AllPossibilitiesModeHandler extends ModeHandler {
   static NAME = 'all-possibilities';
   static DESCRIPTION =
-    'Show all values which are present in any valid solution.';
+    `Show all values which are present in any valid solution.
+     Values are colored by how many solutions they are in.`;
 
   ITERATION_CONTROLS = true;
   ALLOW_DOWNLOAD = true;

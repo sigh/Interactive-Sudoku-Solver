@@ -270,7 +270,10 @@ export class SolutionController {
     }
 
     this._elements.mode.onchange = () => this._update();
-    this._elements.candidateSupportThreshold.onchange = () => this._update();
+    const thresholdInput = this._elements.candidateSupportThreshold;
+    const thresholdValue = thresholdInput.nextElementSibling;
+    thresholdInput.oninput = () => thresholdValue.textContent = thresholdInput.value;
+    thresholdInput.onchange = () => this._update();
     this._elements.stop.onclick = () => this._solverRunner.abort();
     this._elements.solve.onclick = () => this._solve();
 
@@ -278,7 +281,8 @@ export class SolutionController {
     this._setUpKeyBindings(displayContainer);
     this._setUpIterationControls();
 
-    autoSaveField(this._elements.candidateSupportThreshold);
+    autoSaveField(thresholdInput);
+    thresholdInput.oninput();
 
     this._historyHandler = new HistoryHandler((params) => {
       const mode = params.get('mode');

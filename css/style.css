@@ -22,7 +22,7 @@
   /* Colors - Candidate support levels */
 
   /* Green - exactly 1 solution */
-  --color-candidate-unique: #22c55e;
+  --color-candidate-unique: #01ad40;
   /* Orange - < threshold solutions */
   --color-candidate-rare: #f97316;
 
@@ -566,6 +566,17 @@ button.icon-button,
 input[type=number] {
   width: 4.5em;
   height: 1.6em;
+}
+
+#candidate-support-threshold-container div {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+#candidate-support-threshold-container input {
+  width: 100%;
+  cursor: pointer;
 }
 
 input[disabled]+label {
