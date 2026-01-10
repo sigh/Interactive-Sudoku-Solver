@@ -57,6 +57,7 @@ layout: null
             <li><a href="#successor-arrow">Successor Arrow</a></li>
             <li><a href="#flatmates">Flatmates</a></li>
             <li><a href="#odd-even-lots">Odd/Even Lots</a></li>
+            <li><a href="#flexible-sum">Flexible Sum</a></li>
             <li><a href="#general-skyscraper">General Skyscraper</a></li>
             <li><a href="#ambiguous-arrow">Ambiguous Arrow</a></li>
           </ul>
@@ -322,6 +323,60 @@ function transition(state, value) {
 function accept(state) {
   return state.remaining == 0;
 }</pre>
+        </p>
+
+        <h3 id="flexible-sum">Flexible Sum</h3>
+        <p>
+          <b>Description:</b>
+          A set of cells where the sum must satisfy a custom condition.
+          Use this when you need sum constraints beyond what the built-in
+          <code>Cage</code> supports — such as parity, ranges, or multiple
+          possible totals.
+        </p>
+
+        <p>
+          Implement this by configuring a state machine in the
+          "Custom JavaScript constraints" panel. Select the cells in the set.
+          The <code>transition</code> function accumulates the sum, and the
+          <code>accept</code> function defines your condition:
+        <pre>
+startState = 0;
+
+function transition(state, value) {
+  // Limit avoids infinite states (max sum in a 9-cell region)
+  // Increase if you need to support larger regions
+  if (state <= 45) return state + value;
+}
+
+function accept(state) {
+  // Customize this condition (see examples below)
+  return state < 10;
+}</pre>
+        </p>
+        <p>
+          Examples of <code>accept</code> conditions:
+        </p>
+        <pre>
+// Sum within a range
+return state >= 10 && state <= 20;
+
+// One of several possible sums
+return [15, 20, 25].includes(state);
+
+// Even sum
+return state % 2 === 0;
+
+// Odd sum
+return state % 2 === 1;</pre>
+        <p>
+          This allows duplicate values. If you need all values to be
+          distinct, overlay an <code>All Different</code> constraint from the
+          "Lines & Sets" panel on the same cells.
+        </p>
+
+        <p>
+          If you want the values to be restricted as well, then you can filter
+          out unwanted values in the <code>transition</code> function.
         </p>
 
         <h3 id="general-skyscraper">General Skyscraper</h3>
