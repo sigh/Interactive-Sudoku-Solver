@@ -12,6 +12,7 @@ class Sandbox {
     this.editorElement = document.getElementById('editor');
     this.outputElement = document.getElementById('output');
     this.errorElement = document.getElementById('error-output');
+    this.statusElement = document.getElementById('status-output');
     this.constraintElement = document.getElementById('constraint-string');
     this.solverLinkElement = document.getElementById('open-solver-link');
     this.examplesSelect = document.getElementById('examples-select');
@@ -98,6 +99,7 @@ class Sandbox {
 
   _initEventListeners() {
     document.getElementById('run-btn').addEventListener('click', () => this.runCode());
+    document.getElementById('run-abort-btn').addEventListener('click', () => this.abortCode());
     document.getElementById('clear-btn').addEventListener('click', () => this.clear());
     document.getElementById('copy-btn').addEventListener('click', () => this._copyConstraint());
     document.getElementById('share-btn').addEventListener('click', () => this._copyShareableLink());
@@ -127,22 +129,43 @@ class Sandbox {
   }
 
   async runCode() {
-    const btn = document.getElementById('run-btn');
-    const spinner = btn.querySelector('.spinner');
+    const runBtn = document.getElementById('run-btn');
+    const abortBtn = document.getElementById('run-abort-btn');
+    const spinner = runBtn.querySelector('.spinner');
 
-    btn.disabled = true;
+    runBtn.disabled = true;
+    abortBtn.disabled = false;
     spinner.classList.add('active');
     this.errorElement.textContent = '';
     this.constraintElement.textContent = '';
+    this.outputElement.textContent = '';
+    this.statusElement.textContent = '';
 
     const code = this.jar.toString();
 
+    // Callbacks for streaming updates.
+    const callbacks = {
+      onLog: (text) => {
+        if (this.outputElement.textContent) {
+          this.outputElement.textContent += '\n';
+        }
+        this.outputElement.textContent += text;
+        // Auto-scroll to bottom.
+        this.outputElement.scrollTop = this.outputElement.scrollHeight;
+      },
+      onStatus: (text) => {
+        this.statusElement.textContent = text;
+      },
+    };
+
+    // Store current execution ID for abort
+    const executionId = this._userScriptExecutor.runSandboxCode(code, callbacks);
+    this._currentExecution = executionId;
+
     try {
-      const { constraintStr, logs } = await this._userScriptExecutor.runSandboxCode(code);
+      const { constraintStr } = await executionId;
 
-      this.outputElement.textContent = logs.join('\n');
-
-      if (constraintStr != null) {
+      if (constraintStr) {
         this.constraintElement.textContent = constraintStr;
 
         const url = `./?q=${encodeURIComponent(constraintStr)}`;
@@ -151,19 +174,27 @@ class Sandbox {
 
         this._gridPreview.render(constraintStr);
       } else {
+        // Empty return value - don't invoke solver, just hide preview.
         this.constraintElement.textContent = '';
         this.solverLinkElement.style.display = 'none';
         this._gridPreview.hide();
       }
     } catch (err) {
-      const logs = err.logs || [];
-      this.outputElement.textContent = logs.join('\n');
       this.errorElement.textContent = `Error: ${err.message || err}`;
       this.solverLinkElement.style.display = 'none';
       this._gridPreview.hide();
     } finally {
-      btn.disabled = false;
+      this._currentExecution = null;
+      runBtn.disabled = false;
+      abortBtn.disabled = true;
       spinner.classList.remove('active');
+    }
+  }
+
+  abortCode() {
+    if (this._currentExecution) {
+      this._userScriptExecutor.abort();
+      this._currentExecution = null;
     }
   }
 
@@ -171,6 +202,7 @@ class Sandbox {
     this.jar.updateCode('');
     this.outputElement.textContent = '';
     this.errorElement.textContent = '';
+    this.statusElement.textContent = '';
     this.constraintElement.textContent = '';
     this.solverLinkElement.style.display = 'none';
     this._gridPreview.hide();

@@ -65,7 +65,7 @@ body {
   align-self: center;
 }
 
-#sudoku-grid .click-interceptor-svg {
+.click-interceptor-svg {
   z-index: 100;
   position: absolute;
   top: 0;

@@ -33,14 +33,42 @@ const waitForMessage = async (predicate, timeout = 1000) => {
 };
 
 // Helper to send a message to the worker and wait for response
+// Also collects streaming messages (logs, status) for runSandboxCode
 const sendMessage = async (type, payload) => {
   const id = Date.now() + Math.random();
-  const responsePromise = waitForMessage(m => m.id === id);
+  const streamedLogs = [];
+  const streamedStatus = [];
+
+  // For runSandboxCode, include id in payload so worker can send streaming messages
+  const fullPayload = type === 'runSandboxCode' ? { ...payload, id } : payload;
+
+  const responsePromise = waitForMessage(m => m.id === id && (m.result !== undefined || m.error !== undefined));
+
+  // Collect streaming messages
+  const collectStreaming = () => {
+    for (const msg of messages) {
+      if (msg.id === id) {
+        if (msg.type === 'log' && !streamedLogs.includes(msg.text)) {
+          streamedLogs.push(msg.text);
+        }
+        if (msg.type === 'status' && !streamedStatus.includes(msg.text)) {
+          streamedStatus.push(msg.text);
+        }
+      }
+    }
+  };
 
   // Simulate onmessage event
-  await globalThis.onmessage({ data: { id, type, payload } });
+  await globalThis.onmessage({ data: { id, type, payload: fullPayload } });
 
-  return responsePromise;
+  const response = await responsePromise;
+  collectStreaming();
+
+  // Attach streaming data to response for tests
+  response.streamedLogs = streamedLogs;
+  response.streamedStatus = streamedStatus;
+
+  return response;
 };
 
 // Test Suite
@@ -205,7 +233,7 @@ console.log('Worker is ready.');
   const response = await sendMessage('runSandboxCode', { code });
   assert.equal(response.error, undefined);
   assert.equal(response.result.constraintStr, "ConstraintString");
-  assert.ok(response.result.logs.some(l => l.includes("Hello from sandbox")));
+  assert.ok(response.streamedLogs.some(l => l.includes("Hello from sandbox")));
 }
 
 // Test 4: runSandboxCode with error
@@ -218,7 +246,7 @@ console.log('Worker is ready.');
   const response = await sendMessage('runSandboxCode', { code });
   assert.ok(response.error);
   assert.ok(response.error.includes("Sandbox Error"));
-  assert.ok(response.logs.some(l => l.includes("About to fail")));
+  assert.ok(response.streamedLogs.some(l => l.includes("About to fail")));
 }
 
 // Test 5: convertUnifiedToSplit extracts maxDepth
@@ -257,6 +285,58 @@ console.log('Worker is ready.');
   const response = await sendMessage('convertUnifiedToSplit', { code });
   assert.equal(response.error, undefined);
   assert.equal(response.result.maxDepthExpression, '');
+}
+
+// Test 7: runSandboxCode with console.info for status
+{
+  console.log('Test: runSandboxCode with console.info for status');
+  const code = `
+    console.info("Status update 1");
+    console.info("Status update 2");
+    return null;
+  `;
+  const response = await sendMessage('runSandboxCode', { code });
+  assert.equal(response.error, undefined);
+  assert.ok(response.streamedStatus.some(s => s.includes("Status update 1")));
+  assert.ok(response.streamedStatus.some(s => s.includes("Status update 2")));
+}
+
+// Test 8: runSandboxCode with extendTimeoutMs
+{
+  console.log('Test: runSandboxCode with extendTimeoutMs');
+  const code = `
+    extendTimeoutMs(5000);
+    console.log("Extended timeout");
+    return null;
+  `;
+  const response = await sendMessage('runSandboxCode', { code });
+  assert.equal(response.error, undefined);
+  // Check that extendTimeout message was sent
+  const extendMsg = messages.find(m => m.type === 'extendTimeout' && m.ms === 5000);
+  assert.ok(extendMsg, 'extendTimeoutMs message should be sent');
+}
+
+// Test 9: runSandboxCode with empty return (null)
+{
+  console.log('Test: runSandboxCode with empty return');
+  const code = `
+    console.log("No constraint returned");
+    return null;
+  `;
+  const response = await sendMessage('runSandboxCode', { code });
+  assert.equal(response.error, undefined);
+  assert.equal(response.result.constraintStr, null);
+}
+
+// Test 10: runSandboxCode with undefined return
+{
+  console.log('Test: runSandboxCode with undefined return');
+  const code = `
+    console.log("Implicit undefined return");
+  `;
+  const response = await sendMessage('runSandboxCode', { code });
+  assert.equal(response.error, undefined);
+  assert.equal(response.result.constraintStr, null);
 }
 
 console.log('user_script_worker.test.js passed!');
