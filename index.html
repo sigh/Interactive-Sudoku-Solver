@@ -423,10 +423,14 @@ layout: null
               <div id="state-machine-tab" class="tab-content">
                 <div class="description">
                   <p>
-                    Define an finite-state machine using JavaScript transition
+                    Define a finite-state machine using JavaScript transition
                     and accept functions. The constraint will be satisfied
                     the state-machine reaches an accept state after processing
                     the cells in order.
+                  </p>
+                  <p>
+                    <code>NUM_CELLS</code> can be used but will make the NFA
+                    specific to the number of currently selected cells.
                   </p>
                   <p>
                     Tip: You can use <code>console.log</code> to debug your
@@ -480,6 +484,17 @@ layout: null
                       <textarea id="state-machine-accept-body" rows="2" name="accept-body" spellcheck="false"
                         placeholder='return state === "next";'></textarea>
                       <code>}</code>
+                    </div>
+                    <div>
+                      <div class="description">
+                        <code>// Maximum depth for state creation (optional).</code>
+                      </div>
+                      <span>
+                        <code>maxDepth = </code>
+                        <textarea id="state-machine-max-depth" name="max-depth" rows="1" placeholder="Infinity"
+                          spellcheck="false" class="inline-code"></textarea>
+                        <code>;</code>
+                      </span>
                     </div>
                   </div>
                   <div id="state-machine-unified-input" class="constraint-code" style="display: none;">

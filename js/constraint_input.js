@@ -1076,7 +1076,7 @@ ConstraintCategoryInput.StateMachine = class StateMachine extends JavaScriptCate
     this._userScriptExecutor = userScriptExecutor;
 
     this._codeFieldNames = [
-      'start-state', 'transition-body', 'accept-body', 'unified-code'];
+      'start-state', 'transition-body', 'accept-body', 'max-depth', 'unified-code'];
 
     this._splitContainer = document.getElementById('state-machine-split-input');
     this._unifiedContainer = document.getElementById('state-machine-unified-input');
@@ -1089,8 +1089,9 @@ ConstraintCategoryInput.StateMachine = class StateMachine extends JavaScriptCate
   }
 
   // Convert split field values to unified code.
-  _splitToUnified(startExpression, transitionBody, acceptBody) {
+  _splitToUnified(startExpression, transitionBody, acceptBody, maxDepthExpression) {
     const indent = (s) => s.replace(/^/gm, '  ');
+    const maxDepthLine = maxDepthExpression ? `\n\nmaxDepth = ${maxDepthExpression};` : '';
     return `
       startState = ${startExpression};
 
@@ -1100,7 +1101,7 @@ ConstraintCategoryInput.StateMachine = class StateMachine extends JavaScriptCate
 
       function accept(state) {
       ${indent(acceptBody)}
-      }
+      }${maxDepthLine}
     `.trim().replace(/^ {6}/gm, '');
   }
 
@@ -1136,15 +1137,17 @@ ConstraintCategoryInput.StateMachine = class StateMachine extends JavaScriptCate
           form['unified-code'].value = this._splitToUnified(
             form['start-state'].value,
             form['transition-body'].value,
-            form['accept-body'].value);
+            form['accept-body'].value,
+            form['max-depth'].value);
         } else {
           // Unified → Split: parse then extract.
-          const { startExpression, transitionBody, acceptBody } =
+          const { startExpression, transitionBody, acceptBody, maxDepthExpression } =
             await this._userScriptExecutor.convertUnifiedToSplit(
               form['unified-code'].value);
           form['start-state'].value = startExpression;
           form['transition-body'].value = transitionBody;
           form['accept-body'].value = acceptBody;
+          form['max-depth'].value = maxDepthExpression;
         }
       } catch (e) {
         // If parsing fails, keep existing values.
@@ -1164,7 +1167,8 @@ ConstraintCategoryInput.StateMachine = class StateMachine extends JavaScriptCate
             : {
               startExpression: formData.get('start-state'),
               transitionBody: formData.get('transition-body'),
-              acceptBody: formData.get('accept-body')
+              acceptBody: formData.get('accept-body'),
+              maxDepthExpression: formData.get('max-depth'),
             };
 
           const shape = this._shape || SudokuConstraint.Shape.DEFAULT_SHAPE;
