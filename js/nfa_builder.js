@@ -66,7 +66,9 @@ export class NFA {
   addState() {
     this._assertUnsealed();
     if (this._stateLimit !== null && this._transitions.length >= this._stateLimit) {
-      throw new Error(`NFA exceeded state limit of ${this._stateLimit}`);
+      throw new Error(
+        `State limit of ${this._stateLimit} exceeded. ` +
+        'Ensure the state machine is finite, or try setting maxDepth.');
     }
     this._transitions.push([]);
     return this._transitions.length - 1;
@@ -376,32 +378,68 @@ export class NFA {
     return reachable;
   }
 
-  // Removes dead states - states from which no accept state is reachable.
+  // BFS from start states, returns array where [i] = min depth from start (Infinity if unreachable).
+  _computeDepthsFromStart() {
+    const numStates = this._transitions.length;
+    const depths = new Array(numStates).fill(Infinity);
+    let currentLevel = [...this._startIds];
+
+    for (const id of currentLevel) depths[id] = 0;
+
+    for (let depth = 0; currentLevel.length; depth++) {
+      const nextLevel = [];
+      for (const stateId of currentLevel) {
+        const transitions = this._transitions[stateId];
+        for (let symbolIndex = 0; symbolIndex < transitions.length; symbolIndex++) {
+          const targets = transitions[symbolIndex];
+          if (!targets) continue;
+          for (const target of targets) {
+            if (depths[target] === Infinity) {
+              depths[target] = depth + 1;
+              nextLevel.push(target);
+            }
+          }
+        }
+      }
+      currentLevel = nextLevel;
+    }
+    return depths;
+  }
+
+  // Removes dead states - states that can't be part of a valid path within maxDepth.
+  // A state is dead if: depthFromStart + distanceToAccept > maxDepth
   // Must be called after epsilon transitions have been closed over.
-  removeDeadStates({ forward = true, backward = true } = {}) {
+  removeDeadStates({ maxDepth = Infinity, allStatesAreReachable = false } = {}) {
     this._assertSealed();
     this._assertNoEpsilon();
 
     const numStates = this.numStates();
+    if (numStates === 0) return;
 
-    let deadStates = new Set();
-    const findDeadStates = (nfa) => {
-      const reachableStates = nfa._reachableFromStart();
-      if (reachableStates.size < this.numStates()) {
-        for (let i = 0; i < numStates; i++) {
-          if (!reachableStates.has(i)) {
-            deadStates.add(i);
-          }
-        }
+    // Maximum valid path length is 2*(numStates-1): start to some state, then to accept.
+    // Any maxDepth beyond this is equivalent to unbounded.
+    const maxValidPath = 2 * numStates - 2;
+    const effectiveMaxDepth = Math.min(maxDepth, maxValidPath);
+
+    // Always compute backward distances. Reversed NFA has accept states as
+    // starts - BFS from those gives distances to accept.
+    const distToAccept = this._createReversed()._computeDepthsFromStart();
+
+    // Compute forward depths only if needed:
+    // - When !allStatesAreReachable: need to detect unreachable states
+    // - When effectiveMaxDepth < maxValidPath: the sum check might filter reachable states
+    const depths = (!allStatesAreReachable || effectiveMaxDepth < maxValidPath)
+      ? this._computeDepthsFromStart()
+      : null;
+
+    // Find dead states: d + distToAccept > effectiveMaxDepth
+    // Works with Infinity because effectiveMaxDepth is always finite.
+    const deadStates = new Set();
+    for (let i = 0; i < numStates; i++) {
+      const d = depths ? depths[i] : 0;
+      if (d + distToAccept[i] > effectiveMaxDepth) {
+        deadStates.add(i);
       }
-    };
-
-    if (forward) {
-      findDeadStates(this);
-    }
-
-    if (backward) {
-      findDeadStates(this._createReversed());
     }
 
     if (deadStates.size === 0) return;
@@ -568,7 +606,10 @@ export const javascriptSpecToNFA = (config, numSymbols) => {
   const nfa = builder.build();
 
   // Javascript NFA builder never generates states unreachable from the start.
-  optimizeNFA(nfa, { allStatesAreReachable: true });
+  optimizeNFA(nfa, {
+    allStatesAreReachable: true,
+    maxDepth: config.maxDepth ?? Infinity,
+  });
 
   return nfa;
 }
@@ -618,9 +659,9 @@ function accept(state) {
 }`;
 };
 
-export const optimizeNFA = (nfa, { allStatesAreReachable = false } = {}) => {
+export const optimizeNFA = (nfa, { allStatesAreReachable = false, maxDepth = Infinity } = {}) => {
   nfa.closeOverEpsilonTransitions();
-  nfa.removeDeadStates({ forward: !allStatesAreReachable });
+  nfa.removeDeadStates({ maxDepth, allStatesAreReachable });
   nfa.reduceBySimulation();
 }
 
@@ -1298,11 +1339,12 @@ class RegexToNFABuilder {
 
 export class JavascriptNFABuilder {
   constructor(definition, numValues) {
-    const { startState, transition, accept } = definition;
+    const { startState, transition, accept, maxDepth } = definition;
     this._startState = startState;
     this._transitionFn = transition;
     this._acceptFn = accept;
     this._numValues = numValues;
+    this._maxDepth = maxDepth ?? Infinity;
   }
 
   build() {
@@ -1321,28 +1363,37 @@ export class JavascriptNFABuilder {
     const transitionFn = this._wrapTransitionFn(this._transitionFn);
     const acceptFn = this._wrapAcceptFn(this._acceptFn);
 
-    const stack = [];
+    // BFS by processing all states at each progressive depth level.
+    let currentLevel = [];
+    let depth = 0;
 
     const startStateStrs = this._generateStartStatesFromValue(this._startState);
     for (const startStateStr of startStateStrs) {
       const index = addState(startStateStr, acceptFn(startStateStr));
-      stack.push(index);
+      currentLevel.push(index);
       nfa.addStartId(index);
     }
 
-    while (stack.length) {
-      const index = stack.pop();
-      const stateStr = indexToStateStr[index];
-      for (let value = 1; value <= this._numValues; value++) {
-        const nextStateStrs = transitionFn(stateStr, value);
-        for (const nextStateStr of nextStateStrs) {
-          if (!stateStrToIndex.has(nextStateStr)) {
-            stack.push(addState(nextStateStr, acceptFn(nextStateStr)));
+    while (currentLevel.length) {
+      let nextLevel = [];
+      for (const index of currentLevel) {
+        const stateStr = indexToStateStr[index];
+        for (let value = 1; value <= this._numValues; value++) {
+          const nextStateStrs = transitionFn(stateStr, value);
+          for (const nextStateStr of nextStateStrs) {
+            let targetIndex = stateStrToIndex.get(nextStateStr);
+            if (targetIndex === undefined) {
+              // New state: only add if we haven't reached maxDepth
+              if (depth >= this._maxDepth) continue;
+              targetIndex = addState(nextStateStr, acceptFn(nextStateStr));
+              nextLevel.push(targetIndex);
+            }
+            nfa.addTransition(index, targetIndex, new NFA.Symbol(value));
           }
-          const targetIndex = stateStrToIndex.get(nextStateStr);
-          nfa.addTransition(index, targetIndex, new NFA.Symbol(value));
         }
       }
+      currentLevel = nextLevel;
+      depth++;
     }
 
     nfa.seal();
