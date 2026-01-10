@@ -422,6 +422,69 @@ await runTest('javascriptSpecToNFA should merge equivalent states', () => {
   // We can't easily check exact state count, but we can verify correctness.
 });
 
+await runTest('JavascriptNFABuilder maxDepth should limit state exploration depth', () => {
+  // Without maxDepth, this would create infinite states (unbounded counter).
+  // With maxDepth=3, we only explore up to depth 3.
+  const nfa = javascriptSpecToNFA({
+    startState: 0,
+    transition: (state, value) => state + 1,
+    accept: (state) => state >= 3,
+    maxDepth: 3,
+  }, 2);
+
+  // Should have limited states due to maxDepth.
+  assert.ok(nfa.numStates() <= 5, 'maxDepth should limit state count');
+  expectAccepts(nfa, [1, 1, 1], 'should accept path to depth 3');
+  // Beyond maxDepth, no new states are created, so longer paths may not work
+  // unless they loop back to existing states.
+});
+
+await runTest('JavascriptNFABuilder maxDepth should still add transitions to existing states', () => {
+  // Modular arithmetic creates cycles. At maxDepth, transitions to
+  // existing states should still be added to enable state merging.
+  const nfa = javascriptSpecToNFA({
+    startState: 0,
+    transition: (state, value) => (state + 1) % 4,
+    accept: (state) => state === 0,
+    maxDepth: 5,
+  }, 2);
+
+  // The cycle is 0 -> 1 -> 2 -> 3 -> 0, so state 3 should have
+  // transition back to state 0 even though depth >= maxDepth at state 3.
+  expectAccepts(nfa, [], 'start state is accepting');
+  expectAccepts(nfa, [1, 1, 1, 1], 'should accept full cycle back to 0');
+  expectRejects(nfa, [1], 'should reject at state 1');
+  expectRejects(nfa, [1, 1], 'should reject at state 2');
+});
+
+await runTest('JavascriptNFABuilder maxDepth Infinity should behave like no limit', () => {
+  // With maxDepth=Infinity, bounded state space should still work normally.
+  const nfa = javascriptSpecToNFA({
+    startState: 0,
+    transition: (state, value) => (state + 1) % 3,
+    accept: (state) => state === 2,
+    maxDepth: Infinity,
+  }, 2);
+
+  assert.equal(nfa.numStates(), 3, 'should create all 3 states');
+  expectAccepts(nfa, [1, 1], 'should accept at state 2');
+  expectRejects(nfa, [1], 'should reject at state 1');
+});
+
+await runTest('JavascriptNFABuilder maxDepth 0 should only have start states', () => {
+  // maxDepth=0 means no transitions from start states create new states.
+  const nfa = javascriptSpecToNFA({
+    startState: 0,
+    transition: (state, value) => state + 1,
+    accept: (state) => state === 0,
+    maxDepth: 0,
+  }, 2);
+
+  assert.equal(nfa.numStates(), 1, 'should only have start state');
+  expectAccepts(nfa, [], 'start state is accepting');
+  expectRejects(nfa, [1], 'no transitions to new states');
+});
+
 await runTest('closeOverEpsilonTransitions should inline reachable transitions', () => {
   // Build: state0 --epsilon--> state1 --[1]--> state2
   const nfa = new NFA();
@@ -786,6 +849,125 @@ await runTest('removeDeadStates with self-loop on dead state', () => {
   expectAccepts(nfa, [2], 'should still accept valid input');
   expectRejects(nfa, [1], 'dead state path should reject');
   expectRejects(nfa, [1, 1, 1], 'self-loop on dead state should reject');
+});
+
+await runTest('removeDeadStates with maxDepth should prune states too far from accept', () => {
+  // state0 --[1]--> state1 --[1]--> state2 --[1]--> state3 (accepting)
+  // With maxDepth=2, state0 needs 3 steps to reach accept, so path is dead.
+  const nfa = new NFA();
+  nfa.addState();
+  nfa.addState();
+  nfa.addState();
+  nfa.addState();
+  nfa.addStartId(0);
+  nfa.addAcceptId(3);
+  nfa.addTransition(0, 1, Symbol(1));
+  nfa.addTransition(1, 2, Symbol(1));
+  nfa.addTransition(2, 3, Symbol(1));
+
+  nfa.seal();
+  nfa.removeDeadStates({ maxDepth: 2 });
+
+  // depth[0]=0, depth[1]=1, depth[2]=2, depth[3]=3
+  // distToAccept[0]=3, distToAccept[1]=2, distToAccept[2]=1, distToAccept[3]=0
+  // State 0: 0+3=3 > 2 → dead
+  // State 1: 1+2=3 > 2 → dead
+  // State 2: 2+1=3 > 2 → dead
+  // State 3: 3+0=3 > 2 → dead (can't even reach it in time)
+  assert.equal(nfa.numStates(), 0, 'all states should be pruned');
+});
+
+await runTest('removeDeadStates with maxDepth should keep states within depth budget', () => {
+  // state0 --[1]--> state1 --[1]--> state2 (accepting)
+  // With maxDepth=2, state0 can reach accept in 2 steps.
+  const nfa = new NFA();
+  nfa.addState();
+  nfa.addState();
+  nfa.addState();
+  nfa.addStartId(0);
+  nfa.addAcceptId(2);
+  nfa.addTransition(0, 1, Symbol(1));
+  nfa.addTransition(1, 2, Symbol(1));
+
+  nfa.seal();
+  nfa.removeDeadStates({ maxDepth: 2 });
+
+  // depth[0]=0, depth[1]=1, depth[2]=2
+  // distToAccept[0]=2, distToAccept[1]=1, distToAccept[2]=0
+  // State 0: 0+2=2 ≤ 2 → live
+  // State 1: 1+1=2 ≤ 2 → live
+  // State 2: 2+0=2 ≤ 2 → live
+  assert.equal(nfa.numStates(), 3, 'all states should be kept');
+  expectAccepts(nfa, [1, 1], 'should accept path within depth');
+});
+
+await runTest('removeDeadStates with maxDepth should prune branch too far from accept', () => {
+  // state0 --[1]--> state1 --[1]--> state2 (accepting)
+  // state0 --[2]--> state3 --[2]--> state4 --[2]--> state5 (accepting)
+  // With maxDepth=2, the [2] branch is too long.
+  const nfa = new NFA();
+  for (let i = 0; i < 6; i++) nfa.addState();
+  nfa.addStartId(0);
+  nfa.addAcceptId(2);
+  nfa.addAcceptId(5);
+  nfa.addTransition(0, 1, Symbol(1));
+  nfa.addTransition(1, 2, Symbol(1));
+  nfa.addTransition(0, 3, Symbol(2));
+  nfa.addTransition(3, 4, Symbol(2));
+  nfa.addTransition(4, 5, Symbol(2));
+
+  nfa.seal();
+  nfa.removeDeadStates({ maxDepth: 2 });
+
+  // Short branch: 0→1→2, all within depth 2
+  // Long branch: 0→3→4→5, states 3,4,5 are too far
+  // State 3: 1+2=3 > 2 → dead
+  // State 4: 2+1=3 > 2 → dead
+  // State 5: 3+0=3 > 2 → dead
+  assert.equal(nfa.numStates(), 3, 'only short branch should remain');
+  expectAccepts(nfa, [1, 1], 'short path should accept');
+  expectRejects(nfa, [2], 'long path start should reject');
+});
+
+await runTest('removeDeadStates with maxDepth and allStatesAreReachable', () => {
+  // When allStatesAreReachable=true, forward reachability isn't computed
+  // but depth still matters for the sum check.
+  const nfa = new NFA();
+  nfa.addState();
+  nfa.addState();
+  nfa.addState();
+  nfa.addStartId(0);
+  nfa.addAcceptId(2);
+  nfa.addTransition(0, 1, Symbol(1));
+  nfa.addTransition(1, 2, Symbol(1));
+
+  nfa.seal();
+  nfa.removeDeadStates({ maxDepth: 2, allStatesAreReachable: true });
+
+  assert.equal(nfa.numStates(), 3, 'all reachable states within depth should remain');
+});
+
+await runTest('removeDeadStates with large maxDepth behaves like unbounded', () => {
+  // state0 --[1]--> state1 --[1]--> state2 (accepting)
+  // state1 --[2]--> state3 (dead end)
+  const nfa = new NFA();
+  nfa.addState();
+  nfa.addState();
+  nfa.addState();
+  nfa.addState();
+  nfa.addStartId(0);
+  nfa.addAcceptId(2);
+  nfa.addTransition(0, 1, Symbol(1));
+  nfa.addTransition(1, 2, Symbol(1));
+  nfa.addTransition(1, 3, Symbol(2));  // Dead end
+
+  nfa.seal();
+  nfa.removeDeadStates({ maxDepth: 1000 });
+
+  // maxDepth=1000 >> maxValidPath=6, so it's effectively unbounded.
+  // State 3 is dead because it can't reach accept, not because of depth.
+  assert.equal(nfa.numStates(), 3, 'dead end should be removed');
+  expectAccepts(nfa, [1, 1], 'valid path should work');
 });
 
 await runTest('remapStates should reorder states', () => {
