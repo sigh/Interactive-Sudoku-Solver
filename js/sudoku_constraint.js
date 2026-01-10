@@ -2385,8 +2385,8 @@ export class UserScriptExecutor {
     return this._call('compilePairwise', { type, fnStr, numValues }, 1000);
   }
 
-  compileStateMachine(spec, numValues, isUnified) {
-    return this._call('compileStateMachine', { spec, numValues, isUnified }, 3000);
+  compileStateMachine(spec, numValues, numCells, isUnified) {
+    return this._call('compileStateMachine', { spec, numValues, numCells, isUnified }, 3000);
   }
 
   convertUnifiedToSplit(code) {
