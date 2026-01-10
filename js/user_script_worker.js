@@ -57,16 +57,20 @@ const compilePairwise = ({ SudokuConstraint }, { type, fnStr, numValues }) => {
   return typeCls.fnToKey(fn, numValues);
 }
 
-const compileStateMachine = ({ SudokuConstraint }, { spec, numValues, isUnified }) => {
+const compileStateMachine = ({ SudokuConstraint }, { spec, numValues, numCells, isUnified }) => {
   let parsedSpec;
   if (isUnified) {
-    parsedSpec = new Function(`${spec}; return {startState, transition, accept};`)();
+    parsedSpec = new Function('NUM_CELLS', `${spec}; return {startState, transition, accept };`)(numCells);
   } else {
     const { startExpression, transitionBody, acceptBody } = spec;
-    const startState = new Function('"use strict"; return (' + startExpression + ');')();
-    const transition = new Function('state', 'value', transitionBody);
-    const accept = new Function('state', acceptBody);
-    parsedSpec = { startState, transition, accept };
+    const startState = new Function('NUM_CELLS', '"use strict"; return (' + startExpression + ');')(numCells);
+    const transition = new Function('state', 'value', 'NUM_CELLS', transitionBody);
+    const accept = new Function('state', 'NUM_CELLS', acceptBody);
+    parsedSpec = {
+      startState,
+      transition: (s, v) => transition(s, v, numCells),
+      accept: (s) => accept(s, numCells)
+    };
   }
 
   return SudokuConstraint.NFA.encodeSpec(parsedSpec, numValues);
