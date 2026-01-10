@@ -60,24 +60,31 @@ const compilePairwise = ({ SudokuConstraint }, { type, fnStr, numValues }) => {
 const compileStateMachine = ({ SudokuConstraint }, { spec, numValues, numCells, isUnified }) => {
   let parsedSpec;
   if (isUnified) {
-    parsedSpec = new Function('NUM_CELLS', `${spec}; return {startState, transition, accept };`)(numCells);
+    parsedSpec = new Function('NUM_CELLS', `let maxDepth; ${spec}\nreturn {startState, transition, accept, maxDepth };`)(numCells);
   } else {
-    const { startExpression, transitionBody, acceptBody } = spec;
+    const { startExpression, transitionBody, acceptBody, maxDepthExpression } = spec;
     const startState = new Function('NUM_CELLS', '"use strict"; return (' + startExpression + ');')(numCells);
     const transition = new Function('state', 'value', 'NUM_CELLS', transitionBody);
     const accept = new Function('state', 'NUM_CELLS', acceptBody);
+    const maxDepth = maxDepthExpression
+      ? new Function('NUM_CELLS', '"use strict"; return (' + maxDepthExpression + ');')(numCells)
+      : Infinity;
     parsedSpec = {
       startState,
       transition: (s, v) => transition(s, v, numCells),
-      accept: (s) => accept(s, numCells)
+      accept: (s) => accept(s, numCells),
+      maxDepth,
     };
   }
+
+  // Default maxDepth to Infinity.
+  parsedSpec.maxDepth = parsedSpec.maxDepth || Infinity;
 
   return SudokuConstraint.NFA.encodeSpec(parsedSpec, numValues);
 }
 
 const convertUnifiedToSplit = ({ code }) => {
-  const parsed = new Function(`${code}; return {startState, transition, accept};`)();
+  const parsed = new Function(`let maxDepth; ${code}\nreturn {startState, transition, accept, maxDepth};`)();
 
   const extractFunctionBody = (fn) => {
     const source = fn.toString();
@@ -90,6 +97,7 @@ const convertUnifiedToSplit = ({ code }) => {
     startExpression: JSON.stringify(parsed.startState),
     transitionBody: extractFunctionBody(parsed.transition),
     acceptBody: extractFunctionBody(parsed.accept),
+    maxDepthExpression: parsed.maxDepth ? String(parsed.maxDepth) : ''
   };
 }
 
