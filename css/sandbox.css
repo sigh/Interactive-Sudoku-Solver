@@ -40,20 +40,37 @@ p code {
   font-family: var(--font-family-mono);
 }
 
-/* Two-column layout using flexbox for natural wrapping */
+/* 2x2 grid layout */
 .editor-container {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto;
   gap: 20px;
 }
 
 .editor-panel {
-  flex: 0 0 auto;
+  grid-column: 1;
+  grid-row: 1;
 }
 
 .output-panel {
-  flex: 1 1 300px;
+  grid-column: 2;
+  grid-row: 1;
   min-width: 300px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  contain: size;
+}
+
+.result-panel {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.grid-preview {
+  grid-column: 2;
+  grid-row: 2;
 }
 
 /* Panel headers */
@@ -128,7 +145,27 @@ p code {
   white-space: pre-wrap;
   word-break: break-word;
   overflow: auto;
-  height: 200px;
+  flex: 1;
+  min-height: 0;
+}
+
+/* Status display (console.info) */
+.status {
+  background: #f0f7ff;
+  border: 1px solid var(--color-primary);
+  border-radius: 5px;
+  padding: 8px 12px;
+  font-family: var(--font-family-mono);
+  color: var(--color-primary-border);
+}
+
+.status:not(:empty)::before {
+  content: 'Status: ';
+  font-weight: bold;
+}
+
+.status:empty {
+  display: none;
 }
 
 .output.error {
@@ -137,11 +174,6 @@ p code {
 
 .output.success {
   color: #2e7d32;
-}
-
-/* Constraint string section */
-.result-section {
-  margin-top: 15px;
 }
 
 .result-box {
@@ -199,10 +231,6 @@ p code {
 }
 
 /* Grid Preview */
-.grid-preview {
-  margin-top: 15px;
-}
-
 #grid-preview-container {
   position: relative;
   pointer-events: none;
@@ -224,13 +252,36 @@ p code {
     margin: 15px;
   }
 
+  .editor-container {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto auto auto;
+  }
+
+  .editor-panel {
+    grid-column: 1;
+    grid-row: 1;
+    width: 100%;
+  }
+
+  .result-panel {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .output-panel {
+    grid-column: 1;
+    grid-row: 4;
+    contain: none;
+  }
+
+  .grid-preview {
+    grid-column: 1;
+    grid-row: 3;
+  }
+
   .editor {
     width: 100%;
     max-width: 80ch;
     box-sizing: border-box;
-  }
-
-  .editor-panel {
-    width: 100%;
   }
 }

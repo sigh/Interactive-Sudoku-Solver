@@ -12,6 +12,7 @@ ACCEPTED RETURN VALUES
     - A constraint object (e.g. new Cage(...))
     - A constraint string (e.g. ".Cage~12~R1C1_R1C2_R1C3")
     - An array of constraints or constraint strings
+    - Nothing (empty return) to skip solver invocation
 
 CELL IDENTIFIERS
 
@@ -38,8 +39,17 @@ CONSTRAINT OBJECTS
 
 UTILITIES
 
-  Use console.log() for debug output.
-  Use help() function to display this message.
+  console.log()         - Output to the console
+  console.error()       - Output an error to the console
+  console.warn()        - Output a warning to the console
+  console.info()        - Update status display
+  help()                - Display this message
+
+LONG RUNNING TASKS
+
+  Async/await is supported for long-running tasks.
+
+  Use extendTimeoutMs(ms) to extend execution timeout (default: Infinity)
 `.trim();
 
 const getConstraintList = () => {

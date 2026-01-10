@@ -2326,7 +2326,7 @@ export class UserScriptExecutor {
     });
 
     this._worker.onmessage = (e) => {
-      const { type, id, result, error, logs } = e.data;
+      const { type, id, result, error, text, ms } = e.data;
 
       if (type === 'ready') {
         this._resolveReady();
@@ -2339,45 +2339,77 @@ export class UserScriptExecutor {
       }
 
       const p = this._pending.get(id);
-      if (p) {
-        this._pending.delete(id);
-        clearTimeout(p.timer);
-        if (error) {
-          const err = new Error(error);
-          if (logs) err.logs = logs;
-          p.reject(err);
-        } else {
-          p.resolve(result);
-        }
+      if (!p) return;
+
+      // Handle streaming messages (don't remove from pending).
+      if (type === 'log') {
+        p.onLog?.(text);
+        return;
+      }
+      if (type === 'status') {
+        p.onStatus?.(text);
+        return;
+      }
+      if (type === 'extendTimeout') {
+        // Reset the timeout timer.
+        this._resetTimer(id, ms);
+        return;
+      }
+
+      // Final result - remove from pending.
+      this._pending.delete(id);
+      clearTimeout(p.timer);
+      if (error) {
+        p.reject(new Error(error));
+      } else {
+        p.resolve(result);
       }
     };
   }
 
-  _restartWorker() {
+  _resetTimer(id, ms) {
+    const p = this._pending.get(id);
+    if (!p) return;
+
+    clearTimeout(p.timer);
+    if (!Number.isFinite(ms)) {
+      p.timer = null;
+      return;
+    }
+    p.timer = setTimeout(() => {
+      if (this._pending.has(id)) {
+        this._pending.delete(id);
+        p.reject(new Error(
+          'Execution timed out. Use extendTimeoutMs() for long-running tasks.'));
+        this._restartWorker();
+      }
+    }, ms);
+  }
+
+  _restartWorker(reason = 'Execution aborted') {
     this._worker.terminate();
     for (const p of this._pending.values()) {
       clearTimeout(p.timer);
-      p.reject(new Error('Worker terminated due to timeout'));
+      p.reject(new Error(reason));
     }
     this._pending.clear();
     this._initWorker();
   }
 
-  async _call(type, payload, timeoutMs) {
+  async _call(type, payload, timeoutMs, callbacks = {}) {
     await this._readyPromise;
 
     return new Promise((resolve, reject) => {
       const id = this._nextId++;
-      const timer = setTimeout(() => {
-        if (this._pending.has(id)) {
-          this._pending.delete(id);
-          reject(new Error('Execution timed out'));
-          this._restartWorker();
-        }
-      }, self.USER_SCRIPT_TIMEOUT || timeoutMs);
-
-      this._pending.set(id, { resolve, reject, timer });
-      this._worker.postMessage({ id, type, payload });
+      this._pending.set(id, {
+        resolve,
+        reject,
+        timer: null,
+        onLog: callbacks.onLog,
+        onStatus: callbacks.onStatus,
+      });
+      this._resetTimer(id, self.USER_SCRIPT_TIMEOUT || timeoutMs);
+      this._worker.postMessage({ id, type, payload: { ...payload, id } });
     });
   }
 
@@ -2393,8 +2425,13 @@ export class UserScriptExecutor {
     return this._call('convertUnifiedToSplit', { code }, 100);
   }
 
-  runSandboxCode(code) {
-    return this._call('runSandboxCode', { code }, 10000);
+  runSandboxCode(code, callbacks = {}) {
+    return this._call('runSandboxCode', { code }, 5000, callbacks);
+  }
+
+  abort() {
+    // Abort all pending sandbox executions by restarting the worker.
+    this._restartWorker();
   }
 }
 

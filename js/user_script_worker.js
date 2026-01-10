@@ -103,33 +103,50 @@ const convertUnifiedToSplit = ({ code }) => {
 
 let sandboxEnvPromise;
 
-const runSandboxCode = async ({ SudokuConstraint, SudokuParser }, { code }) => {
+const runSandboxCode = async ({ SudokuConstraint, SudokuParser }, { code, id }) => {
   if (!sandboxEnvPromise) {
     sandboxEnvPromise = import('./sandbox/env.js' + self.VERSION_PARAM);
   }
   const { SANDBOX_GLOBALS } = await sandboxEnvPromise;
 
-  const logs = [];
   const originalConsole = {
     log: console.log,
     error: console.error,
     warn: console.warn,
+    info: console.info,
   };
 
   const formatArg = (a) =>
     typeof a === 'object' ? JSON.stringify(a, null, 2) : String(a);
 
-  console.log = (...args) => logs.push(args.map(formatArg).join(' '));
-  console.error = (...args) => logs.push('ERROR: ' + args.map(formatArg).join(' '));
-  console.warn = (...args) => logs.push('WARN: ' + args.map(formatArg).join(' '));
+  // Stream logs immediately to main thread.
+  console.log = (...args) => {
+    self.postMessage({ id, type: 'log', text: args.map(formatArg).join(' ') });
+  };
+  console.error = (...args) => {
+    self.postMessage({ id, type: 'log', text: '❌ ' + args.map(formatArg).join(' ') });
+  };
+  console.warn = (...args) => {
+    self.postMessage({ id, type: 'log', text: '⚠️ ' + args.map(formatArg).join(' ') });
+  };
+  // console.info updates a status field (overwrites previous status).
+  console.info = (...args) => {
+    self.postMessage({ id, type: 'status', text: args.map(formatArg).join(' ') });
+  };
+
+  // extendTimeoutMs() sends a message to extend the timeout.
+  const extendTimeoutMs = (ms = Infinity) => {
+    self.postMessage({ id, type: 'extendTimeout', ms });
+  };
 
   try {
-    const keys = Object.keys(SANDBOX_GLOBALS);
-    const values = Object.values(SANDBOX_GLOBALS);
+    const allGlobals = { ...SANDBOX_GLOBALS, extendTimeoutMs };
+    const keys = Object.keys(allGlobals);
+    const values = Object.values(allGlobals);
     const asyncFn = new Function(...keys, `return (async () => { ${code} })();`);
     const result = await asyncFn(...values);
 
-    let constraintStr = '';
+    let constraintStr = null;
     if (result) {
       if (Array.isArray(result)) {
         const parsed = result.map(item =>
@@ -141,10 +158,7 @@ const runSandboxCode = async ({ SudokuConstraint, SudokuParser }, { code }) => {
       }
     }
 
-    return { constraintStr, logs };
-  } catch (e) {
-    // If an error occurs, we still want to return the logs.
-    throw { message: e.message || String(e), logs };
+    return { constraintStr };
   } finally {
     Object.assign(console, originalConsole);
   }

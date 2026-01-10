@@ -72,6 +72,7 @@ layout: null
               <span class="spinner"></span>
               <span class="btn-text">▶ Run (Ctrl+Enter)</span>
             </button>
+            <button id="run-abort-btn" class="danger-button" disabled>Abort</button>
           </div>
           <button id="share-btn" class="image-button plain-button" title="Copy shareable link">
             <img src="img/link-48.png" alt="Share">
@@ -85,22 +86,23 @@ layout: null
         <div class="panel-header">
           <h2>Console Output – use <code>console.log()</code></h2>
         </div>
+        <div id="status-output" class="status"></div>
         <div id="output" class="output"></div>
+      </div>
 
-        <div class="result-section">
-          <div class="panel-header">
-            <h2>Constraint String</h2>
-            <a id="open-solver-link" href="#" target="_blank" style="display: none;">Open in Solver
-              →</a>
-          </div>
-          <div class="result-box">
-            <span id="constraint-string"></span>
-            <button id="copy-btn" class="copy-button" title="Copy to clipboard">
-              <img src="img/copy-48.png" alt="Copy">
-            </button>
-          </div>
+      <div class="result-panel">
+        <div class="panel-header">
+          <h2>Constraint String</h2>
+          <a id="open-solver-link" href="#" target="_blank" style="display: none;">← Open in Solver</a>
+        </div>
+        <div class="result-box">
+          <span id="constraint-string"></span>
+          <button id="copy-btn" class="copy-button" title="Copy to clipboard">
+            <img src="img/copy-48.png" alt="Copy">
+          </button>
         </div>
       </div>
+
       <div id="grid-preview" class="grid-preview" style="display: none;">
         <div class="panel-header">
           <h2>Grid Preview</h2>
