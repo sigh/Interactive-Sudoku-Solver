@@ -136,6 +136,7 @@ class HistoryHandler {
     window.addEventListener('keydown', event => {
       if (document.activeElement.tagName === 'TEXTAREA') return;
       if (event.key === 'z' && (event.metaKey || event.ctrlKey)) {
+        event.preventDefault();
         this._incrementHistory(event.shiftKey ? 1 : -1);
       }
       return false;
@@ -297,7 +298,7 @@ export class SolutionController {
     });
 
     this._update = deferUntilAnimationFrame(this._update.bind(this));
-    constraintManager.addUpdateListener(this._update.bind(this));
+    constraintManager.addUpdateListener((_, options) => this._update(options));
 
     // This can trigger an update, so do it last.
     thresholdInput.oninput();
@@ -344,6 +345,19 @@ export class SolutionController {
     const FIRE_FAST = 2;
 
     document.addEventListener('keydown', event => {
+      // Ctrl/Cmd+Enter to solve.
+      if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+        event.preventDefault();
+        // If in freeform-input, submit the form (which triggers solve).
+        const freeformInput = document.querySelector('[name="freeform-input"]');
+        if (document.activeElement === freeformInput) {
+          freeformInput.form.requestSubmit();
+        } else {
+          this._solve();
+        }
+        return;
+      }
+
       if (document.activeElement.tagName === 'TEXTAREA' ||
         document.activeElement.tagName === 'INPUT') return;
       let key = event.key;
@@ -401,7 +415,8 @@ export class SolutionController {
     this._elements.buttonPanel.style.visibility = show ? 'visible' : 'hidden';
   }
 
-  async _update() {
+  async _update(options) {
+    const forceSolve = options?.forceSolve;
     this._solutionDisplay.setSolution();
     let mode = this._elements.mode.value;
     if (!mode) {
@@ -429,7 +444,7 @@ export class SolutionController {
 
     this._elements.modeDescription.textContent = getModeDescription(mode);
 
-    if (auto || mode === Modes.STEP_BY_STEP.NAME) {
+    if (forceSolve || auto || mode === Modes.STEP_BY_STEP.NAME) {
       const solverConstraints = isLayoutMode
         ? this._constraintManager.getLayoutConstraints()
         : constraints;
