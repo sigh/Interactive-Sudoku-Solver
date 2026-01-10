@@ -382,9 +382,9 @@ class ConstraintManager {
     return listener;
   }
 
-  runUpdateCallback() {
+  runUpdateCallback(options) {
     for (const listener of this._updateListeners) {
-      listener(this);
+      listener(this, options);
     }
   }
 
@@ -576,6 +576,7 @@ class ConstraintManager {
       clearDOMNode(errorElem);
       const input = inputElem.value;
       this.loadUnsafeFromText(input);
+      this.runUpdateCallback({ forceSolve: true });
       return false;
     };
     autoSaveField(form, 'freeform-input');
@@ -1308,8 +1309,10 @@ class GridInputManager {
       if (this._selection.size() == 0) return;
       switch (event.key) {
         case 'Backspace':
-          this._runCallbacks(
-            this._callbacks.onNewDigit, this._selection.getCells(), null);
+        case '0':
+          for (const cell of this._selection.getCells()) {
+            this._runCallbacks(this._callbacks.onNewDigit, cell, null);
+          }
           break;
         case 'f':
           let i = 1;

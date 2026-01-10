@@ -987,8 +987,10 @@ class JavaScriptCategoryInput extends ConstraintCategoryInput {
     const isPanelOpen = this._panel.classList.contains('container-open');
     const isActiveTab = this._tabContent.classList.contains('active');
     const isEnabled = !this._form[this._addButtonName].disabled;
+    // Check offsetParent to ensure the element is actually visible.
+    const isVisible = this._form[this._addButtonName].offsetParent !== null;
 
-    if (isPanelOpen && isActiveTab && isEnabled) {
+    if (isPanelOpen && isActiveTab && isEnabled && isVisible) {
       return this._form[this._addButtonName];
     }
     return null;
