@@ -258,7 +258,7 @@ const GENERATE_AND_TEST_FN = async () => {
 
   let attempts = 0;
 
-  // Uses backtracking: prune branches with no solutions, continue if multiple.
+  // Backtracking search with pruning of dead branches.
   const search = (selected, nextIndex) => {
     if (++attempts % 100 === 0) console.info(`Tested ${attempts}...`);
 

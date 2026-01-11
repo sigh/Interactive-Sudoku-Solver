@@ -66,6 +66,7 @@ p code {
 .result-panel {
   grid-column: 1;
   grid-row: 2;
+  contain: inline-size;
 }
 
 .grid-preview {
