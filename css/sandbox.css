@@ -11,6 +11,14 @@ body {
   max-width: 600px;
 }
 
+.intro .warning {
+  background: #fff3cd;
+  border: 1px solid #ffc107;
+  border-radius: 5px;
+  padding: 8px 12px;
+  color: #856404;
+}
+
 .sandbox-container {
   margin: 20px;
   max-width: 1200px;
