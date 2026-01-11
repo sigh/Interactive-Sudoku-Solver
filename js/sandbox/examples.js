@@ -230,6 +230,63 @@ const RUN_SOLVER_FN = async () => {
   // Return nothing to skip solver invocation.
 };
 
+const GENERATE_AND_TEST_FN = async () => {
+  // Generate and test: find a 6x6 sudoku with only 6-sum little killers.
+
+  const GRID_SIZE = 6;
+  const TARGET_SUM = 6;
+
+  // Extend timeout since this may take a while.
+  extendTimeoutMs();
+
+  const solver = await makeSolver();
+  const gridShape = GridShape.fromGridSize(GRID_SIZE);
+
+  // Get all little killer diagonals, plus corners as single-cell sums.
+  // (Single cell little killers are handled by the LittleKiller constraint).
+  const cellMap = LittleKiller.cellMap(gridShape);
+  const corners = new Set([
+    makeCellId(1, 1), makeCellId(1, GRID_SIZE),
+    makeCellId(GRID_SIZE, 1), makeCellId(GRID_SIZE, GRID_SIZE),
+  ]);
+  const allCells = [...Object.keys(cellMap), ...corners];
+  console.log(`There are ${allCells.length} possible clues.\n`);
+
+  const makeClue = cell => corners.has(cell)
+    ? new Sum(TARGET_SUM, cell)
+    : new LittleKiller(cell, TARGET_SUM);
+
+  let attempts = 0;
+
+  // Uses backtracking: prune branches with no solutions, continue if multiple.
+  const search = (selected, nextIndex) => {
+    if (++attempts % 100 === 0) console.info(`Tested ${attempts}...`);
+
+    const constraints = [new Shape(gridShape.name), ...selected.map(makeClue)];
+
+    // Find up to 2 solutions to check for uniqueness.
+    const count = solver.solutionArray(constraints, 2).length;
+
+    if (count === 0) return;  // No solutions - Prune
+    if (count === 1) return constraints;  // Unique solution - Found!
+
+    // We have multiple solutions - continue adding clues.
+    for (let i = nextIndex; i < allCells.length; i++) {
+      const result = search([...selected, allCells[i]], i + 1);
+      if (result) return result;
+    }
+  };
+
+  const result = search([], 0);
+
+  console.info();
+  if (result) {
+    console.log(`Found a solution after ${attempts} attempts!\n`);
+    return result;
+  }
+  console.log(`No puzzle found after ${attempts} attempts.`);
+};
+
 export const DEFAULT_CODE = fnToCode(DEFAULT_CODE_FN);
 
 export const EXAMPLES = {
@@ -241,4 +298,5 @@ export const EXAMPLES = {
   'Modifying constraints': fnToCode(MODIFYING_CONSTRAINTS_FN),
   'Checkerboard min/max': fnToCode(CHECKERBOARD_FN),
   'Run solver': fnToCode(RUN_SOLVER_FN),
+  'Generate and test': fnToCode(GENERATE_AND_TEST_FN),
 };
