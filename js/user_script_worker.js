@@ -107,39 +107,16 @@ const runSandboxCode = async ({ SudokuConstraint, SudokuParser }, { code, id }) 
   if (!sandboxEnvPromise) {
     sandboxEnvPromise = import('./sandbox/env.js' + self.VERSION_PARAM);
   }
-  const { SANDBOX_GLOBALS } = await sandboxEnvPromise;
+  const { SANDBOX_GLOBALS, withSandboxConsole } = await sandboxEnvPromise;
 
-  const originalConsole = {
-    log: console.log,
-    error: console.error,
-    warn: console.warn,
-    info: console.info,
-  };
-
-  const formatArg = (a) =>
-    typeof a === 'object' ? JSON.stringify(a, null, 2) : String(a);
-
-  // Stream logs immediately to main thread.
-  console.log = (...args) => {
-    self.postMessage({ id, type: 'log', text: args.map(formatArg).join(' ') });
-  };
-  console.error = (...args) => {
-    self.postMessage({ id, type: 'log', text: '❌ ' + args.map(formatArg).join(' ') });
-  };
-  console.warn = (...args) => {
-    self.postMessage({ id, type: 'log', text: '⚠️ ' + args.map(formatArg).join(' ') });
-  };
-  // console.info updates a status field (overwrites previous status).
-  console.info = (...args) => {
-    self.postMessage({ id, type: 'status', text: args.map(formatArg).join(' ') });
-  };
+  const emit = (msg) => self.postMessage({ id, ...msg });
 
   // extendTimeoutMs() sends a message to extend the timeout.
   const extendTimeoutMs = (ms = Infinity) => {
     self.postMessage({ id, type: 'extendTimeout', ms });
   };
 
-  try {
+  return withSandboxConsole(emit, async () => {
     const allGlobals = { ...SANDBOX_GLOBALS, extendTimeoutMs };
     const keys = Object.keys(allGlobals);
     const values = Object.values(allGlobals);
@@ -159,7 +136,5 @@ const runSandboxCode = async ({ SudokuConstraint, SudokuParser }, { code, id }) 
     }
 
     return { constraintStr };
-  } finally {
-    Object.assign(console, originalConsole);
-  }
+  });
 }

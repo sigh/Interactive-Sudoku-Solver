@@ -47,7 +47,7 @@ SOLVER
     // Get the unique solution, or null if not unique
     const unique = solver.uniqueSolution(constraints);
     // Count the number of solutions
-    const count = solver.countSolutions(constraints);  // Total count
+    const count = solver.countSolutions(constraints);
     // Iterate over all solutions, with optional limit
     for (const s of solver.solutions(constraints[, limit])) { ... }
     // Get an array of solutions, with optional limit
@@ -67,6 +67,7 @@ UTILITIES
   console.error()       - Output an error to the console
   console.warn()        - Output a warning to the console
   console.info()        - Update status display
+  console.table(data)   - Render array of objects as a table
   help()                - Display this message
 
 LONG RUNNING TASKS
@@ -85,9 +86,13 @@ const getConstraintList = () => {
   }
 
   let output = '\nCONSTRAINTS BY CATEGORY\n';
+  const GROUP_SIZE = 4;
   for (const [category, names] of Object.entries(byCategory).sort()) {
     output += `\n  ${category}:\n`;
-    output += '    ' + names.sort().join(', ') + '\n';
+    const sorted = names.sort();
+    for (let i = 0; i < sorted.length; i += GROUP_SIZE) {
+      output += '    ' + sorted.slice(i, i + GROUP_SIZE).join(', ') + '\n';
+    }
   }
   return output;
 };
@@ -141,6 +146,76 @@ const parseConstraint = (str) => {
 const makeSolver = async () => {
   const { SolverAPI } = await import('./solver_api.js');
   return new SolverAPI();
+};
+
+/**
+ * Format a value for console output.
+ * Uses toString() for objects that have a custom implementation (like Solution).
+ */
+const formatConsoleArg = (a) => {
+  if (a == null) return String(a);
+  if (typeof a !== 'object') return String(a);
+  if (typeof a.toString === 'function' && a.toString !== Object.prototype.toString) {
+    return a.toString();
+  }
+  return JSON.stringify(a, null, 2);
+};
+
+/**
+ * Format a table from an array of objects.
+ */
+const formatTable = (data, columns) => {
+  if (!Array.isArray(data) || data.length === 0) {
+    return '(empty table)';
+  }
+  const keys = columns || Object.keys(data[0]);
+  const widths = keys.map(k =>
+    Math.max(String(k).length, ...data.map(row => String(row[k] ?? '').length))
+  );
+  const header = keys.map((k, i) => String(k).padEnd(widths[i])).join(' | ');
+  const sep = widths.map(w => '-'.repeat(w)).join('-+-');
+  const rows = data.map(row =>
+    keys.map((k, i) => String(row[k] ?? '').padEnd(widths[i])).join(' | ')
+  );
+  return [header, sep, ...rows].join('\n');
+};
+
+/**
+ * Create sandbox console methods that emit to a callback.
+ * @param {function} emit - Callback receiving { type, text }
+ * @returns {object} Console methods to override
+ */
+export const createSandboxConsole = (emit) => {
+  const format = (...args) => args.map(formatConsoleArg).join(' ');
+  return {
+    log: (...args) => emit({ type: 'log', text: format(...args) }),
+    error: (...args) => emit({ type: 'log', text: '❌ ' + format(...args) }),
+    warn: (...args) => emit({ type: 'log', text: '⚠️ ' + format(...args) }),
+    info: (...args) => emit({ type: 'status', text: format(...args) }),
+    table: (data, columns) => emit({ type: 'log', text: formatTable(data, columns) }),
+  };
+};
+
+/**
+ * Run a function with sandbox console overrides.
+ * @param {function} emit - Callback receiving { type, text }
+ * @param {function} fn - Async function to run
+ * @returns {Promise} Result of fn
+ */
+export const withSandboxConsole = async (emit, fn) => {
+  const original = {
+    log: console.log,
+    error: console.error,
+    warn: console.warn,
+    info: console.info,
+    table: console.table,
+  };
+  Object.assign(console, createSandboxConsole(emit));
+  try {
+    return await fn();
+  } finally {
+    Object.assign(console, original);
+  }
 };
 
 export const SANDBOX_GLOBALS = {
