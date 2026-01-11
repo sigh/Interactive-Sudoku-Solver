@@ -1,24 +1,11 @@
 import assert from 'node:assert/strict';
-import { performance as perf } from 'node:perf_hooks';
 
-import { ensureGlobalEnvironment } from '../helpers/test_env.js';
 import { runTest, logSuiteComplete } from '../helpers/test_runner.js';
 
-ensureGlobalEnvironment({
-  needWindow: true,
-  documentValue: undefined,
-  locationValue: { search: '' },
-  performance: perf,
-});
-
-// Load debug module to ensure all constraint types are registered.
-const debugModule = await import('../../js/debug/debug.js' + self.VERSION_PARAM);
-await debugModule.debugFilesLoaded;
+const { SolverAPI } = await import('../../js/sandbox/solver_api.js' + self.VERSION_PARAM);
 
 const { CellExclusions, HandlerSet } = await import('../../js/solver/engine.js' + self.VERSION_PARAM);
 const { HandlerUtil } = await import('../../js/solver/handlers.js' + self.VERSION_PARAM);
-const { SudokuBuilder } = await import('../../js/solver/sudoku_builder.js' + self.VERSION_PARAM);
-const { SudokuParser } = await import('../../js/sudoku_parser.js' + self.VERSION_PARAM);
 const { BitSet } = await import('../../js/util.js' + self.VERSION_PARAM);
 
 const SHAPE_9x9 = {
@@ -106,16 +93,9 @@ await runTest('Contradictory constraints (RegionSumLine + Palindrome) do not cra
   // which creates self-exclusions via areSameValue.
   const constraintStr = '.RegionSumLine~R6C1~R7C2~R8C3~R9C4.Palindrome~R6C1~R7C2~R8C3~R9C4';
 
-  // This should not throw an error during setup.
-  let solver;
-  assert.doesNotThrow(() => {
-    const parsed = SudokuParser.parseString(constraintStr);
-    const resolved = SudokuBuilder.resolveConstraint(parsed);
-    solver = SudokuBuilder.build(resolved);
-  }, 'Building solver with contradictory constraints should not crash');
-
-  // The solver should find no solutions (the grid is invalid).
-  const result = solver.nthSolution(1);
+  const solver = new SolverAPI();
+  // This should not throw an error during setup, and should find no solutions.
+  const result = await solver.solution(constraintStr);
   assert.equal(result, null, 'Contradictory constraints should have no solution');
 });
 

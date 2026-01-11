@@ -63,11 +63,11 @@ const compileStateMachine = ({ SudokuConstraint }, { spec, numValues, numCells, 
     parsedSpec = new Function('NUM_CELLS', `let maxDepth; ${spec}\nreturn {startState, transition, accept, maxDepth };`)(numCells);
   } else {
     const { startExpression, transitionBody, acceptBody, maxDepthExpression } = spec;
-    const startState = new Function('NUM_CELLS', '"use strict"; return (' + startExpression + ');')(numCells);
+    const startState = new Function('NUM_CELLS', '"use strict"; return (' + startExpression + '\n);')(numCells);
     const transition = new Function('state', 'value', 'NUM_CELLS', transitionBody);
     const accept = new Function('state', 'NUM_CELLS', acceptBody);
     const maxDepth = maxDepthExpression
-      ? new Function('NUM_CELLS', '"use strict"; return (' + maxDepthExpression + ');')(numCells)
+      ? new Function('NUM_CELLS', '"use strict"; return (' + maxDepthExpression + '\n);')(numCells)
       : Infinity;
     parsedSpec = {
       startState,
@@ -143,7 +143,7 @@ const runSandboxCode = async ({ SudokuConstraint, SudokuParser }, { code, id }) 
     const allGlobals = { ...SANDBOX_GLOBALS, extendTimeoutMs };
     const keys = Object.keys(allGlobals);
     const values = Object.values(allGlobals);
-    const asyncFn = new Function(...keys, `return (async () => { ${code} })();`);
+    const asyncFn = new Function(...keys, `return (async () => { ${code}\n })();`);
     const result = await asyncFn(...values);
 
     let constraintStr = null;

@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
-import { performance as perf } from 'node:perf_hooks';
 
-import { ensureGlobalEnvironment } from '../helpers/test_env.js';
 import { runTest } from '../helpers/test_runner.js';
+
+const { SolverAPI } = await import('../../js/sandbox/solver_api.js' + self.VERSION_PARAM);
 import {
   setupConstraintTest,
   createAccumulator,
@@ -11,17 +11,8 @@ import {
   initializeConstraintHandler,
 } from '../helpers/constraint_test_utils.js';
 
-ensureGlobalEnvironment({
-  needWindow: true,
-  documentValue: undefined,
-  locationValue: { search: '' },
-  performance: perf,
-});
-
 const { LookupTables } = await import('../../js/solver/lookup_tables.js');
 const { FullRank } = await import('../../js/solver/handlers.js');
-const { SudokuParser } = await import('../../js/sudoku_parser.js');
-const { SudokuBuilder } = await import('../../js/solver/sudoku_builder.js');
 
 await runTest('FullRank initialize should fail for invalid clue line', () => {
   const context = setupConstraintTest({ gridSize: 4 });
@@ -955,69 +946,46 @@ await runTest('FullRankTies any should still require enough "<" entries (no shor
 });
 
 await runTest('FullRankTies none should reject a row equal to another row reversed', async () => {
+  const solver = new SolverAPI();
   const base =
     '.Shape~4x4.' +
     '.~R1C1_3.~R1C2_4.~R1C3_2.~R1C4_1.' +
     '.~R2C1_1.~R2C2_2.~R2C3_4.~R2C4_3.';
 
-  const parsed1 = SudokuParser.parseString(base);
-  const resolved1 = SudokuBuilder.resolveConstraint(parsed1);
-  const solver1 = SudokuBuilder.build(resolved1);
-  assert.notEqual(solver1.nthSolution(0), null);
-
-  const parsed2 = SudokuParser.parseString('.Shape~4x4.FullRankTies~none' + base.slice('.Shape~4x4'.length));
-  const resolved2 = SudokuBuilder.resolveConstraint(parsed2);
-  const solver2 = SudokuBuilder.build(resolved2);
-  assert.equal(solver2.nthSolution(0), null);
+  assert.notEqual(await solver.solution(base), null);
+  assert.equal(await solver.solution('.Shape~4x4.FullRankTies~none' + base.slice('.Shape~4x4'.length)), null);
 });
 
 await runTest('FullRank 4x4 regression: provided constraint string has no solutions', async () => {
+  const solver = new SolverAPI();
   const puzzle =
     '.Shape~4x4.FullRankTies~none.FullRank~C1~10~.FullRank~C2~15~.FullRank~C4~3~.FullRank~C3~~4.';
 
-  const parsed = SudokuParser.parseString(puzzle);
-  const resolved = SudokuBuilder.resolveConstraint(parsed);
-  const solver = SudokuBuilder.build(resolved);
-
-  const sol = solver.nthSolution(0);
-  assert.equal(sol, null);
+  assert.equal(await solver.solution(puzzle), null);
 });
 
 await runTest('FullRank 4x4 regression: FullRankTies any should allow a solution (solver)', async () => {
+  const solver = new SolverAPI();
   const puzzle = '.Shape~4x4.FullRank~C1~10~.FullRank~C2~15~.FullRank~R4~5~.FullRankTies~any';
 
-  const parsed = SudokuParser.parseString(puzzle);
-  const resolved = SudokuBuilder.resolveConstraint(parsed);
-  const solver = SudokuBuilder.build(resolved);
-
-  const sol = solver.nthSolution(0);
-  assert.notEqual(sol, null);
+  assert.notEqual(await solver.solution(puzzle), null);
 });
 
 await runTest('FullRankTies only-unclued vs any: any can be solvable when only-unclued is not (solver)', async () => {
+  const solver = new SolverAPI();
   const anyPuzzle = '.Shape~4x4.FullRankTies~any.FullRank~R1~2~..FullRank~C3~15~.';
   const onlyPuzzle = '.Shape~4x4.FullRankTies~only-unclued.FullRank~R1~2~..FullRank~C3~15~.';
 
-  const parsedAny = SudokuParser.parseString(anyPuzzle);
-  const resolvedAny = SudokuBuilder.resolveConstraint(parsedAny);
-  const solverAny = SudokuBuilder.build(resolvedAny);
-  assert.notEqual(solverAny.nthSolution(0), null);
-
-  const parsedOnly = SudokuParser.parseString(onlyPuzzle);
-  const resolvedOnly = SudokuBuilder.resolveConstraint(parsedOnly);
-  const solverOnly = SudokuBuilder.build(resolvedOnly);
-  assert.equal(solverOnly.nthSolution(0), null);
+  assert.notEqual(await solver.solution(anyPuzzle), null);
+  assert.equal(await solver.solution(onlyPuzzle), null);
 });
 
 await runTest('FullRank optimizer should dedupe same-rank clues and enforce equality (solver)', async () => {
+  const solver = new SolverAPI();
   // Two FullRank clues with the same rank imply the corresponding entries are tied,
   // so the optimizer should add equality constraints and keep only one of them
   // in the final FullRank handler.
   const puzzle = '.Shape~4x4.FullRankTies~any.FullRank~R1~1~..FullRank~R2~~1.';
 
-  const parsed = SudokuParser.parseString(puzzle);
-  const resolved = SudokuBuilder.resolveConstraint(parsed);
-  const solver = SudokuBuilder.build(resolved);
-
-  assert.notEqual(solver.nthSolution(0), null);
+  assert.notEqual(await solver.solution(puzzle), null);
 });

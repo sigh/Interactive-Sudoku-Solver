@@ -41,7 +41,7 @@ export class SudokuSolver {
   }
 
   countSolutions() {
-    this._runCountFn(() => {
+    return this._runCountFn(() => {
       this._internalSolver.run(InternalSolver.YIELD_NEVER).next();
       return this._internalSolver.counters.solutions;
     });
@@ -52,7 +52,7 @@ export class SudokuSolver {
       solutions: 0,
       samples: 0,
     };
-    this._runCountFn(() => {
+    return this._runCountFn(() => {
       return this._internalSolver.estimatedCountSolutions(estimationCounters);
     }, estimationCounters);
   }
