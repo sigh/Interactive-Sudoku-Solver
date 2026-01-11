@@ -41,13 +41,20 @@ layout: null
     </div>
 
     <div class="intro">
+      <p class="warning">
+        ⚠️ <strong>Experimental:</strong> The sandbox API is not stable and may change without notice.
+      </p>
+
       <p>
-        Write JavaScript to generate constraints.
+        Write JavaScript to generate constraints and invoke the solver.
       </p>
 
       <p>
         Return a constraint or an array of constraints. A constraint can either
         be an instance of <code>SudokuConstraint</code> or a constraint string.
+        The generated constraint will be shown and solved in the preview grid,
+        or the solver can be accessed manually with
+        <code>await makeSolver()</code>.
       </p>
 
       <p>
