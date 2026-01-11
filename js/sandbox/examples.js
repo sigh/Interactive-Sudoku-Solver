@@ -202,16 +202,15 @@ const RUN_SOLVER_FN = async () => {
 
   const solver = await makeSolver();
   const results = [];
+  const solutions = [];
 
-
-  let count = 0;
-  let solutions = [];
   for (const puzzle of puzzles) {
-    console.info(`Solving puzzle #${++count}:`, puzzle);
+    const index = results.length;
+    console.info(`Solving puzzle #${index + 1}:`, puzzle);
     const solution = solver.uniqueSolution(puzzle);
     const stats = solver.latestStats();
     results.push({
-      i: count,
+      index,
       isUnique: solution ? 'Yes' : 'No',
       guesses: stats.guesses,
       setupMs: stats.setupTimeMs.toFixed(1),
@@ -219,20 +218,14 @@ const RUN_SOLVER_FN = async () => {
     });
     solutions.push(solution);
   }
-  console.info(`Solved ${count} puzzles.`);
+  console.info(`Solved ${results.length} puzzles.`);
 
   // Display results as a table.
   console.log('=== Puzzle Results ===\n');
-  console.log('   | Unique | Guesses | Setup (ms) | Runtime (ms)');
-  console.log('---|--------|---------|------------|-------------');
-  for (const r of results) {
-    console.log(
-      `${String(r.i).padEnd(2)} | ${r.isUnique.padEnd(6)} | ${String(r.guesses).padStart(7)} | ${r.setupMs.padStart(10)} | ${r.runtimeMs.padStart(12)}`
-    );
-  }
+  console.table(results);
 
   console.log('\n=== Solutions ===\n');
-  for (const s of solutions) console.log(s.toString());
+  for (const s of solutions) console.log(s);
 
   // Return nothing to skip solver invocation.
 };
