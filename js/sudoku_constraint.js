@@ -58,6 +58,9 @@ export class SudokuConstraintBase {
   // Used by LinesAndSets constraints. Takes (cells, shape) arguments.
   static VALIDATE_CELLS_FN = null;
 
+  // Set to true for constraints that only work on square grids.
+  static REQUIRE_SQUARE_GRID = false;
+
   constructor(...args) {
     this.args = args;
     this.type = this.constructor.name;
@@ -599,6 +602,7 @@ export class SudokuConstraint {
     static CATEGORY = 'Jigsaw';
     static DISPLAY_CONFIG = { displayClass: 'Jigsaw' };
     static UNIQUENESS_KEY_FIELD = 'cells';
+    static REQUIRE_SQUARE_GRID = true;
 
     constructor(...cells) {
       super(...cells);
@@ -1213,6 +1217,7 @@ export class SudokuConstraint {
     static CATEGORY = 'LayoutCheckbox';
     static DISPLAY_CONFIG = { displayClass: 'Windoku' };
     static UNIQUENESS_KEY_FIELD = 'type';
+    static REQUIRE_SQUARE_GRID = true;
 
     static regions = memoize((shape) => {
       const numRows = shape.numRows;
@@ -1243,6 +1248,7 @@ export class SudokuConstraint {
       No digit may appear in the same position in any two boxes.`);
     static CATEGORY = 'LayoutCheckbox';
     static UNIQUENESS_KEY_FIELD = 'type';
+    static REQUIRE_SQUARE_GRID = true;
   }
 
   static AntiKnight = class AntiKnight extends SudokuConstraintBase {
@@ -1352,6 +1358,7 @@ export class SudokuConstraint {
       FullRank clues present.`);
     static CATEGORY = 'Global';
     static UNIQUENESS_KEY_FIELD = 'type';
+    static REQUIRE_SQUARE_GRID = true;
     static ARGUMENT_CONFIG = {
       inputType: 'select',
       label: 'FullRank ties',
@@ -1395,6 +1402,7 @@ export class SudokuConstraint {
       ],
     };
     static UNIQUENESS_KEY_FIELD = 'direction';
+    static REQUIRE_SQUARE_GRID = true;
 
     constructor(direction) {
       super(direction);
@@ -1867,6 +1875,7 @@ export class SudokuConstraint {
       clueTemplate: '[$CLUE]',
     };
     static CLUE_TYPE = OutsideConstraintBase.CLUE_TYPE_DOUBLE_LINE;
+    static REQUIRE_SQUARE_GRID = true;
   }
 
   static HiddenSkyscraper = class HiddenSkyscraper extends OutsideConstraintBase {
@@ -1908,6 +1917,7 @@ export class SudokuConstraint {
       clueTemplate: '#$CLUE',
     };
     static CLUE_TYPE = OutsideConstraintBase.CLUE_TYPE_DOUBLE_LINE;
+    static REQUIRE_SQUARE_GRID = true;
   }
 
   static AllDifferent = class AllDifferent extends SudokuConstraintBase {
