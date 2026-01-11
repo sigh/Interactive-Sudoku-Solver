@@ -842,10 +842,11 @@ class Diagonal extends BaseConstraintDisplayItem {
     const direction = constraint.direction;
     const shape = this._shape;
 
-    const size = DisplayItem.CELL_SIZE * shape.gridSize;
+    const gridWidth = DisplayItem.CELL_SIZE * shape.numCols;
+    const gridHeight = DisplayItem.CELL_SIZE * shape.numRows;
     const line = this._makePath([
-      [0, direction > 0 ? size : 0],
-      [size, direction > 0 ? 0 : size],
+      [0, direction > 0 ? gridHeight : 0],
+      [gridWidth, direction > 0 ? 0 : gridHeight],
     ]);
 
     this.getSvg().appendChild(line);
@@ -919,21 +920,22 @@ class DefaultRegionsInverted extends BaseConstraintDisplayItem {
     super.clear();
 
     const cellSize = DisplayItem.CELL_SIZE;
-    const gridSizePixels = cellSize * shape.gridSize;
+    const gridWidthPixels = cellSize * shape.numCols;
+    const gridHeightPixels = cellSize * shape.numRows;
     const svg = this.getSvg();
 
     if (shape.noDefaultBoxes) return;
 
-    for (let i = shape.boxWidth; i < shape.gridSize; i += shape.boxWidth) {
+    for (let i = shape.boxWidth; i < shape.numCols; i += shape.boxWidth) {
       svg.appendChild(this._makePath([
         [i * cellSize, 0],
-        [i * cellSize, gridSizePixels],
+        [i * cellSize, gridHeightPixels],
       ]));
     }
-    for (let i = shape.boxHeight; i < shape.gridSize; i += shape.boxHeight) {
+    for (let i = shape.boxHeight; i < shape.numRows; i += shape.boxHeight) {
       svg.appendChild(this._makePath([
         [0, i * cellSize],
-        [gridSizePixels, i * cellSize],
+        [gridWidthPixels, i * cellSize],
       ]));
     }
   }

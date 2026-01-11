@@ -378,7 +378,7 @@ await runTest('_addSumIntersectionHandler: infeasible inferred sum adds False ha
   // Build a case where a sum cage covers the full house plus the extra cells.
   // Then the inferred outside sum is: totalSum = cageSum - shape.maxSum.
   // Pick a cageSum that yields totalSum=2, which is below the min=3.
-  const houseCells = Array.from({ length: shape.gridSize }, (_, i) => i);
+  const houseCells = Array.from({ length: shape.numValues }, (_, i) => i);
   const cageCells = [...houseCells, ...extraCells];
   const cageSum = shape.maxSum + 2;
 

@@ -858,8 +858,9 @@ class ConstraintChipView {
     svg.append(borders);
 
     // Determine the correct scale to fit our icon size.
-    const gridSizePixels = borderDisplay.gridSizePixels();
-    const scale = this._CHIP_ICON_SIZE_PX / gridSizePixels;
+    const maxGridPixels = Math.max(
+      borderDisplay.gridWidthPixels(), borderDisplay.gridHeightPixels());
+    const scale = this._CHIP_ICON_SIZE_PX / maxGridPixels;
     const transform = `scale(${scale})`;
 
     borders.setAttribute('transform', transform);
@@ -1265,9 +1266,10 @@ class GridInputManager {
 
       const shape = this._shape;
       let { row, col } = shape.parseCellId(cell);
-      const gridSize = shape.gridSize;
-      row = (row + dr + gridSize) % gridSize;
-      col = (col + dc + gridSize) % gridSize;
+      const numRows = shape.numRows;
+      const numCols = shape.numCols;
+      row = (row + dr + numRows) % numRows;
+      col = (col + dc + numCols) % numCols;
 
       this._selection.setCells([shape.makeCellId(row, col)]);
     };

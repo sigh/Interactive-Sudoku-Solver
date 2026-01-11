@@ -131,7 +131,7 @@ export class SudokuBuilder {
   }
 
   static * _constraintHandlers(constraintMap, shape) {
-    const gridSize = shape.gridSize;
+    const numValues = shape.numValues;
 
     const constraints = [].concat(...constraintMap.values());
 
@@ -177,8 +177,8 @@ export class SudokuBuilder {
 
         case 'Diagonal':
           cells = [];
-          for (let r = 0; r < gridSize; r++) {
-            let c = constraint.direction > 0 ? gridSize - r - 1 : r;
+          for (let r = 0; r < numValues; r++) {
+            let c = constraint.direction > 0 ? numValues - r - 1 : r;
             cells.push(shape.cellIndex(r, c));
           }
           yield new HandlerModule.AllDifferent(cells);
@@ -657,7 +657,9 @@ export class SudokuBuilder {
                 ? controlCell.row + 1 : controlCell.col + 1;
 
             const cells = [];
-            for (let i = 0; i < shape.gridSize; i++) {
+            const iterCount = constraint.indexType == SudokuConstraint.Indexing.ROW_INDEXING
+              ? shape.numRows : shape.numCols;
+            for (let i = 0; i < iterCount; i++) {
               if (constraint.indexType == SudokuConstraint.Indexing.ROW_INDEXING) {
                 cells.push(shape.cellIndex(i, controlCell.col));
               } else {
@@ -741,15 +743,16 @@ export class SudokuBuilder {
   }
 
   static * _antiHandlers(shape, exclusionFn) {
-    const gridSize = shape.gridSize;
+    const numRows = shape.numRows;
+    const numCols = shape.numCols;
 
-    for (let r = 0; r < gridSize; r++) {
-      for (let c = 0; c < gridSize; c++) {
+    for (let r = 0; r < numRows; r++) {
+      for (let c = 0; c < numCols; c++) {
         const cell = shape.cellIndex(r, c);
         // We only need half the constraints, as the other half will be
         // added by the corresponding exclusion cell.
         for (const [rr, cc] of exclusionFn(r, c)) {
-          if (rr < 0 || rr >= gridSize || cc < 0 || cc >= gridSize) continue;
+          if (rr < 0 || rr >= numRows || cc < 0 || cc >= numCols) continue;
           const exclusionCell = shape.cellIndex(rr, cc);
           yield new HandlerModule.AllDifferent([cell, exclusionCell]);
         }
@@ -760,14 +763,15 @@ export class SudokuBuilder {
   static _allAdjacentCellPairs(shape) {
     const pairs = [];
 
-    const gridSize = shape.gridSize;
+    const numRows = shape.numRows;
+    const numCols = shape.numCols;
 
-    for (let r = 0; r < gridSize; r++) {
-      for (let c = 0; c < gridSize; c++) {
+    for (let r = 0; r < numRows; r++) {
+      for (let c = 0; c < numCols; c++) {
         let cell = shape.cellIndex(r, c);
         // Only look at adjacent cells with larger indexes.
         for (const [rr, cc] of [[r + 1, c], [r, c + 1]]) {
-          if (rr < 0 || rr >= gridSize || cc < 0 || cc >= gridSize) continue;
+          if (rr < 0 || rr >= numRows || cc < 0 || cc >= numCols) continue;
           pairs.push([cell, shape.cellIndex(rr, cc)]);
         }
       }

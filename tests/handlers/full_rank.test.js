@@ -13,6 +13,54 @@ import {
 
 const { LookupTables } = await import('../../js/solver/lookup_tables.js');
 const { FullRank } = await import('../../js/solver/handlers.js');
+const { GridShape } = await import('../../js/grid_shape.js');
+
+//////////////////////////////////////////////////////////////////////////////
+// buildEntries tests
+//////////////////////////////////////////////////////////////////////////////
+
+await runTest('FullRank.buildEntries should create correct entries for 9x9', () => {
+  const shape = GridShape.fromGridSize(9);
+  const entries = FullRank.buildEntries(shape);
+
+  // 9 rows * 2 directions + 9 cols * 2 directions = 36 entries
+  assert.equal(entries.length, 36);
+
+  // First row forward: cells 0-8
+  assert.deepEqual([...entries[0]], [0, 1, 2, 3, 4, 5, 6, 7, 8]);
+  // First row reversed
+  assert.deepEqual([...entries[1]], [8, 7, 6, 5, 4, 3, 2, 1, 0]);
+  // First column forward: cells 0, 9, 18, 27, 36, 45, 54, 63, 72
+  assert.deepEqual([...entries[18]], [0, 9, 18, 27, 36, 45, 54, 63, 72]);
+  // First column reversed
+  assert.deepEqual([...entries[19]], [72, 63, 54, 45, 36, 27, 18, 9, 0]);
+});
+
+await runTest('FullRank.buildEntries should create correct entries for 4x4', () => {
+  const shape = GridShape.fromGridSize(4);
+  const entries = FullRank.buildEntries(shape);
+
+  // 4 rows * 2 directions + 4 cols * 2 directions = 16 entries
+  assert.equal(entries.length, 16);
+
+  // All entries should have 4 cells
+  for (const entry of entries) {
+    assert.equal(entry.length, 4);
+  }
+
+  // First row: cells 0-3
+  assert.deepEqual([...entries[0]], [0, 1, 2, 3]);
+  // Second row: cells 4-7
+  assert.deepEqual([...entries[2]], [4, 5, 6, 7]);
+  // First column: cells 0, 4, 8, 12
+  assert.deepEqual([...entries[8]], [0, 4, 8, 12]);
+  // Second column: cells 1, 5, 9, 13
+  assert.deepEqual([...entries[10]], [1, 5, 9, 13]);
+});
+
+//////////////////////////////////////////////////////////////////////////////
+// initialize tests
+//////////////////////////////////////////////////////////////////////////////
 
 await runTest('FullRank initialize should fail for invalid clue line', () => {
   const context = setupConstraintTest({ gridSize: 4 });

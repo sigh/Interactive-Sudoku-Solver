@@ -48,12 +48,13 @@ const COLUMN_CONSTRAINTS_FN = () => {
   // Puzzle: https://sudokupad.app/gdc/flat-pack/gw
   // Generate constraints for each column
   const columnConstraints = [];
-  const gridSize = 6;
+
+  const GRID_SIZE = 6;
 
   // A constraint for each column.
-  for (let column = 1; column <= gridSize; column++) {
+  for (let column = 1; column <= GRID_SIZE; column++) {
     const cells = [];
-    for (let row = 1; row <= gridSize; row++) {
+    for (let row = 1; row <= GRID_SIZE; row++) {
       cells.push(makeCellId(row, column));
     }
     columnConstraints.push(new Regex('.*(12|24).*', ...cells));

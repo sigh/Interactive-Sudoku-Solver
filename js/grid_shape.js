@@ -44,10 +44,16 @@ export class GridShape {
       throw Error('Use GridShape.fromGridSize() instead.');
     }
 
+    // Core dimensions - for now, always square
+    this.numRows = gridSize;
+    this.numCols = gridSize;
+
+    // Legacy property - will be removed once all usages are migrated
     this.gridSize = gridSize;
+
     [this.boxHeight, this.boxWidth] = this.constructor._boxDims(gridSize);
     this.numValues = gridSize;
-    this.numCells = gridSize * gridSize;
+    this.numCells = this.numRows * this.numCols;
     this.numPencilmarks = this.numCells * this.numValues;
     this.noDefaultBoxes = this.boxHeight === 1 || this.boxWidth === 1;
 
@@ -58,7 +64,7 @@ export class GridShape {
     this.allCells = [];
     for (let i = 0; i < this.numCells; i++) this.allCells.push(i);
 
-    this.maxSum = this.gridSize * (this.gridSize + 1) / 2;
+    this.maxSum = this.numValues * (this.numValues + 1) / 2;
 
     Object.freeze(this);
   }
@@ -86,11 +92,11 @@ export class GridShape {
   }
 
   cellIndex = (row, col) => {
-    return row * this.gridSize + col;
+    return row * this.numCols + col;
   }
 
   splitCellIndex = (cell) => {
-    return [cell / this.gridSize | 0, cell % this.gridSize | 0];
+    return [cell / this.numCols | 0, cell % this.numCols | 0];
   }
 
   parseValueId = (valueId) => {

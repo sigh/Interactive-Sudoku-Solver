@@ -1311,7 +1311,7 @@ export class Lunchbox extends SudokuConstraintHandler {
 
   initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
     const sum = this._sum;
-    this._isHouse = this.cells.length === shape.gridSize;
+    this._isHouse = this.cells.length === shape.numValues;
 
     const lookupTables = LookupTables.get(shape.numValues);
 
@@ -1329,12 +1329,12 @@ export class Lunchbox extends SudokuConstraintHandler {
   }
 
   static _borderMask(shape) {
-    return 1 | LookupTables.fromValue(shape.gridSize);
+    return 1 | LookupTables.fromValue(shape.numValues);
   }
 
   // Max sum within the sandwich.
   static _maxSum(shape) {
-    return (shape.gridSize * (shape.gridSize - 1) / 2) - 1;
+    return (shape.numValues * (shape.numValues - 1) / 2) - 1;
   }
 
   // Possible combinations for values between the sentinels for each possible sum.
@@ -1345,7 +1345,7 @@ export class Lunchbox extends SudokuConstraintHandler {
     const borderMask = this._borderMask(shape);
 
     let table = [];
-    const maxD = shape.gridSize - 1;
+    const maxD = shape.numValues - 1;
     for (let i = 0; i <= maxSum; i++) {
       const subtable = [];
       table.push(subtable);
@@ -1389,8 +1389,8 @@ export class Lunchbox extends SudokuConstraintHandler {
   });
 
   // Scratch buffers for reuse so we don't have to create arrays at runtime.
-  static _validSettings = new Uint16Array(SHAPE_MAX.gridSize);
-  static _cellValues = new Uint16Array(SHAPE_MAX.gridSize);
+  static _validSettings = new Uint16Array(SHAPE_MAX.numValues);
+  static _cellValues = new Uint16Array(SHAPE_MAX.numValues);
 
   enforceConsistency(grid, handlerAccumulator) {
     const isHouse = this._isHouse;
@@ -1590,8 +1590,8 @@ export class SameValues extends SudokuConstraintHandler {
     return true;
   }
 
-  static _buffer1 = new Uint16Array(SHAPE_MAX.gridSize);
-  static _buffer2 = new Uint16Array(SHAPE_MAX.gridSize);
+  static _buffer1 = new Uint16Array(SHAPE_MAX.numValues);
+  static _buffer2 = new Uint16Array(SHAPE_MAX.numValues);
 
   enforceConsistency(grid, handlerAccumulator) {
     const numSets = this._cellSets.length;
@@ -2648,15 +2648,19 @@ export class FullRank extends SudokuConstraintHandler {
     ANY: 2,
   });
 
-  static buildEntries(gridSize) {
+  static buildEntries(shape) {
+    const numRows = shape.numRows;
+    const numCols = shape.numCols;
     const entries = [];
-    for (let i = 0; i < gridSize; i++) {
+    for (let i = 0; i < numRows; i++) {
       const row = Uint8Array.from(
-        { length: gridSize }, (_, j) => i * gridSize + j);
+        { length: numCols }, (_, j) => i * numCols + j);
       entries.push(row);
       entries.push(row.slice().reverse());
+    }
+    for (let i = 0; i < numCols; i++) {
       const col = Uint8Array.from(
-        { length: gridSize }, (_, j) => j * gridSize + i);
+        { length: numRows }, (_, j) => j * numCols + i);
       entries.push(col);
       entries.push(col.slice().reverse());
     }
@@ -2701,14 +2705,13 @@ export class FullRank extends SudokuConstraintHandler {
 
   initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
     // Initialize entries.
-    const gridSize = shape.gridSize;
-    const entries = FullRank.buildEntries(gridSize);
+    const entries = FullRank.buildEntries(shape);
 
     this._allEntries = entries;
 
     // Buffers used by _rejectFixedTies(). Allocate once per shape so they can
     // be reused and sorting works naturally.
-    this._seenPairsBuffer = new Uint32Array(shape.gridSize * 4);
+    this._seenPairsBuffer = new Uint32Array(shape.numValues * 4);
     this._pairBitSetsBuffer = new Uint16Array(shape.numValues);
 
     // Group entries with the same initial values.
@@ -2850,8 +2853,8 @@ export class FullRank extends SudokuConstraintHandler {
     return true;
   }
 
-  _viableEntriesBuffer = new Int16Array(SHAPE_MAX.gridSize * 4 + 1);
-  _flagsBuffer = new Uint8Array(SHAPE_MAX.gridSize * 4);
+  _viableEntriesBuffer = new Int16Array(SHAPE_MAX.numValues * 4 + 1);
+  _flagsBuffer = new Uint8Array(SHAPE_MAX.numValues * 4);
 
   _enforceUncluedEntriesForGiven(
     grid, handlerAccumulator, viableEntries, numViableEntries, given) {
@@ -3109,7 +3112,8 @@ export class FullRank extends SudokuConstraintHandler {
 
   candidateFinders(grid, shape) {
     const finders = [];
-    const gridSize = shape.gridSize;
+    const numRows = shape.numRows;
+    const numCols = shape.numCols;
 
     for (const rankSet of this._rankSets) {
       const value = rankSet.value;
@@ -3121,8 +3125,8 @@ export class FullRank extends SudokuConstraintHandler {
         const [row, col] = shape.splitCellIndex(cell0);
         if (row === 0) flags[0] = 0;
         if (col === 0) flags[1] = 0;
-        if (row === gridSize - 1) flags[2] = 0;
-        if (col === gridSize - 1) flags[3] = 0;
+        if (row === numRows - 1) flags[2] = 0;
+        if (col === numCols - 1) flags[3] = 0;
       }
 
       // Create a multiplier than prioritizes rankSets which have more clues.
@@ -3142,10 +3146,10 @@ export class FullRank extends SudokuConstraintHandler {
         addFinder(SudokuConstraintBase.colRegions(shape)[0]);
       }
       if (flags[2]) {
-        addFinder(SudokuConstraintBase.rowRegions(shape)[gridSize - 1]);
+        addFinder(SudokuConstraintBase.rowRegions(shape)[numRows - 1]);
       }
       if (flags[3]) {
-        addFinder(SudokuConstraintBase.colRegions(shape)[gridSize - 1]);
+        addFinder(SudokuConstraintBase.colRegions(shape)[numCols - 1]);
       }
     }
 
