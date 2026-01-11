@@ -89,6 +89,17 @@ await runTest('parsePlainSudoku should parse 16x16 grid', () => {
   assertShape(result, '16x16');
 });
 
+await runTest('parsePlainSudoku should parse 16x16 grid with letter digits', () => {
+  // 16x16 uses A-P for values 1-16 (baseCharCode is 'A' for numValues >= 10)
+  const input = 'ABCDEFGHIJKLMNOP'.repeat(16);
+  const result = SudokuParser.parsePlainSudoku(input);
+
+  assert.ok(result);
+  assertShape(result, '16x16');
+  // Each row has 16 givens, 16 rows = 256 givens
+  assertConstraintCount(result, 'Given', 256);
+});
+
 await runTest('parsePlainSudoku should parse 6x6 grid', () => {
   const result = SudokuParser.parsePlainSudoku('.'.repeat(36));
   assert.ok(result);

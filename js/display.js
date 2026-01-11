@@ -235,10 +235,10 @@ export class CellValueDisplay extends DisplayItem {
 
   _calculateMultiValueLayout(shape) {
     // Pre-compute multi-value layout parameters.
-    const lineHeight = shape.gridSize <= SHAPE_9x9.gridSize ? 17 : 10;
+    const lineHeight = shape.numValues <= SHAPE_9x9.numValues ? 17 : 10;
     const valuesPerLine = Math.ceil(Math.sqrt(shape.numValues));
     const yOffset = -DisplayItem.CELL_SIZE / 2 + 2;
-    const charWidth = shape.gridSize <= SHAPE_9x9.gridSize ? 9 : 6;
+    const charWidth = shape.numValues <= SHAPE_9x9.numValues ? 9 : 6;
     const totalWidth = (valuesPerLine * 2 - 1) * charWidth;
     const xOffset = (-totalWidth + charWidth) / 2;
     // Position offsets [dx, dy] for each value (1-indexed).
@@ -432,18 +432,19 @@ export class GridGraph {
       graph.push([null, null, null, null]);
     }
 
-    const gridSize = shape.gridSize;
+    const numRows = shape.numRows;
+    const numCols = shape.numCols;
     const cls = this.constructor;
 
-    for (let row = 0; row < gridSize; row++) {
-      for (let col = 0; col < gridSize; col++) {
+    for (let row = 0; row < numRows; row++) {
+      for (let col = 0; col < numCols; col++) {
         const cell = shape.cellIndex(row, col);
         const adj = graph[cell];
 
         if (row > 0) adj[cls.UP] = shape.cellIndex(row - 1, col);
-        if (row < gridSize - 1) adj[cls.DOWN] = shape.cellIndex(row + 1, col);
+        if (row < numRows - 1) adj[cls.DOWN] = shape.cellIndex(row + 1, col);
         if (col > 0) adj[cls.LEFT] = shape.cellIndex(row, col - 1);
-        if (col < gridSize - 1) adj[cls.RIGHT] = shape.cellIndex(row, col + 1);
+        if (col < numCols - 1) adj[cls.RIGHT] = shape.cellIndex(row, col + 1);
       }
     }
 
@@ -499,12 +500,13 @@ export class DisplayContainer {
 
   reshape(shape) {
     const padding = DisplayItem.SVG_PADDING;
-    const sideLength = DisplayItem.CELL_SIZE * shape.gridSize + padding * 2;
-    this._mainSvg.setAttribute('height', sideLength);
-    this._mainSvg.setAttribute('width', sideLength);
+    const width = DisplayItem.CELL_SIZE * shape.numCols + padding * 2;
+    const height = DisplayItem.CELL_SIZE * shape.numRows + padding * 2;
+    this._mainSvg.setAttribute('height', height);
+    this._mainSvg.setAttribute('width', width);
     this._mainSvg.setAttribute(
       'class',
-      shape.gridSize <= SHAPE_9x9.gridSize
+      shape.numValues <= SHAPE_9x9.numValues
         ? 'grid-size-small' : 'grid-size-large');
 
     this._highlightDisplay.reshape(shape);
@@ -551,18 +553,19 @@ class ClickInterceptor extends DisplayItem {
   reshape(shape) {
     super.reshape(shape);
 
-    const sideLength = DisplayItem.CELL_SIZE * shape.gridSize;
+    const width = DisplayItem.CELL_SIZE * shape.numCols;
+    const height = DisplayItem.CELL_SIZE * shape.numRows;
     const svg = this.getSvg();
-    svg.setAttribute('height', sideLength);
-    svg.setAttribute('width', sideLength);
+    svg.setAttribute('height', height);
+    svg.setAttribute('width', width);
   }
 
   cellAt(x, y) {
     const shape = this._shape;
     const row = y / DisplayItem.CELL_SIZE | 0;
     const col = x / DisplayItem.CELL_SIZE | 0;
-    if (row < 0 || row >= shape.gridSize) return null;
-    if (col < 0 || col >= shape.gridSize) return null;
+    if (row < 0 || row >= shape.numRows) return null;
+    if (col < 0 || col >= shape.numCols) return null;
     return shape.makeCellId(row, col);
   }
 }
@@ -707,18 +710,23 @@ export class GridDisplay extends DisplayItem {
     this.clear();
 
     const cellSize = DisplayItem.CELL_SIZE;
-    const gridSize = cellSize * shape.gridSize;
+    const gridWidth = cellSize * shape.numCols;
+    const gridHeight = cellSize * shape.numRows;
 
     const grid = this.getSvg();
 
-    for (let i = 1; i < gridSize; i++) {
+    // Horizontal lines
+    for (let i = 1; i < shape.numRows; i++) {
       grid.append(this._makePath([
         [0, i * cellSize],
-        [gridSize, i * cellSize],
+        [gridWidth, i * cellSize],
       ]));
+    }
+    // Vertical lines
+    for (let i = 1; i < shape.numCols; i++) {
       grid.append(this._makePath([
         [i * cellSize, 0],
-        [i * cellSize, gridSize],
+        [i * cellSize, gridHeight],
       ]));
     }
   }
@@ -735,21 +743,26 @@ export class BorderDisplay extends DisplayItem {
     this._fill = fill;
   }
 
-  gridSizePixels() {
-    return DisplayItem.CELL_SIZE * this._shape.gridSize;
+  gridWidthPixels() {
+    return DisplayItem.CELL_SIZE * this._shape.numCols;
+  }
+
+  gridHeightPixels() {
+    return DisplayItem.CELL_SIZE * this._shape.numRows;
   }
 
   reshape(shape) {
     super.reshape(shape);
     this.clear();
 
-    const gridSizePixels = this.gridSizePixels();
+    const gridWidth = this.gridWidthPixels();
+    const gridHeight = this.gridHeightPixels();
 
     const path = this._makePath([
       [0, 0],
-      [0, gridSizePixels],
-      [gridSizePixels, gridSizePixels],
-      [gridSizePixels, 0],
+      [0, gridHeight],
+      [gridWidth, gridHeight],
+      [gridWidth, 0],
       [0, 0],
     ]);
     if (this._fill) path.setAttribute('fill', this._fill);

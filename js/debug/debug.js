@@ -364,16 +364,6 @@ export const runAll = async (puzzles, runner) => {
   return result;
 };
 
-export const printGrid = (grid) => {
-  const gridSize = Math.sqrt(grid.length);
-  const matrix = [];
-  for (let i = 0; i < gridSize; i++) {
-    matrix.push(
-      [...grid.slice(i * gridSize, (i + 1) * gridSize)].map(LookupTables.toValue));
-  }
-  console.table(matrix);
-}
-
 export const progressBenchmarks = async () => {
   const puzzleSets = {
     MATHEMAGIC_KILLERS,

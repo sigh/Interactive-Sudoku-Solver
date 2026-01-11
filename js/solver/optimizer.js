@@ -382,10 +382,10 @@ export class SudokuConstraintOptimizer {
   _fillInSumGap(sumHandlers, sumCells, shape) {
     // Fill in a gap if one remains.
     const numNonSumCells = shape.numCells - sumCells.size;
-    if (numNonSumCells == 0 || numNonSumCells >= shape.gridSize) return [];
+    if (numNonSumCells == 0 || numNonSumCells >= shape.numValues) return [];
 
     const sumHandlersSum = sumHandlers.map(h => h.sum()).reduce((a, b) => a + b);
-    const remainingSum = shape.gridSize * shape.maxSum - sumHandlersSum;
+    const remainingSum = shape.numValues * shape.maxSum - sumHandlersSum;
 
     const remainingCells = new Set(shape.allCells);
     sumHandlers.forEach(h => h.cells.forEach(c => remainingCells.delete(c)));
@@ -469,7 +469,7 @@ export class SudokuConstraintOptimizer {
   _addSumIntersectionHandler(
     houseHandler, intersectingSumHandlers, intersectingHouseHandlers,
     allHouseHandlers, cellExclusions, shape) {
-    const gridSize = shape.gridSize;
+    const numValues = shape.numValues;
 
     let totalSum = 0;
     let cells = new Set();
@@ -519,16 +519,16 @@ export class SudokuConstraintOptimizer {
     // Note that houses used to construct the cells won't match as we have
     // already removed the cells in the current house.
     let removedExtraHouses = false;
-    if (cells.size >= gridSize) {
+    if (cells.size >= numValues) {
       for (const h of allHouseHandlers) {
         // Ignore any houses which don't cover the cells.
         const intersectSize = setIntersectSize(cells, h.cells);
-        if (intersectSize != gridSize) continue;
+        if (intersectSize != numValues) continue;
         // This house is completely contained within the cells.
         totalSum -= shape.maxSum;
         h.cells.forEach(c => cells.delete(c));
         removedExtraHouses = true;
-        if (cells.size < gridSize) break;
+        if (cells.size < numValues) break;
       }
     }
 
@@ -671,7 +671,7 @@ export class SudokuConstraintOptimizer {
       // pass.
       if (constrainedCells.length == 1) continue;
       // Nothing left to constrain.
-      if (constrainedCells.length == shape.gridSize) continue;
+      if (constrainedCells.length == shape.numValues) continue;
 
       const complementHandler = new SumHandlerModule.Sum(
         complementCells, complementSum);
@@ -738,7 +738,7 @@ export class SudokuConstraintOptimizer {
     ];
   });
 
-  _generalRegionOverlapProcessor(regions, pieces, gridSize, callback) {
+  _generalRegionOverlapProcessor(regions, pieces, numValues, callback) {
     const superRegion = new Set();
     const remainingPieces = new Set(pieces);
     const usedPieces = [];
@@ -747,7 +747,7 @@ export class SudokuConstraintOptimizer {
     let i = 0;
     for (const r of regions) {
       i++;
-      if (i == gridSize) break;
+      if (i == numValues) break;
 
       // Add r to our super-region.
       r.forEach(e => superRegion.add(e));
@@ -782,7 +782,7 @@ export class SudokuConstraintOptimizer {
       const diffB = setDifference(piecesRegion, superRegion);
       // Ignore diff that too big, they are probably not very well
       // constrained.
-      if (diffA.size >= shape.gridSize) return;
+      if (diffA.size >= shape.numValues) return;
 
       // All values in the set differences must be the same.
       const newHandler = new HandlerModule.SameValuesIgnoreCount(diffA, diffB);
@@ -794,7 +794,7 @@ export class SudokuConstraintOptimizer {
       hasBoxes ? this._overlapRegionsWithBox(shape) : this._overlapRegions(shape));
     for (const r of overlapRegions) {
       this._generalRegionOverlapProcessor(
-        r, jigsawPieces.map(p => p.cells), shape.gridSize, handleOverlap);
+        r, jigsawPieces.map(p => p.cells), shape.numValues, handleOverlap);
     }
 
     return newHandlers;
@@ -802,7 +802,7 @@ export class SudokuConstraintOptimizer {
 
   _makeInnieOutieSumHandlers(sumHandlers, hasBoxes, shape) {
     const newHandlers = [];
-    const gridSize = shape.gridSize;
+    const numValues = shape.numValues;
 
     const pieces = sumHandlers.map(h => h.cells);
     const piecesMap = new Map(sumHandlers.map(h => [h.cells, h.sum()]));
@@ -823,7 +823,7 @@ export class SudokuConstraintOptimizer {
       // No diff, no new constraints to add.
       if (diffA.size == 0 && diffB.size == 0) return;
       // Don't use this if the diff is too large.
-      if (diffA.size + diffB.size > gridSize) return;
+      if (diffA.size + diffB.size > numValues) return;
 
       // We can only do negative sum constraints when the diff is 1.
       // We can only do sum constraints when the diff is 0.
@@ -837,7 +837,7 @@ export class SudokuConstraintOptimizer {
         // currently have one, so we'll take all the help we can get!
       }
 
-      let sumDelta = -superRegion.size * shape.maxSum / gridSize;
+      let sumDelta = -superRegion.size * shape.maxSum / numValues;
       for (const p of usedPieces) sumDelta += piecesMap.get(p);
 
       // Ensure diffA is the smaller.
@@ -867,7 +867,7 @@ export class SudokuConstraintOptimizer {
       hasBoxes ? this._overlapRegionsWithBox(shape) : this._overlapRegions(shape));
     for (const r of overlapRegions) {
       this._generalRegionOverlapProcessor(
-        r, pieces, shape.gridSize, handleOverlap);
+        r, pieces, shape.numValues, handleOverlap);
     }
 
     return newHandlers;
@@ -886,7 +886,7 @@ export class SudokuConstraintOptimizer {
     }
 
     // Reuse FullRank's entry construction so we stay in sync.
-    const entries = HandlerModule.FullRank.buildEntries(shape.gridSize);
+    const entries = HandlerModule.FullRank.buildEntries(shape);
     const equalsKey = SudokuConstraintOptimizer._equalsKey(shape.numValues);
 
     // Dedupe. Keep the first clue per rank; if we see a duplicate rank,

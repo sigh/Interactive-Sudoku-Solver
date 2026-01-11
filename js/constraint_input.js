@@ -765,7 +765,7 @@ ConstraintCategoryInput.Jigsaw = class Jigsaw extends ConstraintCategoryInput {
 
   _cellsAreValidJigsawPiece(cells) {
     const shape = this._shape;
-    if (cells.length != shape.gridSize) return false;
+    if (cells.length != shape.numValues) return false;
 
     // Check that we don't conflict with any existing constraints.
     for (const cell of cells) {

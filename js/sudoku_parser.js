@@ -8,7 +8,7 @@ export class SudokuParser {
 
     const shape = SHAPE_9x9;
     const numCells = shape.numCells;
-    const gridSize = shape.gridSize;
+    const numCols = shape.numCols;
 
     if (text.length != numCells) return null;
     // Note: The second ` is just there so my syntax highlighter is happy.
@@ -20,10 +20,10 @@ export class SudokuParser {
     for (let i = 0; i < numCells; i++) {
       switch (text[i]) {
         case 'v':
-          cellDirections.push(i + gridSize);
+          cellDirections.push(i + numCols);
           break;
         case '^':
-          cellDirections.push(i - gridSize);
+          cellDirections.push(i - numCols);
           break;
         case '<':
           cellDirections.push(i - 1);
@@ -32,16 +32,16 @@ export class SudokuParser {
           cellDirections.push(i + 1);
           break;
         case '`':
-          cellDirections.push(i - gridSize - 1);
+          cellDirections.push(i - numCols - 1);
           break;
         case '\'':
-          cellDirections.push(i - gridSize + 1);
+          cellDirections.push(i - numCols + 1);
           break;
         case ',':
-          cellDirections.push(i + gridSize - 1);
+          cellDirections.push(i + numCols - 1);
           break;
         case '.':
-          cellDirections.push(i + gridSize + 1);
+          cellDirections.push(i + numCols + 1);
           break;
         default:
           cellDirections.push(i);
@@ -55,7 +55,7 @@ export class SudokuParser {
       while (cellDirections[cageCell] != cageCell) {
         cageCell = cellDirections[cageCell];
         count++;
-        if (count > gridSize) {
+        if (count > numCols) {
           throw ('Loop in Killer Sudoku input.');
         }
       }
@@ -130,7 +130,7 @@ export class SudokuParser {
     if (!shape) return null;
 
     const numCells = shape.numCells;
-    const gridSize = shape.gridSize;
+    const numValues = shape.numValues;
 
     const baseCharCode = GridShape.baseCharCode(shape);
     if (!baseCharCode) return null;
@@ -139,7 +139,7 @@ export class SudokuParser {
     let nonValueCharacters = [];
     for (let i = 0; i < numCells; i++) {
       let c = text.charCodeAt(i);
-      if (c >= baseCharCode && c <= baseCharCode + gridSize - 1) {
+      if (c >= baseCharCode && c <= baseCharCode + numValues - 1) {
         fixedValues.push(shape.makeValueId(i, c - baseCharCode + 1));
       } else {
         nonValueCharacters.push(c);
@@ -157,10 +157,10 @@ export class SudokuParser {
     if (!shape) return null;
 
     const numCells = shape.numCells;
-    const gridSize = shape.gridSize;
+    const numValues = shape.numValues;
 
     const chars = new Set(text);
-    if (chars.size != gridSize) return null;
+    if (chars.size != numValues) return null;
 
     const counter = {};
     chars.forEach(c => counter[c] = 0);
@@ -168,7 +168,7 @@ export class SudokuParser {
       counter[text[i]]++;
     }
 
-    if (Object.values(counter).some(c => c != gridSize)) return null;
+    if (Object.values(counter).some(c => c != numValues)) return null;
 
     return new SudokuConstraint.Container([
       new SudokuConstraint.Shape(shape.name),
