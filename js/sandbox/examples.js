@@ -225,7 +225,9 @@ const RUN_SOLVER_FN = async () => {
   console.table(results);
 
   console.log('\n=== Solutions ===\n');
-  for (const s of solutions) console.log(s);
+  for (let i = 0; i < puzzles.length; i++) {
+    console.log(solverLink(puzzles[i], `Puzzle #${i + 1}`), solutions[i]);
+  }
 
   // Return nothing to skip solver invocation.
 };

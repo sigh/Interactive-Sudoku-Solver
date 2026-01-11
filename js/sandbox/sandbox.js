@@ -120,6 +120,34 @@ class Sandbox {
     });
   }
 
+  _renderSolverLink(constraintStr, text) {
+    const span = document.createElement('span');
+
+    const link = document.createElement('a');
+    link.href = `./?q=${encodeURIComponent(constraintStr)}`;
+    link.target = '_blank';
+    link.textContent = text;
+    span.appendChild(link);
+
+    const previewBtn = document.createElement('button');
+    previewBtn.className = 'solver-link-preview';
+    previewBtn.title = 'Load in preview grid';
+    const img = document.createElement('img');
+    img.src = 'img/pageview-48.png';
+    img.alt = 'Preview';
+    previewBtn.appendChild(img);
+    previewBtn.onclick = () => {
+      this.constraintElement.textContent = constraintStr;
+      const url = `./?q=${encodeURIComponent(constraintStr)}`;
+      this.solverLinkElement.href = url;
+      this.solverLinkElement.style.display = 'inline-block';
+      this._gridPreview.render(constraintStr);
+    };
+    span.appendChild(previewBtn);
+
+    return span;
+  }
+
   _copyConstraint() {
     const text = this.constraintElement.textContent;
     navigator.clipboard.writeText(text);
@@ -138,7 +166,7 @@ class Sandbox {
     spinner.classList.add('active');
     this.errorElement.textContent = '';
     this.constraintElement.textContent = '';
-    this.outputElement.textContent = '';
+    this.outputElement.innerHTML = '';
     this.statusElement.textContent = '';
     this.solverLinkElement.style.display = 'none';
     this._gridPreview.hide();
@@ -147,16 +175,25 @@ class Sandbox {
 
     // Callbacks for streaming updates.
     const callbacks = {
-      onLog: (text) => {
-        if (this.outputElement.textContent) {
-          this.outputElement.textContent += '\n';
+      onLog: (segments) => {
+        if (this.outputElement.textContent || this.outputElement.children.length) {
+          this.outputElement.appendChild(document.createTextNode('\n'));
         }
-        this.outputElement.textContent += text;
+        for (let i = 0; i < segments.length; i++) {
+          if (i > 0) this.outputElement.appendChild(document.createTextNode(' '));
+          const segment = segments[i];
+          if (typeof segment === 'string') {
+            this.outputElement.appendChild(document.createTextNode(segment));
+          } else if (segment.type === 'link') {
+            this.outputElement.appendChild(
+              this._renderSolverLink(segment.constraintStr, segment.text));
+          }
+        }
         // Auto-scroll to bottom.
         this.outputElement.scrollTop = this.outputElement.scrollHeight;
       },
-      onStatus: (text) => {
-        this.statusElement.textContent = text;
+      onStatus: (segments) => {
+        this.statusElement.textContent = segments.map(s => typeof s === 'string' ? s : s.text).join(' ');
       },
     };
 

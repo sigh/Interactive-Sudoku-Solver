@@ -68,6 +68,9 @@ UTILITIES
   console.warn()        - Output a warning to the console
   console.info()        - Update status display
   console.table(data)   - Render array of objects as a table
+  solverLink(c, t)      - Pass into console.log for clickable link to the solver
+                          c: constraint (string, object, or array)
+                          t: optional link text (defaults to constraint string)
   help()                - Display this message
 
 LONG RUNNING TASKS
@@ -149,12 +152,39 @@ const makeSolver = async () => {
 };
 
 /**
+ * Represents a clickable link to the solver with a constraint.
+ */
+class SolverLink {
+  constructor(constraint, text) {
+    this.constraint = constraint;
+    this.text = text;
+  }
+
+  get constraintStr() {
+    if (typeof this.constraint === 'string') return this.constraint;
+    if (Array.isArray(this.constraint)) {
+      return this.constraint.map(c => typeof c === 'string' ? c : c.toString()).join('');
+    }
+    return this.constraint.toString();
+  }
+}
+
+/**
+ * Create a link to the solver for a constraint.
+ * @param {string|object|array} constraint - Constraint string, object, or array
+ * @param {string} [text] - Optional link text (defaults to constraint string)
+ * @returns {SolverLink}
+ */
+const solverLink = (constraint, text) => new SolverLink(constraint, text);
+
+/**
  * Format a value for console output.
  * Uses toString() for objects that have a custom implementation (like Solution).
  */
 const formatConsoleArg = (a) => {
   if (a == null) return String(a);
   if (typeof a !== 'object') return String(a);
+  if (a instanceof SolverLink) return a; // Keep as-is for special handling
   if (typeof a.toString === 'function' && a.toString !== Object.prototype.toString) {
     return a.toString();
   }
@@ -182,17 +212,26 @@ const formatTable = (data, columns) => {
 
 /**
  * Create sandbox console methods that emit to a callback.
- * @param {function} emit - Callback receiving { type, text }
+ * @param {function} emit - Callback receiving { type, segments } where segments is an array of strings or { type: 'link', text, constraintStr }
  * @returns {object} Console methods to override
  */
 export const createSandboxConsole = (emit) => {
-  const format = (...args) => args.map(formatConsoleArg).join(' ');
+  const format = (...args) => {
+    return args.map(a => {
+      if (a instanceof SolverLink) {
+        const constraintStr = a.constraintStr;
+        const text = a.text || constraintStr;
+        return { type: 'link', text, constraintStr };
+      }
+      return formatConsoleArg(a);
+    });
+  };
   return {
-    log: (...args) => emit({ type: 'log', text: format(...args) }),
-    error: (...args) => emit({ type: 'log', text: '❌ ' + format(...args) }),
-    warn: (...args) => emit({ type: 'log', text: '⚠️ ' + format(...args) }),
-    info: (...args) => emit({ type: 'status', text: format(...args) }),
-    table: (data, columns) => emit({ type: 'log', text: formatTable(data, columns) }),
+    log: (...args) => emit({ type: 'log', segments: format(...args) }),
+    error: (...args) => emit({ type: 'log', segments: ['❌ ', ...format(...args)] }),
+    warn: (...args) => emit({ type: 'log', segments: ['⚠️ ', ...format(...args)] }),
+    info: (...args) => emit({ type: 'status', segments: format(...args) }),
+    table: (data, columns) => emit({ type: 'log', segments: [formatTable(data, columns)] }),
   };
 };
 
@@ -222,6 +261,7 @@ export const SANDBOX_GLOBALS = {
   parseConstraint,
   parseCellId,
   makeCellId,
+  solverLink,
   help,
   makeSolver,
   SHAPE_9x9,

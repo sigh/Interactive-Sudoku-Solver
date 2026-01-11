@@ -2343,11 +2343,11 @@ export class UserScriptExecutor {
 
       // Handle streaming messages (don't remove from pending).
       if (type === 'log') {
-        p.onLog?.(text);
+        p.onLog?.(e.data.segments);
         return;
       }
       if (type === 'status') {
-        p.onStatus?.(text);
+        p.onStatus?.(e.data.segments);
         return;
       }
       if (type === 'extendTimeout') {

@@ -157,6 +157,25 @@ p code {
   min-height: 0;
 }
 
+.output .solver-link-preview {
+  background: none;
+  border: none;
+  padding: 0;
+  margin-left: 2px;
+  cursor: pointer;
+  vertical-align: middle;
+  opacity: 0.6;
+}
+
+.output .solver-link-preview:hover {
+  opacity: 1;
+}
+
+.output .solver-link-preview img {
+  width: 14px;
+  height: 14px;
+}
+
 /* Status display (console.info) */
 .status {
   background: #f0f7ff;

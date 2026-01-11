@@ -48,11 +48,17 @@ const sendMessage = async (type, payload) => {
   const collectStreaming = () => {
     for (const msg of messages) {
       if (msg.id === id) {
-        if (msg.type === 'log' && !streamedLogs.includes(msg.text)) {
-          streamedLogs.push(msg.text);
+        if (msg.type === 'log' && msg.segments) {
+          const text = msg.segments.map(s => typeof s === 'string' ? s : s.text).join(' ');
+          if (!streamedLogs.includes(text)) {
+            streamedLogs.push(text);
+          }
         }
-        if (msg.type === 'status' && !streamedStatus.includes(msg.text)) {
-          streamedStatus.push(msg.text);
+        if (msg.type === 'status' && msg.segments) {
+          const text = msg.segments.map(s => typeof s === 'string' ? s : s.text).join(' ');
+          if (!streamedStatus.includes(text)) {
+            streamedStatus.push(text);
+          }
         }
       }
     }
