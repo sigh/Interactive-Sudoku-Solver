@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 
 import { logSuiteComplete } from './helpers/test_runner.js';
 
-const { SolverAPI } = await import('../js/sandbox/solver_api.js' + self.VERSION_PARAM);
+const { SimpleSolver } = await import('../js/sandbox/simple_solver.js' + self.VERSION_PARAM);
 
 const debugModule = await import('../js/debug/debug.js');
 const {
@@ -14,7 +14,7 @@ const {
 await debugFilesLoaded;
 
 const runner = new PuzzleRunner({
-  solver: new SolverAPI(),
+  solver: new SimpleSolver(),
   enableConsoleLogs: false,
 });
 

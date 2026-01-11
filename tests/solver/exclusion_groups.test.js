@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 
 import { runTest, logSuiteComplete } from '../helpers/test_runner.js';
 
-const { SolverAPI } = await import('../../js/sandbox/solver_api.js' + self.VERSION_PARAM);
+const { SimpleSolver } = await import('../../js/sandbox/simple_solver.js' + self.VERSION_PARAM);
 
 const { CellExclusions, HandlerSet } = await import('../../js/solver/engine.js' + self.VERSION_PARAM);
 const { HandlerUtil } = await import('../../js/solver/handlers.js' + self.VERSION_PARAM);
@@ -93,7 +93,7 @@ await runTest('Contradictory constraints (RegionSumLine + Palindrome) do not cra
   // which creates self-exclusions via areSameValue.
   const constraintStr = '.RegionSumLine~R6C1~R7C2~R8C3~R9C4.Palindrome~R6C1~R7C2~R8C3~R9C4';
 
-  const solver = new SolverAPI();
+  const solver = new SimpleSolver();
   // This should not throw an error during setup, and should find no solutions.
   const result = await solver.solution(constraintStr);
   assert.equal(result, null, 'Contradictory constraints should have no solution');

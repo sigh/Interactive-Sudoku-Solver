@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 
 import { runTest, logSuiteComplete } from './helpers/test_runner.js';
 
-const { SolverAPI, Solution, SolverStats } = await import('../js/sandbox/solver_api.js' + self.VERSION_PARAM);
+const { SimpleSolver, Solution, SolverStats } = await import('../js/sandbox/simple_solver.js' + self.VERSION_PARAM);
 const { DISPLAYED_EXAMPLES } = await import('../data/example_puzzles.js' + self.VERSION_PARAM);
 
 // Get puzzles by name from the examples
@@ -21,7 +21,7 @@ const MULTI_SOLUTIONS = '.Shape~4x4.~R1C1_1';
 // ============================================================================
 
 await runTest('Solution.valueAt with cell ID', async () => {
-  const solver = new SolverAPI();
+  const solver = new SimpleSolver();
   const solution = await solver.solution(CLASSIC_SUDOKU.input);
   assert.ok(solution, 'Should find a solution');
   assert.equal(solution.valueAt('R1C1'), 5);
@@ -30,7 +30,7 @@ await runTest('Solution.valueAt with cell ID', async () => {
 });
 
 await runTest('Solution.valueAt with row/col', async () => {
-  const solver = new SolverAPI();
+  const solver = new SimpleSolver();
   const solution = await solver.solution(CLASSIC_SUDOKU.input);
   assert.ok(solution, 'Should find a solution');
   // Row/col are 1-indexed
@@ -40,14 +40,14 @@ await runTest('Solution.valueAt with row/col', async () => {
 });
 
 await runTest('Solution.toString returns short solution string', async () => {
-  const solver = new SolverAPI();
+  const solver = new SimpleSolver();
   const solution = await solver.solution(CLASSIC_SUDOKU.input);
   assert.ok(solution, 'Should find a solution');
   assert.equal(solution.toString(), CLASSIC_SUDOKU.solution);
 });
 
 await runTest('Solution.equals with string', async () => {
-  const solver = new SolverAPI();
+  const solver = new SimpleSolver();
   const solution = await solver.solution(CLASSIC_SUDOKU.input);
   assert.ok(solution, 'Should find a solution');
   assert.ok(solution.equals(CLASSIC_SUDOKU.solution));
@@ -55,14 +55,14 @@ await runTest('Solution.equals with string', async () => {
 });
 
 await runTest('Solution.equals with Solution', async () => {
-  const solver = new SolverAPI();
+  const solver = new SimpleSolver();
   const solution1 = await solver.solution(CLASSIC_SUDOKU.input);
   const solution2 = await solver.solution(CLASSIC_SUDOKU.input);
   assert.ok(solution1.equals(solution2));
 });
 
 await runTest('Solution iterator yields all cells', async () => {
-  const solver = new SolverAPI();
+  const solver = new SimpleSolver();
   const solution = await solver.solution(CLASSIC_SUDOKU.input);
   assert.ok(solution, 'Should find a solution');
 
@@ -78,7 +78,7 @@ await runTest('Solution iterator yields all cells', async () => {
 });
 
 await runTest('Solution.getArray returns typed array', async () => {
-  const solver = new SolverAPI();
+  const solver = new SimpleSolver();
   const solution = await solver.solution(CLASSIC_SUDOKU.input);
   assert.ok(solution, 'Should find a solution');
   const arr = solution.getArray();
@@ -88,32 +88,32 @@ await runTest('Solution.getArray returns typed array', async () => {
 });
 
 // ============================================================================
-// SolverAPI.solution tests
+// SimpleSolver.solution tests
 // ============================================================================
 
 await runTest('solution() returns Solution for valid puzzle', async () => {
-  const solver = new SolverAPI();
+  const solver = new SimpleSolver();
   const solution = await solver.solution(CLASSIC_SUDOKU.input);
   assert.ok(solution instanceof Solution);
   assert.equal(solution.toString(), CLASSIC_SUDOKU.solution);
 });
 
 await runTest('solution() works for thermo sudoku', async () => {
-  const solver = new SolverAPI();
+  const solver = new SimpleSolver();
   const solution = await solver.solution(THERMOSUDOKU.input);
   assert.ok(solution);
   assert.equal(solution.toString(), THERMOSUDOKU.solution);
 });
 
 await runTest('solution() works for killer sudoku', async () => {
-  const solver = new SolverAPI();
+  const solver = new SimpleSolver();
   const solution = await solver.solution(KILLER_SUDOKU.input);
   assert.ok(solution);
   assert.equal(solution.toString(), KILLER_SUDOKU.solution);
 });
 
 await runTest('solution() works for jigsaw sudoku', async () => {
-  const solver = new SolverAPI();
+  const solver = new SimpleSolver();
   const solution = await solver.solution(JIGSAW.input);
   assert.ok(solution);
   assert.equal(solution.toString(), JIGSAW.solution);
@@ -121,7 +121,7 @@ await runTest('solution() works for jigsaw sudoku', async () => {
 
 await runTest('solution() accepts constraint array', async () => {
   const { SudokuConstraint } = await import('../js/sudoku_constraint.js' + self.VERSION_PARAM);
-  const solver = new SolverAPI();
+  const solver = new SimpleSolver();
   const constraints = [
     new SudokuConstraint.Given('R1C1', 5),
     new SudokuConstraint.Given('R1C2', 3),
@@ -133,28 +133,28 @@ await runTest('solution() accepts constraint array', async () => {
 });
 
 // ============================================================================
-// SolverAPI.uniqueSolution tests
+// SimpleSolver.uniqueSolution tests
 // ============================================================================
 
 await runTest('uniqueSolution() returns solution when exactly one exists', async () => {
-  const solver = new SolverAPI();
+  const solver = new SimpleSolver();
   const solution = await solver.uniqueSolution(CLASSIC_SUDOKU.input);
   assert.ok(solution instanceof Solution);
   assert.equal(solution.toString(), CLASSIC_SUDOKU.solution);
 });
 
 await runTest('uniqueSolution() returns null when multiple solutions exist', async () => {
-  const solver = new SolverAPI();
+  const solver = new SimpleSolver();
   const solution = await solver.uniqueSolution(MULTI_SOLUTIONS);
   assert.equal(solution, null);
 });
 
 // ============================================================================
-// SolverAPI.solutions iterator tests
+// SimpleSolver.solutions iterator tests
 // ============================================================================
 
 await runTest('solutions() yields all solutions for unique puzzle', async () => {
-  const solver = new SolverAPI();
+  const solver = new SimpleSolver();
   const solutions = [];
   for await (const s of solver.solutions(CLASSIC_SUDOKU.input)) {
     solutions.push(s);
@@ -164,7 +164,7 @@ await runTest('solutions() yields all solutions for unique puzzle', async () => 
 });
 
 await runTest('solutions() yields all solutions for multi-solution puzzle', async () => {
-  const solver = new SolverAPI();
+  const solver = new SimpleSolver();
   const solutions = [];
   for await (const s of solver.solutions(MULTI_SOLUTIONS)) {
     solutions.push(s);
@@ -176,7 +176,7 @@ await runTest('solutions() yields all solutions for multi-solution puzzle', asyn
 });
 
 await runTest('solutions() respects limit parameter', async () => {
-  const solver = new SolverAPI();
+  const solver = new SimpleSolver();
   const solutions = [];
   for await (const s of solver.solutions(MULTI_SOLUTIONS, 3)) {
     solutions.push(s);
@@ -188,7 +188,7 @@ await runTest('solutions() respects limit parameter', async () => {
 });
 
 await runTest('solutions() can break early', async () => {
-  const solver = new SolverAPI();
+  const solver = new SimpleSolver();
   let count = 0;
   for await (const s of solver.solutions(MULTI_SOLUTIONS)) {
     count++;
@@ -198,11 +198,11 @@ await runTest('solutions() can break early', async () => {
 });
 
 // ============================================================================
-// SolverAPI.solutionArray tests
+// SimpleSolver.solutionArray tests
 // ============================================================================
 
 await runTest('solutionArray() returns array of solutions', async () => {
-  const solver = new SolverAPI();
+  const solver = new SimpleSolver();
   const solutions = await solver.solutionArray(CLASSIC_SUDOKU.input);
   assert.ok(Array.isArray(solutions));
   assert.equal(solutions.length, 1);
@@ -210,7 +210,7 @@ await runTest('solutionArray() returns array of solutions', async () => {
 });
 
 await runTest('solutionArray() returns all solutions', async () => {
-  const solver = new SolverAPI();
+  const solver = new SimpleSolver();
   const solutions = await solver.solutionArray(MULTI_SOLUTIONS);
   assert.ok(solutions.length > 1, 'Should find multiple solutions');
   // Verify count matches countSolutions
@@ -219,41 +219,41 @@ await runTest('solutionArray() returns all solutions', async () => {
 });
 
 await runTest('solutionArray() respects limit', async () => {
-  const solver = new SolverAPI();
+  const solver = new SimpleSolver();
   const solutions = await solver.solutionArray(MULTI_SOLUTIONS, 5);
   assert.equal(solutions.length, 5);
 });
 
 // ============================================================================
-// SolverAPI.countSolutions tests
+// SimpleSolver.countSolutions tests
 // ============================================================================
 
 await runTest('countSolutions() returns correct count', async () => {
-  const solver = new SolverAPI();
+  const solver = new SimpleSolver();
   const count = await solver.countSolutions(CLASSIC_SUDOKU.input);
   assert.equal(count, 1);
 });
 
 await runTest('countSolutions() counts multiple solutions', async () => {
-  const solver = new SolverAPI();
+  const solver = new SimpleSolver();
   // 4x4 with one given - has multiple solutions but countable quickly
   const count = await solver.countSolutions(MULTI_SOLUTIONS);
   assert.ok(count > 1, `Expected multiple solutions, got ${count}`);
 });
 
 // ============================================================================
-// SolverAPI.validateLayout tests
+// SimpleSolver.validateLayout tests
 // ============================================================================
 
 await runTest('validateLayout() returns solution for valid layout', async () => {
-  const solver = new SolverAPI();
+  const solver = new SimpleSolver();
   // Standard 9x9 layout with no extra constraints
   const solution = await solver.validateLayout('');
   assert.ok(solution instanceof Solution);
 });
 
 await runTest('validateLayout() returns solution for valid jigsaw', async () => {
-  const solver = new SolverAPI();
+  const solver = new SimpleSolver();
   // Valid jigsaw from the test puzzle
   const layout = '.NoBoxes.Jigsaw~000000021453303021453333221453322221455566121445666111445566667488887777888887777';
   const solution = await solver.validateLayout(layout);
@@ -261,18 +261,18 @@ await runTest('validateLayout() returns solution for valid jigsaw', async () => 
 });
 
 // ============================================================================
-// SolverAPI.latestStats tests
+// SimpleSolver.latestStats tests
 // ============================================================================
 
 await runTest('latestStats() returns SolverStats', async () => {
-  const solver = new SolverAPI();
+  const solver = new SimpleSolver();
   await solver.solution(CLASSIC_SUDOKU.input);
   const stats = solver.latestStats();
   assert.ok(stats instanceof SolverStats);
 });
 
 await runTest('latestStats() contains timing info', async () => {
-  const solver = new SolverAPI();
+  const solver = new SimpleSolver();
   await solver.solution(CLASSIC_SUDOKU.input);
   const stats = solver.latestStats();
   assert.equal(typeof stats.setupTimeMs, 'number');
@@ -280,7 +280,7 @@ await runTest('latestStats() contains timing info', async () => {
 });
 
 await runTest('latestStats() contains counters', async () => {
-  const solver = new SolverAPI();
+  const solver = new SimpleSolver();
   await solver.solution(CLASSIC_SUDOKU.input);
   const stats = solver.latestStats();
   assert.equal(typeof stats.solutions, 'number');
@@ -291,7 +291,7 @@ await runTest('latestStats() contains counters', async () => {
 });
 
 await runTest('latestStats() updates after each solve', async () => {
-  const solver = new SolverAPI();
+  const solver = new SimpleSolver();
 
   await solver.solution(CLASSIC_SUDOKU.input);
   const stats1 = solver.latestStats();
@@ -305,11 +305,11 @@ await runTest('latestStats() updates after each solve', async () => {
 });
 
 // ============================================================================
-// SolverAPI reuse tests
+// SimpleSolver reuse tests
 // ============================================================================
 
 await runTest('solver can be reused for multiple puzzles', async () => {
-  const solver = new SolverAPI();
+  const solver = new SimpleSolver();
 
   const sol1 = await solver.solution(CLASSIC_SUDOKU.input);
   assert.ok(sol1);
@@ -325,17 +325,17 @@ await runTest('solver can be reused for multiple puzzles', async () => {
 // ============================================================================
 
 await runTest('empty constraint string uses default 9x9', async () => {
-  const solver = new SolverAPI();
+  const solver = new SimpleSolver();
   const solution = await solver.solution('');
   assert.ok(solution);
   assert.equal(solution.toString().length, 81);
 });
 
 await runTest('handles constraint with shape', async () => {
-  const solver = new SolverAPI();
+  const solver = new SimpleSolver();
   const solution = await solver.solution('.Shape~6x6');
   assert.ok(solution);
   assert.equal(solution.toString().length, 36);
 });
 
-logSuiteComplete('SolverAPI');
+logSuiteComplete('SimpleSolver');
