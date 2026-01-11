@@ -140,6 +140,8 @@ class Sandbox {
     this.constraintElement.textContent = '';
     this.outputElement.textContent = '';
     this.statusElement.textContent = '';
+    this.solverLinkElement.style.display = 'none';
+    this._gridPreview.hide();
 
     const code = this.jar.toString();
 
