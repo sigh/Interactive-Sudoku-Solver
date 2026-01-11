@@ -1046,6 +1046,10 @@ export class Skyscraper extends SudokuConstraintHandler {
   }
 
   initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
+    // Skyscraper requires full-length rows/columns.
+    if (this.cells.length !== shape.numValues) {
+      throw new Error('Skyscraper requires full-length rows/columns');
+    }
     // We need this to avoid overflowing the buffer.
     if (this._numVisible > shape.numValues) return false;
 
@@ -2704,6 +2708,10 @@ export class FullRank extends SudokuConstraintHandler {
   }
 
   initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
+    // FullRank requires square grids.
+    if (shape.numRows !== shape.numCols) {
+      throw new Error('FullRank requires a square grid');
+    }
     // Initialize entries.
     const entries = FullRank.buildEntries(shape);
 
