@@ -1,4 +1,4 @@
-// Solver API for sandbox, debug.js, and tests.
+// SimpleSolver for sandbox, debug.js, and tests.
 //
 // Provides a simplified interface to the solver that runs locally
 // without web workers.
@@ -98,19 +98,19 @@ export class SolverStats {
 }
 
 /**
- * Main solver interface.
+ * Simple synchronous solver interface.
  *
  * Each method takes constraints and runs a complete solve operation.
  * All operations run synchronously in the current thread.
  *
  * @example
- * const solver = new Solver();
+ * const solver = new SimpleSolver();
  * for (const c of constraints) {
  *   const solution = solver.solution(c);
  *   console.log(solution?.toString());
  * }
  */
-export class SolverAPI {
+export class SimpleSolver {
   constructor() {
     this._state = null;
   }

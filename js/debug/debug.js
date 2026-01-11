@@ -7,8 +7,8 @@ const { PUZZLE_INDEX } = await import('../../data/example_puzzles.js' + self.VER
 const { LookupTables } = await import('../solver/lookup_tables.js' + self.VERSION_PARAM);
 
 const makeSolver = async () => {
-  const { SolverAPI } = await import('../sandbox/solver_api.js' + self.VERSION_PARAM);
-  return new SolverAPI();
+  const { SimpleSolver } = await import('../sandbox/simple_solver.js' + self.VERSION_PARAM);
+  return new SimpleSolver();
 };
 
 const loadDataFile = async (name) => {

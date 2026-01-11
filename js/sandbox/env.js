@@ -144,8 +144,8 @@ const parseConstraint = (str) => {
 };
 
 const makeSolver = async () => {
-  const { SolverAPI } = await import('./solver_api.js');
-  return new SolverAPI();
+  const { SimpleSolver } = await import('./simple_solver.js');
+  return new SimpleSolver();
 };
 
 /**

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 
 import { runTest } from '../helpers/test_runner.js';
 
-const { SolverAPI } = await import('../../js/sandbox/solver_api.js' + self.VERSION_PARAM);
+const { SimpleSolver } = await import('../../js/sandbox/simple_solver.js' + self.VERSION_PARAM);
 import {
   setupConstraintTest,
   createAccumulator,
@@ -946,7 +946,7 @@ await runTest('FullRankTies any should still require enough "<" entries (no shor
 });
 
 await runTest('FullRankTies none should reject a row equal to another row reversed', async () => {
-  const solver = new SolverAPI();
+  const solver = new SimpleSolver();
   const base =
     '.Shape~4x4.' +
     '.~R1C1_3.~R1C2_4.~R1C3_2.~R1C4_1.' +
@@ -957,7 +957,7 @@ await runTest('FullRankTies none should reject a row equal to another row revers
 });
 
 await runTest('FullRank 4x4 regression: provided constraint string has no solutions', async () => {
-  const solver = new SolverAPI();
+  const solver = new SimpleSolver();
   const puzzle =
     '.Shape~4x4.FullRankTies~none.FullRank~C1~10~.FullRank~C2~15~.FullRank~C4~3~.FullRank~C3~~4.';
 
@@ -965,14 +965,14 @@ await runTest('FullRank 4x4 regression: provided constraint string has no soluti
 });
 
 await runTest('FullRank 4x4 regression: FullRankTies any should allow a solution (solver)', async () => {
-  const solver = new SolverAPI();
+  const solver = new SimpleSolver();
   const puzzle = '.Shape~4x4.FullRank~C1~10~.FullRank~C2~15~.FullRank~R4~5~.FullRankTies~any';
 
   assert.notEqual(await solver.solution(puzzle), null);
 });
 
 await runTest('FullRankTies only-unclued vs any: any can be solvable when only-unclued is not (solver)', async () => {
-  const solver = new SolverAPI();
+  const solver = new SimpleSolver();
   const anyPuzzle = '.Shape~4x4.FullRankTies~any.FullRank~R1~2~..FullRank~C3~15~.';
   const onlyPuzzle = '.Shape~4x4.FullRankTies~only-unclued.FullRank~R1~2~..FullRank~C3~15~.';
 
@@ -981,7 +981,7 @@ await runTest('FullRankTies only-unclued vs any: any can be solvable when only-u
 });
 
 await runTest('FullRank optimizer should dedupe same-rank clues and enforce equality (solver)', async () => {
-  const solver = new SolverAPI();
+  const solver = new SimpleSolver();
   // Two FullRank clues with the same rank imply the corresponding entries are tied,
   // so the optimizer should add equality constraints and keep only one of them
   // in the final FullRank handler.
