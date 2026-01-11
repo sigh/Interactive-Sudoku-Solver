@@ -235,6 +235,25 @@ await runTest('Lunchbox should handle house with borders adjacent', () => {
   assert.equal(result, true);
 });
 
+await runTest('Lunchbox should work with 2 cells and sum=0 (non-house edge case)', () => {
+  // This is a regression test for a bug where 2-cell non-house configurations
+  // with sum=0 would incorrectly return false because validSettings was never
+  // populated when both innerPossibilities and outerPossibilities were 0.
+  const context = setupConstraintTest({ numValues: 4, numCells: 2 });
+  const cells = [0, 1];
+  const handler = new Lunchbox(cells, 0);
+  handler.initialize(context.createGrid(), createCellExclusions({ numCells: 2 }), context.shape, {});
+
+  const grid = new Uint16Array(2);
+  grid[0] = mask(1, 4); // Can be either border value
+  grid[1] = mask(1, 4); // Can be either border value
+  const acc = createAccumulator();
+
+  const result = handler.enforceConsistency(grid, acc);
+
+  assert.equal(result, true, 'should handle 2-cell non-house with sum=0');
+});
+
 await runTest('Lunchbox should handle large valid sum', () => {
   const context = setupConstraintTest({ numValues: 9, numCells: 9 });
   const cells = [0, 1, 2, 3, 4, 5, 6, 7, 8];

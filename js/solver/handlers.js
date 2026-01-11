@@ -1495,6 +1495,7 @@ export class Lunchbox extends SudokuConstraintHandler {
         const disallowedInside = ~(innerValues & valueMask);
 
         let innerRanges = valueMask;
+        let foundValidCombination = false;
         for (let k = 0; k < combinations.length; k++) {
           let c = combinations[k];
           // Check if the inner values can create the combination.
@@ -1504,21 +1505,23 @@ export class Lunchbox extends SudokuConstraintHandler {
               innerPossibilities |= c;
               outerPossibilities |= ~c;
               innerRanges &= LookupTables.valueRangeInclusive(c);
+              foundValidCombination = true;
             }
           }
+        }
 
-          outerPossibilities &= outerValues;
-          // If we have either innerPossibilities or outerPossibilities it means
-          // we have at least one valid setting. Either maybe empty if there
-          // are 0 cells in the inner or outer range.
-          if (innerPossibilities || outerPossibilities) {
-            let k = 0;
-            while (k < i) validSettings[k++] |= outerPossibilities;
-            validSettings[k++] |= vi & ~innerRanges;
-            while (k < j) validSettings[k++] |= innerPossibilities;
-            validSettings[k++] |= vj & ~innerRanges;
-            while (k < numCells) validSettings[k++] |= outerPossibilities;
-          }
+        outerPossibilities &= outerValues;
+        // If we found a valid combination, populate validSettings.
+        // Note: innerPossibilities or outerPossibilities may be 0 if there
+        // are 0 inner or outer cells respectively, but we still need to
+        // mark the border cells as valid.
+        if (foundValidCombination) {
+          let k = 0;
+          while (k < i) validSettings[k++] |= outerPossibilities;
+          validSettings[k++] |= vi & ~innerRanges;
+          while (k < j) validSettings[k++] |= innerPossibilities;
+          validSettings[k++] |= vj & ~innerRanges;
+          while (k < numCells) validSettings[k++] |= outerPossibilities;
         }
       }
     }

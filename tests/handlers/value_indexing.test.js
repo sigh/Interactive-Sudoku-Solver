@@ -12,7 +12,6 @@ import {
 ensureGlobalEnvironment();
 
 const { ValueIndexing } = await import('../../js/solver/handlers.js');
-const { LookupTables } = await import('../../js/solver/lookup_tables.js');
 
 // =============================================================================
 // Initialization tests
@@ -151,7 +150,7 @@ await runTest('ValueIndexing should work with short indexed array (numIndexed < 
   const context = setupConstraintTest({ numValues: 8, numCells: 10 });
   // valueCell=0, controlCell=1, indexedCells=[2,3,4,5,6,7] (6 cells)
   const handler = new ValueIndexing(0, 1, 2, 3, 4, 5, 6, 7);
-  
+
   const grid = context.createGrid();
   const result = handler.initialize(grid, createCellExclusions({ numCells: 10 }), context.shape, {});
 
@@ -188,7 +187,7 @@ await runTest('ValueIndexing should work with more indexed cells than values', (
   // 6 values, but 10 indexed cells
   const context = setupConstraintTest({ numValues: 6, numCells: 12 });
   const handler = new ValueIndexing(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11);
-  
+
   const grid = context.createGrid();
   const result = handler.initialize(grid, createCellExclusions({ numCells: 12 }), context.shape, {});
 

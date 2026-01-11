@@ -12,7 +12,6 @@ import {
 ensureGlobalEnvironment();
 
 const { Indexing } = await import('../../js/solver/handlers.js');
-const { LookupTables } = await import('../../js/solver/lookup_tables.js');
 
 // =============================================================================
 // Basic functionality tests
