@@ -3,61 +3,83 @@ const { memoize } = await import('./util.js' + self.VERSION_PARAM);
 export class GridShape {
   static MIN_SIZE = 1;
   static MAX_SIZE = 16;
-  static isValidGridSize(size) {
-    return Number.isInteger(size) && size >= this.MIN_SIZE && size <= this.MAX_SIZE;
+
+  static _isValidDimension(dim) {
+    return Number.isInteger(dim) && dim >= this.MIN_SIZE && dim <= this.MAX_SIZE;
   }
 
-  static fromGridSize = memoize((gridSize) => {
-    if (!this.isValidGridSize(gridSize)) return null;
-    return new GridShape(undefined, gridSize);
+  // Internal memoized factory - always takes two arguments
+  static _fromResolvedGridSize = memoize((numRows, numCols) => {
+    if (!this._isValidDimension(numRows) || !this._isValidDimension(numCols)) {
+      return null;
+    }
+    return new GridShape(undefined, numRows, numCols);
   });
+
+  // Public factory for square grids (one arg) or rectangular grids (two args)
+  static fromGridSize(numRows, numCols = numRows) {
+    return this._fromResolvedGridSize(numRows, numCols);
+  }
 
   static fromGridSpec(gridSpec) {
     const parts = gridSpec.split('x');
-    const gridSize = parseInt(parts[0]);
-    if (parts.length != 2 || parts[0] !== parts[1] ||
-      gridSize.toString() !== parts[0]) {
+    if (parts.length !== 2) {
       throw ('Invalid grid spec format: ' + gridSpec);
     }
-    return this.fromGridSize(gridSize);
+
+    const numRows = parseInt(parts[0]);
+    const numCols = parseInt(parts[1]);
+
+    if (numRows.toString() !== parts[0] || numCols.toString() !== parts[1]) {
+      throw ('Invalid grid spec format: ' + gridSpec);
+    }
+
+    const shape = this.fromGridSize(numRows, numCols);
+    if (!shape) {
+      throw ('Invalid grid dimensions: ' + gridSpec);
+    }
+    return shape;
   };
 
   static fromNumCells(numCells) {
+    // Only works for square grids
     const gridSize = Math.sqrt(numCells);
     return this.fromGridSize(gridSize);
   }
+
   static fromNumPencilmarks(numPencilmarks) {
+    // Only works for square grids
     const gridSize = Math.cbrt(numPencilmarks);
     return this.fromGridSize(gridSize);
   }
 
-  static makeName(gridSize) {
-    return `${gridSize}x${gridSize}`;
+  static makeName(numRows, numCols = numRows) {
+    return `${numRows}x${numCols}`;
   }
 
   static baseCharCode(shape) {
     return shape.numValues < 10 ? '1'.charCodeAt(0) : 'A'.charCodeAt(0);
   }
 
-  constructor(do_not_call, gridSize) {
+  constructor(do_not_call, numRows, numCols) {
     if (do_not_call !== undefined) {
       throw Error('Use GridShape.fromGridSize() instead.');
     }
 
-    // Core dimensions - for now, always square
-    this.numRows = gridSize;
-    this.numCols = gridSize;
+    // Core dimensions
+    this.numRows = numRows;
+    this.numCols = numCols;
 
-    // Legacy property - will be removed once all usages are migrated
-    this.gridSize = gridSize;
-
-    [this.boxHeight, this.boxWidth] = this.constructor._boxDims(gridSize);
-    this.numValues = gridSize;
-    this.numCells = this.numRows * this.numCols;
+    // Derived properties
+    this.numValues = Math.max(numRows, numCols);
+    this.numCells = numRows * numCols;
     this.numPencilmarks = this.numCells * this.numValues;
+
+    // Box dimensions
+    [this.boxHeight, this.boxWidth] = this.constructor._boxDims(numRows, numCols);
     this.noDefaultBoxes = this.boxHeight === 1 || this.boxWidth === 1;
 
-    this.name = this.constructor.makeName(gridSize);
+    this.name = this.constructor.makeName(numRows, numCols);
 
     this._valueBase = this.numValues + 1;
 
@@ -69,13 +91,26 @@ export class GridShape {
     Object.freeze(this);
   }
 
-  static _boxDims(gridSize) {
-    for (let i = Math.sqrt(gridSize) | 0; i >= 1; i--) {
-      if (gridSize % i === 0) {
-        return [i, gridSize / i];
+  static _boxDims(numRows, numCols) {
+    // Find (boxH, boxW) where boxH * boxW = numValues that tiles the grid.
+    // Prefer squarer boxes by starting from sqrt and working down.
+    const numValues = Math.max(numRows, numCols);
+
+    for (let small = Math.floor(Math.sqrt(numValues)); small >= 1; small--) {
+      if (numValues % small !== 0) continue;
+      const large = numValues / small;
+
+      // Try both orientations
+      if (numRows % small === 0 && numCols % large === 0) {
+        return [small, large];
+      }
+      if (large !== small && numRows % large === 0 && numCols % small === 0) {
+        return [large, small];
       }
     }
-    throw ('Invalid grid size: ' + gridSize);
+
+    // Unreachable: small=1 always works since numValues = max(numRows, numCols)
+    return [1, numValues];
   }
 
   makeValueId = (cellIndex, n) => {
