@@ -1,12 +1,15 @@
 const {
-  isIterable,
   isPlainObject,
-  withDeadline,
   memoize,
+  withDeadline,
 } = await import('../util.js' + self.VERSION_PARAM);
-const { SudokuParser, toShortSolution } = await import('../sudoku_parser.js' + self.VERSION_PARAM);
 const { PUZZLE_INDEX } = await import('../../data/example_puzzles.js' + self.VERSION_PARAM);
 const { LookupTables } = await import('../solver/lookup_tables.js' + self.VERSION_PARAM);
+
+const makeSolver = async () => {
+  const { SolverAPI } = await import('../sandbox/solver_api.js' + self.VERSION_PARAM);
+  return new SolverAPI();
+};
 
 const loadDataFile = async (name) => {
   const module = await import(name);
@@ -56,13 +59,16 @@ const puzzleFromCfgSync = (puzzleCfg) => {
 };
 
 export class PuzzleRunner {
-  constructor({ solverFactory, enableConsoleLogs } = {}) {
-    this._solverFactory = solverFactory;
-    if (!this._solverFactory) {
-      throw new Error('PuzzleRunner requires a solverFactory in this environment');
-    }
+  constructor({ solver, enableConsoleLogs } = {}) {
+    this._solver = solver;
     this._log = enableConsoleLogs ? console.log.bind(console) : () => { };
-    this._state = null;
+  }
+
+  async _getSolver() {
+    if (!this._solver) {
+      this._solver = await makeSolver();
+    }
+    return this._solver;
   }
 
   static _sumObjectValues(first, ...items) {
@@ -85,85 +91,49 @@ export class PuzzleRunner {
     stats.total = totals;
   }
 
-  _stateHandler(s) {
-    this._state = s;
-  }
-
-  async _runFnWithChecksSinglePuzzle(puzzle, fn, onFailure) {
-    // Set up solver.
-    let solver, shape;
+  async _runWithChecks(puzzle, fn, onFailure) {
+    const solver = await this._getSolver();
+    let result;
     try {
-      const constraint = SudokuParser.parseText(puzzle.input);
-      solver = await this._solverFactory(
-        constraint, this._stateHandler.bind(this));
-      shape = constraint.getShape();
+      let resultPromise = fn(solver, puzzle.input);
+      if (TEST_TIMEOUT_MS) {
+        resultPromise = withDeadline(
+          resultPromise, TEST_TIMEOUT_MS,
+          `Solver timed out (${TEST_TIMEOUT_MS}ms)`);
+      }
+      result = await resultPromise;
     } catch (e) {
       onFailure(puzzle, e);
       return { stats: { puzzle: puzzle.name } };
     }
 
-    // Log a fixed string so the progress gets collapsed to a single line.
-    // Do this after the worker has started to ensure a nice output.
-    this._log('solving...');
+    const solution = result.solution?.toString() || null;
 
-    // Start solver with optional timeout.
-    let resultPromise = fn(solver);
-    if (TEST_TIMEOUT_MS) {
-      resultPromise = withDeadline(
-        resultPromise, TEST_TIMEOUT_MS,
-        `Solver timed out (${TEST_TIMEOUT_MS}ms)`);
-    }
-
-    // Wait for solver.
-    let result;
-    try {
-      result = await resultPromise;
-    } catch (e) {
-      onFailure(puzzle, e);
-    } finally {
-      solver.terminate();
-    }
-
-    let solution = null;
-    if (result !== undefined) {
-      let shortSolution;
-      if (isIterable(result)) {
-        shortSolution = toShortSolution(result, shape);
-        solution = shortSolution;
-      }
-      const resultToCheck = shortSolution || result;
-
-      if (puzzle.solution !== undefined) {
-        // We want to test the result.
-
-        if (!puzzle.solution) {
-          // Expect no solution.
-          if (result) {
-            onFailure(puzzle, resultToCheck);
-          }
-        } else {
-          // Expect a solution.
-          if (!result || resultToCheck != puzzle.solution) {
-            onFailure(puzzle, resultToCheck);
-          }
-        }
+    if (puzzle.solution !== undefined) {
+      if (!puzzle.solution) {
+        // Expect no solution.
+        if (solution) onFailure(puzzle, solution);
+      } else if (puzzle.solution === true) {
+        // Expect any solution (for validateLayout valid cases).
+        if (!solution) onFailure(puzzle, solution);
+      } else {
+        // Expect a specific solution.
+        if (solution !== puzzle.solution) onFailure(puzzle, solution);
       }
     }
 
-    const state = this._state;
-    delete state.counters.progressRatio;
-    delete state.counters.progressRatioPrev;
+    const solverStats = solver.latestStats();
     const stats = {
       puzzle: puzzle.name,
-      ...state.counters,
-      setupTimeMs: state.puzzleSetupTime,
-      rumtimeMs: state.timeMs
+      guesses: solverStats.guesses,
+      backtracks: solverStats.backtracks,
+      nodesSearched: solverStats.nodesSearched,
+      constraintsProcessed: solverStats.constraintsProcessed,
+      setupTimeMs: solverStats.setupTimeMs,
+      runtimeMs: solverStats.runtimeMs,
     };
 
-    return {
-      solution,
-      stats
-    };
+    return { solution, stats };
   }
 
   async runFnWithChecks(puzzles, fn, onFailure) {
@@ -201,7 +171,8 @@ export class PuzzleRunner {
     const stats = [];
     for (const puzzleCfg of puzzles) {
       const puzzle = await puzzleFromCfg(puzzleCfg);
-      const result = await this._runFnWithChecksSinglePuzzle(puzzle, fn, failTest);
+      this._log('solving...');
+      const result = await this._runWithChecks(puzzle, fn, failTest);
       solutions.push(result.solution);
       stats.push(result.stats);
     }
@@ -220,32 +191,22 @@ export class PuzzleRunner {
   }
 
   async runAllWithChecks(puzzles, onFailure) {
-    return await this.runFnWithChecks(puzzles, async (solver) => {
-      const result = await solver.nthSolution(0);
-      await solver.nthSolution(1); // Try to find a second solution to prove uniqueness.
-      return result;
+    return this.runFnWithChecks(puzzles, async (solver, input) => {
+      const solutions = await solver.solutionArray(input, 2);
+      return { solution: solutions[0] || null };
     }, onFailure);
   }
 
   async runValidateLayout(cases, onFailure) {
-    return await this.runFnWithChecks(cases, async (solver) => {
-      return (await solver.validateLayout()) !== null;
+    return this.runFnWithChecks(cases, async (solver, input) => {
+      const solution = await solver.validateLayout(input);
+      return { solution };
     }, onFailure);
   }
 }
 
 const getDefaultPuzzleRunner = memoize(() => {
-  if (typeof document === 'undefined') {
-    throw new Error('PuzzleRunner requires a solverFactory; provide a runner explicitly in non-browser environments.');
-  }
-
-  const solverProxyModulePromise = import('../solver_runner.js' + self.VERSION_PARAM);
-  const solverFactory = async (...args) => {
-    const { SolverProxy } = await solverProxyModulePromise;
-    return SolverProxy.makeSolver(...args);
-  };
-
-  return new PuzzleRunner({ solverFactory, enableConsoleLogs: true });
+  return new PuzzleRunner({ enableConsoleLogs: true });
 });
 
 export const runValidateLayoutTests = async (onFailure, runner) => {
@@ -425,7 +386,7 @@ export const progressBenchmarks = async () => {
 
   const parts = [];
   for (const s of results.stats) {
-    parts.push(s.guesses, s.constraintsProcessed, Math.round(s.rumtimeMs));
+    parts.push(s.guesses, s.constraintsProcessed, Math.round(s.runtimeMs));
   }
 
   console.log(parts.join('\t'));

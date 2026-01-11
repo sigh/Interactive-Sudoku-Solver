@@ -37,6 +37,30 @@ CONSTRAINT OBJECTS
 
   Use help('<ConstraintName>') for details on a specific constraint.
 
+SOLVER
+
+  makeSolver provides programmatic access to the solver:
+
+    const solver = await makeSolver();
+    // Get the first solution, or null if none exist
+    const solution = solver.solution(constraints);
+    // Get the unique solution, or null if not unique
+    const unique = solver.uniqueSolution(constraints);
+    // Count the number of solutions
+    const count = solver.countSolutions(constraints);  // Total count
+    // Iterate over all solutions, with optional limit
+    for (const s of solver.solutions(constraints[, limit])) { ... }
+    // Get an array of solutions, with optional limit
+    const solutions = solver.solutionArray(constraints[, limit]);
+
+  Solution objects provide:
+    solution.valueAt('R1C1')  // Get value at cell
+    solution.valueAt(1, 1)    // Same, using row/col
+    solution.toString()       // Short string (e.g. 81 digits for 9x9)
+    for (const { cell, value } of solution) { ... }  // Iterate cells
+
+  solver.latestStats() returns timing/counter info after each solve.
+
 UTILITIES
 
   console.log()         - Output to the console
@@ -114,11 +138,17 @@ const parseConstraint = (str) => {
   return [resolved];
 };
 
+const makeSolver = async () => {
+  const { SolverAPI } = await import('./solver_api.js');
+  return new SolverAPI();
+};
+
 export const SANDBOX_GLOBALS = {
   parseConstraint,
   parseCellId,
   makeCellId,
   help,
+  makeSolver,
   SHAPE_9x9,
   SHAPE_MAX,
   GridShape,
