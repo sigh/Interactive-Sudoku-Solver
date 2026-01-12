@@ -1206,7 +1206,7 @@ export class SudokuConstraint {
     );
   }
   static Shape = class Shape extends SudokuConstraintBase {
-    static DESCRIPTION = (`The size of the grid.`);
+    static DESCRIPTION = (`The number of rows and columns in the grid.`);
     static CATEGORY = 'Shape';
     static UNIQUENESS_KEY_FIELD = 'type';
     static DEFAULT_SHAPE = SHAPE_9x9;
