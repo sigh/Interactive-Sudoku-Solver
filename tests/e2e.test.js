@@ -43,7 +43,7 @@ const logCollectionSummary = (result, label = result.collection) => {
 const runSolveResults = await runSolveTests((puzzle, err) => {
   throw new Error(`Puzzle ${puzzle.name} failed: ${err}`);
 }, runner);
-assert.equal(runSolveResults.length, 3, 'runSolveTests should return three collections');
+assert.equal(runSolveResults.length, 4, 'runSolveTests should return four collections');
 runSolveResults.forEach((result) => expectStatsStructure(result, `solve tests (${result.collection})`));
 console.log('✓ runSolveTests completed');
 runSolveResults.forEach((result) => logCollectionSummary(result));

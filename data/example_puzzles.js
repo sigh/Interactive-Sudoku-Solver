@@ -369,6 +369,12 @@ export const DISPLAYED_EXAMPLES = [
     input: '.Shape~6x6.RellikCage~5~R1C3~R2C3~R2C2.RellikCage~9~R1C2~R1C1~R2C1.RellikCage~6~R1C4~R2C4~R2C5.RellikCage~4~R3C3~R3C4.RellikCage~4~R4C3~R5C3~R6C3~R5C2.RellikCage~7~R5C1~R6C1~R6C2.RellikCage~5~R6C4~R6C5~R6C6.RellikCage~3~R5C4~R5C5~R5C6~R4C6.RellikCage~8~R1C5~R1C6~R2C6~R3C6',
     solution: '213564564321641235325146136452452613',
   },
+  {
+    name: '6x9: Postcard',
+    src: 'https://www.youtube.com/watch?v=0HDv7XZzeuw',
+    input: '.Shape~6x9.Whisper~5~R2C4~R2C5.Whisper~5~R3C5~R4C6~R4C5~R4C4~R5C5.Indexing~C~R1C5~R2C5~R3C5~R4C5~R5C5~R6C5.Indexing~C~R1C1~R2C1~R3C1.AntiKnight',
+    solution: '762894135438165729159723864215938647876541293943672581',
+  }
 ];
 
 // Index the puzzles by their name in puzzles.
