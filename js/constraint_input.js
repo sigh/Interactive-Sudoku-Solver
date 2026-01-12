@@ -139,32 +139,90 @@ ConstraintCategoryInput.Shape = class Shape extends ConstraintCategoryInput {
 
   constructor(collection) {
     super(collection);
-
     this._setUp();
   }
 
   _setUp() {
-    const select = document.getElementById('shape-select');
+    const input = document.getElementById('shape-input');
+    const dropdown = document.getElementById('shape-dropdown');
+    const items = dropdown.querySelectorAll('.shape-dropdown-item');
+    let highlightedIndex = -1;
 
-    for (let i = GridShape.MIN_SIZE; i <= GridShape.MAX_SIZE; i++) {
-      const name = GridShape.makeName(i);
-      const option = document.createElement('option');
-      option.textContent = name;
-      option.value = name;
-      select.appendChild(option);
-    }
-
-    select.onchange = () => {
-      const shapeName = select.value;
-      const shape = GridShape.fromGridSpec(shapeName);
-      if (!shape) throw ('Invalid shape: ' + shapeName);
-      this.collection.setShape(shape);
+    const setHighlight = (index) => {
+      items.forEach((item, i) => item.classList.toggle('highlighted', i === index));
+      highlightedIndex = index;
     };
-    this._select = select;
+
+    const showDropdown = () => dropdown.classList.add('open');
+    const hideDropdown = () => {
+      dropdown.classList.remove('open');
+      setHighlight(-1);
+    };
+
+    const applyShape = () => {
+      const shapeName = input.value.trim();
+      if (!shapeName) return;
+      try {
+        const shape = GridShape.fromGridSpec(shapeName);
+        if (shape) {
+          input.setCustomValidity('');
+          this.collection.setShape(shape);
+        }
+      } catch (e) {
+        input.setCustomValidity(e.toString());
+      }
+      hideDropdown();
+    };
+
+    // Click and hover handlers for dropdown items
+    items.forEach((item, i) => {
+      item.onmousedown = (e) => {
+        e.preventDefault();
+        input.value = item.textContent;
+        applyShape();
+      };
+      item.onmouseenter = () => setHighlight(i);
+    });
+
+    dropdown.onmouseleave = () => setHighlight(-1);
+
+    input.addEventListener('focus', () => {
+      showDropdown();
+      input.select();
+    });
+    input.addEventListener('click', showDropdown);
+    input.addEventListener('input', showDropdown);
+    input.addEventListener('blur', () => {
+      hideDropdown();
+      applyShape();
+    });
+
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        showDropdown();
+        setHighlight(Math.min(highlightedIndex + 1, items.length - 1));
+        input.select();
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        showDropdown();
+        setHighlight(Math.max(highlightedIndex - 1, 0));
+        input.select();
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (highlightedIndex >= 0) input.value = items[highlightedIndex].textContent;
+        applyShape();
+      } else if (e.key === 'Escape') {
+        hideDropdown();
+      }
+    });
+
+    this._input = input;
   }
 
   reshape(shape) {
-    this._select.value = shape.name;
+    this._input.value = shape.name;
+    this._input.setCustomValidity('');
   }
 }
 
