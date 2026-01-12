@@ -235,19 +235,23 @@ export class CellValueDisplay extends DisplayItem {
 
   _calculateMultiValueLayout(shape) {
     // Pre-compute multi-value layout parameters.
-    const lineHeight = shape.numValues <= SHAPE_9x9.numValues ? 17 : 10;
+
+    // Note: font size is not quite the same to allow for larger gaps in the
+    // large grid.
+    const fontSize = shape.numValues <= SHAPE_9x9.numValues ? 15 : 10;
+    const fontWidth = fontSize * 0.6;
+    const lineHeight = fontSize + 2;
     const valuesPerLine = Math.ceil(Math.sqrt(shape.numValues));
-    const yOffset = -DisplayItem.CELL_SIZE / 2 + 2;
-    const charWidth = shape.numValues <= SHAPE_9x9.numValues ? 9 : 6;
-    const totalWidth = (valuesPerLine * 2 - 1) * charWidth;
-    const xOffset = (-totalWidth + charWidth) / 2;
+    const yOffset = -DisplayItem.CELL_SIZE / 2 + fontSize;
+    const totalWidth = (valuesPerLine * 2 - 1) * fontWidth;
+    const xOffset = (-totalWidth + fontWidth) / 2;
     // Position offsets [dx, dy] for each value (1-indexed).
     const valueOffsets = [null]; // index 0 unused
     for (let v = 1; v <= shape.numValues; v++) {
       const col = (v - 1) % valuesPerLine;
       const row = (v - 1) / valuesPerLine | 0;
       valueOffsets.push([
-        xOffset + col * 2 * charWidth,
+        xOffset + col * 2 * fontWidth,
         yOffset + row * lineHeight,
       ]);
     }
