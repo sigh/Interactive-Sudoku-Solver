@@ -136,6 +136,13 @@ export class SudokuBuilder {
     const constraints = [].concat(...constraintMap.values());
 
     for (const constraint of constraints) {
+      // Validate constraint is compatible with the shape.
+      if (constraint.constructor.REQUIRE_SQUARE_GRID && !shape.isSquare()) {
+        throw Error(
+          `${constraint.constructor.displayName()} requires a square grid, ` +
+          `but the grid is ${shape.name}.`);
+      }
+
       let cells;
       switch (constraint.type) {
         case 'AntiKnight':
@@ -296,8 +303,9 @@ export class SudokuBuilder {
           break;
 
         case 'LittleKiller':
-          cells = constraint.getCells(shape).map(
+          cells = constraint.getCells(shape)?.map(
             c => shape.parseCellId(c).cell);
+          if (!cells) throw Error('Invalid Little Killer line: ' + constraint.arrowId);
           yield new SumHandlerModule.Sum(
             cells, constraint.value);
           break;

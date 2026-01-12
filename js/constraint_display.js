@@ -1066,11 +1066,12 @@ class OutsideClue extends BaseConstraintDisplayItem {
   drawItem(constraint, displayConfig) {
     const { arrowId, value } = constraint;
 
+    const textNode = this._getArrowTextElement(arrowId);
+    if (!textNode) return null;  // Invalid arrowId.
+
     const valueString = displayConfig.clueTemplate.replace('$CLUE', value);
     const tspan = createSvgElement('tspan');
     tspan.appendChild(document.createTextNode(valueString));
-
-    const textNode = this._getArrowTextElement(arrowId);
     textNode.appendChild(tspan);
 
     this._updateValueLayout(textNode);
@@ -1087,7 +1088,7 @@ class OutsideClue extends BaseConstraintDisplayItem {
   }
 
   _getArrowTextElement(arrowId) {
-    return this._outsideArrowMap.get(arrowId).svg.lastChild;
+    return this._outsideArrowMap.get(arrowId)?.svg.lastChild;
   }
 
   _updateValueLayout(textNode) {
