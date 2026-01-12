@@ -762,6 +762,12 @@ export const EXAMPLES = [
     input: '.Shape~5x10.Cage~16~R1C8~R1C9~R2C9.Cage~34~R2C1~R3C1~R4C1~R5C1.Cage~3~R1Ca~R2Ca.Cage~4~R5C6~R5C7.Cage~7~R2C2~R3C2~R3C3.Cage~13~R3C4~R4C4.Cage~20~R5C4~R5C5~R4C5.Cage~20~R4C2~R4C3~R5C2~R5C3.Cage~12~R1C2~R1C3~R2C3.Cage~21~R4C7~R4C6~R3C6~R2C6.Cage~20~R3Ca~R4Ca~R5Ca.Cage~10~R3C8~R3C9.Cage~12~R4C8~R5C9~R5C8.Cage~11~R1C7~R2C7.Cage~34~R1C4~R1C5~R2C5~R3C5~R2C4',
     solution: 'CFAJDIGHEBHBEIFGDJCAJADGECFBHIGECFHBIAJDIDHBJACEFG',
   },
+  {
+    // Arbtrarily added jigsaw pieces and givens.
+    name: '4x7: Jigsaw',
+    input: '.Shape~4x7.Jigsaw~4x7~1222222111113244441334443333.~R2C4_2~R3C6_3~R4C5_4~R3C1_5~R4C3_6~R1C7_7~R4C7_5~R1C1_3~R1C5_6~R2C2_1',
+    solution: '3425617614257352147367361425',
+  },
 
   //////////////////////////////////////////////////////////////////////////////
   // Or

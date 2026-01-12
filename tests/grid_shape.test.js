@@ -317,4 +317,22 @@ await runTest('gridSize property no longer exists', () => {
   assert.equal(shape.gridSize, undefined);
 });
 
+// ============================================================================
+// isSquare()
+// ============================================================================
+
+await runTest('isSquare returns true for square grids', () => {
+  for (const size of [4, 6, 9, 16]) {
+    const shape = GridShape.fromGridSize(size);
+    assert.ok(shape.isSquare(), `${size}x${size} should be square`);
+  }
+});
+
+await runTest('isSquare returns false for rectangular grids', () => {
+  for (const [rows, cols] of [[4, 6], [6, 4], [6, 8], [8, 6]]) {
+    const shape = GridShape.fromGridSize(rows, cols);
+    assert.ok(!shape.isSquare(), `${rows}x${cols} should not be square`);
+  }
+});
+
 logSuiteComplete();
