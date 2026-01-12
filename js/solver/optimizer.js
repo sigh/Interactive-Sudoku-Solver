@@ -385,7 +385,8 @@ export class SudokuConstraintOptimizer {
     if (numNonSumCells == 0 || numNonSumCells >= shape.numValues) return [];
 
     const sumHandlersSum = sumHandlers.map(h => h.sum()).reduce((a, b) => a + b);
-    const remainingSum = shape.numValues * shape.maxSum - sumHandlersSum;
+    const numRegions = shape.numCells / shape.numValues;
+    const remainingSum = numRegions * shape.maxSum - sumHandlersSum;
 
     const remainingCells = new Set(shape.allCells);
     sumHandlers.forEach(h => h.cells.forEach(c => remainingCells.delete(c)));
@@ -720,15 +721,21 @@ export class SudokuConstraintOptimizer {
     return newHandlers;
   }
 
+  // Returns regions that form houses (have numValues cells with all distinct values).
+  // For rectangular grids, only the longer dimension forms houses.
   _overlapRegions = memoize((shape) => {
-    const rowRegions = SudokuConstraintBase.rowRegions(shape);
-    const colRegions = SudokuConstraintBase.colRegions(shape);
-    return [
-      rowRegions,
-      rowRegions.slice().reverse(),
-      colRegions,
-      colRegions.slice().reverse(),
-    ];
+    const regions = [];
+    // Rows are houses if they have numValues cells (numCols == numValues).
+    if (shape.numCols === shape.numValues) {
+      const rowRegions = SudokuConstraintBase.rowRegions(shape);
+      regions.push(rowRegions, rowRegions.slice().reverse());
+    }
+    // Columns are houses if they have numValues cells (numRows == numValues).
+    if (shape.numRows === shape.numValues) {
+      const colRegions = SudokuConstraintBase.colRegions(shape);
+      regions.push(colRegions, colRegions.slice().reverse());
+    }
+    return regions;
   });
 
   _overlapRegionsWithBox = memoize((shape) => {

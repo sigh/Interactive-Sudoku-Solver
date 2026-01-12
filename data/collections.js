@@ -748,6 +748,22 @@ export const EXAMPLES = [
   },
 
   //////////////////////////////////////////////////////////////////////////////
+  // Non-rectangular grids
+  //////////////////////////////////////////////////////////////////////////////
+  {
+    // Added numbers randomly until it had a unique solution.
+    name: '6x8: Plain',
+    input: '.Shape~6x8.~R1C1_1~R3C3_2~R4C6_3~R6C8_4~R1C5_5~R6C2_6~R2C7_7~R5C4_8~R3C5_1~R5C2_2~R3C1_3~R1C6_4~R5C7_5~R3C8_6~R6C5_7~R1C3_8~R4C2_1~R1C8_2~R5C8_3~R3C2_5~R6C3_1~R2C3_4',
+    solution: '178654322345867135241786816723454278615356137824',
+  },
+  {
+    // Added killer cages and adjusted clues until it had a unique solution.
+    name: '5x10: Killer Sudoku',
+    input: '.Shape~5x10.Cage~16~R1C8~R1C9~R2C9.Cage~34~R2C1~R3C1~R4C1~R5C1.Cage~3~R1Ca~R2Ca.Cage~4~R5C6~R5C7.Cage~7~R2C2~R3C2~R3C3.Cage~13~R3C4~R4C4.Cage~20~R5C4~R5C5~R4C5.Cage~20~R4C2~R4C3~R5C2~R5C3.Cage~12~R1C2~R1C3~R2C3.Cage~21~R4C7~R4C6~R3C6~R2C6.Cage~20~R3Ca~R4Ca~R5Ca.Cage~10~R3C8~R3C9.Cage~12~R4C8~R5C9~R5C8.Cage~11~R1C7~R2C7.Cage~34~R1C4~R1C5~R2C5~R3C5~R2C4',
+    solution: 'CFAJDIGHEBHBEIFGDJCAJADGECFBHIGECFHBIAJDIDHBJACEFG',
+  },
+
+  //////////////////////////////////////////////////////////////////////////////
   // Or
   //////////////////////////////////////////////////////////////////////////////
   {

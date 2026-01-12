@@ -342,6 +342,14 @@ export const runSolveTests = async (onFailure, runner) => {
   result.collection = 'Other sizes';
   results.push(result);
 
+  result = await activeRunner.runAllWithChecks([
+    '6x8: Plain',
+    '5x10: Killer Sudoku',  // Killer cages (tests sum optimizer on non-square grids)
+    '6x9: Postcard',  // Indexing, Anti-knight, Whisper
+  ], onFailure);
+  result.collection = 'Non-square grids';
+  results.push(result);
+
   return results;
 };
 
