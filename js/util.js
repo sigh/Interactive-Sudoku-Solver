@@ -237,25 +237,32 @@ export class IteratorWithCount {
   [Symbol.iterator] = () => this;
 }
 
-const loadJSFile = (path) => {
+const makeDynamicLoader = (createElement) => {
+  return (path) => {
+    let loaded = false;
+    return async () => {
+      if (loaded) return;
+      loaded = true;
+      const element = createElement(path);
+      document.head.append(element);
+      await new Promise(resolve => { element.onload = resolve; });
+    };
+  };
+};
+
+export const dynamicJSFileLoader = makeDynamicLoader((path) => {
   const script = document.createElement('script');
   script.src = path;
   script.async = false;
-  document.head.append(script);
+  return script;
+});
 
-  return new Promise(resolve => {
-    script.onload = resolve;
-  });
-};
-
-export const dynamicJSFileLoader = (path) => {
-  let loaded = false;
-  return async () => {
-    if (loaded) return;
-    loaded = true;
-    await loadJSFile(path);
-  };
-};
+export const dynamicCSSFileLoader = makeDynamicLoader((path) => {
+  const link = document.createElement('link');
+  link.rel = 'stylesheet';
+  link.href = path;
+  return link;
+});
 
 export const withDeadline = (promise, delay, reason) => {
   const awaitTimeout = new Promise(
