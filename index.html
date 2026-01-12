@@ -325,9 +325,21 @@ layout: null
             <div class="constraint-panel constraint-panel-borderless">
               <h2>
                 Shape
-                <select id="shape-select" class="thin-select" required></select>
+                <span class="shape-input-container">
+                  <input type="text" id="shape-input" class="shape-input" placeholder="9x9" autocomplete="off">
+                  <div id="shape-dropdown" class="shape-dropdown">
+                    <div class="shape-dropdown-item">9x9</div>
+                    <div class="shape-dropdown-item">6x6</div>
+                    <div class="shape-dropdown-item">16x16</div>
+                    <div class="shape-dropdown-help">
+                      <div>Or type WxH</div>
+                      <div>e.g. 6x8</div>
+                    </div>
+                  </div>
+                </span>
                 <span class="tooltip" data-text="
-              Change the grid shape.
+              Change the grid shape. Enter dimensions as NxM (e.g., 9x9, 6x8).
+              Dimensions must be between 1 and 16.
               Box regions are made as close to square as possible.
               Prime numbered grid sizes have no boxes.">
                 </span>

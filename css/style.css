@@ -740,8 +740,45 @@ select.thin-select {
   padding-bottom: 2px;
 }
 
-#shape-select {
-  margin: 0 5px;
+.shape-input-container {
+  position: relative;
+  display: inline-block;
+}
+
+.shape-input {
+  width: 6em;
+}
+
+.shape-dropdown {
+  display: none;
+  position: absolute;
+  width: 100%;
+  top: 100%;
+  left: 0;
+  background: #fff;
+  border: 1px solid var(--color-border);
+  z-index: 100;
+}
+
+.shape-dropdown.open {
+  display: block;
+}
+
+.shape-dropdown-item {
+  padding: 1px 6px;
+  font-size: var(--font-size-base);
+  cursor: pointer;
+}
+
+.shape-dropdown-item.highlighted {
+  background: rgba(220, 220, 255);
+}
+
+.shape-dropdown-help {
+  padding: 2px;
+  color: var(--color-text-muted);
+  border-top: 1px solid var(--color-border-light);
+  font-size: var(--font-size-small);
 }
 
 .two-column {
