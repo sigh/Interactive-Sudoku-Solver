@@ -82,8 +82,8 @@ p code {
   grid-row: 2;
 }
 
-/* Panel headers */
-.panel-header {
+/* Shared sandbox header and controls */
+.sandbox-header {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -92,31 +92,29 @@ p code {
   min-height: 28px;
 }
 
-/* Editor header layout: left controls + right share button */
-.editor-panel .panel-header {
-  justify-content: space-between;
-  flex-wrap: nowrap;
-}
-
-.editor-panel .btn-group {
-  flex: 1 1 auto;
-}
-
-.panel-header h2 {
+.sandbox-header h2 {
   margin: 0;
-  font-size: 1.1em;
-  color: var(--color-text-muted);
+  flex-grow: 1;
 }
 
-/* Button group */
-.btn-group {
+.sandbox-controls {
   display: flex;
   flex-wrap: wrap;
   gap: 4px 8px;
   align-items: center;
 }
 
-.btn-group button {
+/* Editor header layout: left controls + right share button */
+.editor-panel .sandbox-header {
+  justify-content: space-between;
+  flex-wrap: nowrap;
+}
+
+.editor-panel .sandbox-controls {
+  flex: 1 1 auto;
+}
+
+.sandbox-controls button {
   white-space: nowrap;
 }
 
@@ -311,4 +309,44 @@ p code {
     max-width: 80ch;
     box-sizing: border-box;
   }
+}
+
+/* ==========================================================================
+   Embedded Sandbox Panel (in main page)
+   ========================================================================== */
+
+#sandbox-container {
+  margin: 0 20px 20px 20px;
+  padding: 15px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: #fafafa;
+}
+
+.sandbox-panels {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px;
+}
+
+@media (max-width: 900px) {
+  .sandbox-panels {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Override base editor/output styles for embedded context */
+#sandbox-container .editor {
+  width: auto;
+  height: auto;
+  min-height: 200px;
+  max-height: 400px;
+  resize: none;
+}
+
+#sandbox-container .output {
+  min-height: 200px;
+  max-height: 400px;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
