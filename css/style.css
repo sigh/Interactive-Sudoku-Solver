@@ -83,12 +83,11 @@ body {
   font-size: 15px;
   font-family: var(--font-family-mono);
   text-anchor: middle;
-  dominant-baseline: hanging;
   white-space: pre;
 }
 
 .grid-size-large .cell-multi-value {
-  font-size: 9px;
+  font-size: 8px;
 }
 
 .hidden {
