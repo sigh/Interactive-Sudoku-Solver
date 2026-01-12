@@ -356,16 +356,11 @@ class ConstraintManager {
   _reshape(shape) {
     if (this._shape === shape) return;
 
-    const preservedConstraints = this._getShapeAgnosticConstraints();
-
     this.clear();
     this._shape = shape;
     for (const listener of this._reshapeListeners) {
       listener.reshape(shape);
     }
-
-    preservedConstraints.forEachTopLevel(
-      c => this._rootCollection.addConstraint(c));
 
     this.runUpdateCallback();
   }
@@ -603,11 +598,6 @@ class ConstraintManager {
       }
     }
     return new SudokuConstraint.Container(constraints);
-  }
-
-  _getShapeAgnosticConstraints() {
-    return this._getConstraints(
-      c => ConstraintCategoryInput[c.constructor.CATEGORY].IS_SHAPE_AGNOSTIC);
   }
 
   getLayoutConstraints() {

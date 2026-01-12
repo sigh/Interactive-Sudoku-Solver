@@ -102,7 +102,6 @@ export class CollapsibleContainer {
 
 export class ConstraintCategoryInput {
   static IS_LAYOUT = false;
-  static IS_SHAPE_AGNOSTIC = false;
 
   constructor(collection) {
     this.collection = collection;
@@ -255,13 +254,12 @@ ConstraintCategoryInput.Composite = class Composite extends ConstraintCategoryIn
 }
 
 class CheckboxCategoryInput extends ConstraintCategoryInput {
-  static IS_SHAPE_AGNOSTIC = true;
-
   constructor(collection, containerId) {
     super(collection);
 
     this._checkboxes = new Map();
     this._selects = new Map();
+    this._shape = null;
 
     const removeAllOfType = (constraint) => {
       // We need to remove the exact constraint objects (not necessarily
@@ -428,6 +426,17 @@ class CheckboxCategoryInput extends ConstraintCategoryInput {
 
     for (const item of this._selects.values()) {
       item.element.value = item.defaultValue;
+    }
+  }
+
+  reshape(shape) {
+    this._shape = shape;
+
+    for (const item of this._checkboxes.values()) {
+      const requiresSquare = item.constraint.constructor.REQUIRE_SQUARE_GRID;
+      const disabled = requiresSquare && !shape.isSquare();
+      item.element.disabled = disabled;
+      item.element.parentElement.classList.toggle('disabled', disabled);
     }
   }
 }

@@ -1802,13 +1802,20 @@ export class SudokuConstraint {
       const numRows = shape.numRows;
       const numCols = shape.numCols;
 
+      const seen = new Set();
+
       const addLittleKiller = (row, col, dr, dc) => {
         let cells = [];
         for (; row >= 0 && col >= 0 && col < numCols && row < numRows;
           row += dr, col += dc) {
           cells.push(shape.makeCellId(row, col));
         }
-        if (cells.length > 1) map[cells[0]] = cells;
+        if (cells.length <= 1) return;
+        const sorted = [...cells].sort().join(',');
+        if (seen.has(sorted)) return;
+
+        seen.add(sorted);
+        map[cells[0]] = cells;
       };
 
       // Left side.
