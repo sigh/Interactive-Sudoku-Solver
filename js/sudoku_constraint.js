@@ -1897,7 +1897,6 @@ export class SudokuConstraint {
       clueTemplate: '[$CLUE]',
     };
     static CLUE_TYPE = OutsideConstraintBase.CLUE_TYPE_DOUBLE_LINE;
-    static REQUIRE_SQUARE_GRID = true;
   }
 
   static HiddenSkyscraper = class HiddenSkyscraper extends OutsideConstraintBase {

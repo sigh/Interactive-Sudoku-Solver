@@ -1036,6 +1036,7 @@ export class Skyscraper extends SudokuConstraintHandler {
   constructor(cells, numVisible) {
     super(cells);
     this._numVisible = +numVisible;
+    this._numValues = 0;
     this._forwardStates = null;
     this._backwardStates = null;
     this._allStates = null;
@@ -1046,12 +1047,14 @@ export class Skyscraper extends SudokuConstraintHandler {
   }
 
   initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
-    // Skyscraper requires full-length rows/columns.
-    if (this.cells.length !== shape.numValues) {
-      throw new Error('Skyscraper requires full-length rows/columns');
-    }
-    // We need this to avoid overflowing the buffer.
-    if (this._numVisible > shape.numValues) return false;
+    this._numValues = shape.numValues;
+    // Can't see more buildings than exist.
+    if (this._numVisible > this.cells.length) return false;
+
+    // Terminal max height must be >= numCells (the minimum possible max
+    // with numCells distinct values). For full rows this equals maxValue.
+    const numCells = this.cells.length;
+    this._terminalMask = (1 << shape.numValues) - (1 << (numCells - 1));
 
     [this._forwardStates, this._backwardStates, this._allStates] = (
       this.constructor._makeStateArrays(shape.numValues, this._numVisible));
@@ -1082,7 +1085,7 @@ export class Skyscraper extends SudokuConstraintHandler {
     const cells = this.cells;
     const target = this._numVisible;
     const numCells = cells.length;
-    const maxValue = LookupTables.fromValue(numCells);
+    const maxValue = LookupTables.fromValue(this._numValues);
 
     // This resets the states for both the forward and backward pass.
     this._allStates.fill(0);
@@ -1144,14 +1147,12 @@ export class Skyscraper extends SudokuConstraintHandler {
       if (!(grid[cells[i]] &= ~maxValue)) return false;
     }
 
-    // Set the final state to just the target visibility.
-    // Final state must be our maximum height (e.g. 9 for a 9x9).
+    // Set the final state to the valid terminal states.
     // Updated states are collected into backwardStates.
     const backwardStates = this._backwardStates;
-    {
-      if (!(forwardStates[lastMaxHeightIndex][target - 1] & maxValue)) return false;
-      backwardStates[lastMaxHeightIndex][target - 1] = maxValue;
-    }
+    const terminalState = forwardStates[lastMaxHeightIndex][target - 1] & this._terminalMask;
+    if (!terminalState) return false;
+    backwardStates[lastMaxHeightIndex][target - 1] = terminalState;
 
     // Backward pass to constraint the states that we found based on our
     // knowledge of what the terminal state must be.

@@ -763,10 +763,16 @@ export const EXAMPLES = [
     solution: 'CFAJDIGHEBHBEIFGDJCAJADGECFBHIGECFHBIAJDIDHBJACEFG',
   },
   {
-    // Arbtrarily added jigsaw pieces and givens.
+    // Arbitrarily added jigsaw pieces and givens.
     name: '4x7: Jigsaw',
     input: '.Shape~4x7.Jigsaw~4x7~1222222111113244441334443333.~R2C4_2~R3C6_3~R4C5_4~R3C1_5~R4C3_6~R1C7_7~R4C7_5~R1C1_3~R1C5_6~R2C2_1',
     solution: '3425617614257352147367361425',
+  },
+  {
+    // Arbitrarily added skyscraper clues.
+    name: '4x6: Skyscraper',
+    input: '.Shape~4x6.Skyscraper~C1~1~4.Skyscraper~C2~2~3.Skyscraper~C3~3~.Skyscraper~C4~3~2.Skyscraper~C5~2~.Skyscraper~C6~1~.Skyscraper~R4~4~',
+    solution: '531246462315346521125463',
   },
 
   //////////////////////////////////////////////////////////////////////////////

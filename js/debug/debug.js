@@ -347,6 +347,7 @@ export const runSolveTests = async (onFailure, runner) => {
     '5x10: Killer Sudoku',  // Killer cages (tests sum optimizer on non-square grids)
     '6x9: Postcard',  // Indexing, Anti-knight, Whisper
     '4x7: Jigsaw',  // Jigsaw
+    '4x6: Skyscraper',  // Skyscraper
   ], onFailure);
   result.collection = 'Non-square grids';
   results.push(result);
