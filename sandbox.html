@@ -30,7 +30,7 @@ layout: null
   <script src="{{ 'lib/prism-javascript.min.js' | relative_url }}"></script>
   <script>self.VERSION_PARAM = '?v=' + ('{{ site.github.build_revision }}' || Math.random());</script>
   <script type="module"
-    src="{{ 'js/sandbox/sandbox.js?v=' | append: site.github.build_revision | relative_url }}"></script>
+    src="{{ 'js/sandbox/sandbox_page.js?v=' | append: site.github.build_revision | relative_url }}"></script>
 </head>
 
 <body>
@@ -69,36 +69,36 @@ layout: null
 
     <div class="editor-container">
       <div class="editor-panel">
-        <div class="panel-header">
-          <div class="btn-group">
-            <select id="examples-select">
+        <div class="sandbox-header">
+          <div class="sandbox-controls">
+            <select class="sandbox-examples">
               <option value="">Load example...</option>
             </select>
-            <button id="clear-btn" class="danger-button">Clear</button>
-            <button id="run-btn">
+            <button class="sandbox-clear danger-button">Clear</button>
+            <button class="sandbox-run">
               <span class="spinner"></span>
               <span class="btn-text">▶ Run (Ctrl+Enter)</span>
             </button>
-            <button id="run-abort-btn" class="danger-button" disabled>Abort</button>
+            <button class="sandbox-abort danger-button" disabled>Abort</button>
           </div>
-          <button id="share-btn" class="image-button plain-button" title="Copy shareable link">
+          <button class="sandbox-share image-button plain-button" title="Copy shareable link">
             <img src="img/link-48.png" alt="Share">
           </button>
         </div>
-        <div id="editor" class="editor language-javascript"></div>
+        <div class="sandbox-editor editor language-javascript"></div>
       </div>
 
       <div class="output-panel">
-        <div id="error-output" class="error"></div>
-        <div class="panel-header">
+        <div class="sandbox-error error"></div>
+        <div class="sandbox-header">
           <h2>Console Output – use <code>console.log()</code></h2>
         </div>
-        <div id="status-output" class="status"></div>
-        <div id="output" class="output"></div>
+        <div class="sandbox-status status"></div>
+        <div class="sandbox-output output"></div>
       </div>
 
       <div class="result-panel">
-        <div class="panel-header">
+        <div class="sandbox-header">
           <h2>Constraint String</h2>
           <a id="open-solver-link" href="#" target="_blank" style="display: none;">← Open in Solver</a>
         </div>
@@ -111,9 +111,9 @@ layout: null
       </div>
 
       <div id="grid-preview" class="grid-preview" style="display: none;">
-        <div class="panel-header">
+        <div class="sandbox-header">
           <h2>Grid Preview</h2>
-          <div class="btn-group">
+          <div class="sandbox-controls">
             <button id="solve-btn" disabled>Solve</button>
             <button id="abort-btn" class="danger-button" disabled>Abort</button>
             <div class="switch">

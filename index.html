@@ -172,6 +172,33 @@ layout: null
     </div>
   </div>
 
+  <div id="sandbox-container" style="display: none;">
+    <div class="sandbox-header">
+      <h2>Constraint Sandbox</h2>
+      <div class="sandbox-controls">
+        <select class="sandbox-examples">
+          <option value="">Load example...</option>
+        </select>
+        <button class="sandbox-clear danger-button">Clear</button>
+        <button class="sandbox-share plain-button">Share</button>
+        <button class="sandbox-run">
+          <span class="spinner"></span>
+          <span class="btn-text">▶ Run (Ctrl+Enter)</span>
+        </button>
+        <button class="sandbox-abort danger-button" disabled>Abort</button>
+        <button class="sandbox-close danger-button" title="Close sandbox">× Close</button>
+      </div>
+    </div>
+    <div class="sandbox-panels">
+      <div class="sandbox-editor editor language-javascript"></div>
+      <div class="sandbox-output-wrapper">
+        <div class="sandbox-error error"></div>
+        <div class="sandbox-status status"></div>
+        <div class="sandbox-output output"></div>
+      </div>
+    </div>
+  </div>
+
   <div id="sudoku-container">
     <div>
       <div id="sudoku-grid-and-state">
@@ -608,7 +635,7 @@ function accept(state) {
     Solver runs fastest on Chrome.
     <a href="https://github.com/sigh/Interactive-Sudoku-Solver/issues">
       [File a bug]</a>
-    <a href="sandbox">[Constraint sandbox]</a>
+    <a href="#" id="open-sandbox-link">[Constraint sandbox]</a>
     <a href="javascript:loadDebug()">[Load debug mode]</a>
     <br>
     Code at

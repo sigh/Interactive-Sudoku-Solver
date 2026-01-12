@@ -5,7 +5,9 @@ const {
   sessionAndLocalStorage,
   createSvgElement,
   arraysAreEqual,
-  MultiMap
+  MultiMap,
+  dynamicJSFileLoader,
+  dynamicCSSFileLoader,
 } = await import('./util.js' + self.VERSION_PARAM);
 const {
   SudokuConstraint,
@@ -35,9 +37,12 @@ export const initPage = () => {
     inputManager, displayContainer);
 
   // Load examples.
-  const exampleHandler = new ExampleHandler(constraintManager);
+  new ExampleHandler(constraintManager);
 
-  const controller = new SolutionController(constraintManager, displayContainer);
+  new SolutionController(constraintManager, displayContainer);
+
+  // Set up sandbox integration.
+  new SandboxHandler(constraintManager);
 
   const hiddenElements = Array.from(
     document.getElementsByClassName('hide-until-load'));
@@ -1316,5 +1321,74 @@ class GridInputManager {
           break;
       }
     });
+  }
+}
+
+class SandboxHandler {
+  constructor(constraintManager) {
+    this._constraintManager = constraintManager;
+    this._loadingPromise = null;
+    this._container = document.getElementById('sandbox-container');
+
+    this._setUpListeners();
+    this._checkForCodeParam();
+  }
+
+  _setUpListeners() {
+    const openLink = document.getElementById('open-sandbox-link');
+    const closeBtn = this._container.querySelector('.sandbox-close');
+
+    openLink.addEventListener('click', (e) => {
+      e.preventDefault();
+      this._openSandbox();
+      this._container.scrollIntoView();
+    });
+
+    closeBtn.addEventListener('click', () => {
+      this._closeSandbox();
+    });
+  }
+
+  _checkForCodeParam() {
+    // Auto-open sandbox if ?code= is in URL.
+    const url = new URL(window.location);
+    if (url.searchParams.has('code')) {
+      this._openSandbox();
+    }
+  }
+
+  async _openSandbox() {
+    this._container.style.display = 'block';
+
+    this._loadingPromise ||= this._loadSandbox();
+    return this._loadingPromise;
+  }
+
+  _closeSandbox() {
+    this._container.style.display = 'none';
+  }
+
+  async _loadSandbox() {
+    try {
+      // Load sandbox dependencies.
+      await Promise.all([
+        dynamicCSSFileLoader('css/sandbox.css' + self.VERSION_PARAM)(),
+        dynamicCSSFileLoader('lib/prism-tomorrow.min.css')(),
+      ]);
+      await dynamicJSFileLoader('lib/prism.min.js')();
+      await dynamicJSFileLoader('lib/prism-javascript.min.js')();
+
+      const { EmbeddedSandbox } = await import('./sandbox/embedded_sandbox.js' + self.VERSION_PARAM);
+
+      new EmbeddedSandbox(
+        this._container,
+        (constraintStr) => {
+          this._constraintManager.loadUnsafeFromText(constraintStr);
+          this._constraintManager.runUpdateCallback();
+        },
+      );
+    } catch (e) {
+      this._container.querySelector('.sandbox-error').textContent = `Failed to load sandbox: ${e.message}`;
+    }
   }
 }
