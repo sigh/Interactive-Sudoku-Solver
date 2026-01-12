@@ -168,6 +168,11 @@ export class SudokuBuilder {
 
         case 'Jigsaw':
           {
+            if (constraint.gridSpec !== shape.name) {
+              throw Error(
+                `Jigsaw gridSpec ${constraint.gridSpec} does not match ` +
+                `puzzle shape ${shape.name}`);
+            }
             cells = constraint.cells.map(c => shape.parseCellId(c).cell);
             yield new HandlerModule.AllDifferent(cells);
             // Just to let the solver know that this is a jigsaw puzzle.

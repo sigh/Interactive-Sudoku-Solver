@@ -91,6 +91,10 @@ export class GridShape {
     Object.freeze(this);
   }
 
+  isSquare() {
+    return this.numRows === this.numCols;
+  }
+
   static _boxDims(numRows, numCols) {
     // Find (boxH, boxW) where boxH * boxW = numValues that tiles the grid.
     // Prefer squarer boxes by starting from sqrt and working down.

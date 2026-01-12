@@ -602,29 +602,48 @@ export class SudokuConstraint {
     static CATEGORY = 'Jigsaw';
     static DISPLAY_CONFIG = { displayClass: 'Jigsaw' };
     static UNIQUENESS_KEY_FIELD = 'cells';
-    static REQUIRE_SQUARE_GRID = true;
 
-    constructor(...cells) {
-      super(...cells);
+    constructor(gridSpec, ...cells) {
+      super(gridSpec, ...cells);
+      this.gridSpec = gridSpec;
       this.cells = cells;
     }
 
     chipLabel() { return ''; }
 
     static *makeFromArgs(...args) {
-      const grid = args[0];
-      // TODO: Support rectangular grids.
-      const shape = GridShape.fromNumCells(grid.length);
+      let gridSpec = null;
+      let layoutStr = args[0];
+
+      // Check if first arg is a grid spec (contains 'x', e.g. '6x8').
+      // For backward compatibility, square grids omit the gridSpec.
+      if (args[0] && args[0].includes('x')) {
+        gridSpec = args[0];
+        layoutStr = args[1];
+      }
+
+      // Determine shape from gridSpec or infer from layout length (square only).
+      const shape = gridSpec ?
+        GridShape.fromGridSpec(gridSpec) :
+        GridShape.fromNumCells(layoutStr.length);
       if (!shape) throw Error('Invalid jigsaw regions');
 
+      // Validate that gridSpec matches the layout length.
+      if (gridSpec && layoutStr.length !== shape.numCells) {
+        throw Error(
+          `Jigsaw gridSpec ${gridSpec} expects ${shape.numCells} cells, ` +
+          `but layout has ${layoutStr.length}`);
+      }
+
       const map = new MultiMap();
-      for (let i = 0; i < grid.length; i++) {
-        map.add(grid[i], i);
+      for (let i = 0; i < layoutStr.length; i++) {
+        map.add(layoutStr[i], i);
       }
 
       for (const [_, region] of map) {
         if (region.length === shape.numValues) {
           yield new this(
+            shape.name,
             ...region.map(c => shape.makeCellIdFromIndex(c)));
         }
       }
@@ -633,9 +652,9 @@ export class SudokuConstraint {
     static serialize(parts) {
       if (!parts.length) return [];
 
-      // TODO: This assumes square grids where numParts == cellsPerPart == numValues.
-      // For rectangular grids, we need a different approach to infer the shape.
-      const shape = GridShape.fromNumCells(parts[0].cells.length * parts.length);
+      // Get shape from the first constraint's gridSpec.
+      const gridSpec = parts[0].gridSpec;
+      const shape = GridShape.fromGridSpec(gridSpec);
 
       // Fill parts grid such that each cell has a reference to the part.
       const partsGrid = new Array(shape.numCells).fill(null);
@@ -660,7 +679,10 @@ export class SudokuConstraint {
       });
 
       const layoutStr = partsGrid.map(part => indexMap.get(part)).join('');
-
+      // Only include gridSpec for non-square grids.
+      if (!shape.isSquare()) {
+        return this._argsToString(gridSpec, layoutStr);
+      }
       return this._argsToString(layoutStr);
     }
   }

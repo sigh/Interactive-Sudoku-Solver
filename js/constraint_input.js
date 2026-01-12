@@ -742,7 +742,7 @@ ConstraintCategoryInput.Jigsaw = class Jigsaw extends ConstraintCategoryInput {
     button.onclick = () => {
       const cells = inputManager.getSelection();
       this.collection.addConstraint(
-        new SudokuConstraint.Jigsaw(...cells));
+        new SudokuConstraint.Jigsaw(this._shape.name, ...cells));
       this.runUpdateCallback();
     };
 
