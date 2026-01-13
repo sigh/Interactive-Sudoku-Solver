@@ -1072,7 +1072,8 @@ h3 {
   border-top: 1px solid black;
   padding: 3px;
   right: 6px;
-  transform: translateY(3px) rotate(-135deg);
+  align-self: center;
+  transform: translateX(-3px) rotate(-135deg);
 }
 
 .collapsible-container.container-open .collapsible-anchor:after {
