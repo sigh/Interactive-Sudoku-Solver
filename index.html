@@ -175,19 +175,24 @@ layout: null
   <div id="sandbox-container" style="display: none;">
     <div class="sandbox-header">
       <h2>Constraint Sandbox</h2>
-      <div class="sandbox-controls">
-        <select class="sandbox-examples">
-          <option value="">Load example...</option>
-        </select>
-        <button class="sandbox-clear danger-button">Clear</button>
-        <button class="sandbox-share plain-button">Share</button>
-        <button class="sandbox-run">
-          <span class="spinner"></span>
-          <span class="btn-text">▶ Run (Ctrl+Enter)</span>
-        </button>
-        <button class="sandbox-abort danger-button" disabled>Abort</button>
-        <button class="sandbox-close danger-button" title="Close sandbox">× Close</button>
-      </div>
+      <span class="warning sandbox-warning">
+        ⚠️ <strong>Warning:</strong> The sandbox API is not intended to be stable and may change without notice.
+      </span>
+      <button class="sandbox-close image-button danger-button" title="Close sandbox">×</button>
+    </div>
+    <div class="sandbox-controls">
+      <select class="sandbox-examples">
+        <option value="">Load example...</option>
+      </select>
+      <button class="sandbox-clear danger-button">Clear</button>
+      <button class="sandbox-share image-button plain-button" title="Copy shareable link">
+        <img src="img/link-48.png" alt="Share">
+      </button>
+      <button class="sandbox-run">
+        <span class="spinner"></span>
+        <span class="btn-text">▶ Run (Ctrl+Enter)</span>
+      </button>
+      <button class="sandbox-abort danger-button" disabled>Abort</button>
     </div>
     <div class="sandbox-panels">
       <div id="main-page-sandbox-editor" class="sandbox-editor editor language-javascript"></div>
