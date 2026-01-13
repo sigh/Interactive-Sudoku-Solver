@@ -8,6 +8,7 @@ const {
   MultiMap,
   dynamicJSFileLoader,
   dynamicCSSFileLoader,
+  isKeyEventFromEditableElement,
 } = await import('./util.js' + self.VERSION_PARAM);
 const {
   SudokuConstraint,
@@ -1301,8 +1302,7 @@ class GridInputManager {
     });
 
     window.addEventListener('keydown', event => {
-      if (document.activeElement.tagName === 'TEXTAREA' ||
-        document.activeElement.tagName === 'INPUT') return;
+      if (isKeyEventFromEditableElement(event)) return;
       if (this._selection.size() == 0) return;
       switch (event.key) {
         case 'Backspace':
@@ -1347,6 +1347,23 @@ class SandboxHandler {
     closeBtn.addEventListener('click', () => {
       this._closeSandbox();
     });
+
+    // Ctrl+` to toggle sandbox.
+    document.addEventListener('keydown', (e) => {
+      if (e.ctrlKey && e.key === '`') {
+        e.preventDefault();
+        this._toggleSandbox();
+      }
+    });
+  }
+
+  _toggleSandbox() {
+    if (this._container.style.display === 'none') {
+      this._openSandbox();
+      this._container.scrollIntoView();
+    } else {
+      this._closeSandbox();
+    }
   }
 
   _checkForCodeParam() {
