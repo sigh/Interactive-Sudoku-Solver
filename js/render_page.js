@@ -1360,12 +1360,26 @@ class SandboxHandler {
   async _openSandbox() {
     this._container.style.display = 'block';
 
+    // Ensure code param exists in URL when sandbox is open.
+    const url = new URL(window.location);
+    if (!url.searchParams.has('code')) {
+      url.searchParams.set('code', '');
+      window.history.replaceState({}, '', url);
+    }
+
     this._loadingPromise ||= this._loadSandbox();
     return this._loadingPromise;
   }
 
   _closeSandbox() {
     this._container.style.display = 'none';
+
+    // Remove code param from URL when sandbox is closed.
+    const url = new URL(window.location);
+    if (url.searchParams.has('code')) {
+      url.searchParams.delete('code');
+      window.history.replaceState({}, '', url);
+    }
   }
 
   async _loadSandbox() {
