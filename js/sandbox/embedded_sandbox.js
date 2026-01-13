@@ -34,7 +34,10 @@ export class EmbeddedSandbox {
       editor.innerHTML = Prism.highlight(code, Prism.languages.javascript, 'javascript');
     };
 
-    this._jar = CodeJar(this._editorElement, highlight, { tab: '  ' });
+    this._jar = CodeJar(
+      this._editorElement,
+      highlight,
+      { tab: '  ', addClosing: false });
 
     // Load saved code first so it is available as a fallback.
     autoSaveField(this._editorElement);
