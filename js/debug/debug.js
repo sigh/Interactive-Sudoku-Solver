@@ -348,6 +348,7 @@ export const runSolveTests = async (onFailure, runner) => {
     '6x9: Postcard',  // Indexing, Anti-knight, Whisper
     '4x7: Jigsaw',  // Jigsaw
     '4x6: Skyscraper',  // Skyscraper
+    '9x8: Plain boxless',  // Boxless rectangular grid
   ], onFailure);
   result.collection = 'Non-square grids';
   results.push(result);

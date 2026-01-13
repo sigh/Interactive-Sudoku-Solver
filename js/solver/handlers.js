@@ -641,6 +641,121 @@ export class House extends SudokuConstraintHandler {
   }
 }
 
+// Determine the number of times each value appears in the provided lines,
+// (numCells / numLines), and ensure that each value appears exactly that many
+// times.
+// This is used for non-square grids where there aren't house constraints on
+// each line to better constrain the values. Without it, the solver can easily
+// get into a trap where the rest of the grid is not possible because we
+// don't have the required values.
+export class FullGridRequiredValues extends SudokuConstraintHandler {
+  constructor(allCells, lines) {
+    super(allCells);
+    this._lines = lines;
+    // Each value must appear in exactly K of the numValues lines.
+    // K is the number of cells per line.
+    this._requiredLineCount = lines[0].length;
+    this._numValues = lines.length;
+
+    // Scratch buffers to avoid allocations during propagation.
+    this._lineFixedValues = new Uint16Array(lines.length);
+    this._linePossibleValues = new Uint16Array(lines.length);
+    this._linePossibleHiddenSingles = new Uint16Array(lines.length);
+  }
+
+  enforceConsistency(grid, handlerAccumulator) {
+    const lines = this._lines;
+    const linesLen = lines.length;
+    const required = this._requiredLineCount;
+    const numValues = this._numValues;
+    const lineFixedValues = this._lineFixedValues;
+    const linePossibleValues = this._linePossibleValues;
+    const linePossibleHiddenSingles = this._linePossibleHiddenSingles;
+
+    let possibleHiddenSingles = 0;
+
+    // First pass per line: compute which values are fixed in the line, which
+    // values are still possible in the line (excluding already-fixed values),
+    // and which values are hidden singles (appear in exactly one cell).
+    for (let li = 0; li < linesLen; li++) {
+      const line = lines[li];
+
+      let allValues = 0;
+      let atLeastTwo = 0;
+      let fixedValues = 0;
+      for (let j = 0; j < line.length; j++) {
+        const v = grid[line[j]];
+        atLeastTwo |= allValues & v;
+        allValues |= v;
+        fixedValues |= (!(v & (v - 1))) * v;  // Avoid branching.
+      }
+      lineFixedValues[li] = fixedValues;
+
+      // For this handler, "possible" means "can still appear in this line"
+      // and excludes values already fixed in the line.
+      const possibleValues = allValues & ~fixedValues;
+      linePossibleValues[li] = possibleValues;
+
+      // Values which appear in exactly one cell in the line.
+      possibleHiddenSingles |= (
+        linePossibleHiddenSingles[li] = allValues & ~atLeastTwo & ~fixedValues);
+    }
+
+    let allHiddenSingles = 0;
+    for (let valueIndex = 0; valueIndex < numValues; valueIndex++) {
+      const valueMask = 1 << valueIndex;
+
+      let satisfied = 0;
+      let possible = 0;
+      for (let li = 0; li < linesLen; li++) {
+        satisfied += lineFixedValues[li] & valueMask;
+        possible += linePossibleValues[li] & valueMask;
+      }
+      satisfied >>>= valueIndex;
+      possible >>>= valueIndex;
+
+      if (satisfied > required) return false;
+      if (satisfied + possible < required) return false;
+
+      // If we've already placed the value in enough lines, forbid it elsewhere.
+      if (satisfied === required) {
+        const invMask = ~valueMask;
+        for (let li = 0; li < linesLen; li++) {
+          if (!(linePossibleValues[li] & valueMask)) continue;
+          const line = lines[li];
+          for (let i = 0; i < line.length; i++) {
+            const cell = line[i];
+            const v = grid[cell];
+            const next = v & invMask;
+            if (next !== v) {
+              if (!(grid[cell] = next)) return false;
+              handlerAccumulator.addForCell(cell);
+            }
+          }
+        }
+        continue;
+      }
+
+      // If all remaining possible lines must contain the value, we can enforce
+      // hidden singles in those lines.
+      if ((possibleHiddenSingles & valueMask) && satisfied + possible === required) {
+        allHiddenSingles |= valueMask;
+      }
+    }
+
+    if (allHiddenSingles) {
+      for (let li = 0; li < linesLen; li++) {
+        const hiddenSingles = linePossibleHiddenSingles[li] & allHiddenSingles;
+        if (hiddenSingles && !HandlerUtil.exposeHiddenSingles(grid, lines[li], hiddenSingles)) {
+          return false;
+        }
+      }
+    }
+
+    return true;
+  }
+}
+
 export class BinaryConstraint extends SudokuConstraintHandler {
   constructor(cell1, cell2, key) {
     super([cell1, cell2]);

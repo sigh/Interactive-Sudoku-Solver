@@ -43,6 +43,10 @@ export class SudokuConstraintOptimizer {
 
     this._addHouseHandlers(handlerSet, shape);
 
+    if (!shape.isSquare()) {
+      this._optimizeNonSquareGrids(handlerSet, hasBoxes, shape);
+    }
+
     this._optimizeSums(handlerSet, cellExclusions, hasBoxes, shape);
 
     this._optimizeJigsaw(handlerSet, hasBoxes, shape);
@@ -60,6 +64,56 @@ export class SudokuConstraintOptimizer {
     }
 
     this._logStats(handlerSet);
+  }
+
+  _optimizeNonSquareGrids(handlerSet, hasBoxes, shape) {
+    // For non-square grids without boxes, one axis forms houses
+    // and the other axis has numValues lines of length K < numValues.
+    // Since those K-length lines are all-different then for each value it must
+    // appear in exactly K of those numValues lines.
+    // Add an auxiliary handler that propagates this fact.
+
+    // We don't need this if there are boxes, as the box constraints provide
+    // sufficient propagation.
+    if (hasBoxes) return;
+
+    // Determine the axis that has numValues *lines* (the longer dimension).
+    // Those lines have length K = min(numRows, numCols).
+    let lines;
+    let requiredLineCount;
+    const numValues = shape.numValues;
+
+    if (shape.numCols === numValues) {
+      // Columns: numValues lines, each with numRows cells.
+      lines = SudokuConstraintBase.colRegions(shape);
+      requiredLineCount = shape.numRows;
+    } else if (shape.numRows === numValues) {
+      // Rows: numValues lines, each with numCols cells.
+      lines = SudokuConstraintBase.rowRegions(shape);
+      requiredLineCount = shape.numCols;
+    }
+
+    if (!lines) throw new Error("Invalid grid shape");
+    // If we only have 1 line, this constraint has no effect.
+    // If we have 2 lines, then only there is minimal propagation possible,
+    // because its not very constraining.
+    if (requiredLineCount <= 2) return;
+
+    // Pack all line cell indices into one backing store and create per-line views.
+    const backing = Uint8Array.from(lines.flat());
+    const packedLines = lines.map(
+      (_, i) => backing.subarray(
+        requiredLineCount * i,
+        requiredLineCount * (i + 1)));
+
+    const handler = new HandlerModule.FullGridRequiredValues(
+      shape.allCells,
+      packedLines);
+    handlerSet.addAux(handler);
+    this._logAddHandler('_addFullGridRequiredValues', handler, {
+      aux: true,
+      args: { requiredLineCount },
+    });
   }
 
   static _equalsKey = memoize((numValues) => fnToBinaryKey(
