@@ -1,5 +1,6 @@
 const { SudokuConstraint } = await import('../sudoku_constraint.js' + self.VERSION_PARAM);
 const { clearDOMNode } = await import('../util.js' + self.VERSION_PARAM);
+const { SANDBOX_HELP_TEXT } = await import('../sandbox/help_text.js' + self.VERSION_PARAM);
 
 const CATEGORY_CONFIGS = {
   'LinesAndSets': {
@@ -202,11 +203,17 @@ const createCategorySection = (category, constraints) => {
 export const renderHelpPage = () => {
   const categoriesContainer = document.getElementById('categories-content');
   const constraintsContainer = document.getElementById('constraints-content');
+  const sandboxHelpElement = document.getElementById('sandbox-help-text');
   const constraints = getAllConstraintClasses();
   const grouped = groupConstraintsByCategory(constraints);
 
   clearDOMNode(categoriesContainer);
   clearDOMNode(constraintsContainer);
+
+  // Populate sandbox help text.
+  if (sandboxHelpElement) {
+    sandboxHelpElement.textContent = SANDBOX_HELP_TEXT;
+  }
 
   // Create categories overview section
   const categoriesOverview = document.createElement('div');

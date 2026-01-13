@@ -5,6 +5,7 @@ import { CodeJar } from '../../lib/codejar.min.js';
 import { autoSaveField, Base64Codec } from '../util.js';
 import { DEFAULT_CODE, EXAMPLES } from './examples.js';
 import { UserScriptExecutor } from '../sudoku_constraint.js';
+import { SANDBOX_HELP_TEXT } from './help_text.js';
 
 export class EmbeddedSandbox {
   constructor(container, onConstraintGenerated) {
@@ -26,6 +27,12 @@ export class EmbeddedSandbox {
     this._initEditor();
     this._initExamples();
     this._initEventListeners();
+    this._showInitialHelp();
+  }
+
+  _showInitialHelp() {
+    this._outputElement.textContent = SANDBOX_HELP_TEXT;
+    this._statusElement.textContent = 'help()';
   }
 
   _initEditor() {
