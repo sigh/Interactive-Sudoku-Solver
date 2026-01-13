@@ -73,6 +73,12 @@ export class SudokuConstraintOptimizer {
     // appear in exactly K of those numValues lines.
     // Add an auxiliary handler that propagates this fact.
 
+    // Note: Without this empty grids can be VERY slow. However, when there are
+    // some constraints (or possibly just deeper into the solve) this constraint
+    // just slows things down.
+    // However, rectangular grids without boxes are relatively rare, so it's
+    // ok to just ensure that we avoid the worst cases here.
+
     // We don't need this if there are boxes, as the box constraints provide
     // sufficient propagation.
     if (hasBoxes) return;

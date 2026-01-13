@@ -652,9 +652,8 @@ export class FullGridRequiredValues extends SudokuConstraintHandler {
   constructor(allCells, lines) {
     super(allCells);
     this._lines = lines;
-    // Each value must appear in exactly K of the numValues lines.
-    // K is the number of cells per line.
-    this._requiredLineCount = lines[0].length;
+    // Each value must appear in exactly _lineLength of the numValues lines.
+    this._lineLength = lines[0].length;
     this._numValues = lines.length;
 
     // Scratch buffers to avoid allocations during propagation.
@@ -665,19 +664,17 @@ export class FullGridRequiredValues extends SudokuConstraintHandler {
 
   enforceConsistency(grid, handlerAccumulator) {
     const lines = this._lines;
-    const linesLen = lines.length;
-    const required = this._requiredLineCount;
+    const numLines = lines.length;
+    const lineLength = this._lineLength;
     const numValues = this._numValues;
     const lineFixedValues = this._lineFixedValues;
     const linePossibleValues = this._linePossibleValues;
     const linePossibleHiddenSingles = this._linePossibleHiddenSingles;
 
-    let possibleHiddenSingles = 0;
-
     // First pass per line: compute which values are fixed in the line, which
     // values are still possible in the line (excluding already-fixed values),
     // and which values are hidden singles (appear in exactly one cell).
-    for (let li = 0; li < linesLen; li++) {
+    for (let li = 0; li < numLines; li++) {
       const line = lines[li];
 
       let allValues = 0;
@@ -697,30 +694,29 @@ export class FullGridRequiredValues extends SudokuConstraintHandler {
       linePossibleValues[li] = possibleValues;
 
       // Values which appear in exactly one cell in the line.
-      possibleHiddenSingles |= (
-        linePossibleHiddenSingles[li] = allValues & ~atLeastTwo & ~fixedValues);
+      linePossibleHiddenSingles[li] = allValues & ~atLeastTwo & ~fixedValues;
     }
 
-    let allHiddenSingles = 0;
+    let requiredPossibleValues = 0;
     for (let valueIndex = 0; valueIndex < numValues; valueIndex++) {
       const valueMask = 1 << valueIndex;
 
       let satisfied = 0;
       let possible = 0;
-      for (let li = 0; li < linesLen; li++) {
+      for (let li = 0; li < numLines; li++) {
         satisfied += lineFixedValues[li] & valueMask;
         possible += linePossibleValues[li] & valueMask;
       }
       satisfied >>>= valueIndex;
       possible >>>= valueIndex;
 
-      if (satisfied > required) return false;
-      if (satisfied + possible < required) return false;
+      if (satisfied > lineLength) return false;
+      if (satisfied + possible < lineLength) return false;
 
       // If we've already placed the value in enough lines, forbid it elsewhere.
-      if (satisfied === required) {
+      if (satisfied === lineLength) {
         const invMask = ~valueMask;
-        for (let li = 0; li < linesLen; li++) {
+        for (let li = 0; li < numLines; li++) {
           if (!(linePossibleValues[li] & valueMask)) continue;
           const line = lines[li];
           for (let i = 0; i < line.length; i++) {
@@ -738,16 +734,35 @@ export class FullGridRequiredValues extends SudokuConstraintHandler {
 
       // If all remaining possible lines must contain the value, we can enforce
       // hidden singles in those lines.
-      if ((possibleHiddenSingles & valueMask) && satisfied + possible === required) {
-        allHiddenSingles |= valueMask;
+      if (satisfied + possible === lineLength) {
+        requiredPossibleValues |= valueMask;
       }
     }
 
-    if (allHiddenSingles) {
-      for (let li = 0; li < linesLen; li++) {
-        const hiddenSingles = linePossibleHiddenSingles[li] & allHiddenSingles;
+    if (requiredPossibleValues) {
+      for (let li = 0; li < numLines; li++) {
+        // Remove hidden singles.
+        const hiddenSingles = linePossibleHiddenSingles[li] & requiredPossibleValues;
         if (hiddenSingles && !HandlerUtil.exposeHiddenSingles(grid, lines[li], hiddenSingles)) {
           return false;
+        }
+        // Determine if there all the remaining unfixed cells must take the
+        // required values.
+        const allRequiredValues =
+          ((linePossibleValues[li] & requiredPossibleValues) | lineFixedValues[li]);
+        const usedCellCount = countOnes16bit(allRequiredValues);
+        if (usedCellCount > lineLength) return false;
+        if (usedCellCount === lineLength) {
+          // All the cells must take the required values.
+          const removeValues = ~allRequiredValues;
+          for (let j = 0; j < lines[li].length; j++) {
+            const cell = lines[li][j];
+            const v = grid[cell];
+            if (v & removeValues) {
+              if (!(grid[cell] &= allRequiredValues)) return false;
+              handlerAccumulator.addForCell(cell);
+            }
+          }
         }
       }
     }
