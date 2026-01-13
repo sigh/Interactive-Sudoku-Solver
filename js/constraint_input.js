@@ -209,7 +209,15 @@ ConstraintCategoryInput.Shape = class Shape extends ConstraintCategoryInput {
         input.select();
       } else if (e.key === 'Enter') {
         e.preventDefault();
-        if (highlightedIndex >= 0) input.value = items[highlightedIndex].textContent;
+        // If an item is highlighted and the entire input is selected.
+        // Check that to ensure that the user intends to select the highlighted
+        // item, rather than just pressing enter to accept the current input.
+        const allSelected =
+          input.selectionStart === 0 &&
+          input.selectionEnd === input.value.length;
+        if (highlightedIndex >= 0 && allSelected) {
+          input.value = items[highlightedIndex].textContent;
+        }
         applyShape();
       } else if (e.key === 'Escape') {
         hideDropdown();
