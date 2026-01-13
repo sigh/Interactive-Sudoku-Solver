@@ -2,83 +2,9 @@ import { SudokuConstraint } from '../sudoku_constraint.js';
 import { SudokuParser } from '../sudoku_parser.js';
 import { SudokuBuilder } from '../solver/sudoku_builder.js';
 import { GridShape, SHAPE_9x9, SHAPE_MAX } from '../grid_shape.js';
+import { SANDBOX_HELP_TEXT } from './help_text.js';
 
-const HELP_TEXT = `
-=== Constraint Sandbox Help ===
-
-ACCEPTED RETURN VALUES
-
-  Your code should return one of the following:
-    - A constraint object (e.g. new Cage(...))
-    - A constraint string (e.g. ".Cage~12~R1C1_R1C2_R1C3")
-    - An array of constraints or constraint strings
-    - Nothing (empty return) to skip solver invocation
-
-CELL IDENTIFIERS
-
-  Cells are identified using 'R{row}C{col}' format, with rows and columns
-  starting at 1.
-  e.g. 'R1C1' is the top-left cell, 'R9C9' is the bottom-right cell in a 9x9 grid
-
-  The following convenience functions are available for working with cell IDs:
-    parseCellId('R3C4')  => { row: 3, col: 4 }
-    makeCellId(3, 4)     => 'R3C4'
-
-CONSTRAINT OBJECTS
-
-  Constraint class names match their serialization names. For example:
-    new Cage(sum, ...cells)
-    new Thermo(...cells)
-
-  The type of a constraint instance c can be found with c.type.
-
-  parseConstraint(constraintString) can parse a constraint string into an array
-  of constraint objects. e.g. parseConstraint('.Cage~10~R1C1~R1C2')  => [Cage]
-
-  Use help('<ConstraintName>') for details on a specific constraint.
-
-SOLVER
-
-  makeSolver provides programmatic access to the solver:
-
-    const solver = await makeSolver();
-    // Get the first solution, or null if none exist
-    const solution = solver.solution(constraints);
-    // Get the unique solution, or null if not unique
-    const unique = solver.uniqueSolution(constraints);
-    // Count the number of solutions
-    const count = solver.countSolutions(constraints);
-    // Iterate over all solutions, with optional limit
-    for (const s of solver.solutions(constraints[, limit])) { ... }
-    // Get an array of solutions, with optional limit
-    const solutions = solver.solutionArray(constraints[, limit]);
-
-  Solution objects provide:
-    solution.valueAt('R1C1')  // Get value at cell
-    solution.valueAt(1, 1)    // Same, using row/col
-    solution.toString()       // Short string (e.g. 81 digits for 9x9)
-    for (const { cell, value } of solution) { ... }  // Iterate cells
-
-  solver.latestStats() returns timing/counter info after each solve.
-
-UTILITIES
-
-  console.log()         - Output to the console
-  console.error()       - Output an error to the console
-  console.warn()        - Output a warning to the console
-  console.info()        - Update status display
-  console.table(data)   - Render array of objects as a table
-  solverLink(c, t)      - Pass into console.log for clickable link to the solver
-                          c: constraint (string, object, or array)
-                          t: optional link text (defaults to constraint string)
-  help()                - Display this message
-
-LONG RUNNING TASKS
-
-  Async/await is supported for long-running tasks.
-`.trim();
-
-const getConstraintList = () => {
+export const getConstraintList = () => {
   const byCategory = {};
   for (const [name, cls] of Object.entries(SudokuConstraint)) {
     if (typeof cls !== 'function') continue;
@@ -114,12 +40,13 @@ const help = (arg) => {
     if (cls.CATEGORY) {
       console.log(`\n  Category: ${cls.CATEGORY}`);
     }
+  } else if (arg === 'list') {
+    console.log(getConstraintList());
   } else {
     if (arg) {
       console.error(`Unknown constraint: '${arg}'\n`);
     }
-    console.log(HELP_TEXT);
-    console.log(getConstraintList());
+    console.log(SANDBOX_HELP_TEXT);
   }
   console.log();
 };

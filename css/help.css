@@ -181,6 +181,15 @@ pre {
   }
 }
 
+details summary {
+  cursor: pointer;
+  color: var(--primary-color);
+}
+
+details summary:hover {
+  text-decoration: underline;
+}
+
 /* Mobile responsiveness */
 @media (max-width: 768px) {
   .help-container {
