@@ -41,38 +41,40 @@ export class EmbeddedSandbox {
 
     const savedCode = this._editorElement.textContent;
 
-    // Load code from URL (if present), otherwise use saved code / default.
+    // Load code from URL if present and non-empty, otherwise use saved code / default.
     const url = new URL(window.location);
     const encoded = url.searchParams.get('code');
-    let shouldClearCodeParamOnFirstEdit = encoded !== null;
+    // Track if we loaded from a non-empty code param (for clearing on first edit).
+    let shouldClearCodeParamOnFirstEdit = encoded !== null && encoded !== '';
 
     let initialCode;
-    if (encoded === null) {
-      initialCode = savedCode || DEFAULT_CODE;
-    } else {
+    if (encoded) {
       try {
         initialCode = Base64Codec.decodeToString(encoded);
       } catch (e) {
         this._errorElement.textContent = `Failed to decode code from URL`;
-        initialCode = '';
+        initialCode = savedCode || DEFAULT_CODE;
       }
+    } else {
+      initialCode = savedCode || DEFAULT_CODE;
     }
 
     this._jar.updateCode(initialCode);
 
-    // Save code on changes and clear URL code parameter on first edit.
+    // Save code on changes. On first edit after loading from URL, clear the
+    // code param value (but keep the param to indicate sandbox is open).
     this._jar.onUpdate(() => {
       this._editorElement.dispatchEvent(new Event('change'));
       if (shouldClearCodeParamOnFirstEdit) {
-        this._clearCodeFromUrl();
+        this._setEmptyCodeParam();
         shouldClearCodeParamOnFirstEdit = false;
       }
     });
   }
 
-  _clearCodeFromUrl() {
+  _setEmptyCodeParam() {
     const url = new URL(window.location);
-    url.searchParams.delete('code');
+    url.searchParams.set('code', '');
     window.history.replaceState({}, '', url);
   }
 
