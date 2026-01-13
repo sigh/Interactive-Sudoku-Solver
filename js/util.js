@@ -448,6 +448,17 @@ export const autoSaveField = (element, field) => {
   });
 };
 
+const isEditableElement = (element) => {
+  if (!element) return false;
+  if (element.isContentEditable) return true;
+  const tagName = element.tagName;
+  return tagName === 'INPUT' || tagName === 'TEXTAREA' || tagName === 'SELECT';
+};
+
+export const isKeyEventFromEditableElement = (event) => {
+  return isEditableElement(event?.target);
+};
+
 export const sessionAndLocalStorage = {
   getItem: (key) => {
     const sessionValue = sessionStorage.getItem(key);

@@ -3,6 +3,7 @@ const {
   deferUntilAnimationFrame,
   clearDOMNode,
   localTimestamp,
+  isKeyEventFromEditableElement,
 } = await import('./util.js' + self.VERSION_PARAM);
 const {
   HighlightDisplay,
@@ -134,7 +135,7 @@ class HistoryHandler {
     this._redoButton.onclick = () => this._incrementHistory(+1);
     // ctrl-z/shift-ctrl-z are shortcuts for undo/redo,
     window.addEventListener('keydown', event => {
-      if (document.activeElement.tagName === 'TEXTAREA') return;
+      if (isKeyEventFromEditableElement(event)) return;
       if (event.key === 'z' && (event.metaKey || event.ctrlKey)) {
         event.preventDefault();
         this._incrementHistory(event.shiftKey ? 1 : -1);
@@ -345,21 +346,21 @@ export class SolutionController {
     const FIRE_FAST = 2;
 
     document.addEventListener('keydown', event => {
-      // Ctrl/Cmd+Enter to solve.
-      if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
-        event.preventDefault();
+      // Ctrl/Cmd+Shift+Enter to solve.
+      if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key === 'Enter') {
         // If in freeform-input, submit the form (which triggers solve).
         const freeformInput = document.querySelector('[name="freeform-input"]');
         if (document.activeElement === freeformInput) {
+          event.preventDefault();
           freeformInput.form.requestSubmit();
-        } else {
+        } else if (!isKeyEventFromEditableElement(event)) {
+          event.preventDefault();
           this._solve();
         }
         return;
       }
 
-      if (document.activeElement.tagName === 'TEXTAREA' ||
-        document.activeElement.tagName === 'INPUT') return;
+      if (isKeyEventFromEditableElement(event)) return;
       let key = event.key;
       let handler = keyHandlers[key];
       if (!handler) return;

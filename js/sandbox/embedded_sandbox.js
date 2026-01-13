@@ -104,9 +104,9 @@ export class EmbeddedSandbox {
     this._clearBtn.addEventListener('click', () => this.clear());
     this._shareBtn?.addEventListener('click', () => this._copyShareableLink());
 
-    // Ctrl+Enter to run.
+    // Ctrl+Enter to run (but not Ctrl+Shift+Enter which is for solving).
     document.addEventListener('keydown', (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key === 'Enter') {
         if (this._container.style.display !== 'none') {
           e.preventDefault();
           this.runCode();
