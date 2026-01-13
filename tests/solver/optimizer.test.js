@@ -10,6 +10,8 @@ const { BitSet } = await import('../../js/util.js' + self.VERSION_PARAM);
 const HandlerModule = await import('../../js/solver/handlers.js' + self.VERSION_PARAM);
 const SumHandlerModule = await import('../../js/solver/sum_handler.js' + self.VERSION_PARAM);
 const { GridShape } = await import('../../js/grid_shape.js' + self.VERSION_PARAM);
+const { HandlerSet, CellExclusions } = await import('../../js/solver/engine.js' + self.VERSION_PARAM);
+const { SudokuConstraintBase } = await import('../../js/sudoku_constraint.js' + self.VERSION_PARAM);
 
 class MockCellExclusions {
   constructor(numCells) {
@@ -684,6 +686,52 @@ await runTest('_overlapRegions: 5x7 grid (no houses) returns empty', () => {
   assert.equal(regions.length, 2);
   assert.equal(regions[0].length, 5); // 5 rows
   assert.equal(regions[0][0].length, 7); // 7 cells per row
+});
+
+// =============================================================================
+// _optimizeNonSquareGrids tests
+// =============================================================================
+
+await runTest('_optimizeNonSquareGrids: adds aux handler for 8x9 no-box grid', () => {
+  const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
+  const shape = GridShape.fromGridSize(8, 9);
+
+  // Add all-different constraints for both axes.
+  const handlers = [];
+  for (const r of SudokuConstraintBase.rowRegions(shape)) {
+    handlers.push(new HandlerModule.AllDifferent(r));
+  }
+  for (const c of SudokuConstraintBase.colRegions(shape)) {
+    handlers.push(new HandlerModule.AllDifferent(c));
+  }
+
+  const handlerSet = new HandlerSet(handlers, shape);
+
+  optimizer._optimizeNonSquareGrids(handlerSet, /* hasBoxes= */ false, shape);
+
+  const added = handlerSet.getAllofType(HandlerModule.FullGridRequiredValues);
+  assert.equal(added.length, 1);
+});
+
+await runTest('_optimizeNonSquareGrids: skips aux handler for 1x9 grid', () => {
+  const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
+  const shape = GridShape.fromGridSize(1, 9);
+
+  // Add all-different constraints for both axes.
+  const handlers = [];
+  for (const r of SudokuConstraintBase.rowRegions(shape)) {
+    handlers.push(new HandlerModule.AllDifferent(r));
+  }
+  for (const c of SudokuConstraintBase.colRegions(shape)) {
+    handlers.push(new HandlerModule.AllDifferent(c));
+  }
+
+  const handlerSet = new HandlerSet(handlers, shape);
+
+  optimizer._optimizeNonSquareGrids(handlerSet, /* hasBoxes= */ false, shape);
+
+  const added = handlerSet.getAllofType(HandlerModule.FullGridRequiredValues);
+  assert.equal(added.length, 0);
 });
 
 // =============================================================================

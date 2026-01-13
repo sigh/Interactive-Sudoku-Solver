@@ -774,6 +774,12 @@ export const EXAMPLES = [
     input: '.Shape~4x6.Skyscraper~C1~1~4.Skyscraper~C2~2~3.Skyscraper~C3~3~.Skyscraper~C4~3~2.Skyscraper~C5~2~.Skyscraper~C6~1~.Skyscraper~R4~4~',
     solution: '531246462315346521125463',
   },
+  {
+    // Added numbers randomly until it had a unique solution.
+    name: '9x8: Plain boxless',
+    input: '.Shape~9x8.~R1C1_1~R3C3_2~R6C4_3~R4C6_4~R8C7_5~R8C2_6~R2C5_7~R9C8_8~R5C2_9~R1C7_2~R9C5_9~R9C1_6~R3C7_7~R2C8_3~R4C1_2~R7C3_1~R7C6_9~R5C7_8~R4C4_5~R6C8_5~R1C3_8~R7C2_4~R6C1_8~R8C4_8~R9C3_5~R3C5_6~R2C2_5~R7C8_2~R5C5_4~R1C4_4~R8C5_1~R4C3_3~R4C8_6',
+    solution: '138456279546781338296574213584967962438187932145541739624678125962519738',
+  },
 
   //////////////////////////////////////////////////////////////////////////////
   // Or
