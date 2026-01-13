@@ -310,29 +310,24 @@ p code {
    Embedded Sandbox Panel (in main page)
    ========================================================================== */
 
-#sandbox-container {
-  margin: 0 20px 20px 20px;
-  padding: 15px;
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  background: #fafafa;
+#sandbox-container .sandbox-anchor {
+  display: flex;
 }
 
-#sandbox-container .sandbox-header {
-  gap: 12px;
+#sandbox-container .sandbox-body {
+  padding-top: 10px;
+}
+
+#sandbox-container .sandbox-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
   margin-bottom: 12px;
 }
 
-#sandbox-container .sandbox-header h2 {
-  margin: 0;
-}
-
-#sandbox-container .sandbox-warning {
-  margin-right: auto;
-}
-
-#sandbox-container>.sandbox-controls {
-  margin-bottom: 12px;
+#sandbox-container .sandbox-controls-spacer {
+  flex: 1;
 }
 
 #sandbox-container .sandbox-panels {

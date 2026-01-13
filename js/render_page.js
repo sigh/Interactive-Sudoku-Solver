@@ -1329,6 +1329,7 @@ class SandboxHandler {
     this._constraintManager = constraintManager;
     this._loadingPromise = null;
     this._container = document.getElementById('sandbox-container');
+    this._collapsible = null;
 
     this._setUpListeners();
     this._checkForCodeParam();
@@ -1336,7 +1337,6 @@ class SandboxHandler {
 
   _setUpListeners() {
     const openLink = document.getElementById('open-sandbox-link');
-    const closeBtn = this._container.querySelector('.sandbox-close');
 
     openLink.addEventListener('click', (e) => {
       e.preventDefault();
@@ -1344,13 +1344,9 @@ class SandboxHandler {
       this._container.scrollIntoView();
     });
 
-    closeBtn.addEventListener('click', () => {
-      this._closeSandbox();
-    });
-
-    // Ctrl+` to toggle sandbox.
+    // Ctrl/Cmd+` to toggle sandbox.
     document.addEventListener('keydown', (e) => {
-      if (e.ctrlKey && e.key === '`') {
+      if ((e.ctrlKey || e.metaKey) && e.key === '`') {
         e.preventDefault();
         this._toggleSandbox();
       }
@@ -1361,8 +1357,9 @@ class SandboxHandler {
     if (this._container.style.display === 'none') {
       this._openSandbox();
       this._container.scrollIntoView();
-    } else {
-      this._closeSandbox();
+    } else if (this._collapsible) {
+      this._collapsible.toggleOpen();
+      this._updateCodeParam();
     }
   }
 
@@ -1374,29 +1371,28 @@ class SandboxHandler {
     }
   }
 
-  async _openSandbox() {
-    this._container.style.display = 'block';
-
-    // Ensure code param exists in URL when sandbox is open.
+  _updateCodeParam() {
     const url = new URL(window.location);
-    if (!url.searchParams.has('code')) {
+    const isOpen = this._collapsible?.isOpen();
+
+    if (isOpen && !url.searchParams.has('code')) {
       url.searchParams.set('code', '');
       window.history.replaceState({}, '', url);
-    }
-
-    this._loadingPromise ||= this._loadSandbox();
-    return this._loadingPromise;
-  }
-
-  _closeSandbox() {
-    this._container.style.display = 'none';
-
-    // Remove code param from URL when sandbox is closed.
-    const url = new URL(window.location);
-    if (url.searchParams.has('code')) {
+    } else if (!isOpen && url.searchParams.has('code')) {
       url.searchParams.delete('code');
       window.history.replaceState({}, '', url);
     }
+  }
+
+  async _openSandbox() {
+    this._container.style.display = '';
+
+    this._loadingPromise ||= this._loadSandbox();
+    await this._loadingPromise;
+
+    // Ensure it's expanded when opened.
+    this._collapsible?.toggleOpen(true);
+    this._updateCodeParam();
   }
 
   async _loadSandbox() {
@@ -1410,6 +1406,17 @@ class SandboxHandler {
       await dynamicJSFileLoader('lib/prism-javascript.min.js')();
 
       const { EmbeddedSandbox } = await import('./sandbox/embedded_sandbox.js' + self.VERSION_PARAM);
+
+      // Set up collapsible behavior.
+      this._collapsible = new CollapsibleContainer(this._container, /* defaultOpen= */ true);
+
+      // Override the default anchor click to also update URL param.
+      const anchor = this._collapsible.anchorElement();
+      const originalOnClick = anchor.onclick;
+      anchor.onclick = (e) => {
+        originalOnClick(e);
+        this._updateCodeParam();
+      };
 
       new EmbeddedSandbox(
         this._container,
