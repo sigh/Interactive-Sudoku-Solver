@@ -12,7 +12,6 @@ export class EmbeddedSandbox {
     this._container = container;
     this._editorElement = container.querySelector('.sandbox-editor');
     this._outputElement = container.querySelector('.sandbox-output');
-    this._errorElement = container.querySelector('.sandbox-error');
     this._statusElement = container.querySelector('.sandbox-status');
     this._examplesSelect = container.querySelector('.sandbox-examples');
     this._runBtn = container.querySelector('.sandbox-run');
@@ -32,7 +31,19 @@ export class EmbeddedSandbox {
 
   _showInitialHelp() {
     this._outputElement.textContent = SANDBOX_HELP_TEXT;
-    this._statusElement.textContent = 'help()';
+    this._setStatus('Showing help()');
+  }
+
+  _setStatus(text) {
+    this._statusElement.classList.remove('error');
+    this._statusElement.classList.add('status');
+    this._statusElement.textContent = text;
+  }
+
+  _setError(text) {
+    this._statusElement.classList.remove('status');
+    this._statusElement.classList.add('error');
+    this._statusElement.textContent = text;
   }
 
   _initEditor() {
@@ -62,7 +73,7 @@ export class EmbeddedSandbox {
       try {
         initialCode = Base64Codec.decodeToString(encoded);
       } catch (e) {
-        this._errorElement.textContent = `Failed to decode code from URL`;
+        this._setError('Failed to decode code from URL');
         initialCode = savedCode || DEFAULT_CODE;
       }
     } else {
@@ -158,8 +169,8 @@ export class EmbeddedSandbox {
         this._outputElement.scrollTop = this._outputElement.scrollHeight;
       },
       onStatus: (segments) => {
-        this._statusElement.textContent = segments.map(
-          s => typeof s === 'string' ? s : s.text).join(' ');
+        this._setStatus(segments.map(
+          s => typeof s === 'string' ? s : s.text).join(' '));
       },
     };
 
@@ -189,7 +200,7 @@ export class EmbeddedSandbox {
 
   // Override in subclass for custom error handling.
   _onRunError(err) {
-    this._errorElement.textContent = `Error: ${err.message || err}`;
+    this._setError(`Error: ${err.message || err}`);
   }
 
   // Override in subclass for custom link rendering.
@@ -240,9 +251,10 @@ export class EmbeddedSandbox {
   }
 
   _clearOutput() {
-    this._errorElement.textContent = '';
     this._outputElement.innerHTML = '';
     this._statusElement.textContent = '';
+    this._statusElement.classList.remove('status');
+    this._statusElement.classList.remove('error');
   }
 
   clear() {

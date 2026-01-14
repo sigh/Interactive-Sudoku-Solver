@@ -194,9 +194,8 @@ p code {
   color: var(--color-primary-border);
 }
 
-.status:not(:empty)::before {
-  content: 'Status: ';
-  font-weight: bold;
+.sandbox-status:empty {
+  display: none;
 }
 
 .status:empty {
