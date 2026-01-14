@@ -557,6 +557,7 @@ class ConstraintManager {
     const form = document.forms['freeform-constraint-input'];
     const errorElem = document.getElementById('error-panel').appendChild(
       document.createElement('div'));
+    errorElem.className = 'notice notice-error notice-compact';
     const inputElem = form['freeform-input'];
 
     // Allow loading free-form input from other locations.
@@ -1428,8 +1429,7 @@ class SandboxHandler {
     } catch (e) {
       const messageElement = this._container.querySelector('.sandbox-status');
       messageElement.textContent = `Failed to load sandbox: ${e.message}`;
-      messageElement.classList.remove('status');
-      messageElement.classList.add('error');
+      messageElement.classList.add('notice-error');
     }
   }
 }

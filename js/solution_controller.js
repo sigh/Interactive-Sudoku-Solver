@@ -270,6 +270,8 @@ export class SolutionController {
       download: document.getElementById('download-solutions-button'),
     }
 
+    this._elements.error.className = 'notice notice-error notice-compact';
+
     this._elements.mode.onchange = () => {
       this._updateValueCountLimitUrl();
       this._update();
