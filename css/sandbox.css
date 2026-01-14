@@ -137,7 +137,7 @@ p code {
 }
 
 /* Console output */
-.output {
+.sandbox-output {
   background: white;
   border: 1px solid var(--color-border);
   border-radius: 5px;
@@ -150,7 +150,7 @@ p code {
   min-height: 0;
 }
 
-.output .solver-link-preview {
+.sandbox-output .solver-link-preview {
   background: none;
   border: none;
   padding: 0;
@@ -160,13 +160,28 @@ p code {
   opacity: 0.6;
 }
 
-.output .solver-link-preview:hover {
+.sandbox-output .solver-link-preview:hover {
   opacity: 1;
 }
 
-.output .solver-link-preview img {
+.sandbox-output .solver-link-preview img {
   width: 14px;
   height: 14px;
+}
+
+.sandbox-output .solver-link-with-copy {
+  display: inline-flex;
+  align-items: center;
+}
+
+.sandbox-output .solver-link-with-copy button {
+  padding: 2px;
+  margin-left: 2px;
+}
+
+.sandbox-output .solver-link-with-copy img {
+  width: 12px;
+  height: 12px;
 }
 
 /* Status display (console.info) */
@@ -188,11 +203,11 @@ p code {
   display: none;
 }
 
-.output.error {
+.sandbox-output.error {
   color: var(--color-error);
 }
 
-.output.success {
+.sandbox-output.success {
   color: #2e7d32;
 }
 
@@ -248,6 +263,10 @@ p code {
   height: 16px;
   display: block;
   filter: none;
+}
+
+.copy-button.copied {
+  opacity: 1;
 }
 
 /* Grid Preview */
@@ -362,7 +381,7 @@ p code {
   resize: vertical;
 }
 
-#sandbox-container .output {
+#sandbox-container .sandbox-output {
   flex: 1;
   min-height: 0;
 }

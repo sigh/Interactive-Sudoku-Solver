@@ -52,7 +52,7 @@ const { parseConstraint, Container } = SANDBOX_GLOBALS;
   console.log('Test: solverLink with string constraint');
   const { solverLink } = SANDBOX_GLOBALS;
   const link = solverLink('.Cage~10~R1C1~R1C2', 'Test Link');
-  assert.equal(link.constraintStr, '.Cage~10~R1C1~R1C2', 'constraintStr should match');
+  assert.equal(link.constraintStr(), '.Cage~10~R1C1~R1C2', 'constraintStr() should match');
   assert.equal(link.text, 'Test Link', 'text should match');
 }
 
@@ -62,7 +62,7 @@ const { parseConstraint, Container } = SANDBOX_GLOBALS;
   const { solverLink, Cage } = SANDBOX_GLOBALS;
   const cage = new Cage(10, 'R1C1', 'R1C2');
   const link = solverLink(cage);
-  assert.ok(link.constraintStr.includes('Cage'), 'constraintStr should include Cage');
+  assert.ok(link.constraintStr().includes('Cage'), 'constraintStr() should include Cage');
   assert.equal(link.text, undefined, 'text should be undefined when not provided');
 }
 
@@ -75,8 +75,8 @@ const { parseConstraint, Container } = SANDBOX_GLOBALS;
     new Thermo('R3C3', 'R3C4'),
   ];
   const link = solverLink(constraints, 'Multiple');
-  assert.ok(link.constraintStr.includes('Cage'), 'constraintStr should include Cage');
-  assert.ok(link.constraintStr.includes('Thermo'), 'constraintStr should include Thermo');
+  assert.ok(link.constraintStr().includes('Cage'), 'constraintStr() should include Cage');
+  assert.ok(link.constraintStr().includes('Thermo'), 'constraintStr() should include Thermo');
   assert.equal(link.text, 'Multiple', 'text should match');
 }
 

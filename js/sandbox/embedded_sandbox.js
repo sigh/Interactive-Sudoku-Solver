@@ -194,8 +194,11 @@ export class EmbeddedSandbox {
 
   // Override in subclass for custom link rendering.
   _renderConstraintLink(constraintStr, text) {
+    const wrapper = document.createElement('span');
+    wrapper.className = 'solver-link-with-copy';
+
     const link = document.createElement('a');
-    link.href = '#';
+    link.href = '?q=' + encodeURIComponent(constraintStr);
     link.textContent = text;
     link.title = 'Load into grid';
     link.onclick = (e) => {
@@ -204,7 +207,29 @@ export class EmbeddedSandbox {
         this._onConstraintGenerated(constraintStr);
       }
     };
-    return link;
+
+    const copyBtn = document.createElement('button');
+    copyBtn.type = 'button';
+    copyBtn.className = 'copy-button';
+    copyBtn.title = 'Copy constraint to clipboard';
+    copyBtn.setAttribute('aria-label', 'Copy constraint to clipboard');
+
+    const copyIcon = document.createElement('img');
+    copyIcon.src = 'img/copy-48.png';
+    copyIcon.alt = '';
+    copyBtn.appendChild(copyIcon);
+
+    copyBtn.onclick = async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      await navigator.clipboard.writeText(constraintStr);
+      copyBtn.classList.add('copied');
+      setTimeout(() => copyBtn.classList.remove('copied'), 800);
+    };
+
+    wrapper.appendChild(link);
+    wrapper.appendChild(copyBtn);
+    return wrapper;
   }
 
   abortCode() {
