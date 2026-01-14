@@ -1048,7 +1048,6 @@ h3 {
   display: inline-block;
   position: relative;
   font-size: var(--font-size-base);
-  user-select: none;
   margin: 0px;
   width: 100%;
 }
@@ -1063,6 +1062,7 @@ h3 {
   padding: 5px 10px;
   text-align: center;
   line-height: 1.2em;
+  user-select: none;
 }
 
 .collapsible-container .collapsible-anchor:after {
