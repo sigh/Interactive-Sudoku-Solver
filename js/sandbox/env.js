@@ -1,6 +1,5 @@
 import { SudokuConstraint } from '../sudoku_constraint.js';
 import { SudokuParser } from '../sudoku_parser.js';
-import { SudokuBuilder } from '../solver/sudoku_builder.js';
 import { GridShape, SHAPE_9x9, SHAPE_MAX } from '../grid_shape.js';
 import { SANDBOX_HELP_TEXT } from './help_text.js';
 
@@ -29,25 +28,71 @@ const getConstructorArgs = (cls) => {
   return match?.[1]?.trim() || '';
 };
 
-const help = (arg) => {
-  const cls = arg && SudokuConstraint[arg];
-  if (cls) {
-    const args = getConstructorArgs(cls);
-    console.log(`${arg}${args ? `(${args})` : ''}`);
-    if (cls.DESCRIPTION) {
-      console.log('\n  ' + cls.DESCRIPTION.trim().replace(/\s+/g, ' '));
-    }
-    if (cls.CATEGORY) {
-      console.log(`\n  Category: ${cls.CATEGORY}`);
-    }
-  } else if (arg === 'list') {
-    console.log(getConstraintList());
-  } else {
-    if (arg) {
-      console.error(`Unknown constraint: '${arg}'\n`);
-    }
-    console.log(SANDBOX_HELP_TEXT);
+const printHelpForResolved = ({ name, cls }) => {
+  const args = getConstructorArgs(cls);
+  console.log(`${name}${args ? `(${args})` : ''}`);
+  if (cls.DESCRIPTION) {
+    console.log('\n  ' + cls.DESCRIPTION.trim().replace(/\s+/g, ' '));
   }
+  if (cls.CATEGORY) {
+    console.log(`\n  Category: ${cls.CATEGORY}`);
+  }
+  console.log();
+};
+
+const normalizeToConstraint = (arg) => {
+  if (Array.isArray(arg)) {
+    const constraintStr = arg.map(v => v.toString()).join('');
+    return SudokuParser.parseString(constraintStr);
+  }
+
+  if (typeof arg === 'string') {
+    return SudokuParser.parseString(arg);
+  }
+
+  return arg;
+};
+
+const help = (arg) => {
+  if (!arg) {
+    console.log(SANDBOX_HELP_TEXT);
+    console.log();
+    return;
+  }
+
+  if (arg === 'list') {
+    console.log(getConstraintList());
+    console.log();
+    return;
+  }
+
+  // Handle explicit constraint type requests separately.
+  if (SudokuConstraint[arg]) {
+    printHelpForResolved({ name: arg, cls: SudokuConstraint[arg] });
+    return;
+  }
+  if (SudokuConstraint[arg?.name]) {
+    printHelpForResolved({ name: arg.name, cls: SudokuConstraint[arg.name] });
+    return;
+  }
+
+  try {
+    const constraint = normalizeToConstraint(arg);
+    const types = [...constraint.toMap().keys()].sort();
+
+    if (types.length) {
+      for (const type of types) {
+        printHelpForResolved({ name: type, cls: SudokuConstraint[type] });
+      }
+      return;
+    }
+  } catch (e) {
+    console.error('help(): ' + String(e?.message || e));
+    console.log();
+    return;
+  }
+
+  console.error(`help(): Unknown constraint: '${arg}'\n`);
   console.log();
 };
 
@@ -63,12 +108,11 @@ const makeCellId = (row, col) => SHAPE_MAX.makeCellId(row - 1, col - 1);
 
 const parseConstraint = (str) => {
   const parsed = SudokuParser.parseString(str);
-  const resolved = SudokuBuilder.resolveConstraint(parsed);
   // NOTE: This can't be an instanceof check when run inside the sandbox.
-  if (resolved.type === SudokuConstraint.Container.name) {
-    return resolved.constraints;
+  if (parsed.type === SudokuConstraint.Container.name) {
+    return parsed.constraints;
   }
-  return [resolved];
+  return [parsed];
 };
 
 const makeSolver = async () => {
