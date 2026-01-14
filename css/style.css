@@ -368,6 +368,38 @@ button.icon-button,
   font-weight: bold;
 }
 
+.notice {
+  border-radius: 5px;
+  padding: 8px 12px;
+  border: 1px solid var(--color-border);
+}
+
+.notice:empty {
+  display: none;
+}
+
+.notice-compact {
+  padding: 4px 8px;
+}
+
+.notice-info {
+  background: #f0f7ff;
+  border-color: var(--color-primary);
+  color: var(--color-primary-border);
+}
+
+.notice-warning {
+  background: #fff3cd;
+  border-color: #ffc107;
+  color: #856404;
+}
+
+.notice-error {
+  background: hsl(0, 100%, 95%);
+  border-color: var(--color-error);
+  color: var(--color-error);
+}
+
 .chip-view {
   display: grid;
   grid-template-columns: 1fr 1fr;

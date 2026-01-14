@@ -28,6 +28,11 @@ export class EmbeddedSandbox {
     this._showInitialHelp();
   }
 
+  _setStatusVariant(variant) {
+    this._statusElement.classList.toggle('notice-info', variant === 'info');
+    this._statusElement.classList.toggle('notice-error', variant === 'error');
+  }
+
   _showInitialHelp() {
     this._outputElement.textContent = SANDBOX_HELP_TEXT;
     this._setStatusSegments(['Showing help()']);
@@ -55,8 +60,7 @@ export class EmbeddedSandbox {
   }
 
   _setStatusSegments(segments) {
-    this._statusElement.classList.remove('error');
-    this._statusElement.classList.add('status');
+    this._setStatusVariant('info');
     this._statusElement.replaceChildren(this._renderSegments(segments));
   }
 
@@ -72,8 +76,7 @@ export class EmbeddedSandbox {
   }
 
   _setError(text) {
-    this._statusElement.classList.remove('status');
-    this._statusElement.classList.add('error');
+    this._setStatusVariant('error');
     this._statusElement.textContent = text;
   }
 
@@ -263,8 +266,7 @@ export class EmbeddedSandbox {
   _clearOutput() {
     this._outputElement.innerHTML = '';
     this._statusElement.textContent = '';
-    this._statusElement.classList.remove('status');
-    this._statusElement.classList.remove('error');
+    this._setStatusVariant(null);
   }
 
   clear() {
