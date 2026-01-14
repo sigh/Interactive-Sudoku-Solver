@@ -174,10 +174,28 @@ body {
   margin-top: 0.5em;
 }
 
-#example-select-container {
+#page-header {
   display: flex;
-  flex-direction: column;
   align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+}
+
+#page-header-links {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+#right-panel>* {
+  margin-bottom: 10px;
+}
+
+#example-select-container {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 
 #example-select-container select {
@@ -190,33 +208,19 @@ body {
   font-size: var(--font-size-small);
 }
 
-#freeform-constraint-input {
-  display: inline-block;
-  margin: 0;
-}
-
-#freeform-constraint-input span {
-  position: relative;
-}
-
-#freeform-constraint-input span button {
-  position: absolute;
-  font-size: var(--font-size-base);
-  margin: 5px;
-  bottom: 0;
-  right: 0;
-}
-
 #freeform-constraint-input textarea {
-  width: 300px;
-  margin: 0;
-  padding: 2px 0px 35px 2px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+#freeform-constraint-input .collapsible-body>div {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
 }
 
 #error-panel {
   font-size: var(--font-size-small);
-  width: 370px;
-  margin-bottom: 5px;
 }
 
 #sudoku-container {
@@ -651,7 +655,6 @@ fieldset[disabled],
 }
 
 textarea {
-  margin: 10px 0px;
   font-size: var(--font-size-small);
 }
 
@@ -1029,6 +1032,10 @@ footer {
 
 #progress-container progress {
   width: 100%;
+}
+
+h1 {
+  margin: 0;
 }
 
 h2 {
