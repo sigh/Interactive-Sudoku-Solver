@@ -169,45 +169,46 @@ p code {
   height: 14px;
 }
 
-.sandbox-output .solver-link-with-copy {
+.solver-link-with-copy {
   display: inline-flex;
   align-items: center;
 }
 
-.sandbox-output .solver-link-with-copy button {
+.solver-link-with-copy button {
   padding: 2px;
-  margin-left: 2px;
+  margin-left: 3px;
 }
 
-.sandbox-output .solver-link-with-copy img {
+.solver-link-with-copy button img {
   width: 12px;
   height: 12px;
 }
 
-/* Status display (console.info) */
-.status {
-  background: #f0f7ff;
-  border: 1px solid var(--color-primary);
+.sandbox-status .solver-link-with-copy button img {
+  width: 16px;
+  height: 16px;
+}
+
+.sandbox-status {
   border-radius: 5px;
   padding: 8px 12px;
   font-family: var(--font-family-mono);
-  color: var(--color-primary-border);
 }
 
 .sandbox-status:empty {
   display: none;
 }
 
-.status:empty {
-  display: none;
+.sandbox-status.status {
+  background: #f0f7ff;
+  border: 1px solid var(--color-primary);
+  color: var(--color-primary-border);
 }
 
-.sandbox-output.error {
+.sandbox-status.error {
+  background: hsl(0, 100%, 95%);
+  border: 1px solid var(--color-error);
   color: var(--color-error);
-}
-
-.sandbox-output.success {
-  color: #2e7d32;
 }
 
 .result-box {
