@@ -31,13 +31,45 @@ export class EmbeddedSandbox {
 
   _showInitialHelp() {
     this._outputElement.textContent = SANDBOX_HELP_TEXT;
-    this._setStatus('Showing help()');
+    this._setStatusSegments(['Showing help()']);
   }
 
-  _setStatus(text) {
+  _renderSegments(segments) {
+    const fragment = document.createDocumentFragment();
+    if (!segments?.length) return fragment;
+
+    for (let i = 0; i < segments.length; i++) {
+      if (i > 0) fragment.appendChild(document.createTextNode(' '));
+      const segment = segments[i];
+      if (typeof segment === 'string') {
+        fragment.appendChild(document.createTextNode(segment));
+      } else if (segment.type === 'link') {
+        fragment.appendChild(
+          this._renderConstraintLink(segment.constraintStr, segment.text));
+      } else if (segment.type === 'bold') {
+        const strong = document.createElement('strong');
+        strong.textContent = segment.text;
+        fragment.appendChild(strong);
+      }
+    }
+    return fragment;
+  }
+
+  _setStatusSegments(segments) {
     this._statusElement.classList.remove('error');
     this._statusElement.classList.add('status');
-    this._statusElement.textContent = text;
+    this._statusElement.replaceChildren(this._renderSegments(segments));
+  }
+
+  _setResultStatus(constraintStr) {
+    const MAX_LENGTH = 30;
+    const renderedStr = constraintStr.length > MAX_LENGTH
+      ? constraintStr.slice(0, MAX_LENGTH - 1) + '…' : constraintStr;
+
+    this._setStatusSegments([
+      { type: 'bold', text: 'Result:' },
+      { type: 'link', constraintStr, text: renderedStr },
+    ]);
   }
 
   _setError(text) {
@@ -155,22 +187,12 @@ export class EmbeddedSandbox {
         if (this._outputElement.textContent || this._outputElement.children.length) {
           this._outputElement.appendChild(document.createTextNode('\n'));
         }
-        for (let i = 0; i < segments.length; i++) {
-          if (i > 0) this._outputElement.appendChild(document.createTextNode(' '));
-          const segment = segments[i];
-          if (typeof segment === 'string') {
-            this._outputElement.appendChild(document.createTextNode(segment));
-          } else if (segment.type === 'link') {
-            this._outputElement.appendChild(
-              this._renderConstraintLink(segment.constraintStr, segment.text));
-          }
-        }
+        this._outputElement.appendChild(this._renderSegments(segments));
         // Auto-scroll to bottom.
         this._outputElement.scrollTop = this._outputElement.scrollHeight;
       },
       onStatus: (segments) => {
-        this._setStatus(segments.map(
-          s => typeof s === 'string' ? s : s.text).join(' '));
+        this._setStatusSegments(segments);
       },
     };
 
@@ -180,6 +202,9 @@ export class EmbeddedSandbox {
 
     try {
       const { constraintStr } = await executionId;
+      if (constraintStr) {
+        this._setResultStatus(constraintStr);
+      }
       this._onRunSuccess(constraintStr);
     } catch (err) {
       this._onRunError(err);
@@ -240,6 +265,7 @@ export class EmbeddedSandbox {
 
     wrapper.appendChild(link);
     wrapper.appendChild(copyBtn);
+
     return wrapper;
   }
 
