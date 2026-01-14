@@ -80,4 +80,73 @@ const { parseConstraint, Container } = SANDBOX_GLOBALS;
   assert.equal(link.text, 'Multiple', 'text should match');
 }
 
+// Test help() accepts a constraint class
+{
+  console.log('Test: help(Cage) prints heading');
+  const { help, Cage } = SANDBOX_GLOBALS;
+
+  const logs = [];
+  const errors = [];
+  const original = { log: console.log, error: console.error };
+  console.log = (...args) => logs.push(args.join(' '));
+  console.error = (...args) => errors.push(args.join(' '));
+  try {
+    help(Cage);
+  } finally {
+    console.log = original.log;
+    console.error = original.error;
+  }
+
+  assert.equal(errors.length, 0, 'help(Cage) should not print errors');
+  assert.ok(logs.some(l => l.startsWith('Cage')), 'help(Cage) should print a Cage heading');
+}
+
+// Test help() accepts a constraint string and prints help for contained constraints
+{
+  console.log('Test: help(<constraint string>) prints contained headings');
+  const { help } = SANDBOX_GLOBALS;
+
+  const logs = [];
+  const errors = [];
+  const original = { log: console.log, error: console.error };
+  console.log = (...args) => logs.push(args.join(' '));
+  console.error = (...args) => errors.push(args.join(' '));
+  try {
+    help('.Cage~10~R1C1~R1C2.Thermo~R3C3~R3C4~R3C5');
+  } finally {
+    console.log = original.log;
+    console.error = original.error;
+  }
+
+  assert.equal(errors.length, 0, 'help(constraint string) should not print errors');
+  assert.ok(logs.some(l => l.startsWith('Cage')), 'should print a Cage heading');
+  assert.ok(logs.some(l => l.startsWith('Thermo')), 'should print a Thermo heading');
+}
+
+// Test help() accepts a constraint instance and an array of mixed values
+{
+  console.log('Test: help(constraint|array) prints contained headings');
+  const { help, Cage, Thermo } = SANDBOX_GLOBALS;
+
+  const cage = new Cage(10, 'R1C1', 'R1C2');
+  const thermo = new Thermo('R3C3', 'R3C4', 'R3C5');
+
+  const logs = [];
+  const errors = [];
+  const original = { log: console.log, error: console.error };
+  console.log = (...args) => logs.push(args.join(' '));
+  console.error = (...args) => errors.push(args.join(' '));
+  try {
+    help(cage);
+    help([thermo, new Cage(10, 'R1C1', 'R1C2')]);
+  } finally {
+    console.log = original.log;
+    console.error = original.error;
+  }
+
+  assert.equal(errors.length, 0, 'help(constraint/array) should not print errors');
+  assert.ok(logs.some(l => l.startsWith('Cage')), 'should print a Cage heading');
+  assert.ok(logs.some(l => l.startsWith('Thermo')), 'should print a Thermo heading');
+}
+
 console.log('sandbox_env.test.js passed!');

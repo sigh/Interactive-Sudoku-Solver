@@ -12,7 +12,7 @@
   tab-size: 2;
   white-space: pre-wrap;
   word-wrap: break-word;
-  width: auto;
+  max-width: 80ch;
   height: 300px;
   min-height: 200px;
   resize: vertical;
@@ -144,15 +144,5 @@
   overflow: hidden;
   contain: size;
   font-family: var(--font-family-mono);
-}
-
-@media (max-width: 900px) {
-  #sandbox-container .sandbox-panels {
-    grid-template-columns: 1fr;
-  }
-
-  #sandbox-container .sandbox-output-wrapper {
-    contain: none;
-    height: 300px;
-  }
+  max-width: 80ch;
 }
