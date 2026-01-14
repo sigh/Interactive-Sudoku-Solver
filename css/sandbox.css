@@ -12,9 +12,10 @@
   tab-size: 2;
   white-space: pre-wrap;
   word-wrap: break-word;
+  width: auto;
+  height: 300px;
+  min-height: 200px;
   resize: vertical;
-  width: 80ch;
-  height: 400px;
 }
 
 #sandbox-container .editor:focus {
@@ -27,22 +28,46 @@
   border: 1px solid var(--color-border);
   border-radius: 5px;
   padding: 15px;
-  font-family: var(--font-family-mono);
   font-size: var(--font-size-small);
   white-space: pre;
   overflow: auto;
   flex: 1;
-  min-height: 0;
+  min-height: 10em;
+}
+
+#sandbox-container .sandbox-status {
+  overflow: auto;
+}
+
+#sandbox-container .sandbox-output .sandbox-table {
+  border-collapse: collapse;
+  margin: 6px 0;
+  font-family: inherit;
+  font-size: inherit;
+}
+
+#sandbox-container .sandbox-output .sandbox-table th,
+#sandbox-container .sandbox-output .sandbox-table td {
+  border: 1px solid var(--color-border);
+  padding: 2px 6px;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+#sandbox-container .sandbox-output .sandbox-table th {
+  background: #f7f7f7;
+  font-weight: 600;
 }
 
 #sandbox-container .solver-link-with-copy {
   display: inline-flex;
   align-items: center;
+  gap: 4px;
+  vertical-align: middle;
 }
 
 #sandbox-container .solver-link-with-copy button {
-  padding: 2px;
-  margin-left: 3px;
+  padding: 3px;
 }
 
 #sandbox-container .solver-link-with-copy button img {
@@ -55,17 +80,13 @@
   height: 16px;
 }
 
-#sandbox-container .sandbox-status {
-  font-family: var(--font-family-mono);
-}
-
 /* Copy button */
 #sandbox-container .copy-button {
   flex-shrink: 0;
   background: transparent;
   border: none;
   padding: 4px;
-  margin: -4px -4px -4px 4px;
+  margin: -4px -4px -4px -4px;
   cursor: pointer;
   opacity: 0.5;
   border-radius: 4px;
@@ -90,10 +111,6 @@
 #sandbox-container .copy-button.copied {
   opacity: 1;
 }
-
-/* ==========================================================================
-   Embedded Sandbox Panel (in main page)
-   ========================================================================== */
 
 #sandbox-container .sandbox-anchor {
   display: flex;
@@ -126,6 +143,7 @@
   flex-direction: column;
   overflow: hidden;
   contain: size;
+  font-family: var(--font-family-mono);
 }
 
 @media (max-width: 900px) {
@@ -137,17 +155,4 @@
     contain: none;
     height: 300px;
   }
-}
-
-/* Override base editor/output styles for embedded context */
-#sandbox-container .editor {
-  width: auto;
-  height: 300px;
-  min-height: 200px;
-  resize: vertical;
-}
-
-#sandbox-container .sandbox-output {
-  flex: 1;
-  min-height: 0;
 }

@@ -116,23 +116,38 @@ const formatConsoleArg = (a) => {
   return JSON.stringify(a, null, 2);
 };
 
-/**
- * Format a table from an array of objects.
- */
-const formatTable = (data, columns) => {
-  if (!Array.isArray(data) || data.length === 0) {
+const toSegments = (...args) => {
+  return args.map(a => {
+    if (a instanceof SolverLink) {
+      const constraintStr = a.constraintStr();
+      const text = a.text || constraintStr;
+      return { type: 'link', text, constraintStr };
+    }
+    return formatConsoleArg(a);
+  });
+};
+
+const formatTableSegment = (data, columns) => {
+  if (!Array.isArray(data)) {
+    return toSegments(data, columns);
+  }
+
+  if (data.length === 0) {
     return '(empty table)';
   }
-  const keys = columns || Object.keys(data[0]);
-  const widths = keys.map(k =>
-    Math.max(String(k).length, ...data.map(row => String(row[k] ?? '').length))
-  );
-  const header = keys.map((k, i) => String(k).padEnd(widths[i])).join(' | ');
-  const sep = widths.map(w => '-'.repeat(w)).join('-+-');
-  const rows = data.map(row =>
-    keys.map((k, i) => String(row[k] ?? '').padEnd(widths[i])).join(' | ')
-  );
-  return [header, sep, ...rows].join('\n');
+
+  const keys = columns?.length
+    ? columns
+    : (data[0] && typeof data[0] === 'object')
+      ? Object.keys(data[0])
+      : ['value'];
+
+  const rows = data.map((row) => {
+    const obj = row && typeof row === 'object' ? row : { value: row };
+    return keys.map((k) => toSegments(obj[k]));
+  });
+
+  return { type: 'table', columns: keys, rows };
 };
 
 /**
@@ -141,22 +156,12 @@ const formatTable = (data, columns) => {
  * @returns {object} Console methods to override
  */
 export const createSandboxConsole = (emit) => {
-  const format = (...args) => {
-    return args.map(a => {
-      if (a instanceof SolverLink) {
-        const constraintStr = a.constraintStr();
-        const text = a.text || constraintStr;
-        return { type: 'link', text, constraintStr };
-      }
-      return formatConsoleArg(a);
-    });
-  };
   return {
-    log: (...args) => emit({ type: 'log', segments: format(...args) }),
-    error: (...args) => emit({ type: 'log', segments: ['❌ ', ...format(...args)] }),
-    warn: (...args) => emit({ type: 'log', segments: ['⚠️ ', ...format(...args)] }),
-    info: (...args) => emit({ type: 'status', segments: format(...args) }),
-    table: (data, columns) => emit({ type: 'log', segments: [formatTable(data, columns)] }),
+    log: (...args) => emit({ type: 'log', segments: toSegments(...args) }),
+    error: (...args) => emit({ type: 'log', segments: ['❌ ', ...toSegments(...args)] }),
+    warn: (...args) => emit({ type: 'log', segments: ['⚠️ ', ...toSegments(...args)] }),
+    info: (...args) => emit({ type: 'status', segments: toSegments(...args) }),
+    table: (data, columns) => emit({ type: 'log', segments: [formatTableSegment(data, columns)] }),
   };
 };
 

@@ -54,9 +54,40 @@ export class EmbeddedSandbox {
         const strong = document.createElement('strong');
         strong.textContent = segment.text;
         fragment.appendChild(strong);
+      } else if (segment.type === 'table') {
+        fragment.appendChild(this._renderTable(segment));
       }
     }
     return fragment;
+  }
+
+  _renderTable(tableSegment) {
+    const table = document.createElement('table');
+    table.className = 'sandbox-table';
+
+    const thead = document.createElement('thead');
+    const headerRow = document.createElement('tr');
+    for (const col of tableSegment.columns || []) {
+      const th = document.createElement('th');
+      th.textContent = String(col);
+      headerRow.appendChild(th);
+    }
+    thead.appendChild(headerRow);
+    table.appendChild(thead);
+
+    const tbody = document.createElement('tbody');
+    for (const row of tableSegment.rows || []) {
+      const tr = document.createElement('tr');
+      for (const cellSegments of row || []) {
+        const td = document.createElement('td');
+        td.replaceChildren(this._renderSegments(cellSegments));
+        tr.appendChild(td);
+      }
+      tbody.appendChild(tr);
+    }
+    table.appendChild(tbody);
+
+    return table;
   }
 
   _setStatusSegments(segments) {
@@ -250,8 +281,8 @@ export class EmbeddedSandbox {
       setTimeout(() => copyBtn.classList.remove('copied'), 800);
     };
 
-    wrapper.appendChild(link);
     wrapper.appendChild(copyBtn);
+    wrapper.appendChild(link);
 
     return wrapper;
   }
