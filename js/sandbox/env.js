@@ -85,7 +85,7 @@ class SolverLink {
     this.text = text;
   }
 
-  get constraintStr() {
+  constraintStr() {
     if (typeof this.constraint === 'string') return this.constraint;
     if (Array.isArray(this.constraint)) {
       return this.constraint.map(c => typeof c === 'string' ? c : c.toString()).join('');
@@ -144,7 +144,7 @@ export const createSandboxConsole = (emit) => {
   const format = (...args) => {
     return args.map(a => {
       if (a instanceof SolverLink) {
-        const constraintStr = a.constraintStr;
+        const constraintStr = a.constraintStr();
         const text = a.text || constraintStr;
         return { type: 'link', text, constraintStr };
       }
