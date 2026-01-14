@@ -1,5 +1,4 @@
-// Sandbox editor base class.
-// Extended by sandbox_page.js for the standalone page with GridPreview.
+// Sandbox editor class.
 
 import { CodeJar } from '../../lib/codejar.min.js';
 import { autoSaveField, Base64Codec } from '../util.js';
@@ -204,10 +203,10 @@ export class EmbeddedSandbox {
       const { constraintStr } = await executionId;
       if (constraintStr) {
         this._setResultStatus(constraintStr);
+        this._onConstraintGenerated?.(constraintStr);
       }
-      this._onRunSuccess(constraintStr);
     } catch (err) {
-      this._onRunError(err);
+      this._setError(`Error: ${err.message || err}`);
     } finally {
       this._currentExecution = null;
       this._runBtn.disabled = false;
@@ -216,19 +215,6 @@ export class EmbeddedSandbox {
     }
   }
 
-  // Override in subclass for custom result handling.
-  _onRunSuccess(constraintStr) {
-    if (constraintStr && this._onConstraintGenerated) {
-      this._onConstraintGenerated(constraintStr);
-    }
-  }
-
-  // Override in subclass for custom error handling.
-  _onRunError(err) {
-    this._setError(`Error: ${err.message || err}`);
-  }
-
-  // Override in subclass for custom link rendering.
   _renderConstraintLink(constraintStr, text) {
     const wrapper = document.createElement('span');
     wrapper.className = 'solver-link-with-copy';
@@ -239,9 +225,7 @@ export class EmbeddedSandbox {
     link.title = 'Load into grid';
     link.onclick = (e) => {
       e.preventDefault();
-      if (this._onConstraintGenerated) {
-        this._onConstraintGenerated(constraintStr);
-      }
+      this._onConstraintGenerated?.(constraintStr);
     };
 
     const copyBtn = document.createElement('button');

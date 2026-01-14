@@ -7,127 +7,23 @@ layout: null
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Constraint Sandbox - Interactive Sudoku Solver</title>
-  <meta name="description" content="Code sandbox for testing constraint generation">
-  <link rel="icon" href="{{ 'img/favicon.png' | relative_url }}">
-  <link rel="canonical" href="https://sigh.github.io/Interactive-Sudoku-Solver/sandbox">
-
-  <!-- Google tag (gtag.js) -->
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-2SQH4BL89R"></script>
+  <title>Redirecting…</title>
+  <meta http-equiv="refresh" content="0;url=./">
   <script>
-    window.dataLayer = window.dataLayer || [];
-    function gtag() { dataLayer.push(arguments); }
-    gtag('js', new Date());
-
-    gtag('config', 'G-2SQH4BL89R');
+    // Redirect legacy standalone sandbox page to the main solver page.
+    // Preserve query params (e.g. ?code=...) and hash.
+    (function () {
+      const current = new URL(window.location.href);
+      const target = new URL('./', current);
+      target.search = current.search;
+      target.hash = current.hash;
+      window.location.replace(target.toString());
+    })();
   </script>
-
-  <link rel="stylesheet" href="{{ 'css/style.css?v=' | append: site.github.build_revision | relative_url }}">
-  <link rel="stylesheet" href="{{ 'css/sandbox.css?v=' | append: site.github.build_revision | relative_url }}">
-  <link rel="stylesheet" href="{{ 'lib/prism-tomorrow.min.css' | relative_url }}">
-
-  <script src="{{ 'lib/prism.min.js' | relative_url }}"></script>
-  <script src="{{ 'lib/prism-javascript.min.js' | relative_url }}"></script>
-  <script>self.VERSION_PARAM = '?v=' + ('{{ site.github.build_revision }}' || Math.random());</script>
-  <script type="module"
-    src="{{ 'js/sandbox/sandbox_page.js?v=' | append: site.github.build_revision | relative_url }}"></script>
 </head>
 
 <body>
-  <div class="sandbox-container">
-    <div class="help-header">
-      <h1>Interactive Sudoku Solver (ISS) – Constraint Sandbox</h1>
-      <a href="." class="back-link">← Back to Solver</a>
-    </div>
-
-    <div class="intro">
-      <p class="warning">
-        ⚠️ <strong>Experimental:</strong> The sandbox API is not stable and may change without notice.
-      </p>
-
-      <p>
-        Write JavaScript to generate constraints and invoke the solver.
-      </p>
-
-      <p>
-        Return a constraint or an array of constraints. A constraint can either
-        be an instance of <code>SudokuConstraint</code> or a constraint string.
-        The generated constraint will be shown and solved in the preview grid,
-        or the solver can be accessed manually with
-        <code>await makeSolver()</code>.
-      </p>
-
-      <p>
-        <code>help()</code> will display detailed help or visit the
-        <a href="help">help</a> page for more general information about the
-        solver.
-        Visit the <a href="https://github.com/sigh/Interactive-Sudoku-Solver" target="_blank">github repository</a> to
-        view the source code and <a href="https://github.com/sigh/Interactive-Sudoku-Solver/issues"
-          target="_blank">report bugs</a>.
-      </p>
-    </div>
-
-    <div class="editor-container">
-      <div class="editor-panel">
-        <div class="sandbox-header">
-          <div class="sandbox-controls">
-            <select class="sandbox-examples">
-              <option value="">Load example...</option>
-            </select>
-            <button class="sandbox-clear danger-button">Clear</button>
-            <button class="sandbox-run">
-              <span class="spinner"></span>
-              <span class="btn-text">▶ Run (Ctrl+Enter)</span>
-            </button>
-            <button class="sandbox-abort danger-button" disabled>Abort</button>
-          </div>
-          <button class="sandbox-share image-button plain-button" title="Copy shareable link">
-            <img src="img/link-48.png" alt="Share">
-          </button>
-        </div>
-        <div id="sandbox-page-sandbox-editor" class="sandbox-editor editor language-javascript"></div>
-      </div>
-
-      <div class="output-panel">
-        <div class="sandbox-header">
-          <h2>Console Output – use <code>console.log()</code></h2>
-        </div>
-        <div class="sandbox-output"></div>
-        <div class="sandbox-status status"></div>
-      </div>
-
-      <div class="result-panel">
-        <div class="sandbox-header">
-          <h2>Constraint String</h2>
-          <a id="open-solver-link" href="#" target="_blank" style="display: none;">← Open in Solver</a>
-        </div>
-        <div class="result-box">
-          <span id="constraint-string"></span>
-          <button id="copy-btn" class="copy-button" title="Copy to clipboard">
-            <img src="img/copy-48.png" alt="Copy">
-          </button>
-        </div>
-      </div>
-
-      <div id="grid-preview" class="grid-preview" style="display: none;">
-        <div class="sandbox-header">
-          <h2>Grid Preview</h2>
-          <div class="sandbox-controls">
-            <button id="solve-btn" disabled>Solve</button>
-            <button id="abort-btn" class="danger-button" disabled>Abort</button>
-            <div class="switch">
-              <label>
-                <input id="auto-solve-input" type="checkbox" checked>
-                <span></span>
-              </label>
-            </div>
-            Auto-solve
-          </div>
-        </div>
-        <div id="grid-preview-container"></div>
-      </div>
-    </div>
-  </div>
+  <p>Redirecting… If nothing happens, <a href="./">click here</a>.</p>
 </body>
 
 </html>
