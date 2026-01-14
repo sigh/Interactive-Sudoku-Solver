@@ -22,8 +22,6 @@ const DEFAULT_CODE_FN = () => {
 
   console.log('Creating ', constraints.length, 'constraints', '\n');
 
-  help();  // Usage instructions
-
   return constraints;
 };
 
@@ -207,11 +205,11 @@ const RUN_SOLVER_FN = async () => {
 
   for (const puzzle of puzzles) {
     const index = results.length;
-    console.info(`Solving puzzle #${index + 1}:`, puzzle);
+    console.info(`Solving puzzle #${index + 1}`);
     const solution = solver.uniqueSolution(puzzle);
     const stats = solver.latestStats();
     results.push({
-      index,
+      puzzle: solverLink(puzzle, `Puzzle #${index + 1} `),
       isUnique: solution ? 'Yes' : 'No',
       guesses: stats.guesses,
       setupMs: stats.setupTimeMs.toFixed(1),
@@ -222,13 +220,8 @@ const RUN_SOLVER_FN = async () => {
   console.info(`Solved ${results.length} puzzles.`);
 
   // Display results as a table.
-  console.log('=== Puzzle Results ===\n');
+  console.log('Puzzle Results:\n');
   console.table(results);
-
-  console.log('\n=== Solutions ===\n');
-  for (let i = 0; i < puzzles.length; i++) {
-    console.log(solverLink(puzzles[i], `Puzzle #${i + 1}`), solutions[i]);
-  }
 
   // Return nothing to skip solver invocation.
 };
