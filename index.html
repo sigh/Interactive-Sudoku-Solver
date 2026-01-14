@@ -80,7 +80,21 @@ layout: null
 </head>
 
 <body>
-  <h1>Interactive Sudoku Solver (ISS)</h1>
+  <header id="page-header">
+    <h1>Interactive Sudoku Solver (ISS)</h1>
+    <div id="page-header-links">
+      <span>
+        <a href="https://github.com/sigh/Interactive-Sudoku-Solver/issues" target="_blank" rel="noopener">[file a
+          bug]</a>
+      </span>
+      <span>
+        <a href="https://github.com/sigh/Interactive-Sudoku-Solver" target="_blank" rel="noopener">[source code]</a>
+      </span>
+      <span>
+        <a href="help">[help]</a>
+      </span>
+    </div>
+  </header>
 
   <div id="instruction-panel">
     <div>
@@ -98,29 +112,6 @@ layout: null
           For more information, see the <a href="help">help page</a>.
         </p>
       </div>
-    </div>
-
-
-    <div>
-      <span class="description">OR</span>
-
-      <span id="example-select-container">
-        <select disabled>
-          <option>-- Load an example --</option>
-        </select>
-        <a style="display:none">(Source)</a>
-      </span>
-    </div>
-
-    <div>
-      <span class="description">OR</span>
-
-      <form id="freeform-constraint-input">
-        <span>
-          <textarea name="freeform-input" rows="3"></textarea>
-          <button type="submit" title="Load from text">Load from text</button>
-        </span>
-      </form>
     </div>
 
   </div>
@@ -289,7 +280,7 @@ layout: null
 
     </div>
 
-    <div>
+    <div id="right-panel">
       <div id="error-panel"></div>
 
       <div id="stats-container">
@@ -298,6 +289,27 @@ layout: null
           <button id="chart-close-button" class="danger-button" title="Close chart view">&#10006;</button>
         </div>
       </div>
+
+      <span id="example-select-container">
+        <select disabled>
+          <option>-- Load an example --</option>
+        </select>
+        <a style="display:none">(Source)</a>
+      </span>
+
+      <form id="freeform-constraint-input">
+        <div id="freeform-constraint-panel" class="constraint-panel">
+          <h2>Load constraint from text</h2>
+          <div>
+            <div>
+              <textarea name="freeform-input" rows="5"></textarea>
+              <div>
+                <button type="submit" title="Load from text">Load</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </form>
 
       <div id="constraint-panel-container">
 

@@ -545,7 +545,6 @@ class ConstraintManager {
     const subView = new ConstraintChipView(
       subViewElem, this._display, this._chipHighlighter,
       this._constraintSelector,
-      this.runUpdateCallback.bind(this),
       this._populateFormCallback);
     // Shape is constant for composite constraints.
     subView.reshape(this._shape);
@@ -555,6 +554,11 @@ class ConstraintManager {
   _setUpFreeFormInput() {
     // Free-form.
     const form = document.forms['freeform-constraint-input'];
+
+    new CollapsibleContainer(
+      document.getElementById('freeform-constraint-panel'),
+      /* defaultOpen= */ false);
+
     const errorElem = document.getElementById('error-panel').appendChild(
       document.createElement('div'));
     errorElem.className = 'notice notice-error notice-compact';
