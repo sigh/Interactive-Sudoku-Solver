@@ -17,7 +17,7 @@ class SandboxPage extends EmbeddedSandbox {
     this._gridPreview = new GridPreview(
       document.getElementById('grid-preview-container'),
       document.getElementById('grid-preview'),
-      this._errorElement
+      this._statusElement
     );
 
     this._initExtraEventListeners();
@@ -98,7 +98,7 @@ class SandboxPage extends EmbeddedSandbox {
 class GridPreview {
   constructor(containerElement, previewElement, errorElement) {
     this._previewElement = previewElement;
-    this._errorElement = errorElement;
+    this._messageElement = errorElement;
     this._displayContainer = new DisplayContainer(containerElement);
     this._constraintStr = null;
 
@@ -129,7 +129,9 @@ class GridPreview {
         }
       },
       onError: (error) => {
-        this._errorElement.textContent = error;
+        this._messageElement.textContent = error;
+        this._messageElement.classList.remove('status');
+        this._messageElement.classList.add('error');
       },
       statusHandler: (isSolving) => {
         this._solveBtn.disabled = isSolving;

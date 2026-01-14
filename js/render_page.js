@@ -1426,7 +1426,10 @@ class SandboxHandler {
         },
       );
     } catch (e) {
-      this._container.querySelector('.sandbox-error').textContent = `Failed to load sandbox: ${e.message}`;
+      const messageElement = this._container.querySelector('.sandbox-status');
+      messageElement.textContent = `Failed to load sandbox: ${e.message}`;
+      messageElement.classList.remove('status');
+      messageElement.classList.add('error');
     }
   }
 }
