@@ -203,6 +203,10 @@ body {
   margin-bottom: 10px;
 }
 
+#right-panel hr {
+  margin-top: -5px;
+}
+
 #example-select-container {
   display: inline-flex;
   align-items: center;
