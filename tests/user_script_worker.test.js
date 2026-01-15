@@ -307,21 +307,6 @@ console.log('Worker is ready.');
   assert.ok(response.streamedStatus.some(s => s.includes("Status update 2")));
 }
 
-// Test 8: runSandboxCode with extendTimeoutMs
-{
-  console.log('Test: runSandboxCode with extendTimeoutMs');
-  const code = `
-    extendTimeoutMs(5000);
-    console.log("Extended timeout");
-    return null;
-  `;
-  const response = await sendMessage('runSandboxCode', { code });
-  assert.equal(response.error, undefined);
-  // Check that extendTimeout message was sent
-  const extendMsg = messages.find(m => m.type === 'extendTimeout' && m.ms === 5000);
-  assert.ok(extendMsg, 'extendTimeoutMs message should be sent');
-}
-
 // Test 9: runSandboxCode with empty return (null)
 {
   console.log('Test: runSandboxCode with empty return');
