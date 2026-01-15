@@ -559,10 +559,11 @@ class ConstraintManager {
       document.getElementById('freeform-constraint-panel'),
       /* defaultOpen= */ false);
 
-    const errorElem = document.getElementById('error-panel').appendChild(
-      document.createElement('div'));
-    errorElem.className = 'notice notice-error notice-compact';
     const inputElem = form['freeform-input'];
+
+    const errorElem = document.createElement('div');
+    errorElem.className = 'notice notice-error';
+    inputElem.parentElement.appendChild(errorElem);
 
     // Allow loading free-form input from other locations.
     this.loadUnsafeFromText = (input) => {

@@ -262,15 +262,12 @@ export class SolutionController {
       mode: document.getElementById('solve-mode-input'),
       modeDescription: document.getElementById('solve-mode-description'),
       candidateSupportThreshold: document.getElementById('candidate-support-threshold'),
-      error: document.getElementById('error-panel').appendChild(
-        document.createElement('div')),
+      error: document.querySelector('#right-panel .notice-error'),
       stop: document.getElementById('stop-solver'),
       solve: document.getElementById('solve-button'),
       autoSolve: document.getElementById('auto-solve-input'),
       download: document.getElementById('download-solutions-button'),
     }
-
-    this._elements.error.className = 'notice notice-error notice-compact';
 
     this._elements.mode.onchange = () => {
       this._updateValueCountLimitUrl();
