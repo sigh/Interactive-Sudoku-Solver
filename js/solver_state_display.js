@@ -7,6 +7,8 @@ const {
   clearDOMNode,
 } = await import('./util.js' + self.VERSION_PARAM);
 
+const { CollapsibleContainer } = await import('./constraint_input.js' + self.VERSION_PARAM);
+
 export class SolverStateDisplay {
   constructor(solutionDisplay) {
     this._solutionDisplay = solutionDisplay;
@@ -375,28 +377,26 @@ class StateHistoryDisplay {
     this._statsContainer = document.getElementById('stats-container');
     await dynamicJSFileLoader('lib/chart.umd.min.js')();
 
-    this._setUpStatsWindow(this._statsContainer);
+    const collapsible = new CollapsibleContainer(
+      this._statsContainer,
+      /* defaultOpen= */ true);
+    collapsible.toggleOpen(true);
+    const statsBody = collapsible.bodyElement();
+    clearDOMNode(statsBody);
 
-    this._addChartDisplay(this._statsContainer,
+    this._addChartDisplay(statsBody,
       'Solutions', 'solutions');
-    this._addChartDisplay(this._statsContainer,
+    this._addChartDisplay(statsBody,
       'Estimated solutions', 'estimatedSolutions');
-    this._addChartDisplay(this._statsContainer,
+    this._addChartDisplay(statsBody,
       'Progress percentage (searched + skipped)',
       'searchedPercentage', 'skippedPercentage');
-    this._addChartDisplay(this._statsContainer,
+    this._addChartDisplay(statsBody,
       'Guesses', 'guesses');
 
     this._eventReplayFn = this._syncToolTips(this._charts);
 
     this.setEstimateMode(this._isEstimateMode);
-  }
-
-  _setUpStatsWindow(container) {
-    document.getElementById('chart-close-button').onclick = () => {
-      this._visible = false;
-      container.style.display = 'none';
-    }
   }
 
   _addChartDisplay(container, title, ...yAxis) {

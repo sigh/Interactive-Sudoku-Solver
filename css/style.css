@@ -203,6 +203,10 @@ body {
   margin-bottom: 10px;
 }
 
+#right-panel {
+  width: 350px;
+}
+
 #right-panel hr {
   margin-top: -5px;
 }
@@ -1052,29 +1056,16 @@ h3 {
 
 #stats-container {
   display: none;
-  border: 1px solid var(--color-text-muted);
-  padding: 5px;
-  box-shadow: #00000029 2px 2px 5px 2px;
-  background: white;
-  border-radius: 10px;
+  width: 100%;
 }
 
-#stats-container button {
-  height: 20px;
-  width: 20px;
-  padding: 0;
-}
-
-#stats-container #stats-header {
-  height: 20px;
-  padding: 5px;
-  border-radius: 5px;
-  background: #cdcdcd;
-  background: linear-gradient(to bottom, #cdcdcd 5%, #c0c0c0 100%);
-  border: 1px solid #cdcdcd;
+#stats-container .collapsible-anchor {
   display: flex;
-  justify-content: space-between;
-  cursor: grab;
+  justify-content: center;
+}
+
+#stats-container canvas {
+  max-width: 100%;
 }
 
 #stats-container .description {
