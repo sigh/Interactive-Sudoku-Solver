@@ -45,9 +45,40 @@ export const initPage = () => {
   // Set up sandbox integration.
   new SandboxHandler(constraintManager);
 
+  setUpHeaderSettingsDropdown();
+
   const hiddenElements = Array.from(
     document.getElementsByClassName('hide-until-load'));
   hiddenElements.forEach(e => e.classList.remove('hide-until-load'));
+};
+
+const setUpHeaderSettingsDropdown = () => {
+  const dropdown = document.querySelector('.page-header-settings');
+  const button = document.getElementById('page-header-settings-button');
+  const menu = dropdown.querySelector('.dropdown-menu');
+
+  const onDocumentClick = (e) => {
+    if (!dropdown.contains(e.target)) setOpen(false);
+  };
+
+  let isOpen = false;
+
+  const setOpen = (open) => {
+    if (open === isOpen) return;
+
+    isOpen = open;
+    menu.classList.toggle('dropdown-open', isOpen);
+    if (isOpen) {
+      document.addEventListener('click', onDocumentClick);
+    } else {
+      document.removeEventListener('click', onDocumentClick);
+    }
+  };
+
+  button.addEventListener('click', (e) => {
+    e.preventDefault();
+    setOpen(!isOpen);
+  });
 };
 
 class ExampleHandler {
@@ -646,6 +677,8 @@ class ConstraintManager {
     const dimConstraintsInput = document.getElementById('dim-constraints-input');
     const sudokuGrid = document.getElementById('sudoku-grid');
 
+    const dimWarning = document.getElementById('dim-constraints-warning');
+
     autoSaveField(dimConstraintsInput);
 
     // Apply initial state
@@ -653,9 +686,12 @@ class ConstraintManager {
       sudokuGrid.classList.add('constraints-dimmed');
     }
 
+    dimWarning.style.display = dimConstraintsInput.checked ? '' : 'none';
+
     // Handle toggle
     dimConstraintsInput.onchange = () => {
       sudokuGrid.classList.toggle('constraints-dimmed', dimConstraintsInput.checked);
+      dimWarning.style.display = dimConstraintsInput.checked ? '' : 'none';
     };
   }
 

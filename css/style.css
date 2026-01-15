@@ -199,6 +199,36 @@ body {
   height: 18px;
 }
 
+.dropdown-menu {
+  display: none;
+  position: absolute;
+  background: #fff;
+  border: 1px solid var(--color-border);
+  border-radius: 2px;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.18);
+  box-sizing: border-box;
+  z-index: 1000;
+  top: 100%;
+}
+
+.dropdown-menu.dropdown-open {
+  display: block;
+}
+
+.page-header-settings {
+  position: relative;
+}
+
+.page-header-settings .dropdown-menu {
+  right: 0;
+  padding: 10px;
+  padding-bottom: 0px;
+}
+
+.page-header-settings .dropdown-menu>* {
+  margin-bottom: 10px;
+}
+
 #right-panel>* {
   margin-bottom: 10px;
 }
@@ -794,18 +824,8 @@ select.thin-select {
 }
 
 .shape-dropdown {
-  display: none;
-  position: absolute;
   width: 100%;
-  top: 100%;
   left: 0;
-  background: #fff;
-  border: 1px solid var(--color-border);
-  z-index: 100;
-}
-
-.shape-dropdown.open {
-  display: block;
 }
 
 .shape-dropdown-item {
@@ -820,9 +840,7 @@ select.thin-select {
 
 .shape-dropdown-help {
   padding: 2px;
-  color: var(--color-text-muted);
   border-top: 1px solid var(--color-border-light);
-  font-size: var(--font-size-small);
 }
 
 .two-column {
@@ -926,10 +944,13 @@ a:hover {
   z-index: 1000;
 }
 
-/* Toggle switch
- * From: https://www.w3schools.com/howto/howto_css_switch.asp
- */
+/* Toggle switch */
 .switch {
+  --switch-width: 38px;
+  --switch-height: 20px;
+  --switch-bg-off: var(--color-border-light);
+  --switch-bg-on: var(--color-primary);
+
   white-space: nowrap;
   display: flex;
   flex-direction: column;
@@ -940,8 +961,8 @@ a:hover {
 .switch label {
   position: relative;
   display: inline-block;
-  width: 45px;
-  height: 25px;
+  width: var(--switch-width);
+  height: var(--switch-height);
 }
 
 .switch label span {
@@ -951,18 +972,18 @@ a:hover {
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: var(--color-border-light);
+  background-color: var(--switch-bg-off);
   transition: 0.1s;
-  border-radius: 50px;
+  border-radius: var(--switch-height);
 }
 
 .switch label span:before {
   position: absolute;
   content: "";
-  height: 19px;
-  width: 19px;
-  left: 3px;
-  bottom: 3px;
+  height: calc(var(--switch-height) - (2 * clamp(2px, calc(var(--switch-height) * 0.12), 3px)));
+  width: calc(var(--switch-height) - (2 * clamp(2px, calc(var(--switch-height) * 0.12), 3px)));
+  left: clamp(2px, calc(var(--switch-height) * 0.12), 3px);
+  bottom: clamp(2px, calc(var(--switch-height) * 0.12), 3px);
   background-color: white;
   transition: 0.1s;
   border-radius: 50%;
@@ -975,15 +996,15 @@ a:hover {
 }
 
 .switch input:checked+span {
-  background-color: #2196F3;
+  background-color: var(--switch-bg-on);
 }
 
 .switch input:checked+span:before {
-  transform: translateX(19px);
+  transform: translateX(calc(var(--switch-width) - var(--switch-height)));
 }
 
 .switch input:focus+span {
-  box-shadow: 0 0 1px #2196F3;
+  box-shadow: 0 0 1px var(--switch-bg-on);
 }
 
 .switch.inline-switch {
