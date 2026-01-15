@@ -319,8 +319,12 @@ layout: null
           <div>
             <div>
               <textarea name="freeform-input" rows="5"></textarea>
-              <div>
+              <div class="control-panel">
                 <button type="submit" title="Load from text">Load</button>
+                <button id="freeform-load-current-button" type="button" class="image-button plain-button"
+                  title="Load current constraints into text box">
+                  <img src="img/input-48.png" alt="Load current">
+                </button>
               </div>
             </div>
           </div>
@@ -333,6 +337,8 @@ layout: null
           <button id="chart-close-button" class="danger-button" title="Close chart view">&#10006;</button>
         </div>
       </div>
+
+      <hr>
 
       <div id="constraint-panel-container">
 

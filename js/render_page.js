@@ -586,6 +586,13 @@ class ConstraintManager {
       this.runUpdateCallback({ forceSolve: true });
       return false;
     };
+
+    document.getElementById('freeform-load-current-button').onclick = () => {
+      clearDOMNode(errorElem);
+      inputElem.value = this.getConstraints().toString();
+      inputElem.focus();
+    };
+
     autoSaveField(form, 'freeform-input');
   }
 
