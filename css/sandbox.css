@@ -128,10 +128,6 @@
   margin-bottom: 12px;
 }
 
-#sandbox-container .sandbox-controls-spacer {
-  flex: 1;
-}
-
 #sandbox-container .sandbox-panels {
   display: grid;
   grid-template-columns: 1fr 1fr;
