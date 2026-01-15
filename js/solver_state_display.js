@@ -46,7 +46,7 @@ export class SolverStateDisplay {
   setSolveStatus(isSolving, method) {
     if (!isSolving && method == 'terminate') {
       this._elements.solveStatus.textContent = this._METHOD_TO_STATUS[method];
-      this._elements.progressContainer.classList.add('error');
+      this._elements.progressContainer.classList.add('solver-status-error');
       return;
     }
 
@@ -56,7 +56,7 @@ export class SolverStateDisplay {
         this._isEstimateMode ? 'none' : 'inline';
       this._elements.solveStatus.textContent = '';
     }
-    this._elements.progressContainer.classList.remove('error');
+    this._elements.progressContainer.classList.remove('solver-status-error');
   }
 
   setState(state) {

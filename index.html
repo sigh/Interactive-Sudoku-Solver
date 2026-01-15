@@ -182,7 +182,7 @@ layout: null
           <img src="img/link-48.png" alt="Share">
         </button>
         <span class="sandbox-controls-spacer"></span>
-        <span class="notice notice-warning notice-compact sandbox-warning">
+        <span class="notice notice-warning sandbox-warning">
           ⚠️ <strong>Warning:</strong> The sandbox API may change without notice.
         </span>
         <a href="help#javascript-sandbox" target="_blank" class="sandbox-help-link"><code>help()</code></a>
@@ -281,15 +281,7 @@ layout: null
     </div>
 
     <div id="right-panel">
-      <div id="error-panel"></div>
-
-      <div id="stats-container">
-        <div id="stats-header">
-          <h2>Stats by runtime</h2>
-          <button id="chart-close-button" class="danger-button" title="Close chart view">&#10006;</button>
-        </div>
-      </div>
-
+      <div class="notice notice-error"></div>
       <span id="example-select-container">
         <select disabled>
           <option>-- Load an example --</option>
@@ -310,6 +302,13 @@ layout: null
           </div>
         </div>
       </form>
+
+      <div id="stats-container">
+        <div id="stats-header">
+          <h2>Stats by runtime</h2>
+          <button id="chart-close-button" class="danger-button" title="Close chart view">&#10006;</button>
+        </div>
+      </div>
 
       <div id="constraint-panel-container">
 
@@ -468,7 +467,7 @@ layout: null
                       <textarea rows="2" name="function" spellcheck="false"></textarea>
                     </div>
                   </div>
-                  <div id="custom-pairwise-input-error" class="error"></div>
+                  <div id="custom-pairwise-input-error" class="notice notice-error"></div>
                   <div>
                     <button type="button" title="Add constraint" name="add-pairwise-constraint">
                       <span class="spinner"></span>
@@ -567,7 +566,7 @@ function accept(state) {
   return state == "next";
 }'></textarea>
                   </div>
-                  <div id="state-machine-input-error" class="error"></div>
+                  <div id="state-machine-input-error" class="notice notice-error"></div>
                   <div>
                     <button type="button" title="Add constraint" name="add-state-machine-constraint">
                       <span class="spinner"></span>
