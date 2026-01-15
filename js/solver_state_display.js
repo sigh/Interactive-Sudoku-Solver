@@ -245,7 +245,7 @@ class StateHistoryDisplay {
     this._visible = false;
     this._isEstimateMode = false;
 
-    this._setUpChartButton();
+    this._setUpChartToggle();
     this._charts = [];
 
     this._updateCharts = deferUntilAnimationFrame(
@@ -346,23 +346,26 @@ class StateHistoryDisplay {
     this._states.length = 0;
   }
 
-  _setUpChartButton() {
-    const button = document.getElementById('chart-button');
-    button.onclick = () => {
-      // Ensure container is initialized.
-      this._initStatsContainer();
-      // Toggle visibility.
-      if (this._visible) {
-        this._statsContainer.style.display = 'none';
+  _setUpChartToggle() {
+    const toggle = document.getElementById('show-stats-charts-input');
+
+    const setVisible = async (visible) => {
+      if (!visible) {
+        if (this._statsContainer) this._statsContainer.style.display = 'none';
         this._visible = false;
         return;
       }
 
+      // Ensure container is initialized.
+      this._initStatsContainer();
       this._statsContainer.style.display = 'block';
       this._visible = true;
       this._updateCharts();
     };
-    button.disabled = false;
+
+    toggle.onchange = () => {
+      setVisible(toggle.checked);
+    };
   }
 
   static _openAndPositionContainer(container) {

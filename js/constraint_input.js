@@ -152,9 +152,9 @@ ConstraintCategoryInput.Shape = class Shape extends ConstraintCategoryInput {
       highlightedIndex = index;
     };
 
-    const showDropdown = () => dropdown.classList.add('open');
+    const showDropdown = () => dropdown.classList.add('dropdown-open');
     const hideDropdown = () => {
-      dropdown.classList.remove('open');
+      dropdown.classList.remove('dropdown-open');
       setHighlight(-1);
     };
 

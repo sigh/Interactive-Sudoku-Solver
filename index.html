@@ -96,6 +96,28 @@ layout: null
     <a class="page-header-link" href="help" aria-label="Help">
       <img src="img/help-48.png" alt="Help">
     </a>
+
+    <div class="page-header-settings">
+      <button id="page-header-settings-button" type="button" class="image-button plain-button" title="Settings">
+        <img src="img/settings-48.png" alt="Settings">
+      </button>
+      <div class="dropdown-menu">
+        <div class="inline-switch switch">
+          <label>
+            <input id="show-stats-charts-input" type="checkbox">
+            <span></span>
+          </label>
+          Show stats charts
+        </div>
+        <div class="inline-switch switch">
+          <label>
+            <input id="dim-constraints-input" type="checkbox">
+            <span></span>
+          </label>
+          Dim constraint display
+        </div>
+      </div>
+    </div>
   </header>
 
   <div id="debug-container" class="hide-unless-debug">
@@ -215,9 +237,6 @@ layout: null
                 <span id="solve-percentage"></span>
               </div>
               <div id="state-buttons">
-                <button id="chart-button" title="Show stats charts" class="image-button plain-button" disabled>
-                  <img src="img/chart-48.png" alt="Chart">
-                </button>
                 <button id="download-solutions-button" title="Download solutions" class="image-button plain-button"
                   disabled>
                   <img src="img/download-48.png" alt="Download">
@@ -306,6 +325,9 @@ layout: null
 
     <div id="right-panel">
       <div class="notice notice-error"></div>
+      <div id="dim-constraints-warning" class="notice notice-warning" style="display:none">
+        Constraints are dimmed.
+      </div>
       <span id="example-select-container">
         <select disabled>
           <option>-- Load an example --</option>
@@ -402,11 +424,11 @@ layout: null
                 Shape
                 <span class="shape-input-container">
                   <input type="text" id="shape-input" class="shape-input" placeholder="9x9" autocomplete="off">
-                  <div id="shape-dropdown" class="shape-dropdown">
+                  <div id="shape-dropdown" class="shape-dropdown dropdown-menu">
                     <div class="shape-dropdown-item">9x9</div>
                     <div class="shape-dropdown-item">6x6</div>
                     <div class="shape-dropdown-item">16x16</div>
-                    <div class="shape-dropdown-help">
+                    <div class="shape-dropdown-help description">
                       <div>Or type WxH</div>
                       <div>e.g. 6x8</div>
                     </div>
@@ -668,13 +690,6 @@ function accept(state) {
           </div>
         </div>
 
-        <div class="inline-switch switch">
-          <label>
-            <input id="dim-constraints-input" type="checkbox">
-            <span></span>
-          </label>
-          Dim constraint display
-        </div>
       </div>
     </div>
   </div>
