@@ -76,8 +76,6 @@ UTILITIES
 LONG RUNNING TASKS
 
   Async/await is supported for long-running tasks.
-
-  Use extendTimeoutMs(ms) to extend execution timeout (default: Infinity)
 `.trim();
 
 const getConstraintList = () => {

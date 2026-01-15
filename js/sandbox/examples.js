@@ -239,9 +239,6 @@ const GENERATE_AND_TEST_FN = async () => {
   const GRID_SIZE = 6;
   const TARGET_SUM = 6;
 
-  // Extend timeout since this may take a while.
-  extendTimeoutMs();
-
   const solver = await makeSolver();
   const gridShape = GridShape.fromGridSize(GRID_SIZE);
 

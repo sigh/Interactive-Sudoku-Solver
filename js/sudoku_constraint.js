@@ -2407,11 +2407,6 @@ export class UserScriptExecutor {
         p.onStatus?.(e.data.segments);
         return;
       }
-      if (type === 'extendTimeout') {
-        // Reset the timeout timer.
-        this._resetTimer(id, ms);
-        return;
-      }
 
       // Final result - remove from pending.
       this._pending.delete(id);
@@ -2436,8 +2431,7 @@ export class UserScriptExecutor {
     p.timer = setTimeout(() => {
       if (this._pending.has(id)) {
         this._pending.delete(id);
-        p.reject(new Error(
-          'Execution timed out. Use extendTimeoutMs() for long-running tasks.'));
+        p.reject(new Error('Execution timed out.'));
         this._restartWorker();
       }
     }, ms);
@@ -2483,7 +2477,7 @@ export class UserScriptExecutor {
   }
 
   runSandboxCode(code, callbacks = {}) {
-    return this._call('runSandboxCode', { code }, 5000, callbacks);
+    return this._call('runSandboxCode', { code }, null, callbacks);
   }
 
   abort() {

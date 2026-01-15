@@ -111,12 +111,11 @@ const runSandboxCode = async ({ SudokuConstraint, SudokuParser }, { code, id }) 
 
   const emit = (msg) => self.postMessage({ id, ...msg });
 
-  // extendTimeoutMs() sends a message to extend the timeout.
-  const extendTimeoutMs = (ms = Infinity) => {
-    self.postMessage({ id, type: 'extendTimeout', ms });
-  };
-
   return withSandboxConsole(emit, async () => {
+    const extendTimeoutMs = () => {
+      console.error('extendTimeoutMs is deprecated, sandbox has no timeout.');
+    };
+
     const allGlobals = { ...SANDBOX_GLOBALS, extendTimeoutMs };
     const keys = Object.keys(allGlobals);
     const values = Object.values(allGlobals);
