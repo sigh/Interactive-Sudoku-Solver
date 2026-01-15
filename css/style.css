@@ -3,7 +3,8 @@
   --color-primary: #2dabf9;
   --color-primary-dark: #0688fa;
   --color-primary-border: #124d77;
-  --color-primary-text-shadow: #263666;
+  --color-primary-darkest: #263666;
+  --color-primary-text-shadow: var(--color-primary-darkest);
   --color-primary-soft: #e1f0ff;
 
   /* Colors - Danger */
@@ -161,7 +162,7 @@ body {
 
   padding: 5px 10px;
   background: var(--color-primary-soft);
-  color: var(--color-primary-text-shadow);
+  color: var(--color-primary-darkest);
 }
 
 .page-header-title {
@@ -180,7 +181,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--color-primary-text-shadow);
+  background: var(--color-primary-darkest);
   color: var(--color-primary-soft);
   font-size: var(--font-size-title);
   font-weight: bold;
@@ -333,8 +334,6 @@ button.icon-button,
   padding: 0px;
   line-height: 1.2em;
 }
-
-.highlight-group {}
 
 .highlight-group>.selected-cells {
   fill: rgb(0, 0, 255);
@@ -527,7 +526,7 @@ button.icon-button,
   display: flex;
   flex-direction: column;
   gap: 10px;
-  width: 370px;
+  width: 350px;
 }
 
 #constraint-panel-container>.two-column>div {
@@ -580,8 +579,6 @@ button.icon-button,
   column-gap: 15px;
   margin-top: 10px;
 }
-
-#composite-constraint-input {}
 
 #composite-constraint-input .collapsible-body>div:first-child {
   display: flex;
@@ -1127,8 +1124,6 @@ h3 {
   box-shadow: 0 0 8px rgb(150 150 255);
 }
 
-#multi-cell-constraint-input {}
-
 #multi-cell-constraint-input select {
   width: 100%;
 }
@@ -1148,8 +1143,6 @@ h3 {
   flex-direction: column;
   gap: 10px;
 }
-
-#multi-value-cell-input {}
 
 #multi-value-cell-input .collapsible-body {
   justify-items: center;
@@ -1320,6 +1313,7 @@ button:has(.spinner),
 /* Expandable panel for ordinary constraints */
 #ordinary-constraint-panel {
   position: relative;
+  width: 100%;
 }
 
 .expandable-panel {
