@@ -96,28 +96,6 @@ layout: null
     </div>
   </header>
 
-  <div id="instruction-panel">
-    <div>
-      <div class="description">
-        <p>
-          To set a value, select a cell and type a number.
-        </p>
-        <p>
-          To add a line or region constraint, select and drag; or shift-click.
-        </p>
-        <p>
-          To add other outside clue constraints, select a row or column arrow outside the grid.
-        </p>
-        <p>
-          For more information, see the <a href="help">help page</a>.
-        </p>
-      </div>
-    </div>
-
-  </div>
-
-  <hr>
-
   <div id="debug-container" class="hide-unless-debug">
     <div class="debug-main">
       <div id="debug-panel">
@@ -199,82 +177,126 @@ layout: null
 
   <div id="sudoku-container">
     <div>
-      <div id="sudoku-grid-and-state">
-        <div id="display-panel">
-          <div id="solve-mode-input-container">
-            <select id="solve-mode-input" required>
-              <option value="all-possibilities" checked>All possibilities</option>
-              <option value="solutions">Solutions</option>
-              <option value="count-solutions">Count solutions</option>
-              <option value="estimate-solutions">Estimate solutions</option>
-              <option value="step-by-step">Step-by-step</option>
-              <option value="validate-layout">Validate layout</option>
-            </select>
-            <div id="candidate-support-threshold-container">
-              <label for="candidate-support-threshold">
-                Value count limit
-                <span class="tooltip" data-text="
-                  Values that appear in exactly this many solutions will
-                  be colored purple. Values with a higher count will blue;
-                  a lower count will be orange; and values that appear in a
-                  single solution will be green."></span>:
-              </label>
-              <div>
-                <input type="range" id="candidate-support-threshold" min="0" max="10" value="0">
-                <span>0</span>
+      <div id="left-panel">
+        <div id="left-panel-main">
+          <div id="display-panel">
+            <div id="solve-mode-input-container">
+              <select id="solve-mode-input" required>
+                <option value="all-possibilities" checked>All possibilities</option>
+                <option value="solutions">Solutions</option>
+                <option value="count-solutions">Count solutions</option>
+                <option value="estimate-solutions">Estimate solutions</option>
+                <option value="step-by-step">Step-by-step</option>
+                <option value="validate-layout">Validate layout</option>
+              </select>
+              <div id="candidate-support-threshold-container">
+                <label for="candidate-support-threshold">
+                  Value count limit
+                  <span class="tooltip" data-text="
+                    Values that appear in exactly this many solutions will
+                    be colored purple. Values with a higher count will blue;
+                    a lower count will be orange; and values that appear in a
+                    single solution will be green."></span>:
+                </label>
+                <div>
+                  <input type="range" id="candidate-support-threshold" min="0" max="10" value="0">
+                  <span>0</span>
+                </div>
+              </div>
+              <div id="solve-mode-description" class="description"></div>
+            </div>
+            <div id="state-output"></div>
+            <div>
+              <div id="progress-container">
+                <progress value=0 id="solve-progress"></progress>
+                <span id="solve-status">LOADING...</span>
+                <span id="solve-percentage"></span>
+              </div>
+              <div id="state-buttons">
+                <button id="chart-button" title="Show stats charts" class="image-button" disabled>
+                  <img src="img/chart-48.png" alt="Chart">
+                </button>
+                <button id="download-solutions-button" title="Download solutions" class="image-button plain-button"
+                  disabled>
+                  <img src="img/download-48.png" alt="Download">
+                </button>
+                <button id="copy-solution-button" title="Copy solution to clipboard" class="image-button plain-button"
+                  disabled>
+                  <img src="img/copy-48.png" alt="Copy">
+                </button>
               </div>
             </div>
-            <div id="solve-mode-description" class="description"></div>
           </div>
-          <div id="state-output"></div>
-          <div>
-            <div id="progress-container">
-              <progress value=0 id="solve-progress"></progress>
-              <span id="solve-status">LOADING...</span>
-              <span id="solve-percentage"></span>
+
+          <div id="sudoku-grid-with-controls">
+            <div id="sudoku-grid">
+              <input id="fake-input" inputmode="numeric" type="text" value="x">
             </div>
-            <div id="state-buttons">
-              <button id="chart-button" title="Show stats charts" class="image-button" disabled>
-                <img src="img/chart-48.png" alt="Chart">
-              </button>
-              <button id="download-solutions-button" title="Download solutions" class="image-button plain-button"
-                disabled>
-                <img src="img/download-48.png" alt="Download">
-              </button>
-              <button id="copy-solution-button" title="Copy solution to clipboard" class="image-button plain-button"
-                disabled>
-                <img src="img/copy-48.png" alt="Copy">
-              </button>
+            <div class="control-panel control-panel-spread">
+              <div id="solution-control-panel">
+                <div id="solution-iteration-state"></div>
+                <div id="solution-control-buttons">
+                  <button id="solution-start" class="icon-button" title="start (s)">&#171;</button>
+                  <button id="solution-back" class="icon-button" title="previous (p)">&#8249;</button>
+                  <button id="solution-forward" class="icon-button" title="next (n)">&#8250;</button>
+                  <button id="solution-end" class="icon-button" title="end">&#187;</button>
+                </div>
+              </div>
+              <div class="control-panel">
+                <div class="switch">
+                  <label>
+                    <input id="auto-solve-input" type="checkbox" checked>
+                    <span></span>
+                  </label>
+                  Auto-solve
+                </div>
+                <button id="solve-button" class="big-button" title="solve">Solve</button>
+                <button id="stop-solver" class="big-button danger-button" title="abort">Abort</button>
+              </div>
             </div>
           </div>
         </div>
 
-        <div id="sudoku-grid-with-controls">
-          <div id="sudoku-grid">
-            <input id="fake-input" inputmode="numeric" type="text" value="x">
+        <div class="page-info">
+          <div class="description">
+            <p>
+              <strong>Select a cell</strong> and <strong>type</strong> a number
+              to set a value.
+            </p>
+            <p>
+              <strong>Drag</strong> or <strong><kbd>Shift</kbd>+click</strong>
+              to select multiple cells. This selection can be used to add line
+              or region constraints.
+            </p>
+            <p>
+              <strong>Select an arrow</strong> outside the grid to set outside clues
+              such as Little Killer or Skyscraper constraints.
+            </p>
+            <p>
+              Solver runs fastest on Chrome.
+              For more information, see the <a href="help">help page</a>.
+            </p>
           </div>
-          <div class="control-panel control-panel-spread">
-            <div id="solution-control-panel">
-              <div id="solution-iteration-state"></div>
-              <div id="solution-control-buttons">
-                <button id="solution-start" class="icon-button" title="start (s)">&#171;</button>
-                <button id="solution-back" class="icon-button" title="previous (p)">&#8249;</button>
-                <button id="solution-forward" class="icon-button" title="next (n)">&#8250;</button>
-                <button id="solution-end" class="icon-button" title="end">&#187;</button>
-              </div>
-            </div>
-            <div class="control-panel">
-              <div class="switch">
-                <label>
-                  <input id="auto-solve-input" type="checkbox" checked>
-                  <span></span>
-                </label>
-                Auto-solve
-              </div>
-              <button id="solve-button" class="big-button" title="solve">Solve</button>
-              <button id="stop-solver" class="big-button danger-button" title="abort">Abort</button>
-            </div>
+          <div class="description">
+            Advanced features:
+            <a href="#" id="open-sandbox-link">[JavaScript Sandbox]</a>
+            <a href="javascript:loadDebug()">[Load debug mode]</a>
           </div>
+          <div class="description">
+            <p>
+              Code at
+              <a href="https://github.com/sigh/Interactive-Sudoku-Solver">
+                https://github.com/sigh/Interactive-Sudoku-Solver</a>.
+            </p>
+            <p>
+              <a href="https://github.com/sigh/Interactive-Sudoku-Solver/issues">
+                File bugs</a> or feature requests at the github repo.
+            </p>
+            <p>
+              More projects at <a href="https://sigh.github.io/">sigh.github.io</a>.
+            </p>
+          </div>
+
         </div>
       </div>
 
@@ -648,19 +670,6 @@ function accept(state) {
       </div>
     </div>
   </div>
-
-  <footer>
-    Solver runs fastest on Chrome.
-    <a href="https://github.com/sigh/Interactive-Sudoku-Solver/issues">
-      [File a bug]</a>
-    <a href="#" id="open-sandbox-link">[JavaScript Sandbox]</a>
-    <a href="javascript:loadDebug()">[Load debug mode]</a>
-    <br>
-    Code at
-    <a href="https://github.com/sigh/Interactive-Sudoku-Solver">
-      https://github.com/sigh/Interactive-Sudoku-Solver</a>.
-    More projects at <a href="https://sigh.github.io/">sigh.github.io</a>.
-  </footer>
 
 </body>
 
