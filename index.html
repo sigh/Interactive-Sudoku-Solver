@@ -24,10 +24,6 @@ layout: null
     .hide-until-load {
       display: none !important;
     }
-
-    .hide-unless-debug {
-      display: none !important;
-    }
   </style>
 
   <script type="module">
@@ -120,47 +116,50 @@ layout: null
     </div>
   </header>
 
-  <div id="debug-container" class="hide-unless-debug">
-    <div class="debug-main">
-      <div id="debug-panel">
-        <label>
-          Log level
-          <select id="debug-log-level" class="thin-select">
-            <option value="0">None</option>
-            <option value="1">1</option>
-            <option value="2">2</option>
-          </select>
-        </label>
-        <label>
-          <input type="checkbox" id="conflict-heatmap-checkbox">
-          Conflict heatmap
-        </label>
-        <label>
-          <input type="checkbox" id="stack-trace-checkbox">
-          Stack trace
-        </label>
-        <div>
-          <input list="debug-puzzles" id="debug-puzzle-input" placeholder="Load a puzzle">
-          <datalist id="debug-puzzles"></datalist>
+  <div id="debug-container" class="lazy-load" style="display: none;">
+    <div class="lazy-loading notice notice-info">Loading debug…</div>
+    <div class="lazy-body">
+      <div class="debug-main">
+        <div id="debug-panel">
+          <label>
+            Log level
+            <select id="debug-log-level" class="thin-select">
+              <option value="0">None</option>
+              <option value="1">1</option>
+              <option value="2">2</option>
+            </select>
+          </label>
+          <label>
+            <input type="checkbox" id="conflict-heatmap-checkbox">
+            Conflict heatmap
+          </label>
+          <label>
+            <input type="checkbox" id="stack-trace-checkbox">
+            Stack trace
+          </label>
+          <div>
+            <input list="debug-puzzles" id="debug-puzzle-input" placeholder="Load a puzzle">
+            <datalist id="debug-puzzles"></datalist>
+          </div>
+          <div id="debug-puzzle-src"></div>
+          <div class="debug-toggle-row">
+            Show
+            <input type="checkbox" id="debug-cell-id" class="debug-checkbox">
+            <label for="debug-cell-id">Cell id</label>
+            <input type="checkbox" id="debug-cell-index" class="debug-checkbox">
+            <label for="debug-cell-index">Cell index</label>
+          </div>
+          <button id="close-debug-button" class="danger-button" title="Close debug">Close debug</button>
         </div>
-        <div id="debug-puzzle-src"></div>
-        <div class="debug-toggle-row">
-          Show
-          <input type="checkbox" id="debug-cell-id" class="debug-checkbox">
-          <label for="debug-cell-id">Cell id</label>
-          <input type="checkbox" id="debug-cell-index" class="debug-checkbox">
-          <label for="debug-cell-index">Cell index</label>
-        </div>
-        <button id="close-debug-button" class="danger-button" title="Close debug">Close debug</button>
+        <div id="debug-counters"></div>
+        <div id="debug-logs"></div>
       </div>
-      <div id="debug-counters"></div>
-      <div id="debug-logs"></div>
-    </div>
-    <div id="debug-stack-trace-footer" class="debug-stack-trace-footer">
-      <div class="debug-stack-trace-header">
-        <button type="button" id="debug-flame-toggle" class="expanded" title="Collapse flame graph"
-          aria-label="Toggle flame graph"></button>
-        <div class="debug-stack-trace"></div>
+      <div id="debug-stack-trace-footer" class="debug-stack-trace-footer">
+        <div class="debug-stack-trace-header">
+          <button type="button" id="debug-flame-toggle" class="expanded" title="Collapse flame graph"
+            aria-label="Toggle flame graph"></button>
+          <div class="debug-stack-trace"></div>
+        </div>
       </div>
     </div>
   </div>
