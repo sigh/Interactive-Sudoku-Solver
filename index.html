@@ -102,15 +102,15 @@ layout: null
           <label>
             <input id="show-stats-charts-input" type="checkbox">
             <span></span>
+            <span>Show stats charts</span>
           </label>
-          Show stats charts
         </div>
         <div class="inline-switch switch">
           <label>
             <input id="dim-constraints-input" type="checkbox">
             <span></span>
+            <span>Dim constraint display</span>
           </label>
-          Dim constraint display
         </div>
       </div>
     </div>
@@ -548,15 +548,17 @@ layout: null
                   </p>
                 </div>
                 <div class="constraint-code-form">
-                  <div>
-                    Name:
-                    <input type="text" name="state-machine-name" placeholder="optional" maxlength="20" columns="20">
+                  <div class="control-panel">
+                    <div>
+                      Name:
+                      <input type="text" name="state-machine-name" placeholder="optional" maxlength="20" columns="20">
+                    </div>
                     <div class="inline-switch switch">
                       <label>
                         <input id="unified-mode-input" type="checkbox" name="unified-mode">
                         <span></span>
+                        <span>Unified input</span>
                       </label>
-                      Unified input
                     </div>
                   </div>
                   <div id="state-machine-split-input" class="constraint-code">
