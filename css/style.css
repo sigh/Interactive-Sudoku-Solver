@@ -323,6 +323,37 @@ button:active,
   box-shadow: inset 0px 0px 3px #555;
 }
 
+button.copy-to-clipboard-done {
+  --clipboard-outline-color: var(--color-primary-dark);
+}
+
+button.copy-to-clipboard-failed {
+  --clipboard-outline-color: var(--color-error);
+}
+
+button.copy-to-clipboard-done,
+button.copy-to-clipboard-failed {
+  position: relative;
+}
+
+button.copy-to-clipboard-done::after,
+button.copy-to-clipboard-failed::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: inherit;
+
+  border: 3px solid var(--clipboard-outline-color);
+  opacity: 1;
+  animation: copy-to-clipboard-outline-fade 1000ms ease-out forwards;
+}
+
+@keyframes copy-to-clipboard-outline-fade {
+  to {
+    opacity: 0;
+  }
+}
+
 button.danger-button,
 .button.danger-button {
   --button-border-color: var(--color-danger-border);

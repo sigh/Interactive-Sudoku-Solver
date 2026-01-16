@@ -1,7 +1,7 @@
 // Sandbox editor class.
 
 const { CodeJar } = await import('../../lib/codejar.min.js' + self.VERSION_PARAM);
-const { autoSaveField, Base64Codec } = await import('../util.js' + self.VERSION_PARAM);
+const { autoSaveField, Base64Codec, copyToClipboard } = await import('../util.js' + self.VERSION_PARAM);
 const { DEFAULT_CODE, EXAMPLES } = await import('./examples.js' + self.VERSION_PARAM);
 const { UserScriptExecutor } = await import('../sudoku_constraint.js' + self.VERSION_PARAM);
 const { SANDBOX_HELP_TEXT } = await import('./help_text.js' + self.VERSION_PARAM);
@@ -168,12 +168,9 @@ export class EmbeddedSandbox {
   _copyShareableLink() {
     const code = this._jar.toString();
     const encoded = Base64Codec.encodeString(code);
-    const url = new URL(window.location);
+    const url = new URL(window.location.pathname, window.location.origin);
     url.searchParams.set('code', encoded);
-    navigator.clipboard.writeText(url.toString());
-
-    this._shareBtn.classList.add('copied');
-    setTimeout(() => this._shareBtn.classList.remove('copied'), 1000);
+    copyToClipboard(url.toString(), this._shareBtn);
   }
 
   _initExamples() {
@@ -278,12 +275,10 @@ export class EmbeddedSandbox {
     copyIcon.alt = '';
     copyBtn.appendChild(copyIcon);
 
-    copyBtn.onclick = async (e) => {
+    copyBtn.onclick = (e) => {
       e.preventDefault();
       e.stopPropagation();
-      await navigator.clipboard.writeText(constraintStr);
-      copyBtn.classList.add('copied');
-      setTimeout(() => copyBtn.classList.remove('copied'), 800);
+      copyToClipboard(constraintStr, copyBtn);
     };
 
     wrapper.appendChild(copyBtn);

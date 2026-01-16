@@ -3,6 +3,7 @@ const {
   deferUntilAnimationFrame,
   clearDOMNode,
   localTimestamp,
+  copyToClipboard,
   isKeyEventFromEditableElement,
 } = await import('./util.js' + self.VERSION_PARAM);
 const {
@@ -273,7 +274,12 @@ export class SolutionController {
       solve: document.getElementById('solve-button'),
       autoSolve: document.getElementById('auto-solve-input'),
       download: document.getElementById('download-solutions-button'),
+      copyUrl: document.getElementById('copy-url-button'),
     }
+
+    this._elements.copyUrl.onclick = () => {
+      copyToClipboard(this._shareUrlToString(), this._elements.copyUrl);
+    };
 
     this._elements.mode.onchange = () => {
       this._updateValueCountLimitUrl();
@@ -317,6 +323,24 @@ export class SolutionController {
     // likely to cause problems sending stale data.
     this._shape = shape;
     this._solverRunner.abort();
+  }
+
+  _shareUrlToString() {
+    const current = new URL(window.location.href);
+    const share = new URL(current.origin + current.pathname);
+
+    const q = current.searchParams.get('q');
+    if (q) share.searchParams.set('q', q);
+
+    const mode = current.searchParams.get('mode');
+    if (mode) share.searchParams.set('mode', mode);
+
+    const valueCountLimit = current.searchParams.get('valueCountLimit');
+    if (valueCountLimit) share.searchParams.set('valueCountLimit', valueCountLimit);
+
+    // Unescape specific characters for readability.
+    // (Only '~' for now.)
+    return share.toString().replaceAll('%7E', '~').replaceAll('%7e', '~');
   }
 
   _setUpAutoSolve() {
