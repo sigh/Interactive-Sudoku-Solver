@@ -180,6 +180,11 @@ export class SudokuBuilder {
                 `Jigsaw gridSpec ${constraint.gridSpec} does not match ` +
                 `puzzle shape ${shape.name}`);
             }
+            if (!shape.isDefaultNumValues()) {
+              throw Error(
+                `Jigsaw constraint requires standard grid numbers for ` +
+                `${shape.name}`);
+            }
             cells = constraint.cells.map(c => shape.parseCellId(c).cell);
             yield new HandlerModule.AllDifferent(cells);
             // Just to let the solver know that this is a jigsaw puzzle.

@@ -301,6 +301,7 @@ export const runSolveTests = async (onFailure, runner) => {
     'NFA: Equal sum parition', // NFA (with state bifurcation)
     'Full rank - 6 clue snipe',
     'Irregular region sum line',
+    'Embedded Squishdoku',
     'Force non-unit coeff', // Sum with non-unit coeff
     'Event horizon', // Duplicate cell in sum, BinaryPairwise optimization.
     'Copycat, easy',  // Same value - 2 sets, repeated values
@@ -348,9 +349,15 @@ export const runSolveTests = async (onFailure, runner) => {
     '4x7: Jigsaw',  // Jigsaw
     '4x6: Skyscraper',  // Skyscraper
     '9x8: Plain boxless',  // Boxless rectangular grid
+    '5x5: Squishtroquadri',  // non-standard numValues, Arrows and Thermo
     '7x7: Killer Squishdoku',  // non-standard numValues
     '6x6: Con-set-cutive',  // non-standard numValues, strict subset
     '7x7: Skyscraper Squishdoku',  // non-standard numValues, Skyscraper
+    '7x7: Numbered Rooms Squishdoku',  // non-standard numValues, Numbered Rooms
+    '6x6: Hidden Hostility', // non-standard numValues, Diagonal
+    '6x6: Order from Chaos', // non-standard numValues, Global Entropy, NFA
+    '6x6: Irregular Quadro Quadri', // non-standard numValues, Irregular
+    '7x7: Dutch Flat Mate Squishdoku', // non-standard numValues, Dutch Flatmates
   ], onFailure);
   result.collection = 'Non-square grids';
   results.push(result);

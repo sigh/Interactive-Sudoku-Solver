@@ -2125,7 +2125,13 @@ export class LocalMod3 extends _Squishable2x2 {
 export class DutchFlatmateLine extends SudokuConstraintHandler {
   constructor(cells) {
     super(cells);
-    this._mid = LookupTables.fromValue(Math.ceil(cells.length / 2));
+    this._mid = 0;
+  }
+
+  initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
+    this._mid = LookupTables.fromValue(Math.ceil(shape.numValues / 2));
+    this._below = LookupTables.fromValue(shape.numValues);
+    return true;
   }
 
   enforceConsistency(grid, handlerAccumulator) {
@@ -2133,7 +2139,7 @@ export class DutchFlatmateLine extends SudokuConstraintHandler {
     const numCells = cells.length;
     const target = this._mid;
     const above = 1;
-    const below = LookupTables.fromValue(cells.length);
+    const below = this._below;
 
     for (let i = 0; i < numCells; i++) {
       let v = grid[cells[i]];
@@ -2530,6 +2536,14 @@ export class Indexing extends SudokuConstraintHandler {
     this._indexedValue = LookupTables.fromValue(+indexedValue);
   }
 
+  initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
+    // Clamp control cell to the line length so that N is always a valid index.
+    const lineLength = this._indexedCells.length;
+    const allowedMask = (1 << lineLength) - 1;
+    if (!(initialGridCells[this._controlCell] &= allowedMask)) return false;
+    return true;
+  }
+
   enforceConsistency(grid, handlerAccumulator) {
     const cells = this._indexedCells;
     const controlCell = this._controlCell
@@ -2750,6 +2764,15 @@ export class NumberedRoom extends SudokuConstraintHandler {
     super([cells[0]]);
     this._cells = new Uint8Array(cells);
     this._value = LookupTables.fromValue(+value);
+  }
+
+  initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
+    // The first cell holds the index N, so it can only be 1..(line length).
+    const lineLength = this._cells.length;
+    const allowedMask = (1 << lineLength) - 1;
+    const controlCell = this.cells[0];
+    if (!(initialGridCells[controlCell] &= allowedMask)) return false;
+    return true;
   }
 
   enforceConsistency(grid, handlerAccumulator) {

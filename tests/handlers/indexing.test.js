@@ -14,6 +14,78 @@ ensureGlobalEnvironment();
 const { Indexing } = await import('../../js/solver/handlers.js');
 
 // =============================================================================
+// Initialization tests
+// =============================================================================
+
+await runTest('Indexing should restrict control cell to valid indices on init', () => {
+  const context = setupConstraintTest({ numValues: 9, numCells: 9 });
+  const handler = new Indexing(0, [1, 2, 3, 4], 3);
+
+  const grid = context.createGrid();
+  const result = handler.initialize(grid, createCellExclusions({ numCells: 9 }), context.shape, {});
+
+  assert.equal(result, true);
+  assert.equal(grid[0], mask(1, 2, 3, 4), 'control cell should only allow 1..lineLength');
+});
+
+await runTest('Indexing should fail init if control cell has no values within the line length', () => {
+  const context = setupConstraintTest({ numValues: 9, numCells: 9 });
+  const handler = new Indexing(0, [1, 2, 3, 4], 3);
+
+  const grid = context.createGrid();
+  grid[0] = mask(9); // out of range for a 4-cell index list
+  const result = handler.initialize(grid, createCellExclusions({ numCells: 9 }), context.shape, {});
+
+  assert.equal(result, false);
+});
+
+await runTest('Indexing init should work on non-standard grids (line length < numValues)', () => {
+  // e.g. a 6-cell line on a numValues=8 rectangular grid
+  const context = setupConstraintTest({ numValues: 8, numCells: 8 });
+  const handler = new Indexing(0, [1, 2, 3, 4, 5, 6], 5);
+
+  const grid = context.createGrid();
+  const result = handler.initialize(grid, createCellExclusions({ numCells: 8 }), context.shape, {});
+
+  assert.equal(result, true);
+  assert.equal(grid[0], mask(1, 2, 3, 4, 5, 6), 'control should be limited to the line length');
+});
+
+await runTest('Indexing init should clamp a pre-restricted control cell', () => {
+  const context = setupConstraintTest({ numValues: 9, numCells: 9 });
+  const handler = new Indexing(0, [1, 2, 3, 4], 3);
+
+  const grid = context.createGrid();
+  grid[0] = mask(2, 4, 9); // mix of in-range and out-of-range
+  const result = handler.initialize(grid, createCellExclusions({ numCells: 9 }), context.shape, {});
+
+  assert.equal(result, true);
+  assert.equal(grid[0], mask(2, 4), 'out-of-range candidates should be removed');
+});
+
+await runTest('Indexing init should restrict control to 1 for a single indexed cell', () => {
+  const context = setupConstraintTest({ numValues: 4, numCells: 4 });
+  const handler = new Indexing(0, [1], 3);
+
+  const grid = context.createGrid();
+  const result = handler.initialize(grid, createCellExclusions({ numCells: 4 }), context.shape, {});
+
+  assert.equal(result, true);
+  assert.equal(grid[0], mask(1));
+});
+
+await runTest('Indexing init should be a no-op when line length equals numValues', () => {
+  const context = setupConstraintTest({ numValues: 4, numCells: 5 });
+  const handler = new Indexing(0, [1, 2, 3, 4], 3);
+
+  const grid = context.createGrid();
+  const result = handler.initialize(grid, createCellExclusions({ numCells: 5 }), context.shape, {});
+
+  assert.equal(result, true);
+  assert.equal(grid[0], mask(1, 2, 3, 4));
+});
+
+// =============================================================================
 // Basic functionality tests
 // =============================================================================
 
@@ -112,18 +184,20 @@ await runTest('Indexing should work with fewer indexed cells than numValues', ()
   grid[4] = mask(1, 2, 3); // Indexed[3] - no 5
   grid[5] = mask(4, 5, 6); // Indexed[4] - has 5
   grid[6] = mask(7, 8); // Indexed[5] - no 5
+
+  // The engine calls initialize() before solving starts.
+  assert.equal(
+    handler.initialize(grid, createCellExclusions({ numCells: 8 }), context.shape, {}),
+    true,
+    'constraint handler should initialize'
+  );
   const acc = createAccumulator();
 
   const result = handler.enforceConsistency(grid, acc);
 
   assert.equal(result, true);
   // Valid control values: 1 (indexed[0] has 5), 3 (indexed[2] has 5), 5 (indexed[4] has 5)
-  // Also control values 7, 8 are valid because they're > numIndexed, so nothing is required
-  // Wait - the control cell should be restricted to valid indices
-  // Actually looking at the code - it only checks for i < numCells
-  // So control values > numIndexed won't match any index and won't be pruned by indexed cells
-  // But they also won't enforce anything, which may be fine
-  assert.equal(grid[0], mask(1, 3, 5, 7, 8), 'control should allow 1, 3, 5 (and 7, 8 unaffected)');
+  assert.equal(grid[0], mask(1, 3, 5), 'control should allow 1, 3, 5');
 });
 
 await runTest('Indexing should work with more indexed cells than numValues', () => {

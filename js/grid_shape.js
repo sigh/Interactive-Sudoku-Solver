@@ -203,6 +203,10 @@ export class GridShape {
   static defaultNumValues(numRows, numCols) {
     return Math.max(numRows, numCols);
   }
+
+  isDefaultNumValues() {
+    return this.numValues === this.constructor.defaultNumValues(this.numRows, this.numCols);
+  }
 }
 
 export const SHAPE_MAX = GridShape.fromGridSize(GridShape.MAX_SIZE);

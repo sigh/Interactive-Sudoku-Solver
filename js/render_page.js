@@ -393,10 +393,8 @@ class ConstraintManager {
   _updateNonDefaultNumValuesWarning() {
     if (!this._shape) return;
 
-    const defaultNumValues = this._shape.constructor.defaultNumValues(
-      this._shape.numRows, this._shape.numCols);
     this._nonDefaultNumValuesWarningElem.style.display =
-      (this._shape.numValues !== defaultNumValues) ? '' : 'none';
+      (!this._shape.isDefaultNumValues()) ? '' : 'none';
   }
 
   _reshape(shape) {
