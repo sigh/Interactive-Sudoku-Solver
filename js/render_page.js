@@ -608,6 +608,10 @@ class ConstraintManager {
     errorElem.className = 'notice notice-error';
     inputElem.parentElement.appendChild(errorElem);
 
+    inputElem.addEventListener('input', () => {
+      clearDOMNode(errorElem);
+    });
+
     // Allow loading free-form input from other locations.
     this.loadUnsafeFromText = (input) => {
       try {
