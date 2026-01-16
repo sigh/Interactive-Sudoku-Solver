@@ -968,25 +968,29 @@ a:hover {
 }
 
 .switch label {
-  position: relative;
-  display: inline-block;
-  width: var(--switch-width);
-  height: var(--switch-height);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
 }
 
-.switch label span {
-  position: absolute;
+.switch label :nth-child(3) {
+  display: inline-block;
+}
+
+.switch input+span {
+  position: relative;
+  display: inline-block;
+  flex: none;
+  width: var(--switch-width);
+  height: var(--switch-height);
   cursor: pointer;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
   background-color: var(--switch-bg-off);
   transition: 0.1s;
   border-radius: var(--switch-height);
 }
 
-.switch label span:before {
+.switch input+span:before {
   position: absolute;
   content: "";
   height: calc(var(--switch-height) - (2 * clamp(2px, calc(var(--switch-height) * 0.12), 3px)));
@@ -999,9 +1003,7 @@ a:hover {
 }
 
 .switch input {
-  opacity: 0;
-  width: 0;
-  height: 0;
+  display: none;
 }
 
 .switch input:checked+span {
@@ -1021,7 +1023,6 @@ a:hover {
   flex-direction: row;
   vertical-align: middle;
   align-items: center;
-  margin-left: 5px;
 }
 
 #solve-mode-input-container {
@@ -1254,9 +1255,9 @@ h3 {
   line-height: 1em;
 }
 
-.constraint-code-form input {
+.constraint-code-form input[type=text] {
   /* Required for firefox. */
-  width: 20ch;
+  width: 18ch;
 }
 
 .constraint-code {
