@@ -242,6 +242,7 @@ class StateHistoryDisplay {
   constructor() {
     this._states = [];
     this._statsContainer = null;
+    this._statsInitPromise = null;
     this._visible = false;
     this._isEstimateMode = false;
 
@@ -356,10 +357,14 @@ class StateHistoryDisplay {
         return;
       }
 
-      // Ensure container is initialized.
-      this._initStatsContainer();
+      // Show the container immediately (anchor + loading notice) while the
+      // charts load.
+      this._statsContainer ||= document.getElementById('stats-container');
       this._statsContainer.style.display = 'block';
       this._visible = true;
+
+      await this._initStatsContainer();
+
       this._updateCharts();
     };
 
@@ -375,31 +380,45 @@ class StateHistoryDisplay {
   }
 
   async _initStatsContainer() {
-    if (this._statsContainer) return;
+    if (this._statsInitPromise) return this._statsInitPromise;
 
-    this._statsContainer = document.getElementById('stats-container');
-    await dynamicJSFileLoader('lib/chart.umd.min.js')();
-
+    this._statsContainer ||= document.getElementById('stats-container');
+    const container = this._statsContainer;
     const collapsible = new CollapsibleContainer(
-      this._statsContainer,
-      /* defaultOpen= */ true);
-    collapsible.toggleOpen(true);
-    const statsBody = collapsible.bodyElement();
-    clearDOMNode(statsBody);
+      container,
+          /* defaultOpen= */ true);
 
-    this._addChartDisplay(statsBody,
-      'Solutions', 'solutions');
-    this._addChartDisplay(statsBody,
-      'Estimated solutions', 'estimatedSolutions');
-    this._addChartDisplay(statsBody,
-      'Progress percentage (searched + skipped)',
-      'searchedPercentage', 'skippedPercentage');
-    this._addChartDisplay(statsBody,
-      'Guesses', 'guesses');
+    this._statsInitPromise = (async () => {
+      try {
+        await dynamicJSFileLoader('lib/chart.umd.min.js')();
 
-    this._eventReplayFn = this._syncToolTips(this._charts);
+        collapsible.toggleOpen(true);
+        const statsBody = collapsible.bodyElement();
+        clearDOMNode(statsBody);
 
-    this.setEstimateMode(this._isEstimateMode);
+        this._addChartDisplay(statsBody,
+          'Solutions', 'solutions');
+        this._addChartDisplay(statsBody,
+          'Estimated solutions', 'estimatedSolutions');
+        this._addChartDisplay(statsBody,
+          'Progress percentage (searched + skipped)',
+          'searchedPercentage', 'skippedPercentage');
+        this._addChartDisplay(statsBody,
+          'Guesses', 'guesses');
+
+        this._eventReplayFn = this._syncToolTips(this._charts);
+
+        this.setEstimateMode(this._isEstimateMode);
+        container.classList.add('lazy-loaded');
+      } catch (e) {
+        const loadingElement = container.querySelector('.lazy-loading');
+        loadingElement.textContent = `Failed to load charts: ${e.message}`;
+        loadingElement.classList.remove('notice-info');
+        loadingElement.classList.add('notice-error');
+      }
+    })();
+
+    return this._statsInitPromise;
   }
 
   _addChartDisplay(container, title, ...yAxis) {

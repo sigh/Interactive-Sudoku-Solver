@@ -112,10 +112,6 @@
   opacity: 1;
 }
 
-#sandbox-container .sandbox-anchor {
-  display: flex;
-}
-
 #sandbox-container .sandbox-body {
   padding-top: 10px;
 }
