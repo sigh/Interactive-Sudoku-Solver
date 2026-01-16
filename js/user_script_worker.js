@@ -98,20 +98,17 @@ const convertUnifiedToSplit = ({ code }) => {
 
 let sandboxEnvPromise;
 
-const runSandboxCode = async ({ SudokuConstraint, SudokuParser }, { code, id }) => {
+const runSandboxCode = async ({ SudokuConstraint, SudokuParser }, { code, currentConstraintStr, id }) => {
   if (!sandboxEnvPromise) {
     sandboxEnvPromise = import('./sandbox/env.js' + self.VERSION_PARAM);
   }
-  const { SANDBOX_GLOBALS, withSandboxConsole } = await sandboxEnvPromise;
+  const { SANDBOX_GLOBALS, withSandboxConsole, getSandboxExtraGlobals } = await sandboxEnvPromise;
 
   const emit = (msg) => self.postMessage({ id, ...msg });
 
   return withSandboxConsole(emit, async () => {
-    const extendTimeoutMs = () => {
-      console.error('extendTimeoutMs is deprecated, sandbox has no timeout.');
-    };
-
-    const allGlobals = { ...SANDBOX_GLOBALS, extendTimeoutMs };
+    const extraGlobals = getSandboxExtraGlobals(currentConstraintStr);
+    const allGlobals = { ...SANDBOX_GLOBALS, ...extraGlobals };
     const keys = Object.keys(allGlobals);
     const values = Object.values(allGlobals);
     const asyncFn = new Function(...keys, `return (async () => { ${code}\n })();`);

@@ -242,12 +242,15 @@ const GENERATE_AND_TEST_FN = async () => {
     makeCellId(1, 1), makeCellId(1, GRID_SIZE),
     makeCellId(GRID_SIZE, 1), makeCellId(GRID_SIZE, GRID_SIZE),
   ]);
-  const allCells = [...Object.keys(cellMap), ...corners];
-  console.log(`There are ${allCells.length} possible clues.\n`);
+  const lkCells = [...Object.keys(cellMap), ...corners];
 
-  const makeClue = cell => corners.has(cell)
-    ? new Sum(TARGET_SUM, cell)
-    : new LittleKiller(cell, TARGET_SUM);
+  const fixedClues = [new Shape(gridShape.name)];
+  const searchClues = lkCells.map(
+    cell => corners.has(cell)
+      ? new Sum(TARGET_SUM, cell)
+      : new LittleKiller(cell, TARGET_SUM));
+
+  console.log(`There are ${searchClues.length} possible clues.\n`);
 
   let attempts = 0;
 
@@ -255,7 +258,7 @@ const GENERATE_AND_TEST_FN = async () => {
   const search = (selected, nextIndex) => {
     if (++attempts % 100 === 0) console.info(`Tested ${attempts}...`);
 
-    const constraints = [new Shape(gridShape.name), ...selected.map(makeClue)];
+    const constraints = [...fixedClues, ...selected];
 
     // Find up to 2 solutions to check for uniqueness.
     const count = solver.solutionArray(constraints, 2).length;
@@ -264,8 +267,8 @@ const GENERATE_AND_TEST_FN = async () => {
     if (count === 1) return constraints;  // Unique solution - Found!
 
     // We have multiple solutions - continue adding clues.
-    for (let i = nextIndex; i < allCells.length; i++) {
-      const result = search([...selected, allCells[i]], i + 1);
+    for (let i = nextIndex; i < searchClues.length; i++) {
+      const result = search([...selected, searchClues[i]], i + 1);
       if (result) return result;
     }
   };
@@ -280,6 +283,52 @@ const GENERATE_AND_TEST_FN = async () => {
   console.log(`No puzzle found after ${attempts} attempts.`);
 };
 
+const ROTATE_GRID_FN = () => {
+  // Try to rotate the current puzzle 90° clockwise.
+  // Rotates the shape and constraint argument that looks like a cell.
+
+  const constraints = currentConstraint();
+  const shape = currentShape();
+
+  const rotateCellId = (cellId) => {
+    const { row, col } = parseCellId(cellId);
+    return makeCellId(col, shape.numRows + 1 - row);
+  };
+
+  const looksLikeCellId = (s) => /^R\d+C\d+$/.test(s);
+
+  const rotateValue = (v) => {
+    if (typeof v === 'string' && looksLikeCellId(v)) {
+      return rotateCellId(v);
+    }
+    if (Array.isArray(v)) {
+      return v.map(rotateValue);
+    }
+    if (Array.isArray(v?.args)) {
+      return rotateConstraint(v);
+    }
+    return v;
+  };
+
+  const rotateConstraint = (c) => {
+    try {
+      const newArgs = c.args.map(rotateValue);
+      return new c.constructor(...newArgs);
+    } catch (e) {
+      console.warn(`Could not rotate ${c.type}: ${String(e?.message || e)}`);
+      return c;
+    }
+  };
+
+  const rotatedConstraints = constraints
+    .filter(c => c.type !== 'Shape')
+    .map(rotateConstraint);
+
+  const rotatedShape = GridShape.fromGridSize(shape.numCols, shape.numRows);
+
+  return [new Shape(rotatedShape.name), ...rotatedConstraints];
+};
+
 export const DEFAULT_CODE = fnToCode(DEFAULT_CODE_FN);
 
 export const EXAMPLES = {
@@ -292,4 +341,5 @@ export const EXAMPLES = {
   'Checkerboard min/max': fnToCode(CHECKERBOARD_FN),
   'Run solver': fnToCode(RUN_SOLVER_FN),
   'Generate and test': fnToCode(GENERATE_AND_TEST_FN),
+  'Rotate current grid 90°': fnToCode(ROTATE_GRID_FN),
 };

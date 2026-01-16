@@ -2476,8 +2476,12 @@ export class UserScriptExecutor {
     return this._call('convertUnifiedToSplit', { code }, 100);
   }
 
-  runSandboxCode(code, callbacks = {}) {
-    return this._call('runSandboxCode', { code }, null, callbacks);
+  runSandboxCode(code, callbacks, currentConstraintStr) {
+    return this._call(
+      'runSandboxCode',
+      { code, currentConstraintStr },
+      null,
+      callbacks);
   }
 
   abort() {
