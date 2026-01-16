@@ -1446,6 +1446,9 @@ class SandboxHandler {
 
   async _loadSandbox() {
     try {
+      // Set up collapsible behavior (do this first so the panel is styled.
+      this._collapsible = new CollapsibleContainer(this._container, /* defaultOpen= */ true);
+
       // Load sandbox dependencies.
       await Promise.all([
         dynamicCSSFileLoader('css/sandbox.css' + self.VERSION_PARAM)(),
@@ -1455,9 +1458,6 @@ class SandboxHandler {
       await dynamicJSFileLoader('lib/prism-javascript.min.js')();
 
       const { EmbeddedSandbox } = await import('./sandbox/embedded_sandbox.js' + self.VERSION_PARAM);
-
-      // Set up collapsible behavior.
-      this._collapsible = new CollapsibleContainer(this._container, /* defaultOpen= */ true);
 
       // Override the default anchor click to also update URL param.
       const anchor = this._collapsible.anchorElement();
@@ -1474,10 +1474,13 @@ class SandboxHandler {
           this._constraintManager.runUpdateCallback();
         },
       );
+
+      this._container.classList.add('lazy-loaded');
     } catch (e) {
-      const messageElement = this._container.querySelector('.sandbox-status');
-      messageElement.textContent = `Failed to load sandbox: ${e.message}`;
-      messageElement.classList.add('notice-error');
+      const loadingElement = this._container.querySelector('.lazy-loading');
+      loadingElement.textContent = `Failed to load sandbox: ${e.message}`;
+      loadingElement.classList.remove('notice-info');
+      loadingElement.classList.add('notice-error');
     }
   }
 }

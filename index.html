@@ -165,11 +165,12 @@ layout: null
     </div>
   </div>
 
-  <div id="sandbox-container" class="constraint-panel" style="display: none;">
-    <div class="sandbox-anchor">
+  <div id="sandbox-container" class="constraint-panel lazy-load" style="display: none;">
+    <div class="sandbox-anchor lazy-anchor">
       <h2>JavaScript Sandbox</h2>
+      <div class="lazy-loading notice notice-info">Loading…</div>
     </div>
-    <div class="sandbox-body">
+    <div class="sandbox-body lazy-body">
       <div class="sandbox-controls">
         <select class="sandbox-examples">
           <option value="">Load example...</option>
@@ -353,11 +354,12 @@ layout: null
         </div>
       </form>
 
-      <div id="stats-container" class="constraint-panel">
-        <div id="stats-header">
+      <div id="stats-container" class="constraint-panel lazy-load">
+        <div id="stats-header" class="lazy-anchor">
           <h2>Stats by runtime</h2>
+          <div class="lazy-loading notice notice-info">Loading…</div>
         </div>
-        <div></div>
+        <div class="lazy-body"></div>
       </div>
 
       <hr>
