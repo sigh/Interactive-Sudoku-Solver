@@ -22,15 +22,23 @@ export class GridShape {
   }
 
   static fromGridSpec(gridSpec) {
-    const parts = gridSpec.split('x');
-    if (parts.length !== 2) {
+    const parts = gridSpec.split('~');
+    if (parts.length > 2) {
       throw ('Invalid grid spec format: ' + gridSpec);
     }
 
-    const numRows = parseInt(parts[0]);
-    const numCols = parseInt(parts[1]);
+    const gridDims = parts[0];
+    const numValuesPart = parts[1];
 
-    if (numRows.toString() !== parts[0] || numCols.toString() !== parts[1]) {
+    const dims = gridDims.split('x');
+    if (dims.length !== 2) {
+      throw ('Invalid grid spec format: ' + gridSpec);
+    }
+
+    const numRows = parseInt(dims[0]);
+    const numCols = parseInt(dims[1]);
+
+    if (numRows.toString() !== dims[0] || numCols.toString() !== dims[1]) {
       throw ('Invalid grid spec format: ' + gridSpec);
     }
 
@@ -38,7 +46,17 @@ export class GridShape {
     if (!shape) {
       throw ('Invalid grid dimensions: ' + gridSpec);
     }
-    return shape;
+
+    if (numValuesPart === undefined) {
+      return shape;
+    }
+
+    const numValues = parseInt(numValuesPart);
+    if (numValues.toString() !== numValuesPart) {
+      throw ('Invalid grid spec format: ' + gridSpec);
+    }
+
+    return shape.withNumValues(numValues);
   };
 
   static fromNumCells(numCells) {
@@ -53,15 +71,19 @@ export class GridShape {
     return this.fromGridSize(gridSize);
   }
 
-  static makeName(numRows, numCols = numRows) {
-    return `${numRows}x${numCols}`;
+  static makeName(numRows, numCols = numRows, numValues = null) {
+    let name = `${numRows}x${numCols}`;
+    if (numValues !== this.defaultNumValues(numRows, numCols)) {
+      name += `~${numValues}`;
+    }
+    return name;
   }
 
   static baseCharCode(shape) {
     return shape.numValues < 10 ? '1'.charCodeAt(0) : 'A'.charCodeAt(0);
   }
 
-  constructor(do_not_call, numRows, numCols) {
+  constructor(do_not_call, numRows, numCols, numValues) {
     if (do_not_call !== undefined) {
       throw Error('Use GridShape.fromGridSize() instead.');
     }
@@ -71,15 +93,22 @@ export class GridShape {
     this.numCols = numCols;
 
     // Derived properties
-    this.numValues = Math.max(numRows, numCols);
+    const defaultNumValues = this.constructor.defaultNumValues(numRows, numCols);
+    this.numValues = numValues || defaultNumValues;
+    if (!Number.isInteger(this.numValues) || this.numValues < defaultNumValues || this.numValues > this.constructor.MAX_SIZE) {
+      throw Error('Invalid numValues: ' + this.numValues);
+    }
     this.numCells = numRows * numCols;
     this.numPencilmarks = this.numCells * this.numValues;
 
     // Box dimensions
-    [this.boxHeight, this.boxWidth] = this.constructor._boxDims(numRows, numCols);
-    this.noDefaultBoxes = this.boxHeight === 1 || this.boxWidth === 1;
+    [this.boxHeight, this.boxWidth] = this.constructor._boxDims(numRows, numCols, this.numValues);
+    this.noDefaultBoxes = (
+      this.boxHeight == null || this.boxWidth == null ||
+      this.boxHeight === 1 || this.boxWidth === 1);
 
-    this.name = this.constructor.makeName(numRows, numCols);
+    this.name = this.constructor.makeName(numRows, numCols, this.numValues);
+    this.fullGridSpec = `${this.numRows}x${this.numCols}~${this.numValues}`;
 
     this._valueBase = this.numValues + 1;
 
@@ -95,10 +124,11 @@ export class GridShape {
     return this.numRows === this.numCols;
   }
 
-  static _boxDims(numRows, numCols) {
-    // Find (boxH, boxW) where boxH * boxW = numValues that tiles the grid.
-    // Prefer squarer boxes by starting from sqrt and working down.
-    const numValues = Math.max(numRows, numCols);
+  static _boxDims(numRows, numCols, numValues) {
+    if (numValues !== this.defaultNumValues(numRows, numCols)) {
+      // Non-default numValues => no default boxes
+      return [null, null];
+    }
 
     for (let small = Math.floor(Math.sqrt(numValues)); small >= 1; small--) {
       if (numValues % small !== 0) continue;
@@ -113,8 +143,8 @@ export class GridShape {
       }
     }
 
-    // Unreachable: small=1 always works since numValues = max(numRows, numCols)
-    return [1, numValues];
+    // No valid box dimensions
+    return [null, null];
   }
 
   makeValueId = (cellIndex, n) => {
@@ -155,6 +185,23 @@ export class GridShape {
       row: row,
       col: col,
     };
+  }
+
+  withNumValues(numValues = null) {
+    if (numValues === null || numValues === this.numValues) {
+      return this;
+    }
+
+    const defaultNumValues = this.constructor.defaultNumValues(this.numRows, this.numCols);
+    if (!Number.isInteger(numValues) || numValues < defaultNumValues || numValues > this.constructor.MAX_SIZE) {
+      throw Error('Invalid numValues: ' + numValues);
+    }
+
+    return new GridShape(undefined, this.numRows, this.numCols, numValues);
+  }
+
+  static defaultNumValues(numRows, numCols) {
+    return Math.max(numRows, numCols);
   }
 }
 

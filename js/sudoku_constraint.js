@@ -1211,16 +1211,22 @@ export class SudokuConstraint {
     static UNIQUENESS_KEY_FIELD = 'type';
     static DEFAULT_SHAPE = SHAPE_9x9;
 
-    constructor(gridSpec) {
-      super(gridSpec);
-      this.gridSpec = gridSpec;
+    constructor(gridDims, ...optionalNumValues) {
+      super(gridDims, ...optionalNumValues);
+
+      this.gridSpec = gridDims;
+
+      if (optionalNumValues.length) this.gridSpec += `~${optionalNumValues[0]}`;
     }
 
     static serialize(constraints) {
       if (constraints.length != 1) {
         throw Error('Only one Shape constraint is allowed');
       }
-      if (constraints[0].gridSpec === this.DEFAULT_SHAPE.name) {
+
+      const c = constraints[0];
+      if (c.gridSpec === this.DEFAULT_SHAPE.name ||
+        c.gridSpec === this.DEFAULT_SHAPE.fullGridSpec) {
         return '';
       }
 

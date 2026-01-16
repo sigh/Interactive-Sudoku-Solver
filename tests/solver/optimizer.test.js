@@ -713,6 +713,28 @@ await runTest('_optimizeNonSquareGrids: adds aux handler for 8x9 no-box grid', (
   assert.equal(added.length, 1);
 });
 
+await runTest('_optimizeNonSquareGrids: skips when numValues matches neither axis', () => {
+  const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
+  const shape = GridShape.fromGridSize(8, 9).withNumValues(10);
+
+  // Add all-different constraints for both axes.
+  const handlers = [];
+  for (const r of SudokuConstraintBase.rowRegions(shape)) {
+    handlers.push(new HandlerModule.AllDifferent(r));
+  }
+  for (const c of SudokuConstraintBase.colRegions(shape)) {
+    handlers.push(new HandlerModule.AllDifferent(c));
+  }
+
+  const handlerSet = new HandlerSet(handlers, shape);
+
+  // Should not throw; the optimization assumes one axis equals numValues.
+  optimizer._optimizeNonSquareGrids(handlerSet, /* hasBoxes= */ false, shape);
+
+  const added = handlerSet.getAllofType(HandlerModule.FullGridRequiredValues);
+  assert.equal(added.length, 0);
+});
+
 await runTest('_optimizeNonSquareGrids: skips aux handler for 1x9 grid', () => {
   const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
   const shape = GridShape.fromGridSize(1, 9);

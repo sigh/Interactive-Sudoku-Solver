@@ -99,7 +99,10 @@ export class SudokuConstraintOptimizer {
       requiredLineCount = shape.numCols;
     }
 
-    if (!lines) throw new Error("Invalid grid shape");
+    // This optimization assumes that the longer dimension equals numValues.
+    // With non-default numValues (e.g. 9x9~10), that assumption doesn't hold,
+    // so skip this optimization.
+    if (!lines) return;
     // If we only have 1 line, this constraint has no effect.
     // If we have 2 lines, then only there is minimal propagation possible,
     // because its not very constraining.

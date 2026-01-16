@@ -2843,8 +2843,8 @@ export class FullRank extends SudokuConstraintHandler {
 
   initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
     // FullRank requires square grids.
-    if (!shape.isSquare()) {
-      throw new Error('FullRank requires a square grid');
+    if (shape.numRows !== shape.numValues || shape.numCols !== shape.numValues) {
+      throw new Error('FullRank requires a square grid with all values used.');
     }
     // Initialize entries.
     const entries = FullRank.buildEntries(shape);
