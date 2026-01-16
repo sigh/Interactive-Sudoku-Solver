@@ -23,6 +23,7 @@ class LazyDebugManager {
   constructor(displayContainer, constraintManager) {
     this._displayContainer = displayContainer;
     this._constraintManager = constraintManager;
+    this._container = document.getElementById('debug-container');
     this._shape = null;
 
     this._enabled = false;
@@ -45,17 +46,19 @@ class LazyDebugManager {
       window.history.pushState(null, null, url);
     };
 
-    const toggleDebug = async (enabled) => {
+    const toggleDebug = (enabled) => {
       this._enabled = (enabled !== undefined) ? enabled : !this._enabled;
-
       this._real?.enable(this._enabled);
       updateURL(this._enabled);
-      if (this._enabled) {
-        await this._ensureLoaded();
-      }
+      this._container.style.display = this._enabled ? 'block' : 'none';
+      if (!this._enabled) return;
+      this._ensureLoaded();
     };
 
-    window.loadDebug = () => toggleDebug(true);
+    window.loadDebug = () => {
+      toggleDebug(true);
+      this._container.scrollIntoView();
+    }
 
     document.addEventListener('keydown', (event) => {
       if (event.ctrlKey && event.key === 'd') {
@@ -86,13 +89,16 @@ class LazyDebugManager {
         real.enable(this._enabled);
 
         this._real = real;
+        this._container.classList.add('lazy-loaded');
         return real;
-      })();
-
-      // If the load fails, allow a retry.
-      this._realPromise.catch((e) => {
+      })().catch((e) => {
         console.error('Failed to load debug module:', e);
-        this._realPromise = null;
+        this._realPromise = null;  // Reset to allow retrying.
+        const loadingElement = this._container.querySelector('.lazy-loading');
+        loadingElement.textContent = `Failed to load debug: ${e?.message || e}`;
+        loadingElement.classList.remove('notice-info');
+        loadingElement.classList.add('notice-error');
+        return null;
       });
     }
 

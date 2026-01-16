@@ -37,6 +37,7 @@
 
 #sandbox-container .sandbox-status {
   overflow: auto;
+  width: unset;
 }
 
 #sandbox-container .sandbox-output .sandbox-table {

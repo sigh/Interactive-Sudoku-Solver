@@ -418,6 +418,7 @@ button.icon-button,
   border-radius: 5px;
   padding: 4px 8px;
   border: 1px solid var(--color-border);
+  width: fit-content;
 }
 
 .notice:empty {

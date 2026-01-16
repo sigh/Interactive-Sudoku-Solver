@@ -152,12 +152,6 @@ export class DebugManager {
       this._loadDebugPuzzleInput();
     });
 
-    // Once debug UI is loaded, reveal any debug-only UI elements.
-    const hiddenElements = Array.from(
-      document.getElementsByClassName('hide-unless-debug'));
-    hiddenElements.forEach(e => e.classList.remove('hide-unless-debug'));
-
-
     // Call reshape so that all dependencies are initialized with the shape.
     if (this._shape) {
       this.reshape(this._shape);
