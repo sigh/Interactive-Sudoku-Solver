@@ -245,7 +245,7 @@ body {
   width: 350px;
 }
 
-#right-panel hr {
+#right-panel>hr {
   margin-top: -5px;
 }
 
