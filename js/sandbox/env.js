@@ -1,7 +1,7 @@
-import { SudokuConstraint } from '../sudoku_constraint.js';
-import { SudokuParser } from '../sudoku_parser.js';
-import { GridShape, SHAPE_9x9, SHAPE_MAX } from '../grid_shape.js';
-import { SANDBOX_HELP_TEXT } from './help_text.js';
+const { SudokuConstraint } = await import('../sudoku_constraint.js' + self.VERSION_PARAM);
+const { SudokuParser } = await import('../sudoku_parser.js' + self.VERSION_PARAM);
+const { GridShape, SHAPE_9x9, SHAPE_MAX } = await import('../grid_shape.js' + self.VERSION_PARAM);
+const { SANDBOX_HELP_TEXT } = await import('./help_text.js' + self.VERSION_PARAM);
 
 export const getConstraintList = () => {
   const byCategory = {};
@@ -116,7 +116,7 @@ const parseConstraint = (str) => {
 };
 
 const makeSolver = async () => {
-  const { SimpleSolver } = await import('./simple_solver.js');
+  const { SimpleSolver } = await import('./simple_solver.js' + self.VERSION_PARAM);
   return new SimpleSolver();
 };
 

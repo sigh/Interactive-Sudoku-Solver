@@ -1,10 +1,10 @@
 // Sandbox editor class.
 
-import { CodeJar } from '../../lib/codejar.min.js';
-import { autoSaveField, Base64Codec } from '../util.js';
-import { DEFAULT_CODE, EXAMPLES } from './examples.js';
-import { UserScriptExecutor } from '../sudoku_constraint.js';
-import { SANDBOX_HELP_TEXT } from './help_text.js';
+const { CodeJar } = await import('../../lib/codejar.min.js' + self.VERSION_PARAM);
+const { autoSaveField, Base64Codec } = await import('../util.js' + self.VERSION_PARAM);
+const { DEFAULT_CODE, EXAMPLES } = await import('./examples.js' + self.VERSION_PARAM);
+const { UserScriptExecutor } = await import('../sudoku_constraint.js' + self.VERSION_PARAM);
+const { SANDBOX_HELP_TEXT } = await import('./help_text.js' + self.VERSION_PARAM);
 
 export class EmbeddedSandbox {
   constructor(container, onConstraintGenerated) {

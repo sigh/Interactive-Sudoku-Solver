@@ -4,13 +4,8 @@ self.VERSION_PARAM = self.location.search;
 // Preload modules.
 const modulesPromise = (async () => {
   try {
-    const [
-      { SudokuConstraint },
-      { SudokuParser },
-    ] = await Promise.all([
-      import('./sudoku_constraint.js' + self.VERSION_PARAM),
-      import('./sudoku_parser.js' + self.VERSION_PARAM),
-    ]);
+    const { SudokuConstraint } = await import('./sudoku_constraint.js' + self.VERSION_PARAM);
+    const { SudokuParser } = await import('./sudoku_parser.js' + self.VERSION_PARAM);
     self.postMessage({ type: 'ready' });
     return { SudokuConstraint, SudokuParser };
   } catch (e) {
