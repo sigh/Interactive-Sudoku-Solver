@@ -114,6 +114,30 @@ await runTest('fromGridSpec parses 4x6 grid spec', () => {
   assert.equal(shape.numValues, 6);
 });
 
+await runTest('fromGridSpec parses ~numValues when non-default', () => {
+  const shape = GridShape.fromGridSpec('9x9~10');
+  assert.equal(shape.numRows, 9);
+  assert.equal(shape.numCols, 9);
+  assert.equal(shape.numValues, 10);
+  assert.equal(shape.name, '9x9~10');
+});
+
+await runTest('fromGridSpec canonicalizes default ~numValues', () => {
+  const shape = GridShape.fromGridSpec('9x9~9');
+  assert.equal(shape.numRows, 9);
+  assert.equal(shape.numCols, 9);
+  assert.equal(shape.numValues, 9);
+  assert.equal(shape.name, '9x9');
+});
+
+await runTest('fromGridSpec throws when ~numValues is too small', () => {
+  assert.throws(() => GridShape.fromGridSpec('9x9~8'));
+});
+
+await runTest('fromGridSpec throws when ~numValues is too large', () => {
+  assert.throws(() => GridShape.fromGridSpec('9x9~17'));
+});
+
 await runTest('fromGridSpec throws on invalid format', () => {
   assert.throws(() => GridShape.fromGridSpec('9'));
   assert.throws(() => GridShape.fromGridSpec('9x9x9'));

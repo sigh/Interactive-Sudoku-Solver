@@ -110,6 +110,22 @@ await runTest('parsePlainSudoku should reject non-square sizes', () => {
   assert.equal(SudokuParser.parsePlainSudoku('.'.repeat(50)), null);
 });
 
+await runTest('parseString parses Shape~9x9~numValues', () => {
+  const result = SudokuParser.parseString('.Shape~9x9~10.');
+  assert.ok(result);
+  assertShape(result, '9x9~10');
+  assert.equal(result.getShape().numValues, 10);
+  assert.equal(result.toString(), '.Shape~9x9~10');
+});
+
+await runTest('parseString canonicalizes default Shape~9x9~9 to empty', () => {
+  const result = SudokuParser.parseString('.Shape~9x9~9.');
+  assert.ok(result);
+  assertShape(result, '9x9~9');
+  assert.equal(result.getShape().numValues, 9);
+  assert.equal(result.toString(), '');
+});
+
 //////////////////////////////////////////////////////////////////////////////
 // Grid layout parsing
 //////////////////////////////////////////////////////////////////////////////

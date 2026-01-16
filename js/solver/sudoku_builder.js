@@ -188,9 +188,12 @@ export class SudokuBuilder {
           break;
 
         case 'Diagonal':
+          if (!shape.isSquare()) {
+            throw Error('Diagonal constraint requires a square grid');
+          }
           cells = [];
-          for (let r = 0; r < numValues; r++) {
-            let c = constraint.direction > 0 ? numValues - r - 1 : r;
+          for (let r = 0; r < shape.numRows; r++) {
+            let c = constraint.direction > 0 ? shape.numCols - r - 1 : r;
             cells.push(shape.cellIndex(r, c));
           }
           yield new HandlerModule.AllDifferent(cells);
