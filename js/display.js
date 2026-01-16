@@ -2,6 +2,7 @@ const {
   createSvgElement,
   deferUntilAnimationFrame,
   clearDOMNode,
+  copyToClipboard,
   memoize,
   isIterable
 } = await import('./util.js' + self.VERSION_PARAM);
@@ -598,7 +599,7 @@ export class SolutionDisplay extends CellValueDisplay {
     if (this._copyElem) {
       this._copyElem.onclick = () => {
         const solutionText = toShortSolution(this._currentSolution, this._shape);
-        navigator.clipboard.writeText(solutionText);
+        copyToClipboard(solutionText, this._copyElem);
       };
     }
 

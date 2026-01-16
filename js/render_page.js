@@ -4,6 +4,7 @@ const {
   deferUntilAnimationFrame,
   sessionAndLocalStorage,
   createSvgElement,
+  copyToClipboard,
   arraysAreEqual,
   MultiMap,
   dynamicJSFileLoader,
@@ -523,8 +524,9 @@ class ConstraintManager {
     document.getElementById('clear-constraints-button').onclick = () => this.clear();
 
     // Copy to clipboard.
-    document.getElementById('copy-constraints-button').onclick = () => {
-      navigator.clipboard.writeText(this.getConstraints());
+    const copyButton = document.getElementById('copy-constraints-button');
+    copyButton.onclick = () => {
+      copyToClipboard(this.getConstraints(), copyButton);
     };
 
     // Dim constraints toggle.

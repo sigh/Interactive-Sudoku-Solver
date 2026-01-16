@@ -33,6 +33,27 @@ export const createSvgElement = (tag) => {
   return document.createElementNS('http://www.w3.org/2000/svg', tag);
 };
 
+export const copyToClipboard = async (text, element) => {
+  const TIMEOUT_MS = 1000;
+
+  try {
+    await navigator.clipboard.writeText(String(text));
+  } catch (e) {
+    if (!element) throw e;
+
+    const CLASSNAME = 'copy-to-clipboard-failed';
+    element.classList.add(CLASSNAME);
+    window.setTimeout(() => element.classList.remove(CLASSNAME), TIMEOUT_MS);
+    return;
+  }
+
+  if (!element) return;
+
+  const CLASSNAME = 'copy-to-clipboard-done';
+  element.classList.add(CLASSNAME);
+  window.setTimeout(() => element.classList.remove(CLASSNAME), TIMEOUT_MS);
+};
+
 export const camelCaseToWords = (text) => {
   text = text.replace(/([A-Z])/g, " $1").toLowerCase();
   return text[0].toUpperCase() + text.slice(1);

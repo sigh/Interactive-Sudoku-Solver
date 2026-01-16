@@ -109,10 +109,6 @@
   filter: none;
 }
 
-#sandbox-container .copy-button.copied {
-  opacity: 1;
-}
-
 #sandbox-container .sandbox-body {
   padding-top: 10px;
 }
