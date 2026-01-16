@@ -80,6 +80,11 @@ SOLVER
 
   solver.latestStats() returns timing/counter info after each solve.
 
+CURRENT CONSTRAINT
+
+  currentConstraint()   - returns the current constraint in the UI.
+  currentShape()        - returns the current shape in the UI.
+
 HELP
 
   help()                - Display this message

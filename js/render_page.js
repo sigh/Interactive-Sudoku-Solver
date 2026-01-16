@@ -1473,6 +1473,7 @@ class SandboxHandler {
           this._constraintManager.loadUnsafeFromText(constraintStr);
           this._constraintManager.runUpdateCallback();
         },
+        () => this._constraintManager.getConstraints().toString(),
       );
 
       this._container.classList.add('lazy-loaded');

@@ -236,10 +236,38 @@ console.log('Worker is ready.');
     console.log("Hello from sandbox");
     return "ConstraintString";
   `;
-  const response = await sendMessage('runSandboxCode', { code });
+  const response = await sendMessage('runSandboxCode', { code, currentConstraintStr: '' });
   assert.equal(response.error, undefined);
   assert.equal(response.result.constraintStr, "ConstraintString");
   assert.ok(response.streamedLogs.some(l => l.includes("Hello from sandbox")));
+}
+
+// Test 3b: runSandboxCode with currentConstraint()
+{
+  console.log('Test: runSandboxCode currentConstraint()');
+  const currentConstraintStr = '.Shape~6x6';
+  const code = `
+    return currentConstraint();
+  `;
+  const response = await sendMessage('runSandboxCode', { code, currentConstraintStr });
+  assert.equal(response.error, undefined);
+  assert.equal(response.result.constraintStr, currentConstraintStr);
+}
+
+// Test 3c: runSandboxCode with currentShape()
+{
+  console.log('Test: runSandboxCode currentShape()');
+  const currentConstraintStr = '.Shape~6x6';
+  const code = `
+    const shape = currentShape();
+    if (shape.numRows !== 6 || shape.numCols !== 6) {
+      throw new Error('Unexpected shape');
+    }
+    return currentConstraint();
+  `;
+  const response = await sendMessage('runSandboxCode', { code, currentConstraintStr });
+  assert.equal(response.error, undefined);
+  assert.equal(response.result.constraintStr, currentConstraintStr);
 }
 
 // Test 4: runSandboxCode with error
@@ -249,7 +277,7 @@ console.log('Worker is ready.');
     console.log("About to fail");
     throw new Error("Sandbox Error");
   `;
-  const response = await sendMessage('runSandboxCode', { code });
+  const response = await sendMessage('runSandboxCode', { code, currentConstraintStr: '' });
   assert.ok(response.error);
   assert.ok(response.error.includes("Sandbox Error"));
   assert.ok(response.streamedLogs.some(l => l.includes("About to fail")));
@@ -301,7 +329,7 @@ console.log('Worker is ready.');
     console.info("Status update 2");
     return null;
   `;
-  const response = await sendMessage('runSandboxCode', { code });
+  const response = await sendMessage('runSandboxCode', { code, currentConstraintStr: '' });
   assert.equal(response.error, undefined);
   assert.ok(response.streamedStatus.some(s => s.includes("Status update 1")));
   assert.ok(response.streamedStatus.some(s => s.includes("Status update 2")));
@@ -314,7 +342,7 @@ console.log('Worker is ready.');
     console.log("No constraint returned");
     return null;
   `;
-  const response = await sendMessage('runSandboxCode', { code });
+  const response = await sendMessage('runSandboxCode', { code, currentConstraintStr: '' });
   assert.equal(response.error, undefined);
   assert.equal(response.result.constraintStr, null);
 }
@@ -325,7 +353,7 @@ console.log('Worker is ready.');
   const code = `
     console.log("Implicit undefined return");
   `;
-  const response = await sendMessage('runSandboxCode', { code });
+  const response = await sendMessage('runSandboxCode', { code, currentConstraintStr: '' });
   assert.equal(response.error, undefined);
   assert.equal(response.result.constraintStr, null);
 }

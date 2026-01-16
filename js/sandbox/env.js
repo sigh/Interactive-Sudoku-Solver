@@ -241,5 +241,39 @@ export const SANDBOX_GLOBALS = {
   SHAPE_9x9,
   SHAPE_MAX,
   GridShape,
+  extendTimeoutMs: () => {
+    console.error('extendTimeoutMs is deprecated, sandbox has no timeout.');
+  },
   ...SudokuConstraint,
+};
+
+export const getSandboxExtraGlobals = (currentConstraintStr) => {
+  let cachedParsedConstraint;
+
+  const parseConstraint = () => {
+    if (cachedParsedConstraint !== undefined) return cachedParsedConstraint;
+
+    if (typeof currentConstraintStr === 'string') {
+      cachedParsedConstraint = SudokuParser.parseString(currentConstraintStr);
+    } else {
+      cachedParsedConstraint = null;
+    }
+
+    return cachedParsedConstraint;
+  };
+
+  const currentConstraint = () => {
+    const parsedConstraint = parseConstraint();
+    if (!parsedConstraint) return null;
+    if (parsedConstraint.type === SudokuConstraint.Container.name) {
+      return parsedConstraint.constraints;
+    }
+    return [parsedConstraint];
+  };
+
+  const currentShape = () => {
+    return parseConstraint()?.getShape();
+  };
+
+  return { currentConstraint, currentShape };
 };

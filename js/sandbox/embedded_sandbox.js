@@ -7,7 +7,7 @@ const { UserScriptExecutor } = await import('../sudoku_constraint.js' + self.VER
 const { SANDBOX_HELP_TEXT } = await import('./help_text.js' + self.VERSION_PARAM);
 
 export class EmbeddedSandbox {
-  constructor(container, onConstraintGenerated) {
+  constructor(container, onConstraintGenerated, getCurrentConstraintStr) {
     this._container = container;
     this._editorElement = container.querySelector('.sandbox-editor');
     this._outputElement = container.querySelector('.sandbox-output');
@@ -18,6 +18,7 @@ export class EmbeddedSandbox {
     this._clearBtn = container.querySelector('.sandbox-clear');
     this._shareBtn = container.querySelector('.sandbox-share');
     this._onConstraintGenerated = onConstraintGenerated;
+    this._getCurrentConstraintStr = getCurrentConstraintStr;
 
     this._userScriptExecutor = new UserScriptExecutor();
     this._currentExecution = null;
@@ -213,6 +214,7 @@ export class EmbeddedSandbox {
     this._clearOutput();
 
     const code = this._jar.toString();
+    const currentConstraintStr = String(this._getCurrentConstraintStr());
 
     // Callbacks for streaming updates.
     const callbacks = {
@@ -230,7 +232,10 @@ export class EmbeddedSandbox {
     };
 
     // Store current execution for abort.
-    const executionId = this._userScriptExecutor.runSandboxCode(code, callbacks);
+    const executionId = this._userScriptExecutor.runSandboxCode(
+      code,
+      callbacks,
+      currentConstraintStr);
     this._currentExecution = executionId;
 
     try {
