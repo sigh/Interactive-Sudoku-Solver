@@ -437,6 +437,10 @@ button.icon-button,
   color: #856404;
 }
 
+.notice-warning::before {
+  content: '⚠️ ';
+}
+
 .notice-error {
   background: hsl(0, 100%, 95%);
   border-color: var(--color-error);
