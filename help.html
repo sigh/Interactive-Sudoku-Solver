@@ -66,14 +66,14 @@ layout: null
           <ul>
             <li><a href="#clone">Clone</a></li>
             <li><a href="#magic-square">3x3 Magic Square</a></li>
-            <li><a href="#odd-even-thermo">Odd/Even Thermo</a></li>
+            <li><a href="#thermo-variants">Thermometer Variants</a></li>
             <li><a href="#nabner-line">Nabner Line</a></li>
             <li><a href="#not-renban">Not Renban</a></li>
             <li><a href="#arithmetic-progression">Arithmetic Progression</a></li>
             <li><a href="#successor-arrow">Successor Arrow</a></li>
             <li><a href="#flatmates">Flatmates</a></li>
             <li><a href="#odd-even-lots">Odd/Even Lots</a></li>
-            <li><a href="#flexible-sum">Flexible Sum</a></li>
+            <li><a href="#sum-variants">Sum Variants</a></li>
             <li><a href="#general-skyscraper">General Skyscraper</a></li>
             <li><a href="#ambiguous-arrow">Ambiguous Arrow</a></li>
           </ul>
@@ -221,16 +221,26 @@ layout: null
           sum to 15.
         </p>
 
-        <h3 id="odd-even-thermo">Odd/Even Thermo</h3>
+        <h3 id="thermo-variants">Thermometer Variants</h3>
         <p>
           <b>Description:</b>
-          A thermometer (values are strictly increasing) where the values are
-          either all odd or all even.
+          A thermometer is a line where values are strictly increasing.
+          Some variants modify this basic rule.
         </p>
         <p>
-          Create a pairwise constraint in the "Custom JavaScript constraints"
-          panel with the following condition:
+          Most Thermometer variants can be created with pairwise constraints
+          in the "Custom JavaScript constraints" panel, with an appropriate
+          condition.
+        </p>
+        <p>
+          For an <b>Odd/Even Thermometer</b>, where the values must be all
+          odd or all even, use the following condition:
         <pre>a &lt; b &amp;&amp; (a % 2 == b % 2)</pre>
+        </p>
+        <p>
+          For a <b>Slow Thermometer</b>, where the values don't need to be
+          strictly increasing, use the following condition:
+        <pre>a &lt;= b</pre>
         </p>
 
         <h3 id="nabner-line">Nabner Line</h3>
@@ -385,6 +395,12 @@ function accept(state) {
         </p>
         <pre>.*(AD|DB).*</pre>
 
+        NOTE: This assumes that <code>D</code> must exist in the line. This
+        might not be the case in non-standard grid. In that case,
+        then you can modify the regex as follows:
+
+        <pre>[^D]*(AD|DB)?[^D]*</pre>
+
         <h3 id="odd-even-lots">Odd/Even Lots</h3>
 
         <p>
@@ -423,7 +439,7 @@ function accept(state) {
 }</pre>
         </p>
 
-        <h3 id="flexible-sum">Flexible Sum</h3>
+        <h3 id="sum-variants">Sum Variants</h3>
         <p>
           <b>Description:</b>
           A set of cells where the sum must satisfy a custom condition.
@@ -537,6 +553,14 @@ function accept(state) {
 
       <h2 id="javascript-sandbox">JavaScript Sandbox</h2>
       <div>
+        <p class="notice notice-warning sandbox-warning">
+          The Sandbox API may change without notice.
+        </p>
+        <p class="notice notice-warning sandbox-warning">
+          The Sandbox API exposes internal solver details directly which
+          were not originally designed for general use. There will be rough
+          edges.
+        </p>
         <p>
           The <a href="./?code">JavaScript Sandbox</a> can be used to create
           more complex puzzles by writing JavaScript code
