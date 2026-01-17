@@ -92,6 +92,38 @@ pre {
   line-height: 1.5;
 }
 
+pre.code-with-copy {
+  position: relative;
+}
+
+pre.code-with-copy>button.copy-button {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 1;
+
+  background: transparent;
+  border: none;
+  padding: 4px;
+  margin: -4px;
+  cursor: pointer;
+  opacity: 0.5;
+  border-radius: 4px;
+  transition: opacity 0.2s, background-color 0.2s;
+  text-shadow: none;
+  box-shadow: none;
+}
+
+pre.code-with-copy>button.copy-button:hover {
+  opacity: 1;
+  background: rgba(0, 0, 0, 0.1);
+}
+
+pre.code-with-copy>button.copy-button img {
+  width: 16px;
+  height: 16px;
+}
+
 .help-container {
   max-width: 1200px;
   margin: 0 auto;
