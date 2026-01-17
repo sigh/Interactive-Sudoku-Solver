@@ -34,7 +34,7 @@ export const DISPLAYED_EXAMPLES = [
     solution: '167584329985362417342719856718293645253647198694158732571936284829471563436825971',
   },
   {
-    name: 'Anti-knight, Anti-consecutive',
+    name: 'Anti-knight Anti-consecutive',
     src: 'http://rishipuri.blogspot.com/2013/02/antiknight-nonconsecutive-sudoku-2013-2.html',
     input:
       '.AntiKnight.AntiConsecutive.~R3C4_4~R3C6_7~R4C3_6~R4C7_5~R6C3_4~R6C7_3~R7C4_2~R7C6_5',

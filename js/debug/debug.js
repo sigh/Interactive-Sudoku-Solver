@@ -241,7 +241,7 @@ export const runSolveTests = async (onFailure, runner) => {
     'Killer sudoku, with alldiff',
     'Sudoku X',
     'Anti-knight Anti-king',
-    'Anti-knight, Anti-consecutive',
+    'Anti-knight Anti-consecutive',
     'Arrow sudoku',
     'Double arrow',
     'Pill arrow',

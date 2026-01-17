@@ -69,7 +69,6 @@ body {
 #sudoku-grid {
   position: relative;
   border-radius: 2px;
-  background: #fff;
   border: 1px solid var(--color-border-light);
   box-shadow:
     0 1px 2px rgba(0, 0, 0, 0.14),
@@ -177,14 +176,12 @@ body {
 
   padding: 5px 10px;
   background: var(--color-primary-soft);
-  color: var(--color-primary-darkest);
 }
 
 .page-header-title {
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: var(--font-size-title);
   font-weight: bold;
 }
 
@@ -256,16 +253,6 @@ body {
 
 #right-panel>hr {
   margin-top: -5px;
-}
-
-#example-select-container select {
-  margin-top: 0px;
-  width: 200px;
-}
-
-#example-select-container a {
-  margin: 0 10px;
-  font-size: var(--font-size-small);
 }
 
 #freeform-constraint-input textarea {
@@ -645,10 +632,10 @@ button.icon-button,
   width: 180px;
 }
 
-#constraint-panel-container h1 {
-  font-size: 20px;
-  line-height: 1;
-  color: var(--color-primary-darkest);
+.constraint-panel-header {
+  background: var(--color-primary-soft);
+  padding: 5px;
+  border-radius: 2px;
 }
 
 #constraint-panel-container form {
@@ -1107,6 +1094,8 @@ a:hover {
 }
 
 h1 {
+  font-size: var(--font-size-title);
+  color: var(--color-primary-darkest);
   margin: 0;
 }
 
