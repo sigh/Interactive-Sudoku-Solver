@@ -1,10 +1,14 @@
 // Sandbox editor class.
 
+
 const { CodeJar } = await import('../../lib/codejar.min.js' + self.VERSION_PARAM);
 const { autoSaveField, Base64Codec, copyToClipboard } = await import('../util.js' + self.VERSION_PARAM);
 const { DEFAULT_CODE, EXAMPLES } = await import('./examples.js' + self.VERSION_PARAM);
 const { UserScriptExecutor } = await import('../sudoku_constraint.js' + self.VERSION_PARAM);
-const { SANDBOX_HELP_TEXT } = await import('./help_text.js' + self.VERSION_PARAM);
+const {
+  SANDBOX_HELP_TEXT,
+  SANDBOX_WARNING_TEXT
+} = await import('./help_text.js' + self.VERSION_PARAM);
 
 export class EmbeddedSandbox {
   constructor(container, onConstraintGenerated, getCurrentConstraintStr) {
@@ -35,7 +39,7 @@ export class EmbeddedSandbox {
   }
 
   _showInitialHelp() {
-    this._outputElement.textContent = SANDBOX_HELP_TEXT;
+    this._outputElement.textContent = `${SANDBOX_WARNING_TEXT}\n\n${SANDBOX_HELP_TEXT}`;
     this._setStatusSegments(['Showing help()']);
   }
 

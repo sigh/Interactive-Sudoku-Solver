@@ -5,7 +5,23 @@
   --background-light: #f9f9f9;
   --background-blue: var(--color-primary-soft);
 
+  /* Sticky header offset for the help page (approx header height). */
+  --help-sticky-header-height: 60px;
+
   --font-family-mono: monospace;
+}
+
+/* Keep the help page header visible while scrolling. */
+#page-header {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+
+/* Ensure in-page anchors (TOC links) don't land under the sticky header. */
+html {
+  scroll-padding-top: calc(var(--help-sticky-header-height) + 20px);
 }
 
 ul {
@@ -97,8 +113,8 @@ pre {
   border: 1px solid var(--border-color);
   border-radius: 8px;
   position: sticky;
-  top: 20px;
-  max-height: calc(100vh - 40px);
+  top: calc(var(--help-sticky-header-height) + 20px);
+  max-height: calc(100vh - var(--help-sticky-header-height) - 40px);
   overflow-y: auto;
 
   ul {

@@ -39,6 +39,10 @@ CONSTRAINT OBJECTS
 
   The type of a constraint instance c can be found with c.type.
 
+  WARNING: The APIs of these constraints may be unintuitive as they were not
+           originally designed for general use. Invalid parameters may not be
+           correctly handled.
+
   parseConstraint(constraintString) can parse a constraint string into an array
   of constraint objects. e.g. parseConstraint('.Cage~10~R1C1~R1C2')  => [Cage]
 
@@ -91,4 +95,9 @@ HELP
   help('list')          - List all available constraint types
   help(constraintType)  - Display help for a specific constraint type
   help(constraint)      - Display help for types used in a constraint
+`.trim();
+
+export const SANDBOX_WARNING_TEXT = `
+⚠️ The Sandbox API exposes internal solver details directly which were
+   not originally designed for general use. There will be rough edges.
 `.trim();
