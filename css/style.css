@@ -4,14 +4,15 @@
   --color-primary-dark: #0688fa;
   --color-primary-border: #124d77;
   --color-primary-darkest: #263666;
-  --color-primary-text-shadow: var(--color-primary-darkest);
   --color-primary-soft: #e1f0ff;
 
   /* Colors - Danger */
   --color-danger: #d0451b;
   --color-danger-dark: #bc3315;
   --color-danger-border: #942911;
-  --color-danger-text-shadow: #854629;
+
+  /* Colors - Auxiliary */
+  --color-auxiliary: hsl(210 20% 96%);
 
   /* Colors - Semantic */
   --color-error: rgb(200, 0, 0);
@@ -67,7 +68,13 @@ body {
 
 #sudoku-grid {
   position: relative;
-  box-shadow: 3px 3px 10px;
+  border-radius: 2px;
+  background: #fff;
+  border: 1px solid var(--color-border-light);
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.14),
+    0 10px 24px rgba(0, 0, 0, 0.20),
+    0 0 0 6px rgba(0, 0, 0, 0.08);
   align-self: center;
 }
 
@@ -185,7 +192,7 @@ body {
 .page-header-logo {
   width: 40px;
   height: 40px;
-  border-radius: 10px;
+  border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -211,12 +218,15 @@ body {
   display: none;
   position: absolute;
   background: #fff;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--color-border-light);
   border-radius: 2px;
-  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.18);
+  box-shadow:
+    0 2px 6px rgba(0, 0, 0, 0.10),
+    0 12px 28px rgba(0, 0, 0, 0.14);
   box-sizing: border-box;
   z-index: 1000;
   top: 100%;
+  overflow: hidden;
 }
 
 .dropdown-menu.dropdown-open {
@@ -278,7 +288,7 @@ body {
 
 #sudoku-container {
   display: flex;
-  gap: 20px;
+  gap: 15px;
 }
 
 #state-buttons {
@@ -290,28 +300,25 @@ body {
 button,
 .button {
   --button-border-color: var(--color-primary-border);
-  --button-bg-top: var(--color-primary);
-  --button-bg-bottom: var(--color-primary-dark);
-  --button-text-shadow: var(--color-primary-text-shadow);
-  --button-bg-top-hover: var(--color-primary-dark);
-  --button-bg-bottom-hover: var(--color-primary);
+  --button-bg: var(--color-primary);
+  --button-bg-hover: var(--color-primary-dark);
+  --button-text-color: #ffffff;
 
   font-size: 16px;
-  border-radius: 5px;
-  color: #ffffff;
+  border-radius: 6px;
+  color: var(--button-text-color);
 
   border: 1px solid var(--button-border-color);
-  background: linear-gradient(to bottom, var(--button-bg-top) 5%, var(--button-bg-bottom) 100%);
-  background-color: var(--button-bg-top);
-  text-shadow: 0px 1px 0px var(--button-text-shadow);
+  background: var(--button-bg);
 
-  padding: 5px 15px;
+  padding: 6px 14px;
+  transition: background-color 0.15s, box-shadow 0.15s;
 }
 
 button:hover,
 .button:hover {
-  background: linear-gradient(to bottom, var(--button-bg-top-hover) 5%, var(--button-bg-bottom-hover) 100%);
-  background-color: var(--button-bg-top-hover);
+  background: var(--button-bg-hover);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
 }
 
 button:disabled {
@@ -320,7 +327,7 @@ button:disabled {
 
 button:active,
 .button:active {
-  box-shadow: inset 0px 0px 3px #555;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.35);
 }
 
 /* Plain/unbuttoned base style (for icon-only buttons like copy). */
@@ -330,8 +337,6 @@ button.plain-button {
   padding: 0;
   margin: 0;
   color: inherit;
-  text-shadow: none;
-  box-shadow: none;
   font: inherit;
   line-height: inherit;
 
@@ -392,22 +397,16 @@ button.copy-to-clipboard-failed::after {
 button.danger-button,
 .button.danger-button {
   --button-border-color: var(--color-danger-border);
-  --button-bg-top: var(--color-danger);
-  --button-bg-bottom: var(--color-danger-dark);
-  --button-text-shadow: var(--color-danger-text-shadow);
-  --button-bg-top-hover: var(--color-danger-dark);
-  --button-bg-bottom-hover: var(--color-danger);
+  --button-bg: var(--color-danger);
+  --button-bg-hover: var(--color-danger-dark);
 }
 
 button.auxiliary-button,
 .button.auxiliary-button {
   --button-border-color: var(--color-border);
-  --button-bg-top: white;
-  --button-bg-bottom: var(--color-border-light);
-  --button-text-shadow: transparent;
-  --button-bg-top-hover: var(--color-border-light);
-  --button-bg-bottom-hover: white;
-  color: black;
+  --button-bg: var(--color-auxiliary);
+  --button-bg-hover: var(--color-border-light);
+  --button-text-color: black;
 }
 
 button.image-button,
@@ -518,7 +517,7 @@ button.icon-button,
   grid-template-columns: 1fr 1fr;
 
   background: rgba(220, 220, 255);
-  border-radius: 10px;
+  border-radius: 12px;
 
   font-size: var(--font-size-small);
   width: min-content;
@@ -656,6 +655,7 @@ button.icon-button,
 #constraint-panel-container h1 {
   font-size: 20px;
   line-height: 1;
+  color: var(--color-primary-darkest);
 }
 
 #constraint-panel-container form {
@@ -733,8 +733,10 @@ input:invalid {
 }
 
 .constraint-panel {
-  border-radius: 10px;
-  border: 2px solid var(--color-border);
+  border-radius: 12px;
+  border: 1px solid var(--color-border);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.20);
+  transition: border-color 0.15s, box-shadow 0.15s;
   padding: 0;
   margin: 0;
 }
@@ -750,6 +752,7 @@ input:invalid {
 
 .constraint-panel.constraint-panel-borderless {
   border-color: transparent;
+  box-shadow: none;
 }
 
 .constraint-panel.constraint-panel-borderless>* {
@@ -842,7 +845,7 @@ textarea {
 }
 
 #display-panel {
-  width: 140px;
+  width: 145px;
 }
 
 #state-output {
@@ -971,9 +974,9 @@ select.thin-select {
 }
 
 hr {
-  border: 0;
   height: 1px;
-  background-image: linear-gradient(to right, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.75), rgba(0, 0, 0, 0));
+  border: 0;
+  border-top: 1px solid var(--color-border-light);
   width: 100%;
 }
 
@@ -1028,7 +1031,7 @@ a:hover {
   --switch-width: 38px;
   --switch-height: 20px;
   --switch-bg-off: var(--color-border-light);
-  --switch-bg-on: var(--color-primary);
+  --switch-bg-on: var(--color-primary-dark);
 
   white-space: nowrap;
   display: flex;
@@ -1289,7 +1292,6 @@ h3 {
   cursor: pointer;
   font: inherit;
   color: var(--color-disabled);
-  text-shadow: none;
   border-bottom: 2px solid transparent;
   margin-bottom: -1.5px;
   transition: border-color 0.3s, color 0.3s;
