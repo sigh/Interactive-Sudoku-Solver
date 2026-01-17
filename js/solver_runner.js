@@ -473,6 +473,12 @@ export class SolverRunner {
     this._currentResult = null;
   }
 
+  _handleException(e) {
+    const msg = e?.toString?.() ?? String(e);
+    if (msg.startsWith('Aborted')) return;
+    this._onError('Solver Error: ' + msg);
+  }
+
   // --- Solver state ---
 
   isSolving() {
@@ -530,7 +536,7 @@ export class SolverRunner {
         debugHandler
       );
     } catch (e) {
-      this._onError(e.toString());
+      this._handleException(e);
       this._statusHandler(false, 'terminate');
       return;
     }
@@ -542,7 +548,7 @@ export class SolverRunner {
 
     // Run the handler (if session wasn't aborted during setup)
     if (!session.isAborted()) {
-      handler.run(solver).catch(handler.handleSolverException);
+      handler.run(solver).catch((e) => this._handleException(e));
     }
 
     // Initial update
@@ -602,7 +608,11 @@ export class SolverRunner {
 
   // --- Internal ---
 
-  async _update() {
+  _update() {
+    this._uncheckUpdate().catch((e) => { this._handleException(e); });
+  }
+
+  async _uncheckUpdate() {
     const handler = this._handler;
     const session = this._session;
 
@@ -616,12 +626,7 @@ export class SolverRunner {
     }
 
     // Fetch result
-    let result = null;
-    try {
-      result = await handler.get(this._index);
-    } catch (e) {
-      handler.handleSolverException(e);
-    }
+    const result = await handler.get(this._index);
 
     if (session.isAborted()) return;
 
