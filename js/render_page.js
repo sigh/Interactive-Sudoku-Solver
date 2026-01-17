@@ -1139,6 +1139,7 @@ class Selection {
     let currCell = null;
     let currCenter = null;
     let isDeselecting = false;
+    let activePointerId = null;
     const pointerMoveFn = (e) => {
       const target = this._clickInterceptor.cellAt(e.offsetX, e.offsetY);
       if (target === null || target === currCell) return;
@@ -1163,11 +1164,40 @@ class Selection {
       }
       this._runCallback(false);
     };
+
+    const endPointerSelection = (e) => {
+      if (activePointerId === null) return;
+      if (e && e.pointerId !== activePointerId) return;
+
+      container.removeEventListener('pointermove', pointerMoveFn);
+      this._runCallback(true);
+
+      try {
+        container.releasePointerCapture(activePointerId);
+      } catch {
+        // Ignore; capture may already be released.
+      }
+
+      activePointerId = null;
+      e?.preventDefault();
+    };
+
     container.addEventListener('pointerdown', e => {
+      // Only track one active pointer at a time.
+      if (activePointerId !== null) return;
+
       // If the shift key is pressed, continue adding to the selection.
       if (!e.shiftKey) {
         this.setCells([]);
       }
+
+      activePointerId = e.pointerId;
+      try {
+        container.setPointerCapture(activePointerId);
+      } catch {
+        // Ignore; capture may fail in some environments.
+      }
+
       container.addEventListener('pointermove', pointerMoveFn);
       this._maybeAddOutsideClickListener();
       currCell = null;
@@ -1175,11 +1205,9 @@ class Selection {
       pointerMoveFn(e);
       e.preventDefault();
     });
-    container.addEventListener('pointerup', e => {
-      container.removeEventListener('pointermove', pointerMoveFn);
-      this._runCallback(true);
-      e.preventDefault();
-    });
+    container.addEventListener('pointerup', endPointerSelection);
+    container.addEventListener('pointercancel', endPointerSelection);
+    container.addEventListener('lostpointercapture', endPointerSelection);
     container.addEventListener('touchmove', e => {
       if (e.touches.length == 1) e.preventDefault();
     });
