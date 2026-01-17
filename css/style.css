@@ -323,6 +323,41 @@ button:active,
   box-shadow: inset 0px 0px 3px #555;
 }
 
+/* Plain/unbuttoned base style (for icon-only buttons like copy). */
+button.plain-button {
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin: 0;
+  color: inherit;
+  text-shadow: none;
+  box-shadow: none;
+  font: inherit;
+  line-height: inherit;
+
+  padding: 4px;
+  margin: -4px;
+
+  opacity: 0.5;
+  border-radius: 4px;
+  transition: opacity 0.2s, background-color 0.2s;
+}
+
+button.plain-button:not(:disabled) {
+  cursor: pointer;
+}
+
+button.plain-button:hover {
+  opacity: 1;
+  background: rgba(0, 0, 0, 0.1);
+}
+
+button.plain-button>img {
+  width: 16px;
+  height: 16px;
+  filter: none;
+}
+
 button.copy-to-clipboard-done {
   --clipboard-outline-color: var(--color-primary-dark);
 }
@@ -364,8 +399,8 @@ button.danger-button,
   --button-bg-bottom-hover: var(--color-danger);
 }
 
-button.plain-button,
-.button.plain-button {
+button.auxiliary-button,
+.button.auxiliary-button {
   --button-border-color: var(--color-border);
   --button-bg-top: white;
   --button-bg-bottom: var(--color-border-light);
@@ -392,8 +427,8 @@ button.image-button>img,
   filter: invert(1);
 }
 
-button.plain-button.image-button>img,
-.button.plain-button.image-button>img {
+button.auxiliary-button.image-button>img,
+.button.auxiliary-button.image-button>img {
   filter: none;
 }
 
