@@ -42,9 +42,13 @@ const handleWorkerMessage = (msg) => {
       result: result,
     });
   } catch (e) {
+    const error = (e instanceof Error)
+      ? { name: e.name, message: e.message, stack: e.stack }
+      : { name: 'Error', message: String(e), stack: null };
     self.postMessage({
       type: 'exception',
-      error: e,
+      method: msg?.data?.method,
+      error,
     });
   }
 };

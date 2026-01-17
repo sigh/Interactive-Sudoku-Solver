@@ -483,7 +483,6 @@ export class SolverRunner {
   _handleException(e) {
     if (e instanceof AbortedError) return;
     const msg = e?.toString?.() ?? String(e);
-    if (msg.startsWith('Aborted')) return;
     this._onError('Solver Error: ' + msg);
   }
 
@@ -749,7 +748,17 @@ export class SolverProxy {
         this._waiting = null;
         break;
       case 'exception':
-        this._waiting.reject(data.error);
+        {
+          // Worker exceptions are serialized as a plain object { name, message, stack }.
+          // Keep this intentionally minimal.
+          const message = data.error?.message ?? String(data.error);
+          const err = new Error(message);
+          if (data.error?.name) err.name = data.error.name;
+          if (data.error?.stack) err.stack = data.error.stack;
+          err.workerMethod = data.method ?? this._waiting.method;
+          this._waiting.reject(err);
+        }
+
         this._statusHandler(false, this._waiting.method);
         this._waiting = null;
         break;
