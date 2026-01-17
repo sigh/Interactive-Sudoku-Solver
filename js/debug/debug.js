@@ -162,7 +162,7 @@ export class PuzzleRunner {
         console.error('Test failed: ' + puzzle.name);
         console.error('Expected', puzzle.solution);
         console.error('Got     ', result);
-        throw ('Test failed: ' + puzzle.name);
+        throw new Error('Test failed: ' + puzzle.name);
       }
     };
 

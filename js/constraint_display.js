@@ -53,7 +53,7 @@ class BaseConstraintDisplayItem extends DisplayItem {
   // drawItem should return an item that can be passed to removeItem to remove
   // the item from the display.
   // The returned item should be an svg element.
-  drawItem(constraint, options) { throw 'Unimplemented'; }
+  drawItem(constraint, options) { throw new Error('Unimplemented'); }
 
   // By default, makeIcon returns a shaded grey region for the cells in the
   // constraint.
@@ -142,13 +142,13 @@ class BaseConstraintDisplayItem extends DisplayItem {
           return diamond;
         }
       default:
-        throw (`Unknown marker: ${marker}`);
+        throw new Error(`Unknown marker: ${marker}`);
     }
   }
 
   _makeConstraintLine(cells, options) {
     const len = cells.length;
-    if (len < 2) throw (`Line too short: ${cells}`)
+    if (len < 2) throw new Error(`Line too short: ${cells}`);
 
     if (options.constructor != LineOptions) {
       options = new LineOptions(options);
@@ -686,7 +686,7 @@ class ShadedRegion extends BaseConstraintDisplayItem {
           patternSvg = this._makeHorizontalLinePattern(patternId, color);
           break;
         default:
-          throw `Unknown pattern: ${pattern}`;
+          throw new Error(`Unknown pattern: ${pattern}`);
       }
       region.appendChild(patternSvg);
     }

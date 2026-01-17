@@ -302,7 +302,7 @@ class DebugLogger {
     if (!this.enableLogs) {
       // We throw so we catch accidentally checked calls to log() because
       // they would hurt performance (even just creating the data object).
-      throw ('Debug logs are not enabled');
+      throw new Error('Debug logs are not enabled');
     }
 
     level ||= 1;
@@ -683,12 +683,12 @@ class InternalSolver {
     const yieldOnBacktrack = yieldWhen > 0 ? yieldWhen : 0;
 
     // Set up iterator validation.
-    if (!this._atStart) throw ('State is not in initial state.');
+    if (!this._atStart) throw new Error('State is not in initial state.');
     this._atStart = false;
 
     const runCounter = ++this._runCounter;
     const checkRunCounter = () => {
-      if (runCounter != this._runCounter) throw ('Iterator no longer valid');
+      if (runCounter != this._runCounter) throw new Error('Iterator no longer valid');
     };
 
     // This is required because we may call run multiple times.
@@ -1246,7 +1246,7 @@ export class CellExclusions {
 
   addMutualExclusion(cell1, cell2) {
     if (this._sealed) {
-      throw ('Cannot add exclusions after caching.');
+      throw new Error('Cannot add exclusions after caching.');
     }
     this._cellExclusionSets[cell1].add(cell2);
     this._cellExclusionSets[cell2].add(cell1);
@@ -1256,7 +1256,7 @@ export class CellExclusions {
   areSameValue(cell0, cell1) {
     if (cell0 == cell1) return;
     if (this._sealed) {
-      throw ('Cannot add exclusions after caching.');
+      throw new Error('Cannot add exclusions after caching.');
     }
     for (const c of this._cellExclusionSets[cell0]) {
       this._cellExclusionSets[cell1].add(c);
@@ -1522,7 +1522,7 @@ export class HandlerSet {
   addSingletonHandlers(...handlers) {
     for (const h of handlers) {
       if (!this._addToSeen(h)) {
-        throw ('Singleton handlers must be unique');
+        throw new Error('Singleton handlers must be unique');
       }
 
       const index = this._addToAll(h);

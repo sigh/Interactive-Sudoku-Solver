@@ -83,7 +83,7 @@ const handleWorkerMethod = (method, payload) => {
     case 'estimatedCountSolutions':
       return workerSolver.estimatedCountSolutions();
   }
-  throw (`Unknown method ${method}`);
+  throw new Error(`Unknown method ${method}`);
 };
 
 globalThis.debugCount = (key, value) => {

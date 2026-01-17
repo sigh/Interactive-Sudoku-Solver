@@ -430,7 +430,7 @@ export class GridGraph {
   });
 
   constructor(do_not_call, shape) {
-    if (!do_not_call) throw ('Use GridGraph.get(shape)');
+    if (!do_not_call) throw new Error('Use GridGraph.get(shape)');
 
     const graph = [];
     for (let i = 0; i < shape.numCells; i++) {

@@ -66,7 +66,7 @@ export class LookupTables {
   }
 
   constructor(do_not_call, numValues) {
-    if (!do_not_call) throw ('Use LookupTables.get(shape.numValues)');
+    if (!do_not_call) throw new Error('Use LookupTables.get(shape.numValues)');
 
     this.allValues = (1 << numValues) - 1;
     this.combinations = 1 << numValues;

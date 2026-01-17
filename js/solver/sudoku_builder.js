@@ -227,7 +227,7 @@ export class SudokuBuilder {
           {
             const pillSize = constraint.pillSize;
             if (pillSize != 2 && pillSize != 3) {
-              throw ('Pill size must be 2 or 3');
+              throw new Error('Pill size must be 2 or 3');
             }
             const cells = (
               constraint.cells.map(c => shape.parseCellId(c).cell));
@@ -758,7 +758,7 @@ export class SudokuBuilder {
           break;
 
         default:
-          throw ('Unknown constraint type: ' + constraint.type);
+          throw new Error('Unknown constraint type: ' + constraint.type);
       }
     }
   }
