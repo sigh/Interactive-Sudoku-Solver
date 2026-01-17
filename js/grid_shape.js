@@ -24,7 +24,7 @@ export class GridShape {
   static fromGridSpec(gridSpec) {
     const parts = gridSpec.split('~');
     if (parts.length > 2) {
-      throw ('Invalid grid spec format: ' + gridSpec);
+      throw new Error('Invalid grid spec format: ' + gridSpec);
     }
 
     const gridDims = parts[0];
@@ -32,19 +32,19 @@ export class GridShape {
 
     const dims = gridDims.split('x');
     if (dims.length !== 2) {
-      throw ('Invalid grid spec format: ' + gridSpec);
+      throw new Error('Invalid grid spec format: ' + gridSpec);
     }
 
     const numRows = parseInt(dims[0]);
     const numCols = parseInt(dims[1]);
 
     if (numRows.toString() !== dims[0] || numCols.toString() !== dims[1]) {
-      throw ('Invalid grid spec format: ' + gridSpec);
+      throw new Error('Invalid grid spec format: ' + gridSpec);
     }
 
     const shape = this.fromGridSize(numRows, numCols);
     if (!shape) {
-      throw ('Invalid grid dimensions: ' + gridSpec);
+      throw new Error('Invalid grid dimensions: ' + gridSpec);
     }
 
     if (numValuesPart === undefined) {
@@ -53,7 +53,7 @@ export class GridShape {
 
     const numValues = parseInt(numValuesPart);
     if (numValues.toString() !== numValuesPart) {
-      throw ('Invalid grid spec format: ' + gridSpec);
+      throw new Error('Invalid grid spec format: ' + gridSpec);
     }
 
     return shape.withNumValues(numValues);

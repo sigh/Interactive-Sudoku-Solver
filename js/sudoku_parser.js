@@ -56,7 +56,7 @@ export class SudokuParser {
         cageCell = cellDirections[cageCell];
         count++;
         if (count > numCols) {
-          throw ('Loop in Killer Sudoku input.');
+          throw new Error('Loop in Killer Sudoku input.');
         }
       }
       if (!cages.has(cageCell)) {
@@ -333,7 +333,7 @@ export class SudokuParser {
   static parseString(rawStr) {
     const str = rawStr.replace(/\s+/g, '');
     let items = str.split('.');
-    if (items[0]) throw (
+    if (items[0]) throw new Error(
       'Invalid constraint string: Constraint must start with a ".".\n' +
       rawStr);
     items.shift();
@@ -344,7 +344,7 @@ export class SudokuParser {
       const type = args.shift() || SudokuConstraint.Given.name;
       const cls = SudokuConstraint[type];
       if (!cls) {
-        throw ('Unknown constraint type: ' + type);
+        throw new Error('Unknown constraint type: ' + type);
       }
       const constraintParts = [...cls.makeFromArgs(...args)];
       if (constraintParts.length > 1

@@ -12,13 +12,13 @@ export class CellArgs {
   constructor(args, type) {
     const numArgs = args.length;
     if (!numArgs) {
-      throw ('No cells provided for ' + type);
+      throw new Error('No cells provided for ' + type);
     }
 
     this._isLoop = false;
     if (args[numArgs - 1] == 'LOOP') {
       if (!SudokuConstraint[type].LOOPS_ALLOWED) {
-        throw ('Loops are not allowed for ' + type);
+        throw new Error('Loops are not allowed for ' + type);
       }
       args.pop();
       this._isLoop = true;
@@ -115,7 +115,7 @@ export class SudokuConstraintBase {
     });
 
     const shape = SudokuConstraint.Shape.getShapeFromGridSpec(gridSpec);
-    if (!shape) throw ('Unknown shape: ' + shape);
+    if (!shape) throw new Error('Unknown shape: ' + shape);
     return shape;
   }
 
@@ -1019,7 +1019,7 @@ export class SudokuConstraint {
           decoded = Base64Codec.decodeToString(encodedPattern);
         }
       } catch (err) {
-        throw ('Invalid encoded regex pattern. ' + err);
+        throw new Error('Invalid encoded regex pattern. ' + err);
       }
       return decoded;
     }
@@ -1403,7 +1403,7 @@ export class SudokuConstraint {
       this.ties = ties;
 
       if (!this.constructor.ARGUMENT_CONFIG.options.map(o => o.value).includes(ties)) {
-        throw ('Invalid FullRankTies: ' + ties);
+        throw new Error('Invalid FullRankTies: ' + ties);
       }
     }
   }
@@ -2047,7 +2047,7 @@ export class SudokuConstraint {
     splitCells() {
       const setSize = this.cells.length / this.numSets;
       if (!Number.isInteger(setSize)) {
-        throw ('Number of cells must be a multiple of the number of sets');
+        throw new Error('Number of cells must be a multiple of the number of sets');
       }
       const sets = [];
       for (let i = 0; i < this.numSets; i++) {

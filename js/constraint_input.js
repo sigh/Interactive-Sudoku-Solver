@@ -521,15 +521,15 @@ ConstraintCategoryInput.LinesAndSets = class LinesAndSets extends ConstraintCate
 
   _handleSelection(selectionForm, inputManager) {
     const cells = inputManager.getSelection();
-    if (cells.length < 1) throw ('Selection too short.');
+    if (cells.length < 1) throw new Error('Selection too short.');
 
     const formData = new FormData(selectionForm);
     const type = formData.get('constraint-type');
 
     const constraintClass = SudokuConstraint[type];
     const typeData = this._typeMap.get(type);
-    if (!typeData) throw ('Unknown constraint type: ' + type);
-    if (typeData.elem.disabled) throw ('Invalid selection for ' + type);
+    if (!typeData) throw new Error('Unknown constraint type: ' + type);
+    if (typeData.elem.disabled) throw new Error('Invalid selection for ' + type);
 
     if (constraintClass.LOOPS_ALLOWED && formData.get('is-loop')) {
       cells.push('LOOP');
@@ -605,7 +605,7 @@ ConstraintCategoryInput.LinesAndSets = class LinesAndSets extends ConstraintCate
             typeData.dynamicOptionsFn = this._setUpDynamicOptions(
               input, argConfig.options);
           } else {
-            throw ('Invalid options for ' + type);
+            throw new Error('Invalid options for ' + type);
           }
         } else if (argConfig.long) {
           input = document.createElement('textarea');

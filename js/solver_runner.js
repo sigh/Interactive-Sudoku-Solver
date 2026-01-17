@@ -26,7 +26,7 @@ class SolverSession {
 
   setSolver(solver) {
     if (this._solver !== null) {
-      throw ('Solver already set for session');
+      throw new Error('Solver already set for session');
     }
     this._solver = solver;
     if (this.isAborted()) {
@@ -106,7 +106,7 @@ class ModeHandler {
   handleSolverException(e) {
     // If the solver was terminated, then don't show an error.
     if (!e.toString().startsWith('Aborted')) {
-      throw (e);
+      throw e;
     }
   }
 }
@@ -685,7 +685,7 @@ export class SolverProxy {
 
   constructor(worker, stateHandler, statusHandler, debugHandler) {
     if (!worker) {
-      throw ('Must provide worker');
+      throw new Error('Must provide worker');
     }
 
     this._worker = worker;
@@ -751,13 +751,13 @@ export class SolverProxy {
 
   _callWorker(method, payload) {
     if (!this._initialized) {
-      throw (`SolverProxy not initialized.`);
+      throw new Error('SolverProxy not initialized.');
     }
     if (!this._worker) {
-      throw (`SolverProxy has been terminated.`);
+      throw new Error('SolverProxy has been terminated.');
     }
     if (this._waiting) {
-      throw (`Can't call worker while a method is in progress. (${this._waiting.method})`);
+      throw new Error(`Can't call worker while a method is in progress. (${this._waiting.method})`);
     }
 
     this._statusHandler(true, method);

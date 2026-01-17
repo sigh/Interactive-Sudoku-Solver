@@ -562,7 +562,7 @@ export class Base64Codec {
   static decodeTo6BitArray(str, array) {
     array ||= new Uint8Array(str.length);
     if (array.length < str.length) {
-      throw ('Array is too short.');
+      throw new Error('Array is too short.');
     }
 
     for (let i = 0; i < str.length; i++) {
