@@ -1,77 +1,6 @@
 const { SudokuConstraint } = await import('../sudoku_constraint.js' + self.VERSION_PARAM);
-const { clearDOMNode } = await import('../util.js' + self.VERSION_PARAM);
+const { clearDOMNode, copyToClipboard } = await import('../util.js' + self.VERSION_PARAM);
 const { SANDBOX_HELP_TEXT } = await import('../sandbox/help_text.js' + self.VERSION_PARAM);
-
-const CATEGORY_CONFIGS = {
-  'LinesAndSets': {
-    description: 'Constraints that apply to lines, regions, or sets of cells',
-    instructions: `
-      Select cells by click and dragging on the grid then select a constraint
-      from the "Lines & Sets" panel.
-      Cells can also be added and removed by holding down shift while
-      clicking.`,
-  },
-  'OutsideClue': {
-    description: 'Constraints that use clues outside the grid',
-    instructions: `
-      Click on an arrow outside the grid then select a constraint from the
-      "Outside Clues" panel.`
-  },
-  'LayoutCheckbox': {
-    description: 'Layout and structural constraints',
-    instructions: `Use checkboxes in the "Layout constraints" panel.`
-  },
-  'Global': {
-    description: 'Constraints that apply to the entire grid',
-    instructions: `Use the controls in the "Global constraints" panel.`
-  },
-  'GivenCandidates': {
-    description: 'Restrictions on the initial values of cells',
-    instructions: `
-      Select a cell by clicking on it then typing to enter a value or backspace
-      to clear the cells.
-      Use the "Set multiple values" panel to set more than one value.
-      Select extra cells by dragging, or shift-clicking.`
-  },
-  'Pairwise': {
-    description: 'Custom pairwise relationships between cells',
-    instructions: `
-      Select cells by click and dragging on the grid then configuring the
-      constraint in the "JavaScript constraints" panel using the Pairwise tab
-      (see panel for instructions).
-      Cells can also be added and removed by holding down shift while
-      clicking.`,
-  },
-  'StateMachine': {
-    description: 'Finite-state machine for accepting cell sequences',
-    instructions: `
-      Select cells by click and dragging on the grid, then use the
-      "Custom JavaScript constraints" panel with the State machine tab to define
-      the start state, transition, and accept logic (see panel for guidance).
-      Cells can also be added and removed by holding shift while clicking.`,
-  },
-  'Jigsaw': {
-    description: 'Irregular grid regions',
-    instructions: `
-      Select cells by click and dragging on the grid then pressing
-      "Add Jigsaw Piece" in the "Layout constraints" panel.
-      The selected region size must match the row/column length.
-      Cells can also be added and removed by holding down shift while
-      clicking.`,
-  },
-  'Composite': {
-    description: 'Composite constraints that group other constraints',
-    instructions: `
-      Use the "Composite constraints" panel to create a new composite group
-      by pressing the button of the group type you want.
-      When a group is selected, new constraints you create will be added to it.
-    `
-  },
-  'Shape': {
-    description: 'Overall grid size',
-    instructions: `Select the grid shape using the "Shape" dropdown.`
-  },
-};
 
 const getAllConstraintClasses = () => {
   const classes = [];
@@ -200,6 +129,101 @@ const createCategorySection = (category, constraints) => {
   return categorySection;
 };
 
+const addCopyButtonsToCodeBlocks = () => {
+  const codeBlocks = document.querySelectorAll('.help-content pre');
+  for (const pre of codeBlocks) {
+    if (pre.querySelector('button.copy-button')) continue;
+
+    pre.classList.add('code-with-copy');
+
+    const copyBtn = document.createElement('button');
+    copyBtn.className = 'copy-button';
+    copyBtn.title = 'Copy to clipboard';
+
+    const copyIcon = document.createElement('img');
+    copyIcon.src = 'img/copy-48.png';
+    copyBtn.appendChild(copyIcon);
+
+    copyBtn.addEventListener('click', (e) => {
+      copyToClipboard(pre.textContent, copyBtn);
+    });
+
+    pre.insertBefore(copyBtn, pre.firstChild);
+  }
+};
+
+const CATEGORY_CONFIGS = {
+  'LinesAndSets': {
+    description: 'Constraints that apply to lines, regions, or sets of cells',
+    instructions: `
+      Select cells by click and dragging on the grid then select a constraint
+      from the "Lines & Sets" panel.
+      Cells can also be added and removed by holding down shift while
+      clicking.`,
+  },
+  'OutsideClue': {
+    description: 'Constraints that use clues outside the grid',
+    instructions: `
+      Click on an arrow outside the grid then select a constraint from the
+      "Outside Clues" panel.`
+  },
+  'LayoutCheckbox': {
+    description: 'Layout and structural constraints',
+    instructions: `Use checkboxes in the "Layout constraints" panel.`
+  },
+  'Global': {
+    description: 'Constraints that apply to the entire grid',
+    instructions: `Use the controls in the "Global constraints" panel.`
+  },
+  'GivenCandidates': {
+    description: 'Restrictions on the initial values of cells',
+    instructions: `
+      Select a cell by clicking on it then typing to enter a value or backspace
+      to clear the cells.
+      Use the "Set multiple values" panel to set more than one value.
+      Select extra cells by dragging, or shift-clicking.`
+  },
+  'Pairwise': {
+    description: 'Custom pairwise relationships between cells',
+    instructions: `
+      Select cells by click and dragging on the grid then configuring the
+      constraint in the "JavaScript constraints" panel using the Pairwise tab
+      (see panel for instructions).
+      Cells can also be added and removed by holding down shift while
+      clicking.`,
+  },
+  'StateMachine': {
+    description: 'Finite-state machine for accepting cell sequences',
+    instructions: `
+      Select cells by click and dragging on the grid, then use the
+      "Custom JavaScript constraints" panel with the State machine tab to define
+      the start state, transition, and accept logic (see panel for guidance).
+      Cells can also be added and removed by holding shift while clicking.`,
+  },
+  'Jigsaw': {
+    description: 'Irregular grid regions',
+    instructions: `
+      Select cells by click and dragging on the grid then pressing
+      "Add Jigsaw Piece" in the "Layout constraints" panel.
+      The selected region size must match the row/column length.
+      Cells can also be added and removed by holding down shift while
+      clicking.`,
+  },
+  'Composite': {
+    description: 'Composite constraints that group other constraints',
+    instructions: `
+      Use the "Composite constraints" panel to create a new composite group
+      by pressing the button of the group type you want.
+      When a group is selected, new constraints you create will be added to it.
+    `
+  },
+  'Shape': {
+    description: 'Overall grid size',
+    instructions: `Select the grid shape using the "Shape" dropdown.`
+  },
+};
+
+
 export const renderHelpPage = () => {
   const categoriesContainer = document.getElementById('categories-content');
   const constraintsContainer = document.getElementById('constraints-content');
@@ -234,4 +258,6 @@ export const renderHelpPage = () => {
     const categorySection = createCategorySection(category, categoryConstraints);
     constraintsContainer.appendChild(categorySection);
   }
+
+  addCopyButtonsToCodeBlocks();
 };
