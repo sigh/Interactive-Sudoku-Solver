@@ -161,7 +161,7 @@ layout: null
     <div class="lazy-body">
       <div class="debug-main">
         <div id="debug-panel">
-          <label>
+          <label class="control-panel">
             Log level
             <select id="debug-log-level" class="thin-select">
               <option value="0">None</option>
@@ -169,11 +169,11 @@ layout: null
               <option value="2">2</option>
             </select>
           </label>
-          <label>
+          <label class="control-panel">
             <input type="checkbox" id="conflict-heatmap-checkbox">
             Conflict heatmap
           </label>
-          <label>
+          <label class="control-panel">
             <input type="checkbox" id="stack-trace-checkbox">
             Stack trace
           </label>
@@ -182,26 +182,28 @@ layout: null
             <datalist id="debug-puzzles"></datalist>
           </div>
           <div id="debug-puzzle-src"></div>
-          <div class="debug-toggle-row">
-            Show
+          <div class="control-panel">
             <input type="checkbox" id="debug-cell-id" class="debug-checkbox">
-            <label for="debug-cell-id">Cell id</label>
+            <label for="debug-cell-id" class="button auxiliary-button">Cell id</label>
             <input type="checkbox" id="debug-cell-index" class="debug-checkbox">
-            <label for="debug-cell-index">Cell index</label>
+            <label for="debug-cell-index" class="button auxiliary-button">Cell index</label>
           </div>
-          <button id="close-debug-button" class="danger-button" title="Close debug">Close debug</button>
+          <div>
+            <button id="close-debug-button" class="danger-button" title="Close debug">Close debug</button>
+          </div>
         </div>
         <div id="debug-counters"></div>
         <div id="debug-logs"></div>
       </div>
       <div id="debug-stack-trace-footer" class="debug-stack-trace-footer">
-        <div class="debug-stack-trace-header">
-          <button type="button" id="debug-flame-toggle" class="expanded" title="Collapse flame graph"
-            aria-label="Toggle flame graph"></button>
+        <hr>
+        <div class="debug-stack-trace-header control-panel">
+          <button type="button" id="debug-flame-toggle" class="expanded" title="Collapse flame graph"></button>
           <div class="debug-stack-trace"></div>
         </div>
       </div>
     </div>
+    <hr>
   </div>
 
   <div id="sandbox-container" class="constraint-panel lazy-load" style="display: none;">
@@ -210,7 +212,7 @@ layout: null
       <div class="lazy-loading notice notice-info">Loading…</div>
     </div>
     <div class="sandbox-body lazy-body">
-      <div class="sandbox-controls">
+      <div class="sandbox-controls control-panel">
         <select class="sandbox-examples">
           <option value="">Load example...</option>
         </select>
@@ -299,7 +301,7 @@ layout: null
             <div class="control-panel control-panel-spread">
               <div id="solution-control-panel" class="hide-until-load" style="--skeleton-height:50px;">
                 <div id="solution-iteration-state"></div>
-                <div id="solution-control-buttons">
+                <div id="solution-control-buttons" class="control-panel">
                   <button id="solution-start" class="icon-button" title="start (s)">&#171;</button>
                   <button id="solution-back" class="icon-button" title="previous (p)">&#8249;</button>
                   <button id="solution-forward" class="icon-button" title="next (n)">&#8250;</button>
@@ -374,7 +376,7 @@ layout: null
       <div id="numvalues-experimental-warning" class="notice notice-warning" style="display:none">
         Non-default value count is experimental and may change.
       </div>
-      <span id="example-select-container">
+      <span id="example-select-container" class="control-panel">
         <select disabled>
           <option>-- Load an example --</option>
         </select>
@@ -411,19 +413,19 @@ layout: null
 
       <div id="constraint-panel-container">
 
-        <div>
+        <div class="control-panel">
           <h1>Constraints</h1>
 
-          <div class="control-panel">
-            <button id="copy-constraints-button" title="Copy constraint to clipboard"
-              class="image-button auxiliary-button">
-              <img src="img/copy-48.png" alt="Copy constraint">
-            </button>
-            <button id="clear-constraints-button" class="danger-button" title="Clear constraints">Clear</button>
-            <button id="undo-button" class="icon-button" title="undo" disabled>&#10554;</button>
-            <button id="redo-button" class="icon-button" title="redo" disabled
-              style="transform:rotateY(180deg)">&#10554;</button>
-          </div>
+          <span class="spacer"></span>
+
+          <button id="copy-constraints-button" title="Copy constraint to clipboard"
+            class="image-button auxiliary-button">
+            <img src="img/copy-48.png" alt="Copy constraint">
+          </button>
+          <button id="clear-constraints-button" class="danger-button" title="Clear constraints">Clear</button>
+          <button id="undo-button" class="icon-button" title="undo" disabled>&#10554;</button>
+          <button id="redo-button" class="icon-button" title="redo" disabled
+            style="transform:rotateY(180deg)">&#10554;</button>
         </div>
 
         <div class="two-column">
@@ -431,7 +433,7 @@ layout: null
 
             <form id="multi-value-cell-input">
               <fieldset tabindex="0" class="constraint-panel hide-until-load" disabled>
-                <h2>Set multiple values</h2>
+                <h2>Multiple values</h2>
                 <div></div>
               </fieldset>
             </form>
@@ -454,7 +456,7 @@ layout: null
                       <input type="checkbox" name="is-loop" id="multi-cell-constraint-loop-input"></input>
                       <label for="multi-cell-constraint-loop-input">Loop</label>
                     </div>
-                    <div class="multi-cell-constraint-footer">
+                    <div class="control-panel control-panel-spread">
                       <div id="multi-cell-constraint-value-container"></div>
                       <button type="submit" name="add-constraint" title="Add constraint" disabled>
                         Add
@@ -559,8 +561,8 @@ layout: null
                   <div class="constraint-code">
                     <div>
                       <div class="description">
-                        <code>// Return true if the cell values a and b are a</code>
-                        <code>// valid pair.</code>
+                        <code>// Return true if the cell values a and b are</code>
+                        <code>// a valid pair.</code>
                         <code>// Example: a &lt; b (thermometer constraint)</code>
                       </div>
                       <code>constraintCheck = (a, b) =&gt; </code>
@@ -611,7 +613,7 @@ layout: null
                   <div id="state-machine-split-input" class="constraint-code">
                     <div>
                       <div class="description">
-                        <code>// The initial state(s). Each state can be any</code>
+                        <code>// The initial state(s). States can be any</code>
                         <code>// JSON-serializable value, except arrays.</code>
                         <code>// Use an array for multiple start states.</code>
                       </div>
@@ -624,10 +626,10 @@ layout: null
                     </div>
                     <div>
                       <div class="description">
-                        <code>// transition takes the current state and cell</code>
-                        <code>// value and returns the next state, or an array</code>
-                        <code>// of states. Returning undefined or the empty</code>
-                        <code>// array generates no next states.</code>
+                        <code>// transition takes the current state and</code>
+                        <code>// cell value and returns the next state, or</code>
+                        <code>// an array of states. Returning undefined or</code>
+                        <code>// the empty array generates no next states.</code>
                       </div>
                       <code>function transition(state, value) {</code>
                       <textarea id="state-machine-transition-body" rows="10" name="transition-body" spellcheck="false"
@@ -636,8 +638,8 @@ layout: null
                     </div>
                     <div>
                       <div class="description">
-                        <code>// accept returns true when the state is a valid</code>
-                        <code>// final state.</code>
+                        <code>// accept returns true when the state is a</code>
+                        <code>// valid final state.</code>
                       </div>
                       <code>function accept(state) {</code>
                       <textarea id="state-machine-accept-body" rows="2" name="accept-body" spellcheck="false"
@@ -646,7 +648,7 @@ layout: null
                     </div>
                     <div>
                       <div class="description">
-                        <code>// Maximum depth for state creation (optional).</code>
+                        <code>// Max depth for state creation (optional).</code>
                       </div>
                       <span>
                         <code>maxDepth = </code>
@@ -691,7 +693,7 @@ function accept(state) {
                 </div>
                 <input type="hidden" name="id">
                 <div class="outside-arrow-clue-types"></div>
-                <div class="outside-clue-input-footer">
+                <div class="control-panel">
                   <input type="number" name="value" min=0 placeholder="value">
                   <button type="submit" title="Set constraint">Set</button>
                   <button type="button" id="outside-arrow-clear" class="danger-button"
@@ -707,7 +709,7 @@ function accept(state) {
             <fieldset tabindex="0" class="constraint-panel hide-until-load">
               <h2>Composite constraints</h2>
               <div>
-                <div>
+                <div class="control-panel">
                   <span class="description">
                     Select a composite constraint by clicking on its chip to
                     add constraints to it. Panels which allow constraints to be
