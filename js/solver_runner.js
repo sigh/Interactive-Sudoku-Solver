@@ -3,6 +3,13 @@
 // This module provides a DOM-independent way to run the solver with
 // different modes (all-possibilities, step-by-step, count, etc.)
 
+class AbortedError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = 'AbortedError';
+  }
+}
+
 // Session management for abort control.
 class SolverSession {
   constructor() {
@@ -105,7 +112,7 @@ class ModeHandler {
 
   handleSolverException(e) {
     // If the solver was terminated, then don't show an error.
-    if (!e.toString().startsWith('Aborted')) {
+    if (!(e instanceof AbortedError)) {
       throw e;
     }
   }
@@ -474,6 +481,7 @@ export class SolverRunner {
   }
 
   _handleException(e) {
+    if (e instanceof AbortedError) return;
     const msg = e?.toString?.() ?? String(e);
     if (msg.startsWith('Aborted')) return;
     this._onError('Solver Error: ' + msg);
@@ -801,7 +809,7 @@ export class SolverProxy {
     // we'll be waiting. Otherwise we can just release it to be reused.
     if (this._waiting) {
       worker.terminate();
-      this._waiting.reject('Aborted worker running: ' + this._waiting.method);
+      this._waiting.reject(new AbortedError('Aborted worker running: ' + this._waiting.method));
       this._statusHandler(false, 'terminate');
     } else {
       worker.release();
