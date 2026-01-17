@@ -482,8 +482,11 @@ export class SolverRunner {
 
   _handleException(e) {
     if (e instanceof AbortedError) return;
-    const msg = e?.toString?.() ?? String(e);
-    this._onError('Solver Error: ' + msg);
+    if (e?.name === 'InvalidConstraintError') {
+      this._onError('Invalid Constraint: ' + (e?.message ?? String(e)));
+    } else {
+      this._onError('Internal Solver Error: ' + (e?.toString?.() ?? String(e)));
+    }
   }
 
   // --- Solver state ---

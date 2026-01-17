@@ -1,6 +1,6 @@
 const { memoize, MultiMap, countOnes16bit } = await import('../util.js' + self.VERSION_PARAM);
 const { LookupTables } = await import('./lookup_tables.js' + self.VERSION_PARAM);
-const { SudokuConstraintHandler, HandlerUtil } = await import('./handlers.js' + self.VERSION_PARAM);
+const { SudokuConstraintHandler, HandlerUtil, InvalidConstraintError } = await import('./handlers.js' + self.VERSION_PARAM);
 const { SHAPE_MAX, SHAPE_9x9 } = await import('../grid_shape.js' + self.VERSION_PARAM);
 
 export class Sum extends SudokuConstraintHandler {
@@ -36,10 +36,10 @@ export class Sum extends SudokuConstraintHandler {
       coeffs = coeffs || Array(cells.length).fill(1);
 
       if (coeffs.length !== cells.length) {
-        throw new Error('Invalid number of coefficients: ' + coeffs.length);
+        throw new InvalidConstraintError('Invalid number of Sum coefficients: ' + coeffs.length);
       }
       if (!coeffs.every(c => Number.isInteger(c))) {
-        throw new Error('Coefficients must be integers');
+        throw new InvalidConstraintError('Sum coefficients must be integers');
       }
 
       // If there are duplicates, then update the coefficients.

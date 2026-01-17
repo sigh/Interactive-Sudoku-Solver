@@ -15,6 +15,13 @@ const { SHAPE_MAX } = await import('../grid_shape.js' + self.VERSION_PARAM);
 const { SudokuConstraintBase, fnToBinaryKey } = await import('../sudoku_constraint.js' + self.VERSION_PARAM);
 const { CandidateFinders } = await import('./candidate_selector.js' + self.VERSION_PARAM);
 
+export class InvalidConstraintError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = 'InvalidConstraintError';
+  }
+}
+
 export class SudokuConstraintHandler {
   static SINGLETON_HANDLER = false;
 
@@ -1172,7 +1179,7 @@ export class Skyscraper extends SudokuConstraintHandler {
     this._allStates = null;
 
     if (0 >= this._numVisible) {
-      throw new Error('Skyscraper visibility target must be > 0');
+      throw new InvalidConstraintError('Skyscraper visibility target must be > 0');
     }
   }
 
@@ -1438,7 +1445,7 @@ export class Lunchbox extends SudokuConstraintHandler {
     super(cells);
     sum = +sum;
     if (!Number.isInteger(sum) || sum < 0) {
-      throw new Error('Invalid sum for sandwich constraint: ' + sum);
+      throw new InvalidConstraintError('Invalid sum for sandwich constraint: ' + sum);
     }
 
     this._sum = sum;
@@ -1688,7 +1695,7 @@ export class SameValues extends SudokuConstraintHandler {
 
     const setLen = cellSets[0].length;
     if (!cellSets.every(s => s.length === setLen)) {
-      throw new Error('SameValues must use sets of the same length.');
+      throw new InvalidConstraintError('SameValues must use sets of the same length.');
     }
 
     super(cellSets.flat());
@@ -2345,7 +2352,7 @@ export class SumLine extends SudokuConstraintHandler {
 
     if (this._sum > 30) {
       // A sum of 30 fits within a 32-bit state.
-      throw new Error('SumLine sum must at most 30');
+      throw new InvalidConstraintError('SumLine sum must at most 30');
     }
 
     // Each state is a mask that represents the possible partial sums of a
@@ -2842,7 +2849,7 @@ export class FullRank extends SudokuConstraintHandler {
     const seenRanks = new Set();
     for (const clue of clues) {
       if (seenRanks.has(clue.rank)) {
-        throw new Error(`FullRank clue rank ${clue.rank} is not unique`);
+        throw new InvalidConstraintError(`FullRank clue rank ${clue.rank} is not unique`);
       }
       seenRanks.add(clue.rank);
     }
@@ -2867,7 +2874,7 @@ export class FullRank extends SudokuConstraintHandler {
   initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
     // FullRank requires square grids.
     if (shape.numRows !== shape.numValues || shape.numCols !== shape.numValues) {
-      throw new Error('FullRank requires a square grid with all values used.');
+      throw new InvalidConstraintError('FullRank requires a square grid with all values used.');
     }
     // Initialize entries.
     const entries = FullRank.buildEntries(shape);
@@ -3371,7 +3378,7 @@ export class Rellik extends SudokuConstraintHandler {
 export class EqualSizePartitions extends SudokuConstraintHandler {
   constructor(cells, partition1, partition2) {
     if (cells.length % 2 !== 0) {
-      throw new Error("EqualSizePartitions: 'cells' must have an even number of elements.");
+      throw new InvalidConstraintError("EqualSizePartitions: 'cells' must have an even number of elements.");
     }
     super(cells);
 
