@@ -182,7 +182,6 @@ body {
 
 .page-header-title {
   display: flex;
-  flex-direction: row;
   align-items: center;
   gap: 10px;
   font-size: var(--font-size-title);
@@ -259,12 +258,6 @@ body {
   margin-top: -5px;
 }
 
-#example-select-container {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-
 #example-select-container select {
   margin-top: 0px;
   width: 200px;
@@ -311,7 +304,7 @@ button,
   border: 1px solid var(--button-border-color);
   background: var(--button-bg);
 
-  padding: 6px 14px;
+  padding: 5px 10px;
   transition: background-color 0.15s, box-shadow 0.15s;
 }
 
@@ -483,7 +476,7 @@ button.icon-button,
   border-radius: 5px;
   padding: 4px 8px;
   border: 1px solid var(--color-border);
-  width: fit-content;
+  overflow: scroll;
 }
 
 .notice:empty {
@@ -662,13 +655,6 @@ button.icon-button,
   margin: 0;
 }
 
-#constraint-panel-container>div:first-child {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  justify-content: space-between;
-}
-
 #constraint-panel-container .panel-edge-constraints {
   margin-right: 10px;
   gap: 2px;
@@ -686,21 +672,8 @@ button.icon-button,
   line-height: 1;
 }
 
-#outside-clue-input .description {
-  padding: 5px 0px;
-}
-
-#outside-clue-input .outside-clue-input-footer {
-  display: flex;
-  align-items: center;
-  column-gap: 15px;
-  margin-top: 10px;
-}
-
-#composite-constraint-input .collapsible-body>div:first-child {
-  display: flex;
-  align-items: center;
-  gap: 10px;
+#outside-clue-input .collapsible-body>* {
+  margin-top: 5px;
 }
 
 #composite-constraint-input button {
@@ -804,10 +777,6 @@ textarea {
   width: 40px;
 }
 
-.control-panel button.danger-button {
-  padding: 5px 10px;
-}
-
 .control-panel.control-panel-spread {
   justify-content: space-between;
 }
@@ -817,12 +786,6 @@ textarea {
   display: flex;
   gap: 2px;
   flex-direction: column;
-}
-
-#solution-control-panel #solution-control-buttons {
-  display: flex;
-  align-items: center;
-  gap: 10px;
 }
 
 #solution-control-panel #solution-iteration-state {
@@ -978,6 +941,7 @@ hr {
   border: 0;
   border-top: 1px solid var(--color-border-light);
   width: 100%;
+  margin: 0;
 }
 
 a {
@@ -1225,12 +1189,6 @@ h3 {
   width: 100%;
 }
 
-#multi-cell-constraint-input .multi-cell-constraint-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
 #multi-cell-constraint-input #multi-cell-constraint-loop-container {
   margin-bottom: -10px;
 }
@@ -1253,10 +1211,7 @@ h3 {
 }
 
 #multi-value-cell-input .multi-value-input-option {
-  width: 100%;
   display: inline-flex;
-  align-items: center;
-  gap: 5px;
 }
 
 #multi-value-cell-input .multi-value-input-option .button {
@@ -1275,7 +1230,7 @@ h3 {
 
 #multi-value-cell-input .multi-value-input-control {
   margin: 5px 10px;
-  padding: 5px;
+  padding: 5px 0;
 }
 
 .tab-container {

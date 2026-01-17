@@ -180,7 +180,7 @@ const CATEGORY_CONFIGS = {
     instructions: `
       Select a cell by clicking on it then typing to enter a value or backspace
       to clear the cells.
-      Use the "Set multiple values" panel to set more than one value.
+      Use the "Multiple values" panel to set more than one value.
       Select extra cells by dragging, or shift-clicking.`
   },
   'Pairwise': {
