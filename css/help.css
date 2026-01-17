@@ -8,7 +8,8 @@
   /* Sticky header offset for the help page (approx header height). */
   --help-sticky-header-height: 60px;
 
-  --font-family-mono: monospace;
+  --font-size-header: 18px;
+  --font-size-header-small: 16px;
 }
 
 /* Keep the help page header visible while scrolling. */
@@ -40,12 +41,10 @@ h2 {
   margin: 40px 0 20px 0;
   padding-bottom: 10px;
   border-bottom: 3px solid var(--primary-color);
-  font-size: 1.5em;
 }
 
 h3 {
   margin: 20px 0 10px 0;
-  font-size: 1.2em;
   padding-bottom: 5px;
   border-bottom: 2px solid var(--border-color);
 }
@@ -88,7 +87,7 @@ pre {
   border-left: 3px solid var(--primary-color);
   overflow-x: auto;
   font-family: var(--font-family-mono);
-  font-size: 0.9em;
+  font-size: var(--font-size-small);
   line-height: 1.5;
 }
 
@@ -161,11 +160,10 @@ pre.code-with-copy>button.copy-button {
 .instructions {
   color: var(--text-medium);
   font-style: italic;
-  font-size: 0.9em;
   line-height: 1.6;
   padding: 15px;
-  background-color: var(--background-blue);
-  border-left: 3px solid var(--primary-color);
+  background-color: var(--color-background-special);
+  border-left: 3px solid var(--color-border-special);
   border-radius: 4px;
   white-space: pre-line;
   margin: 0;
