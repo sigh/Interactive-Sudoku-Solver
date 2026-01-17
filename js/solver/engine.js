@@ -931,6 +931,25 @@ class InternalSolver {
     // Choose just the house handlers.
     const houseHandlers = this._handlerSet.getAllofType(HandlerModule.House);
 
+    const finalize = (result) => {
+      this.done = true;
+      if (!result) return null;
+
+      this.counters.branchesIgnored = 1 - this.counters.progressRatio;
+      return SudokuSolverUtil.gridToSolution(result.grid);
+    };
+
+    // Non-standard grids may not have any house handlers (e.g. when there are
+    // more values than rows/cols). In that case, validate by simply finding any
+    // solution under the full constraint set.
+    if (houseHandlers.length === 0) {
+      this._resetRun();
+      for (const result of this.run(InternalSolver.YIELD_ON_SOLUTION)) {
+        return finalize(result);
+      }
+      return finalize(null);
+    }
+
     // Function to fill a house with all values.
     const fillHouse = (house) => {
       this._initialGridState.set(originalInitialGridState);
@@ -941,14 +960,6 @@ class InternalSolver {
     // Arbitrary search limit. Too much lower and there are some cases which get
     // stuck for too long.
     const SEARCH_LIMIT = 200;
-
-    const finalize = (result) => {
-      this.done = true;
-      if (!result) return null;
-
-      this.counters.branchesIgnored = 1 - this.counters.progressRatio;
-      return SudokuSolverUtil.gridToSolution(result.grid);
-    };
 
     // Function to attempt to solve with one house fixed.
     const attempt = (house) => {

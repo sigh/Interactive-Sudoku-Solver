@@ -210,11 +210,16 @@ const getDefaultPuzzleRunner = memoize(() => {
 
 export const runValidateLayoutTests = async (onFailure, runner) => {
   const activeRunner = runner || getDefaultPuzzleRunner();
-  const cases = [].concat(
-    VALID_JIGSAW_LAYOUTS.slice(0, 20),
-    EASY_INVALID_JIGSAW_LAYOUTS,
-    FAST_INVALID_JIGSAW_LAYOUTS.slice(0, 20),
-    VALID_JIGSAW_BOX_LAYOUTS.slice(0, 10));
+  const cases = [
+    ...VALID_JIGSAW_LAYOUTS.slice(0, 20),
+    ...EASY_INVALID_JIGSAW_LAYOUTS,
+    ...FAST_INVALID_JIGSAW_LAYOUTS.slice(0, 20),
+    ...VALID_JIGSAW_BOX_LAYOUTS.slice(0, 10),
+    // Add non-standard grid tests.
+    { input: '.Shape~7x7', solution: true },
+    { input: '.Shape~6x6~9', solution: true },
+    { input: '.Shape~7x6~9', solution: true },
+  ];
   const result = await activeRunner.runValidateLayout(cases, onFailure);
   result.collection = 'Jigsaw layouts';
   return [result];
