@@ -22,7 +22,47 @@ layout: null
   </script>
   <style type="text/css" media="screen">
     .hide-until-load {
-      display: none !important;
+      /* Show a lightweight skeleton until JS finishes initializing. */
+      position: relative;
+      overflow: hidden;
+      height: var(--skeleton-height, 0px);
+      background: #e9edf2;
+      box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+    }
+
+    .hide-until-load.constraint-panel {
+      --skeleton-height: 30px;
+    }
+
+    #sudoku-grid.hide-until-load {
+      --skeleton-height: 526px;
+      width: var(--skeleton-height);
+    }
+
+    .hide-until-load>* {
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+    .hide-until-load::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(90deg,
+          rgba(255, 255, 255, 0) 0%,
+          rgba(255, 255, 255, 0.25) 50%,
+          rgba(255, 255, 255, 0) 100%);
+      animation: skeleton-shimmer 1.2s ease-in-out infinite;
+    }
+
+    @keyframes skeleton-shimmer {
+      0% {
+        transform: translateX(-100%);
+      }
+
+      100% {
+        transform: translateX(100%);
+      }
     }
   </style>
 
@@ -213,7 +253,7 @@ layout: null
                 <option value="step-by-step">Step-by-step</option>
                 <option value="validate-layout">Validate layout</option>
               </select>
-              <div id="candidate-support-threshold-container">
+              <div id="candidate-support-threshold-container" class="hide-until-load">
                 <label for="candidate-support-threshold">
                   Value count limit
                   <span class="tooltip" data-text="
@@ -229,7 +269,7 @@ layout: null
               </div>
               <div id="solve-mode-description" class="description"></div>
             </div>
-            <div id="state-output"></div>
+            <div id="state-output" class="hide-until-load" style="--skeleton-height:380px;"></div>
             <div>
               <div id="progress-container">
                 <progress value=0 id="solve-progress"></progress>
@@ -253,11 +293,11 @@ layout: null
           </div>
 
           <div id="sudoku-grid-with-controls">
-            <div id="sudoku-grid">
+            <div id="sudoku-grid" class="hide-until-load">
               <input id="fake-input" inputmode="numeric" type="text" value="x">
             </div>
             <div class="control-panel control-panel-spread">
-              <div id="solution-control-panel">
+              <div id="solution-control-panel" class="hide-until-load" style="--skeleton-height:50px;">
                 <div id="solution-iteration-state"></div>
                 <div id="solution-control-buttons">
                   <button id="solution-start" class="icon-button" title="start (s)">&#171;</button>
@@ -342,7 +382,7 @@ layout: null
       </span>
 
       <form id="freeform-constraint-input">
-        <div id="freeform-constraint-panel" class="constraint-panel">
+        <div id="freeform-constraint-panel" class="constraint-panel hide-until-load">
           <h2>Load constraint from text</h2>
           <div>
             <div>
@@ -385,18 +425,18 @@ layout: null
           </div>
         </div>
 
-        <div class="two-column hide-until-load">
+        <div class="two-column">
           <div>
 
             <form id="multi-value-cell-input">
-              <fieldset tabindex="0" class="constraint-panel" disabled>
+              <fieldset tabindex="0" class="constraint-panel hide-until-load" disabled>
                 <h2>Set multiple values</h2>
                 <div></div>
               </fieldset>
             </form>
 
             <form id="multi-cell-constraint-input">
-              <fieldset tabindex="0" class="constraint-panel">
+              <fieldset tabindex="0" class="constraint-panel hide-until-load">
                 <h2>Lines & Sets</h2>
                 <div>
                   <div>
@@ -451,7 +491,7 @@ layout: null
               </h2>
             </div>
 
-            <div class="constraint-panel" id="global-constraints-container">
+            <div class="constraint-panel hide-until-load" id="global-constraints-container">
               <h2>Global constraints</h2>
               <div id="global-constraint-checkboxes"></div>
             </div>
@@ -480,8 +520,8 @@ layout: null
           </div>
         </div>
 
-        <form id="custom-constraint-input" class="hide-until-load">
-          <fieldset id="custom-constraint-panel" tabindex="0" class="constraint-panel">
+        <form id="custom-constraint-input">
+          <fieldset id="custom-constraint-panel" tabindex="0" class="constraint-panel hide-until-load">
             <h2>Custom JavaScript constraints</h2>
             <div>
               <div class="tab-container">
@@ -640,9 +680,9 @@ function accept(state) {
           </fieldset>
         </form>
 
-        <div class="hide-until-load">
+        <div>
           <form id="outside-clue-input">
-            <fieldset tabindex="0" class="constraint-panel" disabled>
+            <fieldset tabindex="0" class="constraint-panel hide-until-load" disabled>
               <h2>Outside clues</h2>
               <div>
                 <div class="description">
@@ -661,9 +701,9 @@ function accept(state) {
           </form>
         </div>
 
-        <div class="hide-until-load">
+        <div>
           <form id="composite-constraint-input">
-            <fieldset tabindex="0" class="constraint-panel">
+            <fieldset tabindex="0" class="constraint-panel hide-until-load">
               <h2>Composite constraints</h2>
               <div>
                 <div>

@@ -1167,7 +1167,7 @@ class Selection {
 
     const endPointerSelection = (e) => {
       if (activePointerId === null) return;
-      if (e && e.pointerId !== activePointerId) return;
+      if (e?.pointerId !== activePointerId) return;
 
       container.removeEventListener('pointermove', pointerMoveFn);
       this._runCallback(true);
