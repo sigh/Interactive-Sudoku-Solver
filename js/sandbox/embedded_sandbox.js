@@ -270,7 +270,7 @@ export class EmbeddedSandbox {
 
     const copyBtn = document.createElement('button');
     copyBtn.type = 'button';
-    copyBtn.className = 'copy-button';
+    copyBtn.className = 'copy-button plain-button';
     copyBtn.title = 'Copy constraint to clipboard';
     copyBtn.setAttribute('aria-label', 'Copy constraint to clipboard');
 

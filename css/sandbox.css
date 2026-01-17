@@ -71,42 +71,9 @@
   padding: 3px;
 }
 
-#sandbox-container .solver-link-with-copy button img {
+#sandbox-container .sandbox-output .solver-link-with-copy img {
   width: 12px;
   height: 12px;
-}
-
-#sandbox-container .sandbox-status .solver-link-with-copy button img {
-  width: 16px;
-  height: 16px;
-}
-
-/* Copy button */
-#sandbox-container .copy-button {
-  flex-shrink: 0;
-  background: transparent;
-  border: none;
-  padding: 4px;
-  margin: -4px -4px -4px -4px;
-  cursor: pointer;
-  opacity: 0.5;
-  border-radius: 4px;
-  transition: opacity 0.2s, background-color 0.2s;
-  text-shadow: none;
-  box-shadow: none;
-}
-
-#sandbox-container .copy-button:hover,
-#sandbox-container .copy-button:hover:enabled {
-  opacity: 1;
-  background: rgba(0, 0, 0, 0.1);
-}
-
-#sandbox-container .copy-button img {
-  width: 16px;
-  height: 16px;
-  display: block;
-  filter: none;
 }
 
 #sandbox-container .sandbox-body {

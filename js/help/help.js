@@ -137,7 +137,7 @@ const addCopyButtonsToCodeBlocks = () => {
     pre.classList.add('code-with-copy');
 
     const copyBtn = document.createElement('button');
-    copyBtn.className = 'copy-button';
+    copyBtn.className = 'copy-button plain-button';
     copyBtn.title = 'Copy to clipboard';
 
     const copyIcon = document.createElement('img');
