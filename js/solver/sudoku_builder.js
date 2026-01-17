@@ -6,6 +6,8 @@ const HandlerModule = await import('./handlers.js' + self.VERSION_PARAM);
 const SumHandlerModule = await import('./sum_handler.js' + self.VERSION_PARAM);
 const NFAHandlerModule = await import('./nfa_handler.js' + self.VERSION_PARAM);
 
+const { InvalidConstraintError } = HandlerModule;
+
 export class SudokuBuilder {
   static build(constraint, debugOptions) {
     const shape = constraint.getShape();
@@ -138,7 +140,7 @@ export class SudokuBuilder {
     for (const constraint of constraints) {
       // Validate constraint is compatible with the shape.
       if (constraint.constructor.REQUIRE_SQUARE_GRID && !shape.isSquare()) {
-        throw Error(
+        throw new InvalidConstraintError(
           `${constraint.constructor.displayName()} requires a square grid, ` +
           `but the grid is ${shape.name}.`);
       }
@@ -176,12 +178,12 @@ export class SudokuBuilder {
         case 'Jigsaw':
           {
             if (constraint.gridSpec !== shape.name) {
-              throw Error(
+              throw new InvalidConstraintError(
                 `Jigsaw gridSpec ${constraint.gridSpec} does not match ` +
                 `puzzle shape ${shape.name}`);
             }
             if (!shape.isDefaultNumValues()) {
-              throw Error(
+              throw new InvalidConstraintError(
                 `Jigsaw constraint requires standard grid numbers for ` +
                 `${shape.name}`);
             }
@@ -194,7 +196,7 @@ export class SudokuBuilder {
 
         case 'Diagonal':
           if (!shape.isSquare()) {
-            throw Error('Diagonal constraint requires a square grid');
+            throw new InvalidConstraintError('Diagonal constraint requires a square grid');
           }
           cells = [];
           for (let r = 0; r < shape.numRows; r++) {
@@ -227,7 +229,7 @@ export class SudokuBuilder {
           {
             const pillSize = constraint.pillSize;
             if (pillSize != 2 && pillSize != 3) {
-              throw new Error('Pill size must be 2 or 3');
+              throw new InvalidConstraintError('Pill size must be 2 or 3');
             }
             const cells = (
               constraint.cells.map(c => shape.parseCellId(c).cell));
@@ -313,7 +315,7 @@ export class SudokuBuilder {
         case 'LittleKiller':
           cells = constraint.getCells(shape)?.map(
             c => shape.parseCellId(c).cell);
-          if (!cells) throw Error('Invalid Little Killer line: ' + constraint.arrowId);
+          if (!cells) throw new InvalidConstraintError('Invalid Little Killer line: ' + constraint.arrowId);
           yield new SumHandlerModule.Sum(
             cells, constraint.value);
           break;
@@ -758,7 +760,7 @@ export class SudokuBuilder {
           break;
 
         default:
-          throw new Error('Unknown constraint type: ' + constraint.type);
+          throw new InvalidConstraintError('Unknown constraint type: ' + constraint.type);
       }
     }
   }
