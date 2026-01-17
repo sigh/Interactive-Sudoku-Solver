@@ -535,10 +535,11 @@ export class SolutionController {
     // Set up download handler
     this._elements.download.disabled = true;  // Will be enabled after solve starts
 
+    // Node: modeHandler can be null if initialization failed.
     const modeHandler = await this._solverRunner.solve(constraints, { mode, debugHandler });
 
     // Update download button based on handler capabilities
-    if (modeHandler.ALLOW_DOWNLOAD) {
+    if (modeHandler?.ALLOW_DOWNLOAD) {
       this._elements.download.disabled = false;
       this._elements.download.onclick = () => {
         const solutions = modeHandler.solutions();
@@ -547,7 +548,7 @@ export class SolutionController {
     }
 
     // Show iteration controls if supported
-    if (modeHandler.ITERATION_CONTROLS) {
+    if (modeHandler?.ITERATION_CONTROLS) {
       this._showIterationControls(true);
     }
   }
