@@ -176,9 +176,12 @@ body {
   opacity: 0.2;
 }
 
-#page-header {
+#page-header,
+.constraint-panel-header {
   padding: 5px 10px;
   background: var(--color-primary-soft);
+  border-radius: 2px;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.06), 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
 .page-header-logo {
@@ -628,12 +631,14 @@ button.copy-to-clipboard-failed::after {
   overflow-y: auto;
   overflow-x: hidden;
   padding-inline: var(--constraint-panel-glow-size);
-}
 
-.constraint-panel-header {
-  background: var(--color-primary-soft);
-  padding: 5px;
-  border-radius: 2px;
+  /* Extra whitespace so the last controls can be scrolled up while the grid
+     remains in view. (Doesn't change layout; only affects scroll range.) */
+  padding-bottom: max(200px, 50vh);
+  padding-top: var(--gap-default);
+
+  /* Visual cue for the bottom edge of the scrollable region. */
+  box-shadow: inset 0 -8px 8px -8px rgba(0, 0, 0, 0.25);
 }
 
 #constraint-panel-container form {
