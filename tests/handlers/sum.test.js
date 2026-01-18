@@ -6,7 +6,7 @@ import {
   setupConstraintTest,
   createCellExclusions,
   createAccumulator,
-  mask,
+  valueMask,
   applyCandidates,
   initializeConstraintHandler,
 } from '../helpers/constraint_test_utils.js';
@@ -48,10 +48,10 @@ await runTest('Sum should force a unique combination once candidates align', () 
   const result = handler.enforceConsistency(grid, createAccumulator());
 
   assert.equal(result, true);
-  assert.equal(grid[0], mask(2));
-  assert.equal(grid[1], mask(3));
-  assert.equal(grid[2], mask(4));
-  assert.equal(grid[3], mask(5));
+  assert.equal(grid[0], valueMask(2));
+  assert.equal(grid[1], valueMask(3));
+  assert.equal(grid[2], valueMask(4));
+  assert.equal(grid[3], valueMask(5));
 });
 
 await runTest('Sum should reject impossible cages', () => {
@@ -79,10 +79,10 @@ await runTest('Sum should solve mixed coefficient cages with negative terms', ()
   const result = handler.enforceConsistency(grid, createAccumulator());
 
   assert.equal(result, true, 'handler should solve the linear equation');
-  assert.equal(grid[0], mask(4), 'first cell forced by coefficient scaling');
-  assert.equal(grid[1], mask(1), 'second cell forced by negative coefficient');
-  assert.equal(grid[2], mask(2), 'fixed term should remain consistent');
-  assert.equal(grid[3], mask(3), 'final cell resolved by remaining balance');
+  assert.equal(grid[0], valueMask(4), 'first cell forced by coefficient scaling');
+  assert.equal(grid[1], valueMask(1), 'second cell forced by negative coefficient');
+  assert.equal(grid[2], valueMask(2), 'fixed term should remain consistent');
+  assert.equal(grid[3], valueMask(3), 'final cell resolved by remaining balance');
 });
 
 await runTest('Sum should resolve cages with more than three unfixed cells', () => {
@@ -98,10 +98,10 @@ await runTest('Sum should resolve cages with more than three unfixed cells', () 
   const result = handler.enforceConsistency(grid, accumulator);
 
   assert.equal(result, true, 'handler should keep solvable cages valid');
-  assert.equal(grid[0], mask(8));
-  assert.equal(grid[1], mask(7));
-  assert.equal(grid[2], mask(3));
-  assert.equal(grid[3], mask(4));
+  assert.equal(grid[0], valueMask(8));
+  assert.equal(grid[1], valueMask(7));
+  assert.equal(grid[2], valueMask(3));
+  assert.equal(grid[3], valueMask(4));
 });
 
 await runTest('Sum should handle cages longer than fifteen cells', () => {
@@ -125,9 +125,9 @@ await runTest('Sum should handle cages longer than fifteen cells', () => {
   const result = handler.enforceConsistency(grid, createAccumulator());
 
   assert.equal(result, true, 'handler should solve long cages');
-  assert.equal(grid[12], mask(13));
-  assert.equal(grid[13], mask(14));
-  assert.equal(grid[14], mask(15));
+  assert.equal(grid[12], valueMask(13));
+  assert.equal(grid[13], valueMask(14));
+  assert.equal(grid[14], valueMask(15));
 });
 
 await runTest('Sum should restrict values based on complement cells', () => {
@@ -147,8 +147,8 @@ await runTest('Sum should restrict values based on complement cells', () => {
   const result = handler.enforceConsistency(grid, createAccumulator());
 
   assert.equal(result, true, 'handler should remain consistent with complement data');
-  assert.equal(grid[0], mask(1, 9), 'only digits paired with complement availability should remain');
-  assert.equal(grid[1], mask(1, 9));
+  assert.equal(grid[0], valueMask(1, 9), 'only digits paired with complement availability should remain');
+  assert.equal(grid[1], valueMask(1, 9));
 });
 
 await runTest('Sum should prohibit repeated digits when cells are mutually exclusive', () => {
@@ -166,10 +166,10 @@ await runTest('Sum should prohibit repeated digits when cells are mutually exclu
 
   const result = handler.enforceConsistency(grid, createAccumulator());
   assert.equal(result, true, 'handler should remain consistent under uniqueness constraints');
-  assert.equal(grid[0], mask(1, 3));
-  assert.equal(grid[1], mask(1, 3));
-  assert.equal(grid[2], mask(5));
-  assert.equal(grid[3], mask(6));
+  assert.equal(grid[0], valueMask(1, 3));
+  assert.equal(grid[1], valueMask(1, 3));
+  assert.equal(grid[2], valueMask(5));
+  assert.equal(grid[3], valueMask(6));
 });
 
 await runTest('Sum should allow repeated digits when cells are non-exclusive', () => {
@@ -187,10 +187,10 @@ await runTest('Sum should allow repeated digits when cells are non-exclusive', (
 
   const result = handler.enforceConsistency(grid, createAccumulator());
   assert.equal(result, true, 'non-exclusive cages can reuse digits');
-  assert.equal(grid[0], mask(1, 2, 3));
-  assert.equal(grid[1], mask(1, 2, 3));
-  assert.equal(grid[2], mask(5));
-  assert.equal(grid[3], mask(6));
+  assert.equal(grid[0], valueMask(1, 2, 3));
+  assert.equal(grid[1], valueMask(1, 2, 3));
+  assert.equal(grid[2], valueMask(5));
+  assert.equal(grid[3], valueMask(6));
 });
 
 await runTest('Sum should reject cages with sums above the maximum', () => {

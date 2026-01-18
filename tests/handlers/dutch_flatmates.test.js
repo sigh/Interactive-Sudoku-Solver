@@ -6,7 +6,7 @@ import {
   setupConstraintTest,
   createAccumulator,
   createCellExclusions,
-  mask,
+  valueMask,
 } from '../helpers/constraint_test_utils.js';
 
 ensureGlobalEnvironment();
@@ -27,16 +27,16 @@ await runTest('DutchFlatmateLine should remove target from a cell with no valid 
   assert.equal(handler.initialize(grid, createCellExclusions({ numCells: 3 }), context.shape, {}), true);
 
   // Middle cell can be 5, but neighbors can be neither 1 nor 9.
-  grid[0] = mask(2, 3, 4);
-  grid[1] = mask(5, 6);
-  grid[2] = mask(2, 3, 4);
+  grid[0] = valueMask(2, 3, 4);
+  grid[1] = valueMask(5, 6);
+  grid[2] = valueMask(2, 3, 4);
 
   const acc = createAccumulator();
   const result = handler.enforceConsistency(grid, acc);
 
   assert.equal(result, true);
-  assert.equal(grid[1] & mask(5), 0, 'target value should be removed');
-  assert.equal(grid[1], mask(6), 'other values should remain');
+  assert.equal(grid[1] & valueMask(5), 0, 'target value should be removed');
+  assert.equal(grid[1], valueMask(6), 'other values should remain');
 });
 
 await runTest('DutchFlatmateLine should fail if removing target wipes out a cell', () => {
@@ -47,9 +47,9 @@ await runTest('DutchFlatmateLine should fail if removing target wipes out a cell
   const grid = context.createGrid();
   assert.equal(handler.initialize(grid, createCellExclusions({ numCells: 3 }), context.shape, {}), true);
 
-  grid[0] = mask(2, 3, 4);
-  grid[1] = mask(5); // only target
-  grid[2] = mask(2, 3, 4);
+  grid[0] = valueMask(2, 3, 4);
+  grid[1] = valueMask(5); // only target
+  grid[2] = valueMask(2, 3, 4);
 
   const acc = createAccumulator();
   const result = handler.enforceConsistency(grid, acc);
@@ -69,15 +69,15 @@ await runTest('DutchFlatmateLine should force above flatmate when target is fixe
   const grid = context.createGrid();
   assert.equal(handler.initialize(grid, createCellExclusions({ numCells: 3 }), context.shape, {}), true);
 
-  grid[0] = mask(1, 2); // can be above
-  grid[1] = mask(5); // fixed to target
-  grid[2] = mask(2, 3, 4); // cannot be below=9
+  grid[0] = valueMask(1, 2); // can be above
+  grid[1] = valueMask(5); // fixed to target
+  grid[2] = valueMask(2, 3, 4); // cannot be below=9
 
   const acc = createAccumulator();
   const result = handler.enforceConsistency(grid, acc);
 
   assert.equal(result, true);
-  assert.equal(grid[0], mask(1), 'left neighbor should be forced to above (1)');
+  assert.equal(grid[0], valueMask(1), 'left neighbor should be forced to above (1)');
 });
 
 await runTest('DutchFlatmateLine should force below flatmate when target is fixed and only below is possible', () => {
@@ -88,15 +88,15 @@ await runTest('DutchFlatmateLine should force below flatmate when target is fixe
   const grid = context.createGrid();
   assert.equal(handler.initialize(grid, createCellExclusions({ numCells: 3 }), context.shape, {}), true);
 
-  grid[0] = mask(2, 3, 4); // cannot be above=1
-  grid[1] = mask(5); // fixed to target
-  grid[2] = mask(8, 9); // can be below
+  grid[0] = valueMask(2, 3, 4); // cannot be above=1
+  grid[1] = valueMask(5); // fixed to target
+  grid[2] = valueMask(8, 9); // can be below
 
   const acc = createAccumulator();
   const result = handler.enforceConsistency(grid, acc);
 
   assert.equal(result, true);
-  assert.equal(grid[2], mask(9), 'right neighbor should be forced to below (9)');
+  assert.equal(grid[2], valueMask(9), 'right neighbor should be forced to below (9)');
 });
 
 // =============================================================================
@@ -111,14 +111,14 @@ await runTest('DutchFlatmateLine should prune target at an edge if the only neig
   const grid = context.createGrid();
   assert.equal(handler.initialize(grid, createCellExclusions({ numCells: 2 }), context.shape, {}), true);
 
-  grid[0] = mask(5, 6);
-  grid[1] = mask(2, 3, 4); // cannot be 1 or 9
+  grid[0] = valueMask(5, 6);
+  grid[1] = valueMask(2, 3, 4); // cannot be 1 or 9
 
   const acc = createAccumulator();
   const result = handler.enforceConsistency(grid, acc);
 
   assert.equal(result, true);
-  assert.equal(grid[0], mask(6), 'target should be removed from the edge cell');
+  assert.equal(grid[0], valueMask(6), 'target should be removed from the edge cell');
 });
 
 // =============================================================================
@@ -136,22 +136,22 @@ await runTest('DutchFlatmateLine should work on short lines where the below valu
   assert.equal(handler.initialize(grid, createCellExclusions({ numCells: 6 }), context.shape, {}), true);
 
   // Remove 8 everywhere.
-  for (let i = 0; i < 6; i++) grid[i] &= ~mask(8);
+  for (let i = 0; i < 6; i++) grid[i] &= ~valueMask(8);
 
   // Fix target (ceil(8/2) = 4) at index 2.
-  grid[2] = mask(4);
+  grid[2] = valueMask(4);
 
   // Only valid flatmate is above (1) on the left.
-  grid[1] = mask(1, 2);
-  grid[3] = mask(2, 3, 5, 6, 7); // cannot be 1; 8 already removed
+  grid[1] = valueMask(1, 2);
+  grid[3] = valueMask(2, 3, 5, 6, 7); // cannot be 1; 8 already removed
 
   const acc = createAccumulator();
   const result = handler.enforceConsistency(grid, acc);
 
   assert.equal(result, true);
-  assert.equal(grid[1], mask(1), 'should force the available flatmate (1)');
+  assert.equal(grid[1], valueMask(1), 'should force the available flatmate (1)');
   for (let i = 0; i < 6; i++) {
-    assert.equal(grid[i] & mask(8), 0, 'below value should remain impossible');
+    assert.equal(grid[i] & valueMask(8), 0, 'below value should remain impossible');
   }
 });
 
@@ -164,10 +164,10 @@ await runTest('DutchFlatmateLine should fail when neither flatmate value can exi
   assert.equal(handler.initialize(grid, createCellExclusions({ numCells: 3 }), context.shape, {}), true);
 
   // Remove both flatmate values (above=1 and below=8) everywhere.
-  for (let i = 0; i < 3; i++) grid[i] &= ~(mask(1) | mask(8));
+  for (let i = 0; i < 3; i++) grid[i] &= ~(valueMask(1) | valueMask(8));
 
   // Target is 4 and is forced in the middle.
-  grid[1] = mask(4);
+  grid[1] = valueMask(4);
 
   const acc = createAccumulator();
   const result = handler.enforceConsistency(grid, acc);

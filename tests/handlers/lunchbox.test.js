@@ -6,7 +6,7 @@ import {
   setupConstraintTest,
   createAccumulator,
   createCellExclusions,
-  mask,
+  valueMask,
 } from '../helpers/constraint_test_utils.js';
 
 ensureGlobalEnvironment();
@@ -59,10 +59,10 @@ await runTest('Lunchbox should fail when no valid border placement exists', () =
 
   const grid = new Uint16Array(4);
   // Force borders to be adjacent (distance 1) - can't fit 2+3 inside
-  grid[0] = mask(1); // Border
-  grid[1] = mask(4); // Border
-  grid[2] = mask(2, 3);
-  grid[3] = mask(2, 3);
+  grid[0] = valueMask(1); // Border
+  grid[1] = valueMask(4); // Border
+  grid[2] = valueMask(2, 3);
+  grid[3] = valueMask(2, 3);
   const acc = createAccumulator();
 
   const result = handler.enforceConsistency(grid, acc);
@@ -78,10 +78,10 @@ await runTest('Lunchbox should pass with valid configuration', () => {
   handler.initialize(context.createGrid(), createCellExclusions({ numCells: 4 }), context.shape, {});
 
   const grid = new Uint16Array(4);
-  grid[0] = mask(1); // Border
-  grid[1] = mask(2); // Inner
-  grid[2] = mask(3); // Inner
-  grid[3] = mask(4); // Border
+  grid[0] = valueMask(1); // Border
+  grid[1] = valueMask(2); // Inner
+  grid[2] = valueMask(3); // Inner
+  grid[3] = valueMask(4); // Border
   const acc = createAccumulator();
 
   const result = handler.enforceConsistency(grid, acc);
@@ -98,10 +98,10 @@ await runTest('Lunchbox should handle valid setup with multiple options', () => 
   handler.initialize(context.createGrid(), createCellExclusions({ numCells: 4 }), context.shape, {});
 
   const grid = new Uint16Array(4);
-  grid[0] = mask(1, 2, 3, 4); // All values possible
-  grid[1] = mask(1, 2, 3, 4);
-  grid[2] = mask(1, 2, 3, 4);
-  grid[3] = mask(1, 2, 3, 4);
+  grid[0] = valueMask(1, 2, 3, 4); // All values possible
+  grid[1] = valueMask(1, 2, 3, 4);
+  grid[2] = valueMask(1, 2, 3, 4);
+  grid[3] = valueMask(1, 2, 3, 4);
   const acc = createAccumulator();
 
   const result = handler.enforceConsistency(grid, acc);
@@ -117,10 +117,10 @@ await runTest('Lunchbox should handle sum of 0 (borders adjacent)', () => {
   handler.initialize(context.createGrid(), createCellExclusions({ numCells: 4 }), context.shape, {});
 
   const grid = new Uint16Array(4);
-  grid[0] = mask(1, 4);
-  grid[1] = mask(1, 2, 3, 4);
-  grid[2] = mask(1, 2, 3, 4);
-  grid[3] = mask(1, 4);
+  grid[0] = valueMask(1, 4);
+  grid[1] = valueMask(1, 2, 3, 4);
+  grid[2] = valueMask(1, 2, 3, 4);
+  grid[3] = valueMask(1, 4);
   const acc = createAccumulator();
 
   const result = handler.enforceConsistency(grid, acc);
@@ -142,7 +142,7 @@ await runTest('Lunchbox should work on short rows (numCells < numValues)', () =>
 
   const grid = new Uint16Array(6);
   for (let i = 0; i < 6; i++) {
-    grid[i] = mask(1, 2, 3, 4, 5, 6, 7, 8);
+    grid[i] = valueMask(1, 2, 3, 4, 5, 6, 7, 8);
   }
   const acc = createAccumulator();
 
@@ -162,12 +162,12 @@ await runTest('Lunchbox should work with more cells than values (house)', () => 
   // Set up a valid house configuration
   // Borders are 1 and 6, sum = 2+3 = 5
   const grid = new Uint16Array(6);
-  grid[0] = mask(1);     // Border
-  grid[1] = mask(2);     // Inside: 2
-  grid[2] = mask(3);     // Inside: 3
-  grid[3] = mask(6);     // Border
-  grid[4] = mask(4);
-  grid[5] = mask(5);
+  grid[0] = valueMask(1);     // Border
+  grid[1] = valueMask(2);     // Inside: 2
+  grid[2] = valueMask(3);     // Inside: 3
+  grid[3] = valueMask(6);     // Border
+  grid[4] = valueMask(4);
+  grid[5] = valueMask(5);
   const acc = createAccumulator();
 
   const result = handler.enforceConsistency(grid, acc);
@@ -185,7 +185,7 @@ await runTest('Lunchbox should not assume house when numCells != numValues', () 
 
   const grid = new Uint16Array(5);
   for (let i = 0; i < 5; i++) {
-    grid[i] = mask(1, 2, 3, 4, 5, 6, 7, 8, 9);
+    grid[i] = valueMask(1, 2, 3, 4, 5, 6, 7, 8, 9);
   }
   const acc = createAccumulator();
 
@@ -206,9 +206,9 @@ await runTest('Lunchbox should handle minimum cells for house (numValues cells)'
   handler.initialize(context.createGrid(), createCellExclusions({ numCells: 3 }), context.shape, {});
 
   const grid = new Uint16Array(3);
-  grid[0] = mask(1); // Border
-  grid[1] = mask(2); // Inner = 2
-  grid[2] = mask(3); // Border
+  grid[0] = valueMask(1); // Border
+  grid[1] = valueMask(2); // Inner = 2
+  grid[2] = valueMask(3); // Border
   const acc = createAccumulator();
 
   const result = handler.enforceConsistency(grid, acc);
@@ -224,10 +224,10 @@ await runTest('Lunchbox should handle house with borders adjacent', () => {
   handler.initialize(context.createGrid(), createCellExclusions({ numCells: 4 }), context.shape, {});
 
   const grid = new Uint16Array(4);
-  grid[0] = mask(2);
-  grid[1] = mask(1);
-  grid[2] = mask(4);
-  grid[3] = mask(3);
+  grid[0] = valueMask(2);
+  grid[1] = valueMask(1);
+  grid[2] = valueMask(4);
+  grid[3] = valueMask(3);
   const acc = createAccumulator();
 
   const result = handler.enforceConsistency(grid, acc);
@@ -245,8 +245,8 @@ await runTest('Lunchbox should work with 2 cells and sum=0 (non-house edge case)
   handler.initialize(context.createGrid(), createCellExclusions({ numCells: 2 }), context.shape, {});
 
   const grid = new Uint16Array(2);
-  grid[0] = mask(1, 4); // Can be either border value
-  grid[1] = mask(1, 4); // Can be either border value
+  grid[0] = valueMask(1, 4); // Can be either border value
+  grid[1] = valueMask(1, 4); // Can be either border value
   const acc = createAccumulator();
 
   const result = handler.enforceConsistency(grid, acc);
@@ -263,15 +263,15 @@ await runTest('Lunchbox should handle large valid sum', () => {
 
   const grid = new Uint16Array(9);
   // 1, 2, 3, 4, 5, 6, 7, 8, 9 - borders are 1 and 9
-  grid[0] = mask(1);
-  grid[1] = mask(2);
-  grid[2] = mask(3);
-  grid[3] = mask(4);
-  grid[4] = mask(5);
-  grid[5] = mask(6);
-  grid[6] = mask(7);
-  grid[7] = mask(8);
-  grid[8] = mask(9);
+  grid[0] = valueMask(1);
+  grid[1] = valueMask(2);
+  grid[2] = valueMask(3);
+  grid[3] = valueMask(4);
+  grid[4] = valueMask(5);
+  grid[5] = valueMask(6);
+  grid[6] = valueMask(7);
+  grid[7] = valueMask(8);
+  grid[8] = valueMask(9);
   const acc = createAccumulator();
 
   const result = handler.enforceConsistency(grid, acc);
@@ -288,15 +288,15 @@ await runTest('Lunchbox should handle large sum', () => {
 
   const grid = new Uint16Array(9);
   // 1, 2, 3, 4, 5, 6, 7, 8, 9 - borders are 1 and 9
-  grid[0] = mask(1);
-  grid[1] = mask(2);
-  grid[2] = mask(3);
-  grid[3] = mask(4);
-  grid[4] = mask(5);
-  grid[5] = mask(6);
-  grid[6] = mask(7);
-  grid[7] = mask(8);
-  grid[8] = mask(9);
+  grid[0] = valueMask(1);
+  grid[1] = valueMask(2);
+  grid[2] = valueMask(3);
+  grid[3] = valueMask(4);
+  grid[4] = valueMask(5);
+  grid[5] = valueMask(6);
+  grid[6] = valueMask(7);
+  grid[7] = valueMask(8);
+  grid[8] = valueMask(9);
   const acc = createAccumulator();
 
   const result = handler.enforceConsistency(grid, acc);
@@ -312,10 +312,10 @@ await runTest('Lunchbox should work when borders not at ends', () => {
   handler.initialize(context.createGrid(), createCellExclusions({ numCells: 4 }), context.shape, {});
 
   const grid = new Uint16Array(4);
-  grid[0] = mask(2); // Not a border
-  grid[1] = mask(1); // Border
-  grid[2] = mask(4); // Border
-  grid[3] = mask(3); // Not a border
+  grid[0] = valueMask(2); // Not a border
+  grid[1] = valueMask(1); // Border
+  grid[2] = valueMask(4); // Border
+  grid[3] = valueMask(3); // Not a border
   const acc = createAccumulator();
 
   const result = handler.enforceConsistency(grid, acc);
@@ -334,10 +334,10 @@ await runTest('Lunchbox should accumulate changes', () => {
   handler.initialize(context.createGrid(), createCellExclusions({ numCells: 4 }), context.shape, {});
 
   const grid = new Uint16Array(4);
-  grid[0] = mask(1);
-  grid[1] = mask(2, 3); // Should be pruned based on constraints
-  grid[2] = mask(3);
-  grid[3] = mask(4);
+  grid[0] = valueMask(1);
+  grid[1] = valueMask(2, 3); // Should be pruned based on constraints
+  grid[2] = valueMask(3);
+  grid[3] = valueMask(4);
   const acc = createAccumulator();
 
   handler.enforceConsistency(grid, acc);

@@ -4,7 +4,7 @@ import { ensureGlobalEnvironment } from '../helpers/test_env.js';
 import { runTest, logSuiteComplete } from '../helpers/test_runner.js';
 import {
   createAccumulator,
-  mask,
+  valueMask,
 } from '../helpers/constraint_test_utils.js';
 
 ensureGlobalEnvironment();
@@ -37,20 +37,20 @@ await runTest('FullGridRequiredValues: forbids value in remaining lines when sat
   const handler = new FullGridRequiredValues([0, 1, 2, 3, 4, 5], lines);
 
   // numValues = 3, so all candidates = {1,2,3} => 0b111.
-  const grid = new Uint16Array(6).fill(mask(1, 2, 3));
+  const grid = new Uint16Array(6).fill(valueMask(1, 2, 3));
 
   // Value 1 is fixed in two lines (required = 2), so it must be forbidden
   // in the remaining line.
-  grid[0] = mask(1); // line 0 satisfied
-  grid[2] = mask(1); // line 1 satisfied
+  grid[0] = valueMask(1); // line 0 satisfied
+  grid[2] = valueMask(1); // line 1 satisfied
   // line 2 (cells 4,5) still has candidate 1 initially.
 
   const acc = createAccumulator();
   const ok = handler.enforceConsistency(grid, acc);
 
   assert.equal(ok, true);
-  assert.equal(grid[4] & mask(1), 0, 'should remove value 1 from cell 4');
-  assert.equal(grid[5] & mask(1), 0, 'should remove value 1 from cell 5');
+  assert.equal(grid[4] & valueMask(1), 0, 'should remove value 1 from cell 4');
+  assert.equal(grid[5] & valueMask(1), 0, 'should remove value 1 from cell 5');
   assert.ok(acc.touched.has(4) || acc.touched.has(5), 'should report touched cells');
 });
 
@@ -58,12 +58,12 @@ await runTest('FullGridRequiredValues: returns false when satisfied > required',
   const lines = makeLines3x2();
   const handler = new FullGridRequiredValues([0, 1, 2, 3, 4, 5], lines);
 
-  const grid = new Uint16Array(6).fill(mask(1, 2, 3));
+  const grid = new Uint16Array(6).fill(valueMask(1, 2, 3));
 
   // Value 1 fixed in all 3 lines, but required = 2.
-  grid[0] = mask(1);
-  grid[2] = mask(1);
-  grid[4] = mask(1);
+  grid[0] = valueMask(1);
+  grid[2] = valueMask(1);
+  grid[4] = valueMask(1);
 
   const ok = handler.enforceConsistency(grid, createAccumulator());
   assert.equal(ok, false);
@@ -73,11 +73,11 @@ await runTest('FullGridRequiredValues: returns false when satisfied + possible <
   const lines = makeLines3x2();
   const handler = new FullGridRequiredValues([0, 1, 2, 3, 4, 5], lines);
 
-  const grid = new Uint16Array(6).fill(mask(1, 2, 3));
+  const grid = new Uint16Array(6).fill(valueMask(1, 2, 3));
 
   // Make value 2 (bit 0b010) impossible in two lines, leaving it possible
   // in only one line. With required = 2, this is a contradiction.
-  const v2 = mask(2);
+  const v2 = valueMask(2);
 
   // Remove 2 from line 1 and line 2.
   grid[2] &= ~v2;
@@ -93,8 +93,8 @@ await runTest('FullGridRequiredValues: forces value when satisfied + possible ==
   const lines = makeLines3x2();
   const handler = new FullGridRequiredValues([0, 1, 2, 3, 4, 5], lines);
 
-  const grid = new Uint16Array(6).fill(mask(1, 2, 3));
-  const v3 = mask(3);
+  const grid = new Uint16Array(6).fill(valueMask(1, 2, 3));
+  const v3 = valueMask(3);
 
   // For value 3:
   // - line 0 satisfied (fixed)
@@ -105,8 +105,8 @@ await runTest('FullGridRequiredValues: forces value when satisfied + possible ==
   grid[1] = v3; // line 0 satisfied
 
   // line 1: only cell 2 can be 3
-  grid[2] = mask(1, 3);
-  grid[3] = mask(1, 2);
+  grid[2] = valueMask(1, 3);
+  grid[3] = valueMask(1, 2);
 
   // line 2: make value 3 impossible
   grid[4] &= ~v3;
@@ -125,11 +125,11 @@ await runTest('FullGridRequiredValues: prunes non-required values when required 
   const lines = makeLines4x3();
   const handler = new FullGridRequiredValues([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], lines);
 
-  const grid = new Uint16Array(12).fill(mask(1, 2, 3, 4));
-  const v1 = mask(1);
-  const v2 = mask(2);
-  const v3 = mask(3);
-  const v4 = mask(4);
+  const grid = new Uint16Array(12).fill(valueMask(1, 2, 3, 4));
+  const v1 = valueMask(1);
+  const v2 = valueMask(2);
+  const v3 = valueMask(3);
+  const v4 = valueMask(4);
 
   // With lineLength = 3, each value must appear in exactly 3 of the 4 lines.
   // Make values 1,2,3 each impossible in exactly one line so they become required.
@@ -158,11 +158,11 @@ await runTest('FullGridRequiredValues: returns false when a line contains too ma
   const lines = makeLines4x3();
   const handler = new FullGridRequiredValues([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], lines);
 
-  const grid = new Uint16Array(12).fill(mask(1, 2, 3, 4));
-  const v1 = mask(1);
-  const v2 = mask(2);
-  const v3 = mask(3);
-  const v4 = mask(4);
+  const grid = new Uint16Array(12).fill(valueMask(1, 2, 3, 4));
+  const v1 = valueMask(1);
+  const v2 = valueMask(2);
+  const v3 = valueMask(3);
+  const v4 = valueMask(4);
 
   // Make ALL values requiredPossible by removing each value from exactly one line.
   // Then in line 0, all 4 required values are possible, but line length is 3 => contradiction.
@@ -180,10 +180,10 @@ await runTest('FullGridRequiredValues: returns false if requiredPossibleValues c
   const lines = makeLines3x2();
   const handler = new FullGridRequiredValues([0, 1, 2, 3, 4, 5], lines);
 
-  const grid = new Uint16Array(6).fill(mask(1, 2, 3));
-  const v1 = mask(1);
-  const v2 = mask(2);
-  const v3 = mask(3);
+  const grid = new Uint16Array(6).fill(valueMask(1, 2, 3));
+  const v1 = valueMask(1);
+  const v2 = valueMask(2);
+  const v3 = valueMask(3);
 
   // Line 0: values 2 and 3 each appear in exactly one cell (cell 1), so they
   // are both hidden singles in the same cell.
