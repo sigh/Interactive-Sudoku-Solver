@@ -180,7 +180,7 @@ export class PuzzleRunner {
 
   async runAllWithChecks(puzzles, onFailure) {
     return this.runFnWithChecks(puzzles, async (solver, input) => {
-      const solutions = solver.solutionArray(input, 2);
+      const solutions = [...solver.solutions(input, 2)];
       return { solution: solutions[0] || null };
     }, onFailure);
   }

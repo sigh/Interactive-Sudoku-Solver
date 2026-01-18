@@ -174,16 +174,6 @@ export class SimpleSolver {
   }
 
   /**
-   * Get solutions as an array.
-   * @param {Object|Object[]|string} constraints
-   * @param {number} [limit]
-   * @returns {Solution[]}
-   */
-  solutionArray(constraints, limit) {
-    return [...this.solutions(constraints, limit)];
-  }
-
-  /**
    * Count all solutions efficiently.
    * @param {Object|Object[]|string} constraints
    * @param {number} [limit] - Optional limit to count up to
