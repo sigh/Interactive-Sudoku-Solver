@@ -48,9 +48,71 @@ export const initPage = () => {
 
   setUpHeaderSettingsDropdown();
 
+  setUpTooltipPortal();
+
   const hiddenElements = Array.from(
     document.getElementsByClassName('hide-until-load'));
   hiddenElements.forEach(e => e.classList.remove('hide-until-load'));
+};
+
+const setUpTooltipPortal = () => {
+  // Tooltips are used all over the constraints panel; that panel is now a
+  // scroll container which would clip CSS ::after tooltips. Render a single
+  // tooltip bubble on <body> instead.
+  const bubble = document.createElement('div');
+  bubble.className = 'tooltip-portal-bubble';
+  bubble.hidden = true;
+  document.body.appendChild(bubble);
+
+  const EDGE_PX = 8;
+  const OFFSET_PX = 8;
+
+  const hide = () => {
+    bubble.hidden = true;
+  };
+
+  const positionBubble = (target) => {
+    const rect = target.getBoundingClientRect();
+
+    // Prefer below the icon.
+    let left = rect.left;
+    let top = rect.bottom + OFFSET_PX;
+
+    const bubbleWidth = bubble.offsetWidth;
+    const bubbleHeight = bubble.offsetHeight;
+
+    left = Math.min(left, window.innerWidth - bubbleWidth - EDGE_PX);
+    left = Math.max(left, EDGE_PX);
+
+    // If it would run off the bottom, flip above.
+    if (top + bubbleHeight + EDGE_PX > window.innerHeight) {
+      top = rect.top - bubbleHeight - OFFSET_PX;
+    }
+    top = Math.max(top, EDGE_PX);
+
+    bubble.style.left = left + 'px';
+    bubble.style.top = top + 'px';
+  };
+
+  const showFor = (target) => {
+    const text = target.getAttribute('data-text');
+    if (!text) return;
+
+    bubble.textContent = text;
+    bubble.hidden = false;
+    positionBubble(target);
+  };
+
+  // Bind once: tooltips are expected to exist after init.
+  const tooltips = Array.from(document.querySelectorAll('.tooltip'));
+  for (const tooltip of tooltips) {
+    tooltip.addEventListener('mouseenter', () => showFor(tooltip));
+    tooltip.addEventListener('mouseleave', hide);
+  }
+
+  // Keep things simple: scrolling/resizing hides any visible tooltip.
+  window.addEventListener('scroll', hide, { passive: true });
+  window.addEventListener('resize', hide, { passive: true });
 };
 
 const setUpHeaderSettingsDropdown = () => {

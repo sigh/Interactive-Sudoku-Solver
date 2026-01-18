@@ -906,32 +906,38 @@ a:hover {
   content: '?';
   height: 12px;
   width: 12px;
-  line-height: 12px;
-  background-color: #ddd;
-  display: inline-block;
-  border-radius: 100%;
-  text-align: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: text-bottom;
+
+  background: var(--color-auxiliary);
+  border-radius: 999px;
+  border: 1px solid rgba(0, 0, 0, 0.18);
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.08);
+
   text-decoration: none;
-  font-weight: bold;
-  font-size: var(--font-size-small);
-  border: 2px solid #aaa;
-  color: #999;
+  font-weight: 700;
+  font-size: 11px;
+  line-height: 1;
+  color: rgba(0, 0, 0, 0.55);
 }
 
-.tooltip:hover::after {
-  content: attr(data-text);
-  position: absolute;
-  top: 90%;
-  width: 300px;
-  padding: 3px;
-  border-radius: 5px;
+.tooltip-portal-bubble {
+  position: fixed;
+  z-index: 5000;
+  padding: 8px 10px;
+  border-radius: 10px;
   background: #ffd;
-  box-shadow: 2px 2px 5px;
-  line-height: 1;
-  color: black;
+  box-shadow:
+    0 2px 6px rgba(0, 0, 0, 0.12),
+    0 10px 24px rgba(0, 0, 0, 0.14);
+  line-height: 1.25;
+  color: rgba(0, 0, 0, 0.9);
   font-size: var(--font-size-small);
-  max-width: 200px;
-  z-index: 1000;
+  max-width: min(340px, calc(100vw - 16px));
+  pointer-events: none;
+  white-space: normal;
 }
 
 /* Toggle switch */
