@@ -82,7 +82,7 @@ const handleWorkerMethod = (method, payload) => {
       return workerSolver.nthStep(...payload);
 
     case 'countSolutions':
-      return workerSolver.countSolutions();
+      return workerSolver.countSolutions(payload);
 
     case 'estimatedCountSolutions':
       return workerSolver.estimatedCountSolutions();

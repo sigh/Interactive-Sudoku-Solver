@@ -40,9 +40,9 @@ export class SudokuSolver {
     if (this._progressCallback) this._progressCallback(extraState);
   }
 
-  countSolutions() {
+  countSolutions(limit) {
     return this._runCountFn(() => {
-      this._internalSolver.run(InternalSolver.YIELD_NEVER).next();
+      this._internalSolver.run(InternalSolver.YIELD_NEVER, limit).next();
       return this._internalSolver.counters.solutions;
     });
   }
@@ -678,9 +678,10 @@ class InternalSolver {
   //  YIELD_ON_SOLUTION to yielding each solution.
   //  YIELD_ON_STEP to yield every step.
   //  n > 1 to yield every n backtracks, before the backtrack is applied.
-  * run(yieldWhen) {
+  * run(yieldWhen, maxSolutions) {
     const yieldEveryStep = yieldWhen === this.constructor.YIELD_ON_STEP;
     const yieldOnBacktrack = yieldWhen > 0 ? yieldWhen : 0;
+    maxSolutions ||= 0;
 
     // Set up iterator validation.
     if (!this._atStart) throw new Error('State is not in initial state.');
@@ -879,6 +880,9 @@ class InternalSolver {
           };
         }
         checkRunCounter();
+        if (maxSolutions && counters.solutions >= maxSolutions) {
+          break;
+        }
         continue;
       }
 
