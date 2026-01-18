@@ -226,6 +226,60 @@ const RUN_SOLVER_FN = async () => {
   // Return nothing to skip solver invocation.
 };
 
+const BENCHMARK_PUZZLES_FN = async () => {
+  // Run some hard benchmark puzzles and display aggregate stats.
+
+  const collections = await import('../data/collections.js');
+  const { resolvePuzzleConfig } = await import('../data/example_puzzles.js' + self.VERSION_PARAM);
+
+  const PUZZLE_SETS = [
+    'EXTREME_KILLERS',
+    'TAREK_ALL',
+    'HARD_THERMOS',
+    'HARD_RENBAN',
+    'MATHEMAGIC_KILLERS'
+  ];
+  const FIELDS = ['runtimeMs', 'guesses', 'constraintsProcessed', 'solutions'];
+
+  const solver = await makeSolver();
+
+  const rows = [];
+  const total = new SolverStats();
+  const tableRows = [];
+
+  for (const collectionName of PUZZLE_SETS) {
+    const puzzles = collections[collectionName];
+    const rowStats = new SolverStats();
+    for (let i = 0; i < puzzles.length; i++) {
+      const name = `${collectionName}[${i}]`;
+      console.info(`Solving ${name}`);
+      const { input } = resolvePuzzleConfig(puzzles[i]);
+      if (!solver.uniqueSolution(input)) {
+        throw new Error(
+          `Expected unique solution for ${name}, got ${solutions.length}`);
+      }
+      const stats = solver.latestStats();
+      console.log(
+        solverLink(input, name),
+        JSON.stringify(stats.pick(...FIELDS)));
+      rowStats.add(stats);
+    }
+
+    total.add(rowStats);
+    rows.push(rowStats);
+    tableRows.push({ name: collectionName, ...rowStats.pick(...FIELDS) });
+  }
+  console.info('Done');
+
+  tableRows.push({ name: 'total', ...total.pick(...FIELDS) });
+  console.table(tableRows);
+
+  console.log(
+    rows.flatMap(s => [
+      ...Object.values(s.pick('guesses', 'constraintsProcessed', 'runtimeMs'))
+    ]).join('\t'));
+};
+
 const GENERATE_AND_TEST_FN = async () => {
   // Generate and test: find a 6x6 sudoku with only 6-sum little killers.
 
@@ -342,4 +396,5 @@ export const EXAMPLES = {
   'Run solver': fnToCode(RUN_SOLVER_FN),
   'Generate and test': fnToCode(GENERATE_AND_TEST_FN),
   'Rotate current grid 90°': fnToCode(ROTATE_GRID_FN),
+  'Benchmark puzzles': fnToCode(BENCHMARK_PUZZLES_FN),
 };

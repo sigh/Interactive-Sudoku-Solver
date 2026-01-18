@@ -380,3 +380,19 @@ export const DISPLAYED_EXAMPLES = [
 // Index the puzzles by their name in puzzles.
 export const PUZZLE_INDEX = new Map(
   DISPLAYED_EXAMPLES.map(puzzle => [puzzle.name, puzzle]));
+
+// Resolve a puzzle configuration.
+// Supports:
+// - Plain objects: treated as full puzzle configs.
+// - String names: looked up in PUZZLE_INDEX.
+// - Other strings: treated as raw puzzle input.
+export const resolvePuzzleConfig = (puzzleCfg) => {
+  if (puzzleCfg && typeof puzzleCfg === 'object' && !Array.isArray(puzzleCfg)) {
+    return { name: puzzleCfg.input, ...puzzleCfg };
+  }
+
+  const puzzle = PUZZLE_INDEX.get(puzzleCfg);
+  if (puzzle) return { name: puzzleCfg, ...puzzle };
+
+  return { name: puzzleCfg, input: puzzleCfg };
+};

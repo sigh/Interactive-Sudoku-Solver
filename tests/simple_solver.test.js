@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 
 import { runTest, logSuiteComplete } from './helpers/test_runner.js';
 
-const { SimpleSolver, Solution, SolverStats } = await import('../js/sandbox/simple_solver.js' + self.VERSION_PARAM);
+const { SimpleSolver, Solution } = await import('../js/sandbox/simple_solver.js' + self.VERSION_PARAM);
+const { SolverStats } = await import('../js/sandbox/solver_stats.js' + self.VERSION_PARAM);
 const { DISPLAYED_EXAMPLES } = await import('../data/example_puzzles.js' + self.VERSION_PARAM);
 
 // Get puzzles by name from the examples

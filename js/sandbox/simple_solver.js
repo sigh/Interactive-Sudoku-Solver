@@ -7,6 +7,7 @@ const { SudokuParser, toShortSolution } = await import('../sudoku_parser.js' + s
 const { SudokuConstraint } = await import('../sudoku_constraint.js' + self.VERSION_PARAM);
 const { SudokuBuilder } = await import('../solver/sudoku_builder.js' + self.VERSION_PARAM);
 const { Timer } = await import('../util.js' + self.VERSION_PARAM);
+const { SolverStats } = await import('./solver_stats.js' + self.VERSION_PARAM);
 
 /**
  * Represents a single solution to a puzzle.
@@ -72,28 +73,6 @@ export class Solution {
    */
   getArray() {
     return this._values;
-  }
-}
-
-/**
- * Contains performance statistics from the solve operation.
- */
-export class SolverStats {
-  constructor(state) {
-    const counters = state?.counters || {};
-
-    // Timing
-    this.setupTimeMs = state?.puzzleSetupTime || 0;
-    this.runtimeMs = state?.timeMs || 0;
-
-    // Counters
-    this.solutions = counters.solutions || 0;
-    this.guesses = counters.guesses || 0;
-    this.backtracks = counters.backtracks || 0;
-    this.nodesSearched = counters.nodesSearched || 0;
-    this.constraintsProcessed = counters.constraintsProcessed || 0;
-    this.valuesTried = counters.valuesTried || 0;
-    this.branchesIgnored = counters.branchesIgnored || 0;
   }
 }
 

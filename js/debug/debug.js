@@ -3,7 +3,7 @@ const {
   memoize,
   withDeadline,
 } = await import('../util.js' + self.VERSION_PARAM);
-const { PUZZLE_INDEX } = await import('../../data/example_puzzles.js' + self.VERSION_PARAM);
+const { resolvePuzzleConfig } = await import('../../data/example_puzzles.js' + self.VERSION_PARAM);
 
 const makeSolver = async () => {
   const { SimpleSolver } = await import('../sandbox/simple_solver.js' + self.VERSION_PARAM);
@@ -35,7 +35,7 @@ export const loadInput = async (puzzleCfg) => {
 }
 
 const puzzleFromCfg = async (puzzleCfg) => {
-  const puzzle = puzzleFromCfgSync(puzzleCfg);
+  const puzzle = resolvePuzzleConfig(puzzleCfg);
 
   // Lazily fetch input from file if it's a path.
   if (puzzle.input.startsWith('/')) {
@@ -44,17 +44,6 @@ const puzzleFromCfg = async (puzzleCfg) => {
   }
 
   return puzzle;
-};
-
-const puzzleFromCfgSync = (puzzleCfg) => {
-  if (isPlainObject(puzzleCfg)) {
-    return { name: puzzleCfg.input, ...puzzleCfg };
-  }
-
-  const puzzle = PUZZLE_INDEX.get(puzzleCfg);
-  if (puzzle) return { name: puzzleCfg, ...puzzle };
-
-  return { name: puzzleCfg, input: puzzleCfg };
 };
 
 export class PuzzleRunner {
