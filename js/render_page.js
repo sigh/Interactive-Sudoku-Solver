@@ -538,8 +538,6 @@ class ConstraintManager {
       this.addUpdateListener(() => layoutContainer.updateActiveHighlighting());
     }
 
-    this._setUpOrdinaryConstraintsView(inputManager);
-
     this._rootCollection = new RootConstraintCollection(
       this._display,
       chipViews,
@@ -594,40 +592,6 @@ class ConstraintManager {
     // Dim constraints toggle.
     this._setUpDimConstraints();
   }
-
-  _setUpOrdinaryConstraintsView(inputManager) {
-    const wrapper = document.getElementById('ordinary-constraints-wrapper');
-    const toggle = document.getElementById('ordinary-constraints-toggle');
-    const autoSaveKey = 'autoSave-collapsible-ordinary-constraints-wrapper';
-
-    const setExpanded = (expanded) => {
-      wrapper.classList.toggle('expanded', expanded);
-      toggle.classList.toggle('expanded', expanded);
-      sessionAndLocalStorage.setItem(autoSaveKey, expanded.toString());
-    };
-
-    const savedValue = sessionAndLocalStorage.getItem(autoSaveKey);
-    if (savedValue === 'true') {
-      setExpanded(true);
-    }
-
-    toggle.addEventListener('click', () => {
-      const isExpanded = wrapper.classList.contains('expanded');
-      setExpanded(!isExpanded);
-    });
-    inputManager.addSelectionPreserver(wrapper);
-    inputManager.addSelectionPreserver(toggle);
-
-    // Hide the toggle if the content fits within the collapsed height.
-    const collapsedHeight = parseInt(getComputedStyle(wrapper).getPropertyValue('--collapsed-height')) || 80;
-    this.addUpdateListener(() => {
-      const chipView = wrapper.querySelector('.chip-view');
-      if (chipView) {
-        toggle.style.display = chipView.scrollHeight > collapsedHeight ? '' : 'none';
-      }
-    });
-  }
-
 
   _makeCompositeCollection(constraint, chip, parentCollection) {
     const subView = this._makeCompositeConstraintView(chip);
