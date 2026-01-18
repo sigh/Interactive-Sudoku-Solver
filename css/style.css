@@ -272,14 +272,17 @@ button,
   --button-bg-hover: var(--color-primary-dark);
   --button-text-color: #ffffff;
 
-  font-size: var(--font-size-header);
+  height: 30px;
+  box-sizing: border-box;
+
+  font-size: var(--font-size-base);
   border-radius: 6px;
   color: var(--button-text-color);
 
   border: 1px solid var(--button-border-color);
   background: var(--button-bg);
 
-  padding: 5px 10px;
+  padding: 6px 10px;
   transition: background-color 0.15s, box-shadow 0.15s;
 }
 
@@ -307,6 +310,7 @@ button.plain-button {
   color: inherit;
   font: inherit;
   line-height: inherit;
+  height: unset;
 
   padding: 4px;
   margin: -4px;
@@ -376,7 +380,6 @@ button.copy-to-clipboard-failed::after {
 }
 
 :where(button, .button).image-button {
-  height: 30px;
   width: 40px;
   padding: 0;
   display: inline-flex;
@@ -397,11 +400,12 @@ button.copy-to-clipboard-failed::after {
 :where(button, .button).big-button {
   height: 50px;
   min-width: 50px;
+  font-size: var(--font-size-header);
 }
 
 :where(button, .button).icon-button {
   width: 40px;
-  font-size: 25px;
+  font-size: 24px;
   font-weight: bold;
   padding: 0px;
   line-height: 1.2em;
@@ -601,10 +605,6 @@ button.copy-to-clipboard-failed::after {
 #constraint-panel-container {
   line-height: 1.8;
   width: 350px;
-}
-
-#constraint-panel-container>.two-column>div {
-  flex: 1;
 }
 
 .constraint-panel-header {
@@ -834,9 +834,9 @@ select.thin-select {
 }
 
 .two-column {
-  display: flex;
+  display: grid;
   gap: var(--gap-default);
-  justify-content: space-between;
+  grid-template-columns: 1fr 1fr;
 }
 
 .outside-arrow {
