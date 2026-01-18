@@ -180,14 +180,14 @@ export class PuzzleRunner {
 
   async runAllWithChecks(puzzles, onFailure) {
     return this.runFnWithChecks(puzzles, async (solver, input) => {
-      const solutions = await solver.solutionArray(input, 2);
+      const solutions = solver.solutionArray(input, 2);
       return { solution: solutions[0] || null };
     }, onFailure);
   }
 
   async runValidateLayout(cases, onFailure) {
     return this.runFnWithChecks(cases, async (solver, input) => {
-      const solution = await solver.validateLayout(input);
+      const solution = solver.validateLayout(input);
       return { solution };
     }, onFailure);
   }
