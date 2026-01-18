@@ -51,6 +51,10 @@
   --font-size-header: 16px;
   --font-size-header-small: 14px;
 
+  /* Gaps */
+  --gap-default: 10px;
+  --gap-main-section: 15px;
+
   /* Effects */
 
   /* Emulate opacity(0.5) without making it transparent. */
@@ -66,11 +70,7 @@ body {
   margin-top: 0px;
   display: flex;
   flex-direction: column;
-  gap: 15px;
-}
-
-.spacer {
-  flex-grow: 1;
+  gap: var(--gap-main-section);
 }
 
 #sudoku-grid {
@@ -176,20 +176,8 @@ body {
 }
 
 #page-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 15px;
-
   padding: 5px 10px;
   background: var(--color-primary-soft);
-}
-
-.page-header-title {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-weight: bold;
 }
 
 .page-header-logo {
@@ -208,8 +196,7 @@ body {
 .page-header-link {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  text-decoration: none;
+  gap: 2px;
 }
 
 .page-header-link img {
@@ -275,7 +262,7 @@ body {
 
 #sudoku-container {
   display: flex;
-  gap: 15px;
+  gap: var(--gap-main-section);
 }
 
 button,
@@ -613,17 +600,11 @@ button.copy-to-clipboard-failed::after {
 
 #constraint-panel-container {
   line-height: 1.8;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
   width: 350px;
 }
 
 #constraint-panel-container>.two-column>div {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  width: 180px;
+  flex: 1;
 }
 
 .constraint-panel-header {
@@ -639,12 +620,6 @@ button.copy-to-clipboard-failed::after {
 #constraint-panel-container .panel-edge-constraints {
   margin-right: 10px;
   gap: 2px;
-}
-
-#jigsaw-container {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
 }
 
 #outside-clue-input {
@@ -730,45 +705,36 @@ textarea {
 }
 
 #left-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
   position: sticky;
   top: 10px;
+  --vstack-gap: var(--gap-main-section);
 }
 
 #left-panel-main {
   display: flex;
-  gap: 15px;
+  gap: var(--gap-main-section);
 }
 
-.page-info {
+.vstack {
+  --vstack-gap: var(--gap-default);
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  row-gap: var(--vstack-gap);
 }
 
-#sudoku-grid-with-controls {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.control-panel {
+.hstack {
   display: flex;
   align-items: center;
-  gap: 10px;
+  column-gap: var(--gap-default);
 }
 
-.control-panel.control-panel-spread {
-  justify-content: space-between;
+.hstack>.hstack-push-right {
+  margin-left: auto;
 }
 
 #solution-control-panel {
   width: 250px;
-  display: flex;
-  gap: 2px;
-  flex-direction: column;
+  --vstack-gap: 2px;
 }
 
 #solution-control-panel #solution-iteration-state {
@@ -792,9 +758,6 @@ textarea {
 
 #display-panel {
   width: 145px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
 }
 
 #state-output {
@@ -872,7 +835,7 @@ select.thin-select {
 
 .two-column {
   display: flex;
-  gap: 10px;
+  gap: var(--gap-default);
   justify-content: space-between;
 }
 

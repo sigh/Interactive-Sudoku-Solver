@@ -116,12 +116,12 @@ layout: null
 </head>
 
 <body>
-  <header id="page-header">
+  <header id="page-header" class="hstack">
     <h1 class="page-header-logo">ISS</h1>
     <h1 class="page-header-title">Interactive Sudoku Solver</h1>
-    <div class="spacer"></div>
-    <a class="page-header-link" href="https://github.com/sigh/Interactive-Sudoku-Solver/issues" target="_blank"
-      rel="noopener">
+
+    <a class="page-header-link hstack-push-right" href="https://github.com/sigh/Interactive-Sudoku-Solver/issues"
+      target="_blank" rel="noopener">
       <img src="img/bug-48.png" alt="File a bug">
       <span>File a bug</span>
     </a>
@@ -161,7 +161,7 @@ layout: null
     <div class="lazy-body">
       <div class="debug-main">
         <div id="debug-panel">
-          <label class="control-panel">
+          <label class="hstack">
             Log level
             <select id="debug-log-level" class="thin-select">
               <option value="0">None</option>
@@ -169,11 +169,11 @@ layout: null
               <option value="2">2</option>
             </select>
           </label>
-          <label class="control-panel">
+          <label class="hstack">
             <input type="checkbox" id="conflict-heatmap-checkbox">
             Conflict heatmap
           </label>
-          <label class="control-panel">
+          <label class="hstack">
             <input type="checkbox" id="stack-trace-checkbox">
             Stack trace
           </label>
@@ -182,7 +182,7 @@ layout: null
             <datalist id="debug-puzzles"></datalist>
           </div>
           <div id="debug-puzzle-src"></div>
-          <div class="control-panel">
+          <div class="hstack">
             <input type="checkbox" id="debug-cell-id" class="debug-checkbox">
             <label for="debug-cell-id" class="button auxiliary-button">Cell id</label>
             <input type="checkbox" id="debug-cell-index" class="debug-checkbox">
@@ -197,7 +197,7 @@ layout: null
       </div>
       <div id="debug-stack-trace-footer" class="debug-stack-trace-footer">
         <hr>
-        <div class="debug-stack-trace-header control-panel">
+        <div class="debug-stack-trace-header hstack">
           <button type="button" id="debug-flame-toggle" class="expanded" title="Collapse flame graph"></button>
           <div class="debug-stack-trace"></div>
         </div>
@@ -212,7 +212,7 @@ layout: null
       <div class="lazy-loading notice notice-info">Loading…</div>
     </div>
     <div class="sandbox-body lazy-body">
-      <div class="sandbox-controls control-panel">
+      <div class="sandbox-controls hstack">
         <select class="sandbox-examples">
           <option value="">Load example...</option>
         </select>
@@ -225,8 +225,7 @@ layout: null
         <button class="sandbox-share image-button auxiliary-button" title="Copy shareable link">
           <img src="img/link-48.png" alt="Share">
         </button>
-        <span class="spacer"></span>
-        <span class="notice notice-warning sandbox-warning">
+        <span class="notice notice-warning sandbox-warning hstack-push-right">
           The sandbox API may change without notice.
         </span>
         <a href="help#javascript-sandbox" target="_blank" class="sandbox-help-link"><code>help()</code></a>
@@ -243,9 +242,9 @@ layout: null
 
   <div id="sudoku-container">
     <div>
-      <div id="left-panel">
+      <div id="left-panel" class="vstack">
         <div id="left-panel-main">
-          <div id="display-panel">
+          <div id="display-panel" class="vstack">
             <div id="solve-mode-input-container">
               <select id="solve-mode-input" required>
                 <option value="all-possibilities" checked>All possibilities</option>
@@ -277,7 +276,7 @@ layout: null
               <span id="solve-status">LOADING...</span>
               <span id="solve-percentage"></span>
             </div>
-            <div class="control-panel">
+            <div class="hstack">
               <button id="download-solutions-button" title="Download solutions" class="image-button auxiliary-button"
                 disabled>
                 <img src="img/download-48.png" alt="Download">
@@ -292,36 +291,34 @@ layout: null
             </div>
           </div>
 
-          <div id="sudoku-grid-with-controls">
+          <div id="sudoku-grid-with-controls" class="vstack">
             <div id="sudoku-grid" class="hide-until-load">
               <input id="fake-input" inputmode="numeric" type="text" value="x">
             </div>
-            <div class="control-panel control-panel-spread">
-              <div id="solution-control-panel" class="hide-until-load" style="--skeleton-height:50px;">
+            <div class="hstack">
+              <div id="solution-control-panel" class="vstack hide-until-load" style="--skeleton-height:50px;">
                 <div id="solution-iteration-state"></div>
-                <div id="solution-control-buttons" class="control-panel">
+                <div id="solution-control-buttons" class="hstack">
                   <button id="solution-start" class="icon-button" title="start (s)">&#171;</button>
                   <button id="solution-back" class="icon-button" title="previous (p)">&#8249;</button>
                   <button id="solution-forward" class="icon-button" title="next (n)">&#8250;</button>
                   <button id="solution-end" class="icon-button" title="end">&#187;</button>
                 </div>
               </div>
-              <div class="control-panel">
-                <div class="switch">
-                  <label>
-                    <input id="auto-solve-input" type="checkbox" checked>
-                    <span></span>
-                  </label>
-                  Auto-solve
-                </div>
-                <button id="solve-button" class="big-button" title="solve">Solve</button>
-                <button id="stop-solver" class="big-button danger-button" title="abort">Abort</button>
+              <div class="switch hstack-push-right">
+                <label>
+                  <input id="auto-solve-input" type="checkbox" checked>
+                  <span></span>
+                </label>
+                Auto-solve
               </div>
+              <button id="solve-button" class="big-button" title="solve">Solve</button>
+              <button id="stop-solver" class="big-button danger-button" title="abort">Abort</button>
             </div>
           </div>
         </div>
 
-        <div class="page-info">
+        <div class="vstack page-info">
           <div class="description">
             <p>
               <strong>Select a cell</strong> and <strong>type</strong> a number
@@ -374,7 +371,7 @@ layout: null
       <div id="numvalues-experimental-warning" class="notice notice-warning" style="display:none">
         Non-default value count is experimental and may change.
       </div>
-      <span id="example-select-container" class="control-panel">
+      <span id="example-select-container" class="hstack">
         <select disabled>
           <option>⎯⎯ Load an example ⎯⎯</option>
         </select>
@@ -387,7 +384,7 @@ layout: null
           <div>
             <div>
               <textarea name="freeform-input" rows="5"></textarea>
-              <div class="control-panel">
+              <div class="hstack">
                 <button type="submit" title="Load from text">Load</button>
                 <button id="freeform-load-current-button" type="button" class="image-button auxiliary-button"
                   title="Load current constraints into text box">
@@ -407,15 +404,13 @@ layout: null
         <div class="lazy-body"></div>
       </div>
 
-      <div id="constraint-panel-container">
+      <div id="constraint-panel-container" class="vstack">
 
-        <div class="control-panel constraint-panel-header">
+        <div class="hstack constraint-panel-header">
           <h1>Constraints</h1>
 
-          <span class="spacer"></span>
-
           <button id="copy-constraints-button" title="Copy constraint to clipboard"
-            class="image-button auxiliary-button">
+            class="image-button auxiliary-button hstack-push-right">
             <img src="img/copy-48.png" alt="Copy constraint">
           </button>
           <button id="clear-constraints-button" class="danger-button" title="Clear constraints">Clear</button>
@@ -425,7 +420,7 @@ layout: null
         </div>
 
         <div class="two-column">
-          <div>
+          <div class="vstack">
 
             <form id="multi-value-cell-input">
               <fieldset tabindex="0" class="constraint-panel hide-until-load" disabled>
@@ -452,9 +447,10 @@ layout: null
                       <input type="checkbox" name="is-loop" id="multi-cell-constraint-loop-input"></input>
                       <label for="multi-cell-constraint-loop-input">Loop</label>
                     </div>
-                    <div class="control-panel control-panel-spread">
+                    <div class="hstack">
                       <div id="multi-cell-constraint-value-container"></div>
-                      <button type="submit" name="add-constraint" title="Add constraint" disabled>
+                      <button type="submit" name="add-constraint" title="Add constraint" class="hstack-push-right"
+                        disabled>
                         Add
                       </button>
                     </div>
@@ -464,7 +460,7 @@ layout: null
             </form>
           </div>
 
-          <div>
+          <div class="vstack">
             <div class="constraint-panel constraint-panel-borderless">
               <h2>
                 Shape
@@ -504,7 +500,7 @@ layout: null
 
             <div id="layout-constraint-checkboxes"></div>
 
-            <div id="jigsaw-container">
+            <div id="jigsaw-container" class="vstack">
               <div>
                 <button type="submit" id="add-jigsaw-button" title="Add Piece">
                   Add Jigsaw Piece
@@ -593,7 +589,7 @@ layout: null
                   </p>
                 </div>
                 <div class="constraint-code-form">
-                  <div class="control-panel">
+                  <div class="hstack">
                     <div>
                       Name:
                       <input type="text" name="state-machine-name" placeholder="optional" maxlength="20" columns="20">
@@ -689,7 +685,7 @@ function accept(state) {
                 </div>
                 <input type="hidden" name="id">
                 <div class="outside-arrow-clue-types"></div>
-                <div class="control-panel">
+                <div class="hstack">
                   <input type="number" name="value" min=0 placeholder="value">
                   <button type="submit" title="Set constraint">Set</button>
                   <button type="button" id="outside-arrow-clear" class="danger-button"
@@ -705,7 +701,7 @@ function accept(state) {
             <fieldset tabindex="0" class="constraint-panel hide-until-load">
               <h2>Composite constraints</h2>
               <div>
-                <div class="control-panel">
+                <div class="hstack">
                   <span class="description">
                     Select a composite constraint by clicking on its chip to
                     add constraints to it. Panels which allow constraints to be
