@@ -51,9 +51,10 @@
   --font-size-header: 16px;
   --font-size-header-small: 14px;
 
-  /* Gaps */
+  /* Layout */
   --gap-default: 10px;
   --gap-main-section: 15px;
+  --right-panel-width: 360px;
 
   /* Effects */
 
@@ -242,7 +243,7 @@ body {
 }
 
 #right-panel {
-  width: 350px;
+  width: var(--right-panel-width);
 }
 
 #right-panel>hr {
@@ -603,8 +604,30 @@ button.copy-to-clipboard-failed::after {
 }
 
 #constraint-panel-container {
+  --constraint-panel-glow-size: 6px;
+
   line-height: 1.8;
-  width: 350px;
+  width: var(--right-panel-width);
+
+  /* Keep only the constraints panel visible; only its body scrolls. */
+  position: sticky;
+  top: var(--gap-default);
+  max-height: calc(100vh - 2*var(--gap-default));
+
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+
+  /* Ensure overflow doesn't extend the page; the inner wrapper scrolls. */
+  overflow: hidden;
+}
+
+#constraint-panel-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-inline: var(--constraint-panel-glow-size);
 }
 
 .constraint-panel-header {
@@ -705,8 +728,6 @@ textarea {
 }
 
 #left-panel {
-  position: sticky;
-  top: 10px;
   --vstack-gap: var(--gap-main-section);
 }
 
@@ -1089,11 +1110,13 @@ h3 {
 }
 
 .collapsible-container {
-  display: inline-block;
+  display: block;
   position: relative;
   font-size: var(--font-size-base);
   margin: 0px;
   width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .composite-constraint-selected .collapsible-container.allow-in-composite {
@@ -1133,7 +1156,7 @@ h3 {
 
 .collapsible-container.constraint-panel-highlight:not(.container-open) {
   border-color: var(--color-border-special);
-  box-shadow: 0 0 8px var(--color-border-special);
+  box-shadow: 0 0 var(--constraint-panel-glow-size) var(--color-border-special);
 }
 
 #multi-cell-constraint-input select {
