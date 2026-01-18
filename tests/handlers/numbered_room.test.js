@@ -18,33 +18,33 @@ const { NumberedRoom } = await import('../../js/solver/handlers.js');
 // =============================================================================
 
 await runTest('NumberedRoom should restrict control cell to the line length on init', () => {
-  const context = setupConstraintTest({ numValues: 9, numCells: 9 });
-  const handler = new NumberedRoom([0, 1, 2, 3], 7);
+  const context = setupConstraintTest({ gridSize: [1, 9] });
+  const handler = new NumberedRoom(context.cells(4), 7);
 
-  const grid = context.createGrid();
-  const result = handler.initialize(grid, createCellExclusions({ numCells: 9 }), context.shape, {});
+  const grid = context.grid;
+  const result = context.initializeHandler(handler);
 
   assert.equal(result, true);
   assert.equal(grid[0], valueMask(1, 2, 3, 4), 'control cell should only allow 1..lineLength');
 });
 
 await runTest('NumberedRoom should fail init if control cell has no values within the line length', () => {
-  const context = setupConstraintTest({ numValues: 9, numCells: 9 });
-  const handler = new NumberedRoom([0, 1, 2, 3], 7);
+  const context = setupConstraintTest({ gridSize: [1, 9] });
+  const handler = new NumberedRoom(context.cells(4), 7);
 
-  const grid = context.createGrid();
+  const grid = context.grid;
   grid[0] = valueMask(9); // out of range for a 4-cell line
-  const result = handler.initialize(grid, createCellExclusions({ numCells: 9 }), context.shape, {});
+  const result = context.initializeHandler(handler);
 
   assert.equal(result, false);
 });
 
 await runTest('NumberedRoom init should be a no-op when line length equals numValues', () => {
-  const context = setupConstraintTest({ numValues: 4, numCells: 4 });
-  const handler = new NumberedRoom([0, 1, 2, 3], 2);
+  const context = setupConstraintTest({ gridSize: [1, 4] });
+  const handler = new NumberedRoom(context.cells(4), 2);
 
-  const grid = context.createGrid();
-  const result = handler.initialize(grid, createCellExclusions({ numCells: 4 }), context.shape, {});
+  const grid = context.grid;
+  const result = context.initializeHandler(handler);
 
   assert.equal(result, true);
   assert.equal(grid[0], valueMask(1, 2, 3, 4));
@@ -55,10 +55,10 @@ await runTest('NumberedRoom init should be a no-op when line length equals numVa
 // =============================================================================
 
 await runTest('NumberedRoom should prune control options when corresponding cell cannot take the clue value', () => {
-  const context = setupConstraintTest({ numValues: 4, numCells: 4 });
-  const handler = new NumberedRoom([0, 1, 2, 3], 3);
+  const context = setupConstraintTest({ gridSize: [1, 4] });
+  const handler = new NumberedRoom(context.cells(4), 3);
 
-  const grid = new Uint16Array(4);
+  const grid = context.grid;
   grid[0] = valueMask(1, 2, 3, 4); // control cell N
   grid[1] = valueMask(1, 2); // if N=2, cell[1] must be 3, but it can't
   grid[2] = valueMask(1, 3); // allows 3 (N=3 remains possible)
@@ -72,10 +72,10 @@ await runTest('NumberedRoom should prune control options when corresponding cell
 });
 
 await runTest('NumberedRoom should remove the clue value from cells that cannot be selected by the control cell', () => {
-  const context = setupConstraintTest({ numValues: 4, numCells: 4 });
-  const handler = new NumberedRoom([0, 1, 2, 3], 2);
+  const context = setupConstraintTest({ gridSize: [1, 4] });
+  const handler = new NumberedRoom(context.cells(4), 2);
 
-  const grid = new Uint16Array(4);
+  const grid = context.grid;
   grid[0] = valueMask(3); // N fixed to 3 (selects cell index 2)
   grid[1] = valueMask(1, 2, 4); // has 2 but cannot be selected (N != 2)
   grid[2] = valueMask(2, 3); // selected (N=3)
@@ -91,10 +91,10 @@ await runTest('NumberedRoom should remove the clue value from cells that cannot 
 });
 
 await runTest('NumberedRoom should fail when the clue value is forced in a non-selected cell', () => {
-  const context = setupConstraintTest({ numValues: 4, numCells: 4 });
-  const handler = new NumberedRoom([0, 1, 2, 3], 2);
+  const context = setupConstraintTest({ gridSize: [1, 4] });
+  const handler = new NumberedRoom(context.cells(4), 2);
 
-  const grid = new Uint16Array(4);
+  const grid = context.grid;
   grid[0] = valueMask(3); // N fixed to 3
   grid[1] = valueMask(2); // forced to clue value, but cannot be selected (N != 2)
   grid[2] = valueMask(1, 2, 3, 4); // selected cell still allows clue value
@@ -107,10 +107,10 @@ await runTest('NumberedRoom should fail when the clue value is forced in a non-s
 });
 
 await runTest('NumberedRoom should fail when no index remains compatible with the clue value', () => {
-  const context = setupConstraintTest({ numValues: 4, numCells: 4 });
-  const handler = new NumberedRoom([0, 1, 2, 3], 4);
+  const context = setupConstraintTest({ gridSize: [1, 4] });
+  const handler = new NumberedRoom(context.cells(4), 4);
 
-  const grid = new Uint16Array(4);
+  const grid = context.grid;
   grid[0] = valueMask(1, 2, 3); // first cell also cannot be 4
   grid[1] = valueMask(1, 2, 3); // no 4
   grid[2] = valueMask(1, 2, 3); // no 4

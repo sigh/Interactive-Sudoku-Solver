@@ -22,10 +22,12 @@ const makeSelector = (shape, { handlerSet = [], seenCandidateSet } = {}) => {
     seenCandidateSet || new SeenCandidateSet(shape.numCells),
   );
 
-  const conflictScores = new ConflictScores(new Int32Array(shape.numCells), shape.numValues);
+  const conflictScores = new ConflictScores(new Array(shape.numCells).fill(0), shape.numValues);
   selector.reset(conflictScores);
   return { selector, conflictScores };
 };
+
+const createGridState = (shape, fill) => new Array(shape.numCells).fill(fill);
 
 await runTest('CandidateSelector moves all singletons to the front when next cell is a singleton', () => {
   const shape = GridShape.fromGridSize(4);
@@ -33,8 +35,7 @@ await runTest('CandidateSelector moves all singletons to the front when next cel
 
   const { selector } = makeSelector(shape);
 
-  const gridState = new Uint16Array(shape.numCells);
-  gridState.fill(allValues);
+  const gridState = createGridState(shape, allValues);
 
   // Ensure the next cell is a singleton and there are other singletons later.
   gridState[0] = 1 << 0;
@@ -72,8 +73,7 @@ await runTest('CandidateSelector returns [cellOrder,0,0] when a wipeout (0) exis
 
   const { selector } = makeSelector(shape);
 
-  const gridState = new Uint16Array(shape.numCells);
-  gridState.fill(allValues);
+  const gridState = createGridState(shape, allValues);
 
   // Make the next cell a singleton so that _updateCellOrder scans for other
   // singletons and detects wipeouts.
@@ -121,8 +121,7 @@ await runTest('CandidateSelector consumes custom candidate state across backtrac
   conflictScores.scores[5] = 70;
   conflictScores.scores[7] = 80;
 
-  const gridState = new Uint16Array(shape.numCells);
-  gridState.fill(allValues);
+  const gridState = createGridState(shape, allValues);
 
   // First visit: custom candidate state should be created and the highest
   // conflict-score cell (7) should be popped first.
@@ -189,8 +188,7 @@ await runTest('CandidateSelector stepState override clears any pending custom-ca
   conflictScores.scores[5] = 70;
   conflictScores.scores[7] = 80;
 
-  const gridState = new Uint16Array(shape.numCells);
-  gridState.fill(allValues);
+  const gridState = createGridState(shape, allValues);
 
   // First call seeds the custom candidate state.
   {
@@ -245,13 +243,12 @@ await runTest('CandidateSelector falls back cleanly when filtering to interestin
     seenCandidateSet,
   );
 
-  const initialScores = new Int32Array(shape.numCells);
+  const initialScores = new Array(shape.numCells).fill(0);
   initialScores[5] = 123;
   const conflictScores = new ConflictScores(initialScores, shape.numValues);
   selector.reset(conflictScores);
 
-  const gridState = new Uint16Array(shape.numCells);
-  gridState.fill(allValues);
+  const gridState = createGridState(shape, allValues);
   gridState[0] = 1 << 0;
 
   const [nextDepth, , count] = selector.selectNextCandidate(1, gridState, null, true);
@@ -267,8 +264,7 @@ await runTest('CandidateSelector returns [cellOrder,0,0] when current depth cell
 
   const { selector } = makeSelector(shape);
 
-  const gridState = new Uint16Array(shape.numCells);
-  gridState.fill(allValues);
+  const gridState = createGridState(shape, allValues);
   gridState[0] = 0;
 
   const [cellOrderOrZero, value, count] = selector.selectNextCandidate(
@@ -306,11 +302,10 @@ await runTest('CandidateSelector interesting-cell filtering works on the maxScor
   );
 
   // All conflict scores are 0 => maxScore==0 branch.
-  const conflictScores = new ConflictScores(new Int32Array(shape.numCells), shape.numValues);
+  const conflictScores = new ConflictScores(new Array(shape.numCells).fill(0), shape.numValues);
   selector.reset(conflictScores);
 
-  const gridState = new Uint16Array(shape.numCells);
-  gridState.fill(allValues);
+  const gridState = createGridState(shape, allValues);
   gridState[0] = 1 << 0;
 
   // Make the interesting cells have different counts.

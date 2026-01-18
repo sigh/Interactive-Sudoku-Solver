@@ -14,6 +14,8 @@ const makeDebugLogger = () => ({
   log: () => { },
 });
 
+const createGridState = (shape, fill) => new Array(shape.numCells).fill(fill);
+
 await runTest('CandidateSelector prefers interesting values when uninterestingValues set', () => {
   const shape = GridShape.fromGridSize(4);
 
@@ -32,12 +34,11 @@ await runTest('CandidateSelector prefers interesting values when uninterestingVa
     seenCandidateSet,
   );
 
-  const conflictScores = new ConflictScores(new Int32Array(shape.numCells), shape.numValues);
+  const conflictScores = new ConflictScores(new Array(shape.numCells).fill(0), shape.numValues);
   selector.reset(conflictScores);
 
   // All cells have 4 candidates, so the selector should choose cell 0.
-  const gridState = new Uint16Array(shape.numCells);
-  gridState.fill((1 << shape.numValues) - 1);
+  const gridState = createGridState(shape, (1 << shape.numValues) - 1);
 
   const [nextDepth, value, count] = selector.selectNextCandidate(
     /* cellDepth */ 0,
@@ -70,11 +71,10 @@ await runTest('CandidateSelector falls back when no interesting values exist', (
     seenCandidateSet,
   );
 
-  const conflictScores = new ConflictScores(new Int32Array(shape.numCells), shape.numValues);
+  const conflictScores = new ConflictScores(new Array(shape.numCells).fill(0), shape.numValues);
   selector.reset(conflictScores);
 
-  const gridState = new Uint16Array(shape.numCells);
-  gridState.fill((1 << shape.numValues) - 1);
+  const gridState = createGridState(shape, (1 << shape.numValues) - 1);
 
   const [nextDepth, value, count] = selector.selectNextCandidate(
     /* cellDepth */ 0,
@@ -112,13 +112,12 @@ await runTest('CandidateSelector selects only from interesting cells when prefix
   );
 
   // Give cell 1 a high conflict score so it would normally be selected.
-  const initialScores = new Int32Array(shape.numCells);
+  const initialScores = new Array(shape.numCells).fill(0);
   initialScores[1] = 100;
   const conflictScores = new ConflictScores(initialScores, shape.numValues);
   selector.reset(conflictScores);
 
-  const gridState = new Uint16Array(shape.numCells);
-  gridState.fill(allValues);
+  const gridState = createGridState(shape, allValues);
   gridState[0] = 1 << 0;
 
   const [nextDepth, value, count] = selector.selectNextCandidate(
@@ -171,15 +170,14 @@ await runTest('CandidateSelector custom candidates pop interesting cell first', 
     seenCandidateSet,
   );
 
-  const initialScores = new Int32Array(shape.numCells);
+  const initialScores = new Array(shape.numCells).fill(0);
   // Ensure custom candidate mode is eligible (conflictScores[cell] > 0).
   initialScores[1] = 20;
   initialScores[2] = 20;
   const conflictScores = new ConflictScores(initialScores, shape.numValues);
   selector.reset(conflictScores);
 
-  const gridState = new Uint16Array(shape.numCells);
-  gridState.fill(allValues);
+  const gridState = createGridState(shape, allValues);
   gridState[0] = nominatedValue;
 
   // With depth=1, custom candidates should trigger and choose the interesting

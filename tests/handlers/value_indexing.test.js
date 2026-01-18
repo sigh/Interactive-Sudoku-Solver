@@ -18,12 +18,12 @@ const { ValueIndexing } = await import('../../js/solver/handlers.js');
 // =============================================================================
 
 await runTest('ValueIndexing should restrict control cell to valid indices on init', () => {
-  const context = setupConstraintTest({ numValues: 9, numCells: 9 });
+  const context = setupConstraintTest({ gridSize: [1, 9] });
   // valueCell=0, controlCell=1, indexedCells=[2,3,4] (3 cells)
   const handler = new ValueIndexing(0, 1, 2, 3, 4);
 
-  const grid = context.createGrid();
-  const result = handler.initialize(grid, createCellExclusions({ numCells: 9 }), context.shape, {});
+  const grid = context.grid;
+  const result = context.initializeHandler(handler);
 
   assert.equal(result, true);
   // Control cell should only allow values 1-3 (indices into 3 indexed cells)
@@ -31,24 +31,24 @@ await runTest('ValueIndexing should restrict control cell to valid indices on in
 });
 
 await runTest('ValueIndexing should fail init if value cell is empty', () => {
-  const context = setupConstraintTest({ numValues: 4, numCells: 4 });
+  const context = setupConstraintTest({ gridSize: [1, 4] });
   const handler = new ValueIndexing(0, 1, 2, 3);
 
-  const grid = context.createGrid();
+  const grid = context.grid;
   grid[0] = 0; // Empty value cell
-  const result = handler.initialize(grid, createCellExclusions({ numCells: 4 }), context.shape, {});
+  const result = context.initializeHandler(handler);
 
   assert.equal(result, false);
 });
 
 await runTest('ValueIndexing should pass init even with restricted control cell', () => {
-  const context = setupConstraintTest({ numValues: 4, numCells: 4 });
+  const context = setupConstraintTest({ gridSize: [1, 4] });
   // valueCell=0, controlCell=1, indexedCells=[2,3] (2 cells)
   const handler = new ValueIndexing(0, 1, 2, 3);
 
-  const grid = context.createGrid();
+  const grid = context.grid;
   grid[1] = valueMask(1, 2, 3, 4); // All values initially
-  const result = handler.initialize(grid, createCellExclusions({ numCells: 4 }), context.shape, {});
+  const result = context.initializeHandler(handler);
 
   assert.equal(result, true);
   // Control should be restricted to 1, 2 (only 2 indexed cells)
@@ -60,12 +60,12 @@ await runTest('ValueIndexing should pass init even with restricted control cell'
 // =============================================================================
 
 await runTest('ValueIndexing should prune value cell based on possible indexed values', () => {
-  const context = setupConstraintTest({ numValues: 4, numCells: 5 });
+  const context = setupConstraintTest({ gridSize: [1, 5] });
   // valueCell=0, controlCell=1, indexedCells=[2,3,4]
   const handler = new ValueIndexing(0, 1, 2, 3, 4);
-  handler.initialize(context.createGrid(), createCellExclusions({ numCells: 5 }), context.shape, {});
+  context.initializeHandler(handler);
 
-  const grid = new Uint16Array(5);
+  const grid = context.grid;
   grid[0] = valueMask(1, 2, 3, 4); // Value cell - all values
   grid[1] = valueMask(1, 2, 3); // Control cell (indices 1, 2, 3)
   grid[2] = valueMask(1, 2); // Indexed[0] - has 1, 2
@@ -83,11 +83,11 @@ await runTest('ValueIndexing should prune value cell based on possible indexed v
 });
 
 await runTest('ValueIndexing should prune control cell based on value compatibility', () => {
-  const context = setupConstraintTest({ numValues: 4, numCells: 5 });
+  const context = setupConstraintTest({ gridSize: [1, 5] });
   const handler = new ValueIndexing(0, 1, 2, 3, 4);
-  handler.initialize(context.createGrid(), createCellExclusions({ numCells: 5 }), context.shape, {});
+  context.initializeHandler(handler);
 
-  const grid = new Uint16Array(5);
+  const grid = context.grid;
   grid[0] = valueMask(3); // Value cell - only 3
   grid[1] = valueMask(1, 2, 3); // Control cell
   grid[2] = valueMask(1, 2); // Indexed[0] - no 3
@@ -104,11 +104,11 @@ await runTest('ValueIndexing should prune control cell based on value compatibil
 });
 
 await runTest('ValueIndexing should constrain indexed cell when control is fixed', () => {
-  const context = setupConstraintTest({ numValues: 4, numCells: 5 });
+  const context = setupConstraintTest({ gridSize: [1, 5] });
   const handler = new ValueIndexing(0, 1, 2, 3, 4);
-  handler.initialize(context.createGrid(), createCellExclusions({ numCells: 5 }), context.shape, {});
+  context.initializeHandler(handler);
 
-  const grid = new Uint16Array(5);
+  const grid = context.grid;
   grid[0] = valueMask(2, 3); // Value cell
   grid[1] = valueMask(2); // Control cell - fixed to 2 (meaning indexed[1])
   grid[2] = valueMask(1, 2, 3, 4);
@@ -124,11 +124,11 @@ await runTest('ValueIndexing should constrain indexed cell when control is fixed
 });
 
 await runTest('ValueIndexing should fail when no valid control-value pair exists', () => {
-  const context = setupConstraintTest({ numValues: 4, numCells: 5 });
+  const context = setupConstraintTest({ gridSize: [1, 5] });
   const handler = new ValueIndexing(0, 1, 2, 3, 4);
-  handler.initialize(context.createGrid(), createCellExclusions({ numCells: 5 }), context.shape, {});
+  context.initializeHandler(handler);
 
-  const grid = new Uint16Array(5);
+  const grid = context.grid;
   grid[0] = valueMask(4); // Value cell - only 4
   grid[1] = valueMask(1, 2, 3); // Control cell
   grid[2] = valueMask(1, 2); // Indexed[0] - no 4
@@ -147,12 +147,12 @@ await runTest('ValueIndexing should fail when no valid control-value pair exists
 
 await runTest('ValueIndexing should work with short indexed array (numIndexed < numValues)', () => {
   // 8 values, but only 6 indexed cells (like a 6-cell row on a 6x8 grid)
-  const context = setupConstraintTest({ numValues: 8, numCells: 10 });
+  const context = setupConstraintTest({ gridSize: [2, 5], numValues: 8 });
   // valueCell=0, controlCell=1, indexedCells=[2,3,4,5,6,7] (6 cells)
   const handler = new ValueIndexing(0, 1, 2, 3, 4, 5, 6, 7);
 
-  const grid = context.createGrid();
-  const result = handler.initialize(grid, createCellExclusions({ numCells: 10 }), context.shape, {});
+  const grid = context.grid;
+  const result = context.initializeHandler(handler);
 
   assert.equal(result, true);
   // Control cell should only allow values 1-6 (6 indexed cells)
@@ -160,11 +160,11 @@ await runTest('ValueIndexing should work with short indexed array (numIndexed < 
 });
 
 await runTest('ValueIndexing should enforce correctly on rectangular grid', () => {
-  const context = setupConstraintTest({ numValues: 8, numCells: 10 });
+  const context = setupConstraintTest({ gridSize: [2, 5], numValues: 8 });
   const handler = new ValueIndexing(0, 1, 2, 3, 4, 5, 6, 7);
-  handler.initialize(context.createGrid(), createCellExclusions({ numCells: 10 }), context.shape, {});
+  context.initializeHandler(handler);
 
-  const grid = new Uint16Array(10);
+  const grid = context.grid;
   grid[0] = valueMask(7, 8); // Value cell - values 7 and 8
   grid[1] = valueMask(1, 2, 3, 4, 5, 6); // Control (already restricted by init)
   grid[2] = valueMask(1, 2, 3, 4, 5, 6); // Indexed[0] - no 7 or 8
@@ -185,16 +185,16 @@ await runTest('ValueIndexing should enforce correctly on rectangular grid', () =
 
 await runTest('ValueIndexing should work with more indexed cells than values', () => {
   // 6 values, but 10 indexed cells
-  const context = setupConstraintTest({ numValues: 6, numCells: 12 });
+  const context = setupConstraintTest({ gridSize: [3, 4], numValues: 6 });
   const handler = new ValueIndexing(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11);
 
-  const grid = context.createGrid();
-  const result = handler.initialize(grid, createCellExclusions({ numCells: 12 }), context.shape, {});
+  const grid = context.grid;
+  const result = context.initializeHandler(handler);
 
   assert.equal(result, true);
   // Control cell should allow values 1-6 (limited by numValues even though 10 indexed)
   // Actually: mask is (1 << 10) - 1 = values 1-10, but numValues=6 means only 1-6 exist
-  // So control will be all values 1-6 (as that's what createGrid fills with)
+  // So control will be all values 1-6 (as that's what grid fills with)
   assert.equal(grid[1], valueMask(1, 2, 3, 4, 5, 6));
 });
 
@@ -203,12 +203,12 @@ await runTest('ValueIndexing should work with more indexed cells than values', (
 // =============================================================================
 
 await runTest('ValueIndexing should handle single indexed cell', () => {
-  const context = setupConstraintTest({ numValues: 4, numCells: 3 });
+  const context = setupConstraintTest({ gridSize: [1, 3], numValues: 4 });
   // valueCell=0, controlCell=1, indexedCells=[2] (only 1)
   const handler = new ValueIndexing(0, 1, 2);
-  handler.initialize(context.createGrid(), createCellExclusions({ numCells: 3 }), context.shape, {});
+  context.initializeHandler(handler);
 
-  const grid = new Uint16Array(3);
+  const grid = context.grid;
   grid[0] = valueMask(2, 3); // Value cell
   grid[1] = valueMask(1); // Control - only option is 1
   grid[2] = valueMask(2, 3, 4); // The single indexed cell
@@ -222,11 +222,11 @@ await runTest('ValueIndexing should handle single indexed cell', () => {
 });
 
 await runTest('ValueIndexing should update both value and control cells', () => {
-  const context = setupConstraintTest({ numValues: 4, numCells: 6 });
+  const context = setupConstraintTest({ gridSize: [2, 3], numValues: 4 });
   const handler = new ValueIndexing(0, 1, 2, 3, 4, 5);
-  handler.initialize(context.createGrid(), createCellExclusions({ numCells: 6 }), context.shape, {});
+  context.initializeHandler(handler);
 
-  const grid = new Uint16Array(6);
+  const grid = context.grid;
   grid[0] = valueMask(1, 2, 3, 4); // Value cell
   grid[1] = valueMask(1, 2, 3, 4); // Control
   grid[2] = valueMask(1); // Indexed[0] - only 1

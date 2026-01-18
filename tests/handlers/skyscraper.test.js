@@ -18,12 +18,15 @@ const { Skyscraper } = await import('../../js/solver/handlers.js');
 // =============================================================================
 
 await runTest('Skyscraper constructor should throw for visibility <= 0', () => {
-  assert.throws(() => new Skyscraper([0, 1, 2, 3], 0), /must be > 0/);
-  assert.throws(() => new Skyscraper([0, 1, 2, 3], -1), /must be > 0/);
+  const context = setupConstraintTest({ gridSize: [1, 4] });
+  const cells = context.cells();
+  assert.throws(() => new Skyscraper(cells, 0), /must be > 0/);
+  assert.throws(() => new Skyscraper(cells, -1), /must be > 0/);
 });
 
 await runTest('Skyscraper constructor should accept valid visibility', () => {
-  const handler = new Skyscraper([0, 1, 2, 3], 2);
+  const context = setupConstraintTest({ gridSize: [1, 4] });
+  const handler = new Skyscraper(context.cells(), 2);
   assert.ok(handler);
 });
 
@@ -32,34 +35,34 @@ await runTest('Skyscraper constructor should accept valid visibility', () => {
 // =============================================================================
 
 await runTest('Skyscraper should initialize successfully with valid visibility', () => {
-  const context = setupConstraintTest({ numValues: 4, numCells: 4 });
-  const cells = [0, 1, 2, 3];
+  const context = setupConstraintTest({ gridSize: [1, 4] });
+  const cells = context.cells();
   const handler = new Skyscraper(cells, 2);
 
-  const grid = context.createGrid();
-  const result = handler.initialize(grid, createCellExclusions({ numCells: 4 }), context.shape, {});
+  const grid = context.grid;
+  const result = context.initializeHandler(handler);
 
   assert.equal(result, true);
 });
 
 await runTest('Skyscraper should fail init if visibility > numCells', () => {
-  const context = setupConstraintTest({ numValues: 4, numCells: 4 });
-  const cells = [0, 1, 2, 3];
+  const context = setupConstraintTest({ gridSize: [1, 4] });
+  const cells = context.cells();
   const handler = new Skyscraper(cells, 5); // 5 > 4 cells
 
-  const grid = context.createGrid();
-  const result = handler.initialize(grid, createCellExclusions({ numCells: 4 }), context.shape, {});
+  const grid = context.grid;
+  const result = context.initializeHandler(handler);
 
   assert.equal(result, false, 'should fail when visibility > numCells');
 });
 
 await runTest('Skyscraper should allow visibility == numCells', () => {
-  const context = setupConstraintTest({ numValues: 4, numCells: 4 });
-  const cells = [0, 1, 2, 3];
+  const context = setupConstraintTest({ gridSize: [1, 4] });
+  const cells = context.cells();
   const handler = new Skyscraper(cells, 4); // visibility == numCells
 
-  const grid = context.createGrid();
-  const result = handler.initialize(grid, createCellExclusions({ numCells: 4 }), context.shape, {});
+  const grid = context.grid;
+  const result = context.initializeHandler(handler);
 
   assert.equal(result, true, 'should pass when visibility == numCells');
 });
@@ -69,12 +72,12 @@ await runTest('Skyscraper should allow visibility == numCells', () => {
 // =============================================================================
 
 await runTest('Skyscraper visibility=1 should require max value in first cell', () => {
-  const context = setupConstraintTest({ numValues: 4, numCells: 4 });
-  const cells = [0, 1, 2, 3];
+  const context = setupConstraintTest({ gridSize: [1, 4] });
+  const cells = context.cells();
   const handler = new Skyscraper(cells, 1);
-  handler.initialize(context.createGrid(), createCellExclusions({ numCells: 4 }), context.shape, {});
+  context.initializeHandler(handler);
 
-  const grid = new Uint16Array(4);
+  const grid = context.grid;
   grid[0] = valueMask(1, 2, 3, 4);
   grid[1] = valueMask(1, 2, 3, 4);
   grid[2] = valueMask(1, 2, 3, 4);
@@ -89,12 +92,12 @@ await runTest('Skyscraper visibility=1 should require max value in first cell', 
 });
 
 await runTest('Skyscraper visibility=n should require ascending sequence', () => {
-  const context = setupConstraintTest({ numValues: 4, numCells: 4 });
-  const cells = [0, 1, 2, 3];
+  const context = setupConstraintTest({ gridSize: [1, 4] });
+  const cells = context.cells();
   const handler = new Skyscraper(cells, 4); // All visible = ascending sequence
-  handler.initialize(context.createGrid(), createCellExclusions({ numCells: 4 }), context.shape, {});
+  context.initializeHandler(handler);
 
-  const grid = new Uint16Array(4);
+  const grid = context.grid;
   grid[0] = valueMask(1, 2, 3, 4);
   grid[1] = valueMask(1, 2, 3, 4);
   grid[2] = valueMask(1, 2, 3, 4);
@@ -112,12 +115,12 @@ await runTest('Skyscraper visibility=n should require ascending sequence', () =>
 });
 
 await runTest('Skyscraper visibility=2 should constrain first two visible', () => {
-  const context = setupConstraintTest({ numValues: 4, numCells: 4 });
-  const cells = [0, 1, 2, 3];
+  const context = setupConstraintTest({ gridSize: [1, 4] });
+  const cells = context.cells();
   const handler = new Skyscraper(cells, 2);
-  handler.initialize(context.createGrid(), createCellExclusions({ numCells: 4 }), context.shape, {});
+  context.initializeHandler(handler);
 
-  const grid = new Uint16Array(4);
+  const grid = context.grid;
   grid[0] = valueMask(1, 2, 3); // Not 4 - so always visible
   grid[1] = valueMask(1, 2, 3, 4);
   grid[2] = valueMask(1, 2, 3, 4);
@@ -135,12 +138,12 @@ await runTest('Skyscraper visibility=2 should constrain first two visible', () =
 // =============================================================================
 
 await runTest('Skyscraper forward pass should track visibility correctly', () => {
-  const context = setupConstraintTest({ numValues: 4, numCells: 4 });
-  const cells = [0, 1, 2, 3];
+  const context = setupConstraintTest({ gridSize: [1, 4] });
+  const cells = context.cells();
   const handler = new Skyscraper(cells, 2);
-  handler.initialize(context.createGrid(), createCellExclusions({ numCells: 4 }), context.shape, {});
+  context.initializeHandler(handler);
 
-  const grid = new Uint16Array(4);
+  const grid = context.grid;
   grid[0] = valueMask(3); // First visible is 3
   grid[1] = valueMask(1); // Hidden behind 3
   grid[2] = valueMask(2); // Hidden behind 3
@@ -153,12 +156,12 @@ await runTest('Skyscraper forward pass should track visibility correctly', () =>
 });
 
 await runTest('Skyscraper should fail when visibility cannot be achieved', () => {
-  const context = setupConstraintTest({ numValues: 4, numCells: 4 });
-  const cells = [0, 1, 2, 3];
+  const context = setupConstraintTest({ gridSize: [1, 4] });
+  const cells = context.cells();
   const handler = new Skyscraper(cells, 3);
-  handler.initialize(context.createGrid(), createCellExclusions({ numCells: 4 }), context.shape, {});
+  context.initializeHandler(handler);
 
-  const grid = new Uint16Array(4);
+  const grid = context.grid;
   grid[0] = valueMask(4); // Max is first - only 1 visible possible
   grid[1] = valueMask(1, 2, 3);
   grid[2] = valueMask(1, 2, 3);
@@ -175,12 +178,12 @@ await runTest('Skyscraper should fail when visibility cannot be achieved', () =>
 // =============================================================================
 
 await runTest('Skyscraper backward pass should prune impossible values', () => {
-  const context = setupConstraintTest({ numValues: 4, numCells: 4 });
-  const cells = [0, 1, 2, 3];
+  const context = setupConstraintTest({ gridSize: [1, 4] });
+  const cells = context.cells();
   const handler = new Skyscraper(cells, 2);
-  handler.initialize(context.createGrid(), createCellExclusions({ numCells: 4 }), context.shape, {});
+  context.initializeHandler(handler);
 
-  const grid = new Uint16Array(4);
+  const grid = context.grid;
   grid[0] = valueMask(1, 2, 3);
   grid[1] = valueMask(1, 2, 3, 4);
   grid[2] = valueMask(1, 2, 3, 4);
@@ -195,12 +198,12 @@ await runTest('Skyscraper backward pass should prune impossible values', () => {
 });
 
 await runTest('Skyscraper should remove maxValue from cells after first maxValue', () => {
-  const context = setupConstraintTest({ numValues: 4, numCells: 4 });
-  const cells = [0, 1, 2, 3];
+  const context = setupConstraintTest({ gridSize: [1, 4] });
+  const cells = context.cells();
   const handler = new Skyscraper(cells, 2);
-  handler.initialize(context.createGrid(), createCellExclusions({ numCells: 4 }), context.shape, {});
+  context.initializeHandler(handler);
 
-  const grid = new Uint16Array(4);
+  const grid = context.grid;
   grid[0] = valueMask(1, 2, 3);
   grid[1] = valueMask(4); // Max is here
   grid[2] = valueMask(1, 2, 3, 4); // 4 should be removed
@@ -219,23 +222,23 @@ await runTest('Skyscraper should remove maxValue from cells after first maxValue
 // =============================================================================
 
 await runTest('Skyscraper should work on short rows (numCells < numValues)', () => {
-  const context = setupConstraintTest({ numValues: 9, numCells: 6 });
-  const cells = [0, 1, 2, 3, 4, 5];
+  const context = setupConstraintTest({ gridSize: [1, 6], numValues: 9 });
+  const cells = context.cells();
   const handler = new Skyscraper(cells, 2);
 
-  const grid = context.createGrid();
-  const result = handler.initialize(grid, createCellExclusions({ numCells: 6 }), context.shape, {});
+  const grid = context.grid;
+  const result = context.initializeHandler(handler);
 
   assert.equal(result, true, 'should initialize for short row');
 });
 
 await runTest('Skyscraper short row should accept terminal height >= numCells', () => {
-  const context = setupConstraintTest({ numValues: 9, numCells: 6 });
-  const cells = [0, 1, 2, 3, 4, 5];
+  const context = setupConstraintTest({ gridSize: [1, 6], numValues: 9 });
+  const cells = context.cells();
   const handler = new Skyscraper(cells, 2);
-  handler.initialize(context.createGrid(), createCellExclusions({ numCells: 6 }), context.shape, {});
+  context.initializeHandler(handler);
 
-  const grid = new Uint16Array(6);
+  const grid = context.grid;
   // With 6 cells from values 1-9, max height can be 6,7,8, or 9
   grid[0] = valueMask(5); // First visible
   grid[1] = valueMask(1);
@@ -251,12 +254,12 @@ await runTest('Skyscraper short row should accept terminal height >= numCells', 
 });
 
 await runTest('Skyscraper short row should accept terminal height > numCells', () => {
-  const context = setupConstraintTest({ numValues: 9, numCells: 6 });
-  const cells = [0, 1, 2, 3, 4, 5];
+  const context = setupConstraintTest({ gridSize: [1, 6], numValues: 9 });
+  const cells = context.cells();
   const handler = new Skyscraper(cells, 2);
-  handler.initialize(context.createGrid(), createCellExclusions({ numCells: 6 }), context.shape, {});
+  context.initializeHandler(handler);
 
-  const grid = new Uint16Array(6);
+  const grid = context.grid;
   grid[0] = valueMask(5);
   grid[1] = valueMask(1);
   grid[2] = valueMask(2);
@@ -271,12 +274,12 @@ await runTest('Skyscraper short row should accept terminal height > numCells', (
 });
 
 await runTest('Skyscraper short row should reject terminal height < numCells', () => {
-  const context = setupConstraintTest({ numValues: 9, numCells: 6 });
-  const cells = [0, 1, 2, 3, 4, 5];
+  const context = setupConstraintTest({ gridSize: [1, 6], numValues: 9 });
+  const cells = context.cells();
   const handler = new Skyscraper(cells, 1); // Only 1 visible
-  handler.initialize(context.createGrid(), createCellExclusions({ numCells: 6 }), context.shape, {});
+  context.initializeHandler(handler);
 
-  const grid = new Uint16Array(6);
+  const grid = context.grid;
   // For visibility=1, max must be first
   // But max height must be >= 6 (numCells)
   grid[0] = valueMask(5); // Height 5 < 6 = numCells - invalid!
@@ -292,18 +295,12 @@ await runTest('Skyscraper short row should reject terminal height < numCells', (
 });
 
 await runTest('Skyscraper short row visibility=1 requires first cell >= numCells', () => {
-  const context = setupConstraintTest({ numValues: 9, numCells: 6 });
-  const cells = [0, 1, 2, 3, 4, 5];
+  const context = setupConstraintTest({ gridSize: [1, 6], numValues: 9 });
+  const cells = context.cells();
   const handler = new Skyscraper(cells, 1);
-  handler.initialize(context.createGrid(), createCellExclusions({ numCells: 6 }), context.shape, {});
+  context.initializeHandler(handler);
 
-  const grid = new Uint16Array(6);
-  grid[0] = valueMask(1, 2, 3, 4, 5, 6, 7, 8, 9);
-  grid[1] = valueMask(1, 2, 3, 4, 5, 6, 7, 8, 9);
-  grid[2] = valueMask(1, 2, 3, 4, 5, 6, 7, 8, 9);
-  grid[3] = valueMask(1, 2, 3, 4, 5, 6, 7, 8, 9);
-  grid[4] = valueMask(1, 2, 3, 4, 5, 6, 7, 8, 9);
-  grid[5] = valueMask(1, 2, 3, 4, 5, 6, 7, 8, 9);
+  const grid = context.grid;
   const acc = createAccumulator();
 
   const result = handler.enforceConsistency(grid, acc);
@@ -319,12 +316,12 @@ await runTest('Skyscraper short row visibility=1 requires first cell >= numCells
 
 await runTest('Skyscraper should work on long rows (numCells > numValues)', () => {
   // 12 cells but only values 1-9
-  const context = setupConstraintTest({ numValues: 9, numCells: 12 });
-  const cells = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+  const context = setupConstraintTest({ gridSize: [3, 4], numValues: 9 });
+  const cells = context.cells();
   const handler = new Skyscraper(cells, 2);
 
-  const grid = context.createGrid();
-  const result = handler.initialize(grid, createCellExclusions({ numCells: 12 }), context.shape, {});
+  const grid = context.grid;
+  const result = context.initializeHandler(handler);
 
   assert.equal(result, true, 'should initialize for long row');
 });
@@ -334,13 +331,12 @@ await runTest('Skyscraper should work on long rows (numCells > numValues)', () =
 // =============================================================================
 
 await runTest('Skyscraper should handle single cell with visibility=1', () => {
-  const context = setupConstraintTest({ numValues: 4, numCells: 1 });
-  const cells = [0];
+  const context = setupConstraintTest({ gridSize: [1, 1], numValues: 4 });
+  const cells = context.cells();
   const handler = new Skyscraper(cells, 1);
-  handler.initialize(context.createGrid(), createCellExclusions({ numCells: 1 }), context.shape, {});
+  context.initializeHandler(handler);
 
-  const grid = new Uint16Array(1);
-  grid[0] = valueMask(1, 2, 3, 4);
+  const grid = context.grid;
   const acc = createAccumulator();
 
   const result = handler.enforceConsistency(grid, acc);
@@ -351,14 +347,12 @@ await runTest('Skyscraper should handle single cell with visibility=1', () => {
 });
 
 await runTest('Skyscraper should handle two cells visibility=1', () => {
-  const context = setupConstraintTest({ numValues: 4, numCells: 2 });
-  const cells = [0, 1];
+  const context = setupConstraintTest({ gridSize: [1, 2], numValues: 4 });
+  const cells = context.cells();
   const handler = new Skyscraper(cells, 1);
-  handler.initialize(context.createGrid(), createCellExclusions({ numCells: 2 }), context.shape, {});
+  context.initializeHandler(handler);
 
-  const grid = new Uint16Array(2);
-  grid[0] = valueMask(1, 2, 3, 4);
-  grid[1] = valueMask(1, 2, 3, 4);
+  const grid = context.grid;
   const acc = createAccumulator();
 
   const result = handler.enforceConsistency(grid, acc);
@@ -370,14 +364,12 @@ await runTest('Skyscraper should handle two cells visibility=1', () => {
 });
 
 await runTest('Skyscraper should handle two cells visibility=2', () => {
-  const context = setupConstraintTest({ numValues: 4, numCells: 2 });
-  const cells = [0, 1];
+  const context = setupConstraintTest({ gridSize: [1, 2], numValues: 4 });
+  const cells = context.cells();
   const handler = new Skyscraper(cells, 2);
-  handler.initialize(context.createGrid(), createCellExclusions({ numCells: 2 }), context.shape, {});
+  context.initializeHandler(handler);
 
-  const grid = new Uint16Array(2);
-  grid[0] = valueMask(1, 2, 3, 4);
-  grid[1] = valueMask(1, 2, 3, 4);
+  const grid = context.grid;
   const acc = createAccumulator();
 
   const result = handler.enforceConsistency(grid, acc);
@@ -391,16 +383,13 @@ await runTest('Skyscraper should handle two cells visibility=2', () => {
 });
 
 await runTest('Skyscraper should fail when grid is empty', () => {
-  const context = setupConstraintTest({ numValues: 4, numCells: 4 });
-  const cells = [0, 1, 2, 3];
+  const context = setupConstraintTest({ gridSize: [1, 4] });
+  const cells = context.cells();
   const handler = new Skyscraper(cells, 2);
-  handler.initialize(context.createGrid(), createCellExclusions({ numCells: 4 }), context.shape, {});
+  context.initializeHandler(handler);
 
-  const grid = new Uint16Array(4);
+  const grid = context.grid;
   grid[0] = 0; // Empty cell
-  grid[1] = valueMask(1, 2, 3, 4);
-  grid[2] = valueMask(1, 2, 3, 4);
-  grid[3] = valueMask(1, 2, 3, 4);
   const acc = createAccumulator();
 
   const result = handler.enforceConsistency(grid, acc);
@@ -409,16 +398,12 @@ await runTest('Skyscraper should fail when grid is empty', () => {
 });
 
 await runTest('Skyscraper should prune values correctly', () => {
-  const context = setupConstraintTest({ numValues: 4, numCells: 4 });
-  const cells = [0, 1, 2, 3];
+  const context = setupConstraintTest({ gridSize: [1, 4] });
+  const cells = context.cells();
   const handler = new Skyscraper(cells, 1); // visibility=1 means max first
-  handler.initialize(context.createGrid(), createCellExclusions({ numCells: 4 }), context.shape, {});
+  context.initializeHandler(handler);
 
-  const grid = new Uint16Array(4);
-  grid[0] = valueMask(1, 2, 3, 4);
-  grid[1] = valueMask(1, 2, 3, 4);
-  grid[2] = valueMask(1, 2, 3, 4);
-  grid[3] = valueMask(1, 2, 3, 4);
+  const grid = context.grid;
   const acc = createAccumulator();
 
   handler.enforceConsistency(grid, acc);
@@ -435,12 +420,12 @@ await runTest('Skyscraper should prune values correctly', () => {
 // =============================================================================
 
 await runTest('Skyscraper should validate sequence [2,4,1,3] gives visibility 2', () => {
-  const context = setupConstraintTest({ numValues: 4, numCells: 4 });
-  const cells = [0, 1, 2, 3];
+  const context = setupConstraintTest({ gridSize: [1, 4] });
+  const cells = context.cells();
   const handler = new Skyscraper(cells, 2);
-  handler.initialize(context.createGrid(), createCellExclusions({ numCells: 4 }), context.shape, {});
+  context.initializeHandler(handler);
 
-  const grid = new Uint16Array(4);
+  const grid = context.grid;
   grid[0] = valueMask(2); // Visible (first)
   grid[1] = valueMask(4); // Visible (4 > 2)
   grid[2] = valueMask(1); // Hidden (1 < 4)
@@ -453,12 +438,12 @@ await runTest('Skyscraper should validate sequence [2,4,1,3] gives visibility 2'
 });
 
 await runTest('Skyscraper should validate sequence [1,2,3,4] gives visibility 4', () => {
-  const context = setupConstraintTest({ numValues: 4, numCells: 4 });
-  const cells = [0, 1, 2, 3];
+  const context = setupConstraintTest({ gridSize: [1, 4] });
+  const cells = context.cells();
   const handler = new Skyscraper(cells, 4);
-  handler.initialize(context.createGrid(), createCellExclusions({ numCells: 4 }), context.shape, {});
+  context.initializeHandler(handler);
 
-  const grid = new Uint16Array(4);
+  const grid = context.grid;
   grid[0] = valueMask(1);
   grid[1] = valueMask(2);
   grid[2] = valueMask(3);
@@ -471,12 +456,12 @@ await runTest('Skyscraper should validate sequence [1,2,3,4] gives visibility 4'
 });
 
 await runTest('Skyscraper should reject [1,2,3,4] for visibility=3', () => {
-  const context = setupConstraintTest({ numValues: 4, numCells: 4 });
-  const cells = [0, 1, 2, 3];
+  const context = setupConstraintTest({ gridSize: [1, 4] });
+  const cells = context.cells();
   const handler = new Skyscraper(cells, 3);
-  handler.initialize(context.createGrid(), createCellExclusions({ numCells: 4 }), context.shape, {});
+  context.initializeHandler(handler);
 
-  const grid = new Uint16Array(4);
+  const grid = context.grid;
   grid[0] = valueMask(1);
   grid[1] = valueMask(2);
   grid[2] = valueMask(3);
@@ -489,12 +474,12 @@ await runTest('Skyscraper should reject [1,2,3,4] for visibility=3', () => {
 });
 
 await runTest('Skyscraper should validate sequence [3,2,4,1] gives visibility 2', () => {
-  const context = setupConstraintTest({ numValues: 4, numCells: 4 });
-  const cells = [0, 1, 2, 3];
+  const context = setupConstraintTest({ gridSize: [1, 4] });
+  const cells = context.cells();
   const handler = new Skyscraper(cells, 2);
-  handler.initialize(context.createGrid(), createCellExclusions({ numCells: 4 }), context.shape, {});
+  context.initializeHandler(handler);
 
-  const grid = new Uint16Array(4);
+  const grid = context.grid;
   grid[0] = valueMask(3); // Visible
   grid[1] = valueMask(2); // Hidden
   grid[2] = valueMask(4); // Visible (4 > 3)
@@ -511,15 +496,12 @@ await runTest('Skyscraper should validate sequence [3,2,4,1] gives visibility 2'
 // =============================================================================
 
 await runTest('Skyscraper 9x9 visibility=1 forces first cell to 9', () => {
-  const context = setupConstraintTest({ numValues: 9, numCells: 9 });
-  const cells = [0, 1, 2, 3, 4, 5, 6, 7, 8];
+  const context = setupConstraintTest({ gridSize: [1, 9] });
+  const cells = context.cells();
   const handler = new Skyscraper(cells, 1);
-  handler.initialize(context.createGrid(), createCellExclusions({ numCells: 9 }), context.shape, {});
+  context.initializeHandler(handler);
 
-  const grid = new Uint16Array(9);
-  for (let i = 0; i < 9; i++) {
-    grid[i] = valueMask(1, 2, 3, 4, 5, 6, 7, 8, 9);
-  }
+  const grid = context.grid;
   const acc = createAccumulator();
 
   const result = handler.enforceConsistency(grid, acc);
@@ -529,15 +511,12 @@ await runTest('Skyscraper 9x9 visibility=1 forces first cell to 9', () => {
 });
 
 await runTest('Skyscraper 9x9 visibility=9 forces ascending order', () => {
-  const context = setupConstraintTest({ numValues: 9, numCells: 9 });
-  const cells = [0, 1, 2, 3, 4, 5, 6, 7, 8];
+  const context = setupConstraintTest({ gridSize: [1, 9] });
+  const cells = context.cells();
   const handler = new Skyscraper(cells, 9);
-  handler.initialize(context.createGrid(), createCellExclusions({ numCells: 9 }), context.shape, {});
+  context.initializeHandler(handler);
 
-  const grid = new Uint16Array(9);
-  for (let i = 0; i < 9; i++) {
-    grid[i] = valueMask(1, 2, 3, 4, 5, 6, 7, 8, 9);
-  }
+  const grid = context.grid;
   const acc = createAccumulator();
 
   const result = handler.enforceConsistency(grid, acc);
@@ -553,12 +532,12 @@ await runTest('Skyscraper 9x9 visibility=9 forces ascending order', () => {
 // =============================================================================
 
 await runTest('Skyscraper should be idempotent', () => {
-  const context = setupConstraintTest({ numValues: 4, numCells: 4 });
-  const cells = [0, 1, 2, 3];
+  const context = setupConstraintTest({ gridSize: [1, 4] });
+  const cells = context.cells();
   const handler = new Skyscraper(cells, 2);
-  handler.initialize(context.createGrid(), createCellExclusions({ numCells: 4 }), context.shape, {});
+  context.initializeHandler(handler);
 
-  const grid = new Uint16Array(4);
+  const grid = context.grid;
   grid[0] = valueMask(1, 2, 3);
   grid[1] = valueMask(1, 2, 3, 4);
   grid[2] = valueMask(1, 2, 3, 4);

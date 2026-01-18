@@ -19,12 +19,12 @@ const { DutchFlatmateLine } = await import('../../js/solver/handlers.js');
 
 await runTest('DutchFlatmateLine should remove target from a cell with no valid flatmate', () => {
   // 9 values => target is 5, above=1, below=9
-  const context = setupConstraintTest({ numValues: 9, numCells: 3 });
-  const cells = [0, 1, 2];
+  const context = setupConstraintTest({ gridSize: [1, 3], numValues: 9 });
+  const cells = context.cells();
   const handler = new DutchFlatmateLine(cells);
 
-  const grid = context.createGrid();
-  assert.equal(handler.initialize(grid, createCellExclusions({ numCells: 3 }), context.shape, {}), true);
+  const grid = context.grid;
+  assert.equal(context.initializeHandler(handler), true);
 
   // Middle cell can be 5, but neighbors can be neither 1 nor 9.
   grid[0] = valueMask(2, 3, 4);
@@ -40,12 +40,12 @@ await runTest('DutchFlatmateLine should remove target from a cell with no valid 
 });
 
 await runTest('DutchFlatmateLine should fail if removing target wipes out a cell', () => {
-  const context = setupConstraintTest({ numValues: 9, numCells: 3 });
-  const cells = [0, 1, 2];
+  const context = setupConstraintTest({ gridSize: [1, 3], numValues: 9 });
+  const cells = context.cells();
   const handler = new DutchFlatmateLine(cells);
 
-  const grid = context.createGrid();
-  assert.equal(handler.initialize(grid, createCellExclusions({ numCells: 3 }), context.shape, {}), true);
+  const grid = context.grid;
+  assert.equal(context.initializeHandler(handler), true);
 
   grid[0] = valueMask(2, 3, 4);
   grid[1] = valueMask(5); // only target
@@ -62,12 +62,12 @@ await runTest('DutchFlatmateLine should fail if removing target wipes out a cell
 // =============================================================================
 
 await runTest('DutchFlatmateLine should force above flatmate when target is fixed and only above is possible', () => {
-  const context = setupConstraintTest({ numValues: 9, numCells: 3 });
-  const cells = [0, 1, 2];
+  const context = setupConstraintTest({ gridSize: [1, 3], numValues: 9 });
+  const cells = context.cells();
   const handler = new DutchFlatmateLine(cells);
 
-  const grid = context.createGrid();
-  assert.equal(handler.initialize(grid, createCellExclusions({ numCells: 3 }), context.shape, {}), true);
+  const grid = context.grid;
+  assert.equal(context.initializeHandler(handler), true);
 
   grid[0] = valueMask(1, 2); // can be above
   grid[1] = valueMask(5); // fixed to target
@@ -81,12 +81,12 @@ await runTest('DutchFlatmateLine should force above flatmate when target is fixe
 });
 
 await runTest('DutchFlatmateLine should force below flatmate when target is fixed and only below is possible', () => {
-  const context = setupConstraintTest({ numValues: 9, numCells: 3 });
-  const cells = [0, 1, 2];
+  const context = setupConstraintTest({ gridSize: [1, 3], numValues: 9 });
+  const cells = context.cells();
   const handler = new DutchFlatmateLine(cells);
 
-  const grid = context.createGrid();
-  assert.equal(handler.initialize(grid, createCellExclusions({ numCells: 3 }), context.shape, {}), true);
+  const grid = context.grid;
+  assert.equal(context.initializeHandler(handler), true);
 
   grid[0] = valueMask(2, 3, 4); // cannot be above=1
   grid[1] = valueMask(5); // fixed to target
@@ -104,12 +104,12 @@ await runTest('DutchFlatmateLine should force below flatmate when target is fixe
 // =============================================================================
 
 await runTest('DutchFlatmateLine should prune target at an edge if the only neighbor cannot be a flatmate', () => {
-  const context = setupConstraintTest({ numValues: 9, numCells: 2 });
-  const cells = [0, 1];
+  const context = setupConstraintTest({ gridSize: [1, 2], numValues: 9 });
+  const cells = context.cells();
   const handler = new DutchFlatmateLine(cells);
 
-  const grid = context.createGrid();
-  assert.equal(handler.initialize(grid, createCellExclusions({ numCells: 2 }), context.shape, {}), true);
+  const grid = context.grid;
+  assert.equal(context.initializeHandler(handler), true);
 
   grid[0] = valueMask(5, 6);
   grid[1] = valueMask(2, 3, 4); // cannot be 1 or 9
@@ -128,12 +128,12 @@ await runTest('DutchFlatmateLine should prune target at an edge if the only neig
 await runTest('DutchFlatmateLine should work on short lines where the below value cannot exist in the line', () => {
   // 6-cell line with 8 values per cell (e.g. columns in a 6x8 grid).
   // Below value is 8, but we exclude it everywhere in the line.
-  const context = setupConstraintTest({ numValues: 8, numCells: 6 });
-  const cells = [0, 1, 2, 3, 4, 5];
+  const context = setupConstraintTest({ gridSize: [1, 6], numValues: 8 });
+  const cells = context.cells();
   const handler = new DutchFlatmateLine(cells);
 
-  const grid = context.createGrid();
-  assert.equal(handler.initialize(grid, createCellExclusions({ numCells: 6 }), context.shape, {}), true);
+  const grid = context.grid;
+  assert.equal(context.initializeHandler(handler), true);
 
   // Remove 8 everywhere.
   for (let i = 0; i < 6; i++) grid[i] &= ~valueMask(8);
@@ -156,12 +156,12 @@ await runTest('DutchFlatmateLine should work on short lines where the below valu
 });
 
 await runTest('DutchFlatmateLine should fail when neither flatmate value can exist in the line', () => {
-  const context = setupConstraintTest({ numValues: 8, numCells: 3 });
-  const cells = [0, 1, 2];
+  const context = setupConstraintTest({ gridSize: [1, 3], numValues: 8 });
+  const cells = context.cells();
   const handler = new DutchFlatmateLine(cells);
 
-  const grid = context.createGrid();
-  assert.equal(handler.initialize(grid, createCellExclusions({ numCells: 3 }), context.shape, {}), true);
+  const grid = context.grid;
+  assert.equal(context.initializeHandler(handler), true);
 
   // Remove both flatmate values (above=1 and below=8) everywhere.
   for (let i = 0; i < 3; i++) grid[i] &= ~(valueMask(1) | valueMask(8));
