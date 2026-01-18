@@ -15,7 +15,6 @@ ensureGlobalEnvironment();
 
 const { Sum } = await import('../../js/solver/sum_handler.js');
 
-const defaultContext = setupConstraintTest();
 const uniqueCells = () => createCellExclusions({ allUnique: true });
 const nonUniqueCells = () => createCellExclusions({ allUnique: false });
 
@@ -24,21 +23,23 @@ const initializeSum = (options = {}) => {
     numCells,
     sum,
     coeffs,
-    context = defaultContext,
+    context,
     cellExclusions = uniqueCells(),
   } = options;
 
-  const cells = Array.from({ length: numCells }, (_, i) => i);
+  const resolvedContext = context ?? setupConstraintTest();
+
+  const cells = resolvedContext.cells(numCells);
   return initializeConstraintHandler(Sum, {
     args: [cells, sum, coeffs],
-    context,
+    context: resolvedContext,
     cellExclusions,
   });
 };
 
 await runTest('Sum should force a unique combination once candidates align', () => {
   const { handler, context } = initializeSum({ numCells: 4, sum: 14 });
-  const grid = applyCandidates(context.createGrid(), {
+  const grid = applyCandidates(context.grid, {
     0: [1, 2],
     1: [2, 3],
     2: [3, 4],
@@ -56,7 +57,7 @@ await runTest('Sum should force a unique combination once candidates align', () 
 
 await runTest('Sum should reject impossible cages', () => {
   const { handler, context } = initializeSum({ numCells: 4, sum: 30 });
-  const grid = applyCandidates(context.createGrid(), {
+  const grid = applyCandidates(context.grid, {
     0: [1, 2],
     1: [2, 3],
     2: [3, 4],
@@ -69,7 +70,7 @@ await runTest('Sum should reject impossible cages', () => {
 
 await runTest('Sum should solve mixed coefficient cages with negative terms', () => {
   const { handler, context } = initializeSum({ numCells: 4, sum: 12, coeffs: [2, -1, 1, 1] });
-  const grid = applyCandidates(context.createGrid(), {
+  const grid = applyCandidates(context.grid, {
     0: [3, 4],
     1: [1, 2],
     2: [2],
@@ -87,7 +88,7 @@ await runTest('Sum should solve mixed coefficient cages with negative terms', ()
 
 await runTest('Sum should resolve cages with more than three unfixed cells', () => {
   const { handler, context } = initializeSum({ numCells: 4, sum: 22 });
-  const grid = applyCandidates(context.createGrid(), {
+  const grid = applyCandidates(context.grid, {
     0: [1, 8],
     1: [2, 7],
     2: [3, 6],
@@ -105,7 +106,7 @@ await runTest('Sum should resolve cages with more than three unfixed cells', () 
 });
 
 await runTest('Sum should handle cages longer than fifteen cells', () => {
-  const longContext = setupConstraintTest({ numValues: 16, numCells: 32 });
+  const longContext = setupConstraintTest({ gridSize: [2, 16] });
   const { handler, context } = initializeSum({
     numCells: 16,
     sum: 136,
@@ -120,7 +121,7 @@ await runTest('Sum should handle cages longer than fifteen cells', () => {
   assignments[13] = [14, 15];
   assignments[14] = [15, 16];
   assignments[15] = [16];
-  const grid = applyCandidates(context.createGrid(), assignments);
+  const grid = applyCandidates(context.grid, assignments);
 
   const result = handler.enforceConsistency(grid, createAccumulator());
 
@@ -131,8 +132,9 @@ await runTest('Sum should handle cages longer than fifteen cells', () => {
 });
 
 await runTest('Sum should restrict values based on complement cells', () => {
-  const complementCells = [2, 3, 4, 5, 6, 7, 8, 9];
-  const { handler, context } = initializeSum({ numCells: 2, sum: 10 });
+  const context = setupConstraintTest();
+  const complementCells = context.cells(10).slice(2);
+  const { handler } = initializeSum({ numCells: 2, sum: 10, context });
   handler.setComplementCells(complementCells);
 
   const assignments = {
@@ -142,7 +144,7 @@ await runTest('Sum should restrict values based on complement cells', () => {
   for (const complementCell of complementCells) {
     assignments[complementCell] = [1, 2, 3, 4, 5, 6, 7, 8];
   }
-  const grid = applyCandidates(context.createGrid(), assignments);
+  const grid = applyCandidates(context.grid, assignments);
 
   const result = handler.enforceConsistency(grid, createAccumulator());
 
@@ -157,7 +159,7 @@ await runTest('Sum should prohibit repeated digits when cells are mutually exclu
     sum: 15,
     cellExclusions: uniqueCells(),
   });
-  const grid = applyCandidates(context.createGrid(), {
+  const grid = applyCandidates(context.grid, {
     0: [1, 2, 3],
     1: [1, 2, 3],
     2: [5],
@@ -178,7 +180,7 @@ await runTest('Sum should allow repeated digits when cells are non-exclusive', (
     sum: 15,
     cellExclusions: nonUniqueCells(),
   });
-  const grid = applyCandidates(context.createGrid(), {
+  const grid = applyCandidates(context.grid, {
     0: [1, 2, 3],
     1: [1, 2, 3],
     2: [5],
@@ -194,30 +196,22 @@ await runTest('Sum should allow repeated digits when cells are non-exclusive', (
 });
 
 await runTest('Sum should reject cages with sums above the maximum', () => {
-  const handler = new Sum([0, 1, 2, 3], 100);
-  const initialized = handler.initialize(
-    defaultContext.createGrid(),
-    uniqueCells(),
-    defaultContext.shape,
-    {},
-  );
+  const context = setupConstraintTest();
+  const handler = new Sum(context.cells(4), 100);
+  const initialized = context.initializeHandler(handler, { cellExclusions: uniqueCells() });
   assert.equal(initialized, false, 'handler should refuse impossible cage sums');
 });
 
 await runTest('Sum should reject non-integer totals during initialization', () => {
-  const handler = new Sum([0, 1, 2, 3], 4.5);
-  const initialized = handler.initialize(
-    defaultContext.createGrid(),
-    uniqueCells(),
-    defaultContext.shape,
-    {},
-  );
+  const context = setupConstraintTest();
+  const handler = new Sum(context.cells(4), 4.5);
+  const initialized = context.initializeHandler(handler, { cellExclusions: uniqueCells() });
   assert.equal(initialized, false, 'handler should require integer sums');
 });
 
 await runTest('Sum should detect impossible bounds when minimum exceeds the target', () => {
   const { handler, context } = initializeSum({ numCells: 4, sum: 5 });
-  const grid = applyCandidates(context.createGrid(), {
+  const grid = applyCandidates(context.grid, {
     0: [8, 9],
     1: [7, 9],
     2: [7, 8],

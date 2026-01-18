@@ -13,7 +13,7 @@ await runTest('SeenCandidateSet with candidateSupportThreshold=1 sets candidates
   const seenCandidateSet = new SeenCandidateSet(numCells, numValues);
 
   // Simulate a solution grid where each cell has a single value (as bitmask).
-  const grid = new Uint16Array([1 << 0, 1 << 1, 1 << 2, 1 << 3]);
+  const grid = [1 << 0, 1 << 1, 1 << 2, 1 << 3];
 
   seenCandidateSet.addSolutionGrid(grid);
 
@@ -37,7 +37,7 @@ await runTest('SeenCandidateSet with candidateSupportThreshold>1 delays candidat
   const seenCandidateSet = new SeenCandidateSet(numCells, numValues);
   seenCandidateSet.resetWithThreshold(3);
 
-  const grid = new Uint16Array([1 << 0, 1 << 1, 1 << 2, 1 << 3]);
+  const grid = [1 << 0, 1 << 1, 1 << 2, 1 << 3];
 
   // First solution: counts are 1, candidates should be empty.
   seenCandidateSet.addSolutionGrid(grid);
@@ -61,7 +61,7 @@ await runTest('SeenCandidateSet counts saturate at candidateSupportThreshold', (
   const seenCandidateSet = new SeenCandidateSet(numCells, numValues);
   seenCandidateSet.resetWithThreshold(3);
 
-  const grid = new Uint16Array([1 << 0, 1 << 1]);
+  const grid = [1 << 0, 1 << 1];
 
   // Add many solutions.
   for (let i = 0; i < 10; i++) {
@@ -79,7 +79,7 @@ await runTest('SeenCandidateSet reset clears counts and candidates', () => {
   const numValues = 4;
   const seenCandidateSet = new SeenCandidateSet(numCells, numValues);
 
-  const grid = new Uint16Array([1 << 0, 1 << 1, 1 << 2, 1 << 3]);
+  const grid = [1 << 0, 1 << 1, 1 << 2, 1 << 3];
   seenCandidateSet.addSolutionGrid(grid);
 
   // Verify data is set.
@@ -104,7 +104,7 @@ await runTest('SeenCandidateSet resetWithThreshold sets candidateSupportThreshol
   assert.equal(seenCandidateSet._candidateSupportThreshold, 5);
 
   // Also clears data.
-  const grid = new Uint16Array([1 << 0, 1 << 1, 1 << 2, 1 << 3]);
+  const grid = [1 << 0, 1 << 1, 1 << 2, 1 << 3];
   seenCandidateSet.addSolutionGrid(grid);
   seenCandidateSet.resetWithThreshold(10);
   assert.equal(seenCandidateSet._candidateSupportThreshold, 10);
@@ -127,8 +127,8 @@ await runTest('SeenCandidateSet accumulates multiple values per cell', () => {
   const seenCandidateSet = new SeenCandidateSet(numCells, numValues);
 
   // Two different solutions with different values in cell 0.
-  const grid1 = new Uint16Array([1 << 0, 1 << 1]);
-  const grid2 = new Uint16Array([1 << 2, 1 << 1]);
+  const grid1 = [1 << 0, 1 << 1];
+  const grid2 = [1 << 2, 1 << 1];
 
   seenCandidateSet.addSolutionGrid(grid1);
   seenCandidateSet.addSolutionGrid(grid2);
@@ -152,14 +152,14 @@ await runTest('SeenCandidateSet hasInterestingSolutions works with candidateSupp
   seenCandidateSet.resetWithThreshold(2);
 
   // Add one solution.
-  const solution1 = new Uint16Array([1 << 0, 1 << 1, 1 << 2, 1 << 3]);
+  const solution1 = [1 << 0, 1 << 1, 1 << 2, 1 << 3];
   seenCandidateSet.addSolutionGrid(solution1);
 
   // Candidates not yet set (candidateSupportThreshold=2, count=1).
   assert.equal(seenCandidateSet.candidates[0], 0);
 
   // A grid with the same values should be interesting (count < candidateSupportThreshold).
-  const testGrid = new Uint16Array([1 << 0, 1 << 1, 1 << 2, 1 << 3]);
+  const testGrid = [1 << 0, 1 << 1, 1 << 2, 1 << 3];
   assert.equal(seenCandidateSet.hasInterestingSolutions(testGrid), true);
 
   // Add another solution to reach threshold.
@@ -170,6 +170,6 @@ await runTest('SeenCandidateSet hasInterestingSolutions works with candidateSupp
   assert.equal(seenCandidateSet.hasInterestingSolutions(testGrid), false);
 
   // A grid with a new value should still be interesting.
-  const newGrid = new Uint16Array([1 << 1, 1 << 1, 1 << 2, 1 << 3]);
+  const newGrid = [1 << 1, 1 << 1, 1 << 2, 1 << 3];
   assert.equal(seenCandidateSet.hasInterestingSolutions(newGrid), true);
 });

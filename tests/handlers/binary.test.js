@@ -23,24 +23,24 @@ const binaryKey = (fn, numValues) =>
 // =============================================================================
 
 await runTest('BinaryConstraint should initialize with valid key', () => {
-  const context = setupConstraintTest({ numValues: 4, numCells: 4 });
+  const context = setupConstraintTest({ gridSize: [1, 4] });
   const key = binaryKey((a, b) => a !== b, 4);
   const handler = new BinaryConstraint(0, 1, key);
 
-  const grid = context.createGrid();
-  const result = handler.initialize(grid, createCellExclusions(), context.shape, {});
+  const grid = context.grid;
+  const result = context.initializeHandler(handler);
 
   assert.equal(result, true);
 });
 
 await runTest('BinaryConstraint should fail initialization if no values are legal', () => {
-  const context = setupConstraintTest({ numValues: 4, numCells: 4 });
+  const context = setupConstraintTest({ gridSize: [1, 4] });
   // Impossible constraint: no pair is ever valid.
   const key = binaryKey(() => false, 4);
   const handler = new BinaryConstraint(0, 1, key);
 
-  const grid = context.createGrid();
-  const result = handler.initialize(grid, createCellExclusions(), context.shape, {});
+  const grid = context.grid;
+  const result = context.initializeHandler(handler);
 
   assert.equal(result, false);
 });
@@ -67,12 +67,12 @@ await runTest('BinaryConstraint should have unique idStr', () => {
 // =============================================================================
 
 await runTest('not-equal: should prune same values from both cells', () => {
-  const context = setupConstraintTest({ numValues: 4, numCells: 4 });
+  const context = setupConstraintTest({ gridSize: [1, 4] });
   const key = binaryKey((a, b) => a !== b, 4);
   const handler = new BinaryConstraint(0, 1, key);
-  handler.initialize(context.createGrid(), createCellExclusions(), context.shape, {});
+  context.initializeHandler(handler);
 
-  const grid = new Uint16Array(4);
+  const grid = context.grid;
   grid[0] = valueMask(1, 2);
   grid[1] = valueMask(1, 2, 3);
   const acc = createAccumulator();
@@ -88,12 +88,12 @@ await runTest('not-equal: should prune same values from both cells', () => {
 });
 
 await runTest('not-equal: should prune when one cell is fixed', () => {
-  const context = setupConstraintTest({ numValues: 4, numCells: 4 });
+  const context = setupConstraintTest({ gridSize: [1, 4] });
   const key = binaryKey((a, b) => a !== b, 4);
   const handler = new BinaryConstraint(0, 1, key);
-  handler.initialize(context.createGrid(), createCellExclusions(), context.shape, {});
+  context.initializeHandler(handler);
 
-  const grid = new Uint16Array(4);
+  const grid = context.grid;
   grid[0] = valueMask(2);  // Fixed to 2
   grid[1] = valueMask(1, 2, 3);
   const acc = createAccumulator();
@@ -107,12 +107,12 @@ await runTest('not-equal: should prune when one cell is fixed', () => {
 });
 
 await runTest('not-equal: should fail when both cells forced to same value', () => {
-  const context = setupConstraintTest({ numValues: 4, numCells: 4 });
+  const context = setupConstraintTest({ gridSize: [1, 4] });
   const key = binaryKey((a, b) => a !== b, 4);
   const handler = new BinaryConstraint(0, 1, key);
-  handler.initialize(context.createGrid(), createCellExclusions(), context.shape, {});
+  context.initializeHandler(handler);
 
-  const grid = new Uint16Array(4);
+  const grid = context.grid;
   grid[0] = valueMask(2);
   grid[1] = valueMask(2);
   const acc = createAccumulator();
@@ -127,12 +127,12 @@ await runTest('not-equal: should fail when both cells forced to same value', () 
 // =============================================================================
 
 await runTest('less-than: should prune high values from first cell', () => {
-  const context = setupConstraintTest({ numValues: 4, numCells: 4 });
+  const context = setupConstraintTest({ gridSize: [1, 4] });
   const key = binaryKey((a, b) => a < b, 4);
   const handler = new BinaryConstraint(0, 1, key);
-  handler.initialize(context.createGrid(), createCellExclusions(), context.shape, {});
+  context.initializeHandler(handler);
 
-  const grid = new Uint16Array(4);
+  const grid = context.grid;
   grid[0] = valueMask(1, 2, 3, 4);
   grid[1] = valueMask(3);  // Fixed to 3
   const acc = createAccumulator();
@@ -146,12 +146,12 @@ await runTest('less-than: should prune high values from first cell', () => {
 });
 
 await runTest('less-than: should prune low values from second cell', () => {
-  const context = setupConstraintTest({ numValues: 4, numCells: 4 });
+  const context = setupConstraintTest({ gridSize: [1, 4] });
   const key = binaryKey((a, b) => a < b, 4);
   const handler = new BinaryConstraint(0, 1, key);
-  handler.initialize(context.createGrid(), createCellExclusions(), context.shape, {});
+  context.initializeHandler(handler);
 
-  const grid = new Uint16Array(4);
+  const grid = context.grid;
   grid[0] = valueMask(2);  // Fixed to 2
   grid[1] = valueMask(1, 2, 3, 4);
   const acc = createAccumulator();
@@ -165,12 +165,12 @@ await runTest('less-than: should prune low values from second cell', () => {
 });
 
 await runTest('less-than: should prune both cells', () => {
-  const context = setupConstraintTest({ numValues: 4, numCells: 4 });
+  const context = setupConstraintTest({ gridSize: [1, 4] });
   const key = binaryKey((a, b) => a < b, 4);
   const handler = new BinaryConstraint(0, 1, key);
-  handler.initialize(context.createGrid(), createCellExclusions(), context.shape, {});
+  context.initializeHandler(handler);
 
-  const grid = new Uint16Array(4);
+  const grid = context.grid;
   grid[0] = valueMask(2, 3, 4);  // Can be 2, 3, or 4
   grid[1] = valueMask(1, 2, 3);  // Can be 1, 2, or 3
   const acc = createAccumulator();
@@ -186,12 +186,12 @@ await runTest('less-than: should prune both cells', () => {
 });
 
 await runTest('less-than: should fail when first cell minimum >= second cell maximum', () => {
-  const context = setupConstraintTest({ numValues: 4, numCells: 4 });
+  const context = setupConstraintTest({ gridSize: [1, 4] });
   const key = binaryKey((a, b) => a < b, 4);
   const handler = new BinaryConstraint(0, 1, key);
-  handler.initialize(context.createGrid(), createCellExclusions(), context.shape, {});
+  context.initializeHandler(handler);
 
-  const grid = new Uint16Array(4);
+  const grid = context.grid;
   grid[0] = valueMask(3, 4);  // Min is 3
   grid[1] = valueMask(1, 2);  // Max is 2
   const acc = createAccumulator();
@@ -206,12 +206,12 @@ await runTest('less-than: should fail when first cell minimum >= second cell max
 // =============================================================================
 
 await runTest('equals: should intersect candidates', () => {
-  const context = setupConstraintTest({ numValues: 4, numCells: 4 });
+  const context = setupConstraintTest({ gridSize: [1, 4] });
   const key = binaryKey((a, b) => a === b, 4);
   const handler = new BinaryConstraint(0, 1, key);
-  handler.initialize(context.createGrid(), createCellExclusions(), context.shape, {});
+  context.initializeHandler(handler);
 
-  const grid = new Uint16Array(4);
+  const grid = context.grid;
   grid[0] = valueMask(1, 2, 3);
   grid[1] = valueMask(2, 3, 4);
   const acc = createAccumulator();
@@ -226,12 +226,12 @@ await runTest('equals: should intersect candidates', () => {
 });
 
 await runTest('equals: should fail when no common values', () => {
-  const context = setupConstraintTest({ numValues: 4, numCells: 4 });
+  const context = setupConstraintTest({ gridSize: [1, 4] });
   const key = binaryKey((a, b) => a === b, 4);
   const handler = new BinaryConstraint(0, 1, key);
-  handler.initialize(context.createGrid(), createCellExclusions(), context.shape, {});
+  context.initializeHandler(handler);
 
-  const grid = new Uint16Array(4);
+  const grid = context.grid;
   grid[0] = valueMask(1, 2);
   grid[1] = valueMask(3, 4);
   const acc = createAccumulator();
@@ -246,12 +246,12 @@ await runTest('equals: should fail when no common values', () => {
 // =============================================================================
 
 await runTest('difference >= 2: should prune adjacent values', () => {
-  const context = setupConstraintTest({ numValues: 4, numCells: 4 });
+  const context = setupConstraintTest({ gridSize: [1, 4] });
   const key = binaryKey((a, b) => Math.abs(a - b) >= 2, 4);
   const handler = new BinaryConstraint(0, 1, key);
-  handler.initialize(context.createGrid(), createCellExclusions(), context.shape, {});
+  context.initializeHandler(handler);
 
-  const grid = new Uint16Array(4);
+  const grid = context.grid;
   grid[0] = valueMask(2);
   grid[1] = valueMask(1, 2, 3, 4);
   const acc = createAccumulator();
@@ -264,12 +264,12 @@ await runTest('difference >= 2: should prune adjacent values', () => {
 });
 
 await runTest('difference >= 2: should fail when too close', () => {
-  const context = setupConstraintTest({ numValues: 4, numCells: 4 });
+  const context = setupConstraintTest({ gridSize: [1, 4] });
   const key = binaryKey((a, b) => Math.abs(a - b) >= 2, 4);
   const handler = new BinaryConstraint(0, 1, key);
-  handler.initialize(context.createGrid(), createCellExclusions(), context.shape, {});
+  context.initializeHandler(handler);
 
-  const grid = new Uint16Array(4);
+  const grid = context.grid;
   grid[0] = valueMask(2);
   grid[1] = valueMask(1, 2, 3);  // All within 1 of 2
   const acc = createAccumulator();
@@ -284,12 +284,12 @@ await runTest('difference >= 2: should fail when too close', () => {
 // =============================================================================
 
 await runTest('should not report cells when values unchanged', () => {
-  const context = setupConstraintTest({ numValues: 4, numCells: 4 });
+  const context = setupConstraintTest({ gridSize: [1, 4] });
   const key = binaryKey((a, b) => a < b, 4);
   const handler = new BinaryConstraint(0, 1, key);
-  handler.initialize(context.createGrid(), createCellExclusions(), context.shape, {});
+  context.initializeHandler(handler);
 
-  const grid = new Uint16Array(4);
+  const grid = context.grid;
   grid[0] = valueMask(1);
   grid[1] = valueMask(2);
   const acc = createAccumulator();
@@ -301,12 +301,12 @@ await runTest('should not report cells when values unchanged', () => {
 });
 
 await runTest('should report only changed cells', () => {
-  const context = setupConstraintTest({ numValues: 4, numCells: 4 });
+  const context = setupConstraintTest({ gridSize: [1, 4] });
   const key = binaryKey((a, b) => a < b, 4);
   const handler = new BinaryConstraint(0, 1, key);
-  handler.initialize(context.createGrid(), createCellExclusions(), context.shape, {});
+  context.initializeHandler(handler);
 
-  const grid = new Uint16Array(4);
+  const grid = context.grid;
   grid[0] = valueMask(1);  // Already constrained
   grid[1] = valueMask(1, 2, 3, 4);           // Needs pruning
   const acc = createAccumulator();
@@ -321,27 +321,27 @@ await runTest('should report only changed cells', () => {
 // =============================================================================
 
 await runTest('should be reusable across multiple calls', () => {
-  const context = setupConstraintTest({ numValues: 4, numCells: 4 });
+  const context = setupConstraintTest({ gridSize: [1, 4] });
   const key = binaryKey((a, b) => a !== b, 4);
   const handler = new BinaryConstraint(0, 1, key);
-  handler.initialize(context.createGrid(), createCellExclusions(), context.shape, {});
+  context.initializeHandler(handler);
 
   // First call
-  const grid1 = new Uint16Array(4);
+  const grid1 = setupConstraintTest({ gridSize: [1, 4] }).grid;
   grid1[0] = valueMask(1);
   grid1[1] = valueMask(1, 2, 3);
   assert.equal(handler.enforceConsistency(grid1, createAccumulator()), true);
   assert.equal(grid1[1], valueMask(2, 3));
 
   // Second call with different grid
-  const grid2 = new Uint16Array(4);
+  const grid2 = setupConstraintTest({ gridSize: [1, 4] }).grid;
   grid2[0] = valueMask(3);
   grid2[1] = valueMask(2, 3, 4);
   assert.equal(handler.enforceConsistency(grid2, createAccumulator()), true);
   assert.equal(grid2[1], valueMask(2, 4));
 
   // Third call that fails
-  const grid3 = new Uint16Array(4);
+  const grid3 = setupConstraintTest({ gridSize: [1, 4] }).grid;
   grid3[0] = valueMask(2);
   grid3[1] = valueMask(2);
   assert.equal(handler.enforceConsistency(grid3, createAccumulator()), false);
@@ -352,13 +352,13 @@ await runTest('should be reusable across multiple calls', () => {
 // =============================================================================
 
 await runTest('should work with non-contiguous cell indices', () => {
-  const context = setupConstraintTest({ numValues: 4, numCells: 20 });
-  const key = binaryKey((a, b) => a < b, 4);
+  const context = setupConstraintTest({ gridSize: [4, 5] });
+  const key = binaryKey((a, b) => a < b, 5);
   const handler = new BinaryConstraint(5, 15, key);
-  handler.initialize(context.createGrid(), createCellExclusions(), context.shape, {});
+  context.initializeHandler(handler);
 
-  const grid = context.createGrid();
-  grid[5] = valueMask(1, 2, 3, 4);
+  const grid = context.grid;
+  grid[5] = valueMask(1, 2, 3, 4, 5);
   grid[15] = valueMask(2);
   const acc = createAccumulator();
 
@@ -375,13 +375,13 @@ await runTest('should work with non-contiguous cell indices', () => {
 // =============================================================================
 
 await runTest('asymmetric constraint: a*2 === b', () => {
-  const context = setupConstraintTest({ numValues: 4, numCells: 4 });
+  const context = setupConstraintTest({ gridSize: [1, 4] });
   // a*2 === b, so valid pairs are (1,2) and (2,4)
   const key = binaryKey((a, b) => a * 2 === b, 4);
   const handler = new BinaryConstraint(0, 1, key);
-  handler.initialize(context.createGrid(), createCellExclusions(), context.shape, {});
+  context.initializeHandler(handler);
 
-  const grid = new Uint16Array(4);
+  const grid = context.grid;
   grid[0] = valueMask(1, 2, 3, 4);
   grid[1] = valueMask(1, 2, 3, 4);
   const acc = createAccumulator();
@@ -394,12 +394,12 @@ await runTest('asymmetric constraint: a*2 === b', () => {
 });
 
 await runTest('asymmetric constraint: should prune correctly given fixed value', () => {
-  const context = setupConstraintTest({ numValues: 4, numCells: 4 });
+  const context = setupConstraintTest({ gridSize: [1, 4] });
   const key = binaryKey((a, b) => a * 2 === b, 4);
   const handler = new BinaryConstraint(0, 1, key);
-  handler.initialize(context.createGrid(), createCellExclusions(), context.shape, {});
+  context.initializeHandler(handler);
 
-  const grid = new Uint16Array(4);
+  const grid = context.grid;
   grid[0] = valueMask(1, 2, 3, 4);
   grid[1] = valueMask(4);  // Fixed to 4
   const acc = createAccumulator();
@@ -415,7 +415,7 @@ await runTest('asymmetric constraint: should prune correctly given fixed value',
 // =============================================================================
 
 await runTest('required values: should remove required values from pair exclusions (a !== b)', () => {
-  const context = setupConstraintTest({ numValues: 3, numCells: 3 });
+  const context = setupConstraintTest({ gridSize: [1, 3] });
   const key = binaryKey((a, b) => a !== b, 3);
   const handler = new BinaryConstraint(0, 1, key);
 
@@ -427,9 +427,9 @@ await runTest('required values: should remove required values from pair exclusio
     },
   };
 
-  handler.initialize(context.createGrid(), cellExclusions, context.shape, {});
+  context.initializeHandler(handler, { cellExclusions });
 
-  const grid = new Uint16Array(3);
+  const grid = context.grid;
   grid[0] = valueMask(1, 2);
   grid[1] = valueMask(1, 2);
   grid[2] = valueMask(1, 2, 3);
@@ -445,7 +445,7 @@ await runTest('required values: should remove required values from pair exclusio
 });
 
 await runTest('required values: should not run required-value exclusions for transitive key (a === b)', () => {
-  const context = setupConstraintTest({ numValues: 3, numCells: 3 });
+  const context = setupConstraintTest({ gridSize: [1, 3] });
   const key = binaryKey((a, b) => a === b, 3);
   const handler = new BinaryConstraint(0, 1, key);
 
@@ -457,9 +457,9 @@ await runTest('required values: should not run required-value exclusions for tra
     },
   };
 
-  handler.initialize(context.createGrid(), cellExclusions, context.shape, {});
+  context.initializeHandler(handler, { cellExclusions });
 
-  const grid = new Uint16Array(3);
+  const grid = context.grid;
   grid[0] = valueMask(1, 2);
   grid[1] = valueMask(1, 2);
   grid[2] = valueMask(1, 2, 3);
