@@ -74,7 +74,7 @@ SOLVER
     // Iterate over all solutions, with optional limit
     for (const s of solver.solutions(constraints[, limit])) { ... }
     // Get an array of solutions, with optional limit
-    const solutions = solver.solutionArray(constraints[, limit]);
+    const solutions = [...solver.solutions(constraints[, limit])];
 
   Solution objects provide:
     solution.valueAt('R1C1')  // Get value at cell

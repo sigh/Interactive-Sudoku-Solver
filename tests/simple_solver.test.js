@@ -199,33 +199,6 @@ await runTest('solutions() can break early', async () => {
 });
 
 // ============================================================================
-// SimpleSolver.solutionArray tests
-// ============================================================================
-
-await runTest('solutionArray() returns array of solutions', async () => {
-  const solver = new SimpleSolver();
-  const solutions = await solver.solutionArray(CLASSIC_SUDOKU.input);
-  assert.ok(Array.isArray(solutions));
-  assert.equal(solutions.length, 1);
-  assert.ok(solutions[0] instanceof Solution);
-});
-
-await runTest('solutionArray() returns all solutions', async () => {
-  const solver = new SimpleSolver();
-  const solutions = await solver.solutionArray(MULTI_SOLUTIONS);
-  assert.ok(solutions.length > 1, 'Should find multiple solutions');
-  // Verify count matches countSolutions
-  const count = await solver.countSolutions(MULTI_SOLUTIONS);
-  assert.equal(solutions.length, count, 'solutionArray and countSolutions should agree');
-});
-
-await runTest('solutionArray() respects limit', async () => {
-  const solver = new SimpleSolver();
-  const solutions = await solver.solutionArray(MULTI_SOLUTIONS, 5);
-  assert.equal(solutions.length, 5);
-});
-
-// ============================================================================
 // SimpleSolver.countSolutions tests
 // ============================================================================
 
@@ -240,6 +213,24 @@ await runTest('countSolutions() counts multiple solutions', async () => {
   // 4x4 with one given - has multiple solutions but countable quickly
   const count = await solver.countSolutions(MULTI_SOLUTIONS);
   assert.ok(count > 1, `Expected multiple solutions, got ${count}`);
+});
+
+await runTest('countSolutions(limit) returns exact count when below limit', async () => {
+  const solver = new SimpleSolver();
+  const count = await solver.countSolutions(CLASSIC_SUDOKU.input, 2);
+  assert.equal(count, 1);
+});
+
+await runTest('countSolutions(limit) caps at limit', async () => {
+  const solver = new SimpleSolver();
+  const count = await solver.countSolutions(MULTI_SOLUTIONS, 2);
+  assert.equal(count, 2);
+});
+
+await runTest('countSolutions(limit=1) stops after first solution', async () => {
+  const solver = new SimpleSolver();
+  const count = await solver.countSolutions(MULTI_SOLUTIONS, 1);
+  assert.equal(count, 1);
 });
 
 // ============================================================================
