@@ -929,7 +929,6 @@ export const HARD_THERMOS = [
 export const EXTREME_KILLERS = [
   'Wecoc #1',
   'Wecoc #1 mod A',
-  'Wecoc #1 mod B',
   'Wecoc #2',
   'tarek unsolvable #41',
 ];
