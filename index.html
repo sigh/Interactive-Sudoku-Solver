@@ -404,7 +404,7 @@ layout: null
         <div class="lazy-body"></div>
       </div>
 
-      <div id="constraint-panel-container" class="vstack">
+      <div id="constraint-panel-container">
 
         <div class="hstack constraint-panel-header">
           <h1>Constraints</h1>
@@ -421,240 +421,240 @@ layout: null
 
         <div id="constraint-panel-scroll" class="vstack">
 
-        <div class="two-column">
-          <div class="vstack">
+          <div class="two-column">
+            <div class="vstack">
 
-            <form id="multi-value-cell-input">
-              <fieldset tabindex="0" class="constraint-panel hide-until-load" disabled>
-                <h2>Multiple values</h2>
-                <div></div>
-              </fieldset>
-            </form>
+              <form id="multi-value-cell-input">
+                <fieldset tabindex="0" class="constraint-panel hide-until-load" disabled>
+                  <h2>Multiple values</h2>
+                  <div></div>
+                </fieldset>
+              </form>
 
-            <form id="multi-cell-constraint-input">
-              <fieldset tabindex="0" class="constraint-panel hide-until-load">
-                <h2>Lines & Sets</h2>
-                <div>
+              <form id="multi-cell-constraint-input">
+                <fieldset tabindex="0" class="constraint-panel hide-until-load">
+                  <h2>Lines & Sets</h2>
                   <div>
-                    <span class="description">
-                      Select cells by dragging or shift-clicking.
-                    </span>
                     <div>
-                      <select id="multi-cell-constraint-select" name="constraint-type" required>
-                      </select>
-                    </div>
-                    <div id="multi-cell-constraint-description" class="description">
-                    </div>
-                    <div id="multi-cell-constraint-loop-container">
-                      <input type="checkbox" name="is-loop" id="multi-cell-constraint-loop-input"></input>
-                      <label for="multi-cell-constraint-loop-input">Loop</label>
-                    </div>
-                    <div class="hstack">
-                      <div id="multi-cell-constraint-value-container"></div>
-                      <button type="submit" name="add-constraint" title="Add constraint" class="hstack-push-right"
-                        disabled>
-                        Add
-                      </button>
+                      <span class="description">
+                        Select cells by dragging or shift-clicking.
+                      </span>
+                      <div>
+                        <select id="multi-cell-constraint-select" name="constraint-type" required>
+                        </select>
+                      </div>
+                      <div id="multi-cell-constraint-description" class="description">
+                      </div>
+                      <div id="multi-cell-constraint-loop-container">
+                        <input type="checkbox" name="is-loop" id="multi-cell-constraint-loop-input"></input>
+                        <label for="multi-cell-constraint-loop-input">Loop</label>
+                      </div>
+                      <div class="hstack">
+                        <div id="multi-cell-constraint-value-container"></div>
+                        <button type="submit" name="add-constraint" title="Add constraint" class="hstack-push-right"
+                          disabled>
+                          Add
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              </fieldset>
-            </form>
-          </div>
+                </fieldset>
+              </form>
+            </div>
 
-          <div class="vstack">
-            <div class="constraint-panel constraint-panel-borderless">
-              <h2>
-                Shape
-                <span class="shape-input-container">
-                  <input type="text" id="shape-input" class="shape-input" placeholder="9x9" autocomplete="off">
-                  <div id="shape-dropdown" class="shape-dropdown dropdown-menu">
-                    <div class="shape-dropdown-item">9x9</div>
-                    <div class="shape-dropdown-item">6x6</div>
-                    <div class="shape-dropdown-item">16x16</div>
-                    <div class="shape-dropdown-help description">
-                      <div>Or type WxH</div>
-                      <div>e.g. 6x8</div>
+            <div class="vstack">
+              <div class="constraint-panel constraint-panel-borderless">
+                <h2>
+                  Shape
+                  <span class="shape-input-container">
+                    <input type="text" id="shape-input" class="shape-input" placeholder="9x9" autocomplete="off">
+                    <div id="shape-dropdown" class="shape-dropdown dropdown-menu">
+                      <div class="shape-dropdown-item">9x9</div>
+                      <div class="shape-dropdown-item">6x6</div>
+                      <div class="shape-dropdown-item">16x16</div>
+                      <div class="shape-dropdown-help description">
+                        <div>Or type WxH</div>
+                        <div>e.g. 6x8</div>
+                      </div>
                     </div>
-                  </div>
-                </span>
-                <span class="tooltip" data-text="
+                  </span>
+                  <span class="tooltip" data-text="
               Change the grid shape. Enter dimensions as NxM (e.g., 9x9, 6x8).
               Dimensions must be between 1 and 16.
               Box regions are made as close to square as possible.
               Prime numbered grid sizes have no boxes.">
-                </span>
-              </h2>
-              </h2>
-            </div>
-
-            <div class="constraint-panel hide-until-load" id="global-constraints-container">
-              <h2>Global constraints</h2>
-              <div id="global-constraint-checkboxes"></div>
-            </div>
-          </div>
-
-        </div>
-
-        <div id="layout-constraint-container" class="constraint-panel hide-until-load">
-          <h2>Layout constraints</h2>
-          <div class="two-column">
-
-            <div id="layout-constraint-checkboxes"></div>
-
-            <div id="jigsaw-container" class="vstack">
-              <div>
-                <button type="submit" id="add-jigsaw-button" title="Add Piece">
-                  Add Jigsaw Piece
-                </button>
-                <span class="tooltip"
-                  data-text="Values inside the jigsaw piece can't repeat. Pieces cannot overlap and must contain a cell for each different value (i.e. 9 cells for a 9x9 grid)."></span>
-
+                  </span>
+                </h2>
+                </h2>
               </div>
 
-              <div class="chip-view" data-chip-view-type="jigsaw"></div>
-            </div>
-          </div>
-        </div>
-
-        <form id="custom-constraint-input">
-          <fieldset id="custom-constraint-panel" tabindex="0" class="constraint-panel hide-until-load">
-            <h2>Custom JavaScript constraints</h2>
-            <div>
-              <div class="tab-container">
-                <button type="button" class="active" data-tab="custom-pairwise-tab">Pairwise</button>
-                <button type="button" data-tab="state-machine-tab">State machine</button>
+              <div class="constraint-panel hide-until-load" id="global-constraints-container">
+                <h2>Global constraints</h2>
+                <div id="global-constraint-checkboxes"></div>
               </div>
+            </div>
 
-              <div id="custom-pairwise-tab" class="tab-content active">
-                <div class="description">
-                  <p>
-                    Create constraints between pairs of cells by providing a
-                    custom JavaScript function.
-                  </p>
+          </div>
+
+          <div id="layout-constraint-container" class="constraint-panel hide-until-load">
+            <h2>Layout constraints</h2>
+            <div class="two-column">
+
+              <div id="layout-constraint-checkboxes"></div>
+
+              <div id="jigsaw-container" class="vstack">
+                <div>
+                  <button type="submit" id="add-jigsaw-button" title="Add Piece">
+                    Add Jigsaw Piece
+                  </button>
+                  <span class="tooltip"
+                    data-text="Values inside the jigsaw piece can't repeat. Pieces cannot overlap and must contain a cell for each different value (i.e. 9 cells for a 9x9 grid)."></span>
+
                 </div>
-                <div class="constraint-code-form">
-                  <div>
-                    Name:
-                    <input type="text" name="pairwise-name" placeholder="optional" maxlength="20" columns="20">
+
+                <div class="chip-view" data-chip-view-type="jigsaw"></div>
+              </div>
+            </div>
+          </div>
+
+          <form id="custom-constraint-input">
+            <fieldset id="custom-constraint-panel" tabindex="0" class="constraint-panel hide-until-load">
+              <h2>Custom JavaScript constraints</h2>
+              <div>
+                <div class="tab-container">
+                  <button type="button" class="active" data-tab="custom-pairwise-tab">Pairwise</button>
+                  <button type="button" data-tab="state-machine-tab">State machine</button>
+                </div>
+
+                <div id="custom-pairwise-tab" class="tab-content active">
+                  <div class="description">
+                    <p>
+                      Create constraints between pairs of cells by providing a
+                      custom JavaScript function.
+                    </p>
                   </div>
-                  <div>
-                    Chain handling
-                    <span class="tooltip" data-text="
+                  <div class="constraint-code-form">
+                    <div>
+                      Name:
+                      <input type="text" name="pairwise-name" placeholder="optional" maxlength="20" columns="20">
+                    </div>
+                    <div>
+                      Chain handling
+                      <span class="tooltip" data-text="
                     Select how to handle chains of more than two cells. e.g. for
                     a chain of cells [A, B, C] 'Consecutive pairs' will create
                     constraints on [A, B] and [B, C] while 'All pairs' will create
                     constraints on [A, B], [A, C], [B, A], [B, C], [C, A]
                     and [C, B].">
-                    </span>:
-                    <select name="chain-mode" class="thin-select" required>
-                      <option value="Pair">Consecutive pairs</option>
-                      <option value="PairX">All pairs</option>
-                    </select>
-                  </div>
-                  <div class="constraint-code">
-                    <div>
-                      <div class="description">
-                        <code>// Return true if the cell values a and b are</code>
-                        <code>// a valid pair.</code>
-                        <code>// Example: a &lt; b (thermometer constraint)</code>
+                      </span>:
+                      <select name="chain-mode" class="thin-select" required>
+                        <option value="Pair">Consecutive pairs</option>
+                        <option value="PairX">All pairs</option>
+                      </select>
+                    </div>
+                    <div class="constraint-code">
+                      <div>
+                        <div class="description">
+                          <code>// Return true if the cell values a and b are</code>
+                          <code>// a valid pair.</code>
+                          <code>// Example: a &lt; b (thermometer constraint)</code>
+                        </div>
+                        <code>constraintCheck = (a, b) =&gt; </code>
+                        <textarea rows="2" name="function" spellcheck="false"></textarea>
                       </div>
-                      <code>constraintCheck = (a, b) =&gt; </code>
-                      <textarea rows="2" name="function" spellcheck="false"></textarea>
+                    </div>
+                    <div id="custom-pairwise-input-error" class="notice notice-error"></div>
+                    <div>
+                      <button type="button" title="Add constraint" name="add-pairwise-constraint">
+                        <span class="spinner"></span>
+                        <span class="btn-text">Add</span>
+                      </button>
                     </div>
                   </div>
-                  <div id="custom-pairwise-input-error" class="notice notice-error"></div>
-                  <div>
-                    <button type="button" title="Add constraint" name="add-pairwise-constraint">
-                      <span class="spinner"></span>
-                      <span class="btn-text">Add</span>
-                    </button>
-                  </div>
                 </div>
-              </div>
 
-              <div id="state-machine-tab" class="tab-content">
-                <div class="description">
-                  <p>
-                    Define a finite-state machine using JavaScript transition
-                    and accept functions. The constraint will be satisfied
-                    the state-machine reaches an accept state after processing
-                    the cells in order.
-                  </p>
-                  <p>
-                    <code>NUM_CELLS</code> is available as the number of
-                    currently selected cells.
-                  </p>
-                  <p>
-                    Tip: You can use <code>console.log</code> to debug your
-                    state machine.
-                  </p>
-                </div>
-                <div class="constraint-code-form">
-                  <div class="hstack">
-                    <div>
-                      Name:
-                      <input type="text" name="state-machine-name" placeholder="optional" maxlength="20" columns="20">
-                    </div>
-                    <div class="inline-switch switch">
-                      <label>
-                        <input id="unified-mode-input" type="checkbox" name="unified-mode">
-                        <span></span>
-                        <span>Unified input</span>
-                      </label>
-                    </div>
+                <div id="state-machine-tab" class="tab-content">
+                  <div class="description">
+                    <p>
+                      Define a finite-state machine using JavaScript transition
+                      and accept functions. The constraint will be satisfied
+                      the state-machine reaches an accept state after processing
+                      the cells in order.
+                    </p>
+                    <p>
+                      <code>NUM_CELLS</code> is available as the number of
+                      currently selected cells.
+                    </p>
+                    <p>
+                      Tip: You can use <code>console.log</code> to debug your
+                      state machine.
+                    </p>
                   </div>
-                  <div id="state-machine-split-input" class="constraint-code">
-                    <div>
-                      <div class="description">
-                        <code>// The initial state(s). States can be any</code>
-                        <code>// JSON-serializable value, except arrays.</code>
-                        <code>// Use an array for multiple start states.</code>
+                  <div class="constraint-code-form">
+                    <div class="hstack">
+                      <div>
+                        Name:
+                        <input type="text" name="state-machine-name" placeholder="optional" maxlength="20" columns="20">
                       </div>
-                      <span>
-                        <code>startState = </code>
-                        <textarea id="state-machine-start-state" name="start-state" rows="1" placeholder='"start"'
-                          spellcheck="false" class="inline-code"></textarea>
-                        <code>;</code>
-                      </span>
-                    </div>
-                    <div>
-                      <div class="description">
-                        <code>// transition takes the current state and</code>
-                        <code>// cell value and returns the next state, or</code>
-                        <code>// an array of states. Returning undefined or</code>
-                        <code>// the empty array generates no next states.</code>
+                      <div class="inline-switch switch">
+                        <label>
+                          <input id="unified-mode-input" type="checkbox" name="unified-mode">
+                          <span></span>
+                          <span>Unified input</span>
+                        </label>
                       </div>
-                      <code>function transition(state, value) {</code>
-                      <textarea id="state-machine-transition-body" rows="10" name="transition-body" spellcheck="false"
-                        placeholder='return "next";'></textarea>
-                      <code>}</code>
                     </div>
-                    <div>
-                      <div class="description">
-                        <code>// accept returns true when the state is a</code>
-                        <code>// valid final state.</code>
+                    <div id="state-machine-split-input" class="constraint-code">
+                      <div>
+                        <div class="description">
+                          <code>// The initial state(s). States can be any</code>
+                          <code>// JSON-serializable value, except arrays.</code>
+                          <code>// Use an array for multiple start states.</code>
+                        </div>
+                        <span>
+                          <code>startState = </code>
+                          <textarea id="state-machine-start-state" name="start-state" rows="1" placeholder='"start"'
+                            spellcheck="false" class="inline-code"></textarea>
+                          <code>;</code>
+                        </span>
                       </div>
-                      <code>function accept(state) {</code>
-                      <textarea id="state-machine-accept-body" rows="2" name="accept-body" spellcheck="false"
-                        placeholder='return state === "next";'></textarea>
-                      <code>}</code>
-                    </div>
-                    <div>
-                      <div class="description">
-                        <code>// Max depth for state creation (optional).</code>
+                      <div>
+                        <div class="description">
+                          <code>// transition takes the current state and</code>
+                          <code>// cell value and returns the next state, or</code>
+                          <code>// an array of states. Returning undefined or</code>
+                          <code>// the empty array generates no next states.</code>
+                        </div>
+                        <code>function transition(state, value) {</code>
+                        <textarea id="state-machine-transition-body" rows="10" name="transition-body" spellcheck="false"
+                          placeholder='return "next";'></textarea>
+                        <code>}</code>
                       </div>
-                      <span>
-                        <code>maxDepth = </code>
-                        <textarea id="state-machine-max-depth" name="max-depth" rows="1" placeholder="Infinity"
-                          spellcheck="false" class="inline-code"></textarea>
-                        <code>;</code>
-                      </span>
+                      <div>
+                        <div class="description">
+                          <code>// accept returns true when the state is a</code>
+                          <code>// valid final state.</code>
+                        </div>
+                        <code>function accept(state) {</code>
+                        <textarea id="state-machine-accept-body" rows="2" name="accept-body" spellcheck="false"
+                          placeholder='return state === "next";'></textarea>
+                        <code>}</code>
+                      </div>
+                      <div>
+                        <div class="description">
+                          <code>// Max depth for state creation (optional).</code>
+                        </div>
+                        <span>
+                          <code>maxDepth = </code>
+                          <textarea id="state-machine-max-depth" name="max-depth" rows="1" placeholder="Infinity"
+                            spellcheck="false" class="inline-code"></textarea>
+                          <code>;</code>
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                  <div id="state-machine-unified-input" class="constraint-code" style="display: none;">
-                    <textarea id="state-machine-unified-code" name="unified-code" rows="18" spellcheck="false"
-                      placeholder='startState = "start";
+                    <div id="state-machine-unified-input" class="constraint-code" style="display: none;">
+                      <textarea id="state-machine-unified-code" name="unified-code" rows="18" spellcheck="false"
+                        placeholder='startState = "start";
 
 function transition(state, value) {
   return "next"
@@ -663,78 +663,78 @@ function transition(state, value) {
 function accept(state) {
   return state == "next";
 }'></textarea>
+                    </div>
+                    <div id="state-machine-input-error" class="notice notice-error"></div>
+                    <div>
+                      <button type="button" title="Add constraint" name="add-state-machine-constraint">
+                        <span class="spinner"></span>
+                        <span class="btn-text">Add</span>
+                      </button>
+                    </div>
                   </div>
-                  <div id="state-machine-input-error" class="notice notice-error"></div>
-                  <div>
-                    <button type="button" title="Add constraint" name="add-state-machine-constraint">
-                      <span class="spinner"></span>
-                      <span class="btn-text">Add</span>
+                </div>
+              </div>
+            </fieldset>
+          </form>
+
+          <div>
+            <form id="outside-clue-input">
+              <fieldset tabindex="0" class="constraint-panel hide-until-load" disabled>
+                <h2>Outside clues</h2>
+                <div>
+                  <div class="description">
+                    Select a row, column or diagonal arrow outside the grid.
+                  </div>
+                  <input type="hidden" name="id">
+                  <div class="outside-arrow-clue-types"></div>
+                  <div class="hstack">
+                    <input type="number" name="value" min=0 placeholder="value">
+                    <button type="submit" title="Set constraint">Set</button>
+                    <button type="button" id="outside-arrow-clear" class="danger-button"
+                      title="Clear constraint">Clear</button>
+                  </div>
+                </div>
+              </fieldset>
+            </form>
+          </div>
+
+          <div>
+            <form id="composite-constraint-input">
+              <fieldset tabindex="0" class="constraint-panel hide-until-load">
+                <h2>Composite constraints</h2>
+                <div>
+                  <div class="hstack">
+                    <span class="description">
+                      Select a composite constraint by clicking on its chip to
+                      add constraints to it. Panels which allow constraints to be
+                      added to the composite will be highlighted in yellow.
+                    </span>
+                    <button type="button" name="add-or" title="Add 'Or'">
+                      + Or
+                    </button>
+                    <button type="button" name="add-and" title="Add 'And'">
+                      + And
                     </button>
                   </div>
+                  <div class="chip-view" data-chip-view-type="composite"></div>
                 </div>
-              </div>
-            </div>
-          </fieldset>
-        </form>
+              </fieldset>
+            </form>
+          </div>
 
-        <div>
-          <form id="outside-clue-input">
-            <fieldset tabindex="0" class="constraint-panel hide-until-load" disabled>
-              <h2>Outside clues</h2>
-              <div>
-                <div class="description">
-                  Select a row, column or diagonal arrow outside the grid.
-                </div>
-                <input type="hidden" name="id">
-                <div class="outside-arrow-clue-types"></div>
-                <div class="hstack">
-                  <input type="number" name="value" min=0 placeholder="value">
-                  <button type="submit" title="Set constraint">Set</button>
-                  <button type="button" id="outside-arrow-clear" class="danger-button"
-                    title="Clear constraint">Clear</button>
-                </div>
+          <div id="ordinary-constraint-panel" class="constraint-panel constraint-panel-borderless">
+            <div id="ordinary-constraints-wrapper" class="expandable-panel">
+              <div class="expandable-panel-content">
+                <button id="ordinary-constraints-toggle" class="icon-button collapse-arrow-toggle" title="Expand"
+                  style="display: none">
+                  <svg viewBox="0 0 24 24" width="24" height="24">
+                    <path d="M16.59 8.59L12 13.17 7.41 8.59 6 10l6 6 6-6z" />
+                  </svg>
+                </button>
+                <div class="chip-view" data-chip-view-type="ordinary"></div>
               </div>
-            </fieldset>
-          </form>
-        </div>
-
-        <div>
-          <form id="composite-constraint-input">
-            <fieldset tabindex="0" class="constraint-panel hide-until-load">
-              <h2>Composite constraints</h2>
-              <div>
-                <div class="hstack">
-                  <span class="description">
-                    Select a composite constraint by clicking on its chip to
-                    add constraints to it. Panels which allow constraints to be
-                    added to the composite will be highlighted in yellow.
-                  </span>
-                  <button type="button" name="add-or" title="Add 'Or'">
-                    + Or
-                  </button>
-                  <button type="button" name="add-and" title="Add 'And'">
-                    + And
-                  </button>
-                </div>
-                <div class="chip-view" data-chip-view-type="composite"></div>
-              </div>
-            </fieldset>
-          </form>
-        </div>
-
-        <div id="ordinary-constraint-panel" class="constraint-panel constraint-panel-borderless">
-          <div id="ordinary-constraints-wrapper" class="expandable-panel">
-            <div class="expandable-panel-content">
-              <button id="ordinary-constraints-toggle" class="icon-button collapse-arrow-toggle" title="Expand"
-                style="display: none">
-                <svg viewBox="0 0 24 24" width="24" height="24">
-                  <path d="M16.59 8.59L12 13.17 7.41 8.59 6 10l6 6 6-6z" />
-                </svg>
-              </button>
-              <div class="chip-view" data-chip-view-type="ordinary"></div>
             </div>
           </div>
-        </div>
 
         </div>
 
