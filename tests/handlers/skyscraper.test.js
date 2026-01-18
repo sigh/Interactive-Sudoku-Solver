@@ -6,7 +6,7 @@ import {
   setupConstraintTest,
   createAccumulator,
   createCellExclusions,
-  mask,
+  valueMask,
 } from '../helpers/constraint_test_utils.js';
 
 ensureGlobalEnvironment();
@@ -75,17 +75,17 @@ await runTest('Skyscraper visibility=1 should require max value in first cell', 
   handler.initialize(context.createGrid(), createCellExclusions({ numCells: 4 }), context.shape, {});
 
   const grid = new Uint16Array(4);
-  grid[0] = mask(1, 2, 3, 4);
-  grid[1] = mask(1, 2, 3, 4);
-  grid[2] = mask(1, 2, 3, 4);
-  grid[3] = mask(1, 2, 3, 4);
+  grid[0] = valueMask(1, 2, 3, 4);
+  grid[1] = valueMask(1, 2, 3, 4);
+  grid[2] = valueMask(1, 2, 3, 4);
+  grid[3] = valueMask(1, 2, 3, 4);
   const acc = createAccumulator();
 
   const result = handler.enforceConsistency(grid, acc);
 
   assert.equal(result, true);
   // First cell must be 4 (the max) for visibility=1
-  assert.equal(grid[0], mask(4), 'first cell should be forced to max value');
+  assert.equal(grid[0], valueMask(4), 'first cell should be forced to max value');
 });
 
 await runTest('Skyscraper visibility=n should require ascending sequence', () => {
@@ -95,20 +95,20 @@ await runTest('Skyscraper visibility=n should require ascending sequence', () =>
   handler.initialize(context.createGrid(), createCellExclusions({ numCells: 4 }), context.shape, {});
 
   const grid = new Uint16Array(4);
-  grid[0] = mask(1, 2, 3, 4);
-  grid[1] = mask(1, 2, 3, 4);
-  grid[2] = mask(1, 2, 3, 4);
-  grid[3] = mask(1, 2, 3, 4);
+  grid[0] = valueMask(1, 2, 3, 4);
+  grid[1] = valueMask(1, 2, 3, 4);
+  grid[2] = valueMask(1, 2, 3, 4);
+  grid[3] = valueMask(1, 2, 3, 4);
   const acc = createAccumulator();
 
   const result = handler.enforceConsistency(grid, acc);
 
   assert.equal(result, true);
   // For visibility=4, only 1,2,3,4 in that order works
-  assert.equal(grid[0], mask(1), 'first cell should be 1');
-  assert.equal(grid[1], mask(2), 'second cell should be 2');
-  assert.equal(grid[2], mask(3), 'third cell should be 3');
-  assert.equal(grid[3], mask(4), 'fourth cell should be 4');
+  assert.equal(grid[0], valueMask(1), 'first cell should be 1');
+  assert.equal(grid[1], valueMask(2), 'second cell should be 2');
+  assert.equal(grid[2], valueMask(3), 'third cell should be 3');
+  assert.equal(grid[3], valueMask(4), 'fourth cell should be 4');
 });
 
 await runTest('Skyscraper visibility=2 should constrain first two visible', () => {
@@ -118,10 +118,10 @@ await runTest('Skyscraper visibility=2 should constrain first two visible', () =
   handler.initialize(context.createGrid(), createCellExclusions({ numCells: 4 }), context.shape, {});
 
   const grid = new Uint16Array(4);
-  grid[0] = mask(1, 2, 3); // Not 4 - so always visible
-  grid[1] = mask(1, 2, 3, 4);
-  grid[2] = mask(1, 2, 3, 4);
-  grid[3] = mask(4); // Max is here
+  grid[0] = valueMask(1, 2, 3); // Not 4 - so always visible
+  grid[1] = valueMask(1, 2, 3, 4);
+  grid[2] = valueMask(1, 2, 3, 4);
+  grid[3] = valueMask(4); // Max is here
   const acc = createAccumulator();
 
   const result = handler.enforceConsistency(grid, acc);
@@ -141,10 +141,10 @@ await runTest('Skyscraper forward pass should track visibility correctly', () =>
   handler.initialize(context.createGrid(), createCellExclusions({ numCells: 4 }), context.shape, {});
 
   const grid = new Uint16Array(4);
-  grid[0] = mask(3); // First visible is 3
-  grid[1] = mask(1); // Hidden behind 3
-  grid[2] = mask(2); // Hidden behind 3
-  grid[3] = mask(4); // Second visible (4 > 3)
+  grid[0] = valueMask(3); // First visible is 3
+  grid[1] = valueMask(1); // Hidden behind 3
+  grid[2] = valueMask(2); // Hidden behind 3
+  grid[3] = valueMask(4); // Second visible (4 > 3)
   const acc = createAccumulator();
 
   const result = handler.enforceConsistency(grid, acc);
@@ -159,10 +159,10 @@ await runTest('Skyscraper should fail when visibility cannot be achieved', () =>
   handler.initialize(context.createGrid(), createCellExclusions({ numCells: 4 }), context.shape, {});
 
   const grid = new Uint16Array(4);
-  grid[0] = mask(4); // Max is first - only 1 visible possible
-  grid[1] = mask(1, 2, 3);
-  grid[2] = mask(1, 2, 3);
-  grid[3] = mask(1, 2, 3);
+  grid[0] = valueMask(4); // Max is first - only 1 visible possible
+  grid[1] = valueMask(1, 2, 3);
+  grid[2] = valueMask(1, 2, 3);
+  grid[3] = valueMask(1, 2, 3);
   const acc = createAccumulator();
 
   const result = handler.enforceConsistency(grid, acc);
@@ -181,10 +181,10 @@ await runTest('Skyscraper backward pass should prune impossible values', () => {
   handler.initialize(context.createGrid(), createCellExclusions({ numCells: 4 }), context.shape, {});
 
   const grid = new Uint16Array(4);
-  grid[0] = mask(1, 2, 3);
-  grid[1] = mask(1, 2, 3, 4);
-  grid[2] = mask(1, 2, 3, 4);
-  grid[3] = mask(4); // Max is last
+  grid[0] = valueMask(1, 2, 3);
+  grid[1] = valueMask(1, 2, 3, 4);
+  grid[2] = valueMask(1, 2, 3, 4);
+  grid[3] = valueMask(4); // Max is last
   const acc = createAccumulator();
 
   const result = handler.enforceConsistency(grid, acc);
@@ -201,17 +201,17 @@ await runTest('Skyscraper should remove maxValue from cells after first maxValue
   handler.initialize(context.createGrid(), createCellExclusions({ numCells: 4 }), context.shape, {});
 
   const grid = new Uint16Array(4);
-  grid[0] = mask(1, 2, 3);
-  grid[1] = mask(4); // Max is here
-  grid[2] = mask(1, 2, 3, 4); // 4 should be removed
-  grid[3] = mask(1, 2, 3, 4); // 4 should be removed
+  grid[0] = valueMask(1, 2, 3);
+  grid[1] = valueMask(4); // Max is here
+  grid[2] = valueMask(1, 2, 3, 4); // 4 should be removed
+  grid[3] = valueMask(1, 2, 3, 4); // 4 should be removed
   const acc = createAccumulator();
 
   const result = handler.enforceConsistency(grid, acc);
 
   assert.equal(result, true);
-  assert.equal(grid[2] & mask(4), 0, 'cell 2 should not have maxValue');
-  assert.equal(grid[3] & mask(4), 0, 'cell 3 should not have maxValue');
+  assert.equal(grid[2] & valueMask(4), 0, 'cell 2 should not have maxValue');
+  assert.equal(grid[3] & valueMask(4), 0, 'cell 3 should not have maxValue');
 });
 
 // =============================================================================
@@ -237,12 +237,12 @@ await runTest('Skyscraper short row should accept terminal height >= numCells', 
 
   const grid = new Uint16Array(6);
   // With 6 cells from values 1-9, max height can be 6,7,8, or 9
-  grid[0] = mask(5); // First visible
-  grid[1] = mask(1);
-  grid[2] = mask(2);
-  grid[3] = mask(3);
-  grid[4] = mask(4);
-  grid[5] = mask(6); // Second visible, height=6 (>= numCells)
+  grid[0] = valueMask(5); // First visible
+  grid[1] = valueMask(1);
+  grid[2] = valueMask(2);
+  grid[3] = valueMask(3);
+  grid[4] = valueMask(4);
+  grid[5] = valueMask(6); // Second visible, height=6 (>= numCells)
   const acc = createAccumulator();
 
   const result = handler.enforceConsistency(grid, acc);
@@ -257,12 +257,12 @@ await runTest('Skyscraper short row should accept terminal height > numCells', (
   handler.initialize(context.createGrid(), createCellExclusions({ numCells: 6 }), context.shape, {});
 
   const grid = new Uint16Array(6);
-  grid[0] = mask(5);
-  grid[1] = mask(1);
-  grid[2] = mask(2);
-  grid[3] = mask(3);
-  grid[4] = mask(4);
-  grid[5] = mask(9); // Terminal height = 9 (maxValue)
+  grid[0] = valueMask(5);
+  grid[1] = valueMask(1);
+  grid[2] = valueMask(2);
+  grid[3] = valueMask(3);
+  grid[4] = valueMask(4);
+  grid[5] = valueMask(9); // Terminal height = 9 (maxValue)
   const acc = createAccumulator();
 
   const result = handler.enforceConsistency(grid, acc);
@@ -279,12 +279,12 @@ await runTest('Skyscraper short row should reject terminal height < numCells', (
   const grid = new Uint16Array(6);
   // For visibility=1, max must be first
   // But max height must be >= 6 (numCells)
-  grid[0] = mask(5); // Height 5 < 6 = numCells - invalid!
-  grid[1] = mask(1);
-  grid[2] = mask(2);
-  grid[3] = mask(3);
-  grid[4] = mask(4);
-  grid[5] = mask(5); // Can't have two 5s but illustrates the constraint
+  grid[0] = valueMask(5); // Height 5 < 6 = numCells - invalid!
+  grid[1] = valueMask(1);
+  grid[2] = valueMask(2);
+  grid[3] = valueMask(3);
+  grid[4] = valueMask(4);
+  grid[5] = valueMask(5); // Can't have two 5s but illustrates the constraint
   const acc = createAccumulator();
 
   // This specific setup may not fail for the reason we want,
@@ -298,19 +298,19 @@ await runTest('Skyscraper short row visibility=1 requires first cell >= numCells
   handler.initialize(context.createGrid(), createCellExclusions({ numCells: 6 }), context.shape, {});
 
   const grid = new Uint16Array(6);
-  grid[0] = mask(1, 2, 3, 4, 5, 6, 7, 8, 9);
-  grid[1] = mask(1, 2, 3, 4, 5, 6, 7, 8, 9);
-  grid[2] = mask(1, 2, 3, 4, 5, 6, 7, 8, 9);
-  grid[3] = mask(1, 2, 3, 4, 5, 6, 7, 8, 9);
-  grid[4] = mask(1, 2, 3, 4, 5, 6, 7, 8, 9);
-  grid[5] = mask(1, 2, 3, 4, 5, 6, 7, 8, 9);
+  grid[0] = valueMask(1, 2, 3, 4, 5, 6, 7, 8, 9);
+  grid[1] = valueMask(1, 2, 3, 4, 5, 6, 7, 8, 9);
+  grid[2] = valueMask(1, 2, 3, 4, 5, 6, 7, 8, 9);
+  grid[3] = valueMask(1, 2, 3, 4, 5, 6, 7, 8, 9);
+  grid[4] = valueMask(1, 2, 3, 4, 5, 6, 7, 8, 9);
+  grid[5] = valueMask(1, 2, 3, 4, 5, 6, 7, 8, 9);
   const acc = createAccumulator();
 
   const result = handler.enforceConsistency(grid, acc);
 
   assert.equal(result, true);
   // First cell must have values 6-9 (>= numCells) for visibility=1
-  assert.equal(grid[0], mask(6, 7, 8, 9), 'first cell should only have values >= numCells');
+  assert.equal(grid[0], valueMask(6, 7, 8, 9), 'first cell should only have values >= numCells');
 });
 
 // =============================================================================
@@ -340,7 +340,7 @@ await runTest('Skyscraper should handle single cell with visibility=1', () => {
   handler.initialize(context.createGrid(), createCellExclusions({ numCells: 1 }), context.shape, {});
 
   const grid = new Uint16Array(1);
-  grid[0] = mask(1, 2, 3, 4);
+  grid[0] = valueMask(1, 2, 3, 4);
   const acc = createAccumulator();
 
   const result = handler.enforceConsistency(grid, acc);
@@ -357,8 +357,8 @@ await runTest('Skyscraper should handle two cells visibility=1', () => {
   handler.initialize(context.createGrid(), createCellExclusions({ numCells: 2 }), context.shape, {});
 
   const grid = new Uint16Array(2);
-  grid[0] = mask(1, 2, 3, 4);
-  grid[1] = mask(1, 2, 3, 4);
+  grid[0] = valueMask(1, 2, 3, 4);
+  grid[1] = valueMask(1, 2, 3, 4);
   const acc = createAccumulator();
 
   const result = handler.enforceConsistency(grid, acc);
@@ -366,7 +366,7 @@ await runTest('Skyscraper should handle two cells visibility=1', () => {
   assert.equal(result, true);
   // For visibility=1 with 2 cells, first must be >= second
   // Terminal height must be >= 2 (numCells)
-  assert.equal(grid[0], mask(2, 3, 4), 'first cell should have values >= numCells');
+  assert.equal(grid[0], valueMask(2, 3, 4), 'first cell should have values >= numCells');
 });
 
 await runTest('Skyscraper should handle two cells visibility=2', () => {
@@ -376,8 +376,8 @@ await runTest('Skyscraper should handle two cells visibility=2', () => {
   handler.initialize(context.createGrid(), createCellExclusions({ numCells: 2 }), context.shape, {});
 
   const grid = new Uint16Array(2);
-  grid[0] = mask(1, 2, 3, 4);
-  grid[1] = mask(1, 2, 3, 4);
+  grid[0] = valueMask(1, 2, 3, 4);
+  grid[1] = valueMask(1, 2, 3, 4);
   const acc = createAccumulator();
 
   const result = handler.enforceConsistency(grid, acc);
@@ -386,8 +386,8 @@ await runTest('Skyscraper should handle two cells visibility=2', () => {
   // For visibility=2 with 2 cells, first < second (both visible)
   // Second must be >= 2 (numCells), first must be < second
   // First can be 1,2,3 (anything that can be less than the second)
-  assert.equal(grid[0], mask(1, 2, 3), 'first cell should be 1,2,3 (less than max)');
-  assert.equal(grid[1], mask(2, 3, 4), 'second cell should be >= 2 (numCells)');
+  assert.equal(grid[0], valueMask(1, 2, 3), 'first cell should be 1,2,3 (less than max)');
+  assert.equal(grid[1], valueMask(2, 3, 4), 'second cell should be >= 2 (numCells)');
 });
 
 await runTest('Skyscraper should fail when grid is empty', () => {
@@ -398,9 +398,9 @@ await runTest('Skyscraper should fail when grid is empty', () => {
 
   const grid = new Uint16Array(4);
   grid[0] = 0; // Empty cell
-  grid[1] = mask(1, 2, 3, 4);
-  grid[2] = mask(1, 2, 3, 4);
-  grid[3] = mask(1, 2, 3, 4);
+  grid[1] = valueMask(1, 2, 3, 4);
+  grid[2] = valueMask(1, 2, 3, 4);
+  grid[3] = valueMask(1, 2, 3, 4);
   const acc = createAccumulator();
 
   const result = handler.enforceConsistency(grid, acc);
@@ -415,19 +415,19 @@ await runTest('Skyscraper should prune values correctly', () => {
   handler.initialize(context.createGrid(), createCellExclusions({ numCells: 4 }), context.shape, {});
 
   const grid = new Uint16Array(4);
-  grid[0] = mask(1, 2, 3, 4);
-  grid[1] = mask(1, 2, 3, 4);
-  grid[2] = mask(1, 2, 3, 4);
-  grid[3] = mask(1, 2, 3, 4);
+  grid[0] = valueMask(1, 2, 3, 4);
+  grid[1] = valueMask(1, 2, 3, 4);
+  grid[2] = valueMask(1, 2, 3, 4);
+  grid[3] = valueMask(1, 2, 3, 4);
   const acc = createAccumulator();
 
   handler.enforceConsistency(grid, acc);
 
   // Check that pruning happened
-  assert.equal(grid[0], mask(4), 'first cell should be forced to 4');
-  assert.equal(grid[1] & mask(4), 0, 'cell 1 should not have 4');
-  assert.equal(grid[2] & mask(4), 0, 'cell 2 should not have 4');
-  assert.equal(grid[3] & mask(4), 0, 'cell 3 should not have 4');
+  assert.equal(grid[0], valueMask(4), 'first cell should be forced to 4');
+  assert.equal(grid[1] & valueMask(4), 0, 'cell 1 should not have 4');
+  assert.equal(grid[2] & valueMask(4), 0, 'cell 2 should not have 4');
+  assert.equal(grid[3] & valueMask(4), 0, 'cell 3 should not have 4');
 });
 
 // =============================================================================
@@ -441,10 +441,10 @@ await runTest('Skyscraper should validate sequence [2,4,1,3] gives visibility 2'
   handler.initialize(context.createGrid(), createCellExclusions({ numCells: 4 }), context.shape, {});
 
   const grid = new Uint16Array(4);
-  grid[0] = mask(2); // Visible (first)
-  grid[1] = mask(4); // Visible (4 > 2)
-  grid[2] = mask(1); // Hidden (1 < 4)
-  grid[3] = mask(3); // Hidden (3 < 4)
+  grid[0] = valueMask(2); // Visible (first)
+  grid[1] = valueMask(4); // Visible (4 > 2)
+  grid[2] = valueMask(1); // Hidden (1 < 4)
+  grid[3] = valueMask(3); // Hidden (3 < 4)
   const acc = createAccumulator();
 
   const result = handler.enforceConsistency(grid, acc);
@@ -459,10 +459,10 @@ await runTest('Skyscraper should validate sequence [1,2,3,4] gives visibility 4'
   handler.initialize(context.createGrid(), createCellExclusions({ numCells: 4 }), context.shape, {});
 
   const grid = new Uint16Array(4);
-  grid[0] = mask(1);
-  grid[1] = mask(2);
-  grid[2] = mask(3);
-  grid[3] = mask(4);
+  grid[0] = valueMask(1);
+  grid[1] = valueMask(2);
+  grid[2] = valueMask(3);
+  grid[3] = valueMask(4);
   const acc = createAccumulator();
 
   const result = handler.enforceConsistency(grid, acc);
@@ -477,10 +477,10 @@ await runTest('Skyscraper should reject [1,2,3,4] for visibility=3', () => {
   handler.initialize(context.createGrid(), createCellExclusions({ numCells: 4 }), context.shape, {});
 
   const grid = new Uint16Array(4);
-  grid[0] = mask(1);
-  grid[1] = mask(2);
-  grid[2] = mask(3);
-  grid[3] = mask(4);
+  grid[0] = valueMask(1);
+  grid[1] = valueMask(2);
+  grid[2] = valueMask(3);
+  grid[3] = valueMask(4);
   const acc = createAccumulator();
 
   const result = handler.enforceConsistency(grid, acc);
@@ -495,10 +495,10 @@ await runTest('Skyscraper should validate sequence [3,2,4,1] gives visibility 2'
   handler.initialize(context.createGrid(), createCellExclusions({ numCells: 4 }), context.shape, {});
 
   const grid = new Uint16Array(4);
-  grid[0] = mask(3); // Visible
-  grid[1] = mask(2); // Hidden
-  grid[2] = mask(4); // Visible (4 > 3)
-  grid[3] = mask(1); // Hidden
+  grid[0] = valueMask(3); // Visible
+  grid[1] = valueMask(2); // Hidden
+  grid[2] = valueMask(4); // Visible (4 > 3)
+  grid[3] = valueMask(1); // Hidden
   const acc = createAccumulator();
 
   const result = handler.enforceConsistency(grid, acc);
@@ -518,14 +518,14 @@ await runTest('Skyscraper 9x9 visibility=1 forces first cell to 9', () => {
 
   const grid = new Uint16Array(9);
   for (let i = 0; i < 9; i++) {
-    grid[i] = mask(1, 2, 3, 4, 5, 6, 7, 8, 9);
+    grid[i] = valueMask(1, 2, 3, 4, 5, 6, 7, 8, 9);
   }
   const acc = createAccumulator();
 
   const result = handler.enforceConsistency(grid, acc);
 
   assert.equal(result, true);
-  assert.equal(grid[0], mask(9), 'first cell should be 9 for visibility=1');
+  assert.equal(grid[0], valueMask(9), 'first cell should be 9 for visibility=1');
 });
 
 await runTest('Skyscraper 9x9 visibility=9 forces ascending order', () => {
@@ -536,7 +536,7 @@ await runTest('Skyscraper 9x9 visibility=9 forces ascending order', () => {
 
   const grid = new Uint16Array(9);
   for (let i = 0; i < 9; i++) {
-    grid[i] = mask(1, 2, 3, 4, 5, 6, 7, 8, 9);
+    grid[i] = valueMask(1, 2, 3, 4, 5, 6, 7, 8, 9);
   }
   const acc = createAccumulator();
 
@@ -544,7 +544,7 @@ await runTest('Skyscraper 9x9 visibility=9 forces ascending order', () => {
 
   assert.equal(result, true);
   for (let i = 0; i < 9; i++) {
-    assert.equal(grid[i], mask(i + 1), `cell ${i} should be ${i + 1}`);
+    assert.equal(grid[i], valueMask(i + 1), `cell ${i} should be ${i + 1}`);
   }
 });
 
@@ -559,10 +559,10 @@ await runTest('Skyscraper should be idempotent', () => {
   handler.initialize(context.createGrid(), createCellExclusions({ numCells: 4 }), context.shape, {});
 
   const grid = new Uint16Array(4);
-  grid[0] = mask(1, 2, 3);
-  grid[1] = mask(1, 2, 3, 4);
-  grid[2] = mask(1, 2, 3, 4);
-  grid[3] = mask(4);
+  grid[0] = valueMask(1, 2, 3);
+  grid[1] = valueMask(1, 2, 3, 4);
+  grid[2] = valueMask(1, 2, 3, 4);
+  grid[3] = valueMask(4);
 
   // First call
   handler.enforceConsistency(grid, createAccumulator());

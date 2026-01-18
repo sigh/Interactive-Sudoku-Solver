@@ -6,14 +6,13 @@ import {
   setupConstraintTest,
   createAccumulator,
   createCellExclusions,
-  mask,
+  valueMask,
 } from '../helpers/constraint_test_utils.js';
 
 ensureGlobalEnvironment();
 
 const { fnToBinaryKey } = await import('../../js/sudoku_constraint.js');
 const { BinaryConstraint } = await import('../../js/solver/handlers.js');
-const { LookupTables } = await import('../../js/solver/lookup_tables.js');
 
 // Helper to create a binary key from a predicate function.
 const binaryKey = (fn, numValues) =>
@@ -74,8 +73,8 @@ await runTest('not-equal: should prune same values from both cells', () => {
   handler.initialize(context.createGrid(), createCellExclusions(), context.shape, {});
 
   const grid = new Uint16Array(4);
-  grid[0] = mask(1, 2);
-  grid[1] = mask(1, 2, 3);
+  grid[0] = valueMask(1, 2);
+  grid[1] = valueMask(1, 2, 3);
   const acc = createAccumulator();
 
   const result = handler.enforceConsistency(grid, acc);
@@ -84,8 +83,8 @@ await runTest('not-equal: should prune same values from both cells', () => {
   // Cell 0 can be 1 or 2, so cell 1 can still be 1, 2, or 3 (just not both same)
   // But with a !== b, if cell 0 is {1,2}, cell 1 can still be {1,2,3}
   // The constraint only prunes when one cell is fixed.
-  assert.equal(grid[0], mask(1, 2));
-  assert.equal(grid[1], mask(1, 2, 3));
+  assert.equal(grid[0], valueMask(1, 2));
+  assert.equal(grid[1], valueMask(1, 2, 3));
 });
 
 await runTest('not-equal: should prune when one cell is fixed', () => {
@@ -95,15 +94,15 @@ await runTest('not-equal: should prune when one cell is fixed', () => {
   handler.initialize(context.createGrid(), createCellExclusions(), context.shape, {});
 
   const grid = new Uint16Array(4);
-  grid[0] = LookupTables.fromValue(2);  // Fixed to 2
-  grid[1] = mask(1, 2, 3);
+  grid[0] = valueMask(2);  // Fixed to 2
+  grid[1] = valueMask(1, 2, 3);
   const acc = createAccumulator();
 
   const result = handler.enforceConsistency(grid, acc);
 
   assert.equal(result, true);
-  assert.equal(grid[0], LookupTables.fromValue(2));
-  assert.equal(grid[1], mask(1, 3), 'should remove 2 from cell 1');
+  assert.equal(grid[0], valueMask(2));
+  assert.equal(grid[1], valueMask(1, 3), 'should remove 2 from cell 1');
   assert.ok(acc.touched.has(1));
 });
 
@@ -114,8 +113,8 @@ await runTest('not-equal: should fail when both cells forced to same value', () 
   handler.initialize(context.createGrid(), createCellExclusions(), context.shape, {});
 
   const grid = new Uint16Array(4);
-  grid[0] = LookupTables.fromValue(2);
-  grid[1] = LookupTables.fromValue(2);
+  grid[0] = valueMask(2);
+  grid[1] = valueMask(2);
   const acc = createAccumulator();
 
   const result = handler.enforceConsistency(grid, acc);
@@ -134,15 +133,15 @@ await runTest('less-than: should prune high values from first cell', () => {
   handler.initialize(context.createGrid(), createCellExclusions(), context.shape, {});
 
   const grid = new Uint16Array(4);
-  grid[0] = mask(1, 2, 3, 4);
-  grid[1] = LookupTables.fromValue(3);  // Fixed to 3
+  grid[0] = valueMask(1, 2, 3, 4);
+  grid[1] = valueMask(3);  // Fixed to 3
   const acc = createAccumulator();
 
   const result = handler.enforceConsistency(grid, acc);
 
   assert.equal(result, true);
-  assert.equal(grid[0], mask(1, 2), 'only 1 and 2 are less than 3');
-  assert.equal(grid[1], LookupTables.fromValue(3));
+  assert.equal(grid[0], valueMask(1, 2), 'only 1 and 2 are less than 3');
+  assert.equal(grid[1], valueMask(3));
   assert.ok(acc.touched.has(0));
 });
 
@@ -153,15 +152,15 @@ await runTest('less-than: should prune low values from second cell', () => {
   handler.initialize(context.createGrid(), createCellExclusions(), context.shape, {});
 
   const grid = new Uint16Array(4);
-  grid[0] = LookupTables.fromValue(2);  // Fixed to 2
-  grid[1] = mask(1, 2, 3, 4);
+  grid[0] = valueMask(2);  // Fixed to 2
+  grid[1] = valueMask(1, 2, 3, 4);
   const acc = createAccumulator();
 
   const result = handler.enforceConsistency(grid, acc);
 
   assert.equal(result, true);
-  assert.equal(grid[0], LookupTables.fromValue(2));
-  assert.equal(grid[1], mask(3, 4), 'only 3 and 4 are greater than 2');
+  assert.equal(grid[0], valueMask(2));
+  assert.equal(grid[1], valueMask(3, 4), 'only 3 and 4 are greater than 2');
   assert.ok(acc.touched.has(1));
 });
 
@@ -172,8 +171,8 @@ await runTest('less-than: should prune both cells', () => {
   handler.initialize(context.createGrid(), createCellExclusions(), context.shape, {});
 
   const grid = new Uint16Array(4);
-  grid[0] = mask(2, 3, 4);  // Can be 2, 3, or 4
-  grid[1] = mask(1, 2, 3);  // Can be 1, 2, or 3
+  grid[0] = valueMask(2, 3, 4);  // Can be 2, 3, or 4
+  grid[1] = valueMask(1, 2, 3);  // Can be 1, 2, or 3
   const acc = createAccumulator();
 
   const result = handler.enforceConsistency(grid, acc);
@@ -182,8 +181,8 @@ await runTest('less-than: should prune both cells', () => {
   // For a < b: cell 0 must have values less than something in cell 1
   // cell 1 has max 3, so cell 0 can be 2 (less than 3)
   // cell 0 has min 2, so cell 1 must be > 2, i.e. 3
-  assert.equal(grid[0], LookupTables.fromValue(2));
-  assert.equal(grid[1], LookupTables.fromValue(3));
+  assert.equal(grid[0], valueMask(2));
+  assert.equal(grid[1], valueMask(3));
 });
 
 await runTest('less-than: should fail when first cell minimum >= second cell maximum', () => {
@@ -193,8 +192,8 @@ await runTest('less-than: should fail when first cell minimum >= second cell max
   handler.initialize(context.createGrid(), createCellExclusions(), context.shape, {});
 
   const grid = new Uint16Array(4);
-  grid[0] = mask(3, 4);  // Min is 3
-  grid[1] = mask(1, 2);  // Max is 2
+  grid[0] = valueMask(3, 4);  // Min is 3
+  grid[1] = valueMask(1, 2);  // Max is 2
   const acc = createAccumulator();
 
   const result = handler.enforceConsistency(grid, acc);
@@ -213,15 +212,15 @@ await runTest('equals: should intersect candidates', () => {
   handler.initialize(context.createGrid(), createCellExclusions(), context.shape, {});
 
   const grid = new Uint16Array(4);
-  grid[0] = mask(1, 2, 3);
-  grid[1] = mask(2, 3, 4);
+  grid[0] = valueMask(1, 2, 3);
+  grid[1] = valueMask(2, 3, 4);
   const acc = createAccumulator();
 
   const result = handler.enforceConsistency(grid, acc);
 
   assert.equal(result, true);
-  assert.equal(grid[0], mask(2, 3), 'intersection of {1,2,3} and {2,3,4}');
-  assert.equal(grid[1], mask(2, 3));
+  assert.equal(grid[0], valueMask(2, 3), 'intersection of {1,2,3} and {2,3,4}');
+  assert.equal(grid[1], valueMask(2, 3));
   assert.ok(acc.touched.has(0));
   assert.ok(acc.touched.has(1));
 });
@@ -233,8 +232,8 @@ await runTest('equals: should fail when no common values', () => {
   handler.initialize(context.createGrid(), createCellExclusions(), context.shape, {});
 
   const grid = new Uint16Array(4);
-  grid[0] = mask(1, 2);
-  grid[1] = mask(3, 4);
+  grid[0] = valueMask(1, 2);
+  grid[1] = valueMask(3, 4);
   const acc = createAccumulator();
 
   const result = handler.enforceConsistency(grid, acc);
@@ -253,15 +252,15 @@ await runTest('difference >= 2: should prune adjacent values', () => {
   handler.initialize(context.createGrid(), createCellExclusions(), context.shape, {});
 
   const grid = new Uint16Array(4);
-  grid[0] = LookupTables.fromValue(2);
-  grid[1] = mask(1, 2, 3, 4);
+  grid[0] = valueMask(2);
+  grid[1] = valueMask(1, 2, 3, 4);
   const acc = createAccumulator();
 
   const result = handler.enforceConsistency(grid, acc);
 
   assert.equal(result, true);
   // |2 - b| >= 2 means b <= 0 or b >= 4, so only 4 is valid
-  assert.equal(grid[1], LookupTables.fromValue(4));
+  assert.equal(grid[1], valueMask(4));
 });
 
 await runTest('difference >= 2: should fail when too close', () => {
@@ -271,8 +270,8 @@ await runTest('difference >= 2: should fail when too close', () => {
   handler.initialize(context.createGrid(), createCellExclusions(), context.shape, {});
 
   const grid = new Uint16Array(4);
-  grid[0] = LookupTables.fromValue(2);
-  grid[1] = mask(1, 2, 3);  // All within 1 of 2
+  grid[0] = valueMask(2);
+  grid[1] = valueMask(1, 2, 3);  // All within 1 of 2
   const acc = createAccumulator();
 
   const result = handler.enforceConsistency(grid, acc);
@@ -291,8 +290,8 @@ await runTest('should not report cells when values unchanged', () => {
   handler.initialize(context.createGrid(), createCellExclusions(), context.shape, {});
 
   const grid = new Uint16Array(4);
-  grid[0] = LookupTables.fromValue(1);
-  grid[1] = LookupTables.fromValue(2);
+  grid[0] = valueMask(1);
+  grid[1] = valueMask(2);
   const acc = createAccumulator();
 
   const result = handler.enforceConsistency(grid, acc);
@@ -308,8 +307,8 @@ await runTest('should report only changed cells', () => {
   handler.initialize(context.createGrid(), createCellExclusions(), context.shape, {});
 
   const grid = new Uint16Array(4);
-  grid[0] = LookupTables.fromValue(1);  // Already constrained
-  grid[1] = mask(1, 2, 3, 4);           // Needs pruning
+  grid[0] = valueMask(1);  // Already constrained
+  grid[1] = valueMask(1, 2, 3, 4);           // Needs pruning
   const acc = createAccumulator();
 
   handler.enforceConsistency(grid, acc);
@@ -329,22 +328,22 @@ await runTest('should be reusable across multiple calls', () => {
 
   // First call
   const grid1 = new Uint16Array(4);
-  grid1[0] = LookupTables.fromValue(1);
-  grid1[1] = mask(1, 2, 3);
+  grid1[0] = valueMask(1);
+  grid1[1] = valueMask(1, 2, 3);
   assert.equal(handler.enforceConsistency(grid1, createAccumulator()), true);
-  assert.equal(grid1[1], mask(2, 3));
+  assert.equal(grid1[1], valueMask(2, 3));
 
   // Second call with different grid
   const grid2 = new Uint16Array(4);
-  grid2[0] = LookupTables.fromValue(3);
-  grid2[1] = mask(2, 3, 4);
+  grid2[0] = valueMask(3);
+  grid2[1] = valueMask(2, 3, 4);
   assert.equal(handler.enforceConsistency(grid2, createAccumulator()), true);
-  assert.equal(grid2[1], mask(2, 4));
+  assert.equal(grid2[1], valueMask(2, 4));
 
   // Third call that fails
   const grid3 = new Uint16Array(4);
-  grid3[0] = LookupTables.fromValue(2);
-  grid3[1] = LookupTables.fromValue(2);
+  grid3[0] = valueMask(2);
+  grid3[1] = valueMask(2);
   assert.equal(handler.enforceConsistency(grid3, createAccumulator()), false);
 });
 
@@ -359,14 +358,14 @@ await runTest('should work with non-contiguous cell indices', () => {
   handler.initialize(context.createGrid(), createCellExclusions(), context.shape, {});
 
   const grid = context.createGrid();
-  grid[5] = mask(1, 2, 3, 4);
-  grid[15] = LookupTables.fromValue(2);
+  grid[5] = valueMask(1, 2, 3, 4);
+  grid[15] = valueMask(2);
   const acc = createAccumulator();
 
   const result = handler.enforceConsistency(grid, acc);
 
   assert.equal(result, true);
-  assert.equal(grid[5], LookupTables.fromValue(1), 'only 1 is less than 2');
+  assert.equal(grid[5], valueMask(1), 'only 1 is less than 2');
   assert.ok(acc.touched.has(5));
   assert.ok(!acc.touched.has(15));
 });
@@ -383,15 +382,15 @@ await runTest('asymmetric constraint: a*2 === b', () => {
   handler.initialize(context.createGrid(), createCellExclusions(), context.shape, {});
 
   const grid = new Uint16Array(4);
-  grid[0] = mask(1, 2, 3, 4);
-  grid[1] = mask(1, 2, 3, 4);
+  grid[0] = valueMask(1, 2, 3, 4);
+  grid[1] = valueMask(1, 2, 3, 4);
   const acc = createAccumulator();
 
   const result = handler.enforceConsistency(grid, acc);
 
   assert.equal(result, true);
-  assert.equal(grid[0], mask(1, 2), 'only 1 and 2 have valid doubles');
-  assert.equal(grid[1], mask(2, 4), 'only 2 and 4 are valid doubles');
+  assert.equal(grid[0], valueMask(1, 2), 'only 1 and 2 have valid doubles');
+  assert.equal(grid[1], valueMask(2, 4), 'only 2 and 4 are valid doubles');
 });
 
 await runTest('asymmetric constraint: should prune correctly given fixed value', () => {
@@ -401,14 +400,14 @@ await runTest('asymmetric constraint: should prune correctly given fixed value',
   handler.initialize(context.createGrid(), createCellExclusions(), context.shape, {});
 
   const grid = new Uint16Array(4);
-  grid[0] = mask(1, 2, 3, 4);
-  grid[1] = LookupTables.fromValue(4);  // Fixed to 4
+  grid[0] = valueMask(1, 2, 3, 4);
+  grid[1] = valueMask(4);  // Fixed to 4
   const acc = createAccumulator();
 
   const result = handler.enforceConsistency(grid, acc);
 
   assert.equal(result, true);
-  assert.equal(grid[0], LookupTables.fromValue(2), '2*2 = 4');
+  assert.equal(grid[0], valueMask(2), '2*2 = 4');
 });
 
 // =============================================================================
@@ -431,17 +430,17 @@ await runTest('required values: should remove required values from pair exclusio
   handler.initialize(context.createGrid(), cellExclusions, context.shape, {});
 
   const grid = new Uint16Array(3);
-  grid[0] = mask(1, 2);
-  grid[1] = mask(1, 2);
-  grid[2] = mask(1, 2, 3);
+  grid[0] = valueMask(1, 2);
+  grid[1] = valueMask(1, 2);
+  grid[2] = valueMask(1, 2, 3);
   const acc = createAccumulator();
 
   const result = handler.enforceConsistency(grid, acc);
 
   assert.equal(result, true);
-  assert.equal(grid[0], mask(1, 2));
-  assert.equal(grid[1], mask(1, 2));
-  assert.equal(grid[2], mask(3), 'values required in (0,1) should be excluded from cell 2');
+  assert.equal(grid[0], valueMask(1, 2));
+  assert.equal(grid[1], valueMask(1, 2));
+  assert.equal(grid[2], valueMask(3), 'values required in (0,1) should be excluded from cell 2');
   assert.ok(acc.touched.has(2), 'exclusion cell should be marked touched');
 });
 
@@ -461,15 +460,15 @@ await runTest('required values: should not run required-value exclusions for tra
   handler.initialize(context.createGrid(), cellExclusions, context.shape, {});
 
   const grid = new Uint16Array(3);
-  grid[0] = mask(1, 2);
-  grid[1] = mask(1, 2);
-  grid[2] = mask(1, 2, 3);
+  grid[0] = valueMask(1, 2);
+  grid[1] = valueMask(1, 2);
+  grid[2] = valueMask(1, 2, 3);
   const acc = createAccumulator();
 
   const result = handler.enforceConsistency(grid, acc);
 
   assert.equal(result, true);
-  assert.equal(grid[2], mask(1, 2, 3), 'transitive keys should skip required-value exclusions');
+  assert.equal(grid[2], valueMask(1, 2, 3), 'transitive keys should skip required-value exclusions');
   assert.equal(acc.touched.size, 0, 'no cells should be touched');
 });
 

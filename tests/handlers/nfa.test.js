@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 
 import { ensureGlobalEnvironment } from '../helpers/test_env.js';
 import { runTest, logSuiteComplete } from '../helpers/test_runner.js';
-import { createAccumulator, mask } from '../helpers/constraint_test_utils.js';
+import { createAccumulator, valueMask } from '../helpers/constraint_test_utils.js';
 
 ensureGlobalEnvironment();
 
@@ -20,12 +20,12 @@ const findStartingStateIndex = (cnfa) => {
 };
 
 const getNextStates = (cnfa, stateIndex, value) => {
-  const valueMask = mask(value);
+  const transitionMask = valueMask(value);
   const transitions = cnfa.transitionLists[stateIndex];
   const nextStates = [];
   for (let i = 0; i < transitions.length; i++) {
     const entry = transitions[i];
-    if (entry & valueMask) {
+    if (entry & transitionMask) {
       nextStates.push(entry >>> 16);
     }
   }
@@ -88,7 +88,7 @@ await runTest('compressNFA should combine symbol masks for same target state', (
   assert.equal(transitions.length, 1, 'should combine into single transition');
   const entry = transitions[0];
   const entryMask = entry & 0xFFFF;
-  assert.equal(entryMask, mask(1, 2), 'mask should cover both symbols');
+  assert.equal(entryMask, valueMask(1, 2), 'mask should cover both symbols');
 });
 
 await runTest('compressNFA should use compact transition entry format', () => {
@@ -116,14 +116,14 @@ await runTest('NFAConstraint should prune cells to supported values', () => {
   const cnfa = compressNFA(nfa);
   const handler = new NFAConstraint([0, 1], cnfa);
 
-  const allValues = mask(1, 2, 3, 4);
+  const allValues = valueMask(1, 2, 3, 4);
   const grid = new Uint16Array([allValues, allValues]);
   const accumulator = createAccumulator();
 
   const result = handler.enforceConsistency(grid, accumulator);
   assert.equal(result, true);
-  assert.equal(grid[0], mask(1), 'first cell forced to 1');
-  assert.equal(grid[1], mask(2), 'second cell forced to 2');
+  assert.equal(grid[0], valueMask(1), 'first cell forced to 1');
+  assert.equal(grid[1], valueMask(2), 'second cell forced to 2');
   assert.deepEqual([...accumulator.touched].sort((a, b) => a - b), [0, 1]);
 });
 
@@ -133,8 +133,8 @@ await runTest('NFAConstraint should return false when no valid path exists', () 
   const handler = new NFAConstraint([0, 1], cnfa);
 
   const grid = new Uint16Array([
-    mask(2),
-    mask(2),
+    valueMask(2),
+    valueMask(2),
   ]);
   const accumulator = { addForCell() { throw new Error('should not be called'); } };
 
@@ -148,8 +148,8 @@ await runTest('NFAConstraint should not touch cells already at supported values'
   const handler = new NFAConstraint([0, 1], cnfa);
 
   const grid = new Uint16Array([
-    mask(1),
-    mask(2),
+    valueMask(1),
+    valueMask(2),
   ]);
   const accumulator = createAccumulator();
 
@@ -164,8 +164,8 @@ await runTest('NFAConstraint should report only changed cells', () => {
   const handler = new NFAConstraint([0, 1], cnfa);
 
   const grid = new Uint16Array([
-    mask(1),  // Already constrained
-    mask(1, 2, 3, 4),            // Needs pruning
+    valueMask(1),  // Already constrained
+    valueMask(1, 2, 3, 4),            // Needs pruning
   ]);
   const accumulator = createAccumulator();
 
@@ -184,8 +184,8 @@ await runTest('NFAConstraint forward pass should fail when first cell has no val
 
   // First cell only allows 2, but NFA requires 1 first
   const grid = new Uint16Array([
-    mask(2),
-    mask(1, 2),
+    valueMask(2),
+    valueMask(1, 2),
   ]);
   const accumulator = createAccumulator();
 
@@ -199,9 +199,9 @@ await runTest('NFAConstraint forward pass should fail when middle cell blocks pa
   const handler = new NFAConstraint([0, 1, 2], cnfa);
 
   const grid = new Uint16Array([
-    mask(1),
-    mask(3),  // Should be 2
-    mask(1, 2, 3),
+    valueMask(1),
+    valueMask(3),  // Should be 2
+    valueMask(1, 2, 3),
   ]);
   const accumulator = createAccumulator();
 
@@ -216,15 +216,15 @@ await runTest('NFAConstraint forward pass tracks reachable states through NFA', 
   const handler = new NFAConstraint([0, 1], cnfa);
 
   const grid = new Uint16Array([
-    mask(1),
-    mask(2, 3),
+    valueMask(1),
+    valueMask(2, 3),
   ]);
   const accumulator = createAccumulator();
 
   const result = handler.enforceConsistency(grid, accumulator);
   assert.equal(result, true);
   // Both 2 and 3 should remain valid
-  assert.equal(grid[1], mask(2, 3));
+  assert.equal(grid[1], valueMask(2, 3));
 });
 
 // =============================================================================
@@ -238,9 +238,9 @@ await runTest('NFAConstraint backward pass should fail when final states are not
 
   // Path 121 - reaches a state but not an accepting one
   const grid = new Uint16Array([
-    mask(1),
-    mask(2),
-    mask(1),  // Should be 3 to reach accepting
+    valueMask(1),
+    valueMask(2),
+    valueMask(1),  // Should be 3 to reach accepting
   ]);
   const accumulator = createAccumulator();
 
@@ -255,14 +255,14 @@ await runTest('NFAConstraint backward pass should prune values not reaching acce
 
   // Last cell is 2, so first cell must be 1 (not 3)
   const grid = new Uint16Array([
-    mask(1, 3),
-    mask(2),
+    valueMask(1, 3),
+    valueMask(2),
   ]);
   const accumulator = createAccumulator();
 
   const result = handler.enforceConsistency(grid, accumulator);
   assert.equal(result, true);
-  assert.equal(grid[0], mask(1));
+  assert.equal(grid[0], valueMask(1));
 });
 
 await runTest('NFAConstraint backward pass should prune unreachable states', () => {
@@ -272,14 +272,14 @@ await runTest('NFAConstraint backward pass should prune unreachable states', () 
 
   // Second cell only allows 2
   const grid = new Uint16Array([
-    mask(1, 2, 3),
-    mask(2),
+    valueMask(1, 2, 3),
+    valueMask(2),
   ]);
   const accumulator = createAccumulator();
 
   const result = handler.enforceConsistency(grid, accumulator);
   assert.equal(result, true);
-  assert.equal(grid[0], mask(1));
+  assert.equal(grid[0], valueMask(1));
 });
 
 // =============================================================================
@@ -291,15 +291,15 @@ await runTest('NFAConstraint should work with non-contiguous cell indices', () =
   const cnfa = compressNFA(nfa);
   const handler = new NFAConstraint([5, 10], cnfa);
 
-  const grid = new Uint16Array(15).fill(mask(1, 2, 3, 4));
+  const grid = new Uint16Array(15).fill(valueMask(1, 2, 3, 4));
   const accumulator = createAccumulator();
 
   const result = handler.enforceConsistency(grid, accumulator);
   assert.equal(result, true);
-  assert.equal(grid[5], mask(1));
-  assert.equal(grid[10], mask(2));
+  assert.equal(grid[5], valueMask(1));
+  assert.equal(grid[10], valueMask(2));
   // Other cells should be untouched
-  assert.equal(grid[0], mask(1, 2, 3, 4));
+  assert.equal(grid[0], valueMask(1, 2, 3, 4));
 });
 
 await runTest('NFAConstraint should handle single cell', () => {
@@ -307,12 +307,12 @@ await runTest('NFAConstraint should handle single cell', () => {
   const cnfa = compressNFA(nfa);
   const handler = new NFAConstraint([0], cnfa);
 
-  const grid = new Uint16Array([mask(1, 2, 3, 4)]);
+  const grid = new Uint16Array([valueMask(1, 2, 3, 4)]);
   const accumulator = createAccumulator();
 
   const result = handler.enforceConsistency(grid, accumulator);
   assert.equal(result, true);
-  assert.equal(grid[0], mask(1, 2));
+  assert.equal(grid[0], valueMask(1, 2));
 });
 
 await runTest('NFAConstraint should handle longer cell sequences', () => {
@@ -320,16 +320,16 @@ await runTest('NFAConstraint should handle longer cell sequences', () => {
   const cnfa = compressNFA(nfa);
   const handler = new NFAConstraint([0, 1, 2, 3], cnfa);
 
-  const allValues = mask(1, 2, 3, 4);
+  const allValues = valueMask(1, 2, 3, 4);
   const grid = new Uint16Array([allValues, allValues, allValues, allValues]);
   const accumulator = createAccumulator();
 
   const result = handler.enforceConsistency(grid, accumulator);
   assert.equal(result, true);
-  assert.equal(grid[0], mask(1));
-  assert.equal(grid[1], mask(2));
-  assert.equal(grid[2], mask(3));
-  assert.equal(grid[3], mask(4));
+  assert.equal(grid[0], valueMask(1));
+  assert.equal(grid[1], valueMask(2));
+  assert.equal(grid[2], valueMask(3));
+  assert.equal(grid[3], valueMask(4));
 });
 
 // =============================================================================
@@ -342,23 +342,23 @@ await runTest('NFAConstraint should be reusable across multiple calls', () => {
   const handler = new NFAConstraint([0, 1], cnfa);
 
   // First call
-  const grid1 = new Uint16Array([mask(1, 2, 3, 4), mask(1, 2, 3, 4)]);
+  const grid1 = new Uint16Array([valueMask(1, 2, 3, 4), valueMask(1, 2, 3, 4)]);
   assert.equal(handler.enforceConsistency(grid1, createAccumulator()), true);
-  assert.equal(grid1[0], mask(1));
+  assert.equal(grid1[0], valueMask(1));
 
   // Second call with different grid
-  const grid2 = new Uint16Array([mask(1, 2), mask(2, 3)]);
+  const grid2 = new Uint16Array([valueMask(1, 2), valueMask(2, 3)]);
   assert.equal(handler.enforceConsistency(grid2, createAccumulator()), true);
-  assert.equal(grid2[0], mask(1));
+  assert.equal(grid2[0], valueMask(1));
 
   // Third call that fails
-  const grid3 = new Uint16Array([mask(2), mask(2)]);
+  const grid3 = new Uint16Array([valueMask(2), valueMask(2)]);
   assert.equal(handler.enforceConsistency(grid3, createAccumulator()), false);
 
   // Fourth call should still work after failure
-  const grid4 = new Uint16Array([mask(1, 2), mask(1, 2)]);
+  const grid4 = new Uint16Array([valueMask(1, 2), valueMask(1, 2)]);
   assert.equal(handler.enforceConsistency(grid4, createAccumulator()), true);
-  assert.equal(grid4[0], mask(1));
+  assert.equal(grid4[0], valueMask(1));
 });
 
 await runTest('NFAConstraint internal state should be cleared between calls', () => {
@@ -367,11 +367,11 @@ await runTest('NFAConstraint internal state should be cleared between calls', ()
   const handler = new NFAConstraint([0, 1], cnfa);
 
   // First call with specific values
-  const grid1 = new Uint16Array([mask(1), mask(2)]);
+  const grid1 = new Uint16Array([valueMask(1), valueMask(2)]);
   assert.equal(handler.enforceConsistency(grid1, createAccumulator()), true);
 
   // Second call with different valid values - should not be affected by first
-  const grid2 = new Uint16Array([mask(2), mask(1)]);
+  const grid2 = new Uint16Array([valueMask(2), valueMask(1)]);
   assert.equal(handler.enforceConsistency(grid2, createAccumulator()), true);
 });
 

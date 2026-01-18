@@ -42,7 +42,7 @@ export const setupConstraintTest = ({
   return { shape: resolvedShape, lookupTables, createGrid };
 };
 
-export const mask = (...values) => LookupTables.fromValuesArray(values);
+export const valueMask = (...values) => LookupTables.fromValuesArray(values);
 
 export const createAccumulator = () => {
   const touched = new Set();
@@ -89,7 +89,7 @@ export const applyCandidates = (grid, assignments) => {
   for (const [cellKey, values] of Object.entries(assignments)) {
     const cellIndex = Number(cellKey);
     if (Array.isArray(values)) {
-      grid[cellIndex] = mask(...values);
+      grid[cellIndex] = valueMask(...values);
     } else if (typeof values === 'number') {
       grid[cellIndex] = values;
     } else {
