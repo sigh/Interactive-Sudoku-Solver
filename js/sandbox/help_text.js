@@ -69,8 +69,8 @@ SOLVER
     const solution = solver.solution(constraints);
     // Get the unique solution, or null if not unique
     const unique = solver.uniqueSolution(constraints);
-    // Count the number of solutions
-    const count = solver.countSolutions(constraints);
+    // Count the number of solutions, with optional limit
+    const count = solver.countSolutions(constraints[, limit]);
     // Iterate over all solutions, with optional limit
     for (const s of solver.solutions(constraints[, limit])) { ... }
     // Get an array of solutions, with optional limit

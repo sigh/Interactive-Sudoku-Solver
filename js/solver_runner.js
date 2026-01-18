@@ -730,8 +730,8 @@ export class SolverProxy {
     return this._callWorker('nthStep', [n, stepGuides]);
   }
 
-  async countSolutions() {
-    return this._callWorker('countSolutions');
+  async countSolutions(limit) {
+    return this._callWorker('countSolutions', limit);
   }
 
   async estimatedCountSolutions() {

@@ -186,11 +186,12 @@ export class SimpleSolver {
   /**
    * Count all solutions efficiently.
    * @param {Object|Object[]|string} constraints
+   * @param {number} [limit] - Optional limit to count up to
    * @returns {number}
    */
-  countSolutions(constraints) {
+  countSolutions(constraints, limit) {
     const { solver, captureState } = this._build(constraints);
-    const count = solver.countSolutions();
+    const count = solver.countSolutions(limit);
     captureState();
     return count;
   }

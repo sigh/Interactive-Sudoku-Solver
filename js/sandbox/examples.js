@@ -315,7 +315,7 @@ const GENERATE_AND_TEST_FN = async () => {
     const constraints = [...fixedClues, ...selected];
 
     // Find up to 2 solutions to check for uniqueness.
-    const count = solver.solutionArray(constraints, 2).length;
+    const count = solver.countSolutions(constraints, 2);
 
     if (count === 0) return;  // No solutions - Prune
     if (count === 1) return constraints;  // Unique solution - Found!
