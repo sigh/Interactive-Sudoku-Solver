@@ -288,7 +288,7 @@ class StepByStepModeHandler extends ModeHandler {
   }
 
   _invalidateStepGuides(minStep) {
-    for (const [s, _] of this._stepGuides) {
+    for (const [s,] of this._stepGuides) {
       if (s >= minStep) this._stepGuides.delete(s);
     }
   }

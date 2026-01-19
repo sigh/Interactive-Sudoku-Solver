@@ -1542,9 +1542,8 @@ export class Lunchbox extends SudokuConstraintHandler {
 
     // Cache the grid values for faster lookup.
     const values = Lunchbox._cellValues;
-    let allValues = 0;
     for (let i = 0; i < numCells; i++) {
-      allValues |= (values[i] = grid[cells[i]]);
+      values[i] = grid[cells[i]];
     }
 
     if (isHouse) {

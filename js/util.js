@@ -202,10 +202,6 @@ export const deferUntilAnimationFrame = (fn) => {
   });
 };
 
-// Helper to count operations for debugging.
-let _count = 0;
-export const COUNT = () => { _count++; };
-
 // A timer which can be paused and unpaused and accumulates the elapsed time.
 // Start paused.
 export class Timer {
