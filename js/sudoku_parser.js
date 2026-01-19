@@ -186,10 +186,10 @@ export class SudokuParser {
     const numCells = shape.numCells;
 
     const layout = this.parseJigsawLayout(text.substr(numCells));
-    if (layout == null) return null;
+    if (layout === null) return null;
 
     const fixedValues = this.parsePlainSudoku(text.substr(0, numCells));
-    if (fixedValues == null) return null;
+    if (fixedValues === null) return null;
 
     return new SudokuConstraint.Container([layout, fixedValues]);
   }

@@ -3,7 +3,7 @@ export const clamp = (value, min, max) => {
 };
 
 export const formatTimeMs = (timeMs) => {
-  if (timeMs == 0) return '0 s';
+  if (timeMs === 0) return '0 s';
   if (timeMs < 1e3) {
     return timeMs.toPrecision(3) + ' ms';
   } else if (timeMs < 60e3) {
@@ -19,7 +19,7 @@ export const formatFixedTruncated = (n, digits) => {
 };
 
 export const formatNumberMetric = (value) => {
-  if (value == 0) return value;
+  if (value === 0) return value;
   if (value < 0.001) return value.toExponential(1);
   if (value < 1e3) return value;
   if (value < 1e6) return (value / 1e3) + 'k';
@@ -100,9 +100,9 @@ export const arrayRemoveValue = (a, value) => {
 }
 
 export const arraysAreEqual = (a, b) => {
-  if (a.length != b.length) return false;
+  if (a.length !== b.length) return false;
   for (let i = 0; i < a.length; i++) {
-    if (a[i] != b[i]) return false;
+    if (a[i] !== b[i]) return false;
   }
   return true;
 }
@@ -213,13 +213,13 @@ export class Timer {
   }
 
   unpause() {
-    if (this._startTimestamp == null) {
+    if (this._startTimestamp === null) {
       this._startTimestamp = performance.now();
     }
   }
 
   pause() {
-    if (this._startTimestamp != null) {
+    if (this._startTimestamp !== null) {
       this._elapsedMs += performance.now() - this._startTimestamp;
       this._startTimestamp = null;
     }
@@ -227,7 +227,7 @@ export class Timer {
 
   elapsedMs() {
     let elapsedMs = this._elapsedMs;
-    if (this._startTimestamp != null) {
+    if (this._startTimestamp !== null) {
       elapsedMs += performance.now() - this._startTimestamp;
     }
     return elapsedMs;
