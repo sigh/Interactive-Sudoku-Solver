@@ -1,6 +1,6 @@
 const { memoize, arrayIntersectSize, arrayDifference, setIntersectSize, arrayIntersect, arrayRemoveValue, setIntersectionToArray, setDifference, BitSet, elementarySymmetricSum, mergeSortedArrays } = await import('../util.js' + self.VERSION_PARAM);
 const { LookupTables } = await import('./lookup_tables.js' + self.VERSION_PARAM);
-const { SudokuConstraintBase, SudokuConstraint, fnToBinaryKey } = await import('../sudoku_constraint.js' + self.VERSION_PARAM);
+const { SudokuConstraintBase, fnToBinaryKey } = await import('../sudoku_constraint.js' + self.VERSION_PARAM);
 const HandlerModule = await import('./handlers.js' + self.VERSION_PARAM);
 const SumHandlerModule = await import('./sum_handler.js' + self.VERSION_PARAM);
 const NFAModule = await import('./nfa_handler.js' + self.VERSION_PARAM);
@@ -198,7 +198,7 @@ export class SudokuConstraintOptimizer {
     // i.e. greedy bin-packing.
     const cellsIncluded = new Set();
     const nonOverlappingHandlers = [];
-    for (const [h, _] of handlersByOverlaps) {
+    for (const [h,] of handlersByOverlaps) {
       if (h.cells.some(c => cellsIncluded.has(c))) continue;
       nonOverlappingHandlers.push(h);
       h.cells.forEach(c => cellsIncluded.add(c));
@@ -665,7 +665,7 @@ export class SudokuConstraintOptimizer {
       // overlap themselves.
       // We do this separately for each house so that we can don't have to
       // force the same handle to be used in every house it intersects.
-      const [filteredSumHandlers, _] = this._findNonOverlappingSubset(
+      const [filteredSumHandlers] = this._findNonOverlappingSubset(
         currentHouseSumIndexes.map(i => handlerSet.getHandler(i)),
         handlerSet);
 

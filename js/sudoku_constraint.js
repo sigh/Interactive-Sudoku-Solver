@@ -424,7 +424,7 @@ export class OutsideConstraintBase extends SudokuConstraintBase {
     const seenIds = new Map();
     for (const part of constraints) {
       const { id, arrowId, value } = part;
-      let [_, dir] = arrowId.split(',');
+      const [, dir] = arrowId.split(',');
       const index = dir === '1' ? 1 : 2;
 
       if (seenIds.has(id)) {
@@ -640,7 +640,7 @@ export class SudokuConstraint {
         map.add(layoutStr[i], i);
       }
 
-      for (const [_, region] of map) {
+      for (const [, region] of map) {
         if (region.length === shape.numValues) {
           yield new this(
             shape.name,
@@ -2389,7 +2389,7 @@ export class UserScriptExecutor {
     });
 
     this._worker.onmessage = (e) => {
-      const { type, id, result, error, text, ms } = e.data;
+      const { type, id, result, error } = e.data;
 
       if (type === 'ready') {
         this._resolveReady();

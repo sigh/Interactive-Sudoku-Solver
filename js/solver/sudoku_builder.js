@@ -133,8 +133,6 @@ export class SudokuBuilder {
   }
 
   static * _constraintHandlers(constraintMap, shape) {
-    const numValues = shape.numValues;
-
     const constraints = [].concat(...constraintMap.values());
 
     for (const constraint of constraints) {
