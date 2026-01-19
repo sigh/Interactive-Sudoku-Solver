@@ -36,7 +36,7 @@ export class SudokuConstraintOptimizer {
 
   optimize(handlerSet, cellExclusions, shape) {
     const hasBoxes = (
-      handlerSet.getAllofType(HandlerModule.NoBoxes).length == 0
+      handlerSet.getAllofType(HandlerModule.NoBoxes).length === 0
       && !shape.noDefaultBoxes);
 
     this._addExtraCellExclusions(handlerSet, cellExclusions, shape);
@@ -169,7 +169,7 @@ export class SudokuConstraintOptimizer {
 
   _optimizeJigsaw(handlerSet, hasBoxes, shape) {
     const jigsawPieces = handlerSet.getAllofType(HandlerModule.JigsawPiece);
-    if (jigsawPieces.length == 0) return;
+    if (jigsawPieces.length === 0) return;
 
     handlerSet.addNonEssential(
       ...this._makeJigsawIntersections(handlerSet));
@@ -210,7 +210,7 @@ export class SudokuConstraintOptimizer {
   _optimizeSums(handlerSet, cellExclusions, hasBoxes, shape) {
     // TODO: Consider how this interacts with fixed cells.
     const allSumHandlers = handlerSet.getAllofType(SumHandlerModule.Sum);
-    if (allSumHandlers.length == 0) return;
+    if (allSumHandlers.length === 0) return;
     // Exclude any handlers with duplicate cells from any of the optimizations.
     // TODO: Check which optimizations are still valid.
     const safeSumHandlers = allSumHandlers.filter(h => h.onlyUnitCoeffs());
@@ -417,7 +417,7 @@ export class SudokuConstraintOptimizer {
     let commonHandlers = houseHandlerIndexes;
     for (const c of cells) {
       commonHandlers = arrayIntersect(commonHandlers, cellMap[c]);
-      if (commonHandlers.length == 0) return commonHandlers;
+      if (commonHandlers.length === 0) return commonHandlers;
     }
 
     return commonHandlers;
@@ -473,7 +473,7 @@ export class SudokuConstraintOptimizer {
     for (const h of
       handlerSet.getAllofType(HandlerModule.AllDifferent)) {
       const cells = h.exclusionCells();
-      if (cells.length == shape.numValues) {
+      if (cells.length === shape.numValues) {
         handlerSet.addNonEssential(
           new HandlerModule.House(cells));
       }
@@ -698,7 +698,7 @@ export class SudokuConstraintOptimizer {
 
       // Short-circuit the common case where there is nothing special in the
       // house.
-      if (outies.length == 0 && constrainedCells.length == 0) continue;
+      if (outies.length === 0 && constrainedCells.length === 0) continue;
 
       const complementCells = arrayDifference(h.cells, constrainedCells);
       const complementSum = shape.maxSum - constrainedSum;
@@ -730,12 +730,12 @@ export class SudokuConstraintOptimizer {
       }
 
       // No constraints within this house.
-      if (constrainedCells.length == 0) continue;
+      if (constrainedCells.length === 0) continue;
       // The remaining 8-cell will already be constrained after the first
       // pass.
-      if (constrainedCells.length == 1) continue;
+      if (constrainedCells.length === 1) continue;
       // Nothing left to constrain.
-      if (constrainedCells.length == shape.numValues) continue;
+      if (constrainedCells.length === shape.numValues) continue;
 
       const complementHandler = new SumHandlerModule.Sum(
         complementCells, complementSum);
@@ -764,17 +764,17 @@ export class SudokuConstraintOptimizer {
         const diff0 = arrayDifference(h0.cells, h1.cells);
         if (
           // Skip empty diffs.
-          diff0.length == 0
+          diff0.length === 0
           // Also diffs that are too large.
           || diff0.length > this._MAX_SUM_SIZE
           // Ensure overlap is more than one cell.
-          || diff0.length == h0.cells.length - 1) continue;
+          || diff0.length === h0.cells.length - 1) continue;
 
         // We have some overlapping cells!
         // This means diff0 and diff1 must contain the same values.
         const diff1 = arrayDifference(h1.cells, h0.cells);
 
-        // TODO: Optimize the diff0.length == 1 case (and 2?).
+        // TODO: Optimize the diff0.length === 1 case (and 2?).
         const handler = new HandlerModule.SameValuesIgnoreCount(diff0, diff1);
         newHandlers.push(handler);
         this._logAddHandler('_makeJigsawIntersections', handler);
@@ -945,7 +945,7 @@ export class SudokuConstraintOptimizer {
 
   _optimizeFullRank(handlerSet, shape) {
     const rankHandlers = handlerSet.getAllofType(HandlerModule.FullRank);
-    if (rankHandlers.length == 0) return;
+    if (rankHandlers.length === 0) return;
 
     const clues = [];
     let tieMode = HandlerModule.FullRank.TIE_MODE.ANY;
@@ -1134,7 +1134,7 @@ export class SudokuConstraintOptimizer {
 
   _optimizeRequiredValues(handlerSet, cellExclusions, shape) {
     const requiredValueHandlers = handlerSet.getAllofType(HandlerModule.RequiredValues);
-    if (requiredValueHandlers.length == 0) return;
+    if (requiredValueHandlers.length === 0) return;
 
     const allValues = LookupTables.get(shape.numValues).allValues;
 
@@ -1175,7 +1175,7 @@ export class SudokuConstraintOptimizer {
         for (const [cell, v] of restrictions) {
           const values = LookupTables.toValuesArray(v & allValues);
           restrictions.set(cell, values);
-          if (values.length == 1) {
+          if (values.length === 1) {
             arrayRemoveValue(newValues, values[0]);
             arrayRemoveValue(newCells, cell);
           }
@@ -1225,7 +1225,7 @@ export class SudokuConstraintOptimizer {
   _optimizeTaxicab(handlerSet, cellExclusions, shape) {
     const taxicabHandlers = handlerSet.getAllofType(
       HandlerModule.ValueDependentUniqueValueExclusion);
-    if (taxicabHandlers.length == 0) return;
+    if (taxicabHandlers.length === 0) return;
 
     const valueCellExclusions = [];
     for (let i = 1; i <= shape.numValues; i++) {

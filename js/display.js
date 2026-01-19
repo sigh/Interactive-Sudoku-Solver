@@ -627,7 +627,7 @@ export class SolutionDisplay extends CellValueDisplay {
     if (!solution.length) {
       window.setTimeout(() => {
         // Ensure there is still no solution.
-        if (this._currentSolution.length == 0) {
+        if (this._currentSolution.length === 0) {
           this.clear();
           if (this._copyElem) this._copyElem.disabled = true;
         }

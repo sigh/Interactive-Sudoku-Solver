@@ -604,7 +604,7 @@ class ConstraintManager {
       this._makeCompositeCollection.bind(this));
     // If we create an empty composite collection, then select it.
     // This makes it easier to immediately add constraints to it.
-    if (constraint.constraints.length == 0) {
+    if (constraint.constraints.length === 0) {
       this._constraintSelector.select(
         constraint, chip, collection);
     }
@@ -1235,7 +1235,7 @@ class Selection {
     container.addEventListener('pointercancel', endPointerSelection);
     container.addEventListener('lostpointercapture', endPointerSelection);
     container.addEventListener('touchmove', e => {
-      if (e.touches.length == 1) e.preventDefault();
+      if (e.touches.length === 1) e.preventDefault();
     });
 
     {
@@ -1283,7 +1283,7 @@ class GridInputManager {
 
     this._selection = new Selection(displayContainer);
     this._selection.addCallback((cellIds, finishedSelecting) => {
-      if (cellIds.length == 1) {
+      if (cellIds.length === 1) {
         const [x, y] = this._selection.cellIdCenter(cellIds[0]);
         fakeInput.style.top = y + 'px';
         fakeInput.style.left = x + 'px';
@@ -1293,7 +1293,7 @@ class GridInputManager {
         this._callbacks.onSelection, cellIds, finishedSelecting);
       // Then restore focus based on the updated state.
       if (finishedSelecting) {
-        if (cellIds.length == 1) {
+        if (cellIds.length === 1) {
           fakeInput.select();
         } else {
           // For multi-cell selections, restore focus to the last active panel.
@@ -1358,7 +1358,7 @@ class GridInputManager {
   _setUpKeyBindings() {
     const getActiveCell = () => {
       let cells = [...this._selection.getCells()];
-      if (cells.length != 1) return null;
+      if (cells.length !== 1) return null;
       return cells[0];
     };
 

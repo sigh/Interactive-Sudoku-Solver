@@ -409,7 +409,7 @@ class InternalSolver {
       // This just worked out better.
       // Most puzzles don't seem to depend too much on this order, but
       // it makes a 2x difference for some.
-      if (a.cells.length != b.cells.length) {
+      if (a.cells.length !== b.cells.length) {
         return a.cells.length - b.cells.length;
       }
       // After this it doesn't matter, as long as it is deterministic.

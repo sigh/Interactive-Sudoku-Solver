@@ -104,7 +104,7 @@ export class SudokuBuilder {
       curSet.push(cell);
     }
 
-    const singles = cellSets.filter(s => s.length == 1).map(s => s[0]);
+    const singles = cellSets.filter(s => s.length === 1).map(s => s[0]);
     const multis = cellSets.filter(s => s.length > 1);
 
     if (singles.length > 1) {
