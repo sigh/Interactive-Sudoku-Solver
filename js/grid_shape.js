@@ -104,7 +104,7 @@ export class GridShape {
     // Box dimensions
     [this.boxHeight, this.boxWidth] = this.constructor._boxDims(numRows, numCols, this.numValues);
     this.noDefaultBoxes = (
-      this.boxHeight == null || this.boxWidth == null ||
+      this.boxHeight === null || this.boxWidth === null ||
       this.boxHeight === 1 || this.boxWidth === 1);
 
     this.name = this.constructor.makeName(numRows, numCols, this.numValues);

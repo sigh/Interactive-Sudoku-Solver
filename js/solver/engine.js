@@ -627,7 +627,7 @@ class InternalSolver {
   }
 
   setStepState(updates) {
-    if (this._stepState == null) {
+    if (this._stepState === null) {
       this._stepState = {
         stepGuides: null,
         step: 0,

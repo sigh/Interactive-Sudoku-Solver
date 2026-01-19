@@ -358,8 +358,8 @@ export class ColorPicker {
   // - If there is already a color for the given key then use that.
   // - Otherwise pick a color that is not used by any of the avoidKeys.
   // - If avoidKeys is not set then avoid all used keys.
-  pickColor(key, avoidKeys) {
-    if (key != null && this._keyToColors.has(key)) {
+  pickColor(key = null, avoidKeys) {
+    if (key !== null && this._keyToColors.has(key)) {
       return this._keyToColors.get(key);
     }
 
