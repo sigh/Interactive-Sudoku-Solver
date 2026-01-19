@@ -67,8 +67,7 @@ body {
   font-family: var(--font-family-base);
   width: fit-content;
 
-  margin-left: 10px;
-  margin-top: 0px;
+  margin: 0 10px;
   display: flex;
   flex-direction: column;
   gap: var(--gap-main-section);
@@ -177,11 +176,24 @@ body {
 }
 
 #page-header,
+#page-footer,
 .constraint-panel-header {
   padding: 5px 10px;
   background: var(--color-primary-soft);
   border-radius: 2px;
-  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.06), 0 2px 8px rgba(0, 0, 0, 0.08);
+  box-shadow:
+    0 1px 0 rgba(0, 0, 0, 0.04),
+    0 -1px 0 rgba(0, 0, 0, 0.04),
+    0 2px 8px rgba(0, 0, 0, 0.06),
+    0 -2px 8px rgba(0, 0, 0, 0.06);
+}
+
+#page-footer {
+  flex-wrap: wrap;
+  font-size: var(--font-size-small);
+  color: var(--color-text-muted);
+  margin-top: calc(-1 * var(--gap-main-section));
+  z-index: 500;
 }
 
 .page-header-logo {
@@ -614,12 +626,13 @@ button.copy-to-clipboard-failed::after {
 
   /* Keep only the constraints panel visible; only its body scrolls. */
   position: sticky;
-  top: var(--gap-default);
-  max-height: calc(100vh - 2*var(--gap-default));
+  top: 0;
+  max-height: 100dvh;
 
   display: flex;
   flex-direction: column;
   min-height: 0;
+  margin-bottom: 0;
 
   /* Ensure overflow doesn't extend the page; the inner wrapper scrolls. */
   overflow: hidden;
@@ -636,9 +649,6 @@ button.copy-to-clipboard-failed::after {
      remains in view. (Doesn't change layout; only affects scroll range.) */
   padding-bottom: max(200px, 50vh);
   padding-top: var(--gap-default);
-
-  /* Visual cue for the bottom edge of the scrollable region. */
-  box-shadow: inset 0 -8px 8px -8px rgba(0, 0, 0, 0.25);
 }
 
 #constraint-panel-container form {
@@ -905,6 +915,25 @@ select.thin-select {
 
 .description p {
   margin: 4px 0;
+}
+
+.page-info {
+  border: 1px solid var(--color-border-light);
+  border-radius: 10px;
+  padding: 8px 10px;
+  margin-bottom: var(--gap-default);
+  line-height: 1.35;
+}
+
+.page-info ul {
+  padding-inline-start: 10px;
+}
+
+.page-info a {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: var(--color-primary-soft);
 }
 
 hr {
