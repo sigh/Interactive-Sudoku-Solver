@@ -496,6 +496,25 @@ layout: null
             </div>
           </div>
 
+          <form id="outside-clue-input">
+            <fieldset tabindex="0" class="constraint-panel hide-until-load" disabled>
+              <h2>Outside clues</h2>
+              <div>
+                <div class="description">
+                  Select a row, column or diagonal arrow outside the grid.
+                </div>
+                <input type="hidden" name="id">
+                <div class="outside-arrow-clue-types"></div>
+                <div class="hstack">
+                  <input type="number" name="value" min=0 placeholder="value">
+                  <button type="submit" title="Set constraint">Set</button>
+                  <button type="button" id="outside-arrow-clear" class="danger-button"
+                    title="Clear constraint">Clear</button>
+                </div>
+              </div>
+            </fieldset>
+          </form>
+
           <form id="custom-constraint-input">
             <fieldset id="custom-constraint-panel" tabindex="0" class="constraint-panel hide-until-load">
               <h2>Custom JavaScript constraints</h2>
@@ -655,27 +674,6 @@ function accept(state) {
               </div>
             </fieldset>
           </form>
-
-          <div>
-            <form id="outside-clue-input">
-              <fieldset tabindex="0" class="constraint-panel hide-until-load" disabled>
-                <h2>Outside clues</h2>
-                <div>
-                  <div class="description">
-                    Select a row, column or diagonal arrow outside the grid.
-                  </div>
-                  <input type="hidden" name="id">
-                  <div class="outside-arrow-clue-types"></div>
-                  <div class="hstack">
-                    <input type="number" name="value" min=0 placeholder="value">
-                    <button type="submit" title="Set constraint">Set</button>
-                    <button type="button" id="outside-arrow-clear" class="danger-button"
-                      title="Clear constraint">Clear</button>
-                  </div>
-                </div>
-              </fieldset>
-            </form>
-          </div>
 
           <div>
             <form id="composite-constraint-input">
