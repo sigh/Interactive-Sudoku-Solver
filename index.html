@@ -318,46 +318,25 @@ layout: null
           </div>
         </div>
 
-        <div class="vstack page-info">
-          <div class="description">
-            <p>
+        <div class="description page-info">
+          <ul>
+            <li>
               <strong>Select a cell</strong> and <strong>type</strong> a number
               to set a value.
-            </p>
-            <p>
-              <strong>Drag</strong> or <strong><kbd>Shift</kbd>+click</strong>
+            </li>
+            <li>
+              <strong>Drag</strong> or <strong>Shift+click</strong>
               to select multiple cells. This selection can be used to add line
               or region constraints.
-            </p>
-            <p>
+            </li>
+            <li>
               <strong>Select an arrow</strong> outside the grid to set outside clues
               such as Little Killer or Skyscraper constraints.
-            </p>
-            <p>
-              Solver runs fastest on Chrome.
-              For more information, see the <a href="help">help page</a>.
-            </p>
-          </div>
-          <div class="description">
-            Advanced features:
-            <a href="#" id="open-sandbox-link">[JavaScript sandbox]</a>
-            <a href="javascript:loadDebug()">[Debug mode]</a>
-          </div>
-          <div class="description">
-            <p>
-              Code at
-              <a href="https://github.com/sigh/Interactive-Sudoku-Solver">
-                https://github.com/sigh/Interactive-Sudoku-Solver</a>.
-            </p>
-            <p>
-              <a href="https://github.com/sigh/Interactive-Sudoku-Solver/issues">
-                File bugs</a> or feature requests at the github repo.
-            </p>
-            <p>
-              More projects at <a href="https://sigh.github.io/">sigh.github.io</a>.
-            </p>
-          </div>
-
+            </li>
+          </ul>
+          <p>
+            See the <a href="help">help page</a> for more information.
+          </p>
         </div>
       </div>
 
@@ -729,6 +708,23 @@ function accept(state) {
       </div>
     </div>
   </div>
+
+  <footer id="page-footer" class="hstack">
+    <span>
+      Solver runs fastest on Chrome
+    </span>
+    ·
+    <a href="#" id="open-sandbox-link">[JavaScript sandbox]</a>
+    ·
+    <a href="javascript:loadDebug()">[Debug mode]</a>
+    ·
+    <span>
+      More projects at
+      <a href="https://sigh.github.io/" target="_blank" rel="noopener">
+        sigh.github.io
+      </a>
+    </span>
+  </footer>
 
 </body>
 
