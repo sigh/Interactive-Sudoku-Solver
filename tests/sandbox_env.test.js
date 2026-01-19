@@ -6,7 +6,7 @@ ensureGlobalEnvironment({
 });
 
 const { SANDBOX_GLOBALS } = await import('../js/sandbox/env.js');
-const { parseConstraint, Container } = SANDBOX_GLOBALS;
+const { parseConstraint } = SANDBOX_GLOBALS;
 
 // Test parseConstraint returns array for single constraint
 {

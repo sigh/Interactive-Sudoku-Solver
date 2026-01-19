@@ -5,14 +5,12 @@ import { runTest, logSuiteComplete } from '../helpers/test_runner.js';
 import {
   setupConstraintTest,
   createAccumulator,
-  createCellExclusions,
   valueMask,
 } from '../helpers/constraint_test_utils.js';
 
 ensureGlobalEnvironment();
 
 const { Lunchbox } = await import('../../js/solver/handlers.js');
-const { LookupTables } = await import('../../js/solver/lookup_tables.js');
 
 // =============================================================================
 // Initialization tests
@@ -23,7 +21,6 @@ await runTest('Lunchbox should initialize successfully with valid sum', () => {
   const cells = context.cells();
   const handler = new Lunchbox(cells, 10);
 
-  const grid = context.grid;
   const result = context.initializeHandler(handler);
 
   assert.equal(result, true);
@@ -42,7 +39,6 @@ await runTest('Lunchbox should initialize with sum of 0', () => {
   const cells = context.cells();
   const handler = new Lunchbox(cells, 0);
 
-  const grid = context.grid;
   const result = context.initializeHandler(handler);
 
   assert.equal(result, true);

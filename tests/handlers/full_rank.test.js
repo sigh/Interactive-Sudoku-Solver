@@ -6,7 +6,6 @@ const { SimpleSolver } = await import('../../js/sandbox/simple_solver.js' + self
 import {
   setupConstraintTest,
   createAccumulator,
-  createCellExclusions,
   valueMask,
   initializeConstraintHandler,
 } from '../helpers/constraint_test_utils.js';
@@ -63,7 +62,6 @@ await runTest('FullRank.buildEntries should create correct entries for 4x4', () 
 
 await runTest('FullRank initialize should fail for invalid clue line', () => {
   const context = setupConstraintTest({ gridSize: 4 });
-  const grid = context.grid;
 
   // [0,2] is not the start of any entry (rows/cols are contiguous).
   const handler = new FullRank(16, [{ rank: 1, line: [0, 2] }]);
@@ -906,7 +904,6 @@ await runTest('FullRank should throw when clue ranks are duplicated', () => {
 
 await runTest('FullRank initialize should fail when two clues force different rank-set values on the same entry', () => {
   const context = setupConstraintTest({ gridSize: 4 });
-  const grid = context.grid;
 
   // Two clues point at the same entry start, but belong to different rank sets:
   // rank 1 => value 1 rank set; rank 5 => value 2 rank set.
@@ -923,7 +920,6 @@ await runTest('FullRank initialize should fail when two clues force different ra
 
 await runTest('FullRank initialize should fail for out-of-range rank', () => {
   const context = setupConstraintTest({ gridSize: 4 });
-  const grid = context.grid;
 
   // For a 4x4 grid, ranks are grouped into 4 rank sets of 4 (1..16).
   // rank 17 implies a rank-set value of 5, which cannot exist.

@@ -27,7 +27,6 @@ await runTest('BinaryConstraint should initialize with valid key', () => {
   const key = binaryKey((a, b) => a !== b, 4);
   const handler = new BinaryConstraint(0, 1, key);
 
-  const grid = context.grid;
   const result = context.initializeHandler(handler);
 
   assert.equal(result, true);
@@ -39,7 +38,6 @@ await runTest('BinaryConstraint should fail initialization if no values are lega
   const key = binaryKey(() => false, 4);
   const handler = new BinaryConstraint(0, 1, key);
 
-  const grid = context.grid;
   const result = context.initializeHandler(handler);
 
   assert.equal(result, false);

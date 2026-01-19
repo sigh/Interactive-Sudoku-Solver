@@ -155,12 +155,9 @@ await runTest('SolverRunner constructor should set default callbacks', () => {
 });
 
 await runTest('SolverRunner constructor should accept custom callbacks', () => {
-  let stateReceived = null;
-  let statusReceived = null;
-
   const runner = new SolverRunner({
-    stateHandler: (state) => { stateReceived = state; },
-    statusHandler: (isSolving, method) => { statusReceived = { isSolving, method }; },
+    stateHandler: () => { },
+    statusHandler: () => { },
   });
 
   assert.ok(runner);
@@ -408,9 +405,8 @@ await runTest('onIterationChange should provide iteration state for modes with I
 // ============================================================================
 
 await runTest('count-solutions mode should work', async () => {
-  let updateResult = null;
   const runner = new SolverRunner({
-    onUpdate: (result) => { updateResult = result; },
+    onUpdate: () => { },
   });
 
   const constraint = makeSimpleConstraint();
@@ -422,9 +418,8 @@ await runTest('count-solutions mode should work', async () => {
 });
 
 await runTest('validate-layout mode should work', async () => {
-  let updateResult = null;
   const runner = new SolverRunner({
-    onUpdate: (result) => { updateResult = result; },
+    onUpdate: () => { },
   });
 
   const constraint = makeSimpleConstraint();

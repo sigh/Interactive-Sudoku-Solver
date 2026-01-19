@@ -10,7 +10,7 @@ const { BitSet } = await import('../../js/util.js' + self.VERSION_PARAM);
 const HandlerModule = await import('../../js/solver/handlers.js' + self.VERSION_PARAM);
 const SumHandlerModule = await import('../../js/solver/sum_handler.js' + self.VERSION_PARAM);
 const { GridShape } = await import('../../js/grid_shape.js' + self.VERSION_PARAM);
-const { HandlerSet, CellExclusions } = await import('../../js/solver/engine.js' + self.VERSION_PARAM);
+const { HandlerSet } = await import('../../js/solver/engine.js' + self.VERSION_PARAM);
 const { SudokuConstraintBase } = await import('../../js/sudoku_constraint.js' + self.VERSION_PARAM);
 
 class MockCellExclusions {

@@ -238,7 +238,7 @@ await runTest('forBinaryKey tables should have zero for empty mask', () => {
 await runTest('forBinaryKey not-equal: single value maps to all other values', () => {
   const tables = LookupTables.get(4);
   const key = binaryKey((a, b) => a !== b, 4);
-  const [table, tableInv] = tables.forBinaryKey(key);
+  const [table] = tables.forBinaryKey(key);
 
   // If cell0 = {1}, valid values for cell1 are {2,3,4}
   assert.equal(table[0b0001], 0b1110);
@@ -250,7 +250,7 @@ await runTest('forBinaryKey not-equal: single value maps to all other values', (
 await runTest('forBinaryKey not-equal: multiple values map to union', () => {
   const tables = LookupTables.get(4);
   const key = binaryKey((a, b) => a !== b, 4);
-  const [table, tableInv] = tables.forBinaryKey(key);
+  const [table] = tables.forBinaryKey(key);
 
   // If cell0 = {1,2}, valid values for cell1 are {2,3,4} | {1,3,4} = {1,2,3,4}
   assert.equal(table[0b0011], 0b1111);
@@ -274,7 +274,7 @@ await runTest('forBinaryKey not-equal: should be symmetric', () => {
 await runTest('forBinaryKey less-than: forward table gives valid second values', () => {
   const tables = LookupTables.get(4);
   const key = binaryKey((a, b) => a < b, 4);
-  const [table, tableInv] = tables.forBinaryKey(key);
+  const [table] = tables.forBinaryKey(key);
 
   // table[cell0 values] = valid cell1 values (values greater than cell0)
   assert.equal(table[0b0001], 0b1110); // 1 < {2,3,4}
@@ -286,7 +286,7 @@ await runTest('forBinaryKey less-than: forward table gives valid second values',
 await runTest('forBinaryKey less-than: inverse table gives valid first values', () => {
   const tables = LookupTables.get(4);
   const key = binaryKey((a, b) => a < b, 4);
-  const [table, tableInv] = tables.forBinaryKey(key);
+  const [, tableInv] = tables.forBinaryKey(key);
 
   // tableInv[cell1 values] = valid cell0 values (values less than cell1)
   assert.equal(tableInv[0b0001], 0b0000); // nothing < 1
@@ -314,7 +314,7 @@ await runTest('forBinaryKey less-than: multiple values combine correctly', () =>
 await runTest('forBinaryKey equals: single value maps to itself', () => {
   const tables = LookupTables.get(4);
   const key = binaryKey((a, b) => a === b, 4);
-  const [table, tableInv] = tables.forBinaryKey(key);
+  const [table] = tables.forBinaryKey(key);
 
   assert.equal(table[0b0001], 0b0001);
   assert.equal(table[0b0010], 0b0010);
@@ -325,7 +325,7 @@ await runTest('forBinaryKey equals: single value maps to itself', () => {
 await runTest('forBinaryKey equals: multiple values map to same set', () => {
   const tables = LookupTables.get(4);
   const key = binaryKey((a, b) => a === b, 4);
-  const [table, tableInv] = tables.forBinaryKey(key);
+  const [table] = tables.forBinaryKey(key);
 
   // If cell0 = {1,2}, valid cell1 values are {1} | {2} = {1,2}
   assert.equal(table[0b0011], 0b0011);
@@ -339,7 +339,7 @@ await runTest('forBinaryKey equals: multiple values map to same set', () => {
 await runTest('forBinaryKey difference>=2: should exclude adjacent values', () => {
   const tables = LookupTables.get(4);
   const key = binaryKey((a, b) => Math.abs(a - b) >= 2, 4);
-  const [table, tableInv] = tables.forBinaryKey(key);
+  const [table] = tables.forBinaryKey(key);
 
   // 1 is at least 2 away from {3,4}
   assert.equal(table[0b0001], 0b1100);
@@ -358,7 +358,7 @@ await runTest('forBinaryKey difference>=2: should exclude adjacent values', () =
 await runTest('forBinaryKey asymmetric: a*2===b forward table', () => {
   const tables = LookupTables.get(4);
   const key = binaryKey((a, b) => a * 2 === b, 4);
-  const [table, tableInv] = tables.forBinaryKey(key);
+  const [table] = tables.forBinaryKey(key);
 
   // Forward: given cell0, what can cell1 be?
   assert.equal(table[0b0001], 0b0010); // 1*2 = 2
@@ -370,7 +370,7 @@ await runTest('forBinaryKey asymmetric: a*2===b forward table', () => {
 await runTest('forBinaryKey asymmetric: a*2===b inverse table', () => {
   const tables = LookupTables.get(4);
   const key = binaryKey((a, b) => a * 2 === b, 4);
-  const [table, tableInv] = tables.forBinaryKey(key);
+  const [, tableInv] = tables.forBinaryKey(key);
 
   // Inverse: given cell1, what can cell0 be?
   assert.equal(tableInv[0b0001], 0b0000); // nothing * 2 = 1
