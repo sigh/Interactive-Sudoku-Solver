@@ -8,6 +8,13 @@ export class GridShape {
     return Number.isInteger(dim) && dim >= this.MIN_SIZE && dim <= this.MAX_SIZE;
   }
 
+  _assertValidNumValues(numValues) {
+    const defaultNumValues = this.constructor.defaultNumValues(this.numRows, this.numCols);
+    if (!Number.isInteger(numValues) || numValues < defaultNumValues || numValues > this.constructor.MAX_SIZE) {
+      throw Error('Invalid numValues: ' + numValues);
+    }
+  }
+
   // Internal memoized factory - always takes two arguments
   static _fromResolvedGridSize = memoize((numRows, numCols) => {
     if (!this._isValidDimension(numRows) || !this._isValidDimension(numCols)) {
@@ -95,9 +102,8 @@ export class GridShape {
     // Derived properties
     const defaultNumValues = this.constructor.defaultNumValues(numRows, numCols);
     this.numValues = numValues || defaultNumValues;
-    if (!Number.isInteger(this.numValues) || this.numValues < defaultNumValues || this.numValues > this.constructor.MAX_SIZE) {
-      throw Error('Invalid numValues: ' + this.numValues);
-    }
+    this._assertValidNumValues(this.numValues);
+
     this.numCells = numRows * numCols;
     this.numPencilmarks = this.numCells * this.numValues;
 
@@ -192,10 +198,7 @@ export class GridShape {
       return this;
     }
 
-    const defaultNumValues = this.constructor.defaultNumValues(this.numRows, this.numCols);
-    if (!Number.isInteger(numValues) || numValues < defaultNumValues || numValues > this.constructor.MAX_SIZE) {
-      throw Error('Invalid numValues: ' + numValues);
-    }
+    this._assertValidNumValues(numValues);
 
     return new GridShape(undefined, this.numRows, this.numCols, numValues);
   }
