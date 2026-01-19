@@ -699,13 +699,13 @@ ConstraintCategoryInput.LinesAndSets = class LinesAndSets extends ConstraintCate
         option.textContent = text;
         input.appendChild(option);
       }
-      input.disabled = cells.length == 0;
+      input.disabled = cells.length === 0;
     };
   }
 
   _onNewSelection(selection, selectionForm) {
     // Only enable the selection panel if the selection is long enough.
-    const disabled = (selection.length == 0);
+    const disabled = (selection.length === 0);
     selectionForm['add-constraint'].disabled = disabled;
     selectionForm.classList.toggle('disabled', disabled);
 
@@ -718,7 +718,7 @@ ConstraintCategoryInput.LinesAndSets = class LinesAndSets extends ConstraintCate
       return;
     }
 
-    const isSingleCell = selection.length == 1;
+    const isSingleCell = selection.length === 1;
 
     for (const [validationFn, elems] of this._validationFns) {
       // Call the validation function, or by default disallow single cell
@@ -771,7 +771,7 @@ ConstraintCategoryInput.GivenCandidates = class GivenCandidates extends Constrai
 
   _inputDigit(cell, digit) {
     const values = this._getCellValues(cell);
-    const currValue = values.length == 1 ? values[0] : 0;
+    const currValue = values.length === 1 ? values[0] : 0;
     const numValues = this._shape.numValues;
 
     let newValue;
@@ -840,7 +840,7 @@ ConstraintCategoryInput.Jigsaw = class Jigsaw extends ConstraintCategoryInput {
 
   _cellsAreValidJigsawPiece(cells) {
     const shape = this._shape;
-    if (cells.length != shape.numValues) return false;
+    if (cells.length !== shape.numValues) return false;
 
     // Check that we don't conflict with any existing constraints.
     for (const cell of cells) {
@@ -1315,7 +1315,7 @@ class MultiValueInputPanel {
   }
 
   updateFromCells(selection) {
-    toggleDisabled(this._collapsibleContainer.element(), selection.length == 0);
+    toggleDisabled(this._collapsibleContainer.element(), selection.length === 0);
     if (selection.length) {
       const values = this._givenLookup(selection[0]);
       this._updateForm(
@@ -1354,7 +1354,7 @@ class MultiValueInputPanel {
     const form = this._form;
     form.onchange = () => {
       const selection = this._inputManager.getSelection();
-      if (selection.length == 0) return;
+      if (selection.length === 0) return;
 
       this._onChange(selection, this._getCheckedValues());
     };

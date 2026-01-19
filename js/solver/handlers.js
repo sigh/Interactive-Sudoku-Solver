@@ -448,7 +448,7 @@ export class HandlerUtil {
     let bestExclusionGroupData = this.findExclusionGroupsGreedy(
       cells, cellExclusions, this.GREEDY_STRATEGY_FIRST, bitset);
 
-    if (cells.length < 4 || bestExclusionGroupData.groups.length == 1) {
+    if (cells.length < 4 || bestExclusionGroupData.groups.length === 1) {
       return bestExclusionGroupData;
     }
 
@@ -2218,7 +2218,7 @@ export class RequiredValues extends SudokuConstraintHandler {
     }
 
     // If the size is exact, then there can be no other values in the cells.
-    if (this._values.length == this.cells.length) {
+    if (this._values.length === this.cells.length) {
       for (const cell of this.cells) {
         if (!(initialGridCells[cell] &= this._valueMask)) return false;
       }
@@ -3548,7 +3548,7 @@ export class Or extends SudokuConstraintHandler {
       this._initializations.push(initialization);
     }
 
-    if (validHandlers.length == 0) return false;
+    if (validHandlers.length === 0) return false;
 
     this._handlers = validHandlers;
     this._numGridCells = shape.numCells;

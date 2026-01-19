@@ -168,7 +168,7 @@ class AllPossibilitiesModeHandler extends ModeHandler {
   add(...solutions) {
     this._solutions.push(...solutions);
 
-    if (this._pencilmarks.length == 0) {
+    if (this._pencilmarks.length === 0) {
       this._pencilmarks = Array.from(solutions[0]).map(() => new Set());
       const numCells = solutions[0].length;
       const numValues = Math.max(...solutions[0]);

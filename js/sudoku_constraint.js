@@ -277,7 +277,7 @@ export class SudokuConstraintBase {
   }
 
   static _cellsAre2x2Square(cells, shape) {
-    if (cells.length != 4) return false;
+    if (cells.length !== 4) return false;
     cells = cells.map(
       c => shape.parseCellId(c)).sort((a, b) => a.cell - b.cell);
     let { row, col } = cells[0];
@@ -1220,7 +1220,7 @@ export class SudokuConstraint {
     }
 
     static serialize(constraints) {
-      if (constraints.length != 1) {
+      if (constraints.length !== 1) {
         throw Error('Only one Shape constraint is allowed');
       }
 
@@ -1464,7 +1464,7 @@ export class SudokuConstraint {
     }
 
     chipLabel() {
-      if (this.cells.length == 2) {
+      if (this.cells.length === 2) {
         return `○ [${this.cells}]`;
       } else {
         return `○ (${this.cells.length} cells)`;
@@ -1496,7 +1496,7 @@ export class SudokuConstraint {
     }
 
     chipLabel() {
-      if (this.cells.length == 2) {
+      if (this.cells.length === 2) {
         return `● [${this.cells}]`;
       } else {
         return `● (${this.cells.length} cells)`;
@@ -1538,7 +1538,7 @@ export class SudokuConstraint {
     }
 
     chipLabel() {
-      if (this.cells.length == 2) {
+      if (this.cells.length === 2) {
         return `> [${this.cells}]`;
       } else {
         return `> (${this.cells.length} cells)`;
@@ -1566,7 +1566,7 @@ export class SudokuConstraint {
     }
 
     chipLabel() {
-      if (this.cells.length == 2) {
+      if (this.cells.length === 2) {
         return `X [${this.cells}]`;
       } else {
         return `X (${this.cells.length} cells)`;
@@ -1618,7 +1618,7 @@ export class SudokuConstraint {
     }
 
     chipLabel() {
-      if (this.cells.length == 2) {
+      if (this.cells.length === 2) {
         return `V [${this.cells}]`;
       } else {
         return `V (${this.cells.length} cells)`;

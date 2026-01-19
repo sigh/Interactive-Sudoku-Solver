@@ -1225,7 +1225,7 @@ class Givens extends BaseConstraintDisplayItem {
     const values = constraint.values;
     const item = this._cellDisplay.makeGridValue(
       this._shape.parseCellId(constraint.cell).cell,
-      values.length == 1 ? values[0] : values);
+      values.length === 1 ? values[0] : values);
     this._svg.append(item);
 
     if (values.length === 1) {

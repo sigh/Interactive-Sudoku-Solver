@@ -10,7 +10,7 @@ export class SudokuParser {
     const numCells = shape.numCells;
     const numCols = shape.numCols;
 
-    if (text.length != numCells) return null;
+    if (text.length !== numCells) return null;
     // Note: The second ` is just there so my syntax highlighter is happy.
     if (!text.match(/[<v>^`',`]/)) return null;
     if (!text.match(/^[0-9A-Za-j^<v>`'',.`]*$/)) return null;
@@ -98,7 +98,7 @@ export class SudokuParser {
 
     let parts = text.split(':');
     if (parts[2] != 'k') return null;
-    if (parts.length != numCells + 4) return null;
+    if (parts.length !== numCells + 4) return null;
 
     let cages = new Map();
     for (let i = 0; i < numCells; i++) {
@@ -299,7 +299,7 @@ export class SudokuParser {
       }
       constraints.push(constraint);
     }
-    if (constraints.length == 1) return constraints[0];
+    if (constraints.length === 1) return constraints[0];
     return new SudokuConstraint.Container(constraints);
   }
 
