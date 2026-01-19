@@ -5,7 +5,6 @@ import { runTest, logSuiteComplete } from '../helpers/test_runner.js';
 import {
   setupConstraintTest,
   createAccumulator,
-  createCellExclusions,
   valueMask,
 } from '../helpers/constraint_test_utils.js';
 
@@ -39,7 +38,6 @@ await runTest('Skyscraper should initialize successfully with valid visibility',
   const cells = context.cells();
   const handler = new Skyscraper(cells, 2);
 
-  const grid = context.grid;
   const result = context.initializeHandler(handler);
 
   assert.equal(result, true);
@@ -50,7 +48,6 @@ await runTest('Skyscraper should fail init if visibility > numCells', () => {
   const cells = context.cells();
   const handler = new Skyscraper(cells, 5); // 5 > 4 cells
 
-  const grid = context.grid;
   const result = context.initializeHandler(handler);
 
   assert.equal(result, false, 'should fail when visibility > numCells');
@@ -61,7 +58,6 @@ await runTest('Skyscraper should allow visibility == numCells', () => {
   const cells = context.cells();
   const handler = new Skyscraper(cells, 4); // visibility == numCells
 
-  const grid = context.grid;
   const result = context.initializeHandler(handler);
 
   assert.equal(result, true, 'should pass when visibility == numCells');
@@ -226,7 +222,6 @@ await runTest('Skyscraper should work on short rows (numCells < numValues)', () 
   const cells = context.cells();
   const handler = new Skyscraper(cells, 2);
 
-  const grid = context.grid;
   const result = context.initializeHandler(handler);
 
   assert.equal(result, true, 'should initialize for short row');
@@ -288,7 +283,6 @@ await runTest('Skyscraper short row should reject terminal height < numCells', (
   grid[3] = valueMask(3);
   grid[4] = valueMask(4);
   grid[5] = valueMask(5); // Can't have two 5s but illustrates the constraint
-  const acc = createAccumulator();
 
   // This specific setup may not fail for the reason we want,
   // let's set up a cleaner test
@@ -320,7 +314,6 @@ await runTest('Skyscraper should work on long rows (numCells > numValues)', () =
   const cells = context.cells();
   const handler = new Skyscraper(cells, 2);
 
-  const grid = context.grid;
   const result = context.initializeHandler(handler);
 
   assert.equal(result, true, 'should initialize for long row');

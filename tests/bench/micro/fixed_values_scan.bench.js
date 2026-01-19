@@ -3,7 +3,6 @@ import { bench, benchGroup, runIfMain } from '../bench_harness.js';
 // 9x9 Sudoku assumptions.
 const NUM_CELLS = 81;
 const NUM_VALUES = 9;
-const ALL_VALUES = (1 << NUM_VALUES) - 1;
 
 // Deterministic PRNG (xorshift32) so results are reproducible.
 const makeRng = (seed = 0x12345678) => {

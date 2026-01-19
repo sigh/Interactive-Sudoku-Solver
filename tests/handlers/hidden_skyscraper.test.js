@@ -5,7 +5,6 @@ import { runTest, logSuiteComplete } from '../helpers/test_runner.js';
 import {
   setupConstraintTest,
   createAccumulator,
-  createCellExclusions,
   valueMask,
 } from '../helpers/constraint_test_utils.js';
 

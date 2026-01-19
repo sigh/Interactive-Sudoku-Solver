@@ -3,23 +3,8 @@ import assert from 'node:assert/strict';
 import { runTest, logSuiteComplete } from '../helpers/test_runner.js';
 
 const { SimpleSolver } = await import('../../js/sandbox/simple_solver.js' + self.VERSION_PARAM);
-
-const { CellExclusions, HandlerSet } = await import('../../js/solver/engine.js' + self.VERSION_PARAM);
 const { HandlerUtil } = await import('../../js/solver/handlers.js' + self.VERSION_PARAM);
 const { BitSet } = await import('../../js/util.js' + self.VERSION_PARAM);
-
-const SHAPE_9x9 = {
-  numCells: 81,
-  numValues: 9,
-  gridSize: 9,
-  boxWidth: 3,
-  boxHeight: 3,
-};
-
-const makeEmptyExclusions = () => {
-  const handlerSet = new HandlerSet([], SHAPE_9x9);
-  return new CellExclusions(handlerSet, SHAPE_9x9);
-};
 
 // Creates a mock cellExclusions object that supports self-exclusions for testing.
 const createMockCellExclusions = (numCells, exclusionMap) => {

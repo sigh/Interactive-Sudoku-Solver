@@ -192,6 +192,7 @@ await runTest('solutions() can break early', async () => {
   const solver = new SimpleSolver();
   let count = 0;
   for await (const s of solver.solutions(MULTI_SOLUTIONS)) {
+    void s;
     count++;
     if (count >= 2) break;
   }

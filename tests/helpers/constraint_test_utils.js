@@ -50,7 +50,7 @@ export class GridTestContext {
     shape,
   } = {}) {
     this.shape = (() => {
-      if (shape) return numValues == null ? shape : shape.withNumValues(numValues);
+      if (shape) return (numValues === null || numValues === undefined) ? shape : shape.withNumValues(numValues);
 
       const dims = normalizeGridSize(gridSize);
       if (!dims) throw new Error(`Invalid gridSize: ${gridSize}`);
@@ -58,7 +58,7 @@ export class GridTestContext {
 
       const baseShape = GridShape.fromGridSize(numRows, numCols);
       if (!baseShape) throw new Error(`Invalid gridSize: ${gridSize}`);
-      return numValues == null ? baseShape : baseShape.withNumValues(numValues);
+      return (numValues === null || numValues === undefined) ? baseShape : baseShape.withNumValues(numValues);
     })();
 
     this.lookupTables = LookupTables.get(this.shape.numValues);
@@ -112,8 +112,6 @@ export class GridTestContext {
     return Array.from({ length: this.shape.numRows }, (_, r) => r * this.shape.numCols + colIndex);
   }
 }
-
-export { GridTestContext as ConstraintTestContext };
 
 export const setupConstraintTest = (options = {}) => new GridTestContext(options);
 
