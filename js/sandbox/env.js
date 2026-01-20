@@ -152,7 +152,7 @@ const solverLink = (constraint, text) => new SolverLink(constraint, text);
  * Uses toString() for objects that have a custom implementation (like Solution).
  */
 const formatConsoleArg = (a) => {
-  if (a == null) return String(a);
+  if (a === null) return String(a);
   if (typeof a !== 'object') return String(a);
   if (a instanceof SolverLink) return a; // Keep as-is for special handling
   if (typeof a.toString === 'function' && a.toString !== Object.prototype.toString) {

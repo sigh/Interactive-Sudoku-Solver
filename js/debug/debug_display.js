@@ -343,7 +343,7 @@ export class DebugManager {
     const argsStr = JSON.stringify(data.args || '').replaceAll('"', '');
 
     const key = `${data.loc} ${data.msg} ${argsStr}`;
-    if (key == this._logDedupe.lastKey) {
+    if (key === this._logDedupe.lastKey) {
       return this._addDuplicateLog(data);
     }
     this._logDedupe.lastKey = key;

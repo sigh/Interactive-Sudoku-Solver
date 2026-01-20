@@ -140,7 +140,7 @@ export class LookupTables {
           tableInv[1 << j] |= v << i;
 
           keyArr[keyIndex] >>= 1;
-          if (++vIndex == NUM_BITS_BASE64) {
+          if (++vIndex === NUM_BITS_BASE64) {
             vIndex = 0;
             keyIndex++;
           }

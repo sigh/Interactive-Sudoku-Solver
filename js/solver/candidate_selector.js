@@ -151,7 +151,7 @@ export class CandidateSelector {
     const cellOrder = this._cellOrder;
     let [cellOffset, value, count] = this._selectBestCandidate(
       gridState, cellOrder, cellDepth, isNewNode);
-    if (cellDepth == 0 && this._debugLogger.logLevel >= 2) {
+    if (cellDepth === 0 && this._debugLogger.logLevel >= 2) {
       this._debugLogger.log({
         loc: 'selectNextCandidate',
         msg: 'Root node',
@@ -193,7 +193,7 @@ export class CandidateSelector {
     }
 
     if (this._debugLogger.enableStepLogs) {
-      if (nextCellDepth != cellDepth + 1) {
+      if (nextCellDepth !== cellDepth + 1) {
         this._debugLogger.log({
           loc: 'selectNextCandidate',
           msg: 'Found extra singles',
@@ -229,7 +229,7 @@ export class CandidateSelector {
     const numCells = this._numCells;
 
     // First skip past any values which are already at the front.
-    while (cellOffset == frontOffset && cellOffset < numCells) {
+    while (cellOffset === frontOffset && cellOffset < numCells) {
       const v = grid[cellOrder[cellOffset++]];
       if ((v & (v - 1)) === 0) {
         frontOffset++;
