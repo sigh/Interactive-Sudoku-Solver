@@ -3,6 +3,7 @@ const { memoize } = await import('./util.js' + self.VERSION_PARAM);
 export class GridShape {
   static MIN_SIZE = 1;
   static MAX_SIZE = 16;
+  static _VALUE_BASE = 17;  // for parsing
 
   static _isValidDimension(dim) {
     return Number.isInteger(dim) && dim >= this.MIN_SIZE && dim <= this.MAX_SIZE;
@@ -116,8 +117,6 @@ export class GridShape {
     this.name = this.constructor.makeName(numRows, numCols, this.numValues);
     this.fullGridSpec = `${this.numRows}x${this.numCols}~${this.numValues}`;
 
-    this._valueBase = this.numValues + 1;
-
     this.allCells = [];
     for (let i = 0; i < this.numCells; i++) this.allCells.push(i);
 
@@ -159,7 +158,8 @@ export class GridShape {
   }
 
   makeCellId = (row, col) => {
-    return `R${(row + 1).toString(this._valueBase)}C${(col + 1).toString(this._valueBase)}`;
+    const base = this.constructor._VALUE_BASE;
+    return `R${(row + 1).toString(base)}C${(col + 1).toString(base)}`;
   }
 
   makeCellIdFromIndex = (i) => {
@@ -184,8 +184,9 @@ export class GridShape {
   }
 
   parseCellId = (cellId) => {
-    let row = parseInt(cellId[1], this._valueBase) - 1;
-    let col = parseInt(cellId[3], this._valueBase) - 1;
+    const base = this.constructor._VALUE_BASE;
+    let row = parseInt(cellId[1], base) - 1;
+    let col = parseInt(cellId[3], base) - 1;
     return {
       cell: this.cellIndex(row, col),
       row: row,
