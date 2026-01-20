@@ -156,16 +156,20 @@ export class SudokuConstraintBase {
     return regions;
   }
 
-  static rowRegions = memoize((shape) => {
-    const numRows = shape.numRows;
-    const numCols = shape.numCols;
-    return this._makeRegions((r, i) => r * numCols + i, numRows, numCols);
-  });
-  static colRegions = memoize((shape) => {
-    const numRows = shape.numRows;
-    const numCols = shape.numCols;
-    return this._makeRegions((c, i) => i * numCols + c, numCols, numRows);
-  });
+  static rowRegions = memoize(
+    (shape) => {
+      const numRows = shape.numRows;
+      const numCols = shape.numCols;
+      return this._makeRegions((r, i) => r * numCols + i, numRows, numCols);
+    },
+    (shape) => shape.gridDimsStr);
+  static colRegions = memoize(
+    (shape) => {
+      const numRows = shape.numRows;
+      const numCols = shape.numCols;
+      return this._makeRegions((c, i) => i * numCols + c, numCols, numRows);
+    },
+    (shape) => shape.gridDimsStr);
   static boxRegions = memoize((shape) => {
     if (shape.noDefaultBoxes) return [];
 
@@ -184,7 +188,7 @@ export class SudokuConstraintBase {
         const cellCol = i % boxWidth;
         return (boxRow * boxHeight + cellRow) * numCols + (boxCol * boxWidth + cellCol);
       }, numBoxes, shape.numValues);
-  });
+  }, (shape) => shape.noDefaultBoxes ? '' : shape.fullGridSpec);
   static disjointSetRegions = memoize((shape) => {
     const numCols = shape.numCols;
     const boxWidth = shape.boxWidth;
@@ -193,46 +197,50 @@ export class SudokuConstraintBase {
     return this._makeRegions(
       (r, i) => ((i / boxHeight | 0) * boxHeight + (r % boxHeight | 0)) * numCols
         + (i % boxHeight | 0) * boxWidth + (r / boxHeight | 0), numSets, shape.numValues);
-  });
-  static square2x2Regions = memoize((shape) => {
-    const numRows = shape.numRows;
-    const numCols = shape.numCols;
-    const regions = [];
+  }, (shape) => shape.fullGridSpec);
+  static square2x2Regions = memoize(
+    (shape) => {
+      const numRows = shape.numRows;
+      const numCols = shape.numCols;
+      const regions = [];
 
-    for (let i = 0; i < numRows - 1; i++) {
-      for (let j = 0; j < numCols - 1; j++) {
-        regions.push([
-          shape.cellIndex(i, j),
-          shape.cellIndex(i, j + 1),
-          shape.cellIndex(i + 1, j),
-          shape.cellIndex(i + 1, j + 1),
-        ]);
+      for (let i = 0; i < numRows - 1; i++) {
+        for (let j = 0; j < numCols - 1; j++) {
+          regions.push([
+            shape.cellIndex(i, j),
+            shape.cellIndex(i, j + 1),
+            shape.cellIndex(i + 1, j),
+            shape.cellIndex(i + 1, j + 1),
+          ]);
+        }
       }
-    }
 
-    return regions;
-  });
+      return regions;
+    },
+    (shape) => shape.gridDimsStr);
 
-  static fullLineCellMap = memoize((shape) => {
-    let map = new Map();
-    const numRows = shape.numRows;
-    const numCols = shape.numCols;
+  static fullLineCellMap = memoize(
+    (shape) => {
+      let map = new Map();
+      const numRows = shape.numRows;
+      const numCols = shape.numCols;
 
-    const rowRegions = this.rowRegions(shape);
-    for (let row = 0; row < numRows; row++) {
-      const cells = rowRegions[row].map(c => shape.makeCellIdFromIndex(c));
-      map.set(`R${row + 1},1`, cells);
-      map.set(`R${row + 1},-1`, cells.slice().reverse());
-    }
-    const colRegions = this.colRegions(shape);
-    for (let col = 0; col < numCols; col++) {
-      const cells = colRegions[col].map(c => shape.makeCellIdFromIndex(c));
-      map.set(`C${col + 1},1`, cells);
-      map.set(`C${col + 1},-1`, cells.slice().reverse());
-    }
+      const rowRegions = this.rowRegions(shape);
+      for (let row = 0; row < numRows; row++) {
+        const cells = rowRegions[row].map(c => shape.makeCellIdFromIndex(c));
+        map.set(`R${row + 1},1`, cells);
+        map.set(`R${row + 1},-1`, cells.slice().reverse());
+      }
+      const colRegions = this.colRegions(shape);
+      for (let col = 0; col < numCols; col++) {
+        const cells = colRegions[col].map(c => shape.makeCellIdFromIndex(c));
+        map.set(`C${col + 1},1`, cells);
+        map.set(`C${col + 1},-1`, cells.slice().reverse());
+      }
 
-    return map;
-  });
+      return map;
+    },
+    (shape) => shape.gridDimsStr);
 
   static _hasAdjacentCells(cells, shape) {
     // Convert all cells to row/col coordinates
@@ -1266,7 +1274,7 @@ export class SudokuConstraint {
       }
 
       return regions;
-    });
+    }, (shape) => shape.fullGridSpec);
   }
 
   static DisjointSets = class DisjointSets extends SudokuConstraintBase {
@@ -1801,38 +1809,40 @@ export class SudokuConstraint {
       return `Little Killer (${this.value})`;
     }
 
-    static cellMap = memoize((shape) => {
-      let map = {};
-      const numRows = shape.numRows;
-      const numCols = shape.numCols;
+    static cellMap = memoize(
+      (shape) => {
+        let map = {};
+        const numRows = shape.numRows;
+        const numCols = shape.numCols;
 
-      const seen = new Set();
+        const seen = new Set();
 
-      const addLittleKiller = (row, col, dr, dc) => {
-        let cells = [];
-        for (; row >= 0 && col >= 0 && col < numCols && row < numRows;
-          row += dr, col += dc) {
-          cells.push(shape.makeCellId(row, col));
-        }
-        if (cells.length <= 1) return;
-        const sorted = [...cells].sort().join(',');
-        if (seen.has(sorted)) return;
+        const addLittleKiller = (row, col, dr, dc) => {
+          let cells = [];
+          for (; row >= 0 && col >= 0 && col < numCols && row < numRows;
+            row += dr, col += dc) {
+            cells.push(shape.makeCellId(row, col));
+          }
+          if (cells.length <= 1) return;
+          const sorted = [...cells].sort().join(',');
+          if (seen.has(sorted)) return;
 
-        seen.add(sorted);
-        map[cells[0]] = cells;
-      };
+          seen.add(sorted);
+          map[cells[0]] = cells;
+        };
 
-      // Left side.
-      for (let row = 0; row < numRows - 1; row++) addLittleKiller(row, 0, 1, 1);
-      // Right side.
-      for (let row = 1; row < numRows - 1; row++) addLittleKiller(row, numCols - 1, -1, -1);
-      // Top side.
-      for (let col = 1; col < numCols; col++) addLittleKiller(0, col, 1, -1);
-      // Bottom side.
-      for (let col = 1; col < numCols - 1; col++) addLittleKiller(numRows - 1, col, -1, 1);
+        // Left side.
+        for (let row = 0; row < numRows - 1; row++) addLittleKiller(row, 0, 1, 1);
+        // Right side.
+        for (let row = 1; row < numRows - 1; row++) addLittleKiller(row, numCols - 1, -1, -1);
+        // Top side.
+        for (let col = 1; col < numCols; col++) addLittleKiller(0, col, 1, -1);
+        // Bottom side.
+        for (let col = 1; col < numCols - 1; col++) addLittleKiller(numRows - 1, col, -1, 1);
 
-      return map;
-    });
+        return map;
+      },
+      (shape) => shape.gridDimsStr);
   }
 
   static XSum = class XSum extends OutsideConstraintBase {

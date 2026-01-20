@@ -425,9 +425,9 @@ export class GridGraph {
   static UP = 2;
   static DOWN = 3;
 
-  static get = memoize((shape) => {
-    return new this(true, shape);
-  });
+  static get = memoize(
+    (shape) => new this(true, shape),
+    (shape) => shape.gridDimsStr);
 
   constructor(do_not_call, shape) {
     if (!do_not_call) throw new Error('Use GridGraph.get(shape)');

@@ -784,29 +784,36 @@ export class SudokuConstraintOptimizer {
     return newHandlers;
   }
 
-  // Returns regions that form houses (have numValues cells with all distinct values).
-  // For rectangular grids, only the longer dimension forms houses.
-  _overlapRegions = memoize((shape) => {
-    const regions = [];
-    // Rows are houses if they have numValues cells (numCols == numValues).
-    if (shape.numCols === shape.numValues) {
-      const rowRegions = SudokuConstraintBase.rowRegions(shape);
-      regions.push(rowRegions, rowRegions.slice().reverse());
-    }
-    // Columns are houses if they have numValues cells (numRows == numValues).
-    if (shape.numRows === shape.numValues) {
-      const colRegions = SudokuConstraintBase.colRegions(shape);
-      regions.push(colRegions, colRegions.slice().reverse());
-    }
-    return regions;
-  });
+  // Returns region-groups used by the jigsaw overlap optimizations.
+  // Key detail: whether an axis forms houses depends on (numRows/numCols === numValues),
+  // so we memoize based on those booleans + grid dimensions (not on shape identity).
+  _overlapRegions = memoize(
+    (shape, hasBoxes) => {
+      const regions = [];
 
-  _overlapRegionsWithBox = memoize((shape) => {
-    return [
-      ...this._overlapRegions(shape),
-      SudokuConstraintBase.boxRegions(shape),
-    ];
-  });
+      // Rows are houses if they have numValues cells (numCols === numValues).
+      if (shape.numCols === shape.numValues) {
+        const rowRegions = SudokuConstraintBase.rowRegions(shape);
+        regions.push(rowRegions, rowRegions.slice().reverse());
+      }
+
+      // Columns are houses if they have numValues cells (numRows === numValues).
+      if (shape.numRows === shape.numValues) {
+        const colRegions = SudokuConstraintBase.colRegions(shape);
+        regions.push(colRegions, colRegions.slice().reverse());
+      }
+
+      if (hasBoxes) {
+        regions.push(SudokuConstraintBase.boxRegions(shape));
+      }
+
+      return regions;
+    },
+    (shape, hasBoxes) => {
+      const rowHouses = shape.numCols === shape.numValues;
+      const colHouses = shape.numRows === shape.numValues;
+      return `${shape.gridDimsStr}|${rowHouses}|${colHouses}|${!!hasBoxes}`;
+    });
 
   _generalRegionOverlapProcessor(regions, pieces, numValues, callback) {
     const superRegion = new Set();
@@ -860,8 +867,7 @@ export class SudokuConstraintOptimizer {
       this._logAddHandler('_makeJigsawLawOfLeftoverHandlers', newHandler);
     }
 
-    const overlapRegions = (
-      hasBoxes ? this._overlapRegionsWithBox(shape) : this._overlapRegions(shape));
+    const overlapRegions = this._overlapRegions(shape, hasBoxes);
     for (const r of overlapRegions) {
       this._generalRegionOverlapProcessor(
         r, jigsawPieces.map(p => p.cells), shape.numValues, handleOverlap);
@@ -933,8 +939,7 @@ export class SudokuConstraintOptimizer {
       this._logAddHandler('_makeInnieOutieSumHandlers', newHandler, { args });
     };
 
-    const overlapRegions = (
-      hasBoxes ? this._overlapRegionsWithBox(shape) : this._overlapRegions(shape));
+    const overlapRegions = this._overlapRegions(shape, hasBoxes);
     for (const r of overlapRegions) {
       this._generalRegionOverlapProcessor(
         r, pieces, shape.numValues, handleOverlap);
