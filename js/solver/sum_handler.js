@@ -853,12 +853,16 @@ export class Sum extends SudokuConstraintHandler {
 // Common data shared between instances of the Sum handler.
 class SumData {
 
+  static _VERIFIED_CALL_TOKEN = {};
+
   static get = memoize((numValues) => {
-    return new SumData(true, numValues);
+    return new SumData(this._VERIFIED_CALL_TOKEN, numValues);
   });
 
-  constructor(do_not_call, numValues) {
-    if (!do_not_call) throw new Error('Use SumData.get(shape.numValues)');
+  constructor(verifiedCallToken, numValues) {
+    if (verifiedCallToken !== this.constructor._VERIFIED_CALL_TOKEN) {
+      throw new Error('Use SumData.get(shape.numValues)');
+    }
 
     this.numValues = numValues;
     this.lookupTables = LookupTables.get(numValues);

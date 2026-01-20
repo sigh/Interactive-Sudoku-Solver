@@ -1,8 +1,10 @@
 const { memoize, Base64Codec } = await import('../util.js' + self.VERSION_PARAM);
 
 export class LookupTables {
+  static _VERIFIED_CALL_TOKEN = {};
+
   static get = memoize((numValues) => {
-    return new LookupTables(true, numValues);
+    return new LookupTables(this._VERIFIED_CALL_TOKEN, numValues);
   });
 
   static fromValue = (i) => {
@@ -65,8 +67,10 @@ export class LookupTables {
     return result;
   }
 
-  constructor(do_not_call, numValues) {
-    if (!do_not_call) throw new Error('Use LookupTables.get(shape.numValues)');
+  constructor(verifiedCallToken, numValues) {
+    if (verifiedCallToken !== this.constructor._VERIFIED_CALL_TOKEN) {
+      throw new Error('Use LookupTables.get(shape.numValues)');
+    }
 
     this.allValues = (1 << numValues) - 1;
     this.combinations = 1 << numValues;

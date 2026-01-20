@@ -425,12 +425,16 @@ export class GridGraph {
   static UP = 2;
   static DOWN = 3;
 
+  static _VERIFIED_CALL_TOKEN = {};
+
   static get = memoize(
-    (shape) => new this(true, shape),
+    (shape) => new this(this._VERIFIED_CALL_TOKEN, shape),
     (shape) => shape.gridDimsStr);
 
-  constructor(do_not_call, shape) {
-    if (!do_not_call) throw new Error('Use GridGraph.get(shape)');
+  constructor(verifiedCallToken, shape) {
+    if (verifiedCallToken !== this.constructor._VERIFIED_CALL_TOKEN) {
+      throw new Error('Use GridGraph.get(shape)');
+    }
 
     const graph = [];
     for (let i = 0; i < shape.numCells; i++) {
