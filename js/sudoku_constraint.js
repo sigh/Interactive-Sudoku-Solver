@@ -341,8 +341,6 @@ export class OutsideConstraintBase extends SudokuConstraintBase {
 
   constructor(arrowId, value) {
     super(arrowId, value);
-    arrowId = arrowId.toUpperCase();
-
     this.arrowId = arrowId;
     this.value = parseInt(value);
 
