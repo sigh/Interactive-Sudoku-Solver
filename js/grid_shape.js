@@ -115,7 +115,8 @@ export class GridShape {
       this.boxHeight === 1 || this.boxWidth === 1);
 
     this.name = this.constructor.makeName(numRows, numCols, this.numValues);
-    this.fullGridSpec = `${this.numRows}x${this.numCols}~${this.numValues}`;
+    this.gridDimsStr = `${this.numRows}x${this.numCols}`;
+    this.fullGridSpec = `${this.gridDimsStr}~${this.numValues}`;
 
     this.allCells = [];
     for (let i = 0; i < this.numCells; i++) this.allCells.push(i);

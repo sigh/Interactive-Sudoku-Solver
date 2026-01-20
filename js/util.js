@@ -288,14 +288,15 @@ export const withDeadline = (promise, delay, reason) => {
   return Promise.race([promise, awaitTimeout]);
 };
 
-export const memoize = (f) => {
+export const memoize = (f, keyFunc = null) => {
   const map = new Map();
-  return (...a) => {
-    const key = a.length <= 1 ? a[0] : JSON.stringify(a);
-    let result = map.get(key);
-    if (result) return result;
+  return (...args) => {
+    const key = keyFunc ? keyFunc(...args) :
+      (args.length <= 1 ? args[0] : JSON.stringify(args));
 
-    result = f(...a);
+    if (map.has(key)) return map.get(key);
+
+    const result = f(...args);
     map.set(key, result);
     return result;
   };

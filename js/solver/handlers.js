@@ -1457,11 +1457,11 @@ export class Lunchbox extends SudokuConstraintHandler {
 
     const lookupTables = LookupTables.get(shape.numValues);
 
-    this._borderMask = Lunchbox._borderMask(shape);
+    this._borderMask = Lunchbox._borderMask(shape.numValues);
     this._valueMask = ~this._borderMask & lookupTables.allValues;
 
-    this._distances = Lunchbox._distanceRange(shape)[sum];
-    this._combinations = Lunchbox._combinations(shape)[sum];
+    this._distances = Lunchbox._distanceRange(shape.numValues)[sum];
+    this._combinations = Lunchbox._combinations(shape.numValues)[sum];
 
     return true;
   }
@@ -1470,24 +1470,24 @@ export class Lunchbox extends SudokuConstraintHandler {
     return this.cells;
   }
 
-  static _borderMask(shape) {
-    return 1 | LookupTables.fromValue(shape.numValues);
+  static _borderMask(numValues) {
+    return 1 | LookupTables.fromValue(numValues);
   }
 
   // Max sum within the sandwich.
-  static _maxSum(shape) {
-    return (shape.numValues * (shape.numValues - 1) / 2) - 1;
+  static _maxSum(numValues) {
+    return (numValues * (numValues - 1) / 2) - 1;
   }
 
   // Possible combinations for values between the sentinels for each possible sum.
   // Grouped by distance.
-  static _combinations = memoize((shape) => {
-    const lookupTables = LookupTables.get(shape.numValues);
-    const maxSum = this._maxSum(shape);
-    const borderMask = this._borderMask(shape);
+  static _combinations = memoize((numValues) => {
+    const lookupTables = LookupTables.get(numValues);
+    const maxSum = this._maxSum(numValues);
+    const borderMask = this._borderMask(numValues);
 
     let table = [];
-    const maxD = shape.numValues - 1;
+    const maxD = numValues - 1;
     for (let i = 0; i <= maxSum; i++) {
       const subtable = [];
       table.push(subtable);
@@ -1511,9 +1511,9 @@ export class Lunchbox extends SudokuConstraintHandler {
 
   // Distance range between the sentinels for each possible sum.
   // Map combination to [min, max].
-  static _distanceRange = memoize((shape) => {
-    const combinations = this._combinations(shape);
-    const maxSum = this._maxSum(shape);
+  static _distanceRange = memoize((numValues) => {
+    const combinations = this._combinations(numValues);
+    const maxSum = this._maxSum(numValues);
 
     let table = [];
     for (let i = 0; i <= maxSum; i++) {
@@ -2594,9 +2594,9 @@ export class CountingCircles extends SudokuConstraintHandler {
     super(cells);
   }
 
-  static _sumCombinations = memoize((shape) => {
-    const maxSum = shape.maxSum;
-    const lookupTables = LookupTables.get(shape.numValues);
+  static _sumCombinations = memoize((numValues) => {
+    const maxSum = numValues * (numValues + 1) / 2;
+    const lookupTables = LookupTables.get(numValues);
 
     const combinations = [];
     for (let i = 0; i < maxSum + 1; i++) combinations.push([]);
@@ -2610,7 +2610,7 @@ export class CountingCircles extends SudokuConstraintHandler {
 
   initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
     const numCells = this.cells.length;
-    const combinations = this.constructor._sumCombinations(shape)[numCells];
+    const combinations = this.constructor._sumCombinations(shape.numValues)[numCells];
     if (!combinations) return false;
 
     const exclusionGroups = HandlerUtil.findExclusionGroups(
