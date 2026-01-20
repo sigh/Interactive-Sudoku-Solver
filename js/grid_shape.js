@@ -5,6 +5,8 @@ export class GridShape {
   static MAX_SIZE = 16;
   static _VALUE_BASE = 17;  // for parsing
 
+  static _VERIFIED_CALL_TOKEN = {};
+
   static _isValidDimension(dim) {
     return Number.isInteger(dim) && dim >= this.MIN_SIZE && dim <= this.MAX_SIZE;
   }
@@ -21,7 +23,7 @@ export class GridShape {
     if (!this._isValidDimension(numRows) || !this._isValidDimension(numCols)) {
       return null;
     }
-    return new GridShape(undefined, numRows, numCols);
+    return new GridShape(this._VERIFIED_CALL_TOKEN, numRows, numCols);
   });
 
   // Public factory for square grids (one arg) or rectangular grids (two args)
@@ -91,8 +93,8 @@ export class GridShape {
     return shape.numValues < 10 ? '1'.charCodeAt(0) : 'A'.charCodeAt(0);
   }
 
-  constructor(do_not_call, numRows, numCols, numValues) {
-    if (do_not_call !== undefined) {
+  constructor(verifiedCallToken, numRows, numCols, numValues) {
+    if (verifiedCallToken !== this.constructor._VERIFIED_CALL_TOKEN) {
       throw Error('Use GridShape.fromGridSize() instead.');
     }
 
@@ -202,7 +204,11 @@ export class GridShape {
 
     this._assertValidNumValues(numValues);
 
-    return new GridShape(undefined, this.numRows, this.numCols, numValues);
+    return new GridShape(
+      this.constructor._VERIFIED_CALL_TOKEN,
+      this.numRows,
+      this.numCols,
+      numValues);
   }
 
   static defaultNumValues(numRows, numCols) {
