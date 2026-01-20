@@ -52,7 +52,7 @@ export class SudokuParser {
     for (let i = 0; i < numCells; i++) {
       let cageCell = i;
       let count = 0;
-      while (cellDirections[cageCell] != cageCell) {
+      while (cellDirections[cageCell] !== cageCell) {
         cageCell = cellDirections[cageCell];
         count++;
         if (count > numCols) {
@@ -97,7 +97,7 @@ export class SudokuParser {
     const numCells = shape.numCells;
 
     let parts = text.split(':');
-    if (parts[2] != 'k') return null;
+    if (parts[2] !== 'k') return null;
     if (parts.length !== numCells + 4) return null;
 
     let cages = new Map();
@@ -115,7 +115,7 @@ export class SudokuParser {
     }
 
     let constraints = [];
-    if (parts[1] == 'd') {
+    if (parts[1] === 'd') {
       constraints.push(new SudokuConstraint.Diagonal(1));
       constraints.push(new SudokuConstraint.Diagonal(-1));
     }
@@ -160,7 +160,7 @@ export class SudokuParser {
     const numValues = shape.numValues;
 
     const chars = new Set(text);
-    if (chars.size != numValues) return null;
+    if (chars.size !== numValues) return null;
 
     const counter = {};
     chars.forEach(c => counter[c] = 0);
@@ -168,7 +168,7 @@ export class SudokuParser {
       counter[text[i]]++;
     }
 
-    if (Object.values(counter).some(c => c != numValues)) return null;
+    if (Object.values(counter).some(c => c !== numValues)) return null;
 
     return new SudokuConstraint.Container([
       new SudokuConstraint.Shape(shape.name),
@@ -201,7 +201,7 @@ export class SudokuParser {
 
   static parseGridLayout(rawText) {
     // Only allow digits, dots, spaces and separators.
-    if (rawText.search(/[^\d\s.|_-]/) != -1) return null;
+    if (rawText.search(/[^\d\s.|_-]/) !== -1) return null;
 
     const parts = [...rawText.matchAll(/[.]|\d+/g)];
     const numParts = parts.length;
@@ -211,8 +211,8 @@ export class SudokuParser {
 
     let fixedValues = [];
     for (let i = 0; i < numParts; i++) {
-      const cell = parts[i];
-      if (cell == '.') continue;
+      const cell = parts[i][0];
+      if (cell === '.') continue;
       fixedValues.push(shape.makeValueId(i, cell));
     }
 
@@ -227,7 +227,7 @@ export class SudokuParser {
     if (!shape) return null;
 
     // Only allow digits, and dots.
-    if (text.search(/[^\d.]/) != -1) return null;
+    if (text.search(/[^\d.]/) !== -1) return null;
 
     const numValues = shape.numValues;
 
@@ -238,7 +238,7 @@ export class SudokuParser {
       const values = (
         text.substr(i * numValues, numValues)
           .split('')
-          .filter(c => c != '.')
+          .filter(c => c !== '.')
           .join('_'));
       pencilmarks.push(`${cellId}_${values}`);
     }

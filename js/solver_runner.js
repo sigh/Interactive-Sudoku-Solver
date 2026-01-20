@@ -158,7 +158,7 @@ class AllPossibilitiesModeHandler extends ModeHandler {
 
   setDone() {
     for (let i = 0; i < this._pencilmarks.length; i++) {
-      if (this._pencilmarks[i].size == 1) {
+      if (this._pencilmarks[i].size === 1) {
         this._pencilmarks[i] = this._pencilmarks[i].values().next().value;
       }
     }
