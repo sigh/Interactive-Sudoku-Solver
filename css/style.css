@@ -199,6 +199,8 @@ body {
 .page-header-logo {
   width: 40px;
   height: 40px;
+  flex-shrink: 0;
+
   border-radius: 12px;
   display: flex;
   align-items: center;
