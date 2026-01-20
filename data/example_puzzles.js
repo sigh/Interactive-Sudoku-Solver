@@ -147,7 +147,7 @@ export const DISPLAYED_EXAMPLES = [
   {
     name: 'Skyscraper',
     src: 'https://www.youtube.com/watch?v=rLlZA5ZND00',
-    input: '.~R1C1_1~R1C6_2~R1C9_8~R3C1_3~R3C4_6~R3C7_4~R5C1_5~R5C3_2~R5C6_3~R7C1_7~R7C4_8~R7C7_2~R9C9_6~R9C6_4~R9C1_9.Skyscraper~c5~5.Skyscraper~r2~2.Skyscraper~r4~4.Skyscraper~r6~6.Skyscraper~r8~8',
+    input: '.~R1C1_1~R1C6_2~R1C9_8~R3C1_3~R3C4_6~R3C7_4~R5C1_5~R5C3_2~R5C6_3~R7C1_7~R7C4_8~R7C7_2~R9C9_6~R9C6_4~R9C1_9.Skyscraper~C5~5.Skyscraper~R2~2.Skyscraper~R4~4.Skyscraper~R6~6.Skyscraper~R8~8',
     solution: '147932658826145937359678412678419325592783164413256789765891243234567891981324576',
   },
   {

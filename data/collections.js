@@ -154,7 +154,7 @@ export const EXAMPLES = [
   {
     name: 'Skyscraper - all 6',
     src: 'https://sudokutheory.com/wiki/index.php?title=Snipes#Skyscrapers',
-    input: '.Skyscraper~c1~6.Skyscraper~c3~6.Skyscraper~c6~6.Skyscraper~r5~6.Skyscraper~r8~6.Skyscraper~r1~~6.Skyscraper~r4~~6.Skyscraper~r7~~6.Skyscraper~c2~~6.Skyscraper~c4~~6',
+    input: '.Skyscraper~C1~6.Skyscraper~C3~6.Skyscraper~C6~6.Skyscraper~R5~6.Skyscraper~R8~6.Skyscraper~R1~~6.Skyscraper~R4~~6.Skyscraper~R7~~6.Skyscraper~C2~~6.Skyscraper~C4~~6',
     solution: '491872653582631974673495218714986532356724189829513746968357421145268397237149865',
   },
   {
@@ -166,7 +166,7 @@ export const EXAMPLES = [
   {
     name: 'Renban skyscrapers',
     src: 'https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?chlang=en&id=0007TV',
-    input: '.Renban~R2C1~R3C1~R4C1~R4C2.Renban~R3C3~R4C3~R5C3~R6C3.Renban~R2C5~R3C5.Renban~R6C4~R5C4~R4C4~R4C5~R4C6.Renban~R9C1~R8C1~R8C2~R9C3.Renban~R9C7~R8C8~R8C9~R9C9.Renban~R7C4~R7C5~R7C6~R6C6~R5C6.Renban~R3C7~R4C7~R5C7~R5C8~R5C9.Renban~R2C7~R2C8~R2C9~R3C9~R4C9..Skyscraper~c2~3~4.Skyscraper~c4~0~3.Skyscraper~c6~4.Skyscraper~c7~5.Skyscraper~c8~4~4.Skyscraper~c9~0~5.Skyscraper~r1~3~6.Skyscraper~r3~4.Skyscraper~r5~3~3.Skyscraper~r6~5.Skyscraper~r8~4.Skyscraper~r9~4~3',
+    input: '.Renban~R2C1~R3C1~R4C1~R4C2.Renban~R3C3~R4C3~R5C3~R6C3.Renban~R2C5~R3C5.Renban~R6C4~R5C4~R4C4~R4C5~R4C6.Renban~R9C1~R8C1~R8C2~R9C3.Renban~R9C7~R8C8~R8C9~R9C9.Renban~R7C4~R7C5~R7C6~R6C6~R5C6.Renban~R3C7~R4C7~R5C7~R5C8~R5C9.Renban~R2C7~R2C8~R2C9~R3C9~R4C9..Skyscraper~C2~3~4.Skyscraper~C4~0~3.Skyscraper~C6~4.Skyscraper~C7~5.Skyscraper~C8~4~4.Skyscraper~C9~0~5.Skyscraper~R1~3~6.Skyscraper~R3~4.Skyscraper~R5~3~3.Skyscraper~R6~5.Skyscraper~R8~4.Skyscraper~R9~4~3',
     solution: '359876142821943567674152389795634218183297456246518793932465871468721935517389624',
   },
   {
