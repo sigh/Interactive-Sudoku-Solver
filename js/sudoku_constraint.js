@@ -459,7 +459,7 @@ export class CompositeConstraintBase extends SudokuConstraintBase {
   // Create an allow-list for the types of constraints that can be inside a
   // composite.
   // Other types of constraints either:
-  //  - Don't make sense to next inside one (such as Shape)
+  //  - Don't make sense to nest inside one (such as Shape)
   //  - Interact with other constraints that make them difficult to implement
   //    such as StrictKropki or constraints that define regions.
   //  - Or would just be a bit confusing to include given the above two caveats
@@ -524,6 +524,10 @@ export class SudokuConstraint {
     constructor(constraints) {
       super(constraints);
       this.constraints = constraints;
+    }
+
+    static allowedConstraintClass(constraintClass) {
+      return true;
     }
 
     static serialize(constraints) {
