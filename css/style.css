@@ -560,10 +560,12 @@ button.copy-to-clipboard-failed::after {
   cursor: pointer;
   padding: 0 4px 0 8px;
   font-family: var(--font-family-mono);
+  box-shadow: none;
 }
 
 .chip>button:hover {
   background: none;
+  box-shadow: none;
   color: var(--color-danger);
 }
 

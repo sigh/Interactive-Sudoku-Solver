@@ -46,7 +46,7 @@ export class SolverStateDisplay {
   };
 
   setSolveStatus(isSolving, method) {
-    if (!isSolving && method == 'terminate') {
+    if (!isSolving && method === 'terminate') {
       this._elements.solveStatus.textContent = this._METHOD_TO_STATUS[method];
       this._elements.progressContainer.classList.add('solver-status-error');
       return;
@@ -219,12 +219,9 @@ export class SolverStateDisplay {
       let title = document.createElement('span');
       title.textContent = camelCaseToWords(v);
       title.className = 'description';
-      if (v == 'solutions' || v == 'estimatedSolutions') {
+      if (v === 'solutions' || v === 'estimatedSolutions') {
         title.style.fontSize = '16px';
       }
-      // if (v == 'estimatedSolutions' || v == 'estimateSamples') {
-      //   elem.style.display = 'none';
-      // }
       elem.appendChild(value);
       elem.appendChild(title);
       container.appendChild(elem);
@@ -531,7 +528,7 @@ class StateHistoryDisplay {
 
       // If it is the currently active index, then nothing needs to change.
       const index = points.length ? points[0].index : -1;
-      if (index == currentIndex) return;
+      if (index === currentIndex) return;
 
       // Update the active elements for all the charts.
       currentIndex = index;
