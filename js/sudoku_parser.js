@@ -1,6 +1,14 @@
 const { SudokuConstraint, CompositeConstraintBase } = await import('./sudoku_constraint.js' + self.VERSION_PARAM);
 const { GridShape, SHAPE_9x9 } = await import('./grid_shape.js' + self.VERSION_PARAM);
 
+class AstNode {
+  constructor(cls, args) {
+    this.cls = cls;
+    this.args = args;
+    this.children = cls.IS_COMPOSITE ? [] : null;
+  }
+}
+
 export class SudokuParser {
   static parseShortKillerFormat(text) {
     // Reference for format:
@@ -303,33 +311,6 @@ export class SudokuParser {
     return new SudokuConstraint.Container(constraints);
   }
 
-  static _resolveCompositeConstraints(revConstraints, compositeClass) {
-    // NOTE: The constraints are reversed so we can efficiently pop them off the
-    // end. The result will be that everything is in the original order.
-
-    const items = [];
-    const canAbsorb = compositeClass.CAN_ABSORB();
-
-    while (revConstraints.length) {
-      const c = revConstraints.pop();
-      if (c.type === 'End') break;
-
-      if (c.constructor.IS_COMPOSITE) {
-        const resolvedComposite = this._resolveCompositeConstraints(
-          revConstraints, c.constructor);
-        if (canAbsorb.includes(c.constructor)) {
-          // We can directly add the sub-constraints to this composite.
-          items.push(...resolvedComposite.constraints);
-        } else {
-          items.push(resolvedComposite);
-        }
-      } else {
-        items.push(c);
-      }
-    }
-    return new compositeClass(items);
-  }
-
   static parseString(rawStr) {
     const str = rawStr.replace(/\s+/g, '');
     let items = str.split('.');
@@ -338,33 +319,89 @@ export class SudokuParser {
       rawStr);
     items.shift();
 
-    const constraints = [];
+    // Parse to a simple AST.
+    const root = new AstNode(SudokuConstraint.Container, []);
+
+    const stack = [root];
     for (const item of items) {
-      const args = item.split('~');
-      const type = args.shift() || SudokuConstraint.Given.name;
+      const parts = item.split('~');
+      const type = parts.shift() || SudokuConstraint.Given.name;
+
+      // A root-level `.End` is invalid.
+      if (type === SudokuConstraint.End.name) {
+        if (stack.length === 1) {
+          throw new Error('Unmatched .End');
+        }
+        stack.pop();
+        continue;
+      }
+
       const cls = SudokuConstraint[type];
       if (!cls) {
         throw new Error('Unknown constraint type: ' + type);
       }
-      const constraintParts = [...cls.makeFromArgs(...args)];
-      if (constraintParts.length > 1
-        && CompositeConstraintBase.allowedConstraintClass(cls)) {
-        // If this item was split into multiple constraints, then we wrap it
-        // in an 'And' constraint, since they may need to be treated as a unit
-        // when nested in an 'Or'.
-        // We only need to do this for constraints that are allowed inside
-        // composite constraints.
-        constraints.push(
-          new SudokuConstraint.And(),
-          ...constraintParts,
-          new SudokuConstraint.End());
-      } else {
-        constraints.push(...constraintParts);
+
+      const node = new AstNode(cls, parts);
+
+      // Attach to current parent.
+      stack[stack.length - 1].children.push(node);
+
+      // Composite constraints consume subsequent constraints until `.End`.
+      if (cls.IS_COMPOSITE) {
+        stack.push(node);
       }
     }
 
-    return this._resolveCompositeConstraints(
-      constraints.reverse(), SudokuConstraint.Container);
+    if (stack.length !== 1) {
+      throw new Error('Unterminated composite constraint: '
+        + stack[stack.length - 1].cls.name);
+    }
+
+    // Resolve the AST into constraint instances.
+    const resolveNodes = (nodes, parentCompositeClass) => {
+      const result = [];
+      const canAbsorb = parentCompositeClass.CAN_ABSORB();
+
+      const addConstraint = (constraint) => {
+        if (constraint.constructor.IS_COMPOSITE
+          && canAbsorb.includes(constraint.constructor)) {
+          for (const subConstraint of constraint.constraints) {
+            addConstraint(subConstraint);
+          }
+        } else {
+          result.push(constraint);
+        }
+      };
+
+      for (const n of nodes) {
+        const cls = n.cls;
+
+        if (!parentCompositeClass.allowedConstraintClass(cls)) {
+          throw new Error(`Constraint of type ${cls.name} `
+            + `is not allowed inside ${parentCompositeClass.name}.`);
+        }
+
+        if (cls.IS_COMPOSITE) {
+          const childConstraints = resolveNodes(n.children, cls);
+          addConstraint(new cls(childConstraints));
+          continue;
+        }
+
+        const constraintParts = cls.makeFromArgs(...n.args);
+        if (constraintParts.length > 1) {
+          // If a single token expands into multiple constraints, wrap them in
+          // an And so they behave as a unit inside Or.
+          addConstraint(new SudokuConstraint.And(constraintParts));
+        } else {
+          for (const c of constraintParts) addConstraint(c);
+        }
+      }
+
+      return result;
+    };
+
+    const constraints = resolveNodes(root.children, root.cls);
+    return new root.cls(constraints);
   }
 
   static extractConstraintTypes(str) {
