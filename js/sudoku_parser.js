@@ -2,15 +2,68 @@ const { SudokuConstraint, CompositeConstraintBase } = await import('./sudoku_con
 const { GridShape, SHAPE_9x9 } = await import('./grid_shape.js' + self.VERSION_PARAM);
 
 class AstNode {
-  constructor(cls, args) {
+  constructor(cls, args = null) {
     this.cls = cls;
-    this.args = args;
+    this.args = args === null ? [] : args;
     this.children = cls.IS_COMPOSITE ? [] : null;
+  }
+
+  static makeRoot(...children) {
+    const root = new AstNode(SudokuConstraint.Container);
+    root.children.push(...children);
+    return root;
   }
 }
 
 export class SudokuParser {
-  static parseShortKillerFormat(text) {
+  static _resolveAst(astRoot) {
+    const constraints = this._resolveNodes(astRoot.children, astRoot.cls);
+    return new astRoot.cls(constraints);
+  }
+
+  static _resolveNodes(nodes, parentCompositeClass) {
+    const result = [];
+    const canAbsorb = parentCompositeClass.CAN_ABSORB();
+
+    const addConstraint = (constraint) => {
+      if (constraint.constructor.IS_COMPOSITE
+        && canAbsorb.includes(constraint.constructor)) {
+        for (const subConstraint of constraint.constraints) {
+          addConstraint(subConstraint);
+        }
+      } else {
+        result.push(constraint);
+      }
+    };
+
+    for (const n of nodes) {
+      const cls = n.cls;
+
+      if (!parentCompositeClass.allowedConstraintClass(cls)) {
+        throw new Error(
+          `Constraint ${cls.name} is not allowed in ${parentCompositeClass.name}.`);
+      }
+
+      if (cls.IS_COMPOSITE) {
+        const childConstraints = this._resolveNodes(n.children, cls);
+        addConstraint(new cls(childConstraints));
+        continue;
+      }
+
+      const constraintParts = [...cls.makeFromArgs(...n.args)];
+      if (constraintParts.length > 1 && !canAbsorb.includes(SudokuConstraint.And)) {
+        // If a single token expands into multiple constraints, wrap them in
+        // an And so they behave as a unit inside Or.
+        addConstraint(new SudokuConstraint.And(constraintParts));
+      } else {
+        for (const c of constraintParts) addConstraint(c);
+      }
+    }
+
+    return result;
+  }
+
+  static _parseShortKillerFormatToAst(text) {
     // Reference for format:
     // http://forum.enjoysudoku.com/understandable-snarfable-killer-cages-t6119.html
 
@@ -88,14 +141,16 @@ export class SudokuParser {
       cages.get(cageCell).cells.push(shape.makeCellIdFromIndex(i));
     }
 
-    let constraints = [];
+    const root = AstNode.makeRoot();
     for (const config of cages.values()) {
-      constraints.push(new SudokuConstraint.Cage(config.sum, ...config.cells));
+      root.children.push(new AstNode(
+        SudokuConstraint.Cage,
+        [String(config.sum), ...config.cells]));
     }
-    return new SudokuConstraint.Container(constraints);
+    return root;
   }
 
-  static parseLongKillerFormat(text) {
+  static _parseLongKillerFormatToAst(text) {
     // Reference to format definition:
     // http://www.sudocue.net/forum/viewtopic.php?f=1&t=519
 
@@ -122,18 +177,20 @@ export class SudokuParser {
       cages.get(cageId).cells.push(shape.makeCellIdFromIndex(i));
     }
 
-    let constraints = [];
+    const root = AstNode.makeRoot();
     if (parts[1] === 'd') {
-      constraints.push(new SudokuConstraint.Diagonal(1));
-      constraints.push(new SudokuConstraint.Diagonal(-1));
+      root.children.push(new AstNode(SudokuConstraint.Diagonal, ['1']));
+      root.children.push(new AstNode(SudokuConstraint.Diagonal, ['-1']));
     }
     for (const config of cages.values()) {
-      constraints.push(new SudokuConstraint.Cage(config.sum, ...config.cells));
+      root.children.push(new AstNode(
+        SudokuConstraint.Cage,
+        [String(config.sum), ...config.cells]));
     }
-    return new SudokuConstraint.Container(constraints);
+    return root;
   }
 
-  static parsePlainSudoku(text) {
+  static _parsePlainSudokuToAst(text) {
     const shape = GridShape.fromNumCells(text.length);
     if (!shape) return null;
 
@@ -154,13 +211,15 @@ export class SudokuParser {
       }
     }
     if (new Set(nonValueCharacters).size > 1) return null;
-    return new SudokuConstraint.Container([
-      new SudokuConstraint.Shape(shape.name),
-      ...SudokuConstraint.Given.makeFromArgs(...fixedValues),
-    ]);
+
+    return AstNode.makeRoot(
+      new AstNode(SudokuConstraint.Shape, [shape.name]),
+
+      new AstNode(SudokuConstraint.Given, fixedValues)
+    );
   }
 
-  static parseJigsawLayout(text) {
+  static _parseJigsawLayoutToAst(text) {
     const shape = GridShape.fromNumCells(text.length);
     if (!shape) return null;
 
@@ -178,14 +237,14 @@ export class SudokuParser {
 
     if (Object.values(counter).some(c => c !== numValues)) return null;
 
-    return new SudokuConstraint.Container([
-      new SudokuConstraint.Shape(shape.name),
-      ...SudokuConstraint.Jigsaw.makeFromArgs(text),
-      new SudokuConstraint.NoBoxes(),
-    ]);
+    return AstNode.makeRoot(
+      new AstNode(SudokuConstraint.Shape, [shape.name]),
+      new AstNode(SudokuConstraint.Jigsaw, [text]),
+      new AstNode(SudokuConstraint.NoBoxes)
+    );
   }
 
-  static parseJigsaw(text) {
+  static _parseJigsawToAst(text) {
     if (text.length % 2 !== 0) return null;
 
     const shape = GridShape.fromNumCells(text.length / 2);
@@ -193,21 +252,16 @@ export class SudokuParser {
 
     const numCells = shape.numCells;
 
-    const layout = this.parseJigsawLayout(text.substr(numCells));
+    const layout = this._parseJigsawLayoutToAst(text.substr(numCells));
     if (layout === null) return null;
 
-    const fixedValues = this.parsePlainSudoku(text.substr(0, numCells));
+    const fixedValues = this._parsePlainSudokuToAst(text.substr(0, numCells));
     if (fixedValues === null) return null;
 
-    return new SudokuConstraint.Container([layout, fixedValues]);
+    return AstNode.makeRoot(layout, fixedValues);
   }
 
-  static parseSolution(text) {
-    if (!text.startsWith('=')) return null;
-    return this.parsePlainSudoku(text.substring(1));
-  }
-
-  static parseGridLayout(rawText) {
+  static _parseGridLayoutToAst(rawText) {
     // Only allow digits, dots, spaces and separators.
     if (rawText.search(/[^\d\s.|_-]/) !== -1) return null;
 
@@ -224,13 +278,13 @@ export class SudokuParser {
       fixedValues.push(shape.makeValueId(i, cell));
     }
 
-    return new SudokuConstraint.Container([
-      new SudokuConstraint.Shape(shape.name),
-      ...SudokuConstraint.Given.makeFromArgs(...fixedValues),
-    ]);
+    return AstNode.makeRoot(
+      new AstNode(SudokuConstraint.Shape, [shape.name]),
+      new AstNode(SudokuConstraint.Given, fixedValues)
+    );
   }
 
-  static parsePencilmarks(text) {
+  static _parsePencilmarksToAst(text) {
     const shape = GridShape.fromNumPencilmarks(text.length);
     if (!shape) return null;
 
@@ -239,7 +293,7 @@ export class SudokuParser {
 
     const numValues = shape.numValues;
 
-    // Split into segments of 9 characters.
+    // Split into segments of numValues characters.
     const pencilmarks = [];
     for (let i = 0; i < shape.numCells; i++) {
       const cellId = shape.makeCellIdFromIndex(i);
@@ -251,81 +305,25 @@ export class SudokuParser {
       pencilmarks.push(`${cellId}_${values}`);
     }
 
-    return new SudokuConstraint.Container([
-      new SudokuConstraint.Shape(shape.name),
-      ...SudokuConstraint.Given.makeFromArgs(...pencilmarks),
-    ]);
+    return AstNode.makeRoot(
+      new AstNode(SudokuConstraint.Shape, [shape.name]),
+      new AstNode(SudokuConstraint.Given, pencilmarks)
+    );
   }
 
-  static parseTextLine(rawText) {
-    // Remove all whitespace.
-    const text = rawText.replace(/\s+/g, '');
-
-    let constraint;
-
-    // Need this to avoid parsing this as a 1x1 grid.
-    if (text.length === 1) return null;
-
-    constraint = this.parseSolution(text);
-    if (constraint) return constraint;
-
-    constraint = this.parseShortKillerFormat(text);
-    if (constraint) return constraint;
-
-    constraint = this.parseLongKillerFormat(text);
-    if (constraint) return constraint;
-
-    constraint = this.parseJigsaw(text);
-    if (constraint) return constraint;
-
-    constraint = this.parseJigsawLayout(text);
-    if (constraint) return constraint;
-
-    constraint = this.parsePlainSudoku(text);
-    if (constraint) return constraint;
-
-    constraint = this.parseGridLayout(rawText);
-    if (constraint) return constraint;
-
-    constraint = this.parsePencilmarks(text);
-    if (constraint) return constraint;
-
-    return null;
-  }
-
-  static parseText(rawText) {
-    const constraints = [];
-    // Replace comment lines starting with #
-    const uncommentedText = rawText.replace(/^#.*$/gm, '');
-
-    // Parse sections separated by a blank line separately,
-    // and then merge their constraints.
-    for (const part of uncommentedText.split(/\n\s*\n/)) {
-      let constraint = this.parseTextLine(part);
-      if (!constraint) {
-        constraint = this.parseString(part);
-      }
-      constraints.push(constraint);
-    }
-    if (constraints.length === 1) return constraints[0];
-    return new SudokuConstraint.Container(constraints);
-  }
-
-  static parseString(rawStr) {
+  static _parseStringToAst(rawStr) {
     const str = rawStr.replace(/\s+/g, '');
-    let items = str.split('.');
-    if (items[0]) throw new Error(
+    const [unexpectedItem, ...items] = str.split('.');
+    if (unexpectedItem !== '') throw new Error(
       'Invalid constraint string: Constraint must start with a ".".\n' +
       rawStr);
-    items.shift();
 
-    // Parse to a simple AST.
-    const root = new AstNode(SudokuConstraint.Container, []);
-
+    const root = AstNode.makeRoot();
     const stack = [root];
+
     for (const item of items) {
-      const parts = item.split('~');
-      const type = parts.shift() || SudokuConstraint.Given.name;
+      let [type, ...parts] = item.split('~');
+      type ||= SudokuConstraint.Given.name;
 
       // A root-level `.End` is invalid.
       if (type === SudokuConstraint.End.name) {
@@ -342,11 +340,8 @@ export class SudokuParser {
       }
 
       const node = new AstNode(cls, parts);
-
-      // Attach to current parent.
       stack[stack.length - 1].children.push(node);
 
-      // Composite constraints consume subsequent constraints until `.End`.
       if (cls.IS_COMPOSITE) {
         stack.push(node);
       }
@@ -357,51 +352,92 @@ export class SudokuParser {
         + stack[stack.length - 1].cls.name);
     }
 
-    // Resolve the AST into constraint instances.
-    const resolveNodes = (nodes, parentCompositeClass) => {
-      const result = [];
-      const canAbsorb = parentCompositeClass.CAN_ABSORB();
+    return root;
+  }
 
-      const addConstraint = (constraint) => {
-        if (constraint.constructor.IS_COMPOSITE
-          && canAbsorb.includes(constraint.constructor)) {
-          for (const subConstraint of constraint.constraints) {
-            addConstraint(subConstraint);
-          }
-        } else {
-          result.push(constraint);
-        }
-      };
+  static _parseTextLineToAst(rawText) {
+    // Remove all whitespace.
+    const text = rawText.replace(/\s+/g, '');
 
-      for (const n of nodes) {
-        const cls = n.cls;
+    // Need this to avoid parsing this as a 1x1 grid.
+    if (text.length === 1) return null;
 
-        if (!parentCompositeClass.allowedConstraintClass(cls)) {
-          throw new Error(`Constraint of type ${cls.name} `
-            + `is not allowed inside ${parentCompositeClass.name}.`);
-        }
+    if (text.startsWith('=')) {
+      return this._parsePlainSudokuToAst(text.substring(1));
+    }
 
-        if (cls.IS_COMPOSITE) {
-          const childConstraints = resolveNodes(n.children, cls);
-          addConstraint(new cls(childConstraints));
-          continue;
-        }
+    return (
+      this._parseShortKillerFormatToAst(text)
+      || this._parseLongKillerFormatToAst(text)
+      || this._parseJigsawToAst(text)
+      || this._parseJigsawLayoutToAst(text)
+      || this._parsePlainSudokuToAst(text)
+      || this._parseGridLayoutToAst(rawText)
+      || this._parsePencilmarksToAst(text)
+      || null
+    );
+  }
 
-        const constraintParts = cls.makeFromArgs(...n.args);
-        if (constraintParts.length > 1) {
-          // If a single token expands into multiple constraints, wrap them in
-          // an And so they behave as a unit inside Or.
-          addConstraint(new SudokuConstraint.And(constraintParts));
-        } else {
-          for (const c of constraintParts) addConstraint(c);
-        }
-      }
+  static _parseTextToAst(rawText) {
+    // Replace comment lines starting with #
+    const uncommentedText = rawText.replace(/^#.*$/gm, '');
 
-      return result;
-    };
+    // Parse sections separated by a blank line separately,
+    // and then merge their constraints.
+    const root = AstNode.makeRoot();
+    for (const part of uncommentedText.split(/\n\s*\n/)) {
+      const partAst = this._parseTextLineToAst(part) || this._parseStringToAst(part);
+      root.children.push(...partAst.children);
+    }
+    return root;
+  }
 
-    const constraints = resolveNodes(root.children, root.cls);
-    return new root.cls(constraints);
+  static parseShortKillerFormat(text) {
+    const ast = this._parseShortKillerFormatToAst(text);
+    return ast ? this._resolveAst(ast) : null;
+  }
+
+  static parseLongKillerFormat(text) {
+    const ast = this._parseLongKillerFormatToAst(text);
+    return ast ? this._resolveAst(ast) : null;
+  }
+
+  static parsePlainSudoku(text) {
+    const ast = this._parsePlainSudokuToAst(text);
+    return ast ? this._resolveAst(ast) : null;
+  }
+
+  static parseJigsawLayout(text) {
+    const ast = this._parseJigsawLayoutToAst(text);
+    return ast ? this._resolveAst(ast) : null;
+  }
+
+  static parseJigsaw(text) {
+    const ast = this._parseJigsawToAst(text);
+    return ast ? this._resolveAst(ast) : null;
+  }
+
+  static parseSolution(text) {
+    if (!text.startsWith('=')) return null;
+    return this.parsePlainSudoku(text.substring(1));
+  }
+
+  static parseGridLayout(rawText) {
+    const ast = this._parseGridLayoutToAst(rawText);
+    return ast ? this._resolveAst(ast) : null;
+  }
+
+  static parsePencilmarks(text) {
+    const ast = this._parsePencilmarksToAst(text);
+    return ast ? this._resolveAst(ast) : null;
+  }
+
+  static parseText(rawText) {
+    return this._resolveAst(this._parseTextToAst(rawText));
+  }
+
+  static parseString(rawStr) {
+    return this._resolveAst(this._parseStringToAst(rawStr));
   }
 
   static extractConstraintTypes(str) {
