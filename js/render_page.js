@@ -947,13 +947,14 @@ class ConstraintChipView {
     svg.append(borders);
 
     // Determine the correct scale to fit our icon size.
-    const maxGridPixels = Math.max(
-      borderDisplay.gridWidthPixels(), borderDisplay.gridHeightPixels());
+    const gridWidthPixels = borderDisplay.gridWidthPixels();
+    const gridHeightPixels = borderDisplay.gridHeightPixels();
+    const maxGridPixels = Math.max(gridWidthPixels, gridHeightPixels);
     const scale = this._CHIP_ICON_SIZE_PX / maxGridPixels;
     const transform = `scale(${scale})`;
 
     borders.setAttribute('transform', transform);
-    borders.setAttribute('stoke-width', 0);
+    borders.setAttribute('stroke-width', 0);
 
     elem.setAttribute('transform', transform);
     elem.setAttribute('stroke-width', 15);
@@ -962,11 +963,12 @@ class ConstraintChipView {
     svg.append(elem);
 
     // Set the size (as well as minSize so it doesn't get squished).
-    const cssSize = this._CHIP_ICON_SIZE_PX + 'px';
-    svg.style.height = cssSize;
-    svg.style.width = cssSize;
-    svg.style.minHeight = cssSize;
-    svg.style.minWidth = cssSize;
+    // Keep the longest dimension at _CHIP_ICON_SIZE_PX and scale the other
+    // dimension proportionally, so rectangular grids don't look squashed.
+    svg.style.width = (gridWidthPixels * scale) + 'px';
+    svg.style.height = (gridHeightPixels * scale) + 'px';
+    svg.style.minWidth = svg.style.width;
+    svg.style.minHeight = svg.style.height;
     // Undo the opacity.
     svg.style.filter = 'saturate(100)';
 
