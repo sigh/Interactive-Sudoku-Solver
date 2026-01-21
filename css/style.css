@@ -594,6 +594,7 @@ button.copy-to-clipboard-failed::after {
 }
 
 .chip .chip-icon {
+  flex-shrink: 0;
   border-radius: 5px;
   border: 1px solid rgb(220, 220, 220);
 }
