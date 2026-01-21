@@ -10,18 +10,37 @@ class AstNode {
 
   static makeRoot(...children) {
     const root = new AstNode(SudokuConstraint.Container);
-    root.children.push(...children);
+
+    // Robustness:
+    // Allow callers to pass other root ASTs (i.e. Container nodes)
+    // and merge their children into this root.
+    for (const child of children) {
+      if (child.cls === SudokuConstraint.Container) {
+        root.children.push(...child.children);
+      } else {
+        root.children.push(child);
+      }
+    }
     return root;
   }
 }
 
 export class SudokuParser {
   static _resolveAst(astRoot) {
-    const constraints = this._resolveNodes(astRoot.children, astRoot.cls);
+    let shape = null;
+    for (const n of astRoot.children) {
+      if (n.cls !== SudokuConstraint.Shape) continue;
+
+      shape = SudokuConstraint.Shape.getShapeFromGridSpec(n.args.join('~'));
+      break;
+    }
+    if (!shape) shape = SudokuConstraint.Shape.getShapeFromGridSpec();
+
+    const constraints = this._resolveNodes(astRoot.children, astRoot.cls, shape);
     return new astRoot.cls(constraints);
   }
 
-  static _resolveNodes(nodes, parentCompositeClass) {
+  static _resolveNodes(nodes, parentCompositeClass, shape) {
     const result = [];
     const canAbsorb = parentCompositeClass.CAN_ABSORB();
 
@@ -45,12 +64,12 @@ export class SudokuParser {
       }
 
       if (cls.IS_COMPOSITE) {
-        const childConstraints = this._resolveNodes(n.children, cls);
+        const childConstraints = this._resolveNodes(n.children, cls, shape);
         addConstraint(new cls(childConstraints));
         continue;
       }
 
-      const constraintParts = [...cls.makeFromArgs(...n.args)];
+      const constraintParts = [...cls.makeFromArgs(n.args, shape)];
       if (constraintParts.length > 1 && !canAbsorb.includes(SudokuConstraint.And)) {
         // If a single token expands into multiple constraints, wrap them in
         // an And so they behave as a unit inside Or.

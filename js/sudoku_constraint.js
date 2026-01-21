@@ -66,7 +66,7 @@ export class SudokuConstraintBase {
     this.type = this.constructor.name;
   }
 
-  static *makeFromArgs(...args) {
+  static *makeFromArgs(args, shape) {
     yield new this(...args);
   }
 
@@ -396,7 +396,7 @@ export class OutsideConstraintBase extends SudokuConstraintBase {
     }
   }
 
-  static *makeFromArgs(...args) {
+  static *makeFromArgs(args, shape) {
     switch (this.CLUE_TYPE) {
       case this.CLUE_TYPE_DOUBLE_LINE:
         const rowCol = args[0];
@@ -621,7 +621,7 @@ export class SudokuConstraint {
 
     chipLabel() { return ''; }
 
-    static *makeFromArgs(...args) {
+    static *makeFromArgs(args, shape) {
       let gridSpec = null;
       let layoutStr = args[0];
 
@@ -633,15 +633,15 @@ export class SudokuConstraint {
       }
 
       // Determine shape from gridSpec or infer from layout length (square only).
-      const shape = gridSpec ?
+      const inferredShape = gridSpec ?
         GridShape.fromGridSpec(gridSpec) :
         GridShape.fromNumCells(layoutStr.length);
-      if (!shape) throw Error('Invalid jigsaw regions');
+      if (!inferredShape) throw Error('Invalid jigsaw regions');
 
       // Validate that gridSpec matches the layout length.
-      if (gridSpec && layoutStr.length !== shape.numCells) {
+      if (gridSpec && layoutStr.length !== inferredShape.numCells) {
         throw Error(
-          `Jigsaw gridSpec ${gridSpec} expects ${shape.numCells} cells, ` +
+          `Jigsaw gridSpec ${gridSpec} expects ${inferredShape.numCells} cells, ` +
           `but layout has ${layoutStr.length}`);
       }
 
@@ -651,10 +651,10 @@ export class SudokuConstraint {
       }
 
       for (const [, region] of map) {
-        if (region.length === shape.numValues) {
+        if (region.length === inferredShape.numValues) {
           yield new this(
-            shape.name,
-            ...region.map(c => shape.makeCellIdFromIndex(c)));
+            inferredShape.name,
+            ...region.map(c => inferredShape.makeCellIdFromIndex(c)));
         }
       }
     }
@@ -1034,7 +1034,8 @@ export class SudokuConstraint {
       return decoded;
     }
 
-    static *makeFromArgs(patternToken, ...items) {
+    static *makeFromArgs(args, shape) {
+      const [patternToken, ...items] = args;
       const pattern = this.decodePattern(patternToken);
 
       let cells = [];
@@ -1124,7 +1125,8 @@ export class SudokuConstraint {
       return NFASerializer.serialize(nfa);
     }
 
-    static *makeFromArgs(encodedNFA, ...items) {
+    static *makeFromArgs(args, shape) {
+      const [encodedNFA, ...items] = args;
 
       let currentName = '';
       let currentCells = [];
@@ -1227,6 +1229,24 @@ export class SudokuConstraint {
       this.gridSpec = gridDims;
 
       if (optionalNumValues.length) this.gridSpec += `~${optionalNumValues[0]}`;
+    }
+
+    static *makeFromArgs(args, shape) {
+      const [gridDims, optionalNumValues] = args;
+
+      const ERROR_MSG = 'Inconsistent Shape constraints.';
+      if (shape.gridDimsStr !== gridDims) {
+        throw Error(ERROR_MSG);
+      }
+      if (optionalNumValues !== undefined) {
+        if (shape.numValues !== +optionalNumValues) {
+          throw Error(ERROR_MSG);
+        }
+      } else if (!shape.isDefaultNumValues()) {
+        throw Error(ERROR_MSG);
+      }
+
+      yield new this(...args);
     }
 
     static serialize(constraints) {
@@ -2119,11 +2139,11 @@ export class SudokuConstraint {
     static CATEGORY = null;
     static DISPLAY_CONFIG = null;
 
-    static *makeFromArgs(...args) {
+    static *makeFromArgs(args, shape) {
       const [key, ...rest] = args;
       // Convert base64url encoding by swapping - and _
       const convertedKey = key.replace(/[-_]/g, c => c === '-' ? '_' : '-');
-      yield* SudokuConstraint.Pair.makeFromArgs(convertedKey, ...rest);
+      yield* SudokuConstraint.Pair.makeFromArgs([convertedKey, ...rest], shape);
     }
   }
 
@@ -2133,11 +2153,11 @@ export class SudokuConstraint {
     static CATEGORY = null;
     static DISPLAY_CONFIG = null;
 
-    static *makeFromArgs(...args) {
+    static *makeFromArgs(args, shape) {
       const [key, ...rest] = args;
       // Convert base64url encoding by swapping - and _
       const convertedKey = key.replace(/[-_]/g, c => c === '-' ? '_' : '-');
-      yield* SudokuConstraint.PairX.makeFromArgs(convertedKey, ...rest);
+      yield* SudokuConstraint.PairX.makeFromArgs([convertedKey, ...rest], shape);
     }
   }
 
@@ -2202,7 +2222,7 @@ export class SudokuConstraint {
       return parts.join('');
     }
 
-    static *makeFromArgs(...args) {
+    static *makeFromArgs(args, shape) {
       const [key, ...items] = args;
 
       let currentName = '';
@@ -2350,8 +2370,7 @@ export class SudokuConstraint {
       this.values = values;
     }
 
-    static *makeFromArgs(...args) {
-      const shape = SHAPE_MAX;
+    static *makeFromArgs(args, shape) {
       for (const valueId of args) {
         const { cellId, values } = shape.parseValueId(valueId);
         yield new this(cellId, ...values);
