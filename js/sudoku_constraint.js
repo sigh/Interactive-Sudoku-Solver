@@ -622,26 +622,18 @@ export class SudokuConstraint {
     chipLabel() { return ''; }
 
     static *makeFromArgs(args, shape) {
-      let gridSpec = null;
-      let layoutStr = args[0];
-
-      // Check if first arg is a grid spec (contains 'x', e.g. '6x8').
-      // For backward compatibility, square grids omit the gridSpec.
-      if (args[0] && args[0].includes('x')) {
-        gridSpec = args[0];
-        layoutStr = args[1];
+      // Legacy format: .Jigsaw~<gridSpec>~<layout>
+      // New format:    .Jigsaw~<layout>
+      // Ignore any legacy leading argument(s) and take the layout as the last
+      // argument.
+      if (args.length < 1 || args.length > 2) {
+        throw Error('Invalid jigsaw constraint args');
       }
+      const layoutStr = args[args.length - 1];
 
-      // Determine shape from gridSpec or infer from layout length (square only).
-      const inferredShape = gridSpec ?
-        GridShape.fromGridSpec(gridSpec) :
-        GridShape.fromNumCells(layoutStr.length);
-      if (!inferredShape) throw Error('Invalid jigsaw regions');
-
-      // Validate that gridSpec matches the layout length.
-      if (gridSpec && layoutStr.length !== inferredShape.numCells) {
+      if (layoutStr.length !== shape.numCells) {
         throw Error(
-          `Jigsaw gridSpec ${gridSpec} expects ${inferredShape.numCells} cells, ` +
+          `Jigsaw layout expects ${shape.numCells} cells, ` +
           `but layout has ${layoutStr.length}`);
       }
 
@@ -651,10 +643,10 @@ export class SudokuConstraint {
       }
 
       for (const [, region] of map) {
-        if (region.length === inferredShape.numValues) {
+        if (region.length === shape.numValues) {
           yield new this(
-            inferredShape.name,
-            ...region.map(c => inferredShape.makeCellIdFromIndex(c)));
+            shape.name,
+            ...region.map(c => shape.makeCellIdFromIndex(c)));
         }
       }
     }
@@ -689,10 +681,6 @@ export class SudokuConstraint {
       });
 
       const layoutStr = partsGrid.map(part => indexMap.get(part)).join('');
-      // Only include gridSpec for non-square grids.
-      if (!shape.isSquare()) {
-        return this._argsToString(gridSpec, layoutStr);
-      }
       return this._argsToString(layoutStr);
     }
   }
