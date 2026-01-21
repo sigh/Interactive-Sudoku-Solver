@@ -495,6 +495,13 @@ await runTest('parseText should handle multiple sections', () => {
   assert.deepEqual(given.values, [5]);
 });
 
+await runTest('parseText should reject inconsistent Shape constraints', () => {
+  assert.throws(
+    () => SudokuParser.parseText('.Shape~4x4.Shape~9x9.'),
+    /Inconsistent Shape constraints\./
+  );
+});
+
 //////////////////////////////////////////////////////////////////////////////
 // extractConstraintTypes
 //////////////////////////////////////////////////////////////////////////////
