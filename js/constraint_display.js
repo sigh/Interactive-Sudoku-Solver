@@ -150,7 +150,7 @@ class BaseConstraintDisplayItem extends DisplayItem {
     const len = cells.length;
     if (len < 2) throw new Error(`Line too short: ${cells}`);
 
-    if (options.constructor != LineOptions) {
+    if (options.constructor !== LineOptions) {
       options = new LineOptions(options);
     }
     const g = createSvgElement('g');
@@ -220,14 +220,14 @@ class BaseConstraintDisplayItem extends DisplayItem {
         [col * cellSize, row * cellSize]];
 
       // Apply offsets to create the basic border.
-      const direction = (edgeType == GridGraph.RIGHT || edgeType == GridGraph.DOWN) ? 1 : 0;
-      const orientation = (edgeType == GridGraph.UP || edgeType == GridGraph.DOWN) ? 1 : 0;
+      const direction = (edgeType === GridGraph.RIGHT || edgeType === GridGraph.DOWN) ? 1 : 0;
+      const orientation = (edgeType === GridGraph.UP || edgeType === GridGraph.DOWN) ? 1 : 0;
       parts[0][orientation] += direction * cellSize;
       parts[1][orientation] += direction * cellSize;
       parts[1][1 - orientation] += cellSize;
 
       // If we don't need to cut across to diagonals, we're done.
-      if (cutSize == 0) return parts;
+      if (cutSize === 0) return parts;
 
       const rowOffset = direction ? cutSize : -cutSize;
       const diagStartType = orientation ? GridGraph.LEFT : GridGraph.UP;
@@ -236,7 +236,7 @@ class BaseConstraintDisplayItem extends DisplayItem {
       // NOTE: The diagonal extended from the LEFT/RIGHT edges.
       if (cls._isStrictDiagonal(graph, cellSet, cell, edgeType, diagEndType)) {
         parts[1][1 - orientation] -= cutSize;
-        if (orientation == 0) {
+        if (orientation === 0) {
           parts.push([parts[1][0] + rowOffset, parts[1][1] + cutSize]);
         }
       }
@@ -244,7 +244,7 @@ class BaseConstraintDisplayItem extends DisplayItem {
       // unshift.
       if (cls._isStrictDiagonal(graph, cellSet, cell, edgeType, diagStartType)) {
         parts[0][1 - orientation] += cutSize;
-        if (orientation == 0) {
+        if (orientation === 0) {
           parts.unshift([parts[0][0] + rowOffset, parts[0][1] - cutSize]);
         }
       }
@@ -342,7 +342,7 @@ class Jigsaw extends BaseConstraintDisplayItem {
     }
 
     // Don't shade in anything if there are no jigsaw pieces.
-    if (this._regionElems.size == 0) return;
+    if (this._regionElems.size === 0) return;
 
     // Find the current missing cells.
     const missingCells = new Set();
@@ -388,7 +388,7 @@ class Indexing extends BaseConstraintDisplayItem {
     const patternId = this._nextPatternId++;
     g.appendChild(this._makeSquarePattern(
       patternId,
-      indexType == SudokuConstraint.Indexing.ROW_INDEXING ?
+      indexType === SudokuConstraint.Indexing.ROW_INDEXING ?
         this._INDEXING_ROW_COLOR : this._INDEXING_COL_COLOR));
     return patternId;
   }
@@ -812,7 +812,7 @@ class Quad extends BaseConstraintDisplayItem {
     const numValues = values.length;
     const angleInc = 2 * Math.PI / numValues;
     const startAngle = numValues > 2 ? - Math.PI / 2 : Math.PI;
-    const offset = numValues == 1 ? 0 : QUAD_TEXT_OFFSET;
+    const offset = numValues === 1 ? 0 : QUAD_TEXT_OFFSET;
     for (let i = 0; i < numValues; i++) {
       const value = values[i];
       const x = cx + Math.cos(startAngle + i * angleInc) * offset;
@@ -1120,7 +1120,7 @@ class OutsideClue extends BaseConstraintDisplayItem {
       for (let i = 0; i < tspans.length; i++) {
         const tspan = tspans[i];
         tspan.setAttribute('x', x);
-        tspan.setAttribute('dy', (i == 0 ? initialDyEm : spacingEm) + 'em');
+        tspan.setAttribute('dy', (i === 0 ? initialDyEm : spacingEm) + 'em');
       }
     }
 
@@ -1190,7 +1190,7 @@ class OutsideClue extends BaseConstraintDisplayItem {
     text.setAttribute('y', arrowY - dy * textOffsetFactor);
     text.setAttribute('text-anchor', 'middle');
     text.setAttribute('dominant-baseline', 'middle');
-    if (dr == 0) text.classList.add('vertical-text');
+    if (dr === 0) text.classList.add('vertical-text');
 
     let arrow = createSvgElement('g');
     arrow.appendChild(hitbox);
@@ -1283,17 +1283,17 @@ class GreaterThan extends BaseConstraintDisplayItem {
     const SQUASH = 0.4;
     const dC = Math.sign(x1 - x0);
     const dR = Math.sign(y1 - y0);
-    if (dC == 0) {
+    if (dC === 0) {
       // Vertical comparison
-      if (dR == 0) throw new Error("Can't have self comparison");
+      if (dR === 0) throw new Error("Can't have self comparison");
       return this._makePath([
         [x - COMPARISON_SIZE, y - dR * COMPARISON_SIZE * SQUASH - dR * INSET],
         [x, y + dR * COMPARISON_SIZE * SQUASH - dR * INSET],
         [x + COMPARISON_SIZE, y - dR * COMPARISON_SIZE * SQUASH - dR * INSET]
       ]);
-    } else if (dR == 0) {
+    } else if (dR === 0) {
       // Horizontal comparison
-      if (dC == 0) throw new Error("Can't have self comparison");
+      if (dC === 0) throw new Error("Can't have self comparison");
       return this._makePath([
         [x - dC * COMPARISON_SIZE * SQUASH - dC * INSET, y - COMPARISON_SIZE],
         [x + dC * COMPARISON_SIZE * SQUASH - dC * INSET, y],

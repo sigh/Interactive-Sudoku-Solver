@@ -166,7 +166,7 @@ class HistoryHandler {
   }
 
   _addToHistory(q) {
-    if (q == this._history[this._historyLocation]) return;
+    if (q === this._history[this._historyLocation]) return;
     this._history.length = this._historyLocation + 1;
     this._history.push(q || '');
     this._historyLocation++;
@@ -207,7 +207,7 @@ class HistoryHandler {
     }
 
     let newUrl = url.toString();
-    if (newUrl != window.location.href) {
+    if (newUrl !== window.location.href.toString()) {
       history.pushState(null, null, url.toString());
     }
   }
@@ -408,7 +408,7 @@ export class SolutionController {
       }
 
       // If we haven't started fast fire mode, do so now!
-      if (firingKeys.get(key) != FIRE_FAST) {
+      if (firingKeys.get(key) !== FIRE_FAST) {
         firingKeys.set(key, FIRE_FAST);
         runHandler(key, handler);
       }
