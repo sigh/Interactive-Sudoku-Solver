@@ -771,7 +771,7 @@ export const EXAMPLES = [
   {
     // Arbitrarily added jigsaw pieces and givens.
     name: '4x7: Jigsaw',
-    input: '.Shape~4x7.Jigsaw~4x7~1222222111113244441334443333.~R2C4_2~R3C6_3~R4C5_4~R3C1_5~R4C3_6~R1C7_7~R4C7_5~R1C1_3~R1C5_6~R2C2_1',
+    input: '.Shape~4x7.Jigsaw~1222222111113244441334443333.~R2C4_2~R3C6_3~R4C5_4~R3C1_5~R4C3_6~R1C7_7~R4C7_5~R1C1_3~R1C5_6~R2C2_1',
     solution: '3425617614257352147367361425',
   },
   {
