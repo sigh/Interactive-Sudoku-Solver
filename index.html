@@ -257,11 +257,33 @@ layout: null
               <div id="candidate-support-threshold-container" class="hide-until-load">
                 <label for="candidate-support-threshold">
                   Value count limit
-                  <span class="tooltip" data-text="
-                    Values that appear in exactly this many solutions will
-                    be colored purple. Values with a higher count will blue;
-                    a lower count will be orange; and values that appear in a
-                    single solution will be green."></span>:
+                  <span class="tooltip">
+                    <template>
+                      <div>
+                        <div>
+                          Colors show how many solutions contain each candidate:
+                        </div>
+                        <div>
+                          <div>
+                            <strong style="color: var(--color-primary-dark)">Blue</strong>:
+                            more than the count
+                          </div>
+                          <div>
+                            <strong style="color: var(--color-candidate-at-limit)">Purple</strong>:
+                            exactly this count
+                          </div>
+                          <div>
+                            <strong style="color: var(--color-candidate-below-limit)">Orange</strong>:
+                            fewer than the count
+                          </div>
+                          <div>
+                            <strong style="color: var(--color-candidate-unique)">Green</strong>:
+                            in exactly one solution
+                          </div>
+                        </div>
+                      </div>
+                    </template>
+                  </span>:
                 </label>
                 <div>
                   <input type="range" id="candidate-support-threshold" min="0" max="10" value="0">
@@ -457,11 +479,25 @@ layout: null
                       </div>
                     </div>
                   </span>
-                  <span class="tooltip" data-text="
-              Change the grid shape. Enter dimensions as NxM (e.g., 9x9, 6x8).
-              Dimensions must be between 1 and 16.
-              Box regions are made as close to square as possible.
-              Prime numbered grid sizes have no boxes.">
+                  <span class="tooltip">
+                    <template>
+                      <div>
+                        <div>Change the grid shape.</div>
+                        <div>
+                          Enter <strong>RxC</strong> where
+                          <strong>R</strong> is the number of rows and
+                          <strong>C</strong> is the number of columns
+                          (e.g. <strong>9x9</strong>, <strong>6x8</strong>).
+                        </div>
+                        <div>Each dimension must be <strong>1–16</strong>.</div>
+                        <div>
+                          Box regions are chosen automatically to be as square
+                          as possible. No boxes are used if a good box size
+                          is determined. In this case, use Jigsaw to create
+                          custom regions.
+                        </div>
+                      </div>
+                    </template>
                   </span>
                 </h2>
                 </h2>
@@ -486,8 +522,15 @@ layout: null
                   <button type="submit" id="add-jigsaw-button" title="Add Piece">
                     Add Jigsaw Piece
                   </button>
-                  <span class="tooltip"
-                    data-text="Values inside the jigsaw piece can't repeat. Pieces cannot overlap and must contain a cell for each different value (i.e. 9 cells for a 9x9 grid)."></span>
+                  <span class="tooltip">
+                    <template>
+                      <div>
+                        <div>Values inside the jigsaw pieces can't repeat.</div>
+                        <div>Pieces cannot overlap.</div>
+                        <div>The size of the pieces must match the number of distinct values.</div>
+                      </div>
+                    </template>
+                  </span>
 
                 </div>
 
@@ -538,12 +581,15 @@ layout: null
                     </div>
                     <div>
                       Chain handling
-                      <span class="tooltip" data-text="
-                    Select how to handle chains of more than two cells. e.g. for
-                    a chain of cells [A, B, C] 'Consecutive pairs' will create
-                    constraints on [A, B] and [B, C] while 'All pairs' will create
-                    constraints on [A, B], [A, C], [B, A], [B, C], [C, A]
-                    and [C, B].">
+                      <span class="tooltip">
+                        <template>
+                          <div>
+                            <div>Select how to handle chains of more than two cells.</div>
+                            <div>For a chain of cells [A, B, C]:</div>
+                            <div><strong>Consecutive pairs</strong> → [A,B] and [B,C]</div>
+                            <div><strong>All pairs</strong> → [A,B], [A,C], [B,A], [B,C], [C,A], [C,B]</div>
+                          </div>
+                        </template>
                       </span>:
                       <select name="chain-mode" class="thin-select" required>
                         <option value="Pair">Consecutive pairs</option>

@@ -95,6 +95,14 @@ const setUpTooltipPortal = () => {
   };
 
   const showFor = (target) => {
+    const template = target.querySelector('template');
+    if (template) {
+      bubble.replaceChildren(template.content.cloneNode(true));
+      bubble.hidden = false;
+      positionBubble(target);
+      return;
+    }
+
     const text = target.getAttribute('data-text');
     if (!text) return;
 
@@ -967,8 +975,6 @@ class ConstraintChipView {
     // dimension proportionally, so rectangular grids don't look squashed.
     svg.style.width = (gridWidthPixels * scale) + 'px';
     svg.style.height = (gridHeightPixels * scale) + 'px';
-    svg.style.minWidth = svg.style.width;
-    svg.style.minHeight = svg.style.height;
     // Undo the opacity.
     svg.style.filter = 'saturate(100)';
 
