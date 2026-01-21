@@ -2536,7 +2536,7 @@ export class ValueIndexing extends SudokuConstraintHandler {
 
 export class Indexing extends SudokuConstraintHandler {
   constructor(controlCell, indexedCells, indexedValue) {
-    super([controlCell]);
+    super([controlCell, ...indexedCells]);
     this._controlCell = controlCell;
     this._indexedCells = indexedCells;
     this._indexedValue = LookupTables.fromValue(+indexedValue);
@@ -2767,8 +2767,8 @@ export class CountingCircles extends SudokuConstraintHandler {
 
 export class NumberedRoom extends SudokuConstraintHandler {
   constructor(cells, value) {
-    super([cells[0]]);
-    this._cells = new Uint8Array(cells);
+    super(cells);
+    this._cells = cells;
     this._value = LookupTables.fromValue(+value);
   }
 
@@ -2787,8 +2787,9 @@ export class NumberedRoom extends SudokuConstraintHandler {
     const clueValue = this._value;
 
     let controlV = grid[this.cells[0]];
-    for (let i = 0, iv = 1; i < numCells; i++, iv <<= 1) {
+    for (let i = 0; i < numCells; i++) {
       const v = grid[cells[i]];
+      const iv = 1 << i;
       if (v & clueValue) {
         if (!(controlV & iv)) {
           // This cell can't have the clue value because the control
