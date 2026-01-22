@@ -474,8 +474,11 @@ export class SudokuConstraintOptimizer {
       handlerSet.getAllofType(HandlerModule.AllDifferent)) {
       const cells = h.exclusionCells();
       if (cells.length === shape.numValues) {
-        handlerSet.addNonEssential(
-          new HandlerModule.House(cells));
+        const newHandler = new HandlerModule.House(cells);
+        handlerSet.addNonEssential(newHandler);
+        if (this._debugLogger) {
+          this._logAddHandler('_addHouseHandlers', newHandler);
+        }
       }
     }
   }
@@ -514,6 +517,20 @@ export class SudokuConstraintOptimizer {
                 shape.numValues));
           }
           break;
+        case shape.numValues:
+          {
+            // If N cells are all pairwise mutually exclusive on a base-N grid,
+            // then they must be a permutation of {1..N}. Therefore their sum is
+            // fixed (shape.maxSum).
+            // We handle this because some users add this constraint when they
+            // could just add an AllDifferent constraint.
+            if (!h.onlyUnitCoeffs()) break;
+            if (!cellExclusions.areMutuallyExclusive(h.cells)) break;
+
+            newHandler = (h.sum() === shape.maxSum)
+              ? new HandlerModule.True()
+              : new HandlerModule.False(h.cells);
+          }
       }
 
       if (newHandler) {
