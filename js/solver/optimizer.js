@@ -126,7 +126,7 @@ export class SudokuConstraintOptimizer {
   }
 
   static _equalsKey = memoize((numValues) => fnToBinaryKey(
-    (a, b) => a == b, numValues));
+    (a, b) => a === b, numValues));
 
   _addExtraCellExclusions(handlerSet, cellExclusions, shape) {
     // If two cells must have the same value, then they have to share the same
@@ -445,7 +445,7 @@ export class SudokuConstraintOptimizer {
   _fillInSumGap(sumHandlers, sumCells, shape) {
     // Fill in a gap if one remains.
     const numNonSumCells = shape.numCells - sumCells.size;
-    if (numNonSumCells == 0 || numNonSumCells >= shape.numValues) return [];
+    if (numNonSumCells === 0 || numNonSumCells >= shape.numValues) return [];
 
     const sumHandlersSum = sumHandlers.map(h => h.sum()).reduce((a, b) => a + b);
     const numRegions = shape.numCells / shape.numValues;
@@ -513,7 +513,7 @@ export class SudokuConstraintOptimizer {
             newHandler = new HandlerModule.BinaryConstraint(
               ...cells,
               fnToBinaryKey(
-                (a, b) => a * c0 + b * c1 == sum && (!mutuallyExclusive || a != b),
+                (a, b) => a * c0 + b * c1 === sum && (!mutuallyExclusive || a !== b),
                 shape.numValues));
           }
           break;
@@ -570,12 +570,12 @@ export class SudokuConstraintOptimizer {
         if (setIntersectSize(cells, h.cells) > 0) continue;
         // Ignore any houses which don't cover the uncovered cells.
         const intersectSize = setIntersectSize(uncoveredCells, h.cells);
-        if (intersectSize == 0) continue;
+        if (intersectSize === 0) continue;
         // Ignore handlers which only intersect in one square. This is likely
         // a row crossing a column, and is generally not useful.
-        if (intersectSize == 1) continue;
+        if (intersectSize === 1) continue;
         // Ensure the intersection only covers the uncovered cells.
-        if (intersectSize != arrayIntersectSize(houseHandler.cells, h.cells)) {
+        if (intersectSize !== arrayIntersectSize(houseHandler.cells, h.cells)) {
           continue;
         }
         // This handler fills in an existing gap.
@@ -583,7 +583,7 @@ export class SudokuConstraintOptimizer {
         h.cells.forEach(c => cells.add(c));
         h.cells.forEach(c => uncoveredCells.delete(c));
         usedExtraHouses = true;
-        if (uncoveredCells.size == 0) break;
+        if (uncoveredCells.size === 0) break;
       }
     }
 
@@ -604,7 +604,7 @@ export class SudokuConstraintOptimizer {
       for (const h of allHouseHandlers) {
         // Ignore any houses which don't cover the cells.
         const intersectSize = setIntersectSize(cells, h.cells);
-        if (intersectSize != numValues) continue;
+        if (intersectSize !== numValues) continue;
         // This house is completely contained within the cells.
         totalSum -= shape.maxSum;
         h.cells.forEach(c => cells.delete(c));
@@ -613,7 +613,7 @@ export class SudokuConstraintOptimizer {
       }
     }
 
-    if (cells.size == 0) return null;
+    if (cells.size === 0) return null;
 
     // Use mutual-exclusion structure to estimate how restrictive this inferred
     // sum will be. Prefer sums that imply a narrow range relative to dof.
@@ -634,7 +634,7 @@ export class SudokuConstraintOptimizer {
     }
 
     const dof = Math.min(totalSum - min, max - totalSum);
-    if (range == 0 || range <= 4 * dof) {
+    if (range === 0 || range <= 4 * dof) {
       if (this._debugLogger) {
         this._debugLogger.log({
           loc: '_addSumIntersectionHandler',
@@ -704,11 +704,11 @@ export class SudokuConstraintOptimizer {
       let constrainedSum = 0;
       for (const k of filteredSumHandlers) {
         const overlapSize = arrayIntersectSize(h.cells, k.cells);
-        if (overlapSize == k.cells.length) {
+        if (overlapSize === k.cells.length) {
           constrainedCells.push(...k.cells);
           constrainedSum += k.sum();
           k.setComplementCells(arrayDifference(h.cells, k.cells));
-        } else if (k.cells.length - overlapSize == 1) {
+        } else if (k.cells.length - overlapSize === 1) {
           outies.push(k);
         }
       }
@@ -841,7 +841,7 @@ export class SudokuConstraintOptimizer {
     let i = 0;
     for (const r of regions) {
       i++;
-      if (i == numValues) break;
+      if (i === numValues) break;
 
       // Add r to our super-region.
       r.forEach(e => superRegion.add(e));
@@ -858,7 +858,7 @@ export class SudokuConstraintOptimizer {
 
       // Don't process the first region, as that usually doubles up work from
       // elsewhere.
-      if (i == 1) continue;
+      if (i === 1) continue;
 
       callback(superRegion, piecesRegion, usedPieces);
     }
@@ -869,10 +869,10 @@ export class SudokuConstraintOptimizer {
 
     const handleOverlap = (superRegion, piecesRegion, usedPieces) => {
       // We can only match when regions are the same size.
-      if (superRegion.size != piecesRegion.size) return;
+      if (superRegion.size !== piecesRegion.size) return;
 
       const diffA = setDifference(superRegion, piecesRegion);
-      if (diffA.size == 0) return;
+      if (diffA.size === 0) return;
       const diffB = setDifference(piecesRegion, superRegion);
       // Ignore diff that too big, they are probably not very well
       // constrained.
@@ -914,7 +914,7 @@ export class SudokuConstraintOptimizer {
       let diffB = setDifference(piecesRegion, superRegion);
 
       // No diff, no new constraints to add.
-      if (diffA.size == 0 && diffB.size == 0) return;
+      if (diffA.size === 0 && diffB.size === 0) return;
       // Don't use this if the diff is too large.
       if (diffA.size + diffB.size > numValues) return;
 
@@ -941,7 +941,7 @@ export class SudokuConstraintOptimizer {
 
       let newHandler;
       let args;
-      if (diffA.size == 0) {
+      if (diffA.size === 0) {
         newHandler = new SumHandlerModule.Sum([...diffB], sumDelta);
         args = { sum: sumDelta };
       } else {
@@ -1136,7 +1136,7 @@ export class SudokuConstraintOptimizer {
       }
     }
 
-    if (numCombinations == 0) return false;
+    if (numCombinations === 0) return false;
 
     const addRestriction = (cell, values) => {
       restrictions.set(cell, (restrictions.get(cell) || -1) & values);
@@ -1146,7 +1146,7 @@ export class SudokuConstraintOptimizer {
     for (let i = 0; i < numCells; i++) {
       if (occurrences[i] === numCombinations) {
         addRestriction(cells[i], v);
-      } else if (occurrences[i] == 0) {
+      } else if (occurrences[i] === 0) {
         addRestriction(cells[i], ~v);
       }
     }
