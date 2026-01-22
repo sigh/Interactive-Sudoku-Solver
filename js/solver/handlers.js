@@ -2552,29 +2552,33 @@ export class Indexing extends SudokuConstraintHandler {
 
   enforceConsistency(grid, handlerAccumulator) {
     const cells = this._indexedCells;
-    const controlCell = this._controlCell
+    const controlCell = this._controlCell;
     const numCells = cells.length;
     const indexedValue = this._indexedValue;
 
-    let controlValue = grid[controlCell];
-    for (let i = 0, v = 1; i < numCells; i++, v <<= 1) {
-      if (controlValue & v) {
-        // If the control cell has can take this value, then the corresponding
-        // indexed cell must have the indexed value.
-        if (!(grid[cells[i]] & indexedValue)) {
-          controlValue &= ~v;
+    const originalControl = grid[controlCell];
+    let controlValue = originalControl;
+
+    for (let i = 0, bit = 1; i < numCells; i++, bit <<= 1) {
+      const cell = cells[i];
+      const v = grid[cell];
+
+      if (v & indexedValue) {
+        if (!(controlValue & bit)) {
+          // This cell can't have the indexed value because the control cell
+          // does not allow selecting it.
+          if (!(grid[cell] &= ~indexedValue)) return false;
+          handlerAccumulator.addForCell(cell);
         }
       } else {
-        // If the control cell can't take this value, then the corresponding
-        // indexed cell must not have the indexed value.
-        if (grid[cells[i]] & indexedValue) {
-          if (!(grid[cells[i]] &= ~indexedValue)) return false;
-          handlerAccumulator.addForCell(cells[i]);
-        }
+        // The control value can't select this index because the corresponding
+        // cell doesn't allow the indexed value.
+        controlValue &= ~bit;
+        if (!controlValue) return false;
       }
     }
 
-    if (controlValue !== grid[controlCell]) {
+    if (controlValue !== originalControl) {
       if (!(grid[controlCell] = controlValue)) return false;
       handlerAccumulator.addForCell(controlCell);
     }
@@ -2760,50 +2764,6 @@ export class CountingCircles extends SudokuConstraintHandler {
         }
       }
     }
-
-    return true;
-  }
-}
-
-export class NumberedRoom extends SudokuConstraintHandler {
-  constructor(cells, value) {
-    super(cells);
-    this._cells = cells;
-    this._value = LookupTables.fromValue(+value);
-  }
-
-  initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
-    // The first cell holds the index N, so it can only be 1..(line length).
-    const lineLength = this._cells.length;
-    const allowedMask = (1 << lineLength) - 1;
-    const controlCell = this.cells[0];
-    if (!(initialGridCells[controlCell] &= allowedMask)) return false;
-    return true;
-  }
-
-  enforceConsistency(grid, handlerAccumulator) {
-    const cells = this._cells;
-    const numCells = cells.length;
-    const clueValue = this._value;
-
-    let controlV = grid[this.cells[0]];
-    for (let i = 0; i < numCells; i++) {
-      const v = grid[cells[i]];
-      const iv = 1 << i;
-      if (v & clueValue) {
-        if (!(controlV & iv)) {
-          // This cell can't have the clue value because the control
-          // cell is not set.
-          if (!(grid[cells[i]] &= ~clueValue)) return false;
-        }
-      } else {
-        // The control value can't have this index because the cell doesn't
-        // allow the clue value.
-        if (!(controlV &= ~iv)) return false;
-      }
-    }
-
-    grid[cells[0]] = controlV;
 
     return true;
   }

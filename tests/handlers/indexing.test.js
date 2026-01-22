@@ -304,4 +304,92 @@ await runTest('Indexing should prune indexed cells based on control', () => {
   assert.equal(grid[4], valueMask(1, 2), 'indexed[3] loses 3');
 });
 
+// =============================================================================
+// NumberedRoom-style (indexedCells includes control cell)
+// =============================================================================
+
+await runTest('Indexing should initialize correctly when control cell is in indexedCells', () => {
+  const context = setupConstraintTest({ gridSize: [1, 9] });
+  const cells = context.cells(4);
+  const handler = new Indexing(cells[0], cells, 7);
+
+  const grid = context.grid;
+  const result = context.initializeHandler(handler);
+
+  assert.equal(result, true);
+  assert.equal(grid[0], valueMask(1, 2, 3, 4), 'control cell should only allow 1..lineLength');
+});
+
+await runTest('Indexing should prune control options (control cell in indexedCells)', () => {
+  const context = setupConstraintTest({ gridSize: [1, 4] });
+  const cells = context.cells(4);
+  const handler = new Indexing(cells[0], cells, 3);
+
+  const grid = context.grid;
+  grid[0] = valueMask(1, 2, 3, 4); // control cell N (also indexedCells[0])
+  grid[1] = valueMask(1, 2); // if N=2, cell[1] must be 3, but it can't
+  grid[2] = valueMask(1, 3); // allows 3 (N=3 remains possible)
+  grid[3] = valueMask(3, 4); // allows 3 (N=4 remains possible)
+  const acc = createAccumulator();
+
+  const result = handler.enforceConsistency(grid, acc);
+
+  assert.equal(result, true);
+  assert.equal(grid[0], valueMask(1, 3, 4), 'control should drop 2');
+});
+
+await runTest('Indexing should remove indexed value from non-selected cells (control cell in indexedCells)', () => {
+  const context = setupConstraintTest({ gridSize: [1, 4] });
+  const cells = context.cells(4);
+  const handler = new Indexing(cells[0], cells, 2);
+
+  const grid = context.grid;
+  grid[0] = valueMask(3); // N fixed to 3 (selects indexedCells[2])
+  grid[1] = valueMask(1, 2, 4); // has 2 but cannot be selected (N != 2)
+  grid[2] = valueMask(2, 3); // selected (N=3)
+  grid[3] = valueMask(2, 4); // has 2 but cannot be selected (N != 4)
+  const acc = createAccumulator();
+
+  const result = handler.enforceConsistency(grid, acc);
+
+  assert.equal(result, true);
+  assert.equal(grid[1], valueMask(1, 4), 'cell[1] should lose indexed value');
+  assert.equal(grid[2], valueMask(2, 3), 'selected cell keeps indexed value');
+  assert.equal(grid[3], valueMask(4), 'cell[3] should lose indexed value');
+});
+
+await runTest('Indexing should fail when indexed value is forced in a non-selected cell (control cell in indexedCells)', () => {
+  const context = setupConstraintTest({ gridSize: [1, 4] });
+  const cells = context.cells(4);
+  const handler = new Indexing(cells[0], cells, 2);
+
+  const grid = context.grid;
+  grid[0] = valueMask(3); // N fixed to 3
+  grid[1] = valueMask(2); // forced to indexed value, but cannot be selected (N != 2)
+  grid[2] = valueMask(1, 2, 3, 4); // selected cell still allows indexed value
+  grid[3] = valueMask(1, 2, 3, 4);
+  const acc = createAccumulator();
+
+  const result = handler.enforceConsistency(grid, acc);
+
+  assert.equal(result, false);
+});
+
+await runTest('Indexing should fail when no index remains compatible (control cell in indexedCells)', () => {
+  const context = setupConstraintTest({ gridSize: [1, 4] });
+  const cells = context.cells(4);
+  const handler = new Indexing(cells[0], cells, 4);
+
+  const grid = context.grid;
+  grid[0] = valueMask(1, 2, 3); // first cell also cannot be 4
+  grid[1] = valueMask(1, 2, 3); // no 4
+  grid[2] = valueMask(1, 2, 3); // no 4
+  grid[3] = valueMask(1, 2, 3); // no 4
+  const acc = createAccumulator();
+
+  const result = handler.enforceConsistency(grid, acc);
+
+  assert.equal(result, false);
+});
+
 logSuiteComplete('indexing.test.js');
