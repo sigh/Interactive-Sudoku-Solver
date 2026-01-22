@@ -1435,6 +1435,18 @@ export class HandlerSet {
     this.add(...handlers);
   }
 
+  static _appendIndexToCells(cellToHandlerMap, cells, index) {
+    for (let i = 0; i < cells.length; i++) {
+      // De-dupe by only checking the last element: if a duplicate index is being
+      // added, it will always be appended to the end of that particular cell's
+      // list.
+      const list = cellToHandlerMap[cells[i]];
+      if (list.length === 0 || list[list.length - 1] !== index) {
+        list.push(index);
+      }
+    }
+  }
+
   getAllofType(type) {
     return this._allHandlers.filter(h => h.constructor === type);
   }
@@ -1489,7 +1501,7 @@ export class HandlerSet {
       const indexInMap = this._ordinaryHandlerMap[c].indexOf(index);
       this._ordinaryHandlerMap[c].splice(indexInMap, 1);
     }
-    newCells.forEach(c => this._ordinaryHandlerMap[c].push(index));
+    HandlerSet._appendIndexToCells(this._ordinaryHandlerMap, newCells, index);
   }
 
   delete(handler) {
@@ -1503,7 +1515,7 @@ export class HandlerSet {
       this._allHandlers[index] = handler;
     }
 
-    handler.cells.forEach(c => this._ordinaryHandlerMap[c].push(index));
+    HandlerSet._appendIndexToCells(this._ordinaryHandlerMap, handler.cells, index);
     this._ordinaryIndexLookup.set(handler, index);
   }
 
@@ -1561,8 +1573,7 @@ export class HandlerSet {
 
   _addAux(handler) {
     const index = this._addToAll(handler);
-    handler.cells.forEach(
-      c => this._auxHandlerMap[c].push(index));
+    HandlerSet._appendIndexToCells(this._auxHandlerMap, handler.cells, index);
   }
 
   _addToAll(handler) {

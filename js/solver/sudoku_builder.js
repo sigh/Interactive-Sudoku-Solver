@@ -370,8 +370,8 @@ export class SudokuBuilder {
         case 'NumberedRoom':
           cells = constraint.getCells(shape).map(
             c => shape.parseCellId(c).cell);
-          yield new HandlerModule.NumberedRoom(
-            cells, constraint.value);
+          yield new HandlerModule.Indexing(
+            cells[0], cells, constraint.value);
           break;
 
         case 'AllDifferent':
