@@ -256,7 +256,7 @@ export class SudokuBuilder {
         case 'Cage':
           cells = constraint.cells.map(c => shape.parseCellId(c).cell);
           // A sum of 0 means any sum is ok - i.e. the same as AllDifferent.
-          if (constraint.sum != 0) {
+          if (constraint.sum !== 0) {
             yield new SumHandlerModule.Sum(cells, constraint.sum);
           }
           yield new HandlerModule.AllDifferent(cells);

@@ -24,6 +24,16 @@ class MockCellExclusions {
   isMutuallyExclusive(c1, c2) {
     return this.bitsets[c1].has(c2);
   }
+  areMutuallyExclusive(cells) {
+    const numCells = cells.length;
+    for (let i = 0; i < numCells; i++) {
+      const iSet = this.bitsets[cells[i]];
+      for (let j = i + 1; j < numCells; j++) {
+        if (!iSet.has(cells[j])) return false;
+      }
+    }
+    return true;
+  }
   getBitSet(cell) {
     return this.bitsets[cell];
   }
@@ -398,6 +408,42 @@ await runTest('_addSumIntersectionHandler: infeasible inferred sum adds False ha
   assert.ok(result, 'expected a handler (not null)');
   assert.ok(result instanceof HandlerModule.False, 'expected a False handler');
   assert.deepEqual([...result.cells].sort((a, b) => a - b), [...extraCells].sort((a, b) => a - b));
+});
+
+await runTest('_replaceSizeSpecificSumHandlers: size=numValues mutually exclusive => True/False', () => {
+  const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
+  const shape = GridShape.fromGridSize(9);
+
+  const cells = Array.from({ length: shape.numValues }, (_, i) => i);
+
+  const cellExclusions = new MockCellExclusions(shape.numCells);
+  for (let i = 0; i < cells.length; i++) {
+    for (let j = i + 1; j < cells.length; j++) {
+      cellExclusions.addMutualExclusion(cells[i], cells[j]);
+    }
+  }
+
+  {
+    const sumHandler = new SumHandlerModule.Sum(cells, shape.maxSum);
+    const handlerSet = new HandlerSet([sumHandler], shape);
+
+    optimizer._replaceSizeSpecificSumHandlers(handlerSet, cellExclusions, shape);
+
+    assert.equal(handlerSet.getAllofType(SumHandlerModule.Sum).length, 0);
+    assert.equal(handlerSet.getAllofType(HandlerModule.True).length, 1);
+    assert.equal(handlerSet.getAllofType(HandlerModule.False).length, 0);
+  }
+
+  {
+    const sumHandler = new SumHandlerModule.Sum(cells, shape.maxSum - 1);
+    const handlerSet = new HandlerSet([sumHandler], shape);
+
+    optimizer._replaceSizeSpecificSumHandlers(handlerSet, cellExclusions, shape);
+
+    assert.equal(handlerSet.getAllofType(SumHandlerModule.Sum).length, 0);
+    assert.equal(handlerSet.getAllofType(HandlerModule.True).length, 0);
+    assert.equal(handlerSet.getAllofType(HandlerModule.False).length, 1);
+  }
 });
 
 // =============================================================================
