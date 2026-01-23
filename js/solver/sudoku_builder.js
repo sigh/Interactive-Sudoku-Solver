@@ -225,7 +225,7 @@ export class SudokuBuilder {
         case 'PillArrow':
           {
             const pillSize = constraint.pillSize;
-            if (pillSize != 2 && pillSize != 3) {
+            if (pillSize !== 2 && pillSize !== 3) {
               throw new InvalidConstraintError('Pill size must be 2 or 3');
             }
             const cells = (
@@ -506,7 +506,7 @@ export class SudokuBuilder {
             for (let i = 0; i < ((numCells / 2) | 0); i++) {
               pairs.push([cells[i], cells[numCells - 1 - i]]);
             }
-            if (numCells % 2 == 1) {
+            if (numCells % 2 === 1) {
               // If there are an odd numbers of cells, then treat this as a
               // set of arrows from the center cell to each pair.
               // We don't bother to also add constraints between each pair, as
@@ -673,14 +673,14 @@ export class SudokuBuilder {
           for (let i = 0; i < constraint.cells.length; i++) {
             const controlCell = shape.parseCellId(constraint.cells[i]);
             const value =
-              constraint.indexType == SudokuConstraint.Indexing.ROW_INDEXING
+              constraint.indexType === SudokuConstraint.Indexing.ROW_INDEXING
                 ? controlCell.row + 1 : controlCell.col + 1;
 
             const cells = [];
-            const iterCount = constraint.indexType == SudokuConstraint.Indexing.ROW_INDEXING
+            const iterCount = constraint.indexType === SudokuConstraint.Indexing.ROW_INDEXING
               ? shape.numRows : shape.numCols;
             for (let i = 0; i < iterCount; i++) {
-              if (constraint.indexType == SudokuConstraint.Indexing.ROW_INDEXING) {
+              if (constraint.indexType === SudokuConstraint.Indexing.ROW_INDEXING) {
                 cells.push(shape.cellIndex(i, controlCell.col));
               } else {
                 cells.push(shape.cellIndex(controlCell.row, i));

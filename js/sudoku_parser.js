@@ -1,4 +1,4 @@
-const { SudokuConstraint, CompositeConstraintBase } = await import('./sudoku_constraint.js' + self.VERSION_PARAM);
+const { SudokuConstraint } = await import('./sudoku_constraint.js' + self.VERSION_PARAM);
 const { GridShape, SHAPE_9x9 } = await import('./grid_shape.js' + self.VERSION_PARAM);
 
 class AstNode {
