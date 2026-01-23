@@ -1706,11 +1706,16 @@ export class SameValues extends SudokuConstraintHandler {
     this._valuesAreDistinct = false;
     this._numExclusionSets = setLen;
     this._maxExclusionSize = 1;
+    this._buffer1 = null;
+    this._buffer2 = null;
 
     this.idStr = [this.constructor.name, ...cellSets].join('-');
   }
 
   initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
+    this._buffer1 = new Uint16Array(this._cellSets.length);
+    this._buffer2 = new Uint16Array(this._cellSets.length);
+
     // Determine if the cell values much be unique.
     for (const set of this._cellSets) {
       if (cellExclusions.areMutuallyExclusive(set)) {
@@ -1738,13 +1743,10 @@ export class SameValues extends SudokuConstraintHandler {
     return true;
   }
 
-  static _buffer1 = new Uint16Array(SHAPE_MAX.numValues);
-  static _buffer2 = new Uint16Array(SHAPE_MAX.numValues);
-
   enforceConsistency(grid, handlerAccumulator) {
     const numSets = this._cellSets.length;
     const setLen = this._cellSets[0].length;
-    const valueBuffer = this.constructor._buffer1;
+    const valueBuffer = this._buffer1;
 
     // Determine the possible values for each set.
     for (let i = 0; i < numSets; i++) {
@@ -1791,8 +1793,8 @@ export class SameValues extends SudokuConstraintHandler {
   _enforceCounts(grid, handlerAccumulator, valueIntersection) {
     const numSets = this._cellSets.length;
     const setLen = this._cellSets[0].length;
-    const countBuffer = this.constructor._buffer1;
-    const requiredBuffer = this.constructor._buffer2;
+    const countBuffer = this._buffer1;
+    const requiredBuffer = this._buffer2;
 
     let minTotals = 0;
 

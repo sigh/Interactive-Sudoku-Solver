@@ -269,18 +269,6 @@ class CheckboxCategoryInput extends ConstraintCategoryInput {
     this._selects = new Map();
     this._shape = null;
 
-    const removeAllOfType = (constraint) => {
-      // We need to remove the exact constraint objects (not necessarily
-      // the constraint we store ourselves).
-      for (const uniquenessKey of constraint.uniquenessKeys()) {
-        for (const c of this.collection.getConstraintsByKey(uniquenessKey)) {
-          if (c.type === constraint.type) {
-            this.collection.removeConstraint(c);
-          }
-        }
-      }
-    };
-
     const initSingleCheckbox = (constraintClass, container, option) => {
       const constraint = new constraintClass(...(option ? [option.value] : []));
       const constraintCls = constraint.constructor;
@@ -295,7 +283,7 @@ class CheckboxCategoryInput extends ConstraintCategoryInput {
         if (input.checked) {
           this.collection.addConstraint(constraint);
         } else {
-          removeAllOfType(constraint);
+          removeAllOfType(this.collection, constraint);
         }
       };
       div.appendChild(input);
@@ -359,7 +347,7 @@ class CheckboxCategoryInput extends ConstraintCategoryInput {
 
       select.onchange = () => {
         const value = select.value;
-        removeAllOfType(templateConstraint);
+        removeAllOfType(this.collection, templateConstraint);
         if (value !== defaultValue) {
           this.collection.addConstraint(new constraintClass(value));
         }
@@ -809,7 +797,52 @@ ConstraintCategoryInput.Jigsaw = class Jigsaw extends ConstraintCategoryInput {
     this._chipView = chipView;
     this._button = document.getElementById('add-jigsaw-button');
 
+    this._regionSizeSelect = document.getElementById('region-size-select');
+
     this._setUpButton(inputManager);
+    this._setUpRegionSizeSelect();
+  }
+
+  _setUpRegionSizeSelect() {
+    const select = this._regionSizeSelect;
+
+    select.onchange = () => {
+      if (!this._shape) return;
+      const selected = +select.value;
+
+      this.collection.removeAllConstraints();
+      if (selected !== this._shape.numValues) {
+        this.collection.addConstraint(new SudokuConstraint.RegionSize(selected));
+      }
+    };
+  }
+
+  _updateRegionSizeSelectForShape(shape) {
+    const select = this._regionSizeSelect;
+
+    // Hide when numValues is default.
+    if (shape.isDefaultNumValues()) {
+      select.parentNode.style.display = 'none';
+      return;
+    }
+
+    select.parentNode.style.display = 'block';
+
+    const defaultNumValues = GridShape.defaultNumValues(
+      shape.numRows, shape.numCols);
+    const numValues = shape.numValues;
+
+    // Populate options (exactly two values).
+    clearDOMNode(select);
+    for (const v of [defaultNumValues, numValues]) {
+      const opt = document.createElement('option');
+      opt.value = v;
+      opt.textContent = v;
+      select.appendChild(opt);
+    }
+
+    // Default selection is numValues (no constraint).
+    select.value = numValues;
   }
 
   _setUpButton(inputManager) {
@@ -836,11 +869,16 @@ ConstraintCategoryInput.Jigsaw = class Jigsaw extends ConstraintCategoryInput {
   reshape(shape) {
     this._shape = shape;
     this.clear();
+    this._updateRegionSizeSelectForShape(shape);
   }
 
   _cellsAreValidJigsawPiece(cells) {
     const shape = this._shape;
-    if (cells.length !== shape.numValues) return false;
+    if (!shape) return false;
+
+    const requiredLength = shape.isDefaultNumValues()
+      ? shape.numValues : +this._regionSizeSelect.value;
+    if (cells.length !== requiredLength) return false;
 
     // Check that we don't conflict with any existing constraints.
     for (const cell of cells) {
@@ -851,6 +889,18 @@ ConstraintCategoryInput.Jigsaw = class Jigsaw extends ConstraintCategoryInput {
     }
 
     return true;
+  }
+
+  onAddConstraint(c) {
+    if (c.type === SudokuConstraint.RegionSize.name) {
+      this._regionSizeSelect.value = c.size;
+    }
+  }
+
+  onRemoveConstraint(c) {
+    if (c.type === SudokuConstraint.RegionSize.name) {
+      this._regionSizeSelect.value = this._shape?.numValues;
+    }
   }
 }
 
@@ -1412,3 +1462,15 @@ class MultiValueInputPanel {
     }
   }
 }
+
+const removeAllOfType = (collection, constraint) => {
+  // We need to remove the exact constraint objects (not necessarily
+  // the constraint we store ourselves).
+  for (const uniquenessKey of constraint.uniquenessKeys()) {
+    for (const c of collection.getConstraintsByKey(uniquenessKey)) {
+      if (c.type === constraint.type) {
+        collection.removeConstraint(c);
+      }
+    }
+  }
+};

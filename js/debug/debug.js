@@ -345,7 +345,7 @@ export const runSolveTests = async (onFailure, runner) => {
     '9x8: Plain boxless',  // Boxless rectangular grid
     '5x5: Squishtroquadri',  // non-standard numValues, Arrows and Thermo
     '7x7: Killer Squishdoku',  // non-standard numValues
-    '6x6: Con-set-cutive',  // non-standard numValues, RegionSize
+    '6x6: Con-set-cutive',  // non-standard numValues, RegionSize, Jigsaw
     '7x7: Skyscraper Squishdoku',  // non-standard numValues, Skyscraper
     '7x7: Numbered Rooms Squishdoku',  // non-standard numValues, Numbered Rooms
     '6x6: Hidden Hostility', // non-standard numValues, Diagonal

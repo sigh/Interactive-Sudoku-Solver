@@ -210,6 +210,7 @@ class ConstraintCollectionBase {
   addConstraint(constraint) { throw Error('Not implemented'); }
   removeConstraint(constraint) { throw Error('Not implemented'); }
   updateConstraint(constraint) { throw Error('Not implemented'); }
+  removeAllConstraints() { throw Error('Not implemented'); }
 
   getConstraintsByKey(key) { return []; }
 
@@ -247,6 +248,10 @@ class SelectedConstraintCollection extends ConstraintCollectionBase {
 
   removeConstraint(constraint) {
     this._rootCollection.removeConstraint(constraint);
+  }
+
+  removeAllConstraints() {
+    this._rootCollection.removeAllConstraints();
   }
 
   setShape(shape) {
@@ -350,6 +355,12 @@ class RootConstraintCollection extends ConstraintCollectionBase {
     this._updateListener();
   }
 
+  removeAllConstraints() {
+    for (const constraint of this._constraintMap.keys()) {
+      this.removeConstraint(constraint);
+    }
+  }
+
   setShape(shape) {
     this._reshapeListener(shape);
   }
@@ -370,7 +381,10 @@ class RootConstraintCollection extends ConstraintCollectionBase {
       case 'StateMachine':
         return this._chipViews.get('ordinary');
       case 'Jigsaw':
-        return this._chipViews.get('jigsaw');
+        if (constraint instanceof SudokuConstraint.Jigsaw) {
+          return this._chipViews.get('jigsaw');
+        }
+        break;
       case 'Composite':
         return this._chipViews.get('composite');
     }
@@ -434,6 +448,12 @@ class CompositeConstraintCollection extends ConstraintCollectionBase {
       chip,
       this._display.makeConstraintIcon(c));
     this._parentCollection.updateConstraint(this._parentConstraint);
+  }
+
+  removeAllConstraints() {
+    for (const constraint of this._constraintMap.keys()) {
+      this.removeConstraint(constraint);
+    }
   }
 
   getCollectionForComposite(c) {

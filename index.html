@@ -518,6 +518,22 @@ layout: null
               <div id="layout-constraint-checkboxes"></div>
 
               <div id="jigsaw-container" class="vstack">
+                <div id="region-size-container" class="hstack" style="display:none">
+                  Region size <span class="tooltip">
+                    <template>
+                      <div>
+                        <div>Set the size of jigsaw regions.</div>
+                        <div>
+                          This size will limit the number distinct values
+                          in the grid (regardless of whether jigsaw pieces are
+                          used).
+                        </div>
+                      </div>
+                    </template>
+                  </span>:
+                  <select id="region-size-select" class="thin-select"></select>
+                </div>
+
                 <div>
                   <button type="submit" id="add-jigsaw-button" title="Add Piece">
                     Add Jigsaw Piece
