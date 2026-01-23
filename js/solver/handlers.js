@@ -1708,6 +1708,7 @@ export class SameValues extends SudokuConstraintHandler {
     this._maxExclusionSize = 1;
     this._buffer1 = null;
     this._buffer2 = null;
+    this._stateOffset = -1;
 
     this.idStr = [this.constructor.name, ...cellSets].join('-');
   }
@@ -1721,6 +1722,12 @@ export class SameValues extends SudokuConstraintHandler {
       if (cellExclusions.areMutuallyExclusive(set)) {
         this._numExclusionSets = 1;
         this._maxExclusionSize = set.length;
+        // It's only worth short-circuiting if we have more than 2 cells per set.
+        // Also only on multiple sets, to avoid applying it to the default
+        // SameValues constraints added.
+        if (set.length > 2 && this._cellSets.length > 2) {
+          this._stateOffset = stateAllocator.allocate([0]);
+        }
         return true;
       }
     }
@@ -1744,6 +1751,8 @@ export class SameValues extends SudokuConstraintHandler {
   }
 
   enforceConsistency(grid, handlerAccumulator) {
+    if (this._stateOffset !== -1 && grid[this._stateOffset]) return true;
+
     const numSets = this._cellSets.length;
     const setLen = this._cellSets[0].length;
     const valueBuffer = this._buffer1;
@@ -1768,7 +1777,8 @@ export class SameValues extends SudokuConstraintHandler {
     }
 
     // We need at least enough values to fill the largest exclusion set.
-    if (countOnes16bit(valueIntersection) < this._maxExclusionSize) return false;
+    const intersectionSize = countOnes16bit(valueIntersection);
+    if (intersectionSize < this._maxExclusionSize) return false;
 
     // Enforce the constrained value set.
     if (diff) {
@@ -1785,7 +1795,12 @@ export class SameValues extends SudokuConstraintHandler {
     }
 
     // If all values are distinct, then we can't do any more filtering.
-    if (this._numExclusionSets === 1) return true;
+    if (this._numExclusionSets === 1) {
+      if (this._stateOffset !== -1 && intersectionSize === this._maxExclusionSize) {
+        grid[this._stateOffset] = 1;
+      }
+      return true;
+    }
 
     return this._enforceCounts(grid, handlerAccumulator, valueIntersection);
   }
