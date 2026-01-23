@@ -1180,6 +1180,20 @@ export class SudokuConstraint {
     static UNIQUENESS_KEY_FIELD = 'type';
   }
 
+  static RegionSize = class RegionSize extends SudokuConstraintBase {
+    static DESCRIPTION = (`
+      Jigsaw pieces must be of this size.
+      In addition, enforces that all regions of the this size (rows, columns,
+      and jigsaw pieces) contain the same set of values.`);
+    static CATEGORY = 'Jigsaw';
+    static UNIQUENESS_KEY_FIELD = 'type';
+
+    constructor(size) {
+      super(size);
+      this.size = +size;
+    }
+  }
+
   static StrictKropki = class StrictKropki extends SudokuConstraintBase {
     static DESCRIPTION = (`
       Only explicitly marked cell pairs satisfy Kropki (black/white dot)
@@ -1193,6 +1207,7 @@ export class SudokuConstraint {
         numValues)
     );
   }
+
   static StrictXV = class StrictXV extends SudokuConstraintBase {
     static DESCRIPTION = (`
       Only explicitly marked cell pairs satisfy XV constraints.`);
@@ -1205,6 +1220,7 @@ export class SudokuConstraint {
         numValues)
     );
   }
+
   static Shape = class Shape extends SudokuConstraintBase {
     static DESCRIPTION = (`The number of rows and columns in the grid.`);
     static CATEGORY = 'Shape';
