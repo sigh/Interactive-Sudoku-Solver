@@ -642,11 +642,26 @@ export class SudokuConstraint {
         map.add(layoutStr[i], i);
       }
 
+      // If all the cells in the grid are in one region, then no constraint
+      // is needed.
+      if (map.size === 1) return;
+
+      const maxRegionSize = shape.numValues;
+      const minRegionSize = GridShape.defaultNumValues(
+        shape.numRows, shape.numCols);
+
+      let sawOtherRegionSize = false;
       for (const [, region] of map) {
-        if (region.length === shape.numValues) {
+        const len = region.length;
+        if (len >= minRegionSize && len <= maxRegionSize) {
           yield new this(
             shape.name,
             ...region.map(c => shape.makeCellIdFromIndex(c)));
+        } else if (!sawOtherRegionSize) {
+          // Allow one region to have a different size for partially filled grids.
+          sawOtherRegionSize = true;
+        } else {
+          throw Error('Inconsistent region sizes in jigsaw layout');
         }
       }
     }

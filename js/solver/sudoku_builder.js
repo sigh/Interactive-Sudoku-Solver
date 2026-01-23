@@ -181,9 +181,10 @@ export class SudokuBuilder {
                 `puzzle shape ${shape.name}`);
             }
             cells = constraint.cells.map(c => shape.parseCellId(c).cell);
-            if (cells.length !== shape.numValues) {
+            const regionSize = constraintMap.get('RegionSize')?.[0]?.size ?? shape.numValues;
+            if (cells.length !== regionSize) {
               throw new InvalidConstraintError(
-                `Jigsaw pieces must have ${shape.numValues} cells for the current shape.`);
+                `Jigsaw pieces must have ${regionSize} cells for the current shape.`);
             }
             yield new HandlerModule.AllDifferent(cells);
             // Just to let the solver know that this is a jigsaw puzzle.
