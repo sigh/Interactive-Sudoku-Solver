@@ -57,7 +57,7 @@ export class SudokuConstraintOptimizer {
 
     this._optimizeTaxicab(handlerSet, cellExclusions, shape);
 
-    this._optimizeBinaryPairwise(handlerSet);
+    this._optimizeBinaryPairwise(handlerSet, shape);
 
     if (hasBoxes) {
       this._addHouseIntersections(handlerSet, shape);
@@ -1272,10 +1272,11 @@ export class SudokuConstraintOptimizer {
 
   // Replace 2-cell BinaryPairwise handlers with a direct BinaryConstraint
   // handler. This has less overhead both during runtime and initialization.
-  _optimizeBinaryPairwise(handlerSet) {
+  _optimizeBinaryPairwise(handlerSet, shape) {
     const handlers = handlerSet.getAllofType(HandlerModule.BinaryPairwise);
     for (const h of handlers) {
       if (h.cells.length !== 2) continue;
+      h.validate(shape.numValues);  // Validate so we preserve behaviour.
       const newHandler = new HandlerModule.BinaryConstraint(
         ...h.cells, h.key());
       handlerSet.replace(h, newHandler);

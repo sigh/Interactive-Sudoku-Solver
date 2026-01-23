@@ -979,11 +979,15 @@ export class BinaryPairwise extends SudokuConstraintHandler {
     return validCombinationInfo;
   });
 
-  initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
-    const lookupTables = LookupTables.get(shape.numValues);
-    if (!this.constructor._isKeySymmetric(this._key, shape.numValues)) {
+  validate(numValues) {
+    if (!this.constructor._isKeySymmetric(this._key, numValues)) {
       throw new Error('Function for BinaryPairwise must be symmetric. Key: ' + this._key);
     }
+  }
+
+  initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
+    const lookupTables = LookupTables.get(shape.numValues);
+    this.validate(shape.numValues);
 
     // The key must be symmetric, so we just need the one table.
     this._table = lookupTables.forBinaryKey(this._key)[0];
