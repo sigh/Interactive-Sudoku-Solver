@@ -609,7 +609,7 @@ export class SudokuConstraint {
   static Jigsaw = class Jigsaw extends SudokuConstraintBase {
     static DESCRIPTION = (
       "An irregular region which must contain all digits without repetition.");
-    static CATEGORY = 'Jigsaw';
+    static CATEGORY = 'Region';
     static DISPLAY_CONFIG = { displayClass: 'Jigsaw' };
     static UNIQUENESS_KEY_FIELD = 'cells';
 
@@ -1200,7 +1200,7 @@ export class SudokuConstraint {
       Jigsaw pieces must be of this size.
       In addition, enforces that all regions of the this size (rows, columns,
       and jigsaw pieces) contain the same set of values.`);
-    static CATEGORY = 'Jigsaw';
+    static CATEGORY = 'Region';
     static UNIQUENESS_KEY_FIELD = 'type';
 
     constructor(size) {

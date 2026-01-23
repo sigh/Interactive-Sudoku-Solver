@@ -200,14 +200,16 @@ const CATEGORY_CONFIGS = {
       the start state, transition, and accept logic (see panel for guidance).
       Cells can also be added and removed by holding shift while clicking.`,
   },
-  'Jigsaw': {
+  'Region': {
     description: 'Irregular grid regions',
     instructions: `
       Select cells by click and dragging on the grid then pressing
       "Add Jigsaw Piece" in the "Layout constraints" panel.
-      The selected region size must match the row/column length.
       Cells can also be added and removed by holding down shift while
-      clicking.`,
+      clicking.
+      The number of cells must equal the region size.
+      The default region size is the number of distinct values.
+      `,
   },
   'Composite': {
     description: 'Composite constraints that group other constraints',

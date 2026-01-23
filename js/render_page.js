@@ -380,7 +380,7 @@ class RootConstraintCollection extends ConstraintCollectionBase {
       case 'Experimental':
       case 'StateMachine':
         return this._chipViews.get('ordinary');
-      case 'Jigsaw':
+      case 'Region':
         if (constraint instanceof SudokuConstraint.Jigsaw) {
           return this._chipViews.get('jigsaw');
         }
@@ -581,7 +581,7 @@ class ConstraintManager {
       new ConstraintCategoryInput.Global(
         selectedConstraintCollection, this.addUpdateListener.bind(this)),
       new ConstraintCategoryInput.LayoutCheckbox(selectedConstraintCollection),
-      new ConstraintCategoryInput.Jigsaw(
+      new ConstraintCategoryInput.Region(
         selectedConstraintCollection, inputManager, chipViews.get('jigsaw')),
       new ConstraintCategoryInput.LinesAndSets(
         selectedConstraintCollection, inputManager),

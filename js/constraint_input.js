@@ -788,7 +788,7 @@ ConstraintCategoryInput.GivenCandidates = class GivenCandidates extends Constrai
   }
 }
 
-ConstraintCategoryInput.Jigsaw = class Jigsaw extends ConstraintCategoryInput {
+ConstraintCategoryInput.Region = class Region extends ConstraintCategoryInput {
   static IS_LAYOUT = true;
 
   constructor(collection, inputManager, chipView) {
