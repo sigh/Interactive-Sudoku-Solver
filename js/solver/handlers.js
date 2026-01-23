@@ -413,9 +413,9 @@ export class HandlerUtil {
 
       // Lookup the exclusion cells.
       // If there are more than 2 we use the intersection of the entire list.
-      const exclusionCells = (cellCount == 2)
+      const exclusionCells = (cellCount === 2)
         ? cellExclusions.getPairExclusions(pairIndex)
-        : (cellCount == 1)
+        : (cellCount === 1)
           ? cellExclusions.getArray(pairIndex)
           : cellExclusions.getListExclusions(cells);
 
@@ -623,8 +623,8 @@ export class House extends SudokuConstraintHandler {
       fixedValues |= (!(v & (v - 1))) * v;  // Avoid branching.
     }
 
-    if (allValues != this._allValues) return false;
-    if (fixedValues == this._allValues) return true;
+    if (allValues !== this._allValues) return false;
+    if (fixedValues === this._allValues) return true;
 
     const hiddenSingles = allValues & ~atLeastTwo & ~fixedValues;
     if (hiddenSingles) {
@@ -823,8 +823,8 @@ export class BinaryConstraint extends SudokuConstraintHandler {
     const v1New = grid[this.cells[1]] = v1 & this._tables[0][v0];
 
     if (!(v0New && v1New)) return false;
-    if (v0 != v0New) handlerAccumulator.addForCell(this.cells[0]);
-    if (v1 != v1New) handlerAccumulator.addForCell(this.cells[1]);
+    if (v0 !== v0New) handlerAccumulator.addForCell(this.cells[0]);
+    if (v1 !== v1New) handlerAccumulator.addForCell(this.cells[1]);
 
     // If transitive, then required value exclusion is not possible.
     if (this._exclusionsCellsForRequiredValues === null) return true;
@@ -889,7 +889,7 @@ export class BinaryPairwise extends SudokuConstraintHandler {
     for (let i = 0; i < numValues; i++) {
       for (let j = i + 1; j < numValues; j++) {
         const v = 1 << i | 1 << j;
-        if (table0[v] != table1[v]) return false;
+        if (table0[v] !== table1[v]) return false;
       }
     }
     return true;
@@ -954,7 +954,7 @@ export class BinaryPairwise extends SudokuConstraintHandler {
       // If we don't have enough cells we can't be valid.
       if (count < numCells) continue;
       // If we have the right number of cells then initialize the row.
-      if (count == numCells) {
+      if (count === numCells) {
         if (exactCombinations[i]) {
           validCombinationInfo[i] = (i << 16) | i;
         }
@@ -1024,7 +1024,7 @@ export class BinaryPairwise extends SudokuConstraintHandler {
       fixedValues |= (!(v & (v - 1))) * v;  // Avoid branching.
     }
 
-    if (allValues == fixedValues) return true;
+    if (allValues === fixedValues) return true;
 
     // Run exposeHiddenSingles if we've been asked.
     // (At the moment this isn't a net win for all constraints).
@@ -1142,7 +1142,7 @@ export class BinaryPairwise extends SudokuConstraintHandler {
     const validCombinationInfo = this._validCombinationInfo[allValues];
     const validValues = validCombinationInfo & 0xffff;
     if (!validValues) return false;
-    if (validValues != allValues) {
+    if (validValues !== allValues) {
       for (let i = 0; i < numCells; i++) {
         if (grid[cells[i]] & ~validValues) {
           if (!(grid[cells[i]] &= validValues)) return false;
@@ -1232,14 +1232,14 @@ export class Skyscraper extends SudokuConstraintHandler {
     this._allStates.fill(0);
 
     // forwardStates records the possible max heights at each visibility.
-    // `forwardStates[i][vis] & (1 << (h-1)) == 1` means that:
+    // `forwardStates[i][vis] & (1 << (h-1)) === 1` means that:
     //   When vis cells are visible up to the ith cell, then h is a valid
     //   height for the current highest cell.
     // backwardStates is the same, but is used in the backward pass to avoid
     // having to have a temporary buffer and clear it each time.
     const forwardStates = this._forwardStates;
 
-    // All the values in the first cell are valid for visibility == 1.
+    // All the values in the first cell are valid for visibility === 1.
     forwardStates[0][0] = grid[cells[0]];
 
     // Forward pass to determine the possible heights for each visibility.
@@ -1267,7 +1267,7 @@ export class Skyscraper extends SudokuConstraintHandler {
         //    state.
         {
           const s = prevStates[j - 1];
-          // NOTE: s == 0 => higherThanMinS == 0, so we don't need to special
+          // NOTE: s === 0 => higherThanMinS === 0, so we don't need to special
           // case 0.
           const higherThanMinS = -(s & -s) << 1;
           newState |= v & higherThanMinS;
@@ -1332,7 +1332,7 @@ export class Skyscraper extends SudokuConstraintHandler {
         if (j > 0) {
           const visibleCurrentState = currentState & grid[cells[i]];
           const maxS = LookupTables.maxValue(visibleCurrentState);
-          // NOTE: maxS == 0 => validStates == 0
+          // NOTE: maxS === 0 => validStates === 0
           const validStates = oldStates[j - 1] & (((1 << maxS) - 1) >> 1);
           if (validStates) {
             newStates[j - 1] |= validStates;
@@ -1346,7 +1346,7 @@ export class Skyscraper extends SudokuConstraintHandler {
       if (!(grid[cells[i]] &= valueMask)) return false;
     }
 
-    // The first cell is all those values for which visibility == 1 is valid.
+    // The first cell is all those values for which visibility === 1 is valid.
     if (!(grid[cells[0]] &= backwardStates[0][0])) return false;
 
     return true;
@@ -1580,7 +1580,7 @@ export class Lunchbox extends SudokuConstraintHandler {
         // It is impossible to make the target sum.
         if (sum < minSum || maxSum < sum) return false;
         // We've reached the target sum exactly.
-        if (minSum == maxSum) return true;
+        if (minSum === maxSum) return true;
       }
     }
 
@@ -2021,7 +2021,7 @@ class _Squishable2x2 extends SudokuConstraintHandler {
       fixedValues |= (!(v & (v - 1))) * v;  // Avoid branching.
     }
 
-    if (allValues == fixedValues) return true;
+    if (allValues === fixedValues) return true;
 
     const triads = this.constructor.TRIADS;
     for (let i = 0; i < triads.length; i++) {
@@ -2063,8 +2063,8 @@ class _Squishable2x2 extends SudokuConstraintHandler {
       fixedValues |= (!(v & (v - 1))) * v;  // Avoid branching.
     }
 
-    if (allValues != squishedMask) return false;
-    if (fixedValues == squishedMask) return true;
+    if (allValues !== squishedMask) return false;
+    if (fixedValues === squishedMask) return true;
 
     let hiddenSquishedSingles = allValues & ~atLeastTwo & ~fixedValues;
     if (hiddenSquishedSingles) {
@@ -2163,7 +2163,7 @@ export class DutchFlatmateLine extends SudokuConstraintHandler {
       if (!ok) {
         // Not a valid cell for the target.
         if (!(grid[cells[i]] &= ~target)) return false;
-      } else if (v == target) {
+      } else if (v === target) {
         // Only one valid flatmate (either above or below).
         if (ok === 1) {
           grid[cells[i - 1]] = above;
@@ -2199,7 +2199,7 @@ export class RequiredValues extends SudokuConstraintHandler {
 
   exclusionCells() {
     // If there are as many values as cells, then each cell must be different.
-    if (this._valueCounts.size == this.cells.length) {
+    if (this._valueCounts.size === this.cells.length) {
       return this.cells;
     }
     return [];
@@ -2211,7 +2211,7 @@ export class RequiredValues extends SudokuConstraintHandler {
 
     this._valueMask = LookupTables.fromValuesArray(this._values);
     this._singleValues = LookupTables.fromValuesArray(
-      this._values.filter(v => this._valueCounts.get(v) == 1));
+      this._values.filter(v => this._valueCounts.get(v) === 1));
     // Repeated values is an array of masks [v_n, otherValues_n, ...]
     this._repeatedValues = [];
     for (const [value, count] of this._valueCounts) {
@@ -2273,7 +2273,7 @@ export class RequiredValues extends SudokuConstraintHandler {
 
       if (count < targetCount) return false;
       if (strict && fixedCount > targetCount) return false;
-      if (count == targetCount && fixedCount !== targetCount) {
+      if (count === targetCount && fixedCount !== targetCount) {
         for (let j = 0; j < numCells; j++) {
           if (grid[cells[j]] & target) {
             grid[cells[j]] = target;
@@ -2330,7 +2330,7 @@ export class RequiredValues extends SudokuConstraintHandler {
 
     const remainingValues = valuesMask & ~fixedValues;
     const numRemainingCells = numCells - numFixed;
-    if (countOnes16bit(remainingValues) == numRemainingCells) {
+    if (countOnes16bit(remainingValues) === numRemainingCells) {
       // The number of remaining cell is exactly the number of remaining values.
       // We can constrain the remaining cells to the remaining values.
       for (let i = 0; i < numCells; i++) {
@@ -2430,7 +2430,7 @@ export class SumLine extends SudokuConstraintHandler {
     const numCells = cells.length;
     const sum = this._sum;
 
-    // Check that the totalSum == 0 (mod sum), which is equivalent
+    // Check that the totalSum === 0 (mod sum), which is equivalent
     // to checking that the partialSum is the same at the start and the end
     // (because partialSums are all distinct modulo sum).
 
@@ -2446,7 +2446,7 @@ export class SumLine extends SudokuConstraintHandler {
     if (maxTotal < sum) return false;
     // If the maximum sum is a multiple of the sum, then we know this is valid.
     const maxRemainder = maxTotal % sum;
-    if (maxRemainder == 0) return true;
+    if (maxRemainder === 0) return true;
 
     // Otherwise for the total to be a multiple of sum, the min and max must be
     // different integers when divided by sum.
@@ -2464,7 +2464,7 @@ export class SumLine extends SudokuConstraintHandler {
     // Keep iterating while the final state is not consistent with the initial
     // state. This means that the backward pass eliminated some possibilities
     // thus another iteration is needed.
-    while (states[0] != states[numCells]) {
+    while (states[0] !== states[numCells]) {
       if (!this._singlePass(grid)) return false;
     }
 
@@ -3088,7 +3088,7 @@ export class FullRank extends SudokuConstraintHandler {
     if (maybeLessCount < numRanksBelow) return false;
     // Check if we have too many entries.
     if (fixedLessCount > numRanksBelow) return false;
-    if (maybeLessCount == numRanksBelow && fixedLessCount < numRanksBelow) {
+    if (maybeLessCount === numRanksBelow && fixedLessCount < numRanksBelow) {
       // If all viable entries are required, then they are forced to be included.
       for (let i = 0; i < numViableEntries; i++) {
         if (flagsBuffer[i] & IS_LESS_FLAG) {
@@ -3120,7 +3120,7 @@ export class FullRank extends SudokuConstraintHandler {
     // Repeat for the greater direction.
     if (fixedGreaterCount > numRanksAbove) return false;
     if (!permissiveClues && maybeGreaterCount < numRanksAbove) return false;
-    if (!permissiveClues && maybeGreaterCount == numRanksAbove && fixedGreaterCount < numRanksAbove) {
+    if (!permissiveClues && maybeGreaterCount === numRanksAbove && fixedGreaterCount < numRanksAbove) {
       for (let i = 0; i < numViableEntries; i++) {
         if (flagsBuffer[i] & IS_GREATER_FLAG) {
           const cell = entries[viableEntries[i]][0];
@@ -3209,7 +3209,7 @@ export class FullRank extends SudokuConstraintHandler {
     }
 
     // If all ranks are clued, then we are done.
-    if (numGivens == 4) return true;
+    if (numGivens === 4) return true;
 
     // Find all unclued entries that are viable.
     const entries = this._uncluedEntries;
@@ -3393,7 +3393,7 @@ export class EqualSizePartitions extends SudokuConstraintHandler {
     }
 
     // If there is no ambiguity, then we are done.
-    if (bothCount == 0) return true;
+    if (bothCount === 0) return true;
 
     // If one partition has the target count, then all the other cells must
     // be in the other partition.

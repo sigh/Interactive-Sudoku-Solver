@@ -148,7 +148,7 @@ export class SudokuSolver {
     this._timer.runTimed(() => {
       do {
         // Only show debug logs for the target step.
-        if (yieldEveryStep && this._debugLogger.enableLogs && iter.count == n - 1) {
+        if (yieldEveryStep && this._debugLogger.enableLogs && iter.count === n - 1) {
           this._debugLogger.enableStepLogs = true;
           this._debugLogger.log({
             loc: 'nthStep',
@@ -225,7 +225,7 @@ export class SudokuSolver {
 
   _getIter(yieldEveryStep) {
     // If an iterator doesn't exist or is of the wrong type, then create it.
-    if (!this._iter || this._iter.yieldEveryStep != yieldEveryStep) {
+    if (!this._iter || this._iter.yieldEveryStep !== yieldEveryStep) {
       this._iter = {
         yieldEveryStep: yieldEveryStep,
         iter: new IteratorWithCount(this._internalSolver.run(
@@ -415,7 +415,7 @@ class InternalSolver {
       // After this it doesn't matter, as long as it is deterministic.
       // There still might be equal handlers after comparing cells and
       // the handler type, but that is ok.
-      if (a.constructor.name != b.constructor.name) {
+      if (a.constructor.name !== b.constructor.name) {
         return a.constructor.name.localeCompare(b.constructor.name);
       }
       // Put cell comparison last as it is the most expensive.
@@ -574,7 +574,7 @@ class InternalSolver {
       const candidates = new Array(numCells);
       candidates.fill(null);
       for (let i = 0; i < numCells; i++) {
-        if (oldGridState[i] != gridState[i]) {
+        if (oldGridState[i] !== gridState[i]) {
           candidates[i] = LookupTables.toValuesArray(oldGridState[i] & ~gridState[i]);
           diff[this._shape.makeCellIdFromIndex(i)] = candidates[i];
         }
@@ -689,7 +689,7 @@ class InternalSolver {
 
     const runCounter = ++this._runCounter;
     const checkRunCounter = () => {
-      if (runCounter != this._runCounter) throw new Error('Iterator no longer valid');
+      if (runCounter !== this._runCounter) throw new Error('Iterator no longer valid');
     };
 
     // This is required because we may call run multiple times.
@@ -718,7 +718,7 @@ class InternalSolver {
       if (!this._enforceConstraints(initialRecFrame.gridState, handlerAccumulator)) {
         // If the initial grid is invalid, then ensure it has a zero so that the
         // initial iteration will fail.
-        if (initialRecFrame.gridCells.indexOf(0) == -1) initialRecFrame.gridCells.fill(0);
+        if (initialRecFrame.gridCells.indexOf(0) === -1) initialRecFrame.gridCells.fill(0);
       }
 
       if (yieldEveryStep) {
@@ -729,7 +729,7 @@ class InternalSolver {
           isSolution: false,
           cellOrder: [],
           values: 0,
-          hasContradiction: initialRecFrame.gridCells.indexOf(0) != -1,
+          hasContradiction: initialRecFrame.gridCells.indexOf(0) !== -1,
         }
         checkRunCounter();
         this._stepState.step = 1;
@@ -916,7 +916,7 @@ class InternalSolver {
       // Once we have 2 solutions, then start ignoring branches which maybe
       // duplicating existing solution (up to this point, every branch is
       // interesting).
-      if (counters.solutions == 2) {
+      if (counters.solutions === 2) {
         seenCandidateSet.enabledInSolver = true;
       }
     }
@@ -1176,7 +1176,7 @@ class HandlerAccumulator {
       const i = indexes[j];
       if (i === ignore || this._linkedList[i] !== -2) continue;
 
-      if (this._head == -1) {
+      if (this._head === -1) {
         this._head = i;
       } else {
         this._linkedList[this._tail] = i;
@@ -1189,7 +1189,7 @@ class HandlerAccumulator {
   // Push an index to the front of the queue.
   _pushIndex(index) {
     if (this._linkedList[index] < -1) {
-      if (this._head == -1) {
+      if (this._head === -1) {
         this._tail = index;
       }
       this._linkedList[index] = this._head;
@@ -1198,7 +1198,7 @@ class HandlerAccumulator {
   }
 
   isEmpty() {
-    return this._head == -1;
+    return this._head === -1;
   }
 
   takeNext() {
@@ -1249,7 +1249,7 @@ export class CellExclusions {
       const exclusionCells = h.exclusionCells();
       for (const c of exclusionCells) {
         for (const d of exclusionCells) {
-          if (c == d) break;
+          if (c === d) break;
           cellExclusionSets[c].add(d);
           cellExclusionSets[d].add(c);
         }
@@ -1269,7 +1269,7 @@ export class CellExclusions {
 
   // Assume cell0 and cell1 are the same value, and hence can share exclusions.
   areSameValue(cell0, cell1) {
-    if (cell0 == cell1) return;
+    if (cell0 === cell1) return;
     if (this._sealed) {
       throw new Error('Cannot add exclusions after caching.');
     }
