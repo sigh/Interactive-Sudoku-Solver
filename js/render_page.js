@@ -677,7 +677,7 @@ class ConstraintManager {
         errorElem.textContent = e;
         // If we were called from outside the form, then put the value in the
         // so that the user can see the constraint which failed.
-        if (inputElem.value != input) inputElem.value = input;
+        if (inputElem.value !== input) inputElem.value = input;
       }
     };
 
@@ -1394,7 +1394,7 @@ class GridInputManager {
       const cell = getActiveCell();
       if (!cell) return;
 
-      if (value == '') {
+      if (value === '') {
         this._runCallbacks(this._callbacks.onNewDigit, cell, null);
         return;
       }
@@ -1452,7 +1452,7 @@ class GridInputManager {
 
     window.addEventListener('keydown', event => {
       if (isKeyEventFromEditableElement(event)) return;
-      if (this._selection.size() == 0) return;
+      if (this._selection.size() === 0) return;
       switch (event.key) {
         case 'Backspace':
         case '0':

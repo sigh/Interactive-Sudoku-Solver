@@ -16,7 +16,7 @@ export class CellArgs {
     }
 
     this._isLoop = false;
-    if (args[numArgs - 1] == 'LOOP') {
+    if (args[numArgs - 1] === 'LOOP') {
       if (!SudokuConstraint[type].LOOPS_ALLOWED) {
         throw new Error('Loops are not allowed for ' + type);
       }
@@ -81,7 +81,7 @@ export class SudokuConstraintBase {
 
   static _argsToString(...args) {
     let type = this.name;
-    if (this == SudokuConstraint.Given) type = '';
+    if (this === SudokuConstraint.Given) type = '';
     const arr = [type, ...args];
     return '.' + arr.join('~');
   }
@@ -290,9 +290,9 @@ export class SudokuConstraintBase {
       c => shape.parseCellId(c)).sort((a, b) => a.cell - b.cell);
     let { row, col } = cells[0];
     return (
-      (cells[1].row == row && cells[1].col == col + 1) &&
-      (cells[2].row == row + 1 && cells[2].col == col) &&
-      (cells[3].row == row + 1 && cells[3].col == col + 1));
+      (cells[1].row === row && cells[1].col === col + 1) &&
+      (cells[2].row === row + 1 && cells[2].col === col) &&
+      (cells[3].row === row + 1 && cells[3].col === col + 1));
   }
 
   static _cellsAreValidCage(cells, shape) {
@@ -384,7 +384,7 @@ export class OutsideConstraintBase extends SudokuConstraintBase {
       const arrowId = this.arrowId;
 
       let dirStr = '';
-      if (arrowId[0] == 'C') {
+      if (arrowId[0] === 'C') {
         dirStr = dir > 0 ? '↓' : '↑';
       } else {
         dirStr = dir > 0 ? '→' : '←';
@@ -421,7 +421,7 @@ export class OutsideConstraintBase extends SudokuConstraintBase {
   static serialize(constraints) {
     const clueType = this.CLUE_TYPE;
 
-    if (clueType != this.CLUE_TYPE_DOUBLE_LINE) {
+    if (clueType !== this.CLUE_TYPE_DOUBLE_LINE) {
       return constraints.map(
         c => this._argsToString(c.value, c.id)).join('');
     }
@@ -741,7 +741,7 @@ export class SudokuConstraint {
     constructor(difference, ...cells) {
       // German whisper lines omit the difference, so the
       // first argument is actually a cell
-      if (difference != +difference) {
+      if (!Number.isFinite(+difference)) {
         cells.unshift(difference);
         difference = 5;
       }
@@ -2073,7 +2073,7 @@ export class SudokuConstraint {
       options: (cells) => {
         const options = [];
         for (let i = 2; i <= cells.length; i++) {
-          if (cells.length % i == 0) {
+          if (cells.length % i === 0) {
             options.push({ text: `${i} sets`, value: i });
           }
         }
@@ -2583,7 +2583,7 @@ export const binaryKeyToFnString = (key, numValues) => {
         (lookup[i] ||= []).push(j);
       }
       array[keyIndex] >>= 1;
-      if (++vIndex == NUM_BITS) {
+      if (++vIndex === NUM_BITS) {
         vIndex = 0;
         keyIndex++;
       }

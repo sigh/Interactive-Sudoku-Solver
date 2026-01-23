@@ -913,7 +913,7 @@ ConstraintCategoryInput.OutsideClue = class OutsideClue extends ConstraintCatego
   }
 
   static _isValidValue(value, zeroOk) {
-    if (value == '' || value != +value) return false;
+    if (value === '' || !Number.isFinite(+value)) return false;
     if (+value === 0 && !zeroOk) return false;
     return true;
   }
@@ -1435,8 +1435,8 @@ class MultiValueInputPanel {
 
     addButton('None', _ => false);
     addButton('All', _ => true);
-    addButton('Odd', v => v % 2 == 1);
-    addButton('Even', v => v % 2 == 0);
+    addButton('Odd', v => v % 2 === 1);
+    addButton('Even', v => v % 2 === 0);
   }
 
   _getCheckedValues() {

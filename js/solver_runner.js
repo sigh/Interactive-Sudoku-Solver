@@ -85,10 +85,10 @@ class ModeHandler {
 
   async get(i) {
     const count = this.solutionCount();
-    if (count == 0) return {};
+    if (count === 0) return {};
 
     let description = `Solution ${i + 1}`;
-    if (count == 1 && this.isDone()) description = 'Unique solution';
+    if (count === 1 && this.isDone()) description = 'Unique solution';
     return {
       solution: this._solutions[i],
       description: description,
@@ -195,7 +195,7 @@ class AllPossibilitiesModeHandler extends ModeHandler {
       };
     }
     // Index 0 is the summary view (pencilmarks).
-    if (i == 0) return {
+    if (i === 0) return {
       solution: this._pencilmarks,
       description: 'All possibilities',
       counts: this._counts,
@@ -312,7 +312,7 @@ class StepByStepModeHandler extends ModeHandler {
   }
 
   _handleStep(i, result) {
-    if (result == null) {
+    if (result === null) {
       this._numSteps = i;
       return {
         description: `Step ${i} [Done]`,
