@@ -199,92 +199,99 @@ class BaseConstraintDisplayItem extends DisplayItem {
     return g;
   }
 
-  static _isStrictDiagonal(graph, cellSet, cell, dir0, dir1) {
-    return (
-      !cellSet.has(graph.adjacent(cell, dir0))
-      && !cellSet.has(graph.adjacent(cell, dir1))
-      && cellSet.has(graph.diagonal(cell, dir0, dir1)));
-  }
-
-  _makeRegionBorder(graph, cellSet, shape, cutSize, inset = 0) {
-    const g = createSvgElement('g');
-
-    const cellSize = DisplayItem.CELL_SIZE;
-    cutSize ||= 0;
-    const cls = this.constructor;
-
-    const applyInsetToParts = (parts, edgeType) => {
-      if (!inset) return parts;
-
-      let dx = 0;
-      let dy = 0;
-      switch (edgeType) {
-        case GridGraph.UP:
-          dy = inset;
-          break;
-        case GridGraph.DOWN:
-          dy = -inset;
-          break;
-        case GridGraph.LEFT:
-          dx = inset;
-          break;
-        case GridGraph.RIGHT:
-          dx = -inset;
-          break;
-      }
-
-      if (!dx && !dy) return parts;
-      return parts.map(([x, y]) => [x + dx, y + dy]);
+  _drawIntersection(g, cellSet, shape, row, col, cornerCut, inset) {
+    // Determine which of the 4 cells touching grid point (row, col) are in region.
+    const inRegion = (r, c) => {
+      if (r < 0 || r >= shape.numRows || c < 0 || c >= shape.numCols) return false;
+      return cellSet.has(shape.cellIndex(r, c));
     };
 
-    const borderEdgeParts = (cell, row, col, edgeType) => {
-      // Points with any offsets applied.
-      const parts = [
-        [col * cellSize, row * cellSize],
-        [col * cellSize, row * cellSize]];
+    const tl = inRegion(row - 1, col - 1);
+    const tr = inRegion(row - 1, col);
+    const bl = inRegion(row, col - 1);
+    const br = inRegion(row, col);
+    const count = tl + tr + bl + br;
 
-      // Apply offsets to create the basic border.
-      const direction = (edgeType === GridGraph.RIGHT || edgeType === GridGraph.DOWN) ? 1 : 0;
-      const orientation = (edgeType === GridGraph.UP || edgeType === GridGraph.DOWN) ? 1 : 0;
-      parts[0][orientation] += direction * cellSize;
-      parts[1][orientation] += direction * cellSize;
-      parts[1][1 - orientation] += cellSize;
+    if (count === 0 || count === 4) return;
 
-      // If we don't need to cut across to diagonals, we're done.
-      if (cutSize === 0) return applyInsetToParts(parts, edgeType);
+    const cellSize = DisplayItem.CELL_SIZE;
+    const x = col * cellSize;
+    const y = row * cellSize;
+    const half = cellSize / 2;
 
-      const rowOffset = direction ? cutSize : -cutSize;
-      const diagStartType = orientation ? GridGraph.LEFT : GridGraph.UP;
-      const diagEndType = orientation ? GridGraph.RIGHT : GridGraph.DOWN;
-
-      // NOTE: The diagonal extended from the LEFT/RIGHT edges.
-      if (cls._isStrictDiagonal(graph, cellSet, cell, edgeType, diagEndType)) {
-        parts[1][1 - orientation] -= cutSize;
-        if (orientation === 0) {
-          parts.push([parts[1][0] + rowOffset, parts[1][1] + cutSize]);
-        }
-      }
-      // Update the start second, otherwise the indexes are messed up if we
-      // unshift.
-      if (cls._isStrictDiagonal(graph, cellSet, cell, edgeType, diagStartType)) {
-        parts[0][1 - orientation] += cutSize;
-        if (orientation === 0) {
-          parts.unshift([parts[0][0] + rowOffset, parts[0][1] - cutSize]);
-        }
-      }
-
-      return applyInsetToParts(parts, edgeType);
+    if (count === 1 || count === 3) {
+      // Corner (90° or 270°)
+      const insetX = (count === 1 ? (tl || bl) : (tl && bl)) ? -1 : 1;
+      const insetY = (count === 1 ? (tl || tr) : (tl && tr)) ? -1 : 1;
+      const edgeDir = count === 1 ? 1 : -1;
+      const cx = x + inset * insetX;
+      const cy = y + inset * insetY;
+      g.appendChild(this._makePath([
+        [x + half * insetX * edgeDir, cy],
+        [cx, cy],
+        [cx, y + half * insetY * edgeDir],
+      ]));
+      return;
     }
 
+    // count === 2: diagonal or straight
+
+    // Diagonal: two paths with corner cuts
+    if (tl !== tr && tl !== bl) {
+      const DIAGONAL_CORNER_CUT_SIZE = 10;  // Size of corner cut for diagonal bridges
+
+      const d = (tl && br) ? -1 : 1;
+      const cut = cornerCut ? DIAGONAL_CORNER_CUT_SIZE : 0;
+      const x1 = x + inset * d;
+      const y1 = y + inset;
+      g.appendChild(this._makePath([
+        [x1, y - half],
+        [x1, y1 - cut],
+        [x1 - d * cut, y1],
+        [x - d * half, y1],
+      ]));
+      const x2 = x - inset * d;
+      const y2 = y - inset;
+      g.appendChild(this._makePath([
+        [x + d * half, y2],
+        [x2 + d * cut, y2],
+        [x2, y2 + cut],
+        [x2, y + half],
+      ]));
+      return;
+    }
+
+    // Straight edge
+    const isHorizontal = (tl === tr);
+    const insetDir = tl ? -1 : 1;
+    if (isHorizontal) {
+      const yOff = inset * insetDir;
+      g.appendChild(this._makePath([
+        [x - half, y + yOff],
+        [x + half, y + yOff],
+      ]));
+    } else {
+      const xOff = inset * insetDir;
+      g.appendChild(this._makePath([
+        [x + xOff, y - half],
+        [x + xOff, y + half],
+      ]));
+    }
+  }
+
+  _makeRegionBorder(cellSet, shape, cornerCut, inset = 0) {
+    const g = createSvgElement('g');
+    const seen = new Set();
+
+    const numIntersectionCols = shape.numCols + 1;
     for (const cell of cellSet) {
-      const edges = graph.cellEdges(cell);
       const [row, col] = shape.splitCellIndex(cell);
-      for (let edgeType = 0; edgeType < edges.length; edgeType++) {
-        if (!cellSet.has(edges[edgeType])) {
-          g.appendChild(
-            this._makePath(
-              borderEdgeParts(cell, row, col, edgeType)));
-        }
+      // Process each corner of this cell
+      for (const [r, c] of [[row, col], [row, col + 1], [row + 1, col], [row + 1, col + 1]]) {
+        const key = r * numIntersectionCols + c;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        this._drawIntersection(g, cellSet, shape, r, c, cornerCut, inset);
       }
     }
 
@@ -335,7 +342,7 @@ class Jigsaw extends BaseConstraintDisplayItem {
     const cellSet = new Set(region.map(c => shape.parseCellId(c).cell));
     const graph = GridGraph.get(shape);
 
-    const g = this._makeRegionBorder(graph, cellSet, shape);
+    const g = this._makeRegionBorder(cellSet, shape, /* cornerCut= */ false);
     g.setAttribute('stroke-width', 2);
     g.setAttribute('stroke', 'rgb(100, 100, 100)');
     g.setAttribute('stroke-linecap', 'round');
@@ -1006,7 +1013,6 @@ class BorderedRegion extends BaseConstraintDisplayItem {
 
   _makeItem(constraint, options, colorOverride) {
     const shape = this._shape;
-    const graph = GridGraph.get(shape);
     const color = colorOverride || this._colorPicker.pickColor();
 
     let groups = null;
@@ -1032,10 +1038,9 @@ class BorderedRegion extends BaseConstraintDisplayItem {
       }
 
       const border = this._makeRegionBorder(
-        graph,
         cellSet,
         shape,
-        10,
+        /* cornerCut= */ true,
         options.inset);
       g.append(border);
     }
