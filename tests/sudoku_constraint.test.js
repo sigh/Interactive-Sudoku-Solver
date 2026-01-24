@@ -145,7 +145,6 @@ await runTest('boxRegions for 6x4 grid cells are in bounds', () => {
 await runTest('boxRegions for rectangular grids cover all cells exactly once', () => {
   for (const [rows, cols] of [[4, 6], [6, 4], [6, 8], [8, 6]]) {
     const shape = GridShape.fromGridSize(rows, cols);
-    if (shape.noDefaultBoxes) continue;
 
     const regions = SudokuConstraintBase.boxRegions(shape);
     const allCells = regions.flat().sort((a, b) => a - b);

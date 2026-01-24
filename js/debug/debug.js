@@ -345,12 +345,12 @@ export const runSolveTests = async (onFailure, runner) => {
     '9x8: Plain boxless',  // Boxless rectangular grid
     '5x5: Squishtroquadri',  // non-standard numValues, Arrows and Thermo
     '7x7: Killer Squishdoku',  // non-standard numValues
-    '6x6: Con-set-cutive',  // non-standard numValues, RegionSize, Jigsaw
+    '6x6: Con-set-cutive',  // non-standard numValues, RegionSize, region-sized boxes
     '7x7: Skyscraper Squishdoku',  // non-standard numValues, Skyscraper
     '7x7: Numbered Rooms Squishdoku',  // non-standard numValues, Numbered Rooms
-    '6x6: Hidden Hostility', // non-standard numValues, Diagonal
-    '6x6: Order from Chaos', // non-standard numValues, Global Entropy, NFA
-    '6x6: Irregular Quadro Quadri', // non-standard numValues, Irregular
+    '6x6: Hidden Hostility', // non-standard numValues, Diagonal, region-sized boxes
+    '6x6: Order from Chaos', // non-standard numValues, Global Entropy, NFA, region-sized boxes
+    '6x6: Irregular Quadro Quadri', // non-standard numValues, Jigsaw
     '7x7: Dutch Flat Mate Squishdoku', // non-standard numValues, Dutch Flatmates
     '7x7: Buggy NR Squishdoku',  // non-standard numValues, Numbered Rooms
   ], onFailure);

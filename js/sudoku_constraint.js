@@ -170,14 +170,17 @@ export class SudokuConstraintBase {
       return this._makeRegions((c, i) => i * numCols + c, numCols, numRows);
     },
     (shape) => shape.gridDimsStr);
-  static boxRegions = memoize((shape) => {
-    if (shape.noDefaultBoxes) return [];
-
+  static boxRegions = memoize((shape, size = null) => {
+    const numRows = shape.numRows;
     const numCols = shape.numCols;
-    const boxWidth = shape.boxWidth;
-    const boxHeight = shape.boxHeight;
+    const effectiveSize = size ?? shape.numValues;
+
+    const [boxHeight, boxWidth] = GridShape.boxDimsForSize(
+      numRows, numCols, effectiveSize);
+    if (!boxHeight) return [];
+
     const boxesPerRow = numCols / boxWidth;
-    const numBoxes = shape.numCells / shape.numValues;
+    const numBoxes = shape.numCells / effectiveSize;
 
     return this._makeRegions(
       (r, i) => {
@@ -187,8 +190,8 @@ export class SudokuConstraintBase {
         const cellRow = Math.floor(i / boxWidth);
         const cellCol = i % boxWidth;
         return (boxRow * boxHeight + cellRow) * numCols + (boxCol * boxWidth + cellCol);
-      }, numBoxes, shape.numValues);
-  }, (shape) => shape.noDefaultBoxes ? '' : shape.fullGridSpec);
+      }, numBoxes, effectiveSize);
+  }, (shape, size = null) => `${shape.gridDimsStr}~${size ?? shape.numValues}`);
   static disjointSetRegions = memoize((shape) => {
     const numCols = shape.numCols;
     const boxWidth = shape.boxWidth;

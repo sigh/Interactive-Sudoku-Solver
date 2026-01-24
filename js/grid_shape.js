@@ -112,9 +112,6 @@ export class GridShape {
 
     // Box dimensions
     [this.boxHeight, this.boxWidth] = this.constructor._boxDims(numRows, numCols, this.numValues);
-    this.noDefaultBoxes = (
-      this.boxHeight === null || this.boxWidth === null ||
-      this.boxHeight === 1 || this.boxWidth === 1);
 
     this.name = this.constructor.makeName(numRows, numCols, this.numValues);
     this.gridDimsStr = `${this.numRows}x${this.numCols}`;
@@ -144,7 +141,7 @@ export class GridShape {
   // Compute box dimensions for a target region size.
   // Returns [boxHeight, boxWidth] or [null, null] if no valid box dimensions.
   static boxDimsForSize(numRows, numCols, targetSize) {
-    for (let small = Math.floor(Math.sqrt(targetSize)); small >= 1; small--) {
+    for (let small = Math.floor(Math.sqrt(targetSize)); small >= 2; small--) {
       if (targetSize % small !== 0) continue;
       const large = targetSize / small;
 
