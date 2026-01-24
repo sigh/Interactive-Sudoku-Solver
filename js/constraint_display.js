@@ -9,9 +9,10 @@ const {
 const { LineOptions, CellArgs } = await import('./sudoku_constraint.js' + self.VERSION_PARAM);
 const { createSvgElement, clearDOMNode } = await import('./util.js' + self.VERSION_PARAM);
 const { SudokuConstraint, SudokuConstraintBase } = await import('./sudoku_constraint.js' + self.VERSION_PARAM);
+const { GridShape } = await import('./grid_shape.js' + self.VERSION_PARAM);
 
 const constraintDisplayOrder = () => [
-  DefaultRegionsInverted,
+  DefaultRegions,
   Windoku,
   Jigsaw,
   BorderedRegion,
@@ -929,7 +930,7 @@ class Windoku extends BaseConstraintDisplayItem {
   }
 }
 
-class DefaultRegionsInverted extends BaseConstraintDisplayItem {
+class DefaultRegions extends BaseConstraintDisplayItem {
   static IS_LAYOUT = true;
 
   constructor(svg) {
@@ -943,41 +944,75 @@ class DefaultRegionsInverted extends BaseConstraintDisplayItem {
   }
 
   clear() {
+    this._noBoxes = false;
+    this._regionSize = null;
     this.removeItem(null);
   }
 
   reshape(shape) {
     super.reshape(shape);
+    this._draw();
+  }
+
+  _draw() {
     super.clear();
+    const shape = this._shape;
+    if (!shape) return;
+
+    const svg = this.getSvg();
+
+    if (this._noBoxes) {
+      svg.setAttribute('display', 'none');
+      return;
+    }
+
+    // Determine effective box dimensions.
+    const effectiveSize = this._regionSize ?? shape.numValues;
+    const [boxHeight, boxWidth] = GridShape.boxDimsForSize(
+      shape.numRows, shape.numCols, effectiveSize);
+
+    if (!boxHeight || !boxWidth) {
+      svg.setAttribute('display', 'none');
+      return;
+    }
 
     const cellSize = DisplayItem.CELL_SIZE;
     const gridWidthPixels = cellSize * shape.numCols;
     const gridHeightPixels = cellSize * shape.numRows;
-    const svg = this.getSvg();
 
-    if (shape.noDefaultBoxes) return;
-
-    for (let i = shape.boxWidth; i < shape.numCols; i += shape.boxWidth) {
+    for (let i = boxWidth; i < shape.numCols; i += boxWidth) {
       svg.appendChild(this._makePath([
         [i * cellSize, 0],
         [i * cellSize, gridHeightPixels],
       ]));
     }
-    for (let i = shape.boxHeight; i < shape.numRows; i += shape.boxHeight) {
+    for (let i = boxHeight; i < shape.numRows; i += boxHeight) {
       svg.appendChild(this._makePath([
         [0, i * cellSize],
         [gridWidthPixels, i * cellSize],
       ]));
     }
+
+    svg.setAttribute('display', null);
   }
 
   drawItem(constraint, _) {
-    this.getSvg().setAttribute('display', 'none');
-    return this.getSvg();
+    if (constraint.type === 'NoBoxes') {
+      this._noBoxes = true;
+    } else if (constraint.type === 'RegionSize') {
+      this._regionSize = constraint.size;
+    }
+    this._draw();
+    return constraint;
   }
 
-  removeItem(_) {
-    this.getSvg().setAttribute('display', null);
+  removeItem(constraint) {
+    if (constraint?.type === 'NoBoxes') {
+      this._noBoxes = false;
+    } else if (constraint?.type === 'RegionSize') {
+      this._regionSize = null;
+    }
+    this._draw();
   }
 }
 

@@ -138,9 +138,15 @@ export class GridShape {
       return [null, null];
     }
 
-    for (let small = Math.floor(Math.sqrt(numValues)); small >= 1; small--) {
-      if (numValues % small !== 0) continue;
-      const large = numValues / small;
+    return this.boxDimsForSize(numRows, numCols, numValues);
+  }
+
+  // Compute box dimensions for a target region size.
+  // Returns [boxHeight, boxWidth] or [null, null] if no valid box dimensions.
+  static boxDimsForSize(numRows, numCols, targetSize) {
+    for (let small = Math.floor(Math.sqrt(targetSize)); small >= 1; small--) {
+      if (targetSize % small !== 0) continue;
+      const large = targetSize / small;
 
       // Try both orientations
       if (numRows % small === 0 && numCols % large === 0) {
