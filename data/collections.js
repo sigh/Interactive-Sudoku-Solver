@@ -799,7 +799,7 @@ export const EXAMPLES = [
   {
     name: '6x6: Con-set-cutive',
     src: 'https://www.youtube.com/watch?v=G3rxwq4_RqU',
-    input: '.Shape~6x6~9.Cage~10~R1C2~R2C2.Cage~8~R3C1~R4C1.Renban~R4C1~R5C1.Renban~R2C1~R2C2.Renban~R3C4~R4C4~R5C4~R6C4.Whisper~5~R4C3~R4C4~R4C5.Whisper~5~R2C4~R2C5.Arrow~R6C4~R6C3~R6C2~R6C1.RegionSize~6.RegionSameValues.Jigsaw~111222111222333444333444555666555666',
+    input: '.Shape~6x6~9.Cage~10~R1C2~R2C2.Cage~8~R3C1~R4C1.Renban~R4C1~R5C1.Renban~R2C1~R2C2.Renban~R3C4~R4C4~R5C4~R6C4.Whisper~5~R4C3~R4C4~R4C5.Whisper~5~R2C4~R2C5.Arrow~R6C4~R6C3~R6C2~R6C1.RegionSize~6.RegionSameValues',
     solution: '627198981276198762762819879621216987',
   },
   {
@@ -817,19 +817,19 @@ export const EXAMPLES = [
   {
     name: '6x6: Hidden Hostility',
     src: 'https://sudokupad.app/8rw2twqz7p',
-    input: '.Shape~6x6~9.Diagonal~-1.Cage~8~R1C2~R1C1~R2C1.Cage~7~R5C1~R6C1~R6C2.Cage~23~R4C2~R5C2~R5C3.Cage~22~R2C3~R2C2~R3C2.Cage~23~R2C4~R2C5~R3C5.Cage~21~R4C5~R5C5~R5C4.Cage~8~R5C6~R6C6~R6C5.Cage~7~R1C5~R1C6~R2C6.GreaterThan~R1C3~R1C4.GreaterThan~R6C3~R6C2.GreaterThan~R3C5~R3C6.Jigsaw~111222111222111222333444333444333444',
+    input: '.Shape~6x6~9.Diagonal~-1.Cage~8~R1C2~R1C1~R2C1.Cage~7~R5C1~R6C1~R6C2.Cage~23~R4C2~R5C2~R5C3.Cage~22~R2C3~R2C2~R3C2.Cage~23~R2C4~R2C5~R3C5.Cage~21~R4C5~R5C5~R5C4.Cage~8~R5C6~R6C6~R6C5.Cage~7~R1C5~R1C6~R2C6.GreaterThan~R1C3~R1C4.GreaterThan~R6C3~R6C2.GreaterThan~R3C5~R3C6',
     solution: '348512179864562397795683286941413725',
   },
   {
     name: '6x6: Order from Chaos',
     src: 'https://sudokupad.app/a3ur2w2dvp',
-    input: '.Shape~6x6~9.~R3C1_3.GlobalEntropy.NFA~VgGv_wQgxBRhyCf-UWYaceeef_z0EUkzzzz_-eoqsuceef_zz2GWkzzz_-eeo246cef_zzz3n4ITz_-eeepFHIcf_zzzz3pZpz_-eeeepRTVWASgIiEFyAfADwAAkAQsIE0AeATwIqEGiAcAlAQyIHQIwEHCBCAjwQ2IIEAcBFAg-QJAQ8II0BOBDwhEQJoBWA~_Arith%2E%20Seq~R1C1~R1C2~R1C3~~R2C2~R3C2~R3C3~~R4C1~R5C1~R6C1~R6C2~~R4C2~R4C3~R5C3~R6C3~~R2C4~R3C4~R4C4~~R5C4~R5C5~R6C5~~R3C5~R3C6~R4C6.Jigsaw~111222111222111222333444333444333444',
+    input: '.Shape~6x6~9.~R3C1_3.GlobalEntropy.NFA~VgGv_wQgxBRhyCf-UWYaceeef_z0EUkzzzz_-eoqsuceef_zz2GWkzzz_-eeo246cef_zzz3n4ITz_-eeepFHIcf_zzzz3pZpz_-eeeepRTVWASgIiEFyAfADwAAkAQsIE0AeATwIqEGiAcAlAQyIHQIwEHCBCAjwQ2IIEAcBFAg-QJAQ8II0BOBDwhEQJoBWA~_Arith%2E%20Seq~R1C1~R1C2~R1C3~~R2C2~R3C2~R3C3~~R4C1~R5C1~R6C1~R6C2~~R4C2~R4C3~R5C3~R6C3~~R2C4~R3C4~R4C4~~R5C4~R5C5~R6C5~~R3C5~R3C6~R4C6',
     solution: '159482742163368597813925695748427316',
   },
   {
     name: '6x6: Irregular Quadro Quadri',
     src: 'https://sudokupad.app/txrhj6jpls',
-    input: '.Shape~6x6~9.Renban~R5C1~R6C2.Renban~R4C2~R5C3.Renban~R2C1~R1C2.Renban~R3C2~R2C3.Renban~R1C5~R2C6.Renban~R2C4~R3C5.Renban~R4C5~R5C4.Renban~R5C6~R6C5.Quad~R1C5~1~2~4.Quad~R2C5~7~8.Quad~R1C1~1~2~3.Quad~R1C2~8~9.Quad~R3C3~1~2~3~4.Quad~R4C1~5~9.Quad~R5C1~2~3~4.Quad~R5C4~6~7.Quad~R5C5~1~3~4.Jigsaw~122222112223111233114333144433444443',
+    input: '.Shape~6x6~9.NoBoxes.Renban~R5C1~R6C2.Renban~R4C2~R5C3.Renban~R2C1~R1C2.Renban~R3C2~R2C3.Renban~R1C5~R2C6.Renban~R2C4~R3C5.Renban~R4C5~R5C4.Renban~R5C6~R6C5.Quad~R1C5~1~2~4.Quad~R2C5~7~8.Quad~R1C1~1~2~3.Quad~R1C2~8~9.Quad~R3C3~1~2~3~4.Quad~R4C1~5~9.Quad~R5C1~2~3~4.Quad~R5C4~6~7.Quad~R5C5~1~3~4.Jigsaw~122222112223111233114333144433444443',
     solution: '829514318672972358561497495863236741',
   },
   {

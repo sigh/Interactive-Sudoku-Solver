@@ -681,7 +681,7 @@ await runTest('_overlapRegions: square grid includes rows and columns', () => {
   const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
   const shape = GridShape.fromGridSize(9);
 
-  const regions = optimizer._overlapRegions(shape);
+  const regions = optimizer._overlapRegions(shape, []);
 
   // Should have 4 region sets: rows, rows reversed, cols, cols reversed.
   assert.equal(regions.length, 4);
@@ -695,7 +695,7 @@ await runTest('_overlapRegions: 4x6 grid includes only rows (not columns)', () =
   const shape = GridShape.fromGridSize(4, 6);
 
   // numValues=6, numCols=6 (rows are houses), numRows=4 (columns are NOT houses).
-  const regions = optimizer._overlapRegions(shape);
+  const regions = optimizer._overlapRegions(shape, []);
 
   // Should only include row regions (2 sets: forward and reverse).
   assert.equal(regions.length, 2);
@@ -710,7 +710,7 @@ await runTest('_overlapRegions: 6x4 grid includes only columns (not rows)', () =
   const shape = GridShape.fromGridSize(6, 4);
 
   // numValues=6, numRows=6 (columns are houses), numCols=4 (rows are NOT houses).
-  const regions = optimizer._overlapRegions(shape);
+  const regions = optimizer._overlapRegions(shape, []);
 
   // Should only include column regions (2 sets: forward and reverse).
   assert.equal(regions.length, 2);
@@ -726,7 +726,7 @@ await runTest('_overlapRegions: 5x7 grid (no houses) returns empty', () => {
 
   // numValues=7, numCols=7 (rows are houses), numRows=5 (columns are NOT houses).
   // Wait, numCols=7 === numValues=7, so rows ARE houses.
-  const regions = optimizer._overlapRegions(shape);
+  const regions = optimizer._overlapRegions(shape, []);
 
   // Rows are houses (7 cells each), columns are not (5 cells each).
   assert.equal(regions.length, 2);

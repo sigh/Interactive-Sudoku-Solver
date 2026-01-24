@@ -33,12 +33,22 @@ export class SudokuBuilder {
     const constraintMap = constraint.toMap();
 
     yield* this._rowColHandlers(shape);
-    if (constraintMap.has('NoBoxes')) {
-      yield new HandlerModule.NoBoxes();
-    } else {
-      yield* this._boxHandlers(shape);
-    }
+
+    const boxRegions = this._getBoxRegions(shape, constraintMap);
+    yield new HandlerModule.BoxInfo(boxRegions);
+    yield* this._boxHandlers(boxRegions);
+
     yield* this._constraintHandlers(constraintMap, shape);
+  }
+
+  // Get box regions, respecting NoBoxes and RegionSize constraints.
+  static _getBoxRegions(shape, constraintMap) {
+    if (constraintMap.has('NoBoxes')) return [];
+
+    const regionSizeConstraints = constraintMap.get('RegionSize');
+    const size = regionSizeConstraints?.[0]?.size ?? null;
+
+    return SudokuConstraintBase.boxRegions(shape, size);
   }
 
   static *_rowColHandlers(shape) {
@@ -50,8 +60,8 @@ export class SudokuBuilder {
     }
   }
 
-  static *_boxHandlers(shape) {
-    for (const cells of SudokuConstraintBase.boxRegions(shape)) {
+  static *_boxHandlers(boxRegions) {
+    for (const cells of boxRegions) {
       yield new HandlerModule.AllDifferent(cells);
     }
   }
@@ -464,12 +474,11 @@ export class SudokuBuilder {
         case 'RegionSumLine':
           {
             cells = constraint.cells.map(c => shape.parseCellId(c).cell);
-            if (!constraintMap.has('NoBoxes') && !shape.noDefaultBoxes) {
-              // Default boxes.
-              const regions = SudokuConstraintBase.boxRegions(shape);
-              yield* this._regionSumLineHandlers(cells, regions, shape.numValues);
+            const boxRegions = this._getBoxRegions(shape, constraintMap);
+            if (boxRegions.length) {
+              yield* this._regionSumLineHandlers(cells, boxRegions, shape.numValues);
             } else if (constraintMap.has('Jigsaw')) {
-              // If no boxes is set, try to use the jigsaw regions.
+              // If no boxes, try to use the jigsaw regions.
               const jigsawConstraints = constraintMap.get('Jigsaw');
               const regions = jigsawConstraints.map(
                 c => c.cells.map(c => shape.parseCellId(c).cell));
@@ -641,9 +650,7 @@ export class SudokuBuilder {
 
             regions.push(...SudokuConstraintBase.rowRegions(shape));
             regions.push(...SudokuConstraintBase.colRegions(shape));
-            if (!constraintMap.has('NoBoxes') && !shape.noDefaultBoxes) {
-              regions.push(...SudokuConstraintBase.boxRegions(shape));
-            }
+            regions.push(...this._getBoxRegions(shape, constraintMap));
 
             // We only want the largest regions.
             const maxSize = Math.max(...regions.map(r => r.length));

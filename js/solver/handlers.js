@@ -81,7 +81,18 @@ export class SudokuConstraintHandler {
   }
 }
 
-export class NoBoxes extends SudokuConstraintHandler { }
+// This handler purely exists to pass information about boxes to the optimizer.
+export class BoxInfo extends SudokuConstraintHandler {
+  constructor(boxRegions) {
+    super();
+    this._boxRegions = boxRegions;
+  }
+
+  boxRegions() {
+    return this._boxRegions;
+  }
+}
+
 // This handler purely exists to manually adjust the priorities of cells to
 // adjust initial cell selection.
 export class Priority extends SudokuConstraintHandler {

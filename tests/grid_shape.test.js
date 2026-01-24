@@ -247,22 +247,6 @@ await runTest('box dimensions prefer squarer boxes', () => {
   assert.deepEqual([shape86.boxHeight, shape86.boxWidth], [4, 2]);
 });
 
-await runTest('noDefaultBoxes is true when box size cannot equal numValues', () => {
-  // 3x5 grid: numValues=5 (prime), can't make 5-cell boxes that tile
-  const shape35 = GridShape.fromGridSize(3, 5);
-  assert.equal(shape35.noDefaultBoxes, true);
-
-  // 2x3 grid: numValues=3 (prime), can't make 3-cell boxes that tile 2 rows
-  const shape23 = GridShape.fromGridSize(2, 3);
-  assert.equal(shape23.noDefaultBoxes, true);
-});
-
-await runTest('noDefaultBoxes is false for standard grids', () => {
-  assert.equal(GridShape.fromGridSize(9).noDefaultBoxes, false);
-  assert.equal(GridShape.fromGridSize(6, 8).noDefaultBoxes, false);
-  assert.equal(GridShape.fromGridSize(4, 6).noDefaultBoxes, false);
-});
-
 // ============================================================================
 // Exported constants
 // ============================================================================

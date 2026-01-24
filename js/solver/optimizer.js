@@ -1,6 +1,7 @@
 const { memoize, arrayIntersectSize, arrayDifference, setIntersectSize, arrayIntersect, arrayRemoveValue, setIntersectionToArray, setDifference, BitSet, elementarySymmetricSum, mergeSortedArrays } = await import('../util.js' + self.VERSION_PARAM);
 const { LookupTables } = await import('./lookup_tables.js' + self.VERSION_PARAM);
 const { SudokuConstraintBase, fnToBinaryKey } = await import('../sudoku_constraint.js' + self.VERSION_PARAM);
+const { GridShape } = await import('../grid_shape.js' + self.VERSION_PARAM);
 const HandlerModule = await import('./handlers.js' + self.VERSION_PARAM);
 const SumHandlerModule = await import('./sum_handler.js' + self.VERSION_PARAM);
 const NFAModule = await import('./nfa_handler.js' + self.VERSION_PARAM);
@@ -35,21 +36,20 @@ export class SudokuConstraintOptimizer {
   }
 
   optimize(handlerSet, cellExclusions, shape) {
-    const hasBoxes = (
-      handlerSet.getAllofType(HandlerModule.NoBoxes).length === 0
-      && !shape.noDefaultBoxes);
+    const boxInfo = handlerSet.getAllofType(HandlerModule.BoxInfo)[0];
+    const boxRegions = boxInfo?.boxRegions() || [];
 
     this._addExtraCellExclusions(handlerSet, cellExclusions, shape);
 
     this._addHouseHandlers(handlerSet, shape);
 
     if (!shape.isSquare()) {
-      this._optimizeNonSquareGrids(handlerSet, hasBoxes, shape);
+      this._optimizeNonSquareGrids(handlerSet, boxRegions, shape);
     }
 
-    this._optimizeSums(handlerSet, cellExclusions, hasBoxes, shape);
+    this._optimizeSums(handlerSet, cellExclusions, boxRegions, shape);
 
-    this._optimizeJigsaw(handlerSet, hasBoxes, shape);
+    this._optimizeJigsaw(handlerSet, boxRegions, shape);
 
     this._optimizeFullRank(handlerSet, shape);
 
@@ -59,14 +59,14 @@ export class SudokuConstraintOptimizer {
 
     this._optimizeBinaryPairwise(handlerSet, shape);
 
-    if (hasBoxes) {
-      this._addHouseIntersections(handlerSet, shape);
+    if (boxRegions.length > 0) {
+      this._addHouseIntersections(handlerSet, boxRegions, shape);
     }
 
     this._logStats(handlerSet);
   }
 
-  _optimizeNonSquareGrids(handlerSet, hasBoxes, shape) {
+  _optimizeNonSquareGrids(handlerSet, boxRegions, shape) {
     // For non-square grids without boxes, one axis forms houses
     // and the other axis has numValues lines of length K < numValues.
     // Since those K-length lines are all-different then for each value it must
@@ -81,7 +81,7 @@ export class SudokuConstraintOptimizer {
 
     // We don't need this if there are boxes, as the box constraints provide
     // sufficient propagation.
-    if (hasBoxes) return;
+    if (boxRegions.length > 0) return;
 
     // Determine the axis that has numValues *lines* (the longer dimension).
     // Those lines have length K = min(numRows, numCols).
@@ -150,14 +150,20 @@ export class SudokuConstraintOptimizer {
     }
   }
 
-  _addHouseIntersections(handlerSet, shape) {
+  _addHouseIntersections(handlerSet, boxRegions, shape) {
     const houseHandlers = handlerSet.getAllofType(HandlerModule.House);
     const numHandlers = houseHandlers.length;
+
+    // Intersections are not very useful if there are no boxes.
+    if (boxRegions.length === 0) return;
+
+    const [boxHeight, boxWidth] = GridShape.boxDimsForSize(
+      shape.numRows, shape.numCols, boxRegions[0].length);
     for (let i = 1; i < numHandlers; i++) {
       for (let j = 0; j < i; j++) {
         const intersectionSize = arrayIntersectSize(
           houseHandlers[i].cells, houseHandlers[j].cells);
-        if (intersectionSize !== shape.boxWidth && intersectionSize !== shape.boxHeight) continue;
+        if (intersectionSize !== boxWidth && intersectionSize !== boxHeight) continue;
         const newHandler = new HandlerModule.SameValuesIgnoreCount(
           arrayDifference(houseHandlers[i].cells, houseHandlers[j].cells),
           arrayDifference(houseHandlers[j].cells, houseHandlers[i].cells));
@@ -167,7 +173,7 @@ export class SudokuConstraintOptimizer {
     }
   }
 
-  _optimizeJigsaw(handlerSet, hasBoxes, shape) {
+  _optimizeJigsaw(handlerSet, boxRegions, shape) {
     const jigsawPieces = handlerSet.getAllofType(HandlerModule.JigsawPiece);
     if (jigsawPieces.length === 0) return;
 
@@ -175,7 +181,7 @@ export class SudokuConstraintOptimizer {
       ...this._makeJigsawIntersections(handlerSet));
 
     handlerSet.addNonEssential(
-      ...this._makeJigsawLawOfLeftoverHandlers(jigsawPieces, hasBoxes, shape));
+      ...this._makeJigsawLawOfLeftoverHandlers(jigsawPieces, boxRegions, shape));
   }
 
   // Find a non-overlapping set of handlers.
@@ -207,7 +213,7 @@ export class SudokuConstraintOptimizer {
     return [nonOverlappingHandlers, cellsIncluded];
   }
 
-  _optimizeSums(handlerSet, cellExclusions, hasBoxes, shape) {
+  _optimizeSums(handlerSet, cellExclusions, boxRegions, shape) {
     // TODO: Consider how this interacts with fixed cells.
     const allSumHandlers = handlerSet.getAllofType(SumHandlerModule.Sum);
     if (allSumHandlers.length === 0) return;
@@ -222,7 +228,7 @@ export class SudokuConstraintOptimizer {
       ...this._fillInSumGap(filteredSumHandlers, sumCells, shape));
 
     handlerSet.addNonEssential(
-      ...this._makeInnieOutieSumHandlers(filteredSumHandlers, hasBoxes, shape));
+      ...this._makeInnieOutieSumHandlers(filteredSumHandlers, boxRegions, shape));
 
     handlerSet.addNonEssential(
       ...this._makeHiddenCageHandlers(handlerSet, safeSumHandlers, cellExclusions, shape));
@@ -804,33 +810,27 @@ export class SudokuConstraintOptimizer {
   // Returns region-groups used by the jigsaw overlap optimizations.
   // Key detail: whether an axis forms houses depends on (numRows/numCols === numValues),
   // so we memoize based on those booleans + grid dimensions (not on shape identity).
-  _overlapRegions = memoize(
-    (shape, hasBoxes) => {
-      const regions = [];
+  _overlapRegions(shape, boxRegions) {
+    const regions = [];
 
-      // Rows are houses if they have numValues cells (numCols === numValues).
-      if (shape.numCols === shape.numValues) {
-        const rowRegions = SudokuConstraintBase.rowRegions(shape);
-        regions.push(rowRegions, rowRegions.slice().reverse());
-      }
+    // Rows are houses if they have numValues cells (numCols === numValues).
+    if (shape.numCols === shape.numValues) {
+      const rowRegions = SudokuConstraintBase.rowRegions(shape);
+      regions.push(rowRegions, rowRegions.slice().reverse());
+    }
 
-      // Columns are houses if they have numValues cells (numRows === numValues).
-      if (shape.numRows === shape.numValues) {
-        const colRegions = SudokuConstraintBase.colRegions(shape);
-        regions.push(colRegions, colRegions.slice().reverse());
-      }
+    // Columns are houses if they have numValues cells (numRows === numValues).
+    if (shape.numRows === shape.numValues) {
+      const colRegions = SudokuConstraintBase.colRegions(shape);
+      regions.push(colRegions, colRegions.slice().reverse());
+    }
 
-      if (hasBoxes) {
-        regions.push(SudokuConstraintBase.boxRegions(shape));
-      }
+    if (boxRegions.length > 0 && boxRegions[0].length === shape.numValues) {
+      regions.push(boxRegions);
+    }
 
-      return regions;
-    },
-    (shape, hasBoxes) => {
-      const rowHouses = shape.numCols === shape.numValues;
-      const colHouses = shape.numRows === shape.numValues;
-      return `${shape.gridDimsStr}|${rowHouses}|${colHouses}|${!!hasBoxes}`;
-    });
+    return regions;
+  }
 
   _generalRegionOverlapProcessor(regions, pieces, numValues, callback) {
     const superRegion = new Set();
@@ -864,7 +864,7 @@ export class SudokuConstraintOptimizer {
     }
   }
 
-  _makeJigsawLawOfLeftoverHandlers(jigsawPieces, hasBoxes, shape) {
+  _makeJigsawLawOfLeftoverHandlers(jigsawPieces, boxRegions, shape) {
     const newHandlers = [];
 
     const handleOverlap = (superRegion, piecesRegion, usedPieces) => {
@@ -884,7 +884,7 @@ export class SudokuConstraintOptimizer {
       this._logAddHandler('_makeJigsawLawOfLeftoverHandlers', newHandler);
     }
 
-    const overlapRegions = this._overlapRegions(shape, hasBoxes);
+    const overlapRegions = this._overlapRegions(shape, boxRegions);
     for (const r of overlapRegions) {
       this._generalRegionOverlapProcessor(
         r, jigsawPieces.map(p => p.cells), shape.numValues, handleOverlap);
@@ -893,7 +893,7 @@ export class SudokuConstraintOptimizer {
     return newHandlers;
   }
 
-  _makeInnieOutieSumHandlers(sumHandlers, hasBoxes, shape) {
+  _makeInnieOutieSumHandlers(sumHandlers, boxRegions, shape) {
     const newHandlers = [];
     const numValues = shape.numValues;
 
@@ -956,7 +956,7 @@ export class SudokuConstraintOptimizer {
       this._logAddHandler('_makeInnieOutieSumHandlers', newHandler, { args });
     };
 
-    const overlapRegions = this._overlapRegions(shape, hasBoxes);
+    const overlapRegions = this._overlapRegions(shape, boxRegions);
     for (const r of overlapRegions) {
       this._generalRegionOverlapProcessor(
         r, pieces, shape.numValues, handleOverlap);
