@@ -192,15 +192,27 @@ export class SudokuConstraintBase {
         return (boxRow * boxHeight + cellRow) * numCols + (boxCol * boxWidth + cellCol);
       }, numBoxes, effectiveSize);
   }, (shape, size = null) => `${shape.gridDimsStr}~${size ?? shape.numValues}`);
-  static disjointSetRegions = memoize((shape) => {
+  static disjointSetRegions = memoize((shape, size = null) => {
     const numCols = shape.numCols;
-    const boxWidth = shape.boxWidth;
-    const boxHeight = shape.boxHeight;
-    const numSets = shape.numValues;
+    const effectiveSize = size ?? shape.numValues;
+    const [boxHeight, boxWidth] = GridShape.boxDimsForSize(
+      shape.numRows, numCols, effectiveSize);
+    if (!boxHeight) return [];
+
+    const numSets = effectiveSize;
+    const numBoxes = shape.numCells / effectiveSize;
+    const boxesPerRow = numCols / boxWidth;
+    // r = position within box (0 to effectiveSize-1)
+    // i = box index (0 to numBoxes-1)
     return this._makeRegions(
-      (r, i) => ((i / boxHeight | 0) * boxHeight + (r % boxHeight | 0)) * numCols
-        + (i % boxHeight | 0) * boxWidth + (r / boxHeight | 0), numSets, shape.numValues);
-  }, (shape) => shape.fullGridSpec);
+      (r, i) => {
+        const boxRow = (i / boxesPerRow) | 0;
+        const boxCol = i % boxesPerRow;
+        const posRow = (r / boxWidth) | 0;
+        const posCol = r % boxWidth;
+        return (boxRow * boxHeight + posRow) * numCols + boxCol * boxWidth + posCol;
+      }, numSets, numBoxes);
+  }, (shape, size = null) => `${shape.gridDimsStr}~${size ?? shape.numValues}`);
   static square2x2Regions = memoize(
     (shape) => {
       const numRows = shape.numRows;
@@ -1214,8 +1226,8 @@ export class SudokuConstraint {
 
   static RegionSameValues = class RegionSameValues extends SudokuConstraintBase {
     static DESCRIPTION = (`
-      All the largest-size regions (rows, columns, boxes and jigsaw pieces) must
-      contain the same set of values.`);
+      All the largest-size regions (which could include rows, columns, boxes and
+      jigsaw pieces) must contain the same set of values.`);
     static CATEGORY = 'Region';
     static UNIQUENESS_KEY_FIELD = 'type';
   }
@@ -1307,18 +1319,20 @@ export class SudokuConstraint {
     static UNIQUENESS_KEY_FIELD = 'type';
     static REQUIRE_SQUARE_GRID = true;
 
-    static regions = memoize((shape) => {
+    static regions = memoize((shape, size = null) => {
       const numRows = shape.numRows;
       const numCols = shape.numCols;
-      const boxWidth = shape.boxWidth;
-      const boxHeight = shape.boxHeight;
+      const effectiveSize = size ?? shape.numValues;
+      const [boxHeight, boxWidth] = GridShape.boxDimsForSize(
+        numRows, numCols, effectiveSize);
+      if (!boxHeight) return [];
 
       const regions = [];
 
       for (let i = 1; i + boxWidth < numCols; i += boxWidth + 1) {
         for (let j = 1; j + boxHeight < numRows; j += boxHeight + 1) {
           const cells = [];
-          for (let k = 0; k < shape.numValues; k++) {
+          for (let k = 0; k < effectiveSize; k++) {
             const row = j + (k % boxHeight | 0);
             const col = i + (k / boxHeight | 0);
             cells.push(shape.cellIndex(row, col));
@@ -1328,7 +1342,7 @@ export class SudokuConstraint {
       }
 
       return regions;
-    }, (shape) => shape.fullGridSpec);
+    }, (shape, size = null) => `${shape.gridDimsStr}~${size ?? shape.numValues}`);
   }
 
   static DisjointSets = class DisjointSets extends SudokuConstraintBase {

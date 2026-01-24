@@ -353,6 +353,7 @@ export const runSolveTests = async (onFailure, runner) => {
     '6x6: Irregular Quadro Quadri', // non-standard numValues, Jigsaw
     '7x7: Dutch Flat Mate Squishdoku', // non-standard numValues, Dutch Flatmates
     '7x7: Buggy NR Squishdoku',  // non-standard numValues, Numbered Rooms
+    '6x6: 9-value disjoint sets',  // non-standard numValues, DisjointSets
   ], onFailure);
   result.collection = 'Non-square grids';
   results.push(result);

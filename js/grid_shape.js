@@ -110,9 +110,6 @@ export class GridShape {
     this.numCells = numRows * numCols;
     this.numPencilmarks = this.numCells * this.numValues;
 
-    // Box dimensions
-    [this.boxHeight, this.boxWidth] = this.constructor._boxDims(numRows, numCols, this.numValues);
-
     this.name = this.constructor.makeName(numRows, numCols, this.numValues);
     this.gridDimsStr = `${this.numRows}x${this.numCols}`;
     this.fullGridSpec = `${this.gridDimsStr}~${this.numValues}`;
@@ -127,15 +124,6 @@ export class GridShape {
 
   isSquare() {
     return this.numRows === this.numCols;
-  }
-
-  static _boxDims(numRows, numCols, numValues) {
-    if (numValues !== this.defaultNumValues(numRows, numCols)) {
-      // Non-default numValues => no default boxes
-      return [null, null];
-    }
-
-    return this.boxDimsForSize(numRows, numCols, numValues);
   }
 
   // Compute box dimensions for a target region size.
