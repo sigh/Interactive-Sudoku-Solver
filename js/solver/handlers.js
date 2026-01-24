@@ -1758,6 +1758,8 @@ export class SameValues extends SudokuConstraintHandler {
     const valueBuffer = this._buffer1;
 
     // Determine the possible values for each set.
+    let valueIntersection = -1;
+    let allValues = 0;
     for (let i = 0; i < numSets; i++) {
       const s = this._cellSets[i];
       let values = 0;
@@ -1765,14 +1767,7 @@ export class SameValues extends SudokuConstraintHandler {
         values |= grid[s[j]];
       }
       valueBuffer[i] = values;
-    }
-
-    // Determine the intersection of all the values.
-    let valueIntersection = valueBuffer[0];
-    let diff = 0;
-    for (let i = 1; i < numSets; i++) {
-      const values = valueBuffer[i];
-      diff |= values ^ valueIntersection;
+      allValues |= values;
       valueIntersection &= values;
     }
 
@@ -1781,7 +1776,7 @@ export class SameValues extends SudokuConstraintHandler {
     if (intersectionSize < this._maxExclusionSize) return false;
 
     // Enforce the constrained value set.
-    if (diff) {
+    if (allValues !== valueIntersection) {
       for (let i = 0; i < numSets; i++) {
         if (valueBuffer[i] === valueIntersection) continue;
         const s = this._cellSets[i];
