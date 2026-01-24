@@ -452,6 +452,7 @@ export class CompositeConstraintBase extends SudokuConstraintBase {
   static IS_COMPOSITE = true;
   static DISPLAY_CONFIG = {
     displayClass: 'BorderedRegion',
+    inset: 2,
     opacity: 0.35,
     dashed: true,
   };
@@ -2011,8 +2012,7 @@ export class SudokuConstraint {
     static CATEGORY = 'LinesAndSets';
     static DISPLAY_CONFIG = {
       displayClass: 'BorderedRegion',
-      inset: 2,
-      strokeWidth: 4,
+      inset: 1.5,
     };
 
     constructor(...cells) {
@@ -2068,6 +2068,7 @@ export class SudokuConstraint {
     static DISPLAY_CONFIG = {
       displayClass: 'BorderedRegion',
       fillOpacity: 0.1,
+      inset: 2,
       splitFn: (constraint) => constraint.splitCells(),
     };
     static ARGUMENT_CONFIG = {

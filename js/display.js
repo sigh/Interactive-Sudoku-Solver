@@ -337,15 +337,15 @@ export class CellValueDisplay extends DisplayItem {
 export class ColorPicker {
   // Default color list.
   COLOR_LIST = [
-    'green',
+    'olive',
     'red',
+    'deeppink',
+    'dodgerblue',
     'orange',
-    'cyan',
+    'teal',
     'brown',
     'black',
     'purple',
-    'gold',
-    'lightblue',
   ];
 
   constructor() {

@@ -1045,7 +1045,9 @@ class BorderedRegion extends BaseConstraintDisplayItem {
       g.append(border);
     }
 
-    g.setAttribute('stroke-width', options.strokeWidth ?? 5);
+    const strokeWidth = options.strokeWidth ?? (
+      options.inset ? options.inset * 2 : 5);
+    g.setAttribute('stroke-width', strokeWidth);
     g.setAttribute('stroke', color);
     if (options.dashed) g.setAttribute('stroke-dasharray', '8 2');
     g.setAttribute('opacity', options.opacity ?? 0.4);
