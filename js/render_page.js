@@ -213,6 +213,7 @@ class ConstraintCollectionBase {
   removeAllConstraints() { throw Error('Not implemented'); }
 
   getConstraintsByKey(key) { return []; }
+  getConstraintsByType(type) { return []; }
 
   setShape(shape) { throw Error('Not implemented'); }
 
@@ -260,6 +261,10 @@ class SelectedConstraintCollection extends ConstraintCollectionBase {
 
   getConstraintsByKey(key) {
     return this._rootCollection.getConstraintsByKey(key);
+  }
+
+  getConstraintsByType(type) {
+    return this._rootCollection.getConstraintsByType(type);
   }
 }
 
@@ -371,6 +376,10 @@ class RootConstraintCollection extends ConstraintCollectionBase {
 
   getConstraintsByKey(key) {
     return this._uniquenessKeySet.getKey(key);
+  }
+
+  getConstraintsByType(type) {
+    return [...this._constraintMap.keys()].filter(c => c.type === type);
   }
 
   _chipViewForConstraint(constraint) {

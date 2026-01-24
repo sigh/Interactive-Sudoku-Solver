@@ -1198,9 +1198,7 @@ export class SudokuConstraint {
 
   static RegionSize = class RegionSize extends SudokuConstraintBase {
     static DESCRIPTION = (`
-      Jigsaw pieces must be of this size.
-      In addition, enforces that all regions of the this size (rows, columns,
-      and jigsaw pieces) contain the same set of values.`);
+      Jigsaw pieces must be of this size.`);
     static CATEGORY = 'Region';
     static UNIQUENESS_KEY_FIELD = 'type';
 
@@ -1208,6 +1206,14 @@ export class SudokuConstraint {
       super(size);
       this.size = +size;
     }
+  }
+
+  static RegionSameValues = class RegionSameValues extends SudokuConstraintBase {
+    static DESCRIPTION = (`
+      All the largest-size regions (rows, columns, boxes and jigsaw pieces) must
+      contain the same set of values.`);
+    static CATEGORY = 'Region';
+    static UNIQUENESS_KEY_FIELD = 'type';
   }
 
   static StrictKropki = class StrictKropki extends SudokuConstraintBase {

@@ -799,7 +799,7 @@ export const EXAMPLES = [
   {
     name: '6x6: Con-set-cutive',
     src: 'https://www.youtube.com/watch?v=G3rxwq4_RqU',
-    input: '.Shape~6x6~9.Cage~10~R1C2~R2C2.Cage~8~R3C1~R4C1.Renban~R4C1~R5C1.Renban~R2C1~R2C2.Renban~R3C4~R4C4~R5C4~R6C4.Whisper~5~R4C3~R4C4~R4C5.Whisper~5~R2C4~R2C5.Arrow~R6C4~R6C3~R6C2~R6C1.RegionSize~6.Jigsaw~111222111222333444333444555666555666',
+    input: '.Shape~6x6~9.Cage~10~R1C2~R2C2.Cage~8~R3C1~R4C1.Renban~R4C1~R5C1.Renban~R2C1~R2C2.Renban~R3C4~R4C4~R5C4~R6C4.Whisper~5~R4C3~R4C4~R4C5.Whisper~5~R2C4~R2C5.Arrow~R6C4~R6C3~R6C2~R6C1.RegionSize~6.RegionSameValues.Jigsaw~111222111222333444333444555666555666',
     solution: '627198981276198762762819879621216987',
   },
   {
