@@ -845,6 +845,10 @@ select.thin-select {
   padding-bottom: 2px;
 }
 
+#jigsaw-container {
+  --vstack-gap: 5px;
+}
+
 .shape-input-container {
   position: relative;
   display: inline-block;

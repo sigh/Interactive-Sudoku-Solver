@@ -627,43 +627,30 @@ export class SudokuBuilder {
             /* strict = */ true);
           break;
 
-        case 'RegionSize':
+        case 'RegionSameValues':
           {
-            const size = constraint.size;
-
             const regions = [];
+
             if (constraintMap.has('Jigsaw')) {
               const jigsawConstraints = constraintMap.get('Jigsaw');
               const jigsawRegions = jigsawConstraints.map(
                 c => c.cells.map(id => shape.parseCellId(id).cell));
 
-              for (const region of jigsawRegions) {
-                if (region.length !== size) {
-                  throw new InvalidConstraintError(
-                    `Jigsaw pieces must have ${size} cells for RegionSize.`);
-                }
-              }
-
               regions.push(...jigsawRegions);
             }
 
-            // Region size has no effect (but we do the jigsaw validation above).
-            if (size === shape.numValues) break;
-
-            for (const cells of SudokuConstraintBase.rowRegions(shape)) {
-              if (cells.length === size) regions.push(cells);
-            }
-            for (const cells of SudokuConstraintBase.colRegions(shape)) {
-              if (cells.length === size) regions.push(cells);
+            regions.push(...SudokuConstraintBase.rowRegions(shape));
+            regions.push(...SudokuConstraintBase.colRegions(shape));
+            if (!constraintMap.has('NoBoxes') && !shape.noDefaultBoxes) {
+              regions.push(...SudokuConstraintBase.boxRegions(shape));
             }
 
-            if (regions.length === 0) {
-              throw new InvalidConstraintError(
-                `No rows or columns have ${size} cells for RegionSize.`);
-            }
+            // We only want the largest regions.
+            const maxSize = Math.max(...regions.map(r => r.length));
+            const filteredRegions = regions.filter(r => r.length === maxSize);
 
-            if (regions.length >= 2) {
-              yield new HandlerModule.SameValues(...regions);
+            if (maxSize !== shape.numValues && filteredRegions.length >= 2) {
+              yield new HandlerModule.SameValues(...filteredRegions);
             }
           }
           break;
@@ -795,6 +782,7 @@ export class SudokuBuilder {
 
         case 'NoBoxes':
         case 'Shape':
+        case 'RegionSize':
           // Nothing to do here.
           break;
 

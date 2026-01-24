@@ -798,9 +798,11 @@ ConstraintCategoryInput.Region = class Region extends ConstraintCategoryInput {
     this._button = document.getElementById('add-jigsaw-button');
 
     this._regionSizeSelect = document.getElementById('region-size-select');
+    this._sameValuesCheckbox = document.getElementById('region-same-values-checkbox');
 
     this._setUpButton(inputManager);
     this._setUpRegionSizeSelect();
+    this._setUpSameValuesCheckbox();
   }
 
   _setUpRegionSizeSelect() {
@@ -810,23 +812,45 @@ ConstraintCategoryInput.Region = class Region extends ConstraintCategoryInput {
       if (!this._shape) return;
       const selected = +select.value;
 
-      this.collection.removeAllConstraints();
+      for (const c of this.collection.getConstraintsByKey('RegionSize')) {
+        this.collection.removeConstraint(c);
+      }
+      for (const c of this.collection.getConstraintsByType('Jigsaw')) {
+        this.collection.removeConstraint(c);
+      }
       if (selected !== this._shape.numValues) {
         this.collection.addConstraint(new SudokuConstraint.RegionSize(selected));
       }
     };
   }
 
+  _setUpSameValuesCheckbox() {
+    const checkbox = this._sameValuesCheckbox;
+
+    checkbox.onchange = () => {
+      if (checkbox.checked) {
+        this.collection.addConstraint(new SudokuConstraint.RegionSameValues());
+      } else {
+        for (const c of this.collection.getConstraintsByKey('RegionSameValues')) {
+          this.collection.removeConstraint(c);
+        }
+      }
+    };
+  }
+
   _updateRegionSizeSelectForShape(shape) {
     const select = this._regionSizeSelect;
+    const checkboxContainer = this._sameValuesCheckbox.parentNode;
 
     // Hide when numValues is default.
     if (shape.isDefaultNumValues()) {
       select.parentNode.style.display = 'none';
+      checkboxContainer.style.display = 'none';
       return;
     }
 
     select.parentNode.style.display = 'block';
+    checkboxContainer.style.display = 'block';
 
     const defaultNumValues = GridShape.defaultNumValues(
       shape.numRows, shape.numCols);
@@ -894,13 +918,21 @@ ConstraintCategoryInput.Region = class Region extends ConstraintCategoryInput {
   onAddConstraint(c) {
     if (c.type === SudokuConstraint.RegionSize.name) {
       this._regionSizeSelect.value = c.size;
+    } else if (c.type === SudokuConstraint.RegionSameValues.name) {
+      this._sameValuesCheckbox.checked = true;
     }
   }
 
   onRemoveConstraint(c) {
     if (c.type === SudokuConstraint.RegionSize.name) {
       this._regionSizeSelect.value = this._shape?.numValues;
+    } else if (c.type === SudokuConstraint.RegionSameValues.name) {
+      this._sameValuesCheckbox.checked = false;
     }
+  }
+
+  clear() {
+    this._sameValuesCheckbox.checked = false;
   }
 }
 
