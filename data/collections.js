@@ -849,6 +849,11 @@ export const EXAMPLES = [
     input: '.Shape~7x7~9.AllDifferent~R1C3~R2C3~R3C3~R3C4~R3C5~R2C5~R1C5~R1C4~R2C4.AllDifferent~R3C1~R3C2~R4C2~R3C3~R4C3~R5C3~R5C2~R5C1~R4C1.AllDifferent~R3C3~R4C3~R5C3~R5C4~R5C5~R4C5~R3C5~R3C4~R4C4.AllDifferent~R3C5~R4C5~R5C5~R5C6~R5C7~R4C7~R3C7~R3C6~R4C6.AllDifferent~R5C3~R5C4~R5C5~R6C5~R7C5~R7C4~R7C3~R6C3~R6C4.Skyscraper~C1~~3.Skyscraper~C7~~3.Skyscraper~C2~2~.Skyscraper~R3~2~.Skyscraper~C4~~3.NumberedRoom~C1~~3.NumberedRoom~C7~~3.NumberedRoom~C2~2~.NumberedRoom~R3~2~.NumberedRoom~C4~~3.NumberedRoom~R6~4~.~R5C7_7~R1C5_1~R7C6_8~R4C4_1.Jigsaw~1112333111233311123332222222444255544425554442555',
     solution: '4753192698475331296488571329964851778162345237986',
   },
+  {
+    name: '6x6: 9-value disjoint sets',
+    input: '.Shape~6x6~9.~R1C1_1~R3C4_2~R2C5_1~R4C3_2~R3C2_4~R3C1_6~R5C2_3~R6C4_4~R6C6_6~R1C3_3~R6C3_7~R6C5_9~R2C1_5~R5C4_7~R2C6_7~R1C5_6~R3C6_3.DisjointSets',
+    solution: '173564528917649283952831436752817496',
+  },
 
   //////////////////////////////////////////////////////////////////////////////
   // Or

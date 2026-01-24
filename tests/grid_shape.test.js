@@ -199,52 +199,55 @@ await runTest('splitCellIndex is inverse of cellIndex for rectangular 6x8', () =
 // Box dimensions
 // ============================================================================
 
-await runTest('box dimensions are correct for common square sizes', () => {
-  assert.deepEqual([GridShape.fromGridSize(4).boxHeight, GridShape.fromGridSize(4).boxWidth], [2, 2]);
-  assert.deepEqual([GridShape.fromGridSize(6).boxHeight, GridShape.fromGridSize(6).boxWidth], [2, 3]);
-  assert.deepEqual([GridShape.fromGridSize(9).boxHeight, GridShape.fromGridSize(9).boxWidth], [3, 3]);
-  assert.deepEqual([GridShape.fromGridSize(12).boxHeight, GridShape.fromGridSize(12).boxWidth], [3, 4]);
-  assert.deepEqual([GridShape.fromGridSize(16).boxHeight, GridShape.fromGridSize(16).boxWidth], [4, 4]);
+await runTest('boxDimsForSize is correct for common square sizes', () => {
+  assert.deepEqual(GridShape.boxDimsForSize(4, 4, 4), [2, 2]);
+  assert.deepEqual(GridShape.boxDimsForSize(6, 6, 6), [2, 3]);
+  assert.deepEqual(GridShape.boxDimsForSize(9, 9, 9), [3, 3]);
+  assert.deepEqual(GridShape.boxDimsForSize(12, 12, 12), [3, 4]);
+  assert.deepEqual(GridShape.boxDimsForSize(16, 16, 16), [4, 4]);
 });
 
-await runTest('box dimensions for rectangular grids prefer numValues-sized boxes', () => {
-  // 6x8 grid with numValues=8: boxes must have 8 cells
-  const shape68 = GridShape.fromGridSize(6, 8);
-  assert.equal(shape68.boxHeight * shape68.boxWidth, 8);
-  assert.equal(shape68.numRows % shape68.boxHeight, 0);
-  assert.equal(shape68.numCols % shape68.boxWidth, 0);
+await runTest('boxDimsForSize for rectangular grids', () => {
+  // 6x8 grid with size 8: boxes must have 8 cells
+  const [h68, w68] = GridShape.boxDimsForSize(6, 8, 8);
+  assert.equal(h68 * w68, 8);
+  assert.equal(6 % h68, 0);
+  assert.equal(8 % w68, 0);
 
-  // 4x6 grid with numValues=6: boxes must have 6 cells
-  const shape46 = GridShape.fromGridSize(4, 6);
-  assert.equal(shape46.boxHeight * shape46.boxWidth, 6);
-  assert.equal(shape46.numRows % shape46.boxHeight, 0);
-  assert.equal(shape46.numCols % shape46.boxWidth, 0);
+  // 4x6 grid with size 6: boxes must have 6 cells
+  const [h46, w46] = GridShape.boxDimsForSize(4, 6, 6);
+  assert.equal(h46 * w46, 6);
+  assert.equal(4 % h46, 0);
+  assert.equal(6 % w46, 0);
 });
 
-await runTest('box dimensions for square grids have numValues cells', () => {
+await runTest('boxDimsForSize for square grids have correct cells', () => {
   for (const size of [4, 6, 9, 12, 16]) {
-    const shape = GridShape.fromGridSize(size);
-    const boxCells = shape.boxHeight * shape.boxWidth;
-    assert.equal(boxCells, size, `${size}x${size} box should have ${size} cells`);
+    const [h, w] = GridShape.boxDimsForSize(size, size, size);
+    assert.equal(h * w, size, `${size}x${size} box should have ${size} cells`);
   }
 });
 
-await runTest('box dimensions prefer squarer boxes', () => {
+await runTest('boxDimsForSize prefers squarer boxes', () => {
   // 9x9: should be 3x3, not 1x9
-  const shape9 = GridShape.fromGridSize(9);
-  assert.deepEqual([shape9.boxHeight, shape9.boxWidth], [3, 3]);
+  assert.deepEqual(GridShape.boxDimsForSize(9, 9, 9), [3, 3]);
 
   // 6x6: should be 2x3, not 1x6
-  const shape6 = GridShape.fromGridSize(6);
-  assert.deepEqual([shape6.boxHeight, shape6.boxWidth], [2, 3]);
+  assert.deepEqual(GridShape.boxDimsForSize(6, 6, 6), [2, 3]);
 
-  // 6x8 with numValues=8: should be 2x4, not 1x8 or 8x1
-  const shape68 = GridShape.fromGridSize(6, 8);
-  assert.deepEqual([shape68.boxHeight, shape68.boxWidth], [2, 4]);
+  // 6x8 with size 8: should be 2x4, not 1x8 or 8x1
+  assert.deepEqual(GridShape.boxDimsForSize(6, 8, 8), [2, 4]);
 
-  // 8x6 with numValues=8: should be 4x2, not 1x8 or 8x1
-  const shape86 = GridShape.fromGridSize(8, 6);
-  assert.deepEqual([shape86.boxHeight, shape86.boxWidth], [4, 2]);
+  // 8x6 with size 8: should be 4x2, not 1x8 or 8x1
+  assert.deepEqual(GridShape.boxDimsForSize(8, 6, 8), [4, 2]);
+});
+
+await runTest('boxDimsForSize returns null for invalid sizes', () => {
+  // 5x7 grid cannot have 7-cell boxes that tile evenly
+  assert.deepEqual(GridShape.boxDimsForSize(5, 7, 7), [null, null]);
+
+  // 3x5 grid cannot have 5-cell boxes
+  assert.deepEqual(GridShape.boxDimsForSize(3, 5, 5), [null, null]);
 });
 
 // ============================================================================

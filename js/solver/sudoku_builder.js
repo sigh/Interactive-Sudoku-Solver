@@ -45,10 +45,14 @@ export class SudokuBuilder {
   static _getBoxRegions(shape, constraintMap) {
     if (constraintMap.has('NoBoxes')) return [];
 
-    const regionSizeConstraints = constraintMap.get('RegionSize');
-    const size = regionSizeConstraints?.[0]?.size ?? null;
-
+    const size = this._getEffectiveBoxSize(constraintMap);
     return SudokuConstraintBase.boxRegions(shape, size);
+  }
+
+  // Get the effective box size from RegionSize constraint, or null for default.
+  static _getEffectiveBoxSize(constraintMap) {
+    const regionSizeConstraints = constraintMap.get('RegionSize');
+    return regionSizeConstraints?.[0]?.size ?? null;
   }
 
   static *_rowColHandlers(shape) {
@@ -588,13 +592,15 @@ export class SudokuBuilder {
           }
           break;
         case 'Windoku':
-          for (const cells of SudokuConstraint.Windoku.regions(shape)) {
+          for (const cells of SudokuConstraint.Windoku.regions(
+            shape, this._getEffectiveBoxSize(constraintMap))) {
             yield new HandlerModule.AllDifferent(cells);
           }
           break;
 
         case 'DisjointSets':
-          for (const cells of SudokuConstraintBase.disjointSetRegions(shape)) {
+          for (const cells of SudokuConstraintBase.disjointSetRegions(
+            shape, this._getEffectiveBoxSize(constraintMap))) {
             yield new HandlerModule.AllDifferent(cells);
           }
           break;
