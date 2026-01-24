@@ -1192,7 +1192,7 @@ export class SudokuConstraint {
     static DESCRIPTION = (`
       No standard box regions.`);
     static CATEGORY = 'LayoutCheckbox';
-    static DISPLAY_CONFIG = { displayClass: 'DefaultRegionsInverted' };
+    static DISPLAY_CONFIG = { displayClass: 'DefaultRegions' };
     static UNIQUENESS_KEY_FIELD = 'type';
   }
 
@@ -1200,6 +1200,7 @@ export class SudokuConstraint {
     static DESCRIPTION = (`
       Jigsaw pieces must be of this size.`);
     static CATEGORY = 'Region';
+    static DISPLAY_CONFIG = { displayClass: 'DefaultRegions' };
     static UNIQUENESS_KEY_FIELD = 'type';
 
     constructor(size) {
