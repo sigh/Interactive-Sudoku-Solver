@@ -2010,7 +2010,9 @@ export class SudokuConstraint {
       Values must be unique.`);
     static CATEGORY = 'LinesAndSets';
     static DISPLAY_CONFIG = {
-      displayClass: 'ShadedRegion',
+      displayClass: 'BorderedRegion',
+      inset: 2,
+      strokeWidth: 4,
     };
 
     constructor(...cells) {
@@ -2065,6 +2067,7 @@ export class SudokuConstraint {
     static CATEGORY = 'LinesAndSets';
     static DISPLAY_CONFIG = {
       displayClass: 'BorderedRegion',
+      fillOpacity: 0.1,
       splitFn: (constraint) => constraint.splitCells(),
     };
     static ARGUMENT_CONFIG = {
