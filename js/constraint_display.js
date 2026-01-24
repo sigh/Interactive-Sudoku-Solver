@@ -206,12 +206,36 @@ class BaseConstraintDisplayItem extends DisplayItem {
       && cellSet.has(graph.diagonal(cell, dir0, dir1)));
   }
 
-  _makeRegionBorder(graph, cellSet, shape, cutSize) {
+  _makeRegionBorder(graph, cellSet, shape, cutSize, inset = 0) {
     const g = createSvgElement('g');
 
     const cellSize = DisplayItem.CELL_SIZE;
     cutSize ||= 0;
     const cls = this.constructor;
+
+    const applyInsetToParts = (parts, edgeType) => {
+      if (!inset) return parts;
+
+      let dx = 0;
+      let dy = 0;
+      switch (edgeType) {
+        case GridGraph.UP:
+          dy = inset;
+          break;
+        case GridGraph.DOWN:
+          dy = -inset;
+          break;
+        case GridGraph.LEFT:
+          dx = inset;
+          break;
+        case GridGraph.RIGHT:
+          dx = -inset;
+          break;
+      }
+
+      if (!dx && !dy) return parts;
+      return parts.map(([x, y]) => [x + dx, y + dy]);
+    };
 
     const borderEdgeParts = (cell, row, col, edgeType) => {
       // Points with any offsets applied.
@@ -227,7 +251,7 @@ class BaseConstraintDisplayItem extends DisplayItem {
       parts[1][1 - orientation] += cellSize;
 
       // If we don't need to cut across to diagonals, we're done.
-      if (cutSize === 0) return parts;
+      if (cutSize === 0) return applyInsetToParts(parts, edgeType);
 
       const rowOffset = direction ? cutSize : -cutSize;
       const diagStartType = orientation ? GridGraph.LEFT : GridGraph.UP;
@@ -249,7 +273,7 @@ class BaseConstraintDisplayItem extends DisplayItem {
         }
       }
 
-      return parts;
+      return applyInsetToParts(parts, edgeType);
     }
 
     for (const cell of cellSet) {
@@ -994,17 +1018,33 @@ class BorderedRegion extends BaseConstraintDisplayItem {
 
     const g = createSvgElement('g');
 
+    const fillOpacity = options.fillOpacity;
     for (const group of groups) {
       const cellSet = new Set(group.map(c => shape.parseCellId(c).cell));
 
-      const border = this._makeRegionBorder(graph, cellSet, shape, 10);
+      if (fillOpacity !== undefined) {
+        for (const cell of cellSet) {
+          const path = this._makeCellSquare(cell);
+          path.setAttribute('fill', color);
+          path.setAttribute('opacity', String(fillOpacity));
+          g.append(path);
+        }
+      }
+
+      const border = this._makeRegionBorder(
+        graph,
+        cellSet,
+        shape,
+        10,
+        options.inset);
       g.append(border);
     }
 
-    g.setAttribute('stroke-width', 5);
+    g.setAttribute('stroke-width', options.strokeWidth ?? 5);
     g.setAttribute('stroke', color);
     if (options.dashed) g.setAttribute('stroke-dasharray', '8 2');
-    g.setAttribute('opacity', options.opacity || 0.4);
+    g.setAttribute('opacity', options.opacity ?? 0.4);
+    g.setAttribute('stroke-linejoin', 'round');
 
     if (!colorOverride) {
       this._colorPicker.addItem(g, color, groups.flat());
