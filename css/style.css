@@ -22,6 +22,8 @@
   --color-selection-hover: rgb(240, 240, 20);
   --color-highlight: lime;
   --color-highlight-hover: limegreen;
+  --color-branch-cell: var(--color-primary);
+  --color-diff: rgb(240, 120, 120);
 
   /* Colors - Candidate support levels */
 
@@ -127,7 +129,7 @@ body {
 }
 
 .diff-group {
-  fill: rgb(240, 180, 180);
+  fill: var(--color-diff);
   filter: drop-shadow(0px 0px 1px white);
 }
 

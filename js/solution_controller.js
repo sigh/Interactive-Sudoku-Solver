@@ -587,19 +587,39 @@ export class SolutionController {
   }
 
   _makeCandidateColorFn(result) {
+    const fns = [];
+
+    if (result.branchCells?.size) {
+      fns.push((cellIndex) => {
+        // Branch cells take priority for coloring.
+        return result.branchCells.has(cellIndex)
+          ? 'var(--color-branch-cell)' : null;
+      });
+    }
+
     const counts = result.counts;
     const threshold = result.candidateSupportThreshold;
-    if (!counts || threshold <= 1) return null;
+    if (counts && threshold > 1) {
+      fns.push((cellIndex, value) => {
+        const count = counts[cellIndex]?.[value - 1];
+        if (!count || count >= threshold) return null;
+        if (count === 1) return 'var(--color-candidate-unique)';
+        // Note that the threshold is one more than the limit to detect when
+        // we are over the limit.
+        if (count === threshold - 1) return 'var(--color-candidate-at-limit)';
+        return 'var(--color-candidate-below-limit)';
+      });
+    }
 
+    if (fns.length === 0) return null;
+    if (fns.length === 1) return fns[0];
     return (cellIndex, value) => {
-      const count = counts[cellIndex]?.[value - 1];
-      if (!count || count >= threshold) return null;
-      if (count === 1) return 'var(--color-candidate-unique)';
-      // Note that the threshold is one more than the limit to detect when
-      // we are over the limit.
-      if (count === threshold - 1) return 'var(--color-candidate-at-limit)';
-      return 'var(--color-candidate-below-limit)';
-    };
+      for (const fn of fns) {
+        const color = fn(cellIndex, value);
+        if (color) return color;
+      }
+      return null;
+    }
   }
 
   _handleIterationChange(state) {
@@ -659,7 +679,6 @@ export class SolutionController {
     const statusParts = [];
     if (statusData.isSolution) statusParts.push('[Solution]');
     if (statusData.hasContradiction) statusParts.push('[Conflict]');
-    if (statusData.isBacktrack) statusParts.push('[Backtracked]');
     statusElem.appendChild(document.createTextNode(' ' + statusParts.join(' ')));
 
     return statusElem;

@@ -1,6 +1,13 @@
 "use strict";
 
-const { Timer, IteratorWithCount, arraysAreEqual, setIntersectionToArray, BitSet } = await import('../util.js' + self.VERSION_PARAM);
+const {
+  Timer,
+  IteratorWithCount,
+  arraysAreEqual,
+  setIntersectionToArray,
+  BitSet,
+  setPeek
+} = await import('../util.js' + self.VERSION_PARAM);
 const { LookupTables } = await import('./lookup_tables.js' + self.VERSION_PARAM);
 const { SHAPE_MAX } = await import('../grid_shape.js' + self.VERSION_PARAM);
 const { SudokuConstraintOptimizer } = await import('./optimizer.js' + self.VERSION_PARAM);
@@ -101,29 +108,34 @@ export class SudokuSolver {
     if (!result) return null;
 
     const pencilmarks = SudokuSolverUtil.makePencilmarks(result.grid);
-    for (const cell of result.cellOrder) {
-      pencilmarks[cell] = LookupTables.toValue(result.grid[cell]);
+    // Convert single-value pencilmarks to values.
+    for (let i = 0; i < pencilmarks.length; i++) {
+      if (pencilmarks[i].size === 1) {
+        pencilmarks[i] = setPeek(pencilmarks[i]);
+      }
     }
 
-    let diffPencilmarks = null;
-    if (result.oldGrid) {
-      diffPencilmarks = SudokuSolverUtil.makeDiffPencilmarks(
-        result.oldGrid, result.grid);
-    }
-
-    const latestCell = result.cellOrder.length ?
-      this._shape.makeCellIdFromIndex(
-        result.cellOrder[result.cellOrder.length - 1]) : null;
-
-    return {
+    const returnValue = {
       pencilmarks: pencilmarks,
-      diffPencilmarks: diffPencilmarks,
-      latestCell: latestCell,
+      branchCells: result.cellOrder.subarray(0, result.guessDepth + 1),
       isSolution: result.isSolution,
       hasContradiction: result.hasContradiction,
-      isBacktrack: result.isBacktrack,
-      values: LookupTables.toValuesArray(result.values),
+    };
+
+    if (result.guessDepth !== -1) {
+      // The guess cell is the last item in the cell order.
+      const guessCellIndex = result.cellOrder[result.guessDepth];
+      // The options are the values that existed in the old grid for the guess
+      // cell.
+      returnValue.values = LookupTables.toValuesArray(
+        result.oldGrid[guessCellIndex]);
+
+      returnValue.diffPencilmarks = SudokuSolverUtil.makeDiffPencilmarks(
+        result.oldGrid, result.grid);
+      returnValue.guessCell = this._shape.makeCellIdFromIndex(guessCellIndex);
     }
+
+    return returnValue;
   }
 
   _nthIteration(n, stepGuides) {
@@ -637,7 +649,10 @@ class InternalSolver {
         stepGuides: null,
         step: 0,
         oldGrid: new Uint16Array(this._numCells),
-        hadBacktrack: false,
+        pendingGuess: {
+          cellDepth: -1,
+          guess: 0,
+        },
       };
     }
     for (const [key, value] of Object.entries(updates)) {
@@ -717,6 +732,12 @@ class InternalSolver {
       initialRecFrame.progressRemaining = 1.0;
       initialRecFrame.newNode = true;
 
+      if (yieldEveryStep) {
+        this.setStepState({});
+        this._stepState.oldGrid.set(initialRecFrame.gridCells);
+        this._stepState.step = 1;
+      }
+
       // Enforce constraints for all cells.
       const handlerAccumulator = this._handlerAccumulator;
       handlerAccumulator.reset(false);
@@ -725,22 +746,6 @@ class InternalSolver {
         // If the initial grid is invalid, then ensure it has a zero so that the
         // initial iteration will fail.
         if (initialRecFrame.gridCells.indexOf(0) === -1) initialRecFrame.gridCells.fill(0);
-      }
-
-      if (yieldEveryStep) {
-        this.setStepState({});
-        yield {
-          grid: initialRecFrame.gridCells,
-          oldGrid: null,
-          isSolution: false,
-          cellOrder: [],
-          values: 0,
-          hasContradiction: initialRecFrame.gridCells.indexOf(0) !== -1,
-        }
-        checkRunCounter();
-        this._stepState.oldGrid.set(initialRecFrame.gridCells);
-        this._stepState.hadBacktrack = false;
-        this._stepState.step = 1;
       }
 
       counters.nodesSearched++;
@@ -791,6 +796,31 @@ class InternalSolver {
       }
 
       const cell = this._candidateSelector.getCellAtDepth(cellDepth);
+
+      if (yieldEveryStep) {
+        const stepState = this._stepState;
+        if (!isNewNode) {
+          stepState.oldGrid.set(grid);
+        }
+        if (count > 1 && isNewNode) {
+          yield {
+            grid: grid,
+            oldGrid: stepState.oldGrid,
+            isSolution: false,
+            cellOrder: this._candidateSelector.getCellOrder(),
+            guessDepth: this._stepState.pendingGuess.cellDepth,
+            hasContradiction: false,
+          };
+          checkRunCounter();
+          stepState.oldGrid.set(grid);
+          stepState.step++;
+        }
+        if (!isNewNode || count !== 1) {
+          stepState.pendingGuess.cellDepth = cellDepth;
+          stepState.pendingGuess.guess = value;
+        }
+      }
+
       if (count !== 1) {
         // We only need to start a new recursion frame when there is more than
         // one value to try.
@@ -808,30 +838,9 @@ class InternalSolver {
         grid = recFrame.gridCells;
       }
 
-      if (yieldEveryStep && this._stepState.hadBacktrack) {
-        this._stepState.oldGrid.set(grid);
-      }
-
       // NOTE: Set this even when count == 1 to allow for other candidate
       //       selection methods.
       grid[cell] = value;
-
-      if (yieldEveryStep && (!isNewNode || count !== 1)) {
-        // This is a guess (or this node was a guess before).
-        yield {
-          grid: grid,
-          oldGrid: this._stepState.oldGrid,
-          isSolution: false,
-          cellOrder: this._candidateSelector.getCellOrder(cellDepth + 1),
-          values: this._stepState.oldGrid[cell],
-          hasContradiction: false,
-          isBacktrack: this._stepState.hadBacktrack,
-        };
-        checkRunCounter();
-        this._stepState.oldGrid.set(grid);
-        this._stepState.hadBacktrack = false;
-        this._stepState.step++;
-      }
 
       iterationCounterForUpdates++;
       if ((iterationCounterForUpdates & progressFrequencyMask) === 0) {
@@ -852,19 +861,6 @@ class InternalSolver {
         counters.backtracks++;
         this._conflictScores.increment(cell, value);
 
-        if (yieldEveryStep) {
-          yield {
-            grid: grid,
-            oldGrid: this._stepState.oldGrid,
-            isSolution: false,
-            cellOrder: this._candidateSelector.getCellOrder(cellDepth + 1),
-            hasContradiction: true,
-          };
-          checkRunCounter();
-          this._stepState.hadBacktrack = true;
-          this._stepState.step++;
-        }
-
         if (0 !== yieldOnBacktrack &&
           0 === counters.backtracks % yieldOnBacktrack) {
           yield {
@@ -873,6 +869,26 @@ class InternalSolver {
             cellOrder: this._candidateSelector.getCellOrder(cellDepth),
             hasContradiction: hasContradiction,
           };
+        }
+
+        if (yieldEveryStep) {
+          // Ensure that the pending guess is visible in the grid.
+          if (this._stepState.pendingGuess.guess) {
+            const guessCell = this._candidateSelector.getCellAtDepth(
+              this._stepState.pendingGuess.cellDepth);
+            grid[guessCell] = this._stepState.pendingGuess.guess;
+          }
+          yield {
+            grid: grid,
+            oldGrid: this._stepState.oldGrid,
+            isSolution: false,
+            cellOrder: this._candidateSelector.getCellOrder(),
+            guessDepth: this._stepState.pendingGuess.cellDepth,
+            hasContradiction: true,
+          };
+          checkRunCounter();
+          this._stepState.hadBacktrack = true;
+          this._stepState.step++;
         }
       }
 
@@ -904,7 +920,7 @@ class InternalSolver {
           };
           if (yieldEveryStep) {
             yieldResult.oldGrid = this._stepState.oldGrid;
-            this._stepState.hadBacktrack = true;
+            yieldResult.guessDepth = this._stepState.pendingGuess.cellDepth;
           }
           yield yieldResult;
         }

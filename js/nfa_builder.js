@@ -5,7 +5,8 @@ const {
   BitWriter,
   canonicalJSON,
   memoize,
-  requiredBits
+  requiredBits,
+  setPeek
 } = await import('./util.js' + self.VERSION_PARAM);
 
 // Convenience function to create a Symbol.
@@ -79,7 +80,7 @@ export class NFA {
     if (this._startIds.size !== 1) {
       throw new Error(`Expected exactly one start state, but found ${this._startIds.size}`);
     }
-    return this._startIds.values().next().value;
+    return setPeek(this._startIds);
   }
 
   _ensureStateExists(stateId) {
