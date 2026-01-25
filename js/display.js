@@ -4,7 +4,8 @@ const {
   clearDOMNode,
   copyToClipboard,
   memoize,
-  isIterable
+  isIterable,
+  setPeek
 } = await import('./util.js' + self.VERSION_PARAM);
 const { toShortSolution } = await import('./sudoku_parser.js' + self.VERSION_PARAM);
 const { SHAPE_9x9 } = await import('./grid_shape.js' + self.VERSION_PARAM);
@@ -328,7 +329,10 @@ export class CellValueDisplay extends DisplayItem {
     }
 
     if (value) {
-      return this.makeTextNode(value, x, y, this.constructor.SINGLE_VALUE_CLASS);
+      const text = this.makeTextNode(value, x, y, this.constructor.SINGLE_VALUE_CLASS);
+      const color = colorFn?.(cellIndex, value);
+      if (color) text.setAttribute('fill', color);
+      return text;
     }
     return null;
   }
@@ -475,7 +479,7 @@ export class GridGraph {
 
   cellsAreConnected(cellSet) {
     const seen = new Set();
-    const stack = [cellSet.values().next().value];
+    const stack = [setPeek(cellSet)];
     const graph = this._graph;
     seen.add(stack[0]);
 

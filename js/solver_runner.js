@@ -328,7 +328,6 @@ class StepByStepModeHandler extends ModeHandler {
       values: result.values || [],
       isSolution: result.isSolution,
       hasContradiction: result.hasContradiction,
-      isBacktrack: result.isBacktrack,
     };
 
     // Update numSteps if we have a new max.
@@ -340,7 +339,8 @@ class StepByStepModeHandler extends ModeHandler {
       diff: result.diffPencilmarks || [],
       statusData: statusData,
       description: `Step ${i}`,
-      highlightCells: result.latestCell ? [result.latestCell] : [],
+      highlightCells: result.guessCell ? [result.guessCell] : [],
+      branchCells: new Set(result.branchCells),
       // Provide callback for value selection (for step-by-step UI)
       onValueSelect: (value) => this._addStepGuideValue(i, value),
     }
