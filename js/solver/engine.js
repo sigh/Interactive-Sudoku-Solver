@@ -1046,7 +1046,7 @@ class InternalSolver {
   setProgressCallback(callback, logFrequency) {
     this._progress.callback = callback;
     this._progress.frequencyMask = -1;
-    if (callback) {
+    if (callback && logFrequency) {
       this._progress.frequencyMask = (1 << logFrequency) - 1;
     }
   }

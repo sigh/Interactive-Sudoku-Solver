@@ -58,7 +58,7 @@ await runTest('debugState should include stackTrace when enabled', () => {
     for (let i = 0; i < st.values.length; i++) {
       assert.ok(st.values[i] >= 0 && st.values[i] <= 9);
     }
-  }, 0);
+  }, 1);
 
   const solution = solver.nthSolution(0);
   assert.ok(solution, 'expected a solution');
