@@ -127,7 +127,7 @@ body {
 }
 
 .diff-group {
-  fill: rgb(200, 120, 120);
+  fill: rgb(240, 180, 180);
   filter: drop-shadow(0px 0px 1px white);
 }
 
