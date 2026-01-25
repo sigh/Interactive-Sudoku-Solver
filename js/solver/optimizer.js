@@ -59,9 +59,7 @@ export class SudokuConstraintOptimizer {
 
     this._optimizeBinaryPairwise(handlerSet, shape);
 
-    if (boxRegions.length > 0) {
-      this._addHouseIntersections(handlerSet, boxRegions, shape);
-    }
+    this._addHouseIntersections(handlerSet, boxRegions, shape);
 
     this._logStats(handlerSet);
   }
@@ -151,14 +149,18 @@ export class SudokuConstraintOptimizer {
   }
 
   _addHouseIntersections(handlerSet, boxRegions, shape) {
+    // Intersections are not very useful if there are no boxes.
+    if (boxRegions.length === 0) return;
+    const boxSize = boxRegions[0].length;
+
+    // If the boxes aren't houses, then intersections won't help either.
+    if (boxSize !== shape.numValues) return;
+
     const houseHandlers = handlerSet.getAllofType(HandlerModule.House);
     const numHandlers = houseHandlers.length;
 
-    // Intersections are not very useful if there are no boxes.
-    if (boxRegions.length === 0) return;
-
     const [boxHeight, boxWidth] = GridShape.boxDimsForSize(
-      shape.numRows, shape.numCols, boxRegions[0].length);
+      shape.numRows, shape.numCols, boxSize);
     for (let i = 1; i < numHandlers; i++) {
       for (let j = 0; j < i; j++) {
         const intersectionSize = arrayIntersectSize(
