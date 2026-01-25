@@ -107,8 +107,8 @@ export class SudokuSolver {
 
     let diffPencilmarks = null;
     if (result.oldGrid) {
-      SudokuSolverUtil.removeGridValues(result.oldGrid, result.grid);
-      diffPencilmarks = SudokuSolverUtil.makePencilmarks(result.oldGrid);
+      diffPencilmarks = SudokuSolverUtil.makeDiffPencilmarks(
+        result.oldGrid, result.grid);
     }
 
     const latestCell = result.cellOrder.length ?
@@ -121,6 +121,7 @@ export class SudokuSolver {
       latestCell: latestCell,
       isSolution: result.isSolution,
       hasContradiction: result.hasContradiction,
+      isBacktrack: result.isBacktrack,
       values: LookupTables.toValuesArray(result.values),
     }
   }
@@ -253,10 +254,14 @@ class SudokuSolverUtil {
     return pencilmarks;
   }
 
-  static removeGridValues(gridA, gridB) {
-    for (let i = 0; i < gridA.length; i++) {
-      gridA[i] &= ~gridB[i];
+  static makeDiffPencilmarks(oldGrid, newGrid) {
+    const pencilmarks = [];
+    for (let i = 0; i < oldGrid.length; i++) {
+      const removed = new Set(
+        LookupTables.toValuesArray(oldGrid[i] & ~newGrid[i]));
+      pencilmarks.push(removed);
     }
+    return pencilmarks;
   }
 };
 
@@ -632,6 +637,7 @@ class InternalSolver {
         stepGuides: null,
         step: 0,
         oldGrid: new Uint16Array(this._numCells),
+        hadBacktrack: false,
       };
     }
     for (const [key, value] of Object.entries(updates)) {
@@ -676,7 +682,7 @@ class InternalSolver {
   // run runs the solve.
   // yieldWhen can be:
   //  YIELD_ON_SOLUTION to yielding each solution.
-  //  YIELD_ON_STEP to yield every step.
+  //  YIELD_ON_STEP to yield every step (branches, conflicts, and solutions).
   //  n > 1 to yield every n backtracks, before the backtrack is applied.
   * run(yieldWhen, maxSolutions) {
     const yieldEveryStep = yieldWhen === this.constructor.YIELD_ON_STEP;
@@ -732,6 +738,8 @@ class InternalSolver {
           hasContradiction: initialRecFrame.gridCells.indexOf(0) !== -1,
         }
         checkRunCounter();
+        this._stepState.oldGrid.set(initialRecFrame.gridCells);
+        this._stepState.hadBacktrack = false;
         this._stepState.step = 1;
       }
 
@@ -749,17 +757,14 @@ class InternalSolver {
       const cellDepth = recFrame.cellDepth;
       this._currentRecFrame = recFrame;
       let grid = recFrame.gridCells;
+      const isNewNode = recFrame.newNode;
 
       const [nextDepth, value, count] =
         this._candidateSelector.selectNextCandidate(
-          cellDepth, grid, this._stepState, recFrame.newNode);
+          cellDepth, grid, this._stepState, isNewNode);
       recFrame.newNode = false;
-      if (count === 0) continue;
 
-      // The first nextCell maybe a guess, but the rest are singletons.
-      if (yieldEveryStep) {
-        this._stepState.oldGrid.set(grid);
-      }
+      if (count === 0) continue;
 
       // Assume the remaining progress is evenly distributed among the value
       // options.
@@ -802,9 +807,31 @@ class InternalSolver {
         recFrame.gridState.set(oldGridState);
         grid = recFrame.gridCells;
       }
+
+      if (yieldEveryStep && this._stepState.hadBacktrack) {
+        this._stepState.oldGrid.set(grid);
+      }
+
       // NOTE: Set this even when count == 1 to allow for other candidate
       //       selection methods.
       grid[cell] = value;
+
+      if (yieldEveryStep && (!isNewNode || count !== 1)) {
+        // This is a guess (or this node was a guess before).
+        yield {
+          grid: grid,
+          oldGrid: this._stepState.oldGrid,
+          isSolution: false,
+          cellOrder: this._candidateSelector.getCellOrder(cellDepth + 1),
+          values: this._stepState.oldGrid[cell],
+          hasContradiction: false,
+          isBacktrack: this._stepState.hadBacktrack,
+        };
+        checkRunCounter();
+        this._stepState.oldGrid.set(grid);
+        this._stepState.hadBacktrack = false;
+        this._stepState.step++;
+      }
 
       iterationCounterForUpdates++;
       if ((iterationCounterForUpdates & progressFrequencyMask) === 0) {
@@ -825,6 +852,19 @@ class InternalSolver {
         counters.backtracks++;
         this._conflictScores.increment(cell, value);
 
+        if (yieldEveryStep) {
+          yield {
+            grid: grid,
+            oldGrid: this._stepState.oldGrid,
+            isSolution: false,
+            cellOrder: this._candidateSelector.getCellOrder(cellDepth + 1),
+            hasContradiction: true,
+          };
+          checkRunCounter();
+          this._stepState.hadBacktrack = true;
+          this._stepState.step++;
+        }
+
         if (0 !== yieldOnBacktrack &&
           0 === counters.backtracks % yieldOnBacktrack) {
           yield {
@@ -834,22 +874,6 @@ class InternalSolver {
             hasContradiction: hasContradiction,
           };
         }
-      }
-
-      if (yieldEveryStep) {
-        // The value may have been over-written by the constraint enforcer
-        // (i.e. if there was a contradiction). Replace it for the output.
-        grid[cell] = value;
-        yield {
-          grid: grid,
-          oldGrid: this._stepState.oldGrid,
-          isSolution: false,
-          cellOrder: this._candidateSelector.getCellOrder(cellDepth + 1),
-          values: this._stepState.oldGrid[cell],
-          hasContradiction: hasContradiction,
-        };
-        checkRunCounter();
-        this._stepState.step++;
       }
 
       if (hasContradiction) continue;

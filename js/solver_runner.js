@@ -259,7 +259,7 @@ class AllSolutionsModeHandler extends ModeHandler {
 class StepByStepModeHandler extends ModeHandler {
   static NAME = 'step-by-step';
   static DESCRIPTION = `
-      Step through the solving process.
+      Step through the solving process, stopping at each guess.
       Alt-click on a cell to force the solver to resolve it next.`;
 
   ITERATION_CONTROLS = true;
@@ -328,6 +328,7 @@ class StepByStepModeHandler extends ModeHandler {
       values: result.values || [],
       isSolution: result.isSolution,
       hasContradiction: result.hasContradiction,
+      isBacktrack: result.isBacktrack,
     };
 
     // Update numSteps if we have a new max.
