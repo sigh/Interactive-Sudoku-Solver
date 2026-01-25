@@ -6,75 +6,9 @@
 const { SudokuParser, toShortSolution } = await import('../sudoku_parser.js' + self.VERSION_PARAM);
 const { SudokuConstraint } = await import('../sudoku_constraint.js' + self.VERSION_PARAM);
 const { SudokuBuilder } = await import('../solver/sudoku_builder.js' + self.VERSION_PARAM);
+const { GridShape } = await import('../grid_shape.js' + self.VERSION_PARAM);
 const { Timer } = await import('../util.js' + self.VERSION_PARAM);
 const { SolverStats } = await import('./solver_stats.js' + self.VERSION_PARAM);
-
-/**
- * Represents a single solution to a puzzle.
- */
-export class Solution {
-  constructor(values, shape) {
-    this._values = values;
-    this._shape = shape;
-  }
-
-  /**
-   * Get the value at a cell.
-   * @param {string|number} cellIdOrRow - Cell ID (e.g., 'R5C3') or row (1-indexed)
-   * @param {number} [col] - Column (1-indexed), required if first arg is row
-   * @returns {number} The value at the cell (1-9 for standard grid)
-   */
-  valueAt(cellIdOrRow, col) {
-    let cellIndex;
-    if (typeof cellIdOrRow === 'string') {
-      const parsed = this._shape.parseCellId(cellIdOrRow);
-      cellIndex = parsed.cell;
-    } else {
-      // Convert 1-indexed row/col to 0-indexed
-      cellIndex = this._shape.cellIndex(cellIdOrRow - 1, col - 1);
-    }
-    return this._values[cellIndex];
-  }
-
-  /**
-   * Iterate over all cells in the solution.
-   * @yields {{ cell: string, value: number }}
-   */
-  *[Symbol.iterator]() {
-    for (let i = 0; i < this._values.length; i++) {
-      yield {
-        cell: this._shape.makeCellIdFromIndex(i),
-        value: this._values[i],
-      };
-    }
-  }
-
-  /**
-   * Get the solution as a short string (e.g., 81 chars for 9x9).
-   * @returns {string}
-   */
-  toString() {
-    return toShortSolution(this._values, this._shape);
-  }
-
-  /**
-   * Compare with another solution or string.
-   * @param {Solution|string} other
-   * @returns {boolean}
-   */
-  equals(other) {
-    const otherStr = other instanceof Solution ? other.toString() : other;
-    return this.toString() === otherStr;
-  }
-
-  /**
-   * Get the raw values array.
-   * @returns {Uint8Array}
-   */
-  getArray() {
-    return this._values;
-  }
-}
 
 /**
  * Simple synchronous solver interface.
@@ -187,6 +121,29 @@ export class SimpleSolver {
   }
 
   /**
+   * Find all true candidates (values appearing in valid solutions).
+   * This is "All possibilities" mode in the UI.
+   * @param {Object|Object[]|string} constraints
+   * @param {number} [limit=1] - Candidate count limit to search up to
+   * @returns {TrueCandidates|null}
+   */
+  trueCandidates(constraints, limit = 1) {
+    const { solver, shape, captureState } = this._build(constraints);
+
+    // Collect solutions via progress callback.
+    const solutions = [];
+    solver.setProgressCallback((extraState) => {
+      if (extraState?.solutions) {
+        solutions.push(...extraState.solutions);
+      }
+    });
+
+    const counts = solver.solveAllPossibilities(limit);
+    captureState();
+    return counts ? new TrueCandidates(counts, shape, limit, solutions) : null;
+  }
+
+  /**
    * Validate that a layout (e.g., jigsaw) has valid solutions.
    * Non-layout constraints are ignored.
    * @param {Object|Object[]|string} constraints
@@ -207,3 +164,171 @@ export class SimpleSolver {
     return new SolverStats(this._state);
   }
 }
+
+/**
+ * Represents a single solution to a puzzle.
+ */
+export class Solution {
+  constructor(values, shape) {
+    this._values = values;
+    this._shape = shape;
+  }
+
+  /**
+   * Get the value at a cell.
+   * @param {string|number} cellIdOrRow - Cell ID (e.g., 'R5C3') or row (1-indexed)
+   * @param {number} [col] - Column (1-indexed), required if first arg is row
+   * @returns {number} The value at the cell (1-9 for standard grid)
+   */
+  valueAt(cellIdOrRow, col) {
+    return this._values[cellIndex(this._shape, cellIdOrRow, col)];
+  }
+
+  /**
+   * Iterate over all cells in the solution.
+   * @yields {{ cell: string, value: number }}
+   */
+  *[Symbol.iterator]() {
+    for (let i = 0; i < this._values.length; i++) {
+      yield {
+        cell: this._shape.makeCellIdFromIndex(i),
+        value: this._values[i],
+      };
+    }
+  }
+
+  /**
+   * Get the solution as a short string (e.g., 81 chars for 9x9).
+   * @returns {string}
+   */
+  toString() {
+    return toShortSolution(this._values, this._shape);
+  }
+
+  /**
+   * Compare with another solution or string.
+   * @param {Solution|string} other
+   * @returns {boolean}
+   */
+  equals(other) {
+    const otherStr = other instanceof Solution ? other.toString() : other;
+    return this.toString() === otherStr;
+  }
+
+  /**
+   * Get the raw values array.
+   * @returns {Uint8Array}
+   */
+  getArray() {
+    return this._values;
+  }
+}
+
+/**
+ * Represents true candidates (values appearing in valid solutions).
+ */
+export class TrueCandidates {
+  constructor(counts, shape, limit, solutions) {
+    this._counts = counts;
+    this._shape = shape;
+    this._limit = limit;
+    this._numValues = shape.numValues;
+    this._solutions = solutions.map(s => new Solution(s, shape));
+  }
+
+  /**
+   * Get all witness solutions.
+   * @returns {Solution[]}
+   */
+  get witnessSolutions() {
+    return this._solutions;
+  }
+
+  /**
+   * Get all candidate values at a cell.
+   * @param {string|number} cellIdOrRow - Cell ID (e.g., 'R5C3') or row (1-indexed)
+   * @param {number} [col] - Column (1-indexed), required if first arg is row
+   * @returns {number[]} Array of candidate values (1-indexed)
+   */
+  valuesAt(cellIdOrRow, col) {
+    const idx = cellIndex(this._shape, cellIdOrRow, col);
+    const baseIndex = idx * this._numValues;
+    const values = [];
+    for (let i = 0; i < this._numValues; i++) {
+      if (this._counts[baseIndex + i] > 0) {
+        values.push(i + 1);
+      }
+    }
+    return values;
+  }
+
+  /**
+   * Get the count for a specific value at a cell (capped to limit).
+   * @param {string|number} cellIdOrRow - Cell ID (e.g., 'R5C3') or row (1-indexed)
+   * @param {number} colOrValue - Column (1-indexed) if first arg is row, or value if first arg is cellId
+   * @param {number} [value] - The value (1-indexed), required if first arg is row
+   * @returns {number} Count of solutions containing this value
+   */
+  countAt(cellIdOrRow, colOrValue, value) {
+    let idx, v;
+    if (typeof cellIdOrRow === 'string') {
+      idx = cellIndex(this._shape, cellIdOrRow);
+      v = colOrValue;
+    } else {
+      idx = cellIndex(this._shape, cellIdOrRow, colOrValue);
+      v = value;
+    }
+    const countIndex = idx * this._numValues + (v - 1);
+    return Math.min(this._counts[countIndex], this._limit);
+  }
+
+  /**
+   * Iterate over all non-zero candidates.
+   * @yields {{ cell: string, value: number, count: number }}
+   */
+  *[Symbol.iterator]() {
+    const numCells = this._shape.numCells;
+    for (let i = 0; i < numCells; i++) {
+      const baseIndex = i * this._numValues;
+      for (let v = 0; v < this._numValues; v++) {
+        const count = this._counts[baseIndex + v];
+        if (count > 0) {
+          yield {
+            cell: this._shape.makeCellIdFromIndex(i),
+            value: v + 1,
+            count: Math.min(count, this._limit),
+          };
+        }
+      }
+    }
+  }
+
+  /**
+   * Get candidates as a string (value for candidates, '.' for non-candidates).
+   * @returns {string}
+   */
+  toString() {
+    const numCells = this._shape.numCells;
+    const baseCharCode = GridShape.baseCharCode(this._shape);
+    const chars = [];
+    for (let i = 0; i < numCells; i++) {
+      const baseIndex = i * this._numValues;
+      for (let v = 0; v < this._numValues; v++) {
+        chars.push(this._counts[baseIndex + v] > 0
+          ? String.fromCharCode(baseCharCode + v)
+          : '.');
+      }
+    }
+    return chars.join('');
+  }
+}
+
+// Convert cell reference to cell index.
+const cellIndex = (shape, cellIdOrRow, col) => {
+  if (typeof cellIdOrRow === 'string') {
+    return shape.parseCellId(cellIdOrRow).cell;
+  }
+  // Convert 1-indexed row/col to 0-indexed
+  return shape.cellIndex(cellIdOrRow - 1, col - 1);
+}
+

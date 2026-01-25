@@ -75,12 +75,20 @@ SOLVER
     for (const s of solver.solutions(constraints[, limit])) { ... }
     // Get an array of solutions, with optional limit
     const solutions = [...solver.solutions(constraints[, limit])];
+    // Get true candidates (values appearing in valid solutions)
+    const candidates = solver.trueCandidates(constraints[, limit]);
 
   Solution objects provide:
     solution.valueAt('R1C1')  // Get value at cell
     solution.valueAt(1, 1)    // Same, using row/col
     solution.toString()       // Short string (e.g. 81 digits for 9x9)
     for (const { cell, value } of solution) { ... }  // Iterate cells
+
+  TrueCandidates objects provide:
+    candidates.valuesAt('R1C1')    // Array of candidate values at cell
+    candidates.countAt('R1C1', 5)  // Count for value 5 at cell (capped to limit)
+    candidates.witnessSolutions    // Array of witness Solution objects
+    for (const { cell, value, count } of candidates) { ... }  // Iterate
 
   solver.latestStats() returns timing/counter info after each solve.
 

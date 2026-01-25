@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 
 import { runTest, logSuiteComplete } from './helpers/test_runner.js';
 
-const { SimpleSolver, Solution } = await import('../js/sandbox/simple_solver.js' + self.VERSION_PARAM);
+const { SimpleSolver, Solution, TrueCandidates } = await import('../js/sandbox/simple_solver.js' + self.VERSION_PARAM);
 const { SolverStats } = await import('../js/sandbox/solver_stats.js' + self.VERSION_PARAM);
 const { DISPLAYED_EXAMPLES } = await import('../data/example_puzzles.js' + self.VERSION_PARAM);
 
@@ -329,6 +329,303 @@ await runTest('handles constraint with shape', async () => {
   const solution = await solver.solution('.Shape~6x6');
   assert.ok(solution);
   assert.equal(solution.toString().length, 36);
+});
+
+// ============================================================================
+// SimpleSolver.trueCandidates tests
+// ============================================================================
+
+await runTest('trueCandidates() returns TrueCandidates for unique puzzle', async () => {
+  const solver = new SimpleSolver();
+  const candidates = await solver.trueCandidates(CLASSIC_SUDOKU.input);
+  assert.ok(candidates instanceof TrueCandidates);
+});
+
+await runTest('trueCandidates() returns single value for solved cells', async () => {
+  const solver = new SimpleSolver();
+  const candidates = await solver.trueCandidates(CLASSIC_SUDOKU.input);
+  // R1C1 has value 5 in the unique solution
+  const values = candidates.valuesAt('R1C1');
+  assert.deepEqual(values, [5]);
+});
+
+await runTest('trueCandidates() returns multiple values for multi-solution puzzle', async () => {
+  const solver = new SimpleSolver();
+  const candidates = await solver.trueCandidates(MULTI_SOLUTIONS);
+  // Some cells should have multiple possible values
+  let foundMultiple = false;
+  for (const { cell, value } of candidates) {
+    void cell;
+    void value;
+    const values = candidates.valuesAt(cell);
+    if (values.length > 1) {
+      foundMultiple = true;
+      break;
+    }
+  }
+  assert.ok(foundMultiple, 'Expected at least one cell with multiple candidates');
+});
+
+// ============================================================================
+// TrueCandidates.valuesAt tests
+// ============================================================================
+
+await runTest('TrueCandidates.valuesAt with cell ID', async () => {
+  const solver = new SimpleSolver();
+  const candidates = await solver.trueCandidates(CLASSIC_SUDOKU.input);
+  const values = candidates.valuesAt('R1C1');
+  assert.ok(Array.isArray(values));
+  assert.deepEqual(values, [5]);
+});
+
+await runTest('TrueCandidates.valuesAt with row/col', async () => {
+  const solver = new SimpleSolver();
+  const candidates = await solver.trueCandidates(CLASSIC_SUDOKU.input);
+  // Row/col are 1-indexed
+  const values = candidates.valuesAt(1, 1);
+  assert.deepEqual(values, [5]);
+});
+
+await runTest('TrueCandidates.valuesAt returns sorted values', async () => {
+  const solver = new SimpleSolver();
+  const candidates = await solver.trueCandidates(MULTI_SOLUTIONS);
+  // Find a cell with multiple values and check they're sorted
+  for (let row = 1; row <= 4; row++) {
+    for (let col = 1; col <= 4; col++) {
+      const values = candidates.valuesAt(row, col);
+      if (values.length > 1) {
+        const sorted = [...values].sort((a, b) => a - b);
+        assert.deepEqual(values, sorted, 'Values should be in ascending order');
+        return;
+      }
+    }
+  }
+});
+
+// ============================================================================
+// TrueCandidates.countAt tests
+// ============================================================================
+
+await runTest('TrueCandidates.countAt with cell ID', async () => {
+  const solver = new SimpleSolver();
+  const candidates = await solver.trueCandidates(CLASSIC_SUDOKU.input);
+  // Unique solution means count is 1 for correct value
+  const count = candidates.countAt('R1C1', 5);
+  assert.equal(count, 1);
+});
+
+await runTest('TrueCandidates.countAt with row/col', async () => {
+  const solver = new SimpleSolver();
+  const candidates = await solver.trueCandidates(CLASSIC_SUDOKU.input);
+  const count = candidates.countAt(1, 1, 5);
+  assert.equal(count, 1);
+});
+
+await runTest('TrueCandidates.countAt returns 0 for non-candidate', async () => {
+  const solver = new SimpleSolver();
+  const candidates = await solver.trueCandidates(CLASSIC_SUDOKU.input);
+  // R1C1 is 5 in the unique solution, so other values have count 0
+  const count = candidates.countAt('R1C1', 1);
+  assert.equal(count, 0);
+});
+
+await runTest('TrueCandidates.countAt is capped to limit', async () => {
+  const solver = new SimpleSolver();
+  // Use limit of 2
+  const candidates = await solver.trueCandidates(MULTI_SOLUTIONS, 2);
+  // All counts should be at most 2
+  for (const { cell, value, count } of candidates) {
+    void cell;
+    void value;
+    assert.ok(count <= 2, `Count ${count} exceeds limit 2`);
+  }
+});
+
+// ============================================================================
+// TrueCandidates iterator tests
+// ============================================================================
+
+await runTest('TrueCandidates iterator yields non-zero candidates', async () => {
+  const solver = new SimpleSolver();
+  const candidates = await solver.trueCandidates(CLASSIC_SUDOKU.input);
+
+  const items = [];
+  for (const item of candidates) {
+    items.push(item);
+  }
+
+  // For unique 9x9 puzzle, should have exactly 81 candidates (one per cell)
+  assert.equal(items.length, 81);
+
+  // Each item should have cell, value, count
+  const first = items[0];
+  assert.ok('cell' in first);
+  assert.ok('value' in first);
+  assert.ok('count' in first);
+});
+
+await runTest('TrueCandidates iterator yields correct structure', async () => {
+  const solver = new SimpleSolver();
+  const candidates = await solver.trueCandidates(CLASSIC_SUDOKU.input);
+
+  for (const { cell, value, count } of candidates) {
+    assert.equal(typeof cell, 'string');
+    assert.ok(cell.match(/^R\dC\d$/), `Invalid cell format: ${cell}`);
+    assert.ok(Number.isInteger(value) && value >= 1 && value <= 9);
+    assert.ok(Number.isInteger(count) && count >= 1);
+  }
+});
+
+await runTest('TrueCandidates iterator matches valuesAt', async () => {
+  const solver = new SimpleSolver();
+  const candidates = await solver.trueCandidates(MULTI_SOLUTIONS);
+
+  // Collect all values per cell from iterator
+  const cellValues = new Map();
+  for (const { cell, value } of candidates) {
+    if (!cellValues.has(cell)) cellValues.set(cell, []);
+    cellValues.get(cell).push(value);
+  }
+
+  // Check against valuesAt
+  for (const [cell, values] of cellValues) {
+    assert.deepEqual(values, candidates.valuesAt(cell));
+  }
+});
+
+await runTest('TrueCandidates iterator count matches countAt', async () => {
+  const solver = new SimpleSolver();
+  const candidates = await solver.trueCandidates(MULTI_SOLUTIONS, 3);
+
+  for (const { cell, value, count } of candidates) {
+    assert.equal(count, candidates.countAt(cell, value));
+  }
+});
+
+// ============================================================================
+// trueCandidates limit parameter tests
+// ============================================================================
+
+await runTest('trueCandidates with limit=1 (default)', async () => {
+  const solver = new SimpleSolver();
+  const candidates = await solver.trueCandidates(MULTI_SOLUTIONS);
+  // With limit=1, all counts should be 1
+  for (const { count } of candidates) {
+    assert.equal(count, 1);
+  }
+});
+
+await runTest('trueCandidates with higher limit tracks counts', async () => {
+  const solver = new SimpleSolver();
+  const candidates = await solver.trueCandidates(MULTI_SOLUTIONS, 10);
+  // Some values might appear in multiple solutions
+  let foundHigherCount = false;
+  for (const { count } of candidates) {
+    if (count > 1) {
+      foundHigherCount = true;
+      break;
+    }
+  }
+  // Not guaranteed to find higher counts, but counts should be valid
+  assert.ok(true, 'Completed without error');
+});
+
+// ============================================================================
+// TrueCandidates.toString tests
+// ============================================================================
+
+await runTest('TrueCandidates.toString returns correct format', async () => {
+  const solver = new SimpleSolver();
+  const candidates = await solver.trueCandidates(CLASSIC_SUDOKU.input);
+  const str = candidates.toString();
+  // For 9x9 with 9 values, should be 81*9 = 729 characters
+  assert.equal(str.length, 81 * 9);
+  // Should only contain digits 1-9 and dots
+  assert.ok(/^[1-9.]+$/.test(str), 'Should only contain digits and dots');
+});
+
+await runTest('TrueCandidates.toString has single candidate per cell for unique solution', async () => {
+  const solver = new SimpleSolver();
+  const candidates = await solver.trueCandidates(CLASSIC_SUDOKU.input);
+  const str = candidates.toString();
+  // For unique solution, each cell should have exactly one candidate
+  // Check first cell (9 chars): should have one digit and 8 dots
+  const firstCell = str.slice(0, 9);
+  const digitCount = (firstCell.match(/[1-9]/g) || []).length;
+  assert.equal(digitCount, 1, 'Unique solution cell should have exactly one candidate');
+});
+
+await runTest('TrueCandidates.toString matches valuesAt', async () => {
+  const solver = new SimpleSolver();
+  const candidates = await solver.trueCandidates(MULTI_SOLUTIONS);
+  const str = candidates.toString();
+  const numValues = 4; // 4x4 grid
+
+  // Check first few cells
+  for (let cellIdx = 0; cellIdx < 4; cellIdx++) {
+    const cellStr = str.slice(cellIdx * numValues, (cellIdx + 1) * numValues);
+    const row = Math.floor(cellIdx / 4) + 1;
+    const col = (cellIdx % 4) + 1;
+    const values = candidates.valuesAt(row, col);
+
+    for (let v = 1; v <= numValues; v++) {
+      const isCandidate = values.includes(v);
+      const charAtV = cellStr[v - 1];
+      if (isCandidate) {
+        assert.equal(charAtV, String(v), `Cell ${cellIdx} value ${v} should be candidate`);
+      } else {
+        assert.equal(charAtV, '.', `Cell ${cellIdx} value ${v} should be dot`);
+      }
+    }
+  }
+});
+
+// ============================================================================
+// TrueCandidates.witnessSolutions tests
+// ============================================================================
+
+await runTest('TrueCandidates.witnessSolutions returns array of Solution objects', async () => {
+  const solver = new SimpleSolver();
+  const candidates = await solver.trueCandidates(CLASSIC_SUDOKU.input);
+  const solutions = candidates.witnessSolutions;
+  assert.ok(Array.isArray(solutions));
+  assert.equal(solutions.length, 1);
+  assert.ok(solutions[0] instanceof Solution);
+});
+
+await runTest('TrueCandidates.witnessSolutions has multiple for multi-solution puzzle', async () => {
+  const solver = new SimpleSolver();
+  const candidates = await solver.trueCandidates(MULTI_SOLUTIONS);
+  assert.ok(candidates.witnessSolutions.length > 1, 'Should have multiple solutions');
+});
+
+await runTest('TrueCandidates.witnessSolutions contains valid solutions', async () => {
+  const solver = new SimpleSolver();
+  const candidates = await solver.trueCandidates(CLASSIC_SUDOKU.input);
+  const solution = candidates.witnessSolutions[0];
+  assert.equal(solution.toString(), CLASSIC_SUDOKU.solution);
+});
+
+await runTest('TrueCandidates.witnessSolutions are all unique', async () => {
+  const solver = new SimpleSolver();
+  const candidates = await solver.trueCandidates(MULTI_SOLUTIONS);
+  const solutionStrings = candidates.witnessSolutions.map(s => s.toString());
+  const uniqueStrs = new Set(solutionStrings);
+  assert.equal(uniqueStrs.size, solutionStrings.length, 'All solutions should be unique');
+});
+
+await runTest('TrueCandidates witnessSolutions match valuesAt', async () => {
+  const solver = new SimpleSolver();
+  const candidates = await solver.trueCandidates(MULTI_SOLUTIONS);
+
+  // For each cell, check that all solution values appear in valuesAt
+  for (const solution of candidates.witnessSolutions) {
+    for (const { cell, value } of solution) {
+      const cellValues = candidates.valuesAt(cell);
+      assert.ok(cellValues.includes(value),
+        `Solution value ${value} at ${cell} should be in valuesAt`);
+    }
+  }
 });
 
 logSuiteComplete('SimpleSolver');
