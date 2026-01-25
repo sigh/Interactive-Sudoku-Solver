@@ -896,12 +896,17 @@ class InternalSolver {
           this._sampleSolution.set(grid);
         }
         if (yieldWhen !== this.constructor.YIELD_NEVER) {
-          yield {
+          const yieldResult = {
             grid: grid,
             isSolution: true,
             cellOrder: this._candidateSelector.getCellOrder(),
             hasContradiction: false,
           };
+          if (yieldEveryStep) {
+            yieldResult.oldGrid = this._stepState.oldGrid;
+            this._stepState.hadBacktrack = true;
+          }
+          yield yieldResult;
         }
         checkRunCounter();
         if (maxSolutions && counters.solutions >= maxSolutions) {

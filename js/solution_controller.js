@@ -224,13 +224,14 @@ export class SolutionController {
     this._shape = null;
 
     this._displayContainer = displayContainer;
-    this._solutionDisplay = new SolutionDisplay(
-      displayContainer.getNewGroup('solution-group'),
-      document.getElementById('copy-solution-button'));
 
     this._diffDisplay = new CellValueDisplay(
       displayContainer.getNewGroup('diff-group'));
     constraintManager.addReshapeListener(this._diffDisplay);
+
+    this._solutionDisplay = new SolutionDisplay(
+      displayContainer.getNewGroup('solution-group'),
+      document.getElementById('copy-solution-button'));
 
     this._constraintManager = constraintManager;
     this._stepHighlighter = displayContainer.createCellHighlighter('step-cell');
