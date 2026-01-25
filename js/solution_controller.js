@@ -655,9 +655,11 @@ export class SolutionController {
       statusElem.appendChild(document.createTextNode('}'));
     }
 
-    let statusText = statusData.isSolution ? '[Solution]' :
-      statusData.hasContradiction ? '[Conflict]' : '';
-    statusElem.appendChild(document.createTextNode(' ' + statusText));
+    const statusParts = [];
+    if (statusData.isSolution) statusParts.push('[Solution]');
+    if (statusData.hasContradiction) statusParts.push('[Conflict]');
+    if (statusData.isBacktrack) statusParts.push('[Backtracked]');
+    statusElem.appendChild(document.createTextNode(' ' + statusParts.join(' ')));
 
     return statusElem;
   }

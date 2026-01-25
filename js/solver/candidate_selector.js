@@ -168,7 +168,7 @@ export class CandidateSelector {
     if (stepState) {
       if (this._debugLogger.enableStepLogs) {
         this._logSelectNextCandidate(
-          'Best candidate:', cellOrder[cellOffset], value, count, cellDepth);
+          'Best candidate:', cellOrder[cellOffset], value, count, cellDepth, isNewNode);
       }
 
       let adjusted = false;
@@ -180,7 +180,7 @@ export class CandidateSelector {
         this._candidateSelectionFlags[cellDepth] = 0;
         if (this._debugLogger.enableStepLogs) {
           this._logSelectNextCandidate(
-            'Adjusted by user:', cellOrder[cellOffset], value, count, cellDepth);
+            'Adjusted by user:', cellOrder[cellOffset], value, count, cellDepth, isNewNode);
         }
       }
     }
@@ -252,21 +252,19 @@ export class CandidateSelector {
     return frontOffset;
   }
 
-  _logSelectNextCandidate(msg, cell, value, count, cellDepth) {
-    this._debugLogger.log({
-      loc: 'selectNextCandidate',
-      msg: msg,
-      args: {
-        cell: this._shape.makeCellIdFromIndex(cell),
-        value: LookupTables.toValue(value),
-        numOptions: count,
-        cellDepth: cellDepth,
-        state: (
-          this._candidateSelectionFlags[cellDepth] ?
-            this._candidateSelectionStates[cellDepth] : null),
-      },
-      cells: [cell],
-    });
+  _logSelectNextCandidate(msg, cell, value, count, cellDepth, isNewNode) {
+    const args = {
+      cell: this._shape.makeCellIdFromIndex(cell),
+      value: LookupTables.toValue(value),
+      numOptions: count,
+      cellDepth: cellDepth,
+      isNewNode: isNewNode,
+    };
+    if (this._candidateSelectionFlags[cellDepth]) {
+      args.state = this._candidateSelectionStates[cellDepth];
+    }
+    this._debugLogger.log(
+      { loc: 'selectNextCandidate', msg, args, cells: [cell] });
   }
 
   _selectBestCandidate(gridState, cellOrder, cellDepth, isNewNode) {
