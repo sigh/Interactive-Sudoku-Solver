@@ -270,6 +270,7 @@ class StepByStepModeHandler extends ModeHandler {
     this._pending = null;
     this._numSteps = 0;
     this._stepGuides = new Map();
+    this._currentDepth = -1;
   }
 
   setDone() { }
@@ -297,7 +298,11 @@ class StepByStepModeHandler extends ModeHandler {
     // Invalidate step guides, including the current step.
     // We don't want the current value to remain.
     this._invalidateStepGuides(step);
-    this._stepGuides.set(step, { cell: cell });
+    this._stepGuides.set(
+      step, {
+      cell: cell,
+      depth: this._currentDepth,
+    });
   }
 
   _addStepGuideValue(step, value) {
@@ -307,7 +312,10 @@ class StepByStepModeHandler extends ModeHandler {
     if (!this._stepGuides.has(step)) {
       this._stepGuides.set(step, {});
     }
-    this._stepGuides.get(step).value = value;
+    // Don't overwrite cell guide if present.
+    const guide = this._stepGuides.get(step);
+    guide.value = value;
+    guide.depth = this._currentDepth;
     this._listener();
   }
 
@@ -334,6 +342,7 @@ class StepByStepModeHandler extends ModeHandler {
     if (i + 1 > this._numSteps) {
       this._numSteps = i + 1;
     }
+    this._currentDepth = result.branchCells.length - 1;
     return {
       solution: result.pencilmarks,
       diff: result.diffPencilmarks || [],

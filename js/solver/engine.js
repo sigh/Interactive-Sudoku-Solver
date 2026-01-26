@@ -799,9 +799,9 @@ class InternalSolver {
 
       if (yieldEveryStep) {
         const stepState = this._stepState;
-        if (!isNewNode) {
-          stepState.oldGrid.set(grid);
-        }
+        // Only stop when we are at a new node with multiple options.
+        // If it is not a new node then we just backtracked, so there is
+        // nothing interesting to show.
         if (count > 1 && isNewNode) {
           yield {
             grid: grid,
@@ -812,10 +812,10 @@ class InternalSolver {
             hasContradiction: false,
           };
           checkRunCounter();
-          stepState.oldGrid.set(grid);
           stepState.step++;
         }
         if (!isNewNode || count !== 1) {
+          stepState.oldGrid.set(grid);
           stepState.pendingGuess.cellDepth = cellDepth;
           stepState.pendingGuess.guess = value;
         }
@@ -869,6 +869,7 @@ class InternalSolver {
             cellOrder: this._candidateSelector.getCellOrder(cellDepth),
             hasContradiction: hasContradiction,
           };
+          checkRunCounter();
         }
 
         if (yieldEveryStep) {
@@ -887,7 +888,6 @@ class InternalSolver {
             hasContradiction: true,
           };
           checkRunCounter();
-          this._stepState.hadBacktrack = true;
           this._stepState.step++;
         }
       }
@@ -923,8 +923,11 @@ class InternalSolver {
             yieldResult.guessDepth = this._stepState.pendingGuess.cellDepth;
           }
           yield yieldResult;
+          checkRunCounter();
+          if (yieldEveryStep) {
+            this._stepState.step++;
+          }
         }
-        checkRunCounter();
         if (maxSolutions && counters.solutions >= maxSolutions) {
           break;
         }
