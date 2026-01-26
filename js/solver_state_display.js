@@ -5,6 +5,7 @@ const {
   formatTimeMs,
   camelCaseToWords,
   clearDOMNode,
+  autoSaveField,
 } = await import('./util.js' + self.VERSION_PARAM);
 
 const { CollapsibleContainer } = await import('./constraint_input.js' + self.VERSION_PARAM);
@@ -242,6 +243,7 @@ class StateHistoryDisplay {
     this._statsInitPromise = null;
     this._visible = false;
     this._isEstimateMode = false;
+    this._collapsible = null;
 
     this._setUpChartToggle();
     this._charts = [];
@@ -346,6 +348,7 @@ class StateHistoryDisplay {
 
   _setUpChartToggle() {
     const toggle = document.getElementById('show-stats-charts-input');
+    autoSaveField(toggle);
 
     const setVisible = async (visible) => {
       if (!visible) {
@@ -365,9 +368,11 @@ class StateHistoryDisplay {
       this._updateCharts();
     };
 
-    toggle.onchange = () => {
-      setVisible(toggle.checked);
+    toggle.onchange = async () => {
+      await setVisible(toggle.checked);
+      if (toggle.checked) this._collapsible.toggleOpen(true);
     };
+    setVisible(toggle.checked);
   }
 
   static _openAndPositionContainer(container) {
@@ -381,16 +386,14 @@ class StateHistoryDisplay {
 
     this._statsContainer ||= document.getElementById('stats-container');
     const container = this._statsContainer;
-    const collapsible = new CollapsibleContainer(
-      container,
-          /* defaultOpen= */ true);
+    this._collapsible = new CollapsibleContainer(
+      container, /* defaultOpen= */ true);
 
     this._statsInitPromise = (async () => {
       try {
         await dynamicJSFileLoader('lib/chart.umd.min.js')();
 
-        collapsible.toggleOpen(true);
-        const statsBody = collapsible.bodyElement();
+        const statsBody = this._collapsible.bodyElement();
         clearDOMNode(statsBody);
 
         this._addChartDisplay(statsBody,
