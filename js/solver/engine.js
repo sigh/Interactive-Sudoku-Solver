@@ -660,6 +660,17 @@ class InternalSolver {
     }
   }
 
+  _makeStepYieldResult(grid, stepType) {
+    return {
+      grid: grid,
+      oldGrid: this._stepState.oldGrid,
+      isSolution: stepType === InternalSolver.STEP_RESULT_SOLUTION,
+      cellOrder: this._candidateSelector.getCellOrder(),
+      guessDepth: this._stepState.pendingGuess.cellDepth,
+      hasContradiction: stepType === InternalSolver.STEP_RESULT_CONTRADICTION,
+    };
+  }
+
   _initStack() {
     const numCells = this._numCells;
     const gridStateSize = this._initialGridState.length;
@@ -694,13 +705,17 @@ class InternalSolver {
   static YIELD_NEVER = -1;
   static YIELD_EVERY_BACKTRACK = 1;
 
+  static STEP_RESULT_GUESS = 0;
+  static STEP_RESULT_SOLUTION = 1;
+  static STEP_RESULT_CONTRADICTION = 2;
+
   // run runs the solve.
   // yieldWhen can be:
   //  YIELD_ON_SOLUTION to yielding each solution.
   //  YIELD_ON_STEP to yield every step (branches, conflicts, and solutions).
   //  n > 1 to yield every n backtracks, before the backtrack is applied.
   * run(yieldWhen, maxSolutions) {
-    const yieldEveryStep = yieldWhen === this.constructor.YIELD_ON_STEP;
+    const yieldEveryStep = yieldWhen === InternalSolver.YIELD_ON_STEP;
     const yieldOnBacktrack = yieldWhen > 0 ? yieldWhen : 0;
     maxSolutions ||= 0;
 
@@ -803,14 +818,8 @@ class InternalSolver {
         // If it is not a new node then we just backtracked, so there is
         // nothing interesting to show.
         if (count > 1 && isNewNode) {
-          yield {
-            grid: grid,
-            oldGrid: stepState.oldGrid,
-            isSolution: false,
-            cellOrder: this._candidateSelector.getCellOrder(),
-            guessDepth: this._stepState.pendingGuess.cellDepth,
-            hasContradiction: false,
-          };
+          yield this._makeStepYieldResult(
+            grid, InternalSolver.STEP_RESULT_GUESS);
           checkRunCounter();
           stepState.step++;
         }
@@ -879,14 +888,8 @@ class InternalSolver {
               this._stepState.pendingGuess.cellDepth);
             grid[guessCell] = this._stepState.pendingGuess.guess;
           }
-          yield {
-            grid: grid,
-            oldGrid: this._stepState.oldGrid,
-            isSolution: false,
-            cellOrder: this._candidateSelector.getCellOrder(),
-            guessDepth: this._stepState.pendingGuess.cellDepth,
-            hasContradiction: true,
-          };
+          yield this._makeStepYieldResult(
+            grid, InternalSolver.STEP_RESULT_CONTRADICTION);
           checkRunCounter();
           this._stepState.step++;
         }
@@ -911,22 +914,19 @@ class InternalSolver {
         if (this._sampleSolution[0] === 0) {
           this._sampleSolution.set(grid);
         }
-        if (yieldWhen !== this.constructor.YIELD_NEVER) {
-          const yieldResult = {
+        if (yieldEveryStep) {
+          yield this._makeStepYieldResult(
+            grid, InternalSolver.STEP_RESULT_SOLUTION);
+          checkRunCounter();
+          this._stepState.step++;
+        } else if (yieldWhen !== InternalSolver.YIELD_NEVER) {
+          yield {
             grid: grid,
             isSolution: true,
             cellOrder: this._candidateSelector.getCellOrder(),
             hasContradiction: false,
           };
-          if (yieldEveryStep) {
-            yieldResult.oldGrid = this._stepState.oldGrid;
-            yieldResult.guessDepth = this._stepState.pendingGuess.cellDepth;
-          }
-          yield yieldResult;
           checkRunCounter();
-          if (yieldEveryStep) {
-            this._stepState.step++;
-          }
         }
         if (maxSolutions && counters.solutions >= maxSolutions) {
           break;
