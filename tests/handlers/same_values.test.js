@@ -3,12 +3,12 @@ import assert from 'node:assert/strict';
 import { ensureGlobalEnvironment } from '../helpers/test_env.js';
 import { runTest, logSuiteComplete } from '../helpers/test_runner.js';
 import {
-  setupConstraintTest,
+  GridTestContext,
   createCellExclusions,
   createAccumulator,
   valueMask,
   applyCandidates,
-} from '../helpers/constraint_test_utils.js';
+} from '../helpers/grid_test_utils.js';
 
 ensureGlobalEnvironment();
 
@@ -44,7 +44,7 @@ await runTest('SameValues should normalize set ordering in idStr', () => {
 });
 
 await runTest('SameValues should enforce shared value intersection', () => {
-  const context = setupConstraintTest({ gridSize: [1, 4], numValues: 4 });
+  const context = new GridTestContext({ gridSize: [1, 4], numValues: 4 });
   const handler = new SameValues([0, 1], [2, 3]);
   context.initializeHandler(handler, { cellExclusions: uniqueCells() });
 
@@ -68,7 +68,7 @@ await runTest('SameValues should enforce shared value intersection', () => {
 });
 
 await runTest('SameValues should be idempotent when no changes are needed', () => {
-  const context = setupConstraintTest({ gridSize: [1, 4], numValues: 4 });
+  const context = new GridTestContext({ gridSize: [1, 4], numValues: 4 });
   const handler = new SameValues([0, 1], [2, 3]);
   context.initializeHandler(handler, { cellExclusions: uniqueCells() });
 
@@ -91,7 +91,7 @@ await runTest('SameValues should be idempotent when no changes are needed', () =
 });
 
 await runTest('SameValues should fail when intersection is too small', () => {
-  const context = setupConstraintTest({ gridSize: [1, 4], numValues: 4 });
+  const context = new GridTestContext({ gridSize: [1, 4], numValues: 4 });
   const handler = new SameValues([0, 1], [2, 3]);
   context.initializeHandler(handler, { cellExclusions: nonUniqueCells() });
 
@@ -108,7 +108,7 @@ await runTest('SameValues should fail when intersection is too small', () => {
 });
 
 await runTest('SameValues should fail when maxRequired exceeds minCount', () => {
-  const context = setupConstraintTest({ gridSize: [1, 4], numValues: 4 });
+  const context = new GridTestContext({ gridSize: [1, 4], numValues: 4 });
   const handler = new SameValues([0, 1], [2, 3]);
   context.initializeHandler(handler, { cellExclusions: nonUniqueCells() });
 
@@ -125,7 +125,7 @@ await runTest('SameValues should fail when maxRequired exceeds minCount', () => 
 });
 
 await runTest('SameValues should prune non-fixed values when counts exceed required', () => {
-  const context = setupConstraintTest({ gridSize: [1, 4], numValues: 4 });
+  const context = new GridTestContext({ gridSize: [1, 4], numValues: 4 });
   const handler = new SameValues([0, 1], [2, 3]);
   context.initializeHandler(handler, { cellExclusions: nonUniqueCells() });
 
@@ -145,7 +145,7 @@ await runTest('SameValues should prune non-fixed values when counts exceed requi
 });
 
 await runTest('SameValues should fix values when count matches required limit', () => {
-  const context = setupConstraintTest({ gridSize: [1, 4], numValues: 4 });
+  const context = new GridTestContext({ gridSize: [1, 4], numValues: 4 });
   const handler = new SameValues([0, 1], [2, 3]);
   context.initializeHandler(handler, { cellExclusions: nonUniqueCells() });
 
@@ -165,7 +165,7 @@ await runTest('SameValues should fix values when count matches required limit', 
 });
 
 await runTest('SameValues should fail when minTotals cannot fill the set', () => {
-  const context = setupConstraintTest({ gridSize: [1, 9], numValues: 9 });
+  const context = new GridTestContext({ gridSize: [1, 9], numValues: 9 });
   const handler = new SameValues([0, 1, 2], [3, 4, 5], [6, 7, 8]);
   context.initializeHandler(handler, { cellExclusions: nonUniqueCells() });
 
@@ -187,7 +187,7 @@ await runTest('SameValues should fail when minTotals cannot fill the set', () =>
 });
 
 await runTest('SameValues should enforce intersection across three sets', () => {
-  const context = setupConstraintTest({ gridSize: [1, 6], numValues: 6 });
+  const context = new GridTestContext({ gridSize: [1, 6], numValues: 6 });
   const handler = new SameValues([0, 1], [2, 3], [4, 5]);
   context.initializeHandler(handler, { cellExclusions: nonUniqueCells() });
 
@@ -211,7 +211,7 @@ await runTest('SameValues should enforce intersection across three sets', () => 
 });
 
 await runTest('SameValues should fail when intersection is smaller than max exclusion size for unique cells', () => {
-  const context = setupConstraintTest({ gridSize: [1, 6], numValues: 6 });
+  const context = new GridTestContext({ gridSize: [1, 6], numValues: 6 });
   const handler = new SameValues([0, 1, 2], [3, 4, 5]);
   context.initializeHandler(handler, { cellExclusions: uniqueCells() });
 
@@ -231,7 +231,7 @@ await runTest('SameValues should fail when intersection is smaller than max excl
 });
 
 await runTest('SameValues should allow intersection size equal to max exclusion size for unique cells', () => {
-  const context = setupConstraintTest({ gridSize: [1, 4], numValues: 4 });
+  const context = new GridTestContext({ gridSize: [1, 4], numValues: 4 });
   const handler = new SameValues([0, 1], [2, 3]);
   context.initializeHandler(handler, { cellExclusions: uniqueCells() });
 
@@ -253,7 +253,7 @@ await runTest('SameValues should allow intersection size equal to max exclusion 
 });
 
 await runTest('SameValues should force values when counts are required', () => {
-  const context = setupConstraintTest({ gridSize: [1, 4], numValues: 4 });
+  const context = new GridTestContext({ gridSize: [1, 4], numValues: 4 });
   const handler = new SameValues([0, 1], [2, 3]);
   context.initializeHandler(handler, { cellExclusions: nonUniqueCells() });
 
@@ -275,7 +275,7 @@ await runTest('SameValues should force values when counts are required', () => {
 });
 
 await runTest('SameValues should short-circuit after all values are fixed', () => {
-  const context = setupConstraintTest({ gridSize: [1, 9], numValues: 9 });
+  const context = new GridTestContext({ gridSize: [1, 9], numValues: 9 });
   const handler = new SameValues([0, 1, 2], [3, 4, 5], [6, 7, 8]);
 
   const state = {
@@ -313,7 +313,7 @@ await runTest('SameValues should short-circuit after all values are fixed', () =
 });
 
 await runTest('SameValues should be reusable across multiple calls', () => {
-  const context = setupConstraintTest({ gridSize: [1, 4], numValues: 4 });
+  const context = new GridTestContext({ gridSize: [1, 4], numValues: 4 });
   const handler = new SameValues([0, 1], [2, 3]);
   context.initializeHandler(handler, { cellExclusions: nonUniqueCells() });
 
@@ -347,7 +347,7 @@ await runTest('SameValues should be reusable across multiple calls', () => {
 });
 
 await runTest('SameValues should fail when required counts are impossible', () => {
-  const context = setupConstraintTest({ gridSize: [1, 4], numValues: 4 });
+  const context = new GridTestContext({ gridSize: [1, 4], numValues: 4 });
   const handler = new SameValues([0, 1], [2, 3]);
   context.initializeHandler(handler, { cellExclusions: nonUniqueCells() });
 

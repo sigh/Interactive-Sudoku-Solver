@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { performance as perf } from 'node:perf_hooks';
 
-import { ensureGlobalEnvironment } from './helpers/test_env.js';
-import { runTest, logSuiteComplete } from './helpers/test_runner.js';
+import { ensureGlobalEnvironment } from '../helpers/test_env.js';
+import { runTest, logSuiteComplete } from '../helpers/test_runner.js';
 
 ensureGlobalEnvironment({
   needWindow: true,
@@ -11,16 +11,16 @@ ensureGlobalEnvironment({
   performance: perf,
 });
 
-const { SudokuBuilder } = await import('../js/solver/sudoku_builder.js');
-const { SudokuConstraint } = await import('../js/sudoku_constraint.js');
-const { Timer } = await import('../js/util.js');
+const { SudokuBuilder } = await import('../../js/solver/sudoku_builder.js');
+const { SudokuConstraint } = await import('../../js/sudoku_constraint.js');
+const { Timer } = await import('../../js/util.js');
 const {
   SolverRunner,
   SolverProxy,
   Modes,
   DEFAULT_MODE,
   getHandlerClass,
-} = await import('../js/solver_runner.js');
+} = await import('../../js/solver_runner.js');
 
 // ============================================================================
 // Test Helpers

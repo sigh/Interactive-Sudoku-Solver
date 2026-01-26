@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { ensureGlobalEnvironment } from './helpers/test_env.js';
+import { ensureGlobalEnvironment } from '../helpers/test_env.js';
 
 ensureGlobalEnvironment({
   needWindow: true,
@@ -30,7 +30,7 @@ class MockWorker {
 globalThis.Worker = MockWorker;
 
 // Import UserScriptExecutor
-const { UserScriptExecutor } = await import('../js/sudoku_constraint.js');
+const { UserScriptExecutor } = await import('../../js/sudoku_constraint.js');
 
 // Test
 {

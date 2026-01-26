@@ -3,10 +3,10 @@ import assert from 'node:assert/strict';
 import { ensureGlobalEnvironment } from '../helpers/test_env.js';
 import { runTest, logSuiteComplete } from '../helpers/test_runner.js';
 import {
-  setupConstraintTest,
+  GridTestContext,
   createAccumulator,
   valueMask,
-} from '../helpers/constraint_test_utils.js';
+} from '../helpers/grid_test_utils.js';
 
 ensureGlobalEnvironment();
 
@@ -17,7 +17,7 @@ const { Lunchbox } = await import('../../js/solver/handlers.js');
 // =============================================================================
 
 await runTest('Lunchbox should initialize successfully with valid sum', () => {
-  const context = setupConstraintTest({ gridSize: [1, 9] });
+  const context = new GridTestContext({ gridSize: [1, 9] });
   const cells = context.cells();
   const handler = new Lunchbox(cells, 10);
 
@@ -27,7 +27,7 @@ await runTest('Lunchbox should initialize successfully with valid sum', () => {
 });
 
 await runTest('Lunchbox should throw on invalid sum', () => {
-  const context = setupConstraintTest({ gridSize: [1, 3] });
+  const context = new GridTestContext({ gridSize: [1, 3] });
   const cells = context.cells();
   assert.throws(() => new Lunchbox(cells, -1), /Invalid sum/);
   assert.throws(() => new Lunchbox(cells, 'abc'), /Invalid sum/);
@@ -35,7 +35,7 @@ await runTest('Lunchbox should throw on invalid sum', () => {
 });
 
 await runTest('Lunchbox should initialize with sum of 0', () => {
-  const context = setupConstraintTest({ gridSize: [1, 9] });
+  const context = new GridTestContext({ gridSize: [1, 9] });
   const cells = context.cells();
   const handler = new Lunchbox(cells, 0);
 
@@ -49,7 +49,7 @@ await runTest('Lunchbox should initialize with sum of 0', () => {
 // =============================================================================
 
 await runTest('Lunchbox should fail when no valid border placement exists', () => {
-  const context = setupConstraintTest({ gridSize: [1, 4] });
+  const context = new GridTestContext({ gridSize: [1, 4] });
   const cells = context.cells();
   // Sum of 5 between 1 and 4 (only 2+3=5 works, distance 2)
   const handler = new Lunchbox(cells, 5);
@@ -69,7 +69,7 @@ await runTest('Lunchbox should fail when no valid border placement exists', () =
 });
 
 await runTest('Lunchbox should pass with valid configuration', () => {
-  const context = setupConstraintTest({ gridSize: [1, 4] });
+  const context = new GridTestContext({ gridSize: [1, 4] });
   const cells = context.cells();
   // Sum = 5: 2+3 between borders 1 and 4
   const handler = new Lunchbox(cells, 5);
@@ -88,7 +88,7 @@ await runTest('Lunchbox should pass with valid configuration', () => {
 });
 
 await runTest('Lunchbox should handle valid setup with multiple options', () => {
-  const context = setupConstraintTest({ gridSize: [1, 4] });
+  const context = new GridTestContext({ gridSize: [1, 4] });
   const cells = context.cells();
   // Sum = 2: only value 2 can be between borders (1 and 4)
   // Valid: [1,2,4,3] or [4,2,1,3] etc.
@@ -104,7 +104,7 @@ await runTest('Lunchbox should handle valid setup with multiple options', () => 
 });
 
 await runTest('Lunchbox should handle sum of 0 (borders adjacent)', () => {
-  const context = setupConstraintTest({ gridSize: [1, 4] });
+  const context = new GridTestContext({ gridSize: [1, 4] });
   const cells = context.cells();
   // Sum = 0: borders must be adjacent
   const handler = new Lunchbox(cells, 0);
@@ -128,7 +128,7 @@ await runTest('Lunchbox should handle sum of 0 (borders adjacent)', () => {
 
 await runTest('Lunchbox should work on short rows (numCells < numValues)', () => {
   // 6-cell row with 8 possible values
-  const context = setupConstraintTest({ gridSize: [2, 3], numValues: 8 });
+  const context = new GridTestContext({ gridSize: [2, 3], numValues: 8 });
   const cells = context.cells();
   // Sum = 5: various combinations possible
   const handler = new Lunchbox(cells, 5);
@@ -145,7 +145,7 @@ await runTest('Lunchbox should work on short rows (numCells < numValues)', () =>
 await runTest('Lunchbox should work with more cells than values (house)', () => {
   // When numCells == numValues, it's a "house" with special handling
   // 6 cells with 6 values (this is a house)
-  const context = setupConstraintTest({ gridSize: [1, 6] });
+  const context = new GridTestContext({ gridSize: [1, 6] });
   const cells = context.cells();
   const handler = new Lunchbox(cells, 5); // Sum of 5 (valid: 2+3 or 5)
   context.initializeHandler(handler);
@@ -168,7 +168,7 @@ await runTest('Lunchbox should work with more cells than values (house)', () => 
 
 await runTest('Lunchbox should not assume house when numCells != numValues', () => {
   // 5-cell row with 9 values - NOT a house
-  const context = setupConstraintTest({ gridSize: [1, 5], numValues: 9 });
+  const context = new GridTestContext({ gridSize: [1, 5], numValues: 9 });
   const cells = context.cells();
   // Sum = 10
   const handler = new Lunchbox(cells, 10);
@@ -187,7 +187,7 @@ await runTest('Lunchbox should not assume house when numCells != numValues', () 
 // =============================================================================
 
 await runTest('Lunchbox should handle minimum cells for house (numValues cells)', () => {
-  const context = setupConstraintTest({ gridSize: [1, 3] });
+  const context = new GridTestContext({ gridSize: [1, 3] });
   const cells = context.cells();
   // Sum = 2: only 2 between 1 and 3
   const handler = new Lunchbox(cells, 2);
@@ -205,7 +205,7 @@ await runTest('Lunchbox should handle minimum cells for house (numValues cells)'
 });
 
 await runTest('Lunchbox should handle house with borders adjacent', () => {
-  const context = setupConstraintTest({ gridSize: [1, 4] });
+  const context = new GridTestContext({ gridSize: [1, 4] });
   const cells = context.cells();
   // Sum = 0: borders must be adjacent
   const handler = new Lunchbox(cells, 0);
@@ -227,7 +227,7 @@ await runTest('Lunchbox should work with 2 cells and sum=0 (non-house edge case)
   // This is a regression test for a bug where 2-cell non-house configurations
   // with sum=0 would incorrectly return false because validSettings was never
   // populated when both innerPossibilities and outerPossibilities were 0.
-  const context = setupConstraintTest({ gridSize: [1, 2], numValues: 4 });
+  const context = new GridTestContext({ gridSize: [1, 2], numValues: 4 });
   const cells = context.cells();
   const handler = new Lunchbox(cells, 0);
   context.initializeHandler(handler);
@@ -243,7 +243,7 @@ await runTest('Lunchbox should work with 2 cells and sum=0 (non-house edge case)
 });
 
 await runTest('Lunchbox should handle large valid sum', () => {
-  const context = setupConstraintTest({ gridSize: [1, 9] });
+  const context = new GridTestContext({ gridSize: [1, 9] });
   const cells = context.cells();
   // Max sum = 2+3+4+5+6+7+8 = 35
   const handler = new Lunchbox(cells, 35);
@@ -268,7 +268,7 @@ await runTest('Lunchbox should handle large valid sum', () => {
 });
 
 await runTest('Lunchbox should handle large sum', () => {
-  const context = setupConstraintTest({ gridSize: [1, 9] });
+  const context = new GridTestContext({ gridSize: [1, 9] });
   const cells = context.cells();
   // Max sum = 2+3+4+5+6+7+8 = 35
   const handler = new Lunchbox(cells, 35);
@@ -293,7 +293,7 @@ await runTest('Lunchbox should handle large sum', () => {
 });
 
 await runTest('Lunchbox should work when borders not at ends', () => {
-  const context = setupConstraintTest({ gridSize: [1, 4] });
+  const context = new GridTestContext({ gridSize: [1, 4] });
   const cells = context.cells();
   // Sum = 0: borders adjacent somewhere in middle
   const handler = new Lunchbox(cells, 0);
@@ -316,7 +316,7 @@ await runTest('Lunchbox should work when borders not at ends', () => {
 // =============================================================================
 
 await runTest('Lunchbox should accumulate changes', () => {
-  const context = setupConstraintTest({ gridSize: [1, 4] });
+  const context = new GridTestContext({ gridSize: [1, 4] });
   const cells = context.cells();
   const handler = new Lunchbox(cells, 2);
   context.initializeHandler(handler);

@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
-import { ensureGlobalEnvironment } from './helpers/test_env.js';
+import { ensureGlobalEnvironment } from '../helpers/test_env.js';
 
 ensureGlobalEnvironment({
   needWindow: true,
 });
 
-const { SANDBOX_GLOBALS } = await import('../js/sandbox/env.js');
+const { SANDBOX_GLOBALS } = await import('../../js/sandbox/env.js');
 const { parseConstraint } = SANDBOX_GLOBALS;
 
 // Test parseConstraint returns array for single constraint

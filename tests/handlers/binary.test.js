@@ -3,11 +3,11 @@ import assert from 'node:assert/strict';
 import { ensureGlobalEnvironment } from '../helpers/test_env.js';
 import { runTest, logSuiteComplete } from '../helpers/test_runner.js';
 import {
-  setupConstraintTest,
+  GridTestContext,
   createAccumulator,
   createCellExclusions,
   valueMask,
-} from '../helpers/constraint_test_utils.js';
+} from '../helpers/grid_test_utils.js';
 
 ensureGlobalEnvironment();
 
@@ -23,7 +23,7 @@ const binaryKey = (fn, numValues) =>
 // =============================================================================
 
 await runTest('BinaryConstraint should initialize with valid key', () => {
-  const context = setupConstraintTest({ gridSize: [1, 4] });
+  const context = new GridTestContext({ gridSize: [1, 4] });
   const key = binaryKey((a, b) => a !== b, 4);
   const handler = new BinaryConstraint(0, 1, key);
 
@@ -33,7 +33,7 @@ await runTest('BinaryConstraint should initialize with valid key', () => {
 });
 
 await runTest('BinaryConstraint should fail initialization if no values are legal', () => {
-  const context = setupConstraintTest({ gridSize: [1, 4] });
+  const context = new GridTestContext({ gridSize: [1, 4] });
   // Impossible constraint: no pair is ever valid.
   const key = binaryKey(() => false, 4);
   const handler = new BinaryConstraint(0, 1, key);
@@ -65,7 +65,7 @@ await runTest('BinaryConstraint should have unique idStr', () => {
 // =============================================================================
 
 await runTest('not-equal: should prune same values from both cells', () => {
-  const context = setupConstraintTest({ gridSize: [1, 4] });
+  const context = new GridTestContext({ gridSize: [1, 4] });
   const key = binaryKey((a, b) => a !== b, 4);
   const handler = new BinaryConstraint(0, 1, key);
   context.initializeHandler(handler);
@@ -86,7 +86,7 @@ await runTest('not-equal: should prune same values from both cells', () => {
 });
 
 await runTest('not-equal: should prune when one cell is fixed', () => {
-  const context = setupConstraintTest({ gridSize: [1, 4] });
+  const context = new GridTestContext({ gridSize: [1, 4] });
   const key = binaryKey((a, b) => a !== b, 4);
   const handler = new BinaryConstraint(0, 1, key);
   context.initializeHandler(handler);
@@ -105,7 +105,7 @@ await runTest('not-equal: should prune when one cell is fixed', () => {
 });
 
 await runTest('not-equal: should fail when both cells forced to same value', () => {
-  const context = setupConstraintTest({ gridSize: [1, 4] });
+  const context = new GridTestContext({ gridSize: [1, 4] });
   const key = binaryKey((a, b) => a !== b, 4);
   const handler = new BinaryConstraint(0, 1, key);
   context.initializeHandler(handler);
@@ -125,7 +125,7 @@ await runTest('not-equal: should fail when both cells forced to same value', () 
 // =============================================================================
 
 await runTest('less-than: should prune high values from first cell', () => {
-  const context = setupConstraintTest({ gridSize: [1, 4] });
+  const context = new GridTestContext({ gridSize: [1, 4] });
   const key = binaryKey((a, b) => a < b, 4);
   const handler = new BinaryConstraint(0, 1, key);
   context.initializeHandler(handler);
@@ -144,7 +144,7 @@ await runTest('less-than: should prune high values from first cell', () => {
 });
 
 await runTest('less-than: should prune low values from second cell', () => {
-  const context = setupConstraintTest({ gridSize: [1, 4] });
+  const context = new GridTestContext({ gridSize: [1, 4] });
   const key = binaryKey((a, b) => a < b, 4);
   const handler = new BinaryConstraint(0, 1, key);
   context.initializeHandler(handler);
@@ -163,7 +163,7 @@ await runTest('less-than: should prune low values from second cell', () => {
 });
 
 await runTest('less-than: should prune both cells', () => {
-  const context = setupConstraintTest({ gridSize: [1, 4] });
+  const context = new GridTestContext({ gridSize: [1, 4] });
   const key = binaryKey((a, b) => a < b, 4);
   const handler = new BinaryConstraint(0, 1, key);
   context.initializeHandler(handler);
@@ -184,7 +184,7 @@ await runTest('less-than: should prune both cells', () => {
 });
 
 await runTest('less-than: should fail when first cell minimum >= second cell maximum', () => {
-  const context = setupConstraintTest({ gridSize: [1, 4] });
+  const context = new GridTestContext({ gridSize: [1, 4] });
   const key = binaryKey((a, b) => a < b, 4);
   const handler = new BinaryConstraint(0, 1, key);
   context.initializeHandler(handler);
@@ -204,7 +204,7 @@ await runTest('less-than: should fail when first cell minimum >= second cell max
 // =============================================================================
 
 await runTest('equals: should intersect candidates', () => {
-  const context = setupConstraintTest({ gridSize: [1, 4] });
+  const context = new GridTestContext({ gridSize: [1, 4] });
   const key = binaryKey((a, b) => a === b, 4);
   const handler = new BinaryConstraint(0, 1, key);
   context.initializeHandler(handler);
@@ -224,7 +224,7 @@ await runTest('equals: should intersect candidates', () => {
 });
 
 await runTest('equals: should fail when no common values', () => {
-  const context = setupConstraintTest({ gridSize: [1, 4] });
+  const context = new GridTestContext({ gridSize: [1, 4] });
   const key = binaryKey((a, b) => a === b, 4);
   const handler = new BinaryConstraint(0, 1, key);
   context.initializeHandler(handler);
@@ -244,7 +244,7 @@ await runTest('equals: should fail when no common values', () => {
 // =============================================================================
 
 await runTest('difference >= 2: should prune adjacent values', () => {
-  const context = setupConstraintTest({ gridSize: [1, 4] });
+  const context = new GridTestContext({ gridSize: [1, 4] });
   const key = binaryKey((a, b) => Math.abs(a - b) >= 2, 4);
   const handler = new BinaryConstraint(0, 1, key);
   context.initializeHandler(handler);
@@ -262,7 +262,7 @@ await runTest('difference >= 2: should prune adjacent values', () => {
 });
 
 await runTest('difference >= 2: should fail when too close', () => {
-  const context = setupConstraintTest({ gridSize: [1, 4] });
+  const context = new GridTestContext({ gridSize: [1, 4] });
   const key = binaryKey((a, b) => Math.abs(a - b) >= 2, 4);
   const handler = new BinaryConstraint(0, 1, key);
   context.initializeHandler(handler);
@@ -282,7 +282,7 @@ await runTest('difference >= 2: should fail when too close', () => {
 // =============================================================================
 
 await runTest('should not report cells when values unchanged', () => {
-  const context = setupConstraintTest({ gridSize: [1, 4] });
+  const context = new GridTestContext({ gridSize: [1, 4] });
   const key = binaryKey((a, b) => a < b, 4);
   const handler = new BinaryConstraint(0, 1, key);
   context.initializeHandler(handler);
@@ -299,7 +299,7 @@ await runTest('should not report cells when values unchanged', () => {
 });
 
 await runTest('should report only changed cells', () => {
-  const context = setupConstraintTest({ gridSize: [1, 4] });
+  const context = new GridTestContext({ gridSize: [1, 4] });
   const key = binaryKey((a, b) => a < b, 4);
   const handler = new BinaryConstraint(0, 1, key);
   context.initializeHandler(handler);
@@ -319,27 +319,27 @@ await runTest('should report only changed cells', () => {
 // =============================================================================
 
 await runTest('should be reusable across multiple calls', () => {
-  const context = setupConstraintTest({ gridSize: [1, 4] });
+  const context = new GridTestContext({ gridSize: [1, 4] });
   const key = binaryKey((a, b) => a !== b, 4);
   const handler = new BinaryConstraint(0, 1, key);
   context.initializeHandler(handler);
 
   // First call
-  const grid1 = setupConstraintTest({ gridSize: [1, 4] }).grid;
+  const grid1 = new GridTestContext({ gridSize: [1, 4] }).grid;
   grid1[0] = valueMask(1);
   grid1[1] = valueMask(1, 2, 3);
   assert.equal(handler.enforceConsistency(grid1, createAccumulator()), true);
   assert.equal(grid1[1], valueMask(2, 3));
 
   // Second call with different grid
-  const grid2 = setupConstraintTest({ gridSize: [1, 4] }).grid;
+  const grid2 = new GridTestContext({ gridSize: [1, 4] }).grid;
   grid2[0] = valueMask(3);
   grid2[1] = valueMask(2, 3, 4);
   assert.equal(handler.enforceConsistency(grid2, createAccumulator()), true);
   assert.equal(grid2[1], valueMask(2, 4));
 
   // Third call that fails
-  const grid3 = setupConstraintTest({ gridSize: [1, 4] }).grid;
+  const grid3 = new GridTestContext({ gridSize: [1, 4] }).grid;
   grid3[0] = valueMask(2);
   grid3[1] = valueMask(2);
   assert.equal(handler.enforceConsistency(grid3, createAccumulator()), false);
@@ -350,7 +350,7 @@ await runTest('should be reusable across multiple calls', () => {
 // =============================================================================
 
 await runTest('should work with non-contiguous cell indices', () => {
-  const context = setupConstraintTest({ gridSize: [4, 5] });
+  const context = new GridTestContext({ gridSize: [4, 5] });
   const key = binaryKey((a, b) => a < b, 5);
   const handler = new BinaryConstraint(5, 15, key);
   context.initializeHandler(handler);
@@ -373,7 +373,7 @@ await runTest('should work with non-contiguous cell indices', () => {
 // =============================================================================
 
 await runTest('asymmetric constraint: a*2 === b', () => {
-  const context = setupConstraintTest({ gridSize: [1, 4] });
+  const context = new GridTestContext({ gridSize: [1, 4] });
   // a*2 === b, so valid pairs are (1,2) and (2,4)
   const key = binaryKey((a, b) => a * 2 === b, 4);
   const handler = new BinaryConstraint(0, 1, key);
@@ -392,7 +392,7 @@ await runTest('asymmetric constraint: a*2 === b', () => {
 });
 
 await runTest('asymmetric constraint: should prune correctly given fixed value', () => {
-  const context = setupConstraintTest({ gridSize: [1, 4] });
+  const context = new GridTestContext({ gridSize: [1, 4] });
   const key = binaryKey((a, b) => a * 2 === b, 4);
   const handler = new BinaryConstraint(0, 1, key);
   context.initializeHandler(handler);
@@ -413,7 +413,7 @@ await runTest('asymmetric constraint: should prune correctly given fixed value',
 // =============================================================================
 
 await runTest('required values: should remove required values from pair exclusions (a !== b)', () => {
-  const context = setupConstraintTest({ gridSize: [1, 3] });
+  const context = new GridTestContext({ gridSize: [1, 3] });
   const key = binaryKey((a, b) => a !== b, 3);
   const handler = new BinaryConstraint(0, 1, key);
 
@@ -443,7 +443,7 @@ await runTest('required values: should remove required values from pair exclusio
 });
 
 await runTest('required values: should not run required-value exclusions for transitive key (a === b)', () => {
-  const context = setupConstraintTest({ gridSize: [1, 3] });
+  const context = new GridTestContext({ gridSize: [1, 3] });
   const key = binaryKey((a, b) => a === b, 3);
   const handler = new BinaryConstraint(0, 1, key);
 

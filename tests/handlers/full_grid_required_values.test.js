@@ -4,9 +4,9 @@ import { ensureGlobalEnvironment } from '../helpers/test_env.js';
 import { runTest, logSuiteComplete } from '../helpers/test_runner.js';
 import {
   createAccumulator,
-  setupConstraintTest,
+  GridTestContext,
   valueMask,
-} from '../helpers/constraint_test_utils.js';
+} from '../helpers/grid_test_utils.js';
 
 ensureGlobalEnvironment();
 
@@ -37,7 +37,7 @@ const makeLines4x3 = () => {
 };
 
 await runTest('FullGridRequiredValues: forbids value in remaining lines when satisfied == required', () => {
-  const context = setupConstraintTest({ gridSize: [2, 3], numValues: 3 });
+  const context = new GridTestContext({ gridSize: [2, 3], numValues: 3 });
   const lines = makeLines3x2();
   const handler = new FullGridRequiredValues(context.cells(), lines);
 
@@ -59,7 +59,7 @@ await runTest('FullGridRequiredValues: forbids value in remaining lines when sat
 });
 
 await runTest('FullGridRequiredValues: returns false when satisfied > required', () => {
-  const context = setupConstraintTest({ gridSize: [2, 3], numValues: 3 });
+  const context = new GridTestContext({ gridSize: [2, 3], numValues: 3 });
   const lines = makeLines3x2();
   const handler = new FullGridRequiredValues(context.cells(), lines);
 
@@ -75,7 +75,7 @@ await runTest('FullGridRequiredValues: returns false when satisfied > required',
 });
 
 await runTest('FullGridRequiredValues: returns false when satisfied + possible < required', () => {
-  const context = setupConstraintTest({ gridSize: [2, 3], numValues: 3 });
+  const context = new GridTestContext({ gridSize: [2, 3], numValues: 3 });
   const lines = makeLines3x2();
   const handler = new FullGridRequiredValues(context.cells(), lines);
 
@@ -96,7 +96,7 @@ await runTest('FullGridRequiredValues: returns false when satisfied + possible <
 });
 
 await runTest('FullGridRequiredValues: forces value when satisfied + possible == required and line has single candidate cell', () => {
-  const context = setupConstraintTest({ gridSize: [2, 3], numValues: 3 });
+  const context = new GridTestContext({ gridSize: [2, 3], numValues: 3 });
   const lines = makeLines3x2();
   const handler = new FullGridRequiredValues(context.cells(), lines);
 
@@ -129,7 +129,7 @@ await runTest('FullGridRequiredValues: forces value when satisfied + possible ==
 });
 
 await runTest('FullGridRequiredValues: prunes non-required values when required values exactly fill a line', () => {
-  const context = setupConstraintTest({ gridSize: [3, 4], numValues: 4 });
+  const context = new GridTestContext({ gridSize: [3, 4], numValues: 4 });
   const lines = makeLines4x3();
   const handler = new FullGridRequiredValues(context.cells(), lines);
 
@@ -163,7 +163,7 @@ await runTest('FullGridRequiredValues: prunes non-required values when required 
 });
 
 await runTest('FullGridRequiredValues: returns false when a line contains too many required values', () => {
-  const context = setupConstraintTest({ gridSize: [3, 4], numValues: 4 });
+  const context = new GridTestContext({ gridSize: [3, 4], numValues: 4 });
   const lines = makeLines4x3();
   const handler = new FullGridRequiredValues(context.cells(), lines);
 
@@ -186,7 +186,7 @@ await runTest('FullGridRequiredValues: returns false when a line contains too ma
 });
 
 await runTest('FullGridRequiredValues: returns false if requiredPossibleValues creates multiple hidden singles in one cell', () => {
-  const context = setupConstraintTest({ gridSize: [2, 3], numValues: 3 });
+  const context = new GridTestContext({ gridSize: [2, 3], numValues: 3 });
   const lines = makeLines3x2();
   const handler = new FullGridRequiredValues(context.cells(), lines);
 

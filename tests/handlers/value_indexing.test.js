@@ -3,10 +3,10 @@ import assert from 'node:assert/strict';
 import { ensureGlobalEnvironment } from '../helpers/test_env.js';
 import { runTest, logSuiteComplete } from '../helpers/test_runner.js';
 import {
-  setupConstraintTest,
+  GridTestContext,
   createAccumulator,
   valueMask,
-} from '../helpers/constraint_test_utils.js';
+} from '../helpers/grid_test_utils.js';
 
 ensureGlobalEnvironment();
 
@@ -17,7 +17,7 @@ const { ValueIndexing } = await import('../../js/solver/handlers.js');
 // =============================================================================
 
 await runTest('ValueIndexing should restrict control cell to valid indices on init', () => {
-  const context = setupConstraintTest({ gridSize: [1, 9] });
+  const context = new GridTestContext({ gridSize: [1, 9] });
   // valueCell=0, controlCell=1, indexedCells=[2,3,4] (3 cells)
   const handler = new ValueIndexing(0, 1, 2, 3, 4);
 
@@ -30,7 +30,7 @@ await runTest('ValueIndexing should restrict control cell to valid indices on in
 });
 
 await runTest('ValueIndexing should fail init if value cell is empty', () => {
-  const context = setupConstraintTest({ gridSize: [1, 4] });
+  const context = new GridTestContext({ gridSize: [1, 4] });
   const handler = new ValueIndexing(0, 1, 2, 3);
 
   const grid = context.grid;
@@ -41,7 +41,7 @@ await runTest('ValueIndexing should fail init if value cell is empty', () => {
 });
 
 await runTest('ValueIndexing should pass init even with restricted control cell', () => {
-  const context = setupConstraintTest({ gridSize: [1, 4] });
+  const context = new GridTestContext({ gridSize: [1, 4] });
   // valueCell=0, controlCell=1, indexedCells=[2,3] (2 cells)
   const handler = new ValueIndexing(0, 1, 2, 3);
 
@@ -59,7 +59,7 @@ await runTest('ValueIndexing should pass init even with restricted control cell'
 // =============================================================================
 
 await runTest('ValueIndexing should prune value cell based on possible indexed values', () => {
-  const context = setupConstraintTest({ gridSize: [1, 5] });
+  const context = new GridTestContext({ gridSize: [1, 5] });
   // valueCell=0, controlCell=1, indexedCells=[2,3,4]
   const handler = new ValueIndexing(0, 1, 2, 3, 4);
   context.initializeHandler(handler);
@@ -82,7 +82,7 @@ await runTest('ValueIndexing should prune value cell based on possible indexed v
 });
 
 await runTest('ValueIndexing should prune control cell based on value compatibility', () => {
-  const context = setupConstraintTest({ gridSize: [1, 5] });
+  const context = new GridTestContext({ gridSize: [1, 5] });
   const handler = new ValueIndexing(0, 1, 2, 3, 4);
   context.initializeHandler(handler);
 
@@ -103,7 +103,7 @@ await runTest('ValueIndexing should prune control cell based on value compatibil
 });
 
 await runTest('ValueIndexing should constrain indexed cell when control is fixed', () => {
-  const context = setupConstraintTest({ gridSize: [1, 5] });
+  const context = new GridTestContext({ gridSize: [1, 5] });
   const handler = new ValueIndexing(0, 1, 2, 3, 4);
   context.initializeHandler(handler);
 
@@ -123,7 +123,7 @@ await runTest('ValueIndexing should constrain indexed cell when control is fixed
 });
 
 await runTest('ValueIndexing should fail when no valid control-value pair exists', () => {
-  const context = setupConstraintTest({ gridSize: [1, 5] });
+  const context = new GridTestContext({ gridSize: [1, 5] });
   const handler = new ValueIndexing(0, 1, 2, 3, 4);
   context.initializeHandler(handler);
 
@@ -146,7 +146,7 @@ await runTest('ValueIndexing should fail when no valid control-value pair exists
 
 await runTest('ValueIndexing should work with short indexed array (numIndexed < numValues)', () => {
   // 8 values, but only 6 indexed cells (like a 6-cell row on a 6x8 grid)
-  const context = setupConstraintTest({ gridSize: [2, 5], numValues: 8 });
+  const context = new GridTestContext({ gridSize: [2, 5], numValues: 8 });
   // valueCell=0, controlCell=1, indexedCells=[2,3,4,5,6,7] (6 cells)
   const handler = new ValueIndexing(0, 1, 2, 3, 4, 5, 6, 7);
 
@@ -159,7 +159,7 @@ await runTest('ValueIndexing should work with short indexed array (numIndexed < 
 });
 
 await runTest('ValueIndexing should enforce correctly on rectangular grid', () => {
-  const context = setupConstraintTest({ gridSize: [2, 5], numValues: 8 });
+  const context = new GridTestContext({ gridSize: [2, 5], numValues: 8 });
   const handler = new ValueIndexing(0, 1, 2, 3, 4, 5, 6, 7);
   context.initializeHandler(handler);
 
@@ -184,7 +184,7 @@ await runTest('ValueIndexing should enforce correctly on rectangular grid', () =
 
 await runTest('ValueIndexing should work with more indexed cells than values', () => {
   // 6 values, but 10 indexed cells
-  const context = setupConstraintTest({ gridSize: [3, 4], numValues: 6 });
+  const context = new GridTestContext({ gridSize: [3, 4], numValues: 6 });
   const handler = new ValueIndexing(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11);
 
   const grid = context.grid;
@@ -202,7 +202,7 @@ await runTest('ValueIndexing should work with more indexed cells than values', (
 // =============================================================================
 
 await runTest('ValueIndexing should handle single indexed cell', () => {
-  const context = setupConstraintTest({ gridSize: [1, 3], numValues: 4 });
+  const context = new GridTestContext({ gridSize: [1, 3], numValues: 4 });
   // valueCell=0, controlCell=1, indexedCells=[2] (only 1)
   const handler = new ValueIndexing(0, 1, 2);
   context.initializeHandler(handler);
@@ -221,7 +221,7 @@ await runTest('ValueIndexing should handle single indexed cell', () => {
 });
 
 await runTest('ValueIndexing should update both value and control cells', () => {
-  const context = setupConstraintTest({ gridSize: [2, 3], numValues: 4 });
+  const context = new GridTestContext({ gridSize: [2, 3], numValues: 4 });
   const handler = new ValueIndexing(0, 1, 2, 3, 4, 5);
   context.initializeHandler(handler);
 

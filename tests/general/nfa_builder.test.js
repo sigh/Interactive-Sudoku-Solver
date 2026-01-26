@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict';
 
-import { ensureGlobalEnvironment } from './helpers/test_env.js';
-import { runTest, logSuiteComplete } from './helpers/test_runner.js';
+import { ensureGlobalEnvironment } from '../helpers/test_env.js';
+import { runTest, logSuiteComplete } from '../helpers/test_runner.js';
 
 ensureGlobalEnvironment();
 
-const { regexToNFA, javascriptSpecToNFA, nfaToJavascriptSpec, optimizeNFA, NFASerializer, JavascriptNFABuilder, NFA, Symbol } = await import('../js/nfa_builder.js');
-const { BitReader } = await import('../js/util.js');
+const { regexToNFA, javascriptSpecToNFA, nfaToJavascriptSpec, optimizeNFA, NFASerializer, JavascriptNFABuilder, NFA, Symbol } = await import('../../js/nfa_builder.js');
+const { BitReader } = await import('../../js/util.js');
 
 const evaluateNfa = (nfa, values) => {
   const epsilonClosure = (stateIds) => {
