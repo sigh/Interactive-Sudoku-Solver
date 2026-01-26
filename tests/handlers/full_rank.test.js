@@ -7,7 +7,6 @@ import {
   GridTestContext,
   createAccumulator,
   valueMask,
-  initializeConstraintHandler,
 } from '../helpers/grid_test_utils.js';
 
 const { FullRank } = await import('../../js/solver/handlers.js');
@@ -781,10 +780,13 @@ await runTest('FullRankTies only-unclued should reject an unclued entry forced t
 });
 
 await runTest('FullRank should reject whole-entry fixed ties within a rank set', () => {
-  const { handler, context } = initializeConstraintHandler(FullRank, {
-    args: [81, [], FullRank.TIE_MODE.NONE],
-    shapeConfig: { gridSize: 9 },
-  });
+  const context = new GridTestContext({ gridSize: 9 });
+  const handler = new FullRank(81, [], FullRank.TIE_MODE.NONE);
+  assert.equal(
+    context.initializeHandler(handler),
+    true,
+    'constraint handler should initialize'
+  );
 
   const grid = context.grid;
 

@@ -8,7 +8,6 @@ import {
   createAccumulator,
   valueMask,
   applyCandidates,
-  initializeConstraintHandler,
 } from '../helpers/grid_test_utils.js';
 
 ensureGlobalEnvironment();
@@ -30,11 +29,13 @@ const initializeSum = (options = {}) => {
   const resolvedContext = context ?? new GridTestContext();
 
   const cells = resolvedContext.cells(numCells);
-  return initializeConstraintHandler(Sum, {
-    args: [cells, sum, coeffs],
-    context: resolvedContext,
-    cellExclusions,
-  });
+  const handler = new Sum(cells, sum, coeffs);
+  assert.equal(
+    resolvedContext.initializeHandler(handler, { cellExclusions }),
+    true,
+    'constraint handler should initialize'
+  );
+  return { handler, context: resolvedContext };
 };
 
 await runTest('Sum should force a unique combination once candidates align', () => {

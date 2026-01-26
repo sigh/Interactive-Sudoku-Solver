@@ -10,7 +10,7 @@ if (typeof g.VERSION_PARAM === 'undefined') {
 
 const { LookupTables } = await import('../../js/solver/lookup_tables.js');
 const { GridShape } = await import('../../js/grid_shape.js');
-const { BitSet } = await import('../../js/util.js');
+const { CellExclusions } = await import('../../js/solver/engine.js');
 
 const DEFAULT_NUM_VALUES = 9;
 const DEFAULT_NUM_CELLS = 81;
@@ -113,8 +113,6 @@ export class GridTestContext {
   }
 }
 
-// export const GridTestContext = (options = {}) => new GridTestContext(options);
-
 export const valueMask = (...values) => LookupTables.fromValuesArray(values);
 
 export const createAccumulator = () => {
@@ -128,34 +126,17 @@ export const createAccumulator = () => {
 };
 
 export const createCellExclusions = ({ allUnique = true, numCells = DEFAULT_NUM_CELLS } = {}) => {
-  const cache = new Array(numCells);
+  const exclusions = new CellExclusions([], { numCells });
 
-  return {
-    isMutuallyExclusive: allUnique ? (a, b) => a !== b : () => false,
-    getPairExclusions: () => [],
-    getListExclusions: () => [],
-    getArray: (cell) => {
-      if (!allUnique) return [];
-      const out = [];
-      for (let i = 0; i < numCells; i++) {
-        if (i !== cell) out.push(i);
+  if (allUnique) {
+    for (let i = 0; i < numCells; i++) {
+      for (let j = i + 1; j < numCells; j++) {
+        exclusions.addMutualExclusion(i, j);
       }
-      return out;
-    },
-    getBitSet: (cell) => {
-      let bs = cache[cell];
-      if (!bs) {
-        bs = new BitSet(numCells);
-        if (allUnique) {
-          for (let i = 0; i < numCells; i++) {
-            if (i !== cell) bs.add(i);
-          }
-        }
-        cache[cell] = bs;
-      }
-      return bs;
-    },
-  };
+    }
+  }
+
+  return exclusions;
 };
 
 export const applyCandidates = (grid, assignments) => {
@@ -172,23 +153,3 @@ export const applyCandidates = (grid, assignments) => {
   return grid;
 };
 
-export const initializeConstraintHandler = (
-  HandlerCtor,
-  {
-    args = [],
-    context,
-    shapeConfig,
-    cellExclusions,
-    state = {},
-  } = {}
-) => {
-  const resolvedContext = context ?? new GridTestContext(shapeConfig ?? {});
-  const resolvedCellExclusions = cellExclusions ?? createCellExclusions({ numCells: resolvedContext.shape.numCells });
-  const handler = new HandlerCtor(...args);
-  assert.equal(
-    resolvedContext.initializeHandler(handler, { cellExclusions: resolvedCellExclusions, state }),
-    true,
-    'constraint handler should initialize'
-  );
-  return { handler, context: resolvedContext };
-};
