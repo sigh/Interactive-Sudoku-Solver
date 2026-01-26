@@ -6,7 +6,7 @@ const testsDirUrl = new URL('.', import.meta.url);
 const testsDirPath = fileURLToPath(testsDirUrl);
 
 const largeTests = [
-  'e2e.test.js',
+  'e2e/e2e.test.js',
 ];
 
 const findTests = async (dir, relativePath = '') => {

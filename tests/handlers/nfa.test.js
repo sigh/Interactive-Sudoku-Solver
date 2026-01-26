@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 
 import { ensureGlobalEnvironment } from '../helpers/test_env.js';
 import { runTest, logSuiteComplete } from '../helpers/test_runner.js';
-import { createAccumulator, valueMask } from '../helpers/constraint_test_utils.js';
+import { createAccumulator, valueMask } from '../helpers/grid_test_utils.js';
 
 ensureGlobalEnvironment();
 

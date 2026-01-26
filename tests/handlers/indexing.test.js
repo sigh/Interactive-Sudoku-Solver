@@ -3,10 +3,10 @@ import assert from 'node:assert/strict';
 import { ensureGlobalEnvironment } from '../helpers/test_env.js';
 import { runTest, logSuiteComplete } from '../helpers/test_runner.js';
 import {
-  setupConstraintTest,
+  GridTestContext,
   createAccumulator,
   valueMask,
-} from '../helpers/constraint_test_utils.js';
+} from '../helpers/grid_test_utils.js';
 
 ensureGlobalEnvironment();
 
@@ -17,7 +17,7 @@ const { Indexing } = await import('../../js/solver/handlers.js');
 // =============================================================================
 
 await runTest('Indexing should restrict control cell to valid indices on init', () => {
-  const context = setupConstraintTest({ gridSize: [1, 9] });
+  const context = new GridTestContext({ gridSize: [1, 9] });
   const handler = new Indexing(0, [1, 2, 3, 4], 3);
 
   const grid = context.grid;
@@ -28,7 +28,7 @@ await runTest('Indexing should restrict control cell to valid indices on init', 
 });
 
 await runTest('Indexing should fail init if control cell has no values within the line length', () => {
-  const context = setupConstraintTest({ gridSize: [1, 9] });
+  const context = new GridTestContext({ gridSize: [1, 9] });
   const handler = new Indexing(0, [1, 2, 3, 4], 3);
 
   const grid = context.grid;
@@ -40,7 +40,7 @@ await runTest('Indexing should fail init if control cell has no values within th
 
 await runTest('Indexing init should work on non-standard grids (line length < numValues)', () => {
   // e.g. a 6-cell line on a numValues=8 rectangular grid
-  const context = setupConstraintTest({ gridSize: [1, 8] });
+  const context = new GridTestContext({ gridSize: [1, 8] });
   const handler = new Indexing(0, [1, 2, 3, 4, 5, 6], 5);
 
   const grid = context.grid;
@@ -51,7 +51,7 @@ await runTest('Indexing init should work on non-standard grids (line length < nu
 });
 
 await runTest('Indexing init should clamp a pre-restricted control cell', () => {
-  const context = setupConstraintTest({ gridSize: [1, 9] });
+  const context = new GridTestContext({ gridSize: [1, 9] });
   const handler = new Indexing(0, [1, 2, 3, 4], 3);
 
   const grid = context.grid;
@@ -63,7 +63,7 @@ await runTest('Indexing init should clamp a pre-restricted control cell', () => 
 });
 
 await runTest('Indexing init should restrict control to 1 for a single indexed cell', () => {
-  const context = setupConstraintTest({ gridSize: [1, 4] });
+  const context = new GridTestContext({ gridSize: [1, 4] });
   const handler = new Indexing(0, [1], 3);
 
   const grid = context.grid;
@@ -74,7 +74,7 @@ await runTest('Indexing init should restrict control to 1 for a single indexed c
 });
 
 await runTest('Indexing init should be a no-op when line length equals numValues', () => {
-  const context = setupConstraintTest({ gridSize: [2, 3], numValues: 5 });
+  const context = new GridTestContext({ gridSize: [2, 3], numValues: 5 });
   const handler = new Indexing(0, [1, 2, 3, 4, 5], 3);
 
   const grid = context.grid;
@@ -89,7 +89,7 @@ await runTest('Indexing init should be a no-op when line length equals numValues
 // =============================================================================
 
 await runTest('Indexing should prune control cell when indexed cell cannot have value', () => {
-  const context = setupConstraintTest({ gridSize: [1, 5] });
+  const context = new GridTestContext({ gridSize: [1, 5] });
   // controlCell=0, indexedCells=[1,2,3,4], indexedValue=3
   // If control=N, then indexedCells[N-1] must contain value 3
   const handler = new Indexing(0, [1, 2, 3, 4], 3);
@@ -111,7 +111,7 @@ await runTest('Indexing should prune control cell when indexed cell cannot have 
 });
 
 await runTest('Indexing should remove indexed value from cells that cannot be selected', () => {
-  const context = setupConstraintTest({ gridSize: [1, 5] });
+  const context = new GridTestContext({ gridSize: [1, 5] });
   const handler = new Indexing(0, [1, 2, 3, 4], 3);
 
   const grid = context.grid;
@@ -133,7 +133,7 @@ await runTest('Indexing should remove indexed value from cells that cannot be se
 });
 
 await runTest('Indexing should fail when control has no valid options', () => {
-  const context = setupConstraintTest({ gridSize: [1, 5] });
+  const context = new GridTestContext({ gridSize: [1, 5] });
   const handler = new Indexing(0, [1, 2, 3, 4], 3);
 
   const grid = context.grid;
@@ -150,7 +150,7 @@ await runTest('Indexing should fail when control has no valid options', () => {
 });
 
 await runTest('Indexing should fail when removal empties an indexed cell', () => {
-  const context = setupConstraintTest({ gridSize: [1, 5] });
+  const context = new GridTestContext({ gridSize: [1, 5] });
   const handler = new Indexing(0, [1, 2, 3, 4], 3);
 
   const grid = context.grid;
@@ -172,7 +172,7 @@ await runTest('Indexing should fail when removal empties an indexed cell', () =>
 
 await runTest('Indexing should work with fewer indexed cells than numValues', () => {
   // 8 values, but only 6 indexed cells (like a 6-cell row)
-  const context = setupConstraintTest({ gridSize: [1, 8] });
+  const context = new GridTestContext({ gridSize: [1, 8] });
   const handler = new Indexing(0, [1, 2, 3, 4, 5, 6], 5); // 6 indexed cells
 
   const grid = context.grid;
@@ -201,7 +201,7 @@ await runTest('Indexing should work with fewer indexed cells than numValues', ()
 
 await runTest('Indexing should work with more indexed cells than numValues', () => {
   // 6 values, but 8 indexed cells
-  const context = setupConstraintTest({ gridSize: [2, 5], numValues: 6 });
+  const context = new GridTestContext({ gridSize: [2, 5], numValues: 6 });
   const handler = new Indexing(0, [1, 2, 3, 4, 5, 6, 7, 8], 4); // 8 indexed cells
 
   const grid = context.grid;
@@ -224,7 +224,7 @@ await runTest('Indexing should work with more indexed cells than numValues', () 
 });
 
 await runTest('Indexing should handle control restricted to valid indices', () => {
-  const context = setupConstraintTest({ gridSize: [1, 8] });
+  const context = new GridTestContext({ gridSize: [1, 8] });
   // Only 4 indexed cells, but numValues is 8
   const handler = new Indexing(0, [1, 2, 3, 4], 2);
 
@@ -247,7 +247,7 @@ await runTest('Indexing should handle control restricted to valid indices', () =
 // =============================================================================
 
 await runTest('Indexing should handle single indexed cell', () => {
-  const context = setupConstraintTest({ gridSize: [1, 2], numValues: 4 });
+  const context = new GridTestContext({ gridSize: [1, 2], numValues: 4 });
   const handler = new Indexing(0, [1], 3); // Single indexed cell
 
   const grid = context.grid;
@@ -264,7 +264,7 @@ await runTest('Indexing should handle single indexed cell', () => {
 });
 
 await runTest('Indexing should handle all indexed cells having the value', () => {
-  const context = setupConstraintTest({ gridSize: [1, 5] });
+  const context = new GridTestContext({ gridSize: [1, 5] });
   const handler = new Indexing(0, [1, 2, 3, 4], 2);
 
   const grid = context.grid;
@@ -283,7 +283,7 @@ await runTest('Indexing should handle all indexed cells having the value', () =>
 });
 
 await runTest('Indexing should prune indexed cells based on control', () => {
-  const context = setupConstraintTest({ gridSize: [1, 5] });
+  const context = new GridTestContext({ gridSize: [1, 5] });
   const handler = new Indexing(0, [1, 2, 3, 4], 3);
 
   const grid = context.grid;
@@ -309,7 +309,7 @@ await runTest('Indexing should prune indexed cells based on control', () => {
 // =============================================================================
 
 await runTest('Indexing should initialize correctly when control cell is in indexedCells', () => {
-  const context = setupConstraintTest({ gridSize: [1, 9] });
+  const context = new GridTestContext({ gridSize: [1, 9] });
   const cells = context.cells(4);
   const handler = new Indexing(cells[0], cells, 7);
 
@@ -321,7 +321,7 @@ await runTest('Indexing should initialize correctly when control cell is in inde
 });
 
 await runTest('Indexing should prune control options (control cell in indexedCells)', () => {
-  const context = setupConstraintTest({ gridSize: [1, 4] });
+  const context = new GridTestContext({ gridSize: [1, 4] });
   const cells = context.cells(4);
   const handler = new Indexing(cells[0], cells, 3);
 
@@ -339,7 +339,7 @@ await runTest('Indexing should prune control options (control cell in indexedCel
 });
 
 await runTest('Indexing should remove indexed value from non-selected cells (control cell in indexedCells)', () => {
-  const context = setupConstraintTest({ gridSize: [1, 4] });
+  const context = new GridTestContext({ gridSize: [1, 4] });
   const cells = context.cells(4);
   const handler = new Indexing(cells[0], cells, 2);
 
@@ -359,7 +359,7 @@ await runTest('Indexing should remove indexed value from non-selected cells (con
 });
 
 await runTest('Indexing should fail when indexed value is forced in a non-selected cell (control cell in indexedCells)', () => {
-  const context = setupConstraintTest({ gridSize: [1, 4] });
+  const context = new GridTestContext({ gridSize: [1, 4] });
   const cells = context.cells(4);
   const handler = new Indexing(cells[0], cells, 2);
 
@@ -376,7 +376,7 @@ await runTest('Indexing should fail when indexed value is forced in a non-select
 });
 
 await runTest('Indexing should fail when no index remains compatible (control cell in indexedCells)', () => {
-  const context = setupConstraintTest({ gridSize: [1, 4] });
+  const context = new GridTestContext({ gridSize: [1, 4] });
   const cells = context.cells(4);
   const handler = new Indexing(cells[0], cells, 4);
 

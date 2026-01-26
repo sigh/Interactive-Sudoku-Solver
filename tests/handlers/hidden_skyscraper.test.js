@@ -3,10 +3,10 @@ import assert from 'node:assert/strict';
 import { ensureGlobalEnvironment } from '../helpers/test_env.js';
 import { runTest, logSuiteComplete } from '../helpers/test_runner.js';
 import {
-  setupConstraintTest,
+  GridTestContext,
   createAccumulator,
   valueMask,
-} from '../helpers/constraint_test_utils.js';
+} from '../helpers/grid_test_utils.js';
 
 ensureGlobalEnvironment();
 
@@ -17,7 +17,7 @@ const { HiddenSkyscraper } = await import('../../js/solver/handlers.js');
 // =============================================================================
 
 await runTest('HiddenSkyscraper should remove target from first cell on init', () => {
-  const context = setupConstraintTest({ gridSize: [1, 4] });
+  const context = new GridTestContext({ gridSize: [1, 4] });
   const cells = context.cells();
   const handler = new HiddenSkyscraper(cells, 3); // First hidden = 3
 
@@ -29,7 +29,7 @@ await runTest('HiddenSkyscraper should remove target from first cell on init', (
 });
 
 await runTest('HiddenSkyscraper should fail init if first cell only has target value', () => {
-  const context = setupConstraintTest({ gridSize: [1, 4] });
+  const context = new GridTestContext({ gridSize: [1, 4] });
   const cells = context.cells();
   const handler = new HiddenSkyscraper(cells, 3);
 
@@ -45,7 +45,7 @@ await runTest('HiddenSkyscraper should fail init if first cell only has target v
 // =============================================================================
 
 await runTest('HiddenSkyscraper should allow target when it can be hidden', () => {
-  const context = setupConstraintTest({ gridSize: [1, 4] });
+  const context = new GridTestContext({ gridSize: [1, 4] });
   const cells = context.cells();
   const handler = new HiddenSkyscraper(cells, 3);
   context.initializeHandler(handler);
@@ -61,7 +61,7 @@ await runTest('HiddenSkyscraper should allow target when it can be hidden', () =
 });
 
 await runTest('HiddenSkyscraper should remove target from cells where it cannot be hidden', () => {
-  const context = setupConstraintTest({ gridSize: [1, 4] });
+  const context = new GridTestContext({ gridSize: [1, 4] });
   const cells = context.cells();
   const handler = new HiddenSkyscraper(cells, 2); // First hidden = 2
   context.initializeHandler(handler);
@@ -79,7 +79,7 @@ await runTest('HiddenSkyscraper should remove target from cells where it cannot 
 });
 
 await runTest('HiddenSkyscraper should remove target from cells after first valid position', () => {
-  const context = setupConstraintTest({ gridSize: [1, 4] });
+  const context = new GridTestContext({ gridSize: [1, 4] });
   const cells = context.cells();
   const handler = new HiddenSkyscraper(cells, 2);
   context.initializeHandler(handler);
@@ -103,7 +103,7 @@ await runTest('HiddenSkyscraper should remove target from cells after first vali
 // =============================================================================
 
 await runTest('HiddenSkyscraper backward pass should filter values too large to reach target', () => {
-  const context = setupConstraintTest({ gridSize: [1, 5] });
+  const context = new GridTestContext({ gridSize: [1, 5] });
   const cells = context.cells();
   const handler = new HiddenSkyscraper(cells, 2); // First hidden = 2
   context.initializeHandler(handler);
@@ -131,7 +131,7 @@ await runTest('HiddenSkyscraper backward pass should filter values too large to 
 
 await runTest('HiddenSkyscraper should work on short rows (numCells < numValues)', () => {
   // 6x8 grid: 6 columns, 8 values per cell
-  const context = setupConstraintTest({ gridSize: [1, 6], numValues: 8 });
+  const context = new GridTestContext({ gridSize: [1, 6], numValues: 8 });
   const cells = context.cells(); // A 6-cell row
   const handler = new HiddenSkyscraper(cells, 4); // First hidden = 4
   context.initializeHandler(handler);
@@ -153,7 +153,7 @@ await runTest('HiddenSkyscraper should work on short rows (numCells < numValues)
 
 await runTest('HiddenSkyscraper should work on long rows (numCells > numValues)', () => {
   // Hypothetical 10x6 grid: 10 columns, 6 values
-  const context = setupConstraintTest({ gridSize: [2, 5], numValues: 6 });
+  const context = new GridTestContext({ gridSize: [2, 5], numValues: 6 });
   const cells = context.cells(); // A 10-cell row
   const handler = new HiddenSkyscraper(cells, 3); // First hidden = 3
   context.initializeHandler(handler);
@@ -177,7 +177,7 @@ await runTest('HiddenSkyscraper should work on long rows (numCells > numValues)'
 // =============================================================================
 
 await runTest('HiddenSkyscraper should handle minimum valid scenario', () => {
-  const context = setupConstraintTest({ gridSize: [1, 2] });
+  const context = new GridTestContext({ gridSize: [1, 2] });
   const cells = context.cells();
   const handler = new HiddenSkyscraper(cells, 1); // First hidden = 1
   context.initializeHandler(handler);
@@ -194,7 +194,7 @@ await runTest('HiddenSkyscraper should handle minimum valid scenario', () => {
 });
 
 await runTest('HiddenSkyscraper should fail when target cannot be placed', () => {
-  const context = setupConstraintTest({ gridSize: [1, 3] });
+  const context = new GridTestContext({ gridSize: [1, 3] });
   const cells = context.cells();
   const handler = new HiddenSkyscraper(cells, 2); // First hidden = 2
   context.initializeHandler(handler);

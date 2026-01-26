@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 
-import { ensureGlobalEnvironment } from './helpers/test_env.js';
-import { runTest, logSuiteComplete } from './helpers/test_runner.js';
+import { ensureGlobalEnvironment } from '../helpers/test_env.js';
+import { runTest, logSuiteComplete } from '../helpers/test_runner.js';
 
 ensureGlobalEnvironment();
 
@@ -36,7 +36,7 @@ const {
   MultiMap,
   RandomIntGenerator,
   canonicalJSON,
-} = await import('../js/util.js');
+} = await import('../../js/util.js');
 
 // ============================================================================
 // clamp

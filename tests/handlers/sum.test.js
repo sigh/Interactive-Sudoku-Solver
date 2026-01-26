@@ -3,13 +3,13 @@ import assert from 'node:assert/strict';
 import { ensureGlobalEnvironment } from '../helpers/test_env.js';
 import { runTest, logSuiteComplete } from '../helpers/test_runner.js';
 import {
-  setupConstraintTest,
+  GridTestContext,
   createCellExclusions,
   createAccumulator,
   valueMask,
   applyCandidates,
   initializeConstraintHandler,
-} from '../helpers/constraint_test_utils.js';
+} from '../helpers/grid_test_utils.js';
 
 ensureGlobalEnvironment();
 
@@ -27,7 +27,7 @@ const initializeSum = (options = {}) => {
     cellExclusions = uniqueCells(),
   } = options;
 
-  const resolvedContext = context ?? setupConstraintTest();
+  const resolvedContext = context ?? new GridTestContext();
 
   const cells = resolvedContext.cells(numCells);
   return initializeConstraintHandler(Sum, {
@@ -106,7 +106,7 @@ await runTest('Sum should resolve cages with more than three unfixed cells', () 
 });
 
 await runTest('Sum should handle cages longer than fifteen cells', () => {
-  const longContext = setupConstraintTest({ gridSize: [2, 16] });
+  const longContext = new GridTestContext({ gridSize: [2, 16] });
   const { handler, context } = initializeSum({
     numCells: 16,
     sum: 136,
@@ -132,7 +132,7 @@ await runTest('Sum should handle cages longer than fifteen cells', () => {
 });
 
 await runTest('Sum should restrict values based on complement cells', () => {
-  const context = setupConstraintTest();
+  const context = new GridTestContext();
   const complementCells = context.cells(10).slice(2);
   const { handler } = initializeSum({ numCells: 2, sum: 10, context });
   handler.setComplementCells(complementCells);
@@ -196,14 +196,14 @@ await runTest('Sum should allow repeated digits when cells are non-exclusive', (
 });
 
 await runTest('Sum should reject cages with sums above the maximum', () => {
-  const context = setupConstraintTest();
+  const context = new GridTestContext();
   const handler = new Sum(context.cells(4), 100);
   const initialized = context.initializeHandler(handler, { cellExclusions: uniqueCells() });
   assert.equal(initialized, false, 'handler should refuse impossible cage sums');
 });
 
 await runTest('Sum should reject non-integer totals during initialization', () => {
-  const context = setupConstraintTest();
+  const context = new GridTestContext();
   const handler = new Sum(context.cells(4), 4.5);
   const initialized = context.initializeHandler(handler, { cellExclusions: uniqueCells() });
   assert.equal(initialized, false, 'handler should require integer sums');

@@ -18,7 +18,7 @@ const DEFAULT_NUM_CELLS = 81;
 /*
  * Guidance for AIs
  *
- * - Prefer `setupConstraintTest({ gridSize, numValues })` so tests always use a real `GridShape`.
+ * - Prefer `new GridTestContext({ gridSize, numValues })` so tests always use a real `GridShape`.
  * - Model “line length” scenarios with rectangles:
  *   - short line: `gridSize: [1, N]`, `numValues: M` where `N < M`
  *   - long line:  `gridSize: [1, N]`, `numValues: M` where `N > M`
@@ -113,7 +113,7 @@ export class GridTestContext {
   }
 }
 
-export const setupConstraintTest = (options = {}) => new GridTestContext(options);
+// export const GridTestContext = (options = {}) => new GridTestContext(options);
 
 export const valueMask = (...values) => LookupTables.fromValuesArray(values);
 
@@ -182,7 +182,7 @@ export const initializeConstraintHandler = (
     state = {},
   } = {}
 ) => {
-  const resolvedContext = context ?? setupConstraintTest(shapeConfig ?? {});
+  const resolvedContext = context ?? new GridTestContext(shapeConfig ?? {});
   const resolvedCellExclusions = cellExclusions ?? createCellExclusions({ numCells: resolvedContext.shape.numCells });
   const handler = new HandlerCtor(...args);
   assert.equal(

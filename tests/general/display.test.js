@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict';
 
-import { ensureGlobalEnvironment } from './helpers/test_env.js';
-import { runTest, logSuiteComplete } from './helpers/test_runner.js';
+import { ensureGlobalEnvironment } from '../helpers/test_env.js';
+import { runTest, logSuiteComplete } from '../helpers/test_runner.js';
 
 ensureGlobalEnvironment();
 
-const { GridShape } = await import('../js/grid_shape.js');
-const { GridGraph } = await import('../js/display.js');
+const { GridShape } = await import('../../js/grid_shape.js');
+const { GridGraph } = await import('../../js/display.js');
 
 // ============================================================================
 // GridGraph

@@ -4,11 +4,11 @@ import { runTest } from '../helpers/test_runner.js';
 
 const { SimpleSolver } = await import('../../js/sandbox/simple_solver.js' + self.VERSION_PARAM);
 import {
-  setupConstraintTest,
+  GridTestContext,
   createAccumulator,
   valueMask,
   initializeConstraintHandler,
-} from '../helpers/constraint_test_utils.js';
+} from '../helpers/grid_test_utils.js';
 
 const { FullRank } = await import('../../js/solver/handlers.js');
 const { GridShape } = await import('../../js/grid_shape.js');
@@ -61,7 +61,7 @@ await runTest('FullRank.buildEntries should create correct entries for 4x4', () 
 //////////////////////////////////////////////////////////////////////////////
 
 await runTest('FullRank initialize should fail for invalid clue line', () => {
-  const context = setupConstraintTest({ gridSize: 4 });
+  const context = new GridTestContext({ gridSize: 4 });
 
   // [0,2] is not the start of any entry (rows/cols are contiguous).
   const handler = new FullRank(16, [{ rank: 1, line: [0, 2] }]);
@@ -72,7 +72,7 @@ await runTest('FullRank initialize should fail for invalid clue line', () => {
 });
 
 await runTest('FullRank initialize should restrict clue start cell to rank-set value', () => {
-  const context = setupConstraintTest({ gridSize: 4 });
+  const context = new GridTestContext({ gridSize: 4 });
   const grid = context.grid;
 
   // rank=5 => valueIndex=(5+3)>>2 = 2 => start cell must include only value 2.
@@ -87,7 +87,7 @@ await runTest('FullRank initialize should restrict clue start cell to rank-set v
 await runTest('FullRank ordering should reject forced ties', () => {
   const handler = new FullRank(81, []);
   const acc = createAccumulator();
-  const context = setupConstraintTest({ gridSize: 9 });
+  const context = new GridTestContext({ gridSize: 9 });
   const grid = context.grid;
 
   const lowEntry = [0, 1, 2, 3, 4, 5, 6, 7, 8];
@@ -107,7 +107,7 @@ await runTest('FullRank ordering should reject forced ties', () => {
 await runTest('FullRank ordering should allow strict non-ties', () => {
   const handler = new FullRank(81, []);
   const acc = createAccumulator();
-  const context = setupConstraintTest({ gridSize: 9 });
+  const context = new GridTestContext({ gridSize: 9 });
   const grid = context.grid;
 
   const lowEntry = [0, 1, 2, 3, 4, 5, 6, 7, 8];
@@ -130,7 +130,7 @@ await runTest('FullRank enforceConsistency should prune based on clued rank orde
   // Use a 4x4 grid so the entries are short and easy to reason about.
   // Provide a full rank-set (4 clues) so enforceConsistency does not need to
   // reason about unclued-entry counts.
-  const context = setupConstraintTest({ gridSize: 4 });
+  const context = new GridTestContext({ gridSize: 4 });
   const value1 = valueMask(1);
 
   const clues = [
@@ -163,7 +163,7 @@ await runTest('FullRank enforceConsistency should prune based on clued rank orde
 });
 
 await runTest('FullRank enforceConsistency should reject forced tie between consecutive clued ranks', () => {
-  const context = setupConstraintTest({ gridSize: 4 });
+  const context = new GridTestContext({ gridSize: 4 });
   const clues = [
     { rank: 1, line: [0, 1] },
     { rank: 2, line: [4, 5] },
@@ -190,7 +190,7 @@ await runTest('FullRank enforceConsistency should reject forced tie between cons
 });
 
 await runTest('FullRank clued ranks should still reject forced ties when globallyUnique=true', () => {
-  const context = setupConstraintTest({ gridSize: 4 });
+  const context = new GridTestContext({ gridSize: 4 });
   const clues = [
     { rank: 1, line: [0, 1] },
     { rank: 2, line: [4, 5] },
@@ -215,7 +215,7 @@ await runTest('FullRank clued ranks should still reject forced ties when globall
 });
 
 await runTest('FullRank enforceConsistency should fail when not enough viable entries exist', () => {
-  const context = setupConstraintTest({ gridSize: 4 });
+  const context = new GridTestContext({ gridSize: 4 });
   const value1 = valueMask(1);
 
   // Single clue in value 1 rank set => needs 3 additional unclued entries.
@@ -241,7 +241,7 @@ await runTest('FullRank enforceConsistency should fail when not enough viable en
 });
 
 await runTest('FullRank unclued entry selection should not count forced ties as < or >', () => {
-  const context = setupConstraintTest({ gridSize: 4 });
+  const context = new GridTestContext({ gridSize: 4 });
   const value1 = valueMask(1);
   const value2 = valueMask(2);
 
@@ -288,7 +288,7 @@ await runTest('FullRank unclued entry selection should not count forced ties as 
 });
 
 await runTest('FullRankTies any should allow missing ">" ranks due to ties', () => {
-  const context = setupConstraintTest({ gridSize: 4 });
+  const context = new GridTestContext({ gridSize: 4 });
   const value1 = valueMask(1);
   const value2 = valueMask(2);
   const value3 = valueMask(3);
@@ -367,7 +367,7 @@ await runTest('FullRankTies any should allow missing ">" ranks due to ties', () 
 });
 
 await runTest('FullRankTies any should allow skipping multiple ranks due to multiple ties', () => {
-  const context = setupConstraintTest({ gridSize: 4 });
+  const context = new GridTestContext({ gridSize: 4 });
   const value1 = valueMask(1);
   const value2 = valueMask(2);
   const value3 = valueMask(3);
@@ -446,7 +446,7 @@ await runTest('FullRankTies any should allow skipping multiple ranks due to mult
 });
 
 await runTest('FullRankTies any should still reject too many forced ">" entries', () => {
-  const context = setupConstraintTest({ gridSize: 4 });
+  const context = new GridTestContext({ gridSize: 4 });
   const value1 = valueMask(1);
   const value2 = valueMask(2);
   const value3 = valueMask(3);
@@ -490,7 +490,7 @@ await runTest('FullRankTies any should still reject too many forced ">" entries'
 });
 
 await runTest('FullRank permissive should exclude extra < candidate only when not-equal is proven', () => {
-  const context = setupConstraintTest({ gridSize: 4 });
+  const context = new GridTestContext({ gridSize: 4 });
   const value1 = valueMask(1);
   const value2 = valueMask(2);
   const value3 = valueMask(3);
@@ -537,7 +537,7 @@ await runTest('FullRank permissive should exclude extra < candidate only when no
 });
 
 await runTest('FullRank permissive should exclude extra > candidate only when not-equal is proven', () => {
-  const context = setupConstraintTest({ gridSize: 4 });
+  const context = new GridTestContext({ gridSize: 4 });
   const value1 = valueMask(1);
   const value2 = valueMask(2);
   const value3 = valueMask(3);
@@ -594,7 +594,7 @@ await runTest('FullRank permissive should exclude extra > candidate only when no
 });
 
 await runTest('FullRank should not force/exclude a both-sides viable entry (only-unclued)', () => {
-  const context = setupConstraintTest({ gridSize: 4 });
+  const context = new GridTestContext({ gridSize: 4 });
   const value1 = valueMask(1);
   const value2 = valueMask(2);
   const value3 = valueMask(3);
@@ -655,7 +655,7 @@ await runTest('FullRank should not force/exclude a both-sides viable entry (only
 });
 
 await runTest('FullRank should not force/exclude a both-sides viable entry (any)', () => {
-  const context = setupConstraintTest({ gridSize: 4 });
+  const context = new GridTestContext({ gridSize: 4 });
   const value2 = valueMask(2);
   const value3 = valueMask(3);
   const value4 = valueMask(4);
@@ -705,7 +705,7 @@ await runTest('FullRank should not force/exclude a both-sides viable entry (any)
 });
 
 await runTest('FullRankTies only-unclued should reject an unclued entry forced to tie a clued entry (even if counts are satisfied)', () => {
-  const context = setupConstraintTest({ gridSize: 4 });
+  const context = new GridTestContext({ gridSize: 4 });
   const value1 = valueMask(1);
   const value2 = valueMask(2);
   const value3 = valueMask(3);
@@ -803,7 +803,7 @@ await runTest('FullRank should reject whole-entry fixed ties within a rank set',
 });
 
 await runTest('FullRankTies none should reject a row equal to a column', () => {
-  const context = setupConstraintTest({ gridSize: 4 });
+  const context = new GridTestContext({ gridSize: 4 });
   const handler = new FullRank(16, [], FullRank.TIE_MODE.NONE);
   const grid = context.grid;
   assert.equal(context.initializeHandler(handler), true);
@@ -825,7 +825,7 @@ await runTest('FullRankTies none should reject a row equal to a column', () => {
 });
 
 await runTest('FullRankTies none should reject a row equal to a column reversed', () => {
-  const context = setupConstraintTest({ gridSize: 4 });
+  const context = new GridTestContext({ gridSize: 4 });
   const handler = new FullRank(16, [], FullRank.TIE_MODE.NONE);
   const grid = context.grid;
   assert.equal(context.initializeHandler(handler), true);
@@ -846,7 +846,7 @@ await runTest('FullRankTies none should reject a row equal to a column reversed'
 });
 
 await runTest('FullRankTies none should allow a partial whole-entry tie (not fully fixed)', () => {
-  const context = setupConstraintTest({ gridSize: 4 });
+  const context = new GridTestContext({ gridSize: 4 });
   const handler = new FullRank(16, [], FullRank.TIE_MODE.NONE);
   const grid = context.grid;
   assert.equal(context.initializeHandler(handler), true);
@@ -871,7 +871,7 @@ await runTest('FullRankTies none should allow a partial whole-entry tie (not ful
 });
 
 await runTest('FullRankTies none should allow a partial reversed tie (not fully fixed)', () => {
-  const context = setupConstraintTest({ gridSize: 4 });
+  const context = new GridTestContext({ gridSize: 4 });
   const handler = new FullRank(16, [], FullRank.TIE_MODE.NONE);
   const grid = context.grid;
   assert.equal(context.initializeHandler(handler), true);
@@ -903,7 +903,7 @@ await runTest('FullRank should throw when clue ranks are duplicated', () => {
 });
 
 await runTest('FullRank initialize should fail when two clues force different rank-set values on the same entry', () => {
-  const context = setupConstraintTest({ gridSize: 4 });
+  const context = new GridTestContext({ gridSize: 4 });
 
   // Two clues point at the same entry start, but belong to different rank sets:
   // rank 1 => value 1 rank set; rank 5 => value 2 rank set.
@@ -919,7 +919,7 @@ await runTest('FullRank initialize should fail when two clues force different ra
 });
 
 await runTest('FullRank initialize should fail for out-of-range rank', () => {
-  const context = setupConstraintTest({ gridSize: 4 });
+  const context = new GridTestContext({ gridSize: 4 });
 
   // For a 4x4 grid, ranks are grouped into 4 rank sets of 4 (1..16).
   // rank 17 implies a rank-set value of 5, which cannot exist.
@@ -932,7 +932,7 @@ await runTest('FullRank initialize should fail for out-of-range rank', () => {
 });
 
 await runTest('FullRankTies any should still require enough "<" entries (no shortfall)', () => {
-  const context = setupConstraintTest({ gridSize: 4 });
+  const context = new GridTestContext({ gridSize: 4 });
   const value1 = valueMask(1);
   const value2 = valueMask(2);
   const value3 = valueMask(3);

@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
 
-import { runTest, logSuiteComplete } from './helpers/test_runner.js';
+import { runTest, logSuiteComplete } from '../helpers/test_runner.js';
 
-const { SimpleSolver, Solution, TrueCandidates } = await import('../js/sandbox/simple_solver.js' + self.VERSION_PARAM);
-const { SolverStats } = await import('../js/sandbox/solver_stats.js' + self.VERSION_PARAM);
-const { DISPLAYED_EXAMPLES } = await import('../data/example_puzzles.js' + self.VERSION_PARAM);
+const { SimpleSolver, Solution, TrueCandidates } = await import('../../js/sandbox/simple_solver.js' + self.VERSION_PARAM);
+const { SolverStats } = await import('../../js/sandbox/solver_stats.js' + self.VERSION_PARAM);
+const { DISPLAYED_EXAMPLES } = await import('../../data/example_puzzles.js' + self.VERSION_PARAM);
+const { SudokuConstraint } = await import('../../js/sudoku_constraint.js' + self.VERSION_PARAM);
 
 // Get puzzles by name from the examples
 const getPuzzle = (name) => DISPLAYED_EXAMPLES.find(p => p.name === name);
@@ -121,7 +122,6 @@ await runTest('solution() works for jigsaw sudoku', async () => {
 });
 
 await runTest('solution() accepts constraint array', async () => {
-  const { SudokuConstraint } = await import('../js/sudoku_constraint.js' + self.VERSION_PARAM);
   const solver = new SimpleSolver();
   const constraints = [
     new SudokuConstraint.Given('R1C1', 5),

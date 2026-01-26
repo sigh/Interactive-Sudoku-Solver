@@ -3,10 +3,10 @@ import assert from 'node:assert/strict';
 import { ensureGlobalEnvironment } from '../helpers/test_env.js';
 import { runTest, logSuiteComplete } from '../helpers/test_runner.js';
 import {
-  setupConstraintTest,
+  GridTestContext,
   createAccumulator,
   valueMask,
-} from '../helpers/constraint_test_utils.js';
+} from '../helpers/grid_test_utils.js';
 
 ensureGlobalEnvironment();
 
@@ -18,7 +18,7 @@ const { DutchFlatmateLine } = await import('../../js/solver/handlers.js');
 
 await runTest('DutchFlatmateLine should remove target from a cell with no valid flatmate', () => {
   // 9 values => target is 5, above=1, below=9
-  const context = setupConstraintTest({ gridSize: [1, 3], numValues: 9 });
+  const context = new GridTestContext({ gridSize: [1, 3], numValues: 9 });
   const cells = context.cells();
   const handler = new DutchFlatmateLine(cells);
 
@@ -39,7 +39,7 @@ await runTest('DutchFlatmateLine should remove target from a cell with no valid 
 });
 
 await runTest('DutchFlatmateLine should fail if removing target wipes out a cell', () => {
-  const context = setupConstraintTest({ gridSize: [1, 3], numValues: 9 });
+  const context = new GridTestContext({ gridSize: [1, 3], numValues: 9 });
   const cells = context.cells();
   const handler = new DutchFlatmateLine(cells);
 
@@ -61,7 +61,7 @@ await runTest('DutchFlatmateLine should fail if removing target wipes out a cell
 // =============================================================================
 
 await runTest('DutchFlatmateLine should force above flatmate when target is fixed and only above is possible', () => {
-  const context = setupConstraintTest({ gridSize: [1, 3], numValues: 9 });
+  const context = new GridTestContext({ gridSize: [1, 3], numValues: 9 });
   const cells = context.cells();
   const handler = new DutchFlatmateLine(cells);
 
@@ -80,7 +80,7 @@ await runTest('DutchFlatmateLine should force above flatmate when target is fixe
 });
 
 await runTest('DutchFlatmateLine should force below flatmate when target is fixed and only below is possible', () => {
-  const context = setupConstraintTest({ gridSize: [1, 3], numValues: 9 });
+  const context = new GridTestContext({ gridSize: [1, 3], numValues: 9 });
   const cells = context.cells();
   const handler = new DutchFlatmateLine(cells);
 
@@ -103,7 +103,7 @@ await runTest('DutchFlatmateLine should force below flatmate when target is fixe
 // =============================================================================
 
 await runTest('DutchFlatmateLine should prune target at an edge if the only neighbor cannot be a flatmate', () => {
-  const context = setupConstraintTest({ gridSize: [1, 2], numValues: 9 });
+  const context = new GridTestContext({ gridSize: [1, 2], numValues: 9 });
   const cells = context.cells();
   const handler = new DutchFlatmateLine(cells);
 
@@ -127,7 +127,7 @@ await runTest('DutchFlatmateLine should prune target at an edge if the only neig
 await runTest('DutchFlatmateLine should work on short lines where the below value cannot exist in the line', () => {
   // 6-cell line with 8 values per cell (e.g. columns in a 6x8 grid).
   // Below value is 8, but we exclude it everywhere in the line.
-  const context = setupConstraintTest({ gridSize: [1, 6], numValues: 8 });
+  const context = new GridTestContext({ gridSize: [1, 6], numValues: 8 });
   const cells = context.cells();
   const handler = new DutchFlatmateLine(cells);
 
@@ -155,7 +155,7 @@ await runTest('DutchFlatmateLine should work on short lines where the below valu
 });
 
 await runTest('DutchFlatmateLine should fail when neither flatmate value can exist in the line', () => {
-  const context = setupConstraintTest({ gridSize: [1, 3], numValues: 8 });
+  const context = new GridTestContext({ gridSize: [1, 3], numValues: 8 });
   const cells = context.cells();
   const handler = new DutchFlatmateLine(cells);
 

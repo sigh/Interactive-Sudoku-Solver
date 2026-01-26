@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { ensureGlobalEnvironment } from './helpers/test_env.js';
+import { ensureGlobalEnvironment } from '../helpers/test_env.js';
 
 // Setup global environment to mock a Worker
 const messages = [];
@@ -19,7 +19,7 @@ globalThis.postMessage = postMessage;
 // Import the worker script
 // This will trigger the top-level execution and the async modulesPromise
 console.log('Importing user_script_worker.js...');
-await import('../js/user_script_worker.js');
+await import('../../js/user_script_worker.js');
 
 // Helper to wait for a message
 const waitForMessage = async (predicate, timeout = 1000) => {

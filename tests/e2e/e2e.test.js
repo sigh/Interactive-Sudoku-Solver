@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 
-import { logSuiteComplete } from './helpers/test_runner.js';
+import { logSuiteComplete } from '../helpers/test_runner.js';
 
-const { SimpleSolver } = await import('../js/sandbox/simple_solver.js' + self.VERSION_PARAM);
+const { SimpleSolver } = await import('../../js/sandbox/simple_solver.js' + self.VERSION_PARAM);
 
-const debugModule = await import('../js/debug/debug.js');
+const debugModule = await import('../../js/debug/debug.js');
 const {
   debugFilesLoaded,
   runSolveTests,
