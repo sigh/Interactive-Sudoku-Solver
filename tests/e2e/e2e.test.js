@@ -166,7 +166,10 @@ const layoutCases = [
   // Add non-standard grid tests.
   { input: '.Shape~7x7', solution: true },
   { input: '.Shape~6x6~9', solution: true },
+  { input: '.Shape~6x6~9.NoBoxes', solution: true },
+  { input: '.Shape~6x6~9.RegionSize~6', solution: true },
   { input: '.Shape~7x6~9', solution: true },
+  { input: '.Shape~7x6~9.RegionSize~7', solution: true },
 ];
 
 const loadInput = async (puzzle) => {
