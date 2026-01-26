@@ -1,20 +1,19 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import { resolve as resolvePath } from 'node:path';
 
 import { logSuiteComplete } from '../helpers/test_runner.js';
 
 const { SimpleSolver } = await import('../../js/sandbox/simple_solver.js' + self.VERSION_PARAM);
-const { PuzzleRunner } = await import('../../js/debug/debug.js');
+const { SolverStats } = await import('../../js/sandbox/solver_stats.js' + self.VERSION_PARAM);
+const { resolvePuzzleConfig } = await import('../../data/example_puzzles.js' + self.VERSION_PARAM);
+await import('../../data/collections.js' + self.VERSION_PARAM);
 const {
   VALID_JIGSAW_LAYOUTS,
   EASY_INVALID_JIGSAW_LAYOUTS,
   FAST_INVALID_JIGSAW_LAYOUTS,
 } = await import('../../data/jigsaw_layouts.js' + self.VERSION_PARAM);
 const { VALID_JIGSAW_BOX_LAYOUTS } = await import('../../data/jigsaw_box_layouts.js' + self.VERSION_PARAM);
-
-const runner = new PuzzleRunner({
-  solver: new SimpleSolver(),
-  enableConsoleLogs: false,
-});
 
 const solveCollections = [
   {
@@ -170,6 +169,54 @@ const layoutCases = [
   { input: '.Shape~7x6~9', solution: true },
 ];
 
+const loadInput = async (puzzle) => {
+  if (puzzle.input.startsWith('/')) {
+    const filePath = resolvePath(process.cwd(), '.' + puzzle.input);
+    return readFile(filePath, 'utf8');
+  }
+  return puzzle.input;
+};
+
+const assertPuzzleSolution = (puzzle, solution) => {
+  if (puzzle.solution === undefined) return;
+  if (!puzzle.solution) {
+    if (solution) throw new Error(`Puzzle ${puzzle.name} failed: ${solution}`);
+  } else if (puzzle.solution === true) {
+    if (!solution) throw new Error(`Puzzle ${puzzle.name} failed: ${solution}`);
+  } else if (solution !== puzzle.solution) {
+    throw new Error(`Puzzle ${puzzle.name} failed: ${solution}`);
+  }
+};
+
+const runCollection = async (puzzles, solveFn, label) => {
+  const stats = [];
+  for (const puzzleCfg of puzzles) {
+    const puzzle = await resolvePuzzleConfig(puzzleCfg);
+    const input = await loadInput(puzzle);
+
+    let solution = null;
+    try {
+      solution = await solveFn(input);
+    } catch (e) {
+      throw new Error(`${label} ${puzzle.name} failed: ${e}`);
+    }
+
+    const asString = solution?.toString() || null;
+    assertPuzzleSolution(puzzle, asString);
+
+    stats.push({
+      puzzle: puzzle.name,
+      ...solver.latestStats(),
+    });
+  }
+
+  stats.total = stats.reduce((acc, item) => acc.add(item), new SolverStats());
+  return stats;
+};
+
+const solver = new SimpleSolver();
+
+
 const expectStatsStructure = (result, label) => {
   assert.ok(result, `${label} returned nothing`);
   assert.ok(Array.isArray(result.stats), `${label} stats should be an array`);
@@ -194,11 +241,15 @@ const logCollectionSummary = (result, label = result.collection) => {
 
 const runSolveResults = [];
 for (const { collection, puzzles } of solveCollections) {
-  const result = await runner.runAllWithChecks(puzzles, (puzzle, err) => {
-    throw new Error(`Puzzle ${puzzle.name} failed: ${err}`);
-  });
-  result.collection = collection;
-  runSolveResults.push(result);
+  const stats = await runCollection(
+    puzzles,
+    (input) => {
+      const candidates = [...solver.solutions(input, 2)];
+      return candidates[0] || null;
+    },
+    'Puzzle'
+  );
+  runSolveResults.push({ collection, stats });
 }
 assert.equal(runSolveResults.length, 4, 'solve collections should return four collections');
 runSolveResults.forEach((result) => expectStatsStructure(result, `solve tests (${result.collection})`));
@@ -207,11 +258,12 @@ runSolveResults.forEach((result) => logCollectionSummary(result));
 
 const runLayoutResults = [];
 {
-  const result = await runner.runValidateLayout(layoutCases, (puzzle, err) => {
-    throw new Error(`Layout puzzle ${puzzle.name} failed: ${err}`);
-  });
-  result.collection = 'Jigsaw layouts';
-  runLayoutResults.push(result);
+  const stats = await runCollection(
+    layoutCases,
+    (input) => solver.validateLayout(input),
+    'Layout puzzle'
+  );
+  runLayoutResults.push({ collection: 'Jigsaw layouts', stats });
 }
 assert.equal(runLayoutResults.length, 1, 'layout collections should return a single collection');
 runLayoutResults.forEach((result) => expectStatsStructure(result, 'layout tests'));
