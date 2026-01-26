@@ -466,12 +466,15 @@ export class CandidateSelector {
   }
 
   _adjustForStepState(stepState, gridState, cellOrder, cellDepth, cellOffset, value) {
-    const step = stepState.step;
-    const guide = stepState.stepGuides.get(step) || {};
+    const guide = stepState.stepGuides.get(stepState.step) || {};
     let adjusted = false;
 
+    if (guide.depth !== cellDepth) {
+      return [cellOffset, value, adjusted];
+    }
+
     // If there is a cell guide, then use that.
-    if (guide.cell) {
+    if (Number.isInteger(guide.cell)) {
       const newCellOffset = cellOrder.indexOf(guide.cell, cellDepth);
       if (newCellOffset !== -1) {
         cellOffset = newCellOffset;
@@ -481,11 +484,11 @@ export class CandidateSelector {
 
     const cellValues = gridState[cellOrder[cellOffset]];
 
-    if (guide.value) {
+    if (Number.isInteger(guide.value)) {
       // Use the value from the guide.
       value = LookupTables.fromValue(guide.value);
       adjusted = true;
-    } else if (guide.cell) {
+    } else if (Number.isInteger(guide.cell)) {
       // Or if we had a guide cell then choose a value which is valid for that
       // cell.
       value = cellValues & -cellValues;

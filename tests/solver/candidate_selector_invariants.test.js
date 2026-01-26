@@ -200,7 +200,7 @@ await runTest('CandidateSelector stepState override clears any pending custom-ca
   const guidedCell = 1;
   const stepState = {
     step: 0,
-    stepGuides: new Map([[0, { cell: guidedCell }]]),
+    stepGuides: new Map([[0, { cell: guidedCell, depth: 0 }]]),
   };
 
   {
