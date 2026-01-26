@@ -2,10 +2,10 @@ import assert from 'node:assert/strict';
 
 import { ensureGlobalEnvironment } from '../helpers/test_env.js';
 import { runTest } from '../helpers/test_runner.js';
+import { GridTestContext } from '../helpers/grid_test_utils.js';
 
 ensureGlobalEnvironment();
 
-const { GridShape } = await import('../../js/grid_shape.js');
 const { CandidateSelector, ConflictScores, SeenCandidateSet } = await import('../../js/solver/candidate_selector.js');
 
 const makeDebugLogger = () => ({
@@ -14,10 +14,9 @@ const makeDebugLogger = () => ({
   log: () => { },
 });
 
-const createGridState = (shape, fill) => new Array(shape.numCells).fill(fill);
-
 await runTest('CandidateSelector prefers interesting values when uninterestingValues set', () => {
-  const shape = GridShape.fromGridSize(4);
+  const context = new GridTestContext({ gridSize: 4 });
+  const { shape } = context;
 
   const seenCandidateSet = new SeenCandidateSet(shape.numCells, shape.numValues);
   seenCandidateSet.enabledInSolver = true;
@@ -38,7 +37,7 @@ await runTest('CandidateSelector prefers interesting values when uninterestingVa
   selector.reset(conflictScores);
 
   // All cells have 4 candidates, so the selector should choose cell 0.
-  const gridState = createGridState(shape, (1 << shape.numValues) - 1);
+  const gridState = context.createGrid({ fill: context.lookupTables.allValues });
 
   const [nextDepth, value, count] = selector.selectNextCandidate(
     /* cellDepth */ 0,
@@ -54,7 +53,8 @@ await runTest('CandidateSelector prefers interesting values when uninterestingVa
 });
 
 await runTest('CandidateSelector falls back when no interesting values exist', () => {
-  const shape = GridShape.fromGridSize(4);
+  const context = new GridTestContext({ gridSize: 4 });
+  const { shape } = context;
 
   const seenCandidateSet = new SeenCandidateSet(shape.numCells, shape.numValues);
   seenCandidateSet.enabledInSolver = true;
@@ -74,7 +74,7 @@ await runTest('CandidateSelector falls back when no interesting values exist', (
   const conflictScores = new ConflictScores(new Array(shape.numCells).fill(0), shape.numValues);
   selector.reset(conflictScores);
 
-  const gridState = createGridState(shape, (1 << shape.numValues) - 1);
+  const gridState = context.createGrid({ fill: context.lookupTables.allValues });
 
   const [nextDepth, value, count] = selector.selectNextCandidate(
     /* cellDepth */ 0,
@@ -90,12 +90,13 @@ await runTest('CandidateSelector falls back when no interesting values exist', (
 });
 
 await runTest('CandidateSelector selects only from interesting cells when prefix is interesting', () => {
-  const shape = GridShape.fromGridSize(4);
+  const context = new GridTestContext({ gridSize: 4 });
+  const { shape } = context;
 
   const seenCandidateSet = new SeenCandidateSet(shape.numCells, shape.numValues);
   seenCandidateSet.enabledInSolver = true;
 
-  const allValues = (1 << shape.numValues) - 1;
+  const allValues = context.lookupTables.allValues;
   const candidates = seenCandidateSet.candidates;
   // Cell 0 is fixed to value 1, and value 1 has not been seen -> interesting prefix.
   candidates[0] = 0;
@@ -117,7 +118,7 @@ await runTest('CandidateSelector selects only from interesting cells when prefix
   const conflictScores = new ConflictScores(initialScores, shape.numValues);
   selector.reset(conflictScores);
 
-  const gridState = createGridState(shape, allValues);
+  const gridState = context.createGrid({ fill: allValues });
   gridState[0] = 1 << 0;
 
   const [nextDepth, value, count] = selector.selectNextCandidate(
@@ -134,11 +135,12 @@ await runTest('CandidateSelector selects only from interesting cells when prefix
 });
 
 await runTest('CandidateSelector custom candidates pop interesting cell first', () => {
-  const shape = GridShape.fromGridSize(4);
+  const context = new GridTestContext({ gridSize: 4 });
+  const { shape } = context;
 
   const seenCandidateSet = new SeenCandidateSet(shape.numCells, shape.numValues);
   seenCandidateSet.enabledInSolver = true;
-  const allValues = (1 << shape.numValues) - 1;
+  const allValues = context.lookupTables.allValues;
 
   // Ensure prefix is interesting at depth 1.
   seenCandidateSet.candidates[0] = 0;
@@ -177,7 +179,7 @@ await runTest('CandidateSelector custom candidates pop interesting cell first', 
   const conflictScores = new ConflictScores(initialScores, shape.numValues);
   selector.reset(conflictScores);
 
-  const gridState = createGridState(shape, allValues);
+  const gridState = context.createGrid({ fill: allValues });
   gridState[0] = nominatedValue;
 
   // With depth=1, custom candidates should trigger and choose the interesting

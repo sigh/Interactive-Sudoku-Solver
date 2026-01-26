@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { ensureGlobalEnvironment } from '../helpers/test_env.js';
 import { runTest, logSuiteComplete } from '../helpers/test_runner.js';
+import { GridTestContext, createCellExclusions } from '../helpers/grid_test_utils.js';
 
 ensureGlobalEnvironment();
 
@@ -8,13 +9,8 @@ const { CellExclusions, HandlerSet } = await import('../../js/solver/engine.js' 
 const HandlerModule = await import('../../js/solver/handlers.js' + self.VERSION_PARAM);
 const { BitSet } = await import('../../js/util.js' + self.VERSION_PARAM);
 
-const SHAPE_9x9 = {
-  numCells: 81,
-  numValues: 9,
-  gridSize: 9,
-  boxWidth: 3,
-  boxHeight: 3,
-};
+const context = new GridTestContext({ gridSize: 9 });
+const SHAPE_9x9 = context.shape;
 
 const createHandlerSet = (handlers = []) => {
   return new HandlerSet(handlers, SHAPE_9x9);
@@ -73,17 +69,7 @@ await runTest('CellExclusions should return BitSet', () => {
 });
 
 await runTest('HandlerUtil.findExclusionGroups should return groups/sumOfSquares', () => {
-  const cellExclusions = {
-    isMutuallyExclusive: (a, b) => a !== b,
-    getBitSet: (cell) => {
-      // In this test, every distinct pair is mutually exclusive.
-      const bs = new BitSet(SHAPE_9x9.numCells);
-      for (let i = 0; i < SHAPE_9x9.numCells; i++) {
-        if (i !== cell) bs.add(i);
-      }
-      return bs;
-    },
-  };
+  const cellExclusions = createCellExclusions({ numCells: SHAPE_9x9.numCells });
 
   const cells = [0, 1, 2, 3];
   const result = HandlerModule.HandlerUtil.findExclusionGroups(
@@ -97,16 +83,7 @@ await runTest('HandlerUtil.findExclusionGroups should return groups/sumOfSquares
 });
 
 await runTest('HandlerUtil.findExclusionGroups should work for a single cell', () => {
-  const cellExclusions = {
-    isMutuallyExclusive: (a, b) => a !== b,
-    getBitSet: (cell) => {
-      const bs = new BitSet(SHAPE_9x9.numCells);
-      for (let i = 0; i < SHAPE_9x9.numCells; i++) {
-        if (i !== cell) bs.add(i);
-      }
-      return bs;
-    },
-  };
+  const cellExclusions = createCellExclusions({ numCells: SHAPE_9x9.numCells });
 
   const cells = [7];
   const result = HandlerModule.HandlerUtil.findExclusionGroups(

@@ -1,48 +1,24 @@
 import assert from 'node:assert/strict';
 import { ensureGlobalEnvironment } from '../helpers/test_env.js';
 import { runTest, logSuiteComplete } from '../helpers/test_runner.js';
+import { createCellExclusions } from '../helpers/grid_test_utils.js';
 
 ensureGlobalEnvironment();
 
 const { SudokuConstraintOptimizer } = await import('../../js/solver/optimizer.js' + self.VERSION_PARAM);
 const { LookupTables } = await import('../../js/solver/lookup_tables.js' + self.VERSION_PARAM);
-const { BitSet } = await import('../../js/util.js' + self.VERSION_PARAM);
 const HandlerModule = await import('../../js/solver/handlers.js' + self.VERSION_PARAM);
 const SumHandlerModule = await import('../../js/solver/sum_handler.js' + self.VERSION_PARAM);
 const { GridShape } = await import('../../js/grid_shape.js' + self.VERSION_PARAM);
 const { HandlerSet } = await import('../../js/solver/engine.js' + self.VERSION_PARAM);
 const { SudokuConstraintBase } = await import('../../js/sudoku_constraint.js' + self.VERSION_PARAM);
 
-class MockCellExclusions {
-  constructor(numCells) {
-    this.bitsets = new Array(numCells).fill(0).map(() => new BitSet(numCells));
-  }
-  addMutualExclusion(c1, c2) {
-    this.bitsets[c1].add(c2);
-    this.bitsets[c2].add(c1);
-  }
-  isMutuallyExclusive(c1, c2) {
-    return this.bitsets[c1].has(c2);
-  }
-  areMutuallyExclusive(cells) {
-    const numCells = cells.length;
-    for (let i = 0; i < numCells; i++) {
-      const iSet = this.bitsets[cells[i]];
-      for (let j = i + 1; j < numCells; j++) {
-        if (!iSet.has(cells[j])) return false;
-      }
-    }
-    return true;
-  }
-  getBitSet(cell) {
-    return this.bitsets[cell];
-  }
-}
+const createExclusions = (numCells) => createCellExclusions({ allUnique: false, numCells });
 
 await runTest('_findKnownRequiredValues: simple exclusion', () => {
   const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
   const numCells = 3;
-  const cellExclusions = new MockCellExclusions(numCells);
+  const cellExclusions = createExclusions(numCells);
 
   // Cells 0 and 1 cannot be the same value.
   cellExclusions.addMutualExclusion(0, 1);
@@ -77,7 +53,7 @@ await runTest('_findKnownRequiredValues: simple exclusion', () => {
 await runTest('_findKnownRequiredValues: forced values', () => {
   const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
   const numCells = 3;
-  const cellExclusions = new MockCellExclusions(numCells);
+  const cellExclusions = createExclusions(numCells);
 
   // 0-1 exclusive, 1-2 exclusive.
   cellExclusions.addMutualExclusion(0, 1);
@@ -111,7 +87,7 @@ await runTest('_findKnownRequiredValues: forced values', () => {
 await runTest('_findKnownRequiredValues: no restrictions found', () => {
   const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
   const numCells = 3;
-  const cellExclusions = new MockCellExclusions(numCells);
+  const cellExclusions = createExclusions(numCells);
 
   // No exclusions.
   const cells = [0, 1, 2];
@@ -134,7 +110,7 @@ await runTest('_findKnownRequiredValues: no restrictions found', () => {
 await runTest('_findKnownRequiredValues: all required', () => {
   const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
   const numCells = 3;
-  const cellExclusions = new MockCellExclusions(numCells);
+  const cellExclusions = createExclusions(numCells);
 
   // No exclusions.
   const cells = [0, 1, 2];
@@ -157,7 +133,7 @@ await runTest('_findKnownRequiredValues: all required', () => {
 await runTest('_findKnownRequiredValues: impossible combination', () => {
   const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
   const numCells = 3;
-  const cellExclusions = new MockCellExclusions(numCells);
+  const cellExclusions = createExclusions(numCells);
 
   // All mutually exclusive.
   cellExclusions.addMutualExclusion(0, 1);
@@ -176,7 +152,7 @@ await runTest('_findKnownRequiredValues: impossible combination', () => {
 await runTest('_findKnownRequiredValues: max iterations exceeded', () => {
   const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
   const numCells = 12;
-  const cellExclusions = new MockCellExclusions(numCells);
+  const cellExclusions = createExclusions(numCells);
 
   // No exclusions to maximize combinations.
   const cells = Array.from({ length: numCells }, (_, i) => i);
@@ -194,7 +170,7 @@ await runTest('_findKnownRequiredValues: max iterations exceeded', () => {
 await runTest('_findKnownRequiredValues: merge existing restrictions', () => {
   const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
   const numCells = 3;
-  const cellExclusions = new MockCellExclusions(numCells);
+  const cellExclusions = createExclusions(numCells);
 
   // 0-1 exclusive, 1-2 exclusive.
   cellExclusions.addMutualExclusion(0, 1);
@@ -234,7 +210,7 @@ await runTest('_findKnownRequiredValues: merge existing restrictions', () => {
 await runTest('_findKnownRequiredValues: partial overlap', () => {
   const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
   const numCells = 4;
-  const cellExclusions = new MockCellExclusions(numCells);
+  const cellExclusions = createExclusions(numCells);
 
   // 0-1 exclusive.
   cellExclusions.addMutualExclusion(0, 1);
@@ -262,7 +238,7 @@ await runTest('_findKnownRequiredValues: partial overlap', () => {
 await runTest('_findKnownRequiredValues: count greater than numCells', () => {
   const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
   const numCells = 3;
-  const cellExclusions = new MockCellExclusions(numCells);
+  const cellExclusions = createExclusions(numCells);
 
   const cells = [0, 1, 2];
   const value = 1;
@@ -276,7 +252,7 @@ await runTest('_findKnownRequiredValues: count greater than numCells', () => {
 await runTest('_findKnownRequiredValues: count greater than exclusion groups', () => {
   const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
   const numCells = 4;
-  const cellExclusions = new MockCellExclusions(numCells);
+  const cellExclusions = createExclusions(numCells);
 
   // 0-1 exclusive.
   cellExclusions.addMutualExclusion(0, 1);
@@ -301,7 +277,7 @@ await runTest('_findKnownRequiredValues: count greater than exclusion groups', (
 await runTest('_findKnownRequiredValues: must pick from all groups', () => {
   const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
   const numCells = 3;
-  const cellExclusions = new MockCellExclusions(numCells);
+  const cellExclusions = createExclusions(numCells);
 
   // No exclusions between cells, so each is its own group.
   const cells = [0, 1, 2];
@@ -324,7 +300,7 @@ await runTest('_findKnownRequiredValues: must pick from all groups', () => {
 await runTest('_findKnownRequiredValues: suboptimal grouping (backtracking with skip)', () => {
   const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
   const numCells = 3;
-  const cellExclusions = new MockCellExclusions(numCells);
+  const cellExclusions = createExclusions(numCells);
 
   // 1 and 2 are mutually exclusive.
   cellExclusions.addMutualExclusion(1, 2);
@@ -360,7 +336,7 @@ await runTest('_findKnownRequiredValues: suboptimal grouping (backtracking with 
 await runTest('_findKnownRequiredValues: empty group', () => {
   const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
   const numCells = 2;
-  const cellExclusions = new MockCellExclusions(numCells);
+  const cellExclusions = createExclusions(numCells);
   const cells = [0, 1];
   const value = 1;
   const count = 1;
@@ -380,7 +356,7 @@ await runTest('_findKnownRequiredValues: empty group', () => {
 await runTest('_addSumIntersectionHandler: infeasible inferred sum adds False handler', () => {
   const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
   const shape = GridShape.fromGridSize(9);
-  const cellExclusions = new MockCellExclusions(shape.numCells);
+  const cellExclusions = createExclusions(shape.numCells);
 
   // Force the inferred outside-house cells to be mutually exclusive so their
   // minimum possible sum is 1+2=3.
@@ -416,7 +392,7 @@ await runTest('_replaceSizeSpecificSumHandlers: size=numValues mutually exclusiv
 
   const cells = Array.from({ length: shape.numValues }, (_, i) => i);
 
-  const cellExclusions = new MockCellExclusions(shape.numCells);
+  const cellExclusions = createExclusions(shape.numCells);
   for (let i = 0; i < cells.length; i++) {
     for (let j = i + 1; j < cells.length; j++) {
       cellExclusions.addMutualExclusion(cells[i], cells[j]);

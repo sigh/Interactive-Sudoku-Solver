@@ -2,10 +2,10 @@ import assert from 'node:assert/strict';
 
 import { ensureGlobalEnvironment } from '../helpers/test_env.js';
 import { runTest } from '../helpers/test_runner.js';
+import { GridTestContext } from '../helpers/grid_test_utils.js';
 
 ensureGlobalEnvironment();
 
-const { GridShape } = await import('../../js/grid_shape.js');
 const { CandidateSelector, ConflictScores, SeenCandidateSet } = await import('../../js/solver/candidate_selector.js');
 
 const makeDebugLogger = () => ({
@@ -14,12 +14,13 @@ const makeDebugLogger = () => ({
   log: () => { },
 });
 
-const makeSelector = (shape, { handlerSet = [], seenCandidateSet } = {}) => {
+const makeSelector = (context, { handlerSet = [], seenCandidateSet } = {}) => {
+  const { shape } = context;
   const selector = new CandidateSelector(
     shape,
     handlerSet,
     makeDebugLogger(),
-    seenCandidateSet || new SeenCandidateSet(shape.numCells),
+    seenCandidateSet || new SeenCandidateSet(shape.numCells, shape.numValues),
   );
 
   const conflictScores = new ConflictScores(new Array(shape.numCells).fill(0), shape.numValues);
@@ -27,15 +28,14 @@ const makeSelector = (shape, { handlerSet = [], seenCandidateSet } = {}) => {
   return { selector, conflictScores };
 };
 
-const createGridState = (shape, fill) => new Array(shape.numCells).fill(fill);
-
 await runTest('CandidateSelector moves all singletons to the front when next cell is a singleton', () => {
-  const shape = GridShape.fromGridSize(4);
-  const allValues = (1 << shape.numValues) - 1;
+  const context = new GridTestContext({ gridSize: 4 });
+  const { shape } = context;
+  const allValues = context.lookupTables.allValues;
 
-  const { selector } = makeSelector(shape);
+  const { selector } = makeSelector(context);
 
-  const gridState = createGridState(shape, allValues);
+  const gridState = context.createGrid({ fill: allValues });
 
   // Ensure the next cell is a singleton and there are other singletons later.
   gridState[0] = 1 << 0;
@@ -68,12 +68,13 @@ await runTest('CandidateSelector moves all singletons to the front when next cel
 });
 
 await runTest('CandidateSelector returns [cellOrder,0,0] when a wipeout (0) exists while bubbling singletons', () => {
-  const shape = GridShape.fromGridSize(4);
-  const allValues = (1 << shape.numValues) - 1;
+  const context = new GridTestContext({ gridSize: 4 });
+  const { shape } = context;
+  const allValues = context.lookupTables.allValues;
 
-  const { selector } = makeSelector(shape);
+  const { selector } = makeSelector(context);
 
-  const gridState = createGridState(shape, allValues);
+  const gridState = context.createGrid({ fill: allValues });
 
   // Make the next cell a singleton so that _updateCellOrder scans for other
   // singletons and detects wipeouts.
@@ -93,8 +94,9 @@ await runTest('CandidateSelector returns [cellOrder,0,0] when a wipeout (0) exis
 });
 
 await runTest('CandidateSelector consumes custom candidate state across backtracks (count reflects remaining custom options)', () => {
-  const shape = GridShape.fromGridSize(4);
-  const allValues = (1 << shape.numValues) - 1;
+  const context = new GridTestContext({ gridSize: 4 });
+  const { shape } = context;
+  const allValues = context.lookupTables.allValues;
   const nominatedValue = 1 << 0;
 
   const finder = {
@@ -112,7 +114,7 @@ await runTest('CandidateSelector consumes custom candidate state across backtrac
     candidateFinders: () => [finder],
   };
 
-  const { selector, conflictScores } = makeSelector(shape, { handlerSet: [handler] });
+  const { selector, conflictScores } = makeSelector(context, { handlerSet: [handler] });
 
   // Make default selection eligible for custom candidates: best cell has count>2 and cs>0.
   // Ensure minCS is beaten by at least one finder cell.
@@ -121,7 +123,7 @@ await runTest('CandidateSelector consumes custom candidate state across backtrac
   conflictScores.scores[5] = 70;
   conflictScores.scores[7] = 80;
 
-  const gridState = createGridState(shape, allValues);
+  const gridState = context.createGrid({ fill: allValues });
 
   // First visit: custom candidate state should be created and the highest
   // conflict-score cell (7) should be popped first.
@@ -162,8 +164,9 @@ await runTest('CandidateSelector consumes custom candidate state across backtrac
 });
 
 await runTest('CandidateSelector stepState override clears any pending custom-candidate state', () => {
-  const shape = GridShape.fromGridSize(4);
-  const allValues = (1 << shape.numValues) - 1;
+  const context = new GridTestContext({ gridSize: 4 });
+  const { shape } = context;
+  const allValues = context.lookupTables.allValues;
   const nominatedValue = 1 << 0;
 
   const finder = {
@@ -181,14 +184,14 @@ await runTest('CandidateSelector stepState override clears any pending custom-ca
     candidateFinders: () => [finder],
   };
 
-  const { selector, conflictScores } = makeSelector(shape, { handlerSet: [handler] });
+  const { selector, conflictScores } = makeSelector(context, { handlerSet: [handler] });
 
   conflictScores.scores[0] = 100;
   conflictScores.scores[2] = 60;
   conflictScores.scores[5] = 70;
   conflictScores.scores[7] = 80;
 
-  const gridState = createGridState(shape, allValues);
+  const gridState = context.createGrid({ fill: allValues });
 
   // First call seeds the custom candidate state.
   {
@@ -222,10 +225,11 @@ await runTest('CandidateSelector stepState override clears any pending custom-ca
 });
 
 await runTest('CandidateSelector falls back cleanly when filtering to interesting cells but none are interesting', () => {
-  const shape = GridShape.fromGridSize(4);
-  const allValues = (1 << shape.numValues) - 1;
+  const context = new GridTestContext({ gridSize: 4 });
+  const { shape } = context;
+  const allValues = context.lookupTables.allValues;
 
-  const seenCandidateSet = new SeenCandidateSet(shape.numCells);
+  const seenCandidateSet = new SeenCandidateSet(shape.numCells, shape.numValues);
   seenCandidateSet.enabledInSolver = true;
 
   // Prefix (cell 0) is interesting (fixed value not previously seen).
@@ -248,7 +252,7 @@ await runTest('CandidateSelector falls back cleanly when filtering to interestin
   const conflictScores = new ConflictScores(initialScores, shape.numValues);
   selector.reset(conflictScores);
 
-  const gridState = createGridState(shape, allValues);
+  const gridState = context.createGrid({ fill: allValues });
   gridState[0] = 1 << 0;
 
   const [nextDepth, , count] = selector.selectNextCandidate(1, gridState, null, true);
@@ -259,12 +263,13 @@ await runTest('CandidateSelector falls back cleanly when filtering to interestin
 });
 
 await runTest('CandidateSelector returns [cellOrder,0,0] when current depth cell is already a wipeout (0)', () => {
-  const shape = GridShape.fromGridSize(4);
-  const allValues = (1 << shape.numValues) - 1;
+  const context = new GridTestContext({ gridSize: 4 });
+  const { shape } = context;
+  const allValues = context.lookupTables.allValues;
 
-  const { selector } = makeSelector(shape);
+  const { selector } = makeSelector(context);
 
-  const gridState = createGridState(shape, allValues);
+  const gridState = context.createGrid({ fill: allValues });
   gridState[0] = 0;
 
   const [cellOrderOrZero, value, count] = selector.selectNextCandidate(
@@ -280,10 +285,11 @@ await runTest('CandidateSelector returns [cellOrder,0,0] when current depth cell
 });
 
 await runTest('CandidateSelector interesting-cell filtering works on the maxScore==0 (minCount) path', () => {
-  const shape = GridShape.fromGridSize(4);
-  const allValues = (1 << shape.numValues) - 1;
+  const context = new GridTestContext({ gridSize: 4 });
+  const { shape } = context;
+  const allValues = context.lookupTables.allValues;
 
-  const seenCandidateSet = new SeenCandidateSet(shape.numCells);
+  const seenCandidateSet = new SeenCandidateSet(shape.numCells, shape.numValues);
   seenCandidateSet.enabledInSolver = true;
 
   // Prefix is interesting at depth=1.
@@ -305,7 +311,7 @@ await runTest('CandidateSelector interesting-cell filtering works on the maxScor
   const conflictScores = new ConflictScores(new Array(shape.numCells).fill(0), shape.numValues);
   selector.reset(conflictScores);
 
-  const gridState = createGridState(shape, allValues);
+  const gridState = context.createGrid({ fill: allValues });
   gridState[0] = 1 << 0;
 
   // Make the interesting cells have different counts.

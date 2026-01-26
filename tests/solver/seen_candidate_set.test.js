@@ -2,26 +2,29 @@ import assert from 'node:assert/strict';
 
 import { ensureGlobalEnvironment } from '../helpers/test_env.js';
 import { runTest } from '../helpers/test_runner.js';
+import { GridTestContext, valueMask } from '../helpers/grid_test_utils.js';
 
 ensureGlobalEnvironment();
 
 const { SeenCandidateSet } = await import('../../js/solver/candidate_selector.js');
 
+const makeContext = (numCells, numValues) => new GridTestContext({ gridSize: [1, numCells], numValues });
+
 await runTest('SeenCandidateSet with candidateSupportThreshold=1 sets candidates immediately', () => {
-  const numCells = 4;
-  const numValues = 4;
+  const context = makeContext(4, 4);
+  const { numCells, numValues } = context.shape;
   const seenCandidateSet = new SeenCandidateSet(numCells, numValues);
 
   // Simulate a solution grid where each cell has a single value (as bitmask).
-  const grid = [1 << 0, 1 << 1, 1 << 2, 1 << 3];
+  const grid = [valueMask(1), valueMask(2), valueMask(3), valueMask(4)];
 
   seenCandidateSet.addSolutionGrid(grid);
 
   // With candidateSupportThreshold=1, candidates should be set immediately.
-  assert.equal(seenCandidateSet.candidates[0], 1 << 0);
-  assert.equal(seenCandidateSet.candidates[1], 1 << 1);
-  assert.equal(seenCandidateSet.candidates[2], 1 << 2);
-  assert.equal(seenCandidateSet.candidates[3], 1 << 3);
+  assert.equal(seenCandidateSet.candidates[0], valueMask(1));
+  assert.equal(seenCandidateSet.candidates[1], valueMask(2));
+  assert.equal(seenCandidateSet.candidates[2], valueMask(3));
+  assert.equal(seenCandidateSet.candidates[3], valueMask(4));
 
   // Counts should all be 1.
   const counts = seenCandidateSet.getCandidateCounts();
@@ -32,12 +35,12 @@ await runTest('SeenCandidateSet with candidateSupportThreshold=1 sets candidates
 });
 
 await runTest('SeenCandidateSet with candidateSupportThreshold>1 delays candidate bitmask', () => {
-  const numCells = 4;
-  const numValues = 4;
+  const context = makeContext(4, 4);
+  const { numCells, numValues } = context.shape;
   const seenCandidateSet = new SeenCandidateSet(numCells, numValues);
   seenCandidateSet.resetWithThreshold(3);
 
-  const grid = [1 << 0, 1 << 1, 1 << 2, 1 << 3];
+  const grid = [valueMask(1), valueMask(2), valueMask(3), valueMask(4)];
 
   // First solution: counts are 1, candidates should be empty.
   seenCandidateSet.addSolutionGrid(grid);
@@ -51,17 +54,17 @@ await runTest('SeenCandidateSet with candidateSupportThreshold>1 delays candidat
 
   // Third solution: counts are 3, candidates should now be set.
   seenCandidateSet.addSolutionGrid(grid);
-  assert.equal(seenCandidateSet.candidates[0], 1 << 0);
+  assert.equal(seenCandidateSet.candidates[0], valueMask(1));
   assert.equal(seenCandidateSet.getCandidateCounts()[0], 3);
 });
 
 await runTest('SeenCandidateSet counts saturate at candidateSupportThreshold', () => {
-  const numCells = 2;
-  const numValues = 4;
+  const context = makeContext(2, 4);
+  const { numCells, numValues } = context.shape;
   const seenCandidateSet = new SeenCandidateSet(numCells, numValues);
   seenCandidateSet.resetWithThreshold(3);
 
-  const grid = [1 << 0, 1 << 1];
+  const grid = [valueMask(1), valueMask(2)];
 
   // Add many solutions.
   for (let i = 0; i < 10; i++) {
@@ -75,15 +78,15 @@ await runTest('SeenCandidateSet counts saturate at candidateSupportThreshold', (
 });
 
 await runTest('SeenCandidateSet reset clears counts and candidates', () => {
-  const numCells = 4;
-  const numValues = 4;
+  const context = makeContext(4, 4);
+  const { numCells, numValues } = context.shape;
   const seenCandidateSet = new SeenCandidateSet(numCells, numValues);
 
-  const grid = [1 << 0, 1 << 1, 1 << 2, 1 << 3];
+  const grid = [valueMask(1), valueMask(2), valueMask(3), valueMask(4)];
   seenCandidateSet.addSolutionGrid(grid);
 
   // Verify data is set.
-  assert.equal(seenCandidateSet.candidates[0], 1 << 0);
+  assert.equal(seenCandidateSet.candidates[0], valueMask(1));
   assert.equal(seenCandidateSet.getCandidateCounts()[0], 1);
 
   // Reset and verify data is cleared.
@@ -93,8 +96,8 @@ await runTest('SeenCandidateSet reset clears counts and candidates', () => {
 });
 
 await runTest('SeenCandidateSet resetWithThreshold sets candidateSupportThreshold', () => {
-  const numCells = 4;
-  const numValues = 4;
+  const context = makeContext(4, 4);
+  const { numCells, numValues } = context.shape;
   const seenCandidateSet = new SeenCandidateSet(numCells, numValues);
 
   // Default candidateSupportThreshold is 1.
@@ -104,7 +107,7 @@ await runTest('SeenCandidateSet resetWithThreshold sets candidateSupportThreshol
   assert.equal(seenCandidateSet._candidateSupportThreshold, 5);
 
   // Also clears data.
-  const grid = [1 << 0, 1 << 1, 1 << 2, 1 << 3];
+  const grid = [valueMask(1), valueMask(2), valueMask(3), valueMask(4)];
   seenCandidateSet.addSolutionGrid(grid);
   seenCandidateSet.resetWithThreshold(10);
   assert.equal(seenCandidateSet._candidateSupportThreshold, 10);
@@ -112,8 +115,8 @@ await runTest('SeenCandidateSet resetWithThreshold sets candidateSupportThreshol
 });
 
 await runTest('SeenCandidateSet resetWithThreshold throws for invalid value', () => {
-  const numCells = 4;
-  const numValues = 4;
+  const context = makeContext(4, 4);
+  const { numCells, numValues } = context.shape;
   const seenCandidateSet = new SeenCandidateSet(numCells, numValues);
 
   assert.throws(() => seenCandidateSet.resetWithThreshold(0), /candidateSupportThreshold must be between 1 and 255/);
@@ -122,21 +125,21 @@ await runTest('SeenCandidateSet resetWithThreshold throws for invalid value', ()
 });
 
 await runTest('SeenCandidateSet accumulates multiple values per cell', () => {
-  const numCells = 2;
-  const numValues = 4;
+  const context = makeContext(2, 4);
+  const { numCells, numValues } = context.shape;
   const seenCandidateSet = new SeenCandidateSet(numCells, numValues);
 
   // Two different solutions with different values in cell 0.
-  const grid1 = [1 << 0, 1 << 1];
-  const grid2 = [1 << 2, 1 << 1];
+  const grid1 = [valueMask(1), valueMask(2)];
+  const grid2 = [valueMask(3), valueMask(2)];
 
   seenCandidateSet.addSolutionGrid(grid1);
   seenCandidateSet.addSolutionGrid(grid2);
 
   // Cell 0 should have both values 1 and 3 marked.
-  assert.equal(seenCandidateSet.candidates[0], (1 << 0) | (1 << 2));
+  assert.equal(seenCandidateSet.candidates[0], valueMask(1, 3));
   // Cell 1 should have value 2 marked (appeared twice, but saturates at threshold=1).
-  assert.equal(seenCandidateSet.candidates[1], 1 << 1);
+  assert.equal(seenCandidateSet.candidates[1], valueMask(2));
 
   // Check counts - with candidateSupportThreshold=1, counts saturate at 1.
   const counts = seenCandidateSet.getCandidateCounts();
@@ -146,30 +149,30 @@ await runTest('SeenCandidateSet accumulates multiple values per cell', () => {
 });
 
 await runTest('SeenCandidateSet hasInterestingSolutions works with candidateSupportThreshold', () => {
-  const numCells = 4;
-  const numValues = 4;
+  const context = makeContext(4, 4);
+  const { numCells, numValues } = context.shape;
   const seenCandidateSet = new SeenCandidateSet(numCells, numValues);
   seenCandidateSet.resetWithThreshold(2);
 
   // Add one solution.
-  const solution1 = [1 << 0, 1 << 1, 1 << 2, 1 << 3];
+  const solution1 = [valueMask(1), valueMask(2), valueMask(3), valueMask(4)];
   seenCandidateSet.addSolutionGrid(solution1);
 
   // Candidates not yet set (candidateSupportThreshold=2, count=1).
   assert.equal(seenCandidateSet.candidates[0], 0);
 
   // A grid with the same values should be interesting (count < candidateSupportThreshold).
-  const testGrid = [1 << 0, 1 << 1, 1 << 2, 1 << 3];
+  const testGrid = [valueMask(1), valueMask(2), valueMask(3), valueMask(4)];
   assert.equal(seenCandidateSet.hasInterestingSolutions(testGrid), true);
 
   // Add another solution to reach threshold.
   seenCandidateSet.addSolutionGrid(solution1);
-  assert.equal(seenCandidateSet.candidates[0], 1 << 0);
+  assert.equal(seenCandidateSet.candidates[0], valueMask(1));
 
   // Now the same grid should NOT be interesting.
   assert.equal(seenCandidateSet.hasInterestingSolutions(testGrid), false);
 
   // A grid with a new value should still be interesting.
-  const newGrid = [1 << 1, 1 << 1, 1 << 2, 1 << 3];
+  const newGrid = [valueMask(2), valueMask(2), valueMask(3), valueMask(4)];
   assert.equal(seenCandidateSet.hasInterestingSolutions(newGrid), true);
 });
