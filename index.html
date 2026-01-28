@@ -241,138 +241,135 @@ layout: null
   </div>
 
   <div id="sudoku-container">
-    <div>
-      <div id="left-panel" class="vstack">
-        <div id="left-panel-main">
-          <div id="display-panel" class="vstack">
-            <div id="solve-mode-input-container">
-              <select id="solve-mode-input" required>
-                <option value="all-possibilities" checked>All possibilities</option>
-                <option value="solutions">Solutions</option>
-                <option value="count-solutions">Count solutions</option>
-                <option value="estimate-solutions">Estimate solutions</option>
-                <option value="step-by-step">Step-by-step</option>
-                <option value="validate-layout">Validate layout</option>
-              </select>
-              <div id="candidate-support-threshold-container" class="hide-until-load">
-                <label for="candidate-support-threshold">
-                  Value count limit
-                  <span class="tooltip">
-                    <template>
+    <div id="left-panel" class="vstack">
+      <div id="left-panel-main">
+        <div id="display-panel" class="vstack">
+          <div id="solve-mode-input-container">
+            <select id="solve-mode-input" required>
+              <option value="all-possibilities" checked>All possibilities</option>
+              <option value="solutions">Solutions</option>
+              <option value="count-solutions">Count solutions</option>
+              <option value="estimate-solutions">Estimate solutions</option>
+              <option value="step-by-step">Step-by-step</option>
+              <option value="validate-layout">Validate layout</option>
+            </select>
+            <div id="candidate-support-threshold-container" class="hide-until-load">
+              <label for="candidate-support-threshold">
+                Value count limit
+                <span class="tooltip">
+                  <template>
+                    <div>
+                      <div>
+                        Colors show how many solutions contain each candidate:
+                      </div>
                       <div>
                         <div>
-                          Colors show how many solutions contain each candidate:
+                          <strong style="color: var(--color-primary-dark)">Blue</strong>:
+                          more than the count
                         </div>
                         <div>
-                          <div>
-                            <strong style="color: var(--color-primary-dark)">Blue</strong>:
-                            more than the count
-                          </div>
-                          <div>
-                            <strong style="color: var(--color-candidate-at-limit)">Purple</strong>:
-                            exactly this count
-                          </div>
-                          <div>
-                            <strong style="color: var(--color-candidate-below-limit)">Orange</strong>:
-                            fewer than the count
-                          </div>
-                          <div>
-                            <strong style="color: var(--color-candidate-unique)">Green</strong>:
-                            in exactly one solution
-                          </div>
+                          <strong style="color: var(--color-candidate-at-limit)">Purple</strong>:
+                          exactly this count
+                        </div>
+                        <div>
+                          <strong style="color: var(--color-candidate-below-limit)">Orange</strong>:
+                          fewer than the count
+                        </div>
+                        <div>
+                          <strong style="color: var(--color-candidate-unique)">Green</strong>:
+                          in exactly one solution
                         </div>
                       </div>
-                    </template>
-                  </span>:
-                </label>
-                <div>
-                  <input type="range" id="candidate-support-threshold" min="0" max="10" value="0">
-                  <span>0</span>
-                </div>
+                    </div>
+                  </template>
+                </span>:
+              </label>
+              <div>
+                <input type="range" id="candidate-support-threshold" min="0" max="10" value="0">
+                <span>0</span>
               </div>
-              <div id="solve-mode-description" class="description"></div>
             </div>
-            <div id="state-output" class="hide-until-load" style="--skeleton-height:380px;"></div>
-            <div id="progress-container">
-              <progress value=0 id="solve-progress"></progress>
-              <span id="solve-status">LOADING...</span>
-              <span id="solve-percentage"></span>
-            </div>
-            <div class="hstack">
-              <button id="download-solutions-button" title="Download solutions" class="image-button auxiliary-button"
-                disabled>
-                <img src="img/download-48.png" alt="Download">
-              </button>
-              <button id="copy-solution-button" title="Copy solution to clipboard" class="image-button auxiliary-button"
-                disabled>
-                <img src="img/copy-48.png" alt="Copy">
-              </button>
-              <button id="copy-url-button" title="Copy URL to clipboard" class="image-button auxiliary-button">
-                <img src="img/link-48.png" alt="Copy URL">
-              </button>
-            </div>
+            <div id="solve-mode-description" class="description"></div>
           </div>
-
-          <div id="sudoku-grid-with-controls" class="vstack">
-            <div id="sudoku-grid" class="hide-until-load">
-              <input id="fake-input" inputmode="numeric" type="text" value="x">
-            </div>
-            <div class="hstack">
-              <div id="solution-control-panel" class="vstack hide-until-load" style="--skeleton-height:50px;">
-                <div id="solution-iteration-state"></div>
-                <div id="solution-control-buttons" class="hstack">
-                  <button id="solution-start" class="icon-button" title="start (s)">&#171;</button>
-                  <button id="solution-back" class="icon-button" title="previous (p)">&#8249;</button>
-                  <button id="solution-forward" class="icon-button" title="next (n)">&#8250;</button>
-                  <button id="solution-end" class="icon-button" title="end">&#187;</button>
-                </div>
-              </div>
-              <div class="switch hstack-push-right">
-                <label>
-                  <input id="auto-solve-input" type="checkbox" checked>
-                  <span></span>
-                </label>
-                Auto-solve
-              </div>
-              <button id="solve-button" class="big-button" title="solve">Solve</button>
-              <button id="stop-solver" class="big-button danger-button" title="abort">Abort</button>
-            </div>
+          <div id="state-output" class="hide-until-load" style="--skeleton-height:380px;"></div>
+          <div id="progress-container">
+            <progress value=0 id="solve-progress"></progress>
+            <span id="solve-status">LOADING...</span>
+            <span id="solve-percentage"></span>
+          </div>
+          <div class="hstack">
+            <button id="download-solutions-button" title="Download solutions" class="image-button auxiliary-button"
+              disabled>
+              <img src="img/download-48.png" alt="Download">
+            </button>
+            <button id="copy-solution-button" title="Copy solution to clipboard" class="image-button auxiliary-button"
+              disabled>
+              <img src="img/copy-48.png" alt="Copy">
+            </button>
+            <button id="copy-url-button" title="Copy URL to clipboard" class="image-button auxiliary-button">
+              <img src="img/link-48.png" alt="Copy URL">
+            </button>
           </div>
         </div>
 
-        <div class="description page-info">
-          <ul>
-            <li>
-              <strong>Select a cell</strong> and <strong>type</strong> a number
-              to set a value.
-            </li>
-            <li>
-              <strong>Drag</strong> or <strong>Shift+click</strong>
-              to select multiple cells. This selection can be used to add line
-              or region constraints.
-            </li>
-            <li>
-              <strong>Select an arrow</strong> outside the grid to set outside clues
-              such as Little Killer or Skyscraper constraints.
-            </li>
-          </ul>
-          <p>
-            See the <a href="help">help page</a> for more information.
-          </p>
-        </div>
-        <div class="description page-info">
-          <p>
-            <a href="#" id="open-sandbox-link">JavaScript sandbox</a> ·
-            <a href="javascript:loadDebug()">Debug mode</a>
-          </p>
-          <p>
-            Solver runs fastest on Chrome ·
-            More projects at
-            <a href="https://sigh.github.io/" target="_blank" rel="noopener">sigh.github.io</a>
-          </p>
+        <div id="sudoku-grid-with-controls" class="vstack">
+          <div id="sudoku-grid" class="hide-until-load">
+            <input id="fake-input" inputmode="numeric" type="text" value="x">
+          </div>
+          <div class="hstack">
+            <div id="solution-control-panel" class="vstack hide-until-load" style="--skeleton-height:50px;">
+              <div id="solution-iteration-state"></div>
+              <div id="solution-control-buttons" class="hstack">
+                <button id="solution-start" class="icon-button" title="start (s)">&#171;</button>
+                <button id="solution-back" class="icon-button" title="previous (p)">&#8249;</button>
+                <button id="solution-forward" class="icon-button" title="next (n)">&#8250;</button>
+                <button id="solution-end" class="icon-button" title="end">&#187;</button>
+              </div>
+            </div>
+            <div class="switch hstack-push-right">
+              <label>
+                <input id="auto-solve-input" type="checkbox" checked>
+                <span></span>
+              </label>
+              Auto-solve
+            </div>
+            <button id="solve-button" class="big-button" title="solve">Solve</button>
+            <button id="stop-solver" class="big-button danger-button" title="abort">Abort</button>
+          </div>
         </div>
       </div>
 
+      <div class="description page-info">
+        <ul>
+          <li>
+            <strong>Select a cell</strong> and <strong>type</strong> a number
+            to set a value.
+          </li>
+          <li>
+            <strong>Drag</strong> or <strong>Shift+click</strong>
+            to select multiple cells. This selection can be used to add line
+            or region constraints.
+          </li>
+          <li>
+            <strong>Select an arrow</strong> outside the grid to set outside clues
+            such as Little Killer or Skyscraper constraints.
+          </li>
+        </ul>
+        <p>
+          See the <a href="help">help page</a> for more information.
+        </p>
+      </div>
+      <div class="description page-info">
+        <p>
+          <a href="#" id="open-sandbox-link">JavaScript sandbox</a> ·
+          <a href="javascript:loadDebug()">Debug mode</a>
+        </p>
+        <p>
+          Solver runs fastest on Chrome ·
+          More projects at
+          <a href="https://sigh.github.io/" target="_blank" rel="noopener">sigh.github.io</a>
+        </p>
+      </div>
     </div>
 
     <div id="right-panel">
@@ -416,7 +413,7 @@ layout: null
         <div class="lazy-body"></div>
       </div>
 
-      <div id="constraint-panel-container">
+      <div id="constraint-panel-container" class="vstack">
 
         <div class="hstack constraint-panel-header">
           <h1>Constraints</h1>

@@ -67,12 +67,12 @@
 body {
   font-size: var(--font-size-base);
   font-family: var(--font-family-base);
-  width: fit-content;
 
-  margin: 0 10px;
+  margin: 0;
+  height: 100dvh;
   display: flex;
   flex-direction: column;
-  gap: var(--gap-main-section);
+  overflow: hidden;
 }
 
 #sudoku-grid {
@@ -81,7 +81,6 @@ body {
   border: 1px solid var(--color-border-light);
   box-shadow:
     0 1px 2px rgba(0, 0, 0, 0.14),
-    0 10px 24px rgba(0, 0, 0, 0.20),
     0 0 0 6px rgba(0, 0, 0, 0.08);
   align-self: center;
 }
@@ -189,6 +188,12 @@ body {
     0 -2px 8px rgba(0, 0, 0, 0.06);
 }
 
+#page-header {
+  flex-shrink: 0;
+  border-radius: 0;
+  z-index: 100;
+}
+
 .page-header-logo {
   width: 40px;
   height: 40px;
@@ -252,10 +257,6 @@ body {
   margin-bottom: 10px;
 }
 
-#right-panel {
-  width: var(--right-panel-width);
-}
-
 #right-panel>hr {
   margin-top: -5px;
 }
@@ -273,7 +274,24 @@ body {
 
 #sudoku-container {
   display: flex;
-  gap: var(--gap-main-section);
+  flex: 1;
+  min-height: 0;
+  overflow-x: auto;
+}
+
+#left-panel {
+  flex-shrink: 0;
+  overflow-y: auto;
+  padding: var(--gap-main-section) var(--gap-default);
+  --vstack-gap: var(--gap-main-section);
+}
+
+#right-panel {
+  width: var(--right-panel-width);
+  flex-shrink: 0;
+  overflow-y: auto;
+  padding: var(--gap-main-section) var(--gap-default);
+  padding-left: calc(var(--gap-default) / 2);
 }
 
 button,
@@ -618,35 +636,9 @@ button.copy-to-clipboard-failed::after {
 
 #constraint-panel-container {
   --constraint-panel-glow-size: 6px;
-
   line-height: 1.8;
   width: var(--right-panel-width);
-
-  /* Keep only the constraints panel visible; only its body scrolls. */
-  position: sticky;
-  top: 0;
-  max-height: 100dvh;
-
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  margin-bottom: 0;
-
-  /* Ensure overflow doesn't extend the page; the inner wrapper scrolls. */
-  overflow: hidden;
-}
-
-#constraint-panel-scroll {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
-  padding-inline: var(--constraint-panel-glow-size);
-
-  /* Extra whitespace so the last controls can be scrolled up while the grid
-     remains in view. (Doesn't change layout; only affects scroll range.) */
-  padding-bottom: max(200px, 50vh);
-  padding-top: var(--gap-default);
+  box-sizing: border-box;
 }
 
 #constraint-panel-container form {
@@ -738,10 +730,6 @@ fieldset[disabled],
 
 textarea {
   font-size: var(--font-size-small);
-}
-
-#left-panel {
-  --vstack-gap: var(--gap-main-section);
 }
 
 #left-panel-main {
@@ -923,7 +911,6 @@ select.thin-select {
   border: 1px solid var(--color-border-light);
   border-radius: 10px;
   padding: 8px 10px;
-  margin-bottom: var(--gap-default);
   line-height: 1.35;
 }
 
