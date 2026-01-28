@@ -178,7 +178,6 @@ body {
 }
 
 #page-header,
-#page-footer,
 .constraint-panel-header {
   padding: 5px 10px;
   background: var(--color-primary-soft);
@@ -188,14 +187,6 @@ body {
     0 -1px 0 rgba(0, 0, 0, 0.04),
     0 2px 8px rgba(0, 0, 0, 0.06),
     0 -2px 8px rgba(0, 0, 0, 0.06);
-}
-
-#page-footer {
-  flex-wrap: wrap;
-  font-size: var(--font-size-small);
-  color: var(--color-text-muted);
-  margin-top: calc(-1 * var(--gap-main-section));
-  z-index: 500;
 }
 
 .page-header-logo {
