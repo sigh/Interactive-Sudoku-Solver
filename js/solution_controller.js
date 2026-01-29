@@ -19,6 +19,16 @@ const {
   DEFAULT_MODE,
   getModeDescription,
 } = await import('./solver_runner.js' + self.VERSION_PARAM);
+const { BottomDrawer } = await import('./bottom_drawer.js' + self.VERSION_PARAM);
+
+// Singleton bottom drawer instance
+let bottomDrawer = null;
+const getBottomDrawer = () => {
+  if (!bottomDrawer) {
+    bottomDrawer = new BottomDrawer('bottom-drawer');
+  }
+  return bottomDrawer;
+};
 
 class LazyDebugManager {
   constructor(displayContainer, constraintManager) {
@@ -36,6 +46,8 @@ class LazyDebugManager {
 
   _setUpDebugLoadingControls() {
     const DEBUG_PARAM_NAME = 'debug';
+    const DEBUG_TAB_ID = 'debug';
+    const drawer = getBottomDrawer();
 
     const updateURL = (enable) => {
       const url = new URL(window.location);
@@ -47,32 +59,39 @@ class LazyDebugManager {
       window.history.pushState(null, null, url);
     };
 
-    const toggleDebug = (enabled) => {
-      this._enabled = (enabled !== undefined) ? enabled : !this._enabled;
-      this._real?.enable(this._enabled);
-      updateURL(this._enabled);
-      this._container.style.display = this._enabled ? 'block' : 'none';
-      if (!this._enabled) return;
-      this._ensureLoaded();
+    const setEnabled = (enabled) => {
+      this._enabled = enabled;
+      this._real?.enable(enabled);
+      updateURL(enabled);
+      if (enabled) this._ensureLoaded();
     };
 
+    // Handle tab close from drawer
+    drawer.onTabClose(DEBUG_TAB_ID, () => {
+      if (this._enabled) setEnabled(false);
+    });
+
     window.loadDebug = () => {
-      toggleDebug(true);
-      this._container.scrollIntoView();
-    }
+      if (!this._enabled) {
+        setEnabled(true);
+        drawer.openTab(DEBUG_TAB_ID);
+      }
+    };
 
     document.addEventListener('keydown', (event) => {
       if (event.ctrlKey && event.key === 'd') {
-        toggleDebug();
+        if (drawer.toggleTab(DEBUG_TAB_ID)) {
+          setEnabled(true);
+        } else {
+          setEnabled(false);
+        }
       }
     });
 
-    const closeButton = document.getElementById('close-debug-button');
-    if (closeButton) closeButton.onclick = () => toggleDebug(false);
-
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.has(DEBUG_PARAM_NAME)) {
-      toggleDebug(true);
+      setEnabled(true);
+      drawer.openTab(DEBUG_TAB_ID);
     }
   }
 

@@ -177,7 +177,8 @@ body {
 }
 
 #page-header,
-.constraint-panel-header {
+.constraint-panel-header,
+.bottom-drawer-tabs {
   padding: 5px 10px;
   background: var(--color-primary-soft);
   border-radius: 2px;
@@ -1232,7 +1233,6 @@ h3 {
 
 .tab-container {
   display: flex;
-  margin-bottom: 10px;
   border-bottom: 1px solid var(--color-border-light);
 }
 
@@ -1252,6 +1252,7 @@ h3 {
 .tab-container button:hover {
   background: none;
   color: #111;
+  box-shadow: 0 0 2px rgba(0, 0, 0, 0.18);
 }
 
 .tab-container button:active {
@@ -1361,4 +1362,58 @@ button:has(.spinner),
 /* This is required before the sandbox CSS is loaded */
 #sandbox-container .sandbox-anchor {
   justify-content: left;
+}
+
+/* Bottom Drawer - Tabbed panel at bottom of page */
+#bottom-drawer {
+  --drawer-height: 200px;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  height: var(--drawer-height);
+}
+
+.bottom-drawer-tabs {
+  cursor: ns-resize;
+  touch-action: none;
+  padding: 0 var(--gap-default);
+}
+
+.bottom-drawer-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.bottom-drawer-tab-close:hover {
+  color: var(--color-danger);
+}
+
+.bottom-drawer-collapse::after {
+  content: '';
+  display: block;
+  width: 6px;
+  height: 6px;
+  border-left: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(-45deg) translate(1px, -1px);
+  transition: transform 0.15s;
+}
+
+#bottom-drawer.collapsed .bottom-drawer-collapse::after {
+  transform: rotate(135deg) translate(1px, -1px);
+}
+
+.bottom-drawer-panels {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.bottom-drawer-panel {
+  display: none;
+}
+
+.bottom-drawer-panel.active {
+  display: block;
 }
