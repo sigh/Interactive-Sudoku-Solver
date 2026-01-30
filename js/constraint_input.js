@@ -187,7 +187,6 @@ ConstraintCategoryInput.Shape = class Shape extends ConstraintCategoryInput {
 
     input.addEventListener('focus', () => {
       showDropdown();
-      input.select();
     });
     input.addEventListener('click', showDropdown);
     input.addEventListener('input', showDropdown);

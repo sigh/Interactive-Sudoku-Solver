@@ -5,7 +5,7 @@ export const SANDBOX_HELP_TEXT = `
 
   Write JavaScript to generate constraints and invoke the solver.
 
-  The sandbox can be opened by clicking on the [JavaScript Sandbox] link or
+  The sandbox can be opened from the settings menu in the top-right or
   by the crtl+\` shortcut.
 
   console.log() will write to the output log. help() will display this message.

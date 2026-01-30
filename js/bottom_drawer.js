@@ -1,5 +1,7 @@
 // A tabbed bottom drawer component.
 export class BottomDrawer {
+  static STORAGE_KEY = 'bottom-drawer-height';
+
   constructor(containerId) {
     this._container = document.getElementById(containerId);
     this._tabBar = this._container.querySelector('.bottom-drawer-tabs');
@@ -7,6 +9,11 @@ export class BottomDrawer {
     this._tabs = new Map(); // id -> { button, panel, onClose }
     this._activeTabId = null;
     this._expandedHeight = null;
+
+    {
+      const savedHeight = sessionStorage.getItem(BottomDrawer.STORAGE_KEY);
+      if (savedHeight) this._setHeight(parseInt(savedHeight, 10));
+    }
 
     this._initResize();
     this._initCollapseButton();
@@ -125,11 +132,17 @@ export class BottomDrawer {
     } else {
       this._setHeight(this._expandedHeight || 200);
     }
-    this._container.classList.toggle('collapsed', this._container.offsetHeight <= minHeight);
+    this._saveHeight();
   }
 
   _setHeight(h) {
     this._container.style.setProperty('--drawer-height', `${h}px`);
+  }
+
+  _saveHeight() {
+    const height = this._container.offsetHeight;
+    this._container.classList.toggle('collapsed', height <= this._tabBar.offsetHeight);
+    sessionStorage.setItem(BottomDrawer.STORAGE_KEY, height);
   }
 
   _updateVisibility() {
@@ -146,7 +159,6 @@ export class BottomDrawer {
       startY = e.clientY;
       startHeight = this._container.offsetHeight;
       this._tabBar.setPointerCapture(e.pointerId);
-      document.body.style.cursor = 'ns-resize';
       document.body.style.userSelect = 'none';
     });
 
@@ -158,9 +170,8 @@ export class BottomDrawer {
 
     this._tabBar.addEventListener('pointerup', (e) => {
       this._tabBar.releasePointerCapture(e.pointerId);
-      document.body.style.cursor = '';
       document.body.style.userSelect = '';
-      this._container.classList.toggle('collapsed', this._container.offsetHeight <= this._tabBar.offsetHeight);
+      this._saveHeight();
     });
   }
 }

@@ -56,6 +56,8 @@ export const initPage = () => {
   const hiddenElements = Array.from(
     document.getElementsByClassName('hide-until-load'));
   hiddenElements.forEach(e => e.classList.remove('hide-until-load'));
+
+  document.querySelector('.page-header-logo').scrollIntoView();
 };
 
 const setUpTooltipPortal = () => {
