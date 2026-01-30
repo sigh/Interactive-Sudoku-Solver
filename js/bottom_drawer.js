@@ -56,6 +56,7 @@ class BottomDrawer {
     button.onclick = () => this.switchTab(id);
 
     panel.classList.add('bottom-drawer-panel');
+    panel.style.display = 'none';
     this._tabs.set(id, { button, panel, onClose: null });
   }
 
@@ -83,7 +84,7 @@ class BottomDrawer {
     if (!tab || !this._tabBar.contains(tab.button)) return;
 
     tab.button.remove();
-    tab.panel.classList.remove('active');
+    tab.panel.style.display = 'none';
     tab.onClose?.();
 
     if (this._activeTabId === id) {
@@ -99,15 +100,17 @@ class BottomDrawer {
     this._updateVisibility();
   }
 
-  /** Switch to a tab (assumes tab is open). */
+  /** Switch to a tab. */
   switchTab(id) {
     const tab = this._tabs.get(id);
     if (!tab) return;
 
+    // Only toggle panels for tabs that are currently open.
     for (const [tabId, t] of this._tabs) {
+      if (!this._tabBar.contains(t.button)) continue;
       const isActive = tabId === id;
       t.button.classList.toggle('active', isActive);
-      t.panel.classList.toggle('active', isActive);
+      t.panel.style.display = isActive ? '' : 'none';
     }
     this._activeTabId = id;
   }

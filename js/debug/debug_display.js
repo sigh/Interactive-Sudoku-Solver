@@ -21,7 +21,7 @@ const {
 const debugModule = await import('./debug.js' + self.VERSION_PARAM);
 
 export class DebugManager {
-  constructor(displayContainer, constraintManager) {
+  constructor(displayContainer, constraintManager, bottomDrawer) {
     // External dependencies.
     this._displayContainer = displayContainer;
     this._constraintManager = constraintManager;
@@ -49,7 +49,7 @@ export class DebugManager {
 
     // Views.
     this._stackTraceView = new DebugStackTraceView(
-      this._container.querySelector('.debug-stack-trace'), {
+      document.querySelector('#stack-trace-container .debug-stack-trace'), {
       infoOverlay: this._infoOverlay,
       highlighter: this._debugCellHighlighter,
     });
@@ -58,10 +58,10 @@ export class DebugManager {
       highlighter: this._debugCellHighlighter,
     });
 
-    this._initialize();
+    this._initialize(bottomDrawer);
   }
 
-  _initialize() {
+  _initialize(bottomDrawer) {
     // Import debug module functions into the window scope.
     Object.assign(self, debugModule);
 
@@ -80,42 +80,37 @@ export class DebugManager {
       }
     }
 
-    // Stack trace checkbox controls only whether the footer is visible.
+    // Stack trace checkbox opens/closes the stack trace tab.
     // Whether the solver exports stack traces is decided at solve start via getOptions().
     {
       const stackTraceCheckbox = this._stackTraceCheckbox;
-
-      const stackTraceFooter = document.getElementById('debug-stack-trace-footer');
-      const flameToggleButton = document.getElementById('debug-flame-toggle');
+      const STACK_TRACE_TAB_ID = 'stack-trace';
 
       const showStackTraceKey = 'showStackTrace';
-      const flameExpandedKey = 'debugFlameExpanded';
 
       const savedShowStackTrace = sessionAndLocalStorage.getItem(showStackTraceKey);
       if (savedShowStackTrace !== undefined) {
         stackTraceCheckbox.checked = (savedShowStackTrace === 'true');
       }
 
-      const applyFlameExpanded = (expanded) => {
-        flameToggleButton.classList.toggle('expanded', expanded);
-        this._flameGraphView.setCollapsed(!expanded);
-        sessionAndLocalStorage.setItem(flameExpandedKey, expanded.toString());
-      };
-
-      // Flame graph is visible by default.
-      const savedFlameExpanded = sessionAndLocalStorage.getItem(flameExpandedKey);
-      applyFlameExpanded(savedFlameExpanded === undefined ? true : (savedFlameExpanded === 'true'));
-
-      flameToggleButton.addEventListener('click', () => {
-        applyFlameExpanded(!flameToggleButton.classList.contains('expanded'));
-      });
-
       const applyStackTraceEnabled = (enabled) => {
         this._stackTraceView.setEnabled(enabled);
         this._flameGraphView.setEnabled(enabled);
-        stackTraceFooter.classList.toggle('hidden', !enabled);
+        if (enabled) {
+          bottomDrawer.openTab(STACK_TRACE_TAB_ID);
+        } else {
+          bottomDrawer.closeTab(STACK_TRACE_TAB_ID);
+        }
         sessionAndLocalStorage.setItem(showStackTraceKey, enabled.toString());
       };
+
+      // Sync checkbox when tab is closed via the tab close button.
+      bottomDrawer.onTabClose(STACK_TRACE_TAB_ID, () => {
+        stackTraceCheckbox.checked = false;
+        this._stackTraceView.setEnabled(false);
+        this._flameGraphView.setEnabled(false);
+        sessionAndLocalStorage.setItem(showStackTraceKey, 'false');
+      });
 
       applyStackTraceEnabled(stackTraceCheckbox.checked);
       stackTraceCheckbox.onchange = () => applyStackTraceEnabled(stackTraceCheckbox.checked);

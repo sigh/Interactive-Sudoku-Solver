@@ -1409,11 +1409,3 @@ button:has(.spinner),
   overflow-y: auto;
   min-height: 0;
 }
-
-.bottom-drawer-panel {
-  display: none;
-}
-
-.bottom-drawer-panel.active {
-  display: block;
-}

@@ -28,7 +28,6 @@ export class DebugFlameGraphView {
 
     // Lifecycle.
     this._enabled = false;
-    this._collapsed = false;
 
     // Data.
     this._store = new FlameGraphStore();
@@ -37,7 +36,7 @@ export class DebugFlameGraphView {
     // Centralize gating here so callers can always just call `_render()`.
     const renderDeferred = deferUntilAnimationFrame(this._renderImpl.bind(this));
     this._render = () => {
-      if (!this._enabled || this._collapsed) return;
+      if (!this._enabled) return;
       renderDeferred();
     };
 
@@ -62,8 +61,7 @@ export class DebugFlameGraphView {
     flameContainer.appendChild(tooltip);
     this._tooltip = tooltip;
 
-    const header = stackTraceElem.closest('.debug-stack-trace-header');
-    header.insertAdjacentElement('afterend', flameContainer);
+    stackTraceElem.insertAdjacentElement('afterend', flameContainer);
     this._container = flameContainer;
 
     // Allocate the SVG.
@@ -95,16 +93,6 @@ export class DebugFlameGraphView {
       return;
     }
 
-    this._render();
-  }
-
-  setCollapsed(collapsed) {
-    this._collapsed = !!collapsed;
-    this._syncVisibility();
-    if (this._collapsed) {
-      this._clearHover();
-      return;
-    }
     this._render();
   }
 
