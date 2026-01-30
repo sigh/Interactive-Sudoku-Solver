@@ -21,117 +21,6 @@ const {
   getModeDescription,
 } = await import('./solver_runner.js' + self.VERSION_PARAM);
 
-class LazyDebugManager {
-  constructor(displayContainer, constraintManager, bottomDrawer) {
-    this._displayContainer = displayContainer;
-    this._constraintManager = constraintManager;
-    this._bottomDrawer = bottomDrawer;
-    this._container = document.getElementById('debug-container');
-    this._shape = null;
-
-    this._enabled = false;
-    this._real = null;
-    this._realPromise = null;
-
-    this._setUpDebugLoadingControls();
-  }
-
-  _setUpDebugLoadingControls() {
-    const DEBUG_TAB_ID = 'debug';
-    const drawer = this._bottomDrawer;
-    const toggle = document.getElementById('show-debug-input');
-    autoSaveField(toggle);
-
-    const setEnabled = (enabled) => {
-      this._enabled = enabled;
-      this._real?.enable(enabled);
-      if (enabled) this._ensureLoaded();
-    };
-
-    toggle.addEventListener('change', () => {
-      if (toggle.checked) {
-        setEnabled(true);
-        drawer.openTab(DEBUG_TAB_ID);
-      } else {
-        setEnabled(false);
-        drawer.closeTab(DEBUG_TAB_ID);
-      }
-    });
-
-    // Sync toggle when tab is closed via drawer.
-    drawer.onTabClose(DEBUG_TAB_ID, () => {
-      toggle.checked = false;
-      toggle.dispatchEvent(new Event('change'));
-    });
-
-    // Keep loadDebug for backwards compatibility.
-    window.loadDebug = () => {
-      toggle.checked = true;
-      toggle.dispatchEvent(new Event('change'));
-    };
-
-    // Ctrl+D to toggle debug.
-    document.addEventListener('keydown', (event) => {
-      if (event.ctrlKey && event.key === 'd') {
-        event.preventDefault();
-        toggle.checked = !toggle.checked;
-        toggle.dispatchEvent(new Event('change'));
-      }
-    });
-
-    // Restore state from autoSaveField.
-    if (toggle.checked) {
-      setEnabled(true);
-      drawer.openTab(DEBUG_TAB_ID);
-    }
-  }
-
-  async _ensureLoaded() {
-    if (this._real) return this._real;
-
-    if (!this._realPromise) {
-      this._realPromise = (async () => {
-        const debugDisplay = await import('./debug/debug_display.js' + self.VERSION_PARAM);
-        const real = new debugDisplay.DebugManager(
-          this._displayContainer,
-          this._constraintManager,
-          this._bottomDrawer);
-
-        if (this._shape) real.reshape(this._shape);
-        real.enable(this._enabled);
-
-        this._real = real;
-        this._container.classList.add('lazy-loaded');
-        return real;
-      })().catch((e) => {
-        console.error('Failed to load debug module:', e);
-        this._realPromise = null;  // Reset to allow retrying.
-        const loadingElement = this._container.querySelector('.lazy-loading');
-        loadingElement.textContent = `Failed to load debug: ${e?.message || e}`;
-        loadingElement.classList.remove('notice-info');
-        loadingElement.classList.add('notice-error');
-        return null;
-      });
-    }
-
-    return this._realPromise;
-  }
-
-  async get() {
-    if (!this._enabled) return null;
-    return this._ensureLoaded();
-  }
-
-  reshape(shape) {
-    this._shape = shape;
-    this._real?.reshape(shape);
-  }
-
-  clear() {
-    this._real?.clear();
-  }
-}
-
 class HistoryHandler {
   MAX_HISTORY = 50;
   HISTORY_ADJUSTMENT = 10;
@@ -249,9 +138,22 @@ export class SolutionController {
     displayContainer.addElement(
       HighlightDisplay.makeRadialGradient('highlighted-step-gradient'));
 
-    this._debugManager = new LazyDebugManager(
-      displayContainer, constraintManager, bottomDrawer);
+    this._debugManager = new LazyDrawerManager({
+      tabId: 'debug',
+      modulePath: './debug/debug_display.js',
+      factory: (module, _container) => new module.DebugManager(
+        displayContainer, constraintManager),
+    }, bottomDrawer);
+    this._setUpDebugExtras();
     constraintManager.addReshapeListener(this._debugManager);
+
+    this._flameGraphManager = new LazyDrawerManager({
+      tabId: 'flame-graph',
+      modulePath: './debug/flame_graph.js',
+      factory: (module, container) => new module.FlameGraphManager(
+        container, displayContainer),
+    }, bottomDrawer);
+    constraintManager.addReshapeListener(this._flameGraphManager);
 
     this._stateDisplay = new SolverStateDisplay(this._solutionDisplay, bottomDrawer);
     constraintManager.addReshapeListener(this._solutionDisplay);
@@ -354,6 +256,19 @@ export class SolutionController {
     // Unescape specific characters for readability.
     // (Only '~' for now.)
     return share.toString().replaceAll('%7E', '~').replaceAll('%7e', '~');
+  }
+
+  _setUpDebugExtras() {
+    // Keep loadDebug for backwards compatibility.
+    window.loadDebug = () => this._debugManager.enable();
+
+    // Ctrl+D to toggle debug.
+    document.addEventListener('keydown', (event) => {
+      if (event.ctrlKey && event.key === 'd') {
+        event.preventDefault();
+        this._debugManager.toggle();
+      }
+    });
   }
 
   _setUpAutoSolve() {
@@ -543,7 +458,7 @@ export class SolutionController {
 
     this._resetSolver();
 
-    const debugHandler = await this._debugManager.get();
+    const debugHandler = await this._makeDebugHandler();
 
     // Set up download handler
     this._elements.download.disabled = true;  // Will be enabled after solve starts
@@ -564,6 +479,33 @@ export class SolutionController {
     if (modeHandler?.ITERATION_CONTROLS) {
       this._showIterationControls(true);
     }
+  }
+
+  async _makeDebugHandler() {
+    const debugManager = await this._debugManager.get();
+    const flameGraphManager = await this._flameGraphManager.get();
+
+    const debugOpts = debugManager?.getOptions();
+    const flameOpts = flameGraphManager?.getOptions();
+    const debugCb = debugManager?.getCallback();
+    const flameCb = flameGraphManager?.getCallback();
+
+    if (!debugOpts && !flameOpts && !debugCb && !flameCb) return null;
+
+    return {
+      getOptions: () => {
+        if (!debugOpts && !flameOpts) return null;
+        return { ...debugOpts, ...flameOpts };
+      },
+      getCallback: () => {
+        if (!debugCb) return flameCb;
+        if (!flameCb) return debugCb;
+        return (data, counters) => {
+          debugCb(data, counters);
+          flameCb(data, counters);
+        };
+      },
+    };
   }
 
   _solveStatusChanged(isSolving, method) {
@@ -694,5 +636,103 @@ export class SolutionController {
     statusElem.appendChild(document.createTextNode(' ' + statusParts.join(' ')));
 
     return statusElem;
+  }
+}
+
+class LazyDrawerManager {
+  constructor(config, bottomDrawer) {
+    this._tabId = config.tabId;
+    this._factory = config.factory;
+    this._modulePath = config.modulePath;
+    this._bottomDrawer = bottomDrawer;
+    this._container = document.getElementById(`${config.tabId}-container`);
+    this._shape = null;
+
+    this._enabled = false;
+    this._real = null;
+    this._realPromise = null;
+
+    this._setUpControls();
+  }
+
+  _setUpControls() {
+    const tabId = this._tabId;
+    const drawer = this._bottomDrawer;
+    this._toggle = document.getElementById(`show-${tabId}-input`);
+    autoSaveField(this._toggle);
+
+    this._toggle.addEventListener('change', () => {
+      this._enabled = this._toggle.checked;
+      this._real?.setEnabled(this._enabled);
+      if (this._enabled) {
+        this._ensureLoaded();
+        drawer.openTab(tabId);
+      } else {
+        drawer.closeTab(tabId);
+      }
+    });
+
+    drawer.onTabClose(tabId, () => {
+      this._toggle.checked = false;
+      this._toggle.dispatchEvent(new Event('change'));
+    });
+
+    if (this._toggle.checked) {
+      this._enabled = true;
+      this._ensureLoaded();
+      drawer.openTab(tabId);
+    }
+  }
+
+  enable() {
+    this._toggle.checked = true;
+    this._toggle.dispatchEvent(new Event('change'));
+  }
+
+  toggle() {
+    this._toggle.checked = !this._toggle.checked;
+    this._toggle.dispatchEvent(new Event('change'));
+  }
+
+  async _ensureLoaded() {
+    if (this._real) return this._real;
+
+    if (!this._realPromise) {
+      this._realPromise = (async () => {
+        const module = await import(this._modulePath + self.VERSION_PARAM);
+        const real = this._factory(module, this._container.querySelector('.lazy-body'));
+
+        if (this._shape) real.reshape(this._shape);
+        real.setEnabled(this._enabled);
+
+        this._real = real;
+        this._container.classList.add('lazy-loaded');
+        return real;
+      })().catch((e) => {
+        console.error(`Failed to load ${this._tabId}:`, e);
+        this._realPromise = null;
+        const loadingElement = this._container.querySelector('.lazy-loading');
+        loadingElement.textContent = `Failed to load: ${e?.message || e}`;
+        loadingElement.classList.remove('notice-info');
+        loadingElement.classList.add('notice-error');
+        return null;
+      });
+    }
+
+    return this._realPromise;
+  }
+
+  async get() {
+    if (!this._enabled) return null;
+    return this._ensureLoaded();
+  }
+
+  reshape(shape) {
+    this._shape = shape;
+    this._real?.reshape(shape);
+  }
+
+  clear() {
+    this._real?.clear();
   }
 }

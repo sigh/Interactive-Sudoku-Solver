@@ -5,7 +5,11 @@ const {
   formatTimeMs,
   formatFixedTruncated,
   memoize,
+  dynamicCSSFileLoader,
 } = await import('../util.js' + self.VERSION_PARAM);
+const { CellValueDisplay } = await import('../display.js' + self.VERSION_PARAM);
+
+await dynamicCSSFileLoader('css/flame_graph.css' + self.VERSION_PARAM)();
 
 export const getColorForValue = memoize((value, numValues) => {
   const idx = ((value - 1) % numValues + numValues) % numValues;
@@ -20,11 +24,11 @@ const formatTick = (ms) => {
   return `${formatFixedTruncated(ms / 1e3, 3)} s`;
 };
 export class DebugFlameGraphView {
-  constructor(stackTraceElem, { highlighter, infoOverlay }) {
+  constructor(parentContainer, { highlighter, valueDisplay }) {
     // Dependencies.
     this._shape = null;
     this._highlighter = highlighter;
-    this._infoOverlay = infoOverlay;
+    this._valueDisplay = valueDisplay;
 
     // Lifecycle.
     this._enabled = false;
@@ -61,7 +65,7 @@ export class DebugFlameGraphView {
     flameContainer.appendChild(tooltip);
     this._tooltip = tooltip;
 
-    stackTraceElem.insertAdjacentElement('afterend', flameContainer);
+    parentContainer.appendChild(flameContainer);
     this._container = flameContainer;
 
     // Allocate the SVG.
@@ -118,7 +122,7 @@ export class DebugFlameGraphView {
   }
 
   _syncVisibility() {
-    this._container.hidden = !this._enabled || this._collapsed;
+    this._container.hidden = !this._enabled;
   }
 
   _renderImpl() {
@@ -332,7 +336,7 @@ export class DebugFlameGraphView {
 
     this._clearHoverStyles();
     this._highlighter.clear();
-    this._infoOverlay.setValues();
+    this._valueDisplay.clear();
     this._tooltip.hidden = true;
   }
 
@@ -355,7 +359,8 @@ export class DebugFlameGraphView {
       const s = stackSegs[i];
       gridValues[s.node.cellIndex] = s.segment.value;
     }
-    this._infoOverlay.setValues(gridValues);
+    this._valueDisplay.clear();
+    this._valueDisplay.renderGridValues(gridValues);
   }
 
   _clearHoverStyles() {
@@ -646,5 +651,53 @@ export class FlameGraphStore {
       if (sampleIndex < seg.end) return seg;
     }
     return null;
+  }
+}
+
+export class FlameGraphManager {
+  constructor(container, displayContainer) {
+    this._shape = null;
+    this._enabled = false;
+
+    // Create highlighter for hover effects.
+    this._highlighter = displayContainer.createCellHighlighter('flame-graph-hover');
+
+    // Create value display for showing values on hover.
+    const valueGroup = displayContainer.getNewGroup('flame-graph-value-group');
+    valueGroup.classList.add('solution-group');
+    this._valueDisplay = new CellValueDisplay(valueGroup);
+
+    this._flameGraphView = new DebugFlameGraphView(container, {
+      highlighter: this._highlighter,
+      valueDisplay: this._valueDisplay,
+    });
+  }
+
+  setEnabled(enabled) {
+    this._enabled = enabled;
+    this._flameGraphView.setEnabled(enabled);
+  }
+
+  reshape(shape) {
+    this._shape = shape;
+    this._valueDisplay.reshape(shape);
+    this._flameGraphView.reshape(shape);
+  }
+
+  clear() {
+    this._flameGraphView.clear();
+  }
+
+  getOptions() {
+    if (!this._enabled) return null;
+    return { exportStackTrace: true };
+  }
+
+  getCallback() {
+    return (data) => {
+      if (data.stackTrace !== undefined) {
+        this._flameGraphView.update(data.stackTrace, data.timeMs);
+      }
+    };
   }
 }
