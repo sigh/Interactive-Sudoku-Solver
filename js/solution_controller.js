@@ -253,7 +253,7 @@ export class SolutionController {
       displayContainer, constraintManager, bottomDrawer);
     constraintManager.addReshapeListener(this._debugManager);
 
-    this._stateDisplay = new SolverStateDisplay(this._solutionDisplay);
+    this._stateDisplay = new SolverStateDisplay(this._solutionDisplay, bottomDrawer);
     constraintManager.addReshapeListener(this._solutionDisplay);
 
     // Create the SolverRunner with callbacks for UI updates

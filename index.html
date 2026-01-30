@@ -322,14 +322,6 @@ layout: null
         </div>
       </form>
 
-      <div id="stats-container" class="constraint-panel lazy-load">
-        <div id="stats-header" class="lazy-anchor">
-          <h2>Stats by runtime</h2>
-          <div class="lazy-loading notice notice-info">Loading…</div>
-        </div>
-        <div class="lazy-body"></div>
-      </div>
-
       <div id="constraint-panel-container" class="vstack">
 
         <div class="hstack constraint-panel-header">
@@ -754,7 +746,7 @@ function accept(state) {
         <div class="debug-stack-trace"></div>
       </div>
 
-      <div id="sandbox-container" class="lazy-load" data-tab-id="sandbox" data-tab-label="Sandbox">
+      <div id="sandbox-container" class="lazy-load" data-tab-id="sandbox" data-tab-label="JS Sandbox">
         <div class="lazy-loading notice notice-info">Loading…</div>
         <div class="lazy-body">
           <div class="sandbox-controls hstack">
@@ -787,6 +779,11 @@ function accept(state) {
             </div>
           </div>
         </div>
+      </div>
+
+      <div id="stats-container" class="lazy-load" data-tab-id="stats" data-tab-label="Stats Charts">
+        <div class="lazy-loading notice notice-info">Loading…</div>
+        <div class="lazy-body stats-charts"></div>
       </div>
 
     </div>

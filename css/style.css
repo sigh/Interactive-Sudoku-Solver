@@ -1119,8 +1119,20 @@ h3 {
 }
 
 #stats-container {
-  display: none;
-  width: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+  padding: var(--padding-default);
+}
+
+#stats-container .stats-charts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--gap-default);
+}
+
+#stats-container .stats-charts > div {
+  width: 300px;
 }
 
 #stats-container canvas {
