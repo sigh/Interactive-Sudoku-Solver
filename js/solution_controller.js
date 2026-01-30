@@ -142,7 +142,7 @@ export class SolutionController {
       tabId: 'debug',
       modulePath: './debug/debug_display.js',
       factory: (module, _container) => new module.DebugManager(
-        displayContainer, constraintManager),
+        displayContainer, constraintManager, bottomDrawer),
     }, bottomDrawer);
     this._setUpDebugExtras();
     constraintManager.addReshapeListener(this._debugManager);
@@ -500,9 +500,9 @@ export class SolutionController {
       getCallback: () => {
         if (!debugCb) return flameCb;
         if (!flameCb) return debugCb;
-        return (data, counters) => {
-          debugCb(data, counters);
-          flameCb(data, counters);
+        return (data) => {
+          debugCb(data);
+          flameCb(data);
         };
       },
     };
