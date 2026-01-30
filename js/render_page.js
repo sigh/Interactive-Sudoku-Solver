@@ -23,11 +23,12 @@ const {
 } = await import('./display.js' + self.VERSION_PARAM);
 const { SudokuParser } = await import('./sudoku_parser.js' + self.VERSION_PARAM);
 const { ConstraintDisplay } = await import('./constraint_display.js' + self.VERSION_PARAM);
-const { SolutionController, getBottomDrawer } = await import('./solution_controller.js' + self.VERSION_PARAM);
+const { SolutionController } = await import('./solution_controller.js' + self.VERSION_PARAM);
 const {
   CollapsibleContainer,
   ConstraintCategoryInput
 } = await import('./constraint_input.js' + self.VERSION_PARAM);
+const { BottomDrawer } = await import('./bottom_drawer.js' + self.VERSION_PARAM);
 
 export const initPage = () => {
   // Create grid.
@@ -41,10 +42,12 @@ export const initPage = () => {
   // Load examples.
   new ExampleHandler(constraintManager);
 
-  new SolutionController(constraintManager, displayContainer);
+  const bottomDrawer = new BottomDrawer('bottom-drawer');
+
+  new SolutionController(constraintManager, displayContainer, bottomDrawer);
 
   // Set up sandbox integration.
-  new SandboxHandler(constraintManager, getBottomDrawer());
+  new SandboxHandler(constraintManager, bottomDrawer);
 
   setUpHeaderSettingsDropdown();
 

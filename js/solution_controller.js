@@ -19,21 +19,12 @@ const {
   DEFAULT_MODE,
   getModeDescription,
 } = await import('./solver_runner.js' + self.VERSION_PARAM);
-const { BottomDrawer } = await import('./bottom_drawer.js' + self.VERSION_PARAM);
-
-// Singleton bottom drawer instance
-let bottomDrawer = null;
-export const getBottomDrawer = () => {
-  if (!bottomDrawer) {
-    bottomDrawer = new BottomDrawer('bottom-drawer');
-  }
-  return bottomDrawer;
-};
 
 class LazyDebugManager {
-  constructor(displayContainer, constraintManager) {
+  constructor(displayContainer, constraintManager, bottomDrawer) {
     this._displayContainer = displayContainer;
     this._constraintManager = constraintManager;
+    this._bottomDrawer = bottomDrawer;
     this._container = document.getElementById('debug-container');
     this._shape = null;
 
@@ -47,7 +38,7 @@ class LazyDebugManager {
   _setUpDebugLoadingControls() {
     const DEBUG_PARAM_NAME = 'debug';
     const DEBUG_TAB_ID = 'debug';
-    const drawer = getBottomDrawer();
+    const drawer = this._bottomDrawer;
 
     const updateURL = (enable) => {
       const url = new URL(window.location);
@@ -104,7 +95,7 @@ class LazyDebugManager {
         const real = new debugDisplay.DebugManager(
           this._displayContainer,
           this._constraintManager,
-          getBottomDrawer());
+          this._bottomDrawer);
 
         if (this._shape) real.reshape(this._shape);
         real.enable(this._enabled);
@@ -240,7 +231,7 @@ class HistoryHandler {
 }
 
 export class SolutionController {
-  constructor(constraintManager, displayContainer) {
+  constructor(constraintManager, displayContainer, bottomDrawer) {
     this._shape = null;
 
     this._displayContainer = displayContainer;
@@ -258,7 +249,8 @@ export class SolutionController {
     displayContainer.addElement(
       HighlightDisplay.makeRadialGradient('highlighted-step-gradient'));
 
-    this._debugManager = new LazyDebugManager(displayContainer, constraintManager);
+    this._debugManager = new LazyDebugManager(
+      displayContainer, constraintManager, bottomDrawer);
     constraintManager.addReshapeListener(this._debugManager);
 
     this._stateDisplay = new SolverStateDisplay(this._solutionDisplay);
