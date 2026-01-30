@@ -1,9 +1,22 @@
 /* Code editor */
+#sandbox-container {
+  height: 100%;
+  padding: var(--gap-default);
+  box-sizing: border-box;
+}
+
+#sandbox-container .lazy-body {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  gap: 10px;
+}
+
 #sandbox-container .editor {
   font-family: var(--font-family-mono);
   font-size: var(--font-size-small);
   line-height: 1.5;
-  padding: 15px;
+  padding: var(--gap-default);
   border-radius: 5px;
   border: 1px solid var(--color-border);
   background: #2d2d44;
@@ -12,10 +25,8 @@
   tab-size: 2;
   white-space: pre-wrap;
   word-wrap: break-word;
-  max-width: 80ch;
-  height: 300px;
-  min-height: 200px;
-  resize: vertical;
+  flex: 1;
+  min-height: 0;
 }
 
 #sandbox-container .editor:focus {
@@ -27,12 +38,11 @@
   background: white;
   border: 1px solid var(--color-border);
   border-radius: 5px;
-  padding: 15px;
+  padding: var(--gap-default);
   font-size: var(--font-size-small);
   white-space: pre;
   overflow: auto;
   flex: 1;
-  min-height: 10em;
 }
 
 #sandbox-container .sandbox-status {
@@ -76,26 +86,23 @@
   height: 12px;
 }
 
-#sandbox-container .sandbox-body {
-  padding-top: 10px;
-}
-
 #sandbox-container .sandbox-controls {
   flex-wrap: wrap;
-  margin-bottom: 12px;
+  flex-shrink: 0;
 }
 
 #sandbox-container .sandbox-panels {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 15px;
+  gap: var(--gap-default);
+  flex: 1;
+  min-height: 0;
 }
 
 #sandbox-container .sandbox-output-wrapper {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  contain: size;
   font-family: var(--font-family-mono);
-  max-width: 80ch;
+  min-height: 0;
 }

@@ -23,7 +23,7 @@ const {
 } = await import('./display.js' + self.VERSION_PARAM);
 const { SudokuParser } = await import('./sudoku_parser.js' + self.VERSION_PARAM);
 const { ConstraintDisplay } = await import('./constraint_display.js' + self.VERSION_PARAM);
-const { SolutionController } = await import('./solution_controller.js' + self.VERSION_PARAM);
+const { SolutionController, getBottomDrawer } = await import('./solution_controller.js' + self.VERSION_PARAM);
 const {
   CollapsibleContainer,
   ConstraintCategoryInput
@@ -44,7 +44,7 @@ export const initPage = () => {
   new SolutionController(constraintManager, displayContainer);
 
   // Set up sandbox integration.
-  new SandboxHandler(constraintManager);
+  new SandboxHandler(constraintManager, getBottomDrawer());
 
   setUpHeaderSettingsDropdown();
 
@@ -1483,11 +1483,12 @@ class GridInputManager {
 }
 
 class SandboxHandler {
-  constructor(constraintManager) {
+  constructor(constraintManager, bottomDrawer) {
     this._constraintManager = constraintManager;
+    this._bottomDrawer = bottomDrawer;
     this._loadingPromise = null;
     this._container = document.getElementById('sandbox-container');
-    this._collapsible = null;
+    this._tabId = 'sandbox';
 
     this._setUpListeners();
     this._checkForCodeParam();
@@ -1499,7 +1500,11 @@ class SandboxHandler {
     openLink.addEventListener('click', (e) => {
       e.preventDefault();
       this._openSandbox();
-      this._container.scrollIntoView();
+    });
+
+    // Sync state when tab is closed via the close button.
+    this._bottomDrawer.onTabClose(this._tabId, () => {
+      this._updateCodeParam(false);
     });
 
     // Ctrl/Cmd+` to toggle sandbox.
@@ -1512,12 +1517,11 @@ class SandboxHandler {
   }
 
   _toggleSandbox() {
-    if (this._container.style.display === 'none') {
+    if (this._bottomDrawer.isTabOpen(this._tabId)) {
+      this._bottomDrawer.closeTab(this._tabId);
+      this._updateCodeParam(false);
+    } else {
       this._openSandbox();
-      this._container.scrollIntoView();
-    } else if (this._collapsible) {
-      this._collapsible.toggleOpen();
-      this._updateCodeParam();
     }
   }
 
@@ -1529,9 +1533,8 @@ class SandboxHandler {
     }
   }
 
-  _updateCodeParam() {
+  _updateCodeParam(isOpen) {
     const url = new URL(window.location);
-    const isOpen = this._collapsible?.isOpen();
 
     if (isOpen && !url.searchParams.has('code')) {
       url.searchParams.set('code', '');
@@ -1543,21 +1546,15 @@ class SandboxHandler {
   }
 
   async _openSandbox() {
-    this._container.style.display = '';
-
     this._loadingPromise ||= this._loadSandbox();
     await this._loadingPromise;
 
-    // Ensure it's expanded when opened.
-    this._collapsible?.toggleOpen(true);
-    this._updateCodeParam();
+    this._bottomDrawer.openTab(this._tabId);
+    this._updateCodeParam(true);
   }
 
   async _loadSandbox() {
     try {
-      // Set up collapsible behavior (do this first so the panel is styled.
-      this._collapsible = new CollapsibleContainer(this._container, /* defaultOpen= */ true);
-
       // Load sandbox dependencies.
       await Promise.all([
         dynamicCSSFileLoader('css/sandbox.css' + self.VERSION_PARAM)(),
@@ -1567,14 +1564,6 @@ class SandboxHandler {
       await dynamicJSFileLoader('lib/prism-javascript.min.js')();
 
       const { EmbeddedSandbox } = await import('./sandbox/embedded_sandbox.js' + self.VERSION_PARAM);
-
-      // Override the default anchor click to also update URL param.
-      const anchor = this._collapsible.anchorElement();
-      const originalOnClick = anchor.onclick;
-      anchor.onclick = (e) => {
-        originalOnClick(e);
-        this._updateCodeParam();
-      };
 
       new EmbeddedSandbox(
         this._container,

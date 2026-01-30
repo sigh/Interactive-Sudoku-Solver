@@ -156,40 +156,6 @@ layout: null
     </div>
   </header>
 
-  <div id="sandbox-container" class="constraint-panel lazy-load" style="display: none;">
-    <div class="sandbox-anchor lazy-anchor">
-      <h2>JavaScript Sandbox</h2>
-      <div class="lazy-loading notice notice-info">Loading…</div>
-    </div>
-    <div class="sandbox-body lazy-body">
-      <div class="sandbox-controls hstack">
-        <select class="sandbox-examples">
-          <option value="">Load example...</option>
-        </select>
-        <button class="sandbox-clear danger-button">Clear</button>
-        <button class="sandbox-abort danger-button" disabled>Abort</button>
-        <button class="sandbox-run">
-          <span class="spinner"></span>
-          <span class="btn-text">▶ Run</span>
-        </button>
-        <button class="sandbox-share image-button auxiliary-button" title="Copy shareable link">
-          <img src="img/link-48.png" alt="Share">
-        </button>
-        <span class="notice notice-warning sandbox-warning hstack-push-right">
-          The sandbox API may change without notice.
-        </span>
-        <a href="help#javascript-sandbox" target="_blank" class="sandbox-help-link"><code>help()</code></a>
-      </div>
-      <div class="sandbox-panels">
-        <div id="main-page-sandbox-editor" class="sandbox-editor editor language-javascript"></div>
-        <div class="sandbox-output-wrapper">
-          <div class="sandbox-output"></div>
-          <div class="sandbox-status notice"></div>
-        </div>
-      </div>
-    </div>
-  </div>
-
   <div id="sudoku-container">
     <div id="left-panel" class="vstack">
       <div id="left-panel-main">
@@ -785,6 +751,37 @@ function accept(state) {
 
       <div id="stack-trace-container" data-tab-id="stack-trace" data-tab-label="Stack Trace">
         <div class="debug-stack-trace"></div>
+      </div>
+
+      <div id="sandbox-container" class="lazy-load" data-tab-id="sandbox" data-tab-label="Sandbox">
+        <div class="lazy-loading notice notice-info">Loading…</div>
+        <div class="lazy-body">
+          <div class="sandbox-controls hstack">
+            <select class="sandbox-examples">
+              <option value="">Load example...</option>
+            </select>
+            <button class="sandbox-clear danger-button">Clear</button>
+            <button class="sandbox-abort danger-button" disabled>Abort</button>
+            <button class="sandbox-run">
+              <span class="spinner"></span>
+              <span class="btn-text">▶ Run</span>
+            </button>
+            <button class="sandbox-share image-button auxiliary-button" title="Copy shareable link">
+              <img src="img/link-48.png" alt="Share">
+            </button>
+            <span class="notice notice-warning sandbox-warning hstack-push-right">
+              The sandbox API may change
+            </span>
+            <a href="help#javascript-sandbox" target="_blank" class="sandbox-help-link"><code>help()</code></a>
+          </div>
+          <div class="sandbox-panels">
+            <div id="main-page-sandbox-editor" class="sandbox-editor editor language-javascript"></div>
+            <div class="sandbox-output-wrapper">
+              <div class="sandbox-output"></div>
+              <div class="sandbox-status notice"></div>
+            </div>
+          </div>
+        </div>
       </div>
 
     </div>
