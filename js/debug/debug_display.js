@@ -13,15 +13,10 @@ const {
 
 const { SudokuParser } = await import('../sudoku_parser.js' + self.VERSION_PARAM);
 
-const {
-  DebugFlameGraphView,
-  getColorForValue
-} = await import('./flame_graph.js' + self.VERSION_PARAM);
-
 const debugModule = await import('./debug.js' + self.VERSION_PARAM);
 
 export class DebugManager {
-  constructor(displayContainer, constraintManager, bottomDrawer) {
+  constructor(displayContainer, constraintManager) {
     // External dependencies.
     this._displayContainer = displayContainer;
     this._constraintManager = constraintManager;
@@ -31,7 +26,6 @@ export class DebugManager {
     this._logView = document.getElementById('debug-logs');
     this._counterView = document.getElementById('debug-counters');
     this._debugPuzzleSrc = document.getElementById('debug-puzzle-src');
-    this._stackTraceCheckbox = document.getElementById('stack-trace-checkbox');
     this._logLevelElem = document.getElementById('debug-log-level');
     this._checkboxes = [
       ['exportConflictHeatmap', document.getElementById('conflict-heatmap-checkbox')],
@@ -47,21 +41,10 @@ export class DebugManager {
       'debug-hover');
     this._candidateDisplay = null;
 
-    // Views.
-    this._stackTraceView = new DebugStackTraceView(
-      document.querySelector('#stack-trace-container .debug-stack-trace'), {
-      infoOverlay: this._infoOverlay,
-      highlighter: this._debugCellHighlighter,
-    });
-    this._flameGraphView = new DebugFlameGraphView(this._stackTraceView.getContainer(), {
-      infoOverlay: this._infoOverlay,
-      highlighter: this._debugCellHighlighter,
-    });
-
-    this._initialize(bottomDrawer);
+    this._initialize();
   }
 
-  _initialize(bottomDrawer) {
+  _initialize() {
     // Import debug module functions into the window scope.
     Object.assign(self, debugModule);
 
@@ -78,42 +61,6 @@ export class DebugManager {
       element.onchange = () => {
         sessionAndLocalStorage.setItem(key, element.checked);
       }
-    }
-
-    // Stack trace checkbox opens/closes the stack trace tab.
-    // Whether the solver exports stack traces is decided at solve start via getOptions().
-    {
-      const stackTraceCheckbox = this._stackTraceCheckbox;
-      const STACK_TRACE_TAB_ID = 'stack-trace';
-
-      const showStackTraceKey = 'showStackTrace';
-
-      const savedShowStackTrace = sessionAndLocalStorage.getItem(showStackTraceKey);
-      if (savedShowStackTrace !== undefined) {
-        stackTraceCheckbox.checked = (savedShowStackTrace === 'true');
-      }
-
-      const applyStackTraceEnabled = (enabled) => {
-        this._stackTraceView.setEnabled(enabled);
-        this._flameGraphView.setEnabled(enabled);
-        if (enabled) {
-          bottomDrawer.openTab(STACK_TRACE_TAB_ID);
-        } else {
-          bottomDrawer.closeTab(STACK_TRACE_TAB_ID);
-        }
-        sessionAndLocalStorage.setItem(showStackTraceKey, enabled.toString());
-      };
-
-      // Sync checkbox when tab is closed via the tab close button.
-      bottomDrawer.onTabClose(STACK_TRACE_TAB_ID, () => {
-        stackTraceCheckbox.checked = false;
-        this._stackTraceView.setEnabled(false);
-        this._flameGraphView.setEnabled(false);
-        sessionAndLocalStorage.setItem(showStackTraceKey, 'false');
-      });
-
-      applyStackTraceEnabled(stackTraceCheckbox.checked);
-      stackTraceCheckbox.onchange = () => applyStackTraceEnabled(stackTraceCheckbox.checked);
     }
 
     // Log level selector.
@@ -233,8 +180,6 @@ export class DebugManager {
       )
     );
     options.logLevel = parseInt(this._logLevelElem.value, 10);
-    // Only request stack traces if enabled when the solve starts.
-    options.exportStackTrace = this._stackTraceCheckbox.checked;
     return options;
   }
 
@@ -245,8 +190,6 @@ export class DebugManager {
   reshape(shape) {
     this.clear();
     this._shape = shape;
-    this._stackTraceView.reshape(shape);
-    this._flameGraphView.reshape(shape);
     this._infoOverlay.reshape(shape);
     this._candidateDisplay.reshape(shape);
   }
@@ -263,9 +206,6 @@ export class DebugManager {
       count: 0,
       currentSpan: null,
     };
-
-    this._stackTraceView.clear();
-    this._flameGraphView.clear();
   }
 
   _update(data) {
@@ -304,10 +244,6 @@ export class DebugManager {
       }
     }
 
-    if (data.stackTrace !== undefined) {
-      this._stackTraceView.update(data.stackTrace);
-      this._flameGraphView.update(data.stackTrace, data.timeMs);
-    }
   }
 
   _isScrolledToBottom(obj) {
@@ -422,12 +358,10 @@ export class DebugManager {
     });
   }
 
-  enable(enable) {
-    if (enable === undefined) enable = true;
-
+  setEnabled(enabled) {
     // Show/hide the debug panel. When disabling, we also clear the UI.
-    this._enabled = enable;
-    this._container.classList.toggle('hidden', !enable);
+    this._enabled = enabled;
+    this._container.classList.toggle('hidden', !enabled);
 
     this.clear();
   }
@@ -514,271 +448,5 @@ export class InfoOverlay {
     if (!gridValues) return;
 
     this._valueDisplay.renderGridValues(gridValues);
-  }
-}
-
-export class DebugStackTraceView {
-  constructor(containerElem, { highlighter, infoOverlay }) {
-    // DOM.
-    this._container = containerElem;
-
-    // Dependencies.
-    this._shape = null;
-    this._highlighter = highlighter;
-    this._infoOverlay = infoOverlay;
-
-    // Lifecycle.
-    this._enabled = false;
-
-    // Trace state.
-    this._lastCells = null;
-    this._lastValues = null;
-    this._lastStableLen = 0;
-
-    this._prev = null;
-    this._counts = [];
-
-    // Render state.
-    this._slots = null;
-    this._renderedLen = 0;
-
-    // Hover state.
-    this._hoverStepIndex = null;
-
-    // Hover updates only on mouse movement; DOM updates should not affect it.
-    this._container.onmousemove = (e) => {
-      if (!this._enabled) return;
-
-      const target = e.target;
-      const el = (target instanceof Element) ? target : target?.parentElement;
-      const span = el?.closest?.('span');
-      if (!span || !this._container.contains(span) || span.hidden) {
-        this._setHoverStepIndex(null);
-        return;
-      }
-
-      const idx = parseInt(span.dataset.stepIndex || '', 10);
-      this._setHoverStepIndex(Number.isFinite(idx) ? idx : null);
-    };
-    this._container.onmouseleave = () => {
-      this._setHoverStepIndex(null);
-    };
-
-    this._container.hidden = true;
-  }
-
-  getContainer() {
-    return this._container;
-  }
-
-  setEnabled(enabled) {
-    this._enabled = !!enabled;
-    this._syncVisibility();
-    if (!this._enabled) {
-      this._setHoverStepIndex(null);
-      return;
-    }
-
-    this._ensureSlots();
-    this._renderIfVisible();
-  }
-
-  reshape(shape) {
-    this._shape = shape;
-    this._ensureSlots();
-    this.clear();
-  }
-
-  clear() {
-    this._prev = null;
-    this._counts.length = 0;
-
-    this._lastCells = null;
-    this._lastValues = null;
-    this._lastStableLen = 0;
-
-    this._clearRenderedSpans();
-    this._highlighter.clear();
-  }
-
-  _resetTrace() {
-    this._lastCells = null;
-    this._lastValues = null;
-
-    this._setHoverStepIndex(null);
-
-    this._prev = null;
-    this._counts.length = 0;
-    this._lastStableLen = 0;
-
-    this._clearRenderedSpans();
-  }
-
-  update(stack) {
-    if (!stack) {
-      this._resetTrace();
-      return 0;
-    }
-
-    const next = (stack.cells?.length) ? stack.cells : null;
-    this._lastCells = next;
-    this._lastValues = next ? stack.values : null;
-
-    if (!next) {
-      this._resetTrace();
-      return 0;
-    }
-
-    const prev = this._prev;
-    const counts = this._counts;
-
-    const MIN_STABLE_COUNT = 4;
-
-    if (!prev) {
-      this._prev = next;
-      counts.length = next.length;
-      // Start with the minimum stable count so that first sample can show
-      // something.
-      counts.fill(MIN_STABLE_COUNT);
-    } else {
-      let commonPrefixLen = 0;
-      const minLen = Math.min(prev.length, next.length);
-      while (commonPrefixLen < minLen && prev[commonPrefixLen] === next[commonPrefixLen]) {
-        commonPrefixLen++;
-      }
-
-      counts.length = next.length;
-      for (let i = 0; i < commonPrefixLen; i++) {
-        counts[i] = (counts[i] ?? 1) + 1;
-      }
-      for (let i = commonPrefixLen; i < next.length; i++) {
-        counts[i] = 1;
-      }
-
-      this._prev = next;
-    }
-
-    let stableLen = 0;
-    while (stableLen < next.length && counts[stableLen] >= MIN_STABLE_COUNT) {
-      stableLen++;
-    }
-
-    this._lastStableLen = stableLen;
-    this._renderIfVisible();
-
-    return stableLen;
-  }
-
-  _syncVisibility() {
-    // Visibility is controlled solely by the checkbox.
-    this._container.hidden = !this._enabled;
-  }
-
-  _renderIfVisible() {
-    if (!this._enabled) return;
-    if (!this._shape) return;
-    if (!this._slots) return;
-
-    if (this._lastCells) {
-      this._renderPrefix(this._lastCells, this._lastValues, this._lastStableLen);
-    } else {
-      this._clearRenderedSpans();
-    }
-  }
-
-  _ensureSlots() {
-    if (!this._shape) return;
-    if (this._slots?.length === this._shape.numCells) return;
-
-    clearDOMNode(this._container);
-
-    const numCells = this._shape.numCells;
-    const slots = new Array(numCells);
-
-    for (let i = 0; i < numCells; i++) {
-      const span = document.createElement('span');
-      span.hidden = true;
-      span.dataset.stepIndex = i;
-      slots[i] = span;
-      this._container.appendChild(span);
-    }
-
-    this._slots = slots;
-    this._renderedLen = 0;
-  }
-
-  _setHoverStepIndex(stepIndex) {
-    if (this._hoverStepIndex === stepIndex) return;
-    this._hoverStepIndex = stepIndex;
-    this._syncHover();
-  }
-
-  _syncHover() {
-    const shape = this._shape;
-    const stepIndex = this._hoverStepIndex;
-    const cells = this._lastCells;
-
-    if (!shape || stepIndex === null || !cells?.length) {
-      this._highlighter.clear();
-      this._infoOverlay.setValues();
-      return;
-    }
-
-    const idx = Math.min(stepIndex, cells.length - 1);
-
-    // Highlight the hovered step's cell.
-    const cellId = shape.makeCellIdFromIndex(cells[idx]);
-    this._highlighter.setCells([cellId]);
-
-    // Show values up to (and including) the hovered step.
-    const values = this._lastValues;
-    const gridValues = new Array(shape.numCells);
-    for (let i = 0; i <= idx; i++) {
-      gridValues[cells[i]] = values[i];
-    }
-    this._infoOverlay.setValues(gridValues);
-  }
-
-  _clearRenderedSpans() {
-    if (!this._slots || !this._renderedLen) return;
-    for (let i = 0; i < this._renderedLen; i++) {
-      this._slots[i].hidden = true;
-    }
-    this._renderedLen = 0;
-  }
-
-  _renderPrefix(cells, values, len = 0) {
-    if (!this._slots) return;
-
-    const prevLen = this._renderedLen;
-    const nextLen = len;
-
-    // Update visible prefix spans.
-    for (let i = 0; i < nextLen; i++) {
-      const cellIndex = cells[i];
-      const cellId = this._shape.makeCellIdFromIndex(cellIndex);
-      const span = this._slots[i];
-
-      const value = values[i];
-      const prevValue = span.dataset.v ? +span.dataset.v : 0;
-
-      span.hidden = false;
-
-      // Match flame-graph colors for easier visual association.
-      span.style.backgroundColor = getColorForValue(value, this._shape.numValues);
-
-      if (span.dataset.cellId !== cellId || prevValue !== value) {
-        span.dataset.cellId = cellId;
-        span.dataset.v = value;
-        span.textContent = `${cellId}=${value}`;
-      }
-    }
-
-    // Hide any spans that are no longer part of the rendered prefix.
-    for (let i = nextLen; i < prevLen; i++) {
-      this._slots[i].hidden = true;
-    }
-
-    this._renderedLen = nextLen;
   }
 }

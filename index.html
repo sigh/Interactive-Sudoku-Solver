@@ -162,6 +162,13 @@ layout: null
         </div>
         <div class="inline-switch switch">
           <label>
+            <input id="show-flame-graph-input" type="checkbox">
+            <span></span>
+            <span>Flame graph</span>
+          </label>
+        </div>
+        <div class="inline-switch switch">
+          <label>
             <input id="dim-constraints-input" type="checkbox">
             <span></span>
             <span>Dim constraint display</span>
@@ -729,10 +736,6 @@ function accept(state) {
               <input type="checkbox" id="conflict-heatmap-checkbox">
               Conflict heatmap
             </label>
-            <label class="hstack">
-              <input type="checkbox" id="stack-trace-checkbox">
-              Stack trace
-            </label>
             <div>
               <input type="text" list="debug-puzzles" id="debug-puzzle-input" placeholder="Load a puzzle">
               <datalist id="debug-puzzles"></datalist>
@@ -750,8 +753,9 @@ function accept(state) {
         </div>
       </div>
 
-      <div id="stack-trace-container" data-tab-id="stack-trace" data-tab-label="Stack Trace">
-        <div class="debug-stack-trace"></div>
+      <div id="flame-graph-container" class="lazy-load" data-tab-id="flame-graph" data-tab-label="Flame Graph">
+        <div class="lazy-loading notice notice-info">Loading…</div>
+        <div class="lazy-body"></div>
       </div>
 
       <div id="sandbox-container" class="lazy-load" data-tab-id="sandbox" data-tab-label="JS Sandbox">
