@@ -189,6 +189,17 @@ export class EmbeddedSandbox {
     this._clearBtn.addEventListener('click', () => this.clear());
     this._shareBtn?.addEventListener('click', () => this._copyShareableLink());
 
+    // Panel toggle buttons.
+    const panels = this._container.querySelector('.sandbox-panels');
+    this._container.querySelector('.sandbox-toggle-editor').addEventListener('click', () => {
+      panels.classList.toggle('editor-collapsed');
+      panels.classList.remove('output-collapsed');
+    });
+    this._container.querySelector('.sandbox-toggle-output').addEventListener('click', () => {
+      panels.classList.toggle('output-collapsed');
+      panels.classList.remove('editor-collapsed');
+    });
+
     // Ctrl+Enter to run (but not Ctrl+Shift+Enter which is for solving).
     document.addEventListener('keydown', (e) => {
       if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key === 'Enter') {

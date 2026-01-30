@@ -92,11 +92,78 @@
 }
 
 #sandbox-container .sandbox-panels {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--gap-default);
+  display: flex;
+  gap: 4px;
   flex: 1;
   min-height: 0;
+}
+
+#sandbox-container .sandbox-panels>.editor,
+#sandbox-container .sandbox-panels>.sandbox-output-wrapper {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Panel toggle buttons */
+#sandbox-container .sandbox-panel-toggles {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--gap-default);
+  flex-shrink: 0;
+}
+
+#sandbox-container .sandbox-toggle-editor,
+#sandbox-container .sandbox-toggle-output {
+  width: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+/* Arrow pseudo-elements */
+#sandbox-container .sandbox-toggle-editor::before,
+#sandbox-container .sandbox-toggle-editor::after,
+#sandbox-container .sandbox-toggle-output::before,
+#sandbox-container .sandbox-toggle-output::after {
+  border: 4px solid transparent;
+}
+
+/* Default arrows: editor points left (<), output points right (>) */
+#sandbox-container .sandbox-toggle-editor::before {
+  content: '';
+  border-right-color: currentColor;
+  border-left: none;
+}
+
+#sandbox-container .sandbox-toggle-output::before {
+  content: '';
+  border-left-color: currentColor;
+  border-right: none;
+}
+
+/* Collapsed panels */
+#sandbox-container .sandbox-panels.editor-collapsed>.editor,
+#sandbox-container .sandbox-panels.output-collapsed>.sandbox-output-wrapper {
+  display: none;
+}
+
+#sandbox-container .sandbox-panels.editor-collapsed .sandbox-toggle-editor,
+#sandbox-container .sandbox-panels.output-collapsed .sandbox-toggle-output {
+  gap: 1px;
+}
+
+#sandbox-container .sandbox-panels.editor-collapsed .sandbox-toggle-editor::after,
+#sandbox-container .sandbox-panels.output-collapsed .sandbox-toggle-output::after {
+  content: '';
+  border-left-color: currentColor;
+  border-right: none;
+}
+
+#sandbox-container .sandbox-panels.output-collapsed .sandbox-toggle-output::before {
+  border-left: none;
+  border-right: 4px solid currentColor;
 }
 
 #sandbox-container .sandbox-output-wrapper {
