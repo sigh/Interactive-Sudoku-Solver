@@ -6,10 +6,15 @@
   --background-blue: var(--color-primary-soft);
 
   /* Sticky header offset for the help page (approx header height). */
-  --help-sticky-header-height: 60px;
+  --help-sticky-header-height: 40px;
 
   --font-size-header: 18px;
   --font-size-header-small: 16px;
+}
+
+body {
+  overflow: auto;
+  height: auto;
 }
 
 /* Keep the help page header visible while scrolling. */
@@ -37,7 +42,7 @@ a {
 }
 
 h2 {
-  margin: 40px 0 20px 0;
+  margin: 20px 0 20px 0;
   padding-bottom: 10px;
   border-bottom: 3px solid var(--primary-color);
 }
@@ -122,8 +127,8 @@ pre.code-with-copy>button.copy-button {
   border: 1px solid var(--border-color);
   border-radius: 12px;
   position: sticky;
-  top: calc(var(--help-sticky-header-height) + 20px);
-  max-height: calc(100vh - var(--help-sticky-header-height) - 40px);
+  top: calc(var(--help-sticky-header-height) + 10px);
+  max-height: calc(100dvh - var(--help-sticky-header-height) - 40px);
   overflow-y: auto;
 
   ul {

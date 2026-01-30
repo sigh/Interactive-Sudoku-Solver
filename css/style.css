@@ -50,6 +50,7 @@
   --font-size-base: 14px;
   --font-size-small: 12px;
   --font-size-title: 18px;
+  --font-size-logo: 16px;
   --font-size-header: 16px;
   --font-size-header-small: 14px;
 
@@ -193,20 +194,21 @@ body {
   flex-shrink: 0;
   border-radius: 0;
   z-index: 100;
+  gap: 5px;
 }
 
 .page-header-logo {
-  width: 40px;
-  height: 40px;
+  width: 30px;
+  height: 30px;
   flex-shrink: 0;
 
-  border-radius: 12px;
+  border-radius: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
   background: var(--color-primary-darkest);
   color: var(--color-primary-soft);
-  font-size: var(--font-size-title);
+  font-size: var(--font-size-logo);
   font-weight: bold;
 }
 
@@ -214,6 +216,7 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 2px;
+  font-size: var(--font-size-small);
 }
 
 .page-header-link img {
@@ -1131,7 +1134,7 @@ h3 {
   gap: var(--gap-default);
 }
 
-#stats-container .stats-charts > div {
+#stats-container .stats-charts>div {
   width: 300px;
 }
 
@@ -1378,7 +1381,7 @@ button:has(.spinner),
 
 /* Bottom Drawer - Tabbed panel at bottom of page */
 #bottom-drawer {
-  --drawer-height: 200px;
+  --drawer-height: 50dvh;
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
@@ -1401,6 +1404,12 @@ button:has(.spinner),
   color: var(--color-danger);
 }
 
+@media (pointer: coarse) {
+  .bottom-drawer-tab-close {
+    display: none;
+  }
+}
+
 .bottom-drawer-collapse::after {
   content: '';
   display: block;
@@ -1418,6 +1427,17 @@ button:has(.spinner),
 
 .bottom-drawer-panels {
   flex: 1;
-  overflow-y: auto;
+  min-height: 0;
+  position: relative;
+}
+
+.bottom-drawer-panel {
+  position: absolute;
+  inset: 0;
+  display: flex;
+}
+
+.bottom-drawer-panel>.lazy-body {
+  flex: 1;
   min-height: 0;
 }

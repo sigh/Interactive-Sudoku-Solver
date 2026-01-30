@@ -7,7 +7,7 @@ layout: null
 <head>
   <title>Interactive Sudoku Solver</title>
   <meta name="description" content="Fast interactive Sudoku solver. Supports many variants and up to 16x16 grids.">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=800px, initial-scale=1">
   <link rel="icon" href="{{ 'img/favicon.png' | relative_url }}">
   <link rel="canonical" href="https://sigh.github.io/Interactive-Sudoku-Solver/" />
 
@@ -121,19 +121,25 @@ layout: null
     <h1 class="page-header-logo">ISS</h1>
     <h1 class="page-header-title">Interactive Sudoku Solver</h1>
 
-    <a class="page-header-link hstack-push-right" href="https://github.com/sigh/Interactive-Sudoku-Solver/issues"
-      target="_blank" rel="noopener">
+    <a class="page-header-link hstack-push-right" href="https://sigh.github.io" target="_blank" rel="noopener">
+      <span>sigh.github.io</span>
+    </a>
+    ·
+    <a class="page-header-link" href="https://github.com/sigh/Interactive-Sudoku-Solver/issues" target="_blank"
+      rel="noopener">
       <img src="img/bug-48.png" alt="File a bug">
       <span>File a bug</span>
     </a>
+    ·
     <a class="page-header-link" href="https://github.com/sigh/Interactive-Sudoku-Solver" target="_blank" rel="noopener">
       <img src="img/github-mark.png" alt="Github repo">
       <span>Source code</span>
     </a>
+    ·
     <a class="page-header-link" href="help" aria-label="Help">
       <img src="img/help-48.png" alt="Help">
     </a>
-
+    ·
     <div class="page-header-settings">
       <button id="page-header-settings-button" type="button" class="image-button auxiliary-button" title="Settings">
         <img src="img/settings-48.png" alt="Settings">
@@ -297,9 +303,7 @@ layout: null
           See the <a href="help">help page</a> for more information.
         </p>
         <p>
-          Solver runs fastest on Chrome ·
-          More projects at
-          <a href="https://sigh.github.io/" target="_blank" rel="noopener">sigh.github.io</a>
+          Solver runs fastest on Chrome
         </p>
       </div>
     </div>
@@ -400,7 +404,8 @@ layout: null
                 <h2>
                   Shape
                   <span class="shape-input-container">
-                    <input type="text" id="shape-input" class="shape-input" placeholder="9x9" autocomplete="off">
+                    <input type="text" id="shape-input" class="shape-input" placeholder="9x9" autocomplete="off"
+                      autocorrect="off">
                     <div id="shape-dropdown" class="shape-dropdown dropdown-menu">
                       <div class="shape-dropdown-item">9x9</div>
                       <div class="shape-dropdown-item">6x6</div>
