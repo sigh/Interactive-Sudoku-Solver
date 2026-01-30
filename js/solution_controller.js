@@ -103,7 +103,8 @@ class LazyDebugManager {
         const debugDisplay = await import('./debug/debug_display.js' + self.VERSION_PARAM);
         const real = new debugDisplay.DebugManager(
           this._displayContainer,
-          this._constraintManager);
+          this._constraintManager,
+          getBottomDrawer());
 
         if (this._shape) real.reshape(this._shape);
         real.enable(this._enabled);

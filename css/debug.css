@@ -16,24 +16,24 @@
 }
 
 #debug-container {
-  display: flex;
-  flex-direction: column;
+  height: 100%;
   padding: var(--gap-default);
+  box-sizing: border-box;
 }
 
-#debug-container .debug-main {
+#debug-container .lazy-body {
   display: flex;
   flex-direction: row;
+  gap: var(--gap-default);
+  height: 100%;
 }
 
 #debug-container #debug-logs {
-  resize: both;
+  flex: 1;
   overflow: auto;
-  height: 210px;
-  width: 900px;
+  min-width: 0;
   box-shadow: inset 0px 0px 3px #555;
   padding: 3px;
-  margin-bottom: 10px;
   cursor: pointer;
 }
 
@@ -82,108 +82,61 @@
   font-size: var(--font-size-small);
 }
 
-#debug-container .debug-stack-trace-footer {
+#stack-trace-container {
   font-size: var(--font-size-small);
   padding: 4px 6px;
+  height: 100%;
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  align-items: stretch;
-  contain: inline-size;
-  min-height: 1.2em;
   gap: 4px;
 }
 
-#debug-container .debug-stack-trace-footer:empty {
-  display: none;
-}
-
-#debug-container #debug-flame-toggle {
-  width: 1em;
-  height: 1em;
-  margin: 0;
-  padding: 0;
-  border: 0;
-  background: none;
-  box-shadow: none;
-  color: black;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-#debug-container #debug-flame-toggle:hover,
-#debug-container #debug-flame-toggle:active {
-  background: none;
-  box-shadow: none;
-}
-
-#debug-container #debug-flame-toggle:focus {
-  outline: none;
-}
-
-#debug-container #debug-flame-toggle:after {
-  content: "";
-  width: 6px;
-  height: 6px;
-  border-left: 1px solid currentColor;
-  border-top: 1px solid currentColor;
-  transform: rotate(-135deg);
-  pointer-events: none;
-}
-
-#debug-container #debug-flame-toggle.expanded:after {
-  transform: rotate(45deg);
-}
-
-#debug-container .debug-stack-trace {
+#stack-trace-container .debug-stack-trace {
   display: flex;
   flex-wrap: wrap;
-  flex: 1;
   align-items: flex-start;
   align-content: flex-start;
   min-width: 0;
   padding: 0;
   overflow-x: auto;
   white-space: nowrap;
-  height: 1.5em;
-  resize: both;
+  height: 2.4em;
 }
 
-#debug-container .debug-stack-trace span {
+#stack-trace-container .debug-stack-trace span {
   cursor: pointer;
   padding: 0 2px;
   line-height: 1.2em;
 }
 
-#debug-container .debug-stack-trace span:hover {
+#stack-trace-container .debug-stack-trace span:hover {
   filter: saturate(3) brightness(0.95);
 }
 
-#debug-container .debug-stack-trace:empty {
+#stack-trace-container .debug-stack-trace:empty {
   display: none;
 }
 
-#debug-container .debug-flame-graph {
+#stack-trace-container .debug-flame-graph {
   position: relative;
-  height: 160px;
+  flex: 1;
+  min-height: 0;
   box-sizing: border-box;
-  resize: vertical;
   overflow: auto;
 }
 
-#debug-container .debug-flame-graph svg {
+#stack-trace-container .debug-flame-graph svg {
   display: block;
 }
 
-#debug-container .debug-flame-graph rect.debug-flame-rect {
+#stack-trace-container .debug-flame-graph rect.debug-flame-rect {
   stroke-opacity: 0.22;
   shape-rendering: crispEdges;
   cursor: pointer;
 }
 
-#debug-container .debug-flame-graph .debug-flame-node-outline {
+#stack-trace-container .debug-flame-graph .debug-flame-node-outline {
   fill: none;
   stroke: currentColor;
   stroke-opacity: 0.5;
@@ -192,25 +145,25 @@
   pointer-events: none;
 }
 
-#debug-container .debug-flame-graph text.debug-flame-label {
+#stack-trace-container .debug-flame-graph text.debug-flame-label {
   fill: currentColor;
   opacity: 0.75;
   font-size: 10px;
   pointer-events: none;
 }
 
-#debug-container .debug-flame-graph .debug-flame-node-outline.debug-flame-node-hover {
+#stack-trace-container .debug-flame-graph .debug-flame-node-outline.debug-flame-node-hover {
   stroke-opacity: 0.55;
   stroke-width: 1.5;
   stroke-dasharray: none;
   filter: drop-shadow(0 0 5px black);
 }
 
-#debug-container .debug-flame-graph rect.debug-flame-rect.debug-flame-seg-hover {
+#stack-trace-container .debug-flame-graph rect.debug-flame-rect.debug-flame-seg-hover {
   filter: saturate(3) brightness(0.95);
 }
 
-#debug-container .debug-flame-graph .debug-flame-tooltip {
+#stack-trace-container .debug-flame-graph .debug-flame-tooltip {
   position: absolute;
   pointer-events: none;
   z-index: 1;

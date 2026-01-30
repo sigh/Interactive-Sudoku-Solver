@@ -749,47 +749,42 @@ function accept(state) {
       <div id="debug-container" class="lazy-load" data-tab-id="debug" data-tab-label="Debug">
         <div class="lazy-loading notice notice-info">Loading debug…</div>
         <div class="lazy-body">
-          <div class="debug-main">
-            <div id="debug-panel">
-              <label class="hstack">
-                Log level
-                <select id="debug-log-level" class="thin-select">
-                  <option value="0">None</option>
-                  <option value="1">1</option>
-                  <option value="2">2</option>
-                </select>
-              </label>
-              <label class="hstack">
-                <input type="checkbox" id="conflict-heatmap-checkbox">
-                Conflict heatmap
-              </label>
-              <label class="hstack">
-                <input type="checkbox" id="stack-trace-checkbox">
-                Stack trace
-              </label>
-              <div>
-                <input type="text" list="debug-puzzles" id="debug-puzzle-input" placeholder="Load a puzzle">
-                <datalist id="debug-puzzles"></datalist>
-              </div>
-              <div id="debug-puzzle-src"></div>
-              <div class="hstack">
-                <input type="checkbox" id="debug-cell-id" class="debug-checkbox">
-                <label for="debug-cell-id" class="button auxiliary-button">Cell id</label>
-                <input type="checkbox" id="debug-cell-index" class="debug-checkbox">
-                <label for="debug-cell-index" class="button auxiliary-button">Cell index</label>
-              </div>
+          <div id="debug-panel">
+            <label class="hstack">
+              Log level
+              <select id="debug-log-level" class="thin-select">
+                <option value="0">None</option>
+                <option value="1">1</option>
+                <option value="2">2</option>
+              </select>
+            </label>
+            <label class="hstack">
+              <input type="checkbox" id="conflict-heatmap-checkbox">
+              Conflict heatmap
+            </label>
+            <label class="hstack">
+              <input type="checkbox" id="stack-trace-checkbox">
+              Stack trace
+            </label>
+            <div>
+              <input type="text" list="debug-puzzles" id="debug-puzzle-input" placeholder="Load a puzzle">
+              <datalist id="debug-puzzles"></datalist>
             </div>
-            <div id="debug-counters"></div>
-            <div id="debug-logs"></div>
-          </div>
-          <div id="debug-stack-trace-footer" class="debug-stack-trace-footer">
-            <hr>
-            <div class="debug-stack-trace-header hstack">
-              <button type="button" id="debug-flame-toggle" class="expanded" title="Collapse flame graph"></button>
-              <div class="debug-stack-trace"></div>
+            <div id="debug-puzzle-src"></div>
+            <div class="hstack">
+              <input type="checkbox" id="debug-cell-id" class="debug-checkbox">
+              <label for="debug-cell-id" class="button auxiliary-button">Cell id</label>
+              <input type="checkbox" id="debug-cell-index" class="debug-checkbox">
+              <label for="debug-cell-index" class="button auxiliary-button">Cell index</label>
             </div>
           </div>
+          <div id="debug-counters"></div>
+          <div id="debug-logs"></div>
         </div>
+      </div>
+
+      <div id="stack-trace-container" data-tab-id="stack-trace" data-tab-label="Stack Trace">
+        <div class="debug-stack-trace"></div>
       </div>
 
     </div>
