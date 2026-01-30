@@ -5,6 +5,7 @@ const {
   localTimestamp,
   copyToClipboard,
   isKeyEventFromEditableElement,
+  autoSaveField,
 } = await import('./util.js' + self.VERSION_PARAM);
 const {
   HighlightDisplay,
@@ -36,51 +37,50 @@ class LazyDebugManager {
   }
 
   _setUpDebugLoadingControls() {
-    const DEBUG_PARAM_NAME = 'debug';
     const DEBUG_TAB_ID = 'debug';
     const drawer = this._bottomDrawer;
-
-    const updateURL = (enable) => {
-      const url = new URL(window.location);
-      if (enable) {
-        url.searchParams.set(DEBUG_PARAM_NAME, 1);
-      } else {
-        url.searchParams.delete(DEBUG_PARAM_NAME);
-      }
-      window.history.pushState(null, null, url);
-    };
+    const toggle = document.getElementById('show-debug-input');
+    autoSaveField(toggle);
 
     const setEnabled = (enabled) => {
       this._enabled = enabled;
       this._real?.enable(enabled);
-      updateURL(enabled);
       if (enabled) this._ensureLoaded();
     };
 
-    // Handle tab close from drawer
-    drawer.onTabClose(DEBUG_TAB_ID, () => {
-      if (this._enabled) setEnabled(false);
-    });
-
-    window.loadDebug = () => {
-      if (!this._enabled) {
+    toggle.addEventListener('change', () => {
+      if (toggle.checked) {
         setEnabled(true);
         drawer.openTab(DEBUG_TAB_ID);
-      }
-    };
-
-    document.addEventListener('keydown', (event) => {
-      if (event.ctrlKey && event.key === 'd') {
-        if (drawer.toggleTab(DEBUG_TAB_ID)) {
-          setEnabled(true);
-        } else {
-          setEnabled(false);
-        }
+      } else {
+        setEnabled(false);
+        drawer.closeTab(DEBUG_TAB_ID);
       }
     });
 
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.has(DEBUG_PARAM_NAME)) {
+    // Sync toggle when tab is closed via drawer.
+    drawer.onTabClose(DEBUG_TAB_ID, () => {
+      toggle.checked = false;
+      toggle.dispatchEvent(new Event('change'));
+    });
+
+    // Keep loadDebug for backwards compatibility.
+    window.loadDebug = () => {
+      toggle.checked = true;
+      toggle.dispatchEvent(new Event('change'));
+    };
+
+    // Ctrl+D to toggle debug.
+    document.addEventListener('keydown', (event) => {
+      if (event.ctrlKey && event.key === 'd') {
+        event.preventDefault();
+        toggle.checked = !toggle.checked;
+        toggle.dispatchEvent(new Event('change'));
+      }
+    });
+
+    // Restore state from autoSaveField.
+    if (toggle.checked) {
       setEnabled(true);
       drawer.openTab(DEBUG_TAB_ID);
     }

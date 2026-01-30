@@ -148,6 +148,20 @@ layout: null
         </div>
         <div class="inline-switch switch">
           <label>
+            <input id="show-sandbox-input" type="checkbox">
+            <span></span>
+            <span>JavaScript sandbox</span>
+          </label>
+        </div>
+        <div class="inline-switch switch">
+          <label>
+            <input id="show-debug-input" type="checkbox">
+            <span></span>
+            <span>Debug mode</span>
+          </label>
+        </div>
+        <div class="inline-switch switch">
+          <label>
             <input id="dim-constraints-input" type="checkbox">
             <span></span>
             <span>Dim constraint display</span>
@@ -274,12 +288,6 @@ layout: null
         </ul>
         <p>
           See the <a href="help">help page</a> for more information.
-        </p>
-      </div>
-      <div class="description page-info">
-        <p>
-          <a href="#" id="open-sandbox-link">JavaScript sandbox</a> ·
-          <a href="javascript:loadDebug()">Debug mode</a>
         </p>
         <p>
           Solver runs fastest on Chrome ·

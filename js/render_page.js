@@ -1498,15 +1498,20 @@ class SandboxHandler {
   }
 
   _setUpListeners() {
-    const openLink = document.getElementById('open-sandbox-link');
+    const toggle = document.getElementById('show-sandbox-input');
 
-    openLink.addEventListener('click', (e) => {
-      e.preventDefault();
-      this._openSandbox();
+    toggle.addEventListener('change', () => {
+      if (toggle.checked) {
+        this._openSandbox();
+      } else {
+        this._bottomDrawer.closeTab(this._tabId);
+        this._updateCodeParam(false);
+      }
     });
 
-    // Sync state when tab is closed via the close button.
+    // Sync toggle when tab is closed via the drawer.
     this._bottomDrawer.onTabClose(this._tabId, () => {
+      toggle.checked = false;
       this._updateCodeParam(false);
     });
 
@@ -1514,24 +1519,18 @@ class SandboxHandler {
     document.addEventListener('keydown', (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key === '`') {
         e.preventDefault();
-        this._toggleSandbox();
+        toggle.checked = !toggle.checked;
+        toggle.dispatchEvent(new Event('change'));
       }
     });
-  }
-
-  _toggleSandbox() {
-    if (this._bottomDrawer.isTabOpen(this._tabId)) {
-      this._bottomDrawer.closeTab(this._tabId);
-      this._updateCodeParam(false);
-    } else {
-      this._openSandbox();
-    }
   }
 
   _checkForCodeParam() {
     // Auto-open sandbox if ?code= is in URL.
     const url = new URL(window.location);
     if (url.searchParams.has('code')) {
+      const toggle = document.getElementById('show-sandbox-input');
+      toggle.checked = true;
       this._openSandbox();
     }
   }
