@@ -8,10 +8,8 @@ const {
   autoSaveField,
 } = await import('./util.js' + self.VERSION_PARAM);
 
-const { CollapsibleContainer } = await import('./constraint_input.js' + self.VERSION_PARAM);
-
 export class SolverStateDisplay {
-  constructor(solutionDisplay) {
+  constructor(solutionDisplay, bottomDrawer) {
     this._solutionDisplay = solutionDisplay;
 
     this._elements = {
@@ -23,7 +21,7 @@ export class SolverStateDisplay {
     };
 
     this._setUpStateOutput();
-    this._stateHistory = new StateHistoryDisplay();
+    this._stateHistory = new StateHistoryDisplay(bottomDrawer);
     this._isEstimateMode = false;
 
     this._lazyUpdateState = deferUntilAnimationFrame(
@@ -236,14 +234,15 @@ class StateHistoryDisplay {
   CHART_HEIGHT = 120;
   AXIS_WIDTH = 50;
   MAX_NUM_STATES = 1000;
+  TAB_ID = 'stats';
 
-  constructor() {
+  constructor(bottomDrawer) {
+    this._bottomDrawer = bottomDrawer;
     this._states = [];
     this._statsContainer = null;
     this._statsInitPromise = null;
     this._visible = false;
     this._isEstimateMode = false;
-    this._collapsible = null;
 
     this._setUpChartToggle();
     this._charts = [];
@@ -352,26 +351,24 @@ class StateHistoryDisplay {
 
     const setVisible = async (visible) => {
       if (!visible) {
-        if (this._statsContainer) this._statsContainer.style.display = 'none';
+        this._bottomDrawer.closeTab(this.TAB_ID);
         this._visible = false;
         return;
       }
 
-      // Show the container immediately (anchor + loading notice) while the
-      // charts load.
-      this._statsContainer ||= document.getElementById('stats-container');
-      this._statsContainer.style.display = 'block';
       this._visible = true;
-
       await this._initStatsContainer();
-
+      this._bottomDrawer.openTab(this.TAB_ID);
       this._updateCharts();
     };
 
-    toggle.onchange = async () => {
-      await setVisible(toggle.checked);
-      if (toggle.checked) this._collapsible.toggleOpen(true);
-    };
+    // Sync toggle when tab is closed via drawer.
+    this._bottomDrawer.onTabClose(this.TAB_ID, () => {
+      toggle.checked = false;
+      this._visible = false;
+    });
+
+    toggle.onchange = () => setVisible(toggle.checked);
     setVisible(toggle.checked);
   }
 
@@ -386,14 +383,12 @@ class StateHistoryDisplay {
 
     this._statsContainer ||= document.getElementById('stats-container');
     const container = this._statsContainer;
-    this._collapsible = new CollapsibleContainer(
-      container, /* defaultOpen= */ true);
 
     this._statsInitPromise = (async () => {
       try {
         await dynamicJSFileLoader('lib/chart.umd.min.js')();
 
-        const statsBody = this._collapsible.bodyElement();
+        const statsBody = container.querySelector('.lazy-body');
         clearDOMNode(statsBody);
 
         this._addChartDisplay(statsBody,
