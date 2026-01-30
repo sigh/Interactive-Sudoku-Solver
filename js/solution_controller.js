@@ -23,7 +23,7 @@ const { BottomDrawer } = await import('./bottom_drawer.js' + self.VERSION_PARAM)
 
 // Singleton bottom drawer instance
 let bottomDrawer = null;
-const getBottomDrawer = () => {
+export const getBottomDrawer = () => {
   if (!bottomDrawer) {
     bottomDrawer = new BottomDrawer('bottom-drawer');
   }
