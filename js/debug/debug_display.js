@@ -16,17 +16,18 @@ const { SudokuParser } = await import('../sudoku_parser.js' + self.VERSION_PARAM
 const debugModule = await import('./debug.js' + self.VERSION_PARAM);
 
 export class DebugManager {
-  constructor(displayContainer, constraintManager) {
+  constructor(displayContainer, constraintManager, bottomDrawer) {
     // External dependencies.
     this._displayContainer = displayContainer;
     this._constraintManager = constraintManager;
+    this._bottomDrawer = bottomDrawer;
 
     // DOM.
     this._container = document.getElementById('debug-container');
     this._logView = document.getElementById('debug-logs');
-    this._counterView = document.getElementById('debug-counters');
     this._debugPuzzleSrc = document.getElementById('debug-puzzle-src');
     this._logLevelElem = document.getElementById('debug-log-level');
+    this._countersElem = document.getElementById('counters-container');
     this._checkboxes = [
       ['exportConflictHeatmap', document.getElementById('conflict-heatmap-checkbox')],
     ];
@@ -196,10 +197,10 @@ export class DebugManager {
 
   clear() {
     clearDOMNode(this._logView);
-    clearDOMNode(this._counterView);
     this._infoOverlay.clear();
     this._debugCellHighlighter.clear();
     clearDOMNode(this._debugPuzzleSrc);
+    clearDOMNode(this._countersElem);
 
     this._logDedupe = {
       lastKey: '',
@@ -226,24 +227,28 @@ export class DebugManager {
     }
 
     if (data.counters) {
-      const counterView = this._counterView;
-      clearDOMNode(counterView);
+      this._updateCounters(data.counters);
+    }
+  }
 
-      for (const key of [...data.counters.keys()].sort()) {
-        const value = data.counters.get(key);
+  _updateCounters(counters) {
+    const countersElem = this._countersElem;
+    clearDOMNode(countersElem);
 
-        const elem = document.createElement('div');
-        const label = document.createElement('span');
-        label.className = 'description';
-        label.textContent = key;
-        const count = document.createElement('span');
-        count.textContent = value;
-        elem.appendChild(label);
-        elem.appendChild(count);
-        counterView.appendChild(elem);
-      }
+    for (const key of [...counters.keys()].sort()) {
+      const value = counters.get(key);
+      const elem = document.createElement('div');
+      const label = document.createElement('span');
+      label.className = 'description';
+      label.textContent = key;
+      const count = document.createElement('span');
+      count.textContent = value;
+      elem.appendChild(label);
+      elem.appendChild(count);
+      countersElem.appendChild(elem);
     }
 
+    this._bottomDrawer.openTab('counters');
   }
 
   _isScrolledToBottom(obj) {
