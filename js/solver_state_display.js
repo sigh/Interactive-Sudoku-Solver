@@ -365,7 +365,7 @@ class StateHistoryDisplay {
     // Sync toggle when tab is closed via drawer.
     this._bottomDrawer.onTabClose(this.TAB_ID, () => {
       toggle.checked = false;
-      this._visible = false;
+      toggle.dispatchEvent(new Event('change'));
     });
 
     toggle.onchange = () => setVisible(toggle.checked);
