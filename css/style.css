@@ -1400,14 +1400,12 @@ button:has(.spinner),
   gap: 6px;
 }
 
-.bottom-drawer-tab-close:hover {
-  color: var(--color-danger);
+.bottom-drawer-tab:not(.active) .bottom-drawer-tab-close {
+  display: none;
 }
 
-@media (pointer: coarse) {
-  .bottom-drawer-tab-close {
-    display: none;
-  }
+.bottom-drawer-tab-close:hover {
+  color: var(--color-danger);
 }
 
 .bottom-drawer-collapse::after {
