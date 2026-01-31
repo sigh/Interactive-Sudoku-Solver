@@ -1,3 +1,5 @@
+const { autoSaveField } = await import('./util.js' + self.VERSION_PARAM);
+
 // A tabbed bottom drawer component.
 export class BottomDrawer {
   static STORAGE_KEY = 'bottom-drawer-height';
@@ -173,5 +175,103 @@ export class BottomDrawer {
       document.body.style.userSelect = '';
       this._saveHeight();
     });
+  }
+}
+
+export class LazyDrawerManager {
+  constructor(config, bottomDrawer) {
+    this._tabId = config.tabId;
+    this._factory = config.factory;
+    this._modulePath = config.modulePath;
+    this._bottomDrawer = bottomDrawer;
+    this._container = document.getElementById(`${config.tabId}-container`);
+    this._shape = null;
+
+    this._enabled = false;
+    this._real = null;
+    this._realPromise = null;
+
+    this._setUpControls();
+  }
+
+  _setUpControls() {
+    const tabId = this._tabId;
+    const drawer = this._bottomDrawer;
+    this._toggle = document.getElementById(`show-${tabId}-input`);
+    autoSaveField(this._toggle);
+
+    this._toggle.addEventListener('change', () => {
+      this._enabled = this._toggle.checked;
+      this._real?.setEnabled(this._enabled);
+      if (this._enabled) {
+        this._ensureLoaded();
+        drawer.openTab(tabId);
+      } else {
+        drawer.closeTab(tabId);
+      }
+    });
+
+    drawer.onTabClose(tabId, () => {
+      this._toggle.checked = false;
+      this._toggle.dispatchEvent(new Event('change'));
+    });
+
+    if (this._toggle.checked) {
+      this._enabled = true;
+      this._ensureLoaded();
+      drawer.openTab(tabId);
+    }
+  }
+
+  enable() {
+    this._toggle.checked = true;
+    this._toggle.dispatchEvent(new Event('change'));
+  }
+
+  toggle() {
+    this._toggle.checked = !this._toggle.checked;
+    this._toggle.dispatchEvent(new Event('change'));
+  }
+
+  async _ensureLoaded() {
+    if (this._real) return this._real;
+
+    if (!this._realPromise) {
+      this._realPromise = (async () => {
+        const module = await import(this._modulePath + self.VERSION_PARAM);
+        const real = this._factory(module, this._container.querySelector('.lazy-body'));
+
+        if (this._shape) real.reshape(this._shape);
+        real.setEnabled(this._enabled);
+
+        this._real = real;
+        this._container.classList.add('lazy-loaded');
+        return real;
+      })().catch((e) => {
+        console.error(`Failed to load ${this._tabId}:`, e);
+        this._realPromise = null;
+        const loadingElement = this._container.querySelector('.lazy-loading');
+        loadingElement.textContent = `Failed to load: ${e?.message || e}`;
+        loadingElement.classList.remove('notice-info');
+        loadingElement.classList.add('notice-error');
+        return null;
+      });
+    }
+
+    return this._realPromise;
+  }
+
+  async get() {
+    if (!this._enabled) return null;
+    return this._ensureLoaded();
+  }
+
+  reshape(shape) {
+    this._shape = shape;
+    this._real?.reshape(shape);
+  }
+
+  clear() {
+    this._real?.clear();
   }
 }
