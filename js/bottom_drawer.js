@@ -184,9 +184,12 @@ export class LazyDrawerManager {
     this._factory = config.factory;
     this._modulePath = config.modulePath;
     this._bottomDrawer = bottomDrawer;
-    this._container = document.getElementById(`${config.tabId}-container`);
-    this._shape = null;
 
+    const container = document.getElementById(`${config.tabId}-container`);
+    this._loadingElement = container.querySelector('.loading-notice');
+    this._bodyElement = container.querySelector('.lazy-body');
+
+    this._shape = null;
     this._enabled = false;
     this._real = null;
     this._realPromise = null;
@@ -204,8 +207,8 @@ export class LazyDrawerManager {
       this._enabled = this._toggle.checked;
       this._real?.setEnabled(this._enabled);
       if (this._enabled) {
-        this._ensureLoaded();
         drawer.openTab(tabId);
+        this._ensureLoaded();
       } else {
         drawer.closeTab(tabId);
       }
@@ -218,8 +221,8 @@ export class LazyDrawerManager {
 
     if (this._toggle.checked) {
       this._enabled = true;
-      this._ensureLoaded();
       drawer.openTab(tabId);
+      this._ensureLoaded();
     }
   }
 
@@ -239,21 +242,21 @@ export class LazyDrawerManager {
     if (!this._realPromise) {
       this._realPromise = (async () => {
         const module = await import(this._modulePath + self.VERSION_PARAM);
-        const real = this._factory(module, this._container.querySelector('.lazy-body'));
+        const real = this._factory(module, this._bodyElement);
 
         if (this._shape) real.reshape(this._shape);
         real.setEnabled(this._enabled);
 
         this._real = real;
-        this._container.classList.add('lazy-loaded');
+        this._loadingElement.hidden = true;
+        this._bodyElement.hidden = false;
         return real;
       })().catch((e) => {
         console.error(`Failed to load ${this._tabId}:`, e);
         this._realPromise = null;
-        const loadingElement = this._container.querySelector('.lazy-loading');
-        loadingElement.textContent = `Failed to load: ${e?.message || e}`;
-        loadingElement.classList.remove('notice-info');
-        loadingElement.classList.add('notice-error');
+        this._loadingElement.textContent = `Failed to load: ${e?.message || e}`;
+        this._loadingElement.classList.remove('notice-info');
+        this._loadingElement.classList.add('notice-error');
         return null;
       });
     }

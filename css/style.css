@@ -65,6 +65,11 @@
   --filter-disabled: contrast(0.333) brightness(1.5);
 }
 
+/* Ensure the hidden attribute always works, even when CSS sets display. */
+[hidden] {
+  display: none !important;
+}
+
 body {
   font-size: var(--font-size-base);
   font-family: var(--font-family-base);
@@ -109,18 +114,6 @@ body {
 
 .grid-size-large .cell-multi-value {
   font-size: 8px;
-}
-
-.hidden {
-  display: none !important;
-}
-
-.lazy-load:not(.lazy-loaded) .lazy-body {
-  display: none;
-}
-
-.lazy-load.lazy-loaded .lazy-loading {
-  display: none;
 }
 
 .solution-group {
@@ -1122,14 +1115,13 @@ h3 {
 }
 
 #stats-container {
-  display: flex;
-  flex-direction: column;
   overflow: auto;
   padding: var(--padding-default);
 }
 
 #stats-container .stats-charts {
   display: flex;
+  flex-direction: row;
   flex-wrap: wrap;
   gap: var(--gap-default);
 }
@@ -1436,6 +1428,11 @@ button:has(.spinner),
 }
 
 .bottom-drawer-panel>.lazy-body {
+  display: flex;
   flex: 1;
   min-height: 0;
+}
+
+.bottom-drawer-panel>.loading-notice {
+  margin: auto;
 }

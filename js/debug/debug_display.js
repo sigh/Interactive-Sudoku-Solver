@@ -366,7 +366,7 @@ export class DebugManager {
   setEnabled(enabled) {
     // Show/hide the debug panel. When disabling, we also clear the UI.
     this._enabled = enabled;
-    this._container.classList.toggle('hidden', !enabled);
+    this._container.hidden = !enabled;
 
     this.clear();
   }

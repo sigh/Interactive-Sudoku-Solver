@@ -16,16 +16,14 @@
 }
 
 #debug-container {
-  height: 100%;
   padding: var(--gap-default);
   box-sizing: border-box;
 }
 
-#debug-container .lazy-body {
+#debug-container > .lazy-body {
   display: flex;
   flex-direction: row;
   gap: var(--gap-default);
-  height: 100%;
 }
 
 #debug-container #debug-logs {

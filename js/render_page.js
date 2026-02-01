@@ -1550,10 +1550,11 @@ class SandboxHandler {
   }
 
   async _openSandbox() {
+    this._bottomDrawer.openTab(this._tabId);
+
     this._loadingPromise ||= this._loadSandbox();
     await this._loadingPromise;
 
-    this._bottomDrawer.openTab(this._tabId);
     this._updateCodeParam(true);
   }
 
@@ -1578,9 +1579,10 @@ class SandboxHandler {
         () => this._constraintManager.getConstraints().toString(),
       );
 
-      this._container.classList.add('lazy-loaded');
+      this._container.querySelector('.loading-notice').hidden = true;
+      this._container.querySelector('.lazy-body').hidden = false;
     } catch (e) {
-      const loadingElement = this._container.querySelector('.lazy-loading');
+      const loadingElement = this._container.querySelector('.loading-notice');
       loadingElement.textContent = `Failed to load sandbox: ${e.message}`;
       loadingElement.classList.remove('notice-info');
       loadingElement.classList.add('notice-error');
