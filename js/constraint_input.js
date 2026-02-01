@@ -123,6 +123,11 @@ export class ConstraintCategoryInput {
     this._updateCallback();
   }
 
+  // Returns the input element for a constraint type, or null if not found.
+  getConstraintInputElement(constraintClass) {
+    return null;
+  }
+
   // Find all constraint types that are associated with this category.
   static constraintClasses() {
     const name = this.name;
@@ -230,6 +235,13 @@ ConstraintCategoryInput.Shape = class Shape extends ConstraintCategoryInput {
     this._input.value = shape.name;
     this._input.setCustomValidity('');
   }
+
+  getConstraintInputElement(constraintClass) {
+    if (!this.constructor.constraintClasses().includes(constraintClass)) {
+      return null;
+    }
+    return this._input;
+  }
 }
 
 ConstraintCategoryInput.Experimental = class Experimental extends ConstraintCategoryInput {
@@ -239,10 +251,11 @@ ConstraintCategoryInput.Composite = class Composite extends ConstraintCategoryIn
   constructor(collection, addUpdateListener) {
     super(collection);
     const form = document.forms['composite-constraint-input'];
-    const container = new CollapsibleContainer(
+    this._form = form;
+    this._collapsibleContainer = new CollapsibleContainer(
       form.firstElementChild,
       /* defaultOpen= */ false).allowInComposite();
-    addUpdateListener(() => container.updateActiveHighlighting());
+    addUpdateListener(() => this._collapsibleContainer.updateActiveHighlighting());
 
     this._setUpForm(form, collection);
   }
@@ -257,6 +270,16 @@ ConstraintCategoryInput.Composite = class Composite extends ConstraintCategoryIn
       collection.addConstraint(new SudokuConstraint.And([]));
       return false;
     };
+  }
+
+  getConstraintInputElement(constraintClass) {
+    if (constraintClass === SudokuConstraint.Or) {
+      return this._form['add-or'];
+    }
+    if (constraintClass === SudokuConstraint.And) {
+      return this._form['add-and'];
+    }
+    return null;
   }
 }
 
@@ -434,6 +457,22 @@ class CheckboxCategoryInput extends ConstraintCategoryInput {
       item.element.parentElement.classList.toggle('disabled', disabled);
     }
   }
+
+  getConstraintInputElement(constraintClass) {
+    // Check if this checkbox category has this constraint type.
+    for (const item of this._checkboxes.values()) {
+      if (item.constraint.constructor === constraintClass) {
+        return item.element;
+      }
+    }
+    // Check select dropdowns.
+    for (const item of this._selects.values()) {
+      if (item.constraintClass === constraintClass) {
+        return item.element;
+      }
+    }
+    return null;
+  }
 }
 
 ConstraintCategoryInput.Global = class Global extends CheckboxCategoryInput {
@@ -484,6 +523,16 @@ ConstraintCategoryInput.LinesAndSets = class LinesAndSets extends ConstraintCate
       this._handleSelection(selectionForm, inputManager);
       return false;
     };
+  }
+
+  getConstraintInputElement(constraintClass) {
+    const typeData = this._typeMap.get(constraintClass.name);
+    if (!typeData) return null;
+
+    const select = this._selectionForm['constraint-type'];
+    select.value = constraintClass.name;
+    select.dispatchEvent(new Event('change'));
+    return select;
   }
 
   _getFocusTarget() {
@@ -785,6 +834,13 @@ ConstraintCategoryInput.GivenCandidates = class GivenCandidates extends Constrai
       }
     }
   }
+
+  getConstraintInputElement(constraintClass) {
+    if (!this.constructor.constraintClasses().includes(constraintClass)) {
+      return null;
+    }
+    return this._multiValueInputPanel._collapsibleContainer.element();
+  }
 }
 
 ConstraintCategoryInput.Region = class Region extends ConstraintCategoryInput {
@@ -932,6 +988,13 @@ ConstraintCategoryInput.Region = class Region extends ConstraintCategoryInput {
 
   clear() {
     this._sameValuesCheckbox.checked = false;
+  }
+
+  getConstraintInputElement(constraintClass) {
+    if (constraintClass !== SudokuConstraint.Jigsaw) {
+      return null;
+    }
+    return this._button;
   }
 }
 
@@ -1093,6 +1156,15 @@ ConstraintCategoryInput.OutsideClue = class OutsideClue extends ConstraintCatego
 
     autoSaveField(form, 'type');
   }
+
+  getConstraintInputElement(constraintClass) {
+    const constraintClasses = this.constructor.constraintClasses();
+    if (!constraintClasses.includes(constraintClass)) return null;
+
+    this._outsideClueForm.type.value = constraintClass.name;
+    this._outsideClueForm.dispatchEvent(new Event('change'));
+    return this._outsideClueForm;
+  }
 }
 
 // Base class for JavaScript constraint inputs that share the tabbed panel.
@@ -1161,6 +1233,12 @@ class JavaScriptCategoryInput extends ConstraintCategoryInput {
     // so that tab switching and toggles still work).
     this._form.firstElementChild.classList.toggle('disabled', !hasEnoughCells);
   }
+
+  _selectTab() {
+    const tabButton = this._panel.parentElement.querySelector(
+      `[data-tab="${this._tabContent.id}"]`);
+    tabButton?.click();
+  }
 }
 
 ConstraintCategoryInput.Pairwise = class Pairwise extends JavaScriptCategoryInput {
@@ -1223,6 +1301,16 @@ ConstraintCategoryInput.Pairwise = class Pairwise extends JavaScriptCategoryInpu
     this._form['chain-mode'].value = constraint.type;
     this._form['function'].value = binaryKeyToFnString(constraint.key, numValues);
     this._form['function'].focus();
+  }
+
+  getConstraintInputElement(constraintClass) {
+    if (!this.constructor.constraintClasses().includes(constraintClass)) {
+      return null;
+    }
+
+    this._selectTab();
+    this._form['chain-mode'].value = constraintClass.name;
+    return this._panel;
   }
 }
 
@@ -1371,7 +1459,17 @@ ConstraintCategoryInput.StateMachine = class StateMachine extends JavaScriptCate
     this._form['unified-code'].value = jsSpec;
     this._form['unified-code'].focus();
   }
+
+  getConstraintInputElement(constraintClass) {
+    if (!this.constructor.constraintClasses().includes(constraintClass)) {
+      return null;
+    }
+
+    this._selectTab();
+    return this._panel;
+  }
 }
+
 
 class MultiValueInputPanel {
   constructor(inputManager, onChange, givenLookup) {

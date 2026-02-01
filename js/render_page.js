@@ -26,7 +26,7 @@ const { ConstraintDisplay } = await import('./constraint_display.js' + self.VERS
 const { SolutionController } = await import('./solution_controller.js' + self.VERSION_PARAM);
 const {
   CollapsibleContainer,
-  ConstraintCategoryInput
+  ConstraintCategoryInput,
 } = await import('./constraint_input.js' + self.VERSION_PARAM);
 const { BottomDrawer } = await import('./bottom_drawer.js' + self.VERSION_PARAM);
 
@@ -52,6 +52,8 @@ export const initPage = () => {
   setUpHeaderSettingsDropdown();
 
   setUpTooltipPortal();
+
+  setUpConstraintSearch(constraintManager);
 
   const hiddenElements = Array.from(
     document.getElementsByClassName('hide-until-load'));
@@ -154,6 +156,89 @@ const setUpHeaderSettingsDropdown = () => {
   button.addEventListener('click', (e) => {
     e.preventDefault();
     setOpen(!isOpen);
+  });
+};
+
+const setUpConstraintSearch = (constraintManager) => {
+  const searchButton = document.getElementById('constraint-search-button');
+  const searchInput = document.getElementById('constraint-search-input');
+  const datalist = document.getElementById('constraint-search-list');
+
+  // Build a map of constraint display names to their constraint classes.
+  const constraintMap = new Map();
+
+  // Get all constraint classes from SudokuConstraint.
+  for (const [name, constraintClass] of Object.entries(SudokuConstraint)) {
+    if (!constraintClass.CATEGORY || constraintClass.CATEGORY === 'Experimental') continue;
+
+    const displayName = `${constraintClass.displayName()} [${name}]`;
+    constraintMap.set(displayName, constraintClass);
+  }
+
+  // Populate the datalist.
+  const sortedNames = [...constraintMap.keys()].sort();
+  for (const name of sortedNames) {
+    const option = document.createElement('option');
+    option.value = name;
+    datalist.appendChild(option);
+  }
+
+  // Toggle search input visibility.
+  const searchIcon = searchButton.querySelector('img');
+  const toggleSearch = (open) => {
+    const isOpen = open ?? searchInput.hidden;
+    searchInput.hidden = !isOpen;
+    searchIcon.src = isOpen ? 'img/search-off-48.png' : 'img/search-48.png';
+    if (isOpen) {
+      searchInput.value = '';
+      searchInput.focus();
+    }
+  };
+
+  searchButton.addEventListener('mousedown', (e) => {
+    // Prevent blur from firing before click.
+    e.preventDefault();
+  });
+  searchButton.addEventListener('click', () => toggleSearch());
+
+  // Handle constraint selection.
+  const selectConstraint = (selectedValue) => {
+    const constraintClass = constraintMap.get(selectedValue);
+    if (!constraintClass) return;
+
+    toggleSearch(false);
+
+    const categoryInput = constraintManager.getCategoryInput(constraintClass.CATEGORY);
+    const element = categoryInput?.getConstraintInputElement(constraintClass);
+    if (element) {
+      // Open all parent collapsible containers.
+      let container = element.closest('.collapsible-container');
+      while (container) {
+        container.classList.add('container-open');
+        container = container.parentElement?.closest('.collapsible-container');
+      }
+      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      element.focus();
+
+      // Brief highlight animation.
+      element.classList.remove('constraint-search-highlight');
+      void element.offsetWidth; // Force reflow to restart animation.
+      element.classList.add('constraint-search-highlight');
+    }
+  };
+
+  searchInput.addEventListener('change', () => {
+    selectConstraint(searchInput.value);
+  });
+
+  searchInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      toggleSearch(false);
+    }
+  });
+
+  searchInput.addEventListener('blur', () => {
+    toggleSearch(false);
   });
 };
 
@@ -526,6 +611,10 @@ class ConstraintManager {
   addUpdateListener(listener) {
     this._updateListeners.push(listener);
     return listener;
+  }
+
+  getCategoryInput(category) {
+    return this._constraintCategoryInputs.get(category);
   }
 
   runUpdateCallback(options) {

@@ -269,6 +269,42 @@ body {
   gap: 5px;
 }
 
+#constraint-search-button {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+#constraint-search-button img {
+  width: 24px;
+  height: 24px;
+}
+
+#constraint-search-input {
+  flex: 1;
+}
+
+#constraint-search-input:not([hidden])~.constraint-panel-button {
+  display: none;
+}
+
+.constraint-search-highlight {
+  animation: constraint-search-highlight-fade 2s ease-out;
+}
+
+@keyframes constraint-search-highlight-fade {
+
+  0%,
+  20% {
+    box-shadow: 0 0 10px 6px var(--color-primary-dark);
+  }
+
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
 #sudoku-container {
   display: flex;
   flex: 1;
