@@ -726,9 +726,9 @@ function accept(state) {
     <div class="bottom-drawer-tabs tab-container"></div>
     <div class="bottom-drawer-panels">
 
-      <div id="debug-container" class="lazy-load" data-tab-id="debug" data-tab-label="Debug">
-        <div class="lazy-loading notice notice-info">Loading debug…</div>
-        <div class="lazy-body">
+      <div id="debug-container" data-tab-id="debug" data-tab-label="Debug">
+        <div class="loading-notice notice notice-info">Loading debug…</div>
+        <div class="lazy-body" hidden>
           <div id="debug-panel">
             <label class="hstack">
               Log level
@@ -758,16 +758,16 @@ function accept(state) {
         </div>
       </div>
 
-      <div id="flame-graph-container" class="lazy-load" data-tab-id="flame-graph" data-tab-label="Flame Graph">
-        <div class="lazy-loading notice notice-info">Loading…</div>
-        <div class="lazy-body"></div>
+      <div id="flame-graph-container" data-tab-id="flame-graph" data-tab-label="Flame Graph">
+        <div class="loading-notice notice notice-info">Loading…</div>
+        <div class="lazy-body" hidden></div>
       </div>
 
       <div id="counters-container" data-tab-id="counters" data-tab-label="Debug Counters"></div>
 
-      <div id="sandbox-container" class="lazy-load" data-tab-id="sandbox" data-tab-label="JS Sandbox">
-        <div class="lazy-loading notice notice-info">Loading…</div>
-        <div class="lazy-body">
+      <div id="sandbox-container" data-tab-id="sandbox" data-tab-label="JS Sandbox">
+        <div class="loading-notice notice notice-info">Loading…</div>
+        <div class="lazy-body" hidden>
           <div class="sandbox-controls hstack">
             <select class="sandbox-examples">
               <option value="">Load example...</option>
@@ -800,9 +800,9 @@ function accept(state) {
         </div>
       </div>
 
-      <div id="stats-container" class="lazy-load" data-tab-id="stats" data-tab-label="Stats Charts">
-        <div class="lazy-loading notice notice-info">Loading…</div>
-        <div class="lazy-body stats-charts"></div>
+      <div id="stats-container" data-tab-id="stats" data-tab-label="Stats Charts">
+        <div class="loading-notice notice notice-info">Loading…</div>
+        <div class="lazy-body stats-charts" hidden></div>
       </div>
 
     </div>

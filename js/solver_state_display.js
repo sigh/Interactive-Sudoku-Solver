@@ -357,8 +357,8 @@ class StateHistoryDisplay {
       }
 
       this._visible = true;
-      await this._initStatsContainer();
       this._bottomDrawer.openTab(this.TAB_ID);
+      await this._initStatsContainer();
       this._updateCharts();
     };
 
@@ -404,9 +404,10 @@ class StateHistoryDisplay {
         this._eventReplayFn = this._syncToolTips(this._charts);
 
         this.setEstimateMode(this._isEstimateMode);
-        container.classList.add('lazy-loaded');
+        container.querySelector('.loading-notice').hidden = true;
+        container.querySelector('.lazy-body').hidden = false;
       } catch (e) {
-        const loadingElement = container.querySelector('.lazy-loading');
+        const loadingElement = container.querySelector('.loading-notice');
         loadingElement.textContent = `Failed to load charts: ${e.message}`;
         loadingElement.classList.remove('notice-info');
         loadingElement.classList.add('notice-error');
