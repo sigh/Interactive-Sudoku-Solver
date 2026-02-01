@@ -260,6 +260,7 @@ const makeDynamicLoader = (createElement) => {
     return async () => {
       if (loaded) return;
       loaded = true;
+      if (typeof document === 'undefined' || !document.head) return;
       const element = createElement(path);
       document.head.append(element);
       await new Promise(resolve => { element.onload = resolve; });
