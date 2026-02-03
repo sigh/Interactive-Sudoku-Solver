@@ -1163,7 +1163,7 @@ ConstraintCategoryInput.OutsideClue = class OutsideClue extends ConstraintCatego
 
     this._outsideClueForm.type.value = constraintClass.name;
     this._outsideClueForm.dispatchEvent(new Event('change'));
-    return this._outsideClueForm;
+    return this._outsideClueForm[`${constraintClass.name}-option`].parentNode;
   }
 }
 
@@ -1235,9 +1235,10 @@ class JavaScriptCategoryInput extends ConstraintCategoryInput {
   }
 
   _selectTab() {
-    const tabButton = this._panel.parentElement.querySelector(
+    const tabButton = this._panel.querySelector(
       `[data-tab="${this._tabContent.id}"]`);
     tabButton?.click();
+    return tabButton;
   }
 }
 
@@ -1308,9 +1309,9 @@ ConstraintCategoryInput.Pairwise = class Pairwise extends JavaScriptCategoryInpu
       return null;
     }
 
-    this._selectTab();
-    this._form['chain-mode'].value = constraintClass.name;
-    return this._panel;
+    const input = this._form['chain-mode'];
+    input.value = constraintClass.name;
+    return input;
   }
 }
 
@@ -1465,8 +1466,7 @@ ConstraintCategoryInput.StateMachine = class StateMachine extends JavaScriptCate
       return null;
     }
 
-    this._selectTab();
-    return this._panel;
+    return this._selectTab();
   }
 }
 
