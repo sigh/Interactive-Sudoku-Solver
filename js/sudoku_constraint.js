@@ -1133,6 +1133,10 @@ export class SudokuConstraint {
       return NFASerializer.deserialize(encodedNFA).numStates();
     });
 
+    static displayName() {
+      return 'State Machine';
+    }
+
     chipLabel() {
       const name = this.name ? ` "${this.name}"` : '';
       const numStates = this.constructor._countStates(this.encodedNFA);
