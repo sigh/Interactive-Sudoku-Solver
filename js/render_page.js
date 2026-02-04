@@ -224,6 +224,9 @@ const setUpConstraintSearch = (constraintManager) => {
       element.classList.remove('constraint-search-highlight');
       void element.offsetWidth; // Force reflow to restart animation.
       element.classList.add('constraint-search-highlight');
+      element.addEventListener('animationend', () => {
+        element.classList.remove('constraint-search-highlight');
+      }, { once: true });
     }
   };
 
