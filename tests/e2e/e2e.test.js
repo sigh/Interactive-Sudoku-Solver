@@ -106,6 +106,7 @@ const solveCollections = [
       'And with AllDifferent', // And constraint (with cellExclusions)
       'Or with AllDifferent', // Or constraint (with cellExclusions)
       'Elided And and Or', // And and Or constraint which are both simplified out.
+      'Contain At Least', // ContainAtLeast
     ],
   },
   {
