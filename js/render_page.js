@@ -55,6 +55,8 @@ export const initPage = () => {
 
   setUpConstraintSearch(constraintManager);
 
+  setUpPageInfoDismiss();
+
   const hiddenElements = Array.from(
     document.getElementsByClassName('hide-until-load'));
   hiddenElements.forEach(e => e.classList.remove('hide-until-load'));
@@ -242,6 +244,21 @@ const setUpConstraintSearch = (constraintManager) => {
 
   searchInput.addEventListener('blur', () => {
     toggleSearch(false);
+  });
+};
+
+const setUpPageInfoDismiss = () => {
+  const pageInfo = document.querySelector('.page-info');
+  const closeButton = pageInfo.querySelector('.page-info-close');
+  const storageKey = 'page-info-dismissed';
+
+  if (!localStorage.getItem(storageKey)) {
+    pageInfo.hidden = false;
+  }
+
+  closeButton.addEventListener('click', () => {
+    pageInfo.hidden = true;
+    localStorage.setItem(storageKey, 'true');
   });
 };
 
