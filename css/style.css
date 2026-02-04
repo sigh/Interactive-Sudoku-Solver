@@ -941,10 +941,17 @@ select.thin-select {
 }
 
 .page-info {
+  position: relative;
   border: 1px solid var(--color-border-light);
   border-radius: 10px;
   padding: 8px 10px;
   line-height: 1.35;
+}
+
+.page-info-close {
+  position: absolute;
+  top: 4px;
+  right: 6px;
 }
 
 .page-info ul {
@@ -1428,11 +1435,15 @@ button:has(.spinner),
   gap: 6px;
 }
 
-.bottom-drawer-tab:not(.active) .bottom-drawer-tab-close {
+.bottom-drawer-tab:not(.active) .plain-close-button {
   display: none;
 }
 
-.bottom-drawer-tab-close:hover {
+.plain-close-button {
+  cursor: pointer;
+}
+
+.plain-close-button:hover {
   color: var(--color-danger);
 }
 

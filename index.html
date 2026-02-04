@@ -286,7 +286,8 @@ layout: null
         </div>
       </div>
 
-      <div class="description page-info">
+      <div class="description page-info" hidden>
+        <span class="page-info-close plain-close-button" title="Dismiss">&times;</span>
         <ul>
           <li>
             <strong>Select a cell</strong> and <strong>type</strong> a number
@@ -347,18 +348,18 @@ layout: null
         <div class="hstack constraint-panel-header">
           <h1>Constraints</h1>
 
-          <button id="constraint-search-button" type="button" class="icon-only-button"
-            title="Search constraints">
+          <button id="constraint-search-button" type="button" class="icon-only-button" title="Search constraints">
             <img src="img/search-48.png" alt="Search">
           </button>
-          <input type="text" id="constraint-search-input" list="constraint-search-list"
-            placeholder="Search..." autocomplete="off" hidden>
+          <input type="text" id="constraint-search-input" list="constraint-search-list" placeholder="Search..."
+            autocomplete="off" hidden>
           <datalist id="constraint-search-list"></datalist>
           <button id="copy-constraints-button" title="Copy constraint to clipboard"
             class="image-button auxiliary-button constraint-panel-button">
             <img src="img/copy-48.png" alt="Copy constraint">
           </button>
-          <button id="clear-constraints-button" class="danger-button constraint-panel-button" title="Clear constraints">Clear</button>
+          <button id="clear-constraints-button" class="danger-button constraint-panel-button"
+            title="Clear constraints">Clear</button>
           <button id="undo-button" class="icon-button constraint-panel-button" title="undo" disabled>&#10554;</button>
           <button id="redo-button" class="icon-button constraint-panel-button" title="redo" disabled
             style="transform:rotateY(180deg)">&#10554;</button>

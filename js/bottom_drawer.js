@@ -40,7 +40,7 @@ export class BottomDrawer {
       labelSpan.textContent = label;
 
       const closeBtn = document.createElement('span');
-      closeBtn.className = 'bottom-drawer-tab-close';
+      closeBtn.className = 'plain-close-button';
       closeBtn.title = `Close ${label}`;
       closeBtn.textContent = '×';
 
@@ -156,7 +156,7 @@ export class BottomDrawer {
     let startY, startHeight;
 
     this._tabBar.addEventListener('pointerdown', (e) => {
-      if (e.target.closest('button, .bottom-drawer-tab-close')) return;
+      if (e.target.closest('button, .plain-close-button')) return;
       e.preventDefault();
       startY = e.clientY;
       startHeight = this._container.offsetHeight;
