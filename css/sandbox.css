@@ -27,6 +27,8 @@
   word-wrap: break-word;
   flex: 1;
   min-height: 0;
+  min-width: 0;
+  width: 0;
 }
 
 #sandbox-container .editor:focus {
@@ -40,9 +42,11 @@
   border-radius: 5px;
   padding: var(--gap-default);
   font-size: var(--font-size-small);
-  white-space: pre;
+  white-space: pre-wrap;
+  word-break: break-word;
   overflow: auto;
   flex: 1;
+  min-width: 0;
 }
 
 #sandbox-container .sandbox-status {
