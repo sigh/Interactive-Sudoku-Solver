@@ -688,10 +688,36 @@ export class SolverProxy {
   static LOG_UPDATE_FREQUENCY = 13;
 
   static _unusedWorkers = [];
+  static _unusedWasmWorkers = [];
+
+  static _shouldUseWasm() {
+    const params = new URLSearchParams(self.location.search);
+    return params.get('solver') === 'wasm';
+  }
 
   static async makeSolver(constraints, stateHandler, statusHandler, debugHandler) {
     // Ensure any pending terminations are enacted.
     await new Promise(r => setTimeout(r, 0));
+
+    const useWasm = this._shouldUseWasm();
+
+    if (useWasm) {
+      if (!this._unusedWasmWorkers.length) {
+        const worker = new Worker(
+          'js/wasm_solver_worker.js' + self.VERSION_PARAM, { type: 'module' });
+        this._unusedWasmWorkers.push(worker);
+      }
+      const worker = this._unusedWasmWorkers.pop();
+      worker.release = () => this._unusedWasmWorkers.push(worker);
+
+      const solverProxy = new SolverProxy(
+        worker, stateHandler, statusHandler,
+        debugHandler?.getCallback());
+      await solverProxy.init(
+        constraints, this.LOG_UPDATE_FREQUENCY,
+        debugHandler?.getOptions());
+      return solverProxy;
+    }
 
     if (!this._unusedWorkers.length) {
       const worker = new Worker(

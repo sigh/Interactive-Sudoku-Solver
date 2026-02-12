@@ -117,11 +117,17 @@ impl Grid {
 
     /// Get all 27 houses (9 rows + 9 columns + 9 boxes), each as an array
     /// of 9 cell indices.
+    ///
+    /// Order matches JS: all rows first, then all columns, then all boxes.
     pub fn all_houses() -> Vec<[usize; NUM_VALUES]> {
         let mut houses = Vec::with_capacity(27);
         for i in 0..NUM_VALUES {
             houses.push(Self::row_cells(i));
+        }
+        for i in 0..NUM_VALUES {
             houses.push(Self::col_cells(i));
+        }
+        for i in 0..NUM_VALUES {
             houses.push(Self::box_cells(i));
         }
         houses
