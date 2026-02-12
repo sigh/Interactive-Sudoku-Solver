@@ -1,4 +1,11 @@
+pub mod candidate_selector;
+pub mod cell_exclusions;
 pub mod grid;
+pub mod handler;
+pub mod handler_accumulator;
+pub mod lookup_tables;
+pub mod recursion_stack;
+pub mod solver;
 pub mod util;
 
 #[cfg(feature = "wasm")]
@@ -13,6 +20,7 @@ use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "wasm")]
 #[derive(Deserialize)]
+#[allow(dead_code)] // cages field will be used in Sprint 2
 struct SolverInput {
     puzzle: String,
     #[serde(default)]
@@ -21,6 +29,7 @@ struct SolverInput {
 
 #[cfg(feature = "wasm")]
 #[derive(Deserialize)]
+#[allow(dead_code)] // Will be used in Sprint 2 (Sum Handler)
 struct CageInput {
     cells: Vec<usize>,
     sum: u32,
@@ -128,23 +137,37 @@ fn solve_sudoku_impl(input: &str) -> SolverOutput {
         }
     };
 
-    match grid::Grid::from_str(&parsed.puzzle) {
-        Ok(grid) => {
-            // TODO: Solve in Sprint 1
-            let _ = grid;
-            SolverOutput {
+    let mut solver = match solver::Solver::new(&parsed.puzzle) {
+        Ok(s) => s,
+        Err(e) => {
+            return SolverOutput {
                 success: false,
                 solution: None,
-                error: Some("Solver not yet implemented".to_string()),
+                error: Some(format!("Invalid puzzle: {}", e)),
                 counters: SolverCounters::default(),
-            }
+            };
         }
-        Err(e) => SolverOutput {
-            success: false,
-            solution: None,
-            error: Some(format!("Invalid puzzle: {}", e)),
-            counters: SolverCounters::default(),
-        },
+    };
+
+    let result = solver.solve();
+    let solution_str = result
+        .solution
+        .map(|grid| grid::Grid { cells: grid }.to_string());
+
+    let counters = SolverCounters {
+        solutions: result.counters.solutions,
+        backtracks: result.counters.backtracks,
+        guesses: result.counters.guesses,
+        values_tried: result.counters.values_tried,
+        constraints_processed: result.counters.constraints_processed,
+        progress_ratio: result.counters.progress_ratio,
+    };
+
+    SolverOutput {
+        success: solution_str.is_some(),
+        solution: solution_str,
+        error: None,
+        counters,
     }
 }
 

@@ -1,6 +1,8 @@
 use solver_wasm::grid::Grid;
+use solver_wasm::solver::Solver;
 use std::env;
 use std::process;
+use std::time::Instant;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -45,6 +47,36 @@ fn cmd_solve(args: &[String]) {
     println!("Input:");
     println!("{}", grid);
 
-    // TODO: Actually solve in Sprint 1
-    println!("Solver not yet implemented.");
+    let mut solver = match Solver::new(puzzle) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("Error building solver: {}", e);
+            process::exit(1);
+        }
+    };
+
+    let start = Instant::now();
+    let result = solver.solve();
+    let elapsed = start.elapsed();
+
+    match result.solution {
+        Some(sol) => {
+            let sol_grid = Grid { cells: sol };
+            println!("Solution:");
+            println!("{}", sol_grid);
+            println!("String: {}", sol_grid.to_string());
+        }
+        None => {
+            println!("No solution found.");
+        }
+    }
+
+    println!();
+    println!("Stats:");
+    println!("  Time:          {:.3} ms", elapsed.as_secs_f64() * 1000.0);
+    println!("  Solutions:     {}", result.counters.solutions);
+    println!("  Guesses:       {}", result.counters.guesses);
+    println!("  Backtracks:    {}", result.counters.backtracks);
+    println!("  Values tried:  {}", result.counters.values_tried);
+    println!("  Constraints:   {}", result.counters.constraints_processed);
 }
