@@ -1,0 +1,6 @@
+exclude:
+  - solver-wasm/src
+  - solver-wasm/target
+  - solver-wasm/Cargo.toml
+  - solver-wasm/Cargo.lock
+  - .ignore

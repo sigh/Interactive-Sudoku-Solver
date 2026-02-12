@@ -5,3 +5,7 @@ _site/
 .vscode/
 .ignore/
 .agent/
+
+# Rust / WASM
+solver-wasm/target/
+solver-wasm/pkg/
