@@ -26,10 +26,11 @@ const { Timer } = await import('./util.js' + self.VERSION_PARAM);
 // Import and initialize the WASM module.
 // wasm-pack --target web produces an init() function and named exports.
 import init, {
-  solve_sudoku,
-  solve_sudoku_with_cages,
-  solve_sudoku_with_progress,
+  init_solver,
   count_solutions_with_progress,
+  solve_all_possibilities_with_progress,
+  nth_solution_with_progress,
+  nth_step_with_progress,
 } from '../solver-wasm/pkg/solver_wasm.js';
 
 await init();
@@ -42,86 +43,18 @@ let workerSolverSetUpTime = 0;
 // ============================================================================
 
 /**
- * Extract an 81-character puzzle string from a resolved constraint.
- * Walks all children for 'Given' constraints and places them in the grid.
- */
-function extractGivens(constraint, shape) {
-  const puzzle = new Array(shape.numCells).fill('.');
-
-  const walk = (c) => {
-    if (c.type === 'Given') {
-      const cellIndex = shape.parseCellId(c.cell).cell;
-      if (c.values.length === 1) {
-        puzzle[cellIndex] = String(c.values[0]);
-      }
-    }
-    if (c.constraints) {
-      for (const child of c.constraints) {
-        walk(child);
-      }
-    }
-  };
-
-  walk(constraint);
-  return puzzle.join('');
-}
-
-/**
- * Extract killer cages from a resolved constraint.
- * Returns an array of { cells: number[], sum: number }.
- */
-function extractCages(constraint, shape) {
-  const cages = [];
-
-  const walk = (c) => {
-    if (c.type === 'Cage' && c.sum !== 0) {
-      const cells = c.cells.map(cellId => shape.parseCellId(cellId).cell);
-      cages.push({ cells, sum: c.sum });
-    }
-    if (c.constraints) {
-      for (const child of c.constraints) {
-        walk(child);
-      }
-    }
-  };
-
-  walk(constraint);
-  return cages;
-}
-
-/**
  * Convert a resolved constraint to the WASM solver's JSON input format.
+ * The constraint string is passed directly to the Rust parser, which is
+ * the single source of truth for supported constraint types.
  */
-function constraintToWasmInput(constraint, shape) {
-  return {
-    puzzle: extractGivens(constraint, shape),
-    cages: extractCages(constraint, shape),
+function constraintToWasmInput(constraint, debugOptions) {
+  const input = {
+    constraintString: constraint.toString(),
   };
-}
-
-/**
- * Check if a constraint set is supported by the WASM solver.
- * Returns null if supported, or a string explaining why not.
- */
-function getWasmUnsupportedReason(constraint) {
-  const supportedTypes = new Set([
-    'Container', 'Set', 'Given', 'Cage', 'Shape',
-  ]);
-
-  const walk = (c) => {
-    if (!supportedTypes.has(c.type)) {
-      return `Unsupported constraint type: ${c.type}`;
-    }
-    if (c.constraints) {
-      for (const child of c.constraints) {
-        const reason = walk(child);
-        if (reason) return reason;
-      }
-    }
-    return null;
-  };
-
-  return walk(constraint);
+  if (debugOptions) {
+    input.debugOptions = debugOptions;
+  }
+  return input;
 }
 
 // ============================================================================
@@ -129,6 +62,55 @@ function getWasmUnsupportedReason(constraint) {
 // ============================================================================
 
 const LOG_UPDATE_FREQUENCY = 13; // 2^13 = 8192 iterations per callback.
+
+/**
+ * Parse a SolverProgress JSON string from the WASM solver.
+ * Returns { counters, debugData } where debugData is null if no debug
+ * information is present, or an object with logs/conflictHeatmap/stackTrace.
+ */
+function parseProgress(progressJson) {
+  const progress = JSON.parse(progressJson);
+  const counters = progress.counters;
+
+  let debugData = null;
+  const hasLogs = progress.logs && progress.logs.length > 0;
+  const hasHeatmap = progress.conflictHeatmap != null;
+  const hasStack = progress.stackTrace != null;
+
+  if (hasLogs || hasHeatmap || hasStack) {
+    debugData = {};
+    if (hasLogs) debugData.logs = progress.logs;
+    if (hasHeatmap) debugData.conflictHeatmap = progress.conflictHeatmap;
+    if (hasStack) debugData.stackTrace = progress.stackTrace;
+  }
+
+  return { counters, debugData };
+}
+
+/**
+ * Send debug state if there is any debug data from the progress callback.
+ */
+function sendDebugState(debugData) {
+  if (!debugData || !workerSolverState) return;
+  debugData.timeMs = workerSolverState.timeMs;
+  self.postMessage({
+    type: 'debug',
+    data: debugData,
+  });
+}
+
+/**
+ * Check a parsed WASM result for an error field and throw if present.
+ * This surfaces Rust-side errors (e.g. unsupported constraint types) to the
+ * UI via the worker's exception handling path.
+ */
+function throwOnError(result) {
+  if (result && result.error) {
+    const err = new Error(result.error);
+    err.name = 'InvalidConstraintError';
+    throw err;
+  }
+}
 
 const handleWorkerMessage = (msg) => {
   try {
@@ -157,22 +139,25 @@ const handleWorkerMethod = (method, payload) => {
       let wasmInput;
       timer.runTimed(() => {
         const constraint = SudokuBuilder.resolveConstraint(payload.constraint);
-        const shape = constraint.getShape();
-
-        // Check if the constraint is supported.
-        const unsupported = getWasmUnsupportedReason(constraint);
-        if (unsupported) {
-          throw new Error(unsupported);
-        }
-
-        wasmInput = constraintToWasmInput(constraint, shape);
+        wasmInput = constraintToWasmInput(constraint, payload.debugOptions);
       });
       workerSolverSetUpTime = timer.elapsedMs();
 
-      // Store the input and log frequency for later method calls.
+      const inputJson = JSON.stringify(wasmInput);
+      const logFrequency = payload.logUpdateFrequency || LOG_UPDATE_FREQUENCY;
+
+      // Build the solver eagerly. All construction errors (unsupported
+      // constraints, invalid puzzles, etc.) surface here — matching
+      // how the JS solver throws during SudokuBuilder.build.
+      const buildError = init_solver(inputJson, logFrequency);
+      if (buildError) {
+        const err = new Error(buildError);
+        err.name = 'InvalidConstraintError';
+        throw err;
+      }
+
       workerSolverState = {
-        input: JSON.stringify(wasmInput),
-        logFrequency: payload.logUpdateFrequency || LOG_UPDATE_FREQUENCY,
+        debugOptions: payload.debugOptions || null,
         counters: {
           solutions: 0,
           backtracks: 0,
@@ -193,73 +178,74 @@ const handleWorkerMethod = (method, payload) => {
 
       const timer = new Timer();
       let result;
+      const threshold = payload.candidateSupportThreshold || 1;
       timer.runTimed(() => {
-        const onProgress = (countersJson) => {
-          const counters = JSON.parse(countersJson);
+        const onProgress = (progressJson) => {
+          const { counters, debugData } = parseProgress(progressJson);
           workerSolverState.counters = counters;
           workerSolverState.timeMs = timer.elapsedMs();
           sendState();
+          sendDebugState(debugData);
         };
 
-        const resultJson = solve_sudoku_with_progress(
-          workerSolverState.input,
+        const resultJson = solve_all_possibilities_with_progress(
           onProgress,
-          workerSolverState.logFrequency,
+          threshold,
         );
         result = JSON.parse(resultJson);
       });
+
+      throwOnError(result);
 
       workerSolverState.counters = result.counters;
       workerSolverState.timeMs = timer.elapsedMs();
       workerSolverState.done = true;
 
-      if (!result.success) {
-        return { values: null, pencilmarks: null };
+      // Convert solution strings to value arrays and send as extra state
+      // so AllPossibilitiesModeHandler.add() can process them.
+      const solutions = result.solutions.map(solStr => {
+        const values = [];
+        for (let i = 0; i < solStr.length; i++) {
+          values.push(parseInt(solStr[i], 10));
+        }
+        return values;
+      });
+
+      if (solutions.length > 0) {
+        sendState({ solutions });
       }
 
-      // Convert solution string to the format expected by the UI:
-      // An array where values[i] = the value at cell i (1-9).
-      const solution = result.solution;
-      const values = [];
-      for (let i = 0; i < solution.length; i++) {
-        values.push(parseInt(solution[i], 10));
-      }
-
-      // For solveAllPossibilities, we return the solution as if each cell
-      // has exactly one possible value.
-      const pencilmarks = values.map(v => [v]);
-
-      return {
-        values,
-        pencilmarks,
-        solutions: [values],
-      };
+      // Return candidateCounts as a Uint8Array (matching JS solver).
+      return new Uint8Array(result.candidateCounts);
     }
 
     case 'nthSolution': {
       if (!workerSolverState) throw new Error('Solver not initialized');
 
+      const n = payload;
       const timer = new Timer();
       let result;
       timer.runTimed(() => {
-        const onProgress = (countersJson) => {
-          const counters = JSON.parse(countersJson);
+        const onProgress = (progressJson) => {
+          const { counters, debugData } = parseProgress(progressJson);
           workerSolverState.counters = counters;
           workerSolverState.timeMs = timer.elapsedMs();
           sendState();
+          sendDebugState(debugData);
         };
 
-        const resultJson = solve_sudoku_with_progress(
-          workerSolverState.input,
+        const resultJson = nth_solution_with_progress(
+          n,
           onProgress,
-          workerSolverState.logFrequency,
         );
         result = JSON.parse(resultJson);
       });
 
+      throwOnError(result);
+
       workerSolverState.counters = result.counters;
       workerSolverState.timeMs = timer.elapsedMs();
-      workerSolverState.done = true;
+      workerSolverState.done = !result.success;
 
       if (!result.success) return null;
 
@@ -278,21 +264,22 @@ const handleWorkerMethod = (method, payload) => {
       let result;
       const limit = payload || 0;
       timer.runTimed(() => {
-        const onProgress = (countersJson) => {
-          const counters = JSON.parse(countersJson);
+        const onProgress = (progressJson) => {
+          const { counters, debugData } = parseProgress(progressJson);
           workerSolverState.counters = counters;
           workerSolverState.timeMs = timer.elapsedMs();
           sendState();
+          sendDebugState(debugData);
         };
 
         const resultJson = count_solutions_with_progress(
-          workerSolverState.input,
           onProgress,
-          workerSolverState.logFrequency,
           limit,
         );
         result = JSON.parse(resultJson);
       });
+
+      throwOnError(result);
 
       workerSolverState.counters = result.counters;
       workerSolverState.timeMs = timer.elapsedMs();
@@ -305,8 +292,49 @@ const handleWorkerMethod = (method, payload) => {
       // Not applicable for WASM solver — always valid for supported constraints.
       return true;
 
-    case 'nthStep':
-      throw new Error('Step-by-step solving is not supported by the WASM solver');
+    case 'nthStep': {
+      if (!workerSolverState) throw new Error('Solver not initialized');
+
+      const [n, stepGuides] = payload;
+      const timer = new Timer();
+      let result;
+      timer.runTimed(() => {
+        const onProgress = (progressJson) => {
+          const { counters, debugData } = parseProgress(progressJson);
+          workerSolverState.counters = counters;
+          workerSolverState.timeMs = timer.elapsedMs();
+          sendState();
+          sendDebugState(debugData);
+        };
+
+        // Convert the Map to a plain object for JSON serialization.
+        const guidesObj = {};
+        if (stepGuides) {
+          for (const [step, guide] of stepGuides) {
+            guidesObj[step] = guide;
+          }
+        }
+        const guidesJson = JSON.stringify(guidesObj);
+
+        const resultJson = nth_step_with_progress(
+          n,
+          guidesJson,
+          onProgress,
+        );
+        result = JSON.parse(resultJson);
+      });
+
+      throwOnError(result);
+
+      workerSolverState.timeMs = timer.elapsedMs();
+
+      if (result === null) {
+        workerSolverState.done = true;
+        return null;
+      }
+
+      return result;
+    }
 
     case 'estimatedCountSolutions':
       throw new Error('Estimated count is not supported by the WASM solver');
