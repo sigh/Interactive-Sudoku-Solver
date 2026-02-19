@@ -1,10 +1,10 @@
-use solver_wasm::constraint_parser;
+use solver_wasm::constraint::builder::SudokuBuilder;
+use solver_wasm::constraint::parser as constraint_parser;
 use solver_wasm::grid::Grid;
-use solver_wasm::solver::Solver;
-use solver_wasm::CageInput;
+use solver_wasm::grid_shape::GridShape;
 use std::env;
-use std::fs;
 use std::process;
+use std::str::FromStr;
 use std::time::Instant;
 
 fn main() {
@@ -17,8 +17,8 @@ fn main() {
 
     match args[1].as_str() {
         "solve" => cmd_solve(&args[2..]),
+        "all-possibilities" => cmd_all_possibilities(&args[2..]),
         "bench" => cmd_bench(&args[2..]),
-        "dump" => cmd_dump(&args[2..]),
         "help" | "--help" | "-h" => print_usage(),
         other => {
             eprintln!("Unknown command: {}", other);
@@ -33,9 +33,10 @@ fn print_usage() {
     eprintln!("Usage: solver-cli <command> [args...]");
     eprintln!();
     eprintln!("Commands:");
-    eprintln!("  solve <input> [--cages <file.json>]   Solve a puzzle");
-    eprintln!("  bench <input> [--cages <file.json>] [--iterations N]   Benchmark");
-    eprintln!("  dump <input> [--cages <file.json>]    Dump handler setup (debug)");
+    eprintln!("  solve <input>                Solve a puzzle");
+    eprintln!("  all-possibilities <input> [--threshold N]");
+    eprintln!("                               Find all possible values per cell");
+    eprintln!("  bench <input> [--iterations N]   Benchmark");
     eprintln!();
     eprintln!("Input formats:");
     eprintln!("  81-character puzzle   '1'-'9' for givens, '.' for empty");
@@ -43,61 +44,14 @@ fn print_usage() {
     eprintln!("  Compact killer        81-char direction-pointer format");
     eprintln!();
     eprintln!("Options:");
-    eprintln!("  --cages <file>  JSON file with cage definitions:");
-    eprintln!("                  [{{\"cells\": [0,1], \"sum\": 3}}, ...]");
+    eprintln!("  --threshold N   Candidate support threshold for all-possibilities (1-255)");
     eprintln!("  --iterations N  Number of benchmark iterations (default: 100)");
 }
 
-/// Parse --cages <file.json> from args, returning cage data and remaining args.
-fn parse_cages(args: &[String]) -> (Vec<(Vec<u8>, i32)>, Vec<String>) {
-    let mut cages = Vec::new();
-    let mut remaining = Vec::new();
-    let mut i = 0;
-
-    while i < args.len() {
-        if args[i] == "--cages" {
-            i += 1;
-            if i >= args.len() {
-                eprintln!("Error: --cages requires a file argument");
-                process::exit(1);
-            }
-            let path = &args[i];
-            let content = match fs::read_to_string(path) {
-                Ok(c) => c,
-                Err(e) => {
-                    eprintln!("Error reading {}: {}", path, e);
-                    process::exit(1);
-                }
-            };
-            let cage_inputs: Vec<CageInput> = match serde_json::from_str(&content) {
-                Ok(c) => c,
-                Err(e) => {
-                    eprintln!("Error parsing cages from {}: {}", path, e);
-                    process::exit(1);
-                }
-            };
-            for cage in &cage_inputs {
-                let cells: Vec<u8> = cage.cells.iter().map(|&c| c as u8).collect();
-                cages.push((cells, cage.sum));
-            }
-        } else {
-            remaining.push(args[i].clone());
-        }
-        i += 1;
-    }
-
-    (cages, remaining)
-}
-
-/// Parse the input string and any --cages flag into a puzzle + cages pair.
-fn parse_input(puzzle_str: &str, extra_cages: &[(Vec<u8>, i32)]) -> (String, Vec<(Vec<u8>, i32)>) {
-    // Try the constraint parser first.
-    match constraint_parser::parse(puzzle_str) {
-        Ok(parsed) => {
-            let mut cages = parsed.cages;
-            cages.extend(extra_cages.iter().cloned());
-            (parsed.puzzle, cages)
-        }
+/// Parse the input string into a puzzle + constraints pair.
+fn parse_input(input_str: &str) -> (String, Vec<solver_wasm::constraint::Constraint>, GridShape) {
+    match constraint_parser::parse(input_str) {
+        Ok(parsed) => (parsed.puzzle, parsed.constraints, parsed.shape),
         Err(e) => {
             eprintln!("Error parsing input: {}", e);
             process::exit(1);
@@ -107,13 +61,12 @@ fn parse_input(puzzle_str: &str, extra_cages: &[(Vec<u8>, i32)]) -> (String, Vec
 
 fn cmd_solve(args: &[String]) {
     if args.is_empty() {
-        eprintln!("Usage: solver-cli solve <input> [--cages <file.json>]");
+        eprintln!("Usage: solver-cli solve <input>");
         process::exit(1);
     }
 
     let input = &args[0];
-    let (extra_cages, _remaining) = parse_cages(&args[1..]);
-    let (puzzle, cages) = parse_input(input, &extra_cages);
+    let (puzzle, constraints, shape) = parse_input(input);
 
     // Validate puzzle.
     let grid = match Grid::from_str(&puzzle) {
@@ -126,35 +79,21 @@ fn cmd_solve(args: &[String]) {
 
     println!("Input:");
     println!("{}", grid);
-    if !cages.is_empty() {
-        println!("Cages: {}", cages.len());
+    if !constraints.is_empty() {
+        println!("Constraints: {}", constraints.len());
     }
 
     let start = Instant::now();
 
-    let (result, counters) = if cages.is_empty() {
-        let mut solver = match Solver::new(&puzzle) {
-            Ok(s) => s,
-            Err(e) => {
-                eprintln!("Error building solver: {}", e);
-                process::exit(1);
-            }
-        };
-        let r = solver.solve();
-        let c = r.counters.clone();
-        (r, c)
-    } else {
-        let mut solver = match Solver::with_cages(&puzzle, &cages) {
-            Ok(s) => s,
-            Err(e) => {
-                eprintln!("Error building solver: {}", e);
-                process::exit(1);
-            }
-        };
-        let r = solver.solve();
-        let c = r.counters.clone();
-        (r, c)
+    let mut solver = match SudokuBuilder::build(&puzzle, &constraints, shape) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("Error building solver: {}", e);
+            process::exit(1);
+        }
     };
+    let result = solver.solve();
+    let counters = result.counters.clone();
 
     let elapsed = start.elapsed();
 
@@ -163,7 +102,7 @@ fn cmd_solve(args: &[String]) {
             let sol_grid = Grid { cells: sol };
             println!("Solution:");
             println!("{}", sol_grid);
-            println!("String: {}", sol_grid.to_string());
+            println!("String: {}", sol_grid.to_puzzle_string());
         }
         None => {
             println!("No solution found.");
@@ -180,26 +119,118 @@ fn cmd_solve(args: &[String]) {
     println!("  Constraints:   {}", counters.constraints_processed);
 }
 
-fn cmd_bench(args: &[String]) {
+fn cmd_all_possibilities(args: &[String]) {
     if args.is_empty() {
-        eprintln!("Usage: solver-cli bench <input> [--cages <file.json>] [--iterations N]");
+        eprintln!("Usage: solver-cli all-possibilities <input> [--threshold N]");
         process::exit(1);
     }
 
     let input = &args[0];
-    let (extra_cages, remaining) = parse_cages(&args[1..]);
+
+    // Parse --threshold.
+    let mut threshold: u8 = 1;
+    let mut i = 1;
+    while i < args.len() {
+        if args[i] == "--threshold" {
+            i += 1;
+            if i >= args.len() {
+                eprintln!("Error: --threshold requires a number (1-255)");
+                process::exit(1);
+            }
+            threshold = match args[i].parse() {
+                Ok(n) if n >= 1 => n,
+                _ => {
+                    eprintln!("Error: --threshold value must be 1-255");
+                    process::exit(1);
+                }
+            };
+        }
+        i += 1;
+    }
+
+    let (puzzle, constraints, shape) = parse_input(input);
+
+    // Validate puzzle.
+    let grid = match Grid::from_str(&puzzle) {
+        Ok(g) => g,
+        Err(e) => {
+            eprintln!("Error: {}", e);
+            process::exit(1);
+        }
+    };
+
+    println!("Input:");
+    println!("{}", grid);
+    if !constraints.is_empty() {
+        println!("Constraints: {}", constraints.len());
+    }
+    println!("Threshold: {}", threshold);
+
+    let start = Instant::now();
+
+    let mut solver = SudokuBuilder::build(&puzzle, &constraints, shape).unwrap_or_else(|e| {
+        eprintln!("Error building solver: {}", e);
+        process::exit(1);
+    });
+
+    let result = solver.solve_all_possibilities(threshold, &mut |_| {});
+
+    let elapsed = start.elapsed();
+
+    println!();
+    println!("Solutions found: {}", result.counters.solutions);
+    println!();
+
+    // Display candidate counts as a 9x9 grid of pencilmark sets.
+    let counts = &result.candidate_counts;
+    println!("Candidate counts (per cell, per value):");
+    for row in 0..9 {
+        for col in 0..9 {
+            let cell = row * 9 + col;
+            let mut vals = String::new();
+            for v in 0..9 {
+                let count = counts[cell * 9 + v];
+                if count >= threshold {
+                    vals.push((b'1' + v as u8) as char);
+                }
+            }
+            if vals.is_empty() {
+                vals = ".".to_string();
+            }
+            print!("{:<10}", vals);
+        }
+        println!();
+    }
+
+    println!();
+    println!("Stats:");
+    println!("  Time:          {:.3} ms", elapsed.as_secs_f64() * 1000.0);
+    println!("  Solutions:     {}", result.counters.solutions);
+    println!("  Guesses:       {}", result.counters.guesses);
+    println!("  Backtracks:    {}", result.counters.backtracks);
+    println!("  Values tried:  {}", result.counters.values_tried);
+    println!("  Constraints:   {}", result.counters.constraints_processed);
+}
+
+fn cmd_bench(args: &[String]) {
+    if args.is_empty() {
+        eprintln!("Usage: solver-cli bench <input> [--iterations N]");
+        process::exit(1);
+    }
+
+    let input = &args[0];
 
     // Parse --iterations.
     let mut iterations: usize = 100;
-    let mut i = 0;
-    while i < remaining.len() {
-        if remaining[i] == "--iterations" {
+    let mut i = 1;
+    while i < args.len() {
+        if args[i] == "--iterations" {
             i += 1;
-            if i >= remaining.len() {
+            if i >= args.len() {
                 eprintln!("Error: --iterations requires a number");
                 process::exit(1);
             }
-            iterations = match remaining[i].parse() {
+            iterations = match args[i].parse() {
                 Ok(n) => n,
                 Err(_) => {
                     eprintln!("Error: --iterations value must be a positive integer");
@@ -210,7 +241,7 @@ fn cmd_bench(args: &[String]) {
         i += 1;
     }
 
-    let (puzzle, cages) = parse_input(input, &extra_cages);
+    let (puzzle, constraints, shape) = parse_input(input);
 
     // Validate puzzle.
     if let Err(e) = Grid::from_str(&puzzle) {
@@ -221,10 +252,10 @@ fn cmd_bench(args: &[String]) {
     println!(
         "Benchmarking: {} iterations{}",
         iterations,
-        if cages.is_empty() {
+        if constraints.is_empty() {
             "".to_string()
         } else {
-            format!(" ({} cages)", cages.len())
+            format!(" ({} constraints)", constraints.len())
         }
     );
 
@@ -234,18 +265,11 @@ fn cmd_bench(args: &[String]) {
     for _ in 0..iterations {
         let start = Instant::now();
 
-        let counters = if cages.is_empty() {
-            let mut solver = Solver::new(&puzzle).unwrap();
-            let r = solver.solve();
-            r.counters
-        } else {
-            let mut solver = Solver::with_cages(&puzzle, &cages).unwrap();
-            let r = solver.solve();
-            r.counters
-        };
+        let mut solver = SudokuBuilder::build(&puzzle, &constraints, shape).unwrap();
+        let r = solver.solve();
 
         times.push(start.elapsed());
-        last_counters = Some(counters);
+        last_counters = Some(r.counters);
     }
 
     // Sort for percentile calculations.
@@ -275,42 +299,4 @@ fn cmd_bench(args: &[String]) {
         println!("  Values tried:  {}", counters.values_tried);
         println!("  Constraints:   {}", counters.constraints_processed);
     }
-}
-
-fn cmd_dump(args: &[String]) {
-    if args.is_empty() {
-        eprintln!("Usage: solver-cli dump <input> [--cages <file.json>]");
-        process::exit(1);
-    }
-
-    let input = &args[0];
-    let (extra_cages, _remaining) = parse_cages(&args[1..]);
-    let (puzzle, cages) = parse_input(input, &extra_cages);
-
-    let mut solver = if cages.is_empty() {
-        Solver::new(&puzzle).unwrap_or_else(|e| {
-            eprintln!("Error: {}", e);
-            process::exit(1);
-        })
-    } else {
-        Solver::with_cages(&puzzle, &cages).unwrap_or_else(|e| {
-            eprintln!("Error: {}", e);
-            process::exit(1);
-        })
-    };
-
-    solver.dump_handlers();
-
-    // Also solve and print counters
-    println!();
-    println!("=== Running solver ===");
-    let result = solver.solve();
-    println!("Solution found: {}", result.solution.is_some());
-    println!(
-        "Counters: backtracks={} guesses={} valuesTried={} constraints={}",
-        result.counters.backtracks,
-        result.counters.guesses,
-        result.counters.values_tried,
-        result.counters.constraints_processed,
-    );
 }

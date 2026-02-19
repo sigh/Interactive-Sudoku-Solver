@@ -1,59 +1,38 @@
-use crate::util::{self, ALL_VALUES, NUM_CELLS, NUM_VALUES};
+use crate::candidate_set::CandidateSet;
 use std::fmt;
+use std::str::FromStr;
 
-/// A 9×9 Sudoku grid stored as candidate bitmasks.
+/// A Sudoku grid stored as candidate bitmasks.
 ///
-/// Each cell contains a `u16` bitmask where bit `i` represents value `i+1`.
+/// Each cell contains a [`CandidateSet`] where bit `i` represents value `i+1`.
 /// A solved cell has exactly one bit set. An empty cell starts with all
-/// bits set (`ALL_VALUES`).
-#[derive(Clone)]
+/// bits set (e.g. `CandidateSet::all(9)` for 9×9).
+#[derive(Clone, Debug)]
 pub struct Grid {
-    pub cells: [u16; NUM_CELLS],
+    pub cells: Vec<CandidateSet>,
 }
 
 impl Grid {
-    /// Create an empty grid with all candidates available in every cell.
-    pub fn empty() -> Self {
-        Grid {
-            cells: [ALL_VALUES; NUM_CELLS],
-        }
-    }
-
-    /// Parse a grid from an 81-character puzzle string.
+    /// Create an empty grid for an arbitrary grid size.
     ///
-    /// Each character is either:
-    /// - `'1'`–`'9'`: a given value (cell is fixed to that candidate)
-    /// - `'.'` or `'0'`: an empty cell (all candidates available)
-    pub fn from_str(s: &str) -> Result<Self, GridError> {
-        let chars: Vec<char> = s.chars().collect();
-        if chars.len() != NUM_CELLS {
-            return Err(GridError::InvalidLength(chars.len()));
+    /// `num_cells`: total number of cells (e.g. 81 for 9×9).
+    /// `num_values`: number of candidate values (e.g. 9 for 9×9).
+    pub fn empty_with_size(num_cells: usize, num_values: u8) -> Self {
+        Grid {
+            cells: vec![CandidateSet::all(num_values); num_cells],
         }
-
-        let mut grid = Grid::empty();
-        for (i, &ch) in chars.iter().enumerate() {
-            match ch {
-                '1'..='9' => {
-                    let value = ch as u16 - '0' as u16;
-                    grid.cells[i] = util::value_bit(value);
-                }
-                '.' | '0' => {} // keep ALL_VALUES
-                _ => return Err(GridError::InvalidChar(ch, i)),
-            }
-        }
-        Ok(grid)
     }
 
     /// Serialize the grid to an 81-character solution string.
     ///
     /// Solved cells are written as their digit. Unsolved cells are written
     /// as `'.'`.
-    pub fn to_string(&self) -> String {
+    pub fn to_puzzle_string(&self) -> String {
         self.cells
             .iter()
             .map(|&c| {
-                if util::is_single(c) {
-                    char::from(b'0' + util::bit_value(c) as u8)
+                if !c.is_empty() && c.is_single() {
+                    char::from(b'0' + c.value())
                 } else {
                     '.'
                 }
@@ -63,91 +42,26 @@ impl Grid {
 
     /// Check if every cell has exactly one candidate (the grid is solved).
     pub fn is_solved(&self) -> bool {
-        self.cells.iter().all(|&c| util::is_single(c))
-    }
-
-    // ========================================================================
-    // Index helpers
-    // ========================================================================
-
-    /// Row index (0–8) for a cell index (0–80).
-    #[inline(always)]
-    pub fn row_of(cell: usize) -> usize {
-        cell / NUM_VALUES
-    }
-
-    /// Column index (0–8) for a cell index (0–80).
-    #[inline(always)]
-    pub fn col_of(cell: usize) -> usize {
-        cell % NUM_VALUES
-    }
-
-    /// Box index (0–8) for a cell index (0–80).
-    /// Boxes are numbered left-to-right, top-to-bottom in 3×3 blocks.
-    #[inline(always)]
-    pub fn box_of(cell: usize) -> usize {
-        (Self::row_of(cell) / 3) * 3 + Self::col_of(cell) / 3
-    }
-
-    /// All cell indices in a given row.
-    pub fn row_cells(row: usize) -> [usize; NUM_VALUES] {
-        let start = row * NUM_VALUES;
-        std::array::from_fn(|i| start + i)
-    }
-
-    /// All cell indices in a given column.
-    pub fn col_cells(col: usize) -> [usize; NUM_VALUES] {
-        std::array::from_fn(|i| i * NUM_VALUES + col)
-    }
-
-    /// All cell indices in a given box.
-    pub fn box_cells(box_idx: usize) -> [usize; NUM_VALUES] {
-        let start_row = (box_idx / 3) * 3;
-        let start_col = (box_idx % 3) * 3;
-        let mut cells = [0usize; NUM_VALUES];
-        let mut k = 0;
-        for r in start_row..start_row + 3 {
-            for c in start_col..start_col + 3 {
-                cells[k] = r * NUM_VALUES + c;
-                k += 1;
-            }
-        }
-        cells
-    }
-
-    /// Get all 27 houses (9 rows + 9 columns + 9 boxes), each as an array
-    /// of 9 cell indices.
-    ///
-    /// Order matches JS: all rows first, then all columns, then all boxes.
-    pub fn all_houses() -> Vec<[usize; NUM_VALUES]> {
-        let mut houses = Vec::with_capacity(27);
-        for i in 0..NUM_VALUES {
-            houses.push(Self::row_cells(i));
-        }
-        for i in 0..NUM_VALUES {
-            houses.push(Self::col_cells(i));
-        }
-        for i in 0..NUM_VALUES {
-            houses.push(Self::box_cells(i));
-        }
-        houses
+        self.cells.iter().all(|&c| !c.is_empty() && c.is_single())
     }
 }
 
 impl fmt::Display for Grid {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for row in 0..NUM_VALUES {
+        // Display is a best-effort 9×9 formatter.
+        let nv = 9;
+        for row in 0..nv {
             if row > 0 && row % 3 == 0 {
                 writeln!(f, "------+-------+------")?;
             }
-            for col in 0..NUM_VALUES {
+            for col in 0..nv {
                 if col > 0 && col % 3 == 0 {
                     write!(f, " |")?;
                 }
-                let cell = row * NUM_VALUES + col;
+                let cell = row * nv + col;
                 let c = self.cells[cell];
-                if util::is_single(c) {
-                    write!(f, " {}", util::bit_value(c))?;
+                if !c.is_empty() && c.is_single() {
+                    write!(f, " {}", c.value())?;
                 } else {
                     write!(f, " .")?;
                 }
@@ -180,6 +94,43 @@ impl fmt::Display for GridError {
 
 impl std::error::Error for GridError {}
 
+impl FromStr for Grid {
+    type Err = GridError;
+
+    /// Parse a grid from an 81-character puzzle string (9×9 only).
+    ///
+    /// Each character is either:
+    /// - `'1'`–`'9'`: a given value (cell is fixed to that candidate)
+    /// - `'.'` or `'0'`: an empty cell (all candidates available)
+    fn from_str(s: &str) -> Result<Self, GridError> {
+        let chars: Vec<char> = s.chars().collect();
+        if chars.len() != 81 {
+            return Err(GridError::InvalidLength(chars.len()));
+        }
+
+        let mut grid = Grid::empty_with_size(81, 9);
+        for (i, &ch) in chars.iter().enumerate() {
+            match ch {
+                '1'..='9' => {
+                    let value = (ch as u8 - b'0') as u8;
+                    grid.cells[i] = CandidateSet::from_value(value);
+                }
+                '.' | '0' => {} // keep all candidates
+                _ => return Err(GridError::InvalidChar(ch, i)),
+            }
+        }
+        Ok(grid)
+    }
+}
+
+impl PartialEq for Grid {
+    fn eq(&self, other: &Self) -> bool {
+        self.cells == other.cells
+    }
+}
+
+impl Eq for Grid {}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -189,18 +140,18 @@ mod tests {
 
     #[test]
     fn test_empty_grid() {
-        let grid = Grid::empty();
-        assert_eq!(grid.cells[0], ALL_VALUES);
+        let grid = Grid::empty_with_size(81, 9);
+        assert_eq!(grid.cells[0], CandidateSet::all(9));
         assert!(!grid.is_solved());
     }
 
     #[test]
     fn test_from_str() {
         let grid = Grid::from_str(EASY_PUZZLE).unwrap();
-        // Cell 0 = '5' → value_bit(5) = 0b10000
-        assert_eq!(grid.cells[0], util::value_bit(5));
-        // Cell 2 = '.' → ALL_VALUES
-        assert_eq!(grid.cells[2], ALL_VALUES);
+        // Cell 0 = '5' → from_value(5)
+        assert_eq!(grid.cells[0], CandidateSet::from_value(5));
+        // Cell 2 = '.' → all(9)
+        assert_eq!(grid.cells[2], CandidateSet::all(9));
     }
 
     #[test]
@@ -217,58 +168,8 @@ mod tests {
 
     #[test]
     fn test_to_string_roundtrip() {
-        let grid = Grid::from_str(EASY_PUZZLE).unwrap();
-        assert_eq!(grid.to_string(), EASY_PUZZLE);
-    }
-
-    #[test]
-    fn test_row_col_box() {
-        // Cell 0 = row 0, col 0, box 0
-        assert_eq!(Grid::row_of(0), 0);
-        assert_eq!(Grid::col_of(0), 0);
-        assert_eq!(Grid::box_of(0), 0);
-
-        // Cell 80 = row 8, col 8, box 8
-        assert_eq!(Grid::row_of(80), 8);
-        assert_eq!(Grid::col_of(80), 8);
-        assert_eq!(Grid::box_of(80), 8);
-
-        // Cell 30 = row 3, col 3, box 4
-        assert_eq!(Grid::row_of(30), 3);
-        assert_eq!(Grid::col_of(30), 3);
-        assert_eq!(Grid::box_of(30), 4);
-    }
-
-    #[test]
-    fn test_row_cells() {
-        let row0 = Grid::row_cells(0);
-        assert_eq!(row0, [0, 1, 2, 3, 4, 5, 6, 7, 8]);
-        let row8 = Grid::row_cells(8);
-        assert_eq!(row8, [72, 73, 74, 75, 76, 77, 78, 79, 80]);
-    }
-
-    #[test]
-    fn test_col_cells() {
-        let col0 = Grid::col_cells(0);
-        assert_eq!(col0, [0, 9, 18, 27, 36, 45, 54, 63, 72]);
-    }
-
-    #[test]
-    fn test_box_cells() {
-        let box0 = Grid::box_cells(0);
-        assert_eq!(box0, [0, 1, 2, 9, 10, 11, 18, 19, 20]);
-        let box4 = Grid::box_cells(4);
-        assert_eq!(box4, [30, 31, 32, 39, 40, 41, 48, 49, 50]);
-    }
-
-    #[test]
-    fn test_all_houses() {
-        let houses = Grid::all_houses();
-        assert_eq!(houses.len(), 27);
-        // Each house has 9 cells
-        for house in &houses {
-            assert_eq!(house.len(), 9);
-        }
+        let grid: Grid = EASY_PUZZLE.parse().unwrap();
+        assert_eq!(grid.to_puzzle_string(), EASY_PUZZLE);
     }
 
     #[test]

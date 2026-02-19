@@ -1,0 +1,172 @@
+//! Constraint handler definitions.
+//!
+//! Each handler implements the `ConstraintHandler` trait.
+
+mod all_different;
+mod between;
+mod binary_constraint;
+mod binary_pairwise;
+mod box_info;
+mod false_handler;
+mod full_grid_required_values;
+mod full_rank;
+mod given_candidates;
+mod house;
+mod jigsaw_piece;
+pub(crate) mod nfa_constraint;
+pub(crate) mod placeholder;
+mod priority;
+pub(crate) mod required_values;
+mod same_values_ignore_count;
+pub(crate) mod sum;
+mod true_handler;
+mod unique_value_exclusion;
+pub(crate) mod util;
+mod value_dependent_exclusion;
+mod value_dependent_exclusion_house;
+
+pub use all_different::{AllDifferent, AllDifferentType};
+pub use between::Between;
+pub use binary_constraint::{fn_to_binary_key, BinaryConstraint};
+pub use binary_pairwise::BinaryPairwise;
+pub use box_info::BoxInfo;
+pub use false_handler::False;
+pub use full_grid_required_values::FullGridRequiredValues;
+pub use full_rank::{FullRank, RankClue, TieMode};
+pub use given_candidates::GivenCandidates;
+pub use house::House;
+pub use jigsaw_piece::JigsawPiece;
+pub use nfa_constraint::NfaConstraint;
+pub(crate) use placeholder::Placeholder;
+pub use priority::Priority;
+pub use required_values::RequiredValues;
+pub use same_values_ignore_count::SameValuesIgnoreCount;
+pub use true_handler::True;
+pub use unique_value_exclusion::UniqueValueExclusion;
+pub use value_dependent_exclusion::ValueDependentUniqueValueExclusion;
+pub use value_dependent_exclusion_house::ValueDependentUniqueValueExclusionHouse;
+
+use std::any::Any;
+
+use crate::api::types::CellIndex;
+use crate::candidate_set::CandidateSet;
+use crate::grid_shape::GridShape;
+use crate::solver::candidate_selector::CandidateFinderDescription;
+use crate::solver::cell_exclusions::CellExclusions;
+use crate::solver::grid_state_allocator::GridStateAllocator;
+use crate::solver::handler_accumulator::HandlerAccumulator;
+
+// ============================================================================
+// AsAny — blanket trait for downcast support
+// ============================================================================
+
+/// Provides `as_any` and `as_any_mut` via a blanket impl so that every
+/// `ConstraintHandler` implementor gets downcasting for free.
+pub trait AsAny: 'static {
+    fn as_any(&self) -> &dyn Any;
+    fn as_any_mut(&mut self) -> &mut dyn Any;
+}
+
+impl<T: 'static> AsAny for T {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
+}
+
+// ============================================================================
+// ConstraintHandler trait
+// ============================================================================
+
+/// Trait for all constraint handlers.
+///
+/// Mirrors JS `SudokuConstraintHandler` from handlers.js.
+///
+/// Handlers are invoked during constraint propagation to enforce their
+/// invariants on the grid. The solver calls `enforce_consistency` whenever
+/// a cell touched by this handler changes.
+pub trait ConstraintHandler: AsAny {
+    /// The cells this handler watches. When any of these cells change,
+    /// `enforce_consistency` is called.
+    fn cells(&self) -> &[CellIndex];
+
+    /// Enforce the constraint on the grid.
+    ///
+    /// Returns `false` if the grid is contradictory (impossible to satisfy).
+    /// Returns `true` if the grid is (potentially) valid.
+    ///
+    /// When this handler removes candidates from cells, it must call
+    /// `acc.add_for_cell(cell)` for each modified cell.
+    fn enforce_consistency(&self, grid: &mut [CandidateSet], acc: &mut HandlerAccumulator) -> bool;
+
+    /// One-time initialization after construction.
+    ///
+    /// Called with the initial grid state, cell exclusions, shape, and
+    /// a state allocator. Handlers that need per-backtrack-frame mutable
+    /// state call `state_allocator.allocate()` to reserve extra grid slots.
+    ///
+    /// May modify `initial_grid` (e.g., to set given values).
+    /// Returns `false` if the initial state is contradictory.
+    fn initialize(
+        &mut self,
+        _initial_grid: &mut [CandidateSet],
+        _cell_exclusions: &CellExclusions,
+        _shape: GridShape,
+        _state_allocator: &mut GridStateAllocator,
+    ) -> bool {
+        true
+    }
+
+    /// Called after all handlers have been initialized. Receives the
+    /// full initial grid state (including any extra allocated slots).
+    ///
+    /// Mirrors JS `SudokuConstraintHandler.postInitialize(readonlyGridState)`.
+    fn post_initialize(&mut self, _initial_grid_state: &[CandidateSet]) {}
+
+    /// Whether this is a singleton handler (one per cell, pushed to
+    /// front of propagation queue).
+    fn is_singleton(&self) -> bool {
+        false
+    }
+
+    /// Priority for initial cell ordering. Higher = more constrained.
+    fn priority(&self) -> i32 {
+        self.cells().len() as i32
+    }
+
+    /// Cells that must have mutually exclusive values.
+    /// Used to build the CellExclusions graph.
+    fn exclusion_cells(&self) -> &[CellIndex] {
+        &[]
+    }
+
+    /// Handler type name, matching JS `constructor.name`.
+    /// Used for debug logging, sorting, and optimizer log messages.
+    fn name(&self) -> &'static str;
+
+    /// Unique ID string for deduplication in the optimizer.
+    fn id_str(&self) -> String {
+        format!("{}-{:?}", self.name(), self.cells())
+    }
+
+    /// Whether this handler is essential for correctness (vs. performance-only).
+    fn is_essential(&self) -> bool {
+        true
+    }
+
+    /// Candidate finder specifications for custom branching heuristics.
+    ///
+    /// Returns descriptions of candidate finders this handler provides.
+    /// These are used by `CandidateFinderSet` to build finders that guide
+    /// the solver's cell/value selection during backtracking.
+    ///
+    /// Mirrors JS `SudokuConstraintHandler.candidateFinders(grid, shape)`.
+    /// The `shape` parameter provides grid dimensions for computing cell
+    /// regions (e.g., edge rows/columns). Actual grid-state filtering
+    /// happens lazily during `CandidateFinderSet::initialize()`.
+    fn candidate_finders(&self, _shape: GridShape) -> Vec<CandidateFinderDescription> {
+        vec![]
+    }
+}

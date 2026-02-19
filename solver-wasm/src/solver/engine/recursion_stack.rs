@@ -1,4 +1,4 @@
-use crate::util::NUM_CELLS;
+use crate::candidate_set::CandidateSet;
 
 /// Pre-allocated recursion stack for the iterative backtracking solver.
 ///
@@ -19,36 +19,40 @@ pub struct RecursionFrame {
 
     /// Cell that caused the last contradiction (-1 = none).
     /// Used to prioritize constraint checking after backtrack.
-    pub last_contradiction_cell: i8,
+    pub last_contradiction_cell: i16,
 
     /// Whether this is a new node (first visit) or a backtrack revisit.
     pub new_node: bool,
 
     /// Complete grid state snapshot.
-    pub grid: [u16; NUM_CELLS],
+    pub grid: Vec<CandidateSet>,
 }
 
 impl RecursionFrame {
-    fn new() -> Self {
+    fn new(num_cells: usize) -> Self {
         RecursionFrame {
             cell_depth: 0,
             progress_remaining: 1.0,
-            last_contradiction_cell: -1,
+            last_contradiction_cell: -1i16,
             new_node: true,
-            grid: [0; NUM_CELLS],
+            grid: vec![CandidateSet::EMPTY; num_cells],
         }
     }
 }
 
 impl RecursionStack {
-    /// Create a new recursion stack with `NUM_CELLS + 1` frames.
+    /// Create a new recursion stack with `num_cells + 1` frames.
     ///
-    /// We need at most NUM_CELLS + 1 frames because the maximum search
-    /// depth is NUM_CELLS (one per cell), plus one for the initial frame.
-    pub fn new() -> Self {
-        let mut frames = Vec::with_capacity(NUM_CELLS + 1);
-        for _ in 0..=NUM_CELLS {
-            frames.push(RecursionFrame::new());
+    /// We need at most num_cells + 1 frames because the maximum search
+    /// depth is num_cells (one per cell), plus one for the initial frame.
+    ///
+    /// `grid_state_size` is the total size of each grid state array,
+    /// which may be larger than `num_cells` if handlers allocated
+    /// extra state slots via `GridStateAllocator`.
+    pub fn new(num_cells: usize, grid_state_size: usize) -> Self {
+        let mut frames = Vec::with_capacity(num_cells + 1);
+        for _ in 0..=num_cells {
+            frames.push(RecursionFrame::new(grid_state_size));
         }
         RecursionStack { frames }
     }
@@ -85,28 +89,29 @@ impl RecursionStack {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::util::ALL_VALUES;
+
+    const NUM_CELLS: usize = 81;
 
     #[test]
     fn test_stack_creation() {
-        let stack = RecursionStack::new();
+        let stack = RecursionStack::new(NUM_CELLS, NUM_CELLS);
         assert_eq!(stack.frames.len(), NUM_CELLS + 1);
     }
 
     #[test]
     fn test_copy_grid() {
-        let mut stack = RecursionStack::new();
-        stack.frames[0].grid = [ALL_VALUES; NUM_CELLS];
-        stack.frames[0].grid[0] = 1;
+        let mut stack = RecursionStack::new(NUM_CELLS, NUM_CELLS);
+        stack.frames[0].grid = vec![CandidateSet::all(9); NUM_CELLS];
+        stack.frames[0].grid[0] = CandidateSet::from_value(1);
 
         stack.copy_grid(0, 1);
-        assert_eq!(stack.frames[1].grid[0], 1);
-        assert_eq!(stack.frames[1].grid[1], ALL_VALUES);
+        assert_eq!(stack.frames[1].grid[0], CandidateSet::from_value(1));
+        assert_eq!(stack.frames[1].grid[1], CandidateSet::all(9));
     }
 
     #[test]
     fn test_frame_defaults() {
-        let frame = RecursionFrame::new();
+        let frame = RecursionFrame::new(81);
         assert_eq!(frame.cell_depth, 0);
         assert_eq!(frame.last_contradiction_cell, -1);
         assert!(frame.new_node);
