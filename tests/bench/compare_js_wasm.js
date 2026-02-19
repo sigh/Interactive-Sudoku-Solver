@@ -62,7 +62,7 @@ const wasmPkgPath = new URL(
 );
 const wasmModule = await import(wasmPkgPath.href);
 const initWasm = wasmModule.default;
-const { solve_sudoku, solve_sudoku_with_cages } = wasmModule;
+const { init_solver, nth_solution_with_progress } = wasmModule;
 
 const wasmBinaryPath = new URL(
   '../../solver-wasm/pkg/solver_wasm_bg.wasm',
@@ -80,45 +80,6 @@ const { SudokuParser } = await import(
 const { SudokuBuilder } = await import(
   '../../js/solver/sudoku_builder.js'
 );
-
-// ---------------------------------------------------------------------------
-// 6. Helper: extract givens + cages from a constraint string
-// ---------------------------------------------------------------------------
-function constraintToWasmInput(constraintStr) {
-  const constraint = SudokuParser.parseText(constraintStr);
-  const resolved = SudokuBuilder.resolveConstraint(constraint);
-  const shape = resolved.getShape();
-
-  // Extract givens
-  const puzzle = new Array(shape.numCells).fill('.');
-  const walkGivens = (c) => {
-    if (c.type === 'Given') {
-      const cellIndex = shape.parseCellId(c.cell).cell;
-      if (c.values.length === 1) {
-        puzzle[cellIndex] = String(c.values[0]);
-      }
-    }
-    if (c.constraints) {
-      for (const child of c.constraints) walkGivens(child);
-    }
-  };
-  walkGivens(resolved);
-
-  // Extract cages
-  const cages = [];
-  const walkCages = (c) => {
-    if (c.type === 'Cage' && c.sum !== 0) {
-      const cells = c.cells.map(cellId => shape.parseCellId(cellId).cell);
-      cages.push({ cells, sum: c.sum });
-    }
-    if (c.constraints) {
-      for (const child of c.constraints) walkCages(child);
-    }
-  };
-  walkCages(resolved);
-
-  return { puzzle: puzzle.join(''), cages };
-}
 
 // ---------------------------------------------------------------------------
 // 7. Puzzle suite
@@ -186,20 +147,20 @@ function runJS(constraintStr, iterations) {
 }
 
 function runWASM(constraintStr, iterations) {
-  const wasmInput = constraintToWasmInput(constraintStr);
-  const inputJson = JSON.stringify(wasmInput);
+  // Resolve the constraint string through the same JS pipeline.
+  const constraint = SudokuParser.parseText(constraintStr);
+  const resolved = SudokuBuilder.resolveConstraint(constraint);
+  const inputJson = JSON.stringify({ constraintString: resolved.toString() });
+  const noop = () => { };
   const times = [];
   let lastCounters = null;
   let solution = null;
 
   for (let i = 0; i < iterations; i++) {
     const start = performance.now();
-    let resultJson;
-    if (wasmInput.cages.length > 0) {
-      resultJson = solve_sudoku_with_cages(inputJson);
-    } else {
-      resultJson = solve_sudoku(inputJson);
-    }
+    const buildError = init_solver(inputJson, 0);
+    if (buildError) throw new Error(buildError);
+    const resultJson = nth_solution_with_progress(0, noop);
     const elapsed = performance.now() - start;
     times.push(elapsed);
 
