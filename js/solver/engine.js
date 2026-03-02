@@ -369,7 +369,7 @@ class InternalSolver {
 
     this._handlerAccumulator = new HandlerAccumulator(this._handlerSet);
     this._candidateSelector = new CandidateSelector(
-      shape, this._handlerSet, debugLogger, this._seenCandidateSet);
+      shape, this._handlerSet, debugLogger);
 
     this._cellPriorities = this._initCellPriorities();
 
@@ -1093,7 +1093,7 @@ class InternalSolver {
     // Use a fixed seed so the result is deterministic.
     // TODO: Allows us to save and restore the original.
     this._candidateSelector = new SamplingCandidateSelector(
-      this._shape, this._handlerSet, this._debugLogger, this._seenCandidateSet);
+      this._shape, this._handlerSet, this._debugLogger);
 
     while (true) {
       this._resetRun();

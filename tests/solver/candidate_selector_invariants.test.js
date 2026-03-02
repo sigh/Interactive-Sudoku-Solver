@@ -6,7 +6,7 @@ import { GridTestContext } from '../helpers/grid_test_utils.js';
 
 ensureGlobalEnvironment();
 
-const { CandidateSelector, ConflictScores, SeenCandidateSet } = await import('../../js/solver/candidate_selector.js');
+const { CandidateSelector, ConflictScores } = await import('../../js/solver/candidate_selector.js');
 
 const makeDebugLogger = () => ({
   enableStepLogs: false,
@@ -14,13 +14,12 @@ const makeDebugLogger = () => ({
   log: () => { },
 });
 
-const makeSelector = (context, { handlerSet = [], seenCandidateSet } = {}) => {
+const makeSelector = (context, { handlerSet = [] } = {}) => {
   const { shape } = context;
   const selector = new CandidateSelector(
     shape,
     handlerSet,
     makeDebugLogger(),
-    seenCandidateSet || new SeenCandidateSet(shape.numCells, shape.numValues),
   );
 
   const conflictScores = new ConflictScores(new Array(shape.numCells).fill(0), shape.numValues);
@@ -222,106 +221,4 @@ await runTest('CandidateSelector stepState override clears any pending custom-ca
     assert.equal(selector.getCellAtDepth(0), 0);
     assert.equal(value, 1 << 0);
   }
-});
-
-await runTest('CandidateSelector falls back cleanly when filtering to interesting cells but none are interesting', () => {
-  const context = new GridTestContext({ gridSize: 4 });
-  const { shape } = context;
-  const allValues = context.lookupTables.allValues;
-
-  const seenCandidateSet = new SeenCandidateSet(shape.numCells, shape.numValues);
-  seenCandidateSet.enabledInSolver = true;
-
-  // Prefix (cell 0) is interesting (fixed value not previously seen).
-  seenCandidateSet.candidates[0] = 0;
-
-  // Make all remaining cells non-interesting (all values already seen).
-  for (let i = 1; i < shape.numCells; i++) {
-    seenCandidateSet.candidates[i] = allValues;
-  }
-
-  const selector = new CandidateSelector(
-    shape,
-    /* handlerSet */[],
-    makeDebugLogger(),
-    seenCandidateSet,
-  );
-
-  const initialScores = new Array(shape.numCells).fill(0);
-  initialScores[5] = 123;
-  const conflictScores = new ConflictScores(initialScores, shape.numValues);
-  selector.reset(conflictScores);
-
-  const gridState = context.createGrid({ fill: allValues });
-  gridState[0] = 1 << 0;
-
-  const [nextDepth, , count] = selector.selectNextCandidate(1, gridState, null, true);
-
-  assert.equal(nextDepth, 2);
-  assert.equal(count, 4);
-  assert.equal(selector.getCellAtDepth(1), 5);
-});
-
-await runTest('CandidateSelector returns [cellOrder,0,0] when current depth cell is already a wipeout (0)', () => {
-  const context = new GridTestContext({ gridSize: 4 });
-  const { shape } = context;
-  const allValues = context.lookupTables.allValues;
-
-  const { selector } = makeSelector(context);
-
-  const gridState = context.createGrid({ fill: allValues });
-  gridState[0] = 0;
-
-  const [cellOrderOrZero, value, count] = selector.selectNextCandidate(
-    /* cellDepth */ 0,
-    gridState,
-    /* stepState */ null,
-    /* isNewNode */ true,
-  );
-
-  assert.ok(cellOrderOrZero instanceof Uint8Array);
-  assert.equal(value, 0);
-  assert.equal(count, 0);
-});
-
-await runTest('CandidateSelector interesting-cell filtering works on the maxScore==0 (minCount) path', () => {
-  const context = new GridTestContext({ gridSize: 4 });
-  const { shape } = context;
-  const allValues = context.lookupTables.allValues;
-
-  const seenCandidateSet = new SeenCandidateSet(shape.numCells, shape.numValues);
-  seenCandidateSet.enabledInSolver = true;
-
-  // Prefix is interesting at depth=1.
-  seenCandidateSet.candidates[0] = 0;
-
-  // Make cell 1 non-interesting; cells 2 and 3 interesting.
-  seenCandidateSet.candidates[1] = allValues;
-  seenCandidateSet.candidates[2] = 0;
-  seenCandidateSet.candidates[3] = 0;
-
-  const selector = new CandidateSelector(
-    shape,
-    /* handlerSet */[],
-    makeDebugLogger(),
-    seenCandidateSet,
-  );
-
-  // All conflict scores are 0 => maxScore==0 branch.
-  const conflictScores = new ConflictScores(new Array(shape.numCells).fill(0), shape.numValues);
-  selector.reset(conflictScores);
-
-  const gridState = context.createGrid({ fill: allValues });
-  gridState[0] = 1 << 0;
-
-  // Make the interesting cells have different counts.
-  gridState[2] = (1 << 0) | (1 << 1); // count=2
-  gridState[3] = (1 << 0) | (1 << 1) | (1 << 2); // count=3
-
-  const [nextDepth, value, count] = selector.selectNextCandidate(1, gridState, null, true);
-
-  assert.equal(nextDepth, 2);
-  assert.equal(count, 2);
-  assert.equal(selector.getCellAtDepth(1), 2);
-  assert.equal(value, 1 << 0);
 });
