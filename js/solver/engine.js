@@ -1403,6 +1403,7 @@ export class CellExclusions {
         this._cellExclusionSets[cells[i]], allCellExclusions);
     }
 
+    allCellExclusions.sort((a, b) => a - b);
     return allCellExclusions;
   }
 
@@ -1414,9 +1415,11 @@ export class CellExclusions {
     }
 
     // Otherwise, calculate the intersection.
-    return setIntersectionToArray(
+    const result = setIntersectionToArray(
       this._cellExclusionSets[cell0],
       this._cellExclusionSets[cell1]);
+    result.sort((a, b) => a - b);
+    return result;
   }
 }
 

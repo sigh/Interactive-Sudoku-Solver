@@ -943,15 +943,17 @@ export class SudokuConstraintOptimizer {
 
       let newHandler;
       let args;
+      const sortedDiffB = [...diffB].sort((a, b) => a - b);
       if (diffA.size === 0) {
-        newHandler = new SumHandlerModule.Sum([...diffB], sumDelta);
+        newHandler = new SumHandlerModule.Sum(sortedDiffB, sumDelta);
         args = { sum: sumDelta };
       } else {
-        const newHandlerCells = [...diffB, ...diffA];
+        const sortedDiffA = [...diffA].sort((a, b) => a - b);
+        const newHandlerCells = [...sortedDiffB, ...sortedDiffA];
         const coeffs = newHandlerCells.map((_, i) => i < diffB.size ? 1 : -1);
         newHandler = new SumHandlerModule.Sum(
           newHandlerCells, sumDelta, coeffs);
-        args = { sum: sumDelta, negativeCells: [...diffA] };
+        args = { sum: sumDelta, negativeCells: sortedDiffA };
       }
 
       newHandlers.push(newHandler);
