@@ -85,14 +85,13 @@ export class SeenCandidateSet {
 }
 
 export class CandidateSelector {
-  constructor(shape, handlerSet, debugLogger, seenCandidateSet) {
+  constructor(shape, handlerSet, debugLogger) {
     this._shape = shape;
     this._cellOrder = new Uint8Array(shape.numCells);
     this._conflictScores = null;
     this._debugLogger = debugLogger;
     this._numCells = shape.numCells;
     this._optionSelector = null;
-    this._seenCandidateSet = seenCandidateSet;
 
     this._candidateSelectionStates = this._initCandidateSelectionStates(shape);
     // _candidateSelectionFlags is used to track whether the
@@ -677,8 +676,8 @@ CandidateFinders.House = class House extends CandidateFinderBase {
 // An extension of the candidate selector which chooses values at random
 // from the chosen cell, and only searches a single branch of the tree.
 export class SamplingCandidateSelector extends CandidateSelector {
-  constructor(shape, handlerSet, debugLogger, seenCandidateSet) {
-    super(shape, handlerSet, debugLogger, seenCandidateSet);
+  constructor(shape, handlerSet, debugLogger) {
+    super(shape, handlerSet, debugLogger);
     this._totalWeight = new Float64Array(shape.numCells + 1);
     this._totalWeight[0] = 1.0;
     this._optionSelector = new RandomOptionSelector(/* seed = */ 0);
