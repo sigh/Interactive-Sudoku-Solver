@@ -3,6 +3,7 @@ const { LookupTables } = await import('./lookup_tables.js' + self.VERSION_PARAM)
 const { SudokuConstraintBase, fnToBinaryKey } = await import('../sudoku_constraint.js' + self.VERSION_PARAM);
 const { GridShape } = await import('../grid_shape.js' + self.VERSION_PARAM);
 const HandlerModule = await import('./handlers.js' + self.VERSION_PARAM);
+
 const SumHandlerModule = await import('./sum_handler.js' + self.VERSION_PARAM);
 const NFAModule = await import('./nfa_handler.js' + self.VERSION_PARAM);
 
@@ -114,7 +115,7 @@ export class SudokuConstraintOptimizer {
         requiredLineCount * (i + 1)));
 
     const handler = new HandlerModule.FullGridRequiredValues(
-      shape.allCells,
+      allCells(shape),
       packedLines);
     handlerSet.addAux(handler);
     this._logAddHandler('_addFullGridRequiredValues', handler, {
@@ -457,9 +458,9 @@ export class SudokuConstraintOptimizer {
 
     const sumHandlersSum = sumHandlers.map(h => h.sum()).reduce((a, b) => a + b);
     const numRegions = shape.numCells / shape.numValues;
-    const remainingSum = numRegions * shape.maxSum - sumHandlersSum;
+    const remainingSum = numRegions * maxSumForShape(shape) - sumHandlersSum;
 
-    const remainingCells = new Set(shape.allCells);
+    const remainingCells = new Set(allCells(shape));
     sumHandlers.forEach(h => h.cells.forEach(c => remainingCells.delete(c)));
     const newHandler = new SumHandlerModule.Sum(
       [...remainingCells], remainingSum);
@@ -493,6 +494,7 @@ export class SudokuConstraintOptimizer {
 
   // Find {1-2}-cell sum constraints and replace them dedicated handlers.
   _replaceSizeSpecificSumHandlers(handlerSet, cellExclusions, shape) {
+    const maxSum = maxSumForShape(shape);
     const sumHandlers = handlerSet.getAllofType(SumHandlerModule.Sum);
     for (const h of sumHandlers) {
       let newHandler;
@@ -529,13 +531,13 @@ export class SudokuConstraintOptimizer {
           {
             // If N cells are all pairwise mutually exclusive on a base-N grid,
             // then they must be a permutation of {1..N}. Therefore their sum is
-            // fixed (shape.maxSum).
+            // fixed (maxSum(shape)).
             // We handle this because some users add this constraint when they
             // could just add an AllDifferent constraint.
             if (!h.onlyUnitCoeffs()) break;
             if (!cellExclusions.areMutuallyExclusive(h.cells)) break;
 
-            newHandler = (h.sum() === shape.maxSum)
+            newHandler = (h.sum() === maxSum)
               ? new HandlerModule.True()
               : new HandlerModule.False(h.cells);
           }
@@ -559,6 +561,7 @@ export class SudokuConstraintOptimizer {
     houseHandler, intersectingSumHandlers, intersectingHouseHandlers,
     allHouseHandlers, cellExclusions, shape) {
     const numValues = shape.numValues;
+    const maxSum = maxSumForShape(shape);
 
     let totalSum = 0;
     let cells = new Set();
@@ -587,7 +590,7 @@ export class SudokuConstraintOptimizer {
           continue;
         }
         // This handler fills in an existing gap.
-        totalSum += shape.maxSum;
+        totalSum += maxSum;
         h.cells.forEach(c => cells.add(c));
         h.cells.forEach(c => uncoveredCells.delete(c));
         usedExtraHouses = true;
@@ -601,7 +604,7 @@ export class SudokuConstraintOptimizer {
     // Remove the current house cells, as we care about the cells outside the
     // house.
     houseHandler.cells.forEach(c => cells.delete(c));
-    totalSum -= shape.maxSum;
+    totalSum -= maxSum;
 
     // While it's possible that there could be a house completely contained
     // within the cells, then try to find and remove them.
@@ -614,7 +617,7 @@ export class SudokuConstraintOptimizer {
         const intersectSize = setIntersectSize(cells, h.cells);
         if (intersectSize !== numValues) continue;
         // This house is completely contained within the cells.
-        totalSum -= shape.maxSum;
+        totalSum -= maxSum;
         h.cells.forEach(c => cells.delete(c));
         removedExtraHouses = true;
         if (cells.size < numValues) break;
@@ -673,6 +676,7 @@ export class SudokuConstraintOptimizer {
   _makeHiddenCageHandlers(handlerSet, allSumHandlers, cellExclusions, shape) {
     const houseHandlers = handlerSet.getAllofType(HandlerModule.House);
     const newHandlers = [];
+    const maxSum = maxSumForShape(shape);
 
     const allSumHandlerIndexes = new Set(
       allSumHandlers.map(h => handlerSet.getIndex(h)));
@@ -726,7 +730,7 @@ export class SudokuConstraintOptimizer {
       if (outies.length === 0 && constrainedCells.length === 0) continue;
 
       const complementCells = arrayDifference(h.cells, constrainedCells);
-      const complementSum = shape.maxSum - constrainedSum;
+      const complementSum = maxSum - constrainedSum;
 
       // If a cage sticks out of a house by 1 cell, then we can form the
       // equivalent of an arrow sum (with offset). That is, the value of the
@@ -898,6 +902,7 @@ export class SudokuConstraintOptimizer {
   _makeInnieOutieSumHandlers(sumHandlers, boxRegions, shape) {
     const newHandlers = [];
     const numValues = shape.numValues;
+    const maxSum = maxSumForShape(shape);
 
     const pieces = sumHandlers.map(h => h.cells);
     const piecesMap = new Map(sumHandlers.map(h => [h.cells, h.sum()]));
@@ -932,7 +937,7 @@ export class SudokuConstraintOptimizer {
         // currently have one, so we'll take all the help we can get!
       }
 
-      let sumDelta = -superRegion.size * shape.maxSum / numValues;
+      let sumDelta = -superRegion.size * maxSum / numValues;
       for (const p of usedPieces) sumDelta += piecesMap.get(p);
 
       // Ensure diffA is the smaller.
@@ -1320,3 +1325,7 @@ export class SudokuConstraintOptimizer {
     }
   }
 }
+
+const maxSumForShape = (shape) => shape.numValues * (shape.numValues + 1) / 2;
+
+const allCells = (shape) => Array.from({ length: shape.numCells }, (_, i) => i);

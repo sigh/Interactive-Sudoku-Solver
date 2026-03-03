@@ -43,15 +43,6 @@ await runTest('fromGridSize returns null for invalid sizes', () => {
   assert.equal(GridShape.fromGridSize(1.5), null);
 });
 
-await runTest('fromGridSize is memoized', () => {
-  const shape1 = GridShape.fromGridSize(9);
-  const shape2 = GridShape.fromGridSize(9);
-  assert.strictEqual(shape1, shape2);
-});
-
-// ============================================================================
-// GridShape.fromGridSize with two arguments (rectangular grids)
-// ============================================================================
 
 await runTest('fromGridSize creates rectangular 6x8 grid', () => {
   const shape = GridShape.fromGridSize(6, 8);
@@ -71,23 +62,11 @@ await runTest('fromGridSize creates rectangular 8x6 grid', () => {
   assert.equal(shape.name, '8x6');
 });
 
-await runTest('fromGridSize(9,9) is same object as fromGridSize(9)', () => {
-  const shape1 = GridShape.fromGridSize(9, 9);
-  const shape2 = GridShape.fromGridSize(9);
-  assert.strictEqual(shape1, shape2);
-});
-
 await runTest('fromGridSize returns null for invalid dimensions', () => {
   assert.equal(GridShape.fromGridSize(0, 9), null);
   assert.equal(GridShape.fromGridSize(9, 0), null);
   assert.equal(GridShape.fromGridSize(17, 9), null);
   assert.equal(GridShape.fromGridSize(9, 17), null);
-});
-
-await runTest('fromGridSize is memoized for rectangular grids', () => {
-  const shape1 = GridShape.fromGridSize(6, 8);
-  const shape2 = GridShape.fromGridSize(6, 8);
-  assert.strictEqual(shape1, shape2);
 });
 
 // ============================================================================

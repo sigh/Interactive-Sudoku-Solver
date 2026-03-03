@@ -1,34 +1,19 @@
-const { memoize } = await import('./util.js' + self.VERSION_PARAM);
-
 export class GridShape {
   static MIN_SIZE = 1;
   static MAX_SIZE = 16;
   static _VALUE_BASE = 17;  // for parsing
 
-  static _VERIFIED_CALL_TOKEN = {};
-
   static _isValidDimension(dim) {
     return Number.isInteger(dim) && dim >= this.MIN_SIZE && dim <= this.MAX_SIZE;
   }
 
-  _assertValidNumValues(numValues) {
-    const defaultNumValues = this.constructor.defaultNumValues(this.numRows, this.numCols);
-    if (!Number.isInteger(numValues) || numValues < defaultNumValues || numValues > this.constructor.MAX_SIZE) {
-      throw Error('Invalid numValues: ' + numValues);
-    }
-  }
-
-  // Internal memoized factory - always takes two arguments
-  static _fromResolvedGridSize = memoize((numRows, numCols) => {
+  // Public factory for square grids (one arg) or rectangular grids (two args).
+  // Optionally accepts a numValues override as the third argument.
+  static fromGridSize(numRows, numCols = numRows, numValues = null) {
     if (!this._isValidDimension(numRows) || !this._isValidDimension(numCols)) {
       return null;
     }
-    return new GridShape(this._VERIFIED_CALL_TOKEN, numRows, numCols);
-  });
-
-  // Public factory for square grids (one arg) or rectangular grids (two args)
-  static fromGridSize(numRows, numCols = numRows) {
-    return this._fromResolvedGridSize(numRows, numCols);
+    return new GridShape(numRows, numCols, numValues);
   }
 
   static fromGridSpec(gridSpec) {
@@ -66,7 +51,11 @@ export class GridShape {
       throw new Error('Invalid grid spec format: ' + gridSpec);
     }
 
-    return shape.withNumValues(numValues);
+    const shapeWithValues = this.fromGridSize(numRows, numCols, numValues);
+    if (!shapeWithValues) {
+      throw new Error('Invalid numValues: ' + gridSpec);
+    }
+    return shapeWithValues;
   };
 
   static fromNumCells(numCells) {
@@ -93,19 +82,18 @@ export class GridShape {
     return shape.numValues < 10 ? '1'.charCodeAt(0) : 'A'.charCodeAt(0);
   }
 
-  constructor(verifiedCallToken, numRows, numCols, numValues) {
-    if (verifiedCallToken !== this.constructor._VERIFIED_CALL_TOKEN) {
-      throw Error('Use GridShape.fromGridSize() instead.');
-    }
-
+  constructor(numRows, numCols, numValues = null) {
     // Core dimensions
     this.numRows = numRows;
     this.numCols = numCols;
 
     // Derived properties
     const defaultNumValues = this.constructor.defaultNumValues(numRows, numCols);
-    this.numValues = numValues || defaultNumValues;
-    this._assertValidNumValues(this.numValues);
+    this.numValues = numValues ?? defaultNumValues;
+
+    if (!Number.isInteger(this.numValues) || this.numValues < defaultNumValues || this.numValues > this.constructor.MAX_SIZE) {
+      throw Error('Invalid numValues: ' + this.numValues);
+    }
 
     this.numCells = numRows * numCols;
     this.numPencilmarks = this.numCells * this.numValues;
@@ -113,11 +101,6 @@ export class GridShape {
     this.name = this.constructor.makeName(numRows, numCols, this.numValues);
     this.gridDimsStr = `${this.numRows}x${this.numCols}`;
     this.fullGridSpec = `${this.gridDimsStr}~${this.numValues}`;
-
-    this.allCells = [];
-    for (let i = 0; i < this.numCells; i++) this.allCells.push(i);
-
-    this.maxSum = this.numValues * (this.numValues + 1) / 2;
 
     Object.freeze(this);
   }
@@ -186,20 +169,6 @@ export class GridShape {
       row: row,
       col: col,
     };
-  }
-
-  withNumValues(numValues = null) {
-    if (numValues === null || numValues === this.numValues) {
-      return this;
-    }
-
-    this._assertValidNumValues(numValues);
-
-    return new GridShape(
-      this.constructor._VERIFIED_CALL_TOKEN,
-      this.numRows,
-      this.numCols,
-      numValues);
   }
 
   static defaultNumValues(numRows, numCols) {
