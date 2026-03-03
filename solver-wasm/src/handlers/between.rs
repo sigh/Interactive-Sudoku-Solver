@@ -5,7 +5,7 @@
 //!
 //! Mirrors JS `Between` from handlers.js.
 
-use crate::api::types::CellIndex;
+use crate::api::types::{CellIndex, Value};
 use crate::candidate_set::CandidateSet;
 use crate::grid_shape::GridShape;
 use crate::solver::cell_exclusions::CellExclusions;
@@ -76,7 +76,7 @@ impl ConstraintHandler for Between {
         };
 
         let key = fn_to_binary_key(
-            &move |a: u8, b: u8| (a as i32 - b as i32).unsigned_abs() as usize >= min_ends_delta,
+            &move |a: Value, b: Value| (a as i32 - b as i32).unsigned_abs() as usize >= min_ends_delta,
             shape.num_values,
         );
         let bc = BinaryConstraint::from_key(self.ends[0], self.ends[1], key, shape.num_values);

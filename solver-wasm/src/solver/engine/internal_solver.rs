@@ -25,10 +25,49 @@ use crate::solver::handler_accumulator::HandlerAccumulator;
 use crate::solver::handler_set::HandlerSet;
 use crate::solver::optimizer::Optimizer;
 
-/// Saved search state for resumable solving (used by `nth_solution`).
-pub(super) struct ResumeState {
-    pub(super) rec_depth: usize,
-    pub(super) iteration_counter: u64,
+/// Search state, mirroring JS `InternalSolver.STATE_*` constants.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum SolverState {
+    /// Initial state after construction or `reset_run()`. Ready for a fresh `run()`.
+    /// Mirrors JS `STATE_UNSTARTED`.
+    Unstarted,
+    /// Search is running or was interrupted without a save point.
+    /// `run()` is not valid until `reset_run()` is called.
+    /// Mirrors JS `STATE_INCOMPLETE`.
+    Incomplete,
+    /// Search paused at a `MaxSolutions` limit; saved position is valid.
+    /// Calling `run()` with `MaxSolutions` will continue from that position.
+    /// Mirrors JS `STATE_RESUMABLE`.
+    Resumable,
+    /// Search space fully exhausted. Call `reset_run()` before running again.
+    /// Mirrors JS `STATE_EXHAUSTED`.
+    Exhausted,
+}
+
+/// Termination mode for [`InternalSolver::run`], mirroring JS `yieldWhen` + `maxSolutions`.
+#[derive(Clone, Copy)]
+pub(super) enum RunMode {
+    /// Run until the search space is exhausted, reporting every solution.
+    /// Mirrors JS `run(YIELD_ON_SOLUTION, 0)`.
+    Exhaustive,
+
+    /// Stop after `max_solutions` solutions. Saves the search position so
+    /// the caller can optionally continue via `resume()` using the returned
+    /// `RunToken`. Mirrors JS `run(YIELD_ON_SOLUTION, n)` with iterator reuse.
+    MaxSolutions { max_solutions: u64 },
+
+    /// Stop after `max_backtracks` backtracks (≥ 1), or on the first solution —
+    /// whichever comes first.
+    /// `max_backtracks: 1` gives Knuth sampling: one root-to-backtrack path.
+    /// A larger value (e.g. 200) is used for `validate_layout` warmup probes.
+    /// Mirrors JS `run(YIELD_EVERY_BACKTRACK)` with break after n backtracks.
+    MaxBacktracks { max_backtracks: u64 },
+
+    /// Step-by-step mode: stop at event `target` (1-indexed; guess,
+    /// contradiction, and solution are all events) and store the result in
+    /// `self.step_state.result`.
+    /// Mirrors JS `run(YIELD_ON_STEP)` targeting step n.
+    Step { target: u64 },
 }
 
 /// Mutable state tracked across step yields within a single run_impl call.
@@ -37,8 +76,6 @@ struct StepState {
     step_guides: HashMap<u64, StepGuide>,
     /// Current step number (1-indexed, incremented after each yield).
     step: u64,
-    /// Target step number — run_impl stops when step reaches this.
-    target: u64,
     /// Grid snapshot before the current guess.
     old_grid: Vec<CandidateSet>,
     /// Cell depth of the pending guess (-1 = none).
@@ -54,7 +91,6 @@ impl StepState {
         StepState {
             step_guides: HashMap::new(),
             step: 1,
-            target: 0,
             old_grid: vec![CandidateSet::EMPTY; num_cells],
             pending_guess_depth: -1,
             pending_guess_value: CandidateSet::EMPTY,
@@ -94,19 +130,25 @@ pub(crate) struct InternalSolver {
     /// Callback fires when `iteration_counter & mask == 0`.
     progress_frequency_mask: u64,
 
-    /// Saved search state for resumable solving. Set when `run_impl`
-    /// exits early (max_solutions reached); cleared on fresh `run()` calls
-    /// or when the search space is exhausted.
-    pub(super) resume_state: Option<ResumeState>,
+    /// Current search state. Mirrors JS `InternalSolver._state`.
+    pub(super) state: SolverState,
+
+    /// Saved recursion depth; valid when `state == Resumable`.
+    /// Mirrors JS `InternalSolver._recDepth`.
+    rec_depth: usize,
+
+    /// Saved iteration counter; valid when `state == Resumable`.
+    /// Mirrors JS `InternalSolver._iterationCounter`.
+    iteration_counter: u64,
 
     /// Step state for step-by-step solving.
     step_state: StepState,
 
     /// Debug options controlling what debug data to export.
-    debug_options: DebugOptions,
+    pub(super) debug_options: DebugOptions,
 
     /// Accumulated debug log entries, drained on each progress tick.
-    debug_logs: Vec<DebugLog>,
+    pub(super) debug_logs: Vec<DebugLog>,
 
     /// Handler init failures recorded during construction.
     /// Stored as (handler_name, cells) pairs for deferred logging.
@@ -124,16 +166,12 @@ pub(crate) struct InternalSolver {
     sample_solution: Vec<CandidateSet>,
 
     /// Current recursion depth during search. Matches JS `_currentRecFrame`.
-    /// `None` when not inside a `run_impl` call.
+    /// `None` when not inside a `run_loop` call.
     current_rec_depth: Option<usize>,
 
-    /// Whether the search is complete (all solutions found or max reached).
-    /// Matches JS `this.done`.
-    pub(super) done: bool,
-
-    /// Whether the solver is in its initial state (before first `run`).
-    /// Matches JS `this._atStart`.
-    pub(super) at_start: bool,
+    /// Search counters. Owned by `InternalSolver`, matching JS `this.counters`.
+    /// Cleared by `reset()`, preserved by `reset_run()`.
+    pub(super) counters: SolverCounters,
 }
 
 impl InternalSolver {
@@ -151,8 +189,11 @@ impl InternalSolver {
         let num_values = shape.num_values as usize;
 
         // Step 1: Sort handlers BEFORE optimizer (matching JS behavior).
-        // JS sorts by (cells.length, constructor.name, cells.join(',')) before
-        // the optimizer runs. The optimizer only appends new handlers at the end.
+        // JS sorts by (cells.length, constructor.name, cells.join(',')) where
+        // cells.join(',') uses string comparison (localeCompare). This differs
+        // from numeric comparison when cell indices have different numbers of
+        // digits (e.g. "9,1" > "10,1" in JS but 9 < 10 numerically).
+        // We match JS by joining cells as comma-separated decimal strings.
         handlers.sort_by(|a, b| {
             let len_cmp = a.cells().len().cmp(&b.cells().len());
             if len_cmp != std::cmp::Ordering::Equal {
@@ -162,8 +203,21 @@ impl InternalSolver {
             if name_cmp != std::cmp::Ordering::Equal {
                 return name_cmp;
             }
-            // Tertiary: cells (numeric lexicographic).
-            a.cells().cmp(b.cells())
+            // Tertiary: JS uses cells.join(',') with string (locale) comparison.
+            // Build comma-joined decimal strings to match JS sort order exactly.
+            let a_key: String = a
+                .cells()
+                .iter()
+                .map(|c| c.to_string())
+                .collect::<Vec<_>>()
+                .join(",");
+            let b_key: String = b
+                .cells()
+                .iter()
+                .map(|c| c.to_string())
+                .collect::<Vec<_>>()
+                .join(",");
+            a_key.cmp(&b_key)
         });
 
         // Step 2: Create HandlerSet from sorted handlers.
@@ -223,8 +277,10 @@ impl InternalSolver {
             rec_stack,
             initial_grid,
             initial_contradiction,
-            progress_frequency_mask: (1u64 << 13) - 1, // default: every 8192 iterations
-            resume_state: None,
+            progress_frequency_mask: u64::MAX, // default: disabled (matches JS default of mask=-1)
+            state: SolverState::Unstarted,
+            rec_depth: 0,
+            iteration_counter: 0,
             step_state: StepState::new(num_cells),
             debug_options: DebugOptions::default(),
             debug_logs: Vec::new(),
@@ -233,8 +289,7 @@ impl InternalSolver {
             seen_candidate_set: SeenCandidateSet::new(1, num_cells, num_values),
             sample_solution: Vec::new(),
             current_rec_depth: None,
-            done: false,
-            at_start: true,
+            counters: SolverCounters::default(),
         };
 
         // Generate setup debug logs unconditionally (matches JS which
@@ -244,58 +299,18 @@ impl InternalSolver {
         Ok(solver)
     }
 
-    /// Solve and return the first solution found (if any).
-    pub fn solve(&mut self) -> SolveResult {
-        self.solve_with_progress(&mut |_| {})
-    }
-
-    /// Solve with a progress callback.
-    ///
-    /// The callback receives `&SolverProgress` periodically during search.
-    /// The frequency is controlled by `set_progress_frequency`.
-    pub fn solve_with_progress(
-        &mut self,
-        progress: &mut dyn FnMut(&SolverProgress),
-    ) -> SolveResult {
-        let mut counters = SolverCounters::default();
-
-        if self.initial_contradiction {
-            return SolveResult {
-                solution: None,
-                counters,
-            };
-        }
-
-        let mut solution = None;
-        self.run(&mut counters, 1, 0, progress, None, &mut |sol| {
-            solution = Some(sol.to_vec());
-        });
-
-        SolveResult { solution, counters }
-    }
-
     /// Validate the layout by attempting to find any solution.
-    ///
-    /// Returns the first solution found, or `None` if the layout is invalid
-    /// (no solutions exist). Mirrors JS `InternalSolver.validateLayout()`.
-    pub fn validate_layout(&mut self) -> SolveResult {
-        self.validate_layout_with_progress(&mut |_| {})
-    }
-
-    /// Validate the layout with a progress callback.
     ///
     /// Uses a house-filling warmup heuristic: try a bounded search
     /// (200 backtracks) with each house pre-filled, then do a full
     /// search with the most promising house. This matches the JS
     /// `InternalSolver._validateLayout()`.
-    pub fn validate_layout_with_progress(
+    pub(super) fn validate_layout(
         &mut self,
         progress: &mut dyn FnMut(&SolverProgress),
     ) -> SolveResult {
-        // Always mark done after validate_layout, matching JS finalize().
-        self.done = true;
-
         if self.initial_contradiction {
+            self.state = SolverState::Exhausted;
             return SolveResult {
                 solution: None,
                 counters: SolverCounters::default(),
@@ -316,9 +331,22 @@ impl InternalSolver {
         // Non-standard grids may not have any house handlers. In that case,
         // validate by finding any solution under the full constraint set.
         if house_cells.is_empty() {
-            let result = self.solve_with_progress(progress);
+            self.reset_run();
+            let mut solution = None;
+            self.run(
+                RunMode::MaxSolutions { max_solutions: 1 },
+                progress,
+                None,
+                &mut |sol| {
+                    solution = Some(sol.to_vec());
+                },
+            );
             self.initial_grid = original_initial_grid;
-            return result;
+            self.state = SolverState::Exhausted;
+            return SolveResult {
+                solution,
+                counters: self.counters.clone(),
+            };
         }
 
         const SEARCH_LIMIT: u64 = 200;
@@ -338,38 +366,44 @@ impl InternalSolver {
 
         for (house_idx, cells) in house_cells.iter().enumerate() {
             // _resetRun: reset candidate selector (preserving conflict scores).
-            self.candidate_selector.reset();
+            self.reset_run();
             fill_house(&mut self.initial_grid, cells, &original_initial_grid);
             self.candidate_selector.conflict_scores_mut().decay();
 
-            let mut counters = SolverCounters::default();
             let mut solution = None;
-            self.run(&mut counters, 1, SEARCH_LIMIT, progress, None, &mut |sol| {
-                solution = Some(sol.to_vec());
-            });
+            self.run(
+                RunMode::MaxBacktracks {
+                    max_backtracks: SEARCH_LIMIT,
+                },
+                progress,
+                None,
+                &mut |sol| {
+                    solution = Some(sol.to_vec());
+                },
+            );
 
             if let Some(sol) = solution {
                 // Found a solution — finalize.
-                counters.branches_ignored = 1.0 - counters.progress_ratio;
+                self.counters.branches_ignored = 1.0 - self.counters.progress_ratio;
                 self.initial_grid = original_initial_grid;
                 return SolveResult {
                     solution: Some(sol),
-                    counters,
+                    counters: self.counters.clone(),
                 };
             }
 
-            if counters.backtracks < SEARCH_LIMIT {
+            if self.counters.backtracks < SEARCH_LIMIT {
                 // Search exhausted before limit — no solutions exist.
-                counters.branches_ignored = 1.0 - counters.progress_ratio;
+                self.counters.branches_ignored = 1.0 - self.counters.progress_ratio;
                 self.initial_grid = original_initial_grid;
                 return SolveResult {
                     solution: None,
-                    counters,
+                    counters: self.counters.clone(),
                 };
             }
 
             // Hit the limit — record progress for ranking.
-            attempt_log.push((house_idx, counters.progress_ratio));
+            attempt_log.push((house_idx, self.counters.progress_ratio));
         }
 
         // None completed. Pick the house with the best progress_ratio
@@ -377,43 +411,30 @@ impl InternalSolver {
         attempt_log.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
         let best_house_idx = attempt_log[0].0;
 
-        self.candidate_selector.reset();
+        self.reset_run();
         fill_house(
             &mut self.initial_grid,
             &house_cells[best_house_idx],
             &original_initial_grid,
         );
 
-        let mut counters = SolverCounters::default();
         let mut solution = None;
-        self.run(&mut counters, 1, 0, progress, None, &mut |sol| {
-            solution = Some(sol.to_vec());
-        });
+        self.run(
+            RunMode::MaxSolutions { max_solutions: 1 },
+            progress,
+            None,
+            &mut |sol| {
+                solution = Some(sol.to_vec());
+            },
+        );
 
-        counters.branches_ignored = 1.0 - counters.progress_ratio;
+        self.counters.branches_ignored = 1.0 - self.counters.progress_ratio;
         self.initial_grid = original_initial_grid;
-        SolveResult { solution, counters }
-    }
-
-    /// Count solutions up to a given limit (0 = unlimited).
-    pub fn count_solutions(&mut self, limit: u64) -> (u64, SolverCounters) {
-        self.count_solutions_with_progress(limit, &mut |_| {})
-    }
-
-    /// Count solutions with a progress callback.
-    pub fn count_solutions_with_progress(
-        &mut self,
-        limit: u64,
-        progress: &mut dyn FnMut(&SolverProgress),
-    ) -> (u64, SolverCounters) {
-        let mut counters = SolverCounters::default();
-
-        if self.initial_contradiction {
-            return (0, counters);
+        self.state = SolverState::Exhausted;
+        SolveResult {
+            solution,
+            counters: self.counters.clone(),
         }
-
-        self.run(&mut counters, limit, 0, progress, None, &mut |_| {});
-        (counters.solutions, counters)
     }
 
     /// Solve all possibilities: find every solution and track per-cell
@@ -426,20 +447,19 @@ impl InternalSolver {
     /// Once all candidates in a branch are seen, the branch is pruned.
     ///
     /// The `progress` callback receives `&SolverProgress` periodically.
-    pub fn solve_all_possibilities(
+    pub(super) fn solve_all_possibilities(
         &mut self,
         threshold: u8,
         progress: &mut dyn FnMut(&SolverProgress),
     ) -> AllPossibilitiesResult {
         let num_cells = self.shape.num_cells;
         let num_values = self.shape.num_values as usize;
-        let mut counters = SolverCounters::default();
 
         if self.initial_contradiction {
             return AllPossibilitiesResult {
                 candidate_counts: vec![0u8; num_cells * num_values],
                 solutions: Vec::new(),
-                counters,
+                counters: self.counters.clone(),
             };
         }
 
@@ -451,16 +471,9 @@ impl InternalSolver {
         let mut seen =
             std::mem::replace(&mut self.seen_candidate_set, SeenCandidateSet::new(1, 0, 0));
 
-        self.run(
-            &mut counters,
-            0, // no limit
-            0, // no backtrack limit
-            progress,
-            Some(&mut seen),
-            &mut |sol| {
-                solutions.push(sol.to_vec());
-            },
-        );
+        self.run(RunMode::Exhaustive, progress, Some(&mut seen), &mut |sol| {
+            solutions.push(sol.to_vec());
+        });
 
         let candidate_counts = seen.candidate_counts().to_vec();
         // Put the SeenCandidateSet back.
@@ -469,7 +482,7 @@ impl InternalSolver {
         AllPossibilitiesResult {
             candidate_counts,
             solutions,
-            counters,
+            counters: self.counters.clone(),
         }
     }
 
@@ -487,17 +500,16 @@ impl InternalSolver {
     ///   to the number of completed samples.
     ///
     /// Returns `(estimate, sample_count, counters)`.
-    pub fn estimated_count_solutions(
+    pub(super) fn estimated_count_solutions(
         &mut self,
         max_samples: u64,
         progress: &mut dyn FnMut(&SolverProgress),
     ) -> (f64, u64, SolverCounters) {
         let mut total_estimate = 0.0f64;
         let mut num_samples = 0u64;
-        let mut counters = SolverCounters::default();
 
         if self.initial_contradiction {
-            return (0.0, 0, counters);
+            return (0.0, 0, self.counters.clone());
         }
 
         // Enable sampling mode on the candidate selector.
@@ -505,11 +517,11 @@ impl InternalSolver {
 
         loop {
             let mut found_solution = false;
-            // Use run() which clears resume state and resets selector.
+            // Mirrors JS `_resetRun()` + `run({ maxBacktracks: 1 })` in the
+            // estimation loop: one root-to-backtrack path per sample.
+            self.reset_run();
             self.run(
-                &mut counters,
-                1, // max 1 solution per sample
-                0, // no backtrack limit
+                RunMode::MaxBacktracks { max_backtracks: 1 },
                 &mut |_| {},
                 None,
                 &mut |_sol| {
@@ -526,7 +538,7 @@ impl InternalSolver {
 
             // Report progress with estimate data in `extra`, matching JS
             // `_progressExtraStateFn` which sets `extra.estimate`.
-            let mut progress_counters = counters.clone();
+            let mut progress_counters = self.counters.clone();
             progress_counters.solutions = num_samples;
             let mut solver_progress = SolverProgress::counters_only(progress_counters);
             solver_progress.extra = Some(debug::ProgressExtra {
@@ -550,168 +562,41 @@ impl InternalSolver {
         } else {
             0.0
         };
-        (estimate, num_samples, counters)
+        (estimate, num_samples, self.counters.clone())
     }
 
-    /// Find the nth step (0-indexed).
+    /// Prepare step state for an upcoming `run(RunMode::Step { .. })` call.
     ///
-    /// Mirrors the JS `SudokuSolver.nthStep(n, stepGuides)` pattern.
-    ///
-    /// Always replays the search from scratch. Because the search is
-    /// deterministic, this always produces the same step for the same
-    /// index, regardless of navigation history. This avoids the
-    /// fragility of trying to save and resume mid-loop state.
-    ///
-    /// Returns `Some(StepResult)` if step `n` exists, `None` if the
-    /// search is exhausted before reaching that step.
-    pub fn nth_step(
-        &mut self,
-        n: u64,
-        step_guides: HashMap<u64, StepGuide>,
-        progress: &mut dyn FnMut(&SolverProgress),
-    ) -> Option<StepResult> {
-        if self.initial_contradiction {
-            return None;
-        }
-
-        // Always start fresh — this is the key correctness guarantee.
-        // The search is deterministic, so replaying from the start
-        // always produces identical steps.
-        self.resume_state = None;
-
-        // Full reset: cell order AND conflict scores. Without this,
-        // accumulated conflict scores from previous runs would change
-        // the cell selection order, making the search non-deterministic
-        // across calls.
-        self.candidate_selector.full_reset();
-
-        // Set up step state for this run.
+    /// Sets step guides and resets the step counters. Called by
+    /// `Solver::nth_step` before invoking `run()`.
+    pub(super) fn set_step_guides(&mut self, step_guides: HashMap<u64, StepGuide>) {
         self.step_state = StepState::new(self.shape.num_cells);
         self.step_state.step_guides = step_guides;
-        self.step_state.target = n + 1; // 1-indexed target
+    }
 
-        // Log the step marker (matching JS nthStep).
-        if self.debug_options.log_level >= 1 {
-            self.debug_logs.push(DebugLog {
-                loc: "nthStep".to_string(),
-                msg: format!("Step {}", n),
-                args: None,
-                important: true,
-                cells: Vec::new(),
-                candidates: Vec::new(),
-                overlay: Vec::new(),
-            });
-        }
-
-        let mut counters = SolverCounters::default();
-        self.run_impl(&mut counters, 0, 0, progress, None, &mut |_| {}, true);
-
+    /// Extract the step result produced by the last `run(RunMode::Step)` call.
+    ///
+    /// Returns `Some(StepResult)` if a step was found, `None` otherwise.
+    pub(super) fn take_step_result(&mut self) -> Option<StepResult> {
         self.step_state.result.take()
     }
 
-    /// Return the captured sample solution, if any.
-    /// Matches JS `getSampleSolution()`.
-    pub fn get_sample_solution(&self) -> Option<&[CandidateSet]> {
-        if self.sample_solution.is_empty() {
-            None
-        } else {
-            Some(&self.sample_solution)
-        }
-    }
-
-    /// Clear the captured sample solution.
-    /// Matches JS `unsetSampleSolution()`.
-    pub fn unset_sample_solution(&mut self) {
-        self.sample_solution.clear();
-    }
-
-    /// Return a stack trace of the current search state.
-    /// Matches JS `getStackTrace()`.
+    /// Set the log2 progress frequency.
     ///
-    /// Returns `None` if not currently inside a search, or if the search
-    /// is done / at start. Otherwise returns (cells, values) where `cells`
-    /// are the cell indices in selection order and `values` are the assigned
-    /// values (1-indexed) at each depth.
-    pub fn get_stack_trace(&self) -> Option<(Vec<CellIndex>, Vec<u8>)> {
-        if self.at_start || self.done {
-            return None;
-        }
-        let rec_depth = self.current_rec_depth?;
-        let cell_depth = self.rec_stack.frame(rec_depth).cell_depth;
-        if cell_depth == 0 {
-            return None;
-        }
-
-        let cells: Vec<CellIndex> = (0..cell_depth)
-            .map(|i| self.candidate_selector.get_cell_at_depth(i))
-            .collect();
-
-        let grid = &self.rec_stack.frame(rec_depth).grid;
-        let values: Vec<u8> = cells.iter().map(|&c| grid[c as usize].value()).collect();
-
-        Some((cells, values))
-    }
-
-    /// Replace the candidate selector. Matches JS `_setCandidateSelector()`.
-    pub fn set_candidate_selector(&mut self, selector: CandidateSelector) {
-        self.candidate_selector = selector;
-    }
-
-    /// Whether the search is complete. Matches JS `this.done`.
-    pub fn is_done(&self) -> bool {
-        self.done
-    }
-
-    /// Whether the solver is in its initial state. Matches JS `this._atStart`.
-    pub fn is_at_start(&self) -> bool {
-        self.at_start
-    }
-
-    /// Full reset: reinitialize everything for a fresh search.
-    /// Matches JS `InternalSolver.reset()`.
+    /// The callback fires every `2^log_freq` iterations.
+    /// `log_freq == 0` disables progress (matches JS `frequencyMask = -1`).
     ///
-    /// Resets counters, conflict scores (from cell priorities),
-    /// seenCandidateSet, sampleSolution, and calls `reset_run()`.
-    pub fn reset(&mut self) {
-        self.current_rec_depth = None;
-
-        // Reinitialize conflict scores from cell priorities.
-        self.candidate_selector.full_reset();
-
-        // Reset seenCandidateSet.
-        self.seen_candidate_set.reset();
-
-        // Clear sample solution.
-        self.sample_solution.clear();
-
-        self.reset_run();
-    }
-
-    /// Partial reset: prepare for a new run while preserving conflict scores.
-    /// Matches JS `InternalSolver._resetRun()`.
-    ///
-    /// Resets candidate selector cell order (not conflict scores),
-    /// sets done=false, at_start=true.
-    pub fn reset_run(&mut self) {
-        // Preserve conflict scores — just reset cell order.
-        self.candidate_selector.reset();
-        self.done = false;
-        self.at_start = true;
-    }
-
-    /// Set the log2 progress frequency. The progress callback is called
-    /// every `2^log_freq` iterations. Default is 13 (every 8192 iterations),
-    /// matching the JS solver.
-    pub fn set_progress_frequency(&mut self, log_freq: u32) {
+    /// Mirrors JS `InternalSolver.setProgressCallback(cb, logFrequency)`.
+    pub(super) fn set_progress_frequency(&mut self, log_freq: u32) {
         self.progress_frequency_mask = if log_freq > 0 {
             (1u64 << log_freq) - 1
         } else {
-            u64::MAX // disabled
+            u64::MAX // disabled: check `(counter & MAX) == 0` is never true for counter > 0
         };
     }
 
     /// Set debug options controlling what debug data to export.
-    pub fn set_debug_options(&mut self, opts: DebugOptions) {
+    pub(super) fn set_debug_options(&mut self, opts: DebugOptions) {
         self.debug_options = opts;
     }
 
@@ -782,7 +667,7 @@ impl InternalSolver {
     }
 
     /// Build a `SolverProgress` from current state, draining pending logs.
-    fn build_progress(&mut self, counters: &SolverCounters, rec_depth: usize) -> SolverProgress {
+    fn build_progress(&mut self, rec_depth: usize) -> SolverProgress {
         let conflict_heatmap = if self.debug_options.export_conflict_heatmap {
             Some(self.candidate_selector.conflict_scores().scores.to_vec())
         } else {
@@ -815,7 +700,7 @@ impl InternalSolver {
         let logs = std::mem::take(&mut self.debug_logs);
 
         SolverProgress {
-            counters: counters.clone(),
+            counters: self.counters.clone(),
             conflict_heatmap,
             stack_trace,
             logs,
@@ -823,123 +708,174 @@ impl InternalSolver {
         }
     }
 
-    /// Core backtracking solver — always starts fresh.
+    /// Start a fresh search, discarding any saved resume position.
     ///
-    /// Clears any saved resume state before and after, and delegates to
-    /// `run_impl`. Used by `solve_with_progress`,
-    /// `count_solutions_with_progress`, and `solve_all_possibilities`.
-    fn run(
+    /// Bumps the internal generation counter, invalidating any outstanding
+    /// `RunToken` from a previous run. Owns all fresh-start initialisation:
+    /// resets the candidate selector, sets up the initial recursion frame,
+    /// runs initial constraint propagation, then hands off to `run_loop(1, 0, ...)`.
+    ///
+    /// Returns `Some(RunToken)` when stopped early in `MaxSolutions` mode with
+    /// the search position saved. Pass the token to `resume()` to continue.
+    /// Returns `None` when the search exhausts naturally, or when the mode
+    /// never saves position (`Exhaustive`, `MaxBacktracks`, `Step`).
+    /// Full reset: fresh conflict scores, cleared sample solution, then
+    /// partial reset.
+    ///
+    /// Mirrors JS `InternalSolver.reset()`. Called by the outer `Solver`
+    /// before each public operation that expects a clean slate (same as JS
+    /// `SudokuSolver._reset()` → `InternalSolver.reset()`).
+    pub(super) fn reset(&mut self) {
+        self.counters = SolverCounters::default();
+        self.candidate_selector.full_reset();
+        self.sample_solution.clear();
+        self.seen_candidate_set.reset();
+        self.reset_run();
+    }
+
+    /// Partial reset: preserve conflict scores, reset cell ordering and state.
+    ///
+    /// Mirrors JS `InternalSolver._resetRun()`. Used internally (inside
+    /// `validate_layout` attempt loops and `estimated_count_solutions` loop)
+    /// where conflict scores should carry over between sub-runs.
+    pub(super) fn reset_run(&mut self) {
+        self.candidate_selector.reset();
+        self.rec_depth = 0;
+        self.iteration_counter = 0;
+        self.state = SolverState::Unstarted;
+    }
+
+    /// Run the solver.
+    ///
+    /// If in `Unstarted` state, starts a fresh search via `init_run()`.
+    /// If in `Resumable` state, continues from the saved position;
+    /// `mode` must be `MaxSolutions` with `max_solutions` exceeding the
+    /// current solution count.
+    /// Any other state panics — call `reset_run()` first.
+    ///
+    /// Mirrors JS `InternalSolver.run(mode, onSolution)`.
+    pub(super) fn run(
         &mut self,
-        counters: &mut SolverCounters,
-        max_solutions: u64,
-        max_backtracks: u64,
+        mode: RunMode,
         progress: &mut dyn FnMut(&SolverProgress),
         seen: Option<&mut SeenCandidateSet>,
         on_solution: &mut dyn FnMut(&[CandidateSet]),
     ) {
-        self.resume_state = None;
-        self.run_impl(
-            counters,
-            max_solutions,
-            max_backtracks,
+        match self.state {
+            SolverState::Unstarted => {
+                self.init_run(mode);
+            }
+            SolverState::Resumable => {
+                let RunMode::MaxSolutions { max_solutions } = mode else {
+                    panic!("run() from Resumable state requires MaxSolutions mode");
+                };
+                assert!(
+                    max_solutions > self.counters.solutions,
+                    "run() maxSolutions ({max_solutions}) must exceed current solution count ({})",
+                    self.counters.solutions
+                );
+            }
+            _ => {
+                panic!("run() requires Unstarted or Resumable state; call reset_run() first");
+            }
+        }
+
+        let rec_depth = self.rec_depth;
+        let iteration_counter = self.iteration_counter;
+        self.state = SolverState::Incomplete;
+        self.run_loop(
+            rec_depth,
+            iteration_counter,
+            mode,
             progress,
             seen,
             on_solution,
-            false,
         );
-        // Discard any state saved by run_impl — callers of run()
-        // do not use resume, so don't leak it into nth_solution.
-        self.resume_state = None;
     }
 
-    /// Core iterative backtracking solver (resumable).
+    /// Initialise for a fresh run from `Unstarted` state.
     ///
-    /// Mirrors JS `InternalSolver.run()`. Calls `on_solution` for each
-    /// solution found; the caller decides whether to collect or count them.
+    /// Mirrors JS `InternalSolver._initRun(mode)`. Resets progress ratios,
+    /// sets up the initial recursion frame, runs initial constraint
+    /// propagation, and sets `rec_depth = 1`.
     ///
-    /// If `self.resume_state` is `Some`, the search resumes from the saved
-    /// position. Otherwise a fresh search is initialised.
+    /// Note: `candidate_selector.reset()` is NOT called here — it must
+    /// have been called already (by `reset_run()` or implicitly by
+    /// fresh construction). This matches JS where `_initRun` never calls
+    /// `candidateSelector.reset()` (that is `_resetRun`'s responsibility).
+    fn init_run(&mut self, mode: RunMode) {
+        let num_cells = self.shape.num_cells;
+        let step_mode = matches!(mode, RunMode::Step { .. });
+
+        self.counters.progress_ratio_prev += self.counters.progress_ratio;
+        self.counters.progress_ratio = 0.0;
+
+        {
+            let frame = self.rec_stack.frame_mut(0);
+            frame.grid.copy_from_slice(&self.initial_grid);
+            frame.cell_depth = 0;
+            frame.last_contradiction_cell = -1;
+            frame.progress_remaining = 1.0;
+            frame.new_node = true;
+
+            // Initial constraint propagation: enqueue all cells.
+            self.accumulator.reset(false);
+            for i in 0..num_cells {
+                self.accumulator.add_for_cell(i as CellIndex);
+            }
+
+            if !enforce_constraints_on(&mut frame.grid, &mut self.accumulator, &mut self.counters) {
+                // Initial grid is contradictory — ensure a zero in the
+                // cell range so the initial iteration will fail.
+                if !frame.grid[..num_cells].contains(&CandidateSet::EMPTY) {
+                    frame.grid[..num_cells].fill(CandidateSet::EMPTY);
+                }
+            }
+        }
+
+        // In step mode, capture the initial old_grid before first candidate selection.
+        if step_mode {
+            self.step_state.old_grid = self.rec_stack.frame(0).grid.clone();
+            self.step_state.pending_guess_depth = -1;
+            self.step_state.pending_guess_value = CandidateSet::EMPTY;
+        }
+
+        self.counters.nodes_searched += 1;
+        // rec_depth starts at 1 (frame 0 is initialised above).
+        self.rec_depth = 1;
+        self.iteration_counter = 0;
+    }
+
+    /// Core iterative backtracking loop.
     ///
-    /// `max_solutions`: stop after finding this many solutions (0 = unlimited).
-    /// `max_backtracks`: stop after this many backtracks (0 = unlimited).
-    ///   Used by `validate_layout` to do bounded searches.
-    /// `seen`: optional SeenCandidateSet for all-possibilities mode pruning.
-    /// `step_mode`: when `true`, the solver operates in step mode using
-    ///   `self.step_state`. It yields at guess, contradiction, and solution
-    ///   points by returning early. The step result is stored in
-    ///   `self.step_state.result`. Step mode never saves resume state;
-    ///   `nth_step` always replays from scratch for correctness.
-    pub(super) fn run_impl(
+    /// Pure loop body — no initialisation, no state restoration.
+    /// Starts immediately at `rec_depth` / `iteration_counter` and runs
+    /// until a termination condition fires or the search space is exhausted.
+    ///
+    /// `run()` owns fresh-start initialisation and calls `run_loop(1, 0, ...)`.
+    /// On resume, `run()` reads `self.rec_depth`/`self.iteration_counter` and
+    /// calls `run_loop` with those saved values.
+    ///
+    /// `mode`: controls the termination condition and step behaviour.
+    ///   See [`RunMode`] for the available modes.
+    /// `seen`: optional `SeenCandidateSet` for all-possibilities mode pruning.
+    fn run_loop(
         &mut self,
-        counters: &mut SolverCounters,
-        max_solutions: u64,
-        max_backtracks: u64,
+        mut rec_depth: usize,
+        mut iteration_counter: u64,
+        mode: RunMode,
         progress: &mut dyn FnMut(&SolverProgress),
         mut seen: Option<&mut SeenCandidateSet>,
         on_solution: &mut dyn FnMut(&[CandidateSet]),
-        step_mode: bool,
     ) {
+        let step_mode = matches!(mode, RunMode::Step { .. });
+        let step_target = if let RunMode::Step { target } = mode {
+            target
+        } else {
+            0
+        };
         let progress_mask = self.progress_frequency_mask;
         let num_cells = self.shape.num_cells;
-
-        let mut rec_depth: usize;
-        let mut iteration_counter: u64;
-
-        if let Some(saved) = self.resume_state.take() {
-            // ── Resume from saved state (nth_solution only) ──────────
-            rec_depth = saved.rec_depth;
-            iteration_counter = saved.iteration_counter;
-        } else {
-            // ── Fresh initialisation ──────────────────────────────────
-            iteration_counter = 0;
-
-            // Mark solver as no longer at start (matches JS `this._atStart = false`).
-            self.at_start = false;
-
-            // Accumulate progress from previous runs (matches JS
-            // `counters.progressRatioPrev += counters.progressRatio`).
-            counters.progress_ratio_prev += counters.progress_ratio;
-            counters.progress_ratio = 0.0;
-
-            // Reset candidate selector.
-            self.candidate_selector.reset();
-
-            // Set up initial recursion frame.
-            rec_depth = 0;
-            {
-                let frame = self.rec_stack.frame_mut(rec_depth);
-                frame.grid.copy_from_slice(&self.initial_grid);
-                frame.cell_depth = 0;
-                frame.last_contradiction_cell = -1;
-                frame.progress_remaining = 1.0;
-                frame.new_node = true;
-
-                // Initial constraint propagation: enqueue all cells.
-                self.accumulator.reset(false);
-                for i in 0..num_cells {
-                    self.accumulator.add_for_cell(i as CellIndex);
-                }
-
-                if !enforce_constraints_on(&mut frame.grid, &mut self.accumulator, counters) {
-                    // Initial grid is contradictory — ensure a zero in the
-                    // cell range so the initial iteration will fail.
-                    // Only fill cells 0..num_cells (not handler state beyond).
-                    if !frame.grid[..num_cells].contains(&CandidateSet::EMPTY) {
-                        frame.grid[..num_cells].fill(CandidateSet::EMPTY);
-                    }
-                }
-            }
-
-            // In step mode, capture the initial old_grid.
-            if step_mode {
-                self.step_state.old_grid = self.rec_stack.frame(rec_depth).grid.clone();
-                self.step_state.pending_guess_depth = -1;
-                self.step_state.pending_guess_value = CandidateSet::EMPTY;
-            }
-
-            counters.nodes_searched += 1;
-            rec_depth += 1;
-        }
 
         if self.debug_options.log_level >= 2 {
             self.debug_logs.push(DebugLog {
@@ -1008,7 +944,7 @@ impl InternalSolver {
 
             // ── GUESS YIELD POINT ────────────────────────────────────
             if step_mode && count > 1 && is_new_node {
-                if self.step_state.step >= self.step_state.target {
+                if self.step_state.step >= step_target {
                     let grid = self.rec_stack.frame(rec_depth).grid.clone();
                     let branch_depth = cell_depth + 1;
                     let branch_cells: Vec<CellIndex> = (0..branch_depth)
@@ -1037,7 +973,7 @@ impl InternalSolver {
             }
 
             // Count values tried (all singletons up to the guess cell).
-            counters.values_tried += (next_depth - cell_depth) as u64;
+            self.counters.values_tried += (next_depth - cell_depth) as u64;
 
             // Set up constraint propagation.
             self.accumulator.reset(next_depth == num_cells);
@@ -1059,7 +995,7 @@ impl InternalSolver {
                 // Copy grid to next frame.
                 let old_depth = rec_depth;
                 rec_depth += 1;
-                counters.guesses += 1;
+                self.counters.guesses += 1;
 
                 self.rec_stack.copy_grid(old_depth, rec_depth);
 
@@ -1073,7 +1009,7 @@ impl InternalSolver {
             // Progress callback (every 2^logFreq iterations).
             iteration_counter += 1;
             if (iteration_counter & progress_mask) == 0 {
-                let p = self.build_progress(counters, rec_depth);
+                let p = self.build_progress(rec_depth);
                 progress(&p);
                 iteration_counter &= (1 << 30) - 1;
             }
@@ -1081,7 +1017,7 @@ impl InternalSolver {
             // Propagate constraints.
             let has_contradiction = {
                 let grid = &mut self.rec_stack.frame_mut(rec_depth).grid;
-                !enforce_constraints_on(grid, &mut self.accumulator, counters)
+                !enforce_constraints_on(grid, &mut self.accumulator, &mut self.counters)
             };
 
             if has_contradiction {
@@ -1091,15 +1027,15 @@ impl InternalSolver {
                         .frame_mut(rec_depth - 1)
                         .last_contradiction_cell = cell as i16;
                 }
-                counters.progress_ratio += progress_delta;
-                counters.backtracks += 1;
+                self.counters.progress_ratio += progress_delta;
+                self.counters.backtracks += 1;
                 self.candidate_selector
                     .conflict_scores_mut()
                     .increment(cell, value);
 
                 // ── CONTRADICTION YIELD POINT ────────────────────────
                 if step_mode {
-                    if self.step_state.step >= self.step_state.target {
+                    if self.step_state.step >= step_target {
                         // Make the pending guess visible in the grid.
                         let guess_depth = self.step_state.pending_guess_depth;
                         if guess_depth >= 0 {
@@ -1134,9 +1070,11 @@ impl InternalSolver {
                 }
                 // ─────────────────────────────────────────────────────
 
-                // ── BACKTRACK LIMIT CHECK ────────────────────────────
-                if max_backtracks > 0 && counters.backtracks >= max_backtracks {
-                    break;
+                // ── TERMINATION CHECK (after backtrack) ──────────────
+                if let RunMode::MaxBacktracks { max_backtracks } = mode {
+                    if self.counters.backtracks >= max_backtracks {
+                        return;
+                    }
                 }
                 // ─────────────────────────────────────────────────────
 
@@ -1148,7 +1086,7 @@ impl InternalSolver {
                 if s.enabled {
                     let grid = &self.rec_stack.frame(rec_depth).grid;
                     if !s.has_interesting_solutions(grid) {
-                        counters.branches_ignored += progress_delta;
+                        self.counters.branches_ignored += progress_delta;
                         continue;
                     }
                 }
@@ -1156,9 +1094,9 @@ impl InternalSolver {
 
             // Check if we've found a solution.
             if next_depth == num_cells {
-                counters.progress_ratio += progress_delta;
-                counters.solutions += 1;
-                counters.backtracks += 1;
+                self.counters.progress_ratio += progress_delta;
+                self.counters.solutions += 1;
+                self.counters.backtracks += 1;
 
                 let solution = &self.rec_stack.frame(rec_depth).grid;
 
@@ -1170,7 +1108,7 @@ impl InternalSolver {
                 // Record in SeenCandidateSet and enable pruning after 2 solutions.
                 if let Some(ref mut s) = seen {
                     s.add_solution(solution);
-                    if counters.solutions == 2 {
+                    if self.counters.solutions == 2 {
                         s.enabled = true;
                     }
                 }
@@ -1179,7 +1117,7 @@ impl InternalSolver {
 
                 // ── SOLUTION YIELD POINT ─────────────────────────────
                 if step_mode {
-                    if self.step_state.step >= self.step_state.target {
+                    if self.step_state.step >= step_target {
                         let guess_depth = self.step_state.pending_guess_depth;
                         let branch_depth = if guess_depth >= 0 {
                             (guess_depth + 1) as usize
@@ -1203,20 +1141,27 @@ impl InternalSolver {
                 }
                 // ─────────────────────────────────────────────────────
 
-                if max_solutions > 0 && counters.solutions >= max_solutions {
-                    // Save state so the search can be resumed later
-                    // (used by nth_solution).
-                    self.resume_state = Some(ResumeState {
-                        rec_depth,
-                        iteration_counter,
-                    });
-                    return;
+                match mode {
+                    RunMode::MaxSolutions { max_solutions } => {
+                        if self.counters.solutions >= max_solutions {
+                            // Save position so run() can continue from here.
+                            self.rec_depth = rec_depth;
+                            self.iteration_counter = iteration_counter;
+                            self.state = SolverState::Resumable;
+                            return;
+                        }
+                    }
+                    RunMode::MaxBacktracks { .. } => {
+                        // A solution is also a terminal backtrack event.
+                        return;
+                    }
+                    RunMode::Exhaustive | RunMode::Step { .. } => {}
                 }
                 continue;
             }
 
             // Recurse: set up the next frame.
-            counters.nodes_searched += 1;
+            self.counters.nodes_searched += 1;
             let frame = self.rec_stack.frame_mut(rec_depth);
             frame.cell_depth = next_depth;
             frame.new_node = true;
@@ -1225,10 +1170,9 @@ impl InternalSolver {
             rec_depth += 1;
         }
 
-        // Search space exhausted — clear resume state and current rec depth.
-        self.resume_state = None;
+        // Search space exhausted.
         self.current_rec_depth = None;
-        self.done = true;
+        self.state = SolverState::Exhausted;
 
         if self.debug_options.log_level >= 2 {
             self.debug_logs.push(DebugLog {

@@ -12,6 +12,7 @@
 //! - `{n}`, `{n,}`, `{n,m}` — counted repetition
 
 use super::nfa_core::{optimize_nfa, Nfa};
+use crate::api::types::Value;
 
 // ============================================================================
 // AST
@@ -38,7 +39,7 @@ enum AstNode {
 
 /// Map a character to a 1-based value.
 /// '1'–'9' → 1–9, 'A'–'Z'/'a'–'z' → 10–35.
-fn char_to_value(ch: u8) -> Result<u8, String> {
+fn char_to_value(ch: u8) -> Result<Value, String> {
     match ch {
         b'1'..=b'9' => Ok(ch - b'0'),
         b'A'..=b'Z' => Ok(ch - b'A' + 10),

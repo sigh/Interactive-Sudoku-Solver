@@ -103,7 +103,7 @@ pub fn count_solutions_with_progress(callback: &js_sys::Function, limit: u32) ->
         };
 
         let mut progress = make_js_progress_fn(callback);
-        let (count, counters) = solver.count_solutions_with_progress(limit as u64, &mut progress);
+        let (count, counters) = solver.count_solutions(limit as u64, &mut progress);
 
         serialize_or_error(&CountOutput {
             count,
@@ -134,7 +134,7 @@ pub fn validate_layout_with_progress(callback: &js_sys::Function) -> String {
         };
 
         let mut progress = make_js_progress_fn(callback);
-        let result = solver.validate_layout_with_progress(&mut progress);
+        let result = solver.validate_layout(&mut progress);
 
         let solution_str = result
             .solution

@@ -12,6 +12,7 @@ mod solver;
 pub use solver::Solver;
 
 use super::handler_accumulator::HandlerAccumulator;
+use crate::api::types::{CellIndex, Value};
 use crate::candidate_set::CandidateSet;
 use serde::Serialize;
 
@@ -83,14 +84,14 @@ pub struct StepResult {
     /// Depth of the guess cell in cell_order (-1 if no guess).
     pub guess_depth: i32,
     /// Cell order snapshot up to guess_depth+1 (the branch path).
-    pub branch_cells: Vec<crate::api::types::CellIndex>,
+    pub branch_cells: Vec<CellIndex>,
 }
 
 /// A user-provided step guide entry.
 #[derive(Debug, Clone)]
 pub struct StepGuide {
-    pub cell: Option<crate::api::types::CellIndex>,
-    pub value: Option<u8>,
+    pub cell: Option<CellIndex>,
+    pub value: Option<Value>,
     pub depth: usize,
 }
 

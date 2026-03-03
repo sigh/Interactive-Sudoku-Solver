@@ -7,7 +7,7 @@ use crate::grid_shape::GridShape;
 use crate::solver::cell_exclusions::CellExclusions;
 use crate::solver::grid_state_allocator::GridStateAllocator;
 use crate::solver::handler_accumulator::HandlerAccumulator;
-use crate::api::types::CellIndex;
+use crate::api::types::{CellIndex, Value};
 
 use super::util::handler_util::{expose_hidden_singles, find_exclusion_groups};
 use super::ConstraintHandler;
@@ -30,7 +30,7 @@ impl ValueCounts {
         }
     }
 
-    fn increment(&mut self, value: u8) {
+    fn increment(&mut self, value: Value) {
         let idx = (value - 1) as usize;
         if self.counts[idx] == 0 {
             self.num_distinct += 1;
@@ -39,7 +39,7 @@ impl ValueCounts {
     }
 
     /// Get the count for a given value (1-indexed).
-    pub fn get(&self, value: u8) -> u8 {
+    pub fn get(&self, value: Value) -> u8 {
         self.counts[(value - 1) as usize]
     }
 
@@ -49,7 +49,7 @@ impl ValueCounts {
     }
 
     /// Iterate over (value, count) pairs for values with count > 0.
-    pub fn iter(&self) -> impl Iterator<Item = (u8, u8)> + '_ {
+    pub fn iter(&self) -> impl Iterator<Item = (Value, u8)> + '_ {
         self.counts
             .iter()
             .enumerate()
@@ -65,7 +65,7 @@ impl ValueCounts {
 /// of times (not more).
 pub struct RequiredValues {
     cells: Vec<CellIndex>,
-    values: Vec<u8>,
+    values: Vec<Value>,
     strict: bool,
     /// Flat array from value → required count.
     value_counts: ValueCounts,
@@ -78,7 +78,7 @@ pub struct RequiredValues {
 }
 
 impl RequiredValues {
-    pub fn new(cells: Vec<CellIndex>, values: Vec<u8>, strict: bool) -> Self {
+    pub fn new(cells: Vec<CellIndex>, values: Vec<Value>, strict: bool) -> Self {
         let mut value_counts = ValueCounts::new();
         for &v in &values {
             value_counts.increment(v);
