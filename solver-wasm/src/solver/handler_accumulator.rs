@@ -77,7 +77,7 @@ impl HandlerAccumulator {
     /// `ordinary_map`: for each cell, the list of ordinary handler indices.
     /// `essential_flags`: for each handler index, whether it's essential.
     pub fn new(
-        all_handlers: Vec<Box<dyn ConstraintHandler>>,
+        mut all_handlers: Vec<Box<dyn ConstraintHandler>>,
         singleton_map: Vec<Vec<u16>>,
         ordinary_map: Vec<Vec<u16>>,
         aux_map: Vec<Vec<u16>>,
@@ -86,11 +86,27 @@ impl HandlerAccumulator {
     ) -> Self {
         let n = all_handlers.len();
 
-        // Build singleton handler map: for cells with multiple singletons,
-        // we could combine them, but for now just use the first.
+        // Build singleton handler map. When a cell has multiple singletons,
+        // wrap them in an And handler (mirrors JS HandlerAccumulator constructor).
         let mut singleton_handlers = vec![u16::MAX; singleton_map.len()];
         for (cell, indices) in singleton_map.iter().enumerate() {
-            if !indices.is_empty() {
+            if indices.is_empty() {
+                continue;
+            }
+            if indices.len() == 1 {
+                singleton_handlers[cell] = indices[0];
+            } else {
+                // Multiple singletons: combine into And, replace first slot.
+                let sub: Vec<Box<dyn ConstraintHandler>> = indices
+                    .iter()
+                    .map(|&idx| {
+                        std::mem::replace(
+                            &mut all_handlers[idx as usize],
+                            Box::new(crate::handlers::True),
+                        )
+                    })
+                    .collect();
+                all_handlers[indices[0] as usize] = Box::new(crate::handlers::And::new(sub));
                 singleton_handlers[cell] = indices[0];
             }
         }
@@ -146,6 +162,16 @@ impl HandlerAccumulator {
     /// Create a stub accumulator for a given grid size.
     #[cfg(test)]
     pub fn new_stub_with_num_cells(num_cells: usize) -> Self {
+        Self::new_no_propagate(num_cells)
+    }
+
+    /// Create a no-propagation accumulator for the given grid size.
+    ///
+    /// `add_for_cell` calls are silently ignored (no handlers are registered).
+    /// Used by the `Or` handler for scratch-grid evaluation of sub-handlers.
+    ///
+    /// Mirrors JS `DummyHandlerAccumulator`.
+    pub fn new_no_propagate(num_cells: usize) -> Self {
         HandlerAccumulator {
             all_handlers: Vec::new(),
             singleton_handlers: vec![u16::MAX; num_cells],

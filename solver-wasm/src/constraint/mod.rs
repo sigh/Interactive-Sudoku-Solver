@@ -16,6 +16,8 @@
 pub mod builder;
 pub mod parser;
 
+use crate::api::types::Value;
+
 /// A high-level constraint specification.
 ///
 /// These are the "what" — parsed from the frontend's constraint string.
@@ -29,7 +31,7 @@ pub enum Constraint {
     ///
     /// Single-value givens are typically encoded in the puzzle string itself,
     /// but pencilmark restrictions (multiple allowed values) use this variant.
-    Given { cell: String, values: Vec<u8> },
+    Given { cell: String, values: Vec<Value> },
 
     /// All cells must have different values.
     AllDifferent { cells: Vec<String> },
@@ -185,5 +187,162 @@ pub enum Constraint {
 
     /// Jigsaw region: an irregular group of cells that must contain all
     /// digits without repetition. `grid_spec` identifies the grid shape.
-    Jigsaw { grid_spec: String, cells: Vec<String> },
+    Jigsaw {
+        grid_spec: String,
+        cells: Vec<String>,
+    },
+
+    /// Cells must contain at least the specified values (with multiplicity).
+    /// Mirrors JS `ContainAtLeast` constraint.
+    ContainAtLeast {
+        cells: Vec<String>,
+        values: Vec<Value>,
+    },
+
+    /// Cells must contain exactly the specified values (with multiplicity).
+    /// Mirrors JS `ContainExact` constraint.
+    ContainExact {
+        cells: Vec<String>,
+        values: Vec<Value>,
+    },
+
+    /// Quad: the four cells of a 2×2 square must collectively contain the
+    /// given values. `top_left` is the top-left cell of the square.
+    Quad {
+        top_left: String,
+        values: Vec<Value>,
+    },
+
+    /// Priority: overrides the solver's candidate-selection order for the
+    /// specified cells. Higher priority = cells selected earlier.
+    Priority { cells: Vec<String>, priority: i32 },
+
+    /// Lockout line: endpoints must differ by at least `min_diff`; intermediate
+    /// cells must not lie in the locked-out range between the endpoints.
+    /// Mirrors JS `Lockout` constraint.
+    Lockout { min_diff: u8, cells: Vec<String> },
+
+    /// DutchFlatmates: every occurrence of the mid value (⌈numValues/2⌉) in
+    /// each column must have value 1 directly above it or value `numValues`
+    /// directly below it. Global constraint; no cells stored.
+    /// Mirrors JS `DutchFlatmates` constraint.
+    DutchFlatmates,
+
+    /// ValueIndexing: an arrow pointing from a value cell. The control cell
+    /// (second on the line) gives the 1-based index into the remaining cells
+    /// that must contain the same value as the value cell.
+    /// cells = [value_cell, control_cell, indexed_cells...]
+    /// Mirrors JS `ValueIndexing` constraint.
+    ValueIndexing { cells: Vec<String> },
+
+    /// NumberedRoom outside clue: the clue value gives the digit that must
+    /// appear in the N-th cell of the row/column from the outside, where N is
+    /// the digit in the edge cell.
+    /// `arrow_id` encodes the row/column and direction, e.g. `"R3,1"` or `"C5,-1"`.
+    /// Mirrors JS `NumberedRoom` constraint (OutsideConstraintBase, CLUE_TYPE_DOUBLE_LINE).
+    NumberedRoom { arrow_id: String, value: u8 },
+
+    /// Indexing (UI constraint): for each control cell in `cells`, the cell's
+    /// value V tells which position in the same row (`index_type = "R"`) or
+    /// column (`index_type = "C"`) contains the value equal to the control
+    /// cell's column or row number respectively.
+    /// Mirrors JS `Indexing` constraint.
+    Indexing {
+        index_type: String,
+        cells: Vec<String>,
+    },
+
+    /// Global entropy: every 2×2 region must contain one value from each of
+    /// the triad groups {1,2,3}, {4,5,6}, {7,8,9}.
+    /// Mirrors JS `GlobalEntropy` constraint.
+    GlobalEntropy,
+
+    /// Global mod 3: every 2×2 region must contain one value from each of
+    /// the triad groups {1,4,7}, {2,5,8}, {3,6,9}.
+    /// Mirrors JS `GlobalMod` constraint.
+    GlobalMod,
+
+    /// Sum line: the line can be divided into non-overlapping segments each
+    /// summing to `sum`. If `is_loop`, the line is treated as a loop.
+    /// Mirrors JS `SumLine` constraint.
+    SumLine {
+        sum: u32,
+        is_loop: bool,
+        cells: Vec<String>,
+    },
+
+    /// Counting circles: digit v must appear exactly v times in the set.
+    /// Mirrors JS `CountingCircles` constraint.
+    CountingCircles { cells: Vec<String> },
+
+    /// SameValues: multiple cell-sets of equal size must contain the same
+    /// multiset of values (including count enforcement).
+    /// `num_sets` tells how many equal-sized subsets `cells` is divided into.
+    /// Mirrors JS `SameValues` constraint.
+    SameValues { num_sets: u32, cells: Vec<String> },
+
+    /// RegionSameValues: all standard regions (rows, cols, boxes, jigsaws)
+    /// must contain the same multiset of values.
+    /// Mirrors JS `RegionSameValues` constraint.
+    RegionSameValues,
+
+    /// Sandwich: values between 1 and numValues (the sentinels) in the
+    /// given row/column must sum to `value`.
+    /// `arrow_id`: `"R3,1"` / `"C5,-1"` encoding — same as NumberedRoom.
+    /// Mirrors JS `Sandwich` constraint.
+    Sandwich { arrow_id: String, value: u32 },
+
+    /// Lunchbox: values sandwiched between the smallest and largest
+    /// elements of the given cell set must sum to `sum`.
+    /// Mirrors JS `Lunchbox` constraint.
+    Lunchbox { sum: u32, cells: Vec<String> },
+
+    /// Skyscraper outside clue: exactly `value` skyscrapers are visible
+    /// from the start of the row/column.
+    /// `arrow_id`: `"R3,1"` / `"C5,-1"` encoding — same as NumberedRoom.
+    /// Mirrors JS `Skyscraper` constraint.
+    Skyscraper { arrow_id: String, value: u32 },
+
+    /// HiddenSkyscraper outside clue: `value` is the first hidden
+    /// skyscraper value in the given row/column direction.
+    /// `arrow_id`: `"R3,1"` / `"C5,-1"` encoding.
+    /// Mirrors JS `HiddenSkyscraper` constraint.
+    HiddenSkyscraper { arrow_id: String, value: u32 },
+
+    /// Anti-killer cage: no subset of cells may sum to `sum`.
+    /// Cells must also be all-different.
+    /// Mirrors JS `RellikCage` constraint.
+    RellikCage { sum: u32, cells: Vec<String> },
+
+    /// Equality cage: cells are split equally between even/odd values AND
+    /// between low/high values. Cells must also be all-different.
+    /// Mirrors JS `EqualityCage` constraint.
+    EqualityCage { cells: Vec<String> },
+
+    /// XSum outside clue: the first X cells in the row/column sum to `value`,
+    /// where X equals the digit in the control (first) cell.
+    /// Mirrors JS `XSum` constraint.
+    XSum { arrow_id: String, value: u32 },
+
+    /// FullRank outside clue: `value` is the 1-based rank of this row/column
+    /// when all rows and columns read from the clue direction are sorted
+    /// lexicographically. Uses `CLUE_TYPE_DOUBLE_LINE` format;
+    /// `arrow_id` is `"R3,1"` / `"R3,-1"` / `"C5,1"` etc.
+    /// Mirrors JS `FullRank` constraint.
+    FullRank { arrow_id: String, value: u32 },
+
+    /// Global tie-mode modifier for FullRank: controls whether lines with
+    /// equal values may share a rank.
+    /// `ties` is `"none"`, `"only-unclued"`, or `"any"`.
+    /// Mirrors JS `FullRankTies` constraint.
+    FullRankTies { ties: String },
+
+    /// Disjunctive composite: at least one group of inner constraints must
+    /// hold simultaneously.
+    /// Mirrors JS `Or` constraint.
+    Or { groups: Vec<Vec<Constraint>> },
+
+    /// Conjunctive composite wrapper (used internally when building Or).
+    /// Mirrors JS `And` constraint.
+    And { constraints: Vec<Constraint> },
 }

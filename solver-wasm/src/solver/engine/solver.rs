@@ -2,27 +2,22 @@
 
 use std::collections::HashMap;
 
-use super::internal_solver::InternalSolver;
+use super::internal_solver::{InternalSolver, RunMode, SolverState};
 use super::{AllPossibilitiesResult, SolveResult, SolverCounters, StepGuide, StepResult};
-use crate::candidate_set::CandidateSet;
 use crate::grid::Grid;
 use crate::grid_shape::GridShape;
 use crate::handlers::ConstraintHandler;
-use crate::solver::candidate_selector::CandidateSelector;
-use crate::solver::debug::{DebugOptions, SolverProgress};
+use crate::solver::debug::{DebugLog, DebugOptions, SolverProgress};
 
 /// Public solver wrapper.
 ///
-/// Owns the [`InternalSolver`] (search engine) and iteration management
-/// state (`resume_counters`). This mirrors the JS `SudokuSolver` /
-/// `InternalSolver` split: `InternalSolver` handles the core search,
-/// while `Solver` adds `nth_solution` navigation.
+/// Owns the [`InternalSolver`] (search engine). Counters are owned by
+/// `inner` and accumulate across `nth_solution` calls. Mirrors the JS
+/// `SudokuSolver` / `InternalSolver` split.
 ///
 /// Constructed via [`SudokuBuilder::build`](crate::constraint::builder::SudokuBuilder::build).
 pub struct Solver {
     inner: InternalSolver,
-    /// Cumulative counters across resumed `nth_solution` calls.
-    resume_counters: Option<SolverCounters>,
 }
 
 impl Solver {
@@ -37,10 +32,7 @@ impl Solver {
         shape: GridShape,
     ) -> Result<Self, String> {
         let inner = InternalSolver::new(grid, handlers, shape)?;
-        Ok(Self {
-            inner,
-            resume_counters: None,
-        })
+        Ok(Self { inner })
     }
 
     /// Find the nth solution (0-indexed), resuming the search when possible.
@@ -52,6 +44,8 @@ impl Solver {
     ///
     /// Going backwards (`n < solutions_already_found`) resets the search
     /// and replays from the start.
+    ///
+    /// Mirrors JS `SudokuSolver.nthSolution(n)`.
     pub fn nth_solution(
         &mut self,
         n: u64,
@@ -64,143 +58,167 @@ impl Solver {
             };
         }
 
-        // Recover cumulative counters from previous calls, if any.
-        let mut counters = self.resume_counters.take().unwrap_or_default();
+        let target = n + 1; // need `target` total solutions to reach solution n (0-indexed)
+        let mut solution = None;
 
-        let target = n + 1; // we need `target` total solutions
-
-        // Reset if going backwards (already found too many) or if no
-        // resume state exists (first call, or search previously exhausted).
-        // This mirrors the JS: `if (n <= iter.count) { this._reset(); }`
-        if counters.solutions >= target || self.inner.resume_state.is_none() {
-            counters = SolverCounters::default();
-            self.inner.resume_state = None;
+        // Reset if going backwards or if the solver is in an intermediate state
+        // (e.g. after nth_step interrupted a search), where run() would panic.
+        if target <= self.inner.counters.solutions || self.inner.state == SolverState::Incomplete {
+            // Going backwards or invalid state: full reset (fresh conflict
+            // scores + counters), matching JS.
+            self.inner.reset();
         }
 
-        // run_impl will resume if resume_state is set, or init if not.
-        // max_solutions = target: stop once we've found enough.
+        if self.inner.state != SolverState::Exhausted {
+            self.inner.run(
+                RunMode::MaxSolutions {
+                    max_solutions: target,
+                },
+                progress,
+                None,
+                &mut |sol| {
+                    solution = Some(sol.to_vec());
+                },
+            );
+        }
+
+        // If the search exhausted before reaching the target, there is no nth solution.
+        if self.inner.counters.solutions < target {
+            solution = None;
+        }
+
+        SolveResult {
+            solution,
+            counters: self.inner.counters.clone(),
+        }
+    }
+
+    /// Solve and return the first solution found (if any).
+    ///
+    /// Pass `&mut |_| {}` as `progress` to disable progress reporting.
+    pub fn solve(&mut self, progress: &mut dyn FnMut(&SolverProgress)) -> SolveResult {
+        if self.inner.initial_contradiction {
+            return SolveResult {
+                solution: None,
+                counters: SolverCounters::default(),
+            };
+        }
+        self.inner.reset();
         let mut solution = None;
-        self.inner.run_impl(
-            &mut counters,
-            target,
-            0, // no backtrack limit
+        self.inner.run(
+            RunMode::MaxSolutions { max_solutions: 1 },
             progress,
             None,
             &mut |sol| {
                 solution = Some(sol.to_vec());
             },
-            false,
         );
-
-        // If the search exhausted before reaching the target, there is
-        // no nth solution — return None.
-        if counters.solutions < target {
-            solution = None;
+        SolveResult {
+            solution,
+            counters: self.inner.counters.clone(),
         }
-
-        // Save counters for next call.
-        self.resume_counters = Some(counters.clone());
-
-        SolveResult { solution, counters }
     }
 
-    // ── Delegation to InternalSolver ─────────────────────────────────
-
-    pub fn solve(&mut self) -> SolveResult {
-        self.inner.solve()
+    /// Validate the layout by attempting to find any solution.
+    ///
+    /// Uses a house-filling warmup heuristic to quickly identify invalid layouts.
+    /// Pass `&mut |_| {}` as `progress` to disable progress reporting.
+    pub fn validate_layout(&mut self, progress: &mut dyn FnMut(&SolverProgress)) -> SolveResult {
+        self.inner.reset();
+        self.inner.validate_layout(progress)
     }
 
-    pub fn solve_with_progress(
-        &mut self,
-        progress: &mut dyn FnMut(&SolverProgress),
-    ) -> SolveResult {
-        self.inner.solve_with_progress(progress)
-    }
-
-    pub fn validate_layout(&mut self) -> SolveResult {
-        self.inner.validate_layout()
-    }
-
-    pub fn validate_layout_with_progress(
-        &mut self,
-        progress: &mut dyn FnMut(&SolverProgress),
-    ) -> SolveResult {
-        self.inner.validate_layout_with_progress(progress)
-    }
-
-    pub fn count_solutions(&mut self, limit: u64) -> (u64, SolverCounters) {
-        self.inner.count_solutions(limit)
-    }
-
-    pub fn count_solutions_with_progress(
+    /// Count solutions up to `limit` (0 = unlimited).
+    ///
+    /// Pass `&mut |_| {}` as `progress` to disable progress reporting.
+    pub fn count_solutions(
         &mut self,
         limit: u64,
         progress: &mut dyn FnMut(&SolverProgress),
     ) -> (u64, SolverCounters) {
-        self.inner.count_solutions_with_progress(limit, progress)
+        if self.inner.initial_contradiction {
+            return (0, SolverCounters::default());
+        }
+        self.inner.reset();
+        let mode = if limit == 0 {
+            RunMode::Exhaustive
+        } else {
+            RunMode::MaxSolutions {
+                max_solutions: limit,
+            }
+        };
+        self.inner.run(mode, progress, None, &mut |_| {});
+        (self.inner.counters.solutions, self.inner.counters.clone())
     }
 
+    /// Solve all possibilities: find every solution and track per-cell
+    /// per-value candidate counts.
     pub fn solve_all_possibilities(
         &mut self,
         threshold: u8,
         progress: &mut dyn FnMut(&SolverProgress),
     ) -> AllPossibilitiesResult {
+        self.inner.reset();
         self.inner.solve_all_possibilities(threshold, progress)
     }
 
+    /// Estimate the number of solutions using Knuth's random-walk method.
     pub fn estimated_count_solutions(
         &mut self,
         max_samples: u64,
         progress: &mut dyn FnMut(&SolverProgress),
     ) -> (f64, u64, SolverCounters) {
+        self.inner.reset();
         self.inner.estimated_count_solutions(max_samples, progress)
     }
 
+    /// Find the nth step (0-indexed).
+    ///
+    /// Mirrors JS `SudokuSolver.nthStep(n, stepGuides)`. Always replays
+    /// from scratch for determinism (same step every time for same index).
+    ///
+    /// Returns `Some(StepResult)` if step `n` exists, `None` if the
+    /// search is exhausted before reaching that step.
     pub fn nth_step(
         &mut self,
         n: u64,
         step_guides: HashMap<u64, StepGuide>,
         progress: &mut dyn FnMut(&SolverProgress),
     ) -> Option<StepResult> {
-        self.inner.nth_step(n, step_guides, progress)
+        if self.inner.initial_contradiction {
+            return None;
+        }
+
+        // Always start fresh — guarantees determinism.
+        self.inner.reset();
+        self.inner.set_step_guides(step_guides);
+
+        // Log the step marker (matching JS nthStep debug log).
+        if self.inner.debug_options.log_level >= 1 {
+            self.inner.debug_logs.push(DebugLog {
+                loc: "nthStep".to_string(),
+                msg: format!("Step {}", n),
+                args: None,
+                important: true,
+                cells: Vec::new(),
+                candidates: Vec::new(),
+                overlay: Vec::new(),
+            });
+        }
+
+        // target is 1-indexed: step n (0-indexed) is event number n+1.
+        self.inner
+            .run(RunMode::Step { target: n + 1 }, progress, None, &mut |_| {});
+
+        self.inner.take_step_result()
     }
 
-    pub fn get_sample_solution(&self) -> Option<&[CandidateSet]> {
-        self.inner.get_sample_solution()
-    }
-
-    pub fn unset_sample_solution(&mut self) {
-        self.inner.unset_sample_solution()
-    }
-
-    pub fn get_stack_trace(&self) -> Option<(Vec<crate::api::types::CellIndex>, Vec<u8>)> {
-        self.inner.get_stack_trace()
-    }
-
-    pub fn set_candidate_selector(&mut self, selector: CandidateSelector) {
-        self.inner.set_candidate_selector(selector)
-    }
-
-    pub fn is_done(&self) -> bool {
-        self.inner.is_done()
-    }
-
-    pub fn is_at_start(&self) -> bool {
-        self.inner.is_at_start()
-    }
-
-    pub fn reset(&mut self) {
-        self.inner.reset()
-    }
-
-    pub fn reset_run(&mut self) {
-        self.inner.reset_run()
-    }
-
+    /// Set the log2 progress frequency.
     pub fn set_progress_frequency(&mut self, log_freq: u32) {
         self.inner.set_progress_frequency(log_freq)
     }
 
+    /// Set debug options controlling what debug data to export.
     pub fn set_debug_options(&mut self, opts: DebugOptions) {
         self.inner.set_debug_options(opts)
     }

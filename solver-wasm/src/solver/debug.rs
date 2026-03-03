@@ -5,7 +5,7 @@
 //! worker messages.
 
 use serde::{Deserialize, Serialize};
-use crate::api::types::CellIndex;
+use crate::api::types::{CellIndex, Value};
 
 // ============================================================================
 // Debug options (input from JS)
@@ -68,7 +68,7 @@ pub struct DebugLog {
     /// Per-cell removed candidates (for step-by-step constraint diffs).
     /// Each entry is a vec of removed values for the corresponding cell index.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub candidates: Vec<Vec<u8>>,
+    pub candidates: Vec<Vec<Value>>,
 
     /// Per-cell value overlay (for hover display).
     /// In JS this is an array of numbers shown as hover text on cells.

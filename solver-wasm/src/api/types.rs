@@ -16,9 +16,6 @@ use crate::solver::SolverCounters;
 /// Cell index (0..255). All grid cell references use this type.
 pub type CellIndex = u8;
 
-/// Packed pair index: `(cell_a << 8) | cell_b` for two-cell lookups.
-pub type PairIndex = u16;
-
 /// Sudoku value (1..=16). Distinguished from cell indices and byte counts.
 pub type Value = u8;
 
@@ -101,13 +98,13 @@ pub struct StepOutput {
     pub has_contradiction: bool,
     /// The candidate values for the guess cell (present when guess_depth >= 0).
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub values: Option<Vec<u8>>,
+    pub values: Option<Vec<Value>>,
     /// The guess cell index (present when guess_depth >= 0).
     #[serde(rename = "guessCell", skip_serializing_if = "Option::is_none")]
     pub guess_cell: Option<CellIndex>,
     /// Per-cell diff pencilmarks (values removed since old_grid).
     #[serde(rename = "diffPencilmarks", skip_serializing_if = "Option::is_none")]
-    pub diff_pencilmarks: Option<Vec<Vec<u8>>>,
+    pub diff_pencilmarks: Option<Vec<Vec<Value>>>,
 }
 
 /// JSON output for an estimated-count-solutions request.

@@ -4,6 +4,8 @@
 
 use std::collections::{HashSet, VecDeque};
 
+use crate::api::types::Value;
+
 /// Sentinel for removed states in remap arrays.
 const REMOVE_STATE: i32 = -1;
 
@@ -93,7 +95,7 @@ impl Nfa {
     }
 
     /// Add transitions from `from` to `to` on each given symbol (1-based values).
-    pub fn add_transition(&mut self, from: usize, to: usize, symbols: &[u8]) {
+    pub fn add_transition(&mut self, from: usize, to: usize, symbols: &[Value]) {
         assert!(!self.sealed);
         self.ensure_state_exists(from);
         self.ensure_state_exists(to);

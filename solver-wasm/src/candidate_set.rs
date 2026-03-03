@@ -17,6 +17,7 @@ use std::ops::{
     BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Not, Shl, ShlAssign, Shr,
     ShrAssign,
 };
+use crate::api::types::Value;
 
 /// A bitmask representing a set of candidate values (1–9).
 /// Bit `i` represents value `i + 1`.
@@ -39,7 +40,7 @@ impl CandidateSet {
     /// From a single value (1-indexed).
     /// JS: `LookupTables.fromValue(v)`
     #[inline(always)]
-    pub const fn from_value(v: u8) -> Self {
+    pub const fn from_value(v: Value) -> Self {
         // debug_assert in const fn is nightly-only, so we skip it here.
         Self(1 << (v - 1))
     }
@@ -53,7 +54,7 @@ impl CandidateSet {
 
     /// From an iterator of 1-indexed values.
     /// JS: `LookupTables.fromValuesArray(xs)`
-    pub fn from_values(vs: impl IntoIterator<Item = u8>) -> Self {
+    pub fn from_values(vs: impl IntoIterator<Item = Value>) -> Self {
         vs.into_iter()
             .fold(Self::EMPTY, |acc, v| acc | Self::from_value(v))
     }
@@ -75,7 +76,7 @@ impl CandidateSet {
     /// The single value (1-indexed).  Exactly one bit must be set.
     /// JS: `LookupTables.toValue(v)` — `32 - Math.clz32(v)`
     #[inline(always)]
-    pub fn value(self) -> u8 {
+    pub fn value(self) -> Value {
         debug_assert!(self.0.count_ones() == 1);
         self.0.trailing_zeros() as u8 + 1
     }
@@ -116,7 +117,7 @@ impl CandidateSet {
     /// Minimum value (1-indexed).  Mask must be non-empty.
     /// JS: `LookupTables.minValue(v)`
     #[inline(always)]
-    pub fn min_value(self) -> u8 {
+    pub fn min_value(self) -> Value {
         debug_assert!(!self.is_empty());
         self.0.trailing_zeros() as u8 + 1
     }
@@ -124,7 +125,7 @@ impl CandidateSet {
     /// Maximum value (1-indexed).  Mask must be non-empty.
     /// JS: `LookupTables.maxValue(v)`
     #[inline(always)]
-    pub fn max_value(self) -> u8 {
+    pub fn max_value(self) -> Value {
         debug_assert!(!self.is_empty());
         16 - self.0.leading_zeros() as u8
     }
@@ -200,7 +201,7 @@ impl CandidateSet {
 
     /// Collect to a `Vec` of 1-indexed values.
     /// JS: `LookupTables.toValuesArray(v)`
-    pub fn to_values(self) -> Vec<u8> {
+    pub fn to_values(self) -> Vec<Value> {
         self.iter().map(|c| c.value()).collect()
     }
 }
