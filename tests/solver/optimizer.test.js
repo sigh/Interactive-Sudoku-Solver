@@ -15,6 +15,9 @@ const { SudokuConstraintBase } = await import('../../js/sudoku_constraint.js' + 
 
 const createExclusions = (numCells) => createCellExclusions({ allUnique: false, numCells });
 
+const shapeMaxSum = (shape) => shape.numValues * (shape.numValues + 1) / 2;
+const shapeAllCells = (shape) => Array.from({ length: shape.numCells }, (_, i) => i);
+
 await runTest('_findKnownRequiredValues: simple exclusion', () => {
   const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
   const numCells = 3;
@@ -368,7 +371,7 @@ await runTest('_addSumIntersectionHandler: infeasible inferred sum adds False ha
   // Pick a cageSum that yields totalSum=2, which is below the min=3.
   const houseCells = Array.from({ length: shape.numValues }, (_, i) => i);
   const cageCells = [...houseCells, ...extraCells];
-  const cageSum = shape.maxSum + 2;
+  const cageSum = shapeMaxSum(shape) + 2;
 
   const houseHandler = new HandlerModule.House(houseCells);
   const sumHandler = new SumHandlerModule.Sum(cageCells, cageSum);
@@ -400,7 +403,7 @@ await runTest('_replaceSizeSpecificSumHandlers: size=numValues mutually exclusiv
   }
 
   {
-    const sumHandler = new SumHandlerModule.Sum(cells, shape.maxSum);
+    const sumHandler = new SumHandlerModule.Sum(cells, shapeMaxSum(shape));
     const handlerSet = new HandlerSet([sumHandler], shape);
 
     optimizer._replaceSizeSpecificSumHandlers(handlerSet, cellExclusions, shape);
@@ -411,7 +414,7 @@ await runTest('_replaceSizeSpecificSumHandlers: size=numValues mutually exclusiv
   }
 
   {
-    const sumHandler = new SumHandlerModule.Sum(cells, shape.maxSum - 1);
+    const sumHandler = new SumHandlerModule.Sum(cells, shapeMaxSum(shape) - 1);
     const handlerSet = new HandlerSet([sumHandler], shape);
 
     optimizer._replaceSizeSpecificSumHandlers(handlerSet, cellExclusions, shape);
@@ -431,7 +434,7 @@ await runTest('_fillInSumGap: returns empty when all cells covered', () => {
   const shape = GridShape.fromGridSize(9);
 
   // All 81 cells covered by sum handlers.
-  const sumCells = new Set(shape.allCells);
+  const sumCells = new Set(shapeAllCells(shape));
   const sumHandlers = [];
 
   const result = optimizer._fillInSumGap(sumHandlers, sumCells, shape);
@@ -443,7 +446,7 @@ await runTest('_fillInSumGap: returns empty when gap too large', () => {
   const shape = GridShape.fromGridSize(9);
 
   // Only 72 cells covered, gap is 9 cells (>= numValues).
-  const sumCells = new Set(shape.allCells.slice(0, 72));
+  const sumCells = new Set(shapeAllCells(shape).slice(0, 72));
   const sumHandlers = [];
 
   const result = optimizer._fillInSumGap(sumHandlers, sumCells, shape);
@@ -455,7 +458,7 @@ await runTest('_fillInSumGap: creates handler for small gap in 9x9', () => {
   const shape = GridShape.fromGridSize(9);
 
   // Cover 78 cells, leave 3 uncovered (cells 78, 79, 80).
-  const coveredCells = shape.allCells.slice(0, 78);
+  const coveredCells = shapeAllCells(shape).slice(0, 78);
   const sumCells = new Set(coveredCells);
 
   // Sum of all covered cells. Total grid sum for 9x9 = 9 * 45 = 405.
@@ -481,7 +484,7 @@ await runTest('_fillInSumGap: correct sum for 4x6 rectangular grid', () => {
   // Or equivalently: 4 rows * 21 per row = 84.
 
   // Cover 22 cells, leave 2 uncovered.
-  const coveredCells = shape.allCells.slice(0, 22);
+  const coveredCells = shapeAllCells(shape).slice(0, 22);
   const sumCells = new Set(coveredCells);
 
   // Assume uncovered cells (22, 23) sum to 11.
@@ -505,7 +508,7 @@ await runTest('_fillInSumGap: correct sum for 6x4 rectangular grid', () => {
   // Or equivalently: 4 columns * 21 per column = 84.
 
   // Cover 20 cells, leave 4 uncovered.
-  const coveredCells = shape.allCells.slice(0, 20);
+  const coveredCells = shapeAllCells(shape).slice(0, 20);
   const sumCells = new Set(coveredCells);
 
   // Assume uncovered cells sum to 14.
@@ -529,7 +532,7 @@ await runTest('_fillInSumGap: correct sum for 6x8 rectangular grid', () => {
   // Or equivalently: 6 rows * 36 per row = 216.
 
   // Cover 45 cells, leave 3 uncovered.
-  const coveredCells = shape.allCells.slice(0, 45);
+  const coveredCells = shapeAllCells(shape).slice(0, 45);
   const sumCells = new Set(coveredCells);
 
   // Assume uncovered cells sum to 15.
@@ -550,9 +553,9 @@ await runTest('_fillInSumGap: multiple sum handlers combine correctly', () => {
 
   // Total grid sum for 9x9 = 405.
   // Create multiple sum handlers covering different regions.
-  const cells1 = shape.allCells.slice(0, 27);  // First 3 rows (27 cells)
-  const cells2 = shape.allCells.slice(27, 54); // Next 3 rows (27 cells)
-  const cells3 = shape.allCells.slice(54, 76); // Partial coverage (22 cells)
+  const cells1 = shapeAllCells(shape).slice(0, 27);  // First 3 rows (27 cells)
+  const cells2 = shapeAllCells(shape).slice(27, 54); // Next 3 rows (27 cells)
+  const cells3 = shapeAllCells(shape).slice(54, 76); // Partial coverage (22 cells)
   // Remaining: cells 76-80 (5 cells)
 
   const sum1 = 45 * 3; // 135
@@ -578,7 +581,7 @@ await runTest('_fillInSumGap: handles single cell gap', () => {
   const shape = GridShape.fromGridSize(9);
 
   // Cover all but 1 cell.
-  const coveredCells = shape.allCells.slice(0, 80);
+  const coveredCells = shapeAllCells(shape).slice(0, 80);
   const sumCells = new Set(coveredCells);
 
   // Total = 405, leaving sum=5 for the last cell.
@@ -599,7 +602,7 @@ await runTest('_fillInSumGap: handles gap of numValues-1 cells', () => {
   const shape = GridShape.fromGridSize(9);
 
   // Cover all but 8 cells (numValues - 1 = 8).
-  const coveredCells = shape.allCells.slice(0, 73);
+  const coveredCells = shapeAllCells(shape).slice(0, 73);
   const sumCells = new Set(coveredCells);
 
   // Total = 405, remaining 8 cells sum to some value.
@@ -619,7 +622,7 @@ await runTest('_fillInSumGap: adds handler to sumHandlers array', () => {
   const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
   const shape = GridShape.fromGridSize(9);
 
-  const coveredCells = shape.allCells.slice(0, 78);
+  const coveredCells = shapeAllCells(shape).slice(0, 78);
   const sumCells = new Set(coveredCells);
   const coveredSum = 399;
   const sumHandler = new SumHandlerModule.Sum(coveredCells, coveredSum);
@@ -636,7 +639,7 @@ await runTest('_fillInSumGap: updates sumCells set', () => {
   const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
   const shape = GridShape.fromGridSize(9);
 
-  const coveredCells = shape.allCells.slice(0, 78);
+  const coveredCells = shapeAllCells(shape).slice(0, 78);
   const sumCells = new Set(coveredCells);
   const coveredSum = 399;
   const sumHandler = new SumHandlerModule.Sum(coveredCells, coveredSum);
@@ -737,7 +740,7 @@ await runTest('_optimizeNonSquareGrids: adds aux handler for 8x9 no-box grid', (
 
 await runTest('_optimizeNonSquareGrids: skips when numValues matches neither axis', () => {
   const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
-  const shape = GridShape.fromGridSize(8, 9).withNumValues(10);
+  const shape = GridShape.fromGridSize(8, 9, 10);
 
   // Add all-different constraints for both axes.
   const handlers = [];

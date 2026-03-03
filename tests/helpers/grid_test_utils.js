@@ -50,15 +50,15 @@ export class GridTestContext {
     shape,
   } = {}) {
     this.shape = (() => {
-      if (shape) return (numValues === null || numValues === undefined) ? shape : shape.withNumValues(numValues);
+      if (shape) return (numValues === null || numValues === undefined) ? shape : GridShape.fromGridSize(shape.numRows, shape.numCols, numValues);
 
       const dims = normalizeGridSize(gridSize);
       if (!dims) throw new Error(`Invalid gridSize: ${gridSize}`);
       const [numRows, numCols] = dims;
 
-      const baseShape = GridShape.fromGridSize(numRows, numCols);
+      const baseShape = GridShape.fromGridSize(numRows, numCols, numValues);
       if (!baseShape) throw new Error(`Invalid gridSize: ${gridSize}`);
-      return (numValues === null || numValues === undefined) ? baseShape : baseShape.withNumValues(numValues);
+      return baseShape;
     })();
 
     this.lookupTables = LookupTables.get(this.shape.numValues);
