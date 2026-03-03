@@ -8,10 +8,10 @@
 
 use std::rc::Rc;
 
-use crate::candidate_set::CandidateSet;
-use crate::solver::cell_exclusions::CellExclusions;
-use crate::solver::handler_accumulator::HandlerAccumulator;
 use crate::api::types::CellIndex;
+use crate::candidate_set::CandidateSet;
+use crate::solver::cell_exclusions::{CellExclusions, PairIndex};
+use crate::solver::handler_accumulator::HandlerAccumulator;
 
 use super::ConstraintHandler;
 
@@ -44,11 +44,7 @@ impl ConstraintHandler for ValueDependentUniqueValueExclusionHouse {
         &self.cells
     }
 
-    fn enforce_consistency(
-        &self,
-        grid: &mut [CandidateSet],
-        acc: &mut HandlerAccumulator,
-    ) -> bool {
+    fn enforce_consistency(&self, grid: &mut [CandidateSet], acc: &mut HandlerAccumulator) -> bool {
         let cells = &self.cells;
         let num_cells = cells.len();
 
@@ -96,7 +92,7 @@ impl ValueDependentUniqueValueExclusionHouse {
         let num_cells = cells.len();
 
         // Build pair index matching JS: `pairIndex = (pairIndex << 8) | cells[i]`
-        let mut pair_index: u16 = 0;
+        let mut pair_index: PairIndex = 0;
         for i in 0..num_cells {
             if grid[cells[i] as usize].intersects(v) {
                 pair_index = (pair_index << 8) | cells[i] as u16;

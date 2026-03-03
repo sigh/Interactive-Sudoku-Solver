@@ -27,12 +27,16 @@ pub(super) fn optimize_full_rank(hs: &mut HandlerSet, ctx: &mut OptimizerCtx) {
     // Collect all clues and determine min tie mode.
     let mut all_clues = Vec::new();
     let mut tie_mode = TieMode::Any;
+    let first_idx = rank_info[0].0;
     for (idx, clues, tm) in &rank_info {
         all_clues.extend_from_slice(clues);
         tie_mode = tie_mode.min(*tm);
-        // Replace original handler with True.
-        let true_handler = True;
-        hs.replace(*idx, Box::new(true_handler));
+        // Replace all but the first slot with True (no-op).
+        // The first slot will hold the merged handler.
+        if *idx != first_idx {
+            let true_handler = True;
+            hs.replace(*idx, Box::new(true_handler));
+        }
     }
 
     // Dedupe clues by rank. For duplicates, create BinaryConstraint equals.
@@ -83,5 +87,9 @@ pub(super) fn optimize_full_rank(hs: &mut HandlerSet, ctx: &mut OptimizerCtx) {
         None,
         handler.cells().to_vec(),
     );
-    hs.add_essential(Box::new(handler));
+    // Put the merged handler in the first original slot.
+    // Using replace() instead of add_essential() avoids the seen-map dedup issue:
+    // all FullRank handlers share the same id_str() (same name + same all-cell coverage),
+    // so add_essential() would find the old ID in `seen` and skip the merged handler.
+    hs.replace(first_idx, Box::new(handler));
 }

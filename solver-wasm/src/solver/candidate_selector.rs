@@ -130,20 +130,28 @@ impl CandidateSelector {
         }
     }
 
-    /// Reset for a new solve run (preserves conflict scores).
+    /// Reset for a new solve run (preserves conflict scores and candidate finder).
+    ///
+    /// Mirrors JS `CandidateSelector.reset()`. Does NOT reset the
+    /// `CandidateFinderSet` — JS keeps it initialized across runs
+    /// (lazily initialized on first guess, then reused forever).
     pub fn reset(&mut self) {
         for i in 0..self.num_cells {
             self.cell_order[i] = i as CellIndex;
         }
         self.candidate_selection_flags.fill(false);
-        self.candidate_finder_set.initialized = false;
+        // NOTE: candidate_finder_set.initialized is intentionally NOT reset here.
+        // JS never resets it between runs — it stays initialized from first use.
     }
 
     /// Full reset: cell order, conflict scores, and candidate finder.
     ///
-    /// Used by nth_step which always replays from scratch and needs
-    /// identical search paths every time.
+    /// Called when a completely fresh search is required (e.g. new puzzle or
+    /// mode change). Unlike `reset()`, this also reinitialises the conflict
+    /// scores AND clears the lazy candidate finder so it re-initialises on
+    /// the next first guess.
     pub fn full_reset(&mut self) {
+        self.candidate_finder_set.initialized = false;
         self.reset();
         let num_values = self.conflict_scores.value_scores.len();
         self.conflict_scores = ConflictScores::new(&self.initial_cell_priorities, num_values);

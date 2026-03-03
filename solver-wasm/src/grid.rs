@@ -123,6 +123,36 @@ impl FromStr for Grid {
     }
 }
 
+impl Grid {
+    /// Parse a puzzle string for an arbitrary grid shape.
+    ///
+    /// Validates that `s.len() == shape.num_cells`.
+    /// Digits `'1'`–`'9'` (for 9×9) or `'1'`–`'4'` (for 4×4), etc., set
+    /// the given value; `'.'` and `'0'` leave the cell unconstrained.
+    pub fn from_puzzle(s: &str, shape: crate::grid_shape::GridShape) -> Result<Self, GridError> {
+        let chars: Vec<char> = s.chars().collect();
+        if chars.len() != shape.num_cells {
+            return Err(GridError::InvalidLength(chars.len()));
+        }
+        let mut grid = Grid::empty_with_size(shape.num_cells, shape.num_values);
+        for (i, &ch) in chars.iter().enumerate() {
+            match ch {
+                '0' | '.' => {} // keep all candidates
+                '1'..='9' => {
+                    let value = (ch as u8 - b'0') as u8;
+                    if value <= shape.num_values {
+                        grid.cells[i] = CandidateSet::from_value(value);
+                    } else {
+                        return Err(GridError::InvalidChar(ch, i));
+                    }
+                }
+                _ => return Err(GridError::InvalidChar(ch, i)),
+            }
+        }
+        Ok(grid)
+    }
+}
+
 impl PartialEq for Grid {
     fn eq(&self, other: &Self) -> bool {
         self.cells == other.cells

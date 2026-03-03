@@ -39,7 +39,7 @@ const IMPOSSIBLE_PUZZLE: &str =
 #[test]
 fn test_solve_easy() {
     let mut solver = SudokuBuilder::build(EASY_PUZZLE, &[], SHAPE_9X9).unwrap();
-    let result = solver.solve();
+    let result = solver.solve(&mut |_| {});
     assert!(result.solution.is_some());
     let sol_grid = Grid {
         cells: result.solution.unwrap(),
@@ -57,7 +57,7 @@ fn test_solve_easy() {
 #[test]
 fn test_solve_hard() {
     let mut solver = SudokuBuilder::build(HARD_PUZZLE, &[], SHAPE_9X9).unwrap();
-    let result = solver.solve();
+    let result = solver.solve(&mut |_| {});
     assert!(result.solution.is_some());
     let sol_grid = Grid {
         cells: result.solution.unwrap(),
@@ -68,14 +68,14 @@ fn test_solve_hard() {
 #[test]
 fn test_solve_impossible() {
     let mut solver = SudokuBuilder::build(IMPOSSIBLE_PUZZLE, &[], SHAPE_9X9).unwrap();
-    let result = solver.solve();
+    let result = solver.solve(&mut |_| {});
     assert!(result.solution.is_none());
 }
 
 #[test]
 fn test_count_solutions_unique() {
     let mut solver = SudokuBuilder::build(EASY_PUZZLE, &[], SHAPE_9X9).unwrap();
-    let (count, _) = solver.count_solutions(0);
+    let (count, _) = solver.count_solutions(0, &mut |_| {});
     assert_eq!(count, 1);
 }
 
@@ -84,14 +84,14 @@ fn test_count_solutions_empty_grid() {
     // An empty grid has many solutions.
     let empty = ".".repeat(81);
     let mut solver = SudokuBuilder::build(&empty, &[], SHAPE_9X9).unwrap();
-    let (count, _) = solver.count_solutions(10);
+    let (count, _) = solver.count_solutions(10, &mut |_| {});
     assert_eq!(count, 10, "Empty grid should have at least 10 solutions");
 }
 
 #[test]
 fn test_counters_populated() {
     let mut solver = SudokuBuilder::build(HARD_PUZZLE, &[], SHAPE_9X9).unwrap();
-    let result = solver.solve();
+    let result = solver.solve(&mut |_| {});
     assert!(result.counters.constraints_processed > 0);
     assert!(result.counters.values_tried > 0);
 }
@@ -145,7 +145,7 @@ fn test_killer_wikipedia() {
     let empty = ".".repeat(81);
     let constraints = cages_to_constraints(&cages);
     let mut solver = SudokuBuilder::build(&empty, &constraints, SHAPE_9X9).unwrap();
-    let result = solver.solve();
+    let result = solver.solve(&mut |_| {});
     assert!(
         result.solution.is_some(),
         "Wikipedia killer should have a solution"
@@ -162,7 +162,7 @@ fn test_killer_unique_solution() {
     let empty = ".".repeat(81);
     let constraints = cages_to_constraints(&cages);
     let mut solver = SudokuBuilder::build(&empty, &constraints, SHAPE_9X9).unwrap();
-    let (count, _) = solver.count_solutions(2);
+    let (count, _) = solver.count_solutions(2, &mut |_| {});
     assert_eq!(count, 1, "Wikipedia killer should have exactly 1 solution");
 }
 
@@ -174,7 +174,7 @@ fn test_killer_with_overlap() {
     let empty = ".".repeat(81);
     let constraints = cages_to_constraints(&cages);
     let mut solver = SudokuBuilder::build(&empty, &constraints, SHAPE_9X9).unwrap();
-    let result = solver.solve();
+    let result = solver.solve(&mut |_| {});
     assert!(result.solution.is_some());
     let sol_grid = Grid {
         cells: result.solution.unwrap(),
@@ -277,7 +277,7 @@ fn test_nth_solution_after_solve() {
     let first = solver.nth_solution(0, &mut |_| {}).solution.unwrap();
 
     // Interleave with solve().
-    let solve_result = solver.solve();
+    let solve_result = solver.solve(&mut |_| {});
     assert!(solve_result.solution.is_some());
 
     // nth_solution should start fresh (solve cleared resume state).
@@ -315,7 +315,7 @@ fn test_nth_solution_then_solve_works() {
     let mut solver = SudokuBuilder::build(puzzle, &[], SHAPE_9X9).unwrap();
 
     let _ = solver.nth_solution(0, &mut |_| {});
-    let result = solver.solve();
+    let result = solver.solve(&mut |_| {});
     assert!(result.solution.is_some());
     assert_eq!(result.counters.solutions, 1);
 }

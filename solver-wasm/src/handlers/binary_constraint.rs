@@ -11,7 +11,7 @@ use crate::grid_shape::GridShape;
 use crate::solver::cell_exclusions::CellExclusions;
 use crate::solver::grid_state_allocator::GridStateAllocator;
 use crate::solver::handler_accumulator::HandlerAccumulator;
-use crate::api::types::CellIndex;
+use crate::api::types::{CellIndex, Value};
 
 use super::ConstraintHandler;
 
@@ -27,7 +27,7 @@ const BASE64_CHARS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwx
 /// Matches JS `fnToBinaryKey(fn, numValues)`. The truth table for
 /// `pred(a, b)` where `a, b ∈ 1..=num_values` is packed into 6-bit
 /// groups and encoded as URL-safe Base64 characters.
-pub fn fn_to_binary_key(pred: &dyn Fn(u8, u8) -> bool, num_values: u8) -> String {
+pub fn fn_to_binary_key(pred: &dyn Fn(Value, Value) -> bool, num_values: u8) -> String {
     const NUM_BITS: usize = 6;
     let nv = num_values as usize;
     let mut array: Vec<u8> = Vec::new();
@@ -36,7 +36,7 @@ pub fn fn_to_binary_key(pred: &dyn Fn(u8, u8) -> bool, num_values: u8) -> String
 
     for i in 1..=nv {
         for j in 1..=nv {
-            if pred(i as u8, j as u8) {
+            if pred(i as Value, j as Value) {
                 v |= 1 << v_index;
             }
             v_index += 1;

@@ -1,7 +1,10 @@
+use crate::api::types::CellIndex;
+use crate::bit_set::BitSet;
 use std::cell::Cell;
 use std::collections::HashMap;
-use crate::bit_set::BitSet;
-use crate::api::types::CellIndex;
+
+/// Packed pair index: `(cell_a << 8) | cell_b` for two-cell lookups.
+pub(crate) type PairIndex = u16;
 
 /// Tracks which cells must have mutually exclusive values (AllDifferent).
 ///
@@ -21,7 +24,6 @@ pub struct CellExclusions {
     num_cells: usize,
 
     // ---- Lazy caches (interior mutability, matching JS) ----
-
     /// Whether caches have been populated. Once sealed, no more exclusions
     /// can be added.
     sealed: Cell<bool>,
@@ -200,7 +202,7 @@ impl CellExclusions {
     /// Get exclusions common to a pair of cells.
     /// Key: `(cell0 << 8) | cell1`. Lazily caches the result.
     /// Matches JS `getPairExclusions(pairIndex)`.
-    pub fn get_pair_exclusions(&self, pair_index: u16) -> &[CellIndex] {
+    pub fn get_pair_exclusions(&self, pair_index: PairIndex) -> &[CellIndex] {
         self.seal();
         let cell0 = (pair_index >> 8) as usize;
         let cell1 = (pair_index & 0xFF) as usize;
@@ -221,10 +223,8 @@ impl CellExclusions {
                 return std::slice::from_raw_parts(data.as_ptr(), data.len());
             }
             // Compute and store.
-            let intersection = sorted_intersect(
-                &(*self.arrays.get())[cell0],
-                &(*self.arrays.get())[cell1],
-            );
+            let intersection =
+                sorted_intersect(&(*self.arrays.get())[cell0], &(*self.arrays.get())[cell1]);
             let entry = cache.entry(cache_key).or_insert(intersection);
             std::slice::from_raw_parts(entry.as_ptr(), entry.len())
         }

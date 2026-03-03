@@ -84,7 +84,7 @@ fn solve_impl(
         }
     };
 
-    let result = solver.solve_with_progress(progress);
+    let result = solver.solve(progress);
     let solution_str = result
         .solution
         .map(|cells| grid::Grid { cells }.to_puzzle_string());
@@ -102,7 +102,7 @@ fn solve_impl(
 // ============================================================================
 
 /// Convert a CandidateSet to a list of values (1-9).
-pub(crate) fn candidate_set_to_values(cs: CandidateSet) -> Vec<u8> {
+pub(crate) fn candidate_set_to_values(cs: CandidateSet) -> Vec<Value> {
     cs.to_values()
 }
 
@@ -134,7 +134,7 @@ pub(crate) fn step_result_to_output(step: &solver::StepResult) -> StepOutput {
         let values = candidate_set_to_values(step.old_grid[guess_cell_index as usize]);
 
         // Compute diff pencilmarks (values removed between old_grid and grid).
-        let diffs: Vec<Vec<u8>> = (0..step.grid.len())
+        let diffs: Vec<Vec<Value>> = (0..step.grid.len())
             .map(|i| {
                 let removed = step.old_grid[i] & !step.grid[i];
                 candidate_set_to_values(removed)

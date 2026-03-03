@@ -22,10 +22,10 @@ pub struct Priority {
 }
 
 impl Priority {
-    pub fn new(cells: Vec<CellIndex>, priority: i32) -> Self {
-        Self {
-            priority_cells: cells,
-            priority_value: priority,
+    pub fn new(priority_cells: Vec<CellIndex>, priority_value: i32) -> Self {
+        Priority {
+            priority_cells,
+            priority_value,
         }
     }
 

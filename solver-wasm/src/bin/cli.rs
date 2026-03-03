@@ -92,7 +92,7 @@ fn cmd_solve(args: &[String]) {
             process::exit(1);
         }
     };
-    let result = solver.solve();
+    let result = solver.solve(&mut |_| {});
     let counters = result.counters.clone();
 
     let elapsed = start.elapsed();
@@ -266,7 +266,7 @@ fn cmd_bench(args: &[String]) {
         let start = Instant::now();
 
         let mut solver = SudokuBuilder::build(&puzzle, &constraints, shape).unwrap();
-        let r = solver.solve();
+        let r = solver.solve(&mut |_| {});
 
         times.push(start.elapsed());
         last_counters = Some(r.counters);

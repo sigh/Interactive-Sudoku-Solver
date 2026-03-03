@@ -18,8 +18,8 @@
 //!   pointing to the cage head (transitively).
 
 use super::Constraint;
+use crate::api::types::{CellIndex, Value};
 use crate::grid_shape::GridShape;
-use crate::api::types::CellIndex;
 
 /// Parsed constraint data: puzzle string + constraint list + grid shape.
 #[derive(Debug, Clone)]
@@ -245,6 +245,14 @@ const CONSTRAINT_DEFS: &[ConstraintDef] = &[
         name: "End",
         parse: parse_noop,
     },
+    ConstraintDef {
+        name: "FullRank",
+        parse: parse_full_rank,
+    },
+    ConstraintDef {
+        name: "FullRankTies",
+        parse: parse_full_rank_ties,
+    },
     // Legacy aliases for Pair/PairX with base64url key conversion.
     ConstraintDef {
         name: "Binary",
@@ -254,12 +262,105 @@ const CONSTRAINT_DEFS: &[ConstraintDef] = &[
         name: "BinaryX",
         parse: parse_binary_x,
     },
+    // Handlers wired to builder.
+    ConstraintDef {
+        name: "ContainAtLeast",
+        parse: parse_contain_at_least,
+    },
+    ConstraintDef {
+        name: "ContainExact",
+        parse: parse_contain_exact,
+    },
+    ConstraintDef {
+        name: "Quad",
+        parse: parse_quad,
+    },
+    ConstraintDef {
+        name: "Priority",
+        parse: parse_priority,
+    },
+    // Newly wired handlers.
+    ConstraintDef {
+        name: "Lockout",
+        parse: parse_lockout,
+    },
+    ConstraintDef {
+        name: "DutchFlatmates",
+        parse: parse_dutch_flatmates,
+    },
+    ConstraintDef {
+        name: "ValueIndexing",
+        parse: parse_value_indexing,
+    },
+    ConstraintDef {
+        name: "NumberedRoom",
+        parse: parse_numbered_room,
+    },
+    ConstraintDef {
+        name: "Indexing",
+        parse: parse_indexing,
+    },
+    ConstraintDef {
+        name: "GlobalEntropy",
+        parse: parse_global_entropy,
+    },
+    ConstraintDef {
+        name: "GlobalMod",
+        parse: parse_global_mod,
+    },
+    ConstraintDef {
+        name: "SumLine",
+        parse: parse_sum_line,
+    },
+    ConstraintDef {
+        name: "CountingCircles",
+        parse: parse_counting_circles,
+    },
+    ConstraintDef {
+        name: "SameValues",
+        parse: parse_same_values,
+    },
+    ConstraintDef {
+        name: "RegionSameValues",
+        parse: parse_region_same_values,
+    },
+    ConstraintDef {
+        name: "Sandwich",
+        parse: parse_sandwich,
+    },
+    ConstraintDef {
+        name: "Lunchbox",
+        parse: parse_lunchbox,
+    },
+    ConstraintDef {
+        name: "Skyscraper",
+        parse: parse_skyscraper,
+    },
+    ConstraintDef {
+        name: "HiddenSkyscraper",
+        parse: parse_hidden_skyscraper,
+    },
+    ConstraintDef {
+        name: "RellikCage",
+        parse: parse_rellik_cage,
+    },
+    ConstraintDef {
+        name: "EqualityCage",
+        parse: parse_equality_cage,
+    },
+    ConstraintDef {
+        name: "XSum",
+        parse: parse_xsum,
+    },
 ];
 
 /// Parse verbose constraint string format.
 ///
 /// Format: `.Type~arg1~arg2...` tokens concatenated. Uses a registry
 /// to dispatch each constraint type to its parse function.
+///
+/// Supports nested composite types: `.Or.InnerA~x.InnerB~y.End` and
+/// `.And.InnerA~x.InnerB~y.End`.
 fn parse_verbose(input: &str) -> Result<ParsedConstraints, String> {
     let parts: Vec<&str> = input.split('.').collect();
 
@@ -280,8 +381,12 @@ fn parse_verbose(input: &str) -> Result<ParsedConstraints, String> {
     let mut puzzle = vec!['.'; shape.num_cells];
     let mut constraints: Vec<Constraint> = Vec::new();
 
-    // Second pass: parse all constraint tokens.
-    for part in parts.iter().skip(1) {
+    // Second pass: index-based to support consuming nested Or/And blocks.
+    let mut idx = 1usize;
+    while idx < parts.len() {
+        let part = parts[idx];
+        idx += 1;
+
         if part.is_empty() {
             continue;
         }
@@ -304,6 +409,20 @@ fn parse_verbose(input: &str) -> Result<ParsedConstraints, String> {
             continue;
         }
 
+        // Composite types consume subsequent tokens up to a matching End.
+        if constraint_type == "Or" || constraint_type == "And" {
+            let (inner, consumed) = parse_nested_block(&parts[idx..], shape)?;
+            idx += consumed;
+            if constraint_type == "Or" {
+                constraints.push(Constraint::Or {
+                    groups: inner.into_iter().map(|c| vec![c]).collect(),
+                });
+            } else {
+                constraints.push(Constraint::And { constraints: inner });
+            }
+            continue;
+        }
+
         match CONSTRAINT_DEFS.iter().find(|d| d.name == constraint_type) {
             Some(def) => (def.parse)(args, &mut constraints)?,
             None => {
@@ -321,6 +440,73 @@ fn parse_verbose(input: &str) -> Result<ParsedConstraints, String> {
         constraints,
         shape,
     })
+}
+
+/// Parse inner constraint parts of an `Or` or `And` block, stopping when an
+/// unmatched `End` token is consumed (or the slice is exhausted).
+///
+/// Returns `(inner_constraints, number_of_parts_consumed)`.
+/// The count *includes* the `End` token when found.
+fn parse_nested_block(
+    parts: &[&str],
+    shape: GridShape,
+) -> Result<(Vec<Constraint>, usize), String> {
+    let mut constraints: Vec<Constraint> = Vec::new();
+    let mut idx = 0usize;
+
+    while idx < parts.len() {
+        let part = parts[idx];
+        idx += 1;
+
+        if part.is_empty() {
+            continue;
+        }
+
+        let tokens: Vec<&str> = part.split('~').collect();
+        if tokens.is_empty() {
+            continue;
+        }
+
+        let constraint_type = tokens[0];
+        let args = &tokens[1..];
+
+        // End terminates this block.
+        if constraint_type == "End" {
+            return Ok((constraints, idx));
+        }
+
+        if constraint_type == "Shape" || constraint_type.is_empty() {
+            continue;
+        }
+
+        // Nested composite: recurse.
+        if constraint_type == "Or" || constraint_type == "And" {
+            let (inner, consumed) = parse_nested_block(&parts[idx..], shape)?;
+            idx += consumed;
+            if constraint_type == "Or" {
+                constraints.push(Constraint::Or {
+                    groups: inner.into_iter().map(|c| vec![c]).collect(),
+                });
+            } else {
+                constraints.push(Constraint::And { constraints: inner });
+            }
+            continue;
+        }
+
+        match CONSTRAINT_DEFS.iter().find(|d| d.name == constraint_type) {
+            Some(def) => (def.parse)(args, &mut constraints)?,
+            None => {
+                return Err(format!(
+                    "Unsupported constraint type in nested block: '{}'. \
+                     The WASM solver does not handle this constraint.",
+                    constraint_type
+                ));
+            }
+        }
+    }
+
+    // No End found — reached end of input; return what we have.
+    Ok((constraints, idx))
 }
 
 // ====================================================================
@@ -865,6 +1051,60 @@ fn parse_anti_taxicab(_args: &[&str], constraints: &mut Vec<Constraint>) -> Resu
     Ok(())
 }
 
+fn parse_contain_at_least(args: &[&str], constraints: &mut Vec<Constraint>) -> Result<(), String> {
+    if args.is_empty() {
+        return Err("ContainAtLeast requires values arg".to_string());
+    }
+    let values = parse_underscore_values(args[0])?;
+    let cells = collect_cell_args(&args[1..]);
+    if !cells.is_empty() && !values.is_empty() {
+        constraints.push(Constraint::ContainAtLeast { cells, values });
+    }
+    Ok(())
+}
+
+fn parse_contain_exact(args: &[&str], constraints: &mut Vec<Constraint>) -> Result<(), String> {
+    if args.is_empty() {
+        return Err("ContainExact requires values arg".to_string());
+    }
+    let values = parse_underscore_values(args[0])?;
+    let cells = collect_cell_args(&args[1..]);
+    if !cells.is_empty() && !values.is_empty() {
+        constraints.push(Constraint::ContainExact { cells, values });
+    }
+    Ok(())
+}
+
+fn parse_quad(args: &[&str], constraints: &mut Vec<Constraint>) -> Result<(), String> {
+    if args.is_empty() {
+        return Err("Quad requires topLeftCell arg".to_string());
+    }
+    let top_left = args[0].to_string();
+    let values: Vec<Value> = args[1..]
+        .iter()
+        .filter_map(|s| s.parse::<Value>().ok())
+        .filter(|&v| v >= 1)
+        .collect();
+    if !values.is_empty() {
+        constraints.push(Constraint::Quad { top_left, values });
+    }
+    Ok(())
+}
+
+fn parse_priority(args: &[&str], constraints: &mut Vec<Constraint>) -> Result<(), String> {
+    if args.is_empty() {
+        return Err("Priority requires priority value arg".to_string());
+    }
+    let priority: i32 = args[0]
+        .parse()
+        .map_err(|_| format!("Invalid priority value: {}", args[0]))?;
+    let cells = collect_cell_args(&args[1..]);
+    if !cells.is_empty() {
+        constraints.push(Constraint::Priority { cells, priority });
+    }
+    Ok(())
+}
+
 fn parse_jigsaw(args: &[&str], constraints: &mut Vec<Constraint>) -> Result<(), String> {
     // Format: .Jigsaw~<layout> or .Jigsaw~<gridSpec>~<layout>
     // Take the last argument as the layout string.
@@ -887,7 +1127,11 @@ fn parse_jigsaw(args: &[&str], constraints: &mut Vec<Constraint>) -> Result<(), 
 
     // Emit one Jigsaw constraint per region.
     // The grid_spec is approximated from the layout length.
-    let grid_spec = format!("{}x{}", (layout.len() as f64).sqrt() as usize, (layout.len() as f64).sqrt() as usize);
+    let grid_spec = format!(
+        "{}x{}",
+        (layout.len() as f64).sqrt() as usize,
+        (layout.len() as f64).sqrt() as usize
+    );
     for (_ch, region) in &regions {
         let cells: Vec<String> = region
             .iter()
@@ -908,11 +1152,342 @@ fn parse_jigsaw(args: &[&str], constraints: &mut Vec<Constraint>) -> Result<(), 
     Ok(())
 }
 
+/// Parse FullRank constraint (double-line outside clue).
+///
+/// Format: `.FullRank~rowCol~fwdValue~bwdValue`
+/// Same structure as NumberedRoom / Skyscraper.
+/// Each direction (forward/backward) with a non-empty value becomes a
+/// separate `Constraint::FullRank` with the `arrow_id` carrying the direction.
+fn parse_full_rank(args: &[&str], constraints: &mut Vec<Constraint>) -> Result<(), String> {
+    if args.len() < 2 {
+        return Ok(());
+    }
+    let row_col = args[0];
+    if let Some(fwd) = args.get(1).filter(|s| !s.is_empty()) {
+        if let Ok(value) = fwd.parse::<u32>() {
+            constraints.push(Constraint::FullRank {
+                arrow_id: format!("{},1", row_col),
+                value,
+            });
+        }
+    }
+    if let Some(bwd) = args.get(2).filter(|s| !s.is_empty()) {
+        if let Ok(value) = bwd.parse::<u32>() {
+            constraints.push(Constraint::FullRank {
+                arrow_id: format!("{},-1", row_col),
+                value,
+            });
+        }
+    }
+    Ok(())
+}
+
+/// Parse FullRankTies constraint.
+///
+/// Format: `.FullRankTies~ties` where `ties` is `"none"`, `"only-unclued"`, or `"any"`.
+fn parse_full_rank_ties(args: &[&str], constraints: &mut Vec<Constraint>) -> Result<(), String> {
+    let ties = args.first().copied().unwrap_or("only-unclued").to_string();
+    constraints.push(Constraint::FullRankTies { ties });
+    Ok(())
+}
+
 fn parse_noop(_args: &[&str], _constraints: &mut Vec<Constraint>) -> Result<(), String> {
     Ok(())
 }
 
-/// Legacy Binary: alias for Pair with base64url key conversion.
+fn parse_lockout(args: &[&str], constraints: &mut Vec<Constraint>) -> Result<(), String> {
+    if args.is_empty() {
+        return Err("Lockout constraint missing min_diff".to_string());
+    }
+    let min_diff: u8 = args[0]
+        .parse()
+        .map_err(|_| format!("Invalid Lockout min_diff: {}", args[0]))?;
+    let cells = collect_cell_args(&args[1..]);
+    if cells.len() >= 2 {
+        constraints.push(Constraint::Lockout { min_diff, cells });
+    }
+    Ok(())
+}
+
+fn parse_dutch_flatmates(_args: &[&str], constraints: &mut Vec<Constraint>) -> Result<(), String> {
+    constraints.push(Constraint::DutchFlatmates);
+    Ok(())
+}
+
+fn parse_value_indexing(args: &[&str], constraints: &mut Vec<Constraint>) -> Result<(), String> {
+    let cells = collect_cell_args(args);
+    if cells.len() >= 3 {
+        constraints.push(Constraint::ValueIndexing { cells });
+    }
+    Ok(())
+}
+
+/// Parse NumberedRoom constraint.
+///
+/// `NumberedRoom` uses the `OutsideConstraintBase` double-line URL format:
+///   `.NumberedRoom~R1~forward_value~backward_value`
+/// where `R1` is a row/column ID and the values are the clue numbers.
+fn parse_numbered_room(args: &[&str], constraints: &mut Vec<Constraint>) -> Result<(), String> {
+    if args.len() < 2 {
+        return Ok(()); // Not enough args — skip silently.
+    }
+    let row_col = args[0];
+    // Forward clue (dir=1): cells go from outside inward.
+    if let Some(fwd) = args.get(1).filter(|s| !s.is_empty()) {
+        if let Ok(value) = fwd.parse::<u8>() {
+            constraints.push(Constraint::NumberedRoom {
+                arrow_id: format!("{},1", row_col),
+                value,
+            });
+        }
+    }
+    // Backward clue (dir=-1): cells go from outside inward in reverse.
+    if let Some(bwd) = args.get(2).filter(|s| !s.is_empty()) {
+        if let Ok(value) = bwd.parse::<u8>() {
+            constraints.push(Constraint::NumberedRoom {
+                arrow_id: format!("{},-1", row_col),
+                value,
+            });
+        }
+    }
+    Ok(())
+}
+
+/// Parse Indexing constraint.
+///
+/// Format: `.Indexing~R~R1C1~R2C3~...` (row indexing) or `.Indexing~C~...` (col).
+/// The first arg is the index type ("R" for row, "C" for column).
+fn parse_indexing(args: &[&str], constraints: &mut Vec<Constraint>) -> Result<(), String> {
+    if args.is_empty() {
+        return Err("Indexing constraint missing index type".to_string());
+    }
+    let index_type = args[0].to_string();
+    let cells = collect_cell_args(&args[1..]);
+    if !cells.is_empty() {
+        constraints.push(Constraint::Indexing { index_type, cells });
+    }
+    Ok(())
+}
+
+fn parse_global_entropy(_args: &[&str], constraints: &mut Vec<Constraint>) -> Result<(), String> {
+    constraints.push(Constraint::GlobalEntropy);
+    Ok(())
+}
+
+fn parse_global_mod(_args: &[&str], constraints: &mut Vec<Constraint>) -> Result<(), String> {
+    constraints.push(Constraint::GlobalMod);
+    Ok(())
+}
+
+fn parse_sum_line(args: &[&str], constraints: &mut Vec<Constraint>) -> Result<(), String> {
+    if args.is_empty() {
+        return Err("SumLine constraint missing sum argument".to_string());
+    }
+    let sum: u32 = args[0]
+        .parse()
+        .map_err(|_| format!("Invalid SumLine sum: {}", args[0]))?;
+    // Strip trailing LOOP token (mirrors JS CellArgs).
+    let rest = &args[1..];
+    let (is_loop, cell_args) = if rest.last() == Some(&"LOOP") {
+        (true, &rest[..rest.len() - 1])
+    } else {
+        (false, rest)
+    };
+    let cells = collect_cell_args(cell_args);
+    if cells.len() >= 2 {
+        constraints.push(Constraint::SumLine {
+            sum,
+            is_loop,
+            cells,
+        });
+    }
+    Ok(())
+}
+
+fn parse_counting_circles(args: &[&str], constraints: &mut Vec<Constraint>) -> Result<(), String> {
+    let cells = collect_cell_args(args);
+    if cells.len() >= 2 {
+        constraints.push(Constraint::CountingCircles { cells });
+    }
+    Ok(())
+}
+
+/// Parse SameValues constraint.
+///
+/// Format: `.SameValues~numSets~cell1~cell2~...`
+/// `numSets` is the number of equal-sized subsets to split `cells` into.
+fn parse_same_values(args: &[&str], constraints: &mut Vec<Constraint>) -> Result<(), String> {
+    if args.is_empty() {
+        return Err("SameValues constraint missing numSets argument".to_string());
+    }
+    let num_sets: u32 = args[0]
+        .parse()
+        .map_err(|_| format!("Invalid SameValues numSets: {}", args[0]))?;
+    let cells = collect_cell_args(&args[1..]);
+    if !cells.is_empty() {
+        constraints.push(Constraint::SameValues { num_sets, cells });
+    }
+    Ok(())
+}
+
+fn parse_region_same_values(
+    _args: &[&str],
+    constraints: &mut Vec<Constraint>,
+) -> Result<(), String> {
+    constraints.push(Constraint::RegionSameValues);
+    Ok(())
+}
+
+/// Parse Sandwich constraint (single-line outside clue).
+///
+/// Format: `.Sandwich~value~rowCol`
+/// e.g. `.Sandwich~15~R1` means row 1 sandwich sum = 15.
+/// Direction is always forward (,1).
+fn parse_sandwich(args: &[&str], constraints: &mut Vec<Constraint>) -> Result<(), String> {
+    if args.len() < 2 {
+        return Ok(()); // Not enough args — skip silently.
+    }
+    let value: u32 = match args[0].parse() {
+        Ok(v) => v,
+        Err(_) => return Ok(()),
+    };
+    let row_col = args[1];
+    constraints.push(Constraint::Sandwich {
+        arrow_id: format!("{},1", row_col),
+        value,
+    });
+    Ok(())
+}
+
+/// Parse Lunchbox constraint.
+///
+/// Format: `.Lunchbox~sum~cell1~cell2~...`
+fn parse_lunchbox(args: &[&str], constraints: &mut Vec<Constraint>) -> Result<(), String> {
+    if args.is_empty() {
+        return Err("Lunchbox constraint missing sum argument".to_string());
+    }
+    let sum: u32 = args[0]
+        .parse()
+        .map_err(|_| format!("Invalid Lunchbox sum: {}", args[0]))?;
+    let cells = collect_cell_args(&args[1..]);
+    if !cells.is_empty() {
+        constraints.push(Constraint::Lunchbox { sum, cells });
+    }
+    Ok(())
+}
+
+/// Parse Skyscraper constraint (double-line outside clue).
+///
+/// Format: `.Skyscraper~rowCol~fwdValue~bwdValue`
+/// Same format as NumberedRoom.
+fn parse_skyscraper(args: &[&str], constraints: &mut Vec<Constraint>) -> Result<(), String> {
+    if args.len() < 2 {
+        return Ok(());
+    }
+    let row_col = args[0];
+    if let Some(fwd) = args.get(1).filter(|s| !s.is_empty()) {
+        if let Ok(value) = fwd.parse::<u32>() {
+            constraints.push(Constraint::Skyscraper {
+                arrow_id: format!("{},1", row_col),
+                value,
+            });
+        }
+    }
+    if let Some(bwd) = args.get(2).filter(|s| !s.is_empty()) {
+        if let Ok(value) = bwd.parse::<u32>() {
+            constraints.push(Constraint::Skyscraper {
+                arrow_id: format!("{},-1", row_col),
+                value,
+            });
+        }
+    }
+    Ok(())
+}
+
+/// Parse HiddenSkyscraper constraint (double-line outside clue).
+///
+/// Format: `.HiddenSkyscraper~rowCol~fwdValue~bwdValue`
+fn parse_hidden_skyscraper(args: &[&str], constraints: &mut Vec<Constraint>) -> Result<(), String> {
+    if args.len() < 2 {
+        return Ok(());
+    }
+    let row_col = args[0];
+    if let Some(fwd) = args.get(1).filter(|s| !s.is_empty()) {
+        if let Ok(value) = fwd.parse::<u32>() {
+            constraints.push(Constraint::HiddenSkyscraper {
+                arrow_id: format!("{},1", row_col),
+                value,
+            });
+        }
+    }
+    if let Some(bwd) = args.get(2).filter(|s| !s.is_empty()) {
+        if let Ok(value) = bwd.parse::<u32>() {
+            constraints.push(Constraint::HiddenSkyscraper {
+                arrow_id: format!("{},-1", row_col),
+                value,
+            });
+        }
+    }
+    Ok(())
+}
+
+/// Parse XSum constraint (double-line outside clue).
+///
+/// Format: `.XSum~rowCol~fwdValue~bwdValue`
+/// X is the digit in the first cell; the first X cells must sum to `value`.
+/// Mirrors JS `XSum` which uses `CLUE_TYPE_DOUBLE_LINE` (same format as Skyscraper).
+fn parse_xsum(args: &[&str], constraints: &mut Vec<Constraint>) -> Result<(), String> {
+    if args.len() < 2 {
+        return Ok(());
+    }
+    let row_col = args[0];
+    if let Some(fwd) = args.get(1).filter(|s| !s.is_empty()) {
+        if let Ok(value) = fwd.parse::<u32>() {
+            constraints.push(Constraint::XSum {
+                arrow_id: format!("{},1", row_col),
+                value,
+            });
+        }
+    }
+    if let Some(bwd) = args.get(2).filter(|s| !s.is_empty()) {
+        if let Ok(value) = bwd.parse::<u32>() {
+            constraints.push(Constraint::XSum {
+                arrow_id: format!("{},-1", row_col),
+                value,
+            });
+        }
+    }
+    Ok(())
+}
+
+/// Parse RellikCage constraint.
+///
+/// Format: `.RellikCage~sum~cell1~cell2~...`
+fn parse_rellik_cage(args: &[&str], constraints: &mut Vec<Constraint>) -> Result<(), String> {
+    if args.is_empty() {
+        return Err("RellikCage constraint missing sum argument".to_string());
+    }
+    let sum: u32 = args[0]
+        .parse()
+        .map_err(|_| format!("Invalid RellikCage sum: {}", args[0]))?;
+    let cells = collect_cell_args(&args[1..]);
+    if !cells.is_empty() {
+        constraints.push(Constraint::RellikCage { sum, cells });
+    }
+    Ok(())
+}
+
+/// Parse EqualityCage constraint.
+///
+/// Format: `.EqualityCage~cell1~cell2~...`
+fn parse_equality_cage(args: &[&str], constraints: &mut Vec<Constraint>) -> Result<(), String> {
+    let cells = collect_cell_args(args);
+    if !cells.is_empty() {
+        constraints.push(Constraint::EqualityCage { cells });
+    }
+    Ok(())
+}
+
 /// Swaps `-` ↔ `_` in the key to convert from base64url to standard base64.
 fn parse_binary(args: &[&str], constraints: &mut Vec<Constraint>) -> Result<(), String> {
     if args.is_empty() {
@@ -969,11 +1544,22 @@ fn collect_cell_args(args: &[&str]) -> Vec<String> {
     args.iter().map(|s| s.to_string()).collect()
 }
 
+/// Parse an underscore-separated value list (e.g. "1_2_3" → [1, 2, 3]).
+fn parse_underscore_values(s: &str) -> Result<Vec<Value>, String> {
+    s.split('_')
+        .filter(|p| !p.is_empty())
+        .map(|p| {
+            p.parse::<Value>()
+                .map_err(|_| format!("Invalid value in list: {}", p))
+        })
+        .collect()
+}
+
 /// Parse a given argument like "R1C1_5" into (cell_id, cell_index, values).
 ///
 /// The cell_index is needed for puzzle string placement (positional encoding).
 /// The cell_id string is stored in Given constraints for pencilmarks.
-fn parse_given_arg(arg: &str, shape: GridShape) -> Result<(String, usize, Vec<u8>), String> {
+fn parse_given_arg(arg: &str, shape: GridShape) -> Result<(String, usize, Vec<Value>), String> {
     let parts: Vec<&str> = arg.split('_').collect();
     if parts.len() < 2 {
         return Err(format!("Invalid given format: {}", arg));
@@ -986,7 +1572,7 @@ fn parse_given_arg(arg: &str, shape: GridShape) -> Result<(String, usize, Vec<u8
     let cell_idx = coord.cell;
 
     let nv = shape.num_values;
-    let values: Vec<u8> = parts[1..]
+    let values: Vec<Value> = parts[1..]
         .iter()
         .filter_map(|s| s.parse::<u8>().ok())
         .filter(|&v| v >= 1 && v <= nv)
@@ -1324,7 +1910,7 @@ mod tests {
 
     #[test]
     fn test_parse_unknown_constraint_errors() {
-        let result = parse(".Sandwich~15~R1");
+        let result = parse(".UnknownConstraintXYZ~15~R1");
         assert!(result.is_err());
         let err = result.unwrap_err();
         assert!(
@@ -1332,6 +1918,19 @@ mod tests {
             "Error should mention unsupported type: {}",
             err
         );
+    }
+
+    #[test]
+    fn test_parse_sandwich() {
+        let result = parse(".Sandwich~15~R1").unwrap();
+        assert_eq!(result.constraints.len(), 1);
+        match &result.constraints[0] {
+            Constraint::Sandwich { arrow_id, value } => {
+                assert_eq!(*value, 15);
+                assert_eq!(*arrow_id, "R1,1");
+            }
+            _ => panic!("Expected Sandwich constraint"),
+        }
     }
 
     #[test]
@@ -1362,6 +1961,68 @@ mod tests {
                     arrow_cell
                 );
             }
+        }
+    }
+
+    #[test]
+    fn test_parse_full_rank_forward_only() {
+        let result = parse(".FullRank~C2~26~").unwrap();
+        assert_eq!(result.constraints.len(), 1);
+        match &result.constraints[0] {
+            Constraint::FullRank { arrow_id, value } => {
+                assert_eq!(arrow_id, "C2,1");
+                assert_eq!(*value, 26);
+            }
+            _ => panic!("Expected FullRank constraint"),
+        }
+    }
+
+    #[test]
+    fn test_parse_full_rank_backward_only() {
+        // .FullRank~C3~~12 → no forward value, backward value = 12
+        let result = parse(".FullRank~C3~~12").unwrap();
+        assert_eq!(result.constraints.len(), 1);
+        match &result.constraints[0] {
+            Constraint::FullRank { arrow_id, value } => {
+                assert_eq!(arrow_id, "C3,-1");
+                assert_eq!(*value, 12);
+            }
+            _ => panic!("Expected FullRank constraint"),
+        }
+    }
+
+    #[test]
+    fn test_parse_full_rank_both_directions() {
+        // .FullRank~C1~6~20 → forward=6, backward=20
+        let result = parse(".FullRank~C1~6~20").unwrap();
+        assert_eq!(result.constraints.len(), 2);
+        let fwd = result.constraints.iter().find(|c| matches!(c, Constraint::FullRank { arrow_id, .. } if arrow_id.ends_with(",1")));
+        let bwd = result.constraints.iter().find(|c| matches!(c, Constraint::FullRank { arrow_id, .. } if arrow_id.ends_with(",-1")));
+        assert!(fwd.is_some(), "Expected forward FullRank");
+        assert!(bwd.is_some(), "Expected backward FullRank");
+        if let Some(Constraint::FullRank { value, .. }) = fwd { assert_eq!(*value, 6); }
+        if let Some(Constraint::FullRank { value, .. }) = bwd { assert_eq!(*value, 20); }
+    }
+
+    #[test]
+    fn test_parse_full_rank_ties() {
+        let result_any = parse(".FullRankTies~any").unwrap();
+        assert_eq!(result_any.constraints.len(), 1);
+        match &result_any.constraints[0] {
+            Constraint::FullRankTies { ties } => assert_eq!(ties, "any"),
+            _ => panic!("Expected FullRankTies"),
+        }
+
+        let result_none = parse(".FullRankTies~none").unwrap();
+        match &result_none.constraints[0] {
+            Constraint::FullRankTies { ties } => assert_eq!(ties, "none"),
+            _ => panic!("Expected FullRankTies"),
+        }
+
+        let result_default = parse(".FullRankTies~only-unclued").unwrap();
+        match &result_default.constraints[0] {
+            Constraint::FullRankTies { ties } => assert_eq!(ties, "only-unclued"),
+            _ => panic!("Expected FullRankTies"),
         }
     }
 }

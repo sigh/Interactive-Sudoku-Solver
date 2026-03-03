@@ -9,7 +9,7 @@ use crate::grid_shape::GridShape;
 use crate::solver::cell_exclusions::CellExclusions;
 use crate::solver::grid_state_allocator::GridStateAllocator;
 use crate::solver::handler_accumulator::HandlerAccumulator;
-use crate::api::types::CellIndex;
+use crate::api::types::{CellIndex, Value};
 
 use super::ConstraintHandler;
 
@@ -35,7 +35,7 @@ impl ValueDependentUniqueValueExclusion {
     }
 
     /// Get the exclusion cells for a 1-based value.
-    pub fn get_value_cell_exclusions(&self, value: u8) -> &[CellIndex] {
+    pub fn get_value_cell_exclusions(&self, value: Value) -> &[CellIndex] {
         if value == 0 || (value as usize) > self.value_to_cell_map.len() {
             &[]
         } else {
