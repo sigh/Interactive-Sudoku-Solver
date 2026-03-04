@@ -30,7 +30,7 @@ export class SudokuSolver {
 
   _reset() {
     this._internalSolver.reset();
-    this._iter = null;
+    this._canResume = false;
     this._timer = new Timer();
   }
 
@@ -49,7 +49,7 @@ export class SudokuSolver {
 
   countSolutions(limit) {
     return this._runCountFn(() => {
-      this._internalSolver.run(InternalSolver.YIELD_NEVER, limit).next();
+      this._internalSolver.run(limit ? { maxSolutions: limit } : null, () => { });
       return this._internalSolver.counters.solutions;
     });
   }
@@ -97,14 +97,46 @@ export class SudokuSolver {
   }
 
   nthSolution(n) {
-    let result = this._nthIteration(n, false);
-    if (!result) return null;
+    n++;  // Convert to 1-indexed target.
 
-    return SudokuSolverUtil.gridToSolution(result.grid);
+    // Going backwards: restart from scratch.
+    if (n <= this._internalSolver.counters.solutions) {
+      this._reset();
+    }
+
+    let grid = null;
+    this._timer.runTimed(() => {
+      if (this._canResume) {
+        this._canResume = this._internalSolver.resume(
+          { maxSolutions: n }, (g) => { grid = g; });
+      } else if (!this._internalSolver.done) {
+        this._canResume = this._internalSolver.run(
+          { maxSolutions: n }, (g) => { grid = g; });
+      }
+    });
+
+    if (!grid) return null;
+    return SudokuSolverUtil.gridToSolution(grid);
   }
 
   nthStep(n, stepGuides) {
-    const result = this._nthIteration(n, stepGuides);
+    n++;  // Convert to 1-indexed target.
+
+    // Step mode: always run from scratch (deterministic replay).
+    this._debugLogger.enableStepLogs = false;
+    if (this._debugLogger.enableLogs) {
+      this._debugLogger.log({
+        loc: 'nthStep',
+        msg: 'Step ' + (n - 1),
+        important: true,
+      });
+    }
+    let result = null;
+    this._timer.runTimed(() => {
+      this._internalSolver.run(
+        { step: { n, stepGuides, onStep: (r) => { result = r; } } },
+        () => { });
+    });
     if (!result) return null;
 
     const pencilmarks = SudokuSolverUtil.makePencilmarks(result.grid);
@@ -136,45 +168,6 @@ export class SudokuSolver {
     }
 
     return returnValue;
-  }
-
-  _nthIteration(n, stepGuides) {
-    const yieldEveryStep = !!stepGuides;
-
-    n++;
-    let iter = this._getIter(yieldEveryStep);
-    // To go backwards we start from the start.
-    if (n <= iter.count) {
-      this._reset();
-      iter = this._getIter(yieldEveryStep);
-    }
-
-    if (yieldEveryStep) {
-      this._internalSolver.setStepState({
-        stepGuides: stepGuides,
-      });
-      this._debugLogger.enableStepLogs = false;
-    }
-
-    // Iterate until we have seen n steps.
-    let result = null;
-    this._timer.runTimed(() => {
-      do {
-        // Only show debug logs for the target step.
-        if (yieldEveryStep && this._debugLogger.enableLogs && iter.count === n - 1) {
-          this._debugLogger.enableStepLogs = true;
-          this._debugLogger.log({
-            loc: 'nthStep',
-            msg: 'Step ' + iter.count,
-            important: true
-          });
-        }
-        result = iter.next();
-      } while (iter.count < n);
-    });
-
-    if (result.done) return null;
-    return result.value;
   }
 
   solveAllPossibilities(candidateSupportThreshold) {
@@ -236,20 +229,6 @@ export class SudokuSolver {
     return state;
   }
 
-  _getIter(yieldEveryStep) {
-    // If an iterator doesn't exist or is of the wrong type, then create it.
-    if (!this._iter || this._iter.yieldEveryStep !== yieldEveryStep) {
-      this._iter = {
-        yieldEveryStep: yieldEveryStep,
-        iter: new IteratorWithCount(this._internalSolver.run(
-          yieldEveryStep
-            ? InternalSolver.YIELD_ON_STEP
-            : InternalSolver.YIELD_ON_SOLUTION))
-      };
-    }
-
-    return this._iter.iter;
-  }
 }
 
 class SudokuSolverUtil {
@@ -357,7 +336,6 @@ class InternalSolver {
     this._numCells = this._shape.numCells;
     this._debugLogger = debugLogger;
 
-    this._runCounter = 0;
     this._progress = {
       frequencyMask: -1,
       callback: null,
@@ -502,7 +480,7 @@ class InternalSolver {
   }
 
   reset() {
-    this._iter = null;
+    this._canResume = false;
     this._stepState = null;
     this._currentRecFrame = null;
     this.counters = {
@@ -539,6 +517,8 @@ class InternalSolver {
     // used internally).
     // Candidate selector must be made aware of the new conflict scores.
     this._candidateSelector.reset(this._conflictScores);
+    this._recDepth = 0;
+    this._iterationCounter = 0;
 
     this.done = false;
     this._atStart = true;
@@ -643,20 +623,26 @@ class InternalSolver {
     return true;
   }
 
-  setStepState(updates) {
-    if (this._stepState === null) {
-      this._stepState = {
-        stepGuides: null,
-        step: 0,
-        oldGrid: new Uint16Array(this._numCells),
-        pendingGuess: {
-          cellDepth: -1,
-          guess: 0,
-        },
-      };
+  _initStepState(stepMode) {
+    this._stepState = {
+      stepGuides: stepMode.stepGuides ?? null,
+      stepTarget: stepMode.n,
+      step: 1,
+      oldGrid: new Uint16Array(this._numCells),
+      pendingGuess: {
+        cellDepth: -1,
+        guess: 0,
+      },
+    };
+    if (this._debugLogger.enableLogs) {
+      this._debugLogger.enableStepLogs = (1 === stepMode.n);
     }
-    for (const [key, value] of Object.entries(updates)) {
-      this._stepState[key] = value;
+  }
+
+  _incStep() {
+    const step = ++this._stepState.step;
+    if (this._debugLogger.enableLogs) {
+      this._debugLogger.enableStepLogs = (step === this._stepState.stepTarget);
     }
   }
 
@@ -709,68 +695,90 @@ class InternalSolver {
   static STEP_RESULT_SOLUTION = 1;
   static STEP_RESULT_CONTRADICTION = 2;
 
-  // run runs the solve.
-  // yieldWhen can be:
-  //  YIELD_ON_SOLUTION to yielding each solution.
-  //  YIELD_ON_STEP to yield every step (branches, conflicts, and solutions).
-  //  n > 1 to yield every n backtracks, before the backtrack is applied.
-  * run(yieldWhen, maxSolutions) {
-    const yieldEveryStep = yieldWhen === InternalSolver.YIELD_ON_STEP;
-    const yieldOnBacktrack = yieldWhen > 0 ? yieldWhen : 0;
-    maxSolutions ||= 0;
+  // Start a new search.
+  //
+  // mode: null for exhaustive; { maxSolutions } to stop after N solutions
+  // (saving position for resume); { maxBacktracks } to stop after N backtracks
+  // or the first solution; { step } to stop at the Nth step event.
+  //
+  // onSolution(grid) is called for each solution found.
+  //
+  // Returns true if position was saved for resume (maxSolutions mode only),
+  // false otherwise.
+  run(mode, onSolution) {
+    this._canResume = false;
 
-    // Set up iterator validation.
-    if (!this._atStart) throw new Error('State is not in initial state.');
     this._atStart = false;
-
-    const runCounter = ++this._runCounter;
-    const checkRunCounter = () => {
-      if (runCounter !== this._runCounter) throw new Error('Iterator no longer valid');
-    };
-
-    // This is required because we may call run multiple times.
     const counters = this.counters;
     counters.progressRatioPrev += counters.progressRatio;
     counters.progressRatio = 0;
 
-    const progressFrequencyMask = this._progress.frequencyMask;
-    let iterationCounterForUpdates = 0;
-
+    const yieldEveryStep = !!mode?.step;
     const recStack = this._recStack;
-    let recDepth = 0;
-    {
-      // Setup initial recursion frame.
-      const initialRecFrame = recStack[recDepth];
-      initialRecFrame.gridState.set(this._initialGridState);
-      initialRecFrame.cellDepth = 0;
-      initialRecFrame.lastContradictionCell = -1;
-      initialRecFrame.progressRemaining = 1.0;
-      initialRecFrame.newNode = true;
+    const frame0 = recStack[0];
+    frame0.gridState.set(this._initialGridState);
+    frame0.cellDepth = 0;
+    frame0.lastContradictionCell = -1;
+    frame0.progressRemaining = 1.0;
+    frame0.newNode = true;
 
-      if (yieldEveryStep) {
-        this.setStepState({});
-        this._stepState.oldGrid.set(initialRecFrame.gridCells);
-        this._stepState.step = 1;
-      }
+    if (yieldEveryStep) {
+      this._initStepState(mode.step);
+    }
 
-      // Enforce constraints for all cells.
-      const handlerAccumulator = this._handlerAccumulator;
-      handlerAccumulator.reset(false);
-      for (let i = 0; i < this._numCells; i++) handlerAccumulator.addForCell(i);
-      if (!this._enforceConstraints(initialRecFrame.gridState, handlerAccumulator)) {
-        // If the initial grid is invalid, then ensure it has a zero so that the
-        // initial iteration will fail.
-        if (initialRecFrame.gridCells.indexOf(0) === -1) initialRecFrame.gridCells.fill(0);
-      }
-
-      counters.nodesSearched++;
+    // Enforce constraints for all cells.
+    const handlerAccumulator = this._handlerAccumulator;
+    handlerAccumulator.reset(false);
+    for (let i = 0; i < this._numCells; i++) handlerAccumulator.addForCell(i);
+    if (!this._enforceConstraints(frame0.gridState, handlerAccumulator)) {
+      if (frame0.gridCells.indexOf(0) === -1) frame0.gridCells.fill(0);
     }
 
     if (this._debugLogger.logLevel >= 2) {
       this._debugLogger.log({ loc: 'run', msg: 'Start run-loop' }, 2);
     }
 
-    recDepth++;
+    counters.nodesSearched++;
+    this._recDepth = 1;
+    this._runLoop(mode, onSolution);
+    return this._canResume;
+  }
+
+  // Continue a search from a previously saved position.
+  //
+  // mode must be { maxSolutions } and maxSolutions must exceed the current
+  // solution count.
+  //
+  // Returns true if position is saved again, false if exhausted.
+  resume(mode, onSolution) {
+    if (!this._canResume) return false;
+    if (!mode?.maxSolutions) {
+      throw new Error('resume() mode must include maxSolutions');
+    }
+    if (mode.maxSolutions <= this.counters.solutions) {
+      throw new Error(
+        `resume() maxSolutions (${mode.maxSolutions}) must be greater than ` +
+        `current solution count (${this.counters.solutions})`);
+    }
+    this._canResume = false;
+    this._runLoop(mode, onSolution);
+    return this._canResume;
+  }
+
+  // Pure search loop — no initialisation, no state restoration.
+  // Reads starting position from this._recDepth and this._iterationCounter.
+  // Called by run() and resume().
+  _runLoop(mode, onSolution) {
+    const yieldEveryStep = !!mode?.step;
+    const stepTarget = yieldEveryStep ? mode.step.n : 0;
+    const maxBacktracks = mode?.maxBacktracks ?? 0;
+    const maxSolutions = mode?.maxSolutions ?? 0;
+    const progressFrequencyMask = this._progress.frequencyMask;
+    const recStack = this._recStack;
+    const counters = this.counters;
+    let recDepth = this._recDepth;
+    let iterationCounter = this._iterationCounter;
+
     while (recDepth) {
       let recFrame = recStack[--recDepth];
 
@@ -818,10 +826,12 @@ class InternalSolver {
         // If it is not a new node then we just backtracked, so there is
         // nothing interesting to show.
         if (count > 1 && isNewNode) {
-          yield this._makeStepYieldResult(
-            grid, InternalSolver.STEP_RESULT_GUESS);
-          checkRunCounter();
-          stepState.step++;
+          if (stepState.step >= stepTarget) {
+            mode.step.onStep(
+              this._makeStepYieldResult(grid, InternalSolver.STEP_RESULT_GUESS));
+            return;
+          }
+          this._incStep();
         }
         if (!isNewNode || count !== 1) {
           stepState.oldGrid.set(grid);
@@ -851,10 +861,10 @@ class InternalSolver {
       //       selection methods.
       grid[cell] = value;
 
-      iterationCounterForUpdates++;
-      if ((iterationCounterForUpdates & progressFrequencyMask) === 0) {
+      iterationCounter++;
+      if ((iterationCounter & progressFrequencyMask) === 0) {
         this._progress.callback();
-        iterationCounterForUpdates &= (1 << 30) - 1;
+        iterationCounter &= (1 << 30) - 1;
       }
 
       // Propagate constraints.
@@ -870,17 +880,6 @@ class InternalSolver {
         counters.backtracks++;
         this._conflictScores.increment(cell, value);
 
-        if (0 !== yieldOnBacktrack &&
-          0 === counters.backtracks % yieldOnBacktrack) {
-          yield {
-            grid: grid,
-            isSolution: false,
-            cellOrder: this._candidateSelector.getCellOrder(cellDepth),
-            hasContradiction: hasContradiction,
-          };
-          checkRunCounter();
-        }
-
         if (yieldEveryStep) {
           // Ensure that the pending guess is visible in the grid.
           if (this._stepState.pendingGuess.guess) {
@@ -888,10 +887,16 @@ class InternalSolver {
               this._stepState.pendingGuess.cellDepth);
             grid[guessCell] = this._stepState.pendingGuess.guess;
           }
-          yield this._makeStepYieldResult(
-            grid, InternalSolver.STEP_RESULT_CONTRADICTION);
-          checkRunCounter();
-          this._stepState.step++;
+          if (this._stepState.step >= stepTarget) {
+            mode.step.onStep(
+              this._makeStepYieldResult(grid, InternalSolver.STEP_RESULT_CONTRADICTION));
+            return;
+          }
+          this._incStep();
+        }
+
+        if (maxBacktracks && counters.backtracks >= maxBacktracks) {
+          return;
         }
       }
 
@@ -914,22 +919,23 @@ class InternalSolver {
         if (this._sampleSolution[0] === 0) {
           this._sampleSolution.set(grid);
         }
+        onSolution(grid);
         if (yieldEveryStep) {
-          yield this._makeStepYieldResult(
-            grid, InternalSolver.STEP_RESULT_SOLUTION);
-          checkRunCounter();
-          this._stepState.step++;
-        } else if (yieldWhen !== InternalSolver.YIELD_NEVER) {
-          yield {
-            grid: grid,
-            isSolution: true,
-            cellOrder: this._candidateSelector.getCellOrder(),
-            hasContradiction: false,
-          };
-          checkRunCounter();
+          if (this._stepState.step >= stepTarget) {
+            mode.step.onStep(
+              this._makeStepYieldResult(grid, InternalSolver.STEP_RESULT_SOLUTION));
+            return;
+          }
+          this._incStep();
         }
         if (maxSolutions && counters.solutions >= maxSolutions) {
-          break;
+          this._recDepth = recDepth;
+          this._iterationCounter = iterationCounter;
+          this._canResume = true;
+          return;
+        }
+        if (maxBacktracks && counters.backtracks >= maxBacktracks) {
+          return;
         }
         continue;
       }
@@ -957,9 +963,9 @@ class InternalSolver {
     const seenCandidateSet = this._seenCandidateSet;
     seenCandidateSet.resetWithThreshold(candidateSupportThreshold);
 
-    for (const result of this.run(InternalSolver.YIELD_ON_SOLUTION)) {
-      seenCandidateSet.addSolutionGrid(result.grid);
-      solutions.push(result.grid.slice(0));
+    this.run(null, (grid) => {
+      seenCandidateSet.addSolutionGrid(grid);
+      solutions.push(grid.slice(0));
 
       // Once we have 2 solutions, then start ignoring branches which maybe
       // duplicating existing solution (up to this point, every branch is
@@ -967,7 +973,7 @@ class InternalSolver {
       if (counters.solutions === 2) {
         seenCandidateSet.enabledInSolver = true;
       }
-    }
+    });
 
     return seenCandidateSet.getCandidateCounts();
   }
@@ -983,23 +989,21 @@ class InternalSolver {
     // Choose just the house handlers.
     const houseHandlers = this._handlerSet.getAllofType(HandlerModule.House);
 
-    const finalize = (result) => {
-      this.done = true;
-      if (!result) return null;
+    const finalize = (grid) => {
+      if (!grid) return null;
 
       this.counters.branchesIgnored = 1 - this.counters.progressRatio;
-      return SudokuSolverUtil.gridToSolution(result.grid);
+      return SudokuSolverUtil.gridToSolution(grid);
     };
 
     // Non-standard grids may not have any house handlers (e.g. when there are
     // more values than rows/cols). In that case, validate by simply finding any
     // solution under the full constraint set.
     if (houseHandlers.length === 0) {
+      let grid = null;
       this._resetRun();
-      for (const result of this.run(InternalSolver.YIELD_ON_SOLUTION)) {
-        return finalize(result);
-      }
-      return finalize(null);
+      this.run({ maxSolutions: 1 }, (g) => { grid = g; });
+      return finalize(grid);
     }
 
     // Function to fill a house with all values.
@@ -1014,23 +1018,24 @@ class InternalSolver {
     const SEARCH_LIMIT = 200;
 
     // Function to attempt to solve with one house fixed.
+    // Returns: a grid (solution found), null (exhausted, no solution),
+    //          or undefined (hit SEARCH_LIMIT backtracks, search inconclusive).
     const attempt = (house) => {
       this._resetRun();
-
       fillHouse(house);
       // Reduce backtrack triggers so that we don't weight the last runs too
       // heavily.
       // TODO: Do this in a more principled way.
       this._conflictScores.decay();
 
-      for (const result of this.run(SEARCH_LIMIT)) {
-        if (result.isSolution) {
-          return result;
-        }
-        attemptLog.push([house, this.counters.progressRatio]);
-        return undefined;
-      }
-      return null;
+      let grid = null;
+      // Stop at first solution OR SEARCH_LIMIT total backtracks.
+      this.run({ maxSolutions: 1, maxBacktracks: SEARCH_LIMIT }, (g) => { grid = g; });
+
+      if (grid) return grid;
+      if (this.counters.backtracks < SEARCH_LIMIT) return null;
+      attemptLog.push([house, this.counters.progressRatio]);
+      return undefined;
     };
 
     // Try doing a short search from every house.
@@ -1055,11 +1060,9 @@ class InternalSolver {
 
     // Run the final search until we find a solution or prove that one doesn't
     // exist.
-    for (const result of this.run(InternalSolver.YIELD_ON_SOLUTION)) {
-      return finalize(result);
-    }
-
-    return finalize(null);
+    let finalGrid = null;
+    this.run({ maxSolutions: 1 }, (g) => { finalGrid = g; });
+    return finalize(finalGrid);
   }
 
   setProgressCallback(callback, logFrequency) {
@@ -1097,13 +1100,13 @@ class InternalSolver {
 
     while (true) {
       this._resetRun();
+      // Run one root-to-backtrack path (Knuth sampling).
+      // maxBacktracks:1 stops at the first backtrack (contradiction or solution).
+      let foundSolution = false;
+      this.run({ maxBacktracks: 1 }, (grid) => { foundSolution = true; });
 
-      // Run a search and stop after one backtrack.
-      for (const result of this.run(InternalSolver.YIELD_EVERY_BACKTRACK)) {
-        if (result.isSolution) {
-          totalEstimate += this._candidateSelector.getSolutionWeight();
-        }
-        break;
+      if (foundSolution) {
+        totalEstimate += this._candidateSelector.getSolutionWeight();
       }
 
       numSamples++;
