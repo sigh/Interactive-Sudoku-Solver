@@ -104,10 +104,7 @@ export class SudokuSolver {
 
     let grid = null;
     this._timer.runTimed(() => {
-      const s = this._internalSolver.state;
-      if (s === InternalSolver.STATE_RESUMABLE) {
-        this._internalSolver.resume({ maxSolutions: n }, (g) => { grid = g; });
-      } else if (s !== InternalSolver.STATE_EXHAUSTED) {
+      if (this._internalSolver.state !== InternalSolver.STATE_EXHAUSTED) {
         this._internalSolver.run({ maxSolutions: n }, (g) => { grid = g; });
       }
     });
@@ -703,24 +700,40 @@ class InternalSolver {
   static STEP_RESULT_SOLUTION = 1;
   static STEP_RESULT_CONTRADICTION = 2;
 
-  // Start a new search.
+  // Run the solver.
   //
-  // mode: null for exhaustive; { maxSolutions } to stop after N solutions
-  // (saving position for resume); { maxBacktracks } to stop after N backtracks
-  // or the first solution; { step } to stop at the Nth step event.
+  // If in STATE_RESUMABLE, continues from the saved position; mode must be
+  // { maxSolutions } with maxSolutions exceeding the current solution count.
+  // If in STATE_UNSTARTED, starts a fresh search; mode may be null for
+  // exhaustive, { maxSolutions }, { maxBacktracks }, or { step }.
+  // Any other state throws — call reset() first.
   //
   // onSolution(grid) is called for each solution found.
-  //
-  // Returns true if position was saved for resume (maxSolutions mode only),
-  // false otherwise.
   run(mode, onSolution) {
-    this._state = InternalSolver.STATE_INCOMPLETE;
+    if (this._state === InternalSolver.STATE_UNSTARTED) {
+      this._initRun(mode);
+    } else if (this._state === InternalSolver.STATE_RESUMABLE) {
+      if (!mode?.maxSolutions) {
+        throw new Error('run() from resumable state requires maxSolutions');
+      }
+      if (mode.maxSolutions <= this.counters.solutions) {
+        throw new Error(
+          `run() maxSolutions (${mode.maxSolutions}) must exceed ` +
+          `current solution count (${this.counters.solutions})`);
+      }
+    } else {
+      throw new Error('run() requires STATE_UNSTARTED or STATE_RESUMABLE; call reset() first');
+    }
 
+    this._state = InternalSolver.STATE_INCOMPLETE;
+    this._runLoop(mode, onSolution);
+  }
+
+  _initRun(mode) {
     const counters = this.counters;
     counters.progressRatioPrev += counters.progressRatio;
     counters.progressRatio = 0;
 
-    const yieldEveryStep = !!mode?.step;
     const recStack = this._recStack;
     const frame0 = recStack[0];
     frame0.gridState.set(this._initialGridState);
@@ -729,7 +742,7 @@ class InternalSolver {
     frame0.progressRemaining = 1.0;
     frame0.newNode = true;
 
-    if (yieldEveryStep) {
+    if (mode?.step) {
       this._initStepState(mode.step);
     }
 
@@ -747,34 +760,10 @@ class InternalSolver {
 
     counters.nodesSearched++;
     this._recDepth = 1;
-    this._runLoop(mode, onSolution);
-    return this._state === InternalSolver.STATE_RESUMABLE;
-  }
-
-  // Continue a search from a previously saved position.
-  //
-  // mode must be { maxSolutions } and maxSolutions must exceed the current
-  // solution count.
-  //
-  // Returns true if position is saved again, false if exhausted.
-  resume(mode, onSolution) {
-    if (this._state !== InternalSolver.STATE_RESUMABLE) return false;
-    if (!mode?.maxSolutions) {
-      throw new Error('resume() mode must include maxSolutions');
-    }
-    if (mode.maxSolutions <= this.counters.solutions) {
-      throw new Error(
-        `resume() maxSolutions (${mode.maxSolutions}) must be greater than ` +
-        `current solution count (${this.counters.solutions})`);
-    }
-    this._state = InternalSolver.STATE_INCOMPLETE;
-    this._runLoop(mode, onSolution);
-    return this._state === InternalSolver.STATE_RESUMABLE;
   }
 
   // Pure search loop — no initialisation, no state restoration.
   // Reads starting position from this._recDepth and this._iterationCounter.
-  // Called by run() and resume().
   _runLoop(mode, onSolution) {
     const yieldEveryStep = !!mode?.step;
     const stepTarget = yieldEveryStep ? mode.step.n : 0;
