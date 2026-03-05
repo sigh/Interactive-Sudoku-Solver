@@ -2,7 +2,6 @@
 
 const {
   Timer,
-  IteratorWithCount,
   arraysAreEqual,
   setIntersectionToArray,
   BitSet,
@@ -30,7 +29,6 @@ export class SudokuSolver {
 
   _reset() {
     this._internalSolver.reset();
-    this._canResume = false;
     this._timer = new Timer();
   }
 
@@ -106,12 +104,11 @@ export class SudokuSolver {
 
     let grid = null;
     this._timer.runTimed(() => {
-      if (this._canResume) {
-        this._canResume = this._internalSolver.resume(
-          { maxSolutions: n }, (g) => { grid = g; });
-      } else if (!this._internalSolver.done) {
-        this._canResume = this._internalSolver.run(
-          { maxSolutions: n }, (g) => { grid = g; });
+      const s = this._internalSolver.state;
+      if (s === InternalSolver.STATE_RESUMABLE) {
+        this._internalSolver.resume({ maxSolutions: n }, (g) => { grid = g; });
+      } else if (s !== InternalSolver.STATE_EXHAUSTED) {
+        this._internalSolver.run({ maxSolutions: n }, (g) => { grid = g; });
       }
     });
 
@@ -120,6 +117,7 @@ export class SudokuSolver {
   }
 
   nthStep(n, stepGuides) {
+    this._reset();
     n++;  // Convert to 1-indexed target.
 
     // Step mode: always run from scratch (deterministic replay).
@@ -223,7 +221,7 @@ export class SudokuSolver {
     const state = {
       counters: counters,
       timeMs: this._timer.elapsedMs(),
-      done: this._internalSolver.done,
+      done: this._internalSolver.state === InternalSolver.STATE_EXHAUSTED,
     }
 
     return state;
@@ -480,7 +478,6 @@ class InternalSolver {
   }
 
   reset() {
-    this._canResume = false;
     this._stepState = null;
     this._currentRecFrame = null;
     this.counters = {
@@ -520,13 +517,15 @@ class InternalSolver {
     this._recDepth = 0;
     this._iterationCounter = 0;
 
-    this.done = false;
-    this._atStart = true;
+    this._state = InternalSolver.STATE_UNSTARTED;
   }
 
   static _debugValueBuffer = new Uint16Array(SHAPE_MAX.numCells);
   getStackTrace() {
-    if (this._atStart || this.done || !this._currentRecFrame) return null;
+    const s = this._state;
+    if (s === InternalSolver.STATE_UNSTARTED ||
+        s === InternalSolver.STATE_EXHAUSTED ||
+        !this._currentRecFrame) return null;
 
     const stackFrame = this._currentRecFrame;
     const cellDepth = stackFrame.cellDepth;
@@ -691,6 +690,15 @@ class InternalSolver {
   static YIELD_NEVER = -1;
   static YIELD_EVERY_BACKTRACK = 1;
 
+  static STATE_UNSTARTED = 0;
+  static STATE_INCOMPLETE = 1;
+  static STATE_RESUMABLE = 2;
+  static STATE_EXHAUSTED = 3;
+
+  get state() {
+    return this._state;
+  }
+
   static STEP_RESULT_GUESS = 0;
   static STEP_RESULT_SOLUTION = 1;
   static STEP_RESULT_CONTRADICTION = 2;
@@ -706,9 +714,8 @@ class InternalSolver {
   // Returns true if position was saved for resume (maxSolutions mode only),
   // false otherwise.
   run(mode, onSolution) {
-    this._canResume = false;
+    this._state = InternalSolver.STATE_INCOMPLETE;
 
-    this._atStart = false;
     const counters = this.counters;
     counters.progressRatioPrev += counters.progressRatio;
     counters.progressRatio = 0;
@@ -741,7 +748,7 @@ class InternalSolver {
     counters.nodesSearched++;
     this._recDepth = 1;
     this._runLoop(mode, onSolution);
-    return this._canResume;
+    return this._state === InternalSolver.STATE_RESUMABLE;
   }
 
   // Continue a search from a previously saved position.
@@ -751,7 +758,7 @@ class InternalSolver {
   //
   // Returns true if position is saved again, false if exhausted.
   resume(mode, onSolution) {
-    if (!this._canResume) return false;
+    if (this._state !== InternalSolver.STATE_RESUMABLE) return false;
     if (!mode?.maxSolutions) {
       throw new Error('resume() mode must include maxSolutions');
     }
@@ -760,9 +767,9 @@ class InternalSolver {
         `resume() maxSolutions (${mode.maxSolutions}) must be greater than ` +
         `current solution count (${this.counters.solutions})`);
     }
-    this._canResume = false;
+    this._state = InternalSolver.STATE_INCOMPLETE;
     this._runLoop(mode, onSolution);
-    return this._canResume;
+    return this._state === InternalSolver.STATE_RESUMABLE;
   }
 
   // Pure search loop — no initialisation, no state restoration.
@@ -931,7 +938,7 @@ class InternalSolver {
         if (maxSolutions && counters.solutions >= maxSolutions) {
           this._recDepth = recDepth;
           this._iterationCounter = iterationCounter;
-          this._canResume = true;
+          this._state = InternalSolver.STATE_RESUMABLE;
           return;
         }
         if (maxBacktracks && counters.backtracks >= maxBacktracks) {
@@ -950,7 +957,7 @@ class InternalSolver {
     }
 
     this._currentRecFrame = null;
-    this.done = true;
+    this._state = InternalSolver.STATE_EXHAUSTED;
 
     if (this._debugLogger.logLevel >= 2) {
       this._debugLogger.log({ loc: 'run', msg: 'Done' }, 2);
@@ -982,6 +989,7 @@ class InternalSolver {
     const originalInitialGridState = this._initialGridState.slice();
     const result = this._validateLayout(originalInitialGridState);
     this._initialGridState = originalInitialGridState;
+    this._state = InternalSolver.STATE_EXHAUSTED;
     return result;
   }
 
@@ -1115,7 +1123,7 @@ class InternalSolver {
 
       // Ensure that there are progress callbacks.
       // However, we don't want the progress callback to report done.
-      this.done = false;
+      this._state = InternalSolver.STATE_INCOMPLETE;
       this._progress.callback();
     }
   }
