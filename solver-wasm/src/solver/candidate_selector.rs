@@ -1,7 +1,9 @@
 use super::StepGuide;
 use crate::api::types::CellIndex;
 use crate::candidate_set::CandidateSet;
+use crate::grid_shape::GridShape;
 use crate::rng::RandomIntGenerator;
+use crate::solver::debug::DebugLog;
 
 // ============================================================================
 // CandidateFinderDescription — handler-provided finder specifications
@@ -100,6 +102,19 @@ pub struct CandidateSelection {
     pub value: CandidateSet,
     /// Number of options we selected from (1 = forced, >1 = guess).
     pub count: u32,
+}
+
+/// Debug logger passed into `select_next_candidate`, mirroring how JS
+/// `CandidateSelector` holds `this._debugLogger` + `this._shape`.
+///
+/// In JS these are stored on the object; in Rust we pass them per-call
+/// to satisfy the borrow checker (InternalSolver owns both the selector
+/// and the debug log vec).
+pub struct CandidateDebugLogger<'a> {
+    pub log_level: u8,
+    pub enable_step_logs: bool,
+    pub debug_logs: &'a mut Vec<DebugLog>,
+    pub shape: &'a GridShape,
 }
 
 impl CandidateSelector {
@@ -212,6 +227,9 @@ impl CandidateSelector {
     /// `grid`: current grid state.
     /// `is_new_node`: true if we're exploring this node for the first time.
     /// `step_guide`: optional step guide to override cell/value selection.
+    /// `debug`: optional debug logger for direct logging (mirrors JS
+    ///   `this._debugLogger` — in JS it's stored on the object, here we pass
+    ///   it per-call to satisfy the borrow checker).
     ///
     /// Mirrors JS `selectNextCandidate` + `_adjustForStepState`.
     /// If a step guide is provided and matches the current depth, the
@@ -225,11 +243,11 @@ impl CandidateSelector {
         grid: &[CandidateSet],
         is_new_node: bool,
         step_guide: Option<&StepGuide>,
+        mut debug: Option<&mut CandidateDebugLogger>,
     ) -> CandidateSelection {
         // Sampling mode: force single-branch exploration.
         if self.sampling.is_some() {
             if !is_new_node {
-                // On backtrack, return count=0 to stop exploring.
                 return CandidateSelection {
                     next_depth: 0,
                     value: CandidateSet::EMPTY,
@@ -249,11 +267,38 @@ impl CandidateSelector {
             };
         }
 
+        // JS: if (cellDepth === 0 && this._debugLogger.logLevel >= 2)
+        if let Some(dbg) = debug.as_deref_mut() {
+            if cell_depth == 0 && dbg.log_level >= 2 {
+                dbg.debug_logs.push(DebugLog {
+                    loc: "selectNextCandidate".into(),
+                    msg: "Root node".into(),
+                    args: Some(serde_json::json!({
+                        "cell": self.cell_order[cell_offset],
+                        "value": value.value(),
+                        "count": count,
+                    })),
+                    cells: vec![self.cell_order[cell_offset]],
+                    ..Default::default()
+                });
+            }
+        }
+
+        // JS: if (this._debugLogger.enableStepLogs)
+        //       this._logSelectNextCandidate('Best candidate:', ...)
+        if let Some(dbg) = debug.as_deref_mut() {
+            if dbg.enable_step_logs {
+                self.log_select_next_candidate(
+                    dbg, "Best candidate:",
+                    cell_offset, value, count, cell_depth, is_new_node,
+                );
+            }
+        }
+
         // Apply step guide override if present and matching depth.
+        let mut adjusted = false;
         if let Some(guide) = step_guide {
             if guide.depth == cell_depth {
-                let mut adjusted = false;
-
                 // Override cell if specified.
                 if let Some(guide_cell) = guide.cell {
                     let new_offset = self.cell_order_index_of(guide_cell, cell_depth);
@@ -266,12 +311,9 @@ impl CandidateSelector {
                 let cell_values = grid[self.cell_order[cell_offset] as usize];
 
                 if let Some(guide_value) = guide.value {
-                    // Override value.
                     value = CandidateSet::from_value(guide_value);
                     adjusted = true;
                 } else if guide.cell.is_some() {
-                    // If we had a guide cell but no guide value, pick
-                    // the lowest bit of the cell's values.
                     value = cell_values.lowest();
                     adjusted = true;
                 }
@@ -280,6 +322,17 @@ impl CandidateSelector {
                     count = grid[self.cell_order[cell_offset] as usize].count();
                     self.candidate_selection_flags[cell_depth] = false;
                 }
+            }
+        }
+
+        // JS: if (this._debugLogger.enableStepLogs)
+        //       this._logSelectNextCandidate('Adjusted by user:', ...)
+        if let Some(dbg) = debug.as_deref_mut() {
+            if dbg.enable_step_logs && adjusted {
+                self.log_select_next_candidate(
+                    dbg, "Adjusted by user:",
+                    cell_offset, value, count, cell_depth, is_new_node,
+                );
             }
         }
 
@@ -292,6 +345,22 @@ impl CandidateSelector {
                 value: CandidateSet::EMPTY,
                 count: 0,
             };
+        }
+
+        // JS: if (this._debugLogger.enableStepLogs)
+        //       if (nextCellDepth !== cellDepth + 1) ...
+        if let Some(dbg) = debug {
+            if dbg.enable_step_logs && next_depth != cell_depth + 1 {
+                dbg.debug_logs.push(DebugLog {
+                    loc: "selectNextCandidate".into(),
+                    msg: "Found extra singles".into(),
+                    args: Some(serde_json::json!({
+                        "count": next_depth - cell_depth - 1,
+                    })),
+                    cells: self.cell_order[cell_depth + 1..next_depth].to_vec(),
+                    ..Default::default()
+                });
+            }
         }
 
         // Sampling mode: pick a random value and track weight.
@@ -308,6 +377,49 @@ impl CandidateSelector {
             value,
             count,
         }
+    }
+
+    /// Mirrors JS `_logSelectNextCandidate(msg, cell, value, count, cellDepth, isNewNode)`.
+    fn log_select_next_candidate(
+        &self,
+        dbg: &mut CandidateDebugLogger,
+        msg: &str,
+        cell_offset: usize,
+        value: CandidateSet,
+        count: u32,
+        cell_depth: usize,
+        is_new_node: bool,
+    ) {
+        let cell = self.cell_order[cell_offset];
+        let cell_id = dbg.shape.cell_id_from_index(cell as usize);
+        let mut args = serde_json::json!({
+            "cell": cell_id,
+            "value": value.value(),
+            "numOptions": count,
+            "cellDepth": cell_depth,
+            "isNewNode": is_new_node,
+        });
+        if self.candidate_selection_flags[cell_depth] {
+            let s = &self.candidate_selection_states[cell_depth];
+            let state_cells: Vec<String> = s.cells.iter()
+                .map(|&c| dbg.shape.cell_id_from_index(c as usize))
+                .collect();
+            args.as_object_mut().unwrap().insert(
+                "state".into(),
+                serde_json::json!({
+                    "score": s.score,
+                    "value": s.value.to_values(),
+                    "cells": state_cells,
+                }),
+            );
+        }
+        dbg.debug_logs.push(DebugLog {
+            loc: "selectNextCandidate".into(),
+            msg: msg.into(),
+            args: Some(args),
+            cells: vec![cell],
+            ..Default::default()
+        });
     }
 
     /// The main candidate selection logic, mirroring JS `_selectBestCandidate`.
@@ -1050,7 +1162,7 @@ mod tests {
         let mut grid = vec![CandidateSet::all(9); NUM_CELLS];
         grid[0] = CandidateSet::from_value(5); // singleton
 
-        let result = selector.select_next_candidate(0, &grid, true, None);
+        let result = selector.select_next_candidate(0, &grid, true, None, None);
         assert_eq!(result.value, CandidateSet::from_value(5));
         assert_eq!(result.count, 1);
         assert!(result.next_depth >= 1);

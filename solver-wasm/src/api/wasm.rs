@@ -15,7 +15,8 @@ use crate::api::types::{
     AllPossibilitiesOutput, CountOutput, EstimateOutput, SolverInput, SolverOutput,
 };
 use crate::api::{build_solver_from_input, parse_step_guides, step_result_to_output};
-use crate::grid;
+use crate::constraint::parser as constraint_parser;
+use crate::grid_shape::GridShape;
 use crate::solver::debug::SolverProgress;
 use crate::solver::{self, SolverCounters};
 
@@ -53,7 +54,7 @@ thread_local! {
     /// Set by [`init_solver`], used by [`nth_solution_with_progress`],
     /// [`nth_step_with_progress`], [`count_solutions_with_progress`], and
     /// [`solve_all_possibilities_with_progress`].
-    static SOLVER: RefCell<Option<solver::Solver>> = const { RefCell::new(None) };
+    static SOLVER: RefCell<Option<(solver::Solver, GridShape)>> = const { RefCell::new(None) };
 }
 
 /// Build a solver from JSON input and store it for later method calls.
@@ -75,8 +76,9 @@ pub fn init_solver(input: &str, log_frequency: u32) -> String {
         Err(e) => return e,
     };
 
+    let shape = solver.shape();
     SOLVER.with(|cell| {
-        *cell.borrow_mut() = Some(solver);
+        *cell.borrow_mut() = Some((solver, shape));
     });
 
     String::new()
@@ -91,8 +93,8 @@ pub fn init_solver(input: &str, log_frequency: u32) -> String {
 pub fn count_solutions_with_progress(callback: &js_sys::Function, limit: u32) -> String {
     SOLVER.with(|cell| {
         let mut opt = cell.borrow_mut();
-        let solver = match opt.as_mut() {
-            Some(s) => s,
+        let (solver, _shape) = match opt.as_mut() {
+            Some((s, sh)) => (s, *sh),
             None => {
                 return serialize_or_error(&CountOutput {
                     count: 0,
@@ -121,8 +123,8 @@ pub fn count_solutions_with_progress(callback: &js_sys::Function, limit: u32) ->
 pub fn validate_layout_with_progress(callback: &js_sys::Function) -> String {
     SOLVER.with(|cell| {
         let mut opt = cell.borrow_mut();
-        let solver = match opt.as_mut() {
-            Some(s) => s,
+        let (solver, shape) = match opt.as_mut() {
+            Some((s, sh)) => (s, *sh),
             None => {
                 return serialize_or_error(&SolverOutput {
                     success: false,
@@ -138,7 +140,7 @@ pub fn validate_layout_with_progress(callback: &js_sys::Function) -> String {
 
         let solution_str = result
             .solution
-            .map(|cells| grid::Grid { cells }.to_puzzle_string());
+            .map(|sol| constraint_parser::to_short_solution(&sol, shape));
 
         serialize_or_error(&SolverOutput {
             success: solution_str.is_some(),
@@ -165,8 +167,8 @@ pub fn estimated_count_solutions_with_progress(
 ) -> String {
     SOLVER.with(|cell| {
         let mut opt = cell.borrow_mut();
-        let solver = match opt.as_mut() {
-            Some(s) => s,
+        let (solver, _shape) = match opt.as_mut() {
+            Some((s, sh)) => (s, *sh),
             None => {
                 return serialize_or_error(&EstimateOutput {
                     estimate: 0.0,
@@ -200,8 +202,8 @@ pub fn estimated_count_solutions_with_progress(
 pub fn solve_all_possibilities_with_progress(callback: &js_sys::Function, threshold: u8) -> String {
     SOLVER.with(|cell| {
         let mut opt = cell.borrow_mut();
-        let solver = match opt.as_mut() {
-            Some(s) => s,
+        let (solver, shape) = match opt.as_mut() {
+            Some((s, sh)) => (s, *sh),
             None => {
                 return serialize_or_error(&AllPossibilitiesOutput {
                     candidate_counts: Vec::new(),
@@ -219,7 +221,7 @@ pub fn solve_all_possibilities_with_progress(callback: &js_sys::Function, thresh
         let solutions: Vec<String> = result
             .solutions
             .iter()
-            .map(|sol| grid::Grid { cells: sol.clone() }.to_puzzle_string())
+            .map(|sol| constraint_parser::to_short_solution(sol, shape))
             .collect();
 
         serialize_or_error(&AllPossibilitiesOutput {
@@ -243,8 +245,8 @@ pub fn solve_all_possibilities_with_progress(callback: &js_sys::Function, thresh
 pub fn nth_solution_with_progress(n: u32, callback: &js_sys::Function) -> String {
     SOLVER.with(|cell| {
         let mut opt = cell.borrow_mut();
-        let solver = match opt.as_mut() {
-            Some(s) => s,
+        let (solver, shape) = match opt.as_mut() {
+            Some((s, sh)) => (s, *sh),
             None => {
                 return serialize_or_error(&SolverOutput {
                     success: false,
@@ -260,7 +262,7 @@ pub fn nth_solution_with_progress(n: u32, callback: &js_sys::Function) -> String
 
         let solution_str = result
             .solution
-            .map(|cells| grid::Grid { cells }.to_puzzle_string());
+            .map(|sol| constraint_parser::to_short_solution(&sol, shape));
 
         serialize_or_error(&SolverOutput {
             success: solution_str.is_some(),
@@ -287,8 +289,8 @@ pub fn nth_step_with_progress(
 ) -> String {
     SOLVER.with(|cell| {
         let mut opt = cell.borrow_mut();
-        let solver = match opt.as_mut() {
-            Some(s) => s,
+        let (solver, shape) = match opt.as_mut() {
+            Some((s, sh)) => (s, *sh),
             None => {
                 return serialize_or_error(&SolverOutput {
                     success: false,
@@ -305,7 +307,7 @@ pub fn nth_step_with_progress(
 
         match result {
             Some(step) => {
-                let output = step_result_to_output(&step);
+                let output = step_result_to_output(&step, shape);
                 serialize_or_error(&output)
             }
             None => "null".to_string(),

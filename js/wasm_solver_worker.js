@@ -28,6 +28,8 @@ const { Timer } = await import('./util.js' + self.VERSION_PARAM);
 import init, {
   init_solver,
   count_solutions_with_progress,
+  validate_layout_with_progress,
+  estimated_count_solutions_with_progress,
   solve_all_possibilities_with_progress,
   nth_solution_with_progress,
   nth_step_with_progress,
@@ -65,8 +67,10 @@ const LOG_UPDATE_FREQUENCY = 13; // 2^13 = 8192 iterations per callback.
 
 /**
  * Parse a SolverProgress JSON string from the WASM solver.
- * Returns { counters, debugData } where debugData is null if no debug
+ * Returns { counters, debugData, extra } where debugData is null if no debug
  * information is present, or an object with logs/conflictHeatmap/stackTrace.
+ * extra is the raw progress.extra object (may contain sampleSolution and/or
+ * estimate fields), or null.
  */
 function parseProgress(progressJson) {
   const progress = JSON.parse(progressJson);
@@ -84,7 +88,7 @@ function parseProgress(progressJson) {
     if (hasStack) debugData.stackTrace = progress.stackTrace;
   }
 
-  return { counters, debugData };
+  return { counters, debugData, extra: progress.extra || null };
 }
 
 /**
@@ -265,10 +269,10 @@ const handleWorkerMethod = (method, payload) => {
       const limit = payload || 0;
       timer.runTimed(() => {
         const onProgress = (progressJson) => {
-          const { counters, debugData } = parseProgress(progressJson);
+          const { counters, debugData, extra } = parseProgress(progressJson);
           workerSolverState.counters = counters;
           workerSolverState.timeMs = timer.elapsedMs();
-          sendState();
+          sendState(extra || undefined);
           sendDebugState(debugData);
         };
 
@@ -288,9 +292,39 @@ const handleWorkerMethod = (method, payload) => {
       return result.count;
     }
 
-    case 'validateLayout':
-      // Not applicable for WASM solver — always valid for supported constraints.
-      return true;
+    case 'validateLayout': {
+      if (!workerSolverState) throw new Error('Solver not initialized');
+
+      const timer = new Timer();
+      let result;
+      timer.runTimed(() => {
+        const onProgress = (progressJson) => {
+          const { counters, debugData } = parseProgress(progressJson);
+          workerSolverState.counters = counters;
+          workerSolverState.timeMs = timer.elapsedMs();
+          sendState();
+          sendDebugState(debugData);
+        };
+
+        const resultJson = validate_layout_with_progress(onProgress);
+        result = JSON.parse(resultJson);
+      });
+
+      throwOnError(result);
+
+      workerSolverState.counters = result.counters;
+      workerSolverState.timeMs = timer.elapsedMs();
+      workerSolverState.done = true;
+
+      if (!result.success) return null;
+
+      const solution = result.solution;
+      const values = [];
+      for (let i = 0; i < solution.length; i++) {
+        values.push(parseInt(solution[i], 10));
+      }
+      return values;
+    }
 
     case 'nthStep': {
       if (!workerSolverState) throw new Error('Solver not initialized');
@@ -336,8 +370,34 @@ const handleWorkerMethod = (method, payload) => {
       return result;
     }
 
-    case 'estimatedCountSolutions':
-      throw new Error('Estimated count is not supported by the WASM solver');
+    case 'estimatedCountSolutions': {
+      if (!workerSolverState) throw new Error('Solver not initialized');
+
+      const timer = new Timer();
+      let result;
+      timer.runTimed(() => {
+        const onProgress = (progressJson) => {
+          const { counters, debugData, extra } = parseProgress(progressJson);
+          workerSolverState.counters = counters;
+          workerSolverState.timeMs = timer.elapsedMs();
+          sendState(extra || undefined);
+          sendDebugState(debugData);
+        };
+
+        // max_samples=0 means unlimited (run until worker is terminated),
+        // matching the JS SudokuSolver.estimatedCountSolutions() behavior.
+        const resultJson = estimated_count_solutions_with_progress(onProgress, 0);
+        result = JSON.parse(resultJson);
+      });
+
+      throwOnError(result);
+
+      workerSolverState.counters = result.counters;
+      workerSolverState.timeMs = timer.elapsedMs();
+      workerSolverState.done = true;
+
+      return result.estimate;
+    }
   }
 
   throw new Error(`Unknown method ${method}`);

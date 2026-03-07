@@ -98,7 +98,13 @@ pub(super) fn optimize_required_values(
             given_map.insert(cell, CandidateSet::from_raw(v & all_values_mask));
 
             if values_arr.len() == 1 {
-                new_values.retain(|&x| x != values_arr[0]);
+                // Remove only the FIRST occurrence of the value, mirroring
+                // JS `arrayRemoveValue` which uses indexOf/splice (removes only
+                // one element). Using `retain` would remove ALL occurrences,
+                // incorrectly dropping the remaining sub-constraint.
+                if let Some(pos) = new_values.iter().position(|&x| x == values_arr[0]) {
+                    new_values.remove(pos);
+                }
                 new_cells.retain(|&c| c != cell);
             }
             if v & value_mask == 0 {
@@ -211,7 +217,11 @@ fn find_known_required_values(
             }
         }
 
-        if choice as usize >= group.len() {
+        // choice == -1 means SKIP. In Rust, `(-1i16) as usize == usize::MAX`
+        // so we MUST guard with `choice >= 0` before the unsigned comparison —
+        // otherwise a skip choice would incorrectly trigger backtracking.
+        // Mirrors JS `if (choice >= group.length)` which is correctly false for -1.
+        if choice >= 0 && (choice as usize) >= group.len() {
             stack_depth -= 1;
             continue;
         }
