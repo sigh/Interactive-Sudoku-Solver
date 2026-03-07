@@ -503,7 +503,6 @@ impl FullRank {
         while i < all_entries.len() {
             let entry = &all_entries[i];
 
-            // Check first, last, mid are all singletons.
             let first_v = grid[entry[0] as usize].raw();
             if (first_v & first_v.wrapping_sub(1)) != 0 {
                 i += 2;
@@ -525,6 +524,11 @@ impl FullRank {
             } else {
                 (first_v, last_v, i)
             };
+            // JS: `if (!firstV) continue;`
+            if norm_first == 0 {
+                i += 2;
+                continue;
+            }
 
             let value_index = CandidateSet::from_raw(norm_first).index();
 

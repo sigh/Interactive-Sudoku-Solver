@@ -23,6 +23,8 @@ pub(crate) struct SeenCandidateSet {
     threshold: u8,
     /// Whether pruning is active (enabled after 2 solutions).
     pub enabled: bool,
+    /// Whether any data has been added since the last reset.
+    dirty: bool,
     /// Last cell that had an unseen candidate (fast-path check).
     last_interesting_cell: usize,
     /// Number of values (for index arithmetic).
@@ -38,6 +40,7 @@ impl SeenCandidateSet {
             candidate_counts: vec![0u8; num_cells * num_values],
             threshold,
             enabled: false,
+            dirty: false,
             last_interesting_cell: 0,
             num_values,
         }
@@ -45,6 +48,7 @@ impl SeenCandidateSet {
 
     /// Record a solution grid.
     pub fn add_solution(&mut self, grid: &[CandidateSet]) {
+        self.dirty = true;
         let threshold = self.threshold;
         let num_values = self.num_values;
         for (i, &value) in grid.iter().enumerate() {
@@ -86,6 +90,10 @@ impl SeenCandidateSet {
 
     /// Reset the set, preserving allocations.
     pub fn reset(&mut self) {
+        if !self.dirty {
+            return;
+        }
+        self.dirty = false;
         self.candidates.fill(CandidateSet::EMPTY);
         self.candidate_counts.fill(0);
         self.enabled = false;

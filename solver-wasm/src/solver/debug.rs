@@ -4,8 +4,8 @@
 //! They are serialized to JSON and sent to the UI via `type: 'debug'`
 //! worker messages.
 
-use serde::{Deserialize, Serialize};
 use crate::api::types::{CellIndex, Value};
+use serde::{Deserialize, Serialize};
 
 // ============================================================================
 // Debug options (input from JS)
@@ -21,6 +21,11 @@ pub struct DebugOptions {
     #[serde(default)]
     pub log_level: u8,
 
+    /// Enable per-constraint diff logging during the target step.
+    /// Mirrors JS `debugOptions.enableStepLogs`.
+    #[serde(default)]
+    pub enable_step_logs: bool,
+
     /// Export conflict heatmap data in progress callbacks.
     #[serde(default)]
     pub export_conflict_heatmap: bool,
@@ -33,7 +38,10 @@ pub struct DebugOptions {
 impl DebugOptions {
     /// Whether any debug output is enabled.
     pub fn is_any_enabled(&self) -> bool {
-        self.log_level > 0 || self.export_conflict_heatmap || self.export_stack_trace
+        self.log_level > 0
+            || self.enable_step_logs
+            || self.export_conflict_heatmap
+            || self.export_stack_trace
     }
 }
 
@@ -45,7 +53,7 @@ impl DebugOptions {
 ///
 /// These are accumulated during solver setup and (optionally) execution,
 /// then drained and sent to the UI.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Default, Serialize)]
 pub struct DebugLog {
     /// Location identifier (e.g. "setup", "_enforceConstraints").
     pub loc: String,
@@ -103,13 +111,20 @@ pub struct StackTrace {
 
 /// Extended progress data passed to the progress callback.
 ///
-/// Extra state attached to progress callbacks for estimation mode.
+/// Extra state attached to progress callbacks for count/estimation mode.
 /// Mirrors the JS `extra` object shape from `_progressExtraStateFn`.
 #[derive(Debug, Clone, Serialize)]
 pub struct ProgressExtra {
     /// Running estimate data (present during `estimatedCountSolutions`).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub estimate: Option<EstimateProgress>,
+
+    /// Sample solutions discovered since the last progress tick.
+    /// Each entry is a value array (1-indexed, e.g. [1,2,3,...,9,...]),
+    /// matching JS `gridToSolution()` format. Present during count/estimate
+    /// operations, matching JS `_progressExtraStateFn` → `getSampleSolution`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub solutions: Option<Vec<Vec<u8>>>,
 }
 
 /// Running estimate counts sent in progress callbacks.

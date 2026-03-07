@@ -21,53 +21,245 @@ use super::Constraint;
 use crate::api::types::{CellIndex, Value};
 use crate::grid_shape::GridShape;
 
-/// Parsed constraint data: puzzle string + constraint list + grid shape.
+/// Parsed constraint data: constraint list + grid shape.
+///
+/// Givens are represented as [`Constraint::Given`] entries in `constraints`,
+/// matching the JS architecture where the parser produces `Given` AST nodes
+/// and the builder converts them to `GivenCandidates` handlers.
 #[derive(Debug, Clone)]
 pub struct ParsedConstraints {
-    /// Puzzle string (digits for givens, '.' for empty).
-    /// Length equals `shape.num_cells`.
-    pub puzzle: String,
-    /// High-level constraints parsed from the input.
+    /// High-level constraints parsed from the input (including givens).
     pub constraints: Vec<Constraint>,
     /// Grid shape (dimensions and num_values).
     pub shape: GridShape,
 }
 
+/// Convert puzzle characters into [`Constraint::Given`] entries.
+///
+/// Each non-empty character becomes a `Given` constraint with the cell ID
+/// and decoded value. '.' and '0' are skipped (empty cells).
+fn puzzle_chars_to_givens(
+    chars: impl Iterator<Item = (usize, char)>,
+    shape: GridShape,
+    constraints: &mut Vec<Constraint>,
+) -> Result<(), String> {
+    let base = shape.base_char_code();
+    for (i, ch) in chars {
+        match ch {
+            '0' | '.' => {}
+            _ => {
+                let b = ch as u8;
+                if b >= base && b < base + shape.num_values {
+                    let value = b - base + 1;
+                    constraints.push(Constraint::Given {
+                        cell: shape.cell_id_from_index(i),
+                        values: vec![value],
+                    });
+                } else {
+                    return Err(format!("invalid character '{}' at position {}", ch, i));
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Convert a solution (1-based values per cell) into a puzzle string.
+///
+/// Matches JS `toShortSolution()` in sudoku_parser.js. Solved cells are
+/// written as their character (e.g. '1'-'9' for 9×9, 'A'-'P' for 16×16).
+/// Unsolved cells (value 0) are written as '.'.
+pub fn to_short_solution(solution: &[u8], shape: GridShape) -> String {
+    let base = shape.base_char_code();
+    solution
+        .iter()
+        .take(shape.num_cells)
+        .map(|&v| {
+            if v > 0 {
+                char::from(base + v - 1)
+            } else {
+                '.'
+            }
+        })
+        .collect()
+}
+
 /// Parse a constraint string in any supported format.
 ///
-/// Returns the parsed puzzle string and constraint definitions.
+/// Returns the parsed constraints and shape.
 pub fn parse(input: &str) -> Result<ParsedConstraints, String> {
     let input = input.trim();
 
     if input.is_empty() {
-        return Err("Empty input".to_string());
+        // Empty input is valid — it represents a cleared grid with the
+        // default shape (9×9) and no constraints. This matches the JS
+        // behaviour where Shape.serialize() returns '' for the default
+        // shape, so a cleared grid serializes to an empty string.
+        return Ok(ParsedConstraints {
+            constraints: vec![],
+            shape: GridShape::default_9x9(),
+        });
     }
 
-    // If it starts with '.', try verbose constraint string format.
-    if input.starts_with('.') {
-        return parse_verbose(input);
+    // Strip all whitespace (including internal newlines) for multi-line formats.
+    let stripped: String = input.chars().filter(|c| !c.is_whitespace()).collect();
+
+    // Try the Jigsaw combined format (grid values + layout, no ISS prefix).
+    // Mirrors JS: `_parseJigsawToAst(text)` where text is whitespace-stripped.
+    if let Ok(result) = try_parse_jigsaw_combined(&stripped) {
+        return Ok(result);
+    }
+
+    // Try bare jigsaw layout (N chars, exactly numValues distinct chars
+    // each appearing numValues times, no givens).
+    // Mirrors JS: `_parseJigsawLayoutToAst(text)`.
+    if let Ok(result) = try_parse_jigsaw_layout(&stripped) {
+        return Ok(result);
+    }
+
+    // If it starts with '.', try verbose constraint string format (ISS).
+    if stripped.starts_with('.') {
+        return parse_verbose(&stripped);
     }
 
     // Infer shape from input length (only square grids).
-    let shape = GridShape::from_num_cells(input.len()).ok_or_else(|| {
+    let shape = GridShape::from_num_cells(stripped.len()).ok_or_else(|| {
         format!(
             "Unrecognized format: input length {} is not a perfect square \
              and does not start with '.'",
-            input.len()
+            stripped.len()
         )
     })?;
 
     // Check if it looks like compact killer (has direction chars).
-    if is_compact_killer(input) {
-        return parse_compact_killer(input, shape);
+    if is_compact_killer(&stripped) {
+        return parse_compact_killer(&stripped, shape);
     }
 
     // Otherwise, treat as plain sudoku.
-    Ok(ParsedConstraints {
-        puzzle: input.to_string(),
-        constraints: Vec::new(),
-        shape,
-    })
+    let mut constraints = Vec::new();
+    puzzle_chars_to_givens(stripped.chars().enumerate(), shape, &mut constraints)?;
+    Ok(ParsedConstraints { constraints, shape })
+}
+
+/// Try to parse the combined Jigsaw format: first N chars are grid values,
+/// next N chars are the jigsaw region layout.
+///
+/// Mirrors JS `SudokuParser._parseJigsawToAst(text)`.
+///
+/// Returns `Ok(ParsedConstraints)` if the input matches this format exactly,
+/// or `Err(())` if the format is not recognised (no message needed — the
+/// caller falls through to other formats).
+fn try_parse_jigsaw_combined(text: &str) -> Result<ParsedConstraints, ()> {
+    let len = text.len();
+    if len % 2 != 0 {
+        return Err(());
+    }
+    let n = len / 2;
+    let shape = GridShape::from_num_cells(n).ok_or(())?;
+    let base = shape.base_char_code();
+    let nv = shape.num_values;
+
+    let grid_part = &text[..n];
+    let layout_part = &text[n..];
+
+    // Validate grid part: only '.' and the shape's value characters.
+    if !grid_part
+        .chars()
+        .all(|c| c == '.' || (c as u8 >= base && (c as u8) < base + nv))
+    {
+        return Err(());
+    }
+
+    // Validate layout part: exactly `nv` distinct characters each appearing `nv` times.
+    // Mirrors JS `_parseJigsawLayoutToAst`: `chars.size !== numValues` and
+    // `Object.values(counter).some(c => c !== numValues)`.
+    let mut counts: std::collections::BTreeMap<char, usize> = std::collections::BTreeMap::new();
+    for ch in layout_part.chars() {
+        *counts.entry(ch).or_insert(0) += 1;
+    }
+    if counts.len() != nv as usize {
+        return Err(());
+    }
+    if counts.values().any(|&c| c != nv as usize) {
+        return Err(());
+    }
+
+    // Build constraints: NoBoxes + givens from grid part + Jigsaw regions.
+    //
+    // Givens come before Jigsaw regions, matching JS where _parseJigsawToAst
+    // returns AstNode.makeRoot(Shape, Given, ...Jigsaw).
+    let mut constraints = vec![Constraint::NoBoxes];
+    puzzle_chars_to_givens(grid_part.chars().enumerate(), shape, &mut constraints)
+        .map_err(|_| ())?;
+
+    // Build Jigsaw regions from layout.
+    let mut regions: std::collections::BTreeMap<char, Vec<String>> =
+        std::collections::BTreeMap::new();
+    let nc = shape.num_cols as usize;
+    for (i, ch) in layout_part.chars().enumerate() {
+        let r = i / nc;
+        let c = i % nc;
+        regions
+            .entry(ch)
+            .or_default()
+            .push(shape.make_cell_id(r as u8, c as u8));
+    }
+    let grid_spec = format!("{}x{}", shape.num_rows, shape.num_cols);
+    for (_ch, cells) in regions {
+        constraints.push(Constraint::Jigsaw {
+            grid_spec: grid_spec.clone(),
+            cells,
+        });
+    }
+
+    Ok(ParsedConstraints { constraints, shape })
+}
+
+/// Try to parse a bare jigsaw layout: N chars defining region assignments.
+///
+/// Mirrors JS `SudokuParser._parseJigsawLayoutToAst(text)`. Validates that
+/// the string has exactly `numValues` distinct characters, each appearing
+/// exactly `numValues` times.
+fn try_parse_jigsaw_layout(text: &str) -> Result<ParsedConstraints, ()> {
+    let n = text.len();
+    let shape = GridShape::from_num_cells(n).ok_or(())?;
+    let nv = shape.num_values;
+
+    // Validate: exactly nv distinct chars, each appearing nv times.
+    let mut counts: std::collections::BTreeMap<char, usize> = std::collections::BTreeMap::new();
+    for ch in text.chars() {
+        *counts.entry(ch).or_insert(0) += 1;
+    }
+    if counts.len() != nv as usize {
+        return Err(());
+    }
+    if counts.values().any(|&c| c != nv as usize) {
+        return Err(());
+    }
+
+    // Build constraints: NoBoxes + Jigsaw regions (no givens).
+    let mut constraints = vec![Constraint::NoBoxes];
+    let nc = shape.num_cols as usize;
+    let mut regions: std::collections::BTreeMap<char, Vec<String>> =
+        std::collections::BTreeMap::new();
+    for (i, ch) in text.chars().enumerate() {
+        let r = i / nc;
+        let c = i % nc;
+        regions
+            .entry(ch)
+            .or_default()
+            .push(shape.make_cell_id(r as u8, c as u8));
+    }
+    let grid_spec = format!("{}x{}", shape.num_rows, shape.num_cols);
+    for (_ch, cells) in regions {
+        constraints.push(Constraint::Jigsaw {
+            grid_spec: grid_spec.clone(),
+            cells,
+        });
+    }
+
+    Ok(ParsedConstraints { constraints, shape })
 }
 
 /// Check if an 81-char string looks like compact killer format.
@@ -362,7 +554,7 @@ const CONSTRAINT_DEFS: &[ConstraintDef] = &[
 /// Supports nested composite types: `.Or.InnerA~x.InnerB~y.End` and
 /// `.And.InnerA~x.InnerB~y.End`.
 fn parse_verbose(input: &str) -> Result<ParsedConstraints, String> {
-    let parts: Vec<&str> = input.split('.').collect();
+    let parts: Vec<&str> = input.split('.').map(str::trim).collect();
 
     // First pass: scan for a `.Shape~NxM` token to determine grid shape.
     let mut shape = GridShape::default_9x9();
@@ -378,7 +570,6 @@ fn parse_verbose(input: &str) -> Result<ParsedConstraints, String> {
         }
     }
 
-    let mut puzzle = vec!['.'; shape.num_cells];
     let mut constraints: Vec<Constraint> = Vec::new();
 
     // Second pass: index-based to support consuming nested Or/And blocks.
@@ -405,7 +596,7 @@ fn parse_verbose(input: &str) -> Result<ParsedConstraints, String> {
         }
 
         if constraint_type.is_empty() {
-            parse_givens(args, &mut puzzle, &mut constraints, shape)?;
+            parse_givens(args, &mut constraints, shape)?;
             continue;
         }
 
@@ -414,12 +605,22 @@ fn parse_verbose(input: &str) -> Result<ParsedConstraints, String> {
             let (inner, consumed) = parse_nested_block(&parts[idx..], shape)?;
             idx += consumed;
             if constraint_type == "Or" {
+                // Or branches are alternatives — do not merge across them.
                 constraints.push(Constraint::Or {
                     groups: inner.into_iter().map(|c| vec![c]).collect(),
                 });
             } else {
-                constraints.push(Constraint::And { constraints: inner });
+                // And: merge duplicates within the block.
+                constraints.push(Constraint::And {
+                    constraints: merge_by_uniqueness(inner),
+                });
             }
+            continue;
+        }
+
+        // Jigsaw needs the grid shape for correct cell ID generation.
+        if constraint_type == "Jigsaw" {
+            parse_jigsaw_with_shape(args, &mut constraints, shape)?;
             continue;
         }
 
@@ -435,11 +636,10 @@ fn parse_verbose(input: &str) -> Result<ParsedConstraints, String> {
         }
     }
 
-    Ok(ParsedConstraints {
-        puzzle: puzzle.into_iter().collect(),
-        constraints,
-        shape,
-    })
+    // Merge top-level constraints (mirrors JS `_mergeByUniqueness` in `_resolveNodes`).
+    let constraints = merge_by_uniqueness(constraints);
+
+    Ok(ParsedConstraints { constraints, shape })
 }
 
 /// Parse inner constraint parts of an `Or` or `And` block, stopping when an
@@ -475,7 +675,27 @@ fn parse_nested_block(
             return Ok((constraints, idx));
         }
 
-        if constraint_type == "Shape" || constraint_type.is_empty() {
+        if constraint_type == "Shape" {
+            continue;
+        }
+
+        // Empty constraint type = given values inside a nested block.
+        // Mirrors JS: `SudokuParser` converts "" type into `Given` constraints.
+        if constraint_type.is_empty() {
+            for &arg in args {
+                if arg.is_empty() {
+                    continue;
+                }
+                match parse_given_arg(arg, shape) {
+                    Ok((cell_id, _, values)) => {
+                        constraints.push(Constraint::Given {
+                            cell: cell_id,
+                            values,
+                        });
+                    }
+                    Err(_) => {} // Skip invalid givens silently.
+                }
+            }
             continue;
         }
 
@@ -484,12 +704,22 @@ fn parse_nested_block(
             let (inner, consumed) = parse_nested_block(&parts[idx..], shape)?;
             idx += consumed;
             if constraint_type == "Or" {
+                // Or branches are alternatives — do not merge across them.
                 constraints.push(Constraint::Or {
                     groups: inner.into_iter().map(|c| vec![c]).collect(),
                 });
             } else {
-                constraints.push(Constraint::And { constraints: inner });
+                // And: merge duplicates within the block.
+                constraints.push(Constraint::And {
+                    constraints: merge_by_uniqueness(inner),
+                });
             }
+            continue;
+        }
+
+        // Jigsaw needs the grid shape for correct cell ID generation.
+        if constraint_type == "Jigsaw" {
+            parse_jigsaw_with_shape(args, &mut constraints, shape)?;
             continue;
         }
 
@@ -506,7 +736,41 @@ fn parse_nested_block(
     }
 
     // No End found — reached end of input; return what we have.
+    // Note: parse_nested_block is always called as the inner block of an Or or And.
+    // The caller applies merge_by_uniqueness for And; Or skips merging.
     Ok((constraints, idx))
+}
+
+// ====================================================================
+// Deduplication / merging (mirrors JS `_mergeByUniqueness`)
+// ====================================================================
+
+/// Deduplicate / merge a list of constraints by their uniqueness keys.
+///
+/// Mirrors JS `SudokuParser._mergeByUniqueness(constraints)`.
+fn merge_by_uniqueness(constraints: Vec<Constraint>) -> Vec<Constraint> {
+    use std::collections::HashMap;
+
+    let mut key_to_index: HashMap<String, usize> = HashMap::new();
+    // Use Option<Constraint> so we can take() without cloning.
+    let mut result: Vec<Option<Constraint>> = Vec::with_capacity(constraints.len());
+
+    for constraint in constraints {
+        match constraint.uniqueness_key() {
+            None => result.push(Some(constraint)),
+            Some(key) => {
+                if let Some(&idx) = key_to_index.get(&key) {
+                    let existing = result[idx].take().unwrap();
+                    result[idx] = Some(Constraint::merge(existing, constraint));
+                } else {
+                    key_to_index.insert(key, result.len());
+                    result.push(Some(constraint));
+                }
+            }
+        }
+    }
+
+    result.into_iter().flatten().collect()
 }
 
 // ====================================================================
@@ -515,10 +779,11 @@ fn parse_nested_block(
 
 /// Parse given constraints (`.~R1C1_5~R2C3_7`).
 ///
-/// Single values go into the puzzle string; pencilmarks become Given constraints.
+/// All givens become [`Constraint::Given`] entries, matching the JS
+/// architecture where `SudokuConstraint.Given.makeFromArgs` yields
+/// individual `Given` instances for all value IDs.
 fn parse_givens(
     args: &[&str],
-    puzzle: &mut Vec<char>,
     constraints: &mut Vec<Constraint>,
     shape: GridShape,
 ) -> Result<(), String> {
@@ -528,16 +793,10 @@ fn parse_givens(
         }
         let (cell_id, cell_idx, values) = parse_given_arg(arg, shape)?;
         if cell_idx < shape.num_cells {
-            if values.len() == 1 {
-                let base = shape.base_char_code();
-                let ch = (base + values[0] - 1) as char;
-                puzzle[cell_idx] = ch;
-            } else {
-                constraints.push(Constraint::Given {
-                    cell: cell_id,
-                    values,
-                });
-            }
+            constraints.push(Constraint::Given {
+                cell: cell_id,
+                values,
+            });
         }
     }
     Ok(())
@@ -597,12 +856,16 @@ fn parse_thermo(args: &[&str], constraints: &mut Vec<Constraint>) -> Result<(), 
 
 fn parse_whisper(args: &[&str], constraints: &mut Vec<Constraint>) -> Result<(), String> {
     if args.is_empty() {
-        return Err("Whisper constraint missing difference".to_string());
+        return Err("Whisper constraint missing cells".to_string());
     }
-    let difference: i32 = args[0]
-        .parse()
-        .map_err(|_| format!("Invalid whisper difference: {}", args[0]))?;
-    let cells = collect_cell_args(&args[1..]);
+    // The difference is optional. German whisper lines omit it (default = 5).
+    // If the first argument is a finite number, treat it as the difference;
+    // otherwise default to 5 and treat all arguments as cells.
+    let (difference, cell_args) = match args[0].parse::<i32>() {
+        Ok(d) => (d, &args[1..]),
+        Err(_) => (5, args),
+    };
+    let cells = collect_cell_args(cell_args);
     if cells.len() >= 2 {
         constraints.push(Constraint::Whisper { cells, difference });
     }
@@ -733,20 +996,56 @@ fn parse_no_boxes(_args: &[&str], constraints: &mut Vec<Constraint>) -> Result<(
     Ok(())
 }
 
+/// Parse Pair/PairX/Binary/BinaryX grouped cell lists.
+///
+/// Items can be:
+/// - Empty string `""`: group separator (same key, new group)
+/// - Starting with `_`: name marker (group label, skipped)
+/// - Starting with `R` or `r`: cell ID
+///
+/// Mirrors JS `SudokuConstraint.Pair.makeFromArgs`.
+fn parse_pair_groups(key: &str, items: &[&str], pairwise: bool, constraints: &mut Vec<Constraint>) {
+    let mut current_cells: Vec<String> = Vec::new();
+    for &item in items {
+        if !item.is_empty() && item.as_bytes()[0].to_ascii_uppercase() == b'R' {
+            current_cells.push(item.to_string());
+        } else {
+            if current_cells.len() >= 2 {
+                if pairwise {
+                    constraints.push(Constraint::PairX {
+                        key: key.to_string(),
+                        cells: current_cells.clone(),
+                    });
+                } else {
+                    constraints.push(Constraint::Pair {
+                        key: key.to_string(),
+                        cells: current_cells.clone(),
+                    });
+                }
+            }
+            current_cells.clear();
+        }
+    }
+    if current_cells.len() >= 2 {
+        if pairwise {
+            constraints.push(Constraint::PairX {
+                key: key.to_string(),
+                cells: current_cells,
+            });
+        } else {
+            constraints.push(Constraint::Pair {
+                key: key.to_string(),
+                cells: current_cells,
+            });
+        }
+    }
+}
+
 fn parse_pair(args: &[&str], constraints: &mut Vec<Constraint>) -> Result<(), String> {
     if args.is_empty() {
         return Err("Pair constraint missing key".to_string());
     }
-    let key = args[0].to_string();
-    let cell_start = if args.get(1).map_or(false, |a| a.starts_with('_')) {
-        2
-    } else {
-        1
-    };
-    let cells = collect_cell_args(&args[cell_start..]);
-    if cells.len() >= 2 {
-        constraints.push(Constraint::Pair { key, cells });
-    }
+    parse_pair_groups(args[0], &args[1..], false, constraints);
     Ok(())
 }
 
@@ -754,16 +1053,7 @@ fn parse_pair_x(args: &[&str], constraints: &mut Vec<Constraint>) -> Result<(), 
     if args.is_empty() {
         return Err("PairX constraint missing key".to_string());
     }
-    let key = args[0].to_string();
-    let cell_start = if args.get(1).map_or(false, |a| a.starts_with('_')) {
-        2
-    } else {
-        1
-    };
-    let cells = collect_cell_args(&args[cell_start..]);
-    if cells.len() >= 2 {
-        constraints.push(Constraint::PairX { key, cells });
-    }
+    parse_pair_groups(args[0], &args[1..], true, constraints);
     Ok(())
 }
 
@@ -1113,6 +1403,20 @@ fn parse_jigsaw(args: &[&str], constraints: &mut Vec<Constraint>) -> Result<(), 
     }
     let layout = args[args.len() - 1];
 
+    // Approximate a square shape from the layout length (fallback when shape
+    // context is unavailable). See parse_jigsaw_with_shape for the preferred path.
+    let side = (layout.len() as f64).sqrt() as u8;
+    let shape = GridShape::square(side).unwrap_or_else(GridShape::default_9x9);
+    parse_jigsaw_layout(layout, shape, constraints)
+}
+
+/// Parse a Jigsaw layout string given the known grid shape.
+/// Mirrors JS `SudokuConstraint.Jigsaw.makeFromArgs(args, shape)`.
+fn parse_jigsaw_layout(
+    layout: &str,
+    shape: GridShape,
+    constraints: &mut Vec<Constraint>,
+) -> Result<(), String> {
     // Group cells by their region character.
     let mut regions: std::collections::BTreeMap<char, Vec<CellIndex>> =
         std::collections::BTreeMap::new();
@@ -1125,21 +1429,14 @@ fn parse_jigsaw(args: &[&str], constraints: &mut Vec<Constraint>) -> Result<(), 
         return Ok(());
     }
 
-    // Emit one Jigsaw constraint per region.
-    // The grid_spec is approximated from the layout length.
-    let grid_spec = format!(
-        "{}x{}",
-        (layout.len() as f64).sqrt() as usize,
-        (layout.len() as f64).sqrt() as usize
-    );
+    let grid_spec = shape.name();
+    let num_cols = shape.num_cols as usize;
     for (_ch, region) in &regions {
         let cells: Vec<String> = region
             .iter()
             .map(|&c| {
-                let rows = (layout.len() as f64).sqrt() as usize;
-                let cols = rows;
-                let r = c as usize / cols;
-                let col = c as usize % cols;
+                let r = c as usize / num_cols;
+                let col = c as usize % num_cols;
                 format!("R{}C{}", r + 1, col + 1)
             })
             .collect();
@@ -1150,6 +1447,19 @@ fn parse_jigsaw(args: &[&str], constraints: &mut Vec<Constraint>) -> Result<(), 
     }
 
     Ok(())
+}
+
+/// Parse a Jigsaw constraint when the grid shape is already known.
+fn parse_jigsaw_with_shape(
+    args: &[&str],
+    constraints: &mut Vec<Constraint>,
+    shape: GridShape,
+) -> Result<(), String> {
+    if args.is_empty() || args.len() > 2 {
+        return Err("Jigsaw constraint requires 1 or 2 arguments".to_string());
+    }
+    let layout = args[args.len() - 1];
+    parse_jigsaw_layout(layout, shape, constraints)
 }
 
 /// Parse FullRank constraint (double-line outside clue).
@@ -1494,15 +1804,7 @@ fn parse_binary(args: &[&str], constraints: &mut Vec<Constraint>) -> Result<(), 
         return Err("Binary constraint missing key".to_string());
     }
     let key = convert_base64url_key(args[0]);
-    let cell_start = if args.get(1).map_or(false, |a| a.starts_with('_')) {
-        2
-    } else {
-        1
-    };
-    let cells = collect_cell_args(&args[cell_start..]);
-    if cells.len() >= 2 {
-        constraints.push(Constraint::Pair { key, cells });
-    }
+    parse_pair_groups(&key, &args[1..], false, constraints);
     Ok(())
 }
 
@@ -1512,15 +1814,7 @@ fn parse_binary_x(args: &[&str], constraints: &mut Vec<Constraint>) -> Result<()
         return Err("BinaryX constraint missing key".to_string());
     }
     let key = convert_base64url_key(args[0]);
-    let cell_start = if args.get(1).map_or(false, |a| a.starts_with('_')) {
-        2
-    } else {
-        1
-    };
-    let cells = collect_cell_args(&args[cell_start..]);
-    if cells.len() >= 2 {
-        constraints.push(Constraint::PairX { key, cells });
-    }
+    parse_pair_groups(&key, &args[1..], true, constraints);
     Ok(())
 }
 
@@ -1656,11 +1950,7 @@ fn parse_compact_killer(input: &str, shape: GridShape) -> Result<ParsedConstrain
     }
 
     // Compact killer format has no givens — puzzle is all empty.
-    Ok(ParsedConstraints {
-        puzzle: ".".repeat(num_cells),
-        constraints,
-        shape,
-    })
+    Ok(ParsedConstraints { constraints, shape })
 }
 
 enum CompactChar {
@@ -1726,24 +2016,65 @@ mod tests {
 
     use crate::grid_shape::SHAPE_9X9;
 
+    /// Helper: extract Given constraints and build a puzzle string from them.
+    /// Single-value Givens are placed at their cell index; multi-value
+    /// Givens (pencilmarks) are ignored for puzzle string comparison.
+    fn givens_to_puzzle_string(constraints: &[Constraint], shape: GridShape) -> String {
+        let mut puzzle = vec!['.'; shape.num_cells];
+        let base = shape.base_char_code();
+        for c in constraints {
+            if let Constraint::Given { cell, values } = c {
+                if values.len() == 1 {
+                    if let Ok(coord) = shape.parse_cell_id(cell) {
+                        puzzle[coord.cell] = (base + values[0] - 1) as char;
+                    }
+                }
+            }
+        }
+        puzzle.into_iter().collect()
+    }
+
+    #[test]
+    fn test_parse_empty_input() {
+        // Empty input represents a cleared grid with default 9×9 shape.
+        let result = parse("").unwrap();
+        assert_eq!(result.shape, SHAPE_9X9);
+        assert!(result.constraints.is_empty());
+
+        // Whitespace-only is also treated as empty.
+        let result = parse("   ").unwrap();
+        assert_eq!(result.shape, SHAPE_9X9);
+        assert!(result.constraints.is_empty());
+    }
+
     #[test]
     fn test_parse_plain_sudoku() {
         let puzzle =
             "530070000600195000098000060800060003400803001700020006060000280000419005000080079";
         let result = parse(puzzle).unwrap();
-        assert_eq!(result.puzzle, puzzle);
-        assert!(result.constraints.is_empty());
+        // All non-zero characters become Given constraints.
+        let expected = puzzle.replace('0', ".");
+        assert_eq!(
+            givens_to_puzzle_string(&result.constraints, result.shape),
+            expected
+        );
+        // Only Given constraints for plain sudoku.
+        assert!(result
+            .constraints
+            .iter()
+            .all(|c| matches!(c, Constraint::Given { .. })));
         assert_eq!(result.shape, SHAPE_9X9);
     }
 
     #[test]
     fn test_parse_givens() {
         let result = parse(".~R1C1_5~R1C2_3~R2C1_6").unwrap();
-        assert_eq!(result.puzzle.chars().nth(0), Some('5'));
-        assert_eq!(result.puzzle.chars().nth(1), Some('3'));
-        assert_eq!(result.puzzle.chars().nth(9), Some('6'));
+        let puzzle_str = givens_to_puzzle_string(&result.constraints, result.shape);
+        assert_eq!(puzzle_str.chars().nth(0), Some('5'));
+        assert_eq!(puzzle_str.chars().nth(1), Some('3'));
+        assert_eq!(puzzle_str.chars().nth(9), Some('6'));
         // Rest should be '.'
-        assert_eq!(result.puzzle.chars().nth(2), Some('.'));
+        assert_eq!(puzzle_str.chars().nth(2), Some('.'));
     }
 
     #[test]
@@ -1766,8 +2097,9 @@ mod tests {
     fn test_parse_mixed() {
         let input = ".~R1C1_5~R1C2_3.Cage~15~R1C3~R1C4~R1C5.Cage~3~R2C1~R2C2";
         let result = parse(input).unwrap();
-        assert_eq!(result.puzzle.chars().nth(0), Some('5'));
-        assert_eq!(result.puzzle.chars().nth(1), Some('3'));
+        let puzzle_str = givens_to_puzzle_string(&result.constraints, result.shape);
+        assert_eq!(puzzle_str.chars().nth(0), Some('5'));
+        assert_eq!(puzzle_str.chars().nth(1), Some('3'));
         let cages: Vec<_> = result
             .constraints
             .iter()
@@ -1996,12 +2328,20 @@ mod tests {
         // .FullRank~C1~6~20 → forward=6, backward=20
         let result = parse(".FullRank~C1~6~20").unwrap();
         assert_eq!(result.constraints.len(), 2);
-        let fwd = result.constraints.iter().find(|c| matches!(c, Constraint::FullRank { arrow_id, .. } if arrow_id.ends_with(",1")));
-        let bwd = result.constraints.iter().find(|c| matches!(c, Constraint::FullRank { arrow_id, .. } if arrow_id.ends_with(",-1")));
+        let fwd = result.constraints.iter().find(
+            |c| matches!(c, Constraint::FullRank { arrow_id, .. } if arrow_id.ends_with(",1")),
+        );
+        let bwd = result.constraints.iter().find(
+            |c| matches!(c, Constraint::FullRank { arrow_id, .. } if arrow_id.ends_with(",-1")),
+        );
         assert!(fwd.is_some(), "Expected forward FullRank");
         assert!(bwd.is_some(), "Expected backward FullRank");
-        if let Some(Constraint::FullRank { value, .. }) = fwd { assert_eq!(*value, 6); }
-        if let Some(Constraint::FullRank { value, .. }) = bwd { assert_eq!(*value, 20); }
+        if let Some(Constraint::FullRank { value, .. }) = fwd {
+            assert_eq!(*value, 6);
+        }
+        if let Some(Constraint::FullRank { value, .. }) = bwd {
+            assert_eq!(*value, 20);
+        }
     }
 
     #[test]
@@ -2024,5 +2364,133 @@ mod tests {
             Constraint::FullRankTies { ties } => assert_eq!(ties, "only-unclued"),
             _ => panic!("Expected FullRankTies"),
         }
+    }
+
+    // ---------------------------------------------------------------
+    // merge_by_uniqueness tests (mirrors JS sudoku_parser.test.js)
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn test_identical_givens_for_same_cell_merge_to_same_value() {
+        // Two Given tokens for R1C1 with overlapping values → intersection.
+        let result = parse(".~R1C1_1_2_3.~R1C1_2_3_4").unwrap();
+        let given = result.constraints.iter().find_map(|c| {
+            if let Constraint::Given { cell, values } = c {
+                if cell == "R1C1" {
+                    Some(values.clone())
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        });
+        let mut v = given.expect("Expected Given for R1C1");
+        v.sort();
+        assert_eq!(
+            v,
+            vec![2, 3],
+            "Intersection of [1,2,3] and [2,3,4] should be [2,3]"
+        );
+        // Only one Given for R1C1 should remain.
+        let count = result
+            .constraints
+            .iter()
+            .filter(|c| matches!(c, Constraint::Given { cell, .. } if cell == "R1C1"))
+            .count();
+        assert_eq!(count, 1);
+    }
+
+    #[test]
+    fn test_givens_for_different_cells_are_not_merged() {
+        let result = parse(".~R1C1_1_2.~R1C2_3_4").unwrap();
+        let count = result
+            .constraints
+            .iter()
+            .filter(|c| matches!(c, Constraint::Given { .. }))
+            .count();
+        assert_eq!(
+            count, 2,
+            "Given constraints for different cells must not be merged"
+        );
+    }
+
+    #[test]
+    fn test_givens_inside_or_branches_are_not_merged() {
+        // Or(Given(R1C1,[1,2]), Given(R1C1,[3,4])) — each is a separate Or branch.
+        let result = parse(".Or.~R1C1_1_2.~R1C1_3_4.End").unwrap();
+        assert_eq!(result.constraints.len(), 1);
+        let or_groups = match &result.constraints[0] {
+            Constraint::Or { groups } => groups,
+            _ => panic!("Expected Or constraint"),
+        };
+        // Two separate branches, each holding one Given.
+        assert_eq!(or_groups.len(), 2);
+    }
+
+    #[test]
+    fn test_givens_inside_and_are_merged() {
+        // Rust parser wraps the And block in Constraint::And (not auto-absorbed).
+        // The merged Given should be inside it.
+        let result = parse(".And.~R1C1_1_2.~R1C1_2_3.End").unwrap();
+        assert_eq!(result.constraints.len(), 1);
+        let and_inner = match &result.constraints[0] {
+            Constraint::And { constraints } => constraints,
+            _ => panic!("Expected And constraint"),
+        };
+        let given = and_inner.iter().find_map(|c| {
+            if let Constraint::Given { cell, values } = c {
+                if cell == "R1C1" {
+                    Some(values.clone())
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        });
+        let mut v = given.expect("Expected merged Given for R1C1 inside And");
+        v.sort();
+        assert_eq!(v, vec![2], "Intersection of [1,2] and [2,3] should be [2]");
+    }
+
+    #[test]
+    fn test_duplicate_singleton_constraints_deduped() {
+        // Two AntiKnight tokens → only one should remain.
+        let result = parse(".AntiKnight.AntiKnight").unwrap();
+        let count = result
+            .constraints
+            .iter()
+            .filter(|c| matches!(c, Constraint::AntiKnight))
+            .count();
+        assert_eq!(count, 1);
+    }
+
+    #[test]
+    fn test_duplicate_outside_clue_last_wins() {
+        // Two Sandwich clues for the same row → last one wins.
+        // Format: `.Sandwich~value~rowCol` where rowCol is e.g. "R1";
+        // the parser synthesises arrow_id as "R1,1".
+        let result = parse(".Sandwich~10~R1.Sandwich~20~R1").unwrap();
+        let sandwiches: Vec<_> = result
+            .constraints
+            .iter()
+            .filter_map(|c| {
+                if let Constraint::Sandwich { arrow_id, value } = c {
+                    if arrow_id == "R1,1" {
+                        Some(*value)
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            })
+            .collect();
+        assert_eq!(
+            sandwiches,
+            vec![20],
+            "Second Sandwich for same arrow_id should win"
+        );
     }
 }

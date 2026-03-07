@@ -246,8 +246,15 @@ impl Sum {
     /// Whether the number of unfixed cells is small enough for exact handling.
     fn has_few_remaining_cells(&self, num_unfixed: usize) -> bool {
         if self.flags & FLAG_ONLY_ABS_UNIT_COEFF != 0 {
-            // With pairwise sums table, we can handle up to 3.
-            num_unfixed <= 3
+            // With pairwise sums, we can handle up to 3 unfixed cells.
+            // Without (num_values > 9), only handle up to 2.
+            // Matches JS: numUnfixed <= (this._sumData.pairwiseSums ? 3 : 2)
+            let max_few = if SumData::get(self.num_values).pairwise_sums.is_some() {
+                3
+            } else {
+                2
+            };
+            num_unfixed <= max_few
         } else {
             // General coefficients: only 1-cell case.
             num_unfixed <= 1

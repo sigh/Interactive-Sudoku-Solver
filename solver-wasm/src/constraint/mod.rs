@@ -346,3 +346,73 @@ pub enum Constraint {
     /// Mirrors JS `And` constraint.
     And { constraints: Vec<Constraint> },
 }
+
+impl Constraint {
+    /// Return the uniqueness key used for deduplication / merging during parsing.
+    ///
+    /// Returns `Some(key)` when this constraint participates in deduplication —
+    /// mirrors JS `UNIQUENESS_KEY_FIELD` on each constraint class.
+    /// Returns `None` (JS `null`) to always keep the constraint as-is.
+    ///
+    /// Key format mirrors JS `` `${constraint.type}:${constraint[field]}` ``.
+    pub fn uniqueness_key(&self) -> Option<String> {
+        match self {
+            // Given.UNIQUENESS_KEY_FIELD = 'cell'
+            Self::Given { cell, .. } => Some(format!("Given:{cell}")),
+
+            // OutsideConstraintBase subclasses: UNIQUENESS_KEY_FIELD = 'arrowId'
+            Self::Sandwich { arrow_id, .. } => Some(format!("Sandwich:{arrow_id}")),
+            Self::Skyscraper { arrow_id, .. } => Some(format!("Skyscraper:{arrow_id}")),
+            Self::HiddenSkyscraper { arrow_id, .. } => Some(format!("HiddenSkyscraper:{arrow_id}")),
+            Self::NumberedRoom { arrow_id, .. } => Some(format!("NumberedRoom:{arrow_id}")),
+            Self::XSum { arrow_id, .. } => Some(format!("XSum:{arrow_id}")),
+            Self::FullRank { arrow_id, .. } => Some(format!("FullRank:{arrow_id}")),
+
+            // Zipper.UNIQUENESS_KEY_FIELD = 'cells'
+            // JS uses `${arr}` which coerces to `arr.join(',')`.
+            Self::Zipper { cells } => Some(format!("Zipper:{}", cells.join(","))),
+
+            // Diagonal.UNIQUENESS_KEY_FIELD = 'direction'
+            Self::Diagonal { direction } => Some(format!("Diagonal:{direction}")),
+
+            // Singleton constraints: UNIQUENESS_KEY_FIELD = 'type'
+            // key = "{Type}:{Type}" (JS: type field coerces to itself)
+            Self::NoBoxes => Some("NoBoxes:NoBoxes".to_string()),
+            Self::RegionSameValues => Some("RegionSameValues:RegionSameValues".to_string()),
+            Self::StrictKropki => Some("StrictKropki:StrictKropki".to_string()),
+            Self::StrictXV => Some("StrictXV:StrictXV".to_string()),
+            Self::Windoku => Some("Windoku:Windoku".to_string()),
+            Self::DisjointSets => Some("DisjointSets:DisjointSets".to_string()),
+            Self::AntiKnight => Some("AntiKnight:AntiKnight".to_string()),
+            Self::AntiKing => Some("AntiKing:AntiKing".to_string()),
+            Self::AntiTaxicab => Some("AntiTaxicab:AntiTaxicab".to_string()),
+            Self::AntiConsecutive => Some("AntiConsecutive:AntiConsecutive".to_string()),
+            Self::GlobalEntropy => Some("GlobalEntropy:GlobalEntropy".to_string()),
+            Self::GlobalMod => Some("GlobalMod:GlobalMod".to_string()),
+            Self::FullRankTies { .. } => Some("FullRankTies:FullRankTies".to_string()),
+            Self::DutchFlatmates => Some("DutchFlatmates:DutchFlatmates".to_string()),
+            Self::RegionSize { .. } => Some("RegionSize:RegionSize".to_string()),
+
+            // All other constraints: UNIQUENESS_KEY_FIELD = null — never merged.
+            _ => None,
+        }
+    }
+
+    /// Merge `incoming` into `existing` when both share the same uniqueness key.
+    ///
+    /// For `Given`: intersect allowed values — mirrors JS `Given.mergeConstraints`.
+    /// Default (all others): return `incoming` — last definition wins, mirrors
+    /// `SudokuConstraintBase.mergeConstraints`.
+    pub fn merge(existing: Self, incoming: Self) -> Self {
+        match (existing, incoming) {
+            (Self::Given { cell, values: ev }, Self::Given { values: iv, .. }) => {
+                let merged: Vec<Value> = ev.into_iter().filter(|v| iv.contains(v)).collect();
+                Self::Given {
+                    cell,
+                    values: merged,
+                }
+            }
+            (_, inc) => inc,
+        }
+    }
+}

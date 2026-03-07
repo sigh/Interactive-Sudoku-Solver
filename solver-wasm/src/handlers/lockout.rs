@@ -94,22 +94,22 @@ impl ConstraintHandler for Lockout {
         let max1 = ve1.max_value();
 
         // Compute the lockout mask: values that are NOT locked out.
-        // A value is locked out if it lies strictly between the two endpoints.
-        // We can only constrain when one endpoint range is definitively above
-        // the other (no overlap between their min/max ranges).
+        // A mid value is locked out if it's in the closed interval [lo_endpoint, hi_endpoint].
+        // When min0 > max1, endpoint0 is the higher endpoint.
+        //   allowed = values < max1 (strictly)  OR  values > min0 (strictly)
+        // In bit representation (bit i = value i+1):
+        //   values < max1: bits 0..max1-2   = (1 << (max1-1)) - 1
+        //   values > min0: bits min0..      = !((1 << min0) - 1)
         let mask: Option<CandidateSet> = if min0 > max1 {
-            // Cell 0 is the larger endpoint.
-            // Locked-out range: (max1 .. min0) exclusive.
-            // Allowed: values <= max1 OR values >= min0.
-            let locked_out =
-                CandidateSet::from_raw((((1u32 << (min0 - 1)) - 1) ^ ((1u32 << max1) - 1)) as u16);
-            Some(!locked_out)
+            // Cell 0 is the higher endpoint.
+            let low_bits = (1u16 << (max1 - 1)).wrapping_sub(1); // values < max1
+            let high_bits = !((1u16 << min0) - 1); // values > min0
+            Some(CandidateSet::from_raw(low_bits | high_bits))
         } else if min1 > max0 {
-            // Cell 1 is the larger endpoint.
-            // Locked-out range: (max0 .. min1) exclusive.
-            let locked_out =
-                CandidateSet::from_raw((((1u32 << (min1 - 1)) - 1) ^ ((1u32 << max0) - 1)) as u16);
-            Some(!locked_out)
+            // Cell 1 is the higher endpoint.
+            let low_bits = (1u16 << (max0 - 1)).wrapping_sub(1); // values < max0
+            let high_bits = !((1u16 << min1) - 1); // values > min1
+            Some(CandidateSet::from_raw(low_bits | high_bits))
         } else {
             // The ranges overlap — we cannot determine which endpoint is larger.
             None

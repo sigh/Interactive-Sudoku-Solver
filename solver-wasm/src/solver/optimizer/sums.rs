@@ -54,13 +54,8 @@ pub(super) fn optimize_sums(
     let (mut non_overlapping_indices, mut sum_cells) =
         find_non_overlapping_subset(&safe_sum_indices, hs);
 
-    // Fill in gap.
-    let gap_handlers = fill_in_sum_gap(&non_overlapping_indices, &mut sum_cells, hs, ctx);
-    for h in gap_handlers {
-        if let Some(idx) = hs.add_non_essential(h) {
-            non_overlapping_indices.push(idx);
-        }
-    }
+    // Fill in gap (mutates non_overlapping_indices and sum_cells in-place).
+    fill_in_sum_gap(&mut non_overlapping_indices, &mut sum_cells, hs, ctx);
 
     // Innie/outie sum handlers from region overlaps.
     let innie_outie = make_innie_outie_sum_handlers(&non_overlapping_indices, hs, box_regions, ctx);
@@ -135,16 +130,17 @@ fn find_non_overlapping_subset(
 /// If there are uncovered cells after non-overlapping selection,
 /// create a Sum handler for the remaining cells.
 ///
-/// Mirrors JS `_fillInSumGap`.
+/// Mirrors JS `_fillInSumGap`. Mutates `non_overlapping` and `sum_cells`
+/// in-place (JS: `sumHandlers.push(newHandler)` + `sumCells.add(c)`).
 fn fill_in_sum_gap(
-    non_overlapping: &[usize],
+    non_overlapping: &mut Vec<usize>,
     sum_cells: &mut HashSet<CellIndex>,
-    hs: &HandlerSet,
+    hs: &mut HandlerSet,
     ctx: &mut OptimizerCtx,
-) -> Vec<Box<dyn ConstraintHandler>> {
+) {
     let num_non_sum = hs.shape.num_cells - sum_cells.len();
     if num_non_sum == 0 || num_non_sum >= hs.shape.num_values as usize {
-        return Vec::new();
+        return;
     }
 
     // Total sum of all non-overlapping handlers.
@@ -176,7 +172,9 @@ fn fill_in_sum_gap(
         Some(serde_json::json!({ "sum": remaining_sum })),
         false,
     );
-    vec![Box::new(handler)]
+    if let Some(idx) = hs.add_non_essential(Box::new(handler)) {
+        non_overlapping.push(idx);
+    }
 }
 
 /// Create innie/outie sum handlers from region overlap analysis.
@@ -348,6 +346,7 @@ fn make_hidden_cage_handlers(
             hs,
             house_idx,
             &filtered_indices,
+            &intersecting,
             &house_data,
             cell_exclusions,
             ctx,
@@ -472,11 +471,14 @@ fn make_hidden_cage_handlers(
 
 /// Create a Sum handler from cages sticking out of a house.
 ///
-/// Mirrors JS `_addSumIntersectionHandler`.
+/// Mirrors JS `_addSumIntersectionHandler`. The `intersecting_indices`
+/// parameter is pre-computed by the caller (matching JS where the caller
+/// passes `intersectingHouseHandlers`).
 fn add_sum_intersection_handler(
     hs: &HandlerSet,
     house_idx: usize,
     filtered_sum_indices: &[usize],
+    intersecting_indices: &HashSet<usize>,
     all_house_data: &[(usize, Vec<CellIndex>)],
     cell_exclusions: &CellExclusions,
     ctx: &mut OptimizerCtx,
@@ -502,9 +504,6 @@ fn add_sum_intersection_handler(
 
     // Try to fill holes with house handlers.
     if !uncovered.is_empty() {
-        // Get intersecting house handler indices.
-        let intersecting = hs.get_intersecting_indices(house_idx);
-
         for &(other_house_idx, ref other_cells) in all_house_data {
             if uncovered.is_empty() {
                 break;
@@ -512,7 +511,7 @@ fn add_sum_intersection_handler(
             if other_house_idx == house_idx {
                 continue;
             }
-            if !intersecting.contains(&other_house_idx) {
+            if !intersecting_indices.contains(&other_house_idx) {
                 continue;
             }
 

@@ -270,7 +270,7 @@ impl GridShape {
         if bytes.len() < 4 {
             return Err(format!("Invalid cell ID (too short): {}", cell_id));
         }
-        if bytes[0] != b'R' {
+        if bytes[0] != b'R' && bytes[0] != b'r' {
             return Err(format!("Cell ID must start with 'R': {}", cell_id));
         }
 
@@ -285,9 +285,8 @@ impl GridShape {
         }
         let row = row - 1; // Convert to 0-indexed.
 
-        if bytes[2] != b'C' {
-            return Err(format!("Expected 'C' in cell ID: {}", cell_id));
-        }
+        // Byte at index 2 is the column separator (typically 'C'/'c', but the
+        // JS parser ignores it entirely — so we do too for compatibility).
 
         let col_char = bytes[3] as char;
         let col = parse_base17_digit(col_char)

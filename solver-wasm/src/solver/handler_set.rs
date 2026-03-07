@@ -49,7 +49,7 @@ impl HandlerSet {
         let num_cells = shape.num_cells;
         let mut ordinary_map = vec![Vec::new(); num_cells];
         let aux_map = vec![Vec::new(); num_cells];
-        let singleton_map = vec![Vec::new(); num_cells];
+        let mut singleton_map = vec![Vec::new(); num_cells];
         let mut seen = HashMap::new();
         let mut essential_flags = Vec::with_capacity(handlers.len());
         let mut kind_flags = Vec::with_capacity(handlers.len());
@@ -59,8 +59,15 @@ impl HandlerSet {
             .enumerate()
             .map(|(idx, h)| {
                 seen.insert(h.id_str(), idx);
-                for &c in h.cells() {
-                    ordinary_map[c as usize].push(idx);
+                // Mirrors JS: SINGLETON_HANDLER=true → singletonHandlerMap only.
+                if h.is_singleton() {
+                    for &c in h.cells() {
+                        singleton_map[c as usize].push(idx);
+                    }
+                } else {
+                    for &c in h.cells() {
+                        ordinary_map[c as usize].push(idx);
+                    }
                 }
                 essential_flags.push(h.is_essential());
                 kind_flags.push(HandlerKind::Ordinary);
@@ -220,7 +227,7 @@ impl HandlerSet {
     /// Returns `(initial_grid, grid_state_size, initial_contradiction, init_failures)`.
     pub fn initialize_handlers(
         &mut self,
-        grid: &Grid,
+        initial_cells: &[CandidateSet],
         cell_exclusions: &CellExclusions,
         state_allocator: &mut GridStateAllocator,
     ) -> (
@@ -229,7 +236,7 @@ impl HandlerSet {
         bool,
         Vec<(String, Vec<CellIndex>)>,
     ) {
-        let mut initial_grid = grid.cells.clone();
+        let mut initial_grid = initial_cells.to_vec();
         let mut initial_contradiction = false;
         let mut init_failures: Vec<(String, Vec<CellIndex>)> = Vec::new();
 
@@ -432,5 +439,3 @@ impl HandlerSet {
         }
     }
 }
-
-use crate::grid::Grid;

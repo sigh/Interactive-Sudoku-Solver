@@ -9,15 +9,14 @@ use std::collections::HashMap;
 use super::recursion_stack::RecursionStack;
 use super::seen_candidate_set::SeenCandidateSet;
 use super::{
-    enforce_constraints_on, AllPossibilitiesResult, SolveResult, SolverCounters, StepGuide,
-    StepResult, StepType,
+    debug_enforce_constraints, enforce_constraints_on, grid_to_solution, AllPossibilitiesResult,
+    SolveResult, SolverCounters, StepGuide, StepResult, StepType,
 };
 use crate::api::types::CellIndex;
 use crate::candidate_set::CandidateSet;
-use crate::grid::Grid;
 use crate::grid_shape::GridShape;
 use crate::handlers::{ConstraintHandler, UniqueValueExclusion};
-use crate::solver::candidate_selector::CandidateSelector;
+use crate::solver::candidate_selector::{CandidateDebugLogger, CandidateSelector};
 use crate::solver::cell_exclusions::CellExclusions;
 use crate::solver::debug::{self, DebugLog, DebugOptions, SolverProgress, StackTrace};
 use crate::solver::grid_state_allocator::GridStateAllocator;
@@ -147,12 +146,23 @@ pub(crate) struct InternalSolver {
     /// Debug options controlling what debug data to export.
     pub(super) debug_options: DebugOptions,
 
+    /// Reusable scratch buffer for `debug_enforce_constraints` grid snapshots.
+    /// Mirrors JS `InternalSolver._debugGridBuffer`.
+    debug_grid_buffer: Vec<CandidateSet>,
+
+    /// Reusable buffer for stack-trace cell indices in `build_progress`.
+    /// Mirrors JS `InternalSolver._debugValueBuffer` reuse pattern.
+    stack_trace_cells_buf: Vec<u16>,
+
+    /// Reusable buffer for stack-trace values in `build_progress`.
+    stack_trace_values_buf: Vec<u16>,
+
     /// Accumulated debug log entries, drained on each progress tick.
     pub(super) debug_logs: Vec<DebugLog>,
 
     /// Handler init failures recorded during construction.
     /// Stored as (handler_name, cells) pairs for deferred logging.
-    init_failures: Vec<(String, Vec<CellIndex>)>,
+    pub(super) init_failures: Vec<(String, Vec<CellIndex>)>,
 
     /// Debug logs from the optimizer, stored for deferred emission.
     optimizer_debug_logs: Vec<DebugLog>,
@@ -160,10 +170,6 @@ pub(crate) struct InternalSolver {
     /// Persistent SeenCandidateSet for solve_all_possibilities. Preserves
     /// allocation across calls, matching JS `InternalSolver._seenCandidateSet`.
     seen_candidate_set: SeenCandidateSet,
-
-    /// First solution captured during counting. Matches JS `_sampleSolution`.
-    /// Non-empty when a solution has been captured; empty otherwise.
-    sample_solution: Vec<CandidateSet>,
 
     /// Current recursion depth during search. Matches JS `_currentRecFrame`.
     /// `None` when not inside a `run_loop` call.
@@ -181,12 +187,16 @@ impl InternalSolver {
     /// Sorts handlers, runs the constraint optimizer, adds singleton
     /// handlers, initialises everything, and builds cell maps.
     pub(crate) fn new(
-        grid: Grid,
         mut handlers: Vec<Box<dyn ConstraintHandler>>,
         shape: GridShape,
     ) -> Result<Self, String> {
         let num_cells = shape.num_cells;
         let num_values = shape.num_values as usize;
+
+        // Create the initial grid with all candidates set.
+        // Matches JS where InternalSolver creates the grid via
+        // GridStateAllocator and handlers restrict it during initialize().
+        let initial_cells = vec![CandidateSet::all(shape.num_values); num_cells];
 
         // Step 1: Sort handlers BEFORE optimizer (matching JS behavior).
         // JS sorts by (cells.length, constructor.name, cells.join(',')) where
@@ -246,7 +256,7 @@ impl InternalSolver {
         // Step 6: Initialize all handlers.
         let mut state_allocator = GridStateAllocator::new(num_cells);
         let (initial_grid, grid_state_size, initial_contradiction, init_failures) =
-            handler_set.initialize_handlers(&grid, &cell_exclusions, &mut state_allocator);
+            handler_set.initialize_handlers(&initial_cells, &cell_exclusions, &mut state_allocator);
 
         // Step 7: Build cell priorities and collect candidate finders
         // (must happen before consuming handler_set).
@@ -283,11 +293,13 @@ impl InternalSolver {
             iteration_counter: 0,
             step_state: StepState::new(num_cells),
             debug_options: DebugOptions::default(),
+            debug_grid_buffer: vec![CandidateSet::EMPTY; num_cells],
+            stack_trace_cells_buf: Vec::new(),
+            stack_trace_values_buf: Vec::new(),
             debug_logs: Vec::new(),
             init_failures,
             optimizer_debug_logs,
             seen_candidate_set: SeenCandidateSet::new(1, num_cells, num_values),
-            sample_solution: Vec::new(),
             current_rec_depth: None,
             counters: SolverCounters::default(),
         };
@@ -338,7 +350,7 @@ impl InternalSolver {
                 progress,
                 None,
                 &mut |sol| {
-                    solution = Some(sol.to_vec());
+                    solution = Some(grid_to_solution(sol));
                 },
             );
             self.initial_grid = original_initial_grid;
@@ -378,7 +390,7 @@ impl InternalSolver {
                 progress,
                 None,
                 &mut |sol| {
-                    solution = Some(sol.to_vec());
+                    solution = Some(grid_to_solution(sol));
                 },
             );
 
@@ -424,7 +436,7 @@ impl InternalSolver {
             progress,
             None,
             &mut |sol| {
-                solution = Some(sol.to_vec());
+                solution = Some(grid_to_solution(sol));
             },
         );
 
@@ -472,7 +484,7 @@ impl InternalSolver {
             std::mem::replace(&mut self.seen_candidate_set, SeenCandidateSet::new(1, 0, 0));
 
         self.run(RunMode::Exhaustive, progress, Some(&mut seen), &mut |sol| {
-            solutions.push(sol.to_vec());
+            solutions.push(grid_to_solution(sol));
         });
 
         let candidate_counts = seen.candidate_counts().to_vec();
@@ -517,6 +529,7 @@ impl InternalSolver {
 
         loop {
             let mut found_solution = false;
+            let mut sample_values: Option<Vec<u8>> = None;
             // Mirrors JS `_resetRun()` + `run({ maxBacktracks: 1 })` in the
             // estimation loop: one root-to-backtrack path per sample.
             self.reset_run();
@@ -524,8 +537,9 @@ impl InternalSolver {
                 RunMode::MaxBacktracks { max_backtracks: 1 },
                 &mut |_| {},
                 None,
-                &mut |_sol| {
+                &mut |sol| {
                     found_solution = true;
+                    sample_values = Some(super::grid_to_solution(sol));
                 },
             );
 
@@ -536,8 +550,9 @@ impl InternalSolver {
             num_samples += 1;
             let estimate = total_estimate / num_samples as f64;
 
-            // Report progress with estimate data in `extra`, matching JS
-            // `_progressExtraStateFn` which sets `extra.estimate`.
+            // Report progress with estimate + sample, matching JS
+            // `_progressExtraStateFn` which sets `extra.estimate` and
+            // `extra.solutions`.
             let mut progress_counters = self.counters.clone();
             progress_counters.solutions = num_samples;
             let mut solver_progress = SolverProgress::counters_only(progress_counters);
@@ -546,6 +561,7 @@ impl InternalSolver {
                     solutions: estimate,
                     samples: num_samples,
                 }),
+                solutions: sample_values.map(|s| vec![s]),
             });
             progress(&solver_progress);
 
@@ -569,9 +585,34 @@ impl InternalSolver {
     ///
     /// Sets step guides and resets the step counters. Called by
     /// `Solver::nth_step` before invoking `run()`.
-    pub(super) fn set_step_guides(&mut self, step_guides: HashMap<u64, StepGuide>) {
+    ///
+    /// Mirrors JS `_initStepState(stepMode)` including the
+    /// `enableStepLogs` toggle.
+    pub(super) fn set_step_guides(&mut self, step_guides: HashMap<u64, StepGuide>, target: u64) {
         self.step_state = StepState::new(self.shape.num_cells);
         self.step_state.step_guides = step_guides;
+        // Mirrors JS: if (this._debugLogger.enableLogs) {
+        //   this._debugLogger.enableStepLogs = (1 === stepMode.n);
+        // }
+        if self.debug_options.log_level >= 1 {
+            self.debug_options.enable_step_logs = target == 1;
+        }
+    }
+
+    /// Increment step counter and toggle `enable_step_logs` for the target.
+    ///
+    /// Mirrors JS `_incStep()`:
+    /// ```js
+    /// const step = ++this._stepState.step;
+    /// if (this._debugLogger.enableLogs) {
+    ///   this._debugLogger.enableStepLogs = (step === this._stepState.stepTarget);
+    /// }
+    /// ```
+    fn inc_step(&mut self, step_target: u64) {
+        self.step_state.step += 1;
+        if self.debug_options.log_level >= 1 {
+            self.debug_options.enable_step_logs = self.step_state.step == step_target;
+        }
     }
 
     /// Extract the step result produced by the last `run(RunMode::Step)` call.
@@ -676,23 +717,28 @@ impl InternalSolver {
 
         let stack_trace = if self.debug_options.export_stack_trace && rec_depth > 0 {
             // Build stack trace from the current recursion frame.
+            // Reuse pre-allocated buffers matching JS _debugValueBuffer pattern.
             let frame = self.rec_stack.frame(rec_depth);
             let cell_depth = frame.cell_depth;
             let cells_slice = self.candidate_selector.get_cell_order(cell_depth);
-            let cells: Vec<u16> = cells_slice.iter().map(|&c| c as u16).collect();
-            let values: Vec<u16> = cells_slice
-                .iter()
-                .map(|&c| {
-                    let v = frame.grid[c as usize];
-                    // Convert single-bit mask to 1-indexed value.
-                    if !v.is_empty() && v.is_single() {
-                        v.value() as u16
-                    } else {
-                        0
-                    }
-                })
-                .collect();
-            Some(StackTrace { cells, values })
+
+            self.stack_trace_cells_buf.clear();
+            self.stack_trace_cells_buf.extend(cells_slice.iter().map(|&c| c as u16));
+
+            self.stack_trace_values_buf.clear();
+            self.stack_trace_values_buf.extend(cells_slice.iter().map(|&c| {
+                let v = frame.grid[c as usize];
+                if !v.is_empty() && v.is_single() {
+                    v.value() as u16
+                } else {
+                    0
+                }
+            }));
+
+            Some(StackTrace {
+                cells: self.stack_trace_cells_buf.clone(),
+                values: self.stack_trace_values_buf.clone(),
+            })
         } else {
             None
         };
@@ -728,8 +774,9 @@ impl InternalSolver {
     pub(super) fn reset(&mut self) {
         self.counters = SolverCounters::default();
         self.candidate_selector.full_reset();
-        self.sample_solution.clear();
         self.seen_candidate_set.reset();
+        self.step_state = StepState::new(self.shape.num_cells);
+        self.current_rec_depth = None;
         self.reset_run();
     }
 
@@ -916,6 +963,19 @@ impl InternalSolver {
                 None
             };
 
+            // Build debug logger for candidate selection (mirrors JS
+            // constructor injection of _debugLogger into CandidateSelector).
+            let mut candidate_dbg = if self.debug_options.log_level >= 1 {
+                Some(CandidateDebugLogger {
+                    log_level: self.debug_options.log_level,
+                    enable_step_logs: self.debug_options.enable_step_logs,
+                    debug_logs: &mut self.debug_logs,
+                    shape: &self.shape,
+                })
+            } else {
+                None
+            };
+
             let selection = {
                 let grid = &self.rec_stack.frame(rec_depth).grid;
                 self.candidate_selector.select_next_candidate(
@@ -923,8 +983,10 @@ impl InternalSolver {
                     grid,
                     is_new_node,
                     step_guide.as_ref(),
+                    candidate_dbg.as_mut(),
                 )
             };
+            drop(candidate_dbg);
 
             // Mark this node as visited.
             self.rec_stack.frame_mut(rec_depth).new_node = false;
@@ -960,7 +1022,7 @@ impl InternalSolver {
                     });
                     return;
                 }
-                self.step_state.step += 1;
+                self.inc_step(step_target);
             }
             // ─────────────────────────────────────────────────────────
 
@@ -1015,7 +1077,21 @@ impl InternalSolver {
             }
 
             // Propagate constraints.
-            let has_contradiction = {
+            // Mirrors JS _enforceConstraints: branches on logSteps
+            // (enableStepLogs) to route through _debugEnforceConsistency.
+            let has_contradiction = if self.debug_options.enable_step_logs {
+                let grid = &mut self.rec_stack.frame_mut(rec_depth).grid;
+                !debug_enforce_constraints(
+                    "_enforceConstraints",
+                    grid,
+                    &mut self.accumulator,
+                    &mut self.counters,
+                    &mut self.debug_logs,
+                    &mut self.debug_grid_buffer,
+                    self.shape,
+                    self.debug_options.log_level,
+                )
+            } else {
                 let grid = &mut self.rec_stack.frame_mut(rec_depth).grid;
                 !enforce_constraints_on(grid, &mut self.accumulator, &mut self.counters)
             };
@@ -1066,7 +1142,7 @@ impl InternalSolver {
                         });
                         return;
                     }
-                    self.step_state.step += 1;
+                    self.inc_step(step_target);
                 }
                 // ─────────────────────────────────────────────────────
 
@@ -1100,11 +1176,6 @@ impl InternalSolver {
 
                 let solution = &self.rec_stack.frame(rec_depth).grid;
 
-                // Capture first solution as sample (matches JS _sampleSolution).
-                if self.sample_solution.is_empty() {
-                    self.sample_solution = solution.to_vec();
-                }
-
                 // Record in SeenCandidateSet and enable pruning after 2 solutions.
                 if let Some(ref mut s) = seen {
                     s.add_solution(solution);
@@ -1137,7 +1208,7 @@ impl InternalSolver {
                         });
                         return;
                     }
-                    self.step_state.step += 1;
+                    self.inc_step(step_target);
                 }
                 // ─────────────────────────────────────────────────────
 
