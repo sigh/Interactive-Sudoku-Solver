@@ -1,10 +1,6 @@
-use solver_wasm::constraint::builder::SudokuBuilder;
-use solver_wasm::constraint::parser as constraint_parser;
-use solver_wasm::grid::Grid;
-use solver_wasm::grid_shape::GridShape;
+use solver_wasm::simple_solver::SimpleSolver;
 use std::env;
 use std::process;
-use std::str::FromStr;
 use std::time::Instant;
 
 fn main() {
@@ -48,17 +44,6 @@ fn print_usage() {
     eprintln!("  --iterations N  Number of benchmark iterations (default: 100)");
 }
 
-/// Parse the input string into a puzzle + constraints pair.
-fn parse_input(input_str: &str) -> (String, Vec<solver_wasm::constraint::Constraint>, GridShape) {
-    match constraint_parser::parse(input_str) {
-        Ok(parsed) => (parsed.puzzle, parsed.constraints, parsed.shape),
-        Err(e) => {
-            eprintln!("Error parsing input: {}", e);
-            process::exit(1);
-        }
-    }
-}
-
 fn cmd_solve(args: &[String]) {
     if args.is_empty() {
         eprintln!("Usage: solver-cli solve <input>");
@@ -66,57 +51,37 @@ fn cmd_solve(args: &[String]) {
     }
 
     let input = &args[0];
-    let (puzzle, constraints, shape) = parse_input(input);
+    let mut solver = SimpleSolver::new();
 
-    // Validate puzzle.
-    let grid = match Grid::from_str(&puzzle) {
-        Ok(g) => g,
+    let start = Instant::now();
+    let solution = match solver.solution(input) {
+        Ok(sol) => sol,
         Err(e) => {
             eprintln!("Error: {}", e);
             process::exit(1);
         }
     };
-
-    println!("Input:");
-    println!("{}", grid);
-    if !constraints.is_empty() {
-        println!("Constraints: {}", constraints.len());
-    }
-
-    let start = Instant::now();
-
-    let mut solver = match SudokuBuilder::build(&puzzle, &constraints, shape) {
-        Ok(s) => s,
-        Err(e) => {
-            eprintln!("Error building solver: {}", e);
-            process::exit(1);
-        }
-    };
-    let result = solver.solve(&mut |_| {});
-    let counters = result.counters.clone();
-
     let elapsed = start.elapsed();
 
-    match result.solution {
+    match solution {
         Some(sol) => {
-            let sol_grid = Grid { cells: sol };
-            println!("Solution:");
-            println!("{}", sol_grid);
-            println!("String: {}", sol_grid.to_puzzle_string());
+            println!("Solution: {}", sol);
         }
         None => {
             println!("No solution found.");
         }
     }
 
-    println!();
-    println!("Stats:");
-    println!("  Time:          {:.3} ms", elapsed.as_secs_f64() * 1000.0);
-    println!("  Solutions:     {}", counters.solutions);
-    println!("  Guesses:       {}", counters.guesses);
-    println!("  Backtracks:    {}", counters.backtracks);
-    println!("  Values tried:  {}", counters.values_tried);
-    println!("  Constraints:   {}", counters.constraints_processed);
+    if let Some(counters) = solver.latest_counters() {
+        println!();
+        println!("Stats:");
+        println!("  Time:          {:.3} ms", elapsed.as_secs_f64() * 1000.0);
+        println!("  Solutions:     {}", counters.solutions);
+        println!("  Guesses:       {}", counters.guesses);
+        println!("  Backtracks:    {}", counters.backtracks);
+        println!("  Values tried:  {}", counters.values_tried);
+        println!("  Constraints:   {}", counters.constraints_processed);
+    }
 }
 
 fn cmd_all_possibilities(args: &[String]) {
@@ -148,68 +113,63 @@ fn cmd_all_possibilities(args: &[String]) {
         i += 1;
     }
 
-    let (puzzle, constraints, shape) = parse_input(input);
+    println!("Threshold: {}", threshold);
 
-    // Validate puzzle.
-    let grid = match Grid::from_str(&puzzle) {
-        Ok(g) => g,
+    let start = Instant::now();
+    let mut solver = SimpleSolver::new();
+    let tc = match solver.true_candidates(input, threshold) {
+        Ok(tc) => tc,
         Err(e) => {
             eprintln!("Error: {}", e);
             process::exit(1);
         }
     };
-
-    println!("Input:");
-    println!("{}", grid);
-    if !constraints.is_empty() {
-        println!("Constraints: {}", constraints.len());
-    }
-    println!("Threshold: {}", threshold);
-
-    let start = Instant::now();
-
-    let mut solver = SudokuBuilder::build(&puzzle, &constraints, shape).unwrap_or_else(|e| {
-        eprintln!("Error building solver: {}", e);
-        process::exit(1);
-    });
-
-    let result = solver.solve_all_possibilities(threshold, &mut |_| {});
-
     let elapsed = start.elapsed();
 
-    println!();
-    println!("Solutions found: {}", result.counters.solutions);
-    println!();
+    match tc {
+        Some(tc) => {
+            println!();
+            println!("Solutions found: {}", tc.witness_solutions().len());
+            println!();
 
-    // Display candidate counts as a 9x9 grid of pencilmark sets.
-    let counts = &result.candidate_counts;
-    println!("Candidate counts (per cell, per value):");
-    for row in 0..9 {
-        for col in 0..9 {
-            let cell = row * 9 + col;
-            let mut vals = String::new();
-            for v in 0..9 {
-                let count = counts[cell * 9 + v];
-                if count >= threshold {
-                    vals.push((b'1' + v as u8) as char);
+            // Display candidate counts as a grid of pencilmark sets.
+            let shape = tc.shape();
+            let num_values = shape.num_values as usize;
+            let num_cols = shape.num_cols as usize;
+            let num_rows = shape.num_cells / num_cols;
+            let base_char = shape.base_char_code();
+            for row in 0..num_rows {
+                for col in 0..num_cols {
+                    let cell = row * num_cols + col;
+                    let mut vals = String::new();
+                    for v in 0..num_values {
+                        if tc.count_at(cell, (v + 1) as u8) >= threshold {
+                            vals.push((base_char + v as u8) as char);
+                        }
+                    }
+                    if vals.is_empty() {
+                        vals = ".".to_string();
+                    }
+                    print!("{:<10}", vals);
                 }
+                println!();
             }
-            if vals.is_empty() {
-                vals = ".".to_string();
-            }
-            print!("{:<10}", vals);
         }
-        println!();
+        None => {
+            println!("No solutions found.");
+        }
     }
 
-    println!();
-    println!("Stats:");
-    println!("  Time:          {:.3} ms", elapsed.as_secs_f64() * 1000.0);
-    println!("  Solutions:     {}", result.counters.solutions);
-    println!("  Guesses:       {}", result.counters.guesses);
-    println!("  Backtracks:    {}", result.counters.backtracks);
-    println!("  Values tried:  {}", result.counters.values_tried);
-    println!("  Constraints:   {}", result.counters.constraints_processed);
+    if let Some(counters) = solver.latest_counters() {
+        println!();
+        println!("Stats:");
+        println!("  Time:          {:.3} ms", elapsed.as_secs_f64() * 1000.0);
+        println!("  Solutions:     {}", counters.solutions);
+        println!("  Guesses:       {}", counters.guesses);
+        println!("  Backtracks:    {}", counters.backtracks);
+        println!("  Values tried:  {}", counters.values_tried);
+        println!("  Constraints:   {}", counters.constraints_processed);
+    }
 }
 
 fn cmd_bench(args: &[String]) {
@@ -241,35 +201,18 @@ fn cmd_bench(args: &[String]) {
         i += 1;
     }
 
-    let (puzzle, constraints, shape) = parse_input(input);
+    println!("Benchmarking: {} iterations", iterations);
 
-    // Validate puzzle.
-    if let Err(e) = Grid::from_str(&puzzle) {
-        eprintln!("Error: {}", e);
-        process::exit(1);
-    }
-
-    println!(
-        "Benchmarking: {} iterations{}",
-        iterations,
-        if constraints.is_empty() {
-            "".to_string()
-        } else {
-            format!(" ({} constraints)", constraints.len())
-        }
-    );
-
+    let mut solver = SimpleSolver::new();
     let mut times = Vec::with_capacity(iterations);
-    let mut last_counters = None;
 
     for _ in 0..iterations {
         let start = Instant::now();
-
-        let mut solver = SudokuBuilder::build(&puzzle, &constraints, shape).unwrap();
-        let r = solver.solve(&mut |_| {});
-
+        let _ = solver.solution(input).unwrap_or_else(|e| {
+            eprintln!("Error: {}", e);
+            process::exit(1);
+        });
         times.push(start.elapsed());
-        last_counters = Some(r.counters);
     }
 
     // Sort for percentile calculations.
@@ -290,7 +233,7 @@ fn cmd_bench(args: &[String]) {
     println!("  P95:     {:.3} ms", p95);
     println!("  Total:   {:.3} ms", to_ms(total));
 
-    if let Some(counters) = last_counters {
+    if let Some(counters) = solver.latest_counters() {
         println!();
         println!("Solver stats (last run):");
         println!("  Solutions:     {}", counters.solutions);

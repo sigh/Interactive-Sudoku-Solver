@@ -4,12 +4,12 @@
 //!
 //! Mirrors JS `ValueDependentUniqueValueExclusion`.
 
+use crate::api::types::{CellIndex, Value};
 use crate::candidate_set::CandidateSet;
 use crate::grid_shape::GridShape;
 use crate::solver::cell_exclusions::CellExclusions;
 use crate::solver::grid_state_allocator::GridStateAllocator;
 use crate::solver::handler_accumulator::HandlerAccumulator;
-use crate::api::types::{CellIndex, Value};
 
 use super::ConstraintHandler;
 
@@ -66,22 +66,26 @@ impl ConstraintHandler for ValueDependentUniqueValueExclusion {
     ) -> bool {
         // Remove cells that are already in the normal exclusion set
         // (they're already handled by standard uniqueness).
-        let exclusions: std::collections::HashSet<CellIndex> =
-            cell_exclusions.sets[self.cell as usize].iter().copied().collect();
+        let exclusions: std::collections::HashSet<CellIndex> = cell_exclusions.sets
+            [self.cell as usize]
+            .iter()
+            .copied()
+            .collect();
         for map in &mut self.value_to_cell_map {
             map.retain(|c| !exclusions.contains(c));
         }
         true
     }
 
-    fn enforce_consistency(
-        &self,
-        grid: &mut [CandidateSet],
-        acc: &mut HandlerAccumulator,
-    ) -> bool {
+    fn enforce_consistency(&self, grid: &mut [CandidateSet], acc: &mut HandlerAccumulator) -> bool {
         let v = grid[self.cell as usize];
 
         // Only trigger when the cell is fixed (singleton value).
+        // Mirrors JS: the handler is SINGLETON_HANDLER so enforceConsistency
+        // is only called after the cell is fixed. Guard defensively.
+        if !v.is_single() {
+            return true;
+        }
         let index = v.index();
 
         let exclusion_cells = &self.value_to_cell_map[index];

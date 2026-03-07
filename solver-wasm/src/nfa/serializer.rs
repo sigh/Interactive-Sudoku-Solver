@@ -14,17 +14,17 @@ use super::Nfa;
 // Base64 codec (matching JS Base64Codec)
 // ============================================================================
 
-/// Standard Base64 alphabet (RFC 4648 §4).
+/// URL-safe Base64 alphabet (RFC 4648 §5), matching JS Base64Codec.
 #[cfg(test)]
-const BASE64_CHARS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+const BASE64_CHARS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
 
 fn base64_decode_char(ch: u8) -> Option<u8> {
     match ch {
         b'A'..=b'Z' => Some(ch - b'A'),
         b'a'..=b'z' => Some(ch - b'a' + 26),
         b'0'..=b'9' => Some(ch - b'0' + 52),
-        b'+' => Some(62),
-        b'/' => Some(63),
+        b'-' => Some(62),
+        b'_' => Some(63),
         _ => None,
     }
 }

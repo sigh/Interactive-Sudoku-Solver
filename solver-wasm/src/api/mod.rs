@@ -1,8 +1,9 @@
 //! Platform-agnostic solver API.
 //!
-//! This module provides solver construction from JSON input, result
-//! conversion helpers, and a `solve_impl` convenience function used by
-//! tests. The WASM entry points live in [`wasm`].
+//! This module provides solver construction from JSON input and result
+//! conversion helpers. The WASM entry points live in [`wasm`].
+//!
+//! For a convenient high-level API, see [`crate::simple_solver::SimpleSolver`].
 
 pub mod types;
 
@@ -15,6 +16,7 @@ use self::types::*;
 use crate::candidate_set::CandidateSet;
 use crate::constraint;
 use crate::constraint::builder as sudoku_builder;
+use crate::grid_shape::GridShape;
 use crate::solver;
 
 // ============================================================================
@@ -28,11 +30,7 @@ pub(crate) fn build_solver_from_input(
 ) -> Result<solver::Solver, String> {
     let parsed_constraints = constraint::parser::parse(&parsed.constraint_string)?;
 
-    let mut solver = sudoku_builder::SudokuBuilder::build(
-        &parsed_constraints.puzzle,
-        &parsed_constraints.constraints,
-        parsed_constraints.shape,
-    )?;
+    let mut solver = sudoku_builder::SudokuBuilder::build(&parsed_constraints)?;
 
     if let Some(freq) = log_frequency {
         solver.set_progress_frequency(freq);
@@ -46,58 +44,6 @@ pub(crate) fn build_solver_from_input(
 }
 
 // ============================================================================
-// Public API functions
-// ============================================================================
-
-/// Solve a puzzle from JSON input. Used by tests only.
-///
-/// `log_frequency`: if `Some(n)`, progress fires every `2^n` iterations.
-#[cfg(test)]
-fn solve_impl(
-    input: &str,
-    log_frequency: Option<u32>,
-    progress: &mut dyn FnMut(&solver::debug::SolverProgress),
-) -> SolverOutput {
-    use crate::grid;
-    use crate::solver::SolverCounters;
-    let parsed: SolverInput = match serde_json::from_str(input) {
-        Ok(p) => p,
-        Err(e) => {
-            return SolverOutput {
-                success: false,
-                solution: None,
-                error: Some(format!("Failed to parse input: {}", e)),
-                counters: SolverCounters::default(),
-            };
-        }
-    };
-
-    let mut solver = match build_solver_from_input(&parsed, log_frequency) {
-        Ok(s) => s,
-        Err(e) => {
-            return SolverOutput {
-                success: false,
-                solution: None,
-                error: Some(format!("Invalid puzzle: {}", e)),
-                counters: SolverCounters::default(),
-            };
-        }
-    };
-
-    let result = solver.solve(progress);
-    let solution_str = result
-        .solution
-        .map(|cells| grid::Grid { cells }.to_puzzle_string());
-
-    SolverOutput {
-        success: solution_str.is_some(),
-        solution: solution_str,
-        error: None,
-        counters: result.counters,
-    }
-}
-
-// ============================================================================
 // Conversion helpers
 // ============================================================================
 
@@ -107,7 +53,7 @@ pub(crate) fn candidate_set_to_values(cs: CandidateSet) -> Vec<Value> {
 }
 
 /// Convert a `StepResult` (CandidateSet grids) into a `StepOutput` (pencilmarks).
-pub(crate) fn step_result_to_output(step: &solver::StepResult) -> StepOutput {
+pub(crate) fn step_result_to_output(step: &solver::StepResult, shape: GridShape) -> StepOutput {
     // Build pencilmarks: single values are bare numbers, multi are arrays.
     let pencilmarks: Vec<serde_json::Value> = step
         .grid
@@ -141,7 +87,8 @@ pub(crate) fn step_result_to_output(step: &solver::StepResult) -> StepOutput {
             })
             .collect();
 
-        (Some(values), Some(guess_cell_index), Some(diffs))
+        let guess_cell_id = shape.cell_id_from_index(guess_cell_index as usize);
+        (Some(values), Some(guess_cell_id), Some(diffs))
     } else {
         (None, None, None)
     };
@@ -197,7 +144,51 @@ pub(crate) fn parse_step_guides(json: &str) -> HashMap<u64, solver::StepGuide> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::simple_solver::SimpleSolver;
     use crate::solver::SolverCounters;
+
+    #[test]
+    fn test_solve_basic() {
+        let constraint_str =
+            "53..7....6..195....98....6.8...6...34..8.3..17...2...6.6....28....419..5....8..79";
+        let mut ss = SimpleSolver::new();
+        let sol = ss.solution(constraint_str).unwrap().unwrap();
+        assert_eq!(
+            sol.to_string(),
+            "534678912672195348198342567859761423426853791713924856961537284287419635345286179"
+        );
+    }
+
+    #[test]
+    fn test_solve_killer() {
+        let constraint_str = ".Cage~3~R1C1~R1C2.Cage~15~R1C3~R1C4~R1C5.Cage~25~R2C1~R2C2~R3C1~R3C2.Cage~17~R2C3~R2C4.Cage~9~R3C3~R3C4~R4C4.Cage~22~R1C6~R2C5~R2C6~R3C5.Cage~4~R1C7~R2C7.Cage~16~R1C8~R2C8.Cage~15~R1C9~R2C9~R3C9~R4C9.Cage~20~R3C7~R3C8~R4C7.Cage~8~R3C6~R4C6~R5C6.Cage~17~R4C5~R5C5~R6C5.Cage~20~R5C4~R6C4~R7C4.Cage~14~R4C2~R4C3.Cage~6~R4C1~R5C1.Cage~13~R5C2~R5C3~R6C2.Cage~6~R6C3~R7C2~R7C3.Cage~17~R4C8~R5C7~R5C8.Cage~27~R6C1~R7C1~R8C1~R9C1.Cage~8~R8C2~R9C2.Cage~16~R8C3~R9C3.Cage~10~R7C5~R8C4~R8C5~R9C4.Cage~12~R5C9~R6C9.Cage~6~R6C7~R6C8.Cage~20~R6C6~R7C6~R7C7.Cage~15~R8C6~R8C7.Cage~14~R7C8~R7C9~R8C8~R8C9.Cage~13~R9C5~R9C6~R9C7.Cage~17~R9C8~R9C9";
+        let mut ss = SimpleSolver::new();
+        let sol = ss.solution(constraint_str).unwrap().unwrap();
+        assert_eq!(
+            sol.to_string(),
+            "215647398368952174794381652586274931142593867973816425821739546659428713437165289"
+        );
+    }
+
+    #[test]
+    fn test_solve_invalid_input() {
+        let mut ss = SimpleSolver::new();
+        let result = ss.solution("not a valid constraint string at all!!!");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_solve_no_solution() {
+        let mut ss = SimpleSolver::new();
+        let result = ss.solution(
+            "11...............................................................................",
+        );
+        // Two 1s in the same row → impossible (no solution or parse error).
+        match result {
+            Ok(sol) => assert!(sol.is_none()),
+            Err(_) => {} // Also acceptable if caught during build.
+        }
+    }
 
     #[test]
     fn test_solver_counters_default() {
@@ -208,36 +199,6 @@ mod tests {
         assert_eq!(c.values_tried, 0);
         assert_eq!(c.constraints_processed, 0);
         assert_eq!(c.progress_ratio, 0.0);
-    }
-
-    #[test]
-    fn test_solve_impl_basic() {
-        let input = r#"{"constraintString":"53..7....6..195....98....6.8...6...34..8.3..17...2...6.6....28....419..5....8..79"}"#;
-        let result = solve_impl(input, None, &mut |_| {});
-        assert!(result.success);
-        assert_eq!(
-            result.solution.unwrap(),
-            "534678912672195348198342567859761423426853791713924856961537284287419635345286179"
-        );
-    }
-
-    #[test]
-    fn test_solve_impl_with_constraint_string() {
-        // Wikipedia killer sudoku via constraint string.
-        let input = r#"{"constraintString":".Cage~3~R1C1~R1C2.Cage~15~R1C3~R1C4~R1C5.Cage~25~R2C1~R2C2~R3C1~R3C2.Cage~17~R2C3~R2C4.Cage~9~R3C3~R3C4~R4C4.Cage~22~R1C6~R2C5~R2C6~R3C5.Cage~4~R1C7~R2C7.Cage~16~R1C8~R2C8.Cage~15~R1C9~R2C9~R3C9~R4C9.Cage~20~R3C7~R3C8~R4C7.Cage~8~R3C6~R4C6~R5C6.Cage~17~R4C5~R5C5~R6C5.Cage~20~R5C4~R6C4~R7C4.Cage~14~R4C2~R4C3.Cage~6~R4C1~R5C1.Cage~13~R5C2~R5C3~R6C2.Cage~6~R6C3~R7C2~R7C3.Cage~17~R4C8~R5C7~R5C8.Cage~27~R6C1~R7C1~R8C1~R9C1.Cage~8~R8C2~R9C2.Cage~16~R8C3~R9C3.Cage~10~R7C5~R8C4~R8C5~R9C4.Cage~12~R5C9~R6C9.Cage~6~R6C7~R6C8.Cage~20~R6C6~R7C6~R7C7.Cage~15~R8C6~R8C7.Cage~14~R7C8~R7C9~R8C8~R8C9.Cage~13~R9C5~R9C6~R9C7.Cage~17~R9C8~R9C9"}"#;
-        let result = solve_impl(input, None, &mut |_| {});
-        assert!(result.success, "solve failed: {:?}", result.error);
-        assert_eq!(
-            result.solution.unwrap(),
-            "215647398368952174794381652586274931142593867973816425821739546659428713437165289"
-        );
-    }
-
-    #[test]
-    fn test_solve_impl_invalid_json() {
-        let result = solve_impl("not json", None, &mut |_| {});
-        assert!(!result.success);
-        assert!(result.error.is_some());
     }
 
     #[test]
@@ -264,32 +225,16 @@ mod tests {
     }
 
     #[test]
-    fn test_solve_impl_progress_callback() {
-        let mut callback_count = 0u32;
-        let input = r#"{"constraintString":"800000000003600000070090200050007000000045700000100030001000068008500010090000400"}"#;
-        let result = solve_impl(input, None, &mut |_counters| {
-            callback_count += 1;
-        });
-        assert!(result.success);
-        // Hard puzzle should trigger at least some callbacks.
-        // (may be 0 if puzzle solves in < 8192 iterations, but that's fine)
-    }
-
-    #[test]
-    fn test_solve_impl_no_solution() {
-        // Two 1s in the same row → impossible.
-        let input = r#"{"constraintString":"11.........................................................................."}"#;
-        let result = solve_impl(input, None, &mut |_| {});
-        assert!(!result.success);
-        assert!(result.solution.is_none());
-    }
-
-    #[test]
     fn test_solver_output_json_shape() {
-        let input = r#"{"constraintString":"53..7....6..195....98....6.8...6...34..8.3..17...2...6.6....28....419..5....8..79"}"#;
-        let result = solve_impl(input, None, &mut |_| {});
-        let json = serde_json::to_string(&result).unwrap();
-        // Verify the JSON output shape matches what the JS worker expects.
+        // Verify that SolverOutput serializes to the JSON shape the JS
+        // worker expects.
+        let output = SolverOutput {
+            success: true,
+            solution: Some("123456789".to_string()),
+            error: None,
+            counters: SolverCounters::default(),
+        };
+        let json = serde_json::to_string(&output).unwrap();
         let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
         assert_eq!(parsed["success"], true);
         assert!(parsed["solution"].is_string());
@@ -299,7 +244,7 @@ mod tests {
         assert!(parsed["counters"]["valuesTried"].is_number());
         assert!(parsed["counters"]["constraintsProcessed"].is_number());
         assert!(parsed["counters"]["progressRatio"].is_number());
-        // error should not be present (skip_serializing_if = None)
+        // error should not be present (skip_serializing_if = None).
         assert!(parsed.get("error").is_none());
     }
 
@@ -308,12 +253,8 @@ mod tests {
         // Test the Solver::nth_solution API used by the WASM entry point.
         let puzzle =
             "53..7....6..195....98....6.8...6...34..8.3..17...2...6.6....28....419..5....8..79";
-        let mut solver = crate::constraint::builder::SudokuBuilder::build(
-            puzzle,
-            &[],
-            crate::grid_shape::SHAPE_9X9,
-        )
-        .unwrap();
+        let parsed = crate::constraint::parser::parse(puzzle).unwrap();
+        let mut solver = crate::constraint::builder::SudokuBuilder::build(&parsed).unwrap();
 
         // nth_solution(0) should return the unique solution.
         let r0 = solver.nth_solution(0, &mut |_| {});
@@ -328,12 +269,8 @@ mod tests {
     fn test_nth_solution_incremental_counters() {
         // Sequential forward calls should accumulate counters.
         let empty = ".".repeat(81);
-        let mut solver = crate::constraint::builder::SudokuBuilder::build(
-            &empty,
-            &[],
-            crate::grid_shape::SHAPE_9X9,
-        )
-        .unwrap();
+        let parsed = crate::constraint::parser::parse(&empty).unwrap();
+        let mut solver = crate::constraint::builder::SudokuBuilder::build(&parsed).unwrap();
 
         let r0 = solver.nth_solution(0, &mut |_| {});
         let vt0 = r0.counters.values_tried;

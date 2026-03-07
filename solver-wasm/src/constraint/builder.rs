@@ -9,12 +9,10 @@
 //! numeric indexes here, matching how JS's builder calls
 //! `shape.parseCellId(c).cell` in each switch case.
 
-use std::str::FromStr;
-
+use super::parser::ParsedConstraints;
 use super::Constraint;
 use crate::api::types::{CellIndex, Value};
 use crate::candidate_set::CandidateSet;
-use crate::grid::Grid;
 use crate::grid_shape::GridShape;
 use crate::handlers::sum::Sum;
 use crate::handlers::{
@@ -31,22 +29,15 @@ use crate::solver::Solver;
 pub struct SudokuBuilder;
 
 impl SudokuBuilder {
-    /// Build a solver from a puzzle string, constraints, and grid shape.
+    /// Build a solver from parsed constraints.
     ///
-    /// The puzzle string has `shape.num_cells` characters.
-    /// Constraints describe additional rules beyond standard Sudoku.
-    pub fn build(
-        puzzle: &str,
-        constraints: &[Constraint],
-        shape: GridShape,
-    ) -> Result<Solver, String> {
-        let grid = if shape.num_cells == 81 && shape.num_values == 9 {
-            Grid::from_str(puzzle).map_err(|e| e.to_string())?
-        } else {
-            Grid::from_puzzle(puzzle, shape).map_err(|e| e.to_string())?
-        };
-        let handlers = Self::create_handlers(constraints, shape);
-        Solver::from_handlers(grid, handlers, shape)
+    /// The parser has already converted the input string into a list of
+    /// constraints (including Givens) and a shape — the builder creates
+    /// handlers and constructs the solver. The solver creates its own
+    /// initial grid internally.
+    pub fn build(parsed: &ParsedConstraints) -> Result<Solver, String> {
+        let handlers = Self::create_handlers(&parsed.constraints, parsed.shape);
+        Solver::from_handlers(handlers, parsed.shape)
     }
 
     /// Create all constraint handlers for the given constraints.
@@ -85,30 +76,30 @@ impl SudokuBuilder {
     /// Add AllDifferent handlers for rows and columns.
     fn add_row_col_handlers(handlers: &mut Vec<Box<dyn ConstraintHandler>>, shape: GridShape) {
         let nv = shape.num_values;
-        // Rows are houses when the row length equals num_values.
-        if shape.num_cols == nv {
-            for r in 0..shape.num_rows {
-                let cells: Vec<CellIndex> = (0..nv)
-                    .map(|c| shape.cell_index(r, c) as CellIndex)
-                    .collect();
-                handlers.push(Box::new(AllDifferent::new(
-                    cells,
-                    AllDifferentType::WithExclusionCells,
-                )));
-            }
+        // Rows: always use all num_cols cells per row.
+        // Mirrors JS `SudokuConstraintBase.rowRegions(shape)` which generates
+        // all rows unconditionally.
+        for r in 0..shape.num_rows {
+            let cells: Vec<CellIndex> = (0..shape.num_cols)
+                .map(|c| shape.cell_index(r, c) as CellIndex)
+                .collect();
+            handlers.push(Box::new(AllDifferent::new(
+                cells,
+                AllDifferentType::WithExclusionCells,
+            )));
         }
-        // Cols are houses when the column length equals num_values.
-        if shape.num_rows == nv {
-            for c in 0..shape.num_cols {
-                let cells: Vec<CellIndex> = (0..nv)
-                    .map(|r| shape.cell_index(r, c) as CellIndex)
-                    .collect();
-                handlers.push(Box::new(AllDifferent::new(
-                    cells,
-                    AllDifferentType::WithExclusionCells,
-                )));
-            }
+        // Cols: always use all num_rows cells per column.
+        // Mirrors JS `SudokuConstraintBase.colRegions(shape)`.
+        for c in 0..shape.num_cols {
+            let cells: Vec<CellIndex> = (0..shape.num_rows)
+                .map(|r| shape.cell_index(r, c) as CellIndex)
+                .collect();
+            handlers.push(Box::new(AllDifferent::new(
+                cells,
+                AllDifferentType::WithExclusionCells,
+            )));
         }
+        let _ = nv; // kept for documentation purposes
     }
 
     /// Add AllDifferent handlers for boxes.
@@ -169,10 +160,13 @@ impl SudokuBuilder {
                     // handler so the puzzle correctly reports no solutions.
                     handlers.push(Box::new(False::new(vec![0])));
                 } else {
-                    let nv = shape.num_values as usize;
-                    let cells: Vec<CellIndex> = (0..nv)
+                    // Use actual grid dimensions, not num_values.
+                    // Mirrors JS: for (let r = 0; r < shape.numRows; r++)
+                    let nr = shape.num_rows as usize;
+                    let nc = shape.num_cols as usize;
+                    let cells: Vec<CellIndex> = (0..nr)
                         .map(|r| {
-                            let c = if *direction > 0 { nv - 1 - r } else { r };
+                            let c = if *direction > 0 { nc - 1 - r } else { r };
                             shape.cell_index(r as u8, c as u8) as CellIndex
                         })
                         .collect();
@@ -625,8 +619,9 @@ impl SudokuBuilder {
                 let region_size = Self::get_effective_box_size(all_constraints)
                     .unwrap_or(shape.num_values) as usize;
                 if cells.len() != region_size {
-                    // JS throws InvalidConstraintError.
-                    handlers.push(Box::new(False::new(vec![0])));
+                    // JS makeFromArgs simply doesn't yield constraints for
+                    // non-standard sized regions (e.g. the "background" region
+                    // in a Squishdoku jigsaw layout). Skip without False.
                     return;
                 }
 
@@ -687,14 +682,11 @@ impl SudokuBuilder {
                 // One DutchFlatmateLine handler per column, containing all cells
                 // in that column from top to bottom.
                 // Mirrors JS: `for (const cells of SudokuConstraintBase.colRegions(shape))`
-                let nv = shape.num_values;
-                if shape.num_rows == nv {
-                    for c in 0..shape.num_cols {
-                        let col_cells: Vec<CellIndex> = (0..nv)
-                            .map(|r| shape.cell_index(r, c) as CellIndex)
-                            .collect();
-                        handlers.push(Box::new(DutchFlatmateLine::new(col_cells)));
-                    }
+                for c in 0..shape.num_cols {
+                    let col_cells: Vec<CellIndex> = (0..shape.num_rows)
+                        .map(|r| shape.cell_index(r, c) as CellIndex)
+                        .collect();
+                    handlers.push(Box::new(DutchFlatmateLine::new(col_cells)));
                 }
             }
 
@@ -820,23 +812,19 @@ impl SudokuBuilder {
                         regions.push(resolve_cells(cells, shape));
                     }
                 }
-                // Row regions (when row length == num_values).
-                if shape.num_cols == shape.num_values {
-                    for r in 0..shape.num_rows {
-                        let row: Vec<CellIndex> = (0..shape.num_cols)
-                            .map(|c| shape.cell_index(r, c) as CellIndex)
-                            .collect();
-                        regions.push(row);
-                    }
+                // Row regions — unconditional, mirrors JS `SudokuConstraintBase.rowRegions(shape)`.
+                for r in 0..shape.num_rows {
+                    let row: Vec<CellIndex> = (0..shape.num_cols)
+                        .map(|c| shape.cell_index(r, c) as CellIndex)
+                        .collect();
+                    regions.push(row);
                 }
-                // Column regions (when col length == num_values).
-                if shape.num_rows == shape.num_values {
-                    for c in 0..shape.num_cols {
-                        let col: Vec<CellIndex> = (0..shape.num_rows)
-                            .map(|r| shape.cell_index(r, c) as CellIndex)
-                            .collect();
-                        regions.push(col);
-                    }
+                // Column regions — unconditional, mirrors JS `SudokuConstraintBase.colRegions(shape)`.
+                for c in 0..shape.num_cols {
+                    let col: Vec<CellIndex> = (0..shape.num_rows)
+                        .map(|r| shape.cell_index(r, c) as CellIndex)
+                        .collect();
+                    regions.push(col);
                 }
                 // Box regions.
                 let has_no_boxes = all_constraints
@@ -967,7 +955,11 @@ impl SudokuBuilder {
                             Box::new(Sum::new_cage(cells[1..i].to_vec(), sum_rem as i32));
                         or_handlers.push(Box::new(And::new(vec![given, sum_handler])));
                     }
-                    if !or_handlers.is_empty() {
+                    if or_handlers.is_empty() {
+                        // No valid X exists for this sum — XSum is infeasible.
+                        // Mirrors JS: yields Or() (empty Or) which fails initialize().
+                        handlers.push(Box::new(False::new(vec![cells[0]])));
+                    } else {
                         handlers.push(Box::new(Or::new(or_handlers)));
                     }
                 }
@@ -1372,13 +1364,19 @@ fn expand_little_killer_diagonal(
     let last_row = (shape.num_rows - 1) as i32;
     let last_col = (shape.num_cols - 1) as i32;
 
-    let (dr, dc) = if col == 0 {
+    // Direction is inferred from which edge the arrow cell sits on.
+    // Priority order matches JS `LittleKiller.cellMap()`:
+    //   1. Left column (col == 0, row < last_row)          → down-right  (+1, +1)
+    //   2. Right column (col == last_col, 0 < row < last_row) → up-left  (-1, -1)
+    //   3. Top row (row == 0, col > 0)                     → down-left   (+1, -1)
+    //   4. Bottom row (row == last_row, 0 < col < last_col)  → up-right  (-1, +1)
+    let (dr, dc) = if col == 0 && row < last_row {
         (1, 1)
-    } else if col == last_col {
+    } else if col == last_col && row > 0 && row < last_row {
         (-1, -1)
-    } else if row == 0 {
+    } else if row == 0 && col > 0 {
         (1, -1)
-    } else if row == last_row {
+    } else if row == last_row && col > 0 && col < last_col {
         (-1, 1)
     } else {
         return Err(format!(
@@ -1448,6 +1446,7 @@ fn expand_outside_line(arrow_id: &str, shape: GridShape) -> Option<Vec<CellIndex
 #[cfg(test)]
 mod tests {
     use super::SudokuBuilder;
+    use crate::constraint::parser::{self, ParsedConstraints};
     use crate::constraint::Constraint;
     use crate::grid_shape::SHAPE_9X9;
 
@@ -1455,8 +1454,9 @@ mod tests {
     fn test_build_plain_sudoku() {
         let puzzle =
             "530070000600195000098000060800060003400803001700020006060000280000419005000080079";
-        let mut solver = SudokuBuilder::build(puzzle, &[], SHAPE_9X9).unwrap();
-        let result = solver.solve(&mut |_| {});
+        let parsed = parser::parse(puzzle).unwrap();
+        let mut solver = SudokuBuilder::build(&parsed).unwrap();
+        let result = solver.nth_solution(0, &mut |_| {});
         assert!(result.solution.is_some());
     }
 
@@ -1464,13 +1464,14 @@ mod tests {
     fn test_build_with_cage() {
         // Cage on first 3 cells of row 1 summing to 12 (must be 5+3+4).
         let puzzle =
-            "...070000600195000098000060800060003400803001700020006060000280000419005000080079";
-        let constraints = vec![Constraint::Cage {
+            "000070000600195000098000060800060003400803001700020006060000280000419005000080079";
+        let mut parsed = parser::parse(puzzle).unwrap();
+        parsed.constraints.push(Constraint::Cage {
             cells: vec!["R1C1".to_string(), "R1C2".to_string(), "R1C3".to_string()],
             sum: 12,
-        }];
-        let mut solver = SudokuBuilder::build(puzzle, &constraints, SHAPE_9X9).unwrap();
-        let result = solver.solve(&mut |_| {});
+        });
+        let mut solver = SudokuBuilder::build(&parsed).unwrap();
+        let result = solver.nth_solution(0, &mut |_| {});
         assert!(result.solution.is_some());
     }
 
@@ -1479,10 +1480,11 @@ mod tests {
         // Simple thermo on a solvable puzzle.
         let puzzle =
             "530070000600195000098000060800060003400803001700020006060000280000419005000080079";
-        let constraints = vec![Constraint::Thermo {
+        let mut parsed = parser::parse(puzzle).unwrap();
+        parsed.constraints.push(Constraint::Thermo {
             cells: vec!["R1C1".to_string(), "R1C2".to_string(), "R1C3".to_string()],
-        }];
-        let solver = SudokuBuilder::build(puzzle, &constraints, SHAPE_9X9);
+        });
+        let solver = SudokuBuilder::build(&parsed);
         assert!(solver.is_ok());
     }
 
@@ -1519,17 +1521,13 @@ mod tests {
             .LittleKiller~43~R1C7.LittleKiller~44~R1C8\
             .LittleKiller~34~R9C2.LittleKiller~52~R9C3";
         let parsed = crate::constraint::parser::parse(input).unwrap();
-        let mut solver =
-            SudokuBuilder::build(&parsed.puzzle, &parsed.constraints, parsed.shape).unwrap();
-        let result = solver.solve(&mut |_| {});
+        let mut solver = SudokuBuilder::build(&parsed).unwrap();
+        let result = solver.nth_solution(0, &mut |_| {});
         assert!(
             result.solution.is_some(),
             "Hailstone puzzle should have a solution"
         );
-        let sol_str = crate::grid::Grid {
-            cells: result.solution.unwrap(),
-        }
-        .to_puzzle_string();
+        let sol_str = crate::constraint::parser::to_short_solution(&result.solution.unwrap(), parsed.shape);
         assert_eq!(
             sol_str,
             "815432976763918245942567318278351694154896732396274581437685129681729453529143867"
@@ -1553,11 +1551,7 @@ mod tests {
             other => panic!("Expected XSum, got {:?}", other),
         }
         // Builder should not error.
-        let result = SudokuBuilder::build(
-            ".................................................................................",
-            &parsed.constraints,
-            SHAPE_9X9,
-        );
+        let result = SudokuBuilder::build(&parsed);
         assert!(result.is_ok(), "Builder should accept XSum constraint");
     }
 
@@ -1577,11 +1571,11 @@ mod tests {
                 }],
             ],
         }];
-        let result = SudokuBuilder::build(
-            ".................................................................................",
-            &constraints,
-            SHAPE_9X9,
-        );
+        let parsed = ParsedConstraints {
+            constraints,
+            shape: SHAPE_9X9,
+        };
+        let result = SudokuBuilder::build(&parsed);
         assert!(result.is_ok(), "Builder should accept Or constraint");
     }
 
@@ -1608,11 +1602,7 @@ mod tests {
                 .count(),
             1
         );
-        let result = SudokuBuilder::build(
-            ".................................................................................",
-            &parsed.constraints,
-            SHAPE_9X9,
-        );
+        let result = SudokuBuilder::build(&parsed);
         assert!(result.is_ok(), "Builder should accept FullRank constraints");
     }
 
@@ -1621,17 +1611,15 @@ mod tests {
         // Two cases from the JS handler tests (full_rank.test.js):
         // 1. A solvable puzzle — constraint must not over-reject.
         // 2. An unsolvable puzzle — constraint must correctly reject it.
-        use crate::grid_shape::GridShape;
-        let shape = GridShape::from_grid_spec("4x4").unwrap();
 
         // Case 1: should have at least one solution.
         {
             let input =
                 ".Shape~4x4.FullRank~C1~10~.FullRank~C2~15~.FullRank~R4~5~.FullRankTies~any";
             let parsed = crate::constraint::parser::parse(input).unwrap();
-            let mut solver = SudokuBuilder::build(&parsed.puzzle, &parsed.constraints, shape)
-                .expect("Builder should accept 4x4 FullRank puzzle");
-            let result = solver.solve(&mut |_| {});
+            let mut solver =
+                SudokuBuilder::build(&parsed).expect("Builder should accept 4x4 FullRank puzzle");
+            let result = solver.nth_solution(0, &mut |_| {});
             assert!(
                 result.solution.is_some(),
                 "FullRank 4x4 solvable puzzle should have a solution"
@@ -1643,8 +1631,8 @@ mod tests {
         {
             let input = ".Shape~4x4.FullRankTies~none.FullRank~C1~10~.FullRank~C2~15~.FullRank~C4~3~.FullRank~C3~~4.";
             let parsed = crate::constraint::parser::parse(input).unwrap();
-            let mut solver2 = SudokuBuilder::build(&parsed.puzzle, &parsed.constraints, shape)
-                .expect("Builder should accept 4x4 FullRank puzzle");
+            let mut solver2 =
+                SudokuBuilder::build(&parsed).expect("Builder should accept 4x4 FullRank puzzle");
             let (count, _) = solver2.count_solutions(1, &mut |_| {});
             assert_eq!(
                 count, 0,

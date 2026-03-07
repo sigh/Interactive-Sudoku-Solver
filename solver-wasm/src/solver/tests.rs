@@ -1,6 +1,6 @@
 use super::*;
+use crate::constraint::parser::{self, ParsedConstraints};
 use crate::constraint::{builder::SudokuBuilder, Constraint};
-use crate::grid::Grid;
 use crate::grid_shape::SHAPE_9X9;
 use std::collections::HashMap;
 
@@ -38,13 +38,12 @@ const IMPOSSIBLE_PUZZLE: &str =
 
 #[test]
 fn test_solve_easy() {
-    let mut solver = SudokuBuilder::build(EASY_PUZZLE, &[], SHAPE_9X9).unwrap();
-    let result = solver.solve(&mut |_| {});
+    let parsed = parser::parse(EASY_PUZZLE).unwrap();
+    let mut solver = SudokuBuilder::build(&parsed).unwrap();
+    let result = solver.nth_solution(0, &mut |_| {});
     assert!(result.solution.is_some());
-    let sol_grid = Grid {
-        cells: result.solution.unwrap(),
-    };
-    assert_eq!(sol_grid.to_puzzle_string(), EASY_SOLUTION);
+    let sol = result.solution.unwrap();
+    assert_eq!(parser::to_short_solution(&sol, SHAPE_9X9), EASY_SOLUTION);
     // Easy puzzles should require zero backtracks (pure propagation).
     // Note: backtracks includes the final "solution found" increment,
     // so we check guesses instead.
@@ -56,25 +55,26 @@ fn test_solve_easy() {
 
 #[test]
 fn test_solve_hard() {
-    let mut solver = SudokuBuilder::build(HARD_PUZZLE, &[], SHAPE_9X9).unwrap();
-    let result = solver.solve(&mut |_| {});
+    let parsed = parser::parse(HARD_PUZZLE).unwrap();
+    let mut solver = SudokuBuilder::build(&parsed).unwrap();
+    let result = solver.nth_solution(0, &mut |_| {});
     assert!(result.solution.is_some());
-    let sol_grid = Grid {
-        cells: result.solution.unwrap(),
-    };
-    assert_eq!(sol_grid.to_puzzle_string(), HARD_SOLUTION);
+    let sol = result.solution.unwrap();
+    assert_eq!(parser::to_short_solution(&sol, SHAPE_9X9), HARD_SOLUTION);
 }
 
 #[test]
 fn test_solve_impossible() {
-    let mut solver = SudokuBuilder::build(IMPOSSIBLE_PUZZLE, &[], SHAPE_9X9).unwrap();
-    let result = solver.solve(&mut |_| {});
+    let parsed = parser::parse(IMPOSSIBLE_PUZZLE).unwrap();
+    let mut solver = SudokuBuilder::build(&parsed).unwrap();
+    let result = solver.nth_solution(0, &mut |_| {});
     assert!(result.solution.is_none());
 }
 
 #[test]
 fn test_count_solutions_unique() {
-    let mut solver = SudokuBuilder::build(EASY_PUZZLE, &[], SHAPE_9X9).unwrap();
+    let parsed = parser::parse(EASY_PUZZLE).unwrap();
+    let mut solver = SudokuBuilder::build(&parsed).unwrap();
     let (count, _) = solver.count_solutions(0, &mut |_| {});
     assert_eq!(count, 1);
 }
@@ -83,15 +83,81 @@ fn test_count_solutions_unique() {
 fn test_count_solutions_empty_grid() {
     // An empty grid has many solutions.
     let empty = ".".repeat(81);
-    let mut solver = SudokuBuilder::build(&empty, &[], SHAPE_9X9).unwrap();
+    let parsed = parser::parse(&empty).unwrap();
+    let mut solver = SudokuBuilder::build(&parsed).unwrap();
     let (count, _) = solver.count_solutions(10, &mut |_| {});
     assert_eq!(count, 10, "Empty grid should have at least 10 solutions");
 }
 
 #[test]
+fn test_count_solutions_streams_sample() {
+    // Verify that count_solutions sends at least one sample solution
+    // via the progress callback's extra.solutions field.
+    let empty = ".".repeat(81);
+    let parsed = parser::parse(&empty).unwrap();
+    let mut solver = SudokuBuilder::build(&parsed).unwrap();
+    solver.set_progress_frequency(1); // fire every 2 iterations
+
+    let mut samples: Vec<Vec<u8>> = Vec::new();
+    let (count, _) = solver.count_solutions(10, &mut |p| {
+        if let Some(ref extra) = p.extra {
+            if let Some(ref sols) = extra.solutions {
+                for sol in sols {
+                    samples.push(sol.clone());
+                }
+            }
+        }
+    });
+
+    assert_eq!(count, 10);
+    assert!(
+        !samples.is_empty(),
+        "Expected at least one sample solution in progress callbacks"
+    );
+    // Each sample should be 81 values (9×9 grid), all 1-9.
+    for s in &samples {
+        assert_eq!(s.len(), 81, "Sample solution should have 81 values");
+        assert!(
+            s.iter().all(|&v| (1..=9).contains(&v)),
+            "Sample solution values should be 1-9"
+        );
+    }
+}
+
+#[test]
+fn test_estimated_count_streams_sample() {
+    // Verify that estimated_count_solutions sends sample solutions
+    // via the progress callback.
+    let parsed = parser::parse(EASY_PUZZLE).unwrap();
+    let mut solver = SudokuBuilder::build(&parsed).unwrap();
+
+    let mut samples: Vec<Vec<u8>> = Vec::new();
+    let (estimate, num_samples, _) = solver.estimated_count_solutions(5, &mut |p| {
+        if let Some(ref extra) = p.extra {
+            if let Some(ref sols) = extra.solutions {
+                for sol in sols {
+                    samples.push(sol.clone());
+                }
+            }
+        }
+    });
+
+    assert!(estimate > 0.0);
+    assert_eq!(num_samples, 5);
+    assert!(
+        !samples.is_empty(),
+        "Expected at least one sample solution during estimation"
+    );
+    for s in &samples {
+        assert_eq!(s.len(), 81);
+    }
+}
+
+#[test]
 fn test_counters_populated() {
-    let mut solver = SudokuBuilder::build(HARD_PUZZLE, &[], SHAPE_9X9).unwrap();
-    let result = solver.solve(&mut |_| {});
+    let parsed = parser::parse(HARD_PUZZLE).unwrap();
+    let mut solver = SudokuBuilder::build(&parsed).unwrap();
+    let result = solver.nth_solution(0, &mut |_| {});
     assert!(result.counters.constraints_processed > 0);
     assert!(result.counters.values_tried > 0);
 }
@@ -142,26 +208,28 @@ const KILLER_SOLUTION: &str =
 #[test]
 fn test_killer_wikipedia() {
     let cages = wikipedia_killer_cages();
-    let empty = ".".repeat(81);
-    let constraints = cages_to_constraints(&cages);
-    let mut solver = SudokuBuilder::build(&empty, &constraints, SHAPE_9X9).unwrap();
-    let result = solver.solve(&mut |_| {});
+    let parsed = ParsedConstraints {
+        constraints: cages_to_constraints(&cages),
+        shape: SHAPE_9X9,
+    };
+    let mut solver = SudokuBuilder::build(&parsed).unwrap();
+    let result = solver.nth_solution(0, &mut |_| {});
     assert!(
         result.solution.is_some(),
         "Wikipedia killer should have a solution"
     );
-    let sol_grid = Grid {
-        cells: result.solution.unwrap(),
-    };
-    assert_eq!(sol_grid.to_puzzle_string(), KILLER_SOLUTION);
+    let sol = result.solution.unwrap();
+    assert_eq!(parser::to_short_solution(&sol, SHAPE_9X9), KILLER_SOLUTION);
 }
 
 #[test]
 fn test_killer_unique_solution() {
     let cages = wikipedia_killer_cages();
-    let empty = ".".repeat(81);
-    let constraints = cages_to_constraints(&cages);
-    let mut solver = SudokuBuilder::build(&empty, &constraints, SHAPE_9X9).unwrap();
+    let parsed = ParsedConstraints {
+        constraints: cages_to_constraints(&cages),
+        shape: SHAPE_9X9,
+    };
+    let mut solver = SudokuBuilder::build(&parsed).unwrap();
     let (count, _) = solver.count_solutions(2, &mut |_| {});
     assert_eq!(count, 1, "Wikipedia killer should have exactly 1 solution");
 }
@@ -171,15 +239,15 @@ fn test_killer_with_overlap() {
     // Same puzzle with an extra redundant cage.
     let mut cages = wikipedia_killer_cages();
     cages.push((vec![4, 13], 9)); // R1C5,R2C5 sum=9
-    let empty = ".".repeat(81);
-    let constraints = cages_to_constraints(&cages);
-    let mut solver = SudokuBuilder::build(&empty, &constraints, SHAPE_9X9).unwrap();
-    let result = solver.solve(&mut |_| {});
-    assert!(result.solution.is_some());
-    let sol_grid = Grid {
-        cells: result.solution.unwrap(),
+    let parsed = ParsedConstraints {
+        constraints: cages_to_constraints(&cages),
+        shape: SHAPE_9X9,
     };
-    assert_eq!(sol_grid.to_puzzle_string(), KILLER_SOLUTION);
+    let mut solver = SudokuBuilder::build(&parsed).unwrap();
+    let result = solver.nth_solution(0, &mut |_| {});
+    assert!(result.solution.is_some());
+    let sol = result.solution.unwrap();
+    assert_eq!(parser::to_short_solution(&sol, SHAPE_9X9), KILLER_SOLUTION);
 }
 
 // ====================================================================
@@ -191,7 +259,8 @@ fn test_nth_solution_first() {
     // A unique puzzle: nth_solution(0) should return the same as solve().
     let puzzle =
         "53..7....6..195....98....6.8...6...34..8.3..17...2...6.6....28....419..5....8..79";
-    let mut solver = SudokuBuilder::build(puzzle, &[], SHAPE_9X9).unwrap();
+    let parsed = parser::parse(puzzle).unwrap();
+    let mut solver = SudokuBuilder::build(&parsed).unwrap();
     let result = solver.nth_solution(0, &mut |_| {});
     assert!(result.solution.is_some());
     assert_eq!(result.counters.solutions, 1);
@@ -202,7 +271,8 @@ fn test_nth_solution_sequential_forward() {
     // Empty grid has many solutions. Sequential forward should return
     // distinct solutions incrementally.
     let empty = ".".repeat(81);
-    let mut solver = SudokuBuilder::build(&empty, &[], SHAPE_9X9).unwrap();
+    let parsed = parser::parse(&empty).unwrap();
+    let mut solver = SudokuBuilder::build(&parsed).unwrap();
 
     let mut solutions = Vec::new();
     for i in 0..5u64 {
@@ -238,7 +308,8 @@ fn test_nth_solution_past_end() {
     // Unique puzzle: nth_solution(1) should return None.
     let puzzle =
         "53..7....6..195....98....6.8...6...34..8.3..17...2...6.6....28....419..5....8..79";
-    let mut solver = SudokuBuilder::build(puzzle, &[], SHAPE_9X9).unwrap();
+    let parsed = parser::parse(puzzle).unwrap();
+    let mut solver = SudokuBuilder::build(&parsed).unwrap();
     let r0 = solver.nth_solution(0, &mut |_| {});
     assert!(r0.solution.is_some());
     let r1 = solver.nth_solution(1, &mut |_| {});
@@ -251,7 +322,8 @@ fn test_nth_solution_repeated_past_end() {
     // solution should always return None (not re-find earlier solutions).
     let puzzle =
         "53..7....6..195....98....6.8...6...34..8.3..17...2...6.6....28....419..5....8..79";
-    let mut solver = SudokuBuilder::build(puzzle, &[], SHAPE_9X9).unwrap();
+    let parsed = parser::parse(puzzle).unwrap();
+    let mut solver = SudokuBuilder::build(&parsed).unwrap();
 
     let _ = solver.nth_solution(0, &mut |_| {});
     let r1 = solver.nth_solution(1, &mut |_| {});
@@ -272,12 +344,13 @@ fn test_nth_solution_after_solve() {
     // Calling solve() between nth_solution calls should not corrupt
     // the nth_solution sequence.
     let empty = ".".repeat(81);
-    let mut solver = SudokuBuilder::build(&empty, &[], SHAPE_9X9).unwrap();
+    let parsed = parser::parse(&empty).unwrap();
+    let mut solver = SudokuBuilder::build(&parsed).unwrap();
 
     let first = solver.nth_solution(0, &mut |_| {}).solution.unwrap();
 
     // Interleave with solve().
-    let solve_result = solver.solve(&mut |_| {});
+    let solve_result = solver.nth_solution(0, &mut |_| {});
     assert!(solve_result.solution.is_some());
 
     // nth_solution should start fresh (solve cleared resume state).
@@ -292,7 +365,8 @@ fn test_nth_solution_after_solve() {
 fn test_nth_solution_backwards_resets() {
     // After finding solutions 0..4, going back to 0 should work.
     let empty = ".".repeat(81);
-    let mut solver = SudokuBuilder::build(&empty, &[], SHAPE_9X9).unwrap();
+    let parsed = parser::parse(&empty).unwrap();
+    let mut solver = SudokuBuilder::build(&parsed).unwrap();
 
     let first = solver.nth_solution(0, &mut |_| {}).solution.unwrap();
     let _ = solver.nth_solution(1, &mut |_| {});
@@ -312,10 +386,11 @@ fn test_nth_solution_then_solve_works() {
     // (starts fresh, not affected by resume state).
     let puzzle =
         "53..7....6..195....98....6.8...6...34..8.3..17...2...6.6....28....419..5....8..79";
-    let mut solver = SudokuBuilder::build(puzzle, &[], SHAPE_9X9).unwrap();
+    let parsed = parser::parse(puzzle).unwrap();
+    let mut solver = SudokuBuilder::build(&parsed).unwrap();
 
     let _ = solver.nth_solution(0, &mut |_| {});
-    let result = solver.solve(&mut |_| {});
+    let result = solver.nth_solution(0, &mut |_| {});
     assert!(result.solution.is_some());
     assert_eq!(result.counters.solutions, 1);
 }
@@ -327,7 +402,8 @@ fn test_nth_solution_impossible() {
     for _ in 0..79 {
         puzzle.push('.');
     }
-    let mut solver = SudokuBuilder::build(&puzzle, &[], SHAPE_9X9).unwrap();
+    let parsed = parser::parse(&puzzle).unwrap();
+    let mut solver = SudokuBuilder::build(&parsed).unwrap();
     let result = solver.nth_solution(0, &mut |_| {});
     assert!(result.solution.is_none());
 }
@@ -337,7 +413,8 @@ fn test_nth_solution_impossible() {
 #[test]
 fn test_nth_step_first() {
     // The hard puzzle requires guessing, so step 0 should exist.
-    let mut solver = SudokuBuilder::build(HARD_PUZZLE, &[], SHAPE_9X9).unwrap();
+    let parsed = parser::parse(HARD_PUZZLE).unwrap();
+    let mut solver = SudokuBuilder::build(&parsed).unwrap();
     let result = solver.nth_step(0, HashMap::new(), &mut |_| {});
     assert!(result.is_some(), "step 0 should exist for hard puzzle");
 }
@@ -345,7 +422,8 @@ fn test_nth_step_first() {
 #[test]
 fn test_nth_step_sequential() {
     // Sequential forward steps should return results.
-    let mut solver = SudokuBuilder::build(HARD_PUZZLE, &[], SHAPE_9X9).unwrap();
+    let parsed = parser::parse(HARD_PUZZLE).unwrap();
+    let mut solver = SudokuBuilder::build(&parsed).unwrap();
     let mut steps = Vec::new();
     for i in 0..5u64 {
         let result = solver.nth_step(i, HashMap::new(), &mut |_| {});
@@ -359,7 +437,8 @@ fn test_nth_step_sequential() {
 #[test]
 fn test_nth_step_finds_solution() {
     // Stepping through the entire solve should eventually find a solution.
-    let mut solver = SudokuBuilder::build(HARD_PUZZLE, &[], SHAPE_9X9).unwrap();
+    let parsed = parser::parse(HARD_PUZZLE).unwrap();
+    let mut solver = SudokuBuilder::build(&parsed).unwrap();
     let mut found_solution = false;
     for i in 0..1000u64 {
         let result = solver.nth_step(i, HashMap::new(), &mut |_| {});
@@ -380,7 +459,8 @@ fn test_nth_step_finds_solution() {
 fn test_nth_step_finds_contradiction() {
     // Stepping through should encounter at least one contradiction
     // for a hard puzzle.
-    let mut solver = SudokuBuilder::build(HARD_PUZZLE, &[], SHAPE_9X9).unwrap();
+    let parsed = parser::parse(HARD_PUZZLE).unwrap();
+    let mut solver = SudokuBuilder::build(&parsed).unwrap();
     let mut found_contradiction = false;
     for i in 0..200u64 {
         let result = solver.nth_step(i, HashMap::new(), &mut |_| {});
@@ -403,7 +483,8 @@ fn test_nth_step_finds_contradiction() {
 #[test]
 fn test_nth_step_backward_resets() {
     // Going backwards should replay from the start.
-    let mut solver = SudokuBuilder::build(HARD_PUZZLE, &[], SHAPE_9X9).unwrap();
+    let parsed = parser::parse(HARD_PUZZLE).unwrap();
+    let mut solver = SudokuBuilder::build(&parsed).unwrap();
     let first = solver.nth_step(0, HashMap::new(), &mut |_| {}).unwrap();
     let _ = solver.nth_step(1, HashMap::new(), &mut |_| {});
     let _ = solver.nth_step(2, HashMap::new(), &mut |_| {});
@@ -427,7 +508,8 @@ fn test_nth_step_impossible_puzzle() {
     for _ in 0..79 {
         puzzle.push('.');
     }
-    let mut solver = SudokuBuilder::build(&puzzle, &[], SHAPE_9X9).unwrap();
+    let parsed = parser::parse(&puzzle).unwrap();
+    let mut solver = SudokuBuilder::build(&parsed).unwrap();
     for i in 0..100u64 {
         let result = solver.nth_step(i, HashMap::new(), &mut |_| {});
         match result {
@@ -447,7 +529,8 @@ fn test_nth_step_impossible_puzzle() {
 fn test_nth_step_easy_puzzle_solution_only() {
     // An easy puzzle (no guessing needed) should yield a solution step
     // as the first step (or no steps at all if pure propagation).
-    let mut solver = SudokuBuilder::build(EASY_PUZZLE, &[], SHAPE_9X9).unwrap();
+    let parsed = parser::parse(EASY_PUZZLE).unwrap();
+    let mut solver = SudokuBuilder::build(&parsed).unwrap();
     let result = solver.nth_step(0, HashMap::new(), &mut |_| {});
     // Easy puzzle: either no steps (pure propagation, no guesses)
     // or the first step is a solution.
@@ -466,7 +549,8 @@ fn test_nth_step_easy_puzzle_solution_only() {
 #[test]
 fn test_nth_step_interleaves_with_nth_solution() {
     // Switching between nth_solution and nth_step should work correctly.
-    let mut solver = SudokuBuilder::build(HARD_PUZZLE, &[], SHAPE_9X9).unwrap();
+    let parsed = parser::parse(HARD_PUZZLE).unwrap();
+    let mut solver = SudokuBuilder::build(&parsed).unwrap();
 
     // Use nth_solution first.
     let sol = solver.nth_solution(0, &mut |_| {});
@@ -488,7 +572,8 @@ fn test_nth_step_interleaves_with_nth_solution() {
 fn test_nth_step_same_index_always_same_result() {
     // Core correctness property: the same step index must always
     // produce the same output, regardless of navigation history.
-    let mut solver = SudokuBuilder::build(HARD_PUZZLE, &[], SHAPE_9X9).unwrap();
+    let parsed = parser::parse(HARD_PUZZLE).unwrap();
+    let mut solver = SudokuBuilder::build(&parsed).unwrap();
 
     // Get steps 0..5.
     let mut first_pass = Vec::new();
@@ -527,7 +612,8 @@ fn test_nth_step_same_index_always_same_result() {
 #[test]
 fn test_nth_step_has_branch_cells() {
     // For guess steps, branch_cells should be non-empty.
-    let mut solver = SudokuBuilder::build(HARD_PUZZLE, &[], SHAPE_9X9).unwrap();
+    let parsed = parser::parse(HARD_PUZZLE).unwrap();
+    let mut solver = SudokuBuilder::build(&parsed).unwrap();
     let mut found_guess = false;
     for i in 0..100u64 {
         let result = solver.nth_step(i, HashMap::new(), &mut |_| {});
@@ -554,7 +640,8 @@ fn test_nth_step_has_branch_cells() {
 #[test]
 fn test_nth_step_past_end() {
     // After the search is exhausted, further steps should return None.
-    let mut solver = SudokuBuilder::build(HARD_PUZZLE, &[], SHAPE_9X9).unwrap();
+    let parsed = parser::parse(HARD_PUZZLE).unwrap();
+    let mut solver = SudokuBuilder::build(&parsed).unwrap();
     let mut last_step = 0u64;
     for i in 0..10000u64 {
         let result = solver.nth_step(i, HashMap::new(), &mut |_| {});
