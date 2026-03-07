@@ -2958,6 +2958,7 @@ export class FullRank extends SudokuConstraintHandler {
         [firstV, lastV] = [lastV, firstV];
         index = i + 1;
       }
+      if (!firstV) continue;
       const valueIndex = LookupTables.toIndex(firstV);
 
       if (pairBitSets[valueIndex] & lastV) {
