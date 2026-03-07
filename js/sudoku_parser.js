@@ -79,6 +79,37 @@ export class SudokuParser {
       }
     }
 
+    // Merge constraints that share a uniqueness key (e.g. multiple Givens
+    // for the same cell are intersected). Skip for Or composites where
+    // branches are alternatives, not additive.
+    if (parentCompositeClass !== SudokuConstraint.Or) {
+      return this._mergeByUniqueness(result);
+    }
+    return result;
+  }
+
+  static _mergeByUniqueness(constraints) {
+    const keyToIndex = new Map();
+    const result = [];
+
+    for (const constraint of constraints) {
+      const field = constraint.constructor.UNIQUENESS_KEY_FIELD;
+      if (field === null) {
+        result.push(constraint);
+        continue;
+      }
+
+      const mapKey = `${constraint.type}:${constraint[field]}`;
+      if (keyToIndex.has(mapKey)) {
+        const existingIndex = keyToIndex.get(mapKey);
+        result[existingIndex] = constraint.constructor.mergeConstraints(
+          result[existingIndex], constraint);
+      } else {
+        keyToIndex.set(mapKey, result.length);
+        result.push(constraint);
+      }
+    }
+
     return result;
   }
 
