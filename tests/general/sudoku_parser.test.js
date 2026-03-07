@@ -600,4 +600,80 @@ await runTest('parseSolution should return null if no equals sign', () => {
   assert.equal(result, null);
 });
 
+//////////////////////////////////////////////////////////////////////////////
+// Given merging (intersection semantics)
+//////////////////////////////////////////////////////////////////////////////
+
+await runTest('multiple Givens for same cell are intersected', () => {
+  // Two Givens for R1C1: [1,2,3] and [2,3,4] => intersection [2,3].
+  const result = SudokuParser.parseString(
+    '.~R1C1_1_2_3.~R1C1_2_3_4');
+
+  const givens = findConstraints(result, 'Given');
+  const r1c1 = givens.find(g => g.cell === 'R1C1');
+  assert.ok(r1c1, 'should have a Given for R1C1');
+  assert.deepEqual(r1c1.values, [2, 3]);
+  // Only one Given should remain after merging.
+  assert.equal(givens.filter(g => g.cell === 'R1C1').length, 1);
+});
+
+await runTest('identical Givens for same cell merge to same value', () => {
+  const result = SudokuParser.parseString('.~R1C1_5.~R1C1_5');
+
+  const givens = findConstraints(result, 'Given');
+  const r1c1 = givens.find(g => g.cell === 'R1C1');
+  assert.deepEqual(r1c1.values, [5]);
+  assert.equal(givens.filter(g => g.cell === 'R1C1').length, 1);
+});
+
+await runTest('disjoint Givens for same cell intersect to empty', () => {
+  const result = SudokuParser.parseString('.~R1C1_1_2.~R1C1_3_4');
+
+  const givens = findConstraints(result, 'Given');
+  const r1c1 = givens.find(g => g.cell === 'R1C1');
+  assert.ok(r1c1, 'should have a Given for R1C1');
+  assert.deepEqual(r1c1.values, []);
+});
+
+await runTest('Givens for different cells are not merged', () => {
+  const result = SudokuParser.parseString('.~R1C1_1_2_3.~R1C2_4_5_6');
+
+  const givens = findConstraints(result, 'Given');
+  assert.equal(givens.length, 2);
+  assert.deepEqual(givens.find(g => g.cell === 'R1C1').values, [1, 2, 3]);
+  assert.deepEqual(givens.find(g => g.cell === 'R1C2').values, [4, 5, 6]);
+});
+
+await runTest('Givens inside Or branches are not merged', () => {
+  // Or(Given(R1C1, [1,2]), Given(R1C1, [3,4])) - each is a separate branch.
+  const result = SudokuParser.parseString(
+    '.Or.~R1C1_1_2.~R1C1_3_4.End');
+
+  const or = findConstraint(result, 'Or');
+  const givens = findConstraints(or, 'Given');
+  // Both Givens should remain as separate branches.
+  assert.equal(givens.length, 2);
+});
+
+await runTest('Givens inside And are merged', () => {
+  const result = SudokuParser.parseString(
+    '.And.~R1C1_1_2_3.~R1C1_2_3_4.End');
+
+  // And is absorbed by the Container, so the merged Given is at top level.
+  const givens = findConstraints(result, 'Given');
+  const r1c1 = givens.filter(g => g.cell === 'R1C1');
+  assert.equal(r1c1.length, 1);
+  assert.deepEqual(r1c1[0].values, [2, 3]);
+});
+
+await runTest('parseText merges Givens across sections', () => {
+  // Two sections, each providing pencilmark-style Givens for the same cell.
+  const result = SudokuParser.parseText(
+    '.~R1C1_1_2_3\n\n.~R1C1_2_3_4');
+
+  const givens = findConstraints(result, 'Given');
+  const r1c1 = givens.find(g => g.cell === 'R1C1');
+  assert.deepEqual(r1c1.values, [2, 3]);
+});
+
 logSuiteComplete('SudokuParser');

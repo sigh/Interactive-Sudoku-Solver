@@ -138,6 +138,13 @@ export class SudokuConstraintBase {
     return Array.isArray(key) ? key : [key];
   }
 
+  // Merge two constraints with the same uniqueness key.
+  // Default: last one wins. Subclasses can override for custom behavior
+  // (e.g. intersection).
+  static mergeConstraints(existing, incoming) {
+    return incoming;
+  }
+
   // Get the cells associated with this constraints.
   // Mainly for display purposes.
   getCells(shape) {
@@ -2426,6 +2433,12 @@ export class SudokuConstraint {
         const { cellId, values } = shape.parseValueId(valueId);
         yield new this(cellId, ...values);
       }
+    }
+
+    static mergeConstraints(existing, incoming) {
+      const intersected = existing.values.filter(
+        v => incoming.values.includes(v));
+      return new this(existing.cell, ...intersected);
     }
 
     static serialize(constraints) {
