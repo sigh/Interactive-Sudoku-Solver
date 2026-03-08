@@ -106,3 +106,73 @@ impl ConstraintHandler for ValueDependentUniqueValueExclusion {
         "ValueDependentUniqueValueExclusion"
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::handlers::test_util::*;
+
+    fn make_handler(
+        cell: CellIndex,
+        map: Vec<Vec<CellIndex>>,
+    ) -> ValueDependentUniqueValueExclusion {
+        ValueDependentUniqueValueExclusion::new(cell, map)
+    }
+
+    #[test]
+    fn fixed_cell_removes_value_from_mapped_neighbors() {
+        // 4 values. Cell 0 fixed to value 2. Value 2 maps to exclusions [1, 2].
+        let (mut grid, _) = make_grid(1, 4, Some(4));
+        let handler = make_handler(
+            0,
+            vec![
+                vec![],     // value 1 → no exclusions
+                vec![1, 2], // value 2 → exclude cells 1,2
+                vec![],     // value 3
+                vec![],     // value 4
+            ],
+        );
+
+        grid[0] = vm(&[2]); // fixed to value 2
+
+        let mut a = acc();
+        assert!(handler.enforce_consistency(&mut grid, &mut a));
+        assert_eq!(grid[1] & vm(&[2]), CandidateSet::EMPTY);
+        assert_eq!(grid[2] & vm(&[2]), CandidateSet::EMPTY);
+        // Cell 3 unchanged.
+        assert!(grid[3].intersects(vm(&[2])));
+    }
+
+    #[test]
+    fn unfixed_cell_is_no_op() {
+        let (mut grid, _) = make_grid(1, 4, Some(4));
+        let handler = make_handler(0, vec![vec![1], vec![1], vec![1], vec![1]]);
+
+        grid[0] = vm(&[1, 2]);
+        let before = grid[1];
+
+        let mut a = acc();
+        assert!(handler.enforce_consistency(&mut grid, &mut a));
+        assert_eq!(grid[1], before);
+    }
+
+    #[test]
+    fn fail_when_removal_empties_neighbor() {
+        let (mut grid, _) = make_grid(1, 4, Some(4));
+        let handler = make_handler(
+            0,
+            vec![
+                vec![],
+                vec![1], // value 2 → exclude cell 1
+                vec![],
+                vec![],
+            ],
+        );
+
+        grid[0] = vm(&[2]);
+        grid[1] = vm(&[2]); // only value 2, will become empty
+
+        let mut a = acc();
+        assert!(!handler.enforce_consistency(&mut grid, &mut a));
+    }
+}

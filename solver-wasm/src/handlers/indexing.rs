@@ -111,3 +111,269 @@ impl ConstraintHandler for Indexing {
         true
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::handlers::test_util::*;
+
+    #[test]
+    fn restrict_control_cell_to_valid_indices_on_init() {
+        let (mut grid, shape) = make_grid(1, 9, None);
+        let mut handler = Indexing::new(0, vec![1, 2, 3, 4], 3);
+        assert!(init(&mut handler, &mut grid, shape));
+        assert_eq!(grid[0], vm(&[1, 2, 3, 4]));
+    }
+
+    #[test]
+    fn fail_init_if_control_cell_no_values_within_line_length() {
+        let (mut grid, shape) = make_grid(1, 9, None);
+        let mut handler = Indexing::new(0, vec![1, 2, 3, 4], 3);
+        grid[0] = vm(&[9]);
+        assert!(!init(&mut handler, &mut grid, shape));
+    }
+
+    #[test]
+    fn init_non_standard_grid() {
+        let (mut grid, shape) = make_grid(1, 8, None);
+        let mut handler = Indexing::new(0, vec![1, 2, 3, 4, 5, 6], 5);
+        assert!(init(&mut handler, &mut grid, shape));
+        assert_eq!(grid[0], vm(&[1, 2, 3, 4, 5, 6]));
+    }
+
+    #[test]
+    fn init_clamp_pre_restricted_control_cell() {
+        let (mut grid, shape) = make_grid(1, 9, None);
+        let mut handler = Indexing::new(0, vec![1, 2, 3, 4], 3);
+        grid[0] = vm(&[2, 4, 9]);
+        assert!(init(&mut handler, &mut grid, shape));
+        assert_eq!(grid[0], vm(&[2, 4]));
+    }
+
+    #[test]
+    fn init_restrict_to_1_for_single_indexed_cell() {
+        let (mut grid, shape) = make_grid(1, 4, None);
+        let mut handler = Indexing::new(0, vec![1], 3);
+        assert!(init(&mut handler, &mut grid, shape));
+        assert_eq!(grid[0], vm(&[1]));
+    }
+
+    #[test]
+    fn init_noop_when_line_length_equals_num_values() {
+        let (mut grid, shape) = make_grid(2, 3, Some(5));
+        let mut handler = Indexing::new(0, vec![1, 2, 3, 4, 5], 3);
+        assert!(init(&mut handler, &mut grid, shape));
+        assert_eq!(grid[0], vm(&[1, 2, 3, 4, 5]));
+    }
+
+    #[test]
+    fn prune_control_cell_when_indexed_cell_cannot_have_value() {
+        let (mut grid, shape) = make_grid(1, 5, None);
+        let mut handler = Indexing::new(0, vec![1, 2, 3, 4], 3);
+        init(&mut handler, &mut grid, shape);
+
+        grid[0] = vm(&[1, 2, 3, 4]);
+        grid[1] = vm(&[1, 2]); // no 3
+        grid[2] = vm(&[3, 4]); // has 3
+        grid[3] = vm(&[1, 2]); // no 3
+        grid[4] = vm(&[2, 3]); // has 3
+        let mut a = acc();
+        assert!(handler.enforce_consistency(&mut grid, &mut a));
+        assert_eq!(grid[0], vm(&[2, 4]));
+    }
+
+    #[test]
+    fn remove_indexed_value_from_cells_not_selected() {
+        let (mut grid, shape) = make_grid(1, 5, None);
+        let mut handler = Indexing::new(0, vec![1, 2, 3, 4], 3);
+        init(&mut handler, &mut grid, shape);
+
+        grid[0] = vm(&[2]); // control fixed to 2
+        grid[1] = vm(&[1, 2, 3]); // indexed[0] has 3 but control != 1
+        grid[2] = vm(&[3, 4]); // indexed[1] selected (control=2)
+        grid[3] = vm(&[1, 3]); // indexed[2] has 3 but control != 3
+        grid[4] = vm(&[2, 3]); // indexed[3] has 3 but control != 4
+        let mut a = acc();
+        assert!(handler.enforce_consistency(&mut grid, &mut a));
+        assert_eq!(grid[1], vm(&[1, 2]));
+        assert_eq!(grid[2], vm(&[3, 4]));
+        assert_eq!(grid[3], vm(&[1]));
+        assert_eq!(grid[4], vm(&[2]));
+    }
+
+    #[test]
+    fn fail_when_control_has_no_valid_options() {
+        let (mut grid, shape) = make_grid(1, 5, None);
+        let mut handler = Indexing::new(0, vec![1, 2, 3, 4], 3);
+        init(&mut handler, &mut grid, shape);
+
+        grid[0] = vm(&[1, 2, 3, 4]);
+        grid[1] = vm(&[1, 2]); // no 3
+        grid[2] = vm(&[1, 4]); // no 3
+        grid[3] = vm(&[1, 2]); // no 3
+        grid[4] = vm(&[2, 4]); // no 3
+        let mut a = acc();
+        assert!(!handler.enforce_consistency(&mut grid, &mut a));
+    }
+
+    #[test]
+    fn fail_when_removal_empties_indexed_cell() {
+        let (mut grid, shape) = make_grid(1, 5, None);
+        let mut handler = Indexing::new(0, vec![1, 2, 3, 4], 3);
+        init(&mut handler, &mut grid, shape);
+
+        grid[0] = vm(&[2]); // control fixed to 2
+        grid[1] = vm(&[3]); // forced to 3 but control != 1
+        grid[2] = vm(&[3]); // indexed[1] selected
+        grid[3] = vm(&[3]); // forced to 3 but control != 3
+        grid[4] = vm(&[3]); // forced to 3 but control != 4
+        let mut a = acc();
+        assert!(!handler.enforce_consistency(&mut grid, &mut a));
+    }
+
+    #[test]
+    fn fewer_indexed_cells_than_num_values() {
+        let (mut grid, shape) = make_grid(1, 8, None);
+        let mut handler = Indexing::new(0, vec![1, 2, 3, 4, 5, 6], 5);
+        init(&mut handler, &mut grid, shape);
+
+        grid[0] = vm(&[1, 2, 3, 4, 5, 6, 7, 8]);
+        grid[1] = vm(&[1, 2, 3, 4, 5]); // has 5
+        grid[2] = vm(&[1, 2, 3, 4]); // no 5
+        grid[3] = vm(&[5, 6, 7, 8]); // has 5
+        grid[4] = vm(&[1, 2, 3]); // no 5
+        grid[5] = vm(&[4, 5, 6]); // has 5
+        grid[6] = vm(&[7, 8]); // no 5
+                               // Re-initialize to restrict control cell
+        let (mut grid2, shape2) = make_grid(1, 8, None);
+        let mut handler2 = Indexing::new(0, vec![1, 2, 3, 4, 5, 6], 5);
+        assert!(init(&mut handler2, &mut grid2, shape2));
+
+        grid2[0] = vm(&[1, 2, 3, 4, 5, 6]);
+        grid2[1] = vm(&[1, 2, 3, 4, 5]);
+        grid2[2] = vm(&[1, 2, 3, 4]);
+        grid2[3] = vm(&[5, 6, 7, 8]);
+        grid2[4] = vm(&[1, 2, 3]);
+        grid2[5] = vm(&[4, 5, 6]);
+        grid2[6] = vm(&[7, 8]);
+        let mut a = acc();
+        assert!(handler2.enforce_consistency(&mut grid2, &mut a));
+        assert_eq!(grid2[0], vm(&[1, 3, 5]));
+    }
+
+    #[test]
+    fn more_indexed_cells_than_num_values() {
+        let (mut grid, shape) = make_grid(2, 5, Some(6));
+        let mut handler = Indexing::new(0, vec![1, 2, 3, 4, 5, 6, 7, 8], 4);
+        init(&mut handler, &mut grid, shape);
+
+        grid[0] = vm(&[1, 2, 3, 4, 5, 6]);
+        grid[1] = vm(&[4]); // has 4
+        grid[2] = vm(&[1, 2, 3]); // no 4
+        grid[3] = vm(&[1, 2, 3]); // no 4
+        grid[4] = vm(&[1, 2, 3]); // no 4
+        grid[5] = vm(&[4, 5, 6]); // has 4
+        grid[6] = vm(&[1, 2, 3]); // no 4
+        grid[7] = vm(&[1, 2, 3]); // no 4
+        grid[8] = vm(&[1, 2, 3]); // no 4
+        let mut a = acc();
+        assert!(handler.enforce_consistency(&mut grid, &mut a));
+        assert_eq!(grid[0], vm(&[1, 5]));
+    }
+
+    #[test]
+    fn prune_indexed_cells_based_on_control() {
+        let (mut grid, shape) = make_grid(1, 5, None);
+        let mut handler = Indexing::new(0, vec![1, 2, 3, 4], 3);
+        init(&mut handler, &mut grid, shape);
+
+        grid[0] = vm(&[1, 3]);
+        grid[1] = vm(&[1, 2, 3]); // indexed[0] - control=1 possible
+        grid[2] = vm(&[1, 2, 3]); // indexed[1] - control=2 NOT possible
+        grid[3] = vm(&[1, 2, 3]); // indexed[2] - control=3 possible
+        grid[4] = vm(&[1, 2, 3]); // indexed[3] - control=4 NOT possible
+        let mut a = acc();
+        assert!(handler.enforce_consistency(&mut grid, &mut a));
+        assert_eq!(grid[1], vm(&[1, 2, 3])); // indexed[0] keeps 3
+        assert_eq!(grid[2], vm(&[1, 2])); // indexed[1] loses 3
+        assert_eq!(grid[3], vm(&[1, 2, 3])); // indexed[2] keeps 3
+        assert_eq!(grid[4], vm(&[1, 2])); // indexed[3] loses 3
+    }
+
+    // ================================
+    // NumberedRoom-style (control in indexedCells)
+    // ================================
+
+    #[test]
+    fn control_in_indexed_cells_init() {
+        let (mut grid, shape) = make_grid(1, 9, None);
+        let cells: Vec<CellIndex> = (0..4).collect();
+        let mut handler = Indexing::new(cells[0], cells.clone(), 7);
+        assert!(init(&mut handler, &mut grid, shape));
+        assert_eq!(grid[0], vm(&[1, 2, 3, 4]));
+    }
+
+    #[test]
+    fn control_in_indexed_cells_prune_control() {
+        let (mut grid, shape) = make_grid(1, 4, None);
+        let cells: Vec<CellIndex> = (0..4).collect();
+        let mut handler = Indexing::new(cells[0], cells.clone(), 3);
+        init(&mut handler, &mut grid, shape);
+
+        grid[0] = vm(&[1, 2, 3, 4]);
+        grid[1] = vm(&[1, 2]); // if N=2, cell[1] must be 3, but can't
+        grid[2] = vm(&[1, 3]); // allows 3 (N=3 possible)
+        grid[3] = vm(&[3, 4]); // allows 3 (N=4 possible)
+        let mut a = acc();
+        assert!(handler.enforce_consistency(&mut grid, &mut a));
+        assert_eq!(grid[0], vm(&[1, 3, 4]));
+    }
+
+    #[test]
+    fn control_in_indexed_cells_remove_from_non_selected() {
+        let (mut grid, shape) = make_grid(1, 4, None);
+        let cells: Vec<CellIndex> = (0..4).collect();
+        let mut handler = Indexing::new(cells[0], cells.clone(), 2);
+        init(&mut handler, &mut grid, shape);
+
+        grid[0] = vm(&[3]); // N fixed to 3 (selects cells[2])
+        grid[1] = vm(&[1, 2, 4]); // has 2 but cannot be selected (N!=2)
+        grid[2] = vm(&[2, 3]); // selected (N=3)
+        grid[3] = vm(&[2, 4]); // has 2 but cannot be selected (N!=4)
+        let mut a = acc();
+        assert!(handler.enforce_consistency(&mut grid, &mut a));
+        assert_eq!(grid[1], vm(&[1, 4]));
+        assert_eq!(grid[2], vm(&[2, 3]));
+        assert_eq!(grid[3], vm(&[4]));
+    }
+
+    #[test]
+    fn control_in_indexed_cells_fail_forced_in_non_selected() {
+        let (mut grid, shape) = make_grid(1, 4, None);
+        let cells: Vec<CellIndex> = (0..4).collect();
+        let mut handler = Indexing::new(cells[0], cells.clone(), 2);
+        init(&mut handler, &mut grid, shape);
+
+        grid[0] = vm(&[3]); // N=3
+        grid[1] = vm(&[2]); // forced to indexed value, but N!=2
+        grid[2] = vm(&[1, 2, 3, 4]); // selected
+        grid[3] = vm(&[1, 2, 3, 4]);
+        let mut a = acc();
+        assert!(!handler.enforce_consistency(&mut grid, &mut a));
+    }
+
+    #[test]
+    fn control_in_indexed_cells_fail_no_index_compatible() {
+        let (mut grid, shape) = make_grid(1, 4, None);
+        let cells: Vec<CellIndex> = (0..4).collect();
+        let mut handler = Indexing::new(cells[0], cells.clone(), 4);
+        init(&mut handler, &mut grid, shape);
+
+        grid[0] = vm(&[1, 2, 3]); // can't be 4
+        grid[1] = vm(&[1, 2, 3]); // no 4
+        grid[2] = vm(&[1, 2, 3]); // no 4
+        grid[3] = vm(&[1, 2, 3]); // no 4
+        let mut a = acc();
+        assert!(!handler.enforce_consistency(&mut grid, &mut a));
+    }
+}

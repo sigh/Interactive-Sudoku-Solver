@@ -29,3 +29,16 @@ impl ConstraintHandler for Placeholder {
         true
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::handlers::test_util::*;
+
+    #[test]
+    fn enforce_returns_true() {
+        let handler = Placeholder;
+        let (mut grid, _) = make_grid(1, 4, None);
+        assert!(handler.enforce_consistency(&mut grid, &mut acc()));
+    }
+}

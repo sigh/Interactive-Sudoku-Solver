@@ -36,7 +36,7 @@ impl SudokuBuilder {
     /// handlers and constructs the solver. The solver creates its own
     /// initial grid internally.
     pub fn build(parsed: &ParsedConstraints) -> Result<Solver, String> {
-        let handlers = Self::create_handlers(&parsed.constraints, parsed.shape);
+        let handlers = Self::create_handlers(&parsed.constraints, parsed.shape)?;
         Solver::from_handlers(handlers, parsed.shape)
     }
 
@@ -44,7 +44,7 @@ impl SudokuBuilder {
     fn create_handlers(
         constraints: &[Constraint],
         shape: GridShape,
-    ) -> Vec<Box<dyn ConstraintHandler>> {
+    ) -> Result<Vec<Box<dyn ConstraintHandler>>, String> {
         let mut handlers: Vec<Box<dyn ConstraintHandler>> = Vec::new();
 
         // Standard houses: rows + columns.
@@ -67,10 +67,10 @@ impl SudokuBuilder {
 
         // Constraint-specific handlers.
         for constraint in constraints {
-            Self::constraint_handlers(constraint, constraints, &mut handlers, shape);
+            Self::constraint_handlers(constraint, constraints, &mut handlers, shape)?;
         }
 
-        handlers
+        Ok(handlers)
     }
 
     /// Add AllDifferent handlers for rows and columns.
@@ -125,7 +125,7 @@ impl SudokuBuilder {
         all_constraints: &[Constraint],
         handlers: &mut Vec<Box<dyn ConstraintHandler>>,
         shape: GridShape,
-    ) {
+    ) -> Result<(), String> {
         match constraint {
             Constraint::Given { cell, values } => {
                 let cell = resolve_cell_id(cell, shape);
@@ -156,9 +156,7 @@ impl SudokuBuilder {
 
             Constraint::Diagonal { direction } => {
                 if !shape.is_square() {
-                    // JS throws InvalidConstraintError; in Rust, add a False
-                    // handler so the puzzle correctly reports no solutions.
-                    handlers.push(Box::new(False::new(vec![0])));
+                    return Err("Diagonal requires a square grid".to_string());
                 } else {
                     // Use actual grid dimensions, not num_values.
                     // Mirrors JS: for (let r = 0; r < shape.numRows; r++)
@@ -204,10 +202,9 @@ impl SudokuBuilder {
             }
 
             Constraint::LittleKiller { sum, arrow_cell } => {
-                if let Ok(cells) = expand_little_killer_diagonal(arrow_cell, shape) {
-                    if cells.len() >= 2 {
-                        handlers.push(Box::new(Sum::new(cells, *sum, None)));
-                    }
+                let cells = expand_little_killer_diagonal(arrow_cell, shape)?;
+                if cells.len() >= 2 {
+                    handlers.push(Box::new(Sum::new(cells, *sum, None)));
                 }
             }
 
@@ -424,6 +421,9 @@ impl SudokuBuilder {
             }
 
             Constraint::Windoku => {
+                if !shape.is_square() {
+                    return Err("Windoku requires a square grid".to_string());
+                }
                 let effective_size = Self::get_effective_box_size(all_constraints);
                 for cells in Self::windoku_regions(shape, effective_size) {
                     handlers.push(Box::new(AllDifferent::new(
@@ -434,6 +434,9 @@ impl SudokuBuilder {
             }
 
             Constraint::DisjointSets => {
+                if !shape.is_square() {
+                    return Err("Disjoint Sets requires a square grid".to_string());
+                }
                 let effective_size = Self::get_effective_box_size(all_constraints);
                 for cells in Self::disjoint_set_regions(shape, effective_size) {
                     handlers.push(Box::new(AllDifferent::new(
@@ -446,11 +449,11 @@ impl SudokuBuilder {
             Constraint::PillArrow { pill_size, cells } => {
                 let pill_size = *pill_size as usize;
                 if pill_size != 2 && pill_size != 3 {
-                    return; // Invalid pill size.
+                    return Err("Pill size must be 2 or 3".to_string());
                 }
                 let mut cells = resolve_cells(cells, shape);
                 if cells.len() <= pill_size {
-                    return;
+                    return Err("Pill Arrow must have more cells than the pill size".to_string());
                 }
 
                 // Sort pill cells (first N) by index for reading order.
@@ -522,6 +525,9 @@ impl SudokuBuilder {
             }
 
             Constraint::Entropic { cells } => {
+                if shape.num_values != 9 {
+                    return Err("Entropic Line requires exactly 9 values".to_string());
+                }
                 let cells = resolve_cells(cells, shape);
                 let nv = shape.num_values;
                 let key = crate::handlers::fn_to_binary_key(
@@ -610,19 +616,20 @@ impl SudokuBuilder {
 
                 // Validate gridSpec matches the puzzle shape.
                 if *grid_spec != shape.name() {
-                    // JS throws InvalidConstraintError.
-                    handlers.push(Box::new(False::new(vec![0])));
-                    return;
+                    return Err(format!(
+                        "Jigsaw grid spec '{}' does not match puzzle shape '{}'",
+                        grid_spec,
+                        shape.name()
+                    ));
                 }
 
                 // Validate region size.
                 let region_size = Self::get_effective_box_size(all_constraints)
                     .unwrap_or(shape.num_values) as usize;
                 if cells.len() != region_size {
-                    // JS makeFromArgs simply doesn't yield constraints for
-                    // non-standard sized regions (e.g. the "background" region
-                    // in a Squishdoku jigsaw layout). Skip without False.
-                    return;
+                    return Err(format!(
+                        "Jigsaw pieces must have {} cells for the current shape",
+                        region_size));
                 }
 
                 handlers.push(Box::new(AllDifferent::new(
@@ -747,6 +754,9 @@ impl SudokuBuilder {
             }
 
             Constraint::GlobalEntropy => {
+                if shape.num_values != 9 {
+                    return Err("Global Entropy requires exactly 9 values".to_string());
+                }
                 // One LocalEntropy handler per 2×2 region.
                 // Mirrors JS: `for (const cells of SudokuConstraintBase.square2x2Regions(shape))`
                 for cells in Self::square_2x2_regions(shape) {
@@ -928,7 +938,7 @@ impl SudokuBuilder {
                 let sum = *value;
                 if let Some(cells) = expand_outside_line(arrow_id, shape) {
                     if cells.is_empty() {
-                        return;
+                        return Ok(());
                     }
                     let control = cells[0];
 
@@ -938,7 +948,7 @@ impl SudokuBuilder {
                             control,
                             CandidateSet::from_value(1),
                         )])));
-                        return;
+                        return Ok(());
                     }
 
                     let mut or_handlers: Vec<Box<dyn ConstraintHandler>> = Vec::new();
@@ -966,6 +976,9 @@ impl SudokuBuilder {
             }
 
             Constraint::FullRank { arrow_id, value } => {
+                if !shape.is_square() {
+                    return Err("Full Rank requires a square grid".to_string());
+                }
                 // Mirrors JS `case 'FullRank'` in sudoku_builder.js.
                 // Each FullRank constraint becomes a single-clue FullRank handler.
                 // The optimizer's optimize_full_rank() merges all handlers into one.
@@ -983,6 +996,9 @@ impl SudokuBuilder {
             }
 
             Constraint::FullRankTies { ties } => {
+                if !shape.is_square() {
+                    return Err("Full Rank requires a square grid".to_string());
+                }
                 // Mirrors JS `case 'FullRankTies'`: creates a FullRank handler
                 // with no clues, just to carry the tie mode into the optimizer.
                 let tie_mode = parse_tie_mode(ties);
@@ -997,11 +1013,11 @@ impl SudokuBuilder {
                     .map(|group| {
                         let mut gh: Vec<Box<dyn ConstraintHandler>> = Vec::new();
                         for c in group {
-                            Self::constraint_handlers(c, all_constraints, &mut gh, shape);
+                            Self::constraint_handlers(c, all_constraints, &mut gh, shape)?;
                         }
-                        Box::new(And::new(gh)) as Box<dyn ConstraintHandler>
+                        Ok(Box::new(And::new(gh)) as Box<dyn ConstraintHandler>)
                     })
-                    .collect();
+                    .collect::<Result<Vec<_>, String>>()?;
                 if !or_handlers.is_empty() {
                     handlers.push(Box::new(Or::new(or_handlers)));
                 }
@@ -1010,10 +1026,11 @@ impl SudokuBuilder {
             Constraint::And { constraints: inner } => {
                 // All inner constraints must be satisfied — just flatten them.
                 for c in inner {
-                    Self::constraint_handlers(c, all_constraints, handlers, shape);
+                    Self::constraint_handlers(c, all_constraints, handlers, shape)?;
                 }
             }
         }
+        Ok(())
     }
 
     /// Add AllDifferent handlers for pairs of cells related by an exclusion
@@ -1493,16 +1510,17 @@ mod tests {
         let _puzzle =
             ".................................................................................";
         // Without NoBoxes: 28 handlers (9 rows + 9 cols + 9 boxes + 1 BoxInfo).
-        let handlers = SudokuBuilder::create_handlers(&[], SHAPE_9X9);
+        let handlers = SudokuBuilder::create_handlers(&[], SHAPE_9X9).unwrap();
         assert_eq!(handlers.len(), 28);
         // With NoBoxes: 19 handlers (9 rows + 9 cols + 1 BoxInfo with empty regions).
-        let handlers = SudokuBuilder::create_handlers(&[Constraint::NoBoxes], SHAPE_9X9);
+        let handlers = SudokuBuilder::create_handlers(&[Constraint::NoBoxes], SHAPE_9X9).unwrap();
         assert_eq!(handlers.len(), 19);
     }
 
     #[test]
     fn test_anti_knight_handler_count() {
-        let handlers = SudokuBuilder::create_handlers(&[Constraint::AntiKnight], SHAPE_9X9);
+        let handlers =
+            SudokuBuilder::create_handlers(&[Constraint::AntiKnight], SHAPE_9X9).unwrap();
         // 27 house handlers + knight-move pairs.
         // Each cell has up to 8 knight-move neighbors; we add only half (4
         // offsets per cell that are one-directional). Not all cells have all 4
@@ -1527,7 +1545,8 @@ mod tests {
             result.solution.is_some(),
             "Hailstone puzzle should have a solution"
         );
-        let sol_str = crate::constraint::parser::to_short_solution(&result.solution.unwrap(), parsed.shape);
+        let sol_str =
+            crate::constraint::parser::to_short_solution(&result.solution.unwrap(), parsed.shape);
         assert_eq!(
             sol_str,
             "815432976763918245942567318278351694154896732396274581437685129681729453529143867"

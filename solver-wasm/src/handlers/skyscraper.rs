@@ -1,6 +1,6 @@
-//! Skyscraper and HiddenSkyscraper constraint handlers.
+//! Skyscraper constraint handler.
 //!
-//! Mirrors JS `Skyscraper` and `HiddenSkyscraper` (handlers.js ~L1187, ~L1367).
+//! Mirrors JS `Skyscraper` (handlers.js ~L1187).
 
 use std::cell::RefCell;
 
@@ -74,8 +74,11 @@ impl ConstraintHandler for Skyscraper {
         // Terminal mask: max height must be at least num_cells (the minimum
         // possible maximum value with num_cells distinct values from 1..numValues).
         // terminal_mask = (1 << num_values) - (1 << (num_cells - 1))
+        // JS uses signed 32-bit arithmetic here; when num_cells > num_values
+        // the result is negative, which effectively disables the constraint.
+        // We match JS semantics with wrapping arithmetic + u16 truncation.
         self.terminal_mask =
-            ((1u32 << num_values) - (1u32 << (num_cells - 1))) as u16;
+            ((1i32 << num_values).wrapping_sub(1i32 << (num_cells - 1))) as u16;
 
         // Allocate the combined forward+backward scratch buffer.
         let buf_size = num_cells * 2 * self.num_visible;
@@ -84,7 +87,11 @@ impl ConstraintHandler for Skyscraper {
         true
     }
 
-    fn enforce_consistency(&self, grid: &mut [CandidateSet], _acc: &mut HandlerAccumulator) -> bool {
+    fn enforce_consistency(
+        &self,
+        grid: &mut [CandidateSet],
+        _acc: &mut HandlerAccumulator,
+    ) -> bool {
         let cells = &self.cells;
         let target = self.num_visible;
         let num_cells = cells.len();
@@ -238,162 +245,435 @@ impl ConstraintHandler for Skyscraper {
 }
 
 // ============================================================================
-// HiddenSkyscraper
+// Tests
 // ============================================================================
 
-/// The first "hidden" skyscraper constraint: the `first_hidden_value`
-/// must be the first value in the sequence that is hidden (obscured by
-/// a taller building before it).
-///
-/// Mirrors JS `HiddenSkyscraper`.
-pub struct HiddenSkyscraper {
-    cells: Vec<CellIndex>,
-    /// The target value bitmask (single bit for the hidden value).
-    target_v: CandidateSet,
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::handlers::test_util::*;
 
-impl HiddenSkyscraper {
-    pub fn new(cells: Vec<CellIndex>, first_hidden_value: u8) -> Self {
-        HiddenSkyscraper {
-            cells,
-            target_v: CandidateSet::from_value(first_hidden_value),
-        }
-    }
-}
-
-impl ConstraintHandler for HiddenSkyscraper {
-    fn cells(&self) -> &[CellIndex] {
-        &self.cells
+    #[test]
+    fn skyscraper_init_valid_visibility() {
+        let cells: Vec<CellIndex> = (0..4).collect();
+        let mut handler = Skyscraper::new(cells, 2);
+        let (mut grid, shape) = make_grid(1, 4, None);
+        assert!(init(&mut handler, &mut grid, shape));
     }
 
-    fn initialize(
-        &mut self,
-        initial_grid: &mut [CandidateSet],
-        _cell_exclusions: &CellExclusions,
-        _shape: GridShape,
-        _state_allocator: &mut GridStateAllocator,
-    ) -> bool {
-        // The first cell is always visible, so it can never be the hidden value.
-        // Mirrors JS: `if (!(initialGridCells[this.cells[0]] &= ~this._targetV)) return false;`
-        let c0 = self.cells[0] as usize;
-        let new_v = initial_grid[c0] & !self.target_v;
-        if new_v.is_empty() {
-            return false;
-        }
-        initial_grid[c0] = new_v;
-        true
+    #[test]
+    fn skyscraper_fail_init_visibility_gt_num_cells() {
+        let cells: Vec<CellIndex> = (0..4).collect();
+        let mut handler = Skyscraper::new(cells, 5);
+        let (mut grid, shape) = make_grid(1, 4, None);
+        assert!(!init(&mut handler, &mut grid, shape));
     }
 
-    fn enforce_consistency(&self, grid: &mut [CandidateSet], acc: &mut HandlerAccumulator) -> bool {
-        let cells = &self.cells;
-        let num_cells = cells.len();
-        let target_v = self.target_v;
-        let target_raw = target_v.raw();
-
-        // Mask of values strictly higher than target_v.
-        // JS: `const moreThanTarget = -targetV << 1`
-        let more_than_target = target_raw.wrapping_neg().wrapping_shl(1);
-
-        // The first cell is always visible.
-        let mut allowed_skyscrapers = grid[cells[0] as usize].raw();
-        let mut i = 1usize;
-        let mut first_target_index = 0usize;
-
-        while i < num_cells {
-            let cell = cells[i];
-            let mut v = grid[cell as usize].raw();
-
-            // Mask of values strictly above the minimum of allowedSkyscrapers.
-            let low_allowed = allowed_skyscrapers & allowed_skyscrapers.wrapping_neg();
-            let allowed_mask = low_allowed.wrapping_neg().wrapping_shl(1);
-
-            if first_target_index == 0 {
-                // Haven't found the target yet.
-                if v & target_raw != 0 {
-                    if allowed_skyscrapers & more_than_target != 0 {
-                        // Target is valid at this position.
-                        first_target_index = i;
-                    } else {
-                        // Can't place target here — remove it.
-                        v &= !target_raw;
-                    }
-                }
-                // Only allow values higher than the current max, plus the target.
-                v &= allowed_mask | target_raw;
-            }
-
-            if grid[cell as usize].raw() != v {
-                if v == 0 {
-                    return false;
-                }
-                grid[cell as usize] = CandidateSet::from_raw(v);
-                acc.add_for_cell(cell);
-            }
-
-            // Update allowed skyscrapers: non-target values higher than the current max.
-            allowed_skyscrapers = v & !target_raw & allowed_mask;
-
-            if allowed_skyscrapers == 0 {
-                break;
-            }
-            i += 1;
-        }
-
-        // If we never found a valid position for the target, fail.
-        if first_target_index == 0 {
-            return false;
-        }
-
-        // Clear the target from all cells after first_target_index.
-        let mut k = i + 1;
-        while k < num_cells {
-            let cell = cells[k];
-            if grid[cell as usize].raw() & target_raw != 0 {
-                let new_v = grid[cell as usize].raw() & !target_raw;
-                if new_v == 0 {
-                    return false;
-                }
-                grid[cell as usize] = CandidateSet::from_raw(new_v);
-                acc.add_for_cell(cell);
-            }
-            k += 1;
-        }
-
-        // Backward pass: filter out early values that grow too fast to allow
-        // the target to be reachable. JS sets `allowedSkyscrapers = -1`
-        // (all bits set) which in Rust u16 is u16::MAX, meaning all values
-        // are allowed from the end.
-        let mut allowed_skyscrapers: u16 = u16::MAX;
-        let mut j = first_target_index as isize - 1;
-        while j >= 0 {
-            let v = grid[cells[j as usize] as usize].raw();
-            let new_v = v & allowed_skyscrapers;
-            if new_v != v {
-                if new_v == 0 {
-                    return false;
-                }
-                grid[cells[j as usize] as usize] = CandidateSet::from_raw(new_v);
-                acc.add_for_cell(cells[j as usize]);
-            }
-            // Next allowed: all values strictly below max(new_v).
-            // JS: `(1 << (LookupTables.maxValue(newV) - 1)) - 1`
-            let max_v = CandidateSet::from_raw(new_v).max_value();
-            allowed_skyscrapers = (1u16 << (max_v - 1)).wrapping_sub(1);
-            j -= 1;
-        }
-
-        true
+    #[test]
+    fn skyscraper_allow_visibility_eq_num_cells() {
+        let cells: Vec<CellIndex> = (0..4).collect();
+        let mut handler = Skyscraper::new(cells, 4);
+        let (mut grid, shape) = make_grid(1, 4, None);
+        assert!(init(&mut handler, &mut grid, shape));
     }
 
-    fn name(&self) -> &'static str {
-        "HiddenSkyscraper"
+    #[test]
+    fn skyscraper_visibility_1_requires_max_in_first_cell() {
+        let cells: Vec<CellIndex> = (0..4).collect();
+        let mut handler = Skyscraper::new(cells, 1);
+        let (mut grid, shape) = make_grid(1, 4, None);
+        init(&mut handler, &mut grid, shape);
+
+        for i in 0..4 {
+            grid[i] = vm(&[1, 2, 3, 4]);
+        }
+        let mut a = acc();
+        assert!(handler.enforce_consistency(&mut grid, &mut a));
+        assert_eq!(
+            grid[0],
+            vm(&[4]),
+            "first cell should be forced to max value"
+        );
     }
 
-    fn id_str(&self) -> String {
-        format!(
-            "HiddenSkyscraper-{}-{:?}",
-            self.target_v.min_value(),
-            self.cells
-        )
+    #[test]
+    fn skyscraper_visibility_n_requires_ascending() {
+        let cells: Vec<CellIndex> = (0..4).collect();
+        let mut handler = Skyscraper::new(cells, 4);
+        let (mut grid, shape) = make_grid(1, 4, None);
+        init(&mut handler, &mut grid, shape);
+
+        for i in 0..4 {
+            grid[i] = vm(&[1, 2, 3, 4]);
+        }
+        let mut a = acc();
+        assert!(handler.enforce_consistency(&mut grid, &mut a));
+        assert_eq!(grid[0], vm(&[1]));
+        assert_eq!(grid[1], vm(&[2]));
+        assert_eq!(grid[2], vm(&[3]));
+        assert_eq!(grid[3], vm(&[4]));
+    }
+
+    #[test]
+    fn skyscraper_visibility_2_constrain() {
+        let cells: Vec<CellIndex> = (0..4).collect();
+        let mut handler = Skyscraper::new(cells, 2);
+        let (mut grid, shape) = make_grid(1, 4, None);
+        init(&mut handler, &mut grid, shape);
+
+        grid[0] = vm(&[1, 2, 3]);
+        grid[1] = vm(&[1, 2, 3, 4]);
+        grid[2] = vm(&[1, 2, 3, 4]);
+        grid[3] = vm(&[4]);
+        let mut a = acc();
+        assert!(handler.enforce_consistency(&mut grid, &mut a));
+    }
+
+    #[test]
+    fn skyscraper_forward_pass_visibility_tracking() {
+        let cells: Vec<CellIndex> = (0..4).collect();
+        let mut handler = Skyscraper::new(cells, 2);
+        let (mut grid, shape) = make_grid(1, 4, None);
+        init(&mut handler, &mut grid, shape);
+
+        grid[0] = vm(&[3]);
+        grid[1] = vm(&[1]);
+        grid[2] = vm(&[2]);
+        grid[3] = vm(&[4]);
+        let mut a = acc();
+        assert!(
+            handler.enforce_consistency(&mut grid, &mut a),
+            "[3,1,2,4] should give visibility 2"
+        );
+    }
+
+    #[test]
+    fn skyscraper_fail_when_visibility_cannot_be_achieved() {
+        let cells: Vec<CellIndex> = (0..4).collect();
+        let mut handler = Skyscraper::new(cells, 3);
+        let (mut grid, shape) = make_grid(1, 4, None);
+        init(&mut handler, &mut grid, shape);
+
+        grid[0] = vm(&[4]);
+        grid[1] = vm(&[1, 2, 3]);
+        grid[2] = vm(&[1, 2, 3]);
+        grid[3] = vm(&[1, 2, 3]);
+        let mut a = acc();
+        assert!(
+            !handler.enforce_consistency(&mut grid, &mut a),
+            "should fail when max is first but visibility=3 required"
+        );
+    }
+
+    #[test]
+    fn skyscraper_backward_pass_prune() {
+        let cells: Vec<CellIndex> = (0..4).collect();
+        let mut handler = Skyscraper::new(cells, 2);
+        let (mut grid, shape) = make_grid(1, 4, None);
+        init(&mut handler, &mut grid, shape);
+
+        grid[0] = vm(&[1, 2, 3]);
+        grid[1] = vm(&[1, 2, 3, 4]);
+        grid[2] = vm(&[1, 2, 3, 4]);
+        grid[3] = vm(&[4]);
+        let mut a = acc();
+        assert!(handler.enforce_consistency(&mut grid, &mut a));
+    }
+
+    #[test]
+    fn skyscraper_remove_max_from_cells_after_first_max() {
+        let cells: Vec<CellIndex> = (0..4).collect();
+        let mut handler = Skyscraper::new(cells, 2);
+        let (mut grid, shape) = make_grid(1, 4, None);
+        init(&mut handler, &mut grid, shape);
+
+        grid[0] = vm(&[1, 2, 3]);
+        grid[1] = vm(&[4]);
+        grid[2] = vm(&[1, 2, 3, 4]);
+        grid[3] = vm(&[1, 2, 3, 4]);
+        let mut a = acc();
+        assert!(handler.enforce_consistency(&mut grid, &mut a));
+        assert_eq!(
+            grid[2].raw() & vm(&[4]).raw(),
+            0,
+            "cell 2 should not have 4"
+        );
+        assert_eq!(
+            grid[3].raw() & vm(&[4]).raw(),
+            0,
+            "cell 3 should not have 4"
+        );
+    }
+
+    #[test]
+    fn skyscraper_short_row_init() {
+        let cells: Vec<CellIndex> = (0..6).collect();
+        let mut handler = Skyscraper::new(cells, 2);
+        let (mut grid, shape) = make_grid(1, 6, Some(9));
+        assert!(init(&mut handler, &mut grid, shape));
+    }
+
+    #[test]
+    fn skyscraper_short_row_terminal_height_eq_num_cells() {
+        let cells: Vec<CellIndex> = (0..6).collect();
+        let mut handler = Skyscraper::new(cells, 2);
+        let (mut grid, shape) = make_grid(1, 6, Some(9));
+        init(&mut handler, &mut grid, shape);
+
+        grid[0] = vm(&[5]);
+        grid[1] = vm(&[1]);
+        grid[2] = vm(&[2]);
+        grid[3] = vm(&[3]);
+        grid[4] = vm(&[4]);
+        grid[5] = vm(&[6]);
+        let mut a = acc();
+        assert!(
+            handler.enforce_consistency(&mut grid, &mut a),
+            "should accept terminal height 6 when numCells=6"
+        );
+    }
+
+    #[test]
+    fn skyscraper_short_row_terminal_height_gt_num_cells() {
+        let cells: Vec<CellIndex> = (0..6).collect();
+        let mut handler = Skyscraper::new(cells, 2);
+        let (mut grid, shape) = make_grid(1, 6, Some(9));
+        init(&mut handler, &mut grid, shape);
+
+        grid[0] = vm(&[5]);
+        grid[1] = vm(&[1]);
+        grid[2] = vm(&[2]);
+        grid[3] = vm(&[3]);
+        grid[4] = vm(&[4]);
+        grid[5] = vm(&[9]);
+        let mut a = acc();
+        assert!(
+            handler.enforce_consistency(&mut grid, &mut a),
+            "should accept terminal height 9 when numCells=6"
+        );
+    }
+
+    #[test]
+    fn skyscraper_short_row_visibility_1_first_cell_ge_num_cells() {
+        let cells: Vec<CellIndex> = (0..6).collect();
+        let mut handler = Skyscraper::new(cells, 1);
+        let (mut grid, shape) = make_grid(1, 6, Some(9));
+        init(&mut handler, &mut grid, shape);
+
+        let mut a = acc();
+        assert!(handler.enforce_consistency(&mut grid, &mut a));
+        assert_eq!(
+            grid[0],
+            vm(&[6, 7, 8, 9]),
+            "first cell should only have values >= numCells"
+        );
+    }
+
+    #[test]
+    fn skyscraper_long_row_init() {
+        // 12 cells but only values 1-9
+        let cells: Vec<CellIndex> = (0..12).collect();
+        let mut handler = Skyscraper::new(cells, 2);
+        let (mut grid, shape) = make_grid(3, 4, Some(9));
+        assert!(init(&mut handler, &mut grid, shape));
+    }
+
+    #[test]
+    fn skyscraper_single_cell_visibility_1() {
+        let cells: Vec<CellIndex> = vec![0];
+        let mut handler = Skyscraper::new(cells, 1);
+        let (mut grid, shape) = make_grid(1, 1, Some(4));
+        init(&mut handler, &mut grid, shape);
+
+        let mut a = acc();
+        assert!(handler.enforce_consistency(&mut grid, &mut a));
+    }
+
+    #[test]
+    fn skyscraper_two_cells_visibility_1() {
+        let cells: Vec<CellIndex> = (0..2).collect();
+        let mut handler = Skyscraper::new(cells, 1);
+        let (mut grid, shape) = make_grid(1, 2, Some(4));
+        init(&mut handler, &mut grid, shape);
+
+        let mut a = acc();
+        assert!(handler.enforce_consistency(&mut grid, &mut a));
+        assert_eq!(
+            grid[0],
+            vm(&[2, 3, 4]),
+            "first cell should have values >= numCells"
+        );
+    }
+
+    #[test]
+    fn skyscraper_two_cells_visibility_2() {
+        let cells: Vec<CellIndex> = (0..2).collect();
+        let mut handler = Skyscraper::new(cells, 2);
+        let (mut grid, shape) = make_grid(1, 2, Some(4));
+        init(&mut handler, &mut grid, shape);
+
+        let mut a = acc();
+        assert!(handler.enforce_consistency(&mut grid, &mut a));
+        assert_eq!(grid[0], vm(&[1, 2, 3]), "first cell should be 1,2,3");
+        assert_eq!(
+            grid[1],
+            vm(&[2, 3, 4]),
+            "second cell should be >= 2 (numCells)"
+        );
+    }
+
+    #[test]
+    fn skyscraper_fail_empty_cell() {
+        let cells: Vec<CellIndex> = (0..4).collect();
+        let mut handler = Skyscraper::new(cells, 2);
+        let (mut grid, shape) = make_grid(1, 4, None);
+        init(&mut handler, &mut grid, shape);
+
+        grid[0] = CandidateSet::EMPTY;
+        let mut a = acc();
+        assert!(
+            !handler.enforce_consistency(&mut grid, &mut a),
+            "should fail when a cell is empty"
+        );
+    }
+
+    #[test]
+    fn skyscraper_prune_visibility_1() {
+        let cells: Vec<CellIndex> = (0..4).collect();
+        let mut handler = Skyscraper::new(cells, 1);
+        let (mut grid, shape) = make_grid(1, 4, None);
+        init(&mut handler, &mut grid, shape);
+
+        let mut a = acc();
+        handler.enforce_consistency(&mut grid, &mut a);
+        assert_eq!(grid[0], vm(&[4]), "first cell should be forced to 4");
+        assert_eq!(
+            grid[1].raw() & vm(&[4]).raw(),
+            0,
+            "cell 1 should not have 4"
+        );
+        assert_eq!(
+            grid[2].raw() & vm(&[4]).raw(),
+            0,
+            "cell 2 should not have 4"
+        );
+        assert_eq!(
+            grid[3].raw() & vm(&[4]).raw(),
+            0,
+            "cell 3 should not have 4"
+        );
+    }
+
+    #[test]
+    fn skyscraper_validate_2_4_1_3_visibility_2() {
+        let cells: Vec<CellIndex> = (0..4).collect();
+        let mut handler = Skyscraper::new(cells, 2);
+        let (mut grid, shape) = make_grid(1, 4, None);
+        init(&mut handler, &mut grid, shape);
+
+        grid[0] = vm(&[2]);
+        grid[1] = vm(&[4]);
+        grid[2] = vm(&[1]);
+        grid[3] = vm(&[3]);
+        let mut a = acc();
+        assert!(handler.enforce_consistency(&mut grid, &mut a));
+    }
+
+    #[test]
+    fn skyscraper_validate_1_2_3_4_visibility_4() {
+        let cells: Vec<CellIndex> = (0..4).collect();
+        let mut handler = Skyscraper::new(cells, 4);
+        let (mut grid, shape) = make_grid(1, 4, None);
+        init(&mut handler, &mut grid, shape);
+
+        grid[0] = vm(&[1]);
+        grid[1] = vm(&[2]);
+        grid[2] = vm(&[3]);
+        grid[3] = vm(&[4]);
+        let mut a = acc();
+        assert!(handler.enforce_consistency(&mut grid, &mut a));
+    }
+
+    #[test]
+    fn skyscraper_reject_1_2_3_4_for_visibility_3() {
+        let cells: Vec<CellIndex> = (0..4).collect();
+        let mut handler = Skyscraper::new(cells, 3);
+        let (mut grid, shape) = make_grid(1, 4, None);
+        init(&mut handler, &mut grid, shape);
+
+        grid[0] = vm(&[1]);
+        grid[1] = vm(&[2]);
+        grid[2] = vm(&[3]);
+        grid[3] = vm(&[4]);
+        let mut a = acc();
+        assert!(!handler.enforce_consistency(&mut grid, &mut a));
+    }
+
+    #[test]
+    fn skyscraper_validate_3_2_4_1_visibility_2() {
+        let cells: Vec<CellIndex> = (0..4).collect();
+        let mut handler = Skyscraper::new(cells, 2);
+        let (mut grid, shape) = make_grid(1, 4, None);
+        init(&mut handler, &mut grid, shape);
+
+        grid[0] = vm(&[3]);
+        grid[1] = vm(&[2]);
+        grid[2] = vm(&[4]);
+        grid[3] = vm(&[1]);
+        let mut a = acc();
+        assert!(handler.enforce_consistency(&mut grid, &mut a));
+    }
+
+    #[test]
+    fn skyscraper_9x9_visibility_1_forces_first_to_9() {
+        let cells: Vec<CellIndex> = (0..9).collect();
+        let mut handler = Skyscraper::new(cells, 1);
+        let (mut grid, shape) = make_grid(1, 9, None);
+        init(&mut handler, &mut grid, shape);
+
+        let mut a = acc();
+        assert!(handler.enforce_consistency(&mut grid, &mut a));
+        assert_eq!(grid[0], vm(&[9]));
+    }
+
+    #[test]
+    fn skyscraper_9x9_visibility_9_forces_ascending() {
+        let cells: Vec<CellIndex> = (0..9).collect();
+        let mut handler = Skyscraper::new(cells, 9);
+        let (mut grid, shape) = make_grid(1, 9, None);
+        init(&mut handler, &mut grid, shape);
+
+        let mut a = acc();
+        assert!(handler.enforce_consistency(&mut grid, &mut a));
+        for i in 0..9 {
+            assert_eq!(
+                grid[i],
+                vm(&[i as u8 + 1]),
+                "cell {} should be {}",
+                i,
+                i + 1
+            );
+        }
+    }
+
+    #[test]
+    fn skyscraper_idempotent() {
+        let cells: Vec<CellIndex> = (0..4).collect();
+        let mut handler = Skyscraper::new(cells, 2);
+        let (mut grid, shape) = make_grid(1, 4, None);
+        init(&mut handler, &mut grid, shape);
+
+        grid[0] = vm(&[1, 2, 3]);
+        grid[1] = vm(&[1, 2, 3, 4]);
+        grid[2] = vm(&[1, 2, 3, 4]);
+        grid[3] = vm(&[4]);
+
+        handler.enforce_consistency(&mut grid, &mut acc());
+        let after1: Vec<CandidateSet> = grid.to_vec();
+
+        handler.enforce_consistency(&mut grid, &mut acc());
+        let after2: Vec<CandidateSet> = grid.to_vec();
+
+        assert_eq!(after1, after2, "second call should not change grid");
     }
 }

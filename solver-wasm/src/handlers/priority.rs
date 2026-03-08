@@ -64,3 +64,26 @@ impl ConstraintHandler for Priority {
         "Priority"
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn stores_priority_value() {
+        let handler = Priority::new(vec![0, 1], 42);
+        assert_eq!(handler.priority(), 42);
+    }
+
+    #[test]
+    fn stores_priority_cells() {
+        let handler = Priority::new(vec![3, 5, 7], 10);
+        assert_eq!(handler.priority_cells(), &[3, 5, 7]);
+    }
+
+    #[test]
+    fn has_no_registered_cells() {
+        let handler = Priority::new(vec![0, 1], 5);
+        assert!(handler.cells().is_empty());
+    }
+}

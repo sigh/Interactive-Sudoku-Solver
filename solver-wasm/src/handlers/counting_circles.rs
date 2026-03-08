@@ -278,3 +278,110 @@ impl ConstraintHandler for CountingCircles {
         true
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::handlers::test_util::*;
+
+    #[test]
+    fn init_restricts_to_valid_combinations() {
+        // 3 cells, numValues=4. Sum of values must = 3. Valid combos:
+        // {1,1,1}=mask 0x01, but value-sum per set: just {3}→mask=0x04 gives sum=3,
+        // or {1,2}→1+2=3. So combination masks where sum=3.
+        // bit 0=val 1, bit 1=val 2. mask 0b0100=val 3.
+        let (mut grid, shape) = make_grid(1, 4, Some(4));
+        let ce = CellExclusions::with_num_cells(4);
+        let mut handler = CountingCircles::new(vec![0, 1, 2]);
+        assert!(init_with(&mut handler, &mut grid, shape, &ce));
+        // After init, cells should only have values from valid combination masks.
+        // Value 4 cannot be in any combo with sum 3, so it should be removed.
+        for i in 0..3 {
+            assert_eq!(grid[i] & vm(&[4]), CandidateSet::EMPTY,
+                "cell {} should not contain value 4", i);
+        }
+    }
+
+    #[test]
+    fn fixed_values_filter_combinations() {
+        // 3 cells, numValues=4. Cell 0 fixed to 1.
+        // Sum must be 3. With digit-v-appears-v-times and sum=numCells:
+        // 1 appears 1 time, 2 appears 2 times → {1,2,2} → sum = 1+2+2 = 5 ≠ 3.
+        // Only valid: {1,1,1} → all cells = 1, sum = 3. ← but 1 appears 3 times, need 1 time!
+        // Actually: value 3 appears 0 times. Value sum = numCells = 3.
+        // {3} → 3 appears once, actually need 3 times (digit v appears v times).
+        // Wait, rethinking: mask for sum=3 with numValues=4:
+        //   Individual values: 1+2=3? No, mask must have sum(values_in_mask) = numCells.
+        //   mask {1,2} = bit 0 | bit 1 → sum = 1+2 = 3 ✓
+        //   mask {3} = bit 2 → sum = 3 ✓
+        // The combination masks are just which values CAN appear, not frequencies.
+        let (mut grid, shape) = make_grid(1, 4, Some(4));
+        let ce = CellExclusions::with_num_cells(4);
+        let mut handler = CountingCircles::new(vec![0, 1, 2]);
+        init_with(&mut handler, &mut grid, shape, &ce);
+
+        grid[0] = vm(&[1]); // fixed to 1
+        let mut a = acc();
+        let result = handler.enforce_consistency(&mut grid, &mut a);
+        assert!(result);
+        // After fixing cell 0 to 1, combo {3} is invalidated (doesn't contain 1).
+        // Only combo {1,2} survives. Value 2 must appear twice, and each unfixed
+        // cell has its own exclusion group → both fixed to {2}.
+        assert_eq!(grid[1], vm(&[2]));
+        assert_eq!(grid[2], vm(&[2]));
+    }
+
+    #[test]
+    fn fail_when_no_valid_combination() {
+        // 3 cells, numValues=4. Fix all to 4 → sum=12 ≠ 3.
+        let (mut grid, shape) = make_grid(1, 4, Some(4));
+        let ce = CellExclusions::with_num_cells(4);
+        let mut handler = CountingCircles::new(vec![0, 1, 2]);
+        init_with(&mut handler, &mut grid, shape, &ce);
+
+        grid[0] = vm(&[4]);
+        grid[1] = vm(&[4]);
+        grid[2] = vm(&[4]);
+
+        let mut a = acc();
+        assert!(!handler.enforce_consistency(&mut grid, &mut a));
+    }
+
+    #[test]
+    fn too_many_fixed_values_fail() {
+        // 2 cells, numValues=4. Sum must be 2.
+        // Combo {2}→sum=2, combo {1}+...→sum=1. Only {2} works, but need 2 to appear 2 times.
+        // Fix both to 2 (fixedCount=2, j=2 → exactly right, pass).
+        // Fix both to 1 (fixedCount=2, j=1 → too many → fail).
+        let (mut grid, shape) = make_grid(1, 4, Some(4));
+        let ce = CellExclusions::with_num_cells(4);
+        let mut handler = CountingCircles::new(vec![0, 1]);
+        init_with(&mut handler, &mut grid, shape, &ce);
+
+        grid[0] = vm(&[1]);
+        grid[1] = vm(&[1]);
+
+        let mut a = acc();
+        // Both cells fixed to 1, but value 1 needs to appear exactly 1 time → fail.
+        // Actually: combo filtering first. Combos for sum=2: {2}, {1}+overflow? No: mask with bit-sum=2 = {2}.
+        // Cell 0 fixed to 1, but {2} doesn't contain 1 → allowed_values empty → false.
+        assert!(!handler.enforce_consistency(&mut grid, &mut a));
+    }
+
+    #[test]
+    fn exact_count_fixes_cells() {
+        // 2 cells, numValues=4. Sum=2. Only combo: {2} (sum=2).
+        // Both cells start with {2, ...}, after enforce both should be {2}.
+        let (mut grid, shape) = make_grid(1, 4, Some(4));
+        let ce = CellExclusions::with_num_cells(4);
+        let mut handler = CountingCircles::new(vec![0, 1]);
+        init_with(&mut handler, &mut grid, shape, &ce);
+
+        // After init, allowed values from combos with sum=2: just {2}.
+        // So cells already restricted to {2}. Enforce should confirm both = {2}.
+        let mut a = acc();
+        assert!(handler.enforce_consistency(&mut grid, &mut a));
+        assert_eq!(grid[0], vm(&[2]));
+        assert_eq!(grid[1], vm(&[2]));
+    }
+}

@@ -9,12 +9,12 @@
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 
+use crate::api::types::CellIndex;
 use crate::candidate_set::CandidateSet;
 use crate::grid_shape::GridShape;
 use crate::solver::cell_exclusions::CellExclusions;
 use crate::solver::grid_state_allocator::GridStateAllocator;
 use crate::solver::handler_accumulator::HandlerAccumulator;
-use crate::api::types::CellIndex;
 
 use super::ConstraintHandler;
 use crate::solver::candidate_selector::CandidateFinderDescription;
@@ -611,8 +611,7 @@ impl ConstraintHandler for FullRank {
         self.all_entries = entries;
 
         let mut is_clued = vec![false; self.all_entries.len()];
-        let mut rank_map: HashMap<u16, Vec<RankedGiven>> =
-            HashMap::new();
+        let mut rank_map: HashMap<u16, Vec<RankedGiven>> = HashMap::new();
 
         for clue in &self.clues {
             let value = CandidateSet::from_value(((clue.rank + 3) / 4) as u8);
@@ -719,8 +718,7 @@ impl ConstraintHandler for FullRank {
             // Add a candidate finder for each remaining (uncovered) edge.
             if flags[0] {
                 // Top row (row 0).
-                let cells: Vec<CellIndex> =
-                    (0..num_cols).map(|j| j as CellIndex).collect();
+                let cells: Vec<CellIndex> = (0..num_cols).map(|j| j as CellIndex).collect();
                 finders.push(CandidateFinderDescription::RequiredValue {
                     cells,
                     value,
@@ -766,5 +764,1201 @@ impl ConstraintHandler for FullRank {
 
     fn name(&self) -> &'static str {
         "FullRank"
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::handlers::test_util::*;
+
+    /// Create a 4×4 grid filled with all candidates.
+    fn make_4x4() -> (Vec<CandidateSet>, GridShape) {
+        let shape = GridShape::square(4).unwrap();
+        let all = CandidateSet::all(4);
+        let grid = vec![all; 16];
+        (grid, shape)
+    }
+
+    /// Create a 9×9 grid filled with all candidates.
+    fn make_9x9() -> (Vec<CandidateSet>, GridShape) {
+        let shape = GridShape::default_9x9();
+        let all = CandidateSet::all(9);
+        let grid = vec![all; 81];
+        (grid, shape)
+    }
+
+    // =========================================================================
+    // buildEntries tests
+    // =========================================================================
+
+    #[test]
+    fn build_entries_9x9() {
+        let shape = GridShape::default_9x9();
+        let entries = FullRank::build_entries(shape);
+
+        // 9 rows * 2 + 9 cols * 2 = 36.
+        assert_eq!(entries.len(), 36);
+
+        // First row forward.
+        assert_eq!(entries[0], vec![0, 1, 2, 3, 4, 5, 6, 7, 8]);
+        // First row reversed.
+        assert_eq!(entries[1], vec![8, 7, 6, 5, 4, 3, 2, 1, 0]);
+        // First column forward.
+        assert_eq!(entries[18], vec![0, 9, 18, 27, 36, 45, 54, 63, 72]);
+        // First column reversed.
+        assert_eq!(entries[19], vec![72, 63, 54, 45, 36, 27, 18, 9, 0]);
+    }
+
+    #[test]
+    fn build_entries_4x4() {
+        let shape = GridShape::square(4).unwrap();
+        let entries = FullRank::build_entries(shape);
+
+        assert_eq!(entries.len(), 16);
+        for entry in &entries {
+            assert_eq!(entry.len(), 4);
+        }
+
+        assert_eq!(entries[0], vec![0, 1, 2, 3]);
+        assert_eq!(entries[2], vec![4, 5, 6, 7]);
+        assert_eq!(entries[8], vec![0, 4, 8, 12]);
+        assert_eq!(entries[10], vec![1, 5, 9, 13]);
+    }
+
+    // =========================================================================
+    // initialize tests
+    // =========================================================================
+
+    #[test]
+    fn init_fail_invalid_clue_line() {
+        let (mut grid, shape) = make_4x4();
+        // [0,2] is not the start of any entry.
+        let mut handler = FullRank::new(
+            16,
+            vec![RankClue {
+                rank: 1,
+                line: [0, 2],
+            }],
+            TieMode::None,
+        );
+        assert_eq!(init(&mut handler, &mut grid, shape), false);
+    }
+
+    #[test]
+    fn init_restrict_start_cell_to_rank_set_value() {
+        let (mut grid, shape) = make_4x4();
+        // rank=5 => value = (5+3)/4 = 2 => start cell must include only value 2.
+        let mut handler = FullRank::new(
+            16,
+            vec![RankClue {
+                rank: 5,
+                line: [4, 5],
+            }],
+            TieMode::None,
+        );
+        assert_eq!(init(&mut handler, &mut grid, shape), true);
+        assert_eq!(grid[4], vm(&[2]));
+    }
+
+    #[test]
+    #[should_panic(expected = "not unique")]
+    fn init_fail_duplicate_ranks() {
+        FullRank::new(
+            16,
+            vec![
+                RankClue {
+                    rank: 1,
+                    line: [0, 1],
+                },
+                RankClue {
+                    rank: 1,
+                    line: [4, 5],
+                },
+            ],
+            TieMode::None,
+        );
+    }
+
+    #[test]
+    fn init_fail_conflicting_rank_set_values() {
+        let (mut grid, shape) = make_4x4();
+        // rank 1 => value 1; rank 5 => value 2. Same entry start [0,1] can't hold both.
+        let mut handler = FullRank::new(
+            16,
+            vec![
+                RankClue {
+                    rank: 1,
+                    line: [0, 1],
+                },
+                RankClue {
+                    rank: 5,
+                    line: [0, 1],
+                },
+            ],
+            TieMode::None,
+        );
+        assert_eq!(init(&mut handler, &mut grid, shape), false);
+    }
+
+    #[test]
+    fn init_fail_out_of_range_rank() {
+        let (mut grid, shape) = make_4x4();
+        // For 4x4, ranks 1..16. rank 17 => value 5, which can't exist.
+        let mut handler = FullRank::new(
+            16,
+            vec![RankClue {
+                rank: 17,
+                line: [0, 1],
+            }],
+            TieMode::None,
+        );
+        assert_eq!(init(&mut handler, &mut grid, shape), false);
+    }
+
+    // =========================================================================
+    // enforce_ordered_entry_pair tests
+    // =========================================================================
+
+    #[test]
+    fn ordering_reject_forced_ties() {
+        let (mut grid, _shape) = make_9x9();
+        let low_entry: Vec<u8> = (0..9).collect();
+        let high_entry: Vec<u8> = (9..18).collect();
+
+        // Force identical fixed digits.
+        for i in 0..9 {
+            let v = vm(&[i as u8 + 1]);
+            grid[low_entry[i] as usize] = v;
+            grid[high_entry[i] as usize] = v;
+        }
+
+        let mut a = acc();
+        assert_eq!(
+            FullRank::enforce_ordered_entry_pair(&mut grid, &mut a, &low_entry, &high_entry),
+            false,
+        );
+    }
+
+    #[test]
+    fn ordering_allow_strict_non_ties() {
+        let (mut grid, _shape) = make_9x9();
+        let low_entry: Vec<u8> = (0..9).collect();
+        let high_entry: Vec<u8> = (9..18).collect();
+
+        let low_digits = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+        let high_digits = [1, 2, 3, 4, 5, 6, 7, 9, 8];
+
+        for i in 0..9 {
+            grid[low_entry[i] as usize] = vm(&[low_digits[i]]);
+            grid[high_entry[i] as usize] = vm(&[high_digits[i]]);
+        }
+
+        let mut a = acc();
+        assert_eq!(
+            FullRank::enforce_ordered_entry_pair(&mut grid, &mut a, &low_entry, &high_entry),
+            true,
+        );
+    }
+
+    // =========================================================================
+    // enforceConsistency tests
+    // =========================================================================
+
+    #[test]
+    fn enforce_consistency_prune_based_on_clued_rank_ordering() {
+        let (mut grid, shape) = make_4x4();
+        let value1 = vm(&[1]);
+        let clues = vec![
+            RankClue {
+                rank: 1,
+                line: [0, 1],
+            },
+            RankClue {
+                rank: 2,
+                line: [4, 5],
+            },
+            RankClue {
+                rank: 3,
+                line: [8, 9],
+            },
+            RankClue {
+                rank: 4,
+                line: [12, 13],
+            },
+        ];
+        let mut handler = FullRank::new(16, clues, TieMode::None);
+        assert_eq!(init(&mut handler, &mut grid, shape), true);
+
+        // Row0 < Row1. Force Row1[1]=2, Row0[1]={2,3,4}, break tie via Row0[2]=3, Row1[2]=4.
+        grid[1] = vm(&[2, 3, 4]);
+        grid[5] = vm(&[2]);
+        grid[2] = vm(&[3]);
+        grid[6] = vm(&[4]);
+
+        assert_eq!(grid[0], value1);
+        assert_eq!(grid[4], value1);
+
+        let mut a = acc_n(16);
+        assert_eq!(handler.enforce_consistency(&mut grid, &mut a), true);
+
+        // Ordering should prune Row0[1] down to value 2.
+        assert_eq!(grid[1], vm(&[2]));
+    }
+
+    #[test]
+    fn enforce_consistency_reject_forced_tie_between_consecutive_clued_ranks() {
+        let (mut grid, shape) = make_4x4();
+        let clues = vec![
+            RankClue {
+                rank: 1,
+                line: [0, 1],
+            },
+            RankClue {
+                rank: 2,
+                line: [4, 5],
+            },
+            RankClue {
+                rank: 3,
+                line: [8, 9],
+            },
+            RankClue {
+                rank: 4,
+                line: [12, 13],
+            },
+        ];
+        let mut handler = FullRank::new(16, clues, TieMode::None);
+        assert_eq!(init(&mut handler, &mut grid, shape), true);
+
+        // Force Row0 and Row1 to tie.
+        grid[1] = vm(&[2]);
+        grid[2] = vm(&[3]);
+        grid[3] = vm(&[4]);
+        grid[5] = vm(&[2]);
+        grid[6] = vm(&[3]);
+        grid[7] = vm(&[4]);
+
+        let mut a = acc_n(16);
+        assert_eq!(handler.enforce_consistency(&mut grid, &mut a), false);
+    }
+
+    #[test]
+    fn enforce_consistency_reject_forced_tie_with_unique_ranks() {
+        let (mut grid, shape) = make_4x4();
+        let clues = vec![
+            RankClue {
+                rank: 1,
+                line: [0, 1],
+            },
+            RankClue {
+                rank: 2,
+                line: [4, 5],
+            },
+            RankClue {
+                rank: 3,
+                line: [8, 9],
+            },
+            RankClue {
+                rank: 4,
+                line: [12, 13],
+            },
+        ];
+        let mut handler = FullRank::new(16, clues, TieMode::None);
+        assert_eq!(init(&mut handler, &mut grid, shape), true);
+
+        // Force Row0 and Row1 to tie completely.
+        grid[1] = vm(&[2]);
+        grid[2] = vm(&[3]);
+        grid[3] = vm(&[4]);
+        grid[5] = vm(&[2]);
+        grid[6] = vm(&[3]);
+        grid[7] = vm(&[4]);
+
+        let mut a = acc_n(16);
+        assert_eq!(handler.enforce_consistency(&mut grid, &mut a), false);
+    }
+
+    #[test]
+    fn enforce_consistency_fail_not_enough_viable_entries() {
+        let (mut grid, shape) = make_4x4();
+        let value1 = vm(&[1]);
+
+        let mut handler = FullRank::new(
+            16,
+            vec![RankClue {
+                rank: 1,
+                line: [4, 5],
+            }],
+            TieMode::None,
+        );
+        assert_eq!(init(&mut handler, &mut grid, shape), true);
+        assert_eq!(grid[4], value1);
+
+        // Make almost all unclued entry start cells exclude value1, leaving only 2 viable.
+        let mut kept = 0usize;
+        for i in 0..handler.unclued_entries.len() {
+            let entry_idx = handler.unclued_entries[i];
+            let start_cell = handler.all_entries[entry_idx][0] as usize;
+            if kept < 2 {
+                kept += 1;
+                continue;
+            }
+            grid[start_cell] = CandidateSet::from_raw(grid[start_cell].raw() & !value1.raw());
+        }
+
+        let mut a = acc_n(16);
+        assert_eq!(handler.enforce_consistency(&mut grid, &mut a), false);
+    }
+
+    // =========================================================================
+    // enforce_unclued_entries tests
+    // =========================================================================
+
+    /// Helper: find the index in `handler.unclued_entries` whose entry starts at
+    /// (start_cell, second_cell).
+    fn find_unclued(handler: &FullRank, start: u8, second: u8) -> usize {
+        handler
+            .unclued_entries
+            .iter()
+            .position(|&idx| {
+                let e = &handler.all_entries[idx];
+                e[0] == start && e[1] == second
+            })
+            .unwrap_or_else(|| panic!("No unclued entry starting at ({}, {})", start, second))
+    }
+
+    #[test]
+    fn unclued_forced_ties_not_counted() {
+        let (mut grid, shape) = make_4x4();
+        let value1 = vm(&[1]);
+        let value2 = vm(&[2]);
+
+        // rank=2 => rankIndex=1 => needs 1 strictly-less, 2 strictly-greater.
+        let mut handler = FullRank::new(
+            16,
+            vec![RankClue {
+                rank: 2,
+                line: [4, 5],
+            }],
+            TieMode::None,
+        );
+        assert_eq!(init(&mut handler, &mut grid, shape), true);
+
+        // Fix clued entry [4,5,6,7] to [1,2,2,1].
+        grid[5] = value2;
+        grid[6] = value2;
+        grid[7] = value1;
+
+        // Make 3 viable entries that are forced ties.
+        let kept_starts: HashSet<u8> = [7, 8, 11].iter().copied().collect();
+
+        // row2 forward matches clued entry:
+        grid[8] = value1;
+        grid[9] = value2;
+        grid[10] = value2;
+        grid[11] = value1;
+
+        // Remove value1 from all other unclued start cells.
+        for i in 0..handler.unclued_entries.len() {
+            let entry_idx = handler.unclued_entries[i];
+            let start = handler.all_entries[entry_idx][0];
+            if kept_starts.contains(&start) {
+                continue;
+            }
+            grid[start as usize] =
+                CandidateSet::from_raw(grid[start as usize].raw() & !value1.raw());
+        }
+
+        let mut a = acc_n(16);
+        // All viable entries are forced ties — can't fill < or > slots.
+        assert_eq!(handler.enforce_consistency(&mut grid, &mut a), false);
+    }
+
+    #[test]
+    fn ties_any_allow_missing_greater_ranks() {
+        let (mut grid, shape) = make_4x4();
+        let value1 = vm(&[1]);
+        let value2 = vm(&[2]);
+        let value3 = vm(&[3]);
+        let value4 = vm(&[4]);
+
+        // rank=2 => rankIndex=1. Permissive mode relaxes the "above" requirement.
+        let clue = RankClue {
+            rank: 2,
+            line: [4, 5],
+        };
+
+        // --- Strict handler (ONLY_UNCLUED) ---
+        {
+            let mut handler = FullRank::new(16, vec![clue.clone()], TieMode::OnlyUnclued);
+            let (mut grid2, shape2) = make_4x4();
+            assert_eq!(init(&mut handler, &mut grid2, shape2), true);
+
+            // Fix clued entry [4,5,6,7] to [1,3,4,2].
+            grid2[5] = value3;
+            grid2[6] = value4;
+            grid2[7] = value2;
+
+            let idx_less = find_unclued(&handler, 0, 1);
+            let idx_tie = find_unclued(&handler, 8, 9);
+            let idx_greater = find_unclued(&handler, 12, 13);
+
+            let viable = vec![idx_less, idx_tie, idx_greater];
+
+            // Start cells must include value1.
+            grid2[0] = CandidateSet::from_raw(grid2[0].raw() | value1.raw());
+            grid2[8] = CandidateSet::from_raw(grid2[8].raw() | value1.raw());
+            grid2[12] = CandidateSet::from_raw(grid2[12].raw() | value1.raw());
+
+            // Less-only: row0 => [?,2,2,2] < [?,3,4,2].
+            grid2[1] = value2;
+            grid2[2] = value2;
+            grid2[3] = value2;
+
+            // Tie: row2 => [?,3,4,2] == clued.
+            grid2[9] = value3;
+            grid2[10] = value4;
+            grid2[11] = value2;
+
+            // Greater-only: row3 => [?,4,4,4] > [?,3,4,2].
+            grid2[13] = value4;
+            grid2[14] = value4;
+            grid2[15] = value4;
+
+            let given = &handler.rank_sets[0].givens[0];
+            let mut a = acc_n(16);
+            assert_eq!(
+                handler.enforce_unclued_entries_for_given(
+                    &mut grid2,
+                    &mut a,
+                    &viable,
+                    viable.len(),
+                    given
+                ),
+                false,
+            );
+        }
+
+        // --- Permissive handler (ANY) ---
+        {
+            let mut handler = FullRank::new(16, vec![clue.clone()], TieMode::Any);
+            assert_eq!(init(&mut handler, &mut grid, shape), true);
+
+            grid[5] = value3;
+            grid[6] = value4;
+            grid[7] = value2;
+
+            let idx_less = find_unclued(&handler, 0, 1);
+            let idx_tie = find_unclued(&handler, 8, 9);
+            let idx_greater = find_unclued(&handler, 12, 13);
+
+            let viable = vec![idx_less, idx_tie, idx_greater];
+
+            grid[0] = CandidateSet::from_raw(grid[0].raw() | value1.raw());
+            grid[8] = CandidateSet::from_raw(grid[8].raw() | value1.raw());
+            grid[12] = CandidateSet::from_raw(grid[12].raw() | value1.raw());
+
+            grid[1] = value2;
+            grid[2] = value2;
+            grid[3] = value2;
+
+            grid[9] = value3;
+            grid[10] = value4;
+            grid[11] = value2;
+
+            grid[13] = value4;
+            grid[14] = value4;
+            grid[15] = value4;
+
+            let given = &handler.rank_sets[0].givens[0];
+            let mut a = acc_n(16);
+            assert_eq!(
+                handler.enforce_unclued_entries_for_given(
+                    &mut grid,
+                    &mut a,
+                    &viable,
+                    viable.len(),
+                    given
+                ),
+                true,
+            );
+            // numRanksBelow is strict: the single less-only entry is forced to be included.
+            assert_eq!(grid[0], value1);
+        }
+    }
+
+    #[test]
+    fn ties_any_allow_skipping_multiple_ranks_due_to_ties() {
+        let (_, _) = make_4x4();
+        let value1 = vm(&[1]);
+        let value2 = vm(&[2]);
+        let value3 = vm(&[3]);
+        let value4 = vm(&[4]);
+
+        let clue = RankClue {
+            rank: 2,
+            line: [4, 5],
+        };
+
+        // --- Strict (ONLY_UNCLUED) ---
+        {
+            let mut handler = FullRank::new(16, vec![clue.clone()], TieMode::OnlyUnclued);
+            let (mut grid, shape) = make_4x4();
+            assert_eq!(init(&mut handler, &mut grid, shape), true);
+
+            grid[5] = value3;
+            grid[6] = value4;
+            grid[7] = value2;
+
+            let idx_less = find_unclued(&handler, 0, 1);
+            let idx_tie1 = find_unclued(&handler, 8, 9);
+            let idx_tie2 = find_unclued(&handler, 12, 13);
+
+            let viable = vec![idx_less, idx_tie1, idx_tie2];
+
+            grid[0] = CandidateSet::from_raw(grid[0].raw() | value1.raw());
+            grid[8] = CandidateSet::from_raw(grid[8].raw() | value1.raw());
+            grid[12] = CandidateSet::from_raw(grid[12].raw() | value1.raw());
+
+            grid[1] = value2;
+            grid[2] = value2;
+            grid[3] = value2;
+
+            grid[9] = value3;
+            grid[10] = value4;
+            grid[11] = value2;
+            grid[13] = value3;
+            grid[14] = value4;
+            grid[15] = value2;
+
+            let given = &handler.rank_sets[0].givens[0];
+            let mut a = acc_n(16);
+            assert_eq!(
+                handler.enforce_unclued_entries_for_given(
+                    &mut grid,
+                    &mut a,
+                    &viable,
+                    viable.len(),
+                    given
+                ),
+                false,
+            );
+        }
+
+        // --- Permissive (ANY) ---
+        {
+            let mut handler = FullRank::new(16, vec![clue.clone()], TieMode::Any);
+            let (mut grid, shape) = make_4x4();
+            assert_eq!(init(&mut handler, &mut grid, shape), true);
+
+            grid[5] = value3;
+            grid[6] = value4;
+            grid[7] = value2;
+
+            let idx_less = find_unclued(&handler, 0, 1);
+            let idx_tie1 = find_unclued(&handler, 8, 9);
+            let idx_tie2 = find_unclued(&handler, 12, 13);
+
+            let viable = vec![idx_less, idx_tie1, idx_tie2];
+
+            grid[0] = CandidateSet::from_raw(grid[0].raw() | value1.raw());
+            grid[8] = CandidateSet::from_raw(grid[8].raw() | value1.raw());
+            grid[12] = CandidateSet::from_raw(grid[12].raw() | value1.raw());
+
+            grid[1] = value2;
+            grid[2] = value2;
+            grid[3] = value2;
+
+            grid[9] = value3;
+            grid[10] = value4;
+            grid[11] = value2;
+            grid[13] = value3;
+            grid[14] = value4;
+            grid[15] = value2;
+
+            let given = &handler.rank_sets[0].givens[0];
+            let mut a = acc_n(16);
+            assert_eq!(
+                handler.enforce_unclued_entries_for_given(
+                    &mut grid,
+                    &mut a,
+                    &viable,
+                    viable.len(),
+                    given
+                ),
+                true,
+            );
+            // numRanksBelow strict: less entry is forced.
+            assert_eq!(grid[0], value1);
+        }
+    }
+
+    #[test]
+    fn ties_any_still_reject_too_many_forced_greater() {
+        let (mut grid, shape) = make_4x4();
+        let value1 = vm(&[1]);
+        let value2 = vm(&[2]);
+        let value3 = vm(&[3]);
+        let value4 = vm(&[4]);
+
+        let clue = RankClue {
+            rank: 2,
+            line: [4, 5],
+        };
+        let mut handler = FullRank::new(16, vec![clue], TieMode::Any);
+        assert_eq!(init(&mut handler, &mut grid, shape), true);
+
+        // Clued entry digits [1,3,4,2].
+        grid[5] = value3;
+        grid[6] = value4;
+        grid[7] = value2;
+
+        // Force 3 entries to be strictly greater (start cells fixed to value1).
+        let forced_starts: [usize; 3] = [0, 8, 12];
+        for &s in &forced_starts {
+            grid[s] = value1;
+        }
+
+        // Second cells > 3.
+        grid[1] = value4;
+        grid[9] = value4;
+        grid[13] = value4;
+
+        // A less-only option.
+        grid[2] = value2;
+
+        let kept: HashSet<u8> = [0, 8, 12, 3].iter().map(|&x| x as u8).collect();
+        for i in 0..handler.unclued_entries.len() {
+            let entry_idx = handler.unclued_entries[i];
+            let start = handler.all_entries[entry_idx][0];
+            if kept.contains(&start) {
+                continue;
+            }
+            grid[start as usize] =
+                CandidateSet::from_raw(grid[start as usize].raw() & !value1.raw());
+        }
+
+        let mut a = acc_n(16);
+        assert_eq!(handler.enforce_consistency(&mut grid, &mut a), false);
+    }
+
+    #[test]
+    fn permissive_exclude_extra_less_candidate_when_not_equal_proven() {
+        let (mut grid, shape) = make_4x4();
+        let value1 = vm(&[1]);
+        let value2 = vm(&[2]);
+        let value3 = vm(&[3]);
+        let value4 = vm(&[4]);
+
+        let clue = RankClue {
+            rank: 2,
+            line: [4, 5],
+        };
+        let mut handler = FullRank::new(16, vec![clue], TieMode::Any);
+        assert_eq!(init(&mut handler, &mut grid, shape), true);
+        let given = &handler.rank_sets[0].givens[0] as *const RankedGiven;
+
+        // Clued entry [4,5,6,7] => [1,3,4,2].
+        grid[5] = value3;
+        grid[6] = value4;
+        grid[7] = value2;
+
+        let idx_fixed_less = find_unclued(&handler, 0, 1);
+        let idx_extra_less = find_unclued(&handler, 8, 9);
+
+        // Fixed less: start fixed to rank-set value.
+        grid[0] = value1;
+        grid[1] = value2; // 2 < 3 => strict <, proves not-equal.
+
+        // Extra less: start contains rank-set value but not fixed.
+        grid[8] = CandidateSet::from_raw(value1.raw() | value2.raw());
+        grid[9] = value2;
+
+        let viable = vec![idx_fixed_less, idx_extra_less];
+        let mut a = acc_n(16);
+        // SAFETY: the given reference is valid for the handler's lifetime.
+        let given_ref = unsafe { &*given };
+        assert_eq!(
+            handler.enforce_unclued_entries_for_given(
+                &mut grid,
+                &mut a,
+                &viable,
+                viable.len(),
+                given_ref
+            ),
+            true,
+        );
+
+        // Extra less-only entry must be excluded (can't take rank-set value).
+        assert_eq!((grid[8].raw() & value1.raw()) != 0, false);
+    }
+
+    #[test]
+    fn permissive_exclude_extra_greater_candidate_when_not_equal_proven() {
+        let (mut grid, shape) = make_4x4();
+        let value1 = vm(&[1]);
+        let value2 = vm(&[2]);
+        let value3 = vm(&[3]);
+        let value4 = vm(&[4]);
+
+        let clue = RankClue {
+            rank: 2,
+            line: [4, 5],
+        };
+        let mut handler = FullRank::new(16, vec![clue], TieMode::Any);
+        assert_eq!(init(&mut handler, &mut grid, shape), true);
+        let given = &handler.rank_sets[0].givens[0] as *const RankedGiven;
+
+        // Clued entry [4,5,6,7] => [1,3,4,2].
+        grid[5] = value3;
+        grid[6] = value4;
+        grid[7] = value2;
+
+        let idx_greater1 = find_unclued(&handler, 12, 13);
+        let idx_greater2 = find_unclued(&handler, 0, 1);
+        let idx_greater_extra = find_unclued(&handler, 8, 9);
+        let idx_less = find_unclued(&handler, 3, 2);
+
+        // Two fixed greater entries.
+        grid[12] = value1;
+        grid[13] = value4;
+        grid[0] = value1;
+        grid[1] = value4;
+
+        // Extra greater: start includes rank-set value but isn't fixed.
+        grid[8] = CandidateSet::from_raw(value1.raw() | value2.raw());
+        grid[9] = value4;
+
+        // Less-only.
+        grid[3] = CandidateSet::from_raw(value1.raw() | value2.raw());
+        grid[2] = value2;
+
+        let viable = vec![idx_greater1, idx_greater2, idx_greater_extra, idx_less];
+        let mut a = acc_n(16);
+        let given_ref = unsafe { &*given };
+        assert_eq!(
+            handler.enforce_unclued_entries_for_given(
+                &mut grid,
+                &mut a,
+                &viable,
+                viable.len(),
+                given_ref
+            ),
+            true,
+        );
+
+        // Extra greater-only entry must be excluded.
+        assert_eq!((grid[8].raw() & value1.raw()) != 0, false);
+    }
+
+    #[test]
+    fn both_sides_entry_not_forced_only_unclued() {
+        let (mut grid, shape) = make_4x4();
+        let value1 = vm(&[1]);
+        let value2 = vm(&[2]);
+        let value3 = vm(&[3]);
+        let value4 = vm(&[4]);
+
+        // rank=3 => rankIndex=2 => needs 2 below, 1 above.
+        let clue = RankClue {
+            rank: 3,
+            line: [4, 5],
+        };
+        let mut handler = FullRank::new(16, vec![clue], TieMode::OnlyUnclued);
+        assert_eq!(init(&mut handler, &mut grid, shape), true);
+        let given = &handler.rank_sets[0].givens[0] as *const RankedGiven;
+
+        // Clued entry [4,5,6,7] => [1,3,4,2].
+        grid[5] = value3;
+        grid[6] = value4;
+        grid[7] = value2;
+
+        let idx_less1 = find_unclued(&handler, 0, 1);
+        let idx_both = find_unclued(&handler, 8, 9);
+        let idx_less2 = find_unclued(&handler, 12, 13);
+        let idx_greater = find_unclued(&handler, 3, 2);
+
+        let viable = vec![idx_less1, idx_both, idx_less2, idx_greater];
+
+        // Start cells: not fixed.
+        grid[0] = vm(&[1, 2]);
+        grid[8] = vm(&[1, 2]);
+        grid[12] = vm(&[1, 2]);
+        grid[3] = vm(&[1, 2]);
+
+        // Less-only entries.
+        grid[1] = value2;
+        grid[13] = value2;
+
+        // Both-sides: second cell can be 2 or 4.
+        grid[9] = vm(&[2, 4]);
+
+        // Greater-only (row 0 reverse): second cell fixed to 4.
+        grid[2] = value4;
+
+        let start_before = grid[8];
+        let mut a = acc_n(16);
+        let given_ref = unsafe { &*given };
+        assert_eq!(
+            handler.enforce_unclued_entries_for_given(
+                &mut grid,
+                &mut a,
+                &viable,
+                viable.len(),
+                given_ref
+            ),
+            true,
+        );
+
+        // Both-sides entry start should be unchanged.
+        assert_eq!(grid[8], start_before);
+        assert!((grid[8].raw() & value1.raw()) != 0);
+        assert!((grid[8].raw() & value2.raw()) != 0);
+    }
+
+    #[test]
+    fn both_sides_entry_not_forced_any() {
+        let (mut grid, shape) = make_4x4();
+        let value2 = vm(&[2]);
+        let value3 = vm(&[3]);
+        let value4 = vm(&[4]);
+
+        let clue = RankClue {
+            rank: 3,
+            line: [4, 5],
+        };
+        let mut handler = FullRank::new(16, vec![clue], TieMode::Any);
+        assert_eq!(init(&mut handler, &mut grid, shape), true);
+        let given = &handler.rank_sets[0].givens[0] as *const RankedGiven;
+
+        grid[5] = value3;
+        grid[6] = value4;
+        grid[7] = value2;
+
+        let idx_less1 = find_unclued(&handler, 0, 1);
+        let idx_both = find_unclued(&handler, 8, 9);
+        let idx_less2 = find_unclued(&handler, 12, 13);
+        let idx_greater = find_unclued(&handler, 3, 2);
+        let viable = vec![idx_less1, idx_both, idx_less2, idx_greater];
+
+        grid[0] = vm(&[1, 2]);
+        grid[8] = vm(&[1, 2]);
+        grid[12] = vm(&[1, 2]);
+        grid[3] = vm(&[1, 2]);
+
+        grid[1] = value2;
+        grid[13] = value2;
+        grid[9] = vm(&[2, 4]);
+        grid[2] = value4;
+
+        let start_before = grid[8];
+        let mut a = acc_n(16);
+        let given_ref = unsafe { &*given };
+        assert_eq!(
+            handler.enforce_unclued_entries_for_given(
+                &mut grid,
+                &mut a,
+                &viable,
+                viable.len(),
+                given_ref
+            ),
+            true,
+        );
+
+        assert_eq!(grid[8], start_before);
+    }
+
+    #[test]
+    fn ties_only_unclued_reject_forced_tie_with_clued() {
+        let (mut grid, shape) = make_4x4();
+        let value1 = vm(&[1]);
+        let value2 = vm(&[2]);
+        let value3 = vm(&[3]);
+        let value4 = vm(&[4]);
+
+        // rank=2 => rankIndex=1 => needs 1 less, 2 greater.
+        let clue = RankClue {
+            rank: 2,
+            line: [4, 5],
+        };
+        let mut handler = FullRank::new(16, vec![clue], TieMode::OnlyUnclued);
+        assert_eq!(init(&mut handler, &mut grid, shape), true);
+        let given = &handler.rank_sets[0].givens[0] as *const RankedGiven;
+
+        // Clued entry [4,5,6,7] => [1,3,4,2].
+        grid[5] = value3;
+        grid[6] = value4;
+        grid[7] = value2;
+
+        // Force one unclued entry to exact tie with clued:
+        // row 2 forward: [8,9,10,11]
+        grid[8] = value1;
+        grid[9] = value3;
+        grid[10] = value4;
+        grid[11] = value2;
+
+        // Less: row 0 forward [0,1,2,3] => 2 < 3 at j=1.
+        grid[0] = value1;
+        grid[1] = value2;
+        grid[2] = value1;
+        grid[3] = value2;
+
+        // Greater #1: row 3 forward [12,13,14,15] => 4 > 3 at j=1.
+        grid[12] = value1;
+        grid[13] = value4;
+        grid[14] = value4;
+        grid[15] = value4;
+
+        // Greater #2: col 2 forward [2,6,10,14] => 4 > 3 at j=1.
+        grid[10] = value4;
+        grid[14] = value4;
+
+        let idx_tie = find_unclued(&handler, 8, 9);
+        let idx_less = find_unclued(&handler, 0, 1);
+        let idx_greater_row = find_unclued(&handler, 12, 13);
+        let idx_greater_col = find_unclued(&handler, 2, 6);
+
+        // Sanity: without tie, counts are satisfiable.
+        {
+            let viable_no_tie = vec![idx_less, idx_greater_row, idx_greater_col];
+            let mut a = acc_n(16);
+            let given_ref = unsafe { &*given };
+            assert_eq!(
+                handler.enforce_unclued_entries_for_given(
+                    &mut grid,
+                    &mut a,
+                    &viable_no_tie,
+                    viable_no_tie.len(),
+                    given_ref
+                ),
+                true,
+            );
+        }
+
+        // Adding the forced tie → rejection.
+        {
+            let viable_with_tie = vec![idx_tie, idx_less, idx_greater_row, idx_greater_col];
+            let mut a = acc_n(16);
+            let given_ref = unsafe { &*given };
+            assert_eq!(
+                handler.enforce_unclued_entries_for_given(
+                    &mut grid,
+                    &mut a,
+                    &viable_with_tie,
+                    viable_with_tie.len(),
+                    given_ref
+                ),
+                false,
+            );
+        }
+    }
+
+    #[test]
+    fn ties_any_still_require_enough_less_entries() {
+        let (mut grid, shape) = make_4x4();
+        let value1 = vm(&[1]);
+        let value2 = vm(&[2]);
+        let value3 = vm(&[3]);
+        let value4 = vm(&[4]);
+
+        // rank=3 => rankIndex=2 => needs 2 strictly-less.
+        let clue = RankClue {
+            rank: 3,
+            line: [4, 5],
+        };
+        let mut handler = FullRank::new(16, vec![clue], TieMode::Any);
+        assert_eq!(init(&mut handler, &mut grid, shape), true);
+        let given = &handler.rank_sets[0].givens[0] as *const RankedGiven;
+
+        // Clued entry [4,5,6,7] => [1,3,4,2].
+        grid[5] = value3;
+        grid[6] = value4;
+        grid[7] = value2;
+
+        let idx_less = find_unclued(&handler, 0, 1);
+        let idx_tie1 = find_unclued(&handler, 8, 9);
+        let idx_tie2 = find_unclued(&handler, 12, 13);
+
+        let viable = vec![idx_less, idx_tie1, idx_tie2];
+
+        grid[0] = CandidateSet::from_raw(grid[0].raw() | value1.raw());
+        grid[8] = CandidateSet::from_raw(grid[8].raw() | value1.raw());
+        grid[12] = CandidateSet::from_raw(grid[12].raw() | value1.raw());
+
+        grid[1] = value2;
+        grid[2] = value2;
+        grid[3] = value2;
+
+        grid[9] = value3;
+        grid[10] = value4;
+        grid[11] = value2;
+        grid[13] = value3;
+        grid[14] = value4;
+        grid[15] = value2;
+
+        let mut a = acc_n(16);
+        let given_ref = unsafe { &*given };
+        assert_eq!(
+            handler.enforce_unclued_entries_for_given(
+                &mut grid,
+                &mut a,
+                &viable,
+                viable.len(),
+                given_ref
+            ),
+            false,
+        );
+    }
+
+    // =========================================================================
+    // enforce_unique_ranks tests
+    // =========================================================================
+
+    #[test]
+    fn unique_ranks_reject_whole_entry_ties() {
+        let (mut grid, shape) = make_9x9();
+        let mut handler = FullRank::new(81, vec![], TieMode::None);
+        assert_eq!(init(&mut handler, &mut grid, shape), true);
+
+        // Force two rows to be identical fixed entries.
+        let row1: Vec<usize> = (0..9).collect();
+        let row2: Vec<usize> = (9..18).collect();
+        for i in 0..9 {
+            let v = vm(&[i as u8 + 1]);
+            grid[row1[i]] = v;
+            grid[row2[i]] = v;
+        }
+
+        assert_eq!(handler.enforce_unique_ranks(&grid), false);
+    }
+
+    #[test]
+    fn unique_ranks_reject_row_equals_column() {
+        let (mut grid, shape) = make_4x4();
+        let mut handler = FullRank::new(16, vec![], TieMode::None);
+        assert_eq!(init(&mut handler, &mut grid, shape), true);
+
+        let row0: [usize; 4] = [0, 1, 2, 3];
+        let col0: [usize; 4] = [0, 4, 8, 12];
+        let digits: [u8; 4] = [1, 2, 3, 4];
+        for i in 0..4 {
+            let v = vm(&[digits[i]]);
+            grid[row0[i]] = v;
+            grid[col0[i]] = v;
+        }
+
+        let mut a = acc_n(16);
+        assert_eq!(handler.enforce_consistency(&mut grid, &mut a), false);
+    }
+
+    #[test]
+    fn unique_ranks_reject_row_equals_column_reversed() {
+        let (mut grid, shape) = make_4x4();
+        let mut handler = FullRank::new(16, vec![], TieMode::None);
+        assert_eq!(init(&mut handler, &mut grid, shape), true);
+
+        let row0: [usize; 4] = [0, 1, 2, 3];
+        let col3rev: [usize; 4] = [15, 11, 7, 3];
+        let digits: [u8; 4] = [1, 2, 3, 4];
+        for i in 0..4 {
+            grid[row0[i]] = vm(&[digits[i]]);
+            grid[col3rev[i]] = vm(&[digits[i]]);
+        }
+
+        let mut a = acc_n(16);
+        assert_eq!(handler.enforce_consistency(&mut grid, &mut a), false);
+    }
+
+    #[test]
+    fn unique_ranks_allow_partial_tie_not_fixed() {
+        let (mut grid, shape) = make_4x4();
+        let mut handler = FullRank::new(16, vec![], TieMode::None);
+        assert_eq!(init(&mut handler, &mut grid, shape), true);
+
+        // row0: [1, 2, {2,3}, 4]  row1: [1, 2, {2,3}, 4] — NOT fully fixed.
+        grid[0] = vm(&[1]);
+        grid[1] = vm(&[2]);
+        grid[2] = vm(&[2, 3]);
+        grid[3] = vm(&[4]);
+
+        grid[4] = vm(&[1]);
+        grid[5] = vm(&[2]);
+        grid[6] = vm(&[2, 3]);
+        grid[7] = vm(&[4]);
+
+        let mut a = acc_n(16);
+        assert_eq!(handler.enforce_consistency(&mut grid, &mut a), true);
+    }
+
+    #[test]
+    fn unique_ranks_allow_partial_reversed_tie_not_fixed() {
+        let (mut grid, shape) = make_4x4();
+        let mut handler = FullRank::new(16, vec![], TieMode::None);
+        assert_eq!(init(&mut handler, &mut grid, shape), true);
+
+        // row0: [1, 2, {2,3}, 4]
+        grid[0] = vm(&[1]);
+        grid[1] = vm(&[2]);
+        grid[2] = vm(&[2, 3]);
+        grid[3] = vm(&[4]);
+
+        // row1: [4, {2,3}, 2, 1] => reverse is [1, 2, {2,3}, 4].
+        grid[4] = vm(&[4]);
+        grid[5] = vm(&[2, 3]);
+        grid[6] = vm(&[2]);
+        grid[7] = vm(&[1]);
+
+        let mut a = acc_n(16);
+        assert_eq!(handler.enforce_consistency(&mut grid, &mut a), true);
+    }
+
+    // =========================================================================
+    // SimpleSolver e2e tests
+    // =========================================================================
+
+    #[test]
+    fn solver_reject_row_equal_to_reversed_row() {
+        let mut solver = crate::simple_solver::SimpleSolver::new();
+        let base = ".Shape~4x4.\
+             .~R1C1_3.~R1C2_4.~R1C3_2.~R1C4_1.\
+             .~R2C1_1.~R2C2_2.~R2C3_4.~R2C4_3.";
+
+        assert!(solver.solution(base).unwrap().is_some());
+        let with_rank = format!(
+            ".Shape~4x4.FullRankTies~none{}",
+            &base[".Shape~4x4".len()..]
+        );
+        assert!(solver.solution(&with_rank).unwrap().is_none());
+    }
+
+    #[test]
+    fn solver_4x4_regression_no_solutions() {
+        let mut solver = crate::simple_solver::SimpleSolver::new();
+        let puzzle = ".Shape~4x4.FullRankTies~none.FullRank~C1~10~.FullRank~C2~15~.FullRank~C4~3~.FullRank~C3~~4.";
+        assert!(solver.solution(puzzle).unwrap().is_none());
+    }
+
+    #[test]
+    fn solver_4x4_ties_any_allow_solution() {
+        let mut solver = crate::simple_solver::SimpleSolver::new();
+        let puzzle = ".Shape~4x4.FullRank~C1~10~.FullRank~C2~15~.FullRank~R4~5~.FullRankTies~any";
+        assert!(solver.solution(puzzle).unwrap().is_some());
+    }
+
+    #[test]
+    fn solver_ties_any_vs_only_unclued() {
+        let mut solver = crate::simple_solver::SimpleSolver::new();
+        let any_puzzle = ".Shape~4x4.FullRankTies~any.FullRank~R1~2~..FullRank~C3~15~.";
+        let only_puzzle = ".Shape~4x4.FullRankTies~only-unclued.FullRank~R1~2~..FullRank~C3~15~.";
+
+        assert!(solver.solution(any_puzzle).unwrap().is_some());
+        assert!(solver.solution(only_puzzle).unwrap().is_none());
+    }
+
+    #[test]
+    fn solver_dedupe_same_rank_clues() {
+        let mut solver = crate::simple_solver::SimpleSolver::new();
+        let puzzle = ".Shape~4x4.FullRankTies~any.FullRank~R1~1~..FullRank~R2~~1.";
+        assert!(solver.solution(puzzle).unwrap().is_some());
     }
 }

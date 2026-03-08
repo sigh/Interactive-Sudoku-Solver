@@ -137,3 +137,77 @@ impl ConstraintHandler for EqualSizePartitions {
         true
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::handlers::test_util::*;
+
+    #[test]
+    fn init_restricts_cells_to_partition_values() {
+        // 4 cells, partition1=[1,2], partition2=[3,4]
+        let (mut grid, shape) = make_grid(1, 4, None);
+        let mut handler = EqualSizePartitions::new(
+            vec![0, 1, 2, 3], &[1, 2], &[3, 4]);
+        assert!(init(&mut handler, &mut grid, shape));
+        // All cells should only have values 1-4.
+        for i in 0..4 {
+            assert_eq!(grid[i], vm(&[1, 2, 3, 4]));
+        }
+    }
+
+    #[test]
+    fn one_partition_full_forces_remaining() {
+        // 4 cells → 2 per partition. Partition1=[1,2], Partition2=[3,4].
+        let (mut grid, shape) = make_grid(1, 4, Some(4));
+        let mut handler = EqualSizePartitions::new(
+            vec![0, 1, 2, 3], &[1, 2], &[3, 4]);
+        init(&mut handler, &mut grid, shape);
+
+        // Cells 0,1 fixed to partition1 values.
+        grid[0] = vm(&[1]);
+        grid[1] = vm(&[2]);
+        // Cells 2,3 still ambiguous.
+        grid[2] = vm(&[1, 2, 3, 4]);
+        grid[3] = vm(&[1, 2, 3, 4]);
+
+        let mut a = acc();
+        assert!(handler.enforce_consistency(&mut grid, &mut a));
+        // Cells 2,3 should be forced to partition2 (only 3,4).
+        assert_eq!(grid[2], vm(&[3, 4]));
+        assert_eq!(grid[3], vm(&[3, 4]));
+    }
+
+    #[test]
+    fn both_partitions_satisfied_no_op() {
+        let (mut grid, shape) = make_grid(1, 4, Some(4));
+        let mut handler = EqualSizePartitions::new(
+            vec![0, 1, 2, 3], &[1, 2], &[3, 4]);
+        init(&mut handler, &mut grid, shape);
+
+        grid[0] = vm(&[1]);
+        grid[1] = vm(&[2]);
+        grid[2] = vm(&[3]);
+        grid[3] = vm(&[4]);
+
+        let mut a = acc();
+        assert!(handler.enforce_consistency(&mut grid, &mut a));
+    }
+
+    #[test]
+    fn fail_when_too_many_in_one_partition() {
+        let (mut grid, shape) = make_grid(1, 4, Some(4));
+        let mut handler = EqualSizePartitions::new(
+            vec![0, 1, 2, 3], &[1, 2], &[3, 4]);
+        init(&mut handler, &mut grid, shape);
+
+        // 3 cells fixed to partition1 — exceeds target of 2.
+        grid[0] = vm(&[1]);
+        grid[1] = vm(&[2]);
+        grid[2] = vm(&[1]);
+        grid[3] = vm(&[3, 4]);
+
+        let mut a = acc();
+        assert!(!handler.enforce_consistency(&mut grid, &mut a));
+    }
+}

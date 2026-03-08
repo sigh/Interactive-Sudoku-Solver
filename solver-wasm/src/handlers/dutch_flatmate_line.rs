@@ -103,3 +103,136 @@ impl ConstraintHandler for DutchFlatmateLine {
         true
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::handlers::test_util::*;
+
+    // numValues=9 => target=5, above=1, below=9
+
+    #[test]
+    fn remove_target_from_cell_with_no_valid_flatmate() {
+        let (mut grid, shape) = make_grid(1, 3, Some(9));
+        let cells = (0..3).collect();
+        let mut handler = DutchFlatmateLine::new(cells);
+        assert!(init(&mut handler, &mut grid, shape));
+
+        grid[0] = vm(&[2, 3, 4]);
+        grid[1] = vm(&[5, 6]);
+        grid[2] = vm(&[2, 3, 4]);
+
+        let mut a = acc();
+        assert!(handler.enforce_consistency(&mut grid, &mut a));
+        assert_eq!(grid[1] & vm(&[5]), CandidateSet::EMPTY);
+        assert_eq!(grid[1], vm(&[6]));
+    }
+
+    #[test]
+    fn fail_if_removing_target_wipes_cell() {
+        let (mut grid, shape) = make_grid(1, 3, Some(9));
+        let cells = (0..3).collect();
+        let mut handler = DutchFlatmateLine::new(cells);
+        assert!(init(&mut handler, &mut grid, shape));
+
+        grid[0] = vm(&[2, 3, 4]);
+        grid[1] = vm(&[5]); // only target
+        grid[2] = vm(&[2, 3, 4]);
+
+        assert!(!handler.enforce_consistency(&mut grid, &mut acc()));
+    }
+
+    #[test]
+    fn force_above_flatmate_when_target_fixed_and_only_above_possible() {
+        let (mut grid, shape) = make_grid(1, 3, Some(9));
+        let cells = (0..3).collect();
+        let mut handler = DutchFlatmateLine::new(cells);
+        assert!(init(&mut handler, &mut grid, shape));
+
+        grid[0] = vm(&[1, 2]); // can be above (1)
+        grid[1] = vm(&[5]);    // fixed to target
+        grid[2] = vm(&[2, 3, 4]); // cannot be below (9)
+
+        let mut a = acc();
+        assert!(handler.enforce_consistency(&mut grid, &mut a));
+        assert_eq!(grid[0], vm(&[1]));
+    }
+
+    #[test]
+    fn force_below_flatmate_when_target_fixed_and_only_below_possible() {
+        let (mut grid, shape) = make_grid(1, 3, Some(9));
+        let cells = (0..3).collect();
+        let mut handler = DutchFlatmateLine::new(cells);
+        assert!(init(&mut handler, &mut grid, shape));
+
+        grid[0] = vm(&[2, 3, 4]); // cannot be above (1)
+        grid[1] = vm(&[5]);       // fixed to target
+        grid[2] = vm(&[8, 9]);    // can be below (9)
+
+        let mut a = acc();
+        assert!(handler.enforce_consistency(&mut grid, &mut a));
+        assert_eq!(grid[2], vm(&[9]));
+    }
+
+    #[test]
+    fn prune_target_at_edge_if_only_neighbor_cannot_be_flatmate() {
+        let (mut grid, shape) = make_grid(1, 2, Some(9));
+        let cells = (0..2).collect();
+        let mut handler = DutchFlatmateLine::new(cells);
+        assert!(init(&mut handler, &mut grid, shape));
+
+        grid[0] = vm(&[5, 6]);
+        grid[1] = vm(&[2, 3, 4]); // cannot be 1 or 9
+
+        let mut a = acc();
+        assert!(handler.enforce_consistency(&mut grid, &mut a));
+        assert_eq!(grid[0], vm(&[6]));
+    }
+
+    #[test]
+    fn work_on_short_lines_where_below_cannot_exist() {
+        // 6-cell line, numValues=8 => target=ceil(8/2)=4, above=1, below=8
+        let (mut grid, shape) = make_grid(1, 6, Some(8));
+        let cells = (0..6).collect();
+        let mut handler = DutchFlatmateLine::new(cells);
+        assert!(init(&mut handler, &mut grid, shape));
+
+        // Remove 8 everywhere
+        for i in 0..6 {
+            grid[i] = grid[i] & !vm(&[8]);
+        }
+
+        // Fix target (4) at index 2
+        grid[2] = vm(&[4]);
+
+        // Only valid flatmate is above (1) on the left
+        grid[1] = vm(&[1, 2]);
+        grid[3] = vm(&[2, 3, 5, 6, 7]); // cannot be 1; 8 already removed
+
+        let mut a = acc();
+        assert!(handler.enforce_consistency(&mut grid, &mut a));
+        assert_eq!(grid[1], vm(&[1]));
+        for i in 0..6 {
+            assert_eq!(grid[i] & vm(&[8]), CandidateSet::EMPTY);
+        }
+    }
+
+    #[test]
+    fn fail_when_neither_flatmate_can_exist_in_line() {
+        // numValues=8 => target=4, above=1, below=8
+        let (mut grid, shape) = make_grid(1, 3, Some(8));
+        let cells = (0..3).collect();
+        let mut handler = DutchFlatmateLine::new(cells);
+        assert!(init(&mut handler, &mut grid, shape));
+
+        // Remove both flatmate values (1 and 8) everywhere
+        for i in 0..3 {
+            grid[i] = grid[i] & !(vm(&[1]) | vm(&[8]));
+        }
+
+        // Target is 4, forced in middle
+        grid[1] = vm(&[4]);
+
+        assert!(!handler.enforce_consistency(&mut grid, &mut acc()));
+    }
+}
