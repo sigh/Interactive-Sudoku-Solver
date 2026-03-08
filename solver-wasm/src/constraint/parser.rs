@@ -1429,21 +1429,33 @@ fn parse_jigsaw_layout(
         return Ok(());
     }
 
+    // Filter regions by size, mirroring JS makeFromArgs:
+    // - Regions with minRegionSize <= len <= maxRegionSize are valid.
+    // - Allow one region with a different size (e.g. background in squishdoku).
+    // - Error if more than one non-standard-sized region exists.
+    let max_region_size = shape.num_values as usize;
+    let min_region_size =
+        crate::grid_shape::default_num_values(shape.num_rows, shape.num_cols) as usize;
+
     let grid_spec = shape.name();
-    let num_cols = shape.num_cols as usize;
+    let mut saw_other_region_size = false;
     for (_ch, region) in &regions {
-        let cells: Vec<String> = region
-            .iter()
-            .map(|&c| {
-                let r = c as usize / num_cols;
-                let col = c as usize % num_cols;
-                format!("R{}C{}", r + 1, col + 1)
-            })
-            .collect();
-        constraints.push(Constraint::Jigsaw {
-            grid_spec: grid_spec.clone(),
-            cells,
-        });
+        let len = region.len();
+        if len >= min_region_size && len <= max_region_size {
+            let cells: Vec<String> = region
+                .iter()
+                .map(|&c| shape.cell_id_from_index(c as usize))
+                .collect();
+            constraints.push(Constraint::Jigsaw {
+                grid_spec: grid_spec.clone(),
+                cells,
+            });
+        } else if !saw_other_region_size {
+            // Allow one region with a different size (e.g. background).
+            saw_other_region_size = true;
+        } else {
+            return Err("Inconsistent region sizes in jigsaw layout".to_string());
+        }
     }
 
     Ok(())

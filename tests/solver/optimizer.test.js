@@ -985,4 +985,160 @@ await runTest('_makeInnieOutieSumHandlers: sum calculation uses correct house su
   }
 });
 
+// =============================================================================
+// HandlerUtil.exclusionGroupSumInfo tests
+// =============================================================================
+
+await runTest('exclusionGroupSumInfo: single group of 3 cells', () => {
+  // Single group of 3 cells with numValues=9: min=1+2+3=6, range=(9-3)*3=18, max=24.
+  const groups = [[0, 1, 2]];
+  const info = HandlerModule.HandlerUtil.exclusionGroupSumInfo(groups, 9);
+  assert.equal(info.min, 6);
+  assert.equal(info.range, 18);
+  assert.equal(info.max, 24);
+});
+
+// =============================================================================
+// HandlerUtil.findExclusionGroups tests
+// =============================================================================
+
+await runTest('findExclusionGroups: mutually exclusive cells in one group', () => {
+  const numCells = 9;
+  const cellExclusions = createExclusions(numCells);
+  // Make cells 0..8 all mutually exclusive (like a house row).
+  for (let i = 0; i < 9; i++) {
+    for (let j = i + 1; j < 9; j++) {
+      cellExclusions.addMutualExclusion(i, j);
+    }
+  }
+  const egData = HandlerModule.HandlerUtil.findExclusionGroups([0, 1, 2], cellExclusions);
+  // All 3 cells should be in one group since they're mutually exclusive.
+  assert.equal(egData.groups.length, 1);
+  assert.equal(egData.groups[0].length, 3);
+});
+
+await runTest('findExclusionGroups: non-exclusive cells in separate groups', () => {
+  const numCells = 3;
+  const cellExclusions = createExclusions(numCells);
+  // 0 and 1 are exclusive, but 2 is not exclusive with either.
+  cellExclusions.addMutualExclusion(0, 1);
+  const egData = HandlerModule.HandlerUtil.findExclusionGroups([0, 1, 2], cellExclusions);
+  // Should get 2 groups: {0,1} and {2}.
+  assert.equal(egData.groups.length, 2);
+});
+
+// =============================================================================
+// _addHouseHandlers tests
+// =============================================================================
+
+await runTest('_addHouseHandlers: promotes 9-cell AllDifferent to House', () => {
+  const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
+  const shape = GridShape.fromGridSize(9);
+  const cells = Array.from({ length: 9 }, (_, i) => i);
+  const ad = new HandlerModule.AllDifferent(cells);
+  const handlerSet = new HandlerSet([ad], shape);
+
+  optimizer._addHouseHandlers(handlerSet, shape);
+
+  const houses = handlerSet.getAllofType(HandlerModule.House);
+  assert.equal(houses.length, 1);
+});
+
+// =============================================================================
+// _replaceSizeSpecificSumHandlers tests (additional)
+// =============================================================================
+
+await runTest('_replaceSizeSpecificSumHandlers: 1-cell sum becomes GivenCandidates', () => {
+  const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
+  const shape = GridShape.fromGridSize(9);
+  const cellExclusions = createExclusions(shape.numCells);
+
+  const sumHandler = new SumHandlerModule.Sum([0], 5);
+  const handlerSet = new HandlerSet([sumHandler], shape);
+
+  optimizer._replaceSizeSpecificSumHandlers(handlerSet, cellExclusions, shape);
+
+  assert.equal(handlerSet.getAllofType(SumHandlerModule.Sum).length, 0);
+  assert.equal(handlerSet.getAllofType(HandlerModule.GivenCandidates).length, 1);
+});
+
+await runTest('_replaceSizeSpecificSumHandlers: 2-cell sum becomes BinaryConstraint', () => {
+  const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
+  const shape = GridShape.fromGridSize(9);
+  const cellExclusions = createExclusions(shape.numCells);
+  cellExclusions.addMutualExclusion(0, 1);
+
+  const sumHandler = new SumHandlerModule.Sum([0, 1], 7);
+  const handlerSet = new HandlerSet([sumHandler], shape);
+
+  optimizer._replaceSizeSpecificSumHandlers(handlerSet, cellExclusions, shape);
+
+  assert.equal(handlerSet.getAllofType(SumHandlerModule.Sum).length, 0);
+  assert.equal(handlerSet.getAllofType(HandlerModule.BinaryConstraint).length, 1);
+});
+
+// =============================================================================
+// optimize_required_values regression tests
+// =============================================================================
+
+await runTest('_optimizeRequiredValues: valid ContainExact~6_6 diagonal does not produce False', () => {
+  const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
+  const shape = GridShape.fromGridSize(9);
+  const cellExclusions = createExclusions(shape.numCells);
+  // Cells R6C9=53, R7C8=61, R8C7=69, R9C6=77 — box 9 makes R7C8 and R8C7 exclusive.
+  cellExclusions.addMutualExclusion(61, 69);
+
+  const cells = [53, 61, 69, 77];
+  const rv = new HandlerModule.RequiredValues(cells, [6, 6], true);
+  const handlerSet = new HandlerSet([rv], shape);
+
+  optimizer._optimizeRequiredValues(handlerSet, cellExclusions, shape);
+
+  const falses = handlerSet.getAllofType(HandlerModule.False);
+  assert.equal(falses.length, 0, 'ContainExact~6_6 on diagonal must not produce False');
+});
+
+await runTest('_optimizeRequiredValues: removes only one occurrence of forced value', () => {
+  const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
+  const shape = GridShape.fromGridSize(9);
+  const cellExclusions = createExclusions(shape.numCells);
+  // Cells 0 and 1 are mutually exclusive.
+  cellExclusions.addMutualExclusion(0, 1);
+
+  // Value 1 must appear exactly TWICE among cells [0, 1, 2].
+  // Groups {0,1} and {2}. Valid placements: {0,2} and {1,2}.
+  // Cell 2 forced → one occurrence removed, RequiredValues([0,1], [1]) remains.
+  const rv = new HandlerModule.RequiredValues([0, 1, 2], [1, 1], true);
+  const handlerSet = new HandlerSet([rv], shape);
+
+  optimizer._optimizeRequiredValues(handlerSet, cellExclusions, shape);
+
+  const gcs = handlerSet.getAllofType(HandlerModule.GivenCandidates);
+  assert.equal(gcs.length, 1, 'expected one GivenCandidates for cell 2');
+
+  const rvs = handlerSet.getAllofType(HandlerModule.RequiredValues);
+  assert.equal(rvs.length, 1, 'RequiredValues should survive with remaining count');
+  assert.equal(rvs[0].values().length, 1, 'one occurrence of value 1 should remain');
+  assert.equal(rvs[0].values()[0], 1);
+  assert.equal(rvs[0].cells.length, 2, 'cell 2 should be removed');
+});
+
+await runTest('_optimizeRequiredValues: all forced deletes handler', () => {
+  const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
+  const shape = GridShape.fromGridSize(9);
+  const cellExclusions = createExclusions(shape.numCells);
+
+  // 3 cells, no exclusions. Value 1 must appear 3 times → all forced.
+  const rv = new HandlerModule.RequiredValues([0, 1, 2], [1, 1, 1], true);
+  const handlerSet = new HandlerSet([rv], shape);
+
+  optimizer._optimizeRequiredValues(handlerSet, cellExclusions, shape);
+
+  const rvs = handlerSet.getAllofType(HandlerModule.RequiredValues);
+  assert.equal(rvs.length, 0, 'RequiredValues should be deleted when all cells forced');
+
+  const gcs = handlerSet.getAllofType(HandlerModule.GivenCandidates);
+  assert.equal(gcs.length, 1, 'GivenCandidates should cover forced cells');
+});
+
 logSuiteComplete('optimizer');

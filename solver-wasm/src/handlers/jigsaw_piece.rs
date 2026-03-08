@@ -42,3 +42,22 @@ impl ConstraintHandler for JigsawPiece {
         "JigsawPiece"
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::handlers::test_util::*;
+
+    #[test]
+    fn enforce_returns_true() {
+        let handler = JigsawPiece::new(vec![0, 1, 2]);
+        let (mut grid, _) = make_grid(1, 4, None);
+        assert!(handler.enforce_consistency(&mut grid, &mut acc()));
+    }
+
+    #[test]
+    fn reports_cells() {
+        let handler = JigsawPiece::new(vec![3, 5, 7]);
+        assert_eq!(handler.cells(), &[3, 5, 7]);
+    }
+}

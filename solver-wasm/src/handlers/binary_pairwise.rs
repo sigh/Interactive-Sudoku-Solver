@@ -12,6 +12,8 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, OnceLock};
 
+use crate::bit_set::BitSet;
+
 use crate::api::types::CellIndex;
 use crate::candidate_set::CandidateSet;
 use crate::grid_shape::GridShape;
@@ -167,6 +169,8 @@ pub struct BinaryPairwise {
     id_str: String,
     /// Prefix cache for arc consistency (interior mutable scratch space).
     prefix_cache: RefCell<Vec<CandidateSet>>,
+    /// Tracks which cells have changed across iterations (supports >31 cells).
+    all_changed: RefCell<BitSet>,
     /// Valid combination info table (only for all-different keys).
     valid_combination_info: Option<Arc<Vec<u32>>>,
     /// Whether to run exposeHiddenSingles during required-value enforcement.
@@ -187,6 +191,7 @@ impl BinaryPairwise {
             s
         };
         let prefix_cache = vec![CandidateSet::EMPTY; cells.len() + 1];
+        let all_changed = BitSet::with_capacity(cells.len().max(1));
         let is_all_different = Self::check_all_different(&tables[0], num_values);
         Self {
             cells,
@@ -196,6 +201,7 @@ impl BinaryPairwise {
             is_all_different,
             id_str,
             prefix_cache: RefCell::new(prefix_cache),
+            all_changed: RefCell::new(all_changed),
             valid_combination_info: None,
             enable_hidden_singles: false,
         }
@@ -378,19 +384,20 @@ impl ConstraintHandler for BinaryPairwise {
         let all_values = CandidateSet::all(self.num_values);
         prefix[0] = all_values;
 
-        let mut all_changed = 0u32;
-        let mut new_changed = 1u32;
+        let mut all_changed = self.all_changed.borrow_mut();
+        all_changed.clear();
+        let all_changed_words = all_changed.words_mut();
 
-        while new_changed != 0 {
-            let first_cell = (new_changed & new_changed.wrapping_neg()).trailing_zeros() as usize;
-            new_changed = 0;
+        let mut first_changed: usize = 0;
 
-            // Forward pass: build prefix.
-            for i in first_cell..num_cells {
+        while first_changed < num_cells {
+            // Forward pass: build prefix from first changed cell.
+            for i in first_changed..num_cells {
                 prefix[i + 1] = prefix[i] & table[usize::from(grid[cells[i] as usize])];
             }
 
             // Backward pass: enforce and compute suffix.
+            first_changed = num_cells;
             let mut suffix = all_values;
             for i in (0..num_cells).rev() {
                 let v = grid[cells[i] as usize];
@@ -400,20 +407,16 @@ impl ConstraintHandler for BinaryPairwise {
                         return false;
                     }
                     grid[cells[i] as usize] = v_new;
-                    new_changed |= 1 << i;
+                    first_changed = i;
+                    let bit = 1u32 << (i & 31);
+                    let word = i >> 5;
+                    if (bit & all_changed_words[word]) == 0 {
+                        all_changed_words[word] |= bit;
+                        acc.add_for_cell(cells[i]);
+                    }
                 }
                 suffix = suffix & table[usize::from(v)];
             }
-            all_changed |= new_changed;
-        }
-
-        // Queue changed cells.
-        let mut changed = all_changed;
-        while changed != 0 {
-            let bit = changed & changed.wrapping_neg();
-            changed ^= bit;
-            let idx = bit.trailing_zeros() as usize;
-            acc.add_for_cell(cells[idx]);
         }
 
         // --- All-different path ---
@@ -480,5 +483,112 @@ impl ConstraintHandler for BinaryPairwise {
 
     fn id_str(&self) -> String {
         self.id_str.clone()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::handlers::test_util::*;
+    use crate::handlers::fn_to_binary_key;
+
+    fn all_diff_key(num_values: u8) -> String {
+        fn_to_binary_key(&|a, b| a != b, num_values)
+    }
+
+    #[test]
+    fn prefix_suffix_prunes_values() {
+        // 3 cells, all-different (a≠b), numValues=4.
+        // Cell 0={1}, cell 1={1,2,3,4}, cell 2={1,2,3,4}.
+        // After forward: cell 1 loses 1 (table[{1}] excludes 1), cell 2 gets further restriction.
+        let key = all_diff_key(4);
+        let (mut grid, shape) = make_grid(1, 4, Some(4));
+        let mut handler = BinaryPairwise::new(key, vec![0, 1, 2], 4);
+        init(&mut handler, &mut grid, shape);
+
+        grid[0] = vm(&[1]);
+
+        let mut a = acc();
+        assert!(handler.enforce_consistency(&mut grid, &mut a));
+        // Cell 1 should not contain 1.
+        assert_eq!(grid[1] & vm(&[1]), CandidateSet::EMPTY);
+    }
+
+    #[test]
+    fn all_different_filters_combinations() {
+        // 3 cells, numValues=3. All cells have {1,2,3}.
+        // Valid combos: {1,2,3} and permutations → allValues={1,2,3}, requiredValues={1,2,3}.
+        let key = all_diff_key(3);
+        let (mut grid, shape) = make_grid(1, 3, Some(3));
+        let mut handler = BinaryPairwise::new(key, vec![0, 1, 2], 3);
+        init(&mut handler, &mut grid, shape);
+
+        let mut a = acc();
+        assert!(handler.enforce_consistency(&mut grid, &mut a));
+        // All values remain since all combos use {1,2,3}.
+        assert_eq!(grid[0], vm(&[1, 2, 3]));
+    }
+
+    #[test]
+    fn fail_when_no_valid_assignment() {
+        // 3 cells, all-different, numValues=2. Need 3 distinct values from {1,2} → impossible.
+        let key = all_diff_key(2);
+        let (mut grid, shape) = make_grid(1, 3, Some(2));
+        let mut handler = BinaryPairwise::new(key, vec![0, 1, 2], 2);
+        let ok = init(&mut handler, &mut grid, shape);
+        if ok {
+            let mut a = acc();
+            // Prefix pass: prefix[3] should be empty.
+            assert!(!handler.enforce_consistency(&mut grid, &mut a));
+        }
+    }
+
+    #[test]
+    fn non_all_different_key() {
+        // Key: a <= b (non-all-different, non-symmetric actually, but let's use a+b <= 5).
+        let key = fn_to_binary_key(&|a, b| a + b <= 5, 4);
+        let (mut grid, shape) = make_grid(1, 4, Some(4));
+        let mut handler = BinaryPairwise::new(key, vec![0, 1], 4);
+        init(&mut handler, &mut grid, shape);
+
+        grid[0] = vm(&[4]);
+        // a=4, need a+b <= 5, so b=1 only.
+        let mut a = acc();
+        assert!(handler.enforce_consistency(&mut grid, &mut a));
+        assert_eq!(grid[1], vm(&[1]));
+    }
+
+    #[test]
+    fn backward_pass_prunes_last_cell() {
+        // 2 cells, all-different, numValues=4. Cell 1 fixed to 3.
+        // After backward: cell 0 should lose 3.
+        let key = all_diff_key(4);
+        let (mut grid, shape) = make_grid(1, 4, Some(4));
+        let mut handler = BinaryPairwise::new(key, vec![0, 1], 4);
+        init(&mut handler, &mut grid, shape);
+
+        grid[1] = vm(&[3]);
+
+        let mut a = acc();
+        assert!(handler.enforce_consistency(&mut grid, &mut a));
+        assert_eq!(grid[0] & vm(&[3]), CandidateSet::EMPTY);
+    }
+
+    #[test]
+    fn valid_combination_info_zero_when_no_valid_subset() {
+        // Entropic key: values must be from different groups of 3.
+        // Groups: {1,2,3}, {4,5,6}, {7,8,9}.
+        // With numCells=3, selecting 3 from {1,2,3,4} has no valid 3-cell subset
+        // (every triple includes two values from group 0).
+        // The table entry for valueMask(1,2,3,4) must be 0.
+        // Regression: an operator precedence bug in JS left stale required-value bits.
+        let num_values: u8 = 9;
+        let key = fn_to_binary_key(
+            &|a, b| ((a - 1) / 3) != ((b - 1) / 3),
+            num_values,
+        );
+        let table = build_valid_combination_info(&key, num_values, 3);
+        let mask = vm(&[1, 2, 3, 4]);
+        assert_eq!(table[usize::from(mask)], 0);
     }
 }

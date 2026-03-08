@@ -356,3 +356,78 @@ impl ConstraintHandler for Or {
         true
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::handlers::test_util::*;
+    use crate::handlers::{True, False};
+    use crate::solver::grid_state_allocator::GridStateAllocator;
+
+    /// Initialize an Or handler with proper state allocation.
+    fn init_or(
+        handler: &mut Or,
+        grid: &mut Vec<CandidateSet>,
+        shape: GridShape,
+    ) -> bool {
+        let ce = CellExclusions::with_num_cells(grid.len());
+        let mut alloc = GridStateAllocator::new(grid.len());
+        let ok = handler.initialize(grid, &ce, shape, &mut alloc);
+        if ok {
+            let state = alloc.make_grid_state(grid);
+            *grid = state;
+            handler.post_initialize(grid);
+        }
+        ok
+    }
+
+    #[test]
+    fn all_handlers_fail_returns_false() {
+        let h1: Box<dyn ConstraintHandler> = Box::new(False::new(vec![0]));
+        let h2: Box<dyn ConstraintHandler> = Box::new(False::new(vec![0]));
+        let mut handler = Or::new(vec![h1, h2]);
+
+        let (mut grid, shape) = make_grid(1, 4, Some(4));
+        assert!(!init_or(&mut handler, &mut grid, shape));
+    }
+
+    #[test]
+    fn single_valid_handler_delegates() {
+        let h1: Box<dyn ConstraintHandler> = Box::new(True);
+        let h2: Box<dyn ConstraintHandler> = Box::new(False::new(vec![0]));
+        let mut handler = Or::new(vec![h1, h2]);
+
+        let (mut grid, shape) = make_grid(1, 4, Some(4));
+        assert!(init_or(&mut handler, &mut grid, shape));
+
+        let mut a = acc();
+        assert!(handler.enforce_consistency(&mut grid, &mut a));
+    }
+
+    #[test]
+    fn multiple_valid_handlers_union() {
+        let h1: Box<dyn ConstraintHandler> = Box::new(True);
+        let h2: Box<dyn ConstraintHandler> = Box::new(True);
+        let mut handler = Or::new(vec![h1, h2]);
+
+        let (mut grid, shape) = make_grid(1, 4, Some(4));
+        assert!(init_or(&mut handler, &mut grid, shape));
+
+        let mut a = acc();
+        assert!(handler.enforce_consistency(&mut grid, &mut a));
+    }
+
+    #[test]
+    fn init_prunes_infeasible_handlers() {
+        let h1: Box<dyn ConstraintHandler> = Box::new(True);
+        let h2: Box<dyn ConstraintHandler> = Box::new(False::new(vec![0]));
+        let h3: Box<dyn ConstraintHandler> = Box::new(True);
+        let mut handler = Or::new(vec![h1, h2, h3]);
+
+        let (mut grid, shape) = make_grid(1, 4, Some(4));
+        assert!(init_or(&mut handler, &mut grid, shape));
+
+        let mut a = acc();
+        assert!(handler.enforce_consistency(&mut grid, &mut a));
+    }
+}

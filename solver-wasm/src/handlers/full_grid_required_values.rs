@@ -181,3 +181,188 @@ impl ConstraintHandler for FullGridRequiredValues {
         "FullGridRequiredValues"
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::handlers::test_util::*;
+
+    fn make_lines_3x2() -> Vec<Vec<CellIndex>> {
+        vec![vec![0, 1], vec![2, 3], vec![4, 5]]
+    }
+
+    fn make_lines_4x3() -> Vec<Vec<CellIndex>> {
+        vec![
+            vec![0, 1, 2],
+            vec![3, 4, 5],
+            vec![6, 7, 8],
+            vec![9, 10, 11],
+        ]
+    }
+
+    #[test]
+    fn forbids_value_when_satisfied_eq_required() {
+        let (mut grid, _shape) = make_grid(2, 3, Some(3));
+        let lines = make_lines_3x2();
+        let cells: Vec<CellIndex> = (0..6).collect();
+        let handler = FullGridRequiredValues::new(cells, lines);
+
+        // Value 1 fixed in two lines (required = 2), so must be removed from line 2
+        grid[0] = vm(&[1]);
+        grid[2] = vm(&[1]);
+
+        let mut a = acc();
+        assert!(handler.enforce_consistency(&mut grid, &mut a));
+        assert_eq!(grid[4] & vm(&[1]), CandidateSet::EMPTY);
+        assert_eq!(grid[5] & vm(&[1]), CandidateSet::EMPTY);
+    }
+
+    #[test]
+    fn fail_when_satisfied_gt_required() {
+        let (mut grid, _shape) = make_grid(2, 3, Some(3));
+        let lines = make_lines_3x2();
+        let cells: Vec<CellIndex> = (0..6).collect();
+        let handler = FullGridRequiredValues::new(cells, lines);
+
+        // Value 1 fixed in all 3 lines, but required = 2
+        grid[0] = vm(&[1]);
+        grid[2] = vm(&[1]);
+        grid[4] = vm(&[1]);
+
+        assert!(!handler.enforce_consistency(&mut grid, &mut acc()));
+    }
+
+    #[test]
+    fn fail_when_satisfied_plus_possible_lt_required() {
+        let (mut grid, _shape) = make_grid(2, 3, Some(3));
+        let lines = make_lines_3x2();
+        let cells: Vec<CellIndex> = (0..6).collect();
+        let handler = FullGridRequiredValues::new(cells, lines);
+
+        let v2 = vm(&[2]);
+        // Remove 2 from line 1 and line 2
+        grid[2] = grid[2] & !v2;
+        grid[3] = grid[3] & !v2;
+        grid[4] = grid[4] & !v2;
+        grid[5] = grid[5] & !v2;
+
+        assert!(!handler.enforce_consistency(&mut grid, &mut acc()));
+    }
+
+    #[test]
+    fn force_value_when_single_candidate_cell() {
+        let (mut grid, _shape) = make_grid(2, 3, Some(3));
+        let lines = make_lines_3x2();
+        let cells: Vec<CellIndex> = (0..6).collect();
+        let handler = FullGridRequiredValues::new(cells, lines);
+
+        let v3 = vm(&[3]);
+
+        // line 0 satisfied (cell 1 fixed to 3)
+        grid[1] = v3;
+        // line 1: only cell 2 can be 3
+        grid[2] = vm(&[1, 3]);
+        grid[3] = vm(&[1, 2]);
+        // line 2: make value 3 impossible
+        grid[4] = grid[4] & !v3;
+        grid[5] = grid[5] & !v3;
+
+        let mut a = acc();
+        assert!(handler.enforce_consistency(&mut grid, &mut a));
+        assert_eq!(grid[2], v3);
+    }
+
+    #[test]
+    fn prune_non_required_values_when_required_exactly_fill_line() {
+        let (mut grid, _shape) = make_grid(3, 4, Some(4));
+        let lines = make_lines_4x3();
+        let cells: Vec<CellIndex> = (0..12).collect();
+        let handler = FullGridRequiredValues::new(cells, lines);
+
+        let v1 = vm(&[1]);
+        let v2 = vm(&[2]);
+        let v3 = vm(&[3]);
+        let v4 = vm(&[4]);
+
+        // Remove 3 from line 1
+        for &cell in &[3, 4, 5] {
+            grid[cell as usize] = grid[cell as usize] & !v3;
+        }
+        // Remove 2 from line 2
+        for &cell in &[6, 7, 8] {
+            grid[cell as usize] = grid[cell as usize] & !v2;
+        }
+        // Remove 1 from line 3
+        for &cell in &[9, 10, 11] {
+            grid[cell as usize] = grid[cell as usize] & !v1;
+        }
+
+        let mut a = acc();
+        assert!(handler.enforce_consistency(&mut grid, &mut a));
+        // Line 0 has required values {1,2,3} which exactly fill line length=3
+        // so value 4 should be removed from all cells in line 0
+        for &cell in &[0, 1, 2] {
+            assert_eq!(grid[cell as usize] & v4, CandidateSet::EMPTY);
+        }
+    }
+
+    #[test]
+    fn fail_when_line_has_too_many_required_values() {
+        let (mut grid, _shape) = make_grid(3, 4, Some(4));
+        let lines = make_lines_4x3();
+        let cells: Vec<CellIndex> = (0..12).collect();
+        let handler = FullGridRequiredValues::new(cells, lines);
+
+        let v1 = vm(&[1]);
+        let v2 = vm(&[2]);
+        let v3 = vm(&[3]);
+        let v4 = vm(&[4]);
+
+        // Make ALL values required by removing each from exactly one line
+        for &cell in &[3, 4, 5] {
+            grid[cell as usize] = grid[cell as usize] & !v1;
+        }
+        for &cell in &[6, 7, 8] {
+            grid[cell as usize] = grid[cell as usize] & !v2;
+        }
+        for &cell in &[9, 10, 11] {
+            grid[cell as usize] = grid[cell as usize] & !v3;
+        }
+        // Also remove 4 from line 1 so 4 becomes required too
+        for &cell in &[3, 4, 5] {
+            grid[cell as usize] = grid[cell as usize] & !v4;
+        }
+
+        assert!(!handler.enforce_consistency(&mut grid, &mut acc()));
+    }
+
+    #[test]
+    fn fail_multiple_hidden_singles_in_one_cell() {
+        let (mut grid, _shape) = make_grid(2, 3, Some(3));
+        let lines = make_lines_3x2();
+        let cells: Vec<CellIndex> = (0..6).collect();
+        let handler = FullGridRequiredValues::new(cells, lines);
+
+        let v1 = vm(&[1]);
+        let v2 = vm(&[2]);
+        let v3 = vm(&[3]);
+
+        // Line 0: cell 0 = 1, cell 1 = {2,3}
+        grid[0] = v1;
+        grid[1] = v2 | v3;
+
+        // Make value 2 required: satisfied in line 1, possible in line 0, impossible in line 2
+        grid[2] = v2;
+        grid[3] = v1 | v2;
+        grid[4] = grid[4] & !v2;
+        grid[5] = grid[5] & !v2;
+
+        // Make value 3 required: satisfied in line 2, possible in line 0, impossible in line 1
+        grid[4] = v3;
+        grid[5] = v1 | v3;
+        grid[2] = grid[2] & !v3;
+        grid[3] = grid[3] & !v3;
+
+        assert!(!handler.enforce_consistency(&mut grid, &mut acc()));
+    }
+}

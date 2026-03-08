@@ -431,4 +431,415 @@ mod tests {
         let allowed = bc.tables[0][usize::from(CandidateSet::from_value(5))];
         assert_eq!(allowed, CandidateSet::from_value(5));
     }
+
+    fn vm(values: &[u8]) -> CandidateSet {
+        let mut raw: u16 = 0;
+        for &v in values {
+            raw |= 1 << (v - 1);
+        }
+        CandidateSet::from_raw(raw)
+    }
+
+    fn make_handler(pred: impl Fn(u8, u8) -> bool, nv: u8, cell0: CellIndex, cell1: CellIndex) -> BinaryConstraint {
+        BinaryConstraint::from_predicate(cell0, cell1, pred, nv)
+    }
+
+    fn init_handler(handler: &mut BinaryConstraint, grid: &mut [CandidateSet], ce: &CellExclusions) -> bool {
+        let shape = GridShape::square(1).unwrap(); // shape doesn't matter for binary
+        let mut alloc = GridStateAllocator::new(grid.len());
+        handler.initialize(grid, ce, shape, &mut alloc)
+    }
+
+    // =========================================================================
+    // Initialization tests
+    // =========================================================================
+
+    #[test]
+    fn binary_init_valid_key() {
+        let nv = 4;
+        let all = CandidateSet::all(nv);
+        let mut grid = vec![all; 4];
+        let mut handler = make_handler(|a, b| a != b, nv, 0, 1);
+        let ce = CellExclusions::with_num_cells(4);
+        assert_eq!(init_handler(&mut handler, &mut grid, &ce), true);
+    }
+
+    #[test]
+    fn binary_init_fail_no_legal_values() {
+        let nv = 4;
+        let all = CandidateSet::all(nv);
+        let mut grid = vec![all; 4];
+        let mut handler = make_handler(|_a, _b| false, nv, 0, 1);
+        let ce = CellExclusions::with_num_cells(4);
+        assert_eq!(init_handler(&mut handler, &mut grid, &ce), false);
+    }
+
+    #[test]
+    fn binary_store_key() {
+        let key = fn_to_binary_key(&|a: u8, b: u8| a < b, 4);
+        let handler = BinaryConstraint::from_key(0, 1, key.clone(), 4);
+        assert_eq!(handler.key(), key);
+    }
+
+    #[test]
+    fn binary_unique_id_str() {
+        let key = fn_to_binary_key(&|a: u8, b: u8| a < b, 4);
+        let h1 = BinaryConstraint::from_key(0, 1, key.clone(), 4);
+        let h2 = BinaryConstraint::from_key(0, 2, key.clone(), 4);
+        let h3 = BinaryConstraint::from_key(0, 1, key.clone(), 4);
+        assert_ne!(h1.id_str(), h2.id_str());
+        assert_eq!(h1.id_str(), h3.id_str());
+    }
+
+    // =========================================================================
+    // Not-equal constraint (a != b)
+    // =========================================================================
+
+    #[test]
+    fn not_equal_no_prune_when_unfixed() {
+        let mut handler = make_handler(|a, b| a != b, 4, 0, 1);
+        let mut grid = vec![vm(&[1, 2]), vm(&[1, 2, 3])];
+        let ce = CellExclusions::with_num_cells(2);
+        init_handler(&mut handler, &mut grid, &ce);
+
+        grid[0] = vm(&[1, 2]);
+        grid[1] = vm(&[1, 2, 3]);
+        let mut a = HandlerAccumulator::new_stub();
+        assert_eq!(handler.enforce_consistency(&mut grid, &mut a), true);
+        assert_eq!(grid[0], vm(&[1, 2]));
+        assert_eq!(grid[1], vm(&[1, 2, 3]));
+    }
+
+    #[test]
+    fn not_equal_prune_when_one_fixed() {
+        let mut handler = make_handler(|a, b| a != b, 4, 0, 1);
+        let all = CandidateSet::all(4);
+        let mut grid = vec![all; 4];
+        let ce = CellExclusions::with_num_cells(4);
+        init_handler(&mut handler, &mut grid, &ce);
+
+        grid[0] = vm(&[2]);
+        grid[1] = vm(&[1, 2, 3]);
+        let mut a = HandlerAccumulator::new_stub();
+        assert_eq!(handler.enforce_consistency(&mut grid, &mut a), true);
+        assert_eq!(grid[0], vm(&[2]));
+        assert_eq!(grid[1], vm(&[1, 3]));
+    }
+
+    #[test]
+    fn not_equal_fail_same_value() {
+        let mut handler = make_handler(|a, b| a != b, 4, 0, 1);
+        let all = CandidateSet::all(4);
+        let mut grid = vec![all; 4];
+        let ce = CellExclusions::with_num_cells(4);
+        init_handler(&mut handler, &mut grid, &ce);
+
+        grid[0] = vm(&[2]);
+        grid[1] = vm(&[2]);
+        let mut a = HandlerAccumulator::new_stub();
+        assert_eq!(handler.enforce_consistency(&mut grid, &mut a), false);
+    }
+
+    // =========================================================================
+    // Less-than constraint (a < b)
+    // =========================================================================
+
+    #[test]
+    fn less_than_prune_high_from_first() {
+        let mut handler = make_handler(|a, b| a < b, 4, 0, 1);
+        let all = CandidateSet::all(4);
+        let mut grid = vec![all; 4];
+        let ce = CellExclusions::with_num_cells(4);
+        init_handler(&mut handler, &mut grid, &ce);
+
+        grid[0] = vm(&[1, 2, 3, 4]);
+        grid[1] = vm(&[3]);
+        let mut a = HandlerAccumulator::new_stub();
+        assert_eq!(handler.enforce_consistency(&mut grid, &mut a), true);
+        assert_eq!(grid[0], vm(&[1, 2]));
+        assert_eq!(grid[1], vm(&[3]));
+    }
+
+    #[test]
+    fn less_than_prune_low_from_second() {
+        let mut handler = make_handler(|a, b| a < b, 4, 0, 1);
+        let all = CandidateSet::all(4);
+        let mut grid = vec![all; 4];
+        let ce = CellExclusions::with_num_cells(4);
+        init_handler(&mut handler, &mut grid, &ce);
+
+        grid[0] = vm(&[2]);
+        grid[1] = vm(&[1, 2, 3, 4]);
+        let mut a = HandlerAccumulator::new_stub();
+        assert_eq!(handler.enforce_consistency(&mut grid, &mut a), true);
+        assert_eq!(grid[0], vm(&[2]));
+        assert_eq!(grid[1], vm(&[3, 4]));
+    }
+
+    #[test]
+    fn less_than_prune_both() {
+        let mut handler = make_handler(|a, b| a < b, 4, 0, 1);
+        let all = CandidateSet::all(4);
+        let mut grid = vec![all; 4];
+        let ce = CellExclusions::with_num_cells(4);
+        init_handler(&mut handler, &mut grid, &ce);
+
+        grid[0] = vm(&[2, 3, 4]);
+        grid[1] = vm(&[1, 2, 3]);
+        let mut a = HandlerAccumulator::new_stub();
+        assert_eq!(handler.enforce_consistency(&mut grid, &mut a), true);
+        assert_eq!(grid[0], vm(&[2]));
+        assert_eq!(grid[1], vm(&[3]));
+    }
+
+    #[test]
+    fn less_than_fail_no_valid_pair() {
+        let mut handler = make_handler(|a, b| a < b, 4, 0, 1);
+        let all = CandidateSet::all(4);
+        let mut grid = vec![all; 4];
+        let ce = CellExclusions::with_num_cells(4);
+        init_handler(&mut handler, &mut grid, &ce);
+
+        grid[0] = vm(&[3, 4]);
+        grid[1] = vm(&[1, 2]);
+        let mut a = HandlerAccumulator::new_stub();
+        assert_eq!(handler.enforce_consistency(&mut grid, &mut a), false);
+    }
+
+    // =========================================================================
+    // Equals constraint (a == b)
+    // =========================================================================
+
+    #[test]
+    fn equals_intersect_candidates() {
+        let mut handler = make_handler(|a, b| a == b, 4, 0, 1);
+        let all = CandidateSet::all(4);
+        let mut grid = vec![all; 4];
+        let ce = CellExclusions::with_num_cells(4);
+        init_handler(&mut handler, &mut grid, &ce);
+
+        grid[0] = vm(&[1, 2, 3]);
+        grid[1] = vm(&[2, 3, 4]);
+        let mut a = HandlerAccumulator::new_stub();
+        assert_eq!(handler.enforce_consistency(&mut grid, &mut a), true);
+        assert_eq!(grid[0], vm(&[2, 3]));
+        assert_eq!(grid[1], vm(&[2, 3]));
+    }
+
+    #[test]
+    fn equals_fail_no_common() {
+        let mut handler = make_handler(|a, b| a == b, 4, 0, 1);
+        let all = CandidateSet::all(4);
+        let mut grid = vec![all; 4];
+        let ce = CellExclusions::with_num_cells(4);
+        init_handler(&mut handler, &mut grid, &ce);
+
+        grid[0] = vm(&[1, 2]);
+        grid[1] = vm(&[3, 4]);
+        let mut a = HandlerAccumulator::new_stub();
+        assert_eq!(handler.enforce_consistency(&mut grid, &mut a), false);
+    }
+
+    // =========================================================================
+    // Difference >= 2
+    // =========================================================================
+
+    #[test]
+    fn diff_ge_2_prune_adjacent() {
+        let mut handler = make_handler(|a, b| (a as i32 - b as i32).unsigned_abs() >= 2, 4, 0, 1);
+        let all = CandidateSet::all(4);
+        let mut grid = vec![all; 4];
+        let ce = CellExclusions::with_num_cells(4);
+        init_handler(&mut handler, &mut grid, &ce);
+
+        grid[0] = vm(&[2]);
+        grid[1] = vm(&[1, 2, 3, 4]);
+        let mut a = HandlerAccumulator::new_stub();
+        assert_eq!(handler.enforce_consistency(&mut grid, &mut a), true);
+        assert_eq!(grid[1], vm(&[4]));
+    }
+
+    #[test]
+    fn diff_ge_2_fail_too_close() {
+        let mut handler = make_handler(|a, b| (a as i32 - b as i32).unsigned_abs() >= 2, 4, 0, 1);
+        let all = CandidateSet::all(4);
+        let mut grid = vec![all; 4];
+        let ce = CellExclusions::with_num_cells(4);
+        init_handler(&mut handler, &mut grid, &ce);
+
+        grid[0] = vm(&[2]);
+        grid[1] = vm(&[1, 2, 3]);
+        let mut a = HandlerAccumulator::new_stub();
+        assert_eq!(handler.enforce_consistency(&mut grid, &mut a), false);
+    }
+
+    // =========================================================================
+    // Touched/unchanged
+    // =========================================================================
+
+    #[test]
+    fn no_touch_when_unchanged() {
+        let mut handler = make_handler(|a, b| a < b, 4, 0, 1);
+        let all = CandidateSet::all(4);
+        let mut grid = vec![all; 4];
+        let ce = CellExclusions::with_num_cells(4);
+        init_handler(&mut handler, &mut grid, &ce);
+
+        grid[0] = vm(&[1]);
+        grid[1] = vm(&[2]);
+        let mut a = HandlerAccumulator::new_stub();
+        assert_eq!(handler.enforce_consistency(&mut grid, &mut a), true);
+        // Neither cell was changed.
+        assert_eq!(grid[0], vm(&[1]));
+        assert_eq!(grid[1], vm(&[2]));
+    }
+
+    #[test]
+    fn report_only_changed_cells() {
+        let mut handler = make_handler(|a, b| a < b, 4, 0, 1);
+        let all = CandidateSet::all(4);
+        let mut grid = vec![all; 4];
+        let ce = CellExclusions::with_num_cells(4);
+        init_handler(&mut handler, &mut grid, &ce);
+
+        grid[0] = vm(&[1]);
+        grid[1] = vm(&[1, 2, 3, 4]);
+        let mut a = HandlerAccumulator::new_stub();
+        handler.enforce_consistency(&mut grid, &mut a);
+        // Only cell 1 was pruned.
+        assert_eq!(grid[1], vm(&[2, 3, 4]));
+    }
+
+    // =========================================================================
+    // Reusability
+    // =========================================================================
+
+    #[test]
+    fn binary_reusable_across_calls() {
+        let mut handler = make_handler(|a, b| a != b, 4, 0, 1);
+        let all = CandidateSet::all(4);
+        let mut grid = vec![all; 4];
+        let ce = CellExclusions::with_num_cells(4);
+        init_handler(&mut handler, &mut grid, &ce);
+
+        // First call.
+        grid[0] = vm(&[1]);
+        grid[1] = vm(&[1, 2, 3]);
+        assert_eq!(handler.enforce_consistency(&mut grid, &mut HandlerAccumulator::new_stub()), true);
+        assert_eq!(grid[1], vm(&[2, 3]));
+
+        // Second call with different values.
+        grid[0] = vm(&[3]);
+        grid[1] = vm(&[2, 3, 4]);
+        assert_eq!(handler.enforce_consistency(&mut grid, &mut HandlerAccumulator::new_stub()), true);
+        assert_eq!(grid[1], vm(&[2, 4]));
+
+        // Third call that fails.
+        grid[0] = vm(&[2]);
+        grid[1] = vm(&[2]);
+        assert_eq!(handler.enforce_consistency(&mut grid, &mut HandlerAccumulator::new_stub()), false);
+    }
+
+    // =========================================================================
+    // Non-contiguous cells
+    // =========================================================================
+
+    #[test]
+    fn binary_non_contiguous_cells() {
+        let mut handler = make_handler(|a, b| a < b, 5, 5, 15);
+        let all = CandidateSet::all(5);
+        let mut grid = vec![all; 20];
+        let ce = CellExclusions::with_num_cells(20);
+        init_handler(&mut handler, &mut grid, &ce);
+
+        grid[5] = vm(&[1, 2, 3, 4, 5]);
+        grid[15] = vm(&[2]);
+        let mut a = HandlerAccumulator::new_stub();
+        assert_eq!(handler.enforce_consistency(&mut grid, &mut a), true);
+        assert_eq!(grid[5], vm(&[1]));
+    }
+
+    // =========================================================================
+    // Asymmetric constraints
+    // =========================================================================
+
+    #[test]
+    fn asymmetric_double() {
+        let mut handler = make_handler(|a, b| a * 2 == b, 4, 0, 1);
+        let all = CandidateSet::all(4);
+        let mut grid = vec![all; 4];
+        let ce = CellExclusions::with_num_cells(4);
+        init_handler(&mut handler, &mut grid, &ce);
+
+        grid[0] = vm(&[1, 2, 3, 4]);
+        grid[1] = vm(&[1, 2, 3, 4]);
+        let mut a = HandlerAccumulator::new_stub();
+        assert_eq!(handler.enforce_consistency(&mut grid, &mut a), true);
+        assert_eq!(grid[0], vm(&[1, 2]));
+        assert_eq!(grid[1], vm(&[2, 4]));
+    }
+
+    #[test]
+    fn asymmetric_fixed_value() {
+        let mut handler = make_handler(|a, b| a * 2 == b, 4, 0, 1);
+        let all = CandidateSet::all(4);
+        let mut grid = vec![all; 4];
+        let ce = CellExclusions::with_num_cells(4);
+        init_handler(&mut handler, &mut grid, &ce);
+
+        grid[0] = vm(&[1, 2, 3, 4]);
+        grid[1] = vm(&[4]);
+        let mut a = HandlerAccumulator::new_stub();
+        assert_eq!(handler.enforce_consistency(&mut grid, &mut a), true);
+        assert_eq!(grid[0], vm(&[2]));
+    }
+
+    // =========================================================================
+    // Required-value exclusions
+    // =========================================================================
+
+    #[test]
+    fn required_values_pair_exclusion() {
+        // Cells 0, 1, 2 all in one house. Pair exclusion for (0,1) = [2].
+        let ce = CellExclusions::from_exclusion_groups(&[vec![0, 1, 2]]);
+
+        let nv = 3u8;
+        let mut handler = make_handler(|a, b| a != b, nv, 0, 1);
+        let all = CandidateSet::all(nv);
+        let mut grid = vec![all; 3];
+        let shape = GridShape::square(1).unwrap();
+        let mut alloc = GridStateAllocator::new(3);
+        handler.initialize(&mut grid, &ce, shape, &mut alloc);
+
+        grid[0] = vm(&[1, 2]);
+        grid[1] = vm(&[1, 2]);
+        grid[2] = vm(&[1, 2, 3]);
+        let mut a = HandlerAccumulator::new_stub_with_num_cells(3);
+        assert_eq!(handler.enforce_consistency(&mut grid, &mut a), true);
+        assert_eq!(grid[0], vm(&[1, 2]));
+        assert_eq!(grid[1], vm(&[1, 2]));
+        assert_eq!(grid[2], vm(&[3]));
+    }
+
+    #[test]
+    fn required_values_skip_transitive_key() {
+        // a == b is transitive, so required-value exclusions should NOT run.
+        let ce = CellExclusions::from_exclusion_groups(&[vec![0, 1, 2]]);
+
+        let nv = 3u8;
+        let mut handler = make_handler(|a, b| a == b, nv, 0, 1);
+        let all = CandidateSet::all(nv);
+        let mut grid = vec![all; 3];
+        let shape = GridShape::square(1).unwrap();
+        let mut alloc = GridStateAllocator::new(3);
+        handler.initialize(&mut grid, &ce, shape, &mut alloc);
+
+        grid[0] = vm(&[1, 2]);
+        grid[1] = vm(&[1, 2]);
+        grid[2] = vm(&[1, 2, 3]);
+        let mut a = HandlerAccumulator::new_stub_with_num_cells(3);
+        assert_eq!(handler.enforce_consistency(&mut grid, &mut a), true);
+        // Transitive key → no pair exclusion.
+        assert_eq!(grid[2], vm(&[1, 2, 3]));
+    }
 }

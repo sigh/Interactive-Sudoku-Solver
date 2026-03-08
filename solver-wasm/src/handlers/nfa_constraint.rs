@@ -268,4 +268,294 @@ mod tests {
         assert_eq!(grid[1], CandidateSet::from_raw(1 << 1)); // must be 2
         assert_eq!(grid[2], all); // wildcard: all values
     }
+
+    fn vm(values: &[u8]) -> CandidateSet {
+        let mut raw: u16 = 0;
+        for &v in values {
+            raw |= 1 << (v - 1);
+        }
+        CandidateSet::from_raw(raw)
+    }
+
+    // =========================================================================
+    // compressNFA tests
+    // =========================================================================
+
+    #[test]
+    fn compress_nfa_preserve_transitions_and_states() {
+        let mut nfa = regex_to_nfa("(1|2)3", 3).unwrap();
+        let cnfa = compress_nfa(&mut nfa);
+
+        // Find starting state.
+        let start = (0..cnfa.num_states)
+            .find(|&i| cnfa.starting_states.has(i))
+            .expect("should have a starting state");
+
+        let get_next = |state: usize, value: u8| -> Vec<usize> {
+            let mask = vm(&[value]).raw();
+            cnfa.transitions(state)
+                .iter()
+                .filter(|&&e| (e as u16) & mask != 0)
+                .map(|&e| (e >> 16) as usize)
+                .collect::<Vec<_>>()
+        };
+
+        let states_after_1 = get_next(start, 1);
+        let states_after_2 = get_next(start, 2);
+        assert!(!states_after_1.is_empty(), "1 should transition from start");
+        assert!(!states_after_2.is_empty(), "2 should transition from start");
+        assert!(get_next(start, 3).is_empty(), "3 is not valid from start");
+
+        // Follow path to accepting.
+        let accepting_states = get_next(states_after_1[0], 3);
+        assert!(!accepting_states.is_empty(), "3 should transition after 1");
+        assert!(cnfa.accepting_states.has(accepting_states[0]));
+    }
+
+    #[test]
+    fn compress_nfa_track_starting_states() {
+        let mut nfa = regex_to_nfa("12", 2).unwrap();
+        let cnfa = compress_nfa(&mut nfa);
+        let start_count = (0..cnfa.num_states)
+            .filter(|&i| cnfa.starting_states.has(i))
+            .count();
+        assert!(start_count >= 1);
+    }
+
+    #[test]
+    fn compress_nfa_track_accepting_states() {
+        let mut nfa = regex_to_nfa("12", 2).unwrap();
+        let cnfa = compress_nfa(&mut nfa);
+        let accept_count = (0..cnfa.num_states)
+            .filter(|&i| cnfa.accepting_states.has(i))
+            .count();
+        assert!(accept_count >= 1);
+    }
+
+    #[test]
+    fn compress_nfa_combine_symbol_masks() {
+        let mut nfa = regex_to_nfa("[12]", 2).unwrap();
+        let cnfa = compress_nfa(&mut nfa);
+        let start = (0..cnfa.num_states)
+            .find(|&i| cnfa.starting_states.has(i))
+            .unwrap();
+        let transitions = cnfa.transitions(start);
+        assert_eq!(transitions.len(), 1, "should combine into single transition");
+        let entry_mask = transitions[0] as u16;
+        assert_eq!(entry_mask, vm(&[1, 2]).raw());
+    }
+
+    #[test]
+    fn compress_nfa_compact_entry_format() {
+        let mut nfa = regex_to_nfa("12", 2).unwrap();
+        let cnfa = compress_nfa(&mut nfa);
+        let start = (0..cnfa.num_states)
+            .find(|&i| cnfa.starting_states.has(i))
+            .unwrap();
+        let transitions = cnfa.transitions(start);
+        let entry = transitions[0];
+        let entry_mask = entry as u16;
+        let target_state = (entry >> 16) as usize;
+        assert!(entry_mask > 0, "mask should be non-zero");
+        assert!(target_state < cnfa.num_states, "target state should be valid");
+    }
+
+    // =========================================================================
+    // Basic enforcement tests
+    // =========================================================================
+
+    #[test]
+    fn nfa_prune_cells_to_supported_values() {
+        let handler = make_handler("12", 4, vec![0, 1]);
+        let all = vm(&[1, 2, 3, 4]);
+        let mut grid = vec![all, all];
+        let mut acc = HandlerAccumulator::new_stub();
+
+        assert!(handler.enforce_consistency(&mut grid, &mut acc));
+        assert_eq!(grid[0], vm(&[1]));
+        assert_eq!(grid[1], vm(&[2]));
+    }
+
+    #[test]
+    fn nfa_return_false_no_valid_path() {
+        let handler = make_handler("12", 4, vec![0, 1]);
+        let mut grid = vec![vm(&[2]), vm(&[2])];
+        let mut acc = HandlerAccumulator::new_stub();
+        assert!(!handler.enforce_consistency(&mut grid, &mut acc));
+    }
+
+    #[test]
+    fn nfa_no_touch_already_supported() {
+        let handler = make_handler("12", 4, vec![0, 1]);
+        let mut grid = vec![vm(&[1]), vm(&[2])];
+        let mut acc = HandlerAccumulator::new_stub();
+        assert!(handler.enforce_consistency(&mut grid, &mut acc));
+        // No cells should have been modified (already at supported values).
+        // We verify by checking the grid didn't change.
+        assert_eq!(grid[0], vm(&[1]));
+        assert_eq!(grid[1], vm(&[2]));
+    }
+
+    #[test]
+    fn nfa_report_only_changed_cells() {
+        let handler = make_handler("12", 4, vec![0, 1]);
+        let all = vm(&[1, 2, 3, 4]);
+        let mut grid = vec![vm(&[1]), all]; // cell 0 already constrained
+        let mut acc = HandlerAccumulator::new_stub();
+        handler.enforce_consistency(&mut grid, &mut acc);
+        // Only cell 1 was pruned.
+        assert_eq!(grid[1], vm(&[2]));
+    }
+
+    // =========================================================================
+    // Forward pass tests
+    // =========================================================================
+
+    #[test]
+    fn forward_fail_first_cell_no_valid_transition() {
+        let handler = make_handler("12", 2, vec![0, 1]);
+        let mut grid = vec![vm(&[2]), vm(&[1, 2])];
+        let mut acc = HandlerAccumulator::new_stub();
+        assert!(!handler.enforce_consistency(&mut grid, &mut acc));
+    }
+
+    #[test]
+    fn forward_fail_middle_cell_blocks_path() {
+        let handler = make_handler("123", 3, vec![0, 1, 2]);
+        let mut grid = vec![vm(&[1]), vm(&[3]), vm(&[1, 2, 3])];
+        let mut acc = HandlerAccumulator::new_stub();
+        assert!(!handler.enforce_consistency(&mut grid, &mut acc));
+    }
+
+    #[test]
+    fn forward_track_reachable_states_through_alternation() {
+        let handler = make_handler("(12|13)", 3, vec![0, 1]);
+        let mut grid = vec![vm(&[1]), vm(&[2, 3])];
+        let mut acc = HandlerAccumulator::new_stub();
+        assert!(handler.enforce_consistency(&mut grid, &mut acc));
+        assert_eq!(grid[1], vm(&[2, 3]));
+    }
+
+    // =========================================================================
+    // Backward pass tests
+    // =========================================================================
+
+    #[test]
+    fn backward_fail_final_states_not_accepting() {
+        let handler = make_handler("123", 3, vec![0, 1, 2]);
+        let mut grid = vec![vm(&[1]), vm(&[2]), vm(&[1])];
+        let mut acc = HandlerAccumulator::new_stub();
+        assert!(!handler.enforce_consistency(&mut grid, &mut acc));
+    }
+
+    #[test]
+    fn backward_prune_values_not_reaching_accepting() {
+        let handler = make_handler("(12|34)", 4, vec![0, 1]);
+        let mut grid = vec![vm(&[1, 3]), vm(&[2])];
+        let mut acc = HandlerAccumulator::new_stub();
+        assert!(handler.enforce_consistency(&mut grid, &mut acc));
+        assert_eq!(grid[0], vm(&[1]));
+    }
+
+    #[test]
+    fn backward_prune_unreachable_states() {
+        let handler = make_handler("1[23]", 3, vec![0, 1]);
+        let mut grid = vec![vm(&[1, 2, 3]), vm(&[2])];
+        let mut acc = HandlerAccumulator::new_stub();
+        assert!(handler.enforce_consistency(&mut grid, &mut acc));
+        assert_eq!(grid[0], vm(&[1]));
+    }
+
+    // =========================================================================
+    // Cell configurations tests
+    // =========================================================================
+
+    #[test]
+    fn nfa_non_contiguous_cell_indices() {
+        let handler = make_handler("12", 4, vec![5, 10]);
+        let all = vm(&[1, 2, 3, 4]);
+        let mut grid = vec![all; 15];
+        let mut acc = HandlerAccumulator::new_stub();
+        assert!(handler.enforce_consistency(&mut grid, &mut acc));
+        assert_eq!(grid[5], vm(&[1]));
+        assert_eq!(grid[10], vm(&[2]));
+        assert_eq!(grid[0], all); // untouched
+    }
+
+    #[test]
+    fn nfa_single_cell() {
+        let handler = make_handler("[12]", 4, vec![0]);
+        let all = vm(&[1, 2, 3, 4]);
+        let mut grid = vec![all];
+        let mut acc = HandlerAccumulator::new_stub();
+        assert!(handler.enforce_consistency(&mut grid, &mut acc));
+        assert_eq!(grid[0], vm(&[1, 2]));
+    }
+
+    #[test]
+    fn nfa_longer_cell_sequences() {
+        let handler = make_handler("1234", 4, vec![0, 1, 2, 3]);
+        let all = vm(&[1, 2, 3, 4]);
+        let mut grid = vec![all; 4];
+        let mut acc = HandlerAccumulator::new_stub();
+        assert!(handler.enforce_consistency(&mut grid, &mut acc));
+        assert_eq!(grid[0], vm(&[1]));
+        assert_eq!(grid[1], vm(&[2]));
+        assert_eq!(grid[2], vm(&[3]));
+        assert_eq!(grid[3], vm(&[4]));
+    }
+
+    // =========================================================================
+    // State reuse tests
+    // =========================================================================
+
+    #[test]
+    fn nfa_reusable_across_multiple_calls() {
+        let handler = make_handler("12", 4, vec![0, 1]);
+        let all = vm(&[1, 2, 3, 4]);
+
+        // Call 1: success.
+        let mut grid1 = vec![all, all];
+        assert!(handler.enforce_consistency(&mut grid1, &mut HandlerAccumulator::new_stub()));
+        assert_eq!(grid1[0], vm(&[1]));
+
+        // Call 2: success with different grid.
+        let mut grid2 = vec![vm(&[1, 2]), vm(&[2, 3])];
+        assert!(handler.enforce_consistency(&mut grid2, &mut HandlerAccumulator::new_stub()));
+        assert_eq!(grid2[0], vm(&[1]));
+
+        // Call 3: failure.
+        let mut grid3 = vec![vm(&[2]), vm(&[2])];
+        assert!(!handler.enforce_consistency(&mut grid3, &mut HandlerAccumulator::new_stub()));
+
+        // Call 4: success after failure.
+        let mut grid4 = vec![vm(&[1, 2]), vm(&[1, 2])];
+        assert!(handler.enforce_consistency(&mut grid4, &mut HandlerAccumulator::new_stub()));
+        assert_eq!(grid4[0], vm(&[1]));
+    }
+
+    #[test]
+    fn nfa_internal_state_cleared_between_calls() {
+        let handler = make_handler("(12|21)", 2, vec![0, 1]);
+
+        let mut grid1 = vec![vm(&[1]), vm(&[2])];
+        assert!(handler.enforce_consistency(&mut grid1, &mut HandlerAccumulator::new_stub()));
+
+        let mut grid2 = vec![vm(&[2]), vm(&[1])];
+        assert!(handler.enforce_consistency(&mut grid2, &mut HandlerAccumulator::new_stub()));
+    }
+
+    // =========================================================================
+    // getNFA test
+    // =========================================================================
+
+    #[test]
+    fn nfa_get_nfa_returns_compressed_nfa() {
+        let mut nfa = regex_to_nfa("12", 4).unwrap();
+        let cnfa = compress_nfa(&mut nfa);
+        let num_states = cnfa.num_states;
+        let handler = NfaConstraint::new(vec![0, 1], cnfa);
+        // Verify it returns the same NFA by checking num_states matches.
+        assert_eq!(handler.get_nfa().num_states, num_states);
+    }
 }

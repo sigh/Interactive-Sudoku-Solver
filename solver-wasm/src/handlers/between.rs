@@ -76,7 +76,9 @@ impl ConstraintHandler for Between {
         };
 
         let key = fn_to_binary_key(
-            &move |a: Value, b: Value| (a as i32 - b as i32).unsigned_abs() as usize >= min_ends_delta,
+            &move |a: Value, b: Value| {
+                (a as i32 - b as i32).unsigned_abs() as usize >= min_ends_delta
+            },
             shape.num_values,
         );
         let bc = BinaryConstraint::from_key(self.ends[0], self.ends[1], key, shape.num_values);
@@ -138,5 +140,106 @@ impl ConstraintHandler for Between {
         }
 
         true
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::handlers::test_util::*;
+
+    #[test]
+    fn init_constrains_endpoints_via_binary() {
+        // 4 cells, numValues=4. Endpoints [0,3], mids [1,2].
+        // Mids form 1 exclusion group of size 2 → min_ends_delta = 3.
+        // So endpoints must differ by ≥ 3 → only (1,4) or (4,1).
+        let (mut grid, shape) = make_grid(1, 4, None);
+        let ce = unique_exclusions(4);
+        let mut handler = Between::new(vec![0, 1, 2, 3]);
+        assert!(init_with(&mut handler, &mut grid, shape, &ce));
+        // BinaryConstraint.initialize doesn't prune; enforce does.
+        let mut a = acc();
+        assert!(handler.enforce_consistency(&mut grid, &mut a));
+        // Endpoints should be restricted to {1,4}.
+        assert_eq!(grid[0], vm(&[1, 4]));
+        assert_eq!(grid[3], vm(&[1, 4]));
+    }
+
+    #[test]
+    fn mids_clamped_between_endpoints() {
+        let (mut grid, shape) = make_grid(1, 6, Some(6));
+        let ce = unique_exclusions(6);
+        let mut handler = Between::new(vec![0, 1, 2, 3, 4, 5]);
+        init_with(&mut handler, &mut grid, shape, &ce);
+
+        // Fix endpoints: 1 and 6.
+        grid[0] = vm(&[1]);
+        grid[5] = vm(&[6]);
+        // Mids should be in range (1,6) exclusive = {2,3,4,5}.
+        let mut a = acc();
+        assert!(handler.enforce_consistency(&mut grid, &mut a));
+        for i in 1..5 {
+            assert_eq!(
+                grid[i] & vm(&[1]),
+                CandidateSet::EMPTY,
+                "mid cell {} should not contain 1",
+                i
+            );
+            assert_eq!(
+                grid[i] & vm(&[6]),
+                CandidateSet::EMPTY,
+                "mid cell {} should not contain 6",
+                i
+            );
+        }
+    }
+
+    #[test]
+    fn fail_when_no_valid_intermediate_range() {
+        // Endpoints both fixed to same value → no range for mids.
+        let (mut grid, shape) = make_grid(1, 4, Some(4));
+        let ce = CellExclusions::with_num_cells(4);
+        let mut handler = Between::new(vec![0, 1, 2, 3]);
+        init_with(&mut handler, &mut grid, shape, &ce);
+
+        grid[0] = vm(&[3]);
+        grid[3] = vm(&[3]);
+
+        let mut a = acc();
+        assert!(!handler.enforce_consistency(&mut grid, &mut a));
+    }
+
+    #[test]
+    fn short_line_two_endpoints_only() {
+        // 2 cells (endpoints only, no mids).
+        let (mut grid, shape) = make_grid(1, 4, Some(4));
+        let ce = CellExclusions::with_num_cells(4);
+        let mut handler = Between::new(vec![0, 1]);
+        init_with(&mut handler, &mut grid, shape, &ce);
+
+        grid[0] = vm(&[1]);
+        grid[1] = vm(&[4]);
+
+        let mut a = acc();
+        assert!(handler.enforce_consistency(&mut grid, &mut a));
+    }
+
+    #[test]
+    fn fixed_mid_constrains_endpoints() {
+        // Mid fixed to 3 → endpoints cannot be 3.
+        let (mut grid, shape) = make_grid(1, 4, Some(4));
+        let ce = CellExclusions::with_num_cells(4);
+        let mut handler = Between::new(vec![0, 1, 2]);
+        init_with(&mut handler, &mut grid, shape, &ce);
+
+        grid[0] = vm(&[1, 2, 3, 4]);
+        grid[1] = vm(&[3]); // mid fixed to 3
+        grid[2] = vm(&[1, 2, 3, 4]);
+
+        let mut a = acc();
+        assert!(handler.enforce_consistency(&mut grid, &mut a));
+        // Endpoints should not contain 3 (it's in the inclusive range of fixed mids).
+        assert_eq!(grid[0] & vm(&[3]), CandidateSet::EMPTY);
+        assert_eq!(grid[2] & vm(&[3]), CandidateSet::EMPTY);
     }
 }

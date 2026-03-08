@@ -109,3 +109,53 @@ impl ConstraintHandler for And {
         self.handlers.iter().all(|h| h.is_singleton())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::handlers::test_util::*;
+    use crate::handlers::{True, False};
+
+    #[test]
+    fn all_pass_returns_true() {
+        let h1: Box<dyn ConstraintHandler> = Box::new(True);
+        let h2: Box<dyn ConstraintHandler> = Box::new(True);
+        let handler = And::new(vec![h1, h2]);
+
+        let (mut grid, _shape) = make_grid(1, 4, Some(4));
+        let mut a = acc();
+        assert!(handler.enforce_consistency(&mut grid, &mut a));
+    }
+
+    #[test]
+    fn first_failure_short_circuits() {
+        let h1: Box<dyn ConstraintHandler> = Box::new(False::new(vec![0]));
+        let h2: Box<dyn ConstraintHandler> = Box::new(True);
+        let handler = And::new(vec![h1, h2]);
+
+        let (mut grid, _shape) = make_grid(1, 4, Some(4));
+        let mut a = acc();
+        assert!(!handler.enforce_consistency(&mut grid, &mut a));
+    }
+
+    #[test]
+    fn init_short_circuits_on_failure() {
+        let h1: Box<dyn ConstraintHandler> = Box::new(False::new(vec![0]));
+        let h2: Box<dyn ConstraintHandler> = Box::new(True);
+        let mut handler = And::new(vec![h1, h2]);
+
+        let (mut grid, shape) = make_grid(1, 4, Some(4));
+        assert!(!init(&mut handler, &mut grid, shape));
+    }
+
+    #[test]
+    fn cells_is_union_of_sub_handlers() {
+        // True has no cells, but we can verify the union logic.
+        let handler = And::new(vec![
+            Box::new(True) as Box<dyn ConstraintHandler>,
+            Box::new(True) as Box<dyn ConstraintHandler>,
+        ]);
+        // Both True handlers have empty cells, so union is empty.
+        assert!(handler.cells().is_empty());
+    }
+}

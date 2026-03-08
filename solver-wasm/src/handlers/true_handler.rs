@@ -30,3 +30,22 @@ impl ConstraintHandler for True {
         "True"
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::handlers::test_util::*;
+
+    #[test]
+    fn enforce_returns_true() {
+        let handler = True;
+        let (mut grid, _) = make_grid(1, 4, None);
+        assert!(handler.enforce_consistency(&mut grid, &mut acc()));
+    }
+
+    #[test]
+    fn has_no_cells() {
+        let handler = True;
+        assert!(handler.cells().is_empty());
+    }
+}

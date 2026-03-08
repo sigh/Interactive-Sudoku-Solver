@@ -139,7 +139,7 @@ pub(super) fn optimize_required_values(
 /// Returns false if no valid combination exists (infeasible).
 ///
 /// Mirrors JS `_findKnownRequiredValues`.
-fn find_known_required_values(
+pub(super) fn find_known_required_values(
     cells: &[CellIndex],
     value: u8,
     count: usize,

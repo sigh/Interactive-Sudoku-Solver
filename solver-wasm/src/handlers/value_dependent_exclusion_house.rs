@@ -117,3 +117,72 @@ impl ValueDependentUniqueValueExclusionHouse {
         true
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::handlers::test_util::*;
+
+    fn empty_vce(num_values: usize, num_cells: usize) -> Rc<Vec<CellExclusions>> {
+        Rc::new(
+            (0..num_values)
+                .map(|_| CellExclusions::with_num_cells(num_cells))
+                .collect(),
+        )
+    }
+
+    #[test]
+    fn no_exactly_two_returns_true() {
+        // All values appear in all 4 cells (more than 2) — no pruning.
+        let (mut grid, _) = make_grid(1, 4, Some(4));
+        let vce = empty_vce(4, 4);
+        let handler = ValueDependentUniqueValueExclusionHouse::new(vec![0, 1, 2, 3], vce);
+
+        let mut a = acc();
+        assert!(handler.enforce_consistency(&mut grid, &mut a));
+    }
+
+    #[test]
+    fn exactly_two_with_empty_pair_exclusions() {
+        // Value 1 in exactly cells 0 and 1. No pair exclusions → no pruning.
+        let (mut grid, _) = make_grid(1, 4, Some(4));
+        grid[0] = vm(&[1, 2]);
+        grid[1] = vm(&[1, 3]);
+        grid[2] = vm(&[2, 3, 4]);
+        grid[3] = vm(&[2, 3, 4]);
+
+        let vce = empty_vce(4, 4);
+        let handler = ValueDependentUniqueValueExclusionHouse::new(vec![0, 1, 2, 3], vce);
+
+        let mut a = acc();
+        assert!(handler.enforce_consistency(&mut grid, &mut a));
+    }
+
+    #[test]
+    fn exactly_two_with_pair_exclusions_removes_value() {
+        // Value 1 appears in exactly cells 0 and 1. Pair exclusion for (0,1)
+        // on value 1 includes cell 4 (outside the house). Cell 4 loses value 1.
+        let (mut grid, _) = make_grid(2, 3, Some(4));
+        grid[0] = vm(&[1, 2]);
+        grid[1] = vm(&[1, 3]);
+        grid[2] = vm(&[2, 3, 4]); // no value 1
+        grid[3] = vm(&[2, 3, 4]); // no value 1
+        grid[4] = vm(&[1, 2, 3, 4]); // outside house, has value 1
+        grid[5] = vm(&[2, 3, 4]);
+
+        let mut vce_vec: Vec<CellExclusions> =
+            (0..4).map(|_| CellExclusions::with_num_cells(6)).collect();
+        // For value index 0 (value 1): cells 0 and 1 both exclude cell 4.
+        vce_vec[0].add_mutual_exclusion(0, 4);
+        vce_vec[0].add_mutual_exclusion(1, 4);
+        let vce = Rc::new(vce_vec);
+
+        let handler = ValueDependentUniqueValueExclusionHouse::new(vec![0, 1, 2, 3], vce);
+
+        let mut a = acc();
+        assert!(handler.enforce_consistency(&mut grid, &mut a));
+        // Cell 4 should have value 1 removed.
+        assert_eq!(grid[4] & vm(&[1]), CandidateSet::EMPTY);
+        assert!(grid[4].intersects(vm(&[2, 3, 4])));
+    }
+}

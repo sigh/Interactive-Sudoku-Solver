@@ -88,7 +88,7 @@ pub(super) fn optimize_sums(
 /// whose cells don't conflict.
 ///
 /// Mirrors JS `_findNonOverlappingSubset`.
-fn find_non_overlapping_subset(
+pub(super) fn find_non_overlapping_subset(
     indices: &[usize],
     hs: &HandlerSet,
 ) -> (Vec<usize>, HashSet<CellIndex>) {
@@ -132,7 +132,7 @@ fn find_non_overlapping_subset(
 ///
 /// Mirrors JS `_fillInSumGap`. Mutates `non_overlapping` and `sum_cells`
 /// in-place (JS: `sumHandlers.push(newHandler)` + `sumCells.add(c)`).
-fn fill_in_sum_gap(
+pub(super) fn fill_in_sum_gap(
     non_overlapping: &mut Vec<usize>,
     sum_cells: &mut HashSet<CellIndex>,
     hs: &mut HandlerSet,
@@ -184,7 +184,7 @@ fn fill_in_sum_gap(
 /// infer new sum constraints from the symmetric difference.
 ///
 /// Mirrors JS `_makeInnieOutieSumHandlers`.
-fn make_innie_outie_sum_handlers(
+pub(super) fn make_innie_outie_sum_handlers(
     non_overlapping: &[usize],
     hs: &HandlerSet,
     box_regions: &[Vec<CellIndex>],

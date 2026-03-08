@@ -223,3 +223,83 @@ impl ConstraintHandler for LocalSquishable2x2 {
         self.enforce_required_values(grid, acc)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::handlers::test_util::*;
+
+    #[test]
+    fn entropy_basic_squish() {
+        // 4 cells in a 2x2 region, numValues=9. Each triad {1,2,3},{4,5,6},{7,8,9}
+        // must be represented. Fix cell 0=[1], cell 1=[4], cell 2=[7].
+        // All three triads covered → cell 3 can be anything.
+        let (mut grid, shape) = make_grid(2, 2, Some(9));
+        let mut handler = LocalSquishable2x2::entropy(vec![0, 1, 2, 3]);
+        init(&mut handler, &mut grid, shape);
+
+        grid[0] = vm(&[1]);
+        grid[1] = vm(&[4]);
+        grid[2] = vm(&[7]);
+        grid[3] = vm(&[1, 2, 3, 4, 5, 6, 7, 8, 9]);
+
+        let mut a = acc_n(4);
+        assert!(handler.enforce_consistency(&mut grid, &mut a));
+    }
+
+    #[test]
+    fn entropy_hidden_single() {
+        // cell 0={1,2}, cell 1={4,5}, cell 2={4,5}, cell 3={7,8}.
+        // Triad {1,2,3} only in cell 0 → hidden single in squished space.
+        // Cell 0 should be restricted to {1,2} (already is) and marked.
+        // Triad {7,8,9} only in cell 3 → hidden single.
+        let (mut grid, shape) = make_grid(2, 2, Some(9));
+        let mut handler = LocalSquishable2x2::entropy(vec![0, 1, 2, 3]);
+        init(&mut handler, &mut grid, shape);
+
+        grid[0] = vm(&[1, 2]);
+        grid[1] = vm(&[4, 5]);
+        grid[2] = vm(&[4, 5]);
+        grid[3] = vm(&[7, 8]);
+
+        let mut a = acc_n(4);
+        assert!(handler.enforce_consistency(&mut grid, &mut a));
+        // Cell 0: only cell with triad {1,2,3}, so restricted to {1,2} ∩ {1,2,3} = {1,2}.
+        assert_eq!(grid[0], vm(&[1, 2]));
+        // Cell 3: only cell with triad {7,8,9}, restricted to {7,8}.
+        assert_eq!(grid[3], vm(&[7, 8]));
+    }
+
+    #[test]
+    fn entropy_fail_missing_triad() {
+        // No cell has values from triad {7,8,9} → all_squished ≠ squished_mask → fail.
+        let (mut grid, shape) = make_grid(2, 2, Some(9));
+        let mut handler = LocalSquishable2x2::entropy(vec![0, 1, 2, 3]);
+        init(&mut handler, &mut grid, shape);
+
+        grid[0] = vm(&[1]);
+        grid[1] = vm(&[2]);
+        grid[2] = vm(&[4]);
+        grid[3] = vm(&[5]);
+
+        let mut a = acc_n(4);
+        assert!(!handler.enforce_consistency(&mut grid, &mut a));
+    }
+
+    #[test]
+    fn mod3_basic() {
+        // Mod3 triads: {1,4,7},{2,5,8},{3,6,9}.
+        // Cell 0={1}, cell 1={2}, cell 2={3}, cell 3={4,5,6}: all triads covered.
+        let (mut grid, shape) = make_grid(2, 2, Some(9));
+        let mut handler = LocalSquishable2x2::mod3(vec![0, 1, 2, 3]);
+        init(&mut handler, &mut grid, shape);
+
+        grid[0] = vm(&[1]);
+        grid[1] = vm(&[2]);
+        grid[2] = vm(&[3]);
+        grid[3] = vm(&[4, 5, 6, 7, 8, 9]);
+
+        let mut a = acc_n(4);
+        assert!(handler.enforce_consistency(&mut grid, &mut a));
+    }
+}

@@ -35,16 +35,6 @@ pub struct DebugOptions {
     pub export_stack_trace: bool,
 }
 
-impl DebugOptions {
-    /// Whether any debug output is enabled.
-    pub fn is_any_enabled(&self) -> bool {
-        self.log_level > 0
-            || self.enable_step_logs
-            || self.export_conflict_heatmap
-            || self.export_stack_trace
-    }
-}
-
 // ============================================================================
 // Debug log entry
 // ============================================================================

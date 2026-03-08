@@ -57,3 +57,30 @@ impl ConstraintHandler for BoxInfo {
         "BoxInfo"
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::handlers::test_util::*;
+
+    #[test]
+    fn stores_box_regions() {
+        let regions = vec![vec![0, 1, 2], vec![3, 4, 5]];
+        let handler = BoxInfo::new(regions.clone());
+        assert_eq!(handler.box_regions(), &regions);
+    }
+
+    #[test]
+    fn enforce_returns_true() {
+        let handler = BoxInfo::new(vec![vec![0, 1]]);
+        let (mut grid, _) = make_grid(1, 4, None);
+        assert!(handler.enforce_consistency(&mut grid, &mut acc()));
+    }
+
+    #[test]
+    fn initialize_returns_true() {
+        let mut handler = BoxInfo::new(vec![vec![0]]);
+        let (mut grid, shape) = make_grid(1, 4, None);
+        assert!(init(&mut handler, &mut grid, shape));
+    }
+}

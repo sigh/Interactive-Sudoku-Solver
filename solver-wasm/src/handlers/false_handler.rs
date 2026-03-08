@@ -52,3 +52,23 @@ impl ConstraintHandler for False {
         "False"
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::handlers::test_util::*;
+
+    #[test]
+    fn enforce_returns_false() {
+        let handler = False::new(vec![0, 1]);
+        let (mut grid, _) = make_grid(1, 4, None);
+        assert!(!handler.enforce_consistency(&mut grid, &mut acc()));
+    }
+
+    #[test]
+    fn initialize_returns_false() {
+        let mut handler = False::new(vec![0]);
+        let (mut grid, shape) = make_grid(1, 4, None);
+        assert!(!init(&mut handler, &mut grid, shape));
+    }
+}

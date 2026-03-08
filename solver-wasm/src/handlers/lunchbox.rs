@@ -352,3 +352,207 @@ impl ConstraintHandler for Lunchbox {
         format!("Lunchbox-{}-{:?}", self.sum, self.cells)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::handlers::test_util::*;
+
+    #[test]
+    fn initialize_successfully_with_valid_sum() {
+        let (mut grid, shape) = make_grid(1, 9, None);
+        let cells = (0..9).collect();
+        let mut handler = Lunchbox::new(cells, 10);
+        assert!(init(&mut handler, &mut grid, shape));
+    }
+
+    #[test]
+    fn initialize_with_sum_of_0() {
+        let (mut grid, shape) = make_grid(1, 9, None);
+        let cells = (0..9).collect();
+        let mut handler = Lunchbox::new(cells, 0);
+        assert!(init(&mut handler, &mut grid, shape));
+    }
+
+    #[test]
+    fn fail_when_no_valid_border_placement() {
+        let (mut grid, shape) = make_grid(1, 4, None);
+        let cells = (0..4).collect();
+        let mut handler = Lunchbox::new(cells, 5);
+        init(&mut handler, &mut grid, shape);
+
+        grid[0] = vm(&[1]);
+        grid[1] = vm(&[4]);
+        grid[2] = vm(&[2, 3]);
+        grid[3] = vm(&[2, 3]);
+
+        assert!(!handler.enforce_consistency(&mut grid, &mut acc()));
+    }
+
+    #[test]
+    fn pass_with_valid_configuration() {
+        let (mut grid, shape) = make_grid(1, 4, None);
+        let cells = (0..4).collect();
+        let mut handler = Lunchbox::new(cells, 5);
+        init(&mut handler, &mut grid, shape);
+
+        grid[0] = vm(&[1]);
+        grid[1] = vm(&[2]);
+        grid[2] = vm(&[3]);
+        grid[3] = vm(&[4]);
+
+        assert!(handler.enforce_consistency(&mut grid, &mut acc()));
+    }
+
+    #[test]
+    fn handle_valid_setup_with_multiple_options() {
+        let (mut grid, shape) = make_grid(1, 4, None);
+        let cells = (0..4).collect();
+        let mut handler = Lunchbox::new(cells, 2);
+        init(&mut handler, &mut grid, shape);
+
+        assert!(handler.enforce_consistency(&mut grid, &mut acc()));
+    }
+
+    #[test]
+    fn handle_sum_of_0_borders_adjacent() {
+        let (mut grid, shape) = make_grid(1, 4, None);
+        let cells = (0..4).collect();
+        let mut handler = Lunchbox::new(cells, 0);
+        init(&mut handler, &mut grid, shape);
+
+        grid[0] = vm(&[1, 4]);
+        grid[1] = vm(&[1, 2, 3, 4]);
+        grid[2] = vm(&[1, 2, 3, 4]);
+        grid[3] = vm(&[1, 4]);
+
+        assert!(handler.enforce_consistency(&mut grid, &mut acc()));
+    }
+
+    #[test]
+    fn work_on_short_rows() {
+        // 2x3 grid, numValues=8 => 6 cells, non-house
+        let (mut grid, shape) = make_grid(2, 3, Some(8));
+        let cells = (0..6).collect();
+        let mut handler = Lunchbox::new(cells, 5);
+        init(&mut handler, &mut grid, shape);
+
+        assert!(handler.enforce_consistency(&mut grid, &mut acc()));
+    }
+
+    #[test]
+    fn work_with_house_constraint() {
+        let (mut grid, shape) = make_grid(1, 6, None);
+        let cells = (0..6).collect();
+        let mut handler = Lunchbox::new(cells, 5);
+        init(&mut handler, &mut grid, shape);
+
+        grid[0] = vm(&[1]);
+        grid[1] = vm(&[2]);
+        grid[2] = vm(&[3]);
+        grid[3] = vm(&[6]);
+        grid[4] = vm(&[4]);
+        grid[5] = vm(&[5]);
+
+        assert!(handler.enforce_consistency(&mut grid, &mut acc()));
+    }
+
+    #[test]
+    fn not_assume_house_when_num_cells_ne_num_values() {
+        let (mut grid, shape) = make_grid(1, 5, Some(9));
+        let cells = (0..5).collect();
+        let mut handler = Lunchbox::new(cells, 10);
+        init(&mut handler, &mut grid, shape);
+
+        assert!(handler.enforce_consistency(&mut grid, &mut acc()));
+    }
+
+    #[test]
+    fn handle_minimum_cells_for_house() {
+        let (mut grid, shape) = make_grid(1, 3, None);
+        let cells = (0..3).collect();
+        let mut handler = Lunchbox::new(cells, 2);
+        init(&mut handler, &mut grid, shape);
+
+        grid[0] = vm(&[1]);
+        grid[1] = vm(&[2]);
+        grid[2] = vm(&[3]);
+
+        assert!(handler.enforce_consistency(&mut grid, &mut acc()));
+    }
+
+    #[test]
+    fn handle_house_with_borders_adjacent() {
+        let (mut grid, shape) = make_grid(1, 4, None);
+        let cells = (0..4).collect();
+        let mut handler = Lunchbox::new(cells, 0);
+        init(&mut handler, &mut grid, shape);
+
+        grid[0] = vm(&[2]);
+        grid[1] = vm(&[1]);
+        grid[2] = vm(&[4]);
+        grid[3] = vm(&[3]);
+
+        assert!(handler.enforce_consistency(&mut grid, &mut acc()));
+    }
+
+    #[test]
+    fn work_with_2_cells_and_sum_0_non_house() {
+        let (mut grid, shape) = make_grid(1, 2, Some(4));
+        let cells = (0..2).collect();
+        let mut handler = Lunchbox::new(cells, 0);
+        init(&mut handler, &mut grid, shape);
+
+        grid[0] = vm(&[1, 4]);
+        grid[1] = vm(&[1, 4]);
+
+        assert!(handler.enforce_consistency(&mut grid, &mut acc()));
+    }
+
+    #[test]
+    fn handle_large_valid_sum() {
+        let (mut grid, shape) = make_grid(1, 9, None);
+        let cells = (0..9).collect();
+        // Max sum = 2+3+4+5+6+7+8 = 35
+        let mut handler = Lunchbox::new(cells, 35);
+        init(&mut handler, &mut grid, shape);
+
+        for i in 0..9 {
+            grid[i] = vm(&[(i + 1) as u8]);
+        }
+
+        assert!(handler.enforce_consistency(&mut grid, &mut acc()));
+    }
+
+    #[test]
+    fn work_when_borders_not_at_ends() {
+        let (mut grid, shape) = make_grid(1, 4, None);
+        let cells = (0..4).collect();
+        let mut handler = Lunchbox::new(cells, 0);
+        init(&mut handler, &mut grid, shape);
+
+        grid[0] = vm(&[2]); // not a border
+        grid[1] = vm(&[1]); // border
+        grid[2] = vm(&[4]); // border
+        grid[3] = vm(&[3]); // not a border
+
+        assert!(handler.enforce_consistency(&mut grid, &mut acc()));
+    }
+
+    #[test]
+    fn accumulate_changes() {
+        let (mut grid, shape) = make_grid(1, 4, None);
+        let cells = (0..4).collect();
+        let mut handler = Lunchbox::new(cells, 2);
+        init(&mut handler, &mut grid, shape);
+
+        grid[0] = vm(&[1]);
+        grid[1] = vm(&[2, 3]);
+        grid[2] = vm(&[3]);
+        grid[3] = vm(&[4]);
+
+        let mut a = acc();
+        handler.enforce_consistency(&mut grid, &mut a);
+        // Just verify no crash; exact pruning depends on constraint logic
+    }
+}

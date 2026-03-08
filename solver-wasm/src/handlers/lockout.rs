@@ -128,3 +128,107 @@ impl ConstraintHandler for Lockout {
         true
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::handlers::test_util::*;
+
+    #[test]
+    fn init_constrains_endpoints_by_min_diff() {
+        // 4 cells, numValues=6, min_diff=4.
+        // Endpoints must differ by ≥ 4.
+        let (mut grid, shape) = make_grid(1, 6, Some(6));
+        let ce = CellExclusions::with_num_cells(6);
+        let mut handler = Lockout::new(4, vec![0, 1, 2, 3]);
+        assert!(init_with(&mut handler, &mut grid, shape, &ce));
+
+        // BinaryConstraint.initialize doesn't prune; enforce does.
+        let mut a = acc();
+        assert!(handler.enforce_consistency(&mut grid, &mut a));
+        // With min_diff=4 and numValues=6: valid pairs are (1,5)(1,6)(2,6)(5,1)(6,1)(6,2).
+        // So endpoint 0 can be {1,2,5,6} and endpoint 3 can be {1,2,5,6}.
+        assert_eq!(grid[0], vm(&[1, 2, 5, 6]));
+        assert_eq!(grid[3], vm(&[1, 2, 5, 6]));
+    }
+
+    #[test]
+    fn mids_exclude_lockout_range() {
+        // endpoints fixed: cell 0=1, cell 3=6. Lockout range is [1,6] exclusive = {2,3,4,5}.
+        // Mids must NOT have values in {2,3,4,5} → but no values outside [1,6]...
+        // Actually, lockout means values NOT strictly between endpoints.
+        // With numValues=8, min_diff=4: endpoints 1 and 6.
+        // Mids cannot have values in closed interval [1,6] — wait, that's wrong.
+        // Lockout: values NOT in the range between endpoints. So < max1 or > min0.
+        // If end0=6, end1=1: mids cannot be in (1,6) exclusive.
+        // But with numValues=8, there are values 7,8 outside the range.
+        let (mut grid, shape) = make_grid(2, 4, Some(8));
+        let ce = CellExclusions::with_num_cells(8);
+        let mut handler = Lockout::new(4, vec![0, 1, 2, 3]);
+        init_with(&mut handler, &mut grid, shape, &ce);
+
+        grid[0] = vm(&[6]);
+        grid[3] = vm(&[1]);
+        // Mids get locked-out range removed.
+        let mut a = acc();
+        assert!(handler.enforce_consistency(&mut grid, &mut a));
+        // Allowed: values < 1 (none) or values > 6 → {7, 8}.
+        // Wait, mask allows values < max1(=1) OR values > min0(=6).
+        // values < 1: none (bit -1 doesn't exist). values > 6: {7, 8}.
+        assert_eq!(grid[1], vm(&[7, 8]));
+        assert_eq!(grid[2], vm(&[7, 8]));
+    }
+
+    #[test]
+    fn fail_when_lockout_covers_all_values() {
+        // numValues=4, endpoints 1 and 4. Lockout covers {2,3}.
+        // Mids can only be < 1 (none) or > 4 (none) → fail.
+        let (mut grid, shape) = make_grid(1, 4, Some(4));
+        let ce = CellExclusions::with_num_cells(4);
+        let mut handler = Lockout::new(3, vec![0, 1, 2, 3]);
+        init_with(&mut handler, &mut grid, shape, &ce);
+
+        grid[0] = vm(&[1]);
+        grid[3] = vm(&[4]);
+
+        let mut a = acc();
+        assert!(!handler.enforce_consistency(&mut grid, &mut a));
+    }
+
+    #[test]
+    fn short_line_endpoints_only() {
+        // Just 2 cells. No mids to constrain.
+        let (mut grid, shape) = make_grid(1, 6, Some(6));
+        let ce = CellExclusions::with_num_cells(6);
+        let mut handler = Lockout::new(3, vec![0, 1]);
+        init_with(&mut handler, &mut grid, shape, &ce);
+
+        grid[0] = vm(&[1]);
+        grid[1] = vm(&[4]);
+
+        let mut a = acc();
+        assert!(handler.enforce_consistency(&mut grid, &mut a));
+    }
+
+    #[test]
+    fn overlapping_ranges_no_pruning() {
+        // When endpoint ranges overlap, no lockout mask is applied to mids.
+        // Use numValues=6, min_diff=2. Endpoints = {1,2,3} and {1,2,3}.
+        // Valid pairs: (1,3)(3,1)(1,4)(4,1)... but after BC, both still have
+        // multiple values. The mid ranges overlap so no mid pruning.
+        let (mut grid, shape) = make_grid(1, 6, Some(6));
+        let ce = CellExclusions::with_num_cells(6);
+        let mut handler = Lockout::new(2, vec![0, 1, 2]);
+        init_with(&mut handler, &mut grid, shape, &ce);
+
+        // Endpoints with overlapping ranges (min0=1,max0=4, min1=2,max1=5 →
+        // min0 < max1 and min1 < max0 → ranges overlap).
+        grid[0] = vm(&[1, 2, 3, 4]);
+        grid[2] = vm(&[2, 3, 4, 5]);
+        let before_mid = grid[1];
+
+        let mut a = acc();
+        assert!(handler.enforce_consistency(&mut grid, &mut a));
+        assert_eq!(grid[1], before_mid, "mid should not be pruned when ranges overlap");
+    }
+}

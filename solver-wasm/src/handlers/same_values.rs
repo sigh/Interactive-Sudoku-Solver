@@ -272,3 +272,262 @@ impl ConstraintHandler for SameValues {
         format!("SameValues-{:?}", self.cell_sets)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::handlers::test_util::*;
+
+    #[test]
+    fn enforce_shared_value_intersection() {
+        let (mut grid, shape) = make_grid(1, 4, Some(4));
+        let mut handler = SameValues::new(vec![vec![0, 1], vec![2, 3]]);
+        let ce = unique_exclusions(4);
+        init_with(&mut handler, &mut grid, shape, &ce);
+
+        grid[0] = vm(&[1, 2]);
+        grid[1] = vm(&[2, 3]);
+        grid[2] = vm(&[2, 3]);
+        grid[3] = vm(&[2, 4]);
+        let mut a = acc();
+        assert!(handler.enforce_consistency(&mut grid, &mut a));
+        assert_eq!(grid[0], vm(&[2]));
+        assert_eq!(grid[1], vm(&[2, 3]));
+        assert_eq!(grid[2], vm(&[2, 3]));
+        assert_eq!(grid[3], vm(&[2]));
+    }
+
+    #[test]
+    fn idempotent_when_no_changes_needed() {
+        let (mut grid, shape) = make_grid(1, 4, Some(4));
+        let mut handler = SameValues::new(vec![vec![0, 1], vec![2, 3]]);
+        let ce = unique_exclusions(4);
+        init_with(&mut handler, &mut grid, shape, &ce);
+
+        grid[0] = vm(&[2, 3]);
+        grid[1] = vm(&[2, 3]);
+        grid[2] = vm(&[2, 3]);
+        grid[3] = vm(&[2, 3]);
+        let mut a = acc();
+        assert!(handler.enforce_consistency(&mut grid, &mut a));
+        assert_eq!(grid[0], vm(&[2, 3]));
+        assert_eq!(grid[1], vm(&[2, 3]));
+        assert_eq!(grid[2], vm(&[2, 3]));
+        assert_eq!(grid[3], vm(&[2, 3]));
+    }
+
+    #[test]
+    fn fail_when_intersection_too_small() {
+        let (mut grid, shape) = make_grid(1, 4, Some(4));
+        let mut handler = SameValues::new(vec![vec![0, 1], vec![2, 3]]);
+        let ce = CellExclusions::new(); // non-unique
+        init_with(&mut handler, &mut grid, shape, &ce);
+
+        grid[0] = vm(&[1, 2]);
+        grid[1] = vm(&[2, 3]);
+        grid[2] = vm(&[1, 4]);
+        grid[3] = vm(&[4]);
+        assert!(!handler.enforce_consistency(&mut grid, &mut acc()));
+    }
+
+    #[test]
+    fn fail_when_max_required_exceeds_min_count() {
+        let (mut grid, shape) = make_grid(1, 4, Some(4));
+        let mut handler = SameValues::new(vec![vec![0, 1], vec![2, 3]]);
+        let ce = CellExclusions::new();
+        init_with(&mut handler, &mut grid, shape, &ce);
+
+        grid[0] = vm(&[1]);
+        grid[1] = vm(&[1]);
+        grid[2] = vm(&[1, 2]);
+        grid[3] = vm(&[2]);
+        assert!(!handler.enforce_consistency(&mut grid, &mut acc()));
+    }
+
+    #[test]
+    fn prune_non_fixed_values_when_counts_exceed_required() {
+        let (mut grid, shape) = make_grid(1, 4, Some(4));
+        let mut handler = SameValues::new(vec![vec![0, 1], vec![2, 3]]);
+        let ce = CellExclusions::new();
+        init_with(&mut handler, &mut grid, shape, &ce);
+
+        grid[0] = vm(&[1]);
+        grid[1] = vm(&[2]);
+        grid[2] = vm(&[1]);
+        grid[3] = vm(&[1, 2]);
+        let mut a = acc();
+        assert!(handler.enforce_consistency(&mut grid, &mut a));
+        assert_eq!(grid[3], vm(&[2]));
+    }
+
+    #[test]
+    fn fix_values_when_count_matches_required_limit() {
+        let (mut grid, shape) = make_grid(1, 4, Some(4));
+        let mut handler = SameValues::new(vec![vec![0, 1], vec![2, 3]]);
+        let ce = CellExclusions::new();
+        init_with(&mut handler, &mut grid, shape, &ce);
+
+        grid[0] = vm(&[1]);
+        grid[1] = vm(&[2]);
+        grid[2] = vm(&[1, 2]);
+        grid[3] = vm(&[2]);
+        let mut a = acc();
+        assert!(handler.enforce_consistency(&mut grid, &mut a));
+        assert_eq!(grid[2], vm(&[1]));
+    }
+
+    #[test]
+    fn fail_when_min_totals_cannot_fill_set() {
+        let (mut grid, shape) = make_grid(1, 9, Some(9));
+        let mut handler = SameValues::new(vec![vec![0, 1, 2], vec![3, 4, 5], vec![6, 7, 8]]);
+        let ce = CellExclusions::new();
+        init_with(&mut handler, &mut grid, shape, &ce);
+
+        grid[0] = vm(&[1]);
+        grid[1] = vm(&[2]);
+        grid[2] = vm(&[2]);
+        grid[3] = vm(&[1]);
+        grid[4] = vm(&[1]);
+        grid[5] = vm(&[2]);
+        grid[6] = vm(&[1, 2]);
+        grid[7] = vm(&[1, 2]);
+        grid[8] = vm(&[1, 2]);
+        assert!(!handler.enforce_consistency(&mut grid, &mut acc()));
+    }
+
+    #[test]
+    fn enforce_intersection_across_three_sets() {
+        let (mut grid, shape) = make_grid(1, 6, Some(6));
+        let mut handler = SameValues::new(vec![vec![0, 1], vec![2, 3], vec![4, 5]]);
+        let ce = CellExclusions::new();
+        init_with(&mut handler, &mut grid, shape, &ce);
+
+        grid[0] = vm(&[1, 2, 3]);
+        grid[1] = vm(&[2, 3]);
+        grid[2] = vm(&[2, 3, 4]);
+        grid[3] = vm(&[2, 4]);
+        grid[4] = vm(&[2, 5, 6]);
+        grid[5] = vm(&[2, 6]);
+        let mut a = acc();
+        assert!(handler.enforce_consistency(&mut grid, &mut a));
+        for i in 0..6 {
+            assert_eq!(grid[i], vm(&[2]));
+        }
+    }
+
+    #[test]
+    fn fail_intersection_smaller_than_max_exclusion_size_unique() {
+        let (mut grid, shape) = make_grid(1, 6, Some(6));
+        let mut handler = SameValues::new(vec![vec![0, 1, 2], vec![3, 4, 5]]);
+        let ce = unique_exclusions(6);
+        init_with(&mut handler, &mut grid, shape, &ce);
+
+        grid[0] = vm(&[4, 5]);
+        grid[1] = vm(&[5]);
+        grid[2] = vm(&[3, 5]);
+        grid[3] = vm(&[5, 6]);
+        grid[4] = vm(&[5, 6]);
+        grid[5] = vm(&[5]);
+        assert!(!handler.enforce_consistency(&mut grid, &mut acc()));
+    }
+
+    #[test]
+    fn allow_intersection_size_equal_to_max_exclusion_size_unique() {
+        let (mut grid, shape) = make_grid(1, 4, Some(4));
+        let mut handler = SameValues::new(vec![vec![0, 1], vec![2, 3]]);
+        let ce = unique_exclusions(4);
+        init_with(&mut handler, &mut grid, shape, &ce);
+
+        grid[0] = vm(&[2, 3]);
+        grid[1] = vm(&[2, 3]);
+        grid[2] = vm(&[2, 3]);
+        grid[3] = vm(&[2, 3]);
+        let mut a = acc();
+        assert!(handler.enforce_consistency(&mut grid, &mut a));
+        for i in 0..4 {
+            assert_eq!(grid[i], vm(&[2, 3]));
+        }
+    }
+
+    #[test]
+    fn force_values_when_counts_are_required() {
+        let (mut grid, shape) = make_grid(1, 4, Some(4));
+        let mut handler = SameValues::new(vec![vec![0, 1], vec![2, 3]]);
+        let ce = CellExclusions::new();
+        init_with(&mut handler, &mut grid, shape, &ce);
+
+        grid[0] = vm(&[1]);
+        grid[1] = vm(&[2, 3]);
+        grid[2] = vm(&[1, 2]);
+        grid[3] = vm(&[2, 4]);
+        let mut a = acc();
+        assert!(handler.enforce_consistency(&mut grid, &mut a));
+        assert_eq!(grid[2], vm(&[1]));
+        assert_eq!(grid[3], vm(&[2]));
+    }
+
+    #[test]
+    fn reusable_across_multiple_calls() {
+        let (mut grid, shape) = make_grid(1, 4, Some(4));
+        let mut handler = SameValues::new(vec![vec![0, 1], vec![2, 3]]);
+        let ce = CellExclusions::new();
+        init_with(&mut handler, &mut grid, shape, &ce);
+
+        grid[0] = vm(&[1, 2]);
+        grid[1] = vm(&[2, 3]);
+        grid[2] = vm(&[2, 3]);
+        grid[3] = vm(&[2, 4]);
+        let mut a = acc();
+        assert!(handler.enforce_consistency(&mut grid, &mut a));
+        assert_eq!(grid[0], vm(&[2]));
+        assert_eq!(grid[3], vm(&[2]));
+
+        // Second call with fresh grid state
+        let all = CandidateSet::all(shape.num_values);
+        for c in grid.iter_mut() {
+            *c = all;
+        }
+        grid[0] = vm(&[1, 2]);
+        grid[1] = vm(&[1, 2]);
+        grid[2] = vm(&[2, 3]);
+        grid[3] = vm(&[2, 3]);
+        let mut a2 = acc();
+        assert!(handler.enforce_consistency(&mut grid, &mut a2));
+        assert_eq!(grid[0], vm(&[2]));
+        assert_eq!(grid[1], vm(&[2]));
+        assert_eq!(grid[2], vm(&[2]));
+        assert_eq!(grid[3], vm(&[2]));
+    }
+
+    #[test]
+    fn fail_when_required_counts_impossible() {
+        let (mut grid, shape) = make_grid(1, 4, Some(4));
+        let mut handler = SameValues::new(vec![vec![0, 1], vec![2, 3]]);
+        let ce = CellExclusions::new();
+        init_with(&mut handler, &mut grid, shape, &ce);
+
+        grid[0] = vm(&[1]);
+        grid[1] = vm(&[1]);
+        grid[2] = vm(&[1]);
+        grid[3] = vm(&[2]);
+        assert!(!handler.enforce_consistency(&mut grid, &mut acc()));
+    }
+
+    #[test]
+    fn reject_uneven_set_sizes() {
+        // Sets [0,1] (len 2) and [2] (len 1) — initialize should return false.
+        let (mut grid, shape) = make_grid(1, 3, Some(3));
+        let mut handler = SameValues::new(vec![vec![0, 1], vec![2]]);
+        let ce = CellExclusions::new();
+        assert!(!init_with(&mut handler, &mut grid, shape, &ce));
+    }
+
+    #[test]
+    fn normalize_set_ordering_in_id_str() {
+        // Unsorted input [2,0],[3,1] should produce sorted sets in id_str.
+        let handler = SameValues::new(vec![vec![2, 0], vec![3, 1]]);
+        let id = handler.id_str();
+        assert!(id.contains("[0, 2]"), "id_str should contain sorted set [0, 2]: {}", id);
+        assert!(id.contains("[1, 3]"), "id_str should contain sorted set [1, 3]: {}", id);
+    }
+}

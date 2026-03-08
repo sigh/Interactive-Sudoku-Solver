@@ -111,3 +111,72 @@ impl ConstraintHandler for Rellik {
         true
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::handlers::test_util::*;
+
+    #[test]
+    fn forbidden_sum_value_removed_from_unfixed() {
+        // cells [0,1,2], forbidden sum=5. Cell 0 fixed to 2.
+        // Remainder after subtracting 2: 5 and 3 reachable.
+        // Value 3 should be removed from unfixed cells.
+        let (mut grid, _) = make_grid(1, 4, Some(4));
+        let handler = Rellik::new(vec![0, 1, 2], 5);
+
+        grid[0] = vm(&[2]);
+        grid[1] = vm(&[1, 3, 4]);
+        grid[2] = vm(&[1, 3, 4]);
+
+        let mut a = acc();
+        assert!(handler.enforce_consistency(&mut grid, &mut a));
+        // Value 3 removed (2+3=5), value 5 is already > numValues.
+        assert_eq!(grid[1] & vm(&[3]), CandidateSet::EMPTY);
+        assert_eq!(grid[2] & vm(&[3]), CandidateSet::EMPTY);
+    }
+
+    #[test]
+    fn pass_when_no_dangerous_values() {
+        let (mut grid, _) = make_grid(1, 4, Some(4));
+        let handler = Rellik::new(vec![0, 1, 2], 9);
+
+        // No fixed cells, sum=9 — no single unfixed value can be removed.
+        grid[0] = vm(&[1, 2]);
+        grid[1] = vm(&[1, 2]);
+        grid[2] = vm(&[1, 2]);
+
+        let mut a = acc();
+        assert!(handler.enforce_consistency(&mut grid, &mut a));
+    }
+
+    #[test]
+    fn fail_when_fixed_cells_achieve_forbidden_sum() {
+        // cells [0,1], forbidden sum=5. Fixed 2+3=5 → fail.
+        let (mut grid, _) = make_grid(1, 4, Some(4));
+        let handler = Rellik::new(vec![0, 1], 5);
+
+        grid[0] = vm(&[2]);
+        grid[1] = vm(&[3]);
+
+        let mut a = acc();
+        assert!(!handler.enforce_consistency(&mut grid, &mut a));
+    }
+
+    #[test]
+    fn multiple_fixed_values_accumulate() {
+        // cells [0,1,2], sum=6. Cell 0=1, Cell 1=2.
+        // Remainders: 6, 5 (6-1), 4 (6-2), 3 (5-2). Bit 0 not set → ok.
+        // Values that complete sum: 6,5,4,3 → remove 3,4 from unfixed (5,6 > numValues).
+        let (mut grid, _) = make_grid(1, 4, Some(4));
+        let handler = Rellik::new(vec![0, 1, 2], 6);
+
+        grid[0] = vm(&[1]);
+        grid[1] = vm(&[2]);
+        grid[2] = vm(&[1, 2, 3, 4]);
+
+        let mut a = acc();
+        assert!(handler.enforce_consistency(&mut grid, &mut a));
+        assert_eq!(grid[2] & vm(&[3]), CandidateSet::EMPTY);
+    }
+}
