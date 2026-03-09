@@ -882,6 +882,7 @@ export class BinaryPairwise extends SudokuConstraintHandler {
     this._cellExclusions = null;
     this._enableHiddenSingles = false;
     this._prefixCache = null;
+    this._allChanged = new BitSet(cells.length || 1);
 
     // Ensure we dedupe binary constraints.
     this.idStr = [this.constructor.name, key, ...cells].join('-');
@@ -1101,18 +1102,19 @@ export class BinaryPairwise extends SudokuConstraintHandler {
     // For cell i, the valid values are: v_i & prefix[i] & suffix
     const prefix = this._prefixCache;
 
-    let allChanged = 0;
-    let newChanged = 1;
-    while (newChanged) {
-      const firstCell = LookupTables.toIndex(newChanged & -newChanged);
-      newChanged = 0;
+    const allChangedWords = this._allChanged.words;
 
-      // Forward pass: build prefix cache.
-      for (let i = firstCell; i < numCells; i++) {
+    allChangedWords.fill(0);
+    let firstChanged = 0;
+
+    while (firstChanged < numCells) {
+      // Forward pass: build prefix cache from first changed cell.
+      for (let i = firstChanged; i < numCells; i++) {
         prefix[i + 1] = prefix[i] & table[grid[cells[i]]];
       }
 
       // Backward pass: accumulate suffix and enforce constraints.
+      firstChanged = numCells;
       let suffix = prefix[0];
       for (let i = numCells - 1; i >= 0; i--) {
         const v = grid[cells[i]];
@@ -1121,21 +1123,16 @@ export class BinaryPairwise extends SudokuConstraintHandler {
           if (!(grid[cells[i]] = vNew)) {
             return false;
           }
-          newChanged |= 1 << i;
+          firstChanged = i;
+          const bit = 1 << (i & 31);
+          const word = i >>> 5;
+          if ((bit & allChangedWords[word]) === 0) {
+            allChangedWords[word] |= bit;
+            handlerAccumulator.addForCell(i);
+          }
         }
         suffix &= table[v];
       }
-      allChanged |= newChanged;
-    }
-
-    // Add any changed cells to the accumulator.
-    // This seems to help for the direct pass, but not the all-different
-    // pass.
-    while (allChanged) {
-      const changed = allChanged & -allChanged;
-      allChanged ^= changed;
-      handlerAccumulator.addForCell(cells[
-        LookupTables.toIndex(changed)]);
     }
 
     // The rest of the different is for when the values must be unique.
