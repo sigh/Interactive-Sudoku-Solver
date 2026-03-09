@@ -984,7 +984,7 @@ export class BinaryPairwise extends SudokuConstraintHandler {
         }
       }
       // Clear if there were no valid values.
-      if (!validCombinationInfo[i] & 0xffff) validCombinationInfo[i] = 0;
+      if (!(validCombinationInfo[i] & 0xffff)) validCombinationInfo[i] = 0;
     }
 
     return validCombinationInfo;

@@ -90,4 +90,18 @@ await runTest('backward pass prunes last cell', () => {
   assert.equal(grid[0] & valueMask(3), 0);
 });
 
+await runTest('validCombinationInfo is zero when no valid subset exists', () => {
+  // Entropic key: values must be from different groups of 3.
+  // Groups: {1,2,3}, {4,5,6}, {7,8,9}.
+  // With numCells=3, selecting 3 from {1,2,3,4} has no valid 3-cell subset
+  // (every triple includes two values from group 0).
+  // The table entry for valueMask(1,2,3,4) must be 0.
+  // Regression: an operator precedence bug left stale required-value bits.
+  const numValues = 9;
+  const key = fnToBinaryKey(
+    (a, b) => (((a - 1) / 3) | 0) !== (((b - 1) / 3) | 0), numValues);
+  const table = BinaryPairwise._validCombinationInfoTable(key, numValues, 3);
+  assert.equal(table[valueMask(1, 2, 3, 4)], 0);
+});
+
 logSuiteComplete('binary_pairwise.test.js');
