@@ -76,6 +76,7 @@ layout: null
             <li><a href="#sum-variants">Sum Variants</a></li>
             <li><a href="#general-skyscraper">General Skyscraper</a></li>
             <li><a href="#ambiguous-arrow">Ambiguous Arrow</a></li>
+            <li><a href="#generalized-entropic-line">Generalized Entropic Line</a></li>
           </ul>
         </li>
         <li><a href="#javascript-sandbox">JavaScript Sandbox</a></li>
@@ -423,10 +424,11 @@ function accept(state) {
         </p>
         <pre>.*(AD|DB).*</pre>
 
-        NOTE: This assumes that <code>D</code> must exist in the line. This
-        might not be the case in non-standard grid. In that case,
-        then you can modify the regex as follows:
-
+        <p>
+          Note: This assumes that <code>D</code> must exist in the line. This
+          might not be the case in non-standard grid. In that case,
+          then you can modify the regex as follows:
+        </p>
         <pre>[^D]*(AD|DB)?[^D]*</pre>
 
         <h3 id="odd-even-lots">Odd/Even Lots</h3>
@@ -575,6 +577,37 @@ function transition(state, value) {
 
 function accept(state) {
   return state.sum === 2*state.max;
+}</pre>
+        </p>
+
+        <h3 id="generalized-entropic-line">Generalized Entropic Line</h3>
+        <p>
+          <b>Description:</b>
+          An entropic line requires that every consecutive group of N cells
+          (where N is the number of sets) contains one digit from each set.
+          The standard entropic line uses low (1–3), mid (4–6), and
+          high (7–9), but this recipe generalizes it to any custom
+          partitioning of the digits.
+        </p>
+        <p>
+          Implement this by configuring a state machine in the
+          "Custom JavaScript constraints" panel. Customize the
+          <code>sets</code> variable to define your own partitioning:
+        <pre>
+sets = [[1, 2, 3], [4, 5, 6], [7, 8, 9]];
+
+startState = { window: [] };
+
+function transition(state, value) {
+  const index = sets.findIndex(s => s.includes(value));
+  if (index < 0) return;
+  const window = [...state.window, index].slice(-sets.length);
+  if (new Set(window).size < window.length) return;
+  return { window };
+}
+
+function accept(state) {
+  return true;
 }</pre>
         </p>
       </div>
