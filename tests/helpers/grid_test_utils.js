@@ -153,3 +153,17 @@ export const applyCandidates = (grid, assignments) => {
   return grid;
 };
 
+export const assertTouched = (acc, expectedCells) => {
+  const actual = [...acc.touched].sort((a, b) => a - b);
+  const expected = [...expectedCells].sort((a, b) => a - b);
+  assert.deepEqual(actual, expected, 'Accumulator touched cells mismatch');
+};
+
+export const assertCandidates = (grid, expectations) => {
+  for (const [cell, values] of Object.entries(expectations)) {
+    const expected = Array.isArray(values) ? valueMask(...values) : values;
+    assert.equal(grid[Number(cell)], expected,
+      `Cell ${cell} candidates mismatch`);
+  }
+};
+
