@@ -458,6 +458,10 @@ export class SudokuBuilder {
           break;
 
         case 'Entropic':
+          if (shape.numValues !== 9) {
+            throw new InvalidConstraintError(
+              'Entropic Line requires exactly 9 values');
+          }
           cells = constraint.cells.map(c => shape.parseCellId(c).cell);
           if (cells.length < 3) {
             const handler = new HandlerModule.BinaryPairwise(
@@ -606,6 +610,10 @@ export class SudokuBuilder {
           break;
 
         case 'GlobalEntropy':
+          if (shape.numValues !== 9) {
+            throw new InvalidConstraintError(
+              'Global Entropy requires exactly 9 values');
+          }
           for (const cells of SudokuConstraintBase.square2x2Regions(shape)) {
             yield new HandlerModule.LocalEntropy(cells);
           }

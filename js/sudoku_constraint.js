@@ -859,6 +859,7 @@ export class SudokuConstraint {
       color: 'rgb(255, 100, 255)',
       dashed: true,
     };
+    static VALIDATE_CELLS_FN = (cells, shape) => shape.numValues === 9;
 
     constructor(...cells) {
       super(...cells);
@@ -1446,6 +1447,7 @@ export class SudokuConstraint {
       a middle digit (4, 5, 6) and a high digit (7, 8, 9).`);
     static CATEGORY = 'Global';
     static UNIQUENESS_KEY_FIELD = 'type';
+    static REQUIRE_9_VALUES = true;
   }
 
   static GlobalMod = class GlobalMod extends SudokuConstraintBase {
