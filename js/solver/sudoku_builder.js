@@ -245,6 +245,10 @@ export class SudokuBuilder {
             }
             const cells = (
               constraint.cells.map(c => shape.parseCellId(c).cell));
+            if (cells.length <= pillSize) {
+              throw new InvalidConstraintError(
+                'Pill Arrow must have more cells than the pill size');
+            }
 
             const pillCells = cells.slice(0, pillSize);
             pillCells.sort((a, b) => a - b);
