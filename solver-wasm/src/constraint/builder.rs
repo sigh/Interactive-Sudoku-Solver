@@ -23,6 +23,7 @@ use crate::handlers::{
     Skyscraper, SumLine, TieMode, ValueDependentUniqueValueExclusion, ValueIndexing,
 };
 use crate::nfa::{compress_nfa, regex_to_nfa, NfaSerializer};
+use crate::solver::debug::DebugOptions;
 use crate::solver::Solver;
 
 /// Builds a [`Solver`] from a puzzle string and a list of [`Constraint`]s.
@@ -31,13 +32,17 @@ pub struct SudokuBuilder;
 impl SudokuBuilder {
     /// Build a solver from parsed constraints.
     ///
-    /// The parser has already converted the input string into a list of
-    /// constraints (including Givens) and a shape — the builder creates
-    /// handlers and constructs the solver. The solver creates its own
-    /// initial grid internally.
-    pub fn build(parsed: &ParsedConstraints) -> Result<Solver, String> {
+    /// Mirrors JS `SudokuBuilder.build(constraint, debugOptions)`.
+    /// The debug options are passed through to the solver at construction
+    /// time, matching JS where the `DebugLogger` is created in the
+    /// `SudokuSolver` constructor and passed to `InternalSolver` and
+    /// the optimizer.
+    pub fn build(
+        parsed: &ParsedConstraints,
+        debug_options: Option<DebugOptions>,
+    ) -> Result<Solver, String> {
         let handlers = Self::create_handlers(&parsed.constraints, parsed.shape)?;
-        Solver::from_handlers(handlers, parsed.shape)
+        Solver::from_handlers(handlers, parsed.shape, debug_options)
     }
 
     /// Create all constraint handlers for the given constraints.
@@ -629,7 +634,8 @@ impl SudokuBuilder {
                 if cells.len() != region_size {
                     return Err(format!(
                         "Jigsaw pieces must have {} cells for the current shape",
-                        region_size));
+                        region_size
+                    ));
                 }
 
                 handlers.push(Box::new(AllDifferent::new(
@@ -1472,7 +1478,7 @@ mod tests {
         let puzzle =
             "530070000600195000098000060800060003400803001700020006060000280000419005000080079";
         let parsed = parser::parse(puzzle).unwrap();
-        let mut solver = SudokuBuilder::build(&parsed).unwrap();
+        let mut solver = SudokuBuilder::build(&parsed, None).unwrap();
         let result = solver.nth_solution(0, &mut |_| {});
         assert!(result.solution.is_some());
     }
@@ -1487,7 +1493,7 @@ mod tests {
             cells: vec!["R1C1".to_string(), "R1C2".to_string(), "R1C3".to_string()],
             sum: 12,
         });
-        let mut solver = SudokuBuilder::build(&parsed).unwrap();
+        let mut solver = SudokuBuilder::build(&parsed, None).unwrap();
         let result = solver.nth_solution(0, &mut |_| {});
         assert!(result.solution.is_some());
     }
@@ -1501,7 +1507,7 @@ mod tests {
         parsed.constraints.push(Constraint::Thermo {
             cells: vec!["R1C1".to_string(), "R1C2".to_string(), "R1C3".to_string()],
         });
-        let solver = SudokuBuilder::build(&parsed);
+        let solver = SudokuBuilder::build(&parsed, None);
         assert!(solver.is_ok());
     }
 
@@ -1539,7 +1545,7 @@ mod tests {
             .LittleKiller~43~R1C7.LittleKiller~44~R1C8\
             .LittleKiller~34~R9C2.LittleKiller~52~R9C3";
         let parsed = crate::constraint::parser::parse(input).unwrap();
-        let mut solver = SudokuBuilder::build(&parsed).unwrap();
+        let mut solver = SudokuBuilder::build(&parsed, None).unwrap();
         let result = solver.nth_solution(0, &mut |_| {});
         assert!(
             result.solution.is_some(),
@@ -1570,7 +1576,7 @@ mod tests {
             other => panic!("Expected XSum, got {:?}", other),
         }
         // Builder should not error.
-        let result = SudokuBuilder::build(&parsed);
+        let result = SudokuBuilder::build(&parsed, None);
         assert!(result.is_ok(), "Builder should accept XSum constraint");
     }
 
@@ -1594,7 +1600,7 @@ mod tests {
             constraints,
             shape: SHAPE_9X9,
         };
-        let result = SudokuBuilder::build(&parsed);
+        let result = SudokuBuilder::build(&parsed, None);
         assert!(result.is_ok(), "Builder should accept Or constraint");
     }
 
@@ -1621,7 +1627,7 @@ mod tests {
                 .count(),
             1
         );
-        let result = SudokuBuilder::build(&parsed);
+        let result = SudokuBuilder::build(&parsed, None);
         assert!(result.is_ok(), "Builder should accept FullRank constraints");
     }
 
@@ -1637,7 +1643,7 @@ mod tests {
                 ".Shape~4x4.FullRank~C1~10~.FullRank~C2~15~.FullRank~R4~5~.FullRankTies~any";
             let parsed = crate::constraint::parser::parse(input).unwrap();
             let mut solver =
-                SudokuBuilder::build(&parsed).expect("Builder should accept 4x4 FullRank puzzle");
+                SudokuBuilder::build(&parsed, None).expect("Builder should accept 4x4 FullRank puzzle");
             let result = solver.nth_solution(0, &mut |_| {});
             assert!(
                 result.solution.is_some(),
@@ -1651,7 +1657,7 @@ mod tests {
             let input = ".Shape~4x4.FullRankTies~none.FullRank~C1~10~.FullRank~C2~15~.FullRank~C4~3~.FullRank~C3~~4.";
             let parsed = crate::constraint::parser::parse(input).unwrap();
             let mut solver2 =
-                SudokuBuilder::build(&parsed).expect("Builder should accept 4x4 FullRank puzzle");
+                SudokuBuilder::build(&parsed, None).expect("Builder should accept 4x4 FullRank puzzle");
             let (count, _) = solver2.count_solutions(1, &mut |_| {});
             assert_eq!(
                 count, 0,

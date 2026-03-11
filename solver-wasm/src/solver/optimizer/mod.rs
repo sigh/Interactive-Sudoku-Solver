@@ -29,7 +29,7 @@ pub(super) mod util;
 mod tests;
 
 use super::cell_exclusions::CellExclusions;
-use super::debug::DebugLog;
+use super::debug::{DebugLog, DebugOptions};
 use super::handler_set::HandlerSet;
 use crate::api::types::CellIndex;
 use crate::grid_shape::GridShape;
@@ -50,13 +50,22 @@ pub(super) struct OptimizerCtx {
     pub(super) logs: Vec<DebugLog>,
     /// Cached equals key for BinaryConstraint, computed once per optimize run.
     pub(super) equals_key: String,
+    /// Whether debug logging is enabled. When false, expensive diagnostic
+    /// phases (e.g. NFA stats) are skipped.
+    /// Mirrors JS: `this._debugLogger = debugLogger.enableLogs ? debugLogger : null;`
+    /// where `enableLogs = logLevel > 0`.
+    pub(super) enable_logs: bool,
 }
 
 impl OptimizerCtx {
-    pub(super) fn new(num_values: u8) -> Self {
+    pub(super) fn new(num_values: u8, debug_options: Option<&DebugOptions>) -> Self {
+        // JS: this._debugLogger = debugLogger.enableLogs ? debugLogger : null;
+        // JS: enableLogs = logLevel > 0
+        let enable_logs = debug_options.map_or(false, |o| o.log_level > 0);
         Self {
             logs: Vec::new(),
             equals_key: fn_to_binary_key(&|a: u8, b: u8| a == b, num_values),
+            enable_logs,
         }
     }
 
@@ -128,8 +137,9 @@ impl Optimizer {
         hs: &mut HandlerSet,
         cell_exclusions: &mut CellExclusions,
         shape: GridShape,
+        debug_options: Option<&DebugOptions>,
     ) -> Vec<DebugLog> {
-        let mut ctx = OptimizerCtx::new(shape.num_values);
+        let mut ctx = OptimizerCtx::new(shape.num_values, debug_options);
 
         // Get box regions from BoxInfo handler if available, else from shape.
         let box_regions = hs

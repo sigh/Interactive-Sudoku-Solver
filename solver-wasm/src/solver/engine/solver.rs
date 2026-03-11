@@ -34,8 +34,9 @@ impl Solver {
     pub fn from_handlers(
         handlers: Vec<Box<dyn ConstraintHandler>>,
         shape: GridShape,
+        debug_options: Option<DebugOptions>,
     ) -> Result<Self, String> {
-        let inner = InternalSolver::new(handlers, shape)?;
+        let inner = InternalSolver::new(handlers, shape, debug_options)?;
         Ok(Self { inner })
     }
 
@@ -175,8 +176,7 @@ impl Solver {
         // Final progress with any remaining sample, matching JS
         // _sendProgress() at end of _runCountFn.
         if let Some(values) = sample.into_inner() {
-            let mut final_progress =
-                SolverProgress::counters_only(self.inner.counters.clone());
+            let mut final_progress = SolverProgress::counters_only(self.inner.counters.clone());
             final_progress.extra = Some(ProgressExtra {
                 estimate: None,
                 solutions: Some(vec![values]),
@@ -264,9 +264,14 @@ impl Solver {
         self.inner.set_progress_frequency(log_freq)
     }
 
-    /// Set debug options controlling what debug data to export.
-    pub fn set_debug_options(&mut self, opts: DebugOptions) {
-        self.inner.set_debug_options(opts)
+    /// Set an ad-hoc debug counter (matching JS `debugLogger.setCounter`).
+    pub fn set_counter(&mut self, name: String, value: f64) {
+        self.inner.set_counter(name, value);
+    }
+
+    /// Increment an ad-hoc debug counter (matching JS `debugLogger.incCounter`).
+    pub fn inc_counter(&mut self, name: String, value: f64) {
+        self.inner.inc_counter(name, value);
     }
 
     /// Returns true if the solver detected a contradiction during initialization.
@@ -306,7 +311,7 @@ mod tests {
             .ContainExact~6_6~R6C9~R7C8~R8C7~R9C6.";
 
         let parsed = constraint::parser::parse(input).unwrap();
-        let mut solver = SudokuBuilder::build(&parsed).unwrap();
+        let mut solver = SudokuBuilder::build(&parsed, None).unwrap();
 
         let has_contradiction = solver.has_initial_contradiction();
         let failures = solver.init_failures().to_vec();
@@ -326,12 +331,9 @@ mod tests {
         let result = solver.nth_solution(0, &mut |_| {});
         let expected =
             "893456712654217983721839465562741398948623571317985246179362854435178629286594137";
-        let got = result.solution.map(|sol| {
-            sol[..81]
-                .iter()
-                .map(|v| v.to_string())
-                .collect::<String>()
-        });
+        let got = result
+            .solution
+            .map(|sol| sol[..81].iter().map(|v| v.to_string()).collect::<String>());
         assert_eq!(
             got.as_deref(),
             Some(expected),

@@ -4,6 +4,8 @@
 //! They are serialized to JSON and sent to the UI via `type: 'debug'`
 //! worker messages.
 
+use std::collections::HashMap;
+
 use crate::api::types::{CellIndex, Value};
 use serde::{Deserialize, Serialize};
 
@@ -149,6 +151,11 @@ pub struct SolverProgress {
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub logs: Vec<DebugLog>,
 
+    /// Ad-hoc debug counters, matching JS `_adhHocCounters`.
+    /// Present when `setCounter`/`incCounter` have been called.
+    #[serde(skip_serializing_if = "HashMap::is_empty")]
+    pub ad_hoc_counters: HashMap<String, f64>,
+
     /// Optional extra state (estimation data, sample solutions, etc.).
     /// Present during `estimatedCountSolutions`.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -163,6 +170,7 @@ impl SolverProgress {
             conflict_heatmap: None,
             stack_trace: None,
             logs: Vec::new(),
+            ad_hoc_counters: HashMap::new(),
             extra: None,
         }
     }

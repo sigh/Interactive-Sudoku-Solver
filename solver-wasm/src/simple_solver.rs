@@ -58,7 +58,7 @@ impl SimpleSolver {
         let start = Instant::now();
         let parsed = parser::parse(input)?;
         let shape = parsed.shape;
-        let solver = SudokuBuilder::build(&parsed)?;
+        let solver = SudokuBuilder::build(&parsed, None)?;
         let setup_ms = start.elapsed().as_secs_f64() * 1000.0;
         Ok((solver, shape, setup_ms))
     }

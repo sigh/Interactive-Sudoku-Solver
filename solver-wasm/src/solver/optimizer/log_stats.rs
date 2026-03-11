@@ -11,6 +11,10 @@ use crate::solver::handler_set::HandlerSet;
 /// states and transition entries, and detects whether the automaton is
 /// a DFA (no state has overlapping symbol masks across transitions).
 pub(super) fn log_stats(hs: &mut HandlerSet, ctx: &mut OptimizerCtx) {
+    if !ctx.enable_logs {
+        return;
+    }
+
     let mask: u32 = (1 << 16) - 1;
 
     let nfa_data: Vec<(Vec<crate::api::types::CellIndex>, usize, usize, bool)> = hs
