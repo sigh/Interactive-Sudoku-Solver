@@ -956,12 +956,14 @@ pub(super) fn replace_size_specific_sum_handlers(
 /// For each Sum with unit coefficients, find a common House handler
 /// and attach complement cells.
 ///
-/// Mirrors JS `_addSumComplementCells`.
+/// Mirrors JS `_addSumComplementCells`.  Uses progressive intersection of
+/// the per-cell ordinary handler map (matching JS `_findCommonHandlers`)
+/// instead of brute-force containment checks.
 fn add_sum_complement_cells(hs: &mut HandlerSet) {
-    let house_indices: Vec<(usize, Vec<CellIndex>)> = hs
+    let house_handler_indices: Vec<usize> = hs
         .get_all_of_type::<House>()
         .iter()
-        .map(|&(idx, h)| (idx, h.cells().to_vec()))
+        .map(|&(idx, _)| idx)
         .collect();
 
     let sum_entries: Vec<(usize, Vec<CellIndex>)> = hs
@@ -976,26 +978,57 @@ fn add_sum_complement_cells(hs: &mut HandlerSet) {
         })
         .collect();
 
-    for (sum_idx, sum_cells) in sum_entries {
-        // Find a house that contains all cells of this sum.
-        let house = house_indices
-            .iter()
-            .find(|(_, house_cells)| sum_cells.iter().all(|c| house_cells.contains(c)));
-
-        if let Some((_, house_cells)) = house {
-            let complement: Vec<CellIndex> = house_cells
+    // Phase 1: compute complement cells via progressive intersection.
+    let mut updates: Vec<(usize, Vec<CellIndex>)> = Vec::new();
+    for (sum_idx, sum_cells) in &sum_entries {
+        let common = find_common_house_handlers(
+            sum_cells,
+            hs.ordinary_map(),
+            &house_handler_indices,
+        );
+        if common.is_empty() {
+            continue;
+        }
+        if let Some(handler) = hs.get(common[0]) {
+            let complement: Vec<CellIndex> = handler
+                .cells()
                 .iter()
                 .copied()
                 .filter(|c| !sum_cells.contains(c))
                 .collect();
+            updates.push((*sum_idx, complement));
+        }
+    }
 
-            if !complement.is_empty() {
-                if let Some(h) = hs.get_mut(sum_idx) {
-                    if let Some(sum_h) = h.as_any_mut().downcast_mut::<Sum>() {
-                        sum_h.set_complement_cells(complement);
-                    }
-                }
+    // Phase 2: apply mutations.
+    for (sum_idx, complement) in updates {
+        if let Some(h) = hs.get_mut(sum_idx) {
+            if let Some(sum_h) = h.as_any_mut().downcast_mut::<Sum>() {
+                sum_h.set_complement_cells(complement);
             }
         }
     }
+}
+
+/// Find handler indices common to all cells via progressive intersection.
+///
+/// Mirrors JS `_findCommonHandlers`: starts with `initial` (house handler
+/// indices), then for each cell intersects with `ordinary_map[cell]`,
+/// short-circuiting when the intersection becomes empty.
+fn find_common_house_handlers(
+    cells: &[CellIndex],
+    ordinary_map: &[Vec<usize>],
+    initial: &[usize],
+) -> Vec<usize> {
+    use std::collections::HashSet;
+    let mut common: Vec<usize> = initial.to_vec();
+    for &c in cells {
+        let cell_handlers: HashSet<usize> =
+            ordinary_map[c as usize].iter().copied().collect();
+        common.retain(|idx| cell_handlers.contains(idx));
+        if common.is_empty() {
+            return common;
+        }
+    }
+    common
 }

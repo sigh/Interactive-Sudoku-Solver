@@ -30,14 +30,11 @@ pub(crate) fn build_solver_from_input(
 ) -> Result<solver::Solver, String> {
     let parsed_constraints = constraint::parser::parse(&parsed.constraint_string)?;
 
-    let mut solver = sudoku_builder::SudokuBuilder::build(&parsed_constraints)?;
+    let mut solver =
+        sudoku_builder::SudokuBuilder::build(&parsed_constraints, parsed.debug_options.clone())?;
 
     if let Some(freq) = log_frequency {
         solver.set_progress_frequency(freq);
-    }
-
-    if let Some(ref debug_opts) = parsed.debug_options {
-        solver.set_debug_options(debug_opts.clone());
     }
 
     Ok(solver)
@@ -254,7 +251,7 @@ mod tests {
         let puzzle =
             "53..7....6..195....98....6.8...6...34..8.3..17...2...6.6....28....419..5....8..79";
         let parsed = crate::constraint::parser::parse(puzzle).unwrap();
-        let mut solver = crate::constraint::builder::SudokuBuilder::build(&parsed).unwrap();
+        let mut solver = crate::constraint::builder::SudokuBuilder::build(&parsed, None).unwrap();
 
         // nth_solution(0) should return the unique solution.
         let r0 = solver.nth_solution(0, &mut |_| {});
@@ -270,7 +267,7 @@ mod tests {
         // Sequential forward calls should accumulate counters.
         let empty = ".".repeat(81);
         let parsed = crate::constraint::parser::parse(&empty).unwrap();
-        let mut solver = crate::constraint::builder::SudokuBuilder::build(&parsed).unwrap();
+        let mut solver = crate::constraint::builder::SudokuBuilder::build(&parsed, None).unwrap();
 
         let r0 = solver.nth_solution(0, &mut |_| {});
         let vt0 = r0.counters.values_tried;

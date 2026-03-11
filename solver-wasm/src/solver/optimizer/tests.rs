@@ -64,7 +64,7 @@ fn test_optimize_required_values_6_6_diagonal_no_false() {
     let mut hs = HandlerSet::new(handlers, GridShape::default_9x9());
 
     let ce = sudoku_9x9_cell_exclusions();
-    let mut ctx = OptimizerCtx::new(9);
+    let mut ctx = OptimizerCtx::new(9, None);
     required_values::optimize_required_values(&mut hs, &ce, &mut ctx);
 
     let falses = hs.get_all_of_type::<crate::handlers::False>();
@@ -113,7 +113,7 @@ fn test_add_house_handlers() {
     let ad = AllDifferent::new(cells, AllDifferentType::WithExclusionCells);
     let handlers: Vec<Box<dyn crate::handlers::ConstraintHandler>> = vec![Box::new(ad)];
     let mut hs = HandlerSet::new(handlers, GridShape::default_9x9());
-    let mut ctx = OptimizerCtx::new(9);
+    let mut ctx = OptimizerCtx::new(9, None);
     house::add_house_handlers(&mut hs, &mut ctx);
 
     let houses = hs.get_all_of_type::<House>();
@@ -127,7 +127,7 @@ fn test_replace_1_cell_sum() {
     let handlers: Vec<Box<dyn crate::handlers::ConstraintHandler>> = vec![Box::new(sum)];
     let mut hs = HandlerSet::new(handlers, GridShape::default_9x9());
     let ce = CellExclusions::new();
-    let mut ctx = OptimizerCtx::new(9);
+    let mut ctx = OptimizerCtx::new(9, None);
     sums::replace_size_specific_sum_handlers(&mut hs, &ce, &mut ctx);
 
     let gcs = hs.get_all_of_type::<GivenCandidates>();
@@ -144,7 +144,7 @@ fn test_replace_2_cell_sum() {
     ce.add_mutual_exclusion(0, 1);
     let handlers: Vec<Box<dyn crate::handlers::ConstraintHandler>> = vec![Box::new(sum)];
     let mut hs = HandlerSet::new(handlers, GridShape::default_9x9());
-    let mut ctx = OptimizerCtx::new(9);
+    let mut ctx = OptimizerCtx::new(9, None);
     sums::replace_size_specific_sum_handlers(&mut hs, &ce, &mut ctx);
 
     let bcs = hs.get_all_of_type::<BinaryConstraint>();
@@ -180,7 +180,7 @@ fn test_optimize_required_values_removes_only_one_occurrence() {
     let mut ce = CellExclusions::new();
     ce.add_mutual_exclusion(0, 1);
 
-    let mut ctx = OptimizerCtx::new(9);
+    let mut ctx = OptimizerCtx::new(9, None);
     required_values::optimize_required_values(&mut hs, &ce, &mut ctx);
 
     // One GivenCandidates should have been added.
@@ -211,7 +211,7 @@ fn test_optimize_required_values_all_forced_deletes_handler() {
     let mut hs = HandlerSet::new(handlers, GridShape::default_9x9());
 
     let ce = CellExclusions::new();
-    let mut ctx = OptimizerCtx::new(9);
+    let mut ctx = OptimizerCtx::new(9, None);
     required_values::optimize_required_values(&mut hs, &ce, &mut ctx);
 
     let rvs = hs.get_all_of_type::<RequiredValues>();
@@ -491,7 +491,7 @@ fn test_replace_numvalues_sum_mutually_exclusive_true_or_false() {
         let sum = Sum::new_cage(cells.clone(), shape.max_sum);
         let handlers: Vec<Box<dyn crate::handlers::ConstraintHandler>> = vec![Box::new(sum)];
         let mut hs = HandlerSet::new(handlers, shape);
-        let mut ctx = OptimizerCtx::new(9);
+        let mut ctx = OptimizerCtx::new(9, None);
         sums::replace_size_specific_sum_handlers(&mut hs, &ce, &mut ctx);
 
         assert_eq!(hs.get_all_of_type::<Sum>().len(), 0);
@@ -504,7 +504,7 @@ fn test_replace_numvalues_sum_mutually_exclusive_true_or_false() {
         let sum = Sum::new_cage(cells.clone(), shape.max_sum - 1);
         let handlers: Vec<Box<dyn crate::handlers::ConstraintHandler>> = vec![Box::new(sum)];
         let mut hs = HandlerSet::new(handlers, shape);
-        let mut ctx = OptimizerCtx::new(9);
+        let mut ctx = OptimizerCtx::new(9, None);
         sums::replace_size_specific_sum_handlers(&mut hs, &ce, &mut ctx);
 
         assert_eq!(hs.get_all_of_type::<Sum>().len(), 0);
@@ -528,7 +528,7 @@ fn test_fill_in_sum_gap_all_cells_covered() {
     let mut sum_cells: HashSet<CellIndex> = all_cells(shape).into_iter().collect();
     let mut non_overlapping: Vec<usize> = Vec::new();
     let mut hs = HandlerSet::new(vec![], shape);
-    let mut ctx = OptimizerCtx::new(9);
+    let mut ctx = OptimizerCtx::new(9, None);
 
     let before = hs.get_all_of_type::<Sum>().len();
     sums::fill_in_sum_gap(&mut non_overlapping, &mut sum_cells, &mut hs, &mut ctx);
@@ -543,7 +543,7 @@ fn test_fill_in_sum_gap_gap_too_large() {
     let mut sum_cells: HashSet<CellIndex> = (0..72).collect();
     let mut non_overlapping: Vec<usize> = Vec::new();
     let mut hs = HandlerSet::new(vec![], shape);
-    let mut ctx = OptimizerCtx::new(9);
+    let mut ctx = OptimizerCtx::new(9, None);
 
     sums::fill_in_sum_gap(&mut non_overlapping, &mut sum_cells, &mut hs, &mut ctx);
     assert_eq!(hs.get_all_of_type::<Sum>().len(), 0);
@@ -566,7 +566,7 @@ fn test_fill_in_sum_gap_creates_handler_for_small_gap() {
         .iter()
         .map(|&(idx, _)| idx)
         .collect();
-    let mut ctx = OptimizerCtx::new(9);
+    let mut ctx = OptimizerCtx::new(9, None);
 
     sums::fill_in_sum_gap(&mut non_overlapping, &mut sum_cells, &mut hs, &mut ctx);
 
@@ -593,7 +593,7 @@ fn test_fill_in_sum_gap_4x6_grid() {
         .iter()
         .map(|&(idx, _)| idx)
         .collect();
-    let mut ctx = OptimizerCtx::new(shape.num_values);
+    let mut ctx = OptimizerCtx::new(shape.num_values, None);
 
     sums::fill_in_sum_gap(&mut non_overlapping, &mut sum_cells, &mut hs, &mut ctx);
 
@@ -620,7 +620,7 @@ fn test_fill_in_sum_gap_6x4_grid() {
         .iter()
         .map(|&(idx, _)| idx)
         .collect();
-    let mut ctx = OptimizerCtx::new(shape.num_values);
+    let mut ctx = OptimizerCtx::new(shape.num_values, None);
 
     sums::fill_in_sum_gap(&mut non_overlapping, &mut sum_cells, &mut hs, &mut ctx);
 
@@ -644,7 +644,7 @@ fn test_fill_in_sum_gap_6x8_grid() {
         .iter()
         .map(|&(idx, _)| idx)
         .collect();
-    let mut ctx = OptimizerCtx::new(shape.num_values);
+    let mut ctx = OptimizerCtx::new(shape.num_values, None);
 
     sums::fill_in_sum_gap(&mut non_overlapping, &mut sum_cells, &mut hs, &mut ctx);
 
@@ -677,7 +677,7 @@ fn test_fill_in_sum_gap_multiple_handlers() {
         .iter()
         .map(|&(idx, _)| idx)
         .collect();
-    let mut ctx = OptimizerCtx::new(9);
+    let mut ctx = OptimizerCtx::new(9, None);
 
     sums::fill_in_sum_gap(&mut non_overlapping, &mut sum_cells, &mut hs, &mut ctx);
 
@@ -700,7 +700,7 @@ fn test_fill_in_sum_gap_single_cell() {
         .iter()
         .map(|&(idx, _)| idx)
         .collect();
-    let mut ctx = OptimizerCtx::new(9);
+    let mut ctx = OptimizerCtx::new(9, None);
 
     sums::fill_in_sum_gap(&mut non_overlapping, &mut sum_cells, &mut hs, &mut ctx);
 
@@ -726,7 +726,7 @@ fn test_fill_in_sum_gap_numvalues_minus_1() {
         .iter()
         .map(|&(idx, _)| idx)
         .collect();
-    let mut ctx = OptimizerCtx::new(9);
+    let mut ctx = OptimizerCtx::new(9, None);
 
     sums::fill_in_sum_gap(&mut non_overlapping, &mut sum_cells, &mut hs, &mut ctx);
 
@@ -809,7 +809,7 @@ fn test_non_square_8x9_adds_aux() {
     }
 
     let mut hs = HandlerSet::new(handlers, shape);
-    let mut ctx = OptimizerCtx::new(shape.num_values);
+    let mut ctx = OptimizerCtx::new(shape.num_values, None);
     non_square::optimize_non_square_grids(&mut hs, &[], &mut ctx);
 
     let added = hs.get_all_of_type::<FullGridRequiredValues>();
@@ -837,7 +837,7 @@ fn test_non_square_8x9_numvalues_10_skips() {
     }
 
     let mut hs = HandlerSet::new(handlers, shape);
-    let mut ctx = OptimizerCtx::new(shape.num_values);
+    let mut ctx = OptimizerCtx::new(shape.num_values, None);
     non_square::optimize_non_square_grids(&mut hs, &[], &mut ctx);
 
     let added = hs.get_all_of_type::<FullGridRequiredValues>();
@@ -865,7 +865,7 @@ fn test_non_square_1x9_skips() {
     }
 
     let mut hs = HandlerSet::new(handlers, shape);
-    let mut ctx = OptimizerCtx::new(shape.num_values);
+    let mut ctx = OptimizerCtx::new(shape.num_values, None);
     non_square::optimize_non_square_grids(&mut hs, &[], &mut ctx);
 
     let added = hs.get_all_of_type::<FullGridRequiredValues>();
@@ -892,7 +892,7 @@ fn test_innie_outie_two_row_coverage() {
         .iter()
         .map(|&(idx, _)| idx)
         .collect();
-    let mut ctx = OptimizerCtx::new(9);
+    let mut ctx = OptimizerCtx::new(9, None);
 
     let result = sums::make_innie_outie_sum_handlers(&non_overlapping, &hs, &[], &mut ctx);
     assert!(result
@@ -914,7 +914,7 @@ fn test_innie_outie_cage_crossing_house() {
         .iter()
         .map(|&(idx, _)| idx)
         .collect();
-    let mut ctx = OptimizerCtx::new(9);
+    let mut ctx = OptimizerCtx::new(9, None);
 
     let result = sums::make_innie_outie_sum_handlers(&non_overlapping, &hs, &[], &mut ctx);
     assert!(result
@@ -934,7 +934,7 @@ fn test_innie_outie_integer_sums() {
         .iter()
         .map(|&(idx, _)| idx)
         .collect();
-    let mut ctx = OptimizerCtx::new(9);
+    let mut ctx = OptimizerCtx::new(9, None);
 
     let result = sums::make_innie_outie_sum_handlers(&non_overlapping, &hs, &[], &mut ctx);
     for h in &result {
@@ -955,7 +955,7 @@ fn test_innie_outie_4x6_rows_only() {
         .iter()
         .map(|&(idx, _)| idx)
         .collect();
-    let mut ctx = OptimizerCtx::new(shape.num_values);
+    let mut ctx = OptimizerCtx::new(shape.num_values, None);
 
     let result = sums::make_innie_outie_sum_handlers(&non_overlapping, &hs, &[], &mut ctx);
     assert!(result
@@ -976,7 +976,7 @@ fn test_innie_outie_6x4_cols_only() {
         .iter()
         .map(|&(idx, _)| idx)
         .collect();
-    let mut ctx = OptimizerCtx::new(shape.num_values);
+    let mut ctx = OptimizerCtx::new(shape.num_values, None);
 
     let result = sums::make_innie_outie_sum_handlers(&non_overlapping, &hs, &[], &mut ctx);
     assert!(result
@@ -988,7 +988,7 @@ fn test_innie_outie_6x4_cols_only() {
 fn test_innie_outie_empty_handlers() {
     let shape = GridShape::default_9x9();
     let hs = HandlerSet::new(vec![], shape);
-    let mut ctx = OptimizerCtx::new(9);
+    let mut ctx = OptimizerCtx::new(9, None);
 
     let result = sums::make_innie_outie_sum_handlers(&[], &hs, &[], &mut ctx);
     assert!(result.is_empty());
@@ -1006,7 +1006,7 @@ fn test_innie_outie_4x4_grid() {
         .iter()
         .map(|&(idx, _)| idx)
         .collect();
-    let mut ctx = OptimizerCtx::new(shape.num_values);
+    let mut ctx = OptimizerCtx::new(shape.num_values, None);
 
     let result = sums::make_innie_outie_sum_handlers(&non_overlapping, &hs, &[], &mut ctx);
     for h in &result {
@@ -1030,7 +1030,7 @@ fn test_innie_outie_6x6_grid() {
         .iter()
         .map(|&(idx, _)| idx)
         .collect();
-    let mut ctx = OptimizerCtx::new(shape.num_values);
+    let mut ctx = OptimizerCtx::new(shape.num_values, None);
 
     let result = sums::make_innie_outie_sum_handlers(&non_overlapping, &hs, &[], &mut ctx);
     for h in &result {

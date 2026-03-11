@@ -178,6 +178,9 @@ pub(crate) struct InternalSolver {
     /// Search counters. Owned by `InternalSolver`, matching JS `this.counters`.
     /// Cleared by `reset()`, preserved by `reset_run()`.
     pub(super) counters: SolverCounters,
+
+    /// Ad-hoc debug counters, matching JS `DebugLogger._adhHocCounters`.
+    pub(super) ad_hoc_counters: HashMap<String, f64>,
 }
 
 impl InternalSolver {
@@ -189,6 +192,7 @@ impl InternalSolver {
     pub(crate) fn new(
         mut handlers: Vec<Box<dyn ConstraintHandler>>,
         shape: GridShape,
+        debug_options: Option<DebugOptions>,
     ) -> Result<Self, String> {
         let num_cells = shape.num_cells;
         let num_values = shape.num_values as usize;
@@ -245,8 +249,11 @@ impl InternalSolver {
         }
 
         // Step 4: Run the optimizer (mutates handler_set in place).
+        // Pass debug_options so the optimizer can check enableLogs,
+        // matching JS: `new SudokuConstraintOptimizer(this._debugLogger)`
+        // where the optimizer stores the logger only if enableLogs is true.
         let optimizer_debug_logs =
-            Optimizer::optimize(&mut handler_set, &mut cell_exclusions, shape);
+            Optimizer::optimize(&mut handler_set, &mut cell_exclusions, shape, debug_options.as_ref());
 
         // Step 5: Add UniqueValueExclusion singleton handlers.
         for i in 0..num_cells {
@@ -292,7 +299,7 @@ impl InternalSolver {
             rec_depth: 0,
             iteration_counter: 0,
             step_state: StepState::new(num_cells),
-            debug_options: DebugOptions::default(),
+            debug_options: debug_options.unwrap_or_default(),
             debug_grid_buffer: vec![CandidateSet::EMPTY; num_cells],
             stack_trace_cells_buf: Vec::new(),
             stack_trace_values_buf: Vec::new(),
@@ -302,6 +309,7 @@ impl InternalSolver {
             seen_candidate_set: SeenCandidateSet::new(1, num_cells, num_values),
             current_rec_depth: None,
             counters: SolverCounters::default(),
+            ad_hoc_counters: HashMap::new(),
         };
 
         // Generate setup debug logs unconditionally (matches JS which
@@ -636,9 +644,15 @@ impl InternalSolver {
         };
     }
 
-    /// Set debug options controlling what debug data to export.
-    pub(super) fn set_debug_options(&mut self, opts: DebugOptions) {
-        self.debug_options = opts;
+    /// Set an ad-hoc debug counter (matching JS `debugLogger.setCounter`).
+    pub(super) fn set_counter(&mut self, name: String, value: f64) {
+        self.ad_hoc_counters.insert(name, value);
+    }
+
+    /// Increment an ad-hoc debug counter (matching JS `debugLogger.incCounter`).
+    pub(super) fn inc_counter(&mut self, name: String, value: f64) {
+        let entry = self.ad_hoc_counters.entry(name).or_insert(0.0);
+        *entry += value;
     }
 
     /// Generate handler setup debug logs.
@@ -723,17 +737,19 @@ impl InternalSolver {
             let cells_slice = self.candidate_selector.get_cell_order(cell_depth);
 
             self.stack_trace_cells_buf.clear();
-            self.stack_trace_cells_buf.extend(cells_slice.iter().map(|&c| c as u16));
+            self.stack_trace_cells_buf
+                .extend(cells_slice.iter().map(|&c| c as u16));
 
             self.stack_trace_values_buf.clear();
-            self.stack_trace_values_buf.extend(cells_slice.iter().map(|&c| {
-                let v = frame.grid[c as usize];
-                if !v.is_empty() && v.is_single() {
-                    v.value() as u16
-                } else {
-                    0
-                }
-            }));
+            self.stack_trace_values_buf
+                .extend(cells_slice.iter().map(|&c| {
+                    let v = frame.grid[c as usize];
+                    if !v.is_empty() && v.is_single() {
+                        v.value() as u16
+                    } else {
+                        0
+                    }
+                }));
 
             Some(StackTrace {
                 cells: self.stack_trace_cells_buf.clone(),
@@ -750,6 +766,7 @@ impl InternalSolver {
             conflict_heatmap,
             stack_trace,
             logs,
+            ad_hoc_counters: self.ad_hoc_counters.clone(),
             extra: None,
         }
     }

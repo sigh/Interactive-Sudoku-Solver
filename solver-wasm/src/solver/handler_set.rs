@@ -37,6 +37,8 @@ pub(crate) struct HandlerSet {
     singleton_map: Vec<Vec<usize>>,
     /// Seen id strings → handler index for deduplication.
     seen: HashMap<String, usize>,
+    /// Cached id_str per handler index, matching JS pre-built `idStr`.
+    id_str_cache: Vec<String>,
     /// Grid shape.
     pub shape: GridShape,
 }
@@ -53,12 +55,15 @@ impl HandlerSet {
         let mut seen = HashMap::new();
         let mut essential_flags = Vec::with_capacity(handlers.len());
         let mut kind_flags = Vec::with_capacity(handlers.len());
+        let mut id_str_cache = Vec::with_capacity(handlers.len());
 
         let handlers: Vec<Option<Box<dyn ConstraintHandler>>> = handlers
             .into_iter()
             .enumerate()
             .map(|(idx, h)| {
-                seen.insert(h.id_str(), idx);
+                let id = h.id_str();
+                seen.insert(id.clone(), idx);
+                id_str_cache.push(id);
                 // Mirrors JS: SINGLETON_HANDLER=true → singletonHandlerMap only.
                 if h.is_singleton() {
                     for &c in h.cells() {
@@ -83,6 +88,7 @@ impl HandlerSet {
             aux_map,
             singleton_map,
             seen,
+            id_str_cache,
             shape,
         }
     }
@@ -119,6 +125,16 @@ impl HandlerSet {
             .collect()
     }
 
+    /// Per-cell ordinary handler index map, matching JS `getOrdinaryHandlerMap`.
+    pub fn ordinary_map(&self) -> &[Vec<usize>] {
+        &self.ordinary_map
+    }
+
+    /// Cached id string for the handler at `idx`, matching JS `idStr` property.
+    pub fn get_id_str(&self, idx: usize) -> &str {
+        &self.id_str_cache[idx]
+    }
+
     /// Get handler indices that share any cell with the given handler.
     ///
     /// Only searches the ordinary map, matching JS `getIntersectingIndexes`.
@@ -150,11 +166,12 @@ impl HandlerSet {
         }
 
         let idx = self.handlers.len();
-        self.seen.insert(id, idx);
+        self.seen.insert(id.clone(), idx);
         Self::append_to_map(&mut self.ordinary_map, handler.cells(), idx);
         self.essential.push(true);
         self.kind.push(HandlerKind::Ordinary);
         self.handlers.push(Some(handler));
+        self.id_str_cache.push(id);
         Some(idx)
     }
 
@@ -178,11 +195,12 @@ impl HandlerSet {
             "Singleton handlers must be unique"
         );
         let idx = self.handlers.len();
-        self.seen.insert(id, idx);
+        self.seen.insert(id.clone(), idx);
         Self::append_to_map(&mut self.singleton_map, handler.cells(), idx);
         self.essential.push(handler.is_essential());
         self.kind.push(HandlerKind::Ordinary);
         self.handlers.push(Some(handler));
+        self.id_str_cache.push(id);
         idx
     }
 
@@ -202,6 +220,10 @@ impl HandlerSet {
             }
         }
         self.handlers[idx] = Some(new_handler);
+        // Update cached id_str to match the new handler.
+        if let Some(h) = &self.handlers[idx] {
+            self.id_str_cache[idx] = h.id_str();
+        }
     }
 
     /// Delete a handler at the given index (remove from maps, set to None).
@@ -412,12 +434,13 @@ impl HandlerSet {
         }
 
         let idx = self.handlers.len();
-        self.seen.insert(id, idx);
+        self.seen.insert(id.clone(), idx);
         let map = self.map_for_kind(hk);
         Self::append_to_map(map, handler.cells(), idx);
         self.essential.push(false);
         self.kind.push(hk);
         self.handlers.push(Some(handler));
+        self.id_str_cache.push(id);
         Some(idx)
     }
 
