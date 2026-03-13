@@ -1946,7 +1946,8 @@ export class SudokuConstraint {
   static Sandwich = class Sandwich extends OutsideConstraintBase {
     static DESCRIPTION = (`
       Values between the 1 and the 9 in the row or column must add to the
-      given sum.`);
+      given sum. Clues can only be applied to the top or the left of the
+      grid.`);
     static CATEGORY = 'OutsideClue';
     static DISPLAY_CONFIG = {
       displayClass: 'OutsideClue',
