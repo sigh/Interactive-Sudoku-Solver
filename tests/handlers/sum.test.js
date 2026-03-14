@@ -24,12 +24,13 @@ const initializeSum = (options = {}) => {
     coeffs,
     context,
     cellExclusions = uniqueCells(),
+    valueOffset,
   } = options;
 
   const resolvedContext = context ?? new GridTestContext();
 
   const cells = resolvedContext.cells(numCells);
-  const handler = new Sum(cells, sum, coeffs);
+  const handler = new Sum(cells, sum, coeffs, valueOffset);
   assert.equal(
     resolvedContext.initializeHandler(handler, { cellExclusions }),
     true,
@@ -221,6 +222,57 @@ await runTest('Sum should detect impossible bounds when minimum exceeds the targ
 
   const result = handler.enforceConsistency(grid, createAccumulator());
   assert.equal(result, false, 'handler should fail when even the min sum is too large');
+});
+
+// =============================================================================
+// valueOffset
+// =============================================================================
+
+await runTest('Sum constructor adjusts internal sum by valueOffset', () => {
+  // External sum=6 with offset=-1 means external values 0,1,2,...,8.
+  // Internal values are 1-9. Adjustment: sum -= offset * numCells = 6 - (-1)*3 = 9.
+  const { handler, context } = initializeSum({ numCells: 3, sum: 6, valueOffset: -1 });
+
+  // idStr should use the original (external) sum for deduplication.
+  assert.ok(handler.idStr.includes('|6|'), 'idStr should use external sum');
+
+  // The adjusted internal sum is 9, which is 1+2+6, 1+3+5, or 2+3+4.
+  // If we set cells to [2,3,4] (internal), the handler should accept.
+  const grid = applyCandidates(context.grid, {
+    0: [2], 1: [3], 2: [4],
+  });
+  const result = handler.enforceConsistency(grid, createAccumulator());
+  assert.equal(result, true, 'adjusted sum should accept valid internal values');
+});
+
+await runTest('Sum constructor with no offset does not adjust sum', () => {
+  const { handler, context } = initializeSum({ numCells: 3, sum: 9 });
+
+  // Internal sum should remain 9.
+  const grid = applyCandidates(context.grid, {
+    0: [2], 1: [3], 2: [4],
+  });
+  const result = handler.enforceConsistency(grid, createAccumulator());
+  assert.equal(result, true);
+});
+
+await runTest('Sum.makeEqual adjusts for valueOffset', () => {
+  const context = new GridTestContext({ gridSize: [1, 6] });
+  // makeEqual with offset=-1: cells0=[0,1], cells1=[2].
+  // sum=0, coeffs=[1,1,-1]. coeffSum = 1*2 + (-1)*1 = 1.
+  // adjustment: sum -= (-1)*1 = 1. Internal sum becomes 1.
+  // So cells0 sum - cells1 value = 1 internally,
+  // meaning external sums are equal (each shifted by offset).
+  const handler = Sum.makeEqual([0, 1], [2], -1);
+  context.initializeHandler(handler, { cellExclusions: createCellExclusions({ allUnique: false }) });
+
+  const grid = applyCandidates(context.grid, {
+    // Internal: 2+4=6, and cell2=6. The internal equation is 2+4-6=0,
+    // but we need internal sum=1. Try: 2+5=7, cell2=6 → 7-6=1. ✓
+    0: [2], 1: [5], 2: [6],
+  });
+  const result = handler.enforceConsistency(grid, createAccumulator());
+  assert.equal(result, true, 'makeEqual with offset should enforce equal external sums');
 });
 
 logSuiteComplete('Sum handler');

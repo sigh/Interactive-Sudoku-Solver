@@ -11,7 +11,9 @@ import {
 
 ensureGlobalEnvironment();
 
-const { fnToBinaryKey } = await import('../../js/sudoku_constraint.js');
+const { GridShape } = await import('../../js/grid_shape.js');
+
+const { fnToBinaryKey, binaryKeyToFnString } = await import('../../js/sudoku_constraint.js');
 const { BinaryConstraint } = await import('../../js/solver/handlers.js');
 
 // Helper to create a binary key from a predicate function.
@@ -468,6 +470,80 @@ await runTest('required values: should not run required-value exclusions for tra
   assert.equal(result, true);
   assert.equal(grid[2], valueMask(1, 2, 3), 'transitive keys should skip required-value exclusions');
   assert.equal(acc.touched.size, 0, 'no cells should be touched');
+});
+
+// =============================================================================
+// fnToBinaryKey / binaryKeyToFnString with valueOffset
+// =============================================================================
+
+await runTest('fnToBinaryKey: shift-invariant fn produces same key with offset', () => {
+  // a < b is shift-invariant: the truth table is the same regardless of offset.
+  const keyNoOffset = fnToBinaryKey((a, b) => a < b, 4);
+  const keyOffset = fnToBinaryKey((a, b) => a < b, 4, -1);
+  assert.equal(keyOffset, keyNoOffset);
+});
+
+await runTest('fnToBinaryKey: value-dependent fn produces different key with offset', () => {
+  // a + b === 5 is value-dependent: with offset=0, values are 1-4 so
+  // pairs (1,4) and (2,3) satisfy; with offset=-1, values are 0-3 so
+  // pairs (2,3) satisfy.
+  const keyNoOffset = fnToBinaryKey((a, b) => a + b === 5, 4);
+  const keyOffset = fnToBinaryKey((a, b) => a + b === 5, 4, -1);
+  assert.notEqual(keyOffset, keyNoOffset);
+});
+
+await runTest('fnToBinaryKey: offset shifts domain correctly', () => {
+  // With numValues=4 and offset=-1, fn receives values 0,1,2,3.
+  // a + b === 3 should match (0,3),(1,2),(2,1),(3,0).
+  const key = fnToBinaryKey((a, b) => a + b === 3, 4, -1);
+  // Same result as offset=0 with a + b === 5 (since 0+3=3, 1+2=3 maps
+  // to the same internal pair positions as 1+4=5, 2+3=5).
+  const keyEquiv = fnToBinaryKey((a, b) => a + b === 5, 4, 0);
+  assert.equal(key, keyEquiv);
+});
+
+await runTest('binaryKeyToFnString: round-trips with offset', () => {
+  const fn = (a, b) => a + b === 3;
+  const key = fnToBinaryKey(fn, 4, -1);
+  const fnStr = binaryKeyToFnString(key, 4, -1);
+  // fnStr should reference 0-based values (0,1,2,3).
+  assert.ok(fnStr.includes('0:'), 'should contain 0-based key');
+  // Evaluate the generated function to verify correctness.
+  const evalFn = new Function('a', 'b', 'return ' + fnStr);
+  assert.equal(evalFn(0, 3), true, '0+3=3 should be true');
+  assert.equal(evalFn(1, 2), true, '1+2=3 should be true');
+  assert.equal(evalFn(1, 3), false, '1+3!=3 should be false');
+});
+
+await runTest('binaryKeyToFnString: no offset uses 1-based values', () => {
+  const fn = (a, b) => a + b === 5;
+  const key = fnToBinaryKey(fn, 4, 0);
+  const fnStr = binaryKeyToFnString(key, 4, 0);
+  assert.ok(fnStr.includes('1:'), 'should contain 1-based key');
+  const evalFn = new Function('a', 'b', 'return ' + fnStr);
+  assert.equal(evalFn(1, 4), true, '1+4=5');
+  assert.equal(evalFn(2, 3), true, '2+3=5');
+  assert.ok(!evalFn(0, 3), '0-based values should not match');
+});
+
+await runTest('BinaryConstraint: enforces 0-based key correctly', () => {
+  const shape = GridShape.fromGridSize(1, 4, null, -1);
+  const context = new GridTestContext({ shape });
+  // "sum equals 3" in 0-based: pairs (0,3),(1,2),(2,1),(3,0)
+  const key = fnToBinaryKey((a, b) => a + b === 3, 4, -1);
+  const handler = new BinaryConstraint(0, 1, key);
+  context.initializeHandler(handler);
+
+  const grid = context.grid;
+  // Internal values are always 1-based (1,2,3,4).
+  // The key maps internal pair (1,4) to the external pair (0,3) which sums to 3.
+  grid[0] = valueMask(1);
+  grid[1] = valueMask(1, 2, 3, 4);
+  const acc = createAccumulator();
+  const result = handler.enforceConsistency(grid, acc);
+  assert.equal(result, true);
+  // Internal value 1 maps to external 0; partner must be external 3 = internal 4.
+  assert.equal(grid[1], valueMask(4));
 });
 
 logSuiteComplete('BinaryConstraint handler');

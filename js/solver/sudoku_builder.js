@@ -134,14 +134,14 @@ export class SudokuBuilder {
       // singles.
       const singleCell = singles[0];
       for (let i = 0; i < multis.length; i++) {
-        yield SumHandlerModule.Sum.makeEqual([singleCell], multis[i]);
+        yield SumHandlerModule.Sum.makeEqual([singleCell], multis[i], shape.valueOffset);
       }
     } else {
       // Otherwise set up an equal sum constraint between every
       // pair of multis.
       for (let i = 1; i < multis.length; i++) {
         for (let j = 0; j < i; j++) {
-          yield SumHandlerModule.Sum.makeEqual(multis[i], multis[j]);
+          yield SumHandlerModule.Sum.makeEqual(multis[i], multis[j], shape.valueOffset);
         }
       }
     }
@@ -150,9 +150,6 @@ export class SudokuBuilder {
   // Constraint types that don't yet support non-zero valueOffset.
   // Remove entries as support is added. Delete this guard when empty.
   static _OFFSET_UNSUPPORTED = new Set([
-    // Sum constraints:
-    'Cage', 'Sum', 'LittleKiller', 'X', 'V', 'Arrow', 'DoubleArrow',
-    'PillArrow', 'EqualityCage', 'RegionSumLine', 'Zipper',
     // Value translation:
     'ContainAtLeast', 'ContainExact', 'Quad', 'HiddenSkyscraper',
     'NumberedRoom',
@@ -247,7 +244,7 @@ export class SudokuBuilder {
             const cells = (
               constraint.cells.map(c => shape.parseCellId(c).cell));
             yield SumHandlerModule.Sum.makeEqual(
-              [cells[0]], cells.slice(1));
+              [cells[0]], cells.slice(1), shape.valueOffset);
           }
           break;
 
@@ -257,7 +254,7 @@ export class SudokuBuilder {
               constraint.cells.map(c => shape.parseCellId(c).cell));
 
             const center = cells.splice(1, cells.length - 2);
-            yield SumHandlerModule.Sum.makeEqual(cells, center);
+            yield SumHandlerModule.Sum.makeEqual(cells, center, shape.valueOffset);
           }
           break;
 
@@ -284,7 +281,7 @@ export class SudokuBuilder {
               coeffs[i] = -Math.pow(10, pillSize - i - 1);
             }
 
-            yield new SumHandlerModule.Sum(cells, 0, coeffs);
+            yield new SumHandlerModule.Sum(cells, 0, coeffs, shape.valueOffset);
 
             if (shape.numValues > 9) {
               // Limit pill values to 1-9, other than the first cell.
@@ -300,7 +297,7 @@ export class SudokuBuilder {
           cells = constraint.cells.map(c => shape.parseCellId(c).cell);
           // A sum of 0 means any sum is ok - i.e. the same as AllDifferent.
           if (constraint.sum !== 0) {
-            yield new SumHandlerModule.Sum(cells, constraint.sum);
+            yield new SumHandlerModule.Sum(cells, constraint.sum, null, shape.valueOffset);
           }
           yield new HandlerModule.AllDifferent(cells);
           break;
@@ -332,7 +329,7 @@ export class SudokuBuilder {
 
         case 'Sum':
           cells = constraint.cells.map(c => shape.parseCellId(c).cell);
-          yield new SumHandlerModule.Sum(cells, constraint.sum);
+          yield new SumHandlerModule.Sum(cells, constraint.sum, null, shape.valueOffset);
           break;
 
         case 'Regex':
@@ -357,7 +354,7 @@ export class SudokuBuilder {
             c => shape.parseCellId(c).cell);
           if (!cells) throw new InvalidConstraintError('Invalid Little Killer line: ' + constraint.arrowId);
           yield new SumHandlerModule.Sum(
-            cells, constraint.value);
+            cells, constraint.value, null, shape.valueOffset);
           break;
 
         case 'XSum':
@@ -560,14 +557,14 @@ export class SudokuBuilder {
               // center cell.
               const centerCell = [cells[(numCells / 2) | 0]];
               for (const pair of pairs) {
-                yield SumHandlerModule.Sum.makeEqual(centerCell, pair);
+                yield SumHandlerModule.Sum.makeEqual(centerCell, pair, shape.valueOffset);
               }
             } else {
               // Otherwise create an equal sum constraint between each pair.
               const numPairs = pairs.length;
               for (let i = 1; i < numPairs; i++) {
                 for (let j = 0; j < i; j++) {
-                  yield SumHandlerModule.Sum.makeEqual(pairs[i], pairs[j]);
+                  yield SumHandlerModule.Sum.makeEqual(pairs[i], pairs[j], shape.valueOffset);
                 }
               }
             }
@@ -598,13 +595,13 @@ export class SudokuBuilder {
 
         case 'X':
           for (const pair of constraint.adjacentPairs(shape)) {
-            yield new SumHandlerModule.Sum(pair, 10);
+            yield new SumHandlerModule.Sum(pair, 10, null, shape.valueOffset);
           }
           break;
 
         case 'V':
           for (const pair of constraint.adjacentPairs(shape)) {
-            yield new SumHandlerModule.Sum(pair, 5);
+            yield new SumHandlerModule.Sum(pair, 5, null, shape.valueOffset);
           }
           break;
 

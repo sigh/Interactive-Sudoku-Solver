@@ -165,16 +165,22 @@ const solveCollections = [
       '0-indexed: Anti-knight Anti-king',
       '0-indexed: Jigsaw',
       '0-indexed: Windoku',
-      '0-indexed: Odd even',  // Pencilmark (GivenCandidates)
+      '0-indexed: Odd even',  // Pencilmark
       '0-indexed: 6x6',
       '0-indexed: 4x4 Full Rank',
-      '0-indexed: 6x8 Plain',  // Non-square
-      '0-indexed: 4x7 Jigsaw',  // Non-square
-      '0-indexed: 9x8 Plain boxless',  // Non-square
-      '0-indexed: 6x6 9-value disjoint sets',  // Non-standard numValues
-      '0-indexed: Thermo SameValues',  // Binary: Thermo + SameValues
-      '0-indexed: Whisper GreaterThan',  // Binary: Whisper + GreaterThan
-      '0-indexed: 0-sensitive pairwise', // Binary: Pair with 0-sensitive fn
+      '0-indexed: 6x8 Plain',
+      '0-indexed: 4x7 Jigsaw',
+      '0-indexed: 9x8 Plain boxless',
+      '0-indexed: 6x6 9-value disjoint sets',
+      '0-indexed: Thermo SameValues',  // Thermo, SameValues
+      '0-indexed: Whisper GreaterThan',  // Whisper, GreaterThan
+      '0-indexed: 0-sensitive pairwise', // Pair with 0-sensitive fn
+      '0-indexed: 0-8 Killer',  // Cage
+      '0-indexed: Killer sudoku, with 0 cage, hard',  // Cage (with 0-sum cages)
+      '0-indexed: Region sum lines',  // RegionSumLine
+      '0-indexed: A very full quiver', // Arrow
+      '0-indexed: Lets build a snowman',  // Arrow, BlackDot, WhiteDot, Thermo, Whisper
+      '0-indexed: +-Information',  // V, StrictXV, Diagonal
     ],
   },
 ];
