@@ -150,9 +150,6 @@ export class SudokuBuilder {
   // Constraint types that don't yet support non-zero valueOffset.
   // Remove entries as support is added. Delete this guard when empty.
   static _OFFSET_UNSUPPORTED = new Set([
-    // Value translation:
-    'ContainAtLeast', 'ContainExact', 'Quad', 'HiddenSkyscraper',
-    'NumberedRoom',
     // Individual adjustments:
     'SumLine', 'RellikCage', 'XSum', 'Sandwich', 'Lunchbox',
     'AntiTaxicab', 'Skyscraper', 'CountingCircles',

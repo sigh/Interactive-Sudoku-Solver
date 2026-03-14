@@ -181,6 +181,9 @@ const solveCollections = [
       '0-indexed: A very full quiver', // Arrow
       '0-indexed: Lets build a snowman',  // Arrow, BlackDot, WhiteDot, Thermo, Whisper
       '0-indexed: +-Information',  // V, StrictXV, Diagonal
+      '0-indexed: Hidden skyscrapers',  // HiddenSkyscraper
+      '0-indexed: Quadruple X',  // Quad, Diagonal
+      '0-indexed: Look-and-say',  // ContainExact
     ],
   },
 ];

@@ -505,7 +505,7 @@ export class SudokuParser {
 
 export const toShortSolution = (solution, shape) => {
   const baseCharCode = GridShape.baseCharCode(shape);
-  const minValue = 1 + shape.valueOffset;
+  const minValue = shape.minValue();
   const DEFAULT_VALUE = '.';
 
   const result = new Array(solution.length).fill(DEFAULT_VALUE);

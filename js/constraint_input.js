@@ -576,7 +576,7 @@ ConstraintCategoryInput.LinesAndSets = class LinesAndSets extends ConstraintCate
     if (constraintClass === SudokuConstraint.Quad) {
       const valuesStr = formData.get(type + '-value');
       const values = valuesStr.split(/[, ]+/).map(v => +v).filter(
-        v => Number.isInteger(v) && v >= 1 && v <= this._shape.numValues);
+        v => Number.isInteger(v) && v >= this._shape.minValue() && v <= this._shape.maxValue());
       if (values.length) {
         cells.sort();
         const constraint = new SudokuConstraint.Quad(cells[0], ...values);
@@ -587,7 +587,7 @@ ConstraintCategoryInput.LinesAndSets = class LinesAndSets extends ConstraintCate
       constraintClass === SudokuConstraint.ContainAtLeast) {
       const valuesStr = formData.get(type + '-value');
       const values = valuesStr.split(/[, ]+/).map(v => +v).filter(
-        v => Number.isInteger(v) && v >= 1 && v <= this._shape.numValues);
+        v => Number.isInteger(v) && v >= this._shape.minValue() && v <= this._shape.maxValue());
       if (values.length) {
         const constraint = new constraintClass(values.join('_'), ...cells);
         this.collection.addConstraint(constraint);
@@ -810,8 +810,8 @@ ConstraintCategoryInput.GivenCandidates = class GivenCandidates extends Constrai
   _inputDigit(cell, digit) {
     const values = this._getCellValues(cell);
     const currValue = values.length === 1 ? values[0] : null;
-    const minValue = 1 + this._shape.valueOffset;
-    const maxValue = this._shape.numValues + this._shape.valueOffset;
+    const minValue = this._shape.minValue();
+    const maxValue = this._shape.maxValue();
 
     let newValue;
     if (digit === null || digit < minValue || digit > maxValue) {
@@ -1515,7 +1515,7 @@ class MultiValueInputPanel {
 
     this._allValues = Array.from(
       { length: shape.numValues },
-      (_, i) => i + 1 + shape.valueOffset);
+      (_, i) => shape.minValue() + i);
 
     for (let i = 0; i < this._allValues.length; i++) {
       const label = document.createElement('label');

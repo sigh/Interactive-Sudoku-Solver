@@ -1882,6 +1882,7 @@ export class SudokuConstraint {
       clueTemplate: '$CLUE',
     };
     static CLUE_TYPE = OutsideConstraintBase.CLUE_TYPE_DIAGONAL;
+    static ZERO_VALUE_OK = true;
 
     chipLabel() {
       return `Little Killer (${this.value})`;
@@ -2011,6 +2012,7 @@ export class SudokuConstraint {
       clueTemplate: '|$CLUE|',
     };
     static CLUE_TYPE = OutsideConstraintBase.CLUE_TYPE_DOUBLE_LINE;
+    static ZERO_VALUE_OK = true;
   }
 
   static NumberedRoom = class NumberedRoom extends OutsideConstraintBase {
@@ -2024,6 +2026,7 @@ export class SudokuConstraint {
       clueTemplate: ':$CLUE:',
     };
     static CLUE_TYPE = OutsideConstraintBase.CLUE_TYPE_DOUBLE_LINE;
+    static ZERO_VALUE_OK = true;
   }
 
   static FullRank = class FullRank extends OutsideConstraintBase {

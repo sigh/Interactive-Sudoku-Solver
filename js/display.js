@@ -227,8 +227,8 @@ export class CellValueDisplay extends DisplayItem {
 
   reshape(shape) {
     super.reshape(shape);
-    const minValue = 1 + shape.valueOffset;
     this._valueMap = [];
+    const minValue = shape.minValue();
     for (let v = minValue; v < minValue + shape.numValues; v++) {
       this._valueMap[v] = this._valueFn(v);
     }
@@ -249,7 +249,7 @@ export class CellValueDisplay extends DisplayItem {
     const totalWidth = (valuesPerLine * 2 - 1) * fontWidth;
     const xOffset = (-totalWidth + fontWidth) / 2;
     // Position offsets indexed by value.
-    const minValue = 1 + shape.valueOffset;
+    const minValue = shape.minValue();
     const valueOffsets = [];
     for (let i = 0; i < shape.numValues; i++) {
       const v = minValue + i;

@@ -93,6 +93,7 @@ await runTest('Indexing should prune control cell when indexed cell cannot have 
   // controlCell=0, indexedCells=[1,2,3,4], indexedValue=3
   // If control=N, then indexedCells[N-1] must contain value 3
   const handler = new Indexing(0, [1, 2, 3, 4], 3);
+  context.initializeHandler(handler);
 
   const grid = context.grid;
   grid[0] = valueMask(1, 2, 3, 4); // Control cell - all values
@@ -113,6 +114,7 @@ await runTest('Indexing should prune control cell when indexed cell cannot have 
 await runTest('Indexing should remove indexed value from cells that cannot be selected', () => {
   const context = new GridTestContext({ gridSize: [1, 5] });
   const handler = new Indexing(0, [1, 2, 3, 4], 3);
+  context.initializeHandler(handler);
 
   const grid = context.grid;
   grid[0] = valueMask(2); // Control cell - fixed to 2
@@ -135,6 +137,7 @@ await runTest('Indexing should remove indexed value from cells that cannot be se
 await runTest('Indexing should fail when control has no valid options', () => {
   const context = new GridTestContext({ gridSize: [1, 5] });
   const handler = new Indexing(0, [1, 2, 3, 4], 3);
+  context.initializeHandler(handler);
 
   const grid = context.grid;
   grid[0] = valueMask(1, 2, 3, 4); // Control cell
@@ -152,6 +155,7 @@ await runTest('Indexing should fail when control has no valid options', () => {
 await runTest('Indexing should fail when removal empties an indexed cell', () => {
   const context = new GridTestContext({ gridSize: [1, 5] });
   const handler = new Indexing(0, [1, 2, 3, 4], 3);
+  context.initializeHandler(handler);
 
   const grid = context.grid;
   grid[0] = valueMask(2); // Control fixed to 2
@@ -203,6 +207,7 @@ await runTest('Indexing should work with more indexed cells than numValues', () 
   // 6 values, but 8 indexed cells
   const context = new GridTestContext({ gridSize: [2, 5], numValues: 6 });
   const handler = new Indexing(0, [1, 2, 3, 4, 5, 6, 7, 8], 4); // 8 indexed cells
+  context.initializeHandler(handler);
 
   const grid = context.grid;
   grid[0] = valueMask(1, 2, 3, 4, 5, 6); // Control - numValues limits this
@@ -227,6 +232,7 @@ await runTest('Indexing should handle control restricted to valid indices', () =
   const context = new GridTestContext({ gridSize: [1, 8] });
   // Only 4 indexed cells, but numValues is 8
   const handler = new Indexing(0, [1, 2, 3, 4], 2);
+  context.initializeHandler(handler);
 
   const grid = context.grid;
   grid[0] = valueMask(1, 2, 3, 4); // Pre-restricted control
@@ -249,6 +255,7 @@ await runTest('Indexing should handle control restricted to valid indices', () =
 await runTest('Indexing should handle single indexed cell', () => {
   const context = new GridTestContext({ gridSize: [1, 2], numValues: 4 });
   const handler = new Indexing(0, [1], 3); // Single indexed cell
+  context.initializeHandler(handler);
 
   const grid = context.grid;
   grid[0] = valueMask(1, 2, 3, 4); // Control
@@ -266,6 +273,7 @@ await runTest('Indexing should handle single indexed cell', () => {
 await runTest('Indexing should handle all indexed cells having the value', () => {
   const context = new GridTestContext({ gridSize: [1, 5] });
   const handler = new Indexing(0, [1, 2, 3, 4], 2);
+  context.initializeHandler(handler);
 
   const grid = context.grid;
   grid[0] = valueMask(1, 2, 3, 4); // Control
@@ -285,6 +293,7 @@ await runTest('Indexing should handle all indexed cells having the value', () =>
 await runTest('Indexing should prune indexed cells based on control', () => {
   const context = new GridTestContext({ gridSize: [1, 5] });
   const handler = new Indexing(0, [1, 2, 3, 4], 3);
+  context.initializeHandler(handler);
 
   const grid = context.grid;
   grid[0] = valueMask(1, 3); // Control can only be 1 or 3
@@ -324,6 +333,7 @@ await runTest('Indexing should prune control options (control cell in indexedCel
   const context = new GridTestContext({ gridSize: [1, 4] });
   const cells = context.cells(4);
   const handler = new Indexing(cells[0], cells, 3);
+  context.initializeHandler(handler);
 
   const grid = context.grid;
   grid[0] = valueMask(1, 2, 3, 4); // control cell N (also indexedCells[0])
@@ -342,6 +352,7 @@ await runTest('Indexing should remove indexed value from non-selected cells (con
   const context = new GridTestContext({ gridSize: [1, 4] });
   const cells = context.cells(4);
   const handler = new Indexing(cells[0], cells, 2);
+  context.initializeHandler(handler);
 
   const grid = context.grid;
   grid[0] = valueMask(3); // N fixed to 3 (selects indexedCells[2])
@@ -362,6 +373,7 @@ await runTest('Indexing should fail when indexed value is forced in a non-select
   const context = new GridTestContext({ gridSize: [1, 4] });
   const cells = context.cells(4);
   const handler = new Indexing(cells[0], cells, 2);
+  context.initializeHandler(handler);
 
   const grid = context.grid;
   grid[0] = valueMask(3); // N fixed to 3
@@ -379,6 +391,7 @@ await runTest('Indexing should fail when no index remains compatible (control ce
   const context = new GridTestContext({ gridSize: [1, 4] });
   const cells = context.cells(4);
   const handler = new Indexing(cells[0], cells, 4);
+  context.initializeHandler(handler);
 
   const grid = context.grid;
   grid[0] = valueMask(1, 2, 3); // first cell also cannot be 4
@@ -390,6 +403,74 @@ await runTest('Indexing should fail when no index remains compatible (control ce
   const result = handler.enforceConsistency(grid, acc);
 
   assert.equal(result, false);
+});
+
+// =============================================================================
+// Offset (0-indexed) tests
+// =============================================================================
+
+const { GridShape } = await import('../../js/grid_shape.js');
+
+await runTest('Indexing offset: external value 2 maps to internal 3 with offset -1', () => {
+  // 0-indexed: external values 0-4, internal 1-5, offset=-1.
+  // External indexedValue=2 → internal 3 (bit mask for value 3).
+  const shape = GridShape.fromGridSize(1, 5, null, -1);
+  const context = new GridTestContext({ shape });
+  const handler = new Indexing(0, [1, 2, 3, 4], 2); // external value 2
+  context.initializeHandler(handler);
+
+  const grid = context.grid;
+  grid[0] = valueMask(1, 2, 3, 4); // Control cell
+  grid[1] = valueMask(1, 2); // Indexed[0] - no internal 3
+  grid[2] = valueMask(3, 4); // Indexed[1] - has internal 3
+  grid[3] = valueMask(1, 2); // Indexed[2] - no internal 3
+  grid[4] = valueMask(2, 3); // Indexed[3] - has internal 3
+  const acc = createAccumulator();
+
+  const result = handler.enforceConsistency(grid, acc);
+
+  assert.equal(result, true);
+  // Only indexed[1] (control=2) and indexed[3] (control=4) have internal 3.
+  assert.equal(grid[0], valueMask(2, 4), 'control should only allow 2 and 4');
+});
+
+await runTest('Indexing offset: external value 0 maps to internal 1 with offset -1', () => {
+  const shape = GridShape.fromGridSize(1, 5, null, -1);
+  const context = new GridTestContext({ shape });
+  const handler = new Indexing(0, [1, 2, 3, 4], 0); // external value 0
+  context.initializeHandler(handler);
+
+  const grid = context.grid;
+  grid[0] = valueMask(1, 2, 3, 4); // Control cell
+  grid[1] = valueMask(1, 2, 3); // Indexed[0] - has internal 1
+  grid[2] = valueMask(2, 3, 4); // Indexed[1] - no internal 1
+  grid[3] = valueMask(1, 4, 5); // Indexed[2] - has internal 1
+  grid[4] = valueMask(2, 3); // Indexed[3] - no internal 1
+  const acc = createAccumulator();
+
+  const result = handler.enforceConsistency(grid, acc);
+
+  assert.equal(result, true);
+  assert.equal(grid[0], valueMask(1, 3), 'control should only allow 1 and 3');
+});
+
+await runTest('Indexing offset: zero offset leaves value unchanged', () => {
+  const context = new GridTestContext({ gridSize: [1, 5] });
+  const handler = new Indexing(0, [1, 2, 3, 4], 3); // offset=0, value stays 3
+  context.initializeHandler(handler);
+
+  const grid = context.grid;
+  grid[0] = valueMask(1, 2, 3, 4);
+  grid[1] = valueMask(1, 2);
+  grid[2] = valueMask(3, 4);
+  grid[3] = valueMask(1, 2);
+  grid[4] = valueMask(2, 3);
+  const acc = createAccumulator();
+
+  const result = handler.enforceConsistency(grid, acc);
+
+  assert.equal(result, true);
+  assert.equal(grid[0], valueMask(2, 4));
 });
 
 logSuiteComplete('indexing.test.js');

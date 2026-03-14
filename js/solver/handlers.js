@@ -1365,10 +1365,13 @@ export class Skyscraper extends SudokuConstraintHandler {
 export class HiddenSkyscraper extends SudokuConstraintHandler {
   constructor(cells, firstHiddenValue) {
     super(cells);
-    this._targetV = LookupTables.fromValue(+firstHiddenValue);
+    this._firstHiddenValue = +firstHiddenValue;
+    this._targetV = -1;
   }
 
   initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
+    this._targetV = LookupTables.fromOffsetValue(
+      this._firstHiddenValue, shape.valueOffset);
     // If the hidden value is first it will always be visible.
     if (!(initialGridCells[this.cells[0]] &= ~this._targetV)) return false;
     return true;
@@ -2227,17 +2230,19 @@ export class RequiredValues extends SudokuConstraintHandler {
   }
 
   initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
+    const offset = shape.valueOffset;
+
     this._cellExclusions = cellExclusions;
     const cells = this.cells;
 
-    this._valueMask = LookupTables.fromValuesArray(this._values);
-    this._singleValues = LookupTables.fromValuesArray(
-      this._values.filter(v => this._valueCounts.get(v) === 1));
+    this._valueMask = LookupTables.fromOffsetValuesArray(this._values, offset);
+    this._singleValues = LookupTables.fromOffsetValuesArray(
+      this._values.filter(v => this._valueCounts.get(v) === 1), offset);
     // Repeated values is an array of masks [v_n, otherValues_n, ...]
     this._repeatedValues = [];
     for (const [value, count] of this._valueCounts) {
       if (count > 1) {
-        const v = LookupTables.fromValue(value);
+        const v = LookupTables.fromOffsetValue(value, offset);
         this._repeatedValues.push(v, count, this._valueMask & ~v);
       }
     }
@@ -2564,10 +2569,12 @@ export class Indexing extends SudokuConstraintHandler {
     super([controlCell, ...indexedCells]);
     this._controlCell = controlCell;
     this._indexedCells = indexedCells;
-    this._indexedValue = LookupTables.fromValue(+indexedValue);
+    this._indexedValue = +indexedValue;
   }
 
   initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
+    this._indexedMask = LookupTables.fromOffsetValue(
+      this._indexedValue, shape.valueOffset);
     // Clamp control cell to the line length so that N is always a valid index.
     const lineLength = this._indexedCells.length;
     const allowedMask = (1 << lineLength) - 1;
@@ -2579,7 +2586,7 @@ export class Indexing extends SudokuConstraintHandler {
     const cells = this._indexedCells;
     const controlCell = this._controlCell;
     const numCells = cells.length;
-    const indexedValue = this._indexedValue;
+    const indexedMask = this._indexedMask;
 
     const originalControl = grid[controlCell];
     let controlValue = originalControl;
@@ -2588,11 +2595,11 @@ export class Indexing extends SudokuConstraintHandler {
       const cell = cells[i];
       const v = grid[cell];
 
-      if (v & indexedValue) {
+      if (v & indexedMask) {
         if (!(controlValue & bit)) {
           // This cell can't have the indexed value because the control cell
           // does not allow selecting it.
-          if (!(grid[cell] &= ~indexedValue)) return false;
+          if (!(grid[cell] &= ~indexedMask)) return false;
           handlerAccumulator.addForCell(cell);
         }
       } else {

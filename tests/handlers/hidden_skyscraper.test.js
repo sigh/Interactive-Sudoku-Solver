@@ -211,4 +211,48 @@ await runTest('HiddenSkyscraper should fail when target cannot be placed', () =>
   assert.equal(result, false, 'should fail when 2 cannot be hidden');
 });
 
+// =============================================================================
+// Offset (0-indexed) tests
+// =============================================================================
+
+const { GridShape } = await import('../../js/grid_shape.js');
+
+await runTest('HiddenSkyscraper offset: external value 1 maps to internal 2 with offset -1', () => {
+  // 0-indexed grid: external values 0-3, internal 1-4, offset=-1.
+  // External firstHidden=1 should map to internal 2 (bit mask for value 2).
+  const shape = GridShape.fromGridSize(1, 4, null, -1);
+  const context = new GridTestContext({ shape });
+  const cells = context.cells();
+  const handler = new HiddenSkyscraper(cells, 1); // external value 1
+  context.initializeHandler(handler);
+
+  const grid = context.grid;
+  // First cell should not contain internal value 2 (the translated target).
+  assert.equal(grid[0] & valueMask(2), 0,
+    'first cell should not contain the target (internal value 2)');
+  // First cell should still have values 1, 3, 4.
+  assert.equal(grid[0], valueMask(1, 3, 4));
+});
+
+await runTest('HiddenSkyscraper offset: enforceConsistency works with offset values', () => {
+  // External firstHidden=0, offset=-1 → internal value 1.
+  const shape = GridShape.fromGridSize(1, 3, null, -1);
+  const context = new GridTestContext({ shape });
+  const cells = context.cells();
+  const handler = new HiddenSkyscraper(cells, 0); // external value 0
+  context.initializeHandler(handler);
+
+  const grid = context.grid;
+  grid[0] = valueMask(3); // Internal 3: must be > internal 1 to hide it
+  grid[1] = valueMask(1); // Internal 1 is here and hidden (3 > 1)
+  grid[2] = valueMask(1, 2, 3);
+  const acc = createAccumulator();
+
+  const result = handler.enforceConsistency(grid, acc);
+
+  assert.equal(result, true);
+  // Internal value 1 should be cleared from cell 2 (after first hidden found).
+  assert.equal(grid[2] & valueMask(1), 0, 'cell 2 should not have internal 1');
+});
+
 logSuiteComplete('hidden_skyscraper.test.js');

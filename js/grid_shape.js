@@ -99,6 +99,14 @@ export class GridShape {
     Object.freeze(this);
   }
 
+  minValue() {
+    return 1 + this.valueOffset;
+  }
+
+  maxValue() {
+    return this.numValues + this.valueOffset;
+  }
+
   isSquare() {
     return this.numRows === this.numCols;
   }

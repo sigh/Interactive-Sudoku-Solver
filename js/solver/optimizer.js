@@ -1147,16 +1147,13 @@ export class SudokuConstraintOptimizer {
 
     if (numCombinations === 0) return false;
 
-    const addRestriction = (cell, values) => {
-      restrictions.set(cell, (restrictions.get(cell) || -1) & values);
-    }
-
-    const v = LookupTables.fromValue(value);
     for (let i = 0; i < numCells; i++) {
       if (occurrences[i] === numCombinations) {
-        addRestriction(cells[i], v);
+        if (!restrictions.has(cells[i])) restrictions.set(cells[i], []);
+        restrictions.get(cells[i]).push({ require: value });
       } else if (occurrences[i] === 0) {
-        addRestriction(cells[i], ~v);
+        if (!restrictions.has(cells[i])) restrictions.set(cells[i], []);
+        restrictions.get(cells[i]).push({ remove: value });
       }
     }
 
@@ -1166,8 +1163,6 @@ export class SudokuConstraintOptimizer {
   _optimizeRequiredValues(handlerSet, cellExclusions, shape) {
     const requiredValueHandlers = handlerSet.getAllofType(HandlerModule.RequiredValues);
     if (requiredValueHandlers.length === 0) return;
-
-    const allValues = LookupTables.get(shape.numValues).allValues;
 
     for (const h of requiredValueHandlers) {
       const restrictions = new Map();
@@ -1196,32 +1191,48 @@ export class SudokuConstraintOptimizer {
         }
       }
 
-      // If there are restrictions, then apply then.
+      // If there are restrictions, then apply them.
       if (restrictions.size > 0) {
         const newValues = [...h.values()];
         const newCells = [...h.cells];
-        const valueMask = LookupTables.fromValuesArray(h.values());
+        const handlerValues = new Set(h.values());
+        const allValues = LookupTables.toOffsetValuesArray(
+          LookupTables.get(shape.numValues).allValues,
+          shape.valueOffset);
 
-        // Update restrictions and values.
-        for (const [cell, v] of restrictions) {
-          const values = LookupTables.toValuesArray(v & allValues);
-          restrictions.set(cell, values);
-          if (values.length === 1) {
-            arrayRemoveValue(newValues, values[0]);
+        // Convert {require}/{remove} lists to allowed value arrays.
+        const givenCandidates = new Map();
+        for (const [cell, ops] of restrictions) {
+          let allowed = allValues.slice();
+          for (const op of ops) {
+            if (op.require !== undefined) {
+              allowed = allowed.filter(v => v === op.require);
+            }
+            if (op.remove !== undefined) {
+              arrayRemoveValue(allowed, op.remove);
+            }
+          }
+          givenCandidates.set(cell, allowed);
+          // If only one value is allowed, then the value is known and we can
+          // remove it from the RequiredValues handler.
+          if (allowed.length === 1) {
+            arrayRemoveValue(newValues, allowed[0]);
             arrayRemoveValue(newCells, cell);
           }
-          if (!(v & valueMask)) {
+          // If none of the currently allowed values are in the required set
+          // then we can remove this cell from the RequiredValues handler.
+          if (!allowed.some(v => handlerValues.has(v))) {
             arrayRemoveValue(newCells, cell);
           }
         }
 
         // Create a handler to restrict the values.
         const newHandler = new HandlerModule.GivenCandidates(
-          restrictions);
+          givenCandidates);
         handlerSet.add(newHandler);
         if (this._debugLogger) {
           this._logAddHandler('_optimizeRequiredValues', newHandler, {
-            args: { restrictions: Object.fromEntries(restrictions.entries()) },
+            args: { restrictions: Object.fromEntries(givenCandidates.entries()) },
             cells: h.cells,
           });
         }

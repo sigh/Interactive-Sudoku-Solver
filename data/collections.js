@@ -1041,6 +1041,24 @@ export const EXAMPLES = [
     src: 'https://www.youtube.com/watch?v=bKmmldIq3Lk',
     input: '.Shape~9x9~0-8.Diagonal~1.Diagonal~-1.StrictXV.V~R1C1~R1C2.V~R2C1~R2C2.V~R3C1~R3C2.V~R1C8~R1C9.V~R2C8~R2C9.V~R3C8~R3C9.V~R5C6~R5C5.V~R7C7~R7C8.V~R8C7~R8C8.V~R9C7~R9C8.V~R7C5~R7C4.V~R8C5~R8C4.V~R9C5~R9C4.Renban~R5C3~R6C3.Renban~R1C7~R2C7.Renban~R8C7~R8C8.Renban~R9C9~R9C8',
     solution: '058362741236174805147085632725843160813650274604721583362507418580416327471238056',
+  },
+  {
+    name: '0-indexed: Hidden skyscrapers',
+    src: 'https://www.youtube.com/watch?v=f1QKEzZpKL8',
+    input: '.Shape~9x9~0-8.HiddenSkyscraper~R8~6~3.HiddenSkyscraper~R9~4~2.HiddenSkyscraper~C9~6~4.HiddenSkyscraper~C8~7~4.HiddenSkyscraper~C7~5~0.HiddenSkyscraper~C6~4~2.HiddenSkyscraper~C5~3~4.HiddenSkyscraper~C4~4~4.HiddenSkyscraper~C3~0~5.HiddenSkyscraper~C2~5~7.HiddenSkyscraper~C1~6~4.HiddenSkyscraper~R7~0~1.HiddenSkyscraper~R6~1~2.HiddenSkyscraper~R5~7~1.HiddenSkyscraper~R4~2~5.HiddenSkyscraper~R3~4~0.HiddenSkyscraper~R2~3~6.HiddenSkyscraper~R1~2~4.',
+    solution: '527306481830514672641827503062481357458730216713652840305278164276145038184063725',
+  },
+  {
+    name: '0-indexed: Quadruple X',
+    src: 'https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?id=00040T',
+    input: '.Shape~9x9~0-8.Diagonal~1.Diagonal~-1..Quad~R1C1~0~3~5~6.Quad~R5C1~1~2.Quad~R6C1~0~1.Quad~R3C3~0~1~3~7.Quad~R6C3~2~4~7~8.Quad~R2C4~5~6.Quad~R7C5~2~5.Quad~R3C6~3~4~7~8.Quad~R6C6~1~2~5~6.Quad~R3C8~0~1.Quad~R4C8~0~4.Quad~R8C8~1~2~3~4',
+    solution: '651273480304618257287054316543167802726580134018432675432701568860325741175846023',
+  },
+  {
+    name: '0-indexed: Look-and-say',
+    src: 'https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?id=0007CP',
+    input: '.Shape~9x9~0-8.ContainExact~5_6~R3C1~R2C1~R1C1.ContainExact~2_3_3~R1C3~R2C3~R2C4~R1C4.ContainExact~0~R1C7~R1C8.ContainExact~8_2~R2C9~R2C8~R3C8~R3C7~R3C6.ContainExact~4_4_4_7~R3C9~R4C9~R5C9~R5C8~R5C7~R6C7~R6C6.ContainExact~0_1~R7C9~R7C8~R8C8~R8C7~R9C7.ContainExact~2_2_0~R7C4~R8C4~R8C3~R8C2~R7C2.ContainExact~5_5~R7C5~R6C5~R6C4~R5C4.ContainExact~0_0_2~R6C2~R6C1~R7C1.ContainExact~7_7~R7C7~R7C6~R8C6~R9C6.ContainExact~3_1_1~R5C5~R4C5~R4C4~R4C3.ContainExact~8_8_8~R5C1~R6C2~R7C3~R8C4~R9C5.ContainExact~5_5~R6C9~R7C8~R8C7~R9C6.',
+    solution: '782345601543106872610728354451630287837512460206874135068251743324067518175483026',
   }
 ];
 

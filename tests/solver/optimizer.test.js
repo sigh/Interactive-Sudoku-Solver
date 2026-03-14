@@ -43,10 +43,8 @@ await runTest('_findKnownRequiredValues: simple exclusion', () => {
   const result = optimizer._findKnownRequiredValues(cells, value, count, cellExclusions, restrictions, HandlerModule.HandlerUtil.findMappedExclusionGroups(cells, cellExclusions).groups);
   assert.equal(result, true);
 
-  const v = LookupTables.fromValue(value);
-
-  // Cell 2 must be restricted to v.
-  assert.equal(restrictions.get(2), v);
+  // Cell 2 must be required.
+  assert.deepEqual(restrictions.get(2), [{ require: 1 }]);
 
   // Cells 0 and 1 are not restricted.
   assert.equal(restrictions.has(0), false);
@@ -80,11 +78,9 @@ await runTest('_findKnownRequiredValues: forced values', () => {
   const result = optimizer._findKnownRequiredValues(cells, value, count, cellExclusions, restrictions, HandlerModule.HandlerUtil.findMappedExclusionGroups(cells, cellExclusions).groups);
   assert.equal(result, true);
 
-  const v = LookupTables.fromValue(value);
-
-  assert.equal(restrictions.get(0), v);
-  assert.equal(restrictions.get(2), v);
-  assert.equal(restrictions.get(1), ~v);
+  assert.deepEqual(restrictions.get(0), [{ require: 1 }]);
+  assert.deepEqual(restrictions.get(2), [{ require: 1 }]);
+  assert.deepEqual(restrictions.get(1), [{ remove: 1 }]);
 });
 
 await runTest('_findKnownRequiredValues: no restrictions found', () => {
@@ -127,10 +123,9 @@ await runTest('_findKnownRequiredValues: all required', () => {
   const result = optimizer._findKnownRequiredValues(cells, value, count, cellExclusions, restrictions, HandlerModule.HandlerUtil.findMappedExclusionGroups(cells, cellExclusions).groups);
   assert.equal(result, true);
 
-  const v = LookupTables.fromValue(value);
-  assert.equal(restrictions.get(0), v);
-  assert.equal(restrictions.get(1), v);
-  assert.equal(restrictions.get(2), v);
+  assert.deepEqual(restrictions.get(0), [{ require: 1 }]);
+  assert.deepEqual(restrictions.get(1), [{ require: 1 }]);
+  assert.deepEqual(restrictions.get(2), [{ require: 1 }]);
 });
 
 await runTest('_findKnownRequiredValues: impossible combination', () => {
@@ -184,30 +179,27 @@ await runTest('_findKnownRequiredValues: merge existing restrictions', () => {
   const count = 2;
   const restrictions = new Map();
 
-  const v = LookupTables.fromValue(value);
-  const otherVal = LookupTables.fromValue(2);
-
-  // Pre-existing restriction on cell 0: can be 'value' or 'otherVal'.
-  restrictions.set(0, v | otherVal);
-  // Pre-existing restriction on cell 2: can only be 'otherVal' (which contradicts the new requirement).
-  restrictions.set(2, otherVal);
+  // Pre-existing restriction on cell 0.
+  restrictions.set(0, [{ require: 2 }]);
+  // Pre-existing restriction on cell 2.
+  restrictions.set(2, [{ remove: 1 }]);
 
   // We know from 'forced values' test that:
-  // 0 must be v.
-  // 2 must be v.
-  // 1 must NOT be v.
+  // 0 must have value 1.
+  // 2 must have value 1.
+  // 1 must NOT have value 1.
 
   const result = optimizer._findKnownRequiredValues(cells, value, count, cellExclusions, restrictions, HandlerModule.HandlerUtil.findMappedExclusionGroups(cells, cellExclusions).groups);
   assert.equal(result, true);
 
-  // Cell 0: (v | otherVal) & v => v.
-  assert.equal(restrictions.get(0), v);
+  // Cell 0: had {require: 2}, now also {require: 1}.
+  assert.deepEqual(restrictions.get(0), [{ require: 2 }, { require: 1 }]);
 
-  // Cell 2: otherVal & v => 0 (impossible).
-  assert.equal(restrictions.get(2), 0);
+  // Cell 2: had {remove: 1}, now also {require: 1}.
+  assert.deepEqual(restrictions.get(2), [{ remove: 1 }, { require: 1 }]);
 
-  // Cell 1: undefined & ~v => ~v.
-  assert.equal(restrictions.get(1), ~v);
+  // Cell 1: {remove: 1}.
+  assert.deepEqual(restrictions.get(1), [{ remove: 1 }]);
 });
 
 await runTest('_findKnownRequiredValues: partial overlap', () => {
@@ -230,10 +222,8 @@ await runTest('_findKnownRequiredValues: partial overlap', () => {
   const result = optimizer._findKnownRequiredValues(cells, value, count, cellExclusions, restrictions, HandlerModule.HandlerUtil.findMappedExclusionGroups(cells, cellExclusions).groups);
   assert.equal(result, true);
 
-  const v = LookupTables.fromValue(value);
-
-  assert.equal(restrictions.get(2), v);
-  assert.equal(restrictions.get(3), v);
+  assert.deepEqual(restrictions.get(2), [{ require: 1 }]);
+  assert.deepEqual(restrictions.get(3), [{ require: 1 }]);
   assert.equal(restrictions.has(0), false);
   assert.equal(restrictions.has(1), false);
 });
@@ -294,10 +284,9 @@ await runTest('_findKnownRequiredValues: must pick from all groups', () => {
   const result = optimizer._findKnownRequiredValues(cells, value, count, cellExclusions, restrictions, HandlerModule.HandlerUtil.findMappedExclusionGroups(cells, cellExclusions).groups);
   assert.equal(result, true);
 
-  const v = LookupTables.fromValue(value);
-  assert.equal(restrictions.get(0), v);
-  assert.equal(restrictions.get(1), v);
-  assert.equal(restrictions.get(2), v);
+  assert.deepEqual(restrictions.get(0), [{ require: 1 }]);
+  assert.deepEqual(restrictions.get(1), [{ require: 1 }]);
+  assert.deepEqual(restrictions.get(2), [{ require: 1 }]);
 });
 
 await runTest('_findKnownRequiredValues: suboptimal grouping (backtracking with skip)', () => {
@@ -330,8 +319,7 @@ await runTest('_findKnownRequiredValues: suboptimal grouping (backtracking with 
   const result = optimizer._findKnownRequiredValues(cells, value, count, cellExclusions, restrictions, exclusionGroups);
   assert.equal(result, true);
 
-  const v = LookupTables.fromValue(value);
-  assert.equal(restrictions.get(0), v);
+  assert.deepEqual(restrictions.get(0), [{ require: 1 }]);
   assert.equal(restrictions.has(1), false);
   assert.equal(restrictions.has(2), false);
 });
