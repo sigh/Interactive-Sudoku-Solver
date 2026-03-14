@@ -1275,7 +1275,7 @@ ConstraintCategoryInput.Pairwise = class Pairwise extends JavaScriptCategoryInpu
         let key = null;
         try {
           key = await this._userScriptExecutor.compilePairwise(
-            type, fnStr, this._shape.numValues);
+            type, fnStr, this._shape.numValues, this._shape.valueOffset);
         } catch (e) {
           errorElem.textContent = e;
           return false;
@@ -1293,7 +1293,7 @@ ConstraintCategoryInput.Pairwise = class Pairwise extends JavaScriptCategoryInpu
     };
   }
 
-  populateForm(constraint, numValues) {
+  populateForm(constraint, numValues, valueOffset) {
     // Open panel.
     this._panel.classList.add('container-open');
 
@@ -1305,7 +1305,7 @@ ConstraintCategoryInput.Pairwise = class Pairwise extends JavaScriptCategoryInpu
     // Populate fields.
     this._form['pairwise-name'].value = constraint.name || '';
     this._form['chain-mode'].value = constraint.type;
-    this._form['function'].value = binaryKeyToFnString(constraint.key, numValues);
+    this._form['function'].value = binaryKeyToFnString(constraint.key, numValues, valueOffset);
     this._form['function'].focus();
   }
 

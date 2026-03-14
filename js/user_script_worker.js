@@ -44,12 +44,12 @@ self.onmessage = async (e) => {
   }
 };
 
-const compilePairwise = ({ SudokuConstraint }, { type, fnStr, numValues }) => {
+const compilePairwise = ({ SudokuConstraint }, { type, fnStr, numValues, valueOffset }) => {
   const typeCls = SudokuConstraint[type];
   if (!typeCls) throw new Error(`Unknown constraint type: ${type}`);
 
   const fn = new Function(`return ((a,b)=>${fnStr})`)();
-  return typeCls.fnToKey(fn, numValues);
+  return typeCls.fnToKey(fn, numValues, valueOffset || 0);
 }
 
 const compileStateMachine = ({ SudokuConstraint }, { spec, numValues, numCells, isUnified }) => {

@@ -172,6 +172,9 @@ const solveCollections = [
       '0-indexed: 4x7 Jigsaw',  // Non-square
       '0-indexed: 9x8 Plain boxless',  // Non-square
       '0-indexed: 6x6 9-value disjoint sets',  // Non-standard numValues
+      '0-indexed: Thermo SameValues',  // Binary: Thermo + SameValues
+      '0-indexed: Whisper GreaterThan',  // Binary: Whisper + GreaterThan
+      '0-indexed: 0-sensitive pairwise', // Binary: Pair with 0-sensitive fn
     ],
   },
 ];

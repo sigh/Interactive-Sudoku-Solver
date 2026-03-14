@@ -739,8 +739,8 @@ export class SudokuConstraint {
       this.cells = cells;
     }
 
-    static fnKey = memoize((numValues) =>
-      fnToBinaryKey((a, b) => a < b, numValues)
+    static fnKey = memoize((numValues, valueOffset = 0) =>
+      fnToBinaryKey((a, b) => a < b, numValues, valueOffset)
     );
 
     static displayName() {
@@ -773,10 +773,10 @@ export class SudokuConstraint {
       this.difference = +difference;
     }
 
-    static fnKey = memoize((difference, numValues) =>
+    static fnKey = memoize((difference, numValues, valueOffset = 0) =>
       fnToBinaryKey(
         (a, b) => a >= b + difference || a <= b - difference,
-        numValues)
+        numValues, valueOffset)
     );
 
     chipLabel() {
@@ -798,10 +798,10 @@ export class SudokuConstraint {
       this.cells = cells;
     }
 
-    static fnKey = memoize((numCells, numValues) =>
+    static fnKey = memoize((numCells, numValues, valueOffset = 0) =>
       fnToBinaryKey(
         (a, b) => Math.abs(a - b) < numCells && a !== b,
-        numValues)
+        numValues, valueOffset)
     );
   }
 
@@ -836,16 +836,16 @@ export class SudokuConstraint {
       return `Modular (${this.mod})`;
     }
 
-    static neqFnKey = memoize((mod, numValues) =>
+    static neqFnKey = memoize((mod, numValues, valueOffset = 0) =>
       fnToBinaryKey(
         (a, b) => (a % mod) !== (b % mod),
-        numValues)
+        numValues, valueOffset)
     );
 
-    static eqFnKey = memoize((mod, numValues) =>
+    static eqFnKey = memoize((mod, numValues, valueOffset = 0) =>
       fnToBinaryKey(
         (a, b) => (a % mod) === (b % mod),
-        numValues)
+        numValues, valueOffset)
     );
   }
 
@@ -959,8 +959,8 @@ export class SudokuConstraint {
       this.cells = cells;
     }
 
-    static fnKey = memoize((numValues) =>
-      fnToBinaryKey((a, b) => a === b, numValues)
+    static fnKey = memoize((numValues, valueOffset = 0) =>
+      fnToBinaryKey((a, b) => a === b, numValues, valueOffset)
     );
   }
 
@@ -1251,10 +1251,10 @@ export class SudokuConstraint {
     static CATEGORY = 'Global';
     static UNIQUENESS_KEY_FIELD = 'type';
 
-    static fnKey = memoize((numValues) =>
+    static fnKey = memoize((numValues, valueOffset = 0) =>
       fnToBinaryKey(
         (a, b) => a !== b * 2 && b !== a * 2 && b !== a - 1 && b !== a + 1,
-        numValues)
+        numValues, valueOffset)
     );
   }
 
@@ -1264,10 +1264,10 @@ export class SudokuConstraint {
     static CATEGORY = 'Global';
     static UNIQUENESS_KEY_FIELD = 'type';
 
-    static fnKey = memoize((numValues) =>
+    static fnKey = memoize((numValues, valueOffset = 0) =>
       fnToBinaryKey(
         (a, b) => a + b !== 5 && a + b !== 10,
-        numValues)
+        numValues, valueOffset)
     );
   }
 
@@ -1427,10 +1427,10 @@ export class SudokuConstraint {
     static CATEGORY = 'Global';
     static UNIQUENESS_KEY_FIELD = 'type';
 
-    static fnKey = memoize((numValues) =>
+    static fnKey = memoize((numValues, valueOffset = 0) =>
       fnToBinaryKey(
         (a, b) => (a !== b + 1 && a !== b - 1 && a !== b),
-        numValues)
+        numValues, valueOffset)
     );
 
     static displayName() {
@@ -1537,10 +1537,10 @@ export class SudokuConstraint {
       this.cells = cells;
     }
 
-    static fnKey = memoize((numValues) =>
+    static fnKey = memoize((numValues, valueOffset = 0) =>
       fnToBinaryKey(
         (a, b) => a === b + 1 || a === b - 1,
-        numValues)
+        numValues, valueOffset)
     );
 
     static displayName() {
@@ -1587,10 +1587,10 @@ export class SudokuConstraint {
       }
     }
 
-    static fnKey = memoize((numValues) =>
+    static fnKey = memoize((numValues, valueOffset = 0) =>
       fnToBinaryKey(
         (a, b) => a === b * 2 || b === a * 2,
-        numValues)
+        numValues, valueOffset)
     );
 
     adjacentPairs(shape) {
@@ -1613,8 +1613,8 @@ export class SudokuConstraint {
       this.cells = cells;
     }
 
-    static fnKey = memoize((numValues) =>
-      fnToBinaryKey((a, b) => a > b, numValues)
+    static fnKey = memoize((numValues, valueOffset = 0) =>
+      fnToBinaryKey((a, b) => a > b, numValues, valueOffset)
     );
 
     adjacentPairs(shape) {
@@ -2146,8 +2146,8 @@ export class SudokuConstraint {
       return sets;
     }
 
-    static fnKey = memoize((numValues) => {
-      return fnToBinaryKey((a, b) => a === b, numValues);
+    static fnKey = memoize((numValues, valueOffset = 0) => {
+      return fnToBinaryKey((a, b) => a === b, numValues, valueOffset);
     });
   }
 
@@ -2309,8 +2309,8 @@ export class SudokuConstraint {
       }
     }
 
-    static fnToKey(fn, numValues) {
-      return fnToBinaryKey(fn, numValues);
+    static fnToKey(fn, numValues, valueOffset = 0) {
+      return fnToBinaryKey(fn, numValues, valueOffset);
     }
 
     static encodeName(displayName) {
@@ -2340,11 +2340,11 @@ export class SudokuConstraint {
       nodeMarker: LineOptions.SMALL_FULL_CIRCLE_MARKER,
     };
 
-    static fnToKey(fn, numValues) {
+    static fnToKey(fn, numValues, valueOffset = 0) {
       // Make the function symmetric.
       return fnToBinaryKey(
         (a, b) => fn(a, b) && fn(b, a),
-        numValues);
+        numValues, valueOffset);
     }
 
     chipLabel() {
@@ -2565,8 +2565,8 @@ export class UserScriptExecutor {
     });
   }
 
-  compilePairwise(type, fnStr, numValues) {
-    return this._call('compilePairwise', { type, fnStr, numValues }, 1000);
+  compilePairwise(type, fnStr, numValues, valueOffset) {
+    return this._call('compilePairwise', { type, fnStr, numValues, valueOffset }, 1000);
   }
 
   compileStateMachine(spec, numValues, numCells, isUnified) {
@@ -2591,7 +2591,7 @@ export class UserScriptExecutor {
   }
 }
 
-export const fnToBinaryKey = (fn, numValues) => {
+export const fnToBinaryKey = (fn, numValues, valueOffset = 0) => {
   const NUM_BITS = 6;
   const array = [];
 
@@ -2599,7 +2599,7 @@ export const fnToBinaryKey = (fn, numValues) => {
   let vIndex = 0;
   for (let i = 1; i <= numValues; i++) {
     for (let j = 1; j <= numValues; j++) {
-      v |= (!!fn(i, j)) << vIndex;
+      v |= (!!fn(i + valueOffset, j + valueOffset)) << vIndex;
       if (++vIndex === NUM_BITS) {
         array.push(v);
         vIndex = 0;
@@ -2615,7 +2615,7 @@ export const fnToBinaryKey = (fn, numValues) => {
   return Base64Codec.encode6BitArray(array);
 };
 
-export const binaryKeyToFnString = (key, numValues) => {
+export const binaryKeyToFnString = (key, numValues, valueOffset = 0) => {
   const NUM_BITS = 6;
   const array = Base64Codec.decodeTo6BitArray(key);
   const lookup = {};
@@ -2625,7 +2625,7 @@ export const binaryKeyToFnString = (key, numValues) => {
   for (let i = 1; i <= numValues; i++) {
     for (let j = 1; j <= numValues; j++) {
       if (array[keyIndex] & 1) {
-        (lookup[i] ||= []).push(j);
+        (lookup[i + valueOffset] ||= []).push(j + valueOffset);
       }
       array[keyIndex] >>= 1;
       if (++vIndex === NUM_BITS) {

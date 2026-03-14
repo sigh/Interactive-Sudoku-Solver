@@ -97,7 +97,7 @@ export class SudokuBuilder {
     return new HandlerModule.GivenCandidates(givensMap);
   }
 
-  static * _regionSumLineHandlers(cells, regions, numValues) {
+  static * _regionSumLineHandlers(cells, regions, shape) {
     // Map cells to regions.
     const cellToRegion = new Map();
     for (const region of regions) {
@@ -122,7 +122,8 @@ export class SudokuBuilder {
     const multis = cellSets.filter(s => s.length > 1);
 
     if (singles.length > 1) {
-      const key = SudokuConstraint.SameValues.fnKey(numValues);
+      const key = SudokuConstraint.SameValues.fnKey(
+        shape.numValues, shape.valueOffset);
       yield new HandlerModule.BinaryPairwise(
         key, ...singles);
     }
@@ -149,11 +150,6 @@ export class SudokuBuilder {
   // Constraint types that don't yet support non-zero valueOffset.
   // Remove entries as support is added. Delete this guard when empty.
   static _OFFSET_UNSUPPORTED = new Set([
-    // Binary constraints:
-    'AntiConsecutive', 'Thermo', 'Whisper', 'Renban', 'Modular',
-    'Between', 'Lockout', 'BlackDot', 'WhiteDot', 'GreaterThan',
-    'StrictKropki', 'StrictXV', 'Palindrome', 'Pair', 'PairX',
-    'SameValues', 'RegionSameValues',
     // Sum constraints:
     'Cage', 'Sum', 'LittleKiller', 'X', 'V', 'Arrow', 'DoubleArrow',
     'PillArrow', 'EqualityCage', 'RegionSumLine', 'Zipper',
@@ -440,7 +436,7 @@ export class SudokuBuilder {
           for (let i = 1; i < cells.length; i++) {
             yield new HandlerModule.BinaryConstraint(
               cells[i - 1], cells[i],
-              SudokuConstraint.Thermo.fnKey(shape.numValues));
+              SudokuConstraint.Thermo.fnKey(shape.numValues, shape.valueOffset));
           }
           break;
 
@@ -450,7 +446,7 @@ export class SudokuBuilder {
           for (let i = 1; i < cells.length; i++) {
             yield new HandlerModule.BinaryConstraint(
               cells[i - 1], cells[i],
-              SudokuConstraint.Whisper.fnKey(difference, shape.numValues));
+              SudokuConstraint.Whisper.fnKey(difference, shape.numValues, shape.valueOffset));
           }
           break;
 
@@ -458,7 +454,7 @@ export class SudokuBuilder {
           cells = constraint.cells.map(c => shape.parseCellId(c).cell);
           {
             const handler = new HandlerModule.BinaryPairwise(
-              SudokuConstraint.Renban.fnKey(cells.length, shape.numValues),
+              SudokuConstraint.Renban.fnKey(cells.length, shape.numValues, shape.valueOffset),
               ...cells);
             handler.enableHiddenSingles();
             yield handler;
@@ -472,11 +468,11 @@ export class SudokuBuilder {
             // First `mod` cells must all be different mod n.
             const firstCells = cells.slice(0, mod);
             const handler = new HandlerModule.BinaryPairwise(
-              SudokuConstraint.Modular.neqFnKey(mod, shape.numValues),
+              SudokuConstraint.Modular.neqFnKey(mod, shape.numValues, shape.valueOffset),
               ...firstCells);
             yield handler;
             // Cells at positions i, i+mod, i+2*mod, ... must all be equal mod n.
-            const eqKey = SudokuConstraint.Modular.eqFnKey(mod, shape.numValues);
+            const eqKey = SudokuConstraint.Modular.eqFnKey(mod, shape.numValues, shape.valueOffset);
             for (let i = 0; i < mod; i++) {
               const equalCells = [];
               for (let j = i; j < cells.length; j += mod) {
@@ -516,13 +512,13 @@ export class SudokuBuilder {
             cells = constraint.cells.map(c => shape.parseCellId(c).cell);
             const boxRegions = this._getBoxRegions(shape, constraintMap);
             if (boxRegions.length) {
-              yield* this._regionSumLineHandlers(cells, boxRegions, shape.numValues);
+              yield* this._regionSumLineHandlers(cells, boxRegions, shape);
             } else if (constraintMap.has('Jigsaw')) {
               // If no boxes, try to use the jigsaw regions.
               const jigsawConstraints = constraintMap.get('Jigsaw');
               const regions = jigsawConstraints.map(
                 c => c.cells.map(c => shape.parseCellId(c).cell));
-              yield* this._regionSumLineHandlers(cells, regions, shape.numValues);
+              yield* this._regionSumLineHandlers(cells, regions, shape);
             } else {
               // There are no regions, so the constraint is trivially satisfied.
             }
@@ -545,7 +541,7 @@ export class SudokuBuilder {
           for (let i = 0; i < numCells / 2; i++) {
             yield new HandlerModule.BinaryConstraint(
               cells[i], cells[numCells - 1 - i],
-              SudokuConstraint.Palindrome.fnKey(shape.numValues));
+              SudokuConstraint.Palindrome.fnKey(shape.numValues, shape.valueOffset));
           }
           break;
         case 'Zipper':
@@ -588,7 +584,7 @@ export class SudokuBuilder {
           for (const [a, b] of constraint.adjacentPairs(shape)) {
             yield new HandlerModule.BinaryConstraint(
               a, b,
-              SudokuConstraint.WhiteDot.fnKey(shape.numValues));
+              SudokuConstraint.WhiteDot.fnKey(shape.numValues, shape.valueOffset));
           }
           break;
 
@@ -596,7 +592,7 @@ export class SudokuBuilder {
           for (const [a, b] of constraint.adjacentPairs(shape)) {
             yield new HandlerModule.BinaryConstraint(
               a, b,
-              SudokuConstraint.BlackDot.fnKey(shape.numValues));
+              SudokuConstraint.BlackDot.fnKey(shape.numValues, shape.valueOffset));
           }
           break;
 
@@ -613,7 +609,7 @@ export class SudokuBuilder {
           break;
 
         case 'GreaterThan': {
-          const fn = SudokuConstraint.GreaterThan.fnKey(shape.numValues);
+          const fn = SudokuConstraint.GreaterThan.fnKey(shape.numValues, shape.valueOffset);
           for (const [a, b] of constraint.adjacentPairs(shape)) {
             yield new HandlerModule.BinaryConstraint(a, b, fn);
           }
@@ -721,7 +717,7 @@ export class SudokuBuilder {
             } else {
               // All cells must have the same value, use binary constraints.
               const cells = constraint.cells.map(c => shape.parseCellId(c).cell);
-              const key = SudokuConstraint.SameValues.fnKey(shape.numValues);
+              const key = SudokuConstraint.SameValues.fnKey(shape.numValues, shape.valueOffset);
               yield new HandlerModule.BinaryPairwise(
                 key, ...cells);
             }
@@ -802,7 +798,7 @@ export class SudokuBuilder {
             yield* SudokuBuilder._strictAdjHandlers(
               types.flatMap(t => constraintMap.get(t) || []),
               shape,
-              SudokuConstraint.StrictKropki.fnKey(shape.numValues));
+              SudokuConstraint.StrictKropki.fnKey(shape.numValues, shape.valueOffset));
           }
           break;
 
@@ -812,7 +808,7 @@ export class SudokuBuilder {
             yield* SudokuBuilder._strictAdjHandlers(
               types.flatMap(t => constraintMap.get(t) || []),
               shape,
-              SudokuConstraint.StrictXV.fnKey(shape.numValues));
+              SudokuConstraint.StrictXV.fnKey(shape.numValues, shape.valueOffset));
           }
           break;
 
@@ -891,7 +887,7 @@ export class SudokuBuilder {
     for (const [cell, exclusionCell] of this._allAdjacentCellPairs(shape)) {
       yield new HandlerModule.BinaryConstraint(
         cell, exclusionCell,
-        SudokuConstraint.AntiConsecutive.fnKey(shape.numValues));
+        SudokuConstraint.AntiConsecutive.fnKey(shape.numValues, shape.valueOffset));
     }
   }
 }

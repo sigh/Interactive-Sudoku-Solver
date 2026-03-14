@@ -665,7 +665,7 @@ class ConstraintManager {
     this._populateFormCallback = (constraint) => {
       const categoryInput = this._constraintCategoryInputs.get(
         constraint.constructor.CATEGORY);
-      categoryInput.populateForm?.(constraint, this._shape.numValues);
+      categoryInput.populateForm?.(constraint, this._shape.numValues, this._shape.valueOffset);
     };
 
     const chipViews = new Map();
