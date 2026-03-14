@@ -69,7 +69,7 @@ export class DisplayItem {
 
   makeTextNode(str, x, y, cls) {
     const text = createSvgElement('text');
-    if (str) text.appendChild(document.createTextNode(str));
+    if (str !== null) text.appendChild(document.createTextNode(str));
     text.setAttribute('class', cls);
     text.setAttribute('x', x);
     text.setAttribute('y', y);
@@ -227,9 +227,10 @@ export class CellValueDisplay extends DisplayItem {
 
   reshape(shape) {
     super.reshape(shape);
+    const minValue = 1 + shape.valueOffset;
     this._valueMap = [];
-    for (let i = 0; i <= shape.numValues; i++) {
-      this._valueMap.push(this._valueFn(i));
+    for (let v = minValue; v < minValue + shape.numValues; v++) {
+      this._valueMap[v] = this._valueFn(v);
     }
 
     this._valueOffsets = this._calculateMultiValueLayout(shape);
@@ -247,15 +248,17 @@ export class CellValueDisplay extends DisplayItem {
     const yOffset = -DisplayItem.CELL_SIZE / 2 + fontSize;
     const totalWidth = (valuesPerLine * 2 - 1) * fontWidth;
     const xOffset = (-totalWidth + fontWidth) / 2;
-    // Position offsets [dx, dy] for each value (1-indexed).
-    const valueOffsets = [null]; // index 0 unused
-    for (let v = 1; v <= shape.numValues; v++) {
-      const col = (v - 1) % valuesPerLine;
-      const row = (v - 1) / valuesPerLine | 0;
-      valueOffsets.push([
+    // Position offsets indexed by value.
+    const minValue = 1 + shape.valueOffset;
+    const valueOffsets = [];
+    for (let i = 0; i < shape.numValues; i++) {
+      const v = minValue + i;
+      const col = i % valuesPerLine;
+      const row = i / valuesPerLine | 0;
+      valueOffsets[v] = [
         xOffset + col * 2 * fontWidth,
         yOffset + row * lineHeight,
-      ]);
+      ];
     }
     return valueOffsets;
   }
@@ -301,7 +304,7 @@ export class CellValueDisplay extends DisplayItem {
 
     for (let i = 0; i < grid.length; i++) {
       const value = grid[i];
-      if (!value) continue;
+      if (value == null) continue;
       svg.append(this.makeGridValue(i, value, colorFn));
     }
   }
@@ -328,7 +331,7 @@ export class CellValueDisplay extends DisplayItem {
       return g;
     }
 
-    if (value) {
+    if (value !== null && !isIterable(value)) {
       const text = this.makeTextNode(value, x, y, this.constructor.SINGLE_VALUE_CLASS);
       const color = colorFn?.(cellIndex, value);
       if (color) text.setAttribute('fill', color);
@@ -647,7 +650,7 @@ export class SolutionDisplay extends CellValueDisplay {
 
     if (this._copyElem) {
       this._copyElem.disabled = (
-        !this._currentSolution.every(v => v && isFinite(v)));
+        !this._currentSolution.every(v => v != null && isFinite(v)));
     }
   }
 }

@@ -133,6 +133,7 @@ class AllPossibilitiesModeHandler extends ModeHandler {
     this._solverThreshold = candidateSupportThreshold || 1;
     this._displayThreshold = this._solverThreshold;
     this._counts = [];
+    this._minValue = 1;
   }
 
   setCandidateSupportThreshold(candidateSupportThreshold) {
@@ -171,14 +172,15 @@ class AllPossibilitiesModeHandler extends ModeHandler {
     if (this._pencilmarks.length === 0) {
       this._pencilmarks = Array.from(solutions[0]).map(() => new Set());
       const numCells = solutions[0].length;
-      const numValues = Math.max(...solutions[0]);
-      this._counts = Array.from({ length: numCells }, () => new Array(numValues).fill(0));
+      const maxValue = Math.max(...solutions[0]);
+      this._counts = Array.from(
+        { length: numCells }, () => new Array(maxValue+1).fill(0));
     }
 
     for (const solution of solutions) {
       for (let i = 0; i < solution.length; i++) {
         this._pencilmarks[i].add(solution[i]);
-        this._counts[i][solution[i] - 1]++;
+        this._counts[i][solution[i]]++;
       }
     }
 

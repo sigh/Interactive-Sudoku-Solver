@@ -146,6 +146,27 @@ export class SudokuBuilder {
     }
   }
 
+  // Constraint types that don't yet support non-zero valueOffset.
+  // Remove entries as support is added. Delete this guard when empty.
+  static _OFFSET_UNSUPPORTED = new Set([
+    // Binary constraints:
+    'AntiConsecutive', 'Thermo', 'Whisper', 'Renban', 'Modular',
+    'Between', 'Lockout', 'BlackDot', 'WhiteDot', 'GreaterThan',
+    'StrictKropki', 'StrictXV', 'Palindrome', 'Pair', 'PairX',
+    'SameValues', 'RegionSameValues',
+    // Sum constraints:
+    'Cage', 'Sum', 'LittleKiller', 'X', 'V', 'Arrow', 'DoubleArrow',
+    'PillArrow', 'EqualityCage', 'RegionSumLine', 'Zipper',
+    // Value translation:
+    'ContainAtLeast', 'ContainExact', 'Quad', 'HiddenSkyscraper',
+    'NumberedRoom',
+    // Individual adjustments:
+    'SumLine', 'RellikCage', 'XSum', 'Sandwich', 'Lunchbox',
+    'AntiTaxicab', 'Skyscraper', 'CountingCircles',
+    // NFA/Regex:
+    'Regex', 'NFA',
+  ]);
+
   static * _constraintHandlers(constraintMap, shape) {
     const constraints = [].concat(...constraintMap.values());
 
@@ -155,6 +176,13 @@ export class SudokuBuilder {
         throw new InvalidConstraintError(
           `${constraint.constructor.displayName()} requires a square grid, ` +
           `but the grid is ${shape.name}.`);
+      }
+
+      if (shape.valueOffset !== 0
+        && this._OFFSET_UNSUPPORTED.has(constraint.type)) {
+        throw new InvalidConstraintError(
+          `${constraint.constructor.displayName()} does not yet support ` +
+          `0-based values.`);
       }
 
       let cells;
@@ -462,9 +490,9 @@ export class SudokuBuilder {
           break;
 
         case 'Entropic':
-          if (shape.numValues !== 9) {
+          if (shape.numValues !== 9 || shape.valueOffset !== 0) {
             throw new InvalidConstraintError(
-              'Entropic Line requires exactly 9 values');
+              'Entropic Line requires exactly 9 values (1-9)');
           }
           cells = constraint.cells.map(c => shape.parseCellId(c).cell);
           if (cells.length < 3) {
@@ -614,9 +642,9 @@ export class SudokuBuilder {
           break;
 
         case 'GlobalEntropy':
-          if (shape.numValues !== 9) {
+          if (shape.numValues !== 9 || shape.valueOffset !== 0) {
             throw new InvalidConstraintError(
-              'Global Entropy requires exactly 9 values');
+              'Global Entropy requires exactly 9 values (1-9)');
           }
           for (const cells of SudokuConstraintBase.square2x2Regions(shape)) {
             yield new HandlerModule.LocalEntropy(cells);
@@ -635,6 +663,10 @@ export class SudokuBuilder {
           break;
 
         case 'DutchFlatmates':
+          if (shape.valueOffset !== 0) {
+            throw new InvalidConstraintError(
+              'Dutch Flatmates does not support shifted value ranges.');
+          }
           for (const cells of SudokuConstraintBase.colRegions(shape)) {
             yield new HandlerModule.DutchFlatmateLine(cells);
           }

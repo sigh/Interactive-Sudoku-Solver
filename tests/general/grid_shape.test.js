@@ -325,4 +325,66 @@ await runTest('isSquare returns false for rectangular grids', () => {
   }
 });
 
+// ============================================================================
+// valueOffset
+// ============================================================================
+
+await runTest('fromGridSize with valueOffset=-1 creates 0-based shape', () => {
+  const shape = GridShape.fromGridSize(9, 9, null, -1);
+  assert.equal(shape.numValues, 9);
+  assert.equal(shape.valueOffset, -1);
+  assert.equal(shape.name, '9x9~0-8');
+});
+
+await runTest('fromGridSize rejects invalid valueOffset', () => {
+  assert.throws(() => GridShape.fromGridSize(9, 9, null, -2));
+  assert.throws(() => GridShape.fromGridSize(9, 9, null, 1));
+});
+
+await runTest('fromGridSpec parses range syntax', () => {
+  const shape = GridShape.fromGridSpec('9x9~0-8');
+  assert.equal(shape.numValues, 9);
+  assert.equal(shape.valueOffset, -1);
+  assert.equal(shape.name, '9x9~0-8');
+});
+
+await runTest('fromGridSpec rejects invalid range offset', () => {
+  // 2-10 means offset=1, which is not allowed
+  assert.throws(() => GridShape.fromGridSpec('9x9~2-10'));
+});
+
+await runTest('makeName produces canonical forms', () => {
+  // Default 9x9: no suffix
+  assert.equal(GridShape.makeName(9, 9, 9, 0), '9x9');
+  // Non-default numValues: bare number suffix
+  assert.equal(GridShape.makeName(9, 9, 10, 0), '9x9~10');
+  // Zero-based: range suffix
+  assert.equal(GridShape.makeName(9, 9, 9, -1), '9x9~0-8');
+});
+
+await runTest('fromGridSpec round-trips through name', () => {
+  for (const spec of ['9x9', '9x9~10', '9x9~0-8', '4x6', '6x8~0-7']) {
+    const shape = GridShape.fromGridSpec(spec);
+    const reparsed = GridShape.fromGridSpec(shape.name);
+    assert.equal(reparsed.name, shape.name);
+    assert.equal(reparsed.numValues, shape.numValues);
+    assert.equal(reparsed.valueOffset, shape.valueOffset);
+  }
+});
+
+await runTest('baseCharCode returns 0 for offset -1', () => {
+  const shape = GridShape.fromGridSize(9, 9, null, -1);
+  assert.equal(GridShape.baseCharCode(shape), '0'.charCodeAt(0));
+});
+
+await runTest('baseCharCode returns 1 for offset 0', () => {
+  const shape = GridShape.fromGridSize(9);
+  assert.equal(GridShape.baseCharCode(shape), '1'.charCodeAt(0));
+});
+
+await runTest('baseCharCode returns A for large numValues', () => {
+  const shape = GridShape.fromGridSize(16);
+  assert.equal(GridShape.baseCharCode(shape), 'A'.charCodeAt(0));
+});
+
 logSuiteComplete();

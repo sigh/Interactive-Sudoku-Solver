@@ -1276,31 +1276,29 @@ export class SudokuConstraint {
     static CATEGORY = 'Shape';
     static UNIQUENESS_KEY_FIELD = 'type';
     static DEFAULT_SHAPE = SHAPE_9x9;
+    static _DEFAULT_SPECS = new Set([
+      SHAPE_9x9.name,
+      `${SHAPE_9x9.gridDimsStr}~${SHAPE_9x9.numValues}`,
+      `${SHAPE_9x9.gridDimsStr}~1-${SHAPE_9x9.numValues}`,
+    ]);
 
-    constructor(gridDims, ...optionalNumValues) {
-      super(gridDims, ...optionalNumValues);
+    constructor(gridDims, ...optionalValueRange) {
+      super(gridDims, ...optionalValueRange);
 
       this.gridSpec = gridDims;
 
-      if (optionalNumValues.length) this.gridSpec += `~${optionalNumValues[0]}`;
+      if (optionalValueRange.length) this.gridSpec += `~${optionalValueRange[0]}`;
     }
 
     static *makeFromArgs(args, shape) {
-      const [gridDims, optionalNumValues] = args;
-
-      const ERROR_MSG = 'Inconsistent Shape constraints.';
-      if (shape.gridDimsStr !== gridDims) {
-        throw Error(ERROR_MSG);
-      }
-      if (optionalNumValues !== undefined) {
-        if (shape.numValues !== +optionalNumValues) {
-          throw Error(ERROR_MSG);
-        }
-      } else if (!shape.isDefaultNumValues()) {
-        throw Error(ERROR_MSG);
+      // Reconstruct gridSpec from args the same way the constructor does,
+      // and verify it matches the already-parsed shape.
+      const constraint = new this(...args);
+      if (GridShape.fromGridSpec(constraint.gridSpec).name !== shape.name) {
+        throw Error('Inconsistent Shape constraints.');
       }
 
-      yield new this(...args);
+      yield constraint;
     }
 
     static serialize(constraints) {
@@ -1309,8 +1307,7 @@ export class SudokuConstraint {
       }
 
       const c = constraints[0];
-      if (c.gridSpec === this.DEFAULT_SHAPE.name ||
-        c.gridSpec === this.DEFAULT_SHAPE.fullGridSpec) {
+      if (this._DEFAULT_SPECS.has(c.gridSpec)) {
         return '';
       }
 

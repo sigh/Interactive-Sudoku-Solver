@@ -1578,11 +1578,11 @@ class GridInputManager {
       if (this._selection.size() === 0) return;
       switch (event.key) {
         case 'Backspace':
-        case '0':
           for (const cell of this._selection.getCells()) {
             this._runCallbacks(this._callbacks.onNewDigit, cell, null);
           }
           break;
+
         case 'f':
           let i = 1;
           for (const cell of this._selection.getCells()) {

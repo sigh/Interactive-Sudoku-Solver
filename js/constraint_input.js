@@ -809,19 +809,22 @@ ConstraintCategoryInput.GivenCandidates = class GivenCandidates extends Constrai
 
   _inputDigit(cell, digit) {
     const values = this._getCellValues(cell);
-    const currValue = values.length === 1 ? values[0] : 0;
-    const numValues = this._shape.numValues;
+    const currValue = values.length === 1 ? values[0] : null;
+    const minValue = 1 + this._shape.valueOffset;
+    const maxValue = this._shape.numValues + this._shape.valueOffset;
 
     let newValue;
-    if (digit === null || digit > numValues) {
-      newValue = 0;
+    if (digit === null || digit < minValue || digit > maxValue) {
+      newValue = null;
+    } else if (currValue === null) {
+      newValue = digit;
     } else {
       newValue = currValue * 10 + digit;
-      if (newValue > numValues) newValue = digit;
+      if (newValue > maxValue) newValue = digit;
     }
 
     this._multiValueInputPanel.updateFromCells([cell]);
-    this._setValues([cell], newValue ? [newValue] : []);
+    this._setValues([cell], newValue !== null ? [newValue] : []);
   }
 
   _setValues(cells, values) {
@@ -1510,7 +1513,9 @@ class MultiValueInputPanel {
     clearDOMNode(this._inputContainer);
     this._valueButtons = [];
 
-    this._allValues = Array.from({ length: shape.numValues }, (_, i) => i + 1);
+    this._allValues = Array.from(
+      { length: shape.numValues },
+      (_, i) => i + 1 + shape.valueOffset);
 
     for (let i = 0; i < this._allValues.length; i++) {
       const label = document.createElement('label');
@@ -1583,12 +1588,12 @@ class MultiValueInputPanel {
   }
 
   _updateForm(values) {
+    const base = this._allValues[0];
     for (let i = 0; i < this._allValues.length; i++) {
       this._valueButtons[i].checked = false;
     }
     for (const value of values) {
-      const elem = this._valueButtons[value - 1]
-      // Check elem in case the value is out of range.
+      const elem = this._valueButtons[value - base];
       if (elem) elem.checked = true;
     }
   }

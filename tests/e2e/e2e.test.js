@@ -157,6 +157,23 @@ const solveCollections = [
       '6x6: 9-value disjoint sets',  // non-standard numValues, DisjointSets
     ],
   },
+  {
+    collection: '0-indexed',
+    puzzles: [
+      '0-indexed: Classic sudoku',
+      '0-indexed: Sudoku X',
+      '0-indexed: Anti-knight Anti-king',
+      '0-indexed: Jigsaw',
+      '0-indexed: Windoku',
+      '0-indexed: Odd even',  // Pencilmark (GivenCandidates)
+      '0-indexed: 6x6',
+      '0-indexed: 4x4 Full Rank',
+      '0-indexed: 6x8 Plain',  // Non-square
+      '0-indexed: 4x7 Jigsaw',  // Non-square
+      '0-indexed: 9x8 Plain boxless',  // Non-square
+      '0-indexed: 6x6 9-value disjoint sets',  // Non-standard numValues
+    ],
+  },
 ];
 
 const layoutCases = [
@@ -255,7 +272,7 @@ for (const { collection, puzzles } of solveCollections) {
   );
   runSolveResults.push({ collection, stats });
 }
-assert.equal(runSolveResults.length, 4, 'solve collections should return four collections');
+assert.equal(runSolveResults.length, 5, 'solve collections should return five collections');
 runSolveResults.forEach((result) => expectStatsStructure(result, `solve tests (${result.collection})`));
 console.log('✓ solve collections completed');
 runSolveResults.forEach((result) => logCollectionSummary(result));

@@ -555,7 +555,7 @@ export class SolutionController {
     const threshold = result.candidateSupportThreshold;
     if (counts && threshold > 1) {
       fns.push((cellIndex, value) => {
-        const count = counts[cellIndex]?.[value - 1];
+        const count = counts[cellIndex]?.[value];
         if (!count || count >= threshold) return null;
         if (count === 1) return 'var(--color-candidate-unique)';
         // Note that the threshold is one more than the limit to detect when

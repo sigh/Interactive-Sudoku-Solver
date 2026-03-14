@@ -23,6 +23,18 @@ export class LookupTables {
     return result;
   };
 
+  static fromOffsetValue = (v, offset) => {
+    return 1 << (v - offset - 1);
+  };
+
+  static fromOffsetValuesArray = (values, offset) => {
+    let result = 0;
+    for (const v of values) {
+      result |= this.fromOffsetValue(v, offset);
+    }
+    return result;
+  };
+
   static toValue(v) {
     return 32 - Math.clz32(v);
   };
@@ -65,6 +77,14 @@ export class LookupTables {
       result.push(LookupTables.toValue(value));
     }
     return result;
+  }
+
+  static toOffsetValue(v, offset) {
+    return LookupTables.toValue(v) + offset;
+  }
+
+  static toOffsetValuesArray(values, offset) {
+    return LookupTables.toValuesArray(values).map(v => v + offset);
   }
 
   constructor(verifiedCallToken, numValues) {

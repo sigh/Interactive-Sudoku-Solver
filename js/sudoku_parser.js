@@ -505,12 +505,15 @@ export class SudokuParser {
 
 export const toShortSolution = (solution, shape) => {
   const baseCharCode = GridShape.baseCharCode(shape);
+  const minValue = 1 + shape.valueOffset;
   const DEFAULT_VALUE = '.';
 
   const result = new Array(solution.length).fill(DEFAULT_VALUE);
 
   for (let i = 0; i < solution.length; i++) {
-    result[i] = String.fromCharCode(baseCharCode + solution[i] - 1);
+    if (solution[i] != null) {
+      result[i] = String.fromCharCode(baseCharCode + solution[i] - minValue);
+    }
   }
   return result.join('');
 }

@@ -184,12 +184,13 @@ export class GivenCandidates extends SudokuConstraintHandler {
     this._valueMap = valueMap;
   }
 
-  initialize(initialGridCells, stateAllocator) {
+  initialize(initialGridCells, cellExclusions, shape) {
+    const offset = shape.valueOffset;
     for (const [cell, value] of this._valueMap) {
       if (isIterable(value)) {
-        initialGridCells[cell] &= LookupTables.fromValuesArray(value);
+        initialGridCells[cell] &= LookupTables.fromOffsetValuesArray(value, offset);
       } else {
-        initialGridCells[cell] &= LookupTables.fromValue(value);
+        initialGridCells[cell] &= LookupTables.fromOffsetValue(value, offset);
       }
     }
 

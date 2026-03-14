@@ -72,7 +72,7 @@ export class SudokuSolver {
       const sampleSolution = this._internalSolver.getSampleSolution();
       let result = {};
       if (sampleSolution) {
-        result.solutions = [SudokuSolverUtil.gridToSolution(sampleSolution)];
+        result.solutions = [SudokuSolverUtil.gridToSolution(sampleSolution, this._shape.valueOffset)];
         this._internalSolver.unsetSampleSolution();
       }
       if (estimationCounters) {
@@ -110,7 +110,7 @@ export class SudokuSolver {
     });
 
     if (!grid) return null;
-    return SudokuSolverUtil.gridToSolution(grid);
+    return SudokuSolverUtil.gridToSolution(grid, this._shape.valueOffset);
   }
 
   nthStep(n, stepGuides) {
@@ -126,6 +126,19 @@ export class SudokuSolver {
         important: true,
       });
     }
+
+    // Convert user-visible step guide values to solver values.
+    const offset = this._shape.valueOffset;
+    if (stepGuides && offset !== 0) {
+      const converted = new Map();
+      for (const [k, guide] of stepGuides) {
+        const g = { ...guide };
+        if (Number.isInteger(g.value)) g.value -= offset;
+        converted.set(k, g);
+      }
+      stepGuides = converted;
+    }
+
     let result = null;
     this._timer.runTimed(() => {
       this._internalSolver.run(
@@ -134,7 +147,7 @@ export class SudokuSolver {
     });
     if (!result) return null;
 
-    const pencilmarks = SudokuSolverUtil.makePencilmarks(result.grid);
+    const pencilmarks = SudokuSolverUtil.makePencilmarks(result.grid, offset);
     // Convert single-value pencilmarks to values.
     for (let i = 0; i < pencilmarks.length; i++) {
       if (pencilmarks[i].size === 1) {
@@ -154,11 +167,11 @@ export class SudokuSolver {
       const guessCellIndex = result.cellOrder[result.guessDepth];
       // The options are the values that existed in the old grid for the guess
       // cell.
-      returnValue.values = LookupTables.toValuesArray(
-        result.oldGrid[guessCellIndex]);
+      returnValue.values = LookupTables.toOffsetValuesArray(
+        result.oldGrid[guessCellIndex], offset);
 
       returnValue.diffPencilmarks = SudokuSolverUtil.makeDiffPencilmarks(
-        result.oldGrid, result.grid);
+        result.oldGrid, result.grid, offset);
       returnValue.guessCell = this._shape.makeCellIdFromIndex(guessCellIndex);
     }
 
@@ -176,7 +189,7 @@ export class SudokuSolver {
       if (!solutions.length) return null;
       return {
         solutions: solutions.splice(0).map(
-          s => SudokuSolverUtil.gridToSolution(s)),
+          s => SudokuSolverUtil.gridToSolution(s, this._shape.valueOffset)),
       };
     };
 
@@ -227,25 +240,26 @@ export class SudokuSolver {
 }
 
 class SudokuSolverUtil {
-  static gridToSolution(grid) {
-    return grid.map(value => LookupTables.toValue(value));
+  static gridToSolution(grid, valueOffset) {
+    return grid.map(value => {
+      return value ? LookupTables.toOffsetValue(value, valueOffset) : null;
+    });
   }
 
-  static makePencilmarks(grid) {
+  static makePencilmarks(grid, valueOffset) {
     const pencilmarks = [];
     for (let i = 0; i < grid.length; i++) {
-      pencilmarks.push(new Set(
-        LookupTables.toValuesArray(grid[i])));
+      pencilmarks.push(
+        new Set(LookupTables.toOffsetValuesArray(grid[i], valueOffset)));
     }
     return pencilmarks;
   }
 
-  static makeDiffPencilmarks(oldGrid, newGrid) {
+  static makeDiffPencilmarks(oldGrid, newGrid, valueOffset) {
     const pencilmarks = [];
     for (let i = 0; i < oldGrid.length; i++) {
-      const removed = new Set(
-        LookupTables.toValuesArray(oldGrid[i] & ~newGrid[i]));
-      pencilmarks.push(removed);
+      pencilmarks.push(
+        new Set(LookupTables.toOffsetValuesArray(oldGrid[i] & ~newGrid[i], valueOffset)));
     }
     return pencilmarks;
   }
@@ -529,8 +543,9 @@ class InternalSolver {
     const values = this.constructor._debugValueBuffer.subarray(0, cellDepth);
 
     const cells = this._candidateSelector.getCellOrder(cellDepth);
+    const offset = this._shape.valueOffset;
     for (let i = 0; i < cellDepth; i++) {
-      values[i] = LookupTables.toValue(stackFrame.gridCells[cells[i]]);
+      values[i] = LookupTables.toOffsetValue(stackFrame.gridCells[cells[i]], offset);
     }
 
     return { cells, values };
@@ -990,7 +1005,7 @@ class InternalSolver {
       if (!grid) return null;
 
       this.counters.branchesIgnored = 1 - this.counters.progressRatio;
-      return SudokuSolverUtil.gridToSolution(grid);
+      return SudokuSolverUtil.gridToSolution(grid, this._shape.valueOffset);
     };
 
     // Non-standard grids may not have any house handlers (e.g. when there are

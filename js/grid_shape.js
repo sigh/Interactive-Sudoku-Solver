@@ -9,53 +9,39 @@ export class GridShape {
 
   // Public factory for square grids (one arg) or rectangular grids (two args).
   // Optionally accepts a numValues override as the third argument.
-  static fromGridSize(numRows, numCols = numRows, numValues = null) {
+  static fromGridSize(numRows, numCols = numRows, numValues = null, valueOffset = 0) {
     if (!this._isValidDimension(numRows) || !this._isValidDimension(numCols)) {
       return null;
     }
-    return new GridShape(numRows, numCols, numValues);
+    return new GridShape(numRows, numCols, numValues, valueOffset);
   }
 
   static fromGridSpec(gridSpec) {
-    const parts = gridSpec.split('~');
-    if (parts.length > 2) {
+    const match = gridSpec.match(/^(\d+)x(\d+)(?:~(\d+)(?:-(\d+))?)?$/);
+    if (!match) {
       throw new Error('Invalid grid spec format: ' + gridSpec);
     }
 
-    const gridDims = parts[0];
-    const numValuesPart = parts[1];
+    const numRows = parseInt(match[1]);
+    const numCols = parseInt(match[2]);
 
-    const dims = gridDims.split('x');
-    if (dims.length !== 2) {
-      throw new Error('Invalid grid spec format: ' + gridSpec);
+    let numValues = null;
+    let valueOffset = 0;
+    if (match[4] !== undefined) {
+      // Range: "9x9~0-8"
+      const rangeStart = parseInt(match[3]);
+      numValues = parseInt(match[4]) - rangeStart + 1;
+      valueOffset = rangeStart - 1;
+    } else if (match[3] !== undefined) {
+      // Bare number: "9x9~10"
+      numValues = parseInt(match[3]);
     }
 
-    const numRows = parseInt(dims[0]);
-    const numCols = parseInt(dims[1]);
-
-    if (numRows.toString() !== dims[0] || numCols.toString() !== dims[1]) {
-      throw new Error('Invalid grid spec format: ' + gridSpec);
-    }
-
-    const shape = this.fromGridSize(numRows, numCols);
+    const shape = this.fromGridSize(numRows, numCols, numValues, valueOffset);
     if (!shape) {
-      throw new Error('Invalid grid dimensions: ' + gridSpec);
+      throw new Error('Invalid grid spec: ' + gridSpec);
     }
-
-    if (numValuesPart === undefined) {
-      return shape;
-    }
-
-    const numValues = parseInt(numValuesPart);
-    if (numValues.toString() !== numValuesPart) {
-      throw new Error('Invalid grid spec format: ' + gridSpec);
-    }
-
-    const shapeWithValues = this.fromGridSize(numRows, numCols, numValues);
-    if (!shapeWithValues) {
-      throw new Error('Invalid numValues: ' + gridSpec);
-    }
-    return shapeWithValues;
+    return shape;
   };
 
   static fromNumCells(numCells) {
@@ -70,22 +56,30 @@ export class GridShape {
     return this.fromGridSize(gridSize);
   }
 
-  static makeName(numRows, numCols = numRows, numValues = null) {
-    let name = `${numRows}x${numCols}`;
+  static makeName(numRows, numCols, numValues, valueOffset) {
+    const name = `${numRows}x${numCols}`;
+    if (valueOffset !== 0) {
+      return `${name}~${1 + valueOffset}-${numValues + valueOffset}`;
+    }
     if (numValues !== this.defaultNumValues(numRows, numCols)) {
-      name += `~${numValues}`;
+      return `${name}~${numValues}`;
     }
     return name;
   }
 
   static baseCharCode(shape) {
-    return shape.numValues < 10 ? '1'.charCodeAt(0) : 'A'.charCodeAt(0);
+    if (shape.numValues >= 10) return 'A'.charCodeAt(0);
+    return '1'.charCodeAt(0) + shape.valueOffset;
   }
 
-  constructor(numRows, numCols, numValues = null) {
-    // Core dimensions
+  constructor(numRows, numCols, numValues = null, valueOffset = 0) {
+    if (valueOffset !== 0 && valueOffset !== -1) {
+      throw Error('Invalid valueOffset: ' + valueOffset);
+    }
+
     this.numRows = numRows;
     this.numCols = numCols;
+    this.valueOffset = valueOffset;
 
     // Derived properties
     const defaultNumValues = this.constructor.defaultNumValues(numRows, numCols);
@@ -98,9 +92,9 @@ export class GridShape {
     this.numCells = numRows * numCols;
     this.numPencilmarks = this.numCells * this.numValues;
 
-    this.name = this.constructor.makeName(numRows, numCols, this.numValues);
-    this.gridDimsStr = `${this.numRows}x${this.numCols}`;
-    this.fullGridSpec = `${this.gridDimsStr}~${this.numValues}`;
+    this.name = this.constructor.makeName(
+      numRows, numCols, this.numValues, valueOffset);
+    this.gridDimsStr = `${numRows}x${numCols}`;
 
     Object.freeze(this);
   }
