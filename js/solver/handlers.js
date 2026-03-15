@@ -1190,6 +1190,7 @@ export class Skyscraper extends SudokuConstraintHandler {
     this._forwardStates = null;
     this._backwardStates = null;
     this._allStates = null;
+    this._zeroMask = 0;
 
     if (0 >= this._numVisible) {
       throw new InvalidConstraintError('Skyscraper visibility target must be > 0');
@@ -1198,6 +1199,7 @@ export class Skyscraper extends SudokuConstraintHandler {
 
   initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
     this._numValues = shape.numValues;
+    this._zeroMask = shape.valueOffset < 0 ? 1 : 0;
     // Can't see more buildings than exist.
     if (this._numVisible > this.cells.length) return false;
 
@@ -1236,6 +1238,7 @@ export class Skyscraper extends SudokuConstraintHandler {
     const target = this._numVisible;
     const numCells = cells.length;
     const maxValue = LookupTables.fromValue(this._numValues);
+    const zeroMask = this._zeroMask;
 
     // This resets the states for both the forward and backward pass.
     this._allStates.fill(0);
@@ -1249,7 +1252,9 @@ export class Skyscraper extends SudokuConstraintHandler {
     const forwardStates = this._forwardStates;
 
     // All the values in the first cell are valid for visibility === 1.
-    forwardStates[0][0] = grid[cells[0]];
+    // With 0-based values, external 0 (internal 1) doesn't count as visible.
+    forwardStates[0][0] = grid[cells[0]] & ~zeroMask;
+    const firstCellZero = grid[cells[0]] & zeroMask;
 
     // Forward pass to determine the possible heights for each visibility.
     let lastMaxHeightIndex = numCells - 1;
@@ -1263,6 +1268,8 @@ export class Skyscraper extends SudokuConstraintHandler {
       {
         // Unroll j = 0, since only Case 1 applies.
         currStates[0] = prevStates[0] & higherThanMinV;
+        // If the first cell could be zero, cell 1 can start the sequence.
+        if (firstCellZero && i === 1) currStates[0] |= v & ~zeroMask;
       }
       for (let j = 1; j <= i && j < target; j++) {
         // Case 1: cells[i] is not visible.
@@ -1350,13 +1357,23 @@ export class Skyscraper extends SudokuConstraintHandler {
             valueMask |= visibleCurrentState;
           }
         }
+
+      }
+
+      // If the first cell could be zero, cell 1's backward-validated
+      // values are valid as the first visible building.
+      if (firstCellZero && i === 1) {
+        valueMask |= backwardStates[1][0] & grid[cells[1]];
       }
 
       if (!(grid[cells[i]] &= valueMask)) return false;
     }
 
     // The first cell is all those values for which visibility === 1 is valid.
-    if (!(grid[cells[0]] &= backwardStates[0][0])) return false;
+    // If the first cell can be zero, preserve that candidate.
+    if (!(grid[cells[0]] &= backwardStates[0][0] | firstCellZero)) {
+      return false;
+    }
 
     return true;
   }

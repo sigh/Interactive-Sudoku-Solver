@@ -152,7 +152,7 @@ export class SudokuBuilder {
   static _OFFSET_UNSUPPORTED = new Set([
     // Individual adjustments:
     'SumLine', 'RellikCage', 'XSum', 'Sandwich', 'Lunchbox',
-    'AntiTaxicab', 'Skyscraper', 'CountingCircles',
+    'AntiTaxicab', 'CountingCircles',
     'Indexing', 'ValueIndexing',
     // NFA/Regex:
     'Regex', 'NFA',

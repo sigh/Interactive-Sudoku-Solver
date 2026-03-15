@@ -1065,6 +1065,12 @@ export const EXAMPLES = [
     input: '.Shape~9x9~0-8.EqualityCage~R1C1~R1C2~R2C2~R2C1.EqualityCage~R3C2~R3C3.EqualityCage~R4C2~R4C3~R5C3~R5C2.EqualityCage~R9C2~R9C3~R8C3~R8C4.EqualityCage~R4C4~R4C5~R5C5~R5C6.EqualityCage~R3C4~R3C5~R3C6~R3C7.EqualityCage~R2C6~R2C7~R2C8~R2C9.EqualityCage~R3C8~R3C9.EqualityCage~R6C9~R7C9.EqualityCage~R7C7~R7C8~R8C8~R8C7.BlackDot~R6C6~R6C7~R9C3~R9C2~R8C5~R9C5.BlackDot~R4C1~R4C2.BlackDot~R7C6~R8C6~R8C7.WhiteDot~R8C1~R8C2~R1C7~R1C6~R7C7~R7C8.V~R2C7~R2C8~R2C2~R2C1~R8C3~R9C3.~R7C2_0',
     solution: '631258740058147236427630518210385467785461023346702185104873652872516304563024871',
   },
+  {
+    name: '0-indexed: Skyscraper',
+    src: 'https://www.funwithpuzzles.com/2010/12/online-puzzles-slither-links-google.html',
+    input: '.Shape~9x9~0-8.~R2C2_0~R2C5_6~R2C8_5~R3C7_0~R5C8_6~R8C8_0~R8C5_1~R6C6_4~R6C4_6~R4C4_8~R5C2_3~R8C2_7~R7C3_3~R9C1_5~R7C7_6~R4C6_1~R5C5_5~R3C3_5.Skyscraper~C9~3~.Skyscraper~C1~2~.Skyscraper~R9~4~.Skyscraper~C6~3~.Skyscraper~R3~~2.Skyscraper~R5~4~.Skyscraper~R6~~4.Skyscraper~R2~4~.Skyscraper~C4~2~.Skyscraper~C5~~3.Skyscraper~R8~~2.Skyscraper~C2~~3.Skyscraper~R7~2~.Skyscraper~R1~3~.Skyscraper~C3~~3',
+    solution: '327085146104763852865142037246831570031257468758604213483570621672418305510326784',
+  },
 ];
 
 for (const puzzle of EXAMPLES) {

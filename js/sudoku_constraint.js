@@ -1990,7 +1990,8 @@ export class SudokuConstraint {
       Digits in the grid represent skyscrapers of that height.
       Higher skyscrapers obscure smaller ones.
       Clues outside the grid show the number of visible skyscrapers in that
-      row / column from the clue's direction of view.`);
+      row / column from the clue's direction of view. 0-valued cells do not
+      count as skyscrapers.`);
     static CATEGORY = 'OutsideClue';
     static DISPLAY_CONFIG = {
       displayClass: 'OutsideClue',

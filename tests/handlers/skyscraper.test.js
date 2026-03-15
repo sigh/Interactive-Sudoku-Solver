@@ -547,4 +547,171 @@ await runTest('Skyscraper should be idempotent', () => {
   assert.deepEqual(after1, after2, 'second call should not change grid');
 });
 
+// =============================================================================
+// Offset (0-indexed) tests — zero only matters in the first cell
+// =============================================================================
+
+const { GridShape } = await import('../../js/grid_shape.js');
+
+await runTest('Skyscraper offset: visibility=1, zero in first cell should not count as visible', () => {
+  // 0-indexed 4x4: external 0-3, internal 1-4, offset=-1.
+  // Visibility=1 means only 1 building visible from the left.
+  // With 1-indexed this forces max value (4) into first cell.
+  // With 0-indexed, zero (internal 1) in first cell isn't visible,
+  // so 4 can't be the only answer for cell 0.
+  const shape = GridShape.fromGridSize(1, 4, null, -1);
+  const context = new GridTestContext({ shape });
+  const cells = context.cells();
+  const handler = new Skyscraper(cells, 1);
+  context.initializeHandler(handler);
+
+  const grid = context.grid;
+  grid[0] = valueMask(1, 2, 3, 4);
+  grid[1] = valueMask(1, 2, 3, 4);
+  grid[2] = valueMask(1, 2, 3, 4);
+  grid[3] = valueMask(1, 2, 3, 4);
+  const acc = createAccumulator();
+
+  const result = handler.enforceConsistency(grid, acc);
+  assert.equal(result, true);
+  // First cell should still allow internal 4 (external 3 = tallest, only 1 visible)
+  assert.ok(grid[0] & valueMask(4), 'first cell should allow max value');
+  // First cell must NOT allow internal 1 (external 0): zero + anything behind
+  // means at least 1 real building visible, but we also need the max behind it
+  // to ensure nothing else is visible. So zero is allowed when a later cell is
+  // the sole visible building.
+  // Actually, with vis=1: if first cell is zero (not visible), then exactly one
+  // later cell must be visible with nothing else visible after it. That's
+  // possible when the tallest value comes next. So internal 1 IS allowed.
+  assert.ok(grid[0] & valueMask(1), 'first cell should allow zero (internal 1)');
+});
+
+await runTest('Skyscraper offset: visibility=4 with zero requires 4 non-zero buildings visible', () => {
+  // 0-indexed 4x4: 4 visible, but one cell has external 0.
+  // With zero in the set, we still need 4 visible non-zero buildings,
+  // which is impossible in 4 cells (one holds zero, only 3 real buildings).
+  const shape = GridShape.fromGridSize(1, 4, null, -1);
+  const context = new GridTestContext({ shape });
+  const cells = context.cells();
+  const handler = new Skyscraper(cells, 4);
+  context.initializeHandler(handler);
+
+  const grid = context.grid;
+  grid[0] = valueMask(1);  // zero (external 0)
+  grid[1] = valueMask(2, 3, 4);
+  grid[2] = valueMask(2, 3, 4);
+  grid[3] = valueMask(2, 3, 4);
+  const acc = createAccumulator();
+
+  const result = handler.enforceConsistency(grid, acc);
+  // Zero in first cell means only 3 real buildings exist → can't have 4 visible.
+  assert.equal(result, false, 'should fail: zero first + vis=4 impossible in 4 cells');
+});
+
+await runTest('Skyscraper offset: zero in first cell with vis=3 succeeds', () => {
+  // 4 cells [0,1,2,3] (external). Zero first, then 3 ascending = 3 visible.
+  const shape = GridShape.fromGridSize(1, 4, null, -1);
+  const context = new GridTestContext({ shape });
+  const cells = context.cells();
+  const handler = new Skyscraper(cells, 3);
+  context.initializeHandler(handler);
+
+  const grid = context.grid;
+  grid[0] = valueMask(1);  // zero (external 0) — not visible
+  grid[1] = valueMask(2);  // external 1 — visible (first real building)
+  grid[2] = valueMask(3);  // external 2 — visible (2 > 1)
+  grid[3] = valueMask(4);  // external 3 — visible (3 > 2)
+  const acc = createAccumulator();
+
+  const result = handler.enforceConsistency(grid, acc);
+  assert.equal(result, true, '[0,1,2,3] should give visibility 3');
+});
+
+await runTest('Skyscraper offset: zero first cell counted as vis=4 should fail', () => {
+  // Without offset fix, [0,1,2,3] would give vis=4 (all "visible").
+  // With fix, zero doesn't count → vis=3. So target=4 should fail.
+  const shape = GridShape.fromGridSize(1, 4, null, -1);
+  const context = new GridTestContext({ shape });
+  const cells = context.cells();
+  const handler = new Skyscraper(cells, 4);
+  context.initializeHandler(handler);
+
+  const grid = context.grid;
+  grid[0] = valueMask(1);  // zero
+  grid[1] = valueMask(2);  // 1
+  grid[2] = valueMask(3);  // 2
+  grid[3] = valueMask(4);  // 3
+  const acc = createAccumulator();
+
+  const result = handler.enforceConsistency(grid, acc);
+  assert.equal(result, false, '[0,1,2,3] has only 3 visible, not 4');
+});
+
+await runTest('Skyscraper offset: zero in non-first cell does not affect visibility', () => {
+  // [3,0,1,2] (external). First cell visible (3), zero hidden, 1 hidden, 2 hidden.
+  // Visibility = 1.
+  const shape = GridShape.fromGridSize(1, 4, null, -1);
+  const context = new GridTestContext({ shape });
+  const cells = context.cells();
+  const handler = new Skyscraper(cells, 1);
+  context.initializeHandler(handler);
+
+  const grid = context.grid;
+  grid[0] = valueMask(4);  // external 3, visible
+  grid[1] = valueMask(1);  // external 0, hidden (0 < 3)
+  grid[2] = valueMask(2);  // external 1, hidden (1 < 3)
+  grid[3] = valueMask(3);  // external 2, hidden (2 < 3)
+  const acc = createAccumulator();
+
+  const result = handler.enforceConsistency(grid, acc);
+  assert.equal(result, true, '[3,0,1,2] should give visibility 1');
+});
+
+await runTest('Skyscraper offset: propagation with zero candidate in first cell', () => {
+  // First cell can be zero or 2 (internal 1 or 3). Target vis=2.
+  // If first cell = 0 (internal 1): need 2 visible among cells 1-3.
+  // If first cell = 2 (internal 3): need 1 more visible among cells 1-3.
+  // Both paths are possible, so should succeed and preserve both candidates.
+  const shape = GridShape.fromGridSize(1, 4, null, -1);
+  const context = new GridTestContext({ shape });
+  const cells = context.cells();
+  const handler = new Skyscraper(cells, 2);
+  context.initializeHandler(handler);
+
+  const grid = context.grid;
+  grid[0] = valueMask(1, 3);  // external 0 or 2
+  grid[1] = valueMask(1, 2, 3, 4);
+  grid[2] = valueMask(1, 2, 3, 4);
+  grid[3] = valueMask(1, 2, 3, 4);
+  const acc = createAccumulator();
+
+  const result = handler.enforceConsistency(grid, acc);
+  assert.equal(result, true);
+  // Both candidates should survive in first cell.
+  assert.ok(grid[0] & valueMask(1), 'first cell should keep zero candidate');
+  assert.ok(grid[0] & valueMask(3), 'first cell should keep non-zero candidate');
+});
+
+await runTest('Skyscraper offset=0: unchanged behavior with no zero values', () => {
+  // Standard 1-indexed 4x4, visibility=4. Should force ascending 1,2,3,4.
+  const context = new GridTestContext({ gridSize: [1, 4] });
+  const cells = context.cells();
+  const handler = new Skyscraper(cells, 4);
+  context.initializeHandler(handler);
+
+  const grid = context.grid;
+  grid[0] = valueMask(1, 2, 3, 4);
+  grid[1] = valueMask(1, 2, 3, 4);
+  grid[2] = valueMask(1, 2, 3, 4);
+  grid[3] = valueMask(1, 2, 3, 4);
+  const acc = createAccumulator();
+
+  const result = handler.enforceConsistency(grid, acc);
+  assert.equal(result, true);
+  assert.equal(grid[0], valueMask(1));
+  assert.equal(grid[1], valueMask(2));
+  assert.equal(grid[2], valueMask(3));
+  assert.equal(grid[3], valueMask(4));
+});
+
 logSuiteComplete('skyscraper.test.js');
