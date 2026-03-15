@@ -2663,8 +2663,17 @@ export class CountingCircles extends SudokuConstraintHandler {
 
   initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
     const numCells = this.cells.length;
-    const combinations = this.constructor._sumCombinations(shape.numValues)[numCells];
+    const valueOffset = shape.valueOffset;
+    this._valueOffset = valueOffset;
+    // With offset, external 0 can't appear (0 occurrences = contradiction),
+    // so valid external values are 1..(numValues+valueOffset), shifted up by
+    // -valueOffset to get internal values.
+    let combinations =
+      this.constructor._sumCombinations(shape.maxValue())[numCells];
     if (!combinations) return false;
+    if (valueOffset) {
+      combinations = combinations.map(c => c << (-valueOffset));
+    }
 
     const exclusionGroups = HandlerUtil.findExclusionGroups(
       this.cells, cellExclusions).groups;
@@ -2672,7 +2681,7 @@ export class CountingCircles extends SudokuConstraintHandler {
     // Restrict values to the possible sums.
     // We can't have more values than exclusion groups.
     let allowedValues = combinations.reduce((a, b) => a | b, 0);
-    allowedValues &= (1 << exclusionGroups.length) - 1;
+    allowedValues &= (1 << (exclusionGroups.length - valueOffset)) - 1;
 
     for (let i = 0; i < numCells; i++) {
       if (!(initialGridCells[this.cells[i]] &= allowedValues)) return false;
@@ -2739,11 +2748,11 @@ export class CountingCircles extends SudokuConstraintHandler {
     }
 
     // Count each possible value and restrict cells.
-    const numValues = this._numValues;
+    const valueOffset = this._valueOffset;
     const exclusionMap = this._exclusionMap;
     // Iterate in reverse order as larger numbers are more constrained.
-    for (let j = numValues; j > 0; j--) {
-      const v = LookupTables.fromValue(j);
+    for (let j = this._numValues + valueOffset; j > 0; j--) {
+      const v = LookupTables.fromOffsetValue(j, valueOffset);
       if (!(v & allowedValues)) continue;
 
       let totalCount = 0;

@@ -67,4 +67,72 @@ await runTest('exact count fixes cells', () => {
   assert.equal(grid[1], valueMask(2));
 });
 
+// Offset (0-indexed) tests
+// =============================================================================
+
+const { GridShape } = await import('../../js/grid_shape.js');
+
+await runTest('offset: init excludes external 0 and shifts combinations', () => {
+  // 2 cells, offset=-1, numValues=4: external 0-3, internal 1-4.
+  // External 0 can't appear. Valid external values: {1,2,3}.
+  // Combos with external sum=2: {2} → internal {3}. Both cells must be 3.
+  const shape = GridShape.fromGridSize(1, 4, null, -1);
+  const context = new GridTestContext({ shape });
+  const handler = new CountingCircles([0, 1]);
+  context.initializeHandler(handler, { cellExclusions: noExclusions(4) });
+
+  const grid = context.grid;
+  const acc = createAccumulator();
+  assert.equal(handler.enforceConsistency(grid, acc), true);
+  assert.equal(grid[0], valueMask(3));
+  assert.equal(grid[1], valueMask(3));
+});
+
+await runTest('offset: enforceConsistency uses shifted counts', () => {
+  // 3 cells, offset=-1. Combos: {2,3}(int) and {4}(int).
+  // Fix cell 0 to internal 2 (ext 1) → only combo {2,3} survives.
+  // Internal 3 (ext 2) must appear twice.
+  const shape = GridShape.fromGridSize(1, 4, null, -1);
+  const context = new GridTestContext({ shape });
+  const handler = new CountingCircles([0, 1, 2]);
+  context.initializeHandler(handler, { cellExclusions: noExclusions(4) });
+
+  const grid = context.grid;
+  grid[0] = valueMask(2); // Fix internal 2 (external 1 → appears once)
+
+  const acc = createAccumulator();
+  assert.equal(handler.enforceConsistency(grid, acc), true);
+  assert.equal(grid[1], valueMask(3));
+  assert.equal(grid[2], valueMask(3));
+});
+
+await runTest('offset: too many of a value fails', () => {
+  // Internal 2 (external 1) should appear exactly 1 time.
+  const shape = GridShape.fromGridSize(1, 4, null, -1);
+  const context = new GridTestContext({ shape });
+  const handler = new CountingCircles([0, 1, 2]);
+  context.initializeHandler(handler, { cellExclusions: noExclusions(4) });
+
+  const grid = context.grid;
+  grid[0] = valueMask(2);
+  grid[1] = valueMask(2);
+  grid[2] = valueMask(2);
+
+  const acc = createAccumulator();
+  assert.equal(handler.enforceConsistency(grid, acc), false);
+});
+
+await runTest('offset=0: unchanged behavior', () => {
+  // Same as the non-offset "exact count" test. 2 cells, sum=2, combo: {2}.
+  const context = new GridTestContext({ gridSize: [1, 4], numValues: 4 });
+  const handler = new CountingCircles([0, 1]);
+  context.initializeHandler(handler, { cellExclusions: noExclusions(4) });
+
+  const grid = context.grid;
+  const acc = createAccumulator();
+  assert.equal(handler.enforceConsistency(grid, acc), true);
+  assert.equal(grid[0], valueMask(2));
+  assert.equal(grid[1], valueMask(2));
+});
+
 logSuiteComplete('counting_circles.test.js');

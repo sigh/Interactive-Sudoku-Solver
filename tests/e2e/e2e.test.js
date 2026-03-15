@@ -186,6 +186,7 @@ const solveCollections = [
       '0-indexed: Look-and-say',  // ContainExact
       '0-indexed: Equality cages',  // EqualityCage
       '0-indexed: Skyscraper',  // Skyscraper
+      '0-indexed: Counting circles',  // CountingCircles
     ],
   },
 ];

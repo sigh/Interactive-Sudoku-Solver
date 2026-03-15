@@ -1071,6 +1071,12 @@ export const EXAMPLES = [
     input: '.Shape~9x9~0-8.~R2C2_0~R2C5_6~R2C8_5~R3C7_0~R5C8_6~R8C8_0~R8C5_1~R6C6_4~R6C4_6~R4C4_8~R5C2_3~R8C2_7~R7C3_3~R9C1_5~R7C7_6~R4C6_1~R5C5_5~R3C3_5.Skyscraper~C9~3~.Skyscraper~C1~2~.Skyscraper~R9~4~.Skyscraper~C6~3~.Skyscraper~R3~~2.Skyscraper~R5~4~.Skyscraper~R6~~4.Skyscraper~R2~4~.Skyscraper~C4~2~.Skyscraper~C5~~3.Skyscraper~R8~~2.Skyscraper~C2~~3.Skyscraper~R7~2~.Skyscraper~R1~3~.Skyscraper~C3~~3',
     solution: '327085146104763852865142037246831570031257468758604213483570621672418305510326784',
   },
+  {
+    name: '0-indexed: Counting circles',
+    src: 'https://www.youtube.com/watch?v=utCq4OFN5bQ',
+    input: '.Shape~9x9~0-8.~R6C5_6~R6C6_0.Whisper~5~R9C3~R9C4.Whisper~5~R3C5~R2C4~R2C3~R3C2~R4C2~R5C2~R6C2~R7C2~R8C3~R8C4~R7C5~R6C5~R5C5~R4C4~R4C3.Whisper~5~R4C3~R5C2.Whisper~5~R1C7~R1C8.Whisper~5~R3C6~R4C6~R5C6~R6C6~R7C6~R8C7~R8C8~R7C9~R6C9~R5C9~R4C9~R3C9~R2C8~R2C7.Whisper~5~R3C6~R2C7.CountingCircles~R9C2~R9C5~R7C3~R6C4~R6C1~R6C7~R8C8~R4C9~R3C8~R4C5~R3C2~R1C5~R1C7~R1C9',
+    solution: '825036714430751286176428530503842167684517302712360458367205841251684073048173625',
+  }
 ];
 
 for (const puzzle of EXAMPLES) {
