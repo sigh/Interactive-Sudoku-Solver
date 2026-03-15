@@ -13,6 +13,7 @@ import {
 ensureGlobalEnvironment();
 
 const { Sum } = await import('../../js/solver/sum_handler.js');
+const { GridShape } = await import('../../js/grid_shape.js');
 
 const uniqueCells = () => createCellExclusions({ allUnique: true });
 const nonUniqueCells = () => createCellExclusions({ allUnique: false });
@@ -27,10 +28,11 @@ const initializeSum = (options = {}) => {
     valueOffset,
   } = options;
 
-  const resolvedContext = context ?? new GridTestContext();
+  const resolvedContext = context ?? new GridTestContext(
+    valueOffset != null ? { shape: GridShape.fromGridSize(9, 9, null, valueOffset) } : undefined);
 
   const cells = resolvedContext.cells(numCells);
-  const handler = new Sum(cells, sum, coeffs, valueOffset);
+  const handler = new Sum(cells, sum, coeffs);
   assert.equal(
     resolvedContext.initializeHandler(handler, { cellExclusions }),
     true,
@@ -228,7 +230,7 @@ await runTest('Sum should detect impossible bounds when minimum exceeds the targ
 // valueOffset
 // =============================================================================
 
-await runTest('Sum constructor adjusts internal sum by valueOffset', () => {
+await runTest('Sum initialize adjusts internal sum by valueOffset', () => {
   // External sum=6 with offset=-1 means external values 0,1,2,...,8.
   // Internal values are 1-9. Adjustment: sum -= offset * numCells = 6 - (-1)*3 = 9.
   const { handler, context } = initializeSum({ numCells: 3, sum: 6, valueOffset: -1 });
@@ -257,13 +259,13 @@ await runTest('Sum constructor with no offset does not adjust sum', () => {
 });
 
 await runTest('Sum.makeEqual adjusts for valueOffset', () => {
-  const context = new GridTestContext({ gridSize: [1, 6] });
+  const context = new GridTestContext({ shape: GridShape.fromGridSize(1, 6, null, -1) });
   // makeEqual with offset=-1: cells0=[0,1], cells1=[2].
   // sum=0, coeffs=[1,1,-1]. coeffSum = 1*2 + (-1)*1 = 1.
-  // adjustment: sum -= (-1)*1 = 1. Internal sum becomes 1.
+  // adjustment in initialize: sum -= (-1)*1 = 1. Internal sum becomes 1.
   // So cells0 sum - cells1 value = 1 internally,
   // meaning external sums are equal (each shifted by offset).
-  const handler = Sum.makeEqual([0, 1], [2], -1);
+  const handler = Sum.makeEqual([0, 1], [2]);
   context.initializeHandler(handler, { cellExclusions: createCellExclusions({ allUnique: false }) });
 
   const grid = applyCandidates(context.grid, {

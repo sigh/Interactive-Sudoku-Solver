@@ -511,14 +511,17 @@ export class HandlerUtil {
     return sumOfSquares;
   }
 
-  static exclusionGroupSumInfo(groups, numValues) {
+  static exclusionGroupSumInfo(groups, numValues, valueOffset = 0) {
     let range = 0;
     let min = 0;
+    let totalCells = 0;
     for (const g of groups) {
       const s = g.length;
       range += (numValues - s) * s;
       min += (s * (s + 1)) >> 1;
+      totalCells += s;
     }
+    min += totalCells * valueOffset;
 
     return { range, min, max: range + min };
   }

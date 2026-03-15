@@ -4,7 +4,8 @@ const { SudokuConstraintHandler, HandlerUtil, InvalidConstraintError } = await i
 const { SHAPE_MAX, SHAPE_9x9 } = await import('../grid_shape.js' + self.VERSION_PARAM);
 
 export class Sum extends SudokuConstraintHandler {
-  _sum = 0;
+  _rawSum = -1;
+  _sum = -1;
   _coeffGroups = [];
   _exclusionGroupIds = null;
   _cellExclusions = null;
@@ -15,18 +16,18 @@ export class Sum extends SudokuConstraintHandler {
   static _FLAG_ONLY_ABS_UNIT_COEFF = 0b1;
   static _FLAG_CAGE = 0b10;
 
-  static makeEqual(cells0, cells1, valueOffset) {
+  static makeEqual(cells0, cells1) {
     // Make cell0 the longer array, as it will be the positive cells.
     if (cells0.length < cells1.length) [cells0, cells1] = [cells1, cells0];
     const cells = [...cells0, ...cells1];
     const coeffs = cells.map((_, i) => i < cells0.length ? 1 : -1);
-    return new this(cells, 0, coeffs, valueOffset);
+    return new this(cells, 0, coeffs);
   }
 
-  constructor(cells, sum, coeffs, valueOffset) {
+  constructor(cells, sum, coeffs) {
     const cellSet = new Set(cells);
     super(cellSet);
-    this._sum = +sum;
+    this._rawSum = +sum;
 
     if (cellSet.size === cells.length && !coeffs) {
       // Shortcut the common case.
@@ -74,11 +75,6 @@ export class Sum extends SudokuConstraintHandler {
       ...this._coeffGroups.map(g => g.coeff + ':' + g.cells.join(','))
     ].join('|');
 
-    if (valueOffset) {
-      const coeffSum = this._coeffGroups.reduce(
-        (s, g) => s + g.coeff * g.cells.length, 0);
-      this._sum -= valueOffset * coeffSum;
-    }
   }
 
   onlyUnitCoeffs() {
@@ -102,7 +98,7 @@ export class Sum extends SudokuConstraintHandler {
   }
 
   sum() {
-    return this._sum;
+    return this._rawSum;
   }
 
   priority() {
@@ -137,6 +133,13 @@ export class Sum extends SudokuConstraintHandler {
 
   initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
     this._sumData = SumData.get(shape.numValues);
+
+    this._sum = this._rawSum;
+    if (shape.valueOffset) {
+      const coeffSum = this._coeffGroups.reduce(
+        (s, g) => s + g.coeff * g.cells.length, 0);
+      this._sum -= shape.valueOffset * coeffSum;
+    }
 
     for (const g of this._coeffGroups) {
       g.exclusionGroups = HandlerUtil.findExclusionGroups(

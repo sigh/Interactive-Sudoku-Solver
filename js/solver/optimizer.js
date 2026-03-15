@@ -271,7 +271,7 @@ export class SudokuConstraintOptimizer {
       const groups = HandlerModule.HandlerUtil.findExclusionGroupsGreedy(
         cells, cellExclusions).groups;
       const { range, min, max } = HandlerModule.HandlerUtil.exclusionGroupSumInfo(
-        groups, shape.numValues);
+        groups, shape.numValues, shape.valueOffset);
       if (sum < min || sum > max) return null;
 
       const dof = Math.min(sum - min, max - sum);
@@ -524,7 +524,7 @@ export class SudokuConstraintOptimizer {
               ...cells,
               fnToBinaryKey(
                 (a, b) => a * c0 + b * c1 === sum && (!mutuallyExclusive || a !== b),
-                shape.numValues));
+                shape.numValues, shape.valueOffset));
           }
           break;
         case shape.numValues:
@@ -635,7 +635,7 @@ export class SudokuConstraintOptimizer {
     const groups = HandlerModule.HandlerUtil.findExclusionGroupsGreedy(
       cellsArray, cellExclusions).groups;
     const { range, min, max } = HandlerModule.HandlerUtil.exclusionGroupSumInfo(
-      groups, shape.numValues);
+      groups, shape.numValues, shape.valueOffset);
     if (totalSum < min || totalSum > max) {
       // Infeasible sum, fail the puzzle.
       const handler = new HandlerModule.False(cellsArray);
@@ -1337,6 +1337,7 @@ export class SudokuConstraintOptimizer {
   }
 }
 
-const maxSumForShape = (shape) => shape.numValues * (shape.numValues + 1) / 2;
+const maxSumForShape = (shape) => (
+  (shape.numValues * (shape.numValues + 1)) / 2 + shape.valueOffset * shape.numValues);
 
 const allCells = (shape) => Array.from({ length: shape.numCells }, (_, i) => i);
