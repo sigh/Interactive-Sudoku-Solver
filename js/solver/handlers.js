@@ -1487,14 +1487,29 @@ export class Lunchbox extends SudokuConstraintHandler {
   initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
     const sum = this._sum;
     this._isHouse = this.cells.length === shape.numValues;
+    this._valueOffset = shape.valueOffset;
 
     const lookupTables = LookupTables.get(shape.numValues);
 
     this._borderMask = Lunchbox._borderMask(shape.numValues);
     this._valueMask = ~this._borderMask & lookupTables.allValues;
 
-    this._distances = Lunchbox._distanceRange(shape.numValues)[sum];
-    this._combinations = Lunchbox._combinations(shape.numValues)[sum];
+    const allCombinations = Lunchbox._combinations(shape.numValues);
+    const distanceRange = Lunchbox._distanceRange(shape.numValues);
+
+    this._combinations = allCombinations[sum];
+    this._distances = distanceRange[sum];
+
+    if (shape.valueOffset) {
+      // With offset the internal sum varies by distance. Remap per-distance.
+      const maxD = shape.numValues - 1;
+      const combinations = new Array(maxD + 1);
+      for (let d = 0; d <= maxD; d++) {
+        const s = sum - shape.valueOffset * (d - 1);
+        combinations[d] = allCombinations[s]?.[d] || this._combinations[0];
+      }
+      this._combinations = combinations;
+    }
 
     return true;
   }
@@ -1598,16 +1613,17 @@ export class Lunchbox extends SudokuConstraintHandler {
         let i = 0;
         let minMaxSum = 0;
         while (!(values[i++] & borderMask));
+        let innerStart = i;
         while (!(values[i] & borderMask)) {
           minMaxSum += LookupTables.minMax16bitValue(values[i]);
           i++;
         }
 
-        const sum = this._sum;
+        const targetSum = this._sum - this._valueOffset * (i  - innerStart);
         const minSum = minMaxSum >> 16;
         const maxSum = minMaxSum & 0xffff;
         // It is impossible to make the target sum.
-        if (sum < minSum || maxSum < sum) return false;
+        if (targetSum < minSum || maxSum < targetSum) return false;
         // We've reached the target sum exactly.
         if (minSum === maxSum) return true;
       }
@@ -2412,6 +2428,7 @@ export class SumLine extends SudokuConstraintHandler {
   }
 
   initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
+    this._valueOffset = shape.valueOffset;
     return true;
   }
 
@@ -2423,6 +2440,7 @@ export class SumLine extends SudokuConstraintHandler {
 
     // Forward pass to determine the possible partial sums at each cell
     // boundary, based on what came before on the line.
+    const valueOffset = this._valueOffset;
     for (let i = 0; i < numCells; i++) {
       let nextState = 0;
 
@@ -2430,7 +2448,7 @@ export class SumLine extends SudokuConstraintHandler {
       while (values) {
         const v = values & -values;
         values ^= v;
-        nextState |= states[i] << LookupTables.toValue(v);
+        nextState |= states[i] << LookupTables.toOffsetValue(v, valueOffset);
       }
 
       nextState |= (nextState >> sum) & 1;
@@ -2453,7 +2471,7 @@ export class SumLine extends SudokuConstraintHandler {
         values ^= v;
 
         const afterState = states[i + 1];
-        const possibleBefore = (afterState | ((afterState & 1) << sum)) >> LookupTables.toValue(v);
+        const possibleBefore = (afterState | ((afterState & 1) << sum)) >> LookupTables.toOffsetValue(v, valueOffset);
         newBefore |= possibleBefore;
         if ((possibleBefore & states[i])) {
           possibleValues |= v;
@@ -2482,8 +2500,9 @@ export class SumLine extends SudokuConstraintHandler {
       minMax += LookupTables.minMax16bitValue(grid[cells[i]]);
     }
 
-    const maxTotal = minMax & 0xffff;
-    const minTotal = minMax >> 16;
+    const offsetAdj = this._valueOffset * numCells;
+    const maxTotal = (minMax & 0xffff) + offsetAdj;
+    const minTotal = (minMax >> 16) + offsetAdj;
 
     // Check if it possible to reach the sum.
     if (maxTotal < sum) return false;
@@ -3351,13 +3370,19 @@ export class FullRank extends SudokuConstraintHandler {
 export class Rellik extends SudokuConstraintHandler {
   constructor(cells, sum) {
     super(cells);
-    this._sum = sum;
-    this._remainders = new BitSet(sum + 1);
+    this._sum = +sum;
+    this._remainders = new BitSet(this._sum + 1);
+  }
+
+  initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
+    this._valueOffset = shape.valueOffset;
+    return true;
   }
 
   enforceConsistency(grid, handlerAccumulator) {
     const cells = this.cells;
     const numCells = cells.length;
+    const valueOffset = this._valueOffset;
 
     // Combine the results of optionally subtracting fixed values from the sum.
     const remainders = this._remainders;
@@ -3373,13 +3398,16 @@ export class Rellik extends SudokuConstraintHandler {
         // Subtract v from all remainders.
         // Inline unionShiftRight: since shift <= 16, wordShift is always 0
         // and each word only receives carry from the word above it.
-        const shift = LookupTables.toValue(v);
-        const antiShift = 32 - shift;
-        let carry = 0;
-        for (let j = remainderWords.length - 1; j >= 0; j--) {
-          const w = remainderWords[j];
-          remainderWords[j] = w | (w >>> shift) | carry;
-          carry = w << antiShift;
+        // Subtract using external value (shift=0 means external 0, no-op).
+        const shift = LookupTables.toOffsetValue(v, valueOffset);
+        if (shift) {
+          const antiShift = 32 - shift;
+          let carry = 0;
+          for (let j = remainderWords.length - 1; j >= 0; j--) {
+            const w = remainderWords[j];
+            remainderWords[j] = w | (w >>> shift) | carry;
+            carry = w << antiShift;
+          }
         }
         fixedValues |= v;
       } else {
@@ -3391,7 +3419,7 @@ export class Rellik extends SudokuConstraintHandler {
     if (remainders.has(0)) return false;
 
     // Check if any of the unfixed values exactly match the possible remainders.
-    const smallRemainders = remainderWords[0] >>> 1;
+    const smallRemainders = remainderWords[0] >>> (1 + valueOffset);
     const valuesToRemove = unfixedValues & smallRemainders & ~fixedValues;
     if (valuesToRemove === 0) return true;
 

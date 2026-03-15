@@ -334,4 +334,114 @@ await runTest('Lunchbox should accumulate changes', () => {
   // (The exact pruning depends on constraint logic)
 });
 
+// =============================================================================
+// Offset (0-indexed) tests
+// =============================================================================
+
+const { GridShape } = await import('../../js/grid_shape.js');
+
+await runTest('offset: per-distance combinations adjust correctly', () => {
+  // 4 cells (house), numValues=4, offset=-1. External 0-3, internal 1-4.
+  // Sentinels: internal 1 + 4 (external 0 + 3).
+  // External sandwich sum = 2.
+  // Distance 2 (0 inner): internalSum = 2 - (-1)*(2-1) = 3. No inner cells. Skip.
+  // Distance 3 (1 inner): internalSum = 2 - (-1)*(3-1) = 4. 1 inner cell needs
+  //   internal sum 4, but inner values are {2,3}. Internal 4 is a sentinel. So no combo.
+  //   Wait, inner value mask excludes sentinels. Internal non-sentinels: {2,3}.
+  //   Sum 4 from {2,3}: only possibility is {2}+{3}? No, single cell: internal 4
+  //   is a sentinel. countOnes = 1, so d=2 not d=3... let me reconsider.
+  //
+  // Actually: combinations table is indexed by [internalSum][distance].
+  // Distance = countOnes(combo) + 1.
+  // For d=3: combo has 2 bits set. internalSum = 2 - (-1)*2 = 4.
+  //   Non-sentinel combos summing to 4 with 2 bits: {2,3} (sum=5 no), none.
+  //   Actually wait: sum of {2} is 2 with 1 bit → d=2. sum of {3} is 3 with 1 bit → d=2.
+  //   {2,3} sum = 5 with 2 bits → d=3. Not 4. So no combo matches.
+  // For d=2: combo has 1 bit set. internalSum = 2 - (-1)*1 = 3.
+  //   Non-sentinel single bit summing to 3: {3}. 1 bit → d=2. Yes!
+  //   So adjacent sentinels with {3} between → distance 2 with 1 inner cell.
+  //
+  // With 4-cell house [s1, inner, s2, outer], sentinels at positions 0,2:
+  // inner = cell 1 with internal value 3, outer = cell 3 with internal value 2.
+  const shape = GridShape.fromGridSize(1, 4, null, -1);
+  const context = new GridTestContext({ shape });
+  const handler = new Lunchbox([0, 1, 2, 3], 2);
+  context.initializeHandler(handler);
+
+  const grid = context.grid;
+  // Sentinels can be 1 or 4 (internal). Inner values: 2 or 3.
+  grid[0] = valueMask(1, 4);   // sentinel candidate
+  grid[1] = valueMask(2, 3);   // inner candidate
+  grid[2] = valueMask(1, 4);   // sentinel candidate
+  grid[3] = valueMask(2, 3);   // outer candidate
+
+  const acc = createAccumulator();
+  const result = handler.enforceConsistency(grid, acc);
+  assert.equal(result, true);
+});
+
+await runTest('offset: house shortcut adjusts target sum', () => {
+  // 4-cell house, numValues=4, offset=-1. Sum=1.
+  // Sentinels at fixed positions 0 and 3. Inner cells: 1 and 2.
+  // 2 inner cells. internalTarget = 1 - (-1)*2 = 3.
+  // Inner cells internal min/max range check against internalTarget=3.
+  const shape = GridShape.fromGridSize(1, 4, null, -1);
+  const context = new GridTestContext({ shape });
+  const handler = new Lunchbox([0, 1, 2, 3], 1);
+  context.initializeHandler(handler);
+
+  const grid = context.grid;
+  grid[0] = valueMask(1);   // sentinel (ext 0)
+  grid[1] = valueMask(2);   // inner: internal 2 (ext 1)
+  grid[2] = valueMask(3);   // inner: internal 3 (ext 2)
+  grid[3] = valueMask(4);   // sentinel (ext 3)
+
+  const acc = createAccumulator();
+  // Internal sum of inner cells = 2+3 = 5. Target = 1 - (-1)*2 = 3.
+  // 5 ≠ 3, so this config is not valid for the sandwich constraint.
+  // But the handler may still return true if other sentinel placements work.
+  // Actually with all cells fixed, only one configuration: sentinels at 0,3.
+  // Inner sum = 5 ≠ 3 → fail.
+  const result = handler.enforceConsistency(grid, acc);
+  assert.equal(result, false);
+});
+
+await runTest('offset: house shortcut passes with correct sum', () => {
+  // 4-cell house, numValues=4, offset=-1. Sum=3.
+  // Sentinels at 0 and 3. 2 inner cells: target = 3 - (-1)*2 = 5.
+  // Inner internal sum = 2+3 = 5. Matches!
+  const shape = GridShape.fromGridSize(1, 4, null, -1);
+  const context = new GridTestContext({ shape });
+  const handler = new Lunchbox([0, 1, 2, 3], 3);
+  context.initializeHandler(handler);
+
+  const grid = context.grid;
+  grid[0] = valueMask(1);   // sentinel
+  grid[1] = valueMask(2);   // inner
+  grid[2] = valueMask(3);   // inner
+  grid[3] = valueMask(4);   // sentinel
+
+  const acc = createAccumulator();
+  const result = handler.enforceConsistency(grid, acc);
+  assert.equal(result, true);
+});
+
+await runTest('offset=0: unchanged behavior', () => {
+  // 4-cell house, numValues=4, sum=2. Standard (no offset).
+  // Sentinels: 1 and 4. Inner: {2,3}. Sum=2 → internal 2 between sentinels.
+  const context = new GridTestContext({ gridSize: [1, 4], numValues: 4 });
+  const handler = new Lunchbox([0, 1, 2, 3], 2);
+  context.initializeHandler(handler);
+
+  const grid = context.grid;
+  grid[0] = valueMask(1);
+  grid[1] = valueMask(2);
+  grid[2] = valueMask(4);
+  grid[3] = valueMask(3);
+
+  const acc = createAccumulator();
+  const result = handler.enforceConsistency(grid, acc);
+  assert.equal(result, true);
+});
+
 logSuiteComplete('lunchbox.test.js');

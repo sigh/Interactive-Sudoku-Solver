@@ -151,7 +151,6 @@ export class SudokuBuilder {
   // Remove entries as support is added. Delete this guard when empty.
   static _OFFSET_UNSUPPORTED = new Set([
     // Individual adjustments:
-    'SumLine', 'RellikCage', 'XSum', 'Sandwich', 'Lunchbox',
     'AntiTaxicab',
     'Indexing', 'ValueIndexing',
   ]);
@@ -358,7 +357,6 @@ export class SudokuBuilder {
             const cells = constraint.getCells(shape).map(
               c => shape.parseCellId(c).cell);
             const sum = constraint.value;
-
             const controlCell = cells[0];
 
             if (sum === 1) {
@@ -366,13 +364,15 @@ export class SudokuBuilder {
               break;
             }
 
+            const offset = shape.valueOffset;
             const handlers = [];
             for (let i = 2; i <= cells.length; i++) {
               const sumRem = sum - i;
-              if (sumRem <= 0) break;
+              if (sumRem < 0) break;
               handlers.push(new HandlerModule.And(
                 this._givenHandler(controlCell, i),
-                new SumHandlerModule.Sum(cells.slice(1, i), sumRem)));
+                new SumHandlerModule.Sum(
+                  cells.slice(1, i), sumRem, null, offset)));
             }
             yield new HandlerModule.Or(...handlers);
           }
