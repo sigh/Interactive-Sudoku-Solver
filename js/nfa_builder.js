@@ -588,11 +588,11 @@ export class NFA {
 // The compiler currently supports literals, '.', character classes
 // (with ranges and optional negation), grouping '()', alternation '|', and the
 // quantifiers '*', '+', '?', and '{n}', '{n,}', '{n,m}'.
-export const regexToNFA = (pattern, numSymbols) => {
+export const regexToNFA = (pattern, numSymbols, valueOffset = 0) => {
   try {
     const parser = new RegexParser(pattern);
     const ast = parser.parse();
-    const charToSymbol = createCharToSymbol(numSymbols);
+    const charToSymbol = createCharToSymbol(numSymbols, valueOffset);
     const builder = new RegexToNFABuilder(charToSymbol, numSymbols);
     const nfa = builder.build(ast);
     optimizeNFA(nfa);
@@ -602,8 +602,8 @@ export const regexToNFA = (pattern, numSymbols) => {
   }
 };
 
-export const javascriptSpecToNFA = (config, numSymbols) => {
-  const builder = new JavascriptNFABuilder(config, numSymbols);
+export const javascriptSpecToNFA = (config, numSymbols, valueOffset = 0) => {
+  const builder = new JavascriptNFABuilder(config, numSymbols, valueOffset);
   const nfa = builder.build();
 
   // Javascript NFA builder never generates states unreachable from the start.
@@ -617,7 +617,7 @@ export const javascriptSpecToNFA = (config, numSymbols) => {
 
 // Convert an NFA back to JavaScript code (unified format).
 // This generates code equivalent to the original, but not necessarily identical.
-export const nfaToJavascriptSpec = (nfa) => {
+export const nfaToJavascriptSpec = (nfa, valueOffset = 0) => {
   const maybeArrayToString = (arr) => {
     return arr.length === 1 ? `${arr[0]}` : `[${arr.join(', ')}]`;
   }
@@ -630,7 +630,7 @@ export const nfaToJavascriptSpec = (nfa) => {
     for (let symbolIndex = 0; symbolIndex < stateTransitions.length; symbolIndex++) {
       const targets = stateTransitions[symbolIndex];
       if (targets?.length) {
-        const value = symbolIndex + 1;
+        const value = symbolIndex + 1 + valueOffset;
         valueEntries.push(`${value}: ${maybeArrayToString(targets)}`);
       }
     }
@@ -999,7 +999,7 @@ export class NFASerializer {
 }
 
 const charToValue = (char) => {
-  if (char >= '1' && char <= '9') {
+  if (char >= '0' && char <= '9') {
     return char.charCodeAt(0) - '0'.charCodeAt(0);
   }
   if (char >= 'A' && char <= 'Z') {
@@ -1012,13 +1012,15 @@ const charToValue = (char) => {
 };
 
 
-const createCharToSymbol = (numValues) => {
+const createCharToSymbol = (numValues, valueOffset = 0) => {
+  const minValue = 1 + valueOffset;
+  const maxValue = numValues + valueOffset;
   return (char) => {
     const value = charToValue(char);
-    if (value < 1 || value > numValues) {
-      throw new Error(`Character '${char}' exceeds shape value count (${numValues})`);
+    if (value < minValue || value > maxValue) {
+      throw new Error(`Character '${char}' is out of range (${minValue}-${maxValue})`);
     }
-    return new NFA.Symbol(value);
+    return new NFA.Symbol(value - valueOffset);
   };
 };
 
@@ -1339,12 +1341,13 @@ class RegexToNFABuilder {
 }
 
 export class JavascriptNFABuilder {
-  constructor(definition, numValues) {
+  constructor(definition, numValues, valueOffset = 0) {
     const { startState, transition, accept, maxDepth } = definition;
     this._startState = startState;
     this._transitionFn = transition;
     this._acceptFn = accept;
     this._numValues = numValues;
+    this._valueOffset = valueOffset;
     this._maxDepth = maxDepth ?? Infinity;
   }
 
@@ -1380,7 +1383,7 @@ export class JavascriptNFABuilder {
       for (const index of currentLevel) {
         const stateStr = indexToStateStr[index];
         for (let value = 1; value <= this._numValues; value++) {
-          const nextStateStrs = transitionFn(stateStr, value);
+          const nextStateStrs = transitionFn(stateStr, value + this._valueOffset);
           for (const nextStateStr of nextStateStrs) {
             let targetIndex = stateStrToIndex.get(nextStateStr);
             if (targetIndex === undefined) {

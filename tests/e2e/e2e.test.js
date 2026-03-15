@@ -187,6 +187,8 @@ const solveCollections = [
       '0-indexed: Equality cages',  // EqualityCage
       '0-indexed: Skyscraper',  // Skyscraper
       '0-indexed: Counting circles',  // CountingCircles
+      '0-indexed: Sequence sudoku',  // NFA
+      '0-indexed: Regex line',  // Regex
     ],
   },
 ];

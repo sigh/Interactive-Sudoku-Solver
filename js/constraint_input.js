@@ -1424,7 +1424,7 @@ ConstraintCategoryInput.StateMachine = class StateMachine extends JavaScriptCate
           const shape = this._shape || SudokuConstraint.Shape.DEFAULT_SHAPE;
           const cells = this._inputManager.getSelection();
           const encodedNFA = await this._userScriptExecutor.compileStateMachine(
-            spec, shape.numValues, cells.length, isUnified);
+            spec, shape.numValues, cells.length, isUnified, shape.valueOffset);
 
           this.collection.addConstraint(new SudokuConstraint.NFA(
             encodedNFA, name, ...cells));
@@ -1461,7 +1461,7 @@ ConstraintCategoryInput.StateMachine = class StateMachine extends JavaScriptCate
     this._form['unified-mode'].dispatchEvent(new Event('change'));
 
     // Convert the encoded NFA back to JavaScript and populate unified mode.
-    const jsSpec = encodedNFAToJsSpec(constraint.encodedNFA);
+    const jsSpec = encodedNFAToJsSpec(constraint.encodedNFA, this._shape?.valueOffset || 0);
     this._form['unified-code'].value = jsSpec;
     this._form['unified-code'].focus();
   }

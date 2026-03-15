@@ -1151,8 +1151,8 @@ export class SudokuConstraint {
       return `NFA${name} (${numStates} states)`;
     }
 
-    static encodeSpec(spec, numValues) {
-      const nfa = javascriptSpecToNFA(spec, numValues);
+    static encodeSpec(spec, numValues, valueOffset = 0) {
+      const nfa = javascriptSpecToNFA(spec, numValues, valueOffset);
       return NFASerializer.serialize(nfa);
     }
 
@@ -2572,8 +2572,8 @@ export class UserScriptExecutor {
     return this._call('compilePairwise', { type, fnStr, numValues, valueOffset }, 1000);
   }
 
-  compileStateMachine(spec, numValues, numCells, isUnified) {
-    return this._call('compileStateMachine', { spec, numValues, numCells, isUnified }, 3000);
+  compileStateMachine(spec, numValues, numCells, isUnified, valueOffset) {
+    return this._call('compileStateMachine', { spec, numValues, numCells, isUnified, valueOffset }, 3000);
   }
 
   convertUnifiedToSplit(code) {
@@ -2645,7 +2645,7 @@ export const binaryKeyToFnString = (key, numValues, valueOffset = 0) => {
   return `({${entries}})[a]?.includes(b)`;
 };
 
-export const encodedNFAToJsSpec = (encodedNFA) => {
+export const encodedNFAToJsSpec = (encodedNFA, valueOffset = 0) => {
   const nfa = NFASerializer.deserialize(encodedNFA);
-  return nfaToJavascriptSpec(nfa);
+  return nfaToJavascriptSpec(nfa, valueOffset);
 };

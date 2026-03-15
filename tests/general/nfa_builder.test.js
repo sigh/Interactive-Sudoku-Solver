@@ -1499,4 +1499,62 @@ await runTest('nfaToJavascriptSpec should handle multiple start states', () => {
   assert.ok(jsCode.includes('[0, 1]') || jsCode.includes('[1, 0]'), 'should have array of start states');
 });
 
+// Offset (0-indexed) tests
+// =============================================================================
+
+await runTest('regex with offset=-1 should accept 0 as a valid character', () => {
+  // With offset=-1, external chars are 0-3, internal values are 1-4.
+  // Regex '03' means external 0 then 3 → internal 1 then 4.
+  const nfa = regexToNFA('03', 4, -1);
+  expectAccepts(nfa, [1, 4], 'external 0,3 maps to internal 1,4');
+  expectRejects(nfa, [0, 3], 'raw external values should not work as internal');
+  expectRejects(nfa, [1, 3], 'mismatch should reject');
+});
+
+await runTest('regex charset with offset=-1 includes 0', () => {
+  // [0-2] with offset=-1: external 0,1,2 → internal 1,2,3.
+  const nfa = regexToNFA('[0-2]', 4, -1);
+  expectAccepts(nfa, [1], 'external 0 → internal 1');
+  expectAccepts(nfa, [2], 'external 1 → internal 2');
+  expectAccepts(nfa, [3], 'external 2 → internal 3');
+  expectRejects(nfa, [4], 'external 3 → internal 4 is not in [0-2]');
+});
+
+await runTest('regex with offset=0 is unchanged', () => {
+  const nfa = regexToNFA('12', 9, 0);
+  expectAccepts(nfa, [1, 2]);
+  expectRejects(nfa, [1, 3]);
+});
+
+await runTest('javascriptSpecToNFA with offset=-1 passes external values', () => {
+  // Transition fn expects external values (0-3 with offset=-1).
+  // Track if value 0 (external) is seen by the transition function.
+  const config = {
+    startState: false,
+    transition: (state, value) => value === 0 ? true : state,
+    accept: (state) => state === true,
+  };
+  const nfa = javascriptSpecToNFA(config, 4, -1);
+  // Internal value 1 = external 0, should trigger the transition.
+  expectAccepts(nfa, [1], 'internal 1 (external 0) should trigger transition');
+  // Internal value 2 = external 1, should not trigger.
+  expectRejects(nfa, [2], 'internal 2 (external 1) should not trigger');
+});
+
+await runTest('nfaToJavascriptSpec with offset=-1 shows external values', () => {
+  // Build an NFA with internal symbol 1 (would be external 0 with offset=-1).
+  const nfa = new NFA();
+  const s0 = nfa.addState();
+  const s1 = nfa.addState();
+  nfa.addStartId(s0);
+  nfa.addAcceptId(s1);
+  nfa.addTransition(s0, s1, new NFA.Symbol(1));
+  nfa.seal();
+
+  const jsCode = nfaToJavascriptSpec(nfa, -1);
+  // The transition table should show value 0 (external), not 1 (internal).
+  assert.ok(jsCode.includes('0:'), 'should show external value 0 in transition table');
+  assert.ok(!jsCode.includes('1:'), 'should not show internal value 1');
+});
+
 logSuiteComplete('NFA builder');

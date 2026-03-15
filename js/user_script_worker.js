@@ -52,7 +52,7 @@ const compilePairwise = ({ SudokuConstraint }, { type, fnStr, numValues, valueOf
   return typeCls.fnToKey(fn, numValues, valueOffset || 0);
 }
 
-const compileStateMachine = ({ SudokuConstraint }, { spec, numValues, numCells, isUnified }) => {
+const compileStateMachine = ({ SudokuConstraint }, { spec, numValues, numCells, isUnified, valueOffset }) => {
   let parsedSpec;
   if (isUnified) {
     parsedSpec = new Function('NUM_CELLS', `let maxDepth; ${spec}\nreturn {startState, transition, accept, maxDepth };`)(numCells);
@@ -75,7 +75,7 @@ const compileStateMachine = ({ SudokuConstraint }, { spec, numValues, numCells, 
   // Default maxDepth to Infinity.
   parsedSpec.maxDepth = parsedSpec.maxDepth || Infinity;
 
-  return SudokuConstraint.NFA.encodeSpec(parsedSpec, numValues);
+  return SudokuConstraint.NFA.encodeSpec(parsedSpec, numValues, valueOffset || 0);
 }
 
 const convertUnifiedToSplit = ({ code }) => {

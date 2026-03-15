@@ -154,8 +154,6 @@ export class SudokuBuilder {
     'SumLine', 'RellikCage', 'XSum', 'Sandwich', 'Lunchbox',
     'AntiTaxicab',
     'Indexing', 'ValueIndexing',
-    // NFA/Regex:
-    'Regex', 'NFA',
   ]);
 
   static * _constraintHandlers(constraintMap, shape) {
@@ -333,7 +331,7 @@ export class SudokuBuilder {
         case 'Regex':
           {
             const cells = constraint.cells.map(c => shape.parseCellId(c).cell);
-            const nfa = compileRegex(constraint.pattern, shape.numValues);
+            const nfa = compileRegex(constraint.pattern, shape.numValues, shape.valueOffset);
             yield new NFAHandlerModule.NFAConstraint(cells, nfa);
           }
           break;
@@ -898,8 +896,8 @@ const fullRankTieMode = (fullRankTiesConstraint) => {
   }
 };
 
-export const compileRegex = memoize((pattern, numValues) => {
-  const nfa = regexToNFA(pattern, numValues);
+export const compileRegex = memoize((pattern, numValues, valueOffset = 0) => {
+  const nfa = regexToNFA(pattern, numValues, valueOffset);
   return NFAHandlerModule.compressNFA(nfa);
 });
 
