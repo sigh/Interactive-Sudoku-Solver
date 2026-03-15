@@ -147,13 +147,7 @@ export class SudokuBuilder {
     }
   }
 
-  // Constraint types that don't yet support non-zero valueOffset.
-  // Remove entries as support is added. Delete this guard when empty.
-  static _OFFSET_UNSUPPORTED = new Set([
-    // Individual adjustments:
-    'AntiTaxicab',
-    'Indexing', 'ValueIndexing',
-  ]);
+
 
   static * _constraintHandlers(constraintMap, shape) {
     const constraints = [].concat(...constraintMap.values());
@@ -164,13 +158,6 @@ export class SudokuBuilder {
         throw new InvalidConstraintError(
           `${constraint.constructor.displayName()} requires a square grid, ` +
           `but the grid is ${shape.name}.`);
-      }
-
-      if (shape.valueOffset !== 0
-        && this._OFFSET_UNSUPPORTED.has(constraint.type)) {
-        throw new InvalidConstraintError(
-          `${constraint.constructor.displayName()} does not yet support ` +
-          `0-based values.`);
       }
 
       let cells;
@@ -189,6 +176,10 @@ export class SudokuBuilder {
           break;
 
         case 'AntiTaxicab':
+          if (shape.valueOffset !== 0) {
+            throw new InvalidConstraintError(
+              'Anti-Taxicab is incompatible with 0-based values.');
+          }
           {
             for (let i = 0; i < shape.numCells; i++) {
               const valueMap = [];

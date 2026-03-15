@@ -189,7 +189,7 @@ const solveCollections = [
       '0-indexed: Counting circles',  // CountingCircles
       '0-indexed: Sequence sudoku',  // NFA
       '0-indexed: Regex line',  // Regex
-      '0-indexed: Variable-length sums',  // SumLine, XSum, Rellik, Lunchbox, Sandwich
+      '0-indexed: Sums and indexing',  // SumLine, XSum, Rellik, Lunchbox, Sandwich, Indexing, ValueIndexing, NumberedRoom
     ],
   },
 ];

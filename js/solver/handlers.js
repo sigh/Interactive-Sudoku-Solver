@@ -2553,9 +2553,11 @@ export class ValueIndexing extends SudokuConstraintHandler {
 
   initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
     const numCells = this._indexedCells.length;
-    const mask = (1 << numCells) - 1;
+    const shift = -shape.valueOffset;
+    const mask = ((1 << numCells) - 1) << shift;
     initialGridCells[this._controlCell] &= mask;
 
+    this._controlShift = shift;
     return !!initialGridCells[this._valueCell];
   }
 
@@ -2570,7 +2572,7 @@ export class ValueIndexing extends SudokuConstraintHandler {
 
     let possibleValues = 0;
     let possibleControl = 0;
-    for (let i = 0, v = 1; i < numCells; i++, v <<= 1) {
+    for (let i = 0, v = 1 << this._controlShift; i < numCells; i++, v <<= 1) {
       if ((originalControl & v) && (grid[cells[i]] & originalValues)) {
         possibleValues |= grid[cells[i]] & originalValues;
         possibleControl |= v;
@@ -2580,7 +2582,7 @@ export class ValueIndexing extends SudokuConstraintHandler {
     // If there is a single control value then we can constrain the indexed
     // cell.
     if (!(possibleControl & (possibleControl - 1))) {
-      const index = LookupTables.toIndex(possibleControl);
+      const index = LookupTables.toIndex(possibleControl) - this._controlShift;
       const cell = cells[index];
       grid[cell] = (possibleValues &= grid[cell]);
       if (grid[cell] === 0) return false;
@@ -2612,9 +2614,14 @@ export class Indexing extends SudokuConstraintHandler {
     this._indexedMask = LookupTables.fromOffsetValue(
       this._indexedValue, shape.valueOffset);
     // Clamp control cell to the line length so that N is always a valid index.
+    // With offset, external value N maps to internal bit (N - offset - 1).
+    // External values 1..lineLength are valid, so allowed bits shift by -offset.
     const lineLength = this._indexedCells.length;
-    const allowedMask = (1 << lineLength) - 1;
+    const shift = -shape.valueOffset;
+    const allowedMask = ((1 << lineLength) - 1) << shift;
     if (!(initialGridCells[this._controlCell] &= allowedMask)) return false;
+
+    this._controlShift = shift;
     return true;
   }
 
@@ -2627,7 +2634,7 @@ export class Indexing extends SudokuConstraintHandler {
     const originalControl = grid[controlCell];
     let controlValue = originalControl;
 
-    for (let i = 0, bit = 1; i < numCells; i++, bit <<= 1) {
+    for (let i = 0, bit = 1 << this._controlShift; i < numCells; i++, bit <<= 1) {
       const cell = cells[i];
       const v = grid[cell];
 

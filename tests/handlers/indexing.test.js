@@ -411,47 +411,51 @@ await runTest('Indexing should fail when no index remains compatible (control ce
 
 const { GridShape } = await import('../../js/grid_shape.js');
 
-await runTest('Indexing offset: external value 2 maps to internal 3 with offset -1', () => {
+await runTest('Indexing offset: external value 2 with offset -1', () => {
   // 0-indexed: external values 0-4, internal 1-5, offset=-1.
-  // External indexedValue=2 → internal 3 (bit mask for value 3).
+  // Builder passes external value 2. Handler: fromOffsetValue(2, -1) = bit 2 = internal 3.
+  // Control: _controlShift=1, allowed bits 1-4. bit 1→cells[0], bit 2→cells[1], etc.
   const shape = GridShape.fromGridSize(1, 5, null, -1);
   const context = new GridTestContext({ shape });
   const handler = new Indexing(0, [1, 2, 3, 4], 2); // external value 2
   context.initializeHandler(handler);
 
   const grid = context.grid;
-  grid[0] = valueMask(1, 2, 3, 4); // Control cell
-  grid[1] = valueMask(1, 2); // Indexed[0] - no internal 3
-  grid[2] = valueMask(3, 4); // Indexed[1] - has internal 3
-  grid[3] = valueMask(1, 2); // Indexed[2] - no internal 3
-  grid[4] = valueMask(2, 3); // Indexed[3] - has internal 3
+  grid[0] = valueMask(2, 3, 4, 5); // Control: bits 1-4 (ext 1-4)
+  grid[1] = valueMask(1, 2); // cells[0] - no internal 3
+  grid[2] = valueMask(3, 4); // cells[1] - has internal 3
+  grid[3] = valueMask(1, 2); // cells[2] - no internal 3
+  grid[4] = valueMask(2, 3); // cells[3] - has internal 3
   const acc = createAccumulator();
 
   const result = handler.enforceConsistency(grid, acc);
 
   assert.equal(result, true);
-  // Only indexed[1] (control=2) and indexed[3] (control=4) have internal 3.
-  assert.equal(grid[0], valueMask(2, 4), 'control should only allow 2 and 4');
+  // cells[1] (bit 2, ext 2) and cells[3] (bit 4, ext 4) have internal 3.
+  assert.equal(grid[0], valueMask(3, 5), 'control should allow int 3 (ext 2) and int 5 (ext 4)');
 });
 
-await runTest('Indexing offset: external value 0 maps to internal 1 with offset -1', () => {
+await runTest('Indexing offset: external value 0 with offset -1', () => {
+  // Builder passes external value 0. Handler: fromOffsetValue(0, -1) = bit 0 = internal 1.
+  // Control: _controlShift=1, allowed bits 1-4. bit 1→cells[0], bit 2→cells[1], etc.
   const shape = GridShape.fromGridSize(1, 5, null, -1);
   const context = new GridTestContext({ shape });
   const handler = new Indexing(0, [1, 2, 3, 4], 0); // external value 0
   context.initializeHandler(handler);
 
   const grid = context.grid;
-  grid[0] = valueMask(1, 2, 3, 4); // Control cell
-  grid[1] = valueMask(1, 2, 3); // Indexed[0] - has internal 1
-  grid[2] = valueMask(2, 3, 4); // Indexed[1] - no internal 1
-  grid[3] = valueMask(1, 4, 5); // Indexed[2] - has internal 1
-  grid[4] = valueMask(2, 3); // Indexed[3] - no internal 1
+  grid[0] = valueMask(2, 3, 4, 5); // Control: bits 1-4 (ext 1-4)
+  grid[1] = valueMask(1, 2, 3); // cells[0] - has internal 1
+  grid[2] = valueMask(2, 3, 4); // cells[1] - no internal 1
+  grid[3] = valueMask(1, 4, 5); // cells[2] - has internal 1
+  grid[4] = valueMask(2, 3); // cells[3] - no internal 1
   const acc = createAccumulator();
 
   const result = handler.enforceConsistency(grid, acc);
 
   assert.equal(result, true);
-  assert.equal(grid[0], valueMask(1, 3), 'control should only allow 1 and 3');
+  // cells[0] (bit 1, ext 1) and cells[2] (bit 3, ext 3) have internal 1.
+  assert.equal(grid[0], valueMask(2, 4), 'control should allow int 2 (ext 1) and int 4 (ext 3)');
 });
 
 await runTest('Indexing offset: zero offset leaves value unchanged', () => {
