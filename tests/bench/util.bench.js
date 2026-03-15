@@ -143,6 +143,74 @@ benchGroup('util::bitset', () => {
   }
 });
 
+benchGroup('util::bitset-shift-vs-bigint', () => {
+  // Compare inlined BitSet union-shift-right to BigInt >> for the Rellik
+  // use-case: a bitset with one bit set, repeatedly shifted right by small
+  // values (<=16, so wordShift is always 0).
+
+  // Inlined union-shift-right for shift < 32 (no word shift).
+  // this.words |= this.words >>> n
+  const unionShiftRight = (words, n) => {
+    const antiShift = 32 - n;
+    let carry = 0;
+    for (let j = words.length - 1; j >= 0; j--) {
+      const w = words[j];
+      words[j] = w | (w >>> n) | carry;
+      carry = w << antiShift;
+    }
+  };
+
+  const SHIFTS = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+
+  // --- 1 word (capacity=32) ---
+  {
+    const words = new Uint32Array(BitSet._wordCountFor(32));
+
+    bench('BitSet union-shift-right (1 word, cap=32)', () => {
+      words.fill(0);
+      words[0] = 1 << 25;
+      for (const s of SHIFTS) {
+        unionShiftRight(words, s);
+      }
+      consume(words[0]);
+    }, { innerIterations: 100_000, minSampleTimeMs: 25 });
+  }
+
+  {
+    bench('BigInt >> (1 word, cap=32)', () => {
+      let v = 1n << 25n;
+      for (const s of SHIFTS) {
+        v |= v >> BigInt(s);
+      }
+      consume(Number(v & 0xFFFFFFFFn));
+    }, { innerIterations: 100_000, minSampleTimeMs: 25 });
+  }
+
+  // --- 2 words (capacity=64) ---
+  {
+    const words = new Uint32Array(BitSet._wordCountFor(64));
+
+    bench('BitSet union-shift-right (2 words, cap=64)', () => {
+      words.fill(0);
+      words[1] = 1 << (50 - 32);
+      for (const s of SHIFTS) {
+        unionShiftRight(words, s);
+      }
+      consume(words[0]);
+    }, { innerIterations: 100_000, minSampleTimeMs: 25 });
+  }
+
+  {
+    bench('BigInt >> (2 words, cap=64)', () => {
+      let v = 1n << 50n;
+      for (const s of SHIFTS) {
+        v |= v >> BigInt(s);
+      }
+      consume(Number(v & 0xFFFFFFFFn));
+    }, { innerIterations: 100_000, minSampleTimeMs: 25 });
+  }
+});
+
 benchGroup('util::base64', () => {
   const rng = makeLCG(0xBADC0DE);
 
