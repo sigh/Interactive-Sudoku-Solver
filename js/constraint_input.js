@@ -454,7 +454,8 @@ class CheckboxCategoryInput extends ConstraintCategoryInput {
       const constr = item.constraint.constructor;
       const disabled =
         !!((constr.REQUIRE_SQUARE_GRID && !shape.isSquare()) ||
-          (constr.REQUIRE_9_VALUES && shape.numValues !== 9));
+          (constr.REQUIRE_9_VALUES && shape.numValues !== 9) ||
+          (constr.INCOMPATIBLE_WITH_OFFSET && shape.valueOffset !== 0));
       item.element.disabled = disabled;
       item.element.parentElement.classList.toggle('disabled', disabled);
     }

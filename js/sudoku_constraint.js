@@ -61,6 +61,9 @@ export class SudokuConstraintBase {
   // Set to true for constraints that only work on square grids.
   static REQUIRE_SQUARE_GRID = false;
 
+  // Set to true for constraints incompatible with non-zero valueOffset.
+  static INCOMPATIBLE_WITH_OFFSET = false;
+
   constructor(...args) {
     this.args = args;
     this.type = this.constructor.name;
@@ -859,7 +862,8 @@ export class SudokuConstraint {
       color: 'rgb(255, 100, 255)',
       dashed: true,
     };
-    static VALIDATE_CELLS_FN = (cells, shape) => shape.numValues === 9;
+    static VALIDATE_CELLS_FN = (cells, shape) => (
+      shape.numValues === 9 && shape.valueOffset === 0);
 
     constructor(...cells) {
       super(...cells);
@@ -1394,6 +1398,7 @@ export class SudokuConstraint {
       adjacent cells.`);
     static CATEGORY = 'Global';
     static UNIQUENESS_KEY_FIELD = 'type';
+    static INCOMPATIBLE_WITH_OFFSET = true;
 
     static displayName() {
       return 'Anti-Taxicab';
@@ -1445,6 +1450,7 @@ export class SudokuConstraint {
     static CATEGORY = 'Global';
     static UNIQUENESS_KEY_FIELD = 'type';
     static REQUIRE_9_VALUES = true;
+    static INCOMPATIBLE_WITH_OFFSET = true;
   }
 
   static GlobalMod = class GlobalMod extends SudokuConstraintBase {
@@ -1496,10 +1502,11 @@ export class SudokuConstraint {
     static DESCRIPTION = (`
       All 5's in the grid must have a 1 directly above it or a 9 directly below
       it. It may have both, but it doesn't need both.
-      For non-9x9 grids, the 5 is replaced by the middle number and 9 by the
-      maximum number.`);
+      Only supported for when the allowed values are 1-9.`);
     static CATEGORY = 'Global';
     static UNIQUENESS_KEY_FIELD = 'type';
+    static REQUIRE_9_VALUES = true;
+    static INCOMPATIBLE_WITH_OFFSET = true;
   }
 
   static Diagonal = class Diagonal extends SudokuConstraintBase {

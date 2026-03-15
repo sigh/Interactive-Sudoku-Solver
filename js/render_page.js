@@ -603,8 +603,10 @@ class ConstraintManager {
   _updateNonDefaultNumValuesWarning() {
     if (!this._shape) return;
 
+    const displayWarning = (
+      !this._shape.isDefaultNumValues() || this._shape.valueOffset !== 0);
     this._nonDefaultNumValuesWarningElem.style.display =
-      (!this._shape.isDefaultNumValues()) ? '' : 'none';
+      displayWarning ? '' : 'none';
   }
 
   _reshape(shape) {
