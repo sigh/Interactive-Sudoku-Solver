@@ -184,6 +184,7 @@ const solveCollections = [
       '0-indexed: Hidden skyscrapers',  // HiddenSkyscraper
       '0-indexed: Quadruple X',  // Quad, Diagonal
       '0-indexed: Look-and-say',  // ContainExact
+      '0-indexed: Equality cages',  // EqualityCage
     ],
   },
 ];

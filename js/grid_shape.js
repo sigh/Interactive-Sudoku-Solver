@@ -107,6 +107,11 @@ export class GridShape {
     return this.numValues + this.valueOffset;
   }
 
+  allValues() {
+    const min = this.minValue();
+    return Array.from({length: this.numValues}, (_, i) => min + i);
+  }
+
   isSquare() {
     return this.numRows === this.numCols;
   }

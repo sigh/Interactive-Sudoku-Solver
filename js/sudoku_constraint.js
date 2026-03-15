@@ -1827,10 +1827,9 @@ export class SudokuConstraint {
 
   static EqualityCage = class EqualityCage extends SudokuConstraintBase {
     static DESCRIPTION = (`
-      For a grid size N, cages must have an equal number of low (<= N/2) and
-      high (>= N/2+1) digits AND an equal number of even and odd digits.
-      Equality cages can never contain the middle digit (N/2) when N is odd.
-      Digits may not repeat in a cage.`);
+      Cages much have an equal number of even and odd digits, and an equal
+      number of low and high digits. If the digit range is odd, then the
+      middle digit cannot be included in the cage. All digits must be unique.`);
     static CATEGORY = 'LinesAndSets';
     static DISPLAY_CONFIG = {
       displayClass: 'ShadedRegion',

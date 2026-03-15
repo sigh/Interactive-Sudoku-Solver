@@ -153,6 +153,7 @@ export class SudokuBuilder {
     // Individual adjustments:
     'SumLine', 'RellikCage', 'XSum', 'Sandwich', 'Lunchbox',
     'AntiTaxicab', 'Skyscraper', 'CountingCircles',
+    'Indexing', 'ValueIndexing',
     // NFA/Regex:
     'Regex', 'NFA',
   ]);
@@ -308,8 +309,8 @@ export class SudokuBuilder {
         case 'EqualityCage':
           {
             cells = constraint.cells.map(c => shape.parseCellId(c).cell);
-            const numValues = constraint.getShape().numValues;
-            const allValues = [...Array(numValues).keys()].map(i => i + 1);
+            const allValues = shape.allValues();
+            const half = allValues.length >> 1;
             yield new HandlerModule.AllDifferent(cells);
             // Odd-even partition.
             yield new HandlerModule.EqualSizePartitions(
@@ -319,8 +320,8 @@ export class SudokuBuilder {
             // Low-high partition.
             yield new HandlerModule.EqualSizePartitions(
               cells,
-              allValues.filter(v => v <= numValues / 2),
-              allValues.filter(v => v >= numValues / 2 + 1));
+              allValues.slice(0, half),
+              allValues.slice(allValues.length - half));
           }
           break;
 

@@ -228,8 +228,7 @@ export class CellValueDisplay extends DisplayItem {
   reshape(shape) {
     super.reshape(shape);
     this._valueMap = [];
-    const minValue = shape.minValue();
-    for (let v = minValue; v < minValue + shape.numValues; v++) {
+    for (let v of shape.allValues()) {
       this._valueMap[v] = this._valueFn(v);
     }
 

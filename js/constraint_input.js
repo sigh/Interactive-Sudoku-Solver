@@ -1513,9 +1513,7 @@ class MultiValueInputPanel {
     clearDOMNode(this._inputContainer);
     this._valueButtons = [];
 
-    this._allValues = Array.from(
-      { length: shape.numValues },
-      (_, i) => shape.minValue() + i);
+    this._allValues = shape.allValues();
 
     for (let i = 0; i < this._allValues.length; i++) {
       const label = document.createElement('label');

@@ -3388,11 +3388,17 @@ export class EqualSizePartitions extends SudokuConstraintHandler {
     }
     super(cells);
 
-    this._mask1 = LookupTables.fromValuesArray(partition1);
-    this._mask2 = LookupTables.fromValuesArray(partition2);
+    this._partition1 = partition1;
+    this._partition2 = partition2;
+    this._mask1 = 0;
+    this._mask2 = 0;
   }
 
   initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
+    const offset = shape.valueOffset;
+    this._mask1 = LookupTables.fromOffsetValuesArray(this._partition1, offset);
+    this._mask2 = LookupTables.fromOffsetValuesArray(this._partition2, offset);
+
     const cells = this.cells;
     const excludeValues = ~(this._mask1 | this._mask2);
     if (excludeValues) {
