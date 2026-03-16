@@ -868,6 +868,21 @@ select.thin-select {
   display: inline-block;
 }
 
+.shape-panel-body {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 4px var(--gap-default);
+}
+
+.shape-panel-body select {
+  padding: 2px 20px 2px 5px;
+}
+
+.shape-panel-body .hstack {
+  column-gap: 5px;
+}
+
 .shape-input {
   width: 6em;
 }

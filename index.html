@@ -409,44 +409,32 @@ layout: null
             </div>
 
             <div class="vstack">
-              <div class="constraint-panel constraint-panel-borderless">
-                <h2>
-                  Shape
-                  <span class="shape-input-container">
-                    <input type="text" id="shape-input" class="shape-input" placeholder="9x9" autocomplete="off"
-                      autocorrect="off">
-                    <div id="shape-dropdown" class="shape-dropdown dropdown-menu">
-                      <div class="shape-dropdown-item">9x9</div>
-                      <div class="shape-dropdown-item">6x6</div>
-                      <div class="shape-dropdown-item">16x16</div>
-                      <div class="shape-dropdown-help description">
-                        <div>Or type WxH</div>
-                        <div>e.g. 6x8</div>
-                      </div>
-                    </div>
-                  </span>
-                  <span class="tooltip">
-                    <template>
-                      <div>
-                        <div>Change the grid shape.</div>
-                        <div>
-                          Enter <strong>RxC</strong> where
-                          <strong>R</strong> is the number of rows and
-                          <strong>C</strong> is the number of columns
-                          (e.g. <strong>9x9</strong>, <strong>6x8</strong>).
-                        </div>
-                        <div>Each dimension must be <strong>1–16</strong>.</div>
-                        <div>
-                          Box regions are chosen automatically to be as square
-                          as possible. No boxes are used if a good box size
-                          is determined. In this case, use Jigsaw to create
-                          custom regions.
+              <div id="shape-panel" class="constraint-panel hide-until-load">
+                <h2>Shape</h2>
+                <div>
+                  <div class="shape-panel-body">
+                    <label>Grid</label>
+                    <span class="shape-input-container">
+                      <input type="text" id="shape-input" class="shape-input" placeholder="9x9" autocomplete="off"
+                        autocorrect="off">
+                      <div id="shape-dropdown" class="shape-dropdown dropdown-menu">
+                        <div class="shape-dropdown-item">9x9</div>
+                        <div class="shape-dropdown-item">6x6</div>
+                        <div class="shape-dropdown-item">16x16</div>
+                        <div class="shape-dropdown-help description">
+                          <div>Or type WxH</div>
+                          <div>e.g. 6x8</div>
                         </div>
                       </div>
-                    </template>
-                  </span>
-                </h2>
-                </h2>
+                    </span>
+                    <label>Values</label>
+                    <span class="hstack">
+                      <select id="value-range-min"></select>
+                      &ndash;
+                      <select id="value-range-max"></select>
+                    </span>
+                  </div>
+                </div>
               </div>
 
               <div class="constraint-panel hide-until-load" id="global-constraints-container">

@@ -143,11 +143,25 @@ ConstraintCategoryInput.Shape = class Shape extends ConstraintCategoryInput {
 
   constructor(collection) {
     super(collection);
+    this._shape = null;
     this._setUp();
   }
 
   _setUp() {
-    const input = document.getElementById('shape-input');
+    const panel = document.getElementById('shape-panel');
+    this._collapsibleContainer = new CollapsibleContainer(
+      panel, /* defaultOpen= */ true);
+
+    this._input = document.getElementById('shape-input');
+    this._minSelect = document.getElementById('value-range-min');
+    this._maxSelect = document.getElementById('value-range-max');
+
+    this._setUpGridInput();
+    this._setUpValueRangeDropdowns();
+  }
+
+  _setUpGridInput() {
+    const input = this._input;
     const dropdown = document.getElementById('shape-dropdown');
     const items = dropdown.querySelectorAll('.shape-dropdown-item');
     let highlightedIndex = -1;
@@ -163,41 +177,30 @@ ConstraintCategoryInput.Shape = class Shape extends ConstraintCategoryInput {
       setHighlight(-1);
     };
 
-    const applyShape = () => {
-      const shapeName = input.value.trim();
-      if (!shapeName) return;
-      try {
-        const shape = GridShape.fromGridSpec(shapeName);
-        if (shape) {
-          input.setCustomValidity('');
-          this.collection.setShape(shape);
-        }
-      } catch (e) {
-        input.setCustomValidity(e.toString());
-      }
-      hideDropdown();
-    };
-
     // Click and hover handlers for dropdown items
     items.forEach((item, i) => {
       item.onmousedown = (e) => {
         e.preventDefault();
         input.value = item.textContent;
-        applyShape();
+        hideDropdown();
+        this._applyShape();
       };
       item.onmouseenter = () => setHighlight(i);
     });
 
     dropdown.onmouseleave = () => setHighlight(-1);
 
-    input.addEventListener('focus', () => {
-      showDropdown();
-    });
+    input.addEventListener('focus', showDropdown);
     input.addEventListener('click', showDropdown);
     input.addEventListener('input', showDropdown);
     input.addEventListener('blur', () => {
       hideDropdown();
-      applyShape();
+      // Only apply if the input has changed from the current shape,
+      // to avoid resetting the value range after a full spec like "9x9~0-8"
+      // has already been applied (reshape sets input to just "9x9").
+      if (!this._shape || input.value.trim() !== this._shape.gridDimsStr) {
+        this._applyShape();
+      }
     });
 
     input.addEventListener('keydown', (e) => {
@@ -222,18 +225,88 @@ ConstraintCategoryInput.Shape = class Shape extends ConstraintCategoryInput {
         if (highlightedIndex >= 0 && allSelected) {
           input.value = items[highlightedIndex].textContent;
         }
-        applyShape();
+        hideDropdown();
+        this._applyShape();
       } else if (e.key === 'Escape') {
         hideDropdown();
       }
     });
+  }
 
-    this._input = input;
+  _setUpValueRangeDropdowns() {
+    this._minSelect.onchange = () => {
+      // Shift max by the same amount to prevent invalid ranges.
+      const newMin = +this._minSelect.value;
+      const newMax = this._shape.maxValue() + (newMin - this._shape.minValue());
+      this._applyValueRange(newMin, newMax);
+    };
+    this._maxSelect.onchange = () => {
+      this._applyValueRange(+this._minSelect.value, +this._maxSelect.value);
+    };
+  }
+
+  _applyShape() {
+    const text = this._input.value.trim();
+    if (!text) return;
+    try {
+      // Try parsing as a full spec (handles paste of e.g. "9x9~0-8").
+      const parsed = GridShape.fromGridSpec(text);
+      this._input.setCustomValidity('');
+      this.collection.setShape(parsed);
+    } catch (e) {
+      this._input.setCustomValidity(e.toString());
+    }
+  }
+
+  _applyValueRange(min, max) {
+    if (!this._shape) return;
+    const numValues = max - min + 1;
+    const valueOffset = min - 1;
+    try {
+      const shape = GridShape.fromGridSize(
+        this._shape.numRows, this._shape.numCols, numValues, valueOffset);
+      if (shape) {
+        this.collection.setShape(shape);
+      }
+    } catch (e) {
+      // Revert dropdowns to current shape.
+      this._updateValueRangeDropdowns(this._shape);
+    }
+  }
+
+  _updateValueRangeDropdowns(shape) {
+    const defaultNV = GridShape.defaultNumValues(shape.numRows, shape.numCols);
+    const minValue = shape.minValue();
+    const maxValue = shape.maxValue();
+
+    // Populate min dropdown: options 0 and 1.
+    clearDOMNode(this._minSelect);
+    for (const v of [0, 1]) {
+      const opt = document.createElement('option');
+      opt.value = v;
+      opt.textContent = v;
+      this._minSelect.appendChild(opt);
+    }
+    this._minSelect.value = minValue;
+
+    // Populate max dropdown: min+defaultNV-1 .. min+MAX_SIZE-1.
+    const maxLow = minValue + defaultNV - 1;
+    const maxHigh = minValue + GridShape.MAX_SIZE - 1;
+    clearDOMNode(this._maxSelect);
+    for (let v = maxLow; v <= maxHigh; v++) {
+      const opt = document.createElement('option');
+      opt.value = v;
+      opt.textContent = v;
+      this._maxSelect.appendChild(opt);
+    }
+    this._maxSelect.value = maxValue;
   }
 
   reshape(shape) {
-    this._input.value = shape.name;
+    this._shape = shape;
+    this._input.value = shape.gridDimsStr;
     this._input.setCustomValidity('');
+    this._updateValueRangeDropdowns(shape);
   }
 
   getConstraintInputElement(constraintClass) {
