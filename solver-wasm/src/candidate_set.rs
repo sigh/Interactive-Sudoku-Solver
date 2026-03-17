@@ -12,12 +12,12 @@
 //! inline bit-trick used across handlers.  `#[repr(transparent)]`
 //! guarantees zero overhead.
 
+use crate::api::types::Value;
 use std::fmt;
 use std::ops::{
     BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Not, Shl, ShlAssign, Shr,
     ShrAssign,
 };
-use crate::api::types::Value;
 
 /// A bitmask representing a set of candidate values (1–9).
 /// Bit `i` represents value `i + 1`.
@@ -59,6 +59,22 @@ impl CandidateSet {
             .fold(Self::EMPTY, |acc, v| acc | Self::from_value(v))
     }
 
+    /// From a single external value with offset.
+    /// JS: `LookupTables.fromOffsetValue(v, offset)`
+    /// `external_value - offset` converts to internal 1-indexed value.
+    #[inline(always)]
+    pub fn from_offset_value(v: i32, offset: i8) -> Self {
+        Self::from_value((v - offset as i32) as Value)
+    }
+
+    /// From an iterator of external values (with offset → internal conversion).
+    /// JS: `LookupTables.fromOffsetValuesArray(values, offset)`
+    pub fn from_offset_values(vs: impl IntoIterator<Item = i32>, offset: i8) -> Self {
+        vs.into_iter().fold(Self::EMPTY, |acc, v| {
+            acc | Self::from_offset_value(v, offset)
+        })
+    }
+
     /// From raw bits (for lookup table results, deserialization).
     #[inline(always)]
     pub const fn from_raw(bits: u16) -> Self {
@@ -79,6 +95,19 @@ impl CandidateSet {
     pub fn value(self) -> Value {
         debug_assert!(self.0.count_ones() == 1);
         self.0.trailing_zeros() as u8 + 1
+    }
+
+    /// The single external value with offset applied.
+    /// JS: `LookupTables.toOffsetValue(v, offset)`
+    #[inline(always)]
+    pub fn offset_value(self, offset: i8) -> i32 {
+        self.value() as i32 + offset as i32
+    }
+
+    /// Collect to a `Vec` of external values (with offset applied).
+    /// JS: `LookupTables.toOffsetValuesArray(values, offset)`
+    pub fn to_offset_values(self, offset: i8) -> Vec<i32> {
+        self.iter().map(|c| c.offset_value(offset)).collect()
     }
 
     /// The 0-indexed bit position.  Exactly one bit must be set.
@@ -588,8 +617,14 @@ mod tests {
     #[test]
     fn test_not() {
         // Not is a raw flip; only lower NUM_VALUES bits are meaningful.
-        assert_eq!(!CandidateSet::EMPTY & CandidateSet::all(9), CandidateSet::all(9));
-        assert_eq!(!CandidateSet::all(9) & CandidateSet::all(9), CandidateSet::EMPTY);
+        assert_eq!(
+            !CandidateSet::EMPTY & CandidateSet::all(9),
+            CandidateSet::all(9)
+        );
+        assert_eq!(
+            !CandidateSet::all(9) & CandidateSet::all(9),
+            CandidateSet::EMPTY
+        );
         assert_eq!(
             !CandidateSet::from_values([1, 3, 5, 7, 9]) & CandidateSet::all(9),
             CandidateSet::from_values([2, 4, 6, 8])
@@ -710,5 +745,54 @@ mod tests {
             format!("{:?}", CandidateSet::from_values([1, 5, 9])),
             "CandidateSet({1, 5, 9})"
         );
+    }
+
+    // =====================================================================
+    // Offset value tests
+    // =====================================================================
+
+    #[test]
+    fn test_from_offset_value() {
+        // offset=-1: external 0 → internal 1
+        assert_eq!(
+            CandidateSet::from_offset_value(0, -1),
+            CandidateSet::from_value(1)
+        );
+        // offset=-1: external 3 → internal 4
+        assert_eq!(
+            CandidateSet::from_offset_value(3, -1),
+            CandidateSet::from_value(4)
+        );
+        // offset=0: external 5 → internal 5
+        assert_eq!(
+            CandidateSet::from_offset_value(5, 0),
+            CandidateSet::from_value(5)
+        );
+    }
+
+    #[test]
+    fn test_from_offset_values() {
+        // offset=-1: external [0, 2] → internal [1, 3]
+        assert_eq!(
+            CandidateSet::from_offset_values([0, 2], -1),
+            CandidateSet::from_values([1, 3])
+        );
+    }
+
+    #[test]
+    fn test_offset_value() {
+        // internal 1 with offset=-1 → external 0
+        assert_eq!(CandidateSet::from_value(1).offset_value(-1), 0);
+        // internal 4 with offset=-1 → external 3
+        assert_eq!(CandidateSet::from_value(4).offset_value(-1), 3);
+        // internal 5 with offset=0 → external 5
+        assert_eq!(CandidateSet::from_value(5).offset_value(0), 5);
+    }
+
+    #[test]
+    fn test_to_offset_values() {
+        let cs = CandidateSet::from_values([1, 3, 9]);
+        assert_eq!(cs.to_offset_values(-1), vec![0, 2, 8]);
+        assert_eq!(cs.to_offset_values(0), vec![1, 3, 9]);
     }
 }

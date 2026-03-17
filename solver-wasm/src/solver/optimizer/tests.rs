@@ -79,7 +79,7 @@ fn test_optimize_required_values_6_6_diagonal_no_false() {
 fn test_exclusion_group_sum_info() {
     // Single group of 3 cells: min = 1+2+3=6, range = (9-3)*3=18, max = 24.
     let groups = vec![vec![0, 1, 2]];
-    let info = hu_exclusion_group_sum_info(&groups, 9);
+    let info = hu_exclusion_group_sum_info(&groups, 9, 0);
     assert_eq!(info.min, 6);
     assert_eq!(info.range, 18);
     assert_eq!(info.max, 24);
@@ -256,7 +256,7 @@ fn test_find_required_values_simple_exclusion() {
     let mut restrictions: HashMap<CellIndex, u16> = HashMap::new();
 
     let result =
-        required_values::find_known_required_values(&cells, 1, 2, &ce, &mut restrictions, &groups);
+        required_values::find_known_required_values(&cells, 1, 2, &ce, &mut restrictions, &groups, 0);
     assert!(result);
 
     let v = 1u16 << 0; // value 1 mask
@@ -273,7 +273,7 @@ fn test_find_required_values_forced() {
     let mut restrictions: HashMap<CellIndex, u16> = HashMap::new();
 
     let result =
-        required_values::find_known_required_values(&cells, 1, 2, &ce, &mut restrictions, &groups);
+        required_values::find_known_required_values(&cells, 1, 2, &ce, &mut restrictions, &groups, 0);
     assert!(result);
 
     let v = 1u16 << 0;
@@ -290,7 +290,7 @@ fn test_find_required_values_no_restrictions() {
     let mut restrictions: HashMap<CellIndex, u16> = HashMap::new();
 
     let result =
-        required_values::find_known_required_values(&cells, 1, 2, &ce, &mut restrictions, &groups);
+        required_values::find_known_required_values(&cells, 1, 2, &ce, &mut restrictions, &groups, 0);
     assert!(result);
     assert!(restrictions.is_empty());
 }
@@ -303,7 +303,7 @@ fn test_find_required_values_all_required() {
     let mut restrictions: HashMap<CellIndex, u16> = HashMap::new();
 
     let result =
-        required_values::find_known_required_values(&cells, 1, 3, &ce, &mut restrictions, &groups);
+        required_values::find_known_required_values(&cells, 1, 3, &ce, &mut restrictions, &groups, 0);
     assert!(result);
 
     let v = 1u16 << 0;
@@ -320,7 +320,7 @@ fn test_find_required_values_impossible() {
     let mut restrictions: HashMap<CellIndex, u16> = HashMap::new();
 
     let result =
-        required_values::find_known_required_values(&cells, 1, 2, &ce, &mut restrictions, &groups);
+        required_values::find_known_required_values(&cells, 1, 2, &ce, &mut restrictions, &groups, 0);
     assert!(!result);
 }
 
@@ -333,7 +333,7 @@ fn test_find_required_values_max_iterations_exceeded() {
 
     // 12C6 = 924 > max_nodes (120) — should abort and return true with no restrictions.
     let result =
-        required_values::find_known_required_values(&cells, 1, 6, &ce, &mut restrictions, &groups);
+        required_values::find_known_required_values(&cells, 1, 6, &ce, &mut restrictions, &groups, 0);
     assert!(result);
     assert!(restrictions.is_empty());
 }
@@ -352,7 +352,7 @@ fn test_find_required_values_merge_existing_restrictions() {
     restrictions.insert(2, other_val);
 
     let result =
-        required_values::find_known_required_values(&cells, 1, 2, &ce, &mut restrictions, &groups);
+        required_values::find_known_required_values(&cells, 1, 2, &ce, &mut restrictions, &groups, 0);
     assert!(result);
 
     // Cell 0: (v | other_val) & v => v.
@@ -371,7 +371,7 @@ fn test_find_required_values_partial_overlap() {
     let mut restrictions: HashMap<CellIndex, u16> = HashMap::new();
 
     let result =
-        required_values::find_known_required_values(&cells, 1, 3, &ce, &mut restrictions, &groups);
+        required_values::find_known_required_values(&cells, 1, 3, &ce, &mut restrictions, &groups, 0);
     assert!(result);
 
     let v = 1u16 << 0;
@@ -389,7 +389,7 @@ fn test_find_required_values_count_greater_than_cells() {
     let mut restrictions: HashMap<CellIndex, u16> = HashMap::new();
 
     let result =
-        required_values::find_known_required_values(&cells, 1, 4, &ce, &mut restrictions, &groups);
+        required_values::find_known_required_values(&cells, 1, 4, &ce, &mut restrictions, &groups, 0);
     assert!(!result);
 }
 
@@ -402,7 +402,7 @@ fn test_find_required_values_count_greater_than_groups() {
 
     // 2 groups of size 2, max pickable = 2, but count = 3.
     let result =
-        required_values::find_known_required_values(&cells, 1, 3, &ce, &mut restrictions, &groups);
+        required_values::find_known_required_values(&cells, 1, 3, &ce, &mut restrictions, &groups, 0);
     assert!(!result);
 }
 
@@ -414,7 +414,7 @@ fn test_find_required_values_must_pick_from_all_groups() {
     let mut restrictions: HashMap<CellIndex, u16> = HashMap::new();
 
     let result =
-        required_values::find_known_required_values(&cells, 1, 3, &ce, &mut restrictions, &groups);
+        required_values::find_known_required_values(&cells, 1, 3, &ce, &mut restrictions, &groups, 0);
     assert!(result);
 
     let v = 1u16 << 0;
@@ -439,6 +439,7 @@ fn test_find_required_values_suboptimal_grouping() {
         &ce,
         &mut restrictions,
         &exclusion_groups,
+        0,
     );
     assert!(result);
 
@@ -464,6 +465,7 @@ fn test_find_required_values_empty_group() {
         &ce,
         &mut restrictions,
         &exclusion_groups,
+        0,
     );
     assert!(result);
     assert!(restrictions.is_empty());

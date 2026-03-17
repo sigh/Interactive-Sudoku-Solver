@@ -44,19 +44,20 @@ pub(crate) fn build_solver_from_input(
 // Conversion helpers
 // ============================================================================
 
-/// Convert a CandidateSet to a list of values (1-9).
-pub(crate) fn candidate_set_to_values(cs: CandidateSet) -> Vec<Value> {
-    cs.to_values()
+/// Convert a CandidateSet to a list of values (offset-adjusted display values).
+pub(crate) fn candidate_set_to_values(cs: CandidateSet, value_offset: i8) -> Vec<i32> {
+    cs.to_offset_values(value_offset)
 }
 
 /// Convert a `StepResult` (CandidateSet grids) into a `StepOutput` (pencilmarks).
 pub(crate) fn step_result_to_output(step: &solver::StepResult, shape: GridShape) -> StepOutput {
+    let offset = shape.value_offset;
     // Build pencilmarks: single values are bare numbers, multi are arrays.
     let pencilmarks: Vec<serde_json::Value> = step
         .grid
         .iter()
         .map(|&cs| {
-            let vals = candidate_set_to_values(cs);
+            let vals = candidate_set_to_values(cs, offset);
             if vals.len() == 1 {
                 serde_json::Value::Number(serde_json::Number::from(vals[0]))
             } else {
@@ -74,13 +75,13 @@ pub(crate) fn step_result_to_output(step: &solver::StepResult, shape: GridShape)
 
     let (values, guess_cell, diff_pencilmarks) = if step.guess_depth >= 0 {
         let guess_cell_index = step.branch_cells[step.guess_depth as usize];
-        let values = candidate_set_to_values(step.old_grid[guess_cell_index as usize]);
+        let values = candidate_set_to_values(step.old_grid[guess_cell_index as usize], offset);
 
         // Compute diff pencilmarks (values removed between old_grid and grid).
-        let diffs: Vec<Vec<Value>> = (0..step.grid.len())
+        let diffs: Vec<Vec<i32>> = (0..step.grid.len())
             .map(|i| {
                 let removed = step.old_grid[i] & !step.grid[i];
-                candidate_set_to_values(removed)
+                candidate_set_to_values(removed, offset)
             })
             .collect();
 
@@ -105,7 +106,7 @@ pub(crate) fn step_result_to_output(step: &solver::StepResult, shape: GridShape)
 ///
 /// Input: `{"3": {"cell": 42, "value": 5, "depth": 0}}`.
 /// Output: HashMap<u64, StepGuide>.
-pub(crate) fn parse_step_guides(json: &str) -> HashMap<u64, solver::StepGuide> {
+pub(crate) fn parse_step_guides(json: &str, value_offset: i8) -> HashMap<u64, solver::StepGuide> {
     let mut guides = HashMap::new();
 
     let parsed: serde_json::Value = match serde_json::from_str(json) {
@@ -124,7 +125,8 @@ pub(crate) fn parse_step_guides(json: &str) -> HashMap<u64, solver::StepGuide> {
                 .get("cell")
                 .and_then(|v| v.as_u64())
                 .map(|v| v as CellIndex);
-            let value = val.get("value").and_then(|v| v.as_u64()).map(|v| v as u8);
+            // Convert external display value to internal 1-based value.
+            let value = val.get("value").and_then(|v| v.as_u64()).map(|v| (v as i32 - value_offset as i32) as u8);
             let depth = val.get("depth").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
 
             guides.insert(step_num, solver::StepGuide { cell, value, depth });

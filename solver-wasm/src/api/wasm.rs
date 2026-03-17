@@ -301,7 +301,7 @@ pub fn nth_step_with_progress(
             }
         };
 
-        let step_guides = parse_step_guides(step_guides_json);
+        let step_guides = parse_step_guides(step_guides_json, shape.value_offset);
         let mut progress = make_js_progress_fn(callback);
         let result = solver.nth_step(n as u64, step_guides, &mut progress);
 

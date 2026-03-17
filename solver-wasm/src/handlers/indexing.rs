@@ -25,7 +25,12 @@ pub struct Indexing {
     cells: Vec<CellIndex>,
     control_cell: CellIndex,
     indexed_cells: Vec<CellIndex>,
-    indexed_value: CandidateSet,
+    /// The raw indexed value (external, before offset conversion).
+    indexed_value_raw: u8,
+    /// Bitmask for the indexed value (set during initialize).
+    indexed_mask: CandidateSet,
+    /// Bit shift for 0-based offset: `-value_offset`.
+    control_shift: u8,
 }
 
 impl Indexing {
@@ -40,7 +45,9 @@ impl Indexing {
             cells,
             control_cell,
             indexed_cells,
-            indexed_value: CandidateSet::from_value(indexed_value),
+            indexed_value_raw: indexed_value,
+            indexed_mask: CandidateSet::EMPTY,
+            control_shift: 0,
         }
     }
 }
@@ -58,12 +65,19 @@ impl ConstraintHandler for Indexing {
         &mut self,
         initial_grid: &mut [CandidateSet],
         _cell_exclusions: &CellExclusions,
-        _shape: GridShape,
+        shape: GridShape,
         _state_allocator: &mut GridStateAllocator,
     ) -> bool {
-        // Clamp control cell to the line length so that N is always a valid index.
+        self.indexed_mask = CandidateSet::from_offset_value(
+            self.indexed_value_raw as i32,
+            shape.value_offset,
+        );
+        // Clamp control cell to the line length.
+        // With offset, external values 1..lineLength map to internal bits shifted by -offset.
         let line_length = self.indexed_cells.len();
-        let allowed_mask = CandidateSet::from_raw((1u16 << line_length) - 1);
+        let shift = (-shape.value_offset) as u8;
+        self.control_shift = shift;
+        let allowed_mask = CandidateSet::from_raw(((1u16 << line_length) - 1) << shift);
         initial_grid[self.control_cell as usize] &= allowed_mask;
         !initial_grid[self.control_cell as usize].is_empty()
     }
@@ -72,20 +86,20 @@ impl ConstraintHandler for Indexing {
         let cells = &self.indexed_cells;
         let num_cells = cells.len();
         let control_idx = self.control_cell as usize;
-        let indexed_value = self.indexed_value;
+        let indexed_mask = self.indexed_mask;
 
         let original_control = grid[control_idx];
         let mut control_value = original_control;
 
-        let mut bit = CandidateSet::from_value(1);
+        let mut bit = CandidateSet::from_raw(1u16 << self.control_shift);
         for i in 0..num_cells {
             let cell = cells[i] as usize;
             let v = grid[cell];
 
-            if !(v & indexed_value).is_empty() {
+            if !(v & indexed_mask).is_empty() {
                 if (control_value & bit).is_empty() {
                     // This cell can't have the indexed value — control doesn't allow it.
-                    let new_v = v & !indexed_value;
+                    let new_v = v & !indexed_mask;
                     if new_v.is_empty() {
                         return false;
                     }
@@ -375,5 +389,61 @@ mod tests {
         grid[3] = vm(&[1, 2, 3]); // no 4
         let mut a = acc();
         assert!(!handler.enforce_consistency(&mut grid, &mut a));
+    }
+
+    // =====================================================================
+    // Offset (0-indexed) tests (ported from JS tests/handlers/indexing.test.js)
+    // =====================================================================
+
+    #[test]
+    fn offset_external_value_2_with_offset_minus_1() {
+        // fromOffsetValue(2, -1) = internal 3.
+        // Control: _controlShift=1, allowed bits 1-4. bit 1→cells[0], etc.
+        let (mut grid, shape) = make_grid_offset(1, 5, 5, -1);
+        let mut handler = Indexing::new(0, vec![1, 2, 3, 4], 2); // external value 2
+        init(&mut handler, &mut grid, shape);
+
+        grid[0] = vm(&[2, 3, 4, 5]); // Control: bits 1-4
+        grid[1] = vm(&[1, 2]);       // cells[0] - no internal 3
+        grid[2] = vm(&[3, 4]);       // cells[1] - has internal 3
+        grid[3] = vm(&[1, 2]);       // cells[2] - no internal 3
+        grid[4] = vm(&[2, 3]);       // cells[3] - has internal 3
+
+        assert!(enforce(&handler, &mut grid));
+        // cells[1] (bit 2, ext 2) and cells[3] (bit 4, ext 4) have internal 3.
+        assert_eq!(grid[0], vm(&[3, 5]), "control should allow int 3 (ext 2) and int 5 (ext 4)");
+    }
+
+    #[test]
+    fn offset_external_value_0_with_offset_minus_1() {
+        // fromOffsetValue(0, -1) = internal 1.
+        let (mut grid, shape) = make_grid_offset(1, 5, 5, -1);
+        let mut handler = Indexing::new(0, vec![1, 2, 3, 4], 0); // external value 0
+        init(&mut handler, &mut grid, shape);
+
+        grid[0] = vm(&[2, 3, 4, 5]); // Control: bits 1-4
+        grid[1] = vm(&[1, 2, 3]);    // cells[0] - has internal 1
+        grid[2] = vm(&[2, 3, 4]);    // cells[1] - no internal 1
+        grid[3] = vm(&[1, 4, 5]);    // cells[2] - has internal 1
+        grid[4] = vm(&[2, 3]);       // cells[3] - no internal 1
+
+        assert!(enforce(&handler, &mut grid));
+        assert_eq!(grid[0], vm(&[2, 4]), "control should allow int 2 (ext 1) and int 4 (ext 3)");
+    }
+
+    #[test]
+    fn offset_zero_offset_leaves_value_unchanged() {
+        let (mut grid, shape) = make_grid(1, 5, None);
+        let mut handler = Indexing::new(0, vec![1, 2, 3, 4], 3);
+        init(&mut handler, &mut grid, shape);
+
+        grid[0] = vm(&[1, 2, 3, 4]);
+        grid[1] = vm(&[1, 2]);
+        grid[2] = vm(&[3, 4]);
+        grid[3] = vm(&[1, 2]);
+        grid[4] = vm(&[2, 3]);
+
+        assert!(enforce(&handler, &mut grid));
+        assert_eq!(grid[0], vm(&[2, 4]));
     }
 }

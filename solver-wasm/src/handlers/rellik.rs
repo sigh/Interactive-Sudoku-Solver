@@ -7,6 +7,9 @@
 
 use crate::api::types::CellIndex;
 use crate::candidate_set::CandidateSet;
+use crate::grid_shape::GridShape;
+use crate::solver::cell_exclusions::CellExclusions;
+use crate::solver::grid_state_allocator::GridStateAllocator;
 use crate::solver::handler_accumulator::HandlerAccumulator;
 
 use super::ConstraintHandler;
@@ -24,16 +27,21 @@ use super::ConstraintHandler;
 /// which uses BigInt to handle sums > 31.
 pub struct Rellik {
     cells: Vec<CellIndex>,
+    /// Target forbidden sum.
+    sum: u32,
     /// Bit `sum` is set: `1u128 << sum`.
-    /// JS: `this.sumMask = 1n << BigInt(sum)`
     sum_mask: u128,
+    /// Value offset from grid shape.
+    value_offset: i8,
 }
 
 impl Rellik {
     pub fn new(cells: Vec<CellIndex>, sum: u32) -> Self {
         Rellik {
             cells,
+            sum,
             sum_mask: 1u128 << sum,
+            value_offset: 0,
         }
     }
 }
@@ -45,6 +53,17 @@ impl ConstraintHandler for Rellik {
 
     fn name(&self) -> &'static str {
         "Rellik"
+    }
+
+    fn initialize(
+        &mut self,
+        _initial_grid: &mut [CandidateSet],
+        _cell_exclusions: &CellExclusions,
+        shape: GridShape,
+        _state_allocator: &mut GridStateAllocator,
+    ) -> bool {
+        self.value_offset = shape.value_offset;
+        true
     }
 
     fn enforce_consistency(
@@ -62,13 +81,17 @@ impl ConstraintHandler for Rellik {
         let mut remainders = self.sum_mask;
         let mut fixed_values = CandidateSet::EMPTY;
         let mut unfixed_values = CandidateSet::EMPTY;
+        let value_offset = self.value_offset;
 
         for i in 0..num_cells {
             let v = grid[cells[i] as usize];
             if v.is_single() {
-                // Fixed cell: also track sums achievable by subtracting this value.
-                // JS: remainders |= remainders >> BigInt(LookupTables.toValue(v))
-                remainders |= remainders >> v.value() as u32;
+                // Fixed cell: also track sums achievable by subtracting this
+                // cell's value using the external (offset) value.
+                let shift = v.offset_value(value_offset);
+                if shift > 0 {
+                    remainders |= remainders >> shift as u32;
+                }
                 fixed_values |= v;
             } else {
                 unfixed_values |= v;
@@ -77,16 +100,15 @@ impl ConstraintHandler for Rellik {
 
         // If remainder 0 is reachable from fixed cells alone, the forbidden sum
         // is already achieved — contradiction.
-        // JS: if (remainders & 1n) return false;
         if remainders & 1 != 0 {
             return false;
         }
 
-        // `small_remainders` bit k = `remainders` bit k+1 = "remaining target
-        // can be k+1", which aligns with the grid bitmask convention (bit k =
-        // value k+1).
-        // JS: const smallRemainders = Number(BigInt.asUintN(32, remainders)) >> 1;
-        let small_remainders = CandidateSet::from_raw((remainders >> 1) as u16);
+        // `small_remainders` bit k = `remainders` bit (k+1+offset), aligning
+        // with the grid bitmask convention (bit k = internal value k+1).
+        let small_remainders = CandidateSet::from_raw(
+            (remainders >> (1 + value_offset) as u32) as u16,
+        );
 
         // Values that could exactly complete the forbidden sum from some
         // configuration of fixed cells — remove them from unfixed cells.
@@ -178,5 +200,65 @@ mod tests {
         let mut a = acc();
         assert!(handler.enforce_consistency(&mut grid, &mut a));
         assert_eq!(grid[2] & vm(&[3]), CandidateSet::EMPTY);
+    }
+
+    // =====================================================================
+    // Offset (0-indexed) tests (ported from JS tests/handlers/rellik.test.js)
+    // =====================================================================
+
+    #[test]
+    fn offset_forbidden_external_sum_detected() {
+        // ext 1 + ext 2 = 3 = forbidden → false.
+        let (mut grid, shape) = make_grid_offset(1, 4, 4, -1);
+        let mut handler = Rellik::new(vec![0, 1], 3);
+        init(&mut handler, &mut grid, shape);
+
+        grid[0] = vm(&[2]); // int 2 (ext 1)
+        grid[1] = vm(&[3]); // int 3 (ext 2)
+
+        assert!(!enforce(&handler, &mut grid));
+    }
+
+    #[test]
+    fn offset_non_forbidden_external_sum_passes() {
+        // ext 0 + ext 1 = 1 ≠ 3 → pass.
+        let (mut grid, shape) = make_grid_offset(1, 4, 4, -1);
+        let mut handler = Rellik::new(vec![0, 1], 3);
+        init(&mut handler, &mut grid, shape);
+
+        grid[0] = vm(&[1]); // int 1 (ext 0)
+        grid[1] = vm(&[2]); // int 2 (ext 1)
+
+        assert!(enforce(&handler, &mut grid));
+    }
+
+    #[test]
+    fn offset_removes_dangerous_external_value() {
+        // 3 cells, forbidden sum=5, offset=-1.
+        // Cell 0 fixed ext 3 (int 4). Cell 1 fixed ext 1 (int 2).
+        // Ext 2 (int 3) completes: ext 3 + ext 2 = 5 → remove int 3 from cell 2.
+        let (mut grid, shape) = make_grid_offset(1, 4, 4, -1);
+        let mut handler = Rellik::new(vec![0, 1, 2], 5);
+        init(&mut handler, &mut grid, shape);
+
+        grid[0] = vm(&[4]);        // fixed: ext 3
+        grid[1] = vm(&[2]);        // fixed: ext 1
+        grid[2] = vm(&[1, 2, 3]); // unfixed: ext {0,1,2}
+
+        assert!(enforce(&handler, &mut grid));
+        assert_eq!(grid[2] & vm(&[3]), CandidateSet::EMPTY,
+                   "ext 2 (int 3) should be removed");
+    }
+
+    #[test]
+    fn offset_0_unchanged_behavior() {
+        let (mut grid, shape) = make_grid(1, 4, Some(4));
+        let mut handler = Rellik::new(vec![0, 1], 5);
+        init(&mut handler, &mut grid, shape);
+
+        grid[0] = vm(&[2]);
+        grid[1] = vm(&[3]);
+
+        assert!(!enforce(&handler, &mut grid));
     }
 }

@@ -37,9 +37,12 @@ pub struct GridShape {
     pub num_rows: u8,
     pub num_cols: u8,
     pub num_values: u8,
+    /// Value offset: external_value = internal_value + value_offset.
+    /// 0 for standard (1–N), −1 for 0-based (0–N−1).
+    pub value_offset: i8,
     /// Cached `num_rows * num_cols`.
     pub num_cells: usize,
-    /// Cached `num_values * (num_values + 1) / 2`.
+    /// Cached max sum: `n*(n+1)/2 + value_offset*n`.
     pub max_sum: i32,
     /// Cached box dimensions, `None` if no standard boxes exist.
     pub box_dims: Option<(u8, u8)>,
@@ -62,14 +65,26 @@ impl GridShape {
     }
 
     /// Constructor — all fields derived from the three core values.
+    /// Uses `value_offset = 0` (standard 1-based values).
     pub const fn build(num_rows: u8, num_cols: u8, num_values: u8) -> Self {
+        Self::build_with_offset(num_rows, num_cols, num_values, 0)
+    }
+
+    /// Constructor with explicit value offset.
+    pub const fn build_with_offset(
+        num_rows: u8,
+        num_cols: u8,
+        num_values: u8,
+        value_offset: i8,
+    ) -> Self {
         let n = num_values as i32;
         Self {
             num_rows,
             num_cols,
             num_values,
+            value_offset,
             num_cells: num_rows as usize * num_cols as usize,
-            max_sum: n * (n + 1) / 2,
+            max_sum: n * (n + 1) / 2 + value_offset as i32 * n,
             box_dims: Self::box_dims_for_size(num_rows, num_cols, num_values),
         }
     }
@@ -109,49 +124,76 @@ impl GridShape {
         Self::square(side as u8)
     }
 
-    /// Parse a grid spec string like `"9x9"`, `"4x6"`, or `"9x9~9"`.
+    /// Parse a grid spec string like `"9x9"`, `"4x6"`, `"9x9~9"`, or `"9x9~0-8"`.
     ///
     /// JS: `GridShape.fromGridSpec(gridSpec)`
     pub fn from_grid_spec(spec: &str) -> Result<Self, String> {
-        let tilde_parts: Vec<&str> = spec.split('~').collect();
-        if tilde_parts.len() > 2 {
-            return Err(format!("Invalid grid spec format: {}", spec));
-        }
+        // Regex: NUMxNUM(~NUM(-NUM)?)?
+        // Match groups: 1=rows, 2=cols, 3=first_num, 4=range_end
+        let bytes = spec.as_bytes();
+        // Manual parse to avoid regex dependency.
+        let (rows_str, rest) = spec
+            .split_once('x')
+            .ok_or_else(|| format!("Invalid grid spec format: {}", spec))?;
 
-        let dims: Vec<&str> = tilde_parts[0].split('x').collect();
-        if dims.len() != 2 {
-            return Err(format!("Invalid grid spec format: {}", spec));
-        }
-
-        let num_rows: u8 = dims[0]
-            .parse()
-            .map_err(|_| format!("Invalid grid spec format: {}", spec))?;
-        let num_cols: u8 = dims[1]
+        let num_rows: u8 = rows_str
             .parse()
             .map_err(|_| format!("Invalid grid spec format: {}", spec))?;
 
-        // Validate that parsing round-trips (no leading zeros, etc.)
-        if num_rows.to_string() != dims[0] || num_cols.to_string() != dims[1] {
-            return Err(format!("Invalid grid spec format: {}", spec));
-        }
+        let (cols_str, value_part) = match rest.split_once('~') {
+            Some((c, v)) => (c, Some(v)),
+            None => (rest, None),
+        };
 
-        let shape = Self::new(num_rows, num_cols)
-            .ok_or_else(|| format!("Invalid grid dimensions: {}", spec))?;
-
-        if tilde_parts.len() == 1 {
-            return Ok(shape);
-        }
-
-        let num_values: u8 = tilde_parts[1]
+        let num_cols: u8 = cols_str
             .parse()
             .map_err(|_| format!("Invalid grid spec format: {}", spec))?;
-        if num_values.to_string() != tilde_parts[1] {
-            return Err(format!("Invalid grid spec format: {}", spec));
-        }
 
-        shape
-            .with_num_values(num_values)
-            .ok_or_else(|| format!("Invalid numValues in grid spec: {}", spec))
+        let (num_values, value_offset) = if let Some(vp) = value_part {
+            if let Some((start_str, end_str)) = vp.split_once('-') {
+                // Range format: "0-8" or "1-9"
+                let range_start: i32 = start_str
+                    .parse()
+                    .map_err(|_| format!("Invalid grid spec format: {}", spec))?;
+                let range_end: i32 = end_str
+                    .parse()
+                    .map_err(|_| format!("Invalid grid spec format: {}", spec))?;
+                let nv = (range_end - range_start + 1) as u8;
+                let offset = (range_start - 1) as i8;
+                if offset != 0 && offset != -1 {
+                    return Err(format!(
+                        "Invalid grid spec: unsupported offset {} in {}",
+                        offset, spec
+                    ));
+                }
+                (Some(nv), offset)
+            } else {
+                // Bare number: "10"
+                let nv: u8 = vp
+                    .parse()
+                    .map_err(|_| format!("Invalid grid spec format: {}", spec))?;
+                (Some(nv), 0i8)
+            }
+        } else {
+            (None, 0i8)
+        };
+
+        let default_nv = default_num_values(num_rows, num_cols);
+        let nv = num_values.unwrap_or(default_nv);
+        if nv < default_nv || nv > MAX_SIZE {
+            return Err(format!("Invalid grid spec: {}", spec));
+        }
+        if !is_valid_dimension(num_rows) || !is_valid_dimension(num_cols) {
+            return Err(format!("Invalid grid spec: {}", spec));
+        }
+        let _ = bytes; // suppress unused warning
+
+        Ok(Self::build_with_offset(
+            num_rows,
+            num_cols,
+            nv,
+            value_offset,
+        ))
     }
 
     /// Return a copy with a different `num_values`.
@@ -160,14 +202,19 @@ impl GridShape {
     ///
     /// JS: `shape.withNumValues(n)`
     pub fn with_num_values(self, num_values: u8) -> Option<Self> {
-        if num_values == self.num_values {
+        if num_values == self.num_values && self.value_offset == 0 {
             return Some(self);
         }
         let default = default_num_values(self.num_rows, self.num_cols);
         if num_values < default || num_values > MAX_SIZE {
             return None;
         }
-        Some(Self::build(self.num_rows, self.num_cols, num_values))
+        Some(Self::build_with_offset(
+            self.num_rows,
+            self.num_cols,
+            num_values,
+            self.value_offset,
+        ))
     }
 
     // ====================================================================
@@ -196,15 +243,22 @@ impl GridShape {
     // Name / display
     // ====================================================================
 
-    /// Short name like `"9x9"` or `"4x6~6"` (includes numValues suffix
-    /// only when it differs from the default).
+    /// Short name like `"9x9"`, `"4x6~6"`, or `"9x9~0-8"`.
     ///
-    /// JS: `GridShape.makeName(numRows, numCols, numValues)`
+    /// JS: `GridShape.makeName(numRows, numCols, numValues, valueOffset)`
     pub fn name(self) -> String {
-        if self.is_default_num_values() {
-            format!("{}x{}", self.num_rows, self.num_cols)
+        let dims = format!("{}x{}", self.num_rows, self.num_cols);
+        if self.value_offset != 0 {
+            format!(
+                "{}~{}-{}",
+                dims,
+                1 + self.value_offset,
+                self.num_values as i8 + self.value_offset
+            )
+        } else if !self.is_default_num_values() {
+            format!("{}~{}", dims, self.num_values)
         } else {
-            format!("{}x{}~{}", self.num_rows, self.num_cols, self.num_values)
+            dims
         }
     }
 
@@ -377,11 +431,32 @@ impl GridShape {
     ///
     /// JS: `GridShape.baseCharCode(shape)`
     pub fn base_char_code(self) -> u8 {
-        if self.num_values < 10 {
-            b'1'
-        } else {
+        if self.num_values >= 10 {
             b'A'
+        } else {
+            (b'1' as i8 + self.value_offset) as u8
         }
+    }
+
+    /// Minimum external value.
+    /// JS: `shape.minValue()`
+    #[inline(always)]
+    pub fn min_value(self) -> i32 {
+        1 + self.value_offset as i32
+    }
+
+    /// Maximum external value.
+    /// JS: `shape.maxValue()`
+    #[inline(always)]
+    pub fn max_value(self) -> i32 {
+        self.num_values as i32 + self.value_offset as i32
+    }
+
+    /// All external values as a Vec.
+    /// JS: `shape.allValues()`
+    pub fn all_values(self) -> Vec<i32> {
+        let min = self.min_value();
+        (0..self.num_values as i32).map(|i| min + i).collect()
     }
 
     // ====================================================================
@@ -783,5 +858,84 @@ mod tests {
         assert_eq!(SHAPE_MAX.num_rows, 16);
         assert_eq!(SHAPE_MAX.num_cols, 16);
         assert_eq!(SHAPE_MAX.num_values, 16);
+    }
+
+    // =====================================================================
+    // valueOffset tests (ported from JS tests/general/grid_shape.test.js)
+    // =====================================================================
+
+    #[test]
+    fn test_build_with_offset_creates_zero_based_shape() {
+        let shape = GridShape::build_with_offset(9, 9, 9, -1);
+        assert_eq!(shape.num_values, 9);
+        assert_eq!(shape.value_offset, -1);
+        assert_eq!(shape.name(), "9x9~0-8");
+    }
+
+    #[test]
+    fn test_from_grid_spec_parses_range_syntax() {
+        let shape = GridShape::from_grid_spec("9x9~0-8").unwrap();
+        assert_eq!(shape.num_values, 9);
+        assert_eq!(shape.value_offset, -1);
+        assert_eq!(shape.name(), "9x9~0-8");
+    }
+
+    #[test]
+    fn test_from_grid_spec_rejects_invalid_range_offset() {
+        assert!(GridShape::from_grid_spec("9x9~2-10").is_err());
+    }
+
+    #[test]
+    fn test_name_canonical_forms() {
+        assert_eq!(GridShape::build(9, 9, 9).name(), "9x9");
+        assert_eq!(GridShape::build(9, 9, 10).name(), "9x9~10");
+        assert_eq!(GridShape::build_with_offset(9, 9, 9, -1).name(), "9x9~0-8");
+    }
+
+    #[test]
+    fn test_from_grid_spec_round_trips() {
+        for spec in ["9x9", "9x9~10", "9x9~0-8", "4x6", "6x8~0-7"] {
+            let shape = GridShape::from_grid_spec(spec).unwrap();
+            let reparsed = GridShape::from_grid_spec(&shape.name()).unwrap();
+            assert_eq!(reparsed.name(), shape.name(), "round-trip for {}", spec);
+            assert_eq!(reparsed.num_values, shape.num_values);
+            assert_eq!(reparsed.value_offset, shape.value_offset);
+        }
+    }
+
+    #[test]
+    fn test_base_char_code_offset_minus_1() {
+        let shape = GridShape::build_with_offset(9, 9, 9, -1);
+        assert_eq!(shape.base_char_code(), b'0');
+    }
+
+    #[test]
+    fn test_base_char_code_offset_0() {
+        assert_eq!(SHAPE_9X9.base_char_code(), b'1');
+    }
+
+    #[test]
+    fn test_base_char_code_large_num_values() {
+        assert_eq!(SHAPE_MAX.base_char_code(), b'A');
+    }
+
+    #[test]
+    fn test_min_max_all_values_offset() {
+        let shape = GridShape::build_with_offset(9, 9, 9, -1);
+        assert_eq!(shape.min_value(), 0);
+        assert_eq!(shape.max_value(), 8);
+        assert_eq!(shape.all_values(), (0..=8).collect::<Vec<i32>>());
+
+        let shape0 = SHAPE_9X9;
+        assert_eq!(shape0.min_value(), 1);
+        assert_eq!(shape0.max_value(), 9);
+        assert_eq!(shape0.all_values(), (1..=9).collect::<Vec<i32>>());
+    }
+
+    #[test]
+    fn test_max_sum_offset() {
+        assert_eq!(SHAPE_9X9.max_sum, 45);
+        let shape = GridShape::build_with_offset(9, 9, 9, -1);
+        assert_eq!(shape.max_sum, 36);
     }
 }

@@ -354,15 +354,19 @@ pub(crate) fn find_mapped_exclusion_groups(
 pub(crate) fn exclusion_group_sum_info(
     groups: &[Vec<CellIndex>],
     num_values: u8,
+    value_offset: i8,
 ) -> ExclusionGroupSumInfo {
     let mut range: i32 = 0;
     let mut min: i32 = 0;
+    let mut total_cells: i32 = 0;
 
     for g in groups {
         let s = g.len() as i32;
         range += (num_values as i32 - s) * s;
         min += (s * (s + 1)) >> 1;
+        total_cells += s;
     }
+    min += total_cells * value_offset as i32;
 
     ExclusionGroupSumInfo {
         range,
@@ -414,7 +418,7 @@ mod tests {
     #[test]
     fn test_exclusion_group_sum_info_basic() {
         let groups = vec![vec![0u8, 1, 2]];
-        let info = exclusion_group_sum_info(&groups, 9);
+        let info = exclusion_group_sum_info(&groups, 9, 0);
         assert_eq!(info.min, 6); // 3*4/2
         assert_eq!(info.range, 18); // (9-3)*3
         assert_eq!(info.max, 24);

@@ -36,6 +36,8 @@ pub struct Lunchbox {
     cells: Vec<CellIndex>,
     sum: u32,
     is_house: bool,
+    /// Value offset from grid shape.
+    value_offset: i8,
     /// Bitmask for the two sentinel values (1 and numValues).
     border_mask: u16,
     /// Bitmask for all non-sentinel values.
@@ -56,6 +58,7 @@ impl Lunchbox {
             cells,
             sum,
             is_house: false,
+            value_offset: 0,
             border_mask: 0,
             value_mask: 0,
             min_dist: 0,
@@ -95,6 +98,7 @@ impl ConstraintHandler for Lunchbox {
         let num_cells = self.cells.len();
 
         self.is_house = num_cells == num_values;
+        self.value_offset = shape.value_offset;
 
         let border_mask = Self::border_mask_for(num_values);
         let all_values = CandidateSet::all(shape.num_values).raw();
@@ -150,6 +154,44 @@ impl ConstraintHandler for Lunchbox {
 
         self.min_dist = min_dist;
         self.max_dist = max_dist_valid;
+
+        if shape.value_offset != 0 {
+            // With offset, the internal sum varies by distance.
+            // Remap per-distance: for distance d, the internal sum for (d-1) inner
+            // cells is (external_sum - offset * (d-1)).
+            let offset = shape.value_offset as i32;
+            let max_d = num_values - 1;
+            let mut remapped: Vec<Vec<u16>> = vec![vec![]; max_dist + 1];
+            let default_combos = &combinations[min_dist];
+            for d in 0..=max_d {
+                let adjusted_sum = self.sum as i32 - offset * (d as i32 - 1);
+                if adjusted_sum >= 0 && d <= max_dist {
+                    // Rebuild combos for this adjusted sum at distance d.
+                    let mut combos_d: Vec<u16> = Vec::new();
+                    for i in 0u16..total_combos {
+                        if i & border_mask != 0 {
+                            continue;
+                        }
+                        if lt.sum[i as usize] as i32 != adjusted_sum {
+                            continue;
+                        }
+                        let bits = i.count_ones() as usize + 1;
+                        if bits == d {
+                            combos_d.push(i);
+                        }
+                    }
+                    if combos_d.is_empty() {
+                        remapped[d] = default_combos.clone();
+                    } else {
+                        remapped[d] = combos_d;
+                    }
+                } else if d <= max_dist {
+                    remapped[d] = default_combos.clone();
+                }
+            }
+            combinations = remapped;
+        }
+
         self.combinations = combinations;
         true
     }
@@ -186,15 +228,18 @@ impl ConstraintHandler for Lunchbox {
                     idx += 1;
                 }
                 idx += 1;
+                let inner_start = idx;
                 let mut min_max_sum = 0u32;
                 while values[idx] & border_mask == 0 {
                     let p = CandidateSet::from_raw(values[idx]).min_max_packed();
                     min_max_sum = min_max_sum.wrapping_add(p);
                     idx += 1;
                 }
-                let min_sum = min_max_sum >> 16;
-                let max_sum_val = min_max_sum & 0xffff;
-                if self.sum < min_sum || max_sum_val < self.sum {
+                let target_sum = self.sum as i32
+                    - self.value_offset as i32 * (idx as i32 - inner_start as i32);
+                let min_sum = (min_max_sum >> 16) as i32;
+                let max_sum_val = (min_max_sum & 0xffff) as i32;
+                if target_sum < min_sum || max_sum_val < target_sum {
                     return false;
                 }
                 if min_sum == max_sum_val {
@@ -554,5 +599,80 @@ mod tests {
         let mut a = acc();
         handler.enforce_consistency(&mut grid, &mut a);
         // Just verify no crash; exact pruning depends on constraint logic
+    }
+
+    // =====================================================================
+    // Offset (0-indexed) tests (ported from JS tests/handlers/lunchbox.test.js)
+    // =====================================================================
+
+    #[test]
+    fn offset_per_distance_combinations_adjust_correctly() {
+        // 4 cells, numValues=4, offset=-1. External 0-3, internal 1-4.
+        // Sentinels: internal 1 + 4 (external 0 + 3).
+        // External sandwich sum = 2.
+        let (mut grid, shape) = make_grid_offset(1, 4, 4, -1);
+        let cells = (0..4).collect();
+        let mut handler = Lunchbox::new(cells, 2);
+        init(&mut handler, &mut grid, shape);
+
+        grid[0] = vm(&[1, 4]); // sentinel candidate
+        grid[1] = vm(&[2, 3]); // inner candidate
+        grid[2] = vm(&[1, 4]); // sentinel candidate
+        grid[3] = vm(&[2, 3]); // outer candidate
+
+        assert!(handler.enforce_consistency(&mut grid, &mut acc()));
+    }
+
+    #[test]
+    fn offset_house_shortcut_adjusts_target_sum() {
+        // 4-cell house, numValues=4, offset=-1. Sum=1.
+        // Sentinels at 0 and 3, inner cells 1 and 2.
+        // internalTarget = 1 - (-1)*2 = 3.
+        // Inner internal sum = 2+3 = 5 ≠ 3 → fail.
+        let (mut grid, shape) = make_grid_offset(1, 4, 4, -1);
+        let cells = (0..4).collect();
+        let mut handler = Lunchbox::new(cells, 1);
+        init(&mut handler, &mut grid, shape);
+
+        grid[0] = vm(&[1]); // sentinel (ext 0)
+        grid[1] = vm(&[2]); // inner (ext 1)
+        grid[2] = vm(&[3]); // inner (ext 2)
+        grid[3] = vm(&[4]); // sentinel (ext 3)
+
+        assert!(!handler.enforce_consistency(&mut grid, &mut acc()));
+    }
+
+    #[test]
+    fn offset_house_shortcut_passes_with_correct_sum() {
+        // 4-cell house, numValues=4, offset=-1. Sum=3.
+        // internalTarget = 3 - (-1)*2 = 5.
+        // Inner internal sum = 2+3 = 5. Matches!
+        let (mut grid, shape) = make_grid_offset(1, 4, 4, -1);
+        let cells = (0..4).collect();
+        let mut handler = Lunchbox::new(cells, 3);
+        init(&mut handler, &mut grid, shape);
+
+        grid[0] = vm(&[1]); // sentinel
+        grid[1] = vm(&[2]); // inner
+        grid[2] = vm(&[3]); // inner
+        grid[3] = vm(&[4]); // sentinel
+
+        assert!(handler.enforce_consistency(&mut grid, &mut acc()));
+    }
+
+    #[test]
+    fn offset_0_unchanged_behavior() {
+        // 4-cell house, numValues=4, sum=2. Standard (no offset).
+        let (mut grid, shape) = make_grid(1, 4, Some(4));
+        let cells = (0..4).collect();
+        let mut handler = Lunchbox::new(cells, 2);
+        init(&mut handler, &mut grid, shape);
+
+        grid[0] = vm(&[1]);
+        grid[1] = vm(&[2]);
+        grid[2] = vm(&[4]);
+        grid[3] = vm(&[3]);
+
+        assert!(handler.enforce_consistency(&mut grid, &mut acc()));
     }
 }

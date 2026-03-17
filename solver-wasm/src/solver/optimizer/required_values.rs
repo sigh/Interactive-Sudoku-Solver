@@ -8,10 +8,9 @@ use std::collections::HashMap;
 use super::util::elementary_symmetric_sum;
 use super::OptimizerCtx;
 use crate::api::types::CellIndex;
-use crate::candidate_set::CandidateSet;
 use crate::handlers::required_values::ValueCounts;
 use crate::handlers::util::handler_util::find_mapped_exclusion_groups;
-use crate::handlers::{ConstraintHandler, False, GivenCandidates, RequiredValues};
+use crate::handlers::{ConstraintHandler, False, GivenCandidates, GivenValue, RequiredValues};
 use crate::solver::cell_exclusions::CellExclusions;
 use crate::solver::handler_set::HandlerSet;
 
@@ -40,7 +39,7 @@ pub(super) fn optimize_required_values(
         return;
     }
 
-    let all_values_mask: u16 = (1u16 << hs.shape.num_values) - 1;
+    let offset = hs.shape.value_offset;
 
     for (idx, cells, values, value_counts) in &rv_info {
         let mut restrictions: HashMap<CellIndex, u16> = HashMap::new();
@@ -60,6 +59,7 @@ pub(super) fn optimize_required_values(
                     cell_exclusions,
                     &mut restrictions,
                     &eg_data.groups,
+                    offset,
                 ) {
                     invalid = true;
                     break;
@@ -81,21 +81,24 @@ pub(super) fn optimize_required_values(
         let value_mask: u16 = {
             let mut m = 0u16;
             for &v in values {
-                m |= 1u16 << (v - 1);
+                m |= 1u16 << (v as i32 - offset as i32 - 1);
             }
             m
         };
 
         let mut new_values = values.clone();
         let mut new_cells = cells.clone();
-        let mut given_map: HashMap<CellIndex, CandidateSet> = HashMap::new();
+        let mut given_map: HashMap<CellIndex, Vec<i32>> = HashMap::new();
 
         for (&cell, &v) in &restrictions {
+            // Convert internal bit positions back to external values.
             let values_arr: Vec<u8> = (1..=hs.shape.num_values)
                 .filter(|&val| v & (1u16 << (val - 1)) != 0)
+                .map(|val| (val as i32 + offset as i32) as u8)
                 .collect();
 
-            given_map.insert(cell, CandidateSet::from_raw(v & all_values_mask));
+            let ext_values: Vec<i32> = values_arr.iter().map(|&v| v as i32).collect();
+            given_map.insert(cell, ext_values);
 
             if values_arr.len() == 1 {
                 // Remove only the FIRST occurrence of the value, mirroring
@@ -114,7 +117,10 @@ pub(super) fn optimize_required_values(
 
         // Create GivenCandidates handler to restrict values.
         if !given_map.is_empty() {
-            let gc_values: Vec<(CellIndex, CandidateSet)> = given_map.into_iter().collect();
+            let gc_values: Vec<(CellIndex, GivenValue)> = given_map
+                .into_iter()
+                .map(|(cell, vs)| (cell, GivenValue::Multiple(vs)))
+                .collect();
             let gc = GivenCandidates::new(gc_values);
             ctx.log_add_handler("_optimizeRequiredValues", &gc, None, false);
             hs.add_essential(Box::new(gc));
@@ -146,6 +152,7 @@ pub(super) fn find_known_required_values(
     cell_exclusions: &CellExclusions,
     restrictions: &mut HashMap<CellIndex, u16>,
     exclusion_groups: &[Vec<u8>],
+    value_offset: i8,
 ) -> bool {
     let num_cells = cells.len();
     let num_groups = exclusion_groups.len();
@@ -265,7 +272,7 @@ pub(super) fn find_known_required_values(
         return false;
     }
 
-    let v_mask = 1u16 << (value - 1);
+    let v_mask = 1u16 << (value as i32 - value_offset as i32 - 1);
     for i in 0..num_cells {
         if occurrences[i] == num_combinations {
             // Cell must contain this value.

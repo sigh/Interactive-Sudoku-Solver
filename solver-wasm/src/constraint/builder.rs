@@ -12,17 +12,16 @@
 use super::parser::ParsedConstraints;
 use super::Constraint;
 use crate::api::types::{CellIndex, Value};
-use crate::candidate_set::CandidateSet;
 use crate::grid_shape::GridShape;
 use crate::handlers::sum::Sum;
 use crate::handlers::{
     AllDifferent, AllDifferentType, And, Between, BinaryConstraint, BinaryPairwise, BoxInfo,
     ConstraintHandler, CountingCircles, DutchFlatmateLine, EqualSizePartitions, False, FullRank,
-    GivenCandidates, HiddenSkyscraper, Indexing, JigsawPiece, LocalSquishable2x2, Lockout,
+    GivenCandidates, GivenValue, HiddenSkyscraper, Indexing, JigsawPiece, LocalSquishable2x2, Lockout,
     Lunchbox, NfaConstraint, Or, Priority, RankClue, Rellik, RequiredValues, SameValues,
     Skyscraper, SumLine, TieMode, ValueDependentUniqueValueExclusion, ValueIndexing,
 };
-use crate::nfa::{compress_nfa, regex_to_nfa, NfaSerializer};
+use crate::nfa::{compress_nfa, regex_to_nfa_with_offset, NfaSerializer};
 use crate::solver::debug::DebugOptions;
 use crate::solver::Solver;
 
@@ -134,10 +133,8 @@ impl SudokuBuilder {
         match constraint {
             Constraint::Given { cell, values } => {
                 let cell = resolve_cell_id(cell, shape);
-                let mask = values
-                    .iter()
-                    .fold(CandidateSet::EMPTY, |m, &v| m | CandidateSet::from_value(v));
-                handlers.push(Box::new(GivenCandidates::new(vec![(cell, mask)])));
+                let ext_values: Vec<i32> = values.iter().map(|&v| v as i32).collect();
+                handlers.push(Box::new(GivenCandidates::new(vec![(cell, GivenValue::Multiple(ext_values))])));
             }
 
             Constraint::AllDifferent { cells } => {
@@ -231,11 +228,12 @@ impl SudokuBuilder {
                 let cells = resolve_cells(cells, shape);
                 for pair in cells.windows(2) {
                     let pred = |a: Value, b: Value| a < b;
-                    handlers.push(Box::new(BinaryConstraint::from_predicate(
+                    handlers.push(Box::new(BinaryConstraint::from_predicate_with_offset(
                         pair[0],
                         pair[1],
                         pred,
                         shape.num_values,
+                        shape.value_offset,
                     )));
                 }
             }
@@ -245,11 +243,12 @@ impl SudokuBuilder {
                 let diff = *difference;
                 for pair in cells.windows(2) {
                     let pred = move |a: Value, b: Value| (a as i32 - b as i32).abs() >= diff;
-                    handlers.push(Box::new(BinaryConstraint::from_predicate(
+                    handlers.push(Box::new(BinaryConstraint::from_predicate_with_offset(
                         pair[0],
                         pair[1],
                         pred,
                         shape.num_values,
+                        shape.value_offset,
                     )));
                 }
             }
@@ -257,9 +256,10 @@ impl SudokuBuilder {
             Constraint::Renban { cells } => {
                 let cells = resolve_cells(cells, shape);
                 let n = cells.len() as i32;
-                let key = crate::handlers::fn_to_binary_key(
+                let key = crate::handlers::fn_to_binary_key_with_offset(
                     &move |a: Value, b: Value| a != b && (a as i32 - b as i32).abs() < n,
                     shape.num_values,
+                    shape.value_offset,
                 );
                 let mut handler = BinaryPairwise::new(key, cells, shape.num_values);
                 handler.enable_hidden_singles();
@@ -271,11 +271,12 @@ impl SudokuBuilder {
                 let n = cells.len();
                 for i in 0..n / 2 {
                     let pred = |a: Value, b: Value| a == b;
-                    handlers.push(Box::new(BinaryConstraint::from_predicate(
+                    handlers.push(Box::new(BinaryConstraint::from_predicate_with_offset(
                         cells[i],
                         cells[n - 1 - i],
                         pred,
                         shape.num_values,
+                        shape.value_offset,
                     )));
                 }
             }
@@ -291,11 +292,12 @@ impl SudokuBuilder {
                 let cells = resolve_cells(cells, shape);
                 for [a, b] in adjacent_cell_pairs(&cells, shape) {
                     let pred = |a: Value, b: Value| (a as i32 - b as i32).abs() == 1;
-                    handlers.push(Box::new(BinaryConstraint::from_predicate(
+                    handlers.push(Box::new(BinaryConstraint::from_predicate_with_offset(
                         a,
                         b,
                         pred,
                         shape.num_values,
+                        shape.value_offset,
                     )));
                 }
             }
@@ -304,11 +306,12 @@ impl SudokuBuilder {
                 let cells = resolve_cells(cells, shape);
                 for [a, b] in adjacent_cell_pairs(&cells, shape) {
                     let pred = |a: Value, b: Value| a == 2 * b || b == 2 * a;
-                    handlers.push(Box::new(BinaryConstraint::from_predicate(
+                    handlers.push(Box::new(BinaryConstraint::from_predicate_with_offset(
                         a,
                         b,
                         pred,
                         shape.num_values,
+                        shape.value_offset,
                     )));
                 }
             }
@@ -317,11 +320,12 @@ impl SudokuBuilder {
                 let cells = resolve_cells(cells, shape);
                 for [a, b] in adjacent_cell_pairs(&cells, shape) {
                     let pred = |a: Value, b: Value| a > b;
-                    handlers.push(Box::new(BinaryConstraint::from_predicate(
+                    handlers.push(Box::new(BinaryConstraint::from_predicate_with_offset(
                         a,
                         b,
                         pred,
                         shape.num_values,
+                        shape.value_offset,
                     )));
                 }
             }
@@ -346,11 +350,12 @@ impl SudokuBuilder {
             Constraint::AntiConsecutive => {
                 for (cell, adj) in Self::all_adjacent_pairs(shape) {
                     let pred = |a: Value, b: Value| (a as i32 - b as i32).abs() != 1;
-                    handlers.push(Box::new(BinaryConstraint::from_predicate(
+                    handlers.push(Box::new(BinaryConstraint::from_predicate_with_offset(
                         cell,
                         adj,
                         pred,
                         shape.num_values,
+                        shape.value_offset,
                     )));
                 }
             }
@@ -474,12 +479,9 @@ impl SudokuBuilder {
 
                 // For grids with >9 values, limit non-leading pill digits to 1-9.
                 if shape.num_values > 9 {
-                    let values_1_to_9: Vec<Value> = (1..=9).collect();
-                    let mask = values_1_to_9
-                        .iter()
-                        .fold(CandidateSet::EMPTY, |m, &v| m | CandidateSet::from_value(v));
+                    let values_1_to_9: Vec<i32> = (1..=9).collect();
                     for i in 1..pill_size {
-                        handlers.push(Box::new(GivenCandidates::new(vec![(cells[i], mask)])));
+                        handlers.push(Box::new(GivenCandidates::new(vec![(cells[i], GivenValue::Multiple(values_1_to_9.clone()))])));
                     }
                 }
             }
@@ -513,7 +515,7 @@ impl SudokuBuilder {
 
             Constraint::Regex { pattern, cells } => {
                 let cells = resolve_cells(cells, shape);
-                if let Ok(mut nfa) = regex_to_nfa(pattern, shape.num_values) {
+                if let Ok(mut nfa) = regex_to_nfa_with_offset(pattern, shape.num_values, shape.value_offset) {
                     let cnfa = compress_nfa(&mut nfa);
                     handlers.push(Box::new(NfaConstraint::new(cells, cnfa)));
                 }
@@ -530,14 +532,15 @@ impl SudokuBuilder {
             }
 
             Constraint::Entropic { cells } => {
-                if shape.num_values != 9 {
-                    return Err("Entropic Line requires exactly 9 values".to_string());
+                if shape.num_values != 9 || shape.value_offset != 0 {
+                    return Err("Entropic Line requires exactly 9 values (1-9)".to_string());
                 }
                 let cells = resolve_cells(cells, shape);
                 let nv = shape.num_values;
-                let key = crate::handlers::fn_to_binary_key(
+                let key = crate::handlers::fn_to_binary_key_with_offset(
                     &|a: Value, b: Value| ((a - 1) / 3) != ((b - 1) / 3),
                     nv,
+                    shape.value_offset,
                 );
                 if cells.len() < 3 {
                     handlers.push(Box::new(BinaryPairwise::new(key, cells, nv)));
@@ -554,18 +557,20 @@ impl SudokuBuilder {
                 let m = *mod_value;
                 let nv = shape.num_values;
                 // First `m` cells must all be different mod m.
-                let neq_key = crate::handlers::fn_to_binary_key(
+                let neq_key = crate::handlers::fn_to_binary_key_with_offset(
                     &move |a: Value, b: Value| (a % m) != (b % m),
                     nv,
+                    shape.value_offset,
                 );
                 let first_cells: Vec<CellIndex> = cells.iter().take(m as usize).cloned().collect();
                 if first_cells.len() >= 2 {
                     handlers.push(Box::new(BinaryPairwise::new(neq_key, first_cells, nv)));
                 }
                 // Cells at positions i, i+m, i+2m, ... must be equal mod m.
-                let eq_key = crate::handlers::fn_to_binary_key(
+                let eq_key = crate::handlers::fn_to_binary_key_with_offset(
                     &move |a: Value, b: Value| (a % m) == (b % m),
                     nv,
+                    shape.value_offset,
                 );
                 for i in 0..m as usize {
                     let stride_cells: Vec<CellIndex> =
@@ -581,6 +586,9 @@ impl SudokuBuilder {
             }
 
             Constraint::AntiTaxicab => {
+                if shape.value_offset != 0 {
+                    return Err("Anti-Taxicab is incompatible with 0-based values.".to_string());
+                }
                 let nr = shape.num_rows as i32;
                 let nc = shape.num_cols as i32;
                 let nv = shape.num_values;
@@ -692,6 +700,9 @@ impl SudokuBuilder {
             }
 
             Constraint::DutchFlatmates => {
+                if shape.value_offset != 0 {
+                    return Err("Dutch Flatmates does not support shifted value ranges.".to_string());
+                }
                 // One DutchFlatmateLine handler per column, containing all cells
                 // in that column from top to bottom.
                 // Mirrors JS: `for (const cells of SudokuConstraintBase.colRegions(shape))`
@@ -760,8 +771,8 @@ impl SudokuBuilder {
             }
 
             Constraint::GlobalEntropy => {
-                if shape.num_values != 9 {
-                    return Err("Global Entropy requires exactly 9 values".to_string());
+                if shape.num_values != 9 || shape.value_offset != 0 {
+                    return Err("Global Entropy requires exactly 9 values (1-9)".to_string());
                 }
                 // One LocalEntropy handler per 2×2 region.
                 // Mirrors JS: `for (const cells of SudokuConstraintBase.square2x2Regions(shape))`
@@ -805,7 +816,7 @@ impl SudokuBuilder {
                     // Use BinaryPairwise with equality key.
                     // Mirrors JS: `yield new HandlerModule.BinaryPairwise(key, ...cells)`
                     let nv = shape.num_values;
-                    let key = crate::handlers::fn_to_binary_key(&|a: Value, b: Value| a == b, nv);
+                    let key = crate::handlers::fn_to_binary_key_with_offset(&|a: Value, b: Value| a == b, nv, shape.value_offset);
                     handlers.push(Box::new(BinaryPairwise::new(key, cells, nv)));
                 } else {
                     let set_size = cells.len() / n;
@@ -914,25 +925,23 @@ impl SudokuBuilder {
                 //   yield new EqualSizePartitions(cells, evenValues, oddValues);
                 //   yield new EqualSizePartitions(cells, lowValues, highValues);
                 let cells = resolve_cells(cells, shape);
-                let nv = shape.num_values;
+                let all_values = shape.all_values();
                 handlers.push(Box::new(AllDifferent::new(
                     cells.clone(),
                     AllDifferentType::WithExclusionCells,
                 )));
                 // Even/odd partition: JS allValues.filter(v => v%2===0) / odd.
-                let even: Vec<u8> = (1..=nv).filter(|&v| v % 2 == 0).collect();
-                let odd: Vec<u8> = (1..=nv).filter(|&v| v % 2 == 1).collect();
+                let even: Vec<i32> = all_values.iter().filter(|&&v| v % 2 == 0).copied().collect();
+                let odd: Vec<i32> = all_values.iter().filter(|&&v| v % 2 != 0).copied().collect();
                 handlers.push(Box::new(EqualSizePartitions::new(
                     cells.clone(),
                     &even,
                     &odd,
                 )));
                 // Low/high partition.
-                // JS: v <= numValues/2.0  vs  v >= numValues/2.0 + 1
-                // For nv=9: low={1..4}, high={6..9} (skips middle 5).
-                // Rust integer equivalents: low = 1..=(nv/2), high = ((nv+3)/2)..=nv
-                let low: Vec<u8> = (1..=(nv / 2)).collect();
-                let high: Vec<u8> = ((nv + 3) / 2..=nv).collect();
+                let half = all_values.len() / 2;
+                let low: Vec<i32> = all_values[..half].to_vec();
+                let high: Vec<i32> = all_values[all_values.len() - half..].to_vec();
                 if !low.is_empty() && !high.is_empty() {
                     handlers.push(Box::new(EqualSizePartitions::new(cells, &low, &high)));
                 }
@@ -949,10 +958,10 @@ impl SudokuBuilder {
                     let control = cells[0];
 
                     if sum == 1 {
-                        // Special case: control cell must be 1.
+                        // Special case: control cell must be 1 (external value).
                         handlers.push(Box::new(GivenCandidates::new(vec![(
                             control,
-                            CandidateSet::from_value(1),
+                            GivenValue::Single(1),
                         )])));
                         return Ok(());
                     }
@@ -960,12 +969,12 @@ impl SudokuBuilder {
                     let mut or_handlers: Vec<Box<dyn ConstraintHandler>> = Vec::new();
                     for i in 2..=cells.len() {
                         let sum_rem = sum as i64 - i as i64;
-                        if sum_rem <= 0 {
+                        if sum_rem < 0 {
                             break;
                         }
                         // And(GivenCandidates(control = i), Sum(cells[1..i], sum_rem))
                         let given: Box<dyn ConstraintHandler> = Box::new(GivenCandidates::new(
-                            vec![(control, CandidateSet::from_value(i as u8))],
+                            vec![(control, GivenValue::Single(i as i32))],
                         ));
                         let sum_handler: Box<dyn ConstraintHandler> =
                             Box::new(Sum::new_cage(cells[1..i].to_vec(), sum_rem as i32));
@@ -1131,11 +1140,12 @@ impl SudokuBuilder {
                 (cell_b, cell_a)
             };
             if !marked_pairs.contains(&(a, b)) {
-                handlers.push(Box::new(BinaryConstraint::from_predicate(
+                handlers.push(Box::new(BinaryConstraint::from_predicate_with_offset(
                     a,
                     b,
                     pred,
                     shape.num_values,
+                    shape.value_offset,
                 )));
             }
         }
@@ -1295,7 +1305,7 @@ impl SudokuBuilder {
         // If multiple singles, they must all be equal (use BinaryPairwise).
         if singles.len() > 1 {
             let nv = shape.num_values;
-            let key = crate::handlers::fn_to_binary_key(&|a: u8, b: u8| a == b, nv);
+            let key = crate::handlers::fn_to_binary_key_with_offset(&|a: u8, b: u8| a == b, nv, shape.value_offset);
             handlers.push(Box::new(BinaryPairwise::new(key, singles.clone(), nv)));
         }
 

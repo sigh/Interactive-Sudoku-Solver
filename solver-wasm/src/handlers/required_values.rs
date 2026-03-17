@@ -12,12 +12,12 @@ use crate::solver::handler_accumulator::HandlerAccumulator;
 use super::util::handler_util::{expose_hidden_singles, find_exclusion_groups};
 use super::ConstraintHandler;
 
-/// Flat array mapping value → count, for values 1..=16.
+/// Flat array mapping value → count, for values 0..=16.
 /// Avoids HashMap overhead for small integer keys.
 #[derive(Clone)]
 pub struct ValueCounts {
-    /// counts[v - 1] = number of times value `v` appears.
-    counts: [u8; 16],
+    /// counts[v] = number of times value `v` appears.
+    counts: [u8; 17],
     /// Number of distinct values.
     num_distinct: usize,
 }
@@ -25,22 +25,22 @@ pub struct ValueCounts {
 impl ValueCounts {
     fn new() -> Self {
         Self {
-            counts: [0u8; 16],
+            counts: [0u8; 17],
             num_distinct: 0,
         }
     }
 
     fn increment(&mut self, value: Value) {
-        let idx = (value - 1) as usize;
+        let idx = value as usize;
         if self.counts[idx] == 0 {
             self.num_distinct += 1;
         }
         self.counts[idx] += 1;
     }
 
-    /// Get the count for a given value (1-indexed).
+    /// Get the count for a given value.
     pub fn get(&self, value: Value) -> u8 {
-        self.counts[(value - 1) as usize]
+        self.counts[value as usize]
     }
 
     /// Number of distinct values.
@@ -54,7 +54,7 @@ impl ValueCounts {
             .iter()
             .enumerate()
             .filter(|(_, &c)| c > 0)
-            .map(|(i, &c)| ((i + 1) as u8, c))
+            .map(|(i, &c)| (i as u8, c))
     }
 }
 
@@ -69,11 +69,12 @@ pub struct RequiredValues {
     strict: bool,
     /// Flat array from value → required count.
     value_counts: ValueCounts,
-    /// Bitmask of all required values.
+    /// Bitmask of all required values (built in initialize).
     value_mask: CandidateSet,
-    /// Bitmask of values with count == 1.
+    /// Bitmask of values with count == 1 (built in initialize).
     single_values: CandidateSet,
-    /// Repeated value entries: (value_mask, count, other_values_mask) triples.
+    /// Repeated value entries: (value_mask, count, other_values_mask) triples
+    /// (built in initialize).
     repeated_values: Vec<(CandidateSet, usize, CandidateSet)>,
 }
 
@@ -84,31 +85,15 @@ impl RequiredValues {
             value_counts.increment(v);
         }
 
-        let value_mask = CandidateSet::from_values(values.iter().copied());
-        let single_values = CandidateSet::from_values(
-            values
-                .iter()
-                .filter(|&&v| value_counts.get(v) == 1)
-                .copied(),
-        );
-
-        let mut repeated_values = Vec::new();
-        for (value, count) in value_counts.iter() {
-            if count > 1 {
-                let v = CandidateSet::from_value(value);
-                let other = value_mask ^ v;
-                repeated_values.push((v, count as usize, other));
-            }
-        }
-
+        // Masks are built in initialize() where shape.value_offset is available.
         Self {
             cells,
             values,
             strict,
             value_counts,
-            value_mask,
-            single_values,
-            repeated_values,
+            value_mask: CandidateSet::EMPTY,
+            single_values: CandidateSet::EMPTY,
+            repeated_values: Vec::new(),
         }
     }
 
@@ -140,9 +125,32 @@ impl ConstraintHandler for RequiredValues {
         &mut self,
         initial_grid: &mut [CandidateSet],
         cell_exclusions: &CellExclusions,
-        _shape: GridShape,
+        shape: GridShape,
         _state_allocator: &mut GridStateAllocator,
     ) -> bool {
+        let offset = shape.value_offset;
+
+        // Build masks using offset-aware conversion.
+        self.value_mask = CandidateSet::from_offset_values(
+            self.values.iter().map(|&v| v as i32),
+            offset,
+        );
+        self.single_values = CandidateSet::from_offset_values(
+            self.values
+                .iter()
+                .filter(|&&v| self.value_counts.get(v) == 1)
+                .map(|&v| v as i32),
+            offset,
+        );
+        self.repeated_values.clear();
+        for (value, count) in self.value_counts.iter() {
+            if count > 1 {
+                let v = CandidateSet::from_offset_value(value as i32, offset);
+                let other = self.value_mask ^ v;
+                self.repeated_values.push((v, count as usize, other));
+            }
+        }
+
         // Validate: no value appears more times than there are exclusion groups.
         let eg_data = find_exclusion_groups(&self.cells, cell_exclusions);
         let max_count = eg_data.groups.len();
@@ -621,5 +629,90 @@ mod tests {
             ok,
             "initialize should return true when count == exclusion groups"
         );
+    }
+
+    // =====================================================================
+    // Offset (0-indexed) tests (ported from JS tests/handlers/required_values.test.js)
+    // =====================================================================
+
+    fn vm(values: &[u16]) -> CandidateSet {
+        let mut bits: u16 = 0;
+        for &v in values {
+            bits |= 1 << (v - 1);
+        }
+        CandidateSet::from_raw(bits)
+    }
+
+    #[test]
+    fn offset_hidden_single_with_offset_minus_1() {
+        // 0-indexed: external 0-3, internal 1-4, offset=-1.
+        // RequiredValues [0, 2] → internal {1, 3}.
+        let shape = GridShape::build_with_offset(1, 4, 4, -1);
+        let num_cells = shape.num_cells;
+        let ce = CellExclusions::with_num_cells(num_cells);
+        let cells = vec![0, 1, 2];
+        let mut handler = RequiredValues::new(cells, vec![0, 2], true);
+        let mut grid = vec![CandidateSet::all(shape.num_values); num_cells];
+        let mut alloc = GridStateAllocator::new(num_cells);
+        let ok = handler.initialize(&mut grid, &ce, shape, &mut alloc);
+        assert!(ok);
+
+        grid[0] = vm(&[1]);       // Fixed: internal 1 (external 0).
+        grid[1] = vm(&[2, 3, 4]); // Has internal 3 (external 2).
+        grid[2] = vm(&[2, 4]);    // No internal 3.
+
+        let mut a = HandlerAccumulator::new_stub();
+        let result = handler.enforce_consistency(&mut grid, &mut a);
+        assert!(result);
+        // Internal 3 is a hidden single in cell 1 → cell 1 fixed to internal 3.
+        assert_eq!(grid[1], vm(&[3]));
+    }
+
+    #[test]
+    fn offset_missing_value_with_offset_minus_1() {
+        // External values [0, 2], offset=-1 → internal [1, 3].
+        // No cell has internal 1 → fail.
+        let shape = GridShape::build_with_offset(1, 4, 4, -1);
+        let num_cells = shape.num_cells;
+        let ce = CellExclusions::with_num_cells(num_cells);
+        let cells = vec![0, 1, 2];
+        let mut handler = RequiredValues::new(cells, vec![0, 2], true);
+        let mut grid = vec![CandidateSet::all(shape.num_values); num_cells];
+        let mut alloc = GridStateAllocator::new(num_cells);
+        let ok = handler.initialize(&mut grid, &ce, shape, &mut alloc);
+        assert!(ok);
+
+        grid[0] = vm(&[2, 3]); // No internal 1.
+        grid[1] = vm(&[3, 4]); // No internal 1.
+        grid[2] = vm(&[2, 3]); // No internal 1.
+
+        let mut a = HandlerAccumulator::new_stub();
+        let result = handler.enforce_consistency(&mut grid, &mut a);
+        assert!(!result, "should fail: internal 1 (external 0) not in any cell");
+    }
+
+    #[test]
+    fn offset_repeated_value_with_offset_minus_1() {
+        // External values [1, 1], offset=-1 → internal [2, 2].
+        // 2 cells, no exclusions: repeated value 2 must appear twice.
+        let shape = GridShape::build_with_offset(1, 4, 4, -1);
+        let num_cells = shape.num_cells;
+        let ce = CellExclusions::with_num_cells(num_cells);
+        let cells = vec![0, 1];
+        let mut handler = RequiredValues::new(cells, vec![1, 1], true);
+        let mut grid = vec![CandidateSet::all(shape.num_values); num_cells];
+        let mut alloc = GridStateAllocator::new(num_cells);
+        let ok = handler.initialize(&mut grid, &ce, shape, &mut alloc);
+        assert!(ok);
+
+        grid[0] = vm(&[2, 3]); // Has internal 2.
+        grid[1] = vm(&[2, 4]); // Has internal 2.
+
+        let mut a = HandlerAccumulator::new_stub();
+        let result = handler.enforce_consistency(&mut grid, &mut a);
+        assert!(result);
+        // Both cells must be fixed to internal 2.
+        assert_eq!(grid[0], vm(&[2]));
+        assert_eq!(grid[1], vm(&[2]));
     }
 }

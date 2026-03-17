@@ -10,13 +10,12 @@ use super::util::{general_region_overlap_processor, overlap_regions};
 use super::{OptimizerCtx, MAX_SUM_SIZE};
 use crate::api::types::CellIndex;
 use crate::bit_set::BitSet;
-use crate::candidate_set::CandidateSet;
 use crate::handlers::sum::Sum;
 use crate::handlers::util::handler_util::{
     exclusion_group_sum_info as hu_exclusion_group_sum_info,
     find_exclusion_groups_greedy as hu_find_exclusion_groups_greedy,
 };
-use crate::handlers::{BinaryConstraint, ConstraintHandler, False, GivenCandidates, House, True};
+use crate::handlers::{BinaryConstraint, ConstraintHandler, False, GivenCandidates, GivenValue, House, True};
 use crate::solver::cell_exclusions::CellExclusions;
 use crate::solver::handler_set::HandlerSet;
 
@@ -575,7 +574,7 @@ fn add_sum_intersection_handler(
 
     // Use exclusion groups to estimate restrictiveness.
     let eg_data = hu_find_exclusion_groups_greedy(&cells_array, cell_exclusions, false, None);
-    let info = hu_exclusion_group_sum_info(&eg_data.groups, hs.shape.num_values);
+    let info = hu_exclusion_group_sum_info(&eg_data.groups, hs.shape.num_values, hs.shape.value_offset);
 
     if total_sum < info.min || total_sum > info.max {
         // Infeasible — return a False handler.
@@ -647,7 +646,7 @@ fn make_combined_sum_handlers(
 
     let make_record = |cells: Vec<CellIndex>, sum: i32, original: bool| -> Option<Record> {
         let eg_data = hu_find_exclusion_groups_greedy(&cells, cell_exclusions, false, None);
-        let info = hu_exclusion_group_sum_info(&eg_data.groups, hs.shape.num_values);
+        let info = hu_exclusion_group_sum_info(&eg_data.groups, hs.shape.num_values, hs.shape.value_offset);
 
         if sum < info.min || sum > info.max {
             return None;
@@ -900,11 +899,11 @@ pub(super) fn replace_size_specific_sum_handlers(
                     // Impossible — no integer value satisfies value * coeff == sum.
                     Some(Box::new(False::new(cells.clone())))
                 } else {
-                    let value = (sum / coeff) as u8;
-                    if value >= 1 && value <= hs.shape.num_values {
+                    let value = sum / coeff;
+                    if value >= hs.shape.min_value() as i32 && value <= hs.shape.max_value() as i32 {
                         Some(Box::new(GivenCandidates::new(vec![(
                             cells[0],
-                            CandidateSet::from_value(value),
+                            GivenValue::Single(value),
                         )])))
                     } else {
                         Some(Box::new(False::new(cells.clone())))
@@ -923,11 +922,12 @@ pub(super) fn replace_size_specific_sum_handlers(
                     val == sum && (!mutually_exclusive || a != b)
                 };
 
-                Some(Box::new(BinaryConstraint::from_predicate(
+                Some(Box::new(BinaryConstraint::from_predicate_with_offset(
                     cell0,
                     cell1,
                     pred,
                     hs.shape.num_values,
+                    hs.shape.value_offset,
                 )))
             }
             n if n == hs.shape.num_values as usize => {

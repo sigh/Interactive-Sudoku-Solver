@@ -29,6 +29,9 @@ pub struct Skyscraper {
     terminal_mask: u16,
     /// Number of values in the grid.
     num_values: usize,
+    /// For 0-based values: bit mask for internal value 1 (external 0).
+    /// External 0 doesn't count as visible.
+    zero_mask: u16,
     /// Scratch buffer of size `num_cells * 2 * num_visible`.
     /// Layout: forward states occupy [0 .. num_cells*num_visible),
     /// backward states occupy [num_cells*num_visible .. 2*num_cells*num_visible).
@@ -44,6 +47,7 @@ impl Skyscraper {
             num_visible,
             terminal_mask: 0,
             num_values: 0,
+            zero_mask: 0,
             states: RefCell::new(Vec::new()),
         }
     }
@@ -70,6 +74,7 @@ impl ConstraintHandler for Skyscraper {
         }
 
         self.num_values = num_values;
+        self.zero_mask = if shape.value_offset < 0 { 1 } else { 0 };
 
         // Terminal mask: max height must be at least num_cells (the minimum
         // possible maximum value with num_cells distinct values from 1..numValues).
@@ -99,6 +104,7 @@ impl ConstraintHandler for Skyscraper {
 
         // Bitmask for the maximum value (e.g., 9 in a 9x9 grid).
         let max_value_raw: u16 = 1 << (num_values - 1);
+        let zero_mask = self.zero_mask;
 
         let mut states = self.states.borrow_mut();
         // Clear both halves.
@@ -112,7 +118,9 @@ impl ConstraintHandler for Skyscraper {
         // states[num_cells*target + i*target + j] = backward[i][j]
 
         // Seed: all values of cell 0 are valid for visibility = 1.
-        states[0] = grid[cells[0] as usize].raw();
+        // With 0-based values, external 0 (internal 1) doesn't count as visible.
+        states[0] = grid[cells[0] as usize].raw() & !zero_mask;
+        let first_cell_zero = grid[cells[0] as usize].raw() & zero_mask;
 
         let mut last_max_height_index = num_cells - 1;
 
@@ -128,6 +136,10 @@ impl ConstraintHandler for Skyscraper {
 
             // j = 0: only Case 1 (hidden) applies.
             states[curr_base] = states[prev_base] & higher_than_min_v;
+            // If the first cell could be zero, cell 1 can start the sequence.
+            if first_cell_zero != 0 && i == 1 {
+                states[curr_base] |= v & !zero_mask;
+            }
 
             let j_max = i.min(target - 1);
             for j in 1..=j_max {
@@ -215,6 +227,13 @@ impl ConstraintHandler for Skyscraper {
 
             // Apply the computed value mask to cells[i].
             // Note: no addForCell, matching JS Skyscraper behaviour.
+
+            // If the first cell could be zero, cell 1's backward-validated
+            // values are valid as the first visible building.
+            if first_cell_zero != 0 && i == 1 {
+                value_mask |= states[bwd_off + target] & grid[cells[1] as usize].raw();
+            }
+
             let c = cells[i] as usize;
             let new_v = grid[c].raw() & value_mask;
             if new_v == 0 {
@@ -224,9 +243,10 @@ impl ConstraintHandler for Skyscraper {
         }
 
         // The first cell is valid for exactly those values where backward[0][0] is set.
+        // If the first cell can be zero, preserve that candidate.
         let back_0_0 = states[bwd_off];
         let c0 = cells[0] as usize;
-        let new_v = grid[c0].raw() & back_0_0;
+        let new_v = grid[c0].raw() & (back_0_0 | first_cell_zero);
         if new_v == 0 {
             return false;
         }
@@ -675,5 +695,123 @@ mod tests {
         let after2: Vec<CandidateSet> = grid.to_vec();
 
         assert_eq!(after1, after2, "second call should not change grid");
+    }
+
+    // =====================================================================
+    // Offset (0-indexed) tests (ported from JS tests/handlers/skyscraper.test.js)
+    // =====================================================================
+
+    #[test]
+    fn offset_vis1_zero_in_first_cell_allowed() {
+        // 0-indexed 4x4: internal 1-4, offset=-1.
+        let (mut grid, shape) = make_grid_offset(1, 4, 4, -1);
+        let mut handler = Skyscraper::new(vec![0, 1, 2, 3], 1);
+        init(&mut handler, &mut grid, shape);
+
+        grid[0] = vm(&[1, 2, 3, 4]);
+        grid[1] = vm(&[1, 2, 3, 4]);
+        grid[2] = vm(&[1, 2, 3, 4]);
+        grid[3] = vm(&[1, 2, 3, 4]);
+
+        assert!(enforce(&handler, &mut grid));
+        // Both max value and zero should be allowed in first cell.
+        assert!(grid[0].intersects(CandidateSet::from_value(4)),
+                "first cell should allow max value");
+        assert!(grid[0].intersects(CandidateSet::from_value(1)),
+                "first cell should allow zero (internal 1)");
+    }
+
+    #[test]
+    fn offset_vis4_with_zero_impossible_in_4_cells() {
+        let (mut grid, shape) = make_grid_offset(1, 4, 4, -1);
+        let mut handler = Skyscraper::new(vec![0, 1, 2, 3], 4);
+        init(&mut handler, &mut grid, shape);
+
+        grid[0] = vm(&[1]); // zero (external 0)
+        grid[1] = vm(&[2, 3, 4]);
+        grid[2] = vm(&[2, 3, 4]);
+        grid[3] = vm(&[2, 3, 4]);
+
+        assert!(!enforce(&handler, &mut grid),
+                "zero first + vis=4 impossible in 4 cells");
+    }
+
+    #[test]
+    fn offset_zero_first_cell_vis3_succeeds() {
+        let (mut grid, shape) = make_grid_offset(1, 4, 4, -1);
+        let mut handler = Skyscraper::new(vec![0, 1, 2, 3], 3);
+        init(&mut handler, &mut grid, shape);
+
+        grid[0] = vm(&[1]); // zero — not visible
+        grid[1] = vm(&[2]); // ext 1 — visible
+        grid[2] = vm(&[3]); // ext 2 — visible
+        grid[3] = vm(&[4]); // ext 3 — visible
+
+        assert!(enforce(&handler, &mut grid), "[0,1,2,3] should give visibility 3");
+    }
+
+    #[test]
+    fn offset_zero_first_vis4_should_fail() {
+        let (mut grid, shape) = make_grid_offset(1, 4, 4, -1);
+        let mut handler = Skyscraper::new(vec![0, 1, 2, 3], 4);
+        init(&mut handler, &mut grid, shape);
+
+        grid[0] = vm(&[1]); // zero
+        grid[1] = vm(&[2]);
+        grid[2] = vm(&[3]);
+        grid[3] = vm(&[4]);
+
+        assert!(!enforce(&handler, &mut grid), "[0,1,2,3] has only 3 visible, not 4");
+    }
+
+    #[test]
+    fn offset_zero_in_non_first_cell_no_effect() {
+        let (mut grid, shape) = make_grid_offset(1, 4, 4, -1);
+        let mut handler = Skyscraper::new(vec![0, 1, 2, 3], 1);
+        init(&mut handler, &mut grid, shape);
+
+        grid[0] = vm(&[4]); // ext 3, visible
+        grid[1] = vm(&[1]); // ext 0, hidden
+        grid[2] = vm(&[2]); // ext 1, hidden
+        grid[3] = vm(&[3]); // ext 2, hidden
+
+        assert!(enforce(&handler, &mut grid), "[3,0,1,2] should give visibility 1");
+    }
+
+    #[test]
+    fn offset_propagation_zero_candidate_first_cell() {
+        let (mut grid, shape) = make_grid_offset(1, 4, 4, -1);
+        let mut handler = Skyscraper::new(vec![0, 1, 2, 3], 2);
+        init(&mut handler, &mut grid, shape);
+
+        grid[0] = vm(&[1, 3]); // ext 0 or 2
+        grid[1] = vm(&[1, 2, 3, 4]);
+        grid[2] = vm(&[1, 2, 3, 4]);
+        grid[3] = vm(&[1, 2, 3, 4]);
+
+        assert!(enforce(&handler, &mut grid));
+        assert!(grid[0].intersects(CandidateSet::from_value(1)),
+                "first cell should keep zero candidate");
+        assert!(grid[0].intersects(CandidateSet::from_value(3)),
+                "first cell should keep non-zero candidate");
+    }
+
+    #[test]
+    fn offset_0_unchanged_behavior() {
+        // Standard 1-indexed, vis=4 forces ascending 1,2,3,4.
+        let (mut grid, shape) = make_grid(1, 4, None);
+        let mut handler = Skyscraper::new(vec![0, 1, 2, 3], 4);
+        init(&mut handler, &mut grid, shape);
+
+        grid[0] = vm(&[1, 2, 3, 4]);
+        grid[1] = vm(&[1, 2, 3, 4]);
+        grid[2] = vm(&[1, 2, 3, 4]);
+        grid[3] = vm(&[1, 2, 3, 4]);
+
+        assert!(enforce(&handler, &mut grid));
+        assert_eq!(grid[0], vm(&[1]));
+        assert_eq!(grid[1], vm(&[2]));
+        assert_eq!(grid[2], vm(&[3]));
+        assert_eq!(grid[3], vm(&[4]));
     }
 }

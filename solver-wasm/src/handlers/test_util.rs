@@ -70,6 +70,14 @@ pub fn enforce(handler: &dyn ConstraintHandler, grid: &mut [CandidateSet]) -> bo
     handler.enforce_consistency(grid, &mut acc())
 }
 
+/// Create a grid filled with all candidates for a `rows × cols` grid with offset.
+pub fn make_grid_offset(rows: u8, cols: u8, nv: u8, offset: i8) -> (Vec<CandidateSet>, GridShape) {
+    let shape = GridShape::build_with_offset(rows, cols, nv, offset);
+    let all = CandidateSet::all(shape.num_values);
+    let grid = vec![all; shape.num_cells];
+    (grid, shape)
+}
+
 /// Create `CellExclusions` with all-pairs mutual exclusion (all-different).
 pub fn unique_exclusions(num_cells: usize) -> CellExclusions {
     let mut ce = CellExclusions::with_num_cells(num_cells);

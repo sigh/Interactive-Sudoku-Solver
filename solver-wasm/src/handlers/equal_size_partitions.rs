@@ -25,20 +25,28 @@ use super::ConstraintHandler;
 
 pub struct EqualSizePartitions {
     cells: Vec<CellIndex>,
-    /// Bitmask for partition 1 values.
+    /// Raw partition 1 values (external, before offset conversion).
+    partition1: Vec<i32>,
+    /// Raw partition 2 values (external, before offset conversion).
+    partition2: Vec<i32>,
+    /// Bitmask for partition 1 values (set during initialize).
     mask1: CandidateSet,
-    /// Bitmask for partition 2 values.
+    /// Bitmask for partition 2 values (set during initialize).
     mask2: CandidateSet,
 }
 
 impl EqualSizePartitions {
     /// Create a new handler.
     ///
-    /// `partition1` and `partition2` are slices of 1-indexed values.
-    pub fn new(cells: Vec<CellIndex>, partition1: &[u8], partition2: &[u8]) -> Self {
-        let mask1 = CandidateSet::from_values(partition1.iter().copied());
-        let mask2 = CandidateSet::from_values(partition2.iter().copied());
-        EqualSizePartitions { cells, mask1, mask2 }
+    /// `partition1` and `partition2` are slices of external values.
+    pub fn new(cells: Vec<CellIndex>, partition1: &[i32], partition2: &[i32]) -> Self {
+        EqualSizePartitions {
+            cells,
+            partition1: partition1.to_vec(),
+            partition2: partition2.to_vec(),
+            mask1: CandidateSet::EMPTY,
+            mask2: CandidateSet::EMPTY,
+        }
     }
 }
 
@@ -55,12 +63,16 @@ impl ConstraintHandler for EqualSizePartitions {
         &mut self,
         initial_grid: &mut [CandidateSet],
         _cell_exclusions: &CellExclusions,
-        _shape: GridShape,
+        shape: GridShape,
         _state_allocator: &mut GridStateAllocator,
     ) -> bool {
+        let offset = shape.value_offset;
+        self.mask1 =
+            CandidateSet::from_offset_values(self.partition1.iter().copied(), offset);
+        self.mask2 =
+            CandidateSet::from_offset_values(self.partition2.iter().copied(), offset);
+
         // Remove values that belong to neither partition.
-        // JS: const excludeValues = ~(this._mask1 | this._mask2);
-        //      if (excludeValues) { for (const cell of cells) grid[cell] &= ~excludeValues }
         let combined = self.mask1 | self.mask2;
         for &cell in &self.cells {
             initial_grid[cell as usize] &= combined;

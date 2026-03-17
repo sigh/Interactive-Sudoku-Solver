@@ -6,12 +6,12 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, OnceLock};
 
+use crate::api::types::{CellIndex, Value};
 use crate::candidate_set::CandidateSet;
 use crate::grid_shape::GridShape;
 use crate::solver::cell_exclusions::CellExclusions;
 use crate::solver::grid_state_allocator::GridStateAllocator;
 use crate::solver::handler_accumulator::HandlerAccumulator;
-use crate::api::types::{CellIndex, Value};
 
 use super::ConstraintHandler;
 
@@ -24,10 +24,21 @@ const BASE64_CHARS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwx
 
 /// Encode a predicate function into a Base64 binary key string.
 ///
-/// Matches JS `fnToBinaryKey(fn, numValues)`. The truth table for
-/// `pred(a, b)` where `a, b ∈ 1..=num_values` is packed into 6-bit
+/// Matches JS `fnToBinaryKey(fn, numValues, valueOffset)`. The truth table for
+/// `pred(a, b)` where `a, b ∈ (1+offset)..=(num_values+offset)` is packed into 6-bit
 /// groups and encoded as URL-safe Base64 characters.
+///
+/// When `value_offset` is 0, this is equivalent to the original signature.
 pub fn fn_to_binary_key(pred: &dyn Fn(Value, Value) -> bool, num_values: u8) -> String {
+    fn_to_binary_key_with_offset(pred, num_values, 0)
+}
+
+/// Like `fn_to_binary_key` but with an explicit value offset.
+pub fn fn_to_binary_key_with_offset(
+    pred: &dyn Fn(Value, Value) -> bool,
+    num_values: u8,
+    value_offset: i8,
+) -> String {
     const NUM_BITS: usize = 6;
     let nv = num_values as usize;
     let mut array: Vec<u8> = Vec::new();
@@ -36,7 +47,9 @@ pub fn fn_to_binary_key(pred: &dyn Fn(Value, Value) -> bool, num_values: u8) -> 
 
     for i in 1..=nv {
         for j in 1..=nv {
-            if pred(i as Value, j as Value) {
+            let a = (i as i32 + value_offset as i32) as Value;
+            let b = (j as i32 + value_offset as i32) as Value;
+            if pred(a, b) {
                 v |= 1 << v_index;
             }
             v_index += 1;
@@ -207,6 +220,20 @@ impl BinaryConstraint {
         num_values: u8,
     ) -> Self {
         let key = fn_to_binary_key(&pred, num_values);
+        Self::from_key(cell0, cell1, key, num_values)
+    }
+
+    /// Create a BinaryConstraint from a predicate function with offset.
+    ///
+    /// The predicate receives offset-adjusted values (external values).
+    pub fn from_predicate_with_offset(
+        cell0: CellIndex,
+        cell1: CellIndex,
+        pred: impl Fn(u8, u8) -> bool,
+        num_values: u8,
+        value_offset: i8,
+    ) -> Self {
+        let key = fn_to_binary_key_with_offset(&pred, num_values, value_offset);
         Self::from_key(cell0, cell1, key, num_values)
     }
 
@@ -440,11 +467,20 @@ mod tests {
         CandidateSet::from_raw(raw)
     }
 
-    fn make_handler(pred: impl Fn(u8, u8) -> bool, nv: u8, cell0: CellIndex, cell1: CellIndex) -> BinaryConstraint {
+    fn make_handler(
+        pred: impl Fn(u8, u8) -> bool,
+        nv: u8,
+        cell0: CellIndex,
+        cell1: CellIndex,
+    ) -> BinaryConstraint {
         BinaryConstraint::from_predicate(cell0, cell1, pred, nv)
     }
 
-    fn init_handler(handler: &mut BinaryConstraint, grid: &mut [CandidateSet], ce: &CellExclusions) -> bool {
+    fn init_handler(
+        handler: &mut BinaryConstraint,
+        grid: &mut [CandidateSet],
+        ce: &CellExclusions,
+    ) -> bool {
         let shape = GridShape::square(1).unwrap(); // shape doesn't matter for binary
         let mut alloc = GridStateAllocator::new(grid.len());
         handler.initialize(grid, ce, shape, &mut alloc)
@@ -725,19 +761,28 @@ mod tests {
         // First call.
         grid[0] = vm(&[1]);
         grid[1] = vm(&[1, 2, 3]);
-        assert_eq!(handler.enforce_consistency(&mut grid, &mut HandlerAccumulator::new_stub()), true);
+        assert_eq!(
+            handler.enforce_consistency(&mut grid, &mut HandlerAccumulator::new_stub()),
+            true
+        );
         assert_eq!(grid[1], vm(&[2, 3]));
 
         // Second call with different values.
         grid[0] = vm(&[3]);
         grid[1] = vm(&[2, 3, 4]);
-        assert_eq!(handler.enforce_consistency(&mut grid, &mut HandlerAccumulator::new_stub()), true);
+        assert_eq!(
+            handler.enforce_consistency(&mut grid, &mut HandlerAccumulator::new_stub()),
+            true
+        );
         assert_eq!(grid[1], vm(&[2, 4]));
 
         // Third call that fails.
         grid[0] = vm(&[2]);
         grid[1] = vm(&[2]);
-        assert_eq!(handler.enforce_consistency(&mut grid, &mut HandlerAccumulator::new_stub()), false);
+        assert_eq!(
+            handler.enforce_consistency(&mut grid, &mut HandlerAccumulator::new_stub()),
+            false
+        );
     }
 
     // =========================================================================
@@ -841,5 +886,55 @@ mod tests {
         assert_eq!(handler.enforce_consistency(&mut grid, &mut a), true);
         // Transitive key → no pair exclusion.
         assert_eq!(grid[2], vm(&[1, 2, 3]));
+    }
+
+    // =====================================================================
+    // fnToBinaryKey / BinaryConstraint with valueOffset
+    // (ported from JS tests/handlers/binary.test.js)
+    // =====================================================================
+
+    #[test]
+    fn offset_shift_invariant_fn_produces_same_key() {
+        // a < b is shift-invariant: truth table same regardless of offset.
+        let key_no_offset = fn_to_binary_key(&|a: u8, b: u8| a < b, 4);
+        let key_offset = fn_to_binary_key_with_offset(&|a: u8, b: u8| a < b, 4, -1);
+        assert_eq!(key_offset, key_no_offset);
+    }
+
+    #[test]
+    fn offset_value_dependent_fn_produces_different_key() {
+        // a + b == 5 is value-dependent.
+        let key_no_offset = fn_to_binary_key(&|a: u8, b: u8| a + b == 5, 4);
+        let key_offset = fn_to_binary_key_with_offset(&|a: u8, b: u8| a + b == 5, 4, -1);
+        assert_ne!(key_offset, key_no_offset);
+    }
+
+    #[test]
+    fn offset_shifts_domain_correctly() {
+        // offset=-1, a+b===3 over domain 0-3 is equivalent to
+        // offset=0, a+b===5 over domain 1-4.
+        let key = fn_to_binary_key_with_offset(&|a: u8, b: u8| a + b == 3, 4, -1);
+        let key_equiv = fn_to_binary_key(&|a: u8, b: u8| a + b == 5, 4);
+        assert_eq!(key, key_equiv);
+    }
+
+    #[test]
+    fn binary_constraint_enforces_zero_based_key() {
+        // shape with offset=-1, "sum=3" key.
+        let shape = GridShape::build_with_offset(1, 4, 4, -1);
+        let key = fn_to_binary_key_with_offset(&|a: u8, b: u8| a + b == 3, 4, -1);
+        let mut handler = BinaryConstraint::from_key(0, 1, key, 4);
+        let all = CandidateSet::all(4);
+        let mut grid = vec![all; 4];
+        let ce = CellExclusions::with_num_cells(4);
+        let mut alloc = GridStateAllocator::new(4);
+        handler.initialize(&mut grid, &ce, shape, &mut alloc);
+
+        // Internal value 1 maps to external 0; partner must be external 3 = internal 4.
+        grid[0] = vm(&[1]);
+        grid[1] = vm(&[1, 2, 3, 4]);
+        let mut a = HandlerAccumulator::new_stub();
+        assert_eq!(handler.enforce_consistency(&mut grid, &mut a), true);
+        assert_eq!(grid[1], vm(&[4]));
     }
 }

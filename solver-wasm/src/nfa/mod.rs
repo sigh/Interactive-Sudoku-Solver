@@ -21,5 +21,5 @@ mod serializer;
 
 pub use compress::{compress_nfa, CompressedNfa};
 pub use nfa_core::Nfa;
-pub use regex::regex_to_nfa;
+pub use regex::{regex_to_nfa, regex_to_nfa_with_offset};
 pub use serializer::NfaSerializer;

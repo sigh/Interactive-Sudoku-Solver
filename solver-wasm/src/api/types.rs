@@ -98,13 +98,13 @@ pub struct StepOutput {
     pub has_contradiction: bool,
     /// The candidate values for the guess cell (present when guess_depth >= 0).
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub values: Option<Vec<Value>>,
+    pub values: Option<Vec<i32>>,
     /// The guess cell ID (e.g. "R5C3"), matching JS `makeCellIdFromIndex`.
     #[serde(rename = "guessCell", skip_serializing_if = "Option::is_none")]
     pub guess_cell: Option<String>,
     /// Per-cell diff pencilmarks (values removed since old_grid).
     #[serde(rename = "diffPencilmarks", skip_serializing_if = "Option::is_none")]
-    pub diff_pencilmarks: Option<Vec<Vec<Value>>>,
+    pub diff_pencilmarks: Option<Vec<Vec<i32>>>,
 }
 
 /// JSON output for an estimated-count-solutions request.

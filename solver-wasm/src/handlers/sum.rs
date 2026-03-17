@@ -102,7 +102,9 @@ const FLAG_CAGE: u8 = 0b10;
 ///
 /// Mirrors JS `Sum` from sum_handler.js.
 pub struct Sum {
-    /// Target sum value.
+    /// Raw (external) target sum value, as supplied by the user.
+    raw_sum: i32,
+    /// Target sum adjusted for value offset (used in enforcement).
     sum: i32,
     /// Cells this handler watches (union of all coefficient groups).
     cells: Vec<CellIndex>,
@@ -173,6 +175,7 @@ impl Sum {
         let all_cells: Vec<CellIndex> = cell_coeff.iter().map(|&(c, _)| c).collect();
 
         Sum {
+            raw_sum: sum,
             sum,
             cells: all_cells,
             coeff_groups,
@@ -221,9 +224,9 @@ impl Sum {
         self.coeff_groups.iter().all(|g| g.coeff == 1)
     }
 
-    /// Get the target sum.
+    /// Get the target sum (raw/external value, before offset adjustment).
     pub fn sum(&self) -> i32 {
-        self.sum
+        self.raw_sum
     }
 
     /// Get the coefficients (in cell order).
@@ -942,6 +945,17 @@ impl ConstraintHandler for Sum {
         self.num_values = shape.num_values;
         self.num_cells = shape.num_cells as usize;
 
+        // Adjust sum for value offset.
+        self.sum = self.raw_sum;
+        if shape.value_offset != 0 {
+            let coeff_sum: i32 = self
+                .coeff_groups
+                .iter()
+                .map(|g| g.coeff * g.cells.len() as i32)
+                .sum();
+            self.sum -= shape.value_offset as i32 * coeff_sum;
+        }
+
         // Partition each coefficient group's cells into exclusion groups.
         for g in &mut self.coeff_groups {
             g.exclusion_groups = find_exclusion_groups(&g.cells, cell_exclusions).groups;
@@ -1136,7 +1150,7 @@ impl ConstraintHandler for Sum {
     }
 
     fn id_str(&self) -> String {
-        let mut parts = vec![format!("Sum|{}", self.sum)];
+        let mut parts = vec![format!("Sum|{}", self.raw_sum)];
         for g in &self.coeff_groups {
             let cells_str: Vec<String> = g.cells.iter().map(|c| c.to_string()).collect();
             parts.push(format!("{}:{}", g.coeff, cells_str.join(",")));
@@ -1309,5 +1323,84 @@ mod tests {
         for &c in &cells {
             assert_eq!(grid[c as usize], expected);
         }
+    }
+
+    // =====================================================================
+    // valueOffset tests (ported from JS tests/handlers/sum.test.js)
+    // =====================================================================
+
+    fn vm(values: &[u8]) -> CandidateSet {
+        let mut raw: u16 = 0;
+        for &v in values {
+            raw |= 1 << (v - 1);
+        }
+        CandidateSet::from_raw(raw)
+    }
+
+    #[test]
+    fn test_sum_offset_adjusts_internal_sum() {
+        // External sum=6, offset=-1, 3 cells → internal sum = 6 - (-1)*3 = 9.
+        let shape = GridShape::build_with_offset(1, 9, 9, -1);
+        let mut sum = Sum::new_cage(vec![0, 1, 2], 6);
+        let ce = CellExclusions::new();
+        let mut grid = vec![CandidateSet::all(9); shape.num_cells];
+        assert!(sum.initialize(
+            &mut grid,
+            &ce,
+            shape,
+            &mut GridStateAllocator::new(shape.num_cells)
+        ));
+
+        // idStr should use the original (external) sum.
+        assert!(sum.id_str().contains("|6|") || sum.id_str().contains("|6"),
+                "idStr should use external sum: {}", sum.id_str());
+
+        // Internal [2,3,4] sums to 9 (the adjusted internal sum).
+        grid[0] = vm(&[2]);
+        grid[1] = vm(&[3]);
+        grid[2] = vm(&[4]);
+        let mut acc = HandlerAccumulator::new_stub();
+        assert!(sum.enforce_consistency(&mut grid, &mut acc));
+    }
+
+    #[test]
+    fn test_sum_no_offset_does_not_adjust() {
+        let mut sum = Sum::new_cage(vec![0, 1, 2], 9);
+        let ce = CellExclusions::new();
+        let mut grid = [CandidateSet::all(9); 81];
+        assert!(sum.initialize(
+            &mut grid,
+            &ce,
+            GridShape::default_9x9(),
+            &mut GridStateAllocator::new(81)
+        ));
+
+        grid[0] = vm(&[2]);
+        grid[1] = vm(&[3]);
+        grid[2] = vm(&[4]);
+        let mut acc = HandlerAccumulator::new_stub();
+        assert!(sum.enforce_consistency(&mut grid, &mut acc));
+    }
+
+    #[test]
+    fn test_sum_make_equal_adjusts_for_offset() {
+        let shape = GridShape::build_with_offset(1, 6, 6, -1);
+        let mut handler = Sum::make_equal(&[0, 1], &[2]);
+        let ce = CellExclusions::with_num_cells(shape.num_cells);
+        let mut grid = vec![CandidateSet::all(6); shape.num_cells];
+        assert!(handler.initialize(
+            &mut grid,
+            &ce,
+            shape,
+            &mut GridStateAllocator::new(shape.num_cells)
+        ));
+
+        // Internal: 2+5=7, cell2=6 → 7-6=1 which equals the adjusted internal sum.
+        grid[0] = vm(&[2]);
+        grid[1] = vm(&[5]);
+        grid[2] = vm(&[6]);
+        let mut acc = HandlerAccumulator::new_stub();
+        assert!(handler.enforce_consistency(&mut grid, &mut acc),
+                "makeEqual with offset should enforce equal external sums");
     }
 }

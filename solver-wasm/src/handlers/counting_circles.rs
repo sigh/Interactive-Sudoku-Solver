@@ -22,6 +22,8 @@ pub struct CountingCircles {
     /// All bitmasks (subsets of 1..=numValues) whose value-sum equals numCells.
     combinations: Vec<CandidateSet>,
     num_values: u8,
+    /// Value offset from grid shape.
+    value_offset: i8,
     /// Per-cell bitmask: bit i set if this cell belongs to exclusion group i.
     exclusion_map: Vec<u16>,
     /// The exclusion groups from `find_exclusion_groups`.
@@ -38,6 +40,7 @@ impl CountingCircles {
             cells,
             combinations: Vec::new(),
             num_values: 0,
+            value_offset: 0,
             exclusion_map: Vec::new(),
             exclusion_groups: Vec::new(),
             exclusion_complements: Vec::new(),
@@ -63,12 +66,18 @@ impl ConstraintHandler for CountingCircles {
     ) -> bool {
         let num_cells = self.cells.len();
         let num_values = shape.num_values;
-        let tables = LookupTables::get(num_values);
+        let value_offset = shape.value_offset;
+        self.value_offset = value_offset;
+
+        // With offset, external 0 can't appear (0 occurrences = contradiction),
+        // so valid external values are 1..(numValues+valueOffset).
+        // Use maxValue() for the lookup table to get the right combinations.
+        let max_value = shape.max_value() as u8;
+        let tables = LookupTables::get(max_value);
 
         // Collect all value bitmasks whose digit-sum equals numCells.
-        // Mirrors JS `_sumCombinations(numValues)[numCells]`.
         let target_sum = num_cells as u8;
-        let combinations: Vec<CandidateSet> = (0..tables.combinations)
+        let mut combinations: Vec<CandidateSet> = (0..tables.combinations)
             .filter(|&i| tables.sum[i] == target_sum)
             .map(|i| CandidateSet::from_raw(i as u16))
             .collect();
@@ -77,12 +86,23 @@ impl ConstraintHandler for CountingCircles {
             return false;
         }
 
+        // With offset, shift combinations to align with internal value bits.
+        if value_offset != 0 {
+            let shift = (-value_offset) as u32;
+            combinations = combinations
+                .iter()
+                .map(|&c| CandidateSet::from_raw(c.raw() << shift))
+                .collect();
+        }
+
         let eg_data = find_exclusion_groups(&self.cells, cell_exclusions);
         let num_groups = eg_data.groups.len();
 
         // Restrict cells to values that can actually appear given the exclusion
         // group count.  No value can appear more times than there are groups.
-        let max_groups_mask = CandidateSet::from_raw((1u16 << num_groups) - 1);
+        let max_groups_mask = CandidateSet::from_raw(
+            (1u16 << (num_groups as i32 - value_offset as i32) as u32) - 1,
+        );
         let allowed_values = combinations
             .iter()
             .fold(CandidateSet::EMPTY, |a, &c| a | c)
@@ -182,8 +202,9 @@ impl ConstraintHandler for CountingCircles {
         // Per-value constraint.  Iterate from highest to lowest since larger
         // values are more constrained.
         let exclusion_map = &self.exclusion_map;
-        for j in (1..=self.num_values).rev() {
-            let v = CandidateSet::from_value(j);
+        let value_offset = self.value_offset;
+        for j in (1..=(self.num_values as i32 + value_offset as i32)).rev() {
+            let v = CandidateSet::from_offset_value(j, value_offset);
             if (v & allowed_values).is_empty() {
                 continue;
             }
@@ -379,6 +400,73 @@ mod tests {
 
         // After init, allowed values from combos with sum=2: just {2}.
         // So cells already restricted to {2}. Enforce should confirm both = {2}.
+        let mut a = acc();
+        assert!(handler.enforce_consistency(&mut grid, &mut a));
+        assert_eq!(grid[0], vm(&[2]));
+        assert_eq!(grid[1], vm(&[2]));
+    }
+
+    // =====================================================================
+    // Offset (0-indexed) tests (ported from JS tests/handlers/counting_circles.test.js)
+    // =====================================================================
+
+    #[test]
+    fn offset_init_excludes_external_0_and_shifts_combos() {
+        // 2 cells, offset=-1, numValues=4: external 0-3, internal 1-4.
+        // External 0 can't appear. Valid external values: {1,2,3}.
+        // Combos with external sum=2: {2} → internal {3}. Both cells must be 3.
+        let (mut grid, shape) = make_grid_offset(1, 4, 4, -1);
+        let ce = CellExclusions::with_num_cells(4);
+        let mut handler = CountingCircles::new(vec![0, 1]);
+        init_with(&mut handler, &mut grid, shape, &ce);
+
+        let mut a = acc();
+        assert!(handler.enforce_consistency(&mut grid, &mut a));
+        assert_eq!(grid[0], vm(&[3]));
+        assert_eq!(grid[1], vm(&[3]));
+    }
+
+    #[test]
+    fn offset_enforce_uses_shifted_counts() {
+        // 3 cells, offset=-1. Fix cell 0 to internal 2 (ext 1) → only
+        // combo {2,3} survives. Internal 3 (ext 2) must appear twice.
+        let (mut grid, shape) = make_grid_offset(1, 4, 4, -1);
+        let ce = CellExclusions::with_num_cells(4);
+        let mut handler = CountingCircles::new(vec![0, 1, 2]);
+        init_with(&mut handler, &mut grid, shape, &ce);
+
+        grid[0] = vm(&[2]); // internal 2 (external 1 → appears once)
+
+        let mut a = acc();
+        assert!(handler.enforce_consistency(&mut grid, &mut a));
+        assert_eq!(grid[1], vm(&[3]));
+        assert_eq!(grid[2], vm(&[3]));
+    }
+
+    #[test]
+    fn offset_too_many_of_a_value_fails() {
+        // Internal 2 (external 1) should appear exactly 1 time.
+        let (mut grid, shape) = make_grid_offset(1, 4, 4, -1);
+        let ce = CellExclusions::with_num_cells(4);
+        let mut handler = CountingCircles::new(vec![0, 1, 2]);
+        init_with(&mut handler, &mut grid, shape, &ce);
+
+        grid[0] = vm(&[2]);
+        grid[1] = vm(&[2]);
+        grid[2] = vm(&[2]);
+
+        let mut a = acc();
+        assert!(!handler.enforce_consistency(&mut grid, &mut a));
+    }
+
+    #[test]
+    fn offset_0_unchanged_behavior() {
+        // Same as the non-offset "exact count" test. 2 cells, sum=2, combo: {2}.
+        let (mut grid, shape) = make_grid(1, 4, Some(4));
+        let ce = CellExclusions::with_num_cells(4);
+        let mut handler = CountingCircles::new(vec![0, 1]);
+        init_with(&mut handler, &mut grid, shape, &ce);
+
         let mut a = acc();
         assert!(handler.enforce_consistency(&mut grid, &mut a));
         assert_eq!(grid[0], vm(&[2]));

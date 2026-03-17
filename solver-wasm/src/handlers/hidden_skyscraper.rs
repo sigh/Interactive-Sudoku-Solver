@@ -17,6 +17,8 @@ use super::ConstraintHandler;
 
 pub struct HiddenSkyscraper {
     cells: Vec<CellIndex>,
+    /// The raw external hidden value (before offset conversion).
+    first_hidden_value: u8,
     /// The target value bitmask (single bit for the hidden value).
     target_v: CandidateSet,
 }
@@ -25,7 +27,8 @@ impl HiddenSkyscraper {
     pub fn new(cells: Vec<CellIndex>, first_hidden_value: u8) -> Self {
         HiddenSkyscraper {
             cells,
-            target_v: CandidateSet::from_value(first_hidden_value),
+            first_hidden_value,
+            target_v: CandidateSet::EMPTY,
         }
     }
 }
@@ -39,9 +42,13 @@ impl ConstraintHandler for HiddenSkyscraper {
         &mut self,
         initial_grid: &mut [CandidateSet],
         _cell_exclusions: &CellExclusions,
-        _shape: GridShape,
+        shape: GridShape,
         _state_allocator: &mut GridStateAllocator,
     ) -> bool {
+        self.target_v = CandidateSet::from_offset_value(
+            self.first_hidden_value as i32,
+            shape.value_offset,
+        );
         // The first cell is always visible, so it can never be the hidden value.
         // Mirrors JS: `if (!(initialGridCells[this.cells[0]] &= ~this._targetV)) return false;`
         let c0 = self.cells[0] as usize;
@@ -161,7 +168,7 @@ impl ConstraintHandler for HiddenSkyscraper {
     fn id_str(&self) -> String {
         format!(
             "HiddenSkyscraper-{}-{:?}",
-            self.target_v.min_value(),
+            self.first_hidden_value,
             self.cells
         )
     }
@@ -347,6 +354,48 @@ mod tests {
         assert!(
             !handler.enforce_consistency(&mut grid, &mut a),
             "should fail when 2 cannot be hidden"
+        );
+    }
+
+    // =====================================================================
+    // Offset (0-indexed) tests (ported from JS hidden_skyscraper.test.js)
+    // =====================================================================
+
+    #[test]
+    fn offset_external_1_maps_to_internal_2() {
+        // External firstHidden=1, offset=-1 → internal 2.
+        let (mut grid, shape) = make_grid_offset(1, 4, 4, -1);
+        let cells: Vec<CellIndex> = (0..4).collect();
+        let mut handler = HiddenSkyscraper::new(cells, 1); // external value 1
+        init(&mut handler, &mut grid, shape);
+
+        // First cell should not contain internal 2 (the target).
+        assert_eq!(
+            grid[0] & CandidateSet::from_value(2),
+            CandidateSet::EMPTY,
+            "first cell should not contain the target (internal 2)"
+        );
+        assert_eq!(grid[0], vm(&[1, 3, 4]));
+    }
+
+    #[test]
+    fn offset_enforce_consistency_works_with_offset() {
+        // External firstHidden=0, offset=-1 → internal 1.
+        let (mut grid, shape) = make_grid_offset(1, 3, 3, -1);
+        let cells: Vec<CellIndex> = (0..3).collect();
+        let mut handler = HiddenSkyscraper::new(cells, 0); // external value 0
+        init(&mut handler, &mut grid, shape);
+
+        grid[0] = vm(&[3]); // Internal 3: > internal 1, hides it
+        grid[1] = vm(&[1]); // Internal 1 is here and hidden
+        grid[2] = vm(&[1, 2, 3]);
+
+        assert!(enforce(&handler, &mut grid));
+        // Internal 1 should be cleared from cell 2 (after first hidden found).
+        assert_eq!(
+            grid[2] & CandidateSet::from_value(1),
+            CandidateSet::EMPTY,
+            "cell 2 should not have internal 1"
         );
     }
 }

@@ -37,13 +37,13 @@ enum AstNode {
 // Character ↔ value mapping
 // ============================================================================
 
-/// Map a character to a 1-based value.
-/// '1'–'9' → 1–9, 'A'–'Z'/'a'–'z' → 10–35.
-fn char_to_value(ch: u8) -> Result<Value, String> {
+/// Map a character to a numeric value.
+/// '0'–'9' → 0–9, 'A'–'Z'/'a'–'z' → 10–35.
+fn char_to_value(ch: u8) -> Result<i32, String> {
     match ch {
-        b'1'..=b'9' => Ok(ch - b'0'),
-        b'A'..=b'Z' => Ok(ch - b'A' + 10),
-        b'a'..=b'z' => Ok(ch - b'a' + 10),
+        b'0'..=b'9' => Ok((ch - b'0') as i32),
+        b'A'..=b'Z' => Ok((ch - b'A' + 10) as i32),
+        b'a'..=b'z' => Ok((ch - b'a' + 10) as i32),
         _ => Err(format!(
             "Unsupported character '{}' in regex constraint",
             ch as char
@@ -51,16 +51,20 @@ fn char_to_value(ch: u8) -> Result<Value, String> {
     }
 }
 
-/// Convert a character to a symbol value, checking against num_values.
-fn char_to_symbol(ch: u8, num_values: u8) -> Result<u8, String> {
+/// Convert a character to an internal symbol value (1-indexed), checking range.
+/// `value_offset` shifts the valid external range: min_value = 1+offset, max_value = num_values+offset.
+fn char_to_symbol(ch: u8, num_values: u8, value_offset: i8) -> Result<u8, String> {
     let value = char_to_value(ch)?;
-    if value < 1 || value > num_values {
+    let min_value = 1i32 + value_offset as i32;
+    let max_value = num_values as i32 + value_offset as i32;
+    if value < min_value || value > max_value {
         return Err(format!(
-            "Character '{}' exceeds shape value count ({})",
-            ch as char, num_values
+            "Character '{}' is out of range ({}-{})",
+            ch as char, min_value, max_value
         ));
     }
-    Ok(value)
+    // Convert to internal 1-indexed symbol.
+    Ok((value - value_offset as i32) as u8)
 }
 
 // ============================================================================
@@ -327,13 +331,19 @@ struct Fragment {
 struct RegexToNfaBuilder {
     nfa: Nfa,
     num_values: u8,
+    value_offset: i8,
 }
 
 impl RegexToNfaBuilder {
     fn new(num_values: u8) -> Self {
+        Self::new_with_offset(num_values, 0)
+    }
+
+    fn new_with_offset(num_values: u8, value_offset: i8) -> Self {
         Self {
             nfa: Nfa::with_state_limit(super::nfa_core::MAX_STATE_COUNT_PUB),
             num_values,
+            value_offset,
         }
     }
 
@@ -371,7 +381,7 @@ impl RegexToNfaBuilder {
         let symbols: Vec<u8> = if negated {
             let exclude: std::collections::HashSet<u8> = chars
                 .iter()
-                .filter_map(|&ch| char_to_symbol(ch, self.num_values).ok())
+                .filter_map(|&ch| char_to_symbol(ch, self.num_values, self.value_offset).ok())
                 .collect();
             (1..=self.num_values)
                 .filter(|v| !exclude.contains(v))
@@ -379,7 +389,7 @@ impl RegexToNfaBuilder {
         } else {
             chars
                 .iter()
-                .filter_map(|&ch| char_to_symbol(ch, self.num_values).ok())
+                .filter_map(|&ch| char_to_symbol(ch, self.num_values, self.value_offset).ok())
                 .collect()
         };
 
@@ -476,13 +486,18 @@ impl RegexToNfaBuilder {
 
 /// Compile a regex pattern into an optimized NFA.
 ///
-/// Mirrors JS `regexToNFA(pattern, numSymbols)` from `nfa_builder.js`.
+/// Mirrors JS `regexToNFA(pattern, numSymbols, valueOffset)` from `nfa_builder.js`.
 pub fn regex_to_nfa(pattern: &str, num_values: u8) -> Result<Nfa, String> {
+    regex_to_nfa_with_offset(pattern, num_values, 0)
+}
+
+/// Like `regex_to_nfa` but with an explicit value offset.
+pub fn regex_to_nfa_with_offset(pattern: &str, num_values: u8, value_offset: i8) -> Result<Nfa, String> {
     let mut parser = RegexParser::new(pattern);
     let ast = parser.parse().map_err(|e| {
         format!("Regex \"{}\" could not be compiled: {}", pattern, e)
     })?;
-    let builder = RegexToNfaBuilder::new(num_values);
+    let builder = RegexToNfaBuilder::new_with_offset(num_values, value_offset);
     let mut nfa = builder.build(ast);
     optimize_nfa(&mut nfa, usize::MAX, false);
     Ok(nfa)
@@ -492,6 +507,7 @@ pub fn regex_to_nfa(pattern: &str, num_values: u8) -> Result<Nfa, String> {
 mod tests {
     use super::*;
     use super::super::compress::compress_nfa;
+    use super::super::compress::CompressedNfa;
 
     #[test]
     fn test_literal_pattern() {
@@ -540,5 +556,71 @@ mod tests {
         let mut nfa = regex_to_nfa("(1|2)(3|4){2,4}[5-9]+", 9).unwrap();
         let cnfa = compress_nfa(&mut nfa);
         assert!(cnfa.num_states > 0);
+    }
+
+    // =====================================================================
+    // Offset (0-indexed) tests (ported from JS nfa_builder.test.js)
+    // =====================================================================
+
+    /// Helper: check if a compressed NFA accepts a sequence of internal values.
+    fn nfa_accepts(cnfa: &CompressedNfa, values: &[u8]) -> bool {
+        use crate::bit_set::BitSet;
+        let mut current = BitSet::with_capacity(cnfa.num_states);
+        for i in 0..cnfa.num_states {
+            if cnfa.is_start(i) {
+                current.add(i);
+            }
+        }
+        for &v in values {
+            let symbol_mask = 1u16 << (v - 1);
+            let mut next = BitSet::with_capacity(cnfa.num_states);
+            for state in 0..cnfa.num_states {
+                if !current.has(state) {
+                    continue;
+                }
+                for &entry in cnfa.transitions(state) {
+                    let mask = entry as u16;
+                    let target = (entry >> 16) as usize;
+                    if mask & symbol_mask != 0 {
+                        next.add(target);
+                    }
+                }
+            }
+            current = next;
+        }
+        for state in 0..cnfa.num_states {
+            if current.has(state) && cnfa.is_accepting(state) {
+                return true;
+            }
+        }
+        false
+    }
+
+    #[test]
+    fn test_regex_offset_minus_1_accepts_0_char() {
+        // With offset=-1, regex '03' means external 0,3 → internal 1,4.
+        let mut nfa = regex_to_nfa_with_offset("03", 4, -1).unwrap();
+        let cnfa = compress_nfa(&mut nfa);
+        assert!(nfa_accepts(&cnfa, &[1, 4]), "external 0,3 maps to internal 1,4");
+        assert!(!nfa_accepts(&cnfa, &[1, 3]), "mismatch should reject");
+    }
+
+    #[test]
+    fn test_regex_charset_offset_minus_1_includes_0() {
+        // [0-2] with offset=-1: external 0,1,2 → internal 1,2,3.
+        let mut nfa = regex_to_nfa_with_offset("[0-2]", 4, -1).unwrap();
+        let cnfa = compress_nfa(&mut nfa);
+        assert!(nfa_accepts(&cnfa, &[1]), "external 0 → internal 1");
+        assert!(nfa_accepts(&cnfa, &[2]), "external 1 → internal 2");
+        assert!(nfa_accepts(&cnfa, &[3]), "external 2 → internal 3");
+        assert!(!nfa_accepts(&cnfa, &[4]), "external 3 not in [0-2]");
+    }
+
+    #[test]
+    fn test_regex_offset_0_unchanged() {
+        let mut nfa = regex_to_nfa_with_offset("12", 9, 0).unwrap();
+        let cnfa = compress_nfa(&mut nfa);
+        assert!(nfa_accepts(&cnfa, &[1, 2]));
+        assert!(!nfa_accepts(&cnfa, &[1, 3]));
     }
 }

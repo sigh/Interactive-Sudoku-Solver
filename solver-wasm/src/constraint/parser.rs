@@ -1373,7 +1373,6 @@ fn parse_quad(args: &[&str], constraints: &mut Vec<Constraint>) -> Result<(), St
     let values: Vec<Value> = args[1..]
         .iter()
         .filter_map(|s| s.parse::<Value>().ok())
-        .filter(|&v| v >= 1)
         .collect();
     if !values.is_empty() {
         constraints.push(Constraint::Quad { top_left, values });
@@ -1877,11 +1876,12 @@ fn parse_given_arg(arg: &str, shape: GridShape) -> Result<(String, usize, Vec<Va
         .map_err(|e| format!("Invalid given cell ID: {}", e))?;
     let cell_idx = coord.cell;
 
-    let nv = shape.num_values;
+    let min_val = shape.min_value() as u8;
+    let max_val = shape.max_value() as u8;
     let values: Vec<Value> = parts[1..]
         .iter()
         .filter_map(|s| s.parse::<u8>().ok())
-        .filter(|&v| v >= 1 && v <= nv)
+        .filter(|&v| v >= min_val && v <= max_val)
         .collect();
 
     if values.is_empty() {

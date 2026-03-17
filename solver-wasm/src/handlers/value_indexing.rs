@@ -24,6 +24,8 @@ pub struct ValueIndexing {
     value_cell: CellIndex,
     control_cell: CellIndex,
     indexed_cells: Vec<CellIndex>,
+    /// Bit shift for 0-based offset: `-value_offset`.
+    control_shift: u8,
 }
 
 impl ValueIndexing {
@@ -40,6 +42,7 @@ impl ValueIndexing {
             value_cell,
             control_cell,
             indexed_cells,
+            control_shift: 0,
         }
     }
 }
@@ -57,12 +60,13 @@ impl ConstraintHandler for ValueIndexing {
         &mut self,
         initial_grid: &mut [CandidateSet],
         _cell_exclusions: &CellExclusions,
-        _shape: GridShape,
+        shape: GridShape,
         _state_allocator: &mut GridStateAllocator,
     ) -> bool {
-        // Clamp the control cell to the number of indexed cells.
         let num_cells = self.indexed_cells.len();
-        let mask = CandidateSet::from_raw((1u16 << num_cells) - 1);
+        let shift = (-shape.value_offset) as u8;
+        self.control_shift = shift;
+        let mask = CandidateSet::from_raw(((1u16 << num_cells) - 1) << shift);
         initial_grid[self.control_cell as usize] &= mask;
         if initial_grid[self.control_cell as usize].is_empty() {
             return false;
@@ -82,7 +86,7 @@ impl ConstraintHandler for ValueIndexing {
         let mut possible_values = CandidateSet::EMPTY;
         let mut possible_control = CandidateSet::EMPTY;
 
-        let mut bit = CandidateSet::from_value(1);
+        let mut bit = CandidateSet::from_raw(1u16 << self.control_shift);
         for i in 0..num_cells {
             if !(original_control & bit).is_empty() {
                 let cell_vals = grid[indexed_cells[i] as usize] & original_values;
@@ -96,7 +100,7 @@ impl ConstraintHandler for ValueIndexing {
 
         // If there is a single valid control value, constrain the indexed cell.
         if possible_control.is_single() && !possible_control.is_empty() {
-            let index = possible_control.min_value() as usize - 1;
+            let index = possible_control.min_value() as usize - 1 - self.control_shift as usize;
             let cell = indexed_cells[index] as usize;
             let new_v = grid[cell] & possible_values;
             if new_v.is_empty() {
@@ -275,5 +279,25 @@ mod tests {
         assert!(init(&mut handler, &mut grid, shape));
         // Control cell (cell 1) should have values 1-6 (min of numValues, indexed count).
         assert_eq!(grid[1], vm(&[1, 2, 3, 4, 5, 6]));
+    }
+
+    // =====================================================================
+    // Offset (0-indexed) tests (ported from JS value_indexing.test.js)
+    // =====================================================================
+
+    #[test]
+    fn offset_control_shifted_with_offset_minus_1() {
+        let (mut grid, shape) = make_grid_offset(1, 5, 5, -1);
+        let mut handler = ValueIndexing::new(vec![0, 1, 2, 3, 4]);
+        init(&mut handler, &mut grid, shape);
+
+        grid[0] = vm(&[3]); // Value cell - internal 3 (ext 2)
+        grid[1] = vm(&[2, 3, 4]); // Control: internal 2-4 (ext 1-3)
+        grid[2] = vm(&[1, 2]); // Indexed[0] - no internal 3
+        grid[3] = vm(&[3, 4]); // Indexed[1] - has internal 3
+        grid[4] = vm(&[2, 4]); // Indexed[2] - no internal 3
+
+        assert!(enforce(&handler, &mut grid));
+        assert_eq!(grid[1], vm(&[3]), "control should be int 3 (ext 2)");
     }
 }

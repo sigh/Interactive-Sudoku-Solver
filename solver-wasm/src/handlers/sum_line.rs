@@ -23,6 +23,8 @@ use super::ConstraintHandler;
 pub struct SumLine {
     cells: Vec<CellIndex>,
     sum: u32,
+    /// Value offset from grid shape.
+    value_offset: i8,
     /// Initial partial-sum state.
     /// Non-loop: bit 0 set only (partial sum starts at 0).
     /// Loop: all bits 0..sum set ((1 << sum) - 1).
@@ -38,6 +40,7 @@ impl SumLine {
         Self {
             cells,
             sum,
+            value_offset: 0,
             initial_state,
             states: RefCell::new(vec![0u32; num_cells + 1]),
         }
@@ -51,13 +54,14 @@ impl SumLine {
         let cells = &self.cells;
         let num_cells = cells.len();
         let sum = self.sum;
+        let value_offset = self.value_offset;
 
         // Forward pass: propagate partial sums left-to-right.
         for i in 0..num_cells {
             let mut next_state = 0u32;
             let values = grid[cells[i] as usize];
             for v in values.iter() {
-                let val = v.min_value() as u32;
+                let val = v.offset_value(value_offset) as u32;
                 next_state |= states[i] << val;
             }
             // Modular wrap: if bit `sum` is set, also set bit 0
@@ -68,7 +72,6 @@ impl SumLine {
 
         // Loop closure: intersect forward-projected final state with the
         // starting state so only consistent loop points survive.
-        // JS: `states[0] = (states[numCells] &= states[0])`
         let new_s0 = states[num_cells] & states[0];
         states[num_cells] = new_s0;
         states[0] = new_s0;
@@ -80,7 +83,7 @@ impl SumLine {
             let mut possible_values = 0u16;
             let values = grid[cells[i] as usize];
             for v in values.iter() {
-                let val = v.min_value() as u32;
+                let val = v.offset_value(value_offset) as u32;
                 let after_state = states[i + 1];
                 // Unwrap modular: bit 0 is equivalent to bit `sum`.
                 let possible_before =
@@ -106,23 +109,25 @@ impl SumLine {
     /// Mirrors JS `_checkTotalSum`.
     fn check_total_sum(&self, grid: &[CandidateSet]) -> bool {
         let sum = self.sum;
+        let num_cells = self.cells.len() as u32;
         let mut min_max: u32 = 0;
         for &cell in &self.cells {
             min_max += grid[cell as usize].min_max_packed();
         }
         // min_max_packed layout: [min in upper 16 bits, max in lower 16 bits].
-        let max_total = (min_max & 0xffff) as u32;
-        let min_total = (min_max >> 16) as u32;
+        let offset_adj = self.value_offset as i32 * num_cells as i32;
+        let max_total = (min_max & 0xffff) as i32 + offset_adj;
+        let min_total = (min_max >> 16) as i32 + offset_adj;
 
-        if max_total < sum {
+        if max_total < sum as i32 {
             return false;
         }
-        let max_remainder = max_total % sum;
+        let max_remainder = max_total as u32 % sum;
         if max_remainder == 0 {
             return true;
         }
         // For total to be a multiple of sum, min and max must straddle a multiple.
-        min_total < max_total - max_remainder
+        (min_total as u32) < max_total as u32 - max_remainder
     }
 }
 
@@ -139,9 +144,10 @@ impl ConstraintHandler for SumLine {
         &mut self,
         _initial_grid: &mut [CandidateSet],
         _cell_exclusions: &CellExclusions,
-        _shape: GridShape,
+        shape: GridShape,
         _state_allocator: &mut GridStateAllocator,
     ) -> bool {
+        self.value_offset = shape.value_offset;
         true
     }
 
@@ -276,5 +282,65 @@ mod tests {
         let mut a = acc();
         assert!(handler.enforce_consistency(&mut grid, &mut a));
         assert_eq!(grid[0], vm(&[3]), "only value 3 makes partial sum = 3");
+    }
+
+    // =====================================================================
+    // Offset (0-indexed) tests (ported from JS tests/handlers/sum_line.test.js)
+    // =====================================================================
+
+    #[test]
+    fn offset_external_values_used_for_partial_sums() {
+        // 2 cells, sum=3, offset=-1. Valid: ext 0+3=3, 3+0=3, 1+2=3, 2+1=3.
+        let (mut grid, shape) = make_grid_offset(1, 4, 4, -1);
+        let mut handler = SumLine::new(vec![0, 1], false, 3);
+        init(&mut handler, &mut grid, shape);
+
+        grid[0] = vm(&[1, 4]); // int 1 (ext 0) and int 4 (ext 3)
+        grid[1] = vm(&[1, 4]);
+
+        assert!(enforce(&handler, &mut grid));
+        assert_eq!(grid[0], vm(&[1, 4]));
+        assert_eq!(grid[1], vm(&[1, 4]));
+    }
+
+    #[test]
+    fn offset_constrains_cell_to_correct_external_value() {
+        // Cell 0 fixed ext 1 (int 2) → cell 1 must be ext 2 (int 3) for total=3.
+        let (mut grid, shape) = make_grid_offset(1, 4, 4, -1);
+        let mut handler = SumLine::new(vec![0, 1], false, 3);
+        init(&mut handler, &mut grid, shape);
+
+        grid[0] = vm(&[2]);           // fixed: int 2 (ext 1)
+        grid[1] = vm(&[1, 2, 3, 4]); // all candidates
+
+        assert!(enforce(&handler, &mut grid));
+        assert_eq!(grid[1], vm(&[3]), "only internal 3 (external 2) gives total 3");
+    }
+
+    #[test]
+    fn offset_non_multiple_external_sum_fails() {
+        // ext 0 + ext 1 = 1, 1 mod 3 ≠ 0 → fail.
+        let (mut grid, shape) = make_grid_offset(1, 4, 4, -1);
+        let mut handler = SumLine::new(vec![0, 1], false, 3);
+        init(&mut handler, &mut grid, shape);
+
+        grid[0] = vm(&[1]); // ext 0
+        grid[1] = vm(&[2]); // ext 1
+
+        assert!(!enforce(&handler, &mut grid));
+    }
+
+    #[test]
+    fn offset_0_unchanged_behavior() {
+        let (mut grid, shape) = make_grid(1, 4, Some(4));
+        let mut handler = SumLine::new(vec![0, 1], false, 3);
+        init(&mut handler, &mut grid, shape);
+
+        grid[0] = vm(&[1, 2]);
+        grid[1] = vm(&[1, 2]);
+
+        assert!(enforce(&handler, &mut grid));
+        assert_eq!(grid[0], vm(&[1, 2]));
+        assert_eq!(grid[1], vm(&[1, 2]));
     }
 }
