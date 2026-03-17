@@ -600,22 +600,12 @@ class ConstraintManager {
     this.runUpdateCallback();
   }
 
-  _updateNonDefaultNumValuesWarning() {
-    if (!this._shape) return;
-
-    const displayWarning = (
-      !this._shape.isDefaultNumValues() || this._shape.valueOffset !== 0);
-    this._nonDefaultNumValuesWarningElem.style.display =
-      displayWarning ? '' : 'none';
-  }
-
   _reshape(shape) {
     if (this._shape === shape) return;
 
     this.clear();
     this._shape = shape;
 
-    this._updateNonDefaultNumValuesWarning();
     for (const listener of this._reshapeListeners) {
       listener.reshape(shape);
     }
@@ -646,8 +636,7 @@ class ConstraintManager {
   }
 
   _setUp(inputManager, displayContainer) {
-    this._nonDefaultNumValuesWarningElem = document.getElementById('numvalues-experimental-warning');
-    this._updateNonDefaultNumValuesWarning();
+
 
     let selectedConstraintCollection = null;
     const constraintPanel = document.getElementById(

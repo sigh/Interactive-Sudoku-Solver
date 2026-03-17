@@ -155,6 +155,8 @@ ConstraintCategoryInput.Shape = class Shape extends ConstraintCategoryInput {
     this._input = document.getElementById('shape-input');
     this._minSelect = document.getElementById('value-range-min');
     this._maxSelect = document.getElementById('value-range-max');
+    this._warningElem = document.getElementById('shape-experimental-warning');
+    this._warningIcon = document.getElementById('shape-warning-icon');
 
     this._setUpGridInput();
     this._setUpValueRangeDropdowns();
@@ -307,6 +309,11 @@ ConstraintCategoryInput.Shape = class Shape extends ConstraintCategoryInput {
     this._input.value = shape.gridDimsStr;
     this._input.setCustomValidity('');
     this._updateValueRangeDropdowns(shape);
+
+    const showWarning =
+      !shape.isDefaultNumValues() || shape.valueOffset !== 0;
+    this._warningElem.style.display = showWarning ? '' : 'none';
+    this._warningIcon.style.display = showWarning ? '' : 'none';
   }
 
   getConstraintInputElement(constraintClass) {

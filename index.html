@@ -315,9 +315,7 @@ layout: null
       <div id="dim-constraints-warning" class="notice notice-warning" style="display:none">
         Constraints are dimmed.
       </div>
-      <div id="numvalues-experimental-warning" class="notice notice-warning" style="display:none">
-        Non-default value range is experimental.
-      </div>
+
       <span id="example-select-container" class="hstack">
         <select disabled>
           <option>⎯⎯ Load an example ⎯⎯</option>
@@ -410,8 +408,8 @@ layout: null
 
             <div class="vstack">
               <div id="shape-panel" class="constraint-panel hide-until-load">
-                <h2>Shape</h2>
-                <div>
+                <h2><span id="shape-warning-icon" style="display:none">⚠️ </span>Shape</h2>
+                <div class="vstack">
                   <div class="shape-panel-body">
                     <label>Grid</label>
                     <span class="shape-input-container">
@@ -433,6 +431,9 @@ layout: null
                       &ndash;
                       <select id="value-range-max"></select>
                     </span>
+                  </div>
+                  <div id="shape-experimental-warning" class="notice notice-warning" style="display:none">
+                    Non-default value ranges are experimental
                   </div>
                 </div>
               </div>
