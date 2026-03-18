@@ -382,6 +382,11 @@ await runTest('baseCharCode returns 1 for offset 0', () => {
   assert.equal(GridShape.baseCharCode(shape), '1'.charCodeAt(0));
 });
 
+await runTest('baseCharCode returns 0 for 0-9 grid', () => {
+  const shape = GridShape.fromGridSize(9, 9, 10, -1);
+  assert.equal(GridShape.baseCharCode(shape), '0'.charCodeAt(0));
+});
+
 await runTest('baseCharCode returns A for large numValues', () => {
   const shape = GridShape.fromGridSize(16);
   assert.equal(GridShape.baseCharCode(shape), 'A'.charCodeAt(0));

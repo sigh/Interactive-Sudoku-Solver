@@ -68,7 +68,7 @@ export class GridShape {
   }
 
   static baseCharCode(shape) {
-    if (shape.numValues >= 10) return 'A'.charCodeAt(0);
+    if (shape.numValues + shape.valueOffset > 9) return 'A'.charCodeAt(0);
     return '1'.charCodeAt(0) + shape.valueOffset;
   }
 
