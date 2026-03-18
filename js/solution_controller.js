@@ -419,6 +419,7 @@ export class SolutionController {
     this._diffDisplay.clear();
     this._stateDisplay.clear();
     this._debugManager.clear();
+    this._flameGraphManager.clear();
     this._showIterationControls(false);
     clearDOMNode(this._elements.error);
     clearDOMNode(this._elements.iterationState);
