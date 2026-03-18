@@ -216,14 +216,20 @@ const loadInput = async (puzzle) => {
   return puzzle.input;
 };
 
-const assertPuzzleSolution = (puzzle, solution) => {
+const assertPuzzleSolution = (puzzle, solution, solutionCount) => {
   if (puzzle.solution === undefined) return;
   if (!puzzle.solution) {
     if (solution) throw new Error(`Puzzle ${puzzle.name} failed: ${solution}`);
   } else if (puzzle.solution === true) {
     if (!solution) throw new Error(`Puzzle ${puzzle.name} failed: ${solution}`);
-  } else if (solution !== puzzle.solution) {
-    throw new Error(`Puzzle ${puzzle.name} failed: ${solution}`);
+  } else {
+    if (solution !== puzzle.solution) {
+      throw new Error(`Puzzle ${puzzle.name} failed: ${solution}`);
+    }
+    if (solutionCount !== undefined && solutionCount !== 1) {
+      throw new Error(
+        `Puzzle ${puzzle.name} failed: solution is not unique (found ${solutionCount})`);
+    }
   }
 };
 
@@ -233,15 +239,17 @@ const runCollection = async (puzzles, solveFn, label) => {
     const puzzle = await resolvePuzzleConfig(puzzleCfg);
     const input = await loadInput(puzzle);
 
-    let solution = null;
+    let result = null;
     try {
-      solution = await solveFn(input);
+      result = await solveFn(input);
     } catch (e) {
       throw new Error(`${label} ${puzzle.name} failed: ${e}`);
     }
 
+    const solution = result?.solution !== undefined ? result.solution : result;
+    const solutionCount = result?.solutionCount;
     const asString = solution?.toString() || null;
-    assertPuzzleSolution(puzzle, asString);
+    assertPuzzleSolution(puzzle, asString, solutionCount);
 
     stats.push({
       puzzle: puzzle.name,
@@ -284,7 +292,7 @@ for (const { collection, puzzles } of solveCollections) {
     puzzles,
     (input) => {
       const candidates = [...solver.solutions(input, 2)];
-      return candidates[0] || null;
+      return { solution: candidates[0] || null, solutionCount: candidates.length };
     },
     'Puzzle'
   );
