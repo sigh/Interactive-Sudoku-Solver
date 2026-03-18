@@ -792,6 +792,9 @@ class ConstraintManager {
         // If we were called from outside the form, then put the value in the
         // so that the user can see the constraint which failed.
         if (inputElem.value !== input) inputElem.value = input;
+        // Open the panel so the error is visible.
+        errorElem.closest('.collapsible-container')
+          ?.classList.add('container-open');
       }
     };
 
