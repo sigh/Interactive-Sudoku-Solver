@@ -8,13 +8,35 @@ const NFAHandlerModule = await import('./nfa_handler.js' + self.VERSION_PARAM);
 
 const { InvalidConstraintError } = HandlerModule;
 
+class StateCellAllocator {
+  constructor(numCells) {
+    this._next = numCells;
+    this._numCells = numCells;
+  }
+
+  allocate(count) {
+    const start = this._next;
+    this._next += count;
+    return Array.from({ length: count }, (_, i) => start + i);
+  }
+
+  get numStateCells() {
+    return this._next - this._numCells;
+  }
+}
+
 export class SudokuBuilder {
   static build(constraint, debugOptions) {
     const shape = constraint.getShape();
+    const constraintMap = constraint.toMap();
+    const stateAllocator = new StateCellAllocator(shape.numCells);
+
+    const handlers = [...this._handlers(constraintMap, shape, stateAllocator)];
 
     return new SudokuSolver(
-      this._handlers(constraint, shape),
+      handlers,
       shape,
+      stateAllocator.numStateCells,
       debugOptions);
   }
 
@@ -29,16 +51,14 @@ export class SudokuBuilder {
     return new cls(...args);
   }
 
-  static *_handlers(constraint, shape) {
-    const constraintMap = constraint.toMap();
-
+  static *_handlers(constraintMap, shape, stateAllocator) {
     yield* this._rowColHandlers(shape);
 
     const boxRegions = this._getBoxRegions(shape, constraintMap);
     yield new HandlerModule.BoxInfo(boxRegions);
     yield* this._boxHandlers(boxRegions);
 
-    yield* this._constraintHandlers(constraintMap, shape);
+    yield* this._constraintHandlers(constraintMap, shape, stateAllocator);
   }
 
   // Get box regions, respecting NoBoxes and RegionSize constraints.
@@ -149,7 +169,7 @@ export class SudokuBuilder {
 
 
 
-  static * _constraintHandlers(constraintMap, shape) {
+  static * _constraintHandlers(constraintMap, shape, stateAllocator) {
     const constraints = [].concat(...constraintMap.values());
 
     for (const constraint of constraints) {

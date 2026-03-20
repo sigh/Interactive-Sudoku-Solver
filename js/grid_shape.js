@@ -147,6 +147,7 @@ export class GridShape {
   }
 
   makeCellIdFromIndex = (i) => {
+    if (i >= this.numCells) return `$${i - this.numCells}`;
     return this.makeCellId(...this.splitCellIndex(i));
   }
 
@@ -168,6 +169,9 @@ export class GridShape {
   }
 
   parseCellId = (cellId) => {
+    if (cellId[0] === '$') {
+      return { cell: this.numCells + parseInt(cellId.substring(1)) };
+    }
     const base = this.constructor._VALUE_BASE;
     let row = parseInt(cellId[1], base) - 1;
     let col = parseInt(cellId[3], base) - 1;

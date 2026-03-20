@@ -275,7 +275,7 @@ export class SudokuConstraintOptimizer {
       if (sum < min || sum > max) return null;
 
       const dof = Math.min(sum - min, max - sum);
-      const cellsBitSet = new BitSet(shape.numCells);
+      const cellsBitSet = new BitSet(cellExclusions.numSearchCells());
       for (const c of cells) cellsBitSet.add(c);
 
       return {

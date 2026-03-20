@@ -18,6 +18,7 @@ const makeSelector = (context, { handlerSet = [] } = {}) => {
   const { shape } = context;
   const selector = new CandidateSelector(
     shape,
+    shape.numCells,
     handlerSet,
     makeDebugLogger(),
   );

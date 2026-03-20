@@ -2,16 +2,16 @@ const { countOnes16bit, RandomIntGenerator } = await import('../util.js' + self.
 const { LookupTables } = await import('./lookup_tables.js' + self.VERSION_PARAM);
 
 export class SeenCandidateSet {
-  constructor(numCells, numValues) {
+  constructor(numSearchCells, numValues) {
     this.enabledInSolver = false;
-    this.candidates = new Uint16Array(numCells);
+    this.candidates = new Uint16Array(numSearchCells);
     this._lastInterestingCell = 0;
     this._dirty = false;
 
-    this._numCells = numCells;
+    this._numSearchCells = numSearchCells;
     this._numValues = numValues;
     this._candidateSupportThreshold = 1;
-    this._candidateCounts = new Uint8Array(numCells * numValues);
+    this._candidateCounts = new Uint8Array(numSearchCells * numValues);
   }
 
   getCandidateCounts() {
@@ -40,11 +40,11 @@ export class SeenCandidateSet {
   addSolutionGrid(grid) {
     const candidates = this.candidates;
     const counts = this._candidateCounts;
-    const numCells = this._numCells;
+    const numSearchCells = this._numSearchCells;
     const numValues = this._numValues;
     const threshold = this._candidateSupportThreshold;
 
-    for (let i = 0; i < numCells; i++) {
+    for (let i = 0; i < numSearchCells; i++) {
       const value = grid[i];
       const countIndex = i * numValues + LookupTables.toIndex(value);
       const incrementedCount = counts[countIndex] + 1;
@@ -85,27 +85,27 @@ export class SeenCandidateSet {
 }
 
 export class CandidateSelector {
-  constructor(shape, handlerSet, debugLogger) {
+  constructor(shape, numSearchCells, handlerSet, debugLogger) {
     this._shape = shape;
-    this._cellOrder = new Uint8Array(shape.numCells);
+    this._cellOrder = new Uint8Array(numSearchCells);
     this._conflictScores = null;
     this._debugLogger = debugLogger;
-    this._numCells = shape.numCells;
+    this._numSearchCells = numSearchCells;
     this._optionSelector = null;
 
-    this._candidateSelectionStates = this._initCandidateSelectionStates(shape);
+    this._candidateSelectionStates = this._initCandidateSelectionStates(numSearchCells);
     // _candidateSelectionFlags is used to track whether the
     // _candidateSelectionStates entry is valid.
-    this._candidateSelectionFlags = new Uint8Array(shape.numCells);
+    this._candidateSelectionFlags = new Uint8Array(numSearchCells);
 
-    this._candidateFinderSet = new CandidateFinderSet(handlerSet, shape);
+    this._candidateFinderSet = new CandidateFinderSet(handlerSet, shape, numSearchCells);
   }
 
   reset(conflictScores) {
     // Re-initialize the cell indexes in the cellOrder.
     // This is not required, but keeps things deterministic.
-    const numCells = this._cellOrder.length;
-    for (let i = 0; i < numCells; i++) {
+    const numSearchCells = this._cellOrder.length;
+    for (let i = 0; i < numSearchCells; i++) {
       this._cellOrder[i] = i;
     }
 
@@ -211,10 +211,10 @@ export class CandidateSelector {
     if (count > 1) return frontOffset;
 
     // Move all singletons to the front of the cellOrder.
-    const numCells = this._numCells;
+    const numSearchCells = this._numSearchCells;
 
     // First skip past any values which are already at the front.
-    while (cellOffset === frontOffset && cellOffset < numCells) {
+    while (cellOffset === frontOffset && cellOffset < numSearchCells) {
       const v = grid[cellOrder[cellOffset++]];
       if ((v & (v - 1)) === 0) {
         frontOffset++;
@@ -223,7 +223,7 @@ export class CandidateSelector {
     }
 
     // Find the rest of the values which are singletons.
-    while (cellOffset < numCells) {
+    while (cellOffset < numSearchCells) {
       const v = grid[cellOrder[cellOffset]];
       if ((v & (v - 1)) === 0) {
         if (v === 0) return 0;
@@ -342,7 +342,7 @@ export class CandidateSelector {
     // NOTE: If the scoring is more complicated, it can be useful
     // to do an initial pass to detect 1 or 0 value cells (!(v&(v-1))).
 
-    const numCells = this._numCells;
+    const numSearchCells = this._numSearchCells;
     const conflictScores = this._conflictScores.scores;
 
     const valueInfo = this._conflictScores.getMaxValueScore();
@@ -353,7 +353,7 @@ export class CandidateSelector {
     let maxScore = -1;
     let bestOffset = 0;
 
-    for (let i = cellDepth; i < numCells; i++) {
+    for (let i = cellDepth; i < numSearchCells; i++) {
       const cell = cellOrder[i];
       const count = countOnes16bit(gridState[cell]);
       // If we have a single value then just use it - as it will involve no
@@ -399,8 +399,8 @@ export class CandidateSelector {
   _minCountCellIndex(gridState, cellOrder, cellDepth) {
     let minCount = 1 << 16;
     let bestOffset = 0;
-    const numCells = this._numCells;
-    for (let i = cellDepth; i < numCells; i++) {
+    const numSearchCells = this._numSearchCells;
+    for (let i = cellDepth; i < numSearchCells; i++) {
       const count = countOnes16bit(gridState[cellOrder[i]]);
       if (count < minCount) {
         bestOffset = i;
@@ -452,9 +452,9 @@ export class CandidateSelector {
     // current score.
     let minCS = Math.ceil(result.score * 2) | 0;
 
-    const numCells = cellOrder.length;
+    const numSearchCells = cellOrder.length;
     let foundCandidate = false;
-    for (let i = cellDepth; i < numCells; i++) {
+    for (let i = cellDepth; i < numSearchCells; i++) {
       const cell = cellOrder[i];
       // Ignore cells which are too low in priority.
       if (conflictScores[cell] < minCS) continue;
@@ -481,9 +481,9 @@ export class CandidateSelector {
   }
 
   // This needs to match the fields populated by the CandidateFinders.
-  _initCandidateSelectionStates(shape) {
+  _initCandidateSelectionStates(numSearchCells) {
     const candidateSelectionStates = [];
-    for (let i = 0; i < shape.numCells; i++) {
+    for (let i = 0; i < numSearchCells; i++) {
       candidateSelectionStates.push({
         score: 0.0,
         value: 0,
@@ -495,14 +495,14 @@ export class CandidateSelector {
 }
 
 class CandidateFinderSet {
-  constructor(handlerSet, shape) {
+  constructor(handlerSet, shape, numSearchCells) {
     this._handlerSet = handlerSet;
     this._shape = shape;
     this.initialized = false;
     this._finders = [];
 
     const indexesByCell = [];
-    for (let i = 0; i < shape.numCells; i++) indexesByCell.push([]);
+    for (let i = 0; i < numSearchCells; i++) indexesByCell.push([]);
     this._indexesByCell = indexesByCell;
     this._marked = null;
   }
@@ -676,9 +676,9 @@ CandidateFinders.House = class House extends CandidateFinderBase {
 // An extension of the candidate selector which chooses values at random
 // from the chosen cell, and only searches a single branch of the tree.
 export class SamplingCandidateSelector extends CandidateSelector {
-  constructor(shape, handlerSet, debugLogger) {
-    super(shape, handlerSet, debugLogger);
-    this._totalWeight = new Float64Array(shape.numCells + 1);
+  constructor(shape, numSearchCells, handlerSet, debugLogger) {
+    super(shape, handlerSet, debugLogger, numSearchCells);
+    this._totalWeight = new Float64Array(this._numSearchCells + 1);
     this._totalWeight[0] = 1.0;
     this._optionSelector = new RandomOptionSelector(/* seed = */ 0);
   }
@@ -696,7 +696,7 @@ export class SamplingCandidateSelector extends CandidateSelector {
   }
 
   getSolutionWeight() {
-    return this._totalWeight[this._numCells];
+    return this._totalWeight[this._numSearchCells];
   }
 }
 

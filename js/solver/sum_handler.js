@@ -188,7 +188,7 @@ export class Sum extends SudokuConstraintHandler {
 
     {
       this._exclusionGroupIds = new Int16Array(this.cells.length);
-      const cellLookup = new Uint8Array(shape.numCells);
+      const cellLookup = new Uint8Array(cellExclusions.numSearchCells());
       this.cells.forEach((c, i) => cellLookup[c] = i);
 
       for (let i = 0; i < this._coeffGroups.length; i++) {

@@ -300,8 +300,9 @@ export class CellValueDisplay extends DisplayItem {
   renderGridValues(grid, colorFn) {
     this.clear();
     const svg = this.getSvg();
+    const numCells = this._shape.numCells;
 
-    for (let i = 0; i < grid.length; i++) {
+    for (let i = 0; i < grid.length && i < numCells; i++) {
       const value = grid[i];
       if (value == null) continue;
       svg.append(this.makeGridValue(i, value, colorFn));
@@ -697,6 +698,7 @@ export class HighlightDisplay extends DisplayItem {
 
   highlightCell(cellId, cssClass) {
     const parsed = this._shape.parseCellId(cellId);
+    if (parsed.row === undefined) return null;
 
     const path = this._makeCellSquare(parsed.cell);
     const svg = cssClass ? this._getGroup(cssClass) : this._svg;
@@ -816,6 +818,7 @@ class CellHighlighter {
   addCell(cell) {
     if (!this._cells.has(cell)) {
       const path = this._display.highlightCell(cell, this._cssClass);
+      if (!path) return;
       this._cells.set(cell, path);
       return path;
     }

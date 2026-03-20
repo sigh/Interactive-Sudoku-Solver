@@ -392,7 +392,7 @@ await runTest('_replaceSizeSpecificSumHandlers: size=numValues mutually exclusiv
 
   {
     const sumHandler = new SumHandlerModule.Sum(cells, shapeMaxSum(shape));
-    const handlerSet = new HandlerSet([sumHandler], shape);
+    const handlerSet = new HandlerSet([sumHandler], shape.numCells);
 
     optimizer._replaceSizeSpecificSumHandlers(handlerSet, cellExclusions, shape);
 
@@ -403,7 +403,7 @@ await runTest('_replaceSizeSpecificSumHandlers: size=numValues mutually exclusiv
 
   {
     const sumHandler = new SumHandlerModule.Sum(cells, shapeMaxSum(shape) - 1);
-    const handlerSet = new HandlerSet([sumHandler], shape);
+    const handlerSet = new HandlerSet([sumHandler], shape.numCells);
 
     optimizer._replaceSizeSpecificSumHandlers(handlerSet, cellExclusions, shape);
 
@@ -718,7 +718,7 @@ await runTest('_optimizeNonSquareGrids: adds aux handler for 8x9 no-box grid', (
     handlers.push(new HandlerModule.AllDifferent(c));
   }
 
-  const handlerSet = new HandlerSet(handlers, shape);
+  const handlerSet = new HandlerSet(handlers, shape.numCells);
 
   optimizer._optimizeNonSquareGrids(handlerSet, /* hasBoxes= */ false, shape);
 
@@ -739,7 +739,7 @@ await runTest('_optimizeNonSquareGrids: skips when numValues matches neither axi
     handlers.push(new HandlerModule.AllDifferent(c));
   }
 
-  const handlerSet = new HandlerSet(handlers, shape);
+  const handlerSet = new HandlerSet(handlers, shape.numCells);
 
   // Should not throw; the optimization assumes one axis equals numValues.
   optimizer._optimizeNonSquareGrids(handlerSet, /* hasBoxes= */ false, shape);
@@ -761,7 +761,7 @@ await runTest('_optimizeNonSquareGrids: skips aux handler for 1x9 grid', () => {
     handlers.push(new HandlerModule.AllDifferent(c));
   }
 
-  const handlerSet = new HandlerSet(handlers, shape);
+  const handlerSet = new HandlerSet(handlers, shape.numCells);
 
   optimizer._optimizeNonSquareGrids(handlerSet, /* hasBoxes= */ false, shape);
 

@@ -126,7 +126,7 @@ export const createAccumulator = () => {
 };
 
 export const createCellExclusions = ({ allUnique = true, numCells = DEFAULT_NUM_CELLS } = {}) => {
-  const exclusions = new CellExclusions([], { numCells });
+  const exclusions = new CellExclusions([], numCells);
 
   if (allUnique) {
     for (let i = 0; i < numCells; i++) {

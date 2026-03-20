@@ -13,12 +13,12 @@ const context = new GridTestContext({ gridSize: 9 });
 const SHAPE_9x9 = context.shape;
 
 const createHandlerSet = (handlers = []) => {
-  return new HandlerSet(handlers, SHAPE_9x9);
+  return new HandlerSet(handlers, SHAPE_9x9.numCells);
 };
 
 await runTest('CellExclusions should initialize empty', () => {
   const handlerSet = createHandlerSet();
-  const exclusions = new CellExclusions(handlerSet, SHAPE_9x9);
+  const exclusions = new CellExclusions(handlerSet, SHAPE_9x9.numCells);
 
   assert.equal(exclusions.isMutuallyExclusive(0, 1), false);
 });
@@ -28,7 +28,7 @@ await runTest('CellExclusions should respect handler exclusions', () => {
   const cells = [0, 1, 2, 3, 4, 5, 6, 7, 8];
   const handler = new HandlerModule.AllDifferent(cells);
   const handlerSet = createHandlerSet([handler]);
-  const exclusions = new CellExclusions(handlerSet, SHAPE_9x9);
+  const exclusions = new CellExclusions(handlerSet, SHAPE_9x9.numCells);
 
   assert.equal(exclusions.isMutuallyExclusive(0, 1), true);
   assert.equal(exclusions.isMutuallyExclusive(0, 8), true);
@@ -37,7 +37,7 @@ await runTest('CellExclusions should respect handler exclusions', () => {
 
 await runTest('CellExclusions should allow adding manual exclusions', () => {
   const handlerSet = createHandlerSet();
-  const exclusions = new CellExclusions(handlerSet, SHAPE_9x9);
+  const exclusions = new CellExclusions(handlerSet, SHAPE_9x9.numCells);
 
   exclusions.addMutualExclusion(0, 1);
   assert.equal(exclusions.isMutuallyExclusive(0, 1), true);
@@ -46,7 +46,7 @@ await runTest('CellExclusions should allow adding manual exclusions', () => {
 
 await runTest('CellExclusions should propagate exclusions for same values', () => {
   const handlerSet = createHandlerSet();
-  const exclusions = new CellExclusions(handlerSet, SHAPE_9x9);
+  const exclusions = new CellExclusions(handlerSet, SHAPE_9x9.numCells);
 
   exclusions.addMutualExclusion(0, 2);
   // If 0 and 1 are the same value, then 1 must also be exclusive with 2.
@@ -57,7 +57,7 @@ await runTest('CellExclusions should propagate exclusions for same values', () =
 
 await runTest('CellExclusions should return BitSet', () => {
   const handlerSet = createHandlerSet();
-  const exclusions = new CellExclusions(handlerSet, SHAPE_9x9);
+  const exclusions = new CellExclusions(handlerSet, SHAPE_9x9.numCells);
   exclusions.addMutualExclusion(0, 1);
   exclusions.addMutualExclusion(0, 5);
 
@@ -97,7 +97,7 @@ await runTest('HandlerUtil.findExclusionGroups should work for a single cell', (
 
 await runTest('HandlerUtil.findExclusionGroupsGreedy(BEST) should return clique groups', () => {
   const handlerSet = createHandlerSet();
-  const exclusions = new CellExclusions(handlerSet, SHAPE_9x9);
+  const exclusions = new CellExclusions(handlerSet, SHAPE_9x9.numCells);
 
   // Build a small mutual-exclusion graph over cells [0..4].
   // Clique A: 0-1-2, Clique B: 2-3-4, with no edges between {0,1} and {3,4}.
@@ -135,7 +135,7 @@ await runTest('HandlerUtil.findExclusionGroupsGreedy(BEST) should return clique 
 
 await runTest('HandlerUtil.findExclusionGroupsGreedy should be deterministic for FIRST and BEST', () => {
   const handlerSet = createHandlerSet();
-  const exclusions = new CellExclusions(handlerSet, SHAPE_9x9);
+  const exclusions = new CellExclusions(handlerSet, SHAPE_9x9.numCells);
 
   const addUndirected = (a, b) => {
     exclusions.addMutualExclusion(a, b);
@@ -161,7 +161,7 @@ await runTest('HandlerUtil.findExclusionGroupsGreedy should be deterministic for
 
 await runTest('HandlerUtil.findExclusionGroupsGreedy should seal CellExclusions', () => {
   const handlerSet = createHandlerSet();
-  const exclusions = new CellExclusions(handlerSet, SHAPE_9x9);
+  const exclusions = new CellExclusions(handlerSet, SHAPE_9x9.numCells);
 
   // Calling findExclusionGroupsGreedy uses getBitSet for performance, which
   // seals the exclusions cache.
@@ -176,7 +176,7 @@ await runTest('HandlerUtil.findExclusionGroupsGreedy should seal CellExclusions'
 
 await runTest('CellExclusions should seal after reading BitSet', () => {
   const handlerSet = createHandlerSet();
-  const exclusions = new CellExclusions(handlerSet, SHAPE_9x9);
+  const exclusions = new CellExclusions(handlerSet, SHAPE_9x9.numCells);
   exclusions.getBitSet(0);
 
   assert.throws(() => exclusions.addMutualExclusion(1, 2), /Cannot add exclusions after caching/);
@@ -184,7 +184,7 @@ await runTest('CellExclusions should seal after reading BitSet', () => {
 
 await runTest('CellExclusions should compute pair exclusions', () => {
   const handlerSet = createHandlerSet();
-  const exclusions = new CellExclusions(handlerSet, SHAPE_9x9);
+  const exclusions = new CellExclusions(handlerSet, SHAPE_9x9.numCells);
 
   // 0 is exclusive with 2
   exclusions.addMutualExclusion(0, 2);
@@ -200,7 +200,7 @@ await runTest('CellExclusions should compute pair exclusions', () => {
 
 await runTest('CellExclusions should compute list exclusions', () => {
   const handlerSet = createHandlerSet();
-  const exclusions = new CellExclusions(handlerSet, SHAPE_9x9);
+  const exclusions = new CellExclusions(handlerSet, SHAPE_9x9.numCells);
 
   exclusions.addMutualExclusion(0, 3);
   exclusions.addMutualExclusion(1, 3);
@@ -214,7 +214,7 @@ await runTest('CellExclusions should compute list exclusions', () => {
 
 await runTest('CellExclusions should seal after reading Array', () => {
   const handlerSet = createHandlerSet();
-  const exclusions = new CellExclusions(handlerSet, SHAPE_9x9);
+  const exclusions = new CellExclusions(handlerSet, SHAPE_9x9.numCells);
   exclusions.getArray(0);
 
   assert.throws(() => exclusions.addMutualExclusion(1, 2), /Cannot add exclusions after caching/);
@@ -222,7 +222,7 @@ await runTest('CellExclusions should seal after reading Array', () => {
 
 await runTest('CellExclusions should seal after reading PairExclusions', () => {
   const handlerSet = createHandlerSet();
-  const exclusions = new CellExclusions(handlerSet, SHAPE_9x9);
+  const exclusions = new CellExclusions(handlerSet, SHAPE_9x9.numCells);
   exclusions.getPairExclusions((0 << 8) | 1);
 
   assert.throws(() => exclusions.addMutualExclusion(1, 2), /Cannot add exclusions after caching/);
@@ -230,7 +230,7 @@ await runTest('CellExclusions should seal after reading PairExclusions', () => {
 
 await runTest('CellExclusions should seal after reading ListExclusions', () => {
   const handlerSet = createHandlerSet();
-  const exclusions = new CellExclusions(handlerSet, SHAPE_9x9);
+  const exclusions = new CellExclusions(handlerSet, SHAPE_9x9.numCells);
   exclusions.getListExclusions([0, 1]);
 
   assert.throws(() => exclusions.addMutualExclusion(1, 2), /Cannot add exclusions after caching/);
@@ -238,7 +238,7 @@ await runTest('CellExclusions should seal after reading ListExclusions', () => {
 
 await runTest('CellExclusions should throw when calling areSameValue after sealing', () => {
   const handlerSet = createHandlerSet();
-  const exclusions = new CellExclusions(handlerSet, SHAPE_9x9);
+  const exclusions = new CellExclusions(handlerSet, SHAPE_9x9.numCells);
   exclusions.getArray(0);
 
   assert.throws(() => exclusions.areSameValue(1, 2), /Cannot add exclusions after caching/);
@@ -246,7 +246,7 @@ await runTest('CellExclusions should throw when calling areSameValue after seali
 
 await runTest('CellExclusions should check areMutuallyExclusive correctly', () => {
   const handlerSet = createHandlerSet();
-  const exclusions = new CellExclusions(handlerSet, SHAPE_9x9);
+  const exclusions = new CellExclusions(handlerSet, SHAPE_9x9.numCells);
   exclusions.addMutualExclusion(0, 1);
   exclusions.addMutualExclusion(0, 2);
   exclusions.addMutualExclusion(1, 2);
@@ -257,7 +257,7 @@ await runTest('CellExclusions should check areMutuallyExclusive correctly', () =
 
 await runTest('CellExclusions should clone correctly and preserve sealed state', () => {
   const handlerSet = createHandlerSet();
-  const exclusions = new CellExclusions(handlerSet, SHAPE_9x9);
+  const exclusions = new CellExclusions(handlerSet, SHAPE_9x9.numCells);
   exclusions.addMutualExclusion(0, 1);
   exclusions.getArray(0); // Seals it
 
@@ -268,7 +268,7 @@ await runTest('CellExclusions should clone correctly and preserve sealed state',
 
 await runTest('CellExclusions should allow modifications on clone if not sealed', () => {
   const handlerSet = createHandlerSet();
-  const exclusions = new CellExclusions(handlerSet, SHAPE_9x9);
+  const exclusions = new CellExclusions(handlerSet, SHAPE_9x9.numCells);
   exclusions.addMutualExclusion(0, 1);
 
   const clone = exclusions.clone();
@@ -280,7 +280,7 @@ await runTest('CellExclusions should allow modifications on clone if not sealed'
 
 await runTest('CellExclusions should merge sets when calling areSameValue', () => {
   const handlerSet = createHandlerSet();
-  const exclusions = new CellExclusions(handlerSet, SHAPE_9x9);
+  const exclusions = new CellExclusions(handlerSet, SHAPE_9x9.numCells);
 
   exclusions.addMutualExclusion(0, 2);
   exclusions.addMutualExclusion(1, 3);
@@ -296,7 +296,7 @@ await runTest('CellExclusions should merge sets when calling areSameValue', () =
 
 await runTest('CellExclusions should return sorted array from getArray', () => {
   const handlerSet = createHandlerSet();
-  const exclusions = new CellExclusions(handlerSet, SHAPE_9x9);
+  const exclusions = new CellExclusions(handlerSet, SHAPE_9x9.numCells);
   exclusions.addMutualExclusion(0, 5);
   exclusions.addMutualExclusion(0, 1);
   exclusions.addMutualExclusion(0, 3);
@@ -307,14 +307,14 @@ await runTest('CellExclusions should return sorted array from getArray', () => {
 
 await runTest('CellExclusions should handle empty BitSet', () => {
   const handlerSet = createHandlerSet();
-  const exclusions = new CellExclusions(handlerSet, SHAPE_9x9);
+  const exclusions = new CellExclusions(handlerSet, SHAPE_9x9.numCells);
   const bitSet = exclusions.getBitSet(0);
   assert.ok(bitSet.isEmpty());
 });
 
 await runTest('CellExclusions should cache pair exclusions regardless of order', () => {
   const handlerSet = createHandlerSet();
-  const exclusions = new CellExclusions(handlerSet, SHAPE_9x9);
+  const exclusions = new CellExclusions(handlerSet, SHAPE_9x9.numCells);
   exclusions.addMutualExclusion(0, 2);
   exclusions.addMutualExclusion(1, 2);
 

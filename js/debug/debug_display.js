@@ -426,6 +426,7 @@ export class InfoOverlay {
     for (let i = 0; i < values.length; i++) {
       const cellId = shape.makeCellIdFromIndex(i);
       const path = this._heatmap.addCell(cellId);
+      if (!path) continue;
       path.setAttribute('fill', 'rgb(255, 0, 0)');
       path.setAttribute('opacity', values[i] / 1000);
     }
@@ -443,6 +444,7 @@ export class InfoOverlay {
 
     for (let i = 0; i < values.length; i++) {
       const value = values[i];
+      if (i >= shape.numCells) break;
       const cellId = shape.makeCellIdFromIndex(i);
       this._annotationText.setText(cellId, value);
     }

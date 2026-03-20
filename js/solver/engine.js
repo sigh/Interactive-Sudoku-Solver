@@ -14,12 +14,12 @@ const { CandidateSelector, SamplingCandidateSelector, ConflictScores, SeenCandid
 const HandlerModule = await import('./handlers.js' + self.VERSION_PARAM);
 
 export class SudokuSolver {
-  constructor(handlers, shape, debugOptions) {
+  constructor(handlers, shape, numStateCells, debugOptions) {
     this._debugLogger = new DebugLogger(this, debugOptions);
     this._shape = shape;
 
     this._internalSolver = new InternalSolver(
-      handlers, shape, this._debugLogger);
+      handlers, shape, numStateCells, this._debugLogger);
 
     this._progressExtraStateFn = null;
     this._progressCallback = null;
@@ -72,7 +72,8 @@ export class SudokuSolver {
       const sampleSolution = this._internalSolver.getSampleSolution();
       let result = {};
       if (sampleSolution) {
-        result.solutions = [SudokuSolverUtil.gridToSolution(sampleSolution, this._shape.valueOffset)];
+        result.solutions = [SudokuSolverUtil.gridToSolution(
+          sampleSolution.subarray(0, this._shape.numCells), this._shape.valueOffset)];
         this._internalSolver.unsetSampleSolution();
       }
       if (estimationCounters) {
@@ -110,7 +111,8 @@ export class SudokuSolver {
     });
 
     if (!grid) return null;
-    return SudokuSolverUtil.gridToSolution(grid, this._shape.valueOffset);
+    return SudokuSolverUtil.gridToSolution(
+      grid.subarray(0, this._shape.numCells), this._shape.valueOffset);
   }
 
   nthStep(n, stepGuides) {
@@ -147,7 +149,8 @@ export class SudokuSolver {
     });
     if (!result) return null;
 
-    const pencilmarks = SudokuSolverUtil.makePencilmarks(result.grid, offset);
+    const pencilmarks = SudokuSolverUtil.makePencilmarks(
+      result.grid.subarray(0, this._shape.numCells), offset);
     // Convert single-value pencilmarks to values.
     for (let i = 0; i < pencilmarks.length; i++) {
       if (pencilmarks[i].size === 1) {
@@ -163,6 +166,7 @@ export class SudokuSolver {
     };
 
     if (result.guessDepth !== -1) {
+      const numGridCells = this._shape.numCells;
       // The guess cell is the last item in the cell order.
       const guessCellIndex = result.cellOrder[result.guessDepth];
       // The options are the values that existed in the old grid for the guess
@@ -171,7 +175,8 @@ export class SudokuSolver {
         result.oldGrid[guessCellIndex], offset);
 
       returnValue.diffPencilmarks = SudokuSolverUtil.makeDiffPencilmarks(
-        result.oldGrid, result.grid, offset);
+        result.oldGrid.subarray(0, numGridCells),
+        result.grid.subarray(0, numGridCells), offset);
       returnValue.guessCell = this._shape.makeCellIdFromIndex(guessCellIndex);
     }
 
@@ -340,9 +345,14 @@ class DebugLogger {
 
 class InternalSolver {
 
-  constructor(handlerGen, shape, debugLogger) {
+  constructor(handlerGen, shape, numStateCells, debugLogger) {
     this._shape = shape;
-    this._numCells = this._shape.numCells;
+    this._numSearchCells = shape.numCells + numStateCells;
+    if (this._numSearchCells > 256) {
+      throw new Error(
+        'Too many cells. grid + state cells must be <= 256. ' +
+        `grid cells: ${shape.numCells}, state cells: ${numStateCells}`);
+    }
     this._debugLogger = debugLogger;
 
     this._progress = {
@@ -352,11 +362,11 @@ class InternalSolver {
 
     this._handlerSet = this._setUpHandlers(Array.from(handlerGen));
 
-    this._seenCandidateSet = new SeenCandidateSet(shape.numCells, shape.numValues);
+    this._seenCandidateSet = new SeenCandidateSet(this._numSearchCells, shape.numValues);
 
     this._handlerAccumulator = new HandlerAccumulator(this._handlerSet);
     this._candidateSelector = new CandidateSelector(
-      shape, this._handlerSet, debugLogger);
+      shape, this._numSearchCells, this._handlerSet, debugLogger);
 
     this._cellPriorities = this._initCellPriorities();
 
@@ -368,7 +378,7 @@ class InternalSolver {
   // Cell priorities are used to determine the order in which cells are
   // searched with preference given to cells with higher priority.
   _initCellPriorities() {
-    const priorities = new Int32Array(this._shape.numCells);
+    const priorities = new Int32Array(this._numSearchCells);
 
     // TODO: Determine priorities in a more principled way.
     //  - Add one for each exclusion cell.
@@ -428,7 +438,7 @@ class InternalSolver {
       return aCells.localeCompare(bCells);
     });
 
-    const handlerSet = new HandlerSet(handlers, this._shape);
+    const handlerSet = new HandlerSet(handlers, this._numSearchCells);
 
     if (this._debugLogger?.logLevel >= 2) {
       for (const h of handlerSet) {
@@ -442,19 +452,20 @@ class InternalSolver {
 
     // Create lookups for which cells must have mutually exclusive values.
     const cellExclusions = new CellExclusions(
-      handlerSet, this._shape);
+      handlerSet, this._numSearchCells);
 
     // Optimize handlers.
     new SudokuConstraintOptimizer(this._debugLogger).optimize(
       handlerSet, cellExclusions, this._shape);
 
-    // Add the exclusion handlers.
-    for (let i = 0; i < this._numCells; i++) {
+    // Add the exclusion handlers for all search cells.
+    for (let i = 0; i < this._numSearchCells; i++) {
       handlerSet.addSingletonHandlers(
         new HandlerModule.UniqueValueExclusion(i));
     }
 
-    const stateAllocator = new GridStateAllocator(this._shape);
+    const stateAllocator = new GridStateAllocator(
+      this._shape, this._numSearchCells);
 
     // Initialize handlers.
     for (const handler of handlerSet) {
@@ -515,7 +526,7 @@ class InternalSolver {
 
     // Setup sample solution in a set state, so that by default we don't
     // populate it.
-    this._sampleSolution = this._initialGridState.slice(0, this._numCells);
+    this._sampleSolution = this._initialGridState.slice(0, this._numSearchCells);
 
     this._resetRun();
   }
@@ -578,10 +589,10 @@ class InternalSolver {
 
     if (!arraysAreEqual(oldGridState, gridState)) {
       const diff = {};
-      const numCells = this._numCells;
-      const candidates = new Array(numCells);
+      const numSearchCells = this._numSearchCells;
+      const candidates = new Array(numSearchCells);
       candidates.fill(null);
-      for (let i = 0; i < numCells; i++) {
+      for (let i = 0; i < numSearchCells; i++) {
         if (oldGridState[i] !== gridState[i]) {
           candidates[i] = LookupTables.toValuesArray(oldGridState[i] & ~gridState[i]);
           diff[this._shape.makeCellIdFromIndex(i)] = candidates[i];
@@ -639,7 +650,7 @@ class InternalSolver {
       stepGuides: stepMode.stepGuides ?? null,
       stepTarget: stepMode.n,
       step: 1,
-      oldGrid: new Uint16Array(this._numCells),
+      oldGrid: new Uint16Array(this._numSearchCells),
       pendingGuess: {
         cellDepth: -1,
         guess: 0,
@@ -669,14 +680,14 @@ class InternalSolver {
   }
 
   _initStack() {
-    const numCells = this._numCells;
+    const numSearchCells = this._numSearchCells;
     const gridStateSize = this._initialGridState.length;
 
     const stateBuffer = new ArrayBuffer(
-      (numCells + 1) * gridStateSize * Uint16Array.BYTES_PER_ELEMENT);
+      (numSearchCells + 1) * gridStateSize * Uint16Array.BYTES_PER_ELEMENT);
 
     const recStack = [];
-    for (let i = 0; i < numCells + 1; i++) {
+    for (let i = 0; i < numSearchCells + 1; i++) {
       recStack.push({
         cellDepth: 0,
         progressRemaining: 1.0,
@@ -690,7 +701,7 @@ class InternalSolver {
         gridCells: new Uint16Array(
           stateBuffer,
           i * gridStateSize * Uint16Array.BYTES_PER_ELEMENT,
-          numCells),
+          numSearchCells),
       });
     }
 
@@ -764,7 +775,7 @@ class InternalSolver {
     // Enforce constraints for all cells.
     const handlerAccumulator = this._handlerAccumulator;
     handlerAccumulator.reset(false);
-    for (let i = 0; i < this._numCells; i++) handlerAccumulator.addForCell(i);
+    for (let i = 0; i < this._numSearchCells; i++) handlerAccumulator.addForCell(i);
     if (!this._enforceConstraints(frame0.gridState, handlerAccumulator)) {
       if (frame0.gridCells.indexOf(0) === -1) frame0.gridCells.fill(0);
     }
@@ -815,7 +826,7 @@ class InternalSolver {
 
       // Determine the set of cells/constraints to enforce next.
       const handlerAccumulator = this._handlerAccumulator;
-      handlerAccumulator.reset(nextDepth === this._numCells);
+      handlerAccumulator.reset(nextDepth === this._numSearchCells);
       for (let i = cellDepth; i < nextDepth; i++) {
         handlerAccumulator.addForFixedCell(
           this._candidateSelector.getCellAtDepth(i));
@@ -921,7 +932,7 @@ class InternalSolver {
       }
 
       // If we've enforced all cells, then we have a solution!
-      if (nextDepth === this._shape.numCells) {
+      if (nextDepth === this._numSearchCells) {
         counters.progressRatio += progressDelta;
         // We've set all the values, and we haven't found a contradiction.
         // This is a solution!
@@ -976,7 +987,7 @@ class InternalSolver {
 
     this.run(null, (grid) => {
       seenCandidateSet.addSolutionGrid(grid);
-      solutions.push(grid.slice(0));
+      solutions.push(grid.slice(0, this._shape.numCells));
 
       // Once we have 2 solutions, then start ignoring branches which maybe
       // duplicating existing solution (up to this point, every branch is
@@ -1005,7 +1016,8 @@ class InternalSolver {
       if (!grid) return null;
 
       this.counters.branchesIgnored = 1 - this.counters.progressRatio;
-      return SudokuSolverUtil.gridToSolution(grid, this._shape.valueOffset);
+      return SudokuSolverUtil.gridToSolution(
+        grid.subarray(0, this._shape.numCells), this._shape.valueOffset);
     };
 
     // Non-standard grids may not have any house handlers (e.g. when there are
@@ -1108,7 +1120,7 @@ class InternalSolver {
     // Use a fixed seed so the result is deterministic.
     // TODO: Allows us to save and restore the original.
     this._candidateSelector = new SamplingCandidateSelector(
-      this._shape, this._handlerSet, this._debugLogger);
+      this._shape, this._numSearchCells, this._handlerSet, this._debugLogger);
 
     while (true) {
       this._resetRun();
@@ -1275,11 +1287,13 @@ class HandlerAccumulator {
 }
 
 export class CellExclusions {
-  constructor(handlerSet, shape) {
-    this._cellExclusionSets = [];
+  constructor(handlerSet, numSearchCells) {
+    this._numSearchCells = numSearchCells;
     if (handlerSet !== null) {
       this._cellExclusionSets = this.constructor._makeCellExclusionSets(
-        handlerSet, shape);
+        handlerSet, numSearchCells);
+    } else {
+      this._cellExclusionSets = [];
     }
 
     this._cellExclusionArrays = [];
@@ -1296,15 +1310,15 @@ export class CellExclusions {
   }
 
   clone() {
-    const clone = new CellExclusions(null, null);
+    const clone = new CellExclusions(null, this._numSearchCells);
     clone._cellExclusionSets = this._cellExclusionSets.map(s => new Set(s));
     clone._sealed = this._sealed;
     return clone;
   }
 
-  static _makeCellExclusionSets(handlerSet, shape) {
+  static _makeCellExclusionSets(handlerSet, numSearchCells) {
     const cellExclusionSets = [];
-    for (let i = 0; i < shape.numCells; i++) {
+    for (let i = 0; i < numSearchCells; i++) {
       cellExclusionSets.push(new Set());
     }
 
@@ -1436,20 +1450,24 @@ export class CellExclusions {
     result.sort((a, b) => a - b);
     return result;
   }
+
+  // Total number of cells involved in the search (grid cells + state cells).
+  numSearchCells() {
+    return this._numSearchCells;
+  }
 }
 
 class GridStateAllocator {
-  constructor(shape) {
-    this._offset = shape.numCells;
+  constructor(shape, numSearchCells) {
     this._extraState = [];
 
-    this._gridCells = new Uint16Array(shape.numCells);
+    this._gridCells = new Uint16Array(numSearchCells);
     const allValues = LookupTables.get(shape.numValues).allValues
     this._gridCells.fill(allValues);
   }
 
   allocate(state) {
-    const start = this._offset + this._extraState.length;
+    const start = this._gridCells.length + this._extraState.length;
     this._extraState.push(...state);
     return start;
   }
@@ -1484,7 +1502,7 @@ class GridStateAllocator {
 }
 
 export class HandlerSet {
-  constructor(handlers, shape) {
+  constructor(handlers, numSearchCells) {
     this._allHandlers = [];
     this._seen = new Map();
     this._ordinaryIndexLookup = new Map();
@@ -1492,7 +1510,7 @@ export class HandlerSet {
     this._singletonHandlerMap = [];
     this._ordinaryHandlerMap = [];
     this._auxHandlerMap = [];
-    for (let i = 0; i < shape.numCells; i++) {
+    for (let i = 0; i < numSearchCells; i++) {
       this._ordinaryHandlerMap.push([]);
       this._auxHandlerMap.push([]);
       this._singletonHandlerMap.push([]);
@@ -1565,7 +1583,7 @@ export class HandlerSet {
   updateCells(index, oldCells, newCells) {
     for (const c of oldCells) {
       const indexInMap = this._ordinaryHandlerMap[c].indexOf(index);
-      this._ordinaryHandlerMap[c].splice(indexInMap, 1);
+      if (indexInMap >= 0) this._ordinaryHandlerMap[c].splice(indexInMap, 1);
     }
     HandlerSet._appendIndexToCells(this._ordinaryHandlerMap, newCells, index);
   }
