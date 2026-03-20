@@ -6,6 +6,7 @@ import {
   GridTestContext,
   createAccumulator,
   valueMask,
+  valueMask0,
 } from '../helpers/grid_test_utils.js';
 
 ensureGlobalEnvironment();
@@ -412,8 +413,8 @@ await runTest('Indexing should fail when no index remains compatible (control ce
 const { GridShape } = await import('../../js/grid_shape.js');
 
 await runTest('Indexing offset: external value 2 with offset -1', () => {
-  // 0-indexed: external values 0-4, internal 1-5, offset=-1.
-  // Builder passes external value 2. Handler: fromOffsetValue(2, -1) = bit 2 = internal 3.
+  // 0-indexed: external values 0-4, offset=-1.
+  // Builder passes external value 2.
   // Control: _controlShift=1, allowed bits 1-4. bit 1→cells[0], bit 2→cells[1], etc.
   const shape = GridShape.fromGridSize(1, 5, null, -1);
   const context = new GridTestContext({ shape });
@@ -421,22 +422,22 @@ await runTest('Indexing offset: external value 2 with offset -1', () => {
   context.initializeHandler(handler);
 
   const grid = context.grid;
-  grid[0] = valueMask(2, 3, 4, 5); // Control: bits 1-4 (ext 1-4)
-  grid[1] = valueMask(1, 2); // cells[0] - no internal 3
-  grid[2] = valueMask(3, 4); // cells[1] - has internal 3
-  grid[3] = valueMask(1, 2); // cells[2] - no internal 3
-  grid[4] = valueMask(2, 3); // cells[3] - has internal 3
+  grid[0] = valueMask0(1, 2, 3, 4); // Control: ext 1-4
+  grid[1] = valueMask0(0, 1); // cells[0] - no 2
+  grid[2] = valueMask0(2, 3); // cells[1] - has 2
+  grid[3] = valueMask0(0, 1); // cells[2] - no 2
+  grid[4] = valueMask0(1, 2); // cells[3] - has 2
   const acc = createAccumulator();
 
   const result = handler.enforceConsistency(grid, acc);
 
   assert.equal(result, true);
-  // cells[1] (bit 2, ext 2) and cells[3] (bit 4, ext 4) have internal 3.
-  assert.equal(grid[0], valueMask(3, 5), 'control should allow int 3 (ext 2) and int 5 (ext 4)');
+  // cells[1] (ext 2) and cells[3] (ext 4) have value 2.
+  assert.equal(grid[0], valueMask0(2, 4), 'control should allow ext 2 and ext 4');
 });
 
 await runTest('Indexing offset: external value 0 with offset -1', () => {
-  // Builder passes external value 0. Handler: fromOffsetValue(0, -1) = bit 0 = internal 1.
+  // Builder passes external value 0.
   // Control: _controlShift=1, allowed bits 1-4. bit 1→cells[0], bit 2→cells[1], etc.
   const shape = GridShape.fromGridSize(1, 5, null, -1);
   const context = new GridTestContext({ shape });
@@ -444,18 +445,18 @@ await runTest('Indexing offset: external value 0 with offset -1', () => {
   context.initializeHandler(handler);
 
   const grid = context.grid;
-  grid[0] = valueMask(2, 3, 4, 5); // Control: bits 1-4 (ext 1-4)
-  grid[1] = valueMask(1, 2, 3); // cells[0] - has internal 1
-  grid[2] = valueMask(2, 3, 4); // cells[1] - no internal 1
-  grid[3] = valueMask(1, 4, 5); // cells[2] - has internal 1
-  grid[4] = valueMask(2, 3); // cells[3] - no internal 1
+  grid[0] = valueMask0(1, 2, 3, 4); // Control: ext 1-4
+  grid[1] = valueMask0(0, 1, 2); // cells[0] - has 0
+  grid[2] = valueMask0(1, 2, 3); // cells[1] - no 0
+  grid[3] = valueMask0(0, 3, 4); // cells[2] - has 0
+  grid[4] = valueMask0(1, 2); // cells[3] - no 0
   const acc = createAccumulator();
 
   const result = handler.enforceConsistency(grid, acc);
 
   assert.equal(result, true);
-  // cells[0] (bit 1, ext 1) and cells[2] (bit 3, ext 3) have internal 1.
-  assert.equal(grid[0], valueMask(2, 4), 'control should allow int 2 (ext 1) and int 4 (ext 3)');
+  // cells[0] (ext 1) and cells[2] (ext 3) have value 0.
+  assert.equal(grid[0], valueMask0(1, 3), 'control should allow ext 1 and ext 3');
 });
 
 await runTest('Indexing offset: zero offset leaves value unchanged', () => {

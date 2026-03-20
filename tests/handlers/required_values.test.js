@@ -7,6 +7,7 @@ import {
   createCellExclusions,
   createAccumulator,
   valueMask,
+  valueMask0,
 } from '../helpers/grid_test_utils.js';
 
 ensureGlobalEnvironment();
@@ -273,10 +274,10 @@ await runTest('RequiredValues initialize: accepts count == maxGroups', () => {
 const { GridShape } = await import('../../js/grid_shape.js');
 
 await runTest('RequiredValues offset: enforceConsistency finds hidden single with offset -1', () => {
-  // 0-indexed: external values 0-3, internal 1-4, offset=-1.
-  // RequiredValues [0, 2] in 3 cells. Internal values: 1, 3.
-  // Cell 0 has only internal 1 → hidden single for internal 3 in cells 1/2.
-  // If cell 1 is the only one with internal 3, it becomes a hidden single.
+  // 0-indexed: external values 0-3, offset=-1.
+  // RequiredValues [0, 2] in 3 cells.
+  // Cell 0 has only 0 → hidden single for 2 in cells 1/2.
+  // Cell 1 is the only one with 2, so it becomes a hidden single.
   const shape = GridShape.fromGridSize(1, 4, null, -1);
   const context = new GridTestContext({ shape });
   const cells = [0, 1, 2];
@@ -285,21 +286,21 @@ await runTest('RequiredValues offset: enforceConsistency finds hidden single wit
   context.initializeHandler(handler, { cellExclusions });
 
   const grid = context.grid;
-  grid[0] = valueMask(1);       // Fixed: internal 1 (external 0).
-  grid[1] = valueMask(2, 3, 4); // Has internal 3 (external 2).
-  grid[2] = valueMask(2, 4);    // No internal 3.
+  grid[0] = valueMask0(0);       // Fixed to 0.
+  grid[1] = valueMask0(1, 2, 3); // Has 2.
+  grid[2] = valueMask0(1, 3);    // No 2.
   const acc = createAccumulator();
 
   const result = handler.enforceConsistency(grid, acc);
 
   assert.equal(result, true);
-  // Internal 3 is a hidden single in cell 1 → cell 1 fixed to internal 3.
-  assert.equal(grid[1], valueMask(3));
+  // 2 is a hidden single in cell 1 → cell 1 fixed to 2.
+  assert.equal(grid[1], valueMask0(2));
 });
 
 await runTest('RequiredValues offset: enforceConsistency detects missing value with offset -1', () => {
-  // External values [0, 2], offset=-1 → internal [1, 3].
-  // If no cell has internal 1, enforceConsistency returns false.
+  // External values [0, 2], offset=-1.
+  // If no cell has 0, enforceConsistency returns false.
   const shape = GridShape.fromGridSize(1, 4, null, -1);
   const context = new GridTestContext({ shape });
   const cells = [0, 1, 2];
@@ -308,19 +309,19 @@ await runTest('RequiredValues offset: enforceConsistency detects missing value w
   context.initializeHandler(handler, { cellExclusions });
 
   const grid = context.grid;
-  grid[0] = valueMask(2, 3);  // No internal 1.
-  grid[1] = valueMask(3, 4);  // No internal 1.
-  grid[2] = valueMask(2, 3);  // No internal 1.
+  grid[0] = valueMask0(1, 2);  // No 0.
+  grid[1] = valueMask0(2, 3);  // No 0.
+  grid[2] = valueMask0(1, 2);  // No 0.
   const acc = createAccumulator();
 
   const result = handler.enforceConsistency(grid, acc);
 
-  assert.equal(result, false, 'should fail: internal 1 (external 0) not in any cell');
+  assert.equal(result, false, 'should fail: 0 not in any cell');
 });
 
 await runTest('RequiredValues offset: enforceConsistency with repeated value and offset -1', () => {
-  // External values [1, 1], offset=-1 → internal [2, 2].
-  // 2 cells, no exclusions: repeated value 2 must appear twice.
+  // External values [1, 1], offset=-1.
+  // 2 cells, no exclusions: repeated value 1 must appear twice.
   const shape = GridShape.fromGridSize(1, 4, null, -1);
   const context = new GridTestContext({ shape });
   const cells = [0, 1];
@@ -329,16 +330,16 @@ await runTest('RequiredValues offset: enforceConsistency with repeated value and
   context.initializeHandler(handler, { cellExclusions });
 
   const grid = context.grid;
-  grid[0] = valueMask(2, 3);  // Has internal 2.
-  grid[1] = valueMask(2, 4);  // Has internal 2.
+  grid[0] = valueMask0(1, 2);  // Has 1.
+  grid[1] = valueMask0(1, 3);  // Has 1.
   const acc = createAccumulator();
 
   const result = handler.enforceConsistency(grid, acc);
 
   assert.equal(result, true);
-  // Both cells must be fixed to internal 2.
-  assert.equal(grid[0], valueMask(2));
-  assert.equal(grid[1], valueMask(2));
+  // Both cells must be fixed to 1.
+  assert.equal(grid[0], valueMask0(1));
+  assert.equal(grid[1], valueMask0(1));
 });
 
 logSuiteComplete('required_values.test.js');

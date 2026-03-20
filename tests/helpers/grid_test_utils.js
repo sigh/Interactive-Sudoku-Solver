@@ -115,6 +115,10 @@ export class GridTestContext {
 
 export const valueMask = (...values) => LookupTables.fromValuesArray(values);
 
+// 0-indexed variant: valueMask0(0) = bit 0 (display value 0), etc.
+export const valueMask0 = (...values) =>
+  LookupTables.fromValuesArray(values.map(v => v + 1));
+
 export const createAccumulator = () => {
   const touched = new Set();
   return {

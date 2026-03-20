@@ -6,6 +6,7 @@ import {
   GridTestContext,
   createAccumulator,
   valueMask,
+  valueMask0,
 } from '../helpers/grid_test_utils.js';
 
 ensureGlobalEnvironment();
@@ -566,24 +567,20 @@ await runTest('Skyscraper offset: visibility=1, zero in first cell should not co
   context.initializeHandler(handler);
 
   const grid = context.grid;
-  grid[0] = valueMask(1, 2, 3, 4);
-  grid[1] = valueMask(1, 2, 3, 4);
-  grid[2] = valueMask(1, 2, 3, 4);
-  grid[3] = valueMask(1, 2, 3, 4);
+  grid[0] = valueMask0(0, 1, 2, 3);
+  grid[1] = valueMask0(0, 1, 2, 3);
+  grid[2] = valueMask0(0, 1, 2, 3);
+  grid[3] = valueMask0(0, 1, 2, 3);
   const acc = createAccumulator();
 
   const result = handler.enforceConsistency(grid, acc);
   assert.equal(result, true);
-  // First cell should still allow internal 4 (external 3 = tallest, only 1 visible)
-  assert.ok(grid[0] & valueMask(4), 'first cell should allow max value');
-  // First cell must NOT allow internal 1 (external 0): zero + anything behind
-  // means at least 1 real building visible, but we also need the max behind it
-  // to ensure nothing else is visible. So zero is allowed when a later cell is
-  // the sole visible building.
-  // Actually, with vis=1: if first cell is zero (not visible), then exactly one
+  // First cell should still allow 3 (tallest, only 1 visible).
+  assert.ok(grid[0] & valueMask0(3), 'first cell should allow max value');
+  // With vis=1: if first cell is zero (not visible), then exactly one
   // later cell must be visible with nothing else visible after it. That's
-  // possible when the tallest value comes next. So internal 1 IS allowed.
-  assert.ok(grid[0] & valueMask(1), 'first cell should allow zero (internal 1)');
+  // possible when the tallest value comes next. So zero IS allowed.
+  assert.ok(grid[0] & valueMask0(0), 'first cell should allow zero');
 });
 
 await runTest('Skyscraper offset: visibility=4 with zero requires 4 non-zero buildings visible', () => {
@@ -597,10 +594,10 @@ await runTest('Skyscraper offset: visibility=4 with zero requires 4 non-zero bui
   context.initializeHandler(handler);
 
   const grid = context.grid;
-  grid[0] = valueMask(1);  // zero (external 0)
-  grid[1] = valueMask(2, 3, 4);
-  grid[2] = valueMask(2, 3, 4);
-  grid[3] = valueMask(2, 3, 4);
+  grid[0] = valueMask0(0);  // zero
+  grid[1] = valueMask0(1, 2, 3);
+  grid[2] = valueMask0(1, 2, 3);
+  grid[3] = valueMask0(1, 2, 3);
   const acc = createAccumulator();
 
   const result = handler.enforceConsistency(grid, acc);
@@ -617,10 +614,10 @@ await runTest('Skyscraper offset: zero in first cell with vis=3 succeeds', () =>
   context.initializeHandler(handler);
 
   const grid = context.grid;
-  grid[0] = valueMask(1);  // zero (external 0) — not visible
-  grid[1] = valueMask(2);  // external 1 — visible (first real building)
-  grid[2] = valueMask(3);  // external 2 — visible (2 > 1)
-  grid[3] = valueMask(4);  // external 3 — visible (3 > 2)
+  grid[0] = valueMask0(0);  // zero — not visible
+  grid[1] = valueMask0(1);  // visible (first real building)
+  grid[2] = valueMask0(2);  // visible (2 > 1)
+  grid[3] = valueMask0(3);  // visible (3 > 2)
   const acc = createAccumulator();
 
   const result = handler.enforceConsistency(grid, acc);
@@ -637,10 +634,10 @@ await runTest('Skyscraper offset: zero first cell counted as vis=4 should fail',
   context.initializeHandler(handler);
 
   const grid = context.grid;
-  grid[0] = valueMask(1);  // zero
-  grid[1] = valueMask(2);  // 1
-  grid[2] = valueMask(3);  // 2
-  grid[3] = valueMask(4);  // 3
+  grid[0] = valueMask0(0);  // zero
+  grid[1] = valueMask0(1);
+  grid[2] = valueMask0(2);
+  grid[3] = valueMask0(3);
   const acc = createAccumulator();
 
   const result = handler.enforceConsistency(grid, acc);
@@ -657,10 +654,10 @@ await runTest('Skyscraper offset: zero in non-first cell does not affect visibil
   context.initializeHandler(handler);
 
   const grid = context.grid;
-  grid[0] = valueMask(4);  // external 3, visible
-  grid[1] = valueMask(1);  // external 0, hidden (0 < 3)
-  grid[2] = valueMask(2);  // external 1, hidden (1 < 3)
-  grid[3] = valueMask(3);  // external 2, hidden (2 < 3)
+  grid[0] = valueMask0(3);  // visible
+  grid[1] = valueMask0(0);  // zero, hidden (0 < 3)
+  grid[2] = valueMask0(1);  // hidden (1 < 3)
+  grid[3] = valueMask0(2);  // hidden (2 < 3)
   const acc = createAccumulator();
 
   const result = handler.enforceConsistency(grid, acc);
@@ -679,17 +676,17 @@ await runTest('Skyscraper offset: propagation with zero candidate in first cell'
   context.initializeHandler(handler);
 
   const grid = context.grid;
-  grid[0] = valueMask(1, 3);  // external 0 or 2
-  grid[1] = valueMask(1, 2, 3, 4);
-  grid[2] = valueMask(1, 2, 3, 4);
-  grid[3] = valueMask(1, 2, 3, 4);
+  grid[0] = valueMask0(0, 2);  // 0 or 2
+  grid[1] = valueMask0(0, 1, 2, 3);
+  grid[2] = valueMask0(0, 1, 2, 3);
+  grid[3] = valueMask0(0, 1, 2, 3);
   const acc = createAccumulator();
 
   const result = handler.enforceConsistency(grid, acc);
   assert.equal(result, true);
   // Both candidates should survive in first cell.
-  assert.ok(grid[0] & valueMask(1), 'first cell should keep zero candidate');
-  assert.ok(grid[0] & valueMask(3), 'first cell should keep non-zero candidate');
+  assert.ok(grid[0] & valueMask0(0), 'first cell should keep zero candidate');
+  assert.ok(grid[0] & valueMask0(2), 'first cell should keep non-zero candidate');
 });
 
 await runTest('Skyscraper offset=0: unchanged behavior with no zero values', () => {

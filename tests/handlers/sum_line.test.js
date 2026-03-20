@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { ensureGlobalEnvironment } from '../helpers/test_env.js';
 import { runTest, logSuiteComplete } from '../helpers/test_runner.js';
-import { GridTestContext, createAccumulator, valueMask } from '../helpers/grid_test_utils.js';
+import { GridTestContext, createAccumulator, valueMask, valueMask0 } from '../helpers/grid_test_utils.js';
 
 ensureGlobalEnvironment();
 
@@ -91,9 +91,8 @@ await runTest('forward pass propagation', () => {
 const { GridShape } = await import('../../js/grid_shape.js');
 
 await runTest('offset: external values used for partial sums', () => {
-  // 2 cells, sum=3, offset=-1. External values 0-3, internal 1-4.
-  // External 0 (internal 1) contributes 0 to sum.
-  // External 3 (internal 4) contributes 3 to sum.
+  // 2 cells, sum=3, offset=-1. External values 0-3.
+  // External 0 contributes 0 to sum, external 3 contributes 3.
   // Valid: 0+3=3, 3+0=3, 1+2=3, 2+1=3.
   const shape = GridShape.fromGridSize(1, 4, null, -1);
   const context = new GridTestContext({ shape });
@@ -101,46 +100,45 @@ await runTest('offset: external values used for partial sums', () => {
   context.initializeHandler(handler);
 
   const grid = context.grid;
-  // Internal 1 (ext 0) and internal 4 (ext 3).
-  grid[0] = valueMask(1, 4);
-  grid[1] = valueMask(1, 4);
+  grid[0] = valueMask0(0, 3);
+  grid[1] = valueMask0(0, 3);
 
   const acc = createAccumulator();
   assert.equal(handler.enforceConsistency(grid, acc), true);
   // Both are valid: 0+3 and 3+0.
-  assert.equal(grid[0], valueMask(1, 4));
-  assert.equal(grid[1], valueMask(1, 4));
+  assert.equal(grid[0], valueMask0(0, 3));
+  assert.equal(grid[1], valueMask0(0, 3));
 });
 
 await runTest('offset: constrains cell to correct external value', () => {
-  // 2 cells, sum=3, offset=-1. Cell 0 fixed to internal 2 (ext 1).
-  // Cell 1 must contribute ext value so total = multiple of 3.
-  // ext 0→total 1 (no), ext 1→total 2 (no), ext 2→total 3 (yes), ext 3→total 4 (no).
+  // 2 cells, sum=3, offset=-1. Cell 0 fixed to 1.
+  // Cell 1 must contribute so total = multiple of 3.
+  // 0→total 1 (no), 1→total 2 (no), 2→total 3 (yes), 3→total 4 (no).
   const shape = GridShape.fromGridSize(1, 4, null, -1);
   const context = new GridTestContext({ shape });
   const handler = new SumLine([0, 1], false, 3);
   context.initializeHandler(handler);
 
   const grid = context.grid;
-  grid[0] = valueMask(2);           // fixed: internal 2 (ext 1)
-  grid[1] = valueMask(1, 2, 3, 4); // all candidates
+  grid[0] = valueMask0(1);           // fixed to 1
+  grid[1] = valueMask0(0, 1, 2, 3); // all candidates
 
   const acc = createAccumulator();
   assert.equal(handler.enforceConsistency(grid, acc), true);
-  assert.equal(grid[1], valueMask(3), 'only internal 3 (external 2) gives total 3');
+  assert.equal(grid[1], valueMask0(2), 'only 2 gives total 3');
 });
 
 await runTest('offset: non-multiple external sum fails', () => {
-  // 2 cells, sum=3, offset=-1. Cell 0 = int 1 (ext 0), Cell 1 = int 2 (ext 1).
-  // Total external = 0+1 = 1. 1 mod 3 ≠ 0 → fail.
+  // 2 cells, sum=3, offset=-1. Cell 0 = 0, Cell 1 = 1.
+  // Total = 0+1 = 1. 1 mod 3 ≠ 0 → fail.
   const shape = GridShape.fromGridSize(1, 4, null, -1);
   const context = new GridTestContext({ shape });
   const handler = new SumLine([0, 1], false, 3);
   context.initializeHandler(handler);
 
   const grid = context.grid;
-  grid[0] = valueMask(1);  // ext 0
-  grid[1] = valueMask(2);  // ext 1
+  grid[0] = valueMask0(0);
+  grid[1] = valueMask0(1);
 
   const acc = createAccumulator();
   assert.equal(handler.enforceConsistency(grid, acc), false);
