@@ -1377,6 +1377,21 @@ export class SudokuConstraint {
     }
   }
 
+  static Doppelganger = class Doppelganger extends SudokuConstraintBase {
+    static DESCRIPTION = (`
+      Every region (row, column, box) contains 0 and all but one of the digits
+      1-N.
+      No two regions of the same type may miss the same digit.
+      At each 0, the missing digits from each region differs.
+      Only square grids with values 0-N are supported.`);
+    static CATEGORY = 'LayoutCheckbox';
+    static UNIQUENESS_KEY_FIELD = 'type';
+    static REQUIRE_SQUARE_GRID = true;
+    static VALIDATE_SHAPE_FN = (shape) =>
+      shape.valueOffset === -1
+      && shape.numValues === shape.numRows + 1;
+  }
+
   static AntiKing = class AntiKing extends SudokuConstraintBase {
     static DESCRIPTION = (`
       Cells which are a king's move away cannot have the same value.`);

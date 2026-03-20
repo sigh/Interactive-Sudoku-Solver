@@ -167,7 +167,9 @@ export class SudokuBuilder {
     }
   }
 
-
+  static _regionSize(constraintMap, shape) {
+    return constraintMap.get('RegionSize')?.[0]?.size ?? shape.numValues;
+  }
 
   static * _constraintHandlers(constraintMap, shape, stateAllocator) {
     const constraints = [].concat(...constraintMap.values());
@@ -182,6 +184,10 @@ export class SudokuBuilder {
 
       let cells;
       switch (constraint.type) {
+        case 'Doppelganger':
+          yield* this._doppelgangerHandlers(shape, constraintMap, stateAllocator);
+          break;
+
         case 'AntiKnight':
           yield* this._antiHandlers(shape,
             (r, c) => [[r + 1, c + 2], [r + 2, c + 1], [r + 1, c - 2], [r + 2, c - 1]]);
@@ -222,7 +228,7 @@ export class SudokuBuilder {
                 `puzzle shape ${shape.name}`);
             }
             cells = constraint.cells.map(c => shape.parseCellId(c).cell);
-            const regionSize = constraintMap.get('RegionSize')?.[0]?.size ?? shape.numValues;
+            const regionSize = this._regionSize(constraintMap, shape);
             if (cells.length !== regionSize) {
               throw new InvalidConstraintError(
                 `Jigsaw pieces must have ${regionSize} cells for the current shape.`);
@@ -844,6 +850,80 @@ export class SudokuBuilder {
 
         default:
           throw new InvalidConstraintError('Unknown constraint type: ' + constraint.type);
+      }
+    }
+  }
+
+  static * _doppelgangerHandlers(shape, constraintMap, stateAllocator) {
+    const regionSize = this._regionSize(constraintMap, shape);
+    const gridSize = shape.numValues - 1;
+    if (shape.valueOffset !== -1
+      || gridSize !== shape.numRows
+      || gridSize !== shape.numCols
+      || gridSize !== regionSize) {
+      throw new InvalidConstraintError(
+        'Doppelganger requires shape with values 0-N '
+        + '(e.g. 9x9~0-9 for a 9x9 grid).');
+    }
+
+    const rowRegions = SudokuConstraintBase.rowRegions(shape);
+    const colRegions = SudokuConstraintBase.colRegions(shape);
+    const boxRegions = this._getBoxRegions(shape, constraintMap);
+
+    const [zeroCell] = stateAllocator.allocate(1);
+    const rowStateCells = stateAllocator.allocate(gridSize);
+    const colStateCells = stateAllocator.allocate(gridSize);
+    const boxStateCells = boxRegions.length
+      ? stateAllocator.allocate(boxRegions.length)
+      : [];
+
+    // Fix the zero cell to value 0. This propagates through the state cell
+    // AllDifferent groups to prevent state cells from holding 0 (Rule 1).
+    yield new HandlerModule.GivenCandidates(new Map([[zeroCell, [0]]]));
+
+    // 10-cell AllDifferent for each region + its state cell.
+    // The optimizer will promote these to House via _addHouseHandlers.
+    for (let i = 0; i < gridSize; i++) {
+      yield new HandlerModule.AllDifferent(
+        [...rowRegions[i], rowStateCells[i]]);
+    }
+    for (let i = 0; i < gridSize; i++) {
+      yield new HandlerModule.AllDifferent(
+        [...colRegions[i], colStateCells[i]]);
+    }
+    for (let i = 0; i < boxRegions.length; i++) {
+      yield new HandlerModule.AllDifferent(
+        [...boxRegions[i], boxStateCells[i]]);
+    }
+
+    // Rule 2: No two rows/columns/boxes may be missing the same digit.
+    // Adding zeroCell makes these N+1 cells with N+1 values, which the
+    // optimizer promotes to House (more powerful than plain AllDifferent).
+    yield new HandlerModule.AllDifferent(
+      [...rowStateCells, zeroCell]);
+    yield new HandlerModule.AllDifferent(
+      [...colStateCells, zeroCell]);
+    if (boxStateCells.length) {
+      yield new HandlerModule.AllDifferent(
+        [...boxStateCells, zeroCell]);
+    }
+
+    // Rule 3: For each 0 in the grid, the digits missing in its row, column,
+    // and box must be three different digits.
+    const NO_BOX = 255;
+    const cellToBox = new Uint8Array(shape.numCells).fill(NO_BOX);
+    for (let b = 0; b < boxRegions.length; b++) {
+      for (const cell of boxRegions[b]) {
+        cellToBox[cell] = b;
+      }
+    }
+    for (let r = 0; r < gridSize; r++) {
+      for (let c = 0; c < gridSize; c++) {
+        const cell = shape.cellIndex(r, c);
+        const stateCells = [rowStateCells[r], colStateCells[c]];
+        const boxIdx = cellToBox[cell];
+        if (boxIdx !== NO_BOX) stateCells.push(boxStateCells[boxIdx]);
+        yield new HandlerModule.DoppelgangerZero(cell, stateCells);
       }
     }
   }

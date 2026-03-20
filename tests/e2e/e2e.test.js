@@ -155,6 +155,7 @@ const solveCollections = [
       '7x7: Dutch Flat Mate Squishdoku', // non-standard numValues, Dutch Flatmates
       '7x7: Buggy NR Squishdoku',  // non-standard numValues, Numbered Rooms
       '6x6: 9-value disjoint sets',  // non-standard numValues, DisjointSets
+      'Doppelganger',  // Doppelganger
     ],
   },
   {

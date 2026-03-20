@@ -3526,6 +3526,71 @@ export class EqualSizePartitions extends SudokuConstraintHandler {
   }
 }
 
+// For each grid cell in a Doppelganger puzzle, if the cell is 0 then the
+// missing digits for its row, column, and box must all be different.
+// stateCells are the state cells tracking the missing digit for each region
+// type that contains gridCell (typically [rowState, colState, boxState]).
+export class DoppelgangerZero extends SudokuConstraintHandler {
+  // Value 0 has display value -1+1=0, internal value index 0, so bit = 1<<0.
+  static ZERO_BIT = 1;
+
+  constructor(gridCell, stateCells) {
+    if (stateCells.length > 3 || stateCells.length < 2) {
+      throw new Error('DoppelgangerZero supports 2 or 3 state cells');
+    }
+    super([gridCell, ...stateCells]);
+    this._gridCell = gridCell;
+    this._stateCells = new Uint8Array(stateCells);
+  }
+
+  initialize(initialGridCells, cellExclusions, shape) {
+    if (shape.valueOffset !== -1) {
+      throw new InvalidConstraintError(
+        'DoppelgangerZero requires valueOffset === -1');
+    }
+    return true;
+  }
+
+  enforceConsistency(grid, handlerAccumulator) {
+    const v = grid[this._gridCell];
+
+    // If the grid cell can't be 0, constraint is trivially satisfied.
+    if (!(v & 1)) return true;
+
+    const s = this._stateCells;
+    const n = s.length;
+
+    if (v === 1) {
+      for (let i = 0; i < n; i++) {
+        const si = grid[s[i]];
+        if (si & (si - 1)) continue;
+        for (let j = 0; j < n; j++) {
+          if (j === i) continue;
+          if (si & grid[s[j]]) {
+            if (!(grid[s[j]] &= ~si)) return false;
+            handlerAccumulator.addForCell(s[j]);
+          }
+        }
+      }
+    } else {
+      // Grid cell might be 0. Remove 0 if state cells can't all differ.
+      const s0 = grid[s[0]];
+      const s1 = grid[s[1]];
+      const s2 = n === 3 ? grid[s[2]] : 0;
+      const stateCellConflict = (
+        (!(s0 & (s0 - 1)) && (s0 === s1 || s0 === s2))
+        || (!(s1 & (s1 - 1)) && s1 === s2)
+      );
+      if (stateCellConflict) {
+        if (!(grid[this._gridCell] &= ~1)) return false;
+        handlerAccumulator.addForCell(this._gridCell);
+      }
+    }
+
+    return true;
+  }
+}
+
 class DummyHandlerAccumulator {
   addForCell(cell) { }
 }

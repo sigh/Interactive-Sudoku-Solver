@@ -860,6 +860,12 @@ export const EXAMPLES = [
     input: '.Shape~6x6~9.~R1C1_1~R3C4_2~R2C5_1~R4C3_2~R3C2_4~R3C1_6~R5C2_3~R6C4_4~R6C6_6~R1C3_3~R6C3_7~R6C5_9~R2C1_5~R5C4_7~R2C6_7~R1C5_6~R3C6_3.DisjointSets',
     solution: '173564528917649283952831436752817496',
   },
+  {
+    name: 'Doppelganger',
+    src: 'https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?chlang=en&id=0005Q2',
+    input: '.Shape~9x9~0-9.Doppelganger.~R5C5_0.RegionSize~9.Cage~18~R1C2~R2C2~R3C2~R2C1~R2C3.Cage~22~R1C3~R1C4~R2C4.Cage~9~R1C5~R2C5~R3C5.Cage~21~R1C6~R2C6~R1C7.Cage~31~R1C8~R2C8~R2C7~R2C9~R3C8.Cage~6~R3C6~R4C7~R4C6~R3C7.Cage~16~R3C3~R3C4~R4C4~R4C3.Cage~8~R5C1~R5C2~R5C3.Cage~22~R7C2~R8C2~R9C2~R8C1~R8C3.Cage~8~R8C4~R9C4~R9C3.Cage~23~R7C5~R8C5~R9C5.Cage~9~R6C3~R6C4~R7C4~R7C3.Cage~20~R8C6~R9C6~R9C7.Cage~6~R6C6~R7C6~R7C7~R6C7.Cage~23~R8C7~R8C8~R8C9~R9C8~R7C8.Cage~20~R5C7~R5C8~R5C9.LittleKiller~13~R1C1.LittleKiller~9~R1C9',
+    solution: '259638470403729618761540293096471385512806749874253061980362154325187906147095832',
+  },
 
   //////////////////////////////////////////////////////////////////////////////
   // Or
