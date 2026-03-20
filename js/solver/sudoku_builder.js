@@ -176,10 +176,11 @@ export class SudokuBuilder {
 
     for (const constraint of constraints) {
       // Validate constraint is compatible with the shape.
-      if (constraint.constructor.REQUIRE_SQUARE_GRID && !shape.isSquare()) {
+      const validateShape = constraint.constructor.VALIDATE_SHAPE_FN;
+      if (validateShape && !validateShape(shape)) {
         throw new InvalidConstraintError(
-          `${constraint.constructor.displayName()} requires a square grid, ` +
-          `but the grid is ${shape.name}.`);
+          `${constraint.constructor.displayName()} is not compatible with ` +
+          `grid ${shape.name}.`);
       }
 
       let cells;

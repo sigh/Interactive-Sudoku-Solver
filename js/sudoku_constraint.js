@@ -58,11 +58,9 @@ export class SudokuConstraintBase {
   // Used by LinesAndSets constraints. Takes (cells, shape) arguments.
   static VALIDATE_CELLS_FN = null;
 
-  // Set to true for constraints that only work on square grids.
-  static REQUIRE_SQUARE_GRID = false;
-
-  // Set to true for constraints incompatible with non-zero valueOffset.
-  static INCOMPATIBLE_WITH_OFFSET = false;
+  // Determine if a shape is valid for this constraint class.
+  // Takes (shape) argument, returns true if valid.
+  static VALIDATE_SHAPE_FN = null;
 
   constructor(...args) {
     this.args = args;
@@ -1330,7 +1328,7 @@ export class SudokuConstraint {
     static CATEGORY = 'LayoutCheckbox';
     static DISPLAY_CONFIG = { displayClass: 'Windoku' };
     static UNIQUENESS_KEY_FIELD = 'type';
-    static REQUIRE_SQUARE_GRID = true;
+    static VALIDATE_SHAPE_FN = (shape) => shape.isSquare();
 
     static regions = memoize((shape, size = null) => {
       const numRows = shape.numRows;
@@ -1363,7 +1361,7 @@ export class SudokuConstraint {
       No digit may appear in the same position in any two boxes.`);
     static CATEGORY = 'LayoutCheckbox';
     static UNIQUENESS_KEY_FIELD = 'type';
-    static REQUIRE_SQUARE_GRID = true;
+    static VALIDATE_SHAPE_FN = (shape) => shape.isSquare();
   }
 
   static AntiKnight = class AntiKnight extends SudokuConstraintBase {
@@ -1386,9 +1384,9 @@ export class SudokuConstraint {
       Only square grids with values 0-N are supported.`);
     static CATEGORY = 'LayoutCheckbox';
     static UNIQUENESS_KEY_FIELD = 'type';
-    static REQUIRE_SQUARE_GRID = true;
     static VALIDATE_SHAPE_FN = (shape) =>
-      shape.valueOffset === -1
+      shape.isSquare()
+      && shape.valueOffset === -1
       && shape.numValues === shape.numRows + 1;
   }
 
@@ -1413,7 +1411,7 @@ export class SudokuConstraint {
       adjacent cells.`);
     static CATEGORY = 'Global';
     static UNIQUENESS_KEY_FIELD = 'type';
-    static INCOMPATIBLE_WITH_OFFSET = true;
+    static VALIDATE_SHAPE_FN = (shape) => shape.valueOffset === 0;
 
     static displayName() {
       return 'Anti-Taxicab';
@@ -1464,8 +1462,8 @@ export class SudokuConstraint {
       a middle digit (4, 5, 6) and a high digit (7, 8, 9).`);
     static CATEGORY = 'Global';
     static UNIQUENESS_KEY_FIELD = 'type';
-    static REQUIRE_9_VALUES = true;
-    static INCOMPATIBLE_WITH_OFFSET = true;
+    static VALIDATE_SHAPE_FN = (shape) =>
+      shape.numValues === 9 && shape.valueOffset === 0;
   }
 
   static GlobalMod = class GlobalMod extends SudokuConstraintBase {
@@ -1491,7 +1489,7 @@ export class SudokuConstraint {
       FullRank clues present.`);
     static CATEGORY = 'Global';
     static UNIQUENESS_KEY_FIELD = 'type';
-    static REQUIRE_SQUARE_GRID = true;
+    static VALIDATE_SHAPE_FN = (shape) => shape.isSquare();
     static ARGUMENT_CONFIG = {
       inputType: 'select',
       label: 'FullRank ties',
@@ -1520,8 +1518,8 @@ export class SudokuConstraint {
       Only supported for when the allowed values are 1-9.`);
     static CATEGORY = 'Global';
     static UNIQUENESS_KEY_FIELD = 'type';
-    static REQUIRE_9_VALUES = true;
-    static INCOMPATIBLE_WITH_OFFSET = true;
+    static VALIDATE_SHAPE_FN = (shape) =>
+      shape.numValues === 9 && shape.valueOffset === 0;
   }
 
   static Diagonal = class Diagonal extends SudokuConstraintBase {
@@ -1536,7 +1534,7 @@ export class SudokuConstraint {
       ],
     };
     static UNIQUENESS_KEY_FIELD = 'direction';
-    static REQUIRE_SQUARE_GRID = true;
+    static VALIDATE_SHAPE_FN = (shape) => shape.isSquare();
 
     constructor(direction) {
       super(direction);
@@ -2063,7 +2061,7 @@ export class SudokuConstraint {
       clueTemplate: '#$CLUE',
     };
     static CLUE_TYPE = OutsideConstraintBase.CLUE_TYPE_DOUBLE_LINE;
-    static REQUIRE_SQUARE_GRID = true;
+    static VALIDATE_SHAPE_FN = (shape) => shape.isSquare();
   }
 
   static AllDifferent = class AllDifferent extends SudokuConstraintBase {
