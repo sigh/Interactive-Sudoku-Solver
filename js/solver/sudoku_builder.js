@@ -168,7 +168,8 @@ export class SudokuBuilder {
   }
 
   static _regionSize(constraintMap, shape) {
-    return constraintMap.get('RegionSize')?.[0]?.size ?? shape.numValues;
+    return constraintMap.get('RegionSize')?.[0]?.size
+      ?? shape.constructor.defaultNumValues(shape.numRows, shape.numCols);
   }
 
   static * _constraintHandlers(constraintMap, shape, stateAllocator) {

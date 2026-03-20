@@ -208,7 +208,7 @@ const CATEGORY_CONFIGS = {
       Cells can also be added and removed by holding down shift while
       clicking.
       The number of cells must equal the region size.
-      The default region size is the number of distinct values.
+      The default region size is the grid size.
       `,
   },
   'Composite': {

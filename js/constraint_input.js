@@ -956,7 +956,9 @@ ConstraintCategoryInput.Region = class Region extends ConstraintCategoryInput {
       for (const c of this.collection.getConstraintsByType('Jigsaw')) {
         this.collection.removeConstraint(c);
       }
-      if (selected !== this._shape.numValues) {
+      const defaultSize = GridShape.defaultNumValues(
+        this._shape.numRows, this._shape.numCols);
+      if (selected !== defaultSize) {
         this.collection.addConstraint(new SudokuConstraint.RegionSize(selected));
       }
     };
@@ -1003,8 +1005,8 @@ ConstraintCategoryInput.Region = class Region extends ConstraintCategoryInput {
       select.appendChild(opt);
     }
 
-    // Default selection is numValues (no constraint).
-    select.value = numValues;
+    // Default selection is defaultNumValues (no constraint).
+    select.value = defaultNumValues;
   }
 
   _setUpButton(inputManager) {
@@ -1063,7 +1065,8 @@ ConstraintCategoryInput.Region = class Region extends ConstraintCategoryInput {
 
   onRemoveConstraint(c) {
     if (c.type === SudokuConstraint.RegionSize.name) {
-      this._regionSizeSelect.value = this._shape?.numValues;
+      this._regionSizeSelect.value = GridShape.defaultNumValues(
+        this._shape?.numRows, this._shape?.numCols);
     } else if (c.type === SudokuConstraint.RegionSameValues.name) {
       this._sameValuesCheckbox.checked = false;
     }

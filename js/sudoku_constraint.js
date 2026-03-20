@@ -181,7 +181,7 @@ export class SudokuConstraintBase {
   static boxRegions = memoize((shape, size = null) => {
     const numRows = shape.numRows;
     const numCols = shape.numCols;
-    const effectiveSize = size ?? shape.numValues;
+    const effectiveSize = size ?? GridShape.defaultNumValues(numRows, numCols);
 
     const [boxHeight, boxWidth] = GridShape.boxDimsForSize(
       numRows, numCols, effectiveSize);
@@ -199,10 +199,10 @@ export class SudokuConstraintBase {
         const cellCol = i % boxWidth;
         return (boxRow * boxHeight + cellRow) * numCols + (boxCol * boxWidth + cellCol);
       }, numBoxes, effectiveSize);
-  }, (shape, size = null) => `${shape.gridDimsStr}~${size ?? shape.numValues}`);
+  }, (shape, size = null) => `${shape.gridDimsStr}~${size ?? GridShape.defaultNumValues(shape.numRows, shape.numCols)}`);
   static disjointSetRegions = memoize((shape, size = null) => {
     const numCols = shape.numCols;
-    const effectiveSize = size ?? shape.numValues;
+    const effectiveSize = size ?? GridShape.defaultNumValues(shape.numRows, numCols);
     const [boxHeight, boxWidth] = GridShape.boxDimsForSize(
       shape.numRows, numCols, effectiveSize);
     if (!boxHeight) return [];
@@ -220,7 +220,7 @@ export class SudokuConstraintBase {
         const posCol = r % boxWidth;
         return (boxRow * boxHeight + posRow) * numCols + boxCol * boxWidth + posCol;
       }, numSets, numBoxes);
-  }, (shape, size = null) => `${shape.gridDimsStr}~${size ?? shape.numValues}`);
+  }, (shape, size = null) => `${shape.gridDimsStr}~${size ?? GridShape.defaultNumValues(shape.numRows, shape.numCols)}`);
   static square2x2Regions = memoize(
     (shape) => {
       const numRows = shape.numRows;
@@ -1227,7 +1227,7 @@ export class SudokuConstraint {
 
   static RegionSize = class RegionSize extends SudokuConstraintBase {
     static DESCRIPTION = (`
-      Jigsaw pieces must be of this size.`);
+      The size of default boxes. Jigsaw pieces must be of this size.`);
     static CATEGORY = 'Region';
     static DISPLAY_CONFIG = { displayClass: 'DefaultRegions' };
     static UNIQUENESS_KEY_FIELD = 'type';

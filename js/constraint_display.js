@@ -967,7 +967,8 @@ class DefaultRegions extends BaseConstraintDisplayItem {
     }
 
     // Determine effective box dimensions.
-    const effectiveSize = this._regionSize ?? shape.numValues;
+    const effectiveSize = this._regionSize
+      ?? GridShape.defaultNumValues(shape.numRows, shape.numCols);
     const [boxHeight, boxWidth] = GridShape.boxDimsForSize(
       shape.numRows, shape.numCols, effectiveSize);
 
