@@ -3531,9 +3531,6 @@ export class EqualSizePartitions extends SudokuConstraintHandler {
 // stateCells are the state cells tracking the missing digit for each region
 // type that contains gridCell (typically [rowState, colState, boxState]).
 export class DoppelgangerZero extends SudokuConstraintHandler {
-  // Value 0 has display value -1+1=0, internal value index 0, so bit = 1<<0.
-  static ZERO_BIT = 1;
-
   constructor(gridCell, stateCells) {
     if (stateCells.length > 3 || stateCells.length < 2) {
       throw new Error('DoppelgangerZero supports 2 or 3 state cells');
