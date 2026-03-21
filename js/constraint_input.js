@@ -892,13 +892,17 @@ ConstraintCategoryInput.GivenCandidates = class GivenCandidates extends Constrai
     const maxValue = this._shape.maxValue();
 
     let newValue;
-    if (digit === null || digit < minValue || digit > maxValue) {
+    if (digit === null) {
       newValue = null;
     } else if (currValue === null) {
       newValue = digit;
     } else {
       newValue = currValue * 10 + digit;
       if (newValue > maxValue) newValue = digit;
+    }
+
+    if (newValue !== null && (newValue < minValue || newValue > maxValue)) {
+      newValue = null;
     }
 
     this._multiValueInputPanel.updateFromCells([cell]);
