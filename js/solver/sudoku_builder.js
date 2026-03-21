@@ -1,4 +1,4 @@
-const { SudokuConstraint, SudokuConstraintBase, CellArgs } = await import('../sudoku_constraint.js' + self.VERSION_PARAM);
+const { SudokuConstraint, SudokuConstraintBase, CellArgs, StateCellRegistry } = await import('../sudoku_constraint.js' + self.VERSION_PARAM);
 const { SudokuSolver } = await import('./engine.js' + self.VERSION_PARAM);
 const { regexToNFA, NFASerializer } = await import('../nfa_builder.js' + self.VERSION_PARAM);
 const { memoize } = await import('../util.js' + self.VERSION_PARAM);
@@ -6,37 +6,23 @@ const HandlerModule = await import('./handlers.js' + self.VERSION_PARAM);
 const SumHandlerModule = await import('./sum_handler.js' + self.VERSION_PARAM);
 const NFAHandlerModule = await import('./nfa_handler.js' + self.VERSION_PARAM);
 
+export { StateCellRegistry };
+
 const { InvalidConstraintError } = HandlerModule;
-
-class StateCellAllocator {
-  constructor(numCells) {
-    this._next = numCells;
-    this._numCells = numCells;
-  }
-
-  allocate(count) {
-    const start = this._next;
-    this._next += count;
-    return Array.from({ length: count }, (_, i) => start + i);
-  }
-
-  get numStateCells() {
-    return this._next - this._numCells;
-  }
-}
 
 export class SudokuBuilder {
   static build(constraint, debugOptions) {
     const shape = constraint.getShape();
     const constraintMap = constraint.toMap();
-    const stateAllocator = new StateCellAllocator(shape.numCells);
+    const registry = StateCellRegistry.fromConstraints(
+      [].concat(...constraintMap.values()), shape);
 
-    const handlers = [...this._handlers(constraintMap, shape, stateAllocator)];
+    const handlers = [...this._handlers(constraintMap, shape, registry)];
 
     return new SudokuSolver(
       handlers,
       shape,
-      stateAllocator.numStateCells,
+      shape.numCells + registry.totalCells,
       debugOptions);
   }
 
@@ -51,14 +37,14 @@ export class SudokuBuilder {
     return new cls(...args);
   }
 
-  static *_handlers(constraintMap, shape, stateAllocator) {
+  static *_handlers(constraintMap, shape, registry) {
     yield* this._rowColHandlers(shape);
 
     const boxRegions = this._getBoxRegions(shape, constraintMap);
     yield new HandlerModule.BoxInfo(boxRegions);
     yield* this._boxHandlers(boxRegions);
 
-    yield* this._constraintHandlers(constraintMap, shape, stateAllocator);
+    yield* this._constraintHandlers(constraintMap, shape, registry);
   }
 
   // Get box regions, respecting NoBoxes and RegionSize constraints.
@@ -172,7 +158,7 @@ export class SudokuBuilder {
       ?? shape.constructor.defaultNumValues(shape.numRows, shape.numCols);
   }
 
-  static * _constraintHandlers(constraintMap, shape, stateAllocator) {
+  static * _constraintHandlers(constraintMap, shape, registry) {
     const constraints = [].concat(...constraintMap.values());
 
     for (const constraint of constraints) {
@@ -187,7 +173,7 @@ export class SudokuBuilder {
       let cells;
       switch (constraint.type) {
         case 'Doppelganger':
-          yield* this._doppelgangerHandlers(shape, constraintMap, stateAllocator);
+          yield* this._doppelgangerHandlers(shape, constraintMap, registry);
           break;
 
         case 'AntiKnight':
@@ -870,7 +856,7 @@ export class SudokuBuilder {
       ...nonEmpty.map(b => this._wrapAnd(b)));
   }
 
-  static * _doppelgangerHandlers(shape, constraintMap, stateAllocator) {
+  static * _doppelgangerHandlers(shape, constraintMap, registry) {
     const regionSize = this._regionSize(constraintMap, shape);
     const gridSize = shape.numValues - 1;
     if (shape.valueOffset !== -1
@@ -886,17 +872,22 @@ export class SudokuBuilder {
     const colRegions = SudokuConstraintBase.colRegions(shape);
     const boxRegions = this._getBoxRegions(shape, constraintMap);
 
-    const [zeroCell] = stateAllocator.allocate(1);
-    const rowStateCells = stateAllocator.allocate(gridSize);
-    const colStateCells = stateAllocator.allocate(gridSize);
-    const boxStateCells = boxRegions.length
-      ? stateAllocator.allocate(boxRegions.length)
-      : [];
+    const [zeroCell] = registry.getCellsForGroup('DGZ');
+    const rowStateCells = registry.getCellsForGroup('DGR');
+    const colStateCells = registry.getCellsForGroup('DGC');
+    const boxStateCells = registry.getCellsForGroup('DGB');
 
     // Fix the zero cell to value 0. This propagates through the state cell
     // AllDifferent groups to prevent state cells from holding 0 (Rule 1).
     yield new HandlerModule.GivenCandidates(new Map([[zeroCell, [0]]]));
 
+    // If there are no boxes, fix box state cells to 0 so they don't
+    // participate in search.
+    if (!boxRegions.length) {
+      const fixedCells = new Map();
+      for (const cell of boxStateCells) fixedCells.set(cell, [0]);
+      yield new HandlerModule.GivenCandidates(fixedCells);
+    }
     // 10-cell AllDifferent for each region + its state cell.
     // The optimizer will promote these to House via _addHouseHandlers.
     for (let i = 0; i < gridSize; i++) {
@@ -919,7 +910,7 @@ export class SudokuBuilder {
       [...rowStateCells, zeroCell]);
     yield new HandlerModule.AllDifferent(
       [...colStateCells, zeroCell]);
-    if (boxStateCells.length) {
+    if (boxRegions.length) {
       yield new HandlerModule.AllDifferent(
         [...boxStateCells, zeroCell]);
     }

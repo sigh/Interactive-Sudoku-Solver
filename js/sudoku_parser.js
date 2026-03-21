@@ -496,9 +496,10 @@ export const toShortSolution = (solution, shape) => {
   const minValue = shape.minValue();
   const DEFAULT_VALUE = '.';
 
-  const result = new Array(solution.length).fill(DEFAULT_VALUE);
+  const length = Math.min(solution.length, shape.numCells);
+  const result = new Array(length).fill(DEFAULT_VALUE);
 
-  for (let i = 0; i < solution.length; i++) {
+  for (let i = 0; i < length; i++) {
     if (solution[i] != null) {
       result[i] = String.fromCharCode(baseCharCode + solution[i] - minValue);
     }

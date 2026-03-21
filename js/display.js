@@ -22,6 +22,7 @@ export class DisplayItem {
   constructor(svg) {
     this._svg = svg;
     this._shape = null;
+    this._stateCellPositions = null;
   }
 
   reshape(shape) { this._shape = shape; };
@@ -30,7 +31,14 @@ export class DisplayItem {
     return this._svg;
   }
 
+  setStateCellPositions(posMap) {
+    this._stateCellPositions = posMap;
+  }
+
   cellIndexCenter(cellIndex) {
+    if (cellIndex >= this._shape.numCells) {
+      return this._stateCellPositions?.get(cellIndex) || null;
+    }
     const [row, col] = this._shape.splitCellIndex(cellIndex);
     return DisplayItem._cellCenter(row, col);
   }
@@ -59,7 +67,7 @@ export class DisplayItem {
   }
 
   cellCenter(cell) {
-    return DisplayItem._cellCenter(...this._shape.splitCellIndex(cell));
+    return this.cellIndexCenter(cell);
   }
 
   static _cellCenter(row, col) {
@@ -82,9 +90,11 @@ export class DisplayItem {
   }
 
   _makeCellSquare(cell) {
-    const cellWidth = DisplayItem.CELL_SIZE;
+    const center = this.cellCenter(cell);
+    if (!center) return null;
 
-    const [x, y] = this.cellCenter(cell);
+    const cellWidth = DisplayItem.CELL_SIZE;
+    const [x, y] = center;
     const path = createSvgElement('path');
     const directions = [
       'M', x - cellWidth / 2 + 1, y - cellWidth / 2 + 1,
@@ -300,11 +310,12 @@ export class CellValueDisplay extends DisplayItem {
   renderGridValues(grid, colorFn) {
     this.clear();
     const svg = this.getSvg();
-    const numCells = this._shape.numCells;
 
-    for (let i = 0; i < grid.length && i < numCells; i++) {
+    for (let i = 0; i < grid.length; i++) {
       const value = grid[i];
       if (value == null) continue;
+      const pos = this.cellIndexCenter(i);
+      if (!pos) continue;
       svg.append(this.makeGridValue(i, value, colorFn));
     }
   }
@@ -510,6 +521,10 @@ export class DisplayContainer {
     this._highlightDisplay = new HighlightDisplay(
       this.getNewGroup('highlight-group'));
 
+    this._stateCellDisplay = new StateCellDisplay(
+      this.getNewGroup('state-cell-group'));
+    this._stateCellListeners = [this._highlightDisplay];
+
     this._clickInterceptor = new ClickInterceptor();
     container.append(this._clickInterceptor.getSvg());
   }
@@ -518,6 +533,8 @@ export class DisplayContainer {
     const padding = DisplayItem.SVG_PADDING;
     const width = DisplayItem.CELL_SIZE * shape.numCols + padding * 2;
     const height = DisplayItem.CELL_SIZE * shape.numRows + padding * 2;
+    this._baseHeight = height;
+    this._extraHeight = 0;
     this._mainSvg.setAttribute('height', height);
     this._mainSvg.setAttribute('width', width);
     this._mainSvg.setAttribute(
@@ -529,8 +546,27 @@ export class DisplayContainer {
     this._clickInterceptor.reshape(shape);
   }
 
+  setExtraHeight(extraHeight) {
+    this._extraHeight = extraHeight;
+    this._mainSvg.setAttribute(
+      'height', this._baseHeight + this._extraHeight);
+  }
+
   toggleLayoutView(enable) {
     this._mainSvg.classList.toggle('layout-view', enable);
+  }
+
+  addStateCellListener(displayItem) {
+    this._stateCellListeners.push(displayItem);
+  }
+
+  updateStateCells(groups, shape) {
+    const extraHeight = this._stateCellDisplay.setLayout(groups, shape);
+    this.setExtraHeight(extraHeight);
+    const positions = this._stateCellDisplay.getCellPositions();
+    for (const listener of this._stateCellListeners) {
+      listener.setStateCellPositions(positions);
+    }
   }
 
   createCellHighlighter(cssClass) {
@@ -649,8 +685,10 @@ export class SolutionDisplay extends CellValueDisplay {
     this.renderGridValues(solution, colorFn);
 
     if (this._copyElem) {
+      const numCells = this._shape.numCells;
       this._copyElem.disabled = (
-        !this._currentSolution.every(v => v != null && isFinite(v)));
+        !this._currentSolution.slice(0, numCells).every(
+          v => v != null && isFinite(v)));
     }
   }
 }
@@ -698,9 +736,9 @@ export class HighlightDisplay extends DisplayItem {
 
   highlightCell(cellId, cssClass) {
     const parsed = this._shape.parseCellId(cellId);
-    if (parsed.row === undefined) return null;
-
     const path = this._makeCellSquare(parsed.cell);
+    if (!path) return null;
+
     const svg = cssClass ? this._getGroup(cssClass) : this._svg;
 
     svg.appendChild(path);
@@ -838,5 +876,105 @@ class CellHighlighter {
     }
     this._cells.clear();
     this._key = undefined;
+  }
+}
+
+export class StateCellDisplay extends DisplayItem {
+  static GAP = 20;
+  static LABEL_HEIGHT = 14;
+
+  constructor(svg) {
+    super(svg);
+    this._cellPositions = new Map();
+    this._layout = null;
+  }
+
+  setLayout(groups, shape) {
+    this.clear();
+    this._shape = shape;
+    if (!groups || !groups.length) {
+      this._layout = null;
+      return 0;
+    }
+
+    const cellSize = DisplayItem.CELL_SIZE;
+    const padding = DisplayItem.SVG_PADDING;
+    const gap = StateCellDisplay.GAP;
+    const labelHeight = StateCellDisplay.LABEL_HEIGHT;
+    const gridHeight = cellSize * shape.numRows;
+    const yStart = gridHeight + gap;
+    const rowHeight = labelHeight + cellSize;
+
+    const svg = this.getSvg();
+    svg.setAttribute('transform', `translate(${padding},${padding})`);
+
+    let rowIndex = 0;
+    this._layout = [];
+
+    for (const group of groups) {
+      if (group.hidden || !group.cells.length) continue;
+
+      const yLabel = yStart + rowIndex * rowHeight;
+      const y = yLabel + labelHeight;
+
+      for (let col = 0; col < group.cells.length; col++) {
+        const x = col * cellSize;
+        this._cellPositions.set(group.cells[col], [
+          x + cellSize / 2, y + cellSize / 2]);
+      }
+
+      // Draw grid lines.
+      const groupWidth = group.cells.length * cellSize;
+      const lineGroup = createSvgElement('g');
+      lineGroup.setAttribute('stroke', 'rgb(180, 180, 180)');
+      lineGroup.setAttribute('stroke-width', 1);
+      lineGroup.setAttribute('fill', 'none');
+
+      // Internal vertical lines.
+      for (let col = 1; col < group.cells.length; col++) {
+        const line = createSvgElement('line');
+        line.setAttribute('x1', col * cellSize);
+        line.setAttribute('y1', y);
+        line.setAttribute('x2', col * cellSize);
+        line.setAttribute('y2', y + cellSize);
+        lineGroup.append(line);
+      }
+
+      // Border.
+      const border = createSvgElement('rect');
+      border.setAttribute('x', 0);
+      border.setAttribute('y', y);
+      border.setAttribute('width', groupWidth);
+      border.setAttribute('height', cellSize);
+      border.setAttribute('stroke', 'rgb(100, 100, 100)');
+      border.setAttribute('stroke-width', 1.5);
+      border.setAttribute('fill', 'none');
+      lineGroup.append(border);
+
+      svg.append(lineGroup);
+
+      // Draw label above the row.
+      const label = createSvgElement('text');
+      label.setAttribute('x', 0);
+      label.setAttribute('y', yLabel + labelHeight - 3);
+      label.setAttribute('class', 'state-cell-label');
+      label.textContent = `${group.prefix}: ${group.label}`;
+      svg.append(label);
+
+      this._layout.push({ prefix: group.prefix, row: rowIndex });
+      rowIndex++;
+    }
+
+    return gap + rowIndex * rowHeight;
+  }
+
+  getCellPositions() {
+    return this._cellPositions;
+  }
+
+  clear() {
+    clearDOMNode(this._svg);
+    this._cellPositions = new Map();
+    this._layout = null;
   }
 }

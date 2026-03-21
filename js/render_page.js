@@ -22,6 +22,7 @@ const {
   DisplayItem
 } = await import('./display.js' + self.VERSION_PARAM);
 const { SudokuParser } = await import('./sudoku_parser.js' + self.VERSION_PARAM);
+const { StateCellRegistry } = await import('./sudoku_constraint.js' + self.VERSION_PARAM);
 const { ConstraintDisplay } = await import('./constraint_display.js' + self.VERSION_PARAM);
 const { SolutionController } = await import('./solution_controller.js' + self.VERSION_PARAM);
 const {
@@ -598,6 +599,12 @@ class ConstraintManager {
 
     this.addReshapeListener(displayContainer);
     this.addReshapeListener(inputManager);
+
+    this.addUpdateListener(() => {
+      const registry = StateCellRegistry.fromConstraints(
+        this._rootCollection.constraints(), this._shape);
+      displayContainer.updateStateCells(registry.getGroups(), this._shape);
+    });
 
     this._display = this.addReshapeListener(new ConstraintDisplay(
       inputManager, displayContainer));

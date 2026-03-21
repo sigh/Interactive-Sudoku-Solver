@@ -10,7 +10,7 @@ const { LazyDrawerManager } = await import('./bottom_drawer.js' + self.VERSION_P
 const {
   HighlightDisplay,
   SolutionDisplay,
-  CellValueDisplay
+  CellValueDisplay,
 } = await import('./display.js' + self.VERSION_PARAM);
 const { toShortSolution } = await import('./sudoku_parser.js' + self.VERSION_PARAM);
 const { SolverStateDisplay } = await import('./solver_state_display.js' + self.VERSION_PARAM);
@@ -132,6 +132,8 @@ export class SolutionController {
     this._solutionDisplay = new SolutionDisplay(
       displayContainer.getNewGroup('solution-group'),
       document.getElementById('copy-solution-button'));
+
+    displayContainer.addStateCellListener(this._solutionDisplay);
 
     this._constraintManager = constraintManager;
     this._stepHighlighter = displayContainer.createCellHighlighter('step-cell');

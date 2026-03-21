@@ -14,12 +14,13 @@ const { CandidateSelector, SamplingCandidateSelector, ConflictScores, SeenCandid
 const HandlerModule = await import('./handlers.js' + self.VERSION_PARAM);
 
 export class SudokuSolver {
-  constructor(handlers, shape, numStateCells, debugOptions) {
+  constructor(handlers, shape, numSearchCells, debugOptions) {
     this._debugLogger = new DebugLogger(this, debugOptions);
     this._shape = shape;
+    this._numSearchCells = numSearchCells;
 
     this._internalSolver = new InternalSolver(
-      handlers, shape, numStateCells, this._debugLogger);
+      handlers, shape, numSearchCells, this._debugLogger);
 
     this._progressExtraStateFn = null;
     this._progressCallback = null;
@@ -73,7 +74,7 @@ export class SudokuSolver {
       let result = {};
       if (sampleSolution) {
         result.solutions = [SudokuSolverUtil.gridToSolution(
-          sampleSolution.subarray(0, this._shape.numCells), this._shape.valueOffset)];
+          sampleSolution.subarray(0, this._numSearchCells), this._shape.valueOffset)];
         this._internalSolver.unsetSampleSolution();
       }
       if (estimationCounters) {
@@ -112,7 +113,7 @@ export class SudokuSolver {
 
     if (!grid) return null;
     return SudokuSolverUtil.gridToSolution(
-      grid.subarray(0, this._shape.numCells), this._shape.valueOffset);
+      grid.subarray(0, this._numSearchCells), this._shape.valueOffset);
   }
 
   nthStep(n, stepGuides) {
@@ -150,7 +151,7 @@ export class SudokuSolver {
     if (!result) return null;
 
     const pencilmarks = SudokuSolverUtil.makePencilmarks(
-      result.grid.subarray(0, this._shape.numCells), offset);
+      result.grid.subarray(0, this._numSearchCells), offset);
     // Convert single-value pencilmarks to values.
     for (let i = 0; i < pencilmarks.length; i++) {
       if (pencilmarks[i].size === 1) {
@@ -345,13 +346,13 @@ class DebugLogger {
 
 class InternalSolver {
 
-  constructor(handlerGen, shape, numStateCells, debugLogger) {
+  constructor(handlerGen, shape, numSearchCells, debugLogger) {
     this._shape = shape;
-    this._numSearchCells = shape.numCells + numStateCells;
+    this._numSearchCells = numSearchCells;
     if (this._numSearchCells > 256) {
       throw new Error(
         'Too many cells. grid + state cells must be <= 256. ' +
-        `grid cells: ${shape.numCells}, state cells: ${numStateCells}`);
+        `grid cells: ${shape.numCells}, state cells: ${numSearchCells - shape.numCells}`);
     }
     this._debugLogger = debugLogger;
 
@@ -987,7 +988,7 @@ class InternalSolver {
 
     this.run(null, (grid) => {
       seenCandidateSet.addSolutionGrid(grid);
-      solutions.push(grid.slice(0, this._shape.numCells));
+      solutions.push(grid.slice(0, this._numSearchCells));
 
       // Once we have 2 solutions, then start ignoring branches which maybe
       // duplicating existing solution (up to this point, every branch is
