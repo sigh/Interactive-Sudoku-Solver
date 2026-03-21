@@ -383,16 +383,17 @@ export class SudokuBuilder {
               break;
             }
 
-            const handlers = [];
+            const branches = [];
             for (let i = 2; i <= cells.length; i++) {
               const sumRem = sum - i;
               if (sumRem < 0) break;
-              handlers.push(new HandlerModule.And(
+              branches.push([
                 this._givenHandler(controlCell, i),
                 new SumHandlerModule.Sum(
-                  cells.slice(1, i), sumRem)));
+                  cells.slice(1, i), sumRem),
+              ]);
             }
-            yield new HandlerModule.Or(...handlers);
+            yield* this._yieldOr(branches);
           }
           break;
 
@@ -830,12 +831,9 @@ export class SudokuBuilder {
 
         case 'Or':
           {
-            const handlers = [];
-            for (const c of constraint.constraints) {
-              const cHandlers = [...this._constraintHandlers(c.toMap(), shape)];
-              handlers.push(new HandlerModule.And(...cHandlers));
-            }
-            yield new HandlerModule.Or(...handlers);
+            const branches = constraint.constraints.map(
+              c => [...this._constraintHandlers(c.toMap(), shape)]);
+            yield* this._yieldOr(branches);
           }
           break;
 
@@ -854,6 +852,22 @@ export class SudokuBuilder {
           throw new InvalidConstraintError('Unknown constraint type: ' + constraint.type);
       }
     }
+  }
+
+  static _wrapAnd(handlers) {
+    if (handlers.length === 1) return handlers[0];
+    return new HandlerModule.And(...handlers);
+  }
+
+  static *_yieldOr(branches) {
+    const nonEmpty = branches.filter(b => b.length > 0);
+    if (nonEmpty.length === 0) return;
+    if (nonEmpty.length === 1) {
+      yield* nonEmpty[0];
+      return;
+    }
+    yield new HandlerModule.Or(
+      ...nonEmpty.map(b => this._wrapAnd(b)));
   }
 
   static * _doppelgangerHandlers(shape, constraintMap, stateAllocator) {
