@@ -42,18 +42,6 @@ export class SudokuParser {
 
   static _resolveNodes(nodes, parentCompositeClass, shape) {
     const result = [];
-    const canAbsorb = parentCompositeClass.CAN_ABSORB();
-
-    const addConstraint = (constraint) => {
-      if (constraint.constructor.IS_COMPOSITE
-        && canAbsorb.includes(constraint.constructor)) {
-        for (const subConstraint of constraint.constraints) {
-          addConstraint(subConstraint);
-        }
-      } else {
-        result.push(constraint);
-      }
-    };
 
     for (const n of nodes) {
       const cls = n.cls;
@@ -65,17 +53,17 @@ export class SudokuParser {
 
       if (cls.IS_COMPOSITE) {
         const childConstraints = this._resolveNodes(n.children, cls, shape);
-        addConstraint(new cls(childConstraints));
+        result.push(new cls(childConstraints));
         continue;
       }
 
       const constraintParts = [...cls.makeFromArgs(n.args, shape)];
-      if (constraintParts.length > 1 && !canAbsorb.includes(SudokuConstraint.And)) {
+      if (constraintParts.length > 1 && parentCompositeClass === SudokuConstraint.Or) {
         // If a single token expands into multiple constraints, wrap them in
         // an And so they behave as a unit inside Or.
-        addConstraint(new SudokuConstraint.And(constraintParts));
+        result.push(new SudokuConstraint.And(constraintParts));
       } else {
-        for (const c of constraintParts) addConstraint(c);
+        result.push(...constraintParts);
       }
     }
 

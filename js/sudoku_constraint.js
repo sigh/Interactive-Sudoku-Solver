@@ -519,22 +519,6 @@ export class CompositeConstraintBase extends SudokuConstraintBase {
     return this.constraints.flatMap(c => c.getCells(shape));
   }
 
-  static _isSingleConstraint(constraints, serialized) {
-    // Check if we only had one constraint to serialize.
-    // This handles nested composites.
-    if (constraints.length === 1 && constraints[0].constraints.length === 1) {
-      return true;
-    }
-
-    // Otherwise check if there is a new constraint that is started after the
-    // first one.
-    // This handles ordinary constraints which have been combined.
-    if (serialized.length > 1 && serialized.indexOf('.', 1) === -1) {
-      return true;
-    }
-
-    return false;
-  }
 }
 
 export class SudokuConstraint {
@@ -543,7 +527,6 @@ export class SudokuConstraint {
     static DESCRIPTION = "Container for constraints. Do not use directly.";
     static CATEGORY = null;
     static IS_COMPOSITE = true;
-    static CAN_ABSORB = () => [SudokuConstraint.Container, SudokuConstraint.And];
 
     constructor(constraints) {
       super(constraints);
@@ -577,7 +560,6 @@ export class SudokuConstraint {
   static Or = class Or extends CompositeConstraintBase {
     static DESCRIPTION = (
       "At least one of the contained constraints must be satisfied.");
-    static CAN_ABSORB = () => [SudokuConstraint.Or];
 
     static _serializeSingle(constraint) {
       const parts = [];
@@ -586,11 +568,7 @@ export class SudokuConstraint {
         parts.push(c.constructor.serialize([c]));
       }
 
-      const innerStr = parts.join('');
-      if (this._isSingleConstraint([constraint], innerStr)) {
-        return innerStr;
-      }
-      return `.${this.name}${innerStr}.End`;
+      return `.${this.name}${parts.join('')}.End`;
     }
 
     static serialize(constraints) {
@@ -601,7 +579,6 @@ export class SudokuConstraint {
   static And = class And extends CompositeConstraintBase {
     static DESCRIPTION = (
       "All the contained constraints must be satisfied.");
-    static CAN_ABSORB = () => [SudokuConstraint.Container, SudokuConstraint.And];
 
     static serialize(constraints) {
       // For 'And' we can combine all the constraints.
@@ -617,11 +594,7 @@ export class SudokuConstraint {
         parts.push(cls.serialize(constraints));
       }
 
-      const innerStr = parts.join('');
-      if (this._isSingleConstraint(constraints, innerStr)) {
-        return innerStr;
-      }
-      return `.${this.name}${innerStr}.End`;
+      return `.${this.name}${parts.join('')}.End`;
     }
   }
 

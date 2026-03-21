@@ -449,6 +449,61 @@ await runTest('parseString should parse nested Or and And', () => {
 });
 
 //////////////////////////////////////////////////////////////////////////////
+// Or and And round-trip (parse → serialize → compare)
+//////////////////////////////////////////////////////////////////////////////
+
+await runTest('round-trip: single-child Or', () => {
+  const input = '.Or.~R1C1_5.End';
+  const result = SudokuParser.parseString(input);
+  assert.equal(result.toString(), input);
+});
+
+await runTest('round-trip: single-child And', () => {
+  const input = '.And.~R1C1_5.End';
+  const result = SudokuParser.parseString(input);
+  assert.equal(result.toString(), input);
+});
+
+await runTest('round-trip: And at root level', () => {
+  // And combines same-type constraints (Givens merge into one token).
+  const input = '.And.~R1C1_5~R1C2_3.End';
+  const result = SudokuParser.parseString(input);
+  assert.equal(result.toString(), input);
+});
+
+await runTest('round-trip: multi-branch Or', () => {
+  const input = '.Or.Cage~10~R1C1~R1C2~R1C3.Cage~15~R2C1~R2C2~R2C3.End';
+  const result = SudokuParser.parseString(input);
+  assert.equal(result.toString(), input);
+});
+
+await runTest('round-trip: Or(And(...))', () => {
+  // And combines same-type constraints (Givens merge into one token).
+  const input = '.Or.And.~R1C1_5~R1C2_3.End.End';
+  const result = SudokuParser.parseString(input);
+  assert.equal(result.toString(), input);
+});
+
+await runTest('round-trip: Or with And branch and Given branch', () => {
+  // And combines same-type constraints (Givens merge into one token).
+  const input = '.Or.And.~R1C1_1~R1C2_2.End.~R1C3_3.End';
+  const result = SudokuParser.parseString(input);
+  assert.equal(result.toString(), input);
+});
+
+await runTest('round-trip: nested Or-in-Or preserved', () => {
+  const input = '.Or.Or.~R1C1_1.~R1C2_2.End.~R1C3_3.End';
+  const result = SudokuParser.parseString(input);
+  assert.equal(result.toString(), input);
+});
+
+await runTest('round-trip: nested And-in-And preserved', () => {
+  const input = '.And.And.~R1C1_5~R1C2_3.End.Cage~10~R1C1~R1C2~R1C3.End';
+  const result = SudokuParser.parseString(input);
+  assert.equal(result.toString(), input);
+});
+
+//////////////////////////////////////////////////////////////////////////////
 // parseText (high-level parsing)
 //////////////////////////////////////////////////////////////////////////////
 
