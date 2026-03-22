@@ -677,7 +677,7 @@ CandidateFinders.House = class House extends CandidateFinderBase {
 // from the chosen cell, and only searches a single branch of the tree.
 export class SamplingCandidateSelector extends CandidateSelector {
   constructor(shape, numSearchCells, handlerSet, debugLogger) {
-    super(shape, handlerSet, debugLogger, numSearchCells);
+    super(shape, numSearchCells, handlerSet, debugLogger);
     this._totalWeight = new Float64Array(this._numSearchCells + 1);
     this._totalWeight[0] = 1.0;
     this._optionSelector = new RandomOptionSelector(/* seed = */ 0);
