@@ -120,9 +120,6 @@
 #sandbox-container .sandbox-toggle-editor,
 #sandbox-container .sandbox-toggle-output {
   width: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   padding: 0;
 }
 

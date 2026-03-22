@@ -260,18 +260,15 @@ layout: null
         </div>
 
         <div id="sudoku-grid-with-controls" class="vstack">
-          <div id="sudoku-grid" class="hide-until-load">
-            <input id="fake-input" inputmode="numeric" type="text" value="x">
-          </div>
           <div class="hstack">
             <div id="solution-control-panel" class="vstack hide-until-load" style="--skeleton-height:50px;">
-              <div id="solution-iteration-state"></div>
               <div id="solution-control-buttons" class="hstack">
                 <button id="solution-start" class="icon-button" title="start (s)">&#171;</button>
                 <button id="solution-back" class="icon-button" title="previous (p)">&#8249;</button>
                 <button id="solution-forward" class="icon-button" title="next (n)">&#8250;</button>
                 <button id="solution-end" class="icon-button" title="end">&#187;</button>
               </div>
+              <div id="solution-iteration-state"></div>
             </div>
             <div class="switch hstack-push-right">
               <label>
@@ -282,6 +279,9 @@ layout: null
             </div>
             <button id="solve-button" class="big-button" title="solve">Solve</button>
             <button id="stop-solver" class="big-button danger-button" title="abort">Abort</button>
+          </div>
+          <div id="sudoku-grid" class="hide-until-load">
+            <input id="fake-input" inputmode="numeric" type="text" value="x">
           </div>
         </div>
       </div>

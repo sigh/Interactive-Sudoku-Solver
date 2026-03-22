@@ -340,7 +340,7 @@ button,
   --button-bg-hover: var(--color-primary-dark);
   --button-text-color: #ffffff;
 
-  height: 30px;
+  height: 27.5px;
   box-sizing: border-box;
 
   font-size: var(--font-size-base);
@@ -351,6 +351,9 @@ button,
   background: var(--button-bg);
 
   padding: 6px 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   transition: background-color 0.15s, box-shadow 0.15s;
 }
 
@@ -450,9 +453,6 @@ button.copy-to-clipboard-failed::after {
 :where(button, .button).image-button {
   width: 40px;
   padding: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
 }
 
 :where(button, .button).image-button>img {
@@ -466,13 +466,13 @@ button.copy-to-clipboard-failed::after {
 }
 
 :where(button, .button).big-button {
-  height: 50px;
+  height: 45px;
   min-width: 50px;
   font-size: var(--font-size-header);
 }
 
 :where(button, .button).icon-button {
-  width: 40px;
+  width: 45px;
   font-size: 24px;
   font-weight: bold;
   padding: 0;
@@ -805,7 +805,7 @@ textarea {
   text-align: left;
   overflow: visible;
   white-space: nowrap;
-  min-height: 1.2em;
+  min-height: 1em;
 }
 
 #fake-input {
