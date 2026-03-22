@@ -354,7 +354,7 @@ export class DebugFlameGraphView {
     const hoverSampleIndex = hover.sampleIndex;
 
     const stackSegs = this._store.getStackSegmentsAtSample(hoverSampleIndex, hoverDepth);
-    const gridValues = new Array(this._shape.numCells);
+    const gridValues = [];
     for (let i = 0; i < stackSegs.length; i++) {
       const s = stackSegs[i];
       gridValues[s.node.cellIndex] = s.segment.value;
@@ -665,7 +665,8 @@ export class FlameGraphManager {
     // Create value display for showing values on hover.
     const valueGroup = displayContainer.getNewGroup('flame-graph-value-group');
     valueGroup.classList.add('solution-group');
-    this._valueDisplay = new CellValueDisplay(valueGroup);
+    this._valueDisplay = new CellValueDisplay(valueGroup,
+      null, displayContainer.getCellPositioner());
 
     this._flameGraphView = new DebugFlameGraphView(container, {
       highlighter: this._highlighter,

@@ -19,10 +19,10 @@ export class DisplayItem {
   static CHECKERED_PATTERN = 'checked-pattern';
   static HORIZONTAL_LINE_PATTERN = 'horizontal-line-pattern';
 
-  constructor(svg) {
+  constructor(svg, cellPositioner) {
     this._svg = svg;
     this._shape = null;
-    this._stateCellPositions = null;
+    this._cellPositioner = cellPositioner || null;
   }
 
   reshape(shape) { this._shape = shape; };
@@ -31,38 +31,37 @@ export class DisplayItem {
     return this._svg;
   }
 
-  setStateCellPositions(posMap) {
-    this._stateCellPositions = posMap;
-  }
-
   cellIndexCenter(cellIndex) {
-    if (cellIndex >= this._shape.numCells) {
-      return this._stateCellPositions?.get(cellIndex) || null;
-    }
+    if (this._cellPositioner) return this._cellPositioner.cellCenter(cellIndex);
     const [row, col] = this._shape.splitCellIndex(cellIndex);
     return DisplayItem._cellCenter(row, col);
   }
 
   cellIdCenter(cellId) {
-    const { row, col } = this._shape.parseCellId(cellId);
-    return DisplayItem._cellCenter(row, col);
+    return this.cellIndexCenter(this._shape.parseCellId(cellId).cell);
   }
 
   cellIdTopLeftCorner(cellId) {
+    const center = this.cellIdCenter(cellId);
+    if (!center) return null;
     const cellWidth = DisplayItem.CELL_SIZE;
-    const [x, y] = this.cellIdCenter(cellId);
+    const [x, y] = center;
     return [x - cellWidth / 2, y - cellWidth / 2 + 2];
   }
 
   cellIdBottomLeftCorner(cellId) {
+    const center = this.cellIdCenter(cellId);
+    if (!center) return null;
     const cellWidth = DisplayItem.CELL_SIZE;
-    const [x, y] = this.cellIdCenter(cellId);
+    const [x, y] = center;
     return [x - cellWidth / 2, y + cellWidth / 2];
   }
 
   cellIdBottomRightCorner(cellId) {
+    const center = this.cellIdCenter(cellId);
+    if (!center) return null;
     const cellWidth = DisplayItem.CELL_SIZE;
-    const [x, y] = this.cellIdCenter(cellId);
+    const [x, y] = center;
     return [x + cellWidth / 2, y + cellWidth / 2];
   }
 
@@ -226,8 +225,8 @@ export class CellValueDisplay extends DisplayItem {
 
   static GIVENS_MASK_ID = 'givens-mask';
 
-  constructor(svg, valueFn) {
-    super(svg);
+  constructor(svg, valueFn, cellPositioner) {
+    super(svg, cellPositioner);
     this._applyGridOffset(svg);
 
     this._valueFn = valueFn || (v => v);
@@ -518,12 +517,13 @@ export class DisplayContainer {
     this._mainSvg = svg;
     container.append(svg);
 
+    this._cellPositioner = new CellPositioner();
+
     this._highlightDisplay = new HighlightDisplay(
-      this.getNewGroup('highlight-group'));
+      this.getNewGroup('highlight-group'), this._cellPositioner);
 
     this._stateCellDisplay = new StateCellDisplay(
       this.getNewGroup('state-cell-group'));
-    this._stateCellListeners = [this._highlightDisplay];
 
     this._clickInterceptor = new ClickInterceptor();
     container.append(this._clickInterceptor.getSvg());
@@ -542,6 +542,7 @@ export class DisplayContainer {
       shape.numValues <= SHAPE_9x9.numValues
         ? 'grid-size-small' : 'grid-size-large');
 
+    this._cellPositioner.reshape(shape);
     this._highlightDisplay.reshape(shape);
     this._clickInterceptor.reshape(shape);
   }
@@ -556,17 +557,12 @@ export class DisplayContainer {
     this._mainSvg.classList.toggle('layout-view', enable);
   }
 
-  addStateCellListener(displayItem) {
-    this._stateCellListeners.push(displayItem);
-  }
+  getCellPositioner() { return this._cellPositioner; }
 
-  updateStateCells(groups, shape) {
-    const extraHeight = this._stateCellDisplay.setLayout(groups, shape);
+  updateStateCells(groups) {
+    const { extraHeight, layout } = this._cellPositioner.setStateCellGroups(groups);
     this.setExtraHeight(extraHeight);
-    const positions = this._stateCellDisplay.getCellPositions();
-    for (const listener of this._stateCellListeners) {
-      listener.setStateCellPositions(positions);
-    }
+    this._stateCellDisplay.render(layout);
   }
 
   createCellHighlighter(cssClass) {
@@ -623,13 +619,15 @@ class ClickInterceptor extends DisplayItem {
 }
 
 export class InfoTextDisplay extends DisplayItem {
-  constructor(svg) {
-    super(svg);
+  constructor(svg, cellPositioner) {
+    super(svg, cellPositioner);
     this._applyGridOffset(svg);
   }
 
   setText(cellId, str) {
-    const [x, y] = this.cellIdBottomLeftCorner(cellId);
+    const pos = this.cellIdBottomLeftCorner(cellId);
+    if (!pos) return;
+    const [x, y] = pos;
     const textNode = this.makeTextNode(str, x + 2, y - 2, 'info-overlay-item');
     this._svg.append(textNode);
   }
@@ -637,8 +635,8 @@ export class InfoTextDisplay extends DisplayItem {
 
 
 export class SolutionDisplay extends CellValueDisplay {
-  constructor(svg, copyElem) {
-    super(svg);
+  constructor(svg, copyElem, cellPositioner) {
+    super(svg, null, cellPositioner);
     this._currentSolution = [];
 
     this.setSolution = deferUntilAnimationFrame(this.setSolution.bind(this));
@@ -694,8 +692,8 @@ export class SolutionDisplay extends CellValueDisplay {
 }
 
 export class HighlightDisplay extends DisplayItem {
-  constructor(svg) {
-    super(svg);
+  constructor(svg, cellPositioner) {
+    super(svg, cellPositioner);
 
     this._shape = null;
     this._applyGridOffset(svg);
@@ -880,49 +878,22 @@ class CellHighlighter {
 }
 
 export class StateCellDisplay extends DisplayItem {
-  static GAP = 20;
-  static LABEL_HEIGHT = 14;
-
   constructor(svg) {
     super(svg);
-    this._cellPositions = new Map();
-    this._layout = null;
   }
 
-  setLayout(groups, shape) {
+  render(layout) {
     this.clear();
-    this._shape = shape;
-    if (!groups || !groups.length) {
-      this._layout = null;
-      return 0;
-    }
+    if (!layout?.length) return;
 
     const cellSize = DisplayItem.CELL_SIZE;
     const padding = DisplayItem.SVG_PADDING;
-    const gap = StateCellDisplay.GAP;
-    const labelHeight = StateCellDisplay.LABEL_HEIGHT;
-    const gridHeight = cellSize * shape.numRows;
-    const yStart = gridHeight + gap;
-    const rowHeight = labelHeight + cellSize;
+    const labelHeight = CellPositioner.STATE_CELL_LABEL_HEIGHT;
 
     const svg = this.getSvg();
     svg.setAttribute('transform', `translate(${padding},${padding})`);
 
-    let rowIndex = 0;
-    this._layout = [];
-
-    for (const group of groups) {
-      if (group.hidden || !group.cells.length) continue;
-
-      const yLabel = yStart + rowIndex * rowHeight;
-      const y = yLabel + labelHeight;
-
-      for (let col = 0; col < group.cells.length; col++) {
-        const x = col * cellSize;
-        this._cellPositions.set(group.cells[col], [
-          x + cellSize / 2, y + cellSize / 2]);
-      }
-
+    for (const { group, yLabel, y } of layout) {
       // Draw grid lines.
       const groupWidth = group.cells.length * cellSize;
       const lineGroup = createSvgElement('g');
@@ -960,21 +931,69 @@ export class StateCellDisplay extends DisplayItem {
       label.setAttribute('class', 'state-cell-label');
       label.textContent = `${group.prefix}: ${group.label}`;
       svg.append(label);
-
-      this._layout.push({ prefix: group.prefix, row: rowIndex });
-      rowIndex++;
     }
-
-    return gap + rowIndex * rowHeight;
-  }
-
-  getCellPositions() {
-    return this._cellPositions;
   }
 
   clear() {
     clearDOMNode(this._svg);
-    this._cellPositions = new Map();
-    this._layout = null;
+  }
+}
+
+class CellPositioner {
+  static STATE_CELL_GAP = 20;
+  static STATE_CELL_LABEL_HEIGHT = 14;
+
+  constructor() {
+    this._shape = null;
+    this._stateCellPositions = new Map();
+  }
+
+  reshape(shape) { this._shape = shape; }
+
+  // Compute positions for state cell groups.
+  // Returns { extraHeight, layout } where layout is the pre-computed
+  // rendering data for StateCellDisplay.
+  setStateCellGroups(groups) {
+    this._stateCellPositions = new Map();
+    if (!groups?.length) return { extraHeight: 0, layout: [] };
+
+    const cellSize = DisplayItem.CELL_SIZE;
+    const gap = CellPositioner.STATE_CELL_GAP;
+    const labelHeight = CellPositioner.STATE_CELL_LABEL_HEIGHT;
+    const gridHeight = cellSize * this._shape.numRows;
+    const yStart = gridHeight + gap;
+    const rowHeight = labelHeight + cellSize;
+
+    let rowIndex = 0;
+    const layout = [];
+
+    for (const group of groups) {
+      if (group.hidden || !group.cells.length) continue;
+
+      const yLabel = yStart + rowIndex * rowHeight;
+      const y = yLabel + labelHeight;
+
+      for (let col = 0; col < group.cells.length; col++) {
+        this._stateCellPositions.set(group.cells[col], [
+          col * cellSize + cellSize / 2, y + cellSize / 2]);
+      }
+
+      layout.push({ group, yLabel, y });
+      rowIndex++;
+    }
+
+    return { extraHeight: gap + rowIndex * rowHeight, layout };
+  }
+
+  totalCells() {
+    return this._shape.numCells + this._stateCellPositions.size;
+  }
+
+  cellCenter(cellIndex) {
+    if (cellIndex >= this._shape.numCells) {
+      return this._stateCellPositions.get(cellIndex) || null;
+    }
+    const [row, col] = this._shape.splitCellIndex(cellIndex);
+    return DisplayItem._cellCenter(row, col);
   }
 }

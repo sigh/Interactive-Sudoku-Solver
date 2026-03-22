@@ -603,7 +603,7 @@ class ConstraintManager {
     this.addUpdateListener(() => {
       const registry = StateCellRegistry.fromConstraints(
         this._rootCollection.constraints(), this._shape);
-      displayContainer.updateStateCells(registry.getGroups(), this._shape);
+      displayContainer.updateStateCells(registry.getGroups());
     });
 
     this._display = this.addReshapeListener(new ConstraintDisplay(

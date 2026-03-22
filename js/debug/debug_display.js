@@ -49,9 +49,12 @@ export class DebugManager {
     // Import debug module functions into the window scope.
     Object.assign(self, debugModule);
 
+    const cellPositioner = this._displayContainer.getCellPositioner();
+
     // UI wiring.
     this._candidateDisplay = new CellValueDisplay(
-      this._displayContainer.getNewGroup('debug-candidate-group'));
+      this._displayContainer.getNewGroup('debug-candidate-group'),
+      null, cellPositioner);
 
     // Initialize options checkboxes.
     for (const [key, element] of this._checkboxes) {
@@ -83,8 +86,7 @@ export class DebugManager {
     for (const [id, fn] of debugCheckboxes) {
       const element = document.getElementById(id);
       const overlayValuesFn = () => {
-        const numCells = this._shape.numCells;
-        return [...new Array(numCells).keys()].map(fn);
+        return [...new Array(cellPositioner.totalCells()).keys()].map(fn);
       };
       this._setInfoOverlayOnCheck(element, overlayValuesFn);
     }
@@ -385,10 +387,12 @@ export class InfoOverlay {
 
     this._heatmap = displayContainer.createCellHighlighter();
     this._annotationText = new InfoTextDisplay(
-      displayContainer.getNewGroup('debug-info-group'));
+      displayContainer.getNewGroup('debug-info-group'),
+      displayContainer.getCellPositioner());
     const valueGroup = displayContainer.getNewGroup('debug-value-group');
     valueGroup.classList.add('solution-group');
-    this._valueDisplay = new CellValueDisplay(valueGroup);
+    this._valueDisplay = new CellValueDisplay(valueGroup,
+      null, displayContainer.getCellPositioner());
 
     this._onNextTextChangeFn = null;
   }
@@ -444,7 +448,6 @@ export class InfoOverlay {
 
     for (let i = 0; i < values.length; i++) {
       const value = values[i];
-      if (i >= shape.numCells) break;
       const cellId = shape.makeCellIdFromIndex(i);
       this._annotationText.setText(cellId, value);
     }
