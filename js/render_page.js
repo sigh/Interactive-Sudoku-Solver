@@ -219,6 +219,14 @@ const setUpConstraintSearch = (constraintManager) => {
         container.classList.add('container-open');
         container = container.parentElement?.closest('.collapsible-container');
       }
+
+      // Activate the tab containing the element (if any).
+      const tabContent = element.closest('.tab-content');
+      if (tabContent) {
+        const tabButton = tabContent.parentElement?.querySelector(
+          `.tab-container [data-tab="${tabContent.id}"]`);
+        tabButton?.click();
+      }
       element.scrollIntoView({ behavior: 'smooth', block: 'center' });
       element.focus();
 
