@@ -810,6 +810,7 @@ class ConstraintManager {
     document.getElementById('freeform-load-current-button').onclick = () => {
       clearDOMNode(errorElem);
       inputElem.value = this.getConstraints().toString();
+      form.dispatchEvent(new Event('change'));
       inputElem.focus();
     };
 

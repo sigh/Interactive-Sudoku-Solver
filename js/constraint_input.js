@@ -1391,6 +1391,7 @@ ConstraintCategoryInput.Pairwise = class Pairwise extends JavaScriptCategoryInpu
     this._form['pairwise-name'].value = constraint.name || '';
     this._form['chain-mode'].value = constraint.type;
     this._form['function'].value = binaryKeyToFnString(constraint.key, numValues, valueOffset);
+    this._form.dispatchEvent(new Event('change'));
     this._form['function'].focus();
   }
 
@@ -1548,6 +1549,7 @@ ConstraintCategoryInput.StateMachine = class StateMachine extends JavaScriptCate
     // Convert the encoded NFA back to JavaScript and populate unified mode.
     const jsSpec = encodedNFAToJsSpec(constraint.encodedNFA, this._shape?.valueOffset || 0);
     this._form['unified-code'].value = jsSpec;
+    this._form.dispatchEvent(new Event('change'));
     this._form['unified-code'].focus();
   }
 
