@@ -431,7 +431,7 @@ impl GridShape {
     ///
     /// JS: `GridShape.baseCharCode(shape)`
     pub fn base_char_code(self) -> u8 {
-        if self.num_values >= 10 {
+        if self.num_values as i16 + self.value_offset as i16 > 9 {
             b'A'
         } else {
             (b'1' as i8 + self.value_offset) as u8

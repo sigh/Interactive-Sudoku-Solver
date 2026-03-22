@@ -380,6 +380,7 @@ fn build_solve_cases(index: &HashMap<String, Puzzle>) -> Vec<TestCase> {
         "7x7: Dutch Flat Mate Squishdoku",
         "7x7: Buggy NR Squishdoku",
         "6x6: 9-value disjoint sets",
+        "Doppelganger",
         // 0-indexed
         "0-indexed: Classic sudoku",
         "0-indexed: Sudoku X",

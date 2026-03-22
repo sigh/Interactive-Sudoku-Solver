@@ -124,6 +124,12 @@ impl CellExclusions {
         }
     }
 
+    /// Number of search cells (grid cells + state cells).
+    /// Mirrors JS `CellExclusions` being sized to `numSearchCells`.
+    pub fn num_search_cells(&self) -> usize {
+        self.num_cells
+    }
+
     /// Add a mutual exclusion between two cells.
     pub fn add_mutual_exclusion(&mut self, cell0: CellIndex, cell1: CellIndex) {
         debug_assert!(!self.sealed.get());

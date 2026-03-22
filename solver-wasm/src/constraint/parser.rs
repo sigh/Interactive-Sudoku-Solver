@@ -74,13 +74,7 @@ pub fn to_short_solution(solution: &[u8], shape: GridShape) -> String {
     solution
         .iter()
         .take(shape.num_cells)
-        .map(|&v| {
-            if v > 0 {
-                char::from(base + v - 1)
-            } else {
-                '.'
-            }
-        })
+        .map(|&v| if v > 0 { char::from(base + v - 1) } else { '.' })
         .collect()
 }
 
@@ -544,6 +538,10 @@ const CONSTRAINT_DEFS: &[ConstraintDef] = &[
         name: "XSum",
         parse: parse_xsum,
     },
+    ConstraintDef {
+        name: "Doppelganger",
+        parse: parse_doppelganger,
+    },
 ];
 
 /// Parse verbose constraint string format.
@@ -978,6 +976,11 @@ fn parse_v(args: &[&str], constraints: &mut Vec<Constraint>) -> Result<(), Strin
 
 fn parse_anti_knight(_args: &[&str], constraints: &mut Vec<Constraint>) -> Result<(), String> {
     constraints.push(Constraint::AntiKnight);
+    Ok(())
+}
+
+fn parse_doppelganger(_args: &[&str], constraints: &mut Vec<Constraint>) -> Result<(), String> {
+    constraints.push(Constraint::Doppelganger);
     Ok(())
 }
 

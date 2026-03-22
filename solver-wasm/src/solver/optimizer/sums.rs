@@ -653,7 +653,7 @@ fn make_combined_sum_handlers(
         }
 
         let dof = std::cmp::min(sum - info.min, info.max - sum);
-        let mut cells_bit_set = BitSet::with_capacity(hs.shape.num_cells as usize);
+        let mut cells_bit_set = BitSet::with_capacity(cell_exclusions.num_search_cells());
         for &c in &cells {
             cells_bit_set.add(c as usize);
         }

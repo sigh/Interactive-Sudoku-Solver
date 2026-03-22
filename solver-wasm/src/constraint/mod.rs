@@ -345,6 +345,13 @@ pub enum Constraint {
     /// Conjunctive composite wrapper (used internally when building Or).
     /// Mirrors JS `And` constraint.
     And { constraints: Vec<Constraint> },
+
+    /// Doppelganger: every region contains 0 and all but one digit 1-N.
+    /// No two regions of the same type may miss the same digit.
+    /// At each 0, the missing digits from each region differ.
+    /// Only square grids with values 0-N are supported.
+    /// Mirrors JS `Doppelganger` constraint.
+    Doppelganger,
 }
 
 impl Constraint {
@@ -391,6 +398,7 @@ impl Constraint {
             Self::GlobalMod => Some("GlobalMod:GlobalMod".to_string()),
             Self::FullRankTies { .. } => Some("FullRankTies:FullRankTies".to_string()),
             Self::DutchFlatmates => Some("DutchFlatmates:DutchFlatmates".to_string()),
+            Self::Doppelganger => Some("Doppelganger:Doppelganger".to_string()),
             Self::RegionSize { .. } => Some("RegionSize:RegionSize".to_string()),
 
             // All other constraints: UNIQUENESS_KEY_FIELD = null — never merged.

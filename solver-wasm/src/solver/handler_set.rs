@@ -47,11 +47,10 @@ impl HandlerSet {
     /// Create from an initial list of handlers.
     ///
     /// All initial handlers are ordinary and essential by default.
-    pub fn new(handlers: Vec<Box<dyn ConstraintHandler>>, shape: GridShape) -> Self {
-        let num_cells = shape.num_cells;
-        let mut ordinary_map = vec![Vec::new(); num_cells];
-        let aux_map = vec![Vec::new(); num_cells];
-        let mut singleton_map = vec![Vec::new(); num_cells];
+    pub fn new(handlers: Vec<Box<dyn ConstraintHandler>>, shape: GridShape, num_search_cells: usize) -> Self {
+        let mut ordinary_map = vec![Vec::new(); num_search_cells];
+        let aux_map = vec![Vec::new(); num_search_cells];
+        let mut singleton_map = vec![Vec::new(); num_search_cells];
         let mut seen = HashMap::new();
         let mut essential_flags = Vec::with_capacity(handlers.len());
         let mut kind_flags = Vec::with_capacity(handlers.len());
@@ -334,8 +333,8 @@ impl HandlerSet {
     ///
     /// Mirrors JS `_initCellPriorities`.
     pub fn build_cell_priorities(&self) -> Vec<i32> {
-        let num_cells = self.shape.num_cells;
-        let mut priorities = vec![0i32; num_cells];
+        let num_search_cells = self.ordinary_map.len();
+        let mut priorities = vec![0i32; num_search_cells];
 
         for handler in self.handlers.iter().flatten() {
             let priority = handler.priority();

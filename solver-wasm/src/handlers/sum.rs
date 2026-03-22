@@ -943,7 +943,7 @@ impl ConstraintHandler for Sum {
         _state_allocator: &mut GridStateAllocator,
     ) -> bool {
         self.num_values = shape.num_values;
-        self.num_cells = shape.num_cells as usize;
+        self.num_cells = cell_exclusions.num_search_cells();
 
         // Adjust sum for value offset.
         self.sum = self.raw_sum;

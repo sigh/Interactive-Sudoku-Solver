@@ -9,6 +9,7 @@ mod binary_constraint;
 mod binary_pairwise;
 mod box_info;
 mod counting_circles;
+mod doppelganger_zero;
 mod dutch_flatmate_line;
 mod equal_size_partitions;
 mod false_handler;
@@ -49,6 +50,7 @@ pub use binary_constraint::{fn_to_binary_key, fn_to_binary_key_with_offset, Bina
 pub use binary_pairwise::BinaryPairwise;
 pub use box_info::BoxInfo;
 pub use counting_circles::CountingCircles;
+pub use doppelganger_zero::DoppelgangerZero;
 pub use dutch_flatmate_line::DutchFlatmateLine;
 pub use equal_size_partitions::EqualSizePartitions;
 pub use false_handler::False;

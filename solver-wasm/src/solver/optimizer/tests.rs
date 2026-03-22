@@ -61,7 +61,7 @@ fn test_optimize_required_values_6_6_diagonal_no_false() {
     let cells: Vec<CellIndex> = vec![53, 61, 69, 77];
     let rv = RequiredValues::new(cells, vec![6, 6], true);
     let handlers: Vec<Box<dyn crate::handlers::ConstraintHandler>> = vec![Box::new(rv)];
-    let mut hs = HandlerSet::new(handlers, GridShape::default_9x9());
+    let mut hs = HandlerSet::new(handlers, GridShape::default_9x9(), GridShape::default_9x9().num_cells);
 
     let ce = sudoku_9x9_cell_exclusions();
     let mut ctx = OptimizerCtx::new(9, None);
@@ -112,7 +112,7 @@ fn test_add_house_handlers() {
     let cells: Vec<CellIndex> = (0..9).collect();
     let ad = AllDifferent::new(cells, AllDifferentType::WithExclusionCells);
     let handlers: Vec<Box<dyn crate::handlers::ConstraintHandler>> = vec![Box::new(ad)];
-    let mut hs = HandlerSet::new(handlers, GridShape::default_9x9());
+    let mut hs = HandlerSet::new(handlers, GridShape::default_9x9(), GridShape::default_9x9().num_cells);
     let mut ctx = OptimizerCtx::new(9, None);
     house::add_house_handlers(&mut hs, &mut ctx);
 
@@ -125,7 +125,7 @@ fn test_replace_1_cell_sum() {
     // A 1-cell sum with sum=5 should become GivenCandidates.
     let sum = Sum::new_cage(vec![0], 5);
     let handlers: Vec<Box<dyn crate::handlers::ConstraintHandler>> = vec![Box::new(sum)];
-    let mut hs = HandlerSet::new(handlers, GridShape::default_9x9());
+    let mut hs = HandlerSet::new(handlers, GridShape::default_9x9(), GridShape::default_9x9().num_cells);
     let ce = CellExclusions::new();
     let mut ctx = OptimizerCtx::new(9, None);
     sums::replace_size_specific_sum_handlers(&mut hs, &ce, &mut ctx);
@@ -143,7 +143,7 @@ fn test_replace_2_cell_sum() {
     let mut ce = CellExclusions::new();
     ce.add_mutual_exclusion(0, 1);
     let handlers: Vec<Box<dyn crate::handlers::ConstraintHandler>> = vec![Box::new(sum)];
-    let mut hs = HandlerSet::new(handlers, GridShape::default_9x9());
+    let mut hs = HandlerSet::new(handlers, GridShape::default_9x9(), GridShape::default_9x9().num_cells);
     let mut ctx = OptimizerCtx::new(9, None);
     sums::replace_size_specific_sum_handlers(&mut hs, &ce, &mut ctx);
 
@@ -175,7 +175,7 @@ fn test_optimize_required_values_removes_only_one_occurrence() {
     //   - RequiredValues([0,1], [1]) remains (one more 1 still required).
     let rv = RequiredValues::new(vec![0, 1, 2], vec![1, 1], true);
     let handlers: Vec<Box<dyn crate::handlers::ConstraintHandler>> = vec![Box::new(rv)];
-    let mut hs = HandlerSet::new(handlers, GridShape::default_9x9());
+    let mut hs = HandlerSet::new(handlers, GridShape::default_9x9(), GridShape::default_9x9().num_cells);
 
     let mut ce = CellExclusions::new();
     ce.add_mutual_exclusion(0, 1);
@@ -208,7 +208,7 @@ fn test_optimize_required_values_all_forced_deletes_handler() {
     // RequiredValues deleted.
     let rv = RequiredValues::new(vec![0, 1, 2], vec![1, 1, 1], true);
     let handlers: Vec<Box<dyn crate::handlers::ConstraintHandler>> = vec![Box::new(rv)];
-    let mut hs = HandlerSet::new(handlers, GridShape::default_9x9());
+    let mut hs = HandlerSet::new(handlers, GridShape::default_9x9(), GridShape::default_9x9().num_cells);
 
     let ce = CellExclusions::new();
     let mut ctx = OptimizerCtx::new(9, None);
@@ -492,7 +492,7 @@ fn test_replace_numvalues_sum_mutually_exclusive_true_or_false() {
     {
         let sum = Sum::new_cage(cells.clone(), shape.max_sum);
         let handlers: Vec<Box<dyn crate::handlers::ConstraintHandler>> = vec![Box::new(sum)];
-        let mut hs = HandlerSet::new(handlers, shape);
+        let mut hs = HandlerSet::new(handlers, shape, shape.num_cells);
         let mut ctx = OptimizerCtx::new(9, None);
         sums::replace_size_specific_sum_handlers(&mut hs, &ce, &mut ctx);
 
@@ -505,7 +505,7 @@ fn test_replace_numvalues_sum_mutually_exclusive_true_or_false() {
     {
         let sum = Sum::new_cage(cells.clone(), shape.max_sum - 1);
         let handlers: Vec<Box<dyn crate::handlers::ConstraintHandler>> = vec![Box::new(sum)];
-        let mut hs = HandlerSet::new(handlers, shape);
+        let mut hs = HandlerSet::new(handlers, shape, shape.num_cells);
         let mut ctx = OptimizerCtx::new(9, None);
         sums::replace_size_specific_sum_handlers(&mut hs, &ce, &mut ctx);
 
@@ -529,7 +529,7 @@ fn test_fill_in_sum_gap_all_cells_covered() {
     let shape = GridShape::default_9x9();
     let mut sum_cells: HashSet<CellIndex> = all_cells(shape).into_iter().collect();
     let mut non_overlapping: Vec<usize> = Vec::new();
-    let mut hs = HandlerSet::new(vec![], shape);
+    let mut hs = HandlerSet::new(vec![], shape, shape.num_cells);
     let mut ctx = OptimizerCtx::new(9, None);
 
     let before = hs.get_all_of_type::<Sum>().len();
@@ -544,7 +544,7 @@ fn test_fill_in_sum_gap_gap_too_large() {
     // Only 72 cells covered, gap is 9 (>= numValues).
     let mut sum_cells: HashSet<CellIndex> = (0..72).collect();
     let mut non_overlapping: Vec<usize> = Vec::new();
-    let mut hs = HandlerSet::new(vec![], shape);
+    let mut hs = HandlerSet::new(vec![], shape, shape.num_cells);
     let mut ctx = OptimizerCtx::new(9, None);
 
     sums::fill_in_sum_gap(&mut non_overlapping, &mut sum_cells, &mut hs, &mut ctx);
@@ -562,7 +562,7 @@ fn test_fill_in_sum_gap_creates_handler_for_small_gap() {
     // Covered sum = 405 - 6 = 399 (assuming uncovered cells sum to 6).
     let sum_handler = Sum::new_cage(covered, 399);
     let handlers: Vec<Box<dyn crate::handlers::ConstraintHandler>> = vec![Box::new(sum_handler)];
-    let mut hs = HandlerSet::new(handlers, shape);
+    let mut hs = HandlerSet::new(handlers, shape, shape.num_cells);
     let mut non_overlapping: Vec<usize> = hs
         .get_all_of_type::<Sum>()
         .iter()
@@ -589,7 +589,7 @@ fn test_fill_in_sum_gap_4x6_grid() {
 
     let sum_handler = Sum::new_cage(covered, 84 - 11);
     let handlers: Vec<Box<dyn crate::handlers::ConstraintHandler>> = vec![Box::new(sum_handler)];
-    let mut hs = HandlerSet::new(handlers, shape);
+    let mut hs = HandlerSet::new(handlers, shape, shape.num_cells);
     let mut non_overlapping: Vec<usize> = hs
         .get_all_of_type::<Sum>()
         .iter()
@@ -616,7 +616,7 @@ fn test_fill_in_sum_gap_6x4_grid() {
 
     let sum_handler = Sum::new_cage(covered, 84 - 14);
     let handlers: Vec<Box<dyn crate::handlers::ConstraintHandler>> = vec![Box::new(sum_handler)];
-    let mut hs = HandlerSet::new(handlers, shape);
+    let mut hs = HandlerSet::new(handlers, shape, shape.num_cells);
     let mut non_overlapping: Vec<usize> = hs
         .get_all_of_type::<Sum>()
         .iter()
@@ -640,7 +640,7 @@ fn test_fill_in_sum_gap_6x8_grid() {
 
     let sum_handler = Sum::new_cage(covered, 216 - 15);
     let handlers: Vec<Box<dyn crate::handlers::ConstraintHandler>> = vec![Box::new(sum_handler)];
-    let mut hs = HandlerSet::new(handlers, shape);
+    let mut hs = HandlerSet::new(handlers, shape, shape.num_cells);
     let mut non_overlapping: Vec<usize> = hs
         .get_all_of_type::<Sum>()
         .iter()
@@ -673,7 +673,7 @@ fn test_fill_in_sum_gap_multiple_handlers() {
     let h3 = Sum::new_cage(cells3, 110);
     let handlers: Vec<Box<dyn crate::handlers::ConstraintHandler>> =
         vec![Box::new(h1), Box::new(h2), Box::new(h3)];
-    let mut hs = HandlerSet::new(handlers, shape);
+    let mut hs = HandlerSet::new(handlers, shape, shape.num_cells);
     let mut non_overlapping: Vec<usize> = hs
         .get_all_of_type::<Sum>()
         .iter()
@@ -696,7 +696,7 @@ fn test_fill_in_sum_gap_single_cell() {
 
     let sum_handler = Sum::new_cage(covered, 400);
     let handlers: Vec<Box<dyn crate::handlers::ConstraintHandler>> = vec![Box::new(sum_handler)];
-    let mut hs = HandlerSet::new(handlers, shape);
+    let mut hs = HandlerSet::new(handlers, shape, shape.num_cells);
     let mut non_overlapping: Vec<usize> = hs
         .get_all_of_type::<Sum>()
         .iter()
@@ -722,7 +722,7 @@ fn test_fill_in_sum_gap_numvalues_minus_1() {
     let remaining_sum = 36;
     let sum_handler = Sum::new_cage(covered, 405 - remaining_sum);
     let handlers: Vec<Box<dyn crate::handlers::ConstraintHandler>> = vec![Box::new(sum_handler)];
-    let mut hs = HandlerSet::new(handlers, shape);
+    let mut hs = HandlerSet::new(handlers, shape, shape.num_cells);
     let mut non_overlapping: Vec<usize> = hs
         .get_all_of_type::<Sum>()
         .iter()
@@ -810,7 +810,7 @@ fn test_non_square_8x9_adds_aux() {
         )));
     }
 
-    let mut hs = HandlerSet::new(handlers, shape);
+    let mut hs = HandlerSet::new(handlers, shape, shape.num_cells);
     let mut ctx = OptimizerCtx::new(shape.num_values, None);
     non_square::optimize_non_square_grids(&mut hs, &[], &mut ctx);
 
@@ -838,7 +838,7 @@ fn test_non_square_8x9_numvalues_10_skips() {
         )));
     }
 
-    let mut hs = HandlerSet::new(handlers, shape);
+    let mut hs = HandlerSet::new(handlers, shape, shape.num_cells);
     let mut ctx = OptimizerCtx::new(shape.num_values, None);
     non_square::optimize_non_square_grids(&mut hs, &[], &mut ctx);
 
@@ -866,7 +866,7 @@ fn test_non_square_1x9_skips() {
         )));
     }
 
-    let mut hs = HandlerSet::new(handlers, shape);
+    let mut hs = HandlerSet::new(handlers, shape, shape.num_cells);
     let mut ctx = OptimizerCtx::new(shape.num_values, None);
     non_square::optimize_non_square_grids(&mut hs, &[], &mut ctx);
 
@@ -888,7 +888,7 @@ fn test_innie_outie_two_row_coverage() {
     let h1 = Sum::new_cage(row1, 45);
     let handlers: Vec<Box<dyn crate::handlers::ConstraintHandler>> =
         vec![Box::new(h0), Box::new(h1)];
-    let hs = HandlerSet::new(handlers, shape);
+    let hs = HandlerSet::new(handlers, shape, shape.num_cells);
     let non_overlapping: Vec<usize> = hs
         .get_all_of_type::<Sum>()
         .iter()
@@ -910,7 +910,7 @@ fn test_innie_outie_cage_crossing_house() {
     cells.push(9);
     let sum_handler = Sum::new_cage(cells, 50);
     let handlers: Vec<Box<dyn crate::handlers::ConstraintHandler>> = vec![Box::new(sum_handler)];
-    let hs = HandlerSet::new(handlers, shape);
+    let hs = HandlerSet::new(handlers, shape, shape.num_cells);
     let non_overlapping: Vec<usize> = hs
         .get_all_of_type::<Sum>()
         .iter()
@@ -930,7 +930,7 @@ fn test_innie_outie_integer_sums() {
     let row0: Vec<CellIndex> = (0..9).collect();
     let sum_handler = Sum::new_cage(row0, 45);
     let handlers: Vec<Box<dyn crate::handlers::ConstraintHandler>> = vec![Box::new(sum_handler)];
-    let hs = HandlerSet::new(handlers, shape);
+    let hs = HandlerSet::new(handlers, shape, shape.num_cells);
     let non_overlapping: Vec<usize> = hs
         .get_all_of_type::<Sum>()
         .iter()
@@ -951,7 +951,7 @@ fn test_innie_outie_4x6_rows_only() {
     let row0: Vec<CellIndex> = (0..6).collect();
     let sum_handler = Sum::new_cage(row0, 21);
     let handlers: Vec<Box<dyn crate::handlers::ConstraintHandler>> = vec![Box::new(sum_handler)];
-    let hs = HandlerSet::new(handlers, shape);
+    let hs = HandlerSet::new(handlers, shape, shape.num_cells);
     let non_overlapping: Vec<usize> = hs
         .get_all_of_type::<Sum>()
         .iter()
@@ -972,7 +972,7 @@ fn test_innie_outie_6x4_cols_only() {
     let col0: Vec<CellIndex> = (0..6).map(|r| r * 4).collect();
     let sum_handler = Sum::new_cage(col0, 21);
     let handlers: Vec<Box<dyn crate::handlers::ConstraintHandler>> = vec![Box::new(sum_handler)];
-    let hs = HandlerSet::new(handlers, shape);
+    let hs = HandlerSet::new(handlers, shape, shape.num_cells);
     let non_overlapping: Vec<usize> = hs
         .get_all_of_type::<Sum>()
         .iter()
@@ -989,7 +989,7 @@ fn test_innie_outie_6x4_cols_only() {
 #[test]
 fn test_innie_outie_empty_handlers() {
     let shape = GridShape::default_9x9();
-    let hs = HandlerSet::new(vec![], shape);
+    let hs = HandlerSet::new(vec![], shape, shape.num_cells);
     let mut ctx = OptimizerCtx::new(9, None);
 
     let result = sums::make_innie_outie_sum_handlers(&[], &hs, &[], &mut ctx);
@@ -1002,7 +1002,7 @@ fn test_innie_outie_4x4_grid() {
     let row0: Vec<CellIndex> = (0..4).collect();
     let sum_handler = Sum::new_cage(row0, 10);
     let handlers: Vec<Box<dyn crate::handlers::ConstraintHandler>> = vec![Box::new(sum_handler)];
-    let hs = HandlerSet::new(handlers, shape);
+    let hs = HandlerSet::new(handlers, shape, shape.num_cells);
     let non_overlapping: Vec<usize> = hs
         .get_all_of_type::<Sum>()
         .iter()
@@ -1026,7 +1026,7 @@ fn test_innie_outie_6x6_grid() {
     let h1 = Sum::new_cage(row1, 21);
     let handlers: Vec<Box<dyn crate::handlers::ConstraintHandler>> =
         vec![Box::new(h0), Box::new(h1)];
-    let hs = HandlerSet::new(handlers, shape);
+    let hs = HandlerSet::new(handlers, shape, shape.num_cells);
     let non_overlapping: Vec<usize> = hs
         .get_all_of_type::<Sum>()
         .iter()

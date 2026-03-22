@@ -34,9 +34,10 @@ impl Solver {
     pub fn from_handlers(
         handlers: Vec<Box<dyn ConstraintHandler>>,
         shape: GridShape,
+        num_state_cells: usize,
         debug_options: Option<DebugOptions>,
     ) -> Result<Self, String> {
-        let inner = InternalSolver::new(handlers, shape, debug_options)?;
+        let inner = InternalSolver::new(handlers, shape, num_state_cells, debug_options)?;
         Ok(Self { inner })
     }
 
@@ -80,6 +81,7 @@ impl Solver {
         }
 
         if self.inner.state != SolverState::Exhausted {
+            let nc = self.inner.shape.num_cells;
             self.inner.run(
                 RunMode::MaxSolutions {
                     max_solutions: target,
@@ -87,7 +89,7 @@ impl Solver {
                 progress,
                 None,
                 &mut |sol| {
-                    solution = Some(grid_to_solution(sol));
+                    solution = Some(grid_to_solution(&sol[..nc]));
                 },
             );
         }
@@ -143,6 +145,7 @@ impl Solver {
         // and forwards it. RefCell is needed because both closures are passed
         // into run() and share access to the buffer.
         let sample: RefCell<Option<Vec<u8>>> = RefCell::new(None);
+        let nc = self.inner.shape.num_cells;
 
         self.inner.run(
             mode,
@@ -168,7 +171,7 @@ impl Solver {
                 // if (this._sampleSolution[0] === 0) this._sampleSolution.set(grid);
                 let mut s = sample.borrow_mut();
                 if s.is_none() {
-                    *s = Some(grid_to_solution(grid));
+                    *s = Some(grid_to_solution(&grid[..nc]));
                 }
             },
         );

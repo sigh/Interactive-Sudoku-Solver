@@ -110,6 +110,10 @@ pub(crate) struct InternalSolver {
     /// Grid shape (dimensions and value count).
     pub(super) shape: GridShape,
 
+    /// Total number of search cells (grid cells + state cells).
+    /// Mirrors JS `this._numSearchCells`.
+    num_search_cells: usize,
+
     /// The handler accumulator (owns all handlers + propagation queue).
     pub(super) accumulator: HandlerAccumulator,
 
@@ -192,15 +196,22 @@ impl InternalSolver {
     pub(crate) fn new(
         mut handlers: Vec<Box<dyn ConstraintHandler>>,
         shape: GridShape,
+        num_state_cells: usize,
         debug_options: Option<DebugOptions>,
     ) -> Result<Self, String> {
         let num_cells = shape.num_cells;
+        let num_search_cells = num_cells + num_state_cells;
         let num_values = shape.num_values as usize;
 
+        if num_search_cells > 256 {
+            return Err(format!(
+                "Too many search cells: {} (max 256)",
+                num_search_cells
+            ));
+        }
+
         // Create the initial grid with all candidates set.
-        // Matches JS where InternalSolver creates the grid via
-        // GridStateAllocator and handlers restrict it during initialize().
-        let initial_cells = vec![CandidateSet::all(shape.num_values); num_cells];
+        let initial_cells = vec![CandidateSet::all(shape.num_values); num_search_cells];
 
         // Step 1: Sort handlers BEFORE optimizer (matching JS behavior).
         // JS sorts by (cells.length, constructor.name, cells.join(',')) where
@@ -235,10 +246,10 @@ impl InternalSolver {
         });
 
         // Step 2: Create HandlerSet from sorted handlers.
-        let mut handler_set = HandlerSet::new(handlers, shape);
+        let mut handler_set = HandlerSet::new(handlers, shape, num_search_cells);
 
         // Step 3: Build cell exclusions from all handlers' exclusion_cells.
-        let mut cell_exclusions = CellExclusions::with_num_cells(num_cells);
+        let mut cell_exclusions = CellExclusions::with_num_cells(num_search_cells);
         for handler in handler_set.iter() {
             let excl = handler.exclusion_cells();
             for i in 0..excl.len() {
@@ -256,12 +267,12 @@ impl InternalSolver {
             Optimizer::optimize(&mut handler_set, &mut cell_exclusions, shape, debug_options.as_ref());
 
         // Step 5: Add UniqueValueExclusion singleton handlers.
-        for i in 0..num_cells {
+        for i in 0..num_search_cells {
             handler_set.add_singleton_handler(Box::new(UniqueValueExclusion::new(i as CellIndex)));
         }
 
         // Step 6: Initialize all handlers.
-        let mut state_allocator = GridStateAllocator::new(num_cells);
+        let mut state_allocator = GridStateAllocator::new(num_search_cells);
         let (initial_grid, grid_state_size, initial_contradiction, init_failures) =
             handler_set.initialize_handlers(&initial_cells, &cell_exclusions, &mut state_allocator);
 
@@ -285,10 +296,11 @@ impl InternalSolver {
 
         let candidate_selector =
             CandidateSelector::new(&cell_priorities, num_values, finder_descriptions);
-        let rec_stack = RecursionStack::new(num_cells, grid_state_size);
+        let rec_stack = RecursionStack::new(num_search_cells, grid_state_size);
 
         let mut solver = InternalSolver {
             shape,
+            num_search_cells,
             accumulator,
             candidate_selector,
             rec_stack,
@@ -298,15 +310,15 @@ impl InternalSolver {
             state: SolverState::Unstarted,
             rec_depth: 0,
             iteration_counter: 0,
-            step_state: StepState::new(num_cells),
+            step_state: StepState::new(num_search_cells),
             debug_options: debug_options.unwrap_or_default(),
-            debug_grid_buffer: vec![CandidateSet::EMPTY; num_cells],
+            debug_grid_buffer: vec![CandidateSet::EMPTY; num_search_cells],
             stack_trace_cells_buf: Vec::new(),
             stack_trace_values_buf: Vec::new(),
             debug_logs: Vec::new(),
             init_failures,
             optimizer_debug_logs,
-            seen_candidate_set: SeenCandidateSet::new(1, num_cells, num_values),
+            seen_candidate_set: SeenCandidateSet::new(1, num_search_cells, num_values),
             current_rec_depth: None,
             counters: SolverCounters::default(),
             ad_hoc_counters: HashMap::new(),
@@ -353,12 +365,13 @@ impl InternalSolver {
         if house_cells.is_empty() {
             self.reset_run();
             let mut solution = None;
+            let nc = self.shape.num_cells;
             self.run(
                 RunMode::MaxSolutions { max_solutions: 1 },
                 progress,
                 None,
                 &mut |sol| {
-                    solution = Some(grid_to_solution(sol));
+                    solution = Some(grid_to_solution(&sol[..nc]));
                 },
             );
             self.initial_grid = original_initial_grid;
@@ -391,6 +404,7 @@ impl InternalSolver {
             self.candidate_selector.conflict_scores_mut().decay();
 
             let mut solution = None;
+            let nc = self.shape.num_cells;
             self.run(
                 RunMode::MaxBacktracks {
                     max_backtracks: SEARCH_LIMIT,
@@ -398,7 +412,7 @@ impl InternalSolver {
                 progress,
                 None,
                 &mut |sol| {
-                    solution = Some(grid_to_solution(sol));
+                    solution = Some(grid_to_solution(&sol[..nc]));
                 },
             );
 
@@ -439,12 +453,13 @@ impl InternalSolver {
         );
 
         let mut solution = None;
+        let nc = self.shape.num_cells;
         self.run(
             RunMode::MaxSolutions { max_solutions: 1 },
             progress,
             None,
             &mut |sol| {
-                solution = Some(grid_to_solution(sol));
+                solution = Some(grid_to_solution(&sol[..nc]));
             },
         );
 
@@ -473,11 +488,12 @@ impl InternalSolver {
         progress: &mut dyn FnMut(&SolverProgress),
     ) -> AllPossibilitiesResult {
         let num_cells = self.shape.num_cells;
+        let num_search_cells = self.num_search_cells;
         let num_values = self.shape.num_values as usize;
 
         if self.initial_contradiction {
             return AllPossibilitiesResult {
-                candidate_counts: vec![0u8; num_cells * num_values],
+                candidate_counts: vec![0u8; num_search_cells * num_values],
                 solutions: Vec::new(),
                 counters: self.counters.clone(),
             };
@@ -492,7 +508,7 @@ impl InternalSolver {
             std::mem::replace(&mut self.seen_candidate_set, SeenCandidateSet::new(1, 0, 0));
 
         self.run(RunMode::Exhaustive, progress, Some(&mut seen), &mut |sol| {
-            solutions.push(grid_to_solution(sol));
+            solutions.push(grid_to_solution(&sol[..num_cells]));
         });
 
         let candidate_counts = seen.candidate_counts().to_vec();
@@ -538,6 +554,7 @@ impl InternalSolver {
         loop {
             let mut found_solution = false;
             let mut sample_values: Option<Vec<u8>> = None;
+            let nc = self.shape.num_cells;
             // Mirrors JS `_resetRun()` + `run({ maxBacktracks: 1 })` in the
             // estimation loop: one root-to-backtrack path per sample.
             self.reset_run();
@@ -547,7 +564,7 @@ impl InternalSolver {
                 None,
                 &mut |sol| {
                     found_solution = true;
-                    sample_values = Some(super::grid_to_solution(sol));
+                    sample_values = Some(super::grid_to_solution(&sol[..nc]));
                 },
             );
 
@@ -597,7 +614,7 @@ impl InternalSolver {
     /// Mirrors JS `_initStepState(stepMode)` including the
     /// `enableStepLogs` toggle.
     pub(super) fn set_step_guides(&mut self, step_guides: HashMap<u64, StepGuide>, target: u64) {
-        self.step_state = StepState::new(self.shape.num_cells);
+        self.step_state = StepState::new(self.num_search_cells);
         self.step_state.step_guides = step_guides;
         // Mirrors JS: if (this._debugLogger.enableLogs) {
         //   this._debugLogger.enableStepLogs = (1 === stepMode.n);
@@ -792,7 +809,7 @@ impl InternalSolver {
         self.counters = SolverCounters::default();
         self.candidate_selector.full_reset();
         self.seen_candidate_set.reset();
-        self.step_state = StepState::new(self.shape.num_cells);
+        self.step_state = StepState::new(self.num_search_cells);
         self.current_rec_depth = None;
         self.reset_run();
     }
@@ -869,6 +886,7 @@ impl InternalSolver {
     /// `candidateSelector.reset()` (that is `_resetRun`'s responsibility).
     fn init_run(&mut self, mode: RunMode) {
         let num_cells = self.shape.num_cells;
+        let num_search_cells = self.num_search_cells;
         let step_mode = matches!(mode, RunMode::Step { .. });
 
         self.counters.progress_ratio_prev += self.counters.progress_ratio;
@@ -882,9 +900,9 @@ impl InternalSolver {
             frame.progress_remaining = 1.0;
             frame.new_node = true;
 
-            // Initial constraint propagation: enqueue all cells.
+            // Initial constraint propagation: enqueue all search cells.
             self.accumulator.reset(false);
-            for i in 0..num_cells {
+            for i in 0..num_search_cells {
                 self.accumulator.add_for_cell(i as CellIndex);
             }
 
@@ -939,7 +957,7 @@ impl InternalSolver {
             0
         };
         let progress_mask = self.progress_frequency_mask;
-        let num_cells = self.shape.num_cells;
+        let num_search_cells = self.num_search_cells;
 
         if self.debug_options.log_level >= 2 {
             self.debug_logs.push(DebugLog {
@@ -1055,7 +1073,7 @@ impl InternalSolver {
             self.counters.values_tried += (next_depth - cell_depth) as u64;
 
             // Set up constraint propagation.
-            self.accumulator.reset(next_depth == num_cells);
+            self.accumulator.reset(next_depth == num_search_cells);
             for i in cell_depth..next_depth {
                 self.accumulator
                     .add_for_fixed_cell(self.candidate_selector.get_cell_at_depth(i));
@@ -1186,7 +1204,7 @@ impl InternalSolver {
             }
 
             // Check if we've found a solution.
-            if next_depth == num_cells {
+            if next_depth == num_search_cells {
                 self.counters.progress_ratio += progress_delta;
                 self.counters.solutions += 1;
                 self.counters.backtracks += 1;

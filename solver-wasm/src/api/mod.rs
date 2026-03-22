@@ -52,9 +52,11 @@ pub(crate) fn candidate_set_to_values(cs: CandidateSet, value_offset: i8) -> Vec
 /// Convert a `StepResult` (CandidateSet grids) into a `StepOutput` (pencilmarks).
 pub(crate) fn step_result_to_output(step: &solver::StepResult, shape: GridShape) -> StepOutput {
     let offset = shape.value_offset;
+    let num_cells = shape.num_cells;
     // Build pencilmarks: single values are bare numbers, multi are arrays.
+    // Truncate to grid cells (exclude state cells beyond num_cells).
     let pencilmarks: Vec<serde_json::Value> = step
-        .grid
+        .grid[..num_cells]
         .iter()
         .map(|&cs| {
             let vals = candidate_set_to_values(cs, offset);
@@ -78,7 +80,8 @@ pub(crate) fn step_result_to_output(step: &solver::StepResult, shape: GridShape)
         let values = candidate_set_to_values(step.old_grid[guess_cell_index as usize], offset);
 
         // Compute diff pencilmarks (values removed between old_grid and grid).
-        let diffs: Vec<Vec<i32>> = (0..step.grid.len())
+        // Truncate to grid cells.
+        let diffs: Vec<Vec<i32>> = (0..num_cells)
             .map(|i| {
                 let removed = step.old_grid[i] & !step.grid[i];
                 candidate_set_to_values(removed, offset)

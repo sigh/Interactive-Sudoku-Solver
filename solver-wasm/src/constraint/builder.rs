@@ -12,11 +12,11 @@
 use super::parser::ParsedConstraints;
 use super::Constraint;
 use crate::api::types::{CellIndex, Value};
-use crate::grid_shape::GridShape;
+use crate::grid_shape::{default_num_values, GridShape};
 use crate::handlers::sum::Sum;
 use crate::handlers::{
     AllDifferent, AllDifferentType, And, Between, BinaryConstraint, BinaryPairwise, BoxInfo,
-    ConstraintHandler, CountingCircles, DutchFlatmateLine, EqualSizePartitions, False, FullRank,
+    ConstraintHandler, CountingCircles, DoppelgangerZero, DutchFlatmateLine, EqualSizePartitions, FullRank,
     GivenCandidates, GivenValue, HiddenSkyscraper, Indexing, JigsawPiece, LocalSquishable2x2, Lockout,
     Lunchbox, NfaConstraint, Or, Priority, RankClue, Rellik, RequiredValues, SameValues,
     Skyscraper, SumLine, TieMode, ValueDependentUniqueValueExclusion, ValueIndexing,
@@ -27,6 +27,32 @@ use crate::solver::Solver;
 
 /// Builds a [`Solver`] from a puzzle string and a list of [`Constraint`]s.
 pub struct SudokuBuilder;
+
+/// Allocates state cells beyond the grid, used by constraints like Doppelganger.
+/// Mirrors JS `StateCellAllocator` from sudoku_builder.js.
+struct StateCellAllocator {
+    next: usize,
+    num_cells: usize,
+}
+
+impl StateCellAllocator {
+    fn new(num_cells: usize) -> Self {
+        StateCellAllocator {
+            next: num_cells,
+            num_cells,
+        }
+    }
+
+    fn allocate(&mut self, count: usize) -> Vec<CellIndex> {
+        let start = self.next;
+        self.next += count;
+        (start..self.next).map(|i| i as CellIndex).collect()
+    }
+
+    fn num_state_cells(&self) -> usize {
+        self.next - self.num_cells
+    }
+}
 
 impl SudokuBuilder {
     /// Build a solver from parsed constraints.
@@ -40,14 +66,17 @@ impl SudokuBuilder {
         parsed: &ParsedConstraints,
         debug_options: Option<DebugOptions>,
     ) -> Result<Solver, String> {
-        let handlers = Self::create_handlers(&parsed.constraints, parsed.shape)?;
-        Solver::from_handlers(handlers, parsed.shape, debug_options)
+        let shape = parsed.shape;
+        let mut state_allocator = StateCellAllocator::new(shape.num_cells);
+        let handlers = Self::create_handlers(&parsed.constraints, shape, &mut state_allocator)?;
+        Solver::from_handlers(handlers, shape, state_allocator.num_state_cells(), debug_options)
     }
 
     /// Create all constraint handlers for the given constraints.
     fn create_handlers(
         constraints: &[Constraint],
         shape: GridShape,
+        state_allocator: &mut StateCellAllocator,
     ) -> Result<Vec<Box<dyn ConstraintHandler>>, String> {
         let mut handlers: Vec<Box<dyn ConstraintHandler>> = Vec::new();
 
@@ -71,7 +100,7 @@ impl SudokuBuilder {
 
         // Constraint-specific handlers.
         for constraint in constraints {
-            Self::constraint_handlers(constraint, constraints, &mut handlers, shape)?;
+            Self::constraint_handlers(constraint, constraints, &mut handlers, shape, state_allocator)?;
         }
 
         Ok(handlers)
@@ -129,6 +158,7 @@ impl SudokuBuilder {
         all_constraints: &[Constraint],
         handlers: &mut Vec<Box<dyn ConstraintHandler>>,
         shape: GridShape,
+        state_allocator: &mut StateCellAllocator,
     ) -> Result<(), String> {
         match constraint {
             Constraint::Given { cell, values } => {
@@ -178,6 +208,10 @@ impl SudokuBuilder {
             }
 
             Constraint::NoBoxes => {}
+
+            Constraint::Doppelganger => {
+                Self::add_doppelganger_handlers(handlers, shape, all_constraints, state_allocator)?;
+            }
 
             Constraint::Sum { cells, sum, coeffs } => {
                 let cells = resolve_cells(cells, shape);
@@ -637,8 +671,7 @@ impl SudokuBuilder {
                 }
 
                 // Validate region size.
-                let region_size = Self::get_effective_box_size(all_constraints)
-                    .unwrap_or(shape.num_values) as usize;
+                let region_size = Self::region_size(all_constraints, shape) as usize;
                 if cells.len() != region_size {
                     return Err(format!(
                         "Jigsaw pieces must have {} cells for the current shape",
@@ -948,8 +981,7 @@ impl SudokuBuilder {
             }
 
             Constraint::XSum { arrow_id, value } => {
-                // Mirrors JS XSum case in sudoku_builder.js (L335–357).
-                // controlCell = cells[0]; X = digit there; first X cells must sum to value.
+                // Mirrors JS XSum case in sudoku_builder.js.
                 let sum = *value;
                 if let Some(cells) = expand_outside_line(arrow_id, shape) {
                     if cells.is_empty() {
@@ -966,27 +998,20 @@ impl SudokuBuilder {
                         return Ok(());
                     }
 
-                    let mut or_handlers: Vec<Box<dyn ConstraintHandler>> = Vec::new();
+                    let mut branches: Vec<Vec<Box<dyn ConstraintHandler>>> = Vec::new();
                     for i in 2..=cells.len() {
                         let sum_rem = sum as i64 - i as i64;
                         if sum_rem < 0 {
                             break;
                         }
-                        // And(GivenCandidates(control = i), Sum(cells[1..i], sum_rem))
                         let given: Box<dyn ConstraintHandler> = Box::new(GivenCandidates::new(
                             vec![(control, GivenValue::Single(i as i32))],
                         ));
                         let sum_handler: Box<dyn ConstraintHandler> =
                             Box::new(Sum::new_cage(cells[1..i].to_vec(), sum_rem as i32));
-                        or_handlers.push(Box::new(And::new(vec![given, sum_handler])));
+                        branches.push(vec![given, sum_handler]);
                     }
-                    if or_handlers.is_empty() {
-                        // No valid X exists for this sum — XSum is infeasible.
-                        // Mirrors JS: yields Or() (empty Or) which fails initialize().
-                        handlers.push(Box::new(False::new(vec![cells[0]])));
-                    } else {
-                        handlers.push(Box::new(Or::new(or_handlers)));
-                    }
+                    Self::yield_or(branches, handlers);
                 }
             }
 
@@ -1023,28 +1048,203 @@ impl SudokuBuilder {
             Constraint::Or { groups } => {
                 // Each group is a list of constraints forming one alternative.
                 // Mirrors JS `Or` composite: at least one group must be satisfiable.
-                let or_handlers: Vec<Box<dyn ConstraintHandler>> = groups
-                    .iter()
-                    .map(|group| {
-                        let mut gh: Vec<Box<dyn ConstraintHandler>> = Vec::new();
-                        for c in group {
-                            Self::constraint_handlers(c, all_constraints, &mut gh, shape)?;
-                        }
-                        Ok(Box::new(And::new(gh)) as Box<dyn ConstraintHandler>)
-                    })
-                    .collect::<Result<Vec<_>, String>>()?;
-                if !or_handlers.is_empty() {
-                    handlers.push(Box::new(Or::new(or_handlers)));
+                let mut branches: Vec<Vec<Box<dyn ConstraintHandler>>> = Vec::new();
+                for group in groups {
+                    let mut gh: Vec<Box<dyn ConstraintHandler>> = Vec::new();
+                    for c in group {
+                        Self::constraint_handlers(c, all_constraints, &mut gh, shape, state_allocator)?;
+                    }
+                    branches.push(gh);
                 }
+                Self::yield_or(branches, handlers);
             }
 
             Constraint::And { constraints: inner } => {
                 // All inner constraints must be satisfied — just flatten them.
                 for c in inner {
-                    Self::constraint_handlers(c, all_constraints, handlers, shape)?;
+                    Self::constraint_handlers(c, all_constraints, handlers, shape, state_allocator)?;
                 }
             }
         }
+        Ok(())
+    }
+
+    /// Wrap multiple handlers in an And, or return the single handler directly.
+    /// Mirrors JS `_wrapAnd(handlers)`.
+    fn wrap_and(h: Vec<Box<dyn ConstraintHandler>>) -> Box<dyn ConstraintHandler> {
+        if h.len() == 1 {
+            h.into_iter().next().unwrap()
+        } else {
+            Box::new(And::new(h))
+        }
+    }
+
+    /// Yield handlers from Or branches, eliding empty/single branches.
+    /// Mirrors JS `*_yieldOr(branches)`.
+    fn yield_or(
+        branches: Vec<Vec<Box<dyn ConstraintHandler>>>,
+        handlers: &mut Vec<Box<dyn ConstraintHandler>>,
+    ) {
+        let non_empty: Vec<Vec<Box<dyn ConstraintHandler>>> =
+            branches.into_iter().filter(|b| !b.is_empty()).collect();
+        if non_empty.is_empty() {
+            return;
+        }
+        if non_empty.len() == 1 {
+            handlers.extend(non_empty.into_iter().next().unwrap());
+            return;
+        }
+        handlers.push(Box::new(Or::new(
+            non_empty.into_iter().map(Self::wrap_and).collect(),
+        )));
+    }
+
+    /// Row regions: Vec of cell-index vectors, one per row.
+    /// Mirrors JS `SudokuConstraintBase.rowRegions(shape)`.
+    fn row_regions(shape: GridShape) -> Vec<Vec<CellIndex>> {
+        (0..shape.num_rows)
+            .map(|r| {
+                (0..shape.num_cols)
+                    .map(|c| shape.cell_index(r, c) as CellIndex)
+                    .collect()
+            })
+            .collect()
+    }
+
+    /// Column regions: Vec of cell-index vectors, one per column.
+    /// Mirrors JS `SudokuConstraintBase.colRegions(shape)`.
+    fn col_regions(shape: GridShape) -> Vec<Vec<CellIndex>> {
+        (0..shape.num_cols)
+            .map(|c| {
+                (0..shape.num_rows)
+                    .map(|r| shape.cell_index(r, c) as CellIndex)
+                    .collect()
+            })
+            .collect()
+    }
+
+    /// Add handlers for the Doppelganger constraint.
+    /// Mirrors JS `_doppelgangerHandlers(shape, constraintMap, stateAllocator)`.
+    fn add_doppelganger_handlers(
+        handlers: &mut Vec<Box<dyn ConstraintHandler>>,
+        shape: GridShape,
+        all_constraints: &[Constraint],
+        state_allocator: &mut StateCellAllocator,
+    ) -> Result<(), String> {
+        let region_size = Self::region_size(all_constraints, shape);
+        let grid_size = shape.num_values - 1;
+        if shape.value_offset != -1
+            || grid_size != shape.num_rows
+            || grid_size != shape.num_cols
+            || grid_size != region_size
+        {
+            return Err(
+                "Doppelganger requires shape with values 0-N \
+                 (e.g. 9x9~0-9 for a 9x9 grid)."
+                    .to_string(),
+            );
+        }
+
+        let row_regions = Self::row_regions(shape);
+        let col_regions = Self::col_regions(shape);
+        let has_no_boxes = all_constraints.iter().any(|c| matches!(c, Constraint::NoBoxes));
+        let box_regions = if has_no_boxes {
+            Vec::new()
+        } else {
+            Self::box_regions(shape, Self::get_effective_box_size(all_constraints))
+        };
+
+        let zero_cell = state_allocator.allocate(1);
+        let row_state_cells = state_allocator.allocate(grid_size as usize);
+        let col_state_cells = state_allocator.allocate(grid_size as usize);
+        let box_state_cells = if !box_regions.is_empty() {
+            state_allocator.allocate(box_regions.len())
+        } else {
+            Vec::new()
+        };
+
+        // Fix the zero cell to value 0. Propagates through state cell
+        // AllDifferent groups to prevent state cells from holding 0 (Rule 1).
+        handlers.push(Box::new(GivenCandidates::new(vec![(
+            zero_cell[0],
+            GivenValue::Single(0),
+        )])));
+
+        // N+1 cell AllDifferent for each region + its state cell.
+        for i in 0..grid_size as usize {
+            let mut cells = row_regions[i].clone();
+            cells.push(row_state_cells[i]);
+            handlers.push(Box::new(AllDifferent::new(
+                cells,
+                AllDifferentType::WithExclusionCells,
+            )));
+        }
+        for i in 0..grid_size as usize {
+            let mut cells = col_regions[i].clone();
+            cells.push(col_state_cells[i]);
+            handlers.push(Box::new(AllDifferent::new(
+                cells,
+                AllDifferentType::WithExclusionCells,
+            )));
+        }
+        for i in 0..box_regions.len() {
+            let mut cells = box_regions[i].clone();
+            cells.push(box_state_cells[i]);
+            handlers.push(Box::new(AllDifferent::new(
+                cells,
+                AllDifferentType::WithExclusionCells,
+            )));
+        }
+
+        // Rule 2: No two rows/columns/boxes missing the same digit.
+        // N+1 cells with N+1 values → optimizer promotes to House.
+        let mut row_group: Vec<CellIndex> = row_state_cells.clone();
+        row_group.push(zero_cell[0]);
+        handlers.push(Box::new(AllDifferent::new(
+            row_group,
+            AllDifferentType::WithExclusionCells,
+        )));
+
+        let mut col_group: Vec<CellIndex> = col_state_cells.clone();
+        col_group.push(zero_cell[0]);
+        handlers.push(Box::new(AllDifferent::new(
+            col_group,
+            AllDifferentType::WithExclusionCells,
+        )));
+
+        if !box_state_cells.is_empty() {
+            let mut box_group: Vec<CellIndex> = box_state_cells.clone();
+            box_group.push(zero_cell[0]);
+            handlers.push(Box::new(AllDifferent::new(
+                box_group,
+                AllDifferentType::WithExclusionCells,
+            )));
+        }
+
+        // Rule 3: For each 0 in the grid, the digits missing in its row,
+        // column, and box must be different.
+        const NO_BOX: u8 = 255;
+        let mut cell_to_box = vec![NO_BOX; shape.num_cells];
+        for (b, region) in box_regions.iter().enumerate() {
+            for &cell in region {
+                cell_to_box[cell as usize] = b as u8;
+            }
+        }
+        for r in 0..grid_size {
+            for c in 0..grid_size {
+                let cell = shape.cell_index(r, c) as CellIndex;
+                let mut state_cells = vec![
+                    row_state_cells[r as usize],
+                    col_state_cells[c as usize],
+                ];
+                let box_idx = cell_to_box[cell as usize];
+                if box_idx != NO_BOX {
+                    state_cells.push(box_state_cells[box_idx as usize]);
+                }
+                handlers.push(Box::new(DoppelgangerZero::new(cell, state_cells)));
+            }
+        }
+
         Ok(())
     }
 
@@ -1157,6 +1357,13 @@ impl SudokuBuilder {
             Constraint::RegionSize { size } => Some(*size),
             _ => None,
         })
+    }
+
+    /// Get the region size, falling back to the default num_values for the
+    /// grid dimensions. Mirrors JS `_regionSize(constraintMap, shape)`.
+    fn region_size(constraints: &[Constraint], shape: GridShape) -> u8 {
+        Self::get_effective_box_size(constraints)
+            .unwrap_or_else(|| default_num_values(shape.num_rows, shape.num_cols))
     }
 
     /// All 2×2 overlapping regions of the grid.
@@ -1478,10 +1685,11 @@ fn expand_outside_line(arrow_id: &str, shape: GridShape) -> Option<Vec<CellIndex
 }
 #[cfg(test)]
 mod tests {
-    use super::SudokuBuilder;
+    use super::{StateCellAllocator, SudokuBuilder};
     use crate::constraint::parser::{self, ParsedConstraints};
     use crate::constraint::Constraint;
     use crate::grid_shape::SHAPE_9X9;
+    use crate::handlers::{And, Or, True, GivenCandidates, ConstraintHandler};
 
     #[test]
     fn test_build_plain_sudoku() {
@@ -1526,17 +1734,19 @@ mod tests {
         let _puzzle =
             ".................................................................................";
         // Without NoBoxes: 28 handlers (9 rows + 9 cols + 9 boxes + 1 BoxInfo).
-        let handlers = SudokuBuilder::create_handlers(&[], SHAPE_9X9).unwrap();
+        let mut state_allocator = StateCellAllocator::new(SHAPE_9X9.num_cells);
+        let handlers = SudokuBuilder::create_handlers(&[], SHAPE_9X9, &mut state_allocator).unwrap();
         assert_eq!(handlers.len(), 28);
         // With NoBoxes: 19 handlers (9 rows + 9 cols + 1 BoxInfo with empty regions).
-        let handlers = SudokuBuilder::create_handlers(&[Constraint::NoBoxes], SHAPE_9X9).unwrap();
+        let handlers = SudokuBuilder::create_handlers(&[Constraint::NoBoxes], SHAPE_9X9, &mut state_allocator).unwrap();
         assert_eq!(handlers.len(), 19);
     }
 
     #[test]
     fn test_anti_knight_handler_count() {
+        let mut state_allocator = StateCellAllocator::new(SHAPE_9X9.num_cells);
         let handlers =
-            SudokuBuilder::create_handlers(&[Constraint::AntiKnight], SHAPE_9X9).unwrap();
+            SudokuBuilder::create_handlers(&[Constraint::AntiKnight], SHAPE_9X9, &mut state_allocator).unwrap();
         // 27 house handlers + knight-move pairs.
         // Each cell has up to 8 knight-move neighbors; we add only half (4
         // offsets per cell that are one-directional). Not all cells have all 4
@@ -1639,6 +1849,245 @@ mod tests {
         );
         let result = SudokuBuilder::build(&parsed, None);
         assert!(result.is_ok(), "Builder should accept FullRank constraints");
+    }
+
+    // =========================================================================
+    // wrap_and / yield_or tests — port of sudoku_builder_or_and.test.js
+    // =========================================================================
+
+    fn collect_handlers(constraint: Constraint) -> Vec<Box<dyn ConstraintHandler>> {
+        let mut state_allocator = StateCellAllocator::new(SHAPE_9X9.num_cells);
+        let mut handlers = Vec::new();
+        SudokuBuilder::constraint_handlers(
+            &constraint,
+            &[],
+            &mut handlers,
+            SHAPE_9X9,
+            &mut state_allocator,
+        )
+        .unwrap();
+        handlers
+    }
+
+    #[test]
+    fn test_wrap_and_single_handler_returns_directly() {
+        let h: Box<dyn ConstraintHandler> = Box::new(True);
+        let result = SudokuBuilder::wrap_and(vec![h]);
+        assert_eq!(result.name(), "True");
+        assert!(result.as_any().downcast_ref::<And>().is_none());
+    }
+
+    #[test]
+    fn test_wrap_and_multiple_handlers_returns_and() {
+        let h1: Box<dyn ConstraintHandler> = Box::new(True);
+        let h2: Box<dyn ConstraintHandler> = Box::new(True);
+        let result = SudokuBuilder::wrap_and(vec![h1, h2]);
+        assert!(result.as_any().downcast_ref::<And>().is_some());
+    }
+
+    #[test]
+    fn test_yield_or_empty_branches_yields_nothing() {
+        let mut out = Vec::new();
+        SudokuBuilder::yield_or(vec![], &mut out);
+        assert_eq!(out.len(), 0);
+    }
+
+    #[test]
+    fn test_yield_or_all_empty_branches_yields_nothing() {
+        let mut out = Vec::new();
+        SudokuBuilder::yield_or(vec![vec![], vec![]], &mut out);
+        assert_eq!(out.len(), 0);
+    }
+
+    #[test]
+    fn test_yield_or_single_branch_one_handler_yields_directly() {
+        let h: Box<dyn ConstraintHandler> = Box::new(True);
+        let mut out = Vec::new();
+        SudokuBuilder::yield_or(vec![vec![h]], &mut out);
+        assert_eq!(out.len(), 1);
+        assert!(out[0].as_any().downcast_ref::<Or>().is_none());
+        assert!(out[0].as_any().downcast_ref::<And>().is_none());
+    }
+
+    #[test]
+    fn test_yield_or_single_branch_multiple_handlers_yields_all_unwrapped() {
+        let h1: Box<dyn ConstraintHandler> = Box::new(True);
+        let h2: Box<dyn ConstraintHandler> = Box::new(True);
+        let mut out = Vec::new();
+        SudokuBuilder::yield_or(vec![vec![h1, h2]], &mut out);
+        assert_eq!(out.len(), 2);
+        assert_eq!(out[0].name(), "True");
+        assert_eq!(out[1].name(), "True");
+    }
+
+    #[test]
+    fn test_yield_or_multiple_branches_yields_single_or() {
+        let h1: Box<dyn ConstraintHandler> = Box::new(True);
+        let h2: Box<dyn ConstraintHandler> = Box::new(True);
+        let mut out = Vec::new();
+        SudokuBuilder::yield_or(vec![vec![h1], vec![h2]], &mut out);
+        assert_eq!(out.len(), 1);
+        assert!(out[0].as_any().downcast_ref::<Or>().is_some());
+    }
+
+    #[test]
+    fn test_yield_or_multiple_branches_wraps_multi_handler_in_and() {
+        let h1: Box<dyn ConstraintHandler> = Box::new(True);
+        let h2: Box<dyn ConstraintHandler> = Box::new(True);
+        let h3: Box<dyn ConstraintHandler> = Box::new(True);
+        let mut out = Vec::new();
+        SudokuBuilder::yield_or(vec![vec![h1, h2], vec![h3]], &mut out);
+        assert_eq!(out.len(), 1);
+        assert!(out[0].as_any().downcast_ref::<Or>().is_some());
+    }
+
+    #[test]
+    fn test_yield_or_skips_empty_branches_among_nonempty() {
+        let h: Box<dyn ConstraintHandler> = Box::new(True);
+        let mut out = Vec::new();
+        SudokuBuilder::yield_or(vec![vec![], vec![h], vec![]], &mut out);
+        // Single non-empty branch -> yield directly.
+        assert_eq!(out.len(), 1);
+        assert_eq!(out[0].name(), "True");
+    }
+
+    // -- Integration: Or constraint via constraint_handlers --
+
+    #[test]
+    fn test_or_single_sub_yields_unwrapped() {
+        // Or with a single Given inside should not produce an Or or And handler.
+        let or = Constraint::Or {
+            groups: vec![vec![Constraint::Given {
+                cell: "R1C1".to_string(),
+                values: vec![5],
+            }]],
+        };
+        let handlers = collect_handlers(or);
+        assert!(!handlers.is_empty());
+        for h in &handlers {
+            assert!(h.as_any().downcast_ref::<Or>().is_none(), "should not yield Or");
+            assert!(h.as_any().downcast_ref::<And>().is_none(), "should not yield And");
+        }
+        assert!(handlers.iter().any(|h| h.as_any().downcast_ref::<GivenCandidates>().is_some()));
+    }
+
+    #[test]
+    fn test_or_multiple_subs_yields_or() {
+        let or = Constraint::Or {
+            groups: vec![
+                vec![Constraint::Given {
+                    cell: "R1C1".to_string(),
+                    values: vec![5],
+                }],
+                vec![Constraint::Given {
+                    cell: "R1C1".to_string(),
+                    values: vec![3],
+                }],
+            ],
+        };
+        let handlers = collect_handlers(or);
+        assert_eq!(handlers.len(), 1);
+        assert!(handlers[0].as_any().downcast_ref::<Or>().is_some());
+    }
+
+    #[test]
+    fn test_or_multi_handler_sub_wraps_in_and() {
+        // Cage yields Sum + AllDifferent (2 handlers), so each branch is And.
+        let or = Constraint::Or {
+            groups: vec![
+                vec![Constraint::Cage {
+                    cells: vec!["R1C1".to_string(), "R1C2".to_string(), "R1C3".to_string()],
+                    sum: 10,
+                }],
+                vec![Constraint::Cage {
+                    cells: vec!["R2C1".to_string(), "R2C2".to_string(), "R2C3".to_string()],
+                    sum: 15,
+                }],
+            ],
+        };
+        let handlers = collect_handlers(or);
+        assert_eq!(handlers.len(), 1);
+        assert!(handlers[0].as_any().downcast_ref::<Or>().is_some());
+    }
+
+    #[test]
+    fn test_or_single_multi_handler_sub_yields_all_unwrapped() {
+        // Single branch Cage yields Sum + AllDifferent directly.
+        let or = Constraint::Or {
+            groups: vec![vec![Constraint::Cage {
+                cells: vec!["R1C1".to_string(), "R1C2".to_string(), "R1C3".to_string()],
+                sum: 10,
+            }]],
+        };
+        let handlers = collect_handlers(or);
+        assert_eq!(handlers.len(), 2);
+        for h in &handlers {
+            assert!(h.as_any().downcast_ref::<Or>().is_none(), "should not yield Or");
+            assert!(h.as_any().downcast_ref::<And>().is_none(), "should not yield And");
+        }
+    }
+
+    #[test]
+    fn test_or_nested_or_in_or_is_unnested() {
+        // Or(Or(Given1, Given2)) — outer Or should be elided.
+        let or = Constraint::Or {
+            groups: vec![vec![Constraint::Or {
+                groups: vec![
+                    vec![Constraint::Given {
+                        cell: "R1C1".to_string(),
+                        values: vec![5],
+                    }],
+                    vec![Constraint::Given {
+                        cell: "R1C1".to_string(),
+                        values: vec![3],
+                    }],
+                ],
+            }]],
+        };
+        let handlers = collect_handlers(or);
+        // Should yield a single Or (the inner one).
+        assert_eq!(handlers.len(), 1);
+        assert!(handlers[0].as_any().downcast_ref::<Or>().is_some());
+    }
+
+    #[test]
+    fn test_or_nested_or_in_and_in_or_is_unnested() {
+        // Or(And(Or(Given1, Given2))) — outer Or + And elided.
+        let or = Constraint::Or {
+            groups: vec![vec![Constraint::And {
+                constraints: vec![Constraint::Or {
+                    groups: vec![
+                        vec![Constraint::Given {
+                            cell: "R1C1".to_string(),
+                            values: vec![5],
+                        }],
+                        vec![Constraint::Given {
+                            cell: "R1C1".to_string(),
+                            values: vec![3],
+                        }],
+                    ],
+                }],
+            }]],
+        };
+        let handlers = collect_handlers(or);
+        assert_eq!(handlers.len(), 1);
+        assert!(handlers[0].as_any().downcast_ref::<Or>().is_some());
+    }
+
+    #[test]
+    fn test_elided_and_and_or() {
+        // And(Given) and Or(Given): both should be elided.
+        let and = Constraint::And {
+            constraints: vec![Constraint::Given {
+                cell: "R1C1".to_string(),
+                values: vec![5],
+            }],
+        };
+        let handlers = collect_handlers(and);
+        assert!(!handlers.is_empty());
+        for h in &handlers {
+            assert!(h.as_any().downcast_ref::<And>().is_none());
+        }
     }
 
     #[test]
