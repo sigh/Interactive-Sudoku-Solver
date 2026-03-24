@@ -534,7 +534,6 @@ export class DisplayContainer {
     const width = DisplayItem.CELL_SIZE * shape.numCols + padding * 2;
     const height = DisplayItem.CELL_SIZE * shape.numRows + padding * 2;
     this._baseHeight = height;
-    this._extraHeight = 0;
     this._mainSvg.setAttribute('height', height);
     this._mainSvg.setAttribute('width', width);
     this._mainSvg.setAttribute(
@@ -545,12 +544,14 @@ export class DisplayContainer {
     this._cellPositioner.reshape(shape);
     this._highlightDisplay.reshape(shape);
     this._clickInterceptor.reshape(shape);
+
+    shape.onStateCellsChanged(
+      () => this._updateStateCells(shape.stateCellGroups()));
   }
 
-  setExtraHeight(extraHeight) {
-    this._extraHeight = extraHeight;
+  _setExtraHeight(extraHeight) {
     this._mainSvg.setAttribute(
-      'height', this._baseHeight + this._extraHeight);
+      'height', this._baseHeight + extraHeight);
   }
 
   toggleLayoutView(enable) {
@@ -559,9 +560,9 @@ export class DisplayContainer {
 
   getCellPositioner() { return this._cellPositioner; }
 
-  updateStateCells(groups) {
-    const { extraHeight, layout } = this._cellPositioner.setStateCellGroups(groups);
-    this.setExtraHeight(extraHeight);
+  _updateStateCells(groups) {
+    const { extraHeight, layout } = this._cellPositioner.computeStateCellLayout(groups);
+    this._setExtraHeight(extraHeight);
     this._stateCellDisplay.render(layout);
   }
 
@@ -945,22 +946,20 @@ class CellPositioner {
 
   constructor() {
     this._shape = null;
-    this._stateCellPositions = new Map();
   }
 
   reshape(shape) { this._shape = shape; }
 
-  // Compute positions for state cell groups.
+  // Shared layout computation for state cell groups.
   // Returns { extraHeight, layout } where layout is the pre-computed
   // rendering data for StateCellDisplay.
-  setStateCellGroups(groups) {
-    this._stateCellPositions = new Map();
+  static _computeStateCellLayout(shape, groups) {
     if (!groups?.length) return { extraHeight: 0, layout: [] };
 
     const cellSize = DisplayItem.CELL_SIZE;
     const gap = CellPositioner.STATE_CELL_GAP;
     const labelHeight = CellPositioner.STATE_CELL_LABEL_HEIGHT;
-    const gridHeight = cellSize * this._shape.numRows;
+    const gridHeight = cellSize * shape.numRows;
     const yStart = gridHeight + gap;
     const rowHeight = labelHeight + cellSize;
 
@@ -973,27 +972,41 @@ class CellPositioner {
       const yLabel = yStart + rowIndex * rowHeight;
       const y = yLabel + labelHeight;
 
-      for (let col = 0; col < group.cells.length; col++) {
-        this._stateCellPositions.set(group.cells[col], [
-          col * cellSize + cellSize / 2, y + cellSize / 2]);
-      }
-
       layout.push({ group, yLabel, y });
       rowIndex++;
     }
 
-    return { extraHeight: gap + rowIndex * rowHeight, layout };
+    return { extraHeight: rowIndex > 0 ? gap + rowIndex * rowHeight : 0, layout };
+  }
+
+  // Compute layout for rendering. Called by DisplayContainer._updateStateCells.
+  computeStateCellLayout(groups) {
+    return CellPositioner._computeStateCellLayout(this._shape, groups);
   }
 
   totalCells() {
-    return this._shape.numCells + this._stateCellPositions.size;
+    return this._shape.totalCells();
   }
 
   cellCenter(cellIndex) {
-    if (cellIndex >= this._shape.numCells) {
-      return this._stateCellPositions.get(cellIndex) || null;
+    if (cellIndex < this._shape.numCells) {
+      const [row, col] = this._shape.splitCellIndex(cellIndex);
+      return DisplayItem._cellCenter(row, col);
     }
-    const [row, col] = this._shape.splitCellIndex(cellIndex);
-    return DisplayItem._cellCenter(row, col);
+    return this._computeStateCellCenter(cellIndex);
+  }
+
+  _computeStateCellCenter(cellIndex) {
+    const groups = this._shape.stateCellGroups();
+    const { layout } = CellPositioner._computeStateCellLayout(this._shape, groups);
+    const cellSize = DisplayItem.CELL_SIZE;
+
+    for (const { group, y } of layout) {
+      const col = cellIndex - group.cells[0];
+      if (col >= 0 && col < group.cells.length) {
+        return [col * cellSize + cellSize / 2, y + cellSize / 2];
+      }
+    }
+    return null;
   }
 }

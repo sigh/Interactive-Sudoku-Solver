@@ -1,4 +1,5 @@
-const { SudokuConstraint, SudokuConstraintBase, CellArgs, StateCellRegistry } = await import('../sudoku_constraint.js' + self.VERSION_PARAM);
+const { SudokuConstraint, SudokuConstraintBase, CellArgs } = await import('../sudoku_constraint.js' + self.VERSION_PARAM);
+const { StateCellRegistry } = await import('../grid_shape.js' + self.VERSION_PARAM);
 const { SudokuSolver } = await import('./engine.js' + self.VERSION_PARAM);
 const { regexToNFA, NFASerializer } = await import('../nfa_builder.js' + self.VERSION_PARAM);
 const { memoize } = await import('../util.js' + self.VERSION_PARAM);
@@ -6,23 +7,21 @@ const HandlerModule = await import('./handlers.js' + self.VERSION_PARAM);
 const SumHandlerModule = await import('./sum_handler.js' + self.VERSION_PARAM);
 const NFAHandlerModule = await import('./nfa_handler.js' + self.VERSION_PARAM);
 
-export { StateCellRegistry };
-
 const { InvalidConstraintError } = HandlerModule;
 
 export class SudokuBuilder {
   static build(constraint, debugOptions) {
     const shape = constraint.getShape();
     const constraintMap = constraint.toMap();
-    const registry = StateCellRegistry.fromConstraints(
+    const stateCellRegistry = StateCellRegistry.fromConstraints(
       [].concat(...constraintMap.values()), shape);
 
-    const handlers = [...this._handlers(constraintMap, shape, registry)];
+    const handlers = [...this._handlers(constraintMap, shape, stateCellRegistry)];
 
     return new SudokuSolver(
       handlers,
       shape,
-      shape.numCells + registry.totalCells,
+      shape.numCells + stateCellRegistry.numStateCells(),
       debugOptions);
   }
 
@@ -37,14 +36,14 @@ export class SudokuBuilder {
     return new cls(...args);
   }
 
-  static *_handlers(constraintMap, shape, registry) {
+  static *_handlers(constraintMap, shape, stateCellRegistry) {
     yield* this._rowColHandlers(shape);
 
     const boxRegions = this._getBoxRegions(shape, constraintMap);
     yield new HandlerModule.BoxInfo(boxRegions);
     yield* this._boxHandlers(boxRegions);
 
-    yield* this._constraintHandlers(constraintMap, shape, registry);
+    yield* this._constraintHandlers(constraintMap, shape, stateCellRegistry);
   }
 
   // Get box regions, respecting NoBoxes and RegionSize constraints.
@@ -158,7 +157,7 @@ export class SudokuBuilder {
       ?? shape.constructor.defaultNumValues(shape.numRows, shape.numCols);
   }
 
-  static * _constraintHandlers(constraintMap, shape, registry) {
+  static * _constraintHandlers(constraintMap, shape, stateCellRegistry) {
     const constraints = [].concat(...constraintMap.values());
 
     for (const constraint of constraints) {
@@ -173,7 +172,7 @@ export class SudokuBuilder {
       let cells;
       switch (constraint.type) {
         case 'Doppelganger':
-          yield* this._doppelgangerHandlers(shape, constraintMap, registry);
+          yield* this._doppelgangerHandlers(shape, constraintMap, stateCellRegistry);
           break;
 
         case 'AntiKnight':
@@ -856,7 +855,7 @@ export class SudokuBuilder {
       ...nonEmpty.map(b => this._wrapAnd(b)));
   }
 
-  static * _doppelgangerHandlers(shape, constraintMap, registry) {
+  static * _doppelgangerHandlers(shape, constraintMap, stateCellRegistry) {
     const regionSize = this._regionSize(constraintMap, shape);
     const gridSize = shape.numValues - 1;
     if (shape.valueOffset !== -1
@@ -872,10 +871,10 @@ export class SudokuBuilder {
     const colRegions = SudokuConstraintBase.colRegions(shape);
     const boxRegions = this._getBoxRegions(shape, constraintMap);
 
-    const [zeroCell] = registry.getCellsForGroup('DGZ');
-    const rowStateCells = registry.getCellsForGroup('DGR');
-    const colStateCells = registry.getCellsForGroup('DGC');
-    const boxStateCells = registry.getCellsForGroup('DGB');
+    const [zeroCell] = stateCellRegistry.getCellsForGroup('DGZ');
+    const rowStateCells = stateCellRegistry.getCellsForGroup('DGR');
+    const colStateCells = stateCellRegistry.getCellsForGroup('DGC');
+    const boxStateCells = stateCellRegistry.getCellsForGroup('DGB');
 
     // Fix the zero cell to value 0. This propagates through the state cell
     // AllDifferent groups to prevent state cells from holding 0 (Rule 1).

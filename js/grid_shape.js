@@ -1,3 +1,131 @@
+export class StateCellRegistry {
+  constructor(cellIndexOffset = 0) {
+    this._cellIndexOffset = cellIndexOffset;
+    this._groups = new Map();
+    this._sortedGroups = [];
+    this._totalCells = 0;
+    this._cellToId = new Map();
+    this._idToCell = new Map();
+    this._changeListeners = [];
+  }
+
+  addGroup(prefix, count, label, { hidden = false } = {}) {
+    if (this._groups.has(prefix)) {
+      throw Error(`State cell group prefix '${prefix}' already exists`);
+    }
+
+    this._groups.set(prefix, { prefix, count, label, hidden });
+    this._rebuild();
+    this._notify({ added: [prefix], removed: [] });
+  }
+
+  removeGroup(prefix) {
+    if (!this._groups.has(prefix)) return;
+
+    this._groups.delete(prefix);
+    this._rebuild();
+    this._notify({ added: [], removed: [prefix] });
+  }
+
+  clear() {
+    if (this._groups.size === 0) return;
+    const removed = [...this._groups.keys()];
+    this._groups.clear();
+    this._rebuild();
+    this._notify({ added: [], removed });
+  }
+
+  _rebuild() {
+    this._cellToId.clear();
+    this._idToCell.clear();
+
+    const sorted = [...this._groups.values()].sort(
+      (a, b) => a.prefix < b.prefix ? -1 : a.prefix > b.prefix ? 1 : 0);
+
+    let next = this._cellIndexOffset;
+    for (const group of sorted) {
+      group.cells = Array.from({ length: group.count }, (_, i) => next + i);
+      next += group.count;
+
+      for (let i = 0; i < group.cells.length; i++) {
+        const id = group.cells.length === 1 ? group.prefix : `${group.prefix}${i}`;
+        this._cellToId.set(group.cells[i], id);
+        this._idToCell.set(id, group.cells[i]);
+      }
+    }
+
+    this._sortedGroups = sorted;
+    this._totalCells = next - this._cellIndexOffset;
+  }
+
+  _notify(change) {
+    for (const listener of this._changeListeners) {
+      listener(change);
+    }
+  }
+
+  addChangeListener(fn) { this._changeListeners.push(fn); }
+
+  getGroups() {
+    return [...this._sortedGroups];
+  }
+
+  getCellsForGroup(prefix) {
+    return this._groups.get(prefix)?.cells || null;
+  }
+
+  numStateCells() {
+    return this._totalCells;
+  }
+
+  getCellId(cellIndex) {
+    return this._cellToId.get(cellIndex) ?? null;
+  }
+
+  getCellIndex(cellId) {
+    return this._idToCell.get(cellId) ?? null;
+  }
+
+  // Parse a named state cell ID like 'DGR3' into { prefix, index }.
+  // Returns null if the ID doesn't match the [A-Z]+[0-9]* format.
+  static parseStateCellId(cellId) {
+    const match = cellId.match(/^([A-Z]+)(\d*)$/);
+    if (!match) return null;
+    return { prefix: match[1], index: match[2] !== '' ? parseInt(match[2]) : 0 };
+  }
+
+  toJSON() {
+    return this.getGroups();
+  }
+
+  // Build a registry deterministically from a constraint list and shape.
+  static fromConstraints(constraints, shape) {
+    const seenClasses = new Set();
+    const allSpecs = [];
+
+    for (const constraint of constraints) {
+      const cls = constraint.constructor;
+      if (seenClasses.has(cls)) continue;
+      seenClasses.add(cls);
+      if (typeof cls.getStateCellGroups !== 'function') continue;
+      allSpecs.push(...cls.getStateCellGroups(shape));
+    }
+
+    return this.fromGroupSpecs(allSpecs, shape.numCells);
+  }
+
+  // Build a registry from group specs.
+  static fromGroupSpecs(specs, cellIndexOffset) {
+    const registry = new StateCellRegistry(cellIndexOffset);
+    for (const spec of specs) {
+      registry.addGroup(
+        spec.prefix, spec.count, spec.label,
+        { hidden: spec.hidden || false });
+    }
+    return registry;
+  }
+}
+
 export class GridShape {
   static MIN_SIZE = 1;
   static MAX_SIZE = 16;
@@ -96,7 +224,31 @@ export class GridShape {
       numRows, numCols, this.numValues, valueOffset);
     this.gridDimsStr = `${numRows}x${numCols}`;
 
-    Object.freeze(this);
+    this._stateCellRegistry = new StateCellRegistry(this.numCells);
+  }
+
+  totalCells() {
+    return this.numCells + this._stateCellRegistry.numStateCells();
+  }
+
+  stateCellGroups() {
+    return this._stateCellRegistry.getGroups();
+  }
+
+  addStateCellGroup(prefix, count, label, opts) {
+    this._stateCellRegistry.addGroup(prefix, count, label, opts);
+  }
+
+  removeStateCellGroup(prefix) {
+    this._stateCellRegistry.removeGroup(prefix);
+  }
+
+  clearStateCells() {
+    this._stateCellRegistry.clear();
+  }
+
+  onStateCellsChanged(fn) {
+    this._stateCellRegistry.addChangeListener(fn);
   }
 
   minValue() {
@@ -147,6 +299,8 @@ export class GridShape {
   }
 
   makeCellIdFromIndex = (i) => {
+    const namedId = this._stateCellRegistry.getCellId(i);
+    if (namedId) return namedId;
     if (i >= this.numCells) return `$${i - this.numCells}`;
     return this.makeCellId(...this.splitCellIndex(i));
   }
@@ -169,6 +323,9 @@ export class GridShape {
   }
 
   parseCellId = (cellId) => {
+    // Check registry first — named IDs like 'DGR3' would be mangled by R#C#.
+    const registryCell = this._stateCellRegistry.getCellIndex(cellId);
+    if (registryCell !== null) return { cell: registryCell };
     if (cellId[0] === '$') {
       return { cell: this.numCells + parseInt(cellId.substring(1)) };
     }

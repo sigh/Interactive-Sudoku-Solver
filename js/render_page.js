@@ -22,7 +22,6 @@ const {
   DisplayItem
 } = await import('./display.js' + self.VERSION_PARAM);
 const { SudokuParser } = await import('./sudoku_parser.js' + self.VERSION_PARAM);
-const { StateCellRegistry } = await import('./sudoku_constraint.js' + self.VERSION_PARAM);
 const { ConstraintDisplay } = await import('./constraint_display.js' + self.VERSION_PARAM);
 const { SolutionController } = await import('./solution_controller.js' + self.VERSION_PARAM);
 const {
@@ -398,11 +397,17 @@ class RootConstraintCollection extends ConstraintCollectionBase {
     this._updateListener = updateListener;
     this._constraintCategoryInputs = constraintCategoryInputs;
     this._collectionFactory = collectionFactor;
+    this._shape = null;
+  }
+
+  reshape(shape) {
+    this._shape = shape;
   }
 
   clear() {
     this._uniquenessKeySet.clear();
     this._constraintMap.clear();
+    this._shape.clearStateCells();
   }
 
   constraints() {
@@ -440,6 +445,13 @@ class RootConstraintCollection extends ConstraintCollectionBase {
     this._constraintCategoryInputs.get(
       constraint.constructor.CATEGORY).onAddConstraint(
         constraint);
+
+    const groups = constraint.constructor.getStateCellGroups?.(this._shape) ?? [];
+    for (const spec of groups) {
+      this._shape.addStateCellGroup(spec.prefix, spec.count, spec.label,
+        { hidden: spec.hidden || false });
+    }
+
     this._updateListener();
   }
 
@@ -458,6 +470,11 @@ class RootConstraintCollection extends ConstraintCollectionBase {
     this._constraintCategoryInputs.get(
       constraint.constructor.CATEGORY).onRemoveConstraint(
         constraint);
+
+    const groups = constraint.constructor.getStateCellGroups?.(this._shape) ?? [];
+    for (const spec of groups) {
+      this._shape.removeStateCellGroup(spec.prefix);
+    }
     this._updateListener();
   }
 
@@ -600,12 +617,6 @@ class ConstraintManager {
     this.addReshapeListener(displayContainer);
     this.addReshapeListener(inputManager);
 
-    this.addUpdateListener(() => {
-      const registry = StateCellRegistry.fromConstraints(
-        this._rootCollection.constraints(), this._shape);
-      displayContainer.updateStateCells(registry.getGroups());
-    });
-
     this._display = this.addReshapeListener(new ConstraintDisplay(
       inputManager, displayContainer));
     this._constraintCategoryInputs = new Map();
@@ -695,13 +706,14 @@ class ConstraintManager {
       this.addUpdateListener(() => layoutContainer.updateActiveHighlighting());
     }
 
-    this._rootCollection = new RootConstraintCollection(
-      this._display,
-      chipViews,
-      this._constraintCategoryInputs,
-      this._makeCompositeCollection.bind(this),
-      this._reshape.bind(this),
-      this.runUpdateCallback.bind(this));
+    this._rootCollection = this.addReshapeListener(
+      new RootConstraintCollection(
+        this._display,
+        chipViews,
+        this._constraintCategoryInputs,
+        this._makeCompositeCollection.bind(this),
+        this._reshape.bind(this),
+        this.runUpdateCallback.bind(this)));
 
     selectedConstraintCollection = new SelectedConstraintCollection(this._rootCollection);
 
