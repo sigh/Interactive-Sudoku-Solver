@@ -14,13 +14,13 @@ const { CandidateSelector, SamplingCandidateSelector, ConflictScores, SeenCandid
 const HandlerModule = await import('./handlers.js' + self.VERSION_PARAM);
 
 export class SudokuSolver {
-  constructor(handlers, shape, numSearchCells, debugOptions) {
+  constructor(handlers, shape, debugOptions) {
     this._debugLogger = new DebugLogger(this, debugOptions);
     this._shape = shape;
-    this._numSearchCells = numSearchCells;
+    this._numSearchCells = shape.totalCells();
 
     this._internalSolver = new InternalSolver(
-      handlers, shape, numSearchCells, this._debugLogger);
+      handlers, shape, this._numSearchCells, this._debugLogger);
 
     this._progressExtraStateFn = null;
     this._progressCallback = null;
@@ -547,8 +547,8 @@ class InternalSolver {
   getStackTrace() {
     const s = this._state;
     if (s === InternalSolver.STATE_UNSTARTED ||
-        s === InternalSolver.STATE_EXHAUSTED ||
-        !this._currentRecFrame) return null;
+      s === InternalSolver.STATE_EXHAUSTED ||
+      !this._currentRecFrame) return null;
 
     const stackFrame = this._currentRecFrame;
     const cellDepth = stackFrame.cellDepth;

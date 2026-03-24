@@ -32,9 +32,7 @@ export class DisplayItem {
   }
 
   cellIndexCenter(cellIndex) {
-    if (this._cellPositioner) return this._cellPositioner.cellCenter(cellIndex);
-    const [row, col] = this._shape.splitCellIndex(cellIndex);
-    return DisplayItem._cellCenter(row, col);
+    return this._cellPositioner.cellCenter(cellIndex);
   }
 
   cellIdCenter(cellId) {
@@ -67,11 +65,6 @@ export class DisplayItem {
 
   cellCenter(cell) {
     return this.cellIndexCenter(cell);
-  }
-
-  static _cellCenter(row, col) {
-    const cellSize = DisplayItem.CELL_SIZE;
-    return [col * cellSize + cellSize / 2, row * cellSize + cellSize / 2];
   }
 
   makeTextNode(str, x, y, cls) {
@@ -525,7 +518,7 @@ export class DisplayContainer {
     this._stateCellDisplay = new StateCellDisplay(
       this.getNewGroup('state-cell-group'));
 
-    this._clickInterceptor = new ClickInterceptor();
+    this._clickInterceptor = new ClickInterceptor(this._cellPositioner);
     container.append(this._clickInterceptor.getSvg());
   }
 
@@ -561,7 +554,8 @@ export class DisplayContainer {
   getCellPositioner() { return this._cellPositioner; }
 
   _updateStateCells(groups) {
-    const { extraHeight, layout } = this._cellPositioner.computeStateCellLayout(groups);
+    const { extraHeight, layout } = this._cellPositioner.setStateCellGroups(
+      groups);
     this._setExtraHeight(extraHeight);
     this._stateCellDisplay.render(layout);
   }
@@ -587,11 +581,11 @@ export class DisplayContainer {
 }
 
 class ClickInterceptor extends DisplayItem {
-  constructor() {
+  constructor(cellPositioner) {
     const svg = createSvgElement('svg');
     svg.classList.add('click-interceptor-svg');
 
-    super(svg);
+    super(svg, cellPositioner);
 
     // Note: _applyGridOffset won't work here because this is a DOM element
     // not an element inside the svg (breaks in Safari).
@@ -946,20 +940,50 @@ class CellPositioner {
 
   constructor() {
     this._shape = null;
+    this._centers = [];
+    this._stateCellLayout = { extraHeight: 0, layout: [] };
   }
 
-  reshape(shape) { this._shape = shape; }
+  reshape(shape) {
+    this._shape = shape;
 
-  // Shared layout computation for state cell groups.
-  // Returns { extraHeight, layout } where layout is the pre-computed
-  // rendering data for StateCellDisplay.
-  static _computeStateCellLayout(shape, groups) {
+    // Precompute grid cell centers.
+    const cellSize = DisplayItem.CELL_SIZE;
+    const numCols = shape.numCols;
+    const centers = new Array(shape.numCells);
+    for (let i = 0; i < shape.numCells; i++) {
+      const row = i / numCols | 0;
+      const col = i % numCols | 0;
+      centers[i] = [col * cellSize + cellSize / 2, row * cellSize + cellSize / 2];
+    }
+    this._centers = centers;
+    this._stateCellLayout = { extraHeight: 0, layout: [] };
+  }
+
+  setStateCellGroups(groups) {
+    const result = this._computeStateCellLayout(groups);
+
+    // Update centers with state cell positions.
+    const cellSize = DisplayItem.CELL_SIZE;
+    const centers = this._centers.slice(0, this._shape.numCells);
+    for (const { group, y } of result.layout) {
+      const cy = y + cellSize / 2;
+      for (let i = 0; i < group.cells.length; i++) {
+        centers[group.cells[i]] = [i * cellSize + cellSize / 2, cy];
+      }
+    }
+    this._centers = centers;
+
+    return result;
+  }
+
+  _computeStateCellLayout(groups) {
     if (!groups?.length) return { extraHeight: 0, layout: [] };
 
     const cellSize = DisplayItem.CELL_SIZE;
     const gap = CellPositioner.STATE_CELL_GAP;
     const labelHeight = CellPositioner.STATE_CELL_LABEL_HEIGHT;
-    const gridHeight = cellSize * shape.numRows;
+    const gridHeight = cellSize * this._shape.numRows;
     const yStart = gridHeight + gap;
     const rowHeight = labelHeight + cellSize;
 
@@ -976,12 +1000,10 @@ class CellPositioner {
       rowIndex++;
     }
 
-    return { extraHeight: rowIndex > 0 ? gap + rowIndex * rowHeight : 0, layout };
-  }
-
-  // Compute layout for rendering. Called by DisplayContainer._updateStateCells.
-  computeStateCellLayout(groups) {
-    return CellPositioner._computeStateCellLayout(this._shape, groups);
+    return {
+      extraHeight: rowIndex > 0 ? gap + rowIndex * rowHeight : 0,
+      layout
+    };
   }
 
   totalCells() {
@@ -989,24 +1011,6 @@ class CellPositioner {
   }
 
   cellCenter(cellIndex) {
-    if (cellIndex < this._shape.numCells) {
-      const [row, col] = this._shape.splitCellIndex(cellIndex);
-      return DisplayItem._cellCenter(row, col);
-    }
-    return this._computeStateCellCenter(cellIndex);
-  }
-
-  _computeStateCellCenter(cellIndex) {
-    const groups = this._shape.stateCellGroups();
-    const { layout } = CellPositioner._computeStateCellLayout(this._shape, groups);
-    const cellSize = DisplayItem.CELL_SIZE;
-
-    for (const { group, y } of layout) {
-      const col = cellIndex - group.cells[0];
-      if (col >= 0 && col < group.cells.length) {
-        return [col * cellSize + cellSize / 2, y + cellSize / 2];
-      }
-    }
-    return null;
+    return this._centers[cellIndex]?.slice() || null;
   }
 }

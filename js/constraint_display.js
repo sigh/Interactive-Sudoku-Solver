@@ -36,8 +36,8 @@ class BaseConstraintDisplayItem extends DisplayItem {
   static IS_LAYOUT = false;
   static IS_DIMMABLE = false;
 
-  constructor(svg) {
-    super(svg);
+  constructor(svg, cellPositioner) {
+    super(svg, cellPositioner);
 
     svg.classList.add(
       this.constructor.IS_LAYOUT ? 'layout-constraint' : 'non-layout-constraint');
@@ -303,8 +303,8 @@ class BaseConstraintDisplayItem extends DisplayItem {
 class Jigsaw extends BaseConstraintDisplayItem {
   static IS_LAYOUT = true;
 
-  constructor(svg) {
-    super(svg);
+  constructor(svg, cellPositioner) {
+    super(svg, cellPositioner);
 
     this._regionGroup = createSvgElement('g');
     svg.append(this._regionGroup);
@@ -455,8 +455,8 @@ class GenericLine extends BaseConstraintDisplayItem {
 class Thermo extends GenericLine { }
 
 class CustomLine extends GenericLine {
-  constructor(svg) {
-    super(svg);
+  constructor(svg, cellPositioner) {
+    super(svg, cellPositioner);
     this._colorPicker = new ColorPicker();
   }
 
@@ -648,8 +648,8 @@ class Letter extends BaseConstraintDisplayItem {
 class ShadedRegion extends BaseConstraintDisplayItem {
   static IS_DIMMABLE = true;
 
-  constructor(svg) {
-    super(svg);
+  constructor(svg, cellPositioner) {
+    super(svg, cellPositioner);
     this._unusedPatternId = 0;
     this._cellColors = new ColorPicker();
 
@@ -769,8 +769,8 @@ class ShadedRegion extends BaseConstraintDisplayItem {
 class CountingCircles extends BaseConstraintDisplayItem {
   static IS_DIMMABLE = true;
 
-  constructor(svg) {
-    super(svg);
+  constructor(svg, cellPositioner) {
+    super(svg, cellPositioner);
     this._circleColors = new ColorPicker();
   }
 
@@ -863,8 +863,8 @@ class Diagonal extends BaseConstraintDisplayItem {
   static IS_LAYOUT = true;
   DIRECTIONS = [1, -1];
 
-  constructor(svg) {
-    super(svg);
+  constructor(svg, cellPositioner) {
+    super(svg, cellPositioner);
 
     svg.setAttribute('stroke-width', 1);
     svg.setAttribute('stroke', 'rgb(255, 0, 0)');
@@ -894,8 +894,8 @@ class Diagonal extends BaseConstraintDisplayItem {
 class Windoku extends BaseConstraintDisplayItem {
   static IS_LAYOUT = true;
 
-  constructor(svg) {
-    super(svg);
+  constructor(svg, cellPositioner) {
+    super(svg, cellPositioner);
 
     svg.setAttribute('fill', 'rgb(255, 0, 255)');
     svg.setAttribute('opacity', '0.1');
@@ -933,8 +933,8 @@ class Windoku extends BaseConstraintDisplayItem {
 class DefaultRegions extends BaseConstraintDisplayItem {
   static IS_LAYOUT = true;
 
-  constructor(svg) {
-    super(svg);
+  constructor(svg, cellPositioner) {
+    super(svg, cellPositioner);
 
     svg.setAttribute('stroke-width', 2);
     svg.setAttribute('stroke', 'rgb(0, 0, 0)');
@@ -1020,8 +1020,8 @@ class DefaultRegions extends BaseConstraintDisplayItem {
 class BorderedRegion extends BaseConstraintDisplayItem {
   static IS_DIMMABLE = true;
 
-  constructor(svg) {
-    super(svg);
+  constructor(svg, cellPositioner) {
+    super(svg, cellPositioner);
     this._items = [];
     this._colorPicker = new ColorPicker();
   }
@@ -1098,8 +1098,8 @@ class BorderedRegion extends BaseConstraintDisplayItem {
 }
 
 class OutsideClue extends BaseConstraintDisplayItem {
-  constructor(svg, inputManager) {
-    super(svg);
+  constructor(svg, cellPositioner, inputManager) {
+    super(svg, cellPositioner);
     inputManager.addSelectionPreserver(svg);
 
     let selectedArrow = null;
@@ -1286,8 +1286,8 @@ class OutsideClue extends BaseConstraintDisplayItem {
 }
 
 class Givens extends BaseConstraintDisplayItem {
-  constructor(svg) {
-    super(svg);
+  constructor(svg, cellPositioner) {
+    super(svg, cellPositioner);
 
     const REPLACE_CHAR = '●';
     const valueFn = v => {
@@ -1296,7 +1296,7 @@ class Givens extends BaseConstraintDisplayItem {
 
     this._maskMap = new Map();
 
-    this._cellDisplay = new CellValueDisplay(svg, valueFn);
+    this._cellDisplay = new CellValueDisplay(svg, valueFn, cellPositioner);
   }
 
   reshape(shape) {
@@ -1398,13 +1398,14 @@ export class ConstraintDisplay extends DisplayItem {
     this._gridDisplay = new GridDisplay(
       displayContainer.getNewGroup('base-grid-group'));
 
+    const cellPositioner = displayContainer.getCellPositioner();
     this._constraintDisplays = new Map();
     for (const displayClass of constraintDisplayOrder()) {
       const name = displayClass.name;
       const groupClass = name.toLowerCase() + '-group';
       const group = displayContainer.getNewGroup(groupClass);
       this._constraintDisplays.set(
-        name, new displayClass(group, inputManager));
+        name, new displayClass(group, cellPositioner, inputManager));
       this._applyGridOffset(group);
     }
 

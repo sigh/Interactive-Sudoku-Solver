@@ -446,11 +446,7 @@ class RootConstraintCollection extends ConstraintCollectionBase {
       constraint.constructor.CATEGORY).onAddConstraint(
         constraint);
 
-    const groups = constraint.constructor.getStateCellGroups?.(this._shape) ?? [];
-    for (const spec of groups) {
-      this._shape.addStateCellGroup(spec.prefix, spec.count, spec.label,
-        { hidden: spec.hidden || false });
-    }
+    this._shape.addStateCellsForConstraints([constraint]);
 
     this._updateListener();
   }
@@ -471,10 +467,7 @@ class RootConstraintCollection extends ConstraintCollectionBase {
       constraint.constructor.CATEGORY).onRemoveConstraint(
         constraint);
 
-    const groups = constraint.constructor.getStateCellGroups?.(this._shape) ?? [];
-    for (const spec of groups) {
-      this._shape.removeStateCellGroup(spec.prefix);
-    }
+    this._shape.removeStateCellsForConstraints([constraint]);
     this._updateListener();
   }
 
