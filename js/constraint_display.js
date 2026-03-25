@@ -758,7 +758,9 @@ class ShadedRegion extends BaseConstraintDisplayItem {
     const adjacentCells = [];
     const graph = GridGraph.get(shape);
     for (const cell of cellIds) {
-      for (const adjCell of graph.cellEdges(cell)) {
+      const edges = graph.cellEdges(cell);
+      if (!edges) continue;
+      for (const adjCell of edges) {
         if (adjCell !== null) adjacentCells.push(adjCell);
       }
     }

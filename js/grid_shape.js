@@ -204,7 +204,6 @@ export class GridShape {
     return {
       values: values.map(v => parseInt(v)),
       cellId: cellId,
-      ...this.parseCellId(cellId),
     };
   }
 

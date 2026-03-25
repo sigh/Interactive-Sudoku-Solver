@@ -558,6 +558,7 @@ export class DisplayContainer {
       groups);
     this._setExtraHeight(extraHeight);
     this._stateCellDisplay.render(layout);
+    this._clickInterceptor.setExtraHeight(extraHeight);
   }
 
   createCellHighlighter(cssClass) {
@@ -597,19 +598,21 @@ class ClickInterceptor extends DisplayItem {
     super.reshape(shape);
 
     const width = DisplayItem.CELL_SIZE * shape.numCols;
-    const height = DisplayItem.CELL_SIZE * shape.numRows;
+    this._gridHeight = DisplayItem.CELL_SIZE * shape.numRows;
     const svg = this.getSvg();
-    svg.setAttribute('height', height);
+    svg.setAttribute('height', this._gridHeight);
     svg.setAttribute('width', width);
   }
 
+  setExtraHeight(extraHeight) {
+    this.getSvg().setAttribute(
+      'height', this._gridHeight + extraHeight);
+  }
+
   cellAt(x, y) {
-    const shape = this._shape;
-    const row = y / DisplayItem.CELL_SIZE | 0;
-    const col = x / DisplayItem.CELL_SIZE | 0;
-    if (row < 0 || row >= shape.numRows) return null;
-    if (col < 0 || col >= shape.numCols) return null;
-    return shape.makeCellId(row, col);
+    const cellIndex = this._cellPositioner.cellIndexAt(x, y);
+    if (cellIndex === null) return null;
+    return this._shape.makeCellIdFromIndex(cellIndex);
   }
 }
 
@@ -962,6 +965,7 @@ class CellPositioner {
 
   setStateCellGroups(groups) {
     const result = this._computeStateCellLayout(groups);
+    this._stateCellLayout = result;
 
     // Update centers with state cell positions.
     const cellSize = DisplayItem.CELL_SIZE;
@@ -975,6 +979,34 @@ class CellPositioner {
     this._centers = centers;
 
     return result;
+  }
+
+  stateCellLayout() {
+    return this._stateCellLayout;
+  }
+
+  cellIndexAt(x, y) {
+    const cellSize = DisplayItem.CELL_SIZE;
+    const shape = this._shape;
+
+    // Grid cells.
+    const row = y / cellSize | 0;
+    const col = x / cellSize | 0;
+    if (row >= 0 && row < shape.numRows && col >= 0 && col < shape.numCols) {
+      return shape.cellIndex(row, col);
+    }
+
+    // State cells.
+    for (const { group, y: cellY } of this._stateCellLayout.layout) {
+      if (y >= cellY && y < cellY + cellSize) {
+        const idx = x / cellSize | 0;
+        if (idx >= 0 && idx < group.cells.length) {
+          return group.cells[idx];
+        }
+        return null;
+      }
+    }
+    return null;
   }
 
   _computeStateCellLayout(groups) {

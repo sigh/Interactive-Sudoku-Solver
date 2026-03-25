@@ -843,7 +843,17 @@ class ConstraintManager {
     this.clear();
 
     this._rootCollection.setShape(constraint.getShape());
-    constraint.forEachTopLevel(c => this._rootCollection.addConstraint(c));
+
+    // Add state-cell-defining constraints first so their cell IDs are
+    // available when subsequent constraints reference them.
+    const sorted = [];
+    constraint.forEachTopLevel(c => sorted.push(c));
+    sorted.sort((a, b) => {
+      const aHasState = a.constructor.getStateCellGroups ? 1 : 0;
+      const bHasState = b.constructor.getStateCellGroups ? 1 : 0;
+      return bHasState - aHasState;
+    });
+    for (const c of sorted) this._rootCollection.addConstraint(c);
 
     this.runUpdateCallback();
 

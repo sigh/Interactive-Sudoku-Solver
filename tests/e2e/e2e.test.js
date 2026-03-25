@@ -155,7 +155,6 @@ const solveCollections = [
       '7x7: Dutch Flat Mate Squishdoku', // non-standard numValues, Dutch Flatmates
       '7x7: Buggy NR Squishdoku',  // non-standard numValues, Numbered Rooms
       '6x6: 9-value disjoint sets',  // non-standard numValues, DisjointSets
-      'Doppelganger',  // Doppelganger
     ],
   },
   {
@@ -191,6 +190,8 @@ const solveCollections = [
       '0-indexed: Sequence sudoku',  // NFA
       '0-indexed: Regex line',  // Regex
       '0-indexed: Sums and indexing',  // SumLine, XSum, Rellik, Lunchbox, Sandwich, Indexing, ValueIndexing, NumberedRoom
+      'Doppelganger',  // Doppelganger
+      'Dutch-pelganger - easier',  // Doppelganger, Whisper on state cells
     ],
   },
 ];
