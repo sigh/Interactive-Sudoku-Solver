@@ -482,7 +482,7 @@ export class DisplayContainer {
       groups);
     this._setExtraHeight(extraHeight);
     this._stateCellDisplay.render(layout);
-    this._clickInterceptor.setExtraHeight(extraHeight);
+    this._clickInterceptor.setStateCellLayout(layout);
   }
 
   createCellHighlighter(cssClass) {
@@ -509,6 +509,7 @@ class ClickInterceptor extends DisplayItem {
   constructor(cellPositioner) {
     const svg = createSvgElement('svg');
     svg.classList.add('click-interceptor-svg');
+    svg.setAttribute('pointer-events', 'none');
 
     super(svg, cellPositioner);
 
@@ -516,21 +517,56 @@ class ClickInterceptor extends DisplayItem {
     // not an element inside the svg (breaks in Safari).
     const padding = DisplayItem.SVG_PADDING;
     svg.style.transform = `translate(${padding}px,${padding}px)`;
+
+    this._gridRect = createSvgElement('rect');
+    this._gridRect.setAttribute('fill', 'transparent');
+    this._gridRect.setAttribute('pointer-events', 'all');
+    svg.appendChild(this._gridRect);
+
+    this._stateCellRects = [];
   }
 
   reshape(shape) {
     super.reshape(shape);
 
     const width = DisplayItem.CELL_SIZE * shape.numCols;
+    this._gridWidth = width;
     this._gridHeight = DisplayItem.CELL_SIZE * shape.numRows;
     const svg = this.getSvg();
     svg.setAttribute('height', this._gridHeight);
     svg.setAttribute('width', width);
+
+    this._gridRect.setAttribute('width', width);
+    this._gridRect.setAttribute('height', this._gridHeight);
+
+    this._clearStateCellRects();
   }
 
-  setExtraHeight(extraHeight) {
-    this.getSvg().setAttribute(
-      'height', this._gridHeight + extraHeight);
+  setStateCellLayout(layout) {
+    this._clearStateCellRects();
+    const svg = this.getSvg();
+    const cellSize = DisplayItem.CELL_SIZE;
+    let maxBottom = this._gridHeight;
+
+    for (const { columns, rows, y } of layout) {
+      const rect = createSvgElement('rect');
+      rect.setAttribute('x', 0);
+      rect.setAttribute('y', y);
+      rect.setAttribute('width', columns * cellSize);
+      rect.setAttribute('height', rows * cellSize);
+      rect.setAttribute('fill', 'transparent');
+      rect.setAttribute('pointer-events', 'all');
+      svg.appendChild(rect);
+      this._stateCellRects.push(rect);
+      maxBottom = Math.max(maxBottom, y + rows * cellSize);
+    }
+
+    svg.setAttribute('height', maxBottom);
+  }
+
+  _clearStateCellRects() {
+    for (const rect of this._stateCellRects) rect.remove();
+    this._stateCellRects = [];
   }
 
   cellAt(x, y) {

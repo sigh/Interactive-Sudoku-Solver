@@ -402,6 +402,17 @@ class RootConstraintCollection extends ConstraintCollectionBase {
 
   reshape(shape) {
     this._shape = shape;
+    shape.onStateCellsChanged(({ removed }) => {
+      if (!removed.length) return;
+      const hasRemovedCells = (cell) =>
+        removed.some(p => cell.startsWith(p)
+          && /^\d*$/.test(cell.substring(p.length)));
+      for (const c of [...this._constraintMap.keys()]) {
+        if (c.getCells(shape).some(hasRemovedCells)) {
+          this.removeConstraint(c);
+        }
+      }
+    });
   }
 
   clear() {

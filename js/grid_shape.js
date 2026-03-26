@@ -1,9 +1,10 @@
 const { memoize, setPeek } = await import('./util.js' + self.VERSION_PARAM);
 
+const VALUE_BASE = 17;  // for parsing cell IDs
+
 export class GridShape {
   static MIN_SIZE = 1;
   static MAX_SIZE = 16;
-  static _VALUE_BASE = 17;  // for parsing
 
   static _isValidDimension(dim) {
     return Number.isInteger(dim) && dim >= this.MIN_SIZE && dim <= this.MAX_SIZE;
@@ -188,7 +189,7 @@ export class GridShape {
   }
 
   makeCellId = (row, col) => {
-    const base = this.constructor._VALUE_BASE;
+    const base = VALUE_BASE;
     return `R${(row + 1).toString(base)}C${(col + 1).toString(base)}`;
   }
 
@@ -216,20 +217,21 @@ export class GridShape {
   }
 
   parseCellId = (cellId) => {
-    // Check registry first — named IDs like 'DGR3' would be mangled by R#C#.
-    const registryCell = this._stateCellRegistry.getCellIndex(cellId);
-    if (registryCell !== null) return { cell: registryCell };
+    if ((cellId[0] === 'R' || cellId[0] === 'r') &&
+      (cellId[2] === 'C' || cellId[2] === 'c')) {
+      const row = CELL_ID_CHAR[cellId.charCodeAt(1)];
+      const col = CELL_ID_CHAR[cellId.charCodeAt(3)];
+      if (row < this.numRows && col < this.numCols) {
+        return { cell: this.cellIndex(row, col), row, col };
+      }
+      throw new Error('Invalid cell ID: ' + cellId);
+    }
     if (cellId[0] === '$') {
       return { cell: this.numCells + parseInt(cellId.substring(1)) };
     }
-    const base = this.constructor._VALUE_BASE;
-    let row = parseInt(cellId[1], base) - 1;
-    let col = parseInt(cellId[3], base) - 1;
-    return {
-      cell: this.cellIndex(row, col),
-      row: row,
-      col: col,
-    };
+    const registryCell = this._stateCellRegistry.getCellIndex(cellId);
+    if (registryCell !== null) return { cell: registryCell };
+    throw new Error('Invalid cell ID: ' + cellId);
   }
 
   static defaultNumValues(numRows, numCols) {
@@ -432,6 +434,12 @@ export class CellGraph {
   }
 }
 
+const CELL_ID_CHAR = new Uint8Array(128).fill(255);
+for (let i = 1; i <= GridShape.MAX_SIZE; i++) {
+  const c = i.toString(VALUE_BASE);
+  CELL_ID_CHAR[c.charCodeAt(0)] = i - 1;
+  CELL_ID_CHAR[c.toUpperCase().charCodeAt(0)] = i - 1;
+}
 
 export const SHAPE_MAX = GridShape.fromGridSize(GridShape.MAX_SIZE);
 export const SHAPE_9x9 = GridShape.fromGridSize(9);
