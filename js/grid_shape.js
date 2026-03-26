@@ -131,7 +131,7 @@ export class GridShape {
   _allStateCellSpecsForConstraints(constraints) {
     const allSpecs = [];
     for (const c of constraints) {
-      allSpecs.push(...(c.constructor.getStateCellGroups?.(this) ?? []));
+      allSpecs.push(...c.getStateCellGroups(this));
     }
     return allSpecs;
   }

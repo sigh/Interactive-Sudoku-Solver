@@ -87,6 +87,19 @@ export class SudokuConstraintBase {
     return '.' + arr.join('~');
   }
 
+  static uriEncodeArg(displayName) {
+    const name = encodeURIComponent(displayName);
+    return name.replace(/\./g, '%2E').replace(/~/g, '%7E');
+  }
+
+  static uriDecodeArg(name) {
+    let displayName = name;
+    try {
+      displayName = decodeURIComponent(name);
+    } catch (e) { }
+    return displayName;
+  }
+
   toString() {
     return this.constructor.serialize([this]);
   }
@@ -150,6 +163,10 @@ export class SudokuConstraintBase {
   // Mainly for display purposes.
   getCells(shape) {
     return this.cells || [];
+  }
+
+  getStateCellGroups(shape) {
+    return [];
   }
 
   static _makeRegions(fn, numRegions, regionSize) {
@@ -1134,7 +1151,7 @@ export class SudokuConstraint {
         }
 
         if (item.length) {
-          currentName = SudokuConstraint.Pair.decodeName(item.substring(1));
+          currentName = this.uriDecodeArg(item.substring(1));
         }
 
         currentCells = [];
@@ -1159,8 +1176,7 @@ export class SudokuConstraint {
           let first = true;
           for (const part of nameGroup) {
             if (first) {
-              // TODO: Extract function from Pair constraint for encoding names.
-              items.push('_' + SudokuConstraint.Pair.encodeName(part.name));
+              items.push('_' + this.uriEncodeArg(part.name));
               first = false;
             } else {
               items.push('');
@@ -1348,7 +1364,7 @@ export class SudokuConstraint {
       && shape.valueOffset === -1
       && shape.numValues === shape.numRows + 1;
 
-    static getStateCellGroups(shape) {
+    getStateCellGroups(shape) {
       const defaultSize = GridShape.defaultNumValues(
         shape.numRows, shape.numCols);
       const [boxHeight, boxWidth] = GridShape.boxDimsForSize(
@@ -2261,7 +2277,7 @@ export class SudokuConstraint {
           let first = true;
           for (const part of nameGroup) {
             if (first) {
-              items.push('_' + this.encodeName(part.name));
+              items.push('_' + this.uriEncodeArg(part.name));
               first = false;
             } else {
               items.push('');
@@ -2294,7 +2310,7 @@ export class SudokuConstraint {
 
         // Update the name if it has been replaced.
         if (item.length) {
-          currentName = this.decodeName(item.substring(1));
+          currentName = this.uriDecodeArg(item.substring(1));
         }
 
         currentCells = [];
@@ -2307,19 +2323,6 @@ export class SudokuConstraint {
 
     static fnToKey(fn, numValues, valueOffset = 0) {
       return fnToBinaryKey(fn, numValues, valueOffset);
-    }
-
-    static encodeName(displayName) {
-      const name = encodeURIComponent(displayName);
-      return name.replace(/\./g, '%2E').replace(/~/g, '%7E');
-    }
-
-    static decodeName(name) {
-      let displayName = name;
-      try {
-        displayName = decodeURIComponent(name);
-      } catch (e) { }
-      return displayName;
     }
 
     static displayName() {
@@ -2461,6 +2464,48 @@ export class SudokuConstraint {
       super(priority, ...cells);
       this.cells = cells;
       this.priority = priority;
+    }
+  }
+
+  static Var = class Var extends SudokuConstraintBase {
+    static DESCRIPTION = (
+      "Adds variables to use as extra cells outside the grid.");
+    static CATEGORY = 'Experimental';
+    static UNIQUENESS_KEY_FIELD = 'prefix';
+
+    constructor(prefix, label, count) {
+      super(prefix, label, count);
+      if (!/^[A-Z]+$/.test(prefix)) {
+        throw new Error(
+          `Var prefix must be upper-case letters A-Z, got: ${prefix}`);
+      }
+      this.prefix = prefix;
+      this.label = label || '';
+      this.count = +count || 1;
+      this.groups = [
+        { prefix: 'V' + this.prefix, label: this.label, count: this.count }
+      ];
+    }
+
+    static *makeFromArgs(args, shape) {
+      const [prefix, encodedLabel, count] = args;
+      const label = this.uriDecodeArg(encodedLabel || '');
+      yield new this(prefix, label, count);
+    }
+
+    static serialize(constraints) {
+      return constraints.map(c => {
+        const encodedLabel = this.uriEncodeArg(c.label);
+        return this._argsToString(c.prefix, encodedLabel, c.count);
+      }).join('');
+    }
+
+    getStateCellGroups(shape) {
+      return this.groups;
+    }
+
+    chipLabel() {
+      return `Var: $${this.prefix} (${this.count})`;
     }
   }
 }

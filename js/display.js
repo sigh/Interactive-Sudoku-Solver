@@ -852,7 +852,10 @@ export class StateCellDisplay extends DisplayItem {
     svg.setAttribute('transform', `translate(${padding},${padding})`);
 
     for (const { group, columns, rows, yLabel, y } of layout) {
+      const count = group.cells.length;
+      const lastRowCols = ((count - 1) % columns) + 1;
       const groupWidth = columns * cellSize;
+      const lastRowWidth = lastRowCols * cellSize;
       const groupHeight = rows * cellSize;
       const lineGroup = createSvgElement('g');
       lineGroup.setAttribute('stroke', 'rgb(180, 180, 180)');
@@ -861,30 +864,41 @@ export class StateCellDisplay extends DisplayItem {
 
       // Internal vertical lines.
       for (let col = 1; col < columns; col++) {
+        const x1 = col * cellSize;
+        const yEnd = col < lastRowCols
+          ? y + groupHeight : y + (rows - 1) * cellSize;
         const line = createSvgElement('line');
-        line.setAttribute('x1', col * cellSize);
+        line.setAttribute('x1', x1);
         line.setAttribute('y1', y);
-        line.setAttribute('x2', col * cellSize);
-        line.setAttribute('y2', y + groupHeight);
+        line.setAttribute('x2', x1);
+        line.setAttribute('y2', yEnd);
         lineGroup.append(line);
       }
 
       // Internal horizontal lines.
       for (let row = 1; row < rows; row++) {
+        const width = row === rows - 1 ? lastRowWidth : groupWidth;
         const line = createSvgElement('line');
         line.setAttribute('x1', 0);
         line.setAttribute('y1', y + row * cellSize);
-        line.setAttribute('x2', groupWidth);
+        line.setAttribute('x2', width);
         line.setAttribute('y2', y + row * cellSize);
         lineGroup.append(line);
       }
 
-      // Border.
-      const border = createSvgElement('rect');
-      border.setAttribute('x', 0);
-      border.setAttribute('y', y);
-      border.setAttribute('width', groupWidth);
-      border.setAttribute('height', groupHeight);
+      // Border path (accounting for partial last row).
+      const border = createSvgElement('path');
+      const lastRowY = y + (rows - 1) * cellSize;
+      const d = [
+        'M0,', y,
+        'h', groupWidth,
+        'v', lastRowY - y,
+        'h', lastRowWidth - groupWidth,
+        'v', cellSize,
+        'h', -lastRowWidth,
+        'Z',
+      ].join('');
+      border.setAttribute('d', d);
       border.setAttribute('stroke', 'rgb(100, 100, 100)');
       border.setAttribute('stroke-width', 1.5);
       border.setAttribute('fill', 'none');
@@ -897,7 +911,10 @@ export class StateCellDisplay extends DisplayItem {
       label.setAttribute('x', 0);
       label.setAttribute('y', yLabel + labelHeight - 3);
       label.setAttribute('class', 'state-cell-label');
-      label.textContent = `${group.prefix}: ${group.label}`;
+      const groupPrefix = group.prefix[0] === 'V'
+        ? '$' + group.prefix.substring(1) : group.prefix;
+      const groupLabel = group.label ? `: ${group.label}` : '';
+      label.textContent = `${groupPrefix}${groupLabel}`;
       svg.append(label);
     }
   }

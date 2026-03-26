@@ -8,7 +8,7 @@ const {
 const { LineOptions, CellArgs } = await import('./sudoku_constraint.js' + self.VERSION_PARAM);
 const { createSvgElement, clearDOMNode } = await import('./util.js' + self.VERSION_PARAM);
 const { SudokuConstraint, SudokuConstraintBase } = await import('./sudoku_constraint.js' + self.VERSION_PARAM);
-const { GridShape } = await import('./grid_shape.js' + self.VERSION_PARAM);
+const { GridShape, CellGraph } = await import('./grid_shape.js' + self.VERSION_PARAM);
 
 const constraintDisplayOrder = () => [
   DefaultRegions,
@@ -199,25 +199,22 @@ class BaseConstraintDisplayItem extends DisplayItem {
     return g;
   }
 
-  _drawIntersection(g, cellSet, shape, row, col, cornerCut, inset) {
-    // Determine which of the 4 cells touching grid point (row, col) are in region.
-    const inRegion = (r, c) => {
-      if (r < 0 || r >= shape.numRows || c < 0 || c >= shape.numCols) return false;
-      return cellSet.has(shape.cellIndex(r, c));
-    };
-
-    const tl = inRegion(row - 1, col - 1);
-    const tr = inRegion(row - 1, col);
-    const bl = inRegion(row, col - 1);
-    const br = inRegion(row, col);
+  // Draw border segments at an intersection point where four cells meet.
+  //
+  //   tl | tr        The border is drawn between cells that are
+  //   ---+---        inside the region and cells that are outside.
+  //   bl | br
+  //
+  // g         - SVG group to append path elements to.
+  // tl/tr/bl/br - Whether each adjacent cell is in the region.
+  // x, y      - Pixel coordinates of the intersection point.
+  // cornerCut - Add a chamfer where two diagonal cells meet (count=2).
+  // inset     - Pixel offset to shrink the border inward.
+  _drawIntersection(g, tl, tr, bl, br, x, y, cornerCut, inset) {
     const count = tl + tr + bl + br;
-
     if (count === 0 || count === 4) return;
 
-    const cellSize = DisplayItem.CELL_SIZE;
-    const x = col * cellSize;
-    const y = row * cellSize;
-    const half = cellSize / 2;
+    const half = DisplayItem.CELL_SIZE / 2;
 
     if (count === 1 || count === 3) {
       // Corner (90° or 270°)
@@ -279,19 +276,51 @@ class BaseConstraintDisplayItem extends DisplayItem {
     }
   }
 
+  static _NO_EDGES = [null, null, null, null];
+
   _makeRegionBorder(cellSet, shape, cornerCut, inset = 0) {
     const g = createSvgElement('g');
     const seen = new Set();
+    const graph = shape.cellGraph();
+    const half = DisplayItem.CELL_SIZE / 2;
+    const { LEFT, RIGHT, UP, DOWN } = CellGraph;
 
-    const numIntersectionCols = shape.numCols + 1;
     for (const cell of cellSet) {
-      const [row, col] = shape.splitCellIndex(cell);
-      // Process each corner of this cell
-      for (const [r, c] of [[row, col], [row, col + 1], [row + 1, col], [row + 1, col + 1]]) {
-        const key = r * numIntersectionCols + c;
+      const [cx, cy] = this.cellCenter(cell);
+      const edges = graph.cellEdges(cell);
+      const lCell = edges[LEFT];
+      const rCell = edges[RIGHT];
+      const uCell = edges[UP];
+      const dCell = edges[DOWN];
+      const uEdges = uCell !== null ? graph.cellEdges(uCell)
+        : BaseConstraintDisplayItem._NO_EDGES;
+      const dEdges = dCell !== null ? graph.cellEdges(dCell)
+        : BaseConstraintDisplayItem._NO_EDGES;
+
+      //   tl | tr    Each corner is where four cells meet.
+      //   ---+---    Neighbors are resolved via cellEdges;
+      //   bl | br    diagonals via the neighbor's edges.
+      for (const [ix, iy, tlCell, trCell, blCell, brCell] of [
+        [cx - half, cy - half, uEdges[LEFT], uCell, lCell, cell],
+        [cx + half, cy - half, uCell, uEdges[RIGHT], cell, rCell],
+        [cx - half, cy + half, lCell, cell, dEdges[LEFT], dCell],
+        [cx + half, cy + half, cell, rCell, dCell, dEdges[RIGHT]],
+      ]) {
+        // Deduplicate shared intersections using a cell-index key.
+        // Each cell is the BR of exactly one intersection (its top-left
+        // corner), BL of one (top-right), etc. The offset distinguishes
+        // which position the keying cell occupies.
+        const key = brCell !== null ? (brCell << 2)
+          : blCell !== null ? (blCell << 2) + 1
+            : trCell !== null ? (trCell << 2) + 2
+              : (tlCell << 2) + 3;
         if (seen.has(key)) continue;
         seen.add(key);
-        this._drawIntersection(g, cellSet, shape, r, c, cornerCut, inset);
+        this._drawIntersection(
+          g,
+          cellSet.has(tlCell), cellSet.has(trCell),
+          cellSet.has(blCell), cellSet.has(brCell),
+          ix, iy, cornerCut, inset);
       }
     }
 

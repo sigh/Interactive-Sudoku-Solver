@@ -824,6 +824,7 @@ export class SudokuBuilder {
         case 'NoBoxes':
         case 'Shape':
         case 'RegionSize':
+        case 'Var':
           // Nothing to do here.
           break;
 
