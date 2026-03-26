@@ -246,11 +246,15 @@ class StateCellRegistry {
 
   addGroups(specs) {
     const added = [];
-    for (const { prefix, count, label, hidden } of specs) {
+    for (const { prefix, count, label, hidden, columns } of specs) {
       if (this._groups.has(prefix)) {
         throw Error(`State cell group prefix '${prefix}' already exists`);
       }
-      this._groups.set(prefix, { prefix, count, label, hidden: hidden || false });
+      this._groups.set(prefix, {
+        prefix, count, label,
+        hidden: hidden || false,
+        columns: columns || 0,
+      });
       added.push(prefix);
     }
     if (added.length === 0) return;
@@ -291,7 +295,7 @@ class StateCellRegistry {
       next += group.count;
 
       for (let i = 0; i < group.cells.length; i++) {
-        const id = group.cells.length === 1 ? group.prefix : `${group.prefix}${i}`;
+        const id = group.cells.length === 1 ? group.prefix : `${group.prefix}${i + 1}`;
         this._cellToId.set(group.cells[i], id);
         this._idToCell.set(id, group.cells[i]);
       }

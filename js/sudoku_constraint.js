@@ -1363,13 +1363,16 @@ export class SudokuConstraint {
       && shape.numValues === shape.numRows + 1;
 
     static getStateCellGroups(shape) {
-      const gridSize = shape.numValues - 1;
-      const boxCount = SudokuConstraintBase.boxRegions(shape).length;
+      const defaultSize = GridShape.defaultNumValues(
+        shape.numRows, shape.numCols);
+      const [boxHeight, boxWidth] = GridShape.boxDimsForSize(
+        shape.numRows, shape.numCols, defaultSize);
+      const boxCount = boxHeight ? boxHeight * boxWidth : 0;
       return [
         { prefix: 'DGZ', label: 'Doppelganger zero', count: 1, hidden: true },
-        { prefix: 'DGR', label: 'Doppelganger row', count: gridSize },
-        { prefix: 'DGC', label: 'Doppelganger col', count: gridSize },
-        { prefix: 'DGB', label: 'Doppelganger box', count: boxCount },
+        { prefix: 'DGR', label: 'Doppelganger row', count: shape.numCols },
+        { prefix: 'DGC', label: 'Doppelganger col', count: shape.numRows },
+        { prefix: 'DGB', label: 'Doppelganger box', count: boxCount, columns: boxWidth || 0 },
       ];
     }
   }

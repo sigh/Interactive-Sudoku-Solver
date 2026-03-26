@@ -891,21 +891,31 @@ export class StateCellDisplay extends DisplayItem {
     const svg = this.getSvg();
     svg.setAttribute('transform', `translate(${padding},${padding})`);
 
-    for (const { group, yLabel, y } of layout) {
-      // Draw grid lines.
-      const groupWidth = group.cells.length * cellSize;
+    for (const { group, columns, rows, yLabel, y } of layout) {
+      const groupWidth = columns * cellSize;
+      const groupHeight = rows * cellSize;
       const lineGroup = createSvgElement('g');
       lineGroup.setAttribute('stroke', 'rgb(180, 180, 180)');
       lineGroup.setAttribute('stroke-width', 1);
       lineGroup.setAttribute('fill', 'none');
 
       // Internal vertical lines.
-      for (let col = 1; col < group.cells.length; col++) {
+      for (let col = 1; col < columns; col++) {
         const line = createSvgElement('line');
         line.setAttribute('x1', col * cellSize);
         line.setAttribute('y1', y);
         line.setAttribute('x2', col * cellSize);
-        line.setAttribute('y2', y + cellSize);
+        line.setAttribute('y2', y + groupHeight);
+        lineGroup.append(line);
+      }
+
+      // Internal horizontal lines.
+      for (let row = 1; row < rows; row++) {
+        const line = createSvgElement('line');
+        line.setAttribute('x1', 0);
+        line.setAttribute('y1', y + row * cellSize);
+        line.setAttribute('x2', groupWidth);
+        line.setAttribute('y2', y + row * cellSize);
         lineGroup.append(line);
       }
 
@@ -914,7 +924,7 @@ export class StateCellDisplay extends DisplayItem {
       border.setAttribute('x', 0);
       border.setAttribute('y', y);
       border.setAttribute('width', groupWidth);
-      border.setAttribute('height', cellSize);
+      border.setAttribute('height', groupHeight);
       border.setAttribute('stroke', 'rgb(100, 100, 100)');
       border.setAttribute('stroke-width', 1.5);
       border.setAttribute('fill', 'none');
@@ -970,10 +980,14 @@ class CellPositioner {
     // Update centers with state cell positions.
     const cellSize = DisplayItem.CELL_SIZE;
     const centers = this._centers.slice(0, this._shape.numCells);
-    for (const { group, y } of result.layout) {
-      const cy = y + cellSize / 2;
+    for (const { group, columns, y } of result.layout) {
       for (let i = 0; i < group.cells.length; i++) {
-        centers[group.cells[i]] = [i * cellSize + cellSize / 2, cy];
+        const col = i % columns;
+        const row = i / columns | 0;
+        centers[group.cells[i]] = [
+          col * cellSize + cellSize / 2,
+          y + row * cellSize + cellSize / 2,
+        ];
       }
     }
     this._centers = centers;
@@ -997,10 +1011,12 @@ class CellPositioner {
     }
 
     // State cells.
-    for (const { group, y: cellY } of this._stateCellLayout.layout) {
-      if (y >= cellY && y < cellY + cellSize) {
-        const idx = x / cellSize | 0;
-        if (idx >= 0 && idx < group.cells.length) {
+    for (const { group, columns, rows, y: cellY } of this._stateCellLayout.layout) {
+      if (y >= cellY && y < cellY + rows * cellSize) {
+        const r = (y - cellY) / cellSize | 0;
+        const c = x / cellSize | 0;
+        const idx = r * columns + c;
+        if (c >= 0 && c < columns && idx < group.cells.length) {
           return group.cells[idx];
         }
         return null;
@@ -1016,24 +1032,25 @@ class CellPositioner {
     const gap = CellPositioner.STATE_CELL_GAP;
     const labelHeight = CellPositioner.STATE_CELL_LABEL_HEIGHT;
     const gridHeight = cellSize * this._shape.numRows;
-    const yStart = gridHeight + gap;
-    const rowHeight = labelHeight + cellSize;
+    const defaultColumns = this._shape.numCols;
 
-    let rowIndex = 0;
+    let yNext = gridHeight + gap;
     const layout = [];
 
     for (const group of groups) {
       if (group.hidden || !group.cells.length) continue;
 
-      const yLabel = yStart + rowIndex * rowHeight;
+      const columns = group.columns || defaultColumns;
+      const rows = Math.ceil(group.cells.length / columns);
+      const yLabel = yNext;
       const y = yLabel + labelHeight;
 
-      layout.push({ group, yLabel, y });
-      rowIndex++;
+      layout.push({ group, columns, rows, yLabel, y });
+      yNext = y + rows * cellSize;
     }
 
     return {
-      extraHeight: rowIndex > 0 ? gap + rowIndex * rowHeight : 0,
+      extraHeight: yNext - gridHeight,
       layout
     };
   }

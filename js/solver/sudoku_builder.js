@@ -866,8 +866,8 @@ export class SudokuBuilder {
     const boxRegions = this._getBoxRegions(shape, constraintMap);
 
     const [zeroCell] = shape.stateCellsForGroup('DGZ');
-    const rowStateCells = shape.stateCellsForGroup('DGR');
     const colStateCells = shape.stateCellsForGroup('DGC');
+    const rowStateCells = shape.stateCellsForGroup('DGR');
     const boxStateCells = shape.stateCellsForGroup('DGB');
 
     // Fix the zero cell to value 0. This propagates through the state cell
@@ -885,11 +885,11 @@ export class SudokuBuilder {
     // The optimizer will promote these to House via _addHouseHandlers.
     for (let i = 0; i < gridSize; i++) {
       yield new HandlerModule.AllDifferent(
-        [...rowRegions[i], rowStateCells[i]]);
+        [...rowRegions[i], colStateCells[i]]);
     }
     for (let i = 0; i < gridSize; i++) {
       yield new HandlerModule.AllDifferent(
-        [...colRegions[i], colStateCells[i]]);
+        [...colRegions[i], rowStateCells[i]]);
     }
     for (let i = 0; i < boxRegions.length; i++) {
       yield new HandlerModule.AllDifferent(
@@ -900,9 +900,9 @@ export class SudokuBuilder {
     // Adding zeroCell makes these N+1 cells with N+1 values, which the
     // optimizer promotes to House (more powerful than plain AllDifferent).
     yield new HandlerModule.AllDifferent(
-      [...rowStateCells, zeroCell]);
-    yield new HandlerModule.AllDifferent(
       [...colStateCells, zeroCell]);
+    yield new HandlerModule.AllDifferent(
+      [...rowStateCells, zeroCell]);
     if (boxRegions.length) {
       yield new HandlerModule.AllDifferent(
         [...boxStateCells, zeroCell]);
@@ -920,7 +920,7 @@ export class SudokuBuilder {
     for (let r = 0; r < gridSize; r++) {
       for (let c = 0; c < gridSize; c++) {
         const cell = shape.cellIndex(r, c);
-        const stateCells = [rowStateCells[r], colStateCells[c]];
+        const stateCells = [colStateCells[r], rowStateCells[c]];
         const boxIdx = cellToBox[cell];
         if (boxIdx !== NO_BOX) stateCells.push(boxStateCells[boxIdx]);
         yield new HandlerModule.DoppelgangerZero(cell, stateCells);
