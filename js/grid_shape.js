@@ -1,3 +1,5 @@
+const { memoize, setPeek } = await import('./util.js' + self.VERSION_PARAM);
+
 export class GridShape {
   static MIN_SIZE = 1;
   static MAX_SIZE = 16;
@@ -97,6 +99,12 @@ export class GridShape {
     this.gridDimsStr = `${numRows}x${numCols}`;
 
     this._stateCellRegistry = new StateCellRegistry(this.numCells);
+    this._cellGraph = null;
+    this._stateCellRegistry.addChangeListener(() => { this._cellGraph = null; });
+  }
+
+  cellGraph() {
+    return this._cellGraph ??= CellGraph.get(this);
   }
 
   totalCells() {
@@ -331,6 +339,96 @@ class StateCellRegistry {
 
   getCellIndex(cellId) {
     return this._idToCell.get(cellId) ?? null;
+  }
+}
+
+export class CellGraph {
+  static LEFT = 0;
+  static RIGHT = 1;
+  static UP = 2;
+  static DOWN = 3;
+
+  static _gridGraph = memoize(
+    (shape) => {
+      const graph = [];
+      const cells = Array.from({ length: shape.numCells }, (_, i) => i);
+      CellGraph._addEdges(graph, cells, shape.numCols);
+      return new CellGraph(graph);
+    },
+    (shape) => shape.gridDimsStr);
+
+  static get(shape) {
+    const base = this._gridGraph(shape);
+    const groups = shape.stateCellGroups();
+    if (!groups.length) return base;
+
+    const graph = base._graph.slice();
+    const defaultColumns = shape.numCols;
+    for (const group of groups) {
+      const cells = group.cells;
+      if (!cells || !cells.length) continue;
+      this._addEdges(graph, cells, group.columns || defaultColumns);
+    }
+
+    return new CellGraph(graph);
+  }
+
+  static _addEdges(graph, cells, columns) {
+    for (let j = 0; j < cells.length; j++) {
+      const c = j % columns;
+      const adj = [null, null, null, null];
+
+      if (c > 0) adj[CellGraph.LEFT] = cells[j - 1];
+      if (c < columns - 1 && j + 1 < cells.length) adj[CellGraph.RIGHT] = cells[j + 1];
+      if (j - columns >= 0) adj[CellGraph.UP] = cells[j - columns];
+      if (j + columns < cells.length) adj[CellGraph.DOWN] = cells[j + columns];
+
+      graph[cells[j]] = adj;
+    }
+  }
+
+  constructor(graph) {
+    this._graph = graph;
+  }
+
+  cellEdges(cell) {
+    return this._graph[cell];
+  }
+
+  adjacent(cell, dir) {
+    return this._graph[cell][dir];
+  }
+
+  diagonal(cell, dir0, dir1) {
+    const cell1 = this._graph[cell][dir0];
+    return cell1 && this._graph[cell1][dir1];
+  }
+
+  neighborCountIn(cell, cellSet) {
+    let count = 0;
+    for (const adj of this._graph[cell]) {
+      if (adj !== null && cellSet.has(adj)) count++;
+    }
+    return count;
+  }
+
+  cellsAreConnected(cellSet) {
+    const seen = new Set();
+    const stack = [setPeek(cellSet)];
+    const graph = this._graph;
+    seen.add(stack[0]);
+
+    while (stack.length > 0) {
+      const cell = stack.pop();
+
+      for (const adjCell of graph[cell]) {
+        if (adjCell === null || seen.has(adjCell) || !cellSet.has(adjCell)) continue;
+        stack.push(adjCell);
+        seen.add(adjCell);
+      }
+    }
+
+    return seen.size === cellSet.size;
   }
 }
 

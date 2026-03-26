@@ -20,7 +20,7 @@ export class SudokuSolver {
     this._numSearchCells = shape.totalCells();
 
     this._internalSolver = new InternalSolver(
-      handlers, shape, this._numSearchCells, this._debugLogger);
+      handlers, shape, this._debugLogger);
 
     this._progressExtraStateFn = null;
     this._progressCallback = null;
@@ -346,13 +346,13 @@ class DebugLogger {
 
 class InternalSolver {
 
-  constructor(handlerGen, shape, numSearchCells, debugLogger) {
+  constructor(handlerGen, shape, debugLogger) {
     this._shape = shape;
-    this._numSearchCells = numSearchCells;
+    this._numSearchCells = shape.totalCells();
     if (this._numSearchCells > 256) {
       throw new Error(
         'Too many cells. grid + state cells must be <= 256. ' +
-        `grid cells: ${shape.numCells}, state cells: ${numSearchCells - shape.numCells}`);
+        `grid cells: ${shape.numCells}, state cells: ${this._numSearchCells - shape.numCells}`);
     }
     this._debugLogger = debugLogger;
 

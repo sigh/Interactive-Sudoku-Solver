@@ -266,41 +266,27 @@ export class SudokuConstraintBase {
     (shape) => shape.gridDimsStr);
 
   static _hasAdjacentCells(cells, shape) {
-    // Convert all cells to row/col coordinates
-    const coords = cells.map(c => shape.parseCellId(c));
-    const seen = new Array(coords.length).fill(false);
+    const graph = shape.cellGraph();
+    const cellIndices = cells.map(c => shape.parseCellId(c).cell);
+    const cellSet = new Set(cellIndices);
 
-    // For each cell, check if it has at least one adjacent cell
-    for (let i = 0; i < coords.length; i++) {
-      if (seen[i]) continue;
-
-      const ci = coords[i];
-
-      for (let j = 0; j < coords.length; j++) {
-        if (i === j) continue;
-        const cj = coords[j];
-        if (Math.abs(ci.row - cj.row) + Math.abs(ci.col - cj.col) === 1) {
-          seen[i] = true;
-          seen[j] = true;
-          break;
-        }
-      }
-
-      if (!seen[i]) return false;
+    for (const cell of cellIndices) {
+      if (graph.neighborCountIn(cell, cellSet) === 0) return false;
     }
 
     return true;
   }
 
   static _adjacentCellPairs(cells, shape) {
-    const coords = cells.map(c => shape.parseCellId(c));
+    const graph = shape.cellGraph();
+    const cellIndices = cells.map(c => shape.parseCellId(c).cell);
+    const cellSet = new Set(cellIndices);
     const pairs = [];
-    for (let i = 0; i < coords.length; i++) {
-      const ci = coords[i];
-      for (let j = i + 1; j < coords.length; j++) {
-        const cj = coords[j];
-        if (Math.abs(ci.row - cj.row) + Math.abs(ci.col - cj.col) === 1) {
-          pairs.push([ci.cell, cj.cell]);
+    for (const cell of cellIndices) {
+      cellSet.delete(cell);
+      for (const adj of graph.cellEdges(cell)) {
+        if (cellSet.has(adj)) {
+          pairs.push([cell, adj]);
         }
       }
     }
@@ -309,13 +295,13 @@ export class SudokuConstraintBase {
 
   static _cellsAre2x2Square(cells, shape) {
     if (cells.length !== 4) return false;
-    cells = cells.map(
-      c => shape.parseCellId(c)).sort((a, b) => a.cell - b.cell);
-    let { row, col } = cells[0];
-    return (
-      (cells[1].row === row && cells[1].col === col + 1) &&
-      (cells[2].row === row + 1 && cells[2].col === col) &&
-      (cells[3].row === row + 1 && cells[3].col === col + 1));
+    const graph = shape.cellGraph();
+    const cellIndices = new Set(cells.map(c => shape.parseCellId(c).cell));
+
+    for (const cell of cellIndices) {
+      if (graph.neighborCountIn(cell, cellIndices) !== 2) return false;
+    }
+    return true;
   }
 
   static _cellsAreValidCage(cells, shape) {
@@ -1371,7 +1357,7 @@ export class SudokuConstraint {
       return [
         { prefix: 'DGZ', label: 'Doppelganger zero', count: 1, hidden: true },
         { prefix: 'DGR', label: 'Doppelganger row', count: shape.numCols },
-        { prefix: 'DGC', label: 'Doppelganger col', count: shape.numRows },
+        { prefix: 'DGC', label: 'Doppelganger column', count: shape.numRows },
         { prefix: 'DGB', label: 'Doppelganger box', count: boxCount, columns: boxWidth || 0 },
       ];
     }

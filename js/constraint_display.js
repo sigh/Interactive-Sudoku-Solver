@@ -4,7 +4,6 @@ const {
   DisplayItem,
   ColorPicker,
   CellValueDisplay,
-  GridGraph
 } = await import('./display.js' + self.VERSION_PARAM);
 const { LineOptions, CellArgs } = await import('./sudoku_constraint.js' + self.VERSION_PARAM);
 const { createSvgElement, clearDOMNode } = await import('./util.js' + self.VERSION_PARAM);
@@ -341,7 +340,7 @@ class Jigsaw extends BaseConstraintDisplayItem {
     const region = constraint.cells;
     const shape = this._shape;
     const cellSet = new Set(region.map(c => shape.parseCellId(c).cell));
-    const graph = GridGraph.get(shape);
+    const graph = shape.cellGraph();
 
     const g = this._makeRegionBorder(cellSet, shape, /* cornerCut= */ false);
     g.setAttribute('stroke-width', 2);
@@ -756,7 +755,7 @@ class ShadedRegion extends BaseConstraintDisplayItem {
     const shape = this._shape;
     // Use a greedy algorithm to choose the graph color.
     const adjacentCells = [];
-    const graph = GridGraph.get(shape);
+    const graph = shape.cellGraph();
     for (const cell of cellIds) {
       const edges = graph.cellEdges(cell);
       if (!edges) continue;

@@ -3,9 +3,7 @@ const {
   deferUntilAnimationFrame,
   clearDOMNode,
   copyToClipboard,
-  memoize,
   isIterable,
-  setPeek
 } = await import('./util.js' + self.VERSION_PARAM);
 const { toShortSolution } = await import('./sudoku_parser.js' + self.VERSION_PARAM);
 const { SHAPE_9x9 } = await import('./grid_shape.js' + self.VERSION_PARAM);
@@ -428,80 +426,6 @@ export class ColorPicker {
     this._keyToItems.clear();
   }
 };
-
-export class GridGraph {
-  static LEFT = 0;
-  static RIGHT = 1;
-  static UP = 2;
-  static DOWN = 3;
-
-  static _VERIFIED_CALL_TOKEN = {};
-
-  static get = memoize(
-    (shape) => new this(this._VERIFIED_CALL_TOKEN, shape),
-    (shape) => shape.gridDimsStr);
-
-  constructor(verifiedCallToken, shape) {
-    if (verifiedCallToken !== this.constructor._VERIFIED_CALL_TOKEN) {
-      throw new Error('Use GridGraph.get(shape)');
-    }
-
-    const graph = [];
-    for (let i = 0; i < shape.numCells; i++) {
-      graph.push([null, null, null, null]);
-    }
-
-    const numRows = shape.numRows;
-    const numCols = shape.numCols;
-    const cls = this.constructor;
-
-    for (let row = 0; row < numRows; row++) {
-      for (let col = 0; col < numCols; col++) {
-        const cell = shape.cellIndex(row, col);
-        const adj = graph[cell];
-
-        if (row > 0) adj[cls.UP] = shape.cellIndex(row - 1, col);
-        if (row < numRows - 1) adj[cls.DOWN] = shape.cellIndex(row + 1, col);
-        if (col > 0) adj[cls.LEFT] = shape.cellIndex(row, col - 1);
-        if (col < numCols - 1) adj[cls.RIGHT] = shape.cellIndex(row, col + 1);
-      }
-    }
-
-    this._graph = graph;
-  }
-
-  cellEdges(cell) {
-    return this._graph[cell];
-  }
-
-  adjacent(cell, dir) {
-    return this._graph[cell][dir];
-  }
-
-  diagonal(cell, dir0, dir1) {
-    const cell1 = this._graph[cell][dir0];
-    return cell1 && this._graph[cell1][dir1];
-  }
-
-  cellsAreConnected(cellSet) {
-    const seen = new Set();
-    const stack = [setPeek(cellSet)];
-    const graph = this._graph;
-    seen.add(stack[0]);
-
-    while (stack.length > 0) {
-      const cell = stack.pop();
-
-      for (const adjCell of graph[cell]) {
-        if (adjCell === null || seen.has(adjCell) || !cellSet.has(adjCell)) continue;
-        stack.push(adjCell);
-        seen.add(adjCell);
-      }
-    }
-
-    return seen.size === cellSet.size;
-  }
-}
 
 export class DisplayContainer {
   constructor(container) {

@@ -439,3 +439,87 @@ await runTest('Jigsaw.makeFromArgs throws when gridSpec does not match layout le
 });
 
 logSuiteComplete('SudokuConstraintBase');
+
+// ============================================================================
+// Adjacency validation with state cells
+// ============================================================================
+
+function makeShapeWithGroups(size, groups) {
+  const shape = GridShape.fromGridSize(size);
+  shape._stateCellRegistry.addGroups(groups);
+  return shape;
+}
+
+await runTest('_hasAdjacentCells: grid cells work', () => {
+  const shape = GridShape.fromGridSize(9);
+  assert.ok(SudokuConstraintBase._hasAdjacentCells(['R1C1', 'R1C2'], shape));
+  assert.ok(!SudokuConstraintBase._hasAdjacentCells(['R1C1', 'R1C3'], shape));
+});
+
+await runTest('_hasAdjacentCells: adjacent state cells', () => {
+  const shape = makeShapeWithGroups(9, [
+    { prefix: 'T', label: 'test', count: 9 },
+  ]);
+  assert.ok(SudokuConstraintBase._hasAdjacentCells(['T1', 'T2'], shape));
+  assert.ok(SudokuConstraintBase._hasAdjacentCells(['T1', 'T2', 'T3'], shape));
+});
+
+await runTest('_hasAdjacentCells: non-adjacent state cells', () => {
+  const shape = makeShapeWithGroups(9, [
+    { prefix: 'T', label: 'test', count: 9 },
+  ]);
+  assert.ok(!SudokuConstraintBase._hasAdjacentCells(['T1', 'T3'], shape));
+});
+
+await runTest('_hasAdjacentCells: state cells across groups not adjacent', () => {
+  const shape = makeShapeWithGroups(4, [
+    { prefix: 'A', label: 'a', count: 4 },
+    { prefix: 'B', label: 'b', count: 4 },
+  ]);
+  assert.ok(!SudokuConstraintBase._hasAdjacentCells(['A4', 'B1'], shape));
+});
+
+await runTest('_adjacentCellPairs: state cells return correct pairs', () => {
+  const shape = makeShapeWithGroups(9, [
+    { prefix: 'T', label: 'test', count: 9 },
+  ]);
+  const pairs = SudokuConstraintBase._adjacentCellPairs(
+    ['T1', 'T2', 'T3'], shape);
+  assert.equal(pairs.length, 2);
+  const cells = shape.stateCellsForGroup('T');
+  assert.deepEqual(pairs[0], [cells[0], cells[1]]);
+  assert.deepEqual(pairs[1], [cells[1], cells[2]]);
+});
+
+await runTest('_adjacentCellPairs: multi-row group', () => {
+  const shape = makeShapeWithGroups(9, [
+    { prefix: 'B', label: 'box', count: 9, columns: 3 },
+  ]);
+  const cells = shape.stateCellsForGroup('B');
+  // B1 (row0,col0) and B4 (row1,col0) are vertically adjacent.
+  const pairs = SudokuConstraintBase._adjacentCellPairs(
+    ['B1', 'B4'], shape);
+  assert.equal(pairs.length, 1);
+  assert.deepEqual(pairs[0], [cells[0], cells[3]]);
+});
+
+await runTest('_cellsAre2x2Square: state cells in 2x2', () => {
+  const shape = makeShapeWithGroups(9, [
+    { prefix: 'B', label: 'box', count: 9, columns: 3 },
+  ]);
+  // B1 B2    (row0,col0) (row0,col1)
+  // B4 B5    (row1,col0) (row1,col1)
+  assert.ok(SudokuConstraintBase._cellsAre2x2Square(
+    ['B1', 'B2', 'B4', 'B5'], shape));
+});
+
+await runTest('_cellsAre2x2Square: non-square state cells', () => {
+  const shape = makeShapeWithGroups(9, [
+    { prefix: 'B', label: 'box', count: 9, columns: 3 },
+  ]);
+  // B1 B2 B3 in a row — not a 2x2.
+  assert.ok(!SudokuConstraintBase._cellsAre2x2Square(
+    ['B1', 'B2', 'B3', 'B4'], shape));
+});
+
+logSuiteComplete('Adjacency validation');
