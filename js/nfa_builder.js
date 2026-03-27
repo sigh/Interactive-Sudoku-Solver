@@ -67,9 +67,11 @@ export class NFA {
   addState() {
     this._assertUnsealed();
     if (this._stateLimit !== null && this._transitions.length >= this._stateLimit) {
-      throw new Error(
-        `State limit of ${this._stateLimit} exceeded. ` +
-        'Ensure the state machine is finite, or try setting maxDepth.');
+      const error = new Error(
+        `State limit of ${this._stateLimit} exceeded. `);
+      error.helpUrl = 'help/custom-constraints#state-count';
+      error.helpText = 'See help on reducing the state count';
+      throw error;
     }
     this._transitions.push([]);
     return this._transitions.length - 1;

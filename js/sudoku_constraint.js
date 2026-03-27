@@ -2509,7 +2509,10 @@ export class UserScriptExecutor {
       this._pending.delete(id);
       clearTimeout(p.timer);
       if (error) {
-        p.reject(new Error(error));
+        const err = new Error(error);
+        if (e.data.helpUrl) err.helpUrl = e.data.helpUrl;
+        if (e.data.helpText) err.helpText = e.data.helpText;
+        p.reject(err);
       } else {
         p.resolve(result);
       }

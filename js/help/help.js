@@ -49,6 +49,16 @@ const formatInstructions = (instructions) => {
   return sentences.map(sentence => sentence.trim() + '.').join('\n');
 };
 
+const appendHelpLink = (element, config) => {
+  if (!config.helpLink) return;
+  element.append(' See the ');
+  const link = document.createElement('a');
+  link.href = config.helpLink;
+  link.textContent = config.helpLinkText;
+  element.append(link);
+  element.append('.');
+};
+
 const createCategoryOverviewItem = (category, config) => {
   const overviewItem = document.createElement('div');
   overviewItem.className = 'category-overview-item';
@@ -74,6 +84,7 @@ const createCategoryOverviewItem = (category, config) => {
   const categoryInstructions = document.createElement('div');
   categoryInstructions.className = 'instructions';
   categoryInstructions.textContent = formatInstructions(config.instructions);
+  appendHelpLink(categoryInstructions, config);
 
   overviewItem.appendChild(categoryContent);
   overviewItem.appendChild(categoryInstructions);
@@ -112,6 +123,7 @@ const createCategorySection = (category, constraints) => {
   categoryInstructions.className = 'instructions';
   categoryInstructions.textContent = formatInstructions(
     CATEGORY_CONFIGS[category].instructions);
+  appendHelpLink(categoryInstructions, CATEGORY_CONFIGS[category]);
 
   const constraintList = document.createElement('div');
   constraintList.className = 'constraint-list';
@@ -185,19 +197,22 @@ const CATEGORY_CONFIGS = {
   },
   'Pairwise': {
     description: 'Custom pairwise relationships between cells',
+    helpLink: 'custom-constraints#pairwise',
+    helpLinkText: 'pairwise constraints guide',
     instructions: `
       Select cells by click and dragging on the grid then configuring the
-      constraint in the "JavaScript constraints" panel using the Pairwise tab
-      (see panel for instructions).
+      constraint in the "JavaScript constraints" panel using the Pairwise tab.
       Cells can also be added and removed by holding down shift while
       clicking.`,
   },
   'StateMachine': {
     description: 'Finite-state machine for accepting cell sequences',
+    helpLink: 'custom-constraints#state-machine',
+    helpLinkText: 'state machine guide',
     instructions: `
       Select cells by click and dragging on the grid, then use the
       "Custom JavaScript constraints" panel with the State machine tab to define
-      the start state, transition, and accept logic (see panel for guidance).
+      the start state, transition, and accept logic.
       Cells can also be added and removed by holding shift while clicking.`,
   },
   'Region': {

@@ -40,6 +40,8 @@ self.onmessage = async (e) => {
     // If the error object has logs, include them in the response.
     const response = { id, error: error.message || String(error) };
     if (error.logs) response.logs = error.logs;
+    if (error.helpUrl) response.helpUrl = error.helpUrl;
+    if (error.helpText) response.helpText = error.helpText;
     self.postMessage(response);
   }
 };

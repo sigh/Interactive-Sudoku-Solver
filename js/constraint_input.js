@@ -1517,6 +1517,13 @@ ConstraintCategoryInput.StateMachine = class StateMachine extends JavaScriptCate
           this._inputManager.setSelection([]);
         } catch (err) {
           errorElem.textContent = err.message || err;
+          if (err.helpUrl) {
+            const link = Object.assign(document.createElement('a'), {
+              href: err.helpUrl,
+              textContent: err.helpText || 'Help',
+            });
+            errorElem.append(' ', link);
+          }
         }
 
         return false;
