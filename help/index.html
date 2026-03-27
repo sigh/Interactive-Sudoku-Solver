@@ -26,7 +26,7 @@ layout: null
     // Use a VERSION_PARAM for cache busting.
     self.VERSION_PARAM = '?v=' + ('{{ site.github.build_revision }}' || Math.random());
 
-    const helpModule = import('./js/help/help.js' + self.VERSION_PARAM);
+    const helpModule = import('../js/help/help.js' + self.VERSION_PARAM);
     window.addEventListener(
       'load', async () => (await helpModule).renderHelpPage());
   </script>
@@ -36,17 +36,17 @@ layout: null
   <header id="page-header" class="hstack">
     <h1 class="page-header-logo">ISS</h1>
     <h1 class="page-header-title">Interactive Sudoku Solver – Help</h1>
-    <a class="page-header-link hstack-push-right" href="." aria-label="Back to Solver">
+    <a class="page-header-link hstack-push-right" href=".." aria-label="Back to Solver">
       <span>←</span>
       <span>Back to Solver</span>
     </a>
     <a class="page-header-link" href="https://github.com/sigh/Interactive-Sudoku-Solver/issues" target="_blank"
       rel="noopener">
-      <img src="img/bug-48.png" alt="File a bug">
+      <img src="../img/bug-48.png" alt="File a bug">
       <span>File a bug</span>
     </a>
     <a class="page-header-link" href="https://github.com/sigh/Interactive-Sudoku-Solver" target="_blank" rel="noopener">
-      <img src="img/github-mark.png" alt="Github repo">
+      <img src="../img/github-mark.png" alt="Github repo">
       <span>Source code</span>
     </a>
   </header>
@@ -83,6 +83,10 @@ layout: null
         </li>
         <li><a href="#javascript-sandbox">JavaScript Sandbox</a></li>
       </ul>
+      <div class="toc-pages">
+        <div class="toc-title">Other Help Pages</div>
+        <a href="custom-constraints">Custom Constraints</a>
+      </div>
     </div>
 
     <div class="help-content">
@@ -229,7 +233,9 @@ layout: null
       <h2 id="recipes">Recipes</h2>
       <div class="recipes-content">
         <p>Some constraint types aren't directly supported but can be constructed using combinations of available
-          constraints.</p>
+          constraints. Many of these use the Custom JavaScript constraints panel &mdash;
+          see the <a href="custom-constraints">Custom Constraints</a> help page for
+          a full guide.</p>
 
         <h3 id="clone">Clone</h3>
         <p>
@@ -699,7 +705,7 @@ function accept({ first, sum }) {
           edges.
         </p>
         <p>
-          The <a href="./?code">JavaScript Sandbox</a> can be used to create
+          The <a href="../?code">JavaScript Sandbox</a> can be used to create
           more complex puzzles by writing JavaScript code
           that programmatically creates constraints.
         </p>

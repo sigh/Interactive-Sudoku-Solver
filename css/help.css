@@ -83,6 +83,11 @@ p {
   line-height: 1.4;
 }
 
+.help-content li {
+  color: var(--text-medium);
+  line-height: 1.4;
+}
+
 pre {
   margin-left: 20px;
   padding: 12px 16px;
@@ -143,6 +148,15 @@ pre.code-with-copy>button.copy-button {
   font-weight: bold;
 }
 
+.toc-pages {
+  margin-top: 15px;
+  padding-top: 15px;
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
 .category-name {
   font-weight: bold;
   margin-bottom: 10px;
@@ -170,7 +184,6 @@ pre.code-with-copy>button.copy-button {
   background-color: var(--color-background-special);
   border-left: 3px solid var(--color-border-special);
   border-radius: 4px;
-  white-space: pre-line;
   margin: 0;
 }
 
@@ -206,6 +219,25 @@ details summary {
 
 details summary:hover {
   text-decoration: underline;
+}
+
+.inline-table {
+  border-collapse: collapse;
+  margin: 8px 0 16px 20px;
+  font-size: var(--font-size-small);
+}
+
+.inline-table th,
+.inline-table td {
+  border: 1px solid var(--border-color);
+  padding: 8px 10px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.inline-table th {
+  background: var(--background-light);
+  color: var(--text-medium);
 }
 
 /* Mobile responsiveness */

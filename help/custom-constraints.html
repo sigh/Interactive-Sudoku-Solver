@@ -1,0 +1,414 @@
+---
+layout: null
+---
+<html>
+
+<head>
+  <title>Custom Constraint Help - Interactive Sudoku Solver</title>
+  <meta name="description"
+    content="Detailed guide for writing Pairwise and State machine custom constraints in Interactive Sudoku Solver.">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="{{ 'img/favicon.png' | relative_url }}">
+  <link rel="canonical" href="https://sigh.github.io/Interactive-Sudoku-Solver/help/custom-constraints" />
+  <link rel="stylesheet" href="{{ 'css/style.css?v=' | append: site.github.build_revision | relative_url }}">
+  <link rel="stylesheet" href="{{ 'css/help.css?v=' | append: site.github.build_revision | relative_url }}">
+
+</head>
+
+<body>
+  <header id="page-header" class="hstack">
+    <h1 class="page-header-logo">ISS</h1>
+    <h1 class="page-header-title">Custom Constraint Help</h1>
+    <a class="page-header-link hstack-push-right" href=".." aria-label="Back to Solver">
+      <span>&larr;</span>
+      <span>Back to Solver</span>
+    </a>
+    <a class="page-header-link" href="https://github.com/sigh/Interactive-Sudoku-Solver/issues" target="_blank"
+      rel="noopener">
+      <img src="../img/bug-48.png" alt="File a bug">
+      <span>File a bug</span>
+    </a>
+    <a class="page-header-link" href="https://github.com/sigh/Interactive-Sudoku-Solver" target="_blank" rel="noopener">
+      <img src="../img/github-mark.png" alt="Github repo">
+      <span>Source code</span>
+    </a>
+  </header>
+
+  <div class="help-container">
+    <div class="toc">
+      <div class="toc-title">Contents</div>
+      <ul>
+        <li><a href="#overview">Overview</a></li>
+        <li><a href="#pairwise">Pairwise Constraints</a>
+          <ul>
+            <li><a href="#pairwise-function">The Check Function</a></li>
+            <li><a href="#chain-handling">Chain Handling</a></li>
+          </ul>
+        </li>
+        <li><a href="#state-machine">State Machine Constraints</a>
+          <ul>
+            <li><a href="#start-state">Start State</a></li>
+            <li><a href="#transition">Transition Function</a></li>
+            <li><a href="#accept">Accept Function</a></li>
+            <li><a href="#branching">Branching</a></li>
+            <li><a href="#max-depth">Max Depth</a></li>
+          </ul>
+        </li>
+        <li><a href="#state-count">Reducing the State Count</a>
+          <ul>
+            <li><a href="#state-limit">The 4096 State Limit</a></li>
+            <li><a href="#optimization">Optimization</a></li>
+          </ul>
+        </li>
+      </ul>
+      <div class="toc-pages">
+        <div class="toc-title">Other Help Pages</div>
+        <a href=".">Help</a>
+      </div>
+    </div>
+
+    <div class="help-content">
+      <h2 id="overview">Overview</h2>
+      <div>
+        <p>
+          The <strong>Custom JavaScript constraints</strong> panel lets you
+          define constraints using JavaScript. It has two tabs:
+        </p>
+
+        <ul>
+          <li>
+            <strong>Pairwise</strong> &mdash; constrains relationships between
+            pairs of cell values.
+          </li>
+          <li>
+            <strong>State machine</strong> &mdash; processes cell values
+            sequentially through a finite-state machine.
+          </li>
+        </ul>
+
+        <p>
+          To create a custom constraint:
+        </p>
+        <ul>
+          <li>Select cells on the grid by dragging or Shift+clicking.</li>
+          <li>Open the panel and write your constraint logic.</li>
+          <li>Optionally set a <strong>Name</strong> to label the constraint in the list.</li>
+        </ul>
+        <p>
+          The JavaScript you write is only executed when you add the constraint,
+          not during loading or solving. The efficiency of your code does not
+          affect solver performance.
+        </p>
+        <div class="instructions">
+          You can use <code>console.log</code> inside your functions to print
+          values to the browser console for debugging.
+        </div>
+        <p>
+          For worked examples, see the
+          <a href=".#recipes">Recipes</a> section on the main help page.
+        </p>
+      </div>
+
+      <h2 id="pairwise">Pairwise Constraints</h2>
+      <div>
+        <h3 id="pairwise-function">The Check Function</h3>
+        <p>
+          Write a function that takes two cell values <code>a</code> and
+          <code>b</code> and returns <code>true</code> if they form a valid
+          pair.
+        </p>
+        <pre>constraintCheck = (a, b) =&gt; a &lt;= b</pre>
+        <p>
+          The function is called for each pair of cells determined by the
+          <strong>Chain handling</strong> setting. If the function returns
+          <code>false</code> (or any falsy value) for any pair, the constraint
+          is violated.
+        </p>
+
+        <h3 id="chain-handling">Chain Handling</h3>
+        <p>
+          When more than two cells are selected, <strong>Chain handling</strong>
+          determines which pairs of cells are checked.
+        </p>
+        <table class="inline-table">
+          <thead>
+            <tr>
+              <th>Mode</th>
+              <th>Pairs checked for cells [A, B, C]</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Consecutive pairs</strong></td>
+              <td>[A,B] and [B,C]</td>
+            </tr>
+            <tr>
+              <td><strong>All pairs</strong></td>
+              <td>[A,B], [A,C], [B,A], [B,C], [C,A], [C,B]</td>
+            </tr>
+          </tbody>
+        </table>
+        <p>
+          <strong>Consecutive pairs</strong> checks each cell against the
+          next cell in the selection. This is useful for ordered line
+          constraints. For example, a slow thermometer where each value must be
+          greater than or equal to the previous:
+        </p>
+        <pre>constraintCheck = (a, b) =&gt; a &lt;= b</pre>
+        <p>
+          <strong>All pairs</strong> checks every ordered pair of cells in both
+          directions. This is useful when the constraint applies between any
+          two cells regardless of position. For example, requiring that no two
+          digits on a line are consecutive:
+        </p>
+        <pre>constraintCheck = (a, b) =&gt; Math.abs(a - b) &gt; 1</pre>
+      </div>
+
+      <h2 id="state-machine">State Machine Constraints</h2>
+      <div>
+        <p>
+          A state machine constraint processes the selected cells one at a time,
+          in selection order, by maintaining a <em>state</em> that is updated
+          at each step. After all cells are processed, the final state
+          determines whether the constraint is satisfied.
+        </p>
+        <div class="instructions">
+          Toggle <strong>Unified input</strong> to write
+          <code>startState</code>, <code>transition</code>, and
+          <code>accept</code> in a single text area instead of separate fields.
+          The behavior is identical.
+        </div>
+
+        <h3 id="start-state">Start State</h3>
+        <p>
+          <code>startState</code> is the initial state before any cell values
+          are processed. It can be any JSON-serializable value &mdash; a number,
+          a string, an object, or <code>null</code>.
+        </p>
+        <pre>// A numeric accumulator.
+startState = 0;
+
+// null - e.g. as a sentinel for "first cell not yet seen".
+startState = null;
+
+// An object to track multiple values.
+startState = { sum: 0, count: 0 };</pre>
+        <p>
+          States must be JSON-serializable (no functions, no circular
+          references).
+          Mutating a state object inside <code>transition</code>
+          or <code>accept</code> has no side effects &mdash; the solver creates
+          a fresh copy for each call.
+        </p>
+        <p>
+          To start from multiple initial states at once, set
+          <code>startState</code> to an array. Each element becomes an
+          independent starting path:
+        </p>
+        <pre>startState = ["even", "odd"];</pre>
+
+        <h3 id="transition">Transition Function</h3>
+        <p>
+          <code>transition(state, value)</code> takes the current state and the
+          next cell's value. It returns the next state.
+        </p>
+        <pre>
+startState = 0;
+
+function transition(state, value) {
+  return state + value;
+}</pre>
+        <p>
+          If a transition is invalid (the constraint cannot be satisfied from
+          this state with this value), return <code>undefined</code> (or return
+          nothing) to signal that this path is dead. The solver will prune it.
+        </p>
+        <pre>
+// Only allow the running total to stay under 20.
+function transition(state, value) {
+  const next = state + value;
+  if (next &lt; 20) return next;
+  // Returning nothing kills this path.
+}</pre>
+        <p>
+          <code>NUM_CELLS</code> is available as a variable containing the
+          number of selected cells.
+        </p>
+        <p>
+          When the state is an object, you can destructure it directly in the
+          function parameters. For example, tracking the running minimum and
+          maximum:
+        </p>
+        <pre>
+startState = { min: 16, max: -1 };
+
+function transition({ min, max }, value) {
+  return {
+    min: Math.min(min, value),
+    max: Math.max(max, value),
+  };
+}
+
+function accept({ min, max }) {
+  return (max - min) !== NUM_CELLS - 1;
+}</pre>
+
+        <h3 id="accept">Accept Function</h3>
+        <p>
+          <code>accept(state)</code> is called on the final state after all
+          cell values have been processed. Return <code>true</code> if the
+          state represents a valid outcome.
+        </p>
+        <pre>
+function accept(state) {
+  return state === 10;
+}</pre>
+        <p>
+          A state machine is satisfied when at least one path through all the
+          cells ends in an accepted state.
+        </p>
+
+        <h3 id="branching">Branching</h3>
+        <p>
+          <code>transition</code> can return an <em>array</em> of states
+          instead of a single state. Each element becomes an independent path
+          that is explored separately. The constraint is satisfied if
+          <em>any</em> of these paths reaches an accepted final state.
+        </p>
+        <p>
+          Returning an empty array <code>[]</code> is equivalent to returning
+          <code>undefined</code> &mdash; the path is dead.
+        </p>
+        <p>
+          For example, to require that the cells sum to either 20 or 30,
+          branch on the first value into two paths that each track a
+          remaining target:
+        </p>
+        <pre>
+startState = null;
+
+function transition(state, value) {
+  // On the first cell, branch into two targets.
+  if (state === null) {
+    return [20 - value, 30 - value];
+  }
+  // On subsequent cells, subtract from the remaining target.
+  return state - value;
+}
+
+function accept(state) {
+  return state === 0;
+}</pre>
+
+        <h3 id="max-depth">Max Depth</h3>
+        <p>
+          The optional <code>maxDepth</code> parameter limits how many cells
+          deep the solver will expand the state machine. States beyond this
+          depth are not created. It defaults to <code>Infinity</code> (no
+          limit).
+        </p>
+        <pre>maxDepth = 5;</pre>
+        <p>
+          This is useful when the state machine only needs to inspect the first
+          few cells of a line, or when the number of reachable states grows
+          too large. If the solver hits its internal state limit, consider
+          setting <code>maxDepth</code> to a lower value.
+        </p>
+      </div>
+
+      <h2 id="state-count">Reducing the State Count</h2>
+      <div>
+        <p>
+          When you add a state machine constraint, ISS builds an internal
+          NFA (Nondeterministic Finite Automaton) by running your
+          <code>transition</code> function on every reachable state with every
+          possible cell value. Each distinct result becomes a state in
+          the NFA. Two return values map to the same state if they produce
+          identical JSON when serialized &mdash; object key order does not
+          matter, but <code>{values: [1, 2]}</code> and
+          <code>{values: [2, 1]}</code> are different states.
+        </p>
+
+        <h3 id="state-limit">The 4096 State Limit</h3>
+        <p>
+          There is a hard limit of 4096 states. The builder will return an
+          error if your state machine exceeds this limit. This happens when you
+          create your constraint, not during solving.
+
+          If you encounter this error:
+        </p>
+        <ul>
+          <li>
+            <strong>Ensure the state space is finite.</strong> If any of values
+            in your state grow without bound (like a running total),
+            the builder can't finish building the NFA.
+          </li>
+          <li>
+            <strong>Normalize states.</strong> Sort collections where
+            order doesn't matter so that equivalent states produce
+            the same JSON.
+          </li>
+          <li>
+            <strong>Carry only what you need.</strong> A boolean to flag that
+            a threshold has been exceeded may be sufficient instead of a running
+            total.
+          </li>
+          <li>
+            <strong>Reject invalid paths early.</strong> If you can
+            determine that a state cannot lead to an accepted result,
+            then immediately prune it.
+          </li>
+          <li>
+            <strong>Use <code>maxDepth</code></strong> to bound
+            expansion depth. Generally <code>maxDepth</code> must be at least
+            the number of cells that the constraint applies to. Any less, and
+            you may get incorrect results.
+          </li>
+        </ul>
+
+        <h3 id="optimization">Optimization</h3>
+        <p>
+          Even under the limit, fewer states often means faster solving.
+          ISS automatically removes dead-end states and merges logically
+          equivalent states, so it is not always obvious how changes to your
+          code will affect the final state count.
+        </p>
+        <ul>
+          <li>
+            <strong>Avoid over-pruning.</strong> Aggressively pruning
+            can prevent states from being merged. If you are under the state
+            limit, you usually don't need to prune since the builder can
+            determine that automatically.
+          </li>
+          <li>
+            <strong>Rethink the structure of the problem.</strong>
+            Just finding a different state representation is often not enough,
+            since the builder can merge states that are logically equivalent.
+            Explore different ways the problem can be solved. Sometimes even
+            <i>generalizing</i> can help, as the overall structure maybe
+            simpler.
+          </li>
+          <li>
+            <strong>Consider splitting into multiple constraints.</strong>
+            If you are combining two independent pieces of logic, that can
+            quadratically increase the state count. However, combining them
+            can allow for more powerful propagation during solving and is
+            easier to manage in the UI.
+          </li>
+          <li>
+            <strong>Take advantage of non-determinism.</strong> If your
+            problem can be solved by branching into multiple paths, it can
+            reduce the absolute number of states required. Branches are just
+            as efficient in the solver.
+          </li>
+          <li>
+            <strong><code>maxDepth</code></strong> to can sometimes reduce the
+            size, at the cost of making it less general.
+          </li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</body>
+
+</html>
