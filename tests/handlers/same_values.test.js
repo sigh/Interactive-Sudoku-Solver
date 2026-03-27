@@ -293,7 +293,7 @@ await runTest('SameValues should short-circuit after all values are fixed', () =
   const result = handler.enforceConsistency(grid, acc);
 
   assert.equal(result, true);
-  assert.equal(grid[context.shape.numCells], 1, 'state offset should be set once values fixed');
+  assert.equal(grid[context.shape.numGridCells], 1, 'state offset should be set once values fixed');
 
   const secondAcc = createAccumulator();
   const secondResult = handler.enforceConsistency(grid, secondAcc);

@@ -167,7 +167,7 @@ export class SudokuSolver {
     };
 
     if (result.guessDepth !== -1) {
-      const numGridCells = this._shape.numCells;
+      const numGridCells = this._shape.numGridCells;
       // The guess cell is the last item in the cell order.
       const guessCellIndex = result.cellOrder[result.guessDepth];
       // The options are the values that existed in the old grid for the guess
@@ -352,7 +352,7 @@ class InternalSolver {
     if (this._numSearchCells > 256) {
       throw new Error(
         'Too many cells. grid + var cells must be <= 256. ' +
-        `grid cells: ${shape.numCells}, var cells: ${this._numSearchCells - shape.numCells}`);
+        `grid cells: ${shape.numGridCells}, var cells: ${this._numSearchCells - shape.numGridCells}`);
     }
     this._debugLogger = debugLogger;
 
@@ -543,7 +543,7 @@ class InternalSolver {
     this._state = InternalSolver.STATE_UNSTARTED;
   }
 
-  static _debugValueBuffer = new Uint16Array(SHAPE_MAX.numCells);
+  static _debugValueBuffer = new Uint16Array(SHAPE_MAX.numGridCells);
   getStackTrace() {
     const s = this._state;
     if (s === InternalSolver.STATE_UNSTARTED ||
@@ -579,7 +579,7 @@ class InternalSolver {
     this._sampleSolution[0] = 0;
   }
 
-  static _debugGridBuffer = new Uint16Array(SHAPE_MAX.numCells);
+  static _debugGridBuffer = new Uint16Array(SHAPE_MAX.numGridCells);
 
   _debugEnforceConsistency(loc, gridState, handler, handlerAccumulator) {
     const oldGridState = this.constructor._debugGridBuffer.subarray(0, gridState.length);
@@ -1018,7 +1018,7 @@ class InternalSolver {
 
       this.counters.branchesIgnored = 1 - this.counters.progressRatio;
       return SudokuSolverUtil.gridToSolution(
-        grid.subarray(0, this._shape.numCells), this._shape.valueOffset);
+        grid.subarray(0, this._shape.numGridCells), this._shape.valueOffset);
     };
 
     // Non-standard grids may not have any house handlers (e.g. when there are

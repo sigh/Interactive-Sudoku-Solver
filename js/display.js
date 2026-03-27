@@ -641,7 +641,7 @@ export class SolutionDisplay extends CellValueDisplay {
     this.renderGridValues(solution, colorFn);
 
     if (this._copyElem) {
-      const numCells = this._shape.numCells;
+      const numCells = this._shape.numGridCells;
       this._copyElem.disabled = (
         !this._currentSolution.slice(0, numCells).every(
           v => v != null && isFinite(v)));
@@ -940,8 +940,8 @@ class CellPositioner {
     // Precompute grid cell centers.
     const cellSize = DisplayItem.CELL_SIZE;
     const numCols = shape.numCols;
-    const centers = new Array(shape.numCells);
-    for (let i = 0; i < shape.numCells; i++) {
+    const centers = new Array(shape.numGridCells);
+    for (let i = 0; i < shape.numGridCells; i++) {
       const row = i / numCols | 0;
       const col = i % numCols | 0;
       centers[i] = [col * cellSize + cellSize / 2, row * cellSize + cellSize / 2];
@@ -956,7 +956,7 @@ class CellPositioner {
 
     // Update centers with var cell positions.
     const cellSize = DisplayItem.CELL_SIZE;
-    const centers = this._centers.slice(0, this._shape.numCells);
+    const centers = this._centers.slice(0, this._shape.numGridCells);
     for (const { group, columns, y } of result.layout) {
       for (let i = 0; i < group.cells.length; i++) {
         const col = i % columns;

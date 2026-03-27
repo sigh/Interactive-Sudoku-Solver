@@ -92,14 +92,14 @@ export class GridShape {
       throw Error('Invalid numValues: ' + this.numValues);
     }
 
-    this.numCells = numRows * numCols;
-    this.numPencilmarks = this.numCells * this.numValues;
+    this.numGridCells = numRows * numCols;
+    this.numPencilmarks = this.numGridCells * this.numValues;
 
     this.name = this.constructor.makeName(
       numRows, numCols, this.numValues, valueOffset);
     this.gridDimsStr = `${numRows}x${numCols}`;
 
-    this._varCellRegistry = new VarCellRegistry(this.numCells);
+    this._varCellRegistry = new VarCellRegistry(this.numGridCells);
     this._cellGraph = null;
     this._varCellRegistry.addChangeListener(() => { this._cellGraph = null; });
   }
@@ -109,7 +109,7 @@ export class GridShape {
   }
 
   totalCells() {
-    return this.numCells + this._varCellRegistry.numVarCells();
+    return this.numGridCells + this._varCellRegistry.numVarCells();
   }
 
   varCellGroups() {
@@ -196,7 +196,7 @@ export class GridShape {
   makeCellIdFromIndex = (i) => {
     const namedId = this._varCellRegistry.getCellId(i);
     if (namedId) return namedId;
-    if (i >= this.numCells) return `$${i - this.numCells}`;
+    if (i >= this.numGridCells) return `$${i - this.numGridCells}`;
     return this.makeCellId(...this.splitCellIndex(i));
   }
 
@@ -227,7 +227,7 @@ export class GridShape {
       throw new Error('Invalid cell ID: ' + cellId);
     }
     if (cellId[0] === '$') {
-      return { cell: this.numCells + parseInt(cellId.substring(1)) };
+      return { cell: this.numGridCells + parseInt(cellId.substring(1)) };
     }
     const registryCell = this._varCellRegistry.getCellIndex(cellId);
     if (registryCell !== null) return { cell: registryCell };
@@ -353,7 +353,7 @@ export class CellGraph {
   static _gridGraph = memoize(
     (shape) => {
       const graph = [];
-      const cells = Array.from({ length: shape.numCells }, (_, i) => i);
+      const cells = Array.from({ length: shape.numGridCells }, (_, i) => i);
       CellGraph._addEdges(graph, cells, shape.numCols);
       return new CellGraph(graph);
     },

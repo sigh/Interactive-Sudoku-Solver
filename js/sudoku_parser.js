@@ -106,7 +106,7 @@ export class SudokuParser {
     // http://forum.enjoysudoku.com/understandable-snarfable-killer-cages-t6119.html
 
     const shape = SHAPE_9x9;
-    const numCells = shape.numCells;
+    const numCells = shape.numGridCells;
     const numCols = shape.numCols;
 
     if (text.length !== numCells) return null;
@@ -195,7 +195,7 @@ export class SudokuParser {
     if (!text.startsWith('3x3:')) return null;
 
     const shape = SHAPE_9x9;
-    const numCells = shape.numCells;
+    const numCells = shape.numGridCells;
 
     let parts = text.split(':');
     if (parts[2] !== 'k') return null;
@@ -232,7 +232,7 @@ export class SudokuParser {
     const shape = GridShape.fromNumCells(text.length);
     if (!shape) return null;
 
-    const numCells = shape.numCells;
+    const numCells = shape.numGridCells;
     const numValues = shape.numValues;
 
     const baseCharCode = GridShape.baseCharCode(shape);
@@ -261,7 +261,7 @@ export class SudokuParser {
     const shape = GridShape.fromNumCells(text.length);
     if (!shape) return null;
 
-    const numCells = shape.numCells;
+    const numCells = shape.numGridCells;
     const numValues = shape.numValues;
 
     const chars = new Set(text);
@@ -288,7 +288,7 @@ export class SudokuParser {
     const shape = GridShape.fromNumCells(text.length / 2);
     if (!shape) return null;
 
-    const numCells = shape.numCells;
+    const numCells = shape.numGridCells;
 
     const layout = this._parseJigsawLayoutToAst(text.substr(numCells));
     if (layout === null) return null;
@@ -333,7 +333,7 @@ export class SudokuParser {
 
     // Split into segments of numValues characters.
     const pencilmarks = [];
-    for (let i = 0; i < shape.numCells; i++) {
+    for (let i = 0; i < shape.numGridCells; i++) {
       const cellId = shape.makeCellIdFromIndex(i);
       const values = (
         text.substr(i * numValues, numValues)
@@ -496,7 +496,7 @@ export const toShortSolution = (solution, shape) => {
   const minValue = shape.minValue();
   const DEFAULT_VALUE = '.';
 
-  const length = Math.min(solution.length, shape.numCells);
+  const length = Math.min(solution.length, shape.numGridCells);
   const result = new Array(length).fill(DEFAULT_VALUE);
 
   for (let i = 0; i < length; i++) {

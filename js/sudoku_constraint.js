@@ -205,7 +205,7 @@ export class SudokuConstraintBase {
     if (!boxHeight) return [];
 
     const boxesPerRow = numCols / boxWidth;
-    const numBoxes = shape.numCells / effectiveSize;
+    const numBoxes = shape.numGridCells / effectiveSize;
 
     return this._makeRegions(
       (r, i) => {
@@ -225,7 +225,7 @@ export class SudokuConstraintBase {
     if (!boxHeight) return [];
 
     const numSets = effectiveSize;
-    const numBoxes = shape.numCells / effectiveSize;
+    const numBoxes = shape.numGridCells / effectiveSize;
     const boxesPerRow = numCols / boxWidth;
     // r = position within box (0 to effectiveSize-1)
     // i = box index (0 to numBoxes-1)
@@ -631,9 +631,9 @@ export class SudokuConstraint {
       }
       const layoutStr = args[args.length - 1];
 
-      if (layoutStr.length !== shape.numCells) {
+      if (layoutStr.length !== shape.numGridCells) {
         throw Error(
-          `Jigsaw layout expects ${shape.numCells} cells, ` +
+          `Jigsaw layout expects ${shape.numGridCells} cells, ` +
           `but layout has ${layoutStr.length}`);
       }
 
@@ -674,7 +674,7 @@ export class SudokuConstraint {
       const shape = GridShape.fromGridSpec(gridSpec);
 
       // Fill parts grid such that each cell has a reference to the part.
-      const partsGrid = new Array(shape.numCells).fill(null);
+      const partsGrid = new Array(shape.numGridCells).fill(null);
       for (const part of parts) {
         for (const cellId of part.cells) {
           const { cell } = shape.parseCellId(cellId);

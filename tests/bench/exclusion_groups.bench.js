@@ -34,8 +34,8 @@ const rowOf = (cell) => (cell / 9) | 0;
 const colOf = (cell) => cell % 9;
 
 const makeEmptyExclusions = () => {
-  const handlerSet = new HandlerSet([], SHAPE_9x9.numCells);
-  return new CellExclusions(handlerSet, SHAPE_9x9.numCells);
+  const handlerSet = new HandlerSet([], SHAPE_9x9.numGridCells);
+  return new CellExclusions(handlerSet, SHAPE_9x9.numGridCells);
 };
 
 const addSudokuBaseEdges = (exclusions) => {

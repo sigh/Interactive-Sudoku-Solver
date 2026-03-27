@@ -12,7 +12,7 @@ const makeContext = (numCells, numValues) => new GridTestContext({ gridSize: [1,
 
 await runTest('SeenCandidateSet with candidateSupportThreshold=1 sets candidates immediately', () => {
   const context = makeContext(4, 4);
-  const { numCells, numValues } = context.shape;
+  const { numGridCells: numCells, numValues } = context.shape;
   const seenCandidateSet = new SeenCandidateSet(numCells, numValues);
 
   // Simulate a solution grid where each cell has a single value (as bitmask).
@@ -36,7 +36,7 @@ await runTest('SeenCandidateSet with candidateSupportThreshold=1 sets candidates
 
 await runTest('SeenCandidateSet with candidateSupportThreshold>1 delays candidate bitmask', () => {
   const context = makeContext(4, 4);
-  const { numCells, numValues } = context.shape;
+  const { numGridCells: numCells, numValues } = context.shape;
   const seenCandidateSet = new SeenCandidateSet(numCells, numValues);
   seenCandidateSet.resetWithThreshold(3);
 
@@ -60,7 +60,7 @@ await runTest('SeenCandidateSet with candidateSupportThreshold>1 delays candidat
 
 await runTest('SeenCandidateSet counts saturate at candidateSupportThreshold', () => {
   const context = makeContext(2, 4);
-  const { numCells, numValues } = context.shape;
+  const { numGridCells: numCells, numValues } = context.shape;
   const seenCandidateSet = new SeenCandidateSet(numCells, numValues);
   seenCandidateSet.resetWithThreshold(3);
 
@@ -79,7 +79,7 @@ await runTest('SeenCandidateSet counts saturate at candidateSupportThreshold', (
 
 await runTest('SeenCandidateSet reset clears counts and candidates', () => {
   const context = makeContext(4, 4);
-  const { numCells, numValues } = context.shape;
+  const { numGridCells: numCells, numValues } = context.shape;
   const seenCandidateSet = new SeenCandidateSet(numCells, numValues);
 
   const grid = [valueMask(1), valueMask(2), valueMask(3), valueMask(4)];
@@ -97,7 +97,7 @@ await runTest('SeenCandidateSet reset clears counts and candidates', () => {
 
 await runTest('SeenCandidateSet resetWithThreshold sets candidateSupportThreshold', () => {
   const context = makeContext(4, 4);
-  const { numCells, numValues } = context.shape;
+  const { numGridCells: numCells, numValues } = context.shape;
   const seenCandidateSet = new SeenCandidateSet(numCells, numValues);
 
   // Default candidateSupportThreshold is 1.
@@ -116,7 +116,7 @@ await runTest('SeenCandidateSet resetWithThreshold sets candidateSupportThreshol
 
 await runTest('SeenCandidateSet resetWithThreshold throws for invalid value', () => {
   const context = makeContext(4, 4);
-  const { numCells, numValues } = context.shape;
+  const { numGridCells: numCells, numValues } = context.shape;
   const seenCandidateSet = new SeenCandidateSet(numCells, numValues);
 
   assert.throws(() => seenCandidateSet.resetWithThreshold(0), /candidateSupportThreshold must be between 1 and 255/);
@@ -126,7 +126,7 @@ await runTest('SeenCandidateSet resetWithThreshold throws for invalid value', ()
 
 await runTest('SeenCandidateSet accumulates multiple values per cell', () => {
   const context = makeContext(2, 4);
-  const { numCells, numValues } = context.shape;
+  const { numGridCells: numCells, numValues } = context.shape;
   const seenCandidateSet = new SeenCandidateSet(numCells, numValues);
 
   // Two different solutions with different values in cell 0.
@@ -150,7 +150,7 @@ await runTest('SeenCandidateSet accumulates multiple values per cell', () => {
 
 await runTest('SeenCandidateSet hasInterestingSolutions works with candidateSupportThreshold', () => {
   const context = makeContext(4, 4);
-  const { numCells, numValues } = context.shape;
+  const { numGridCells: numCells, numValues } = context.shape;
   const seenCandidateSet = new SeenCandidateSet(numCells, numValues);
   seenCandidateSet.resetWithThreshold(2);
 

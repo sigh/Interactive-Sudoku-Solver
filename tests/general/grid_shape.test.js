@@ -16,7 +16,7 @@ await runTest('fromGridSize creates valid shape for size 9', () => {
   assert.equal(shape.numRows, 9);
   assert.equal(shape.numCols, 9);
   assert.equal(shape.numValues, 9);
-  assert.equal(shape.numCells, 81);
+  assert.equal(shape.numGridCells, 81);
   assert.equal(shape.numPencilmarks, 729);
 });
 
@@ -25,7 +25,7 @@ await runTest('fromGridSize creates valid shape for size 4', () => {
   assert.equal(shape.numRows, 4);
   assert.equal(shape.numCols, 4);
   assert.equal(shape.numValues, 4);
-  assert.equal(shape.numCells, 16);
+  assert.equal(shape.numGridCells, 16);
 });
 
 await runTest('fromGridSize creates valid shape for size 16', () => {
@@ -33,7 +33,7 @@ await runTest('fromGridSize creates valid shape for size 16', () => {
   assert.equal(shape.numRows, 16);
   assert.equal(shape.numCols, 16);
   assert.equal(shape.numValues, 16);
-  assert.equal(shape.numCells, 256);
+  assert.equal(shape.numGridCells, 256);
 });
 
 await runTest('fromGridSize returns null for invalid sizes', () => {
@@ -49,7 +49,7 @@ await runTest('fromGridSize creates rectangular 6x8 grid', () => {
   assert.equal(shape.numRows, 6);
   assert.equal(shape.numCols, 8);
   assert.equal(shape.numValues, 8); // max(6, 8)
-  assert.equal(shape.numCells, 48);
+  assert.equal(shape.numGridCells, 48);
   assert.equal(shape.name, '6x8');
 });
 
@@ -58,7 +58,7 @@ await runTest('fromGridSize creates rectangular 8x6 grid', () => {
   assert.equal(shape.numRows, 8);
   assert.equal(shape.numCols, 6);
   assert.equal(shape.numValues, 8); // max(8, 6)
-  assert.equal(shape.numCells, 48);
+  assert.equal(shape.numGridCells, 48);
   assert.equal(shape.name, '8x6');
 });
 
@@ -280,14 +280,14 @@ await runTest('makeCellId works for rectangular grids', () => {
 // Invariants
 // ============================================================================
 
-await runTest('numRows * numCols equals numCells', () => {
+await runTest('numRows * numCols equals numGridCells', () => {
   for (const size of [4, 6, 9, 12, 16]) {
     const shape = GridShape.fromGridSize(size);
-    assert.equal(shape.numRows * shape.numCols, shape.numCells);
+    assert.equal(shape.numRows * shape.numCols, shape.numGridCells);
   }
   // Also test rectangular
   const rect = GridShape.fromGridSize(6, 8);
-  assert.equal(rect.numRows * rect.numCols, rect.numCells);
+  assert.equal(rect.numRows * rect.numCols, rect.numGridCells);
 });
 
 await runTest('numValues equals max(numRows, numCols)', () => {
@@ -541,7 +541,7 @@ await runTest('cellGraph: no edges between grid and var cells', () => {
   const graph = shape.cellGraph();
   const varCells = new Set(shape.varCellsForGroup('T'));
 
-  for (let i = 0; i < shape.numCells; i++) {
+  for (let i = 0; i < shape.numGridCells; i++) {
     for (const adj of graph.cellEdges(i)) {
       if (adj !== null) assert.ok(!varCells.has(adj));
     }

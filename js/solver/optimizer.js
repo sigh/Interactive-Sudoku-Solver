@@ -453,11 +453,11 @@ export class SudokuConstraintOptimizer {
 
   _fillInSumGap(sumHandlers, sumCells, shape) {
     // Fill in a gap if one remains.
-    const numNonSumCells = shape.numCells - sumCells.size;
+    const numNonSumCells = shape.numGridCells - sumCells.size;
     if (numNonSumCells === 0 || numNonSumCells >= shape.numValues) return [];
 
     const sumHandlersSum = sumHandlers.map(h => h.sum()).reduce((a, b) => a + b);
-    const numRegions = shape.numCells / shape.numValues;
+    const numRegions = shape.numGridCells / shape.numValues;
     const remainingSum = numRegions * maxSumForShape(shape) - sumHandlersSum;
 
     const remainingCells = new Set(allCells(shape));
@@ -1027,7 +1027,7 @@ export class SudokuConstraintOptimizer {
     }
 
     const handler = new HandlerModule.FullRank(
-      shape.numCells, dedupedClues, tieMode);
+      shape.numGridCells, dedupedClues, tieMode);
     handlerSet.add(handler);
 
     if (this._debugLogger) {
@@ -1340,4 +1340,4 @@ export class SudokuConstraintOptimizer {
 const maxSumForShape = (shape) => (
   (shape.numValues * (shape.numValues + 1)) / 2 + shape.valueOffset * shape.numValues);
 
-const allCells = (shape) => Array.from({ length: shape.numCells }, (_, i) => i);
+const allCells = (shape) => Array.from({ length: shape.numGridCells }, (_, i) => i);

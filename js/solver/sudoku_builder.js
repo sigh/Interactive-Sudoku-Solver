@@ -70,7 +70,7 @@ export class SudokuBuilder {
   }
 
   static *_strictAdjHandlers(constraints, shape, fnKey) {
-    const numCells = shape.numCells;
+    const numCells = shape.numGridCells;
     const intCmp = (a, b) => a - b;
     const pairId = p => p[0] + p[1] * numCells;
 
@@ -188,7 +188,7 @@ export class SudokuBuilder {
               'Anti-Taxicab is incompatible with 0-based values.');
           }
           {
-            for (let i = 0; i < shape.numCells; i++) {
+            for (let i = 0; i < shape.numGridCells; i++) {
               const valueMap = [];
               for (let d = 1; d <= shape.numValues; d++) {
                 const [r, c] = shape.splitCellIndex(i);
@@ -646,7 +646,7 @@ export class SudokuBuilder {
 
         case 'FullRankTies':
           yield new HandlerModule.FullRank(
-            shape.numCells, [], fullRankTieMode(constraint));
+            shape.numGridCells, [], fullRankTieMode(constraint));
           break;
 
         case 'DutchFlatmates':
@@ -771,7 +771,7 @@ export class SudokuBuilder {
               c => shape.parseCellId(c).cell);
 
             yield new HandlerModule.FullRank(
-              shape.numCells,
+              shape.numGridCells,
               [{ rank: constraint.value, line }],
               fullRankTieMode(constraintMap.get('FullRankTies')?.[0]));
           }
@@ -912,7 +912,7 @@ export class SudokuBuilder {
     // Rule 3: For each 0 in the grid, the digits missing in its row, column,
     // and box must be three different digits.
     const NO_BOX = 255;
-    const cellToBox = new Uint8Array(shape.numCells).fill(NO_BOX);
+    const cellToBox = new Uint8Array(shape.numGridCells).fill(NO_BOX);
     for (let b = 0; b < boxRegions.length; b++) {
       for (const cell of boxRegions[b]) {
         cellToBox[cell] = b;

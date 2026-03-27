@@ -406,7 +406,7 @@ class Jigsaw extends BaseConstraintDisplayItem {
 
     // Find the current missing cells.
     const missingCells = new Set();
-    for (let i = 0; i < this._shape.numCells; i++) missingCells.add(i);
+    for (let i = 0; i < this._shape.numGridCells; i++) missingCells.add(i);
     this._regionElems.forEach(
       cs => cs.forEach(c => missingCells.delete(this._shape.parseCellId(c).cell)));
 

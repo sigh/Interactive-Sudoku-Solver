@@ -544,7 +544,7 @@ export class Sum extends SudokuConstraintHandler {
   }
 
   // Scratch buffers for reuse so we don't have to create arrays at runtime.
-  static _seenMinMaxs = new Uint32Array(SHAPE_MAX.numCells);
+  static _seenMinMaxs = new Uint32Array(SHAPE_MAX.numGridCells);
 
   // Restricts cell values to only the ranges that are possible taking into
   // account uniqueness constraints between values.

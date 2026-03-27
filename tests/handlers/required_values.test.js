@@ -282,7 +282,7 @@ await runTest('RequiredValues offset: enforceConsistency finds hidden single wit
   const context = new GridTestContext({ shape });
   const cells = [0, 1, 2];
   const handler = new RequiredValues(cells, [0, 2], /* strict */ true);
-  const cellExclusions = createCellExclusions({ numCells: shape.numCells });
+  const cellExclusions = createCellExclusions({ numCells: shape.numGridCells });
   context.initializeHandler(handler, { cellExclusions });
 
   const grid = context.grid;
@@ -305,7 +305,7 @@ await runTest('RequiredValues offset: enforceConsistency detects missing value w
   const context = new GridTestContext({ shape });
   const cells = [0, 1, 2];
   const handler = new RequiredValues(cells, [0, 2], /* strict */ true);
-  const cellExclusions = createCellExclusions({ numCells: shape.numCells });
+  const cellExclusions = createCellExclusions({ numCells: shape.numGridCells });
   context.initializeHandler(handler, { cellExclusions });
 
   const grid = context.grid;
@@ -326,7 +326,7 @@ await runTest('RequiredValues offset: enforceConsistency with repeated value and
   const context = new GridTestContext({ shape });
   const cells = [0, 1];
   const handler = new RequiredValues(cells, [1, 1], /* strict */ true);
-  const cellExclusions = createCellExclusions({ numCells: shape.numCells });
+  const cellExclusions = createCellExclusions({ numCells: shape.numGridCells });
   context.initializeHandler(handler, { cellExclusions });
 
   const grid = context.grid;

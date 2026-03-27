@@ -94,8 +94,8 @@ await runTest('boxRegions for 4x6 grid cells are in bounds', () => {
 
   for (const region of regions) {
     for (const cell of region) {
-      assert.ok(cell >= 0 && cell < shape.numCells,
-        `Cell ${cell} out of bounds [0, ${shape.numCells})`);
+      assert.ok(cell >= 0 && cell < shape.numGridCells,
+        `Cell ${cell} out of bounds [0, ${shape.numGridCells})`);
     }
   }
 });
@@ -132,8 +132,8 @@ await runTest('boxRegions for 6x4 grid cells are in bounds', () => {
 
   for (const region of regions) {
     for (const cell of region) {
-      assert.ok(cell >= 0 && cell < shape.numCells,
-        `Cell ${cell} out of bounds [0, ${shape.numCells})`);
+      assert.ok(cell >= 0 && cell < shape.numGridCells,
+        `Cell ${cell} out of bounds [0, ${shape.numGridCells})`);
     }
   }
 });
@@ -144,7 +144,7 @@ await runTest('boxRegions for rectangular grids cover all cells exactly once', (
 
     const regions = SudokuConstraintBase.boxRegions(shape);
     const allCells = regions.flat().sort((a, b) => a - b);
-    const expected = Array.from({ length: shape.numCells }, (_, i) => i);
+    const expected = Array.from({ length: shape.numGridCells }, (_, i) => i);
     assert.deepEqual(allCells, expected, `boxRegions for ${rows}x${cols}`);
   }
 });
@@ -159,7 +159,7 @@ await runTest('all regions cover all cells exactly once', () => {
     ]) {
       const regions = regionFn(shape);
       const allCells = regions.flat().sort((a, b) => a - b);
-      const expected = Array.from({ length: shape.numCells }, (_, i) => i);
+      const expected = Array.from({ length: shape.numGridCells }, (_, i) => i);
       assert.deepEqual(allCells, expected, `${regionFn.name} for size ${size}`);
     }
   }

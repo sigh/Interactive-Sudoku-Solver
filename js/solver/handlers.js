@@ -3676,7 +3676,7 @@ export class Or extends SudokuConstraintHandler {
       }
 
       const initialization = [];
-      for (let i = 0; i < shape.numCells; i++) {
+      for (let i = 0; i < shape.numGridCells; i++) {
         if (scratchGrid[i] !== initialGridCells[i]) {
           initialization.push(i, scratchGrid[i]);
           initializationCells.add(i);
@@ -3690,7 +3690,7 @@ export class Or extends SudokuConstraintHandler {
     if (validHandlers.length === 0) return false;
 
     this._handlers = validHandlers;
-    this._numGridCells = shape.numCells;
+    this._numGridCells = shape.numGridCells;
 
     // state = [finalHandlerIndex|numRemainingHandlers, ...handlerStates]
     // For state[0] The 16th bit is a flag which determine if we are counting

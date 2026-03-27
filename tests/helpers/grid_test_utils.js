@@ -25,7 +25,7 @@ const DEFAULT_NUM_CELLS = 81;
  * - Prefer `context.initializeHandler(handler)` to avoid boilerplate; pass `{ cellExclusions, state }` only when the test is about them.
  * - `context.grid` is cached per context; use a fresh context when you need an independent grid.
  * - Build candidate masks with `valueMask(...values)` (values are 1-indexed), or via `applyCandidates`.
- * - If something needs a cell count (e.g. `createCellExclusions`), use `context.shape.numCells`.
+ * - If something needs a cell count (e.g. `createCellExclusions`), use `context.shape.numGridCells`.
  * - Consider when the API might evolve; for example if a resetGrid method would be useful on the context.
  * - Update this guidance as needed when you notice common patterns.
  */
@@ -72,12 +72,12 @@ export class GridTestContext {
   }
 
   initializeHandler(handler, { cellExclusions, state = {} } = {}) {
-    const resolvedCellExclusions = cellExclusions ?? createCellExclusions({ numCells: this.shape.numCells });
+    const resolvedCellExclusions = cellExclusions ?? createCellExclusions({ numCells: this.shape.numGridCells });
     return handler.initialize(this.grid, resolvedCellExclusions, this.shape, state);
   }
 
   createGrid({ fill = this.lookupTables.allValues } = {}) {
-    const grid = new Array(this.shape.numCells).fill(fill);
+    const grid = new Array(this.shape.numGridCells).fill(fill);
     this._grid = grid;
     return grid;
   }
@@ -89,7 +89,7 @@ export class GridTestContext {
   }
 
   cells(...args) {
-    if (args.length === 0) return this._range(this.shape.numCells);
+    if (args.length === 0) return this._range(this.shape.numGridCells);
 
     if (args.length === 1) {
       const [only] = args;

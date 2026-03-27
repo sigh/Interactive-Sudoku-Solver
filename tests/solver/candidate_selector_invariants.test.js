@@ -18,12 +18,12 @@ const makeSelector = (context, { handlerSet = [] } = {}) => {
   const { shape } = context;
   const selector = new CandidateSelector(
     shape,
-    shape.numCells,
+    shape.numGridCells,
     handlerSet,
     makeDebugLogger(),
   );
 
-  const conflictScores = new ConflictScores(new Array(shape.numCells).fill(0), shape.numValues);
+  const conflictScores = new ConflictScores(new Array(shape.numGridCells).fill(0), shape.numValues);
   selector.reset(conflictScores);
   return { selector, conflictScores };
 };
@@ -61,7 +61,7 @@ await runTest('CandidateSelector moves all singletons to the front when next cel
     const v = gridState[cellOrder[i]];
     assert.ok(v && ((v & (v - 1)) === 0), `Expected singleton at depth ${i}`);
   }
-  for (let i = nextDepth; i < shape.numCells; i++) {
+  for (let i = nextDepth; i < shape.numGridCells; i++) {
     const v = gridState[cellOrder[i]];
     assert.ok((v & (v - 1)) !== 0, `Expected non-singleton at depth ${i}`);
   }

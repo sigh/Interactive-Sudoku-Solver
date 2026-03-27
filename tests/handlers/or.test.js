@@ -26,7 +26,7 @@ function initOrHandler(context, handler) {
     }
   };
 
-  const cellExclusions = createCellExclusions({ numCells: context.shape.numCells });
+  const cellExclusions = createCellExclusions({ numCells: context.shape.numGridCells });
   const result = handler.initialize(typedGrid, cellExclusions, context.shape, stateAllocator);
 
   if (result && extraState.length) {

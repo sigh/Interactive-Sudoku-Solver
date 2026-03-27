@@ -287,7 +287,7 @@ export class TrueCandidates {
    * @yields {{ cell: string, value: number, count: number }}
    */
   *[Symbol.iterator]() {
-    const numCells = this._shape.numCells;
+    const numCells = this._shape.numGridCells;
     for (let i = 0; i < numCells; i++) {
       const baseIndex = i * this._numValues;
       for (let v = 0; v < this._numValues; v++) {
@@ -308,7 +308,7 @@ export class TrueCandidates {
    * @returns {string}
    */
   toString() {
-    const numCells = this._shape.numCells;
+    const numCells = this._shape.numGridCells;
     const baseCharCode = GridShape.baseCharCode(this._shape);
     const chars = [];
     for (let i = 0; i < numCells; i++) {
