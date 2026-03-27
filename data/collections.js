@@ -860,24 +860,6 @@ export const EXAMPLES = [
     input: '.Shape~6x6~9.RegionSize~9.~R1C1_1~R3C4_2~R2C5_1~R4C3_2~R3C2_4~R3C1_6~R5C2_3~R6C4_4~R6C6_6~R1C3_3~R6C3_7~R6C5_9~R2C1_5~R5C4_7~R2C6_7~R1C5_6~R3C6_3.DisjointSets',
     solution: '173564528917649283952831436752817496',
   },
-  {
-    name: 'Doppelganger',
-    src: 'https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?chlang=en&id=0005Q2',
-    input: '.Shape~9x9~0-9.Doppelganger.~R5C5_0.RegionSize~9.Cage~18~R1C2~R2C2~R3C2~R2C1~R2C3.Cage~22~R1C3~R1C4~R2C4.Cage~9~R1C5~R2C5~R3C5.Cage~21~R1C6~R2C6~R1C7.Cage~31~R1C8~R2C8~R2C7~R2C9~R3C8.Cage~6~R3C6~R4C7~R4C6~R3C7.Cage~16~R3C3~R3C4~R4C4~R4C3.Cage~8~R5C1~R5C2~R5C3.Cage~22~R7C2~R8C2~R9C2~R8C1~R8C3.Cage~8~R8C4~R9C4~R9C3.Cage~23~R7C5~R8C5~R9C5.Cage~9~R6C3~R6C4~R7C4~R7C3.Cage~20~R8C6~R9C6~R9C7.Cage~6~R6C6~R7C6~R7C7~R6C7.Cage~23~R8C7~R8C8~R8C9~R9C8~R7C8.Cage~20~R5C7~R5C8~R5C9.LittleKiller~13~R1C1.LittleKiller~9~R1C9',
-    solution: '259638470403729618761540293096471385512806749874253061980362154325187906147095832',
-  },
-  {
-    name: 'Dutch-pelganger',
-    src: 'https://sudokupad.app/t4fevoplnv',
-    input: '.Shape~9x9~0-9.Doppelganger.Whisper~4~R1C2~R1C1~R2C1.Whisper~4~R2C1~R1C2.Whisper~4~R1C3~R2C2~R3C1.Whisper~4~R3C2~R2C3~R3C3.Whisper~4~R3C2~R3C3.Whisper~4~R2C5~R2C6~R3C6.Whisper~4~R2C5~R3C6.Whisper~4~R1C7~R2C7~R1C8.Whisper~4~R1C7~R1C8.Whisper~4~R2C9~R3C8~R3C9.Whisper~4~R2C9~R3C9.Whisper~4~R5C9~R5C8~R6C8.Whisper~4~R6C8~R5C9.Whisper~4~R7C7~R8C7~R9C7~R8C8.Whisper~4~R7C7~R8C8.Whisper~4~R7C6~R8C5~R9C4.Whisper~4~R9C5~R8C6~R9C6.Whisper~4~R9C5~R9C6.Whisper~4~R7C4~R7C5~R8C4.Whisper~4~R7C4~R8C4.Whisper~4~R7C3~R7C2~R8C2.Whisper~4~R8C2~R7C3.Whisper~4~R6C2~R5C1~R6C1.Whisper~4~R6C1~R6C2.Whisper~4~R5C4~R4C4~R5C5~R6C6~R5C6.Whisper~4~R5C4~R5C5~R5C6.Whisper~4~DGR3~DGR4~DGR5.Whisper~4~DGR6~DGR7~DGR8.Whisper~4~DGC2~DGC3~DGC4.Whisper~4~DGB2~DGB4~DGB5.Whisper~4~DGB5~DGB2',
-    solution: '916837042520649831784210659172563480863904715045728396351082967298475103607391524',
-  },
-  {
-    name: 'Dutch-pelganger - easier',
-    src: 'https://sudokupad.app/t4fevoplnv',
-    input: '.Shape~9x9~0-9.Doppelganger.Whisper~4~R1C2~R1C1~R2C1.Whisper~4~R2C1~R1C2.Whisper~4~R1C3~R2C2~R3C1.Whisper~4~R3C2~R2C3~R3C3.Whisper~4~R3C2~R3C3.Whisper~4~R2C5~R2C6~R3C6.Whisper~4~R2C5~R3C6.Whisper~4~R1C7~R2C7~R1C8.Whisper~4~R1C7~R1C8.Whisper~4~R2C9~R3C8~R3C9.Whisper~4~R2C9~R3C9.Whisper~4~R5C9~R5C8~R6C8.Whisper~4~R6C8~R5C9.Whisper~4~R7C7~R8C7~R9C7~R8C8.Whisper~4~R7C7~R8C8.Whisper~4~R7C6~R8C5~R9C4.Whisper~4~R9C5~R8C6~R9C6.Whisper~4~R9C5~R9C6.Whisper~4~R7C4~R7C5~R8C4.Whisper~4~R7C4~R8C4.Whisper~4~R7C3~R7C2~R8C2.Whisper~4~R8C2~R7C3.Whisper~4~R6C2~R5C1~R6C1.Whisper~4~R6C1~R6C2.Whisper~4~R5C4~R4C4~R5C5~R6C6~R5C6.Whisper~4~R5C4~R5C5~R5C6.Whisper~4~DGR3~DGR4~DGR5.Whisper~4~DGR6~DGR7~DGR8.Whisper~4~DGC2~DGC3~DGC4.Whisper~4~DGB2~DGB4~DGB5.Whisper~4~DGB5~DGB2.GreaterThan~DGB9~DGB8~DGB6.~R8C3_8~R3C5_1',
-    solution: '916837042520649831784210659172563480863904715045728396351082967298475103607391524',
-  },
 
   //////////////////////////////////////////////////////////////////////////////
   // Or
@@ -1111,6 +1093,34 @@ export const EXAMPLES = [
     name: '0-indexed: Sums and indexing',
     input: '.Shape~9x9~0-8.SumLine~10~R3C2~R3C3~R3C4~R3C5~R4C5.Sum~0~R4C5~R3C6.~R3C5_8~R8C3_0~R6C5_7~R9C6_2.RellikCage~5~R6C8~R7C8~R7C7~R7C6.Lunchbox~5~R8C2~R8C3~R8C4~R8C5~R8C6.Lunchbox~11~R2C2~R3C2~R4C2~R5C2~R6C3.XSum~C7~~16.Sandwich~17~R5.Indexing~C~R1C6.ValueIndexing~R1C7~R2C7~R3C7~R4C7~R5C7~R5C8.Cage~10~R9C7~R9C8~R9C9~R8C9.NumberedRoom~C8~~8',
     solution: '712456308508731426346280715273108654184625037065374182851047263420563871637812540',
+  },
+
+  //////////////////////////////////////////////////////////////////////////////
+  // Extra variables
+  //////////////////////////////////////////////////////////////////////////////
+  {
+    name: 'Doppelganger',
+    src: 'https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?chlang=en&id=0005Q2',
+    input: '.Shape~9x9~0-9.Doppelganger.~R5C5_0.RegionSize~9.Cage~18~R1C2~R2C2~R3C2~R2C1~R2C3.Cage~22~R1C3~R1C4~R2C4.Cage~9~R1C5~R2C5~R3C5.Cage~21~R1C6~R2C6~R1C7.Cage~31~R1C8~R2C8~R2C7~R2C9~R3C8.Cage~6~R3C6~R4C7~R4C6~R3C7.Cage~16~R3C3~R3C4~R4C4~R4C3.Cage~8~R5C1~R5C2~R5C3.Cage~22~R7C2~R8C2~R9C2~R8C1~R8C3.Cage~8~R8C4~R9C4~R9C3.Cage~23~R7C5~R8C5~R9C5.Cage~9~R6C3~R6C4~R7C4~R7C3.Cage~20~R8C6~R9C6~R9C7.Cage~6~R6C6~R7C6~R7C7~R6C7.Cage~23~R8C7~R8C8~R8C9~R9C8~R7C8.Cage~20~R5C7~R5C8~R5C9.LittleKiller~13~R1C1.LittleKiller~9~R1C9',
+    solution: '259638470403729618761540293096471385512806749874253061980362154325187906147095832',
+  },
+  {
+    name: 'Dutch-pelganger',
+    src: 'https://sudokupad.app/t4fevoplnv',
+    input: '.Shape~9x9~0-9.Doppelganger.Whisper~4~R1C2~R1C1~R2C1.Whisper~4~R2C1~R1C2.Whisper~4~R1C3~R2C2~R3C1.Whisper~4~R3C2~R2C3~R3C3.Whisper~4~R3C2~R3C3.Whisper~4~R2C5~R2C6~R3C6.Whisper~4~R2C5~R3C6.Whisper~4~R1C7~R2C7~R1C8.Whisper~4~R1C7~R1C8.Whisper~4~R2C9~R3C8~R3C9.Whisper~4~R2C9~R3C9.Whisper~4~R5C9~R5C8~R6C8.Whisper~4~R6C8~R5C9.Whisper~4~R7C7~R8C7~R9C7~R8C8.Whisper~4~R7C7~R8C8.Whisper~4~R7C6~R8C5~R9C4.Whisper~4~R9C5~R8C6~R9C6.Whisper~4~R9C5~R9C6.Whisper~4~R7C4~R7C5~R8C4.Whisper~4~R7C4~R8C4.Whisper~4~R7C3~R7C2~R8C2.Whisper~4~R8C2~R7C3.Whisper~4~R6C2~R5C1~R6C1.Whisper~4~R6C1~R6C2.Whisper~4~R5C4~R4C4~R5C5~R6C6~R5C6.Whisper~4~R5C4~R5C5~R5C6.Whisper~4~DGR3~DGR4~DGR5.Whisper~4~DGR6~DGR7~DGR8.Whisper~4~DGC2~DGC3~DGC4.Whisper~4~DGB2~DGB4~DGB5.Whisper~4~DGB5~DGB2',
+    solution: '916837042520649831784210659172563480863904715045728396351082967298475103607391524',
+  },
+  {
+    name: 'Dutch-pelganger - easier',
+    src: 'https://sudokupad.app/t4fevoplnv',
+    input: '.Shape~9x9~0-9.Doppelganger.Whisper~4~R1C2~R1C1~R2C1.Whisper~4~R2C1~R1C2.Whisper~4~R1C3~R2C2~R3C1.Whisper~4~R3C2~R2C3~R3C3.Whisper~4~R3C2~R3C3.Whisper~4~R2C5~R2C6~R3C6.Whisper~4~R2C5~R3C6.Whisper~4~R1C7~R2C7~R1C8.Whisper~4~R1C7~R1C8.Whisper~4~R2C9~R3C8~R3C9.Whisper~4~R2C9~R3C9.Whisper~4~R5C9~R5C8~R6C8.Whisper~4~R6C8~R5C9.Whisper~4~R7C7~R8C7~R9C7~R8C8.Whisper~4~R7C7~R8C8.Whisper~4~R7C6~R8C5~R9C4.Whisper~4~R9C5~R8C6~R9C6.Whisper~4~R9C5~R9C6.Whisper~4~R7C4~R7C5~R8C4.Whisper~4~R7C4~R8C4.Whisper~4~R7C3~R7C2~R8C2.Whisper~4~R8C2~R7C3.Whisper~4~R6C2~R5C1~R6C1.Whisper~4~R6C1~R6C2.Whisper~4~R5C4~R4C4~R5C5~R6C6~R5C6.Whisper~4~R5C4~R5C5~R5C6.Whisper~4~DGR3~DGR4~DGR5.Whisper~4~DGR6~DGR7~DGR8.Whisper~4~DGC2~DGC3~DGC4.Whisper~4~DGB2~DGB4~DGB5.Whisper~4~DGB5~DGB2.GreaterThan~DGB9~DGB8~DGB6.~R8C3_8~R3C5_1',
+    solution: '916837042520649831784210659172563480863904715045728396351082967298475103607391524',
+  },
+  {
+    name: 'Bates Motel',
+    src: 'https://www.youtube.com/watch?v=tKGjkTJj9lU',
+    input: '.Shape~6x6.Var~A~Numbered%20Rooms~8.AllDifferent~VA1~R1C1~R1C2~R1C3~R2C3~VA2.AllDifferent~VA3~VA4~R2C6~R1C6~R1C5~R1C4.AllDifferent~R2C4~R2C5~R3C5~R4C5~R4C4~R4C6.AllDifferent~VA5~VA6~R6C5~R5C5~R5C6~R6C6.AllDifferent~VA7~R6C2~R5C2~R4C2~R5C1~R6C1.AllDifferent~R4C3~R3C3~R3C2~R2C2~R2C1~VA8.ValueIndexing~VA1~R1C1~R1C2~R1C3~R1C4~R1C5~R1C6.ValueIndexing~VA2~R1C3~R2C3~R3C3~R4C3~R5C3~R6C3.ValueIndexing~VA3~R1C6~R1C5~R1C4~R1C3~R1C2~R1C1.ValueIndexing~VA4~R2C6~R2C5~R2C4~R2C3~R2C2~R2C1.ValueIndexing~VA5~R6C5~R5C5~R4C5~R3C5~R2C5~R1C5.ValueIndexing~VA6~R6C6~R5C6~R4C6~R3C6~R2C6~R1C6.ValueIndexing~VA7~R6C2~R5C2~R4C2~R3C2~R2C2~R1C2.ValueIndexing~VA8~R2C1~R2C2~R2C3~R2C4~R2C5~R2C6',
+    solution: '514263326451261534435612152346643125',
   }
 ];
 

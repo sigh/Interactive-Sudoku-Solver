@@ -99,9 +99,9 @@ export class GridShape {
       numRows, numCols, this.numValues, valueOffset);
     this.gridDimsStr = `${numRows}x${numCols}`;
 
-    this._stateCellRegistry = new StateCellRegistry(this.numCells);
+    this._varCellRegistry = new VarCellRegistry(this.numCells);
     this._cellGraph = null;
-    this._stateCellRegistry.addChangeListener(() => { this._cellGraph = null; });
+    this._varCellRegistry.addChangeListener(() => { this._cellGraph = null; });
   }
 
   cellGraph() {
@@ -109,41 +109,41 @@ export class GridShape {
   }
 
   totalCells() {
-    return this.numCells + this._stateCellRegistry.numStateCells();
+    return this.numCells + this._varCellRegistry.numVarCells();
   }
 
-  stateCellGroups() {
-    return this._stateCellRegistry.getGroups();
+  varCellGroups() {
+    return this._varCellRegistry.getGroups();
   }
 
-  stateCellsForGroup(prefix) {
-    return this._stateCellRegistry.getCellsForGroup(prefix);
+  varCellsForGroup(prefix) {
+    return this._varCellRegistry.getCellsForGroup(prefix);
   }
 
-  clearStateCells() {
-    this._stateCellRegistry.clear();
+  clearVarCells() {
+    this._varCellRegistry.clear();
   }
 
-  onStateCellsChanged(fn) {
-    this._stateCellRegistry.addChangeListener(fn);
+  onVarCellsChanged(fn) {
+    this._varCellRegistry.addChangeListener(fn);
   }
 
-  _allStateCellSpecsForConstraints(constraints) {
+  _allVarCellSpecsForConstraints(constraints) {
     const allSpecs = [];
     for (const c of constraints) {
-      allSpecs.push(...c.getStateCellGroups(this));
+      allSpecs.push(...c.getVarCellGroups(this));
     }
     return allSpecs;
   }
 
-  removeStateCellsForConstraints(constraints) {
-    this._stateCellRegistry.removeGroups(
-      this._allStateCellSpecsForConstraints(constraints));
+  removeVarCellsForConstraints(constraints) {
+    this._varCellRegistry.removeGroups(
+      this._allVarCellSpecsForConstraints(constraints));
   }
 
-  addStateCellsForConstraints(constraints) {
-    this._stateCellRegistry.addGroups(
-      this._allStateCellSpecsForConstraints(constraints));
+  addVarCellsForConstraints(constraints) {
+    this._varCellRegistry.addGroups(
+      this._allVarCellSpecsForConstraints(constraints));
   }
 
   minValue() {
@@ -194,7 +194,7 @@ export class GridShape {
   }
 
   makeCellIdFromIndex = (i) => {
-    const namedId = this._stateCellRegistry.getCellId(i);
+    const namedId = this._varCellRegistry.getCellId(i);
     if (namedId) return namedId;
     if (i >= this.numCells) return `$${i - this.numCells}`;
     return this.makeCellId(...this.splitCellIndex(i));
@@ -229,7 +229,7 @@ export class GridShape {
     if (cellId[0] === '$') {
       return { cell: this.numCells + parseInt(cellId.substring(1)) };
     }
-    const registryCell = this._stateCellRegistry.getCellIndex(cellId);
+    const registryCell = this._varCellRegistry.getCellIndex(cellId);
     if (registryCell !== null) return { cell: registryCell };
     throw new Error('Invalid cell ID: ' + cellId);
   }
@@ -243,7 +243,7 @@ export class GridShape {
   }
 }
 
-class StateCellRegistry {
+class VarCellRegistry {
   constructor(cellIndexOffset = 0) {
     this._cellIndexOffset = cellIndexOffset;
     this._groups = new Map();
@@ -258,7 +258,7 @@ class StateCellRegistry {
     const added = [];
     for (const { prefix, count, label, hidden, columns } of specs) {
       if (this._groups.has(prefix)) {
-        throw Error(`State cell group prefix '${prefix}' already exists`);
+        throw Error(`Var cell group prefix '${prefix}' already exists`);
       }
       this._groups.set(prefix, {
         prefix, count, label,
@@ -331,7 +331,7 @@ class StateCellRegistry {
     return this._groups.get(prefix)?.cells || null;
   }
 
-  numStateCells() {
+  numVarCells() {
     return this._totalCells;
   }
 
@@ -361,7 +361,7 @@ export class CellGraph {
 
   static get(shape) {
     const base = this._gridGraph(shape);
-    const groups = shape.stateCellGroups();
+    const groups = shape.varCellGroups();
     if (!groups.length) return base;
 
     const graph = base._graph.slice();

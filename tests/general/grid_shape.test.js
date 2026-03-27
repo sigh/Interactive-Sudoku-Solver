@@ -452,26 +452,26 @@ await runTest('CellGraph works for different grid sizes', () => {
 logSuiteComplete('CellGraph');
 
 // ============================================================================
-// shape.cellGraph() (state cell adjacency + caching)
+// shape.cellGraph() (var cell adjacency + caching)
 // ============================================================================
 
 function makeShapeWithGroups(size, groups) {
   const shape = GridShape.fromGridSize(size);
-  shape._stateCellRegistry.addGroups(groups);
+  shape._varCellRegistry.addGroups(groups);
   return shape;
 }
 
-await runTest('cellGraph: caches result without state cells', () => {
+await runTest('cellGraph: caches result without var cells', () => {
   const shape = GridShape.fromGridSize(9);
   assert.equal(shape.cellGraph(), shape.cellGraph());
 });
 
-await runTest('cellGraph: state cells have correct edges within group', () => {
+await runTest('cellGraph: var cells have correct edges within group', () => {
   const shape = makeShapeWithGroups(9, [
     { prefix: 'T', label: 'test', count: 9 },
   ]);
   const graph = shape.cellGraph();
-  const cells = shape.stateCellsForGroup('T');
+  const cells = shape.varCellsForGroup('T');
 
   // First cell: no LEFT, has RIGHT.
   const e0 = graph.cellEdges(cells[0]);
@@ -498,7 +498,7 @@ await runTest('cellGraph: multi-row group has UP/DOWN edges', () => {
     { prefix: 'B', label: 'box', count: 9, columns: 3 },
   ]);
   const graph = shape.cellGraph();
-  const cells = shape.stateCellsForGroup('B');
+  const cells = shape.varCellsForGroup('B');
 
   // Center cell (index 4, row 1 col 1): all 4 neighbors.
   const e4 = graph.cellEdges(cells[4]);
@@ -521,8 +521,8 @@ await runTest('cellGraph: no edges between different groups', () => {
     { prefix: 'B', label: 'beta', count: 4 },
   ]);
   const graph = shape.cellGraph();
-  const aCells = shape.stateCellsForGroup('A');
-  const bCells = shape.stateCellsForGroup('B');
+  const aCells = shape.varCellsForGroup('A');
+  const bCells = shape.varCellsForGroup('B');
 
   const eALast = graph.cellEdges(aCells[3]);
   const eBFirst = graph.cellEdges(bCells[0]);
@@ -534,21 +534,21 @@ await runTest('cellGraph: no edges between different groups', () => {
   }
 });
 
-await runTest('cellGraph: no edges between grid and state cells', () => {
+await runTest('cellGraph: no edges between grid and var cells', () => {
   const shape = makeShapeWithGroups(4, [
     { prefix: 'T', label: 'test', count: 4 },
   ]);
   const graph = shape.cellGraph();
-  const stateCells = new Set(shape.stateCellsForGroup('T'));
+  const varCells = new Set(shape.varCellsForGroup('T'));
 
   for (let i = 0; i < shape.numCells; i++) {
     for (const adj of graph.cellEdges(i)) {
-      if (adj !== null) assert.ok(!stateCells.has(adj));
+      if (adj !== null) assert.ok(!varCells.has(adj));
     }
   }
 });
 
-await runTest('cellGraph: grid cell edges unchanged with state cells', () => {
+await runTest('cellGraph: grid cell edges unchanged with var cells', () => {
   const shape = makeShapeWithGroups(9, [
     { prefix: 'T', label: 'test', count: 9 },
   ]);
@@ -561,12 +561,12 @@ await runTest('cellGraph: grid cell edges unchanged with state cells', () => {
   assert.equal(edges[CellGraph.DOWN], shape.cellIndex(5, 4));
 });
 
-await runTest('cellGraph: cellsAreConnected works for state cells', () => {
+await runTest('cellGraph: cellsAreConnected works for var cells', () => {
   const shape = makeShapeWithGroups(4, [
     { prefix: 'T', label: 'test', count: 4 },
   ]);
   const graph = shape.cellGraph();
-  const cells = shape.stateCellsForGroup('T');
+  const cells = shape.varCellsForGroup('T');
 
   assert.ok(graph.cellsAreConnected(new Set(cells)));
   assert.ok(graph.cellsAreConnected(new Set([cells[0], cells[1]])));
@@ -582,30 +582,30 @@ await runTest('cellGraph: returns same instance on repeated calls', () => {
   assert.equal(g1, g2);
 });
 
-await runTest('cellGraph: invalidates when state cells change', () => {
+await runTest('cellGraph: invalidates when var cells change', () => {
   const shape = GridShape.fromGridSize(4);
   const g1 = shape.cellGraph();
 
-  shape._stateCellRegistry.addGroups([
+  shape._varCellRegistry.addGroups([
     { prefix: 'T', label: 'test', count: 4 },
   ]);
   const g2 = shape.cellGraph();
   assert.notEqual(g1, g2);
 
-  // New graph has state cell edges.
-  const cells = shape.stateCellsForGroup('T');
+  // New graph has var cell edges.
+  const cells = shape.varCellsForGroup('T');
   assert.notEqual(g2.cellEdges(cells[0]), undefined);
   assert.equal(g2.cellEdges(cells[0])[CellGraph.RIGHT], cells[1]);
 });
 
 await runTest('cellGraph: invalidates on removal too', () => {
   const shape = GridShape.fromGridSize(4);
-  shape._stateCellRegistry.addGroups([
+  shape._varCellRegistry.addGroups([
     { prefix: 'T', label: 'test', count: 4 },
   ]);
   const g1 = shape.cellGraph();
 
-  shape._stateCellRegistry.removeGroups([{ prefix: 'T' }]);
+  shape._varCellRegistry.removeGroups([{ prefix: 'T' }]);
   const g2 = shape.cellGraph();
   assert.notEqual(g1, g2);
 

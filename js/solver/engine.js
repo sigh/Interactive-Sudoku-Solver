@@ -351,8 +351,8 @@ class InternalSolver {
     this._numSearchCells = shape.totalCells();
     if (this._numSearchCells > 256) {
       throw new Error(
-        'Too many cells. grid + state cells must be <= 256. ' +
-        `grid cells: ${shape.numCells}, state cells: ${this._numSearchCells - shape.numCells}`);
+        'Too many cells. grid + var cells must be <= 256. ' +
+        `grid cells: ${shape.numCells}, var cells: ${this._numSearchCells - shape.numCells}`);
     }
     this._debugLogger = debugLogger;
 
@@ -1452,7 +1452,7 @@ export class CellExclusions {
     return result;
   }
 
-  // Total number of cells involved in the search (grid cells + state cells).
+  // Total number of cells involved in the search (grid cells + var cells).
   numSearchCells() {
     return this._numSearchCells;
   }

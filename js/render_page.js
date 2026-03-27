@@ -402,7 +402,7 @@ class RootConstraintCollection extends ConstraintCollectionBase {
 
   reshape(shape) {
     this._shape = shape;
-    shape.onStateCellsChanged(({ removed }) => {
+    shape.onVarCellsChanged(({ removed }) => {
       if (!removed.length) return;
       const hasRemovedCells = (cell) =>
         removed.some(p => cell.startsWith(p)
@@ -418,7 +418,7 @@ class RootConstraintCollection extends ConstraintCollectionBase {
   clear() {
     this._uniquenessKeySet.clear();
     this._constraintMap.clear();
-    this._shape.clearStateCells();
+    this._shape.clearVarCells();
   }
 
   constraints() {
@@ -457,7 +457,7 @@ class RootConstraintCollection extends ConstraintCollectionBase {
       constraint.constructor.CATEGORY).onAddConstraint(
         constraint);
 
-    this._shape.addStateCellsForConstraints([constraint]);
+    this._shape.addVarCellsForConstraints([constraint]);
 
     this._updateListener();
   }
@@ -478,7 +478,7 @@ class RootConstraintCollection extends ConstraintCollectionBase {
       constraint.constructor.CATEGORY).onRemoveConstraint(
         constraint);
 
-    this._shape.removeStateCellsForConstraints([constraint]);
+    this._shape.removeVarCellsForConstraints([constraint]);
     this._updateListener();
   }
 
@@ -856,15 +856,15 @@ class ConstraintManager {
     const shape = constraint.getShape();
     this._rootCollection.setShape(shape);
 
-    // Add state-cell-defining constraints first so their cell IDs are
+    // Add var-cell-defining constraints first so their cell IDs are
     // available when subsequent constraints reference them.
-    const stateConstraints = [];
+    const varConstraints = [];
     const otherConstraints = [];
     constraint.forEachTopLevel(c => {
-      (c.getStateCellGroups(shape).length
-        ? stateConstraints : otherConstraints).push(c);
+      (c.getVarCellGroups(shape).length
+        ? varConstraints : otherConstraints).push(c);
     });
-    for (const c of stateConstraints) this._rootCollection.addConstraint(c);
+    for (const c of varConstraints) this._rootCollection.addConstraint(c);
     for (const c of otherConstraints) this._rootCollection.addConstraint(c);
 
     this.runUpdateCallback();

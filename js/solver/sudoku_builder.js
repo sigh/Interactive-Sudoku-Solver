@@ -12,7 +12,7 @@ export class SudokuBuilder {
   static build(constraint, debugOptions) {
     const shape = constraint.getShape();
     const constraintMap = constraint.toMap();
-    shape.addStateCellsForConstraints([].concat(...constraintMap.values()));
+    shape.addVarCellsForConstraints([].concat(...constraintMap.values()));
 
     const handlers = [...this._handlers(constraintMap, shape)];
 
@@ -866,47 +866,47 @@ export class SudokuBuilder {
     const colRegions = SudokuConstraintBase.colRegions(shape);
     const boxRegions = this._getBoxRegions(shape, constraintMap);
 
-    const [zeroCell] = shape.stateCellsForGroup('DGZ');
-    const colStateCells = shape.stateCellsForGroup('DGC');
-    const rowStateCells = shape.stateCellsForGroup('DGR');
-    const boxStateCells = shape.stateCellsForGroup('DGB');
+    const [zeroCell] = shape.varCellsForGroup('DGZ');
+    const colVarCells = shape.varCellsForGroup('DGC');
+    const rowVarCells = shape.varCellsForGroup('DGR');
+    const boxVarCells = shape.varCellsForGroup('DGB');
 
-    // Fix the zero cell to value 0. This propagates through the state cell
-    // AllDifferent groups to prevent state cells from holding 0 (Rule 1).
+    // Fix the zero cell to value 0. This propagates through the var cell
+    // AllDifferent groups to prevent var cells from holding 0 (Rule 1).
     yield new HandlerModule.GivenCandidates(new Map([[zeroCell, [0]]]));
 
-    // If there are no boxes, fix box state cells to 0 so they don't
+    // If there are no boxes, fix box var cells to 0 so they don't
     // participate in search.
     if (!boxRegions.length) {
       const fixedCells = new Map();
-      for (const cell of boxStateCells) fixedCells.set(cell, [0]);
+      for (const cell of boxVarCells) fixedCells.set(cell, [0]);
       yield new HandlerModule.GivenCandidates(fixedCells);
     }
-    // 10-cell AllDifferent for each region + its state cell.
+    // 10-cell AllDifferent for each region + its var cell.
     // The optimizer will promote these to House via _addHouseHandlers.
     for (let i = 0; i < gridSize; i++) {
       yield new HandlerModule.AllDifferent(
-        [...rowRegions[i], colStateCells[i]]);
+        [...rowRegions[i], colVarCells[i]]);
     }
     for (let i = 0; i < gridSize; i++) {
       yield new HandlerModule.AllDifferent(
-        [...colRegions[i], rowStateCells[i]]);
+        [...colRegions[i], rowVarCells[i]]);
     }
     for (let i = 0; i < boxRegions.length; i++) {
       yield new HandlerModule.AllDifferent(
-        [...boxRegions[i], boxStateCells[i]]);
+        [...boxRegions[i], boxVarCells[i]]);
     }
 
     // Rule 2: No two rows/columns/boxes may be missing the same digit.
     // Adding zeroCell makes these N+1 cells with N+1 values, which the
     // optimizer promotes to House (more powerful than plain AllDifferent).
     yield new HandlerModule.AllDifferent(
-      [...colStateCells, zeroCell]);
+      [...colVarCells, zeroCell]);
     yield new HandlerModule.AllDifferent(
-      [...rowStateCells, zeroCell]);
+      [...rowVarCells, zeroCell]);
     if (boxRegions.length) {
       yield new HandlerModule.AllDifferent(
-        [...boxStateCells, zeroCell]);
+        [...boxVarCells, zeroCell]);
     }
 
     // Rule 3: For each 0 in the grid, the digits missing in its row, column,
@@ -921,10 +921,10 @@ export class SudokuBuilder {
     for (let r = 0; r < gridSize; r++) {
       for (let c = 0; c < gridSize; c++) {
         const cell = shape.cellIndex(r, c);
-        const stateCells = [colStateCells[r], rowStateCells[c]];
+        const varCells = [colVarCells[r], rowVarCells[c]];
         const boxIdx = cellToBox[cell];
-        if (boxIdx !== NO_BOX) stateCells.push(boxStateCells[boxIdx]);
-        yield new HandlerModule.DoppelgangerZero(cell, stateCells);
+        if (boxIdx !== NO_BOX) varCells.push(boxVarCells[boxIdx]);
+        yield new HandlerModule.DoppelgangerZero(cell, varCells);
       }
     }
   }

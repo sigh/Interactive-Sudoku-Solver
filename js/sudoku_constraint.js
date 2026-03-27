@@ -165,7 +165,7 @@ export class SudokuConstraintBase {
     return this.cells || [];
   }
 
-  getStateCellGroups(shape) {
+  getVarCellGroups(shape) {
     return [];
   }
 
@@ -1364,7 +1364,7 @@ export class SudokuConstraint {
       && shape.valueOffset === -1
       && shape.numValues === shape.numRows + 1;
 
-    getStateCellGroups(shape) {
+    getVarCellGroups(shape) {
       const defaultSize = GridShape.defaultNumValues(
         shape.numRows, shape.numCols);
       const [boxHeight, boxWidth] = GridShape.boxDimsForSize(
@@ -2500,7 +2500,7 @@ export class SudokuConstraint {
       }).join('');
     }
 
-    getStateCellGroups(shape) {
+    getVarCellGroups(shape) {
       return this.groups;
     }
 

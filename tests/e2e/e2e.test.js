@@ -190,10 +190,16 @@ const solveCollections = [
       '0-indexed: Sequence sudoku',  // NFA
       '0-indexed: Regex line',  // Regex
       '0-indexed: Sums and indexing',  // SumLine, XSum, Rellik, Lunchbox, Sandwich, Indexing, ValueIndexing, NumberedRoom
-      'Doppelganger',  // Doppelganger
-      'Dutch-pelganger - easier',  // Doppelganger, Whisper on state cells
     ],
   },
+  {
+    collection: 'Extra Variables',
+    puzzles: [
+      'Doppelganger',  // Doppelganger
+      'Dutch-pelganger - easier',  // Doppelganger, Whisper on state cells
+      'Bates Motel',  // Var, ValueIndexing, 6x6
+    ],
+  }
 ];
 
 const layoutCases = [
@@ -300,7 +306,7 @@ for (const { collection, puzzles } of solveCollections) {
   );
   runSolveResults.push({ collection, stats });
 }
-assert.equal(runSolveResults.length, 5, 'solve collections should return five collections');
+assert.equal(runSolveResults.length, 6, 'should solve all collections');
 runSolveResults.forEach((result) => expectStatsStructure(result, `solve tests (${result.collection})`));
 console.log('✓ solve collections completed');
 runSolveResults.forEach((result) => logCollectionSummary(result));

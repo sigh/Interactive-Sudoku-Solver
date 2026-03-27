@@ -1048,7 +1048,7 @@ ConstraintCategoryInput.Region = class Region extends ConstraintCategoryInput {
       ? shape.numValues : +this._regionSizeSelect.value;
     if (cells.length !== requiredLength) return false;
 
-    // State cells are not valid in jigsaw pieces.
+    // Var cells are not valid in jigsaw pieces.
     if (cells.some(c => shape.parseCellId(c).row === undefined)) return false;
 
     // Check that we don't conflict with any existing constraints.

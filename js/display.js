@@ -439,8 +439,8 @@ export class DisplayContainer {
     this._highlightDisplay = new HighlightDisplay(
       this.getNewGroup('highlight-group'), this._cellPositioner);
 
-    this._stateCellDisplay = new StateCellDisplay(
-      this.getNewGroup('state-cell-group'));
+    this._varCellDisplay = new VarCellDisplay(
+      this.getNewGroup('var-cell-group'));
 
     this._clickInterceptor = new ClickInterceptor(this._cellPositioner);
     container.append(this._clickInterceptor.getSvg());
@@ -462,8 +462,8 @@ export class DisplayContainer {
     this._highlightDisplay.reshape(shape);
     this._clickInterceptor.reshape(shape);
 
-    shape.onStateCellsChanged(
-      () => this._updateStateCells(shape.stateCellGroups()));
+    shape.onVarCellsChanged(
+      () => this._updateVarCells(shape.varCellGroups()));
   }
 
   _setExtraHeight(extraHeight) {
@@ -477,12 +477,12 @@ export class DisplayContainer {
 
   getCellPositioner() { return this._cellPositioner; }
 
-  _updateStateCells(groups) {
-    const { extraHeight, layout } = this._cellPositioner.setStateCellGroups(
+  _updateVarCells(groups) {
+    const { extraHeight, layout } = this._cellPositioner.setVarCellGroups(
       groups);
     this._setExtraHeight(extraHeight);
-    this._stateCellDisplay.render(layout);
-    this._clickInterceptor.setStateCellLayout(layout);
+    this._varCellDisplay.render(layout);
+    this._clickInterceptor.setVarCellLayout(layout);
   }
 
   createCellHighlighter(cssClass) {
@@ -523,7 +523,7 @@ class ClickInterceptor extends DisplayItem {
     this._gridRect.setAttribute('pointer-events', 'all');
     svg.appendChild(this._gridRect);
 
-    this._stateCellRects = [];
+    this._varCellRects = [];
   }
 
   reshape(shape) {
@@ -539,11 +539,11 @@ class ClickInterceptor extends DisplayItem {
     this._gridRect.setAttribute('width', width);
     this._gridRect.setAttribute('height', this._gridHeight);
 
-    this._clearStateCellRects();
+    this._clearVarCellRects();
   }
 
-  setStateCellLayout(layout) {
-    this._clearStateCellRects();
+  setVarCellLayout(layout) {
+    this._clearVarCellRects();
     const svg = this.getSvg();
     const cellSize = DisplayItem.CELL_SIZE;
     let maxBottom = this._gridHeight;
@@ -557,16 +557,16 @@ class ClickInterceptor extends DisplayItem {
       rect.setAttribute('fill', 'transparent');
       rect.setAttribute('pointer-events', 'all');
       svg.appendChild(rect);
-      this._stateCellRects.push(rect);
+      this._varCellRects.push(rect);
       maxBottom = Math.max(maxBottom, y + rows * cellSize);
     }
 
     svg.setAttribute('height', maxBottom);
   }
 
-  _clearStateCellRects() {
-    for (const rect of this._stateCellRects) rect.remove();
-    this._stateCellRects = [];
+  _clearVarCellRects() {
+    for (const rect of this._varCellRects) rect.remove();
+    this._varCellRects = [];
   }
 
   cellAt(x, y) {
@@ -835,7 +835,7 @@ class CellHighlighter {
   }
 }
 
-export class StateCellDisplay extends DisplayItem {
+export class VarCellDisplay extends DisplayItem {
   constructor(svg) {
     super(svg);
   }
@@ -846,7 +846,7 @@ export class StateCellDisplay extends DisplayItem {
 
     const cellSize = DisplayItem.CELL_SIZE;
     const padding = DisplayItem.SVG_PADDING;
-    const labelHeight = CellPositioner.STATE_CELL_LABEL_HEIGHT;
+    const labelHeight = CellPositioner.VAR_CELL_LABEL_HEIGHT;
 
     const svg = this.getSvg();
     svg.setAttribute('transform', `translate(${padding},${padding})`);
@@ -910,7 +910,7 @@ export class StateCellDisplay extends DisplayItem {
       const label = createSvgElement('text');
       label.setAttribute('x', 0);
       label.setAttribute('y', yLabel + labelHeight - 3);
-      label.setAttribute('class', 'state-cell-label');
+      label.setAttribute('class', 'var-cell-label');
       const groupPrefix = group.prefix[0] === 'V'
         ? '$' + group.prefix.substring(1) : group.prefix;
       const groupLabel = group.label ? `: ${group.label}` : '';
@@ -925,13 +925,13 @@ export class StateCellDisplay extends DisplayItem {
 }
 
 class CellPositioner {
-  static STATE_CELL_GAP = 20;
-  static STATE_CELL_LABEL_HEIGHT = 14;
+  static VAR_CELL_GAP = 20;
+  static VAR_CELL_LABEL_HEIGHT = 14;
 
   constructor() {
     this._shape = null;
     this._centers = [];
-    this._stateCellLayout = { extraHeight: 0, layout: [] };
+    this._varCellLayout = { extraHeight: 0, layout: [] };
   }
 
   reshape(shape) {
@@ -947,14 +947,14 @@ class CellPositioner {
       centers[i] = [col * cellSize + cellSize / 2, row * cellSize + cellSize / 2];
     }
     this._centers = centers;
-    this._stateCellLayout = { extraHeight: 0, layout: [] };
+    this._varCellLayout = { extraHeight: 0, layout: [] };
   }
 
-  setStateCellGroups(groups) {
-    const result = this._computeStateCellLayout(groups);
-    this._stateCellLayout = result;
+  setVarCellGroups(groups) {
+    const result = this._computeVarCellLayout(groups);
+    this._varCellLayout = result;
 
-    // Update centers with state cell positions.
+    // Update centers with var cell positions.
     const cellSize = DisplayItem.CELL_SIZE;
     const centers = this._centers.slice(0, this._shape.numCells);
     for (const { group, columns, y } of result.layout) {
@@ -972,8 +972,8 @@ class CellPositioner {
     return result;
   }
 
-  stateCellLayout() {
-    return this._stateCellLayout;
+  varCellLayout() {
+    return this._varCellLayout;
   }
 
   cellIndexAt(x, y) {
@@ -987,8 +987,8 @@ class CellPositioner {
       return shape.cellIndex(row, col);
     }
 
-    // State cells.
-    for (const { group, columns, rows, y: cellY } of this._stateCellLayout.layout) {
+    // Var cells.
+    for (const { group, columns, rows, y: cellY } of this._varCellLayout.layout) {
       if (y >= cellY && y < cellY + rows * cellSize) {
         const r = (y - cellY) / cellSize | 0;
         const c = x / cellSize | 0;
@@ -1002,12 +1002,12 @@ class CellPositioner {
     return null;
   }
 
-  _computeStateCellLayout(groups) {
+  _computeVarCellLayout(groups) {
     if (!groups?.length) return { extraHeight: 0, layout: [] };
 
     const cellSize = DisplayItem.CELL_SIZE;
-    const gap = CellPositioner.STATE_CELL_GAP;
-    const labelHeight = CellPositioner.STATE_CELL_LABEL_HEIGHT;
+    const gap = CellPositioner.VAR_CELL_GAP;
+    const labelHeight = CellPositioner.VAR_CELL_LABEL_HEIGHT;
     const gridHeight = cellSize * this._shape.numRows;
     const defaultColumns = this._shape.numCols;
 
