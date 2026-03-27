@@ -77,6 +77,8 @@ layout: null
             <li><a href="#general-skyscraper">General Skyscraper</a></li>
             <li><a href="#ambiguous-arrow">Ambiguous Arrow</a></li>
             <li><a href="#generalized-entropic-line">Generalized Entropic Line</a></li>
+            <li><a href="#index-line">Index Line</a></li>
+            <li><a href="#magnet-sum">Magnet Sum</a></li>
           </ul>
         </li>
         <li><a href="#javascript-sandbox">JavaScript Sandbox</a></li>
@@ -304,15 +306,15 @@ layout: null
 NUM_CELLS = 3;  // Number of cells in the set
 startState = { min: 16, max: -1 };
 
-function transition(state, value) {
+function transition({ min, max }, value) {
   return {
-    min: Math.min(state.min, value),
-    max: Math.max(state.max, value),
+    min: Math.min(min, value),
+    max: Math.max(max, value),
   };
 }
 
-function accept(state) {
-  return state.max - state.min !== NUM_CELLS - 1;
+function accept({ min, max }) {
+  return max - min !== NUM_CELLS - 1;
 }</pre>
         </p>
         <p>
@@ -323,38 +325,38 @@ function accept(state) {
 NUM_CELLS = 3;  // Number of cells in the set
 startState = {type: 'start'};
 
-function transition(state, value) {
-  if (state.type === 'start') {
+function transition({ type, min, max, value: trackedValue }, value) {
+  if (type === 'start') {
     return [
       { type: "rangeCheck", min: value, max: value },
       { type: "duplicateCheck", value },
     ];
   }
-  if (state.type === 'rangeCheck') {
+  if (type === 'rangeCheck') {
     return [{
       type: "rangeCheck",
-      min: Math.min(state.min, value),
-      max: Math.max(state.max, value),
+      min: Math.min(min, value),
+      max: Math.max(max, value),
     }];
   }
-  if (state.type === 'duplicateCheck') {
-    if (value === state.value) {
+  if (type === 'duplicateCheck') {
+    if (value === trackedValue) {
       return [{ type: 'hasDuplicate' }];
     } else {
       return [
-        state,
+        { type: 'duplicateCheck', value: trackedValue },
         { type: 'duplicateCheck', value }
       ];
     }
   }
-  if (state.type === 'hasDuplicate') return [state];
+  if (type === 'hasDuplicate') return [{ type: 'hasDuplicate' }];
 }
 
-function accept(state) {
-  if (state.type == 'rangeCheck') {
-    return state.max - state.min !== NUM_CELLS - 1;
+function accept({ type, min, max }) {
+  if (type == 'rangeCheck') {
+    return max - min !== NUM_CELLS - 1;
   }
-  return (state.type === 'hasDuplicate');
+  return (type === 'hasDuplicate');
 }</pre>
         </p>
 
@@ -376,15 +378,15 @@ function accept(state) {
         <pre>
 startState = { lastVal: null, diff: null };
 
-function transition(state, value) {
-  if (state.lastVal == null) {
+function transition({ lastVal, diff }, value) {
+  if (lastVal == null) {
     return { lastVal: value, diff: null};
   }
 
-  const diff = value - state.lastVal;
+  const nextDiff = value - lastVal;
 
-  if (state.diff == null || state.diff == diff) {
-    return { lastVal: value, diff: diff };
+  if (diff == null || diff == nextDiff) {
+    return { lastVal: value, diff: nextDiff };
   }
 }
 
@@ -448,11 +450,9 @@ function accept(state) {
         <pre>
 startState = { remaining: null };
 
-function transition(state, value) {
+function transition({ remaining }, value) {
   const isOdd = x => x%2 == 1;
   const isEven = x => x%2 == 0;
-
-  let remaining = state.remaining;
 
   // If we are starting, then initialize the count of remaining values.
   if (remaining == null) remaining = value;
@@ -464,8 +464,8 @@ function transition(state, value) {
   if (remaining >= 0) return { remaining: remaining };
 }
 
-function accept(state) {
-  return state.remaining == 0;
+function accept({ remaining }) {
+  return remaining == 0;
 }</pre>
         </p>
 
@@ -539,15 +539,15 @@ return state % 2 === 1;</pre>
         <pre>
 startState = { max: 0, seen: 0 };
 
-function transition(state, value) {
+function transition({ max, seen }, value) {
   return {
-    max: Math.max(state.max, value),
-    seen: state.seen + (value > state.max),
+    max: Math.max(max, value),
+    seen: seen + (value > max),
   }
 }
 
-function accept(state) {
-  return state.seen === 5;  // Change to target number of visible buildings
+function accept({ seen }) {
+  return seen === 5;  // Change to target number of visible buildings
 }</pre>
         </p>
 
@@ -566,17 +566,17 @@ function accept(state) {
         <pre>
 startState = { max: 0, sum: 0 };
 
-function transition(state, value) {
-  if (state.sum > 18) return;
+function transition({ max, sum }, value) {
+  if (sum > 18) return;
 
   return {
-    max: Math.max(state.max, value),
-    sum: state.sum + value
+    max: Math.max(max, value),
+    sum: sum + value
   }
 }
 
-function accept(state) {
-  return state.sum === 2*state.max;
+function accept({ max, sum }) {
+  return sum === 2*max;
 }</pre>
         </p>
 
@@ -598,16 +598,92 @@ sets = [[1, 2, 3], [4, 5, 6], [7, 8, 9]];
 
 startState = { window: [] };
 
-function transition(state, value) {
+function transition({ window }, value) {
   const index = sets.findIndex(s => s.includes(value));
   if (index < 0) return;
-  const window = [...state.window, index].slice(-sets.length);
-  if (new Set(window).size < window.length) return;
-  return { window };
+  const nextWindow = [...window, index].slice(-sets.length);
+  if (new Set(nextWindow).size < nextWindow.length) return;
+  return { window: nextWindow };
 }
 
 function accept(state) {
   return true;
+}</pre>
+        </p>
+
+        <h3 id="index-line">Index Line</h3>
+        <p>
+          <b>Description:</b>
+          On an index line, the digit in the Nth cell
+          indicates the position along the line where the digit N
+          appears. For example, <code>3 2 1 4</code> is valid: the 1st digit
+          is 3, so digit 1 appears at position 3; and the 3rd digit is 1, so
+          digit 3 appears at position 1.
+        </p>
+        <p>
+          Implement this by configuring a state machine in the
+          "Custom JavaScript constraints" panel. The state tracks the current
+          <code>position</code> and a <code>futures</code> map of
+          unsatisfied digits.
+          if the current position already has an expectation, it is checked and
+          cleared. If the current digit refers to a future position, that
+          expectation is recorded. The line is valid when all expectations have
+          been satisfied:
+        <pre>
+startState = { position: 0, futures: {} };
+
+function transition({ position, futures }, value) {
+  position++;
+
+  if (value &lt; position || futures[position] !== undefined) {
+    if (futures[position] !== value) return;
+    delete futures[position];
+  }
+  if (value &gt; position) {
+    if (futures[value] !== undefined) return;
+    futures[value] = position;
+  }
+
+  return { position, futures };
+}
+
+function accept({ futures }) {
+  return Object.keys(futures).length === 0;
+}</pre>
+        </p>
+
+        <h3 id="magnet-sum">Magnet Sum</h3>
+        <p>
+          <b>Description:</b>
+          In a magnet clue cell, let the clue value be <code>M</code>. Moving
+          in the indicated direction, sum digits until the first digit greater
+          than <code>M</code> is encountered. The sum of those seen digits must
+          equal <code>M</code>.
+        </p>
+        <p>
+          Implement this by configuring a state machine in the
+          "Custom JavaScript constraints" panel. Select the clue cell first,
+          followed by all the cells in the indicated direction:
+        <pre>
+startState = { first: null, sum: 0, done: false };
+
+function transition({ first, sum, done }, value) {
+  if (done) {
+    return { first, sum, done };
+  }
+  if (first === null) {
+    return { first: value, sum, done };
+  }
+  if (value &gt; first) {
+    return sum !== first ? [] :
+      { first: 0, sum: 0, done: true };
+  }
+  sum += value;
+  return sum &gt; first ? [] : { first, sum, done };
+}
+
+function accept({ first, sum }) {
+  return first === sum;
 }</pre>
         </p>
       </div>
