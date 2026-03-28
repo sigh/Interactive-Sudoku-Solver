@@ -522,4 +522,36 @@ await runTest('_cellsAre2x2Square: non-square state cells', () => {
     ['B1', 'B2', 'B3', 'B4'], shape));
 });
 
+await runTest('NFA.makeFromArgs treats non-underscore items as cells', () => {
+  const constraints = [...SudokuConstraint.NFA.makeFromArgs(
+    ['encoded', '_named', 'R1C1', '$0', '', '$1'],
+    GridShape.fromGridSize(9))];
+
+  assert.equal(constraints.length, 2);
+
+  assert.equal(constraints[0].encodedNFA, 'encoded');
+  assert.equal(constraints[0].name, 'named');
+  assert.deepEqual(constraints[0].cells, ['R1C1', '$0']);
+
+  assert.equal(constraints[1].encodedNFA, 'encoded');
+  assert.equal(constraints[1].name, 'named');
+  assert.deepEqual(constraints[1].cells, ['$1']);
+});
+
+await runTest('Pair.makeFromArgs treats non-underscore items as cells', () => {
+  const constraints = [...SudokuConstraint.Pair.makeFromArgs(
+    ['key', '_group', '$0', 'R1C2', '', '$1'],
+    GridShape.fromGridSize(9))];
+
+  assert.equal(constraints.length, 2);
+
+  assert.equal(constraints[0].key, 'key');
+  assert.equal(constraints[0].name, 'group');
+  assert.deepEqual(constraints[0].cells, ['$0', 'R1C2']);
+
+  assert.equal(constraints[1].key, 'key');
+  assert.equal(constraints[1].name, 'group');
+  assert.deepEqual(constraints[1].cells, ['$1']);
+});
+
 logSuiteComplete('Adjacency validation');

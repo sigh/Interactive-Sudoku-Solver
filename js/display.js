@@ -889,11 +889,12 @@ export class VarCellDisplay extends DisplayItem {
       // Border path (accounting for partial last row).
       const border = createSvgElement('path');
       const lastRowY = y + (rows - 1) * cellSize;
+      const topWidth = rows > 1 ? groupWidth : lastRowWidth;
       const d = [
         'M0,', y,
-        'h', groupWidth,
+        'h', topWidth,
         'v', lastRowY - y,
-        'h', lastRowWidth - groupWidth,
+        'h', lastRowWidth - topWidth,
         'v', cellSize,
         'h', -lastRowWidth,
         'Z',

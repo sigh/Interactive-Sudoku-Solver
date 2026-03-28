@@ -1137,58 +1137,17 @@ export class SudokuConstraint {
     static *makeFromArgs(args, shape) {
       const [encodedNFA, ...items] = args;
 
-      let currentName = '';
-      let currentCells = [];
-
-      for (const item of items) {
-        if (item.length && 'R' === item[0].toUpperCase()) {
-          currentCells.push(item);
-          continue;
-        }
-
-        if (currentCells.length) {
-          yield new this(encodedNFA, currentName, ...currentCells);
-        }
-
-        if (item.length) {
-          currentName = this.uriDecodeArg(item.substring(1));
-        }
-
-        currentCells = [];
-      }
-
-      if (currentCells.length) {
-        yield new this(encodedNFA, currentName, ...currentCells);
+      for (const group of parseNamedCellGroups(items, this.uriDecodeArg)) {
+        yield new this(encodedNFA, group.name, ...group.cells);
       }
     }
 
     static serialize(constraints) {
-      const parts = [];
-
-      constraints.sort(
-        (a, b) => a.encodedNFA.localeCompare(b.encodedNFA) || a.name.localeCompare(b.name));
-
-      for (const defGroup of groupSortedBy(constraints, c => c.encodedNFA)) {
-        const encodedNFA = defGroup[0].encodedNFA;
-        const items = [];
-
-        for (const nameGroup of groupSortedBy(defGroup, c => c.name)) {
-          let first = true;
-          for (const part of nameGroup) {
-            if (first) {
-              items.push('_' + this.uriEncodeArg(part.name));
-              first = false;
-            } else {
-              items.push('');
-            }
-            items.push(...part.cells);
-          }
-        }
-
-        parts.push(this._argsToString(encodedNFA, ...items));
-      }
-
-      return parts.join('');
+      return serializeNamedCellGroups(
+        constraints,
+        c => c.encodedNFA,
+        name => this.uriEncodeArg(name),
+        (encodedNFA, items) => this._argsToString(encodedNFA, ...items));
     }
   }
 
@@ -2263,61 +2222,18 @@ export class SudokuConstraint {
     }
 
     static serialize(constraints) {
-      const parts = [];
-
-      // Sort so that all keys appear together, and names within keys.
-      constraints.sort(
-        (a, b) => a.key.localeCompare(b.key) || a.name.localeCompare(b.name));
-
-      for (const keyGroup of groupSortedBy(constraints, c => c.key)) {
-        const key = keyGroup[0].key;
-        const items = [];
-
-        for (const nameGroup of groupSortedBy(keyGroup, c => c.name)) {
-          let first = true;
-          for (const part of nameGroup) {
-            if (first) {
-              items.push('_' + this.uriEncodeArg(part.name));
-              first = false;
-            } else {
-              items.push('');
-            }
-            items.push(...part.cells);
-          }
-        }
-
-        parts.push(this._argsToString(key, ...items));
-      }
-
-      return parts.join('');
+      return serializeNamedCellGroups(
+        constraints,
+        c => c.key,
+        name => this.uriEncodeArg(name),
+        (key, items) => this._argsToString(key, ...items));
     }
 
     static *makeFromArgs(args, shape) {
       const [key, ...items] = args;
 
-      let currentName = '';
-      let currentCells = [];
-      for (const item of items) {
-        if (item.length && 'R' === item[0].toUpperCase()) {
-          // This is a cell.
-          currentCells.push(item);
-          continue;
-        }
-        // Otherwise we are starting a new group. Yield the current one.
-        if (currentCells.length) {
-          yield new this(key, currentName, ...currentCells);
-        }
-
-        // Update the name if it has been replaced.
-        if (item.length) {
-          currentName = this.uriDecodeArg(item.substring(1));
-        }
-
-        currentCells = [];
-      }
-
-      if (currentCells.length) {
-        yield new this(key, currentName, ...currentCells);
+      for (const group of parseNamedCellGroups(items, this.uriDecodeArg)) {
+        yield new this(key, group.name, ...group.cells);
       }
     }
 
@@ -2690,3 +2606,63 @@ export const encodedNFAToJsSpec = (encodedNFA, valueOffset = 0) => {
   const nfa = NFASerializer.deserialize(encodedNFA);
   return nfaToJavascriptSpec(nfa, valueOffset);
 };
+
+function* parseNamedCellGroups(items, decodeName) {
+  let currentName = '';
+  let currentCells = [];
+
+  const flush = () => {
+    if (!currentCells.length) return null;
+    const group = { name: currentName, cells: currentCells };
+    currentCells = [];
+    return group;
+  };
+
+  for (const item of items) {
+    if (!item.length) {
+      const group = flush();
+      if (group) yield group;
+      continue;
+    }
+
+    if (item[0] === '_') {
+      const group = flush();
+      if (group) yield group;
+      currentName = decodeName(item.substring(1));
+      continue;
+    }
+
+    currentCells.push(item);
+  }
+
+  const group = flush();
+  if (group) yield group;
+}
+
+function serializeNamedCellGroups(constraints, keyOf, encodeName, argsForGroup) {
+  const parts = [];
+  const sorted = [...constraints].sort(
+    (a, b) => keyOf(a).localeCompare(keyOf(b)) || a.name.localeCompare(b.name));
+
+  for (const keyGroup of groupSortedBy(sorted, keyOf)) {
+    const key = keyOf(keyGroup[0]);
+    const items = [];
+
+    for (const nameGroup of groupSortedBy(keyGroup, c => c.name)) {
+      let first = true;
+      for (const part of nameGroup) {
+        if (first) {
+          items.push('_' + encodeName(part.name));
+          first = false;
+        } else {
+          items.push('');
+        }
+        items.push(...part.cells);
+      }
+    }
+
+    parts.push(argsForGroup(key, items));
+  }
+
+  return parts.join('');
+}

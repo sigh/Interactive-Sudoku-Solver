@@ -198,6 +198,7 @@ const solveCollections = [
       'Doppelganger',  // Doppelganger
       'Dutch-pelganger - easier',  // Doppelganger, Whisper on state cells
       'Bates Motel',  // Var, ValueIndexing, 6x6
+      'The good, the bad and the ugly',  // Var, NFA, SameValues, Arrow, NFA (for sandwich, xsum, skyscraper)
     ],
   }
 ];
