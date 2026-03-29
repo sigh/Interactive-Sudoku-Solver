@@ -486,19 +486,26 @@ button.copy-to-clipboard-failed::after {
 .highlight-group>.chip-hover {
   fill: rgb(250, 250, 250);
   opacity: 0.9;
+  /* Filter doesn't work on safari, so also add a thin stroke */
   filter: drop-shadow(0 0 5px black);
+  stroke: rgba(0, 0, 0, 1);
+  stroke-width: 1px;
 }
 
 .highlight-group>.selected-constraint {
   fill: var(--color-selection);
   opacity: 0.7;
   filter: drop-shadow(0 0 5px black);
+  stroke: rgba(0, 0, 0, 1);
+  stroke-width: 1px;
 }
 
 .highlight-group>.latest-constraint {
   fill: var(--color-highlight);
   opacity: 0.7;
   filter: drop-shadow(0 0 5px black);
+  stroke: rgba(0, 0, 0, 1);
+  stroke-width: 1px;
 }
 
 .highlight-group>.step-cell {
