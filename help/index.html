@@ -529,6 +529,62 @@ return state % 2 === 1;</pre>
           out unwanted values in the <code>transition</code> function.
         </p>
 
+        <p>
+          In some cases, it can be easier to count down from a target sum,
+          especially if the target sum needs to be determined. In this case,
+          start with the remainingSum as <code>null</code> to indicate that it
+          is not yet known.
+          For example, to simulate a <code>Sandwich</code> constraint where
+          the first cell is the clue cell:
+        </p>
+        <pre>
+startState = {remainingSum: null, inside: false};
+
+function transition({ remainingSum, inside}, value) {
+  if (remainingSum === null) {
+    return {remainingSum: value, inside};
+  }
+  if (value === 1 || value === 9) {
+    return {remainingSum, inside: !inside};
+  }
+  if (inside) {
+    remainingSum -= value;
+  }
+  if (remainingSum >= 0) {
+    return {remainingSum, inside};
+  }
+}
+
+function accept({remainingSum}) {
+  return remainingSum === 0;
+}</pre>
+
+        <p>Likewise for <code>XSum</code>:</p>
+        <pre>
+startState = { remainingCount: null, remainingSum: null };
+
+function transition({ remainingCount, remainingSum, done }, value) {
+  if (done === true) return {done};
+  if (remainingSum === null) {
+    return {remainingCount, remainingSum: value};
+  }
+  remainingSum -= value;
+  if (remainingCount === null) {
+    remainingCount = value;
+  }
+  remainingCount--;
+  if (remainingCount === 0 && remainingSum === 0) {
+    return {done: true};
+  }
+  if (remainingCount > 0 && remainingSum > 0) {
+    return {remainingCount, remainingSum};
+  }
+}
+
+function accept({done}) {
+  return done === true;
+}</pre>
+
         <h3 id="general-skyscraper">General Skyscraper</h3>
         <p>
           <b>Description:</b>
@@ -540,23 +596,28 @@ return state % 2 === 1;</pre>
         </p>
         <p>
           Implement this by configuring a state machine in the
-          "Custom JavaScript constraints" panel. Change the `accept` function
+          "Custom JavaScript constraints" panel. Change <code>TARGET</code>
           to set the target number of visible buildings:
         <pre>
-startState = { max: 0, seen: 0 };
+TARGET = 5;  // Change to target number of visible buildings
+startState = { max: 0, remaining: TARGET };
 
-function transition({ max, seen }, value) {
+function transition({ max, remaining }, value) {
   return {
     max: Math.max(max, value),
-    seen: seen + (value > max),
+    remaining: remaining - (value > max),
   }
 }
 
-function accept({ seen }) {
-  return seen === 5;  // Change to target number of visible buildings
+function accept({ remaining }) {
+  return remaining === 0;
 }</pre>
         </p>
 
+        <p>
+          If the first cell is the clue cell, <code>remaining</code> can be set
+          to <code>null</code> and initialized on the first transition.
+        </p>
 
         <h3 id="ambiguous-arrow">Ambiguous Arrow</h3>
         <p>
