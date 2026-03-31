@@ -222,7 +222,10 @@ export class SudokuConstraintOptimizer {
     if (allSumHandlers.length === 0) return;
     // Exclude any handlers with duplicate cells from any of the optimizations.
     // TODO: Check which optimizations are still valid.
-    const safeSumHandlers = allSumHandlers.filter(h => h.onlyUnitCoeffs());
+    // Also exclude 0-cell handlers (e.g. from cancelled makeEqual) as they
+    // have no cells to optimize over.
+    const safeSumHandlers = allSumHandlers.filter(
+      h => h.onlyUnitCoeffs() && h.cells.length > 0);
 
     const [filteredSumHandlers, sumCells] =
       this._findNonOverlappingSubset(safeSumHandlers, handlerSet);

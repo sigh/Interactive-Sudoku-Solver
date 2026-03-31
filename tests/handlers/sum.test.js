@@ -277,4 +277,116 @@ await runTest('Sum.makeEqual adjusts for valueOffset', () => {
   assert.equal(result, true, 'makeEqual with offset should enforce equal external sums');
 });
 
+// =============================================================================
+// makeEqual with same/overlapping cells
+// =============================================================================
+
+await runTest('Sum.makeEqual with same array reference produces trivially true handler', () => {
+  const context = new GridTestContext();
+  const cells = [0, 1, 2];
+  const handler = Sum.makeEqual(cells, cells);
+
+  assert.equal(handler.cells.length, 0, 'handler should have no cells after cancellation');
+  context.initializeHandler(handler, { cellExclusions: uniqueCells() });
+
+  const grid = applyCandidates(context.grid, {
+    0: [3], 1: [5], 2: [9],
+  });
+  const result = handler.enforceConsistency(grid, createAccumulator());
+  assert.equal(result, true, 'identical sets are always equal');
+});
+
+await runTest('Sum.makeEqual with identical contents (different arrays) produces trivially true handler', () => {
+  const context = new GridTestContext();
+  const handler = Sum.makeEqual([0, 1, 2], [0, 1, 2]);
+
+  assert.equal(handler.cells.length, 0, 'handler should have no cells after cancellation');
+  context.initializeHandler(handler, { cellExclusions: uniqueCells() });
+
+  const grid = applyCandidates(context.grid, {
+    0: [1], 1: [2], 2: [7],
+  });
+  const result = handler.enforceConsistency(grid, createAccumulator());
+  assert.equal(result, true, 'identical cell sets are always equal');
+});
+
+await runTest('Sum.makeEqual with partially overlapping cells constrains only non-overlapping cells', () => {
+  const context = new GridTestContext();
+  // cells0=[0,1,2], cells1=[1,2,3]
+  // After cancellation: cell 0 coeff +1, cell 3 coeff -1. (cells 1,2 cancel)
+  // Constraint: value(0) = value(3).
+  const handler = Sum.makeEqual([0, 1, 2], [1, 2, 3]);
+
+  assert.equal(handler.cells.length, 2, 'only non-overlapping cells should remain');
+  context.initializeHandler(handler, { cellExclusions: nonUniqueCells() });
+
+  const grid = applyCandidates(context.grid, {
+    0: [3, 5],
+    1: [1, 2, 3, 4, 5, 6, 7, 8, 9],
+    3: [5, 7],
+  });
+  const result = handler.enforceConsistency(grid, createAccumulator());
+  assert.equal(result, true);
+  assert.equal(grid[0], valueMask(5), 'cell 0 should be restricted to match cell 3');
+  assert.equal(grid[3], valueMask(5), 'cell 3 should be restricted to match cell 0');
+});
+
+await runTest('Sum.makeEqual with single overlapping cell cancels it', () => {
+  const context = new GridTestContext();
+  // cells0=[0,1], cells1=[1,2]. Cell 1 cancels out.
+  // Constraint: value(0) = value(2).
+  const handler = Sum.makeEqual([0, 1], [1, 2]);
+
+  assert.equal(handler.cells.length, 2, 'overlapping cell should be removed');
+  context.initializeHandler(handler, { cellExclusions: nonUniqueCells() });
+
+  const grid = applyCandidates(context.grid, {
+    0: [4],
+    1: [7],
+    2: [3, 4, 6],
+  });
+  const result = handler.enforceConsistency(grid, createAccumulator());
+  assert.equal(result, true);
+  assert.equal(grid[2], valueMask(4), 'cell 2 should equal cell 0');
+});
+
+await runTest('Sum constructor filters explicitly passed zero coefficients', () => {
+  const context = new GridTestContext();
+  // Cell 1 has coeff 0, so it should be removed.
+  const handler = new Sum([0, 1, 2], 7, [1, 0, 1]);
+
+  assert.equal(handler.cells.length, 2, 'zero-coeff cell should be removed');
+  context.initializeHandler(handler, { cellExclusions: uniqueCells() });
+
+  const grid = applyCandidates(context.grid, {
+    0: [3],
+    1: [9],
+    2: [1, 4, 5],
+  });
+  const result = handler.enforceConsistency(grid, createAccumulator());
+  assert.equal(result, true);
+  assert.equal(grid[2], valueMask(4), 'cell 2 should be 4 to sum to 7 with cell 0');
+});
+
+await runTest('Sum with 0 cells and sum=0 initializes successfully', () => {
+  const context = new GridTestContext();
+  const handler = new Sum([], 0);
+  assert.equal(handler.cells.length, 0);
+
+  const initialized = context.initializeHandler(handler, { cellExclusions: uniqueCells() });
+  assert.equal(initialized, true, '0-cell sum with sum=0 is trivially satisfiable');
+
+  const result = handler.enforceConsistency(context.grid, createAccumulator());
+  assert.equal(result, true);
+});
+
+await runTest('Sum with 0 cells and nonzero sum fails initialization', () => {
+  const context = new GridTestContext();
+  const handler = new Sum([], 5);
+  assert.equal(handler.cells.length, 0);
+
+  const initialized = context.initializeHandler(handler, { cellExclusions: uniqueCells() });
+  assert.equal(initialized, false, '0-cell sum with nonzero sum is impossible');
+});
+
 logSuiteComplete('Sum handler');
