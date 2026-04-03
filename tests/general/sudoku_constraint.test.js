@@ -555,3 +555,100 @@ await runTest('Pair.makeFromArgs treats non-underscore items as cells', () => {
 });
 
 logSuiteComplete('Adjacency validation');
+
+// ============================================================================
+// Sum constraint with coefficients
+
+await runTest('Sum: constructor parses sum without coefficients', () => {
+  const c = new SudokuConstraint.Sum('15', 'R1C1', 'R1C2');
+  assert.equal(c.sum, 15);
+  assert.equal(c.coeffs, null);
+  assert.deepEqual(c.cells, ['R1C1', 'R1C2']);
+});
+
+await runTest('Sum: constructor parses sum with coefficients', () => {
+  const c = new SudokuConstraint.Sum('15_2_3', 'R1C1', 'R1C2');
+  assert.equal(c.sum, 15);
+  assert.deepEqual(c.coeffs, [2, 3]);
+  assert.deepEqual(c.cells, ['R1C1', 'R1C2']);
+});
+
+await runTest('Sum: constructor parses negative coefficients', () => {
+  const c = new SudokuConstraint.Sum('0_1_-1', 'R1C1', 'R1C2');
+  assert.equal(c.sum, 0);
+  assert.deepEqual(c.coeffs, [1, -1]);
+});
+
+await runTest('Sum: numeric sum argument works', () => {
+  const c = new SudokuConstraint.Sum(15, 'R1C1', 'R1C2');
+  assert.equal(c.sum, 15);
+  assert.equal(c.coeffs, null);
+});
+
+await runTest('Sum: chipLabel without coefficients', () => {
+  const c = new SudokuConstraint.Sum('15', 'R1C1', 'R1C2');
+  assert.equal(c.chipLabel(), 'Sum (15)');
+});
+
+await runTest('Sum: chipLabel with coefficients', () => {
+  const c = new SudokuConstraint.Sum('15_2_3', 'R1C1', 'R1C2');
+  assert.equal(c.chipLabel(), 'Sum (15) [2,3]');
+});
+
+await runTest('Sum: serialization round-trip without coefficients', () => {
+  const c = new SudokuConstraint.Sum('15', 'R1C1', 'R1C2');
+  const serialized = SudokuConstraint.Sum.serialize([c]);
+  assert.equal(serialized, '.Sum~15~R1C1~R1C2');
+
+  const args = serialized.replace('.Sum~', '').split('~');
+  const [parsed] = [...SudokuConstraint.Sum.makeFromArgs(args)];
+  assert.equal(parsed.sum, 15);
+  assert.equal(parsed.coeffs, null);
+  assert.deepEqual(parsed.cells, ['R1C1', 'R1C2']);
+});
+
+await runTest('Sum: serialization round-trip with coefficients', () => {
+  const c = new SudokuConstraint.Sum('15_2_3', 'R1C1', 'R1C2');
+  const serialized = SudokuConstraint.Sum.serialize([c]);
+  assert.equal(serialized, '.Sum~15_2_3~R1C1~R1C2');
+
+  const args = serialized.replace('.Sum~', '').split('~');
+  const [parsed] = [...SudokuConstraint.Sum.makeFromArgs(args)];
+  assert.equal(parsed.sum, 15);
+  assert.deepEqual(parsed.coeffs, [2, 3]);
+  assert.deepEqual(parsed.cells, ['R1C1', 'R1C2']);
+});
+
+await runTest('Sum: rejects non-integer sum', () => {
+  assert.throws(
+    () => new SudokuConstraint.Sum('abc', 'R1C1'),
+    { message: /Sum must be an integer/ });
+});
+
+await runTest('Sum: rejects non-integer coefficient', () => {
+  assert.throws(
+    () => new SudokuConstraint.Sum('15_2.5', 'R1C1'),
+    { message: /Coefficients must be integers between -100 and 100/ });
+});
+
+await runTest('Sum: rejects coefficient magnitude > 100', () => {
+  assert.throws(
+    () => new SudokuConstraint.Sum('15_101', 'R1C1'),
+    { message: /Coefficients must be integers between -100 and 100/ });
+  assert.throws(
+    () => new SudokuConstraint.Sum('15_-101', 'R1C1'),
+    { message: /Coefficients must be integers between -100 and 100/ });
+});
+
+await runTest('Sum: rejects mismatched coefficient and cell count', () => {
+  assert.throws(
+    () => new SudokuConstraint.Sum('15_2_3_4', 'R1C1', 'R1C2'),
+    { message: /Coefficient count \(3\) must match cell count \(2\)/ });
+});
+
+await runTest('Sum: allows coefficient magnitude of exactly 100', () => {
+  const c = new SudokuConstraint.Sum('15_100_-100', 'R1C1', 'R1C2');
+  assert.deepEqual(c.coeffs, [100, -100]);
+});
+
+logSuiteComplete('Sum constraint');

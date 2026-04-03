@@ -40,6 +40,10 @@ export class Sum extends SudokuConstraintHandler {
       if (!coeffs.every(c => Number.isInteger(c))) {
         throw new InvalidConstraintError('Sum coefficients must be integers');
       }
+      if (!coeffs.every(c => Math.abs(c) <= 100)) {
+        throw new InvalidConstraintError(
+          'Sum coefficients must be between -100 and 100');
+      }
 
       // If there are duplicates, then update the coefficients.
       // Not as efficient as it could be, but this is a rare case.

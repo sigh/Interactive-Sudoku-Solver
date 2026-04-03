@@ -322,7 +322,8 @@ export class SudokuBuilder {
 
         case 'Sum':
           cells = constraint.cells.map(c => shape.parseCellId(c).cell);
-          yield new SumHandlerModule.Sum(cells, constraint.sum);
+          yield new SumHandlerModule.Sum(
+            cells, constraint.sum, constraint.coeffs || undefined);
           break;
 
         case 'Regex':

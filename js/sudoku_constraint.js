@@ -1211,7 +1211,6 @@ export class SudokuConstraint {
     static DESCRIPTION = (`The number of rows and columns in the grid.`);
     static CATEGORY = 'Shape';
     static UNIQUENESS_KEY_FIELD = 'type';
-    static DEFAULT_SHAPE = SHAPE_9x9;
     static _DEFAULT_SPECS = new Set([
       SHAPE_9x9.name,
       `${SHAPE_9x9.gridDimsStr}~${SHAPE_9x9.numValues}`,
@@ -1251,7 +1250,10 @@ export class SudokuConstraint {
     }
 
     static getShapeFromGridSpec(gridSpec) {
-      if (!gridSpec) return this.DEFAULT_SHAPE;
+      if (!gridSpec) {
+        return GridShape.fromGridSize(
+          SHAPE_9x9.numRows, SHAPE_9x9.numCols);
+      }
       return GridShape.fromGridSpec(gridSpec);
     }
   }
@@ -1832,10 +1834,34 @@ export class SudokuConstraint {
     constructor(sum, ...cells) {
       super(sum, ...cells);
       this.cells = cells;
-      this.sum = sum;
+
+      const parts = String(sum).split('_');
+      this.sum = +parts[0];
+      if (!Number.isInteger(this.sum)) {
+        throw Error('Sum must be an integer: ' + parts[0]);
+      }
+
+      if (parts.length > 1) {
+        this.coeffs = parts.slice(1).map(Number);
+        for (const c of this.coeffs) {
+          if (!Number.isInteger(c) || Math.abs(c) > 100) {
+            throw Error('Coefficients must be integers between -100 and 100: ' + c);
+          }
+        }
+        if (this.coeffs.length !== cells.length) {
+          throw Error(
+            `Coefficient count (${this.coeffs.length}) must match ` +
+            `cell count (${cells.length})`);
+        }
+      } else {
+        this.coeffs = null;
+      }
     }
 
     chipLabel() {
+      if (this.coeffs) {
+        return `Sum (${this.sum}) [${this.coeffs.join(',')}]`;
+      }
       return `Sum (${this.sum})`;
     }
   }
