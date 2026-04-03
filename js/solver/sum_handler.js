@@ -188,7 +188,8 @@ export class Sum extends SudokuConstraintHandler {
             // This can only happen when the last exclusion group is exactly 16
             // cells.
             const eg = egs[egs.length - 1];
-            newEgs = newCells = eg.splice(0, MAX_GROUP_SIZE);
+            newCells = eg.splice(0, MAX_GROUP_SIZE);
+            newEgs = [newCells];
           }
           this._coeffGroups.push({ coeff: g.coeff, cells: newCells, exclusionGroups: newEgs });
           newCells.forEach(c => cellSet.delete(c));
@@ -237,6 +238,11 @@ export class Sum extends SudokuConstraintHandler {
       // Thus it can't be used to exclude the value from other cells.
       // (This is only relevant for calls to _enforceFewRemainingCells).
       this._cellExclusions = cellExclusions;
+    }
+
+    // Ensure the shared scratch buffer is large enough.
+    if (this.constructor._seenMinMaxs.length < this.cells.length) {
+      this.constructor._seenMinMaxs = new Uint32Array(this.cells.length);
     }
 
     // Check for valid sums.

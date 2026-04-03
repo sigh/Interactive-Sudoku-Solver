@@ -135,6 +135,36 @@ await runTest('Sum should handle cages longer than fifteen cells', () => {
   assert.equal(grid[14], valueMask(15));
 });
 
+await runTest('Sum should split a 16-cell exclusion group correctly', () => {
+  // 16 mutually-exclusive cells form a single exclusion group of size 16,
+  // which must be split (MAX_GROUP_SIZE = 15). This exercises the path where
+  // the last exclusion group is too large and must be spliced.
+  const longContext = new GridTestContext({ gridSize: [2, 16] });
+  const numCells = longContext.shape.numGridCells;
+  const { handler, context } = initializeSum({
+    numCells: 16,
+    sum: 136,
+    context: longContext,
+    cellExclusions: createCellExclusions({ allUnique: true, numCells }),
+  });
+  const assignments = {};
+  for (let i = 0; i < 12; i++) {
+    assignments[i] = [i + 1];
+  }
+  assignments[12] = [13, 14];
+  assignments[13] = [14, 15];
+  assignments[14] = [15, 16];
+  assignments[15] = [16];
+  const grid = applyCandidates(context.grid, assignments);
+
+  const result = handler.enforceConsistency(grid, createAccumulator());
+
+  assert.equal(result, true, 'handler should solve with split exclusion group');
+  assert.equal(grid[12], valueMask(13));
+  assert.equal(grid[13], valueMask(14));
+  assert.equal(grid[14], valueMask(15));
+});
+
 await runTest('Sum should restrict values based on complement cells', () => {
   const context = new GridTestContext();
   const complementCells = context.cells(10).slice(2);
