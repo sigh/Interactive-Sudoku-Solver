@@ -2437,7 +2437,13 @@ export class SudokuConstraint {
 
     static serialize(constraints) {
       return constraints.map(c => {
+        if (c.count === 1 && !c.label) {
+          return this._argsToString(c.prefix);
+        }
         const encodedLabel = this.uriEncodeArg(c.label);
+        if (c.count === 1) {
+          return this._argsToString(c.prefix, encodedLabel);
+        }
         return this._argsToString(c.prefix, encodedLabel, c.count);
       }).join('');
     }
