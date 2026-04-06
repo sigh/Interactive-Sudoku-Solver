@@ -2448,12 +2448,19 @@ export class SudokuConstraint {
       }).join('');
     }
 
+    getCells(shape) {
+      return this.groups.flatMap(
+        g => (shape.varCellsForGroup(g.prefix) || []).map(
+          c => shape.makeCellIdFromIndex(c)));
+    }
+
     getVarCellGroups(shape) {
       return this.groups;
     }
 
     chipLabel() {
-      return `Var: $${this.prefix} (${this.count})`;
+      const countStr = this.count > 1 ? `[${this.count}]` : '';
+      return `Extra Cells: $${this.prefix}${countStr}`;
     }
   }
 }
