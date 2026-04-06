@@ -527,7 +527,6 @@ class RootConstraintCollection extends ConstraintCollectionBase {
       case 'LinesAndSets':
       case 'Pairwise':
       case 'Experimental':
-      case 'Shape':
       case 'StateMachine':
         return this._chipViews.get('ordinary');
       case 'Region':
@@ -719,6 +718,15 @@ class ConstraintManager {
         this._makeCompositeCollection.bind(this),
         this._reshape.bind(this),
         this.runUpdateCallback.bind(this)));
+
+    displayContainer.onVarCellRemove((prefix) => {
+      for (const c of this._rootCollection.constraints()) {
+        if (c.getVarCellGroups(this._shape).some(g => g.prefix === prefix)) {
+          this._rootCollection.removeConstraint(c);
+          return;
+        }
+      }
+    });
 
     selectedConstraintCollection = new SelectedConstraintCollection(this._rootCollection);
 

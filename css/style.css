@@ -146,6 +146,18 @@ body {
   fill: rgb(100, 100, 100);
 }
 
+.var-cell-close {
+  font-size: 20px;
+  dominant-baseline: central;
+  fill: rgb(200, 80, 80);
+  cursor: pointer;
+  pointer-events: all;
+}
+
+.var-cell-close:hover {
+  fill: rgb(220, 40, 40);
+}
+
 .shaded-region-label {
   font-size: 10px;
   font-family: var(--font-family-mono);

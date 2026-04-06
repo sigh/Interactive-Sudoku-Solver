@@ -439,8 +439,10 @@ export class DisplayContainer {
     this._highlightDisplay = new HighlightDisplay(
       this.getNewGroup('highlight-group'), this._cellPositioner);
 
+    this._onRemoveVarCellGroup = null;
     this._varCellDisplay = new VarCellDisplay(
-      this.getNewGroup('var-cell-group'));
+      this.getNewGroup('var-cell-group'),
+      (prefix) => this._onRemoveVarCellGroup?.(prefix));
 
     this._clickInterceptor = new ClickInterceptor(this._cellPositioner);
     container.append(this._clickInterceptor.getSvg());
@@ -502,6 +504,10 @@ export class DisplayContainer {
 
   getClickInterceptor() {
     return this._clickInterceptor
+  }
+
+  onVarCellRemove(callback) {
+    this._onRemoveVarCellGroup = callback;
   }
 }
 
@@ -836,8 +842,9 @@ class CellHighlighter {
 }
 
 export class VarCellDisplay extends DisplayItem {
-  constructor(svg) {
+  constructor(svg, onRemove) {
     super(svg);
+    this._onRemove = onRemove;
   }
 
   render(layout) {
@@ -907,9 +914,18 @@ export class VarCellDisplay extends DisplayItem {
 
       svg.append(lineGroup);
 
+      // Close button.
+      const close = createSvgElement('text');
+      close.textContent = '\u00D7';
+      close.setAttribute('x', 0);
+      close.setAttribute('y', yLabel + labelHeight / 2 + 1);
+      close.setAttribute('class', 'var-cell-close');
+      close.addEventListener('click', () => this._onRemove(group.prefix));
+      svg.append(close);
+
       // Draw label above the row.
       const label = createSvgElement('text');
-      label.setAttribute('x', 0);
+      label.setAttribute('x', 14);
       label.setAttribute('y', yLabel + labelHeight - 3);
       label.setAttribute('class', 'var-cell-label');
       const groupPrefix = group.prefix[0] === 'V'
