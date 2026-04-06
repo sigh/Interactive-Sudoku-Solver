@@ -377,6 +377,33 @@ await runTest('_addSumIntersectionHandler: infeasible inferred sum adds False ha
   assert.deepEqual([...result.cells].sort((a, b) => a - b), [...extraCells].sort((a, b) => a - b));
 });
 
+await runTest('_addSumIntersectionHandler: cage with outside-grid outie cell', () => {
+  const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
+  const shape = GridShape.fromGridSize(4);
+  const numCells = shape.numGridCells + 1; // 17 to support cell 16
+  const cellExclusions = createExclusions(numCells);
+
+  // House = row 0 [0..3], sum = 10.
+  const houseCells = [0, 1, 2, 3];
+  const houseHandler = new HandlerModule.House(houseCells);
+
+  // Cage covers entire house + one cell outside the grid.
+  // Outie cell 16 should have inferred sum = 14 - 10 = 4.
+  const cageCells = [0, 1, 2, 3, 16];
+  const cageSum = 14;
+  const sumHandler = new SumHandlerModule.Sum(cageCells, cageSum);
+
+  const result = optimizer._addSumIntersectionHandler(
+    houseHandler, [sumHandler], [], [], cellExclusions, shape);
+
+  // The outie is a single cell (16) with inferred sum 4.
+  // range > 0 and dof = 0, so a handler should be created.
+  assert.ok(result);
+  assert.ok(result instanceof SumHandlerModule.Sum);
+  assert.deepEqual([...result.cells], [16]);
+  assert.equal(result.sum(), 4);
+});
+
 await runTest('_replaceSizeSpecificSumHandlers: size=numValues mutually exclusive => True/False', () => {
   const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
   const shape = GridShape.fromGridSize(9);
@@ -411,6 +438,38 @@ await runTest('_replaceSizeSpecificSumHandlers: size=numValues mutually exclusiv
     assert.equal(handlerSet.getAllofType(HandlerModule.True).length, 0);
     assert.equal(handlerSet.getAllofType(HandlerModule.False).length, 1);
   }
+});
+
+await runTest('_replaceSizeSpecificSumHandlers: 1-cell outside-grid sum converted', () => {
+  const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
+  const shape = GridShape.fromGridSize(4);
+  const numCells = shape.numGridCells + 1;
+  const cellExclusions = createExclusions(numCells);
+
+  const sumHandler = new SumHandlerModule.Sum([16], 3);
+  const handlerSet = new HandlerSet([sumHandler], numCells);
+
+  optimizer._replaceSizeSpecificSumHandlers(handlerSet, cellExclusions, shape);
+
+  // 1-cell sum should be replaced with GivenCandidates.
+  assert.equal(handlerSet.getAllofType(SumHandlerModule.Sum).length, 0);
+  assert.equal(handlerSet.getAllofType(HandlerModule.GivenCandidates).length, 1);
+});
+
+await runTest('_replaceSizeSpecificSumHandlers: 2-cell with outside-grid cell converted', () => {
+  const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
+  const shape = GridShape.fromGridSize(4);
+  const numCells = shape.numGridCells + 1;
+  const cellExclusions = createExclusions(numCells);
+
+  const sumHandler = new SumHandlerModule.Sum([0, 16], 5);
+  const handlerSet = new HandlerSet([sumHandler], numCells);
+
+  optimizer._replaceSizeSpecificSumHandlers(handlerSet, cellExclusions, shape);
+
+  // 2-cell sum should be replaced with BinaryConstraint.
+  assert.equal(handlerSet.getAllofType(SumHandlerModule.Sum).length, 0);
+  assert.equal(handlerSet.getAllofType(HandlerModule.BinaryConstraint).length, 1);
 });
 
 // =============================================================================
@@ -638,6 +697,81 @@ await runTest('_fillInSumGap: updates sumCells set', () => {
 
   // sumCells should now include all cells.
   assert.equal(sumCells.size, 81);
+});
+
+await runTest('_fillInSumGap: ignores handlers with cells outside grid', () => {
+  const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
+  const shape = GridShape.fromGridSize(9);
+  const numGridCells = shape.numGridCells; // 81
+
+  // Cover 78 grid cells with one handler, and add a handler with an
+  // out-of-grid cell. The gap is 3 cells so a new handler should be created.
+  const gridCells = shapeAllCells(shape).slice(0, 78);
+  const gridSum = 399;
+  const outsideHandler = new SumHandlerModule.Sum(
+    [numGridCells, numGridCells + 1], 10);
+  const gridHandler = new SumHandlerModule.Sum(gridCells, gridSum);
+
+  const sumCells = new Set([...gridCells, numGridCells, numGridCells + 1]);
+  const sumHandlers = [gridHandler, outsideHandler];
+
+  const result = optimizer._fillInSumGap(sumHandlers, sumCells, shape);
+
+  // Should produce a handler for the 3 remaining grid cells.
+  assert.equal(result.length, 1);
+  const newHandler = result[0];
+  assert.equal(newHandler.cells.length, 3);
+  // All cells in the new handler must be within the grid.
+  assert.ok(newHandler.cells.every(c => c < numGridCells));
+  // Sum should be based only on the grid handler, not the outside one.
+  const expectedSum = 9 * shapeMaxSum(shape) - gridSum;
+  assert.equal(newHandler.sum(), expectedSum);
+});
+
+await runTest('_fillInSumGap: returns empty when only outside-grid handlers', () => {
+  const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
+  const shape = GridShape.fromGridSize(4);
+  const numGridCells = shape.numGridCells; // 16
+
+  // Only an outside-grid handler, no grid cells covered at all.
+  // Gap = 16 cells >= numValues(4), so should return empty.
+  const outsideHandler = new SumHandlerModule.Sum(
+    [numGridCells, numGridCells + 1], 5);
+  const sumCells = new Set([numGridCells, numGridCells + 1]);
+  const sumHandlers = [outsideHandler];
+
+  const result = optimizer._fillInSumGap(sumHandlers, sumCells, shape);
+  assert.deepEqual(result, []);
+});
+
+await runTest('_fillInSumGap: mixed inside/outside handler is excluded', () => {
+  const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
+  const shape = GridShape.fromGridSize(4);
+  const numGridCells = shape.numGridCells; // 16
+
+  // Cover 13 grid cells with a clean handler.
+  const gridCells = shapeAllCells(shape).slice(0, 13);
+  const gridSum = 38;
+  const gridHandler = new SumHandlerModule.Sum(gridCells, gridSum);
+
+  // A handler that has both grid and outside-grid cells should be excluded.
+  const mixedHandler = new SumHandlerModule.Sum(
+    [13, numGridCells], 7);
+
+  const sumCells = new Set([...gridCells, 13, numGridCells]);
+  const sumHandlers = [gridHandler, mixedHandler];
+
+  const result = optimizer._fillInSumGap(sumHandlers, sumCells, shape);
+
+  // Gap is 3 cells (16 - 13), which is < numValues(4), so a handler is created.
+  assert.equal(result.length, 1);
+  const newHandler = result[0];
+  // The new handler should cover cells 13, 14, 15 (the 3 uncovered grid cells).
+  assert.equal(newHandler.cells.length, 3);
+  assert.ok(newHandler.cells.every(c => c < numGridCells));
+  // Sum based only on gridHandler.
+  const expectedSum = 4 * shapeMaxSum(shape) - gridSum;
+  assert.equal(newHandler.sum(), expectedSum);
 });
 
 // =============================================================================
@@ -982,6 +1116,49 @@ await runTest('_makeInnieOutieSumHandlers: sum calculation uses correct house su
     assert.ok(handler instanceof SumHandlerModule.Sum);
     // Sum should be a reasonable integer.
     assert.ok(Number.isInteger(handler.sum()));
+  }
+});
+
+await runTest('_makeInnieOutieSumHandlers: handler entirely outside grid produces no results', () => {
+  const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
+  const shape = GridShape.fromGridSize(4);
+
+  // All cells outside the grid: no overlap with any row/column region.
+  const outsideHandler = new SumHandlerModule.Sum([16, 17, 18, 19], 20);
+  const sumHandlers = [outsideHandler];
+
+  const result = optimizer._makeInnieOutieSumHandlers(sumHandlers, false, shape);
+  assert.deepEqual(result, []);
+});
+
+await runTest('_makeInnieOutieSumHandlers: mixed handler produces correct constraint', () => {
+  const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
+  const shape = GridShape.fromGridSize(4); // 4x4, numValues=4, maxSum=10
+
+  // Full row 0 handler + a mixed handler (3 cells in row 1 + 1 outside grid).
+  const gridHandler = new SumHandlerModule.Sum([0, 1, 2, 3], 10);
+  const mixedHandler = new SumHandlerModule.Sum([4, 5, 6, 16], 15);
+  const sumHandlers = [gridHandler, mixedHandler];
+
+  const result = optimizer._makeInnieOutieSumHandlers(sumHandlers, false, shape);
+
+  // After 2 rows, pieces region = {0-6, 16}, super region = {0-7}.
+  // diffA = {7}, diffB = {16}, sumDelta = -20 + 25 = 5.
+  // Constraint: cell_16 - cell_7 = 5, which is algebraically correct:
+  //   rows sum = 20, pieces sum = 25, so cell_16 - cell_7 = 5.
+  assert.ok(result.length > 0);
+  for (const h of result) {
+    assert.ok(h instanceof SumHandlerModule.Sum);
+    assert.ok(Number.isInteger(h.sum()));
+  }
+
+  // Find the handler for the {7, 16} diff.
+  const diffHandler = result.find(
+    h => h.cells.length === 2
+      && h.cells.includes(7) && h.cells.includes(16));
+  if (diffHandler) {
+    // |sumDelta| = 5 regardless of sign convention.
+    assert.equal(Math.abs(diffHandler.sum()), 5);
   }
 });
 
