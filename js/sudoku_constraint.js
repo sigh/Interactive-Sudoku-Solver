@@ -2412,7 +2412,7 @@ export class SudokuConstraint {
   static Var = class Var extends SudokuConstraintBase {
     static DESCRIPTION = (
       "Adds variables to use as extra cells outside the grid.");
-    static CATEGORY = 'Experimental';
+    static CATEGORY = 'Shape';
     static UNIQUENESS_KEY_FIELD = 'prefix';
 
     constructor(prefix, label, count) {

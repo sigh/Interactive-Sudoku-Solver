@@ -527,6 +527,7 @@ class RootConstraintCollection extends ConstraintCollectionBase {
       case 'LinesAndSets':
       case 'Pairwise':
       case 'Experimental':
+      case 'Shape':
       case 'StateMachine':
         return this._chipViews.get('ordinary');
       case 'Region':

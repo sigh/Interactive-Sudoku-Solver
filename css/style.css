@@ -683,7 +683,6 @@ button.copy-to-clipboard-failed::after {
 
 #constraint-panel-container {
   --constraint-panel-glow-size: 6px;
-  line-height: 1.8;
   width: var(--right-panel-width);
   box-sizing: border-box;
 }
@@ -895,6 +894,10 @@ select.thin-select {
 
 .shape-panel-body .hstack {
   column-gap: 5px;
+}
+
+.var-constraint-fields {
+  gap: 2px;
 }
 
 .shape-input {
