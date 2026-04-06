@@ -1841,8 +1841,8 @@ export class SudokuConstraint {
         throw Error('Sum must be an integer: ' + parts[0]);
       }
 
-      if (parts.length > 1) {
-        this.coeffs = parts.slice(1).map(Number);
+      if (parts.length > 1 && parts[1] === '=') {
+        this.coeffs = parts.slice(2).map(Number);
         for (const c of this.coeffs) {
           if (!Number.isInteger(c) || Math.abs(c) > 100) {
             throw Error('Coefficients must be integers between -100 and 100: ' + c);
