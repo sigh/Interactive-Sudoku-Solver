@@ -255,7 +255,7 @@ class VarCellRegistry {
   }
 
   addGroups(specs) {
-    const added = [];
+    let anyAdded = false;
     for (const { prefix, count, label, hidden, columns } of specs) {
       if (this._groups.has(prefix)) {
         throw Error(`Var cell group prefix '${prefix}' already exists`);
@@ -265,31 +265,34 @@ class VarCellRegistry {
         hidden: hidden || false,
         columns: columns || 0,
       });
-      added.push(prefix);
+      anyAdded = true;
     }
-    if (added.length === 0) return;
+    if (!anyAdded) return;
     this._rebuild();
-    this._notify({ added, removed: [] });
+    this._notify({ removedCellIds: [] });
   }
 
   removeGroups(specs) {
-    const removed = [];
+    const removedCellIds = [];
     for (const { prefix } of specs) {
-      if (!this._groups.has(prefix)) continue;
+      const group = this._groups.get(prefix);
+      if (!group) continue;
+      for (const cellIndex of group.cells) {
+        removedCellIds.push(this._cellToId.get(cellIndex));
+      }
       this._groups.delete(prefix);
-      removed.push(prefix);
     }
-    if (removed.length === 0) return;
+    if (removedCellIds.length === 0) return;
     this._rebuild();
-    this._notify({ added: [], removed });
+    this._notify({ removedCellIds });
   }
 
   clear() {
     if (this._groups.size === 0) return;
-    const removed = [...this._groups.keys()];
+    const removedCellIds = [...this._cellToId.values()];
     this._groups.clear();
     this._rebuild();
-    this._notify({ added: [], removed });
+    this._notify({ removedCellIds });
   }
 
   _rebuild() {

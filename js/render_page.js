@@ -402,14 +402,21 @@ class RootConstraintCollection extends ConstraintCollectionBase {
 
   reshape(shape) {
     this._shape = shape;
-    shape.onVarCellsChanged(({ removed }) => {
-      if (!removed.length) return;
-      const hasRemovedCells = (cell) =>
-        removed.some(p => cell.startsWith(p)
-          && /^\d*$/.test(cell.substring(p.length)));
-      for (const c of [...this._constraintMap.keys()]) {
-        if (c.getCells(shape).some(hasRemovedCells)) {
-          this.removeConstraint(c);
+    shape.onVarCellsChanged(({ removedCellIds }) => {
+      // Remove constraints whose cells no longer exist.
+      if (removedCellIds.length) {
+        const removed = new Set(removedCellIds);
+        for (const c of [...this._constraintMap.keys()]) {
+          if (c.getCells(shape).some(id => removed.has(id))) {
+            this.removeConstraint(c);
+          }
+        }
+      }
+
+      // Redraw all displayed constraints, as cell positions may have shifted.
+      for (const [c, state] of this._constraintMap) {
+        if (state.displayElem) {
+          this.updateConstraint(c);
         }
       }
     });
@@ -492,10 +499,10 @@ class RootConstraintCollection extends ConstraintCollectionBase {
       constraintState.displayElem = this._display.drawConstraint(constraint);
     }
     const chip = constraintState.chip;
-    if (chip) {
+    if (chip && constraintState.displayElem) {
       this._chipViewForConstraint(constraint).replaceChipIcon(
         chip,
-        constraintState.displayElem?.cloneNode(true));
+        constraintState.displayElem.cloneNode(true));
     }
     this._updateListener();
   }
@@ -520,6 +527,15 @@ class RootConstraintCollection extends ConstraintCollectionBase {
 
   getConstraintsByType(type) {
     return [...this._constraintMap.keys()].filter(c => c.type === type);
+  }
+
+  removeConstraintForVarPrefix(prefix) {
+    for (const c of this._constraintMap.keys()) {
+      if (c.getVarCellGroups(this._shape).some(g => g.prefix === prefix)) {
+        this.removeConstraint(c);
+        return;
+      }
+    }
   }
 
   _chipViewForConstraint(constraint) {
@@ -719,14 +735,8 @@ class ConstraintManager {
         this._reshape.bind(this),
         this.runUpdateCallback.bind(this)));
 
-    displayContainer.onVarCellRemove((prefix) => {
-      for (const c of this._rootCollection.constraints()) {
-        if (c.getVarCellGroups(this._shape).some(g => g.prefix === prefix)) {
-          this._rootCollection.removeConstraint(c);
-          return;
-        }
-      }
-    });
+    displayContainer.onVarCellRemove(
+      (prefix) => this._rootCollection.removeConstraintForVarPrefix(prefix));
 
     selectedConstraintCollection = new SelectedConstraintCollection(this._rootCollection);
 
@@ -1126,8 +1136,7 @@ class ConstraintChipView {
   replaceChipIcon(chip, newIcon) {
     const iconElem = this.constructor._makeChipIcon(newIcon, this._shape);
     const oldElem = chip.querySelector(
-      ':scope > .chip-label > .chip-icon',
-      ':scope > .chip-icon');
+      ':scope > .chip-label > .chip-icon, :scope > .chip-icon');
     oldElem.replaceWith(iconElem);
   }
 
