@@ -312,8 +312,13 @@ ConstraintCategoryInput.Shape = class Shape extends ConstraintCategoryInput {
     this._gridSpecInput.setCustomValidity('');
     this._updateValueRangeDropdowns(shape);
 
+    this._updateExtraCellsWarning();
+    shape.onVarCellsChanged(() => this._updateExtraCellsWarning());
+  }
+
+  _updateExtraCellsWarning() {
     const showWarning =
-      !shape.isDefaultNumValues() || shape.valueOffset !== 0;
+      this._shape.totalCells() > this._shape.numGridCells;
     this._warningElem.style.display = showWarning ? '' : 'none';
     this._warningIcon.style.display = showWarning ? '' : 'none';
   }
