@@ -1860,7 +1860,7 @@ export class SudokuConstraint {
 
     chipLabel() {
       if (this.coeffs) {
-        return `Sum (${this.sum}) [${this.coeffs.join(',')}]`;
+        return `Sum (${this.sum}) [${this.coeffs.join(', ')}]`;
       }
       return `Sum (${this.sum})`;
     }
