@@ -2,6 +2,8 @@
 
 This directory contains the solver that finds solutions to Sudoku puzzles with arbitrary constraint combinations. It runs inside a Web Worker (see [../solver_worker.js](../solver_worker.js)) to keep the UI responsive.
 
+For a detailed description of the engine internals (propagation queue, search stack, grid state management, public API), see [SOLVER_ENGINE.md](SOLVER_ENGINE.md).
+
 ## How It Works (High Level)
 
 The solver is a **constraint-satisfaction problem (CSP) engine** that uses backtracking search with constraint propagation. The core loop is:
@@ -53,43 +55,24 @@ flowchart TD
 | File | Purpose |
 |------|---------|
 | [engine.js](engine.js) | **Core solver.** `SudokuSolver` is the public API (`countSolutions`, `nthSolution`, `nthStep`, `solveAllPossibilities`). `InternalSolver` implements the search loop with a pre-allocated stack (no recursion). Manages constraint propagation to a fixed point via `HandlerAccumulator`. |
-| [handlers.js](handlers.js) | **Constraint handler library.** `SudokuConstraintHandler` is the base class — all handlers implement `enforceConsistency(grid, accumulator)` which removes invalid candidates and returns `false` on contradiction. ~33 handler implementations including `AllDifferent`, `BinaryConstraint`, `House`, `And`, `Or`. `HandlerSet` maps cells to their handlers for efficient lookup. |
+| [handlers.js](handlers.js) | **Constraint handler library.** `SudokuConstraintHandler` is the base class — all handlers implement `enforceConsistency(grid, accumulator)` which removes invalid candidates and returns `false` on contradiction. ~33 handler implementations including `AllDifferent`, `BinaryConstraint`, `House`, `And`, `Or`. |
 | [sudoku_builder.js](sudoku_builder.js) | **Constraint-to-handler bridge.** `SudokuBuilder.build(constraint, debugOptions)` converts high-level constraint objects into solver handlers. Contains the mapping from each constraint type (Cage, Arrow, Thermo, etc.) to the handler(s) that enforce it. |
 | [optimizer.js](optimizer.js) | **Constraint derivation.** Adds logically-implied handlers that don't change the solution set but speed up propagation: innie/outie sums, cage gap filling, house handlers, jigsaw intersection logic, binary constraint transitivity, combined sums, and more. |
-| [candidate_selector.js](candidate_selector.js) | **Search heuristics.** `CandidateSelector` picks which cell to solve next (MRV with conflict-score tiebreaking) and which value to try first. `ConflictScores` tracks cells that caused contradictions to improve future ordering. `SeenCandidateSet` deduplicates solutions. |
+| [candidate_selector.js](candidate_selector.js) | **Search heuristics.** `CandidateSelector` picks which cell to solve next (ranked by conflict score per candidate, falling back to MRV when scores are zero) and which value to try first. `ConflictScores` tracks cells that caused contradictions to improve future ordering. `SeenCandidateSet` deduplicates solutions. |
 | [sum_handler.js](sum_handler.js) | **Algebraic sum constraints.** Handles equations of the form `Σ cᵢ·vᵢ = target` with integer coefficients. Used for cages, arrows, pill arrows, and optimizer-derived sums. Groups cells by coefficient. Specialized fast paths for 1–3 remaining unfixed cells. |
 | [nfa_handler.js](nfa_handler.js) | **NFA-based sequential constraints.** Enforces constraints on ordered cell sequences (palindromes, whisper lines, regex patterns) using a compressed NFA representation. Uses a forward+backward pass to prune candidates. |
 | [lookup_tables.js](lookup_tables.js) | **Precomputed tables.** `LookupTables` provides O(1) bitmask lookups: `sum[mask]` (sum of values in a bitmask), `rangeInfo[mask]` (min/max/isFixed), `reverse[mask]` (complement). Also decodes binary relationship keys for pairwise constraints. |
 
-## Key Abstractions
-
-### Handler Interface
-
-Every constraint in the solver is a handler implementing this interface:
-
-- **`enforceConsistency(grid, accumulator)`** — The core method. Inspects `grid[cell]` bitmasks for its cells, removes invalid candidates, and adds changed cells to the accumulator for further propagation. Returns `false` if a contradiction is detected.
-- **`initialize(initialGrid, cellExclusions, shape, stateAllocator)`** — One-time setup before search begins.
-- **`cells`** — `Uint8Array` of cell indices this handler constrains.
-- **`exclusionCells()`** — Returns cells that must have distinct values (used by the optimizer).
-- **`priority()`** — Hint for cell selection ordering.
-
-The engine doesn't know about specific constraint types — it just iterates handlers calling `enforceConsistency`.
-
-### Constraint-to-Handler Mapping
+## Constraint-to-Handler Mapping
 
 [sudoku_builder.js](sudoku_builder.js) contains the mapping from each `SudokuConstraint.*` type to one or more handlers. For example:
 
 - `Cage` → `Sum` handler + `AllDifferent` handler
 - `Arrow` → `Sum.makeEqual()` (equality between circle and arrow cells)
 - `PillArrow` → `Sum` with negative power-of-10 coefficients
-- `Palindrome` → `NFAConstraint`
 - `AntiKnight` → multiple `BinaryConstraint` instances (one per affected pair)
 
-### Cell Candidates as Bitmasks
-
-Each cell's possible values are stored as a 16-bit integer where bit `i` represents value `i+1`. This enables O(1) set operations (AND to intersect, OR to union, popcount to count candidates). The [lookup_tables.js](lookup_tables.js) module precomputes derived values (sums, ranges) for every possible bitmask.
-
-### Optimization Phase
+## Optimization Phase
 
 After handlers are created, [optimizer.js](optimizer.js) analyzes them and adds derived handlers. Examples:
 
@@ -98,4 +81,5 @@ After handlers are created, [optimizer.js](optimizer.js) analyzes them and adds 
 - Add `House` handlers (optimized `AllDifferent` for full rows/columns/boxes).
 - Derive exclusion relationships from binary constraint transitivity.
 
-Derived handlers are marked non-essential and can be disabled for debugging.
+Derived handlers are marked non-essential and may be skipped by the solver
+in certain places.

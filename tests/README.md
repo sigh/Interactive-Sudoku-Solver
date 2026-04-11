@@ -28,3 +28,35 @@ node tests/run_all_tests.js
 - Tests import modules directly (ES modules) and call `runTest(name, async fn)`.
 - `GridTestContext` (from [helpers/grid_test_utils.js](helpers/grid_test_utils.js)) sets up a solver grid with a given size for handler tests.
 - Handler tests typically: create a grid, add the handler under test, run `enforceConsistency`, and assert that candidates were correctly pruned.
+
+## Writing Handler Tests
+
+Handler tests live in [handlers/](handlers/). The standard pattern:
+
+```js
+import { GridTestContext, createAccumulator, valueMask }
+  from '../helpers/grid_test_utils.js';
+
+const context = new GridTestContext({ gridSize: [1, 4] });
+const handler = new MyHandler([0, 1], someParam);
+context.initializeHandler(handler);
+
+const grid = context.grid;
+grid[0] = valueMask(1, 2);    // candidates {1, 2}
+grid[1] = valueMask(1, 2, 3); // candidates {1, 2, 3}
+
+const acc = createAccumulator();
+const result = handler.enforceConsistency(grid, acc);
+
+assert.equal(result, true);
+assert.equal(grid[1], valueMask(/* expected */));
+assert.ok(acc.touched.has(1)); // cell 1 was modified
+```
+
+- `GridTestContext({ gridSize })` creates a `GridShape` and fills all cells
+  with the all-candidates bitmask. Use `[rows, cols]` for non-square grids.
+- `context.initializeHandler(handler)` calls `initialize` with default
+  cell exclusions and grid state.
+- `valueMask(1, 2, 3)` creates a bitmask for 1-indexed values.
+- `createAccumulator()` returns a mock with a `touched` set recording which
+  cells were passed to `addForCell`.
