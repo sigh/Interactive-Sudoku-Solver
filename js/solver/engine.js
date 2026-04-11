@@ -53,13 +53,14 @@ export class SudokuSolver {
     });
   }
 
-  estimatedCountSolutions() {
+  estimatedCountSolutions(maxSamples) {
     const estimationCounters = {
       solutions: 0,
       samples: 0,
     };
     return this._runCountFn(() => {
-      return this._internalSolver.estimatedCountSolutions(estimationCounters);
+      return this._internalSolver.estimatedCountSolutions(
+        estimationCounters, maxSamples);
     }, estimationCounters);
   }
 
@@ -1098,16 +1099,17 @@ class InternalSolver {
     }
   }
 
-  estimatedCountSolutions(estimationCounters) {
+  estimatedCountSolutions(estimationCounters, maxSamples) {
     const originalCandidateSelector = this._candidateSelector;
 
-    let result = this._estimatedCountSolutions(estimationCounters);
+    let result = this._estimatedCountSolutions(
+      estimationCounters, maxSamples);
 
     this._candidateSelector = originalCandidateSelector;
     return result;
   }
 
-  _estimatedCountSolutions(estimationCounters) {
+  _estimatedCountSolutions(estimationCounters, maxSamples) {
     // Solution count estimate is based on the algorithm from:
     // "Estimating the Efficiency of Backtrack Programs" Knuth (1975)
     // https://www.ams.org/journals/mcom/1975-29-129/S0025-5718-1975-0373371-6/S0025-5718-1975-0373371-6.pdf
@@ -1138,10 +1140,14 @@ class InternalSolver {
       estimationCounters.solutions = totalEstimate / numSamples;
       estimationCounters.samples = numSamples;
 
+      if (maxSamples && numSamples >= maxSamples) {
+        return estimationCounters.solutions;
+      }
+
       // Ensure that there are progress callbacks.
       // However, we don't want the progress callback to report done.
       this._state = InternalSolver.STATE_INCOMPLETE;
-      this._progress.callback();
+      this._progress.callback?.();
     }
   }
 }

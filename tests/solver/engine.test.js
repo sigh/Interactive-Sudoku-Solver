@@ -176,9 +176,25 @@ await runTest('validateLayout returns solution for valid standard layout', () =>
 // estimatedCountSolutions
 // ============================================================================
 
-// Note: estimatedCountSolutions runs an infinite sampling loop that
-// terminates only via external interruption (e.g. worker termination).
-// It is tested indirectly through SolverRunner's estimate-solutions mode.
+await runTest('estimatedCountSolutions returns a positive estimate for a valid puzzle', () => {
+  const solver = buildSolver(makeEasyClassicConstraint());
+  const estimate = solver.estimatedCountSolutions(50);
+  assert.equal(typeof estimate, 'number');
+  assert.ok(estimate > 0, `Expected positive estimate, got ${estimate}`);
+});
+
+await runTest('estimatedCountSolutions returns 0 for a contradictory puzzle', () => {
+  const solver = buildSolver(makeContradictoryConstraint());
+  const estimate = solver.estimatedCountSolutions(50);
+  assert.equal(estimate, 0);
+});
+
+await runTest('estimatedCountSolutions is deterministic (fixed seed)', () => {
+  const constraint = makeMultiSolutionConstraint();
+  const estimate1 = buildSolver(constraint).estimatedCountSolutions(100);
+  const estimate2 = buildSolver(constraint).estimatedCountSolutions(100);
+  assert.equal(estimate1, estimate2);
+});
 
 // ============================================================================
 // nthStep
