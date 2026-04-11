@@ -39,7 +39,6 @@ const {
   canonicalJSON,
   Timer,
   IteratorWithCount,
-  withDeadline,
 } = await import('../../js/util.js');
 
 // ============================================================================
@@ -767,30 +766,6 @@ await runTest('IteratorWithCount with empty iterator', () => {
   const result = iter.next();
   assert.equal(result.done, true);
   assert.equal(iter.count, 1);
-});
-
-// ============================================================================
-// withDeadline
-// ============================================================================
-
-await runTest('withDeadline resolves when promise resolves before deadline', async () => {
-  const result = await withDeadline(
-    Promise.resolve(42),
-    1000,
-    'timeout',
-  );
-  assert.equal(result, 42);
-});
-
-await runTest('withDeadline rejects when deadline expires', async () => {
-  const slow = new Promise(resolve => {
-    const t = setTimeout(resolve, 5000);
-    t.unref(); // Don't keep the process alive.
-  });
-  await assert.rejects(
-    () => withDeadline(slow, 10, 'timed out'),
-    (err) => err === 'timed out',
-  );
 });
 
 logSuiteComplete('util');

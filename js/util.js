@@ -282,13 +282,6 @@ export const dynamicCSSFileLoader = makeDynamicLoader((path) => {
   return link;
 });
 
-export const withDeadline = (promise, delay, reason) => {
-  const awaitTimeout = new Promise(
-    (resolve, reject) => setTimeout((() => reject(reason)), delay));
-
-  return Promise.race([promise, awaitTimeout]);
-};
-
 export const memoize = (f, keyFunc = null) => {
   const map = new Map();
   return (...args) => {
