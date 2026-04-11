@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 
-import { runTest } from '../helpers/test_runner.js';
+import { runTest, logSuiteComplete } from '../helpers/test_runner.js';
 
 const { SimpleSolver } = await import('../../js/sandbox/simple_solver.js' + self.VERSION_PARAM);
 import {
@@ -1034,3 +1034,5 @@ await runTest('FullRank optimizer should dedupe same-rank clues and enforce equa
 
   assert.notEqual(await solver.solution(puzzle), null);
 });
+
+logSuiteComplete('FullRank handler');

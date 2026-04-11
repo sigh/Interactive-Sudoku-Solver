@@ -652,3 +652,93 @@ await runTest('Sum: allows coefficient magnitude of exactly 100', () => {
 });
 
 logSuiteComplete('Sum constraint');
+
+// ============================================================================
+// fnToBinaryKey / binaryKeyToFnString
+// ============================================================================
+
+const { fnToBinaryKey, binaryKeyToFnString } = await import('../../js/sudoku_constraint.js');
+
+await runTest('fnToBinaryKey encodes a simple inequality', () => {
+  const key = fnToBinaryKey((a, b) => a < b, 4);
+  assert.equal(typeof key, 'string');
+  assert.ok(key.length > 0);
+});
+
+await runTest('fnToBinaryKey and binaryKeyToFnString round-trip', () => {
+  const fn = (a, b) => Math.abs(a - b) >= 2;
+  const numValues = 4;
+  const key = fnToBinaryKey(fn, numValues);
+  const fnString = binaryKeyToFnString(key, numValues);
+  // fnString is a JS expression using a and b. Evaluate it for all pairs
+  // and verify it matches the original function.
+  for (let a = 1; a <= numValues; a++) {
+    for (let b = 1; b <= numValues; b++) {
+      const expected = !!fn(a, b);
+      const actual = !!eval(fnString);
+      assert.equal(actual, expected, `Mismatch at (${a},${b})`);
+    }
+  }
+});
+
+await runTest('fnToBinaryKey with valueOffset', () => {
+  const fn = (a, b) => a === b;
+  const key = fnToBinaryKey(fn, 3, 5);  // values 6,7,8
+  const fnString = binaryKeyToFnString(key, 3, 5);
+  for (let a = 6; a <= 8; a++) {
+    for (let b = 6; b <= 8; b++) {
+      const expected = a === b;
+      const actual = !!eval(fnString);
+      assert.equal(actual, expected, `Mismatch at (${a},${b})`);
+    }
+  }
+});
+
+await runTest('fnToBinaryKey with all-false function returns empty key', () => {
+  const key = fnToBinaryKey(() => false, 4);
+  assert.equal(key, '');
+});
+
+logSuiteComplete('fnToBinaryKey');
+
+// ============================================================================
+// NFA makeFromArgs / serialize round-trip
+// ============================================================================
+
+const { encodedNFAToJsSpec } = await import('../../js/sudoku_constraint.js');
+
+await runTest('NFA.serialize and makeFromArgs round-trip with named groups', () => {
+  const spec = '(1)(2|3)';
+  const encodedNFA = SudokuConstraint.NFA.encodeSpec(spec, 9);
+
+  // Create constraints with different names.
+  const c1 = new SudokuConstraint.NFA(encodedNFA, 'alpha', 'R1C1', 'R1C2');
+  const c2 = new SudokuConstraint.NFA(encodedNFA, 'beta', 'R2C1', 'R2C2');
+
+  const serialized = SudokuConstraint.NFA.serialize([c1, c2]);
+  assert.ok(serialized.length > 0);
+
+  // Parse back — extract the args portion (after ".NFA~").
+  const argsStr = serialized.substring('.NFA~'.length);
+  const args = argsStr.split('~');
+
+  const shape = GridShape.fromGridSize(9);
+  const recovered = [...SudokuConstraint.NFA.makeFromArgs(args, shape)];
+  assert.equal(recovered.length, 2);
+  assert.equal(recovered[0].encodedNFA, encodedNFA);
+  assert.equal(recovered[1].encodedNFA, encodedNFA);
+  // Names should be recovered (order may be sorted).
+  const names = recovered.map(c => c.name).sort();
+  assert.deepEqual(names, ['alpha', 'beta']);
+});
+
+await runTest('encodedNFAToJsSpec converts encoded NFA to JS spec', () => {
+  const spec = '(1|2)(3)';
+  const encodedNFA = SudokuConstraint.NFA.encodeSpec(spec, 9);
+  const jsSpec = encodedNFAToJsSpec(encodedNFA);
+  assert.ok(jsSpec);
+  assert.equal(typeof jsSpec, 'string');
+  assert.ok(jsSpec.includes('transition'), 'Expected transition function in spec');
+});
+
+logSuiteComplete('NFA serialize');

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { ensureGlobalEnvironment } from '../helpers/test_env.js';
+import { runTest, logSuiteComplete } from '../helpers/test_runner.js';
 
 // Setup global environment to mock a Worker
 const messages = [];
@@ -18,18 +19,19 @@ globalThis.postMessage = postMessage;
 
 // Import the worker script
 // This will trigger the top-level execution and the async modulesPromise
-console.log('Importing user_script_worker.js...');
 await import('../../js/user_script_worker.js');
 
-// Helper to wait for a message
-const waitForMessage = async (predicate, timeout = 1000) => {
-  const start = Date.now();
-  while (Date.now() - start < timeout) {
+// Helper to wait for a message.
+// Most messages arrive synchronously via postMessage, but the initial
+// 'ready' message is posted after async module imports, so we yield
+// with setTimeout(0) to let those resolve.
+const waitForMessage = async (predicate) => {
+  for (let i = 0; i < 20; i++) {
     const msg = messages.find(predicate);
     if (msg) return msg;
-    await new Promise(r => setTimeout(r, 10));
+    await new Promise(r => setTimeout(r, 0));
   }
-  throw new Error('Timeout waiting for message');
+  throw new Error('Message not found after waiting');
 };
 
 // Helper to send a message to the worker and wait for response
@@ -78,13 +80,9 @@ const sendMessage = async (type, payload) => {
 };
 
 // Test Suite
-console.log('Waiting for worker ready...');
 await waitForMessage(m => m.type === 'ready');
-console.log('Worker is ready.');
 
-// Test 1: compilePairwise
-{
-  console.log('Test: compilePairwise');
+await runTest('compilePairwise', async () => {
   const response = await sendMessage('compilePairwise', {
     type: 'Pair',
     fnStr: 'a !== b',
@@ -92,13 +90,9 @@ console.log('Worker is ready.');
   });
   assert.equal(response.error, undefined);
   assert.ok(response.result);
-  // Pair constraint key for a !== b with 9 values should be a specific string or structure
-  // We just check it returns something truthy and looks like a constraint key (usually a string or object)
-}
+});
 
-// Test 2: compileStateMachine (Unified)
-{
-  console.log('Test: compileStateMachine (Unified)');
+await runTest('compileStateMachine unified', async () => {
   const spec = `
     const startState = 0;
     const transition = (state, value) => (state + 1) % 4;
@@ -109,14 +103,11 @@ console.log('Worker is ready.');
     numValues: 9,
     isUnified: true
   });
-  if (response.error) console.error('StateMachine Error:', response.error);
   assert.equal(response.error, undefined);
   assert.ok(response.result);
-}
+});
 
-// Test 2b: compileStateMachine (Unified) with NUM_CELLS
-{
-  console.log('Test: compileStateMachine (Unified) with NUM_CELLS');
+await runTest('compileStateMachine unified with NUM_CELLS', async () => {
   const spec = `
     const startState = 0;
     const transition = (state, value) => state < NUM_CELLS ? state + 1 : undefined;
@@ -128,14 +119,11 @@ console.log('Worker is ready.');
     numCells: 5,
     isUnified: true
   });
-  if (response.error) console.error('StateMachine Error:', response.error);
   assert.equal(response.error, undefined);
   assert.ok(response.result);
-}
+});
 
-// Test 2c: compileStateMachine (Unified) with maxDepth
-{
-  console.log('Test: compileStateMachine (Unified) with maxDepth');
+await runTest('compileStateMachine unified with maxDepth', async () => {
   const spec = `
     const startState = 0;
     const transition = (state, value) => (state + 1) % 5;
@@ -148,14 +136,11 @@ console.log('Worker is ready.');
     numCells: 5,
     isUnified: true
   });
-  if (response.error) console.error('StateMachine Error:', response.error);
   assert.equal(response.error, undefined);
   assert.ok(response.result);
-}
+});
 
-// Test 2d: compileStateMachine (Unified) with maxDepth using NUM_CELLS
-{
-  console.log('Test: compileStateMachine (Unified) with maxDepth using NUM_CELLS');
+await runTest('compileStateMachine unified with maxDepth using NUM_CELLS', async () => {
   const spec = `
     const startState = 0;
     const transition = (state, value) => (state + 1) % 10;
@@ -168,14 +153,11 @@ console.log('Worker is ready.');
     numCells: 5,
     isUnified: true
   });
-  if (response.error) console.error('StateMachine Error:', response.error);
   assert.equal(response.error, undefined);
   assert.ok(response.result);
-}
+});
 
-// Test 2e: compileStateMachine (Split) with NUM_CELLS
-{
-  console.log('Test: compileStateMachine (Split) with NUM_CELLS');
+await runTest('compileStateMachine split with NUM_CELLS', async () => {
   const response = await sendMessage('compileStateMachine', {
     spec: {
       startExpression: '0',
@@ -186,14 +168,11 @@ console.log('Worker is ready.');
     numCells: 3,
     isUnified: false
   });
-  if (response.error) console.error('StateMachine Error:', response.error);
   assert.equal(response.error, undefined);
   assert.ok(response.result);
-}
+});
 
-// Test 2f: compileStateMachine (Split) with maxDepthExpression
-{
-  console.log('Test: compileStateMachine (Split) with maxDepthExpression');
+await runTest('compileStateMachine split with maxDepthExpression', async () => {
   const response = await sendMessage('compileStateMachine', {
     spec: {
       startExpression: '0',
@@ -205,14 +184,11 @@ console.log('Worker is ready.');
     numCells: 3,
     isUnified: false
   });
-  if (response.error) console.error('StateMachine Error:', response.error);
   assert.equal(response.error, undefined);
   assert.ok(response.result);
-}
+});
 
-// Test 2g: compileStateMachine (Split) with empty maxDepthExpression defaults to Infinity
-{
-  console.log('Test: compileStateMachine (Split) with empty maxDepthExpression');
+await runTest('compileStateMachine split with empty maxDepthExpression', async () => {
   const response = await sendMessage('compileStateMachine', {
     spec: {
       startExpression: '0',
@@ -224,14 +200,11 @@ console.log('Worker is ready.');
     numCells: 3,
     isUnified: false
   });
-  if (response.error) console.error('StateMachine Error:', response.error);
   assert.equal(response.error, undefined);
   assert.ok(response.result);
-}
+});
 
-// Test 3: runSandboxCode
-{
-  console.log('Test: runSandboxCode');
+await runTest('runSandboxCode', async () => {
   const code = `
     console.log("Hello from sandbox");
     return "ConstraintString";
@@ -240,11 +213,9 @@ console.log('Worker is ready.');
   assert.equal(response.error, undefined);
   assert.equal(response.result.constraintStr, "ConstraintString");
   assert.ok(response.streamedLogs.some(l => l.includes("Hello from sandbox")));
-}
+});
 
-// Test 3b: runSandboxCode with currentConstraint()
-{
-  console.log('Test: runSandboxCode currentConstraint()');
+await runTest('runSandboxCode currentConstraint()', async () => {
   const currentConstraintStr = '.Shape~6x6';
   const code = `
     return currentConstraint();
@@ -252,11 +223,9 @@ console.log('Worker is ready.');
   const response = await sendMessage('runSandboxCode', { code, currentConstraintStr });
   assert.equal(response.error, undefined);
   assert.equal(response.result.constraintStr, currentConstraintStr);
-}
+});
 
-// Test 3c: runSandboxCode with currentShape()
-{
-  console.log('Test: runSandboxCode currentShape()');
+await runTest('runSandboxCode currentShape()', async () => {
   const currentConstraintStr = '.Shape~6x6';
   const code = `
     const shape = currentShape();
@@ -268,11 +237,9 @@ console.log('Worker is ready.');
   const response = await sendMessage('runSandboxCode', { code, currentConstraintStr });
   assert.equal(response.error, undefined);
   assert.equal(response.result.constraintStr, currentConstraintStr);
-}
+});
 
-// Test 4: runSandboxCode with error
-{
-  console.log('Test: runSandboxCode with error');
+await runTest('runSandboxCode with error', async () => {
   const code = `
     console.log("About to fail");
     throw new Error("Sandbox Error");
@@ -281,11 +248,9 @@ console.log('Worker is ready.');
   assert.ok(response.error);
   assert.ok(response.error.includes("Sandbox Error"));
   assert.ok(response.streamedLogs.some(l => l.includes("About to fail")));
-}
+});
 
-// Test 5: convertUnifiedToSplit extracts maxDepth
-{
-  console.log('Test: convertUnifiedToSplit extracts maxDepth');
+await runTest('convertUnifiedToSplit extracts maxDepth', async () => {
   const code = `
     startState = 0;
     function transition(state, value) {
@@ -302,11 +267,9 @@ console.log('Worker is ready.');
   assert.ok(response.result.transitionBody.includes('return state + 1'));
   assert.ok(response.result.acceptBody.includes('return state > 0'));
   assert.equal(response.result.maxDepthExpression, '42');
-}
+});
 
-// Test 6: convertUnifiedToSplit handles missing maxDepth
-{
-  console.log('Test: convertUnifiedToSplit handles missing maxDepth');
+await runTest('convertUnifiedToSplit handles missing maxDepth', async () => {
   const code = `
     startState = "start";
     function transition(state, value) {
@@ -319,11 +282,9 @@ console.log('Worker is ready.');
   const response = await sendMessage('convertUnifiedToSplit', { code });
   assert.equal(response.error, undefined);
   assert.equal(response.result.maxDepthExpression, '');
-}
+});
 
-// Test 7: runSandboxCode with console.info for status
-{
-  console.log('Test: runSandboxCode with console.info for status');
+await runTest('runSandboxCode with console.info for status', async () => {
   const code = `
     console.info("Status update 1");
     console.info("Status update 2");
@@ -333,11 +294,9 @@ console.log('Worker is ready.');
   assert.equal(response.error, undefined);
   assert.ok(response.streamedStatus.some(s => s.includes("Status update 1")));
   assert.ok(response.streamedStatus.some(s => s.includes("Status update 2")));
-}
+});
 
-// Test 9: runSandboxCode with empty return (null)
-{
-  console.log('Test: runSandboxCode with empty return');
+await runTest('runSandboxCode with null return', async () => {
   const code = `
     console.log("No constraint returned");
     return null;
@@ -345,17 +304,15 @@ console.log('Worker is ready.');
   const response = await sendMessage('runSandboxCode', { code, currentConstraintStr: '' });
   assert.equal(response.error, undefined);
   assert.equal(response.result.constraintStr, null);
-}
+});
 
-// Test 10: runSandboxCode with undefined return
-{
-  console.log('Test: runSandboxCode with undefined return');
+await runTest('runSandboxCode with undefined return', async () => {
   const code = `
     console.log("Implicit undefined return");
   `;
   const response = await sendMessage('runSandboxCode', { code, currentConstraintStr: '' });
   assert.equal(response.error, undefined);
   assert.equal(response.result.constraintStr, null);
-}
+});
 
-console.log('user_script_worker.test.js passed!');
+logSuiteComplete('UserScriptWorker');

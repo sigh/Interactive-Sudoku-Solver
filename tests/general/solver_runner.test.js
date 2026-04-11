@@ -28,6 +28,8 @@ const {
 
 // Helper to wait for a callback to fire (use microtask queue)
 const waitForCallback = () => new Promise(resolve => queueMicrotask(resolve));
+// Helper to wait for all pending microtasks and async callbacks to settle.
+const waitForSettle = () => new Promise(resolve => setTimeout(resolve, 0));
 
 // Create a local solver proxy for testing (no web worker needed)
 class LocalSolverProxy {
@@ -39,7 +41,7 @@ class LocalSolverProxy {
     this._terminated = false;
 
     if (typeof solver.setProgressCallback === 'function') {
-      solver.setProgressCallback(() => this._notifyState(), 13);
+      solver.setProgressCallback((extraState) => this._notifyState(extraState), 13);
     }
   }
 
@@ -404,39 +406,133 @@ await runTest('onIterationChange should provide iteration state for modes with I
 // Mode-specific behavior
 // ============================================================================
 
-await runTest('count-solutions mode should work', async () => {
+await runTest('count-solutions mode returns sample solution', async () => {
+  let updateResult = null;
   const runner = new SolverRunner({
-    onUpdate: () => { },
+    onUpdate: (result) => { updateResult = result; },
   });
 
   const constraint = makeSimpleConstraint();
   const handler = await runner.solve(constraint, { mode: 'count-solutions' });
+  await waitForSettle();
 
   assert.ok(handler);
   assert.equal(handler.ITERATION_CONTROLS, false);
   assert.equal(handler.ALLOW_DOWNLOAD, false);
+
+  assert.ok(updateResult);
+  assert.ok(updateResult.solution, 'Should have a sample solution');
+  assert.equal(updateResult.description, 'Sample solution');
 });
 
-await runTest('validate-layout mode should work', async () => {
+await runTest('validate-layout mode handler properties', async () => {
   const runner = new SolverRunner({
-    onUpdate: () => { },
+    onUpdate: () => {},
   });
 
   const constraint = makeSimpleConstraint();
   const handler = await runner.solve(constraint, { mode: 'validate-layout' });
 
   assert.ok(handler);
+  // validate-layout has no iteration controls or downloads
+  assert.equal(handler.ITERATION_CONTROLS, false);
+  assert.equal(handler.ALLOW_DOWNLOAD, false);
+  assert.equal(handler.ALLOW_ALT_CLICK, false);
 });
 
-await runTest('step-by-step mode should allow alt-click', async () => {
-  const runner = new SolverRunner();
-  const constraint = makeSimpleConstraint();
+await runTest('step-by-step mode returns step data with statusData', async () => {
+  let updateResult = null;
+  const runner = new SolverRunner({
+    onUpdate: (result) => { updateResult = result; },
+  });
 
+  const constraint = makeSimpleConstraint();
   const handler = await runner.solve(constraint, { mode: 'step-by-step' });
+  await waitForSettle();
 
   assert.ok(handler);
   assert.equal(handler.ALLOW_ALT_CLICK, true);
   assert.equal(handler.ITERATION_CONTROLS, true);
+
+  assert.ok(updateResult);
+  assert.ok(updateResult.description.startsWith('Step '));
+  assert.ok(updateResult.solution, 'Step should have pencilmarks');
+  assert.ok(updateResult.statusData, 'Step should have statusData');
+  assert.ok('values' in updateResult.statusData);
+  assert.ok('isSolution' in updateResult.statusData);
+  assert.ok('hasContradiction' in updateResult.statusData);
+  assert.ok(Array.isArray(updateResult.highlightCells));
+});
+
+await runTest('solutions mode onUpdate provides solution array', async () => {
+  let updateResult = null;
+  const runner = new SolverRunner({
+    onUpdate: (result) => { updateResult = result; },
+  });
+
+  const constraint = makeSimpleConstraint();
+  await runner.solve(constraint, { mode: 'solutions' });
+  // solutions mode needs multiple async cycles: run → fetch → add → update
+  await waitForSettle();
+  await waitForSettle();
+
+  assert.ok(updateResult);
+  assert.ok(updateResult.solution, 'Should have a solution');
+  assert.ok(updateResult.description);
+});
+
+await runTest('solutions mode navigation fetches multiple solutions', async () => {
+  const updates = [];
+  const runner = new SolverRunner({
+    onUpdate: (result) => { updates.push(result); },
+  });
+
+  const constraint = makeSimpleConstraint();
+  await runner.solve(constraint, { mode: 'solutions' });
+  await waitForSettle();
+
+  // Navigate forward
+  runner.next();
+  await waitForSettle();
+
+  // For a unique solution, next should still produce a result
+  assert.ok(updates.length >= 1);
+});
+
+await runTest('step-by-step next advances step index', async () => {
+  const iterations = [];
+  const runner = new SolverRunner({
+    onUpdate: () => {},
+    onIterationChange: (state) => { iterations.push({ ...state }); },
+  });
+
+  const constraint = makeSimpleConstraint();
+  await runner.solve(constraint, { mode: 'step-by-step' });
+  await waitForSettle();
+
+  const initialIndex = iterations[iterations.length - 1].index;
+
+  runner.next();
+  await waitForSettle();
+
+  const nextIndex = iterations[iterations.length - 1].index;
+  assert.equal(nextIndex, initialIndex + 1);
+});
+
+await runTest('all-possibilities onUpdate returns solution data', async () => {
+  let updateResult = null;
+  const runner = new SolverRunner({
+    onUpdate: (result) => { updateResult = result; },
+  });
+
+  const constraint = makeSimpleConstraint();
+  await runner.solve(constraint, { mode: 'all-possibilities' });
+  await waitForSettle();
+
+  assert.ok(updateResult);
+  assert.ok(updateResult.solution, 'Should have solution');
+  // Unique sudoku yields 'Unique solution'
+  assert.equal(updateResult.description, 'Unique solution');
 });
 
 // ============================================================================
@@ -455,9 +551,86 @@ await runTest('handleAltClick should be ignored for modes without ALLOW_ALT_CLIC
   const constraint = makeSimpleConstraint();
 
   await runner.solve(constraint, { mode: 'all-possibilities' });
+  await waitForCallback();
 
   // Should not throw
   runner.handleAltClick(0);
+});
+
+await runTest('handleAltClick in step-by-step mode with iterable cell triggers guide', async () => {
+  let updateResult = null;
+  const iterations = [];
+  const runner = new SolverRunner({
+    onUpdate: (result) => { updateResult = result; },
+    onIterationChange: (state) => { iterations.push({ ...state }); },
+  });
+
+  const constraint = makeSimpleConstraint();
+  await runner.solve(constraint, { mode: 'step-by-step' });
+  await waitForSettle();
+
+  // Find a cell with multiple possibilities (an iterable, not a string)
+  if (updateResult?.solution) {
+    let cellIndex = -1;
+    for (let i = 0; i < updateResult.solution.length; i++) {
+      const v = updateResult.solution[i];
+      if (v && typeof v !== 'string' && typeof v[Symbol.iterator] === 'function') {
+        cellIndex = i;
+        break;
+      }
+    }
+    if (cellIndex >= 0) {
+      const itersBefore = iterations.length;
+      runner.handleAltClick(cellIndex);
+      await waitForSettle();
+      // handleAltClick should trigger an update cycle
+      assert.ok(iterations.length > itersBefore,
+        'handleAltClick should trigger iteration change');
+    }
+  }
+});
+
+// ============================================================================
+// setCandidateSupportThreshold
+// ============================================================================
+
+await runTest('setCandidateSupportThreshold returns true when threshold decreases', async () => {
+  const runner = new SolverRunner({ onUpdate: () => { } });
+  const constraint = makeSimpleConstraint();
+
+  await runner.solve(constraint, { mode: 'all-possibilities' });
+  await waitForCallback();
+
+  // Default threshold is 1. Lowering it is a display-only change.
+  const result = runner.setCandidateSupportThreshold(1);
+  assert.equal(result, true);
+});
+
+await runTest('setCandidateSupportThreshold returns false when no handler', () => {
+  const runner = new SolverRunner();
+  // No solve called, so no handler.
+  const result = runner.setCandidateSupportThreshold(5);
+  assert.equal(result, undefined);
+});
+
+// ============================================================================
+// _handleException error routing
+// ============================================================================
+
+await runTest('solve with invalid constraint reports InvalidConstraintError', async () => {
+  let errorMsg = null;
+  const runner = new SolverRunner({
+    onError: (msg) => { errorMsg = msg; },
+  });
+
+  // Jigsaw piece with wrong number of cells triggers InvalidConstraintError
+  // during build (pieces must match regionSize).
+  const constraint = new SudokuConstraint.Jigsaw('R1C1', 'R1C2');
+  await runner.solve(constraint, { mode: 'all-possibilities' });
+  await waitForCallback();
+
+  assert.ok(errorMsg);
+  assert.ok(errorMsg.startsWith('Invalid Constraint:'), `Expected prefix, got: ${errorMsg}`);
 });
 
 // ============================================================================

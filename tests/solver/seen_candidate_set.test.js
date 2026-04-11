@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 
 import { ensureGlobalEnvironment } from '../helpers/test_env.js';
-import { runTest } from '../helpers/test_runner.js';
+import { runTest, logSuiteComplete } from '../helpers/test_runner.js';
 import { GridTestContext, valueMask } from '../helpers/grid_test_utils.js';
 
 ensureGlobalEnvironment();
@@ -176,3 +176,5 @@ await runTest('SeenCandidateSet hasInterestingSolutions works with candidateSupp
   const newGrid = [valueMask(2), valueMask(2), valueMask(3), valueMask(4)];
   assert.equal(seenCandidateSet.hasInterestingSolutions(newGrid), true);
 });
+
+logSuiteComplete('SeenCandidateSet');

@@ -277,3 +277,50 @@ await runTest('setProgressCallback is called during solveAllPossibilities', () =
 });
 
 logSuiteComplete('SudokuSolver Engine');
+
+// ============================================================================
+// HandlerSet
+// ============================================================================
+
+const { HandlerSet } = await import('../../js/solver/engine.js');
+const {
+  SudokuConstraintHandler,
+  AllDifferent,
+  UniqueValueExclusion,
+} = await import('../../js/solver/handlers.js');
+
+const NUM_SEARCH_CELLS = 81;
+
+await runTest('HandlerSet.addNonEssential marks handlers as non-essential', () => {
+  const hs = new HandlerSet([], NUM_SEARCH_CELLS);
+  const h = new AllDifferent([0, 1, 2]);
+  hs.addNonEssential(h);
+
+  const all = hs.getAll();
+  assert.equal(all.length, 1);
+  assert.equal(all[0].essential, false);
+});
+
+await runTest('HandlerSet.addSingletonHandlers adds to singleton map', () => {
+  const hs = new HandlerSet([], NUM_SEARCH_CELLS);
+  const h = new UniqueValueExclusion(0);
+  hs.addSingletonHandlers(h);
+
+  const all = hs.getAll();
+  assert.equal(all.length, 1);
+});
+
+await runTest('HandlerSet.addSingletonHandlers throws on duplicate', () => {
+  const hs = new HandlerSet([], NUM_SEARCH_CELLS);
+  const h1 = new UniqueValueExclusion(0);
+  // Force same idStr to create a duplicate.
+  const h2 = new UniqueValueExclusion(0);
+  h2.idStr = h1.idStr;
+
+  hs.addSingletonHandlers(h1);
+  assert.throws(
+    () => hs.addSingletonHandlers(h2),
+    /Singleton handlers must be unique/);
+});
+
+logSuiteComplete('HandlerSet');

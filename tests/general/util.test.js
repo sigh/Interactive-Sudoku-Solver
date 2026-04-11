@@ -434,6 +434,25 @@ await runTest('Base64Codec should calculate correct length for 6-bit arrays', ()
   assert.equal(Base64Codec.lengthOf6BitArray(7), 2);
 });
 
+await runTest('Base64Codec.decodeTo6BitArray with pre-allocated array', () => {
+  const original = [0, 1, 62, 63, 32];
+  const encoded = Base64Codec.encode6BitArray(original);
+
+  const preallocated = new Uint8Array(10);
+  const result = Base64Codec.decodeTo6BitArray(encoded, preallocated);
+  assert.equal(result, preallocated);
+  assert.deepEqual([...result.subarray(0, original.length)], original);
+});
+
+await runTest('Base64Codec.decodeTo6BitArray throws if array too short', () => {
+  const encoded = Base64Codec.encode6BitArray([1, 2, 3, 4, 5]);
+  const tooSmall = new Uint8Array(2);
+  assert.throws(
+    () => Base64Codec.decodeTo6BitArray(encoded, tooSmall),
+    /Array is too short/,
+  );
+});
+
 // ============================================================================
 // BitSet
 // ============================================================================
@@ -560,6 +579,34 @@ await runTest('BitSet.intersectCount should count intersection bits', () => {
   assert.equal(a.intersectCount(b), 3);
 });
 
+await runTest('BitSet.hasAll returns true when superset', () => {
+  const a = new BitSet(64);
+  a.add(1); a.add(2); a.add(3);
+
+  const b = new BitSet(64);
+  b.add(1); b.add(2);
+
+  assert.equal(a.hasAll(b), true);
+});
+
+await runTest('BitSet.hasAll returns false when not superset', () => {
+  const a = new BitSet(64);
+  a.add(1); a.add(2);
+
+  const b = new BitSet(64);
+  b.add(1); b.add(3);
+
+  assert.equal(a.hasAll(b), false);
+});
+
+await runTest('BitSet.hasAll with identical sets', () => {
+  const a = new BitSet(64);
+  a.add(10); a.add(50);
+
+  const b = a.clone();
+  assert.equal(a.hasAll(b), true);
+});
+
 // ============================================================================
 // MultiMap
 // ============================================================================
@@ -599,6 +646,21 @@ await runTest('MultiMap should be iterable', () => {
   mm.add('b', 2);
   const entries = [...mm];
   assert.equal(entries.length, 2);
+});
+
+await runTest('MultiMap.delete removes key when last value is deleted', () => {
+  const mm = new MultiMap();
+  mm.add('key', 'only');
+  mm.delete('key', 'only');
+  assert.deepEqual(mm.get('key'), []);
+  // Key should be fully removed from the underlying map.
+  assert.equal([...mm].length, 0);
+});
+
+await runTest('MultiMap.delete on missing key is a no-op', () => {
+  const mm = new MultiMap();
+  mm.delete('nonexistent', 'value');
+  assert.deepEqual(mm.get('nonexistent'), []);
 });
 
 // ============================================================================

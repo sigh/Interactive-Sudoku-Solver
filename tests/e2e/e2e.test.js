@@ -328,4 +328,6 @@ runLayoutResults.forEach((result) => expectStatsStructure(result, 'layout tests'
 console.log('✓ layout collections completed');
 runLayoutResults.forEach((result) => logCollectionSummary(result));
 
-logSuiteComplete('End-to-end');
+const totalPuzzles = [...runSolveResults, ...runLayoutResults]
+  .reduce((sum, r) => sum + r.stats.length, 0);
+logSuiteComplete('End-to-end', totalPuzzles);

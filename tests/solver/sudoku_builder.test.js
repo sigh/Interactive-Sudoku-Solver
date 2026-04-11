@@ -264,4 +264,19 @@ await runTest('Jigsaw produces AllDifferent and JigsawPiece handlers', () => {
   assert.equal(countHandlers(handlers, 'AllDifferent'), 12);
 });
 
+// ============================================================================
+// Priority
+// ============================================================================
+
+await runTest('Priority constraint produces Priority handler', () => {
+  const constraint = new SudokuConstraint.Container([
+    new SudokuConstraint.Priority(5, 'R1C1', 'R1C2'),
+  ]);
+  const handlers = buildHandlers(constraint);
+  assert.ok(hasHandler(handlers, 'Priority'));
+  const priorityHandler = handlers.find(h => h.constructor.name === 'Priority');
+  assert.equal(priorityHandler.priority(), 5);
+  assert.equal(priorityHandler.priorityCells().length, 2);
+});
+
 logSuiteComplete('SudokuBuilder');

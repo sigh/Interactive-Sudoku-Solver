@@ -392,7 +392,7 @@ await runTest('baseCharCode returns A for large numValues', () => {
   assert.equal(GridShape.baseCharCode(shape), 'A'.charCodeAt(0));
 });
 
-logSuiteComplete();
+logSuiteComplete('GridShape');
 
 // ============================================================================
 // CellGraph
@@ -449,6 +449,31 @@ await runTest('CellGraph works for different grid sizes', () => {
   }
 });
 
+await runTest('CellGraph.adjacent returns neighbor in given direction', () => {
+  const shape = GridShape.fromGridSize(9);
+  const graph = shape.cellGraph();
+  const cell = shape.cellIndex(4, 4);
+  assert.equal(graph.adjacent(cell, CellGraph.RIGHT), shape.cellIndex(4, 5));
+  assert.equal(graph.adjacent(cell, CellGraph.LEFT), shape.cellIndex(4, 3));
+});
+
+await runTest('CellGraph.diagonal returns diagonal neighbor', () => {
+  const shape = GridShape.fromGridSize(9);
+  const graph = shape.cellGraph();
+  const cell = shape.cellIndex(4, 4);
+  // Down-right diagonal
+  assert.equal(graph.diagonal(cell, CellGraph.RIGHT, CellGraph.DOWN), shape.cellIndex(5, 5));
+  // Up-left diagonal
+  assert.equal(graph.diagonal(cell, CellGraph.LEFT, CellGraph.UP), shape.cellIndex(3, 3));
+});
+
+await runTest('CellGraph.diagonal returns null at edge', () => {
+  const shape = GridShape.fromGridSize(9);
+  const graph = shape.cellGraph();
+  const corner = shape.cellIndex(0, 0);
+  assert.equal(graph.diagonal(corner, CellGraph.LEFT, CellGraph.UP), null);
+});
+
 logSuiteComplete('CellGraph');
 
 // ============================================================================
@@ -460,6 +485,26 @@ function makeShapeWithGroups(size, groups) {
   shape._varCellRegistry.addGroups(groups);
   return shape;
 }
+
+await runTest('VarCellRegistry.addGroups throws on duplicate prefix', () => {
+  const shape = GridShape.fromGridSize(4);
+  shape._varCellRegistry.addGroups([{ prefix: 'X', label: 'x', count: 2 }]);
+  assert.throws(
+    () => shape._varCellRegistry.addGroups([{ prefix: 'X', label: 'x2', count: 3 }]),
+    /Var cell group prefix 'X' already exists/);
+});
+
+await runTest('VarCellRegistry.clear removes all groups', () => {
+  const shape = GridShape.fromGridSize(4);
+  shape._varCellRegistry.addGroups([
+    { prefix: 'A', label: 'a', count: 2 },
+    { prefix: 'B', label: 'b', count: 3 },
+  ]);
+  shape._varCellRegistry.clear();
+  // After clear, no var cells should exist.
+  assert.equal(shape._varCellRegistry._groups.size, 0);
+  assert.equal(shape._varCellRegistry._totalCells, 0);
+});
 
 await runTest('cellGraph: caches result without var cells', () => {
   const shape = GridShape.fromGridSize(9);

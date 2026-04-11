@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 
 import { ensureGlobalEnvironment } from '../helpers/test_env.js';
-import { runTest } from '../helpers/test_runner.js';
+import { runTest, logSuiteComplete } from '../helpers/test_runner.js';
 import { GridTestContext } from '../helpers/grid_test_utils.js';
 
 ensureGlobalEnvironment();
@@ -223,3 +223,5 @@ await runTest('CandidateSelector stepState override clears any pending custom-ca
     assert.equal(value, 1 << 0);
   }
 });
+
+logSuiteComplete('CandidateSelector invariants');
