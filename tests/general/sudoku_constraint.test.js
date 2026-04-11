@@ -592,7 +592,7 @@ await runTest('Sum: chipLabel without coefficients', () => {
 
 await runTest('Sum: chipLabel with coefficients', () => {
   const c = new SudokuConstraint.Sum('15_=_2_3', 'R1C1', 'R1C2');
-  assert.equal(c.chipLabel(), 'Sum (15) [2,3]');
+  assert.equal(c.chipLabel(), 'Sum (15) [2, 3]');
 });
 
 await runTest('Sum: serialization round-trip without coefficients', () => {

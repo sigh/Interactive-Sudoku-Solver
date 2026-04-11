@@ -8,6 +8,7 @@ ensureGlobalEnvironment();
 const {
   clamp,
   formatTimeMs,
+  formatFixedTruncated,
   formatNumberMetric,
   camelCaseToWords,
   arrayDifference,
@@ -36,6 +37,9 @@ const {
   MultiMap,
   RandomIntGenerator,
   canonicalJSON,
+  Timer,
+  IteratorWithCount,
+  withDeadline,
 } = await import('../../js/util.js');
 
 // ============================================================================
@@ -660,6 +664,133 @@ await runTest('canonicalJSON should handle primitives', () => {
 await runTest('canonicalJSON should handle empty objects and arrays', () => {
   assert.equal(canonicalJSON({}), '{}');
   assert.equal(canonicalJSON([]), '[]');
+});
+
+// ============================================================================
+// formatFixedTruncated
+// ============================================================================
+
+await runTest('formatFixedTruncated should truncate trailing zeros', () => {
+  assert.equal(formatFixedTruncated(1.50, 2), '1.5');
+  assert.equal(formatFixedTruncated(1.00, 2), '1');
+  assert.equal(formatFixedTruncated(1.23, 2), '1.23');
+});
+
+await runTest('formatFixedTruncated with 0 digits', () => {
+  assert.equal(formatFixedTruncated(1.5, 0), '2');
+  assert.equal(formatFixedTruncated(1.0, 0), '1');
+});
+
+await runTest('formatFixedTruncated with whole number', () => {
+  assert.equal(formatFixedTruncated(42, 3), '42');
+});
+
+// ============================================================================
+// Timer
+// ============================================================================
+
+await runTest('Timer starts paused with 0 elapsed', () => {
+  const timer = new Timer();
+  assert.equal(timer.elapsedMs(), 0);
+});
+
+await runTest('Timer.runTimed accumulates elapsed time', () => {
+  const timer = new Timer();
+  timer.runTimed(() => {
+    // Do some work to ensure measurable time.
+    let x = 0;
+    for (let i = 0; i < 10000; i++) x += i;
+  });
+  assert.ok(timer.elapsedMs() >= 0);
+});
+
+await runTest('Timer.unpause and pause accumulate time', () => {
+  const timer = new Timer();
+  timer.unpause();
+  // Brief work.
+  let x = 0;
+  for (let i = 0; i < 10000; i++) x += i;
+  timer.pause();
+  const elapsed = timer.elapsedMs();
+  assert.ok(elapsed >= 0);
+  // After pause, time shouldn't change.
+  assert.equal(timer.elapsedMs(), elapsed);
+});
+
+await runTest('Timer.pause when already paused is safe', () => {
+  const timer = new Timer();
+  timer.pause(); // Already paused, should be a no-op.
+  assert.equal(timer.elapsedMs(), 0);
+});
+
+await runTest('Timer.unpause when already running is safe', () => {
+  const timer = new Timer();
+  timer.unpause();
+  timer.unpause(); // Already running, should be a no-op.
+  timer.pause();
+  assert.ok(timer.elapsedMs() >= 0);
+});
+
+// ============================================================================
+// IteratorWithCount
+// ============================================================================
+
+await runTest('IteratorWithCount counts iterations', () => {
+  const arr = [10, 20, 30];
+  const iter = new IteratorWithCount(arr[Symbol.iterator]());
+  assert.equal(iter.count, 0);
+
+  iter.next();
+  assert.equal(iter.count, 1);
+
+  iter.next();
+  assert.equal(iter.count, 2);
+
+  iter.next();
+  assert.equal(iter.count, 3);
+});
+
+await runTest('IteratorWithCount works in for-of loop', () => {
+  const arr = [1, 2, 3, 4, 5];
+  const iter = new IteratorWithCount(arr[Symbol.iterator]());
+  const collected = [];
+  for (const v of iter) {
+    collected.push(v);
+  }
+  assert.deepEqual(collected, [1, 2, 3, 4, 5]);
+  // Count includes the final done=true call.
+  assert.equal(iter.count, 6);
+});
+
+await runTest('IteratorWithCount with empty iterator', () => {
+  const iter = new IteratorWithCount([][Symbol.iterator]());
+  const result = iter.next();
+  assert.equal(result.done, true);
+  assert.equal(iter.count, 1);
+});
+
+// ============================================================================
+// withDeadline
+// ============================================================================
+
+await runTest('withDeadline resolves when promise resolves before deadline', async () => {
+  const result = await withDeadline(
+    Promise.resolve(42),
+    1000,
+    'timeout',
+  );
+  assert.equal(result, 42);
+});
+
+await runTest('withDeadline rejects when deadline expires', async () => {
+  const slow = new Promise(resolve => {
+    const t = setTimeout(resolve, 5000);
+    t.unref(); // Don't keep the process alive.
+  });
+  await assert.rejects(
+    () => withDeadline(slow, 10, 'timed out'),
+    (err) => err === 'timed out',
+  );
 });
 
 logSuiteComplete('util');

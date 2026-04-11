@@ -5,3 +5,6 @@ _site/
 .vscode/
 .ignore/
 .agent/
+node_modules/
+coverage/
+package-lock.json

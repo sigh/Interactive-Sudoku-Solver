@@ -166,7 +166,7 @@ export const EXAMPLES = [
   {
     name: 'Renban skyscrapers',
     src: 'https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?chlang=en&id=0007TV',
-    input: '.Renban~R2C1~R3C1~R4C1~R4C2.Renban~R3C3~R4C3~R5C3~R6C3.Renban~R2C5~R3C5.Renban~R6C4~R5C4~R4C4~R4C5~R4C6.Renban~R9C1~R8C1~R8C2~R9C3.Renban~R9C7~R8C8~R8C9~R9C9.Renban~R7C4~R7C5~R7C6~R6C6~R5C6.Renban~R3C7~R4C7~R5C7~R5C8~R5C9.Renban~R2C7~R2C8~R2C9~R3C9~R4C9..Skyscraper~C2~3~4.Skyscraper~C4~0~3.Skyscraper~C6~4.Skyscraper~C7~5.Skyscraper~C8~4~4.Skyscraper~C9~0~5.Skyscraper~R1~3~6.Skyscraper~R3~4.Skyscraper~R5~3~3.Skyscraper~R6~5.Skyscraper~R8~4.Skyscraper~R9~4~3',
+    input: '.Renban~R2C1~R3C1~R4C1~R4C2.Renban~R3C3~R4C3~R5C3~R6C3.Renban~R2C5~R3C5.Renban~R6C4~R5C4~R4C4~R4C5~R4C6.Renban~R9C1~R8C1~R8C2~R9C3.Renban~R9C7~R8C8~R8C9~R9C9.Renban~R7C4~R7C5~R7C6~R6C6~R5C6.Renban~R3C7~R4C7~R5C7~R5C8~R5C9.Renban~R2C7~R2C8~R2C9~R3C9~R4C9..Skyscraper~C2~3~4.Skyscraper~C4~~3.Skyscraper~C6~4.Skyscraper~C7~5.Skyscraper~C8~4~4.Skyscraper~C9~~5.Skyscraper~R1~3~6.Skyscraper~R3~4.Skyscraper~R5~3~3.Skyscraper~R6~5.Skyscraper~R8~4.Skyscraper~R9~4~3',
     solution: '359876142821943567674152389795634218183297456246518793932465871468721935517389624',
   },
   {
@@ -178,7 +178,7 @@ export const EXAMPLES = [
   {
     name: 'Heat up - global entropy',
     src: 'https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?id=000FZ4',
-    input: '.Thermo~R1C2~R2C2~R3C1.Thermo~R2C9~R2C8~R1C7.Thermo~R4C5~R5C6~R6C5~R5C4.Thermo~R8C1~R8C2~R9C3.Thermo~R9C8~R8C8~R7C9.Skyscraper~C4~5~0.Skyscraper~R6~5~0.Skyscraper~C6~0~5.Skyscraper~R4~0~5..GlobalEntropy',
+    input: '.Thermo~R1C2~R2C2~R3C1.Thermo~R2C9~R2C8~R1C7.Thermo~R4C5~R5C6~R6C5~R5C4.Thermo~R8C1~R8C2~R9C3.Thermo~R9C8~R8C8~R7C9.Skyscraper~C4~5~.Skyscraper~R6~5~.Skyscraper~C6~~5.Skyscraper~R4~~5..GlobalEntropy',
     solution: '834159627659273841712486395967518432183942576425367918376824159241695783598731264',
   },
   {

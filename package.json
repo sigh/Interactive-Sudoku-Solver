@@ -4,6 +4,17 @@
   "type": "module",
   "scripts": {
     "test": "node tests/run_all_tests.js",
+    "test:coverage": "c8 node tests/run_all_tests.js",
     "bench": "node tests/bench/run_all_benchmarks.js"
+  },
+  "c8": {
+    "all": true,
+    "src": ["js"],
+    "exclude": ["_site/**", "lib/**", "tests/**", "node_modules/**"],
+    "reporter": ["text", "html"],
+    "report-dir": "coverage"
+  },
+  "devDependencies": {
+    "c8": "^11.0.0"
   }
 }
