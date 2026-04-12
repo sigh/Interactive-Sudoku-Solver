@@ -444,4 +444,50 @@ await runTest('offset=0: unchanged behavior', () => {
   assert.equal(result, true);
 });
 
+// =============================================================================
+// Per-cell numValues tests
+// =============================================================================
+
+await runTest('Lunchbox works when cells have fewer values than numValues', () => {
+  // 6-cell Lunchbox with numValues=9, but cells restricted to 1-6.
+  // effectiveNumValues should be 6, enabling the isHouse path.
+  // Sentinels: 1 and 6. Sum = 5 → inner values 2+3 between borders.
+  const context = new GridTestContext({ gridSize: [1, 6], numValues: 9 });
+  const cells = context.cells();
+  const handler = new Lunchbox(cells, 5);
+
+  const grid = context.grid;
+  const allSix = valueMask(1, 2, 3, 4, 5, 6);
+  for (let i = 0; i < 6; i++) grid[cells[i]] = allSix;
+  context.initializeHandler(handler);
+
+  // Set up a valid configuration: [1, 2, 3, 6, 4, 5]
+  grid[cells[0]] = valueMask(1);   // Border
+  grid[cells[1]] = valueMask(2);   // Inner
+  grid[cells[2]] = valueMask(3);   // Inner
+  grid[cells[3]] = valueMask(6);   // Border
+  grid[cells[4]] = valueMask(4);   // Outer
+  grid[cells[5]] = valueMask(5);   // Outer
+  const acc = createAccumulator();
+
+  const result = handler.enforceConsistency(grid, acc);
+  assert.equal(result, true, 'isHouse path should work with restricted values');
+});
+
+await runTest('Lunchbox returns false for impossible sum with restricted values', () => {
+  // 4-cell Lunchbox with numValues=9, cells restricted to 1-4.
+  // effectiveNumValues = 4. maxSum = (4*3/2)-1 = 5.
+  // Sum = 10 exceeds maxSum, so initialize should return false.
+  const context = new GridTestContext({ gridSize: [1, 4], numValues: 9 });
+  const cells = context.cells();
+  const handler = new Lunchbox(cells, 10);
+
+  const grid = context.grid;
+  const allFour = valueMask(1, 2, 3, 4);
+  for (let i = 0; i < 4; i++) grid[cells[i]] = allFour;
+
+  const result = context.initializeHandler(handler);
+  assert.equal(result, false, 'should fail when sum exceeds maxSum for effective values');
+});
+
 logSuiteComplete('lunchbox.test.js');

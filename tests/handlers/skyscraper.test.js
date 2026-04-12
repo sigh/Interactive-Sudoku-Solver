@@ -711,4 +711,35 @@ await runTest('Skyscraper offset=0: unchanged behavior with no zero values', () 
   assert.equal(grid[3], valueMask(4));
 });
 
+// =============================================================================
+// Per-cell numValues tests
+// =============================================================================
+
+await runTest('Skyscraper works when cells have fewer values than numValues', () => {
+  // 4 cells in a numValues=9 grid, but restricted to values 1-4.
+  const context = new GridTestContext({ gridSize: [1, 9], numValues: 9 });
+  const cells = [0, 1, 2, 3];
+  const handler = new Skyscraper(cells, 4);
+
+  // Restrict cells to values 1-4 before initialization.
+  const restricted = valueMask(1, 2, 3, 4);
+  for (const c of cells) context.grid[c] = restricted;
+
+  context.initializeHandler(handler);
+
+  const grid = context.grid;
+  // Reset to all 1-4 for enforceConsistency.
+  for (const c of cells) grid[c] = restricted;
+  const acc = createAccumulator();
+
+  const result = handler.enforceConsistency(grid, acc);
+
+  assert.equal(result, true);
+  // visibility=4 with 4 cells forces ascending: 1,2,3,4.
+  assert.equal(grid[0], valueMask(1));
+  assert.equal(grid[1], valueMask(2));
+  assert.equal(grid[2], valueMask(3));
+  assert.equal(grid[3], valueMask(4));
+});
+
 logSuiteComplete('skyscraper.test.js');

@@ -134,4 +134,28 @@ await runTest('offset=0: unchanged behavior', () => {
   assert.equal(grid[1], valueMask(2));
 });
 
+// =============================================================================
+// Per-cell numValues tests
+// =============================================================================
+
+await runTest('CountingCircles works when cells have fewer values than numValues', () => {
+  // 2 cells in a numValues=9 grid, but restricted to values 1-4.
+  // Sum must equal 2, so only combo {2} works → both cells must be 2.
+  const context = new GridTestContext({ gridSize: [1, 9], numValues: 9 });
+  const handler = new CountingCircles([0, 1]);
+
+  // Restrict cells to values 1-4 before initialization.
+  const restricted = valueMask(1, 2, 3, 4);
+  context.grid[0] = restricted;
+  context.grid[1] = restricted;
+
+  context.initializeHandler(handler, { cellExclusions: noExclusions(9) });
+
+  const grid = context.grid;
+  const acc = createAccumulator();
+  assert.equal(handler.enforceConsistency(grid, acc), true);
+  assert.equal(grid[0], valueMask(2));
+  assert.equal(grid[1], valueMask(2));
+});
+
 logSuiteComplete('counting_circles.test.js');

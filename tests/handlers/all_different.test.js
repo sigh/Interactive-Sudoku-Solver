@@ -93,4 +93,34 @@ await runTest('AllDifferent should not prune when no cell is fixed', () => {
   assert.equal(grid[2], before[2]);
 });
 
+await runTest('AllDifferent should fail init when cells have fewer distinct values than cells', () => {
+  // 5 cells, but restrict to only 4 values available.
+  const context = new GridTestContext({ gridSize: [1, 5], numValues: 9 });
+  const handler = new AllDifferent(
+    [0, 1, 2, 3, 4], AllDifferent.PROPAGATE_WITH_ENFORCER);
+
+  const grid = context.grid;
+  for (let i = 0; i < 5; i++) {
+    grid[i] = valueMask(1, 2, 3, 4);
+  }
+
+  const result = context.initializeHandler(handler);
+  assert.equal(result, false, '5 cells with only 4 available values is impossible');
+});
+
+await runTest('AllDifferent should pass init when cells have enough distinct values', () => {
+  // 5 cells with 5 values available — feasible.
+  const context = new GridTestContext({ gridSize: [1, 5], numValues: 9 });
+  const handler = new AllDifferent(
+    [0, 1, 2, 3, 4], AllDifferent.PROPAGATE_WITH_ENFORCER);
+
+  const grid = context.grid;
+  for (let i = 0; i < 5; i++) {
+    grid[i] = valueMask(1, 2, 3, 4, 5);
+  }
+
+  const result = context.initializeHandler(handler);
+  assert.equal(result, true, '5 cells with 5 available values is feasible');
+});
+
 logSuiteComplete('all_different.test.js');

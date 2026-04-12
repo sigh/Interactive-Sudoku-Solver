@@ -65,6 +65,10 @@ export class LookupTables {
     return (1 << (31 - Math.clz32(v))) - ((v & -v) << 1);
   };
 
+  static allValues(numValues) {
+    return (1 << numValues) - 1;
+  };
+
   static toIndex(v) {
     return 31 - Math.clz32(v);
   };
@@ -92,7 +96,7 @@ export class LookupTables {
       throw new Error('Use LookupTables.get(shape.numValues)');
     }
 
-    this.allValues = (1 << numValues) - 1;
+    this.allValues = LookupTables.allValues(numValues);
     this.combinations = 1 << numValues;
 
     const combinations = this.combinations;
