@@ -2086,6 +2086,10 @@ class _Squishable2x2 extends SudokuConstraintHandler {
   static _valuesBuffer = new Uint16Array(SHAPE_MAX.numValues);
 
   initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
+    if (shape.numValues !== 9) {
+      throw new InvalidConstraintError(
+        `${this.constructor.name} requires numValues=9`);
+    }
     this._cellExclusions = cellExclusions;
 
     return true;

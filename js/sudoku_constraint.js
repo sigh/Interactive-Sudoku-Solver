@@ -1424,6 +1424,7 @@ export class SudokuConstraint {
       a digit from (2, 5, 8) and a digit from (3, 6, 9).`);
     static CATEGORY = 'Global';
     static UNIQUENESS_KEY_FIELD = 'type';
+    static VALIDATE_SHAPE_FN = (shape) => shape.numValues === 9;
 
     static displayName() {
       return 'Global Mod 3';
