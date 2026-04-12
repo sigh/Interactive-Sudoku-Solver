@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "test": "node tests/run_all_tests.js",
+    "test:quiet": "node tests/run_all_tests.js --quiet",
     "test:coverage": "c8 node tests/run_all_tests.js",
     "bench": "node tests/bench/run_all_benchmarks.js"
   },

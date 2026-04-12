@@ -37,11 +37,12 @@ if (orderedTests.length === 0) {
   process.exit(0);
 }
 
+const quiet = process.argv.includes('--quiet');
 const failures = [];
 const totalStart = performance.now();
 
 for (const testFile of orderedTests) {
-  console.log(`\u25b6 Running ${testFile}`);
+  if (!quiet) console.log(`\u25b6 Running ${testFile}`);
   try {
     await import(pathToFileURL(join(testsDirPath, testFile)));
   } catch (error) {
@@ -62,4 +63,5 @@ if (failures.length > 0) {
   process.exit(1);
 }
 
-console.log(`\n\u2713 All tests passed. (${totalTests} tests across ${orderedTests.length} files in ${totalMs}ms)`);
+if (!quiet) console.log('\n');
+console.log(`\u2713 All tests passed. (${totalTests} tests across ${orderedTests.length} files in ${totalMs}ms)`);

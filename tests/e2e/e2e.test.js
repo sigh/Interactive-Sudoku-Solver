@@ -1,8 +1,6 @@
-import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { resolve as resolvePath } from 'node:path';
-
-import { logSuiteComplete } from '../helpers/test_runner.js';
+import { runTest, logSuiteComplete, logInfo } from '../helpers/test_runner.js';
 
 const { SimpleSolver } = await import('../../js/sandbox/simple_solver.js' + self.VERSION_PARAM);
 const { SolverStats } = await import('../../js/sandbox/solver_stats.js' + self.VERSION_PARAM);
@@ -248,19 +246,14 @@ const runCollection = async (puzzles, solveFn, label) => {
   const stats = [];
   for (const puzzleCfg of puzzles) {
     const puzzle = await resolvePuzzleConfig(puzzleCfg);
-    const input = await loadInput(puzzle);
+    await runTest(`${label}: ${puzzle.name}`, async () => {
+      const input = await loadInput(puzzle);
+      const result = await solveFn(input);
 
-    let result = null;
-    try {
-      result = await solveFn(input);
-    } catch (e) {
-      throw new Error(`${label} ${puzzle.name} failed: ${e}`);
-    }
-
-    const solution = result?.solution !== undefined ? result.solution : result;
-    const solutionCount = result?.solutionCount;
-    const asString = solution?.toString() || null;
-    assertPuzzleSolution(puzzle, asString, solutionCount);
+      const solution = result?.solution !== undefined ? result.solution : result;
+      const solutionCount = result?.solutionCount;
+      assertPuzzleSolution(puzzle, solution?.toString() || null, solutionCount);
+    });
 
     stats.push({
       puzzle: puzzle.name,
@@ -275,12 +268,6 @@ const runCollection = async (puzzles, solveFn, label) => {
 const solver = new SimpleSolver();
 
 
-const expectStatsStructure = (result, label) => {
-  assert.ok(result, `${label} returned nothing`);
-  assert.ok(Array.isArray(result.stats), `${label} stats should be an array`);
-  assert.ok(result.stats.total, `${label} stats should include totals`);
-};
-
 const formatNumber = (value) => value.toLocaleString('en-US');
 const formatSeconds = (ms) => `${(ms / 1000).toFixed(2)}s`;
 
@@ -294,7 +281,7 @@ const logCollectionSummary = (result, label = result.collection) => {
   if (typeof total.guesses === 'number') {
     parts.push(`guesses ${formatNumber(total.guesses)}`);
   }
-  console.log('  ' + parts.join(' | '));
+  logInfo('  ' + parts.join(' | '));
 };
 
 const runSolveResults = [];
@@ -305,13 +292,10 @@ for (const { collection, puzzles } of solveCollections) {
       const candidates = [...solver.solutions(input, 2)];
       return { solution: candidates[0] || null, solutionCount: candidates.length };
     },
-    'Puzzle'
+    collection
   );
   runSolveResults.push({ collection, stats });
 }
-assert.equal(runSolveResults.length, 6, 'should solve all collections');
-runSolveResults.forEach((result) => expectStatsStructure(result, `solve tests (${result.collection})`));
-console.log('✓ solve collections completed');
 runSolveResults.forEach((result) => logCollectionSummary(result));
 
 const runLayoutResults = [];
@@ -319,15 +303,10 @@ const runLayoutResults = [];
   const stats = await runCollection(
     layoutCases,
     (input) => solver.validateLayout(input),
-    'Layout puzzle'
+    'Layout'
   );
   runLayoutResults.push({ collection: 'Jigsaw layouts', stats });
 }
-assert.equal(runLayoutResults.length, 1, 'layout collections should return a single collection');
-runLayoutResults.forEach((result) => expectStatsStructure(result, 'layout tests'));
-console.log('✓ layout collections completed');
 runLayoutResults.forEach((result) => logCollectionSummary(result));
 
-const totalPuzzles = [...runSolveResults, ...runLayoutResults]
-  .reduce((sum, r) => sum + r.stats.length, 0);
-logSuiteComplete('End-to-end', totalPuzzles);
+logSuiteComplete('End-to-end');

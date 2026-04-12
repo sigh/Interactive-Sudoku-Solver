@@ -5,8 +5,17 @@ Tests use Node.js with the native `assert/strict` module and a custom test runne
 ## Running Tests
 
 ```sh
-node tests/run_all_tests.js           # default: suite summaries only
-node tests/run_all_tests.js --verbose  # also print each passing test name
+npm test                # default: per-file and per-suite summaries
+npm run test:quiet      # final summary only
+npm run test:coverage   # with c8 code coverage
+```
+
+Flags can also be passed directly:
+
+```sh
+node tests/run_all_tests.js             # same as npm test
+node tests/run_all_tests.js --quiet     # suppress per-file/suite output
+node tests/run_all_tests.js --verbose   # also print each passing test name
 ```
 
 ## Interpreting Output
@@ -34,7 +43,8 @@ node tests/run_all_tests.js --verbose  # also print each passing test name
 From `helpers/test_runner.js`:
 
 - `runTest(name, fn)` — run a single test. Increments the suite counter. Prints name only with `--verbose`.
-- `logSuiteComplete(suiteName, count?)` — log suite result. Uses internal counter by default; pass `count` to override (e.g. e2e bulk tests).
+- `logSuiteComplete(suiteName, count?)` — log suite result. Uses internal counter by default; pass `count` to override. Suppressed with `--quiet`.
+- `logInfo(...args)` — log informational output. Suppressed with `--quiet`.
 - `getTotalCount()` — aggregate count across all suites.
 
 ## Writing Tests
