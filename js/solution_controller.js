@@ -43,7 +43,7 @@ class HistoryHandler {
     // ctrl-z/shift-ctrl-z are shortcuts for undo/redo,
     window.addEventListener('keydown', event => {
       if (isKeyEventFromEditableElement(event)) return;
-      if (event.key === 'z' && (event.metaKey || event.ctrlKey)) {
+      if (event.key.toLowerCase() === 'z' && (event.metaKey || event.ctrlKey)) {
         event.preventDefault();
         this._incrementHistory(event.shiftKey ? 1 : -1);
       }
