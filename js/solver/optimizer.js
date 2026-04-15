@@ -222,7 +222,10 @@ export class SudokuConstraintOptimizer {
     if (allSumHandlers.length === 0) return;
     // Exclude any handlers with duplicate cells from any of the optimizations.
     // TODO: Check which optimizations are still valid.
-    const safeSumHandlers = allSumHandlers.filter(h => h.onlyUnitCoeffs());
+    // Also exclude 0-cell handlers (e.g. from cancelled makeEqual) as they
+    // have no cells to optimize over.
+    const safeSumHandlers = allSumHandlers.filter(
+      h => h.onlyUnitCoeffs() && h.cells.length > 0);
 
     const [filteredSumHandlers, sumCells] =
       this._findNonOverlappingSubset(safeSumHandlers, handlerSet);
@@ -453,15 +456,20 @@ export class SudokuConstraintOptimizer {
 
   _fillInSumGap(sumHandlers, sumCells, shape) {
     // Fill in a gap if one remains.
-    const numNonSumCells = shape.numGridCells - sumCells.size;
+    // Exclude handlers with cells outside the grid.
+    const gridHandlers = sumHandlers.filter(
+      h => h.cells.every(c => c < shape.numGridCells));
+
+    const numNonSumCells = shape.numGridCells - gridHandlers.reduce(
+      (n, h) => n + h.cells.length, 0);
     if (numNonSumCells === 0 || numNonSumCells >= shape.numValues) return [];
 
-    const sumHandlersSum = sumHandlers.map(h => h.sum()).reduce((a, b) => a + b);
+    const sumHandlersSum = gridHandlers.map(h => h.sum()).reduce((a, b) => a + b);
     const numRegions = shape.numGridCells / shape.numValues;
     const remainingSum = numRegions * maxSumForShape(shape) - sumHandlersSum;
 
     const remainingCells = new Set(allCells(shape));
-    sumHandlers.forEach(h => h.cells.forEach(c => remainingCells.delete(c)));
+    gridHandlers.forEach(h => h.cells.forEach(c => remainingCells.delete(c)));
     const newHandler = new SumHandlerModule.Sum(
       [...remainingCells], remainingSum);
 

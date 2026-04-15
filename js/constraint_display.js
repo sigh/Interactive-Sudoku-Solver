@@ -78,7 +78,9 @@ class BaseConstraintDisplayItem extends DisplayItem {
 
   _removeCircleFromPath(p0, p1) {
     const [dx, dy] = [p1[0] - p0[0], p1[1] - p0[1]];
-    const frac = this._CIRCLE_RADIUS / Math.sqrt(dx * dx + dy * dy);
+    const d = Math.sqrt(dx * dx + dy * dy);
+    if (d === 0) return;
+    const frac = this._CIRCLE_RADIUS / d;
     p0[0] += dx * frac;
     p0[1] += dy * frac;
   }

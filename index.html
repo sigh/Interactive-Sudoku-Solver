@@ -432,8 +432,25 @@ layout: null
                       <select id="value-range-max"></select>
                     </span>
                   </div>
+                  <form id="var-constraint-input" class="shape-panel-body">
+                    <label>Extra Cells</label>
+                    <div class="vstack var-constraint-fields">
+                      <span class="hstack">
+                        <input type="text" name="var-prefix" placeholder="prefix" size="4" autocomplete="off"
+                          autocorrect="off">
+                        &times;
+                        <input type="number" name="var-count" min="1" value="1" size="3">
+                      </span>
+                      <span class="hstack">
+                        <input type="text" name="var-label" placeholder="label" size="8" autocomplete="off"
+                          autocorrect="off">
+                        <button type="submit" name="add-var">Add</button>
+                      </span>
+                    </div>
+                  </form>
+                  <div id="var-constraint-input-error" class="notice notice-error"></div>
                   <div id="shape-experimental-warning" class="notice notice-warning" style="display:none">
-                    Non-default value ranges are experimental
+                    Extra cells are experimental
                   </div>
                 </div>
               </div>

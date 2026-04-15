@@ -152,18 +152,20 @@ ConstraintCategoryInput.Shape = class Shape extends ConstraintCategoryInput {
     this._collapsibleContainer = new CollapsibleContainer(
       panel, /* defaultOpen= */ true);
 
-    this._input = document.getElementById('shape-input');
+    this._gridSpecInput = document.getElementById('shape-input');
     this._minSelect = document.getElementById('value-range-min');
     this._maxSelect = document.getElementById('value-range-max');
     this._warningElem = document.getElementById('shape-experimental-warning');
     this._warningIcon = document.getElementById('shape-warning-icon');
+    this._varForm = document.forms['var-constraint-input'];
 
     this._setUpGridInput();
     this._setUpValueRangeDropdowns();
+    this._setUpVarInput();
   }
 
   _setUpGridInput() {
-    const input = this._input;
+    const input = this._gridSpecInput;
     const dropdown = document.getElementById('shape-dropdown');
     const items = dropdown.querySelectorAll('.shape-dropdown-item');
     let highlightedIndex = -1;
@@ -248,15 +250,15 @@ ConstraintCategoryInput.Shape = class Shape extends ConstraintCategoryInput {
   }
 
   _applyShape() {
-    const text = this._input.value.trim();
+    const text = this._gridSpecInput.value.trim();
     if (!text) return;
     try {
       // Try parsing as a full spec (handles paste of e.g. "9x9~0-8").
       const parsed = GridShape.fromGridSpec(text);
-      this._input.setCustomValidity('');
+      this._gridSpecInput.setCustomValidity('');
       this.collection.setShape(parsed);
     } catch (e) {
-      this._input.setCustomValidity(e.toString());
+      this._gridSpecInput.setCustomValidity(e.toString());
     }
   }
 
@@ -306,21 +308,57 @@ ConstraintCategoryInput.Shape = class Shape extends ConstraintCategoryInput {
 
   reshape(shape) {
     this._shape = shape;
-    this._input.value = shape.gridDimsStr;
-    this._input.setCustomValidity('');
+    this._gridSpecInput.value = shape.gridDimsStr;
+    this._gridSpecInput.setCustomValidity('');
     this._updateValueRangeDropdowns(shape);
 
+    this._updateExtraCellsWarning();
+    shape.onVarCellsChanged(() => this._updateExtraCellsWarning());
+  }
+
+  _updateExtraCellsWarning() {
     const showWarning =
-      !shape.isDefaultNumValues() || shape.valueOffset !== 0;
+      this._shape.totalCells() > this._shape.numGridCells;
     this._warningElem.style.display = showWarning ? '' : 'none';
     this._warningIcon.style.display = showWarning ? '' : 'none';
   }
 
+  _setUpVarInput() {
+    const form = this._varForm;
+    const errorElem = document.getElementById('var-constraint-input-error');
+
+    const prefixInput = form['var-prefix'];
+    prefixInput.addEventListener('input', () => {
+      prefixInput.value = prefixInput.value.toUpperCase();
+      errorElem.textContent = '';
+    });
+
+    form.onsubmit = e => {
+      e.preventDefault();
+      const prefix = prefixInput.value.trim();
+      const label = form['var-label'].value.trim();
+      const count = +form['var-count'].value || 1;
+
+      try {
+        const constraint = new SudokuConstraint.Var(prefix, label, count);
+        this.collection.addConstraint(constraint);
+        this.runUpdateCallback();
+        errorElem.textContent = '';
+      } catch (err) {
+        errorElem.textContent = err.message;
+      }
+      return false;
+    };
+  }
+
   getConstraintInputElement(constraintClass) {
+    if (constraintClass === SudokuConstraint.Var) {
+      return this._varForm['var-prefix'];
+    }
     if (!this.constructor.constraintClasses().includes(constraintClass)) {
       return null;
     }
-    return this._input;
+    return this._gridSpecInput;
   }
 }
 
@@ -1510,7 +1548,7 @@ ConstraintCategoryInput.StateMachine = class StateMachine extends JavaScriptCate
               maxDepthExpression: formData.get('max-depth'),
             };
 
-          const shape = this._shape || SudokuConstraint.Shape.DEFAULT_SHAPE;
+          const shape = this._shape || SudokuConstraint.Shape.getShapeFromGridSpec(null);
           const cells = this._inputManager.getSelection();
           const encodedNFA = await this._userScriptExecutor.compileStateMachine(
             spec, shape.numValues, cells.length, isUnified, shape.valueOffset);

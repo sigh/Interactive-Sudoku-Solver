@@ -26,13 +26,11 @@ export class Sum extends SudokuConstraintHandler {
 
   constructor(cells, sum, coeffs) {
     const cellSet = new Set(cells);
-    super(cellSet);
-    this._rawSum = +sum;
+    let coeffGroups;
 
     if (cellSet.size === cells.length && !coeffs) {
       // Shortcut the common case.
-      this._coeffGroups.push(
-        { coeff: 1, cells: [...cells], exclusionGroups: [] });
+      coeffGroups = [{ coeff: 1, cells: [...cells], exclusionGroups: [] }];
     } else {
       coeffs = coeffs || Array(cells.length).fill(1);
 
@@ -41,6 +39,10 @@ export class Sum extends SudokuConstraintHandler {
       }
       if (!coeffs.every(c => Number.isInteger(c))) {
         throw new InvalidConstraintError('Sum coefficients must be integers');
+      }
+      if (!coeffs.every(c => Math.abs(c) <= 100)) {
+        throw new InvalidConstraintError(
+          'Sum coefficients must be between -100 and 100');
       }
 
       // If there are duplicates, then update the coefficients.
@@ -56,18 +58,30 @@ export class Sum extends SudokuConstraintHandler {
         coeffs = cells.map(c => cellMap.get(c));
       }
 
+      // Remove cells whose coefficients are zero (e.g. from cancellation,
+      // or explicitly passed in).
+      if (coeffs.some(c => c === 0)) {
+        cells = cells.filter((_, i) => coeffs[i] !== 0);
+        coeffs = coeffs.filter(c => c !== 0);
+      }
+
       // Group coefficients by value.
+      coeffGroups = [];
       const coeffMap = new MultiMap();
       for (let i = 0; i < cells.length; i++) {
         coeffMap.add(coeffs[i], cells[i]);
       }
       for (let [coeff, coeffCells] of coeffMap) {
-        this._coeffGroups.push({ coeff, cells: coeffCells, exclusionGroups: [] });
+        coeffGroups.push({ coeff, cells: coeffCells, exclusionGroups: [] });
       }
     }
 
     // Sort cells for consistent idStr and exclusion cell performance.
-    this._coeffGroups.forEach(g => g.cells.sort((a, b) => a - b));
+    coeffGroups.forEach(g => g.cells.sort((a, b) => a - b));
+
+    super(cells);
+    this._rawSum = +sum;
+    this._coeffGroups = coeffGroups;
 
     this.idStr = [
       this.constructor.name,
@@ -141,6 +155,9 @@ export class Sum extends SudokuConstraintHandler {
       this._sum -= shape.valueOffset * coeffSum;
     }
 
+    // 0-cell handlers are trivially satisfiable iff sum is 0.
+    if (this.cells.length === 0) return this._sum === 0;
+
     for (const g of this._coeffGroups) {
       g.exclusionGroups = HandlerUtil.findExclusionGroups(
         g.cells, cellExclusions).groups;
@@ -171,7 +188,8 @@ export class Sum extends SudokuConstraintHandler {
             // This can only happen when the last exclusion group is exactly 16
             // cells.
             const eg = egs[egs.length - 1];
-            newEgs = newCells = eg.splice(0, MAX_GROUP_SIZE);
+            newCells = eg.splice(0, MAX_GROUP_SIZE);
+            newEgs = [newCells];
           }
           this._coeffGroups.push({ coeff: g.coeff, cells: newCells, exclusionGroups: newEgs });
           newCells.forEach(c => cellSet.delete(c));
@@ -220,6 +238,11 @@ export class Sum extends SudokuConstraintHandler {
       // Thus it can't be used to exclude the value from other cells.
       // (This is only relevant for calls to _enforceFewRemainingCells).
       this._cellExclusions = cellExclusions;
+    }
+
+    // Ensure the shared scratch buffer is large enough.
+    if (this.constructor._seenMinMaxs.length < this.cells.length) {
+      this.constructor._seenMinMaxs = new Uint32Array(this.cells.length);
     }
 
     // Check for valid sums.

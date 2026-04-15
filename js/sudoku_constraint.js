@@ -1211,7 +1211,6 @@ export class SudokuConstraint {
     static DESCRIPTION = (`The number of rows and columns in the grid.`);
     static CATEGORY = 'Shape';
     static UNIQUENESS_KEY_FIELD = 'type';
-    static DEFAULT_SHAPE = SHAPE_9x9;
     static _DEFAULT_SPECS = new Set([
       SHAPE_9x9.name,
       `${SHAPE_9x9.gridDimsStr}~${SHAPE_9x9.numValues}`,
@@ -1251,7 +1250,10 @@ export class SudokuConstraint {
     }
 
     static getShapeFromGridSpec(gridSpec) {
-      if (!gridSpec) return this.DEFAULT_SHAPE;
+      if (!gridSpec) {
+        return GridShape.fromGridSize(
+          SHAPE_9x9.numRows, SHAPE_9x9.numCols);
+      }
       return GridShape.fromGridSpec(gridSpec);
     }
   }
@@ -1832,10 +1834,34 @@ export class SudokuConstraint {
     constructor(sum, ...cells) {
       super(sum, ...cells);
       this.cells = cells;
-      this.sum = sum;
+
+      const parts = String(sum).split('_');
+      this.sum = +parts[0];
+      if (!Number.isInteger(this.sum)) {
+        throw Error('Sum must be an integer: ' + parts[0]);
+      }
+
+      if (parts.length > 1 && parts[1] === '=') {
+        this.coeffs = parts.slice(2).map(Number);
+        for (const c of this.coeffs) {
+          if (!Number.isInteger(c) || Math.abs(c) > 100) {
+            throw Error('Coefficients must be integers between -100 and 100: ' + c);
+          }
+        }
+        if (this.coeffs.length !== cells.length) {
+          throw Error(
+            `Coefficient count (${this.coeffs.length}) must match ` +
+            `cell count (${cells.length})`);
+        }
+      } else {
+        this.coeffs = null;
+      }
     }
 
     chipLabel() {
+      if (this.coeffs) {
+        return `Sum (${this.sum}) [${this.coeffs.join(', ')}]`;
+      }
       return `Sum (${this.sum})`;
     }
   }
@@ -2386,7 +2412,7 @@ export class SudokuConstraint {
   static Var = class Var extends SudokuConstraintBase {
     static DESCRIPTION = (
       "Adds variables to use as extra cells outside the grid.");
-    static CATEGORY = 'Experimental';
+    static CATEGORY = 'Shape';
     static UNIQUENESS_KEY_FIELD = 'prefix';
 
     constructor(prefix, label, count) {
@@ -2411,9 +2437,21 @@ export class SudokuConstraint {
 
     static serialize(constraints) {
       return constraints.map(c => {
+        if (c.count === 1 && !c.label) {
+          return this._argsToString(c.prefix);
+        }
         const encodedLabel = this.uriEncodeArg(c.label);
+        if (c.count === 1) {
+          return this._argsToString(c.prefix, encodedLabel);
+        }
         return this._argsToString(c.prefix, encodedLabel, c.count);
       }).join('');
+    }
+
+    getCells(shape) {
+      return this.groups.flatMap(
+        g => (shape.varCellsForGroup(g.prefix) || []).map(
+          c => shape.makeCellIdFromIndex(c)));
     }
 
     getVarCellGroups(shape) {
@@ -2421,7 +2459,8 @@ export class SudokuConstraint {
     }
 
     chipLabel() {
-      return `Var: $${this.prefix} (${this.count})`;
+      const countStr = this.count > 1 ? `[${this.count}]` : '';
+      return `Extra Cells: $${this.prefix}${countStr}`;
     }
   }
 }
