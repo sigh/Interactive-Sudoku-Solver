@@ -2392,7 +2392,8 @@ export class SudokuConstraint {
     chipLabel() {
       let valueStr = this.values.join(',');
       if (this.values.length !== 1) valueStr = `[${valueStr}]`;
-      return `${this.cell}: ${valueStr}`;
+      const displayCell = GridShape.displayCellId(this.cell);
+      return `${displayCell}: ${valueStr}`;
     }
 
     getCells(shape) {
@@ -2461,7 +2462,7 @@ export class SudokuConstraint {
 
     chipLabel() {
       const countStr = this.count > 1 ? `[${this.count}]` : '';
-      return `Extra Cells: $${this.prefix}${countStr}`;
+      return `Extra Cells: ${GridShape.displayCellId('V' + this.prefix)}${countStr}`;
     }
   }
 }

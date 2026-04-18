@@ -163,6 +163,11 @@ export class GridShape {
     return this.numRows === this.numCols;
   }
 
+  static displayCellId(cellId) {
+    if (cellId[0] === 'V') return '$' + cellId.substring(1);
+    return cellId;
+  }
+
   // Compute box dimensions for a target region size.
   // Returns [boxHeight, boxWidth] or [null, null] if no valid box dimensions.
   static boxDimsForSize(numRows, numCols, targetSize) {

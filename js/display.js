@@ -6,7 +6,7 @@ const {
   isIterable,
 } = await import('./util.js' + self.VERSION_PARAM);
 const { toShortSolution } = await import('./sudoku_parser.js' + self.VERSION_PARAM);
-const { SHAPE_9x9 } = await import('./grid_shape.js' + self.VERSION_PARAM);
+const { GridShape, SHAPE_9x9 } = await import('./grid_shape.js' + self.VERSION_PARAM);
 
 export class DisplayItem {
   static SVG_PADDING = 29;
@@ -928,8 +928,7 @@ export class VarCellDisplay extends DisplayItem {
       label.setAttribute('x', 14);
       label.setAttribute('y', yLabel + labelHeight - 3);
       label.setAttribute('class', 'var-cell-label');
-      const groupPrefix = group.prefix[0] === 'V'
-        ? '$' + group.prefix.substring(1) : group.prefix;
+      const groupPrefix = GridShape.displayCellId(group.prefix);
       const groupLabel = group.label ? `: ${group.label}` : '';
       label.textContent = `${groupPrefix}${groupLabel}`;
       svg.append(label);
