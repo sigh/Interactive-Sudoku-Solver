@@ -184,16 +184,18 @@ export class GivenCandidates extends SudokuConstraintHandler {
     this._valueMap = valueMap;
   }
 
-  initialize(initialGridCells, cellExclusions, shape) {
-    const offset = shape.valueOffset;
+  applyValues(grid, valueOffset) {
     for (const [cell, value] of this._valueMap) {
       if (isIterable(value)) {
-        initialGridCells[cell] &= LookupTables.fromOffsetValuesArray(value, offset);
+        grid[cell] &= LookupTables.fromOffsetValuesArray(value, valueOffset);
       } else {
-        initialGridCells[cell] &= LookupTables.fromOffsetValue(value, offset);
+        grid[cell] &= LookupTables.fromOffsetValue(value, valueOffset);
       }
     }
+  }
 
+  initialize(initialGridCells, cellExclusions, shape) {
+    this.applyValues(initialGridCells, shape.valueOffset);
     return true;
   }
 }
@@ -622,7 +624,10 @@ export class HandlerUtil {
   }
 }
 
-export class House extends SudokuConstraintHandler {
+// An AllDifferent where the number of distinct possible values equals
+// the number of cells. House is a special case where
+// cells.length === shape.numValues.
+export class PerfectAllDifferent extends SudokuConstraintHandler {
   constructor(cells) {
     super(cells);
     this._allValues = 0;
@@ -673,6 +678,9 @@ export class House extends SudokuConstraintHandler {
     ];
   }
 }
+
+// A PerfectAllDifferent where cells.length === shape.numValues.
+export class House extends PerfectAllDifferent { }
 
 // Determine the number of times each value appears in the provided lines,
 // (numCells / numLines), and ensure that each value appears exactly that many

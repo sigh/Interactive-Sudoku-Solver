@@ -1,4 +1,17 @@
-const { memoize, arrayIntersectSize, arrayDifference, setIntersectSize, arrayIntersect, arrayRemoveValue, setIntersectionToArray, setDifference, BitSet, elementarySymmetricSum, mergeSortedArrays } = await import('../util.js' + self.VERSION_PARAM);
+const {
+  memoize,
+  arrayIntersectSize,
+  arrayDifference,
+  setIntersectSize,
+  arrayIntersect,
+  arrayRemoveValue,
+  setIntersectionToArray,
+  setDifference,
+  BitSet,
+  elementarySymmetricSum,
+  mergeSortedArrays,
+  countOnes16bit
+} = await import('../util.js' + self.VERSION_PARAM);
 const { LookupTables } = await import('./lookup_tables.js' + self.VERSION_PARAM);
 const { SudokuConstraintBase, fnToBinaryKey } = await import('../sudoku_constraint.js' + self.VERSION_PARAM);
 const { GridShape } = await import('../grid_shape.js' + self.VERSION_PARAM);
@@ -42,7 +55,7 @@ export class SudokuConstraintOptimizer {
 
     this._addExtraCellExclusions(handlerSet, cellExclusions, shape);
 
-    this._addHouseHandlers(handlerSet, shape);
+    this._addPerfectAllDifferentHandlers(handlerSet, shape);
 
     if (!shape.isSquare()) {
       this._optimizeNonSquareGrids(handlerSet, boxRegions, shape);
@@ -485,16 +498,48 @@ export class SudokuConstraintOptimizer {
     return [newHandler];
   }
 
-  // Add house handlers for any AllDifferentHandler which have numValues cells.
-  _addHouseHandlers(handlerSet, shape) {
+  // Compute per-cell effective values by applying GivenCandidates
+  // restrictions to a scratch grid.
+  _computeEffectiveValues(handlerSet, shape) {
+    const numCells = shape.totalCells();
+    const allValues = LookupTables.allValues(shape.numValues);
+    const effectiveValues = new Uint16Array(numCells);
+    effectiveValues.fill(allValues);
+    for (const h of
+      handlerSet.getAllofType(HandlerModule.GivenCandidates)) {
+      h.applyValues(effectiveValues, shape.valueOffset);
+    }
+    return effectiveValues;
+  }
+
+  // Promote AllDifferent handlers to PerfectAllDifferent (or House, its
+  // special case where cells.length === numValues).
+  _addPerfectAllDifferentHandlers(handlerSet, shape) {
+    const effectiveValues = this._computeEffectiveValues(handlerSet, shape);
+
     for (const h of
       handlerSet.getAllofType(HandlerModule.AllDifferent)) {
       const cells = h.exclusionCells();
+      if (cells.length <= 2) continue;
+
       if (cells.length === shape.numValues) {
         const newHandler = new HandlerModule.House(cells);
         handlerSet.addNonEssential(newHandler);
         if (this._debugLogger) {
-          this._logAddHandler('_addHouseHandlers', newHandler);
+          this._logAddHandler('_addPerfectAllDifferentHandlers', newHandler);
+        }
+        continue;
+      }
+
+      let houseValues = 0;
+      for (let i = 0; i < cells.length; i++) {
+        houseValues |= effectiveValues[cells[i]];
+      }
+      if (countOnes16bit(houseValues) === cells.length) {
+        const newHandler = new HandlerModule.PerfectAllDifferent(cells);
+        handlerSet.addNonEssential(newHandler);
+        if (this._debugLogger) {
+          this._logAddHandler('_addPerfectAllDifferentHandlers', newHandler);
         }
       }
     }

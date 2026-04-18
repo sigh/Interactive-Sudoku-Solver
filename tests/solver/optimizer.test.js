@@ -1162,4 +1162,132 @@ await runTest('_makeInnieOutieSumHandlers: mixed handler produces correct constr
   }
 });
 
+// =============================================================================
+// _addPerfectAllDifferentHandlers tests
+// =============================================================================
+
+await runTest('_addPerfectAllDifferentHandlers: promotes AllDifferent to PerfectAllDifferent with restricted values', () => {
+  const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
+  // 6x6 grid with numValues=10 (values 1-10).
+  const shape = GridShape.fromGridSize(6, 6, 10);
+  const numCells = shape.numGridCells;
+
+  // Restrict all 36 grid cells to values 1-6 via GivenCandidates.
+  const valueMap = new Map();
+  for (let i = 0; i < numCells; i++) {
+    valueMap.set(i, [1, 2, 3, 4, 5, 6]);
+  }
+  const givenHandler = new HandlerModule.GivenCandidates(valueMap);
+
+  // Add a 6-cell AllDifferent (a row).
+  const rowCells = [0, 1, 2, 3, 4, 5];
+  const allDiffHandler = new HandlerModule.AllDifferent(rowCells);
+
+  const handlerSet = new HandlerSet(
+    [givenHandler, allDiffHandler], numCells);
+
+  optimizer._addPerfectAllDifferentHandlers(handlerSet, shape);
+
+  // Standard House should NOT be created (6 !== 10).
+  assert.equal(
+    handlerSet.getAllofType(HandlerModule.House).length, 0);
+
+  // PerfectAllDifferent should fire (6 cells, 6 effective values).
+  const perfect = handlerSet.getAllofType(HandlerModule.PerfectAllDifferent);
+  assert.equal(perfect.length, 1);
+  assert.deepEqual([...perfect[0].cells], rowCells);
+});
+
+await runTest('_addPerfectAllDifferentHandlers: promotes to House when cells.length equals numValues', () => {
+  const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
+  const shape = GridShape.fromGridSize(9);
+  const numCells = shape.numGridCells;
+
+  const rowCells = [0, 1, 2, 3, 4, 5, 6, 7, 8];
+  const allDiffHandler = new HandlerModule.AllDifferent(rowCells);
+
+  const handlerSet = new HandlerSet([allDiffHandler], numCells);
+
+  optimizer._addPerfectAllDifferentHandlers(handlerSet, shape);
+
+  assert.equal(
+    handlerSet.getAllofType(HandlerModule.House).length, 1);
+  assert.equal(
+    handlerSet.getAllofType(HandlerModule.PerfectAllDifferent).length, 0);
+});
+
+await runTest('_addPerfectAllDifferentHandlers: skips when cell values exceed cell count', () => {
+  const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
+  // 6x6 grid with numValues=10.
+  const shape = GridShape.fromGridSize(6, 6, 10);
+  const numCells = shape.numGridCells;
+
+  // Restrict cells to values 1-8 (8 values > 6 cells — not a house).
+  const valueMap = new Map();
+  for (let i = 0; i < numCells; i++) {
+    valueMap.set(i, [1, 2, 3, 4, 5, 6, 7, 8]);
+  }
+  const givenHandler = new HandlerModule.GivenCandidates(valueMap);
+
+  const rowCells = [0, 1, 2, 3, 4, 5];
+  const allDiffHandler = new HandlerModule.AllDifferent(rowCells);
+
+  const handlerSet = new HandlerSet(
+    [givenHandler, allDiffHandler], numCells);
+
+  optimizer._addPerfectAllDifferentHandlers(handlerSet, shape);
+  assert.equal(
+    handlerSet.getAllofType(HandlerModule.House).length, 0);
+  assert.equal(
+    handlerSet.getAllofType(HandlerModule.PerfectAllDifferent).length, 0);
+});
+
+await runTest('_addPerfectAllDifferentHandlers: promotes subset AllDifferent on standard grid', () => {
+  const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
+  // Standard 9x9 grid.
+  const shape = GridShape.fromGridSize(9);
+  const numCells = shape.numGridCells;
+
+  // 4 cells restricted to {1,2,3,4} via GivenCandidates.
+  const subsetCells = [0, 1, 2, 3];
+  const valueMap = new Map();
+  for (const c of subsetCells) {
+    valueMap.set(c, [1, 2, 3, 4]);
+  }
+  const givenHandler = new HandlerModule.GivenCandidates(valueMap);
+  const allDiffHandler = new HandlerModule.AllDifferent(subsetCells);
+
+  const handlerSet = new HandlerSet(
+    [givenHandler, allDiffHandler], numCells);
+
+  optimizer._addPerfectAllDifferentHandlers(handlerSet, shape);
+  const perfect = handlerSet.getAllofType(HandlerModule.PerfectAllDifferent);
+  assert.equal(perfect.length, 1);
+  assert.deepEqual([...perfect[0].cells], subsetCells);
+});
+
+await runTest('_addPerfectAllDifferentHandlers: skips AllDifferent with 2 or fewer cells', () => {
+  const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
+  const shape = GridShape.fromGridSize(9);
+  const numCells = shape.numGridCells;
+
+  // 2 cells restricted to {1,2} — would match but too small to be useful.
+  const smallCells = [0, 1];
+  const valueMap = new Map();
+  for (const c of smallCells) {
+    valueMap.set(c, [1, 2]);
+  }
+  const givenHandler = new HandlerModule.GivenCandidates(valueMap);
+  const allDiffHandler = new HandlerModule.AllDifferent(smallCells);
+
+  const handlerSet = new HandlerSet(
+    [givenHandler, allDiffHandler], numCells);
+
+  optimizer._addPerfectAllDifferentHandlers(handlerSet, shape);
+  assert.equal(
+    handlerSet.getAllofType(HandlerModule.House).length, 0);
+  assert.equal(
+    handlerSet.getAllofType(HandlerModule.PerfectAllDifferent).length, 0);
+});
+
 logSuiteComplete('optimizer');
