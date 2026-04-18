@@ -55,7 +55,10 @@ export class SudokuConstraintOptimizer {
 
     this._addExtraCellExclusions(handlerSet, cellExclusions, shape);
 
-    this._addPerfectAllDifferentHandlers(handlerSet, shape);
+    const effectiveValues = this._computeEffectiveValues(handlerSet, shape);
+
+    this._addPerfectAllDifferentHandlers(handlerSet, shape, effectiveValues);
+
 
     if (!shape.isSquare()) {
       this._optimizeNonSquareGrids(handlerSet, boxRegions, shape);
@@ -63,7 +66,9 @@ export class SudokuConstraintOptimizer {
 
     this._optimizeSums(handlerSet, cellExclusions, boxRegions, shape);
 
-    this._optimizeJigsaw(handlerSet, boxRegions, shape);
+    this._optimizeJigsaw(
+      handlerSet, boxRegions, shape,
+      this._effectiveValueCount(effectiveValues, shape));
 
     this._optimizeFullRank(handlerSet, shape);
 
@@ -193,7 +198,7 @@ export class SudokuConstraintOptimizer {
     }
   }
 
-  _optimizeJigsaw(handlerSet, boxRegions, shape) {
+  _optimizeJigsaw(handlerSet, boxRegions, shape, effectiveValueCount) {
     const jigsawPieces = handlerSet.getAllofType(HandlerModule.JigsawPiece);
     if (jigsawPieces.length === 0) return;
 
@@ -201,7 +206,8 @@ export class SudokuConstraintOptimizer {
       ...this._makeJigsawIntersections(handlerSet));
 
     handlerSet.addNonEssential(
-      ...this._makeJigsawLawOfLeftoverHandlers(jigsawPieces, boxRegions, shape));
+      ...this._makeJigsawLawOfLeftoverHandlers(
+        jigsawPieces, boxRegions, shape, effectiveValueCount));
   }
 
   // Find a non-overlapping set of handlers.
@@ -516,10 +522,17 @@ export class SudokuConstraintOptimizer {
     return effectiveValues;
   }
 
+  _effectiveValueCount(effectiveValues, shape) {
+    let gridValues = 0;
+    for (let i = 0; i < shape.numGridCells; i++) {
+      gridValues |= effectiveValues[i];
+    }
+    return countOnes16bit(gridValues);
+  }
+
   // Promote AllDifferent handlers to PerfectAllDifferent (or House, its
   // special case where cells.length === numValues).
-  _addPerfectAllDifferentHandlers(handlerSet, shape) {
-    const effectiveValues = this._computeEffectiveValues(handlerSet, shape);
+  _addPerfectAllDifferentHandlers(handlerSet, shape, effectiveValues) {
     const allValues = LookupTables.allValues(shape.numValues);
 
     for (const h of
@@ -841,13 +854,18 @@ export class SudokuConstraintOptimizer {
 
   // Add same value handlers for the intersections between houses.
   _makeJigsawIntersections(handlerSet) {
-    const houseHandlers = handlerSet.getAllofType(HandlerModule.House);
+    const allHandlers = [
+      ...handlerSet.getAllofType(HandlerModule.House),
+      ...handlerSet.getAllofType(HandlerModule.PerfectAllDifferent),
+    ];
     const newHandlers = [];
 
     // Add constraints due to overlapping regions.
-    for (const h0 of houseHandlers) {
-      for (const h1 of houseHandlers) {
+    for (const h0 of allHandlers) {
+      for (const h1 of allHandlers) {
         if (h0 === h1) continue;
+        if (h0.cells.length !== h1.cells.length) continue;
+        if (h0.valueMask() !== h1.valueMask()) continue;
 
         const diff0 = arrayDifference(h0.cells, h1.cells);
         if (
@@ -873,31 +891,31 @@ export class SudokuConstraintOptimizer {
   }
 
   // Returns region-groups used by the jigsaw overlap optimizations.
-  // Key detail: whether an axis forms houses depends on (numRows/numCols === numValues),
-  // so we memoize based on those booleans + grid dimensions (not on shape identity).
-  _overlapRegions(shape, boxRegions) {
+  // An axis forms regions when its cells-per-region equals valueCount.
+  _overlapRegions(shape, boxRegions, valueCount) {
     const regions = [];
 
-    // Rows are houses if they have numValues cells (numCols === numValues).
-    if (shape.numCols === shape.numValues) {
+    // Rows are houses if they have valueCount cells (numCols === valueCount).
+    if (shape.numCols === valueCount) {
       const rowRegions = SudokuConstraintBase.rowRegions(shape);
       regions.push(rowRegions, rowRegions.slice().reverse());
     }
 
-    // Columns are houses if they have numValues cells (numRows === numValues).
-    if (shape.numRows === shape.numValues) {
+    // Columns are houses if they have valueCount cells (numRows === valueCount).
+    if (shape.numRows === valueCount) {
       const colRegions = SudokuConstraintBase.colRegions(shape);
       regions.push(colRegions, colRegions.slice().reverse());
     }
 
-    if (boxRegions.length > 0 && boxRegions[0].length === shape.numValues) {
+    if (boxRegions.length > 0 && boxRegions[0].length === valueCount) {
       regions.push(boxRegions);
     }
 
     return regions;
   }
 
-  _generalRegionOverlapProcessor(regions, pieces, numValues, callback) {
+  _generalRegionOverlapProcessor(regions, pieces, callback) {
+    const numValues = regions.length;
     const superRegion = new Set();
     const remainingPieces = new Set(pieces);
     const usedPieces = [];
@@ -929,8 +947,10 @@ export class SudokuConstraintOptimizer {
     }
   }
 
-  _makeJigsawLawOfLeftoverHandlers(jigsawPieces, boxRegions, shape) {
+  _makeJigsawLawOfLeftoverHandlers(
+    jigsawPieces, boxRegions, shape, effectiveValueCount) {
     const newHandlers = [];
+    const pieces = jigsawPieces.map(p => p.cells);
 
     const handleOverlap = (superRegion, piecesRegion, usedPieces) => {
       // We can only match when regions are the same size.
@@ -949,10 +969,8 @@ export class SudokuConstraintOptimizer {
       this._logAddHandler('_makeJigsawLawOfLeftoverHandlers', newHandler);
     }
 
-    const overlapRegions = this._overlapRegions(shape, boxRegions);
-    for (const r of overlapRegions) {
-      this._generalRegionOverlapProcessor(
-        r, jigsawPieces.map(p => p.cells), shape.numValues, handleOverlap);
+    for (const r of this._overlapRegions(shape, boxRegions, effectiveValueCount)) {
+      this._generalRegionOverlapProcessor(r, pieces, handleOverlap);
     }
 
     return newHandlers;
@@ -1024,10 +1042,8 @@ export class SudokuConstraintOptimizer {
       this._logAddHandler('_makeInnieOutieSumHandlers', newHandler, { args });
     };
 
-    const overlapRegions = this._overlapRegions(shape, boxRegions);
-    for (const r of overlapRegions) {
-      this._generalRegionOverlapProcessor(
-        r, pieces, shape.numValues, handleOverlap);
+    for (const r of this._overlapRegions(shape, boxRegions, shape.numValues)) {
+      this._generalRegionOverlapProcessor(r, pieces, handleOverlap);
     }
 
     return newHandlers;
