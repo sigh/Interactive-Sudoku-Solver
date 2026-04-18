@@ -1290,4 +1290,92 @@ await runTest('_addPerfectAllDifferentHandlers: skips AllDifferent with 2 or few
     handlerSet.getAllofType(HandlerModule.PerfectAllDifferent).length, 0);
 });
 
+// =============================================================================
+// _addHouseIntersections tests
+// =============================================================================
+
+await runTest('_addHouseIntersections: creates intersections for restricted grid', () => {
+  const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
+  // 6x6 grid with numValues=10 (values 0-9).
+  const shape = GridShape.fromGridSize(6, 6, 10);
+  const numCells = shape.numGridCells;
+
+  // Restrict all cells to values 1-6 via GivenCandidates.
+  const valueMap = new Map();
+  for (let i = 0; i < numCells; i++) {
+    valueMap.set(i, [1, 2, 3, 4, 5, 6]);
+  }
+  const givenHandler = new HandlerModule.GivenCandidates(valueMap);
+
+  // Box regions for 6x6: 2x3 boxes.
+  const boxRegions = SudokuConstraintBase.boxRegions(shape);
+
+  // Add AllDifferent for row 0, row 1, box 0, and box 1.
+  const row0 = [0, 1, 2, 3, 4, 5];
+  const row1 = [6, 7, 8, 9, 10, 11];
+  const handlers = [
+    givenHandler,
+    new HandlerModule.AllDifferent(row0),
+    new HandlerModule.AllDifferent(row1),
+    new HandlerModule.AllDifferent(boxRegions[0]),
+    new HandlerModule.AllDifferent(boxRegions[1]),
+  ];
+
+  const handlerSet = new HandlerSet(handlers, numCells);
+
+  // First promote to PerfectAllDifferent.
+  optimizer._addPerfectAllDifferentHandlers(handlerSet, shape);
+  assert.equal(
+    handlerSet.getAllofType(HandlerModule.PerfectAllDifferent).length, 4);
+
+  // Now test intersections with 2x3 box regions.
+  optimizer._addHouseIntersections(handlerSet, boxRegions, shape);
+
+  const sameValues = handlerSet.getAllofType(
+    HandlerModule.SameValuesIgnoreCount);
+  assert.ok(sameValues.length > 0,
+    'should create SameValuesIgnoreCount for restricted grid');
+});
+
+await runTest('_addHouseIntersections: skips pairing handlers with different value masks', () => {
+  const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
+  const shape = GridShape.fromGridSize(6, 6, 10);
+  const numCells = shape.numGridCells;
+
+  // Row 0 cells restricted to {1,2,3,4,5,6}.
+  // Row 1 cells restricted to {4,5,6,7,8,9}.
+  const valueMap = new Map();
+  for (let i = 0; i < 6; i++) {
+    valueMap.set(i, [1, 2, 3, 4, 5, 6]);
+  }
+  for (let i = 6; i < 12; i++) {
+    valueMap.set(i, [4, 5, 6, 7, 8, 9]);
+  }
+  const givenHandler = new HandlerModule.GivenCandidates(valueMap);
+
+  const row0 = [0, 1, 2, 3, 4, 5];
+  const row1 = [6, 7, 8, 9, 10, 11];
+  const allDiff0 = new HandlerModule.AllDifferent(row0);
+  const allDiff1 = new HandlerModule.AllDifferent(row1);
+
+  const handlerSet = new HandlerSet(
+    [givenHandler, allDiff0, allDiff1], numCells);
+
+  optimizer._addPerfectAllDifferentHandlers(handlerSet, shape);
+  const perfects = handlerSet.getAllofType(
+    HandlerModule.PerfectAllDifferent);
+  assert.equal(perfects.length, 2);
+  // Verify they have different value masks.
+  assert.notEqual(perfects[0].valueMask(), perfects[1].valueMask());
+
+  const boxRegions = SudokuConstraintBase.boxRegions(shape);
+  optimizer._addHouseIntersections(handlerSet, boxRegions, shape);
+
+  // No SameValuesIgnoreCount should be created (different value masks).
+  const sameValues = handlerSet.getAllofType(
+    HandlerModule.SameValuesIgnoreCount);
+  assert.equal(sameValues.length, 0,
+    'should not pair handlers with different value masks');
+});
+
 logSuiteComplete('optimizer');

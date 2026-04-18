@@ -167,22 +167,26 @@ export class SudokuConstraintOptimizer {
     if (boxRegions.length === 0) return;
     const boxSize = boxRegions[0].length;
 
-    // If the boxes aren't houses, then intersections won't help either.
-    if (boxSize !== shape.numValues) return;
-
-    const houseHandlers = handlerSet.getAllofType(HandlerModule.House);
-    const numHandlers = houseHandlers.length;
-
     const [boxHeight, boxWidth] = GridShape.boxDimsForSize(
       shape.numRows, shape.numCols, boxSize);
+    if (!boxHeight) return;
+
+    // Collect House and PerfectAllDifferent handlers with the right cell count.
+    const allHandlers = [
+      ...handlerSet.getAllofType(HandlerModule.House),
+      ...handlerSet.getAllofType(HandlerModule.PerfectAllDifferent),
+    ].filter(h => h.cells.length === boxSize);
+
+    const numHandlers = allHandlers.length;
     for (let i = 1; i < numHandlers; i++) {
       for (let j = 0; j < i; j++) {
+        if (allHandlers[i].valueMask() !== allHandlers[j].valueMask()) continue;
         const intersectionSize = arrayIntersectSize(
-          houseHandlers[i].cells, houseHandlers[j].cells);
+          allHandlers[i].cells, allHandlers[j].cells);
         if (intersectionSize !== boxWidth && intersectionSize !== boxHeight) continue;
         const newHandler = new HandlerModule.SameValuesIgnoreCount(
-          arrayDifference(houseHandlers[i].cells, houseHandlers[j].cells),
-          arrayDifference(houseHandlers[j].cells, houseHandlers[i].cells));
+          arrayDifference(allHandlers[i].cells, allHandlers[j].cells),
+          arrayDifference(allHandlers[j].cells, allHandlers[i].cells));
         handlerSet.addAux(newHandler);
         this._logAddHandler('_addHouseIntersections', newHandler, { aux: true });
       }
@@ -516,6 +520,7 @@ export class SudokuConstraintOptimizer {
   // special case where cells.length === numValues).
   _addPerfectAllDifferentHandlers(handlerSet, shape) {
     const effectiveValues = this._computeEffectiveValues(handlerSet, shape);
+    const allValues = LookupTables.allValues(shape.numValues);
 
     for (const h of
       handlerSet.getAllofType(HandlerModule.AllDifferent)) {
@@ -523,7 +528,7 @@ export class SudokuConstraintOptimizer {
       if (cells.length <= 2) continue;
 
       if (cells.length === shape.numValues) {
-        const newHandler = new HandlerModule.House(cells);
+        const newHandler = new HandlerModule.House(cells, allValues);
         handlerSet.addNonEssential(newHandler);
         if (this._debugLogger) {
           this._logAddHandler('_addPerfectAllDifferentHandlers', newHandler);
@@ -531,12 +536,13 @@ export class SudokuConstraintOptimizer {
         continue;
       }
 
-      let houseValues = 0;
+      let valueMask = 0;
       for (let i = 0; i < cells.length; i++) {
-        houseValues |= effectiveValues[cells[i]];
+        valueMask |= effectiveValues[cells[i]];
       }
-      if (countOnes16bit(houseValues) === cells.length) {
-        const newHandler = new HandlerModule.PerfectAllDifferent(cells);
+
+      if (countOnes16bit(valueMask) === cells.length) {
+        const newHandler = new HandlerModule.PerfectAllDifferent(cells, valueMask);
         handlerSet.addNonEssential(newHandler);
         if (this._debugLogger) {
           this._logAddHandler('_addPerfectAllDifferentHandlers', newHandler);

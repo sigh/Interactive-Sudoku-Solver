@@ -195,4 +195,16 @@ await runTest('PerfectAllDifferent is distinct from House for getAllofType', () 
   assert.notEqual(h.constructor, House);
 });
 
+await runTest('PerfectAllDifferent stores valueMask from constructor', () => {
+  const h1 = new PerfectAllDifferent([0, 1, 2], 0b1110);
+  assert.equal(h1.valueMask(), 0b1110);
+
+  const h2 = new PerfectAllDifferent([0, 1, 2]);
+  assert.equal(h2.valueMask(), 0, 'default valueMask should be 0');
+
+  // House inherits the same behavior.
+  const h3 = new House([0, 1], 0b11);
+  assert.equal(h3.valueMask(), 0b11);
+});
+
 logSuiteComplete('house.test.js');

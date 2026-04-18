@@ -628,13 +628,17 @@ export class HandlerUtil {
 // the number of cells. House is a special case where
 // cells.length === shape.numValues.
 export class PerfectAllDifferent extends SudokuConstraintHandler {
-  constructor(cells) {
+  constructor(cells, valueMask) {
     super(cells);
-    this._allValues = 0;
+    this._valueMask = valueMask || 0;
+  }
+
+  valueMask() {
+    return this._valueMask;
   }
 
   initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
-    this._allValues = HandlerUtil.cellsAllValues(
+    this._valueMask = HandlerUtil.cellsAllValues(
       initialGridCells, this.cells);
 
     return true;
@@ -654,8 +658,8 @@ export class PerfectAllDifferent extends SudokuConstraintHandler {
       fixedValues |= (!(v & (v - 1))) * v;  // Avoid branching.
     }
 
-    if (allValues !== this._allValues) return false;
-    if (fixedValues === this._allValues) return true;
+    if (allValues !== this._valueMask) return false;
+    if (fixedValues === this._valueMask) return true;
 
     const hiddenSingles = allValues & ~atLeastTwo & ~fixedValues;
     if (hiddenSingles) {
