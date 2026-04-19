@@ -713,4 +713,93 @@ await runTest('_makeInnieOutieSumHandlers: mixed handler produces correct constr
   }
 });
 
+// =============================================================================
+// _addSumComplementCells tests
+// =============================================================================
+
+await runTest('_addSumComplementCells: sets complement from House', () => {
+  const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
+  const shape = GridShape.fromGridSize(9);
+
+  const houseCells = Array.from({ length: 9 }, (_, i) => i);
+  const sumCells = [0, 1, 2];
+  const houseHandler = new HandlerModule.House(houseCells);
+  const sumHandler = new SumHandlerModule.Sum(sumCells, 6);
+
+  const handlerSet = new HandlerSet(
+    [houseHandler, sumHandler], shape.numGridCells);
+
+  optimizer._addSumComplementCells(handlerSet);
+
+  // The sum handler should have complement cells set to the remaining
+  // house cells.
+  assert.deepEqual([...sumHandler._complementCells], [3, 4, 5, 6, 7, 8]);
+  assert.equal(sumHandler._complementValueMask, houseHandler.valueMask());
+});
+
+await runTest('_addSumComplementCells: sets complement from PerfectAllDifferent', () => {
+  const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
+  const shape = GridShape.fromGridSize(9);
+
+  // A 4-cell PerfectAllDifferent with valueMask={1,2,3,4} (0b1111).
+  const padCells = [0, 1, 2, 3];
+  const valueMask = 0b1111;
+  const padHandler = new HandlerModule.PerfectAllDifferent(padCells, valueMask);
+
+  // A 2-cell Sum fully contained within the PerfectAllDifferent.
+  const sumCells = [0, 1];
+  const sumHandler = new SumHandlerModule.Sum(sumCells, 3);
+
+  const handlerSet = new HandlerSet(
+    [padHandler, sumHandler], shape.numGridCells);
+
+  optimizer._addSumComplementCells(handlerSet);
+
+  assert.deepEqual([...sumHandler._complementCells], [2, 3]);
+  assert.equal(sumHandler._complementValueMask, valueMask);
+});
+
+await runTest('_addSumComplementCells: prefers smallest containing handler', () => {
+  const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
+  const shape = GridShape.fromGridSize(9);
+
+  // A 9-cell House and a 4-cell PerfectAllDifferent both contain the sum.
+  const houseCells = Array.from({ length: 9 }, (_, i) => i);
+  const padCells = [0, 1, 2, 3];
+  const valueMask = 0b1111;
+  const houseHandler = new HandlerModule.House(houseCells);
+  const padHandler = new HandlerModule.PerfectAllDifferent(padCells, valueMask);
+
+  const sumCells = [0, 1];
+  const sumHandler = new SumHandlerModule.Sum(sumCells, 3);
+
+  const handlerSet = new HandlerSet(
+    [houseHandler, padHandler, sumHandler], shape.numGridCells);
+
+  optimizer._addSumComplementCells(handlerSet);
+
+  // Should pick the 4-cell PAD, not the 9-cell House.
+  assert.deepEqual([...sumHandler._complementCells], [2, 3]);
+  assert.equal(sumHandler._complementValueMask, valueMask);
+});
+
+await runTest('_addSumComplementCells: no match when sum not contained', () => {
+  const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
+  const shape = GridShape.fromGridSize(9);
+
+  const houseCells = [0, 1, 2, 3, 4, 5, 6, 7, 8];
+  const houseHandler = new HandlerModule.House(houseCells);
+
+  // Sum has a cell (9) outside the house.
+  const sumCells = [0, 1, 9];
+  const sumHandler = new SumHandlerModule.Sum(sumCells, 10);
+
+  const handlerSet = new HandlerSet(
+    [houseHandler, sumHandler], shape.numGridCells);
+
+  optimizer._addSumComplementCells(handlerSet);
+
+  assert.equal(sumHandler._complementCells, null);
+});
+
 logSuiteComplete('optimizer/sum_optimization');

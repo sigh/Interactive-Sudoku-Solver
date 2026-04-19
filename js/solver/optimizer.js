@@ -459,21 +459,38 @@ export class SudokuConstraintOptimizer {
   }
 
   _addSumComplementCells(handlerSet) {
-    const houseHandlers = (
-      handlerSet.getAllofType(HandlerModule.House).map(
-        h => handlerSet.getIndex(h)));
+    const allDiffHandlers = [
+      ...handlerSet.getAllofType(HandlerModule.House),
+      ...handlerSet.getAllofType(HandlerModule.PerfectAllDifferent),
+    ].map(h => handlerSet.getIndex(h));
 
     for (const h of handlerSet.getAllofType(SumHandlerModule.Sum)) {
       if (!h.onlyUnitCoeffs()) continue;
 
       const cells = h.cells;
       const commonHandlers = this._findCommonHandlers(
-        cells, handlerSet, houseHandlers);
+        cells, handlerSet, allDiffHandlers);
       if (commonHandlers.length === 0) continue;
-      const commonHandler = handlerSet.getHandler(commonHandlers[0]);
+      // Prefer the smallest containing handler: fewer complement cells and a
+      // tighter valueMask give stronger propagation.
+      let commonHandler = handlerSet.getHandler(commonHandlers[0]);
+      for (let i = 1; i < commonHandlers.length; i++) {
+        const h = handlerSet.getHandler(commonHandlers[i]);
+        if (h.cells.length < commonHandler.cells.length) {
+          commonHandler = h;
+        }
+      }
 
       const complementCells = arrayDifference(commonHandler.cells, cells);
-      h.setComplementCells(complementCells);
+      h.setComplementCells(complementCells, commonHandler.valueMask());
+
+      if (this._debugLogger) {
+        this._debugLogger.log({
+          loc: '_addSumComplementCells',
+          msg: 'Set complement cells',
+          cells: complementCells
+        });
+      }
     }
   }
 
@@ -791,7 +808,7 @@ export class SudokuConstraintOptimizer {
         if (overlapSize === k.cells.length) {
           constrainedCells.push(...k.cells);
           constrainedSum += k.sum();
-          k.setComplementCells(arrayDifference(h.cells, k.cells));
+          k.setComplementCells(arrayDifference(h.cells, k.cells), h.valueMask());
         } else if (k.cells.length - overlapSize === 1) {
           outies.push(k);
         }
@@ -840,7 +857,7 @@ export class SudokuConstraintOptimizer {
 
       const complementHandler = new SumHandlerModule.Sum(
         complementCells, complementSum);
-      complementHandler.setComplementCells(constrainedCells);
+      complementHandler.setComplementCells(constrainedCells, h.valueMask());
       newHandlers.push(complementHandler);
       if (this._debugLogger) {
         this._logAddHandler('_makeHiddenCageHandlers', complementHandler, {

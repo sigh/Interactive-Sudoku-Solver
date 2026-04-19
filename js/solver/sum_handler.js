@@ -10,6 +10,7 @@ export class Sum extends SudokuConstraintHandler {
   _exclusionGroupIds = null;
   _cellExclusions = null;
   _complementCells = null;
+  _complementValueMask = 0;
   _sumData = null;
   _flags = 0;
 
@@ -95,11 +96,12 @@ export class Sum extends SudokuConstraintHandler {
     return this._coeffGroups.every(g => g.coeff === 1);
   }
 
-  setComplementCells(cells) {
+  setComplementCells(cells, valueMask) {
     if (!this.onlyUnitCoeffs()) {
       throw Error("Can't use complementCells with non-unit coefficients.");
     }
     this._complementCells = cells;
+    this._complementValueMask = valueMask;
   }
 
   coefficients() {
@@ -478,13 +480,20 @@ export class Sum extends SudokuConstraintHandler {
     let possibilities0 = 0;
     let possibilities1 = 0;
 
-    const allValues = this._sumData.allValues;
+    // Use the value mask of the containing region (e.g. House or
+    // PerfectAllDifferent) so that the complement is computed within the
+    // correct value space.
+    const allValues = this._complementValueMask;
     for (let j = 0; j < cageSums.length; j++) {
       const option = cageSums[j];
       // Branchlessly check that the option is consistent with both set1 and
       // set0.
       const includeOption = -(!(option & ~values0) & !(~option & ~values1 & allValues));
       possibilities0 |= option & includeOption;
+      // NOTE: ~option may have bits outside allValues, but this is harmless:
+      // values1 only contains bits within allValues (set1 cells are restricted
+      // to the containing region's values), so the extra bits don't affect
+      // valuesToRemove1 = values1 & ~possibilities1.
       possibilities1 |= ~option & includeOption;
     }
     if (!possibilities0) return false;

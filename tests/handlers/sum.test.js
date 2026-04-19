@@ -169,7 +169,7 @@ await runTest('Sum should restrict values based on complement cells', () => {
   const context = new GridTestContext();
   const complementCells = context.cells(10).slice(2);
   const { handler } = initializeSum({ numCells: 2, sum: 10, context });
-  handler.setComplementCells(complementCells);
+  handler.setComplementCells(complementCells, context.lookupTables.allValues);
 
   const assignments = {
     0: [1, 2, 8, 9],
@@ -185,6 +185,36 @@ await runTest('Sum should restrict values based on complement cells', () => {
   assert.equal(result, true, 'handler should remain consistent with complement data');
   assert.equal(grid[0], valueMask(1, 9), 'only digits paired with complement availability should remain');
   assert.equal(grid[1], valueMask(1, 9));
+});
+
+await runTest('Sum complement cells with restricted valueMask', () => {
+  // Simulate a PerfectAllDifferent with valueMask={1,2,3,4} containing a
+  // 2-cell Sum with sum=3. Complement cells get the remaining 2 cells.
+  // The complement values are {1,2,3,4} minus the sum's values.
+  const context = new GridTestContext({ gridSize: 4 });
+  const allCells = context.cells(4);
+  const restrictedValueMask = valueMask(1, 2, 3, 4);
+
+  // Sum cells: cells 0,1 with sum=3. Complement cells: cells 2,3.
+  const { handler } = initializeSum({ numCells: 2, sum: 3, context });
+  handler.setComplementCells(allCells.slice(2), restrictedValueMask);
+
+  const grid = applyCandidates(context.grid, {
+    0: [1, 2, 3],
+    1: [1, 2, 3],
+    2: [1, 2, 3, 4],
+    3: [1, 2, 3, 4],
+  });
+
+  const result = handler.enforceConsistency(grid, createAccumulator());
+
+  assert.equal(result, true, 'handler should remain consistent');
+  // sum=3 with 2 cells from {1,2,3,4}: only option is {1,2}.
+  assert.equal(grid[0], valueMask(1, 2), 'set0 restricted to {1,2}');
+  assert.equal(grid[1], valueMask(1, 2), 'set0 restricted to {1,2}');
+  // Complement within {1,2,3,4} is {3,4}.
+  assert.equal(grid[2], valueMask(3, 4), 'set1 restricted to {3,4}');
+  assert.equal(grid[3], valueMask(3, 4), 'set1 restricted to {3,4}');
 });
 
 await runTest('Sum should prohibit repeated digits when cells are mutually exclusive', () => {
