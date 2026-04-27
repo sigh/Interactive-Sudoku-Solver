@@ -14,7 +14,14 @@ const { HandlerSet } = await import('../../../js/solver/engine.js' + self.VERSIO
 const createExclusions = (numCells) => createCellExclusions({ allUnique: false, numCells });
 
 const shapeMaxSum = (shape) => shape.numValues * (shape.numValues + 1) / 2;
+const shapeAllValuesMask = (shape) => (1 << shape.numValues) - 1;
 const shapeAllCells = (shape) => Array.from({ length: shape.numGridCells }, (_, i) => i);
+const fixedSumRegion = (handler, sum) => ({
+  handler,
+  cells: handler.cells,
+  cellCount: handler.cells.length,
+  sum,
+});
 
 // =============================================================================
 // _addSumIntersectionHandler tests
@@ -37,11 +44,13 @@ await runTest('_addSumIntersectionHandler: infeasible inferred sum adds False ha
   const cageCells = [...houseCells, ...extraCells];
   const cageSum = shapeMaxSum(shape) + 2;
 
-  const houseHandler = new HandlerModule.House(houseCells);
+  const houseHandler = new HandlerModule.House(
+    houseCells, shapeAllValuesMask(shape));
+  const houseRegion = fixedSumRegion(houseHandler, shapeMaxSum(shape));
   const sumHandler = new SumHandlerModule.Sum(cageCells, cageSum);
 
   const result = optimizer._addSumIntersectionHandler(
-    houseHandler,
+    houseRegion,
     [sumHandler],
     [],
     [],
@@ -61,7 +70,9 @@ await runTest('_addSumIntersectionHandler: cage with outside-grid outie cell', (
 
   // House = row 0 [0..3], sum = 10.
   const houseCells = [0, 1, 2, 3];
-  const houseHandler = new HandlerModule.House(houseCells);
+  const houseHandler = new HandlerModule.House(
+    houseCells, shapeAllValuesMask(shape));
+  const houseRegion = fixedSumRegion(houseHandler, shapeMaxSum(shape));
 
   // Cage covers entire house + one cell outside the grid.
   // Outie cell 16 should have inferred sum = 14 - 10 = 4.
@@ -70,7 +81,7 @@ await runTest('_addSumIntersectionHandler: cage with outside-grid outie cell', (
   const sumHandler = new SumHandlerModule.Sum(cageCells, cageSum);
 
   const result = optimizer._addSumIntersectionHandler(
-    houseHandler, [sumHandler], [], [], cellExclusions, shape);
+    houseRegion, [sumHandler], [], [], cellExclusions, shape);
 
   // The outie is a single cell (16) with inferred sum 4.
   // range > 0 and dof = 0, so a handler should be created.
@@ -78,6 +89,32 @@ await runTest('_addSumIntersectionHandler: cage with outside-grid outie cell', (
   assert.ok(result instanceof SumHandlerModule.Sum);
   assert.deepEqual([...result.cells], [16]);
   assert.equal(result.sum(), 4);
+});
+
+await runTest('_addSumIntersectionHandler: PerfectAllDifferent uses region valueMask total', () => {
+  const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
+  const shape = GridShape.fromGridSize(9);
+  const numCells = shape.numGridCells + 1;
+  const cellExclusions = createExclusions(numCells);
+
+  const regionCells = [0, 1, 2, 3];
+  const regionValueMask = 0b1111; // {1,2,3,4} => total 10
+  const regionHandler = new HandlerModule.PerfectAllDifferent(
+    regionCells, regionValueMask);
+  const padRegion = fixedSumRegion(regionHandler, 10);
+
+  // If the region total is computed from the valueMask, the outside cell must
+  // sum to 1. Using the shape-wide house total would make this impossible.
+  const cageCells = [...regionCells, 81];
+  const sumHandler = new SumHandlerModule.Sum(cageCells, 11);
+
+  const result = optimizer._addSumIntersectionHandler(
+    padRegion, [sumHandler], [], [], cellExclusions, shape);
+
+  assert.ok(result);
+  assert.ok(result instanceof SumHandlerModule.Sum);
+  assert.deepEqual([...result.cells], [81]);
+  assert.equal(result.sum(), 1);
 });
 
 // =============================================================================
@@ -711,6 +748,53 @@ await runTest('_makeInnieOutieSumHandlers: mixed handler produces correct constr
     // |sumDelta| = 5 regardless of sign convention.
     assert.equal(Math.abs(diffHandler.sum()), 5);
   }
+});
+
+// =============================================================================
+// _makeHiddenCageHandlers tests
+// =============================================================================
+
+await runTest('_makeHiddenCageHandlers: PerfectAllDifferent creates complement handler with region sum', () => {
+  const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
+  const shape = GridShape.fromGridSize(9);
+  const cellExclusions = createExclusions(shape.numGridCells);
+
+  const valueMask = 0b1111; // {1,2,3,4} => total 10
+  const padHandler = new HandlerModule.PerfectAllDifferent([0, 1, 2, 3], valueMask);
+  const sumHandler = new SumHandlerModule.Sum([0, 1], 3);
+  const handlerSet = new HandlerSet(
+    [padHandler, sumHandler], shape.numGridCells);
+
+  const result = optimizer._makeHiddenCageHandlers(
+    handlerSet, [sumHandler], cellExclusions, shape);
+
+  assert.equal(result.length, 1);
+  assert.ok(result[0] instanceof SumHandlerModule.Sum);
+  assert.deepEqual([...result[0].cells], [2, 3]);
+  assert.equal(result[0].sum(), 7);
+  assert.deepEqual([...result[0]._complementCells], [0, 1]);
+  assert.equal(result[0]._complementValueMask, valueMask);
+});
+
+await runTest('_makeHiddenCageHandlers: PerfectAllDifferent outie uses region sum', () => {
+  const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
+  const shape = GridShape.fromGridSize(9);
+  const cellExclusions = createExclusions(shape.numGridCells);
+
+  const padHandler = new HandlerModule.PerfectAllDifferent(
+    [0, 1, 2, 3], 0b1111); // {1,2,3,4} => total 10
+  const sumHandler = new SumHandlerModule.Sum([0, 1, 4], 6);
+  const handlerSet = new HandlerSet(
+    [padHandler, sumHandler], shape.numGridCells);
+
+  const result = optimizer._makeHiddenCageHandlers(
+    handlerSet, [sumHandler], cellExclusions, shape);
+
+  assert.equal(result.length, 1);
+  assert.ok(result[0] instanceof SumHandlerModule.Sum);
+  assert.deepEqual([...result[0].cells], [2, 3, 4]);
+  assert.equal(result[0].sum(), 4);
+  assert.deepEqual(result[0].coefficients(), [1, 1, -1]);
 });
 
 // =============================================================================

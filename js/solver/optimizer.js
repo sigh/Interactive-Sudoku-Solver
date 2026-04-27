@@ -446,10 +446,10 @@ export class SudokuConstraintOptimizer {
     return newHandlers;
   }
 
-  _findCommonHandlers(cells, handlerSet, houseHandlerIndexes) {
+  _findCommonHandlers(cells, handlerSet, handlerIndexes) {
     const cellMap = handlerSet.getOrdinaryHandlerMap();
 
-    let commonHandlers = houseHandlerIndexes;
+    let commonHandlers = handlerIndexes;
     for (const c of cells) {
       commonHandlers = arrayIntersect(commonHandlers, cellMap[c]);
       if (commonHandlers.length === 0) return commonHandlers;
@@ -645,79 +645,78 @@ export class SudokuConstraintOptimizer {
     }
   }
 
-  // Create a Sum handler out of all the cages sticking out of a house.
+  // Create a Sum handler out of all the cages sticking out of a fixed-sum
+  // all-different region.
   _addSumIntersectionHandler(
-    houseHandler, intersectingSumHandlers, intersectingHouseHandlers,
-    allHouseHandlers, cellExclusions, shape) {
-    const numValues = shape.numValues;
-    const maxSum = maxSumForShape(shape);
-
+    baseRegion, intersectingSumHandlers, gapRegions,
+    removableRegionsBySize, cellExclusions, shape) {
     let totalSum = 0;
-    let cells = new Set();
-    let uncoveredCells = new Set(houseHandler.cells);
+    let candidateCells = new Set();
+    let uncoveredBaseCells = new Set(baseRegion.cells);
     for (const h of intersectingSumHandlers) {
       totalSum += h.sum();
-      h.cells.forEach(c => cells.add(c));
-      h.cells.forEach(c => uncoveredCells.delete(c));
+      h.cells.forEach(c => candidateCells.add(c));
+      h.cells.forEach(c => uncoveredBaseCells.delete(c));
     }
 
-    // If we haven't filled up the entire house then try to greedily fill the
-    // holes with house handlers.
-    let usedExtraHouses = false;
-    if (uncoveredCells.size > 0) {
-      for (const h of intersectingHouseHandlers) {
-        // Ignore any houses which intersect with the existing cells.
-        if (setIntersectSize(cells, h.cells) > 0) continue;
-        // Ignore any houses which don't cover the uncovered cells.
-        const intersectSize = setIntersectSize(uncoveredCells, h.cells);
+    // If we haven't filled up the entire region then try to greedily fill the
+    // holes with intersecting all-different regions.
+    let usedExtraRegions = false;
+    if (uncoveredBaseCells.size > 0) {
+      for (const gapRegion of gapRegions) {
+        // Ignore any regions which intersect with the existing cells.
+        if (setIntersectSize(candidateCells, gapRegion.cells) > 0) continue;
+        // Ignore any regions which don't cover the uncovered cells.
+        const intersectSize = setIntersectSize(uncoveredBaseCells, gapRegion.cells);
         if (intersectSize === 0) continue;
         // Ignore handlers which only intersect in one square. This is likely
         // a row crossing a column, and is generally not useful.
         if (intersectSize === 1) continue;
         // Ensure the intersection only covers the uncovered cells.
-        if (intersectSize !== arrayIntersectSize(houseHandler.cells, h.cells)) {
+        if (intersectSize !== arrayIntersectSize(baseRegion.cells, gapRegion.cells)) {
           continue;
         }
         // This handler fills in an existing gap.
-        totalSum += maxSum;
-        h.cells.forEach(c => cells.add(c));
-        h.cells.forEach(c => uncoveredCells.delete(c));
-        usedExtraHouses = true;
-        if (uncoveredCells.size === 0) break;
+        totalSum += gapRegion.sum;
+        gapRegion.cells.forEach(c => candidateCells.add(c));
+        gapRegion.cells.forEach(c => uncoveredBaseCells.delete(c));
+        usedExtraRegions = true;
+        if (uncoveredBaseCells.size === 0) break;
       }
     }
 
     // If we still haven't covered all the cells, then give up.
-    if (uncoveredCells.size > 0) return null;
+    if (uncoveredBaseCells.size > 0) return null;
 
-    // Remove the current house cells, as we care about the cells outside the
-    // house.
-    houseHandler.cells.forEach(c => cells.delete(c));
-    totalSum -= maxSum;
+    // Remove the current region cells, as we care about the cells outside the
+    // region.
+    baseRegion.cells.forEach(c => candidateCells.delete(c));
+    totalSum -= baseRegion.sum;
 
-    // While it's possible that there could be a house completely contained
-    // within the cells, then try to find and remove them.
-    // Note that houses used to construct the cells won't match as we have
-    // already removed the cells in the current house.
-    let removedExtraHouses = false;
-    if (cells.size >= numValues) {
-      for (const h of allHouseHandlers) {
-        // Ignore any houses which don't cover the cells.
-        const intersectSize = setIntersectSize(cells, h.cells);
-        if (intersectSize !== numValues) continue;
-        // This house is completely contained within the cells.
-        totalSum -= maxSum;
-        h.cells.forEach(c => cells.delete(c));
-        removedExtraHouses = true;
-        if (cells.size < numValues) break;
-      }
+    // While it's possible that there could be another region completely
+    // contained within the cells, then try to find and remove it.
+    // Note that regions used to construct the cells won't match as we have
+    // already removed the cells in the current region.
+    let removedExtraRegions = false;
+    for (const region of removableRegionsBySize) {
+      // Regions are sorted by increasing cellCount; once one region is larger
+      // than candidateCells, all remaining regions are also too large.
+      if (region.cellCount > candidateCells.size) break;
+      // Ignore any regions which don't cover the cells.
+      const intersectSize = setIntersectSize(candidateCells, region.cells);
+      if (intersectSize !== region.cellCount) continue;
+      // This region is completely contained within the cells.
+      totalSum -= region.sum;
+      region.cells.forEach(c => candidateCells.delete(c));
+      removedExtraRegions = true;
+      if (candidateCells.size === 0) break;
     }
 
-    if (cells.size === 0) return null;
+    if (candidateCells.size === 0) return null;
 
     // Use mutual-exclusion structure to estimate how restrictive this inferred
     // sum will be. Prefer sums that imply a narrow range relative to dof.
-    const cellsArray = [...cells];
+    const cellsArray = [...candidateCells];
     // Sort so that the result is deterministic, and also makes greedy grouping
     // naturally align on rows.
     cellsArray.sort((a, b) => a - b);
@@ -753,8 +752,8 @@ export class SudokuConstraintOptimizer {
         sum: handler.sum(), size: handler.cells.length,
         minSum: min, maxSum: max, range
       };
-      if (usedExtraHouses) args.usedExtraHouses = usedExtraHouses;
-      if (removedExtraHouses) args.removedExtraHouses = removedExtraHouses;
+      if (usedExtraRegions) args.usedExtraRegions = usedExtraRegions;
+      if (removedExtraRegions) args.removedExtraRegions = removedExtraRegions;
       this._logAddHandler('_addSumIntersectionHandler', handler, { args });
     }
 
@@ -763,44 +762,52 @@ export class SudokuConstraintOptimizer {
 
   // Find sets of cells which we can infer have a known sum and unique values.
   _makeHiddenCageHandlers(handlerSet, allSumHandlers, cellExclusions, shape) {
-    const houseHandlers = handlerSet.getAllofType(HandlerModule.House);
+    const allDiffHandlers = [
+      ...handlerSet.getAllofType(HandlerModule.House),
+      ...handlerSet.getAllofType(HandlerModule.PerfectAllDifferent),
+    ];
+    const allDiffRegions = fixedSumRegions(allDiffHandlers, handlerSet, shape);
+    const allDiffRegionsBySize = [...allDiffRegions].sort(
+      (a, b) => a.cellCount - b.cellCount);
+    const allDiffRegionByIndex = new Map(
+      allDiffRegions.map(region => [region.handlerIndex, region]));
     const newHandlers = [];
-    const maxSum = maxSumForShape(shape);
 
     const allSumHandlerIndexes = new Set(
       allSumHandlers.map(h => handlerSet.getIndex(h)));
-    const houseHandlerIndexes = new Set(
-      houseHandlers.map(h => handlerSet.getIndex(h)));
+    const allDiffHandlerIndexes = new Set(
+      allDiffHandlers.map(h => handlerSet.getIndex(h)));
 
-    for (const h of houseHandlers) {
-      // Find sum constraints which overlap this house.
+    for (const baseRegion of allDiffRegions) {
+      const h = baseRegion.handler;
+      // Find sum constraints which overlap this region.
       let intersectingHandlers = handlerSet.getIntersectingIndexes(h);
-      const currentHouseSumIndexes = setIntersectionToArray(
+      const currentRegionSumIndexes = setIntersectionToArray(
         intersectingHandlers, allSumHandlerIndexes);
-      if (currentHouseSumIndexes.length === 0) continue;
+      if (currentRegionSumIndexes.length === 0) continue;
 
       // For the sum intersection, we need to ensure that the sum handlers don't
       // overlap themselves.
-      // We do this separately for each house so that we can don't have to
-      // force the same handle to be used in every house it intersects.
+      // We do this separately for each region so that we don't have to force
+      // the same handler to be used in every region it intersects.
       const [filteredSumHandlers] = this._findNonOverlappingSubset(
-        currentHouseSumIndexes.map(i => handlerSet.getHandler(i)),
+        currentRegionSumIndexes.map(i => handlerSet.getHandler(i)),
         handlerSet);
 
       {
-        const intersectingHouseHandlers = (
-          setIntersectionToArray(intersectingHandlers, houseHandlerIndexes)).map(
-            i => handlerSet.getHandler(i));
+        const intersectingAllDiffRegions = (
+          setIntersectionToArray(intersectingHandlers, allDiffHandlerIndexes)).map(
+            i => allDiffRegionByIndex.get(i));
         const sumIntersectionHandler = this._addSumIntersectionHandler(
-          h, filteredSumHandlers, intersectingHouseHandlers, houseHandlers,
+          baseRegion, filteredSumHandlers, intersectingAllDiffRegions, allDiffRegionsBySize,
           cellExclusions, shape);
         if (sumIntersectionHandler) newHandlers.push(sumIntersectionHandler);
       }
 
-      // Outies are cages which stick out of the house by 1 cell.
+      // Outies are cages which stick out of the region by 1 cell.
       const outies = [];
       // Constrained cells are those from cages which are fully contained within
-      // the house.
+      // the region.
       const constrainedCells = [];
       let constrainedSum = 0;
       for (const k of filteredSumHandlers) {
@@ -815,17 +822,17 @@ export class SudokuConstraintOptimizer {
       }
 
       // Short-circuit the common case where there is nothing special in the
-      // house.
+      // region.
       if (outies.length === 0 && constrainedCells.length === 0) continue;
 
       const complementCells = arrayDifference(h.cells, constrainedCells);
-      const complementSum = maxSum - constrainedSum;
+      const complementSum = baseRegion.sum - constrainedSum;
 
-      // If a cage sticks out of a house by 1 cell, then we can form the
+      // If a cage sticks out of a region by 1 cell, then we can form the
       // equivalent of an arrow sum (with offset). That is, the value of the
-      // cell outside house is direct offset of the sum of the remaining
-      // cells in the house outside the cage. The sum can be further reduced
-      // by any other cages (i.e. known sums) in the house.
+      // cell outside the region is a direct offset of the sum of the remaining
+      // cells in the region outside the cage. The sum can be further reduced
+      // by any other cages (i.e. known sums) in the region.
       for (const o of outies) {
         const remainingCells = arrayDifference(complementCells, o.cells);
         // Don't add sums with too many cells.
@@ -847,13 +854,12 @@ export class SudokuConstraintOptimizer {
         }
       }
 
-      // No constraints within this house.
+      // No constraints within this region.
       if (constrainedCells.length === 0) continue;
-      // The remaining 8-cell will already be constrained after the first
-      // pass.
+      // A single remaining cell will already be constrained after the first pass.
       if (constrainedCells.length === 1) continue;
       // Nothing left to constrain.
-      if (constrainedCells.length === shape.numValues) continue;
+      if (constrainedCells.length === baseRegion.cellCount) continue;
 
       const complementHandler = new SumHandlerModule.Sum(
         complementCells, complementSum);
@@ -1434,5 +1440,21 @@ export class SudokuConstraintOptimizer {
 
 const maxSumForShape = (shape) => (
   (shape.numValues * (shape.numValues + 1)) / 2 + shape.valueOffset * shape.numValues);
+
+const fixedSumRegions = (handlers, handlerSet, shape) => {
+  const lookup = LookupTables.get(shape.numValues);
+  return handlers.map(handler => {
+    const valueMask = handler.valueMask();
+    const cellCount = handler.cells.length;
+    return {
+      handler,
+      handlerIndex: handlerSet.getIndex(handler),
+      cells: handler.cells,
+      cellCount,
+      sum: lookup.sum[valueMask]
+        + shape.valueOffset * cellCount,
+    };
+  });
+};
 
 const allCells = (shape) => Array.from({ length: shape.numGridCells }, (_, i) => i);
