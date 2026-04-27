@@ -1373,9 +1373,12 @@ export class SudokuConstraintOptimizer {
       }
     }
 
-    const houseHandlers = handlerSet.getAllofType(HandlerModule.House);
-    for (const h of houseHandlers) {
-      const newHandler = new HandlerModule.ValueDependentUniqueValueExclusionHouse(
+    const allDiffHandlers = [
+      ...handlerSet.getAllofType(HandlerModule.House),
+      ...handlerSet.getAllofType(HandlerModule.PerfectAllDifferent),
+    ];
+    for (const h of allDiffHandlers) {
+      const newHandler = new HandlerModule.ValueDependentUniqueValueExclusionForPerfectAllDifferent(
         h.cells, valueCellExclusions);
       handlerSet.add(newHandler);
       this._logAddHandler('_optimizeTaxicab', newHandler);

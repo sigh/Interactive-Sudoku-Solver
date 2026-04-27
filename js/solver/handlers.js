@@ -332,7 +332,7 @@ export class ValueDependentUniqueValueExclusion extends SudokuConstraintHandler 
   }
 }
 
-export class ValueDependentUniqueValueExclusionHouse extends SudokuConstraintHandler {
+export class ValueDependentUniqueValueExclusionForPerfectAllDifferent extends SudokuConstraintHandler {
   constructor(cells, valueCellExclusions) {
     super(cells);
     this._valueCellExclusions = valueCellExclusions;
