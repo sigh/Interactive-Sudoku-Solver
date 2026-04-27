@@ -676,6 +676,25 @@ await runTest('_makeInnieOutieSumHandlers: 6x4 grid only processes column region
   assert.ok(Array.isArray(result));
 });
 
+await runTest('_makeInnieOutieSumHandlers: effective value info processes restricted rows', () => {
+  const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
+  const shape = GridShape.fromGridSize(4, 4, 6);
+
+  // Effective values {2,3,4,5}: count 4, fixed row sum 14.
+  const row0Handler = new SumHandlerModule.Sum([0, 1, 2, 3], 14);
+  const mixedHandler = new SumHandlerModule.Sum([4, 5, 6, 16], 18);
+  const sumHandlers = [row0Handler, mixedHandler];
+
+  const result = optimizer._makeInnieOutieSumHandlers(
+    sumHandlers, false, shape, 4, 14);
+
+  const diffHandler = result.find(
+    h => h.cells.length === 2 && h.cells.includes(7) && h.cells.includes(16));
+  assert.ok(diffHandler,
+    'should process 4-cell rows on a 4x4 grid with numValues=6');
+  assert.equal(diffHandler.sum(), 4);
+});
+
 await runTest('_makeInnieOutieSumHandlers: empty sum handlers returns empty', () => {
   const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
   const shape = GridShape.fromGridSize(9);
