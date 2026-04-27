@@ -188,11 +188,11 @@ await runTest('PerfectAllDifferent should fail when required value is missing', 
   assert.equal(result, false, 'should fail when a required value is missing');
 });
 
-await runTest('PerfectAllDifferent is distinct from House for getAllofType', () => {
-  assert.notEqual(PerfectAllDifferent, House);
+await runTest('House is an alias of PerfectAllDifferent', () => {
+  assert.equal(PerfectAllDifferent, House);
   const h = new PerfectAllDifferent([0, 1, 2]);
   assert.equal(h.constructor, PerfectAllDifferent);
-  assert.notEqual(h.constructor, House);
+  assert.equal(h.constructor, House);
 });
 
 await runTest('PerfectAllDifferent stores valueMask from constructor', () => {

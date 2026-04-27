@@ -884,7 +884,7 @@ export class SudokuBuilder {
       yield new HandlerModule.GivenCandidates(fixedCells);
     }
     // 10-cell AllDifferent for each region + its var cell.
-    // The optimizer will promote these to House via _addHouseHandlers.
+    // The optimizer will promote these to PerfectAllDifferent.
     for (let i = 0; i < gridSize; i++) {
       yield new HandlerModule.AllDifferent(
         [...rowRegions[i], colVarCells[i]]);
@@ -900,7 +900,7 @@ export class SudokuBuilder {
 
     // Rule 2: No two rows/columns/boxes may be missing the same digit.
     // Adding zeroCell makes these N+1 cells with N+1 values, which the
-    // optimizer promotes to House (more powerful than plain AllDifferent).
+    // optimizer promotes to PerfectAllDifferent.
     yield new HandlerModule.AllDifferent(
       [...colVarCells, zeroCell]);
     yield new HandlerModule.AllDifferent(

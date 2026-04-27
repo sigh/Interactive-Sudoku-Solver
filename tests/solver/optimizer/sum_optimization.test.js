@@ -44,7 +44,7 @@ await runTest('_addSumIntersectionHandler: infeasible inferred sum adds False ha
   const cageCells = [...houseCells, ...extraCells];
   const cageSum = shapeMaxSum(shape) + 2;
 
-  const houseHandler = new HandlerModule.House(
+  const houseHandler = new HandlerModule.PerfectAllDifferent(
     houseCells, shapeAllValuesMask(shape));
   const houseRegion = fixedSumRegion(houseHandler, shapeMaxSum(shape));
   const sumHandler = new SumHandlerModule.Sum(cageCells, cageSum);
@@ -70,7 +70,7 @@ await runTest('_addSumIntersectionHandler: cage with outside-grid outie cell', (
 
   // House = row 0 [0..3], sum = 10.
   const houseCells = [0, 1, 2, 3];
-  const houseHandler = new HandlerModule.House(
+  const houseHandler = new HandlerModule.PerfectAllDifferent(
     houseCells, shapeAllValuesMask(shape));
   const houseRegion = fixedSumRegion(houseHandler, shapeMaxSum(shape));
 
@@ -820,13 +820,14 @@ await runTest('_makeHiddenCageHandlers: PerfectAllDifferent outie uses region su
 // _addSumComplementCells tests
 // =============================================================================
 
-await runTest('_addSumComplementCells: sets complement from House', () => {
+await runTest('_addSumComplementCells: sets complement from grid-house sized PerfectAllDifferent', () => {
   const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
   const shape = GridShape.fromGridSize(9);
 
   const houseCells = Array.from({ length: 9 }, (_, i) => i);
   const sumCells = [0, 1, 2];
-  const houseHandler = new HandlerModule.House(houseCells);
+  const houseHandler = new HandlerModule.PerfectAllDifferent(
+    houseCells, shapeAllValuesMask(shape));
   const sumHandler = new SumHandlerModule.Sum(sumCells, 6);
 
   const handlerSet = new HandlerSet(
@@ -834,8 +835,7 @@ await runTest('_addSumComplementCells: sets complement from House', () => {
 
   optimizer._addSumComplementCells(handlerSet);
 
-  // The sum handler should have complement cells set to the remaining
-  // house cells.
+  // The sum handler should have complement cells set to the remaining region cells.
   assert.deepEqual([...sumHandler._complementCells], [3, 4, 5, 6, 7, 8]);
   assert.equal(sumHandler._complementValueMask, houseHandler.valueMask());
 });
@@ -866,11 +866,12 @@ await runTest('_addSumComplementCells: prefers smallest containing handler', () 
   const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
   const shape = GridShape.fromGridSize(9);
 
-  // A 9-cell House and a 4-cell PerfectAllDifferent both contain the sum.
+  // A 9-cell region and a 4-cell PerfectAllDifferent both contain the sum.
   const houseCells = Array.from({ length: 9 }, (_, i) => i);
   const padCells = [0, 1, 2, 3];
   const valueMask = 0b1111;
-  const houseHandler = new HandlerModule.House(houseCells);
+  const houseHandler = new HandlerModule.PerfectAllDifferent(
+    houseCells, shapeAllValuesMask(shape));
   const padHandler = new HandlerModule.PerfectAllDifferent(padCells, valueMask);
 
   const sumCells = [0, 1];
@@ -881,7 +882,7 @@ await runTest('_addSumComplementCells: prefers smallest containing handler', () 
 
   optimizer._addSumComplementCells(handlerSet);
 
-  // Should pick the 4-cell PAD, not the 9-cell House.
+  // Should pick the 4-cell PAD, not the 9-cell region.
   assert.deepEqual([...sumHandler._complementCells], [2, 3]);
   assert.equal(sumHandler._complementValueMask, valueMask);
 });
@@ -891,9 +892,10 @@ await runTest('_addSumComplementCells: no match when sum not contained', () => {
   const shape = GridShape.fromGridSize(9);
 
   const houseCells = [0, 1, 2, 3, 4, 5, 6, 7, 8];
-  const houseHandler = new HandlerModule.House(houseCells);
+  const houseHandler = new HandlerModule.PerfectAllDifferent(
+    houseCells, shapeAllValuesMask(shape));
 
-  // Sum has a cell (9) outside the house.
+  // Sum has a cell (9) outside the region.
   const sumCells = [0, 1, 9];
   const sumHandler = new SumHandlerModule.Sum(sumCells, 10);
 

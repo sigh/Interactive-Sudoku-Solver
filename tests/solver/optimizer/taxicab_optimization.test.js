@@ -18,13 +18,13 @@ const createTaxicabHandler = (cell, numValues) => {
 
 const createExclusions = (numCells) => createCellExclusions({ allUnique: false, numCells });
 
-await runTest('_optimizeTaxicab: creates region handler for House', () => {
+await runTest('_optimizeTaxicab: creates region handler for grid-house sized PerfectAllDifferent', () => {
   const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
   const shape = GridShape.fromGridSize(9);
   const numCells = shape.numGridCells;
 
   const houseCells = Array.from({ length: 9 }, (_, i) => i);
-  const houseHandler = new HandlerModule.House(houseCells);
+  const houseHandler = new HandlerModule.PerfectAllDifferent(houseCells);
   const taxicabHandler = createTaxicabHandler(0, shape.numValues);
 
   const handlerSet = new HandlerSet(
@@ -44,7 +44,7 @@ await runTest('_optimizeTaxicab: no-op when no taxicab handlers are present', ()
   const numCells = shape.numGridCells;
 
   const houseCells = Array.from({ length: 9 }, (_, i) => i);
-  const houseHandler = new HandlerModule.House(houseCells);
+  const houseHandler = new HandlerModule.PerfectAllDifferent(houseCells);
   const padHandler = new HandlerModule.PerfectAllDifferent([9, 10, 11, 12], 0b1111);
 
   const handlerSet = new HandlerSet(
@@ -62,7 +62,7 @@ await runTest('_optimizeTaxicab: ignores plain AllDifferent handlers', () => {
   const shape = GridShape.fromGridSize(9);
   const numCells = shape.numGridCells;
 
-  // _optimizeTaxicab should only target House + PerfectAllDifferent.
+  // _optimizeTaxicab should only target PerfectAllDifferent handlers.
   const allDifferent = new HandlerModule.AllDifferent([0, 1, 2, 3]);
   const taxicabHandler = createTaxicabHandler(0, shape.numValues);
 
@@ -97,13 +97,13 @@ await runTest('_optimizeTaxicab: creates region handler for PerfectAllDifferent'
   assert.deepEqual([...regionHandlers[0].cells], padCells);
 });
 
-await runTest('_optimizeTaxicab: creates region handlers for mixed House and PerfectAllDifferent', () => {
+await runTest('_optimizeTaxicab: creates region handlers for mixed PerfectAllDifferent sizes', () => {
   const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
   const shape = GridShape.fromGridSize(9);
   const numCells = shape.numGridCells;
 
   const houseCells = Array.from({ length: 9 }, (_, i) => i);
-  const houseHandler = new HandlerModule.House(houseCells);
+  const houseHandler = new HandlerModule.PerfectAllDifferent(houseCells);
 
   const padCells = [9, 10, 11, 12];
   const valueMask = 0b1111;

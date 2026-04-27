@@ -80,7 +80,7 @@ export class SudokuConstraintOptimizer {
 
     this._optimizeBinaryPairwise(handlerSet, shape);
 
-    this._addHouseIntersections(handlerSet, boxRegions, shape);
+    this._addGridHouseIntersections(handlerSet, boxRegions, shape);
 
     this._logStats(handlerSet);
   }
@@ -169,7 +169,7 @@ export class SudokuConstraintOptimizer {
     }
   }
 
-  _addHouseIntersections(handlerSet, boxRegions, shape) {
+  _addGridHouseIntersections(handlerSet, boxRegions, shape) {
     // Intersections are not very useful if there are no boxes.
     if (boxRegions.length === 0) return;
     const boxSize = boxRegions[0].length;
@@ -178,11 +178,9 @@ export class SudokuConstraintOptimizer {
       shape.numRows, shape.numCols, boxSize);
     if (!boxHeight) return;
 
-    // Collect House and PerfectAllDifferent handlers with the right cell count.
-    const allHandlers = [
-      ...handlerSet.getAllofType(HandlerModule.House),
-      ...handlerSet.getAllofType(HandlerModule.PerfectAllDifferent),
-    ].filter(h => h.cells.length === boxSize);
+    const allHandlers = handlerSet.getAllofType(
+      HandlerModule.PerfectAllDifferent).filter(
+        h => h.cells.length === boxSize);
 
     const numHandlers = allHandlers.length;
     for (let i = 1; i < numHandlers; i++) {
@@ -195,7 +193,8 @@ export class SudokuConstraintOptimizer {
           arrayDifference(allHandlers[i].cells, allHandlers[j].cells),
           arrayDifference(allHandlers[j].cells, allHandlers[i].cells));
         handlerSet.addAux(newHandler);
-        this._logAddHandler('_addHouseIntersections', newHandler, { aux: true });
+        this._logAddHandler(
+          '_addGridHouseIntersections', newHandler, { aux: true });
       }
     }
   }
@@ -463,17 +462,15 @@ export class SudokuConstraintOptimizer {
   }
 
   _addSumComplementCells(handlerSet) {
-    const allDiffHandlers = [
-      ...handlerSet.getAllofType(HandlerModule.House),
-      ...handlerSet.getAllofType(HandlerModule.PerfectAllDifferent),
-    ].map(h => handlerSet.getIndex(h));
+    const allDiffHandlerIndexes = handlerSet.getAllofType(
+      HandlerModule.PerfectAllDifferent).map(h => handlerSet.getIndex(h));
 
     for (const h of handlerSet.getAllofType(SumHandlerModule.Sum)) {
       if (!h.onlyUnitCoeffs()) continue;
 
       const cells = h.cells;
       const commonHandlers = this._findCommonHandlers(
-        cells, handlerSet, allDiffHandlers);
+        cells, handlerSet, allDiffHandlerIndexes);
       if (commonHandlers.length === 0) continue;
       // Prefer the smallest containing handler: fewer complement cells and a
       // tighter valueMask give stronger propagation.
@@ -560,24 +557,12 @@ export class SudokuConstraintOptimizer {
     return this._effectiveValueInfo(effectiveValues, shape).count;
   }
 
-  // Promote AllDifferent handlers to PerfectAllDifferent (or House, its
-  // special case where cells.length === numValues).
+  // Promote AllDifferent handlers to PerfectAllDifferent as appropriate.
   _addPerfectAllDifferentHandlers(handlerSet, shape, effectiveValues) {
-    const allValues = LookupTables.allValues(shape.numValues);
-
     for (const h of
       handlerSet.getAllofType(HandlerModule.AllDifferent)) {
       const cells = h.exclusionCells();
       if (cells.length <= 2) continue;
-
-      if (cells.length === shape.numValues) {
-        const newHandler = new HandlerModule.House(cells, allValues);
-        handlerSet.addNonEssential(newHandler);
-        if (this._debugLogger) {
-          this._logAddHandler('_addPerfectAllDifferentHandlers', newHandler);
-        }
-        continue;
-      }
 
       let valueMask = 0;
       for (let i = 0; i < cells.length; i++) {
@@ -775,11 +760,9 @@ export class SudokuConstraintOptimizer {
 
   // Find sets of cells which we can infer have a known sum and unique values.
   _makeHiddenCageHandlers(handlerSet, allSumHandlers, cellExclusions, shape) {
-    const allDiffHandlers = [
-      ...handlerSet.getAllofType(HandlerModule.House),
-      ...handlerSet.getAllofType(HandlerModule.PerfectAllDifferent),
-    ];
-    const allDiffRegions = fixedSumRegions(allDiffHandlers, handlerSet, shape);
+    const allDiffRegions = fixedSumRegions(
+      handlerSet.getAllofType(HandlerModule.PerfectAllDifferent),
+      handlerSet, shape);
     const allDiffRegionsBySize = [...allDiffRegions].sort(
       (a, b) => a.cellCount - b.cellCount);
     const allDiffRegionByIndex = new Map(
@@ -789,7 +772,7 @@ export class SudokuConstraintOptimizer {
     const allSumHandlerIndexes = new Set(
       allSumHandlers.map(h => handlerSet.getIndex(h)));
     const allDiffHandlerIndexes = new Set(
-      allDiffHandlers.map(h => handlerSet.getIndex(h)));
+      allDiffRegions.map(region => region.handlerIndex));
 
     for (const baseRegion of allDiffRegions) {
       const h = baseRegion.handler;
@@ -888,12 +871,9 @@ export class SudokuConstraintOptimizer {
     return newHandlers;
   }
 
-  // Add same value handlers for the intersections between houses.
+  // Add same value handlers for intersections between fixed-value regions.
   _makeJigsawIntersections(handlerSet) {
-    const allHandlers = [
-      ...handlerSet.getAllofType(HandlerModule.House),
-      ...handlerSet.getAllofType(HandlerModule.PerfectAllDifferent),
-    ];
+    const allHandlers = handlerSet.getAllofType(HandlerModule.PerfectAllDifferent);
     const newHandlers = [];
 
     // Add constraints due to overlapping regions.
@@ -1392,11 +1372,7 @@ export class SudokuConstraintOptimizer {
       }
     }
 
-    const allDiffHandlers = [
-      ...handlerSet.getAllofType(HandlerModule.House),
-      ...handlerSet.getAllofType(HandlerModule.PerfectAllDifferent),
-    ];
-    for (const h of allDiffHandlers) {
+    for (const h of handlerSet.getAllofType(HandlerModule.PerfectAllDifferent)) {
       const newHandler = new HandlerModule.ValueDependentUniqueValueExclusionForPerfectAllDifferent(
         h.cells, valueCellExclusions);
       handlerSet.add(newHandler);

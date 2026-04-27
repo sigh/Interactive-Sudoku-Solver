@@ -625,8 +625,7 @@ export class HandlerUtil {
 }
 
 // An AllDifferent where the number of distinct possible values equals
-// the number of cells. House is a special case where
-// cells.length === shape.numValues.
+// the number of cells.
 export class PerfectAllDifferent extends SudokuConstraintHandler {
   constructor(cells, valueMask) {
     super(cells);
@@ -682,9 +681,6 @@ export class PerfectAllDifferent extends SudokuConstraintHandler {
     ];
   }
 }
-
-// A PerfectAllDifferent where cells.length === shape.numValues.
-export class House extends PerfectAllDifferent { }
 
 // Determine the number of times each value appears in the provided lines,
 // (numCells / numLines), and ensure that each value appears exactly that many

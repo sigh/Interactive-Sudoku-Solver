@@ -146,7 +146,7 @@ await runTest('_optimizeNonSquareGrids: skips aux handler for 1x9 grid', () => {
 await runTest('_makeJigsawIntersections: creates intersections from PerfectAllDifferent pairs', () => {
   const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
   // 6x6 grid with numValues=10 so 6-cell AllDifferent promotes to
-  // PerfectAllDifferent (not House).
+  // PerfectAllDifferent regions.
   const shape = GridShape.fromGridSize(6, 6, 10);
   const numCells = shape.numGridCells;
 
@@ -173,9 +173,6 @@ await runTest('_makeJigsawIntersections: creates intersections from PerfectAllDi
   optimizer._addPerfectAllDifferentHandlers(handlerSet, shape, optimizer._computeEffectiveValues(handlerSet, shape));
   assert.equal(
     handlerSet.getAllofType(HandlerModule.PerfectAllDifferent).length, 2);
-  assert.equal(
-    handlerSet.getAllofType(HandlerModule.House).length, 0);
-
   const result = optimizer._makeJigsawIntersections(handlerSet);
   assert.ok(result.length > 0,
     'should create SameValuesIgnoreCount from PerfectAllDifferent pairs');

@@ -1011,8 +1011,10 @@ class InternalSolver {
   }
 
   _validateLayout(originalInitialGridState) {
-    // Choose just the house handlers.
-    const houseHandlers = this._handlerSet.getAllofType(HandlerModule.House);
+    // Only choose the full houses.
+    const houseHandlers = this._handlerSet.getAllofType(
+      HandlerModule.PerfectAllDifferent).filter(
+        h => h.cells.length === this._shape.numValues);
 
     const finalize = (grid) => {
       if (!grid) return null;
