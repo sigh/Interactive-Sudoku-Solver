@@ -480,9 +480,8 @@ export class Sum extends SudokuConstraintHandler {
     let possibilities0 = 0;
     let possibilities1 = 0;
 
-    // Use the value mask of the containing region (e.g. House or
-    // PerfectAllDifferent) so that the complement is computed within the
-    // correct value space.
+    // Use the value mask of the containing region so that the complement is
+    // computed within the correct value space.
     const allValues = this._complementValueMask;
     for (let j = 0; j < cageSums.length; j++) {
       const option = cageSums[j];

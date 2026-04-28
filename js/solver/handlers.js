@@ -682,8 +682,6 @@ export class PerfectAllDifferent extends SudokuConstraintHandler {
   }
 }
 
-export const House = PerfectAllDifferent;
-
 // Determine the number of times each value appears in the provided lines,
 // (numCells / numLines), and ensure that each value appears exactly that many
 // times.
@@ -2143,7 +2141,7 @@ class _Squishable2x2 extends SudokuConstraintHandler {
     const squishOffset = this.constructor.SQUISH_OFFSET;
     const squishOffset2 = squishOffset << 1;
 
-    // This code is very similar to the House handler, but adjusted to
+    // This code is very similar to PerfectAllDifferent, but adjusted to
     // collapse the values into 3 sets.
     let allValues = 0;
     let atLeastTwo = 0;

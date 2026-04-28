@@ -10,12 +10,12 @@ import {
 
 ensureGlobalEnvironment();
 
-const { House, PerfectAllDifferent } = await import('../../js/solver/handlers.js');
+const { PerfectAllDifferent } = await import('../../js/solver/handlers.js');
 
-await runTest('House should detect and fix hidden singles', () => {
+await runTest('PerfectAllDifferent should detect and fix hidden singles', () => {
   const context = new GridTestContext({ gridSize: 9 });
   const cells = context.cells(9);
-  const handler = new House(cells);
+  const handler = new PerfectAllDifferent(cells);
 
   const grid = context.grid;
   context.initializeHandler(handler);
@@ -35,10 +35,10 @@ await runTest('House should detect and fix hidden singles', () => {
   assert.equal(grid[0], valueMask(1), 'cell 0 should be fixed to hidden single');
 });
 
-await runTest('House should fail when required value missing from all cells', () => {
+await runTest('PerfectAllDifferent should fail when required value missing from all cells', () => {
   const context = new GridTestContext({ gridSize: 9 });
   const cells = context.cells(9);
-  const handler = new House(cells);
+  const handler = new PerfectAllDifferent(cells);
 
   const grid = context.grid;
   context.initializeHandler(handler);
@@ -54,15 +54,14 @@ await runTest('House should fail when required value missing from all cells', ()
   assert.equal(result, false, 'should fail when a value cannot be placed');
 });
 
-await runTest('House should not modify cells when no hidden singles exist', () => {
+await runTest('PerfectAllDifferent should not modify cells when no hidden singles exist', () => {
   const context = new GridTestContext({ gridSize: 9 });
   const cells = context.cells(9);
-  const handler = new House(cells);
+  const handler = new PerfectAllDifferent(cells);
 
   const grid = context.grid;
   context.initializeHandler(handler);
 
-  // All cells have all values — no hidden singles, no issues.
   const acc = createAccumulator();
   const result = handler.enforceConsistency(grid, acc);
 
@@ -72,10 +71,10 @@ await runTest('House should not modify cells when no hidden singles exist', () =
   }
 });
 
-await runTest('House should pass when all cells have distinct fixed values', () => {
+await runTest('PerfectAllDifferent should pass when all cells have distinct fixed values', () => {
   const context = new GridTestContext({ gridSize: 9 });
   const cells = context.cells(9);
-  const handler = new House(cells);
+  const handler = new PerfectAllDifferent(cells);
 
   const grid = context.grid;
   context.initializeHandler(handler);
@@ -90,11 +89,11 @@ await runTest('House should pass when all cells have distinct fixed values', () 
   assert.equal(result, true);
 });
 
-await runTest('House allValues should reflect cell candidates, not shape.numValues', () => {
+await runTest('PerfectAllDifferent allValues should reflect cell candidates, not shape.numValues', () => {
   // 6 cells in a grid with numValues=9, but cells only have values 1-6.
   const context = new GridTestContext({ gridSize: [1, 6], numValues: 9 });
   const cells = context.cells(6);
-  const handler = new House(cells);
+  const handler = new PerfectAllDifferent(cells);
 
   const grid = context.grid;
   for (let i = 0; i < 6; i++) {
@@ -102,7 +101,6 @@ await runTest('House allValues should reflect cell candidates, not shape.numValu
   }
   context.initializeHandler(handler);
 
-  // Each cell has a distinct fixed value from 1-6.
   for (let i = 0; i < 6; i++) {
     grid[i] = valueMask(i + 1);
   }
@@ -110,15 +108,13 @@ await runTest('House allValues should reflect cell candidates, not shape.numValu
   const acc = createAccumulator();
   const result = handler.enforceConsistency(grid, acc);
 
-  // With the fix, allValues is {1..6}, so all values are present → pass.
-  // Old code would use shape.numValues=9, requiring values 7,8,9 too → fail.
-  assert.equal(result, true, 'house should pass when all cell-available values are present');
+  assert.equal(result, true, 'should pass when all cell-available values are present');
 });
 
-await runTest('House should detect hidden singles with non-default value set', () => {
+await runTest('PerfectAllDifferent should detect hidden singles with non-default value set', () => {
   const context = new GridTestContext({ gridSize: [1, 4], numValues: 4 });
   const cells = context.cells(4);
-  const handler = new House(cells);
+  const handler = new PerfectAllDifferent(cells);
 
   const grid = context.grid;
   context.initializeHandler(handler);
@@ -136,11 +132,7 @@ await runTest('House should detect hidden singles with non-default value set', (
   assert.equal(grid[0], valueMask(1), 'cell 0 should be fixed to hidden single 1');
 });
 
-// =============================================================================
-// PerfectAllDifferent tests
-// =============================================================================
-
-await runTest('PerfectAllDifferent should detect hidden singles like House', () => {
+await runTest('PerfectAllDifferent should handle restricted value sets', () => {
   const context = new GridTestContext({ gridSize: [1, 6], numValues: 10 });
   const cells = context.cells(6);
   const handler = new PerfectAllDifferent(cells);
@@ -177,7 +169,6 @@ await runTest('PerfectAllDifferent should fail when required value is missing', 
   }
   context.initializeHandler(handler);
 
-  // Remove value 4 from all cells.
   for (let i = 0; i < 4; i++) {
     grid[i] = valueMask(1, 2, 3);
   }
@@ -188,23 +179,12 @@ await runTest('PerfectAllDifferent should fail when required value is missing', 
   assert.equal(result, false, 'should fail when a required value is missing');
 });
 
-await runTest('House is an alias of PerfectAllDifferent', () => {
-  assert.equal(PerfectAllDifferent, House);
-  const h = new PerfectAllDifferent([0, 1, 2]);
-  assert.equal(h.constructor, PerfectAllDifferent);
-  assert.equal(h.constructor, House);
-});
-
 await runTest('PerfectAllDifferent stores valueMask from constructor', () => {
   const h1 = new PerfectAllDifferent([0, 1, 2], 0b1110);
   assert.equal(h1.valueMask(), 0b1110);
 
   const h2 = new PerfectAllDifferent([0, 1, 2]);
   assert.equal(h2.valueMask(), 0, 'default valueMask should be 0');
-
-  // House inherits the same behavior.
-  const h3 = new House([0, 1], 0b11);
-  assert.equal(h3.valueMask(), 0b11);
 });
 
-logSuiteComplete('house.test.js');
+logSuiteComplete('perfect_all_different.test.js');
