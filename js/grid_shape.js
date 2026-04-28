@@ -70,11 +70,6 @@ export class GridShape {
     return name;
   }
 
-  static baseCharCode(shape) {
-    if (shape.numValues + shape.valueOffset > 9) return 'A'.charCodeAt(0);
-    return '1'.charCodeAt(0) + shape.valueOffset;
-  }
-
   constructor(numRows, numCols, numValues = null, valueOffset = 0) {
     if (valueOffset !== 0 && valueOffset !== -1) {
       throw Error('Invalid valueOffset: ' + valueOffset);

@@ -90,7 +90,7 @@ await runTest('parsePlainSudoku should parse 16x16 grid', () => {
 });
 
 await runTest('parsePlainSudoku should parse 16x16 grid with letter digits', () => {
-  // 16x16 uses A-P for values 1-16 (baseCharCode is 'A' for numValues >= 10)
+  // 16x16 uses A-P for values 1-16.
   const input = 'ABCDEFGHIJKLMNOP'.repeat(16);
   const result = SudokuParser.parsePlainSudoku(input);
 
@@ -613,6 +613,33 @@ await runTest('toShortSolution should convert 6x6 solution', () => {
 
   assert.equal(result.length, 36);
   assert.equal(result.slice(0, 6), '123456');
+});
+
+await runTest('toShortSolution should use digits for zero-based values less than 10', () => {
+  const shape = GridShape.fromGridSpec('9x9~0-8');
+  const solution = [0, 1, 2, 3, 4, 5, 6, 7, 8, ...Array(72).fill(0)];
+  const result = toShortSolution(solution, shape);
+
+  assert.equal(result.length, 81);
+  assert.equal(result.slice(0, 9), '012345678');
+});
+
+await runTest('toShortSolution should use digits when extended range values are less than 10', () => {
+  const shape = GridShape.fromGridSpec('9x9~0-10');
+  const solution = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, ...Array(71).fill(0)];
+  const result = toShortSolution(solution, shape);
+
+  assert.equal(result.length, 81);
+  assert.equal(result.slice(0, 10), '0123456789');
+});
+
+await runTest('toShortSolution should map 0 to 0 when extended values use letters', () => {
+  const shape = GridShape.fromGridSpec('9x9~0-10');
+  const solution = [0, 1, 10, ...Array(78).fill(0)];
+  const result = toShortSolution(solution, shape);
+
+  assert.equal(result.length, 81);
+  assert.equal(result.slice(0, 3), '0AJ');
 });
 
 //////////////////////////////////////////////////////////////////////////////

@@ -3,7 +3,7 @@
 // Provides a simplified interface to the solver that runs locally
 // without web workers.
 
-const { SudokuParser, toShortSolution } = await import('../sudoku_parser.js' + self.VERSION_PARAM);
+const { SudokuParser, toShortSolution, valueToShortChar } = await import('../sudoku_parser.js' + self.VERSION_PARAM);
 const { SudokuConstraint } = await import('../sudoku_constraint.js' + self.VERSION_PARAM);
 const { SudokuBuilder } = await import('../solver/sudoku_builder.js' + self.VERSION_PARAM);
 const { GridShape } = await import('../grid_shape.js' + self.VERSION_PARAM);
@@ -309,13 +309,14 @@ export class TrueCandidates {
    */
   toString() {
     const numCells = this._shape.numGridCells;
-    const baseCharCode = GridShape.baseCharCode(this._shape);
+    const minValue = this._shape.minValue();
+    const maxValue = this._shape.maxValue();
     const chars = [];
     for (let i = 0; i < numCells; i++) {
       const baseIndex = i * this._numValues;
       for (let v = 0; v < this._numValues; v++) {
         chars.push(this._counts[baseIndex + v] > 0
-          ? String.fromCharCode(baseCharCode + v)
+          ? valueToShortChar(minValue + v, maxValue)
           : '.');
       }
     }

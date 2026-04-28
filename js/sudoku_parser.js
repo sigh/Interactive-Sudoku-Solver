@@ -1,6 +1,22 @@
 const { SudokuConstraint } = await import('./sudoku_constraint.js' + self.VERSION_PARAM);
 const { GridShape, SHAPE_9x9 } = await import('./grid_shape.js' + self.VERSION_PARAM);
 
+const FIRST_LETTER_CODE = 'A'.charCodeAt(0);
+
+export const valueToShortChar = (value, maxValue) => {
+  if (value === 0) return '0';
+  if (maxValue < 10) return String(value);
+
+  return String.fromCharCode(FIRST_LETTER_CODE + value - 1);
+}
+
+const shortCharToValue = (char, maxValue) => {
+  if (maxValue < 10) return char >= '0' && char <= '9' ? +char : null;
+  if (char === '0') return 0;
+  if (char >= 'A' && char <= 'Z') return 1 + char.charCodeAt(0) - FIRST_LETTER_CODE;
+  return null;
+}
+
 class AstNode {
   constructor(cls, args = null) {
     this.cls = cls;
@@ -233,19 +249,18 @@ export class SudokuParser {
     if (!shape) return null;
 
     const numCells = shape.numGridCells;
-    const numValues = shape.numValues;
-
-    const baseCharCode = GridShape.baseCharCode(shape);
-    if (!baseCharCode) return null;
+    const minValue = shape.minValue();
+    const maxValue = shape.maxValue();
 
     let fixedValues = [];
     let nonValueCharacters = [];
     for (let i = 0; i < numCells; i++) {
-      let c = text.charCodeAt(i);
-      if (c >= baseCharCode && c <= baseCharCode + numValues - 1) {
-        fixedValues.push(shape.makeValueId(i, c - baseCharCode + 1));
+      const char = text[i];
+      const value = shortCharToValue(char, maxValue);
+      if (value !== null && value >= minValue && value <= maxValue) {
+        fixedValues.push(shape.makeValueId(i, value));
       } else {
-        nonValueCharacters.push(c);
+        nonValueCharacters.push(char);
       }
     }
     if (new Set(nonValueCharacters).size > 1) return null;
@@ -492,16 +507,19 @@ export class SudokuParser {
 }
 
 export const toShortSolution = (solution, shape) => {
-  const baseCharCode = GridShape.baseCharCode(shape);
-  const minValue = shape.minValue();
   const DEFAULT_VALUE = '.';
 
   const length = Math.min(solution.length, shape.numGridCells);
   const result = new Array(length).fill(DEFAULT_VALUE);
+  const minValue = shape.minValue();
+  let maxValue = minValue;
+  for (let i = 0; i < length; i++) {
+    if (solution[i] != null) maxValue = Math.max(maxValue, solution[i]);
+  }
 
   for (let i = 0; i < length; i++) {
     if (solution[i] != null) {
-      result[i] = String.fromCharCode(baseCharCode + solution[i] - minValue);
+      result[i] = valueToShortChar(solution[i], maxValue) ?? DEFAULT_VALUE;
     }
   }
   return result.join('');

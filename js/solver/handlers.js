@@ -682,6 +682,8 @@ export class PerfectAllDifferent extends SudokuConstraintHandler {
   }
 }
 
+export const House = PerfectAllDifferent;
+
 // Determine the number of times each value appears in the provided lines,
 // (numCells / numLines), and ensure that each value appears exactly that many
 // times.

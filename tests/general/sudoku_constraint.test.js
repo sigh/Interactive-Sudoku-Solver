@@ -378,6 +378,7 @@ await runTest('Jigsaw.serialize omits gridSpec for square grids', () => {
   // Should be .Jigsaw~LAYOUT (no gridSpec in the middle)
   assert.ok(!serialized.includes('~9x9~'), 'should not include gridSpec for square grid');
   assert.ok(serialized.startsWith('.Jigsaw~'), 'should start with constraint type');
+  assert.equal(serialized, `.Jigsaw~${JIGSAW_9x9_LAYOUT}`);
 });
 
 await runTest('Jigsaw.serialize omits gridSpec for rectangular grids', () => {

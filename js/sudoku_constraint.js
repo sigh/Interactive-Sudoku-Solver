@@ -686,12 +686,11 @@ export class SudokuConstraint {
       // This ensures that we create a consistent index independent of the
       // order of the parts or cells inside the parts.
       const indexMap = new Map();
-      const baseCharCode = GridShape.baseCharCode(shape);
       partsGrid.forEach((part) => {
         // Create a new index when we first encounter a part.
         if (!indexMap.has(part)) {
-          const char = String.fromCharCode(baseCharCode + indexMap.size);
-          indexMap.set(part, char);
+          const index = indexMap.size;
+          indexMap.set(part, index.toString(SHAPE_9x9.numValues + 1));
         }
       });
 
