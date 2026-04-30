@@ -36,6 +36,13 @@ Execute the test suite with:
 npm test
 ```
 
+## Development Docs
+
+For source and test layout details, see [js/README.md](js/README.md),
+[js/solver/README.md](js/solver/README.md),
+[js/solver/SOLVER_ENGINE.md](js/solver/SOLVER_ENGINE.md), and
+[tests/README.md](tests/README.md).
+
 ## Contributions
 
 Contributions are welcome including:

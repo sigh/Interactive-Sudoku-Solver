@@ -8,8 +8,8 @@ For a detailed description of the engine internals (propagation queue, search st
 
 The solver is a **constraint-satisfaction problem (CSP) engine** that uses backtracking search with constraint propagation. The core loop is:
 
-1. Pick the most-constrained unsolved cell (MRV heuristic).
-2. Try a candidate value.
+1. Pick the next candidate. Fixed cells are processed first; unresolved choices use conflict score per candidate, with MRV behavior when scores are zero.
+2. Try a candidate value or a handler-provided candidate group.
 3. Propagate constraints — let all affected handlers remove impossible candidates.
 4. If a contradiction is found, backtrack and try the next value.
 5. If all cells are solved, yield a solution.

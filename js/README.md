@@ -7,7 +7,7 @@ The application runs entirely in the browser with no server-side component.
 
 The code is organized around a few key areas:
 
-- **Constraint model** ([sudoku_constraint.js](sudoku_constraint.js)) — ~70 constraint types with serialization, parsing, and display metadata. This is the shared vocabulary used by the UI, parser, display, and solver.
+- **Constraint model** ([sudoku_constraint.js](sudoku_constraint.js)) — constraint types with serialization, parsing, and display metadata. This is the shared vocabulary used by the UI, parser, display, and solver.
 - **UI** ([constraint_input.js](constraint_input.js), [constraint_display.js](constraint_display.js), [display.js](display.js)) — SVG grid rendering, constraint visualization, and input controls.
 - **Solver** ([solver/](solver/)) — A constraint-satisfaction engine that runs in a Web Worker. See [solver/README.md](solver/README.md).
 - **Orchestration** ([render_page.js](render_page.js), [solution_controller.js](solution_controller.js), [solver_runner.js](solver_runner.js)) — Wires everything together: manages state, coordinates solving, and handles URL-based history.
@@ -19,17 +19,20 @@ The code is organized around a few key areas:
 ```mermaid
 flowchart TD
     Input["Constraint Input"] -- "add / remove" --> CM["ConstraintManager"]
-    URL["URL / Pasted Text"] -- "load" --> CM
+    URL["URL / Pasted Text"] --> Parser["SudokuParser"]
+    Parser --> CM
     CM -- "on change" --> CD["Constraint Display"]
     CM -- "on change" --> SC["Solution Controller"]
     CD --> Grid["Grid Display"]
     SC -- "solutions" --> Grid
+    SC --> Runner["SolverRunner"]
 
     subgraph "Web Worker"
-        Solver["Solver Engine"]
+        Worker["solver_worker.js"] --> Builder["SudokuBuilder"]
+        Builder --> Solver["Solver Engine"]
     end
 
-    SC <-->|"postMessage"| Solver
+    Runner <-->|"postMessage"| Worker
 ```
 
 ### Data Flow
@@ -48,9 +51,9 @@ The `ConstraintManager` (defined in [render_page.js](render_page.js)) is the cen
 |------|---------|
 | [render_page.js](render_page.js) | **Entry point.** Initializes all components, wires up event listeners, configures the bottom drawer. Also defines `ConstraintManager`, which holds the active constraint tree and notifies listeners on changes. |
 | [display.js](display.js) | SVG rendering system. `DisplayContainer` manages layered SVG groups. Key classes: `CellValueDisplay`, `SolutionDisplay`, `HighlightDisplay`, `GridDisplay`, `BorderDisplay`, `ColorPicker`. |
-| [constraint_display.js](constraint_display.js) | Renders constraints as SVG overlays (lines, regions, shading, arrows, dots, etc.). ~18 display item subclasses of `BaseConstraintDisplayItem`. |
+| [constraint_display.js](constraint_display.js) | Renders constraints as SVG overlays (lines, regions, shading, arrows, dots, etc.). Display item subclasses inherit from `BaseConstraintDisplayItem`. |
 | [constraint_input.js](constraint_input.js) | UI controls for adding/configuring constraints. `CollapsibleContainer` for grouped inputs. Auto-saves configuration state. |
-| [sudoku_constraint.js](sudoku_constraint.js) | **Constraint model.** `SudokuConstraintBase` is the base class for ~70 constraint types (static inner classes of `SudokuConstraint`). Handles serialization (`.Type~arg1~arg2~cell1~cell2`), deserialization, merging, and metadata (`CATEGORY`, `DESCRIPTION`, `DISPLAY_CONFIG`, `ARGUMENT_CONFIG`). |
+| [sudoku_constraint.js](sudoku_constraint.js) | **Constraint model.** `SudokuConstraintBase` is the base class for constraint types (static inner classes of `SudokuConstraint`). Handles serialization (`.Type~arg1~arg2~cell1~cell2`), deserialization, merging, and metadata (`CATEGORY`, `DESCRIPTION`, `DISPLAY_CONFIG`, `ARGUMENT_CONFIG`). |
 | [sudoku_parser.js](sudoku_parser.js) | Multi-format parser. Converts plain-text sudoku strings, killer format, jigsaw format, and the internal dot-notation into constraint objects. Builds an AST and resolves it against the shape. |
 | [solution_controller.js](solution_controller.js) | Bridges the constraint manager and solver. Manages solve modes, URL-based history (undo/redo), debug/flame-graph integration, and keyboard shortcuts. |
 | [solver_runner.js](solver_runner.js) | Solve mode strategies: `AllPossibilitiesModeHandler`, `AllSolutionsModeHandler`, `StepByStepModeHandler`, `CountModeHandler`, `EstimatedCountModeHandler`. Each mode controls how the worker is invoked and results are processed. |
@@ -72,7 +75,7 @@ The `ConstraintManager` (defined in [render_page.js](render_page.js)) is the cen
 
 ## Key Patterns
 
-- **Constraint type hierarchy**: All ~70 constraint types are static inner classes of `SudokuConstraint` in [sudoku_constraint.js](sudoku_constraint.js), inheriting from `SudokuConstraintBase`. Each type declares metadata (`CATEGORY`, `DESCRIPTION`, `DISPLAY_CONFIG`, `ARGUMENT_CONFIG`) that drives the UI, help page, and parser automatically.
+- **Constraint type hierarchy**: Constraint types are static inner classes of `SudokuConstraint` in [sudoku_constraint.js](sudoku_constraint.js), inheriting from `SudokuConstraintBase`. Each type declares metadata (`CATEGORY`, `DESCRIPTION`, `DISPLAY_CONFIG`, `ARGUMENT_CONFIG`) that drives the UI, help page, and parser automatically.
 
 - **Web Worker isolation**: The solver runs in a dedicated Web Worker ([solver_worker.js](solver_worker.js)) to avoid blocking the UI. Communication is via `postMessage` with `{method, payload}` messages. The worker preloads solver modules asynchronously on startup.
 

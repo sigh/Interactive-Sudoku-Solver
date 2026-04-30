@@ -34,23 +34,25 @@ solving occurs:
    [optimizer.js](optimizer.js)) analyzes the handler set and adds derived
    handlers that are logically implied by the existing ones. This doesn't
    change the solution set but makes propagation more effective.
-4. **Initialize all handlers** — each handler's `initialize()` method can
+4. **Add singleton value-exclusion handlers** — each search cell gets the
+    fixed-value exclusion propagation used when a cell becomes known.
+5. **Initialize all handlers** — each handler's `initialize()` method can
    modify the initial candidate bitmasks (e.g., a Given handler removes all
    but one candidate) and allocate extra state slots that will be
    saved/restored during backtracking.
-5. **Set up the candidate selector** — `CandidateSelector` (in
-   [candidate_selector.js](candidate_selector.js)) determines cell/value
-   ordering during search.
-6. **Build the search stack** — pre-allocates stack frames with grid state
-   buffers.
+6. **Run `postInitialize()` on all handlers** — handlers can inspect the full
+   initialized state, but must not mutate it.
+7. **Set up propagation, candidate selection, priorities, and the search
+   stack** — these structures are reused across runs of the same solver.
 
 ## Cell Candidates as Bitmasks
 
 Each cell's possible values are stored as a 16-bit integer where each bit
 represents one value. By default (values 1–9), bit 0 is value 1, bit 1 is
-value 2, and so on — but the mapping depends on the grid's `valueOffset`
-(e.g., for 0-based values, bit 0 is value 0). This enables fast set operations:
-AND to intersect, OR to union, popcount to count remaining candidates.
+value 2, and so on. In general, displayed value `v` maps to
+`1 << (v - valueOffset - 1)`. For 1-based values, bit 0 is displayed value 1.
+This enables fast set operations: AND to intersect, OR to union, popcount to
+count remaining candidates.
 
 `LookupTables` (in [lookup_tables.js](lookup_tables.js)) precomputes derived
 values for every possible bitmask: `sum[mask]` gives the sum of values in a
@@ -97,6 +99,14 @@ this interface:
   `GivenCandidates`, `BoxInfo`).
 - **`exclusionCells()`** — cells that must have distinct values. Used to build
   `CellExclusions` and by the optimizer.
+- **`postInitialize(readonlyGridState)`** — optional hook after all handlers
+  initialize. Do not write to `readonlyGridState`.
+- **`candidateFinders(grid, shape)`** — optional hook for handlers that can
+  nominate branch choices that are better than a single cell/value guess.
+- **`idStr`** — stable identity used by `HandlerSet` to deduplicate handlers.
+  Equivalent handlers should share an ID; unrelated handlers must not collide.
+- **`essential`** — defaults to `true`. Optimizer-added performance handlers
+  can be marked non-essential and skipped in some fixed-value propagation.
 
 Handler classes are defined across [handlers.js](handlers.js),
 [sum_handler.js](sum_handler.js), and [nfa_handler.js](nfa_handler.js).
@@ -220,7 +230,7 @@ Derived handlers are marked as non-essential and can be disabled for debugging.
 | Method | Purpose |
 |--------|---------|
 | `countSolutions(limit)` | Count solutions up to `limit`. |
-| `estimatedCountSolutions()` | Estimate solution count using random sampling. |
+| `estimatedCountSolutions(maxSamples)` | Estimate solution count using random sampling. If `maxSamples` is omitted, sampling continues until the caller aborts. |
 | `nthSolution(n)` | Return the nth solution grid, or `null`. |
 | `nthStep(n, stepGuides)` | Return the state at the nth branching point (for step-by-step UI). |
 | `solveAllPossibilities(threshold)` | Find all candidate values that appear in at least `threshold` solutions. |
