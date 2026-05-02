@@ -8,6 +8,8 @@ ensureGlobalEnvironment({
 
 // Mock Worker
 class MockWorker {
+  static noResponseTypes = new Set();
+
   constructor(script) {
     this.script = script;
     this.onmessage = null;
@@ -19,6 +21,8 @@ class MockWorker {
     }, 1);
   }
   postMessage(msg) {
+    if (this.constructor.noResponseTypes.has(msg.type)) return;
+
     // Echo back with a delay
     setTimeout(() => {
       if (this.onmessage) {
@@ -29,6 +33,8 @@ class MockWorker {
   terminate() { }
 }
 globalThis.Worker = MockWorker;
+
+const waitForSettle = () => new Promise(resolve => setTimeout(resolve, 0));
 
 // Import UserScriptExecutor
 const { UserScriptExecutor } = await import('../../js/sudoku_constraint.js');
@@ -52,6 +58,26 @@ await runTest('UserScriptExecutor timeout override', async () => {
 
   // Reset
   delete self.USER_SCRIPT_TIMEOUT;
+});
+
+await runTest('runSandboxCode has no default timeout timer', async () => {
+  MockWorker.noResponseTypes.add('runSandboxCode');
+  try {
+    const executor = new UserScriptExecutor();
+
+    const promise = executor.runSandboxCode('return null;', {}, '');
+    await executor._readyPromise;
+    await waitForSettle();
+
+    assert.equal(executor._pending.size, 1);
+    const pending = executor._pending.values().next().value;
+    assert.equal(pending.timer, null);
+
+    executor.abort();
+    await assert.rejects(promise, /Execution aborted/);
+  } finally {
+    MockWorker.noResponseTypes.delete('runSandboxCode');
+  }
 });
 
 logSuiteComplete('UserScriptExecutor');

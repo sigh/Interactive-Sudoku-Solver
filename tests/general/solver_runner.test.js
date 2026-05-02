@@ -84,6 +84,43 @@ class LocalSolverProxy {
   }
 }
 
+class DelayedWorker {
+  constructor() {
+    this._listeners = new Set();
+    this.messages = [];
+    this.released = false;
+    this.terminated = false;
+  }
+
+  addEventListener(type, listener) {
+    assert.equal(type, 'message');
+    this._listeners.add(listener);
+  }
+
+  removeEventListener(type, listener) {
+    assert.equal(type, 'message');
+    this._listeners.delete(listener);
+  }
+
+  postMessage(message) {
+    this.messages.push(message);
+  }
+
+  emit(data) {
+    for (const listener of this._listeners) {
+      listener({ data });
+    }
+  }
+
+  release() {
+    this.released = true;
+  }
+
+  terminate() {
+    this.terminated = true;
+  }
+}
+
 // Replace SolverProxy.makeSolver for testing
 const originalMakeSolver = SolverProxy.makeSolver.bind(SolverProxy);
 SolverProxy.makeSolver = async (constraint, stateHandler, statusHandler, debugHandler) => {
@@ -250,6 +287,61 @@ await runTest('solve should call statusHandler when solving starts/ends', async 
   const endCalls = statusCalls.filter(c => !c.isSolving);
   assert.ok(startCalls.length > 0, 'Expected status calls with isSolving=true');
   assert.ok(endCalls.length > 0, 'Expected status calls with isSolving=false');
+});
+
+// ============================================================================
+// SolverProxy worker protocol
+// ============================================================================
+
+await runTest('SolverProxy rejects concurrent calls until delayed result resolves', async () => {
+  const worker = new DelayedWorker();
+  const statusCalls = [];
+  const proxy = new SolverProxy(
+    worker,
+    null,
+    (isSolving, method) => statusCalls.push({ isSolving, method }),
+  );
+  proxy._initialized = true;
+
+  const first = proxy.nthSolution(0);
+  assert.deepEqual(worker.messages, [{ method: 'nthSolution', payload: 0 }]);
+
+  await assert.rejects(
+    () => proxy.nthSolution(1),
+    /Can't call worker while a method is in progress\. \(nthSolution\)/,
+  );
+
+  worker.emit({ type: 'result', result: ['done'] });
+  assert.deepEqual(await first, ['done']);
+  assert.equal(proxy._waiting, null);
+  assert.deepEqual(statusCalls, [
+    { isSolving: true, method: 'nthSolution' },
+    { isSolving: false, method: 'nthSolution' },
+  ]);
+
+  proxy.terminate();
+  assert.equal(worker.released, true);
+});
+
+await runTest('SolverProxy forwards state and debug worker messages without a pending call', () => {
+  const worker = new DelayedWorker();
+  const states = [];
+  const debugMessages = [];
+  const proxy = new SolverProxy(
+    worker,
+    state => states.push(state),
+    null,
+    (data, counters) => debugMessages.push({ data, counters }),
+  );
+
+  worker.emit({ type: 'state', state: { done: false, counters: { nodesSearched: 7 } } });
+  worker.emit({ type: 'debug', data: { logs: ['x'] }, counters: { y: 1 } });
+
+  assert.deepEqual(states, [{ done: false, counters: { nodesSearched: 7 } }]);
+  assert.deepEqual(debugMessages, [{ data: { logs: ['x'] }, counters: { y: 1 } }]);
+
+  proxy.terminate();
+  assert.equal(worker.released, true);
 });
 
 // ============================================================================

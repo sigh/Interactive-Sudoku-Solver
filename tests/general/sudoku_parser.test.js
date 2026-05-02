@@ -314,6 +314,20 @@ await runTest('parseString should parse Given constraints', () => {
   assert.deepEqual(g2.values, [3]);
 });
 
+await runTest('parseString documents current permissive Given value parsing', () => {
+  const result = SudokuParser.parseString('.~R1C1_99.~R1C2_x.~R1C3_2x.');
+
+  const givens = findConstraints(result, 'Given');
+  const r1c1 = givens.find(g => g.cell === 'R1C1');
+  const r1c2 = givens.find(g => g.cell === 'R1C2');
+  const r1c3 = givens.find(g => g.cell === 'R1C3');
+
+  assert.deepEqual(r1c1.values, [99]);
+  assert.equal(r1c2.values.length, 1);
+  assert.ok(Number.isNaN(r1c2.values[0]));
+  assert.deepEqual(r1c3.values, [2]);
+});
+
 await runTest('parseString should parse AntiKnight', () => {
   const result = SudokuParser.parseString('.AntiKnight.');
   assert.ok(result);

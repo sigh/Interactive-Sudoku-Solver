@@ -269,6 +269,25 @@ await runTest('parseCellId is inverse of makeCellId', () => {
   }
 });
 
+await runTest('parseCellId documents current fixed-width parsing behavior', () => {
+  const shape = GridShape.fromGridSize(9);
+
+  assert.deepEqual(shape.parseCellId('R1C10'), { cell: 0, row: 0, col: 0 });
+  assert.deepEqual(shape.parseCellId('R9C9extra'), { cell: 80, row: 8, col: 8 });
+  assert.throws(() => shape.parseCellId('R0C1'), /Invalid cell ID/);
+  assert.throws(() => shape.parseCellId('R1C0'), /Invalid cell ID/);
+});
+
+await runTest('parseValueId documents current permissive parseInt behavior', () => {
+  const shape = GridShape.fromGridSize(9);
+  const parsed = shape.parseValueId('R1C1_2x_x_99');
+
+  assert.equal(parsed.cellId, 'R1C1');
+  assert.equal(parsed.values[0], 2);
+  assert.ok(Number.isNaN(parsed.values[1]));
+  assert.equal(parsed.values[2], 99);
+});
+
 await runTest('makeCellId works for rectangular grids', () => {
   const shape = GridShape.fromGridSize(6, 8);
   assert.equal(shape.makeCellId(0, 0), 'R1C1');
