@@ -16,6 +16,10 @@ Flags can also be passed directly:
 node tests/run_all_tests.js             # same as npm test
 node tests/run_all_tests.js --quiet     # suppress per-file/suite output
 node tests/run_all_tests.js --verbose   # also print each passing test name
+node tests/run_all_tests.js --list      # list selected test files without running them
+node tests/run_all_tests.js solver      # run files whose relative path contains "solver"
+node tests/run_all_tests.js --filter sum.test.js
+node tests/run_all_tests.js --fail-fast # stop after the first failing file
 ```
 
 ## Interpreting Output
@@ -23,12 +27,13 @@ node tests/run_all_tests.js --verbose   # also print each passing test name
 - Each file prints `▶ Running <path>` before execution.
 - Each suite prints: `All <name> tests passed. (<N> tests in <ms>ms)`
 - Final line: `✓ All tests passed. (<total> tests across <files> files in <ms>ms)`
-- On failure: the runner continues all remaining files, then prints `✗ N file(s) failed:` with the file list and exits with code 1.
+- On `runTest` failure: the current suite continues running remaining tests, then the runner prints each failed test name, continues remaining files, and exits with code 1.
+- On top-level import/setup failure: the runner reports the file-level failure and continues remaining files unless `--fail-fast` is used.
 
 ## Directories
 
 | Directory | Purpose |
-|-----------|---------|
+| --- | --- |
 | [handlers/](handlers/) | Per-handler tests. Each file tests one constraint handler in isolation. |
 | [general/](general/) | Application-level tests. Utilities, NFA builder, parser, solver runner, grid shapes, sandbox environment, and the simple solver API. |
 | [solver/](solver/) | Solver internals. Candidate selection, exclusion groups, conflict scores, lookup tables, optimizer, and builder. |
@@ -43,13 +48,25 @@ node tests/run_all_tests.js --verbose   # also print each passing test name
 From `helpers/test_runner.js`:
 
 - `runTest(name, fn)` — run a single test. Increments the suite counter. Prints name only with `--verbose`.
+- `runTestCases(name, cases, fn)` — run parameterized cases. Each case is `[label, ...args]` and becomes `<name>: <label>`.
 - `logSuiteComplete(suiteName, count?)` — log suite result. Uses internal counter by default; pass `count` to override. Suppressed with `--quiet`.
 - `logInfo(...args)` — log informational output. Suppressed with `--quiet`.
-- `getTotalCount()` — aggregate count across all suites.
+- `getTestStats()` — aggregate `{ total, passed, failed }` across all suites.
 
 ## Writing Tests
 
 Each `*.test.js` file imports modules directly (ESM), calls `runTest(name, fn)` for each test, and ends with `logSuiteComplete('SuiteName')`.
+
+Use `runTestCases` when the same behavior should be checked across several shapes, constraints, or candidate sets:
+
+```js
+await runTestCases('box count', [
+  ['4x4 default', '4x4', 4],
+  ['6x6 region size 4', '6x6', 9, 4],
+], (gridSpec, expectedBoxes, regionSize = null) => {
+  // test body
+});
+```
 
 ### Handler Tests
 
@@ -85,7 +102,7 @@ assert.ok(acc.touched.has(1));
 Use this table to choose the narrowest useful tests.
 
 | Change | Start with |
-|--------|------------|
+| --- | --- |
 | Parser, serialization, or grid IDs | [general/sudoku_parser.test.js](general/sudoku_parser.test.js), [general/sudoku_constraint.test.js](general/sudoku_constraint.test.js), [general/grid_shape.test.js](general/grid_shape.test.js) |
 | Constraint-to-handler mapping | [solver/sudoku_builder.test.js](solver/sudoku_builder.test.js), [solver/sudoku_builder_or_and.test.js](solver/sudoku_builder_or_and.test.js) |
 | Handler propagation | The matching file in [handlers/](handlers/), plus [solver/handler_util.test.js](solver/handler_util.test.js) when shared helper behavior changes |

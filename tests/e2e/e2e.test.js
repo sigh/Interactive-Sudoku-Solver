@@ -1,6 +1,9 @@
 import { readFile } from 'node:fs/promises';
 import { resolve as resolvePath } from 'node:path';
+import { ensureGlobalEnvironment } from '../helpers/test_env.js';
 import { runTest, logSuiteComplete, logInfo } from '../helpers/test_runner.js';
+
+ensureGlobalEnvironment();
 
 const { SimpleSolver } = await import('../../js/sandbox/simple_solver.js' + self.VERSION_PARAM);
 const { SolverStats } = await import('../../js/sandbox/solver_stats.js' + self.VERSION_PARAM);

@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
 
+import { ensureGlobalEnvironment } from '../helpers/test_env.js';
 import { runTest, logSuiteComplete } from '../helpers/test_runner.js';
+
+ensureGlobalEnvironment();
 
 const { SolverStats } = await import('../../js/sandbox/solver_stats.js' + self.VERSION_PARAM);
 

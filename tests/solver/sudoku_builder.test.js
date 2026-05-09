@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 
 import { ensureGlobalEnvironment } from '../helpers/test_env.js';
-import { runTest, logSuiteComplete } from '../helpers/test_runner.js';
+import { runTest, runTestCases, logSuiteComplete } from '../helpers/test_runner.js';
 
 ensureGlobalEnvironment();
 
@@ -98,6 +98,20 @@ await runTest('4x4 produces correct number of AllDifferent handlers', () => {
   assert.equal(adCount, 12, `Expected 12 AllDifferent, got ${adCount}`);
 });
 
+await runTestCases('RegionSize controls generated box handlers', [
+  ['6x6 default boxes', '6x6', null, 18],
+  ['6x6 four-cell boxes', '6x6', 4, 21],
+  ['4x6 four-cell boxes', '4x6', 4, 16],
+], (gridSpec, regionSize, expectedAllDifferent) => {
+  const constraints = [new SudokuConstraint.Shape(gridSpec)];
+  if (regionSize !== null) constraints.push(new SudokuConstraint.RegionSize(regionSize));
+
+  const handlers = buildHandlers(new SudokuConstraint.Container(constraints));
+  const adCount = countHandlers(handlers, 'AllDifferent');
+  assert.equal(adCount, expectedAllDifferent,
+    `Expected ${expectedAllDifferent} AllDifferent handlers for ${gridSpec}`);
+});
+
 // ============================================================================
 // _boxHandlers with NoBoxes
 // ============================================================================
@@ -161,12 +175,38 @@ await runTest('Cage with sum=0 produces AllDifferent only (no Sum)', () => {
   assert.equal(sumCount, 0, 'Sum=0 cage should not produce Sum handler');
 });
 
+await runTest('Sum with coefficients produces Sum handler preserving coefficients', () => {
+  const constraint = new SudokuConstraint.Container([
+    new SudokuConstraint.Sum('0_=_2_-1', 'R1C1', 'R1C2'),
+  ]);
+  const sumHandlers = buildHandlers(constraint)
+    .filter(h => h instanceof SumHandlerModule.Sum);
+
+  assert.equal(sumHandlers.length, 1);
+  assert.deepEqual([...sumHandlers[0].cells], [0, 1]);
+  assert.deepEqual(sumHandlers[0].coefficients(), [2, -1]);
+  assert.equal(sumHandlers[0].sum(), 0);
+});
+
 await runTest('Arrow produces Sum handler', () => {
   const constraint = new SudokuConstraint.Container([
     new SudokuConstraint.Arrow('R1C1', 'R1C2', 'R1C3'),
   ]);
   const handlers = buildHandlers(constraint);
   assert.ok(hasHandler(handlers, 'Sum'));
+});
+
+await runTest('PillArrow produces place-value Sum coefficients', () => {
+  const constraint = new SudokuConstraint.Container([
+    new SudokuConstraint.PillArrow(2, 'R1C2', 'R1C1', 'R1C3'),
+  ]);
+  const sumHandlers = buildHandlers(constraint)
+    .filter(h => h instanceof SumHandlerModule.Sum);
+
+  assert.equal(sumHandlers.length, 1);
+  assert.deepEqual([...sumHandlers[0].cells], [0, 1, 2]);
+  assert.deepEqual(sumHandlers[0].coefficients(), [-10, -1, 1]);
+  assert.equal(sumHandlers[0].sum(), 0);
 });
 
 await runTest('Thermo produces BinaryConstraint handlers', () => {
