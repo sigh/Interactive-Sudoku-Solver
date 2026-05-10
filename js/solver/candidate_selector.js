@@ -1,6 +1,29 @@
 const { countOnes16bit, RandomIntGenerator } = await import('../util.js' + self.VERSION_PARAM);
 const { LookupTables } = await import('./lookup_tables.js' + self.VERSION_PARAM);
 
+export const NO_LINKED_CELL = 0xffff;
+
+export const buildLinkedSearchCells = (handlerSet, numSearchCells) => {
+  let linkedCells = null;
+  for (const handler of handlerSet) {
+    const links = handler.linkedSearchCells();
+    if (links.length === 0) continue;
+
+    if (linkedCells === null) {
+      linkedCells = new Uint16Array(numSearchCells);
+      linkedCells.fill(NO_LINKED_CELL);
+    }
+
+    for (let i = 0; i < links.length; i += 2) {
+      const cellA = links[i];
+      const cellB = links[i + 1];
+      linkedCells[cellA] = cellB;
+      linkedCells[cellB] = cellA;
+    }
+  }
+  return linkedCells;
+};
+
 export class SeenCandidateSet {
   constructor(numSearchCells, numValues) {
     this.enabledInSolver = false;
@@ -92,6 +115,7 @@ export class CandidateSelector {
     this._debugLogger = debugLogger;
     this._numSearchCells = numSearchCells;
     this._optionSelector = null;
+    this._linkedCells = buildLinkedSearchCells(handlerSet, numSearchCells);
 
     this._candidateSelectionStates = this._initCandidateSelectionStates(numSearchCells);
     // _candidateSelectionFlags is used to track whether the
@@ -344,6 +368,7 @@ export class CandidateSelector {
 
     const numSearchCells = this._numSearchCells;
     const conflictScores = this._conflictScores.scores;
+    const linkedCells = this._linkedCells;
 
     const valueInfo = this._conflictScores.getMaxValueScore();
     const maxValue = valueInfo.value;
@@ -368,6 +393,16 @@ export class CandidateSelector {
       }
 
       let scoreUnnormalized = conflictScores[cell];
+
+      if (linkedCells !== null) {
+        const linkedCell = linkedCells[cell];
+        if (linkedCell !== NO_LINKED_CELL) {
+          const linkedValues = gridState[linkedCell];
+          if ((linkedValues & (linkedValues - 1)) === 0) {
+            scoreUnnormalized <<= 2;
+          }
+        }
+      }
 
       // If a value has been particularly conflict-prone recently, prefer
       // searching cells that contain that value.

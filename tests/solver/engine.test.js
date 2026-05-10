@@ -86,13 +86,23 @@ class FixedPriorityHandler extends SudokuConstraintHandler {
   }
 }
 
+class LinkedCellsHandler extends SudokuConstraintHandler {
+  constructor(links) {
+    super([]);
+    this._links = Uint16Array.from(links);
+  }
+
+  linkedSearchCells() {
+    return this._links;
+  }
+}
+
 class WatchedCellExpandingHandler extends FixedPriorityHandler {
   initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
     this.cells = Uint8Array.from([0, 2]);
     return true;
   }
 }
-
 // ============================================================================
 // countSolutions
 // ============================================================================
@@ -327,6 +337,32 @@ await runTest('cell priorities are computed before initialization expands watche
   const priorities = solver._internalSolver._cellPriorities;
   assert.equal(priorities[0], 5);
   assert.equal(priorities[2], 0);
+});
+
+await runTest('cell priorities boost linked cell pairs', () => {
+  const shape = GridShape.fromGridSize(2);
+  shape.addVarCellsForConstraints([new SudokuConstraint.ChaosConstruction()]);
+  const regionCells = shape.varCellsForGroup('CC');
+
+  const solver = new SudokuSolver([
+    new LinkedCellsHandler([
+      0, regionCells[0],
+      1, regionCells[1],
+      2, regionCells[2],
+      3, regionCells[3],
+    ]),
+    new FixedPriorityHandler([0, regionCells[0]], 10),
+    new FixedPriorityHandler([1, regionCells[2]], 11),
+    new FixedPriorityHandler([3, regionCells[3]], 7),
+  ], shape);
+  const priorities = solver._internalSolver._cellPriorities;
+
+  assert.equal(priorities[0], 20);
+  assert.equal(priorities[regionCells[0]], 20);
+  assert.equal(priorities[1], 11);
+  assert.equal(priorities[regionCells[2]], 11);
+  assert.equal(priorities[3], 7);
+  assert.equal(priorities[regionCells[3]], 7);
 });
 
 // ============================================================================

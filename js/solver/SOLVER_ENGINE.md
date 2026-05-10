@@ -30,12 +30,13 @@ solving occurs:
 1. **Sort handlers** deterministically.
 2. **Build `CellExclusions`** — tracks which cell pairs must have distinct
    values, derived from handlers that report `exclusionCells()`.
-3. **Run the optimizer** — `SudokuConstraintOptimizer.optimize()` (in
-   [optimizer.js](optimizer.js)) analyzes the handler set and adds derived
-   handlers that are logically implied by the existing ones. This doesn't
-   change the solution set but makes propagation more effective.
-4. **Compute cell priorities** — `SudokuConstraintOptimizer.computeCellPriorities()`
-  computes the initial priority scores used by search.
+3. **Initialize default cell priorities** — priorities start at zero so the
+  solver can run without optimizer-provided search hints.
+4. **Run the optimizer** — `SudokuConstraintOptimizer.optimize()` (in
+  [optimizer.js](optimizer.js)) analyzes the handler set, adds derived
+  handlers, computes cell priorities, and may select handler metadata used
+  during initialization. This doesn't change the solution set but makes
+  propagation and search more effective.
 5. **Add singleton value-exclusion handlers** — each search cell gets the
     fixed-value exclusion propagation used when a cell becomes known.
 6. **Initialize all handlers** — each handler's `initialize()` method can

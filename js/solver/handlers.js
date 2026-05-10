@@ -76,6 +76,10 @@ export class SudokuConstraintHandler {
     return [];
   }
 
+  linkedSearchCells() {
+    return [];
+  }
+
   debugName() {
     return this.constructor.name;
   }

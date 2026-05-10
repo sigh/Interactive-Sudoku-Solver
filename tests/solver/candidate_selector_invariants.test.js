@@ -7,6 +7,8 @@ import { GridTestContext } from '../helpers/grid_test_utils.js';
 ensureGlobalEnvironment();
 
 const { CandidateSelector, ConflictScores } = await import('../../js/solver/candidate_selector.js');
+const { SudokuConstraint } = await import('../../js/sudoku_constraint.js');
+const { ChaosConstruction } = await import('../../js/solver/chaos_handler.js');
 
 const makeDebugLogger = () => ({
   enableStepLogs: false,
@@ -16,14 +18,15 @@ const makeDebugLogger = () => ({
 
 const makeSelector = (context, { handlerSet = [] } = {}) => {
   const { shape } = context;
+  const numSearchCells = shape.totalCells();
   const selector = new CandidateSelector(
     shape,
-    shape.numGridCells,
+    numSearchCells,
     handlerSet,
     makeDebugLogger(),
   );
 
-  const conflictScores = new ConflictScores(new Array(shape.numGridCells).fill(0), shape.numValues);
+  const conflictScores = new ConflictScores(new Array(numSearchCells).fill(0), shape.numValues);
   selector.reset(conflictScores);
   return { selector, conflictScores };
 };
@@ -112,6 +115,7 @@ await runTest('CandidateSelector consumes custom candidate state across backtrac
 
   const handler = {
     candidateFinders: () => [finder],
+    linkedSearchCells: () => [],
   };
 
   const { selector, conflictScores } = makeSelector(context, { handlerSet: [handler] });
@@ -182,6 +186,7 @@ await runTest('CandidateSelector stepState override clears any pending custom-ca
 
   const handler = {
     candidateFinders: () => [finder],
+    linkedSearchCells: () => [],
   };
 
   const { selector, conflictScores } = makeSelector(context, { handlerSet: [handler] });
@@ -221,6 +226,52 @@ await runTest('CandidateSelector stepState override clears any pending custom-ca
     assert.equal(count, 4);
     assert.equal(selector.getCellAtDepth(0), 0);
     assert.equal(value, 1 << 0);
+  }
+});
+
+await runTest('CandidateSelector boosts linked chaos cells whose counterpart is fixed', () => {
+  const context = new GridTestContext({ gridSize: 4 });
+  const { shape } = context;
+  shape.addVarCellsForConstraints([new SudokuConstraint.ChaosConstruction()]);
+  const regionCells = shape.varCellsForGroup('CC');
+  const handlerSet = [new ChaosConstruction(shape.numGridCells, regionCells[0])];
+  const allValues = context.lookupTables.allValues;
+
+  {
+    const { selector, conflictScores } = makeSelector(context, { handlerSet });
+    conflictScores.scores[0] = 1;
+
+    const gridState = new Array(shape.totalCells()).fill(allValues);
+    gridState[1] = (1 << 0) | (1 << 1);
+    gridState[regionCells[0]] = 1 << 0;
+
+    const [nextDepth, , fixedCount] = selector.selectNextCandidate(0, gridState, null, true);
+    assert.equal(fixedCount, 1);
+    assert.equal(nextDepth, 1);
+    assert.equal(selector.getCellAtDepth(0), regionCells[0]);
+
+    const [, , count] = selector.selectNextCandidate(nextDepth, gridState, null, true);
+
+    assert.equal(count, 4);
+    assert.equal(selector.getCellAtDepth(nextDepth), 0);
+  }
+
+  {
+    const { selector, conflictScores } = makeSelector(context, { handlerSet });
+    conflictScores.scores[regionCells[0]] = 1;
+
+    const gridState = new Array(shape.totalCells()).fill(allValues);
+    gridState[0] = 1 << 0;
+    gridState[1] = (1 << 0) | (1 << 1);
+
+    const [nextDepth, , fixedCount] = selector.selectNextCandidate(0, gridState, null, true);
+    assert.equal(fixedCount, 1);
+    assert.equal(nextDepth, 1);
+    assert.equal(selector.getCellAtDepth(0), 0);
+
+    const [, , regionCount] = selector.selectNextCandidate(nextDepth, gridState, null, true);
+    assert.equal(regionCount, 4);
+    assert.equal(selector.getCellAtDepth(nextDepth), regionCells[0]);
   }
 });
 

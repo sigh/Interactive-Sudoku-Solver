@@ -419,20 +419,19 @@ class InternalSolver {
 
     // Optimize handlers.
     const optimizer = new SudokuConstraintOptimizer(this._debugLogger);
-    optimizer.optimize(handlerSet, cellExclusions, this._shape);
+    this._cellPriorities = optimizer.optimize(
+      handlerSet, cellExclusions, this._shape);
 
-    this._cellPriorities = optimizer.computeCellPriorities(
-      handlerSet,
-      this._shape);
+    this._cellPriorities ??= new Int32Array(this._shape.totalCells());
+
+    const stateAllocator = new GridStateAllocator(
+      this._shape, this._numSearchCells);
 
     // Add the exclusion handlers for all search cells.
     for (let i = 0; i < this._numSearchCells; i++) {
       handlerSet.addSingletonHandlers(
         new HandlerModule.UniqueValueExclusion(i));
     }
-
-    const stateAllocator = new GridStateAllocator(
-      this._shape, this._numSearchCells);
 
     // Initialize handlers.
     for (const handler of handlerSet) {
@@ -1129,8 +1128,13 @@ class HandlerAccumulator {
       const index = handlers[0];
       this._singletonHandlers[i] = index;
       if (handlers.length > 1) {
+        const sortedHandlers = [...handlers].sort((a, b) => {
+          const aIsUnique = this._allHandlers[a].constructor === HandlerModule.UniqueValueExclusion;
+          const bIsUnique = this._allHandlers[b].constructor === HandlerModule.UniqueValueExclusion;
+          return bIsUnique - aIsUnique;
+        });
         this._allHandlers[index] = new HandlerModule.And(
-          ...handlers.map(i => this._allHandlers[i]));
+          ...sortedHandlers.map(i => this._allHandlers[i]));
       }
     }
 

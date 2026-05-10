@@ -30,6 +30,16 @@ const hasHandler = (handlers, typeName) =>
 const countHandlers = (handlers, typeName) =>
   handlers.filter(h => h.constructor.name === typeName).length;
 
+const nestedHandlers = (handler) => handler._handlers
+  ? [handler, ...handler._handlers.flatMap(nestedHandlers)]
+  : [handler];
+
+const countHandlersDeep = (handlers, typeName) => handlers
+  .flatMap(nestedHandlers)
+  .filter(handler => handler.constructor.name === typeName).length;
+
+const regionShardParent = (handler, grid, cell) => grid[handler._regionShardOffset + cell];
+
 // ============================================================================
 // build() basics
 // ============================================================================
@@ -315,6 +325,92 @@ await runTest('Jigsaw produces AllDifferent and JigsawPiece handlers', () => {
   assert.ok(hasHandler(handlers, 'JigsawPiece'));
   // 4 rows + 4 cols + 4 jigsaw pieces = 12 AllDifferent (no boxes).
   assert.equal(countHandlers(handlers, 'AllDifferent'), 12);
+});
+
+await runTest('ChaosConstruction produces handler, extra cells, and no box handlers', () => {
+  const constraint = new SudokuConstraint.Container([
+    new SudokuConstraint.Shape('4x4'),
+    new SudokuConstraint.ChaosConstruction(),
+  ]);
+
+  const shape = constraint.getShape();
+  shape.addVarCellsForConstraints([new SudokuConstraint.ChaosConstruction()]);
+  assert.equal(shape.totalCells(), 32);
+  assert.equal(shape.varCellsForGroup('CC').length, 16);
+
+  const handlers = buildHandlers(constraint);
+  assert.ok(hasHandler(handlers, 'ChaosConstruction'));
+  assert.equal(countHandlers(handlers, 'ChaosFixedValueRegionExclusion'), 0);
+  // 4 rows + 4 columns. Chaos Construction replaces default boxes.
+  assert.equal(countHandlers(handlers, 'AllDifferent'), 8);
+});
+
+await runTest('ChaosConstruction optimizer adds fixed value-region handlers with cages', () => {
+  const constraint = new SudokuConstraint.Container([
+    new SudokuConstraint.Shape('4x4'),
+    new SudokuConstraint.ChaosConstruction(),
+    new SudokuConstraint.Cage(3, 'R1C1', 'R1C2'),
+  ]);
+
+  const solver = SudokuBuilder.build(constraint);
+  const handlers = solver._internalSolver._handlerSet.getAll();
+  assert.equal(countHandlersDeep(handlers, 'ChaosFixedValueRegionExclusion'), 32);
+});
+
+await runTest('ChaosConstruction optimizer links adjacent equal CC cells only', () => {
+  const constraint = new SudokuConstraint.Container([
+    new SudokuConstraint.Shape('4x4'),
+    new SudokuConstraint.ChaosConstruction(),
+    new SudokuConstraint.SameValues(3, 'CC1', 'CC2', 'CC16'),
+  ]);
+
+  const solver = SudokuBuilder.build(constraint);
+  const handlers = solver._internalSolver._handlerSet.getAll();
+  const handler = handlers.find(h => h.constructor.name === 'ChaosConstruction');
+  const grid = solver._internalSolver._initialGridState.slice();
+  const root = regionShardParent(handler, grid, 0);
+
+  assert.equal(regionShardParent(handler, grid, 1), root);
+  assert.notEqual(regionShardParent(handler, grid, 15), root);
+});
+
+await runTest('ChaosConstruction rejects explicit non-value region size', () => {
+  const constraint = new SudokuConstraint.Container([
+    new SudokuConstraint.Shape('4x4'),
+    new SudokuConstraint.RegionSize(2),
+    new SudokuConstraint.ChaosConstruction(),
+  ]);
+
+  assert.throws(
+    () => buildHandlers(constraint),
+    { name: 'InvalidConstraintError' },
+  );
+});
+
+await runTest('ChaosConstruction rejects effective non-value region size', () => {
+  const constraint = new SudokuConstraint.Container([
+    new SudokuConstraint.Shape('6x6~9'),
+    new SudokuConstraint.ChaosConstruction(),
+  ]);
+
+  assert.throws(
+    () => buildHandlers(constraint),
+    { name: 'InvalidConstraintError' },
+  );
+});
+
+await runTest('ChaosConstruction solves through builder with canonical labels', () => {
+  const constraint = new SudokuConstraint.Container([
+    new SudokuConstraint.Shape('2x2'),
+    new SudokuConstraint.ChaosConstruction(),
+  ]);
+
+  const solver = SudokuBuilder.build(constraint);
+  assert.equal(solver.countSolutions(20), 4);
+
+  const firstSolution = SudokuBuilder.build(constraint).nthSolution(0);
+  assert.equal(firstSolution.length, 8);
+  assert.equal(firstSolution[4], 1);
 });
 
 // ============================================================================

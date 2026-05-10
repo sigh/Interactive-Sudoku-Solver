@@ -5,6 +5,7 @@ const { memoize } = await import('../util.js' + self.VERSION_PARAM);
 const HandlerModule = await import('./handlers.js' + self.VERSION_PARAM);
 const SumHandlerModule = await import('./sum_handler.js' + self.VERSION_PARAM);
 const NFAHandlerModule = await import('./nfa_handler.js' + self.VERSION_PARAM);
+const ChaosHandlerModule = await import('./chaos_handler.js' + self.VERSION_PARAM);
 
 const { InvalidConstraintError } = HandlerModule;
 
@@ -42,7 +43,7 @@ export class SudokuBuilder {
 
   // Get box regions, respecting NoBoxes and RegionSize constraints.
   static _getBoxRegions(shape, constraintMap) {
-    if (constraintMap.has('NoBoxes')) return [];
+    if (constraintMap.has('NoBoxes') || constraintMap.has('ChaosConstruction')) return [];
 
     const size = this._getEffectiveBoxSize(constraintMap);
     return SudokuConstraintBase.boxRegions(shape, size);
@@ -220,6 +221,28 @@ export class SudokuBuilder {
           }
           break;
 
+        case 'ChaosConstruction':
+          {
+            if (this._regionSize(constraintMap, shape) !== shape.numValues) {
+              throw new InvalidConstraintError(
+                'Chaos Construction only supports region size equal to numValues.');
+            }
+            const regionCells = shape.varCellsForGroup('CC');
+            if (!regionCells || regionCells.length !== shape.numGridCells) {
+              throw new InvalidConstraintError(
+                'Chaos Construction requires one region cell for every grid cell.');
+            }
+            const regionCellOffset = regionCells[0];
+            for (let i = 0; i < regionCells.length; i++) {
+              if (regionCells[i] !== regionCellOffset + i) {
+                throw new InvalidConstraintError(
+                  'Chaos Construction requires contiguous region cells.');
+              }
+            }
+            yield new ChaosHandlerModule.ChaosConstruction(shape.numGridCells, regionCellOffset);
+          }
+          break;
+
         case 'Diagonal':
           if (!shape.isSquare()) {
             throw new InvalidConstraintError('Diagonal constraint requires a square grid');
@@ -339,7 +362,7 @@ export class SudokuBuilder {
             const cells = constraint.cells.map(c => shape.parseCellId(c).cell);
             const encodedNFA = constraint.encodedNFA;
             const nfa = compileNFA(encodedNFA, shape.numValues);
-            yield new NFAHandlerModule.NFAConstraint(cells, nfa);
+            yield new NFAHandlerModule.NFAConstraint(cells, nfa, encodedNFA);
           }
           break;
 

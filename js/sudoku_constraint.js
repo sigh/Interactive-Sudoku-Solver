@@ -1158,6 +1158,26 @@ export class SudokuConstraint {
     static UNIQUENESS_KEY_FIELD = 'type';
   }
 
+  static ChaosConstruction = class ChaosConstruction extends SudokuConstraintBase {
+    static DESCRIPTION = (`
+      Construct jigsaw regions during solving. Regions have size equal to the
+      number of values, are orthogonally connected, and each region contains
+      every value once.`);
+    static CATEGORY = 'Experimental';
+    static UNIQUENESS_KEY_FIELD = 'type';
+    static VALIDATE_SHAPE_FN = (shape) =>
+      shape.numGridCells === shape.numValues * shape.numValues;
+
+    getVarCellGroups(shape) {
+      return [{
+        prefix: 'CC',
+        label: 'Chaos regions',
+        count: shape.numGridCells,
+        columns: shape.numCols,
+      }];
+    }
+  }
+
   static RegionSize = class RegionSize extends SudokuConstraintBase {
     static DESCRIPTION = (`
       The size of default boxes. Jigsaw pieces must be of this size.`);

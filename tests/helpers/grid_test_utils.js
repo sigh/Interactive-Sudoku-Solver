@@ -71,9 +71,11 @@ export class GridTestContext {
     return this._grid;
   }
 
-  initializeHandler(handler, { cellExclusions, state = {} } = {}) {
+  initializeHandler(handler, { cellExclusions, state } = {}) {
+    const grid = this.grid;
     const resolvedCellExclusions = cellExclusions ?? createCellExclusions({ numCells: this.shape.numGridCells });
-    return handler.initialize(this.grid, resolvedCellExclusions, this.shape, state);
+    const resolvedState = state ?? createStateAllocator(grid);
+    return handler.initialize(grid, resolvedCellExclusions, this.shape, resolvedState);
   }
 
   createGrid({ fill = this.lookupTables.allValues } = {}) {
@@ -126,6 +128,25 @@ export const createAccumulator = () => {
     addForCell(cell) {
       touched.add(cell);
     },
+  };
+};
+
+export const createStateAllocator = (grid, startOffset = grid.length) => {
+  let nextOffset = startOffset;
+  return {
+  allocate(state) {
+    const offset = nextOffset;
+    if (grid.set) {
+      if (offset + state.length > grid.length) {
+        throw new Error('Typed test grid is too small for state allocation');
+      }
+      grid.set(state, offset);
+    } else {
+      for (let i = 0; i < state.length; i++) grid[offset + i] = state[i];
+    }
+    nextOffset += state.length;
+    return offset;
+  },
   };
 };
 
