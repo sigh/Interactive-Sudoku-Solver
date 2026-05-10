@@ -841,14 +841,21 @@ export class SudokuBuilder {
   }
 
   static *_yieldOr(branches) {
-    const nonEmpty = branches.filter(b => b.length > 0);
-    if (nonEmpty.length === 0) return;
-    if (nonEmpty.length === 1) {
-      yield* nonEmpty[0];
+    if (branches.length === 0) {
+      yield new HandlerModule.False();
+      return;
+    }
+    if (branches.length === 1) {
+      yield* branches[0];
+      return;
+    }
+
+    // If any branch is empty (logically true), the whole Or is true.
+    if (branches.some(b => b.length === 0)) {
       return;
     }
     yield new HandlerModule.Or(
-      ...nonEmpty.map(b => this._wrapAnd(b)));
+      ...branches.map(b => this._wrapAnd(b)));
   }
 
   static * _doppelgangerHandlers(shape, constraintMap) {

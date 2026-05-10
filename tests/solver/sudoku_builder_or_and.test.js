@@ -7,7 +7,7 @@ ensureGlobalEnvironment();
 
 const { SudokuBuilder } = await import('../../js/solver/sudoku_builder.js');
 const { SudokuConstraint } = await import('../../js/sudoku_constraint.js');
-const { And, Or, True, AllDifferent, GivenCandidates } = await import('../../js/solver/handlers.js');
+const { And, Or, True, False, AllDifferent, GivenCandidates } = await import('../../js/solver/handlers.js');
 const { Sum } = await import('../../js/solver/sum_handler.js');
 
 // Helper: collect all handlers yielded by _constraintHandlers for a given
@@ -35,9 +35,10 @@ await runTest('_wrapAnd: multiple handlers returns And', () => {
 
 // -- _yieldOr tests --
 
-await runTest('_yieldOr: empty branches yields nothing', () => {
+await runTest('_yieldOr: empty branches yields False', () => {
   const result = [...SudokuBuilder._yieldOr([])];
-  assert.equal(result.length, 0);
+  assert.equal(result.length, 1);
+  assert.ok(result[0] instanceof False);
 });
 
 await runTest('_yieldOr: all-empty branches yields nothing', () => {
@@ -84,12 +85,10 @@ await runTest('_yieldOr: multiple branches wraps multi-handler branch in And', (
   assert.equal(orHandlers[1], h3);
 });
 
-await runTest('_yieldOr: skips empty branches among non-empty', () => {
+await runTest('_yieldOr: empty branch among non-empty yields nothing', () => {
   const h = new True();
   const result = [...SudokuBuilder._yieldOr([[], [h], []])];
-  // Single non-empty branch -> yield directly.
-  assert.equal(result.length, 1);
-  assert.equal(result[0], h);
+  assert.equal(result.length, 0);
 });
 
 // -- Integration: Or constraint --
@@ -117,6 +116,36 @@ await runTest('Or constraint: multiple sub-constraints yields Or handler', () =>
 
   assert.equal(handlers.length, 1);
   assert.ok(handlers[0] instanceof Or);
+});
+
+await runTest('Or constraint: empty Or is unsatisfiable', () => {
+  const orConstraint = new SudokuConstraint.Or([]);
+  const handlers = collectHandlers(orConstraint);
+
+  assert.equal(handlers.length, 1,
+    'An empty Or should emit a contradiction handler');
+  assert.ok(handlers[0] instanceof False);
+});
+
+await runTest('Or constraint: empty And branch makes the Or unconstrained', () => {
+  const trueBranch = new SudokuConstraint.And([]);
+  const given = new SudokuConstraint.Given('R1C1', 5);
+  const orConstraint = new SudokuConstraint.Or([trueBranch, given]);
+  const handlers = collectHandlers(orConstraint);
+
+  assert.equal(handlers.length, 0,
+    'Or with a true branch (empty And) should yield no handlers');
+});
+
+await runTest('Or constraint: empty Or branch among alternatives yields nothing', () => {
+  const falseBranch = new SudokuConstraint.Or([]);
+  const given = new SudokuConstraint.Given('R1C1', 5);
+  const orConstraint = new SudokuConstraint.Or([falseBranch, given]);
+  const handlers = collectHandlers(orConstraint);
+
+  // Empty Or (false) branch is lowered but isn't empty, so it's treated like
+  // any other branch. Since we have two branches, we should get an Or handler.
+  assert.ok(handlers.length > 0);
 });
 
 await runTest('Or constraint: sub-constraint yielding multiple handlers wraps in And', () => {

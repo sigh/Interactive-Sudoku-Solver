@@ -117,11 +117,10 @@ export class True extends SudokuConstraintHandler {
 }
 
 export class False extends SudokuConstraintHandler {
-  constructor(cells) {
-    // The cells with which to associate the failure.
+  constructor(cells = []) {
+    // The cells with which to associate the failure, when there are meaningful
+    // culprit cells. A zero-cell False is still effective during initialization.
     super(cells);
-
-    if (cells.length === 0) throw new Error('False needs cells to be effective.');
   }
 
   initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
