@@ -743,3 +743,29 @@ await runTest('encodedNFAToJsSpec converts encoded NFA to JS spec', () => {
 });
 
 logSuiteComplete('NFA serialize');
+
+// ============================================================================
+// Container getCells
+// ============================================================================
+
+await runTest('Container.getCells collects cells from child constraints', () => {
+  const shape = GridShape.fromGridSize(9);
+  
+  // Create constraints with specific cells
+  const given1 = new SudokuConstraint.Given('R1C1', 5);
+  const given2 = new SudokuConstraint.Given('R2C2', 7);
+  
+  // Create a container with these constraints
+  const container = new SudokuConstraint.Container([given1, given2]);
+  
+  // getCells should collect cells from child constraints
+  const cells = container.getCells(shape);
+  
+  // Both constraints should contribute their cells
+  assert.ok(Array.isArray(cells));
+  assert.equal(cells.length, 2);
+  // The cells array should contain the cell IDs from child constraints
+  // (Given stores cell as a parsed ID, likely a string like 'R1C1')
+  assert.equal(cells[0], 'R1C1');
+  assert.equal(cells[1], 'R2C2');
+});

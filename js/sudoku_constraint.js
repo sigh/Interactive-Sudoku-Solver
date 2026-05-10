@@ -556,7 +556,7 @@ export class SudokuConstraint {
     }
 
     getCells(shape) {
-      return this.constraints.flatMap(c => c.cells(shape));
+      return this.constraints.flatMap(c => c.getCells(shape));
     }
   }
 
