@@ -719,7 +719,7 @@ export class SudokuBuilder {
         case 'Quad':
           yield new HandlerModule.RequiredValues(
             SudokuConstraint.Quad.cells(
-              constraint.topLeftCell).map(c => shape.parseCellId(c).cell),
+              constraint.topLeftCell, shape).map(c => shape.parseCellId(c).cell),
             constraint.values.map(v => +v),
             /* strict = */ false);
           break;

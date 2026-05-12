@@ -6,6 +6,7 @@ import { runTest, runTestCases, logSuiteComplete } from '../helpers/test_runner.
 ensureGlobalEnvironment();
 
 const { SudokuBuilder } = await import('../../js/solver/sudoku_builder.js');
+const { SudokuParser } = await import('../../js/sudoku_parser.js');
 const { SudokuConstraint, SudokuConstraintBase } = await import('../../js/sudoku_constraint.js');
 const HandlerModule = await import('../../js/solver/handlers.js');
 const SumHandlerModule = await import('../../js/solver/sum_handler.js');
@@ -243,6 +244,18 @@ await runTest('Renban produces BinaryPairwise handler', () => {
   ]);
   const handlers = buildHandlers(constraint);
   assert.ok(hasHandler(handlers, 'BinaryPairwise'));
+});
+
+await runTest('Quad supports var-cell 2x2 squares', () => {
+  const constraint = SudokuParser.parseString(
+    '.Var~X~X~81.BlackDot~VX1~VX2~VX3~VX10.Quad~VX13~1~2~3~4');
+  const handlers = buildHandlers(constraint);
+  const requiredHandlers = handlers.filter(h =>
+    h instanceof HandlerModule.RequiredValues &&
+    h.values().join(',') === '1,2,3,4');
+
+  assert.equal(requiredHandlers.length, 1);
+  assert.deepEqual([...requiredHandlers[0].cells], [93, 94, 102, 103]);
 });
 
 await runTest('Between produces Between handler', () => {

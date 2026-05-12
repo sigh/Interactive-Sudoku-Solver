@@ -694,8 +694,9 @@ ConstraintCategoryInput.LinesAndSets = class LinesAndSets extends ConstraintCate
       const values = valuesStr.split(/[, ]+/).map(v => +v).filter(
         v => Number.isInteger(v) && v >= this._shape.minValue() && v <= this._shape.maxValue());
       if (values.length) {
-        cells.sort();
-        const constraint = new SudokuConstraint.Quad(cells[0], ...values);
+        const topLeftCell = this._shape.makeCellIdFromIndex(Math.min(
+          ...cells.map(c => this._shape.parseCellId(c).cell)));
+        const constraint = new SudokuConstraint.Quad(topLeftCell, ...values);
         this.collection.addConstraint(constraint);
       }
     } else if (

@@ -142,6 +142,25 @@ const createMockInputManager = () => {
   };
 };
 
+const withMockFormData = (fn) => {
+  const originalFormData = globalThis.FormData;
+  globalThis.FormData = class MockFormData {
+    constructor(form) {
+      this._form = form;
+    }
+
+    get(name) {
+      return this._form[name]?.value ?? null;
+    }
+  };
+
+  try {
+    fn();
+  } finally {
+    globalThis.FormData = originalFormData;
+  }
+};
+
 // Helper: create a GivenCandidates instance with a shape applied.
 const createGivenCandidates = (shape) => {
   const collection = createMockCollection();
@@ -359,6 +378,36 @@ await runTest('_inputDigit: independent cells do not interfere', () => {
   assert.equal(collection.constraints.length, 2);
   assert.deepEqual(gc._getCellValues('R1C1'), [3]);
   assert.deepEqual(gc._getCellValues('R2C2'), [7]);
+});
+
+await runTest('LinesAndSets._handleSelection: Quad finds var-cell top-left numerically', () => {
+  const shape = GridShape.fromGridSize(9);
+  shape._varCellRegistry.addGroups([
+    { prefix: 'VX', label: 'vars', count: 81 },
+  ]);
+  const collection = createMockCollection();
+  const linesAndSets = Object.create(ConstraintCategoryInput.LinesAndSets.prototype);
+  linesAndSets.collection = collection;
+  linesAndSets._shape = shape;
+  linesAndSets._updateCallback = () => { };
+  linesAndSets._typeMap = new Map([
+    [SudokuConstraint.Quad.name, { elem: { disabled: false } }],
+  ]);
+  const selectionForm = {
+    'constraint-type': { value: SudokuConstraint.Quad.name },
+    'Quad-value': { value: '1 2 3 4' },
+  };
+  const inputManager = {
+    getSelection: () => ['VX11', 'VX12', 'VX2', 'VX3'],
+    setSelection: () => { },
+  };
+
+  withMockFormData(() => {
+    linesAndSets._handleSelection(selectionForm, inputManager);
+  });
+
+  assert.equal(collection.constraints.length, 1);
+  assert.equal(collection.constraints[0].topLeftCell, 'VX2');
 });
 
 logSuiteComplete('ConstraintCategoryInput.GivenCandidates');

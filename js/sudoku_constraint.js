@@ -5,7 +5,7 @@ const {
   groupSortedBy,
   Base64Codec
 } = await import('./util.js' + self.VERSION_PARAM);
-const { GridShape, SHAPE_9x9, SHAPE_MAX } = await import('./grid_shape.js' + self.VERSION_PARAM);
+const { GridShape, CellGraph, SHAPE_9x9, SHAPE_MAX } = await import('./grid_shape.js' + self.VERSION_PARAM);
 const { NFASerializer, javascriptSpecToNFA, nfaToJavascriptSpec } = await import('./nfa_builder.js' + self.VERSION_PARAM);
 
 export class CellArgs {
@@ -2172,19 +2172,32 @@ export class SudokuConstraint {
       return `Quad (${this.values.join(',')})`;
     }
 
-    static cells(topLeftCell) {
-      const shape = SHAPE_MAX;
-      const { row, col } = shape.parseCellId(topLeftCell);
+    static cells(topLeftCell, shape = SHAPE_MAX) {
+      const graph = shape.cellGraph();
+      const { cell } = shape.parseCellId(topLeftCell);
+      const topRight = graph.adjacent(cell, CellGraph.RIGHT);
+      const bottomLeft = graph.adjacent(cell, CellGraph.DOWN);
+      const bottomRightFromTop = topRight === null
+        ? null : graph.adjacent(topRight, CellGraph.DOWN);
+      const bottomRightFromLeft = bottomLeft === null
+        ? null : graph.adjacent(bottomLeft, CellGraph.RIGHT);
+
+      if (topRight === null || bottomLeft === null ||
+        bottomRightFromTop === null ||
+        bottomRightFromTop !== bottomRightFromLeft) {
+        throw new Error('Invalid 2x2 square starting at cell ID: ' + topLeftCell);
+      }
+
       return [
-        topLeftCell,
-        shape.makeCellId(row, col + 1),
-        shape.makeCellId(row + 1, col),
-        shape.makeCellId(row + 1, col + 1),
-      ];
+        cell,
+        topRight,
+        bottomLeft,
+        bottomRightFromTop,
+      ].map(c => shape.makeCellIdFromIndex(c));
     }
 
     getCells(shape) {
-      return this.constructor.cells(this.topLeftCell);
+      return this.constructor.cells(this.topLeftCell, shape);
     }
   }
 
