@@ -7,6 +7,13 @@ ensureGlobalEnvironment();
 
 const { SudokuBuilder } = await import('../../js/solver/sudoku_builder.js');
 const { SudokuConstraint } = await import('../../js/sudoku_constraint.js');
+const { GridShape } = await import('../../js/grid_shape.js');
+const { SudokuSolver, HandlerSet } = await import('../../js/solver/engine.js');
+const {
+  SudokuConstraintHandler,
+  AllDifferent,
+  UniqueValueExclusion,
+} = await import('../../js/solver/handlers.js');
 
 // ============================================================================
 // Test Data
@@ -30,7 +37,7 @@ const makeEasyClassicConstraint = () => {
   );
 };
 
-const EASY_SOLUTION = [5,3,4,6,7,8,9,1,2,6,7,2,1,9,5,3,4,8,1,9,8,3,4,2,5,6,7,8,5,9,7,6,1,4,2,3,4,2,6,8,5,3,7,9,1,7,1,3,9,2,4,8,5,6,9,6,1,5,3,7,2,8,4,2,8,7,4,1,9,6,3,5,3,4,5,2,8,6,1,7,9];
+const EASY_SOLUTION = [5, 3, 4, 6, 7, 8, 9, 1, 2, 6, 7, 2, 1, 9, 5, 3, 4, 8, 1, 9, 8, 3, 4, 2, 5, 6, 7, 8, 5, 9, 7, 6, 1, 4, 2, 3, 4, 2, 6, 8, 5, 3, 7, 9, 1, 7, 1, 3, 9, 2, 4, 8, 5, 6, 9, 6, 1, 5, 3, 7, 2, 8, 4, 2, 8, 7, 4, 1, 9, 6, 3, 5, 3, 4, 5, 2, 8, 6, 1, 7, 9];
 
 // 4x4 with one given — has multiple solutions.
 const makeMultiSolutionConstraint = () => {
@@ -55,6 +62,17 @@ const makeContradictoryConstraint = () => {
 const buildSolver = (constraint, debugOptions) => {
   return SudokuBuilder.build(constraint, debugOptions);
 };
+
+class ExtraStateHandler extends SudokuConstraintHandler {
+  constructor() {
+    super([0]);
+  }
+
+  initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
+    stateAllocator.allocate([0]);
+    return true;
+  }
+}
 
 // ============================================================================
 // countSolutions
@@ -219,6 +237,13 @@ await runTest('nthStep returns null for contradictory puzzle', () => {
   }
 });
 
+await runTest('nthStep debug logs support extra solver state', () => {
+  const shape = GridShape.fromGridSize(9);
+  const solver = new SudokuSolver([new ExtraStateHandler()], shape, { logLevel: 1 });
+  const step = solver.nthStep(0, new Map());
+  assert.ok(step);
+});
+
 // ============================================================================
 // state()
 // ============================================================================
@@ -281,13 +306,6 @@ logSuiteComplete('SudokuSolver Engine');
 // ============================================================================
 // HandlerSet
 // ============================================================================
-
-const { HandlerSet } = await import('../../js/solver/engine.js');
-const {
-  SudokuConstraintHandler,
-  AllDifferent,
-  UniqueValueExclusion,
-} = await import('../../js/solver/handlers.js');
 
 const NUM_SEARCH_CELLS = 81;
 

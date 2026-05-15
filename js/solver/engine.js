@@ -8,7 +8,6 @@ const {
   setPeek
 } = await import('../util.js' + self.VERSION_PARAM);
 const { LookupTables } = await import('./lookup_tables.js' + self.VERSION_PARAM);
-const { SHAPE_MAX } = await import('../grid_shape.js' + self.VERSION_PARAM);
 const { SudokuConstraintOptimizer } = await import('./optimizer.js' + self.VERSION_PARAM);
 const { CandidateSelector, SamplingCandidateSelector, ConflictScores, SeenCandidateSet } = await import('./candidate_selector.js' + self.VERSION_PARAM);
 const HandlerModule = await import('./handlers.js' + self.VERSION_PARAM);
@@ -373,6 +372,8 @@ class InternalSolver {
     this._cellPriorities = this._initCellPriorities();
 
     this._recStack = this._initStack();
+    this._debugValueBuffer = new Uint16Array(this._numSearchCells);
+    this._debugGridBuffer = new Uint16Array(this._initialGridState.length);
 
     this.reset();
   }
@@ -544,7 +545,6 @@ class InternalSolver {
     this._state = InternalSolver.STATE_UNSTARTED;
   }
 
-  static _debugValueBuffer = new Uint16Array(SHAPE_MAX.numGridCells);
   getStackTrace() {
     const s = this._state;
     if (s === InternalSolver.STATE_UNSTARTED ||
@@ -553,7 +553,7 @@ class InternalSolver {
 
     const stackFrame = this._currentRecFrame;
     const cellDepth = stackFrame.cellDepth;
-    const values = this.constructor._debugValueBuffer.subarray(0, cellDepth);
+    const values = this._debugValueBuffer.subarray(0, cellDepth);
 
     const cells = this._candidateSelector.getCellOrder(cellDepth);
     const offset = this._shape.valueOffset;
@@ -580,10 +580,8 @@ class InternalSolver {
     this._sampleSolution[0] = 0;
   }
 
-  static _debugGridBuffer = new Uint16Array(SHAPE_MAX.numGridCells);
-
   _debugEnforceConsistency(loc, gridState, handler, handlerAccumulator) {
-    const oldGridState = this.constructor._debugGridBuffer.subarray(0, gridState.length);
+    const oldGridState = this._debugGridBuffer.subarray(0, gridState.length);
     oldGridState.set(gridState);
 
     const result = handler.enforceConsistency(gridState, handlerAccumulator);
