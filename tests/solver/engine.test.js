@@ -12,6 +12,7 @@ const { SudokuSolver, HandlerSet } = await import('../../js/solver/engine.js');
 const {
   SudokuConstraintHandler,
   AllDifferent,
+  Priority,
   UniqueValueExclusion,
 } = await import('../../js/solver/handlers.js');
 
@@ -70,6 +71,24 @@ class ExtraStateHandler extends SudokuConstraintHandler {
 
   initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
     stateAllocator.allocate([0]);
+    return true;
+  }
+}
+
+class FixedPriorityHandler extends SudokuConstraintHandler {
+  constructor(cells, priority) {
+    super(cells);
+    this._priority = priority;
+  }
+
+  priority() {
+    return this._priority;
+  }
+}
+
+class WatchedCellExpandingHandler extends FixedPriorityHandler {
+  initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
+    this.cells = Uint8Array.from([0, 2]);
     return true;
   }
 }
@@ -278,6 +297,36 @@ await runTest('state() counters include expected fields', () => {
   assert.equal(typeof counters.guesses, 'number');
   assert.equal(typeof counters.solutions, 'number');
   assert.equal(typeof counters.constraintsProcessed, 'number');
+});
+
+// ============================================================================
+// Cell priorities
+// ============================================================================
+
+await runTest('cell priorities sum handler priorities and apply explicit overrides', () => {
+  const shape = GridShape.fromGridSize(2);
+  const solver = new SudokuSolver([
+    new FixedPriorityHandler([0, 1], 4),
+    new FixedPriorityHandler([1, 2], 3),
+    new Priority([1, 3], 12),
+  ], shape);
+
+  const priorities = solver._internalSolver._cellPriorities;
+  assert.equal(priorities[0], 4);
+  assert.equal(priorities[1], 12);
+  assert.equal(priorities[2], 3);
+  assert.equal(priorities[3], 12);
+});
+
+await runTest('cell priorities are computed before initialization expands watched cells', () => {
+  const shape = GridShape.fromGridSize(2);
+  const solver = new SudokuSolver([
+    new WatchedCellExpandingHandler([0], 5),
+  ], shape);
+
+  const priorities = solver._internalSolver._cellPriorities;
+  assert.equal(priorities[0], 5);
+  assert.equal(priorities[2], 0);
 });
 
 // ============================================================================

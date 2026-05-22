@@ -67,7 +67,7 @@ export class SudokuConstraintHandler {
   // results if the handler is used from within an Or constraint.
   postInitialize(readonlyGridState) { }
 
-  priority() {
+  priority(shape) {
     // By default, constraints which constrain more cells have higher priority.
     return this.cells.length;
   }

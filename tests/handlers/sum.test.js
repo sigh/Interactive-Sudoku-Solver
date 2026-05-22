@@ -41,6 +41,13 @@ const initializeSum = (options = {}) => {
   return { handler, context: resolvedContext };
 };
 
+await runTest('Sum priority can be computed before initialization', () => {
+  const shape = GridShape.fromGridSize(4);
+  const handler = new Sum([0, 1, 2], 6);
+
+  assert.equal(handler.priority(shape), 5);
+});
+
 await runTest('Sum should force a unique combination once candidates align', () => {
   const { handler, context } = initializeSum({ numCells: 4, sum: 14 });
   const grid = applyCandidates(context.grid, {

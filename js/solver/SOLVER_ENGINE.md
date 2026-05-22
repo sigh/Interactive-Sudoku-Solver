@@ -34,16 +34,18 @@ solving occurs:
    [optimizer.js](optimizer.js)) analyzes the handler set and adds derived
    handlers that are logically implied by the existing ones. This doesn't
    change the solution set but makes propagation more effective.
-4. **Add singleton value-exclusion handlers** — each search cell gets the
+4. **Compute cell priorities** — `SudokuConstraintOptimizer.computeCellPriorities()`
+  computes the initial priority scores used by search.
+5. **Add singleton value-exclusion handlers** — each search cell gets the
     fixed-value exclusion propagation used when a cell becomes known.
-5. **Initialize all handlers** — each handler's `initialize()` method can
+6. **Initialize all handlers** — each handler's `initialize()` method can
    modify the initial candidate bitmasks (e.g., a Given handler removes all
    but one candidate) and allocate extra state slots that will be
    saved/restored during backtracking.
-6. **Run `postInitialize()` on all handlers** — handlers can inspect the full
+7. **Run `postInitialize()` on all handlers** — handlers can inspect the full
    initialized state, but must not mutate it.
-7. **Set up propagation, candidate selection, priorities, and the search
-   stack** — these structures are reused across runs of the same solver.
+8. **Set up propagation, candidate selection, and the search stack** — these
+  structures are reused across runs of the same solver.
 
 ## Cell Candidates as Bitmasks
 

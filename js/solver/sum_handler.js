@@ -117,10 +117,10 @@ export class Sum extends SudokuConstraintHandler {
     return this._rawSum;
   }
 
-  priority() {
+  priority(shape) {
     // We want smaller cages to have higher priority, but we still want all sums
     // to have a high priority.
-    const numValues = this._sumData.numValues;
+    const numValues = shape.numValues;
     return Math.max(numValues * 2 - this.cells.length, numValues);
   }
 

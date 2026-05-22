@@ -85,6 +85,44 @@ export class SudokuConstraintOptimizer {
     this._logStats(handlerSet);
   }
 
+  // Cell priorities are used to determine the order in which cells are
+  // searched with preference given to cells with higher priority.
+  computeCellPriorities(handlerSet, shape) {
+    const priorities = new Int32Array(shape.totalCells());
+
+    // TODO: Determine priorities in a more principled way.
+    //  - Add one for each exclusion cell.
+    //  - Add custom priorities for each constraint based on how restrictive it
+    //    is.
+
+    for (const handler of handlerSet) {
+      const priority = handler.priority(shape);
+      for (const cell of handler.cells) {
+        priorities[cell] += priority;
+      }
+    }
+
+    for (const handler of handlerSet.getAllofType(HandlerModule.Priority)) {
+      for (const cell of handler.priorityCells()) {
+        priorities[cell] = handler.priority(shape);
+      }
+    }
+
+    if (this._debugLogger) {
+      this._debugLogger.log({
+        loc: 'computeCellPriorities',
+        msg: 'Hover for values',
+        args: {
+          min: Math.min(...priorities),
+          max: Math.max(...priorities),
+        },
+        overlay: priorities,
+      });
+    }
+
+    return priorities;
+  }
+
   _optimizeNonSquareGrids(handlerSet, boxRegions, shape) {
     // For non-square grids without boxes, one axis forms houses
     // and the other axis has numValues lines of length K < numValues.

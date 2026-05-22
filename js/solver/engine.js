@@ -369,51 +369,11 @@ class InternalSolver {
     this._candidateSelector = new CandidateSelector(
       shape, this._numSearchCells, this._handlerSet, debugLogger);
 
-    this._cellPriorities = this._initCellPriorities();
-
     this._recStack = this._initStack();
     this._debugValueBuffer = new Uint16Array(this._numSearchCells);
     this._debugGridBuffer = new Uint16Array(this._initialGridState.length);
 
     this.reset();
-  }
-
-  // Cell priorities are used to determine the order in which cells are
-  // searched with preference given to cells with higher priority.
-  _initCellPriorities() {
-    const priorities = new Int32Array(this._numSearchCells);
-
-    // TODO: Determine priorities in a more principled way.
-    //  - Add one for each exclusion cell.
-    //  - Add custom priorities for each constraint based on how restrictive it
-    //    is.
-
-    for (const handler of this._handlerSet) {
-      const priority = handler.priority();
-      for (const cell of handler.cells) {
-        priorities[cell] += priority;
-      }
-    }
-
-    for (const handler of this._handlerSet.getAllofType(HandlerModule.Priority)) {
-      for (const cell of handler.priorityCells()) {
-        priorities[cell] = handler.priority();
-      }
-    }
-
-    if (this._debugLogger.enableLogs) {
-      this._debugLogger.log({
-        loc: '_initCellPriorities',
-        msg: 'Hover for values',
-        args: {
-          min: Math.min(...priorities),
-          max: Math.max(...priorities),
-        },
-        overlay: priorities,
-      });
-    }
-
-    return priorities;
   }
 
   _setUpHandlers(handlers) {
@@ -458,8 +418,12 @@ class InternalSolver {
       handlerSet, this._numSearchCells);
 
     // Optimize handlers.
-    new SudokuConstraintOptimizer(this._debugLogger).optimize(
-      handlerSet, cellExclusions, this._shape);
+    const optimizer = new SudokuConstraintOptimizer(this._debugLogger);
+    optimizer.optimize(handlerSet, cellExclusions, this._shape);
+
+    this._cellPriorities = optimizer.computeCellPriorities(
+      handlerSet,
+      this._shape);
 
     // Add the exclusion handlers for all search cells.
     for (let i = 0; i < this._numSearchCells; i++) {
