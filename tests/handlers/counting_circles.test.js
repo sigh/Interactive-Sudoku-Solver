@@ -67,6 +67,16 @@ await runTest('exact count fixes cells', () => {
   assert.equal(grid[1], valueMask(2));
 });
 
+await runTest('throws with more than 16 exclusion groups', () => {
+  const context = new GridTestContext({ gridSize: 9, numValues: 9 });
+  const cells = Array.from({ length: 17 }, (_, i) => i);
+  const handler = new CountingCircles(cells);
+
+  assert.throws(() => {
+    context.initializeHandler(handler, { cellExclusions: noExclusions(context.shape.numGridCells) });
+  }, { name: 'Error' });
+});
+
 // Offset (0-indexed) tests
 // =============================================================================
 

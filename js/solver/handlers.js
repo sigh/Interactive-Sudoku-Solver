@@ -2744,6 +2744,10 @@ export class CountingCircles extends SudokuConstraintHandler {
 
     const exclusionGroups = HandlerUtil.findExclusionGroups(
       this.cells, cellExclusions).groups;
+    if (exclusionGroups.length > 16) {
+      throw new Error(
+        `CountingCircles supports cells spanning up to 16 regions, got ${exclusionGroups.length}`);
+    }
 
     // Restrict values to the possible sums.
     // We can't have more values than exclusion groups.

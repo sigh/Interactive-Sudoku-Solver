@@ -172,6 +172,27 @@ await runTest('Sum should split a 16-cell exclusion group correctly', () => {
   assert.equal(grid[14], valueMask(15));
 });
 
+await runTest('Sum should split more than 16 singleton exclusion groups', () => {
+  const longContext = new GridTestContext({ gridSize: [2, 16] });
+  const numCells = longContext.shape.numGridCells;
+  const { handler, context } = initializeSum({
+    numCells: 17,
+    sum: 17,
+    context: longContext,
+    cellExclusions: createCellExclusions({ allUnique: false, numCells }),
+  });
+
+  assert.ok(handler._coeffGroups.every(g => g.cells.length <= 15));
+  assert.ok(handler._coeffGroups.every(g => g.exclusionGroups.length <= 15));
+
+  const assignments = {};
+  for (const cell of context.cells(17)) assignments[cell] = [1];
+  const grid = applyCandidates(context.grid, assignments);
+
+  const result = handler.enforceConsistency(grid, createAccumulator());
+  assert.equal(result, true, 'handler should solve after splitting singleton groups');
+});
+
 await runTest('Sum should restrict values based on complement cells', () => {
   const context = new GridTestContext();
   const complementCells = context.cells(10).slice(2);

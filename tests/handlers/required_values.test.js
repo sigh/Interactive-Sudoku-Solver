@@ -267,6 +267,21 @@ await runTest('RequiredValues initialize: accepts count == maxGroups', () => {
     'initialize should return true when count == number of exclusion groups');
 });
 
+await runTest('RequiredValues initialize: accepts more than 16 singleton exclusion groups', () => {
+  const context = new GridTestContext({ gridSize: [2, 16] });
+  const cells = context.cells(17);
+  const handler = new RequiredValues(cells, Array(17).fill(1), /* strict */ true);
+  const result = context.initializeHandler(handler, {
+    cellExclusions: createCellExclusions({
+      allUnique: false,
+      numCells: context.shape.numGridCells,
+    }),
+  });
+
+  assert.equal(result, true,
+    'initialize should use exclusion group count without packing it into a 16-bit mask');
+});
+
 // ===========================================================================
 // Tests – Offset (0-indexed) value translation
 // ===========================================================================
