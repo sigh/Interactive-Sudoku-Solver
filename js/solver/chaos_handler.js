@@ -1,6 +1,13 @@
 const { LookupTables } = await import('./lookup_tables.js' + self.VERSION_PARAM);
 const { SudokuConstraintHandler, InvalidConstraintError } = await import('./handlers.js' + self.VERSION_PARAM);
 
+const DEFER_CONNECTIVITY = 2;
+const REGION_POSSIBLE_COUNT_MASK = 0x1ff;
+const REGION_FIXED_COUNT_SHIFT = 9;
+const REGION_FIXED_COUNT_MASK = 0x1f;
+const REGION_VALUE_MASK_SHIFT = 14;
+const REGION_COUNT_MASK = (1 << REGION_VALUE_MASK_SHIFT) - 1;
+
 export class ChaosConstruction extends SudokuConstraintHandler {
   static _NO_CELL = 0xffff;
 
@@ -116,11 +123,10 @@ export class ChaosConstruction extends SudokuConstraintHandler {
     }
     this._neighbors = neighbors;
 
-    // Per-region scan summaries. `_possibleCounts` and `_possibleValueMasks`
-    // are reused as hidden-single scratch after scan validation consumes them.
-    this._fixedCounts = new Uint16Array(this._numRegions);
-    this._possibleCounts = new Uint16Array(this._numRegions);
-    this._possibleValueMasks = new Uint16Array(this._numRegions);
+    // Packed per-region scan summary: possible cell weight, fixed cell weight,
+    // and possible value mask. The value-mask lane is reused by hidden singles.
+    this._regionScanData = new Uint32Array(this._numRegions);
+    this._regionScratchCounts = new Uint16Array(this._numRegions);
     this._fixedValueMasks = new Uint16Array(this._numRegions);
     // Traversal scratch; `_rootScratch` also stores hidden-single witness roots.
     this._componentStack = new Uint8Array(numGridCells);
@@ -396,7 +402,7 @@ export class ChaosConstruction extends SudokuConstraintHandler {
     const visitMarks = this._visitMarks;
     const rootsByDistance = this._rootScratch;
     // Connectivity runs after possible-count summaries have been consumed.
-    const rootCountsByDistance = this._possibleCounts;
+    const rootCountsByDistance = this._regionScratchCounts;
     const shardSizes = this._regionShardSizes;
     const nextCells = this._regionShardNextCells;
     const numGridCells = this._numGridCells;
@@ -572,13 +578,9 @@ export class ChaosConstruction extends SudokuConstraintHandler {
   }
 
   _scanRegionCandidates(grid) {
-    const fixedCounts = this._fixedCounts;
-    const possibleCounts = this._possibleCounts;
-    const possibleValueMasks = this._possibleValueMasks;
+    const regionScanData = this._regionScanData;
     const fixedValueMasks = this._fixedValueMasks;
-    fixedCounts.fill(0);
-    possibleCounts.fill(0);
-    possibleValueMasks.fill(0);
+    regionScanData.fill(0);
     fixedValueMasks.fill(0);
 
     const numGridCells = this._numGridCells;
@@ -602,8 +604,12 @@ export class ChaosConstruction extends SudokuConstraintHandler {
 
       if (!(regionMask & (regionMask - 1))) {
         const region = 31 - Math.clz32(regionMask);
-        possibleValueMasks[region] |= shardValueMask;
-        fixedCounts[region] += shardSize;
+        let scanData = regionScanData[region] | (shardValueMask << REGION_VALUE_MASK_SHIFT);
+        const fixedCount = ((scanData >>> REGION_FIXED_COUNT_SHIFT)
+          & REGION_FIXED_COUNT_MASK) + shardSize;
+        if (fixedCount > this._regionSize) return false;
+        regionScanData[region] = (scanData & ~(REGION_FIXED_COUNT_MASK << REGION_FIXED_COUNT_SHIFT))
+          | (fixedCount << REGION_FIXED_COUNT_SHIFT);
         const fixedValueMask = shardFixedValueMasks[root];
         if (fixedValueMask) {
           if (fixedValueMasks[region] & fixedValueMask) return false;
@@ -616,14 +622,14 @@ export class ChaosConstruction extends SudokuConstraintHandler {
           const regionBit = regionValues & -regionValues;
           regionValues ^= regionBit;
           const region = 31 - Math.clz32(regionBit);
-          possibleValueMasks[region] |= shardValueMask;
-          possibleCounts[region] += shardSize;
+          regionScanData[region] = (regionScanData[region]
+            | (shardValueMask << REGION_VALUE_MASK_SHIFT)) + shardSize;
         }
       }
     }
 
     for (let region = 0; region < numRegions; region++) {
-      const possibleCount = possibleCounts[region];
+      const possibleCount = regionScanData[region] & REGION_POSSIBLE_COUNT_MASK;
       // Dirty labels accumulate across local rescans until connectivity runs.
       if (grid[possibleCountCacheOffset + region] !== possibleCount) {
         connectivityDirtyRegionsMask |= 1 << region;
@@ -669,7 +675,7 @@ export class ChaosConstruction extends SudokuConstraintHandler {
     const stack = this._componentStack;
     const shardSizes = this._regionShardSizes;
     const shardMasks = this._regionShardScratchMasks;
-    const fixedCounts = this._fixedCounts;
+    const regionScanData = this._regionScanData;
     const fixedValueMasks = this._fixedValueMasks;
     const visitMarks = this._visitMarks;
     const regionSize = this._regionSize;
@@ -765,8 +771,12 @@ export class ChaosConstruction extends SudokuConstraintHandler {
 
     let bottleneckRegionsMask = this._connectivityDirtyRegionsMask;
     for (let region = 0; region < this._numRegions; region++) {
-      const fixedCount = fixedCounts[region];
-      if (fixedCount && fixedCount < regionSize) bottleneckRegionsMask |= 1 << region;
+      const fixedCount = (regionScanData[region] >>> REGION_FIXED_COUNT_SHIFT)
+        & REGION_FIXED_COUNT_MASK;
+      // Dirty labels always run; clean labels wait until regions are half-fixed.
+      if (fixedCount && fixedCount < regionSize && (fixedCount << 1) >= regionSize) {
+        bottleneckRegionsMask |= 1 << region;
+      }
     }
     if (!this._enforceFixedComponentBottlenecks(grid, shardMasks, bottleneckRegionsMask)) return false;
 
@@ -780,7 +790,7 @@ export class ChaosConstruction extends SudokuConstraintHandler {
 
   _enforceHiddenRegionValueSingles(
     grid, handlerAccumulator, checkRegionsMask, restrictedRegionsMask, hiddenDuplicateValueMasks) {
-    // Apply one precomputed shard-level witness after confirming the member cell.
+    // Apply at most one precomputed shard-level witness after confirming the member cell.
     const firstRootByRegionValue = this._rootScratch;
     const fixedValueMasks = this._fixedValueMasks;
     const nextCells = this._regionShardNextCells;
@@ -820,25 +830,19 @@ export class ChaosConstruction extends SudokuConstraintHandler {
           changed = true;
         }
         if (regionChanged) this._setRegionShardMask(grid, root, regionBit, handlerAccumulator);
-        if (changed || regionChanged) {
-          this._connectivityDirtyRegionsMask |= oldRegionMask | regionBit;
-          return true;
-        }
+        if (changed || regionChanged) return true;
       }
     }
 
-    return true;
+    return false;
   }
 
   _enforceRegionShardConsistency(grid, handlerAccumulator) {
     // Phase 2: scan summaries, prune shard labels, then use stable witnesses.
-    const fixedCounts = this._fixedCounts;
-    const possibleCounts = this._possibleCounts;
-    const possibleValueMasks = this._possibleValueMasks;
+    const regionScanData = this._regionScanData;
     const fixedValueMasks = this._fixedValueMasks;
-    // Hidden-single scratch lives between region scanning and connectivity.
-    const hiddenSeenValueMasks = possibleCounts;
-    const hiddenDuplicateValueMasks = possibleValueMasks;
+    // Hidden-single duplicate masks live here until connectivity reuses it.
+    const hiddenDuplicateValueMasks = this._regionScratchCounts;
     const firstRootByRegionValue = this._rootScratch;
     const shardSizes = this._regionShardSizes;
     const shardValueMasks = this._regionShardScratchMasks;
@@ -858,13 +862,16 @@ export class ChaosConstruction extends SudokuConstraintHandler {
       let hiddenRegionsMask = 0;
       for (let region = 0; region < this._numRegions; region++) {
         const regionBit = 1 << region;
-        const fixedCount = fixedCounts[region];
-        const possibleCount = possibleCounts[region];
+        const scanData = regionScanData[region];
+        const fixedCount = (scanData >>> REGION_FIXED_COUNT_SHIFT) & REGION_FIXED_COUNT_MASK;
+        const possibleCount = scanData & REGION_POSSIBLE_COUNT_MASK;
         if (fixedCount > regionSize || fixedCount + possibleCount < regionSize) return false;
-        if (possibleValueMasks[region] !== this._regionMask) return false;
+        if ((scanData >>> REGION_VALUE_MASK_SHIFT) !== this._regionMask) return false;
         if (fixedValueMasks[region]) fixedValueRegionsMask |= regionBit;
+        // Hidden singles are opportunistic; only enforce after regions are half-fixed
         if ((fixedCount << 1) >= regionSize && fixedValueMasks[region] !== this._regionMask) {
           hiddenRegionsMask |= regionBit;
+          regionScanData[region] = scanData & REGION_COUNT_MASK;
         }
         if (fixedCount === regionSize && possibleCount) {
           fullRegionsMask |= regionBit;
@@ -874,7 +881,6 @@ export class ChaosConstruction extends SudokuConstraintHandler {
       let changed = false;
       let hiddenRestrictedRegionsMask = 0;
       if (hiddenRegionsMask) {
-        hiddenSeenValueMasks.fill(0);
         hiddenDuplicateValueMasks.fill(0);
       }
       if (fullRegionsMask || fixedValueRegionsMask || hiddenRegionsMask) {
@@ -894,15 +900,16 @@ export class ChaosConstruction extends SudokuConstraintHandler {
                 candidateRegions ^= regionBit;
                 const region = 31 - Math.clz32(regionBit);
                 const valueBits = shardValueMask & ~fixedValueMasks[region];
-                let firstSeenValues = valueBits & ~hiddenSeenValueMasks[region];
+                const hiddenSeenValueMask = regionScanData[region] >>> REGION_VALUE_MASK_SHIFT;
+                let firstSeenValues = valueBits & ~hiddenSeenValueMask;
                 while (firstSeenValues) {
                   const valueBit = firstSeenValues & -firstSeenValues;
                   firstSeenValues ^= valueBit;
                   const valueIndex = 31 - Math.clz32(valueBit);
                   firstRootByRegionValue[region * regionSize + valueIndex] = root;
                 }
-                hiddenDuplicateValueMasks[region] |= hiddenSeenValueMasks[region] & valueBits;
-                hiddenSeenValueMasks[region] |= valueBits;
+                hiddenDuplicateValueMasks[region] |= hiddenSeenValueMask & valueBits;
+                regionScanData[region] |= valueBits << REGION_VALUE_MASK_SHIFT;
               }
             }
           }
@@ -934,9 +941,9 @@ export class ChaosConstruction extends SudokuConstraintHandler {
       if (changed) continue;
 
       if (hiddenRegionsMask) {
-        if (!this._enforceHiddenRegionValueSingles(
+        if (this._enforceHiddenRegionValueSingles(
           grid, handlerAccumulator, hiddenRegionsMask, hiddenRestrictedRegionsMask,
-          hiddenDuplicateValueMasks)) return false;
+          hiddenDuplicateValueMasks)) return DEFER_CONNECTIVITY;
       }
 
       return true;
@@ -950,11 +957,14 @@ export class ChaosConstruction extends SudokuConstraintHandler {
     if (!this._enforceCanonicalOrder(grid, handlerAccumulator)) return false;
     if (!this._enforceRegionShards(grid, handlerAccumulator)) return false;
 
-    if (!this._enforceRegionShardConsistency(grid, handlerAccumulator)) return false;
+    const shardConsistencyResult = this._enforceRegionShardConsistency(grid, handlerAccumulator);
+    if (!shardConsistencyResult) return false;
+    if (shardConsistencyResult === DEFER_CONNECTIVITY) {
+      return true;
+    }
 
     if (!this._enforceConnectivity(grid, handlerAccumulator)) return false;
 
-    this._connectivityDirtyRegionsMask = 0;
     return true;
   }
 }

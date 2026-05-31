@@ -58,6 +58,8 @@ const enforce = (context) => {
 const isFixedMask = mask => mask && !(mask & (mask - 1));
 
 const regionShardParent = (handler, grid, cell) => grid[handler._regionShardOffset + cell];
+const possibleRegionCount = (handler, region) => handler._regionScanData[region] & 0x1ff;
+const fixedRegionCount = (handler, region) => (handler._regionScanData[region] >>> 9) & 0x1f;
 
 const fullChaosGridIsValid = (shape, values, regions) => {
   const allValues = LookupTables.get(shape.numValues).allValues;
@@ -336,8 +338,8 @@ await runTest('ChaosConstruction connectivity cache tracks possible region candi
 
   assert.equal(handler._enforceRegionShards(grid, acc), true);
   assert.equal(handler._scanRegionCandidates(grid), true);
-  const previousPossibleCount = handler._possibleCounts[0];
-  const previousFixedCount = handler._fixedCounts[0];
+  const previousPossibleCount = possibleRegionCount(handler, 0);
+  const previousFixedCount = fixedRegionCount(handler, 0);
   handler._connectivityDirtyRegionsMask = 0;
 
   grid[regionCells[1]] = valueMask(1);
@@ -345,8 +347,8 @@ await runTest('ChaosConstruction connectivity cache tracks possible region candi
 
   assert.equal(handler._enforceRegionShards(grid, acc), true);
   assert.equal(handler._scanRegionCandidates(grid), true);
-  assert.equal(handler._possibleCounts[0], previousPossibleCount - 2);
-  assert.equal(handler._fixedCounts[0], previousFixedCount + 1);
+  assert.equal(possibleRegionCount(handler, 0), previousPossibleCount - 2);
+  assert.equal(fixedRegionCount(handler, 0), previousFixedCount + 1);
   assert.notEqual(handler._connectivityDirtyRegionsMask & valueMask(1), 0);
 });
 
