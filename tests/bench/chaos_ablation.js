@@ -9,12 +9,12 @@ const { SudokuSolver } = await import('../../js/solver/engine.js' + self.VERSION
 const { CandidateSelector } = await import('../../js/solver/candidate_selector.js' + self.VERSION_PARAM);
 const { SudokuConstraintOptimizer } = await import('../../js/solver/optimizer.js' + self.VERSION_PARAM);
 const { LookupTables } = await import('../../js/solver/lookup_tables.js' + self.VERSION_PARAM);
-const NFAModule = await import('../../js/solver/nfa_handler.js' + self.VERSION_PARAM);
 const {
   Priority,
   SudokuConstraintHandler,
 } = await import('../../js/solver/handlers.js' + self.VERSION_PARAM);
 const {
+  ChaosArrow,
   ChaosConstruction,
   ChaosFixedValueRegionExclusion,
 } = await import('../../js/solver/chaos_handler.js' + self.VERSION_PARAM);
@@ -2524,8 +2524,29 @@ const enforceRegionValuePairScanMasks = function () {
   return true;
 };
 
+const restrictCell = function (grid, cell, allowedMask, handlerAccumulator) {
+  const restrictedMask = grid[cell] & allowedMask;
+  if (!restrictedMask) return false;
+  if (restrictedMask !== grid[cell]) {
+    grid[cell] = restrictedMask;
+    this._changed = true;
+    handlerAccumulator.addForCell(cell);
+  }
+  return true;
+};
+
+const originalInitialize = ChaosConstruction.prototype.initialize;
+const initializeWithRegionCells = function (...args) {
+  const result = originalInitialize.call(this, ...args);
+  if (result) {
+    this._regionCells = Uint16Array.from(
+      { length: this._numGridCells }, (_, cell) => this._regionCellOffset + cell);
+  }
+  return result;
+};
+
 const originalMethods = {
-  initialize: ChaosConstruction.prototype.initialize,
+  initialize: initializeWithRegionCells,
   selectPriorityAnchorCells: ChaosConstruction.prototype.selectPriorityAnchorCells,
   _updateFixedRegionShards: ChaosConstruction.prototype._updateFixedRegionShards,
   _scanRegionCandidates: ChaosConstruction.prototype._scanRegionCandidates,
@@ -2534,6 +2555,7 @@ const originalMethods = {
   _enforceConnectivity: ChaosConstruction.prototype._enforceConnectivity,
   _enforceRegionValuePairs: enforceRegionValuePairScanMasks,
   priority: ChaosConstruction.prototype.priority,
+  _restrictCell: restrictCell,
   enforceConsistency: ChaosConstruction.prototype.enforceConsistency,
 };
 
@@ -3067,8 +3089,6 @@ const installWithoutFixedValueRegionSingletonHandlers = () => {
   SudokuConstraintOptimizer.prototype._addChaosFixedValueRegionExclusions = function () { };
 };
 
-const CHAOS_REGION_RUN_ENCODED_NFA = 'WgCKf8WMGjh5AiSJ_4UKFChQoUK_ooUKFChQoV-xQoUKFChQr7ihQoUKFChXvFChQoUKFCu-KFChQoUKFb8UKFChQoUKv4oUKFChQoU_xQoUKFChQr_ihQoUKFChQr_gQQMIFDBxAn_lCpYuYMmjZz_nTx9AhRI0iX_pk6hSqVrFq7_r2DFkzaNWzf_uHLp28evn8D_wYUOJFjR5En_ypcybOn0KNL_06lWtXsWbVsAgQECAgMEBAgFEAYgB0AIgAkAlAEVAhYEFwgYEBkgGkAbgBwAnQEeAh8EIAghECIgI0AkgCUApgEnAigEKQgqECsgLEAtgC4ArwEwAjEEMggzEDQgNUA2gDcAuAE5AjoEOwg8ED0gPkA_gEAAwQFCAkMERAhFEEYgR0BIgEkAygFLAkwETQhOEE8gUEBRgFIA';
-
 const addRegionCountLines = function (lines) {
   this._regionCountLines ??= [];
   for (const line of lines) {
@@ -3179,29 +3199,10 @@ const addChaosNfaRegionCountLines = function (handlerSet, shape) {
   const numGridCells = shape.numGridCells;
   if (!regionCells || regionCells.length !== numGridCells) return;
 
-  const regionCellToGridCell = new Int32Array(shape.totalCells());
-  regionCellToGridCell.fill(-1);
-  for (let gridCell = 0; gridCell < numGridCells; gridCell++) {
-    regionCellToGridCell[regionCells[gridCell]] = gridCell;
-  }
-
   const lines = [];
-  for (const handler of handlerSet.getAllofType(NFAModule.NFAConstraint)) {
-    const cells = handler.cells;
-    if (cells.length < 3 || cells[0] >= numGridCells) continue;
-    if (cells[1] !== regionCells[cells[0]]) continue;
-
-    const line = [cells[0]];
-    let isRegionLine = true;
-    for (let i = 1; i < cells.length; i++) {
-      const gridCell = regionCellToGridCell[cells[i]];
-      if (gridCell < 0) {
-        isRegionLine = false;
-        break;
-      }
-      line.push(gridCell);
-    }
-    if (isRegionLine) lines.push(line);
+  for (const handler of handlerSet.getAllofType(ChaosArrow)) {
+    const [line, controlCell] = handler.regionRunLine();
+    lines.push([controlCell, ...line]);
   }
 
   if (lines.length === 0) return;
@@ -4186,35 +4187,11 @@ const enforceConsistencyShardRelations = function (grid, handlerAccumulator) {
 const chaosShardRelationLinesFromConstraints = (constraintMap, shape) => {
   if (!constraintMap.has('ChaosConstruction')) return [];
 
-  const regionCells = shape.varCellsForGroup('CC');
-  const numGridCells = shape.numGridCells;
-  if (!regionCells || regionCells.length !== numGridCells) return [];
-
-  const regionCellToGridCell = new Int32Array(shape.totalCells());
-  regionCellToGridCell.fill(-1);
-  for (let gridCell = 0; gridCell < numGridCells; gridCell++) {
-    regionCellToGridCell[regionCells[gridCell]] = gridCell;
-  }
-
   const lines = [];
-  for (const constraint of constraintMap.get('NFA') || []) {
-    if (constraint.encodedNFA !== CHAOS_REGION_RUN_ENCODED_NFA) continue;
-
+  for (const constraint of constraintMap.get('ChaosArrow') || []) {
     const cells = constraint.cells.map(cellId => shape.parseCellId(cellId).cell);
-    if (cells.length < 3 || cells[0] >= numGridCells) continue;
-    if (cells[1] !== regionCells[cells[0]]) continue;
-
-    const line = [cells[0]];
-    let isRegionLine = true;
-    for (let i = 1; i < cells.length; i++) {
-      const gridCell = regionCellToGridCell[cells[i]];
-      if (gridCell < 0) {
-        isRegionLine = false;
-        break;
-      }
-      line.push(gridCell);
-    }
-    if (isRegionLine) lines.push(line);
+    if (cells.length < 2 || cells.some(cell => cell >= shape.numGridCells)) continue;
+    lines.push([cells[0], ...cells]);
   }
   return lines;
 };
@@ -4699,12 +4676,12 @@ const installNfaGridAnchorPriorityHandlers = (gridPriority, regionPriority = nul
     yield* originalConstraintHandlers.call(this, constraintMap, shape);
     if (!constraintMap.has('ChaosConstruction')) return;
 
-    const nfaConstraints = constraintMap.get('NFA');
-    if (!nfaConstraints?.length) return;
+    const arrowConstraints = constraintMap.get('ChaosArrow');
+    if (!arrowConstraints?.length) return;
 
     const gridAnchors = [];
     const seen = new Set();
-    for (const constraint of nfaConstraints) {
+    for (const constraint of arrowConstraints) {
       for (const cellId of constraint.cells) {
         const cell = shape.parseCellId(cellId).cell;
         if (cell >= shape.numGridCells || seen.has(cell)) continue;

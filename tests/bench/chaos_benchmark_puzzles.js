@@ -9,7 +9,7 @@ const ORIGINAL_CHAOS_NAME = 'Chaos Construction';
 const EASIER_CHAOS_NAME = 'Chaos Construction - easier';
 const CHAOS_KILLER_NAME = 'Chaos Construction: killer';
 const CHAOS_X_SUMS_NAME = 'Chaos Construction: x-sums';
-const NFA_MARKER = '.NFA~';
+const CONSTRAINT_SUFFIX_MARKERS = ['.ChaosArrow~', '.NFA~'];
 const GIVEN_PATTERN = /~(?:R\d+C\d+|CC\d+)(?:_\d+)+/g;
 const SOLUTION_GIVEN_STRIDE = 37;
 
@@ -29,6 +29,9 @@ const inferSquareSize = (numCells) => {
   const size = Math.sqrt(numCells);
   return Number.isInteger(size) ? size : 0;
 };
+
+const constraintSuffixIndex = (input) => Math.min(...CONSTRAINT_SUFFIX_MARKERS.map(
+  marker => input.indexOf(marker)).filter(index => index >= 0));
 
 const balancedCellOrder = (numRows, numCols) => {
   const numCells = numRows * numCols;
@@ -84,14 +87,14 @@ const balancedTokenOrder = (tokens, numRows, numCols) => {
 const buildChaosLadderPuzzles = (examples) => {
   const original = findPuzzle(examples, ORIGINAL_CHAOS_NAME);
   const easier = findPuzzle(examples, EASIER_CHAOS_NAME);
-  const originalNfaIndex = original.input.indexOf(NFA_MARKER);
-  const easierNfaIndex = easier.input.indexOf(NFA_MARKER);
-  if (originalNfaIndex < 0 || easierNfaIndex < 0) {
-    throw new Error('Chaos Construction ladder requires NFA constraints.');
+  const originalSuffixIndex = constraintSuffixIndex(original.input);
+  const easierSuffixIndex = constraintSuffixIndex(easier.input);
+  if (!Number.isFinite(originalSuffixIndex) || !Number.isFinite(easierSuffixIndex)) {
+    throw new Error('Chaos Construction ladder requires arrow constraints.');
   }
 
-  const originalPrefix = original.input.slice(0, originalNfaIndex);
-  const easierPrefix = easier.input.slice(0, easierNfaIndex);
+  const originalPrefix = original.input.slice(0, originalSuffixIndex);
+  const easierPrefix = easier.input.slice(0, easierSuffixIndex);
   if (!easierPrefix.startsWith(originalPrefix)) {
     throw new Error('Chaos Construction - easier must extend the original givens.');
   }
@@ -101,7 +104,7 @@ const buildChaosLadderPuzzles = (examples) => {
   const balancedExtraGivens = gridSize
     ? balancedTokenOrder(extraGivens, gridSize, gridSize)
     : extraGivens;
-  const suffix = original.input.slice(originalNfaIndex);
+  const suffix = original.input.slice(originalSuffixIndex);
 
   return Array.from({ length: balancedExtraGivens.length + 1 }, (_, extraCount) => ({
     name: `${CHAOS_LADDER_ALIAS} ${extraCount}`,

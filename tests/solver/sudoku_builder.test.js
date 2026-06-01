@@ -345,6 +345,28 @@ await runTest('ChaosConstruction produces handler, extra cells, and no box handl
   assert.equal(countHandlers(handlers, 'AllDifferent'), 8);
 });
 
+await runTest('ChaosArrow produces ChaosArrow handler', () => {
+  const constraint = new SudokuConstraint.Container([
+    new SudokuConstraint.Shape('4x4'),
+    new SudokuConstraint.ChaosConstruction(),
+    new SudokuConstraint.ChaosArrow('R2C1', 'R4C4'),
+  ]);
+
+  const handlers = buildHandlers(constraint);
+  assert.ok(hasHandler(handlers, 'ChaosArrow'));
+});
+
+await runTest('ChaosArrow requires ChaosConstruction', () => {
+  const constraint = new SudokuConstraint.Container([
+    new SudokuConstraint.Shape('4x4'),
+    new SudokuConstraint.ChaosArrow('R2C1', 'R2C2'),
+  ]);
+
+  assert.throws(
+    () => buildHandlers(constraint),
+    /ChaosArrow requires Chaos Construction/);
+});
+
 await runTest('ChaosConstruction optimizer adds fixed value-region handlers with cages', () => {
   const constraint = new SudokuConstraint.Container([
     new SudokuConstraint.Shape('4x4'),

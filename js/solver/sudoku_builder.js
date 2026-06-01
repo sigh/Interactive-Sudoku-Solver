@@ -243,6 +243,19 @@ export class SudokuBuilder {
           }
           break;
 
+        case 'ChaosArrow':
+          {
+            const regionCells = shape.varCellsForGroup('CC');
+            if (!regionCells || regionCells.length !== shape.numGridCells) {
+              throw new InvalidConstraintError('ChaosArrow requires Chaos Construction.');
+            }
+            cells = constraint.cells.map(c => shape.parseCellId(c).cell);
+            yield new ChaosHandlerModule.ChaosArrow(
+              cells,
+              cells.map(c => regionCells[c]));
+          }
+          break;
+
         case 'Diagonal':
           if (!shape.isSquare()) {
             throw new InvalidConstraintError('Diagonal constraint requires a square grid');
@@ -360,9 +373,8 @@ export class SudokuBuilder {
         case 'NFA':
           {
             const cells = constraint.cells.map(c => shape.parseCellId(c).cell);
-            const encodedNFA = constraint.encodedNFA;
-            const nfa = compileNFA(encodedNFA, shape.numValues);
-            yield new NFAHandlerModule.NFAConstraint(cells, nfa, encodedNFA);
+            const nfa = compileNFA(constraint.encodedNFA, shape.numValues);
+            yield new NFAHandlerModule.NFAConstraint(cells, nfa);
           }
           break;
 

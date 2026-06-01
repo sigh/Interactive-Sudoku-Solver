@@ -969,6 +969,99 @@ export class ChaosConstruction extends SudokuConstraintHandler {
   }
 }
 
+export class ChaosArrow extends SudokuConstraintHandler {
+  constructor(line, regionLine) {
+    super([line[0], ...regionLine]);
+
+    this._line = Uint16Array.from(line);
+    this._regionCells = Uint16Array.from(regionLine);
+    this._supportedCellMasks = new Uint16Array(regionLine.length);
+    this._runSupportMasks = new Uint16Array(regionLine.length);
+  }
+
+  initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
+    const maxValueCount = Math.min(shape.numValues, this._regionCells.length);
+    return !!(initialGridCells[this._line[0]] &= (1 << maxValueCount) - 1);
+  }
+
+  regionRunLine() {
+    return [this._line, this._line[0]];
+  }
+
+  enforceConsistency(grid, handlerAccumulator) {
+    const controlCell = this._line[0];
+    const regionCells = this._regionCells;
+    const regionCellCount = regionCells.length;
+
+    let controlMask = grid[controlCell];
+    const supportedCellMasks = this._supportedCellMasks;
+    const runSupportMasks = this._runSupportMasks;
+    supportedCellMasks.fill(0);
+    runSupportMasks.fill(0);
+    let supportedControlMask = 0;
+    let minTailStart = regionCellCount;
+    let runMask = 0xffff;
+    const maxValueCount = LookupTables.maxValue(controlMask);
+
+    // Collect exact support by control count and chosen shared region label.
+    for (let valueCount = 1; valueCount <= maxValueCount; valueCount++) {
+      runMask &= grid[regionCells[valueCount - 1]];
+      if (!runMask) break;
+
+      const controlBit = 1 << (valueCount - 1);
+      if (!(controlMask & controlBit)) continue;
+
+      const boundaryIndex = valueCount;
+      if (boundaryIndex < regionCellCount) {
+        const boundaryMask = grid[regionCells[boundaryIndex]];
+
+        let supportedRunMask = runMask;
+        if (!(boundaryMask & (boundaryMask - 1))) {
+          supportedRunMask &= ~boundaryMask;
+        }
+        if (!supportedRunMask) continue;
+
+        if (minTailStart === regionCellCount) {
+          let boundarySupport = boundaryMask;
+          if (!(runMask & (runMask - 1))) {
+            boundarySupport &= ~runMask;
+          }
+          minTailStart = boundaryIndex + 1;
+          supportedCellMasks[boundaryIndex] |= boundarySupport;
+        }
+        runSupportMasks[valueCount - 1] = supportedRunMask;
+      } else {
+        runSupportMasks[valueCount - 1] = runMask;
+      }
+
+      supportedControlMask |= controlBit;
+    }
+
+    let suffixRunSupport = 0;
+    for (let i = regionCellCount - 1; i >= 0; i--) {
+      suffixRunSupport |= runSupportMasks[i];
+      supportedCellMasks[i] |= i < minTailStart ? suffixRunSupport : grid[regionCells[i]];
+    }
+
+    if (!(controlMask &= supportedControlMask)) return false;
+    if (controlMask !== grid[controlCell]) {
+      grid[controlCell] = controlMask;
+      handlerAccumulator.addForCell(controlCell);
+    }
+
+    for (let i = 0; i < regionCellCount; i++) {
+      const regionCell = regionCells[i];
+      const oldMask = grid[regionCell];
+      const newMask = oldMask & supportedCellMasks[i];
+      if (newMask === oldMask) continue;
+      grid[regionCell] = newMask;
+      handlerAccumulator.addForCell(regionCell);
+    }
+
+    return true;
+  }
+}
+
 export class ChaosFixedValueRegionExclusion extends SudokuConstraintHandler {
   static SINGLETON_HANDLER = true;
 

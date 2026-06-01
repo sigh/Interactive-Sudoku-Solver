@@ -1178,6 +1178,27 @@ export class SudokuConstraint {
     }
   }
 
+  static ChaosArrow = class ChaosArrow extends SudokuConstraintBase {
+    static DESCRIPTION = (`
+      For Chaos Construction puzzles, the first cell gives a run length. That
+      many cells from the start of the listed arrow cells must be in the same
+      chaos region, and the next listed cell, if any, must be in a different
+      region.`);
+    static CATEGORY = 'Experimental';
+    static DISPLAY_CONFIG = {
+      displayClass: 'GenericLine',
+      dashed: true,
+      arrow: true,
+      startMarker: LineOptions.EMPTY_CIRCLE_MARKER,
+    };
+    static VALIDATE_CELLS_FN = cells => cells.length >= 2;
+
+    constructor(...cells) {
+      super(...cells);
+      this.cells = cells;
+    }
+  }
+
   static RegionSize = class RegionSize extends SudokuConstraintBase {
     static DESCRIPTION = (`
       The size of default boxes. Jigsaw pieces must be of this size.`);
