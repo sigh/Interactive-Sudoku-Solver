@@ -349,11 +349,23 @@ await runTest('ChaosArrow produces ChaosArrow handler', () => {
   const constraint = new SudokuConstraint.Container([
     new SudokuConstraint.Shape('4x4'),
     new SudokuConstraint.ChaosConstruction(),
-    new SudokuConstraint.ChaosArrow('R2C1', 'R4C4'),
+    new SudokuConstraint.ChaosArrow('R2C1', 'CC16'),
   ]);
 
   const handlers = buildHandlers(constraint);
   assert.ok(hasHandler(handlers, 'ChaosArrow'));
+});
+
+await runTest('ChaosArrow requires chaos cells after control cell', () => {
+  const constraint = new SudokuConstraint.Container([
+    new SudokuConstraint.Shape('4x4'),
+    new SudokuConstraint.ChaosConstruction(),
+    new SudokuConstraint.ChaosArrow('R2C1', 'R4C4'),
+  ]);
+
+  assert.throws(
+    () => buildHandlers(constraint),
+    /ChaosArrow cells after the control cell must be Chaos Construction region cells/);
 });
 
 await runTest('ChaosArrow requires ChaosConstruction', () => {

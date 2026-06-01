@@ -75,6 +75,15 @@ await runTest('boxRegions works for 6x6', () => {
   assert.deepEqual(regions[0].sort((a, b) => a - b), [0, 1, 2, 6, 7, 8]);
 });
 
+await runTest('ChaosArrow getCells includes control and maps chaos cells', () => {
+  const shape = GridShape.fromGridSize(4);
+  shape.addVarCellsForConstraints([new SudokuConstraint.ChaosConstruction()]);
+
+  const constraint = new SudokuConstraint.ChaosArrow('R2C1', 'CC6', 'CC16');
+
+  assert.deepEqual(constraint.getCells(shape), ['R2C1', 'R2C2', 'R4C4']);
+});
+
 // Rectangular grid tests for boxRegions
 await runTest('boxRegions for 4x6 grid has correct structure', () => {
   const shape = GridShape.fromGridSize(4, 6);

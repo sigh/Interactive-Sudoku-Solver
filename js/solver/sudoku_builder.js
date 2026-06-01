@@ -250,9 +250,16 @@ export class SudokuBuilder {
               throw new InvalidConstraintError('ChaosArrow requires Chaos Construction.');
             }
             cells = constraint.cells.map(c => shape.parseCellId(c).cell);
+            const regionCellOffset = regionCells[0];
+            const regionCellLimit = regionCellOffset + regionCells.length;
+            const [controlCell, ...chaosCells] = cells;
+            if (chaosCells.some(c => c < regionCellOffset || c >= regionCellLimit)) {
+              throw new InvalidConstraintError(
+                'ChaosArrow cells after the control cell must be Chaos Construction region cells.');
+            }
+            const line = chaosCells.map(c => c - regionCellOffset);
             yield new ChaosHandlerModule.ChaosArrow(
-              cells,
-              cells.map(c => regionCells[c]));
+              controlCell, line, chaosCells);
           }
           break;
 

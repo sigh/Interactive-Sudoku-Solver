@@ -4185,15 +4185,30 @@ const enforceConsistencyShardRelations = function (grid, handlerAccumulator) {
 };
 
 const chaosShardRelationLinesFromConstraints = (constraintMap, shape) => {
-  if (!constraintMap.has('ChaosConstruction')) return [];
+  if (!constraintMap.has('ChaosConstruction')) return { shardLines: [], regionRunLines: [] };
 
-  const lines = [];
+  const regionCells = shape.varCellsForGroup('CC');
+  if (!regionCells || regionCells.length !== shape.numGridCells) {
+    return { shardLines: [], regionRunLines: [] };
+  }
+  const regionCellOffset = regionCells[0];
+  const regionCellLimit = regionCellOffset + regionCells.length;
+
+  const shardLines = [];
+  const regionRunLines = [];
   for (const constraint of constraintMap.get('ChaosArrow') || []) {
     const cells = constraint.cells.map(cellId => shape.parseCellId(cellId).cell);
-    if (cells.length < 2 || cells.some(cell => cell >= shape.numGridCells)) continue;
-    lines.push([cells[0], ...cells]);
+    const controlCell = cells[0];
+    const chaosCells = cells.slice(1);
+    if (chaosCells.length < 2
+      || chaosCells.some(cell => cell < regionCellOffset || cell >= regionCellLimit)) {
+      continue;
+    }
+    const line = chaosCells.map(cell => cell - regionCellOffset);
+    shardLines.push(line);
+    regionRunLines.push([controlCell, ...line]);
   }
-  return lines;
+  return { shardLines, regionRunLines };
 };
 
 const installNfaShardRelations = ({
@@ -4242,12 +4257,12 @@ const installNfaShardRelations = ({
 
   SudokuBuilder._constraintHandlers = function* (constraintMap, shape) {
     const handlers = [...originalConstraintHandlers.call(this, constraintMap, shape)];
-    const lines = chaosShardRelationLinesFromConstraints(constraintMap, shape);
-    if (lines.length) {
+    const { shardLines, regionRunLines } = chaosShardRelationLinesFromConstraints(constraintMap, shape);
+    if (shardLines.length || regionRunLines.length) {
       for (const handler of handlers) {
         if (handler.constructor === ChaosConstruction) {
-          handler.addShardRelationLines(lines);
-          if (alsoRegionRuns) handler.addRegionCountLines(lines);
+          handler.addShardRelationLines(shardLines);
+          if (alsoRegionRuns) handler.addRegionCountLines(regionRunLines);
         }
       }
     }

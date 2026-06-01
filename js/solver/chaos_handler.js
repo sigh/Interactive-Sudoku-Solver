@@ -970,9 +970,10 @@ export class ChaosConstruction extends SudokuConstraintHandler {
 }
 
 export class ChaosArrow extends SudokuConstraintHandler {
-  constructor(line, regionLine) {
-    super([line[0], ...regionLine]);
+  constructor(controlCell, line, regionLine) {
+    super([controlCell, ...regionLine]);
 
+    this._controlCell = controlCell;
     this._line = Uint16Array.from(line);
     this._regionCells = Uint16Array.from(regionLine);
     this._supportedCellMasks = new Uint16Array(regionLine.length);
@@ -981,15 +982,15 @@ export class ChaosArrow extends SudokuConstraintHandler {
 
   initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
     const maxValueCount = Math.min(shape.numValues, this._regionCells.length);
-    return !!(initialGridCells[this._line[0]] &= (1 << maxValueCount) - 1);
+    return !!(initialGridCells[this._controlCell] &= (1 << maxValueCount) - 1);
   }
 
   regionRunLine() {
-    return [this._line, this._line[0]];
+    return [this._line, this._controlCell];
   }
 
   enforceConsistency(grid, handlerAccumulator) {
-    const controlCell = this._line[0];
+    const controlCell = this._controlCell;
     const regionCells = this._regionCells;
     const regionCellCount = regionCells.length;
 

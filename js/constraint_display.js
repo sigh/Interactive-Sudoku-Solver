@@ -472,7 +472,7 @@ class GenericLine extends BaseConstraintDisplayItem {
 
   _makeItem(constraint, options) {
     // TODO: Inline cellArgs.
-    const cellArgs = new CellArgs(constraint.cells, constraint.type);
+    const cellArgs = new CellArgs(constraint.getCells(this._shape), constraint.type);
     const cells = cellArgs.cells().slice();
     if (cellArgs.isLoop()) {
       cells.push(cells[0]);

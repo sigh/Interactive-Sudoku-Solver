@@ -1180,11 +1180,11 @@ export class SudokuConstraint {
 
   static ChaosArrow = class ChaosArrow extends SudokuConstraintBase {
     static DESCRIPTION = (`
-      For Chaos Construction puzzles, the first cell gives a run length. That
-      many cells from the start of the listed arrow cells must be in the same
-      chaos region, and the next listed cell, if any, must be in a different
-      region.`);
-    static CATEGORY = 'Experimental';
+      For Chaos Construction puzzles, the first cell is a control cell giving
+      a run length. The remaining listed cells are Chaos Construction region
+      variables. That many region variables from the start of the list must be
+      the same, and the next listed region variable, if any, must be different.`);
+    static CATEGORY = 'LinesAndSets';
     static DISPLAY_CONFIG = {
       displayClass: 'GenericLine',
       dashed: true,
@@ -1196,6 +1196,21 @@ export class SudokuConstraint {
     constructor(...cells) {
       super(...cells);
       this.cells = cells;
+    }
+
+    getCells(shape) {
+      const regionCells = shape.varCellsForGroup('CC');
+      if (!regionCells || regionCells.length !== shape.numGridCells) return this.cells;
+
+      const controlCell = this.cells[0];
+      const regionCellOffset = regionCells[0];
+      const lineCells = this.cells.slice(1).map(cellId => {
+        const regionCell = shape.parseCellId(cellId).cell;
+        const gridCell = regionCell - regionCellOffset;
+        if (gridCell < 0 || gridCell >= regionCells.length) return cellId;
+        return shape.makeCellIdFromIndex(gridCell);
+      });
+      return [controlCell, ...lineCells];
     }
   }
 
