@@ -969,97 +969,198 @@ export class ChaosConstruction extends SudokuConstraintHandler {
   }
 }
 
-export class ChaosArrow extends SudokuConstraintHandler {
-  constructor(controlCell, line, regionLine) {
-    super([controlCell, ...regionLine]);
+export class ChaosMultiArrow extends SudokuConstraintHandler {
+  constructor(controlCell, regionArms, regionRunLines = null) {
+    super([controlCell, ...regionArms.flat()]);
+
+    const startCell = regionArms[0]?.[0];
+    if (startCell === undefined || regionArms.some(arm => arm[0] !== startCell)) {
+      throw new InvalidConstraintError('ChaosMultiArrow arms must share their first region cell.');
+    }
 
     this._controlCell = controlCell;
-    this._line = Uint16Array.from(line);
-    this._regionCells = Uint16Array.from(regionLine);
-    this._supportedCellMasks = new Uint16Array(regionLine.length);
-    this._runSupportMasks = new Uint16Array(regionLine.length);
+    this._regionArms = regionArms.map(arm => Uint16Array.from(arm));
+    this._duplicateStartCount = regionArms.length - 1;
+    this._armLengthMasks = regionArms.map(_ => new Uint16Array(16));
+    this._armRunSupportMasks = regionArms.map(arm => new Uint16Array(arm.length));
+    this._regionRunLines = regionRunLines?.map(line => Uint16Array.from(line)) ?? [];
+    this._numRegions = 16;
+  }
+
+  regionRunLines() {
+    return this._regionRunLines.map(line => [line, this._controlCell]);
   }
 
   initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
-    const maxValueCount = Math.min(shape.numValues, this._regionCells.length);
-    return !!(initialGridCells[this._controlCell] &= (1 << maxValueCount) - 1);
+    const minValueCount = 1;
+    const maxArmCells = this._regionArms.reduce((sum, arm) => sum + arm.length, 0)
+      - this._duplicateStartCount;
+    const maxValueCount = Math.min(shape.numValues, maxArmCells);
+    if (maxValueCount < minValueCount) return false;
+
+    this._numRegions = shape.numValues;
+    const maxMask = (1 << maxValueCount) - 1;
+    return !!(initialGridCells[this._controlCell] &= maxMask);
   }
 
-  regionRunLine() {
-    return [this._line, this._controlCell];
+  _updateArmLengthMasks(grid, controlMask) {
+    const collectLengthMasks = this._regionArms.length !== 1;
+    let supportedRegionMask = (1 << this._numRegions) - 1;
+
+    for (let armIndex = 0; armIndex < this._regionArms.length; armIndex++) {
+      const arm = this._regionArms[armIndex];
+      const armLengthMasks = this._armLengthMasks[armIndex];
+      const runSupportMasks = this._armRunSupportMasks[armIndex];
+      if (collectLengthMasks) armLengthMasks.fill(0);
+
+      let armRegionMask = 0;
+      let runMask = 0xffff;
+      const maxLength = Math.min(LookupTables.maxValue(controlMask), arm.length);
+      for (let length = 1; length <= maxLength; length++) {
+        runMask &= grid[arm[length - 1]];
+        if (!runMask) break;
+
+        let lengthRegionMask = runMask;
+        if (length < arm.length) {
+          const boundaryMask = grid[arm[length]];
+          if (!(boundaryMask & (boundaryMask - 1))) {
+            lengthRegionMask &= ~boundaryMask;
+          }
+        }
+
+        const lengthBit = 1 << (length - 1);
+        if (collectLengthMasks) {
+          let regions = lengthRegionMask;
+          while (regions) {
+            const regionBit = regions & -regions;
+            regions ^= regionBit;
+            armRegionMask |= regionBit;
+            armLengthMasks[LookupTables.toIndex(regionBit)] |= lengthBit;
+          }
+        } else if (lengthRegionMask && (controlMask & lengthBit)) {
+          runSupportMasks[length - 1] = lengthRegionMask;
+          this._supportedControlMask |= lengthBit;
+        }
+      }
+
+      if (collectLengthMasks) supportedRegionMask &= armRegionMask;
+    }
+
+    this._supportedRegionMask = collectLengthMasks ? supportedRegionMask : 0;
+  }
+
+  _updateSupportedLengthsForRegion(controlMask, regionIndex) {
+    let totalMin = 0;
+    let totalMax = 0;
+    for (let armIndex = 0; armIndex < this._regionArms.length; armIndex++) {
+      const lengthMask = this._armLengthMasks[armIndex][regionIndex];
+      if (!lengthMask) return;
+      const minLength = LookupTables.minValue(lengthMask);
+      const maxLength = LookupTables.maxValue(lengthMask);
+      totalMin += minLength;
+      totalMax += maxLength;
+    }
+
+    totalMin -= this._duplicateStartCount;
+    totalMax -= this._duplicateStartCount;
+    const totalRangeMask = (1 << totalMax) - (1 << (totalMin - 1));
+    const supportedControlMask = controlMask & totalRangeMask;
+    if (!supportedControlMask) return;
+    this._supportedControlMask |= supportedControlMask;
+    const regionBit = 1 << regionIndex;
+
+    for (let armIndex = 0; armIndex < this._regionArms.length; armIndex++) {
+      let lengths = this._armLengthMasks[armIndex][regionIndex];
+      const minLength = LookupTables.minValue(lengths);
+      const maxLength = LookupTables.maxValue(lengths);
+      const otherMin = totalMin - minLength;
+      const otherMax = totalMax - maxLength;
+      const runSupportMasks = this._armRunSupportMasks[armIndex];
+      while (lengths) {
+        const lengthBit = lengths & -lengths;
+        lengths ^= lengthBit;
+        const length = LookupTables.toValue(lengthBit);
+        const minControl = otherMin + length;
+        const maxControl = otherMax + length;
+        const rangeMask = (1 << maxControl) - (1 << (minControl - 1));
+        if (controlMask & rangeMask) {
+          runSupportMasks[length - 1] |= regionBit;
+        }
+      }
+    }
+  }
+
+  _applySupportedCellMasks(grid, handlerAccumulator) {
+    for (let armIndex = 0; armIndex < this._regionArms.length; armIndex++) {
+      const arm = this._regionArms[armIndex];
+      const runSupportMasks = this._armRunSupportMasks[armIndex];
+
+      let minSupportedLength = arm.length + 1;
+      for (let i = 0; i < arm.length; i++) {
+        if (runSupportMasks[i]) {
+          minSupportedLength = i + 1;
+          break;
+        }
+      }
+
+      let suffixRunSupport = 0;
+      for (let i = arm.length - 1; i >= 0; i--) {
+        const regionCell = arm[i];
+        const cellMask = grid[regionCell];
+        suffixRunSupport |= runSupportMasks[i];
+        let supportedMask = suffixRunSupport;
+
+        if (minSupportedLength < i) {
+          supportedMask |= cellMask;
+        }
+
+        if (i > 0) {
+          const boundaryRunSupport = runSupportMasks[i - 1];
+          if (boundaryRunSupport) {
+            supportedMask |= (boundaryRunSupport & (boundaryRunSupport - 1))
+              ? cellMask
+              : cellMask & ~boundaryRunSupport;
+          }
+        }
+
+        const newMask = cellMask & supportedMask;
+        if (!newMask) return false;
+        if (newMask !== cellMask) {
+          grid[regionCell] = newMask;
+          handlerAccumulator.addForCell(regionCell);
+        }
+      }
+    }
+
+    return true;
   }
 
   enforceConsistency(grid, handlerAccumulator) {
     const controlCell = this._controlCell;
-    const regionCells = this._regionCells;
-    const regionCellCount = regionCells.length;
-
     let controlMask = grid[controlCell];
-    const supportedCellMasks = this._supportedCellMasks;
-    const runSupportMasks = this._runSupportMasks;
-    supportedCellMasks.fill(0);
-    runSupportMasks.fill(0);
-    let supportedControlMask = 0;
-    let minTailStart = regionCellCount;
-    let runMask = 0xffff;
-    const maxValueCount = LookupTables.maxValue(controlMask);
+    this._supportedControlMask = 0;
+    for (const runSupportMasks of this._armRunSupportMasks) {
+      runSupportMasks.fill(0);
+    }
 
-    // Collect exact support by control count and chosen shared region label.
-    for (let valueCount = 1; valueCount <= maxValueCount; valueCount++) {
-      runMask &= grid[regionCells[valueCount - 1]];
-      if (!runMask) break;
-
-      const controlBit = 1 << (valueCount - 1);
-      if (!(controlMask & controlBit)) continue;
-
-      const boundaryIndex = valueCount;
-      if (boundaryIndex < regionCellCount) {
-        const boundaryMask = grid[regionCells[boundaryIndex]];
-
-        let supportedRunMask = runMask;
-        if (!(boundaryMask & (boundaryMask - 1))) {
-          supportedRunMask &= ~boundaryMask;
-        }
-        if (!supportedRunMask) continue;
-
-        if (minTailStart === regionCellCount) {
-          let boundarySupport = boundaryMask;
-          if (!(runMask & (runMask - 1))) {
-            boundarySupport &= ~runMask;
-          }
-          minTailStart = boundaryIndex + 1;
-          supportedCellMasks[boundaryIndex] |= boundarySupport;
-        }
-        runSupportMasks[valueCount - 1] = supportedRunMask;
-      } else {
-        runSupportMasks[valueCount - 1] = runMask;
+    this._updateArmLengthMasks(grid, controlMask);
+    if (this._regionArms.length !== 1) {
+      let supportedRegionMask = this._supportedRegionMask;
+      while (supportedRegionMask) {
+        const regionBit = supportedRegionMask & -supportedRegionMask;
+        supportedRegionMask ^= regionBit;
+        const regionIndex = LookupTables.toIndex(regionBit);
+        this._updateSupportedLengthsForRegion(controlMask, regionIndex);
       }
-
-      supportedControlMask |= controlBit;
     }
 
-    let suffixRunSupport = 0;
-    for (let i = regionCellCount - 1; i >= 0; i--) {
-      suffixRunSupport |= runSupportMasks[i];
-      supportedCellMasks[i] |= i < minTailStart ? suffixRunSupport : grid[regionCells[i]];
-    }
-
-    if (!(controlMask &= supportedControlMask)) return false;
+    if (!(controlMask &= this._supportedControlMask)) return false;
     if (controlMask !== grid[controlCell]) {
       grid[controlCell] = controlMask;
       handlerAccumulator.addForCell(controlCell);
     }
 
-    for (let i = 0; i < regionCellCount; i++) {
-      const regionCell = regionCells[i];
-      const oldMask = grid[regionCell];
-      const newMask = oldMask & supportedCellMasks[i];
-      if (newMask === oldMask) continue;
-      grid[regionCell] = newMask;
-      handlerAccumulator.addForCell(regionCell);
-    }
-
-    return true;
+    return this._applySupportedCellMasks(grid, handlerAccumulator);
   }
 }
 

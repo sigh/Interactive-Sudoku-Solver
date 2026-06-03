@@ -16,6 +16,7 @@ const { SudokuConstraint } = await import('../../js/sudoku_constraint.js');
 const { LookupTables } = await import('../../js/solver/lookup_tables.js');
 const {
   ChaosConstruction,
+  ChaosMultiArrow,
   ChaosFixedValueRegionExclusion,
 } = await import('../../js/solver/chaos_handler.js');
 
@@ -662,6 +663,44 @@ await runTest('ChaosConstruction region shard persists fixed-control merges', ()
   grid[0] = valueMask(2);
   assert.equal(enforce(context).result, true);
   assert.equal(grid[regionCells[0]], grid[regionCells[1]]);
+});
+
+await runTest('ChaosMultiArrow allows origin-only directions', () => {
+  const shape = GridShape.fromGridSpec('4x4');
+  shape.addVarCellsForConstraints([new SudokuConstraint.ChaosConstruction()]);
+  const regionCells = shape.varCellsForGroup('CC');
+  const grid = makeChaosGrid(shape);
+  const handler = new ChaosMultiArrow(
+    0,
+    [
+      [regionCells[0], regionCells[1], regionCells[2], regionCells[3]],
+      [regionCells[0], regionCells[4], regionCells[5], regionCells[6]],
+    ]);
+
+  grid[0] = valueMask(4);
+  grid[regionCells[0]] = valueMask(1);
+  for (const cell of [regionCells[4], regionCells[5], regionCells[6]]) {
+    grid[cell] = valueMask(2);
+  }
+
+  assert.equal(handler.enforceConsistency(grid, createAccumulator()), true);
+  assert.equal(grid[0], valueMask(4));
+});
+
+await runTest('ChaosMultiArrow prunes unsupported total counts', () => {
+  const shape = GridShape.fromGridSpec('4x4');
+  shape.addVarCellsForConstraints([new SudokuConstraint.ChaosConstruction()]);
+  const regionCells = shape.varCellsForGroup('CC');
+  const grid = makeChaosGrid(shape);
+  const handler = new ChaosMultiArrow(
+    0,
+    [
+      [regionCells[0], regionCells[1]],
+      [regionCells[0], regionCells[4]],
+    ]);
+
+  assert.equal(handler.enforceConsistency(grid, createAccumulator()), true);
+  assert.equal(grid[0], valueMask(1, 2, 3));
 });
 
 logSuiteComplete('chaos_construction.test.js');

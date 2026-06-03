@@ -18,6 +18,7 @@ const constraintDisplayOrder = () => [
   Indexing,
   Thermo,
   PillArrow,
+  ChaosArrow,
   GenericLine,
   CustomLine,
   ShadedRegion,
@@ -483,6 +484,34 @@ class GenericLine extends BaseConstraintDisplayItem {
 }
 
 class Thermo extends GenericLine { }
+
+class ChaosArrow extends BaseConstraintDisplayItem {
+  static IS_DIMMABLE = true;
+
+  drawItem(constraint, options) {
+    const item = this._makeItem(constraint, options);
+    this._svg.append(item);
+    return item;
+  }
+
+  makeIcon(constraint, options) {
+    return this._makeItem(constraint, options);
+  }
+
+  _makeItem(constraint, options) {
+    const cellGroups = constraint.getCellGroups?.(this._shape)
+      ?? [constraint.getCells(this._shape)];
+    if (cellGroups.length === 1) {
+      return this._makeConstraintLine(cellGroups[0], options);
+    }
+
+    const g = createSvgElement('g');
+    for (const group of cellGroups) {
+      g.append(this._makeConstraintLine(group, options));
+    }
+    return g;
+  }
+}
 
 class CustomLine extends GenericLine {
   constructor(svg, cellPositioner) {

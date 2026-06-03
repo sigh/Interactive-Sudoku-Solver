@@ -258,8 +258,21 @@ export class SudokuBuilder {
                 'ChaosArrow cells after the control cell must be Chaos Construction region cells.');
             }
             const line = chaosCells.map(c => c - regionCellOffset);
-            yield new ChaosHandlerModule.ChaosArrow(
-              controlCell, line, chaosCells);
+            yield new ChaosHandlerModule.ChaosMultiArrow(
+              controlCell, [chaosCells], [line]);
+          }
+          break;
+
+        case 'ChaosMultiArrow':
+          {
+            const regionCells = shape.varCellsForGroup('CC');
+            if (!regionCells || regionCells.length !== shape.numGridCells) {
+              throw new InvalidConstraintError('ChaosMultiArrow requires Chaos Construction.');
+            }
+            const controlCell = shape.parseCellId(constraint.cells[0]).cell;
+            const chaosArms = constraint.armCellGroups()
+              .map(arm => arm.map(cellId => shape.parseCellId(cellId).cell));
+            yield new ChaosHandlerModule.ChaosMultiArrow(controlCell, chaosArms);
           }
           break;
 

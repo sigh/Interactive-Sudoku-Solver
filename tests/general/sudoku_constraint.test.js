@@ -84,6 +84,21 @@ await runTest('ChaosArrow getCells includes control and maps chaos cells', () =>
   assert.deepEqual(constraint.getCells(shape), ['R2C1', 'R2C2', 'R4C4']);
 });
 
+await runTest('ChaosMultiArrow maps grouped chaos arms for display', () => {
+  const shape = GridShape.fromGridSize(4);
+  shape.addVarCellsForConstraints([new SudokuConstraint.ChaosConstruction()]);
+
+  const constraint = new SudokuConstraint.ChaosMultiArrow(
+    'R2C1', 'CC6', 'CC10', '', 'CC6', 'CC7', 'CC8');
+
+  assert.deepEqual(constraint.armCellGroups(), [['CC6', 'CC10'], ['CC6', 'CC7', 'CC8']]);
+  assert.deepEqual(constraint.getCells(shape), ['R2C1', 'R2C2', 'R3C2', 'R2C2', 'R2C3', 'R2C4']);
+  assert.deepEqual(constraint.getCellGroups(shape), [
+    ['R2C1', 'R2C2', 'R3C2'],
+    ['R2C1', 'R2C2', 'R2C3', 'R2C4'],
+  ]);
+});
+
 // Rectangular grid tests for boxRegions
 await runTest('boxRegions for 4x6 grid has correct structure', () => {
   const shape = GridShape.fromGridSize(4, 6);

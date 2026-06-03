@@ -345,7 +345,7 @@ await runTest('ChaosConstruction produces handler, extra cells, and no box handl
   assert.equal(countHandlers(handlers, 'AllDifferent'), 8);
 });
 
-await runTest('ChaosArrow produces ChaosArrow handler', () => {
+await runTest('ChaosArrow produces ChaosMultiArrow handler', () => {
   const constraint = new SudokuConstraint.Container([
     new SudokuConstraint.Shape('4x4'),
     new SudokuConstraint.ChaosConstruction(),
@@ -353,7 +353,7 @@ await runTest('ChaosArrow produces ChaosArrow handler', () => {
   ]);
 
   const handlers = buildHandlers(constraint);
-  assert.ok(hasHandler(handlers, 'ChaosArrow'));
+  assert.ok(hasHandler(handlers, 'ChaosMultiArrow'));
 });
 
 await runTest('ChaosArrow requires chaos cells after control cell', () => {
@@ -377,6 +377,28 @@ await runTest('ChaosArrow requires ChaosConstruction', () => {
   assert.throws(
     () => buildHandlers(constraint),
     /ChaosArrow requires Chaos Construction/);
+});
+
+await runTest('ChaosMultiArrow produces ChaosMultiArrow handler', () => {
+  const constraint = new SudokuConstraint.Container([
+    new SudokuConstraint.Shape('4x4'),
+    new SudokuConstraint.ChaosConstruction(),
+    new SudokuConstraint.ChaosMultiArrow('R2C1', 'CC6', 'CC10', '', 'CC6', 'CC7', 'CC8'),
+  ]);
+
+  const handlers = buildHandlers(constraint);
+  assert.ok(hasHandler(handlers, 'ChaosMultiArrow'));
+});
+
+await runTest('ChaosMultiArrow requires ChaosConstruction', () => {
+  const constraint = new SudokuConstraint.Container([
+    new SudokuConstraint.Shape('4x4'),
+    new SudokuConstraint.ChaosMultiArrow('R2C1', 'CC6', '', 'CC7'),
+  ]);
+
+  assert.throws(
+    () => buildHandlers(constraint),
+    /ChaosMultiArrow requires Chaos Construction/);
 });
 
 await runTest('ChaosConstruction optimizer adds fixed value-region handlers with cages', () => {

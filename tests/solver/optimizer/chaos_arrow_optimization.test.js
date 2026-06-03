@@ -16,7 +16,7 @@ const { GridShape } = await import('../../../js/grid_shape.js' + self.VERSION_PA
 const { SudokuConstraint } = await import('../../../js/sudoku_constraint.js' + self.VERSION_PARAM);
 const { HandlerSet } = await import('../../../js/solver/engine.js' + self.VERSION_PARAM);
 const { LookupTables } = await import('../../../js/solver/lookup_tables.js' + self.VERSION_PARAM);
-const { ChaosConstruction, ChaosArrow } = await import('../../../js/solver/chaos_handler.js' + self.VERSION_PARAM);
+const { ChaosConstruction, ChaosMultiArrow } = await import('../../../js/solver/chaos_handler.js' + self.VERSION_PARAM);
 
 const makeChaosGrid = (shape) => {
   const grid = new Uint16Array(
@@ -37,11 +37,11 @@ const initializeHandler = (handler, shape, grid) => handler.initialize(
   shape,
   createStateAllocator(grid, shape.totalCells()));
 
-await runTest('ChaosArrow prunes impossible control counts', () => {
+await runTest('ChaosMultiArrow prunes impossible control counts', () => {
   const shape = makeShape();
   const grid = makeChaosGrid(shape);
   const regionCells = shape.varCellsForGroup('CC');
-  const handler = new ChaosArrow(4, [4, 10], [regionCells[4], regionCells[10]]);
+  const handler = new ChaosMultiArrow(4, [[regionCells[4], regionCells[10]]], [[4, 10]]);
 
   grid[regionCells[4]] = valueMask(2);
   grid[regionCells[10]] = valueMask(2);
@@ -51,11 +51,11 @@ await runTest('ChaosArrow prunes impossible control counts', () => {
   assert.equal(grid[4], valueMask(2));
 });
 
-await runTest('ChaosArrow keeps shorter run when shared prefix has another region choice', () => {
+await runTest('ChaosMultiArrow keeps shorter run when shared prefix has another region choice', () => {
   const shape = makeShape();
   const grid = makeChaosGrid(shape);
   const regionCells = shape.varCellsForGroup('CC');
-  const handler = new ChaosArrow(4, [4, 10], [regionCells[4], regionCells[10]]);
+  const handler = new ChaosMultiArrow(4, [[regionCells[4], regionCells[10]]], [[4, 10]]);
 
   grid[regionCells[4]] = valueMask(1, 2);
   grid[regionCells[10]] = valueMask(1);
@@ -65,11 +65,11 @@ await runTest('ChaosArrow keeps shorter run when shared prefix has another regio
   assert.equal(grid[4], valueMask(1, 2));
 });
 
-await runTest('ChaosArrow supports region labels beyond line length', () => {
+await runTest('ChaosMultiArrow supports region labels beyond line length', () => {
   const shape = makeShape();
   const grid = makeChaosGrid(shape);
   const regionCells = shape.varCellsForGroup('CC');
-  const handler = new ChaosArrow(4, [4, 10], [regionCells[4], regionCells[10]]);
+  const handler = new ChaosMultiArrow(4, [[regionCells[4], regionCells[10]]], [[4, 10]]);
 
   grid[regionCells[4]] = valueMask(4);
   grid[regionCells[10]] = valueMask(4);
@@ -79,11 +79,11 @@ await runTest('ChaosArrow supports region labels beyond line length', () => {
   assert.equal(grid[4], valueMask(2));
 });
 
-await runTest('ChaosArrow prunes break cell regions', () => {
+await runTest('ChaosMultiArrow prunes break cell regions', () => {
   const shape = makeShape();
   const grid = makeChaosGrid(shape);
   const regionCells = shape.varCellsForGroup('CC');
-  const handler = new ChaosArrow(4, [4, 10], [regionCells[4], regionCells[10]]);
+  const handler = new ChaosMultiArrow(4, [[regionCells[4], regionCells[10]]], [[4, 10]]);
 
   grid[4] = valueMask(1);
   grid[regionCells[4]] = valueMask(2);
@@ -94,11 +94,11 @@ await runTest('ChaosArrow prunes break cell regions', () => {
   assert.equal(grid[regionCells[10]], valueMask(3));
 });
 
-await runTest('ChaosArrow symmetrically prunes unsupported prefix region values', () => {
+await runTest('ChaosMultiArrow symmetrically prunes unsupported prefix region values', () => {
   const shape = makeShape();
   const grid = makeChaosGrid(shape);
   const regionCells = shape.varCellsForGroup('CC');
-  const handler = new ChaosArrow(4, [4, 10], [regionCells[4], regionCells[10]]);
+  const handler = new ChaosMultiArrow(4, [[regionCells[4], regionCells[10]]], [[4, 10]]);
 
   // With control fixed to a 1-cell run, region=1 is impossible because the
   // boundary cell is also fixed to region=1 and must differ from the run.
@@ -112,12 +112,12 @@ await runTest('ChaosArrow symmetrically prunes unsupported prefix region values'
   assert.equal(grid[regionCells[10]], valueMask(1));
 });
 
-await runTest('_addChaosRegionShardSources attaches ChaosArrow lines', () => {
+await runTest('_addChaosRegionShardSources attaches ChaosMultiArrow lines', () => {
   const shape = makeShape();
   const grid = makeChaosGrid(shape);
   const regionCells = shape.varCellsForGroup('CC');
   const chaosHandler = new ChaosConstruction(shape.numGridCells, regionCells[0]);
-  const arrowHandler = new ChaosArrow(4, [4, 10], [regionCells[4], regionCells[10]]);
+  const arrowHandler = new ChaosMultiArrow(4, [[regionCells[4], regionCells[10]]], [[4, 10]]);
   const handlerSet = new HandlerSet([chaosHandler, arrowHandler], shape.totalCells());
 
   grid[4] = valueMask(2);

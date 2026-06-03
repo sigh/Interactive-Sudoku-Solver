@@ -14,9 +14,9 @@ const {
   SudokuConstraintHandler,
 } = await import('../../js/solver/handlers.js' + self.VERSION_PARAM);
 const {
-  ChaosArrow,
   ChaosConstruction,
   ChaosFixedValueRegionExclusion,
+  ChaosMultiArrow,
 } = await import('../../js/solver/chaos_handler.js' + self.VERSION_PARAM);
 const {
   CHAOS_LADDER_ALIAS,
@@ -3200,9 +3200,10 @@ const addChaosNfaRegionCountLines = function (handlerSet, shape) {
   if (!regionCells || regionCells.length !== numGridCells) return;
 
   const lines = [];
-  for (const handler of handlerSet.getAllofType(ChaosArrow)) {
-    const [line, controlCell] = handler.regionRunLine();
-    lines.push([controlCell, ...line]);
+  for (const handler of handlerSet.getAllofType(ChaosMultiArrow)) {
+    for (const [line, controlCell] of handler.regionRunLines()) {
+      lines.push([controlCell, ...line]);
+    }
   }
 
   if (lines.length === 0) return;

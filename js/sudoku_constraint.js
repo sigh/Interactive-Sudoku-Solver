@@ -1186,7 +1186,7 @@ export class SudokuConstraint {
       the same, and the next listed region variable, if any, must be different.`);
     static CATEGORY = 'LinesAndSets';
     static DISPLAY_CONFIG = {
-      displayClass: 'GenericLine',
+      displayClass: 'ChaosArrow',
       dashed: true,
       arrow: true,
       startMarker: LineOptions.EMPTY_CIRCLE_MARKER,
@@ -1211,6 +1211,56 @@ export class SudokuConstraint {
         return shape.makeCellIdFromIndex(gridCell);
       });
       return [controlCell, ...lineCells];
+    }
+  }
+
+  static ChaosMultiArrow = class ChaosMultiArrow extends SudokuConstraintBase {
+    static DESCRIPTION = (`
+      For Chaos Construction puzzles, the first cell is a control cell giving
+      the total run length across chaos arms. The remaining arguments are Chaos
+      Construction region variables, split into arms by empty arguments.`);
+    static CATEGORY = 'LinesAndSets';
+    static DISPLAY_CONFIG = {
+      displayClass: 'ChaosArrow',
+      dashed: true,
+      arrow: true,
+      startMarker: LineOptions.EMPTY_CIRCLE_MARKER,
+    };
+    static VALIDATE_CELLS_FN = cells => cells.length >= 2;
+
+    constructor(...cells) {
+      super(...cells);
+      this.cells = cells;
+    }
+
+    armCellGroups() {
+      const arms = [];
+      let arm = [];
+      for (const cell of this.cells.slice(1)) {
+        if (cell === '') {
+          if (arm.length) arms.push(arm);
+          arm = [];
+        } else {
+          arm.push(cell);
+        }
+      }
+      if (arm.length) arms.push(arm);
+      return arms;
+    }
+
+    _mapRegionCells(shape, cells) {
+      const regionCellOffset = shape.varCellsForGroup('CC')[0];
+      return cells.map(cellId => shape.makeCellIdFromIndex(
+        shape.parseCellId(cellId).cell - regionCellOffset));
+    }
+
+    getCells(shape) {
+      return [this.cells[0], ...this._mapRegionCells(shape, this.armCellGroups().flat())];
+    }
+
+    getCellGroups(shape) {
+      const controlCell = this.cells[0];
+      return this.armCellGroups().map(arm => [controlCell, ...this._mapRegionCells(shape, arm)]);
     }
   }
 
