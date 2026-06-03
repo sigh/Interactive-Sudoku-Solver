@@ -10,6 +10,7 @@ const { LazyDrawerManager } = await import('./bottom_drawer.js' + self.VERSION_P
 const {
   HighlightDisplay,
   SolutionDisplay,
+  ChaosRegionBorderDisplay,
   CellValueDisplay,
 } = await import('./display.js' + self.VERSION_PARAM);
 const { toShortSolution } = await import('./sudoku_parser.js' + self.VERSION_PARAM);
@@ -122,6 +123,7 @@ class HistoryHandler {
 export class SolutionController {
   constructor(constraintManager, displayContainer, bottomDrawer) {
     this._shape = null;
+    this._searchComplete = false;
 
     this._displayContainer = displayContainer;
 
@@ -133,6 +135,9 @@ export class SolutionController {
     this._solutionDisplay = new SolutionDisplay(
       displayContainer.getNewGroup('solution-group'),
       document.getElementById('copy-solution-button'),
+      displayContainer.getCellPositioner());
+    this._chaosRegionBorderDisplay = new ChaosRegionBorderDisplay(
+      displayContainer.getNewGroup('chaos-region-border-group'),
       displayContainer.getCellPositioner());
 
     this._constraintManager = constraintManager;
@@ -159,10 +164,14 @@ export class SolutionController {
 
     this._stateDisplay = new SolverStateDisplay(this._solutionDisplay, bottomDrawer);
     constraintManager.addReshapeListener(this._solutionDisplay);
+    constraintManager.addReshapeListener(this._chaosRegionBorderDisplay);
 
     // Create the SolverRunner with callbacks for UI updates
     this._solverRunner = new SolverRunner({
-      stateHandler: (state) => this._stateDisplay.setState(state),
+      stateHandler: (state) => {
+        this._searchComplete = state.done;
+        this._stateDisplay.setState(state);
+      },
       statusHandler: (isSolving, method) => this._solveStatusChanged(isSolving, method),
       onError: (error) => {
         this._elements.error.textContent = error;
@@ -377,7 +386,9 @@ export class SolutionController {
 
   async _update(options) {
     const forceSolve = options?.forceSolve;
+    this._searchComplete = false;
     this._solutionDisplay.setSolution();
+    this._chaosRegionBorderDisplay.setSolution();
     let mode = this._elements.mode.value;
     if (!mode) {
       mode = DEFAULT_MODE;
@@ -416,8 +427,10 @@ export class SolutionController {
 
   _resetSolver() {
     this._solverRunner.abort();
+    this._searchComplete = false;
     this._stepHighlighter.setCells([]);
     this._solutionDisplay.setSolution();
+    this._chaosRegionBorderDisplay.setSolution();
     this._diffDisplay.clear();
     this._stateDisplay.clear();
     this._debugManager.clear();
@@ -528,11 +541,13 @@ export class SolutionController {
   _handleResultUpdate(result) {
     if (!result) {
       this._solutionDisplay.setSolution();
+      this._chaosRegionBorderDisplay.setSolution();
       return;
     }
 
     const colorFn = this._makeCandidateColorFn(result);
     this._solutionDisplay.setSolution(result.solution, colorFn);
+    this._chaosRegionBorderDisplay.setSolution(result.solution, this._searchComplete);
 
     if (result.highlightCells) {
       this._stepHighlighter.setCells(result.highlightCells);

@@ -4,9 +4,10 @@ const {
   clearDOMNode,
   copyToClipboard,
   isIterable,
+  setIntersectSize,
 } = await import('./util.js' + self.VERSION_PARAM);
 const { toShortSolution } = await import('./sudoku_parser.js' + self.VERSION_PARAM);
-const { GridShape, SHAPE_9x9 } = await import('./grid_shape.js' + self.VERSION_PARAM);
+const { GridShape, CellGraph, SHAPE_9x9 } = await import('./grid_shape.js' + self.VERSION_PARAM);
 
 export class DisplayItem {
   static SVG_PADDING = 29;
@@ -784,6 +785,76 @@ export class BorderDisplay extends DisplayItem {
     ]);
     if (this._fill) path.setAttribute('fill', this._fill);
     this.getSvg().append(path);
+  }
+}
+
+export class ChaosRegionBorderDisplay extends DisplayItem {
+  static BORDER_COLOR = 'rgb(0, 100, 255)';
+  static IN_PROGRESS_BORDER_WIDTH = 2;
+  static COMPLETE_BORDER_WIDTH = 3;
+
+  constructor(svg, cellPositioner) {
+    super(svg, cellPositioner);
+    this._applyGridOffset(svg);
+    svg.setAttribute('stroke', this.constructor.BORDER_COLOR);
+    svg.setAttribute('stroke-width', this.constructor.IN_PROGRESS_BORDER_WIDTH);
+    svg.setAttribute('stroke-linecap', 'round');
+    svg.setAttribute('fill', 'none');
+  }
+
+  reshape(shape) {
+    super.reshape(shape);
+    this.clear();
+  }
+
+  setSolution(solution, searchComplete = false) {
+    this.clear();
+    if (!solution?.length) return;
+    this.getSvg().setAttribute('stroke-width', searchComplete
+      ? this.constructor.COMPLETE_BORDER_WIDTH
+      : this.constructor.IN_PROGRESS_BORDER_WIDTH);
+
+    const regionCells = this._shape.varCellsForGroup('CC');
+    if (!regionCells || regionCells.length !== this._shape.numGridCells) return;
+    const graph = this._shape.cellGraph();
+
+    for (let cell = 0; cell < this._shape.numGridCells; cell++) {
+      const right = graph.adjacent(cell, CellGraph.RIGHT);
+      if (right !== null) this._drawBorderIfDisjoint(solution, regionCells, cell, right);
+      const down = graph.adjacent(cell, CellGraph.DOWN);
+      if (down !== null) this._drawBorderIfDisjoint(solution, regionCells, cell, down);
+    }
+  }
+
+  _drawBorderIfDisjoint(solution, regionCells, cellA, cellB) {
+    if (!this._regionValuesAreDisjoint(
+      solution[regionCells[cellA]], solution[regionCells[cellB]])) return;
+
+    this.getSvg().append(
+      this._makeCellBorder(cellA, cellB),
+      this._makeCellBorder(regionCells[cellA], regionCells[cellB]));
+  }
+
+  _regionValuesAreDisjoint(valueA, valueB) {
+    if (!isIterable(valueA)) {
+      if (!isIterable(valueB)) return valueA !== valueB;
+      return !valueB.has(valueA);
+    }
+    if (!isIterable(valueB)) return !valueA.has(valueB);
+    return setIntersectSize(valueA, valueB) === 0;
+  }
+
+  _makeCellBorder(cellA, cellB) {
+    const [xA, yA] = this.cellIndexCenter(cellA);
+    const [xB, yB] = this.cellIndexCenter(cellB);
+    const cellSize = DisplayItem.CELL_SIZE;
+    const x = (xA + xB) / 2;
+    const y = (yA + yB) / 2;
+
+    if (xA === xB) {
+      return this._makePath([[x - cellSize / 2, y], [x + cellSize / 2, y]]);
+    }
+    return this._makePath([[x, y - cellSize / 2], [x, y + cellSize / 2]]);
   }
 }
 
