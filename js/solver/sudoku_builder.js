@@ -272,7 +272,9 @@ export class SudokuBuilder {
             const controlCell = shape.parseCellId(constraint.cells[0]).cell;
             const chaosArms = constraint.armCellGroups()
               .map(arm => arm.map(cellId => shape.parseCellId(cellId).cell));
-            yield new ChaosHandlerModule.ChaosMultiArrow(controlCell, chaosArms);
+            const regionCellOffset = regionCells[0];
+            const regionRunArms = chaosArms.map(arm => arm.map(c => c - regionCellOffset));
+            yield new ChaosHandlerModule.ChaosMultiArrow(controlCell, chaosArms, regionRunArms);
           }
           break;
 

@@ -31,11 +31,18 @@ const makeShape = () => {
   return shape;
 };
 
-const initializeHandler = (handler, shape, grid) => handler.initialize(
-  grid,
-  createCellExclusions({ allUnique: false, numCells: shape.totalCells() }),
-  shape,
-  createStateAllocator(grid, shape.totalCells()));
+const initializeHandler = (handler, shape, grid) => {
+  const cellExclusions = createCellExclusions({ allUnique: false, numCells: shape.totalCells() });
+  const stateAllocator = createStateAllocator(grid, shape.totalCells());
+  if (handler.attachRegionShardState) {
+    const regionCells = shape.varCellsForGroup('CC');
+    const chaosHandler = new ChaosConstruction(shape.numGridCells, regionCells[0]);
+    chaosHandler.selectPriorityAnchorCells(shape, new Int32Array(shape.totalCells()));
+    assert.equal(chaosHandler.initialize(grid, cellExclusions, shape, stateAllocator), true);
+    handler.attachRegionShardState(chaosHandler.regionShardState());
+  }
+  return handler.initialize(grid, cellExclusions, shape, stateAllocator);
+};
 
 await runTest('ChaosMultiArrow prunes impossible control counts', () => {
   const shape = makeShape();
@@ -127,10 +134,42 @@ await runTest('_addChaosRegionShardSources attaches ChaosMultiArrow lines', () =
   optimizer._addChaosRegionShardSources(handlerSet, shape);
 
   chaosHandler.selectPriorityAnchorCells(shape, new Int32Array(shape.totalCells()));
-  assert.equal(initializeHandler(chaosHandler, shape, grid), true);
+  const stateAllocator = createStateAllocator(grid, shape.totalCells());
+  const cellExclusions = createCellExclusions({ allUnique: false, numCells: shape.totalCells() });
+  assert.equal(chaosHandler.initialize(grid, cellExclusions, shape, stateAllocator), true);
+  assert.equal(arrowHandler.initialize(grid, cellExclusions, shape, stateAllocator), true);
+  assert.equal(arrowHandler.enforceConsistency(grid, createAccumulator()), true);
   assert.equal(chaosHandler.enforceConsistency(grid, createAccumulator()), true);
   assert.equal(grid[regionCells[4]], valueMask(2));
   assert.equal(grid[regionCells[10]], valueMask(2));
+});
+
+await runTest('_addChaosRegionShardSources attaches multi-arm guaranteed prefixes', () => {
+  const shape = makeShape();
+  const grid = makeChaosGrid(shape);
+  const regionCells = shape.varCellsForGroup('CC');
+  const chaosHandler = new ChaosConstruction(shape.numGridCells, regionCells[0]);
+  const arrowHandler = new ChaosMultiArrow(
+    4,
+    [[regionCells[4], regionCells[5], regionCells[6]], [regionCells[4], regionCells[8]]],
+    [[4, 5, 6], [4, 8]]);
+  const handlerSet = new HandlerSet([chaosHandler, arrowHandler], shape.totalCells());
+
+  grid[4] = valueMask(3);
+  grid[regionCells[5]] = valueMask(2);
+
+  const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
+  optimizer._addChaosRegionShardSources(handlerSet, shape);
+
+  chaosHandler.selectPriorityAnchorCells(shape, new Int32Array(shape.totalCells()));
+  const stateAllocator = createStateAllocator(grid, shape.totalCells());
+  const cellExclusions = createCellExclusions({ allUnique: false, numCells: shape.totalCells() });
+  assert.equal(chaosHandler.initialize(grid, cellExclusions, shape, stateAllocator), true);
+  assert.equal(arrowHandler.initialize(grid, cellExclusions, shape, stateAllocator), true);
+  assert.equal(arrowHandler.enforceConsistency(grid, createAccumulator()), true);
+  assert.equal(chaosHandler.enforceConsistency(grid, createAccumulator()), true);
+  assert.equal(grid[regionCells[4]], valueMask(2));
+  assert.equal(grid[regionCells[5]], valueMask(2));
 });
 
 logSuiteComplete('chaos_arrow_optimization.test.js');

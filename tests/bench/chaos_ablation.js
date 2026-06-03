@@ -3201,8 +3201,8 @@ const addChaosNfaRegionCountLines = function (handlerSet, shape) {
 
   const lines = [];
   for (const handler of handlerSet.getAllofType(ChaosMultiArrow)) {
-    for (const [line, controlCell] of handler.regionRunLines()) {
-      lines.push([controlCell, ...line]);
+    for (const line of handler._regionRunArms) {
+      lines.push([handler._controlCell, ...line]);
     }
   }
 
@@ -4983,11 +4983,10 @@ const enforceConsistencyConnectivityFixedPoint = function (grid, handlerAccumula
 };
 
 const collectShardRegionInvariantState = function (grid) {
-  if (!this._regionRunLines?.length || this._regionShardOffset === undefined) {
+  if (this._regionShardOffset === undefined) {
     return true;
   }
 
-  this._updateRegionRunLineShards(grid);
   this._updateFixedRegionShards(grid);
 
   const numGridCells = this._numGridCells;
@@ -5296,7 +5295,7 @@ const enforceShardRegionConnectivity = function (grid, handlerAccumulator) {
 
 const enforceShardRegionInvariants = function (grid, handlerAccumulator) {
   if (!collectShardRegionInvariantState.call(this, grid)) return false;
-  if (!this._regionRunLines?.length || this._regionShardOffset === undefined) return true;
+  if (this._regionShardOffset === undefined) return true;
   if (this._shardRegionInvariantFixedValuesEnabled
     && !enforceShardFixedValueInvariants.call(this, grid, handlerAccumulator)) return false;
   if (this._shardRegionInvariantCapacityEnabled

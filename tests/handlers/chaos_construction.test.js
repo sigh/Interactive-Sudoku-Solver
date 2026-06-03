@@ -45,15 +45,32 @@ const makeChaosContext = (gridSpec = '2x2', configureGrid = null) => {
   });
 
   handler.selectPriorityAnchorCells(shape, new Int32Array(shape.totalCells()));
+  const stateAllocator = createStateAllocator(grid, shape.totalCells());
   const initialized = handler.initialize(
-    grid, cellExclusions, shape, createStateAllocator(grid, shape.totalCells()));
-  return { shape, grid, gridCells, regionCells, regionCellOffset, handler, initialized };
+    grid, cellExclusions, shape, stateAllocator);
+  return {
+    shape, grid, gridCells, regionCells, regionCellOffset, handler,
+    cellExclusions, stateAllocator, initialized,
+  };
 };
 
 const enforce = (context) => {
   const acc = createAccumulator();
   const result = context.handler.enforceConsistency(context.grid, acc);
   return { result, acc };
+};
+
+const makeShardArrow = (context, controlCell, regionRunArms) => {
+  const regionArms = regionRunArms.map(arm => arm.map(c => context.regionCells[c]));
+  const handler = new ChaosMultiArrow(controlCell, regionArms, regionRunArms);
+  handler.attachRegionShardState(context.handler.regionShardState());
+  assert.equal(handler.initialize(
+    context.grid, context.cellExclusions, context.shape, context.stateAllocator), true);
+  return handler;
+};
+
+const enforceShardArrow = (arrowHandler, context) => {
+  assert.equal(arrowHandler.enforceConsistency(context.grid, createAccumulator()), true);
 };
 
 const isFixedMask = mask => mask && !(mask & (mask - 1));
@@ -300,8 +317,7 @@ await runTest('ChaosConstruction removes region candidates too far from fixed ce
 });
 
 await runTest('ChaosConstruction distance pruning takes whole shards together', () => {
-  const context = makeChaosContext('3x3', ({ grid, regionCells, handler }) => {
-    handler.addRegionLink([3, 4], 3);
+  const context = makeChaosContext('3x3', ({ grid, regionCells }) => {
     grid[0] = valueMask(1);
     grid[1] = valueMask(3);
     grid[3] = valueMask(2);
@@ -310,6 +326,7 @@ await runTest('ChaosConstruction distance pruning takes whole shards together', 
     grid[regionCells[3]] = valueMask(1, 2);
     grid[regionCells[4]] = valueMask(1, 2);
   });
+  enforceShardArrow(makeShardArrow(context, 3, [[3, 4]]), context);
   const { grid, regionCells } = context;
 
   assert.equal(enforce(context).result, true);
@@ -534,11 +551,11 @@ await runTest('ChaosConstruction forces sole region-value locations opportunisti
 });
 
 await runTest('ChaosConstruction region shard equalizes minimum-prefix candidates', () => {
-  const context = makeChaosContext('4x4', ({ grid, regionCells, handler }) => {
-    handler.addRegionLink([2, 3], 2);
+  const context = makeChaosContext('4x4', ({ grid, regionCells }) => {
     grid[2] = valueMask(2, 3);
     grid[regionCells[3]] = valueMask(2);
   });
+  enforceShardArrow(makeShardArrow(context, 2, [[2, 3]]), context);
   const { grid, regionCells } = context;
 
   assert.equal(enforce(context).result, true);
@@ -547,21 +564,21 @@ await runTest('ChaosConstruction region shard equalizes minimum-prefix candidate
 });
 
 await runTest('ChaosConstruction region shard rejects oversized shards', () => {
-  const context = makeChaosContext('4x4', ({ grid, handler }) => {
-    handler.addRegionLink([4, 5, 6], 4);
-    handler.addRegionLink([4, 7, 8], 4);
+  const context = makeChaosContext('4x4', ({ grid }) => {
     grid[4] = valueMask(3);
   });
+  enforceShardArrow(makeShardArrow(context, 4, [[4, 5, 6]]), context);
+  enforceShardArrow(makeShardArrow(context, 4, [[4, 7, 8]]), context);
 
   assert.equal(enforce(context).result, false);
 });
 
 await runTest('ChaosConstruction region shard rejects duplicate fixed values', () => {
-  const context = makeChaosContext('4x4', ({ grid, handler }) => {
-    handler.addRegionLink([0, 1], 0);
+  const context = makeChaosContext('4x4', ({ grid }) => {
     grid[0] = valueMask(2);
     grid[1] = valueMask(2);
   });
+  enforceShardArrow(makeShardArrow(context, 0, [[0, 1]]), context);
 
   assert.equal(enforce(context).result, false);
 });
@@ -594,14 +611,14 @@ await runTest('ChaosConstruction merges contiguous fixed region cells into shard
 });
 
 await runTest('ChaosConstruction region shard removes fixed-value duplicate labels', () => {
-  const context = makeChaosContext('4x4', ({ grid, regionCells, handler }) => {
-    handler.addRegionLink([2, 3], 2);
+  const context = makeChaosContext('4x4', ({ grid, regionCells }) => {
     grid[0] = valueMask(2);
     grid[2] = valueMask(2);
     grid[regionCells[0]] = valueMask(1);
     grid[regionCells[2]] = valueMask(1, 2);
     grid[regionCells[3]] = valueMask(1, 2);
   });
+  enforceShardArrow(makeShardArrow(context, 2, [[2, 3]]), context);
   const { grid, regionCells } = context;
 
   assert.equal(enforce(context).result, true);
@@ -610,9 +627,7 @@ await runTest('ChaosConstruction region shard removes fixed-value duplicate labe
 });
 
 await runTest('ChaosConstruction region shard removes labels without compatible capacity', () => {
-  const context = makeChaosContext('4x4', ({ grid, handler, acc }) => {
-    handler.addRegionLink([6, 7, 11], 6);
-  });
+  const context = makeChaosContext('4x4');
   const { grid, regionCells, handler } = context;
   const acc = createAccumulator();
 
@@ -640,6 +655,7 @@ await runTest('ChaosConstruction region shard removes labels without compatible 
   grid[10] = valueMask(2);
   grid[regionCells[10]] = valueMask(2);
 
+  enforceShardArrow(makeShardArrow(context, 6, [[6, 7, 11]]), context);
   assert.equal(handler._enforceRegionShards(grid, acc), true);
   assert.equal(handler._scanRegionCandidates(grid), true);
   handler._connectivityDirtyRegionsMask = valueMask(2);
@@ -651,31 +667,63 @@ await runTest('ChaosConstruction region shard removes labels without compatible 
 });
 
 await runTest('ChaosConstruction region shard persists fixed-control merges', () => {
-  const context = makeChaosContext('4x4', ({ grid, handler }) => {
-    handler.addRegionLink([0, 1], 0);
+  const context = makeChaosContext('4x4', ({ grid }) => {
     grid[0] = valueMask(1, 2);
   });
   const { shape, grid, regionCells } = context;
+  const arrowHandler = makeShardArrow(context, 0, [[0, 1]]);
 
+  enforceShardArrow(arrowHandler, context);
   assert.equal(enforce(context).result, true);
   assert.equal(grid[regionCells[1]], LookupTables.get(shape.numValues).allValues);
 
   grid[0] = valueMask(2);
+  enforceShardArrow(arrowHandler, context);
   assert.equal(enforce(context).result, true);
   assert.equal(grid[regionCells[0]], grid[regionCells[1]]);
 });
 
+await runTest('ChaosMultiArrow shard merges use supported multi-arm prefixes', () => {
+  const context = makeChaosContext('4x4');
+  const { grid, regionCells, handler } = context;
+  const arrowHandler = makeShardArrow(context, 15, [[5, 2, 3], [5, 8, 12]]);
+
+  grid[15] = valueMask(3);
+  grid[regionCells[5]] = valueMask(2);
+  grid[regionCells[2]] = valueMask(2);
+  grid[regionCells[3]] = valueMask(3);
+  grid[regionCells[8]] = valueMask(2);
+  grid[regionCells[12]] = valueMask(3);
+
+  enforceShardArrow(arrowHandler, context);
+  assert.equal(regionShardParent(handler, grid, 5), regionShardParent(handler, grid, 2));
+  assert.equal(regionShardParent(handler, grid, 5), regionShardParent(handler, grid, 8));
+});
+
+await runTest('ChaosMultiArrow derives minimum lengths from region shards', () => {
+  const context = makeChaosContext('4x4');
+  const { grid, handler } = context;
+  const arrowHandler = makeShardArrow(context, 0, [[0, 1, 2], [0, 4]]);
+
+  handler.regionShardState().merge(grid, 0, 1);
+
+  assert.equal(arrowHandler.enforceConsistency(grid, createAccumulator()), true);
+  assert.equal(grid[0], valueMask(2, 3, 4));
+});
+
+await runTest('ChaosMultiArrow drops origin-only arms from runtime support', () => {
+  const context = makeChaosContext('4x4');
+  const handler = makeShardArrow(context, 0, [[0], [0, 1], [0]]);
+
+  assert.equal(handler._regionArms.length, 1);
+  assert.equal(handler._duplicateStartCount, 0);
+  assert.equal(handler._regionRunArms.length, 1);
+});
+
 await runTest('ChaosMultiArrow allows origin-only directions', () => {
-  const shape = GridShape.fromGridSpec('4x4');
-  shape.addVarCellsForConstraints([new SudokuConstraint.ChaosConstruction()]);
-  const regionCells = shape.varCellsForGroup('CC');
-  const grid = makeChaosGrid(shape);
-  const handler = new ChaosMultiArrow(
-    0,
-    [
-      [regionCells[0], regionCells[1], regionCells[2], regionCells[3]],
-      [regionCells[0], regionCells[4], regionCells[5], regionCells[6]],
-    ]);
+  const context = makeChaosContext('4x4');
+  const { grid, regionCells } = context;
+  const handler = makeShardArrow(context, 0, [[0, 1, 2, 3], [0, 4, 5, 6]]);
 
   grid[0] = valueMask(4);
   grid[regionCells[0]] = valueMask(1);
@@ -688,16 +736,9 @@ await runTest('ChaosMultiArrow allows origin-only directions', () => {
 });
 
 await runTest('ChaosMultiArrow prunes unsupported total counts', () => {
-  const shape = GridShape.fromGridSpec('4x4');
-  shape.addVarCellsForConstraints([new SudokuConstraint.ChaosConstruction()]);
-  const regionCells = shape.varCellsForGroup('CC');
-  const grid = makeChaosGrid(shape);
-  const handler = new ChaosMultiArrow(
-    0,
-    [
-      [regionCells[0], regionCells[1]],
-      [regionCells[0], regionCells[4]],
-    ]);
+  const context = makeChaosContext('4x4');
+  const { grid } = context;
+  const handler = makeShardArrow(context, 0, [[0, 1], [0, 4]]);
 
   assert.equal(handler.enforceConsistency(grid, createAccumulator()), true);
   assert.equal(grid[0], valueMask(1, 2, 3));

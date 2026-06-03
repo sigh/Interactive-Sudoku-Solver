@@ -7,6 +7,7 @@ ensureGlobalEnvironment();
 
 const { SudokuParser } = await import('../../js/sudoku_parser.js');
 const { SudokuBuilder } = await import('../../js/solver/sudoku_builder.js');
+const { SimpleSolver } = await import('../../js/sandbox/simple_solver.js');
 const { DISPLAYED_EXAMPLES, PUZZLE_INDEX } = await import('../../data/example_puzzles.js');
 const { EXAMPLES } = await import('../../data/collections.js');
 const { VALID_JIGSAW_BOX_LAYOUTS } = await import('../../data/jigsaw_box_layouts.js');
@@ -60,6 +61,14 @@ await runTest('all EXAMPLES build into solvers without error', () => {
     const resolved = SudokuBuilder.resolveConstraint(constraint);
     const solver = SudokuBuilder.build(resolved);
     assert.ok(solver, `Failed to build solver for collection: ${example.name}`);
+  }
+});
+
+await runTest('Cavernous Construction examples solve true candidates without error', () => {
+  const solver = new SimpleSolver();
+  for (const example of EXAMPLES) {
+    if (!example.name.startsWith('Cavernous Construction')) continue;
+    assert.ok(solver.trueCandidates(example.input), `Failed true candidates for: ${example.name}`);
   }
 });
 

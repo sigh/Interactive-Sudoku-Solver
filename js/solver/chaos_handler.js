@@ -8,6 +8,52 @@ const REGION_FIXED_COUNT_MASK = 0x1f;
 const REGION_VALUE_MASK_SHIFT = 14;
 const REGION_COUNT_MASK = (1 << REGION_VALUE_MASK_SHIFT) - 1;
 
+const mergeRegionShardRoots = (roots, offset, cellA, cellB) => {
+  let rootA = roots[offset + cellA];
+  let rootB = roots[offset + cellB];
+  if (rootA === rootB) return false;
+  while (rootA !== cellA) {
+    cellA = rootA;
+    rootA = roots[offset + cellA];
+  }
+  while (rootB !== cellB) {
+    cellB = rootB;
+    rootB = roots[offset + cellB];
+  }
+  if (rootA === rootB) return false;
+  // Keep roots monotonic so shard member lists can be rebuilt in cell order.
+  if (rootB < rootA) [rootA, rootB] = [rootB, rootA];
+  roots[offset + rootB] = rootA;
+  return true;
+};
+
+class ChaosRegionShardState {
+  configure(regionCellOffset, regionShardOffset) {
+    this._regionCellOffset = regionCellOffset;
+    this._regionShardOffset = regionShardOffset;
+  }
+
+  merge(grid, cellA, cellB, handlerAccumulator = null) {
+    if (!mergeRegionShardRoots(grid, this._regionShardOffset, cellA, cellB)) return false;
+    if (handlerAccumulator) {
+      handlerAccumulator.addForCell(this._regionCellOffset + cellA);
+      handlerAccumulator.addForCell(this._regionCellOffset + cellB);
+    }
+    return true;
+  }
+
+  // Return the current representative for a physical same-region shard.
+  root(grid, cell) {
+    const offset = this._regionShardOffset;
+    let root = grid[offset + cell];
+    while (root !== cell) {
+      cell = root;
+      root = grid[offset + cell];
+    }
+    return root;
+  }
+}
+
 export class ChaosConstruction extends SudokuConstraintHandler {
   static _NO_CELL = 0xffff;
 
@@ -22,7 +68,8 @@ export class ChaosConstruction extends SudokuConstraintHandler {
     this._numGridCells = numGridCells;
     this._regionCellOffset = regionCellOffset;
     this._canonicalAnchorCells = [0];
-    this._regionRunLines = [];
+    this._regionLinks = [];
+    this._regionShardState = new ChaosRegionShardState();
     this.idStr = [this.constructor.name, this._numGridCells].join('|');
   }
 
@@ -30,13 +77,13 @@ export class ChaosConstruction extends SudokuConstraintHandler {
     return this.cells;
   }
 
-  addRegionLink(line, control) {
+  addRegionLink(line) {
     if (line.length < 2) return;
+    this._regionLinks.push(Uint16Array.from(line));
+  }
 
-    const regionLink = new Uint16Array(line.length + 1);
-    regionLink[0] = control ?? this.constructor._NO_CELL;
-    regionLink.set(line, 1);
-    this._regionRunLines.push(regionLink);
+  regionShardState() {
+    return this._regionShardState;
   }
 
   _selectPriorityAnchorCells(shape, cellPriorities) {
@@ -140,26 +187,15 @@ export class ChaosConstruction extends SudokuConstraintHandler {
     this._visitId = 0;
     // Branch-state union-find for cells that are known to occupy one region.
     const regionShardRoots = Uint16Array.from({ length: numGridCells }, (_, cell) => cell);
-    const regionRunLines = this._regionRunLines;
-    const noCell = this.constructor._NO_CELL;
     this._regionShardOffset = 0;
-    let runLineCount = 0;
-    for (let i = 0; i < regionRunLines.length; i++) {
-      const line = regionRunLines[i];
-      if (line[0] === noCell) {
-        const root = line[1];
-        for (let lineIndex = 2; lineIndex < line.length; lineIndex++) {
-          this._mergeRegionShards(regionShardRoots, root, line[lineIndex]);
-        }
-      } else {
-        regionRunLines[runLineCount++] = line;
+    for (const link of this._regionLinks) {
+      const root = link[0];
+      for (let i = 1; i < link.length; i++) {
+        this._mergeRegionShards(regionShardRoots, root, link[i]);
       }
     }
-    regionRunLines.length = runLineCount;
-    // Dynamic run-line prefixes only grow within a branch, so each implied
-    // merge is applied once and restored naturally by backtracking.
-    this._regionRunProgressOffset = stateAllocator.allocate(new Uint8Array(runLineCount).fill(1));
     this._regionShardOffset = stateAllocator.allocate(regionShardRoots);
+    this._regionShardState.configure(this._regionCellOffset, this._regionShardOffset);
     // Per-shard summaries rebuilt from the branch-state union-find roots.
     this._regionShardSizes = new Uint8Array(numGridCells);
     this._regionShardScratchMasks = new Uint16Array(numGridCells);
@@ -230,41 +266,7 @@ export class ChaosConstruction extends SudokuConstraintHandler {
   }
 
   _mergeRegionShards(grid, cellA, cellB) {
-    const offset = this._regionShardOffset;
-    let rootA = grid[offset + cellA];
-    let rootB = grid[offset + cellB];
-    if (rootA === rootB) return;
-    while (rootA !== cellA) {
-      cellA = rootA;
-      rootA = grid[offset + cellA];
-    }
-    while (rootB !== cellB) {
-      cellB = rootB;
-      rootB = grid[offset + cellB];
-    }
-    if (rootA === rootB) return;
-    // Keep roots monotonic so shard member lists can be rebuilt in cell order.
-    if (rootB < rootA) [rootA, rootB] = [rootB, rootA];
-    grid[offset + rootB] = rootA;
-  }
-
-  _updateRegionRunLineShards(grid) {
-    const regionRunLines = this._regionRunLines;
-    const progressOffset = this._regionRunProgressOffset;
-    for (let i = 0; i < regionRunLines.length; i++) {
-      const line = regionRunLines[i];
-      const count = LookupTables.minValue(grid[line[0]]);
-      const appliedCount = grid[progressOffset + i];
-      if (count <= appliedCount || count >= line.length) continue;
-
-      // minValue gives the prefix that is already guaranteed even before the
-      // run control is fixed.
-      const startCell = line[1];
-      for (let lineIndex = appliedCount + 1; lineIndex <= count; lineIndex++) {
-        this._mergeRegionShards(grid, startCell, line[lineIndex]);
-      }
-      grid[progressOffset + i] = count;
-    }
+    mergeRegionShardRoots(grid, this._regionShardOffset, cellA, cellB);
   }
 
   _updateFixedRegionShards(grid) {
@@ -292,7 +294,6 @@ export class ChaosConstruction extends SudokuConstraintHandler {
 
   _enforceRegionShards(grid, handlerAccumulator) {
     // Phase 1: materialize same-region facts into shards and rebuild summaries.
-    this._updateRegionRunLineShards(grid);
     this._updateFixedRegionShards(grid);
 
     const regionCellOffset = this._regionCellOffset;
@@ -970,25 +971,35 @@ export class ChaosConstruction extends SudokuConstraintHandler {
 }
 
 export class ChaosMultiArrow extends SudokuConstraintHandler {
-  constructor(controlCell, regionArms, regionRunLines = null) {
-    super([controlCell, ...regionArms.flat()]);
-
-    const startCell = regionArms[0]?.[0];
-    if (startCell === undefined || regionArms.some(arm => arm[0] !== startCell)) {
+  constructor(controlCell, regionArms, regionRunArms) {
+    const startCell = regionArms[0][0];
+    if (regionArms.some(arm => arm[0] !== startCell)) {
       throw new InvalidConstraintError('ChaosMultiArrow arms must share their first region cell.');
     }
+    let activeRegionArms = regionArms.filter(arm => arm.length > 1);
+    let activeRegionRunArms = regionRunArms.filter((_, index) => regionArms[index].length > 1);
+    if (!activeRegionArms.length) {
+      activeRegionArms = [regionArms[0]];
+      activeRegionRunArms = [regionRunArms[0]];
+    }
+
+    super([controlCell, ...activeRegionArms.flat()]);
 
     this._controlCell = controlCell;
-    this._regionArms = regionArms.map(arm => Uint16Array.from(arm));
-    this._duplicateStartCount = regionArms.length - 1;
-    this._armLengthMasks = regionArms.map(_ => new Uint16Array(16));
-    this._armRunSupportMasks = regionArms.map(arm => new Uint16Array(arm.length));
-    this._regionRunLines = regionRunLines?.map(line => Uint16Array.from(line)) ?? [];
-    this._numRegions = 16;
+    this._regionArms = activeRegionArms.map(arm => Uint16Array.from(arm));
+    this._duplicateStartCount = activeRegionArms.length - 1;
+    // Scratch is per-enforcement: possible lengths per arm, and guaranteed
+    // same-shard prefix length per physical arm.
+    this._armLengthScratch = new Uint16Array(activeRegionArms.length);
+    this._armMinLengthScratch = new Uint8Array(activeRegionArms.length);
+    // Per arm position, the region labels that support a run ending there.
+    this._armRunSupportMasks = activeRegionArms.map(arm => new Uint16Array(arm.length));
+    this._regionRunArms = activeRegionRunArms.map(arm => Uint16Array.from(arm));
+    this._regionShardState = null;
   }
 
-  regionRunLines() {
-    return this._regionRunLines.map(line => [line, this._controlCell]);
+  attachRegionShardState(regionShardState) {
+    this._regionShardState = regionShardState;
   }
 
   initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
@@ -998,63 +1009,41 @@ export class ChaosMultiArrow extends SudokuConstraintHandler {
     const maxValueCount = Math.min(shape.numValues, maxArmCells);
     if (maxValueCount < minValueCount) return false;
 
-    this._numRegions = shape.numValues;
     const maxMask = (1 << maxValueCount) - 1;
     return !!(initialGridCells[this._controlCell] &= maxMask);
   }
 
-  _updateArmLengthMasks(grid, controlMask) {
-    const collectLengthMasks = this._regionArms.length !== 1;
-    let supportedRegionMask = (1 << this._numRegions) - 1;
-
-    for (let armIndex = 0; armIndex < this._regionArms.length; armIndex++) {
-      const arm = this._regionArms[armIndex];
-      const armLengthMasks = this._armLengthMasks[armIndex];
-      const runSupportMasks = this._armRunSupportMasks[armIndex];
-      if (collectLengthMasks) armLengthMasks.fill(0);
-
-      let armRegionMask = 0;
-      let runMask = 0xffff;
-      const maxLength = Math.min(LookupTables.maxValue(controlMask), arm.length);
-      for (let length = 1; length <= maxLength; length++) {
-        runMask &= grid[arm[length - 1]];
-        if (!runMask) break;
-
-        let lengthRegionMask = runMask;
-        if (length < arm.length) {
-          const boundaryMask = grid[arm[length]];
-          if (!(boundaryMask & (boundaryMask - 1))) {
-            lengthRegionMask &= ~boundaryMask;
-          }
-        }
-
-        const lengthBit = 1 << (length - 1);
-        if (collectLengthMasks) {
-          let regions = lengthRegionMask;
-          while (regions) {
-            const regionBit = regions & -regions;
-            regions ^= regionBit;
-            armRegionMask |= regionBit;
-            armLengthMasks[LookupTables.toIndex(regionBit)] |= lengthBit;
-          }
-        } else if (lengthRegionMask && (controlMask & lengthBit)) {
-          runSupportMasks[length - 1] = lengthRegionMask;
-          this._supportedControlMask |= lengthBit;
-        }
-      }
-
-      if (collectLengthMasks) supportedRegionMask &= armRegionMask;
+  _lengthMaskForRegion(grid, arm, regionBit, maxControlLength, minLength) {
+    // A length is valid when the prefix can be this region and the next cell,
+    // if any, is not fixed to the same region.
+    const maxLength = Math.min(maxControlLength, arm.length);
+    let lengthMask = 0;
+    for (let length = minLength; length <= maxLength; length++) {
+      if (length > minLength && !(grid[arm[length - 1]] & regionBit)) break;
+      if (length < arm.length && grid[arm[length]] === regionBit) continue;
+      lengthMask |= 1 << (length - 1);
     }
-
-    this._supportedRegionMask = collectLengthMasks ? supportedRegionMask : 0;
+    return lengthMask;
   }
 
-  _updateSupportedLengthsForRegion(controlMask, regionIndex) {
+  _updateSingleArmRunSupport(controlMask, regionBit) {
+    let lengths = this._armLengthScratch[0] & controlMask;
+    this._supportedControlMask |= lengths;
+    const runSupportMasks = this._armRunSupportMasks[0];
+    while (lengths) {
+      const lengthBit = lengths & -lengths;
+      lengths ^= lengthBit;
+      runSupportMasks[LookupTables.toValue(lengthBit) - 1] |= regionBit;
+    }
+  }
+
+  _updateMultiArmRunSupport(controlMask, regionBit) {
+    // For multi-arm arrows, the control is the total run length across all
+    // arms, with the shared start cell counted once.
     let totalMin = 0;
     let totalMax = 0;
     for (let armIndex = 0; armIndex < this._regionArms.length; armIndex++) {
-      const lengthMask = this._armLengthMasks[armIndex][regionIndex];
-      if (!lengthMask) return;
+      const lengthMask = this._armLengthScratch[armIndex];
       const minLength = LookupTables.minValue(lengthMask);
       const maxLength = LookupTables.maxValue(lengthMask);
       totalMin += minLength;
@@ -1067,10 +1056,9 @@ export class ChaosMultiArrow extends SudokuConstraintHandler {
     const supportedControlMask = controlMask & totalRangeMask;
     if (!supportedControlMask) return;
     this._supportedControlMask |= supportedControlMask;
-    const regionBit = 1 << regionIndex;
 
     for (let armIndex = 0; armIndex < this._regionArms.length; armIndex++) {
-      let lengths = this._armLengthMasks[armIndex][regionIndex];
+      let lengths = this._armLengthScratch[armIndex];
       const minLength = LookupTables.minValue(lengths);
       const maxLength = LookupTables.maxValue(lengths);
       const otherMin = totalMin - minLength;
@@ -1090,16 +1078,73 @@ export class ChaosMultiArrow extends SudokuConstraintHandler {
     }
   }
 
+  _updateRunSupportMasks(grid, controlMask) {
+    const maxControlLength = LookupTables.maxValue(controlMask);
+    const shardState = this._regionShardState;
+    const startRoot = shardState.root(grid, this._regionRunArms[0][0]);
+    let regions = grid[this._regionArms[0][0]];
+    // Same-shard prefixes are already forced to share a region. Their region
+    // mask intersection gives a lower bound and removes impossible labels up front.
+    for (let armIndex = 0; armIndex < this._regionRunArms.length; armIndex++) {
+      const runArm = this._regionRunArms[armIndex];
+      const regionArm = this._regionArms[armIndex];
+      let minLength = 1;
+      let minRegionMask = grid[regionArm[0]];
+      while (minLength < runArm.length && shardState.root(grid, runArm[minLength]) === startRoot) {
+        minRegionMask &= grid[regionArm[minLength]];
+        minLength++;
+      }
+      this._armMinLengthScratch[armIndex] = minLength;
+      regions &= minRegionMask;
+    }
+
+    while (regions) {
+      const regionBit = regions & -regions;
+      regions ^= regionBit;
+
+      let supported = true;
+      for (let armIndex = 0; armIndex < this._regionArms.length; armIndex++) {
+        const lengthMask = this._lengthMaskForRegion(
+          grid, this._regionArms[armIndex], regionBit, maxControlLength,
+          this._armMinLengthScratch[armIndex]);
+        this._armLengthScratch[armIndex] = lengthMask;
+        if (!lengthMask) {
+          supported = false;
+          break;
+        }
+      }
+      if (!supported) continue;
+
+      if (this._regionArms.length === 1) {
+        this._updateSingleArmRunSupport(controlMask, regionBit);
+      } else {
+        this._updateMultiArmRunSupport(controlMask, regionBit);
+      }
+    }
+  }
+
   _applySupportedCellMasks(grid, handlerAccumulator) {
+    // Apply the supported run lengths back to CC candidates, and persist any
+    // newly forced prefixes into the shared shard state.
     for (let armIndex = 0; armIndex < this._regionArms.length; armIndex++) {
       const arm = this._regionArms[armIndex];
       const runSupportMasks = this._armRunSupportMasks[armIndex];
 
-      let minSupportedLength = arm.length + 1;
-      for (let i = 0; i < arm.length; i++) {
+      let minSupportedLength = 0;
+      for (let i = this._armMinLengthScratch[armIndex] - 1; i < arm.length; i++) {
         if (runSupportMasks[i]) {
           minSupportedLength = i + 1;
           break;
+        }
+      }
+      if (!minSupportedLength) return false;
+
+      const appliedCount = this._armMinLengthScratch[armIndex];
+      if (minSupportedLength > appliedCount) {
+        const runArm = this._regionRunArms[armIndex];
+        const startCell = runArm[0];
+        for (let i = appliedCount; i < minSupportedLength; i++) {
+          this._regionShardState.merge(grid, startCell, runArm[i], handlerAccumulator);
         }
       }
 
@@ -1143,16 +1188,7 @@ export class ChaosMultiArrow extends SudokuConstraintHandler {
       runSupportMasks.fill(0);
     }
 
-    this._updateArmLengthMasks(grid, controlMask);
-    if (this._regionArms.length !== 1) {
-      let supportedRegionMask = this._supportedRegionMask;
-      while (supportedRegionMask) {
-        const regionBit = supportedRegionMask & -supportedRegionMask;
-        supportedRegionMask ^= regionBit;
-        const regionIndex = LookupTables.toIndex(regionBit);
-        this._updateSupportedLengthsForRegion(controlMask, regionIndex);
-      }
-    }
+    this._updateRunSupportMasks(grid, controlMask);
 
     if (!(controlMask &= this._supportedControlMask)) return false;
     if (controlMask !== grid[controlCell]) {
