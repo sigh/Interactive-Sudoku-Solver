@@ -150,8 +150,14 @@ class BaseConstraintDisplayItem extends DisplayItem {
   }
 
   _makeConstraintLine(cells, options) {
-    const len = cells.length;
-    if (len < 2) throw new Error(`Line too short: ${cells}`);
+    if (cells.length < 2) throw new Error(`Line too short: ${cells}`);
+    return this._makeConstraintLineFromPoints(
+      cells.map(c => this.cellIdCenter(c)), options);
+  }
+
+  _makeConstraintLineFromPoints(points, options) {
+    const len = points.length;
+    if (len < 2) throw new Error('Line too short');
 
     if (options.constructor !== LineOptions) {
       options = new LineOptions(options);
@@ -162,8 +168,6 @@ class BaseConstraintDisplayItem extends DisplayItem {
     g.setAttribute('stroke-width', options.width);
     g.setAttribute('stroke-linecap', 'round');
 
-    const points = cells.map(c => this.cellIdCenter(c));
-
     // Default start and end markers to nodeMarker if not provided.
     let { startMarker, endMarker, nodeMarker } = options;
     if (nodeMarker) {
@@ -173,8 +177,9 @@ class BaseConstraintDisplayItem extends DisplayItem {
 
     // Add the markers.
     if (startMarker) {
-      g.append(this._makeConstraintLineMarker(
-        startMarker, points, 0));
+      const marker = this._makeConstraintLineMarker(startMarker, points, 0);
+      if (options.startMarkerDashed) marker.setAttribute('stroke-dasharray', '3 6');
+      g.append(marker);
     }
     if (endMarker) {
       g.append(this._makeConstraintLineMarker(
@@ -487,6 +492,8 @@ class Thermo extends GenericLine { }
 
 class ChaosArrow extends BaseConstraintDisplayItem {
   static IS_DIMMABLE = true;
+  static SHORT_ARROW_LENGTH = DisplayItem.CELL_SIZE * 0.45;
+  _CIRCLE_RADIUS = 16;
 
   drawItem(constraint, options) {
     const item = this._makeItem(constraint, options);
@@ -495,21 +502,95 @@ class ChaosArrow extends BaseConstraintDisplayItem {
   }
 
   makeIcon(constraint, options) {
-    return this._makeItem(constraint, options);
+    return this._makeItem(constraint, options, false);
   }
 
-  _makeItem(constraint, options) {
+  _makeItem(constraint, options, includeRegionCells = true) {
+    const g = createSvgElement('g');
     const cellGroups = constraint.getCellGroups?.(this._shape)
       ?? [constraint.getCells(this._shape)];
-    if (cellGroups.length === 1) {
-      return this._makeConstraintLine(cellGroups[0], options);
+    for (const group of cellGroups) {
+      const item = this._makeArrowLine(group, options);
+      if (item) g.append(item);
     }
 
-    const g = createSvgElement('g');
-    for (const group of cellGroups) {
-      g.append(this._makeConstraintLine(group, options));
+    if (includeRegionCells) {
+      for (const group of this._regionCellGroups(constraint)) {
+        const item = this._makeArrowLine(group, options, true);
+        if (item) g.append(item);
+      }
     }
     return g;
+  }
+
+  _regionCellGroups(constraint) {
+    const regionCells = this._shape.varCellsForGroup('CC');
+    if (!regionCells || regionCells.length !== this._shape.numGridCells) return [];
+
+    const controlCell = this._shape.parseCellId(constraint.cells[0]).cell;
+    const controlRegionCell = this._shape.makeCellIdFromIndex(regionCells[controlCell]);
+    const arms = constraint.armCellGroups?.() ?? [constraint.cells.slice(1)];
+    return arms.map(arm => [controlRegionCell, ...arm]);
+  }
+
+  _makeArrowLine(cells, options, startMarkerDashed = false) {
+    const points = cells.map(c => this.cellIdCenter(c));
+    const direction = this._straightArmDirection(points);
+    if (!direction && this._samePointArm(points)) return null;
+    if (!direction) {
+      return this._makeConstraintLineFromPoints(points, this._lineOptions(options, true, startMarkerDashed));
+    }
+
+    const start = points[0];
+    const end = [
+      start[0] + direction[0] * this.constructor.SHORT_ARROW_LENGTH,
+      start[1] + direction[1] * this.constructor.SHORT_ARROW_LENGTH,
+    ];
+    return this._makeConstraintLineFromPoints(
+      [start, end], this._lineOptions(options, false, startMarkerDashed));
+  }
+
+  _lineOptions(options, dashed = true, startMarkerDashed = false) {
+    return {
+      ...options,
+      arrow: true,
+      dashed,
+      startMarker: LineOptions.EMPTY_CIRCLE_MARKER,
+      startMarkerDashed,
+      width: LineOptions.THIN_LINE_WIDTH,
+    };
+  }
+
+  _straightArmDirection(points) {
+    const start = points[0];
+    let direction = null;
+
+    for (const point of points.slice(1)) {
+      const deltaX = point[0] - start[0];
+      const deltaY = point[1] - start[1];
+      if (!deltaX && !deltaY) continue;
+      if (!this._isStraightDirection(deltaX, deltaY)) return null;
+
+      const armDirection = [Math.sign(deltaX), Math.sign(deltaY)];
+      if (!direction) {
+        direction = armDirection;
+      } else if (direction[0] !== armDirection[0] || direction[1] !== armDirection[1]) {
+        return null;
+      }
+    }
+
+    return direction;
+  }
+
+  _samePointArm(points) {
+    const start = points[0];
+    return points.every(p => p[0] === start[0] && p[1] === start[1]);
+  }
+
+  _isStraightDirection(deltaX, deltaY) {
+    if (deltaX === 0) return true;
+    if (deltaY === 0) return true;
+    return Math.abs(deltaX) === Math.abs(deltaY);
   }
 }
 

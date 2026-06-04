@@ -1187,9 +1187,6 @@ export class SudokuConstraint {
     static CATEGORY = 'LinesAndSets';
     static DISPLAY_CONFIG = {
       displayClass: 'ChaosArrow',
-      dashed: true,
-      arrow: true,
-      startMarker: LineOptions.EMPTY_CIRCLE_MARKER,
     };
     static VALIDATE_CELLS_FN = cells => cells.length >= 2;
 
@@ -1222,9 +1219,6 @@ export class SudokuConstraint {
     static CATEGORY = 'LinesAndSets';
     static DISPLAY_CONFIG = {
       displayClass: 'ChaosArrow',
-      dashed: true,
-      arrow: true,
-      startMarker: LineOptions.EMPTY_CIRCLE_MARKER,
     };
     static VALIDATE_CELLS_FN = cells => cells.length >= 2;
 
