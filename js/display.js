@@ -334,7 +334,8 @@ export class CellValueDisplay extends DisplayItem {
     }
 
     if (value !== null && !isIterable(value)) {
-      const text = this.makeTextNode(value, x, y, this.constructor.SINGLE_VALUE_CLASS);
+      const text = this.makeTextNode(
+        value, x, y+2, this.constructor.SINGLE_VALUE_CLASS);
       const color = colorFn?.(cellIndex, value);
       if (color) text.setAttribute('fill', color);
       return text;
