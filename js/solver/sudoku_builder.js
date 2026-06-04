@@ -543,6 +543,10 @@ export class SudokuBuilder {
 
         case 'RegionSumLine':
           {
+            if (constraintMap.has('ChaosConstruction')) {
+              throw new InvalidConstraintError(
+                'RegionSumLine is not supported with Chaos Construction.');
+            }
             cells = constraint.cells.map(c => shape.parseCellId(c).cell);
             const boxRegions = this._getBoxRegions(shape, constraintMap);
             if (boxRegions.length) {
@@ -718,6 +722,10 @@ export class SudokuBuilder {
 
         case 'RegionSameValues':
           {
+            if (constraintMap.has('ChaosConstruction')) {
+              throw new InvalidConstraintError(
+                'RegionSameValues is not supported with Chaos Construction.');
+            }
             const regions = [];
 
             if (constraintMap.has('Jigsaw')) {

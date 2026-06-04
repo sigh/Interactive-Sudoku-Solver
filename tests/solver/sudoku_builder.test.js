@@ -472,6 +472,30 @@ await runTest('ChaosConstruction rejects effective non-value region size', () =>
   );
 });
 
+await runTest('ChaosConstruction rejects RegionSumLine', () => {
+  const constraint = new SudokuConstraint.Container([
+    new SudokuConstraint.Shape('4x4'),
+    new SudokuConstraint.ChaosConstruction(),
+    new SudokuConstraint.RegionSumLine('R1C1', 'R1C2', 'R1C3'),
+  ]);
+
+  assert.throws(
+    () => buildHandlers(constraint),
+    /RegionSumLine is not supported with Chaos Construction/);
+});
+
+await runTest('ChaosConstruction rejects RegionSameValues', () => {
+  const constraint = new SudokuConstraint.Container([
+    new SudokuConstraint.Shape('4x4'),
+    new SudokuConstraint.ChaosConstruction(),
+    new SudokuConstraint.RegionSameValues(),
+  ]);
+
+  assert.throws(
+    () => buildHandlers(constraint),
+    /RegionSameValues is not supported with Chaos Construction/);
+});
+
 await runTest('ChaosConstruction solves through builder with canonical labels', () => {
   const constraint = new SudokuConstraint.Container([
     new SudokuConstraint.Shape('2x2'),
