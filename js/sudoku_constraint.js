@@ -1196,12 +1196,14 @@ export class SudokuConstraint {
       if (shape.parseCellId(cells[0]).cell >= shape.numGridCells) return false;
       const regionCellOffset = regionCells[0];
       const regionCellLimit = regionCellOffset + regionCells.length;
-      let armKind = null;
+      const GRID_ARM = 1;
+      const REGION_ARM = 2;
+      let armKind = 0;
       for (let i = 1; i < cells.length; i++) {
         const cell = shape.parseCellId(cells[i]).cell;
-        const cellKind = cell < shape.numGridCells ? 'grid'
-          : cell >= regionCellOffset && cell < regionCellLimit ? 'region'
-            : null;
+        const cellKind = cell < shape.numGridCells ? GRID_ARM
+          : cell >= regionCellOffset && cell < regionCellLimit ? REGION_ARM
+            : 0;
         if (!cellKind || (armKind && armKind !== cellKind)) return false;
         armKind = cellKind;
       }
@@ -1244,14 +1246,17 @@ export class SudokuConstraint {
       });
     }
 
-    _mapRegionCells(shape, cells) {
-      const regionCellOffset = shape.varCellsForGroup('CC')[0];
-      return cells.map(cellId => shape.makeCellIdFromIndex(
-        shape.parseCellId(cellId).cell - regionCellOffset));
-    }
-
     getCells(shape) {
-      return [this.cells[0], ...this._mapRegionCells(shape, this.expandedArmCellGroups(shape).flat())];
+      const regionCells = shape.varCellsForGroup('CC');
+      // Ensure that a 'CC' cell is included so that it can be slated for
+      // deletion when regionCells aren't present.
+      if (!regionCells) return [this.cells[0], 'CC1'];
+
+      const armCells = this.expandedArmCellGroups(shape).flat();
+      const regionCellOffset = regionCells[0];
+      const gridCells = armCells.map(cellId => shape.makeCellIdFromIndex(
+        shape.parseCellId(cellId).cell - regionCellOffset));
+      return [this.cells[0], ...gridCells, ...armCells];
     }
   }
 

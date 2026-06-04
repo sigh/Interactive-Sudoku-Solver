@@ -81,7 +81,7 @@ await runTest('ChaosArrow getCells includes control and maps chaos cells', () =>
 
   const constraint = new SudokuConstraint.ChaosArrow('R2C1', 'CC6', 'CC16');
 
-  assert.deepEqual(constraint.getCells(shape), ['R2C1', 'R2C2', 'R4C4']);
+  assert.deepEqual(constraint.getCells(shape), ['R2C1', 'R2C2', 'R4C4', 'CC6', 'CC16']);
 });
 
 await runTest('ChaosArrow maps grouped chaos arms for display', () => {
@@ -92,7 +92,15 @@ await runTest('ChaosArrow maps grouped chaos arms for display', () => {
     'R2C1', 'CC6', 'CC10', '', 'CC6', 'CC7', 'CC8');
 
   assert.deepEqual(constraint.armCellGroups(), [['CC6', 'CC10'], ['CC6', 'CC7', 'CC8']]);
-  assert.deepEqual(constraint.getCells(shape), ['R2C1', 'R2C2', 'R3C2', 'R2C2', 'R2C3', 'R2C4']);
+  assert.deepEqual(constraint.getCells(shape), [
+    'R2C1', 'R2C2', 'R3C2', 'R2C2', 'R2C3', 'R2C4',
+    'CC6', 'CC10', 'CC6', 'CC7', 'CC8']);
+});
+
+await runTest('ChaosArrow getCells survives missing CC cells for removal', () => {
+  const shape = GridShape.fromGridSize(4);
+
+  assert.deepEqual(new SudokuConstraint.ChaosArrow('R2C2').getCells(shape), ['R2C2', 'CC1']);
 });
 
 await runTest('ChaosArrow expands control-only arrows orthogonally', () => {
