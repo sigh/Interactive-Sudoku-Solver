@@ -18,11 +18,11 @@ const constraintDisplayOrder = () => [
   Indexing,
   Thermo,
   PillArrow,
-  ChaosArrow,
   GenericLine,
   CustomLine,
   ShadedRegion,
   CountingCircles,
+  ChaosArrow,
   Diagonal,
   Dot,
   Letter,
@@ -195,7 +195,7 @@ class BaseConstraintDisplayItem extends DisplayItem {
     // Make and style the path.
     const path = this._makePath(points);
     if (options.arrow) {
-      path.setAttribute('marker-end', 'url(#arrowhead)');
+      path.setAttribute('marker-end', `url(#${options.arrowheadId ?? 'arrowhead'})`);
     }
     if (options.dashed) {
       const pattern = options.dashed === true ? '0.5 2' : options.dashed;
@@ -492,6 +492,7 @@ class Thermo extends GenericLine { }
 
 class ChaosArrow extends BaseConstraintDisplayItem {
   static IS_DIMMABLE = true;
+  static COLOR = 'rgb(140, 70, 220)';
   static SHORT_ARROW_LENGTH = DisplayItem.CELL_SIZE * 0.45;
   _CIRCLE_RADIUS = 16;
 
@@ -562,7 +563,9 @@ class ChaosArrow extends BaseConstraintDisplayItem {
   _lineOptions(options, dashed = true, startMarkerDashed = false) {
     return {
       ...options,
+      color: this.constructor.COLOR,
       arrow: true,
+      arrowheadId: 'chaos-arrowhead',
       dashed,
       startMarker: LineOptions.EMPTY_CIRCLE_MARKER,
       startMarkerDashed,
@@ -1546,6 +1549,8 @@ export class ConstraintDisplay extends DisplayItem {
     super();
 
     displayContainer.addElement(this.constructor._makeArrowhead());
+    displayContainer.addElement(
+      this.constructor._makeArrowhead('chaos-arrowhead', ChaosArrow.COLOR));
     displayContainer.addElement(this.constructor._makeTextBgFilter());
     displayContainer.addElement(CellValueDisplay.makeGivensMask());
 
@@ -1579,9 +1584,9 @@ export class ConstraintDisplay extends DisplayItem {
   }
 
   // Reusable arrowhead marker.
-  static _makeArrowhead() {
+  static _makeArrowhead(id = 'arrowhead', color = 'rgb(200, 200, 200)') {
     const arrowhead = createSvgElement('marker');
-    arrowhead.id = 'arrowhead';
+    arrowhead.id = id;
     arrowhead.setAttribute('refX', '3');
     arrowhead.setAttribute('refY', '2');
     arrowhead.setAttribute('markerWidth', '4');
@@ -1591,7 +1596,7 @@ export class ConstraintDisplay extends DisplayItem {
     arrowPath.setAttribute('d', 'M 0 0 L 3 2 L 0 4');
     arrowPath.setAttribute('fill', 'none');
     arrowPath.setAttribute('stroke-width', 1);
-    arrowPath.setAttribute('stroke', 'rgb(200, 200, 200)');
+    arrowPath.setAttribute('stroke', color);
     arrowhead.appendChild(arrowPath);
 
     return arrowhead;
