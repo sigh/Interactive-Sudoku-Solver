@@ -249,32 +249,17 @@ export class SudokuBuilder {
             if (!regionCells || regionCells.length !== shape.numGridCells) {
               throw new InvalidConstraintError('ChaosArrow requires Chaos Construction.');
             }
-            cells = constraint.cells.map(c => shape.parseCellId(c).cell);
+            const controlCell = shape.parseCellId(constraint.cells[0]).cell;
             const regionCellOffset = regionCells[0];
             const regionCellLimit = regionCellOffset + regionCells.length;
-            const [controlCell, ...chaosCells] = cells;
-            if (chaosCells.some(c => c < regionCellOffset || c >= regionCellLimit)) {
+            const chaosArms = constraint.expandedArmCellGroups(shape)
+              .map(arm => arm.map(cellId => shape.parseCellId(cellId).cell));
+            if (chaosArms.flat().some(c => c < regionCellOffset || c >= regionCellLimit)) {
               throw new InvalidConstraintError(
                 'ChaosArrow cells after the control cell must be Chaos Construction region cells.');
             }
-            const line = chaosCells.map(c => c - regionCellOffset);
-            yield new ChaosHandlerModule.ChaosMultiArrow(
-              controlCell, [chaosCells], [line]);
-          }
-          break;
-
-        case 'ChaosMultiArrow':
-          {
-            const regionCells = shape.varCellsForGroup('CC');
-            if (!regionCells || regionCells.length !== shape.numGridCells) {
-              throw new InvalidConstraintError('ChaosMultiArrow requires Chaos Construction.');
-            }
-            const controlCell = shape.parseCellId(constraint.cells[0]).cell;
-            const chaosArms = constraint.armCellGroups()
-              .map(arm => arm.map(cellId => shape.parseCellId(cellId).cell));
-            const regionCellOffset = regionCells[0];
             const regionRunArms = chaosArms.map(arm => arm.map(c => c - regionCellOffset));
-            yield new ChaosHandlerModule.ChaosMultiArrow(controlCell, chaosArms, regionRunArms);
+            yield new ChaosHandlerModule.ChaosArrow(controlCell, chaosArms, regionRunArms);
           }
           break;
 

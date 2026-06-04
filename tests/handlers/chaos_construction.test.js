@@ -16,7 +16,7 @@ const { SudokuConstraint } = await import('../../js/sudoku_constraint.js');
 const { LookupTables } = await import('../../js/solver/lookup_tables.js');
 const {
   ChaosConstruction,
-  ChaosMultiArrow,
+  ChaosArrow,
   ChaosFixedValueRegionExclusion,
 } = await import('../../js/solver/chaos_handler.js');
 
@@ -62,7 +62,7 @@ const enforce = (context) => {
 
 const makeShardArrow = (context, controlCell, regionRunArms) => {
   const regionArms = regionRunArms.map(arm => arm.map(c => context.regionCells[c]));
-  const handler = new ChaosMultiArrow(controlCell, regionArms, regionRunArms);
+  const handler = new ChaosArrow(controlCell, regionArms, regionRunArms);
   handler.attachRegionShardState(context.handler.regionShardState());
   assert.equal(handler.initialize(
     context.grid, context.cellExclusions, context.shape, context.stateAllocator), true);
@@ -683,7 +683,7 @@ await runTest('ChaosConstruction region shard persists fixed-control merges', ()
   assert.equal(grid[regionCells[0]], grid[regionCells[1]]);
 });
 
-await runTest('ChaosMultiArrow shard merges use supported multi-arm prefixes', () => {
+await runTest('ChaosArrow shard merges use supported multi-arm prefixes', () => {
   const context = makeChaosContext('4x4');
   const { grid, regionCells, handler } = context;
   const arrowHandler = makeShardArrow(context, 15, [[5, 2, 3], [5, 8, 12]]);
@@ -700,7 +700,7 @@ await runTest('ChaosMultiArrow shard merges use supported multi-arm prefixes', (
   assert.equal(regionShardParent(handler, grid, 5), regionShardParent(handler, grid, 8));
 });
 
-await runTest('ChaosMultiArrow derives minimum lengths from region shards', () => {
+await runTest('ChaosArrow derives minimum lengths from region shards', () => {
   const context = makeChaosContext('4x4');
   const { grid, handler } = context;
   const arrowHandler = makeShardArrow(context, 0, [[0, 1, 2], [0, 4]]);
@@ -711,7 +711,7 @@ await runTest('ChaosMultiArrow derives minimum lengths from region shards', () =
   assert.equal(grid[0], valueMask(2, 3, 4));
 });
 
-await runTest('ChaosMultiArrow drops origin-only arms from runtime support', () => {
+await runTest('ChaosArrow drops origin-only arms from runtime support', () => {
   const context = makeChaosContext('4x4');
   const handler = makeShardArrow(context, 0, [[0], [0, 1], [0]]);
 
@@ -720,7 +720,7 @@ await runTest('ChaosMultiArrow drops origin-only arms from runtime support', () 
   assert.equal(handler._regionRunArms.length, 1);
 });
 
-await runTest('ChaosMultiArrow allows origin-only directions', () => {
+await runTest('ChaosArrow allows origin-only directions', () => {
   const context = makeChaosContext('4x4');
   const { grid, regionCells } = context;
   const handler = makeShardArrow(context, 0, [[0, 1, 2, 3], [0, 4, 5, 6]]);
@@ -735,7 +735,7 @@ await runTest('ChaosMultiArrow allows origin-only directions', () => {
   assert.equal(grid[0], valueMask(4));
 });
 
-await runTest('ChaosMultiArrow prunes unsupported total counts', () => {
+await runTest('ChaosArrow prunes unsupported total counts', () => {
   const context = makeChaosContext('4x4');
   const { grid } = context;
   const handler = makeShardArrow(context, 0, [[0, 1], [0, 4]]);

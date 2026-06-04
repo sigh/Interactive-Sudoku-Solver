@@ -970,11 +970,11 @@ export class ChaosConstruction extends SudokuConstraintHandler {
   }
 }
 
-export class ChaosMultiArrow extends SudokuConstraintHandler {
+export class ChaosArrow extends SudokuConstraintHandler {
   constructor(controlCell, regionArms, regionRunArms) {
     const startCell = regionArms[0][0];
     if (regionArms.some(arm => arm[0] !== startCell)) {
-      throw new InvalidConstraintError('ChaosMultiArrow arms must share their first region cell.');
+      throw new InvalidConstraintError('ChaosArrow arms must share their first region cell.');
     }
     let activeRegionArms = regionArms.filter(arm => arm.length > 1);
     let activeRegionRunArms = regionRunArms.filter((_, index) => regionArms[index].length > 1);

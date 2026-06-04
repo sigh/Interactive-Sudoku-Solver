@@ -190,7 +190,7 @@ export class SudokuConstraintOptimizer {
     const regionCellOffset = regionCells[0];
     const regionCellLimit = regionCellOffset + numGridCells;
 
-    const arrowHandlers = handlerSet.getAllofType(ChaosHandlerModule.ChaosMultiArrow);
+    const arrowHandlers = handlerSet.getAllofType(ChaosHandlerModule.ChaosArrow);
 
     const equalsKey = SudokuConstraintOptimizer._equalsKey(shape.numValues);
     const binaryHandlers = [

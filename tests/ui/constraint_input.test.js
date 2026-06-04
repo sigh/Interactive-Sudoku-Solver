@@ -410,4 +410,42 @@ await runTest('LinesAndSets._handleSelection: Quad finds var-cell top-left numer
   assert.equal(collection.constraints[0].topLeftCell, 'VX2');
 });
 
+await runTest('LinesAndSets._handleSelection: ChaosArrow maps grid arm cells to CC cells', () => {
+  const shape = GridShape.fromGridSize(4);
+  shape.addVarCellsForConstraints([new SudokuConstraint.ChaosConstruction()]);
+  const collection = createMockCollection();
+  const linesAndSets = Object.create(ConstraintCategoryInput.LinesAndSets.prototype);
+  linesAndSets.collection = collection;
+  linesAndSets._shape = shape;
+  linesAndSets._updateCallback = () => { };
+  linesAndSets._typeMap = new Map([
+    [SudokuConstraint.ChaosArrow.name, { elem: { disabled: false } }],
+  ]);
+  const selectionForm = {
+    'constraint-type': { value: SudokuConstraint.ChaosArrow.name },
+  };
+  const inputManager = {
+    getSelection: () => ['R2C1', 'R2C2', 'R3C2'],
+    setSelection: () => { },
+  };
+
+  withMockFormData(() => {
+    linesAndSets._handleSelection(selectionForm, inputManager);
+  });
+
+  assert.equal(collection.constraints.length, 1);
+  assert.deepEqual(collection.constraints[0].cells, ['R2C1', 'CC5', 'CC6', 'CC10']);
+});
+
+await runTest('LinesAndSets: ChaosArrow validates grid-only and CC-arm selections', () => {
+  const shape = GridShape.fromGridSize(4);
+  shape.addVarCellsForConstraints([new SudokuConstraint.ChaosConstruction()]);
+
+  assert.equal(SudokuConstraint.ChaosArrow.VALIDATE_CELLS_FN(['R2C1'], shape), true);
+  assert.equal(SudokuConstraint.ChaosArrow.VALIDATE_CELLS_FN(['R2C1', 'R2C2'], shape), true);
+  assert.equal(SudokuConstraint.ChaosArrow.VALIDATE_CELLS_FN(['R2C1', 'CC6'], shape), true);
+  assert.equal(SudokuConstraint.ChaosArrow.VALIDATE_CELLS_FN(['CC5', 'CC6'], shape), false);
+  assert.equal(SudokuConstraint.ChaosArrow.VALIDATE_CELLS_FN(['R2C1', 'CC6', 'R2C3'], shape), false);
+});
+
 logSuiteComplete('ConstraintCategoryInput.GivenCandidates');

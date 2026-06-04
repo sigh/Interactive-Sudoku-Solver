@@ -357,6 +357,13 @@ await runTest('parseString should parse Arrow', () => {
   assert.deepEqual(arrow.cells, ['R1C1', 'R1C2', 'R1C3', 'R1C4']);
 });
 
+await runTest('parseString should parse control-only ChaosArrow', () => {
+  const result = SudokuParser.parseString('.ChaosArrow~R2C2.');
+  assert.ok(result);
+  const arrow = findConstraint(result, 'ChaosArrow');
+  assert.deepEqual(arrow.cells, ['R2C2']);
+});
+
 await runTest('parseString should parse Diagonal', () => {
   const result = SudokuParser.parseString('.Diagonal~1.');
   assert.ok(result);

@@ -674,7 +674,7 @@ ConstraintCategoryInput.LinesAndSets = class LinesAndSets extends ConstraintCate
   }
 
   _handleSelection(selectionForm, inputManager) {
-    const cells = inputManager.getSelection();
+    let cells = inputManager.getSelection();
     if (cells.length < 1) throw new Error('Selection too short.');
 
     const formData = new FormData(selectionForm);
@@ -687,6 +687,17 @@ ConstraintCategoryInput.LinesAndSets = class LinesAndSets extends ConstraintCate
 
     if (constraintClass.LOOPS_ALLOWED && formData.get('is-loop')) {
       cells.push('LOOP');
+    }
+
+    if (constraintClass === SudokuConstraint.ChaosArrow) {
+      const regionCells = this._shape.varCellsForGroup('CC');
+      const result = [cells[0]];
+      for (const cellId of cells) {
+        const cell = this._shape.parseCellId(cellId).cell;
+        if (cell >= this._shape.numGridCells) return cells;
+        result.push(this._shape.makeCellIdFromIndex(regionCells[cell]));
+      }
+      cells = result;
     }
 
     if (constraintClass === SudokuConstraint.Quad) {

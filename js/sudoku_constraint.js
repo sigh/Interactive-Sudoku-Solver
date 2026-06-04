@@ -1181,46 +1181,32 @@ export class SudokuConstraint {
   static ChaosArrow = class ChaosArrow extends SudokuConstraintBase {
     static DESCRIPTION = (`
       For Chaos Construction puzzles, the first cell is a control cell giving
-      a run length. The remaining listed cells are Chaos Construction region
-      variables. That many region variables from the start of the list must be
-      the same, and the next listed region variable, if any, must be different.`);
+      a run length across one or more arms. The remaining arguments are Chaos
+      Construction region variables which define the arms.
+      If only a control cell is given then arms are generated for all four
+      orthogonal directions.`);
     static CATEGORY = 'LinesAndSets';
     static DISPLAY_CONFIG = {
       displayClass: 'ChaosArrow',
     };
-    static VALIDATE_CELLS_FN = cells => cells.length >= 2;
-
-    constructor(...cells) {
-      super(...cells);
-      this.cells = cells;
-    }
-
-    getCells(shape) {
+    static VALIDATE_CELLS_FN = (cells, shape) => {
       const regionCells = shape.varCellsForGroup('CC');
-      if (!regionCells || regionCells.length !== shape.numGridCells) return this.cells;
+      if (!regionCells || cells.length < 1) return false;
 
-      const controlCell = this.cells[0];
+      if (shape.parseCellId(cells[0]).cell >= shape.numGridCells) return false;
       const regionCellOffset = regionCells[0];
-      const lineCells = this.cells.slice(1).map(cellId => {
-        const regionCell = shape.parseCellId(cellId).cell;
-        const gridCell = regionCell - regionCellOffset;
-        if (gridCell < 0 || gridCell >= regionCells.length) return cellId;
-        return shape.makeCellIdFromIndex(gridCell);
-      });
-      return [controlCell, ...lineCells];
-    }
-  }
-
-  static ChaosMultiArrow = class ChaosMultiArrow extends SudokuConstraintBase {
-    static DESCRIPTION = (`
-      For Chaos Construction puzzles, the first cell is a control cell giving
-      the total run length across chaos arms. The remaining arguments are Chaos
-      Construction region variables, split into arms by empty arguments.`);
-    static CATEGORY = 'LinesAndSets';
-    static DISPLAY_CONFIG = {
-      displayClass: 'ChaosArrow',
+      const regionCellLimit = regionCellOffset + regionCells.length;
+      let armKind = null;
+      for (let i = 1; i < cells.length; i++) {
+        const cell = shape.parseCellId(cells[i]).cell;
+        const cellKind = cell < shape.numGridCells ? 'grid'
+          : cell >= regionCellOffset && cell < regionCellLimit ? 'region'
+            : null;
+        if (!cellKind || (armKind && armKind !== cellKind)) return false;
+        armKind = cellKind;
+      }
+      return true;
     };
-    static VALIDATE_CELLS_FN = cells => cells.length >= 2;
 
     constructor(...cells) {
       super(...cells);
@@ -1242,6 +1228,22 @@ export class SudokuConstraint {
       return arms;
     }
 
+    expandedArmCellGroups(shape) {
+      const arms = this.armCellGroups();
+      if (arms.length) return arms;
+
+      const regionCells = shape.varCellsForGroup('CC');
+      const graph = shape.cellGraph();
+      const controlCell = shape.parseCellId(this.cells[0]).cell;
+      return [CellGraph.LEFT, CellGraph.RIGHT, CellGraph.UP, CellGraph.DOWN].map(direction => {
+        const arm = [];
+        for (let cell = controlCell; cell !== null; cell = graph.adjacent(cell, direction)) {
+          arm.push(shape.makeCellIdFromIndex(regionCells[cell]));
+        }
+        return arm;
+      });
+    }
+
     _mapRegionCells(shape, cells) {
       const regionCellOffset = shape.varCellsForGroup('CC')[0];
       return cells.map(cellId => shape.makeCellIdFromIndex(
@@ -1249,12 +1251,7 @@ export class SudokuConstraint {
     }
 
     getCells(shape) {
-      return [this.cells[0], ...this._mapRegionCells(shape, this.armCellGroups().flat())];
-    }
-
-    getCellGroups(shape) {
-      const controlCell = this.cells[0];
-      return this.armCellGroups().map(arm => [controlCell, ...this._mapRegionCells(shape, arm)]);
+      return [this.cells[0], ...this._mapRegionCells(shape, this.expandedArmCellGroups(shape).flat())];
     }
   }
 

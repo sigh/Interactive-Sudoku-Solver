@@ -16,7 +16,7 @@ const {
 const {
   ChaosConstruction,
   ChaosFixedValueRegionExclusion,
-  ChaosMultiArrow,
+  ChaosArrow,
 } = await import('../../js/solver/chaos_handler.js' + self.VERSION_PARAM);
 const {
   CHAOS_LADDER_ALIAS,
@@ -3200,7 +3200,7 @@ const addChaosNfaRegionCountLines = function (handlerSet, shape) {
   if (!regionCells || regionCells.length !== numGridCells) return;
 
   const lines = [];
-  for (const handler of handlerSet.getAllofType(ChaosMultiArrow)) {
+  for (const handler of handlerSet.getAllofType(ChaosArrow)) {
     for (const line of handler._regionRunArms) {
       lines.push([handler._controlCell, ...line]);
     }

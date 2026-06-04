@@ -227,6 +227,7 @@ const solveCollections = [
         input: '.Var~X~X~27.BlackDot~VX1~VX2~VX3~VX10.Quad~VX13~1~2~3~4.AntiKnight.AntiConsecutive.Thermo~VX22~VX13~VX4~R9C4~R8C4~R7C4.Thermo~VX19~VX10~VX1~R9C1~R8C1.Thermo~VX22~VX23~VX24~VX25~VX26~VX27~VX18~VX17.Thermo~VX16~VX15~VX14~VX5~VX6~VX7~VX8~VX9.Thermo~VX12~VX21~VX20~VX11~VX2.~VX12_4~VX16_2~R5C3_1~R2C2_2~R6C7_5~R4C6_6',
         solution: '384629157629157384157384629573846291291573846846291573462915738915738462738462915',
       },
+      'Cavernous Construction: 6x6',  // Chaos Construction, multi-arm ChaosArrow
       'Chaos Construction: 6x6',  // Chaos Construction, NFA
       'Chaos Construction: cell count', // Chaos Construction, NFA
     ],

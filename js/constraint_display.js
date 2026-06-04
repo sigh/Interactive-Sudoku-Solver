@@ -507,37 +507,46 @@ class ChaosArrow extends BaseConstraintDisplayItem {
 
   _makeItem(constraint, options, includeRegionCells = true) {
     const g = createSvgElement('g');
-    const cellGroups = constraint.getCellGroups?.(this._shape)
-      ?? [constraint.getCells(this._shape)];
-    for (const group of cellGroups) {
-      const item = this._makeArrowLine(group, options);
+    const shape = this._shape;
+    const controlCell = constraint.cells[0];
+    const regionCells = shape.varCellsForGroup('CC');
+    const regionCellOffset = regionCells[0];
+    const arms = constraint.expandedArmCellGroups(shape);
+    for (const arm of arms) {
+      const group = [controlCell];
+      for (const cellId of arm) {
+        group.push(shape.makeCellIdFromIndex(shape.parseCellId(cellId).cell - regionCellOffset));
+      }
+      const item = this._makeArrowLine(group, options, regionCellOffset);
       if (item) g.append(item);
     }
 
-    if (includeRegionCells) {
-      for (const group of this._regionCellGroups(constraint)) {
-        const item = this._makeArrowLine(group, options, true);
+    if (includeRegionCells && regionCells.length === shape.numGridCells) {
+      const controlRegionCell = shape.makeCellIdFromIndex(
+        regionCells[shape.parseCellId(controlCell).cell]);
+      for (const arm of arms) {
+        const item = this._makeArrowLine(
+          [controlRegionCell, ...arm], options, regionCellOffset, true);
         if (item) g.append(item);
       }
     }
     return g;
   }
 
-  _regionCellGroups(constraint) {
-    const regionCells = this._shape.varCellsForGroup('CC');
-    if (!regionCells || regionCells.length !== this._shape.numGridCells) return [];
+  _makeArrowLine(cells, options, regionCellOffset, startMarkerDashed = false) {
+    const points = [];
+    let lastCell = null;
+    for (const cellId of cells) {
+      const cell = this._shape.parseCellId(cellId).cell;
+      const point = this.cellIndexCenter(cell);
+      if (points.length === 1 && point[0] === points[0][0] && point[1] === points[0][1]) continue;
 
-    const controlCell = this._shape.parseCellId(constraint.cells[0]).cell;
-    const controlRegionCell = this._shape.makeCellIdFromIndex(regionCells[controlCell]);
-    const arms = constraint.armCellGroups?.() ?? [constraint.cells.slice(1)];
-    return arms.map(arm => [controlRegionCell, ...arm]);
-  }
-
-  _makeArrowLine(cells, options, startMarkerDashed = false) {
-    const points = cells.map(c => this.cellIdCenter(c));
+      points.push(point);
+      lastCell = cell < this._shape.numGridCells ? cell : cell - regionCellOffset;
+    }
+    if (points.length < 2) return null;
     const direction = this._straightArmDirection(points);
-    if (!direction && this._samePointArm(points)) return null;
-    if (!direction) {
+    if (!direction || !this._reachesGridEdge(lastCell, direction)) {
       return this._makeConstraintLineFromPoints(points, this._lineOptions(options, true, startMarkerDashed));
     }
 
@@ -561,6 +570,14 @@ class ChaosArrow extends BaseConstraintDisplayItem {
     };
   }
 
+  _reachesGridEdge(cell, direction) {
+    const [row, col] = this._shape.splitCellIndex(cell);
+    return (direction[0] < 0 && col === 0) ||
+      (direction[0] > 0 && col === this._shape.numCols - 1) ||
+      (direction[1] < 0 && row === 0) ||
+      (direction[1] > 0 && row === this._shape.numRows - 1);
+  }
+
   _straightArmDirection(points) {
     const start = points[0];
     let direction = null;
@@ -580,11 +597,6 @@ class ChaosArrow extends BaseConstraintDisplayItem {
     }
 
     return direction;
-  }
-
-  _samePointArm(points) {
-    const start = points[0];
-    return points.every(p => p[0] === start[0] && p[1] === start[1]);
   }
 
   _isStraightDirection(deltaX, deltaY) {
