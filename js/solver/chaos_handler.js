@@ -1205,6 +1205,7 @@ export class ChaosCount extends SudokuConstraintHandler {
     super([controlCell, ...regionCells]);
     this._controlCell = controlCell;
     this._regionCells = Uint16Array.from(regionCells);
+    this._supportedRegionCellMasks = new Uint16Array(regionCells.length);
   }
 
   initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
@@ -1220,7 +1221,10 @@ export class ChaosCount extends SudokuConstraintHandler {
     const firstRegionMask = grid[firstRegionCell];
     let supportedControlMask = 0;
     let supportedFirstRegionMask = 0;
+    const supportedRegionCellMasks = this._supportedRegionCellMasks;
+    supportedRegionCellMasks.fill(0);
     let regionValues = firstRegionMask;
+    const numRegionCells = regionCells.length;
 
     while (regionValues) {
       const regionBit = regionValues & -regionValues;
@@ -1228,7 +1232,7 @@ export class ChaosCount extends SudokuConstraintHandler {
       let minCount = 1;
       let maxCount = 1;
 
-      for (let i = 1; i < regionCells.length; i++) {
+      for (let i = 1; i < numRegionCells; i++) {
         const regionCell = regionCells[i];
         const regionMask = grid[regionCell];
         if (regionMask === regionBit) minCount++;
@@ -1239,6 +1243,21 @@ export class ChaosCount extends SudokuConstraintHandler {
       if (!countMask) continue;
       supportedControlMask |= countMask;
       supportedFirstRegionMask |= regionBit;
+      const includeCountMask = controlMask & ((1 << maxCount) - (1 << minCount));
+      const excludeCountMask = minCount < maxCount
+        ? controlMask & ((1 << (maxCount - 1)) - (1 << (minCount - 1)))
+        : 0;
+
+      for (let i = 1; i < numRegionCells; i++) {
+        const regionCell = regionCells[i];
+        const cellMask = grid[regionCell];
+        if (cellMask === regionBit) {
+          supportedRegionCellMasks[i] |= regionBit;
+        } else {
+          if (excludeCountMask || !(cellMask & regionBit)) supportedRegionCellMasks[i] |= cellMask & ~regionBit;
+          if (includeCountMask && (cellMask & regionBit)) supportedRegionCellMasks[i] |= regionBit;
+        }
+      }
     }
 
     if (!supportedControlMask) return false;
@@ -1249,6 +1268,17 @@ export class ChaosCount extends SudokuConstraintHandler {
     if (supportedFirstRegionMask !== firstRegionMask) {
       grid[firstRegionCell] = supportedFirstRegionMask;
       handlerAccumulator.addForCell(firstRegionCell);
+    }
+
+    for (let i = 1; i < regionCells.length; i++) {
+      const regionCell = regionCells[i];
+      const cellMask = grid[regionCell];
+      const supportedMask = supportedRegionCellMasks[i] & cellMask;
+      if (!supportedMask) return false;
+      if (supportedMask !== cellMask) {
+        grid[regionCell] = supportedMask;
+        handlerAccumulator.addForCell(regionCell);
+      }
     }
 
     return true;
