@@ -84,6 +84,17 @@ await runTest('ChaosArrow getCells includes control and maps chaos cells', () =>
   assert.deepEqual(constraint.getCells(shape), ['R2C1', 'R2C2', 'R4C4', 'CC6', 'CC16']);
 });
 
+await runTest('ChaosArrow allows var control cells with explicit arms', () => {
+  const shape = GridShape.fromGridSize(4);
+  shape.addVarCellsForConstraints([
+    new SudokuConstraint.ChaosConstruction(),
+    new SudokuConstraint.Var('X', 'Control', 1),
+  ]);
+
+  assert.equal(
+    SudokuConstraint.ChaosArrow.VALIDATE_CELLS_FN(['VX', 'CC6', 'CC16'], shape), true);
+});
+
 await runTest('ChaosArrow maps grouped chaos arms for display', () => {
   const shape = GridShape.fromGridSize(4);
   shape.addVarCellsForConstraints([new SudokuConstraint.ChaosConstruction()]);
@@ -115,6 +126,32 @@ await runTest('ChaosArrow expands control-only arrows orthogonally', () => {
     ['CC6', 'CC2'],
     ['CC6', 'CC10', 'CC14'],
   ]);
+});
+
+await runTest('ChaosCount getCells includes control and maps chaos cells', () => {
+  const shape = GridShape.fromGridSize(4);
+  shape.addVarCellsForConstraints([new SudokuConstraint.ChaosConstruction()]);
+
+  const constraint = new SudokuConstraint.ChaosCount('R2C1', 'CC6', 'CC16');
+
+  assert.deepEqual(constraint.getCells(shape), ['R2C1', 'R2C2', 'R4C4', 'CC6', 'CC16']);
+});
+
+await runTest('ChaosCount allows var control cells', () => {
+  const shape = GridShape.fromGridSize(4);
+  shape.addVarCellsForConstraints([
+    new SudokuConstraint.ChaosConstruction(),
+    new SudokuConstraint.Var('X', 'Control', 1),
+  ]);
+
+  assert.equal(
+    SudokuConstraint.ChaosCount.VALIDATE_CELLS_FN(['VX', 'CC6', 'CC16'], shape), true);
+});
+
+await runTest('ChaosCount getCells survives missing CC cells for removal', () => {
+  const shape = GridShape.fromGridSize(4);
+
+  assert.deepEqual(new SudokuConstraint.ChaosCount('R2C2').getCells(shape), ['R2C2', 'CC1']);
 });
 
 // Rectangular grid tests for boxRegions

@@ -522,9 +522,12 @@ class ChaosArrow extends BaseConstraintDisplayItem {
       if (item) g.append(item);
     }
 
-    if (includeRegionCells && regionCells.length === shape.numGridCells) {
+    const controlCellIndex = shape.parseCellId(controlCell).cell;
+    if (includeRegionCells
+      && controlCellIndex < shape.numGridCells
+      && regionCells.length === shape.numGridCells) {
       const controlRegionCell = shape.makeCellIdFromIndex(
-        regionCells[shape.parseCellId(controlCell).cell]);
+        regionCells[controlCellIndex]);
       for (const arm of arms) {
         const item = this._makeArrowLine(
           [controlRegionCell, ...arm], options, regionCellOffset, true);

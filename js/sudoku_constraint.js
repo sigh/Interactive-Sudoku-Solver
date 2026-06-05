@@ -1193,7 +1193,6 @@ export class SudokuConstraint {
       const regionCells = shape.varCellsForGroup('CC');
       if (!regionCells || cells.length < 1) return false;
 
-      if (shape.parseCellId(cells[0]).cell >= shape.numGridCells) return false;
       const regionCellOffset = regionCells[0];
       const regionCellLimit = regionCellOffset + regionCells.length;
       const GRID_ARM = 1;
@@ -1257,6 +1256,44 @@ export class SudokuConstraint {
       const gridCells = armCells.map(cellId => shape.makeCellIdFromIndex(
         shape.parseCellId(cellId).cell - regionCellOffset));
       return [this.cells[0], ...gridCells, ...armCells];
+    }
+  }
+
+  static ChaosCount = class ChaosCount extends SudokuConstraintBase {
+    static DESCRIPTION = (`
+      For Chaos Construction puzzles, the first cell is a control cell giving
+      how many of the selected Chaos Construction region cells match the
+      first selected region cell.`);
+    static CATEGORY = 'LinesAndSets';
+    static DISPLAY_CONFIG = {
+      displayClass: 'ShadedRegion',
+    };
+    static VALIDATE_CELLS_FN = (cells, shape) => {
+      const regionCells = shape.varCellsForGroup('CC');
+      if (!regionCells || cells.length < 2) return false;
+
+      const regionCellOffset = regionCells[0];
+      const regionCellLimit = regionCellOffset + regionCells.length;
+      for (let i = 1; i < cells.length; i++) {
+        const cell = shape.parseCellId(cells[i]).cell;
+        if (cell < regionCellOffset || cell >= regionCellLimit) return false;
+      }
+      return true;
+    };
+
+    constructor(...cells) {
+      super(...cells);
+      this.cells = cells;
+    }
+
+    getCells(shape) {
+      const regionCells = shape.varCellsForGroup('CC');
+      if (!regionCells) return [this.cells[0], 'CC1'];
+
+      const regionCellOffset = regionCells[0];
+      const gridCells = this.cells.slice(1).map(cellId => shape.makeCellIdFromIndex(
+        shape.parseCellId(cellId).cell - regionCellOffset));
+      return [this.cells[0], ...gridCells, ...this.cells.slice(1)];
     }
   }
 

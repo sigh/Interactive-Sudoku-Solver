@@ -17,6 +17,7 @@ const { LookupTables } = await import('../../js/solver/lookup_tables.js');
 const {
   ChaosConstruction,
   ChaosArrow,
+  ChaosCount,
   ChaosFixedValueRegionExclusion,
 } = await import('../../js/solver/chaos_handler.js');
 
@@ -71,6 +72,14 @@ const makeShardArrow = (context, controlCell, regionRunArms) => {
 
 const enforceShardArrow = (arrowHandler, context) => {
   assert.equal(arrowHandler.enforceConsistency(context.grid, createAccumulator()), true);
+};
+
+const makeChaosCount = (shape, controlCell, regionCells, grid) => {
+  const handler = new ChaosCount(controlCell, regionCells);
+  const cellExclusions = createCellExclusions({ allUnique: false, numCells: shape.totalCells() });
+  const stateAllocator = createStateAllocator(grid, shape.totalCells());
+  assert.equal(handler.initialize(grid, cellExclusions, shape, stateAllocator), true);
+  return handler;
 };
 
 const isFixedMask = mask => mask && !(mask & (mask - 1));
@@ -210,6 +219,51 @@ await runTest('ChaosConstruction initializes canonical region candidates', () =>
   assert.equal(grid[regionCells[4]], valueMask(1, 2, 3, 4));
   assert.equal(grid[regionCells[7]], valueMask(2));
   assert.equal(grid[regionCells[13]], valueMask(3));
+});
+
+await runTest('ChaosCount prunes control candidates to feasible match counts', () => {
+  const shape = GridShape.fromGridSize(4);
+  shape.addVarCellsForConstraints([new SudokuConstraint.ChaosConstruction()]);
+  const grid = makeChaosGrid(shape);
+  const regionCells = shape.varCellsForGroup('CC');
+  const handler = makeChaosCount(shape, 0, [regionCells[0], regionCells[1], regionCells[2]], grid);
+
+  grid[regionCells[0]] = valueMask(2);
+  grid[regionCells[1]] = valueMask(2);
+  grid[regionCells[2]] = valueMask(3);
+
+  assert.equal(handler.enforceConsistency(grid, createAccumulator()), true);
+  assert.equal(grid[0], valueMask(2));
+});
+
+await runTest('ChaosCount prunes unsupported first region candidates', () => {
+  const shape = GridShape.fromGridSize(4);
+  shape.addVarCellsForConstraints([new SudokuConstraint.ChaosConstruction()]);
+  const grid = makeChaosGrid(shape);
+  const regionCells = shape.varCellsForGroup('CC');
+  const handler = makeChaosCount(shape, 0, [regionCells[0], regionCells[1], regionCells[2]], grid);
+
+  grid[0] = valueMask(3);
+  grid[regionCells[0]] = valueMask(1) | valueMask(2);
+  grid[regionCells[1]] = valueMask(1);
+  grid[regionCells[2]] = valueMask(1);
+
+  assert.equal(handler.enforceConsistency(grid, createAccumulator()), true);
+  assert.equal(grid[regionCells[0]], valueMask(1));
+});
+
+await runTest('ChaosCount rejects impossible fixed counts', () => {
+  const shape = GridShape.fromGridSize(4);
+  shape.addVarCellsForConstraints([new SudokuConstraint.ChaosConstruction()]);
+  const grid = makeChaosGrid(shape);
+  const regionCells = shape.varCellsForGroup('CC');
+  const handler = makeChaosCount(shape, 0, [regionCells[0], regionCells[1]], grid);
+
+  grid[0] = valueMask(1);
+  grid[regionCells[0]] = valueMask(2);
+  grid[regionCells[1]] = valueMask(2);
+
+  assert.equal(handler.enforceConsistency(grid, createAccumulator()), false);
 });
 
 await runTest('ChaosConstruction priority anchor selection does not mutate grid', () => {

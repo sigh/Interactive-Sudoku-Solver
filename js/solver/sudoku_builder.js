@@ -263,6 +263,24 @@ export class SudokuBuilder {
           }
           break;
 
+        case 'ChaosCount':
+          {
+            const regionCells = shape.varCellsForGroup('CC');
+            if (!regionCells || regionCells.length !== shape.numGridCells) {
+              throw new InvalidConstraintError('ChaosCount requires Chaos Construction.');
+            }
+            const controlCell = shape.parseCellId(constraint.cells[0]).cell;
+            const regionCellOffset = regionCells[0];
+            const regionCellLimit = regionCellOffset + regionCells.length;
+            const countCells = constraint.cells.slice(1).map(c => shape.parseCellId(c).cell);
+            if (countCells.some(c => c < regionCellOffset || c >= regionCellLimit)) {
+              throw new InvalidConstraintError(
+                'ChaosCount cells after the control cell must be Chaos Construction region cells.');
+            }
+            yield new ChaosHandlerModule.ChaosCount(controlCell, countCells);
+          }
+          break;
+
         case 'Diagonal':
           if (!shape.isSquare()) {
             throw new InvalidConstraintError('Diagonal constraint requires a square grid');

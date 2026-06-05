@@ -356,6 +356,54 @@ await runTest('ChaosArrow produces ChaosArrow handler', () => {
   assert.ok(hasHandler(handlers, 'ChaosArrow'));
 });
 
+await runTest('ChaosArrow accepts var control cells', () => {
+  const constraint = new SudokuConstraint.Container([
+    new SudokuConstraint.Shape('4x4'),
+    new SudokuConstraint.ChaosConstruction(),
+    new SudokuConstraint.Var('X', 'Control', 1),
+    new SudokuConstraint.ChaosArrow('VX', 'CC6', 'CC16'),
+  ]);
+
+  const handler = buildHandlers(constraint).find(h => h.constructor.name === 'ChaosArrow');
+  assert.ok(handler);
+  assert.equal(handler._controlCell, 32);
+});
+
+await runTest('ChaosCount produces ChaosCount handler', () => {
+  const constraint = new SudokuConstraint.Container([
+    new SudokuConstraint.Shape('4x4'),
+    new SudokuConstraint.ChaosConstruction(),
+    new SudokuConstraint.ChaosCount('R2C1', 'CC6', 'CC10', 'CC16'),
+  ]);
+
+  const handlers = buildHandlers(constraint);
+  assert.ok(hasHandler(handlers, 'ChaosCount'));
+});
+
+await runTest('ChaosCount accepts var control cells', () => {
+  const constraint = new SudokuConstraint.Container([
+    new SudokuConstraint.Shape('4x4'),
+    new SudokuConstraint.ChaosConstruction(),
+    new SudokuConstraint.Var('X', 'Control', 1),
+    new SudokuConstraint.ChaosCount('VX', 'CC6', 'CC10', 'CC16'),
+  ]);
+
+  const handler = buildHandlers(constraint).find(h => h.constructor.name === 'ChaosCount');
+  assert.ok(handler);
+  assert.equal(handler._controlCell, 32);
+});
+
+await runTest('ChaosCount requires ChaosConstruction', () => {
+  const constraint = new SudokuConstraint.Container([
+    new SudokuConstraint.Shape('4x4'),
+    new SudokuConstraint.ChaosCount('R2C1', 'CC6', 'CC10'),
+  ]);
+
+  assert.throws(
+    () => buildHandlers(constraint),
+    /ChaosCount requires Chaos Construction/);
+});
+
 await runTest('ChaosArrow expands control-only arrows before handler creation', () => {
   const constraint = new SudokuConstraint.Container([
     new SudokuConstraint.Shape('4x4'),

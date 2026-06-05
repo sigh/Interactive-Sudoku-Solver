@@ -1200,6 +1200,61 @@ export class ChaosArrow extends SudokuConstraintHandler {
   }
 }
 
+export class ChaosCount extends SudokuConstraintHandler {
+  constructor(controlCell, regionCells) {
+    super([controlCell, ...regionCells]);
+    this._controlCell = controlCell;
+    this._regionCells = Uint16Array.from(regionCells);
+  }
+
+  initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
+    const maxCount = Math.min(shape.numValues, this._regionCells.length);
+    return !!(initialGridCells[this._controlCell] &= (1 << maxCount) - 1);
+  }
+
+  enforceConsistency(grid, handlerAccumulator) {
+    const controlCell = this._controlCell;
+    const controlMask = grid[controlCell];
+    const regionCells = this._regionCells;
+    const firstRegionCell = regionCells[0];
+    const firstRegionMask = grid[firstRegionCell];
+    let supportedControlMask = 0;
+    let supportedFirstRegionMask = 0;
+    let regionValues = firstRegionMask;
+
+    while (regionValues) {
+      const regionBit = regionValues & -regionValues;
+      regionValues ^= regionBit;
+      let minCount = 1;
+      let maxCount = 1;
+
+      for (let i = 1; i < regionCells.length; i++) {
+        const regionCell = regionCells[i];
+        const regionMask = grid[regionCell];
+        if (regionMask === regionBit) minCount++;
+        if (regionMask & regionBit) maxCount++;
+      }
+
+      const countMask = controlMask & ((1 << maxCount) - (1 << (minCount - 1)));
+      if (!countMask) continue;
+      supportedControlMask |= countMask;
+      supportedFirstRegionMask |= regionBit;
+    }
+
+    if (!supportedControlMask) return false;
+    if (supportedControlMask !== controlMask) {
+      grid[controlCell] = supportedControlMask;
+      handlerAccumulator.addForCell(controlCell);
+    }
+    if (supportedFirstRegionMask !== firstRegionMask) {
+      grid[firstRegionCell] = supportedFirstRegionMask;
+      handlerAccumulator.addForCell(firstRegionCell);
+    }
+
+    return true;
+  }
+}
+
 export class ChaosFixedValueRegionExclusion extends SudokuConstraintHandler {
   static SINGLETON_HANDLER = true;
 
