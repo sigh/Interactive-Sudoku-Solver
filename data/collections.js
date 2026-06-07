@@ -1190,15 +1190,15 @@ export const EXAMPLES = [
     solution: '862341579759418326638297145391752684147629853423965718975183462286574931514836297',
   },
   {
-    name: 'Chaos Construction: cell count - harder',
+    name: 'Chaos Construction: cell count',
     src: 'https://www.gmpuzzles.com/blog/2025/06/chaos-construction-sudoku-cell-count-by-clover/',
-    input: '.Shape~6x6.ChaosConstruction.NoBoxes.~R5C6_5~R2C1_3~R6C4_3~R3C4_1~R4C2_2.ChaosCount~R1C2~CC2~CC1~CC7~CC8~CC9~CC3.ChaosCount~R1C4~CC4~CC3~CC9~CC10~CC11~CC5.ChaosCount~R1C6~CC6~CC5~CC11~CC12.ChaosCount~R2C6~CC12~CC6~CC5~CC11~CC17~CC18.ChaosCount~R5C1~CC25~CC19~CC20~CC26~CC32~CC31.ChaosCount~R6C1~CC31~CC25~CC26~CC32.ChaosCount~R6C3~CC33~CC32~CC26~CC27~CC28~CC34.ChaosCount~R6C5~CC35~CC34~CC28~CC29~CC30~CC36',
+    input: '.Shape~6x6.ChaosConstruction.NoBoxes.~R1C2_6~R1C4_4~R1C6_3~R2C1_3~R6C1_4~R6C3_2~R6C5_6~R5C6_5.ChaosCount~R1C2.ChaosCount~R1C4.ChaosCount~R1C6.ChaosCount~R2C6.ChaosCount~R5C1.ChaosCount~R6C1.ChaosCount~R6C3.ChaosCount~R6C5',
     solution: '265413314652543126126534631245452361',
   },
   {
-    name: 'Chaos Construction: cell count',
+    name: 'Chaos Construction: cell count - harder',
     src: 'https://www.gmpuzzles.com/blog/2025/06/chaos-construction-sudoku-cell-count-by-clover/',  // modified
-    input: '.Shape~6x6.ChaosConstruction.NoBoxes.~R1C2_6~R1C4_4~R1C6_3~R2C1_3~R6C1_4~R6C3_2~R6C5_6~R5C6_5.ChaosCount~R1C2~CC2~CC1~CC7~CC8~CC9~CC3.ChaosCount~R1C4~CC4~CC3~CC9~CC10~CC11~CC5.ChaosCount~R1C6~CC6~CC5~CC11~CC12.ChaosCount~R2C6~CC12~CC6~CC5~CC11~CC17~CC18.ChaosCount~R5C1~CC25~CC19~CC20~CC26~CC32~CC31.ChaosCount~R6C1~CC31~CC25~CC26~CC32.ChaosCount~R6C3~CC33~CC32~CC26~CC27~CC28~CC34.ChaosCount~R6C5~CC35~CC34~CC28~CC29~CC30~CC36',
+    input: '.Shape~6x6.ChaosConstruction.NoBoxes.~R5C6_5~R2C1_3~R6C4_3~R3C4_1~R4C2_2.ChaosCount~R1C2~CC2~CC1~CC7~CC8~CC9~CC3.ChaosCount~R1C4~CC4~CC3~CC9~CC10~CC11~CC5.ChaosCount~R1C6~CC6~CC5~CC11~CC12.ChaosCount~R2C6~CC12~CC6~CC5~CC11~CC17~CC18.ChaosCount~R5C1~CC25~CC19~CC20~CC26~CC32~CC31.ChaosCount~R6C1~CC31~CC25~CC26~CC32.ChaosCount~R6C3~CC33~CC32~CC26~CC27~CC28~CC34.ChaosCount~R6C5~CC35~CC34~CC28~CC29~CC30~CC36',
     solution: '265413314652543126126534631245452361',
   },
   {

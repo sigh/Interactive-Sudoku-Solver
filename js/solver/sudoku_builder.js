@@ -272,7 +272,8 @@ export class SudokuBuilder {
             const controlCell = shape.parseCellId(constraint.cells[0]).cell;
             const regionCellOffset = regionCells[0];
             const regionCellLimit = regionCellOffset + regionCells.length;
-            const countCells = constraint.cells.slice(1).map(c => shape.parseCellId(c).cell);
+            const countCells = constraint.expandedRegionCells(shape)
+              .map(c => shape.parseCellId(c).cell);
             if (countCells.some(c => c < regionCellOffset || c >= regionCellLimit)) {
               throw new InvalidConstraintError(
                 'ChaosCount cells after the control cell must be Chaos Construction region cells.');

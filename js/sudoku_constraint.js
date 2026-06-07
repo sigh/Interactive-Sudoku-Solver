@@ -524,6 +524,46 @@ export class CompositeConstraintBase extends SudokuConstraintBase {
 
 }
 
+class ChaosConstraintBase extends SudokuConstraintBase {
+  static CATEGORY = 'ChaosConstruction';
+  static VALIDATE_CELLS_FN = (cells, shape) => {
+    const regionCells = shape.varCellsForGroup('CC');
+    if (!regionCells || cells.length < 1) return false;
+
+    const regionCellOffset = regionCells[0];
+    const regionCellLimit = regionCellOffset + regionCells.length;
+    const controlCell = shape.parseCellId(cells[0]).cell;
+    if (controlCell >= regionCellOffset && controlCell < regionCellLimit) return false;
+
+    let kind = 0;
+    for (let i = 1; i < cells.length; i++) {
+      const cell = shape.parseCellId(cells[i]).cell;
+      const cellKind = cell < shape.numGridCells ? 1
+        : cell >= regionCellOffset && cell < regionCellLimit ? 2
+          : 0;
+      if (!cellKind || (kind && kind !== cellKind)) return false;
+      kind = cellKind;
+    }
+    return true;
+  };
+
+  constructor(...cells) {
+    super(...cells);
+    this.cells = cells;
+  }
+
+  getCells(shape) {
+    const regionCells = shape.varCellsForGroup('CC');
+    if (!regionCells) return [this.cells[0], 'CC1'];
+
+    const regionCellOffset = regionCells[0];
+    const ccCells = this.expandedRegionCells(shape);
+    const gridCells = ccCells.map(cellId => shape.makeCellIdFromIndex(
+      shape.parseCellId(cellId).cell - regionCellOffset));
+    return [this.cells[0], ...gridCells, ...ccCells];
+  }
+}
+
 export class SudokuConstraint {
 
   static Container = class Container extends SudokuConstraintBase {
@@ -1178,44 +1218,17 @@ export class SudokuConstraint {
     }
   }
 
-  static ChaosArrow = class ChaosArrow extends SudokuConstraintBase {
+  static ChaosArrow = class ChaosArrow extends ChaosConstraintBase {
     static DESCRIPTION = (`
       For Chaos Construction puzzles, the first cell is a control cell giving
       a run length across one or more arms. The remaining arguments are Chaos
       Construction region variables which define the arms.
       If only a control cell is given then arms are generated for all four
       orthogonal directions.`);
-    static CATEGORY = 'ChaosConstruction';
     static DISPLAY_CONFIG = {
       displayClass: 'Chaos',
       multiArrow: true,
     };
-    static VALIDATE_CELLS_FN = (cells, shape) => {
-      const regionCells = shape.varCellsForGroup('CC');
-      if (!regionCells || cells.length < 1) return false;
-
-      const regionCellOffset = regionCells[0];
-      const regionCellLimit = regionCellOffset + regionCells.length;
-      const controlCell = shape.parseCellId(cells[0]).cell;
-      if (controlCell >= regionCellOffset && controlCell < regionCellLimit) return false;
-      const GRID_ARM = 1;
-      const REGION_ARM = 2;
-      let armKind = 0;
-      for (let i = 1; i < cells.length; i++) {
-        const cell = shape.parseCellId(cells[i]).cell;
-        const cellKind = cell < shape.numGridCells ? GRID_ARM
-          : cell >= regionCellOffset && cell < regionCellLimit ? REGION_ARM
-            : 0;
-        if (!cellKind || (armKind && armKind !== cellKind)) return false;
-        armKind = cellKind;
-      }
-      return true;
-    };
-
-    constructor(...cells) {
-      super(...cells);
-      this.cells = cells;
-    }
 
     armCellGroups() {
       const arms = [];
@@ -1248,56 +1261,40 @@ export class SudokuConstraint {
       });
     }
 
-    getCells(shape) {
-      const regionCells = shape.varCellsForGroup('CC');
-      // Ensure that a 'CC' cell is included so that it can be slated for
-      // deletion when regionCells aren't present.
-      if (!regionCells) return [this.cells[0], 'CC1'];
-
-      const armCells = this.expandedArmCellGroups(shape).flat();
-      const regionCellOffset = regionCells[0];
-      const gridCells = armCells.map(cellId => shape.makeCellIdFromIndex(
-        shape.parseCellId(cellId).cell - regionCellOffset));
-      return [this.cells[0], ...gridCells, ...armCells];
+    expandedRegionCells(shape) {
+      return this.expandedArmCellGroups(shape).flat();
     }
   }
 
-  static ChaosCount = class ChaosCount extends SudokuConstraintBase {
+  static ChaosCount = class ChaosCount extends ChaosConstraintBase {
     static DESCRIPTION = (`
       For Chaos Construction puzzles, the first cell is a control cell giving
       how many of the selected Chaos Construction region cells match the
       first selected region cell.`);
-    static CATEGORY = 'ChaosConstruction';
     static DISPLAY_CONFIG = {
       displayClass: 'Chaos',
       borderedRegion: true,
     };
-    static VALIDATE_CELLS_FN = (cells, shape) => {
+
+    expandedRegionCells(shape) {
+      if (this.cells.length > 1) return this.cells.slice(1);
+
       const regionCells = shape.varCellsForGroup('CC');
-      if (!regionCells || cells.length < 2) return false;
-
-      const regionCellOffset = regionCells[0];
-      const regionCellLimit = regionCellOffset + regionCells.length;
-      for (let i = 1; i < cells.length; i++) {
-        const cell = shape.parseCellId(cells[i]).cell;
-        if (cell < regionCellOffset || cell >= regionCellLimit) return false;
-      }
-      return true;
-    };
-
-    constructor(...cells) {
-      super(...cells);
-      this.cells = cells;
-    }
-
-    getCells(shape) {
-      const regionCells = shape.varCellsForGroup('CC');
-      if (!regionCells) return [this.cells[0], 'CC1'];
-
-      const regionCellOffset = regionCells[0];
-      const gridCells = this.cells.slice(1).map(cellId => shape.makeCellIdFromIndex(
-        shape.parseCellId(cellId).cell - regionCellOffset));
-      return [this.cells[0], ...gridCells, ...this.cells.slice(1)];
+      const graph = shape.cellGraph();
+      const controlCell = shape.parseCellId(this.cells[0]).cell;
+      const neighbors = [
+        controlCell,
+        graph.adjacent(controlCell, CellGraph.UP),
+        graph.adjacent(controlCell, CellGraph.DOWN),
+        graph.adjacent(controlCell, CellGraph.LEFT),
+        graph.adjacent(controlCell, CellGraph.RIGHT),
+        graph.diagonal(controlCell, CellGraph.UP, CellGraph.LEFT),
+        graph.diagonal(controlCell, CellGraph.UP, CellGraph.RIGHT),
+        graph.diagonal(controlCell, CellGraph.DOWN, CellGraph.LEFT),
+        graph.diagonal(controlCell, CellGraph.DOWN, CellGraph.RIGHT),
+      ];
+      return neighbors.filter(c => c !== null)
+        .map(c => shape.makeCellIdFromIndex(regionCells[c]));
     }
   }
 

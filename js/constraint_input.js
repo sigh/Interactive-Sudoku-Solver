@@ -884,22 +884,18 @@ ConstraintCategoryInput.LinesAndSets = class LinesAndSets extends MultiCellInput
   }
 
   _addConstraint(constraintClass, cells, formData) {
-    if (constraintClass === SudokuConstraint.Quad) {
-      const valuesStr = formData.get('Quad-value');
-      const values = valuesStr.split(/[, ]+/).map(v => +v).filter(
-        v => Number.isInteger(v) && v >= this._shape.minValue() && v <= this._shape.maxValue());
-      if (values.length) {
+    if (constraintClass === SudokuConstraint.Quad ||
+        constraintClass === SudokuConstraint.ContainExact ||
+        constraintClass === SudokuConstraint.ContainAtLeast) {
+      const values = formData.get(constraintClass.name + '-value')
+        .split(/[, ]+/).map(v => +v)
+        .filter(v => Number.isInteger(v) && v >= this._shape.minValue() && v <= this._shape.maxValue());
+      if (!values.length) return;
+      if (constraintClass === SudokuConstraint.Quad) {
         const topLeftCell = this._shape.makeCellIdFromIndex(Math.min(
           ...cells.map(c => this._shape.parseCellId(c).cell)));
         this.collection.addConstraint(new SudokuConstraint.Quad(topLeftCell, ...values));
-      }
-    } else if (
-      constraintClass === SudokuConstraint.ContainExact ||
-      constraintClass === SudokuConstraint.ContainAtLeast) {
-      const valuesStr = formData.get(constraintClass.name + '-value');
-      const values = valuesStr.split(/[, ]+/).map(v => +v).filter(
-        v => Number.isInteger(v) && v >= this._shape.minValue() && v <= this._shape.maxValue());
-      if (values.length) {
+      } else {
         this.collection.addConstraint(new constraintClass(values.join('_'), ...cells));
       }
     } else {
@@ -920,7 +916,7 @@ ConstraintCategoryInput.ChaosConstruction = class ChaosConstruction extends Mult
     });
   }
 
-  _translateChaosArrowCells(cells) {
+  _translateToCCCells(cells) {
     const regionCells = this._shape.varCellsForGroup('CC');
     const result = [cells[0]];
     for (const cellId of cells) {
@@ -932,8 +928,8 @@ ConstraintCategoryInput.ChaosConstruction = class ChaosConstruction extends Mult
   }
 
   _addConstraint(constraintClass, cells, formData) {
-    if (constraintClass === SudokuConstraint.ChaosArrow) {
-      cells = this._translateChaosArrowCells(cells);
+    if (cells.length > 1) {
+      cells = this._translateToCCCells(cells);
     }
     super._addConstraint(constraintClass, cells, formData);
   }
