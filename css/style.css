@@ -1277,15 +1277,15 @@ h3 {
   box-shadow: 0 0 var(--constraint-panel-glow-size) var(--color-border-special);
 }
 
-#multi-cell-constraint-input select {
+.multi-cell-constraint-input select {
   width: 100%;
 }
 
-#multi-cell-constraint-input #multi-cell-constraint-loop-container {
+.multi-cell-constraint-input .constraint-loop {
   margin-bottom: -10px;
 }
 
-#multi-cell-constraint-input .collapsible-body>div {
+.multi-cell-constraint-input .collapsible-body>div {
   display: flex;
   flex-direction: column;
   gap: 10px;

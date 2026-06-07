@@ -612,10 +612,8 @@ ConstraintCategoryInput.LayoutCheckbox = class LayoutCheckbox extends CheckboxCa
   }
 }
 
-ConstraintCategoryInput.LinesAndSets = class LinesAndSets extends ConstraintCategoryInput {
-  static DEFAULT_TYPE = 'Cage';
-
-  constructor(collection, inputManager) {
+class MultiCellInput extends ConstraintCategoryInput {
+  constructor(collection, inputManager, form) {
     super(collection);
     this._shape = null;
 
@@ -623,22 +621,21 @@ ConstraintCategoryInput.LinesAndSets = class LinesAndSets extends ConstraintCate
     this._typeMap = new Map();
     this._validationFns = new MultiMap();
 
-    const selectionForm = document.forms['multi-cell-constraint-input'];
-    this._selectionForm = selectionForm;
-    this._setUp(selectionForm, this._constraintClasses, inputManager);
+    this._selectionForm = form;
+    this._setUp(form, this._constraintClasses, inputManager);
 
     this._collapsibleContainer = new CollapsibleContainer(
-      selectionForm.firstElementChild,
+      form.firstElementChild,
       /* defaultOpen= */ true).allowInComposite();
 
     inputManager.onSelection(
-      (selection) => this._onNewSelection(selection, selectionForm));
-    inputManager.addSelectionPreserver(selectionForm);
+      (selection) => this._onNewSelection(selection, form));
+    inputManager.addSelectionPreserver(form);
     inputManager.registerFocusPanel(
-      selectionForm, () => this._getFocusTarget());
+      form, () => this._getFocusTarget());
 
-    selectionForm.onsubmit = e => {
-      this._handleSelection(selectionForm, inputManager);
+    form.onsubmit = e => {
+      this._handleSelection(form, inputManager);
       return false;
     };
   }
@@ -689,57 +686,28 @@ ConstraintCategoryInput.LinesAndSets = class LinesAndSets extends ConstraintCate
       cells.push('LOOP');
     }
 
-    if (constraintClass === SudokuConstraint.ChaosArrow) {
-      const regionCells = this._shape.varCellsForGroup('CC');
-      const result = [cells[0]];
-      for (const cellId of cells) {
-        const cell = this._shape.parseCellId(cellId).cell;
-        if (cell >= this._shape.numGridCells) return cells;
-        result.push(this._shape.makeCellIdFromIndex(regionCells[cell]));
-      }
-      cells = result;
-    }
-
-    if (constraintClass === SudokuConstraint.Quad) {
-      const valuesStr = formData.get(type + '-value');
-      const values = valuesStr.split(/[, ]+/).map(v => +v).filter(
-        v => Number.isInteger(v) && v >= this._shape.minValue() && v <= this._shape.maxValue());
-      if (values.length) {
-        const topLeftCell = this._shape.makeCellIdFromIndex(Math.min(
-          ...cells.map(c => this._shape.parseCellId(c).cell)));
-        const constraint = new SudokuConstraint.Quad(topLeftCell, ...values);
-        this.collection.addConstraint(constraint);
-      }
-    } else if (
-      constraintClass === SudokuConstraint.ContainExact ||
-      constraintClass === SudokuConstraint.ContainAtLeast) {
-      const valuesStr = formData.get(type + '-value');
-      const values = valuesStr.split(/[, ]+/).map(v => +v).filter(
-        v => Number.isInteger(v) && v >= this._shape.minValue() && v <= this._shape.maxValue());
-      if (values.length) {
-        const constraint = new constraintClass(values.join('_'), ...cells);
-        this.collection.addConstraint(constraint);
-      }
-    } else if (constraintClass.ARGUMENT_CONFIG) {
-      const value = formData.get(type + '-value');
-      this.collection.addConstraint(
-        new constraintClass(value, ...cells));
-    } else {
-      this.collection.addConstraint(
-        new constraintClass(...cells));
-    }
+    this._addConstraint(constraintClass, cells, formData);
 
     inputManager.setSelection([]);
     this.runUpdateCallback();
   }
 
+  _addConstraint(constraintClass, cells, formData) {
+    if (constraintClass.ARGUMENT_CONFIG) {
+      const value = formData.get(constraintClass.name + '-value');
+      this.collection.addConstraint(new constraintClass(value, ...cells));
+    } else {
+      this.collection.addConstraint(new constraintClass(...cells));
+    }
+  }
+
   _setUp(selectionForm, constraintClasses, inputManager) {
     const selectElem = selectionForm['constraint-type'];
     selectionForm.classList.add('disabled');
-    const valueContainer = document.getElementById('multi-cell-constraint-value-container');
+    const valueContainer = selectionForm.querySelector('.constraint-value');
     const valueElems = [];
 
-    const loopContainer = document.getElementById('multi-cell-constraint-loop-container');
+    const loopContainer = selectionForm.querySelector('.constraint-loop');
     loopContainer.style.display = 'none';
 
     // Create the options.
@@ -811,7 +779,7 @@ ConstraintCategoryInput.LinesAndSets = class LinesAndSets extends ConstraintCate
     }
 
     // Update the form based on the selected constraint.
-    const descriptionElem = document.getElementById('multi-cell-constraint-description');
+    const descriptionElem = selectionForm.querySelector('div.description');
     selectElem.onchange = () => {
       const type = selectElem.value;
       const typeData = this._typeMap.get(type);
@@ -905,6 +873,72 @@ ConstraintCategoryInput.LinesAndSets = class LinesAndSets extends ConstraintCate
     if (typeData.dynamicOptionsFn) {
       typeData.dynamicOptionsFn(selection);
     }
+  }
+}
+
+ConstraintCategoryInput.LinesAndSets = class LinesAndSets extends MultiCellInput {
+  static DEFAULT_TYPE = 'Cage';
+
+  constructor(collection, inputManager) {
+    super(collection, inputManager, document.forms['lines-and-sets-input']);
+  }
+
+  _addConstraint(constraintClass, cells, formData) {
+    if (constraintClass === SudokuConstraint.Quad) {
+      const valuesStr = formData.get('Quad-value');
+      const values = valuesStr.split(/[, ]+/).map(v => +v).filter(
+        v => Number.isInteger(v) && v >= this._shape.minValue() && v <= this._shape.maxValue());
+      if (values.length) {
+        const topLeftCell = this._shape.makeCellIdFromIndex(Math.min(
+          ...cells.map(c => this._shape.parseCellId(c).cell)));
+        this.collection.addConstraint(new SudokuConstraint.Quad(topLeftCell, ...values));
+      }
+    } else if (
+      constraintClass === SudokuConstraint.ContainExact ||
+      constraintClass === SudokuConstraint.ContainAtLeast) {
+      const valuesStr = formData.get(constraintClass.name + '-value');
+      const values = valuesStr.split(/[, ]+/).map(v => +v).filter(
+        v => Number.isInteger(v) && v >= this._shape.minValue() && v <= this._shape.maxValue());
+      if (values.length) {
+        this.collection.addConstraint(new constraintClass(values.join('_'), ...cells));
+      }
+    } else {
+      super._addConstraint(constraintClass, cells, formData);
+    }
+  }
+}
+
+ConstraintCategoryInput.ChaosConstruction = class ChaosConstruction extends MultiCellInput {
+  static DEFAULT_TYPE = 'ChaosArrow';
+
+  constructor(collection, inputManager, addUpdateListener) {
+    super(collection, inputManager, document.forms['chaos-constraint-input']);
+    this._setVisible(false);
+    addUpdateListener(() => {
+      this._setVisible(
+        collection.getConstraintsByType('ChaosConstruction').length > 0);
+    });
+  }
+
+  _translateChaosArrowCells(cells) {
+    const regionCells = this._shape.varCellsForGroup('CC');
+    const result = [cells[0]];
+    for (const cellId of cells) {
+      const cell = this._shape.parseCellId(cellId).cell;
+      if (cell >= this._shape.numGridCells) return cells;
+      result.push(this._shape.makeCellIdFromIndex(regionCells[cell]));
+    }
+    return result;
+  }
+
+  _addConstraint(constraintClass, cells, formData) {
+    if (constraintClass === SudokuConstraint.ChaosArrow) {
+      cells = this._translateChaosArrowCells(cells);
+    }
+    super._addConstraint(constraintClass, cells, formData);
+  }
+  _setVisible(visible) {
+    this._selectionForm.style.display = visible ? '' : 'none';
   }
 }
 

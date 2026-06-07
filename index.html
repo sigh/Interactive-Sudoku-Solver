@@ -375,7 +375,7 @@ layout: null
                 </fieldset>
               </form>
 
-              <form id="multi-cell-constraint-input">
+              <form id="lines-and-sets-input" class="multi-cell-constraint-input">
                 <fieldset tabindex="0" class="constraint-panel hide-until-load">
                   <h2>Lines & Sets</h2>
                   <div>
@@ -389,12 +389,12 @@ layout: null
                       </div>
                       <div id="multi-cell-constraint-description" class="description">
                       </div>
-                      <div id="multi-cell-constraint-loop-container">
+                      <div id="multi-cell-constraint-loop-container" class="constraint-loop">
                         <input type="checkbox" name="is-loop" id="multi-cell-constraint-loop-input"></input>
                         <label for="multi-cell-constraint-loop-input">Loop</label>
                       </div>
                       <div class="hstack">
-                        <div id="multi-cell-constraint-value-container"></div>
+                        <div id="multi-cell-constraint-value-container" class="constraint-value"></div>
                         <button type="submit" name="add-constraint" title="Add constraint" class="hstack-push-right"
                           disabled>
                           Add
@@ -404,6 +404,7 @@ layout: null
                   </div>
                 </fieldset>
               </form>
+
             </div>
 
             <div class="vstack">
@@ -720,6 +721,37 @@ function accept(state) {
               </fieldset>
             </form>
           </div>
+
+          <form id="chaos-constraint-input" class="multi-cell-constraint-input">
+            <fieldset tabindex="0" class="constraint-panel hide-until-load">
+              <h2>Chaos Construction</h2>
+              <div>
+                <div>
+                  <span class="description">
+                    These constraints only apply when ChaosConstruction is enabled.
+                    Select cells by dragging or shift-clicking.
+                  </span>
+                  <div>
+                    <select id="chaos-constraint-select" name="constraint-type" required>
+                    </select>
+                  </div>
+                  <div id="chaos-constraint-description" class="description">
+                  </div>
+                  <div id="chaos-constraint-loop-container" class="constraint-loop">
+                    <input type="checkbox" name="is-loop"></input>
+                    <label>Loop</label>
+                  </div>
+                  <div class="hstack">
+                    <div id="chaos-constraint-value-container" class="constraint-value"></div>
+                    <button type="submit" name="add-constraint" title="Add constraint" class="hstack-push-right"
+                      disabled>
+                      Add
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </fieldset>
+          </form>
 
           <div class="chip-view" data-chip-view-type="ordinary"></div>
 

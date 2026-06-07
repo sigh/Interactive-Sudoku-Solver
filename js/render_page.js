@@ -541,6 +541,7 @@ class RootConstraintCollection extends ConstraintCollectionBase {
   _chipViewForConstraint(constraint) {
     switch (constraint.constructor.CATEGORY) {
       case 'LinesAndSets':
+      case 'ChaosConstruction':
       case 'Pairwise':
       case 'Experimental':
       case 'StateMachine':
@@ -749,6 +750,8 @@ class ConstraintManager {
         selectedConstraintCollection, inputManager, chipViews.get('jigsaw')),
       new ConstraintCategoryInput.LinesAndSets(
         selectedConstraintCollection, inputManager),
+      new ConstraintCategoryInput.ChaosConstruction(
+        selectedConstraintCollection, inputManager, this.addUpdateListener.bind(this)),
       new ConstraintCategoryInput.Pairwise(
         selectedConstraintCollection, inputManager, this._userScriptExecutor),
       new ConstraintCategoryInput.StateMachine(

@@ -1185,7 +1185,7 @@ export class SudokuConstraint {
       Construction region variables which define the arms.
       If only a control cell is given then arms are generated for all four
       orthogonal directions.`);
-    static CATEGORY = 'LinesAndSets';
+    static CATEGORY = 'ChaosConstruction';
     static DISPLAY_CONFIG = {
       displayClass: 'Chaos',
       multiArrow: true,
@@ -1267,7 +1267,7 @@ export class SudokuConstraint {
       For Chaos Construction puzzles, the first cell is a control cell giving
       how many of the selected Chaos Construction region cells match the
       first selected region cell.`);
-    static CATEGORY = 'LinesAndSets';
+    static CATEGORY = 'ChaosConstruction';
     static DISPLAY_CONFIG = {
       displayClass: 'Chaos',
       borderedRegion: true,

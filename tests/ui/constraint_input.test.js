@@ -410,11 +410,11 @@ await runTest('LinesAndSets._handleSelection: Quad finds var-cell top-left numer
   assert.equal(collection.constraints[0].topLeftCell, 'VX2');
 });
 
-await runTest('LinesAndSets._handleSelection: ChaosArrow maps grid arm cells to CC cells', () => {
+await runTest('ChaosConstruction._handleSelection: ChaosArrow maps grid arm cells to CC cells', () => {
   const shape = GridShape.fromGridSize(4);
   shape.addVarCellsForConstraints([new SudokuConstraint.ChaosConstruction()]);
   const collection = createMockCollection();
-  const linesAndSets = Object.create(ConstraintCategoryInput.LinesAndSets.prototype);
+  const linesAndSets = Object.create(ConstraintCategoryInput.ChaosConstruction.prototype);
   linesAndSets.collection = collection;
   linesAndSets._shape = shape;
   linesAndSets._updateCallback = () => { };
