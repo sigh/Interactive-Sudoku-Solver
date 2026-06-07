@@ -1195,6 +1195,8 @@ export class SudokuConstraint {
 
       const regionCellOffset = regionCells[0];
       const regionCellLimit = regionCellOffset + regionCells.length;
+      const controlCell = shape.parseCellId(cells[0]).cell;
+      if (controlCell >= regionCellOffset && controlCell < regionCellLimit) return false;
       const GRID_ARM = 1;
       const REGION_ARM = 2;
       let armKind = 0;

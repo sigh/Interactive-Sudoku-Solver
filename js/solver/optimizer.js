@@ -191,6 +191,7 @@ export class SudokuConstraintOptimizer {
     const regionCellLimit = regionCellOffset + numGridCells;
 
     const arrowHandlers = handlerSet.getAllofType(ChaosHandlerModule.ChaosArrow);
+    const countHandlers = handlerSet.getAllofType(ChaosHandlerModule.ChaosCount);
 
     const equalsKey = SudokuConstraintOptimizer._equalsKey(shape.numValues);
     const binaryHandlers = [
@@ -221,6 +222,9 @@ export class SudokuConstraintOptimizer {
       for (const link of links) handler.addRegionLink(link);
       for (const arrowHandler of arrowHandlers) {
         arrowHandler.attachRegionShardState(handler.regionShardState());
+      }
+      for (const countHandler of countHandlers) {
+        countHandler.attachRegionShardState(handler.regionShardState());
       }
     }
   }

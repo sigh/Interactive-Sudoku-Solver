@@ -277,7 +277,8 @@ export class SudokuBuilder {
               throw new InvalidConstraintError(
                 'ChaosCount cells after the control cell must be Chaos Construction region cells.');
             }
-            yield new ChaosHandlerModule.ChaosCount(controlCell, countCells);
+            const regionRunCells = countCells.map(c => c - regionCellOffset);
+            yield new ChaosHandlerModule.ChaosCount(controlCell, countCells, regionRunCells);
           }
           break;
 

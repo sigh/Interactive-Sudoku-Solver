@@ -124,11 +124,11 @@ await runTest('_addChaosRegionShardSources attaches ChaosArrow lines', () => {
   const grid = makeChaosGrid(shape);
   const regionCells = shape.varCellsForGroup('CC');
   const chaosHandler = new ChaosConstruction(shape.numGridCells, regionCells[0]);
-  const arrowHandler = new ChaosArrow(4, [[regionCells[4], regionCells[10]]], [[4, 10]]);
+  const arrowHandler = new ChaosArrow(4, [[regionCells[4], regionCells[5]]], [[4, 5]]);
   const handlerSet = new HandlerSet([chaosHandler, arrowHandler], shape.totalCells());
 
   grid[4] = valueMask(2);
-  grid[regionCells[10]] = valueMask(2);
+  grid[regionCells[5]] = valueMask(2);
 
   const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
   optimizer._addChaosRegionShardSources(handlerSet, shape);
@@ -141,7 +141,7 @@ await runTest('_addChaosRegionShardSources attaches ChaosArrow lines', () => {
   assert.equal(arrowHandler.enforceConsistency(grid, createAccumulator()), true);
   assert.equal(chaosHandler.enforceConsistency(grid, createAccumulator()), true);
   assert.equal(grid[regionCells[4]], valueMask(2));
-  assert.equal(grid[regionCells[10]], valueMask(2));
+  assert.equal(grid[regionCells[5]], valueMask(2));
 });
 
 await runTest('_addChaosRegionShardSources attaches multi-arm guaranteed prefixes', () => {

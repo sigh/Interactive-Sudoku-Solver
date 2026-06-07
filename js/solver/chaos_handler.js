@@ -8,6 +8,11 @@ const REGION_FIXED_COUNT_MASK = 0x1f;
 const REGION_VALUE_MASK_SHIFT = 14;
 const REGION_COUNT_MASK = (1 << REGION_VALUE_MASK_SHIFT) - 1;
 
+const cellsAreAdjacent = (cellA, cellB, numCols) => {
+  const delta = Math.abs(cellA - cellB);
+  return delta === numCols || (delta === 1 && (cellA / numCols | 0) === (cellB / numCols | 0));
+};
+
 const mergeRegionShardRoots = (roots, offset, cellA, cellB) => {
   let rootA = roots[offset + cellA];
   let rootB = roots[offset + cellB];
@@ -995,6 +1000,7 @@ export class ChaosArrow extends SudokuConstraintHandler {
     // Per arm position, the region labels that support a run ending there.
     this._armRunSupportMasks = activeRegionArms.map(arm => new Uint16Array(arm.length));
     this._regionRunArms = activeRegionRunArms.map(arm => Uint16Array.from(arm));
+    this._canMergeRegionShards = false;
     this._regionShardState = null;
   }
 
@@ -1008,6 +1014,13 @@ export class ChaosArrow extends SudokuConstraintHandler {
       - this._duplicateStartCount;
     const maxValueCount = Math.min(shape.numValues, maxArmCells);
     if (maxValueCount < minValueCount) return false;
+
+    this._canMergeRegionShards = this._regionRunArms.every(arm => {
+      for (let i = 1; i < arm.length; i++) {
+        if (!cellsAreAdjacent(arm[i - 1], arm[i], shape.numCols)) return false;
+      }
+      return true;
+    });
 
     const maxMask = (1 << maxValueCount) - 1;
     return !!(initialGridCells[this._controlCell] &= maxMask);
@@ -1140,7 +1153,7 @@ export class ChaosArrow extends SudokuConstraintHandler {
       if (!minSupportedLength) return false;
 
       const appliedCount = this._armMinLengthScratch[armIndex];
-      if (minSupportedLength > appliedCount) {
+      if (this._canMergeRegionShards && minSupportedLength > appliedCount) {
         const runArm = this._regionRunArms[armIndex];
         const startCell = runArm[0];
         for (let i = appliedCount; i < minSupportedLength; i++) {
@@ -1201,15 +1214,35 @@ export class ChaosArrow extends SudokuConstraintHandler {
 }
 
 export class ChaosCount extends SudokuConstraintHandler {
-  constructor(controlCell, regionCells) {
+  constructor(controlCell, regionCells, regionRunCells = null) {
     super([controlCell, ...regionCells]);
     this._controlCell = controlCell;
     this._regionCells = Uint16Array.from(regionCells);
+    this._regionRunCells = regionRunCells ? Uint16Array.from(regionRunCells) : null;
     this._supportedRegionCellMasks = new Uint16Array(regionCells.length);
+    this._regionShardMergePairs = null;
+    this._regionShardState = null;
+  }
+
+  attachRegionShardState(regionShardState) {
+    this._regionShardState = regionShardState;
   }
 
   initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
     const maxCount = Math.min(shape.numValues, this._regionCells.length);
+    const regionRunCells = this._regionRunCells;
+    if (regionRunCells) {
+      const mergePairs = [];
+      for (let i = 1; i < regionRunCells.length; i++) {
+        for (let j = 0; j < i; j++) {
+          if (!cellsAreAdjacent(regionRunCells[i], regionRunCells[j], shape.numCols)) continue;
+          mergePairs.push(j, i);
+        }
+      }
+      this._regionShardMergePairs = Uint8Array.from(mergePairs);
+    } else {
+      this._regionShardMergePairs = new Uint8Array(0);
+    }
     return !!(initialGridCells[this._controlCell] &= (1 << maxCount) - 1);
   }
 
@@ -1278,6 +1311,20 @@ export class ChaosCount extends SudokuConstraintHandler {
       if (supportedMask !== cellMask) {
         grid[regionCell] = supportedMask;
         handlerAccumulator.addForCell(regionCell);
+      }
+    }
+
+    if (this._regionShardMergePairs.length > 0 && this._regionShardState
+      && !(grid[firstRegionCell] & (grid[firstRegionCell] - 1))) {
+      const firstRegionBit = grid[firstRegionCell];
+      const mergePairs = this._regionShardMergePairs;
+      for (let i = 0; i < mergePairs.length; i += 2) {
+        const indexA = mergePairs[i];
+        const indexB = mergePairs[i + 1];
+        if (grid[regionCells[indexA]] === firstRegionBit && grid[regionCells[indexB]] === firstRegionBit) {
+          this._regionShardState.merge(
+            grid, this._regionRunCells[indexA], this._regionRunCells[indexB], handlerAccumulator);
+        }
       }
     }
 

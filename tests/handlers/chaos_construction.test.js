@@ -74,6 +74,19 @@ const enforceShardArrow = (arrowHandler, context) => {
   assert.equal(arrowHandler.enforceConsistency(context.grid, createAccumulator()), true);
 };
 
+const makeShardCount = (context, controlCell, runCells) => {
+  const regionCells = runCells.map(cell => context.regionCells[cell]);
+  const handler = new ChaosCount(controlCell, regionCells, runCells);
+  handler.attachRegionShardState(context.handler.regionShardState());
+  assert.equal(handler.initialize(
+    context.grid, context.cellExclusions, context.shape, context.stateAllocator), true);
+  return handler;
+};
+
+const enforceShardCount = (countHandler, context) => {
+  assert.equal(countHandler.enforceConsistency(context.grid, createAccumulator()), true);
+};
+
 const makeChaosCount = (shape, controlCell, regionCells, grid) => {
   const handler = new ChaosCount(controlCell, regionCells);
   const cellExclusions = createCellExclusions({ allUnique: false, numCells: shape.totalCells() });
@@ -298,6 +311,32 @@ await runTest('ChaosCount prunes counted cells when control forces all matches',
   assert.equal(handler.enforceConsistency(grid, createAccumulator()), true);
   assert.equal(grid[regionCells[1]], valueMask(2));
   assert.equal(grid[regionCells[2]], valueMask(2));
+});
+
+await runTest('ChaosCount merges contiguous fixed matching region cells into shards', () => {
+  const context = makeChaosContext('4x4');
+  const { grid, regionCells, handler } = context;
+  const countHandler = makeShardCount(context, 0, [5, 6, 9]);
+
+  grid[regionCells[5]] = valueMask(2);
+  grid[regionCells[6]] = valueMask(2);
+  grid[regionCells[9]] = valueMask(2);
+
+  enforceShardCount(countHandler, context);
+  assert.equal(regionShardParent(handler, grid, 5), regionShardParent(handler, grid, 6));
+  assert.equal(regionShardParent(handler, grid, 5), regionShardParent(handler, grid, 9));
+});
+
+await runTest('ChaosCount does not shard-merge non-contiguous fixed matching region cells', () => {
+  const context = makeChaosContext('4x4');
+  const { grid, regionCells, handler } = context;
+  const countHandler = makeShardCount(context, 0, [5, 10]);
+
+  grid[regionCells[5]] = valueMask(2);
+  grid[regionCells[10]] = valueMask(2);
+
+  enforceShardCount(countHandler, context);
+  assert.notEqual(regionShardParent(handler, grid, 5), regionShardParent(handler, grid, 10));
 });
 
 await runTest('ChaosConstruction priority anchor selection does not mutate grid', () => {
@@ -774,18 +813,18 @@ await runTest('ChaosConstruction region shard persists fixed-control merges', ()
 await runTest('ChaosArrow shard merges use supported multi-arm prefixes', () => {
   const context = makeChaosContext('4x4');
   const { grid, regionCells, handler } = context;
-  const arrowHandler = makeShardArrow(context, 15, [[5, 2, 3], [5, 8, 12]]);
+  const arrowHandler = makeShardArrow(context, 15, [[5, 6, 7], [5, 9, 13]]);
 
   grid[15] = valueMask(3);
   grid[regionCells[5]] = valueMask(2);
-  grid[regionCells[2]] = valueMask(2);
-  grid[regionCells[3]] = valueMask(3);
-  grid[regionCells[8]] = valueMask(2);
-  grid[regionCells[12]] = valueMask(3);
+  grid[regionCells[6]] = valueMask(2);
+  grid[regionCells[7]] = valueMask(3);
+  grid[regionCells[9]] = valueMask(2);
+  grid[regionCells[13]] = valueMask(3);
 
   enforceShardArrow(arrowHandler, context);
-  assert.equal(regionShardParent(handler, grid, 5), regionShardParent(handler, grid, 2));
-  assert.equal(regionShardParent(handler, grid, 5), regionShardParent(handler, grid, 8));
+  assert.equal(regionShardParent(handler, grid, 5), regionShardParent(handler, grid, 6));
+  assert.equal(regionShardParent(handler, grid, 5), regionShardParent(handler, grid, 9));
 });
 
 await runTest('ChaosArrow derives minimum lengths from region shards', () => {
