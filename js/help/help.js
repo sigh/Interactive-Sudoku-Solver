@@ -153,7 +153,7 @@ const addCopyButtonsToCodeBlocks = () => {
     copyBtn.title = 'Copy to clipboard';
 
     const copyIcon = document.createElement('img');
-    copyIcon.src = 'img/copy-48.png';
+    copyIcon.src = '../img/copy-48.png';
     copyBtn.appendChild(copyIcon);
 
     copyBtn.addEventListener('click', (e) => {
