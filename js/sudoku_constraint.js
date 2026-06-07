@@ -1187,7 +1187,8 @@ export class SudokuConstraint {
       orthogonal directions.`);
     static CATEGORY = 'LinesAndSets';
     static DISPLAY_CONFIG = {
-      displayClass: 'ChaosArrow',
+      displayClass: 'Chaos',
+      multiArrow: true,
     };
     static VALIDATE_CELLS_FN = (cells, shape) => {
       const regionCells = shape.varCellsForGroup('CC');
@@ -1268,7 +1269,8 @@ export class SudokuConstraint {
       first selected region cell.`);
     static CATEGORY = 'LinesAndSets';
     static DISPLAY_CONFIG = {
-      displayClass: 'ShadedRegion',
+      displayClass: 'Chaos',
+      borderedRegion: true,
     };
     static VALIDATE_CELLS_FN = (cells, shape) => {
       const regionCells = shape.varCellsForGroup('CC');

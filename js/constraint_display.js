@@ -22,7 +22,7 @@ const constraintDisplayOrder = () => [
   CustomLine,
   ShadedRegion,
   CountingCircles,
-  ChaosArrow,
+  Chaos,
   Diagonal,
   Dot,
   Letter,
@@ -490,7 +490,7 @@ class GenericLine extends BaseConstraintDisplayItem {
 
 class Thermo extends GenericLine { }
 
-class ChaosArrow extends BaseConstraintDisplayItem {
+class Chaos extends BaseConstraintDisplayItem {
   static IS_DIMMABLE = true;
   static COLOR = 'rgb(140, 70, 220)';
   static SHORT_ARROW_LENGTH = DisplayItem.CELL_SIZE * 0.45;
@@ -509,16 +509,46 @@ class ChaosArrow extends BaseConstraintDisplayItem {
   _makeItem(constraint, options, includeRegionCells = true) {
     const g = createSvgElement('g');
     const shape = this._shape;
-    const controlCell = constraint.cells[0];
     const regionCells = shape.varCellsForGroup('CC');
+    if (!regionCells) return g;
+
+    const controlCellId = constraint.cells[0];
+    const controlCellIndex = shape.parseCellId(controlCellId).cell;
+
+    g.append(this._makeCircle(this.cellIdCenter(controlCellId)));
+
+    if (includeRegionCells && controlCellIndex < shape.numGridCells) {
+      g.append(this._makeCircle(
+        this.cellIndexCenter(regionCells[controlCellIndex]), /* dashed= */ true));
+    }
+
+    if (options.multiArrow) this._appendArrows(g, constraint, regionCells, includeRegionCells);
+    if (options.borderedRegion) this._appendBorderedRegion(g, constraint);
+
+    return g;
+  }
+
+  _makeCircle(point, dashed = false) {
+    const circle = this._makeCircleAtPoint(point);
+    circle.setAttribute('fill', 'transparent');
+    circle.setAttribute('stroke', this.constructor.COLOR);
+    circle.setAttribute('stroke-width', String(LineOptions.THIN_LINE_WIDTH));
+    if (dashed) circle.setAttribute('stroke-dasharray', '3 6');
+    return circle;
+  }
+
+  _appendArrows(g, constraint, regionCells, includeRegionCells) {
+    const shape = this._shape;
+    const controlCell = constraint.cells[0];
     const regionCellOffset = regionCells[0];
     const arms = constraint.expandedArmCellGroups(shape);
+
     for (const arm of arms) {
       const group = [controlCell];
       for (const cellId of arm) {
         group.push(shape.makeCellIdFromIndex(shape.parseCellId(cellId).cell - regionCellOffset));
       }
-      const item = this._makeArrowLine(group, options, regionCellOffset);
+      const item = this._makeArrowLine(group, regionCellOffset);
       if (item) g.append(item);
     }
 
@@ -526,18 +556,15 @@ class ChaosArrow extends BaseConstraintDisplayItem {
     if (includeRegionCells
       && controlCellIndex < shape.numGridCells
       && regionCells.length === shape.numGridCells) {
-      const controlRegionCell = shape.makeCellIdFromIndex(
-        regionCells[controlCellIndex]);
+      const controlRegionCell = shape.makeCellIdFromIndex(regionCells[controlCellIndex]);
       for (const arm of arms) {
-        const item = this._makeArrowLine(
-          [controlRegionCell, ...arm], options, regionCellOffset, true);
+        const item = this._makeArrowLine([controlRegionCell, ...arm], regionCellOffset, true);
         if (item) g.append(item);
       }
     }
-    return g;
   }
 
-  _makeArrowLine(cells, options, regionCellOffset, startMarkerDashed = false) {
+  _makeArrowLine(cells, regionCellOffset, startMarkerDashed = false) {
     const points = [];
     let lastCell = null;
     for (const cellId of cells) {
@@ -549,9 +576,18 @@ class ChaosArrow extends BaseConstraintDisplayItem {
       lastCell = cell < this._shape.numGridCells ? cell : cell - regionCellOffset;
     }
     if (points.length < 2) return null;
+
+    const lineOptions = {
+      color: this.constructor.COLOR,
+      arrow: true,
+      arrowheadId: 'chaos-arrowhead',
+      startMarker: LineOptions.EMPTY_CIRCLE_MARKER,
+      startMarkerDashed,
+      width: LineOptions.THIN_LINE_WIDTH,
+    };
     const direction = this._straightArmDirection(points);
     if (!direction || !this._reachesGridEdge(lastCell, direction)) {
-      return this._makeConstraintLineFromPoints(points, this._lineOptions(options, true, startMarkerDashed));
+      return this._makeConstraintLineFromPoints(points, { ...lineOptions, dashed: true });
     }
 
     const start = points[0];
@@ -559,21 +595,21 @@ class ChaosArrow extends BaseConstraintDisplayItem {
       start[0] + direction[0] * this.constructor.SHORT_ARROW_LENGTH,
       start[1] + direction[1] * this.constructor.SHORT_ARROW_LENGTH,
     ];
-    return this._makeConstraintLineFromPoints(
-      [start, end], this._lineOptions(options, false, startMarkerDashed));
+    return this._makeConstraintLineFromPoints([start, end], lineOptions);
   }
 
-  _lineOptions(options, dashed = true, startMarkerDashed = false) {
-    return {
-      ...options,
-      color: this.constructor.COLOR,
-      arrow: true,
-      arrowheadId: 'chaos-arrowhead',
-      dashed,
-      startMarker: LineOptions.EMPTY_CIRCLE_MARKER,
-      startMarkerDashed,
-      width: LineOptions.THIN_LINE_WIDTH,
-    };
+  _appendBorderedRegion(g, constraint) {
+    if (constraint.cells.length < 2) return;
+    const shape = this._shape;
+    const color = this.constructor.COLOR;
+    const cellSet = new Set(constraint.cells.slice(1).map(c => shape.parseCellId(c).cell));
+    const border = this._makeRegionBorder(cellSet, shape, /* cornerCut= */ true, /* inset= */ 3);
+    border.setAttribute('stroke', color);
+    border.setAttribute('stroke-width', '5');
+    border.setAttribute('fill', 'none');
+    border.setAttribute('opacity', '0.4');
+    border.setAttribute('stroke-linejoin', 'round');
+    g.append(border);
   }
 
   _reachesGridEdge(cell, direction) {
@@ -1553,7 +1589,7 @@ export class ConstraintDisplay extends DisplayItem {
 
     displayContainer.addElement(this.constructor._makeArrowhead());
     displayContainer.addElement(
-      this.constructor._makeArrowhead('chaos-arrowhead', ChaosArrow.COLOR));
+      this.constructor._makeArrowhead('chaos-arrowhead', Chaos.COLOR));
     displayContainer.addElement(this.constructor._makeTextBgFilter());
     displayContainer.addElement(CellValueDisplay.makeGivensMask());
 
