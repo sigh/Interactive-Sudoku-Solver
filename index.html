@@ -161,6 +161,13 @@ layout: null
         </div>
         <div class="inline-switch switch">
           <label>
+            <input id="show-raw-strings-input" type="checkbox">
+            <span></span>
+            <span>Show raw strings</span>
+          </label>
+        </div>
+        <div class="inline-switch switch">
+          <label>
             <input id="show-debug-input" type="checkbox">
             <span></span>
             <span>Debug mode</span>
@@ -836,6 +843,13 @@ function accept(state) {
               <div class="sandbox-status notice"></div>
             </div>
           </div>
+        </div>
+      </div>
+
+      <div id="raw-strings-container" data-tab-id="raw-strings" data-tab-label="Raw Strings">
+        <div class="loading-notice notice notice-info">Loading…</div>
+        <div class="lazy-body" hidden>
+          <div id="raw-strings-output"></div>
         </div>
       </div>
 

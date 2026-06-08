@@ -28,7 +28,7 @@ const {
   CollapsibleContainer,
   ConstraintCategoryInput,
 } = await import('./constraint_input.js' + self.VERSION_PARAM);
-const { BottomDrawer } = await import('./bottom_drawer.js' + self.VERSION_PARAM);
+const { BottomDrawer, LazyDrawerManager } = await import('./bottom_drawer.js' + self.VERSION_PARAM);
 
 export const initPage = () => {
   // Create grid.
@@ -48,6 +48,13 @@ export const initPage = () => {
 
   // Set up sandbox integration.
   new SandboxHandler(constraintManager, bottomDrawer);
+
+  new LazyDrawerManager({
+    tabId: 'raw-strings',
+    modulePath: './debug/raw_strings_panel.js',
+    factory: (module, bodyElement) => new module.RawStringsPanel(
+      constraintManager, displayContainer, bodyElement),
+  }, bottomDrawer);
 
   setUpHeaderSettingsDropdown();
 
@@ -1756,3 +1763,4 @@ class SandboxHandler {
     }
   }
 }
+

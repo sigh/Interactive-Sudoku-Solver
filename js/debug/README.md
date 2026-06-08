@@ -9,6 +9,7 @@ This directory provides the debug panel UI, solver benchmarking, and flame graph
 | [debug.js](debug.js) | **Debug module core.** Loads test data (puzzle collections, layouts) and provides `loadInput(puzzleCfg)` to load puzzles into the constraint manager. `runAll(puzzles)` benchmarks a set of puzzles and returns solutions + stats. `progressBenchmarks()` logs solver performance metrics. |
 | [debug_display.js](debug_display.js) | **Debug panel UI.** `DebugManager` renders the debug tab: solver logs, counters, puzzle selector dropdown, and debug option toggles. Processes real-time solver updates via `getCallback()`. `InfoOverlay` displays per-cell annotations with optional heatmap coloring. |
 | [flame_graph.js](flame_graph.js) | **Flame graph visualization.** `DebugFlameGraphView` renders an SVG timeline of solver activity with interactive tooltips. `FlameGraphStore` accumulates timeline samples (pruned to max 1000 nodes). |
+| [raw_strings_panel.js](raw_strings_panel.js) | **Raw constraint strings panel.** `RawStringsPanel` lists the serialized string for each constraint, one per line, with composite constraints expanded and nested. Hovering a line highlights the constraint's cells on the grid. |
 
 ## Integration
 

@@ -495,13 +495,18 @@ button.copy-to-clipboard-failed::after {
   opacity: 0.1;
 }
 
-.highlight-group>.chip-hover {
+.highlight-group>.chip-hover,
+.highlight-group>.raw-strings-hover {
   fill: rgb(250, 250, 250);
   opacity: 0.9;
   /* Filter doesn't work on safari, so also add a thin stroke */
   filter: drop-shadow(0 0 5px black);
   stroke: rgba(0, 0, 0, 1);
   stroke-width: 1px;
+}
+
+.highlight-group>.raw-strings-hover {
+  fill: rgb(200, 250, 250);
 }
 
 .highlight-group>.selected-constraint {
@@ -1526,4 +1531,20 @@ button:has(.spinner),
 
 .bottom-drawer-panel>.loading-notice {
   margin: auto;
+}
+
+#raw-strings-output {
+  margin: 0;
+  padding: 4px;
+  overflow: auto;
+  flex: 1;
+  font-family: monospace;
+  font-size: 12px;
+}
+
+.raw-strings-line {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
 }
