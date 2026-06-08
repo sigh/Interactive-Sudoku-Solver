@@ -204,7 +204,7 @@ body {
 #page-header {
   flex-shrink: 0;
   border-radius: 0;
-  z-index: 100;
+  z-index: 200;
   gap: 5px;
 }
 
