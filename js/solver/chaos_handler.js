@@ -155,7 +155,8 @@ export class ChaosConstruction extends SudokuConstraintHandler {
     }
     // Region labels reuse the normal value bitmask representation.
     this._regionMask = (1 << this._numRegions) - 1;
-    this._allValues = this._regionMask;
+    this._numValues = shape.numValues;
+    this._allValuesMask = (1 << this._numValues) - 1;
   }
 
   initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
@@ -335,7 +336,7 @@ export class ChaosConstruction extends SudokuConstraintHandler {
 
       const cellValues = grid[cell];
       shardValueMasks[root] |= cellValues;
-      if (cellValues !== this._regionMask) shardRestrictedValueFlags[root] = 1;
+      if (cellValues !== this._allValuesMask) shardRestrictedValueFlags[root] = 1;
       if (cellValues && !(cellValues & (cellValues - 1))) {
         if (shardFixedValueMasks[root] & cellValues) return false;
         shardFixedValueMasks[root] |= cellValues;
@@ -802,8 +803,8 @@ export class ChaosConstruction extends SudokuConstraintHandler {
     const nextCells = this._regionShardNextCells;
     const regionCellOffset = this._regionCellOffset;
     const noCell = this.constructor._NO_CELL;
-    const regionSize = this._regionSize;
-    const allValues = this._regionMask;
+    const numValues = this._numValues;
+    const allValues = this._allValuesMask;
 
     checkRegionsMask &= restrictedRegionsMask;
 
@@ -816,7 +817,7 @@ export class ChaosConstruction extends SudokuConstraintHandler {
         const valueBit = hiddenValues & -hiddenValues;
         hiddenValues ^= valueBit;
         const valueIndex = 31 - Math.clz32(valueBit);
-        const root = firstRootByRegionValue[region * regionSize + valueIndex];
+        const root = firstRootByRegionValue[region * numValues + valueIndex];
 
         let cell = noCell;
         let cellCount = 0;
@@ -855,6 +856,7 @@ export class ChaosConstruction extends SudokuConstraintHandler {
     const shardFixedValueMasks = this._regionShardFixedValueMasks;
     const shardRestrictedValueFlags = this._regionShardRestrictedValueFlags;
     const regionSize = this._regionSize;
+    const numValues = this._numValues;
     const numGridCells = this._numGridCells;
     const regionCellOffset = this._regionCellOffset;
 
@@ -872,10 +874,10 @@ export class ChaosConstruction extends SudokuConstraintHandler {
         const fixedCount = (scanData >>> REGION_FIXED_COUNT_SHIFT) & REGION_FIXED_COUNT_MASK;
         const possibleCount = scanData & REGION_POSSIBLE_COUNT_MASK;
         if (fixedCount > regionSize || fixedCount + possibleCount < regionSize) return false;
-        if ((scanData >>> REGION_VALUE_MASK_SHIFT) !== this._regionMask) return false;
+        if ((scanData >>> REGION_VALUE_MASK_SHIFT) !== this._allValuesMask) return false;
         if (fixedValueMasks[region]) fixedValueRegionsMask |= regionBit;
         // Hidden singles are opportunistic; only enforce after regions are half-fixed
-        if ((fixedCount << 1) >= regionSize && fixedValueMasks[region] !== this._regionMask) {
+        if ((fixedCount << 1) >= regionSize && fixedValueMasks[region] !== this._allValuesMask) {
           hiddenRegionsMask |= regionBit;
           regionScanData[region] = scanData & REGION_COUNT_MASK;
         }
@@ -912,7 +914,7 @@ export class ChaosConstruction extends SudokuConstraintHandler {
                   const valueBit = firstSeenValues & -firstSeenValues;
                   firstSeenValues ^= valueBit;
                   const valueIndex = 31 - Math.clz32(valueBit);
-                  firstRootByRegionValue[region * regionSize + valueIndex] = root;
+                  firstRootByRegionValue[region * numValues + valueIndex] = root;
                 }
                 hiddenDuplicateValueMasks[region] |= hiddenSeenValueMask & valueBits;
                 regionScanData[region] |= valueBits << REGION_VALUE_MASK_SHIFT;

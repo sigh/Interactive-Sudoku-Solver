@@ -742,10 +742,6 @@ export class SudokuBuilder {
 
         case 'RegionSameValues':
           {
-            if (constraintMap.has('ChaosConstruction')) {
-              throw new InvalidConstraintError(
-                'RegionSameValues is not supported with Chaos Construction.');
-            }
             const regions = [];
 
             if (constraintMap.has('Jigsaw')) {
