@@ -518,6 +518,51 @@ await runTest('Jigsaw.makeFromArgs throws when gridSpec does not match layout le
   );
 });
 
+// 16x16 jigsaw layout with 16 box regions (4×4 boxes each containing 16 cells).
+// Region indices 0-15 in base 17: '0'-'9' then 'a'-'f'.
+const JIGSAW_16x16_LAYOUT = (
+  '0000111122223333'.repeat(4) +
+  '4444555566667777'.repeat(4) +
+  '88889999aaaabbbb'.repeat(4) +
+  'ccccddddeeeeffff'.repeat(4)
+);
+
+await runTest('Jigsaw.makeFromArgs parses 16x16 grid', () => {
+  const shape = GridShape.fromGridSize(16);
+  const jigsaws = [...SudokuConstraint.Jigsaw.makeFromArgs([JIGSAW_16x16_LAYOUT], shape)];
+  assert.equal(jigsaws.length, 16, 'should have 16 jigsaw regions');
+  assert.equal(jigsaws[0].cells.length, 16, 'each region should have 16 cells');
+});
+
+await runTest('Jigsaw.serialize produces single-character indices for 16x16 grid', () => {
+  const shape = GridShape.fromGridSize(16);
+  const jigsaws = [...SudokuConstraint.Jigsaw.makeFromArgs([JIGSAW_16x16_LAYOUT], shape)];
+  const serialized = SudokuConstraint.Jigsaw.serialize(jigsaws);
+  const layoutStr = serialized.replace('.Jigsaw~', '');
+  // Each of the 256 cells must be encoded as exactly one character.
+  assert.equal(layoutStr.length, 256,
+    'layout string must be exactly 256 characters (one per cell)');
+  assert.ok(/^[0-9a-f]{256}$/.test(layoutStr),
+    'each cell must be a single base-17 digit');
+});
+
+await runTest('Jigsaw round-trips for 16x16 grid', () => {
+  const shape = GridShape.fromGridSize(16);
+  const jigsaws = [...SudokuConstraint.Jigsaw.makeFromArgs([JIGSAW_16x16_LAYOUT], shape)];
+  const serialized = SudokuConstraint.Jigsaw.serialize(jigsaws);
+  const argsStr = serialized.replace('.Jigsaw~', '');
+  const reparsed = [...SudokuConstraint.Jigsaw.makeFromArgs([argsStr], shape)];
+
+  assert.equal(reparsed.length, jigsaws.length, 'should have same number of regions');
+  for (let i = 0; i < jigsaws.length; i++) {
+    assert.deepEqual(
+      reparsed[i].cells.sort(),
+      jigsaws[i].cells.sort(),
+      `region ${i} should have same cells`
+    );
+  }
+});
+
 logSuiteComplete('SudokuConstraintBase');
 
 // ============================================================================

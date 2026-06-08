@@ -731,7 +731,7 @@ export class SudokuConstraint {
         // Create a new index when we first encounter a part.
         if (!indexMap.has(part)) {
           const index = indexMap.size;
-          indexMap.set(part, index.toString(SHAPE_9x9.numValues + 1));
+          indexMap.set(part, index.toString(shape.numValues + 1));
         }
       });
 
