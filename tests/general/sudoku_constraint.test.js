@@ -848,3 +848,92 @@ await runTest('Container.getCells collects cells from child constraints', () => 
   assert.equal(cells[0], 'R1C1');
   assert.equal(cells[1], 'R2C2');
 });
+
+// ============================================================================
+// CompositeConstraintBase allowed categories
+// ============================================================================
+
+// --- Allowed categories ---
+
+await runTest('And accepts LinesAndSets (Thermo)', () => {
+  assert.doesNotThrow(
+    () => new SudokuConstraint.And([new SudokuConstraint.Thermo('R1C1', 'R1C2')]));
+});
+
+await runTest('And accepts GivenCandidates (Given)', () => {
+  assert.doesNotThrow(
+    () => new SudokuConstraint.And([new SudokuConstraint.Given('R1C1', 5)]));
+});
+
+await runTest('And accepts OutsideClue (Sandwich)', () => {
+  assert.doesNotThrow(
+    () => new SudokuConstraint.And([new SudokuConstraint.Sandwich('R1', 10)]));
+});
+
+await runTest('And accepts Pairwise (Pair)', () => {
+  assert.doesNotThrow(
+    () => new SudokuConstraint.And([new SudokuConstraint.Pair('key', 'name', 'R1C1', 'R1C2')]));
+});
+
+await runTest('And accepts StateMachine (NFA)', () => {
+  const enc = SudokuConstraint.NFA.encodeSpec('(1|2)', 9);
+  assert.doesNotThrow(
+    () => new SudokuConstraint.And([new SudokuConstraint.NFA(enc, 'g', 'R1C1')]));
+});
+
+await runTest('And accepts ChaosConstruction (ChaosArrow)', () => {
+  assert.doesNotThrow(
+    () => new SudokuConstraint.And([new SudokuConstraint.ChaosArrow('R2C1')]));
+});
+
+await runTest('And accepts ChaosConstruction (ChaosCount)', () => {
+  assert.doesNotThrow(
+    () => new SudokuConstraint.And([new SudokuConstraint.ChaosCount('R2C1')]));
+});
+
+await runTest('And accepts nested Composite (And)', () => {
+  assert.doesNotThrow(
+    () => new SudokuConstraint.And([new SudokuConstraint.And([])]));
+});
+
+await runTest('Or accepts all the same allowed categories', () => {
+  const allowed = [
+    new SudokuConstraint.Thermo('R1C1', 'R1C2'),
+    new SudokuConstraint.Given('R1C1', 5),
+    new SudokuConstraint.Sandwich('R1', 10),
+    new SudokuConstraint.ChaosArrow('R2C1'),
+  ];
+  for (const inner of allowed) {
+    assert.doesNotThrow(
+      () => new SudokuConstraint.Or([inner]),
+      `Or should accept ${inner.type}`);
+  }
+});
+
+// --- Disallowed categories ---
+
+await runTest('And rejects LayoutCheckbox (AntiKnight)', () => {
+  assert.throws(
+    () => new SudokuConstraint.And([new SudokuConstraint.AntiKnight()]),
+    /Invalid constraint type in 'And'/);
+});
+
+await runTest('And rejects Global (StrictKropki)', () => {
+  assert.throws(
+    () => new SudokuConstraint.And([new SudokuConstraint.StrictKropki()]),
+    /Invalid constraint type in 'And'/);
+});
+
+await runTest('And rejects Region (RegionSize)', () => {
+  assert.throws(
+    () => new SudokuConstraint.And([new SudokuConstraint.RegionSize(3)]),
+    /Invalid constraint type in 'And'/);
+});
+
+await runTest('And rejects Shape (Var)', () => {
+  assert.throws(
+    () => new SudokuConstraint.And([new SudokuConstraint.Var('X', 'label', 1)]),
+    /Invalid constraint type in 'And'/);
+});
+
+logSuiteComplete('CompositeConstraintBase allowed categories');

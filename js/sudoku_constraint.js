@@ -493,7 +493,8 @@ export class CompositeConstraintBase extends SudokuConstraintBase {
   //    (such as Anti-knight). It is easier to ban everything in the layout
   //    panel.
   static _ALLOWED_CATEGORIES = new Set(
-    ['LinesAndSets', 'GivenCandidates', 'OutsideClue', 'Composite', 'Pairwise', 'StateMachine']);
+    ['LinesAndSets', 'GivenCandidates', 'OutsideClue', 'Composite', 'Pairwise',
+      'StateMachine', 'ChaosConstruction']);
 
   static allowedConstraintClass(constraintClass) {
     return this._ALLOWED_CATEGORIES.has(constraintClass.CATEGORY);
