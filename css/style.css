@@ -1527,6 +1527,7 @@ button:has(.spinner),
   display: flex;
   flex: 1;
   min-height: 0;
+  min-width: 0;
 }
 
 .bottom-drawer-panel>.loading-notice {
@@ -1538,6 +1539,7 @@ button:has(.spinner),
   padding: 4px;
   overflow: auto;
   flex: 1;
+  min-width: 0;
   font-family: monospace;
   font-size: 12px;
 }
