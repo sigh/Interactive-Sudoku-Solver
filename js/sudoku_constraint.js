@@ -1207,7 +1207,7 @@ export class SudokuConstraint {
     static CATEGORY = 'Experimental';
     static UNIQUENESS_KEY_FIELD = 'type';
     static VALIDATE_SHAPE_FN = (shape) =>
-      shape.numGridCells === shape.numValues * shape.numValues;
+      shape.isSquare() && shape.numValues >= shape.numCols;
 
     getVarCellGroups(shape) {
       return [{

@@ -80,7 +80,7 @@ export class SudokuConstraintOptimizer {
     this._optimizeFullRank(handlerSet, shape);
 
     this._addChaosFixedValueRegionExclusions(handlerSet, shape);
-    this._addChaosRegionShardSources(handlerSet, shape);
+    this._addChaosRegionShardSources(handlerSet, shape, effectiveValueInfo.mask);
 
     this._optimizeRequiredValues(handlerSet, cellExclusions, shape);
 
@@ -179,7 +179,7 @@ export class SudokuConstraintOptimizer {
     }
   }
 
-  _addChaosRegionShardSources(handlerSet, shape) {
+  _addChaosRegionShardSources(handlerSet, shape, effectiveValueMask) {
     const chaosHandlers = handlerSet.getAllofType(ChaosHandlerModule.ChaosConstruction);
     if (chaosHandlers.length === 0) return;
 
@@ -219,6 +219,7 @@ export class SudokuConstraintOptimizer {
     }
 
     for (const handler of chaosHandlers) {
+      handler.setEffectiveValueMask(effectiveValueMask);
       for (const link of links) handler.addRegionLink(link);
       for (const arrowHandler of arrowHandlers) {
         arrowHandler.attachRegionShardState(handler.regionShardState());
@@ -700,6 +701,7 @@ export class SudokuConstraintOptimizer {
       count,
       sum: LookupTables.get(shape.numValues).sum[gridValues]
         + shape.valueOffset * count,
+      mask: gridValues,
     };
   }
 

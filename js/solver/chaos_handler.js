@@ -76,7 +76,12 @@ export class ChaosConstruction extends SudokuConstraintHandler {
     this._canonicalAnchorCells = [0];
     this._regionLinks = [];
     this._regionShardState = new ChaosRegionShardState();
+    this._effectiveValueMask = -1;
     this.idStr = [this.constructor.name, this._numGridCells].join('|');
+  }
+
+  setEffectiveValueMask(mask) {
+    this._effectiveValueMask = mask;
   }
 
   linkedSearchCells() {
@@ -148,16 +153,16 @@ export class ChaosConstruction extends SudokuConstraintHandler {
       throw new InvalidConstraintError(
         'ChaosConstruction requires one region cell for every grid cell.');
     }
-    this._regionSize = shape.numValues;
-    this._numRegions = shape.numValues;
-    if (shape.numGridCells !== shape.numValues * shape.numValues) {
+    this._regionSize = shape.numCols;
+    this._numRegions = shape.numCols;
+    if (shape.numCols !== shape.numRows) {
       throw new InvalidConstraintError(
-        'ChaosConstruction requires the number of regions to equal the number of values.');
+        'ChaosConstruction requires a square grid.');
     }
     // Region labels reuse the normal value bitmask representation.
     this._regionMask = (1 << this._numRegions) - 1;
     this._numValues = shape.numValues;
-    this._allValuesMask = (1 << this._numValues) - 1;
+    this._effectiveValueMask &= (1 << this._numValues) - 1;
   }
 
   initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
@@ -214,6 +219,7 @@ export class ChaosConstruction extends SudokuConstraintHandler {
     const regionCellOffset = this._regionCellOffset;
 
     for (let i = 0; i < numGridCells; i++) {
+      if (!(initialGridCells[i] &= this._effectiveValueMask)) return false;
       if (!(initialGridCells[regionCellOffset + i] &= this._regionMask)) return false;
     }
 
@@ -339,7 +345,7 @@ export class ChaosConstruction extends SudokuConstraintHandler {
 
       const cellValues = grid[cell];
       shardValueMasks[root] |= cellValues;
-      if (cellValues !== this._allValuesMask) shardRestrictedValueFlags[root] = 1;
+      if (cellValues !== this._effectiveValueMask) shardRestrictedValueFlags[root] = 1;
       if (cellValues && !(cellValues & (cellValues - 1))) {
         if (shardFixedValueMasks[root] & cellValues) return false;
         shardFixedValueMasks[root] |= cellValues;

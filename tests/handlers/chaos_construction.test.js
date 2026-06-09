@@ -212,7 +212,7 @@ await runTest('ChaosConstruction rejects shapes with region count different from
       createCellExclusions({ allUnique: false, numCells: shape.totalCells() }),
       shape,
       createStateAllocator(grid, shape.totalCells())),
-    /number of regions to equal the number of values/);
+    /requires a square grid/);
 });
 
 await runTest('ChaosConstruction priority is a low global floor', () => {

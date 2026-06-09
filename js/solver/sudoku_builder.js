@@ -223,9 +223,10 @@ export class SudokuBuilder {
 
         case 'ChaosConstruction':
           {
-            if (this._regionSize(constraintMap, shape) !== shape.numValues) {
+            const regionSize = this._regionSize(constraintMap, shape);
+            if (regionSize !== shape.numCols || regionSize !== shape.numRows) {
               throw new InvalidConstraintError(
-                'Chaos Construction only supports region size equal to numValues.');
+                'Chaos Construction requires region size to equal the number of rows and columns.');
             }
             const regionCells = shape.varCellsForGroup('CC');
             if (!regionCells || regionCells.length !== shape.numGridCells) {

@@ -508,16 +508,14 @@ await runTest('ChaosConstruction rejects explicit non-value region size', () => 
   );
 });
 
-await runTest('ChaosConstruction rejects effective non-value region size', () => {
+await runTest('ChaosConstruction accepts numValues greater than region size', () => {
+  // Relaxed: numValues > numCols is valid; region size comes from grid geometry.
   const constraint = new SudokuConstraint.Container([
     new SudokuConstraint.Shape('6x6~9'),
     new SudokuConstraint.ChaosConstruction(),
   ]);
 
-  assert.throws(
-    () => buildHandlers(constraint),
-    { name: 'InvalidConstraintError' },
-  );
+  assert.doesNotThrow(() => buildHandlers(constraint));
 });
 
 await runTest('ChaosConstruction rejects RegionSumLine', () => {
