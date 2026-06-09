@@ -1,5 +1,6 @@
 const { LookupTables } = await import('./lookup_tables.js' + self.VERSION_PARAM);
 const { SudokuConstraintHandler, InvalidConstraintError } = await import('./handlers.js' + self.VERSION_PARAM);
+const { countOnes16bit } = await import('../util.js' + self.VERSION_PARAM);
 
 const DEFER_CONNECTIVITY = 2;
 const REGION_POSSIBLE_COUNT_MASK = 0x1ff;
@@ -103,7 +104,7 @@ export class ChaosConstruction extends SudokuConstraintHandler {
     const separated = (cellA, cellB) => {
       const rowDistance = Math.abs((cellA / numCols | 0) - (cellB / numCols | 0));
       const colDistance = Math.abs((cellA % numCols) - (cellB % numCols));
-      return rowDistance + colDistance >= numValues;
+      return rowDistance + colDistance >= numCols;
     };
 
     const edgeCells = [];
@@ -184,7 +185,9 @@ export class ChaosConstruction extends SudokuConstraintHandler {
     // Traversal scratch; `_rootScratch` also stores hidden-single witness roots.
     this._componentStack = new Uint8Array(numGridCells);
     this._visitMarks = new Uint16Array(numGridCells);
-    this._rootScratch = new Uint8Array(this._regionSize * numGridCells);
+    // BFS needs regionSize * numGridCells; hidden-singles needs numRegions * numValues.
+    // The former dominates when numGridCells >= numValues (i.e. regionSize >= sqrt(numValues)).
+    this._rootScratch = new Uint8Array(this._regionSize * Math.max(numGridCells, this._numValues));
     // Branch-state cache for connectivity: region labels are dirty when their
     // non-fixed candidate weight changes since the last stable scan.
     this._possibleCountCacheOffset = stateAllocator.allocate(
@@ -804,7 +807,8 @@ export class ChaosConstruction extends SudokuConstraintHandler {
     const regionCellOffset = this._regionCellOffset;
     const noCell = this.constructor._NO_CELL;
     const numValues = this._numValues;
-    const allValues = this._allValuesMask;
+    const regionSize = this._regionSize;
+    const regionScanData = this._regionScanData;
 
     checkRegionsMask &= restrictedRegionsMask;
 
@@ -812,7 +816,14 @@ export class ChaosConstruction extends SudokuConstraintHandler {
       const regionBit = checkRegionsMask & -checkRegionsMask;
       checkRegionsMask ^= regionBit;
       const region = 31 - Math.clz32(regionBit);
-      let hiddenValues = allValues & ~(fixedValueMasks[region] | hiddenDuplicateValueMasks[region]);
+      // Use the per-region accumulated value mask: only values present in some
+      // non-fixed candidate cell of this region, rebuilt by the shard scan above.
+      const regionValueMask = regionScanData[region] >>> REGION_VALUE_MASK_SHIFT;
+      // Hidden single is only valid when the region's active value set is
+      // exactly regionSize: then AllDifferent forces every active value to
+      // appear, so a value confined to one cell really must go there.
+      if (countOnes16bit(regionValueMask | fixedValueMasks[region]) !== regionSize) continue;
+      let hiddenValues = regionValueMask & ~(fixedValueMasks[region] | hiddenDuplicateValueMasks[region]);
       while (hiddenValues) {
         const valueBit = hiddenValues & -hiddenValues;
         hiddenValues ^= valueBit;
@@ -874,10 +885,10 @@ export class ChaosConstruction extends SudokuConstraintHandler {
         const fixedCount = (scanData >>> REGION_FIXED_COUNT_SHIFT) & REGION_FIXED_COUNT_MASK;
         const possibleCount = scanData & REGION_POSSIBLE_COUNT_MASK;
         if (fixedCount > regionSize || fixedCount + possibleCount < regionSize) return false;
-        if ((scanData >>> REGION_VALUE_MASK_SHIFT) !== this._allValuesMask) return false;
+        if (countOnes16bit(scanData >>> REGION_VALUE_MASK_SHIFT) < regionSize) return false;
         if (fixedValueMasks[region]) fixedValueRegionsMask |= regionBit;
         // Hidden singles are opportunistic; only enforce after regions are half-fixed
-        if ((fixedCount << 1) >= regionSize && fixedValueMasks[region] !== this._allValuesMask) {
+        if ((fixedCount << 1) >= regionSize && countOnes16bit(fixedValueMasks[region]) < regionSize) {
           hiddenRegionsMask |= regionBit;
           regionScanData[region] = scanData & REGION_COUNT_MASK;
         }
