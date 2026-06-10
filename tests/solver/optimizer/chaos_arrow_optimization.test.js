@@ -36,7 +36,7 @@ const initializeHandler = (handler, shape, grid) => {
   const stateAllocator = createStateAllocator(grid, shape.totalCells());
   if (handler.attachRegionShardState) {
     const regionCells = shape.varCellsForGroup('CC');
-    const chaosHandler = new ChaosConstruction(shape.numGridCells, regionCells[0]);
+    const chaosHandler = new ChaosConstruction(shape.numGridCells, regionCells[0], shape.numValues);
     chaosHandler.selectPriorityAnchorCells(shape, new Int32Array(shape.totalCells()));
     assert.equal(chaosHandler.initialize(grid, cellExclusions, shape, stateAllocator), true);
     handler.attachRegionShardState(chaosHandler.regionShardState());
@@ -123,7 +123,7 @@ await runTest('_addChaosRegionShardSources attaches ChaosArrow lines', () => {
   const shape = makeShape();
   const grid = makeChaosGrid(shape);
   const regionCells = shape.varCellsForGroup('CC');
-  const chaosHandler = new ChaosConstruction(shape.numGridCells, regionCells[0]);
+  const chaosHandler = new ChaosConstruction(shape.numGridCells, regionCells[0], shape.numValues);
   const arrowHandler = new ChaosArrow(4, [[regionCells[4], regionCells[5]]], [[4, 5]]);
   const handlerSet = new HandlerSet([chaosHandler, arrowHandler], shape.totalCells());
 
@@ -148,7 +148,7 @@ await runTest('_addChaosRegionShardSources attaches multi-arm guaranteed prefixe
   const shape = makeShape();
   const grid = makeChaosGrid(shape);
   const regionCells = shape.varCellsForGroup('CC');
-  const chaosHandler = new ChaosConstruction(shape.numGridCells, regionCells[0]);
+  const chaosHandler = new ChaosConstruction(shape.numGridCells, regionCells[0], shape.numValues);
   const arrowHandler = new ChaosArrow(
     4,
     [[regionCells[4], regionCells[5], regionCells[6]], [regionCells[4], regionCells[8]]],

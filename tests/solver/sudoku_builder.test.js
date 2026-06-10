@@ -495,17 +495,15 @@ await runTest('ChaosConstruction optimizer links adjacent equal CC cells only', 
   assert.notEqual(regionShardParent(handler, grid, 15), root);
 });
 
-await runTest('ChaosConstruction rejects explicit non-value region size', () => {
+await runTest('ChaosConstruction accepts explicit region size smaller than numValues', () => {
+  // regionSize=2 on 4x4: 16 cells / 2 = 8 regions, numValues=4 > regionSize=2 — valid.
   const constraint = new SudokuConstraint.Container([
     new SudokuConstraint.Shape('4x4'),
     new SudokuConstraint.RegionSize(2),
     new SudokuConstraint.ChaosConstruction(),
   ]);
 
-  assert.throws(
-    () => buildHandlers(constraint),
-    { name: 'InvalidConstraintError' },
-  );
+  assert.doesNotThrow(() => buildHandlers(constraint));
 });
 
 await runTest('ChaosConstruction accepts numValues greater than region size', () => {

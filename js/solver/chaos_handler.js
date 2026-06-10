@@ -63,7 +63,7 @@ class ChaosRegionShardState {
 export class ChaosConstruction extends SudokuConstraintHandler {
   static _NO_CELL = 0xffff;
 
-  constructor(numGridCells, regionCellOffset) {
+  constructor(numGridCells, regionCellOffset, regionSize) {
     const cells = new Uint8Array(numGridCells * 2);
     for (let cell = 0; cell < numGridCells; cell++) {
       cells[cell * 2] = cell;
@@ -73,6 +73,7 @@ export class ChaosConstruction extends SudokuConstraintHandler {
 
     this._numGridCells = numGridCells;
     this._regionCellOffset = regionCellOffset;
+    this._regionSize = regionSize;
     this._canonicalAnchorCells = [0];
     this._regionLinks = [];
     this._regionShardState = new ChaosRegionShardState();
@@ -109,7 +110,7 @@ export class ChaosConstruction extends SudokuConstraintHandler {
     const separated = (cellA, cellB) => {
       const rowDistance = Math.abs((cellA / numCols | 0) - (cellB / numCols | 0));
       const colDistance = Math.abs((cellA % numCols) - (cellB % numCols));
-      return rowDistance + colDistance >= numCols;
+      return rowDistance + colDistance >= this._regionSize;
     };
 
     const edgeCells = [];
@@ -153,12 +154,11 @@ export class ChaosConstruction extends SudokuConstraintHandler {
       throw new InvalidConstraintError(
         'ChaosConstruction requires one region cell for every grid cell.');
     }
-    this._regionSize = shape.numCols;
-    this._numRegions = shape.numCols;
-    if (shape.numCols !== shape.numRows) {
+    if (shape.numGridCells % this._regionSize !== 0) {
       throw new InvalidConstraintError(
-        'ChaosConstruction requires a square grid.');
+        'ChaosConstruction requires grid cell count to be divisible by region size.');
     }
+    this._numRegions = shape.numGridCells / this._regionSize;
     // Region labels reuse the normal value bitmask representation.
     this._regionMask = (1 << this._numRegions) - 1;
     this._numValues = shape.numValues;

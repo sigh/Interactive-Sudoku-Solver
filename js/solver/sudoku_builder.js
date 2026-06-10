@@ -224,9 +224,9 @@ export class SudokuBuilder {
         case 'ChaosConstruction':
           {
             const regionSize = this._regionSize(constraintMap, shape);
-            if (regionSize !== shape.numCols || regionSize !== shape.numRows) {
+            if (shape.numGridCells % regionSize !== 0) {
               throw new InvalidConstraintError(
-                'Chaos Construction requires region size to equal the number of rows and columns.');
+                'Chaos Construction requires grid cell count to be divisible by region size.');
             }
             const regionCells = shape.varCellsForGroup('CC');
             if (!regionCells || regionCells.length !== shape.numGridCells) {
@@ -240,7 +240,7 @@ export class SudokuBuilder {
                   'Chaos Construction requires contiguous region cells.');
               }
             }
-            yield new ChaosHandlerModule.ChaosConstruction(shape.numGridCells, regionCellOffset);
+            yield new ChaosHandlerModule.ChaosConstruction(shape.numGridCells, regionCellOffset, regionSize);
           }
           break;
 

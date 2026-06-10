@@ -38,7 +38,7 @@ const makeChaosContext = (gridSpec = '2x2', configureGrid = null) => {
   const regionCells = shape.varCellsForGroup('CC');
   const gridCells = Uint8Array.from({ length: shape.numGridCells }, (_, i) => i);
   const regionCellOffset = regionCells[0];
-  const handler = new ChaosConstruction(shape.numGridCells, regionCellOffset);
+  const handler = new ChaosConstruction(shape.numGridCells, regionCellOffset, shape.numValues);
   configureGrid?.({ shape, grid, regionCells, handler });
   const cellExclusions = createCellExclusions({
     allUnique: false,
@@ -196,15 +196,34 @@ await runTest('ChaosConstruction defines one visible region cell per grid cell',
   assert.deepEqual(shape.varCellsForGroup('CC').slice(0, 4), [16, 17, 18, 19]);
 });
 
-await runTest('ChaosConstruction rejects shapes with region count different from value count', () => {
+await runTest('ChaosConstruction accepts non-square grids', () => {
+  // 2x3 has regionSize=3 (max), numRegions=2 — valid.
   const shape = GridShape.fromGridSpec('2x3');
   const constraint = new SudokuConstraint.ChaosConstruction();
-  assert.equal(SudokuConstraint.ChaosConstruction.VALIDATE_SHAPE_FN(shape), false);
   shape.addVarCellsForConstraints([constraint]);
 
   const grid = makeChaosGrid(shape);
   const regionCells = shape.varCellsForGroup('CC');
-  const handler = new ChaosConstruction(shape.numGridCells, regionCells[0]);
+  const handler = new ChaosConstruction(shape.numGridCells, regionCells[0], shape.numValues);
+
+  assert.equal(
+    handler.initialize(
+      grid,
+      createCellExclusions({ allUnique: false, numCells: shape.totalCells() }),
+      shape,
+      createStateAllocator(grid, shape.totalCells())),
+    true);
+});
+
+await runTest('ChaosConstruction rejects region size that does not divide grid cell count', () => {
+  // 4x5 = 20 cells, regionSize=3 — 20 % 3 !== 0.
+  const shape = GridShape.fromGridSpec('4x5');
+  const constraint = new SudokuConstraint.ChaosConstruction();
+  shape.addVarCellsForConstraints([constraint]);
+
+  const grid = makeChaosGrid(shape);
+  const regionCells = shape.varCellsForGroup('CC');
+  const handler = new ChaosConstruction(shape.numGridCells, regionCells[0], 3);
 
   assert.throws(
     () => handler.initialize(
@@ -212,7 +231,7 @@ await runTest('ChaosConstruction rejects shapes with region count different from
       createCellExclusions({ allUnique: false, numCells: shape.totalCells() }),
       shape,
       createStateAllocator(grid, shape.totalCells())),
-    /requires a square grid/);
+    /divisible by region size/);
 });
 
 await runTest('ChaosConstruction priority is a low global floor', () => {
@@ -346,7 +365,7 @@ await runTest('ChaosConstruction priority anchor selection does not mutate grid'
 
   const grid = makeChaosGrid(shape);
   const beforeSelection = grid.slice();
-  const handler = new ChaosConstruction(shape.numGridCells, shape.varCellsForGroup('CC')[0]);
+  const handler = new ChaosConstruction(shape.numGridCells, shape.varCellsForGroup('CC')[0], shape.numValues);
 
   handler.selectPriorityAnchorCells(shape, new Int32Array(shape.totalCells()));
   assert.deepEqual(grid, beforeSelection);
@@ -362,6 +381,84 @@ await runTest('ChaosConstruction uses one anchor when no separated triple exists
   assert.equal(grid[regionCells[7]], valueMask(1, 2, 3));
 });
 
+await runTest('ChaosConstruction anchor separation uses regionSize not numCols for tall grids', () => {
+  // 4x3: numRows=4, numCols=3, regionSize=4, numRegions=3
+  // With numCols (3) as threshold: triple [0,5,9] passes since dist(0,9)=3 >= 3, but 3 < regionSize=4
+  // With regionSize (4) as threshold: no triple has all pairwise distances >= 4, so falls back to [0]
+  const shape = GridShape.fromGridSpec('4x3');
+  const constraint = new SudokuConstraint.ChaosConstruction();
+  shape.addVarCellsForConstraints([constraint]);
+  const regionCells = shape.varCellsForGroup('CC');
+  const handler = new ChaosConstruction(shape.numGridCells, regionCells[0], shape.numValues);
+  handler.selectPriorityAnchorCells(shape, new Int32Array(shape.totalCells()));
+  assert.deepEqual(handler._canonicalAnchorCells, [0]);
+});
+
+await runTest('ChaosConstruction returned anchors have pairwise Manhattan distance at least regionSize', () => {
+  const shape = GridShape.fromGridSpec('4x4');
+  const constraint = new SudokuConstraint.ChaosConstruction();
+  shape.addVarCellsForConstraints([constraint]);
+  const regionCells = shape.varCellsForGroup('CC');
+  const handler = new ChaosConstruction(shape.numGridCells, regionCells[0], shape.numValues);
+  handler.selectPriorityAnchorCells(shape, new Int32Array(shape.totalCells()));
+
+  const anchors = handler._canonicalAnchorCells;
+  assert.equal(anchors.length, 3);
+  const { numCols } = shape;
+  const regionSize = shape.numValues;
+  const manhattan = (a, b) =>
+    Math.abs((a / numCols | 0) - (b / numCols | 0)) + Math.abs(a % numCols - b % numCols);
+  for (let i = 0; i < anchors.length; i++) {
+    for (let j = i + 1; j < anchors.length; j++) {
+      const dist = manhattan(anchors[i], anchors[j]);
+      assert.ok(dist >= regionSize,
+        `anchors ${anchors[i]} and ${anchors[j]}: dist=${dist} < regionSize=${regionSize}`);
+    }
+  }
+});
+
+await runTest('ChaosConstruction exits early with single anchor when numRegions < 3 (tall 4x2)', () => {
+  // 4x2: numRows=4, numCols=2, regionSize=4, numRegions=2 — hits the numRegions<3 early return
+  const shape = GridShape.fromGridSpec('4x2');
+  const constraint = new SudokuConstraint.ChaosConstruction();
+  shape.addVarCellsForConstraints([constraint]);
+  const regionCells = shape.varCellsForGroup('CC');
+  const handler = new ChaosConstruction(shape.numGridCells, regionCells[0], shape.numValues);
+  handler.selectPriorityAnchorCells(shape, new Int32Array(shape.totalCells()));
+  assert.deepEqual(handler._canonicalAnchorCells, [0]);
+});
+
+await runTest('ChaosConstruction falls back to single anchor when no sufficiently separated triple exists (wide 3x4)', () => {
+  // 3x4: numRows=3, numCols=4, regionSize=4, numRegions=3 — enough regions but no triple
+  // with all pairwise Manhattan distance >= 4 exists in this narrow grid.
+  // Max distance = 2+3=5, but three mutually-distant cells cannot be found.
+  const shape = GridShape.fromGridSpec('3x4');
+  const constraint = new SudokuConstraint.ChaosConstruction();
+  shape.addVarCellsForConstraints([constraint]);
+  const regionCells = shape.varCellsForGroup('CC');
+  const handler = new ChaosConstruction(shape.numGridCells, regionCells[0], shape.numValues);
+  handler.selectPriorityAnchorCells(shape, new Int32Array(shape.totalCells()));
+  assert.deepEqual(handler._canonicalAnchorCells, [0]);
+});
+
+await runTest('ChaosConstruction anchor selection picks highest-scoring valid triple via cell priorities', () => {
+  // 6x6: multiple valid triples exist; boost cell 23 (r3,c5, right-column edge cell)
+  // so the algorithm prefers any triple containing it over the default first-found triple.
+  // Triple (0, 23, 31): dist(0,23)=8, dist(0,31)=6, dist(23,31)=6 — all >= regionSize=6.
+  const shape = GridShape.fromGridSpec('6x6');
+  const constraint = new SudokuConstraint.ChaosConstruction();
+  shape.addVarCellsForConstraints([constraint]);
+  const regionCells = shape.varCellsForGroup('CC');
+  const handler = new ChaosConstruction(shape.numGridCells, regionCells[0], shape.numValues);
+
+  const priorities = new Int32Array(shape.totalCells());
+  priorities[23] = 100;
+  priorities[regionCells[0] + 23] = 100;
+  handler.selectPriorityAnchorCells(shape, priorities);
+
+  assert.deepEqual(handler._canonicalAnchorCells, [0, 23, 31]);
+});
+
 await runTest('ChaosConstruction rejects conflicting default canonical anchor during initialization', () => {
   assert.equal(makeChaosContext('4x4', ({ grid, regionCells }) => {
     grid[regionCells[0]] = valueMask(2);
@@ -375,7 +472,7 @@ await runTest('ChaosConstruction default anchor is applied without priority sele
 
   const grid = makeChaosGrid(shape);
   const regionCells = shape.varCellsForGroup('CC');
-  const handler = new ChaosConstruction(shape.numGridCells, regionCells[0]);
+  const handler = new ChaosConstruction(shape.numGridCells, regionCells[0], shape.numValues);
 
   const initialized = handler.initialize(
     grid,
