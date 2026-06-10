@@ -103,10 +103,28 @@ const solveCollections = [
       'Clone sudoku', // Same value - single cell sets
       'Slingshot sudoku', // ValueIndexing
       'Numbered Rooms vs X-Sums', // Or constraint
-      'Or with Givens', // Or constraint (update watched cells)
-      'And with AllDifferent', // And constraint (with cellExclusions)
-      'Or with AllDifferent', // Or constraint (with cellExclusions)
-      'Elided And and Or', // And and Or constraint which are both simplified out.
+      {  // Or constraint (update watched cells)
+        name: 'Or with Givens',
+        input: '.~R1C1_5~R1C2_3~R2C1_6~R2C6_5~R3C2_9~R3C3_8~R3C8_6~R7C2_6~R8C6_9~R8C9_5~R9C8_7~R9C5_8~R8C4_4~R7C7_2~R7C8_8~R5C9_1~R4C9_3~R4C5_6~R6C5_2~R5C4_8~R5C1_4~R4C1_8.Or.~R6C1_7.~R6C1_1.End',
+        solution: '534678912672195348198342567859761423426853791713924856961537284287419635345286179',
+      },
+      {  // And constraint (with cellExclusions)
+        // Note: And needs to be inside an Or to not be elided.
+        name: 'And with AllDifferent',
+        input: '.~R1C1_5~R1C2_3~R2C1_6~R2C6_5~R3C2_9~R3C3_8~R7C2_6~R8C6_9~R8C9_5~R9C8_7~R9C5_8~R8C4_4~R7C7_2~R7C8_8~R5C9_1~R4C9_3~R4C5_6~R6C5_2~R5C4_8~R5C1_4~R4C1_8~R6C1_7~R1C5_9~R5C8_9~R7C4_5~R3C1_1~R1C4_2.Or.~R1C1_1.And.~R1C1_5.AllDifferent~R3C8~R4C7.End.End',
+        solution: '534298617672315948198746532859167423426853791713924856967531284281479365345682179',
+      },
+      {  // Or constraint (with cellExclusions)
+        // Note: Or needs multiple constraints to not be elided.
+        name: 'Or with AllDifferent',
+        input: '.Or.~R1C1_1.AllDifferent~R3C8~R4C7.End.~R1C1_5~R1C2_3~R2C1_6~R2C6_5~R3C2_9~R3C3_8~R7C2_6~R8C6_9~R8C9_5~R9C8_7~R9C5_8~R8C4_4~R7C7_2~R7C8_8~R5C9_1~R4C9_3~R4C5_6~R6C5_2~R5C4_8~R5C1_4~R4C1_8~R6C1_7~R1C5_9~R5C8_9~R7C4_5~R3C1_1~R1C4_2',
+        solution: '534298617672315948198746532859167423426853791713924856967531284281479365345682179',
+      },
+      {  // And and Or constraint which are both simplified out
+        name: 'Elided And and Or',
+        input: '.Or.And.AllDifferent~R3C8~R4C7.End.End.~R1C1_5~R1C2_3~R2C1_6~R2C6_5~R3C2_9~R3C3_8~R7C2_6~R8C6_9~R8C9_5~R9C8_7~R9C5_8~R8C4_4~R7C7_2~R7C8_8~R5C9_1~R4C9_3~R4C5_6~R6C5_2~R5C4_8~R5C1_4~R4C1_8~R6C1_7~R1C5_9~R5C8_9~R7C4_5~R3C1_1~R1C4_2',
+        solution: '534298617672315948198746532859167423426853791713924856967531284281479365345682179',
+      },
       'Contain At Least', // ContainAtLeast
     ],
   },
