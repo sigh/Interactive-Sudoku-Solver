@@ -699,10 +699,29 @@ export class SudokuConstraint {
     );
     static _ALLOWED_CATEGORIES = new Set(
       [...super._ALLOWED_CATEGORIES].filter(c => c !== 'OutsideClue'));
+    static CHIP_ACTION = {
+      icon: 'img/input-48.png',
+      title: 'Update targets from selection'
+    };
 
     constructor(constraints, targetBitset) {
       super(constraints || [], targetBitset);
       this.targetBitset = String(targetBitset || '');
+    }
+
+    setTargetBitset(bitset) {
+      this.targetBitset = String(bitset || '');
+      this.args[1] = this.targetBitset;
+    }
+
+    toggleTargetCells(cellIds, shape) {
+      const current = new Set(this.getCells(shape));
+      const toggling = new Set(cellIds);
+      const result = [
+        ...this.getCells(shape).filter(c => !toggling.has(c)),
+        ...cellIds.filter(c => !current.has(c)),
+      ];
+      this.setTargetBitset(this.constructor.encodeTargetCells(result, shape));
     }
 
     chipLabel() {

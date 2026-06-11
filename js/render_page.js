@@ -707,7 +707,12 @@ class ConstraintManager {
       () => this._constraintSelector.onConstraintsUpdated());
 
     // Callback for chip action buttons.
-    this._chipActionCallback = (constraint) => {
+    this._chipActionCallback = (constraint, collection) => {
+      if (constraint instanceof SudokuConstraint.Replicate) {
+        constraint.toggleTargetCells(inputManager.getSelection(), this._shape);
+        collection.updateConstraint(constraint);
+        return;
+      }
       const categoryInput = this._constraintCategoryInputs.get(
         constraint.constructor.CATEGORY);
       categoryInput.populateForm?.(constraint, this._shape.numValues, this._shape.valueOffset);
@@ -1100,7 +1105,7 @@ class ConstraintChipView {
       actionButton.title = chipAction.title;
       actionButton.addEventListener('click', (e) => {
         e.stopPropagation();
-        this._chipActionCallback?.(constraint);
+        this._chipActionCallback?.(constraint, collection);
       });
       chip.appendChild(actionButton);
     }
