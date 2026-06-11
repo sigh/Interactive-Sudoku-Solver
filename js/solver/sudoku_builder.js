@@ -888,30 +888,30 @@ export class SudokuBuilder {
           {
             if (constraint.constraints.length === 0) break;
 
+            const originIdx = shape.parseCellId(constraint.origin).cell;
             const targets = SudokuConstraint.Replicate.decodeTargetCells(
-              constraint.targetBitset, shape.totalCells());
+              constraint.targetBitset, constraint.origin, shape);
 
             if (targets.length === 0) break;
 
-            // Children define a template anchored at the subgraph origin.
-            // For each target, shift all children as a unit so that the
-            // subgraph origin maps to that target. All targets must be in
-            // the same subgraph.
             const graph = shape.cellGraph();
-            const subgraphOrigin = graph.cellPosition(targets[0])[2];
+            const originPos = graph.cellPosition(originIdx);
+            const originSubgraph = originPos[2];
 
-            if (targets.some(t => graph.cellPosition(t)[2] !== subgraphOrigin)) {
-              throw new Error('Replicate targets span multiple subgraphs.');
-            }
-
-            for (const targetBaseCell of targets) {
+            for (const targetCell of targets) {
+              if (graph.cellPosition(targetCell)[2] !== originSubgraph) {
+                throw new Error('All Replicate cells must be in the same cell group.');
+              }
               const shiftFn = cellId => {
                 const cell = shape.parseCellId(cellId).cell;
                 const cellPos = graph.cellPosition(cell);
-                if (!cellPos || cellPos[2] !== subgraphOrigin) {
-                  throw new Error('Cannot shift cell: ' + cellId);
+                if (cellPos[2] !== originSubgraph) {
+                  throw new Error('All Replicate constraints must be in the same cell group.');
                 }
-                const newCell = graph.traverse(targetBaseCell, cellPos[0], cellPos[1]);
+                const newCell = graph.traverse(
+                  targetCell,
+                  cellPos[0] - originPos[0],
+                  cellPos[1] - originPos[1]);
                 if (newCell === null) throw new Error('Shifted cell is out of bounds.');
                 return shape.makeCellIdFromIndex(newCell);
               };

@@ -823,6 +823,7 @@ class ConstraintManager {
     const subView = new ConstraintChipView(
       subViewElem, this._display, this._chipHighlighter,
       this._constraintSelector,
+      this.runUpdateCallback.bind(this),
       this._chipActionCallback);
     // Shape is constant for composite constraints.
     subView.reshape(this._shape);

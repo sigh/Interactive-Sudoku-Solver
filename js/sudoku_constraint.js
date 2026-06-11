@@ -690,13 +690,11 @@ export class SudokuConstraint {
   }
 
   static Replicate = class Replicate extends CompositeConstraintBase {
-    static DESCRIPTION = (
-      "Replicates the contained constraints onto target cell groups. " +
-      "The children define a template anchored at the subgraph origin; for each target cell " +
-      "in the bitset, the entire template is shifted so that the origin maps to that cell. " +
-      "All targets must be within the same subgraph. " +
-      "The first argument is a base64 encoded numCells-length bitset selecting the target cells."
-    );
+    static DESCRIPTION = (`
+      Replicates the contained constraints onto target cells.
+      The children define a template; for each target cell, the template
+      is shifted so that the origin maps to that target.
+    `);
     static _ALLOWED_CATEGORIES = new Set(
       [...super._ALLOWED_CATEGORIES].filter(c => c !== 'OutsideClue'));
     static CHIP_ACTION = {
@@ -704,9 +702,10 @@ export class SudokuConstraint {
       title: 'Update targets from selection'
     };
 
-    constructor(constraints, targetBitset) {
-      super(constraints || [], targetBitset);
+    constructor(constraints, targetBitset, origin) {
+      super(constraints || [], targetBitset, origin);
       this.targetBitset = String(targetBitset || '');
+      this.origin = origin || 'R1C1';
     }
 
     setTargetBitset(bitset) {
@@ -721,75 +720,67 @@ export class SudokuConstraint {
         ...this.getCells(shape).filter(c => !toggling.has(c)),
         ...cellIds.filter(c => !current.has(c)),
       ];
-      this.setTargetBitset(this.constructor.encodeTargetCells(result, shape));
+      this.setTargetBitset(
+        this.constructor.encodeTargetCells(result, this.origin, shape));
     }
 
     chipLabel() {
-      return 'Replicate';
+      if (this.origin === 'R1C1') return 'Replicate';
+      return `Replicate ${GridShape.displayCellId(this.origin)}`;
     }
 
     getCells(shape) {
-      try {
-        return this.constructor.decodeTargetCells(this.targetBitset, shape.totalCells())
-          .map(c => shape.makeCellIdFromIndex(c));
-      } catch {
-        return [];
-      }
+      return this.constructor.decodeTargetCells(this.targetBitset, this.origin, shape)
+        .map(c => shape.makeCellIdFromIndex(c));
     }
 
-    static decodeTargetCells(encoded, numCells) {
-      const capacity = Base64Codec.lengthOf6BitArray(numCells);
-      const arr = new Uint8Array(capacity);
-
-      if (encoded) {
-        try {
-          Base64Codec.decodeTo6BitArray(String(encoded), arr);
-        } catch (e) {
-          throw new Error('Invalid Replicate bitset: ' + e);
-        }
+    static decodeTargetCells(encoded, origin, shape) {
+      if (!encoded) return [];
+      const originIdx = shape.parseCellId(origin).cell;
+      const str = String(encoded);
+      const numWords = str.length;
+      const arr = new Uint8Array(numWords);
+      try {
+        Base64Codec.decodeTo6BitArray(str, arr);
+      } catch (e) {
+        throw new Error('Invalid Replicate bitset: ' + e);
       }
-
       const cells = [];
-      for (let i = 0; i < numCells; i++) {
-        const word = arr[i / 6 | 0];
-        if (word & (1 << (i % 6))) cells.push(i);
+      for (let i = 0; i < numWords * 6; i++) {
+        if (arr[i / 6 | 0] & (1 << (i % 6))) cells.push(originIdx + i);
       }
       return cells;
     }
 
-    static encodeTargetCells(cellIds, shape) {
-      const numCells = shape.totalCells();
-      const len = Base64Codec.lengthOf6BitArray(numCells);
+    static encodeTargetCells(cellIds, origin, shape) {
+      if (!cellIds.length) return '';
+      const originIdx = shape.parseCellId(origin).cell;
+      const offsets = cellIds.map(id => shape.parseCellId(id).cell - originIdx);
+      const maxOffset = Math.max(...offsets);
+      const len = Base64Codec.lengthOf6BitArray(maxOffset + 1);
       const arr = new Uint8Array(len);
-
-      for (const cellId of cellIds) {
-        const idx = shape.parseCellId(cellId).cell;
-        const wordIndex = (idx / 6) | 0;
-        const bitIndex = idx % 6;
-        arr[wordIndex] |= (1 << bitIndex);
+      for (const offset of offsets) {
+        arr[(offset / 6) | 0] |= (1 << (offset % 6));
       }
-
-      // Trim trailing zeros for a shorter token.
       let end = arr.length;
       while (end > 0 && arr[end - 1] === 0) end--;
       return Base64Codec.encode6BitArray(Array.from(arr.slice(0, end)));
     }
 
     static _serializeSingle(constraint) {
-      // Like And, combine child constraints by type; unlike And, always wrap
-      // because replication changes semantics.
       const constraintMap = new MultiMap();
       for (const cc of constraint.constraints) {
         constraintMap.add(cc.constructor, cc);
       }
-
       const parts = [];
       for (const [cls, constraints] of constraintMap) {
         parts.push(cls.serialize(constraints));
       }
-
-      const innerStr = parts.join('');
-      return `.${this.name}~${constraint.targetBitset}${innerStr}.End`;
+      const headerArgs = [constraint.targetBitset];
+      if (constraint.origin !== 'R1C1') {
+        headerArgs.push(constraint.origin);
+      }
+      return `.${this.name}~${headerArgs.join('~')}${parts.join('')}.End`;
     }
 
     static serialize(constraints) {

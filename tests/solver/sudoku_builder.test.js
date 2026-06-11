@@ -561,4 +561,112 @@ await runTest('Priority constraint produces Priority handler', () => {
   assert.equal(priorityHandler.priorityCells().length, 2);
 });
 
+// ============================================================================
+// Replicate
+// ============================================================================
+
+const givenCells = (handlers) => {
+  const cells = new Map();
+  for (const h of handlers.filter(h => h instanceof HandlerModule.GivenCandidates)) {
+    for (const [cell, values] of h._valueMap) {
+      cells.set(cell, Array.isArray(values) ? values : [values]);
+    }
+  }
+  return cells;
+};
+
+await runTest('Replicate with no child constraints yields no extra handlers', () => {
+  const shape = new SudokuConstraint.Container([]).getShape();
+  const bitset = SudokuConstraint.Replicate.encodeTargetCells(
+    ['R1C1', 'R1C2'], 'R1C1', shape);
+  const constraint = new SudokuConstraint.Container([
+    new SudokuConstraint.Replicate([], bitset),
+  ]);
+  assert.equal(countHandlers(buildHandlers(constraint), 'GivenCandidates'), 0);
+});
+
+await runTest('Replicate with empty target bitset yields no extra handlers', () => {
+  const constraint = new SudokuConstraint.Container([
+    new SudokuConstraint.Replicate([new SudokuConstraint.Given('R1C1', 5)], ''),
+  ]);
+  assert.equal(countHandlers(buildHandlers(constraint), 'GivenCandidates'), 0);
+});
+
+await runTest('Replicate shifts multiple child constraints to each target', () => {
+  // Template: Given R1C1=5, R1C2=3 at origin R1C1.
+  // Targets R1C1 and R2C1 shift the pair to rows 1 and 2.
+  const shape = new SudokuConstraint.Container([]).getShape();
+  const bitset = SudokuConstraint.Replicate.encodeTargetCells(
+    ['R1C1', 'R2C1'], 'R1C1', shape);
+  const constraint = new SudokuConstraint.Container([
+    new SudokuConstraint.Replicate([
+      new SudokuConstraint.Given('R1C1', 5),
+      new SudokuConstraint.Given('R1C2', 3),
+    ], bitset),
+  ]);
+  const cells = givenCells(buildHandlers(constraint));
+  // R1C1=0, R1C2=1, R2C1=9, R2C2=10
+  assert.deepEqual(cells.get(0), [5]);
+  assert.deepEqual(cells.get(1), [3]);
+  assert.deepEqual(cells.get(9), [5]);
+  assert.deepEqual(cells.get(10), [3]);
+});
+
+await runTest('Replicate throws when shifted cell is out of bounds', () => {
+  // Origin R1C1, target R8C8 (+7,+7). Child at R3C3 (+2,+2) → R10C10 out of bounds.
+  const shape = new SudokuConstraint.Container([]).getShape();
+  const bitset = SudokuConstraint.Replicate.encodeTargetCells(['R8C8'], 'R1C1', shape);
+  const constraint = new SudokuConstraint.Container([
+    new SudokuConstraint.Replicate([new SudokuConstraint.Given('R3C3', 5)], bitset),
+  ]);
+  assert.throws(() => buildHandlers(constraint), { message: /out of bounds/ });
+});
+
+await runTest('Replicate throws when a target is in a different subgraph', () => {
+  // VX1 (index 81) and R1C1 (index 0) are in different subgraphs.
+  const setupRoot = new SudokuConstraint.Container([
+    new SudokuConstraint.Var('X', 'X', 2),
+  ]);
+  const setupShape = setupRoot.getShape();
+  setupShape.addVarCellsForConstraints([new SudokuConstraint.Var('X', 'X', 2)]);
+  const bitset = SudokuConstraint.Replicate.encodeTargetCells(
+    ['VX1'], 'R1C1', setupShape);
+  const constraint = new SudokuConstraint.Container([
+    new SudokuConstraint.Var('X', 'X', 2),
+    new SudokuConstraint.Replicate([new SudokuConstraint.Given('R1C1', 5)], bitset),
+  ]);
+  assert.throws(() => buildHandlers(constraint), { message: /same/ });
+});
+
+await runTest('Replicate throws when a child constraint cell is in a different subgraph', () => {
+  // Origin and target are grid cells, but the child Given references a var cell.
+  const shape = new SudokuConstraint.Container([]).getShape();
+  const bitset = SudokuConstraint.Replicate.encodeTargetCells(['R1C2'], 'R1C1', shape);
+  const constraint = new SudokuConstraint.Container([
+    new SudokuConstraint.Var('X', 'X', 2),
+    new SudokuConstraint.Replicate([new SudokuConstraint.Given('VX1', 5)], bitset),
+  ]);
+  assert.throws(() => buildHandlers(constraint), { message: /same/ });
+});
+
+await runTest('Replicate works with var cells in the same subgraph', () => {
+  // Var('X','X',2): VX1 at [0,0], VX2 at [0,1] in the var-cell subgraph.
+  // Origin VX1, target VX2: Given at VX1 shifts to VX2.
+  const setupRoot = new SudokuConstraint.Container([
+    new SudokuConstraint.Var('X', 'X', 2),
+  ]);
+  const setupShape = setupRoot.getShape();
+  setupShape.addVarCellsForConstraints([new SudokuConstraint.Var('X', 'X', 2)]);
+  const vx2Idx = setupShape.parseCellId('VX2').cell;
+  const bitset = SudokuConstraint.Replicate.encodeTargetCells(
+    ['VX2'], 'VX1', setupShape);
+  const constraint = new SudokuConstraint.Container([
+    new SudokuConstraint.Var('X', 'X', 2),
+    new SudokuConstraint.Replicate([new SudokuConstraint.Given('VX1', 5)], bitset, 'VX1'),
+  ]);
+  const cells = givenCells(buildHandlers(constraint));
+  assert.deepEqual(cells.get(vx2Idx), [5]);
+  assert.equal(cells.get(vx2Idx - 1), undefined); // VX1 not a target
+});
+
 logSuiteComplete('SudokuBuilder');

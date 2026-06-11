@@ -397,8 +397,16 @@ ConstraintCategoryInput.Composite = class Composite extends ConstraintCategoryIn
 
     form['add-replicate'].onclick = () => {
       const selectedCells = this._inputManager?.getSelection?.() || [];
-      const bitset = SudokuConstraint.Replicate.encodeTargetCells(selectedCells, this._shape);
-      collection.addConstraint(new SudokuConstraint.Replicate([], bitset));
+      if (selectedCells.length === 0) {
+        collection.addConstraint(new SudokuConstraint.Replicate([]));
+        return false;
+      }
+      const originIdx = this._shape.parseCellId(selectedCells[0]).cell;
+      const origin = this._shape.makeCellIdFromIndex(
+        this._shape.cellGraph().cellPosition(originIdx)[2]);
+      const bitset = SudokuConstraint.Replicate.encodeTargetCells(
+        selectedCells, origin, this._shape);
+      collection.addConstraint(new SudokuConstraint.Replicate([], bitset, origin));
       return false;
     };
   }
@@ -901,8 +909,8 @@ ConstraintCategoryInput.LinesAndSets = class LinesAndSets extends MultiCellInput
 
   _addConstraint(constraintClass, cells, formData) {
     if (constraintClass === SudokuConstraint.Quad ||
-        constraintClass === SudokuConstraint.ContainExact ||
-        constraintClass === SudokuConstraint.ContainAtLeast) {
+      constraintClass === SudokuConstraint.ContainExact ||
+      constraintClass === SudokuConstraint.ContainAtLeast) {
       const values = formData.get(constraintClass.name + '-value')
         .split(/[, ]+/).map(v => +v)
         .filter(v => Number.isInteger(v) && v >= this._shape.minValue() && v <= this._shape.maxValue());

@@ -11,20 +11,22 @@ const { SudokuBuilder } = await import('../js/solver/sudoku_builder.js');
 const HandlerModule = await import('../js/solver/handlers.js');
 
 await runTest('Replicate.decodeTargetCells should decode base64 bitset', () => {
-  const numCells = SHAPE_9x9.numGridCells;
-  const cellIds = [0, 1, 10, 80].map(i => SHAPE_9x9.makeCellIdFromIndex(i));
-  const token = SudokuConstraint.Replicate.encodeTargetCells(cellIds, SHAPE_9x9);
+  const shape = SHAPE_9x9;
+  const origin = 'R1C1';
+  const cellIds = [0, 1, 10, 80].map(i => shape.makeCellIdFromIndex(i));
+  const token = SudokuConstraint.Replicate.encodeTargetCells(cellIds, origin, shape);
 
-  const decoded = SudokuConstraint.Replicate.decodeTargetCells(token, numCells);
+  const decoded = SudokuConstraint.Replicate.decodeTargetCells(token, origin, shape);
   assert.deepEqual(decoded, [0, 1, 10, 80]);
 
-  const decodedCellIds = decoded.map(i => SHAPE_9x9.makeCellIdFromIndex(i));
-  const token2 = SudokuConstraint.Replicate.encodeTargetCells(decodedCellIds, SHAPE_9x9);
+  const decodedCellIds = decoded.map(i => shape.makeCellIdFromIndex(i));
+  const token2 = SudokuConstraint.Replicate.encodeTargetCells(decodedCellIds, origin, shape);
   assert.equal(token2, token);
 });
 
 await runTest('Replicate.getCells returns only target cells', () => {
-  const bitset = SudokuConstraint.Replicate.encodeTargetCells(['R1C2', 'R1C3'], SHAPE_9x9);
+  const bitset = SudokuConstraint.Replicate.encodeTargetCells(
+    ['R1C2', 'R1C3'], 'R1C1', SHAPE_9x9);
   const constraint = new SudokuConstraint.Replicate([
     new SudokuConstraint.Given('R1C1', 5),
   ], bitset);
@@ -46,7 +48,7 @@ await runTest('Replicate should replicate child constraints onto targets', () =>
   // Template: Given at R1C1. Targets R1C1, R1C2, R1C3 — R1C1 maps to each
   // target, so the Given shifts to R1C1, R1C2, R1C3 respectively.
   const bitset = SudokuConstraint.Replicate.encodeTargetCells(
-    ['R1C1', 'R1C2', 'R1C3'], shape);
+    ['R1C1', 'R1C2', 'R1C3'], 'R1C1', shape);
 
   const root = new SudokuConstraint.Container([
     new SudokuConstraint.Shape('9x9'),
@@ -79,7 +81,7 @@ await runTest('Replicate does not enforce template when target is not in bitset'
   const shape = SHAPE_9x9;
 
   // R1C1 is not in the bitset, so the template at R1C1 is not enforced.
-  const bitset = SudokuConstraint.Replicate.encodeTargetCells(['R1C2'], shape);
+  const bitset = SudokuConstraint.Replicate.encodeTargetCells(['R1C2'], 'R1C1', shape);
 
   const root = new SudokuConstraint.Container([
     new SudokuConstraint.Shape('9x9'),
