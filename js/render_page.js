@@ -575,6 +575,7 @@ class CompositeConstraintCollection extends ConstraintCollectionBase {
     this._collectionFactory = collectionFactory;
     this._parentCollection = parentCollection;
     this._chipView = chipView;
+    this._uniquenessKeySet = new UniquenessKeySet();
 
     this._parentConstraint = parentConstraint;
     for (const child of parentConstraint.constraints) {
@@ -587,6 +588,7 @@ class CompositeConstraintCollection extends ConstraintCollectionBase {
       c, this._display.makeConstraintIcon(c), this);
     const constraintState = { chip };
     this._constraintMap.set(c, constraintState);
+    this._uniquenessKeySet.addConstraint(c);
     if (c.constructor.IS_COMPOSITE) {
       constraintState.collection = this._collectionFactory(
         c, chip, this);
@@ -595,6 +597,14 @@ class CompositeConstraintCollection extends ConstraintCollectionBase {
   }
 
   addConstraint(c) {
+    // Enforce uniqueness within And/Replicate, but not Or where branches are
+    // alternatives so duplicate constraint types are valid.
+    if (this._parentConstraint.constructor !== SudokuConstraint.Or) {
+      for (const match of this._uniquenessKeySet.matchConstraint(c)) {
+        this.removeConstraint(match);
+      }
+    }
+
     this._parentConstraint.addChild(c);
     const constraintState = this._addWithoutUpdate(c);
     this._parentCollection.updateConstraint(this._parentConstraint);
@@ -609,6 +619,7 @@ class CompositeConstraintCollection extends ConstraintCollectionBase {
       ConstraintChipView.removeChip(constraintState.chip);
     }
     this._constraintMap.delete(c);
+    this._uniquenessKeySet.removeConstraint(c);
     this._parentCollection.updateConstraint(this._parentConstraint);
   }
 
