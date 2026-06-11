@@ -1352,10 +1352,14 @@ class Selection {
 
     this._selectionPreservers = [this._clickInterceptor.getSvg()];
 
+    this._shape = null;
+
     this._setUpMouseHandlers(this._clickInterceptor.getSvg());
 
     this._callbacks = [];
   }
+
+  setShape(shape) { this._shape = shape; }
 
   addCallback(fn) {
     this._callbacks.push(fn);
@@ -1370,6 +1374,36 @@ class Selection {
     this._highlight.setCells(cellIds);
     if (cellIds.length > 0) this._maybeAddOutsideClickListener();
     this._runCallback(false);
+  }
+
+  _cellsInRect(anchorId, targetId) {
+    const shape = this._shape;
+    if (!shape) return [anchorId, targetId];
+    const a = shape.parseCellId(anchorId);
+    const b = shape.parseCellId(targetId);
+    if (!a || !b) return [anchorId, targetId];
+
+    const graph = shape.cellGraph();
+    const posA = graph.cellPosition(a.cell);
+    const posB = graph.cellPosition(b.cell);
+    if (!posA || !posB || posA[2] !== posB[2]) return [anchorId, targetId];
+
+    const minRow = Math.min(posA[0], posB[0]);
+    const maxRow = Math.max(posA[0], posB[0]);
+    const minCol = Math.min(posA[1], posB[1]);
+    const maxCol = Math.max(posA[1], posB[1]);
+
+    const topLeft = graph.traverse(posA[2], minRow, minCol);
+    if (topLeft === null) return [anchorId, targetId];
+
+    const cells = [];
+    for (let dr = 0; dr <= maxRow - minRow; dr++) {
+      for (let dc = 0; dc <= maxCol - minCol; dc++) {
+        const cell = graph.traverse(topLeft, dr, dc);
+        if (cell !== null) cells.push(shape.makeCellIdFromIndex(cell));
+      }
+    }
+    return cells.length > 0 ? cells : [anchorId, targetId];
   }
   getCells() { return this._highlight.getCells(); }
   size() { return this._highlight.size(); }
@@ -1387,6 +1421,7 @@ class Selection {
     let currCell = null;
     let currCenter = null;
     let isDeselecting = false;
+    let isRectMode = false;
     let activePointerId = null;
     const pointerMoveFn = (e) => {
       const target = this._clickInterceptor.cellAt(e.offsetX, e.offsetY);
@@ -1398,14 +1433,17 @@ class Selection {
       const dy = Math.abs(e.offsetY - currCenter[1]);
       if (Math.max(dx, dy) < cellFuzziness) return;
 
-      if (currCell === null) {
+      if (currCell === null && !isRectMode) {
         isDeselecting = this._highlight.getCells().some(cell => cell === target);
       }
 
       currCell = target;
       currCenter = this._clickInterceptor.cellIdCenter(currCell);
 
-      if (isDeselecting) {
+      if (isRectMode) {
+        const anchor = [...this._highlight.getCells()][0];
+        if (anchor) this._highlight.setCells(this._cellsInRect(anchor, currCell));
+      } else if (isDeselecting) {
         this._highlight.removeCell(currCell);
       } else {
         this._highlight.addCell(currCell);
@@ -1434,8 +1472,9 @@ class Selection {
       // Only track one active pointer at a time.
       if (activePointerId !== null) return;
 
-      // If the shift key is pressed, continue adding to the selection.
-      if (!e.shiftKey) {
+      isRectMode = e.ctrlKey || e.metaKey;
+
+      if (!e.shiftKey && !isRectMode) {
         this.setCells([]);
       }
 
@@ -1546,7 +1585,10 @@ class GridInputManager {
     if (target) target.select ? target.select() : target.focus();
   }
 
-  reshape(shape) { this._shape = shape; }
+  reshape(shape) {
+    this._shape = shape;
+    this._selection.setShape(shape);
+  }
 
   onNewDigit(fn) { this._callbacks.onNewDigit.push(fn); }
   onSelection(fn) { this._callbacks.onSelection.push(fn); }
