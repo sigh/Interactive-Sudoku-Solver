@@ -1270,6 +1270,7 @@ export class SudokuConstraint {
       Digits along the line, read in order, must be accepted by the provided
       Non-deterministic finite automaton (NFA).`);
     static CATEGORY = 'StateMachine';
+    static CHIP_ACTION = { icon: 'img/publish-48.png', title: 'Load into panel' };
     static DISPLAY_CONFIG = {
       displayClass: 'CustomLine',
       nodeMarker: LineOptions.SMALL_EMPTY_CIRCLE_MARKER,
@@ -2512,6 +2513,7 @@ export class SudokuConstraint {
     static DESCRIPTION = (
       "Applies a custom binary relationship between consecutive pairs of cells.");
     static CATEGORY = 'Pairwise';
+    static CHIP_ACTION = { icon: 'img/publish-48.png', title: 'Load into panel' };
     static DISPLAY_CONFIG = {
       displayClass: 'CustomLine',
       nodeMarker: LineOptions.SMALL_EMPTY_CIRCLE_MARKER,
