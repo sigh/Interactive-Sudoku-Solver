@@ -46,7 +46,8 @@ export class RawStringsPanel {
 
   _buildRows(constraint, container, depth) {
     if (constraint instanceof CompositeConstraintBase) {
-      container.append(this._buildRow(`.${constraint.constructor.name}`, constraint, depth));
+      const headerItems = [constraint.constructor.name, ...constraint.args.slice(1)];
+      container.append(this._buildRow(`.${headerItems.join('~')}`, constraint, depth));
       for (const child of constraint.constraints) {
         this._buildRows(child, container, depth + 1);
       }
