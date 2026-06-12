@@ -595,9 +595,30 @@ class ChaosConstraintBase extends SudokuConstraintBase {
     return true;
   };
 
-  constructor(...cells) {
-    super(...cells);
-    this.cells = cells;
+  static ARGUMENT_CONFIG = {
+    options: [
+      { value: 0, text: 'Include first cell' },
+      { value: 1, text: 'Exclude first cell' },
+    ],
+  };
+
+  constructor(gridCell, offset, ...cells) {
+    // offset is optional: undefined or '' means 0. Omitted entirely for control-only form.
+    if (offset !== undefined) {
+      super(gridCell, offset, ...cells);
+    } else {
+      super(gridCell);
+    }
+    this.offset = +offset || 0;
+    this.cells = [gridCell, ...cells];
+  }
+
+  makeShifted(shiftFn) {
+    const [gridCell, offset, ...cells] = this.args;
+    if (offset !== undefined) {
+      return new this.constructor(shiftFn(gridCell), offset, ...cells.map(shiftFn));
+    }
+    return new this.constructor(shiftFn(gridCell));
   }
 
   getCells(shape) {

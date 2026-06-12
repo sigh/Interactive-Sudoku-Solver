@@ -63,7 +63,7 @@ const enforce = (context) => {
 
 const makeShardArrow = (context, controlCell, regionRunArms) => {
   const regionArms = regionRunArms.map(arm => arm.map(c => context.regionCells[c]));
-  const handler = new ChaosArrow(controlCell, regionArms, regionRunArms);
+  const handler = new ChaosArrow(controlCell, regionArms, regionRunArms, 0);
   handler.attachRegionShardState(context.handler.regionShardState());
   assert.equal(handler.initialize(
     context.grid, context.cellExclusions, context.shape, context.stateAllocator), true);
@@ -76,7 +76,7 @@ const enforceShardArrow = (arrowHandler, context) => {
 
 const makeShardCount = (context, controlCell, runCells) => {
   const regionCells = runCells.map(cell => context.regionCells[cell]);
-  const handler = new ChaosCount(controlCell, regionCells, runCells);
+  const handler = new ChaosCount(controlCell, regionCells, runCells, 0);
   handler.attachRegionShardState(context.handler.regionShardState());
   assert.equal(handler.initialize(
     context.grid, context.cellExclusions, context.shape, context.stateAllocator), true);
@@ -88,7 +88,7 @@ const enforceShardCount = (countHandler, context) => {
 };
 
 const makeChaosCount = (shape, controlCell, regionCells, grid) => {
-  const handler = new ChaosCount(controlCell, regionCells);
+  const handler = new ChaosCount(controlCell, regionCells, null, 0);
   const cellExclusions = createCellExclusions({ allUnique: false, numCells: shape.totalCells() });
   const stateAllocator = createStateAllocator(grid, shape.totalCells());
   assert.equal(handler.initialize(grid, cellExclusions, shape, stateAllocator), true);

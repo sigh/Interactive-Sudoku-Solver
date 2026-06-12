@@ -361,7 +361,24 @@ await runTest('parseString should parse control-only ChaosArrow', () => {
   const result = SudokuParser.parseString('.ChaosArrow~R2C2.');
   assert.ok(result);
   const arrow = findConstraint(result, 'ChaosArrow');
+  assert.equal(arrow.offset, 0);
   assert.deepEqual(arrow.cells, ['R2C2']);
+});
+
+await runTest('parseString should parse ChaosArrow with explicit offset', () => {
+  const result = SudokuParser.parseString('.ChaosArrow~R2C2~1~CC5~CC6.');
+  assert.ok(result);
+  const arrow = findConstraint(result, 'ChaosArrow');
+  assert.equal(arrow.offset, 1);
+  assert.deepEqual(arrow.cells, ['R2C2', 'CC5', 'CC6']);
+});
+
+await runTest('parseString should parse ChaosArrow with empty offset', () => {
+  const result = SudokuParser.parseString('.ChaosArrow~R2C2~~CC5~CC6.');
+  assert.ok(result);
+  const arrow = findConstraint(result, 'ChaosArrow');
+  assert.equal(arrow.offset, 0);
+  assert.deepEqual(arrow.cells, ['R2C2', 'CC5', 'CC6']);
 });
 
 await runTest('parseString should parse Diagonal', () => {

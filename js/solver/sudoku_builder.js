@@ -260,7 +260,8 @@ export class SudokuBuilder {
                 'ChaosArrow cells after the control cell must be Chaos Construction region cells.');
             }
             const regionRunArms = chaosArms.map(arm => arm.map(c => c - regionCellOffset));
-            yield new ChaosHandlerModule.ChaosArrow(controlCell, chaosArms, regionRunArms);
+            yield new ChaosHandlerModule.ChaosArrow(
+              controlCell, chaosArms, regionRunArms, constraint.offset);
           }
           break;
 
@@ -280,7 +281,8 @@ export class SudokuBuilder {
                 'ChaosCount cells after the control cell must be Chaos Construction region cells.');
             }
             const regionRunCells = countCells.map(c => c - regionCellOffset);
-            yield new ChaosHandlerModule.ChaosCount(controlCell, countCells, regionRunCells);
+            yield new ChaosHandlerModule.ChaosCount(
+              controlCell, countCells, regionRunCells, constraint.offset);
           }
           break;
 

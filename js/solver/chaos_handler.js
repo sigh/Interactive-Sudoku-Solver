@@ -995,7 +995,7 @@ export class ChaosConstruction extends SudokuConstraintHandler {
 }
 
 export class ChaosArrow extends SudokuConstraintHandler {
-  constructor(controlCell, regionArms, regionRunArms) {
+  constructor(controlCell, regionArms, regionRunArms, offset) {
     const startCell = regionArms[0][0];
     if (regionArms.some(arm => arm[0] !== startCell)) {
       throw new InvalidConstraintError('ChaosArrow arms must share their first region cell.');
@@ -1021,6 +1021,7 @@ export class ChaosArrow extends SudokuConstraintHandler {
     this._regionRunArms = activeRegionRunArms.map(arm => Uint16Array.from(arm));
     this._canMergeRegionShards = false;
     this._regionShardState = null;
+    this._offset = +offset;
   }
 
   attachRegionShardState(regionShardState) {
@@ -1031,7 +1032,7 @@ export class ChaosArrow extends SudokuConstraintHandler {
     const minValueCount = 1;
     const maxArmCells = this._regionArms.reduce((sum, arm) => sum + arm.length, 0)
       - this._duplicateStartCount;
-    const maxValueCount = Math.min(shape.numValues, maxArmCells);
+    const maxValueCount = Math.min(shape.numValues, maxArmCells - this._offset);
     if (maxValueCount < minValueCount) return false;
 
     this._canMergeRegionShards = this._regionRunArms.every(arm => {
@@ -1220,9 +1221,13 @@ export class ChaosArrow extends SudokuConstraintHandler {
       runSupportMasks.fill(0);
     }
 
-    this._updateRunSupportMasks(grid, controlMask);
+    // Shift control mask so internal arm length = control value + offset.
+    // With offset=1, a control value of n means a run of n+1 cells (first not counted).
+    const internalControlMask = controlMask << this._offset;
+    this._updateRunSupportMasks(grid, internalControlMask);
 
-    if (!(controlMask &= this._supportedControlMask)) return false;
+    // Shift supported mask back to external control value space.
+    if (!(controlMask &= this._supportedControlMask >> this._offset)) return false;
     if (controlMask !== grid[controlCell]) {
       grid[controlCell] = controlMask;
       handlerAccumulator.addForCell(controlCell);
@@ -1233,7 +1238,7 @@ export class ChaosArrow extends SudokuConstraintHandler {
 }
 
 export class ChaosCount extends SudokuConstraintHandler {
-  constructor(controlCell, regionCells, regionRunCells = null) {
+  constructor(controlCell, regionCells, regionRunCells = null, offset) {
     super([controlCell, ...regionCells]);
     this._controlCell = controlCell;
     this._regionCells = Uint16Array.from(regionCells);
@@ -1241,6 +1246,7 @@ export class ChaosCount extends SudokuConstraintHandler {
     this._supportedRegionCellMasks = new Uint16Array(regionCells.length);
     this._regionShardMergePairs = null;
     this._regionShardState = null;
+    this._offset = +offset;
   }
 
   attachRegionShardState(regionShardState) {
@@ -1248,7 +1254,7 @@ export class ChaosCount extends SudokuConstraintHandler {
   }
 
   initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
-    const maxCount = Math.min(shape.numValues, this._regionCells.length);
+    const maxCount = Math.min(shape.numValues, this._regionCells.length - this._offset);
     const regionRunCells = this._regionRunCells;
     if (regionRunCells) {
       const mergePairs = [];
@@ -1277,6 +1283,9 @@ export class ChaosCount extends SudokuConstraintHandler {
     supportedRegionCellMasks.fill(0);
     let regionValues = firstRegionMask;
     const numRegionCells = regionCells.length;
+    // Shift control mask so internal count = control value + offset.
+    // With offset=1, a control value of n means n+1 cells match (first not counted).
+    const internalControlMask = controlMask << this._offset;
 
     while (regionValues) {
       const regionBit = regionValues & -regionValues;
@@ -1291,13 +1300,13 @@ export class ChaosCount extends SudokuConstraintHandler {
         if (regionMask & regionBit) maxCount++;
       }
 
-      const countMask = controlMask & ((1 << maxCount) - (1 << (minCount - 1)));
+      const countMask = internalControlMask & ((1 << maxCount) - (1 << (minCount - 1)));
       if (!countMask) continue;
-      supportedControlMask |= countMask;
+      supportedControlMask |= countMask >> this._offset;
       supportedFirstRegionMask |= regionBit;
-      const includeCountMask = controlMask & ((1 << maxCount) - (1 << minCount));
+      const includeCountMask = internalControlMask & ((1 << maxCount) - (1 << minCount));
       const excludeCountMask = minCount < maxCount
-        ? controlMask & ((1 << (maxCount - 1)) - (1 << (minCount - 1)))
+        ? internalControlMask & ((1 << (maxCount - 1)) - (1 << (minCount - 1)))
         : 0;
 
       for (let i = 1; i < numRegionCells; i++) {

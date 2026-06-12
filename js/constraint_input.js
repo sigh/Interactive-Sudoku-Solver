@@ -955,7 +955,14 @@ ConstraintCategoryInput.ChaosConstruction = class ChaosConstruction extends Mult
     if (cells.length > 1) {
       cells = this._translateToCCCells(cells);
     }
-    super._addConstraint(constraintClass, cells, formData);
+    if (constraintClass.ARGUMENT_CONFIG) {
+      const value = formData.get(constraintClass.name + '-value');
+      // Chaos format: (gridCell, offset, ...chaosCells)
+      this.collection.addConstraint(
+        new constraintClass(cells[0], value, ...cells.slice(1)));
+    } else {
+      this.collection.addConstraint(new constraintClass(...cells));
+    }
   }
   _setVisible(visible) {
     this._selectionForm.style.display = visible ? '' : 'none';

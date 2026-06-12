@@ -48,7 +48,7 @@ await runTest('ChaosArrow prunes impossible control counts', () => {
   const shape = makeShape();
   const grid = makeChaosGrid(shape);
   const regionCells = shape.varCellsForGroup('CC');
-  const handler = new ChaosArrow(4, [[regionCells[4], regionCells[10]]], [[4, 10]]);
+  const handler = new ChaosArrow(4, [[regionCells[4], regionCells[10]]], [[4, 10]], 0);
 
   grid[regionCells[4]] = valueMask(2);
   grid[regionCells[10]] = valueMask(2);
@@ -62,7 +62,7 @@ await runTest('ChaosArrow keeps shorter run when shared prefix has another regio
   const shape = makeShape();
   const grid = makeChaosGrid(shape);
   const regionCells = shape.varCellsForGroup('CC');
-  const handler = new ChaosArrow(4, [[regionCells[4], regionCells[10]]], [[4, 10]]);
+  const handler = new ChaosArrow(4, [[regionCells[4], regionCells[10]]], [[4, 10]], 0);
 
   grid[regionCells[4]] = valueMask(1, 2);
   grid[regionCells[10]] = valueMask(1);
@@ -76,7 +76,7 @@ await runTest('ChaosArrow supports region labels beyond line length', () => {
   const shape = makeShape();
   const grid = makeChaosGrid(shape);
   const regionCells = shape.varCellsForGroup('CC');
-  const handler = new ChaosArrow(4, [[regionCells[4], regionCells[10]]], [[4, 10]]);
+  const handler = new ChaosArrow(4, [[regionCells[4], regionCells[10]]], [[4, 10]], 0);
 
   grid[regionCells[4]] = valueMask(4);
   grid[regionCells[10]] = valueMask(4);
@@ -90,7 +90,7 @@ await runTest('ChaosArrow prunes break cell regions', () => {
   const shape = makeShape();
   const grid = makeChaosGrid(shape);
   const regionCells = shape.varCellsForGroup('CC');
-  const handler = new ChaosArrow(4, [[regionCells[4], regionCells[10]]], [[4, 10]]);
+  const handler = new ChaosArrow(4, [[regionCells[4], regionCells[10]]], [[4, 10]], 0);
 
   grid[4] = valueMask(1);
   grid[regionCells[4]] = valueMask(2);
@@ -105,7 +105,7 @@ await runTest('ChaosArrow symmetrically prunes unsupported prefix region values'
   const shape = makeShape();
   const grid = makeChaosGrid(shape);
   const regionCells = shape.varCellsForGroup('CC');
-  const handler = new ChaosArrow(4, [[regionCells[4], regionCells[10]]], [[4, 10]]);
+  const handler = new ChaosArrow(4, [[regionCells[4], regionCells[10]]], [[4, 10]], 0);
 
   // With control fixed to a 1-cell run, region=1 is impossible because the
   // boundary cell is also fixed to region=1 and must differ from the run.
@@ -124,7 +124,7 @@ await runTest('_addChaosRegionShardSources attaches ChaosArrow lines', () => {
   const grid = makeChaosGrid(shape);
   const regionCells = shape.varCellsForGroup('CC');
   const chaosHandler = new ChaosConstruction(shape.numGridCells, regionCells[0], shape.numValues);
-  const arrowHandler = new ChaosArrow(4, [[regionCells[4], regionCells[5]]], [[4, 5]]);
+  const arrowHandler = new ChaosArrow(4, [[regionCells[4], regionCells[5]]], [[4, 5]], 0);
   const handlerSet = new HandlerSet([chaosHandler, arrowHandler], shape.totalCells());
 
   grid[4] = valueMask(2);
@@ -152,7 +152,7 @@ await runTest('_addChaosRegionShardSources attaches multi-arm guaranteed prefixe
   const arrowHandler = new ChaosArrow(
     4,
     [[regionCells[4], regionCells[5], regionCells[6]], [regionCells[4], regionCells[8]]],
-    [[4, 5, 6], [4, 8]]);
+    [[4, 5, 6], [4, 8]], 0);
   const handlerSet = new HandlerSet([chaosHandler, arrowHandler], shape.totalCells());
 
   grid[4] = valueMask(3);
