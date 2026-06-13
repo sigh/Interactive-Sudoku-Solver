@@ -620,7 +620,7 @@ export class ChaosConstruction extends SudokuConstraintHandler {
 
       if (!(regionMask & (regionMask - 1))) {
         const region = 31 - Math.clz32(regionMask);
-        let scanData = regionScanData[region] | (shardValueMask << REGION_VALUE_MASK_SHIFT);
+        const scanData = regionScanData[region] | (shardValueMask << REGION_VALUE_MASK_SHIFT);
         const fixedCount = ((scanData >>> REGION_FIXED_COUNT_SHIFT)
           & REGION_FIXED_COUNT_MASK) + shardSize;
         if (fixedCount > this._regionSize) return false;
@@ -1032,11 +1032,11 @@ export class ChaosArrow extends SudokuConstraintHandler {
   }
 
   initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
-    const minValueCount = 1;
+    this._offset += shape.valueOffset;
     const maxArmCells = this._regionArms.reduce((sum, arm) => sum + arm.length, 0)
       - this._duplicateStartCount;
     const maxValueCount = Math.min(shape.numValues, maxArmCells - this._offset);
-    if (maxValueCount < minValueCount) return false;
+    if (maxValueCount < 1) return false;
 
     this._canMergeRegionShards = this._regionRunArms.every(arm => {
       for (let i = 1; i < arm.length; i++) {
@@ -1045,8 +1045,7 @@ export class ChaosArrow extends SudokuConstraintHandler {
       return true;
     });
 
-    const maxMask = (1 << maxValueCount) - 1;
-    return !!(initialGridCells[this._controlCell] &= maxMask);
+    return !!(initialGridCells[this._controlCell] &= (1 << maxValueCount) - 1);
   }
 
   _lengthMaskForRegion(grid, arm, regionBit, maxControlLength, minLength) {
@@ -1225,12 +1224,16 @@ export class ChaosArrow extends SudokuConstraintHandler {
     }
 
     // Shift control mask so internal arm length = control value + offset.
-    // With offset=1, a control value of n means a run of n+1 cells (first not counted).
-    const internalControlMask = controlMask << this._offset;
+    // The combined offset can be negative, so shift either direction.
+    const offset = this._offset;
+    const internalControlMask =
+      offset >= 0 ? controlMask << offset : controlMask >>> -offset;
     this._updateRunSupportMasks(grid, internalControlMask);
 
     // Shift supported mask back to external control value space.
-    if (!(controlMask &= this._supportedControlMask >> this._offset)) return false;
+    const supportedControlMask = offset >= 0
+      ? this._supportedControlMask >>> offset : this._supportedControlMask << -offset;
+    if (!(controlMask &= supportedControlMask)) return false;
     if (controlMask !== grid[controlCell]) {
       grid[controlCell] = controlMask;
       handlerAccumulator.addForCell(controlCell);
@@ -1260,6 +1263,7 @@ export class ChaosCount extends SudokuConstraintHandler {
   }
 
   initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
+    this._offset += shape.valueOffset;
     const maxCount = Math.min(shape.numValues, this._regionCells.length - this._offset);
     const regionRunCells = this._regionRunCells;
     if (regionRunCells) {
@@ -1290,8 +1294,10 @@ export class ChaosCount extends SudokuConstraintHandler {
     let regionValues = firstRegionMask;
     const numRegionCells = regionCells.length;
     // Shift control mask so internal count = control value + offset.
-    // With offset=1, a control value of n means n+1 cells match (first not counted).
-    const internalControlMask = controlMask << this._offset;
+    // The combined offset can be negative, so shift either direction.
+    const offset = this._offset;
+    const internalControlMask =
+      offset >= 0 ? controlMask << offset : controlMask >>> -offset;
 
     while (regionValues) {
       const regionBit = regionValues & -regionValues;
@@ -1308,12 +1314,12 @@ export class ChaosCount extends SudokuConstraintHandler {
 
       const countMask = internalControlMask & ((1 << maxCount) - (1 << (minCount - 1)));
       if (!countMask) continue;
-      supportedControlMask |= countMask >> this._offset;
+      supportedControlMask |= offset <= 0 ? countMask << -offset : countMask >>> offset;
       supportedFirstRegionMask |= regionBit;
-      const includeCountMask = internalControlMask & ((1 << maxCount) - (1 << minCount));
-      const excludeCountMask = minCount < maxCount
-        ? internalControlMask & ((1 << (maxCount - 1)) - (1 << (minCount - 1)))
-        : 0;
+      // Drop the lowest supported count (== minCount) to learn if an optional
+      // cell may match, and the highest (== maxCount) to learn if one may not.
+      const includeCountMask = countMask & ~(1 << (minCount - 1));
+      const excludeCountMask = countMask & ~(1 << (maxCount - 1));
 
       for (let i = 1; i < numRegionCells; i++) {
         const regionCell = regionCells[i];
@@ -1348,9 +1354,9 @@ export class ChaosCount extends SudokuConstraintHandler {
       }
     }
 
+    const firstRegionBit = grid[firstRegionCell];
     if (this._regionShardMergePairs.length > 0 && this._regionShardState
-      && !(grid[firstRegionCell] & (grid[firstRegionCell] - 1))) {
-      const firstRegionBit = grid[firstRegionCell];
+      && !(firstRegionBit & (firstRegionBit - 1))) {
       const mergePairs = this._regionShardMergePairs;
       for (let i = 0; i < mergePairs.length; i += 2) {
         const indexA = mergePairs[i];

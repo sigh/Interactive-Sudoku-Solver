@@ -268,6 +268,24 @@ await runTest('ChaosCount prunes control candidates to feasible match counts', (
   assert.equal(grid[0], valueMask(2));
 });
 
+await runTest('ChaosCount maps the control value through the shape value offset', () => {
+  // On a 0-8 style grid (valueOffset -1) the control's displayed count is one
+  // less than its stored value, so a count of 2 fixes the control to value 3.
+  const shape = GridShape.fromGridSpec('4x4~0-3');
+  assert.equal(shape.valueOffset, -1);
+  shape.addVarCellsForConstraints([new SudokuConstraint.ChaosConstruction()]);
+  const grid = makeChaosGrid(shape);
+  const regionCells = shape.varCellsForGroup('CC');
+  const handler = makeChaosCount(shape, 0, [regionCells[0], regionCells[1], regionCells[2]], grid);
+
+  grid[regionCells[0]] = valueMask(2);
+  grid[regionCells[1]] = valueMask(2);
+  grid[regionCells[2]] = valueMask(3);
+
+  assert.equal(handler.enforceConsistency(grid, createAccumulator()), true);
+  assert.equal(grid[0], valueMask(3));
+});
+
 await runTest('ChaosCount prunes unsupported first region candidates', () => {
   const shape = GridShape.fromGridSize(4);
   shape.addVarCellsForConstraints([new SudokuConstraint.ChaosConstruction()]);
@@ -966,6 +984,23 @@ await runTest('ChaosArrow prunes unsupported total counts', () => {
 
   assert.equal(handler.enforceConsistency(grid, createAccumulator()), true);
   assert.equal(grid[0], valueMask(1, 2, 3));
+});
+
+await runTest('ChaosArrow maps the control value through the shape value offset', () => {
+  // On a 0-8 style grid (valueOffset -1) the control's displayed run length is
+  // one less than its stored value, so a run of 3 fixes the control to value 4.
+  const context = makeChaosContext('4x4~0-3');
+  assert.equal(context.shape.valueOffset, -1);
+  const { grid, regionCells } = context;
+  const handler = makeShardArrow(context, 0, [[0, 1, 2, 3]]);
+
+  grid[regionCells[0]] = valueMask(1);
+  grid[regionCells[1]] = valueMask(1);
+  grid[regionCells[2]] = valueMask(1);
+  grid[regionCells[3]] = valueMask(2);
+
+  assert.equal(handler.enforceConsistency(grid, createAccumulator()), true);
+  assert.equal(grid[0], valueMask(4));
 });
 
 logSuiteComplete('chaos_construction.test.js');
