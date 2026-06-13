@@ -2686,6 +2686,28 @@ export class SudokuConstraint {
     }
   }
 
+  static CountDistinct = class CountDistinct extends SudokuConstraintBase {
+    static DESCRIPTION = (`
+      The value in the first (control) cell counts the number of distinct
+      values among the remaining cells.`);
+    static CATEGORY = 'LinesAndSets';
+    static DISPLAY_CONFIG = {
+      displayClass: 'BorderedRegion',
+      inset: 1.5,
+      markFirstCell: true,
+    };
+
+    constructor(controlCell, ...cells) {
+      super(controlCell, ...cells);
+      this.controlCell = controlCell;
+      this.cells = [controlCell, ...cells];
+    }
+
+    chipLabel() {
+      return `CountDistinct (${this.cells.length - 1} cells)`;
+    }
+  }
+
   static Given = class Given extends SudokuConstraintBase {
     static DESCRIPTION = (
       "Constrains the initial values for the given cell.");

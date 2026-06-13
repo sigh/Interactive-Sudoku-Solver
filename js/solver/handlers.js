@@ -2902,6 +2902,90 @@ export class CountingCircles extends SudokuConstraintHandler {
   }
 }
 
+// The control cell's value equals the number of distinct values among the
+// counted cells.
+export class CountDistinct extends SudokuConstraintHandler {
+  constructor(controlCell, countedCells) {
+    super([controlCell, ...countedCells]);
+    this._controlCell = controlCell;
+    this._countedCells = Uint16Array.from(countedCells);
+  }
+
+  initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
+    this._valueOffset = shape.valueOffset;
+    const offset = shape.valueOffset;
+
+    // Counted cells that are mutually exclusive must take different values.
+    const exclusionGroups = HandlerUtil.findExclusionGroups(
+      Array.from(this._countedCells), cellExclusions).groups;
+    const minDistinct = Math.max(1, ...exclusionGroups.map(g => g.length));
+
+    const maxPossible = Math.min(this._countedCells.length, shape.numValues);
+    const rangeMask =
+      (1 << (maxPossible - offset)) - (1 << (minDistinct - offset - 1));
+    return !!(initialGridCells[this._controlCell] &= rangeMask);
+  }
+
+  enforceConsistency(grid, handlerAccumulator) {
+    const countedCells = this._countedCells;
+    const numCells = countedCells.length;
+    const offset = this._valueOffset;
+
+    let unionMask = 0;
+    let fixedMask = 0;
+    for (let i = 0; i < numCells; i++) {
+      const mask = grid[countedCells[i]];
+      unionMask |= mask;
+      if (!(mask & (mask - 1))) fixedMask |= mask;
+    }
+
+    // Lower bound on the distinct count: distinct fixed values, plus any unfixed
+    // cell whose candidates are disjoint from the values claimed so far.
+    const fixedCount = countOnes16bit(fixedMask);
+    let disjointMask = fixedMask;
+    let minDistinct = fixedCount;
+    for (let i = 0; i < numCells; i++) {
+      const mask = grid[countedCells[i]];
+      if ((mask & (mask - 1)) && !(mask & disjointMask)) {
+        minDistinct++;
+        disjointMask |= mask;
+      }
+    }
+    const maxDistinct = Math.min(numCells, countOnes16bit(unionMask));
+
+    // Prune the control cell to the range [minDistinct, maxDistinct].
+    const controlCell = this._controlCell;
+    const controlMask = grid[controlCell];
+    const rangeMask =
+      (1 << (maxDistinct - offset)) - (1 << (minDistinct - offset - 1));
+    const newControlMask = controlMask & rangeMask;
+    if (!newControlMask) return false;
+    if (newControlMask !== controlMask) {
+      grid[controlCell] = newControlMask;
+      handlerAccumulator.addForCell(controlCell);
+    }
+
+    // If the largest allowed count equals the number of distinct fixed values,
+    // then no new distinct value may appear: collapse every counted cell onto
+    // the fixed values.
+    const controlMax = LookupTables.toValue(newControlMask) + offset;
+    if (controlMax === fixedCount && (unionMask & ~fixedMask)) {
+      for (let i = 0; i < numCells; i++) {
+        const cell = countedCells[i];
+        const mask = grid[cell];
+        const newMask = mask & fixedMask;
+        if (!newMask) return false;
+        if (newMask !== mask) {
+          grid[cell] = newMask;
+          handlerAccumulator.addForCell(cell);
+        }
+      }
+    }
+
+    return true;
+  }
+}
+
 export class FullRank extends SudokuConstraintHandler {
   static TIE_MODE = Object.freeze({
     NONE: 0,

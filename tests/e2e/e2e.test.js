@@ -103,6 +103,7 @@ const solveCollections = [
       'Clone sudoku', // Same value - single cell sets
       'Slingshot sudoku', // ValueIndexing
       'Numbered Rooms vs X-Sums', // Or constraint
+      'Count Different',  // CountDistinct
       {  // Or constraint (update watched cells)
         name: 'Or with Givens',
         input: '.~R1C1_5~R1C2_3~R2C1_6~R2C6_5~R3C2_9~R3C3_8~R3C8_6~R7C2_6~R8C6_9~R8C9_5~R9C8_7~R9C5_8~R8C4_4~R7C7_2~R7C8_8~R5C9_1~R4C9_3~R4C5_6~R6C5_2~R5C4_8~R5C1_4~R4C1_8.Or.~R6C1_7.~R6C1_1.End',
@@ -125,7 +126,12 @@ const solveCollections = [
         input: '.Or.And.AllDifferent~R3C8~R4C7.End.End.~R1C1_5~R1C2_3~R2C1_6~R2C6_5~R3C2_9~R3C3_8~R7C2_6~R8C6_9~R8C9_5~R9C8_7~R9C5_8~R8C4_4~R7C7_2~R7C8_8~R5C9_1~R4C9_3~R4C5_6~R6C5_2~R5C4_8~R5C1_4~R4C1_8~R6C1_7~R1C5_9~R5C8_9~R7C4_5~R3C1_1~R1C4_2',
         solution: '534298617672315948198746532859167423426853791713924856967531284281479365345682179',
       },
-      'Contain At Least', // ContainAtLeast
+      {
+        // Randomly added constraints until unique.
+        name: 'Contain At Least',  // ContainAtLeast
+        input: '.ContainAtLeast~1_1_2_3~R3C4~R3C5~R3C6~R4C6~R5C6~R6C6.ContainAtLeast~1_1_2_3~R7C4~R7C3~R7C2~R6C2~R5C2.ContainAtLeast~1_1_2_3~R5C7~R5C8~R4C9~R3C9~R2C9.ContainAtLeast~1_1_2_3~R8C7~R9C7~R9C6~R9C5.ContainAtLeast~4_4_6_9_5~R2C4~R2C3~R2C2~R2C1~R3C1.ContainAtLeast~4_4_6_9_5~R4C5~R5C5~R6C5~R7C5~R7C6~R7C7~R6C7.ContainAtLeast~2_3_8_7~R5C9~R6C9~R6C8~R7C8~R8C8~R9C8.ContainAtLeast~9_5_4~R7C9~R8C9~R9C9.ContainAtLeast~4_5~R5C3~R6C3.ContainAtLeast~2_3_7_8~R7C1~R8C1~R8C2~R8C3~R8C4.ContainAtLeast~6_8~R1C9~R1C8~R2C8~R3C8.ContainAtLeast~6_2~R4C8~R4C7~R3C7~R2C7.ContainAtLeast~9_3~R1C1~R1C2~R1C3~R1C4.ContainAtLeast~7_9~R9C1~R9C2~R9C3.ContainAtLeast~3_7~R4C2~R3C2~R3C3~R4C3',
+        solution: '132985746596437281487126953873541692925673418614298537251364879368759124749812365',
+      },
       {
         name: 'Stepped Thermos - nested replicate', // Using nested Replicate
         src: 'https://sudokupad.app/g21db32fo4',

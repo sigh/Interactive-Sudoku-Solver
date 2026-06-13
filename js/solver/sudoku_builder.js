@@ -853,6 +853,13 @@ export class SudokuBuilder {
             cells.cellIds(shape));
           break;
 
+        case 'CountDistinct':
+          {
+            const allCells = constraint.cells.map(c => shape.parseCellId(c).cell);
+            yield new HandlerModule.CountDistinct(allCells[0], allCells.slice(1));
+          }
+          break;
+
         case 'StrictKropki':
           {
             const types = ['BlackDot', 'WhiteDot'];

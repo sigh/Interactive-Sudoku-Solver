@@ -1277,6 +1277,13 @@ class BorderedRegion extends BaseConstraintDisplayItem {
       g.append(border);
     }
 
+    if (options.markFirstCell) {
+      const firstCell = groups[0][0];
+      const circle = this._makeCircleAtPoint(this.cellIdCenter(firstCell));
+      circle.setAttribute('fill', 'transparent');
+      g.append(circle);
+    }
+
     const strokeWidth = options.strokeWidth ?? (
       options.inset ? options.inset * 2 : 5);
     g.setAttribute('stroke-width', strokeWidth);
