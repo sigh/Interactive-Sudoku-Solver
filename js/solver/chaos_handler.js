@@ -1022,6 +1022,9 @@ export class ChaosArrow extends SudokuConstraintHandler {
     this._canMergeRegionShards = false;
     this._regionShardState = null;
     this._offset = +offset;
+    if (this._offset !== 0 && this._offset !== 1) {
+      throw new InvalidConstraintError('ChaosArrow offset must be 0 or 1.');
+    }
   }
 
   attachRegionShardState(regionShardState) {
@@ -1247,6 +1250,9 @@ export class ChaosCount extends SudokuConstraintHandler {
     this._regionShardMergePairs = null;
     this._regionShardState = null;
     this._offset = +offset;
+    if (this._offset !== 0 && this._offset !== 1) {
+      throw new InvalidConstraintError('ChaosCount offset must be 0 or 1.');
+    }
   }
 
   attachRegionShardState(regionShardState) {

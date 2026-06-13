@@ -610,6 +610,9 @@ class ChaosConstraintBase extends SudokuConstraintBase {
       super(gridCell);
     }
     this.offset = +offset || 0;
+    if (this.offset !== 0 && this.offset !== 1) {
+      throw new Error(`${this.constructor.name} offset must be 0 or 1.`);
+    }
     this.cells = [gridCell, ...cells];
   }
 
