@@ -38,11 +38,14 @@ const parseArgs = (argv) => {
   const args = {
     puzzles: DEFAULT_PUZZLES,
     maxBacktracks: 50_000,
+    summary: false,
   };
   for (let i = 2; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === '--help' || arg === '-h') {
       args.help = true;
+    } else if (arg === '--summary') {
+      args.summary = true;
     } else if (arg === '--puzzles') {
       args.puzzles = parseList(argv[++i], DEFAULT_PUZZLES);
     } else if (arg.startsWith('--puzzles=')) {
@@ -195,6 +198,9 @@ Options:
   --puzzles <names>         Comma-separated puzzle names.
                             Use "chaos-ladder" for generated 9x9 ladder points.
   --max-backtracks <n>      Stop any run after this many backtracks.
+  --summary                 One compact line per puzzle (status, search shape,
+                            wall time, connectivity time) instead of the full
+                            per-phase table. Use for before/after comparisons.
 
 Default puzzles:
   ${DEFAULT_PUZZLES.join(', ')}
@@ -213,6 +219,29 @@ if (args.help) {
 }
 
 const puzzles = resolveChaosBenchmarkPuzzles(EXAMPLES, args.puzzles);
+
+// Compact mode: one line per puzzle with just the decision metrics
+// (search shape + wall time + connectivity-phase time). Use this for
+// before/after comparisons; the full per-phase table below is for deep dives.
+if (args.summary) {
+  console.log(['puzzle', 'status', 'sols', 'guesses', 'backtracks', 'nodes',
+    'solveMs', 'connMs'].join('\t'));
+  for (const puzzle of puzzles) {
+    const { puzzle: name, status, elapsedMs, counters, stats } =
+      solvePuzzle(puzzle, args.maxBacktracks);
+    console.log([
+      name,
+      status,
+      counters.solutions,
+      counters.guesses,
+      counters.backtracks,
+      counters.nodesSearched,
+      elapsedMs.toFixed(1),
+      stats._enforceConnectivity.ms.toFixed(1),
+    ].join('\t'));
+  }
+  process.exit(0);
+}
 
 console.log([
   'puzzle',

@@ -187,6 +187,14 @@ export class ChaosConstruction extends SudokuConstraintHandler {
     this._regionScanData = new Uint32Array(this._numRegions);
     this._regionScratchCounts = new Uint16Array(this._numRegions);
     this._fixedValueMasks = new Uint16Array(this._numRegions);
+    // Per-region seed for connectivity: a shard fixed to the region. Seeded by
+    // the scan and updated as the pass fixes more shards. Only read when the
+    // region's fixed weight is non-zero, so stale unfixed entries are never used.
+    this._firstFixedRootByRegion = new Uint16Array(this._numRegions);
+    // Live per-region fixed cell weight during a connectivity pass. Seeded from
+    // the scan, then kept current as the pass fixes shards (the pass mutates the
+    // fixed set, so a single snapshot would go stale for later labels).
+    this._connectivityFixedSizeByRegion = new Uint16Array(this._numRegions);
     // Traversal scratch; `_rootScratch` also stores hidden-single witness roots.
     this._componentStack = new Uint8Array(numGridCells);
     this._visitMarks = new Uint16Array(numGridCells);
@@ -271,13 +279,38 @@ export class ChaosConstruction extends SudokuConstraintHandler {
   _removeConnectivityShardRegion(shardMasks, root, regionBit) {
     // Connectivity only removes labels from roots with at least one other candidate.
     const oldMask = shardMasks[root];
-    shardMasks[root] = oldMask & ~regionBit;
+    const newMask = oldMask & ~regionBit;
+    shardMasks[root] = newMask;
     this._connectivityDirtyRegionsMask |= oldMask;
+    // A removal that leaves a single candidate newly fixes this shard to that
+    // region; keep the per-region fixed weight that later labels rely on current.
+    if (newMask && !(newMask & (newMask - 1))) {
+      this._addConnectivityFixedShard(31 - Math.clz32(newMask), root);
+    }
   }
 
   _setConnectivityShardRegion(shardMasks, root, regionBit) {
-    this._connectivityDirtyRegionsMask |= shardMasks[root];
+    const oldMask = shardMasks[root];
+    this._connectivityDirtyRegionsMask |= oldMask;
     shardMasks[root] = regionBit;
+    // Forcing a multi-candidate shard newly fixes it to the region.
+    if (oldMask !== regionBit) {
+      this._addConnectivityFixedShard(31 - Math.clz32(regionBit), root);
+    }
+  }
+
+  _addConnectivityFixedShard(region, root) {
+    // Fixed shards are never un-fixed within a connectivity pass, so the weight
+    // only grows. The seed must stay the lowest-index fixed root so the
+    // distance-bounded traversal (and its boundary pruning) matches the order an
+    // index scan would produce.
+    const fixedSizeByRegion = this._connectivityFixedSizeByRegion;
+    const firstFixedRootByRegion = this._firstFixedRootByRegion;
+    const shardSize = this._regionShardSizes[root];
+    if ((fixedSizeByRegion[region] += shardSize) === shardSize
+      || root < firstFixedRootByRegion[region]) {
+      firstFixedRootByRegion[region] = root;
+    }
   }
 
   _mergeRegionShards(grid, cellA, cellB) {
@@ -604,6 +637,7 @@ export class ChaosConstruction extends SudokuConstraintHandler {
     const shardSizes = this._regionShardSizes;
     const shardValueMasks = this._regionShardScratchMasks;
     const shardFixedValueMasks = this._regionShardFixedValueMasks;
+    const firstFixedRootByRegion = this._firstFixedRootByRegion;
     const possibleCountCacheOffset = this._possibleCountCacheOffset;
     const regionCellOffset = this._regionCellOffset;
     let connectivityDirtyRegionsMask = this._connectivityDirtyRegionsMask;
@@ -624,6 +658,9 @@ export class ChaosConstruction extends SudokuConstraintHandler {
         const fixedCount = ((scanData >>> REGION_FIXED_COUNT_SHIFT)
           & REGION_FIXED_COUNT_MASK) + shardSize;
         if (fixedCount > this._regionSize) return false;
+        // Roots are scanned in increasing index order, so the first fixed shard
+        // seen is the lowest-index one; connectivity reuses it as its seed.
+        if (fixedCount === shardSize) firstFixedRootByRegion[region] = root;
         regionScanData[region] = (scanData & ~(REGION_FIXED_COUNT_MASK << REGION_FIXED_COUNT_SHIFT))
           | (fixedCount << REGION_FIXED_COUNT_SHIFT);
         const fixedValueMask = shardFixedValueMasks[root];
@@ -693,6 +730,8 @@ export class ChaosConstruction extends SudokuConstraintHandler {
     const shardMasks = this._regionShardScratchMasks;
     const regionScanData = this._regionScanData;
     const fixedValueMasks = this._fixedValueMasks;
+    const firstFixedRootByRegion = this._firstFixedRootByRegion;
+    const fixedSizeByRegion = this._connectivityFixedSizeByRegion;
     const visitMarks = this._visitMarks;
     const regionSize = this._regionSize;
     const dirtyRegionsMask = this._connectivityDirtyRegionsMask;
@@ -700,24 +739,24 @@ export class ChaosConstruction extends SudokuConstraintHandler {
 
     shardMasks.set(
       grid.subarray(regionCellOffset, regionCellOffset + numGridCells));
+    // Seed live fixed weights from the scan; the helpers keep them current as
+    // the pass fixes more shards, replacing the old per-region rescan.
+    for (let region = 0; region < this._numRegions; region++) {
+      fixedSizeByRegion[region] = (regionScanData[region] >>> REGION_FIXED_COUNT_SHIFT)
+        & REGION_FIXED_COUNT_MASK;
+    }
 
     for (let region = 0; region < this._numRegions; region++) {
       const regionBit = 1 << region;
       if (!(dirtyRegionsMask & regionBit)) continue;
 
       const visitId = this._nextVisitId();
-      let fixedSize = 0;
-      let fixedRoot = this.constructor._NO_CELL;
-      // Fixed shards are exactly the roots whose effective region mask is the
-      // region bit. Their total cell weight is the connectivity target.
-      for (let root = 0; root < numGridCells; root++) {
-        if (!shardSizes[root] || shardMasks[root] !== regionBit) continue;
-        if (fixedRoot === this.constructor._NO_CELL) fixedRoot = root;
-        fixedSize += shardSizes[root];
-        if (fixedSize > regionSize) return false;
-      }
+      // Fixed weight reflects both the scan and any shards fixed earlier in this
+      // pass; the seed root is a shard currently fixed to the region.
+      const fixedSize = fixedSizeByRegion[region];
 
       if (fixedSize) {
+        const fixedRoot = firstFixedRootByRegion[region];
         // Fixed shards choose the component. Everything outside it loses this
         // region label; exact-size components are forced.
         const componentSize = this._traverseFixedRegionShardComponent(
@@ -789,9 +828,14 @@ export class ChaosConstruction extends SudokuConstraintHandler {
     for (let region = 0; region < this._numRegions; region++) {
       const fixedCount = (regionScanData[region] >>> REGION_FIXED_COUNT_SHIFT)
         & REGION_FIXED_COUNT_MASK;
-      // Dirty labels always run; clean labels wait until regions are half-fixed.
-      if (fixedCount && fixedCount < regionSize && (fixedCount << 1) >= regionSize) {
-        bottleneckRegionsMask |= 1 << region;
+      // A bottleneck needs a door plus at least one cell beyond it (two free
+      // cells). With zero or one free cell the connectivity traversal already
+      // decides the region, so skip the check even for dirty labels.
+      if (fixedCount + 2 > regionSize) {
+        bottleneckRegionsMask &= ~(1 << region);
+      } else if ((fixedCount << 1) >= regionSize) {
+        // Dirty labels always run; clean labels wait until regions are half-fixed.
+        bottleneckRegionsMask |= (1 << region);
       }
     }
     if (!this._enforceFixedComponentBottlenecks(grid, shardMasks, bottleneckRegionsMask)) return false;

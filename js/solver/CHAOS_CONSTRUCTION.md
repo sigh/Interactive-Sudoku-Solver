@@ -451,15 +451,32 @@ function enforceBottlenecks(grid, shardMask, regions):
 
 The doors are computed over the *whole* connected fixed component, because an
 individual fixed shard may appear to have one exit while the component as a whole
-has several. Bottlenecks are checked for dirty regions and additionally for any
-region that is at least half fixed but not yet complete.
+has several.
+
+**Which regions are checked.** A bottleneck can only *add* information when the
+region has at least two free cells (`s − fixedCount ≥ 2`): the forced door plus
+at least one cell beyond it. With one free cell the door would be the last cell,
+which §7.1 already forces whenever it is the unique reachable extension; with
+zero free cells the region is complete. So regions with `fixedCount + 2 > s` are
+excluded from the bottleneck pass entirely, even dirty ones — for a dirty region
+any genuine "no door" contradiction is already reported by the size check in
+§7.1. Among the remaining regions, dirty labels are always checked and clean
+labels are checked once they are at least half fixed.
+
+Only the **single-door** case is forced. A natural generalization — force any
+door `d` when the cells reachable from the core *without* `d` fall below `s` (a
+vertex-cut / "the other doors can't supply enough cells" argument, computable in
+one articulation-point pass) — was prototyped and measured. It is sound and fires
+often, and it cut search sharply on some puzzles (x-sums −43% nodes), but it
+*tripled* the node count on the canonical Chaos Construction puzzle: the extra
+sound forcing steers the conflict-score / MRV heuristic into a worse tree.
 
 After all per-region work, the scratch `shardMask[]` is written back to the grid
 wherever it differs, queuing the affected cells for downstream handlers.
 
 ## 8. Incrementality
 
-Two mechanisms keep the cost proportional to what actually changed:
+Three mechanisms keep the cost proportional to what actually changed:
 
 - **Branch-state union-find.** Shard merges live in saved/restored state, so the
   same merges are not recomputed after backtracking.
@@ -468,6 +485,15 @@ Two mechanisms keep the cost proportional to what actually changed:
   previous value is cached per region in branch state; `scanRegionCandidates`
   marks a region dirty when its weight differs. Only dirty regions (plus
   half-fixed regions for the bottleneck check) are traversed in §7.
+- **Carried-over fixed weights.** The per-region fixed weight `F(region)` and a
+  seed root (the lowest-index fixed shard) are produced by the region scan (§6.1)
+  and reused as the §7.1 starting point, instead of rescanning all shards per
+  region. The connectivity pass itself fixes more shards as it runs — a forced
+  shard, or a removal that leaves a single candidate, both newly fix a shard to
+  some region — so these values are *maintained incrementally* as labels are set
+  or removed, never snapshotted once. The seed is kept as the lowest index so the
+  distance-bounded traversal explores in the same order an index scan would,
+  which matters because its boundary pruning (§7.1) is order-sensitive.
 
 ## 9. Auxiliary Handlers
 
