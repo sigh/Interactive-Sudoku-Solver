@@ -3,6 +3,9 @@ const { LookupTables } = await import('./lookup_tables.js' + self.VERSION_PARAM)
 const { SudokuConstraintHandler, HandlerUtil, InvalidConstraintError } = await import('./handlers.js' + self.VERSION_PARAM);
 const { SHAPE_MAX, SHAPE_9x9 } = await import('../grid_shape.js' + self.VERSION_PARAM);
 
+// Enforces a weighted linear equation `Σ coeff·value = sum` over the cells
+// (killer cages, arithmetic sums, equalities). See SUM.md for the full
+// algorithm.
 export class Sum extends SudokuConstraintHandler {
   _rawSum = -1;
   _sum = -1;

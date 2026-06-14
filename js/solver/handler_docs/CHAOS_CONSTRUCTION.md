@@ -1,9 +1,9 @@
 # Chaos Construction
 
 This document specifies the constraint-propagation algorithms implemented in
-[chaos_handler.js](chaos_handler.js). For the solver engine that drives these
-handlers, see [SOLVER_ENGINE.md](SOLVER_ENGINE.md); for the handler interface in
-general, see [README.md](README.md).
+[chaos_handler.js](../chaos_handler.js). For the solver engine that drives these
+handlers, see [SOLVER_ENGINE.md](../SOLVER_ENGINE.md); for the handler interface in
+general, see [README.md](../README.md).
 
 The presentation is self-contained and aimed at a reader comfortable with basic
 graph algorithms (BFS, union-find) and bitmask manipulation. Each algorithm is
