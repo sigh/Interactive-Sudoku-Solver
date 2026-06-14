@@ -61,6 +61,7 @@ flowchart TD
 | [candidate_selector.js](candidate_selector.js) | **Search heuristics.** `CandidateSelector` picks which cell to solve next (ranked by conflict score per candidate, falling back to MRV when scores are zero) and which value to try first. `ConflictScores` tracks cells that caused contradictions to improve future ordering. `SeenCandidateSet` deduplicates solutions. |
 | [sum_handler.js](sum_handler.js) | **Algebraic sum constraints.** Handles equations of the form `Σ cᵢ·vᵢ = target` with integer coefficients. Used for cages, arrows, pill arrows, and optimizer-derived sums. Groups cells by coefficient. Specialized fast paths for 1–3 remaining unfixed cells. |
 | [nfa_handler.js](nfa_handler.js) | **NFA-based sequential constraints.** Enforces constraints on ordered cell sequences (palindromes, whisper lines, regex patterns) using a compressed NFA representation. Uses a forward+backward pass to prune candidates. |
+| [chaos_handler.js](chaos_handler.js) | **Chaos construction.** Discovers an unknown region (box) layout: partitions the grid into connected, distinct-value regions. See [CHAOS_CONSTRUCTION.md](CHAOS_CONSTRUCTION.md). |
 | [lookup_tables.js](lookup_tables.js) | **Precomputed tables.** `LookupTables` provides O(1) bitmask lookups: `sum[mask]` (sum of values in a bitmask), `rangeInfo[mask]` (min/max/isFixed), `reverse[mask]` (complement). Also decodes binary relationship keys for pairwise constraints. |
 
 ## Constraint-to-Handler Mapping
