@@ -2905,6 +2905,30 @@ export class CountingCircles extends SudokuConstraintHandler {
 // The control cell's value equals the number of distinct values among the
 // counted cells.
 export class CountDistinct extends SudokuConstraintHandler {
+  // Per-call scratch, shared across all instances: the solver enforces one
+  // handler at a time, so there is never concurrent use. `_ensureScratch` grows it
+  // to the largest constraint seen. Cell indices and value masks both fit in 16
+  // bits (grids are at most 16x16).
+  static _cellCap = 0;
+  static _unfixedDoms = new Uint16Array(0);   // unfixed domain masks
+  static _unfixedCells = new Uint16Array(0);  // their grid indices
+  static _cellMatch = new Int16Array(0);      // cell -> matched value bit, or -1
+  static _stackCell = new Uint16Array(0);     // augmenting-path stack: cell
+  static _stackVal = new Uint16Array(0);      // augmenting-path stack: value bit
+  static _valueOwner = new Int16Array(SHAPE_MAX.numValues); // value bit -> cell, or -1
+  static _reach = new Uint16Array(SHAPE_MAX.numValues);     // value -> reachable values (Régin)
+
+  static _ensureScratch(numCells) {
+    if (numCells > CountDistinct._cellCap) {
+      CountDistinct._cellCap = numCells;
+      CountDistinct._unfixedDoms = new Uint16Array(numCells);
+      CountDistinct._unfixedCells = new Uint16Array(numCells);
+      CountDistinct._cellMatch = new Int16Array(numCells);
+      CountDistinct._stackCell = new Uint16Array(numCells + 1);
+      CountDistinct._stackVal = new Uint16Array(numCells + 1);
+    }
+  }
+
   constructor(controlCell, countedCells) {
     super([controlCell, ...countedCells]);
     this._controlCell = controlCell;
@@ -2913,51 +2937,62 @@ export class CountDistinct extends SudokuConstraintHandler {
 
   initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
     this._valueOffset = shape.valueOffset;
+    this._numValues = shape.numValues;
     const offset = shape.valueOffset;
+    const numCells = this._countedCells.length;
 
-    // Counted cells that are mutually exclusive must take different values.
+    // Static lower bound from mutually-exclusive counted cells (§5).
     const exclusionGroups = HandlerUtil.findExclusionGroups(
       Array.from(this._countedCells), cellExclusions).groups;
     const minDistinct = Math.max(1, ...exclusionGroups.map(g => g.length));
 
-    const maxPossible = Math.min(this._countedCells.length, shape.numValues);
+    CountDistinct._ensureScratch(numCells);
+    this._numUnfixed = 0;
+    this._reachA = 0;       // values reachable from a free value (set per call)
+    this._freeCellDom = 0;  // union of free cells' effective domains (set per call)
+
+    const maxPossible = Math.min(numCells, shape.numValues);
     const rangeMask =
       (1 << (maxPossible - offset)) - (1 << (minDistinct - offset - 1));
     return !!(initialGridCells[this._controlCell] &= rangeMask);
   }
 
+  // NValue propagator (`control = #distinct(counted)`). See COUNT_DISTINCT.md for
+  // the full derivation; the section references below point into it.
   enforceConsistency(grid, handlerAccumulator) {
     const countedCells = this._countedCells;
     const numCells = countedCells.length;
     const offset = this._valueOffset;
+    const unfixedDoms = CountDistinct._unfixedDoms;
+    const unfixedCells = CountDistinct._unfixedCells;
 
-    let unionMask = 0;
+    // Split into forced (fixed) values and unfixed domains (§2.2).
     let fixedMask = 0;
+    let nu = 0;
     for (let i = 0; i < numCells; i++) {
       const mask = grid[countedCells[i]];
-      unionMask |= mask;
-      if (!(mask & (mask - 1))) fixedMask |= mask;
-    }
-
-    // Lower bound on the distinct count: distinct fixed values, plus any unfixed
-    // cell whose candidates are disjoint from the values claimed so far.
-    const fixedCount = countOnes16bit(fixedMask);
-    let disjointMask = fixedMask;
-    let minDistinct = fixedCount;
-    for (let i = 0; i < numCells; i++) {
-      const mask = grid[countedCells[i]];
-      if ((mask & (mask - 1)) && !(mask & disjointMask)) {
-        minDistinct++;
-        disjointMask |= mask;
+      if (!mask) return false;
+      if (mask & (mask - 1)) {
+        unfixedDoms[nu] = mask;
+        unfixedCells[nu] = countedCells[i];
+        nu++;
+      } else {
+        fixedMask |= mask;
       }
     }
-    const maxDistinct = Math.min(numCells, countOnes16bit(unionMask));
+    this._numUnfixed = nu;
+    const fixedCount = countOnes16bit(fixedMask);
 
-    // Prune the control cell to the range [minDistinct, maxDistinct].
+    // Unfixed cells add at most `matchBase` (§3.1), at least `packBase` (§4.1).
+    const matchBase = this._maxMatching(fixedMask);
+    const packBase = this._packing(fixedMask);
+    const maxD = fixedCount + matchBase;
+    const minD = fixedCount + packBase;
+
+    // Prune the control cell to the achievable range [minD, maxD] (§2.1).
     const controlCell = this._controlCell;
     const controlMask = grid[controlCell];
-    const rangeMask =
-      (1 << (maxDistinct - offset)) - (1 << (minDistinct - offset - 1));
+    const rangeMask = (1 << (maxD - offset)) - (1 << (minD - offset - 1));
     const newControlMask = controlMask & rangeMask;
     if (!newControlMask) return false;
     if (newControlMask !== controlMask) {
@@ -2965,24 +3000,196 @@ export class CountDistinct extends SudokuConstraintHandler {
       handlerAccumulator.addForCell(controlCell);
     }
 
-    // If the largest allowed count equals the number of distinct fixed values,
-    // then no new distinct value may appear: collapse every counted cell onto
-    // the fixed values.
-    const controlMax = LookupTables.toValue(newControlMask) + offset;
-    if (controlMax === fixedCount && (unionMask & ~fixedMask)) {
-      for (let i = 0; i < numCells; i++) {
-        const cell = countedCells[i];
-        const mask = grid[cell];
-        const newMask = mask & fixedMask;
-        if (!newMask) return false;
-        if (newMask !== mask) {
-          grid[cell] = newMask;
-          handlerAccumulator.addForCell(cell);
+    // Counted cells are only prunable once the control is pinned to an extreme
+    // (§2.3): an allowed count strictly inside (minD, maxD) supports everything.
+    if (maxD - minD >= 2) {
+      const interiorMask =
+        (1 << (maxD - offset - 1)) - (1 << (minD - offset));
+      if (newControlMask & interiorMask) return true;
+    }
+    const minAllowed = (newControlMask >> (minD - offset - 1)) & 1;
+    const maxAllowed = (newControlMask >> (maxD - offset - 1)) & 1;
+
+    // Régin value-graph reachability off the base matching in `_valueOwner` (§3.2),
+    // only needed when the control can still take its maximum.
+    let reachA = 0;
+    let freeCellDom = 0;
+    if (maxAllowed) [reachA, freeCellDom] = this._reginPrep(fixedMask);
+    const cellMatch = CountDistinct._cellMatch;
+    const reach = CountDistinct._reach;
+
+    for (let j = 0; j < nu; j++) {
+      const dom = unfixedDoms[j];
+      // Max-supported values for this cell (§3.2).
+      let maxSup = 0;
+      if (maxAllowed) {
+        const w = cellMatch[j];
+        maxSup = (w === -1 || (reach[w] & freeCellDom))
+          ? dom
+          : (dom & ~fixedMask) & (reach[w] | reachA);
+      }
+      if (maxSup === dom) continue;  // everything max-supported; nothing to prune
+
+      let keep = maxSup;  // default when !minAllowed
+      if (minAllowed) {
+        // Max-supported and fixed values survive the min side for free (§4.2);
+        // only the rest each cost a packing call.
+        keep = dom & (maxSup | fixedMask);
+        let m = dom ^ keep;
+        while (m) {
+          const v = m & -m;
+          m ^= v;
+          if (1 + this._packing(fixedMask | v) <= packBase) keep |= v;
         }
+      }
+
+      if (keep !== dom) {
+        if (!keep) return false;
+        grid[unfixedCells[j]] = keep;
+        handlerAccumulator.addForCell(unfixedCells[j]);
       }
     }
 
     return true;
+  }
+
+  // Maximum bipartite matching of unfixed cells to values not in `excludeVal`
+  // (§3.1) = the distinct values the unfixed cells add. Leaves the matching in
+  // `_valueOwner` for Régin to reuse; `freeMask` is the set of unmatched values.
+  _maxMatching(excludeVal) {
+    const nu = this._numUnfixed;
+    const doms = CountDistinct._unfixedDoms;
+    const owner = CountDistinct._valueOwner;
+    owner.fill(-1);
+    // Invariant: freeMask = values that are allowed (not excluded) and unmatched.
+    let freeMask = ((1 << this._numValues) - 1) & ~excludeVal;
+    let size = 0;
+    for (let i = 0; i < nu; i++) {
+      // Common case: a free value is directly available, so match it without the
+      // augmenting-path search and its stack setup.
+      const free = doms[i] & freeMask;
+      let matched = -1;
+      if (free) {
+        matched = LookupTables.toIndex(free & -free);
+        owner[matched] = i;
+      } else {
+        matched = this._augment(i, excludeVal, freeMask);
+        if (matched < 0) continue;
+      }
+      freeMask &= ~(1 << matched);
+      size++;
+    }
+    return size;
+  }
+
+  // Iterative augmenting-path DFS (Kuhn, §3.1). Returns the value bit newly matched
+  // (for the caller to clear from `freeMask`), or -1 if none; flips the matching
+  // along the path in one sweep.
+  _augment(startCell, excludeVal, freeMask) {
+    const doms = CountDistinct._unfixedDoms;
+    const owner = CountDistinct._valueOwner;
+    const sCell = CountDistinct._stackCell;
+    const sVal = CountDistinct._stackVal;
+
+    let seen = 0;
+    let sp = 0;
+    sCell[0] = startCell;
+
+    while (sp >= 0) {
+      const avail = doms[sCell[sp]] & ~excludeVal & ~seen;
+      const freeHit = avail & freeMask;
+      if (freeHit) {
+        // Free value reached: apply the whole augmenting path and report it.
+        const b = LookupTables.toIndex(freeHit & -freeHit);
+        sVal[sp] = b;
+        for (let i = 0; i <= sp; i++) owner[sVal[i]] = sCell[i];
+        return b;
+      }
+      if (avail) {
+        // Descend into the owner of the lowest unseen (matched) value.
+        const v = avail & -avail;
+        const b = LookupTables.toIndex(v);
+        seen |= v;
+        sVal[sp] = b;
+        sCell[++sp] = owner[b];
+      } else {
+        sp--;  // no options left at this level: backtrack
+      }
+    }
+    return -1;
+  }
+
+  // Greedy disjoint-domain packing over the unfixed cells.
+  _packing(used) {
+    const doms = CountDistinct._unfixedDoms;
+    const nu = this._numUnfixed;
+    let count = 0;
+    for (let i = 0; i < nu; i++) {
+      const d = doms[i];
+      if (d & used) continue;  // covered by a fixed/pinned value or a picked domain
+      count++;
+      used |= d;
+    }
+    return count;
+  }
+
+  // Régin filtering on the value graph (§3.2): from the matching in `_valueOwner`,
+  // fill `_reach` (per-value transitive closure, edges built in place then closed)
+  // and return [reachA, freeCellDom], from which the caller derives each cell's
+  // max-supported values.
+  _reginPrep(fixedMask) {
+    const nu = this._numUnfixed;
+    const numValues = this._numValues;
+    const doms = CountDistinct._unfixedDoms;
+    const owner = CountDistinct._valueOwner;   // value bit -> cell (base matching), or -1
+    const cellMatch = CountDistinct._cellMatch;
+    const reach = CountDistinct._reach;
+
+    // Invert the matching to cell->value and clear the value-graph edges.
+    for (let c = 0; c < nu; c++) cellMatch[c] = -1;
+    let matchedMask = 0;
+    for (let b = 0; b < numValues; b++) {
+      reach[b] = 0;
+      const c = owner[b];
+      if (c !== -1) { cellMatch[c] = b; matchedMask |= 1 << b; }
+    }
+
+    // One pass over cells: live values, free-cell domains, and the edges u -> w.
+    let unionEd = 0;
+    let freeCellDom = 0;
+    for (let c = 0; c < nu; c++) {
+      const e = doms[c] & ~fixedMask;
+      unionEd |= e;
+      const w = cellMatch[c];
+      if (w === -1) { freeCellDom |= e; continue; }
+      const wbit = 1 << w;
+      let m = e ^ wbit;  // drop the self value (w is always in e)
+      while (m) {
+        const low = m & -m;
+        m ^= low;
+        reach[LookupTables.toIndex(low)] |= wbit;
+      }
+    }
+
+    // Transitive closure (Warshall over <=16 nodes), then add the self bit.
+    for (let k = 0; k < numValues; k++) {
+      const rk = reach[k];
+      if (!rk) continue;  // no successors: nothing to propagate
+      const kbit = 1 << k;
+      for (let u = 0; u < numValues; u++) if (reach[u] & kbit) reach[u] |= rk;
+    }
+    for (let b = 0; b < numValues; b++) reach[b] |= 1 << b;
+
+    // Values reachable from a free value.
+    let reachA = unionEd & ~matchedMask;
+    let f = reachA;
+    while (f) {
+      const low = f & -f;
+      f ^= low;
+      reachA |= reach[LookupTables.toIndex(low)];
+    }
+
+    return [reachA, freeCellDom];
   }
 }
 

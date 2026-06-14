@@ -89,6 +89,59 @@ await runTest('control fixed to the fixed-distinct count collapses counted cells
   assert.equal(grid[3], valueMask(1));
 });
 
+await runTest('GAC: repeated fixed value tightens the control max exactly', () => {
+  const context = new GridTestContext({ gridSize: [1, 4], numValues: 4 });
+  const handler = new CountDistinct(0, [1, 2, 3]);
+  context.initializeHandler(handler, { cellExclusions: noExclusions(4) });
+
+  const grid = context.grid;
+  grid[1] = valueMask(1);
+  grid[2] = valueMask(1);
+  grid[3] = valueMask(1, 2, 3);
+
+  const acc = createAccumulator();
+  assert.equal(handler.enforceConsistency(grid, acc), true);
+  // Two cells pinned to 1 means the distinct count is 1 or 2, never 3 — the
+  // cheap popcount bound would leave value 3 in place.
+  assert.equal(grid[0], valueMask(1, 2));
+});
+
+await runTest('GAC: control forces the only value that adds a new distinct', () => {
+  const context = new GridTestContext({ gridSize: [1, 4], numValues: 4 });
+  const handler = new CountDistinct(0, [1, 2, 3]);
+  context.initializeHandler(handler, { cellExclusions: noExclusions(4) });
+
+  const grid = context.grid;
+  grid[0] = valueMask(3);          // exactly 3 distinct required
+  grid[1] = valueMask(1);
+  grid[2] = valueMask(2);
+  grid[3] = valueMask(1, 2, 3);    // must supply the 3rd distinct value
+
+  const acc = createAccumulator();
+  assert.equal(handler.enforceConsistency(grid, acc), true);
+  // Only value 3 keeps a third distinct value reachable.
+  assert.equal(grid[3], valueMask(3));
+  assert.equal(grid[1], valueMask(1));
+  assert.equal(grid[2], valueMask(2));
+});
+
+await runTest('GAC: control pinned to the minimum collapses onto a shared value', () => {
+  const context = new GridTestContext({ gridSize: [1, 4], numValues: 4 });
+  const handler = new CountDistinct(0, [1, 2]);
+  context.initializeHandler(handler, { cellExclusions: noExclusions(4) });
+
+  const grid = context.grid;
+  grid[0] = valueMask(1);          // exactly 1 distinct value
+  grid[1] = valueMask(1, 2);
+  grid[2] = valueMask(2, 3);
+
+  const acc = createAccumulator();
+  assert.equal(handler.enforceConsistency(grid, acc), true);
+  // One distinct value forces both cells onto their only shared value, 2.
+  assert.equal(grid[1], valueMask(2));
+  assert.equal(grid[2], valueMask(2));
+});
+
 await runTest('fails when the control value is unreachable', () => {
   const context = new GridTestContext({ gridSize: [1, 4], numValues: 4 });
   const handler = new CountDistinct(0, [1, 2, 3]);
