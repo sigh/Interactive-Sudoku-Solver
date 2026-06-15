@@ -1196,6 +1196,12 @@ export const EXAMPLES = [
     input: '/data/uncovering_tunnels.iss',
     solution: '524176398159864732643915287932781465785249613496532871371628954268357149817493526',
     constraintTypes: ['ChaosConstruction', 'ChaosArrow', 'AllDifferent', 'NFA', 'Whisper'],
+  },
+  {
+    name: 'Chaos Construction: Sunblock',
+    src: 'https://www.youtube.com/watch?v=wmd78ZbRXrI',
+    input: '.ChaosConstruction.NoBoxes.ChaosCount~R2C2.ChaosCount~R2C3.ChaosCount~R2C4.ChaosCount~R2C5.ChaosCount~R2C6.ChaosCount~R2C7.ChaosCount~R2C9.ChaosCount~R3C3.ChaosCount~R3C4.ChaosCount~R3C5.ChaosCount~R1C6.ChaosCount~R4C4.ChaosCount~R4C6.ChaosCount~R4C1.ChaosCount~R4C9.ChaosCount~R5C8.ChaosCount~R6C8.ChaosCount~R6C1.ChaosCount~R6C2.ChaosCount~R6C3.ChaosCount~R7C3.ChaosCount~R7C2.ChaosCount~R7C1.ChaosCount~R7C6.ChaosCount~R7C5.ChaosCount~R8C5.ChaosCount~R9C3.ChaosCount~R8C9.ChaosCount~R2C1~0~CC10~CC1~CC2~CC11~CC20~CC19',
+    solution: '679214358458726913936458721581673294124897536345982167267135849792341685813569472',
   }
 ];
 

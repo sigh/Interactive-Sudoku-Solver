@@ -546,6 +546,14 @@ the cell just past the end is not already fixed to `r` (otherwise the run would 
 longer). Cells already in the same shard as the start are forced to share `r`,
 which gives a cheap lower bound on the run length.
 
+`initialize` also clamps the control to feasible run lengths `[minLength,
+maxLength]`. Length 0 never occurs (the start is in its own region). And since
+regions have size ≥ 2, the start shares its region with an orthogonal neighbour;
+if every orthogonal neighbour is the first step of an arm (e.g. an arrow pointing
+in all four directions), that neighbour lies on an arm, so the run length is ≥ 2
+and length 1 is removed. This is geometric, hence a one-time static prune (unlike
+the count case there is no per-cell growth to track dynamically).
+
 ### 9.3 `ChaosCount`
 
 The control value counts how many listed cells share the *first* listed cell's
@@ -562,6 +570,14 @@ function enforceCount(grid):
     if the first cell's region becomes fixed:
         UNION listed cells proven to share it into one shard
 ```
+
+`initialize` clamps the control to the feasible count range `[minCount, maxCount]`.
+The first listed cell is always in its own region, so `minCount ≥ 1` (count 0 is
+removed). Regions have size ≥ 2 (rejected at build otherwise), so the first cell
+also shares its region with an orthogonal neighbour; if every neighbour is itself a
+listed cell that neighbour is counted, giving `minCount = 2`. Both bounds are
+geometric, so this is a one-time static prune (count `c` sits at control bit
+`c − 1 − offset`).
 
 ### 9.4 `ChaosFixedValueRegionExclusion`
 

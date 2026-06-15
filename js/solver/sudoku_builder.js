@@ -224,6 +224,10 @@ export class SudokuBuilder {
         case 'ChaosConstruction':
           {
             const regionSize = this._regionSize(constraintMap, shape);
+            if (regionSize < 2) {
+              throw new InvalidConstraintError(
+                'Chaos Construction requires a region size of at least 2.');
+            }
             if (shape.numGridCells % regionSize !== 0) {
               throw new InvalidConstraintError(
                 'Chaos Construction requires grid cell count to be divisible by region size.');

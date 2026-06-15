@@ -88,7 +88,9 @@ const enforceShardCount = (countHandler, context) => {
 };
 
 const makeChaosCount = (shape, controlCell, regionCells, grid) => {
-  const handler = new ChaosCount(controlCell, regionCells, null, 0);
+  const regionOffset = shape.varCellsForGroup('CC')[0];
+  const runCells = regionCells.map(c => c - regionOffset);
+  const handler = new ChaosCount(controlCell, regionCells, runCells, 0);
   const cellExclusions = createCellExclusions({ allUnique: false, numCells: shape.totalCells() });
   const stateAllocator = createStateAllocator(grid, shape.totalCells());
   assert.equal(handler.initialize(grid, cellExclusions, shape, stateAllocator), true);
@@ -266,6 +268,79 @@ await runTest('ChaosCount prunes control candidates to feasible match counts', (
 
   assert.equal(handler.enforceConsistency(grid, createAccumulator()), true);
   assert.equal(grid[0], valueMask(2));
+});
+
+const makeEnclosedCount = (shape, runCells) => {
+  const grid = makeChaosGrid(shape);
+  const regionCells = shape.varCellsForGroup('CC');
+  const counted = runCells.map(p => regionCells[p]);
+  const handler = new ChaosCount(0, counted, runCells, 0);
+  const ok = handler.initialize(
+    grid,
+    createCellExclusions({ allUnique: false, numCells: shape.totalCells() }),
+    shape,
+    createStateAllocator(grid, shape.totalCells()));
+  return { handler, grid, ok };
+};
+
+await runTest('ChaosCount removes count 1 when the first cell is enclosed', () => {
+  // First counted cell is corner 0; its neighbours (1 right, 4 down) are both
+  // counted, so it is enclosed and the count can never be 1.
+  const shape = GridShape.fromGridSize(4);
+  shape.addVarCellsForConstraints([new SudokuConstraint.ChaosConstruction()]);
+  const { grid, ok } = makeEnclosedCount(shape, [0, 1, 4]);
+  assert.equal(ok, true);
+  assert.equal(grid[0] & valueMask(1), 0);          // count 1 gone
+  assert.equal(grid[0], valueMask(2) | valueMask(3)); // counts 2,3 remain
+});
+
+await runTest('ChaosCount keeps count 1 when the first cell is not enclosed', () => {
+  // Missing the down-neighbour (4), so the first cell is not enclosed.
+  const shape = GridShape.fromGridSize(4);
+  shape.addVarCellsForConstraints([new SudokuConstraint.ChaosConstruction()]);
+  const { grid, ok } = makeEnclosedCount(shape, [0, 1]);
+  assert.equal(ok, true);
+  assert.notEqual(grid[0] & valueMask(1), 0);       // count 1 still possible
+});
+
+await runTest('ChaosCount removes the infeasible count 0 in a 0-indexed grid', () => {
+  // 0-3 grid (valueOffset -1): count k sits at value k+1, so count 0 is value 1.
+  // The count is never 0 (the first cell is always counted), so value 1 is removed
+  // even when the first cell is not enclosed.
+  const shape = GridShape.fromGridSpec('4x4~0-3');
+  shape.addVarCellsForConstraints([new SudokuConstraint.ChaosConstruction()]);
+  const { grid, ok } = makeEnclosedCount(shape, [0, 1]);  // not enclosed
+  assert.equal(ok, true);
+  assert.equal(grid[0] & valueMask(1), 0);          // count 0 (value 1) removed
+  assert.notEqual(grid[0] & valueMask(2), 0);       // count 1 (value 2) still ok
+});
+
+await runTest('ChaosCount removes counts 0 and 1 through the offset when enclosed', () => {
+  const shape = GridShape.fromGridSpec('4x4~0-3');  // valueOffset -1
+  shape.addVarCellsForConstraints([new SudokuConstraint.ChaosConstruction()]);
+  const { grid, ok } = makeEnclosedCount(shape, [0, 1, 4]);
+  assert.equal(ok, true);
+  // count 0 (value 1) and count 1 (value 2) gone; counts 2,3 (values 3,4) remain.
+  assert.equal(grid[0], valueMask(3) | valueMask(4));
+});
+
+await runTest('ChaosCount: enclosed first cell needs an extra in-region neighbour', () => {
+  // First cell (corner 0) is enclosed by counted cells 1, 4. A non-neighbour
+  // counted cell (5) is fixed to the first cell's region, but neither neighbour
+  // is — so a neighbour must still join, forcing the count to >= 3.
+  const shape = GridShape.fromGridSize(4);
+  shape.addVarCellsForConstraints([new SudokuConstraint.ChaosConstruction()]);
+  const regionCells = shape.varCellsForGroup('CC');
+  const { handler, grid, ok } = makeEnclosedCount(shape, [0, 1, 4, 5]);
+  assert.equal(ok, true);
+  const allRegions = (1 << (shape.numGridCells / 4)) - 1;  // regionSize 4 -> 4 regions
+  grid[regionCells[0]] = valueMask(2);  // first cell fixed to region 2
+  grid[regionCells[1]] = allRegions;    // neighbour, open
+  grid[regionCells[4]] = allRegions;    // neighbour, open
+  grid[regionCells[5]] = valueMask(2);  // non-neighbour fixed to region 2
+  assert.equal(handler.enforceConsistency(grid, createAccumulator()), true);
+  // count is first + cell 5 + one of {1,4} >= 3, so counts 1 and 2 are removed.
+  assert.equal(grid[0], valueMask(3) | valueMask(4));
 });
 
 await runTest('ChaosCount maps the control value through the shape value offset', () => {
@@ -983,7 +1058,20 @@ await runTest('ChaosArrow prunes unsupported total counts', () => {
   const handler = makeShardArrow(context, 0, [[0, 1], [0, 4]]);
 
   assert.equal(handler.enforceConsistency(grid, createAccumulator()), true);
-  assert.equal(grid[0], valueMask(1, 2, 3));
+  // Corner start 0 is enclosed by its two arms (to 1 and 4), so its same-region
+  // neighbour is on an arm and the run length is >= 2: length 1 is ruled out.
+  assert.equal(grid[0], valueMask(2, 3));
+});
+
+await runTest('ChaosArrow keeps length 1 when the start is not enclosed', () => {
+  // Start 5 (interior) has four neighbours but only two arms (up to 1, left to 4),
+  // so its same-region neighbour may be off-arm — length 1 stays possible.
+  const context = makeChaosContext('4x4');
+  const { grid } = context;
+  const handler = makeShardArrow(context, 0, [[5, 1], [5, 4]]);
+
+  assert.equal(handler.enforceConsistency(grid, createAccumulator()), true);
+  assert.notEqual(grid[0] & valueMask(1), 0);
 });
 
 await runTest('ChaosArrow maps the control value through the shape value offset', () => {
