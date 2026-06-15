@@ -460,7 +460,7 @@ export class CellGraph {
 
   diagonal(cell, dir0, dir1) {
     const cell1 = this._graph[cell][dir0];
-    return cell1 && this._graph[cell1][dir1];
+    return cell1 === null ? null : this._graph[cell1][dir1];
   }
 
   neighborCountIn(cell, cellSet) {

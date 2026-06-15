@@ -473,6 +473,17 @@ await runTest('CellGraph.diagonal returns null at edge', () => {
   assert.equal(graph.diagonal(corner, CellGraph.LEFT, CellGraph.UP), null);
 });
 
+await runTest('CellGraph.diagonal handles cell index 0 as intermediate', () => {
+  const shape = GridShape.fromGridSize(9);
+  const graph = shape.cellGraph();
+  // From R2C1 the up-right diagonal steps through R1C1 (cell index 0), which
+  // is a valid cell and must not be treated as falsy.
+  const cell = shape.cellIndex(1, 0);
+  assert.equal(graph.diagonal(cell, CellGraph.UP, CellGraph.RIGHT), shape.cellIndex(0, 1));
+  // The up-left diagonal from the same cell is off-grid and should be null.
+  assert.equal(graph.diagonal(cell, CellGraph.UP, CellGraph.LEFT), null);
+});
+
 await runTest('CellGraph.cellPosition returns grid row, col, and origin', () => {
   const shape = GridShape.fromGridSize(9);
   const graph = shape.cellGraph();
