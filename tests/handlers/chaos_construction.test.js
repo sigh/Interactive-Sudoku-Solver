@@ -713,7 +713,25 @@ await runTest('ChaosConstruction rechecks connectivity on fully fixed regions', 
 
   assert.equal(handler._rebuildShards(grid, acc), true);
   assert.equal(handler._scanRegionCandidates(grid), true);
+  // Even with the incremental dirty tracking cleared, a complete partition must
+  // still be fully connectivity-checked before it can be accepted.
   handler._connectivityDirtyRegionsMask = 0;
+
+  assert.equal(enforce(context).result, false);
+});
+
+await runTest('ChaosConstruction rejects a fully fixed but disconnected grid', () => {
+  // End-to-end (no internal poking): a complete grid whose region 1 is the three
+  // non-adjacent cells {0, 2, 6} must be rejected as disconnected.
+  const context = makeChaosContext('3x3');
+  const { grid, regionCells } = context;
+  const regions = [1, 2, 1, 2, 2, 3, 1, 3, 3];
+  const values = [1, 1, 2, 2, 3, 1, 3, 2, 3];
+
+  for (let cell = 0; cell < regions.length; cell++) {
+    grid[cell] = valueMask(values[cell]);
+    grid[regionCells[cell]] = valueMask(regions[cell]);
+  }
 
   assert.equal(enforce(context).result, false);
 });
