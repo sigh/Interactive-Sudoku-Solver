@@ -101,8 +101,8 @@ previous one, and the final (most expensive) phase must not run on stale input.
 function enforceConsistency(grid):
     dirtyRegions ← ∅
     if not enforceCanonicalOrder(grid):       return CONTRADICTION   # §4
-    if not enforceRegionShards(grid):         return CONTRADICTION   # §5
-    result ← enforceShardConsistency(grid)                           # §6
+    if not rebuildShards(grid):                return CONTRADICTION   # §5
+    result ← enforceShardHouseRules(grid)                            # §6
     if result = CONTRADICTION:                 return CONTRADICTION
     if result = DEFER_CONNECTIVITY:            return OK             # re-enter later
     if not enforceConnectivity(grid):          return CONTRADICTION   # §7
@@ -164,7 +164,7 @@ rebuilds the summaries the later phases read.
 ### 5.1 Absorbing adjacent fixed cells
 
 ```text
-function updateFixedRegionShards(grid):
+function mergeAdjacentFixedRegions(grid):
     for each cell c with a fixed region label r:
         for nb in {right(c), down(c)}:               # right/down avoids double work
             if nb exists and grid[regionCell(nb)] = r:
@@ -174,14 +174,19 @@ function updateFixedRegionShards(grid):
 Two orthogonally adjacent cells fixed to the same label are necessarily part of
 the same connected region, so merging them loses nothing.
 
-### 5.2 Rebuilding shard summaries
+### 5.2 Rebuilding shard summaries and the region intersection
 
-A single index-order pass flattens the forest, threads member lists, and
-accumulates per-shard summaries. It also performs two immediate contradiction
-checks.
+A single index-order pass flattens the forest, threads member lists, accumulates
+per-shard summaries, *and* tightens each shard's region label. Because all cells
+of a shard share one region, their region masks must agree; the shared candidate
+set is their intersection. Rather than a second member walk, the intersection is
+accumulated **in place** at the root's region cell as each member is visited, and
+any root that gets tightened is recorded for the write-back of §5.3. Single-cell
+shards take the root branch only, so they add no work here.
 
 ```text
 function rebuildShardSummaries(grid):
+    constrained ← empty list
     for c in 0 … N−1:
         r ← shardRoots[c]
         if c = r:                                     # c is its own root
@@ -191,31 +196,42 @@ function rebuildShardSummaries(grid):
             r ← shardRoots[r]                         # parent already flattened
             shardRoots[c] ← r                         # path-compress
             prepend c to memberList[r]
+            # Fold the member into the shard's running region intersection, which
+            # is kept directly in grid[regionCell(r)].
+            if grid[regionCell(c)] ≠ grid[regionCell(r)]:    # member disagrees
+                inter ← grid[regionCell(r)] ∧ grid[regionCell(c)]
+                if inter ≠ grid[regionCell(r)]:              # it narrows the shard
+                    if inter = 0: return CONTRADICTION
+                    grid[regionCell(r)] ← inter
+                append r to constrained                       # (skip if already the tail)
         size[r] ← size[r] + 1
-        if size[r] > s: return false                  # region would overflow
+        if size[r] > s: return CONTRADICTION          # region would overflow
         valueMask[r] ← valueMask[r] | grid[c]
         if grid[c] is a single value v:
-            if v ∈ fixedValueMask[r]: return false    # two cells fix the same value
+            if v ∈ fixedValueMask[r]: return CONTRADICTION   # two cells fix the same value
             fixedValueMask[r] ← fixedValueMask[r] | v
-    return true
+    return constrained
 ```
 
-### 5.3 Intersecting region labels within a shard
+A single forward pass yields the full intersection because members only ever
+*narrow* it: a member that disagrees with the running intersection either has
+fewer labels (narrowing it now) or extra labels (which the write-back trims), and
+either way its root is recorded. Recording is deduplicated cheaply against the
+list's tail, so a run of adjacent members of one shard collapses to one entry; a
+rare straggler that slips through is harmless because the §5.3 write-back is
+idempotent.
 
-All cells of a shard share one region, so their region masks must agree. Their
-intersection is the set of labels still possible for the whole shard.
+### 5.3 Propagating the shared region mask
 
 ```text
-function tightenShardRegionMasks(grid):
-    for each shard with ≥ 2 members:
-        inter ← AND of grid[regionCell(m)] over members m
-        if inter = 0: return false
-        if inter ≠ (OR of those masks):               # some member had extra labels
-            set grid[regionCell(m)] ← inter for every member m
-    return true
+function applyShardRegionMasks(grid, constrained):
+    for each root r in constrained:
+        set grid[regionCell(m)] ← grid[regionCell(r)] for every member m
 ```
 
-`enforceRegionShards` runs §5.1, §5.2, then §5.3.
+Only shards whose members disagreed are rewritten; shards already in agreement
+(and all single-cell shards) are never visited. `rebuildShards` runs §5.1,
+then the combined §5.2/§5.3.
 
 ## 6. Phase 2b — Shard / House Consistency
 
@@ -351,7 +367,7 @@ optional shard contributes its size to the path cost), with budget
 `maxExtra = s − fixedSize`.
 
 ```text
-function traverseFixedComponent(grid, shardMask, r, fixedSize, coreRoot):
+function growComponentFromCore(grid, shardMask, r, fixedSize, coreRoot):
     budget ← s − fixedSize
     bucket[0] ← {coreRoot}; mark coreRoot visited
     reachedFixed ← size[coreRoot]; componentSize ← fixedSize
@@ -376,10 +392,10 @@ function traverseFixedComponent(grid, shardMask, r, fixedSize, coreRoot):
 Then:
 
 ```text
-componentSize ← traverseFixedComponent(...)
+componentSize ← growComponentFromCore(...)
 if componentSize = DISCONNECTED or componentSize < s: return false
 remove r from every shard not visited                 # unreachable ⇒ not in r
-if componentSize > s: componentSize ← pruneValueConflicts(...)   # §7.3
+if componentSize > s: componentSize ← pruneValueInfeasibleShards(...)   # §7.3
 if componentSize < s: return false
 if componentSize = s: fix every visited optional shard to r       # region determined
 ```
@@ -400,7 +416,7 @@ region if *no* component can, and prune components that are too small.
 for each maximal connected component C of shards with r in their mask:
     if size(C) < s:
         remove r from every shard in C
-    else if pruneValueConflicts(C) still ≥ s:
+    else if pruneValueInfeasibleShards(C) still ≥ s:
         mark "a viable component exists"
     else:
         remove r from every shard in C
@@ -416,7 +432,7 @@ shards (no two sharing a fixed value, none clashing with the core's fixed values
 can reach size `s` while including it.
 
 ```text
-function pruneValueConflicts(component, base):
+function pruneValueInfeasibleShards(component, base):
     for each shard u in component that fixes some value:
         feasible ← size(base)
         for each shard w in component:
@@ -439,7 +455,7 @@ component has no door it is trapped (contradiction); if it has exactly one door,
 every completion must use it, so that door is forced into the region.
 
 ```text
-function enforceBottlenecks(grid, shardMask, regions):
+function forceComponentDoors(grid, shardMask, regions):
     for each region r in regions:
         for each maximal connected fixed component C of region r:
             if size(C) ≥ s: continue

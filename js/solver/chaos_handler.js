@@ -14,7 +14,8 @@ const cellsAreAdjacent = (cellA, cellB, numCols) => {
   return delta === numCols || (delta === 1 && (cellA / numCols | 0) === (cellB / numCols | 0));
 };
 
-const mergeRegionShardRoots = (roots, offset, cellA, cellB) => {
+// Union-find union: merges cellA and cellB's shards, keeping the smaller index as root.
+const unionShardRoots = (roots, offset, cellA, cellB) => {
   let rootA = roots[offset + cellA];
   let rootB = roots[offset + cellB];
   if (rootA === rootB) return false;
@@ -39,8 +40,9 @@ class ChaosRegionShardState {
     this._regionShardOffset = regionShardOffset;
   }
 
+  // Merge the shards of cellA and cellB, queuing their region cells if they changed.
   merge(grid, cellA, cellB, handlerAccumulator = null) {
-    if (!mergeRegionShardRoots(grid, this._regionShardOffset, cellA, cellB)) return false;
+    if (!unionShardRoots(grid, this._regionShardOffset, cellA, cellB)) return false;
     if (handlerAccumulator) {
       handlerAccumulator.addForCell(this._regionCellOffset + cellA);
       handlerAccumulator.addForCell(this._regionCellOffset + cellB);
@@ -49,7 +51,7 @@ class ChaosRegionShardState {
   }
 
   // Return the current representative for a physical same-region shard.
-  root(grid, cell) {
+  findRoot(grid, cell) {
     const offset = this._regionShardOffset;
     let root = grid[offset + cell];
     while (root !== cell) {
@@ -98,7 +100,8 @@ export class ChaosConstruction extends SudokuConstraintHandler {
     return this._regionShardState;
   }
 
-  _selectPriorityAnchorCells(shape, cellPriorities) {
+  // Picks up to three well-separated, high-priority edge cells to pre-seed region labels 0,1,2.
+  _chooseCanonicalAnchors(shape, cellPriorities) {
     if (this._numRegions < 3 || this._numGridCells < 3) return [0];
 
     const { numRows, numCols, numValues } = shape;
@@ -213,7 +216,7 @@ export class ChaosConstruction extends SudokuConstraintHandler {
     for (const link of this._regionLinks) {
       const root = link[0];
       for (let i = 1; i < link.length; i++) {
-        this._mergeRegionShards(regionShardRoots, root, link[i]);
+        unionShardRoots(regionShardRoots, this._regionShardOffset, root, link[i]);
       }
     }
     this._regionShardOffset = stateAllocator.allocate(regionShardRoots);
@@ -244,7 +247,7 @@ export class ChaosConstruction extends SudokuConstraintHandler {
 
   selectPriorityAnchorCells(shape, cellPriorities) {
     this._configureShape(shape);
-    const anchorCells = this._selectPriorityAnchorCells(shape, cellPriorities);
+    const anchorCells = this._chooseCanonicalAnchors(shape, cellPriorities);
     const numAnchors = Math.min(anchorCells.length, this._numRegions);
     this._canonicalAnchorCells = anchorCells.slice(0, numAnchors);
   }
@@ -253,6 +256,7 @@ export class ChaosConstruction extends SudokuConstraintHandler {
     return 2;
   }
 
+  // Returns a fresh generation stamp for _visitMarks; resets marks on overflow.
   _nextVisitId() {
     this._visitId++;
     if (this._visitId === this.constructor._NO_CELL) {
@@ -262,7 +266,8 @@ export class ChaosConstruction extends SudokuConstraintHandler {
     return this._visitId;
   }
 
-  _setRegionShardMask(grid, root, mask, handlerAccumulator) {
+  // Writes mask to every member of a shard's region cell, queuing changed cells.
+  _writeShardRegion(grid, root, mask, handlerAccumulator) {
     const regionCellOffset = this._regionCellOffset;
     const nextCells = this._regionShardNextCells;
     const noCell = this.constructor._NO_CELL;
@@ -276,7 +281,8 @@ export class ChaosConstruction extends SudokuConstraintHandler {
     }
   }
 
-  _removeConnectivityShardRegion(shardMasks, root, regionBit) {
+  // Removes regionBit from a shard's scratch mask; if the shard becomes fixed, records it.
+  _dropShardRegion(shardMasks, root, regionBit) {
     // Connectivity only removes labels from roots with at least one other candidate.
     const oldMask = shardMasks[root];
     const newMask = oldMask & ~regionBit;
@@ -285,21 +291,23 @@ export class ChaosConstruction extends SudokuConstraintHandler {
     // A removal that leaves a single candidate newly fixes this shard to that
     // region; keep the per-region fixed weight that later labels rely on current.
     if (newMask && !(newMask & (newMask - 1))) {
-      this._addConnectivityFixedShard(31 - Math.clz32(newMask), root);
+      this._recordFixedShard(31 - Math.clz32(newMask), root);
     }
   }
 
-  _setConnectivityShardRegion(shardMasks, root, regionBit) {
+  // Forces a shard's scratch mask to exactly regionBit; records the shard as fixed.
+  _fixShardRegion(shardMasks, root, regionBit) {
     const oldMask = shardMasks[root];
     this._connectivityDirtyRegionsMask |= oldMask;
     shardMasks[root] = regionBit;
     // Forcing a multi-candidate shard newly fixes it to the region.
     if (oldMask !== regionBit) {
-      this._addConnectivityFixedShard(31 - Math.clz32(regionBit), root);
+      this._recordFixedShard(31 - Math.clz32(regionBit), root);
     }
   }
 
-  _addConnectivityFixedShard(region, root) {
+  // Adds a newly fixed shard's weight to its region and updates the lowest-index seed root.
+  _recordFixedShard(region, root) {
     // Fixed shards are never un-fixed within a connectivity pass, so the weight
     // only grows. The seed must stay the lowest-index fixed root so the
     // distance-bounded traversal (and its boundary pruning) matches the order an
@@ -313,14 +321,12 @@ export class ChaosConstruction extends SudokuConstraintHandler {
     }
   }
 
-  _mergeRegionShards(grid, cellA, cellB) {
-    mergeRegionShardRoots(grid, this._regionShardOffset, cellA, cellB);
-  }
-
-  _updateFixedRegionShards(grid) {
+  // Unions right- and down-neighbours that are fixed to the same region label into one shard.
+  _mergeAdjacentFixedRegions(grid) {
     const noCell = this.constructor._NO_CELL;
     const neighbors = this._neighbors;
     const regionCellOffset = this._regionCellOffset;
+    const shardOffset = this._regionShardOffset;
 
     // Adjacent cells fixed to the same region label are already one connected
     // part of that final region.
@@ -331,18 +337,20 @@ export class ChaosConstruction extends SudokuConstraintHandler {
       const neighborOffset = cell << 2;
       const right = neighbors[neighborOffset + 1];
       if (right !== noCell && grid[regionCellOffset + right] === regionMask) {
-        this._mergeRegionShards(grid, cell, right);
+        unionShardRoots(grid, shardOffset, cell, right);
       }
       const down = neighbors[neighborOffset + 3];
       if (down !== noCell && grid[regionCellOffset + down] === regionMask) {
-        this._mergeRegionShards(grid, cell, down);
+        unionShardRoots(grid, shardOffset, cell, down);
       }
     }
   }
 
-  _enforceRegionShards(grid, handlerAccumulator) {
+  // Phase 2a: merges fixed neighbours, flattens the shard forest, rebuilds summaries,
+  // and tightens each shard's region mask to the intersection of its members' masks.
+  _rebuildShards(grid, handlerAccumulator) {
     // Phase 1: materialize same-region facts into shards and rebuild summaries.
-    this._updateFixedRegionShards(grid);
+    this._mergeAdjacentFixedRegions(grid);
 
     const regionCellOffset = this._regionCellOffset;
     const shardSizes = this._regionShardSizes;
@@ -350,13 +358,16 @@ export class ChaosConstruction extends SudokuConstraintHandler {
     const shardFixedValueMasks = this._regionShardFixedValueMasks;
     const shardRestrictedValueFlags = this._regionShardRestrictedValueFlags;
     const nextCells = this._regionShardNextCells;
-    const multiCellRoots = this._componentStack;
+    const constrainedRoots = this._componentStack;
     const noCell = this.constructor._NO_CELL;
     const shardOffset = this._regionShardOffset;
-    let multiCellRootCount = 0;
+    let constrainedCount = 0;
 
     // Roots only move toward lower indexes, so a non-root's parent has already
-    // been flattened to the true root in this scan.
+    // been flattened to the true root in this scan. A member folds its region
+    // candidates into the root's running intersection, which lives directly in the
+    // grid; a root is recorded only when a member actually narrows it. Single-cell
+    // shards take the root branch only, so they cost nothing here.
     for (let cell = 0; cell < this._numGridCells; cell++) {
       let root = grid[shardOffset + cell];
       shardSizes[cell] = 0;
@@ -370,11 +381,29 @@ export class ChaosConstruction extends SudokuConstraintHandler {
         grid[shardOffset + cell] = root;
         nextCells[cell] = nextCells[root];
         nextCells[root] = cell;
+
+        const rootRegionCell = regionCellOffset + root;
+        const currentRegionMask = grid[rootRegionCell];
+        const memberMask = grid[regionCellOffset + cell];
+        // A member disagreeing with the running intersection means the shard needs
+        // a rewrite (the member loses bits, or it narrows the others, or both).
+        if (memberMask !== currentRegionMask) {
+          const newRegionMask = currentRegionMask & memberMask;
+          if (newRegionMask !== currentRegionMask) {
+            if (!newRegionMask) return false;
+            grid[rootRegionCell] = newRegionMask;        // the root itself narrowed
+            handlerAccumulator.addForCell(rootRegionCell);
+          }
+          // Record the root for write-back. The back-of-list check elides the
+          // common run of adjacent same-shard members.
+          if (!constrainedCount || constrainedRoots[constrainedCount - 1] !== root) {
+            constrainedRoots[constrainedCount++] = root;
+          }
+        }
       }
       const shardSize = shardSizes[root] + 1;
       if (shardSize > this._regionSize) return false;
       shardSizes[root] = shardSize;
-      if (shardSize === 2) multiCellRoots[multiCellRootCount++] = root;
 
       const cellValues = grid[cell];
       shardValueMasks[root] |= cellValues;
@@ -385,26 +414,17 @@ export class ChaosConstruction extends SudokuConstraintHandler {
       }
     }
 
-    for (let rootIndex = 0; rootIndex < multiCellRootCount; rootIndex++) {
-      const root = multiCellRoots[rootIndex];
-      const rootRegionMask = grid[regionCellOffset + root];
-      let regionMask = rootRegionMask;
-      let regionUnionMask = rootRegionMask;
-      for (let cell = nextCells[root]; cell !== noCell; cell = nextCells[cell]) {
-        const cellRegionMask = grid[regionCellOffset + cell];
-        regionMask &= cellRegionMask;
-        regionUnionMask |= cellRegionMask;
-      }
-      if (!regionMask) return false;
-      if (regionUnionMask !== regionMask) {
-        this._setRegionShardMask(grid, root, regionMask, handlerAccumulator);
-      }
+    // Propagate each narrowed intersection to the shard's members.
+    for (let i = 0; i < constrainedCount; i++) {
+      const root = constrainedRoots[i];
+      this._writeShardRegion(grid, root, grid[regionCellOffset + root], handlerAccumulator);
     }
 
     return true;
   }
 
-  _collectRegionShardComponent(grid, shardMasks, startRoot, regionBit, visitId) {
+  // BFS over shards reachable from startRoot for regionBit; returns total cell weight.
+  _collectShardComponent(grid, shardMasks, startRoot, regionBit, visitId) {
     const noCell = this.constructor._NO_CELL;
     const neighbors = this._neighbors;
     const shardOffset = this._regionShardOffset;
@@ -442,7 +462,9 @@ export class ChaosConstruction extends SudokuConstraintHandler {
     return componentSize;
   }
 
-  _traverseFixedRegionShardComponent(
+  // Distance-bounded BFS from the fixed core; prunes shards too far to fit and returns
+  // the reachable optional-cell weight (0 if the fixed shards are not all connected).
+  _growComponentFromCore(
     grid, shardMasks, regionBit, fixedSize, startRoot, visitId) {
     const noCell = this.constructor._NO_CELL;
     const neighbors = this._neighbors;
@@ -488,7 +510,7 @@ export class ChaosConstruction extends SudokuConstraintHandler {
               if (neighborDistance > maxExtraSize) {
                 // A path that enters a shard must reserve the whole shard, even
                 // when it only needs to pass through one of its cells.
-                this._removeConnectivityShardRegion(shardMasks, neighborRoot, regionBit);
+                this._dropShardRegion(shardMasks, neighborRoot, regionBit);
                 continue;
               }
             }
@@ -512,7 +534,9 @@ export class ChaosConstruction extends SudokuConstraintHandler {
     return componentSize;
   }
 
-  _pruneConnectivityValueConflicts(
+  // Removes shards from the component that cannot fit in any valid size-s selection
+  // with distinct fixed values; returns the remaining cell weight.
+  _pruneValueInfeasibleShards(
     shardMasks, regionBit, componentRootCount, componentSize, baseSize, baseFixedValueMask) {
     const stack = this._componentStack;
     const shardSizes = this._regionShardSizes;
@@ -536,7 +560,7 @@ export class ChaosConstruction extends SudokuConstraintHandler {
       }
 
       if (compatibleSize < regionSize) {
-        this._removeConnectivityShardRegion(shardMasks, root, regionBit);
+        this._dropShardRegion(shardMasks, root, regionBit);
         remainingComponentSize -= shardSizes[root];
       }
     }
@@ -544,7 +568,9 @@ export class ChaosConstruction extends SudokuConstraintHandler {
     return remainingComponentSize;
   }
 
-  _enforceFixedComponentBottlenecks(grid, shardMasks, checkRegionsMask) {
+  // For each undersized fixed component, forces its single exit shard into the region;
+  // returns false if any component has no exit (contradiction).
+  _forceComponentDoors(grid, shardMasks, checkRegionsMask) {
     const noCell = this.constructor._NO_CELL;
     const numGridCells = this._numGridCells;
     const neighbors = this._neighbors;
@@ -619,13 +645,15 @@ export class ChaosConstruction extends SudokuConstraintHandler {
 
       for (let i = 0; i < forcedCount; i++) {
         const root = stack[numGridCells - i - 1];
-        this._setConnectivityShardRegion(shardMasks, root, regionBit);
+        this._fixShardRegion(shardMasks, root, regionBit);
       }
     }
 
     return true;
   }
 
+  // Accumulates per-region fixed weight, possible weight, and value mask into _regionScanData;
+  // marks dirty regions where possible weight changed since the last stable scan.
   _scanRegionCandidates(grid) {
     const regionScanData = this._regionScanData;
     const fixedValueMasks = this._fixedValueMasks;
@@ -697,6 +725,8 @@ export class ChaosConstruction extends SudokuConstraintHandler {
     return true;
   }
 
+  // Phase 1: restricts region labels so label k may first appear only after label k−1,
+  // breaking the label-permutation symmetry (§4 in CHAOS_CONSTRUCTION.md).
   _enforceCanonicalOrder(grid, handlerAccumulator) {
     const regionCellOffset = this._regionCellOffset;
     const regionMask = this._regionMask;
@@ -721,6 +751,8 @@ export class ChaosConstruction extends SudokuConstraintHandler {
     return true;
   }
 
+  // Phase 3: for each dirty region, prunes shards that cannot reach a connected s-cell
+  // component, forces uniquely-determined components, and checks door bottlenecks.
   _enforceConnectivity(grid, handlerAccumulator) {
     // Phase 3: connectivity runs on the current shard graph for dirty labels only.
     const numGridCells = this._numGridCells;
@@ -759,7 +791,7 @@ export class ChaosConstruction extends SudokuConstraintHandler {
         const fixedRoot = firstFixedRootByRegion[region];
         // Fixed shards choose the component. Everything outside it loses this
         // region label; exact-size components are forced.
-        const componentSize = this._traverseFixedRegionShardComponent(
+        const componentSize = this._growComponentFromCore(
           grid, shardMasks, regionBit, fixedSize, fixedRoot, visitId);
         if (componentSize < regionSize) return false;
         const componentRootCount = this._componentStackSize;
@@ -769,12 +801,12 @@ export class ChaosConstruction extends SudokuConstraintHandler {
         for (let root = 0; root < numGridCells; root++) {
           if (!shardSizes[root] || !(shardMasks[root] & regionBit)) continue;
           if (visitMarks[root] !== visitId) {
-            this._removeConnectivityShardRegion(shardMasks, root, regionBit);
+            this._dropShardRegion(shardMasks, root, regionBit);
           }
         }
 
         if (remainingComponentSize > regionSize) {
-          remainingComponentSize = this._pruneConnectivityValueConflicts(
+          remainingComponentSize = this._pruneValueInfeasibleShards(
             shardMasks, regionBit, componentRootCount, componentSize, fixedSize, fixedValueMask);
         }
 
@@ -783,7 +815,7 @@ export class ChaosConstruction extends SudokuConstraintHandler {
           for (let i = 0; i < componentRootCount; i++) {
             const root = stack[i];
             if (!(shardMasks[root] & regionBit)) continue;
-            this._setConnectivityShardRegion(shardMasks, root, regionBit);
+            this._fixShardRegion(shardMasks, root, regionBit);
           }
         }
       } else {
@@ -796,12 +828,12 @@ export class ChaosConstruction extends SudokuConstraintHandler {
           if (!(shardMasks[startRoot] & regionBit)) continue;
           if (visitMarks[startRoot] === visitId) continue;
 
-          const componentSize = this._collectRegionShardComponent(
+          const componentSize = this._collectShardComponent(
             grid, shardMasks, startRoot, regionBit, visitId);
           const componentRootCount = this._componentStackSize;
 
           if (componentSize >= regionSize) {
-            const remainingComponentSize = this._pruneConnectivityValueConflicts(
+            const remainingComponentSize = this._pruneValueInfeasibleShards(
               shardMasks, regionBit, componentRootCount, componentSize, 0, 0);
 
             if (remainingComponentSize >= regionSize) {
@@ -810,12 +842,12 @@ export class ChaosConstruction extends SudokuConstraintHandler {
               for (let i = 0; i < componentRootCount; i++) {
                 const root = stack[i];
                 if (!(shardMasks[root] & regionBit)) continue;
-                this._removeConnectivityShardRegion(shardMasks, root, regionBit);
+                this._dropShardRegion(shardMasks, root, regionBit);
               }
             }
           } else {
             for (let i = 0; i < componentRootCount; i++) {
-              this._removeConnectivityShardRegion(shardMasks, stack[i], regionBit);
+              this._dropShardRegion(shardMasks, stack[i], regionBit);
             }
           }
         }
@@ -838,16 +870,18 @@ export class ChaosConstruction extends SudokuConstraintHandler {
         bottleneckRegionsMask |= (1 << region);
       }
     }
-    if (!this._enforceFixedComponentBottlenecks(grid, shardMasks, bottleneckRegionsMask)) return false;
+    if (!this._forceComponentDoors(grid, shardMasks, bottleneckRegionsMask)) return false;
 
     for (let root = 0; root < numGridCells; root++) {
       if (!shardSizes[root] || shardMasks[root] === grid[regionCellOffset + root]) continue;
-      this._setRegionShardMask(grid, root, shardMasks[root], handlerAccumulator);
+      this._writeShardRegion(grid, root, shardMasks[root], handlerAccumulator);
     }
 
     return true;
   }
 
+  // When a region's active value set equals s, places any value confined to one cell
+  // and fixes that cell's shard; returns true if a placement fired (caller must rescan).
   _enforceHiddenRegionValueSingles(
     grid, handlerAccumulator, checkRegionsMask, restrictedRegionsMask, hiddenDuplicateValueMasks) {
     // Apply at most one precomputed shard-level witness after confirming the member cell.
@@ -897,7 +931,7 @@ export class ChaosConstruction extends SudokuConstraintHandler {
           handlerAccumulator.addForCell(cell);
           changed = true;
         }
-        if (regionChanged) this._setRegionShardMask(grid, root, regionBit, handlerAccumulator);
+        if (regionChanged) this._writeShardRegion(grid, root, regionBit, handlerAccumulator);
         if (changed || regionChanged) return true;
       }
     }
@@ -905,7 +939,9 @@ export class ChaosConstruction extends SudokuConstraintHandler {
     return false;
   }
 
-  _enforceRegionShardConsistency(grid, handlerAccumulator) {
+  // Phase 2b: fixed-point loop — scan shard summaries, apply size/value/full-region
+  // pruning rules, then attempt a hidden-region-value single (§6 in CHAOS_CONSTRUCTION.md).
+  _enforceShardHouseRules(grid, handlerAccumulator) {
     // Phase 2: scan summaries, prune shard labels, then use stable witnesses.
     const regionScanData = this._regionScanData;
     const fixedValueMasks = this._fixedValueMasks;
@@ -1002,7 +1038,7 @@ export class ChaosConstruction extends SudokuConstraintHandler {
 
           if (!keepMask) return false;
           if (keepMask === regionMask) continue;
-          this._setRegionShardMask(grid, root, keepMask, handlerAccumulator);
+          this._writeShardRegion(grid, root, keepMask, handlerAccumulator);
           changed = true;
         }
       }
@@ -1024,9 +1060,9 @@ export class ChaosConstruction extends SudokuConstraintHandler {
 
     // Phase order keeps derived summaries local and avoids stale connectivity input.
     if (!this._enforceCanonicalOrder(grid, handlerAccumulator)) return false;
-    if (!this._enforceRegionShards(grid, handlerAccumulator)) return false;
+    if (!this._rebuildShards(grid, handlerAccumulator)) return false;
 
-    const shardConsistencyResult = this._enforceRegionShardConsistency(grid, handlerAccumulator);
+    const shardConsistencyResult = this._enforceShardHouseRules(grid, handlerAccumulator);
     if (!shardConsistencyResult) return false;
     if (shardConsistencyResult === DEFER_CONNECTIVITY) {
       return true;
@@ -1160,7 +1196,7 @@ export class ChaosArrow extends SudokuConstraintHandler {
   _updateRunSupportMasks(grid, controlMask) {
     const maxControlLength = LookupTables.maxValue(controlMask);
     const shardState = this._regionShardState;
-    const startRoot = shardState.root(grid, this._regionRunArms[0][0]);
+    const startRoot = shardState.findRoot(grid, this._regionRunArms[0][0]);
     let regions = grid[this._regionArms[0][0]];
     // Same-shard prefixes are already forced to share a region. Their region
     // mask intersection gives a lower bound and removes impossible labels up front.
@@ -1169,7 +1205,7 @@ export class ChaosArrow extends SudokuConstraintHandler {
       const regionArm = this._regionArms[armIndex];
       let minLength = 1;
       let minRegionMask = grid[regionArm[0]];
-      while (minLength < runArm.length && shardState.root(grid, runArm[minLength]) === startRoot) {
+      while (minLength < runArm.length && shardState.findRoot(grid, runArm[minLength]) === startRoot) {
         minRegionMask &= grid[regionArm[minLength]];
         minLength++;
       }
