@@ -20,7 +20,7 @@ const NO_CELL = 0xffff;
 // Orthogonal-neighbour lookup: neighbors[cell * 4 + dir] is the neighbouring cell
 // in direction dir (0 left, 1 right, 2 up, 3 down), or NO_CELL at the grid edge.
 // Memoized by grid dimensions so it is built once and shared across handlers.
-const neighborTable = memoize((numRows, numCols) => {
+export const neighborTable = memoize((numRows, numCols) => {
   const numCells = numRows * numCols;
   const neighbors = new Uint16Array(numCells * 4).fill(NO_CELL);
   for (let cell = 0; cell < numCells; cell++) {
@@ -34,6 +34,20 @@ const neighborTable = memoize((numRows, numCols) => {
   }
   return neighbors;
 });
+
+// Returns `cell`'s in-grid orthogonal neighbours when every one of them is in
+// `cellSet` (the cell is "enclosed"), otherwise null.
+export const enclosingNeighbors = (neighborTable, cell, cellSet) => {
+  const base = cell * 4;
+  const neighbors = [];
+  for (let dir = 0; dir < 4; dir++) {
+    const neighbor = neighborTable[base + dir];
+    if (neighbor === NO_CELL) continue;
+    if (!cellSet.has(neighbor)) return null;
+    neighbors.push(neighbor);
+  }
+  return neighbors;
+};
 
 // Union-find union: merges cellA and cellB's shards, keeping the smaller index as root.
 const unionShardRoots = (roots, offset, cellA, cellB) => {
@@ -1159,12 +1173,8 @@ export class ChaosArrow extends SudokuConstraintHandler {
     for (const arm of this._regionRunArms) {
       if (arm.length >= 2) armSteps.add(arm[1]);
     }
-    const base = this._regionRunArms[0][0] << 2;
-    let enclosed = true;
-    for (let dir = 0; dir < 4; dir++) {
-      const neighbor = neighbors[base + dir];
-      if (neighbor !== NO_CELL && !armSteps.has(neighbor)) { enclosed = false; break; }
-    }
+    const enclosed = enclosingNeighbors(
+      neighbors, this._regionRunArms[0][0], armSteps) !== null;
 
     // Keep only feasible run lengths [minLength, maxValueCount]
     const minLength = enclosed ? 2 : 1;
@@ -1416,18 +1426,11 @@ export class ChaosCount extends SudokuConstraintHandler {
     const neighbors = neighborTable(shape.numRows, shape.numCols);
     const counted = new Set(regionRunCells);
     const regionCellOffset = this._regionCells[0] - regionRunCells[0];
-    const base = regionRunCells[0] << 2;
-    const neighborCells = [];
-    let enclosed = true;
-    for (let dir = 0; dir < 4; dir++) {
-      const neighbor = neighbors[base + dir];
-      if (neighbor === NO_CELL) continue;
-      if (!counted.has(neighbor)) { enclosed = false; break; }
-      neighborCells.push(neighbor + regionCellOffset);
-    }
-    this._firstCellEnclosed = enclosed;
-    this._firstCellNeighbors = Uint16Array.from(enclosed ? neighborCells : []);
-    const minCount = enclosed ? 2 : 1;
+    const enclosingCells = enclosingNeighbors(neighbors, regionRunCells[0], counted);
+    this._firstCellEnclosed = enclosingCells !== null;
+    this._firstCellNeighbors = Uint16Array.from(
+      enclosingCells ? enclosingCells.map(c => c + regionCellOffset) : []);
+    const minCount = this._firstCellEnclosed ? 2 : 1;
 
     // Keep only the feasible counts [minCount, maxCount].
     const loBit = Math.max(0, minCount - 1 - this._offset);

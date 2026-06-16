@@ -131,7 +131,8 @@ await runTest('_addChaosRegionShardSources attaches ChaosArrow lines', () => {
   grid[regionCells[5]] = valueMask(2);
 
   const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
-  optimizer._addChaosRegionShardSources(handlerSet, shape, LookupTables.get(shape.numValues).allValues);
+  optimizer._optimizeChaosConstruction(
+    handlerSet, shape, LookupTables.get(shape.numValues).allValues);
 
   chaosHandler.selectPriorityAnchorCells(shape, new Int32Array(shape.totalCells()));
   const stateAllocator = createStateAllocator(grid, shape.totalCells());
@@ -159,7 +160,8 @@ await runTest('_addChaosRegionShardSources attaches multi-arm guaranteed prefixe
   grid[regionCells[5]] = valueMask(2);
 
   const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
-  optimizer._addChaosRegionShardSources(handlerSet, shape, LookupTables.get(shape.numValues).allValues);
+  optimizer._optimizeChaosConstruction(
+    handlerSet, shape, LookupTables.get(shape.numValues).allValues);
 
   chaosHandler.selectPriorityAnchorCells(shape, new Int32Array(shape.totalCells()));
   const stateAllocator = createStateAllocator(grid, shape.totalCells());

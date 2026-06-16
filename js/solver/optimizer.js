@@ -79,8 +79,7 @@ export class SudokuConstraintOptimizer {
 
     this._optimizeFullRank(handlerSet, shape);
 
-    this._addChaosFixedValueRegionExclusions(handlerSet, shape);
-    this._addChaosRegionShardSources(handlerSet, shape, effectiveValueInfo.mask);
+    this._optimizeChaosConstruction(handlerSet, shape, effectiveValueInfo.mask);
 
     this._optimizeRequiredValues(handlerSet, cellExclusions, shape);
 
@@ -162,14 +161,30 @@ export class SudokuConstraintOptimizer {
     }
   }
 
-  _addChaosFixedValueRegionExclusions(handlerSet, shape) {
-    if (handlerSet.getAllofType(ChaosHandlerModule.ChaosConstruction).length === 0) return;
+  _optimizeChaosConstruction(handlerSet, shape, effectiveValueMask) {
+    const chaosHandlers = handlerSet.getAllofType(ChaosHandlerModule.ChaosConstruction);
+    if (chaosHandlers.length === 0) return;
 
     const regionCells = shape.varCellsForGroup('CC');
     const numGridCells = shape.numGridCells;
     if (!regionCells || regionCells.length !== numGridCells) return;
 
     const regionCellOffset = regionCells[0];
+    // Shared context so each sub-optimization skips the region-cell lookups.
+    const chaos = {
+      chaosHandlers,
+      numGridCells,
+      regionCellOffset,
+      regionCellLimit: regionCellOffset + numGridCells,
+    };
+
+    this._addChaosFixedValueRegionExclusions(handlerSet, chaos);
+    this._addChaosRegionShardSources(handlerSet, shape, effectiveValueMask, chaos);
+    this._addChaosCountDistinctMaxBounds(handlerSet, shape, chaos);
+  }
+
+  _addChaosFixedValueRegionExclusions(handlerSet, chaos) {
+    const { numGridCells, regionCellOffset } = chaos;
     for (let i = 0; i < numGridCells; i++) {
       handlerSet.add(
         new ChaosHandlerModule.ChaosFixedValueRegionExclusion(
@@ -179,16 +194,8 @@ export class SudokuConstraintOptimizer {
     }
   }
 
-  _addChaosRegionShardSources(handlerSet, shape, effectiveValueMask) {
-    const chaosHandlers = handlerSet.getAllofType(ChaosHandlerModule.ChaosConstruction);
-    if (chaosHandlers.length === 0) return;
-
-    const regionCells = shape.varCellsForGroup('CC');
-    const numGridCells = shape.numGridCells;
-    if (!regionCells || regionCells.length !== numGridCells) return;
-
-    const regionCellOffset = regionCells[0];
-    const regionCellLimit = regionCellOffset + numGridCells;
+  _addChaosRegionShardSources(handlerSet, shape, effectiveValueMask, chaos) {
+    const { chaosHandlers, regionCellOffset, regionCellLimit } = chaos;
 
     const arrowHandlers = handlerSet.getAllofType(ChaosHandlerModule.ChaosArrow);
     const countHandlers = handlerSet.getAllofType(ChaosHandlerModule.ChaosCount);
@@ -228,6 +235,84 @@ export class SudokuConstraintOptimizer {
         countHandler.attachRegionShardState(handler.regionShardState());
       }
     }
+  }
+
+  _addChaosCountDistinctMaxBounds(handlerSet, shape, chaos) {
+    const countHandlers = handlerSet.getAllofType(HandlerModule.CountDistinct);
+    if (countHandlers.length === 0) return;
+
+    const { regionCellOffset, regionCellLimit } = chaos;
+
+    for (const handler of countHandlers) {
+      // cells[0] is the control; only counted sets entirely in the region lane
+      // carry region-adjacency structure. The smallest enclosed configuration is
+      // a corner cell with its two neighbours, so anything smaller can't help.
+      const cells = handler.cells;
+      const numCounted = cells.length - 1;
+      if (numCounted < 3) continue;
+      const countedGridCells = new Set();
+      let allRegionLane = true;
+      for (let i = 1; i < cells.length; i++) {
+        const regionCell = cells[i];
+        if (regionCell < regionCellOffset || regionCell >= regionCellLimit) {
+          allRegionLane = false;
+          break;
+        }
+        countedGridCells.add(regionCell - regionCellOffset);
+      }
+      if (!allRegionLane) continue;
+
+      const reduction = this._countEnclosedRegionCoincidences(countedGridCells, shape);
+      if (reduction === 0) continue;
+
+      // The control cell's value is the distinct count, so cap it at the reduced
+      // maximum. Skip when the handler's own bound (min(numCounted, numValues))
+      // is already at least this tight.
+      const maxDistinct = numCounted - reduction;
+      if (maxDistinct >= shape.numValues) continue;
+      // Keep only the lowest maxDistinct count-bits; count k occupies value bit
+      // k - offset - 1, matching the handler's own range encoding.
+      const keepMask = (1 << (maxDistinct - shape.valueOffset)) - 1;
+      const allowed = LookupTables.toOffsetValuesArray(keepMask, shape.valueOffset);
+
+      const newHandler = new HandlerModule.GivenCandidates(
+        new Map([[cells[0], allowed]]));
+      handlerSet.add(newHandler);
+      if (this._debugLogger) {
+        this._logAddHandler('_addChaosCountDistinctMaxBounds', newHandler, {
+          args: { maxDistinct },
+          cells: handler.cells,
+        });
+      }
+    }
+  }
+
+  // Greedily counts enclosed counted cells whose closed neighbourhoods are
+  // pairwise disjoint. Each enclosed cell forces one same-region pair within the
+  // set; keeping the neighbourhoods disjoint keeps those pairs cell-disjoint, so
+  // the count is a sound lower bound on the number of forced coincidences (hence
+  // on the reduction in distinct labels).
+  _countEnclosedRegionCoincidences(countedGridCells, shape) {
+    const neighborTable = ChaosHandlerModule.neighborTable(
+      shape.numRows, shape.numCols);
+    const used = new Set();
+    let reduction = 0;
+
+    for (const cell of countedGridCells) {
+      const neighbors = ChaosHandlerModule.enclosingNeighbors(
+        neighborTable, cell, countedGridCells);
+      if (neighbors === null) continue;
+
+      // Take the coincidence only if its closed neighbourhood is untouched, so
+      // the forced same-region pairs stay cell-disjoint across selections.
+      if (used.has(cell) || neighbors.some(n => used.has(n))) continue;
+
+      reduction++;
+      used.add(cell);
+      for (const neighbor of neighbors) used.add(neighbor);
+    }
+
+    return reduction;
   }
 
   _selectPriorityAnchorCells(handlerSet, shape, cellPriorities) {
