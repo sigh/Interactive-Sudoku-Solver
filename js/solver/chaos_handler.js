@@ -233,7 +233,6 @@ export class ChaosConstruction extends SudokuConstraintHandler {
     this._shards = {
       sizes: new Uint8Array(numGridCells),            // cells per shard
       fixedValueMasks: new Uint16Array(numGridCells), // values fixed within the shard
-      restrictedFlags: new Uint8Array(numGridCells),  // shard has a narrowed value set
       nextCells: new Uint16Array(numGridCells),       // shard member linked list
       // Shard value masks (rebuild -> scan); the same buffer is reused as
       // connectivity's region-candidate working copy.
@@ -387,7 +386,6 @@ export class ChaosConstruction extends SudokuConstraintHandler {
     const shardSizes = shards.sizes;
     const shardValueMasks = shards.masks;
     const shardFixedValueMasks = shards.fixedValueMasks;
-    const shardRestrictedValueFlags = shards.restrictedFlags;
     const nextCells = shards.nextCells;
     const constrainedRoots = this._scratchGridCells0;
     const shardOffset = this._regionShardOffset;
@@ -404,7 +402,6 @@ export class ChaosConstruction extends SudokuConstraintHandler {
       if (cell === root) {
         shardValueMasks[root] = 0;
         shardFixedValueMasks[root] = 0;
-        shardRestrictedValueFlags[root] = 0;
         nextCells[root] = NO_CELL;
       } else {
         root = grid[shardOffset + root];
@@ -437,7 +434,6 @@ export class ChaosConstruction extends SudokuConstraintHandler {
 
       const cellValues = grid[cell];
       shardValueMasks[root] |= cellValues;
-      if (cellValues !== this._effectiveValueMask) shardRestrictedValueFlags[root] = 1;
       if (cellValues && !(cellValues & (cellValues - 1))) {
         if (shardFixedValueMasks[root] & cellValues) return false;
         shardFixedValueMasks[root] |= cellValues;
@@ -914,7 +910,7 @@ export class ChaosConstruction extends SudokuConstraintHandler {
   // When a region's active value set equals s, places any value confined to one cell
   // and fixes that cell's shard; returns true if a placement fired (caller must rescan).
   _enforceHiddenRegionValueSingles(
-    grid, handlerAccumulator, shards, regions, checkRegionsMask, restrictedRegionsMask,
+    grid, handlerAccumulator, shards, regions, checkRegionsMask,
     hiddenDuplicateValueMasks) {
     // Apply at most one precomputed shard-level witness after confirming the member cell.
     const firstRootByRegionValue = this._scratchRoots0;
@@ -924,8 +920,6 @@ export class ChaosConstruction extends SudokuConstraintHandler {
     const numValues = this._numValues;
     const regionSize = this._regionSize;
     const regionScanData = regions.scanData;
-
-    checkRegionsMask &= restrictedRegionsMask;
 
     while (checkRegionsMask) {
       const regionBit = checkRegionsMask & -checkRegionsMask;
@@ -982,7 +976,6 @@ export class ChaosConstruction extends SudokuConstraintHandler {
     const shardSizes = shards.sizes;
     const shardValueMasks = shards.masks;
     const shardFixedValueMasks = shards.fixedValueMasks;
-    const shardRestrictedValueFlags = shards.restrictedFlags;
     const regionSize = this._regionSize;
     const numValues = this._numValues;
     const numGridCells = this._numGridCells;
@@ -1015,7 +1008,6 @@ export class ChaosConstruction extends SudokuConstraintHandler {
       }
 
       let changed = false;
-      let hiddenRestrictedRegionsMask = 0;
       if (hiddenRegionsMask) {
         hiddenDuplicateValueMasks.fill(0);
       }
@@ -1030,7 +1022,6 @@ export class ChaosConstruction extends SudokuConstraintHandler {
             let candidateRegions = regionMask & hiddenRegionsMask;
             if (candidateRegions) {
               const shardValueMask = shardValueMasks[root];
-              if (shardRestrictedValueFlags[root]) hiddenRestrictedRegionsMask |= candidateRegions;
               while (candidateRegions) {
                 const regionBit = candidateRegions & -candidateRegions;
                 candidateRegions ^= regionBit;
@@ -1079,7 +1070,7 @@ export class ChaosConstruction extends SudokuConstraintHandler {
       if (hiddenRegionsMask) {
         if (this._enforceHiddenRegionValueSingles(
           grid, handlerAccumulator, shards, regions, hiddenRegionsMask,
-          hiddenRestrictedRegionsMask, hiddenDuplicateValueMasks)) return DEFER_CONNECTIVITY;
+          hiddenDuplicateValueMasks)) return DEFER_CONNECTIVITY;
       }
 
       return true;
