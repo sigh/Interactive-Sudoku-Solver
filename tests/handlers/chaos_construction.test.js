@@ -100,8 +100,8 @@ const makeChaosCount = (shape, controlCell, regionCells, grid) => {
 const isFixedMask = mask => mask && !(mask & (mask - 1));
 
 const regionShardParent = (handler, grid, cell) => grid[handler._regionShardOffset + cell];
-const possibleRegionCount = (handler, region) => handler._regionScanData[region] & 0x1ff;
-const fixedRegionCount = (handler, region) => (handler._regionScanData[region] >>> 9) & 0x1f;
+const possibleRegionCount = (handler, region) => handler._regions.scanData[region] & 0x1ff;
+const fixedRegionCount = (handler, region) => (handler._regions.scanData[region] >>> 9) & 0x1f;
 
 const fullChaosGridIsValid = (shape, values, regions) => {
   const allValues = LookupTables.get(shape.numValues).allValues;
@@ -671,8 +671,8 @@ await runTest('ChaosConstruction connectivity cache tracks possible region candi
   const { grid, regionCells, handler } = context;
   const acc = createAccumulator();
 
-  assert.equal(handler._rebuildShards(grid, acc), true);
-  assert.equal(handler._scanRegionCandidates(grid), true);
+  assert.equal(handler._rebuildShards(grid, acc, handler._shards), true);
+  assert.equal(handler._scanRegionCandidates(grid, handler._shards, handler._regions), true);
   const previousPossibleCount = possibleRegionCount(handler, 0);
   const previousFixedCount = fixedRegionCount(handler, 0);
   handler._connectivityDirtyRegionsMask = 0;
@@ -680,8 +680,8 @@ await runTest('ChaosConstruction connectivity cache tracks possible region candi
   grid[regionCells[1]] = valueMask(1);
   grid[regionCells[2]] = valueMask(2, 3);
 
-  assert.equal(handler._rebuildShards(grid, acc), true);
-  assert.equal(handler._scanRegionCandidates(grid), true);
+  assert.equal(handler._rebuildShards(grid, acc, handler._shards), true);
+  assert.equal(handler._scanRegionCandidates(grid, handler._shards, handler._regions), true);
   assert.equal(possibleRegionCount(handler, 0), previousPossibleCount - 2);
   assert.equal(fixedRegionCount(handler, 0), previousFixedCount + 1);
   assert.notEqual(handler._connectivityDirtyRegionsMask & valueMask(1), 0);
@@ -711,8 +711,8 @@ await runTest('ChaosConstruction rechecks connectivity on fully fixed regions', 
     grid[regionCells[cell]] = valueMask(regions[cell]);
   }
 
-  assert.equal(handler._rebuildShards(grid, acc), true);
-  assert.equal(handler._scanRegionCandidates(grid), true);
+  assert.equal(handler._rebuildShards(grid, acc, handler._shards), true);
+  assert.equal(handler._scanRegionCandidates(grid, handler._shards, handler._regions), true);
   // Even with the incremental dirty tracking cleared, a complete partition must
   // still be fully connectivity-checked before it can be accepted.
   handler._connectivityDirtyRegionsMask = 0;
@@ -938,11 +938,11 @@ await runTest('ChaosConstruction merges contiguous fixed region cells into shard
   grid[regionCells[1]] = valueMask(1);
   grid[regionCells[2]] = valueMask(1, 2, 3);
 
-  assert.equal(handler._rebuildShards(grid, createAccumulator()), true);
+  assert.equal(handler._rebuildShards(grid, createAccumulator(), handler._shards), true);
   const root = regionShardParent(handler, grid, 0);
   assert.equal(regionShardParent(handler, grid, 1), root);
   assert.notEqual(regionShardParent(handler, grid, 2), root);
-  assert.equal(handler._regionShardSizes[root], 2);
+  assert.equal(handler._shards.sizes[root], 2);
 });
 
 await runTest('ChaosConstruction region shard removes fixed-value duplicate labels', () => {
@@ -991,10 +991,10 @@ await runTest('ChaosConstruction region shard removes labels without compatible 
   grid[regionCells[10]] = valueMask(2);
 
   enforceShardArrow(makeShardArrow(context, 6, [[6, 7, 11]]), context);
-  assert.equal(handler._rebuildShards(grid, acc), true);
-  assert.equal(handler._scanRegionCandidates(grid), true);
+  assert.equal(handler._rebuildShards(grid, acc, handler._shards), true);
+  assert.equal(handler._scanRegionCandidates(grid, handler._shards, handler._regions), true);
   handler._connectivityDirtyRegionsMask = valueMask(2);
-  assert.equal(handler._enforceConnectivity(grid, acc), true);
+  assert.equal(handler._enforceConnectivity(grid, acc, handler._shards, handler._regions), true);
   assert.equal(grid[regionCells[5]], valueMask(1));
   assert.equal(grid[regionCells[6]], valueMask(2));
   assert.equal(grid[regionCells[7]], valueMask(2));
