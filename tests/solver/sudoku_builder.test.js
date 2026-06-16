@@ -331,7 +331,7 @@ await runTest('Jigsaw produces AllDifferent and JigsawPiece handlers', () => {
   assert.equal(countHandlers(handlers, 'AllDifferent'), 12);
 });
 
-await runTest('ChaosConstruction produces handler, extra cells, and no box handlers', () => {
+await runTest('ChaosConstruction produces handler, extra cells, and box handlers', () => {
   const constraint = new SudokuConstraint.Container([
     new SudokuConstraint.Shape('4x4'),
     new SudokuConstraint.ChaosConstruction(),
@@ -345,8 +345,8 @@ await runTest('ChaosConstruction produces handler, extra cells, and no box handl
   const handlers = buildHandlers(constraint);
   assert.ok(hasHandler(handlers, 'ChaosConstruction'));
   assert.equal(countHandlers(handlers, 'ChaosFixedValueRegionExclusion'), 0);
-  // 4 rows + 4 columns. Chaos Construction replaces default boxes.
-  assert.equal(countHandlers(handlers, 'AllDifferent'), 8);
+  // 4 rows + 4 columns + 4 boxes. Chaos Construction coexists with default boxes.
+  assert.equal(countHandlers(handlers, 'AllDifferent'), 12);
 });
 
 await runTest('ChaosArrow produces ChaosArrow handler', () => {

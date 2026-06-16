@@ -43,7 +43,7 @@ export class SudokuBuilder {
 
   // Get box regions, respecting NoBoxes and RegionSize constraints.
   static _getBoxRegions(shape, constraintMap) {
-    if (constraintMap.has('NoBoxes') || constraintMap.has('ChaosConstruction')) return [];
+    if (constraintMap.has('NoBoxes')) return [];
 
     const size = this._getEffectiveBoxSize(constraintMap);
     return SudokuConstraintBase.boxRegions(shape, size);
