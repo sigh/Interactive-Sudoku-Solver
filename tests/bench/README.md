@@ -10,9 +10,10 @@ methodology — what to measure and the traps to avoid — is at the end.
 | --- | --- |
 | `node tests/bench/solve.js` | Solve puzzles and report search counters (solutions, guesses, backtracks, nodes, wall time). The "did my change move the search / how hard is this" tool, with built-in ablation A/B. |
 | `node tests/bench/profile.js` | Per-method profile of one handler during a solve (call counts, false-returns, time). Find where a handler spends time and which rules fire. |
+| `node tests/bench/step_analysis.js` | Walk a solve one step at a time and explain each branch — cell-value vs value-placement guess, real branch factor, the conflict-score ranking of competing cells, and per-step pencilmarks / var-cell candidates. The "why did it branch here / what is the search doing" tool; constraint-agnostic. |
 | `node tests/bench/run_legacy_benchmarks.js` (`npm run bench`) | The legacy micro/registered benchmark runner — discovers and runs `*.bench.js` files (lookup tables, bitset ops, etc.). Not for full-solve analysis. |
 
-Run any of the first two with `--help` for full options.
+Run `solve.js`, `profile.js`, or `step_analysis.js` with `--help` for full options.
 
 ## Two conventions that prevent footguns
 
@@ -44,6 +45,13 @@ node tests/bench/solve.js --max-backtracks none --puzzles "Chaos Construction: k
 
 # Where does a handler spend time on this puzzle?
 node tests/bench/profile.js --max-backtracks 50000 --handler Sum --puzzles "Killer sudoku"
+
+# Why did the solver branch on this cell? Walk the search, then explain a guess.
+node tests/bench/step_analysis.js --puzzle "Chaos Construction: The Fountain" --steps 10
+node tests/bench/step_analysis.js --puzzle "Chaos Construction: The Fountain" --explain first
+
+# Pencilmarks (value cells) and var-cell candidates at a given step.
+node tests/bench/step_analysis.js --puzzle "Chaos Construction: The Fountain" --grid 33 --vars 33
 
 # A raw constraint string instead of a named puzzle.
 node tests/bench/solve.js --max-backtracks none --input ".Cage~10~R1C1~R1C2~R1C3"

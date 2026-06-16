@@ -13,10 +13,21 @@
 // one.
 
 import { readdir } from 'node:fs/promises';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { ensureGlobalEnvironment } from '../helpers/test_env.js';
 
 ensureGlobalEnvironment();
+
+const PROJECT_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+
+// Some collection puzzles store `input` as a "/data/*.iss" file path (the app
+// fetches it lazily); resolve those to the file text. SudokuParser strips the
+// file's leading `#` comments.
+const resolveInput = (input) =>
+  input.startsWith('/') ? readFileSync(join(PROJECT_ROOT, input), 'utf8') : input;
 
 const { EXAMPLES } = await import('../../data/collections.js' + self.VERSION_PARAM);
 const { PUZZLE_INDEX } = await import('../../data/example_puzzles.js' + self.VERSION_PARAM);
@@ -152,7 +163,7 @@ const solutionString = (grid, shape) => {
 // beforehand take effect. The optional `onSolver` hook (used by the profiler)
 // runs after build but before search, e.g. to install method wrappers.
 export const runSolve = (puzzle, { maxBacktracks, maxSolutions }, onSolver) => {
-  const constraint = SudokuParser.parseText(puzzle.input);
+  const constraint = SudokuParser.parseText(resolveInput(puzzle.input));
   const shape = constraint.getShape();
   // Match the production build path (SimpleSolver / the worker): resolve the
   // constraint through the optimizer before building, so counts reflect real
