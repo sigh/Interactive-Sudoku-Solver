@@ -1195,7 +1195,7 @@ export const EXAMPLES = [
     src: 'https://sudokupad.app/y323plq5im',
     input: '/data/uncovering_tunnels.iss',
     solution: '524176398159864732643915287932781465785249613496532871371628954268357149817493526',
-    constraintTypes: ['ChaosConstruction', 'ChaosArrow', 'AllDifferent', 'NFA', 'Whisper'],
+    constraintTypes: ['ChaosConstruction', 'ChaosArrow', 'AllDifferent', 'NFA', 'Whisper', 'CountDistinct'],
   },
   {
     name: 'Chaos Construction: Sunblock',
