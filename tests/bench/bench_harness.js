@@ -85,7 +85,7 @@ const toNameMatcher = (nameArg) => {
 };
 
 /**
- * Registry is module-global so `run_all_benchmarks.js` can discover results.
+ * Registry is module-global so `run_legacy_benchmarks.js` can discover results.
  */
 const registry = [];
 let currentGroup = null;

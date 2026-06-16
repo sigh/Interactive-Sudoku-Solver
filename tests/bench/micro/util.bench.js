@@ -1,5 +1,5 @@
-import { ensureGlobalEnvironment } from '../helpers/test_env.js';
-import { bench, benchGroup, runIfMain } from './bench_harness.js';
+import { ensureGlobalEnvironment } from '../../helpers/test_env.js';
+import { bench, benchGroup, runIfMain } from '../bench_harness.js';
 
 ensureGlobalEnvironment();
 
@@ -19,7 +19,7 @@ const {
   setIntersectSize,
   setIntersectionToArray,
   setPeek,
-} = await import('../../js/util.js' + self.VERSION_PARAM);
+} = await import('../../../js/util.js' + self.VERSION_PARAM);
 
 // Keep inputs deterministic and avoid allocations inside timed sections.
 

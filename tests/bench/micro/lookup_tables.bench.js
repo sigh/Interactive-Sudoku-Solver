@@ -1,9 +1,9 @@
-import { ensureGlobalEnvironment } from '../helpers/test_env.js';
-import { bench, benchGroup, runIfMain } from './bench_harness.js';
+import { ensureGlobalEnvironment } from '../../helpers/test_env.js';
+import { bench, benchGroup, runIfMain } from '../bench_harness.js';
 
 ensureGlobalEnvironment();
 
-const { LookupTables } = await import('../../js/solver/lookup_tables.js' + self.VERSION_PARAM);
+const { LookupTables } = await import('../../../js/solver/lookup_tables.js' + self.VERSION_PARAM);
 
 // Keep this file focused on hot primitives and stable inputs.
 // As the suite grows, prefer adding new *.bench.js files per module.

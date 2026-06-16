@@ -1,3 +1,7 @@
+// Runs the legacy micro/registered benchmarks: it discovers every `*.bench.js`
+// file under tests/bench/ and runs the benchmarks they register via bench_harness.
+// For solving puzzles and comparing search counters, use solve.js / profile.js
+// instead (see README.md). Invoked by `npm run bench`.
 import { readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -63,13 +67,13 @@ const findBenches = async (dir, relativePath = '') => {
 
 const args = parseArgs(process.argv);
 if (args.help) {
-  console.log('Usage: node tests/bench/run_all_benchmarks.js [--file <substring>] [--name <substring|/regex/>]');
+  console.log('Usage: node tests/bench/run_legacy_benchmarks.js [--file <substring>] [--name <substring|/regex/>]');
   console.log('');
   console.log('Examples:');
-  console.log('  node tests/bench/run_all_benchmarks.js --file util');
-  console.log('  node tests/bench/run_all_benchmarks.js --file lookup_tables');
-  console.log("  node tests/bench/run_all_benchmarks.js --name 'BitSet'");
-  console.log("  node tests/bench/run_all_benchmarks.js --name '/^util::base64/'");
+  console.log('  node tests/bench/run_legacy_benchmarks.js --file util');
+  console.log('  node tests/bench/run_legacy_benchmarks.js --file lookup_tables');
+  console.log("  node tests/bench/run_legacy_benchmarks.js --name 'BitSet'");
+  console.log("  node tests/bench/run_legacy_benchmarks.js --name '/^util::base64/'");
   process.exit(0);
 }
 

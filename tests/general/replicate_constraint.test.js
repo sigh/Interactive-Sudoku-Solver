@@ -1,14 +1,14 @@
 import assert from 'node:assert/strict';
 
-import { ensureGlobalEnvironment } from './helpers/test_env.js';
-import { runTest, logSuiteComplete } from './helpers/test_runner.js';
+import { ensureGlobalEnvironment } from '../helpers/test_env.js';
+import { runTest, logSuiteComplete } from '../helpers/test_runner.js';
 
 ensureGlobalEnvironment();
 
-const { SudokuConstraint } = await import('../js/sudoku_constraint.js');
-const { SHAPE_9x9 } = await import('../js/grid_shape.js');
-const { SudokuBuilder } = await import('../js/solver/sudoku_builder.js');
-const HandlerModule = await import('../js/solver/handlers.js');
+const { SudokuConstraint } = await import('../../js/sudoku_constraint.js');
+const { SHAPE_9x9 } = await import('../../js/grid_shape.js');
+const { SudokuBuilder } = await import('../../js/solver/sudoku_builder.js');
+const HandlerModule = await import('../../js/solver/handlers.js');
 
 await runTest('Replicate.decodeTargetCells should decode base64 bitset', () => {
   const shape = SHAPE_9x9;

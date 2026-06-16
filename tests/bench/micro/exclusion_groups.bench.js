@@ -1,13 +1,13 @@
-import { ensureGlobalEnvironment } from '../helpers/test_env.js';
-import { bench, benchGroup, runIfMain } from './bench_harness.js';
+import { ensureGlobalEnvironment } from '../../helpers/test_env.js';
+import { bench, benchGroup, runIfMain } from '../bench_harness.js';
 
 ensureGlobalEnvironment();
 
-const { CellExclusions, HandlerSet } = await import('../../js/solver/engine.js' + self.VERSION_PARAM);
-const { HandlerUtil } = await import('../../js/solver/handlers.js' + self.VERSION_PARAM);
+const { CellExclusions, HandlerSet } = await import('../../../js/solver/engine.js' + self.VERSION_PARAM);
+const { HandlerUtil } = await import('../../../js/solver/handlers.js' + self.VERSION_PARAM);
 
 const SHAPE_9x9 = {
-  numCells: 81,
+  numGridCells: 81,
   numValues: 9,
   gridSize: 9,
   boxWidth: 3,
