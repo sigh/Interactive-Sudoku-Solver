@@ -1,4 +1,4 @@
-// Shared helpers for the solver analysis CLIs (solve.js, profile.js).
+// Shared helpers for the solver analysis CLIs (benchmark_puzzles.js, profile.js).
 //
 // Centralises: puzzle resolution (named puzzles, chaos ladder aliases, or raw
 // input), running a single solve under an explicit backtrack/solution budget,
@@ -29,7 +29,7 @@ const PROJECT_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const resolveInput = (input) =>
   input.startsWith('/') ? readFileSync(join(PROJECT_ROOT, input), 'utf8') : input;
 
-const { EXAMPLES } = await import('../../data/collections.js' + self.VERSION_PARAM);
+const COLLECTIONS = await import('../../data/collections.js' + self.VERSION_PARAM);
 const { PUZZLE_INDEX } = await import('../../data/example_puzzles.js' + self.VERSION_PARAM);
 const { SudokuParser } = await import('../../js/sudoku_parser.js' + self.VERSION_PARAM);
 const { SudokuBuilder } = await import('../../js/solver/sudoku_builder.js' + self.VERSION_PARAM);
@@ -76,14 +76,26 @@ const ALL_EXAMPLES = [...PUZZLE_INDEX.values()];
 
 export const LADDER_ALIASES = ['chaos-ladder', 'chaos-killer-ladder', 'chaos-x-sums-ladder'];
 
+// Expand a collections.js export name (e.g. 'TAREK_ALL', 'EXTREME_KILLERS') into
+// its puzzle objects. Entries are either raw constraint strings or already-shaped
+// { name, input, solution? } objects.
+const expandCollection = (name) =>
+  COLLECTIONS[name].map((entry, i) =>
+    typeof entry === 'string' ? { name: `${name}#${i}`, input: entry } : entry);
+
 // Resolve a list of selectors into puzzle objects ({ name, input, solution? }).
 // A selector is one of:
 //   - a puzzle name ('Chaos Construction', 'Count Different', ...)
 //   - a ladder alias (see LADDER_ALIASES) which expands to several puzzles
+//   - a collections.js set name ('TAREK_ALL', 'EXTREME_KILLERS', ...) which
+//     expands to every puzzle in that set
 //   - 'input:<puzzle-string>' to solve a raw constraint string directly
 export const resolvePuzzles = (selectors) => selectors.flatMap((selector) => {
   if (selector.startsWith('input:')) {
     return [{ name: 'input', input: selector.slice('input:'.length) }];
+  }
+  if (Array.isArray(COLLECTIONS[selector])) {
+    return expandCollection(selector);
   }
   return benchPuzzles.resolveChaosBenchmarkPuzzles(ALL_EXAMPLES, [selector]);
 });

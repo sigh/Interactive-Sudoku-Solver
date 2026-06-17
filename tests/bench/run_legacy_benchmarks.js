@@ -1,6 +1,6 @@
 // Runs the legacy micro/registered benchmarks: it discovers every `*.bench.js`
 // file under tests/bench/ and runs the benchmarks they register via bench_harness.
-// For solving puzzles and comparing search counters, use solve.js / profile.js
+// For solving puzzles and comparing search counters, use benchmark_puzzles.js / profile.js
 // instead (see README.md). Invoked by `npm run bench`.
 import { readdir } from 'node:fs/promises';
 import { join } from 'node:path';

@@ -8,12 +8,13 @@ methodology — what to measure and the traps to avoid — is at the end.
 
 | Command | Purpose |
 | --- | --- |
-| `node tests/bench/solve.js` | Solve puzzles and report search counters (solutions, guesses, backtracks, nodes, wall time). The "did my change move the search / how hard is this" tool, with built-in ablation A/B. |
+| `node tests/bench/benchmark_puzzles.js` | Run puzzles and report search counters (solutions, guesses, backtracks, nodes, wall time). The "did my change move the search / how hard is this" tool, with built-in ablation A/B. |
 | `node tests/bench/profile.js` | Per-method profile of one handler during a solve (call counts, false-returns, time). Find where a handler spends time and which rules fire. |
-| `node tests/bench/step_analysis.js` | Walk a solve one step at a time and explain each branch — cell-value vs value-placement guess, real branch factor, the conflict-score ranking of competing cells, and per-step pencilmarks / var-cell candidates. The "why did it branch here / what is the search doing" tool; constraint-agnostic. |
 | `node tests/bench/run_legacy_benchmarks.js` (`npm run bench`) | The legacy micro/registered benchmark runner — discovers and runs `*.bench.js` files (lookup tables, bitset ops, etc.). Not for full-solve analysis. |
 
-Run `solve.js`, `profile.js`, or `step_analysis.js` with `--help` for full options.
+For solution content (digit grids, var cells, solution verification) and step-by-step search inspection, see [`tests/debug/`](../debug/README.md).
+
+Run `benchmark_puzzles.js` or `profile.js` with `--help` for full options.
 
 ## Two conventions that prevent footguns
 
@@ -34,32 +35,31 @@ Run `solve.js`, `profile.js`, or `step_analysis.js` with `--help` for full optio
 
 ```sh
 # How hard is a puzzle (proof of uniqueness)?
-node tests/bench/solve.js --max-backtracks none --puzzles "Chaos Construction"
+node tests/bench/benchmark_puzzles.js --max-backtracks none --puzzles "Chaos Construction"
 
 # A ladder of difficulties (capped, so a bad point can't hang the run).
-node tests/bench/solve.js --max-backtracks 50000 --puzzles chaos-ladder
+node tests/bench/benchmark_puzzles.js --max-backtracks 50000 --puzzles chaos-ladder
 
 # Does an optimization actually reduce search? (baseline vs feature-off, node ratio)
-node tests/bench/solve.js --max-backtracks none --puzzles "Chaos Construction: killer" \
+node tests/bench/benchmark_puzzles.js --max-backtracks none --puzzles "Chaos Construction: killer" \
     --compare chaos-hidden-singles
 
 # Where does a handler spend time on this puzzle?
 node tests/bench/profile.js --max-backtracks 50000 --handler Sum --puzzles "Killer sudoku"
 
-# Why did the solver branch on this cell? Walk the search, then explain a guess.
-node tests/bench/step_analysis.js --puzzle "Chaos Construction: The Fountain" --steps 10
-node tests/bench/step_analysis.js --puzzle "Chaos Construction: The Fountain" --explain first
-
-# Pencilmarks (value cells) and var-cell candidates at a given step.
-node tests/bench/step_analysis.js --puzzle "Chaos Construction: The Fountain" --grid 33 --vars 33
+# A whole collections.js set (e.g. the sum-heavy TAREK_ALL killers, ~1s for all 42),
+# best-of-3 timing per puzzle.
+node tests/bench/benchmark_puzzles.js --max-backtracks none --puzzles TAREK_ALL --repeat 3
 
 # A raw constraint string instead of a named puzzle.
-node tests/bench/solve.js --max-backtracks none --input ".Cage~10~R1C1~R1C2~R1C3"
+node tests/bench/benchmark_puzzles.js --max-backtracks none --input ".Cage~10~R1C1~R1C2~R1C3"
 ```
 
 Puzzle selectors are puzzle names (`--list`... use any name from the examples),
-ladder aliases (`chaos-ladder`, `chaos-killer-ladder`, `chaos-x-sums-ladder`), or
-`input:<constraint-string>` (the `--input` flag is shorthand).
+ladder aliases (`chaos-ladder`, `chaos-killer-ladder`, `chaos-x-sums-ladder`), a
+`collections.js` set name (`TAREK_ALL`, `EXTREME_KILLERS`, ... — expands to every
+puzzle in that exported array), or `input:<constraint-string>` (the `--input` flag
+is shorthand).
 
 ## Extending: `extensions/`
 
@@ -70,8 +70,8 @@ edits to the core scripts. An extension file may export either of:
 - **`ablations`** — a map of `name → { description, apply() }`. `apply()` disables
   one optimization (typically by patching a handler prototype method) and returns
   a restore function. **Disabling must keep the solver sound** — it should still
-  find the correct solution, just explore more. Exposed via `solve.js --ablate`
-  / `--compare` and `profile.js --ablate`; list them with `solve.js --list-ablations`.
+  find the correct solution, just explore more. Exposed via `benchmark_puzzles.js --ablate`
+  / `--compare` and `profile.js --ablate`; list them with `benchmark_puzzles.js --list-ablations`.
 
   ```js
   // extensions/my_handler.js

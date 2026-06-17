@@ -12,11 +12,12 @@
 // --vars to inspect constraint-specific cells such as chaos region labels).
 //
 // Examples:
-//   node tests/bench/step_analysis.js --puzzle "Fountain" --steps 8
-//   node tests/bench/step_analysis.js --puzzle "Fountain" --explain 0
-//   node tests/bench/step_analysis.js --input ".Thermo~R1C1~R1C2" --steps 5
-//   node tests/bench/step_analysis.js --puzzle "Fountain" --explain 0 --guide 0:R7C9=5
-//   node tests/bench/step_analysis.js --list
+//   node tests/debug/step_analysis.js --puzzle "Fountain" --steps 8
+//   node tests/debug/step_analysis.js --puzzle "Fountain" --at first --explain
+//   node tests/debug/step_analysis.js --puzzle "Fountain" --at 5 --grid --vars
+//   node tests/debug/step_analysis.js --input ".Thermo~R1C1~R1C2" --steps 5
+//   node tests/debug/step_analysis.js --puzzle "Fountain" --at first --explain --guide 1:R7C9=5
+//   node tests/debug/step_analysis.js --list
 
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -44,11 +45,12 @@ const DEFAULTS = {
   input: null,
   inputFile: null,
   steps: 12,
-  from: 0,
-  explain: null,
+
+  at: null,
+  explain: false,
   cell: null,
-  grid: null,
-  vars: null,
+  grid: false,
+  vars: false,
   top: 12,
   guides: [],
   priorities: false,
@@ -74,11 +76,12 @@ const parseArgs = (argv) => {
       case '--input': args.input = value(); break;
       case '--input-file': args.inputFile = value(); break;
       case '--steps': args.steps = +value(); break;
-      case '--from': args.from = +value(); break;
-      case '--explain': args.explain = value(); break;
+
+      case '--at': args.at = value(); break;
+      case '--explain': args.explain = true; break;
       case '--cell': args.cell = value(); break;
-      case '--grid': args.grid = +value(); break;
-      case '--vars': args.vars = +value(); break;
+      case '--grid': args.grid = true; break;
+      case '--vars': args.vars = true; break;
       case '--top': args.top = +value(); break;
       case '--guide': args.guides.push(value()); break;
       case '--priorities': args.priorities = true; break;
@@ -92,7 +95,7 @@ const parseArgs = (argv) => {
 };
 
 const printUsage = () => {
-  console.log(`Usage: node tests/bench/step_analysis.js [options]
+  console.log(`Usage: node tests/debug/step_analysis.js [options]
 
 Puzzle source (pick one):
   --puzzle <name>       Name (or substring) of a puzzle in data/collections.js.
@@ -104,17 +107,19 @@ guess); step N (N >= 1) is the Nth guess/dead-end the search reaches.
 
 Walk:
   --steps <n>           Number of steps to walk. Default ${DEFAULTS.steps}.
-  --from <k>            First step index to print. Default ${DEFAULTS.from}.
 
-Analysis:
-  --explain <step>      Explain the branch made to reach <step> (or "first"/"last").
-  --cell <id>           Track one cell across the walk (candidate count + guesses).
-  --grid <step>         Print the value-cell pencilmark grid at <step>.
-  --vars <step>         Print every extra (var) cell group at <step> — e.g. Chaos
+Step inspection (all three use --at for the step):
+  --at <step>           Step to inspect. Accepts a number, "first", or "last".
+  --explain             Explain the branch chosen at --at.
+  --grid                Print the value-cell pencilmark grid at --at.
+  --vars                Print every extra (var) cell group at --at — e.g. Chaos
                         region labels, Doppelganger cells, sum cells. Grid-shaped
                         groups print as a grid, others as a list.
-  --priorities          Print initial cell priorities (the root conflict scores).
   --top <n>             Competing-cell rows to show in --explain. Default ${DEFAULTS.top}.
+
+Other:
+  --cell <id>           Track one cell across the walk (candidate count + guesses).
+  --priorities          Print initial cell priorities (the root conflict scores).
   --guide <STEP:CELL[=VALUE]>
                         Force the guess at step STEP (>= 1, repeatable). CELL is
                         e.g. R7C9 or CC68; VALUE is the user-facing digit. Steers
@@ -581,14 +586,14 @@ const main = () => {
 
   // Walk the requested steps. We always iterate from step 0 so the decision
   // captured at step s-1 (which describes the guess shown at public step s) is
-  // available as we reach step s; rows before --from are computed but not kept.
+  // available as we reach step s.
   const records = [];
   let prevDecision = null;  // capture from step s-1 == decision for step s's guess.
-  const lastStep = args.from + args.steps - 1;
+  const lastStep = args.steps - 1;
   for (let s = 0; s <= lastStep; s++) {
     const { step, decision } = runStep(solver, s, guides, false);
     if (!step) break;
-    if (s >= args.from) records.push(buildStepRecord(shape, s, step, prevDecision));
+    records.push(buildStepRecord(shape, s, step, prevDecision));
     prevDecision = decision;
     if (step.isSolution) break;
   }
@@ -607,28 +612,36 @@ const main = () => {
 
   if (args.cell) printCellTracking(shape, args.cell, records, solver, guides);
 
-  if (args.explain !== null) {
-    const target = resolveExplainTarget(args.explain, records);
-    if (target < 1) {
-      console.log(`\nStep ${target} is the initial position; no branch to explain (the first guess is step 1).`);
-    } else {
-      // The guess shown at step `target` is decided during the replay to step
-      // target - 1, so capture its decision (with a snapshot) there.
-      const { decision } = runStep(solver, target - 1, guides, true);
-      printExplain(shape, target, decision, args.top);
+  const needsAt = args.explain || args.grid || args.vars;
+  if (needsAt && args.at === null) {
+    throw new Error('--explain, --grid, and --vars require --at <step|first|last>');
+  }
+
+  if (needsAt) {
+    const atStep = resolveExplainTarget(args.at, records);
+
+    if (args.explain) {
+      if (atStep < 1) {
+        console.log(`\nStep ${atStep} is the initial position; no branch to explain (the first guess is step 1).`);
+      } else {
+        // The guess shown at step `atStep` is decided during the replay to step
+        // atStep - 1, so capture its decision (with a snapshot) there.
+        const { decision } = runStep(solver, atStep - 1, guides, true);
+        printExplain(shape, atStep, decision, args.top);
+      }
     }
-  }
 
-  if (args.grid !== null) {
-    const { step } = runStep(solver, args.grid, guides, false);
-    if (step) printGrid(shape, step.pencilmarks, args.grid);
-    else console.log(`\nStep ${args.grid} is past the end of the search.`);
-  }
+    if (args.grid) {
+      const { step } = runStep(solver, atStep, guides, false);
+      if (step) printGrid(shape, step.pencilmarks, atStep);
+      else console.log(`\nStep ${atStep} is past the end of the search.`);
+    }
 
-  if (args.vars !== null) {
-    const { step } = runStep(solver, args.vars, guides, false);
-    if (step) printVarCells(shape, step.pencilmarks, args.vars);
-    else console.log(`\nStep ${args.vars} is past the end of the search.`);
+    if (args.vars) {
+      const { step } = runStep(solver, atStep, guides, false);
+      if (step) printVarCells(shape, step.pencilmarks, atStep);
+      else console.log(`\nStep ${atStep} is past the end of the search.`);
+    }
   }
 };
 

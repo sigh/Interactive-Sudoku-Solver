@@ -1,11 +1,11 @@
-// solve.js — run puzzles through the solver and report search counters.
+// benchmark_puzzles.js — run puzzles through the solver and report search counters.
 //
 // The general "how hard is this / did my change move the search" tool. Solves
 // one or more puzzles under an explicit backtrack budget and prints solver
 // counters (solutions, guesses, backtracks, nodes) plus wall time.
 //
 // Usage:
-//   node tests/bench/solve.js --max-backtracks <n|none> [options]
+//   node tests/bench/benchmark_puzzles.js --max-backtracks <n|none> [options]
 //
 // Required:
 //   --max-backtracks <n|none>  Stop each solve after n backtracks. Use "none"
@@ -33,9 +33,9 @@
 //   -h, --help            Print this help and exit.
 //
 // Examples:
-//   node tests/bench/solve.js --max-backtracks none --puzzles "Count Different"
-//   node tests/bench/solve.js --max-backtracks 50000 --puzzles chaos-ladder
-//   node tests/bench/solve.js --max-backtracks none --puzzles "Chaos Construction" \
+//   node tests/bench/benchmark_puzzles.js --max-backtracks none --puzzles "Count Different"
+//   node tests/bench/benchmark_puzzles.js --max-backtracks 50000 --puzzles chaos-ladder
+//   node tests/bench/benchmark_puzzles.js --max-backtracks none --puzzles "Chaos Construction" \
 //       --compare chaos-hidden-singles
 
 import {
@@ -71,7 +71,7 @@ const parseArgs = (argv) => {
 
 const usage = () => console.log(
   /* keep in sync with the header comment */
-  `Usage: node tests/bench/solve.js --max-backtracks <n|none> [options]\n\n` +
+  `Usage: node tests/bench/benchmark_puzzles.js --max-backtracks <n|none> [options]\n\n` +
   `  --max-backtracks <n|none>  REQUIRED. Backtrack cap per solve; "none" = unlimited.\n` +
   `  --puzzles <a,b,...>        Names / ladder aliases. Default: "Chaos Construction".\n` +
   `  --input <string>           Solve a raw constraint string.\n` +

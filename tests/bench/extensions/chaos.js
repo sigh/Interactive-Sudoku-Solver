@@ -1,7 +1,7 @@
 // Extension: ablations for ChaosConstruction.
 //
 // An ablation disables one optimization (by patching a prototype method) so its
-// search impact can be measured with solve.js --ablate / --compare. Disabling
+// search impact can be measured with benchmark_puzzles.js --ablate / --compare. Disabling
 // must keep the solver SOUND — it should still find the correct solution, just
 // explore more; ablations are for measurement, never for changing answers.
 //
