@@ -88,8 +88,9 @@ export const compressNFA = (nfa) => {
   );
 };
 
-// Enforces a linear regex constraint by compiling the pattern into an NFA and
-// propagating it across candidate sets to prune unsupported values.
+// Enforces a sequential constraint (regex / line constraints) by propagating a
+// compiled NFA across the cells' candidate sets to prune unsupported values.
+// See handler_docs/NFA.md for the full algorithm.
 export class NFAConstraint extends SudokuConstraintHandler {
   constructor(cells, cnfa) {
     super(cells);
@@ -121,22 +122,27 @@ export class NFAConstraint extends SudokuConstraintHandler {
 
     for (let i = 0; i < numCells; i++) {
       const nextStates = statesList[i + 1];
+      const nextWords = nextStates.words;
       const currentStatesWords = statesList[i].words;
       const values = grid[cells[i]];
 
       // Note: We operate directly on the bitset words for performance.
-      // Encapsulating this in methods caused significant overhead.
+      // Encapsulating this in methods caused significant overhead, so the bit
+      // iteration and the `add`/`bitIndex` calls are all inlined here.
       for (let wordIndex = 0; wordIndex < currentStatesWords.length; wordIndex++) {
         let word = currentStatesWords[wordIndex];
+        const wordBase = wordIndex << 5;
         while (word) {
           const lowestBit = word & -word;
           word ^= lowestBit;
-          const stateIndex = BitSet.bitIndex(wordIndex, lowestBit);
+          const stateIndex = wordBase + (31 - Math.clz32(lowestBit));
           const transitionList = transitionLists[stateIndex];
-          for (let j = 0; j < transitionList.length; j++) {
+          const len = transitionList.length;
+          for (let j = 0; j < len; j++) {
             const entry = transitionList[j];
             if (values & entry) {
-              nextStates.add(entry >>> 16);
+              const target = entry >>> 16;
+              nextWords[target >>> 5] |= 1 << (target & 31);
             }
           }
         }
@@ -153,26 +159,30 @@ export class NFAConstraint extends SudokuConstraintHandler {
 
     for (let i = numCells - 1; i >= 0; i--) {
       const currentStatesWords = statesList[i].words;
-      const nextStates = statesList[i + 1];
+      const nextWords = statesList[i + 1].words;
       const values = grid[cells[i]];
       let supportedValues = 0;
 
       // Note: We operate directly on the bitset words for performance.
-      // Encapsulating this in methods caused significant overhead.
+      // Encapsulating this in methods caused significant overhead, so the bit
+      // iteration and the `has`/`bitIndex` calls are all inlined here.
       for (let wordIndex = 0; wordIndex < currentStatesWords.length; wordIndex++) {
         let word = currentStatesWords[wordIndex];
         let keptWord = 0;
+        const wordBase = wordIndex << 5;
         while (word) {
           const lowestBit = word & -word;
           word ^= lowestBit;
-          const stateIndex = BitSet.bitIndex(wordIndex, lowestBit);
+          const stateIndex = wordBase + (31 - Math.clz32(lowestBit));
           const transitionList = transitionLists[stateIndex];
+          const len = transitionList.length;
           let stateSupportedValues = 0;
-          for (let j = 0; j < transitionList.length; j++) {
+          for (let j = 0; j < len; j++) {
             const entry = transitionList[j];
             const maskedValues = values & entry;
             if (maskedValues) {
-              if (nextStates.has(entry >>> 16)) {
+              const target = entry >>> 16;
+              if (nextWords[target >>> 5] & (1 << (target & 31))) {
                 stateSupportedValues |= maskedValues;
               }
             }
