@@ -1,4 +1,4 @@
-import { bench, benchGroup, runIfMain } from '../bench_harness.js';
+import { bench, benchGroup, runIfMain } from '../micro_bench_harness.js';
 
 // Microbench: iterate set bits in small masks.
 // Pattern appears throughout the solver: `while (m) { b=m&-m; m^=b; ... }`.

@@ -8,7 +8,8 @@ methodology — what to measure and the traps to avoid — is at the end.
 
 | Command | Purpose |
 | --- | --- |
-| `node tests/bench/benchmark_puzzles.js` | Run puzzles and report search counters (solutions, guesses, backtracks, nodes, wall time). The "did my change move the search / how hard is this" tool, with built-in ablation A/B. |
+| `node tests/bench/benchmark_puzzles.js` | Run puzzles and report search counters (solutions, guesses, backtracks, nodes, wall time). The "did my change move the search / how hard is this" tool, with built-in ablation A/B. `--json` emits the same rows as a machine-readable array. |
+| `node tests/bench/bench_vs_ref.js` | A/B the working tree against a baseline git revision (the cross-revision comparison the in-process ablation A/B can't do). Reports per puzzle the wall-time delta and any change in search counters. Add `--require-identical` to make it a behaviour-preserving gate that fails if any counter moved (a pure refactor); omit it when the counter change is intentional and you just want to see how search and time moved. |
 | `node tests/bench/profile.js` | Per-method profile of one handler during a solve (call counts, false-returns, time). Find where a handler spends time and which rules fire. |
 | `node tests/bench/run_legacy_benchmarks.js` (`npm run bench`) | The legacy micro/registered benchmark runner — discovers and runs `*.bench.js` files (lookup tables, bitset ops, etc.). Not for full-solve analysis. |
 
@@ -37,8 +38,10 @@ Run `benchmark_puzzles.js` or `profile.js` with `--help` for full options.
 # How hard is a puzzle (proof of uniqueness)?
 node tests/bench/benchmark_puzzles.js --max-backtracks none --puzzles "Chaos Construction"
 
-# A ladder of difficulties (capped, so a bad point can't hang the run).
-node tests/bench/benchmark_puzzles.js --max-backtracks 50000 --puzzles chaos-ladder
+# A ladder of difficulties (capped, so a bad point can't hang the run). `ladder:`
+# grades any solved puzzle by revealing solution givens; @counts is optional.
+node tests/bench/benchmark_puzzles.js --max-backtracks 50000 --puzzles "ladder:Chaos Construction"
+node tests/bench/benchmark_puzzles.js --max-backtracks 50000 --puzzles "ladder:Killer sudoku@25-15-5"
 
 # Does an optimization actually reduce search? (baseline vs feature-off, node ratio)
 node tests/bench/benchmark_puzzles.js --max-backtracks none --puzzles "Chaos Construction: killer" \
@@ -53,13 +56,33 @@ node tests/bench/benchmark_puzzles.js --max-backtracks none --puzzles TAREK_ALL 
 
 # A raw constraint string instead of a named puzzle.
 node tests/bench/benchmark_puzzles.js --max-backtracks none --input ".Cage~10~R1C1~R1C2~R1C3"
+
+# How did the working tree change vs HEAD? (wall time + counter deltas per puzzle).
+# Same workload flags as benchmark_puzzles.
+node tests/bench/bench_vs_ref.js --max-backtracks none --puzzles TAREK_ALL --repeat 5
+
+# As a behaviour-preserving gate for a pure refactor (fails if any counter moved).
+node tests/bench/bench_vs_ref.js --require-identical --max-backtracks none --puzzles TAREK_ALL --repeat 5
 ```
 
-Puzzle selectors are puzzle names (`--list`... use any name from the examples),
-ladder aliases (`chaos-ladder`, `chaos-killer-ladder`, `chaos-x-sums-ladder`), a
+**Two kinds of A/B, two tools.** `benchmark_puzzles --compare/--ablate` toggles a
+feature *within one build* (it patches a prototype at runtime) — use it to ask
+"is this optimization reducing search?", where the node count is *expected* to
+move. `bench_vs_ref` compares *two git revisions in separate processes*. By
+default it reports both how the counters moved and the wall-time delta; add
+`--require-identical` for a pure refactor where the counters must **not** move (it
+then fails on any change). When counters change intentionally the wall-time ratio
+compares different work, so read total ms as the end-to-end number. It consumes
+`benchmark_puzzles --json` (falling back to TSV for an older `--ref`) and needs
+the baseline revision to contain the benchmark harness.
+
+Puzzle selectors are puzzle names (use any name from the examples), a
 `collections.js` set name (`TAREK_ALL`, `EXTREME_KILLERS`, ... — expands to every
-puzzle in that exported array), or `input:<constraint-string>` (the `--input` flag
-is shorthand).
+puzzle in that exported array), a ladder selector
+`ladder:<puzzle name>[@25-15-5]` (grades any solved puzzle by revealing solution
+givens in spatially-balanced order; counts are dash-separated and default to
+`25-20-15-10-5`, clamped to the grid), or `input:<constraint-string>` (the
+`--input` flag is shorthand).
 
 ## Extending: `extensions/`
 

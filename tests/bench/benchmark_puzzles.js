@@ -15,9 +15,8 @@
 //                              "capped" so it is never mistaken for a real solve.
 //
 // Options:
-//   --puzzles <a,b,...>   Puzzle names and/or ladder aliases (chaos-ladder,
-//                         chaos-killer-ladder, chaos-x-sums-ladder).
-//                         Default: "Chaos Construction".
+//   --puzzles <a,b,...>   Puzzle names, collection names, and/or ladder selectors
+//                         (ladder:<name>[@25-15-5]). Default: "Chaos Construction".
 //   --input <string>      Solve a raw constraint string instead of named puzzles.
 //   --solutions <n|all>   How many solutions to search for. Default 2 = proof of
 //                         uniqueness (status "unique" once the search exhausts
@@ -29,12 +28,17 @@
 //                         node ratio (>1 ⇒ the feature was reducing search).
 //   --repeat <n>          Re-solve n times and report the best wall time (node
 //                         counts are deterministic; only timing is noisy). Default 1.
+//   --json                Emit a JSON array of result rows instead of TSV — a
+//                         stable, machine-readable contract for tooling (e.g.
+//                         bench_vs_ref.js). Each row: { puzzle, status, solutions,
+//                         guesses, backtracks, nodesSearched, ms } (+ vsBase under
+//                         --compare).
 //   --list-ablations      Print the available ablations and exit.
 //   -h, --help            Print this help and exit.
 //
 // Examples:
 //   node tests/bench/benchmark_puzzles.js --max-backtracks none --puzzles "Count Different"
-//   node tests/bench/benchmark_puzzles.js --max-backtracks 50000 --puzzles chaos-ladder
+//   node tests/bench/benchmark_puzzles.js --max-backtracks 50000 --puzzles "ladder:Chaos Construction"
 //   node tests/bench/benchmark_puzzles.js --max-backtracks none --puzzles "Chaos Construction" \
 //       --compare chaos-hidden-singles
 
@@ -48,13 +52,14 @@ const parseList = (value) => (value ?? '').split(',').map(v => v.trim()).filter(
 const parseArgs = (argv) => {
   const args = {
     maxBacktracksRaw: undefined, puzzles: ['Chaos Construction'], solutionsRaw: undefined,
-    ablate: [], compare: [], repeat: 1, help: false, listAblations: false,
+    ablate: [], compare: [], repeat: 1, help: false, listAblations: false, json: false,
   };
   for (let i = 2; i < argv.length; i++) {
     const [key, inlineValue] = argv[i].split(/=(.*)/s);
     const next = () => inlineValue ?? argv[++i];
     switch (key) {
       case '-h': case '--help': args.help = true; break;
+      case '--json': args.json = true; break;
       case '--list-ablations': args.listAblations = true; break;
       case '--max-backtracks': args.maxBacktracksRaw = next(); break;
       case '--solutions': args.solutionsRaw = next(); break;
@@ -73,14 +78,15 @@ const usage = () => console.log(
   /* keep in sync with the header comment */
   `Usage: node tests/bench/benchmark_puzzles.js --max-backtracks <n|none> [options]\n\n` +
   `  --max-backtracks <n|none>  REQUIRED. Backtrack cap per solve; "none" = unlimited.\n` +
-  `  --puzzles <a,b,...>        Names / ladder aliases. Default: "Chaos Construction".\n` +
+  `  --puzzles <a,b,...>        Names / collections / ladder:<name>. Default: "Chaos Construction".\n` +
   `  --input <string>           Solve a raw constraint string.\n` +
   `  --solutions <n|all>        Default 2 = prove uniqueness; "all" exhausts; "1" = first only (warns).\n` +
   `  --ablate <a,b,...>         Disable optimizations for the run.\n` +
   `  --compare <a,b,...>        Baseline vs each ablation (prints node ratio).\n` +
   `  --repeat <n>               Best wall time over n runs (default 1).\n` +
+  `  --json                     Emit JSON rows instead of TSV (machine-readable).\n` +
   `  --list-ablations           List available ablations.\n` +
-  `\nLadder aliases: chaos-ladder, chaos-killer-ladder, chaos-x-sums-ladder`);
+  `\nLadders: ladder:<puzzle name>[@25-15-5] reveals solution givens to grade any solved puzzle.`);
 
 const bestOf = (repeat, fn) => {
   let result, bestMs = Infinity;
@@ -89,10 +95,29 @@ const bestOf = (repeat, fn) => {
   return result;
 };
 
-const fmt = (r, label) => [
-  r.name + (label ? ` [${label}]` : ''), r.status, r.counters.solutions,
-  r.counters.guesses, r.counters.backtracks, r.counters.nodesSearched, r.elapsedMs.toFixed(1),
-].join('\t');
+// A result row as a plain object — the shared shape for both TSV and JSON output.
+// `vsBase` is only present under --compare.
+const toRow = (r, label, vsBase) => {
+  const row = {
+    puzzle: r.name + (label ? ` [${label}]` : ''),
+    status: r.status,
+    solutions: r.counters.solutions,
+    guesses: r.counters.guesses,
+    backtracks: r.counters.backtracks,
+    nodesSearched: r.counters.nodesSearched,
+    ms: Number(r.elapsedMs.toFixed(1)),
+  };
+  if (vsBase !== undefined) row.vsBase = vsBase;
+  return row;
+};
+
+const TSV_COLUMNS = ['puzzle', 'status', 'sols', 'guesses', 'backtracks', 'nodes', 'ms'];
+const tsvLine = (row) => {
+  const cells = [row.puzzle, row.status, row.solutions, row.guesses,
+    row.backtracks, row.nodesSearched, row.ms.toFixed(1)];
+  if (row.vsBase !== undefined) cells.push(row.vsBase);
+  return cells.join('\t');
+};
 
 const main = () => {
   const args = parseArgs(process.argv);
@@ -110,28 +135,33 @@ const main = () => {
   const puzzles = resolvePuzzles(args.puzzles);
   const budgets = { maxBacktracks, maxSolutions };
 
+  // Collect rows for JSON; in TSV mode also stream each line as it completes.
+  const rows = [];
+  const header = args.compare.length ? [...TSV_COLUMNS, 'vs-base'] : TSV_COLUMNS;
+  if (!args.json) console.log(header.join('\t'));
+  const emit = (row) => { rows.push(row); if (!args.json) console.log(tsvLine(row)); };
+
   if (args.compare.length) {
-    console.log(['puzzle', 'status', 'sols', 'guesses', 'backtracks', 'nodes', 'ms', 'vs-base'].join('\t'));
     for (const puzzle of puzzles) {
       const base = bestOf(repeat, () => runSolve(puzzle, budgets));
-      console.log(fmt(base) + '\t1.00');
+      emit(toRow(base, '', '1.00'));
       for (const name of args.compare) {
         const restore = applyAblations([name]);
         try {
           const ablated = bestOf(repeat, () => runSolve(puzzle, budgets));
           const ratio = (ablated.counters.nodesSearched / Math.max(1, base.counters.nodesSearched)).toFixed(2);
-          console.log(fmt(ablated, `-${name}`) + '\t' + ratio);
+          emit(toRow(ablated, `-${name}`, ratio));
         } finally { restore(); }
       }
     }
-    return;
+  } else {
+    const restore = args.ablate.length ? applyAblations(args.ablate) : null;
+    try {
+      for (const puzzle of puzzles) emit(toRow(bestOf(repeat, () => runSolve(puzzle, budgets))));
+    } finally { restore?.(); }
   }
 
-  const restore = args.ablate.length ? applyAblations(args.ablate) : null;
-  try {
-    console.log(['puzzle', 'status', 'sols', 'guesses', 'backtracks', 'nodes', 'ms'].join('\t'));
-    for (const puzzle of puzzles) console.log(fmt(bestOf(repeat, () => runSolve(puzzle, budgets))));
-  } finally { restore?.(); }
+  if (args.json) console.log(JSON.stringify(rows));
 };
 
 try {

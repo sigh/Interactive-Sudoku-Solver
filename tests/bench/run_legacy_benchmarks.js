@@ -1,12 +1,12 @@
 // Runs the legacy micro/registered benchmarks: it discovers every `*.bench.js`
-// file under tests/bench/ and runs the benchmarks they register via bench_harness.
+// file under tests/bench/ and runs the benchmarks they register via micro_bench_harness.
 // For solving puzzles and comparing search counters, use benchmark_puzzles.js / profile.js
 // instead (see README.md). Invoked by `npm run bench`.
 import { readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-import { getRegisteredBenches, printBenchResult, runBench } from './bench_harness.js';
+import { getRegisteredBenches, printBenchResult, runBench } from './micro_bench_harness.js';
 
 const benchesDirUrl = new URL('.', import.meta.url);
 const benchesDirPath = fileURLToPath(benchesDirUrl);

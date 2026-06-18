@@ -1,5 +1,5 @@
 import { mergeSortedArrays } from '../../../js/util.js';
-import { bench, benchGroup, runIfMain } from '../bench_harness.js';
+import { bench, benchGroup, runIfMain } from '../micro_bench_harness.js';
 
 // Alternative: concat + sort
 const concatAndSort = (a, b) => {

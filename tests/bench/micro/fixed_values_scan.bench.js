@@ -1,4 +1,4 @@
-import { bench, benchGroup, runIfMain } from '../bench_harness.js';
+import { bench, benchGroup, runIfMain } from '../micro_bench_harness.js';
 
 // 9x9 Sudoku assumptions.
 const NUM_CELLS = 81;

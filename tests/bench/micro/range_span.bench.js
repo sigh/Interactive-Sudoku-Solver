@@ -1,4 +1,4 @@
-import { bench, benchGroup, runIfMain } from '../bench_harness.js';
+import { bench, benchGroup, runIfMain } from '../micro_bench_harness.js';
 
 // Microbench: compute bit-span (maxBitIndex - minBitIndex) for a 16-bit mask.
 // This mirrors the `sum_handler` pattern:

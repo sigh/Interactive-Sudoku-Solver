@@ -1,6 +1,6 @@
 // Shared helpers for the solver analysis CLIs (benchmark_puzzles.js, profile.js).
 //
-// Centralises: puzzle resolution (named puzzles, chaos ladder aliases, or raw
+// Centralises: puzzle resolution (named puzzles, ladder selectors, or raw
 // input), running a single solve under an explicit backtrack/solution budget,
 // the ablation registry (toggle a named optimization off for A/B runs), and the
 // handler-class registry used by the profiler.
@@ -18,6 +18,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { ensureGlobalEnvironment } from '../helpers/test_env.js';
+import { buildSolutionGivenLadder, DEFAULT_LADDER_COUNTS } from './ladder.js';
 
 ensureGlobalEnvironment();
 
@@ -34,7 +35,6 @@ const { PUZZLE_INDEX } = await import('../../data/example_puzzles.js' + self.VER
 const { SudokuParser } = await import('../../js/sudoku_parser.js' + self.VERSION_PARAM);
 const { SudokuBuilder } = await import('../../js/solver/sudoku_builder.js' + self.VERSION_PARAM);
 const { LookupTables } = await import('../../js/solver/lookup_tables.js' + self.VERSION_PARAM);
-const benchPuzzles = await import('./chaos_benchmark_puzzles.js' + self.VERSION_PARAM);
 
 // --- Extensions (pluggable) ---------------------------------------------------
 //
@@ -71,10 +71,15 @@ export { ABLATIONS };
 // --- Puzzle resolution --------------------------------------------------------
 
 // All named puzzles (collections.js merges its puzzles into PUZZLE_INDEX on
-// import), used both for name lookup and as the source for the ladder builders.
+// import), used for name lookup and as the base puzzles for ladders.
 const ALL_EXAMPLES = [...PUZZLE_INDEX.values()];
 
-export const LADDER_ALIASES = ['chaos-ladder', 'chaos-killer-ladder', 'chaos-x-sums-ladder'];
+// Look up a single named example puzzle.
+const findExample = (name) => {
+  const puzzle = ALL_EXAMPLES.find((e) => e.name === name);
+  if (!puzzle) throw new Error(`Unknown puzzle: ${name}`);
+  return puzzle;
+};
 
 // Expand a collections.js export name (e.g. 'TAREK_ALL', 'EXTREME_KILLERS') into
 // its puzzle objects. Entries are either raw constraint strings or already-shaped
@@ -83,10 +88,31 @@ const expandCollection = (name) =>
   COLLECTIONS[name].map((entry, i) =>
     typeof entry === 'string' ? { name: `${name}#${i}`, input: entry } : entry);
 
+// Build a difficulty ladder from a base puzzle. Spec forms:
+//   ladder:<puzzle name>            — default given counts
+//   ladder:<puzzle name>@25-15-5    — explicit revealed-given counts
+// '@' separates the counts (not ':') because puzzle names can contain ':', and
+// the counts are dash-separated (not ',') because the caller's --puzzles list is
+// already comma-split before it reaches here.
+const resolveLadder = (spec) => {
+  const at = spec.lastIndexOf('@');
+  const name = at === -1 ? spec : spec.slice(0, at);
+  const counts = at === -1
+    ? DEFAULT_LADDER_COUNTS
+    : spec.slice(at + 1).split(/\D+/).filter(Boolean).map(Number);
+  if (!counts.length || counts.some((n) => !Number.isInteger(n) || n <= 0)) {
+    throw new Error(`ladder counts must be positive integers (e.g. @25-15-5): ${spec}`);
+  }
+  const puzzle = findExample(name);
+  const shape = SudokuParser.parseText(resolveInput(puzzle.input)).getShape();
+  return buildSolutionGivenLadder(puzzle, shape.numRows, shape.numCols, counts);
+};
+
 // Resolve a list of selectors into puzzle objects ({ name, input, solution? }).
 // A selector is one of:
 //   - a puzzle name ('Chaos Construction', 'Count Different', ...)
-//   - a ladder alias (see LADDER_ALIASES) which expands to several puzzles
+//   - 'ladder:<name>[@counts]' — a difficulty ladder built by revealing solution
+//     givens from that puzzle (works for any solved puzzle, not just chaos)
 //   - a collections.js set name ('TAREK_ALL', 'EXTREME_KILLERS', ...) which
 //     expands to every puzzle in that set
 //   - 'input:<puzzle-string>' to solve a raw constraint string directly
@@ -94,10 +120,13 @@ export const resolvePuzzles = (selectors) => selectors.flatMap((selector) => {
   if (selector.startsWith('input:')) {
     return [{ name: 'input', input: selector.slice('input:'.length) }];
   }
+  if (selector.startsWith('ladder:')) {
+    return resolveLadder(selector.slice('ladder:'.length));
+  }
   if (Array.isArray(COLLECTIONS[selector])) {
     return expandCollection(selector);
   }
-  return benchPuzzles.resolveChaosBenchmarkPuzzles(ALL_EXAMPLES, [selector]);
+  return [findExample(selector)];
 });
 
 // --- Backtrack / solution budgets --------------------------------------------

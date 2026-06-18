@@ -1,4 +1,4 @@
-import { bench, benchGroup, runIfMain } from '../bench_harness.js';
+import { bench, benchGroup, runIfMain } from '../micro_bench_harness.js';
 
 // Microbench: loop forms on Arrays vs TypedArrays.
 // This targets "non-idiomatic" choices like preferring indexed `for` loops

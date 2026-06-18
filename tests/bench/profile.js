@@ -20,7 +20,7 @@
 //   --methods <a,b,...>    Methods to profile. Default: all of the handler's own
 //                          methods. Narrow this (e.g. to the top-level phases) for
 //                          clean timing — see the note on inclusive time below.
-//   --puzzles <a,b,...>    Names / ladder aliases. Default: "Chaos Construction".
+//   --puzzles <a,b,...>    Names / collections / ladder:<name>. Default: "Chaos Construction".
 //   --input <string>       Profile a raw constraint string.
 //   --solutions <n|all>    Solutions to search for. Default 2 (proof of uniqueness);
 //                          "all" exhausts; "1" is first-solution only (warns).
@@ -38,7 +38,7 @@
 // Examples:
 //   node tests/bench/profile.js --max-backtracks 50000 --puzzles "Chaos Construction - easier"
 //   node tests/bench/profile.js --max-backtracks 50000 --handler Sum --puzzles "Killer sudoku"
-//   node tests/bench/profile.js --max-backtracks 50000 --summary --puzzles chaos-ladder
+//   node tests/bench/profile.js --max-backtracks 50000 --summary --puzzles "ladder:Chaos Construction"
 
 import {
   resolvePuzzles, parseBacktrackLimit, parseSolutionLimit, warnIfFirstSolution,
@@ -78,7 +78,7 @@ const usage = () => console.log(
   `  --max-backtracks <n|none>  REQUIRED. Backtrack cap per solve; "none" = unlimited.\n` +
   `  --handler <ClassName>      Handler to profile (default ChaosConstruction; --list-handlers).\n` +
   `  --methods <a,b,...>        Methods to profile (default: all of the handler's own methods).\n` +
-  `  --puzzles <a,b,...>        Names / ladder aliases. Default: "Chaos Construction".\n` +
+  `  --puzzles <a,b,...>        Names / collections / ladder:<name>. Default: "Chaos Construction".\n` +
   `  --input <string>           Profile a raw constraint string.\n` +
   `  --solutions <n|all>        Default 2 = prove uniqueness; "all" exhausts; "1" = first only (warns).\n` +
   `  --ablate <a,b,...>         Disable optimizations during the run.\n` +

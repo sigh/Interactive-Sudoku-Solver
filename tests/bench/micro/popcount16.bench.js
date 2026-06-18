@@ -1,4 +1,4 @@
-import { bench, benchGroup, runIfMain } from '../bench_harness.js';
+import { bench, benchGroup, runIfMain } from '../micro_bench_harness.js';
 
 // Microbench: 16-bit popcount variants.
 // The solver uses popcount in many hot paths (candidate counts, etc.).

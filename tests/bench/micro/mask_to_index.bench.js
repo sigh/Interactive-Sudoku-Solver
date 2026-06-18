@@ -1,4 +1,4 @@
-import { bench, benchGroup, runIfMain } from '../bench_harness.js';
+import { bench, benchGroup, runIfMain } from '../micro_bench_harness.js';
 
 // Microbench: single-bit mask -> index/value conversions.
 // Used heavily throughout solver code (e.g., iterating bitmasks).

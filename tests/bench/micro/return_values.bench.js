@@ -1,4 +1,4 @@
-import { bench, benchGroup, runIfMain } from '../bench_harness.js';
+import { bench, benchGroup, runIfMain } from '../micro_bench_harness.js';
 
 // Standalone microbench: compare strategies for returning two values from a hot function.
 // Intentionally independent of application code.

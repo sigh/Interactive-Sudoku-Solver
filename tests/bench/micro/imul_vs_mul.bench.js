@@ -1,4 +1,4 @@
-import { bench, benchGroup, runIfMain } from '../bench_harness.js';
+import { bench, benchGroup, runIfMain } from '../micro_bench_harness.js';
 
 // Deterministic PRNG (xorshift32) so results are reproducible.
 const makeRng = (seed = 0x12345678) => {

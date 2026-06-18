@@ -1,5 +1,5 @@
 import { ensureGlobalEnvironment } from '../../helpers/test_env.js';
-import { bench, benchGroup, runIfMain } from '../bench_harness.js';
+import { bench, benchGroup, runIfMain } from '../micro_bench_harness.js';
 
 ensureGlobalEnvironment();
 
