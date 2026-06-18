@@ -772,9 +772,8 @@ class InternalSolver {
       let grid = recFrame.gridCells;
       const isNewNode = recFrame.newNode;
 
-      const [nextDepth, value, count] =
-        this._candidateSelector.selectNextCandidate(
-          cellDepth, grid, this._stepState, isNewNode);
+      const { nextDepth, value, count } = this._candidateSelector.selectNextCandidate(
+        cellDepth, grid, this._stepState, isNewNode);
       recFrame.newNode = false;
 
       if (count === 0) continue;

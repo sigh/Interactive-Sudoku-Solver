@@ -31,6 +31,14 @@ const makeSelector = (context, { handlerSet = [] } = {}) => {
   return { selector, conflictScores };
 };
 
+// selectNextCandidate writes its result to reused fields (no per-node allocation);
+// adapt that to the [nextDepth, value, count] tuple these tests assert on.
+const select = (selector, cellDepth, gridState, stepState, isNewNode) => {
+  const { nextDepth, value, count } =
+    selector.selectNextCandidate(cellDepth, gridState, stepState, isNewNode);
+  return [nextDepth, value, count];
+};
+
 await runTest('CandidateSelector moves all singletons to the front when next cell is a singleton', () => {
   const context = new GridTestContext({ gridSize: 4 });
   const { shape } = context;
@@ -45,12 +53,13 @@ await runTest('CandidateSelector moves all singletons to the front when next cel
   gridState[3] = 1 << 1;
   gridState[7] = 1 << 2;
 
-  const [nextDepth, value, count] = selector.selectNextCandidate(
+  const [nextDepth, value, count] = select(
+    selector,
     /* cellDepth */ 0,
     gridState,
     /* stepState */ null,
     /* isNewNode */ true,
-  );
+    );
 
   assert.equal(count, 1);
   assert.equal(value, 1 << 0);
@@ -70,7 +79,7 @@ await runTest('CandidateSelector moves all singletons to the front when next cel
   }
 });
 
-await runTest('CandidateSelector returns [cellOrder,0,0] when a wipeout (0) exists while bubbling singletons', () => {
+await runTest('CandidateSelector signals a wipeout (count 0) when a 0 exists while bubbling singletons', () => {
   const context = new GridTestContext({ gridSize: 4 });
   const { shape } = context;
   const allValues = context.lookupTables.allValues;
@@ -84,14 +93,15 @@ await runTest('CandidateSelector returns [cellOrder,0,0] when a wipeout (0) exis
   gridState[0] = 1 << 0;
   gridState[5] = 0;
 
-  const [cellOrderOrZero, value, count] = selector.selectNextCandidate(
+  const [nextDepth, value, count] = select(
+    selector,
     /* cellDepth */ 0,
     gridState,
     /* stepState */ null,
     /* isNewNode */ true,
-  );
+    );
 
-  assert.ok(cellOrderOrZero instanceof Uint8Array);
+  assert.equal(nextDepth, 0);
   assert.equal(value, 0);
   assert.equal(count, 0);
 });
@@ -132,7 +142,7 @@ await runTest('CandidateSelector consumes custom candidate state across backtrac
   // First visit: custom candidate state should be created and the highest
   // conflict-score cell (7) should be popped first.
   {
-    const [nextDepth, value, count] = selector.selectNextCandidate(0, gridState, null, true);
+    const [nextDepth, value, count] = select(selector, 0, gridState, null, true);
     assert.equal(nextDepth, 1);
     assert.equal(value, nominatedValue);
     assert.equal(count, 3);
@@ -141,7 +151,7 @@ await runTest('CandidateSelector consumes custom candidate state across backtrac
 
   // Backtrack: should continue consuming the custom state (count=2), popping 5 next.
   {
-    const [nextDepth, value, count] = selector.selectNextCandidate(0, gridState, null, false);
+    const [nextDepth, value, count] = select(selector, 0, gridState, null, false);
     assert.equal(nextDepth, 1);
     assert.equal(value, nominatedValue);
     assert.equal(count, 2);
@@ -150,7 +160,7 @@ await runTest('CandidateSelector consumes custom candidate state across backtrac
 
   // Backtrack again: last custom option (count=1), popping 2.
   {
-    const [nextDepth, value, count] = selector.selectNextCandidate(0, gridState, null, false);
+    const [nextDepth, value, count] = select(selector, 0, gridState, null, false);
     assert.equal(nextDepth, 1);
     assert.equal(value, nominatedValue);
     assert.equal(count, 1);
@@ -159,7 +169,7 @@ await runTest('CandidateSelector consumes custom candidate state across backtrac
 
   // After exhaustion: should fall back to default selection (count=domain size).
   {
-    const [nextDepth, value, count] = selector.selectNextCandidate(0, gridState, null, false);
+    const [nextDepth, value, count] = select(selector, 0, gridState, null, false);
     assert.equal(nextDepth, 1);
     assert.equal(count, 4);
     assert.equal(selector.getCellAtDepth(0), 0);
@@ -200,7 +210,7 @@ await runTest('CandidateSelector stepState override clears any pending custom-ca
 
   // First call seeds the custom candidate state.
   {
-    const [, , count] = selector.selectNextCandidate(0, gridState, null, true);
+    const [, , count] = select(selector, 0, gridState, null, true);
     assert.equal(count, 3);
   }
 
@@ -212,7 +222,7 @@ await runTest('CandidateSelector stepState override clears any pending custom-ca
   };
 
   {
-    const [nextDepth, , count] = selector.selectNextCandidate(0, gridState, stepState, false);
+    const [nextDepth, , count] = select(selector, 0, gridState, stepState, false);
     assert.equal(nextDepth, 1);
     assert.equal(count, 4);
     assert.equal(selector.getCellAtDepth(0), guidedCell);
@@ -221,7 +231,7 @@ await runTest('CandidateSelector stepState override clears any pending custom-ca
   // Third call: custom state should have been cleared by the adjustment, so we should
   // see default selection behavior (count=4, best cell=0).
   {
-    const [nextDepth, value, count] = selector.selectNextCandidate(0, gridState, null, false);
+    const [nextDepth, value, count] = select(selector, 0, gridState, null, false);
     assert.equal(nextDepth, 1);
     assert.equal(count, 4);
     assert.equal(selector.getCellAtDepth(0), 0);
@@ -245,12 +255,12 @@ await runTest('CandidateSelector boosts linked chaos cells whose counterpart is 
     gridState[1] = (1 << 0) | (1 << 1);
     gridState[regionCells[0]] = 1 << 0;
 
-    const [nextDepth, , fixedCount] = selector.selectNextCandidate(0, gridState, null, true);
+    const [nextDepth, , fixedCount] = select(selector, 0, gridState, null, true);
     assert.equal(fixedCount, 1);
     assert.equal(nextDepth, 1);
     assert.equal(selector.getCellAtDepth(0), regionCells[0]);
 
-    const [, , count] = selector.selectNextCandidate(nextDepth, gridState, null, true);
+    const [, , count] = select(selector, nextDepth, gridState, null, true);
 
     assert.equal(count, 4);
     assert.equal(selector.getCellAtDepth(nextDepth), 0);
@@ -264,12 +274,12 @@ await runTest('CandidateSelector boosts linked chaos cells whose counterpart is 
     gridState[0] = 1 << 0;
     gridState[1] = (1 << 0) | (1 << 1);
 
-    const [nextDepth, , fixedCount] = selector.selectNextCandidate(0, gridState, null, true);
+    const [nextDepth, , fixedCount] = select(selector, 0, gridState, null, true);
     assert.equal(fixedCount, 1);
     assert.equal(nextDepth, 1);
     assert.equal(selector.getCellAtDepth(0), 0);
 
-    const [, , regionCount] = selector.selectNextCandidate(nextDepth, gridState, null, true);
+    const [, , regionCount] = select(selector, nextDepth, gridState, null, true);
     assert.equal(regionCount, 4);
     assert.equal(selector.getCellAtDepth(nextDepth), regionCells[0]);
   }

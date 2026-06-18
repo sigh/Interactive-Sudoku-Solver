@@ -3014,7 +3014,7 @@ export class CountDistinct extends SudokuConstraintHandler {
     // only needed when the control can still take its maximum.
     let reachA = 0;
     let freeCellDom = 0;
-    if (maxAllowed) [reachA, freeCellDom] = this._reginPrep(fixedMask);
+    if (maxAllowed) ({ reachA, freeCellDom } = this._reginPrep(fixedMask));
     const cellMatch = CountDistinct._cellMatch;
     const reach = CountDistinct._reach;
 
@@ -3133,10 +3133,14 @@ export class CountDistinct extends SudokuConstraintHandler {
     return count;
   }
 
+  // Reused return object for _reginPrep() (avoids allocating a fresh result on
+  // every call). Read it immediately and do not retain it.
+  static _reginResult = { reachA: 0, freeCellDom: 0 };
+
   // Régin filtering on the value graph (§3.2): from the matching in `_valueOwner`,
   // fill `_reach` (per-value transitive closure, edges built in place then closed)
-  // and return [reachA, freeCellDom], from which the caller derives each cell's
-  // max-supported values.
+  // and return { reachA, freeCellDom } (the reused `_reginResult`), from which the
+  // caller derives each cell's max-supported values.
   _reginPrep(fixedMask) {
     const nu = this._numUnfixed;
     const numValues = this._numValues;
@@ -3189,7 +3193,10 @@ export class CountDistinct extends SudokuConstraintHandler {
       reachA |= reach[LookupTables.toIndex(low)];
     }
 
-    return [reachA, freeCellDom];
+    const result = CountDistinct._reginResult;
+    result.reachA = reachA;
+    result.freeCellDom = freeCellDom;
+    return result;
   }
 }
 
@@ -3352,7 +3359,9 @@ export class FullRank extends SudokuConstraintHandler {
 
       let index = i;
       if (firstV > lastV) {
-        [firstV, lastV] = [lastV, firstV];
+        const tmpV = firstV;
+        firstV = lastV;
+        lastV = tmpV;
         index = i + 1;
       }
       if (!firstV) continue;

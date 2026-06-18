@@ -537,9 +537,10 @@ export class Sum extends SudokuConstraintHandler {
         maxMinusSum = (maxMinusSum * invCoeff) | 0;
       } else {
         const invCoeff = -1 / coeff;
-        [maxMinusSum, sumMinusMin] = [
-          (sumMinusMin * invCoeff) | 0,
-          (maxMinusSum * invCoeff) | 0];
+        // Negative coefficient flips the roles of the two bounds.
+        const newMaxMinusSum = (sumMinusMin * invCoeff) | 0;
+        sumMinusMin = (maxMinusSum * invCoeff) | 0;
+        maxMinusSum = newMaxMinusSum;
       }
     }
 
@@ -675,9 +676,10 @@ export class Sum extends SudokuConstraintHandler {
           maxDofSet = (maxDofSet * invCoeff) | 0;
         } else {
           const invCoeff = -1 / coeff;
-          [maxDofSet, minDofSet] = [
-            (minDofSet * invCoeff) | 0,
-            (maxDofSet * invCoeff) | 0];
+          // Negative coefficient flips the roles of the two bounds.
+          const newMaxDofSet = (minDofSet * invCoeff) | 0;
+          minDofSet = (maxDofSet * invCoeff) | 0;
+          maxDofSet = newMaxDofSet;
         }
       }
 

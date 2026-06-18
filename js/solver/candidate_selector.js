@@ -111,6 +111,12 @@ export class CandidateSelector {
   constructor(shape, numSearchCells, handlerSet, debugLogger) {
     this._shape = shape;
     this._cellOrder = new Uint8Array(numSearchCells);
+
+    // Reused return objects for selectNextCandidate() and _selectBestCandidate().
+    // Callers must read it immediately and not retain it.
+    this._result = { nextDepth: 0, value: 0, count: 0 };
+    this._bestCandidate = { cellOffset: 0, value: 0, count: 0 };
+
     this._conflictScores = null;
     this._debugLogger = debugLogger;
     this._numSearchCells = numSearchCells;
@@ -147,10 +153,11 @@ export class CandidateSelector {
     return this._cellOrder[cellDepth];
   }
 
-  // selectNextCandidate find the next candidate to try.
+  // selectNextCandidate finds the next candidate to try.
   // cellOrder will be updated such that cellOrder[cellDepth] is the next cell
   // to explore.
-  // Returns [nextDepth, value, count]:
+  // Returns a { nextDepth, value, count } object (reused across calls — read it
+  // immediately, do not retain):
   //   nextDepth: Index into cellOrder passing all singletons.
   //   value: The candidate value in the nextCells[0].
   //   count: The number of options we selected from:
@@ -161,7 +168,7 @@ export class CandidateSelector {
   //        other than the cell (e.g. a digit within a house).
   selectNextCandidate(cellDepth, gridState, stepState, isNewNode) {
     const cellOrder = this._cellOrder;
-    let [cellOffset, value, count] = this._selectBestCandidate(
+    let { cellOffset, value, count } = this._selectBestCandidate(
       gridState, cellOrder, cellDepth, isNewNode);
     if (cellDepth === 0 && this._debugLogger.logLevel >= 2) {
       this._debugLogger.log({
@@ -200,8 +207,12 @@ export class CandidateSelector {
     const nextCellDepth = this._updateCellOrder(
       cellDepth, cellOffset, count, gridState);
 
+    const result = this._result;
     if (nextCellDepth === 0) {
-      return [cellOrder, 0, 0];
+      result.nextDepth = 0;
+      result.value = 0;
+      result.count = 0;
+      return result;
     }
 
     if (this._debugLogger.enableStepLogs) {
@@ -217,7 +228,10 @@ export class CandidateSelector {
       }
     }
 
-    return [nextCellDepth, value, count];
+    result.nextDepth = nextCellDepth;
+    result.value = value;
+    result.count = count;
+    return result;
   }
 
   _updateCellOrder(cellDepth, cellOffset, count, grid) {
@@ -276,7 +290,10 @@ export class CandidateSelector {
       { loc: 'selectNextCandidate', msg, args, cells: [cell] });
   }
 
+  // Selects the best candidate, returning a { cellOffset, value, count } object
+  // (reused across calls — read it immediately, do not retain).
   _selectBestCandidate(gridState, cellOrder, cellDepth, isNewNode) {
+    const best = this._bestCandidate;
     if (isNewNode) {
       // Clear any previous candidate selection state.
       this._candidateSelectionFlags[cellDepth] = 0;
@@ -287,7 +304,10 @@ export class CandidateSelector {
         const state = this._candidateSelectionStates[cellDepth];
         const count = state.cells.length;
         if (count) {
-          return [cellOrder.indexOf(state.cells.pop()), state.value, count];
+          best.cellOffset = cellOrder.indexOf(state.cells.pop());
+          best.value = state.value;
+          best.count = count;
+          return best;
         }
       }
     }
@@ -297,7 +317,10 @@ export class CandidateSelector {
     {
       const firstValue = gridState[cellOrder[cellDepth]];
       if ((firstValue & (firstValue - 1)) === 0) {
-        return [cellDepth, firstValue, firstValue !== 0 ? 1 : 0];
+        best.cellOffset = cellDepth;
+        best.value = firstValue;
+        best.count = firstValue !== 0 ? 1 : 0;
+        return best;
       }
     }
 
@@ -355,7 +378,10 @@ export class CandidateSelector {
       }
     }
 
-    return [cellOffset, value, count];
+    best.cellOffset = cellOffset;
+    best.value = value;
+    best.count = count;
+    return best;
   }
 
   _selectBestCell(gridState, cellOrder, cellDepth) {
@@ -370,9 +396,8 @@ export class CandidateSelector {
     const conflictScores = this._conflictScores.scores;
     const linkedCells = this._linkedCells;
 
-    const valueInfo = this._conflictScores.getMaxValueScore();
-    const maxValue = valueInfo.value;
-    const maxValueScore = valueInfo.score;
+    const { value: maxValue, score: maxValueScore } =
+      this._conflictScores.getMaxValueScore();
 
     // Find the cell with the minimum score.
     let maxScore = -1;
@@ -720,14 +745,16 @@ export class SamplingCandidateSelector extends CandidateSelector {
 
   selectNextCandidate(cellDepth, gridState, stepState, isNewNode) {
     if (!isNewNode) {
-      return [0, 0, 0];
+      const result = this._result;
+      result.nextDepth = 0;
+      result.value = 0;
+      result.count = 0;
+      return result;
     }
 
-    const [nextDepth, value, count] =
-      super.selectNextCandidate(cellDepth, gridState, stepState, isNewNode);
-    this._totalWeight[nextDepth] = this._totalWeight[cellDepth] * count;
-
-    return [nextDepth, value, count];
+    const result = super.selectNextCandidate(cellDepth, gridState, stepState, isNewNode);
+    this._totalWeight[result.nextDepth] = this._totalWeight[cellDepth] * result.count;
+    return result;
   }
 
   getSolutionWeight() {
@@ -770,6 +797,9 @@ export class ConflictScores {
 
     this._numValues = numValues;
     this._decayCountdown = this.DECAY_FREQUENCY;
+
+    // Reused result for getMaxValueScore() to avoid a per-node allocation.
+    this._maxValueScore = { value: 0, score: 0 };
   }
 
   increment(cell, valueMask) {
@@ -797,7 +827,7 @@ export class ConflictScores {
     this._decayCountdown = this.DECAY_FREQUENCY;
   }
 
-  // Returns { value, score }.
+  // Returns a reused { value, score } object (do not retain across calls):
   // value = value bit mask (0 if none / insufficient spread)
   // score = score (0 if none / insufficient spread)
   getMaxValueScore() {
@@ -816,12 +846,16 @@ export class ConflictScores {
       }
     }
 
+    const result = this._maxValueScore;
     // Only return a value if there is a sufficient spread (max > 1.5 * min),
     // and the max is significant compared to the number of cells.
     if (max < this._numValues || (max << 1) <= min * 3) {
-      return { value: 0, score: 0 };
+      result.value = 0;
+      result.score = 0;
+    } else {
+      result.value = value;
+      result.score = max;
     }
-
-    return { value, score: max };
+    return result;
   }
 }
