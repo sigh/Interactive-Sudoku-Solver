@@ -2916,6 +2916,7 @@ export class CountDistinct extends SudokuConstraintHandler {
   static _stackCell = new Uint16Array(0);     // augmenting-path stack: cell
   static _stackVal = new Uint16Array(0);      // augmenting-path stack: value bit
   static _valueOwner = new Int16Array(SHAPE_MAX.numValues); // value bit -> cell, or -1
+  static _packOwnerDom = new Uint16Array(SHAPE_MAX.numValues); // value index -> its picked cell's domain, or 0
   static _reach = new Uint16Array(SHAPE_MAX.numValues);     // value -> reachable values (Régin)
 
   static _ensureScratch(numCells) {
@@ -2985,7 +2986,20 @@ export class CountDistinct extends SudokuConstraintHandler {
 
     // Unfixed cells add at most `matchBase` (§3.1), at least `packBase` (§4.1).
     const matchBase = this._maxMatching(fixedMask);
-    const packBase = this._packing(fixedMask);
+    // Base packing (§4.1). Also records, for §4.2, `packUsed` (the values it
+    // covers) and `ownerDom` (each value -> its covering picked domain, else 0).
+    const ownerDom = CountDistinct._packOwnerDom;
+    ownerDom.fill(0);
+    let packUsed = fixedMask;
+    let packBase = 0;
+    for (let i = 0; i < nu; i++) {
+      const d = unfixedDoms[i];
+      if (d & packUsed) continue;
+      let m = d;
+      while (m) { const v = m & -m; m ^= v; ownerDom[LookupTables.toIndex(v)] = d; }
+      packBase++;
+      packUsed |= d;
+    }
     const maxD = fixedCount + matchBase;
     const minD = fixedCount + packBase;
 
@@ -3018,6 +3032,20 @@ export class CountDistinct extends SudokuConstraintHandler {
     const cellMatch = CountDistinct._cellMatch;
     const reach = CountDistinct._reach;
 
+    // Min-support set (§4.2): one branchless pass over the packing. `supported`
+    // starts as every covered value; each cell that can stand in for a picked
+    // owner narrows that owner's bits to its footprint. See COUNT_DISTINCT.md §4.2.
+    let supportedMask = 0;
+    if (minAllowed) {
+      supportedMask = packUsed;
+      for (let q = 0; q < nu; q++) {
+        const b = unfixedDoms[q] & packUsed;
+        const nod = ~ownerDom[LookupTables.toIndex(b)];
+        // Narrow the owner to b when b lies within it.
+        supportedMask &= (b | nod) | -((b & nod) !== 0);
+      }
+    }
+
     for (let j = 0; j < nu; j++) {
       const dom = unfixedDoms[j];
       // Max-supported values for this cell (§3.2).
@@ -3030,18 +3058,11 @@ export class CountDistinct extends SudokuConstraintHandler {
       }
       if (maxSup === dom) continue;  // everything max-supported; nothing to prune
 
-      let keep = maxSup;  // default when !minAllowed
-      if (minAllowed) {
-        // Max-supported and fixed values survive the min side for free (§4.2);
-        // only the rest each cost a packing call.
-        keep = dom & (maxSup | fixedMask);
-        let m = dom ^ keep;
-        while (m) {
-          const v = m & -m;
-          m ^= v;
-          if (1 + this._packing(fixedMask | v) <= packBase) keep |= v;
-        }
-      }
+      // Keep max-supported and min-supported values (supportedMask already
+      // includes the fixed values, §4.2).
+      const keep = minAllowed
+        ? dom & (maxSup | supportedMask)
+        : maxSup;
 
       if (keep !== dom) {
         if (!keep) return false;
@@ -3070,7 +3091,7 @@ export class CountDistinct extends SudokuConstraintHandler {
       const free = doms[i] & freeMask;
       let matched = -1;
       if (free) {
-        matched = LookupTables.toIndex(free & -free);
+        matched = LookupTables.toIndex(free);  // any free value
         owner[matched] = i;
       } else {
         matched = this._augment(i, excludeVal, freeMask);
@@ -3100,16 +3121,14 @@ export class CountDistinct extends SudokuConstraintHandler {
       const freeHit = avail & freeMask;
       if (freeHit) {
         // Free value reached: apply the whole augmenting path and report it.
-        const b = LookupTables.toIndex(freeHit & -freeHit);
+        const b = LookupTables.toIndex(freeHit);  // any free value
         sVal[sp] = b;
         for (let i = 0; i <= sp; i++) owner[sVal[i]] = sCell[i];
         return b;
       }
       if (avail) {
-        // Descend into the owner of the lowest unseen (matched) value.
-        const v = avail & -avail;
-        const b = LookupTables.toIndex(v);
-        seen |= v;
+        const b = LookupTables.toIndex(avail);  // Any free value
+        seen |= 1 << b;
         sVal[sp] = b;
         sCell[++sp] = owner[b];
       } else {
@@ -3117,20 +3136,6 @@ export class CountDistinct extends SudokuConstraintHandler {
       }
     }
     return -1;
-  }
-
-  // Greedy disjoint-domain packing over the unfixed cells.
-  _packing(used) {
-    const doms = CountDistinct._unfixedDoms;
-    const nu = this._numUnfixed;
-    let count = 0;
-    for (let i = 0; i < nu; i++) {
-      const d = doms[i];
-      if (d & used) continue;  // covered by a fixed/pinned value or a picked domain
-      count++;
-      used |= d;
-    }
-    return count;
   }
 
   // Reused return object for _reginPrep() (avoids allocating a fresh result on

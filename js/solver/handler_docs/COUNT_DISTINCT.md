@@ -129,9 +129,10 @@ function enforceConsistency(grid):
 
     if the control still allows a count in (minD, maxD): return OK   # §2.3
     if maxD is allowed: reginPrep()                            # §3.2
-    for each unfixed cell j, value v:
-        keep v iff (max side supports it) or (min side supports it) # §3.2 / §4.2
-        write back the surviving mask; fail if empty
+    if minD is allowed: supported ← minSupport()              # §4.2 (one pass)
+    for each unfixed cell j:
+        keep ← (maxSup_j, §3.2) ∨ (supported, §4.2)           # whichever sides apply
+        write back keep ∧ D_j; fail if empty
     return OK
 ```
 
@@ -266,42 +267,86 @@ pairwise disjoint (and disjoint from the already-reserved values), then they mus
 take `k` distinct new values, so `k` is a lower bound. Greedily:
 
 ```text
-function packing(used):                 # used is seeded with fixedMask (+ a pinned value)
-    count ← 0
+function packing(seed = fixedMask):     # the picked cells are those it counts
+    used ← seed;  count ← 0
     for each unfixed cell c:
         if D_c ∧ used = 0:              # disjoint from everything reserved so far
-            count ← count + 1
+            count ← count + 1           # c is "picked"
             used ← used ∪ D_c
-    return count
+    return count                         # leaves packUsed = used
 ```
 
-`minD = fixedCount + packing(fixedMask)`. Because the packing never *over*counts,
-`minD` is a true lower bound on the real minimum, so intersecting the control with
+Writing `packBase = packing()`, we have `minD = fixedCount + packBase`. Because
+the packing never *over*counts, `minD` is a true lower bound on the real minimum,
+so intersecting the control with
 `[minD, maxD]` (§2.1) is **sound**: the kept low counts are a superset of the
 achievable ones, so no achievable control value is ever removed. (Seeding `used`
 with `fixedMask` first is what makes the bound tight in practice: it reserves the
 forced values before any unfixed domain can claim them, e.g. it packs
 `{1,2},{1},{2}` to 2 rather than 1.)
 
+The same pass records what §4.2 needs: the final `used` (call it `packUsed` —
+`fixedMask` plus the picked domains), and `ownerDom`, mapping each value in a
+picked domain to that whole domain (and every other value to `0`). The picked
+domains are pairwise disjoint by construction.
+
 ### 4.2 Min-side counted pruning
 
 When the control is pinned so that `minD` is allowed, value `v` in cell `j`
-survives only if fixing `x_j = v` can still reach `minD`. We test this with the
-same packing, applied with `v` reserved:
+survives only if fixing `x_j = v` can still reach `minD`. We answer this for
+*every* value in a single pass, reusing the packing of §4.1 — its `packBase`
+pairwise-disjoint **picked** domains, with union `packUsed`.
+
+> **Prune rule.** If some `packBase`-sized disjoint packing of unfixed domains
+> *avoids* `v` (and avoids `fixedMask`), then `v` is unsupportable at `minD`, so
+> remove it.
+
+*Soundness.* Such a packing forces `packBase` distinct values, none equal to a
+fixed value or to `v`. Any assignment with some `x = v` then contributes one more
+distinct value, so its count is at least `fixedCount + packBase + 1 = minD + 1`.
+Hence no assignment with `x_j = v` reaches `minD`, and removing `v` is sound. ∎
+
+We look for an avoiding packing with a **single swap**. A value `v ∈ packUsed`
+lies in exactly one picked domain (they are disjoint) — its **owner** `od`.
+Replacing that owner cell with a different unfixed cell `q` gives another
+`packBase` packing iff `q` avoids the rest of the packing,
+`D_q ∧ (packUsed \ od) = ∅`; the swap avoids `v` iff `v ∉ D_q`. So a stand-in `q`
+for `od` rules out exactly the owner values it omits, and
+
+> `v ∈ od` survives the min side iff *every* stand-in for `od` contains `v` —
+> i.e. `od`'s survivors are `od ∧ (⋀ stand-in D_q)`, all of `od` if it has none.
+
+This is a deliberate **under**-approximation: it tries only single swaps, not
+multi-cell rearrangements, so it can keep a value a fuller search would prune. It
+is sound (every removal exhibits a real avoiding packing) but, like the
+hitting-set bound it builds on, prunes less than GAC. (It is therefore *not*
+comparable to the per-value-packing test it replaces: each rules out cases the
+other misses; both are sound.)
 
 ```text
-keep v on the min side  iff  newBit + packing(fixedMask ∨ v) ≤ packBase
-       where  newBit  = 0 if v ∈ fixedMask else 1     # does v itself add a value?
-              packBase = packing(fixedMask)           # = minD − fixedCount
+function minSupport():                       # picked domains + packUsed + ownerDom from §4.1
+    supported ← packUsed                      # every covered value, fixed included
+    for each unfixed cell q:
+        b  ← D_q ∧ packUsed                   # q's footprint on the packed values
+        od ← ownerDom[highest bit of b]       # candidate owner (0 if none)
+        if b ⊆ od:                            # q is a stand-in for od's owner
+            supported ← supported ∧ (b ∨ ¬od) # intersect od's bits with b, others untouched
+    return supported
 ```
 
-Reserving `v` in `used` automatically drops cell `j` from the packing (its domain
-meets `used`), so this measures the rest. **Soundness:** because `packing` is a
-lower bound, `newBit + packing(fixedMask ∨ v)` is a lower bound on the true
-minimum once `x_j = v`; if even that lower bound exceeds `minD`, then count `minD`
-is genuinely unreachable with `x_j = v`, so removing `v` is sound. When the bound
-does *not* exceed `minD` we keep `v` — possibly conservatively, since the bound may
-be loose, but never unsoundly.
+Two facts collapse this to one branchless loop with no per-owner storage:
+
+- **One accumulator for all owners.** The picked domains occupy disjoint bit
+  ranges, so `supported ∧ (b ∨ ¬od)` narrows only `od`'s bits and leaves every
+  other owner alone.
+- **`od = 0` self-handles everything that is not a stand-in.** A footprint whose
+  highest bit is fixed or free maps to `od = 0`, and `b ⊆ od` then fails, so the
+  cell contributes nothing. Fixed values likewise have `od = 0`, so they are
+  never narrowed and stay supported — exactly "a fixed value adds nothing, so it
+  is always min-supported". The owner cell maps to its own domain, a no-op.
+
+A value survives the min side iff it is in `supported`; the per-cell `keep` is
+`maxSup_j ∨ supported` intersected with `D_j` (§2.4).
 
 ## 5. A Static Lower Bound from Exclusions
 
@@ -319,16 +364,18 @@ during search, so the bound, applied once, never needs revisiting.
 ## 6. Implementation Notes
 
 - **Shared scratch.** All working arrays (`_unfixedDoms`, `_cellMatch`, the
-  augmenting-path stacks, `_valueOwner`, `_reach`, …) are *static* members of
-  `CountDistinct`, grown on demand by `_ensureScratch`. The solver enforces one
-  handler at a time, so there is never concurrent use, and a single set of buffers
-  sized to the largest constraint serves every instance. Only the constraint
-  definition and a few per-call scalars live on the instance.
+  augmenting-path stacks, `_valueOwner`, `_reach`, `_packOwnerDom`, …) are
+  *static* members of `CountDistinct`, grown on demand by `_ensureScratch`. The
+  solver enforces one handler at a time, so there is never concurrent use, and a
+  single set of buffers sized to the largest constraint serves every instance.
+  Only the constraint definition and a few per-call scalars live on the instance.
 - **16-bit storage.** Cell indices (≤ 256) and value masks (≤ 16 bits) both fit in
   16 bits, so the buffers are `Uint16Array` / `Int16Array`.
-- **No allocation, no recursion on the hot path.** The matching is iterative Kuhn
-  over the explicit stacks; the value-graph closure is an iterative Warshall over
-  ≤16 nodes; the packing is a single loop. `enforceConsistency` allocates nothing.
+- **No allocation, no recursion, no per-value loops on the hot path.** The
+  matching is iterative Kuhn over the explicit stacks; the value-graph closure is
+  an iterative Warshall over ≤16 nodes; the packing and the min-side support
+  (§4.2) are each a single pass over the unfixed cells — the min side needs no
+  per-value packing recomputation. `enforceConsistency` allocates nothing.
 - **Work is over unfixed cells only.** Splitting out the fixed cells once (§2.2)
   keeps the matching, packing, and Régin pass small — they never touch the fixed
   cells, which contribute only the constant `fixedCount` and the reserved
