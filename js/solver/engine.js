@@ -591,20 +591,24 @@ class InternalSolver {
     const counters = this.counters;
     const logSteps = this._debugLogger.enableStepLogs;
 
+    let constraintsProcessed = 0;
     while (!handlerAccumulator.isEmpty()) {
       const c = handlerAccumulator.takeNext();
-      counters.constraintsProcessed++;
+      constraintsProcessed++;
       if (logSteps) {
         if (!this._debugEnforceConsistency('_enforceConstraints', gridState, c, handlerAccumulator)) {
+          counters.constraintsProcessed += constraintsProcessed;
           return false;
         }
       } else {
         if (!c.enforceConsistency(gridState, handlerAccumulator)) {
+          counters.constraintsProcessed += constraintsProcessed;
           return false;
         }
       }
     }
 
+    counters.constraintsProcessed += constraintsProcessed;
     return true;
   }
 

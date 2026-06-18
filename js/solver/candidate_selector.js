@@ -304,7 +304,7 @@ export class CandidateSelector {
         const state = this._candidateSelectionStates[cellDepth];
         const count = state.cells.length;
         if (count) {
-          best.cellOffset = cellOrder.indexOf(state.cells.pop());
+          best.cellOffset = cellOrder.indexOf(state.cells.pop(), cellDepth);
           best.value = state.value;
           best.count = count;
           return best;
@@ -373,7 +373,7 @@ export class CandidateSelector {
             [state.cells[count - 1], state.cells[index]];
         }
 
-        cellOffset = cellOrder.indexOf(state.cells.pop());
+        cellOffset = cellOrder.indexOf(state.cells.pop(), cellDepth);
         this._candidateSelectionFlags[cellDepth] = 1
       }
     }
@@ -398,6 +398,7 @@ export class CandidateSelector {
 
     const { value: maxValue, score: maxValueScore } =
       this._conflictScores.getMaxValueScore();
+    const maxValueScoreScaled = maxValueScore * 0.2;
 
     // Find the cell with the minimum score.
     let maxScore = -1;
@@ -405,7 +406,8 @@ export class CandidateSelector {
 
     for (let i = cellDepth; i < numSearchCells; i++) {
       const cell = cellOrder[i];
-      const count = countOnes16bit(gridState[cell]);
+      const values = gridState[cell];
+      const count = countOnes16bit(values);
       // If we have a single value then just use it - as it will involve no
       // guessing.
       // NOTE: We could use more efficient check for count() < 1, but it's not
@@ -431,8 +433,8 @@ export class CandidateSelector {
 
       // If a value has been particularly conflict-prone recently, prefer
       // searching cells that contain that value.
-      if (gridState[cell] & maxValue) {
-        scoreUnnormalized += (maxValueScore * 0.2);
+      if (values & maxValue) {
+        scoreUnnormalized += maxValueScoreScaled;
       }
 
       if (scoreUnnormalized > maxScore * count) {
@@ -799,13 +801,18 @@ export class ConflictScores {
     this._decayCountdown = this.DECAY_FREQUENCY;
 
     // Reused result for getMaxValueScore() to avoid a per-node allocation.
-    this._maxValueScore = { value: 0, score: 0 };
+    // Its value only changes when _valueScores changes (i.e. in increment() and
+    // decay()), so between those it can be returned directly without rescanning.
+    // A score of -1 is the dirty sentinel: a real score is always >= 0, so this
+    // signals "must recompute" without needing a separate flag.
+    this._maxValueScore = { value: 0, score: -1 };
   }
 
   increment(cell, valueMask) {
     this.scores[cell]++;
 
     this._valueScores[(LookupTables.toIndex(valueMask))]++;
+    this._maxValueScore.score = -1;
 
     if (--this._decayCountdown === 0) {
       this.decay();
@@ -813,6 +820,7 @@ export class ConflictScores {
   }
 
   decay() {
+    this._maxValueScore.score = -1;
     const scores = this.scores;
     for (let i = 0; i < scores.length; i++) {
       scores[i] >>= 1;
@@ -831,6 +839,8 @@ export class ConflictScores {
   // value = value bit mask (0 if none / insufficient spread)
   // score = score (0 if none / insufficient spread)
   getMaxValueScore() {
+    if (this._maxValueScore.score !== -1) return this._maxValueScore;
+
     const valueScores = this._valueScores;
     let max = 0;
     let value = 0;
