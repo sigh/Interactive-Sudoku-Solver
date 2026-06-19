@@ -1222,6 +1222,12 @@ export const EXAMPLES = [
     solution: '728316459816594723397425816563281974471968235934657182152743698689132547245879361',
     constraintTypes: ['ChaosConstruction', 'ChaosArrow', 'AllDifferent', 'NFA', 'And', 'WhiteDot'],
   },
+  {
+    name: 'Inset',
+    src: 'https://sudokupad.app/nlmbdwt4wn',
+    input: '/data/inset.iss',
+    constraintTypes: ['Var', 'AllDifferent', 'NFA'],
+  },
 ];
 
 for (const puzzle of EXAMPLES) {

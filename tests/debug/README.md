@@ -14,8 +14,9 @@ causes.
 | `node tests/debug/solve.js` | Run a puzzle and display solution content: digit grid plus all var-cell groups (e.g. Chaos region labels). Optionally verify a known solution is accepted. |
 | `node tests/debug/step_analysis.js` | Walk the search step by step. Explain why a branch was chosen, show pencilmarks/var-cell candidates, the per-step propagation log (what each handler pruned + the refuter), and where an ablation makes the branching diverge. |
 | `node tests/debug/search_hotspots.js` | Where the search concentrates over a (bounded) solve: the conflict heatmap, the cells re-guessed most (churn), and the branch-factor shape (grid vs var, MRV gap). The headless view of the debug UI's heatmap. |
+| `node tests/debug/run_sandbox.js` | Run a [sandbox](../../js/sandbox/README.md) script outside the browser and print the constraints it returns. Generate or regenerate puzzle definitions (e.g. `.iss` files) without opening the browser; pipe the output into `solve.js`. |
 
-Run either script with `--help` for the full option reference.
+Run any script with `--help` for the full option reference.
 
 ---
 
@@ -161,3 +162,29 @@ node tests/debug/search_hotspots.js --max-backtracks 50000 --puzzle "Chaos Const
 
 A `capped` status means the run hit the backtrack limit, so the rankings reflect
 only the work done so far.
+
+---
+
+### `run_sandbox.js` — run a sandbox script outside the browser
+
+Executes a [sandbox](../../js/sandbox/README.md) script against the real
+`SANDBOX_GLOBALS` (constraint classes, `makeCellId`, `makeSolver`, …), then
+serializes whatever it returns into a constraint string — one constraint per
+line. Top-level `return` and `await` work just as they do in the browser sandbox.
+
+```sh
+# Print the constraints a sandbox script generates.
+node tests/debug/run_sandbox.js --file my_puzzle.js
+
+# Generate a puzzle and solve it in one pipe.
+node tests/debug/run_sandbox.js --file my_puzzle.js \
+  | node tests/debug/solve.js --max-backtracks none --input-file /dev/stdin --solutions 2
+
+# Run inline code; --raw prints the return value instead of serializing it.
+node tests/debug/run_sandbox.js --code 'return [new Shape("6x6"), new Given("R1C1", 3)];'
+```
+
+Use `--current <constraintString>` to populate `currentConstraint()` /
+`currentShape()` for scripts that transform the loaded puzzle. This is how the
+`.iss` puzzle files under [`data/`](../../data/) are (re)generated from a sandbox
+script.

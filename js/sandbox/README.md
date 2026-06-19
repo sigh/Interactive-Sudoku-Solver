@@ -39,3 +39,40 @@ User code has access to everything in `SANDBOX_GLOBALS` (defined in [env.js](env
 ### Code Sharing
 
 Code is encoded as Base64 in the URL `?code=` parameter, enabling shareable sandbox links. The editor also auto-saves to localStorage on every change.
+
+## Encoding puzzles
+
+The script API (return values, console methods, cell ids, the solver interface) is documented in [help_text.js](help_text.js). See [sudoku_constraint.js](../sudoku_constraint.js)
+for the full list of built-in constraint classes.
+
+See [examples.js](examples.js) for runnable scripts demonstrating these patterns.
+To run a script outside the browser — e.g. to generate a puzzle file — use
+[`tests/debug/run_sandbox.js`](../../tests/debug/run_sandbox.js), which executes
+it against these same globals and prints the resulting constraints.
+
+### What the engine always enforces
+
+Every grid has the same baseline, applied automatically:
+
+- Each row and each column is all-different.
+- Each box is all-different, unless you add `NoBoxes` (or change them with `RegionSize`).
+- Every cell draws from one value range (e.g. `1–9`), set by `Shape`.
+
+Everything else is built by adding constraints on top of this baseline.
+
+### A rule with no dedicated constraint
+
+Most "custom" rules reduce to one of these shapes, using a constraint class from [sudoku_constraint.js](../sudoku_constraint.js):
+
+| Rule is about… | Use |
+| --- | --- |
+| a set or sum of cells | `Cage`, `Sum`, `AllDifferent` |
+| the digits along an ordered list of cells | `Regex`, `NFA` |
+| a relation between adjacent/paired cells | `Pair`, `PairX` |
+| one of several alternatives holding | `Or`, `And` |
+
+A rule with no constraint of its own is often a regular language in disguise — e.g. a parity-of-sum rule is a parity-of-count rule over odd/even digits, which `Regex`/`NFA` express directly. Note their alphabet is the grid's value range, so a pattern can only reference in-range digits.
+
+### Structure the grid model doesn't support
+
+For variables outside the grid, regions the shape can't describe, or multiple/overlapping sub-grids, add cells with `Var` (addressed `VA1`, `VA2`, …). Var cells are *not* part of the automatic row/column/box groups, so you define their behaviour yourself: restrict their values with givens, and form regions with explicit `AllDifferent`. Combined with `NoBoxes`, this expresses geometries the built-in shape cannot.
