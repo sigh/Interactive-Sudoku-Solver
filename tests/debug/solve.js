@@ -6,7 +6,11 @@
 // want search counters (guesses, backtracks, nodes) rather than solution content.
 //
 // Usage:
-//   node tests/debug/solve.js [options]
+//   node tests/debug/solve.js --max-backtracks <n|none> [options]
+//
+// Required:
+//   --max-backtracks <n|none>  Backtrack cap; "none" = unlimited. No default,
+//                         so a run is never silently unbounded.
 //
 // Puzzle source (pick one):
 //   --puzzle <name>       Named puzzle from data/collections.js.
@@ -23,14 +27,15 @@
 //   -h, --help            Print this help and exit.
 //
 // Examples:
-//   node tests/debug/solve.js --puzzle "Chaos Construction"
-//   node tests/debug/solve.js --input-file puzzle.txt --solutions all
-//   node tests/debug/solve.js --puzzle "Chaos Construction" --solution 123456789...
+//   node tests/debug/solve.js --max-backtracks none --puzzle "Chaos Construction"
+//   node tests/debug/solve.js --max-backtracks none --input-file puzzle.txt --solutions all
+//   node tests/debug/solve.js --max-backtracks 50000 --puzzle "Chaos Construction" --solution 123456789...
 
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ensureGlobalEnvironment } from '../helpers/test_env.js';
+import { runAsCli } from '../helpers/cli_entry.js';
 
 ensureGlobalEnvironment();
 
@@ -44,10 +49,25 @@ const { LookupTables } = await import('../../js/solver/lookup_tables.js' + self.
 // Arg parsing
 // ============================================================================
 
+// Parse an *explicit* backtrack limit (mirrors solver_analysis.parseBacktrackLimit).
+// There is no default: a run is never silently bounded or silently unbounded.
+const parseBacktrackLimit = (raw) => {
+  if (raw === undefined || raw === '') {
+    throw new Error(
+      'a backtrack limit is required: pass --max-backtracks <n> (or "none" for unlimited)');
+  }
+  if (raw === 'none' || raw === 'unlimited' || raw === '0') return 0;
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n < 0) {
+    throw new Error(`invalid --max-backtracks: ${raw} (expected a non-negative integer or "none")`);
+  }
+  return n;
+};
+
 const parseArgs = (argv) => {
   const args = {
     puzzle: null, input: null, inputFile: null,
-    maxSolutions: 2, solution: null,
+    maxSolutions: 2, maxBacktracksRaw: undefined, solution: null,
     list: false, help: false,
   };
   for (let i = 2; i < argv.length; i++) {
@@ -60,6 +80,7 @@ const parseArgs = (argv) => {
       case '--input': args.input = next(); break;
       case '--input-file': args.inputFile = next(); break;
       case '--solution': args.solution = next(); break;
+      case '--max-backtracks': args.maxBacktracksRaw = next(); break;
       case '--solutions': {
         const v = next();
         args.maxSolutions = v === 'all' ? 0 : +v;
@@ -72,7 +93,12 @@ const parseArgs = (argv) => {
 };
 
 const printUsage = () => console.log(`\
-Usage: node tests/debug/solve.js [options]
+Usage: node tests/debug/solve.js --max-backtracks <n|none> [options]
+
+Required:
+  --max-backtracks <n|none>  Backtrack cap; "none" = unlimited. No default —
+                             you must say which, so a run is never silently
+                             unbounded (it can hang on a hard puzzle).
 
 Puzzle source (pick one):
   --puzzle <name>       Named puzzle from data/collections.js.
@@ -198,8 +224,8 @@ const injectSolutionGivens = (input, digits) => {
   return input + givens;
 };
 
-const main = () => {
-  const args = parseArgs(process.argv);
+export const main = (argv) => {
+  const args = parseArgs(argv);
   if (args.help) { printUsage(); return; }
   if (args.list) { for (const p of allPuzzles()) console.log(p.name); return; }
 
@@ -215,27 +241,42 @@ const main = () => {
   const internal = solver._internalSolver;
   const shape = internal._shape;
 
-  const mode = args.maxSolutions > 0 ? { maxSolutions: args.maxSolutions } : null;
+  const maxBacktracks = parseBacktrackLimit(args.maxBacktracksRaw);
+
+  const mode = {};
+  if (args.maxSolutions > 0) mode.maxSolutions = args.maxSolutions;
+  if (maxBacktracks > 0) mode.maxBacktracks = maxBacktracks;
 
   let count = 0;
   const grids = [];
-  internal.run(mode, (grid) => {
+  internal.run(Object.keys(mode).length ? mode : null, (grid) => {
     count++;
     grids.push(grid.slice());
   });
 
   const exhausted = internal.state === internal.constructor.STATE_EXHAUSTED;
+  const capped = !exhausted && maxBacktracks > 0 &&
+    internal.counters.backtracks >= maxBacktracks;
 
   console.log(`Puzzle: ${puzzle.name}`);
   if (args.solution !== null) console.log(`Verifying solution: ${args.solution}`);
 
   if (count === 0) {
+    // A capped run is inconclusive, and a rejected --solution verify is a
+    // failure; both throw so the CLI exits non-zero. A genuine no-solution is a
+    // valid result (exit 0).
+    if (capped) {
+      throw new Error(`capped after ${maxBacktracks} backtracks — no solution found yet (incomplete)`);
+    }
     console.log('Result: no solution');
-    if (args.solution !== null) process.exit(1);
+    if (args.solution !== null) throw new Error('solver rejected the given solution');
     return;
   }
 
-  const status = !exhausted ? 'first-only' : count > 1 ? 'multiple solutions' : 'unique';
+  const status = capped ? `capped after ${maxBacktracks} backtracks (incomplete)`
+    : !exhausted ? 'first-only'
+    : count > 1 ? 'multiple solutions'
+    : 'unique';
   console.log(`Result: ${status} (${count} found)`);
 
   for (let i = 0; i < grids.length; i++) {
@@ -243,4 +284,4 @@ const main = () => {
   }
 };
 
-main();
+runAsCli(import.meta.url, main);

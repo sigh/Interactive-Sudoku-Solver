@@ -206,9 +206,9 @@ const solutionString = (grid, shape) => {
 export const runSolve = (puzzle, { maxBacktracks, maxSolutions }, onSolver) => {
   const constraint = SudokuParser.parseText(resolveInput(puzzle.input));
   const shape = constraint.getShape();
-  // Match the production build path (SimpleSolver / the worker): resolve the
-  // constraint through the optimizer before building, so counts reflect real
-  // solves rather than an un-optimized handler set.
+  // Reconstruct constraint instances from their type+args, as the worker and
+  // SimpleSolver do after a constraint crosses a serialization boundary. A no-op
+  // for a freshly parsed constraint; kept so this path matches production.
   const resolved = SudokuBuilder.resolveConstraint(constraint);
   const solver = SudokuBuilder.build(resolved);
   const internal = solver._internalSolver;
