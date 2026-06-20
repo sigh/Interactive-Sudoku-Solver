@@ -1,4 +1,4 @@
-// SimpleSolver for sandbox, debug.js, and tests.
+// SimpleSolver for sandbox and tests.
 //
 // Provides a simplified interface to the solver that runs locally
 // without web workers.

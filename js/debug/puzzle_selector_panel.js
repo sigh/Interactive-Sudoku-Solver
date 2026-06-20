@@ -6,8 +6,11 @@ const {
 await dynamicCSSFileLoader('css/puzzle_selector.css' + self.VERSION_PARAM)();
 
 const { SudokuParser } = await import('../sudoku_parser.js' + self.VERSION_PARAM);
-
-const debugModule = await import('./debug.js' + self.VERSION_PARAM);
+const {
+  PUZZLE_INDEX,
+  resolvePuzzleConfig,
+} = await import('../../data/example_puzzles.js' + self.VERSION_PARAM);
+const PuzzleCollections = await import('../../data/collections.js' + self.VERSION_PARAM);
 
 export class PuzzleSelectorPanel {
   constructor(constraintManager, bodyElement) {
@@ -17,8 +20,7 @@ export class PuzzleSelectorPanel {
     this._datalist = bodyElement.querySelector('#puzzle-selector-puzzles');
     this._puzzleSrc = bodyElement.querySelector('#puzzle-selector-src');
 
-    debugModule.setConstraintManager(constraintManager);
-    debugModule.debugFilesLoaded.then(() => this._loadPuzzleInput());
+    this._loadPuzzleInput();
   }
 
   setEnabled() { }
@@ -29,18 +31,15 @@ export class PuzzleSelectorPanel {
     clearDOMNode(this._puzzleSrc);
   }
 
-  static async _makeIndex() {
+  static _makeIndex() {
     const index = new Map();
 
-    const { PUZZLE_INDEX } = await import('../../data/example_puzzles.js' + self.VERSION_PARAM);
     for (const puzzle of PUZZLE_INDEX.values()) {
       const constraintTypes = puzzle.constraintTypes
         || SudokuParser.extractConstraintTypes(puzzle.input);
       const title = `${puzzle.name || ''} [${constraintTypes.join(',')}]`;
       index.set(title, puzzle);
     }
-
-    const PuzzleCollections = await import('../../data/collections.js' + self.VERSION_PARAM);
 
     const puzzleLists = {
       TAREK_ALL: PuzzleCollections.TAREK_ALL,
@@ -63,8 +62,20 @@ export class PuzzleSelectorPanel {
     return index;
   }
 
-  async _loadPuzzleInput() {
-    const index = await this.constructor._makeIndex();
+  async _loadInput(puzzleCfg) {
+    const puzzle = resolvePuzzleConfig(puzzleCfg);
+
+    // Lazily fetch input from file if it's a path.
+    if (puzzle.input.startsWith('/')) {
+      const response = await fetch('.' + puzzle.input);
+      puzzle.input = await response.text();
+    }
+
+    this._constraintManager.loadUnsafeFromText(puzzle.input);
+  }
+
+  _loadPuzzleInput() {
+    const index = this.constructor._makeIndex();
     const datalist = this._datalist;
     for (const name of index.keys()) {
       const option = document.createElement('option');
@@ -84,7 +95,7 @@ export class PuzzleSelectorPanel {
       const puzzle = index.get(name);
       if (!puzzle) return;
 
-      await debugModule.loadInput(puzzle);
+      await this._loadInput(puzzle);
 
       window.setTimeout(() => {
         const puzzleSrc = this._puzzleSrc;

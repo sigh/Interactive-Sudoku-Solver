@@ -11,8 +11,6 @@ const {
   CellValueDisplay,
 } = await import('../display.js' + self.VERSION_PARAM);
 
-const debugModule = await import('./debug.js' + self.VERSION_PARAM);
-
 export class DebugManager {
   constructor(displayContainer, constraintManager, bottomDrawer) {
     // External dependencies.
@@ -43,9 +41,6 @@ export class DebugManager {
   }
 
   _initialize() {
-    // Import debug module functions into the window scope.
-    Object.assign(self, debugModule);
-
     const cellPositioner = this._displayContainer.getCellPositioner();
 
     // UI wiring.
@@ -87,9 +82,6 @@ export class DebugManager {
       };
       this._setInfoOverlayOnCheck(element, overlayValuesFn);
     }
-
-    // Expose the constraint manager to debug console helpers (e.g. loadInput).
-    debugModule.setConstraintManager(this._constraintManager);
 
     // Call reshape so that all dependencies are initialized with the shape.
     if (this._shape) {
