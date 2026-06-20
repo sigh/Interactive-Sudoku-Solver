@@ -1,21 +1,117 @@
-#puzzle-selector-container > .lazy-body {
+#puzzle-selector-container>.lazy-body {
   box-sizing: border-box;
   padding: var(--gap-default);
 }
 
 #puzzle-selector-panel {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   gap: var(--gap-default);
-  width: 240px;
-  max-width: 100%;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
 }
 
-#puzzle-selector-panel #puzzle-selector-input {
+#puzzle-selector-controls {
+  flex: 0 0 200px;
+}
+
+#puzzle-selector-filter {
   box-sizing: border-box;
   width: 100%;
 }
 
-#puzzle-selector-src {
-  font-size: 0.9em;
+#puzzle-selector-count {
+  font-size: var(--font-size-small);
+  color: var(--color-text-muted);
+}
+
+#puzzle-selector-list {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+}
+
+/* Subtle separator between collections; no heading text needed since each
+   row is self-labelled (e.g. "TAREK_ALL[37]"). */
+.puzzle-group+.puzzle-group {
+  border-top: 1px solid var(--color-border-light);
+}
+
+/* A single row: icon, name, then the type chips / detail. */
+.puzzle-item {
+  padding: 1px 8px;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.puzzle-item:hover {
+  background: var(--color-primary-soft);
+}
+
+/* The active row (where Enter loads / the last one clicked). Inset outline so
+   it composes with the hover background without shifting layout. */
+.puzzle-item.active {
+  outline: 2px solid var(--color-primary-dark);
+  outline-offset: -2px;
+}
+
+/* The name takes whatever room is left and truncates rather than the chips. */
+.puzzle-item-label {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.puzzle-item-detail {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-small);
+}
+
+/* Constraint types: each rendered as a small chip so they read as distinct
+   tokens without commas. */
+.puzzle-item-tags {
+  display: flex;
+  flex: 0 0 auto;
+  column-gap: 5px;
+}
+
+/* Colour derived from a per-type hue (set inline) so each constraint type is
+   consistently coloured and easy to scan for. */
+.puzzle-item-tag {
+  padding: 0 5px;
+  border-radius: 10px;
+  font-size: var(--font-size-small);
+  background: hsl(var(--tag-hue, 0) 55% 95%);
+  color: hsl(var(--tag-hue, 0) 15% 40%);
+  border: 1px solid hsl(var(--tag-hue, 0) 40% 82%);
+}
+
+/* Source link icon (and an equal-width placeholder for source-less rows, so
+   the labels line up). */
+.puzzle-item-src {
+  flex: 0 0 auto;
+  width: 13px;
+  height: 13px;
+}
+
+/* Sits a little smaller by default and grows to fill the slot on hover. The
+   slot itself stays a fixed size, so labels never shift. */
+.puzzle-item-src img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  opacity: 0.6;
+  transform: scale(0.75);
+  transition: transform 0.1s ease, opacity 0.1s ease;
+}
+
+.puzzle-item-src:hover img {
+  opacity: 1;
+  transform: scale(1);
 }

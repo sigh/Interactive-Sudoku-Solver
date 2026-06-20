@@ -797,11 +797,11 @@ function accept(state) {
         <div class="loading-notice notice notice-info">Loading…</div>
         <div class="lazy-body" hidden>
           <div id="puzzle-selector-panel">
-            <div>
-              <input type="text" list="puzzle-selector-puzzles" id="puzzle-selector-input" placeholder="Load a puzzle">
-              <datalist id="puzzle-selector-puzzles"></datalist>
+            <div id="puzzle-selector-controls" class="vstack">
+              <input type="text" id="puzzle-selector-filter" placeholder="Filter puzzles…" autocomplete="off">
+              <div id="puzzle-selector-count"></div>
             </div>
-            <div id="puzzle-selector-src"></div>
+            <div id="puzzle-selector-list"></div>
           </div>
         </div>
       </div>
