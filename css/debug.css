@@ -55,10 +55,6 @@
   gap: 10px;
 }
 
-#debug-container #debug-panel #debug-puzzle-input {
-  width: 95%;
-}
-
 #counters-container {
   display: flex;
   flex-direction: column;

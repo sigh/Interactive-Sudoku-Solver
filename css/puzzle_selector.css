@@ -1,0 +1,21 @@
+#puzzle-selector-container > .lazy-body {
+  box-sizing: border-box;
+  padding: var(--gap-default);
+}
+
+#puzzle-selector-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-default);
+  width: 240px;
+  max-width: 100%;
+}
+
+#puzzle-selector-panel #puzzle-selector-input {
+  box-sizing: border-box;
+  width: 100%;
+}
+
+#puzzle-selector-src {
+  font-size: 0.9em;
+}

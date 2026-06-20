@@ -11,8 +11,6 @@ const {
   CellValueDisplay,
 } = await import('../display.js' + self.VERSION_PARAM);
 
-const { SudokuParser } = await import('../sudoku_parser.js' + self.VERSION_PARAM);
-
 const debugModule = await import('./debug.js' + self.VERSION_PARAM);
 
 export class DebugManager {
@@ -25,7 +23,6 @@ export class DebugManager {
     // DOM.
     this._container = document.getElementById('debug-container');
     this._logView = document.getElementById('debug-logs');
-    this._debugPuzzleSrc = document.getElementById('debug-puzzle-src');
     this._logLevelElem = document.getElementById('debug-log-level');
     this._countersElem = document.getElementById('counters-container');
     this._checkboxes = [
@@ -91,88 +88,13 @@ export class DebugManager {
       this._setInfoOverlayOnCheck(element, overlayValuesFn);
     }
 
-    // Debug puzzle loader.
+    // Expose the constraint manager to debug console helpers (e.g. loadInput).
     debugModule.setConstraintManager(this._constraintManager);
-    debugModule.debugFilesLoaded.then(() => {
-      this._loadDebugPuzzleInput();
-    });
 
     // Call reshape so that all dependencies are initialized with the shape.
     if (this._shape) {
       this.reshape(this._shape);
     }
-  }
-
-  static async _makeDebugIndex() {
-    const index = new Map();
-
-    const { PUZZLE_INDEX } = await import('../../data/example_puzzles.js' + self.VERSION_PARAM);
-    for (const puzzle of PUZZLE_INDEX.values()) {
-      const constraintTypes = puzzle.constraintTypes
-        || SudokuParser.extractConstraintTypes(puzzle.input);
-      const title = `${puzzle.name || ''} [${constraintTypes.join(',')}]`;
-      index.set(title, puzzle);
-    }
-
-    const PuzzleCollections = await import('../../data/collections.js' + self.VERSION_PARAM);
-
-    const puzzleLists = {
-      TAREK_ALL: PuzzleCollections.TAREK_ALL,
-      EXTREME_KILLERS: PuzzleCollections.EXTREME_KILLERS,
-      HARD_THERMOS: PuzzleCollections.HARD_THERMOS,
-      MATHEMAGIC_KILLERS: PuzzleCollections.MATHEMAGIC_KILLERS,
-      HARD_RENBAN: PuzzleCollections.HARD_RENBAN,
-      HARD_PENCILMARKS: PuzzleCollections.HARD_PENCILMARKS,
-      HS_KILLERS: PuzzleCollections.HS_KILLERS,
-      LITTLE_KILLER_SNIPES: PuzzleCollections.LITTLE_KILLER_SNIPES,
-    };
-    for (const [listName, list] of Object.entries(puzzleLists)) {
-      for (let i = 0; i < list.length; i++) {
-        const puzzle = list[i];
-        const name = `${listName}[${i}]`;
-        index.set(name, puzzle);
-      }
-    }
-
-    return index;
-  }
-
-  async _loadDebugPuzzleInput() {
-    const debugIndex = await this.constructor._makeDebugIndex();
-    const datalist = document.getElementById('debug-puzzles');
-    for (const name of debugIndex.keys()) {
-      const option = document.createElement('option');
-      option.value = name;
-      datalist.appendChild(option);
-    }
-
-    const input = document.getElementById('debug-puzzle-input');
-    input.onchange = async () => {
-      const name = input.value;
-      // Clear the input after a short time so the user can still notice
-      // what was selected.
-      window.setTimeout(() => {
-        input.value = '';
-      }, 300);
-
-      const puzzle = debugIndex.get(name);
-      if (!puzzle) return;
-
-      await debugModule.loadInput(puzzle);
-
-      window.setTimeout(() => {
-        const debugPuzzleSrc = this._debugPuzzleSrc;
-        clearDOMNode(debugPuzzleSrc);
-        if (puzzle.src) {
-          const link = document.createElement('a');
-          link.href = puzzle.src;
-          link.textContent = puzzle.name;
-          debugPuzzleSrc.appendChild(link);
-        } else {
-          debugPuzzleSrc.textContent = puzzle.name;
-        }
-      }, 0);
-    };
   }
 
   getOptions() {
@@ -201,7 +123,6 @@ export class DebugManager {
     clearDOMNode(this._logView);
     this._infoOverlay.clear();
     this._debugCellHighlighter.clear();
-    clearDOMNode(this._debugPuzzleSrc);
     clearDOMNode(this._countersElem);
 
     this._logDedupe = {

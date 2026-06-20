@@ -56,6 +56,13 @@ export const initPage = () => {
       constraintManager, displayContainer, bodyElement),
   }, bottomDrawer);
 
+  new LazyDrawerManager({
+    tabId: 'puzzle-selector',
+    modulePath: './debug/puzzle_selector_panel.js',
+    factory: (module, bodyElement) => new module.PuzzleSelectorPanel(
+      constraintManager, bodyElement),
+  }, bottomDrawer);
+
   setUpHeaderSettingsDropdown();
 
   setUpTooltipPortal();

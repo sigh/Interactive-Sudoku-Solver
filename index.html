@@ -168,6 +168,13 @@ layout: null
         </div>
         <div class="inline-switch switch">
           <label>
+            <input id="show-puzzle-selector-input" type="checkbox">
+            <span></span>
+            <span>Puzzle selector</span>
+          </label>
+        </div>
+        <div class="inline-switch switch">
+          <label>
             <input id="show-debug-input" type="checkbox">
             <span></span>
             <span>Debug panel</span>
@@ -786,6 +793,19 @@ function accept(state) {
     <div class="bottom-drawer-tabs tab-container"></div>
     <div class="bottom-drawer-panels">
 
+      <div id="puzzle-selector-container" data-tab-id="puzzle-selector" data-tab-label="Puzzle selector">
+        <div class="loading-notice notice notice-info">Loading…</div>
+        <div class="lazy-body" hidden>
+          <div id="puzzle-selector-panel">
+            <div>
+              <input type="text" list="puzzle-selector-puzzles" id="puzzle-selector-input" placeholder="Load a puzzle">
+              <datalist id="puzzle-selector-puzzles"></datalist>
+            </div>
+            <div id="puzzle-selector-src"></div>
+          </div>
+        </div>
+      </div>
+
       <div id="debug-container" data-tab-id="debug" data-tab-label="Debug">
         <div class="loading-notice notice notice-info">Loading debug…</div>
         <div class="lazy-body" hidden>
@@ -802,11 +822,6 @@ function accept(state) {
               <input type="checkbox" id="conflict-heatmap-checkbox">
               Conflict heatmap
             </label>
-            <div>
-              <input type="text" list="debug-puzzles" id="debug-puzzle-input" placeholder="Load a puzzle">
-              <datalist id="debug-puzzles"></datalist>
-            </div>
-            <div id="debug-puzzle-src"></div>
             <div class="hstack">
               <input type="checkbox" id="debug-cell-id" class="debug-checkbox">
               <label for="debug-cell-id" class="button auxiliary-button">Cell id</label>
