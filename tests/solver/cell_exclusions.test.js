@@ -194,7 +194,7 @@ await runTest('CellExclusions should compute pair exclusions', () => {
   exclusions.addMutualExclusion(0, 3);
 
   // Intersection of exclusions for 0 and 1 should contain 2.
-  const pairExclusions = exclusions.getPairExclusions((0 << 8) | 1);
+  const pairExclusions = exclusions.getPairExclusions((0 << 16) | 1);
   assert.deepEqual(pairExclusions, [2]);
 });
 
@@ -223,7 +223,7 @@ await runTest('CellExclusions should seal after reading Array', () => {
 await runTest('CellExclusions should seal after reading PairExclusions', () => {
   const handlerSet = createHandlerSet();
   const exclusions = new CellExclusions(handlerSet, SHAPE_9x9.numGridCells);
-  exclusions.getPairExclusions((0 << 8) | 1);
+  exclusions.getPairExclusions((0 << 16) | 1);
 
   assert.throws(() => exclusions.addMutualExclusion(1, 2), /Cannot add exclusions after caching/);
 });
@@ -318,8 +318,8 @@ await runTest('CellExclusions should cache pair exclusions regardless of order',
   exclusions.addMutualExclusion(0, 2);
   exclusions.addMutualExclusion(1, 2);
 
-  const pair1 = exclusions.getPairExclusions((0 << 8) | 1);
-  const pair2 = exclusions.getPairExclusions((1 << 8) | 0);
+  const pair1 = exclusions.getPairExclusions((0 << 16) | 1);
+  const pair2 = exclusions.getPairExclusions((1 << 16) | 0);
 
   assert.deepEqual(pair1, [2]);
   assert.deepEqual(pair2, [2]);
@@ -327,10 +327,74 @@ await runTest('CellExclusions should cache pair exclusions regardless of order',
   // but the content should be the same. If it caches based on computed result, they might be same instance.
   // The current implementation caches `revKey` inside `_computePairExclusions` but `getPairExclusions`
   // stores the result under the requested key.
-  // So `pair1` is stored under `(0<<8)|1`.
-  // When requesting `(1<<8)|0`, `_computePairExclusions` checks `(0<<8)|1` and returns it.
+  // So `pair1` is stored under `(0<<16)|1`.
+  // When requesting `(1<<16)|0`, `_computePairExclusions` checks `(0<<16)|1` and returns it.
   // So they should be the same instance if the first one was computed first.
   assert.equal(pair1, pair2);
+});
+
+// =============================================================================
+// Pair-exclusion packing edge cases.
+//
+// A pair key packs two cell indices as `(a << 16) | b`, decoded with an UNSIGNED
+// `>>> 16` / `& 0xffff`. These cover the boundaries: cells past the old 8-bit
+// limit, cell 0 in the pair, an empty intersection, and — most importantly — a
+// high cell >= 2^15, where `a << 16` makes the key a negative int32 and a SIGNED
+// `>> 16` would decode the wrong cell0.
+// =============================================================================
+
+// Build a CellExclusions of the given size with the listed mutual-exclusion
+// pairs, then return the shared exclusions of (a, b) in both orders.
+const sharedExclusions = (size, mutualPairs, a, b) => {
+  const exclusions = new CellExclusions(createHandlerSet(), size);
+  for (const [c, d] of mutualPairs) exclusions.addMutualExclusion(c, d);
+  return {
+    forward: exclusions.getPairExclusions((a << 16) | b),
+    reverse: exclusions.getPairExclusions((b << 16) | a),
+  };
+};
+
+await runTest('pair exclusions: first var cell (just past the old 8-bit limit)', () => {
+  // 256 = 0x100: its low byte is 0, which the old (a << 8) packing dropped.
+  const { forward, reverse } = sharedExclusions(
+    300, [[256, 258], [257, 258]], 256, 257);
+  assert.deepEqual(forward, [258]);
+  assert.deepEqual(reverse, [258]);
+});
+
+await runTest('pair exclusions: both cells > 255', () => {
+  const { forward, reverse } = sharedExclusions(
+    300, [[270, 280], [290, 280]], 270, 290);
+  assert.deepEqual(forward, [280]);
+  assert.deepEqual(reverse, [280]);
+});
+
+await runTest('pair exclusions: pair involving cell 0 and a high cell', () => {
+  // (0 << 16) | b === b, so the packed key looks like a bare cell index; the
+  // dispatch must still treat it as the pair (0, b).
+  const { forward, reverse } = sharedExclusions(
+    400, [[0, 150], [300, 150]], 0, 300);
+  assert.deepEqual(forward, [150]);
+  assert.deepEqual(reverse, [150]);
+});
+
+await runTest('pair exclusions: empty when the two cells share no exclusions', () => {
+  const { forward, reverse } = sharedExclusions(
+    300, [[270, 271], [290, 291]], 270, 290);
+  assert.deepEqual(forward, []);
+  assert.deepEqual(reverse, []);
+});
+
+await runTest('pair exclusions: high cell >= 2^15 (negative packed key)', () => {
+  // 32768 = 2^15: (32768 << 16) is negative as an int32, so a signed `>> 16`
+  // would decode cell0 wrong (and crash on the missing cell set). The design
+  // envelope is cell index < 2^16, so this must still resolve correctly.
+  const A = 32768;
+  const B = 40000;
+  const { forward, reverse } = sharedExclusions(
+    50001, [[A, 33000], [B, 33000]], A, B);
+  assert.deepEqual(forward, [33000]);
+  assert.deepEqual(reverse, [33000]);
 });
 
 logSuiteComplete('CellExclusions');

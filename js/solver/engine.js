@@ -1277,7 +1277,9 @@ export class CellExclusions {
     this._cellExclusionArrays = [];
 
     // Indexing of pairs:
-    //   pairExclusions[(i << 8) | j] = [cells which are excluded by both i and j]
+    //   pairExclusions[(i << 16) | j] = [cells which are excluded by both i and j]
+    // 16 bits per cell index (cells span grid + var cells). The packers in
+    // handlers.js must use the same width.
     this._pairExclusions = new Map();
     // Indexing of lists:
     //   listExclusions[obj] = [cells which are excluded by all cells in obj]
@@ -1383,7 +1385,9 @@ export class CellExclusions {
     this._sealed = true;
     let result = this._pairExclusions.get(pairIndex);
     if (result === undefined) {
-      result = this._computePairExclusions(pairIndex >> 8, pairIndex & 0xff);
+      // Unsigned shift: the key may be a negative int32 when the high cell is
+      // >= 2^15 (see the pairExclusions comment above).
+      result = this._computePairExclusions(pairIndex >>> 16, pairIndex & 0xffff);
       this._pairExclusions.set(pairIndex, result);
     }
 
@@ -1416,7 +1420,7 @@ export class CellExclusions {
 
   _computePairExclusions(cell0, cell1) {
     // If we've cached the reverse order, then use that.
-    const revKey = (cell1 << 8) | cell0;
+    const revKey = (cell1 << 16) | cell0;
     if (this._pairExclusions.has(revKey)) {
       return this._pairExclusions.get(revKey);
     }

@@ -348,7 +348,7 @@ export class ValueDependentUniqueValueExclusionForPerfectAllDifferent extends Su
     let pairIndex = 0;
     for (let i = 0; i < numCells; i++) {
       if (grid[cells[i]] & v) {
-        pairIndex = (pairIndex << 8) | cells[i];
+        pairIndex = (pairIndex << 16) | cells[i];
       }
     }
 
@@ -433,7 +433,7 @@ export class HandlerUtil {
       const numCells = cells.length;
       for (let i = 0; i < numCells; i++) {
         if (grid[cells[i]] & value) {
-          pairIndex = (pairIndex << 8) | cells[i];
+          pairIndex = (pairIndex << 16) | cells[i];
           cellCount++;
         }
       }
@@ -849,7 +849,7 @@ export class BinaryConstraint extends SudokuConstraintHandler {
     // enough to identify that Thermo can't be optimized this way.
     const isTransitive = lookupTables.binaryKeyIsTransitive(this._key);
     if (!isTransitive) {
-      const pairIndex = (this.cells[0] << 8) | this.cells[1];
+      const pairIndex = (this.cells[0] << 16) | this.cells[1];
       const exclusionsCells = cellExclusions.getPairExclusions(pairIndex);
       if (exclusionsCells?.length) {
         this._exclusionsCellsForRequiredValues = exclusionsCells;
