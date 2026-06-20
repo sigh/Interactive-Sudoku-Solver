@@ -13,6 +13,7 @@ export class SudokuBuilder {
   static build(constraint, debugOptions) {
     const shape = constraint.getShape();
     const constraintMap = constraint.toMap();
+    // The shape enforces the cell-count limit here (throws if too many cells).
     shape.addVarCellsForConstraints([].concat(...constraintMap.values()));
 
     const handlers = [...this._handlers(constraintMap, shape)];

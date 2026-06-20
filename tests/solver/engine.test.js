@@ -383,6 +383,26 @@ await runTest('setProgressCallback is called during solveAllPossibilities', () =
   assert.ok(callCount >= 1, `Expected callback calls, got ${callCount}`);
 });
 
+// ============================================================================
+// Cell limit (MAX_SEARCH_CELLS)
+// ============================================================================
+
+// 9x9 grid (81 cells) + var cells. The limit is on grid + var cells together.
+const withVarCells = (numVars) => new SudokuConstraint.Container([
+  new SudokuConstraint.Var('X', '', numVars),
+]);
+
+await runTest('build accepts exactly MAX_SEARCH_CELLS (1000) cells', () => {
+  // 81 + 919 = 1000.
+  assert.doesNotThrow(() => buildSolver(withVarCells(919)));
+});
+
+await runTest('build rejects more than MAX_SEARCH_CELLS cells', () => {
+  // 81 + 920 = 1001. The shape throws when the var cells are registered (before
+  // the solver is built); the error bubbles up to the caller (and the UI).
+  assert.throws(() => buildSolver(withVarCells(920)), /Too many cells/);
+});
+
 logSuiteComplete('SudokuSolver Engine');
 
 // ============================================================================

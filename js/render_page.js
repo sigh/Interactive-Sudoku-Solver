@@ -450,6 +450,10 @@ class RootConstraintCollection extends ConstraintCollectionBase {
       this.removeConstraint(match);
     }
 
+    // Register var cells first: an over-limit constraint throws here (and the
+    // error bubbles up to the user) before any chip/display state is created.
+    this._shape.addVarCellsForConstraints([constraint]);
+
     if (constraint.constructor.DISPLAY_CONFIG) {
       constraintState.displayElem = this._display.drawConstraint(constraint);
     }
@@ -470,8 +474,6 @@ class RootConstraintCollection extends ConstraintCollectionBase {
     this._constraintCategoryInputs.get(
       constraint.constructor.CATEGORY).onAddConstraint(
         constraint);
-
-    this._shape.addVarCellsForConstraints([constraint]);
 
     this._updateListener();
   }

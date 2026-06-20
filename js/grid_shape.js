@@ -2,6 +2,10 @@ const { memoize, setPeek } = await import('./util.js' + self.VERSION_PARAM);
 
 const VALUE_BASE = 17;  // for parsing cell IDs
 
+// Upper bound on grid + var cells. A cell index is stored in 16 bits throughout
+// the solver, so this must stay below 2^16.
+export const MAX_SEARCH_CELLS = 1000;
+
 export class GridShape {
   static MIN_SIZE = 1;
   static MAX_SIZE = 16;
@@ -137,8 +141,19 @@ export class GridShape {
   }
 
   addVarCellsForConstraints(constraints) {
-    this._varCellRegistry.addGroups(
-      this._allVarCellSpecsForConstraints(constraints));
+    const specs = this._allVarCellSpecsForConstraints(constraints);
+
+    // Reject too many cells before mutating the registry, so the shape is never
+    // left in an inconsistent state (and we never attempt a huge allocation).
+    const newVarCells = specs.reduce((sum, g) => sum + g.count, 0);
+    const total = this.totalCells() + newVarCells;
+    if (total > MAX_SEARCH_CELLS) {
+      throw new Error(
+        `Too many cells. Total cells must be <= ${MAX_SEARCH_CELLS}. ` +
+        `grid cells: ${this.numGridCells}, var cells: ${total - this.numGridCells}`);
+    }
+
+    this._varCellRegistry.addGroups(specs);
   }
 
   minValue() {

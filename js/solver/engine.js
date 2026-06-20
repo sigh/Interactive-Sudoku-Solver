@@ -349,11 +349,6 @@ class InternalSolver {
   constructor(handlerGen, shape, debugLogger) {
     this._shape = shape;
     this._numSearchCells = shape.totalCells();
-    if (this._numSearchCells > 256) {
-      throw new Error(
-        'Too many cells. grid + var cells must be <= 256. ' +
-        `grid cells: ${shape.numGridCells}, var cells: ${this._numSearchCells - shape.numGridCells}`);
-    }
     this._debugLogger = debugLogger;
 
     this._progress = {
