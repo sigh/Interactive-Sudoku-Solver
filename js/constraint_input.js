@@ -445,9 +445,16 @@ class CheckboxCategoryInput extends ConstraintCategoryInput {
       input.id = checkboxId;
       input.onchange = () => {
         if (input.checked) {
-          this.collection.addConstraint(constraint);
+          try {
+            this.collection.addConstraint(constraint);
+            this._clearError();
+          } catch (e) {
+            input.checked = false;  // Revert: the constraint was not added.
+            this._showError(e.message || e);
+          }
         } else {
           removeAllOfType(this.collection, constraint);
+          this._clearError();
         }
       };
       div.appendChild(input);
@@ -513,7 +520,15 @@ class CheckboxCategoryInput extends ConstraintCategoryInput {
         const value = select.value;
         removeAllOfType(this.collection, templateConstraint);
         if (value !== defaultValue) {
-          this.collection.addConstraint(new constraintClass(value));
+          try {
+            this.collection.addConstraint(new constraintClass(value));
+            this._clearError();
+          } catch (e) {
+            select.value = defaultValue;  // Revert: the constraint was not added.
+            this._showError(e.message || e);
+          }
+        } else {
+          this._clearError();
         }
       };
       div.appendChild(select);
@@ -550,6 +565,25 @@ class CheckboxCategoryInput extends ConstraintCategoryInput {
       if (argConfig?.inputType !== 'select') continue;
       initSelectDropdown(constraintClass, container, argConfig);
     }
+
+    this._errorElem = document.getElementById(`${containerId}-error`);
+    container.appendChild(this._errorElem);
+  }
+
+  static _ERROR_TIMEOUT_MS = 6000;
+
+  _showError(message) {
+    this._errorElem.textContent = message;
+    this._errorElem.style.display = '';
+    clearTimeout(this._errorTimeout);
+    this._errorTimeout = setTimeout(
+      () => this._clearError(), CheckboxCategoryInput._ERROR_TIMEOUT_MS);
+  }
+
+  _clearError() {
+    clearTimeout(this._errorTimeout);
+    this._errorElem.textContent = '';
+    this._errorElem.style.display = 'none';
   }
 
   onAddConstraint(c) {

@@ -148,9 +148,10 @@ export class GridShape {
     const newVarCells = specs.reduce((sum, g) => sum + g.count, 0);
     const total = this.totalCells() + newVarCells;
     if (total > MAX_SEARCH_CELLS) {
+      const added = specs.map(g => `${g.label || g.prefix}`).join(', ');
       throw new Error(
-        `Too many cells. Total cells must be <= ${MAX_SEARCH_CELLS}. ` +
-        `grid cells: ${this.numGridCells}, var cells: ${total - this.numGridCells}`);
+        `Adding ${added} cells would exceed the ${MAX_SEARCH_CELLS}-cell limit ` +
+        `(${this.totalCells()} cells already in use).`);
     }
 
     this._varCellRegistry.addGroups(specs);

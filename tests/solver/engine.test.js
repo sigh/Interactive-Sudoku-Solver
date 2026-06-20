@@ -400,7 +400,7 @@ await runTest('build accepts exactly MAX_SEARCH_CELLS (1000) cells', () => {
 await runTest('build rejects more than MAX_SEARCH_CELLS cells', () => {
   // 81 + 920 = 1001. The shape throws when the var cells are registered (before
   // the solver is built); the error bubbles up to the caller (and the UI).
-  assert.throws(() => buildSolver(withVarCells(920)), /Too many cells/);
+  assert.throws(() => buildSolver(withVarCells(920)), /would exceed the .*-cell limit/);
 });
 
 logSuiteComplete('SudokuSolver Engine');
