@@ -100,7 +100,7 @@ class ChaosRegionShardState {
 export class ChaosConstruction extends SudokuConstraintHandler {
 
   constructor(numGridCells, regionCellOffset, regionSize) {
-    const cells = new Uint8Array(numGridCells * 2);
+    const cells = new Uint16Array(numGridCells * 2);
     for (let cell = 0; cell < numGridCells; cell++) {
       cells[cell * 2] = cell;
       cells[cell * 2 + 1] = regionCellOffset + cell;
@@ -270,6 +270,9 @@ export class ChaosConstruction extends SudokuConstraintHandler {
     //     transient roles (never live together) and aliased to a descriptive local
     //     at the use site. Named by size, not role. ===
     this._scratchRegions0 = new Uint16Array(this._numRegions);
+    // Uint8: these hold grid-cell indices / union-find roots only. Grid cells are
+    // capped at 16x16 = 256 (numValues <= 16), so they never exceed 255 — unlike
+    // the region-label var cells, which live above the grid and use Uint16 above.
     this._scratchGridCells0 = new Uint8Array(numGridCells);
     this._scratchRoots0 = new Uint8Array(this._regionSize * Math.max(numGridCells, this._numValues));
 

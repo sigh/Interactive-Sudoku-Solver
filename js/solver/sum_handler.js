@@ -211,7 +211,7 @@ export class Sum extends SudokuConstraintHandler {
 
     {
       this._exclusionGroupIds = new Int16Array(this.cells.length);
-      const cellLookup = new Uint8Array(cellExclusions.numSearchCells());
+      const cellLookup = new Uint16Array(cellExclusions.numSearchCells());
       this.cells.forEach((c, i) => cellLookup[c] = i);
 
       for (let i = 0; i < this._coeffGroups.length; i++) {
@@ -261,12 +261,12 @@ export class Sum extends SudokuConstraintHandler {
   }
 
   static _exclusionIdsBuffer = new Int16Array(3);
-  static _reversedCellsBuffer = new Uint8Array(3);
+  static _reversedCellsBuffer = new Uint16Array(3);
   // Create a cellBuffer for each possible number of unfixed cells that
   // _enforceFewRemainingCells() can be called with.
   // This allows calls to functions like restrictCellsSingleExclusionGroup()
   // to rely on the array length.
-  static _cellBuffers = [...Array(4).keys()].map(i => new Uint8Array(i));
+  static _cellBuffers = [...Array(4).keys()].map(i => new Uint16Array(i));
 
   // Determines if _enforceFewRemainingCells() can be run.
   _hasFewRemainingCells(numUnfixed) {

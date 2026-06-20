@@ -477,4 +477,68 @@ await runTest('Sum with 0 cells and nonzero sum fails initialization', () => {
   assert.equal(initialized, false, '0-cell sum with nonzero sum is impossible');
 });
 
+// =============================================================================
+// Extended cells: a cell index spans grid + var cells and can exceed 255. The
+// handler must propagate identically regardless of where its cells sit, and its
+// within-handler position map (0..numCells-1, which exceeds 255 for a Sum over
+// > 255 cells) must not wrap.
+// =============================================================================
+
+// Narrow a 3-cell distinct cage summing to 24 whose cells start at `base`.
+// 7+8+9 is the only distinct triple, so each cell must end up as {7,8,9}.
+const narrowCageAt = (base) => {
+  const numCells = base + 3;
+  const cells = [base, base + 1, base + 2];
+  const handler = new Sum(cells, 24);
+  const shape = GridShape.fromGridSize(9);
+  const allValues = valueMask(1, 2, 3, 4, 5, 6, 7, 8, 9);
+  const grid = new Array(numCells).fill(allValues);
+  const noopState = { allocate: () => 0 };
+  assert.equal(
+    handler.initialize(
+      grid, createCellExclusions({ allUnique: true, numCells }), shape, noopState),
+    true, 'Sum should initialize');
+  const acc = createAccumulator();
+  assert.equal(handler.enforceConsistency(grid, acc), true);
+  return cells.map(c => grid[c]);
+};
+
+await runTest('Sum cage propagates identically for cells at low and high (> 255) indices', () => {
+  const expected = [valueMask(7, 8, 9), valueMask(7, 8, 9), valueMask(7, 8, 9)];
+  assert.deepEqual(narrowCageAt(0), expected, 'low-index cage');
+  // A Uint8 cell store would truncate 256/257/258 and touch the wrong cells,
+  // leaving these high cells unchanged.
+  assert.deepEqual(narrowCageAt(256), expected, 'high-index cage');
+});
+
+await runTest('Sum over > 255 cells maps every cell to its exclusion group', () => {
+  // The position map assigns each cell its within-handler index (0..259). Under
+  // a Uint8 map, indices >= 256 wrap and those cells never receive a group id.
+  const numCells = 260;
+  const cells = Array.from({ length: numCells }, (_, i) => i);
+  const handler = new Sum(cells, 260);   // min possible sum: forces every cell to 1.
+
+  const shape = GridShape.fromGridSize(9);
+  const grid = new Array(numCells).fill(valueMask(1, 2, 3, 4, 5, 6, 7, 8, 9));
+  const noopState = { allocate: () => 0 };
+  assert.equal(
+    handler.initialize(
+      grid, createCellExclusions({ allUnique: false, numCells }), shape, noopState),
+    true, 'Sum should initialize');
+
+  // Every cell belongs to a unit-coeff group, so every within-handler position
+  // must hold a non-zero group id; a wrapped position map leaves the tail at 0.
+  assert.equal(handler._exclusionGroupIds.length, numCells);
+  assert.ok(
+    handler._exclusionGroupIds.every(id => id !== 0),
+    'every within-handler position must be assigned a group id');
+
+  // And it must still propagate correctly end-to-end: sum 260 over 260 cells
+  // (each >= 1) forces every cell to 1, including the high-position tail.
+  assert.equal(handler.enforceConsistency(grid, createAccumulator()), true);
+  assert.ok(
+    cells.every(c => grid[c] === valueMask(1)),
+    'every cell must be forced to value 1');
+});
+
 logSuiteComplete('Sum handler');

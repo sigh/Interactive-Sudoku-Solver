@@ -51,6 +51,32 @@ await runTest('DoppelgangerZero constructor accepts 3 state cells', () => {
   assert.deepEqual([...handler.cells], [0, 1, 2, 3]);
 });
 
+// Extended cells: var cells are indexed above the grid and can exceed 255. The
+// handler must actually propagate over those high indices, not just store them.
+// This mirrors the "v=1: fixed state cell excludes from others" case below but
+// places the state cells at indices > 255 (which a Uint8 cell store would
+// truncate, causing the handler to read/write the wrong low-index cells).
+await runTest('v=1: excludes fixed value among var cells at indices > 255', () => {
+  const shape = makeShape();
+  const gridCell = 0;
+  const stateCells = [300, 301, 302];
+  const handler = new DoppelgangerZero(gridCell, stateCells);
+  assert.equal(handler.initialize(null, null, shape), true);
+
+  const allValues = new GridTestContext({ shape }).lookupTables.allValues;
+  const grid = new Array(303).fill(allValues);
+  grid[gridCell] = ZERO;                       // v === 1 branch
+  grid[stateCells[0]] = valueMask0(3);         // fixed to 3
+  grid[stateCells[1]] = valueMask0(2, 3, 4);   // contains 3
+  grid[stateCells[2]] = valueMask0(3, 5);      // contains 3
+
+  const acc = createAccumulator();
+  assert.equal(handler.enforceConsistency(grid, acc), true);
+  assert.equal(grid[stateCells[1]], valueMask0(2, 4), 's1 should have 3 removed');
+  assert.equal(grid[stateCells[2]], valueMask0(5), 's2 should have 3 removed');
+  assertTouched(acc, [stateCells[1], stateCells[2]]);
+});
+
 await runTest('DoppelgangerZero constructor rejects 1 state cell', () => {
   assert.throws(() => new DoppelgangerZero(0, [1]));
 });

@@ -31,7 +31,7 @@ export class SudokuConstraintHandler {
     // This constraint is enforced whenever these cells are touched.
     // cells must not be written to. They can be updated during initialization,
     // but it must replace the array, not modify it.
-    this.cells = new Uint8Array(cells || []);
+    this.cells = new Uint16Array(cells || []);
     // By default all constraints are essential for correctness.
     // The optimizer may add non-essential constraints to improve performance.
     this.essential = true;
@@ -306,7 +306,7 @@ export class ValueDependentUniqueValueExclusion extends SudokuConstraintHandler 
     // Remove cellExclusions, as it would be redundant.
     const exclusions = new Set(cellExclusions.getArray(this._cell));
     for (let i = 0; i < this._valueToCellMap.length; i++) {
-      this._valueToCellMap[i] = new Uint8Array(
+      this._valueToCellMap[i] = new Uint16Array(
         this._valueToCellMap[i].filter(c => !exclusions.has(c)));
     }
     return true;
@@ -3216,14 +3216,15 @@ export class FullRank extends SudokuConstraintHandler {
     const numRows = shape.numRows;
     const numCols = shape.numCols;
     const entries = [];
+    // Uint16Array: these entries hold cell indices (see the base `cells` store).
     for (let i = 0; i < numRows; i++) {
-      const row = Uint8Array.from(
+      const row = Uint16Array.from(
         { length: numCols }, (_, j) => i * numCols + j);
       entries.push(row);
       entries.push(row.slice().reverse());
     }
     for (let i = 0; i < numCols; i++) {
-      const col = Uint8Array.from(
+      const col = Uint16Array.from(
         { length: numRows }, (_, j) => j * numCols + i);
       entries.push(col);
       entries.push(col.slice().reverse());
@@ -3237,7 +3238,7 @@ export class FullRank extends SudokuConstraintHandler {
   }
 
   constructor(numGridCells, clues, tieMode = FullRank.TIE_MODE.ONLY_UNCLUED) {
-    const allCells = Uint8Array.from({ length: numGridCells }, (_, i) => i);
+    const allCells = Uint16Array.from({ length: numGridCells }, (_, i) => i);
     super(allCells);
 
     // FullRank clues must have unique ranks (The builder/optimizer should
@@ -3888,7 +3889,7 @@ export class DoppelgangerZero extends SudokuConstraintHandler {
     }
     super([gridCell, ...varCells]);
     this._gridCell = gridCell;
-    this._varCells = new Uint8Array(varCells);
+    this._varCells = new Uint16Array(varCells);
   }
 
   initialize(initialGridCells, cellExclusions, shape) {

@@ -1109,4 +1109,23 @@ await runTest('ChaosArrow maps the control value through the shape value offset'
   assert.equal(grid[0], valueMask(4));
 });
 
+// Extended cells: on a full 16x16 grid the region-label var cells live at
+// indices 256..511, above the grid. The handler must construct, initialize and
+// propagate over those high indices. Canonical anchoring (run during
+// initialize) deterministically restricts the first grid cell to region 1 and
+// writes the result to its region-label cell — here a cell at index >= 256.
+// A truncated cell store would land this propagation on the wrong cell.
+await runTest('ChaosConstruction propagates with region cells at indices > 255', () => {
+  const context = makeChaosContext('16x16');
+  const { grid, regionCells, handler, initialized } = context;
+
+  assert.equal(initialized, true);
+  assert.ok(regionCells[0] >= 256, 'region cells should live above the grid');
+  // The handler reports the high-index region cells to the engine.
+  assert.equal(handler.cells[1], regionCells[0]);
+  assert.equal(handler.cells[handler.cells.length - 1], regionCells[regionCells.length - 1]);
+  // Canonical anchoring landed on the high-index region cell.
+  assert.equal(grid[regionCells[0]], valueMask(1));
+});
+
 logSuiteComplete('chaos_construction.test.js');

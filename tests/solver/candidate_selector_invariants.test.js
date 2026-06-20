@@ -285,4 +285,35 @@ await runTest('CandidateSelector boosts linked chaos cells whose counterpart is 
   }
 });
 
+// Extended cells: with more than 256 search cells, cellOrder must address cells
+// beyond index 255. Drive a real selection where the only singletons sit at high
+// indices: the selector must find them, bubble them to the front, and branch on
+// one. A truncated cellOrder could not represent those indices, so it would
+// select the wrong cell.
+await runTest('CandidateSelector selects singletons at cell indices > 255', () => {
+  const numSearchCells = 300;
+  const { shape } = new GridTestContext({ gridSize: 16 });
+  const numValues = shape.numValues;
+  const selector = new CandidateSelector(shape, numSearchCells, [], makeDebugLogger());
+  selector.reset(new ConflictScores(new Array(numSearchCells).fill(0), numValues));
+
+  const allValues = (1 << numValues) - 1;
+  const gridState = new Uint16Array(numSearchCells).fill(allValues);
+  gridState[270] = 1 << 1;   // singletons, both above index 255
+  gridState[290] = 1 << 4;
+
+  const { nextDepth, value, count } =
+    selector.selectNextCandidate(0, gridState, null, true);
+
+  assert.equal(count, 1, 'a singleton has a single candidate');
+  assert.equal(nextDepth, 2, 'both singletons bubble to the front');
+
+  const cellOrder = selector.getCellOrder();
+  const prefix = Array.from(cellOrder.subarray(0, nextDepth)).sort((a, b) => a - b);
+  assert.deepEqual(prefix, [270, 290], 'high-index singletons are at the front');
+
+  const branchCell = cellOrder[0];
+  assert.equal(gridState[branchCell], value, 'branches on a bubbled singleton');
+});
+
 logSuiteComplete('CandidateSelector invariants');

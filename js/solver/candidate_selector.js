@@ -110,7 +110,7 @@ export class SeenCandidateSet {
 export class CandidateSelector {
   constructor(shape, numSearchCells, handlerSet, debugLogger) {
     this._shape = shape;
-    this._cellOrder = new Uint8Array(numSearchCells);
+    this._cellOrder = new Uint16Array(numSearchCells);
 
     // Reused return objects for selectNextCandidate() and _selectBestCandidate().
     // Callers must read it immediately and not retain it.

@@ -118,4 +118,27 @@ await runTest('ValueDependentExclusion should iterate map length, not shape.numV
   assert.equal(grid[2] & valueMask(2), 0, 'cell 2 should not have value 2');
 });
 
+// Extended cells: this is a generic handler, so its value-to-cell map may hold
+// var cells (indices > 255). It must propagate the exclusion to those high
+// cells; a Uint8 map would truncate the index and touch the wrong low cell.
+await runTest('ValueDependentExclusion excludes a mapped cell at index > 255', () => {
+  const numCells = 301;
+  // value 2 maps to the high-index cell 300.
+  const handler = new ValueDependentUniqueValueExclusion(0, [[], [300], [], []]);
+
+  const cellExclusions = createCellExclusions({ allUnique: false, numCells });
+  // initialize only uses cellExclusions (to strip redundant exclusions); the
+  // grid/shape/state args are unused.
+  assert.equal(handler.initialize(null, cellExclusions, null, null), true);
+
+  const grid = new Array(numCells).fill(valueMask(1, 2, 3, 4));
+  grid[0] = valueMask(2);          // fixed to value 2
+  grid[300] = valueMask(2, 3);     // high cell that must lose value 2
+
+  const acc = createAccumulator();
+  assert.equal(handler.enforceConsistency(grid, acc), true);
+  assert.equal(grid[300], valueMask(3), 'value 2 removed from the high-index cell');
+  assert.ok(acc.touched.has(300), 'the high-index cell is reported as touched');
+});
+
 logSuiteComplete('value_dependent_exclusion.test.js');

@@ -364,7 +364,7 @@ export class SudokuConstraintOptimizer {
     if (requiredLineCount <= 2) return;
 
     // Pack all line cell indices into one backing store and create per-line views.
-    const backing = Uint8Array.from(lines.flat());
+    const backing = Uint16Array.from(lines.flat());
     const packedLines = lines.map(
       (_, i) => backing.subarray(
         requiredLineCount * i,
