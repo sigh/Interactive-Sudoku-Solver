@@ -25,7 +25,7 @@
 //                         only — not valid evidence for an optimization (warns).
 //   --ablate <a,b,...>    Disable named optimizations for the run (see --list-ablations).
 //   --compare <a,b,...>   Run a baseline AND each ablation, printing a "vs-base"
-//                         node ratio (>1 ⇒ the feature was reducing search).
+//                         guess ratio (>1 ⇒ the feature was reducing search).
 //   --repeat <n>          Re-solve n times and report the best wall time (node
 //                         counts are deterministic; only timing is noisy). Default 1.
 //   --json                Emit a JSON array of result rows instead of TSV — a
@@ -82,7 +82,7 @@ const usage = () => console.log(
   `  --input <string>           Solve a raw constraint string.\n` +
   `  --solutions <n|all>        Default 2 = prove uniqueness; "all" exhausts; "1" = first only (warns).\n` +
   `  --ablate <a,b,...>         Disable optimizations for the run.\n` +
-  `  --compare <a,b,...>        Baseline vs each ablation (prints node ratio).\n` +
+  `  --compare <a,b,...>        Baseline vs each ablation (prints guess ratio).\n` +
   `  --repeat <n>               Best wall time over n runs (default 1).\n` +
   `  --json                     Emit JSON rows instead of TSV (machine-readable).\n` +
   `  --list-ablations           List available ablations.\n` +
@@ -149,7 +149,7 @@ const main = () => {
         const restore = applyAblations([name]);
         try {
           const ablated = bestOf(repeat, () => runSolve(puzzle, budgets));
-          const ratio = (ablated.counters.nodesSearched / Math.max(1, base.counters.nodesSearched)).toFixed(2);
+          const ratio = (ablated.counters.guesses / Math.max(1, base.counters.guesses)).toFixed(2);
           emit(toRow(ablated, `-${name}`, ratio));
         } finally { restore(); }
       }

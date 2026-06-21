@@ -13,7 +13,7 @@
 //     change into a hard failure (a CI-style gate). When counters are identical a
 //     `capped` run is a valid timing harness — same work on both sides.
 //   - Intentional change (a heuristic/propagation tweak): the counters are
-//     *meant* to move. The default just reports the deltas; the per-puzzle node
+//     *meant* to move. The default just reports the deltas; the per-puzzle guess
 //     ratio shows how the search shifted. Note the wall-time ratio then compares
 //     *different* work, so read total ms as an end-to-end number, not a
 //     like-for-like speedup.
@@ -162,26 +162,26 @@ const main = () => {
   }
 
   // Columns compare the working tree against the baseline ref:
-  // `time` = tree/ref wall-time ratio; `nodes` = tree/ref search-size ratio
+  // `time` = tree/ref wall-time ratio; `guesses` = tree/ref search-size ratio
   // (1.000 when unchanged); `status` = ok, or which counters moved.
-  console.log(['puzzle', 'ref_ms', 'tree_ms', 'time', 'nodes', 'status'].join('\t'));
+  console.log(['puzzle', 'ref_ms', 'tree_ms', 'time', 'guesses', 'status'].join('\t'));
   let changed = false, missing = false;
-  let baseTotal = 0, headTotal = 0, baseNodes = 0, headNodes = 0;
+  let baseTotal = 0, headTotal = 0, baseGuesses = 0, headGuesses = 0;
   for (const [name, b] of base) {
     const h = head.get(name);
     if (!h) { console.log(`${name}\tMISSING in working-tree run`); missing = true; continue; }
     const eq = countersEqual(b.counters, h.counters);
     if (!eq) changed = true;
     baseTotal += b.ms; headTotal += h.ms;
-    baseNodes += b.counters.nodesSearched; headNodes += h.counters.nodesSearched;
+    baseGuesses += b.counters.guesses; headGuesses += h.counters.guesses;
     const timeRatio = (h.ms / b.ms).toFixed(3);
-    const nodeRatio = (h.counters.nodesSearched / Math.max(1, b.counters.nodesSearched)).toFixed(3);
-    console.log([name, b.ms.toFixed(1), h.ms.toFixed(1), timeRatio, nodeRatio,
+    const guessRatio = (h.counters.guesses / Math.max(1, b.counters.guesses)).toFixed(3);
+    console.log([name, b.ms.toFixed(1), h.ms.toFixed(1), timeRatio, guessRatio,
       eq ? 'ok' : countersDiff(b.counters, h.counters)].join('\t'));
   }
   console.log(['TOTAL', baseTotal.toFixed(1), headTotal.toFixed(1),
     (headTotal / baseTotal).toFixed(3),
-    (headNodes / Math.max(1, baseNodes)).toFixed(3),
+    (headGuesses / Math.max(1, baseGuesses)).toFixed(3),
     changed ? 'COUNTERS CHANGED' : 'counters identical'].join('\t'));
 
   // A missing puzzle means the two runs aren't comparable — always a failure.
