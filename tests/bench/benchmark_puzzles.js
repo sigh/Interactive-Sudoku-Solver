@@ -26,13 +26,14 @@
 //   --ablate <a,b,...>    Disable named optimizations for the run (see --list-ablations).
 //   --compare <a,b,...>   Run a baseline AND each ablation, printing a "vs-base"
 //                         guess ratio (>1 ⇒ the feature was reducing search).
-//   --repeat <n>          Re-solve n times and report the best wall time (node
+//   --repeat <n>          Re-solve n times and report the best wall time as `ms`,
+//                         plus `median` and `max` columns showing the spread (node
 //                         counts are deterministic; only timing is noisy). Default 1.
 //   --json                Emit a JSON array of result rows instead of TSV — a
 //                         stable, machine-readable contract for tooling (e.g.
 //                         bench_vs_ref.js). Each row: { puzzle, status, solutions,
-//                         guesses, backtracks, nodesSearched, ms } (+ vsBase under
-//                         --compare).
+//                         guesses, backtracks, nodesSearched, ms, msMedian, msMax }
+//                         (+ vsBase under --compare).
 //   --list-ablations      Print the available ablations and exit.
 //   -h, --help            Print this help and exit.
 //
@@ -83,21 +84,34 @@ const usage = () => console.log(
   `  --solutions <n|all>        Default 2 = prove uniqueness; "all" exhausts; "1" = first only (warns).\n` +
   `  --ablate <a,b,...>         Disable optimizations for the run.\n` +
   `  --compare <a,b,...>        Baseline vs each ablation (prints guess ratio).\n` +
-  `  --repeat <n>               Best wall time over n runs (default 1).\n` +
+  `  --repeat <n>               Re-solve n times; report best (ms), median and max (default 1).\n` +
   `  --json                     Emit JSON rows instead of TSV (machine-readable).\n` +
   `  --list-ablations           List available ablations.\n` +
   `\nLadders: ladder:<puzzle name>[@25-15-5] reveals solution givens to grade any solved puzzle.`);
 
+const median = (sorted) => {
+  const mid = sorted.length >> 1;
+  return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+};
+
+// Run `fn` `repeat` times and annotate the result with the spread of wall times.
+// `elapsedMs` stays the best (min) time — the headline number, and what
+// bench_vs_ref consumes — while `msStats` exposes min / median / max so a warming
+// or noisy run shows up instead of being silently hidden behind the min.
 const bestOf = (repeat, fn) => {
-  let result, bestMs = Infinity;
-  for (let i = 0; i < repeat; i++) { const r = fn(); if (r.elapsedMs < bestMs) bestMs = r.elapsedMs; result = r; }
-  result.elapsedMs = bestMs;
+  const times = [];
+  let result;
+  for (let i = 0; i < repeat; i++) { result = fn(); times.push(result.elapsedMs); }
+  times.sort((a, b) => a - b);
+  result.elapsedMs = times[0];
+  result.msStats = { min: times[0], median: median(times), max: times[times.length - 1] };
   return result;
 };
 
 // A result row as a plain object — the shared shape for both TSV and JSON output.
 // `vsBase` is only present under --compare.
 const toRow = (r, label, vsBase) => {
+  const s = r.msStats ?? { min: r.elapsedMs, median: r.elapsedMs, max: r.elapsedMs };
   const row = {
     puzzle: r.name + (label ? ` [${label}]` : ''),
     status: r.status,
@@ -106,17 +120,39 @@ const toRow = (r, label, vsBase) => {
     backtracks: r.counters.backtracks,
     nodesSearched: r.counters.nodesSearched,
     ms: Number(r.elapsedMs.toFixed(1)),
+    msMedian: Number(s.median.toFixed(1)),
+    msMax: Number(s.max.toFixed(1)),
   };
   if (vsBase !== undefined) row.vsBase = vsBase;
   return row;
 };
 
-const TSV_COLUMNS = ['puzzle', 'status', 'sols', 'guesses', 'backtracks', 'nodes', 'ms'];
-const tsvLine = (row) => {
-  const cells = [row.puzzle, row.status, row.solutions, row.guesses,
-    row.backtracks, row.nodesSearched, row.ms.toFixed(1)];
+// `ms` is the best (min) time; `median`/`max` show the spread across --repeat runs.
+const COLUMNS = ['puzzle', 'status', 'sols', 'guesses', 'backtracks', 'nodes', 'ms', 'median', 'max'];
+// Columns 0 (puzzle) and 1 (status) read as text, left-justified; the rest are
+// numbers, right-justified so digits line up.
+const LEFT_COLS = new Set([0, 1]);
+
+const rowCells = (row) => {
+  const cells = [row.puzzle, row.status, String(row.solutions), String(row.guesses),
+    String(row.backtracks), String(row.nodesSearched), row.ms.toFixed(1),
+    row.msMedian.toFixed(1), row.msMax.toFixed(1)];
   if (row.vsBase !== undefined) cells.push(row.vsBase);
-  return cells.join('\t');
+  return cells;
+};
+
+// Render rows as a space-aligned table. The puzzle column is variable-width, so
+// we size every column from the data (header + all rows) — which is why output
+// is buffered until the run completes rather than streamed line by line. --json
+// is the machine-readable contract; this is purely the human view.
+const renderTable = (headerCols, rows) => {
+  const matrix = [headerCols, ...rows.map(rowCells)];
+  const widths = headerCols.map((_, c) => Math.max(...matrix.map((cells) => (cells[c] ?? '').length)));
+  const formatRow = (cells) => cells
+    .map((cell, c) => LEFT_COLS.has(c) ? (cell ?? '').padEnd(widths[c]) : (cell ?? '').padStart(widths[c]))
+    .join('  ')
+    .trimEnd();
+  return matrix.map(formatRow).join('\n');
 };
 
 const main = () => {
@@ -135,11 +171,10 @@ const main = () => {
   const puzzles = resolvePuzzles(args.puzzles);
   const budgets = { maxBacktracks, maxSolutions };
 
-  // Collect rows for JSON; in TSV mode also stream each line as it completes.
+  // Buffer rows; render the aligned table (or JSON) once the run completes.
   const rows = [];
-  const header = args.compare.length ? [...TSV_COLUMNS, 'vs-base'] : TSV_COLUMNS;
-  if (!args.json) console.log(header.join('\t'));
-  const emit = (row) => { rows.push(row); if (!args.json) console.log(tsvLine(row)); };
+  const headerCols = args.compare.length ? [...COLUMNS, 'vs-base'] : COLUMNS;
+  const emit = (row) => { rows.push(row); };
 
   if (args.compare.length) {
     for (const puzzle of puzzles) {
@@ -162,6 +197,7 @@ const main = () => {
   }
 
   if (args.json) console.log(JSON.stringify(rows));
+  else console.log(renderTable(headerCols, rows));
 };
 
 try {

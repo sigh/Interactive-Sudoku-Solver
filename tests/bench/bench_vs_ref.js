@@ -59,10 +59,11 @@ const parseArgs = (argv) => {
 
 const usage = () => console.log(
   `Usage: node tests/bench/bench_vs_ref.js [--ref <git-ref>] [--require-identical] <benchmark_puzzles args...>\n\n` +
-  `  --ref <git-ref>      Baseline revision to compare the working tree against (default HEAD).\n` +
+  `  --ref <git-ref>      Baseline revision to compare the current changes against (default HEAD).\n` +
   `  --require-identical  Fail if any search counter differs (behaviour-preserving gate).\n` +
   `  <rest>               Forwarded to ${SCRIPT} (--max-backtracks is still required).\n\n` +
-  `Reports the per-puzzle wall-time delta and any change in search counters.`);
+  `Reports per puzzle the current/baseline time ratio on both the best (min) and\n` +
+  `median time, plus any change in search counters. Use --repeat <n> for the median.`);
 
 // The comparable search counters (ms is excluded — it is what we measure).
 const COUNTERS = ['status', 'solutions', 'guesses', 'backtracks', 'nodesSearched'];
@@ -83,8 +84,9 @@ const countersEqual = (a, b) => COUNTERS.every((k) => a[k] === b[k]);
 const countersDiff = (a, b) =>
   COUNTERS.filter((k) => a[k] !== b[k]).map((k) => `${k} ${a[k]}→${b[k]}`).join(' ');
 
-// Parse benchmark_puzzles.js TSV (fallback for refs predating --json). The
-// column order is fixed by benchmark_puzzles' TSV_COLUMNS.
+// Parse benchmark_puzzles.js tab-separated output (fallback for refs predating
+// --json; those older revisions still emit real TSV). Columns are looked up by
+// header name, so column order/additions don't matter.
 const parseTsv = (out) => {
   const lines = out.trim().split('\n');
   const header = lines[0].split('\t');
@@ -125,8 +127,29 @@ const run = (cwd, passthrough) => {
     }
   }
   const map = new Map();
-  for (const row of rows) map.set(row.puzzle, { counters: normCounters(row), ms: Number(row.ms) });
+  for (const row of rows) {
+    map.set(row.puzzle, {
+      counters: normCounters(row),
+      // ms is the best (min) time. median/max come from benchmark_puzzles' new
+      // spread fields; an older ref predating them reports only ms, so fall back
+      // to it (median == max == min ⇒ that side contributes no spread signal).
+      ms: Number(row.ms),
+      median: Number(row.msMedian ?? row.ms),
+      max: Number(row.msMax ?? row.ms),
+    });
+  }
   return map;
+};
+
+// Render rows as a space-aligned table (same approach as benchmark_puzzles): the
+// named columns in `leftCols` are left-justified, the rest right-justified so
+// numbers line up regardless of puzzle-name width.
+const renderTable = (header, rows, leftCols) => {
+  const matrix = [header, ...rows];
+  const widths = header.map((_, c) => Math.max(...matrix.map((r) => (r[c] ?? '').length)));
+  return matrix.map((r) => r
+    .map((cell, c) => (leftCols.has(c) ? (cell ?? '').padEnd(widths[c]) : (cell ?? '').padStart(widths[c])))
+    .join('  ').trimEnd()).join('\n');
 };
 
 const main = () => {
@@ -146,7 +169,7 @@ const main = () => {
     process.exit(1);
   }
 
-  console.error(`baseline ref ${args.ref} (${refSha}) vs working tree`);
+  console.error(`current changes vs baseline ${args.ref} (${refSha})`);
 
   // Materialise the baseline ref in a throwaway worktree so the comparison never
   // touches the working tree (which holds the change under test).
@@ -161,32 +184,45 @@ const main = () => {
     rmSync(wt, { recursive: true, force: true });
   }
 
-  // Columns compare the working tree against the baseline ref:
-  // `time` = tree/ref wall-time ratio; `guesses` = tree/ref search-size ratio
-  // (1.000 when unchanged); `status` = ok, or which counters moved.
-  console.log(['puzzle', 'ref_ms', 'tree_ms', 'time', 'guesses', 'status'].join('\t'));
+  // One row per puzzle. ref_ms / cur_ms are the best (min) times for the baseline
+  // and the current code; `min` and `med` are the current/ref ratios on the min
+  // and median time; `guesses` is the search-size ratio; `status` is ok or which
+  // counters moved.
+  const header = ['puzzle', 'ref_ms', 'cur_ms', 'min', 'med', 'guesses', 'status'];
+  const tableRows = [];
   let changed = false, missing = false;
-  let baseTotal = 0, headTotal = 0, baseGuesses = 0, headGuesses = 0;
+  let baseSum = 0, headSum = 0, baseMedSum = 0, headMedSum = 0, baseGuesses = 0, headGuesses = 0;
   for (const [name, b] of base) {
     const h = head.get(name);
-    if (!h) { console.log(`${name}\tMISSING in working-tree run`); missing = true; continue; }
+    if (!h) { tableRows.push([name, 'MISSING in current run']); missing = true; continue; }
     const eq = countersEqual(b.counters, h.counters);
     if (!eq) changed = true;
-    baseTotal += b.ms; headTotal += h.ms;
+    baseSum += b.ms; headSum += h.ms;
+    baseMedSum += b.median; headMedSum += h.median;
     baseGuesses += b.counters.guesses; headGuesses += h.counters.guesses;
-    const timeRatio = (h.ms / b.ms).toFixed(3);
-    const guessRatio = (h.counters.guesses / Math.max(1, b.counters.guesses)).toFixed(3);
-    console.log([name, b.ms.toFixed(1), h.ms.toFixed(1), timeRatio, guessRatio,
-      eq ? 'ok' : countersDiff(b.counters, h.counters)].join('\t'));
+    tableRows.push([
+      name, b.ms.toFixed(1), h.ms.toFixed(1),
+      (h.ms / b.ms).toFixed(3),
+      (h.median / b.median).toFixed(3),
+      (h.counters.guesses / Math.max(1, b.counters.guesses)).toFixed(3),
+      eq ? 'ok' : countersDiff(b.counters, h.counters),
+    ]);
   }
-  console.log(['TOTAL', baseTotal.toFixed(1), headTotal.toFixed(1),
-    (headTotal / baseTotal).toFixed(3),
-    (headGuesses / Math.max(1, baseGuesses)).toFixed(3),
-    changed ? 'COUNTERS CHANGED' : 'counters identical'].join('\t'));
+  // For multiple puzzles add a pooled row: times summed, ratios over those sums.
+  if (base.size > 1) {
+    tableRows.push([
+      'all puzzles', baseSum.toFixed(1), headSum.toFixed(1),
+      (headSum / baseSum).toFixed(3),
+      (headMedSum / baseMedSum).toFixed(3),
+      (headGuesses / Math.max(1, baseGuesses)).toFixed(3),
+      changed ? 'COUNTERS CHANGED' : 'counters identical',
+    ]);
+  }
+  console.log(renderTable(header, tableRows, new Set([0, header.length - 1])));
 
   // A missing puzzle means the two runs aren't comparable — always a failure.
   if (missing) {
-    console.error('\nFAIL: some puzzles were missing from the working-tree run.');
+    console.error('\nFAIL: some puzzles were missing from the current run.');
     process.exit(1);
   }
 
@@ -201,8 +237,13 @@ const main = () => {
       'speedup. Pass --require-identical to treat any counter change as a failure.');
     return;
   }
-  console.error(`\nratio < 1.0 ⇒ working tree is faster than ${args.ref} (${refSha}). ` +
-    `tree/ref = ${(headTotal / baseTotal).toFixed(3)}`);
+  const speed = (ratio) => ratio < 1
+    ? `${((1 - ratio) * 100).toFixed(1)}% faster`
+    : `${((ratio - 1) * 100).toFixed(1)}% slower`;
+  const minRatio = headSum / baseSum;
+  const medRatio = headMedSum / baseMedSum;
+  console.error(`\ncurrent vs ${args.ref} (${refSha}): ${speed(minRatio)} on best time, ` +
+    `${speed(medRatio)} on median.`);
 };
 
 try {
