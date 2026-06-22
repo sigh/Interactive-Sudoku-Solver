@@ -3,6 +3,10 @@ const { LookupTables } = await import('./lookup_tables.js' + self.VERSION_PARAM)
 
 export const NO_LINKED_CELL = 0xffff;
 
+// A guess branching at least this many ways that eliminates nothing is demoted
+// (see selectNextCandidate).
+const MIN_BRANCH_COUNT_FOR_DEMOTE = 5;
+
 export const buildLinkedSearchCells = (handlerSet, numSearchCells) => {
   let linkedCells = null;
   for (const handler of handlerSet) {
@@ -34,11 +38,11 @@ export class SeenCandidateSet {
     this._numSearchCells = numSearchCells;
     this._numValues = numValues;
     this._candidateSupportThreshold = 1;
-    this._candidateCounts = new Uint8Array(numSearchCells * numValues);
+    this._totalCandidateCounts = new Uint8Array(numSearchCells * numValues);
   }
 
   getCandidateCounts() {
-    return this._candidateCounts;
+    return this._totalCandidateCounts;
   }
 
   reset() {
@@ -47,7 +51,7 @@ export class SeenCandidateSet {
     this._dirty = false;
     this.enabledInSolver = false;
     this.candidates.fill(0);
-    this._candidateCounts.fill(0);
+    this._totalCandidateCounts.fill(0);
     this._lastInterestingCell = 0;
   }
 
@@ -62,7 +66,7 @@ export class SeenCandidateSet {
 
   addSolutionGrid(grid) {
     const candidates = this.candidates;
-    const counts = this._candidateCounts;
+    const counts = this._totalCandidateCounts;
     const numSearchCells = this._numSearchCells;
     const numValues = this._numValues;
     const threshold = this._candidateSupportThreshold;
@@ -112,15 +116,13 @@ export class CandidateSelector {
     this._shape = shape;
     this._cellOrder = new Uint16Array(numSearchCells);
 
-    // Reused return objects for selectNextCandidate() and _selectBestCandidate().
-    // Callers must read it immediately and not retain it.
-    this._result = { nextDepth: 0, value: 0, count: 0 };
-    this._bestCandidate = { cellOffset: 0, value: 0, count: 0 };
-
     this._conflictScores = null;
     this._debugLogger = debugLogger;
     this._numSearchCells = numSearchCells;
     this._optionSelector = null;
+
+    // The candidate count the previously-watched guess left behind.
+    this._prevCandidateCount = -1;
     this._linkedCells = buildLinkedSearchCells(handlerSet, numSearchCells);
 
     this._candidateSelectionStates = this._initCandidateSelectionStates(numSearchCells);
@@ -140,6 +142,7 @@ export class CandidateSelector {
     }
 
     this._conflictScores = conflictScores;
+    this._prevCandidateCount = -1;
 
     this._candidateSelectionFlags.fill(0);
   }
@@ -166,10 +169,27 @@ export class CandidateSelector {
   //      - Most of the time, `count` will equal the number of values in
   //        nextCells[0], but it may be less if we are branching on something
   //        other than the cell (e.g. a digit within a house).
+  static _selectNextCandidateResult = { nextDepth: 0, value: 0, count: 0 };
   selectNextCandidate(cellDepth, gridState, stepState, isNewNode) {
     const cellOrder = this._cellOrder;
-    let { cellOffset, value, count } = this._selectBestCandidate(
+    const best = this._selectBestCandidate(
       gridState, cellOrder, cellDepth, isNewNode);
+    let { cellOffset, value, count } = best;
+    const totalCandidateCount = best.totalCandidateCount;
+
+    // A fresh node is the direct child of the previous guess. If this node's
+    // candidate count equals what that guess left behind, the guess eliminated
+    // nothing — demote the cell it fixed (at cellDepth - 1) so we stop picking it.
+    if (isNewNode && this._prevCandidateCount >= 0 &&
+      totalCandidateCount === this._prevCandidateCount) {
+      this._conflictScores.demote(cellOrder[cellDepth - 1]);
+    }
+    // Watch this node's guess if it branches widely enough to be worth demoting:
+    // store the candidate count it leaves behind (its child still having it means
+    // it eliminated nothing). -1 = not watching.
+    this._prevCandidateCount = isNewNode && count >= MIN_BRANCH_COUNT_FOR_DEMOTE
+      ? totalCandidateCount - (countOnes16bit(gridState[cellOrder[cellOffset]]) - 1)
+      : -1;
     if (cellDepth === 0 && this._debugLogger.logLevel >= 2) {
       this._debugLogger.log({
         loc: 'selectNextCandidate',
@@ -207,7 +227,7 @@ export class CandidateSelector {
     const nextCellDepth = this._updateCellOrder(
       cellDepth, cellOffset, count, gridState);
 
-    const result = this._result;
+    const result = CandidateSelector._selectNextCandidateResult;
     if (nextCellDepth === 0) {
       result.nextDepth = 0;
       result.value = 0;
@@ -292,8 +312,12 @@ export class CandidateSelector {
 
   // Selects the best candidate, returning a { cellOffset, value, count } object
   // (reused across calls — read it immediately, do not retain).
+  static _selectBestCandidateResult = {
+    cellOffset: 0, value: 0, count: 0, totalCandidateCount: -1
+  };
   _selectBestCandidate(gridState, cellOrder, cellDepth, isNewNode) {
-    const best = this._bestCandidate;
+    const result = CandidateSelector._selectBestCandidateResult;
+    result.totalCandidateCount = -1;  // default for the non-branching early returns below
     if (isNewNode) {
       // Clear any previous candidate selection state.
       this._candidateSelectionFlags[cellDepth] = 0;
@@ -304,10 +328,10 @@ export class CandidateSelector {
         const state = this._candidateSelectionStates[cellDepth];
         const count = state.cells.length;
         if (count) {
-          best.cellOffset = cellOrder.indexOf(state.cells.pop(), cellDepth);
-          best.value = state.value;
-          best.count = count;
-          return best;
+          result.cellOffset = cellOrder.indexOf(state.cells.pop(), cellDepth);
+          result.value = state.value;
+          result.count = count;
+          return result;
         }
       }
     }
@@ -317,15 +341,17 @@ export class CandidateSelector {
     {
       const firstValue = gridState[cellOrder[cellDepth]];
       if ((firstValue & (firstValue - 1)) === 0) {
-        best.cellOffset = cellDepth;
-        best.value = firstValue;
-        best.count = firstValue !== 0 ? 1 : 0;
-        return best;
+        result.cellOffset = cellDepth;
+        result.value = firstValue;
+        result.count = firstValue !== 0 ? 1 : 0;
+        return result;
       }
     }
 
     // Find the best cell to explore next.
-    let cellOffset = this._selectBestCell(gridState, cellOrder, cellDepth);
+    let { cellOffset, totalCandidateCount } = this._selectBestCell(
+      gridState, cellOrder, cellDepth);
+    result.totalCandidateCount = totalCandidateCount;
     const cell = cellOrder[cellOffset];
 
     // Find the next smallest value to try.
@@ -378,12 +404,13 @@ export class CandidateSelector {
       }
     }
 
-    best.cellOffset = cellOffset;
-    best.value = value;
-    best.count = count;
-    return best;
+    result.cellOffset = cellOffset;
+    result.value = value;
+    result.count = count;
+    return result;
   }
 
+  static _selectBestCellResult = { cellOffset: 0, totalCandidateCount: -1 };
   _selectBestCell(gridState, cellOrder, cellDepth) {
     // Choose cells based on value count and number of backtracks it caused.
     // NOTE: The constraint handlers are written such that they detect domain
@@ -392,6 +419,7 @@ export class CandidateSelector {
     // NOTE: If the scoring is more complicated, it can be useful
     // to do an initial pass to detect 1 or 0 value cells (!(v&(v-1))).
 
+    const result = CandidateSelector._selectBestCellResult;
     const numSearchCells = this._numSearchCells;
     const conflictScores = this._conflictScores.scores;
     const linkedCells = this._linkedCells;
@@ -403,6 +431,7 @@ export class CandidateSelector {
     // Find the cell with the minimum score.
     let maxScore = -1;
     let bestOffset = 0;
+    let totalCandidateCount = cellDepth;
 
     for (let i = cellDepth; i < numSearchCells; i++) {
       const cell = cellOrder[i];
@@ -414,10 +443,12 @@ export class CandidateSelector {
       // worth it as this only happens at most once per loop. The full count()
       // will have to occur anyway for every other iteration.
       if (count <= 1) {
-        bestOffset = i;
-        maxScore = -1;
-        break;
+        // Forced single: take it next; -1 marks this as a non-branching node.
+        result.cellOffset = i;
+        result.totalCandidateCount = -1;
+        return result;
       }
+      totalCandidateCount += count;
 
       let scoreUnnormalized = conflictScores[cell];
 
@@ -454,7 +485,9 @@ export class CandidateSelector {
       bestOffset = this._minCountCellIndex(gridState, cellOrder, cellDepth);
     }
 
-    return bestOffset;
+    result.cellOffset = bestOffset;
+    result.totalCandidateCount = totalCandidateCount;
+    return result;
   }
 
   // Find the cell index with the minimum score. Return the index into cellOrder.
@@ -747,7 +780,7 @@ export class SamplingCandidateSelector extends CandidateSelector {
 
   selectNextCandidate(cellDepth, gridState, stepState, isNewNode) {
     if (!isNewNode) {
-      const result = this._result;
+      const result = CandidateSelector._selectNextCandidateResult;
       result.nextDepth = 0;
       result.value = 0;
       result.count = 0;
@@ -817,6 +850,11 @@ export class ConflictScores {
     if (--this._decayCountdown === 0) {
       this.decay();
     }
+  }
+
+  // Lower a cell's selection priority by halving its conflict score.
+  demote(cell) {
+    this.scores[cell] >>= 1;
   }
 
   decay() {
