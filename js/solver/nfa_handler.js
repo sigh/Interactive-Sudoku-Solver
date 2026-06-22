@@ -125,30 +125,30 @@ export class NFAConstraint extends SudokuConstraintHandler {
       const nextWords = nextStates.words;
       const currentStatesWords = statesList[i].words;
       const values = grid[cells[i]];
+      let nextIsEmpty = true;
 
       // Note: We operate directly on the bitset words for performance.
       // Encapsulating this in methods caused significant overhead, so the bit
       // iteration and the `add`/`bitIndex` calls are all inlined here.
       for (let wordIndex = 0; wordIndex < currentStatesWords.length; wordIndex++) {
         let word = currentStatesWords[wordIndex];
-        const wordBase = wordIndex << 5;
+        const stateIndexBase = (wordIndex << 5) + 31;
         while (word) {
-          const lowestBit = word & -word;
-          word ^= lowestBit;
-          const stateIndex = wordBase + (31 - Math.clz32(lowestBit));
-          const transitionList = transitionLists[stateIndex];
+          const clz = Math.clz32(word);
+          word ^= 0x80000000 >>> clz;
+          const transitionList = transitionLists[stateIndexBase - clz];
           const len = transitionList.length;
           for (let j = 0; j < len; j++) {
             const entry = transitionList[j];
             if (values & entry) {
-              const target = entry >>> 16;
-              nextWords[target >>> 5] |= 1 << (target & 31);
+              nextWords[entry >>> 21] |= 1 << (entry >>> 16);
+              nextIsEmpty = false;
             }
           }
         }
       }
 
-      if (nextStates.isEmpty()) return false;
+      if (nextIsEmpty) return false;
     }
 
     // Backward pass: Filter down to only the states that can reach an accepting
@@ -181,8 +181,7 @@ export class NFAConstraint extends SudokuConstraintHandler {
             const entry = transitionList[j];
             const maskedValues = values & entry;
             if (maskedValues) {
-              const target = entry >>> 16;
-              if (nextWords[target >>> 5] & (1 << (target & 31))) {
+              if (nextWords[entry >>> 21] & (1 << (entry >>> 16))) {
                 stateSupportedValues |= maskedValues;
               }
             }
