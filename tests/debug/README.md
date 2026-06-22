@@ -13,7 +13,7 @@ causes.
 | --- | --- |
 | `node tests/debug/solve.js` | Run a puzzle and display solution content: digit grid plus all var-cell groups (e.g. Chaos region labels). Optionally verify a known solution is accepted. |
 | `node tests/debug/step_analysis.js` | Walk the search step by step. Explain why a branch was chosen, show pencilmarks/var-cell candidates, the per-step propagation log (what each handler pruned + the refuter), and where an ablation makes the branching diverge. |
-| `node tests/debug/search_hotspots.js` | Where the search concentrates over a (bounded) solve: the conflict heatmap, the cells re-guessed most (churn), and the branch-factor shape (grid vs var, MRV gap). The headless view of the debug UI's heatmap. |
+| `node tests/debug/search_hotspots.js` | Where the search concentrates over a (bounded) solve: the conflict heatmap, the cells re-guessed most (churn), the branch-factor shape (grid vs var, MRV gap), and the propagation yield (how often guesses eliminate nothing — branching into the void). The headless view of the debug UI's heatmap. |
 | `node tests/debug/run_sandbox.js` | Run a [sandbox](../../js/sandbox/README.md) script outside the browser and print the constraints it returns. Generate or regenerate puzzle definitions (e.g. `.iss` files) without opening the browser; pipe the output into `solve.js`. |
 
 Run any script with `--help` for the full option reference.
@@ -73,8 +73,11 @@ node tests/debug/step_analysis.js --puzzle "Chaos Construction: The Fountain" --
 # Where do the branch decisions diverge once an ablation is applied?
 node tests/debug/step_analysis.js --puzzle "Chaos Construction" --steps 20 --compare chaos-bottlenecks
 
-# Dump the grid state at a step as a constraint string (re-feedable via --input).
-node tests/debug/step_analysis.js --puzzle "Chaos Construction: The Fountain" --at 6 --dump-state
+# Dump the grid state at a step as a constraint string, and full-propagate it in
+# one pipe. --dump-state writes ONLY the constraint to stdout (everything else to
+# stderr); --input - reads the constraint from stdin.
+node tests/debug/step_analysis.js --puzzle "Chaos Construction: The Fountain" --at 6 --dump-state \
+  | node tests/debug/step_analysis.js --input - --at 0 --grid --vars
 ```
 
 `--compare <ablation>` shows *where* the search first branches differently; for
@@ -111,15 +114,17 @@ During search a node only runs *incremental* propagation (the handlers reachable
 from the cells that just changed). To check whether a full sweep would derive
 more from a node's state than the search did:
 
-1. `step_analysis.js --at N --dump-state` — emits the state at step N as a
-   constraint string (original puzzle + a `~Cell_v…` given per search-narrowed
-   grid/var cell).
+```sh
+step_analysis.js --at N --dump-state --puzzle "<name>" \
+  | step_analysis.js --input - --at 0 --grid --vars
+```
 
-2. Feed it back: `step_analysis.js --input "<string>" --at 0 --grid --vars` shows
-   the grid after *full* initial propagation from that state. If it is narrower
-   than the step-N state (or `--log` reports a `returned false`), full propagation
-   found something the node's incremental pass missed; if it is identical, the
-   node was already at the full-propagation fixpoint.
+The first command emits the state at step N as a constraint string (original
+puzzle + a `~Cell_v…` given per search-narrowed grid/var cell) on stdout, with
+all other output on stderr so it pipes cleanly. The second full-propagates from
+that state. If the result is narrower than the step-N state (or `--log` reports a
+`returned false`), full propagation found something the node's incremental pass
+missed; if it is identical, the node was already at the full-propagation fixpoint.
 
 #### Debugging a custom NFA spec
 
@@ -143,14 +148,14 @@ which would feed a named NFA constraint's token stream through the spec at the
 ### `search_hotspots.js` — where the search concentrates
 
 ```sh
-# Conflict heatmap + churn + branch-factor shape over a bounded solve.
+# Conflict heatmap + churn + branch-factor shape + propagation yield over a bounded solve.
 node tests/debug/search_hotspots.js --max-backtracks none --puzzle "Chaos Construction"
 
 # Cap a hard puzzle so the run is bounded (rankings reflect the work done).
 node tests/debug/search_hotspots.js --max-backtracks 50000 --puzzle "Chaos Construction: The Fountain"
 ```
 
-`--max-backtracks <n|none>` is required. Reports three rankings:
+`--max-backtracks <n|none>` is required. Reports four sections:
 
 - **CONFLICT** — cells with the most accumulated backtrack conflict (the engine's
   conflict heatmap, otherwise only visible in the debug UI), with the share that
@@ -159,6 +164,12 @@ node tests/debug/search_hotspots.js --max-backtracks 50000 --puzzle "Chaos Const
 - **BRANCH FACTOR** — the branch-factor histogram split grid vs var, the fraction
   of branches on var cells, and the **MRV gap** (how far the heuristic strays from
   branching on the fewest-options cell).
+- **PROPAGATION YIELD** — how many candidates each branching guess actually
+  eliminates, split grid vs var: the fraction of guesses that are **inert** (0
+  eliminations) or near-inert (1–2), the branch-factor histogram of the inert
+  guesses, and what fraction of them immediately contradict. Wide inert guesses
+  (high branch factor, 0 elimination) are the signature of branching into the
+  void — the search guessing where its propagators can't yet deduce anything.
 
 A `capped` status means the run hit the backtrack limit, so the rankings reflect
 only the work done so far.

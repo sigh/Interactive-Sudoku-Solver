@@ -109,6 +109,7 @@ const printUsage = () => {
 Puzzle source (pick one):
   --puzzle <name>       Name (or substring) of a puzzle in data/collections.js.
   --input <string>      Raw constraint string (e.g. ".Thermo~R1C1~R1C2").
+                        Use "-" to read the constraint string from stdin.
   --input-file <path>   Read the constraint string from a file.
 
 Step indexing matches the UI: step 0 is the initial position (before any
@@ -127,10 +128,12 @@ Step inspection (all three use --at for the step):
   --log                 Print the constraint-propagation log for the --at step:
                         what each handler pruned, and (at a contradiction step)
                         which handler returned false (the refuter).
-  --dump-state          Print the grid state at the --at step as a constraint
-                        string (original puzzle + a given per search-narrowed
-                        cell). Feed it back via --input to full-propagate from
-                        that state (incremental-vs-full propagation checks).
+  --dump-state          Print (to stdout) the grid state at the --at step as a
+                        constraint string; ALL other output goes to stderr, so
+                        it pipes straight into a second invocation:
+                          step_analysis.js --dump-state --at N --input "<p>" \\
+                            | step_analysis.js --input - --at 0 --grid --vars
+                        (the basis for incremental-vs-full propagation checks).
   --top <n>             Competing-cell rows to show in --explain. Default ${DEFAULTS.top}.
 
 Other:
@@ -193,6 +196,7 @@ const resolveFileInput = (input) =>
   input.startsWith('/') ? readFileSync(join(PROJECT_ROOT, input), 'utf8') : input;
 
 const loadPuzzle = (args) => {
+  if (args.input === '-') return { name: 'stdin', input: readFileSync(0, 'utf8') };
   if (args.input !== null) return { name: 'custom', input: resolveFileInput(args.input) };
   if (args.inputFile !== null) {
     return { name: args.inputFile, input: readFileSync(args.inputFile, 'utf8') };
@@ -636,10 +640,13 @@ const printStateString = (shape, internal, solver, atStep, guides, baseInput) =>
   }
   const stateString = baseInput + givens.map(g => `.${g}`).join('');
 
-  console.log(`\n=== State at step ${atStep} as a constraint string ===`);
-  console.log(`# ${givens.length} given(s) added; re-run with --input "<below>" --at 0 to full-propagate from here`);
-  if (empties) console.log(`# note: ${empties} cell(s) have an empty domain (contradiction state) and were omitted`);
-  console.log(stateString);
+  // Comments to stderr; the constraint string to stdout (so it can be piped into
+  // `--input -`). console.log is routed to stderr in --dump-state mode, so write
+  // the constraint to the real stdout explicitly.
+  console.error(`# state at step ${atStep}: ${givens.length} given(s) added` +
+    (empties ? `; ${empties} empty-domain cell(s) omitted (contradiction state)` : '') +
+    `. Pipe stdout into a second run with --input - .`);
+  process.stdout.write(stateString + '\n');
 };
 
 const printPriorities = (shape, internal) => {
@@ -696,6 +703,11 @@ export const main = (argv) => {
     for (const p of allPuzzles()) console.log(p.name);
     return;
   }
+
+  // In --dump-state mode, stdout must carry ONLY the dumped constraint string
+  // (so it pipes straight into `--input -`). Route every human-readable line to
+  // stderr; printStateString writes the constraint to stdout directly.
+  if (args.dumpState) console.log = (...a) => console.error(...a);
 
   const puzzle = loadPuzzle(args);
   const constraint = SudokuParser.parseText(puzzle.input);

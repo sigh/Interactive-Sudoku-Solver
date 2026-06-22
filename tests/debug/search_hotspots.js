@@ -3,9 +3,11 @@
 // Runs a bounded solve and aggregates where the search spends its effort: the
 // cells with the most accumulated conflict (the engine's conflict heatmap, which
 // is otherwise only visible in the debug UI), the cells the search re-guesses
-// most (churn), and the branch-factor shape (how wide the branching is, split
-// grid vs var, and how far the heuristic strays from fewest-options — the MRV
-// gap). Deterministic: counts, not wall-time sampling.
+// most (churn), the branch-factor shape (how wide the branching is, split grid
+// vs var, and how far the heuristic strays from fewest-options — the MRV gap),
+// and the propagation yield (how many candidates each guess actually eliminates
+// — exposing wide guesses that branch into the void). Deterministic: counts, not
+// wall-time sampling.
 //
 // Usage:
 //   node tests/debug/search_hotspots.js --max-backtracks <n|none> [options]
@@ -26,6 +28,8 @@
 //   churn    — per cell, how many distinct values the search branched on it.
 //   MRV gap  — (avg chosen branch factor) − (avg minimum available); how far the
 //              heuristic strays from branching on the fewest-options cell.
+//   inert    — a branching guess whose propagation eliminates no candidates; a
+//              wide inert guess (high branch factor) is ineffective branching.
 //
 // Examples:
 //   node tests/debug/search_hotspots.js --max-backtracks none --puzzle "Chaos Construction"
@@ -89,6 +93,12 @@ export const main = (argv) => {
   const churn = new Map();           // cell -> Set of values branched on it
   const bfGrid = new Map(), bfVar = new Map();  // branch factor -> count
   let branches = 0, varBranches = 0, sumChosen = 0, sumMin = 0;
+  // Propagation yield per branching guess, split grid/var: how many candidates
+  // the guess's propagation actually eliminated. inertBf is the branch-factor
+  // histogram of the inert (0-elimination) guesses; inertContra counts the inert
+  // guesses that immediately contradicted.
+  const yieldBucket = () => ({ n: 0, inert: 0, few: 0, inertContra: 0, inertBf: new Map() });
+  const yld = { grid: yieldBucket(), var: yieldBucket() };
   let internal = null, shape = null;
 
   const onSolver = (solver) => {
@@ -97,6 +107,11 @@ export const main = (argv) => {
     const numGridCells = shape.numGridCells;
     const numSearch = internal._numSearchCells;
     const sel = internal._candidateSelector;
+
+    // The selector wrapper records the branch decision and stashes a `pending`
+    // descriptor; the matching _enforceConstraints call (next in the loop)
+    // measures how many candidates that guess propagated away.
+    let pending = null;
     const orig = sel._selectBestCandidate.bind(sel);
     sel._selectBestCandidate = function (g, co, cd, nn) {
       const res = orig(g, co, cd, nn);
@@ -116,8 +131,33 @@ export const main = (argv) => {
         }
         sumChosen += res.count;
         sumMin += minBf;
+        pending = { count: res.count, isVar };
+      } else {
+        pending = null;
       }
       return res;
+    };
+
+    const popSum = (gs) => { let s = 0; for (let i = 0; i < numSearch; i++) s += popcount(gs[i]); return s; };
+    const origEnforce = internal._enforceConstraints.bind(internal);
+    internal._enforceConstraints = function (gridState, acc) {
+      const p = pending; pending = null;
+      if (!p) return origEnforce(gridState, acc);
+      // The guess cell is already a single value here, so any population drop is
+      // propagation into OTHER cells. before − after = candidates eliminated.
+      const before = popSum(gridState);
+      const ok = origEnforce(gridState, acc);
+      const elim = before - popSum(gridState);
+      const b = p.isVar ? yld.var : yld.grid;
+      b.n++;
+      if (elim === 0) {
+        b.inert++;
+        if (!ok) b.inertContra++;
+        b.inertBf.set(p.count, (b.inertBf.get(p.count) ?? 0) + 1);
+      } else if (elim <= 2) {
+        b.few++;
+      }
+      return ok;
     };
   };
 
@@ -163,6 +203,21 @@ export const main = (argv) => {
   console.log(`avg chosen branch factor: ${(sumChosen / Math.max(1, branches)).toFixed(2)}  ` +
     `avg min available: ${(sumMin / Math.max(1, branches)).toFixed(2)}  ` +
     `(MRV gap: ${((sumChosen - sumMin) / Math.max(1, branches)).toFixed(2)})`);
+
+  // --- Propagation yield: are the branches doing work, or branching blindly? ---
+  // An "inert" guess is one whose propagation eliminates nothing — wide inert
+  // guesses (high branch factor, 0 elimination) are the signature of ineffective
+  // branching into the void.
+  const pctY = (x, n) => n ? `${(100 * x / n).toFixed(0)}%` : '-';
+  const inertHist = (m) =>
+    [...m.entries()].sort((a, b) => a[0] - b[0]).map(([bf, n]) => `bf${bf}:${n}`).join(' ') || '-';
+  console.log('\n=== PROPAGATION YIELD (candidates eliminated per branching guess) ===');
+  console.log(`grid: n=${yld.grid.n}\tinert(0)=${pctY(yld.grid.inert, yld.grid.n)}\tfew(1-2)=${pctY(yld.grid.few, yld.grid.n)}`);
+  console.log(`var : n=${yld.var.n}\tinert(0)=${pctY(yld.var.inert, yld.var.n)}\tfew(1-2)=${pctY(yld.var.few, yld.var.n)}`);
+  console.log(`inert guesses by branch factor — grid: ${inertHist(yld.grid.inertBf)}`);
+  console.log(`                                  var : ${inertHist(yld.var.inertBf)}`);
+  console.log(`inert guesses that immediately contradict — ` +
+    `grid: ${pctY(yld.grid.inertContra, yld.grid.inert)}  var: ${pctY(yld.var.inertContra, yld.var.inert)}`);
 };
 
 runAsCli(import.meta.url, main);
