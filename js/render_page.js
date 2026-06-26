@@ -1365,8 +1365,18 @@ class ConstraintSelector {
 }
 
 class Selection {
+  // Committed groups in a multi-group selection are all drawn with the same
+  // bordered style, to distinguish them from the active selection.
+  static COMMITTED_GROUP_CLASS = 'committed-group';
+
   constructor(displayContainer) {
+    this._displayContainer = displayContainer;
     this._highlight = displayContainer.createCellHighlighter('selected-cells');
+
+    // Committed groups for multi-group selection. Each entry is
+    // { cells: [...cellIds], highlighter }. The current (active) selection in
+    // `_highlight` is the trailing, not-yet-committed group.
+    this._committedGroups = [];
 
     this._clickInterceptor = displayContainer.getClickInterceptor();
 
@@ -1377,6 +1387,37 @@ class Selection {
     this._setUpMouseHandlers(this._clickInterceptor.getSvg());
 
     this._callbacks = [];
+  }
+
+  // Commit the active selection as a group and start a fresh one. No-op if
+  // nothing is selected.
+  commitGroup() {
+    const cells = [...this._highlight.getCells()];
+    if (cells.length === 0) return;
+
+    const highlighter = this._displayContainer.createRegionHighlighter(
+      Selection.COMMITTED_GROUP_CLASS, /* inset= */ 2);
+    highlighter.setCells(cells);
+    this._committedGroups.push({ cells, highlighter });
+
+    // Clear the active highlight directly (not via setCells, which would also
+    // discard the committed groups) to begin the next group.
+    this._highlight.setCells([]);
+    this._runCallback(false);
+  }
+
+  // Committed groups, plus the active selection as a trailing group if non-empty.
+  getGroups() {
+    const groups = this._committedGroups.map(g => [...g.cells]);
+    const active = [...this._highlight.getCells()];
+    if (active.length > 0) groups.push(active);
+    return groups;
+  }
+
+  _clearCommittedGroups() {
+    if (this._committedGroups.length === 0) return;
+    for (const group of this._committedGroups) group.highlighter.clear();
+    this._committedGroups = [];
   }
 
   setShape(shape) { this._shape = shape; }
@@ -1391,6 +1432,9 @@ class Selection {
   }
 
   setCells(cellIds) {
+    // Setting the active selection wholesale resets any in-progress grouping:
+    // a fresh click, outside-click, or post-submit clear all start over.
+    this._clearCommittedGroups();
     this._highlight.setCells(cellIds);
     if (cellIds.length > 0) this._maybeAddOutsideClickListener();
     this._runCallback(false);
@@ -1631,6 +1675,12 @@ class GridInputManager {
   }
   getSelection() {
     return [...this._selection.getCells()];
+  }
+  commitSelectionGroup() {
+    this._selection.commitGroup();
+  }
+  getSelectionGroups() {
+    return this._selection.getGroups();
   }
 
   _runCallbacks(callbacks, ...args) {

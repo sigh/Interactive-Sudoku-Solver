@@ -119,6 +119,11 @@ export class SudokuBuilder {
       curSet.push(cell);
     }
 
+    yield* this._equalSumHandlers(cellSets, shape);
+  }
+
+  // Emit handlers enforcing that every cell set in `cellSets` has the same sum.
+  static * _equalSumHandlers(cellSets, shape) {
     const singles = cellSets.filter(s => s.length === 1).map(s => s[0]);
     const multis = cellSets.filter(s => s.length > 1);
 
@@ -787,6 +792,14 @@ export class SudokuBuilder {
               yield new HandlerModule.BinaryPairwise(
                 key, ...cells);
             }
+          }
+          break;
+
+        case 'EqualSum':
+          {
+            const groups = constraint.groups.map(
+              g => g.map(c => shape.parseCellId(c).cell));
+            yield* this._equalSumHandlers(groups, shape);
           }
           break;
 

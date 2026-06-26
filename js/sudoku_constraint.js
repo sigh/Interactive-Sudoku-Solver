@@ -2408,7 +2408,7 @@ export class SudokuConstraint {
     static CATEGORY = 'LinesAndSets';
     static DISPLAY_CONFIG = {
       displayClass: 'BorderedRegion',
-      fillOpacity: 0.1,
+      fillOpacity: 0.04,
       inset: 2,
       splitFn: (constraint) => constraint.splitCells(),
     };
@@ -2455,6 +2455,70 @@ export class SudokuConstraint {
     static fnKey = memoize((numValues, valueOffset = 0) => {
       return fnToBinaryKey((a, b) => a === b, numValues, valueOffset);
     });
+  }
+
+  static EqualSum = class EqualSum extends SudokuConstraintBase {
+    static DESCRIPTION = (`
+      Each group of cells must have the same sum.`);
+    static CATEGORY = 'LinesAndSets';
+    static MULTI_GROUP = true;
+    static DISPLAY_CONFIG = {
+      displayClass: 'BorderedRegion',
+      fillOpacity: 0.1,
+      inset: 2,
+      pattern: ShadedRegionOptions.CHECKERED_PATTERN,
+      splitFn: (constraint) => constraint.groups,
+    };
+    // Allow any non-empty group (groups may be single cells).
+    static VALIDATE_CELLS_FN = (cells, shape) => cells.length > 0;
+
+    // Token separating groups in the serialized form.
+    static _SEPARATOR = '-';
+
+    constructor(...groups) {
+      super(...groups);
+      this.groups = groups;
+    }
+
+    // The serialized form is a flat token list with separators between groups;
+    // splitting/joining lives here, so the instance only deals with arrays.
+    static *makeFromArgs(args, shape) {
+      const groups = [];
+      let group = [];
+      for (const arg of args) {
+        if (arg === this._SEPARATOR) {
+          if (group.length) groups.push(group);
+          group = [];
+        } else {
+          group.push(arg);
+        }
+      }
+      if (group.length) groups.push(group);
+      yield new this(...groups);
+    }
+
+    static serialize(constraints) {
+      return constraints.map(c => {
+        const args = [];
+        c.groups.forEach((group, i) => {
+          if (i > 0) args.push(this._SEPARATOR);
+          args.push(...group);
+        });
+        return this._argsToString(...args);
+      }).join('');
+    }
+
+    makeShifted(shiftFn) {
+      return new this.constructor(...this.groups.map(g => g.map(shiftFn)));
+    }
+
+    chipLabel() {
+      return `Equal Sum (${this.groups.length} groups)`;
+    }
+
+    getCells(shape) {
+      return this.groups.flat();
+    }
   }
 
   static Quad = class Quad extends SudokuConstraintBase {

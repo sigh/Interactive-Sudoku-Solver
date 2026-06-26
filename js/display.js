@@ -123,6 +123,136 @@ export class DisplayItem {
     return line;
   }
 
+  static _NO_EDGES = [null, null, null, null];
+
+  // Draw a border around the region covered by cellSet, as an SVG group of
+  // path segments. cornerCut chamfers diagonal bridges; inset shrinks inward.
+  _makeRegionBorder(cellSet, shape, cornerCut, inset = 0) {
+    const g = createSvgElement('g');
+    const seen = new Set();
+    const graph = shape.cellGraph();
+    const half = DisplayItem.CELL_SIZE / 2;
+    const { LEFT, RIGHT, UP, DOWN } = CellGraph;
+
+    for (const cell of cellSet) {
+      const [cx, cy] = this.cellCenter(cell);
+      const edges = graph.cellEdges(cell);
+      const lCell = edges[LEFT];
+      const rCell = edges[RIGHT];
+      const uCell = edges[UP];
+      const dCell = edges[DOWN];
+      const uEdges = uCell !== null ? graph.cellEdges(uCell)
+        : DisplayItem._NO_EDGES;
+      const dEdges = dCell !== null ? graph.cellEdges(dCell)
+        : DisplayItem._NO_EDGES;
+
+      //   tl | tr    Each corner is where four cells meet.
+      //   ---+---    Neighbors are resolved via cellEdges;
+      //   bl | br    diagonals via the neighbor's edges.
+      for (const [ix, iy, tlCell, trCell, blCell, brCell] of [
+        [cx - half, cy - half, uEdges[LEFT], uCell, lCell, cell],
+        [cx + half, cy - half, uCell, uEdges[RIGHT], cell, rCell],
+        [cx - half, cy + half, lCell, cell, dEdges[LEFT], dCell],
+        [cx + half, cy + half, cell, rCell, dCell, dEdges[RIGHT]],
+      ]) {
+        // Deduplicate shared intersections using a cell-index key.
+        // Each cell is the BR of exactly one intersection (its top-left
+        // corner), BL of one (top-right), etc. The offset distinguishes
+        // which position the keying cell occupies.
+        const key = brCell !== null ? (brCell << 2)
+          : blCell !== null ? (blCell << 2) + 1
+            : trCell !== null ? (trCell << 2) + 2
+              : (tlCell << 2) + 3;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        this._drawIntersection(
+          g,
+          cellSet.has(tlCell), cellSet.has(trCell),
+          cellSet.has(blCell), cellSet.has(brCell),
+          ix, iy, cornerCut, inset);
+      }
+    }
+
+    return g;
+  }
+
+  // Draw border segments at an intersection point where four cells meet.
+  //
+  //   tl | tr        The border is drawn between cells that are
+  //   ---+---        inside the region and cells that are outside.
+  //   bl | br
+  //
+  // g         - SVG group to append path elements to.
+  // tl/tr/bl/br - Whether each adjacent cell is in the region.
+  // x, y      - Pixel coordinates of the intersection point.
+  // cornerCut - Add a chamfer where two diagonal cells meet (count=2).
+  // inset     - Pixel offset to shrink the border inward.
+  _drawIntersection(g, tl, tr, bl, br, x, y, cornerCut, inset) {
+    const count = tl + tr + bl + br;
+    if (count === 0 || count === 4) return;
+
+    const half = DisplayItem.CELL_SIZE / 2;
+
+    if (count === 1 || count === 3) {
+      // Corner (90° or 270°)
+      const insetX = (count === 1 ? (tl || bl) : (tl && bl)) ? -1 : 1;
+      const insetY = (count === 1 ? (tl || tr) : (tl && tr)) ? -1 : 1;
+      const edgeDir = count === 1 ? 1 : -1;
+      const cx = x + inset * insetX;
+      const cy = y + inset * insetY;
+      g.appendChild(this._makePath([
+        [x + half * insetX * edgeDir, cy],
+        [cx, cy],
+        [cx, y + half * insetY * edgeDir],
+      ]));
+      return;
+    }
+
+    // count === 2: diagonal or straight
+
+    // Diagonal: two paths with corner cuts
+    if (tl !== tr && tl !== bl) {
+      const DIAGONAL_CORNER_CUT_SIZE = 10;  // Size of corner cut for diagonal bridges
+
+      const d = (tl && br) ? -1 : 1;
+      const cut = cornerCut ? DIAGONAL_CORNER_CUT_SIZE : 0;
+      const x1 = x + inset * d;
+      const y1 = y + inset;
+      g.appendChild(this._makePath([
+        [x1, y - half],
+        [x1, y1 - cut],
+        [x1 - d * cut, y1],
+        [x - d * half, y1],
+      ]));
+      const x2 = x - inset * d;
+      const y2 = y - inset;
+      g.appendChild(this._makePath([
+        [x + d * half, y2],
+        [x2 + d * cut, y2],
+        [x2, y2 + cut],
+        [x2, y + half],
+      ]));
+      return;
+    }
+
+    // Straight edge
+    const isHorizontal = (tl === tr);
+    const insetDir = tl ? -1 : 1;
+    if (isHorizontal) {
+      const yOff = inset * insetDir;
+      g.appendChild(this._makePath([
+        [x - half, y + yOff],
+        [x + half, y + yOff],
+      ]));
+    } else {
+      const xOff = inset * insetDir;
+      g.appendChild(this._makePath([
+        [x + xOff, y - half],
+        [x + xOff, y + half],
+      ]));
+    }
+  }
+
   _makeSquarePattern(id, color) {
     const pattern = createSvgElement('pattern');
     pattern.id = id;
@@ -493,6 +623,10 @@ export class DisplayContainer {
     return new CellHighlighter(this._highlightDisplay, cssClass);
   }
 
+  createRegionHighlighter(cssClass, inset = 0) {
+    return new RegionHighlighter(this._highlightDisplay, cssClass, inset);
+  }
+
   getNewGroup(groupClass) {
     const group = createSvgElement('g');
     group.classList.add(groupClass);
@@ -710,6 +844,18 @@ export class HighlightDisplay extends DisplayItem {
     return path;
   }
 
+  // Draw a single border around the region covered by cellIds (cf. how
+  // BorderedRegion constraints are drawn), returning the element for removal.
+  highlightRegion(cellIds, cssClass, inset = 0) {
+    const cellSet = new Set(
+      cellIds.map(id => this._shape.parseCellId(id).cell));
+    const region = this._makeRegionBorder(
+      cellSet, this._shape, /* cornerCut= */ true, inset);
+    if (cssClass) region.classList.add(cssClass);
+    this._svg.append(region);
+    return region;
+  }
+
   removeHighlight(path) {
     path.parentNode.removeChild(path);
   }
@@ -910,6 +1056,43 @@ class CellHighlighter {
     }
     this._cells.clear();
     this._key = undefined;
+  }
+}
+
+// Like CellHighlighter, but draws a single border around the whole cell set
+// (as bordered-region constraints are drawn) rather than per-cell.
+class RegionHighlighter {
+  constructor(display, cssClass, inset = 0) {
+    this._display = display;
+    this._cssClass = cssClass;
+    this._inset = inset;
+    this._cells = [];
+    this._element = null;
+  }
+
+  setCells(cellIds) {
+    this.clear();
+    this._cells = [...cellIds];
+    if (this._cells.length) {
+      this._element = this._display.highlightRegion(
+        this._cells, this._cssClass, this._inset);
+    }
+  }
+
+  size() {
+    return this._cells.length;
+  }
+
+  getCells() {
+    return [...this._cells];
+  }
+
+  clear() {
+    if (this._element) {
+      this._display.removeHighlight(this._element);
+      this._element = null;
+    }
+    this._cells = [];
   }
 }
 

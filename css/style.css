@@ -495,6 +495,14 @@ button.copy-to-clipboard-failed::after {
   opacity: 0.1;
 }
 
+.highlight-group>.committed-group {
+  fill: none;
+  stroke: rgb(0, 0, 255);
+  stroke-width: 2px;
+  stroke-linejoin: round;
+  opacity: 0.6;
+}
+
 .highlight-group>.chip-hover,
 .highlight-group>.raw-strings-hover {
   fill: rgb(250, 250, 250);

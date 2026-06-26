@@ -408,6 +408,14 @@ layout: null
                         <input type="checkbox" name="is-loop" id="multi-cell-constraint-loop-input"></input>
                         <label for="multi-cell-constraint-loop-input">Loop</label>
                       </div>
+                      <div class="constraint-multi-group hstack">
+                        <button type="button" name="add-group"
+                          title="Bank the current selection as a group and start a new one"
+                          disabled>
+                          + Group
+                        </button>
+                        <span class="group-readout description"></span>
+                      </div>
                       <div class="hstack">
                         <div id="multi-cell-constraint-value-container" class="constraint-value"></div>
                         <button type="submit" name="add-constraint" title="Add constraint" class="hstack-push-right"
