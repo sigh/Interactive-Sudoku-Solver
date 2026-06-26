@@ -1374,7 +1374,7 @@ export class SudokuConstraint {
       Construct jigsaw regions during solving. Regions have size equal to the
       number of values, are orthogonally connected, and each region contains
       every value once.`);
-    static CATEGORY = 'Experimental';
+    static CATEGORY = 'LayoutCheckbox';
     static UNIQUENESS_KEY_FIELD = 'type';
 
     getVarCellGroups(shape) {
