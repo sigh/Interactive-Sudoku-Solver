@@ -2415,10 +2415,9 @@ export class SudokuConstraint {
     };
     static ARGUMENT_CONFIG = {
       label: 'num sets',
-      default: 2,
       options: (cells) => {
         const options = [];
-        for (let i = 2; i <= cells.length; i++) {
+        for (let i = cells.length; i >= 2; i--) {
           if (cells.length % i === 0) {
             options.push({ text: `${i} sets`, value: i });
           }
