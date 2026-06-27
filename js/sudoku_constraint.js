@@ -46,6 +46,7 @@ export class SudokuConstraintBase {
   static DISPLAY_CONFIG = null;
   static LOOPS_ALLOWED = false;
   static IS_COMPOSITE = false;
+  static MULTI_SEGMENT = false;
   // A puzzle can't have multiple constraints with the same
   // uniquenessKey. Uniqueness keys are specific to a constraint
   // type.
@@ -2459,65 +2460,65 @@ export class SudokuConstraint {
 
   static EqualSum = class EqualSum extends SudokuConstraintBase {
     static DESCRIPTION = (`
-      Each group of cells must have the same sum.`);
+      Each segment of cells must have the same sum.`);
     static CATEGORY = 'LinesAndSets';
-    static MULTI_GROUP = true;
+    static MULTI_SEGMENT = true;
     static DISPLAY_CONFIG = {
       displayClass: 'BorderedRegion',
       fillOpacity: 0.1,
       inset: 2,
       pattern: ShadedRegionOptions.CHECKERED_PATTERN,
-      splitFn: (constraint) => constraint.groups,
+      splitFn: (constraint) => constraint.segments,
     };
-    // Allow any non-empty group (groups may be single cells).
+    // Allow any non-empty segment (segments may be single cells).
     static VALIDATE_CELLS_FN = (cells, shape) => cells.length > 0;
 
-    // Token separating groups in the serialized form.
+    // Token separating segments in the serialized form.
     static _SEPARATOR = '-';
 
-    constructor(...groups) {
-      super(...groups);
-      this.groups = groups;
+    constructor(...segments) {
+      super(...segments);
+      this.segments = segments;
     }
 
-    // The serialized form is a flat token list with separators between groups;
+    // The serialized form is a flat token list with separators between segments;
     // splitting/joining lives here, so the instance only deals with arrays.
     static *makeFromArgs(args, shape) {
-      const groups = [];
-      let group = [];
+      const segments = [];
+      let segment = [];
       for (const arg of args) {
         if (arg === this._SEPARATOR) {
-          if (group.length) groups.push(group);
-          group = [];
+          if (segment.length) segments.push(segment);
+          segment = [];
         } else {
-          group.push(arg);
+          segment.push(arg);
         }
       }
-      if (group.length) groups.push(group);
-      yield new this(...groups);
+      if (segment.length) segments.push(segment);
+      yield new this(...segments);
     }
 
     static serialize(constraints) {
       return constraints.map(c => {
         const args = [];
-        c.groups.forEach((group, i) => {
+        c.segments.forEach((segment, i) => {
           if (i > 0) args.push(this._SEPARATOR);
-          args.push(...group);
+          args.push(...segment);
         });
         return this._argsToString(...args);
       }).join('');
     }
 
     makeShifted(shiftFn) {
-      return new this.constructor(...this.groups.map(g => g.map(shiftFn)));
+      return new this.constructor(...this.segments.map(s => s.map(shiftFn)));
     }
 
     chipLabel() {
-      return `Equal Sum (${this.groups.length} groups)`;
+      return `Equal Sum (${this.segments.length} segments)`;
     }
 
     getCells(shape) {
-      return this.groups.flat();
+      return this.segments.flat();
     }
   }
 

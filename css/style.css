@@ -495,12 +495,15 @@ button.copy-to-clipboard-failed::after {
   opacity: 0.1;
 }
 
-.highlight-group>.committed-group {
-  fill: none;
-  stroke: rgb(0, 0, 255);
+.highlight-group>.committed-segment {
+  fill: rgba(0, 0, 255, 0.1);
+  stroke: rgba(0, 0, 255, 0.6);
   stroke-width: 2px;
   stroke-linejoin: round;
-  opacity: 0.6;
+}
+
+#selection-controls {
+  justify-content: flex-end;
 }
 
 .highlight-group>.chip-hover,

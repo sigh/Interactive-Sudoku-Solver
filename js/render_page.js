@@ -1365,18 +1365,18 @@ class ConstraintSelector {
 }
 
 class Selection {
-  // Committed groups in a multi-group selection are all drawn with the same
+  // Committed segments in a multi-segment selection are all drawn with the same
   // bordered style, to distinguish them from the active selection.
-  static COMMITTED_GROUP_CLASS = 'committed-group';
+  static COMMITTED_SEGMENT_CLASS = 'committed-segment';
 
   constructor(displayContainer) {
     this._displayContainer = displayContainer;
     this._highlight = displayContainer.createCellHighlighter('selected-cells');
 
-    // Committed groups for multi-group selection. Each entry is
-    // { cells: [...cellIds], highlighter }. The current (active) selection in
-    // `_highlight` is the trailing, not-yet-committed group.
-    this._committedGroups = [];
+    // Committed segments for multi-segment selection: a RegionHighlighter per
+    // segment (which also holds the segment's cells). The active selection in
+    // `_highlight` is the trailing, not-yet-committed segment.
+    this._committedSegments = [];
 
     this._clickInterceptor = displayContainer.getClickInterceptor();
 
@@ -1389,35 +1389,39 @@ class Selection {
     this._callbacks = [];
   }
 
-  // Commit the active selection as a group and start a fresh one. No-op if
+  // Commit the active selection as a segment and start a fresh one. No-op if
   // nothing is selected.
-  commitGroup() {
+  commitSegment() {
     const cells = [...this._highlight.getCells()];
     if (cells.length === 0) return;
 
     const highlighter = this._displayContainer.createRegionHighlighter(
-      Selection.COMMITTED_GROUP_CLASS, /* inset= */ 2);
+      Selection.COMMITTED_SEGMENT_CLASS, /* inset= */ 2);
     highlighter.setCells(cells);
-    this._committedGroups.push({ cells, highlighter });
+    this._committedSegments.push(highlighter);
 
     // Clear the active highlight directly (not via setCells, which would also
-    // discard the committed groups) to begin the next group.
+    // discard the committed segments) to begin the next segment.
     this._highlight.setCells([]);
     this._runCallback(false);
   }
 
-  // Committed groups, plus the active selection as a trailing group if non-empty.
-  getGroups() {
-    const groups = this._committedGroups.map(g => [...g.cells]);
+  // Committed segments, plus the active selection as a trailing segment if non-empty.
+  getSegments() {
+    const segments = this._committedSegments.map(h => h.getCells());
     const active = [...this._highlight.getCells()];
-    if (active.length > 0) groups.push(active);
-    return groups;
+    if (active.length > 0) segments.push(active);
+    return segments;
   }
 
-  _clearCommittedGroups() {
-    if (this._committedGroups.length === 0) return;
-    for (const group of this._committedGroups) group.highlighter.clear();
-    this._committedGroups = [];
+  // Size of the active (in-progress, not-yet-committed) segment.
+  activeSize() { return this._highlight.size(); }
+
+  committedSegmentCount() { return this._committedSegments.length; }
+
+  _clearCommittedSegments() {
+    for (const highlighter of this._committedSegments) highlighter.clear();
+    this._committedSegments = [];
   }
 
   setShape(shape) { this._shape = shape; }
@@ -1427,16 +1431,22 @@ class Selection {
   }
 
   _runCallback(finishedSelecting) {
-    this._callbacks.forEach(fn => fn(
-      [...this._highlight.getCells()], finishedSelecting));
+    this._callbacks.forEach(fn => fn(this.getCells(), finishedSelecting));
   }
 
   setCells(cellIds) {
-    // Setting the active selection wholesale resets any in-progress grouping:
-    // a fresh click, outside-click, or post-submit clear all start over.
-    this._clearCommittedGroups();
+    // Setting the active selection wholesale resets any committed segments:
+    // outside-click and post-submit clear all start over.
+    this._clearCommittedSegments();
     this._highlight.setCells(cellIds);
     if (cellIds.length > 0) this._maybeAddOutsideClickListener();
+    this._runCallback(false);
+  }
+
+  // Clear only the active (in-progress) selection, keeping committed segments.
+  // A fresh drag thus starts the next segment rather than wiping committed ones.
+  _clearActive() {
+    this._highlight.setCells([]);
     this._runCallback(false);
   }
 
@@ -1469,8 +1479,16 @@ class Selection {
     }
     return cells.length > 0 ? cells : [anchorId, targetId];
   }
-  getCells() { return this._highlight.getCells(); }
-  size() { return this._highlight.size(); }
+  // The selection is the deduplicated union of all segments (committed + active).
+  // getSegments() exposes the per-segment structure for multi-segment constraints.
+  getCells() {
+    const seen = new Set();
+    for (const segment of this.getSegments()) {
+      for (const cell of segment) seen.add(cell);
+    }
+    return [...seen];
+  }
+  size() { return this.getCells().length; }
 
   cellIdCenter(cellId) {
     return this._clickInterceptor.cellIdCenter(cellId);
@@ -1539,7 +1557,8 @@ class Selection {
       isRectMode = e.ctrlKey || e.metaKey;
 
       if (!e.shiftKey && !isRectMode) {
-        this.setCells([]);
+        // Start a fresh active selection, but keep any committed segments.
+        this._clearActive();
       }
 
       activePointerId = e.pointerId;
@@ -1628,6 +1647,31 @@ class GridInputManager {
     });
 
     this._setUpKeyBindings();
+    this._setUpSelectionControls();
+  }
+
+  // General selection controls under the grid: commit the active selection as a
+  // segment (for multi-segment constraints). Available regardless of focus/panel.
+  _setUpSelectionControls() {
+    const container = document.getElementById('selection-controls');
+    const button = document.getElementById('commit-segment-button');
+    const clearButton = document.getElementById('clear-selection-button');
+    const readout = document.getElementById('selection-segment-readout');
+    if (!button) return;
+
+    // Clicking the controls must not clear the selection (outside-click handler).
+    this.addSelectionPreserver(container);
+    button.onclick = () => this._selection.commitSegment();
+    clearButton.onclick = () => this._selection.setCells([]);
+    this.onSelection(() => {
+      const count = this._selection.getSegments().length;
+      // Clear and the count are only shown once there are committed segments.
+      const hasCommitted = this._selection.committedSegmentCount() > 0;
+      button.disabled = this._selection.activeSize() === 0;
+      clearButton.style.display = hasCommitted ? '' : 'none';
+      readout.textContent = hasCommitted
+        ? `${count} segment${count === 1 ? '' : 's'}` : '';
+    });
   }
 
   // Track which panel the user last interacted with, so we can restore focus
@@ -1676,11 +1720,8 @@ class GridInputManager {
   getSelection() {
     return [...this._selection.getCells()];
   }
-  commitSelectionGroup() {
-    this._selection.commitGroup();
-  }
-  getSelectionGroups() {
-    return this._selection.getGroups();
+  getSelectionSegments() {
+    return this._selection.getSegments();
   }
 
   _runCallbacks(callbacks, ...args) {

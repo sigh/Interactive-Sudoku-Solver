@@ -725,10 +725,9 @@ class MultiCellInput extends ConstraintCategoryInput {
     const typeData = this._typeMap.get(type);
     if (!typeData) throw new Error('Unknown constraint type: ' + type);
 
-    if (constraintClass.MULTI_GROUP) {
-      const groups = inputManager.getSelectionGroups();
-      if (groups.length < 2) throw new Error('Need at least 2 groups.');
-      this.collection.addConstraint(new constraintClass(...groups));
+    if (constraintClass.MULTI_SEGMENT) {
+      const segments = inputManager.getSelectionSegments();
+      this.collection.addConstraint(new constraintClass(...segments));
       inputManager.setSelection([]);
       this.runUpdateCallback();
       return;
@@ -765,15 +764,6 @@ class MultiCellInput extends ConstraintCategoryInput {
 
     const loopContainer = selectionForm.querySelector('.constraint-loop');
     loopContainer.style.display = 'none';
-
-    // Multi-group controls (only present/used for MULTI_GROUP constraints).
-    this._multiGroupContainer = selectionForm.querySelector('.constraint-multi-group');
-    if (this._multiGroupContainer) {
-      this._multiGroupContainer.style.display = 'none';
-      this._addGroupButton = this._multiGroupContainer.querySelector('[name=add-group]');
-      this._groupReadout = this._multiGroupContainer.querySelector('.group-readout');
-      this._addGroupButton.onclick = () => inputManager.commitSelectionGroup();
-    }
 
     // Create the options.
     for (const constraintClass of constraintClasses) {
@@ -871,14 +861,6 @@ class MultiCellInput extends ConstraintCategoryInput {
         loopContainer.style.display = 'none';
       }
 
-      if (this._multiGroupContainer) {
-        const multiGroup = !!constraintClass.MULTI_GROUP;
-        this._multiGroupContainer.style.display = multiGroup ? '' : 'none';
-        // Leaving multi-group mode discards any in-progress grouping.
-        if (!multiGroup) inputManager.setSelection(inputManager.getSelection());
-        if (multiGroup) this._refreshMultiGroupState(selectionForm);
-      }
-
       descriptionElem.textContent = constraintClass.DESCRIPTION;
 
       if (!selectionForm.classList.contains('disabled')) {
@@ -910,34 +892,8 @@ class MultiCellInput extends ConstraintCategoryInput {
     };
   }
 
-  // Update the Add button, +Group button and readout for a MULTI_GROUP
-  // constraint, based on the current grouped selection.
-  _refreshMultiGroupState(selectionForm) {
-    const groups = this._inputManager.getSelectionGroups();
-    const numGroups = groups.length;
-    const activeSize = this._inputManager.getSelection().length;
-
-    if (this._groupReadout) {
-      this._groupReadout.textContent =
-        numGroups ? `${numGroups} group${numGroups === 1 ? '' : 's'}` : '';
-    }
-    if (this._addGroupButton) {
-      this._addGroupButton.disabled = activeSize === 0;
-    }
-    selectionForm['add-constraint'].disabled = numGroups < 2;
-    selectionForm.classList.toggle('disabled', numGroups === 0);
-    // Keep all type options selectable while building groups.
-    for (const typeData of this._typeMap.values()) {
-      typeData.elem.disabled = false;
-    }
-  }
-
   _onNewSelection(selection, selectionForm) {
     const type = selectionForm['constraint-type'].value;
-    if (SudokuConstraint[type]?.MULTI_GROUP) {
-      this._refreshMultiGroupState(selectionForm);
-      return;
-    }
 
     // Only enable the selection panel if the selection is long enough.
     const disabled = (selection.length === 0);

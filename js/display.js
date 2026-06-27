@@ -851,6 +851,13 @@ export class HighlightDisplay extends DisplayItem {
       cellIds.map(id => this._shape.parseCellId(id).cell));
     const region = this._makeRegionBorder(
       cellSet, this._shape, /* cornerCut= */ true, inset);
+    // Shade the interior, behind the border.
+    for (const cell of cellSet) {
+      const square = this._makeCellSquare(cell);
+      if (!square) continue;
+      square.setAttribute('stroke', 'none');
+      region.insertBefore(square, region.firstChild);
+    }
     if (cssClass) region.classList.add(cssClass);
     this._svg.append(region);
     return region;
@@ -1077,10 +1084,6 @@ class RegionHighlighter {
       this._element = this._display.highlightRegion(
         this._cells, this._cssClass, this._inset);
     }
-  }
-
-  size() {
-    return this._cells.length;
   }
 
   getCells() {

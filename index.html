@@ -297,6 +297,22 @@ layout: null
           <div id="sudoku-grid" class="hide-until-load">
             <input id="fake-input" inputmode="numeric" type="text" value="x">
           </div>
+          <div id="selection-controls" class="hstack">
+            <span id="selection-segment-readout" class="description"></span>
+            <button id="clear-selection-button" type="button" class="danger-button"
+              title="Clear the selection and all segments" style="display:none">
+              Clear
+            </button>
+            <button id="commit-segment-button" type="button"
+              title="Set the current selection as a segment and start a new one" disabled>
+              + Segment
+            </button>
+            <span class="tooltip" data-text="
+              Created a segmented selection of cells. Some constraints
+              (e.g. Equal Sum) apply to each segment separately.
+              By default, other constraints use all the selected cells together,
+              but segments can be used to repeat cells."></span>
+          </div>
         </div>
       </div>
 
@@ -397,6 +413,7 @@ layout: null
                     <div>
                       <span class="description">
                         Select cells by dragging or shift-clicking.
+                        Use "+ Segment" below the grid to start a new segment.
                       </span>
                       <div>
                         <select id="multi-cell-constraint-select" name="constraint-type" required>
@@ -407,14 +424,6 @@ layout: null
                       <div id="multi-cell-constraint-loop-container" class="constraint-loop">
                         <input type="checkbox" name="is-loop" id="multi-cell-constraint-loop-input"></input>
                         <label for="multi-cell-constraint-loop-input">Loop</label>
-                      </div>
-                      <div class="constraint-multi-group hstack">
-                        <button type="button" name="add-group"
-                          title="Bank the current selection as a group and start a new one"
-                          disabled>
-                          + Group
-                        </button>
-                        <span class="group-readout description"></span>
                       </div>
                       <div class="hstack">
                         <div id="multi-cell-constraint-value-container" class="constraint-value"></div>

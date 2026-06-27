@@ -797,9 +797,9 @@ export class SudokuBuilder {
 
         case 'EqualSum':
           {
-            const groups = constraint.groups.map(
-              g => g.map(c => shape.parseCellId(c).cell));
-            yield* this._equalSumHandlers(groups, shape);
+            const segments = constraint.segments.map(
+              s => s.map(c => shape.parseCellId(c).cell));
+            yield* this._equalSumHandlers(segments, shape);
           }
           break;
 
