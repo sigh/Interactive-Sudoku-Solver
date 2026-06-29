@@ -52,6 +52,7 @@ layout: null
             <li><a href="#accept">Accept Function</a></li>
             <li><a href="#branching">Branching</a></li>
             <li><a href="#max-depth">Max Depth</a></li>
+            <li><a href="#segments">Segments</a></li>
           </ul>
         </li>
         <li><a href="#state-count">Reducing the State Count</a>
@@ -313,6 +314,32 @@ function accept(state) {
           few cells of a line, or when the number of reachable states grows
           too large. If the solver hits its internal state limit, consider
           setting <code>maxDepth</code> to a lower value.
+        </p>
+
+        <h3 id="segments">Segments</h3>
+        <p>
+          A state machine can be applied to a
+          <a href=".#segments">segmented line</a>.
+          Between one segment and
+          the next, <code>transition</code> is called with the special
+          <code>SEGMENT_BREAK</code> value in place of a cell value to allow
+          the state machine to be aware of segment boundaries. e.g.
+        </p>
+        <pre>
+startState = 0;
+
+// Strictly increasing within each segment, resetting at every boundary.
+function transition(state, value) {
+  if (value === SEGMENT_BREAK) return 0;   // reset at the segment boundary
+  return value > state ? value : undefined;
+}
+
+function accept(state) {
+  return true;
+}</pre>
+        <p>
+          When being applied to segments, the state machine is limited to
+          <code>15</code> values, rather than the usual <code>16</code>.
         </p>
       </div>
 

@@ -406,15 +406,16 @@ export class SudokuBuilder {
           {
             const cells = constraint.cells.map(c => geometry.parseCellId(c).cell);
             const nfa = compileRegex(constraint.pattern, geometry.numValues, geometry.valueOffset);
-            yield new NFAHandlerModule.NFAConstraint(cells, nfa);
+            yield new NFAHandlerModule.NFAConstraint([cells], nfa);
           }
           break;
 
         case 'NFA':
           {
-            const cells = constraint.cells.map(c => geometry.parseCellId(c).cell);
+            const segments = constraint.segments.map(
+              seg => seg.map(c => geometry.parseCellId(c).cell));
             const nfa = compileNFA(constraint.encodedNFA, geometry.numValues);
-            yield new NFAHandlerModule.NFAConstraint(cells, nfa);
+            yield new NFAHandlerModule.NFAConstraint(segments, nfa);
           }
           break;
 

@@ -36,6 +36,7 @@ Canonical terms used throughout the solver. Where legacy synonyms exist
 | **house** | A region that must contain every value exactly once (row, column, box, or equivalent). | — |
 | **true candidates** | Candidates that appear in at least *threshold* solutions. Sandbox: `trueCandidates`; engine: `solveAllPossibilities`; UI mode: "all possibilities" — one concept, three surfaces. | — |
 | **shard** (chaos) | A union-find fragment of a chaos-construction region tracked in `ChaosRegionShardState`. | — |
+| **segment break** (`SEGMENT_BREAK`) | The synthetic symbol passed to an NFA `transition` between segments of a multi-segment line; occupies the symbol slot just past the real values. Distinct from the generic "sentinel" values used elsewhere (Lunchbox crust cells, dirty-score markers). | SENTINEL |
 
 ## Overview
 

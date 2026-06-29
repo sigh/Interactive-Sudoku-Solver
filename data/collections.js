@@ -491,6 +491,14 @@ export const EXAMPLES = [
     constraintTypes: ['ChaosConstruction', 'ChaosCount', 'CountDistinct'],
   },
   {
+    // Segmented state machine (arrows count cells per ring).
+    name: 'Hit, Reveal, Solve',
+    src: 'https://www.youtube.com/watch?v=vspwP6DlQik',
+    input: '/data/scripts/hit_reveal_solve.js',
+    solution: '751392468283614795964578312326857149478961523195243687542139876837426951619785234',
+    constraintTypes: ['NFA'],
+  },
+  {
     // Raised in https://github.com/sigh/Interactive-Sudoku-Solver/issues/10
     name: 'Stepped Thermos',
     src: 'https://sudokupad.app/g21db32fo4',

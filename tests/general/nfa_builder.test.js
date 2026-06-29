@@ -1534,7 +1534,7 @@ await runTest('javascriptSpecToNFA with offset=-1 passes external values', () =>
     transition: (state, value) => value === 0 ? true : state,
     accept: (state) => state === true,
   };
-  const nfa = javascriptSpecToNFA(config, 4, -1);
+  const nfa = javascriptSpecToNFA(config, 4, { valueOffset: -1 });
   // Internal value 1 = external 0, should trigger the transition.
   expectAccepts(nfa, [1], 'internal 1 (external 0) should trigger transition');
   // Internal value 2 = external 1, should not trigger.

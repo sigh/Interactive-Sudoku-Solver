@@ -42,13 +42,14 @@ The automaton is produced once, at construction, by
 - `optimizeNFA` then **closes over ε-transitions**, **removes dead states** (those
   that cannot lie on any start→accept path within the cell count), and **merges
   simulation-equivalent states** (`reduceBySimulation`). Shrinking the state count
-  here directly bounds the handler's per-call work (§6).
+  here directly bounds the handler's per-call work (§7).
 
 A **symbol** corresponds to a grid value: value `v` is symbol index `v − 1`, the
 same bit position used in the solver's candidate bitsets. (Any `valueOffset` for
 0-based grids is folded in during compilation, so the handler works in unshifted
-value space.) `compressNFA` finally `seal`s the automaton and converts it to the
-runtime representation below.
+value space.) A segmented constraint adds one further symbol — the *sentinel*, at
+index `numValues` — read at the boundaries between segments (§6). `compressNFA`
+finally `seal`s the automaton and converts it to the runtime representation below.
 
 ## 3. Representation: `CompressedNFA`
 
@@ -98,7 +99,7 @@ Each call makes two sweeps over the layers. `layer[i]` denotes `statesList[i]`, 
 set of NFA states the automaton might be in after reading the first `i` cells. Each
 sweep is a double loop — over the states in a layer, and over each state's
 transition list — so a call costs `O(k × |active states| × |transitions per
-state|)` (§6). A transition `s → t` carries a set of `symbols` (the values that
+state|)` (§7). A transition `s → t` carries a set of `symbols` (the values that
 take `s` to `t`); it **fires** at position `i` when `symbols` intersects
 `cell_i`'s candidate set.
 
@@ -177,7 +178,50 @@ layer) is what makes this correct for a *nondeterministic* automaton: ambiguity 
 which state the machine is in never loses a supporting path, because every
 reachable state is carried.
 
-## 6. Implementation Notes
+## 6. Segments
+
+A single `NFAConstraint` can cover several **segments** of cells rather than one
+flat sequence — for example one arm per direction of an arrow, all judged by the
+same automaton. Segments let the automaton reset or carry state across a boundary
+under its own control, instead of the boundary being implicit in the cell order.
+
+A boundary is modelled as one extra symbol, the **sentinel**, read between
+segments. The builder ([nfa_builder.js](../../nfa_builder.js)) emits sentinel
+transitions when a state machine is compiled with `multiSegment` set; the sentinel
+takes symbol index `numValues` (bit `numValues`), one past the real values.
+Because the packed transition entry keeps its symbol mask in 16 bits (§3.1), the
+sentinel only fits when `numValues ≤ 15`; segmented constraints on larger grids
+are rejected when the constraint is built.
+
+### 6.1 Steps
+
+The handler flattens the segments into a single **step** list — the real cells
+with a boundary marker (`−1`) inserted between segments:
+
+```text
+segments [c_0 c_1] [c_2]      →      steps  c_0  c_1  (−1)  c_2
+```
+
+Propagation (§4) runs over the steps instead of the raw cells, with one change to
+how each step's value set is chosen:
+
+- a real step contributes its cell's candidate set, `grid[step]`, as before;
+- a boundary step (`step < 0`) contributes the singleton **sentinel mask**
+  `1 << numValues`, so the only transitions that can fire are sentinel ones.
+
+The layered state pool (§3.2) therefore gains one extra layer per boundary. Both
+sweeps are otherwise unchanged: a boundary is just a position whose sole forced
+"value" is the sentinel.
+
+### 6.2 Pruning and boundaries
+
+The backward pass narrows a step's cell to its supported values, but a boundary is
+not a cell — it has no candidate set to shrink, and its sentinel mask is fixed. So
+the write-back is skipped for boundary steps: they still filter the state sets like
+any other layer, they just never prune the grid. Everything else in §4 and the GAC
+argument of §5 carries over verbatim.
+
+## 7. Implementation Notes
 
 - **16-bit packing.** `(target << 16) | symbolMask` and the `values & entry` /
   `entry >>> 16` pair (§3.1) are the whole reason a transition test is two integer

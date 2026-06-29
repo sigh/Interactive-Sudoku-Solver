@@ -12,6 +12,13 @@ const {
 // Convenience function to create a Symbol.
 export const Symbol = (value) => new NFA.Symbol(value);
 
+// Segment-boundary symbol. An object, so it can't collide with a numeric value.
+export const SEGMENT_BREAK = Object.freeze({ toString: () => 'SEGMENT_BREAK' });
+
+// The segment break occupies the symbol slot just past the real values, so its
+// mask bit is `numValues` (nfa_handler builds the matching mask when it propagates).
+const segmentBreakSymbol = (numValues) => new NFA.Symbol(numValues + 1);
+
 // Sentinel value for removed states in remap arrays.
 // Using -1 keeps the array in packed SMI mode in V8.
 const REMOVE_STATE = -1;
@@ -604,8 +611,8 @@ export const regexToNFA = (pattern, numSymbols, valueOffset = 0) => {
   }
 };
 
-export const javascriptSpecToNFA = (config, numSymbols, valueOffset = 0) => {
-  const builder = new JavascriptNFABuilder(config, numSymbols, valueOffset);
+export const javascriptSpecToNFA = (config, numSymbols, { valueOffset = 0, multiSegment = false } = {}) => {
+  const builder = new JavascriptNFABuilder(config, numSymbols, valueOffset, multiSegment);
   const nfa = builder.build();
 
   // Javascript NFA builder never generates states unreachable from the start.
@@ -1343,13 +1350,14 @@ class RegexToNFABuilder {
 }
 
 export class JavascriptNFABuilder {
-  constructor(definition, numValues, valueOffset = 0) {
+  constructor(definition, numValues, valueOffset = 0, multiSegment = false) {
     const { startState, transition, accept, maxDepth } = definition;
     this._startState = startState;
     this._transitionFn = transition;
     this._acceptFn = accept;
     this._numValues = numValues;
     this._valueOffset = valueOffset;
+    this._multiSegment = multiSegment;
     this._maxDepth = maxDepth ?? Infinity;
   }
 
@@ -1384,8 +1392,8 @@ export class JavascriptNFABuilder {
       let nextLevel = [];
       for (const index of currentLevel) {
         const stateStr = indexToStateStr[index];
-        for (let value = 1; value <= this._numValues; value++) {
-          const nextStateStrs = transitionFn(stateStr, value + this._valueOffset);
+        const addTransitions = (userValue, symbol) => {
+          const nextStateStrs = transitionFn(stateStr, userValue);
           for (const nextStateStr of nextStateStrs) {
             let targetIndex = stateStrToIndex.get(nextStateStr);
             if (targetIndex === undefined) {
@@ -1394,8 +1402,14 @@ export class JavascriptNFABuilder {
               targetIndex = addState(nextStateStr, acceptFn(nextStateStr));
               nextLevel.push(targetIndex);
             }
-            nfa.addTransition(index, targetIndex, new NFA.Symbol(value));
+            nfa.addTransition(index, targetIndex, symbol);
           }
+        };
+        for (let value = 1; value <= this._numValues; value++) {
+          addTransitions(value + this._valueOffset, new NFA.Symbol(value));
+        }
+        if (this._multiSegment) {
+          addTransitions(SEGMENT_BREAK, segmentBreakSymbol(this._numValues));
         }
       }
       currentLevel = nextLevel;

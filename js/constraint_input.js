@@ -1669,12 +1669,14 @@ ConstraintCategoryInput.StateMachine = class StateMachine extends JavaScriptCate
             };
 
           const geometry = this._geometry || CellGeometry.newDefault();
-          const cells = this._inputManager.getSelection();
+          const segments = this._inputManager.getSelectionSegments();
+          const numCells = segments.reduce((n, s) => n + s.length, 0);
           const encodedNFA = await this._userScriptExecutor.compileStateMachine(
-            spec, geometry.numValues, cells.length, isUnified, geometry.valueOffset);
+            spec, geometry.numValues, numCells, isUnified, geometry.valueOffset,
+            segments.length > 1);
 
           this.collection.addConstraint(new SudokuConstraint.NFA(
-            encodedNFA, name, ...cells));
+            encodedNFA, name, ...segments));
           this._inputManager.setSelection([]);
         } catch (err) {
           errorElem.textContent = err.message || err;

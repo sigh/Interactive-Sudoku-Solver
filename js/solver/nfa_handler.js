@@ -1,12 +1,13 @@
-const { SudokuConstraintHandler } = await import('./handlers.js' + self.VERSION_PARAM);
+const { SudokuConstraintHandler, InvalidConstraintError } = await import('./handlers.js' + self.VERSION_PARAM);
 const { BitSet } = await import('../util.js' + self.VERSION_PARAM);
 
 class CompressedNFA {
-  constructor(numStates, acceptingStates, startingStates, transitionLists) {
+  constructor(numStates, acceptingStates, startingStates, transitionLists, numSymbols) {
     this.numStates = numStates;
     this.acceptingStates = acceptingStates;
     this.startingStates = startingStates;
     this.transitionLists = transitionLists;
+    this.numSymbols = numSymbols;
   }
 
   static makeTransitionEntry(mask, state) {
@@ -85,6 +86,7 @@ export const compressNFA = (nfa) => {
     acceptingStates,
     startingStates,
     transitionLists,
+    nfa.numSymbols(),
   );
 };
 
@@ -92,15 +94,40 @@ export const compressNFA = (nfa) => {
 // compiled NFA across the cells' candidate sets to prune unsupported values.
 // See handler_docs/NFA.md for the full algorithm.
 export class NFAConstraint extends SudokuConstraintHandler {
-  constructor(cells, cnfa) {
-    super(cells);
+  constructor(segments, cnfa) {
+    super(segments.flat());
     this._cnfa = cnfa;
+    this._segmentBreakMask = 0;
+
+    // `steps` is the sequence the automaton actually consumes:
+    // the real cells with a -1 boundary marker inserted between segments.
+    // `this.cells` (from super) holds only the real cells.
+    const steps = [];
+    segments.forEach((segment, i) => {
+      if (i > 0) steps.push(-1);
+      for (const cell of segment) steps.push(cell);
+    });
+    this._steps = steps;
 
     const stateCapacity = this._cnfa.numStates;
-    const slots = this.cells.length + 1;
+    const slots = steps.length + 1;
     const { bitsets, words } = BitSet.allocatePool(stateCapacity, slots);
     this._stateWords = words;
     this._statesList = bitsets;
+  }
+
+  initialize(initialGridCells, cellExclusions, geometry, stateAllocator) {
+    const isMultiSegment = this._steps.includes(-1);
+    const minNumSymbols = geometry.numValues + (isMultiSegment ? 1 : 0);
+    if (this._cnfa.numSymbols < minNumSymbols) {
+      throw new InvalidConstraintError(
+        `NFA has ${this._cnfa.numSymbols} symbols but requires ${minNumSymbols} symbols.` +
+        (isMultiSegment ? ' Ensure the NFA is compiled as multiSegment.' : ''));
+    }
+    // The segment break is the symbol just past the real values (see nfa_builder's
+    // segmentBreakSymbol), so its mask bit is numValues.
+    this._segmentBreakMask = 1 << geometry.numValues;
+    return true;
   }
 
   getNFA() {
@@ -108,8 +135,9 @@ export class NFAConstraint extends SudokuConstraintHandler {
   }
 
   enforceConsistency(grid, pQueue) {
-    const cells = this.cells;
-    const numCells = cells.length;
+    const steps = this._steps;
+    const numSteps = steps.length;
+    const segmentBreakMask = this._segmentBreakMask;
     const cnfa = this._cnfa;
     const transitionLists = cnfa.transitionLists;
     const statesList = this._statesList;
@@ -120,11 +148,12 @@ export class NFAConstraint extends SudokuConstraintHandler {
     // Forward pass: Find all states reachable from the start state.
     statesList[0].copyFrom(cnfa.startingStates);
 
-    for (let i = 0; i < numCells; i++) {
+    for (let i = 0; i < numSteps; i++) {
       const nextStates = statesList[i + 1];
       const nextWords = nextStates.words;
       const currentStatesWords = statesList[i].words;
-      const values = grid[cells[i]];
+      const step = steps[i];
+      const values = step < 0 ? segmentBreakMask : grid[step];
       let nextIsEmpty = true;
 
       // Note: We operate directly on the bitset words for performance.
@@ -153,14 +182,15 @@ export class NFAConstraint extends SudokuConstraintHandler {
 
     // Backward pass: Filter down to only the states that can reach an accepting
     // state. Prune any unsupported values from the grid.
-    const finalStates = statesList[numCells];
+    const finalStates = statesList[numSteps];
     finalStates.intersect(cnfa.acceptingStates);
     if (finalStates.isEmpty()) return false;
 
-    for (let i = numCells - 1; i >= 0; i--) {
+    for (let i = numSteps - 1; i >= 0; i--) {
       const currentStatesWords = statesList[i].words;
       const nextWords = statesList[i + 1].words;
-      const values = grid[cells[i]];
+      const step = steps[i];
+      const values = step < 0 ? segmentBreakMask : grid[step];
       let supportedValues = 0;
 
       // Note: We operate directly on the bitset words for performance.
@@ -197,9 +227,9 @@ export class NFAConstraint extends SudokuConstraintHandler {
 
       if (!supportedValues) return false;
 
-      if (values !== supportedValues) {
-        grid[cells[i]] = supportedValues;
-        pQueue.addForCell(cells[i]);
+      if (step >= 0 && values !== supportedValues) {
+        grid[step] = supportedValues;
+        pQueue.addForCell(step);
       }
     }
 

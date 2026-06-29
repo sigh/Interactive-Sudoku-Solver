@@ -6,8 +6,9 @@ const modulesPromise = (async () => {
   try {
     const { SudokuConstraint } = await import('./sudoku_constraint.js' + self.VERSION_PARAM);
     const { SudokuParser } = await import('./sudoku_parser.js' + self.VERSION_PARAM);
+    const { SEGMENT_BREAK } = await import('./nfa_builder.js' + self.VERSION_PARAM);
     self.postMessage({ type: 'ready' });
-    return { SudokuConstraint, SudokuParser };
+    return { SudokuConstraint, SudokuParser, SEGMENT_BREAK };
   } catch (e) {
     self.postMessage({ type: 'initError', error: e.message || String(e) });
     throw e;
@@ -54,22 +55,22 @@ const compilePairwise = ({ SudokuConstraint }, { type, fnStr, numValues, valueOf
   return typeCls.fnToKey(fn, numValues, valueOffset || 0);
 }
 
-const compileStateMachine = ({ SudokuConstraint }, { spec, numValues, numCells, isUnified, valueOffset }) => {
+const compileStateMachine = ({ SudokuConstraint, SEGMENT_BREAK }, { spec, numValues, numCells, isUnified, valueOffset, multiSegment }) => {
   let parsedSpec;
   if (isUnified) {
-    parsedSpec = new Function('NUM_CELLS', `let maxDepth; ${spec}\nreturn {startState, transition, accept, maxDepth };`)(numCells);
+    parsedSpec = new Function('NUM_CELLS', 'SEGMENT_BREAK', `let maxDepth; ${spec}\nreturn {startState, transition, accept, maxDepth };`)(numCells, SEGMENT_BREAK);
   } else {
     const { startExpression, transitionBody, acceptBody, maxDepthExpression } = spec;
     const startState = new Function('NUM_CELLS', '"use strict"; return (' + startExpression + '\n);')(numCells);
-    const transition = new Function('state', 'value', 'NUM_CELLS', transitionBody);
-    const accept = new Function('state', 'NUM_CELLS', acceptBody);
+    const transition = new Function('state', 'value', 'NUM_CELLS', 'SEGMENT_BREAK', transitionBody);
+    const accept = new Function('state', 'NUM_CELLS', 'SEGMENT_BREAK', acceptBody);
     const maxDepth = maxDepthExpression
       ? new Function('NUM_CELLS', '"use strict"; return (' + maxDepthExpression + '\n);')(numCells)
       : Infinity;
     parsedSpec = {
       startState,
-      transition: (s, v) => transition(s, v, numCells),
-      accept: (s) => accept(s, numCells),
+      transition: (s, v) => transition(s, v, numCells, SEGMENT_BREAK),
+      accept: (s) => accept(s, numCells, SEGMENT_BREAK),
       maxDepth,
     };
   }
@@ -77,7 +78,8 @@ const compileStateMachine = ({ SudokuConstraint }, { spec, numValues, numCells, 
   // Default maxDepth to Infinity.
   parsedSpec.maxDepth = parsedSpec.maxDepth || Infinity;
 
-  return SudokuConstraint.NFA.encodeSpec(parsedSpec, numValues, valueOffset || 0);
+  return SudokuConstraint.NFA.encodeSpec(parsedSpec, numValues,
+    { valueOffset: valueOffset || 0, multiSegment });
 }
 
 const convertUnifiedToSplit = ({ code }) => {

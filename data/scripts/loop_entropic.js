@@ -118,69 +118,44 @@ for (const cell of gridCells) {
 }
 
 // --- Vision: the clue counts same-type cells it sees along its row and column,
-// itself included, with the opposite type blocking sight. What it "sees" in a
-// line is the unbroken same-type run through the clue, so
-//   digit = rowRun + colRun - 1   (the clue itself is in both runs).
-// The clue's type and position are fixed per clue, so a machine is built for each.
-// Reads the membership of the whole row, then the whole column, then the digit.
-const visionMachine = (type, clueRow, clueCol) => {
-  const LINE_START = { position: 1, runEndingHere: 0, runThroughClue: 0, blocked: false };
-
-  // Walk one line one cell at a time, measuring the same-type run through the
-  // clue's index. `runEndingHere` tracks the same-type streak up to the current
-  // cell; once we pass the clue, `runThroughClue` only grows until a blocker.
-  const walkLine = ({ position, runEndingHere, runThroughClue, blocked }, membership, clueIndex) => {
-    const sameType = membership === type;
-    const next = { position: position + 1, runEndingHere, runThroughClue, blocked };
-    if (position < clueIndex) {
-      next.runEndingHere = sameType ? runEndingHere + 1 : 0;
-    } else if (position === clueIndex) {
-      // The run through the clue starts as the same-type cells reaching it.
-      next.runThroughClue = sameType ? runEndingHere + 1 : 0;
-    } else if (blocked || !sameType) {
-      next.blocked = true;
-    } else {
-      next.runThroughClue = runThroughClue + 1;
+// itself included, with the opposite type blocking sight. Equivalently, it counts
+// itself plus the four rays radiating from it, each an unbroken same-type run out
+// to the first blocker, so the rays must total digit - 1.
+// The cells are given as segments (SEGMENT_BREAK between): first the clue's own
+// membership (which fixes the type it counts) and its digit, then one segment per
+// ray, ordered outward from the clue. The machine tallies each ray's leading run
+// of cells matching the clue's type.
+const visionMachine = NFA.encodeSpec({
+  startState: { type: null, need: null, seen: 0, blocked: false },
+  transition: ({ type, need, seen, blocked }, value) => {
+    // First two values are the clue: its membership (the type it counts), then
+    // its digit (the rays must see digit - 1 same-type cells). Restricting the
+    // type to ON/OFF keeps the builder from materialising a sub-machine per value.
+    if (type === null) {
+      return value === ON || value === OFF
+        ? { type: value, need: null, seen: 0, blocked: false }
+        : [];
     }
-    return next;
-  };
+    if (need === null) return { type, need: value - 1, seen: 0, blocked: false };
+    // A SEGMENT_BREAK starts the next ray, with sight cleared.
+    if (value === SEGMENT_BREAK) return { type, need, seen, blocked: false };
+    // A ray cell extends the run while unblocked and same-type.
+    if (blocked || value !== type) return { type, need, seen, blocked: true };
+    const next = seen + 1;
+    return next > need ? [] : { type, need, seen: next, blocked: false };
+  },
+  accept: ({ need, seen }) => seen === need,
+}, gridShape.numValues, { multiSegment: true });
 
-  return NFA.encodeSpec({
-    startState: { phase: 'row', ...LINE_START },
-    transition: ({ phase, rowRun, visionCount, ...line }, value) => {
-      if (phase === 'row') {
-        const next = walkLine(line, value, clueCol);
-        return next.position > gridShape.numCols
-          ? { phase: 'column', ...LINE_START, rowRun: next.runThroughClue }
-          : { phase: 'row', ...next };
-      }
-      if (phase === 'column') {
-        const next = walkLine(line, value, clueRow);
-        return next.position > gridShape.numRows
-          ? { phase: 'digit', visionCount: rowRun + next.runThroughClue - 1 }
-          : { phase: 'column', ...next, rowRun };
-      }
-      // Final value is the clue's digit; it must equal the vision count.
-      return value === visionCount ? { phase: 'done' } : undefined;
-    },
-    accept: ({ phase }) => phase === 'done',
-  }, gridShape.numValues);
-};
-
-// Each clue is [type, row, col]: circles see loop cells, squares see non-loop.
-const clues = [
-  [ON, 1, 1], [ON, 1, 4],
-  [OFF, 1, 5], [OFF, 4, 5], [OFF, 5, 2],
-];
-for (const [type, clueRow, clueCol] of clues) {
-  const clueCell = makeCellId(clueRow, clueCol);
-  const clueVar = loop.at(clueCell);
-  const cells = [
-    ...loop.row(clueVar),      // the clue's row
-    ...loop.column(clueVar),   // the clue's column
-    clueCell,                  // the clue digit
-  ];
-  add(new NFA(visionMachine(type, clueRow, clueCol), 'vision', ...cells));
+// Circles count loop cells, squares count non-loop; the machine reads the type
+// from each clue's own membership.
+const RAY_DIRS = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+for (const clue of [...circles, ...squares]) {
+  // Each ray excludes the clue itself (slice(1)); drop rays that run off-grid.
+  const rays = RAY_DIRS
+    .map(([dR, dC]) => graph.ray(clue, dR, dC).slice(1).map(loopCell))
+    .filter(ray => ray.length);
+  add(new NFA(visionMachine, 'vision', [loopCell(clue), clue], ...rays));
 }
 
 return constraints;

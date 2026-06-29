@@ -113,7 +113,7 @@ await runTest('compressNFA should use compact transition entry format', () => {
 await runTest('NFAConstraint should prune cells to supported values', () => {
   const nfa = regexToNFA('12', 4);
   const cnfa = compressNFA(nfa);
-  const handler = new NFAConstraint([0, 1], cnfa);
+  const handler = new NFAConstraint([[0, 1]], cnfa);
 
   const allValues = valueMask(1, 2, 3, 4);
   const grid = [allValues, allValues];
@@ -129,7 +129,7 @@ await runTest('NFAConstraint should prune cells to supported values', () => {
 await runTest('NFAConstraint should return false when no valid path exists', () => {
   const nfa = regexToNFA('12', 4);
   const cnfa = compressNFA(nfa);
-  const handler = new NFAConstraint([0, 1], cnfa);
+  const handler = new NFAConstraint([[0, 1]], cnfa);
 
   const grid = [0, 0];
   grid[0] = valueMask(2);
@@ -143,7 +143,7 @@ await runTest('NFAConstraint should return false when no valid path exists', () 
 await runTest('NFAConstraint should not touch cells already at supported values', () => {
   const nfa = regexToNFA('12', 4);
   const cnfa = compressNFA(nfa);
-  const handler = new NFAConstraint([0, 1], cnfa);
+  const handler = new NFAConstraint([[0, 1]], cnfa);
 
   const grid = [0, 0];
   grid[0] = valueMask(1);
@@ -158,7 +158,7 @@ await runTest('NFAConstraint should not touch cells already at supported values'
 await runTest('NFAConstraint should report only changed cells', () => {
   const nfa = regexToNFA('12', 4);
   const cnfa = compressNFA(nfa);
-  const handler = new NFAConstraint([0, 1], cnfa);
+  const handler = new NFAConstraint([[0, 1]], cnfa);
 
   const allValues = valueMask(1, 2, 3, 4);
   const grid = [allValues, allValues];
@@ -176,7 +176,7 @@ await runTest('NFAConstraint should report only changed cells', () => {
 await runTest('NFAConstraint forward pass should fail when first cell has no valid transition', () => {
   const nfa = regexToNFA('12', 2);
   const cnfa = compressNFA(nfa);
-  const handler = new NFAConstraint([0, 1], cnfa);
+  const handler = new NFAConstraint([[0, 1]], cnfa);
 
   // First cell only allows 2, but NFA requires 1 first
   const grid = [0, 0];
@@ -191,7 +191,7 @@ await runTest('NFAConstraint forward pass should fail when first cell has no val
 await runTest('NFAConstraint forward pass should fail when middle cell blocks path', () => {
   const nfa = regexToNFA('123', 3);
   const cnfa = compressNFA(nfa);
-  const handler = new NFAConstraint([0, 1, 2], cnfa);
+  const handler = new NFAConstraint([[0, 1, 2]], cnfa);
 
   const grid = [0, 0, 0];
   grid[0] = valueMask(1);
@@ -207,7 +207,7 @@ await runTest('NFAConstraint forward pass tracks reachable states through NFA', 
   // With alternation, multiple states may be reachable
   const nfa = regexToNFA('(12|13)', 3);
   const cnfa = compressNFA(nfa);
-  const handler = new NFAConstraint([0, 1], cnfa);
+  const handler = new NFAConstraint([[0, 1]], cnfa);
 
   const grid = [0, 0];
   grid[0] = valueMask(1);
@@ -227,7 +227,7 @@ await runTest('NFAConstraint forward pass tracks reachable states through NFA', 
 await runTest('NFAConstraint backward pass should fail when final states are not accepting', () => {
   const nfa = regexToNFA('123', 3);
   const cnfa = compressNFA(nfa);
-  const handler = new NFAConstraint([0, 1, 2], cnfa);
+  const handler = new NFAConstraint([[0, 1, 2]], cnfa);
 
   // Path 121 - reaches a state but not an accepting one
   const grid = [0, 0, 0];
@@ -243,7 +243,7 @@ await runTest('NFAConstraint backward pass should fail when final states are not
 await runTest('NFAConstraint backward pass should prune values not reaching accepting state', () => {
   const nfa = regexToNFA('(12|34)', 4);
   const cnfa = compressNFA(nfa);
-  const handler = new NFAConstraint([0, 1], cnfa);
+  const handler = new NFAConstraint([[0, 1]], cnfa);
 
   // Last cell is 2, so first cell must be 1 (not 3)
   const grid = [0, 0];
@@ -259,7 +259,7 @@ await runTest('NFAConstraint backward pass should prune values not reaching acce
 await runTest('NFAConstraint backward pass should prune unreachable states', () => {
   const nfa = regexToNFA('1[23]', 3);
   const cnfa = compressNFA(nfa);
-  const handler = new NFAConstraint([0, 1], cnfa);
+  const handler = new NFAConstraint([[0, 1]], cnfa);
 
   // Second cell only allows 2
   const grid = [0, 0];
@@ -279,7 +279,7 @@ await runTest('NFAConstraint backward pass should prune unreachable states', () 
 await runTest('NFAConstraint should work with non-contiguous cell indices', () => {
   const nfa = regexToNFA('12', 4);
   const cnfa = compressNFA(nfa);
-  const handler = new NFAConstraint([5, 10], cnfa);
+  const handler = new NFAConstraint([[5, 10]], cnfa);
 
   const allValues = valueMask(1, 2, 3, 4);
   const grid = new Array(15).fill(allValues);
@@ -296,7 +296,7 @@ await runTest('NFAConstraint should work with non-contiguous cell indices', () =
 await runTest('NFAConstraint should handle single cell', () => {
   const nfa = regexToNFA('[12]', 4);
   const cnfa = compressNFA(nfa);
-  const handler = new NFAConstraint([0], cnfa);
+  const handler = new NFAConstraint([[0]], cnfa);
 
   const allValues = valueMask(1, 2, 3, 4);
   const grid = [allValues];
@@ -310,7 +310,7 @@ await runTest('NFAConstraint should handle single cell', () => {
 await runTest('NFAConstraint should handle longer cell sequences', () => {
   const nfa = regexToNFA('1234', 4);
   const cnfa = compressNFA(nfa);
-  const handler = new NFAConstraint([0, 1, 2, 3], cnfa);
+  const handler = new NFAConstraint([[0, 1, 2, 3]], cnfa);
 
   const allValues = valueMask(1, 2, 3, 4);
   const grid = [allValues, allValues, allValues, allValues];
@@ -331,7 +331,7 @@ await runTest('NFAConstraint should handle longer cell sequences', () => {
 await runTest('NFAConstraint should be reusable across multiple calls', () => {
   const nfa = regexToNFA('12', 4);
   const cnfa = compressNFA(nfa);
-  const handler = new NFAConstraint([0, 1], cnfa);
+  const handler = new NFAConstraint([[0, 1]], cnfa);
 
   const allValues = valueMask(1, 2, 3, 4);
 
@@ -364,7 +364,7 @@ await runTest('NFAConstraint should be reusable across multiple calls', () => {
 await runTest('NFAConstraint internal state should be cleared between calls', () => {
   const nfa = regexToNFA('(12|21)', 2);
   const cnfa = compressNFA(nfa);
-  const handler = new NFAConstraint([0, 1], cnfa);
+  const handler = new NFAConstraint([[0, 1]], cnfa);
 
   // First call with specific values
   const grid1 = [0, 0];
@@ -386,7 +386,7 @@ await runTest('NFAConstraint internal state should be cleared between calls', ()
 await runTest('NFAConstraint getNFA should return the compressed NFA', () => {
   const nfa = regexToNFA('12', 4);
   const cnfa = compressNFA(nfa);
-  const handler = new NFAConstraint([0, 1], cnfa);
+  const handler = new NFAConstraint([[0, 1]], cnfa);
 
   assert.strictEqual(handler.getNFA(), cnfa);
 });

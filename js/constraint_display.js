@@ -166,14 +166,13 @@ class BaseConstraintDisplayItem extends DisplayItem {
   }
 
   _makeConstraintLine(cells, options) {
-    if (cells.length < 2) throw new Error(`Line too short: ${cells}`);
     return this._makeConstraintLineFromPoints(
       cells.map(c => this.cellIdCenter(c)), options);
   }
 
   _makeConstraintLineFromPoints(points, options) {
     const len = points.length;
-    if (len < 2) throw new Error('Line too short');
+    if (len < 1) throw new Error('Line has no points');
 
     if (options.constructor !== LineOptions) {
       options = new LineOptions(options);
@@ -565,21 +564,30 @@ class CustomLine extends GenericLine {
   }
 
   _makeItem(constraint, options) {
-    const cells = constraint.cells;
+    const groups = options.splitFn
+      ? options.splitFn(constraint)
+      : [constraint.cells];
 
     const colorKey = `${constraint.displayKey()}-${constraint.type}`;
     // Note: We want the colors to be consistent, even for makeIcon.
     const color = this._colorPicker.pickColor(colorKey);
+    const lineOptions = {
+      color,
+      width: LineOptions.THIN_LINE_WIDTH,
+      nodeMarker: options.nodeMarker,
+      startMarker: LineOptions.SMALL_FULL_CIRCLE_MARKER,
+      dashed: options.dashed ?? true,
+    };
 
-    const elem = this._makeConstraintLine(
-      cells,
-      {
-        color,
-        width: LineOptions.THIN_LINE_WIDTH,
-        nodeMarker: options.nodeMarker,
-        startMarker: LineOptions.SMALL_FULL_CIRCLE_MARKER,
-        dashed: options.dashed || true,
-      });
+    let elem;
+    if (groups.length === 1) {
+      elem = this._makeConstraintLine(groups[0], lineOptions);
+    } else {
+      elem = createSvgElement('g');
+      for (const group of groups) {
+        elem.append(this._makeConstraintLine(group, lineOptions));
+      }
+    }
 
     this._colorPicker.addItem(elem, color, colorKey);
 

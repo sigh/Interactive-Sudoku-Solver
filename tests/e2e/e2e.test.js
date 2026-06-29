@@ -105,6 +105,12 @@ const solveCollections = [
       'Regex line',  // Regex
       'Sequence sudoku', // NFA (simple transitions only)
       'NFA: Equal sum parition', // NFA (with state bifurcation)
+      {
+        name: 'Hit, Reveal, Solve',
+        src: 'https://www.youtube.com/watch?v=vspwP6DlQik',
+        input: '.NFA~VkEk_5RZhpx6CKX_Aggggggghf6EEEEEEEEH_YYYYYYYYYn7iCCCCCCCC_eKKKKKKKKN74wwwwwwww_fjjjjjjjjkb-QQQQQQQQSAH_lFFFFFFFFJ_-WWWWWWWWWp_5hhhhhhhhiv_mmmmmmmmmrf-cccccccccv_5555555557H_oIIIIIIIIM_-iiiiiiiii1_6SSSSSSSSTb_gpppppppp_-moooooooo5_6iqqqqqqqrv_qrLLLLLLLPf-suuuuuuuu__67DDDDDDDEH_sMsssssssw_-y00000001F_7Tbbbbbbbcb_uBOOOOOOOf666666667J_7zjzzzzzz0v_vuvvvvvvvzf_A9BBBBBBBP_8L8MMMMMMNH_xQRRRRRRRU__HDHHHHHHHU_8kgckkkkkn9yyyyyyyy1_3NNNNNNNNZ_888k888889v_0US0UUUUUXf_TTNTTTTTTf_9VU9VVVVVWD_111iV1111_vZZZZZZZZj-9tttttttuX73XXXXXXXZ__fffXfffffo_-GGFmGGGGD_4444i4444_fllllllllr9-eeeeeeee336aaaaaaabv_rrrrqNrrr7-22222223Hv777777778v_xxxxxwPxx3_PPPPPPPPT_9ddddddEdAA~_HPA~R1C1~-~R2C1~-~R3C1~-~R4C1~-~R5C1~-~R6C1~-~R7C1~-~R8C1~-~R9C1~~R1C5~-~R2C5~-~R3C5~-~R4C5~-~R5C5~-~R6C5~-~R7C5~-~R8C5~-~R9C5~~R1C9~-~R2C9~-~R3C9~-~R4C9~-~R5C9~-~R6C9~-~R7C9~-~R8C9~-~R9C9~~R2C4~-~R2C5~-~R2C6~-~R2C7~-~R2C8~-~R2C9~~R2C6~-~R2C5~-~R2C4~-~R2C3~-~R2C2~-~R2C1~~R3C7~-~R2C7~R3C8~-~R1C7~R3C9~~R4C6~-~R3C6~R4C7~R5C6~R4C5~-~R2C6~R4C8~R6C6~R4C4~-~R1C6~R4C9~R7C6~R4C3~-~R8C6~R4C2~-~R9C6~R4C1~~R5C7~-~R4C7~R5C8~-~R3C7~R5C9~-~R2C7~-~R1C7~~R6C2~-~R6C3~-~R6C4~-~R6C5~-~R6C6~-~R6C7~-~R6C8~-~R6C9~~R6C9~-~R6C8~-~R6C7~-~R6C6~-~R6C5~-~R6C4~-~R6C3~-~R6C2~-~R6C1~~R7C5~-~R7C4~-~R7C3~-~R7C2~-~R7C1~~R7C6~-~R7C5~-~R7C4~-~R7C3~-~R7C2~-~R7C1.~R7C7_8~R3C4_5~R1C3_1~R1C8_6~R9C4_7~R8C2_3',
+        solution: '751392468283614795964578312326857149478961523195243687542139876837426951619785234',
+      }, // NFA (with segments)
       'Full rank - 6 clue snipe',
       'Irregular region sum line',
       'Embedded Squishdoku',

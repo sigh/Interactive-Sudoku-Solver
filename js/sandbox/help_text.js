@@ -80,6 +80,19 @@ CELL GEOMETRY
                             'VL'), connected as its paired grid cells are; adds
                             .at(cell) / .gridAt(varCell), each null if unpaired
 
+STATE MACHINES (NFA)
+
+    NFA.encodeSpec(spec, numValues[, opts])  => compile a state machine to an NFA.
+      spec                   { startState, transition, accept }
+      opts.multiSegment      Compile with segments, with SEGMENT_BREAK passed into
+                             transition
+      opts.valueOffset       offset added to cell values before transition, e.g.
+                             -1 for a 0-based grid. Default 0.
+    new NFA(encoded, name, ...cells)         => apply over an ordered cell list.
+    new NFA(encoded, name, ...cellArrays)    => apply over segments; encoded
+                                                must have been compiled with
+                                                opts.multiSegment must be set
+
 SOLVER
 
   makeSolver provides programmatic access to the solver:

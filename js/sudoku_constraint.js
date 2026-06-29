@@ -1311,16 +1311,35 @@ export class SudokuConstraint {
       displayClass: 'CustomLine',
       nodeMarker: LineOptions.SMALL_EMPTY_CIRCLE_MARKER,
       dashed: '0.5 2 2 2',
+      splitFn: (constraint) => constraint.segments,
     };
     static ARGUMENT_CONFIG = {
       numArgs: 2,
     };
 
-    constructor(encodedNFA, name, ...cells) {
+    // Segments are cell-id arrays. A flat cell list is also accepted (and split
+    // on the separator) for the serializer and for backward compatibility.
+    constructor(encodedNFA, name, ...segments) {
+      if (segments.length > 0 && !Array.isArray(segments[0])) {
+        segments = splitSegments(segments);
+      }
+      // `cells` (flat, with separators) is consumed by the named-group
+      // serializer; segments are the structured form.
+      const cells = joinSegments(segments);
       super(encodedNFA, name, ...cells);
       this.encodedNFA = encodedNFA;
       this.name = name;
+      this.segments = segments;
       this.cells = cells;
+    }
+
+    getCells(geometry) {
+      return this.segments.flat();
+    }
+
+    makeShifted(shiftFn) {
+      return new NFA(this.encodedNFA, this.name,
+        ...this.segments.map(segment => segment.map(shiftFn)));
     }
 
     displayKey() {
@@ -1341,8 +1360,8 @@ export class SudokuConstraint {
       return `NFA${name} (${numStates} states)`;
     }
 
-    static encodeSpec(spec, numValues, valueOffset = 0) {
-      const nfa = javascriptSpecToNFA(spec, numValues, valueOffset);
+    static encodeSpec(spec, numValues, { valueOffset = 0, multiSegment = false } = {}) {
+      const nfa = javascriptSpecToNFA(spec, numValues, { valueOffset, multiSegment });
       return NFASerializer.serialize(nfa);
     }
 
@@ -2979,8 +2998,8 @@ export class UserScriptExecutor {
     return this._call('compilePairwise', { type, fnStr, numValues, valueOffset }, 1000);
   }
 
-  compileStateMachine(spec, numValues, numCells, isUnified, valueOffset) {
-    return this._call('compileStateMachine', { spec, numValues, numCells, isUnified, valueOffset }, 3000);
+  compileStateMachine(spec, numValues, numCells, isUnified, valueOffset, multiSegment) {
+    return this._call('compileStateMachine', { spec, numValues, numCells, isUnified, valueOffset, multiSegment }, 3000);
   }
 
   convertUnifiedToSplit(code) {

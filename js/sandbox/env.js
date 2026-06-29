@@ -1,5 +1,6 @@
 const { SudokuConstraint } = await import('../sudoku_constraint.js' + self.VERSION_PARAM);
 const { SudokuParser } = await import('../sudoku_parser.js' + self.VERSION_PARAM);
+const { SEGMENT_BREAK } = await import('../nfa_builder.js' + self.VERSION_PARAM);
 const { CellGeometry, CellGraph, GEOMETRY_9x9, GEOMETRY_MAX } = await import('../cell_geometry.js' + self.VERSION_PARAM);
 const { SolverStats } = await import('./solver_stats.js' + self.VERSION_PARAM);
 const { SANDBOX_HELP_TEXT } = await import('./help_text.js' + self.VERSION_PARAM);
@@ -414,6 +415,7 @@ export const SANDBOX_GLOBALS = {
   extendTimeoutMs: () => {
     console.error('extendTimeoutMs is deprecated, sandbox has no timeout.');
   },
+  SEGMENT_BREAK,
   ...SudokuConstraint,
 };
 
