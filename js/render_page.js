@@ -1479,14 +1479,9 @@ class Selection {
     }
     return cells.length > 0 ? cells : [anchorId, targetId];
   }
-  // The selection is the deduplicated union of all segments (committed + active).
-  // getSegments() exposes the per-segment structure for multi-segment constraints.
+  // All selected cells; getSegments() keeps the per-segment structure.
   getCells() {
-    const seen = new Set();
-    for (const segment of this.getSegments()) {
-      for (const cell of segment) seen.add(cell);
-    }
-    return [...seen];
+    return this.getSegments().flat();
   }
   size() { return this.getCells().length; }
 
