@@ -1390,11 +1390,13 @@ export class SudokuConstraint {
 
   static ChaosArrow = class ChaosArrow extends ChaosConstraintBase {
     static DESCRIPTION = (`
-      For Chaos Construction puzzles, the first cell is a control cell giving
-      a run length across one or more arms. The remaining arguments are Chaos
-      Construction region variables which define the arms.
+      The first cell is a control cell giving
+      a run length across one or more arms. The remaining cells are Chaos
+      Construction region cells which define the arms.
       If only a control cell is given then arms are generated for all four
-      orthogonal directions.`);
+      orthogonal directions.
+      As a convenience in the UI, the arm cells can be grid cells and they
+      will be mapped appropriately.`);
     static DISPLAY_CONFIG = {
       displayClass: 'Chaos',
       multiArrow: true,
@@ -1438,9 +1440,13 @@ export class SudokuConstraint {
 
   static ChaosCount = class ChaosCount extends ChaosConstraintBase {
     static DESCRIPTION = (`
-      For Chaos Construction puzzles, the first cell is a control cell giving
+      The first cell is a control cell giving
       how many of the selected Chaos Construction region cells match the
-      first selected region cell.`);
+      first selected region cell.
+      If a single grid cell is selected then it will
+      count the surrounding 3x3 area of region cells.
+      As a convenience in the UI, the counted cells can be grid cells and they
+      will be mapped appropriately.`);
     static DISPLAY_CONFIG = {
       displayClass: 'Chaos',
       borderedRegion: true,
