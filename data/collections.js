@@ -457,7 +457,7 @@ export const EXAMPLES = [
     // Very large state machine
     name: 'How Shall We Split This?',
     src: 'https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?chlang=en&id=000MIE',
-    input: '/data/large_state_machine.iss',
+    input: '/data/scripts/large_state_machine.js',
     solution: '138657429645298731792341568521934876879126354463875192954712683216583947387469215',
     constraintTypes: ['NFA'],
   },
@@ -492,14 +492,14 @@ export const EXAMPLES = [
   {
     name: 'Factorial Cages',
     src: 'https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?id=000JC4',
-    input: '/data/factorial_cages.iss',
+    input: '/data/scripts/factorial_cages.js',
     solution: '153827946274965813896431725415286397382794651769153284627549138538612479941378562',
     constraintTypes: ['NFA'],
   },
   {
     name: 'Rectangle Sums',
     src: 'https://www.youtube.com/watch?v=T03vUTiJBjk',
-    input: '/data/rectangle_sums.iss',
+    input: '/data/scripts/rectangle_sums.js',
     solution: 'BFGDAHEICCEAFBIHDGDHIEGCABFACHIEFDGBFGEHDBICAIBDGCAFEHGIFCHEBADHDBAIGCFEEACBFDGHI',
     constraintTypes: ['Or', 'And', 'Var', 'Sum'],
   },
@@ -1193,7 +1193,7 @@ export const EXAMPLES = [
   {
     name: 'Chaos Construction: Uncovering tunnels',
     src: 'https://sudokupad.app/y323plq5im',
-    input: '/data/uncovering_tunnels.iss',
+    input: '/data/scripts/uncovering_tunnels.js',
     solution: '524176398159864732643915287932781465785249613496532871371628954268357149817493526',
     constraintTypes: ['ChaosConstruction', 'ChaosArrow', 'AllDifferent', 'NFA', 'Whisper', 'CountDistinct'],
   },
@@ -1225,7 +1225,7 @@ export const EXAMPLES = [
   {
     name: 'Inset',
     src: 'https://sudokupad.app/nlmbdwt4wn',
-    input: '/data/inset.iss',
+    input: '/data/scripts/inset.js',
     constraintTypes: ['Var', 'AllDifferent', 'NFA'],
   },
 ];

@@ -6,6 +6,7 @@ const {
 await dynamicCSSFileLoader('css/puzzle_selector.css' + self.VERSION_PARAM)();
 
 const { SudokuParser } = await import('../sudoku_parser.js' + self.VERSION_PARAM);
+const { UserScriptExecutor } = await import('../sudoku_constraint.js' + self.VERSION_PARAM);
 const {
   PUZZLE_INDEX,
   resolvePuzzleConfig,
@@ -275,9 +276,24 @@ export class PuzzleSelectorPanel {
     // Lazily fetch input from file if it's a path.
     if (puzzle.input.startsWith('/')) {
       const response = await fetch('.' + puzzle.input);
-      puzzle.input = await response.text();
+      const text = await response.text();
+      // .js files are sandbox scripts that generate the constraint.
+      if (puzzle.input.endsWith('.js')) {
+        puzzle.input = await this._runSandboxScript(text);
+      } else {
+        puzzle.input = text;
+      }
     }
     this._constraintManager.loadUnsafeFromText(puzzle.input);
+  }
+
+  // Run a sandbox script and return the constraint string it generates. The
+  // script has the same capabilities (and risks) as code typed into the
+  // sandbox editor.
+  _runSandboxScript(code) {
+    this._userScriptExecutor ??= new UserScriptExecutor();
+    return this._userScriptExecutor.runSandboxCode(code, {}, '')
+      .then(result => result.constraintStr);
   }
 
   // A small link icon that opens the puzzle's source, or an empty placeholder

@@ -11,8 +11,7 @@ Static data files used by the UI and tests: example puzzles, puzzle collections 
 | [jigsaw_layouts.js](jigsaw_layouts.js) | Valid and easily-invalid jigsaw region layouts for 9×9 grids. Each layout is an 81-character string where each character is a region ID. |
 | [jigsaw_box_layouts.js](jigsaw_box_layouts.js) | Additional valid jigsaw layouts using box-based region assignments. |
 | [invalid_jigsaw_layouts.js](invalid_jigsaw_layouts.js) | 26+ intentionally invalid jigsaw layouts. Used by tests to verify the solver correctly rejects unsolvable configurations. |
-| [factorial_cages.iss](factorial_cages.iss) | Pre-generated puzzle with complex NFA-encoded constraints (factorial cage rules). |
-| [large_state_machine.iss](large_state_machine.iss) | Pre-generated puzzle with a large NFA state machine (30 states tracking running sums). |
+| [scripts/](scripts/) | Sandbox scripts (`.js`) referenced as puzzle inputs. Loaded by running them through the sandbox to generate the constraint, rather than reading a pre-expanded string. |
 
 ## Formats
 
@@ -21,3 +20,5 @@ Static data files used by the UI and tests: example puzzles, puzzle collections 
 **Jigsaw layout strings**: 81 characters for a 9×9 grid, read left-to-right top-to-bottom. Each character is a region identifier (digit or letter).
 
 **.iss files**: Pre-generated puzzle definitions containing serialized NFA state machines as constraint strings. Generated via sandbox scripts and stored for use as test fixtures and examples.
+
+**.js sandbox scripts** (in `scripts/`): JavaScript that the sandbox executes to generate a constraint, the same code you would type into the sandbox editor (it `return`s an array of constraints). Referenced from a puzzle's `input` like an `.iss` path; the loader detects the `.js` extension and runs it instead of parsing it as a constraint string.

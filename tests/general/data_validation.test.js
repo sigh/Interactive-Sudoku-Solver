@@ -53,8 +53,8 @@ await runTest('all EXAMPLES have required fields', () => {
 
 await runTest('all EXAMPLES build into solvers without error', () => {
   for (const example of EXAMPLES) {
-    // Skip file path references (e.g. '/data/large_state_machine.iss')
-    // which require file I/O to resolve.
+    // Skip file path references (e.g. '/data/scripts/large_state_machine.js')
+    // which require file I/O (and sandbox execution) to resolve.
     if (example.input.startsWith('/')) continue;
     const constraint = SudokuParser.parseText(example.input);
     assert.ok(constraint, `Failed to parse collection puzzle: ${example.name}`);
