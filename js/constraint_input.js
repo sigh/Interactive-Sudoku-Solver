@@ -972,30 +972,45 @@ ConstraintCategoryInput.ChaosConstruction = class ChaosConstruction extends Mult
     });
   }
 
+  _toRegionCell(cellId) {
+    const cell = this._shape.parseCellId(cellId).cell;
+    if (cell >= this._shape.numGridCells) return cellId;
+    return this._shape.makeCellIdFromIndex(
+      this._shape.varCellsForGroup('CC')[cell]);
+  }
+
   _translateToCCCells(cells) {
-    const regionCells = this._shape.varCellsForGroup('CC');
-    const result = [cells[0]];
-    for (const cellId of cells) {
-      const cell = this._shape.parseCellId(cellId).cell;
-      if (cell >= this._shape.numGridCells) return cells;
-      result.push(this._shape.makeCellIdFromIndex(regionCells[cell]));
+    if (cells.some(
+      c => this._shape.parseCellId(c).cell >= this._shape.numGridCells)) {
+      return cells;
     }
-    return result;
+    return [cells[0], ...cells.map(c => this._toRegionCell(c))];
+  }
+
+  _chaosArrowCells() {
+    const segments = this._inputManager.getSelectionSegments();
+    const control = segments[0][0];
+    const arms = [segments[0].slice(1), ...segments.slice(1)]
+      .filter(arm => arm.length)
+      .map(arm => [control, ...arm].map(c => this._toRegionCell(c)));
+    return [control, ...arms];
   }
 
   _addConstraint(constraintClass, cells, formData) {
-    if (cells.length > 1) {
+    if (constraintClass === SudokuConstraint.ChaosArrow) {
+      cells = this._chaosArrowCells();
+    } else if (cells.length > 1) {
       cells = this._translateToCCCells(cells);
     }
     if (constraintClass.ARGUMENT_CONFIG) {
       const value = formData.get(constraintClass.name + '-value');
-      // Chaos format: (gridCell, offset, ...chaosCells)
       this.collection.addConstraint(
         new constraintClass(cells[0], value, ...cells.slice(1)));
     } else {
       this.collection.addConstraint(new constraintClass(...cells));
     }
   }
+
   _setVisible(visible) {
     this._selectionForm.style.display = visible ? '' : 'none';
   }

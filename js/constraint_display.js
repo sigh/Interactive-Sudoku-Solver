@@ -430,7 +430,7 @@ class Chaos extends BaseConstraintDisplayItem {
     const shape = this._shape;
     const controlCell = constraint.cells[0];
     const regionCellOffset = regionCells[0];
-    const arms = constraint.expandedArmCellGroups(shape);
+    const arms = constraint.expandedArms(shape);
 
     for (const arm of arms) {
       const group = [controlCell];

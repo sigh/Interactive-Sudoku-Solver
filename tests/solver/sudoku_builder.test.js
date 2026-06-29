@@ -353,7 +353,7 @@ await runTest('ChaosArrow produces ChaosArrow handler', () => {
   const constraint = new SudokuConstraint.Container([
     new SudokuConstraint.Shape('4x4'),
     new SudokuConstraint.ChaosConstruction(),
-    new SudokuConstraint.ChaosArrow('R2C1', 0, 'CC16'),
+    new SudokuConstraint.ChaosArrow('R2C1', 0, ['CC16']),
   ]);
 
   const handlers = buildHandlers(constraint);
@@ -365,7 +365,7 @@ await runTest('ChaosArrow accepts var control cells', () => {
     new SudokuConstraint.Shape('4x4'),
     new SudokuConstraint.ChaosConstruction(),
     new SudokuConstraint.Var('X', 'Control', 1),
-    new SudokuConstraint.ChaosArrow('VX', 0, 'CC6', 'CC16'),
+    new SudokuConstraint.ChaosArrow('VX', 0, ['CC6', 'CC16']),
   ]);
 
   const handler = buildHandlers(constraint).find(h => h.constructor.name === 'ChaosArrow');
@@ -429,7 +429,7 @@ await runTest('ChaosArrow requires chaos cells after control cell', () => {
   const constraint = new SudokuConstraint.Container([
     new SudokuConstraint.Shape('4x4'),
     new SudokuConstraint.ChaosConstruction(),
-    new SudokuConstraint.ChaosArrow('R2C1', 0, 'R4C4'),
+    new SudokuConstraint.ChaosArrow('R2C1', 0, ['R4C4']),
   ]);
 
   assert.throws(
@@ -452,7 +452,7 @@ await runTest('ChaosArrow produces ChaosArrow handler', () => {
   const constraint = new SudokuConstraint.Container([
     new SudokuConstraint.Shape('4x4'),
     new SudokuConstraint.ChaosConstruction(),
-    new SudokuConstraint.ChaosArrow('R2C1', 0, 'CC6', 'CC10', '', 'CC6', 'CC7', 'CC8'),
+    new SudokuConstraint.ChaosArrow('R2C1', 0, ['CC6', 'CC10'], ['CC6', 'CC7', 'CC8']),
   ]);
 
   const handlers = buildHandlers(constraint);
@@ -462,7 +462,7 @@ await runTest('ChaosArrow produces ChaosArrow handler', () => {
 await runTest('ChaosArrow requires ChaosConstruction', () => {
   const constraint = new SudokuConstraint.Container([
     new SudokuConstraint.Shape('4x4'),
-    new SudokuConstraint.ChaosArrow('R2C1', 'CC6', '', 'CC7'),
+    new SudokuConstraint.ChaosArrow('R2C1', 0, ['CC6', 'CC7']),
   ]);
 
   assert.throws(

@@ -426,8 +426,10 @@ await runTest('ChaosConstruction._handleSelection: ChaosArrow maps grid arm cell
   };
   const inputManager = {
     getSelection: () => ['R2C1', 'R2C2', 'R3C2'],
+    getSelectionSegments: () => [['R2C1', 'R2C2', 'R3C2']],
     setSelection: () => { },
   };
+  linesAndSets._inputManager = inputManager;
 
   withMockFormData(() => {
     linesAndSets._handleSelection(selectionForm, inputManager);
@@ -435,6 +437,37 @@ await runTest('ChaosConstruction._handleSelection: ChaosArrow maps grid arm cell
 
   assert.equal(collection.constraints.length, 1);
   assert.deepEqual(collection.constraints[0].cells, ['R2C1', 'CC5', 'CC6', 'CC10']);
+});
+
+await runTest('ChaosConstruction._handleSelection: ChaosArrow builds an arm per segment', () => {
+  const shape = GridShape.fromGridSize(4);
+  shape.addVarCellsForConstraints([new SudokuConstraint.ChaosConstruction()]);
+  const collection = createMockCollection();
+  const linesAndSets = Object.create(ConstraintCategoryInput.ChaosConstruction.prototype);
+  linesAndSets.collection = collection;
+  linesAndSets._shape = shape;
+  linesAndSets._updateCallback = () => { };
+  linesAndSets._typeMap = new Map([
+    [SudokuConstraint.ChaosArrow.name, { elem: { disabled: false } }],
+  ]);
+  const selectionForm = {
+    'constraint-type': { value: SudokuConstraint.ChaosArrow.name },
+  };
+  const inputManager = {
+    getSelection: () => ['R2C1', 'R2C2', 'R3C2', 'R3C1'],
+    getSelectionSegments: () => [['R2C1', 'R2C2'], ['R3C1']],
+    setSelection: () => { },
+  };
+  linesAndSets._inputManager = inputManager;
+
+  withMockFormData(() => {
+    linesAndSets._handleSelection(selectionForm, inputManager);
+  });
+
+  assert.equal(collection.constraints.length, 1);
+  // Control R2C1; arm 1 = [R2C1, R2C2] -> [CC5, CC6]; arm 2 = [R2C1, R3C1] -> [CC5, CC9].
+  assert.deepEqual(collection.constraints[0].arms,
+    [['CC5', 'CC6'], ['CC5', 'CC9']]);
 });
 
 await runTest('LinesAndSets: ChaosArrow validates grid-only and CC-arm selections', () => {

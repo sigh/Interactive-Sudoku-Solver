@@ -263,7 +263,7 @@ export class SudokuBuilder {
             const controlCell = shape.parseCellId(constraint.cells[0]).cell;
             const regionCellOffset = regionCells[0];
             const regionCellLimit = regionCellOffset + regionCells.length;
-            const chaosArms = constraint.expandedArmCellGroups(shape)
+            const chaosArms = constraint.expandedArms(shape)
               .map(arm => arm.map(cellId => shape.parseCellId(cellId).cell));
             if (chaosArms.flat().some(c => c < regionCellOffset || c >= regionCellLimit)) {
               throw new InvalidConstraintError(

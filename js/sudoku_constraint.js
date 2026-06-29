@@ -614,7 +614,8 @@ class ChaosConstraintBase extends SudokuConstraintBase {
     if (this.offset !== 0 && this.offset !== 1) {
       throw new Error(`${this.constructor.name} offset must be 0 or 1.`);
     }
-    this.cells = [gridCell, ...cells];
+    // cells may be given as groups (e.g. ChaosArrow arms); cells is their union.
+    this.cells = [gridCell, ...cells.flat()];
   }
 
   makeShifted(shiftFn) {
@@ -1402,24 +1403,32 @@ export class SudokuConstraint {
       multiArrow: true,
     };
 
-    armCellGroups() {
-      const arms = [];
-      let arm = [];
-      for (const cell of this.cells.slice(1)) {
-        if (cell === '') {
-          if (arm.length) arms.push(arm);
-          arm = [];
-        } else {
-          arm.push(cell);
-        }
-      }
-      if (arm.length) arms.push(arm);
-      return arms;
+    constructor(gridCell, offset, ...arms) {
+      // Accept either arm groups, or a flat cell list as a single arm.
+      if (arms.length && !Array.isArray(arms[0])) arms = [arms];
+      super(gridCell, offset, ...arms);
+      this.arms = arms;
     }
 
-    expandedArmCellGroups(shape) {
-      const arms = this.armCellGroups();
-      if (arms.length) return arms;
+    static *makeFromArgs(args, shape) {
+      const [gridCell, offset, ...flat] = args;
+      yield new this(gridCell, offset, ...splitSegments(flat));
+    }
+
+    static serialize(constraints) {
+      return constraints.map(
+        c => this._argsToString(c.cells[0], c.offset, ...joinSegments(c.arms))
+      ).join('');
+    }
+
+    makeShifted(shiftFn) {
+      return new this.constructor(
+        shiftFn(this.cells[0]), this.offset,
+        ...this.arms.map(arm => arm.map(shiftFn)));
+    }
+
+    expandedArms(shape) {
+      if (this.arms.length) return this.arms;
 
       const regionCells = shape.varCellsForGroup('CC');
       const graph = shape.cellGraph();
@@ -1434,7 +1443,7 @@ export class SudokuConstraint {
     }
 
     expandedRegionCells(shape) {
-      return this.expandedArmCellGroups(shape).flat();
+      return this.expandedArms(shape).flat();
     }
   }
 
@@ -2478,40 +2487,20 @@ export class SudokuConstraint {
     // Allow any non-empty segment (segments may be single cells).
     static VALIDATE_CELLS_FN = (cells, shape) => cells.length > 0;
 
-    // Token separating segments in the serialized form.
-    static _SEPARATOR = '-';
-
     constructor(...segments) {
       super(...segments);
       this.segments = segments;
     }
 
     // The serialized form is a flat token list with separators between segments;
-    // splitting/joining lives here, so the instance only deals with arrays.
+    // the instance only deals with arrays.
     static *makeFromArgs(args, shape) {
-      const segments = [];
-      let segment = [];
-      for (const arg of args) {
-        if (arg === this._SEPARATOR) {
-          if (segment.length) segments.push(segment);
-          segment = [];
-        } else {
-          segment.push(arg);
-        }
-      }
-      if (segment.length) segments.push(segment);
-      yield new this(...segments);
+      yield new this(...splitSegments(args));
     }
 
     static serialize(constraints) {
-      return constraints.map(c => {
-        const args = [];
-        c.segments.forEach((segment, i) => {
-          if (i > 0) args.push(this._SEPARATOR);
-          args.push(...segment);
-        });
-        return this._argsToString(...args);
-      }).join('');
+      return constraints.map(
+        c => this._argsToString(...joinSegments(c.segments))).join('');
     }
 
     makeShifted(shiftFn) {
@@ -3108,7 +3097,34 @@ function* parseNamedCellGroups(items, decodeName) {
   if (group) yield group;
 }
 
-function serializeNamedCellGroups(constraints, keyOf, encodeName, argsForGroup) {
+// Token separating segments in a flat cell list.
+const SEGMENT_SEPARATOR = '-';
+
+const splitSegments = (items) => {
+  const segments = [];
+  let segment = [];
+  for (const item of items) {
+    if (item === SEGMENT_SEPARATOR) {
+      if (segment.length) segments.push(segment);
+      segment = [];
+    } else {
+      segment.push(item);
+    }
+  }
+  if (segment.length) segments.push(segment);
+  return segments;
+};
+
+const joinSegments = (segments) => {
+  const items = [];
+  segments.forEach((segment, i) => {
+    if (i > 0) items.push(SEGMENT_SEPARATOR);
+    items.push(...segment);
+  });
+  return items;
+};
+
+const serializeNamedCellGroups = (constraints, keyOf, encodeName, argsForGroup) => {
   const parts = [];
   const sorted = [...constraints].sort(
     (a, b) => keyOf(a).localeCompare(keyOf(b)) || a.name.localeCompare(b.name));
@@ -3134,4 +3150,4 @@ function serializeNamedCellGroups(constraints, keyOf, encodeName, argsForGroup) 
   }
 
   return parts.join('');
-}
+};
