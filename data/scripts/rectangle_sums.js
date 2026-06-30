@@ -26,14 +26,11 @@ function* rangeI(from, to) {
   }
 }
 
-function* rectangle(topLeft, bottomRight) {
+const graph = cellGraph("9x9");
+const rectangle = (topLeft, bottomRight) => {
   let [rc1, rc2] = [topLeft, bottomRight].map(parseCellId);
-  yield*
-    rangeI(rc1.row, rc2.row).flatMap(r =>
-      rangeI(rc1.col, rc2.col).map(c =>
-        makeCellId(r, c)
-      ));
-}
+  return graph.block(topLeft, rc2.row - rc1.row + 1, rc2.col - rc1.col + 1);
+};
 
 return [
   new Shape("9x9", K),

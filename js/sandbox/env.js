@@ -107,6 +107,78 @@ const parseCellId = (cellId) => {
 
 const makeCellId = (row, col) => SHAPE_MAX.makeCellId(row - 1, col - 1);
 
+// Resolve a lenient shape argument to a GridShape:
+//   - a GridShape                       (returned as-is)
+//   - a grid spec string, e.g. '6x6'
+//   - a Shape constraint (or any object carrying a gridSpec)
+//   - nothing                           (the default grid)
+const shape = (shapeSpec) => {
+  if (shapeSpec && typeof shapeSpec.cellGraph === 'function') return shapeSpec;
+  const gridSpec = typeof shapeSpec === 'string' ? shapeSpec
+    : shapeSpec && typeof shapeSpec === 'object' ? shapeSpec.gridSpec ?? null
+      : null;
+  return SudokuConstraint.Shape.getShapeFromGridSpec(gridSpec);
+};
+
+// A cell-id view over a shape's CellGraph. The underlying graph works in integer
+// indices; this exposes the sandbox-useful operations in 'RxCy' terms.
+class SandboxCellGraph {
+  constructor(gridShape) {
+    this._shape = gridShape;
+    this._graph = gridShape.cellGraph();
+  }
+
+  _index(cell) { return this._shape.parseCellId(cell).cell; }
+  _cell(index) { return index == null ? null : this._shape.makeCellIdFromIndex(index); }
+
+  // The orthogonally-adjacent in-grid cells.
+  neighbours(cell) {
+    return this._graph.cellEdges(this._index(cell))
+      .filter(i => i != null).map(i => this._cell(i));
+  }
+
+  // The cell (dRow, dCol) away, or null past the grid edge. Steps are signed,
+  // so step(cell, 1, 1) is the down-right diagonal.
+  step(cell, dRow, dCol) {
+    return this._cell(this._graph.traverse(this._index(cell), dRow, dCol));
+  }
+
+  // Cells from `cell` to the grid edge along (dRow, dCol), inclusive of `cell`.
+  ray(cell, dRow, dCol) {
+    const cells = [];
+    for (let c = cell; c != null; c = this.step(c, dRow, dCol)) cells.push(c);
+    return cells;
+  }
+
+  // The cells of a numRows x numCols block with topLeft as its top-left corner,
+  // row-major, or null if the block runs off the grid. Walks one step at a time
+  // in index space rather than re-traversing from topLeft for every cell.
+  block(topLeft, numRows, numCols) {
+    const cells = [];
+    let rowStart = this._index(topLeft);
+    for (let r = 0; r < numRows; r++) {
+      let cell = rowStart;
+      for (let c = 0; c < numCols; c++) {
+        if (cell == null) return null;
+        cells.push(this._cell(cell));
+        cell = this._graph.traverse(cell, 0, 1);    // step right
+      }
+      rowStart = this._graph.traverse(rowStart, 1, 0);   // step down
+    }
+    return cells;
+  }
+
+  // Whether the cells form a single orthogonally-connected group.
+  connected(cells) {
+    const indices = new Set([...cells].map(c => this._index(c)));
+    return indices.size === 0 || this._graph.cellsAreConnected(indices);
+  }
+}
+
+// A SandboxCellGraph for a shape. The argument is passed through shape(), so it
+// accepts a grid spec, Shape constraint, GridShape, or nothing for the default.
+const cellGraph = (shapeSpec) => new SandboxCellGraph(shape(shapeSpec));
+
 const parseConstraint = (str) => {
   const parsed = SudokuParser.parseString(str);
   // NOTE: This can't be an instanceof check when run inside the sandbox.
@@ -236,6 +308,8 @@ export const SANDBOX_GLOBALS = {
   parseConstraint,
   parseCellId,
   makeCellId,
+  shape,
+  cellGraph,
   solverLink,
   help,
   makeSolver,

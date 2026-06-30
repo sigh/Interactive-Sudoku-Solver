@@ -18,7 +18,6 @@
 //                           row and column, stopping at the opposite type
 // One loop (not several) is left to the other clues, which already force it here.
 
-const SIZE = 6;
 const ON = 1;                  // loop-membership values, stored in the Var cells
 const OFF = 2;
 
@@ -26,33 +25,24 @@ const OFF = 2;
 const bandOf = digit => (digit - 1) >> 1;
 const ALL_BANDS = 0b111;
 
-const inGrid = (row, col) =>
-  row >= 1 && row <= SIZE && col >= 1 && col <= SIZE;
+const gridShape = shape('6x6');
+const graph = cellGraph(gridShape);
 
-// The membership Var cell for a grid cell. The `Var('L', ...)` below names them
-// VL1..VL36 in row-major order.
-const loopCell = (row, col) => `VL${(row - 1) * SIZE + col}`;
+// The loop-membership Var cell paired with a grid cell (VL1..VL36, in grid order).
+const loopCell = cell => `VL${gridShape.parseCellId(cell).cell + 1}`;
 
-const neighbours = (row, col) =>
-  [[row - 1, col], [row + 1, col], [row, col - 1], [row, col + 1]]
-    .filter(([r, c]) => inGrid(r, c));
+const gridCells = Array.from({ length: gridShape.numGridCells },
+  (_, i) => gridShape.makeCellIdFromIndex(i));
 
-const allCells = [];
-for (let row = 1; row <= SIZE; row++) {
-  for (let col = 1; col <= SIZE; col++) {
-    allCells.push([row, col]);
-  }
-}
-
-const constraints = [new Shape('6x6'), new Var('L', 'loop', SIZE * SIZE)];
+const constraints = [new Shape('6x6'), new Var('L', 'loop', gridShape.numGridCells)];
 const add = (...newConstraints) => constraints.push(...newConstraints);
 
 // --- Loop membership: every cell is on (1) or off (2); circles on, squares off.
-const circles = [[1, 1], [1, 4]];
-const squares = [[1, 5], [4, 5], [5, 2]];
-for (const [row, col] of allCells) add(new Given(loopCell(row, col), ON, OFF));
-for (const [row, col] of circles) add(new Given(loopCell(row, col), ON));
-for (const [row, col] of squares) add(new Given(loopCell(row, col), OFF));
+const circles = ['R1C1', 'R1C4'];
+const squares = ['R1C5', 'R4C5', 'R5C2'];
+for (const cell of gridCells) add(new Given(loopCell(cell), ON, OFF));
+for (const cell of circles) add(new Given(loopCell(cell), ON));
+for (const cell of squares) add(new Given(loopCell(cell), OFF));
 
 // --- Degree 2: each on cell has exactly two on-loop orthogonal neighbours. ---
 // Reads the membership of the cell, then of each neighbour. Off cells are free.
@@ -67,13 +57,10 @@ const degreeMachine = NFA.encodeSpec({
     return onNeighbours > 2 ? undefined : { onNeighbours };
   },
   accept: state => state === 'off' || state.onNeighbours === 2,
-}, SIZE);
-for (const [row, col] of allCells) {
-  const cells = [
-    loopCell(row, col),
-    ...neighbours(row, col).map(([r, c]) => loopCell(r, c)),
-  ];
-  add(new NFA(degreeMachine, 'degree', ...cells));
+}, gridShape.numValues);
+for (const cell of gridCells) {
+  add(new NFA(degreeMachine, 'degree',
+    loopCell(cell), ...graph.neighbours(cell).map(loopCell)));
 }
 
 // --- No diagonal self-touch: forbid a 2x2 whose only on cells are a diagonal. ---
@@ -91,13 +78,10 @@ const noDiagonalTouchMachine = NFA.encodeSpec({
     return diagonalOnly ? undefined : 'ok';
   },
   accept: state => state === 'ok',
-}, SIZE);
-for (let row = 1; row < SIZE; row++) {
-  for (let col = 1; col < SIZE; col++) {
-    add(new NFA(noDiagonalTouchMachine, 'no-touch',
-      loopCell(row, col), loopCell(row, col + 1),
-      loopCell(row + 1, col), loopCell(row + 1, col + 1)));
-  }
+}, gridShape.numValues);
+for (const cell of gridCells) {
+  const block = graph.block(cell, 2, 2);
+  if (block) add(new NFA(noDiagonalTouchMachine, 'no-touch', ...block.map(loopCell)));
 }
 
 // --- Entropic loop: each on cell, with its two on-loop neighbours, must show one
@@ -124,12 +108,10 @@ const entropicMachine = NFA.encodeSpec({
   },
   accept: state => state === 'off' ||
     (state.awaiting === 'membership' && state.bands === ALL_BANDS),
-}, SIZE);
-for (const [row, col] of allCells) {
-  const cells = [loopCell(row, col), makeCellId(row, col)];
-  for (const [r, c] of neighbours(row, col)) {
-    cells.push(loopCell(r, c), makeCellId(r, c));
-  }
+}, gridShape.numValues);
+for (const cell of gridCells) {
+  const cells = [loopCell(cell), cell];
+  for (const neighbour of graph.neighbours(cell)) cells.push(loopCell(neighbour), neighbour);
   add(new NFA(entropicMachine, 'entropic', ...cells));
 }
 
@@ -157,8 +139,10 @@ const visionMachine = (type, clueRow, clueCol) => {
     if (state.blocked || !sameType) {
       return { ...state, position: state.position + 1, blocked: true };
     }
-    return { ...state, position: state.position + 1,
-      runThroughClue: state.runThroughClue + 1 };
+    return {
+      ...state, position: state.position + 1,
+      runThroughClue: state.runThroughClue + 1
+    };
   };
   const lineStart = phase =>
     ({ phase, position: 1, runEndingHere: 0, runThroughClue: 0, blocked: false });
@@ -168,14 +152,14 @@ const visionMachine = (type, clueRow, clueCol) => {
     transition: (state, value) => {
       if (state.phase === 'row') {
         const next = walkLine(state, value, clueCol);
-        if (next.position > SIZE) {
+        if (next.position > gridShape.numCols) {
           return { ...lineStart('column'), rowRun: next.runThroughClue };
         }
         return next;
       }
       if (state.phase === 'column') {
         const next = walkLine(state, value, clueRow);
-        if (next.position > SIZE) {
+        if (next.position > gridShape.numRows) {
           const visionCount = state.rowRun + next.runThroughClue - 1;
           return { phase: 'digit', visionCount };
         }
@@ -185,7 +169,7 @@ const visionMachine = (type, clueRow, clueCol) => {
       return value === state.visionCount ? 'ok' : undefined;
     },
     accept: state => state === 'ok',
-  }, SIZE);
+  }, gridShape.numValues);
 };
 
 // Each clue is [type, row, col]: circles see loop cells, squares see non-loop.
@@ -194,10 +178,12 @@ const clues = [
   [OFF, 1, 5], [OFF, 4, 5], [OFF, 5, 2],
 ];
 for (const [type, clueRow, clueCol] of clues) {
-  const cells = [];
-  for (let col = 1; col <= SIZE; col++) cells.push(loopCell(clueRow, col));
-  for (let row = 1; row <= SIZE; row++) cells.push(loopCell(row, clueCol));
-  cells.push(makeCellId(clueRow, clueCol));
+  const clueCell = makeCellId(clueRow, clueCol);
+  const cells = [
+    ...graph.ray(makeCellId(clueRow, 1), 0, 1).map(loopCell),   // the clue's row
+    ...graph.ray(makeCellId(1, clueCol), 1, 0).map(loopCell),   // the clue's column
+    clueCell,                                             // the clue digit
+  ];
   add(new NFA(visionMachine(type, clueRow, clueCol), 'vision', ...cells));
 }
 
