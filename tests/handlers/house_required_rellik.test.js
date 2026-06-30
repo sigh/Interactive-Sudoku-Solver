@@ -12,13 +12,13 @@ ensureGlobalEnvironment();
 
 const { Rellik, HouseRequiredRellik } = await import('../../js/solver/handlers.js');
 
-// The companion delegates to a real Rellik handler over the cage cells. Each
-// house is given as (outside cells, the value mask the house must hold).
+// The companion delegates to a real Rellik handler over the cage cells. One
+// handler per overlapping house: (outside cells, the value mask the house holds).
 const ALL9 = valueMask(1, 2, 3, 4, 5, 6, 7, 8, 9);
-const makeHandler = (context, cageCells, sum, houseOutsides, houseMasks) => {
+const makeHandler = (context, cageCells, sum, outsideCells, mask) => {
   const rellik = new Rellik(cageCells, sum);
   context.initializeHandler(rellik);
-  const handler = new HouseRequiredRellik(rellik, houseOutsides, houseMasks);
+  const handler = new HouseRequiredRellik(rellik, outsideCells, mask);
   context.initializeHandler(handler);
   return handler;
 };
@@ -38,7 +38,7 @@ const forceValueViaHouse = (grid, value) => {
 await runTest('HouseRequiredRellik removes a value forced by an overlapping house', () => {
   const context = new GridTestContext({ gridSize: [2, 9], numValues: 9 });
   // Rellik (forbidden sum) cage [0,1,2] with target 6.
-  const handler = makeHandler(context, CAGE, 6, [OUTSIDE], [ALL9]);
+  const handler = makeHandler(context, CAGE, 6, OUTSIDE, ALL9);
 
   const grid = context.grid;
   forceValueViaHouse(grid, 1); // 1 now required inside the cage.
@@ -52,7 +52,7 @@ await runTest('HouseRequiredRellik removes a value forced by an overlapping hous
 
 await runTest('HouseRequiredRellik fails when a required value cannot be placed', () => {
   const context = new GridTestContext({ gridSize: [2, 9], numValues: 9 });
-  const handler = makeHandler(context, CAGE, 6, [OUTSIDE], [ALL9]);
+  const handler = makeHandler(context, CAGE, 6, OUTSIDE, ALL9);
 
   const grid = context.grid;
   // House forces value 9 into the cage, but no cage cell can hold it.
@@ -69,7 +69,7 @@ await runTest('HouseRequiredRellik handles a cage extending beyond the house', (
   // overlapping house, with outside [2..8].
   const context = new GridTestContext({ gridSize: [2, 9], numValues: 9 });
   const cage = [0, 1, 9, 10];
-  const handler = makeHandler(context, cage, 6, [OUTSIDE], [ALL9]);
+  const handler = makeHandler(context, cage, 6, OUTSIDE, ALL9);
 
   const grid = context.grid;
   forceValueViaHouse(grid, 1); // row 0 forces value 1 into cells 0/1.
@@ -84,7 +84,7 @@ await runTest('HouseRequiredRellik handles a cage extending beyond the house', (
 
 await runTest('HouseRequiredRellik fast-bails when nothing is required', () => {
   const context = new GridTestContext({ gridSize: [2, 9], numValues: 9 });
-  const handler = makeHandler(context, CAGE, 6, [OUTSIDE], [ALL9]);
+  const handler = makeHandler(context, CAGE, 6, OUTSIDE, ALL9);
 
   const grid = context.grid;
   grid[2] = valueMask(5, 9);

@@ -3742,17 +3742,23 @@ export class Rellik extends SudokuConstraintHandler {
       throw new InvalidConstraintError(
         'Rellik cage cells must be mutually exclusive');
     }
+    // Values that are forced to be in this cage.
+    this._forcedState = stateAllocator.allocate([0]);
     return true;
   }
 
   enforceConsistency(grid, handlerAccumulator) {
-    return this.enforce(grid, 0, handlerAccumulator);
+    return this._enforce(grid, grid[this._forcedState], handlerAccumulator);
   }
 
-  // `extraForced` is a mask of values known to be present in the cage from
-  // outside this handler (e.g. required by an overlapping house). Exposed so
-  // companion handlers (HouseRequiredRellik) can drive the cage directly.
-  enforce(grid, extraForced, handlerAccumulator) {
+  // Record `values` as known to be present in the cage.
+  addForcedValues(grid, values, handlerAccumulator) {
+    const combined = grid[this._forcedState] | values;
+    if (combined === grid[this._forcedState]) return true;
+    return this._enforce(grid, combined, handlerAccumulator);
+  }
+
+  _enforce(grid, forcedValues, handlerAccumulator) {
     const cells = this.cells;
     const sum = this._sum;
     const valueOffset = this._valueOffset;
@@ -3760,7 +3766,6 @@ export class Rellik extends SudokuConstraintHandler {
     const numCells = cells.length;
 
     // Find the values that must be present in the cage.
-    let forcedValues = extraForced;
     let candidateValues = 0;
     for (let i = 0; i < numCells; i++) {
       const mask = grid[cells[i]];
@@ -3778,6 +3783,7 @@ export class Rellik extends SudokuConstraintHandler {
 
     // A value required in the cage that no cell can hold is a contradiction.
     if (forcedValues & ~candidateValues) return false;
+    grid[this._forcedState] = forcedValues;
 
     // Combine the results of optionally subtracting each forced value from the
     // sum. The forced values are distinct, so each is subtracted at most once.
@@ -3824,37 +3830,28 @@ export class Rellik extends SudokuConstraintHandler {
   }
 }
 
-// Strengthens a Rellik cage with values forced into it by overlapping houses.
+// One per (Rellik cage, overlapping house): any value the house holds that is
+// absent from all its cells outside the cage must lie in the cage.
 export class HouseRequiredRellik extends SudokuConstraintHandler {
-  constructor(rellik, houseOutsides, houseMasks) {
-    const wake = new Set(rellik.cells);
-    for (const outside of houseOutsides) for (const c of outside) wake.add(c);
-    super([...wake].sort((a, b) => a - b));
-
+  constructor(rellik, outsideCells, mask) {
+    super(outsideCells);
     this._rellik = rellik;
-    this._houseOutsides = houseOutsides;
-    this._houseMasks = houseMasks;
+    this._mask = mask;
   }
 
   enforceConsistency(grid, handlerAccumulator) {
-    const houseOutsides = this._houseOutsides;
-    const houseMasks = this._houseMasks;
-    let houseRequired = 0;
-    for (let h = 0; h < houseOutsides.length; h++) {
-      const outside = houseOutsides[h];
-      const mask = houseMasks[h];
-      let outsideValues = 0;
-      for (let i = 0; i < outside.length; i++) {
-        outsideValues |= grid[outside[i]];
-        // Once the outside cells cover every value the house holds it can force
-        // nothing into the cage; skip the rest of its cells.
-        if ((outsideValues & mask) === mask) break;
-      }
-      houseRequired |= mask & ~outsideValues;
+    const outside = this.cells;
+    const mask = this._mask;
+    let outsideValues = 0;
+    for (let i = 0; i < outside.length; i++) {
+      outsideValues |= grid[outside[i]];
+      // Once the outside cells cover every value the house holds, nothing is
+      // forced into the cage.
+      if ((outsideValues & mask) === mask) return true;
     }
-    if (houseRequired === 0) return true;
 
-    return this._rellik.enforce(grid, houseRequired, handlerAccumulator);
+    return this._rellik.addForcedValues(
+      grid, mask & ~outsideValues, handlerAccumulator);
   }
 }
 

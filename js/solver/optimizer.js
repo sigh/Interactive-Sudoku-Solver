@@ -1180,8 +1180,6 @@ export class SudokuConstraintOptimizer {
 
     for (const r of rellikHandlers) {
       const cageSet = new Set(r.cells);
-      const houseOutsides = [];
-      const houseMasks = [];
       for (const house of houses) {
         const cells = house.cells;
         const interCount = setIntersectSize(cageSet, cells);
@@ -1189,15 +1187,12 @@ export class SudokuConstraintOptimizer {
         // elsewhere); a cage covering the whole house has no outside cells to
         // reason from.
         if (interCount < 2 || interCount === cells.length) continue;
-        houseOutsides.push(arrayDifference(cells, r.cells));
-        houseMasks.push(house.valueMask());
-      }
-      if (houseOutsides.length === 0) continue;
 
-      const handler = new HandlerModule.HouseRequiredRellik(
-        r, houseOutsides, houseMasks);
-      handlerSet.addAux(handler);
-      this._logAddHandler('_optimizeRellik', handler, { aux: true });
+        const handler = new HandlerModule.HouseRequiredRellik(
+          r, arrayDifference(cells, r.cells), house.valueMask());
+        handlerSet.addNonEssential(handler);
+        this._logAddHandler('_optimizeRellik', handler);
+      }
     }
   }
 
