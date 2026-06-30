@@ -3738,51 +3738,78 @@ export class Rellik extends SudokuConstraintHandler {
 
   initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
     this._valueOffset = shape.valueOffset;
+    if (!cellExclusions.areMutuallyExclusive(this.cells)) {
+      throw new InvalidConstraintError(
+        'Rellik cage cells must be mutually exclusive');
+    }
     return true;
   }
 
   enforceConsistency(grid, handlerAccumulator) {
-    const cells = this.cells;
-    const numCells = cells.length;
-    const valueOffset = this._valueOffset;
+    return this.enforce(grid, 0, handlerAccumulator);
+  }
 
-    // Combine the results of optionally subtracting fixed values from the sum.
+  // `extraForced` is a mask of values known to be present in the cage from
+  // outside this handler (e.g. required by an overlapping house). Exposed so
+  // companion handlers (HouseRequiredRellik) can drive the cage directly.
+  enforce(grid, extraForced, handlerAccumulator) {
+    const cells = this.cells;
+    const sum = this._sum;
+    const valueOffset = this._valueOffset;
     const remainders = this._remainders;
+    const numCells = cells.length;
+
+    // Find the values that must be present in the cage.
+    let forcedValues = extraForced;
+    let candidateValues = 0;
+    for (let i = 0; i < numCells; i++) {
+      const mask = grid[cells[i]];
+      candidateValues |= mask;
+      if (!(mask & ~forcedValues)) continue;
+      const target = countOnes16bit(mask);
+      if (target === 1) { forcedValues |= mask; continue; }
+      if (target > numCells) continue;
+      let count = 0;
+      for (let j = 0; j < numCells; j++) {
+        if (!(grid[cells[j]] & ~mask) && ++count > target) break;
+      }
+      if (count === target) forcedValues |= mask;
+    }
+
+    // A value required in the cage that no cell can hold is a contradiction.
+    if (forcedValues & ~candidateValues) return false;
+
+    // Combine the results of optionally subtracting each forced value from the
+    // sum. The forced values are distinct, so each is subtracted at most once.
     remainders.clear();
-    remainders.add(this._sum);
+    remainders.add(sum);
     const remainderWords = remainders.words;
 
-    let fixedValues = 0;
-    let unfixedValues = 0;
-    for (let i = 0; i < numCells; i++) {
-      let v = grid[cells[i]];
-      if (!(v & (v - 1))) {
-        // Subtract v from all remainders.
-        // Inline unionShiftRight: since shift <= 16, wordShift is always 0
-        // and each word only receives carry from the word above it.
-        // Subtract using external value (shift=0 means external 0, no-op).
-        const shift = LookupTables.toOffsetValue(v, valueOffset);
-        if (shift) {
-          const antiShift = 32 - shift;
-          let carry = 0;
-          for (let j = remainderWords.length - 1; j >= 0; j--) {
-            const w = remainderWords[j];
-            remainderWords[j] = w | (w >>> shift) | carry;
-            carry = w << antiShift;
-          }
+    for (let v = forcedValues; v;) {
+      const value = v & -v;
+      v ^= value;
+      // Subtract value from all remainders.
+      // Inline unionShiftRight: since shift <= 16, wordShift is always 0
+      // and each word only receives carry from the word above it.
+      const shift = LookupTables.toOffsetValue(value, valueOffset);
+      if (shift) {
+        const antiShift = 32 - shift;
+        let carry = 0;
+        for (let j = remainderWords.length - 1; j >= 0; j--) {
+          const w = remainderWords[j];
+          remainderWords[j] = w | (w >>> shift) | carry;
+          carry = w << antiShift;
         }
-        fixedValues |= v;
-      } else {
-        unfixedValues |= v;
       }
     }
 
     // Fail if remainder of 0 is possible.
     if (remainders.has(0)) return false;
 
-    // Check if any of the unfixed values exactly match the possible remainders.
+    // Remove any non-forced candidate that completes a forbidden sum with a
+    // subset of the forced values.
     const smallRemainders = remainderWords[0] >>> (1 + valueOffset);
-    const valuesToRemove = unfixedValues & smallRemainders & ~fixedValues;
+    const valuesToRemove = candidateValues & smallRemainders & ~forcedValues;
     if (valuesToRemove === 0) return true;
 
     for (let i = 0; i < numCells; i++) {
@@ -3794,6 +3821,40 @@ export class Rellik extends SudokuConstraintHandler {
     }
 
     return true;
+  }
+}
+
+// Strengthens a Rellik cage with values forced into it by overlapping houses.
+export class HouseRequiredRellik extends SudokuConstraintHandler {
+  constructor(rellik, houseOutsides, houseMasks) {
+    const wake = new Set(rellik.cells);
+    for (const outside of houseOutsides) for (const c of outside) wake.add(c);
+    super([...wake].sort((a, b) => a - b));
+
+    this._rellik = rellik;
+    this._houseOutsides = houseOutsides;
+    this._houseMasks = houseMasks;
+  }
+
+  enforceConsistency(grid, handlerAccumulator) {
+    const houseOutsides = this._houseOutsides;
+    const houseMasks = this._houseMasks;
+    let houseRequired = 0;
+    for (let h = 0; h < houseOutsides.length; h++) {
+      const outside = houseOutsides[h];
+      const mask = houseMasks[h];
+      let outsideValues = 0;
+      for (let i = 0; i < outside.length; i++) {
+        outsideValues |= grid[outside[i]];
+        // Once the outside cells cover every value the house holds it can force
+        // nothing into the cage; skip the rest of its cells.
+        if ((outsideValues & mask) === mask) break;
+      }
+      houseRequired |= mask & ~outsideValues;
+    }
+    if (houseRequired === 0) return true;
+
+    return this._rellik.enforce(grid, houseRequired, handlerAccumulator);
   }
 }
 

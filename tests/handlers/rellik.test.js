@@ -80,6 +80,40 @@ await runTest('Rellik should track multiple fixed values correctly', () => {
   assert.equal(grid[2] & valueMask(3), 0, 'value 3 should be removed');
 });
 
+await runTest('Rellik uses naked sets to force present values', () => {
+  // Cells 0,1 are a naked pair confined to {1,2}, so both 1 and 2 are
+  // guaranteed present even though neither cell is fixed. With target 6,
+  // value 5 in cell 2 would complete 1+5=6, so it must be removed.
+  const context = new GridTestContext({ gridSize: [1, 9], numValues: 9 });
+  const handler = new Rellik([0, 1, 2], 6);
+  context.initializeHandler(handler);
+
+  const grid = context.grid;
+  grid[0] = valueMask(1, 2);
+  grid[1] = valueMask(1, 2);
+  grid[2] = valueMask(5, 9);
+
+  const acc = createAccumulator();
+  assert.equal(handler.enforceConsistency(grid, acc), true);
+  assert.equal(grid[2], valueMask(9), 'value 5 should be removed from cell 2');
+});
+
+await runTest('Rellik fails when forced naked-set values reach the sum', () => {
+  // Cells 0,1,2 are confined to {1,2,3} (naked triple), so all of 1,2,3 are
+  // present and 1+2+3 = 6 is an unavoidable forbidden combination.
+  const context = new GridTestContext({ gridSize: [1, 9], numValues: 9 });
+  const handler = new Rellik([0, 1, 2], 6);
+  context.initializeHandler(handler);
+
+  const grid = context.grid;
+  grid[0] = valueMask(1, 2, 3);
+  grid[1] = valueMask(1, 2, 3);
+  grid[2] = valueMask(1, 2, 3);
+
+  const acc = createAccumulator();
+  assert.equal(handler.enforceConsistency(grid, acc), false);
+});
+
 // =============================================================================
 // Offset (0-indexed) tests
 // The handler works in external-value space: it subtracts external values

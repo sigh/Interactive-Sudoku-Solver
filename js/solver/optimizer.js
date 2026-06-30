@@ -74,6 +74,8 @@ export class SudokuConstraintOptimizer {
     this._optimizeSums(
       handlerSet, cellExclusions, boxRegions, shape, effectiveValueInfo);
 
+    this._optimizeRellik(handlerSet, shape);
+
     this._optimizeJigsaw(
       handlerSet, boxRegions, shape, effectiveValueInfo.count);
 
@@ -1165,6 +1167,38 @@ export class SudokuConstraintOptimizer {
     }
 
     return regions;
+  }
+
+  // Attach an aux handler to each Rellik cage that forces into the cage any
+  // value an overlapping house can only place inside it (see HouseRequiredRellik).
+  _optimizeRellik(handlerSet, shape) {
+    const rellikHandlers = handlerSet.getAllofType(HandlerModule.Rellik);
+    if (rellikHandlers.length === 0) return;
+
+    const houses = handlerSet.getAllofType(HandlerModule.PerfectAllDifferent);
+    if (houses.length === 0) return;
+
+    for (const r of rellikHandlers) {
+      const cageSet = new Set(r.cells);
+      const houseOutsides = [];
+      const houseMasks = [];
+      for (const house of houses) {
+        const cells = house.cells;
+        const interCount = setIntersectSize(cageSet, cells);
+        // A single overlapping cell is just a hidden single (handled
+        // elsewhere); a cage covering the whole house has no outside cells to
+        // reason from.
+        if (interCount < 2 || interCount === cells.length) continue;
+        houseOutsides.push(arrayDifference(cells, r.cells));
+        houseMasks.push(house.valueMask());
+      }
+      if (houseOutsides.length === 0) continue;
+
+      const handler = new HandlerModule.HouseRequiredRellik(
+        r, houseOutsides, houseMasks);
+      handlerSet.addAux(handler);
+      this._logAddHandler('_optimizeRellik', handler, { aux: true });
+    }
   }
 
   _generalRegionOverlapProcessor(regions, pieces, callback) {
