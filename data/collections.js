@@ -462,6 +462,21 @@ export const EXAMPLES = [
     constraintTypes: ['NFA'],
   },
   {
+    // Loop modelled with Var membership cells + state machines (no native loop).
+    name: '6x6 Loop: Entropic Lines',
+    src: 'https://sudokupad.app/gdc/loop-pack/entropic',
+    input: '/data/scripts/loop_entropic.js',
+    solution: '641523253416362154514632136245425361',
+    constraintTypes: ['NFA'],
+  },
+  {
+    name: 'Atrocious Destruction',
+    src: 'https://sudokupad.app/ow89c0ugwr',
+    input: '/data/scripts/atrocious_destruction.js',
+    solution: '1536824772641853487536122348716556124738815324763781652464275381',
+    constraintTypes: ['ChaosConstruction', 'ChaosCount', 'CountDistinct'],
+  },
+  {
     // Raised in https://github.com/sigh/Interactive-Sudoku-Solver/issues/10
     name: 'Stepped Thermos',
     src: 'https://sudokupad.app/g21db32fo4',
