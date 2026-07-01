@@ -127,6 +127,8 @@ export class EmbeddedSandbox {
       highlight,
       { tab: '  ', addClosing: false });
 
+    installLargeSelectionHandlers(this._editorElement, this._jar);
+
     // Load saved code first so it is available as a fallback.
     autoSaveField(this._editorElement);
 
@@ -320,3 +322,82 @@ export class EmbeddedSandbox {
     this._clearOutput();
   }
 }
+
+// Replacing a large selection through the browser's native contenteditable path
+// is O(n^2) in the number of highlighted spans, so any edit over a big selection
+// (delete, type, or paste after select-all) hangs for seconds. The quadratic
+// cost is in Chromium's editing pipeline: https://issues.chromium.org/issues/41475538.
+// CodeJar does not work around it
+// (https://github.com/antonmedv/codejar/issues/67, closed without a fix), so we
+// intercept large-selection edits and apply them by re-setting the plain text (a
+// single re-highlight) instead. Small selections keep the native path so
+// ordinary editing is unaffected.
+//
+// Paste and cut are handled in the capture phase on the editor's parent, so they
+// run before CodeJar's own paste/cut handlers (which would otherwise do the slow
+// native replace) regardless of when this is called. Typing and deletion have no
+// CodeJar counterpart, so a plain listener on the editor suffices.
+const installLargeSelectionHandlers = (editor, jar) => {
+  const LARGE_SELECTION_CHARS = 200;
+
+  const largeSelectionRange = () => {
+    const { start, end } = jar.save();
+    const lo = Math.min(start, end);
+    const hi = Math.max(start, end);
+    return hi - lo >= LARGE_SELECTION_CHARS ? { lo, hi } : null;
+  };
+  const replaceLargeSelection = (insert) => {
+    const range = largeSelectionRange();
+    if (!range) return false;
+    const text = jar.toString();
+    jar.updateCode(text.slice(0, range.lo) + insert + text.slice(range.hi));
+    const caret = range.lo + insert.length;
+    jar.restore({ start: caret, end: caret });
+    return true;
+  };
+
+  editor.parentNode.addEventListener('paste', (e) => {
+    if (!editor.contains(e.target)) return;
+    const data = e.clipboardData?.getData('text/plain');
+    if (data == null) return;
+    if (replaceLargeSelection(data.replace(/\r\n?/g, '\n'))) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  }, { capture: true });
+  editor.parentNode.addEventListener('cut', (e) => {
+    if (!editor.contains(e.target)) return;
+    const range = largeSelectionRange();
+    if (!range) return;
+    e.clipboardData?.setData(
+      'text/plain', jar.toString().slice(range.lo, range.hi));
+    e.preventDefault();
+    e.stopPropagation();
+    replaceLargeSelection('');
+  }, { capture: true });
+  editor.addEventListener('beforeinput', (e) => {
+    let insert;
+    switch (e.inputType) {
+      case 'insertText':
+        insert = e.data ?? '';
+        break;
+      case 'insertParagraph':
+      case 'insertLineBreak':
+        insert = '\n';
+        break;
+      case 'deleteContentBackward':
+      case 'deleteContentForward':
+      case 'deleteWordBackward':
+      case 'deleteWordForward':
+      case 'deleteSoftLineBackward':
+      case 'deleteSoftLineForward':
+      case 'deleteHardLineBackward':
+      case 'deleteHardLineForward':
+        insert = '';
+        break;
+      default:
+        return;
+    }
+    if (replaceLargeSelection(insert)) e.preventDefault();
+  });
+};
