@@ -47,28 +47,26 @@ removal in the input string).
 ### `step_analysis.js` — walk the search, inspect state
 
 ```sh
-# Walk the first 10 steps.
+# Walk the first 10 steps. If the walk ends in a contradiction, the refuter (the
+# handler that returned false) prints automatically — no extra flag needed.
 node tests/debug/step_analysis.js --puzzle "Chaos Construction: The Fountain" --steps 10
 
 # Explain why the solver branched the way it did at step 1.
-node tests/debug/step_analysis.js --puzzle "Chaos Construction: The Fountain" --at first --explain
+node tests/debug/step_analysis.js --puzzle "Chaos Construction: The Fountain" --steps 1 --explain
 
-# Show pencilmarks and var-cell candidates at step 5 (--at applies to both).
-node tests/debug/step_analysis.js --puzzle "Chaos Construction: The Fountain" --at 5 --grid --vars
-
-# Walk 20 steps, and also explain a specific step within that window.
-node tests/debug/step_analysis.js --puzzle "Chaos Construction: The Fountain" --steps 20 --at 5 --explain
+# Show pencilmarks and var-cell candidates at step 5.
+node tests/debug/step_analysis.js --puzzle "Chaos Construction: The Fountain" --steps 5 --grid --vars
 
 # Steer the search to a specific branch and inspect from there.
 node tests/debug/step_analysis.js --puzzle "Chaos Construction: The Fountain" \
-    --at first --explain --guide 1:R7C9=5
+    --steps 1 --explain --guide 1:R7C9=5
 
-# Read the constraint string from a file; show initial var-cell state.
-node tests/debug/step_analysis.js --input-file puzzle.txt --at 0 --grid --vars
+# Read the constraint string from a file; show initial var-cell state (step 0).
+node tests/debug/step_analysis.js --input-file puzzle.txt --steps 0 --grid --vars
 
 # Show what each handler pruned at a step, and (at a contradiction step) the
 # handler that returned false — the "refuter" that killed the branch.
-node tests/debug/step_analysis.js --puzzle "Chaos Construction: The Fountain" --at 2 --log
+node tests/debug/step_analysis.js --puzzle "Chaos Construction: The Fountain" --steps 2 --log
 
 # Where do the branch decisions diverge once an ablation is applied?
 node tests/debug/step_analysis.js --puzzle "Chaos Construction" --steps 20 --compare chaos-bottlenecks
@@ -76,17 +74,13 @@ node tests/debug/step_analysis.js --puzzle "Chaos Construction" --steps 20 --com
 # Dump the grid state at a step as a constraint string, and full-propagate it in
 # one pipe. --dump-state writes ONLY the constraint to stdout (everything else to
 # stderr); --input - reads the constraint from stdin.
-node tests/debug/step_analysis.js --puzzle "Chaos Construction: The Fountain" --at 6 --dump-state \
-  | node tests/debug/step_analysis.js --input - --at 0 --grid --vars
+node tests/debug/step_analysis.js --puzzle "Chaos Construction: The Fountain" --steps 6 --dump-state \
+  | node tests/debug/step_analysis.js --input - --steps 0 --grid --vars
 ```
 
 `--compare <ablation>` shows *where* the search first branches differently; for
 the *node-count* impact of an ablation use `benchmark_puzzles.js --compare`. See
 `benchmark_puzzles.js --list-ablations` for available ablation names.
-
-`--steps` controls the walk table range; `--at` controls the inspection point
-for `--grid`, `--vars`, and `--explain`. They are independent: a wide `--steps`
-gives overall search context while `--at` drills into a specific step.
 
 #### Workflow: debugging a bad elimination
 
@@ -105,8 +99,9 @@ concrete, 0-guess reproduction:
    the guess count while keeping the rejection. Stop when `guesses=0` — you
    now have a concrete 0-guess reproduction.
 
-4. At 0 guesses, `step_analysis.js --at 0 --vars` shows which var-cell
-   candidates were pruned to empty after initial propagation.
+4. At 0 guesses, a plain `step_analysis.js` run prints the refuter, and
+   `--steps 0 --vars` shows which var-cell candidates were pruned to empty
+   after initial propagation.
 
 #### Workflow: incremental vs full propagation
 
@@ -115,8 +110,8 @@ from the cells that just changed). To check whether a full sweep would derive
 more from a node's state than the search did:
 
 ```sh
-step_analysis.js --at N --dump-state --puzzle "<name>" \
-  | step_analysis.js --input - --at 0 --grid --vars
+step_analysis.js --steps N --dump-state --puzzle "<name>" \
+  | step_analysis.js --input - --steps 0 --grid --vars
 ```
 
 The first command emits the state at step N as a constraint string (original
@@ -141,14 +136,14 @@ sequence from the known solution's assignments, and step through them logging
 
 The natural future addition to `step_analysis.js` is `--trace-nfa <name>`,
 which would feed a named NFA constraint's token stream through the spec at the
-`--at` step and log the state transitions directly.
+walked step and log the state transitions directly.
 
 ---
 
 ### `search_hotspots.js` — where the search concentrates
 
 ```sh
-# Conflict heatmap + churn + branch-factor shape + propagation yield over a bounded solve.
+# Conflict heatmap + churn + branch-factor shape + propagation yield over an unbounded solve.
 node tests/debug/search_hotspots.js --max-backtracks none --puzzle "Chaos Construction"
 
 # Cap a hard puzzle so the run is bounded (rankings reflect the work done).

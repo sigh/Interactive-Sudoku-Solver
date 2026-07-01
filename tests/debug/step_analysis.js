@@ -13,10 +13,10 @@
 //
 // Examples:
 //   node tests/debug/step_analysis.js --puzzle "Fountain" --steps 8
-//   node tests/debug/step_analysis.js --puzzle "Fountain" --at first --explain
-//   node tests/debug/step_analysis.js --puzzle "Fountain" --at 5 --grid --vars
-//   node tests/debug/step_analysis.js --input ".Thermo~R1C1~R1C2" --steps 5
-//   node tests/debug/step_analysis.js --puzzle "Fountain" --at first --explain --guide 1:R7C9=5
+//   node tests/debug/step_analysis.js --puzzle "Fountain" --steps 1 --explain
+//   node tests/debug/step_analysis.js --puzzle "Fountain" --steps 5 --grid --vars
+//   node tests/debug/step_analysis.js --input ".Thermo~R1C1~R1C2" --steps 0 --log
+//   node tests/debug/step_analysis.js --puzzle "Fountain" --steps 1 --explain --guide 1:R7C9=5
 //   node tests/debug/step_analysis.js --list
 
 import { readFileSync } from 'node:fs';
@@ -47,9 +47,11 @@ const DEFAULTS = {
   puzzle: null,
   input: null,
   inputFile: null,
+  // The walk replays from step 0 for every step (deterministic replay), so it is
+  // O(steps^2); keep the default a small overview and opt into depth explicitly.
+  // Failures at step 0 (the common "0 guesses" case) are caught regardless.
   steps: 12,
 
-  at: null,
   explain: false,
   cell: null,
   grid: false,
@@ -82,8 +84,6 @@ const parseArgs = (argv) => {
       case '--input': args.input = value(); break;
       case '--input-file': args.inputFile = value(); break;
       case '--steps': args.steps = +value(); break;
-
-      case '--at': args.at = value(); break;
       case '--explain': args.explain = true; break;
       case '--cell': args.cell = value(); break;
       case '--grid': args.grid = true; break;
@@ -115,24 +115,27 @@ Puzzle source (pick one):
 Step indexing matches the UI: step 0 is the initial position (before any
 guess); step N (N >= 1) is the Nth guess/dead-end the search reaches.
 
-Walk:
-  --steps <n>           Number of steps to walk. Default ${DEFAULTS.steps}.
+  --steps <n>           Walk from step 0 through step <n>, clamped to where the
+                        search ends. Default ${DEFAULTS.steps}. The step you walk
+                        to is the step the inspectors below report on, so e.g.
+                        "--steps 0 --log" shows the initial propagation. If the
+                        walk ends in a contradiction, the refuter is printed
+                        automatically (no --log needed).
 
-Step inspection (all three use --at for the step):
-  --at <step>           Step to inspect. Accepts a number, "first", or "last".
-  --explain             Explain the branch chosen at --at.
-  --grid                Print the value-cell pencilmark grid at --at.
-  --vars                Print every extra (var) cell group at --at — e.g. Chaos
-                        region labels, Doppelganger cells, sum cells. Grid-shaped
-                        groups print as a grid, others as a list.
-  --log                 Print the constraint-propagation log for the --at step:
-                        what each handler pruned, and (at a contradiction step)
-                        which handler returned false (the refuter).
-  --dump-state          Print (to stdout) the grid state at the --at step as a
+Inspect the step the walk reached:
+  --explain             Explain the guess made to reach the step.
+  --grid                Print the value-cell pencilmark grid at the step.
+  --vars                Print every extra (var) cell group at the step — e.g.
+                        Chaos region labels, Doppelganger cells, sum cells.
+                        Grid-shaped groups print as a grid, others as a list.
+  --log                 Print the constraint-propagation log: what each handler
+                        pruned, and (at a contradiction) which handler returned
+                        false (the refuter).
+  --dump-state          Print (to stdout) the grid state at the step as a
                         constraint string; ALL other output goes to stderr, so
                         it pipes straight into a second invocation:
-                          step_analysis.js --dump-state --at N --input "<p>" \\
-                            | step_analysis.js --input - --at 0 --grid --vars
+                          step_analysis.js --dump-state --steps N --input "<p>" \\
+                            | step_analysis.js --input - --steps 0 --grid --vars
                         (the basis for incremental-vs-full propagation checks).
   --top <n>             Competing-cell rows to show in --explain. Default ${DEFAULTS.top}.
 
@@ -590,7 +593,7 @@ const printVarCells = (shape, pencilmarks, stepIndex) => {
 // logs to the target step, so we discard logs from earlier replays, run the step
 // fresh, then read what it produced.
 const printDebugLog = (shape, solver, atStep, guides) => {
-  solver.debugState();  // drain logs accumulated during the walk / other --at runs
+  solver.debugState();  // drain logs accumulated during the walk / earlier runs
   runStep(solver, atStep, guides, false);
   const logs = (solver.debugState()?.logs ?? [])
     .filter(l => l.loc === '_enforceConstraints');
@@ -689,13 +692,6 @@ const valuesString_fromSet = (set) => [...set].sort((a, b) => a - b).join('') ||
 // Main
 // ============================================================================
 
-const resolveExplainTarget = (spec, records) => {
-  const guessRows = records.filter(r => r.count > 1);
-  if (spec === 'first') return guessRows[0]?.step ?? 1;
-  if (spec === 'last') return guessRows[guessRows.length - 1]?.step ?? 1;
-  return +spec;
-};
-
 export const main = (argv) => {
   const args = parseArgs(argv);
   if (args.help) { printUsage(); return; }
@@ -712,8 +708,9 @@ export const main = (argv) => {
   const puzzle = loadPuzzle(args);
   const constraint = SudokuParser.parseText(puzzle.input);
   // logLevel 1 enables the engine's per-step propagation log (handler prunings
-  // and refuter), which --log surfaces; only at the targeted step, so it's cheap.
-  const solver = SudokuBuilder.build(constraint, { logLevel: args.log ? 1 : 0 });
+  // and refuter). Always on so a contradiction can be explained automatically;
+  // it only logs the walked step, so it's cheap.
+  const solver = SudokuBuilder.build(constraint, { logLevel: 1 });
   const internal = solver._internalSolver;
   const shape = solver._shape;
 
@@ -723,11 +720,10 @@ export const main = (argv) => {
 
   if (args.priorities) printPriorities(shape, internal);
 
-  // Walk the requested steps. We always iterate from step 0 so the decision
-  // captured at step s-1 (which describes the guess shown at public step s) is
-  // available as we reach step s.
-  const lastStep = args.steps - 1;
-  const records = walk(solver, shape, guides, lastStep);
+  // Walk from step 0 through step `--steps` (clamped to where the search ends).
+  // We always iterate from step 0 so the decision captured at step s-1 (which
+  // describes the guess shown at public step s) is available as we reach step s.
+  const records = walk(solver, shape, guides, args.steps);
 
   // Validate any ablation up front, before producing output.
   if (args.compare) validateAblations([args.compare]);
@@ -754,46 +750,36 @@ export const main = (argv) => {
         SudokuParser.parseText(puzzle.input), { logLevel: 0 });
       installInstrumentation(solver2._internalSolver._candidateSelector);
       const guides2 = buildGuides(solver2, solver2._shape, args.guides);
-      ablatedRecords = walk(solver2, solver2._shape, guides2, lastStep);
+      ablatedRecords = walk(solver2, solver2._shape, guides2, args.steps);
     } finally { restore(); }
     printCompare(records, ablatedRecords, args.compare);
   }
 
-  const needsAt = args.explain || args.grid || args.vars || args.log || args.dumpState;
-  if (needsAt && args.at === null) {
-    throw new Error('--explain, --grid, --vars, --log, and --dump-state require --at <step|first|last>');
+  // Everything below inspects the last step the walk reached (step `--steps`, or
+  // wherever the search ended). No separate target: the step you walked to is the
+  // step you inspect.
+  const last = records.at(-1);
+  const atStep = last?.step ?? 0;
+
+  if (args.explain) {
+    if (atStep < 1) {
+      console.log(`\nStep ${atStep} is the initial position; no guess to explain.`);
+    } else {
+      // The guess shown at step `atStep` is decided during the replay to step
+      // atStep - 1, so capture its decision (with a snapshot) there.
+      const { decision } = runStep(solver, atStep - 1, guides, true);
+      printExplain(shape, atStep, decision, args.top);
+    }
   }
 
-  if (needsAt) {
-    const atStep = resolveExplainTarget(args.at, records);
+  if (args.grid) printGrid(shape, runStep(solver, atStep, guides).step.pencilmarks, atStep);
+  if (args.vars) printVarCells(shape, runStep(solver, atStep, guides).step.pencilmarks, atStep);
 
-    if (args.explain) {
-      if (atStep < 1) {
-        console.log(`\nStep ${atStep} is the initial position; no branch to explain (the first guess is step 1).`);
-      } else {
-        // The guess shown at step `atStep` is decided during the replay to step
-        // atStep - 1, so capture its decision (with a snapshot) there.
-        const { decision } = runStep(solver, atStep - 1, guides, true);
-        printExplain(shape, atStep, decision, args.top);
-      }
-    }
+  // Show the propagation log when asked, and always when the walk ended in a
+  // contradiction — so a plain run explains a failure (e.g. 0 guesses) by itself.
+  if (args.log || last?.contradiction) printDebugLog(shape, solver, atStep, guides);
 
-    if (args.grid) {
-      const { step } = runStep(solver, atStep, guides, false);
-      if (step) printGrid(shape, step.pencilmarks, atStep);
-      else console.log(`\nStep ${atStep} is past the end of the search.`);
-    }
-
-    if (args.vars) {
-      const { step } = runStep(solver, atStep, guides, false);
-      if (step) printVarCells(shape, step.pencilmarks, atStep);
-      else console.log(`\nStep ${atStep} is past the end of the search.`);
-    }
-
-    if (args.log) printDebugLog(shape, solver, atStep, guides);
-
-    if (args.dumpState) printStateString(shape, internal, solver, atStep, guides, puzzle.input);
-  }
+  if (args.dumpState) printStateString(shape, internal, solver, atStep, guides, puzzle.input);
 };
 
 runAsCli(import.meta.url, main);

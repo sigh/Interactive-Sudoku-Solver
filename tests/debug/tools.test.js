@@ -57,7 +57,7 @@ await runTest('solve.js requires an explicit --max-backtracks', () => {
 // per-step propagation log (--log).
 await runTest('step_analysis.js walk + explain + grid + vars + log', () => {
   const { stdout, thrown } = capture(() => stepMain(argv('step_analysis.js',
-    '--puzzle', PUZZLE, '--steps', '6', '--at', '2', '--explain', '--grid', '--vars', '--log')));
+    '--puzzle', PUZZLE, '--steps', '2', '--explain', '--grid', '--vars', '--log')));
   assert.equal(thrown, null, thrown?.message);
   assert.match(stdout, /step\tguess/);
   assert.match(stdout, /Explain step/);
@@ -69,7 +69,7 @@ await runTest('step_analysis.js walk + explain + grid + vars + log', () => {
 // --dump-state must write ONLY the constraint string to stdout (human output to
 // stderr), and that string must parse and re-propagate.
 await runTest('step_analysis.js --dump-state round-trips', () => {
-  const dump = capture(() => stepMain(argv('step_analysis.js', '--puzzle', PUZZLE, '--at', '4', '--dump-state')));
+  const dump = capture(() => stepMain(argv('step_analysis.js', '--puzzle', PUZZLE, '--steps', '4', '--dump-state')));
   assert.equal(dump.thrown, null, dump.thrown?.message);
   const stateString = dump.stdout.trim();
   assert.ok(stateString.startsWith('.'), `expected a bare constraint on stdout, got: ${JSON.stringify(stateString)}`);
@@ -83,7 +83,7 @@ await runTest('step_analysis.js --dump-state round-trips', () => {
 // Subprocess because it exercises real stdin + the stdout/stderr split.
 await runTest('step_analysis.js --dump-state | --input - pipe', () => {
   const script = join(dirname(fileURLToPath(import.meta.url)), 'step_analysis.js');
-  const dump = spawnSync(process.execPath, [script, '--puzzle', PUZZLE, '--at', '4', '--dump-state'],
+  const dump = spawnSync(process.execPath, [script, '--puzzle', PUZZLE, '--steps', '4', '--dump-state'],
     { encoding: 'utf8', timeout: 60000 });
   assert.equal(dump.status, 0, dump.stderr);
   assert.equal(dump.stdout.trim().split('\n').length, 1, 'dump stdout must be one clean line');
