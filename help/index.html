@@ -347,18 +347,18 @@ function accept({ min, max }) {
           branches to check each digit:
         <pre>
 NUM_CELLS = 3;  // Number of cells in the set
-startState = {type: 'start'};
+startState = { type: 'start' };
 
 function transition({ type, min, max, value: trackedValue }, value) {
   if (type === 'start') {
     return [
-      { type: "rangeCheck", min: value, max: value },
-      { type: "duplicateCheck", value },
+      { type: 'rangeCheck', min: value, max: value },
+      { type: 'duplicateCheck', value },
     ];
   }
   if (type === 'rangeCheck') {
     return [{
-      type: "rangeCheck",
+      type: 'rangeCheck',
       min: Math.min(min, value),
       max: Math.max(max, value),
     }];
@@ -366,21 +366,20 @@ function transition({ type, min, max, value: trackedValue }, value) {
   if (type === 'duplicateCheck') {
     if (value === trackedValue) {
       return [{ type: 'hasDuplicate' }];
-    } else {
-      return [
-        { type: 'duplicateCheck', value: trackedValue },
-        { type: 'duplicateCheck', value }
-      ];
     }
+    return [
+      { type: 'duplicateCheck', value: trackedValue },
+      { type: 'duplicateCheck', value }
+    ];
   }
   if (type === 'hasDuplicate') return [{ type: 'hasDuplicate' }];
 }
 
 function accept({ type, min, max }) {
-  if (type == 'rangeCheck') {
+  if (type === 'rangeCheck') {
     return max - min !== NUM_CELLS - 1;
   }
-  return (type === 'hasDuplicate');
+  return type === 'hasDuplicate';
 }</pre>
         </p>
 
@@ -403,13 +402,13 @@ function accept({ type, min, max }) {
 startState = { lastVal: null, diff: null };
 
 function transition({ lastVal, diff }, value) {
-  if (lastVal == null) {
-    return { lastVal: value, diff: null};
+  if (lastVal === null) {
+    return { lastVal: value, diff };
   }
 
   const nextDiff = value - lastVal;
 
-  if (diff == null || diff == nextDiff) {
+  if (diff === null || diff === nextDiff) {
     return { lastVal: value, diff: nextDiff };
   }
 }
@@ -475,21 +474,21 @@ function accept(state) {
 startState = { remaining: null };
 
 function transition({ remaining }, value) {
-  const isOdd = x => x%2 == 1;
-  const isEven = x => x%2 == 0;
+  const isOdd = x => x % 2 === 1;
+  const isEven = x => x % 2 === 0;
 
   // If we are starting, then initialize the count of remaining values.
-  if (remaining == null) remaining = value;
+  if (remaining === null) remaining = value;
 
   // Update remaining count if we see a matching value.
   if (isOdd(value)) remaining = remaining - 1;
 
   // Only return a new state if it is valid.
-  if (remaining >= 0) return { remaining: remaining };
+  if (remaining >= 0) return { remaining };
 }
 
 function accept({ remaining }) {
-  return remaining == 0;
+  return remaining === 0;
 }</pre>
         </p>
 
@@ -556,24 +555,24 @@ return state % 2 === 1;</pre>
           the first cell is the clue cell:
         </p>
         <pre>
-startState = {remainingSum: null, inside: false};
+startState = { remainingSum: null, inside: false };
 
-function transition({ remainingSum, inside}, value) {
+function transition({ remainingSum, inside }, value) {
   if (remainingSum === null) {
-    return {remainingSum: value, inside};
+    return { remainingSum: value, inside };
   }
   if (value === 1 || value === 9) {
-    return {remainingSum, inside: !inside};
+    return { remainingSum, inside: !inside };
   }
   if (inside) {
     remainingSum -= value;
   }
   if (remainingSum >= 0) {
-    return {remainingSum, inside};
+    return { remainingSum, inside };
   }
 }
 
-function accept({remainingSum}) {
+function accept({ remainingSum }) {
   return remainingSum === 0;
 }</pre>
 
@@ -582,9 +581,9 @@ function accept({remainingSum}) {
 startState = { remainingCount: null, remainingSum: null };
 
 function transition({ remainingCount, remainingSum, done }, value) {
-  if (done === true) return {done};
+  if (done === true) return { done };
   if (remainingSum === null) {
-    return {remainingCount, remainingSum: value};
+    return { remainingCount, remainingSum: value };
   }
   remainingSum -= value;
   if (remainingCount === null) {
@@ -592,14 +591,14 @@ function transition({ remainingCount, remainingSum, done }, value) {
   }
   remainingCount--;
   if (remainingCount === 0 && remainingSum === 0) {
-    return {done: true};
+    return { done: true };
   }
   if (remainingCount > 0 && remainingSum > 0) {
-    return {remainingCount, remainingSum};
+    return { remainingCount, remainingSum };
   }
 }
 
-function accept({done}) {
+function accept({ done }) {
   return done === true;
 }</pre>
 

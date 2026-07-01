@@ -40,14 +40,14 @@ const CIRCLE_CELLS = [
 // NFA: Opposite-parity count (arrow cells, over digit values only)
 // Cell sequence: [arrow_cell, dir_cell_1, dir_cell_2, ...]
 const parityCountSpec = {
-  startState: null,
-  transition(state, value) {
-    if (state === null) return { target: value, count: 0 };
-    const newCount = state.count + ((value % 2) !== (state.target % 2) ? 1 : 0);
-    if (newCount > state.target) return undefined;
-    return { target: state.target, count: newCount };
+  startState: { target: null, count: 0 },
+  transition({ target, count }, value) {
+    if (target === null) return { target: value, count };
+    const newCount = count + ((value % 2) !== (target % 2) ? 1 : 0);
+    if (newCount > target) return undefined;
+    return { target, count: newCount };
   },
-  accept: (state) => state !== null && state.count === state.target,
+  accept: ({ target, count }) => target !== null && count === target,
 };
 
 const parityCountNFA = NFA.encodeSpec(parityCountSpec, 9);
@@ -60,9 +60,8 @@ const ccToGrid = (ccId) => {
 };
 
 const gridToCC = (cellId) => {
-  const r = +cellId.match(/R(\d+)/)[1];
-  const c = +cellId.match(/C(\d+)/)[1];
-  return `CC${(r - 1) * 9 + c}`;
+  const { row, col } = parseCellId(cellId);
+  return `CC${(row - 1) * 9 + col}`;
 };
 
 const rowCC = (row) => Array.from({ length: 9 }, (_, i) => `CC${(row - 1) * 9 + i + 1}`);
@@ -81,8 +80,7 @@ const orangeLines = ORANGE_LINE_PAIRS.flatMap(([a, b]) => [
 ]);
 
 const circles = CIRCLE_CELLS.map(cell => {
-  const row = +cell.match(/R(\d+)/)[1];
-  return new CountDistinct(cell, ...rowCC(row));
+  return new CountDistinct(cell, ...rowCC(parseCellId(cell).row));
 });
 
 return [

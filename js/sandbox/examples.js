@@ -93,18 +93,14 @@ const STATE_MACHINE_FN = () => {
   // All differences between consecutive cells must be equal
   const spec = {
     startState: { lastVal: null, diff: null },
-    transition: (state, value) => {
-      if (state.lastVal === null) {
-        return { lastVal: value, diff: null };
+    transition: ({ lastVal, diff }, value) => {
+      if (lastVal === null) return { lastVal: value, diff };
+      const newDiff = value - lastVal;
+      if (diff === null || diff === newDiff) {
+        return { lastVal: value, diff: newDiff };
       }
-      const diff = value - state.lastVal;
-      if (state.diff === null || state.diff === diff) {
-        return { lastVal: value, diff: diff };
-      }
-      // Invalid - difference doesn't match
-      return undefined;
     },
-    accept: (state) => true,
+    accept: () => true,
   };
 
   const encodedNFA = NFA.encodeSpec(spec, /* numValues= */ 9);
@@ -255,8 +251,7 @@ const BENCHMARK_PUZZLES_FN = async () => {
       console.info(`Solving ${name}`);
       const { input } = resolvePuzzleConfig(puzzles[i]);
       if (!solver.uniqueSolution(input)) {
-        throw new Error(
-          `Expected unique solution for ${name}, got ${solutions.length}`);
+        throw new Error(`Expected a unique solution for ${name}`);
       }
       const stats = solver.latestStats();
       console.log(
@@ -275,9 +270,8 @@ const BENCHMARK_PUZZLES_FN = async () => {
   console.table(tableRows);
 
   console.log(
-    rows.flatMap(s => [
-      ...Object.values(s.pick('guesses', 'constraintsProcessed', 'runtimeMs'))
-    ]).join('\t'));
+    rows.flatMap(s => Object.values(s.pick('guesses', 'constraintsProcessed', 'runtimeMs')))
+      .join('\t'));
 };
 
 const GENERATE_AND_TEST_FN = async () => {

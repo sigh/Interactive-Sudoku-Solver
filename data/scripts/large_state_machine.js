@@ -12,37 +12,34 @@ const MAX_SUM = 20;
 const MAX_VALUE = 5;
 
 const nfa = NFA.encodeSpec({
-  startState: 'start',
-  transition(state, value) {
-    if (state === 'start') {
+  // `splits` is null in the seed state, before the green circle sets the count.
+  startState: { splits: null, current: 0, target: null },
+  transition({ splits, current, target }, value) {
+    if (splits === null) {
       if (value > MAX_VALUE) return [];
-      return [{ splits: value, current: 0, target: null }];
+      return [{ splits: value, current, target }];
     }
 
-    const { splits, current, target } = state;
     const newSum = current + value;
     if (newSum > MAX_SUM) return [];
 
     const nextStates = [];
 
-    if (target == null || newSum <= target) {
-      nextStates.push({ splits: splits, current: newSum, target });
+    // Extend the current run, as long as it doesn't overshoot the shared sum.
+    if (target === null || newSum <= target) {
+      nextStates.push({ splits, current: newSum, target });
     }
 
-    if (splits > 0) {
-      if (target === null) {
-        nextStates.push({ splits: splits - 1, current: 0, target: newSum });
-      } else if (newSum == target) {
-        nextStates.push({ splits: splits - 1, current: 0, target: newSum });
-      }
+    // Close the current run and start a new one. The first run sets the target;
+    // later runs may only close once they match it.
+    if (splits > 0 && (target === null || newSum === target)) {
+      nextStates.push({ splits: splits - 1, current: 0, target: newSum });
     }
 
     return nextStates;
   },
-  accept(state) {
-    if (state === 'start') return false;
-    if (state.splits !== 0) return false;
-    return state.current === state.target;
+  accept({ splits, current, target }) {
+    return splits === 0 && current === target;
   },
 }, 9);
 
