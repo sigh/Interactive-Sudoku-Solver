@@ -470,6 +470,20 @@ export const EXAMPLES = [
     constraintTypes: ['NFA'],
   },
   {
+    name: '9x9 Loop: Nordschleife',
+    src: 'https://www.youtube.com/watch?v=A8GBl5GGypA',
+    input: '/data/scripts/nordschleife.js',
+    solution: '526973148384165972917824356145782693279436581638519724793648215852391467461257839',
+    constraintTypes: ['NFA'],
+  },
+  {
+    name: '9x9 Loop: Wendezäune',
+    src: 'https://www.youtube.com/watch?v=bhKtKFEy0AM',
+    input: '/data/scripts/wendezaune.js',
+    solution: '617349582382715469945682731596134278834527916271896345129463857763958124458271693',
+    constraintTypes: ['NFA', 'Quad'],
+  },
+  {
     name: 'Atrocious Destruction',
     src: 'https://sudokupad.app/ow89c0ugwr',
     input: '/data/scripts/atrocious_destruction.js',
