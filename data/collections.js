@@ -1166,6 +1166,12 @@ export const EXAMPLES = [
     solution: '316542245163421356653214162435534621',
   },
   {
+    name: 'Circus Maximus',
+    src: 'https://www.youtube.com/watch?v=DVy_zGc9UQI',
+    input: '/data/scripts/circus_maximum.js',
+    solution: '251487369638219754794653218329164875175938642486572193912846537543721986867395421',
+  },
+  {
     name: 'Chaos Construction: Sack Lunch',
     src: 'https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?id=000LKM',
     input: '.ChaosConstruction.NoBoxes.Arrow~R3C1~R2C1~R2C2.Arrow~R1C5~R1C4~R1C3.Arrow~R4C9~R3C9~R2C9.Arrow~R4C5~R3C5~R3C6.Arrow~R4C5~R4C6~R4C7.Arrow~R9C1~R8C2~R8C3~R8C4.Arrow~R8C8~R9C8~R9C7.Arrow~R8C6~R9C5~R9C4.Arrow~R8C6~R7C7~R6C7.Arrow~R6C2~R5C1~R4C1.Arrow~R6C2~R7C3~R7C4.Arrow~R6C3~R6C4~R6C5.Arrow~R6C3~R6C4~R7C5~R6C6.SameValues~3~CC19~CC10~CC11.SameValues~3~CC5~CC4~CC3.SameValues~3~CC36~CC27~CC18.SameValues~3~CC32~CC23~CC24.SameValues~3~CC32~CC33~CC34.SameValues~4~CC73~CC65~CC66~CC67.SameValues~3~CC71~CC80~CC79.SameValues~3~CC69~CC77~CC76.SameValues~3~CC69~CC61~CC52.SameValues~3~CC47~CC37~CC28.SameValues~3~CC47~CC57~CC58.SameValues~3~CC48~CC49~CC50.SameValues~4~CC48~CC49~CC59~CC51.ChaosArrow~R3C1.ChaosArrow~R1C5.ChaosArrow~R4C9.ChaosArrow~R4C5.ChaosArrow~R4C5.ChaosArrow~R9C1.ChaosArrow~R8C8.ChaosArrow~R8C6.ChaosArrow~R8C6.ChaosArrow~R6C2.ChaosArrow~R6C2.ChaosArrow~R6C3.ChaosArrow~R6C3.ChaosArrow~R4C2.ChaosArrow~R4C8.ChaosArrow~R6C9',

@@ -4,7 +4,7 @@ _site/
 .jekyll-metadata
 .vscode/
 .ignore/
-.agent/
+_notes/
 node_modules/
 coverage/
 package-lock.json
