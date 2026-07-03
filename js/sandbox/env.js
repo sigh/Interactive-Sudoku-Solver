@@ -109,15 +109,15 @@ const makeCellId = (row, col) => GEOMETRY_MAX.makeCellId(row - 1, col - 1);
 
 // Resolve a lenient shape argument to a CellGeometry:
 //   - a CellGeometry                       (returned as-is)
-//   - a grid spec string, e.g. '6x6'
-//   - a Shape constraint (or any object carrying a gridSpec)
+//   - a shape spec string, e.g. '6x6'
+//   - a Shape constraint (or any object carrying a shapeSpec)
 //   - nothing                           (the default grid)
-const cellGeometry = (shapeSpec) => {
-  if (shapeSpec && typeof shapeSpec.cellGraph === 'function') return shapeSpec;
-  const gridSpec = typeof shapeSpec === 'string' ? shapeSpec
-    : shapeSpec && typeof shapeSpec === 'object' ? shapeSpec.gridSpec ?? null
+const cellGeometry = (geometrySource) => {
+  if (geometrySource && typeof geometrySource.cellGraph === 'function') return geometrySource;
+  const spec = typeof geometrySource === 'string' ? geometrySource
+    : geometrySource && typeof geometrySource === 'object' ? geometrySource.shapeSpec ?? null
       : null;
-  return SudokuConstraint.Shape.getShapeFromGridSpec(gridSpec);
+  return SudokuConstraint.Shape.getShapeFromShapeSpec(spec);
 };
 
 // A cell-id view over a shape's CellGraph. The underlying graph works in integer
@@ -176,8 +176,8 @@ class SandboxCellGraph {
 }
 
 // A SandboxCellGraph for a shape. The argument is passed through cellGeometry(), so
-// it accepts a grid spec, Shape constraint, CellGeometry, or nothing for the default.
-const cellGraph = (shapeSpec) => new SandboxCellGraph(cellGeometry(shapeSpec));
+// it accepts a shape spec, Shape constraint, CellGeometry, or nothing for the default.
+const cellGraph = (geometryLike) => new SandboxCellGraph(cellGeometry(geometryLike));
 
 const parseConstraint = (str) => {
   const parsed = SudokuParser.parseString(str);

@@ -117,14 +117,14 @@ await runTestCases('RegionSize controls generated box handlers', [
   ['6x6 default boxes', '6x6', null, 18],
   ['6x6 four-cell boxes', '6x6', 4, 21],
   ['4x6 four-cell boxes', '4x6', 4, 16],
-], (gridSpec, regionSize, expectedAllDifferent) => {
-  const constraints = [new SudokuConstraint.Shape(gridSpec)];
+], (shapeSpec, regionSize, expectedAllDifferent) => {
+  const constraints = [new SudokuConstraint.Shape(shapeSpec)];
   if (regionSize !== null) constraints.push(new SudokuConstraint.RegionSize(regionSize));
 
   const handlers = buildHandlers(new SudokuConstraint.Container(constraints));
   const adCount = countHandlers(handlers, 'AllDifferent');
   assert.equal(adCount, expectedAllDifferent,
-    `Expected ${expectedAllDifferent} AllDifferent handlers for ${gridSpec}`);
+    `Expected ${expectedAllDifferent} AllDifferent handlers for ${shapeSpec}`);
 });
 
 // ============================================================================

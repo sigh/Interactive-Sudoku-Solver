@@ -23,10 +23,10 @@ export class CellGeometry {
     return new CellGeometry(numRows, numCols, numValues, valueOffset);
   }
 
-  static fromGridSpec(gridSpec) {
-    const match = gridSpec.match(/^(\d+)x(\d+)(?:~(\d+)(?:-(\d+))?)?$/);
+  static fromShapeSpec(shapeSpec) {
+    const match = shapeSpec.match(/^(\d+)x(\d+)(?:~(\d+)(?:-(\d+))?)?$/);
     if (!match) {
-      throw new Error('Invalid grid spec format: ' + gridSpec);
+      throw new Error('Invalid shape spec format: ' + shapeSpec);
     }
 
     const numRows = parseInt(match[1]);
@@ -46,7 +46,7 @@ export class CellGeometry {
 
     const shape = this.fromGridSize(numRows, numCols, numValues, valueOffset);
     if (!shape) {
-      throw new Error('Invalid grid spec: ' + gridSpec);
+      throw new Error('Invalid shape spec: ' + shapeSpec);
     }
     return shape;
   };

@@ -70,64 +70,64 @@ await runTest('fromGridSize returns null for invalid dimensions', () => {
 });
 
 // ============================================================================
-// CellGeometry.fromGridSpec
+// CellGeometry.fromShapeSpec
 // ============================================================================
 
-await runTest('fromGridSpec parses square grid specs', () => {
-  const shape = CellGeometry.fromGridSpec('9x9');
+await runTest('fromShapeSpec parses square shape specs', () => {
+  const shape = CellGeometry.fromShapeSpec('9x9');
   assert.equal(shape.numRows, 9);
   assert.equal(shape.numCols, 9);
 });
 
-await runTest('fromGridSpec parses rectangular grid specs', () => {
-  const shape = CellGeometry.fromGridSpec('6x8');
+await runTest('fromShapeSpec parses rectangular shape specs', () => {
+  const shape = CellGeometry.fromShapeSpec('6x8');
   assert.equal(shape.numRows, 6);
   assert.equal(shape.numCols, 8);
   assert.equal(shape.numValues, 8);
 });
 
-await runTest('fromGridSpec parses 4x6 grid spec', () => {
-  const shape = CellGeometry.fromGridSpec('4x6');
+await runTest('fromShapeSpec parses 4x6 shape spec', () => {
+  const shape = CellGeometry.fromShapeSpec('4x6');
   assert.equal(shape.numRows, 4);
   assert.equal(shape.numCols, 6);
   assert.equal(shape.numValues, 6);
 });
 
-await runTest('fromGridSpec parses ~numValues when non-default', () => {
-  const shape = CellGeometry.fromGridSpec('9x9~10');
+await runTest('fromShapeSpec parses ~numValues when non-default', () => {
+  const shape = CellGeometry.fromShapeSpec('9x9~10');
   assert.equal(shape.numRows, 9);
   assert.equal(shape.numCols, 9);
   assert.equal(shape.numValues, 10);
   assert.equal(shape.name, '9x9~10');
 });
 
-await runTest('fromGridSpec canonicalizes default ~numValues', () => {
-  const shape = CellGeometry.fromGridSpec('9x9~9');
+await runTest('fromShapeSpec canonicalizes default ~numValues', () => {
+  const shape = CellGeometry.fromShapeSpec('9x9~9');
   assert.equal(shape.numRows, 9);
   assert.equal(shape.numCols, 9);
   assert.equal(shape.numValues, 9);
   assert.equal(shape.name, '9x9');
 });
 
-await runTest('fromGridSpec throws when ~numValues is too small', () => {
-  assert.throws(() => CellGeometry.fromGridSpec('9x9~8'));
+await runTest('fromShapeSpec throws when ~numValues is too small', () => {
+  assert.throws(() => CellGeometry.fromShapeSpec('9x9~8'));
 });
 
-await runTest('fromGridSpec throws when ~numValues is too large', () => {
-  assert.throws(() => CellGeometry.fromGridSpec('9x9~17'));
+await runTest('fromShapeSpec throws when ~numValues is too large', () => {
+  assert.throws(() => CellGeometry.fromShapeSpec('9x9~17'));
 });
 
-await runTest('fromGridSpec throws on invalid format', () => {
-  assert.throws(() => CellGeometry.fromGridSpec('9'));
-  assert.throws(() => CellGeometry.fromGridSpec('9x9x9'));
-  assert.throws(() => CellGeometry.fromGridSpec('abc'));
-  assert.throws(() => CellGeometry.fromGridSpec('axb'));
+await runTest('fromShapeSpec throws on invalid format', () => {
+  assert.throws(() => CellGeometry.fromShapeSpec('9'));
+  assert.throws(() => CellGeometry.fromShapeSpec('9x9x9'));
+  assert.throws(() => CellGeometry.fromShapeSpec('abc'));
+  assert.throws(() => CellGeometry.fromShapeSpec('axb'));
 });
 
-await runTest('fromGridSpec throws on invalid dimensions', () => {
-  assert.throws(() => CellGeometry.fromGridSpec('0x9'));
-  assert.throws(() => CellGeometry.fromGridSpec('9x0'));
-  assert.throws(() => CellGeometry.fromGridSpec('17x9'));
+await runTest('fromShapeSpec throws on invalid dimensions', () => {
+  assert.throws(() => CellGeometry.fromShapeSpec('0x9'));
+  assert.throws(() => CellGeometry.fromShapeSpec('9x0'));
+  assert.throws(() => CellGeometry.fromShapeSpec('17x9'));
 });
 
 // ============================================================================
@@ -360,16 +360,16 @@ await runTest('fromGridSize rejects invalid valueOffset', () => {
   assert.throws(() => CellGeometry.fromGridSize(9, 9, null, 1));
 });
 
-await runTest('fromGridSpec parses range syntax', () => {
-  const shape = CellGeometry.fromGridSpec('9x9~0-8');
+await runTest('fromShapeSpec parses range syntax', () => {
+  const shape = CellGeometry.fromShapeSpec('9x9~0-8');
   assert.equal(shape.numValues, 9);
   assert.equal(shape.valueOffset, -1);
   assert.equal(shape.name, '9x9~0-8');
 });
 
-await runTest('fromGridSpec rejects invalid range offset', () => {
+await runTest('fromShapeSpec rejects invalid range offset', () => {
   // 2-10 means offset=1, which is not allowed
-  assert.throws(() => CellGeometry.fromGridSpec('9x9~2-10'));
+  assert.throws(() => CellGeometry.fromShapeSpec('9x9~2-10'));
 });
 
 await runTest('makeName produces canonical forms', () => {
@@ -381,10 +381,10 @@ await runTest('makeName produces canonical forms', () => {
   assert.equal(CellGeometry.makeName(9, 9, 9, -1), '9x9~0-8');
 });
 
-await runTest('fromGridSpec round-trips through name', () => {
+await runTest('fromShapeSpec round-trips through name', () => {
   for (const spec of ['9x9', '9x9~10', '9x9~0-8', '4x6', '6x8~0-7']) {
-    const shape = CellGeometry.fromGridSpec(spec);
-    const reparsed = CellGeometry.fromGridSpec(shape.name);
+    const shape = CellGeometry.fromShapeSpec(spec);
+    const reparsed = CellGeometry.fromShapeSpec(shape.name);
     assert.equal(reparsed.name, shape.name);
     assert.equal(reparsed.numValues, shape.numValues);
     assert.equal(reparsed.valueOffset, shape.valueOffset);

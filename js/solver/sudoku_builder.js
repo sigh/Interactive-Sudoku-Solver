@@ -210,9 +210,9 @@ export class SudokuBuilder {
 
         case 'Jigsaw':
           {
-            if (constraint.gridSpec !== shape.name) {
+            if (constraint.shapeSpec !== shape.name) {
               throw new InvalidConstraintError(
-                `Jigsaw gridSpec ${constraint.gridSpec} does not match ` +
+                `Jigsaw shapeSpec ${constraint.shapeSpec} does not match ` +
                 `puzzle shape ${shape.name}`);
             }
             cells = constraint.cells.map(c => shape.parseCellId(c).cell);

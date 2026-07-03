@@ -63,7 +63,7 @@ Use `runTestCases` when the same behavior should be checked across several shape
 await runTestCases('box count', [
   ['4x4 default', '4x4', 4],
   ['6x6 region size 4', '6x6', 9, 4],
-], (gridSpec, expectedBoxes, regionSize = null) => {
+], (shapeSpec, expectedBoxes, regionSize = null) => {
   // test body
 });
 ```

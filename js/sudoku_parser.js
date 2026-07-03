@@ -47,10 +47,10 @@ export class SudokuParser {
     for (const n of astRoot.children) {
       if (n.cls !== SudokuConstraint.Shape) continue;
 
-      shape = SudokuConstraint.Shape.getShapeFromGridSpec(n.args.join('~'));
+      shape = SudokuConstraint.Shape.getShapeFromShapeSpec(n.args.join('~'));
       break;
     }
-    if (!shape) shape = SudokuConstraint.Shape.getShapeFromGridSpec();
+    if (!shape) shape = SudokuConstraint.Shape.getShapeFromShapeSpec();
 
     const constraints = this._resolveNodes(astRoot.children, astRoot.cls, shape);
     return new astRoot.cls(constraints);

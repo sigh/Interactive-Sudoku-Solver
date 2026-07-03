@@ -26,7 +26,7 @@ const makeChaosGrid = (shape) => {
 };
 
 const makeShape = () => {
-  const shape = CellGeometry.fromGridSpec('4x4');
+  const shape = CellGeometry.fromShapeSpec('4x4');
   shape.addVarCellsForConstraints([new SudokuConstraint.ChaosConstruction()]);
   return shape;
 };

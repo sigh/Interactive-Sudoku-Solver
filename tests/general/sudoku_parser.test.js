@@ -32,10 +32,10 @@ const hasConstraintType = (constraint, type) => {
   return findConstraints(constraint, type).length > 0;
 };
 
-// Assert the parsed result has a Shape with the expected gridSpec.
+// Assert the parsed result has a Shape with the expected shapeSpec.
 const assertShape = (result, expectedSpec) => {
   const shape = findConstraint(result, 'Shape');
-  assert.equal(shape.gridSpec, expectedSpec);
+  assert.equal(shape.shapeSpec, expectedSpec);
 };
 
 // Assert the number of constraints of a given type.
@@ -654,7 +654,7 @@ await runTest('toShortSolution should convert 6x6 solution', () => {
 });
 
 await runTest('toShortSolution should use digits for zero-based values less than 10', () => {
-  const shape = CellGeometry.fromGridSpec('9x9~0-8');
+  const shape = CellGeometry.fromShapeSpec('9x9~0-8');
   const solution = [0, 1, 2, 3, 4, 5, 6, 7, 8, ...Array(72).fill(0)];
   const result = toShortSolution(solution, shape);
 
@@ -663,7 +663,7 @@ await runTest('toShortSolution should use digits for zero-based values less than
 });
 
 await runTest('toShortSolution should use digits when extended range values are less than 10', () => {
-  const shape = CellGeometry.fromGridSpec('9x9~0-10');
+  const shape = CellGeometry.fromShapeSpec('9x9~0-10');
   const solution = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, ...Array(71).fill(0)];
   const result = toShortSolution(solution, shape);
 
@@ -672,7 +672,7 @@ await runTest('toShortSolution should use digits when extended range values are 
 });
 
 await runTest('toShortSolution should map 0 to 0 when extended values use letters', () => {
-  const shape = CellGeometry.fromGridSpec('9x9~0-10');
+  const shape = CellGeometry.fromShapeSpec('9x9~0-10');
   const solution = [0, 1, 10, ...Array(78).fill(0)];
   const result = toShortSolution(solution, shape);
 

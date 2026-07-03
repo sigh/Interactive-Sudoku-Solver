@@ -90,7 +90,7 @@ await runTest('applyValues should AND with existing values', () => {
 
 await runTest('applyValues with non-zero valueOffset', () => {
   // 9x9 grid with valueOffset=-1 (values 0-8).
-  const offsetShape = CellGeometry.fromGridSpec('9x9~0-8');
+  const offsetShape = CellGeometry.fromShapeSpec('9x9~0-8');
   const grid = new Array(offsetShape.numGridCells).fill(
     (1 << offsetShape.numValues) - 1);
 

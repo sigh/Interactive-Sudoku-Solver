@@ -420,7 +420,7 @@ await runTest('disjointSetRegions returns empty for invalid box size', () => {
 // 9x9 jigsaw layout with 9 regions
 const JIGSAW_9x9_LAYOUT = '000111222000111222000111222333444555333444555333444555666777888666777888666777888';
 
-await runTest('Jigsaw.makeFromArgs parses square grid without gridSpec', () => {
+await runTest('Jigsaw.makeFromArgs parses square grid without shapeSpec', () => {
   const shape9x9 = CellGeometry.fromGridSize(9);
   const jigsaws = [...SudokuConstraint.Jigsaw.makeFromArgs([JIGSAW_9x9_LAYOUT], shape9x9)];
   assert.equal(jigsaws.length, 9, 'should have 9 jigsaw regions');
@@ -428,47 +428,47 @@ await runTest('Jigsaw.makeFromArgs parses square grid without gridSpec', () => {
   // Check first region has 9 cells
   assert.equal(jigsaws[0].cells.length, 9, 'each region should have 9 cells');
 
-  // Each region should store the inferred gridSpec
+  // Each region should store the inferred shapeSpec
   for (const jigsaw of jigsaws) {
-    assert.equal(jigsaw.gridSpec, '9x9', 'should store gridSpec');
+    assert.equal(jigsaw.shapeSpec, '9x9', 'should store shapeSpec');
   }
 });
 
-await runTest('Jigsaw.makeFromArgs parses rectangular grid with gridSpec prefix', () => {
+await runTest('Jigsaw.makeFromArgs parses rectangular grid with shapeSpec prefix', () => {
   // 4x6 grid layout (24 cells, 4 regions of 6 cells each)
   // Layout: 4 rows x 6 cols = 24 cells
   const layout4x6 = '000111000111222333222333';
-  const shape4x6 = CellGeometry.fromGridSpec('4x6');
+  const shape4x6 = CellGeometry.fromShapeSpec('4x6');
   const jigsaws = [...SudokuConstraint.Jigsaw.makeFromArgs(['4x6', layout4x6], shape4x6)];
 
   assert.equal(jigsaws.length, 4, 'should have 4 jigsaw regions');
   assert.equal(jigsaws[0].cells.length, 6, 'each region should have 6 cells');
 
   for (const jigsaw of jigsaws) {
-    assert.equal(jigsaw.gridSpec, '4x6', 'should store gridSpec');
+    assert.equal(jigsaw.shapeSpec, '4x6', 'should store shapeSpec');
   }
 });
 
-await runTest('Jigsaw.serialize omits gridSpec for square grids', () => {
+await runTest('Jigsaw.serialize omits shapeSpec for square grids', () => {
   const shape9x9 = CellGeometry.fromGridSize(9);
   const jigsaws = [...SudokuConstraint.Jigsaw.makeFromArgs([JIGSAW_9x9_LAYOUT], shape9x9)];
   const serialized = SudokuConstraint.Jigsaw.serialize(jigsaws);
 
-  // Should be .Jigsaw~LAYOUT (no gridSpec in the middle)
-  assert.ok(!serialized.includes('~9x9~'), 'should not include gridSpec for square grid');
+  // Should be .Jigsaw~LAYOUT (no shapeSpec in the middle)
+  assert.ok(!serialized.includes('~9x9~'), 'should not include shapeSpec for square grid');
   assert.ok(serialized.startsWith('.Jigsaw~'), 'should start with constraint type');
   assert.equal(serialized, `.Jigsaw~${JIGSAW_9x9_LAYOUT}`);
 });
 
-await runTest('Jigsaw.serialize omits gridSpec for rectangular grids', () => {
+await runTest('Jigsaw.serialize omits shapeSpec for rectangular grids', () => {
   // 4x6 = 24 cells, 4 regions of 6 cells each
   const layout4x6 = '000111000111222333222333';
-  const shape4x6 = CellGeometry.fromGridSpec('4x6');
+  const shape4x6 = CellGeometry.fromShapeSpec('4x6');
   const jigsaws = [...SudokuConstraint.Jigsaw.makeFromArgs(['4x6', layout4x6], shape4x6)];
   const serialized = SudokuConstraint.Jigsaw.serialize(jigsaws);
 
-  // Should be .Jigsaw~LAYOUT (no gridSpec token)
-  assert.ok(!serialized.includes('~4x6~'), 'should not include gridSpec for rectangular grid');
+  // Should be .Jigsaw~LAYOUT (no shapeSpec token)
+  assert.ok(!serialized.includes('~4x6~'), 'should not include shapeSpec for rectangular grid');
 });
 
 await runTest('Jigsaw round-trips for square grid', () => {
@@ -492,7 +492,7 @@ await runTest('Jigsaw round-trips for square grid', () => {
 await runTest('Jigsaw round-trips for rectangular grid', () => {
   // 4x6 grid: 24 cells, numValues=6, so 4 regions of 6 cells each
   const layout4x6 = '000111000111222333222333';
-  const shape4x6 = CellGeometry.fromGridSpec('4x6');
+  const shape4x6 = CellGeometry.fromShapeSpec('4x6');
   const jigsaws = [...SudokuConstraint.Jigsaw.makeFromArgs(['4x6', layout4x6], shape4x6)];
   const serialized = SudokuConstraint.Jigsaw.serialize(jigsaws);
   // serialized is '.Jigsaw~LAYOUT', extract args after '.Jigsaw~'
@@ -509,9 +509,9 @@ await runTest('Jigsaw round-trips for rectangular grid', () => {
   }
 });
 
-await runTest('Jigsaw.makeFromArgs throws when gridSpec does not match layout length', () => {
+await runTest('Jigsaw.makeFromArgs throws when shapeSpec does not match layout length', () => {
   // 4x6 = 24 cells, but provide a 9x9 layout (81 cells)
-  const shape4x6 = CellGeometry.fromGridSpec('4x6');
+  const shape4x6 = CellGeometry.fromShapeSpec('4x6');
   assert.throws(
     () => [...SudokuConstraint.Jigsaw.makeFromArgs(['4x6', JIGSAW_9x9_LAYOUT], shape4x6)],
     /expects 24 cells.*but layout has 81/

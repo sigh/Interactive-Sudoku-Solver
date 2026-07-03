@@ -152,7 +152,7 @@ ConstraintCategoryInput.Shape = class Shape extends ConstraintCategoryInput {
     this._collapsibleContainer = new CollapsibleContainer(
       panel, /* defaultOpen= */ true);
 
-    this._gridSpecInput = document.getElementById('shape-input');
+    this._shapeSpecInput = document.getElementById('shape-input');
     this._minSelect = document.getElementById('value-range-min');
     this._maxSelect = document.getElementById('value-range-max');
     this._varForm = document.forms['var-constraint-input'];
@@ -163,7 +163,7 @@ ConstraintCategoryInput.Shape = class Shape extends ConstraintCategoryInput {
   }
 
   _setUpGridInput() {
-    const input = this._gridSpecInput;
+    const input = this._shapeSpecInput;
     const dropdown = document.getElementById('shape-dropdown');
     const items = dropdown.querySelectorAll('.shape-dropdown-item');
     let highlightedIndex = -1;
@@ -248,15 +248,15 @@ ConstraintCategoryInput.Shape = class Shape extends ConstraintCategoryInput {
   }
 
   _applyShape() {
-    const text = this._gridSpecInput.value.trim();
+    const text = this._shapeSpecInput.value.trim();
     if (!text) return;
     try {
       // Try parsing as a full spec (handles paste of e.g. "9x9~0-8").
-      const parsed = CellGeometry.fromGridSpec(text);
-      this._gridSpecInput.setCustomValidity('');
+      const parsed = CellGeometry.fromShapeSpec(text);
+      this._shapeSpecInput.setCustomValidity('');
       this.collection.setShape(parsed);
     } catch (e) {
-      this._gridSpecInput.setCustomValidity(e.toString());
+      this._shapeSpecInput.setCustomValidity(e.toString());
     }
   }
 
@@ -306,8 +306,8 @@ ConstraintCategoryInput.Shape = class Shape extends ConstraintCategoryInput {
 
   reshape(shape) {
     this._shape = shape;
-    this._gridSpecInput.value = shape.gridDimsStr;
-    this._gridSpecInput.setCustomValidity('');
+    this._shapeSpecInput.value = shape.gridDimsStr;
+    this._shapeSpecInput.setCustomValidity('');
     this._updateValueRangeDropdowns(shape);
   }
 
@@ -346,7 +346,7 @@ ConstraintCategoryInput.Shape = class Shape extends ConstraintCategoryInput {
     if (!this.constructor.constraintClasses().includes(constraintClass)) {
       return null;
     }
-    return this._gridSpecInput;
+    return this._shapeSpecInput;
   }
 }
 
@@ -1668,7 +1668,7 @@ ConstraintCategoryInput.StateMachine = class StateMachine extends JavaScriptCate
               maxDepthExpression: formData.get('max-depth'),
             };
 
-          const shape = this._shape || SudokuConstraint.Shape.getShapeFromGridSpec(null);
+          const shape = this._shape || SudokuConstraint.Shape.getShapeFromShapeSpec(null);
           const cells = this._inputManager.getSelection();
           const encodedNFA = await this._userScriptExecutor.compileStateMachine(
             spec, shape.numValues, cells.length, isUnified, shape.valueOffset);

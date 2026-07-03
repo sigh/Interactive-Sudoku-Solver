@@ -13,7 +13,7 @@ const { Sum } = await import('../../js/solver/sum_handler.js');
 // Helper: collect all handlers yielded by _constraintHandlers for a given
 // constraint on a standard 9x9 shape.
 const collectHandlers = (constraint) => {
-  const shape = SudokuConstraint.Shape.getShapeFromGridSpec(null);
+  const shape = SudokuConstraint.Shape.getShapeFromShapeSpec(null);
   const constraintMap = constraint.toMap();
   return [...SudokuBuilder._constraintHandlers(constraintMap, shape)];
 };

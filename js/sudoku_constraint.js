@@ -124,12 +124,12 @@ export class SudokuConstraintBase {
   }
 
   getShape() {
-    let gridSpec = null;
+    let shapeSpec = null;
     this.forEachTopLevel(c => {
-      if (c.type === 'Shape') gridSpec = c.gridSpec;
+      if (c.type === 'Shape') shapeSpec = c.shapeSpec;
     });
 
-    const shape = SudokuConstraint.Shape.getShapeFromGridSpec(gridSpec);
+    const shape = SudokuConstraint.Shape.getShapeFromShapeSpec(shapeSpec);
     if (!shape) throw new Error('Unknown shape: ' + shape);
     return shape;
   }
@@ -826,16 +826,16 @@ export class SudokuConstraint {
     static DISPLAY_CONFIG = { displayClass: 'Jigsaw' };
     static UNIQUENESS_KEY_FIELD = 'cells';
 
-    constructor(gridSpec, ...cells) {
-      super(gridSpec, ...cells);
-      this.gridSpec = gridSpec;
+    constructor(shapeSpec, ...cells) {
+      super(shapeSpec, ...cells);
+      this.shapeSpec = shapeSpec;
       this.cells = cells;
     }
 
     chipLabel() { return ''; }
 
     static *makeFromArgs(args, shape) {
-      // Legacy format: .Jigsaw~<gridSpec>~<layout>
+      // Legacy format: .Jigsaw~<shapeSpec>~<layout>
       // New format:    .Jigsaw~<layout>
       // Ignore any legacy leading argument(s) and take the layout as the last
       // argument.
@@ -882,9 +882,9 @@ export class SudokuConstraint {
     static serialize(parts) {
       if (!parts.length) return [];
 
-      // Get shape from the first constraint's gridSpec.
-      const gridSpec = parts[0].gridSpec;
-      const shape = CellGeometry.fromGridSpec(gridSpec);
+      // Get shape from the first constraint's shapeSpec.
+      const shapeSpec = parts[0].shapeSpec;
+      const shape = CellGeometry.fromShapeSpec(shapeSpec);
 
       // Fill parts grid such that each cell has a reference to the part.
       const partsGrid = new Array(shape.numGridCells).fill(null);
@@ -1544,16 +1544,16 @@ export class SudokuConstraint {
     constructor(gridDims, ...optionalValueRange) {
       super(gridDims, ...optionalValueRange);
 
-      this.gridSpec = gridDims;
+      this.shapeSpec = gridDims;
 
-      if (optionalValueRange.length) this.gridSpec += `~${optionalValueRange[0]}`;
+      if (optionalValueRange.length) this.shapeSpec += `~${optionalValueRange[0]}`;
     }
 
     static *makeFromArgs(args, shape) {
-      // Reconstruct gridSpec from args the same way the constructor does,
+      // Reconstruct shapeSpec from args the same way the constructor does,
       // and verify it matches the already-parsed shape.
       const constraint = new this(...args);
-      if (CellGeometry.fromGridSpec(constraint.gridSpec).name !== shape.name) {
+      if (CellGeometry.fromShapeSpec(constraint.shapeSpec).name !== shape.name) {
         throw Error('Inconsistent Shape constraints.');
       }
 
@@ -1566,19 +1566,19 @@ export class SudokuConstraint {
       }
 
       const c = constraints[0];
-      if (this._DEFAULT_SPECS.has(c.gridSpec)) {
+      if (this._DEFAULT_SPECS.has(c.shapeSpec)) {
         return '';
       }
 
       return super.serialize(constraints);
     }
 
-    static getShapeFromGridSpec(gridSpec) {
-      if (!gridSpec) {
+    static getShapeFromShapeSpec(shapeSpec) {
+      if (!shapeSpec) {
         return CellGeometry.fromGridSize(
           GEOMETRY_9x9.numRows, GEOMETRY_9x9.numCols);
       }
-      return CellGeometry.fromGridSpec(gridSpec);
+      return CellGeometry.fromShapeSpec(shapeSpec);
     }
   }
 

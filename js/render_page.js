@@ -656,7 +656,7 @@ class CompositeConstraintCollection extends ConstraintCollectionBase {
 
 class ConstraintManager {
   constructor(inputManager, displayContainer) {
-    this._shape = SudokuConstraint.Shape.getShapeFromGridSpec(null);
+    this._shape = SudokuConstraint.Shape.getShapeFromShapeSpec(null);
     this._reshapeListeners = [];
     this._updateListeners = [];
     this.runUpdateCallback = deferUntilAnimationFrame(
