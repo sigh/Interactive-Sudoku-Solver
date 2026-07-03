@@ -49,7 +49,7 @@ export class SimpleSolver {
     const setupTimeMs = timer.elapsedMs();
     return {
       solver,
-      shape: constraints.getShape(),
+      geometry: constraints.getShape(),
       captureState: () => {
         const state = solver.state?.();
         if (state) state.puzzleSetupTime = setupTimeMs;
@@ -64,10 +64,10 @@ export class SimpleSolver {
    * @returns {Solution|null}
    */
   solution(constraints) {
-    const { solver, shape, captureState } = this._build(constraints);
+    const { solver, geometry, captureState } = this._build(constraints);
     const values = solver.nthSolution(0);
     captureState();
-    return values ? new Solution(values, shape) : null;
+    return values ? new Solution(values, geometry) : null;
   }
 
   /**
@@ -76,7 +76,7 @@ export class SimpleSolver {
    * @returns {Solution|null} The solution if exactly one exists, null otherwise
    */
   uniqueSolution(constraints) {
-    const { solver, shape, captureState } = this._build(constraints);
+    const { solver, geometry, captureState } = this._build(constraints);
     const first = solver.nthSolution(0);
     if (!first) {
       captureState();
@@ -87,7 +87,7 @@ export class SimpleSolver {
       return null;
     }
     captureState();
-    return new Solution(first, shape);
+    return new Solution(first, geometry);
   }
 
   /**
@@ -97,12 +97,12 @@ export class SimpleSolver {
    * @yields {Solution}
    */
   *solutions(constraints, limit) {
-    const { solver, shape, captureState } = this._build(constraints);
+    const { solver, geometry, captureState } = this._build(constraints);
     for (let n = 0; limit === undefined || n < limit; n++) {
       const values = solver.nthSolution(n);
       if (!values) break;
       captureState();
-      yield new Solution(values, shape);
+      yield new Solution(values, geometry);
     }
     captureState();
   }
@@ -128,7 +128,7 @@ export class SimpleSolver {
    * @returns {TrueCandidates|null}
    */
   trueCandidates(constraints, limit = 1) {
-    const { solver, shape, captureState } = this._build(constraints);
+    const { solver, geometry, captureState } = this._build(constraints);
 
     // Collect solutions via progress callback.
     const solutions = [];
@@ -140,7 +140,7 @@ export class SimpleSolver {
 
     const counts = solver.solveAllPossibilities(limit);
     captureState();
-    return counts ? new TrueCandidates(counts, shape, limit, solutions) : null;
+    return counts ? new TrueCandidates(counts, geometry, limit, solutions) : null;
   }
 
   /**
@@ -150,10 +150,10 @@ export class SimpleSolver {
    * @returns {Solution|null} A sample solution if valid, null if invalid
    */
   validateLayout(constraints) {
-    const { solver, shape, captureState } = this._build(constraints);
+    const { solver, geometry, captureState } = this._build(constraints);
     const values = solver.validateLayout();
     captureState();
-    return values ? new Solution(values, shape) : null;
+    return values ? new Solution(values, geometry) : null;
   }
 
   /**
@@ -169,9 +169,9 @@ export class SimpleSolver {
  * Represents a single solution to a puzzle.
  */
 export class Solution {
-  constructor(values, shape) {
+  constructor(values, geometry) {
     this._values = values;
-    this._shape = shape;
+    this._geometry = geometry;
   }
 
   /**
@@ -181,7 +181,7 @@ export class Solution {
    * @returns {number} The value at the cell (1-9 for standard grid)
    */
   valueAt(cellIdOrRow, col) {
-    return this._values[cellIndex(this._shape, cellIdOrRow, col)];
+    return this._values[cellIndex(this._geometry, cellIdOrRow, col)];
   }
 
   /**
@@ -191,7 +191,7 @@ export class Solution {
   *[Symbol.iterator]() {
     for (let i = 0; i < this._values.length; i++) {
       yield {
-        cell: this._shape.makeCellIdFromIndex(i),
+        cell: this._geometry.makeCellIdFromIndex(i),
         value: this._values[i],
       };
     }
@@ -202,7 +202,7 @@ export class Solution {
    * @returns {string}
    */
   toString() {
-    return toShortSolution(this._values, this._shape);
+    return toShortSolution(this._values, this._geometry);
   }
 
   /**
@@ -228,12 +228,12 @@ export class Solution {
  * Represents true candidates (values appearing in valid solutions).
  */
 export class TrueCandidates {
-  constructor(counts, shape, limit, solutions) {
+  constructor(counts, geometry, limit, solutions) {
     this._counts = counts;
-    this._shape = shape;
+    this._geometry = geometry;
     this._limit = limit;
-    this._numValues = shape.numValues;
-    this._solutions = solutions.map(s => new Solution(s, shape));
+    this._numValues = geometry.numValues;
+    this._solutions = solutions.map(s => new Solution(s, geometry));
   }
 
   /**
@@ -251,7 +251,7 @@ export class TrueCandidates {
    * @returns {number[]} Array of candidate values (1-indexed)
    */
   valuesAt(cellIdOrRow, col) {
-    const idx = cellIndex(this._shape, cellIdOrRow, col);
+    const idx = cellIndex(this._geometry, cellIdOrRow, col);
     const baseIndex = idx * this._numValues;
     const values = [];
     for (let i = 0; i < this._numValues; i++) {
@@ -272,10 +272,10 @@ export class TrueCandidates {
   countAt(cellIdOrRow, colOrValue, value) {
     let idx, v;
     if (typeof cellIdOrRow === 'string') {
-      idx = cellIndex(this._shape, cellIdOrRow);
+      idx = cellIndex(this._geometry, cellIdOrRow);
       v = colOrValue;
     } else {
-      idx = cellIndex(this._shape, cellIdOrRow, colOrValue);
+      idx = cellIndex(this._geometry, cellIdOrRow, colOrValue);
       v = value;
     }
     const countIndex = idx * this._numValues + (v - 1);
@@ -287,14 +287,14 @@ export class TrueCandidates {
    * @yields {{ cell: string, value: number, count: number }}
    */
   *[Symbol.iterator]() {
-    const numCells = this._shape.numGridCells;
+    const numCells = this._geometry.numGridCells;
     for (let i = 0; i < numCells; i++) {
       const baseIndex = i * this._numValues;
       for (let v = 0; v < this._numValues; v++) {
         const count = this._counts[baseIndex + v];
         if (count > 0) {
           yield {
-            cell: this._shape.makeCellIdFromIndex(i),
+            cell: this._geometry.makeCellIdFromIndex(i),
             value: v + 1,
             count: Math.min(count, this._limit),
           };
@@ -308,9 +308,9 @@ export class TrueCandidates {
    * @returns {string}
    */
   toString() {
-    const numCells = this._shape.numGridCells;
-    const minValue = this._shape.minValue();
-    const maxValue = this._shape.maxValue();
+    const numCells = this._geometry.numGridCells;
+    const minValue = this._geometry.minValue();
+    const maxValue = this._geometry.maxValue();
     const chars = [];
     for (let i = 0; i < numCells; i++) {
       const baseIndex = i * this._numValues;
@@ -325,11 +325,11 @@ export class TrueCandidates {
 }
 
 // Convert cell reference to cell index.
-const cellIndex = (shape, cellIdOrRow, col) => {
+const cellIndex = (geometry, cellIdOrRow, col) => {
   if (typeof cellIdOrRow === 'string') {
-    return shape.parseCellId(cellIdOrRow).cell;
+    return geometry.parseCellId(cellIdOrRow).cell;
   }
   // Convert 1-indexed row/col to 0-indexed
-  return shape.cellIndex(cellIdOrRow - 1, col - 1);
+  return geometry.cellIndex(cellIdOrRow - 1, col - 1);
 }
 

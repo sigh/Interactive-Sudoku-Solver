@@ -281,18 +281,18 @@ const GENERATE_AND_TEST_FN = async () => {
   const TARGET_SUM = 6;
 
   const solver = await makeSolver();
-  const gridShape = CellGeometry.fromGridSize(GRID_SIZE);
+  const geometry = CellGeometry.fromGridSize(GRID_SIZE);
 
   // Get all little killer diagonals, plus corners as single-cell sums.
   // (Single cell little killers are handled by the LittleKiller constraint).
-  const cellMap = LittleKiller.cellMap(gridShape);
+  const cellMap = LittleKiller.cellMap(geometry);
   const corners = new Set([
     makeCellId(1, 1), makeCellId(1, GRID_SIZE),
     makeCellId(GRID_SIZE, 1), makeCellId(GRID_SIZE, GRID_SIZE),
   ]);
   const lkCells = [...Object.keys(cellMap), ...corners];
 
-  const fixedClues = [new Shape(gridShape.name)];
+  const fixedClues = [new Shape(geometry.name)];
   const searchClues = lkCells.map(
     cell => corners.has(cell)
       ? new Sum(TARGET_SUM, cell)
@@ -333,14 +333,14 @@ const GENERATE_AND_TEST_FN = async () => {
 
 const ROTATE_GRID_FN = () => {
   // Try to rotate the current puzzle 90° clockwise.
-  // Rotates the shape and constraint argument that looks like a cell.
+  // Rotates the geometry and constraint argument that looks like a cell.
 
   const constraints = currentConstraint();
-  const shape = currentCellGeometry();
+  const geometry = currentCellGeometry();
 
   const rotateCellId = (cellId) => {
     const { row, col } = parseCellId(cellId);
-    return makeCellId(col, shape.numRows + 1 - row);
+    return makeCellId(col, geometry.numRows + 1 - row);
   };
 
   const looksLikeCellId = (s) => /^R\d+C\d+$/.test(s);
@@ -372,9 +372,9 @@ const ROTATE_GRID_FN = () => {
     .filter(c => c.type !== 'Shape')
     .map(rotateConstraint);
 
-  const rotatedShape = CellGeometry.fromGridSize(shape.numCols, shape.numRows);
+  const rotatedGeometry = CellGeometry.fromGridSize(geometry.numCols, geometry.numRows);
 
-  return [new Shape(rotatedShape.name), ...rotatedConstraints];
+  return [new Shape(rotatedGeometry.name), ...rotatedConstraints];
 };
 
 export const DEFAULT_CODE = fnToCode(DEFAULT_CODE_FN);

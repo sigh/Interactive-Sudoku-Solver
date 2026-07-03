@@ -62,9 +62,11 @@ CELL IDENTIFIERS
 
 CELL GEOMETRY
 
+  The cell geometry is configured by the Shape and Var constraints.
+
     cellGeometry('6x6')  => CellGeometry (also accepts a Shape constraint, a
                             CellGeometry, or nothing for the default grid)
-    cellGraph('6x6')     => cell graph for the shape (same argument as cellGeometry()).
+    cellGraph('6x6')     => cell graph for the geometry (same argument as cellGeometry()).
                             Its methods all work in cell ids:
       .neighbours(cell)        orthogonally-adjacent in-grid cells
       .step(cell, dR, dC)      the cell (dR, dC) away, or null off-grid
@@ -107,7 +109,7 @@ SOLVER
 CURRENT CONSTRAINT
 
   currentConstraint()   - returns the current constraint in the UI.
-  currentCellGeometry() - returns the current shape in the UI.
+  currentCellGeometry() - returns the current geometry in the UI.
 
 HELP
 

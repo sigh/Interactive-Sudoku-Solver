@@ -121,16 +121,16 @@ const cellGeometry = (geometrySource) => {
   return spec ? CellGeometry.fromShapeSpec(spec) : CellGeometry.newDefault();
 };
 
-// A cell-id view over a shape's CellGraph. The underlying graph works in integer
-// indices; this exposes the sandbox-useful operations in 'RxCy' terms.
+// A cell-id view over a geometry's CellGraph. The underlying graph works in
+// integer indices; this exposes the sandbox-useful operations in 'RxCy' terms.
 class SandboxCellGraph {
-  constructor(gridShape) {
-    this._shape = gridShape;
-    this._graph = gridShape.cellGraph();
+  constructor(geometry) {
+    this._geometry = geometry;
+    this._graph = geometry.cellGraph();
   }
 
-  _index(cell) { return this._shape.parseCellId(cell).cell; }
-  _cell(index) { return index == null ? null : this._shape.makeCellIdFromIndex(index); }
+  _index(cell) { return this._geometry.parseCellId(cell).cell; }
+  _cell(index) { return index == null ? null : this._geometry.makeCellIdFromIndex(index); }
 
   // The orthogonally-adjacent in-grid cells.
   neighbours(cell) {
@@ -176,7 +176,7 @@ class SandboxCellGraph {
   }
 }
 
-// A SandboxCellGraph for a shape. The argument is passed through cellGeometry(), so
+// A SandboxCellGraph for a geometry. The argument is passed through cellGeometry(), so
 // it accepts a shape spec, Shape constraint, CellGeometry, or nothing for the default.
 const cellGraph = (geometryLike) => new SandboxCellGraph(cellGeometry(geometryLike));
 
