@@ -14,33 +14,33 @@ const { HandlerSet } = await import('../../../js/solver/engine.js' + self.VERSIO
 const { ChaosConstruction } = await import('../../../js/solver/chaos_handler.js' + self.VERSION_PARAM);
 
 const makeChaosShape = () => {
-  const shape = CellGeometry.fromGridSize(9);
-  shape.addVarCellsForConstraints([new SudokuConstraint.ChaosConstruction()]);
-  return shape;
+  const geometry = CellGeometry.fromGridSize(9);
+  geometry.addVarCellsForConstraints([new SudokuConstraint.ChaosConstruction()]);
+  return geometry;
 };
 
-const regionCellsFor = (shape, gridCells) => {
-  const regionCells = shape.varCellsForGroup('CC');
+const regionCellsFor = (geometry, gridCells) => {
+  const regionCells = geometry.varCellsForGroup('CC');
   return gridCells.map(c => regionCells[c]);
 };
 
 // Builds a handler set with a CountDistinct over the given counted cells, runs
 // the optimization, and returns the control cell's capped value list (or null if
 // no cap was added).
-const capForCountDistinct = (shape, controlCell, countedCells, { withChaos = true } = {}) => {
+const capForCountDistinct = (geometry, controlCell, countedCells, { withChaos = true } = {}) => {
   const handlers = [];
   if (withChaos) {
-    const regionCells = shape.varCellsForGroup('CC');
+    const regionCells = geometry.varCellsForGroup('CC');
     handlers.push(new ChaosConstruction(
-      shape.numGridCells, regionCells[0], shape.numValues));
+      geometry.numGridCells, regionCells[0], geometry.numValues));
   }
   const countHandler = new HandlerModule.CountDistinct(controlCell, countedCells);
   handlers.push(countHandler);
 
-  const handlerSet = new HandlerSet(handlers, shape.totalCells());
+  const handlerSet = new HandlerSet(handlers, geometry.totalCells());
   const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
   optimizer._optimizeChaosConstruction(
-    handlerSet, shape, (1 << shape.numValues) - 1);
+    handlerSet, geometry, (1 << geometry.numValues) - 1);
 
   const givens = handlerSet.getAllofType(HandlerModule.GivenCandidates);
   if (givens.length === 0) return null;
@@ -52,51 +52,51 @@ const capForCountDistinct = (shape, controlCell, countedCells, { withChaos = tru
 // middle-left cell R5C1 is enclosed (no left neighbour, the other three are in
 // the set), so one coincidence is forced: at most 5 of the 6 labels are distinct.
 await runTest('caps the control of an enclosed region-cell blob', () => {
-  const shape = makeChaosShape();
+  const geometry = makeChaosShape();
   const blob = [27, 28, 36, 37, 45, 46];
-  const cap = capForCountDistinct(shape, 0, regionCellsFor(shape, blob));
+  const cap = capForCountDistinct(geometry, 0, regionCellsFor(geometry, blob));
   assert.deepEqual(cap, [1, 2, 3, 4, 5]);
 });
 
 // Two plus-shapes with disjoint closed neighbourhoods each have an enclosed
 // centre, forcing two cell-disjoint coincidences: at most 8 of the 10 distinct.
 await runTest('counts disjoint enclosed cells independently', () => {
-  const shape = makeChaosShape();
+  const geometry = makeChaosShape();
   const plusA = [20, 11, 29, 19, 21];   // centre R3C3
   const plusB = [60, 51, 69, 59, 61];   // centre R7C7
-  const cap = capForCountDistinct(shape, 0, regionCellsFor(shape, [...plusA, ...plusB]));
+  const cap = capForCountDistinct(geometry, 0, regionCellsFor(geometry, [...plusA, ...plusB]));
   assert.deepEqual(cap, [1, 2, 3, 4, 5, 6, 7, 8]);
 });
 
 // A whole row of region cells has no enclosed cell (the up/down neighbours are
 // outside the counted set), so nothing is forced.
 await runTest('does not cap a row of region cells', () => {
-  const shape = makeChaosShape();
+  const geometry = makeChaosShape();
   const row = [0, 1, 2, 3, 4, 5, 6, 7, 8];
-  assert.equal(capForCountDistinct(shape, 9, regionCellsFor(shape, row)), null);
+  assert.equal(capForCountDistinct(geometry, 9, regionCellsFor(geometry, row)), null);
 });
 
 // The deduction is region-specific: a value-lane counted set is left alone even
 // when it would be geometrically enclosed.
 await runTest('ignores value-lane counted cells', () => {
-  const shape = makeChaosShape();
+  const geometry = makeChaosShape();
   const blob = [27, 28, 36, 37, 45, 46];  // grid (value) cells, not CC cells
-  assert.equal(capForCountDistinct(shape, 0, blob), null);
+  assert.equal(capForCountDistinct(geometry, 0, blob), null);
 });
 
 // Without a ChaosConstruction handler the adjacency fact does not hold.
 await runTest('does nothing without Chaos Construction', () => {
-  const shape = makeChaosShape();
+  const geometry = makeChaosShape();
   const blob = [27, 28, 36, 37, 45, 46];
   const cap = capForCountDistinct(
-    shape, 0, regionCellsFor(shape, blob), { withChaos: false });
+    geometry, 0, regionCellsFor(geometry, blob), { withChaos: false });
   assert.equal(cap, null);
 });
 
 // A cap of numValues or more would not tighten the handler's own bound, so no
 // given is added even though a cell is enclosed.
 await runTest('skips caps that do not tighten the handler', () => {
-  const shape = makeChaosShape();
+  const geometry = makeChaosShape();
   // A single enclosed cell (the plus centred at R2C2) among 11 counted cells:
   // 11 - 1 = 10 >= numValues (9), so capping the count would not tighten anything.
   const cells = [
@@ -104,7 +104,7 @@ await runTest('skips caps that do not tighten the handler', () => {
     4, 5, 6, 7, 8, 13,          // padding cells, none enclosed
   ];
   // Sanity: the centre (10) is the only enclosed cell here.
-  assert.equal(capForCountDistinct(shape, 0, regionCellsFor(shape, cells)), null);
+  assert.equal(capForCountDistinct(geometry, 0, regionCellsFor(geometry, cells)), null);
 });
 
 logSuiteComplete();

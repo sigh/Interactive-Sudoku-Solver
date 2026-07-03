@@ -122,7 +122,7 @@ class HistoryHandler {
 
 export class SolutionController {
   constructor(constraintManager, displayContainer, bottomDrawer) {
-    this._shape = null;
+    this._geometry = null;
     this._searchComplete = false;
 
     this._displayContainer = displayContainer;
@@ -244,10 +244,10 @@ export class SolutionController {
     this._update();
   }
 
-  reshape(shape) {
+  reshape(geometry) {
     // Terminate any running solvers ASAP, so they are less
     // likely to cause problems sending stale data.
-    this._shape = shape;
+    this._geometry = geometry;
     this._solverRunner.abort();
   }
 
@@ -367,7 +367,7 @@ export class SolutionController {
       const target = clickInterceptor.cellAt(e.offsetX, e.offsetY);
       if (target === null) return;
 
-      const cellIndex = this._shape.parseCellId(target).cell;
+      const cellIndex = this._geometry.parseCellId(target).cell;
       this._solverRunner.handleAltClick(cellIndex);
       e.preventDefault();
     });
@@ -613,7 +613,7 @@ export class SolutionController {
 
   _downloadSolutionFile(solutions) {
     // Create the object URL.
-    const text = solutions.map(s => toShortSolution(s, this._shape)).join('\n');
+    const text = solutions.map(s => toShortSolution(s, this._geometry)).join('\n');
     const blob = new Blob([text], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
 

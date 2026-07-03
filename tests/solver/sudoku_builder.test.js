@@ -16,10 +16,10 @@ const SumHandlerModule = await import('../../js/solver/sum_handler.js');
 // ============================================================================
 
 const buildHandlers = (constraint) => {
-  const shape = constraint.getShape();
+  const geometry = constraint.getShape();
   const constraintMap = constraint.toMap();
-  shape.addVarCellsForConstraints([].concat(...constraintMap.values()));
-  return [...SudokuBuilder._handlers(constraintMap, shape)];
+  geometry.addVarCellsForConstraints([].concat(...constraintMap.values()));
+  return [...SudokuBuilder._handlers(constraintMap, geometry)];
 };
 
 const handlerTypes = (handlers) => handlers.map(h => h.constructor.name);
@@ -337,10 +337,10 @@ await runTest('ChaosConstruction produces handler, extra cells, and box handlers
     new SudokuConstraint.ChaosConstruction(),
   ]);
 
-  const shape = constraint.getShape();
-  shape.addVarCellsForConstraints([new SudokuConstraint.ChaosConstruction()]);
-  assert.equal(shape.totalCells(), 32);
-  assert.equal(shape.varCellsForGroup('CC').length, 16);
+  const geometry = constraint.getShape();
+  geometry.addVarCellsForConstraints([new SudokuConstraint.ChaosConstruction()]);
+  assert.equal(geometry.totalCells(), 32);
+  assert.equal(geometry.varCellsForGroup('CC').length, 16);
 
   const handlers = buildHandlers(constraint);
   assert.ok(hasHandler(handlers, 'ChaosConstruction'));
@@ -576,9 +576,9 @@ const givenCells = (handlers) => {
 };
 
 await runTest('Replicate with no child constraints yields no extra handlers', () => {
-  const shape = new SudokuConstraint.Container([]).getShape();
+  const geometry = new SudokuConstraint.Container([]).getShape();
   const bitset = SudokuConstraint.Replicate.encodeTargetCells(
-    ['R1C1', 'R1C2'], 'R1C1', shape);
+    ['R1C1', 'R1C2'], 'R1C1', geometry);
   const constraint = new SudokuConstraint.Container([
     new SudokuConstraint.Replicate([], bitset),
   ]);
@@ -595,9 +595,9 @@ await runTest('Replicate with empty target bitset yields no extra handlers', () 
 await runTest('Replicate shifts multiple child constraints to each target', () => {
   // Template: Given R1C1=5, R1C2=3 at origin R1C1.
   // Targets R1C1 and R2C1 shift the pair to rows 1 and 2.
-  const shape = new SudokuConstraint.Container([]).getShape();
+  const geometry = new SudokuConstraint.Container([]).getShape();
   const bitset = SudokuConstraint.Replicate.encodeTargetCells(
-    ['R1C1', 'R2C1'], 'R1C1', shape);
+    ['R1C1', 'R2C1'], 'R1C1', geometry);
   const constraint = new SudokuConstraint.Container([
     new SudokuConstraint.Replicate([
       new SudokuConstraint.Given('R1C1', 5),
@@ -614,8 +614,8 @@ await runTest('Replicate shifts multiple child constraints to each target', () =
 
 await runTest('Replicate throws when shifted cell is out of bounds', () => {
   // Origin R1C1, target R8C8 (+7,+7). Child at R3C3 (+2,+2) → R10C10 out of bounds.
-  const shape = new SudokuConstraint.Container([]).getShape();
-  const bitset = SudokuConstraint.Replicate.encodeTargetCells(['R8C8'], 'R1C1', shape);
+  const geometry = new SudokuConstraint.Container([]).getShape();
+  const bitset = SudokuConstraint.Replicate.encodeTargetCells(['R8C8'], 'R1C1', geometry);
   const constraint = new SudokuConstraint.Container([
     new SudokuConstraint.Replicate([new SudokuConstraint.Given('R3C3', 5)], bitset),
   ]);
@@ -640,8 +640,8 @@ await runTest('Replicate throws when a target is in a different subgraph', () =>
 
 await runTest('Replicate throws when a child constraint cell is in a different subgraph', () => {
   // Origin and target are grid cells, but the child Given references a var cell.
-  const shape = new SudokuConstraint.Container([]).getShape();
-  const bitset = SudokuConstraint.Replicate.encodeTargetCells(['R1C2'], 'R1C1', shape);
+  const geometry = new SudokuConstraint.Container([]).getShape();
+  const bitset = SudokuConstraint.Replicate.encodeTargetCells(['R1C2'], 'R1C1', geometry);
   const constraint = new SudokuConstraint.Container([
     new SudokuConstraint.Var('X', 'X', 2),
     new SudokuConstraint.Replicate([new SudokuConstraint.Given('VX1', 5)], bitset),

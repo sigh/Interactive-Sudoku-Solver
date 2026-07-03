@@ -20,17 +20,17 @@ const createExclusions = (numCells) => createCellExclusions({ allUnique: false, 
 
 await runTest('_optimizeTaxicab: creates region handler for grid-house sized PerfectAllDifferent', () => {
   const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
-  const shape = CellGeometry.fromGridSize(9);
-  const numCells = shape.numGridCells;
+  const geometry = CellGeometry.fromGridSize(9);
+  const numCells = geometry.numGridCells;
 
   const houseCells = Array.from({ length: 9 }, (_, i) => i);
   const houseHandler = new HandlerModule.PerfectAllDifferent(houseCells);
-  const taxicabHandler = createTaxicabHandler(0, shape.numValues);
+  const taxicabHandler = createTaxicabHandler(0, geometry.numValues);
 
   const handlerSet = new HandlerSet(
     [houseHandler, taxicabHandler], numCells);
 
-  optimizer._optimizeTaxicab(handlerSet, createExclusions(numCells), shape);
+  optimizer._optimizeTaxicab(handlerSet, createExclusions(numCells), geometry);
 
   const regionHandlers = handlerSet.getAllofType(
     HandlerModule.ValueDependentUniqueValueExclusionForPerfectAllDifferent);
@@ -40,8 +40,8 @@ await runTest('_optimizeTaxicab: creates region handler for grid-house sized Per
 
 await runTest('_optimizeTaxicab: no-op when no taxicab handlers are present', () => {
   const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
-  const shape = CellGeometry.fromGridSize(9);
-  const numCells = shape.numGridCells;
+  const geometry = CellGeometry.fromGridSize(9);
+  const numCells = geometry.numGridCells;
 
   const houseCells = Array.from({ length: 9 }, (_, i) => i);
   const houseHandler = new HandlerModule.PerfectAllDifferent(houseCells);
@@ -50,7 +50,7 @@ await runTest('_optimizeTaxicab: no-op when no taxicab handlers are present', ()
   const handlerSet = new HandlerSet(
     [houseHandler, padHandler], numCells);
 
-  optimizer._optimizeTaxicab(handlerSet, createExclusions(numCells), shape);
+  optimizer._optimizeTaxicab(handlerSet, createExclusions(numCells), geometry);
 
   const regionHandlers = handlerSet.getAllofType(
     HandlerModule.ValueDependentUniqueValueExclusionForPerfectAllDifferent);
@@ -59,17 +59,17 @@ await runTest('_optimizeTaxicab: no-op when no taxicab handlers are present', ()
 
 await runTest('_optimizeTaxicab: ignores plain AllDifferent handlers', () => {
   const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
-  const shape = CellGeometry.fromGridSize(9);
-  const numCells = shape.numGridCells;
+  const geometry = CellGeometry.fromGridSize(9);
+  const numCells = geometry.numGridCells;
 
   // _optimizeTaxicab should only target PerfectAllDifferent handlers.
   const allDifferent = new HandlerModule.AllDifferent([0, 1, 2, 3]);
-  const taxicabHandler = createTaxicabHandler(0, shape.numValues);
+  const taxicabHandler = createTaxicabHandler(0, geometry.numValues);
 
   const handlerSet = new HandlerSet(
     [allDifferent, taxicabHandler], numCells);
 
-  optimizer._optimizeTaxicab(handlerSet, createExclusions(numCells), shape);
+  optimizer._optimizeTaxicab(handlerSet, createExclusions(numCells), geometry);
 
   const regionHandlers = handlerSet.getAllofType(
     HandlerModule.ValueDependentUniqueValueExclusionForPerfectAllDifferent);
@@ -78,18 +78,18 @@ await runTest('_optimizeTaxicab: ignores plain AllDifferent handlers', () => {
 
 await runTest('_optimizeTaxicab: creates region handler for PerfectAllDifferent', () => {
   const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
-  const shape = CellGeometry.fromGridSize(9);
-  const numCells = shape.numGridCells;
+  const geometry = CellGeometry.fromGridSize(9);
+  const numCells = geometry.numGridCells;
 
   const padCells = [0, 1, 2, 3];
   const valueMask = 0b1111;
   const padHandler = new HandlerModule.PerfectAllDifferent(padCells, valueMask);
-  const taxicabHandler = createTaxicabHandler(0, shape.numValues);
+  const taxicabHandler = createTaxicabHandler(0, geometry.numValues);
 
   const handlerSet = new HandlerSet(
     [padHandler, taxicabHandler], numCells);
 
-  optimizer._optimizeTaxicab(handlerSet, createExclusions(numCells), shape);
+  optimizer._optimizeTaxicab(handlerSet, createExclusions(numCells), geometry);
 
   const regionHandlers = handlerSet.getAllofType(
     HandlerModule.ValueDependentUniqueValueExclusionForPerfectAllDifferent);
@@ -99,8 +99,8 @@ await runTest('_optimizeTaxicab: creates region handler for PerfectAllDifferent'
 
 await runTest('_optimizeTaxicab: creates region handlers for mixed PerfectAllDifferent sizes', () => {
   const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
-  const shape = CellGeometry.fromGridSize(9);
-  const numCells = shape.numGridCells;
+  const geometry = CellGeometry.fromGridSize(9);
+  const numCells = geometry.numGridCells;
 
   const houseCells = Array.from({ length: 9 }, (_, i) => i);
   const houseHandler = new HandlerModule.PerfectAllDifferent(houseCells);
@@ -109,12 +109,12 @@ await runTest('_optimizeTaxicab: creates region handlers for mixed PerfectAllDif
   const valueMask = 0b1111;
   const padHandler = new HandlerModule.PerfectAllDifferent(padCells, valueMask);
 
-  const taxicabHandler = createTaxicabHandler(0, shape.numValues);
+  const taxicabHandler = createTaxicabHandler(0, geometry.numValues);
 
   const handlerSet = new HandlerSet(
     [houseHandler, padHandler, taxicabHandler], numCells);
 
-  optimizer._optimizeTaxicab(handlerSet, createExclusions(numCells), shape);
+  optimizer._optimizeTaxicab(handlerSet, createExclusions(numCells), geometry);
 
   const regionHandlers = handlerSet.getAllofType(
     HandlerModule.ValueDependentUniqueValueExclusionForPerfectAllDifferent);
@@ -131,17 +131,17 @@ await runTest('_optimizeTaxicab: creates region handlers for mixed PerfectAllDif
 
 await runTest('_optimizeTaxicab: PerfectAllDifferent region handler propagates removals', () => {
   const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
-  const shape = CellGeometry.fromGridSize(9);
-  const numCells = shape.numGridCells;
+  const geometry = CellGeometry.fromGridSize(9);
+  const numCells = geometry.numGridCells;
 
   const padCells = [0, 1, 2, 3];
   const valueMask = 0b1111;
   const padHandler = new HandlerModule.PerfectAllDifferent(padCells, valueMask);
 
   // For value 1, make both cells 0 and 1 exclude cell 20.
-  const valueMap0 = Array.from({ length: shape.numValues }, () => []);
+  const valueMap0 = Array.from({ length: geometry.numValues }, () => []);
   valueMap0[0] = [20];
-  const valueMap1 = Array.from({ length: shape.numValues }, () => []);
+  const valueMap1 = Array.from({ length: geometry.numValues }, () => []);
   valueMap1[0] = [20];
 
   const taxicab0 = new HandlerModule.ValueDependentUniqueValueExclusion(0, valueMap0);
@@ -150,13 +150,13 @@ await runTest('_optimizeTaxicab: PerfectAllDifferent region handler propagates r
   const handlerSet = new HandlerSet(
     [padHandler, taxicab0, taxicab1], numCells);
 
-  optimizer._optimizeTaxicab(handlerSet, createExclusions(numCells), shape);
+  optimizer._optimizeTaxicab(handlerSet, createExclusions(numCells), geometry);
 
   const regionHandlers = handlerSet.getAllofType(
     HandlerModule.ValueDependentUniqueValueExclusionForPerfectAllDifferent);
   assert.equal(regionHandlers.length, 1);
 
-  const allValues = LookupTables.allValues(shape.numValues);
+  const allValues = LookupTables.allValues(geometry.numValues);
   const v1 = 1 << 0;
   const v2 = 1 << 1;
   const v3 = 1 << 2;
@@ -181,29 +181,29 @@ await runTest('_optimizeTaxicab: PerfectAllDifferent region handler propagates r
 
 await runTest('_optimizeTaxicab: propagation works for non-1 values', () => {
   const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
-  const shape = CellGeometry.fromGridSize(9);
-  const numCells = shape.numGridCells;
+  const geometry = CellGeometry.fromGridSize(9);
+  const numCells = geometry.numGridCells;
 
   const padCells = [0, 1, 2, 3];
   const padHandler = new HandlerModule.PerfectAllDifferent(padCells, 0b1111);
 
   // For value 3 (index 2), make both cells 0 and 1 exclude cell 21.
-  const valueMap0 = Array.from({ length: shape.numValues }, () => []);
+  const valueMap0 = Array.from({ length: geometry.numValues }, () => []);
   valueMap0[2] = [21];
-  const valueMap1 = Array.from({ length: shape.numValues }, () => []);
+  const valueMap1 = Array.from({ length: geometry.numValues }, () => []);
   valueMap1[2] = [21];
   const taxicab0 = new HandlerModule.ValueDependentUniqueValueExclusion(0, valueMap0);
   const taxicab1 = new HandlerModule.ValueDependentUniqueValueExclusion(1, valueMap1);
 
   const handlerSet = new HandlerSet(
     [padHandler, taxicab0, taxicab1], numCells);
-  optimizer._optimizeTaxicab(handlerSet, createExclusions(numCells), shape);
+  optimizer._optimizeTaxicab(handlerSet, createExclusions(numCells), geometry);
 
   const regionHandler = handlerSet.getAllofType(
     HandlerModule.ValueDependentUniqueValueExclusionForPerfectAllDifferent)[0];
   assert.ok(regionHandler);
 
-  const allValues = LookupTables.allValues(shape.numValues);
+  const allValues = LookupTables.allValues(geometry.numValues);
   const v1 = 1 << 0;
   const v2 = 1 << 1;
   const v3 = 1 << 2;
@@ -227,24 +227,24 @@ await runTest('_optimizeTaxicab: propagation works for non-1 values', () => {
 
 await runTest('_optimizeTaxicab: does not modify grid when no value appears exactly twice', () => {
   const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
-  const shape = CellGeometry.fromGridSize(9);
-  const numCells = shape.numGridCells;
+  const geometry = CellGeometry.fromGridSize(9);
+  const numCells = geometry.numGridCells;
 
   const padCells = [0, 1, 2, 3];
   const padHandler = new HandlerModule.PerfectAllDifferent(padCells, 0b1111);
 
-  const valueMap = Array.from({ length: shape.numValues }, () => []);
+  const valueMap = Array.from({ length: geometry.numValues }, () => []);
   valueMap[0] = [20];
   const taxicab = new HandlerModule.ValueDependentUniqueValueExclusion(0, valueMap);
 
   const handlerSet = new HandlerSet([padHandler, taxicab], numCells);
-  optimizer._optimizeTaxicab(handlerSet, createExclusions(numCells), shape);
+  optimizer._optimizeTaxicab(handlerSet, createExclusions(numCells), geometry);
 
   const regionHandler = handlerSet.getAllofType(
     HandlerModule.ValueDependentUniqueValueExclusionForPerfectAllDifferent)[0];
   assert.ok(regionHandler);
 
-  const allValues = LookupTables.allValues(shape.numValues);
+  const allValues = LookupTables.allValues(geometry.numValues);
   const v1 = 1 << 0;
   const v2 = 1 << 1;
   const v3 = 1 << 2;

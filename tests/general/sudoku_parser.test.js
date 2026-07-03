@@ -34,8 +34,8 @@ const hasConstraintType = (constraint, type) => {
 
 // Assert the parsed result has a Shape with the expected shapeSpec.
 const assertShape = (result, expectedSpec) => {
-  const shape = findConstraint(result, 'Shape');
-  assert.equal(shape.shapeSpec, expectedSpec);
+  const geometry = findConstraint(result, 'Shape');
+  assert.equal(geometry.shapeSpec, expectedSpec);
 };
 
 // Assert the number of constraints of a given type.
@@ -632,11 +632,11 @@ await runTest('toShortSolution should convert 9x9 solution', () => {
 });
 
 await runTest('toShortSolution should convert 16x16 solution', () => {
-  const shape = CellGeometry.fromGridSize(16);
+  const geometry = CellGeometry.fromGridSize(16);
   const solution = Array(256).fill(1);
   solution[0] = 16;
   solution[1] = 10;
-  const result = toShortSolution(solution, shape);
+  const result = toShortSolution(solution, geometry);
 
   assert.equal(result.length, 256);
   // 16x16 uses A-P: 1=A, 2=B, ..., 10=J, ..., 16=P
@@ -645,36 +645,36 @@ await runTest('toShortSolution should convert 16x16 solution', () => {
 });
 
 await runTest('toShortSolution should convert 6x6 solution', () => {
-  const shape = CellGeometry.fromGridSize(6);
+  const geometry = CellGeometry.fromGridSize(6);
   const solution = [1, 2, 3, 4, 5, 6, ...Array(30).fill(1)];
-  const result = toShortSolution(solution, shape);
+  const result = toShortSolution(solution, geometry);
 
   assert.equal(result.length, 36);
   assert.equal(result.slice(0, 6), '123456');
 });
 
 await runTest('toShortSolution should use digits for zero-based values less than 10', () => {
-  const shape = CellGeometry.fromShapeSpec('9x9~0-8');
+  const geometry = CellGeometry.fromShapeSpec('9x9~0-8');
   const solution = [0, 1, 2, 3, 4, 5, 6, 7, 8, ...Array(72).fill(0)];
-  const result = toShortSolution(solution, shape);
+  const result = toShortSolution(solution, geometry);
 
   assert.equal(result.length, 81);
   assert.equal(result.slice(0, 9), '012345678');
 });
 
 await runTest('toShortSolution should use digits when extended range values are less than 10', () => {
-  const shape = CellGeometry.fromShapeSpec('9x9~0-10');
+  const geometry = CellGeometry.fromShapeSpec('9x9~0-10');
   const solution = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, ...Array(71).fill(0)];
-  const result = toShortSolution(solution, shape);
+  const result = toShortSolution(solution, geometry);
 
   assert.equal(result.length, 81);
   assert.equal(result.slice(0, 10), '0123456789');
 });
 
 await runTest('toShortSolution should map 0 to 0 when extended values use letters', () => {
-  const shape = CellGeometry.fromShapeSpec('9x9~0-10');
+  const geometry = CellGeometry.fromShapeSpec('9x9~0-10');
   const solution = [0, 1, 10, ...Array(78).fill(0)];
-  const result = toShortSolution(solution, shape);
+  const result = toShortSolution(solution, geometry);
 
   assert.equal(result.length, 81);
   assert.equal(result.slice(0, 3), '0AJ');

@@ -189,7 +189,7 @@ export class LazyDrawerManager {
     this._loadingElement = container.querySelector('.loading-notice');
     this._bodyElement = container.querySelector('.lazy-body');
 
-    this._shape = null;
+    this._geometry = null;
     this._enabled = false;
     this._real = null;
     this._realPromise = null;
@@ -244,7 +244,7 @@ export class LazyDrawerManager {
         const module = await import(this._modulePath + self.VERSION_PARAM);
         const real = this._factory(module, this._bodyElement);
 
-        if (this._shape) real.reshape(this._shape);
+        if (this._geometry) real.reshape(this._geometry);
         real.setEnabled(this._enabled);
 
         this._real = real;
@@ -269,9 +269,9 @@ export class LazyDrawerManager {
     return this._ensureLoaded();
   }
 
-  reshape(shape) {
-    this._shape = shape;
-    this._real?.reshape(shape);
+  reshape(geometry) {
+    this._geometry = geometry;
+    this._real?.reshape(geometry);
   }
 
   clear() {

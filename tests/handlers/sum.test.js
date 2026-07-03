@@ -29,7 +29,7 @@ const initializeSum = (options = {}) => {
   } = options;
 
   const resolvedContext = context ?? new GridTestContext(
-    valueOffset != null ? { shape: CellGeometry.fromGridSize(9, 9, null, valueOffset) } : undefined);
+    valueOffset != null ? { geometry: CellGeometry.fromGridSize(9, 9, null, valueOffset) } : undefined);
 
   const cells = resolvedContext.cells(numCells);
   const handler = new Sum(cells, sum, coeffs);
@@ -42,10 +42,10 @@ const initializeSum = (options = {}) => {
 };
 
 await runTest('Sum priority can be computed before initialization', () => {
-  const shape = CellGeometry.fromGridSize(4);
+  const geometry = CellGeometry.fromGridSize(4);
   const handler = new Sum([0, 1, 2], 6);
 
-  assert.equal(handler.priority(shape), 5);
+  assert.equal(handler.priority(geometry), 5);
 });
 
 await runTest('Sum should force a unique combination once candidates align', () => {
@@ -147,7 +147,7 @@ await runTest('Sum should split a 16-cell exclusion group correctly', () => {
   // which must be split (MAX_GROUP_SIZE = 15). This exercises the path where
   // the last exclusion group is too large and must be spliced.
   const longContext = new GridTestContext({ gridSize: [2, 16] });
-  const numCells = longContext.shape.numGridCells;
+  const numCells = longContext.geometry.numGridCells;
   const { handler, context } = initializeSum({
     numCells: 16,
     sum: 136,
@@ -174,7 +174,7 @@ await runTest('Sum should split a 16-cell exclusion group correctly', () => {
 
 await runTest('Sum should split more than 16 singleton exclusion groups', () => {
   const longContext = new GridTestContext({ gridSize: [2, 16] });
-  const numCells = longContext.shape.numGridCells;
+  const numCells = longContext.geometry.numGridCells;
   const { handler, context } = initializeSum({
     numCells: 17,
     sum: 17,
@@ -347,7 +347,7 @@ await runTest('Sum constructor with no offset does not adjust sum', () => {
 });
 
 await runTest('Sum.makeEqual adjusts for valueOffset', () => {
-  const context = new GridTestContext({ shape: CellGeometry.fromGridSize(1, 6, null, -1) });
+  const context = new GridTestContext({ geometry: CellGeometry.fromGridSize(1, 6, null, -1) });
   // makeEqual with offset=-1: cells0=[0,1], cells1=[2].
   // sum=0, coeffs=[1,1,-1]. coeffSum = 1*2 + (-1)*1 = 1.
   // adjustment in initialize: sum -= (-1)*1 = 1. Internal sum becomes 1.
@@ -490,13 +490,13 @@ const narrowCageAt = (base) => {
   const numCells = base + 3;
   const cells = [base, base + 1, base + 2];
   const handler = new Sum(cells, 24);
-  const shape = CellGeometry.fromGridSize(9);
+  const geometry = CellGeometry.fromGridSize(9);
   const allValues = valueMask(1, 2, 3, 4, 5, 6, 7, 8, 9);
   const grid = new Array(numCells).fill(allValues);
   const noopState = { allocate: () => 0 };
   assert.equal(
     handler.initialize(
-      grid, createCellExclusions({ allUnique: true, numCells }), shape, noopState),
+      grid, createCellExclusions({ allUnique: true, numCells }), geometry, noopState),
     true, 'Sum should initialize');
   const acc = createAccumulator();
   assert.equal(handler.enforceConsistency(grid, acc), true);
@@ -518,12 +518,12 @@ await runTest('Sum over > 255 cells maps every cell to its exclusion group', () 
   const cells = Array.from({ length: numCells }, (_, i) => i);
   const handler = new Sum(cells, 260);   // min possible sum: forces every cell to 1.
 
-  const shape = CellGeometry.fromGridSize(9);
+  const geometry = CellGeometry.fromGridSize(9);
   const grid = new Array(numCells).fill(valueMask(1, 2, 3, 4, 5, 6, 7, 8, 9));
   const noopState = { allocate: () => 0 };
   assert.equal(
     handler.initialize(
-      grid, createCellExclusions({ allUnique: false, numCells }), shape, noopState),
+      grid, createCellExclusions({ allUnique: false, numCells }), geometry, noopState),
     true, 'Sum should initialize');
 
   // Every cell belongs to a unit-coeff group, so every within-handler position

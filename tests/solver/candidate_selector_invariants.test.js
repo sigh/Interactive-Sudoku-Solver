@@ -17,16 +17,16 @@ const makeDebugLogger = () => ({
 });
 
 const makeSelector = (context, { handlerSet = [] } = {}) => {
-  const { shape } = context;
-  const numSearchCells = shape.totalCells();
+  const { geometry } = context;
+  const numSearchCells = geometry.totalCells();
   const selector = new CandidateSelector(
-    shape,
+    geometry,
     numSearchCells,
     handlerSet,
     makeDebugLogger(),
   );
 
-  const conflictScores = new ConflictScores(new Array(numSearchCells).fill(0), shape.numValues);
+  const conflictScores = new ConflictScores(new Array(numSearchCells).fill(0), geometry.numValues);
   selector.reset(conflictScores);
   return { selector, conflictScores };
 };
@@ -41,7 +41,7 @@ const select = (selector, cellDepth, gridState, stepState, isNewNode) => {
 
 await runTest('CandidateSelector moves all singletons to the front when next cell is a singleton', () => {
   const context = new GridTestContext({ gridSize: 4 });
-  const { shape } = context;
+  const { geometry } = context;
   const allValues = context.lookupTables.allValues;
 
   const { selector } = makeSelector(context);
@@ -73,7 +73,7 @@ await runTest('CandidateSelector moves all singletons to the front when next cel
     const v = gridState[cellOrder[i]];
     assert.ok(v && ((v & (v - 1)) === 0), `Expected singleton at depth ${i}`);
   }
-  for (let i = nextDepth; i < shape.numGridCells; i++) {
+  for (let i = nextDepth; i < geometry.numGridCells; i++) {
     const v = gridState[cellOrder[i]];
     assert.ok((v & (v - 1)) !== 0, `Expected non-singleton at depth ${i}`);
   }
@@ -81,7 +81,7 @@ await runTest('CandidateSelector moves all singletons to the front when next cel
 
 await runTest('CandidateSelector signals a wipeout (count 0) when a 0 exists while bubbling singletons', () => {
   const context = new GridTestContext({ gridSize: 4 });
-  const { shape } = context;
+  const { geometry } = context;
   const allValues = context.lookupTables.allValues;
 
   const { selector } = makeSelector(context);
@@ -108,7 +108,7 @@ await runTest('CandidateSelector signals a wipeout (count 0) when a 0 exists whi
 
 await runTest('CandidateSelector consumes custom candidate state across backtracks (count reflects remaining custom options)', () => {
   const context = new GridTestContext({ gridSize: 4 });
-  const { shape } = context;
+  const { geometry } = context;
   const allValues = context.lookupTables.allValues;
   const nominatedValue = 1 << 0;
 
@@ -179,7 +179,7 @@ await runTest('CandidateSelector consumes custom candidate state across backtrac
 
 await runTest('CandidateSelector stepState override clears any pending custom-candidate state', () => {
   const context = new GridTestContext({ gridSize: 4 });
-  const { shape } = context;
+  const { geometry } = context;
   const allValues = context.lookupTables.allValues;
   const nominatedValue = 1 << 0;
 
@@ -241,17 +241,17 @@ await runTest('CandidateSelector stepState override clears any pending custom-ca
 
 await runTest('CandidateSelector boosts linked chaos cells whose counterpart is fixed', () => {
   const context = new GridTestContext({ gridSize: 4 });
-  const { shape } = context;
-  shape.addVarCellsForConstraints([new SudokuConstraint.ChaosConstruction()]);
-  const regionCells = shape.varCellsForGroup('CC');
-  const handlerSet = [new ChaosConstruction(shape.numGridCells, regionCells[0])];
+  const { geometry } = context;
+  geometry.addVarCellsForConstraints([new SudokuConstraint.ChaosConstruction()]);
+  const regionCells = geometry.varCellsForGroup('CC');
+  const handlerSet = [new ChaosConstruction(geometry.numGridCells, regionCells[0])];
   const allValues = context.lookupTables.allValues;
 
   {
     const { selector, conflictScores } = makeSelector(context, { handlerSet });
     conflictScores.scores[0] = 1;
 
-    const gridState = new Array(shape.totalCells()).fill(allValues);
+    const gridState = new Array(geometry.totalCells()).fill(allValues);
     gridState[1] = (1 << 0) | (1 << 1);
     gridState[regionCells[0]] = 1 << 0;
 
@@ -270,7 +270,7 @@ await runTest('CandidateSelector boosts linked chaos cells whose counterpart is 
     const { selector, conflictScores } = makeSelector(context, { handlerSet });
     conflictScores.scores[regionCells[0]] = 1;
 
-    const gridState = new Array(shape.totalCells()).fill(allValues);
+    const gridState = new Array(geometry.totalCells()).fill(allValues);
     gridState[0] = 1 << 0;
     gridState[1] = (1 << 0) | (1 << 1);
 
@@ -292,9 +292,9 @@ await runTest('CandidateSelector boosts linked chaos cells whose counterpart is 
 // select the wrong cell.
 await runTest('CandidateSelector selects singletons at cell indices > 255', () => {
   const numSearchCells = 300;
-  const { shape } = new GridTestContext({ gridSize: 16 });
-  const numValues = shape.numValues;
-  const selector = new CandidateSelector(shape, numSearchCells, [], makeDebugLogger());
+  const { geometry } = new GridTestContext({ gridSize: 16 });
+  const numValues = geometry.numValues;
+  const selector = new CandidateSelector(geometry, numSearchCells, [], makeDebugLogger());
   selector.reset(new ConflictScores(new Array(numSearchCells).fill(0), numValues));
 
   const allValues = (1 << numValues) - 1;

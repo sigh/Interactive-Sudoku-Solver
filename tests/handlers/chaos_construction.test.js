@@ -21,36 +21,36 @@ const {
   ChaosFixedValueRegionExclusion,
 } = await import('../../js/solver/chaos_handler.js');
 
-const makeChaosGrid = (shape) => {
+const makeChaosGrid = (geometry) => {
   const grid = new Uint16Array(
-    shape.totalCells() + shape.numGridCells * 2 + shape.numGridCells / shape.numValues);
-  grid.fill(LookupTables.get(shape.numValues).allValues, 0, shape.totalCells());
+    geometry.totalCells() + geometry.numGridCells * 2 + geometry.numGridCells / geometry.numValues);
+  grid.fill(LookupTables.get(geometry.numValues).allValues, 0, geometry.totalCells());
   return grid;
 };
 
 const makeChaosContext = (shapeSpec = '2x2', configureGrid = null) => {
-  const shape = CellGeometry.fromShapeSpec(shapeSpec);
+  const geometry = CellGeometry.fromShapeSpec(shapeSpec);
   const constraint = new SudokuConstraint.ChaosConstruction();
-  shape.addVarCellsForConstraints([constraint]);
+  geometry.addVarCellsForConstraints([constraint]);
 
-  const grid = makeChaosGrid(shape);
+  const grid = makeChaosGrid(geometry);
 
-  const regionCells = shape.varCellsForGroup('CC');
-  const gridCells = Uint8Array.from({ length: shape.numGridCells }, (_, i) => i);
+  const regionCells = geometry.varCellsForGroup('CC');
+  const gridCells = Uint8Array.from({ length: geometry.numGridCells }, (_, i) => i);
   const regionCellOffset = regionCells[0];
-  const handler = new ChaosConstruction(shape.numGridCells, regionCellOffset, shape.numValues);
-  configureGrid?.({ shape, grid, regionCells, handler });
+  const handler = new ChaosConstruction(geometry.numGridCells, regionCellOffset, geometry.numValues);
+  configureGrid?.({ geometry, grid, regionCells, handler });
   const cellExclusions = createCellExclusions({
     allUnique: false,
-    numCells: shape.totalCells(),
+    numCells: geometry.totalCells(),
   });
 
-  handler.selectPriorityAnchorCells(shape, new Int32Array(shape.totalCells()));
-  const stateAllocator = createStateAllocator(grid, shape.totalCells());
+  handler.selectPriorityAnchorCells(geometry, new Int32Array(geometry.totalCells()));
+  const stateAllocator = createStateAllocator(grid, geometry.totalCells());
   const initialized = handler.initialize(
-    grid, cellExclusions, shape, stateAllocator);
+    grid, cellExclusions, geometry, stateAllocator);
   return {
-    shape, grid, gridCells, regionCells, regionCellOffset, handler,
+    geometry, grid, gridCells, regionCells, regionCellOffset, handler,
     cellExclusions, stateAllocator, initialized,
   };
 };
@@ -66,7 +66,7 @@ const makeShardArrow = (context, controlCell, regionRunArms) => {
   const handler = new ChaosArrow(controlCell, regionArms, regionRunArms, 0);
   handler.attachRegionShardState(context.handler.regionShardState());
   assert.equal(handler.initialize(
-    context.grid, context.cellExclusions, context.shape, context.stateAllocator), true);
+    context.grid, context.cellExclusions, context.geometry, context.stateAllocator), true);
   return handler;
 };
 
@@ -79,7 +79,7 @@ const makeShardCount = (context, controlCell, runCells) => {
   const handler = new ChaosCount(controlCell, regionCells, runCells, 0);
   handler.attachRegionShardState(context.handler.regionShardState());
   assert.equal(handler.initialize(
-    context.grid, context.cellExclusions, context.shape, context.stateAllocator), true);
+    context.grid, context.cellExclusions, context.geometry, context.stateAllocator), true);
   return handler;
 };
 
@@ -87,13 +87,13 @@ const enforceShardCount = (countHandler, context) => {
   assert.equal(countHandler.enforceConsistency(context.grid, createAccumulator()), true);
 };
 
-const makeChaosCount = (shape, controlCell, regionCells, grid) => {
-  const regionOffset = shape.varCellsForGroup('CC')[0];
+const makeChaosCount = (geometry, controlCell, regionCells, grid) => {
+  const regionOffset = geometry.varCellsForGroup('CC')[0];
   const runCells = regionCells.map(c => c - regionOffset);
   const handler = new ChaosCount(controlCell, regionCells, runCells, 0);
-  const cellExclusions = createCellExclusions({ allUnique: false, numCells: shape.totalCells() });
-  const stateAllocator = createStateAllocator(grid, shape.totalCells());
-  assert.equal(handler.initialize(grid, cellExclusions, shape, stateAllocator), true);
+  const cellExclusions = createCellExclusions({ allUnique: false, numCells: geometry.totalCells() });
+  const stateAllocator = createStateAllocator(grid, geometry.totalCells());
+  assert.equal(handler.initialize(grid, cellExclusions, geometry, stateAllocator), true);
   return handler;
 };
 
@@ -103,13 +103,13 @@ const regionShardParent = (handler, grid, cell) => grid[handler._regionShardOffs
 const possibleRegionCount = (handler, region) => handler._regions.scanData[region] & 0x1ff;
 const fixedRegionCount = (handler, region) => (handler._regions.scanData[region] >>> 9) & 0x1f;
 
-const fullChaosGridIsValid = (shape, values, regions) => {
-  const allValues = LookupTables.get(shape.numValues).allValues;
-  const numRegions = shape.numGridCells / shape.numValues;
+const fullChaosGridIsValid = (geometry, values, regions) => {
+  const allValues = LookupTables.get(geometry.numValues).allValues;
+  const numRegions = geometry.numGridCells / geometry.numValues;
   const regionMask = (1 << numRegions) - 1;
   let previousSeen = 1;
 
-  for (let cell = 0; cell < shape.numGridCells; cell++) {
+  for (let cell = 0; cell < geometry.numGridCells; cell++) {
     const allowed = (previousSeen | (previousSeen << 1)) & regionMask;
     if (!(regions[cell] & allowed)) return false;
     previousSeen |= regions[cell];
@@ -120,28 +120,28 @@ const fullChaosGridIsValid = (shape, values, regions) => {
     const regionBit = 1 << region;
     const cells = [];
     let valuesSeen = 0;
-    for (let cell = 0; cell < shape.numGridCells; cell++) {
+    for (let cell = 0; cell < geometry.numGridCells; cell++) {
       if (regions[cell] !== regionBit) continue;
       if (valuesSeen & values[cell]) return false;
       valuesSeen |= values[cell];
       cells.push(cell);
     }
-    if (cells.length !== shape.numValues || valuesSeen !== allValues) return false;
+    if (cells.length !== geometry.numValues || valuesSeen !== allValues) return false;
 
     const seen = new Set([cells[0]]);
     const queue = [cells[0]];
     for (let i = 0; i < queue.length; i++) {
       const cell = queue[i];
-      const row = cell / shape.numCols | 0;
-      const col = cell % shape.numCols;
+      const row = cell / geometry.numCols | 0;
+      const col = cell % geometry.numCols;
       for (const [dr, dc] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) {
         const nextRow = row + dr;
         const nextCol = col + dc;
         if (nextRow < 0 || nextCol < 0
-          || nextRow >= shape.numRows || nextCol >= shape.numCols) {
+          || nextRow >= geometry.numRows || nextCol >= geometry.numCols) {
           continue;
         }
-        const next = nextRow * shape.numCols + nextCol;
+        const next = nextRow * geometry.numCols + nextCol;
         if (regions[next] !== regionBit || seen.has(next)) continue;
         seen.add(next);
         queue.push(next);
@@ -153,13 +153,13 @@ const fullChaosGridIsValid = (shape, values, regions) => {
   return true;
 };
 
-const partialChaosGridHasCompletion = (shape, partialValues, partialRegions) => {
-  const values = new Array(shape.numGridCells);
-  const regions = new Array(shape.numGridCells);
+const partialChaosGridHasCompletion = (geometry, partialValues, partialRegions) => {
+  const values = new Array(geometry.numGridCells);
+  const regions = new Array(geometry.numGridCells);
 
   const assignRegions = (cell) => {
-    if (cell === shape.numGridCells) return fullChaosGridIsValid(shape, values, regions);
-    const numRegions = shape.numGridCells / shape.numValues;
+    if (cell === geometry.numGridCells) return fullChaosGridIsValid(geometry, values, regions);
+    const numRegions = geometry.numGridCells / geometry.numValues;
     for (let region = 0; region < numRegions; region++) {
       const regionBit = 1 << region;
       if (!(partialRegions[cell] & regionBit)) continue;
@@ -170,8 +170,8 @@ const partialChaosGridHasCompletion = (shape, partialValues, partialRegions) => 
   };
 
   const assignValues = (cell) => {
-    if (cell === shape.numGridCells) return assignRegions(0);
-    for (let valueIndex = 0; valueIndex < shape.numValues; valueIndex++) {
+    if (cell === geometry.numGridCells) return assignRegions(0);
+    for (let valueIndex = 0; valueIndex < geometry.numValues; valueIndex++) {
       const value = 1 << valueIndex;
       if (!(partialValues[cell] & value)) continue;
       values[cell] = value;
@@ -184,55 +184,55 @@ const partialChaosGridHasCompletion = (shape, partialValues, partialRegions) => 
 };
 
 await runTest('ChaosConstruction defines one visible region cell per grid cell', () => {
-  const shape = CellGeometry.fromGridSize(4);
+  const geometry = CellGeometry.fromGridSize(4);
   const constraint = new SudokuConstraint.ChaosConstruction();
-  assert.deepEqual(constraint.getVarCellGroups(shape), [{
+  assert.deepEqual(constraint.getVarCellGroups(geometry), [{
     prefix: 'CC',
     label: 'Chaos regions',
     count: 16,
     columns: 4,
   }]);
 
-  shape.addVarCellsForConstraints([constraint]);
-  assert.equal(shape.totalCells(), 32);
-  assert.deepEqual(shape.varCellsForGroup('CC').slice(0, 4), [16, 17, 18, 19]);
+  geometry.addVarCellsForConstraints([constraint]);
+  assert.equal(geometry.totalCells(), 32);
+  assert.deepEqual(geometry.varCellsForGroup('CC').slice(0, 4), [16, 17, 18, 19]);
 });
 
 await runTest('ChaosConstruction accepts non-square grids', () => {
   // 2x3 has regionSize=3 (max), numRegions=2 — valid.
-  const shape = CellGeometry.fromShapeSpec('2x3');
+  const geometry = CellGeometry.fromShapeSpec('2x3');
   const constraint = new SudokuConstraint.ChaosConstruction();
-  shape.addVarCellsForConstraints([constraint]);
+  geometry.addVarCellsForConstraints([constraint]);
 
-  const grid = makeChaosGrid(shape);
-  const regionCells = shape.varCellsForGroup('CC');
-  const handler = new ChaosConstruction(shape.numGridCells, regionCells[0], shape.numValues);
+  const grid = makeChaosGrid(geometry);
+  const regionCells = geometry.varCellsForGroup('CC');
+  const handler = new ChaosConstruction(geometry.numGridCells, regionCells[0], geometry.numValues);
 
   assert.equal(
     handler.initialize(
       grid,
-      createCellExclusions({ allUnique: false, numCells: shape.totalCells() }),
-      shape,
-      createStateAllocator(grid, shape.totalCells())),
+      createCellExclusions({ allUnique: false, numCells: geometry.totalCells() }),
+      geometry,
+      createStateAllocator(grid, geometry.totalCells())),
     true);
 });
 
 await runTest('ChaosConstruction rejects region size that does not divide grid cell count', () => {
   // 4x5 = 20 cells, regionSize=3 — 20 % 3 !== 0.
-  const shape = CellGeometry.fromShapeSpec('4x5');
+  const geometry = CellGeometry.fromShapeSpec('4x5');
   const constraint = new SudokuConstraint.ChaosConstruction();
-  shape.addVarCellsForConstraints([constraint]);
+  geometry.addVarCellsForConstraints([constraint]);
 
-  const grid = makeChaosGrid(shape);
-  const regionCells = shape.varCellsForGroup('CC');
-  const handler = new ChaosConstruction(shape.numGridCells, regionCells[0], 3);
+  const grid = makeChaosGrid(geometry);
+  const regionCells = geometry.varCellsForGroup('CC');
+  const handler = new ChaosConstruction(geometry.numGridCells, regionCells[0], 3);
 
   assert.throws(
     () => handler.initialize(
       grid,
-      createCellExclusions({ allUnique: false, numCells: shape.totalCells() }),
-      shape,
-      createStateAllocator(grid, shape.totalCells())),
+      createCellExclusions({ allUnique: false, numCells: geometry.totalCells() }),
+      geometry,
+      createStateAllocator(grid, geometry.totalCells())),
     /divisible by region size/);
 });
 
@@ -256,11 +256,11 @@ await runTest('ChaosConstruction initializes canonical region candidates', () =>
 });
 
 await runTest('ChaosCount prunes control candidates to feasible match counts', () => {
-  const shape = CellGeometry.fromGridSize(4);
-  shape.addVarCellsForConstraints([new SudokuConstraint.ChaosConstruction()]);
-  const grid = makeChaosGrid(shape);
-  const regionCells = shape.varCellsForGroup('CC');
-  const handler = makeChaosCount(shape, 0, [regionCells[0], regionCells[1], regionCells[2]], grid);
+  const geometry = CellGeometry.fromGridSize(4);
+  geometry.addVarCellsForConstraints([new SudokuConstraint.ChaosConstruction()]);
+  const grid = makeChaosGrid(geometry);
+  const regionCells = geometry.varCellsForGroup('CC');
+  const handler = makeChaosCount(geometry, 0, [regionCells[0], regionCells[1], regionCells[2]], grid);
 
   grid[regionCells[0]] = valueMask(2);
   grid[regionCells[1]] = valueMask(2);
@@ -270,25 +270,25 @@ await runTest('ChaosCount prunes control candidates to feasible match counts', (
   assert.equal(grid[0], valueMask(2));
 });
 
-const makeEnclosedCount = (shape, runCells) => {
-  const grid = makeChaosGrid(shape);
-  const regionCells = shape.varCellsForGroup('CC');
+const makeEnclosedCount = (geometry, runCells) => {
+  const grid = makeChaosGrid(geometry);
+  const regionCells = geometry.varCellsForGroup('CC');
   const counted = runCells.map(p => regionCells[p]);
   const handler = new ChaosCount(0, counted, runCells, 0);
   const ok = handler.initialize(
     grid,
-    createCellExclusions({ allUnique: false, numCells: shape.totalCells() }),
-    shape,
-    createStateAllocator(grid, shape.totalCells()));
+    createCellExclusions({ allUnique: false, numCells: geometry.totalCells() }),
+    geometry,
+    createStateAllocator(grid, geometry.totalCells()));
   return { handler, grid, ok };
 };
 
 await runTest('ChaosCount removes count 1 when the first cell is enclosed', () => {
   // First counted cell is corner 0; its neighbours (1 right, 4 down) are both
   // counted, so it is enclosed and the count can never be 1.
-  const shape = CellGeometry.fromGridSize(4);
-  shape.addVarCellsForConstraints([new SudokuConstraint.ChaosConstruction()]);
-  const { grid, ok } = makeEnclosedCount(shape, [0, 1, 4]);
+  const geometry = CellGeometry.fromGridSize(4);
+  geometry.addVarCellsForConstraints([new SudokuConstraint.ChaosConstruction()]);
+  const { grid, ok } = makeEnclosedCount(geometry, [0, 1, 4]);
   assert.equal(ok, true);
   assert.equal(grid[0] & valueMask(1), 0);          // count 1 gone
   assert.equal(grid[0], valueMask(2) | valueMask(3)); // counts 2,3 remain
@@ -296,9 +296,9 @@ await runTest('ChaosCount removes count 1 when the first cell is enclosed', () =
 
 await runTest('ChaosCount keeps count 1 when the first cell is not enclosed', () => {
   // Missing the down-neighbour (4), so the first cell is not enclosed.
-  const shape = CellGeometry.fromGridSize(4);
-  shape.addVarCellsForConstraints([new SudokuConstraint.ChaosConstruction()]);
-  const { grid, ok } = makeEnclosedCount(shape, [0, 1]);
+  const geometry = CellGeometry.fromGridSize(4);
+  geometry.addVarCellsForConstraints([new SudokuConstraint.ChaosConstruction()]);
+  const { grid, ok } = makeEnclosedCount(geometry, [0, 1]);
   assert.equal(ok, true);
   assert.notEqual(grid[0] & valueMask(1), 0);       // count 1 still possible
 });
@@ -307,18 +307,18 @@ await runTest('ChaosCount removes the infeasible count 0 in a 0-indexed grid', (
   // 0-3 grid (valueOffset -1): count k sits at value k+1, so count 0 is value 1.
   // The count is never 0 (the first cell is always counted), so value 1 is removed
   // even when the first cell is not enclosed.
-  const shape = CellGeometry.fromShapeSpec('4x4~0-3');
-  shape.addVarCellsForConstraints([new SudokuConstraint.ChaosConstruction()]);
-  const { grid, ok } = makeEnclosedCount(shape, [0, 1]);  // not enclosed
+  const geometry = CellGeometry.fromShapeSpec('4x4~0-3');
+  geometry.addVarCellsForConstraints([new SudokuConstraint.ChaosConstruction()]);
+  const { grid, ok } = makeEnclosedCount(geometry, [0, 1]);  // not enclosed
   assert.equal(ok, true);
   assert.equal(grid[0] & valueMask(1), 0);          // count 0 (value 1) removed
   assert.notEqual(grid[0] & valueMask(2), 0);       // count 1 (value 2) still ok
 });
 
 await runTest('ChaosCount removes counts 0 and 1 through the offset when enclosed', () => {
-  const shape = CellGeometry.fromShapeSpec('4x4~0-3');  // valueOffset -1
-  shape.addVarCellsForConstraints([new SudokuConstraint.ChaosConstruction()]);
-  const { grid, ok } = makeEnclosedCount(shape, [0, 1, 4]);
+  const geometry = CellGeometry.fromShapeSpec('4x4~0-3');  // valueOffset -1
+  geometry.addVarCellsForConstraints([new SudokuConstraint.ChaosConstruction()]);
+  const { grid, ok } = makeEnclosedCount(geometry, [0, 1, 4]);
   assert.equal(ok, true);
   // count 0 (value 1) and count 1 (value 2) gone; counts 2,3 (values 3,4) remain.
   assert.equal(grid[0], valueMask(3) | valueMask(4));
@@ -328,12 +328,12 @@ await runTest('ChaosCount: enclosed first cell needs an extra in-region neighbou
   // First cell (corner 0) is enclosed by counted cells 1, 4. A non-neighbour
   // counted cell (5) is fixed to the first cell's region, but neither neighbour
   // is — so a neighbour must still join, forcing the count to >= 3.
-  const shape = CellGeometry.fromGridSize(4);
-  shape.addVarCellsForConstraints([new SudokuConstraint.ChaosConstruction()]);
-  const regionCells = shape.varCellsForGroup('CC');
-  const { handler, grid, ok } = makeEnclosedCount(shape, [0, 1, 4, 5]);
+  const geometry = CellGeometry.fromGridSize(4);
+  geometry.addVarCellsForConstraints([new SudokuConstraint.ChaosConstruction()]);
+  const regionCells = geometry.varCellsForGroup('CC');
+  const { handler, grid, ok } = makeEnclosedCount(geometry, [0, 1, 4, 5]);
   assert.equal(ok, true);
-  const allRegions = (1 << (shape.numGridCells / 4)) - 1;  // regionSize 4 -> 4 regions
+  const allRegions = (1 << (geometry.numGridCells / 4)) - 1;  // regionSize 4 -> 4 regions
   grid[regionCells[0]] = valueMask(2);  // first cell fixed to region 2
   grid[regionCells[1]] = allRegions;    // neighbour, open
   grid[regionCells[4]] = allRegions;    // neighbour, open
@@ -343,15 +343,15 @@ await runTest('ChaosCount: enclosed first cell needs an extra in-region neighbou
   assert.equal(grid[0], valueMask(3) | valueMask(4));
 });
 
-await runTest('ChaosCount maps the control value through the shape value offset', () => {
+await runTest('ChaosCount maps the control value through the geometry value offset', () => {
   // On a 0-8 style grid (valueOffset -1) the control's displayed count is one
   // less than its stored value, so a count of 2 fixes the control to value 3.
-  const shape = CellGeometry.fromShapeSpec('4x4~0-3');
-  assert.equal(shape.valueOffset, -1);
-  shape.addVarCellsForConstraints([new SudokuConstraint.ChaosConstruction()]);
-  const grid = makeChaosGrid(shape);
-  const regionCells = shape.varCellsForGroup('CC');
-  const handler = makeChaosCount(shape, 0, [regionCells[0], regionCells[1], regionCells[2]], grid);
+  const geometry = CellGeometry.fromShapeSpec('4x4~0-3');
+  assert.equal(geometry.valueOffset, -1);
+  geometry.addVarCellsForConstraints([new SudokuConstraint.ChaosConstruction()]);
+  const grid = makeChaosGrid(geometry);
+  const regionCells = geometry.varCellsForGroup('CC');
+  const handler = makeChaosCount(geometry, 0, [regionCells[0], regionCells[1], regionCells[2]], grid);
 
   grid[regionCells[0]] = valueMask(2);
   grid[regionCells[1]] = valueMask(2);
@@ -362,11 +362,11 @@ await runTest('ChaosCount maps the control value through the shape value offset'
 });
 
 await runTest('ChaosCount prunes unsupported first region candidates', () => {
-  const shape = CellGeometry.fromGridSize(4);
-  shape.addVarCellsForConstraints([new SudokuConstraint.ChaosConstruction()]);
-  const grid = makeChaosGrid(shape);
-  const regionCells = shape.varCellsForGroup('CC');
-  const handler = makeChaosCount(shape, 0, [regionCells[0], regionCells[1], regionCells[2]], grid);
+  const geometry = CellGeometry.fromGridSize(4);
+  geometry.addVarCellsForConstraints([new SudokuConstraint.ChaosConstruction()]);
+  const grid = makeChaosGrid(geometry);
+  const regionCells = geometry.varCellsForGroup('CC');
+  const handler = makeChaosCount(geometry, 0, [regionCells[0], regionCells[1], regionCells[2]], grid);
 
   grid[0] = valueMask(3);
   grid[regionCells[0]] = valueMask(1) | valueMask(2);
@@ -378,11 +378,11 @@ await runTest('ChaosCount prunes unsupported first region candidates', () => {
 });
 
 await runTest('ChaosCount rejects impossible fixed counts', () => {
-  const shape = CellGeometry.fromGridSize(4);
-  shape.addVarCellsForConstraints([new SudokuConstraint.ChaosConstruction()]);
-  const grid = makeChaosGrid(shape);
-  const regionCells = shape.varCellsForGroup('CC');
-  const handler = makeChaosCount(shape, 0, [regionCells[0], regionCells[1]], grid);
+  const geometry = CellGeometry.fromGridSize(4);
+  geometry.addVarCellsForConstraints([new SudokuConstraint.ChaosConstruction()]);
+  const grid = makeChaosGrid(geometry);
+  const regionCells = geometry.varCellsForGroup('CC');
+  const handler = makeChaosCount(geometry, 0, [regionCells[0], regionCells[1]], grid);
 
   grid[0] = valueMask(1);
   grid[regionCells[0]] = valueMask(2);
@@ -392,11 +392,11 @@ await runTest('ChaosCount rejects impossible fixed counts', () => {
 });
 
 await runTest('ChaosCount prunes counted cells when control forces no extra matches', () => {
-  const shape = CellGeometry.fromGridSize(4);
-  shape.addVarCellsForConstraints([new SudokuConstraint.ChaosConstruction()]);
-  const grid = makeChaosGrid(shape);
-  const regionCells = shape.varCellsForGroup('CC');
-  const handler = makeChaosCount(shape, 0, [regionCells[0], regionCells[1], regionCells[2]], grid);
+  const geometry = CellGeometry.fromGridSize(4);
+  geometry.addVarCellsForConstraints([new SudokuConstraint.ChaosConstruction()]);
+  const grid = makeChaosGrid(geometry);
+  const regionCells = geometry.varCellsForGroup('CC');
+  const handler = makeChaosCount(geometry, 0, [regionCells[0], regionCells[1], regionCells[2]], grid);
 
   grid[0] = valueMask(1);
   grid[regionCells[0]] = valueMask(2);
@@ -409,11 +409,11 @@ await runTest('ChaosCount prunes counted cells when control forces no extra matc
 });
 
 await runTest('ChaosCount prunes counted cells when control forces all matches', () => {
-  const shape = CellGeometry.fromGridSize(4);
-  shape.addVarCellsForConstraints([new SudokuConstraint.ChaosConstruction()]);
-  const grid = makeChaosGrid(shape);
-  const regionCells = shape.varCellsForGroup('CC');
-  const handler = makeChaosCount(shape, 0, [regionCells[0], regionCells[1], regionCells[2]], grid);
+  const geometry = CellGeometry.fromGridSize(4);
+  geometry.addVarCellsForConstraints([new SudokuConstraint.ChaosConstruction()]);
+  const grid = makeChaosGrid(geometry);
+  const regionCells = geometry.varCellsForGroup('CC');
+  const handler = makeChaosCount(geometry, 0, [regionCells[0], regionCells[1], regionCells[2]], grid);
 
   grid[0] = valueMask(3);
   grid[regionCells[0]] = valueMask(2);
@@ -452,15 +452,15 @@ await runTest('ChaosCount does not shard-merge non-contiguous fixed matching reg
 });
 
 await runTest('ChaosConstruction priority anchor selection does not mutate grid', () => {
-  const shape = CellGeometry.fromShapeSpec('4x4');
+  const geometry = CellGeometry.fromShapeSpec('4x4');
   const constraint = new SudokuConstraint.ChaosConstruction();
-  shape.addVarCellsForConstraints([constraint]);
+  geometry.addVarCellsForConstraints([constraint]);
 
-  const grid = makeChaosGrid(shape);
+  const grid = makeChaosGrid(geometry);
   const beforeSelection = grid.slice();
-  const handler = new ChaosConstruction(shape.numGridCells, shape.varCellsForGroup('CC')[0], shape.numValues);
+  const handler = new ChaosConstruction(geometry.numGridCells, geometry.varCellsForGroup('CC')[0], geometry.numValues);
 
-  handler.selectPriorityAnchorCells(shape, new Int32Array(shape.totalCells()));
+  handler.selectPriorityAnchorCells(geometry, new Int32Array(geometry.totalCells()));
   assert.deepEqual(grid, beforeSelection);
 });
 
@@ -478,27 +478,27 @@ await runTest('ChaosConstruction anchor separation uses regionSize not numCols f
   // 4x3: numRows=4, numCols=3, regionSize=4, numRegions=3
   // With numCols (3) as threshold: triple [0,5,9] passes since dist(0,9)=3 >= 3, but 3 < regionSize=4
   // With regionSize (4) as threshold: no triple has all pairwise distances >= 4, so falls back to [0]
-  const shape = CellGeometry.fromShapeSpec('4x3');
+  const geometry = CellGeometry.fromShapeSpec('4x3');
   const constraint = new SudokuConstraint.ChaosConstruction();
-  shape.addVarCellsForConstraints([constraint]);
-  const regionCells = shape.varCellsForGroup('CC');
-  const handler = new ChaosConstruction(shape.numGridCells, regionCells[0], shape.numValues);
-  handler.selectPriorityAnchorCells(shape, new Int32Array(shape.totalCells()));
+  geometry.addVarCellsForConstraints([constraint]);
+  const regionCells = geometry.varCellsForGroup('CC');
+  const handler = new ChaosConstruction(geometry.numGridCells, regionCells[0], geometry.numValues);
+  handler.selectPriorityAnchorCells(geometry, new Int32Array(geometry.totalCells()));
   assert.deepEqual(handler._canonicalAnchorCells, [0]);
 });
 
 await runTest('ChaosConstruction returned anchors have pairwise Manhattan distance at least regionSize', () => {
-  const shape = CellGeometry.fromShapeSpec('4x4');
+  const geometry = CellGeometry.fromShapeSpec('4x4');
   const constraint = new SudokuConstraint.ChaosConstruction();
-  shape.addVarCellsForConstraints([constraint]);
-  const regionCells = shape.varCellsForGroup('CC');
-  const handler = new ChaosConstruction(shape.numGridCells, regionCells[0], shape.numValues);
-  handler.selectPriorityAnchorCells(shape, new Int32Array(shape.totalCells()));
+  geometry.addVarCellsForConstraints([constraint]);
+  const regionCells = geometry.varCellsForGroup('CC');
+  const handler = new ChaosConstruction(geometry.numGridCells, regionCells[0], geometry.numValues);
+  handler.selectPriorityAnchorCells(geometry, new Int32Array(geometry.totalCells()));
 
   const anchors = handler._canonicalAnchorCells;
   assert.equal(anchors.length, 3);
-  const { numCols } = shape;
-  const regionSize = shape.numValues;
+  const { numCols } = geometry;
+  const regionSize = geometry.numValues;
   const manhattan = (a, b) =>
     Math.abs((a / numCols | 0) - (b / numCols | 0)) + Math.abs(a % numCols - b % numCols);
   for (let i = 0; i < anchors.length; i++) {
@@ -512,12 +512,12 @@ await runTest('ChaosConstruction returned anchors have pairwise Manhattan distan
 
 await runTest('ChaosConstruction exits early with single anchor when numRegions < 3 (tall 4x2)', () => {
   // 4x2: numRows=4, numCols=2, regionSize=4, numRegions=2 — hits the numRegions<3 early return
-  const shape = CellGeometry.fromShapeSpec('4x2');
+  const geometry = CellGeometry.fromShapeSpec('4x2');
   const constraint = new SudokuConstraint.ChaosConstruction();
-  shape.addVarCellsForConstraints([constraint]);
-  const regionCells = shape.varCellsForGroup('CC');
-  const handler = new ChaosConstruction(shape.numGridCells, regionCells[0], shape.numValues);
-  handler.selectPriorityAnchorCells(shape, new Int32Array(shape.totalCells()));
+  geometry.addVarCellsForConstraints([constraint]);
+  const regionCells = geometry.varCellsForGroup('CC');
+  const handler = new ChaosConstruction(geometry.numGridCells, regionCells[0], geometry.numValues);
+  handler.selectPriorityAnchorCells(geometry, new Int32Array(geometry.totalCells()));
   assert.deepEqual(handler._canonicalAnchorCells, [0]);
 });
 
@@ -525,12 +525,12 @@ await runTest('ChaosConstruction falls back to single anchor when no sufficientl
   // 3x4: numRows=3, numCols=4, regionSize=4, numRegions=3 — enough regions but no triple
   // with all pairwise Manhattan distance >= 4 exists in this narrow grid.
   // Max distance = 2+3=5, but three mutually-distant cells cannot be found.
-  const shape = CellGeometry.fromShapeSpec('3x4');
+  const geometry = CellGeometry.fromShapeSpec('3x4');
   const constraint = new SudokuConstraint.ChaosConstruction();
-  shape.addVarCellsForConstraints([constraint]);
-  const regionCells = shape.varCellsForGroup('CC');
-  const handler = new ChaosConstruction(shape.numGridCells, regionCells[0], shape.numValues);
-  handler.selectPriorityAnchorCells(shape, new Int32Array(shape.totalCells()));
+  geometry.addVarCellsForConstraints([constraint]);
+  const regionCells = geometry.varCellsForGroup('CC');
+  const handler = new ChaosConstruction(geometry.numGridCells, regionCells[0], geometry.numValues);
+  handler.selectPriorityAnchorCells(geometry, new Int32Array(geometry.totalCells()));
   assert.deepEqual(handler._canonicalAnchorCells, [0]);
 });
 
@@ -538,16 +538,16 @@ await runTest('ChaosConstruction anchor selection picks highest-scoring valid tr
   // 6x6: multiple valid triples exist; boost cell 23 (r3,c5, right-column edge cell)
   // so the algorithm prefers any triple containing it over the default first-found triple.
   // Triple (0, 23, 31): dist(0,23)=8, dist(0,31)=6, dist(23,31)=6 — all >= regionSize=6.
-  const shape = CellGeometry.fromShapeSpec('6x6');
+  const geometry = CellGeometry.fromShapeSpec('6x6');
   const constraint = new SudokuConstraint.ChaosConstruction();
-  shape.addVarCellsForConstraints([constraint]);
-  const regionCells = shape.varCellsForGroup('CC');
-  const handler = new ChaosConstruction(shape.numGridCells, regionCells[0], shape.numValues);
+  geometry.addVarCellsForConstraints([constraint]);
+  const regionCells = geometry.varCellsForGroup('CC');
+  const handler = new ChaosConstruction(geometry.numGridCells, regionCells[0], geometry.numValues);
 
-  const priorities = new Int32Array(shape.totalCells());
+  const priorities = new Int32Array(geometry.totalCells());
   priorities[23] = 100;
   priorities[regionCells[0] + 23] = 100;
-  handler.selectPriorityAnchorCells(shape, priorities);
+  handler.selectPriorityAnchorCells(geometry, priorities);
 
   assert.deepEqual(handler._canonicalAnchorCells, [0, 23, 31]);
 });
@@ -559,19 +559,19 @@ await runTest('ChaosConstruction rejects conflicting default canonical anchor du
 });
 
 await runTest('ChaosConstruction default anchor is applied without priority selection', () => {
-  const shape = CellGeometry.fromShapeSpec('4x4');
+  const geometry = CellGeometry.fromShapeSpec('4x4');
   const constraint = new SudokuConstraint.ChaosConstruction();
-  shape.addVarCellsForConstraints([constraint]);
+  geometry.addVarCellsForConstraints([constraint]);
 
-  const grid = makeChaosGrid(shape);
-  const regionCells = shape.varCellsForGroup('CC');
-  const handler = new ChaosConstruction(shape.numGridCells, regionCells[0], shape.numValues);
+  const grid = makeChaosGrid(geometry);
+  const regionCells = geometry.varCellsForGroup('CC');
+  const handler = new ChaosConstruction(geometry.numGridCells, regionCells[0], geometry.numValues);
 
   const initialized = handler.initialize(
     grid,
-    createCellExclusions({ allUnique: false, numCells: shape.totalCells() }),
-    shape,
-    createStateAllocator(grid, shape.totalCells()));
+    createCellExclusions({ allUnique: false, numCells: geometry.totalCells() }),
+    geometry,
+    createStateAllocator(grid, geometry.totalCells()));
   assert.equal(initialized, true);
   assert.equal(grid[regionCells[0]], valueMask(1));
   assert.equal(grid[regionCells[7]], valueMask(1, 2, 3, 4));
@@ -744,25 +744,25 @@ await runTest('ChaosConstruction does not reject completable 2x2 partial grids',
   for (const v0 of masks) for (const v1 of masks) for (const v2 of masks) for (const v3 of masks) {
     for (const r1 of masks) for (const r2 of masks) for (const r3 of masks) {
       const context = makeChaosContext('2x2');
-      const { grid, regionCells, shape } = context;
+      const { grid, regionCells, geometry } = context;
       const partialValues = [v0, v1, v2, v3];
       const partialRegions = [valueMask(1), r1, r2, r3];
       checked++;
 
-      for (let cell = 0; cell < shape.numGridCells; cell++) {
+      for (let cell = 0; cell < geometry.numGridCells; cell++) {
         grid[cell] = partialValues[cell];
         grid[regionCells[cell]] = partialRegions[cell];
       }
 
       const result = enforce(context).result;
-      const hasCompletion = partialChaosGridHasCompletion(shape, partialValues, partialRegions);
+      const hasCompletion = partialChaosGridHasCompletion(geometry, partialValues, partialRegions);
       if (hasCompletion) completable++;
       assert.equal(result || !hasCompletion, true,
         `rejected completable values=${partialValues.join(',')} regions=${partialRegions.join(',')}`);
 
       const fullyFixed = partialValues.every(isFixedMask) && partialRegions.every(isFixedMask);
       if (fullyFixed) {
-        assert.equal(result, fullChaosGridIsValid(shape, partialValues, partialRegions),
+        assert.equal(result, fullChaosGridIsValid(geometry, partialValues, partialRegions),
           `full fixed mismatch values=${partialValues.join(',')} regions=${partialRegions.join(',')}`);
       }
     }
@@ -782,7 +782,7 @@ await runTest('ChaosFixedValueRegionExclusion removes fixed pair region from mat
   grid[regionCells[1]] = valueMask(1, 2);
 
   const handler = new ChaosFixedValueRegionExclusion(
-    0, gridCells[0], context.shape.numGridCells, regionCellOffset);
+    0, gridCells[0], context.geometry.numGridCells, regionCellOffset);
   const acc = createAccumulator();
 
   assert.equal(handler.enforceConsistency(grid, acc), true);
@@ -800,7 +800,7 @@ await runTest('ChaosFixedValueRegionExclusion removes fixed pair value from matc
   grid[regionCells[1]] = valueMask(1);
 
   const handler = new ChaosFixedValueRegionExclusion(
-    0, gridCells[0], context.shape.numGridCells, regionCellOffset);
+    0, gridCells[0], context.geometry.numGridCells, regionCellOffset);
   const acc = createAccumulator();
 
   assert.equal(handler.enforceConsistency(grid, acc), true);
@@ -818,7 +818,7 @@ await runTest('ChaosFixedValueRegionExclusion rejects duplicate fixed pairs', ()
   grid[regionCells[1]] = valueMask(1);
 
   const handler = new ChaosFixedValueRegionExclusion(
-    0, gridCells[0], context.shape.numGridCells, regionCellOffset);
+    0, gridCells[0], context.geometry.numGridCells, regionCellOffset);
 
   assert.equal(handler.enforceConsistency(grid, createAccumulator()), false);
 });
@@ -828,9 +828,9 @@ await runTest('ChaosFixedValueRegionExclusion is a singleton per trigger cell', 
   const { gridCells, regionCells, regionCellOffset } = context;
 
   const gridTriggerHandler = new ChaosFixedValueRegionExclusion(
-    0, gridCells[0], context.shape.numGridCells, regionCellOffset);
+    0, gridCells[0], context.geometry.numGridCells, regionCellOffset);
   const regionTriggerHandler = new ChaosFixedValueRegionExclusion(
-    0, regionCells[0], context.shape.numGridCells, regionCellOffset);
+    0, regionCells[0], context.geometry.numGridCells, regionCellOffset);
 
   assert.equal(ChaosFixedValueRegionExclusion.SINGLETON_HANDLER, true);
   assert.deepEqual([...gridTriggerHandler.cells], [gridCells[0]]);
@@ -966,7 +966,7 @@ await runTest('ChaosConstruction region shard removes labels without compatible 
   const { grid, regionCells, handler } = context;
   const acc = createAccumulator();
 
-  for (let cell = 0; cell < context.shape.numGridCells; cell++) {
+  for (let cell = 0; cell < context.geometry.numGridCells; cell++) {
     grid[regionCells[cell]] = valueMask(3, 4);
   }
 
@@ -1005,12 +1005,12 @@ await runTest('ChaosConstruction region shard persists fixed-control merges', ()
   const context = makeChaosContext('4x4', ({ grid }) => {
     grid[0] = valueMask(1, 2);
   });
-  const { shape, grid, regionCells } = context;
+  const { geometry, grid, regionCells } = context;
   const arrowHandler = makeShardArrow(context, 0, [[0, 1]]);
 
   enforceShardArrow(arrowHandler, context);
   assert.equal(enforce(context).result, true);
-  assert.equal(grid[regionCells[1]], LookupTables.get(shape.numValues).allValues);
+  assert.equal(grid[regionCells[1]], LookupTables.get(geometry.numValues).allValues);
 
   grid[0] = valueMask(2);
   enforceShardArrow(arrowHandler, context);
@@ -1092,11 +1092,11 @@ await runTest('ChaosArrow keeps length 1 when the start is not enclosed', () => 
   assert.notEqual(grid[0] & valueMask(1), 0);
 });
 
-await runTest('ChaosArrow maps the control value through the shape value offset', () => {
+await runTest('ChaosArrow maps the control value through the geometry value offset', () => {
   // On a 0-8 style grid (valueOffset -1) the control's displayed run length is
   // one less than its stored value, so a run of 3 fixes the control to value 4.
   const context = makeChaosContext('4x4~0-3');
-  assert.equal(context.shape.valueOffset, -1);
+  assert.equal(context.geometry.valueOffset, -1);
   const { grid, regionCells } = context;
   const handler = makeShardArrow(context, 0, [[0, 1, 2, 3]]);
 

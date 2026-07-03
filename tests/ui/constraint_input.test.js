@@ -161,13 +161,13 @@ const withMockFormData = (fn) => {
   }
 };
 
-// Helper: create a GivenCandidates instance with a shape applied.
-const createGivenCandidates = (shape) => {
+// Helper: create a GivenCandidates instance with a geometry applied.
+const createGivenCandidates = (geometry) => {
   const collection = createMockCollection();
   const inputManager = createMockInputManager();
   const gc = new ConstraintCategoryInput.GivenCandidates(
     collection, inputManager);
-  gc.reshape(shape);
+  gc.reshape(geometry);
   return { gc, collection, inputManager };
 };
 
@@ -176,8 +176,8 @@ const createGivenCandidates = (shape) => {
 // ============================================================================
 
 await runTest('_inputDigit: sets a single digit on empty cell (9x9)', () => {
-  const shape = CellGeometry.fromGridSize(9);
-  const { gc, collection } = createGivenCandidates(shape);
+  const geometry = CellGeometry.fromGridSize(9);
+  const { gc, collection } = createGivenCandidates(geometry);
 
   gc._inputDigit('R1C1', 5);
 
@@ -187,8 +187,8 @@ await runTest('_inputDigit: sets a single digit on empty cell (9x9)', () => {
 });
 
 await runTest('_inputDigit: null digit clears the cell', () => {
-  const shape = CellGeometry.fromGridSize(9);
-  const { gc, collection } = createGivenCandidates(shape);
+  const geometry = CellGeometry.fromGridSize(9);
+  const { gc, collection } = createGivenCandidates(geometry);
 
   gc._inputDigit('R1C1', 5);
   assert.equal(collection.constraints.length, 1);
@@ -198,8 +198,8 @@ await runTest('_inputDigit: null digit clears the cell', () => {
 });
 
 await runTest('_inputDigit: composing multi-digit value on 16x16 grid', () => {
-  const shape = CellGeometry.fromGridSize(16);
-  const { gc, collection } = createGivenCandidates(shape);
+  const geometry = CellGeometry.fromGridSize(16);
+  const { gc, collection } = createGivenCandidates(geometry);
 
   // Type '1' then '0' to make 10.
   gc._inputDigit('R1C1', 1);
@@ -213,8 +213,8 @@ await runTest('_inputDigit: composing multi-digit value on 16x16 grid', () => {
 });
 
 await runTest('_inputDigit: composing wraps when exceeding maxValue', () => {
-  const shape = CellGeometry.fromGridSize(9);
-  const { gc, collection } = createGivenCandidates(shape);
+  const geometry = CellGeometry.fromGridSize(9);
+  const { gc, collection } = createGivenCandidates(geometry);
 
   // Type '1' then '5' — 15 > 9, so should reset to just 5.
   gc._inputDigit('R1C1', 1);
@@ -226,8 +226,8 @@ await runTest('_inputDigit: composing wraps when exceeding maxValue', () => {
 });
 
 await runTest('_inputDigit: composing 16 on 16x16 grid works', () => {
-  const shape = CellGeometry.fromGridSize(16);
-  const { gc, collection } = createGivenCandidates(shape);
+  const geometry = CellGeometry.fromGridSize(16);
+  const { gc, collection } = createGivenCandidates(geometry);
 
   gc._inputDigit('R1C1', 1);
   gc._inputDigit('R1C1', 6);
@@ -236,8 +236,8 @@ await runTest('_inputDigit: composing 16 on 16x16 grid works', () => {
 });
 
 await runTest('_inputDigit: composing past maxValue wraps on 16x16', () => {
-  const shape = CellGeometry.fromGridSize(16);
-  const { gc, collection } = createGivenCandidates(shape);
+  const geometry = CellGeometry.fromGridSize(16);
+  const { gc, collection } = createGivenCandidates(geometry);
 
   gc._inputDigit('R1C1', 1);
   gc._inputDigit('R1C1', 7);
@@ -247,8 +247,8 @@ await runTest('_inputDigit: composing past maxValue wraps on 16x16', () => {
 });
 
 await runTest('_inputDigit: digit 0 alone is rejected when minValue is 1', () => {
-  const shape = CellGeometry.fromGridSize(9);
-  const { gc, collection } = createGivenCandidates(shape);
+  const geometry = CellGeometry.fromGridSize(9);
+  const { gc, collection } = createGivenCandidates(geometry);
 
   gc._inputDigit('R1C1', 0);
   // 0 < minValue(1), so should clear.
@@ -256,9 +256,9 @@ await runTest('_inputDigit: digit 0 alone is rejected when minValue is 1', () =>
 });
 
 await runTest('_inputDigit: digit 0 alone is accepted when minValue is 0', () => {
-  // Create a shape with value range 0-8 (valueOffset = -1).
-  const shape = CellGeometry.fromGridSize(9, 9, null, -1);
-  const { gc, collection } = createGivenCandidates(shape);
+  // Create a geometry with value range 0-8 (valueOffset = -1).
+  const geometry = CellGeometry.fromGridSize(9, 9, null, -1);
+  const { gc, collection } = createGivenCandidates(geometry);
 
   gc._inputDigit('R1C1', 0);
   assert.equal(collection.constraints.length, 1);
@@ -266,8 +266,8 @@ await runTest('_inputDigit: digit 0 alone is accepted when minValue is 0', () =>
 });
 
 await runTest('_inputDigit: composing with 0 on 16x16 (1 then 0 = 10)', () => {
-  const shape = CellGeometry.fromGridSize(16);
-  const { gc, collection } = createGivenCandidates(shape);
+  const geometry = CellGeometry.fromGridSize(16);
+  const { gc, collection } = createGivenCandidates(geometry);
 
   gc._inputDigit('R1C1', 1);
   gc._inputDigit('R1C1', 0);
@@ -279,8 +279,8 @@ await runTest('_inputDigit: composing with 0 on 16x16 (1 then 0 = 10)', () => {
 // ============================================================================
 
 await runTest('_setValues: adds constraints for given values', () => {
-  const shape = CellGeometry.fromGridSize(9);
-  const { gc, collection } = createGivenCandidates(shape);
+  const geometry = CellGeometry.fromGridSize(9);
+  const { gc, collection } = createGivenCandidates(geometry);
 
   gc._setValues(['R1C1', 'R2C2'], [3, 5]);
   // One constraint per cell.
@@ -292,8 +292,8 @@ await runTest('_setValues: adds constraints for given values', () => {
 });
 
 await runTest('_setValues: empty values removes existing constraints', () => {
-  const shape = CellGeometry.fromGridSize(9);
-  const { gc, collection } = createGivenCandidates(shape);
+  const geometry = CellGeometry.fromGridSize(9);
+  const { gc, collection } = createGivenCandidates(geometry);
 
   gc._setValues(['R1C1'], [7]);
   assert.equal(collection.constraints.length, 1);
@@ -307,8 +307,8 @@ await runTest('_setValues: empty values removes existing constraints', () => {
 // ============================================================================
 
 await runTest('_getCellValues: returns values for a cell with a constraint', () => {
-  const shape = CellGeometry.fromGridSize(9);
-  const { gc, collection } = createGivenCandidates(shape);
+  const geometry = CellGeometry.fromGridSize(9);
+  const { gc, collection } = createGivenCandidates(geometry);
 
   collection.addConstraint(new SudokuConstraint.Given('R1C1', 4));
   const values = gc._getCellValues('R1C1');
@@ -316,16 +316,16 @@ await runTest('_getCellValues: returns values for a cell with a constraint', () 
 });
 
 await runTest('_getCellValues: returns empty for cell with no constraints', () => {
-  const shape = CellGeometry.fromGridSize(9);
-  const { gc } = createGivenCandidates(shape);
+  const geometry = CellGeometry.fromGridSize(9);
+  const { gc } = createGivenCandidates(geometry);
 
   const values = gc._getCellValues('R1C1');
   assert.deepEqual(values, []);
 });
 
 await runTest('_getCellValues: returns multiple candidate values', () => {
-  const shape = CellGeometry.fromGridSize(9);
-  const { gc, collection } = createGivenCandidates(shape);
+  const geometry = CellGeometry.fromGridSize(9);
+  const { gc, collection } = createGivenCandidates(geometry);
 
   collection.addConstraint(new SudokuConstraint.Given('R1C1', 2, 5, 8));
   const values = gc._getCellValues('R1C1');
@@ -337,8 +337,8 @@ await runTest('_getCellValues: returns multiple candidate values', () => {
 // ============================================================================
 
 await runTest('_inputDigit: second digit on cell with multiple candidates resets', () => {
-  const shape = CellGeometry.fromGridSize(9);
-  const { gc, collection } = createGivenCandidates(shape);
+  const geometry = CellGeometry.fromGridSize(9);
+  const { gc, collection } = createGivenCandidates(geometry);
 
   // Manually set multiple candidates (simulating multi-value input panel).
   collection.addConstraint(new SudokuConstraint.Given('R1C1', 2, 5));
@@ -351,8 +351,8 @@ await runTest('_inputDigit: second digit on cell with multiple candidates resets
 });
 
 await runTest('_inputDigit: boundary value maxValue is accepted', () => {
-  const shape = CellGeometry.fromGridSize(9);
-  const { gc, collection } = createGivenCandidates(shape);
+  const geometry = CellGeometry.fromGridSize(9);
+  const { gc, collection } = createGivenCandidates(geometry);
 
   gc._inputDigit('R1C1', 9);
   assert.equal(collection.constraints.length, 1);
@@ -360,8 +360,8 @@ await runTest('_inputDigit: boundary value maxValue is accepted', () => {
 });
 
 await runTest('_inputDigit: boundary value minValue is accepted', () => {
-  const shape = CellGeometry.fromGridSize(9);
-  const { gc, collection } = createGivenCandidates(shape);
+  const geometry = CellGeometry.fromGridSize(9);
+  const { gc, collection } = createGivenCandidates(geometry);
 
   gc._inputDigit('R1C1', 1);
   assert.equal(collection.constraints.length, 1);
@@ -369,8 +369,8 @@ await runTest('_inputDigit: boundary value minValue is accepted', () => {
 });
 
 await runTest('_inputDigit: independent cells do not interfere', () => {
-  const shape = CellGeometry.fromGridSize(9);
-  const { gc, collection } = createGivenCandidates(shape);
+  const geometry = CellGeometry.fromGridSize(9);
+  const { gc, collection } = createGivenCandidates(geometry);
 
   gc._inputDigit('R1C1', 3);
   gc._inputDigit('R2C2', 7);
@@ -381,14 +381,14 @@ await runTest('_inputDigit: independent cells do not interfere', () => {
 });
 
 await runTest('LinesAndSets._handleSelection: Quad finds var-cell top-left numerically', () => {
-  const shape = CellGeometry.fromGridSize(9);
-  shape._varCellRegistry.addGroups([
+  const geometry = CellGeometry.fromGridSize(9);
+  geometry._varCellRegistry.addGroups([
     { prefix: 'VX', label: 'vars', count: 81 },
   ]);
   const collection = createMockCollection();
   const linesAndSets = Object.create(ConstraintCategoryInput.LinesAndSets.prototype);
   linesAndSets.collection = collection;
-  linesAndSets._shape = shape;
+  linesAndSets._geometry = geometry;
   linesAndSets._updateCallback = () => { };
   linesAndSets._typeMap = new Map([
     [SudokuConstraint.Quad.name, { elem: { disabled: false } }],
@@ -411,12 +411,12 @@ await runTest('LinesAndSets._handleSelection: Quad finds var-cell top-left numer
 });
 
 await runTest('ChaosConstruction._handleSelection: ChaosArrow maps grid arm cells to CC cells', () => {
-  const shape = CellGeometry.fromGridSize(4);
-  shape.addVarCellsForConstraints([new SudokuConstraint.ChaosConstruction()]);
+  const geometry = CellGeometry.fromGridSize(4);
+  geometry.addVarCellsForConstraints([new SudokuConstraint.ChaosConstruction()]);
   const collection = createMockCollection();
   const linesAndSets = Object.create(ConstraintCategoryInput.ChaosConstruction.prototype);
   linesAndSets.collection = collection;
-  linesAndSets._shape = shape;
+  linesAndSets._geometry = geometry;
   linesAndSets._updateCallback = () => { };
   linesAndSets._typeMap = new Map([
     [SudokuConstraint.ChaosArrow.name, { elem: { disabled: false } }],
@@ -440,12 +440,12 @@ await runTest('ChaosConstruction._handleSelection: ChaosArrow maps grid arm cell
 });
 
 await runTest('ChaosConstruction._handleSelection: ChaosArrow builds an arm per segment', () => {
-  const shape = CellGeometry.fromGridSize(4);
-  shape.addVarCellsForConstraints([new SudokuConstraint.ChaosConstruction()]);
+  const geometry = CellGeometry.fromGridSize(4);
+  geometry.addVarCellsForConstraints([new SudokuConstraint.ChaosConstruction()]);
   const collection = createMockCollection();
   const linesAndSets = Object.create(ConstraintCategoryInput.ChaosConstruction.prototype);
   linesAndSets.collection = collection;
-  linesAndSets._shape = shape;
+  linesAndSets._geometry = geometry;
   linesAndSets._updateCallback = () => { };
   linesAndSets._typeMap = new Map([
     [SudokuConstraint.ChaosArrow.name, { elem: { disabled: false } }],
@@ -471,14 +471,14 @@ await runTest('ChaosConstruction._handleSelection: ChaosArrow builds an arm per 
 });
 
 await runTest('LinesAndSets: ChaosArrow validates grid-only and CC-arm selections', () => {
-  const shape = CellGeometry.fromGridSize(4);
-  shape.addVarCellsForConstraints([new SudokuConstraint.ChaosConstruction()]);
+  const geometry = CellGeometry.fromGridSize(4);
+  geometry.addVarCellsForConstraints([new SudokuConstraint.ChaosConstruction()]);
 
-  assert.equal(SudokuConstraint.ChaosArrow.VALIDATE_CELLS_FN(['R2C1'], shape), true);
-  assert.equal(SudokuConstraint.ChaosArrow.VALIDATE_CELLS_FN(['R2C1', 'R2C2'], shape), true);
-  assert.equal(SudokuConstraint.ChaosArrow.VALIDATE_CELLS_FN(['R2C1', 'CC6'], shape), true);
-  assert.equal(SudokuConstraint.ChaosArrow.VALIDATE_CELLS_FN(['CC5', 'CC6'], shape), false);
-  assert.equal(SudokuConstraint.ChaosArrow.VALIDATE_CELLS_FN(['R2C1', 'CC6', 'R2C3'], shape), false);
+  assert.equal(SudokuConstraint.ChaosArrow.VALIDATE_CELLS_FN(['R2C1'], geometry), true);
+  assert.equal(SudokuConstraint.ChaosArrow.VALIDATE_CELLS_FN(['R2C1', 'R2C2'], geometry), true);
+  assert.equal(SudokuConstraint.ChaosArrow.VALIDATE_CELLS_FN(['R2C1', 'CC6'], geometry), true);
+  assert.equal(SudokuConstraint.ChaosArrow.VALIDATE_CELLS_FN(['CC5', 'CC6'], geometry), false);
+  assert.equal(SudokuConstraint.ChaosArrow.VALIDATE_CELLS_FN(['R2C1', 'CC6', 'R2C3'], geometry), false);
 });
 
 logSuiteComplete('ConstraintCategoryInput.GivenCandidates');

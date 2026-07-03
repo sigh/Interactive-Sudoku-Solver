@@ -113,7 +113,7 @@ export class ConstraintCategoryInput {
 
   clear() { }
 
-  reshape(shape) { }
+  reshape(geometry) { }
 
   setUpdateCallback(fn) {
     this._updateCallback = fn || (() => { });
@@ -143,7 +143,7 @@ ConstraintCategoryInput.Shape = class Shape extends ConstraintCategoryInput {
 
   constructor(collection) {
     super(collection);
-    this._shape = null;
+    this._geometry = null;
     this._setUp();
   }
 
@@ -197,10 +197,10 @@ ConstraintCategoryInput.Shape = class Shape extends ConstraintCategoryInput {
     input.addEventListener('input', showDropdown);
     input.addEventListener('blur', () => {
       hideDropdown();
-      // Only apply if the input has changed from the current shape,
+      // Only apply if the input has changed from the current geometry,
       // to avoid resetting the value range after a full spec like "9x9~0-8"
       // has already been applied (reshape sets input to just "9x9").
-      if (!this._shape || input.value.trim() !== this._shape.gridDimsStr) {
+      if (!this._geometry || input.value.trim() !== this._geometry.gridDimsStr) {
         this._applyShape();
       }
     });
@@ -239,7 +239,7 @@ ConstraintCategoryInput.Shape = class Shape extends ConstraintCategoryInput {
     this._minSelect.onchange = () => {
       // Shift max by the same amount to prevent invalid ranges.
       const newMin = +this._minSelect.value;
-      const newMax = this._shape.maxValue() + (newMin - this._shape.minValue());
+      const newMax = this._geometry.maxValue() + (newMin - this._geometry.minValue());
       this._applyValueRange(newMin, newMax);
     };
     this._maxSelect.onchange = () => {
@@ -261,25 +261,25 @@ ConstraintCategoryInput.Shape = class Shape extends ConstraintCategoryInput {
   }
 
   _applyValueRange(min, max) {
-    if (!this._shape) return;
+    if (!this._geometry) return;
     const numValues = max - min + 1;
     const valueOffset = min - 1;
     try {
-      const shape = CellGeometry.fromGridSize(
-        this._shape.numRows, this._shape.numCols, numValues, valueOffset);
-      if (shape) {
-        this.collection.setShape(shape);
+      const geometry = CellGeometry.fromGridSize(
+        this._geometry.numRows, this._geometry.numCols, numValues, valueOffset);
+      if (geometry) {
+        this.collection.setShape(geometry);
       }
     } catch (e) {
-      // Revert dropdowns to current shape.
-      this._updateValueRangeDropdowns(this._shape);
+      // Revert dropdowns to current geometry.
+      this._updateValueRangeDropdowns(this._geometry);
     }
   }
 
-  _updateValueRangeDropdowns(shape) {
-    const defaultNV = CellGeometry.defaultNumValues(shape.numRows, shape.numCols);
-    const minValue = shape.minValue();
-    const maxValue = shape.maxValue();
+  _updateValueRangeDropdowns(geometry) {
+    const defaultNV = CellGeometry.defaultNumValues(geometry.numRows, geometry.numCols);
+    const minValue = geometry.minValue();
+    const maxValue = geometry.maxValue();
 
     // Populate min dropdown: options 0 and 1.
     clearDOMNode(this._minSelect);
@@ -304,11 +304,11 @@ ConstraintCategoryInput.Shape = class Shape extends ConstraintCategoryInput {
     this._maxSelect.value = maxValue;
   }
 
-  reshape(shape) {
-    this._shape = shape;
-    this._shapeSpecInput.value = shape.gridDimsStr;
+  reshape(geometry) {
+    this._geometry = geometry;
+    this._shapeSpecInput.value = geometry.gridDimsStr;
     this._shapeSpecInput.setCustomValidity('');
-    this._updateValueRangeDropdowns(shape);
+    this._updateValueRangeDropdowns(geometry);
   }
 
   _setUpVarInput() {
@@ -357,7 +357,7 @@ ConstraintCategoryInput.Composite = class Composite extends ConstraintCategoryIn
   constructor(collection, addUpdateListener, inputManager) {
     super(collection);
     this._inputManager = inputManager;
-    this._shape = null;
+    this._geometry = null;
     const form = document.forms['composite-constraint-input'];
     this._form = form;
     this._collapsibleContainer = new CollapsibleContainer(
@@ -369,8 +369,8 @@ ConstraintCategoryInput.Composite = class Composite extends ConstraintCategoryIn
     this._setUpForm(form, collection);
   }
 
-  reshape(shape) {
-    this._shape = shape;
+  reshape(geometry) {
+    this._geometry = geometry;
   }
 
   _setUpForm(form, collection) {
@@ -389,11 +389,11 @@ ConstraintCategoryInput.Composite = class Composite extends ConstraintCategoryIn
         collection.addConstraint(new SudokuConstraint.Replicate([]));
         return false;
       }
-      const originIdx = this._shape.parseCellId(selectedCells[0]).cell;
-      const origin = this._shape.makeCellIdFromIndex(
-        this._shape.cellGraph().cellPosition(originIdx)[2]);
+      const originIdx = this._geometry.parseCellId(selectedCells[0]).cell;
+      const origin = this._geometry.makeCellIdFromIndex(
+        this._geometry.cellGraph().cellPosition(originIdx)[2]);
       const bitset = SudokuConstraint.Replicate.encodeTargetCells(
-        selectedCells, origin, this._shape);
+        selectedCells, origin, this._geometry);
       collection.addConstraint(new SudokuConstraint.Replicate([], bitset, origin));
       return false;
     };
@@ -419,7 +419,7 @@ class CheckboxCategoryInput extends ConstraintCategoryInput {
 
     this._checkboxes = new Map();
     this._selects = new Map();
-    this._shape = null;
+    this._geometry = null;
 
     const initSingleCheckbox = (constraintClass, container, option) => {
       const constraint = new constraintClass(...(option ? [option.value] : []));
@@ -611,12 +611,12 @@ class CheckboxCategoryInput extends ConstraintCategoryInput {
     }
   }
 
-  reshape(shape) {
-    this._shape = shape;
+  reshape(geometry) {
+    this._geometry = geometry;
 
     for (const item of this._checkboxes.values()) {
       const constr = item.constraint.constructor;
-      const disabled = !!(constr.VALIDATE_SHAPE_FN && !constr.VALIDATE_SHAPE_FN(shape));
+      const disabled = !!(constr.VALIDATE_SHAPE_FN && !constr.VALIDATE_SHAPE_FN(geometry));
       item.element.disabled = disabled;
       item.element.parentElement.classList.toggle('disabled', disabled);
     }
@@ -661,7 +661,7 @@ ConstraintCategoryInput.LayoutCheckbox = class LayoutCheckbox extends CheckboxCa
 class MultiCellInput extends ConstraintCategoryInput {
   constructor(collection, inputManager, form) {
     super(collection);
-    this._shape = null;
+    this._geometry = null;
     this._inputManager = inputManager;
 
     this._constraintClasses = this.constructor.constraintClasses();
@@ -713,8 +713,8 @@ class MultiCellInput extends ConstraintCategoryInput {
     return form['add-constraint'];
   }
 
-  reshape(shape) {
-    this._shape = shape;
+  reshape(geometry) {
+    this._geometry = geometry;
   }
 
   _handleSelection(selectionForm, inputManager) {
@@ -915,7 +915,7 @@ class MultiCellInput extends ConstraintCategoryInput {
       // Call the validation function, or by default disallow single cell
       // selections.
       const isValid = (
-        validationFn ? validationFn(selection, this._shape) : !isSingleCell);
+        validationFn ? validationFn(selection, this._geometry) : !isSingleCell);
 
       for (const elem of elems) elem.disabled = !isValid;
     }
@@ -945,11 +945,11 @@ ConstraintCategoryInput.LinesAndSets = class LinesAndSets extends MultiCellInput
       constraintClass === SudokuConstraint.ContainAtLeast) {
       const values = formData.get(constraintClass.name + '-value')
         .split(/[, ]+/).map(v => +v)
-        .filter(v => Number.isInteger(v) && v >= this._shape.minValue() && v <= this._shape.maxValue());
+        .filter(v => Number.isInteger(v) && v >= this._geometry.minValue() && v <= this._geometry.maxValue());
       if (!values.length) return;
       if (constraintClass === SudokuConstraint.Quad) {
-        const topLeftCell = this._shape.makeCellIdFromIndex(Math.min(
-          ...cells.map(c => this._shape.parseCellId(c).cell)));
+        const topLeftCell = this._geometry.makeCellIdFromIndex(Math.min(
+          ...cells.map(c => this._geometry.parseCellId(c).cell)));
         this.collection.addConstraint(new SudokuConstraint.Quad(topLeftCell, ...values));
       } else {
         this.collection.addConstraint(new constraintClass(values.join('_'), ...cells));
@@ -973,15 +973,15 @@ ConstraintCategoryInput.ChaosConstruction = class ChaosConstruction extends Mult
   }
 
   _toRegionCell(cellId) {
-    const cell = this._shape.parseCellId(cellId).cell;
-    if (cell >= this._shape.numGridCells) return cellId;
-    return this._shape.makeCellIdFromIndex(
-      this._shape.varCellsForGroup('CC')[cell]);
+    const cell = this._geometry.parseCellId(cellId).cell;
+    if (cell >= this._geometry.numGridCells) return cellId;
+    return this._geometry.makeCellIdFromIndex(
+      this._geometry.varCellsForGroup('CC')[cell]);
   }
 
   _translateToCCCells(cells) {
     if (cells.some(
-      c => this._shape.parseCellId(c).cell >= this._shape.numGridCells)) {
+      c => this._geometry.parseCellId(c).cell >= this._geometry.numGridCells)) {
       return cells;
     }
     return [cells[0], ...cells.map(c => this._toRegionCell(c))];
@@ -1019,7 +1019,7 @@ ConstraintCategoryInput.ChaosConstruction = class ChaosConstruction extends Mult
 ConstraintCategoryInput.GivenCandidates = class GivenCandidates extends ConstraintCategoryInput {
   constructor(collection, inputManager) {
     super(collection);
-    this._shape = null;
+    this._geometry = null;
 
     inputManager.onNewDigit(this._inputDigit.bind(this));
 
@@ -1038,16 +1038,16 @@ ConstraintCategoryInput.GivenCandidates = class GivenCandidates extends Constrai
     return this._getCellConstraints(cell).flatMap(c => c.values);
   }
 
-  reshape(shape) {
-    this._shape = shape;
-    this._multiValueInputPanel.reshape(shape);
+  reshape(geometry) {
+    this._geometry = geometry;
+    this._multiValueInputPanel.reshape(geometry);
   }
 
   _inputDigit(cell, digit) {
     const values = this._getCellValues(cell);
     const currValue = values.length === 1 ? values[0] : null;
-    const minValue = this._shape.minValue();
-    const maxValue = this._shape.maxValue();
+    const minValue = this._geometry.minValue();
+    const maxValue = this._geometry.maxValue();
 
     let newValue;
     if (digit === null) {
@@ -1093,7 +1093,7 @@ ConstraintCategoryInput.Region = class Region extends ConstraintCategoryInput {
 
   constructor(collection, inputManager, chipView) {
     super(collection);
-    this._shape = null;
+    this._geometry = null;
     this._chipView = chipView;
     this._button = document.getElementById('add-jigsaw-button');
 
@@ -1109,7 +1109,7 @@ ConstraintCategoryInput.Region = class Region extends ConstraintCategoryInput {
     const select = this._regionSizeSelect;
 
     select.onchange = () => {
-      if (!this._shape) return;
+      if (!this._geometry) return;
       const selected = +select.value;
 
       for (const c of this.collection.getConstraintsByKey('RegionSize')) {
@@ -1119,7 +1119,7 @@ ConstraintCategoryInput.Region = class Region extends ConstraintCategoryInput {
         this.collection.removeConstraint(c);
       }
       const defaultSize = CellGeometry.defaultNumValues(
-        this._shape.numRows, this._shape.numCols);
+        this._geometry.numRows, this._geometry.numCols);
       if (selected !== defaultSize) {
         this.collection.addConstraint(new SudokuConstraint.RegionSize(selected));
       }
@@ -1140,12 +1140,12 @@ ConstraintCategoryInput.Region = class Region extends ConstraintCategoryInput {
     };
   }
 
-  _updateRegionSizeSelectForShape(shape) {
+  _updateRegionSizeSelectForShape(geometry) {
     const select = this._regionSizeSelect;
     const checkboxContainer = this._sameValuesCheckbox.parentNode;
 
     // Hide when numValues is default.
-    if (shape.isDefaultNumValues()) {
+    if (geometry.isDefaultNumValues()) {
       select.parentNode.style.display = 'none';
       checkboxContainer.style.display = 'none';
       return;
@@ -1155,8 +1155,8 @@ ConstraintCategoryInput.Region = class Region extends ConstraintCategoryInput {
     checkboxContainer.style.display = 'block';
 
     const defaultNumValues = CellGeometry.defaultNumValues(
-      shape.numRows, shape.numCols);
-    const numValues = shape.numValues;
+      geometry.numRows, geometry.numCols);
+    const numValues = geometry.numValues;
 
     // Populate options (exactly two values).
     clearDOMNode(select);
@@ -1176,7 +1176,7 @@ ConstraintCategoryInput.Region = class Region extends ConstraintCategoryInput {
     button.onclick = () => {
       const cells = inputManager.getSelection();
       this.collection.addConstraint(
-        new SudokuConstraint.Jigsaw(this._shape.name, ...cells));
+        new SudokuConstraint.Jigsaw(this._geometry.name, ...cells));
       this.runUpdateCallback();
     };
 
@@ -1192,22 +1192,22 @@ ConstraintCategoryInput.Region = class Region extends ConstraintCategoryInput {
       () => !button.disabled ? button : null);
   }
 
-  reshape(shape) {
-    this._shape = shape;
+  reshape(geometry) {
+    this._geometry = geometry;
     this.clear();
-    this._updateRegionSizeSelectForShape(shape);
+    this._updateRegionSizeSelectForShape(geometry);
   }
 
   _cellsAreValidJigsawPiece(cells) {
-    const shape = this._shape;
-    if (!shape) return false;
+    const geometry = this._geometry;
+    if (!geometry) return false;
 
-    const requiredLength = shape.isDefaultNumValues()
-      ? shape.numValues : +this._regionSizeSelect.value;
+    const requiredLength = geometry.isDefaultNumValues()
+      ? geometry.numValues : +this._regionSizeSelect.value;
     if (cells.length !== requiredLength) return false;
 
     // Var cells are not valid in jigsaw pieces.
-    if (cells.some(c => shape.parseCellId(c).row === undefined)) return false;
+    if (cells.some(c => geometry.parseCellId(c).row === undefined)) return false;
 
     // Check that we don't conflict with any existing constraints.
     for (const cell of cells) {
@@ -1231,7 +1231,7 @@ ConstraintCategoryInput.Region = class Region extends ConstraintCategoryInput {
   onRemoveConstraint(c) {
     if (c.type === SudokuConstraint.RegionSize.name) {
       this._regionSizeSelect.value = CellGeometry.defaultNumValues(
-        this._shape?.numRows, this._shape?.numCols);
+        this._geometry?.numRows, this._geometry?.numCols);
     } else if (c.type === SudokuConstraint.RegionSameValues.name) {
       this._sameValuesCheckbox.checked = false;
     }
@@ -1263,16 +1263,16 @@ ConstraintCategoryInput.OutsideClue = class OutsideClue extends ConstraintCatego
     return true;
   }
 
-  reshape(shape) {
-    super.reshape(shape);
+  reshape(geometry) {
+    super.reshape(geometry);
     this._outsideArrowMap.clear();
-    const diagonalCellMap = SudokuConstraint.LittleKiller.cellMap(shape);
+    const diagonalCellMap = SudokuConstraint.LittleKiller.cellMap(geometry);
     for (const arrowId in diagonalCellMap) {
       this._outsideArrowMap.set(
         arrowId,
         [OutsideConstraintBase.CLUE_TYPE_DIAGONAL]);
     }
-    for (const [arrowId, cells] of SudokuConstraintBase.fullLineCellMap(shape)) {
+    for (const [arrowId, cells] of SudokuConstraintBase.fullLineCellMap(geometry)) {
       if (cells.length <= 1) continue;
       const clueTypes = [OutsideConstraintBase.CLUE_TYPE_DOUBLE_LINE];
       if (arrowId.endsWith(',1')) {
@@ -1439,12 +1439,12 @@ class JavaScriptCategoryInput extends ConstraintCategoryInput {
       this._tabContent,
       () => this._getFocusTarget());
 
-    this._shape = null;
+    this._geometry = null;
     this._inputManager = inputManager;
   }
 
-  reshape(shape) {
-    this._shape = shape;
+  reshape(geometry) {
+    this._geometry = geometry;
   }
 
   async _runWithSpinner(task) {
@@ -1521,7 +1521,7 @@ ConstraintCategoryInput.Pairwise = class Pairwise extends JavaScriptCategoryInpu
         let key = null;
         try {
           key = await this._userScriptExecutor.compilePairwise(
-            type, fnStr, this._shape.numValues, this._shape.valueOffset);
+            type, fnStr, this._geometry.numValues, this._geometry.valueOffset);
         } catch (e) {
           errorElem.textContent = e;
           return false;
@@ -1668,10 +1668,10 @@ ConstraintCategoryInput.StateMachine = class StateMachine extends JavaScriptCate
               maxDepthExpression: formData.get('max-depth'),
             };
 
-          const shape = this._shape || CellGeometry.newDefault();
+          const geometry = this._geometry || CellGeometry.newDefault();
           const cells = this._inputManager.getSelection();
           const encodedNFA = await this._userScriptExecutor.compileStateMachine(
-            spec, shape.numValues, cells.length, isUnified, shape.valueOffset);
+            spec, geometry.numValues, cells.length, isUnified, geometry.valueOffset);
 
           this.collection.addConstraint(new SudokuConstraint.NFA(
             encodedNFA, name, ...cells));
@@ -1715,7 +1715,7 @@ ConstraintCategoryInput.StateMachine = class StateMachine extends JavaScriptCate
     this._form['unified-mode'].dispatchEvent(new Event('change'));
 
     // Convert the encoded NFA back to JavaScript and populate unified mode.
-    const jsSpec = encodedNFAToJsSpec(constraint.encodedNFA, this._shape?.valueOffset || 0);
+    const jsSpec = encodedNFAToJsSpec(constraint.encodedNFA, this._geometry?.valueOffset || 0);
     this._form['unified-code'].value = jsSpec;
     this._form.dispatchEvent(new Event('change'));
     this._form['unified-code'].focus();
@@ -1764,11 +1764,11 @@ class MultiValueInputPanel {
     }
   };
 
-  reshape(shape) {
+  reshape(geometry) {
     clearDOMNode(this._inputContainer);
     this._valueButtons = [];
 
-    this._allValues = shape.allValues();
+    this._allValues = geometry.allValues();
 
     for (let i = 0; i < this._allValues.length; i++) {
       const label = document.createElement('label');
@@ -1784,7 +1784,7 @@ class MultiValueInputPanel {
       this._valueButtons.push(input);
     }
 
-    const numbersPerLine = Math.ceil(Math.sqrt(shape.numValues));
+    const numbersPerLine = Math.ceil(Math.sqrt(geometry.numValues));
     this._inputContainer.style.setProperty(
       'grid-template-columns', `repeat(${numbersPerLine}, 1fr)`);
   }

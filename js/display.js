@@ -20,11 +20,11 @@ export class DisplayItem {
 
   constructor(svg, cellPositioner) {
     this._svg = svg;
-    this._shape = null;
+    this._geometry = null;
     this._cellPositioner = cellPositioner || null;
   }
 
-  reshape(shape) { this._shape = shape; };
+  reshape(geometry) { this._geometry = geometry; };
 
   getSvg() {
     return this._svg;
@@ -35,7 +35,7 @@ export class DisplayItem {
   }
 
   cellIdCenter(cellId) {
-    return this.cellIndexCenter(this._shape.parseCellId(cellId).cell);
+    return this.cellIndexCenter(this._geometry.parseCellId(cellId).cell);
   }
 
   cellIdTopLeftCorner(cellId) {
@@ -127,10 +127,10 @@ export class DisplayItem {
 
   // Draw a border around the region covered by cellSet, as an SVG group of
   // path segments. cornerCut chamfers diagonal bridges; inset shrinks inward.
-  _makeRegionBorder(cellSet, shape, cornerCut, inset = 0) {
+  _makeRegionBorder(cellSet, geometry, cornerCut, inset = 0) {
     const g = createSvgElement('g');
     const seen = new Set();
-    const graph = shape.cellGraph();
+    const graph = geometry.cellGraph();
     const half = DisplayItem.CELL_SIZE / 2;
     const { LEFT, RIGHT, UP, DOWN } = CellGraph;
 
@@ -356,32 +356,32 @@ export class CellValueDisplay extends DisplayItem {
     this._valueOffsets = [];
   }
 
-  reshape(shape) {
-    super.reshape(shape);
+  reshape(geometry) {
+    super.reshape(geometry);
     this._valueMap = [];
-    for (let v of shape.allValues()) {
+    for (let v of geometry.allValues()) {
       this._valueMap[v] = this._valueFn(v);
     }
 
-    this._valueOffsets = this._calculateMultiValueLayout(shape);
+    this._valueOffsets = this._calculateMultiValueLayout(geometry);
   }
 
-  _calculateMultiValueLayout(shape) {
+  _calculateMultiValueLayout(geometry) {
     // Pre-compute multi-value layout parameters.
 
     // Note: font size is not quite the same to allow for larger gaps in the
     // large grid.
-    const fontSize = shape.numValues <= GEOMETRY_9x9.numValues ? 15 : 10;
+    const fontSize = geometry.numValues <= GEOMETRY_9x9.numValues ? 15 : 10;
     const fontWidth = fontSize * 0.6;
     const lineHeight = fontSize + 2;
-    const valuesPerLine = Math.ceil(Math.sqrt(shape.numValues));
+    const valuesPerLine = Math.ceil(Math.sqrt(geometry.numValues));
     const yOffset = -DisplayItem.CELL_SIZE / 2 + fontSize;
     const totalWidth = (valuesPerLine * 2 - 1) * fontWidth;
     const xOffset = (-totalWidth + fontWidth) / 2;
     // Position offsets indexed by value.
-    const minValue = shape.minValue();
+    const minValue = geometry.minValue();
     const valueOffsets = [];
-    for (let i = 0; i < shape.numValues; i++) {
+    for (let i = 0; i < geometry.numValues; i++) {
       const v = minValue + i;
       const col = i % valuesPerLine;
       const row = i / valuesPerLine | 0;
@@ -421,7 +421,7 @@ export class CellValueDisplay extends DisplayItem {
   maskCell(cellId) {
     const mask = document.getElementById(this.constructor.GIVENS_MASK_ID);
 
-    const { cell } = this._shape.parseCellId(cellId);
+    const { cell } = this._geometry.parseCellId(cellId);
     const square = this._makeCellSquare(cell);
     square.setAttribute('fill', 'black');
     mask.append(square);
@@ -580,24 +580,24 @@ export class DisplayContainer {
     container.append(this._clickInterceptor.getSvg());
   }
 
-  reshape(shape) {
+  reshape(geometry) {
     const padding = DisplayItem.SVG_PADDING;
-    const width = DisplayItem.CELL_SIZE * shape.numCols + padding * 2;
-    const height = DisplayItem.CELL_SIZE * shape.numRows + padding * 2;
+    const width = DisplayItem.CELL_SIZE * geometry.numCols + padding * 2;
+    const height = DisplayItem.CELL_SIZE * geometry.numRows + padding * 2;
     this._baseHeight = height;
     this._mainSvg.setAttribute('height', height);
     this._mainSvg.setAttribute('width', width);
     this._mainSvg.setAttribute(
       'class',
-      shape.numValues <= GEOMETRY_9x9.numValues
+      geometry.numValues <= GEOMETRY_9x9.numValues
         ? 'grid-size-small' : 'grid-size-large');
 
-    this._cellPositioner.reshape(shape);
-    this._highlightDisplay.reshape(shape);
-    this._clickInterceptor.reshape(shape);
+    this._cellPositioner.reshape(geometry);
+    this._highlightDisplay.reshape(geometry);
+    this._clickInterceptor.reshape(geometry);
 
-    shape.onVarCellsChanged(
-      () => this._updateVarCells(shape.varCellGroups()));
+    geometry.onVarCellsChanged(
+      () => this._updateVarCells(geometry.varCellGroups()));
   }
 
   _setExtraHeight(extraHeight) {
@@ -668,12 +668,12 @@ class ClickInterceptor extends DisplayItem {
     this._varCellRects = [];
   }
 
-  reshape(shape) {
-    super.reshape(shape);
+  reshape(geometry) {
+    super.reshape(geometry);
 
-    const width = DisplayItem.CELL_SIZE * shape.numCols;
+    const width = DisplayItem.CELL_SIZE * geometry.numCols;
     this._gridWidth = width;
-    this._gridHeight = DisplayItem.CELL_SIZE * shape.numRows;
+    this._gridHeight = DisplayItem.CELL_SIZE * geometry.numRows;
     const svg = this.getSvg();
     svg.setAttribute('height', this._gridHeight);
     svg.setAttribute('width', width);
@@ -714,7 +714,7 @@ class ClickInterceptor extends DisplayItem {
   cellAt(x, y) {
     const cellIndex = this._cellPositioner.cellIndexAt(x, y);
     if (cellIndex === null) return null;
-    return this._shape.makeCellIdFromIndex(cellIndex);
+    return this._geometry.makeCellIdFromIndex(cellIndex);
   }
 }
 
@@ -743,7 +743,7 @@ export class SolutionDisplay extends CellValueDisplay {
     this._copyElem = copyElem || null;
     if (this._copyElem) {
       this._copyElem.onclick = () => {
-        const solutionText = toShortSolution(this._currentSolution, this._shape);
+        const solutionText = toShortSolution(this._currentSolution, this._geometry);
         copyToClipboard(solutionText, this._copyElem);
       };
     }
@@ -751,11 +751,11 @@ export class SolutionDisplay extends CellValueDisplay {
     svg.setAttribute('mask', `url(#${this.constructor.GIVENS_MASK_ID})`);
   }
 
-  reshape(shape) {
+  reshape(geometry) {
     // This clears the solution, but importantly it overwrites any pending
     // setSolution calls.
     this.setSolution();
-    super.reshape(shape);
+    super.reshape(geometry);
   }
 
   // Display solution on grid.
@@ -783,7 +783,7 @@ export class SolutionDisplay extends CellValueDisplay {
     this.renderGridValues(solution, colorFn);
 
     if (this._copyElem) {
-      const numCells = this._shape.numGridCells;
+      const numCells = this._geometry.numGridCells;
       this._copyElem.disabled = (
         !this._currentSolution.slice(0, numCells).every(
           v => v != null && isFinite(v)));
@@ -795,7 +795,7 @@ export class HighlightDisplay extends DisplayItem {
   constructor(svg, cellPositioner) {
     super(svg, cellPositioner);
 
-    this._shape = null;
+    this._geometry = null;
     this._applyGridOffset(svg);
     this._groups = new Map();
   }
@@ -833,7 +833,7 @@ export class HighlightDisplay extends DisplayItem {
   }
 
   highlightCell(cellId, cssClass) {
-    const parsed = this._shape.parseCellId(cellId);
+    const parsed = this._geometry.parseCellId(cellId);
     const path = this._makeCellSquare(parsed.cell);
     if (!path) return null;
 
@@ -848,9 +848,9 @@ export class HighlightDisplay extends DisplayItem {
   // BorderedRegion constraints are drawn), returning the element for removal.
   highlightRegion(cellIds, cssClass, inset = 0) {
     const cellSet = new Set(
-      cellIds.map(id => this._shape.parseCellId(id).cell));
+      cellIds.map(id => this._geometry.parseCellId(id).cell));
     const region = this._makeRegionBorder(
-      cellSet, this._shape, /* cornerCut= */ true, inset);
+      cellSet, this._geometry, /* cornerCut= */ true, inset);
     // Shade the interior, behind the border.
     for (const cell of cellSet) {
       const square = this._makeCellSquare(cell);
@@ -877,25 +877,25 @@ export class GridDisplay extends DisplayItem {
     svg.setAttribute('stroke', 'rgb(150, 150, 150)');
   }
 
-  reshape(shape) {
-    super.reshape(shape);
+  reshape(geometry) {
+    super.reshape(geometry);
     this.clear();
 
     const cellSize = DisplayItem.CELL_SIZE;
-    const gridWidth = cellSize * shape.numCols;
-    const gridHeight = cellSize * shape.numRows;
+    const gridWidth = cellSize * geometry.numCols;
+    const gridHeight = cellSize * geometry.numRows;
 
     const grid = this.getSvg();
 
     // Horizontal lines
-    for (let i = 1; i < shape.numRows; i++) {
+    for (let i = 1; i < geometry.numRows; i++) {
       grid.append(this._makePath([
         [0, i * cellSize],
         [gridWidth, i * cellSize],
       ]));
     }
     // Vertical lines
-    for (let i = 1; i < shape.numCols; i++) {
+    for (let i = 1; i < geometry.numCols; i++) {
       grid.append(this._makePath([
         [i * cellSize, 0],
         [i * cellSize, gridHeight],
@@ -916,15 +916,15 @@ export class BorderDisplay extends DisplayItem {
   }
 
   gridWidthPixels() {
-    return DisplayItem.CELL_SIZE * this._shape.numCols;
+    return DisplayItem.CELL_SIZE * this._geometry.numCols;
   }
 
   gridHeightPixels() {
-    return DisplayItem.CELL_SIZE * this._shape.numRows;
+    return DisplayItem.CELL_SIZE * this._geometry.numRows;
   }
 
-  reshape(shape) {
-    super.reshape(shape);
+  reshape(geometry) {
+    super.reshape(geometry);
     this.clear();
 
     const gridWidth = this.gridWidthPixels();
@@ -956,8 +956,8 @@ export class ChaosRegionBorderDisplay extends DisplayItem {
     svg.setAttribute('fill', 'none');
   }
 
-  reshape(shape) {
-    super.reshape(shape);
+  reshape(geometry) {
+    super.reshape(geometry);
     this.clear();
   }
 
@@ -968,11 +968,11 @@ export class ChaosRegionBorderDisplay extends DisplayItem {
       ? this.constructor.COMPLETE_BORDER_WIDTH
       : this.constructor.IN_PROGRESS_BORDER_WIDTH);
 
-    const regionCells = this._shape.varCellsForGroup('CC');
-    if (!regionCells || regionCells.length !== this._shape.numGridCells) return;
-    const graph = this._shape.cellGraph();
+    const regionCells = this._geometry.varCellsForGroup('CC');
+    if (!regionCells || regionCells.length !== this._geometry.numGridCells) return;
+    const graph = this._geometry.cellGraph();
 
-    for (let cell = 0; cell < this._shape.numGridCells; cell++) {
+    for (let cell = 0; cell < this._geometry.numGridCells; cell++) {
       const right = graph.adjacent(cell, CellGraph.RIGHT);
       if (right !== null) this._drawBorderIfDisjoint(solution, regionCells, cell, right);
       const down = graph.adjacent(cell, CellGraph.DOWN);
@@ -1203,19 +1203,19 @@ class CellPositioner {
   static VAR_CELL_LABEL_HEIGHT = 14;
 
   constructor() {
-    this._shape = null;
+    this._geometry = null;
     this._centers = [];
     this._varCellLayout = { extraHeight: 0, layout: [] };
   }
 
-  reshape(shape) {
-    this._shape = shape;
+  reshape(geometry) {
+    this._geometry = geometry;
 
     // Precompute grid cell centers.
     const cellSize = DisplayItem.CELL_SIZE;
-    const numCols = shape.numCols;
-    const centers = new Array(shape.numGridCells);
-    for (let i = 0; i < shape.numGridCells; i++) {
+    const numCols = geometry.numCols;
+    const centers = new Array(geometry.numGridCells);
+    for (let i = 0; i < geometry.numGridCells; i++) {
       const row = i / numCols | 0;
       const col = i % numCols | 0;
       centers[i] = [col * cellSize + cellSize / 2, row * cellSize + cellSize / 2];
@@ -1230,7 +1230,7 @@ class CellPositioner {
 
     // Update centers with var cell positions.
     const cellSize = DisplayItem.CELL_SIZE;
-    const centers = this._centers.slice(0, this._shape.numGridCells);
+    const centers = this._centers.slice(0, this._geometry.numGridCells);
     for (const { group, columns, y } of result.layout) {
       for (let i = 0; i < group.cells.length; i++) {
         const col = i % columns;
@@ -1252,13 +1252,13 @@ class CellPositioner {
 
   cellIndexAt(x, y) {
     const cellSize = DisplayItem.CELL_SIZE;
-    const shape = this._shape;
+    const geometry = this._geometry;
 
     // Grid cells.
     const row = y / cellSize | 0;
     const col = x / cellSize | 0;
-    if (row >= 0 && row < shape.numRows && col >= 0 && col < shape.numCols) {
-      return shape.cellIndex(row, col);
+    if (row >= 0 && row < geometry.numRows && col >= 0 && col < geometry.numCols) {
+      return geometry.cellIndex(row, col);
     }
 
     // Var cells.
@@ -1282,8 +1282,8 @@ class CellPositioner {
     const cellSize = DisplayItem.CELL_SIZE;
     const gap = CellPositioner.VAR_CELL_GAP;
     const labelHeight = CellPositioner.VAR_CELL_LABEL_HEIGHT;
-    const gridHeight = cellSize * this._shape.numRows;
-    const defaultColumns = this._shape.numCols;
+    const gridHeight = cellSize * this._geometry.numRows;
+    const defaultColumns = this._geometry.numCols;
 
     let yNext = gridHeight + gap;
     const layout = [];
@@ -1307,7 +1307,7 @@ class CellPositioner {
   }
 
   totalCells() {
-    return this._shape.totalCells();
+    return this._geometry.totalCells();
   }
 
   cellCenter(cellIndex) {

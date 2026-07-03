@@ -89,7 +89,7 @@ await runTest('PerfectAllDifferent should pass when all cells have distinct fixe
   assert.equal(result, true);
 });
 
-await runTest('PerfectAllDifferent allValues should reflect cell candidates, not shape.numValues', () => {
+await runTest('PerfectAllDifferent allValues should reflect cell candidates, not geometry.numValues', () => {
   // 6 cells in a grid with numValues=9, but cells only have values 1-6.
   const context = new GridTestContext({ gridSize: [1, 6], numValues: 9 });
   const cells = context.cells(6);

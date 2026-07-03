@@ -274,7 +274,7 @@ await runTest('RequiredValues initialize: accepts more than 16 singleton exclusi
   const result = context.initializeHandler(handler, {
     cellExclusions: createCellExclusions({
       allUnique: false,
-      numCells: context.shape.numGridCells,
+      numCells: context.geometry.numGridCells,
     }),
   });
 
@@ -293,11 +293,11 @@ await runTest('RequiredValues offset: enforceConsistency finds hidden single wit
   // RequiredValues [0, 2] in 3 cells.
   // Cell 0 has only 0 → hidden single for 2 in cells 1/2.
   // Cell 1 is the only one with 2, so it becomes a hidden single.
-  const shape = CellGeometry.fromGridSize(1, 4, null, -1);
-  const context = new GridTestContext({ shape });
+  const geometry = CellGeometry.fromGridSize(1, 4, null, -1);
+  const context = new GridTestContext({ geometry });
   const cells = [0, 1, 2];
   const handler = new RequiredValues(cells, [0, 2], /* strict */ true);
-  const cellExclusions = createCellExclusions({ numCells: shape.numGridCells });
+  const cellExclusions = createCellExclusions({ numCells: geometry.numGridCells });
   context.initializeHandler(handler, { cellExclusions });
 
   const grid = context.grid;
@@ -316,11 +316,11 @@ await runTest('RequiredValues offset: enforceConsistency finds hidden single wit
 await runTest('RequiredValues offset: enforceConsistency detects missing value with offset -1', () => {
   // External values [0, 2], offset=-1.
   // If no cell has 0, enforceConsistency returns false.
-  const shape = CellGeometry.fromGridSize(1, 4, null, -1);
-  const context = new GridTestContext({ shape });
+  const geometry = CellGeometry.fromGridSize(1, 4, null, -1);
+  const context = new GridTestContext({ geometry });
   const cells = [0, 1, 2];
   const handler = new RequiredValues(cells, [0, 2], /* strict */ true);
-  const cellExclusions = createCellExclusions({ numCells: shape.numGridCells });
+  const cellExclusions = createCellExclusions({ numCells: geometry.numGridCells });
   context.initializeHandler(handler, { cellExclusions });
 
   const grid = context.grid;
@@ -337,11 +337,11 @@ await runTest('RequiredValues offset: enforceConsistency detects missing value w
 await runTest('RequiredValues offset: enforceConsistency with repeated value and offset -1', () => {
   // External values [1, 1], offset=-1.
   // 2 cells, no exclusions: repeated value 1 must appear twice.
-  const shape = CellGeometry.fromGridSize(1, 4, null, -1);
-  const context = new GridTestContext({ shape });
+  const geometry = CellGeometry.fromGridSize(1, 4, null, -1);
+  const context = new GridTestContext({ geometry });
   const cells = [0, 1];
   const handler = new RequiredValues(cells, [1, 1], /* strict */ true);
-  const cellExclusions = createCellExclusions({ numCells: shape.numGridCells });
+  const cellExclusions = createCellExclusions({ numCells: geometry.numGridCells });
   context.initializeHandler(handler, { cellExclusions });
 
   const grid = context.grid;

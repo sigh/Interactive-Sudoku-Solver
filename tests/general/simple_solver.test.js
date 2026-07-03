@@ -327,7 +327,7 @@ await runTest('empty constraint string uses default 9x9', async () => {
   assert.equal(solution.toString().length, 81);
 });
 
-await runTest('handles constraint with shape', async () => {
+await runTest('handles constraint with geometry', async () => {
   const solver = new SimpleSolver();
   const solution = await solver.solution('.Shape~6x6');
   assert.ok(solution);

@@ -17,8 +17,8 @@ const { SudokuConstraintBase } = await import('../../../js/sudoku_constraint.js'
 await runTest('_addPerfectAllDifferentHandlers: promotes AllDifferent to PerfectAllDifferent with restricted values', () => {
   const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
   // 6x6 grid with numValues=10 (values 1-10).
-  const shape = CellGeometry.fromGridSize(6, 6, 10);
-  const numCells = shape.numGridCells;
+  const geometry = CellGeometry.fromGridSize(6, 6, 10);
+  const numCells = geometry.numGridCells;
 
   // Restrict all 36 grid cells to values 1-6 via GivenCandidates.
   const valueMap = new Map();
@@ -34,7 +34,7 @@ await runTest('_addPerfectAllDifferentHandlers: promotes AllDifferent to Perfect
   const handlerSet = new HandlerSet(
     [givenHandler, allDiffHandler], numCells);
 
-  optimizer._addPerfectAllDifferentHandlers(handlerSet, shape, optimizer._computeEffectiveValues(handlerSet, shape));
+  optimizer._addPerfectAllDifferentHandlers(handlerSet, geometry, optimizer._computeEffectiveValues(handlerSet, geometry));
 
   // PerfectAllDifferent should fire (6 cells, 6 effective values).
   const perfect = handlerSet.getAllofType(HandlerModule.PerfectAllDifferent);
@@ -44,15 +44,15 @@ await runTest('_addPerfectAllDifferentHandlers: promotes AllDifferent to Perfect
 
 await runTest('_addPerfectAllDifferentHandlers: promotes grid-house sized region to PerfectAllDifferent', () => {
   const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
-  const shape = CellGeometry.fromGridSize(9);
-  const numCells = shape.numGridCells;
+  const geometry = CellGeometry.fromGridSize(9);
+  const numCells = geometry.numGridCells;
 
   const rowCells = [0, 1, 2, 3, 4, 5, 6, 7, 8];
   const allDiffHandler = new HandlerModule.AllDifferent(rowCells);
 
   const handlerSet = new HandlerSet([allDiffHandler], numCells);
 
-  optimizer._addPerfectAllDifferentHandlers(handlerSet, shape, optimizer._computeEffectiveValues(handlerSet, shape));
+  optimizer._addPerfectAllDifferentHandlers(handlerSet, geometry, optimizer._computeEffectiveValues(handlerSet, geometry));
 
   const perfect = handlerSet.getAllofType(HandlerModule.PerfectAllDifferent);
   assert.equal(perfect.length, 1);
@@ -62,8 +62,8 @@ await runTest('_addPerfectAllDifferentHandlers: promotes grid-house sized region
 await runTest('_addPerfectAllDifferentHandlers: skips when cell values exceed cell count', () => {
   const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
   // 6x6 grid with numValues=10.
-  const shape = CellGeometry.fromGridSize(6, 6, 10);
-  const numCells = shape.numGridCells;
+  const geometry = CellGeometry.fromGridSize(6, 6, 10);
+  const numCells = geometry.numGridCells;
 
   // Restrict cells to values 1-8 (8 values > 6 cells — not a house).
   const valueMap = new Map();
@@ -78,7 +78,7 @@ await runTest('_addPerfectAllDifferentHandlers: skips when cell values exceed ce
   const handlerSet = new HandlerSet(
     [givenHandler, allDiffHandler], numCells);
 
-  optimizer._addPerfectAllDifferentHandlers(handlerSet, shape, optimizer._computeEffectiveValues(handlerSet, shape));
+  optimizer._addPerfectAllDifferentHandlers(handlerSet, geometry, optimizer._computeEffectiveValues(handlerSet, geometry));
   assert.equal(
     handlerSet.getAllofType(HandlerModule.PerfectAllDifferent).length, 0);
 });
@@ -86,8 +86,8 @@ await runTest('_addPerfectAllDifferentHandlers: skips when cell values exceed ce
 await runTest('_addPerfectAllDifferentHandlers: promotes subset AllDifferent on standard grid', () => {
   const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
   // Standard 9x9 grid.
-  const shape = CellGeometry.fromGridSize(9);
-  const numCells = shape.numGridCells;
+  const geometry = CellGeometry.fromGridSize(9);
+  const numCells = geometry.numGridCells;
 
   // 4 cells restricted to {1,2,3,4} via GivenCandidates.
   const subsetCells = [0, 1, 2, 3];
@@ -101,7 +101,7 @@ await runTest('_addPerfectAllDifferentHandlers: promotes subset AllDifferent on 
   const handlerSet = new HandlerSet(
     [givenHandler, allDiffHandler], numCells);
 
-  optimizer._addPerfectAllDifferentHandlers(handlerSet, shape, optimizer._computeEffectiveValues(handlerSet, shape));
+  optimizer._addPerfectAllDifferentHandlers(handlerSet, geometry, optimizer._computeEffectiveValues(handlerSet, geometry));
   const perfect = handlerSet.getAllofType(HandlerModule.PerfectAllDifferent);
   assert.equal(perfect.length, 1);
   assert.deepEqual([...perfect[0].cells], subsetCells);
@@ -109,8 +109,8 @@ await runTest('_addPerfectAllDifferentHandlers: promotes subset AllDifferent on 
 
 await runTest('_addPerfectAllDifferentHandlers: skips AllDifferent with 2 or fewer cells', () => {
   const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
-  const shape = CellGeometry.fromGridSize(9);
-  const numCells = shape.numGridCells;
+  const geometry = CellGeometry.fromGridSize(9);
+  const numCells = geometry.numGridCells;
 
   // 2 cells restricted to {1,2} — would match but too small to be useful.
   const smallCells = [0, 1];
@@ -124,7 +124,7 @@ await runTest('_addPerfectAllDifferentHandlers: skips AllDifferent with 2 or few
   const handlerSet = new HandlerSet(
     [givenHandler, allDiffHandler], numCells);
 
-  optimizer._addPerfectAllDifferentHandlers(handlerSet, shape, optimizer._computeEffectiveValues(handlerSet, shape));
+  optimizer._addPerfectAllDifferentHandlers(handlerSet, geometry, optimizer._computeEffectiveValues(handlerSet, geometry));
   assert.equal(
     handlerSet.getAllofType(HandlerModule.PerfectAllDifferent).length, 0);
 });
@@ -136,8 +136,8 @@ await runTest('_addPerfectAllDifferentHandlers: skips AllDifferent with 2 or few
 await runTest('_addGridHouseIntersections: creates intersections for restricted grid', () => {
   const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
   // 6x6 grid with numValues=10 (values 0-9).
-  const shape = CellGeometry.fromGridSize(6, 6, 10);
-  const numCells = shape.numGridCells;
+  const geometry = CellGeometry.fromGridSize(6, 6, 10);
+  const numCells = geometry.numGridCells;
 
   // Restrict all cells to values 1-6 via GivenCandidates.
   const valueMap = new Map();
@@ -147,7 +147,7 @@ await runTest('_addGridHouseIntersections: creates intersections for restricted 
   const givenHandler = new HandlerModule.GivenCandidates(valueMap);
 
   // Box regions for 6x6: 2x3 boxes.
-  const boxRegions = SudokuConstraintBase.boxRegions(shape);
+  const boxRegions = SudokuConstraintBase.boxRegions(geometry);
 
   // Add AllDifferent for row 0, row 1, box 0, and box 1.
   const row0 = [0, 1, 2, 3, 4, 5];
@@ -163,12 +163,12 @@ await runTest('_addGridHouseIntersections: creates intersections for restricted 
   const handlerSet = new HandlerSet(handlers, numCells);
 
   // First promote to PerfectAllDifferent.
-  optimizer._addPerfectAllDifferentHandlers(handlerSet, shape, optimizer._computeEffectiveValues(handlerSet, shape));
+  optimizer._addPerfectAllDifferentHandlers(handlerSet, geometry, optimizer._computeEffectiveValues(handlerSet, geometry));
   assert.equal(
     handlerSet.getAllofType(HandlerModule.PerfectAllDifferent).length, 4);
 
   // Now test intersections with 2x3 box regions.
-  optimizer._addGridHouseIntersections(handlerSet, boxRegions, shape);
+  optimizer._addGridHouseIntersections(handlerSet, boxRegions, geometry);
 
   const sameValues = handlerSet.getAllofType(
     HandlerModule.SameValuesIgnoreCount);
@@ -178,8 +178,8 @@ await runTest('_addGridHouseIntersections: creates intersections for restricted 
 
 await runTest('_addGridHouseIntersections: skips pairing handlers with different value masks', () => {
   const optimizer = new SudokuConstraintOptimizer({ enableLogs: false });
-  const shape = CellGeometry.fromGridSize(6, 6, 10);
-  const numCells = shape.numGridCells;
+  const geometry = CellGeometry.fromGridSize(6, 6, 10);
+  const numCells = geometry.numGridCells;
 
   // Row 0 cells restricted to {1,2,3,4,5,6}.
   // Row 1 cells restricted to {4,5,6,7,8,9}.
@@ -200,15 +200,15 @@ await runTest('_addGridHouseIntersections: skips pairing handlers with different
   const handlerSet = new HandlerSet(
     [givenHandler, allDiff0, allDiff1], numCells);
 
-  optimizer._addPerfectAllDifferentHandlers(handlerSet, shape, optimizer._computeEffectiveValues(handlerSet, shape));
+  optimizer._addPerfectAllDifferentHandlers(handlerSet, geometry, optimizer._computeEffectiveValues(handlerSet, geometry));
   const perfects = handlerSet.getAllofType(
     HandlerModule.PerfectAllDifferent);
   assert.equal(perfects.length, 2);
   // Verify they have different value masks.
   assert.notEqual(perfects[0].valueMask(), perfects[1].valueMask());
 
-  const boxRegions = SudokuConstraintBase.boxRegions(shape);
-  optimizer._addGridHouseIntersections(handlerSet, boxRegions, shape);
+  const boxRegions = SudokuConstraintBase.boxRegions(geometry);
+  optimizer._addGridHouseIntersections(handlerSet, boxRegions, geometry);
 
   // No SameValuesIgnoreCount should be created (different value masks).
   const sameValues = handlerSet.getAllofType(

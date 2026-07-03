@@ -108,7 +108,7 @@ const bestOf = (repeat, fn) => {
   return result;
 };
 
-// A result row as a plain object — the shared shape for both TSV and JSON output.
+// A result row as a plain object — the shared geometry for both TSV and JSON output.
 // `vsBase` is only present under --compare.
 const toRow = (r, label, vsBase) => {
   const s = r.msStats ?? { min: r.elapsedMs, median: r.elapsedMs, max: r.elapsedMs };

@@ -1,7 +1,7 @@
 // Smoke test for the tests/debug CLI tools.
 //
 // These tools instrument solver internals (e.g. the candidate selector's return
-// shape), so they break silently when an internal API changes — this catches
+// geometry), so they break silently when an internal API changes — this catches
 // that drift. Each tool exports `main(argv)` and throws on failure, so the tests
 // run them IN-PROCESS: the heavy solver + collections module graph loads once
 // (when this file imports the three tools), and each case is a cheap call. Adding
@@ -53,7 +53,7 @@ await runTest('solve.js requires an explicit --max-backtracks', () => {
 
 // One call exercises the whole step-inspection surface: the walk table, the
 // candidate-selector instrumentation (--explain, the path that silently broke
-// when _selectBestCandidate changed shape), pencilmarks/var cells, and the
+// when _selectBestCandidate changed geometry), pencilmarks/var cells, and the
 // per-step propagation log (--log).
 await runTest('step_analysis.js walk + explain + grid + vars + log', () => {
   const { stdout, thrown } = capture(() => stepMain(argv('step_analysis.js',

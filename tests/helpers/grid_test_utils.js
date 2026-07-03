@@ -25,7 +25,7 @@ const DEFAULT_NUM_CELLS = 81;
  * - Prefer `context.initializeHandler(handler)` to avoid boilerplate; pass `{ cellExclusions, state }` only when the test is about them.
  * - `context.grid` is cached per context; use a fresh context when you need an independent grid.
  * - Build candidate masks with `valueMask(...values)` (values are 1-indexed), or via `applyCandidates`.
- * - If something needs a cell count (e.g. `createCellExclusions`), use `context.shape.numGridCells`.
+ * - If something needs a cell count (e.g. `createCellExclusions`), use `context.geometry.numGridCells`.
  * - Consider when the API might evolve; for example if a resetGrid method would be useful on the context.
  * - Update this guidance as needed when you notice common patterns.
  */
@@ -47,21 +47,21 @@ export class GridTestContext {
   constructor({
     gridSize = DEFAULT_NUM_VALUES,
     numValues = null,
-    shape,
+    geometry,
   } = {}) {
-    this.shape = (() => {
-      if (shape) return (numValues === null || numValues === undefined) ? shape : CellGeometry.fromGridSize(shape.numRows, shape.numCols, numValues);
+    this.geometry = (() => {
+      if (geometry) return (numValues === null || numValues === undefined) ? geometry : CellGeometry.fromGridSize(geometry.numRows, geometry.numCols, numValues);
 
       const dims = normalizeGridSize(gridSize);
       if (!dims) throw new Error(`Invalid gridSize: ${gridSize}`);
       const [numRows, numCols] = dims;
 
-      const baseShape = CellGeometry.fromGridSize(numRows, numCols, numValues);
-      if (!baseShape) throw new Error(`Invalid gridSize: ${gridSize}`);
-      return baseShape;
+      const baseGeometry = CellGeometry.fromGridSize(numRows, numCols, numValues);
+      if (!baseGeometry) throw new Error(`Invalid gridSize: ${gridSize}`);
+      return baseGeometry;
     })();
 
-    this.lookupTables = LookupTables.get(this.shape.numValues);
+    this.lookupTables = LookupTables.get(this.geometry.numValues);
 
     this._grid = null;
   }
@@ -73,13 +73,13 @@ export class GridTestContext {
 
   initializeHandler(handler, { cellExclusions, state } = {}) {
     const grid = this.grid;
-    const resolvedCellExclusions = cellExclusions ?? createCellExclusions({ numCells: this.shape.numGridCells });
+    const resolvedCellExclusions = cellExclusions ?? createCellExclusions({ numCells: this.geometry.numGridCells });
     const resolvedState = state ?? createStateAllocator(grid);
-    return handler.initialize(grid, resolvedCellExclusions, this.shape, resolvedState);
+    return handler.initialize(grid, resolvedCellExclusions, this.geometry, resolvedState);
   }
 
   createGrid({ fill = this.lookupTables.allValues } = {}) {
-    const grid = new Array(this.shape.numGridCells).fill(fill);
+    const grid = new Array(this.geometry.numGridCells).fill(fill);
     this._grid = grid;
     return grid;
   }
@@ -91,7 +91,7 @@ export class GridTestContext {
   }
 
   cells(...args) {
-    if (args.length === 0) return this._range(this.shape.numGridCells);
+    if (args.length === 0) return this._range(this.geometry.numGridCells);
 
     if (args.length === 1) {
       const [only] = args;
@@ -104,14 +104,14 @@ export class GridTestContext {
 
   row(rowIndex) {
     if (!Number.isInteger(rowIndex)) throw new Error(`Invalid row index: ${rowIndex}`);
-    if (rowIndex < 0 || rowIndex >= this.shape.numRows) throw new Error(`Row out of bounds: ${rowIndex}`);
-    return this._range(this.shape.numCols, rowIndex * this.shape.numCols);
+    if (rowIndex < 0 || rowIndex >= this.geometry.numRows) throw new Error(`Row out of bounds: ${rowIndex}`);
+    return this._range(this.geometry.numCols, rowIndex * this.geometry.numCols);
   }
 
   col(colIndex) {
     if (!Number.isInteger(colIndex)) throw new Error(`Invalid col index: ${colIndex}`);
-    if (colIndex < 0 || colIndex >= this.shape.numCols) throw new Error(`Col out of bounds: ${colIndex}`);
-    return Array.from({ length: this.shape.numRows }, (_, r) => r * this.shape.numCols + colIndex);
+    if (colIndex < 0 || colIndex >= this.geometry.numCols) throw new Error(`Col out of bounds: ${colIndex}`);
+    return Array.from({ length: this.geometry.numRows }, (_, r) => r * this.geometry.numCols + colIndex);
   }
 }
 

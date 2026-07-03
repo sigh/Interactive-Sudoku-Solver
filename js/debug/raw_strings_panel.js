@@ -36,7 +36,7 @@ export class RawStringsPanel {
     if (constraint) {
       line.addEventListener('mouseenter', () => {
         this._highlighter.setCells(
-          constraint.getCells(this._constraintManager._shape), line);
+          constraint.getCells(this._constraintManager._geometry), line);
       });
       line.addEventListener('mouseleave', () => this._highlighter.clear());
     }

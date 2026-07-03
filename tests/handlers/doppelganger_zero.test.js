@@ -28,12 +28,12 @@ const ZERO = valueMask0(0);
 const makeShape = () => CellGeometry.fromGridSize(9, 9, 10, -1);
 
 const makeContext = (numStateCells = 3) => {
-  const shape = makeShape();
+  const geometry = makeShape();
   // Use cells 0 (gridCell), 1, 2, [3] (stateCells).
   const gridCell = 0;
   const stateCells = Array.from({ length: numStateCells }, (_, i) => i + 1);
   const handler = new DoppelgangerZero(gridCell, stateCells);
-  const context = new GridTestContext({ shape });
+  const context = new GridTestContext({ geometry });
   return { handler, context, gridCell, stateCells };
 };
 
@@ -57,13 +57,13 @@ await runTest('DoppelgangerZero constructor accepts 3 state cells', () => {
 // places the state cells at indices > 255 (which a Uint8 cell store would
 // truncate, causing the handler to read/write the wrong low-index cells).
 await runTest('v=1: excludes fixed value among var cells at indices > 255', () => {
-  const shape = makeShape();
+  const geometry = makeShape();
   const gridCell = 0;
   const stateCells = [300, 301, 302];
   const handler = new DoppelgangerZero(gridCell, stateCells);
-  assert.equal(handler.initialize(null, null, shape), true);
+  assert.equal(handler.initialize(null, null, geometry), true);
 
-  const allValues = new GridTestContext({ shape }).lookupTables.allValues;
+  const allValues = new GridTestContext({ geometry }).lookupTables.allValues;
   const grid = new Array(303).fill(allValues);
   grid[gridCell] = ZERO;                       // v === 1 branch
   grid[stateCells[0]] = valueMask0(3);         // fixed to 3
@@ -96,9 +96,9 @@ await runTest('DoppelgangerZero initialize succeeds with valueOffset -1', () => 
 });
 
 await runTest('DoppelgangerZero initialize fails with valueOffset 0', () => {
-  const shape = CellGeometry.fromGridSize(9);
+  const geometry = CellGeometry.fromGridSize(9);
   const handler = new DoppelgangerZero(0, [1, 2, 3]);
-  const context = new GridTestContext({ shape });
+  const context = new GridTestContext({ geometry });
   assert.throws(() => context.initializeHandler(handler));
 });
 

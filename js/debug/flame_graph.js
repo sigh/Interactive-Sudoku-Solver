@@ -26,7 +26,7 @@ const formatTick = (ms) => {
 export class DebugFlameGraphView {
   constructor(parentContainer, { highlighter, valueDisplay }) {
     // Dependencies.
-    this._shape = null;
+    this._geometry = null;
     this._highlighter = highlighter;
     this._valueDisplay = valueDisplay;
 
@@ -100,8 +100,8 @@ export class DebugFlameGraphView {
     this._render();
   }
 
-  reshape(shape) {
-    this._shape = shape;
+  reshape(geometry) {
+    this._geometry = geometry;
 
     this._render();
   }
@@ -133,7 +133,7 @@ export class DebugFlameGraphView {
 
     const numSamples = this._store.getNumSamples();
     if (!numSamples) return;
-    if (!this._shape) return;
+    if (!this._geometry) return;
 
     const AXIS_HEIGHT = 14;
     const ROW_HEIGHT = 16;
@@ -210,7 +210,7 @@ export class DebugFlameGraphView {
         overlayLayer.appendChild(outline);
 
         if (nodeW >= MIN_LABEL_WIDTH) {
-          const cellId = this._shape.makeCellIdFromIndex(node.cellIndex);
+          const cellId = this._geometry.makeCellIdFromIndex(node.cellIndex);
           const text = createSvgElement('text');
           text.classList.add('debug-flame-label');
           text.style.pointerEvents = 'none';
@@ -228,7 +228,7 @@ export class DebugFlameGraphView {
           const w = x1 - x0;
           if (w <= 0) continue;
 
-          const color = getColorForValue(seg.value, this._shape.numValues);
+          const color = getColorForValue(seg.value, this._geometry.numValues);
 
           const rect = createSvgElement('rect');
           rect.classList.add('debug-flame-rect');
@@ -285,7 +285,7 @@ export class DebugFlameGraphView {
   }
 
   _updateTooltip(pointer) {
-    if (!this._shape) return;
+    if (!this._geometry) return;
 
     const tooltip = this._tooltip;
 
@@ -294,7 +294,7 @@ export class DebugFlameGraphView {
     const entry = this._store.getDepthEntryAtSample(hover.depth, hover.sampleIndex);
     if (!entry) return;
 
-    const cellId = this._shape.makeCellIdFromIndex(entry.node.cellIndex);
+    const cellId = this._geometry.makeCellIdFromIndex(entry.node.cellIndex);
     const startTimeMs = entry.segment.startTimeMs;
     const endTimeMs = entry.segment.endTimeMs;
     const durationMs = (Number.isFinite(startTimeMs) && Number.isFinite(endTimeMs))
@@ -342,11 +342,11 @@ export class DebugFlameGraphView {
 
   _syncHover() {
     const hover = this._hover;
-    if (!this._shape || hover.sampleIndex === null) return;
+    if (!this._geometry || hover.sampleIndex === null) return;
     const entry = this._store.getDepthEntryAtSample(hover.depth, hover.sampleIndex);
     if (!entry) return;
 
-    const cellId = this._shape.makeCellIdFromIndex(entry.node.cellIndex);
+    const cellId = this._geometry.makeCellIdFromIndex(entry.node.cellIndex);
     this._highlighter.setCells([cellId]);
 
     // Show values up to (and including) the hovered depth at the hovered time.
@@ -656,7 +656,7 @@ export class FlameGraphStore {
 
 export class FlameGraphManager {
   constructor(container, displayContainer) {
-    this._shape = null;
+    this._geometry = null;
     this._enabled = false;
 
     // Create highlighter for hover effects.
@@ -679,10 +679,10 @@ export class FlameGraphManager {
     this._flameGraphView.setEnabled(enabled);
   }
 
-  reshape(shape) {
-    this._shape = shape;
-    this._valueDisplay.reshape(shape);
-    this._flameGraphView.reshape(shape);
+  reshape(geometry) {
+    this._geometry = geometry;
+    this._valueDisplay.reshape(geometry);
+    this._flameGraphView.reshape(geometry);
   }
 
   clear() {

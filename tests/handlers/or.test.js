@@ -13,14 +13,14 @@ const { LookupTables } = await import('../../js/solver/lookup_tables.js');
 // with a grid-like array. This helper handles both.
 // Or uses .set() and .fill() on grids, so typed arrays are required.
 function initOrHandler(context, handler) {
-  const numCells = context.shape.totalCells();
+  const numCells = context.geometry.totalCells();
 
   // Convert the grid to Uint16Array for Or compatibility.
   const plainGrid = context.grid;
   const typedGrid = new Uint16Array(numCells);
   for (let i = 0; i < plainGrid.length; i++) typedGrid[i] = plainGrid[i];
   // Fill var cells with allValues.
-  const allValues = LookupTables.get(context.shape.numValues).allValues;
+  const allValues = LookupTables.get(context.geometry.numValues).allValues;
   for (let i = plainGrid.length; i < numCells; i++) typedGrid[i] = allValues;
   context._grid = typedGrid;
 
@@ -33,8 +33,8 @@ function initOrHandler(context, handler) {
     }
   };
 
-  const cellExclusions = createCellExclusions({ numCells: context.shape.numGridCells });
-  const result = handler.initialize(typedGrid, cellExclusions, context.shape, stateAllocator);
+  const cellExclusions = createCellExclusions({ numCells: context.geometry.numGridCells });
+  const result = handler.initialize(typedGrid, cellExclusions, context.geometry, stateAllocator);
 
   if (result && extraState.length) {
     // Extend the grid to include the extra state.
@@ -84,10 +84,10 @@ await runTest('init prunes infeasible handlers', () => {
   assert.equal(result, true);
 });
 
-// Helper: create a context with a shape that has var cells.
+// Helper: create a context with a geometry that has var cells.
 function contextWithVarCells({ gridSize, numValues, varCellCount }) {
   const context = new GridTestContext({ gridSize, numValues });
-  context.shape._varCellRegistry.addGroups([
+  context.geometry._varCellRegistry.addGroups([
     { prefix: 'VX', count: varCellCount },
   ]);
   return context;
@@ -101,7 +101,7 @@ await runTest('var cells: initialization captures var cell constraints', () => {
   const context = contextWithVarCells({
     gridSize: [1, 4], numValues: 4, varCellCount: 1,
   });
-  const varCell = context.shape.numGridCells;  // = 4
+  const varCell = context.geometry.numGridCells;  // = 4
 
   const branch1 = new GivenCandidates(new Map([[varCell, [1]]]));
   const branch2 = new GivenCandidates(new Map([[varCell, [2]]]));
@@ -122,7 +122,7 @@ await runTest('var cells: enforceConsistency unions var cell values', () => {
   const context = contextWithVarCells({
     gridSize: [1, 4], numValues: 4, varCellCount: 1,
   });
-  const varCell = context.shape.numGridCells;
+  const varCell = context.geometry.numGridCells;
 
   const branch1 = new GivenCandidates(new Map([[varCell, [1]]]));
   const branch2 = new GivenCandidates(new Map([[varCell, [3]]]));
@@ -144,7 +144,7 @@ await runTest('var cells: var cell not left unconstrained', () => {
   const context = contextWithVarCells({
     gridSize: [1, 4], numValues: 4, varCellCount: 1,
   });
-  const varCell = context.shape.numGridCells;
+  const varCell = context.geometry.numGridCells;
   const allValues = LookupTables.get(4).allValues;
 
   const branch1 = new GivenCandidates(new Map([[varCell, [1]]]));

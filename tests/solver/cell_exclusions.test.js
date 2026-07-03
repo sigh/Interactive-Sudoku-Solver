@@ -10,7 +10,7 @@ const HandlerModule = await import('../../js/solver/handlers.js' + self.VERSION_
 const { BitSet } = await import('../../js/util.js' + self.VERSION_PARAM);
 
 const context = new GridTestContext({ gridSize: 9 });
-const GEOMETRY_9x9 = context.shape;
+const GEOMETRY_9x9 = context.geometry;
 
 const createHandlerSet = (handlers = []) => {
   return new HandlerSet(handlers, GEOMETRY_9x9.numGridCells);

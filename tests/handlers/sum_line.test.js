@@ -94,8 +94,8 @@ await runTest('offset: external values used for partial sums', () => {
   // 2 cells, sum=3, offset=-1. External values 0-3.
   // External 0 contributes 0 to sum, external 3 contributes 3.
   // Valid: 0+3=3, 3+0=3, 1+2=3, 2+1=3.
-  const shape = CellGeometry.fromGridSize(1, 4, null, -1);
-  const context = new GridTestContext({ shape });
+  const geometry = CellGeometry.fromGridSize(1, 4, null, -1);
+  const context = new GridTestContext({ geometry });
   const handler = new SumLine([0, 1], false, 3);
   context.initializeHandler(handler);
 
@@ -114,8 +114,8 @@ await runTest('offset: constrains cell to correct external value', () => {
   // 2 cells, sum=3, offset=-1. Cell 0 fixed to 1.
   // Cell 1 must contribute so total = multiple of 3.
   // 0→total 1 (no), 1→total 2 (no), 2→total 3 (yes), 3→total 4 (no).
-  const shape = CellGeometry.fromGridSize(1, 4, null, -1);
-  const context = new GridTestContext({ shape });
+  const geometry = CellGeometry.fromGridSize(1, 4, null, -1);
+  const context = new GridTestContext({ geometry });
   const handler = new SumLine([0, 1], false, 3);
   context.initializeHandler(handler);
 
@@ -131,8 +131,8 @@ await runTest('offset: constrains cell to correct external value', () => {
 await runTest('offset: non-multiple external sum fails', () => {
   // 2 cells, sum=3, offset=-1. Cell 0 = 0, Cell 1 = 1.
   // Total = 0+1 = 1. 1 mod 3 ≠ 0 → fail.
-  const shape = CellGeometry.fromGridSize(1, 4, null, -1);
-  const context = new GridTestContext({ shape });
+  const geometry = CellGeometry.fromGridSize(1, 4, null, -1);
+  const context = new GridTestContext({ geometry });
   const handler = new SumLine([0, 1], false, 3);
   context.initializeHandler(handler);
 

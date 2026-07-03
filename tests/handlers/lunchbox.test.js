@@ -363,8 +363,8 @@ await runTest('offset: per-distance combinations adjust correctly', () => {
   //
   // With 4-cell house [s1, inner, s2, outer], sentinels at positions 0,2:
   // inner = cell 1 with internal value 3, outer = cell 3 with internal value 2.
-  const shape = CellGeometry.fromGridSize(1, 4, null, -1);
-  const context = new GridTestContext({ shape });
+  const geometry = CellGeometry.fromGridSize(1, 4, null, -1);
+  const context = new GridTestContext({ geometry });
   const handler = new Lunchbox([0, 1, 2, 3], 2);
   context.initializeHandler(handler);
 
@@ -385,8 +385,8 @@ await runTest('offset: house shortcut adjusts target sum', () => {
   // Sentinels at fixed positions 0 and 3. Inner cells: 1 and 2.
   // 2 inner cells. internalTarget = 1 - (-1)*2 = 3.
   // Inner cells internal min/max range check against internalTarget=3.
-  const shape = CellGeometry.fromGridSize(1, 4, null, -1);
-  const context = new GridTestContext({ shape });
+  const geometry = CellGeometry.fromGridSize(1, 4, null, -1);
+  const context = new GridTestContext({ geometry });
   const handler = new Lunchbox([0, 1, 2, 3], 1);
   context.initializeHandler(handler);
 
@@ -410,8 +410,8 @@ await runTest('offset: house shortcut passes with correct sum', () => {
   // 4-cell house, numValues=4, offset=-1. Sum=3.
   // Sentinels at 0 and 3. 2 inner cells: target = 3 - (-1)*2 = 5.
   // Inner internal sum = 2+3 = 5. Matches!
-  const shape = CellGeometry.fromGridSize(1, 4, null, -1);
-  const context = new GridTestContext({ shape });
+  const geometry = CellGeometry.fromGridSize(1, 4, null, -1);
+  const context = new GridTestContext({ geometry });
   const handler = new Lunchbox([0, 1, 2, 3], 3);
   context.initializeHandler(handler);
 

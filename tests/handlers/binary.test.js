@@ -527,8 +527,8 @@ await runTest('binaryKeyToFnString: no offset uses 1-based values', () => {
 });
 
 await runTest('BinaryConstraint: enforces 0-based key correctly', () => {
-  const shape = CellGeometry.fromGridSize(1, 4, null, -1);
-  const context = new GridTestContext({ shape });
+  const geometry = CellGeometry.fromGridSize(1, 4, null, -1);
+  const context = new GridTestContext({ geometry });
   // "sum equals 3" in 0-based: pairs (0,3),(1,2),(2,1),(3,0)
   const key = fnToBinaryKey((a, b) => a + b === 3, 4, -1);
   const handler = new BinaryConstraint(0, 1, key);

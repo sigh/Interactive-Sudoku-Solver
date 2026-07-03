@@ -75,9 +75,9 @@ class BaseConstraintDisplayItem extends DisplayItem {
   // By default, makeIcon returns a shaded grey region for the cells in the
   // constraint.
   makeIcon(constraint, options) {
-    const cells = constraint.getCells(this._shape);
+    const cells = constraint.getCells(this._geometry);
     if (!cells.length) return null;
-    const cellIds = cells.map(c => this._shape.parseCellId(c).cell);
+    const cellIds = cells.map(c => this._geometry.parseCellId(c).cell);
 
     const g = createSvgElement('g');
 
@@ -264,11 +264,11 @@ class Jigsaw extends BaseConstraintDisplayItem {
 
   drawItem(constraint, _) {
     const region = constraint.cells;
-    const shape = this._shape;
-    const cellSet = new Set(region.map(c => shape.parseCellId(c).cell));
-    const graph = shape.cellGraph();
+    const geometry = this._geometry;
+    const cellSet = new Set(region.map(c => geometry.parseCellId(c).cell));
+    const graph = geometry.cellGraph();
 
-    const g = this._makeRegionBorder(cellSet, shape, /* cornerCut= */ false);
+    const g = this._makeRegionBorder(cellSet, geometry, /* cornerCut= */ false);
     g.setAttribute('stroke-width', 2);
     g.setAttribute('stroke', 'rgb(100, 100, 100)');
     g.setAttribute('stroke-linecap', 'round');
@@ -303,9 +303,9 @@ class Jigsaw extends BaseConstraintDisplayItem {
 
     // Find the current missing cells.
     const missingCells = new Set();
-    for (let i = 0; i < this._shape.numGridCells; i++) missingCells.add(i);
+    for (let i = 0; i < this._geometry.numGridCells; i++) missingCells.add(i);
     this._regionElems.forEach(
-      cs => cs.forEach(c => missingCells.delete(this._shape.parseCellId(c).cell)));
+      cs => cs.forEach(c => missingCells.delete(this._geometry.parseCellId(c).cell)));
 
     // Shade in the missing cells.
     for (const cell of missingCells) {
@@ -326,7 +326,7 @@ class Indexing extends BaseConstraintDisplayItem {
 
     for (const cellId of cells) {
       const path = this._makeCellSquare(
-        this._shape.parseCellId(cellId).cell);
+        this._geometry.parseCellId(cellId).cell);
       path.setAttribute('fill', fill);
       path.setAttribute('opacity', '0.2');
 
@@ -367,7 +367,7 @@ class GenericLine extends BaseConstraintDisplayItem {
 
   _makeItem(constraint, options) {
     // TODO: Inline cellArgs.
-    const cellArgs = new CellArgs(constraint.getCells(this._shape), constraint.type);
+    const cellArgs = new CellArgs(constraint.getCells(this._geometry), constraint.type);
     const cells = cellArgs.cells().slice();
     if (cellArgs.isLoop()) {
       cells.push(cells[0]);
@@ -397,16 +397,16 @@ class Chaos extends BaseConstraintDisplayItem {
 
   _makeItem(constraint, options, includeRegionCells = true) {
     const g = createSvgElement('g');
-    const shape = this._shape;
-    const regionCells = shape.varCellsForGroup('CC');
+    const geometry = this._geometry;
+    const regionCells = geometry.varCellsForGroup('CC');
     if (!regionCells) return g;
 
     const controlCellId = constraint.cells[0];
-    const controlCellIndex = shape.parseCellId(controlCellId).cell;
+    const controlCellIndex = geometry.parseCellId(controlCellId).cell;
 
     g.append(this._makeCircle(this.cellIdCenter(controlCellId)));
 
-    if (includeRegionCells && controlCellIndex < shape.numGridCells) {
+    if (includeRegionCells && controlCellIndex < geometry.numGridCells) {
       g.append(this._makeCircle(
         this.cellIndexCenter(regionCells[controlCellIndex]), /* dashed= */ true));
     }
@@ -427,25 +427,25 @@ class Chaos extends BaseConstraintDisplayItem {
   }
 
   _appendArrows(g, constraint, regionCells, includeRegionCells) {
-    const shape = this._shape;
+    const geometry = this._geometry;
     const controlCell = constraint.cells[0];
     const regionCellOffset = regionCells[0];
-    const arms = constraint.expandedArms(shape);
+    const arms = constraint.expandedArms(geometry);
 
     for (const arm of arms) {
       const group = [controlCell];
       for (const cellId of arm) {
-        group.push(shape.makeCellIdFromIndex(shape.parseCellId(cellId).cell - regionCellOffset));
+        group.push(geometry.makeCellIdFromIndex(geometry.parseCellId(cellId).cell - regionCellOffset));
       }
       const item = this._makeArrowLine(group, regionCellOffset);
       if (item) g.append(item);
     }
 
-    const controlCellIndex = shape.parseCellId(controlCell).cell;
+    const controlCellIndex = geometry.parseCellId(controlCell).cell;
     if (includeRegionCells
-      && controlCellIndex < shape.numGridCells
-      && regionCells.length === shape.numGridCells) {
-      const controlRegionCell = shape.makeCellIdFromIndex(regionCells[controlCellIndex]);
+      && controlCellIndex < geometry.numGridCells
+      && regionCells.length === geometry.numGridCells) {
+      const controlRegionCell = geometry.makeCellIdFromIndex(regionCells[controlCellIndex]);
       for (const arm of arms) {
         const item = this._makeArrowLine([controlRegionCell, ...arm], regionCellOffset, true);
         if (item) g.append(item);
@@ -457,12 +457,12 @@ class Chaos extends BaseConstraintDisplayItem {
     const points = [];
     let lastCell = null;
     for (const cellId of cells) {
-      const cell = this._shape.parseCellId(cellId).cell;
+      const cell = this._geometry.parseCellId(cellId).cell;
       const point = this.cellIndexCenter(cell);
       if (points.length === 1 && point[0] === points[0][0] && point[1] === points[0][1]) continue;
 
       points.push(point);
-      lastCell = cell < this._shape.numGridCells ? cell : cell - regionCellOffset;
+      lastCell = cell < this._geometry.numGridCells ? cell : cell - regionCellOffset;
     }
     if (points.length < 2) return null;
 
@@ -489,10 +489,10 @@ class Chaos extends BaseConstraintDisplayItem {
 
   _appendBorderedRegion(g, constraint) {
     if (constraint.cells.length < 2) return;
-    const shape = this._shape;
+    const geometry = this._geometry;
     const color = this.constructor.COLOR;
-    const cellSet = new Set(constraint.cells.slice(1).map(c => shape.parseCellId(c).cell));
-    const border = this._makeRegionBorder(cellSet, shape, /* cornerCut= */ true, /* inset= */ 3);
+    const cellSet = new Set(constraint.cells.slice(1).map(c => geometry.parseCellId(c).cell));
+    const border = this._makeRegionBorder(cellSet, geometry, /* cornerCut= */ true, /* inset= */ 3);
     border.setAttribute('stroke', color);
     border.setAttribute('stroke-width', '5');
     border.setAttribute('fill', 'none');
@@ -502,11 +502,11 @@ class Chaos extends BaseConstraintDisplayItem {
   }
 
   _reachesGridEdge(cell, direction) {
-    const [row, col] = this._shape.splitCellIndex(cell);
+    const [row, col] = this._geometry.splitCellIndex(cell);
     return (direction[0] < 0 && col === 0) ||
-      (direction[0] > 0 && col === this._shape.numCols - 1) ||
+      (direction[0] > 0 && col === this._geometry.numCols - 1) ||
       (direction[1] < 0 && row === 0) ||
-      (direction[1] > 0 && row === this._shape.numRows - 1);
+      (direction[1] > 0 && row === this._geometry.numRows - 1);
   }
 
   _straightArmDirection(points) {
@@ -671,7 +671,7 @@ class Dot extends BaseConstraintDisplayItem {
     g.setAttribute('stroke', 'black');
     g.setAttribute('stroke-width', 1);
 
-    for (const [a, b] of constraint.adjacentPairs(this._shape)) {
+    for (const [a, b] of constraint.adjacentPairs(this._geometry)) {
       // Find the midpoint between the squares.
       let [x0, y0] = this.cellIndexCenter(a);
       let [x1, y1] = this.cellIndexCenter(b);
@@ -698,7 +698,7 @@ class Letter extends BaseConstraintDisplayItem {
 
     const g = createSvgElement('g');
 
-    for (const [a, b] of constraint.adjacentPairs(this._shape)) {
+    for (const [a, b] of constraint.adjacentPairs(this._geometry)) {
 
       // Find the midpoint between the squares.
       let [x0, y0] = this.cellIndexCenter(a);
@@ -780,7 +780,7 @@ class ShadedRegion extends BaseConstraintDisplayItem {
 
     const region = createSvgElement('g');
 
-    const cellIndexes = cells.map(c => this._shape.parseCellId(c).cell);
+    const cellIndexes = cells.map(c => this._geometry.parseCellId(c).cell);
     const color = colorOverride || this._chooseCellColor(cellIndexes);
 
     let patternId = null;
@@ -819,10 +819,10 @@ class ShadedRegion extends BaseConstraintDisplayItem {
   }
 
   _chooseCellColor(cellIds) {
-    const shape = this._shape;
+    const geometry = this._geometry;
     // Use a greedy algorithm to choose the graph color.
     const adjacentCells = [];
-    const graph = shape.cellGraph();
+    const graph = geometry.cellGraph();
     for (const cell of cellIds) {
       const edges = graph.cellEdges(cell);
       if (!edges) continue;
@@ -940,10 +940,10 @@ class Diagonal extends BaseConstraintDisplayItem {
 
   drawItem(constraint, _) {
     const direction = constraint.direction;
-    const shape = this._shape;
+    const geometry = this._geometry;
 
-    const gridWidth = DisplayItem.CELL_SIZE * shape.numCols;
-    const gridHeight = DisplayItem.CELL_SIZE * shape.numRows;
+    const gridWidth = DisplayItem.CELL_SIZE * geometry.numCols;
+    const gridHeight = DisplayItem.CELL_SIZE * geometry.numRows;
     const line = this._makePath([
       [0, direction > 0 ? gridHeight : 0],
       [gridWidth, direction > 0 ? 0 : gridHeight],
@@ -975,13 +975,13 @@ class Windoku extends BaseConstraintDisplayItem {
     this.removeItem(null);
   }
 
-  reshape(shape) {
-    super.reshape(shape);
+  reshape(geometry) {
+    super.reshape(geometry);
     super.clear();
 
     const svg = this.getSvg();
 
-    for (const region of SudokuConstraint.Windoku.regions(shape)) {
+    for (const region of SudokuConstraint.Windoku.regions(geometry)) {
       for (const cell of region) {
         svg.append(this._makeCellSquare(cell));
       }
@@ -1017,15 +1017,15 @@ class DefaultRegions extends BaseConstraintDisplayItem {
     this.removeItem(null);
   }
 
-  reshape(shape) {
-    super.reshape(shape);
+  reshape(geometry) {
+    super.reshape(geometry);
     this._draw();
   }
 
   _draw() {
     super.clear();
-    const shape = this._shape;
-    if (!shape) return;
+    const geometry = this._geometry;
+    if (!geometry) return;
 
     const svg = this.getSvg();
 
@@ -1036,9 +1036,9 @@ class DefaultRegions extends BaseConstraintDisplayItem {
 
     // Determine effective box dimensions.
     const effectiveSize = this._regionSize
-      ?? CellGeometry.defaultNumValues(shape.numRows, shape.numCols);
+      ?? CellGeometry.defaultNumValues(geometry.numRows, geometry.numCols);
     const [boxHeight, boxWidth] = CellGeometry.boxDimsForSize(
-      shape.numRows, shape.numCols, effectiveSize);
+      geometry.numRows, geometry.numCols, effectiveSize);
 
     if (!boxHeight || !boxWidth) {
       svg.setAttribute('display', 'none');
@@ -1046,16 +1046,16 @@ class DefaultRegions extends BaseConstraintDisplayItem {
     }
 
     const cellSize = DisplayItem.CELL_SIZE;
-    const gridWidthPixels = cellSize * shape.numCols;
-    const gridHeightPixels = cellSize * shape.numRows;
+    const gridWidthPixels = cellSize * geometry.numCols;
+    const gridHeightPixels = cellSize * geometry.numRows;
 
-    for (let i = boxWidth; i < shape.numCols; i += boxWidth) {
+    for (let i = boxWidth; i < geometry.numCols; i += boxWidth) {
       svg.appendChild(this._makePath([
         [i * cellSize, 0],
         [i * cellSize, gridHeightPixels],
       ]));
     }
-    for (let i = boxHeight; i < shape.numRows; i += boxHeight) {
+    for (let i = boxHeight; i < geometry.numRows; i += boxHeight) {
       svg.appendChild(this._makePath([
         [0, i * cellSize],
         [gridWidthPixels, i * cellSize],
@@ -1117,14 +1117,14 @@ class BorderedRegion extends BaseConstraintDisplayItem {
   }
 
   _makeItem(constraint, options, colorOverride) {
-    const shape = this._shape;
+    const geometry = this._geometry;
     const color = colorOverride || this._colorPicker.pickColor();
 
     let groups = null;
     if (options.splitFn) {
       groups = options.splitFn(constraint);
     } else {
-      groups = [constraint.getCells(shape)];
+      groups = [constraint.getCells(geometry)];
     }
 
     const g = createSvgElement('g');
@@ -1143,7 +1143,7 @@ class BorderedRegion extends BaseConstraintDisplayItem {
     const cellOpacity = fillOpacity === undefined
       ? undefined : Math.min(1, fillOpacity / groupOpacity);
     for (const group of groups) {
-      const cellSet = new Set(group.map(c => shape.parseCellId(c).cell));
+      const cellSet = new Set(group.map(c => geometry.parseCellId(c).cell));
 
       if (cellOpacity !== undefined) {
         for (const cell of cellSet) {
@@ -1156,7 +1156,7 @@ class BorderedRegion extends BaseConstraintDisplayItem {
 
       const border = this._makeRegionBorder(
         cellSet,
-        shape,
+        geometry,
         /* cornerCut= */ true,
         options.inset);
       g.append(border);
@@ -1217,17 +1217,17 @@ class OutsideClue extends BaseConstraintDisplayItem {
     }
   }
 
-  reshape(shape) {
-    super.reshape(shape);
+  reshape(geometry) {
+    super.reshape(geometry);
     super.clear();
     this._outsideArrowMap.clear();
 
-    const diagonalCellMap = SudokuConstraint.LittleKiller.cellMap(shape);
+    const diagonalCellMap = SudokuConstraint.LittleKiller.cellMap(geometry);
     for (const arrowId in diagonalCellMap) {
       this._addArrowSvg(
         'diagonal-arrow', arrowId, diagonalCellMap[arrowId]);
     }
-    for (const [arrowId, cells] of SudokuConstraintBase.fullLineCellMap(shape)) {
+    for (const [arrowId, cells] of SudokuConstraintBase.fullLineCellMap(geometry)) {
       if (cells.length > 1) {
         this._addArrowSvg('full-line-arrow', arrowId, cells);
       }
@@ -1301,9 +1301,9 @@ class OutsideClue extends BaseConstraintDisplayItem {
   }
 
   _addArrowSvg(arrowType, arrowId, cells) {
-    const shape = this._shape;
+    const geometry = this._geometry;
 
-    const parsedCells = cells.map(c => shape.parseCellId(c));
+    const parsedCells = cells.map(c => geometry.parseCellId(c));
 
     const cell0 = parsedCells[0];
     const cell1 = parsedCells[1];
@@ -1322,9 +1322,9 @@ class OutsideClue extends BaseConstraintDisplayItem {
   };
 
   _makeArrow(row, col, dr, dc) {
-    const shape = this._shape;
+    const geometry = this._geometry;
 
-    const [x, y] = this.cellIdCenter(shape.makeCellId(row, col));
+    const [x, y] = this.cellIdCenter(geometry.makeCellId(row, col));
     const cellSize = DisplayItem.CELL_SIZE;
 
     const arrowLen = 0.2;
@@ -1387,15 +1387,15 @@ class Givens extends BaseConstraintDisplayItem {
     this._cellDisplay = new CellValueDisplay(svg, valueFn, cellPositioner);
   }
 
-  reshape(shape) {
-    super.reshape(shape);
-    this._cellDisplay.reshape(shape);
+  reshape(geometry) {
+    super.reshape(geometry);
+    this._cellDisplay.reshape(geometry);
   }
 
   drawItem(constraint) {
     const values = constraint.values;
     const item = this._cellDisplay.makeGridValue(
-      this._shape.parseCellId(constraint.cell).cell,
+      this._geometry.parseCellId(constraint.cell).cell,
       values.length === 1 ? values[0] : values);
     this._svg.append(item);
 
@@ -1434,7 +1434,7 @@ class GreaterThan extends BaseConstraintDisplayItem {
     result.setAttribute('stroke-width', 1.5);
     result.setAttribute('stroke-linecap', 'round');
 
-    for (const [cell0, cell1] of constraint.adjacentPairs(this._shape)) {
+    for (const [cell0, cell1] of constraint.adjacentPairs(this._geometry)) {
       result.appendChild(this._drawGreaterThanDecoration(cell0, cell1));
     }
 
@@ -1505,13 +1505,13 @@ export class ConstraintDisplay extends DisplayItem {
     this.clear();  // clear() to initialize.
   }
 
-  reshape(shape) {
-    this._shape = shape;
-    this._gridDisplay.reshape(shape);
+  reshape(geometry) {
+    this._geometry = geometry;
+    this._gridDisplay.reshape(geometry);
     for (const display of this._constraintDisplays.values()) {
-      display.reshape(shape);
+      display.reshape(geometry);
     }
-    this._borders.reshape(shape);
+    this._borders.reshape(geometry);
   }
 
   // Reusable arrowhead marker.

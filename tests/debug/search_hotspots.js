@@ -3,7 +3,7 @@
 // Runs a bounded solve and aggregates where the search spends its effort: the
 // cells with the most accumulated conflict (the engine's conflict heatmap, which
 // is otherwise only visible in the debug UI), the cells the search re-guesses
-// most (churn), the branch-factor shape (how wide the branching is, split grid
+// most (churn), the branch-factor geometry (how wide the branching is, split grid
 // vs var, and how far the heuristic strays from fewest-options — the MRV gap),
 // and the propagation yield (how many candidates each guess actually eliminates
 // — exposing wide guesses that branch into the void). Deterministic: counts, not
@@ -195,7 +195,7 @@ export const main = (argv) => {
     console.log(`${cid(i)}\t${kind(i)}\t${n}`);
   }
 
-  // --- Branch-factor shape + MRV gap. ---
+  // --- Branch-factor geometry + MRV gap. ---
   const hist = (m) => [...m.entries()].sort((a, b) => a[0] - b[0]).map(([bf, n]) => `bf${bf}:${n}`).join(' ');
   console.log(`\n=== BRANCH FACTOR (n=${branches} branches; ${(100 * varBranches / Math.max(1, branches)).toFixed(1)}% on var cells) ===`);
   console.log(`grid: ${hist(bfGrid) || '-'}`);

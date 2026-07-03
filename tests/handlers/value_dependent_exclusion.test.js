@@ -88,8 +88,8 @@ await runTest('ValueDependentExclusion should strip regular exclusions from map 
   assert.equal(grid[2] & valueMask(1), 0, 'cell 2 should not have value 1');
 });
 
-await runTest('ValueDependentExclusion should iterate map length, not shape.numValues', () => {
-  // Map has 6 entries, but shape.numValues is 9.
+await runTest('ValueDependentExclusion should iterate map length, not geometry.numValues', () => {
+  // Map has 6 entries, but geometry.numValues is 9.
   // Old code would iterate 0..8, crashing on undefined entries.
   const context = new GridTestContext({ gridSize: [1, 6], numValues: 9 });
   const handler = new ValueDependentUniqueValueExclusion(0, [
@@ -128,7 +128,7 @@ await runTest('ValueDependentExclusion excludes a mapped cell at index > 255', (
 
   const cellExclusions = createCellExclusions({ allUnique: false, numCells });
   // initialize only uses cellExclusions (to strip redundant exclusions); the
-  // grid/shape/state args are unused.
+  // grid/geometry/state args are unused.
   assert.equal(handler.initialize(null, cellExclusions, null, null), true);
 
   const grid = new Array(numCells).fill(valueMask(1, 2, 3, 4));

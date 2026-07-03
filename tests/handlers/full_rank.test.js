@@ -20,8 +20,8 @@ const { CellGeometry } = await import('../../js/cell_geometry.js');
 //////////////////////////////////////////////////////////////////////////////
 
 await runTest('FullRank.buildEntries should create correct entries for 9x9', () => {
-  const shape = CellGeometry.fromGridSize(9);
-  const entries = FullRank.buildEntries(shape);
+  const geometry = CellGeometry.fromGridSize(9);
+  const entries = FullRank.buildEntries(geometry);
 
   // 9 rows * 2 directions + 9 cols * 2 directions = 36 entries
   assert.equal(entries.length, 36);
@@ -37,8 +37,8 @@ await runTest('FullRank.buildEntries should create correct entries for 9x9', () 
 });
 
 await runTest('FullRank.buildEntries should create correct entries for 4x4', () => {
-  const shape = CellGeometry.fromGridSize(4);
-  const entries = FullRank.buildEntries(shape);
+  const geometry = CellGeometry.fromGridSize(4);
+  const entries = FullRank.buildEntries(geometry);
 
   // 4 rows * 2 directions + 4 cols * 2 directions = 16 entries
   assert.equal(entries.length, 16);

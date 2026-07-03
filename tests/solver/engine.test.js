@@ -66,7 +66,7 @@ class ExtraStateHandler extends SudokuConstraintHandler {
     super([0]);
   }
 
-  initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
+  initialize(initialGridCells, cellExclusions, geometry, stateAllocator) {
     stateAllocator.allocate([0]);
     return true;
   }
@@ -95,7 +95,7 @@ class LinkedCellsHandler extends SudokuConstraintHandler {
 }
 
 class WatchedCellExpandingHandler extends FixedPriorityHandler {
-  initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
+  initialize(initialGridCells, cellExclusions, geometry, stateAllocator) {
     this.cells = Uint8Array.from([0, 2]);
     return true;
   }
@@ -264,8 +264,8 @@ await runTest('nthStep returns null for contradictory puzzle', () => {
 });
 
 await runTest('nthStep debug logs support extra solver state', () => {
-  const shape = CellGeometry.fromGridSize(9);
-  const solver = new SudokuSolver([new ExtraStateHandler()], shape, { logLevel: 1 });
+  const geometry = CellGeometry.fromGridSize(9);
+  const solver = new SudokuSolver([new ExtraStateHandler()], geometry, { logLevel: 1 });
   const step = solver.nthStep(0, new Map());
   assert.ok(step);
 });
@@ -274,7 +274,7 @@ await runTest('nthStep debug logs support extra solver state', () => {
 // state()
 // ============================================================================
 
-await runTest('state() returns correct shape before solving', () => {
+await runTest('state() returns correct geometry before solving', () => {
   const solver = buildSolver(makeEasyClassicConstraint());
   const state = solver.state();
   assert.ok(state);
@@ -311,12 +311,12 @@ await runTest('state() counters include expected fields', () => {
 // ============================================================================
 
 await runTest('cell priorities sum handler priorities and apply explicit overrides', () => {
-  const shape = CellGeometry.fromGridSize(2);
+  const geometry = CellGeometry.fromGridSize(2);
   const solver = new SudokuSolver([
     new FixedPriorityHandler([0, 1], 4),
     new FixedPriorityHandler([1, 2], 3),
     new Priority([1, 3], 12),
-  ], shape);
+  ], geometry);
 
   const priorities = solver._internalSolver._cellPriorities;
   assert.equal(priorities[0], 4);
@@ -326,10 +326,10 @@ await runTest('cell priorities sum handler priorities and apply explicit overrid
 });
 
 await runTest('cell priorities are computed before initialization expands watched cells', () => {
-  const shape = CellGeometry.fromGridSize(2);
+  const geometry = CellGeometry.fromGridSize(2);
   const solver = new SudokuSolver([
     new WatchedCellExpandingHandler([0], 5),
-  ], shape);
+  ], geometry);
 
   const priorities = solver._internalSolver._cellPriorities;
   assert.equal(priorities[0], 5);
@@ -337,9 +337,9 @@ await runTest('cell priorities are computed before initialization expands watche
 });
 
 await runTest('cell priorities boost linked cell pairs', () => {
-  const shape = CellGeometry.fromGridSize(2);
-  shape.addVarCellsForConstraints([new SudokuConstraint.ChaosConstruction()]);
-  const regionCells = shape.varCellsForGroup('CC');
+  const geometry = CellGeometry.fromGridSize(2);
+  geometry.addVarCellsForConstraints([new SudokuConstraint.ChaosConstruction()]);
+  const regionCells = geometry.varCellsForGroup('CC');
 
   const solver = new SudokuSolver([
     new LinkedCellsHandler([
@@ -351,7 +351,7 @@ await runTest('cell priorities boost linked cell pairs', () => {
     new FixedPriorityHandler([0, regionCells[0]], 10),
     new FixedPriorityHandler([1, regionCells[2]], 11),
     new FixedPriorityHandler([3, regionCells[3]], 7),
-  ], shape);
+  ], geometry);
   const priorities = solver._internalSolver._cellPriorities;
 
   assert.equal(priorities[0], 20);
@@ -398,7 +398,7 @@ await runTest('build accepts exactly MAX_SEARCH_CELLS (1000) cells', () => {
 });
 
 await runTest('build rejects more than MAX_SEARCH_CELLS cells', () => {
-  // 81 + 920 = 1001. The shape throws when the var cells are registered (before
+  // 81 + 920 = 1001. The geometry throws when the var cells are registered (before
   // the solver is built); the error bubbles up to the caller (and the UI).
   assert.throws(() => buildSolver(withVarCells(920)), /would exceed the .*-cell limit/);
 });

@@ -104,8 +104,8 @@ const resolveLadder = (spec) => {
     throw new Error(`ladder counts must be positive integers (e.g. @25-15-5): ${spec}`);
   }
   const puzzle = findExample(name);
-  const shape = SudokuParser.parseText(resolveInput(puzzle.input)).getShape();
-  return buildSolutionGivenLadder(puzzle, shape.numRows, shape.numCols, counts);
+  const geometry = SudokuParser.parseText(resolveInput(puzzle.input)).getShape();
+  return buildSolutionGivenLadder(puzzle, geometry.numRows, geometry.numCols, counts);
 };
 
 // Resolve a list of selectors into puzzle objects ({ name, input, solution? }).
@@ -153,7 +153,7 @@ export const parseBacktrackLimit = (raw) => {
 // exhaust the search to confirm there is no second solution, so a completed run
 // finding exactly one solution ('unique') is the success condition. 'all'
 // exhausts (counts every solution). '1' is first-solution only — first-solution
-// timing/shape is NOT valid evidence for an optimization (see README.md
+// timing/geometry is NOT valid evidence for an optimization (see README.md
 // "Methodology"); it is offered for convenience, not comparison, and the CLIs warn
 // when it is used.
 export const parseSolutionLimit = (raw) => {
@@ -187,13 +187,13 @@ const STATUS = {
   MULTIPLE: 'multiple', UNIQUE: 'unique', FIRST: 'first',
 };
 
-const solutionString = (grid, shape) => {
+const solutionString = (grid, geometry) => {
   if (!grid) return '';
   let result = '';
-  for (let cell = 0; cell < shape.numGridCells; cell++) {
+  for (let cell = 0; cell < geometry.numGridCells; cell++) {
     const mask = grid[cell];
     const fixed = mask && !(mask & (mask - 1));
-    result += fixed ? String(LookupTables.toOffsetValue(mask, shape.valueOffset)) : '?';
+    result += fixed ? String(LookupTables.toOffsetValue(mask, geometry.valueOffset)) : '?';
   }
   return result;
 };
@@ -205,7 +205,7 @@ const solutionString = (grid, shape) => {
 // runs after build but before search, e.g. to install method wrappers.
 export const runSolve = (puzzle, { maxBacktracks, maxSolutions }, onSolver) => {
   const constraint = SudokuParser.parseText(resolveInput(puzzle.input));
-  const shape = constraint.getShape();
+  const geometry = constraint.getShape();
   // Reconstruct constraint instances from their type+args, as the worker and
   // SimpleSolver do after a constraint crosses a serialization boundary. A no-op
   // for a freshly parsed constraint; kept so this path matches production.
@@ -221,14 +221,14 @@ export const runSolve = (puzzle, { maxBacktracks, maxSolutions }, onSolver) => {
   let firstGrid = null;
   const start = performance.now();
   internal.run(Object.keys(mode).length ? mode : null, (grid) => {
-    if (!firstGrid) firstGrid = grid.slice(0, shape.numGridCells);
+    if (!firstGrid) firstGrid = grid.slice(0, geometry.numGridCells);
   });
   const elapsedMs = performance.now() - start;
 
   const counters = { ...internal.counters };
   const exhausted = internal.state === internal.constructor.STATE_EXHAUSTED;
   const capped = !exhausted && maxBacktracks > 0 && counters.backtracks >= maxBacktracks;
-  const actual = solutionString(firstGrid, shape);
+  const actual = solutionString(firstGrid, geometry);
   const expected = puzzle.solution ?? '';
 
   let status;
@@ -239,7 +239,7 @@ export const runSolve = (puzzle, { maxBacktracks, maxSolutions }, onSolver) => {
   else if (exhausted) status = STATUS.UNIQUE;
   else status = STATUS.FIRST;
 
-  return { name: puzzle.name, shape, counters, elapsedMs, exhausted, capped, status, solution: actual };
+  return { name: puzzle.name, geometry, counters, elapsedMs, exhausted, capped, status, solution: actual };
 };
 
 // --- Ablations ---------------------------------------------------------------

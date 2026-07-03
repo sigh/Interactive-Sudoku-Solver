@@ -348,7 +348,7 @@ class ConstraintCollectionBase {
   getConstraintsByKey(key) { return []; }
   getConstraintsByType(type) { return []; }
 
-  setShape(shape) { throw Error('Not implemented'); }
+  setShape(geometry) { throw Error('Not implemented'); }
 
   getCollectionForComposite(constraint) {
     throw Error('Not implemented');
@@ -388,8 +388,8 @@ class SelectedConstraintCollection extends ConstraintCollectionBase {
     this._rootCollection.removeAllConstraints();
   }
 
-  setShape(shape) {
-    this._rootCollection.setShape(shape);
+  setShape(geometry) {
+    this._rootCollection.setShape(geometry);
   }
 
   getConstraintsByKey(key) {
@@ -412,17 +412,17 @@ class RootConstraintCollection extends ConstraintCollectionBase {
     this._updateListener = updateListener;
     this._constraintCategoryInputs = constraintCategoryInputs;
     this._collectionFactory = collectionFactor;
-    this._shape = null;
+    this._geometry = null;
   }
 
-  reshape(shape) {
-    this._shape = shape;
-    shape.onVarCellsChanged(({ removedCellIds }) => {
+  reshape(geometry) {
+    this._geometry = geometry;
+    geometry.onVarCellsChanged(({ removedCellIds }) => {
       // Remove constraints whose cells no longer exist.
       if (removedCellIds.length) {
         const removed = new Set(removedCellIds);
         for (const c of [...this._constraintMap.keys()]) {
-          if (c.getCells(shape).some(id => removed.has(id))) {
+          if (c.getCells(geometry).some(id => removed.has(id))) {
             this.removeConstraint(c);
           }
         }
@@ -440,7 +440,7 @@ class RootConstraintCollection extends ConstraintCollectionBase {
   clear() {
     this._uniquenessKeySet.clear();
     this._constraintMap.clear();
-    this._shape.clearVarCells();
+    this._geometry.clearVarCells();
   }
 
   constraints() {
@@ -460,7 +460,7 @@ class RootConstraintCollection extends ConstraintCollectionBase {
 
     // Register var cells first: an over-limit constraint throws here (and the
     // error bubbles up to the user) before any chip/display state is created.
-    this._shape.addVarCellsForConstraints([constraint]);
+    this._geometry.addVarCellsForConstraints([constraint]);
 
     if (constraint.constructor.DISPLAY_CONFIG) {
       constraintState.displayElem = this._display.drawConstraint(constraint);
@@ -502,7 +502,7 @@ class RootConstraintCollection extends ConstraintCollectionBase {
       constraint.constructor.CATEGORY).onRemoveConstraint(
         constraint);
 
-    this._shape.removeVarCellsForConstraints([constraint]);
+    this._geometry.removeVarCellsForConstraints([constraint]);
     this._updateListener();
   }
 
@@ -530,8 +530,8 @@ class RootConstraintCollection extends ConstraintCollectionBase {
     }
   }
 
-  setShape(shape) {
-    this._reshapeListener(shape);
+  setShape(geometry) {
+    this._reshapeListener(geometry);
   }
 
   getCollectionForComposite(c) {
@@ -548,7 +548,7 @@ class RootConstraintCollection extends ConstraintCollectionBase {
 
   removeConstraintForVarPrefix(prefix) {
     for (const c of this._constraintMap.keys()) {
-      if (c.getVarCellGroups(this._shape).some(g => g.prefix === prefix)) {
+      if (c.getVarCellGroups(this._geometry).some(g => g.prefix === prefix)) {
         this.removeConstraint(c);
         return;
       }
@@ -657,7 +657,7 @@ class CompositeConstraintCollection extends ConstraintCollectionBase {
 
 class ConstraintManager {
   constructor(inputManager, displayContainer) {
-    this._shape = CellGeometry.newDefault();
+    this._geometry = CellGeometry.newDefault();
     this._reshapeListeners = [];
     this._updateListeners = [];
     this.runUpdateCallback = deferUntilAnimationFrame(
@@ -675,14 +675,14 @@ class ConstraintManager {
     this.runUpdateCallback();
   }
 
-  _reshape(shape) {
-    if (this._shape === shape) return;
+  _reshape(geometry) {
+    if (this._geometry === geometry) return;
 
     this.clear();
-    this._shape = shape;
+    this._geometry = geometry;
 
     for (const listener of this._reshapeListeners) {
-      listener.reshape(shape);
+      listener.reshape(geometry);
     }
 
     this.runUpdateCallback();
@@ -690,8 +690,8 @@ class ConstraintManager {
 
   addReshapeListener(listener) {
     this._reshapeListeners.push(listener);
-    // Ensure the listener is initialized with the current shape if it exists.
-    if (this._shape) listener.reshape(this._shape);
+    // Ensure the listener is initialized with the current geometry if it exists.
+    if (this._geometry) listener.reshape(this._geometry);
     return listener;
   }
 
@@ -730,13 +730,13 @@ class ConstraintManager {
     // Callback for chip action buttons.
     this._chipActionCallback = (constraint, collection) => {
       if (constraint instanceof SudokuConstraint.Replicate) {
-        constraint.toggleTargetCells(inputManager.getSelection(), this._shape);
+        constraint.toggleTargetCells(inputManager.getSelection(), this._geometry);
         collection.updateConstraint(constraint);
         return;
       }
       const categoryInput = this._constraintCategoryInputs.get(
         constraint.constructor.CATEGORY);
-      categoryInput.populateForm?.(constraint, this._shape.numValues, this._shape.valueOffset);
+      categoryInput.populateForm?.(constraint, this._geometry.numValues, this._geometry.valueOffset);
     };
 
     const chipViews = new Map();
@@ -847,7 +847,7 @@ class ConstraintManager {
       this.runUpdateCallback.bind(this),
       this._chipActionCallback);
     // Shape is constant for composite constraints.
-    subView.reshape(this._shape);
+    subView.reshape(this._geometry);
     return subView;
   }
 
@@ -909,15 +909,15 @@ class ConstraintManager {
 
     this.clear();
 
-    const shape = constraint.getShape();
-    this._rootCollection.setShape(shape);
+    const geometry = constraint.getShape();
+    this._rootCollection.setShape(geometry);
 
     // Add var-cell-defining constraints first so their cell IDs are
     // available when subsequent constraints reference them.
     const varConstraints = [];
     const otherConstraints = [];
     constraint.forEachTopLevel(c => {
-      (c.getVarCellGroups(shape).length
+      (c.getVarCellGroups(geometry).length
         ? varConstraints : otherConstraints).push(c);
     });
     for (const c of varConstraints) this._rootCollection.addConstraint(c);
@@ -929,7 +929,7 @@ class ConstraintManager {
   }
 
   _getConstraints(filterFn) {
-    const constraints = [new SudokuConstraint.Shape(this._shape.name)];
+    const constraints = [new SudokuConstraint.Shape(this._geometry.name)];
     for (const constraint of this._rootCollection.constraints()) {
       if (filterFn(constraint)) {
         constraints.push(constraint);
@@ -1058,13 +1058,13 @@ class ConstraintChipView {
     this._chipHighlighter = chipHighlighter;
     this._constraintSelector = constraintSelector;
     this._display = display;
-    this._shape = null;
+    this._geometry = null;
     this._onUpdate = onUpdate;
     this._chipActionCallback = chipActionCallback;
   }
 
-  reshape(shape) {
-    this._shape = shape;
+  reshape(geometry) {
+    this._geometry = geometry;
   }
 
   element() {
@@ -1106,7 +1106,7 @@ class ConstraintChipView {
     chipLabel.textContent = constraint.chipLabel();
 
     if (iconElem) {
-      const chipIcon = this.constructor._makeChipIcon(iconElem, this._shape);
+      const chipIcon = this.constructor._makeChipIcon(iconElem, this._geometry);
       if (constraint.constructor.IS_COMPOSITE) {
         chipLabel.appendChild(chipIcon);
       } else {
@@ -1154,7 +1154,7 @@ class ConstraintChipView {
       if (e.target.closest('.chip') !== chip) return;
       if (this._chipHighlighter.key() === chip) return;
       this._chipHighlighter.setCells(
-        constraint.getCells(this._shape), chip);
+        constraint.getCells(this._geometry), chip);
     });
     chip.addEventListener('mouseleave', () => {
       this._chipHighlighter.clear();
@@ -1171,7 +1171,7 @@ class ConstraintChipView {
   }
 
   replaceChipIcon(chip, newIcon) {
-    const iconElem = this.constructor._makeChipIcon(newIcon, this._shape);
+    const iconElem = this.constructor._makeChipIcon(newIcon, this._geometry);
     const oldElem = chip.querySelector(
       ':scope > .chip-label > .chip-icon, :scope > .chip-icon');
     oldElem.replaceWith(iconElem);
@@ -1179,14 +1179,14 @@ class ConstraintChipView {
 
   static _CHIP_ICON_SIZE_PX = 28;
 
-  static _makeChipIcon(elem, shape) {
+  static _makeChipIcon(elem, geometry) {
     const svg = createSvgElement('svg');
     svg.classList.add('chip-icon');
 
     const borders = createSvgElement('g');
     const borderDisplay = new BorderDisplay(
       borders, 'rgb(255, 255, 255)');
-    borderDisplay.reshape(shape);
+    borderDisplay.reshape(geometry);
     svg.append(borders);
 
     // Determine the correct scale to fit our icon size.
@@ -1223,11 +1223,11 @@ class ConstraintHighlighter {
     this._cssClass = cssClass;
     this._display = display;
     this._currentState = null;
-    this._shape = null;
+    this._geometry = null;
   }
 
-  reshape(shape) {
-    this._shape = shape;
+  reshape(geometry) {
+    this._geometry = geometry;
   }
 
   _isInSubChipView(chip) {
@@ -1238,7 +1238,7 @@ class ConstraintHighlighter {
     this.clear();
     this._currentState = { chip, constraint };
     chip.classList.add(this._cssClass);
-    this._highlighter.setCells(constraint.getCells(this._shape));
+    this._highlighter.setCells(constraint.getCells(this._geometry));
     if (this._isInSubChipView(chip)) {
       this._currentState.displayElem = this._drawConstraint(constraint);
     }
@@ -1262,7 +1262,7 @@ class ConstraintHighlighter {
     }
 
     // Check if the constraint cells have changed at all.
-    const cells = constraint.getCells(this._shape);
+    const cells = constraint.getCells(this._geometry);
     if (arraysAreEqual(cells, this._highlighter.getCells())) {
       return true;
     }
@@ -1310,9 +1310,9 @@ class ConstraintSelector {
     this._escapeListener = null;
   }
 
-  reshape(shape) {
-    this._selectionHighlighter.reshape(shape);
-    this._latestHighlighter.reshape(shape);
+  reshape(geometry) {
+    this._selectionHighlighter.reshape(geometry);
+    this._latestHighlighter.reshape(geometry);
   }
 
   onConstraintsUpdated() {
@@ -1383,7 +1383,7 @@ class Selection {
 
     this._selectionPreservers = [this._clickInterceptor.getSvg()];
 
-    this._shape = null;
+    this._geometry = null;
 
     this._setUpMouseHandlers(this._clickInterceptor.getSvg());
 
@@ -1425,7 +1425,7 @@ class Selection {
     this._committedSegments = [];
   }
 
-  setShape(shape) { this._shape = shape; }
+  setShape(geometry) { this._geometry = geometry; }
 
   addCallback(fn) {
     this._callbacks.push(fn);
@@ -1452,13 +1452,13 @@ class Selection {
   }
 
   _cellsInRect(anchorId, targetId) {
-    const shape = this._shape;
-    if (!shape) return [anchorId, targetId];
-    const a = shape.parseCellId(anchorId);
-    const b = shape.parseCellId(targetId);
+    const geometry = this._geometry;
+    if (!geometry) return [anchorId, targetId];
+    const a = geometry.parseCellId(anchorId);
+    const b = geometry.parseCellId(targetId);
     if (!a || !b) return [anchorId, targetId];
 
-    const graph = shape.cellGraph();
+    const graph = geometry.cellGraph();
     const posA = graph.cellPosition(a.cell);
     const posB = graph.cellPosition(b.cell);
     if (!posA || !posB || posA[2] !== posB[2]) return [anchorId, targetId];
@@ -1475,7 +1475,7 @@ class Selection {
     for (let dr = 0; dr <= maxRow - minRow; dr++) {
       for (let dc = 0; dc <= maxCol - minCol; dc++) {
         const cell = graph.traverse(topLeft, dr, dc);
-        if (cell !== null) cells.push(shape.makeCellIdFromIndex(cell));
+        if (cell !== null) cells.push(geometry.makeCellIdFromIndex(cell));
       }
     }
     return cells.length > 0 ? cells : [anchorId, targetId];
@@ -1607,7 +1607,7 @@ class Selection {
 
 class GridInputManager {
   constructor(displayContainer) {
-    this._shape = null;
+    this._geometry = null;
 
     this._callbacks = {
       onNewDigit: [],
@@ -1689,9 +1689,9 @@ class GridInputManager {
     if (target) target.select ? target.select() : target.focus();
   }
 
-  reshape(shape) {
-    this._shape = shape;
-    this._selection.setShape(shape);
+  reshape(geometry) {
+    this._geometry = geometry;
+    this._selection.setShape(geometry);
   }
 
   onNewDigit(fn) { this._callbacks.onNewDigit.push(fn); }
@@ -1752,14 +1752,14 @@ class GridInputManager {
       let cell = getActiveCell();
       if (!cell) return;
 
-      const shape = this._shape;
-      let { row, col } = shape.parseCellId(cell);
-      const numRows = shape.numRows;
-      const numCols = shape.numCols;
+      const geometry = this._geometry;
+      let { row, col } = geometry.parseCellId(cell);
+      const numRows = geometry.numRows;
+      const numCols = geometry.numCols;
       row = (row + dr + numRows) % numRows;
       col = (col + dc + numCols) % numCols;
 
-      this._selection.setCells([shape.makeCellId(row, col)]);
+      this._selection.setCells([geometry.makeCellId(row, col)]);
     };
 
     let fakeInput = this._fakeInput;

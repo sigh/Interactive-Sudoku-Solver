@@ -29,7 +29,7 @@ export class DebugManager {
 
     // State.
     this._enabled = false;
-    this._shape = null;
+    this._geometry = null;
 
     // UI helpers.
     this._infoOverlay = new InfoOverlay(this._displayContainer);
@@ -71,7 +71,7 @@ export class DebugManager {
 
     // Setup debug checkboxes.
     const debugCheckboxes = [
-      ['debug-cell-id', (index) => this._shape.makeCellIdFromIndex(index)],
+      ['debug-cell-id', (index) => this._geometry.makeCellIdFromIndex(index)],
       ['debug-cell-index', (index) => index],
     ];
 
@@ -83,9 +83,9 @@ export class DebugManager {
       this._setInfoOverlayOnCheck(element, overlayValuesFn);
     }
 
-    // Call reshape so that all dependencies are initialized with the shape.
-    if (this._shape) {
-      this.reshape(this._shape);
+    // Call reshape so that all dependencies are initialized with the geometry.
+    if (this._geometry) {
+      this.reshape(this._geometry);
     }
   }
 
@@ -104,11 +104,11 @@ export class DebugManager {
     return this._update.bind(this);
   }
 
-  reshape(shape) {
+  reshape(geometry) {
     this.clear();
-    this._shape = shape;
-    this._infoOverlay.reshape(shape);
-    this._candidateDisplay.reshape(shape);
+    this._geometry = geometry;
+    this._infoOverlay.reshape(geometry);
+    this._candidateDisplay.reshape(geometry);
   }
 
   clear() {
@@ -230,10 +230,10 @@ export class DebugManager {
   }
 
   _addLogMouseOver(elem, data) {
-    const shape = this._shape;
+    const geometry = this._geometry;
 
     if (data.cells?.length) {
-      const cellIds = [...data.cells].map(c => shape.makeCellIdFromIndex(c));
+      const cellIds = [...data.cells].map(c => geometry.makeCellIdFromIndex(c));
       elem.addEventListener('mouseover', () => {
         this._debugCellHighlighter.setCells(cellIds);
       });
@@ -296,7 +296,7 @@ export class DebugManager {
 // Keeping these separate ensures stack-trace hover never interferes with annotation toggles.
 export class InfoOverlay {
   constructor(displayContainer) {
-    this._shape = null;
+    this._geometry = null;
 
     this._heatmap = displayContainer.createCellHighlighter();
     this._annotationText = new InfoTextDisplay(
@@ -310,12 +310,12 @@ export class InfoOverlay {
     this._onNextTextChangeFn = null;
   }
 
-  reshape(shape) {
-    this._shape = shape;
+  reshape(geometry) {
+    this._geometry = geometry;
     this.clear();
 
-    this._annotationText.reshape(shape);
-    this._valueDisplay.reshape(shape);
+    this._annotationText.reshape(geometry);
+    this._valueDisplay.reshape(geometry);
   }
 
   clear() {
@@ -337,11 +337,11 @@ export class InfoOverlay {
   }
 
   setHeatmapValues(values) {
-    const shape = this._shape;
+    const geometry = this._geometry;
     this._heatmap.clear();
 
     for (let i = 0; i < values.length; i++) {
-      const cellId = shape.makeCellIdFromIndex(i);
+      const cellId = geometry.makeCellIdFromIndex(i);
       const path = this._heatmap.addCell(cellId);
       if (!path) continue;
       path.setAttribute('fill', 'rgb(255, 0, 0)');
@@ -353,7 +353,7 @@ export class InfoOverlay {
   // If onChange is provided, it will be called the next time annotations are cleared.
   // (Used by checkbox-driven overlays so they can auto-uncheck.)
   setAnnotations(values, onChange) {
-    const shape = this._shape;
+    const geometry = this._geometry;
     this._clearAnnotationText();
     if (onChange) this._onNextTextChangeFn = onChange;
 
@@ -361,7 +361,7 @@ export class InfoOverlay {
 
     for (let i = 0; i < values.length; i++) {
       const value = values[i];
-      const cellId = shape.makeCellIdFromIndex(i);
+      const cellId = geometry.makeCellIdFromIndex(i);
       this._annotationText.setText(cellId, value);
     }
   }

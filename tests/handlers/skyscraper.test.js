@@ -560,8 +560,8 @@ await runTest('Skyscraper offset: visibility=1, zero in first cell should not co
   // With 1-indexed this forces max value (4) into first cell.
   // With 0-indexed, zero (internal 1) in first cell isn't visible,
   // so 4 can't be the only answer for cell 0.
-  const shape = CellGeometry.fromGridSize(1, 4, null, -1);
-  const context = new GridTestContext({ shape });
+  const geometry = CellGeometry.fromGridSize(1, 4, null, -1);
+  const context = new GridTestContext({ geometry });
   const cells = context.cells();
   const handler = new Skyscraper(cells, 1);
   context.initializeHandler(handler);
@@ -587,8 +587,8 @@ await runTest('Skyscraper offset: visibility=4 with zero requires 4 non-zero bui
   // 0-indexed 4x4: 4 visible, but one cell has external 0.
   // With zero in the set, we still need 4 visible non-zero buildings,
   // which is impossible in 4 cells (one holds zero, only 3 real buildings).
-  const shape = CellGeometry.fromGridSize(1, 4, null, -1);
-  const context = new GridTestContext({ shape });
+  const geometry = CellGeometry.fromGridSize(1, 4, null, -1);
+  const context = new GridTestContext({ geometry });
   const cells = context.cells();
   const handler = new Skyscraper(cells, 4);
   context.initializeHandler(handler);
@@ -607,8 +607,8 @@ await runTest('Skyscraper offset: visibility=4 with zero requires 4 non-zero bui
 
 await runTest('Skyscraper offset: zero in first cell with vis=3 succeeds', () => {
   // 4 cells [0,1,2,3] (external). Zero first, then 3 ascending = 3 visible.
-  const shape = CellGeometry.fromGridSize(1, 4, null, -1);
-  const context = new GridTestContext({ shape });
+  const geometry = CellGeometry.fromGridSize(1, 4, null, -1);
+  const context = new GridTestContext({ geometry });
   const cells = context.cells();
   const handler = new Skyscraper(cells, 3);
   context.initializeHandler(handler);
@@ -627,8 +627,8 @@ await runTest('Skyscraper offset: zero in first cell with vis=3 succeeds', () =>
 await runTest('Skyscraper offset: zero first cell counted as vis=4 should fail', () => {
   // Without offset fix, [0,1,2,3] would give vis=4 (all "visible").
   // With fix, zero doesn't count → vis=3. So target=4 should fail.
-  const shape = CellGeometry.fromGridSize(1, 4, null, -1);
-  const context = new GridTestContext({ shape });
+  const geometry = CellGeometry.fromGridSize(1, 4, null, -1);
+  const context = new GridTestContext({ geometry });
   const cells = context.cells();
   const handler = new Skyscraper(cells, 4);
   context.initializeHandler(handler);
@@ -647,8 +647,8 @@ await runTest('Skyscraper offset: zero first cell counted as vis=4 should fail',
 await runTest('Skyscraper offset: zero in non-first cell does not affect visibility', () => {
   // [3,0,1,2] (external). First cell visible (3), zero hidden, 1 hidden, 2 hidden.
   // Visibility = 1.
-  const shape = CellGeometry.fromGridSize(1, 4, null, -1);
-  const context = new GridTestContext({ shape });
+  const geometry = CellGeometry.fromGridSize(1, 4, null, -1);
+  const context = new GridTestContext({ geometry });
   const cells = context.cells();
   const handler = new Skyscraper(cells, 1);
   context.initializeHandler(handler);
@@ -669,8 +669,8 @@ await runTest('Skyscraper offset: propagation with zero candidate in first cell'
   // If first cell = 0 (internal 1): need 2 visible among cells 1-3.
   // If first cell = 2 (internal 3): need 1 more visible among cells 1-3.
   // Both paths are possible, so should succeed and preserve both candidates.
-  const shape = CellGeometry.fromGridSize(1, 4, null, -1);
-  const context = new GridTestContext({ shape });
+  const geometry = CellGeometry.fromGridSize(1, 4, null, -1);
+  const context = new GridTestContext({ geometry });
   const cells = context.cells();
   const handler = new Skyscraper(cells, 2);
   context.initializeHandler(handler);

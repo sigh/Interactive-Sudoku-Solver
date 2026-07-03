@@ -12,11 +12,11 @@ const { And, Or, True, False, AllDifferent, GivenCandidates } = await import('..
 const { Sum } = await import('../../js/solver/sum_handler.js');
 
 // Helper: collect all handlers yielded by _constraintHandlers for a given
-// constraint on a standard 9x9 shape.
+// constraint on a standard 9x9 geometry.
 const collectHandlers = (constraint) => {
-  const shape = CellGeometry.newDefault();
+  const geometry = CellGeometry.newDefault();
   const constraintMap = constraint.toMap();
-  return [...SudokuBuilder._constraintHandlers(constraintMap, shape)];
+  return [...SudokuBuilder._constraintHandlers(constraintMap, geometry)];
 };
 
 // -- _wrapAnd tests --
