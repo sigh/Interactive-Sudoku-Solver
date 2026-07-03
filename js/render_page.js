@@ -22,6 +22,7 @@ const {
   DisplayItem
 } = await import('./display.js' + self.VERSION_PARAM);
 const { SudokuParser } = await import('./sudoku_parser.js' + self.VERSION_PARAM);
+const { CellGeometry } = await import('./cell_geometry.js' + self.VERSION_PARAM);
 const { ConstraintDisplay } = await import('./constraint_display.js' + self.VERSION_PARAM);
 const { SolutionController } = await import('./solution_controller.js' + self.VERSION_PARAM);
 const {
@@ -656,7 +657,7 @@ class CompositeConstraintCollection extends ConstraintCollectionBase {
 
 class ConstraintManager {
   constructor(inputManager, displayContainer) {
-    this._shape = SudokuConstraint.Shape.getShapeFromShapeSpec(null);
+    this._shape = CellGeometry.newDefault();
     this._reshapeListeners = [];
     this._updateListeners = [];
     this.runUpdateCallback = deferUntilAnimationFrame(

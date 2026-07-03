@@ -47,10 +47,11 @@ export class SudokuParser {
     for (const n of astRoot.children) {
       if (n.cls !== SudokuConstraint.Shape) continue;
 
-      shape = SudokuConstraint.Shape.getShapeFromShapeSpec(n.args.join('~'));
+      const spec = n.args.join('~');
+      shape = spec ? CellGeometry.fromShapeSpec(spec) : CellGeometry.newDefault();
       break;
     }
-    if (!shape) shape = SudokuConstraint.Shape.getShapeFromShapeSpec();
+    if (!shape) shape = CellGeometry.newDefault();
 
     const constraints = this._resolveNodes(astRoot.children, astRoot.cls, shape);
     return new astRoot.cls(constraints);

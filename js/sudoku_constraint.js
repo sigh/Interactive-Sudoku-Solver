@@ -129,9 +129,9 @@ export class SudokuConstraintBase {
       if (c.type === 'Shape') shapeSpec = c.shapeSpec;
     });
 
-    const shape = SudokuConstraint.Shape.getShapeFromShapeSpec(shapeSpec);
-    if (!shape) throw new Error('Unknown shape: ' + shape);
-    return shape;
+    // No Shape constraint means the default grid.
+    return shapeSpec
+      ? CellGeometry.fromShapeSpec(shapeSpec) : CellGeometry.newDefault();
   }
 
   static displayName() {
@@ -1571,14 +1571,6 @@ export class SudokuConstraint {
       }
 
       return super.serialize(constraints);
-    }
-
-    static getShapeFromShapeSpec(shapeSpec) {
-      if (!shapeSpec) {
-        return CellGeometry.fromGridSize(
-          GEOMETRY_9x9.numRows, GEOMETRY_9x9.numCols);
-      }
-      return CellGeometry.fromShapeSpec(shapeSpec);
     }
   }
 

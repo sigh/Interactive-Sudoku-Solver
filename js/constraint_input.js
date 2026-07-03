@@ -1668,7 +1668,7 @@ ConstraintCategoryInput.StateMachine = class StateMachine extends JavaScriptCate
               maxDepthExpression: formData.get('max-depth'),
             };
 
-          const shape = this._shape || SudokuConstraint.Shape.getShapeFromShapeSpec(null);
+          const shape = this._shape || CellGeometry.newDefault();
           const cells = this._inputManager.getSelection();
           const encodedNFA = await this._userScriptExecutor.compileStateMachine(
             spec, shape.numValues, cells.length, isUnified, shape.valueOffset);

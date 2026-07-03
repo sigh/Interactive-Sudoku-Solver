@@ -51,6 +51,11 @@ export class CellGeometry {
     return shape;
   };
 
+  // The default grid geometry (9x9), as a fresh mutable instance.
+  static newDefault() {
+    return this.fromGridSize(GEOMETRY_9x9.numRows, GEOMETRY_9x9.numCols);
+  }
+
   static fromNumCells(numCells) {
     // Only works for square grids
     const gridSize = Math.sqrt(numCells);

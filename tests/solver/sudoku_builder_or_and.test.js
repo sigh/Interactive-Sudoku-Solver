@@ -7,13 +7,14 @@ ensureGlobalEnvironment();
 
 const { SudokuBuilder } = await import('../../js/solver/sudoku_builder.js');
 const { SudokuConstraint } = await import('../../js/sudoku_constraint.js');
+const { CellGeometry } = await import('../../js/cell_geometry.js');
 const { And, Or, True, False, AllDifferent, GivenCandidates } = await import('../../js/solver/handlers.js');
 const { Sum } = await import('../../js/solver/sum_handler.js');
 
 // Helper: collect all handlers yielded by _constraintHandlers for a given
 // constraint on a standard 9x9 shape.
 const collectHandlers = (constraint) => {
-  const shape = SudokuConstraint.Shape.getShapeFromShapeSpec(null);
+  const shape = CellGeometry.newDefault();
   const constraintMap = constraint.toMap();
   return [...SudokuBuilder._constraintHandlers(constraintMap, shape)];
 };

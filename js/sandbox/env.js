@@ -117,7 +117,8 @@ const cellGeometry = (geometrySource) => {
   const spec = typeof geometrySource === 'string' ? geometrySource
     : geometrySource && typeof geometrySource === 'object' ? geometrySource.shapeSpec ?? null
       : null;
-  return SudokuConstraint.Shape.getShapeFromShapeSpec(spec);
+  // Nothing (or an object with no shapeSpec) means the default grid.
+  return spec ? CellGeometry.fromShapeSpec(spec) : CellGeometry.newDefault();
 };
 
 // A cell-id view over a shape's CellGraph. The underlying graph works in integer
