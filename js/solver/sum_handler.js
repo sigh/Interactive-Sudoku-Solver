@@ -120,10 +120,10 @@ export class Sum extends SudokuConstraintHandler {
     return this._rawSum;
   }
 
-  priority(shape) {
+  priority(geometry) {
     // We want smaller cages to have higher priority, but we still want all sums
     // to have a high priority.
-    const numValues = shape.numValues;
+    const numValues = geometry.numValues;
     return Math.max(numValues * 2 - this.cells.length, numValues);
   }
 
@@ -150,14 +150,14 @@ export class Sum extends SudokuConstraintHandler {
     return exclusionGroupId;
   }
 
-  initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
-    this._sumData = SumData.get(shape.numValues);
+  initialize(initialGridCells, cellExclusions, geometry, stateAllocator) {
+    this._sumData = SumData.get(geometry.numValues);
 
     this._sum = this._rawSum;
-    if (shape.valueOffset) {
+    if (geometry.valueOffset) {
       const coeffSum = this._coeffGroups.reduce(
         (s, g) => s + g.coeff * g.cells.length, 0);
-      this._sum -= shape.valueOffset * coeffSum;
+      this._sum -= geometry.valueOffset * coeffSum;
     }
 
     // 0-cell handlers are trivially satisfiable iff sum is 0.
@@ -906,7 +906,7 @@ class SumData {
 
   constructor(verifiedCallToken, numValues) {
     if (verifiedCallToken !== this.constructor._VERIFIED_CALL_TOKEN) {
-      throw new Error('Use SumData.get(shape.numValues)');
+      throw new Error('Use SumData.get(geometry.numValues)');
     }
 
     this.numValues = numValues;

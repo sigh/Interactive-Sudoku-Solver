@@ -93,7 +93,7 @@ export class LookupTables {
 
   constructor(verifiedCallToken, numValues) {
     if (verifiedCallToken !== this.constructor._VERIFIED_CALL_TOKEN) {
-      throw new Error('Use LookupTables.get(shape.numValues)');
+      throw new Error('Use LookupTables.get(geometry.numValues)');
     }
 
     this.allValues = LookupTables.allValues(numValues);

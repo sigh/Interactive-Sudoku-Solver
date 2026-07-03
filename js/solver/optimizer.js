@@ -54,45 +54,45 @@ export class SudokuConstraintOptimizer {
     this._debugLogger.log(entry);
   }
 
-  optimize(handlerSet, cellExclusions, shape) {
+  optimize(handlerSet, cellExclusions, geometry) {
     const boxInfo = handlerSet.getAllofType(HandlerModule.BoxInfo)[0];
     const boxRegions = boxInfo?.boxRegions() || [];
 
-    this._addExtraCellExclusions(handlerSet, cellExclusions, shape);
+    this._addExtraCellExclusions(handlerSet, cellExclusions, geometry);
 
-    const effectiveValues = this._computeEffectiveValues(handlerSet, shape);
+    const effectiveValues = this._computeEffectiveValues(handlerSet, geometry);
 
-    this._addPerfectAllDifferentHandlers(handlerSet, shape, effectiveValues);
+    this._addPerfectAllDifferentHandlers(handlerSet, geometry, effectiveValues);
 
 
-    if (!shape.isSquare()) {
-      this._optimizeNonSquareGrids(handlerSet, boxRegions, shape);
+    if (!geometry.isSquare()) {
+      this._optimizeNonSquareGrids(handlerSet, boxRegions, geometry);
     }
 
-    const effectiveValueInfo = this._effectiveValueInfo(effectiveValues, shape);
+    const effectiveValueInfo = this._effectiveValueInfo(effectiveValues, geometry);
 
     this._optimizeSums(
-      handlerSet, cellExclusions, boxRegions, shape, effectiveValueInfo);
+      handlerSet, cellExclusions, boxRegions, geometry, effectiveValueInfo);
 
-    this._optimizeRellik(handlerSet, shape);
+    this._optimizeRellik(handlerSet, geometry);
 
     this._optimizeJigsaw(
-      handlerSet, boxRegions, shape, effectiveValueInfo.count);
+      handlerSet, boxRegions, geometry, effectiveValueInfo.count);
 
-    this._optimizeFullRank(handlerSet, shape);
+    this._optimizeFullRank(handlerSet, geometry);
 
-    this._optimizeChaosConstruction(handlerSet, shape, effectiveValueInfo.mask);
+    this._optimizeChaosConstruction(handlerSet, geometry, effectiveValueInfo.mask);
 
-    this._optimizeRequiredValues(handlerSet, cellExclusions, shape);
+    this._optimizeRequiredValues(handlerSet, cellExclusions, geometry);
 
-    this._optimizeTaxicab(handlerSet, cellExclusions, shape);
+    this._optimizeTaxicab(handlerSet, cellExclusions, geometry);
 
-    this._optimizeBinaryPairwise(handlerSet, shape);
+    this._optimizeBinaryPairwise(handlerSet, geometry);
 
-    this._addGridHouseIntersections(handlerSet, boxRegions, shape);
+    this._addGridHouseIntersections(handlerSet, boxRegions, geometry);
 
-    const cellPriorities = this._computeCellPriorities(handlerSet, shape);
-    this._selectPriorityAnchorCells(handlerSet, shape, cellPriorities);
+    const cellPriorities = this._computeCellPriorities(handlerSet, geometry);
+    this._selectPriorityAnchorCells(handlerSet, geometry, cellPriorities);
 
     this._logStats(handlerSet);
     return cellPriorities;
@@ -100,8 +100,8 @@ export class SudokuConstraintOptimizer {
 
   // Cell priorities are used to determine the order in which cells are
   // searched with preference given to cells with higher priority.
-  _computeCellPriorities(handlerSet, shape) {
-    const priorities = new Int32Array(shape.totalCells());
+  _computeCellPriorities(handlerSet, geometry) {
+    const priorities = new Int32Array(geometry.totalCells());
 
     // TODO: Determine priorities in a more principled way.
     //  - Add one for each exclusion cell.
@@ -109,17 +109,17 @@ export class SudokuConstraintOptimizer {
     //    is.
 
     for (const handler of handlerSet) {
-      const priority = handler.priority(shape);
+      const priority = handler.priority(geometry);
       for (const cell of handler.cells) {
         priorities[cell] += priority;
       }
     }
 
-    this._boostLinkedCellPriorities(priorities, handlerSet, shape);
+    this._boostLinkedCellPriorities(priorities, handlerSet, geometry);
 
     for (const handler of handlerSet.getAllofType(HandlerModule.Priority)) {
       for (const cell of handler.priorityCells()) {
-        priorities[cell] = handler.priority(shape);
+        priorities[cell] = handler.priority(geometry);
       }
     }
 
@@ -138,15 +138,15 @@ export class SudokuConstraintOptimizer {
     return priorities;
   }
 
-  _boostLinkedCellPriorities(priorities, handlerSet, shape) {
+  _boostLinkedCellPriorities(priorities, handlerSet, geometry) {
     const linkedCells = buildLinkedSearchCells(handlerSet, priorities.length);
     if (linkedCells === null) return;
 
-    const minLinkedPriority = Math.max(10, shape.numValues + 1);
+    const minLinkedPriority = Math.max(10, geometry.numValues + 1);
     const marks = new Uint32Array(priorities.length);
     let mark = 0;
     for (const handler of handlerSet) {
-      const priority = handler.priority(shape);
+      const priority = handler.priority(geometry);
       if (priority < minLinkedPriority) continue;
 
       mark++;
@@ -163,12 +163,12 @@ export class SudokuConstraintOptimizer {
     }
   }
 
-  _optimizeChaosConstruction(handlerSet, shape, effectiveValueMask) {
+  _optimizeChaosConstruction(handlerSet, geometry, effectiveValueMask) {
     const chaosHandlers = handlerSet.getAllofType(ChaosHandlerModule.ChaosConstruction);
     if (chaosHandlers.length === 0) return;
 
-    const regionCells = shape.varCellsForGroup('CC');
-    const numGridCells = shape.numGridCells;
+    const regionCells = geometry.varCellsForGroup('CC');
+    const numGridCells = geometry.numGridCells;
     if (!regionCells || regionCells.length !== numGridCells) return;
 
     const regionCellOffset = regionCells[0];
@@ -181,8 +181,8 @@ export class SudokuConstraintOptimizer {
     };
 
     this._addChaosFixedValueRegionExclusions(handlerSet, chaos);
-    this._addChaosRegionShardSources(handlerSet, shape, effectiveValueMask, chaos);
-    this._addChaosCountDistinctMaxBounds(handlerSet, shape, chaos);
+    this._addChaosRegionShardSources(handlerSet, geometry, effectiveValueMask, chaos);
+    this._addChaosCountDistinctMaxBounds(handlerSet, geometry, chaos);
   }
 
   _addChaosFixedValueRegionExclusions(handlerSet, chaos) {
@@ -196,13 +196,13 @@ export class SudokuConstraintOptimizer {
     }
   }
 
-  _addChaosRegionShardSources(handlerSet, shape, effectiveValueMask, chaos) {
+  _addChaosRegionShardSources(handlerSet, geometry, effectiveValueMask, chaos) {
     const { chaosHandlers, regionCellOffset, regionCellLimit } = chaos;
 
     const arrowHandlers = handlerSet.getAllofType(ChaosHandlerModule.ChaosArrow);
     const countHandlers = handlerSet.getAllofType(ChaosHandlerModule.ChaosCount);
 
-    const equalsKey = SudokuConstraintOptimizer._equalsKey(shape.numValues);
+    const equalsKey = SudokuConstraintOptimizer._equalsKey(geometry.numValues);
     const binaryHandlers = [
       ...handlerSet.getAllofType(HandlerModule.BinaryConstraint),
       ...handlerSet.getAllofType(HandlerModule.BinaryPairwise)];
@@ -219,8 +219,8 @@ export class SudokuConstraintOptimizer {
           if (regionCellB < regionCellOffset || regionCellB >= regionCellLimit) continue;
           const cellB = regionCellB - regionCellOffset;
           const delta = Math.abs(cellA - cellB);
-          if (delta === shape.numCols
-            || (delta === 1 && (cellA / shape.numCols | 0) === (cellB / shape.numCols | 0))) {
+          if (delta === geometry.numCols
+            || (delta === 1 && (cellA / geometry.numCols | 0) === (cellB / geometry.numCols | 0))) {
             links.push([cellA, cellB]);
           }
         }
@@ -239,7 +239,7 @@ export class SudokuConstraintOptimizer {
     }
   }
 
-  _addChaosCountDistinctMaxBounds(handlerSet, shape, chaos) {
+  _addChaosCountDistinctMaxBounds(handlerSet, geometry, chaos) {
     const countHandlers = handlerSet.getAllofType(HandlerModule.CountDistinct);
     if (countHandlers.length === 0) return;
 
@@ -264,18 +264,18 @@ export class SudokuConstraintOptimizer {
       }
       if (!allRegionLane) continue;
 
-      const reduction = this._countEnclosedRegionCoincidences(countedGridCells, shape);
+      const reduction = this._countEnclosedRegionCoincidences(countedGridCells, geometry);
       if (reduction === 0) continue;
 
       // The control cell's value is the distinct count, so cap it at the reduced
       // maximum. Skip when the handler's own bound (min(numCounted, numValues))
       // is already at least this tight.
       const maxDistinct = numCounted - reduction;
-      if (maxDistinct >= shape.numValues) continue;
+      if (maxDistinct >= geometry.numValues) continue;
       // Keep only the lowest maxDistinct count-bits; count k occupies value bit
       // k - offset - 1, matching the handler's own range encoding.
-      const keepMask = (1 << (maxDistinct - shape.valueOffset)) - 1;
-      const allowed = LookupTables.toOffsetValuesArray(keepMask, shape.valueOffset);
+      const keepMask = (1 << (maxDistinct - geometry.valueOffset)) - 1;
+      const allowed = LookupTables.toOffsetValuesArray(keepMask, geometry.valueOffset);
 
       const newHandler = new HandlerModule.GivenCandidates(
         new Map([[cells[0], allowed]]));
@@ -294,9 +294,9 @@ export class SudokuConstraintOptimizer {
   // set; keeping the neighbourhoods disjoint keeps those pairs cell-disjoint, so
   // the count is a sound lower bound on the number of forced coincidences (hence
   // on the reduction in distinct labels).
-  _countEnclosedRegionCoincidences(countedGridCells, shape) {
+  _countEnclosedRegionCoincidences(countedGridCells, geometry) {
     const neighborTable = ChaosHandlerModule.neighborTable(
-      shape.numRows, shape.numCols);
+      geometry.numRows, geometry.numCols);
     const used = new Set();
     let reduction = 0;
 
@@ -317,13 +317,13 @@ export class SudokuConstraintOptimizer {
     return reduction;
   }
 
-  _selectPriorityAnchorCells(handlerSet, shape, cellPriorities) {
+  _selectPriorityAnchorCells(handlerSet, geometry, cellPriorities) {
     for (const handler of handlerSet.getAllofType(ChaosHandlerModule.ChaosConstruction)) {
-      handler.selectPriorityAnchorCells(shape, cellPriorities);
+      handler.selectPriorityAnchorCells(geometry, cellPriorities);
     }
   }
 
-  _optimizeNonSquareGrids(handlerSet, boxRegions, shape) {
+  _optimizeNonSquareGrids(handlerSet, boxRegions, geometry) {
     // For non-square grids without boxes, one axis forms houses
     // and the other axis has numValues lines of length K < numValues.
     // Since those K-length lines are all-different then for each value it must
@@ -344,16 +344,16 @@ export class SudokuConstraintOptimizer {
     // Those lines have length K = min(numRows, numCols).
     let lines;
     let requiredLineCount;
-    const numValues = shape.numValues;
+    const numValues = geometry.numValues;
 
-    if (shape.numCols === numValues) {
+    if (geometry.numCols === numValues) {
       // Columns: numValues lines, each with numRows cells.
-      lines = SudokuConstraintBase.colRegions(shape);
-      requiredLineCount = shape.numRows;
-    } else if (shape.numRows === numValues) {
+      lines = SudokuConstraintBase.colRegions(geometry);
+      requiredLineCount = geometry.numRows;
+    } else if (geometry.numRows === numValues) {
       // Rows: numValues lines, each with numCols cells.
-      lines = SudokuConstraintBase.rowRegions(shape);
-      requiredLineCount = shape.numCols;
+      lines = SudokuConstraintBase.rowRegions(geometry);
+      requiredLineCount = geometry.numCols;
     }
 
     // This optimization assumes that the longer dimension equals numValues.
@@ -373,7 +373,7 @@ export class SudokuConstraintOptimizer {
         requiredLineCount * (i + 1)));
 
     const handler = new HandlerModule.FullGridRequiredValues(
-      allCells(shape),
+      allCells(geometry),
       packedLines);
     handlerSet.addAux(handler);
     this._logAddHandler('_addFullGridRequiredValues', handler, {
@@ -385,7 +385,7 @@ export class SudokuConstraintOptimizer {
   static _equalsKey = memoize((numValues) => fnToBinaryKey(
     (a, b) => a === b, numValues));
 
-  _addExtraCellExclusions(handlerSet, cellExclusions, shape) {
+  _addExtraCellExclusions(handlerSet, cellExclusions, geometry) {
     // If two cells must have the same value, then they have to share the same
     // cell exclusions.
     // This will allow Palindrome and SameValue constraints to propagate their
@@ -395,7 +395,7 @@ export class SudokuConstraintOptimizer {
         HandlerModule.BinaryConstraint),
       ...handlerSet.getAllofType(
         HandlerModule.BinaryPairwise)];
-    const equalsKey = SudokuConstraintOptimizer._equalsKey(shape.numValues);
+    const equalsKey = SudokuConstraintOptimizer._equalsKey(geometry.numValues);
 
     for (const h of binaryHandlers) {
       if (h.key() !== equalsKey) continue;
@@ -407,13 +407,13 @@ export class SudokuConstraintOptimizer {
     }
   }
 
-  _addGridHouseIntersections(handlerSet, boxRegions, shape) {
+  _addGridHouseIntersections(handlerSet, boxRegions, geometry) {
     // Intersections are not very useful if there are no boxes.
     if (boxRegions.length === 0) return;
     const boxSize = boxRegions[0].length;
 
     const [boxHeight, boxWidth] = CellGeometry.boxDimsForSize(
-      shape.numRows, shape.numCols, boxSize);
+      geometry.numRows, geometry.numCols, boxSize);
     if (!boxHeight) return;
 
     const allHandlers = handlerSet.getAllofType(
@@ -437,7 +437,7 @@ export class SudokuConstraintOptimizer {
     }
   }
 
-  _optimizeJigsaw(handlerSet, boxRegions, shape, effectiveValueCount) {
+  _optimizeJigsaw(handlerSet, boxRegions, geometry, effectiveValueCount) {
     const jigsawPieces = handlerSet.getAllofType(HandlerModule.JigsawPiece);
     if (jigsawPieces.length === 0) return;
 
@@ -446,7 +446,7 @@ export class SudokuConstraintOptimizer {
 
     handlerSet.addNonEssential(
       ...this._makeJigsawLawOfLeftoverHandlers(
-        jigsawPieces, boxRegions, shape, effectiveValueCount));
+        jigsawPieces, boxRegions, geometry, effectiveValueCount));
   }
 
   // Find a non-overlapping set of handlers.
@@ -478,7 +478,7 @@ export class SudokuConstraintOptimizer {
     return [nonOverlappingHandlers, cellsIncluded];
   }
 
-  _optimizeSums(handlerSet, cellExclusions, boxRegions, shape, effectiveValueInfo) {
+  _optimizeSums(handlerSet, cellExclusions, boxRegions, geometry, effectiveValueInfo) {
     // TODO: Consider how this interacts with fixed cells.
     const allSumHandlers = handlerSet.getAllofType(SumHandlerModule.Sum);
     if (allSumHandlers.length === 0) return;
@@ -493,20 +493,20 @@ export class SudokuConstraintOptimizer {
       this._findNonOverlappingSubset(safeSumHandlers, handlerSet);
 
     handlerSet.addNonEssential(
-      ...this._fillInSumGap(filteredSumHandlers, sumCells, shape));
+      ...this._fillInSumGap(filteredSumHandlers, sumCells, geometry));
 
     handlerSet.addNonEssential(
       ...this._makeInnieOutieSumHandlers(
-        filteredSumHandlers, boxRegions, shape,
+        filteredSumHandlers, boxRegions, geometry,
         effectiveValueInfo.count, effectiveValueInfo.sum));
 
     handlerSet.addNonEssential(
-      ...this._makeHiddenCageHandlers(handlerSet, safeSumHandlers, cellExclusions, shape));
+      ...this._makeHiddenCageHandlers(handlerSet, safeSumHandlers, cellExclusions, geometry));
 
     handlerSet.addNonEssential(
-      ...this._makeCombinedSumHandlers(safeSumHandlers, cellExclusions, shape));
+      ...this._makeCombinedSumHandlers(safeSumHandlers, cellExclusions, geometry));
 
-    this._replaceSizeSpecificSumHandlers(handlerSet, cellExclusions, shape);
+    this._replaceSizeSpecificSumHandlers(handlerSet, cellExclusions, geometry);
 
     // Don't pass in the sum handlers so that this phase can operate on all the
     // new sum handlers that were added.
@@ -515,7 +515,7 @@ export class SudokuConstraintOptimizer {
     return;
   }
 
-  _makeCombinedSumHandlers(allSumHandlers, cellExclusions, shape) {
+  _makeCombinedSumHandlers(allSumHandlers, cellExclusions, geometry) {
     // Bounded, greedy merge process:
     // - Assign a score to each record
     // - Only merge two records if the merged score is strictly better than BOTH inputs.
@@ -527,7 +527,7 @@ export class SudokuConstraintOptimizer {
       for (const g of groups) {
         const k = g.length;
         // How much "slack" this group provides beyond the dof.
-        score += k * (shape.numValues - k) - dof;
+        score += k * (geometry.numValues - k) - dof;
       }
       return score;
     };
@@ -538,7 +538,7 @@ export class SudokuConstraintOptimizer {
       const groups = HandlerModule.HandlerUtil.findExclusionGroupsGreedy(
         cells, cellExclusions).groups;
       const { range, min, max } = HandlerModule.HandlerUtil.exclusionGroupSumInfo(
-        groups, shape.numValues, shape.valueOffset);
+        groups, geometry.numValues, geometry.valueOffset);
       if (sum < min || sum > max) return null;
 
       const dof = Math.min(sum - min, max - sum);
@@ -733,21 +733,21 @@ export class SudokuConstraintOptimizer {
     }
   }
 
-  _fillInSumGap(sumHandlers, sumCells, shape) {
+  _fillInSumGap(sumHandlers, sumCells, geometry) {
     // Fill in a gap if one remains.
     // Exclude handlers with cells outside the grid.
     const gridHandlers = sumHandlers.filter(
-      h => h.cells.every(c => c < shape.numGridCells));
+      h => h.cells.every(c => c < geometry.numGridCells));
 
-    const numNonSumCells = shape.numGridCells - gridHandlers.reduce(
+    const numNonSumCells = geometry.numGridCells - gridHandlers.reduce(
       (n, h) => n + h.cells.length, 0);
-    if (numNonSumCells === 0 || numNonSumCells >= shape.numValues) return [];
+    if (numNonSumCells === 0 || numNonSumCells >= geometry.numValues) return [];
 
     const sumHandlersSum = gridHandlers.map(h => h.sum()).reduce((a, b) => a + b);
-    const numRegions = shape.numGridCells / shape.numValues;
-    const remainingSum = numRegions * maxSumForShape(shape) - sumHandlersSum;
+    const numRegions = geometry.numGridCells / geometry.numValues;
+    const remainingSum = numRegions * maxSumForShape(geometry) - sumHandlersSum;
 
-    const remainingCells = new Set(allCells(shape));
+    const remainingCells = new Set(allCells(geometry));
     gridHandlers.forEach(h => h.cells.forEach(c => remainingCells.delete(c)));
     const newHandler = new SumHandlerModule.Sum(
       [...remainingCells], remainingSum);
@@ -766,38 +766,38 @@ export class SudokuConstraintOptimizer {
 
   // Compute per-cell effective values by applying GivenCandidates
   // restrictions to a scratch grid.
-  _computeEffectiveValues(handlerSet, shape) {
-    const numCells = shape.totalCells();
-    const allValues = LookupTables.allValues(shape.numValues);
+  _computeEffectiveValues(handlerSet, geometry) {
+    const numCells = geometry.totalCells();
+    const allValues = LookupTables.allValues(geometry.numValues);
     const effectiveValues = new Uint16Array(numCells);
     effectiveValues.fill(allValues);
     for (const h of
       handlerSet.getAllofType(HandlerModule.GivenCandidates)) {
-      h.applyValues(effectiveValues, shape.valueOffset);
+      h.applyValues(effectiveValues, geometry.valueOffset);
     }
     return effectiveValues;
   }
 
-  _effectiveValueInfo(effectiveValues, shape) {
+  _effectiveValueInfo(effectiveValues, geometry) {
     let gridValues = 0;
-    for (let i = 0; i < shape.numGridCells; i++) {
+    for (let i = 0; i < geometry.numGridCells; i++) {
       gridValues |= effectiveValues[i];
     }
     const count = countOnes16bit(gridValues);
     return {
       count,
-      sum: LookupTables.get(shape.numValues).sum[gridValues]
-        + shape.valueOffset * count,
+      sum: LookupTables.get(geometry.numValues).sum[gridValues]
+        + geometry.valueOffset * count,
       mask: gridValues,
     };
   }
 
-  _effectiveValueCount(effectiveValues, shape) {
-    return this._effectiveValueInfo(effectiveValues, shape).count;
+  _effectiveValueCount(effectiveValues, geometry) {
+    return this._effectiveValueInfo(effectiveValues, geometry).count;
   }
 
   // Promote AllDifferent handlers to PerfectAllDifferent as appropriate.
-  _addPerfectAllDifferentHandlers(handlerSet, shape, effectiveValues) {
+  _addPerfectAllDifferentHandlers(handlerSet, geometry, effectiveValues) {
     for (const h of
       handlerSet.getAllofType(HandlerModule.AllDifferent)) {
       const cells = h.exclusionCells();
@@ -819,8 +819,8 @@ export class SudokuConstraintOptimizer {
   }
 
   // Find {1-2}-cell sum constraints and replace them dedicated handlers.
-  _replaceSizeSpecificSumHandlers(handlerSet, cellExclusions, shape) {
-    const maxSum = maxSumForShape(shape);
+  _replaceSizeSpecificSumHandlers(handlerSet, cellExclusions, geometry) {
+    const maxSum = maxSumForShape(geometry);
     const sumHandlers = handlerSet.getAllofType(SumHandlerModule.Sum);
     for (const h of sumHandlers) {
       let newHandler;
@@ -850,14 +850,14 @@ export class SudokuConstraintOptimizer {
               ...cells,
               fnToBinaryKey(
                 (a, b) => a * c0 + b * c1 === sum && (!mutuallyExclusive || a !== b),
-                shape.numValues, shape.valueOffset));
+                geometry.numValues, geometry.valueOffset));
           }
           break;
-        case shape.numValues:
+        case geometry.numValues:
           {
             // If N cells are all pairwise mutually exclusive on a base-N grid,
             // then they must be a permutation of {1..N}. Therefore their sum is
-            // fixed (maxSum(shape)).
+            // fixed (maxSum(geometry)).
             // We handle this because some users add this constraint when they
             // could just add an AllDifferent constraint.
             if (!h.onlyUnitCoeffs()) break;
@@ -886,7 +886,7 @@ export class SudokuConstraintOptimizer {
   // all-different region.
   _addSumIntersectionHandler(
     baseRegion, intersectingSumHandlers, gapRegions,
-    removableRegionsBySize, cellExclusions, shape) {
+    removableRegionsBySize, cellExclusions, geometry) {
     let totalSum = 0;
     let candidateCells = new Set();
     let uncoveredBaseCells = new Set(baseRegion.cells);
@@ -960,7 +960,7 @@ export class SudokuConstraintOptimizer {
     const groups = HandlerModule.HandlerUtil.findExclusionGroupsGreedy(
       cellsArray, cellExclusions).groups;
     const { range, min, max } = HandlerModule.HandlerUtil.exclusionGroupSumInfo(
-      groups, shape.numValues, shape.valueOffset);
+      groups, geometry.numValues, geometry.valueOffset);
     if (totalSum < min || totalSum > max) {
       // Infeasible sum, fail the puzzle.
       const handler = new HandlerModule.False(cellsArray);
@@ -998,10 +998,10 @@ export class SudokuConstraintOptimizer {
   }
 
   // Find sets of cells which we can infer have a known sum and unique values.
-  _makeHiddenCageHandlers(handlerSet, allSumHandlers, cellExclusions, shape) {
+  _makeHiddenCageHandlers(handlerSet, allSumHandlers, cellExclusions, geometry) {
     const allDiffRegions = fixedSumRegions(
       handlerSet.getAllofType(HandlerModule.PerfectAllDifferent),
-      handlerSet, shape);
+      handlerSet, geometry);
     const allDiffRegionsBySize = [...allDiffRegions].sort(
       (a, b) => a.cellCount - b.cellCount);
     const allDiffRegionByIndex = new Map(
@@ -1035,7 +1035,7 @@ export class SudokuConstraintOptimizer {
             i => allDiffRegionByIndex.get(i));
         const sumIntersectionHandler = this._addSumIntersectionHandler(
           baseRegion, filteredSumHandlers, intersectingAllDiffRegions, allDiffRegionsBySize,
-          cellExclusions, shape);
+          cellExclusions, geometry);
         if (sumIntersectionHandler) newHandlers.push(sumIntersectionHandler);
       }
 
@@ -1147,18 +1147,18 @@ export class SudokuConstraintOptimizer {
 
   // Returns region-groups used by the jigsaw overlap optimizations.
   // An axis forms regions when its cells-per-region equals valueCount.
-  _overlapRegions(shape, boxRegions, valueCount) {
+  _overlapRegions(geometry, boxRegions, valueCount) {
     const regions = [];
 
     // Rows are houses if they have valueCount cells (numCols === valueCount).
-    if (shape.numCols === valueCount) {
-      const rowRegions = SudokuConstraintBase.rowRegions(shape);
+    if (geometry.numCols === valueCount) {
+      const rowRegions = SudokuConstraintBase.rowRegions(geometry);
       regions.push(rowRegions, rowRegions.slice().reverse());
     }
 
     // Columns are houses if they have valueCount cells (numRows === valueCount).
-    if (shape.numRows === valueCount) {
-      const colRegions = SudokuConstraintBase.colRegions(shape);
+    if (geometry.numRows === valueCount) {
+      const colRegions = SudokuConstraintBase.colRegions(geometry);
       regions.push(colRegions, colRegions.slice().reverse());
     }
 
@@ -1171,7 +1171,7 @@ export class SudokuConstraintOptimizer {
 
   // Attach an aux handler to each Rellik cage that forces into the cage any
   // value an overlapping house can only place inside it (see HouseRequiredRellik).
-  _optimizeRellik(handlerSet, shape) {
+  _optimizeRellik(handlerSet, geometry) {
     const rellikHandlers = handlerSet.getAllofType(HandlerModule.Rellik);
     if (rellikHandlers.length === 0) return;
 
@@ -1230,7 +1230,7 @@ export class SudokuConstraintOptimizer {
   }
 
   _makeJigsawLawOfLeftoverHandlers(
-    jigsawPieces, boxRegions, shape, effectiveValueCount) {
+    jigsawPieces, boxRegions, geometry, effectiveValueCount) {
     const newHandlers = [];
     const pieces = jigsawPieces.map(p => p.cells);
 
@@ -1243,7 +1243,7 @@ export class SudokuConstraintOptimizer {
       const diffB = setDifference(piecesRegion, superRegion);
       // Ignore diff that too big, they are probably not very well
       // constrained.
-      if (diffA.size >= shape.numValues) return;
+      if (diffA.size >= geometry.numValues) return;
 
       // All values in the set differences must be the same.
       const newHandler = new HandlerModule.SameValuesIgnoreCount(diffA, diffB);
@@ -1251,7 +1251,7 @@ export class SudokuConstraintOptimizer {
       this._logAddHandler('_makeJigsawLawOfLeftoverHandlers', newHandler);
     }
 
-    for (const r of this._overlapRegions(shape, boxRegions, effectiveValueCount)) {
+    for (const r of this._overlapRegions(geometry, boxRegions, effectiveValueCount)) {
       this._generalRegionOverlapProcessor(r, pieces, handleOverlap);
     }
 
@@ -1259,8 +1259,8 @@ export class SudokuConstraintOptimizer {
   }
 
   _makeInnieOutieSumHandlers(
-    sumHandlers, boxRegions, shape, effectiveValueCount = shape.numValues,
-    effectiveValueSum = maxSumForShape(shape)) {
+    sumHandlers, boxRegions, geometry, effectiveValueCount = geometry.numValues,
+    effectiveValueSum = maxSumForShape(geometry)) {
     const newHandlers = [];
 
     const pieces = sumHandlers.map(h => h.cells);
@@ -1324,14 +1324,14 @@ export class SudokuConstraintOptimizer {
       this._logAddHandler('_makeInnieOutieSumHandlers', newHandler, { args });
     };
 
-    for (const r of this._overlapRegions(shape, boxRegions, effectiveValueCount)) {
+    for (const r of this._overlapRegions(geometry, boxRegions, effectiveValueCount)) {
       this._generalRegionOverlapProcessor(r, pieces, handleOverlap);
     }
 
     return newHandlers;
   }
 
-  _optimizeFullRank(handlerSet, shape) {
+  _optimizeFullRank(handlerSet, geometry) {
     const rankHandlers = handlerSet.getAllofType(HandlerModule.FullRank);
     if (rankHandlers.length === 0) return;
 
@@ -1344,8 +1344,8 @@ export class SudokuConstraintOptimizer {
     }
 
     // Reuse FullRank's entry construction so we stay in sync.
-    const entries = HandlerModule.FullRank.buildEntries(shape);
-    const equalsKey = SudokuConstraintOptimizer._equalsKey(shape.numValues);
+    const entries = HandlerModule.FullRank.buildEntries(geometry);
+    const equalsKey = SudokuConstraintOptimizer._equalsKey(geometry.numValues);
 
     // Dedupe. Keep the first clue per rank; if we see a duplicate rank,
     // enforce entry equality against the representative.
@@ -1384,7 +1384,7 @@ export class SudokuConstraintOptimizer {
     }
 
     const handler = new HandlerModule.FullRank(
-      shape.numGridCells, dedupedClues, tieMode);
+      geometry.numGridCells, dedupedClues, tieMode);
     handlerSet.add(handler);
 
     if (this._debugLogger) {
@@ -1517,7 +1517,7 @@ export class SudokuConstraintOptimizer {
     return true;
   }
 
-  _optimizeRequiredValues(handlerSet, cellExclusions, shape) {
+  _optimizeRequiredValues(handlerSet, cellExclusions, geometry) {
     const requiredValueHandlers = handlerSet.getAllofType(HandlerModule.RequiredValues);
     if (requiredValueHandlers.length === 0) return;
 
@@ -1554,8 +1554,8 @@ export class SudokuConstraintOptimizer {
         const newCells = [...h.cells];
         const handlerValues = new Set(h.values());
         const allValues = LookupTables.toOffsetValuesArray(
-          LookupTables.get(shape.numValues).allValues,
-          shape.valueOffset);
+          LookupTables.get(geometry.numValues).allValues,
+          geometry.valueOffset);
 
         // Convert {require}/{remove} lists to allowed value arrays.
         const givenCandidates = new Map();
@@ -1621,13 +1621,13 @@ export class SudokuConstraintOptimizer {
     }
   }
 
-  _optimizeTaxicab(handlerSet, cellExclusions, shape) {
+  _optimizeTaxicab(handlerSet, cellExclusions, geometry) {
     const taxicabHandlers = handlerSet.getAllofType(
       HandlerModule.ValueDependentUniqueValueExclusion);
     if (taxicabHandlers.length === 0) return;
 
     const valueCellExclusions = [];
-    for (let i = 1; i <= shape.numValues; i++) {
+    for (let i = 1; i <= geometry.numValues; i++) {
       const valueCellExclusion = cellExclusions.clone();
       valueCellExclusions.push(valueCellExclusion);
       for (const h of taxicabHandlers) {
@@ -1648,11 +1648,11 @@ export class SudokuConstraintOptimizer {
 
   // Replace 2-cell BinaryPairwise handlers with a direct BinaryConstraint
   // handler. This has less overhead both during runtime and initialization.
-  _optimizeBinaryPairwise(handlerSet, shape) {
+  _optimizeBinaryPairwise(handlerSet, geometry) {
     const handlers = handlerSet.getAllofType(HandlerModule.BinaryPairwise);
     for (const h of handlers) {
       if (h.cells.length !== 2) continue;
-      h.validate(shape.numValues);  // Validate so we preserve behaviour.
+      h.validate(geometry.numValues);  // Validate so we preserve behaviour.
       const newHandler = new HandlerModule.BinaryConstraint(
         ...h.cells, h.key());
       handlerSet.replace(h, newHandler);
@@ -1696,11 +1696,11 @@ export class SudokuConstraintOptimizer {
 const maxSumForValueCount = (valueCount, valueOffset) => (
   (valueCount * (valueCount + 1)) / 2 + valueOffset * valueCount);
 
-const maxSumForShape = (shape) => (
-  maxSumForValueCount(shape.numValues, shape.valueOffset));
+const maxSumForShape = (geometry) => (
+  maxSumForValueCount(geometry.numValues, geometry.valueOffset));
 
-const fixedSumRegions = (handlers, handlerSet, shape) => {
-  const lookup = LookupTables.get(shape.numValues);
+const fixedSumRegions = (handlers, handlerSet, geometry) => {
+  const lookup = LookupTables.get(geometry.numValues);
   return handlers.map(handler => {
     const valueMask = handler.valueMask();
     const cellCount = handler.cells.length;
@@ -1710,9 +1710,9 @@ const fixedSumRegions = (handlers, handlerSet, shape) => {
       cells: handler.cells,
       cellCount,
       sum: lookup.sum[valueMask]
-        + shape.valueOffset * cellCount,
+        + geometry.valueOffset * cellCount,
     };
   });
 };
 
-const allCells = (shape) => Array.from({ length: shape.numGridCells }, (_, i) => i);
+const allCells = (geometry) => Array.from({ length: geometry.numGridCells }, (_, i) => i);

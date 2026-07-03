@@ -35,8 +35,8 @@ export class CellArgs {
     return this._cells;
   }
 
-  cellIds(shape) {
-    return this._cells.map(c => shape.parseCellId(c).cell);
+  cellIds(geometry) {
+    return this._cells.map(c => geometry.parseCellId(c).cell);
   }
 }
 
@@ -56,11 +56,11 @@ export class SudokuConstraintBase {
   static UNIQUENESS_KEY_FIELD = null;
 
   // Determine if a list of cells is valid for this constraint class.
-  // Used by LinesAndSets constraints. Takes (cells, shape) arguments.
+  // Used by LinesAndSets constraints. Takes (cells, geometry) arguments.
   static VALIDATE_CELLS_FN = null;
 
-  // Determine if a shape is valid for this constraint class.
-  // Takes (shape) argument, returns true if valid.
+  // Determine if a geometry is valid for this constraint class.
+  // Takes (geometry) argument, returns true if valid.
   static VALIDATE_SHAPE_FN = null;
 
   constructor(...args) {
@@ -68,7 +68,7 @@ export class SudokuConstraintBase {
     this.type = this.constructor.name;
   }
 
-  static *makeFromArgs(args, shape) {
+  static *makeFromArgs(args, geometry) {
     yield new this(...args);
   }
 
@@ -162,26 +162,26 @@ export class SudokuConstraintBase {
 
   // Get the cells associated with this constraints.
   // Mainly for display purposes.
-  getCells(shape) {
+  getCells(geometry) {
     return this.cells || [];
   }
 
-  getVarCellGroups(shape) {
+  getVarCellGroups(geometry) {
     return [];
   }
 
   // Return a new constraint shifted so that its first cell lands on
-  // baseCellId. Each cell's offset from getCells(shape)[0] is preserved.
-  shiftCells(baseCellId, shape) {
-    const cells = this.getCells(shape);
+  // baseCellId. Each cell's offset from getCells(geometry)[0] is preserved.
+  shiftCells(baseCellId, geometry) {
+    const cells = this.getCells(geometry);
     if (cells.length === 0) return this;
-    const graph = shape.cellGraph();
-    const baseCell = shape.parseCellId(cells[0]).cell;
-    const targetCell = shape.parseCellId(baseCellId).cell;
+    const graph = geometry.cellGraph();
+    const baseCell = geometry.parseCellId(cells[0]).cell;
+    const targetCell = geometry.parseCellId(baseCellId).cell;
     if (baseCell === targetCell) return this;
     const basePos = graph.cellPosition(baseCell);
     return this.makeShifted(cellId => {
-      const cell = shape.parseCellId(cellId).cell;
+      const cell = geometry.parseCellId(cellId).cell;
       const cellPos = graph.cellPosition(cell);
       if (!cellPos || cellPos[2] !== basePos[2]) {
         throw new Error('Cannot shift cell: ' + cellId);
@@ -191,7 +191,7 @@ export class SudokuConstraintBase {
       if (shifted === null) {
         throw new Error('Shifted cell is out of bounds.');
       }
-      return shape.makeCellIdFromIndex(shifted);
+      return geometry.makeCellIdFromIndex(shifted);
     });
   }
 
@@ -218,22 +218,22 @@ export class SudokuConstraintBase {
   }
 
   static rowRegions = memoize(
-    (shape) => {
-      const numRows = shape.numRows;
-      const numCols = shape.numCols;
+    (geometry) => {
+      const numRows = geometry.numRows;
+      const numCols = geometry.numCols;
       return this._makeRegions((r, i) => r * numCols + i, numRows, numCols);
     },
-    (shape) => shape.gridDimsStr);
+    (geometry) => geometry.gridDimsStr);
   static colRegions = memoize(
-    (shape) => {
-      const numRows = shape.numRows;
-      const numCols = shape.numCols;
+    (geometry) => {
+      const numRows = geometry.numRows;
+      const numCols = geometry.numCols;
       return this._makeRegions((c, i) => i * numCols + c, numCols, numRows);
     },
-    (shape) => shape.gridDimsStr);
-  static boxRegions = memoize((shape, size = null) => {
-    const numRows = shape.numRows;
-    const numCols = shape.numCols;
+    (geometry) => geometry.gridDimsStr);
+  static boxRegions = memoize((geometry, size = null) => {
+    const numRows = geometry.numRows;
+    const numCols = geometry.numCols;
     const effectiveSize = size ?? CellGeometry.defaultNumValues(numRows, numCols);
 
     const [boxHeight, boxWidth] = CellGeometry.boxDimsForSize(
@@ -241,7 +241,7 @@ export class SudokuConstraintBase {
     if (!boxHeight) return [];
 
     const boxesPerRow = numCols / boxWidth;
-    const numBoxes = shape.numGridCells / effectiveSize;
+    const numBoxes = geometry.numGridCells / effectiveSize;
 
     return this._makeRegions(
       (r, i) => {
@@ -252,16 +252,16 @@ export class SudokuConstraintBase {
         const cellCol = i % boxWidth;
         return (boxRow * boxHeight + cellRow) * numCols + (boxCol * boxWidth + cellCol);
       }, numBoxes, effectiveSize);
-  }, (shape, size = null) => `${shape.gridDimsStr}~${size ?? CellGeometry.defaultNumValues(shape.numRows, shape.numCols)}`);
-  static disjointSetRegions = memoize((shape, size = null) => {
-    const numCols = shape.numCols;
-    const effectiveSize = size ?? CellGeometry.defaultNumValues(shape.numRows, numCols);
+  }, (geometry, size = null) => `${geometry.gridDimsStr}~${size ?? CellGeometry.defaultNumValues(geometry.numRows, geometry.numCols)}`);
+  static disjointSetRegions = memoize((geometry, size = null) => {
+    const numCols = geometry.numCols;
+    const effectiveSize = size ?? CellGeometry.defaultNumValues(geometry.numRows, numCols);
     const [boxHeight, boxWidth] = CellGeometry.boxDimsForSize(
-      shape.numRows, numCols, effectiveSize);
+      geometry.numRows, numCols, effectiveSize);
     if (!boxHeight) return [];
 
     const numSets = effectiveSize;
-    const numBoxes = shape.numGridCells / effectiveSize;
+    const numBoxes = geometry.numGridCells / effectiveSize;
     const boxesPerRow = numCols / boxWidth;
     // r = position within box (0 to effectiveSize-1)
     // i = box index (0 to numBoxes-1)
@@ -273,54 +273,54 @@ export class SudokuConstraintBase {
         const posCol = r % boxWidth;
         return (boxRow * boxHeight + posRow) * numCols + boxCol * boxWidth + posCol;
       }, numSets, numBoxes);
-  }, (shape, size = null) => `${shape.gridDimsStr}~${size ?? CellGeometry.defaultNumValues(shape.numRows, shape.numCols)}`);
+  }, (geometry, size = null) => `${geometry.gridDimsStr}~${size ?? CellGeometry.defaultNumValues(geometry.numRows, geometry.numCols)}`);
   static square2x2Regions = memoize(
-    (shape) => {
-      const numRows = shape.numRows;
-      const numCols = shape.numCols;
+    (geometry) => {
+      const numRows = geometry.numRows;
+      const numCols = geometry.numCols;
       const regions = [];
 
       for (let i = 0; i < numRows - 1; i++) {
         for (let j = 0; j < numCols - 1; j++) {
           regions.push([
-            shape.cellIndex(i, j),
-            shape.cellIndex(i, j + 1),
-            shape.cellIndex(i + 1, j),
-            shape.cellIndex(i + 1, j + 1),
+            geometry.cellIndex(i, j),
+            geometry.cellIndex(i, j + 1),
+            geometry.cellIndex(i + 1, j),
+            geometry.cellIndex(i + 1, j + 1),
           ]);
         }
       }
 
       return regions;
     },
-    (shape) => shape.gridDimsStr);
+    (geometry) => geometry.gridDimsStr);
 
   static fullLineCellMap = memoize(
-    (shape) => {
+    (geometry) => {
       let map = new Map();
-      const numRows = shape.numRows;
-      const numCols = shape.numCols;
+      const numRows = geometry.numRows;
+      const numCols = geometry.numCols;
 
-      const rowRegions = this.rowRegions(shape);
+      const rowRegions = this.rowRegions(geometry);
       for (let row = 0; row < numRows; row++) {
-        const cells = rowRegions[row].map(c => shape.makeCellIdFromIndex(c));
+        const cells = rowRegions[row].map(c => geometry.makeCellIdFromIndex(c));
         map.set(`R${row + 1},1`, cells);
         map.set(`R${row + 1},-1`, cells.slice().reverse());
       }
-      const colRegions = this.colRegions(shape);
+      const colRegions = this.colRegions(geometry);
       for (let col = 0; col < numCols; col++) {
-        const cells = colRegions[col].map(c => shape.makeCellIdFromIndex(c));
+        const cells = colRegions[col].map(c => geometry.makeCellIdFromIndex(c));
         map.set(`C${col + 1},1`, cells);
         map.set(`C${col + 1},-1`, cells.slice().reverse());
       }
 
       return map;
     },
-    (shape) => shape.gridDimsStr);
+    (geometry) => geometry.gridDimsStr);
 
-  static _hasAdjacentCells(cells, shape) {
-    const graph = shape.cellGraph();
-    const cellIndices = cells.map(c => shape.parseCellId(c).cell);
+  static _hasAdjacentCells(cells, geometry) {
+    const graph = geometry.cellGraph();
+    const cellIndices = cells.map(c => geometry.parseCellId(c).cell);
     const cellSet = new Set(cellIndices);
 
     for (const cell of cellIndices) {
@@ -330,9 +330,9 @@ export class SudokuConstraintBase {
     return true;
   }
 
-  static _adjacentCellPairs(cells, shape) {
-    const graph = shape.cellGraph();
-    const cellIndices = cells.map(c => shape.parseCellId(c).cell);
+  static _adjacentCellPairs(cells, geometry) {
+    const graph = geometry.cellGraph();
+    const cellIndices = cells.map(c => geometry.parseCellId(c).cell);
     const cellSet = new Set(cellIndices);
     const pairs = [];
     for (const cell of cellIndices) {
@@ -346,10 +346,10 @@ export class SudokuConstraintBase {
     return pairs;
   }
 
-  static _cellsAre2x2Square(cells, shape) {
+  static _cellsAre2x2Square(cells, geometry) {
     if (cells.length !== 4) return false;
-    const graph = shape.cellGraph();
-    const cellIndices = new Set(cells.map(c => shape.parseCellId(c).cell));
+    const graph = geometry.cellGraph();
+    const cellIndices = new Set(cells.map(c => geometry.parseCellId(c).cell));
 
     for (const cell of cellIndices) {
       if (graph.neighborCountIn(cell, cellIndices) !== 2) return false;
@@ -357,8 +357,8 @@ export class SudokuConstraintBase {
     return true;
   }
 
-  static _cellsAreValidCage(cells, shape) {
-    return cells.length > 1 && cells.length <= shape.numValues;
+  static _cellsAreValidCage(cells, geometry) {
+    return cells.length > 1 && cells.length <= geometry.numValues;
   }
 }
 
@@ -426,15 +426,15 @@ export class OutsideConstraintBase extends SudokuConstraintBase {
     this.dir = idParts.length > 1 ? +idParts[1] : 0;
   }
 
-  getCells(shape) {
+  getCells(geometry) {
     const cls = this.constructor;
     switch (cls.CLUE_TYPE) {
       case cls.CLUE_TYPE_DOUBLE_LINE:
-        return cls.fullLineCellMap(shape).get(this.arrowId);
+        return cls.fullLineCellMap(geometry).get(this.arrowId);
       case cls.CLUE_TYPE_DIAGONAL:
-        return cls.cellMap(shape)[this.id];
+        return cls.cellMap(geometry)[this.id];
       case cls.CLUE_TYPE_SINGLE_LINE:
-        return cls.fullLineCellMap(shape).get(this.arrowId);
+        return cls.fullLineCellMap(geometry).get(this.arrowId);
       default:
         throw Error('Unknown clue type');
     }
@@ -458,7 +458,7 @@ export class OutsideConstraintBase extends SudokuConstraintBase {
     }
   }
 
-  static *makeFromArgs(args, shape) {
+  static *makeFromArgs(args, geometry) {
     switch (this.CLUE_TYPE) {
       case this.CLUE_TYPE_DOUBLE_LINE:
         const rowCol = args[0];
@@ -561,8 +561,8 @@ export class CompositeConstraintBase extends SudokuConstraintBase {
     arrayRemoveValue(this.constraints, constraint);
   }
 
-  getCells(shape) {
-    return this.constraints.flatMap(c => c.getCells(shape));
+  getCells(geometry) {
+    return this.constraints.flatMap(c => c.getCells(geometry));
   }
 
   makeShifted(shiftFn) {
@@ -575,19 +575,19 @@ export class CompositeConstraintBase extends SudokuConstraintBase {
 
 class ChaosConstraintBase extends SudokuConstraintBase {
   static CATEGORY = 'ChaosConstruction';
-  static VALIDATE_CELLS_FN = (cells, shape) => {
-    const regionCells = shape.varCellsForGroup('CC');
+  static VALIDATE_CELLS_FN = (cells, geometry) => {
+    const regionCells = geometry.varCellsForGroup('CC');
     if (!regionCells || cells.length < 1) return false;
 
     const regionCellOffset = regionCells[0];
     const regionCellLimit = regionCellOffset + regionCells.length;
-    const controlCell = shape.parseCellId(cells[0]).cell;
+    const controlCell = geometry.parseCellId(cells[0]).cell;
     if (controlCell >= regionCellOffset && controlCell < regionCellLimit) return false;
 
     let kind = 0;
     for (let i = 1; i < cells.length; i++) {
-      const cell = shape.parseCellId(cells[i]).cell;
-      const cellKind = cell < shape.numGridCells ? 1
+      const cell = geometry.parseCellId(cells[i]).cell;
+      const cellKind = cell < geometry.numGridCells ? 1
         : cell >= regionCellOffset && cell < regionCellLimit ? 2
           : 0;
       if (!cellKind || (kind && kind !== cellKind)) return false;
@@ -626,14 +626,14 @@ class ChaosConstraintBase extends SudokuConstraintBase {
     return new this.constructor(shiftFn(gridCell));
   }
 
-  getCells(shape) {
-    const regionCells = shape.varCellsForGroup('CC');
+  getCells(geometry) {
+    const regionCells = geometry.varCellsForGroup('CC');
     if (!regionCells) return [this.cells[0], 'CC1'];
 
     const regionCellOffset = regionCells[0];
-    const ccCells = this.expandedRegionCells(shape);
-    const gridCells = ccCells.map(cellId => shape.makeCellIdFromIndex(
-      shape.parseCellId(cellId).cell - regionCellOffset));
+    const ccCells = this.expandedRegionCells(geometry);
+    const gridCells = ccCells.map(cellId => geometry.makeCellIdFromIndex(
+      geometry.parseCellId(cellId).cell - regionCellOffset));
     return [this.cells[0], ...gridCells, ...ccCells];
   }
 }
@@ -669,8 +669,8 @@ export class SudokuConstraint {
       return parts.join('');
     }
 
-    getCells(shape) {
-      return this.constraints.flatMap(c => c.getCells(shape));
+    getCells(geometry) {
+      return this.constraints.flatMap(c => c.getCells(geometry));
     }
   }
 
@@ -739,15 +739,15 @@ export class SudokuConstraint {
       this.args[1] = this.targetBitset;
     }
 
-    toggleTargetCells(cellIds, shape) {
-      const current = new Set(this.getCells(shape));
+    toggleTargetCells(cellIds, geometry) {
+      const current = new Set(this.getCells(geometry));
       const toggling = new Set(cellIds);
       const result = [
-        ...this.getCells(shape).filter(c => !toggling.has(c)),
+        ...this.getCells(geometry).filter(c => !toggling.has(c)),
         ...cellIds.filter(c => !current.has(c)),
       ];
       this.setTargetBitset(
-        this.constructor.encodeTargetCells(result, this.origin, shape));
+        this.constructor.encodeTargetCells(result, this.origin, geometry));
     }
 
     chipLabel() {
@@ -755,14 +755,14 @@ export class SudokuConstraint {
       return `Replicate ${CellGeometry.displayCellId(this.origin)}`;
     }
 
-    getCells(shape) {
-      return this.constructor.decodeTargetCells(this.targetBitset, this.origin, shape)
-        .map(c => shape.makeCellIdFromIndex(c));
+    getCells(geometry) {
+      return this.constructor.decodeTargetCells(this.targetBitset, this.origin, geometry)
+        .map(c => geometry.makeCellIdFromIndex(c));
     }
 
-    static decodeTargetCells(encoded, origin, shape) {
+    static decodeTargetCells(encoded, origin, geometry) {
       if (!encoded) return [];
-      const originIdx = shape.parseCellId(origin).cell;
+      const originIdx = geometry.parseCellId(origin).cell;
       const str = String(encoded);
       const numWords = str.length;
       const arr = new Uint8Array(numWords);
@@ -778,10 +778,10 @@ export class SudokuConstraint {
       return cells;
     }
 
-    static encodeTargetCells(cellIds, origin, shape) {
+    static encodeTargetCells(cellIds, origin, geometry) {
       if (!cellIds.length) return '';
-      const originIdx = shape.parseCellId(origin).cell;
-      const offsets = cellIds.map(id => shape.parseCellId(id).cell - originIdx);
+      const originIdx = geometry.parseCellId(origin).cell;
+      const offsets = cellIds.map(id => geometry.parseCellId(id).cell - originIdx);
       const maxOffset = Math.max(...offsets);
       const len = Base64Codec.lengthOf6BitArray(maxOffset + 1);
       const arr = new Uint8Array(len);
@@ -834,7 +834,7 @@ export class SudokuConstraint {
 
     chipLabel() { return ''; }
 
-    static *makeFromArgs(args, shape) {
+    static *makeFromArgs(args, geometry) {
       // Legacy format: .Jigsaw~<shapeSpec>~<layout>
       // New format:    .Jigsaw~<layout>
       // Ignore any legacy leading argument(s) and take the layout as the last
@@ -844,9 +844,9 @@ export class SudokuConstraint {
       }
       const layoutStr = args[args.length - 1];
 
-      if (layoutStr.length !== shape.numGridCells) {
+      if (layoutStr.length !== geometry.numGridCells) {
         throw Error(
-          `Jigsaw layout expects ${shape.numGridCells} cells, ` +
+          `Jigsaw layout expects ${geometry.numGridCells} cells, ` +
           `but layout has ${layoutStr.length}`);
       }
 
@@ -859,17 +859,17 @@ export class SudokuConstraint {
       // is needed.
       if (map.size === 1) return;
 
-      const maxRegionSize = shape.numValues;
+      const maxRegionSize = geometry.numValues;
       const minRegionSize = CellGeometry.defaultNumValues(
-        shape.numRows, shape.numCols);
+        geometry.numRows, geometry.numCols);
 
       let sawOtherRegionSize = false;
       for (const [, region] of map) {
         const len = region.length;
         if (len >= minRegionSize && len <= maxRegionSize) {
           yield new this(
-            shape.name,
-            ...region.map(c => shape.makeCellIdFromIndex(c)));
+            geometry.name,
+            ...region.map(c => geometry.makeCellIdFromIndex(c)));
         } else if (!sawOtherRegionSize) {
           // Allow one region to have a different size for partially filled grids.
           sawOtherRegionSize = true;
@@ -882,15 +882,15 @@ export class SudokuConstraint {
     static serialize(parts) {
       if (!parts.length) return [];
 
-      // Get shape from the first constraint's shapeSpec.
+      // Get geometry from the first constraint's shapeSpec.
       const shapeSpec = parts[0].shapeSpec;
-      const shape = CellGeometry.fromShapeSpec(shapeSpec);
+      const geometry = CellGeometry.fromShapeSpec(shapeSpec);
 
       // Fill parts grid such that each cell has a reference to the part.
-      const partsGrid = new Array(shape.numGridCells).fill(null);
+      const partsGrid = new Array(geometry.numGridCells).fill(null);
       for (const part of parts) {
         for (const cellId of part.cells) {
-          const { cell } = shape.parseCellId(cellId);
+          const { cell } = geometry.parseCellId(cellId);
           partsGrid[cell] = part;
         }
       }
@@ -903,7 +903,7 @@ export class SudokuConstraint {
         // Create a new index when we first encounter a part.
         if (!indexMap.has(part)) {
           const index = indexMap.size;
-          indexMap.set(part, index.toString(shape.numValues + 1));
+          indexMap.set(part, index.toString(geometry.numValues + 1));
         }
       });
 
@@ -1048,8 +1048,8 @@ export class SudokuConstraint {
       color: 'rgb(255, 100, 255)',
       dashed: true,
     };
-    static VALIDATE_CELLS_FN = (cells, shape) => (
-      shape.numValues === 9 && shape.valueOffset === 0);
+    static VALIDATE_CELLS_FN = (cells, geometry) => (
+      geometry.numValues === 9 && geometry.valueOffset === 0);
 
     constructor(...cells) {
       super(...cells);
@@ -1251,7 +1251,7 @@ export class SudokuConstraint {
       return decoded;
     }
 
-    static *makeFromArgs(args, shape) {
+    static *makeFromArgs(args, geometry) {
       const [patternToken, ...items] = args;
       const pattern = this.decodePattern(patternToken);
 
@@ -1346,7 +1346,7 @@ export class SudokuConstraint {
       return NFASerializer.serialize(nfa);
     }
 
-    static *makeFromArgs(args, shape) {
+    static *makeFromArgs(args, geometry) {
       const [encodedNFA, ...items] = args;
 
       for (const group of parseNamedCellGroups(items, this.uriDecodeArg)) {
@@ -1379,12 +1379,12 @@ export class SudokuConstraint {
     static CATEGORY = 'LayoutCheckbox';
     static UNIQUENESS_KEY_FIELD = 'type';
 
-    getVarCellGroups(shape) {
+    getVarCellGroups(geometry) {
       return [{
         prefix: 'CC',
         label: 'Chaos regions',
-        count: shape.numGridCells,
-        columns: shape.numCols,
+        count: geometry.numGridCells,
+        columns: geometry.numCols,
       }];
     }
   }
@@ -1410,7 +1410,7 @@ export class SudokuConstraint {
       this.arms = arms;
     }
 
-    static *makeFromArgs(args, shape) {
+    static *makeFromArgs(args, geometry) {
       const [gridCell, offset, ...flat] = args;
       yield new this(gridCell, offset, ...splitSegments(flat));
     }
@@ -1427,23 +1427,23 @@ export class SudokuConstraint {
         ...this.arms.map(arm => arm.map(shiftFn)));
     }
 
-    expandedArms(shape) {
+    expandedArms(geometry) {
       if (this.arms.length) return this.arms;
 
-      const regionCells = shape.varCellsForGroup('CC');
-      const graph = shape.cellGraph();
-      const controlCell = shape.parseCellId(this.cells[0]).cell;
+      const regionCells = geometry.varCellsForGroup('CC');
+      const graph = geometry.cellGraph();
+      const controlCell = geometry.parseCellId(this.cells[0]).cell;
       return [CellGraph.LEFT, CellGraph.RIGHT, CellGraph.UP, CellGraph.DOWN].map(direction => {
         const arm = [];
         for (let cell = controlCell; cell !== null; cell = graph.adjacent(cell, direction)) {
-          arm.push(shape.makeCellIdFromIndex(regionCells[cell]));
+          arm.push(geometry.makeCellIdFromIndex(regionCells[cell]));
         }
         return arm;
       });
     }
 
-    expandedRegionCells(shape) {
-      return this.expandedArms(shape).flat();
+    expandedRegionCells(geometry) {
+      return this.expandedArms(geometry).flat();
     }
   }
 
@@ -1461,12 +1461,12 @@ export class SudokuConstraint {
       borderedRegion: true,
     };
 
-    expandedRegionCells(shape) {
+    expandedRegionCells(geometry) {
       if (this.cells.length > 1) return this.cells.slice(1);
 
-      const regionCells = shape.varCellsForGroup('CC');
-      const graph = shape.cellGraph();
-      const controlCell = shape.parseCellId(this.cells[0]).cell;
+      const regionCells = geometry.varCellsForGroup('CC');
+      const graph = geometry.cellGraph();
+      const controlCell = geometry.parseCellId(this.cells[0]).cell;
       const neighbors = [
         controlCell,
         graph.adjacent(controlCell, CellGraph.UP),
@@ -1479,7 +1479,7 @@ export class SudokuConstraint {
         graph.diagonal(controlCell, CellGraph.DOWN, CellGraph.RIGHT),
       ];
       return neighbors.filter(c => c !== null)
-        .map(c => shape.makeCellIdFromIndex(regionCells[c]));
+        .map(c => geometry.makeCellIdFromIndex(regionCells[c]));
     }
   }
 
@@ -1549,11 +1549,11 @@ export class SudokuConstraint {
       if (optionalValueRange.length) this.shapeSpec += `~${optionalValueRange[0]}`;
     }
 
-    static *makeFromArgs(args, shape) {
+    static *makeFromArgs(args, geometry) {
       // Reconstruct shapeSpec from args the same way the constructor does,
-      // and verify it matches the already-parsed shape.
+      // and verify it matches the already-parsed geometry.
       const constraint = new this(...args);
-      if (CellGeometry.fromShapeSpec(constraint.shapeSpec).name !== shape.name) {
+      if (CellGeometry.fromShapeSpec(constraint.shapeSpec).name !== geometry.name) {
         throw Error('Inconsistent Shape constraints.');
       }
 
@@ -1580,12 +1580,12 @@ export class SudokuConstraint {
     static CATEGORY = 'LayoutCheckbox';
     static DISPLAY_CONFIG = { displayClass: 'Windoku' };
     static UNIQUENESS_KEY_FIELD = 'type';
-    static VALIDATE_SHAPE_FN = (shape) => shape.isSquare();
+    static VALIDATE_SHAPE_FN = (geometry) => geometry.isSquare();
 
-    static regions = memoize((shape, size = null) => {
-      const numRows = shape.numRows;
-      const numCols = shape.numCols;
-      const effectiveSize = size ?? shape.numValues;
+    static regions = memoize((geometry, size = null) => {
+      const numRows = geometry.numRows;
+      const numCols = geometry.numCols;
+      const effectiveSize = size ?? geometry.numValues;
       const [boxHeight, boxWidth] = CellGeometry.boxDimsForSize(
         numRows, numCols, effectiveSize);
       if (!boxHeight) return [];
@@ -1598,14 +1598,14 @@ export class SudokuConstraint {
           for (let k = 0; k < effectiveSize; k++) {
             const row = j + (k % boxHeight | 0);
             const col = i + (k / boxHeight | 0);
-            cells.push(shape.cellIndex(row, col));
+            cells.push(geometry.cellIndex(row, col));
           }
           regions.push(cells);
         }
       }
 
       return regions;
-    }, (shape, size = null) => `${shape.gridDimsStr}~${size ?? shape.numValues}`);
+    }, (geometry, size = null) => `${geometry.gridDimsStr}~${size ?? geometry.numValues}`);
   }
 
   static DisjointSets = class DisjointSets extends SudokuConstraintBase {
@@ -1613,7 +1613,7 @@ export class SudokuConstraint {
       No digit may appear in the same position in any two boxes.`);
     static CATEGORY = 'LayoutCheckbox';
     static UNIQUENESS_KEY_FIELD = 'type';
-    static VALIDATE_SHAPE_FN = (shape) => shape.isSquare();
+    static VALIDATE_SHAPE_FN = (geometry) => geometry.isSquare();
   }
 
   static AntiKnight = class AntiKnight extends SudokuConstraintBase {
@@ -1636,21 +1636,21 @@ export class SudokuConstraint {
       Only square grids with values 0-N are supported.`);
     static CATEGORY = 'LayoutCheckbox';
     static UNIQUENESS_KEY_FIELD = 'type';
-    static VALIDATE_SHAPE_FN = (shape) =>
-      shape.isSquare()
-      && shape.valueOffset === -1
-      && shape.numValues === shape.numRows + 1;
+    static VALIDATE_SHAPE_FN = (geometry) =>
+      geometry.isSquare()
+      && geometry.valueOffset === -1
+      && geometry.numValues === geometry.numRows + 1;
 
-    getVarCellGroups(shape) {
+    getVarCellGroups(geometry) {
       const defaultSize = CellGeometry.defaultNumValues(
-        shape.numRows, shape.numCols);
+        geometry.numRows, geometry.numCols);
       const [boxHeight, boxWidth] = CellGeometry.boxDimsForSize(
-        shape.numRows, shape.numCols, defaultSize);
+        geometry.numRows, geometry.numCols, defaultSize);
       const boxCount = boxHeight ? boxHeight * boxWidth : 0;
       return [
         { prefix: 'DGZ', label: 'Doppelganger zero', count: 1, hidden: true },
-        { prefix: 'DGR', label: 'Doppelganger row', count: shape.numCols },
-        { prefix: 'DGC', label: 'Doppelganger column', count: shape.numRows },
+        { prefix: 'DGR', label: 'Doppelganger row', count: geometry.numCols },
+        { prefix: 'DGC', label: 'Doppelganger column', count: geometry.numRows },
         { prefix: 'DGB', label: 'Doppelganger box', count: boxCount, columns: boxWidth || 0 },
       ];
     }
@@ -1677,16 +1677,16 @@ export class SudokuConstraint {
       adjacent cells.`);
     static CATEGORY = 'Global';
     static UNIQUENESS_KEY_FIELD = 'type';
-    static VALIDATE_SHAPE_FN = (shape) => shape.valueOffset === 0;
+    static VALIDATE_SHAPE_FN = (geometry) => geometry.valueOffset === 0;
 
     static displayName() {
       return 'Anti-Taxicab';
     }
 
-    static taxicabCells(row, col, dist, shape) {
+    static taxicabCells(row, col, dist, geometry) {
       const cells = [];
-      const numRows = shape.numRows;
-      const numCols = shape.numCols;
+      const numRows = geometry.numRows;
+      const numCols = geometry.numCols;
 
       for (let r = 0; r < numRows; r++) {
         const rDist = Math.abs(r - row);
@@ -1694,10 +1694,10 @@ export class SudokuConstraint {
 
         const cDist = dist - rDist;
         if (col - cDist >= 0) {
-          cells.push(shape.cellIndex(r, col - cDist));
+          cells.push(geometry.cellIndex(r, col - cDist));
         }
         if (col + cDist < numCols) {
-          cells.push(shape.cellIndex(r, col + cDist));
+          cells.push(geometry.cellIndex(r, col + cDist));
         }
       }
 
@@ -1728,8 +1728,8 @@ export class SudokuConstraint {
       a middle digit (4, 5, 6) and a high digit (7, 8, 9).`);
     static CATEGORY = 'Global';
     static UNIQUENESS_KEY_FIELD = 'type';
-    static VALIDATE_SHAPE_FN = (shape) =>
-      shape.numValues === 9 && shape.valueOffset === 0;
+    static VALIDATE_SHAPE_FN = (geometry) =>
+      geometry.numValues === 9 && geometry.valueOffset === 0;
   }
 
   static GlobalMod = class GlobalMod extends SudokuConstraintBase {
@@ -1740,7 +1740,7 @@ export class SudokuConstraint {
       a digit from (2, 5, 8) and a digit from (3, 6, 9).`);
     static CATEGORY = 'Global';
     static UNIQUENESS_KEY_FIELD = 'type';
-    static VALIDATE_SHAPE_FN = (shape) => shape.numValues === 9;
+    static VALIDATE_SHAPE_FN = (geometry) => geometry.numValues === 9;
 
     static displayName() {
       return 'Global Mod 3';
@@ -1756,7 +1756,7 @@ export class SudokuConstraint {
       FullRank clues present.`);
     static CATEGORY = 'Global';
     static UNIQUENESS_KEY_FIELD = 'type';
-    static VALIDATE_SHAPE_FN = (shape) => shape.isSquare();
+    static VALIDATE_SHAPE_FN = (geometry) => geometry.isSquare();
     static ARGUMENT_CONFIG = {
       inputType: 'select',
       label: 'FullRank ties',
@@ -1785,8 +1785,8 @@ export class SudokuConstraint {
       Only supported for when the allowed values are 1-9.`);
     static CATEGORY = 'Global';
     static UNIQUENESS_KEY_FIELD = 'type';
-    static VALIDATE_SHAPE_FN = (shape) =>
-      shape.numValues === 9 && shape.valueOffset === 0;
+    static VALIDATE_SHAPE_FN = (geometry) =>
+      geometry.numValues === 9 && geometry.valueOffset === 0;
   }
 
   static Diagonal = class Diagonal extends SudokuConstraintBase {
@@ -1801,7 +1801,7 @@ export class SudokuConstraint {
       ],
     };
     static UNIQUENESS_KEY_FIELD = 'direction';
-    static VALIDATE_SHAPE_FN = (shape) => shape.isSquare();
+    static VALIDATE_SHAPE_FN = (geometry) => geometry.isSquare();
 
     constructor(direction) {
       super(direction);
@@ -1842,8 +1842,8 @@ export class SudokuConstraint {
       }
     }
 
-    adjacentPairs(shape) {
-      return this.constructor._adjacentCellPairs(this.cells, shape);
+    adjacentPairs(geometry) {
+      return this.constructor._adjacentCellPairs(this.cells, geometry);
     }
   }
 
@@ -1880,8 +1880,8 @@ export class SudokuConstraint {
         numValues, valueOffset)
     );
 
-    adjacentPairs(shape) {
-      return this.constructor._adjacentCellPairs(this.cells, shape);
+    adjacentPairs(geometry) {
+      return this.constructor._adjacentCellPairs(this.cells, geometry);
     }
   }
 
@@ -1904,8 +1904,8 @@ export class SudokuConstraint {
       fnToBinaryKey((a, b) => a > b, numValues, valueOffset)
     );
 
-    adjacentPairs(shape) {
-      return this.constructor._adjacentCellPairs(this.cells, shape);
+    adjacentPairs(geometry) {
+      return this.constructor._adjacentCellPairs(this.cells, geometry);
     }
 
     chipLabel() {
@@ -1944,8 +1944,8 @@ export class SudokuConstraint {
       }
     }
 
-    adjacentPairs(shape) {
-      return this.constructor._adjacentCellPairs(this.cells, shape);
+    adjacentPairs(geometry) {
+      return this.constructor._adjacentCellPairs(this.cells, geometry);
     }
   }
 
@@ -1961,7 +1961,7 @@ export class SudokuConstraint {
       arrow: true,
       dashed: true,
     };
-    static VALIDATE_CELLS_FN = (cells, shape) => cells.length > 2;
+    static VALIDATE_CELLS_FN = (cells, geometry) => cells.length > 2;
 
     constructor(...cells) {
       super(...cells);
@@ -1996,8 +1996,8 @@ export class SudokuConstraint {
       }
     }
 
-    adjacentPairs(shape) {
-      return this.constructor._adjacentCellPairs(this.cells, shape);
+    adjacentPairs(geometry) {
+      return this.constructor._adjacentCellPairs(this.cells, geometry);
     }
   }
 
@@ -2027,7 +2027,7 @@ export class SudokuConstraint {
       startMarker: LineOptions.EMPTY_CIRCLE_MARKER,
       endMarker: LineOptions.EMPTY_CIRCLE_MARKER
     };
-    static VALIDATE_CELLS_FN = (cells, shape) => cells.length > 2;
+    static VALIDATE_CELLS_FN = (cells, geometry) => cells.length > 2;
 
     constructor(...cells) {
       super(...cells);
@@ -2050,7 +2050,7 @@ export class SudokuConstraint {
         { value: 3, text: '3-digit' },
       ],
     };
-    static VALIDATE_CELLS_FN = (cells, shape) => cells.length > 2;
+    static VALIDATE_CELLS_FN = (cells, geometry) => cells.length > 2;
 
     constructor(pillSize, ...cells) {
       super(pillSize, ...cells);
@@ -2199,10 +2199,10 @@ export class SudokuConstraint {
     }
 
     static cellMap = memoize(
-      (shape) => {
+      (geometry) => {
         let map = {};
-        const numRows = shape.numRows;
-        const numCols = shape.numCols;
+        const numRows = geometry.numRows;
+        const numCols = geometry.numCols;
 
         const seen = new Set();
 
@@ -2210,7 +2210,7 @@ export class SudokuConstraint {
           let cells = [];
           for (; row >= 0 && col >= 0 && col < numCols && row < numRows;
             row += dr, col += dc) {
-            cells.push(shape.makeCellId(row, col));
+            cells.push(geometry.makeCellId(row, col));
           }
           if (cells.length <= 1) return;
           const sorted = [...cells].sort().join(',');
@@ -2231,7 +2231,7 @@ export class SudokuConstraint {
 
         return map;
       },
-      (shape) => shape.gridDimsStr);
+      (geometry) => geometry.gridDimsStr);
   }
 
   static XSum = class XSum extends OutsideConstraintBase {
@@ -2352,7 +2352,7 @@ export class SudokuConstraint {
       clueTemplate: '#$CLUE',
     };
     static CLUE_TYPE = OutsideConstraintBase.CLUE_TYPE_DOUBLE_LINE;
-    static VALIDATE_SHAPE_FN = (shape) => shape.isSquare();
+    static VALIDATE_SHAPE_FN = (geometry) => geometry.isSquare();
   }
 
   static AllDifferent = class AllDifferent extends SudokuConstraintBase {
@@ -2477,7 +2477,7 @@ export class SudokuConstraint {
       splitFn: (constraint) => constraint.segments,
     };
     // Allow any non-empty segment (segments may be single cells).
-    static VALIDATE_CELLS_FN = (cells, shape) => cells.length > 0;
+    static VALIDATE_CELLS_FN = (cells, geometry) => cells.length > 0;
 
     constructor(...segments) {
       super(...segments);
@@ -2486,7 +2486,7 @@ export class SudokuConstraint {
 
     // The serialized form is a flat token list with separators between segments;
     // the instance only deals with arrays.
-    static *makeFromArgs(args, shape) {
+    static *makeFromArgs(args, geometry) {
       yield new this(...splitSegments(args));
     }
 
@@ -2503,7 +2503,7 @@ export class SudokuConstraint {
       return `Equal Sum (${this.segments.length} segments)`;
     }
 
-    getCells(shape) {
+    getCells(geometry) {
       return this.segments.flat();
     }
   }
@@ -2536,9 +2536,9 @@ export class SudokuConstraint {
       return `Quad (${this.values.join(',')})`;
     }
 
-    static cells(topLeftCell, shape = GEOMETRY_MAX) {
-      const graph = shape.cellGraph();
-      const { cell } = shape.parseCellId(topLeftCell);
+    static cells(topLeftCell, geometry = GEOMETRY_MAX) {
+      const graph = geometry.cellGraph();
+      const { cell } = geometry.parseCellId(topLeftCell);
       const topRight = graph.adjacent(cell, CellGraph.RIGHT);
       const bottomLeft = graph.adjacent(cell, CellGraph.DOWN);
       const bottomRightFromTop = topRight === null
@@ -2557,11 +2557,11 @@ export class SudokuConstraint {
         topRight,
         bottomLeft,
         bottomRightFromTop,
-      ].map(c => shape.makeCellIdFromIndex(c));
+      ].map(c => geometry.makeCellIdFromIndex(c));
     }
 
-    getCells(shape) {
-      return this.constructor.cells(this.topLeftCell, shape);
+    getCells(geometry) {
+      return this.constructor.cells(this.topLeftCell, geometry);
     }
   }
 
@@ -2571,11 +2571,11 @@ export class SudokuConstraint {
     static CATEGORY = null;
     static DISPLAY_CONFIG = null;
 
-    static *makeFromArgs(args, shape) {
+    static *makeFromArgs(args, geometry) {
       const [key, ...rest] = args;
       // Convert base64url encoding by swapping - and _
       const convertedKey = key.replace(/[-_]/g, c => c === '-' ? '_' : '-');
-      yield* SudokuConstraint.Pair.makeFromArgs([convertedKey, ...rest], shape);
+      yield* SudokuConstraint.Pair.makeFromArgs([convertedKey, ...rest], geometry);
     }
   }
 
@@ -2585,11 +2585,11 @@ export class SudokuConstraint {
     static CATEGORY = null;
     static DISPLAY_CONFIG = null;
 
-    static *makeFromArgs(args, shape) {
+    static *makeFromArgs(args, geometry) {
       const [key, ...rest] = args;
       // Convert base64url encoding by swapping - and _
       const convertedKey = key.replace(/[-_]/g, c => c === '-' ? '_' : '-');
-      yield* SudokuConstraint.PairX.makeFromArgs([convertedKey, ...rest], shape);
+      yield* SudokuConstraint.PairX.makeFromArgs([convertedKey, ...rest], geometry);
     }
   }
 
@@ -2636,7 +2636,7 @@ export class SudokuConstraint {
         (key, items) => this._argsToString(key, ...items));
     }
 
-    static *makeFromArgs(args, shape) {
+    static *makeFromArgs(args, geometry) {
       const [key, ...items] = args;
 
       for (const group of parseNamedCellGroups(items, this.uriDecodeArg)) {
@@ -2690,7 +2690,7 @@ export class SudokuConstraint {
     static DISPLAY_CONFIG = {
       displayClass: 'Indexing',
     };
-    static VALIDATE_CELLS_FN = (cells, shape) => cells.length > 0;
+    static VALIDATE_CELLS_FN = (cells, geometry) => cells.length > 0;
 
     static ROW_INDEXING = 'R';
     static COL_INDEXING = 'C';
@@ -2772,9 +2772,9 @@ export class SudokuConstraint {
       this.values = values;
     }
 
-    static *makeFromArgs(args, shape) {
+    static *makeFromArgs(args, geometry) {
       for (const valueId of args) {
-        const { cellId, values } = shape.parseValueId(valueId);
+        const { cellId, values } = geometry.parseValueId(valueId);
         yield new this(cellId, ...values);
       }
     }
@@ -2802,7 +2802,7 @@ export class SudokuConstraint {
       return new this.constructor(shiftFn(this.cell), ...this.values);
     }
 
-    getCells(shape) {
+    getCells(geometry) {
       return [this.cell];
     }
   }
@@ -2840,7 +2840,7 @@ export class SudokuConstraint {
       ];
     }
 
-    static *makeFromArgs(args, shape) {
+    static *makeFromArgs(args, geometry) {
       const [prefix, encodedLabel, count] = args;
       const label = this.uriDecodeArg(encodedLabel || '');
       yield new this(prefix, label, count);
@@ -2859,13 +2859,13 @@ export class SudokuConstraint {
       }).join('');
     }
 
-    getCells(shape) {
+    getCells(geometry) {
       return this.groups.flatMap(
-        g => (shape.varCellsForGroup(g.prefix) || []).map(
-          c => shape.makeCellIdFromIndex(c)));
+        g => (geometry.varCellsForGroup(g.prefix) || []).map(
+          c => geometry.makeCellIdFromIndex(c)));
     }
 
-    getVarCellGroups(shape) {
+    getVarCellGroups(geometry) {
       return this.groups;
     }
 

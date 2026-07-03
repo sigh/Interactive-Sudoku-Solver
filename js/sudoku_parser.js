@@ -43,21 +43,21 @@ class AstNode {
 
 export class SudokuParser {
   static _resolveAst(astRoot) {
-    let shape = null;
+    let geometry = null;
     for (const n of astRoot.children) {
       if (n.cls !== SudokuConstraint.Shape) continue;
 
       const spec = n.args.join('~');
-      shape = spec ? CellGeometry.fromShapeSpec(spec) : CellGeometry.newDefault();
+      geometry = spec ? CellGeometry.fromShapeSpec(spec) : CellGeometry.newDefault();
       break;
     }
-    if (!shape) shape = CellGeometry.newDefault();
+    if (!geometry) geometry = CellGeometry.newDefault();
 
-    const constraints = this._resolveNodes(astRoot.children, astRoot.cls, shape);
+    const constraints = this._resolveNodes(astRoot.children, astRoot.cls, geometry);
     return new astRoot.cls(constraints);
   }
 
-  static _resolveNodes(nodes, parentCompositeClass, shape) {
+  static _resolveNodes(nodes, parentCompositeClass, geometry) {
     const result = [];
 
     for (const n of nodes) {
@@ -69,12 +69,12 @@ export class SudokuParser {
       }
 
       if (cls.IS_COMPOSITE) {
-        const childConstraints = this._resolveNodes(n.children, cls, shape);
+        const childConstraints = this._resolveNodes(n.children, cls, geometry);
         result.push(new cls(childConstraints, ...n.args));
         continue;
       }
 
-      const constraintParts = [...cls.makeFromArgs(n.args, shape)];
+      const constraintParts = [...cls.makeFromArgs(n.args, geometry)];
       if (constraintParts.length > 1 && parentCompositeClass === SudokuConstraint.Or) {
         // If a single token expands into multiple constraints, wrap them in
         // an And so they behave as a unit inside Or.
@@ -122,9 +122,9 @@ export class SudokuParser {
     // Reference for format:
     // http://forum.enjoysudoku.com/understandable-snarfable-killer-cages-t6119.html
 
-    const shape = GEOMETRY_9x9;
-    const numCells = shape.numGridCells;
-    const numCols = shape.numCols;
+    const geometry = GEOMETRY_9x9;
+    const numCells = geometry.numGridCells;
+    const numCols = geometry.numCols;
 
     if (text.length !== numCells) return null;
     // Note: The second ` is just there so my syntax highlighter is happy.
@@ -193,7 +193,7 @@ export class SudokuParser {
           cells: [],
         });
       }
-      cages.get(cageCell).cells.push(shape.makeCellIdFromIndex(i));
+      cages.get(cageCell).cells.push(geometry.makeCellIdFromIndex(i));
     }
 
     const root = AstNode.makeRoot();
@@ -211,8 +211,8 @@ export class SudokuParser {
 
     if (!text.startsWith('3x3:')) return null;
 
-    const shape = GEOMETRY_9x9;
-    const numCells = shape.numGridCells;
+    const geometry = GEOMETRY_9x9;
+    const numCells = geometry.numGridCells;
 
     let parts = text.split(':');
     if (parts[2] !== 'k') return null;
@@ -229,7 +229,7 @@ export class SudokuParser {
       if (!cages.has(cageId)) {
         cages.set(cageId, { sum: cageSum, cells: [] });
       }
-      cages.get(cageId).cells.push(shape.makeCellIdFromIndex(i));
+      cages.get(cageId).cells.push(geometry.makeCellIdFromIndex(i));
     }
 
     const root = AstNode.makeRoot();
@@ -246,12 +246,12 @@ export class SudokuParser {
   }
 
   static _parsePlainSudokuToAst(text) {
-    const shape = CellGeometry.fromNumCells(text.length);
-    if (!shape) return null;
+    const geometry = CellGeometry.fromNumCells(text.length);
+    if (!geometry) return null;
 
-    const numCells = shape.numGridCells;
-    const minValue = shape.minValue();
-    const maxValue = shape.maxValue();
+    const numCells = geometry.numGridCells;
+    const minValue = geometry.minValue();
+    const maxValue = geometry.maxValue();
 
     let fixedValues = [];
     let nonValueCharacters = [];
@@ -259,7 +259,7 @@ export class SudokuParser {
       const char = text[i];
       const value = shortCharToValue(char, maxValue);
       if (value !== null && value >= minValue && value <= maxValue) {
-        fixedValues.push(shape.makeValueId(i, value));
+        fixedValues.push(geometry.makeValueId(i, value));
       } else {
         nonValueCharacters.push(char);
       }
@@ -267,18 +267,18 @@ export class SudokuParser {
     if (new Set(nonValueCharacters).size > 1) return null;
 
     return AstNode.makeRoot(
-      new AstNode(SudokuConstraint.Shape, [shape.name]),
+      new AstNode(SudokuConstraint.Shape, [geometry.name]),
 
       new AstNode(SudokuConstraint.Given, fixedValues)
     );
   }
 
   static _parseJigsawLayoutToAst(text) {
-    const shape = CellGeometry.fromNumCells(text.length);
-    if (!shape) return null;
+    const geometry = CellGeometry.fromNumCells(text.length);
+    if (!geometry) return null;
 
-    const numCells = shape.numGridCells;
-    const numValues = shape.numValues;
+    const numCells = geometry.numGridCells;
+    const numValues = geometry.numValues;
 
     const chars = new Set(text);
     if (chars.size !== numValues) return null;
@@ -292,7 +292,7 @@ export class SudokuParser {
     if (Object.values(counter).some(c => c !== numValues)) return null;
 
     return AstNode.makeRoot(
-      new AstNode(SudokuConstraint.Shape, [shape.name]),
+      new AstNode(SudokuConstraint.Shape, [geometry.name]),
       new AstNode(SudokuConstraint.Jigsaw, [text]),
       new AstNode(SudokuConstraint.NoBoxes)
     );
@@ -301,10 +301,10 @@ export class SudokuParser {
   static _parseJigsawToAst(text) {
     if (text.length % 2 !== 0) return null;
 
-    const shape = CellGeometry.fromNumCells(text.length / 2);
-    if (!shape) return null;
+    const geometry = CellGeometry.fromNumCells(text.length / 2);
+    if (!geometry) return null;
 
-    const numCells = shape.numGridCells;
+    const numCells = geometry.numGridCells;
 
     const layout = this._parseJigsawLayoutToAst(text.substr(numCells));
     if (layout === null) return null;
@@ -322,35 +322,35 @@ export class SudokuParser {
     const parts = [...rawText.matchAll(/[.]|\d+/g)];
     const numParts = parts.length;
 
-    const shape = CellGeometry.fromNumCells(numParts);
-    if (!shape) return null;
+    const geometry = CellGeometry.fromNumCells(numParts);
+    if (!geometry) return null;
 
     let fixedValues = [];
     for (let i = 0; i < numParts; i++) {
       const cell = parts[i][0];
       if (cell === '.') continue;
-      fixedValues.push(shape.makeValueId(i, cell));
+      fixedValues.push(geometry.makeValueId(i, cell));
     }
 
     return AstNode.makeRoot(
-      new AstNode(SudokuConstraint.Shape, [shape.name]),
+      new AstNode(SudokuConstraint.Shape, [geometry.name]),
       new AstNode(SudokuConstraint.Given, fixedValues)
     );
   }
 
   static _parsePencilmarksToAst(text) {
-    const shape = CellGeometry.fromNumPencilmarks(text.length);
-    if (!shape) return null;
+    const geometry = CellGeometry.fromNumPencilmarks(text.length);
+    if (!geometry) return null;
 
     // Only allow digits, and dots.
     if (text.search(/[^\d.]/) !== -1) return null;
 
-    const numValues = shape.numValues;
+    const numValues = geometry.numValues;
 
     // Split into segments of numValues characters.
     const pencilmarks = [];
-    for (let i = 0; i < shape.numGridCells; i++) {
-      const cellId = shape.makeCellIdFromIndex(i);
+    for (let i = 0; i < geometry.numGridCells; i++) {
+      const cellId = geometry.makeCellIdFromIndex(i);
       const values = (
         text.substr(i * numValues, numValues)
           .split('')
@@ -360,7 +360,7 @@ export class SudokuParser {
     }
 
     return AstNode.makeRoot(
-      new AstNode(SudokuConstraint.Shape, [shape.name]),
+      new AstNode(SudokuConstraint.Shape, [geometry.name]),
       new AstNode(SudokuConstraint.Given, pencilmarks)
     );
   }
@@ -507,12 +507,12 @@ export class SudokuParser {
   }
 }
 
-export const toShortSolution = (solution, shape) => {
+export const toShortSolution = (solution, geometry) => {
   const DEFAULT_VALUE = '.';
 
-  const length = Math.min(solution.length, shape.numGridCells);
+  const length = Math.min(solution.length, geometry.numGridCells);
   const result = new Array(length).fill(DEFAULT_VALUE);
-  const minValue = shape.minValue();
+  const minValue = geometry.minValue();
   let maxValue = minValue;
   for (let i = 0; i < length; i++) {
     if (solution[i] != null) maxValue = Math.max(maxValue, solution[i]);

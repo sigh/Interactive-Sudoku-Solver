@@ -166,17 +166,17 @@ const loadPuzzle = (args) => {
 const decode = (mask, offset) =>
   (mask && !(mask & (mask - 1))) ? String(LookupTables.toOffsetValue(mask, offset)) : '?';
 
-const printDigitGrid = (shape, grid) => {
-  for (let r = 0; r < shape.numRows; r++) {
+const printDigitGrid = (geometry, grid) => {
+  for (let r = 0; r < geometry.numRows; r++) {
     const row = [];
-    for (let c = 0; c < shape.numCols; c++) {
-      row.push(decode(grid[r * shape.numCols + c], shape.valueOffset).padStart(2));
+    for (let c = 0; c < geometry.numCols; c++) {
+      row.push(decode(grid[r * geometry.numCols + c], geometry.valueOffset).padStart(2));
     }
     console.log(row.join(' '));
   }
 };
 
-const printVarGrid = (shape, grid, cells, columns) => {
+const printVarGrid = (geometry, grid, cells, columns) => {
   const numRows = Math.ceil(cells.length / columns);
   for (let r = 0; r < numRows; r++) {
     const row = [];
@@ -189,18 +189,18 @@ const printVarGrid = (shape, grid, cells, columns) => {
   }
 };
 
-const printSolution = (shape, grid, solutionNum) => {
+const printSolution = (geometry, grid, solutionNum) => {
   console.log(`\n=== Solution ${solutionNum} ===`);
-  printDigitGrid(shape, grid);
+  printDigitGrid(geometry, grid);
 
-  for (const group of shape.varCellGroups()) {
+  for (const group of geometry.varCellGroups()) {
     if (group.hidden) continue;
     console.log(`\n[${group.prefix}] ${group.label}:`);
     if (group.columns) {
-      printVarGrid(shape, grid, group.cells, group.columns);
+      printVarGrid(geometry, grid, group.cells, group.columns);
     } else {
       for (const cell of group.cells) {
-        const id = shape.makeCellIdFromIndex(cell);
+        const id = geometry.makeCellIdFromIndex(cell);
         console.log(`  ${id} = ${decode(grid[cell], 0)}`);
       }
     }
@@ -239,7 +239,7 @@ export const main = (argv) => {
   const resolved = SudokuBuilder.resolveConstraint(constraint);
   const solver = SudokuBuilder.build(resolved);
   const internal = solver._internalSolver;
-  const shape = internal._shape;
+  const geometry = internal._geometry;
 
   const maxBacktracks = parseBacktrackLimit(args.maxBacktracksRaw);
 
@@ -280,7 +280,7 @@ export const main = (argv) => {
   console.log(`Result: ${status} (${count} found)`);
 
   for (let i = 0; i < grids.length; i++) {
-    printSolution(shape, grids[i], i + 1);
+    printSolution(geometry, grids[i], i + 1);
   }
 };
 

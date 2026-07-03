@@ -57,7 +57,7 @@ export class SudokuConstraintHandler {
 
   // Initialize the grid before solving starts.
   // Return `false` if the grid is invalid, `true` otherwise.
-  initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
+  initialize(initialGridCells, cellExclusions, geometry, stateAllocator) {
     return true;
   }
 
@@ -67,12 +67,12 @@ export class SudokuConstraintHandler {
   // results if the handler is used from within an Or constraint.
   postInitialize(readonlyGridState) { }
 
-  priority(shape) {
+  priority(geometry) {
     // By default, constraints which constrain more cells have higher priority.
     return this.cells.length;
   }
 
-  candidateFinders(grid, shape) {
+  candidateFinders(grid, geometry) {
     return [];
   }
 
@@ -127,7 +127,7 @@ export class False extends SudokuConstraintHandler {
     super(cells);
   }
 
-  initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
+  initialize(initialGridCells, cellExclusions, geometry, stateAllocator) {
     return false;
   }
   enforceConsistency(grid, handlerAccumulator) { return false; }
@@ -159,9 +159,9 @@ export class And extends SudokuConstraintHandler {
     return this._debugName;
   }
 
-  initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
+  initialize(initialGridCells, cellExclusions, geometry, stateAllocator) {
     for (const h of this._handlers) {
-      if (!h.initialize(initialGridCells, cellExclusions, shape, stateAllocator)) return false;
+      if (!h.initialize(initialGridCells, cellExclusions, geometry, stateAllocator)) return false;
     }
     return true;
   }
@@ -197,8 +197,8 @@ export class GivenCandidates extends SudokuConstraintHandler {
     }
   }
 
-  initialize(initialGridCells, cellExclusions, shape) {
-    this.applyValues(initialGridCells, shape.valueOffset);
+  initialize(initialGridCells, cellExclusions, geometry) {
+    this.applyValues(initialGridCells, geometry.valueOffset);
     return true;
   }
 }
@@ -221,7 +221,7 @@ export class AllDifferent extends SudokuConstraintHandler {
     this._exclusionCells = exclusionCells;
   }
 
-  initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
+  initialize(initialGridCells, cellExclusions, geometry, stateAllocator) {
     const allValues = HandlerUtil.cellsAllValues(
       initialGridCells, this._exclusionCells);
     return this._exclusionCells.length <= countOnes16bit(allValues);
@@ -263,7 +263,7 @@ export class UniqueValueExclusion extends SudokuConstraintHandler {
     this._cellExclusions = null;
   }
 
-  initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
+  initialize(initialGridCells, cellExclusions, geometry, stateAllocator) {
     this._cellExclusions = cellExclusions.getArray(this._cell);
     return true;
   }
@@ -302,7 +302,7 @@ export class ValueDependentUniqueValueExclusion extends SudokuConstraintHandler 
     return this._valueToCellMap[value - 1];
   }
 
-  initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
+  initialize(initialGridCells, cellExclusions, geometry, stateAllocator) {
     // Remove cellExclusions, as it would be redundant.
     const exclusions = new Set(cellExclusions.getArray(this._cell));
     for (let i = 0; i < this._valueToCellMap.length; i++) {
@@ -639,7 +639,7 @@ export class PerfectAllDifferent extends SudokuConstraintHandler {
     return this._valueMask;
   }
 
-  initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
+  initialize(initialGridCells, cellExclusions, geometry, stateAllocator) {
     this._valueMask = HandlerUtil.cellsAllValues(
       initialGridCells, this.cells);
 
@@ -678,7 +678,7 @@ export class PerfectAllDifferent extends SudokuConstraintHandler {
     return this.cells;
   }
 
-  candidateFinders(grid, shape) {
+  candidateFinders(grid, geometry) {
     return [
       new CandidateFinders.House(this.cells, grid, -1)
     ];
@@ -706,10 +706,10 @@ export class FullGridRequiredValues extends SudokuConstraintHandler {
     this._linePossibleHiddenSingles = new Uint16Array(lines.length);
   }
 
-  initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
-    if (this._numValues !== shape.numValues) {
+  initialize(initialGridCells, cellExclusions, geometry, stateAllocator) {
+    if (this._numValues !== geometry.numValues) {
       throw new InvalidConstraintError(
-        `FullGridRequiredValues requires lines.length (${this._numValues}) === numValues (${shape.numValues})`);
+        `FullGridRequiredValues requires lines.length (${this._numValues}) === numValues (${geometry.numValues})`);
     }
     return true;
   }
@@ -837,8 +837,8 @@ export class BinaryConstraint extends SudokuConstraintHandler {
     return this._key;
   }
 
-  initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
-    const lookupTables = LookupTables.get(shape.numValues);
+  initialize(initialGridCells, cellExclusions, geometry, stateAllocator) {
+    const lookupTables = LookupTables.get(geometry.numValues);
     this._tables = lookupTables.forBinaryKey(this._key);
     this._cellExclusions = cellExclusions;
 
@@ -1031,19 +1031,19 @@ export class BinaryPairwise extends SudokuConstraintHandler {
     }
   }
 
-  initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
-    const lookupTables = LookupTables.get(shape.numValues);
-    this.validate(shape.numValues);
+  initialize(initialGridCells, cellExclusions, geometry, stateAllocator) {
+    const lookupTables = LookupTables.get(geometry.numValues);
+    this.validate(geometry.numValues);
 
     // The key must be symmetric, so we just need the one table.
     this._table = lookupTables.forBinaryKey(this._key)[0];
     this._isAllDifferent = this.constructor._isAllDifferent(
-      this._table, shape.numValues);
+      this._table, geometry.numValues);
     if (this._isAllDifferent) {
       // Only apply this for all-different constraints for now. Can generalize
       // in the future if required.
       this._validCombinationInfo = this.constructor._validCombinationInfoTable(
-        this._key, shape.numValues, this.cells.length);
+        this._key, geometry.numValues, this.cells.length);
 
       this._cellExclusions = cellExclusions;
     }
@@ -1230,10 +1230,10 @@ export class Skyscraper extends SudokuConstraintHandler {
     }
   }
 
-  initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
+  initialize(initialGridCells, cellExclusions, geometry, stateAllocator) {
     const allValues = HandlerUtil.cellsAllValues(initialGridCells, this.cells);
     this._numValues = LookupTables.maxValue(allValues);
-    this._zeroMask = shape.valueOffset < 0 ? 1 : 0;
+    this._zeroMask = geometry.valueOffset < 0 ? 1 : 0;
     // Can't see more buildings than exist.
     if (this._numVisible > this.cells.length) return false;
 
@@ -1420,9 +1420,9 @@ export class HiddenSkyscraper extends SudokuConstraintHandler {
     this._targetV = -1;
   }
 
-  initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
+  initialize(initialGridCells, cellExclusions, geometry, stateAllocator) {
     this._targetV = LookupTables.fromOffsetValue(
-      this._firstHiddenValue, shape.valueOffset);
+      this._firstHiddenValue, geometry.valueOffset);
     // If the hidden value is first it will always be visible.
     if (!(initialGridCells[this.cells[0]] &= ~this._targetV)) return false;
     return true;
@@ -1518,13 +1518,13 @@ export class Lunchbox extends SudokuConstraintHandler {
     this._sum = sum;
   }
 
-  initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
+  initialize(initialGridCells, cellExclusions, geometry, stateAllocator) {
     const sum = this._sum;
     const allValues = HandlerUtil.cellsAllValues(initialGridCells, this.cells);
     const effectiveNumValues = LookupTables.maxValue(allValues);
 
     this._isHouse = this.cells.length === effectiveNumValues;
-    this._valueOffset = shape.valueOffset;
+    this._valueOffset = geometry.valueOffset;
 
     if (sum > Lunchbox._maxSum(effectiveNumValues)) return false;
 
@@ -1537,12 +1537,12 @@ export class Lunchbox extends SudokuConstraintHandler {
     this._combinations = allCombinations[sum];
     this._distances = distanceRange[sum];
 
-    if (shape.valueOffset) {
+    if (geometry.valueOffset) {
       // With offset the internal sum varies by distance. Remap per-distance.
       const maxD = effectiveNumValues - 1;
       const combinations = new Array(maxD + 1);
       for (let d = 0; d <= maxD; d++) {
-        const s = sum - shape.valueOffset * (d - 1);
+        const s = sum - geometry.valueOffset * (d - 1);
         combinations[d] = allCombinations[s]?.[d] || this._combinations[0];
       }
       this._combinations = combinations;
@@ -1795,7 +1795,7 @@ export class SameValues extends SudokuConstraintHandler {
     this.idStr = [this.constructor.name, ...cellSets].join('-');
   }
 
-  initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
+  initialize(initialGridCells, cellExclusions, geometry, stateAllocator) {
     this._buffer1 = new Uint16Array(this._cellSets.length);
     this._buffer2 = new Uint16Array(this._cellSets.length);
 
@@ -1979,7 +1979,7 @@ export class Between extends SudokuConstraintHandler {
     this._binaryConstraint = null;
   }
 
-  initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
+  initialize(initialGridCells, cellExclusions, geometry, stateAllocator) {
     const exclusionGroups = HandlerUtil.findExclusionGroups(
       this._mids, cellExclusions).groups;
     const maxGroupSize = Math.max(0, ...exclusionGroups.map(a => a.length));
@@ -1989,8 +1989,8 @@ export class Between extends SudokuConstraintHandler {
       ...this._ends,
       fnToBinaryKey(
         (a, b) => Math.abs(a - b) >= minEndsDelta,
-        shape.numValues));
-    return this._binaryConstraint.initialize(initialGridCells, cellExclusions, shape, stateAllocator);
+        geometry.numValues));
+    return this._binaryConstraint.initialize(initialGridCells, cellExclusions, geometry, stateAllocator);
   }
 
   exclusionCells() {
@@ -2036,13 +2036,13 @@ export class Lockout extends SudokuConstraintHandler {
     this._binaryConstraint = null;
   }
 
-  initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
+  initialize(initialGridCells, cellExclusions, geometry, stateAllocator) {
     this._binaryConstraint = new BinaryConstraint(
       ...this._ends,
       fnToBinaryKey(
         (a, b) => Math.abs(a - b) >= this._minDiff,
-        shape.numValues));
-    return this._binaryConstraint.initialize(initialGridCells, cellExclusions, shape, stateAllocator);
+        geometry.numValues));
+    return this._binaryConstraint.initialize(initialGridCells, cellExclusions, geometry, stateAllocator);
   }
 
   exclusionCells() {
@@ -2096,8 +2096,8 @@ class _Squishable2x2 extends SudokuConstraintHandler {
 
   static _valuesBuffer = new Uint16Array(GEOMETRY_MAX.numValues);
 
-  initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
-    if (shape.numValues !== 9) {
+  initialize(initialGridCells, cellExclusions, geometry, stateAllocator) {
+    if (geometry.numValues !== 9) {
       throw new InvalidConstraintError(
         `${this.constructor.name} requires numValues=9`);
     }
@@ -2236,9 +2236,9 @@ export class DutchFlatmateLine extends SudokuConstraintHandler {
     this._mid = 0;
   }
 
-  initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
-    this._mid = LookupTables.fromValue(Math.ceil(shape.numValues / 2));
-    this._below = LookupTables.fromValue(shape.numValues);
+  initialize(initialGridCells, cellExclusions, geometry, stateAllocator) {
+    this._mid = LookupTables.fromValue(Math.ceil(geometry.numValues / 2));
+    this._below = LookupTables.fromValue(geometry.numValues);
     return true;
   }
 
@@ -2303,8 +2303,8 @@ export class RequiredValues extends SudokuConstraintHandler {
     return [];
   }
 
-  initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
-    const offset = shape.valueOffset;
+  initialize(initialGridCells, cellExclusions, geometry, stateAllocator) {
+    const offset = geometry.valueOffset;
 
     this._cellExclusions = cellExclusions;
     const cells = this.cells;
@@ -2468,8 +2468,8 @@ export class SumLine extends SudokuConstraintHandler {
     this._initialState = loop ? (1 << sum) - 1 : 1;
   }
 
-  initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
-    this._valueOffset = shape.valueOffset;
+  initialize(initialGridCells, cellExclusions, geometry, stateAllocator) {
+    this._valueOffset = geometry.valueOffset;
     return true;
   }
 
@@ -2592,9 +2592,9 @@ export class ValueIndexing extends SudokuConstraintHandler {
     this._indexedCells = indexedCells;
   }
 
-  initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
+  initialize(initialGridCells, cellExclusions, geometry, stateAllocator) {
     const numCells = this._indexedCells.length;
-    const shift = -shape.valueOffset;
+    const shift = -geometry.valueOffset;
     const mask = ((1 << numCells) - 1) << shift;
     initialGridCells[this._controlCell] &= mask;
 
@@ -2651,14 +2651,14 @@ export class Indexing extends SudokuConstraintHandler {
     this._indexedValue = +indexedValue;
   }
 
-  initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
+  initialize(initialGridCells, cellExclusions, geometry, stateAllocator) {
     this._indexedMask = LookupTables.fromOffsetValue(
-      this._indexedValue, shape.valueOffset);
+      this._indexedValue, geometry.valueOffset);
     // Clamp control cell to the line length so that N is always a valid index.
     // With offset, external value N maps to internal bit (N - offset - 1).
     // External values 1..lineLength are valid, so allowed bits shift by -offset.
     const lineLength = this._indexedCells.length;
-    const shift = -shape.valueOffset;
+    const shift = -geometry.valueOffset;
     const allowedMask = ((1 << lineLength) - 1) << shift;
     if (!(initialGridCells[this._controlCell] &= allowedMask)) return false;
 
@@ -2728,9 +2728,9 @@ export class CountingCircles extends SudokuConstraintHandler {
     return combinations;
   });
 
-  initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
+  initialize(initialGridCells, cellExclusions, geometry, stateAllocator) {
     const numCells = this.cells.length;
-    const valueOffset = shape.valueOffset;
+    const valueOffset = geometry.valueOffset;
     this._valueOffset = valueOffset;
 
     const allValues = HandlerUtil.cellsAllValues(initialGridCells, this.cells);
@@ -2941,10 +2941,10 @@ export class CountDistinct extends SudokuConstraintHandler {
     this._countedCells = Uint16Array.from(countedCells);
   }
 
-  initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
-    this._valueOffset = shape.valueOffset;
-    this._numValues = shape.numValues;
-    const offset = shape.valueOffset;
+  initialize(initialGridCells, cellExclusions, geometry, stateAllocator) {
+    this._valueOffset = geometry.valueOffset;
+    this._numValues = geometry.numValues;
+    const offset = geometry.valueOffset;
     const numCells = this._countedCells.length;
 
     // Static lower bound from mutually-exclusive counted cells (§5).
@@ -2957,7 +2957,7 @@ export class CountDistinct extends SudokuConstraintHandler {
     this._reachA = 0;       // values reachable from a free value (set per call)
     this._freeCellDom = 0;  // union of free cells' effective domains (set per call)
 
-    const maxPossible = Math.min(numCells, shape.numValues);
+    const maxPossible = Math.min(numCells, geometry.numValues);
     const rangeMask =
       (1 << (maxPossible - offset)) - (1 << (minDistinct - offset - 1));
     return !!(initialGridCells[this._controlCell] &= rangeMask);
@@ -3217,9 +3217,9 @@ export class FullRank extends SudokuConstraintHandler {
     ANY: 2,
   });
 
-  static buildEntries(shape) {
-    const numRows = shape.numRows;
-    const numCols = shape.numCols;
+  static buildEntries(geometry) {
+    const numRows = geometry.numRows;
+    const numCols = geometry.numCols;
     const entries = [];
     // Uint16Array: these entries hold cell indices (see the base `cells` store).
     for (let i = 0; i < numRows; i++) {
@@ -3273,20 +3273,20 @@ export class FullRank extends SudokuConstraintHandler {
     return this._tieMode;
   }
 
-  initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
+  initialize(initialGridCells, cellExclusions, geometry, stateAllocator) {
     // FullRank requires square grids.
-    if (shape.numRows !== shape.numValues || shape.numCols !== shape.numValues) {
+    if (geometry.numRows !== geometry.numValues || geometry.numCols !== geometry.numValues) {
       throw new InvalidConstraintError('FullRank requires a square grid with all values used.');
     }
     // Initialize entries.
-    const entries = FullRank.buildEntries(shape);
+    const entries = FullRank.buildEntries(geometry);
 
     this._allEntries = entries;
 
-    // Buffers used by _rejectFixedTies(). Allocate once per shape so they can
+    // Buffers used by _rejectFixedTies(). Allocate once per geometry so they can
     // be reused and sorting works naturally.
-    this._seenPairsBuffer = new Uint32Array(shape.numValues * 4);
-    this._pairBitSetsBuffer = new Uint16Array(shape.numValues);
+    this._seenPairsBuffer = new Uint32Array(geometry.numValues * 4);
+    this._pairBitSetsBuffer = new Uint16Array(geometry.numValues);
 
     // Group entries with the same initial values.
     // i.e. the same int((rank+3)/4)
@@ -3687,10 +3687,10 @@ export class FullRank extends SudokuConstraintHandler {
     return this._tieMode === FullRank.TIE_MODE.NONE ? this._enforceUniqueRanks(grid) : true;
   }
 
-  candidateFinders(grid, shape) {
+  candidateFinders(grid, geometry) {
     const finders = [];
-    const numRows = shape.numRows;
-    const numCols = shape.numCols;
+    const numRows = geometry.numRows;
+    const numCols = geometry.numCols;
 
     for (const rankSet of this._rankSets) {
       const value = rankSet.value;
@@ -3699,7 +3699,7 @@ export class FullRank extends SudokuConstraintHandler {
       const flags = [1, 1, 1, 1];
       for (const given of rankSet.givens) {
         const cell0 = given.entry[0];
-        const [row, col] = shape.splitCellIndex(cell0);
+        const [row, col] = geometry.splitCellIndex(cell0);
         if (row === 0) flags[0] = 0;
         if (col === 0) flags[1] = 0;
         if (row === numRows - 1) flags[2] = 0;
@@ -3717,16 +3717,16 @@ export class FullRank extends SudokuConstraintHandler {
 
       // Add a candidate finder for each remaining edge.
       if (flags[0]) {
-        addFinder(SudokuConstraintBase.rowRegions(shape)[0]);
+        addFinder(SudokuConstraintBase.rowRegions(geometry)[0]);
       }
       if (flags[1]) {
-        addFinder(SudokuConstraintBase.colRegions(shape)[0]);
+        addFinder(SudokuConstraintBase.colRegions(geometry)[0]);
       }
       if (flags[2]) {
-        addFinder(SudokuConstraintBase.rowRegions(shape)[numRows - 1]);
+        addFinder(SudokuConstraintBase.rowRegions(geometry)[numRows - 1]);
       }
       if (flags[3]) {
-        addFinder(SudokuConstraintBase.colRegions(shape)[numCols - 1]);
+        addFinder(SudokuConstraintBase.colRegions(geometry)[numCols - 1]);
       }
     }
 
@@ -3741,8 +3741,8 @@ export class Rellik extends SudokuConstraintHandler {
     this._remainders = new BitSet(this._sum + 1);
   }
 
-  initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
-    this._valueOffset = shape.valueOffset;
+  initialize(initialGridCells, cellExclusions, geometry, stateAllocator) {
+    this._valueOffset = geometry.valueOffset;
     if (!cellExclusions.areMutuallyExclusive(this.cells)) {
       throw new InvalidConstraintError(
         'Rellik cage cells must be mutually exclusive');
@@ -3873,8 +3873,8 @@ export class EqualSizePartitions extends SudokuConstraintHandler {
     this._mask2 = 0;
   }
 
-  initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
-    const offset = shape.valueOffset;
+  initialize(initialGridCells, cellExclusions, geometry, stateAllocator) {
+    const offset = geometry.valueOffset;
     this._mask1 = LookupTables.fromOffsetValuesArray(this._partition1, offset);
     this._mask2 = LookupTables.fromOffsetValuesArray(this._partition2, offset);
 
@@ -3955,8 +3955,8 @@ export class DoppelgangerZero extends SudokuConstraintHandler {
     this._varCells = new Uint16Array(varCells);
   }
 
-  initialize(initialGridCells, cellExclusions, shape) {
-    if (shape.valueOffset !== -1) {
+  initialize(initialGridCells, cellExclusions, geometry) {
+    if (geometry.valueOffset !== -1) {
       throw new InvalidConstraintError(
         'DoppelgangerZero requires valueOffset === -1');
     }
@@ -4075,9 +4075,9 @@ export class Or extends SudokuConstraintHandler {
     return true;
   }
 
-  initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
+  initialize(initialGridCells, cellExclusions, geometry, stateAllocator) {
     const scratchGrid = initialGridCells.slice();
-    const numShapeCells = shape.totalCells();
+    const numShapeCells = geometry.totalCells();
 
     // Initialize each handler and store any initialization changes that it
     // makes.
@@ -4087,7 +4087,7 @@ export class Or extends SudokuConstraintHandler {
       const handler = this._handlers[h];
 
       scratchGrid.set(initialGridCells);
-      if (!handler.initialize(scratchGrid, cellExclusions, shape, stateAllocator)) {
+      if (!handler.initialize(scratchGrid, cellExclusions, geometry, stateAllocator)) {
         continue;
       }
 

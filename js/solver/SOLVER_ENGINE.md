@@ -88,7 +88,7 @@ this interface:
   `handlerAccumulator.addForCell(cell)` so other handlers watching that cell
   are queued. The accumulator automatically skips re-queuing the
   currently-active handler for its own changes.
-- **`initialize(initialGridCells, cellExclusions, shape, stateAllocator)`** —
+- **`initialize(initialGridCells, cellExclusions, geometry, stateAllocator)`** —
   one-time setup before search begins. Can modify initial candidates and
   allocate per-branch state (see below). All handlers share the same mutable
   `initialGridCells` array, so changes from earlier handlers are visible to
@@ -104,7 +104,7 @@ this interface:
   `CellExclusions` and by the optimizer.
 - **`postInitialize(readonlyGridState)`** — optional hook after all handlers
   initialize. Do not write to `readonlyGridState`.
-- **`candidateFinders(grid, shape)`** — optional hook for handlers that can
+- **`candidateFinders(grid, geometry)`** — optional hook for handlers that can
   nominate branch choices that are better than a single cell/value guess.
 - **`idStr`** — stable identity used by `HandlerSet` to deduplicate handlers.
   Equivalent handlers should share an ID; unrelated handlers must not collide.

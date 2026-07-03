@@ -44,11 +44,11 @@ export class CellGeometry {
       numValues = parseInt(match[3]);
     }
 
-    const shape = this.fromGridSize(numRows, numCols, numValues, valueOffset);
-    if (!shape) {
+    const geometry = this.fromGridSize(numRows, numCols, numValues, valueOffset);
+    if (!geometry) {
       throw new Error('Invalid shape spec: ' + shapeSpec);
     }
-    return shape;
+    return geometry;
   };
 
   // The default grid geometry (9x9), as a fresh mutable instance.
@@ -148,8 +148,8 @@ export class CellGeometry {
   addVarCellsForConstraints(constraints) {
     const specs = this._allVarCellSpecsForConstraints(constraints);
 
-    // Reject too many cells before mutating the registry, so the shape is never
-    // left in an inconsistent state (and we never attempt a huge allocation).
+    // Reject too many cells before mutating the registry, so the geometry is
+    // never left in an inconsistent state (and we never attempt a huge allocation).
     const newVarCells = specs.reduce((sum, g) => sum + g.count, 0);
     const total = this.totalCells() + newVarCells;
     if (total > MAX_SEARCH_CELLS) {
@@ -375,21 +375,21 @@ export class CellGraph {
   static DOWN = 3;
 
   static _gridGraph = memoize(
-    (shape) => {
+    (geometry) => {
       const graph = [];
-      const cells = Array.from({ length: shape.numGridCells }, (_, i) => i);
-      CellGraph._addEdges(graph, cells, shape.numCols);
+      const cells = Array.from({ length: geometry.numGridCells }, (_, i) => i);
+      CellGraph._addEdges(graph, cells, geometry.numCols);
       return new CellGraph(graph);
     },
-    (shape) => shape.gridDimsStr);
+    (geometry) => geometry.gridDimsStr);
 
-  static get(shape) {
-    const base = this._gridGraph(shape);
-    const groups = shape.varCellGroups();
+  static get(geometry) {
+    const base = this._gridGraph(geometry);
+    const groups = geometry.varCellGroups();
     if (!groups.length) return base;
 
     const graph = base._graph.slice();
-    const defaultColumns = shape.numCols;
+    const defaultColumns = geometry.numCols;
     for (const group of groups) {
       const cells = group.cells;
       if (!cells || !cells.length) continue;

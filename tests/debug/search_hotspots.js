@@ -99,12 +99,12 @@ export const main = (argv) => {
   // guesses that immediately contradicted.
   const yieldBucket = () => ({ n: 0, inert: 0, few: 0, inertContra: 0, inertBf: new Map() });
   const yld = { grid: yieldBucket(), var: yieldBucket() };
-  let internal = null, shape = null;
+  let internal = null, geometry = null;
 
   const onSolver = (solver) => {
     internal = solver._internalSolver;
-    shape = solver._shape;
-    const numGridCells = shape.numGridCells;
+    geometry = solver._geometry;
+    const numGridCells = geometry.numGridCells;
     const numSearch = internal._numSearchCells;
     const sel = internal._candidateSelector;
 
@@ -163,8 +163,8 @@ export const main = (argv) => {
 
   const result = runSolve(puzzle, { maxBacktracks, maxSolutions }, onSolver);
   const c = result.counters;
-  const numGridCells = shape.numGridCells;
-  const cid = (i) => shape.makeCellIdFromIndex(i);
+  const numGridCells = geometry.numGridCells;
+  const cid = (i) => geometry.makeCellIdFromIndex(i);
   const kind = (i) => i >= numGridCells ? 'var' : 'grid';
 
   console.log(`puzzle: ${puzzle.name}`);

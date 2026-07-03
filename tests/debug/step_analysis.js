@@ -215,22 +215,22 @@ const loadPuzzle = (args) => {
 // Formatting helpers
 // ============================================================================
 
-const cellId = (shape, cell) => shape.makeCellIdFromIndex(cell);
+const cellId = (geometry, cell) => geometry.makeCellIdFromIndex(cell);
 
-const valueOf = (shape, mask) => LookupTables.toValue(mask) + shape.valueOffset;
+const valueOf = (geometry, mask) => LookupTables.toValue(mask) + geometry.valueOffset;
 
 const valuesString = (mask) => LookupTables.toValuesArray(mask).join('') || '-';
 
 // Describe a set of cells as a house (row/col) when they share one, else list.
-const describeCells = (shape, cells) => {
-  const gridCells = cells.filter(c => c < shape.numGridCells);
+const describeCells = (geometry, cells) => {
+  const gridCells = cells.filter(c => c < geometry.numGridCells);
   if (gridCells.length === cells.length && gridCells.length > 1) {
-    const rows = new Set(gridCells.map(c => c / shape.numCols | 0));
-    const cols = new Set(gridCells.map(c => c % shape.numCols));
+    const rows = new Set(gridCells.map(c => c / geometry.numCols | 0));
+    const cols = new Set(gridCells.map(c => c % geometry.numCols));
     if (rows.size === 1) return `row ${[...rows][0] + 1}`;
     if (cols.size === 1) return `col ${[...cols][0] + 1}`;
   }
-  const ids = cells.map(c => cellId(shape, c));
+  const ids = cells.map(c => cellId(geometry, c));
   return ids.length > 6 ? `[${ids.slice(0, 6).join(',')},...] (${ids.length} cells)` : `[${ids.join(',')}]`;
 };
 
@@ -339,21 +339,21 @@ const scoreCell = (cell, grid, conflictScores, linkedCells, maxValueInfo) => {
 // ============================================================================
 
 // Parse "STEP:CELL[=VALUE]" into { step, cell (index), value (user digit|null) }.
-const parseGuideSpec = (shape, spec) => {
+const parseGuideSpec = (geometry, spec) => {
   const m = /^(\d+):([^=]+)(?:=(.+))?$/.exec(spec);
   if (!m) throw new Error(`Bad --guide "${spec}". Expected STEP:CELL[=VALUE].`);
   return {
     step: +m[1],
-    cell: shape.parseCellId(m[2]).cell,
+    cell: geometry.parseCellId(m[2]).cell,
     value: m[3] !== undefined ? +m[3] : null,
   };
 };
 
 // Step guides need the branch depth at their step, which depends on earlier
 // guides. Resolve depths by replaying steps in order with the guides so far.
-const buildGuides = (solver, shape, specs) => {
+const buildGuides = (solver, geometry, specs) => {
   const guides = new Map();
-  const parsed = specs.map(s => parseGuideSpec(shape, s)).sort((a, b) => a.step - b.step);
+  const parsed = specs.map(s => parseGuideSpec(geometry, s)).sort((a, b) => a.step - b.step);
   for (const g of parsed) {
     const res = solver.nthStep(g.step, guides);
     const depth = res?.branchCells ? res.branchCells.length - 1 : 0;
@@ -390,11 +390,11 @@ const triedValueAt = (step, guessCellIndex) => {
   return null;
 };
 
-const buildStepRecord = (shape, stepIndex, step, decision) => {
+const buildStepRecord = (geometry, stepIndex, step, decision) => {
   const eliminated = step.diffPencilmarks
     ? step.diffPencilmarks.reduce((sum, set) => sum + set.size, 0)
     : 0;
-  const guessCellIndex = step.guessCell ? shape.parseCellId(step.guessCell).cell : null;
+  const guessCellIndex = step.guessCell ? geometry.parseCellId(step.guessCell).cell : null;
   const matched = decisionMatchesGuess(decision, guessCellIndex);
   return {
     step: stepIndex,
@@ -407,12 +407,12 @@ const buildStepRecord = (shape, stepIndex, step, decision) => {
     contradiction: !!step.hasContradiction,
     solution: !!step.isSolution,
     detail: matched && decision.isCustom
-      ? (decision.finder ? `${valueOf(shape, decision.placementValue)}@${describeCells(shape, decision.finder.cells)}` : 'custom')
+      ? (decision.finder ? `${valueOf(geometry, decision.placementValue)}@${describeCells(geometry, decision.finder.cells)}` : 'custom')
       : '',
   };
 };
 
-const printWalk = (shape, records) => {
+const printWalk = (geometry, records) => {
   const header = ['step', 'guess', 'tried', 'branch', 'n', 'options', 'elim', 'flags', 'detail'];
   console.log(header.join('\t'));
   for (const r of records) {
@@ -436,13 +436,13 @@ const printWalk = (shape, records) => {
 // Walk steps 0..lastStep on `solver`, returning a per-step record list. (Always
 // walks from step 0 so each step's guess decision, captured at the prior step's
 // replay, is available — see the note in main().)
-const walk = (solver, shape, guides, lastStep) => {
+const walk = (solver, geometry, guides, lastStep) => {
   const records = [];
   let prevDecision = null;
   for (let s = 0; s <= lastStep; s++) {
     const { step, decision } = runStep(solver, s, guides, false);
     if (!step) break;
-    records.push(buildStepRecord(shape, s, step, prevDecision));
+    records.push(buildStepRecord(geometry, s, step, prevDecision));
     prevDecision = decision;
     if (step.isSolution) break;
   }
@@ -470,31 +470,31 @@ const printCompare = (records, ablated, name) => {
     : `\nFirst divergence at step ${firstDiff}.`);
 };
 
-const printExplain = (shape, stepIndex, decision, top) => {
+const printExplain = (geometry, stepIndex, decision, top) => {
   console.log(`\n=== Explain step ${stepIndex} (the guess made to reach this step) ===`);
   if (!decision) {
     console.log('No multi-way branch was decided for this step (forced single, contradiction, or past the end).');
     return;
   }
 
-  const chosen = cellId(shape, decision.chosenCell);
-  const tried = valueOf(shape, decision.value);
+  const chosen = cellId(geometry, decision.chosenCell);
+  const tried = valueOf(geometry, decision.value);
   console.log(`Branch type:   ${branchType(decision)}`);
   console.log(`Chosen cell:   ${chosen} (first value tried: ${tried})`);
   console.log(`Branch factor: ${decision.count}`);
 
   if (decision.isCustom) {
-    const house = decision.finder ? describeCells(shape, decision.finder.cells) : 'unknown house';
+    const house = decision.finder ? describeCells(geometry, decision.finder.cells) : 'unknown house';
     const finderType = decision.finder?.type ?? 'unknown';
-    const placeCells = decision.placementCells.map(c => cellId(shape, c));
+    const placeCells = decision.placementCells.map(c => cellId(geometry, c));
     console.log(`\nThis is NOT a guess on ${chosen}'s ${countOnes16bit(decision.grid?.[decision.chosenCell] ?? 0) || '?'} candidates.`);
-    console.log(`A ${finderType} candidate finder noticed that value ${valueOf(shape, decision.placementValue)} ` +
+    console.log(`A ${finderType} candidate finder noticed that value ${valueOf(geometry, decision.placementValue)} ` +
       `can only go in ${decision.placementCells.length} cells of ${house}:`);
     console.log(`  ${placeCells.join(', ')}`);
-    console.log(`The solver branches on that placement, trying ${placeCells[0]}=${valueOf(shape, decision.placementValue)} first.`);
+    console.log(`The solver branches on that placement, trying ${placeCells[0]}=${valueOf(geometry, decision.placementValue)} first.`);
     if (decision.heuristicCell !== null && decision.heuristicCell !== undefined) {
       console.log(`(Before the override, the score heuristic's best plain cell was ` +
-        `${cellId(shape, decision.heuristicCell)}.)`);
+        `${cellId(geometry, decision.heuristicCell)}.)`);
     }
   } else {
     console.log(`\nThe score heuristic picked the cell maximizing conflictScore / candidateCount, ` +
@@ -519,7 +519,7 @@ const printExplain = (shape, stepIndex, decision, top) => {
   console.log('cell\tcount\tconflict\tlinkx4\tvalboost\tscore');
   for (const r of rows.slice(0, top)) {
     console.log([
-      cellId(shape, r.cell),
+      cellId(geometry, r.cell),
       r.count,
       r.conflictScore,
       r.linkBoost ? 'yes' : '-',
@@ -528,7 +528,7 @@ const printExplain = (shape, stepIndex, decision, top) => {
     ].join('\t'));
   }
   if (decision.maxValueInfo.value) {
-    console.log(`\n(A recently conflict-prone value (${valueOf(shape, decision.maxValueInfo.value)}, ` +
+    console.log(`\n(A recently conflict-prone value (${valueOf(geometry, decision.maxValueInfo.value)}, ` +
       `score ${decision.maxValueInfo.score}) is boosting cells that contain it.)`);
   }
 };
@@ -536,11 +536,11 @@ const printExplain = (shape, stepIndex, decision, top) => {
 // Render pencilmarks laid out as the grid. cellIndexFor(row, col) maps a grid
 // position to the search-cell index whose candidates to show (the value cell
 // itself, or its region cell).
-const printPencilmarkGrid = (shape, pencilmarks, cellIndexFor, title, width) => {
+const printPencilmarkGrid = (geometry, pencilmarks, cellIndexFor, title, width) => {
   console.log(`\n=== ${title} ===`);
-  for (let row = 0; row < shape.numRows; row++) {
+  for (let row = 0; row < geometry.numRows; row++) {
     const cells = [];
-    for (let col = 0; col < shape.numCols; col++) {
+    for (let col = 0; col < geometry.numCols; col++) {
       const pm = pencilmarks[cellIndexFor(row, col)];
       const text = pm instanceof Set ? [...pm].join('') : String(pm);
       cells.push(text.padEnd(width));
@@ -549,10 +549,10 @@ const printPencilmarkGrid = (shape, pencilmarks, cellIndexFor, title, width) => 
   }
 };
 
-const printGrid = (shape, pencilmarks, stepIndex) => {
-  printPencilmarkGrid(shape, pencilmarks,
-    (row, col) => row * shape.numCols + col,
-    `Pencilmarks at step ${stepIndex}`, shape.numValues);
+const printGrid = (geometry, pencilmarks, stepIndex) => {
+  printPencilmarkGrid(geometry, pencilmarks,
+    (row, col) => row * geometry.numCols + col,
+    `Pencilmarks at step ${stepIndex}`, geometry.numValues);
 };
 
 const candidatesText = (pencilmarks, cellIndex) => {
@@ -562,8 +562,8 @@ const candidatesText = (pencilmarks, cellIndex) => {
 
 // Print every var-cell group (chaos regions, doppelganger cells, sum cells, ...).
 // Groups with a `columns` layout hint print as a grid; the rest as a list.
-const printVarCells = (shape, pencilmarks, stepIndex) => {
-  const groups = shape.varCellGroups();
+const printVarCells = (geometry, pencilmarks, stepIndex) => {
+  const groups = geometry.varCellGroups();
   if (!groups.length) {
     console.log(`\nThis puzzle has no extra (var) cells.`);
     return;
@@ -581,7 +581,7 @@ const printVarCells = (shape, pencilmarks, stepIndex) => {
         console.log('  ' + line.join(' | '));
       }
     } else {
-      const entries = cells.map(c => `${cellId(shape, c)}=${candidatesText(pencilmarks, c)}`);
+      const entries = cells.map(c => `${cellId(geometry, c)}=${candidatesText(pencilmarks, c)}`);
       console.log('  ' + entries.join('  '));
     }
   }
@@ -592,7 +592,7 @@ const printVarCells = (shape, pencilmarks, stepIndex) => {
 // false. Requires the solver built with logLevel >= 1. The engine scopes step
 // logs to the target step, so we discard logs from earlier replays, run the step
 // fresh, then read what it produced.
-const printDebugLog = (shape, solver, atStep, guides) => {
+const printDebugLog = (geometry, solver, atStep, guides) => {
   solver.debugState();  // drain logs accumulated during the walk / earlier runs
   runStep(solver, atStep, guides, false);
   const logs = (solver.debugState()?.logs ?? [])
@@ -612,7 +612,7 @@ const printDebugLog = (shape, solver, atStep, guides) => {
       console.log(`  ${l.msg}${removed}`);
     } else {
       const cells = l.cells?.length
-        ? ` [${Array.from(l.cells, c => cellId(shape, c)).join(',')}]` : '';
+        ? ` [${Array.from(l.cells, c => cellId(geometry, c)).join(',')}]` : '';
       console.log(`  ${l.msg}${cells}`);
     }
   }
@@ -626,7 +626,7 @@ const printDebugLog = (shape, solver, atStep, guides) => {
 const valuesOf = (pm) =>
   typeof pm === 'number' ? [pm] : (pm instanceof Set ? [...pm].sort((a, b) => a - b) : []);
 
-const printStateString = (shape, internal, solver, atStep, guides, baseInput) => {
+const printStateString = (geometry, internal, solver, atStep, guides, baseInput) => {
   const initial = runStep(solver, 0, guides).step;
   const { step: target } = runStep(solver, atStep, guides);
   if (!target) { console.log(`\nStep ${atStep} is past the end of the search.`); return; }
@@ -639,7 +639,7 @@ const printStateString = (shape, internal, solver, atStep, guides, baseInput) =>
     // Only emit cells the search narrowed; initial-propagation narrowings are
     // reproduced by the original constraints when the string is re-propagated.
     if (values.length >= valuesOf(initial.pencilmarks[cell]).length) continue;
-    givens.push(`~${cellId(shape, cell)}_${values.join('_')}`);
+    givens.push(`~${cellId(geometry, cell)}_${values.join('_')}`);
   }
   const stateString = baseInput + givens.map(g => `.${g}`).join('');
 
@@ -652,19 +652,19 @@ const printStateString = (shape, internal, solver, atStep, guides, baseInput) =>
   process.stdout.write(stateString + '\n');
 };
 
-const printPriorities = (shape, internal) => {
+const printPriorities = (geometry, internal) => {
   const priorities = internal._cellPriorities;
   console.log('\n=== Initial cell priorities (root conflict scores) ===');
-  for (let row = 0; row < shape.numRows; row++) {
+  for (let row = 0; row < geometry.numRows; row++) {
     const cells = [];
-    for (let col = 0; col < shape.numCols; col++) {
-      cells.push(String(priorities[row * shape.numCols + col]).padStart(4));
+    for (let col = 0; col < geometry.numCols; col++) {
+      cells.push(String(priorities[row * geometry.numCols + col]).padStart(4));
     }
     console.log(cells.join(' '));
   }
   const nonzeroVar = [];
-  for (let i = shape.numGridCells; i < internal._numSearchCells; i++) {
-    if (priorities[i]) nonzeroVar.push(`${cellId(shape, i)}=${priorities[i]}`);
+  for (let i = geometry.numGridCells; i < internal._numSearchCells; i++) {
+    if (priorities[i]) nonzeroVar.push(`${cellId(geometry, i)}=${priorities[i]}`);
   }
   if (nonzeroVar.length) {
     console.log('\nNon-zero var-cell priorities:');
@@ -672,16 +672,16 @@ const printPriorities = (shape, internal) => {
   }
 };
 
-const printCellTracking = (shape, cellSpec, records, solver, guides) => {
-  const cellIndex = shape.parseCellId(cellSpec).cell;
-  console.log(`\n=== Tracking ${cellId(shape, cellIndex)} ===`);
+const printCellTracking = (geometry, cellSpec, records, solver, guides) => {
+  const cellIndex = geometry.parseCellId(cellSpec).cell;
+  console.log(`\n=== Tracking ${cellId(geometry, cellIndex)} ===`);
   console.log('step\tcandidates\tguessedHere');
   for (const r of records) {
     const { step } = runStep(solver, r.step, guides, false);
     if (!step) break;
     const pm = step.pencilmarks[cellIndex];
     const text = pm instanceof Set ? valuesString_fromSet(pm) : String(pm);
-    const guessed = step.guessCell === cellId(shape, cellIndex) ? 'yes' : '';
+    const guessed = step.guessCell === cellId(geometry, cellIndex) ? 'yes' : '';
     console.log([r.step, text, guessed].join('\t'));
   }
 };
@@ -712,18 +712,18 @@ export const main = (argv) => {
   // it only logs the walked step, so it's cheap.
   const solver = SudokuBuilder.build(constraint, { logLevel: 1 });
   const internal = solver._internalSolver;
-  const shape = solver._shape;
+  const geometry = solver._geometry;
 
   installInstrumentation(internal._candidateSelector);
 
-  const guides = buildGuides(solver, shape, args.guides);
+  const guides = buildGuides(solver, geometry, args.guides);
 
-  if (args.priorities) printPriorities(shape, internal);
+  if (args.priorities) printPriorities(geometry, internal);
 
   // Walk from step 0 through step `--steps` (clamped to where the search ends).
   // We always iterate from step 0 so the decision captured at step s-1 (which
   // describes the guess shown at public step s) is available as we reach step s.
-  const records = walk(solver, shape, guides, args.steps);
+  const records = walk(solver, geometry, guides, args.steps);
 
   // Validate any ablation up front, before producing output.
   if (args.compare) validateAblations([args.compare]);
@@ -734,13 +734,13 @@ export const main = (argv) => {
   }
 
   console.log(`Puzzle: ${puzzle.name}`);
-  console.log(`Grid:   ${shape.numRows}x${shape.numCols}, ${internal._numSearchCells} search cells ` +
-    `(${shape.numGridCells} grid + ${internal._numSearchCells - shape.numGridCells} var)`);
+  console.log(`Grid:   ${geometry.numRows}x${geometry.numCols}, ${internal._numSearchCells} search cells ` +
+    `(${geometry.numGridCells} grid + ${internal._numSearchCells - geometry.numGridCells} var)`);
   if (guides.size) console.log(`Guides: ${args.guides.join(' ')}`);
   console.log('');
-  printWalk(shape, records);
+  printWalk(geometry, records);
 
-  if (args.cell) printCellTracking(shape, args.cell, records, solver, guides);
+  if (args.cell) printCellTracking(geometry, args.cell, records, solver, guides);
 
   if (args.compare) {
     const restore = applyAblations([args.compare]);
@@ -749,8 +749,8 @@ export const main = (argv) => {
       const solver2 = SudokuBuilder.build(
         SudokuParser.parseText(puzzle.input), { logLevel: 0 });
       installInstrumentation(solver2._internalSolver._candidateSelector);
-      const guides2 = buildGuides(solver2, solver2._shape, args.guides);
-      ablatedRecords = walk(solver2, solver2._shape, guides2, args.steps);
+      const guides2 = buildGuides(solver2, solver2._geometry, args.guides);
+      ablatedRecords = walk(solver2, solver2._geometry, guides2, args.steps);
     } finally { restore(); }
     printCompare(records, ablatedRecords, args.compare);
   }
@@ -768,18 +768,18 @@ export const main = (argv) => {
       // The guess shown at step `atStep` is decided during the replay to step
       // atStep - 1, so capture its decision (with a snapshot) there.
       const { decision } = runStep(solver, atStep - 1, guides, true);
-      printExplain(shape, atStep, decision, args.top);
+      printExplain(geometry, atStep, decision, args.top);
     }
   }
 
-  if (args.grid) printGrid(shape, runStep(solver, atStep, guides).step.pencilmarks, atStep);
-  if (args.vars) printVarCells(shape, runStep(solver, atStep, guides).step.pencilmarks, atStep);
+  if (args.grid) printGrid(geometry, runStep(solver, atStep, guides).step.pencilmarks, atStep);
+  if (args.vars) printVarCells(geometry, runStep(solver, atStep, guides).step.pencilmarks, atStep);
 
   // Show the propagation log when asked, and always when the walk ended in a
   // contradiction — so a plain run explains a failure (e.g. 0 guesses) by itself.
-  if (args.log || last?.contradiction) printDebugLog(shape, solver, atStep, guides);
+  if (args.log || last?.contradiction) printDebugLog(geometry, solver, atStep, guides);
 
-  if (args.dumpState) printStateString(shape, internal, solver, atStep, guides, puzzle.input);
+  if (args.dumpState) printStateString(geometry, internal, solver, atStep, guides, puzzle.input);
 };
 
 runAsCli(import.meta.url, main);

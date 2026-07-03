@@ -11,14 +11,14 @@ const { InvalidConstraintError } = HandlerModule;
 
 export class SudokuBuilder {
   static build(constraint, debugOptions) {
-    const shape = constraint.getShape();
+    const geometry = constraint.getShape();
     const constraintMap = constraint.toMap();
-    // The shape enforces the cell-count limit here (throws if too many cells).
-    shape.addVarCellsForConstraints([].concat(...constraintMap.values()));
+    // The geometry enforces the cell-count limit here (throws if too many cells).
+    geometry.addVarCellsForConstraints([].concat(...constraintMap.values()));
 
-    const handlers = [...this._handlers(constraintMap, shape)];
+    const handlers = [...this._handlers(constraintMap, geometry)];
 
-    return new SudokuSolver(handlers, shape, debugOptions);
+    return new SudokuSolver(handlers, geometry, debugOptions);
   }
 
   static resolveConstraint(constraint) {
@@ -32,22 +32,22 @@ export class SudokuBuilder {
     return new cls(...args);
   }
 
-  static *_handlers(constraintMap, shape) {
-    yield* this._rowColHandlers(shape);
+  static *_handlers(constraintMap, geometry) {
+    yield* this._rowColHandlers(geometry);
 
-    const boxRegions = this._getBoxRegions(shape, constraintMap);
+    const boxRegions = this._getBoxRegions(geometry, constraintMap);
     yield new HandlerModule.BoxInfo(boxRegions);
     yield* this._boxHandlers(boxRegions);
 
-    yield* this._constraintHandlers(constraintMap, shape);
+    yield* this._constraintHandlers(constraintMap, geometry);
   }
 
   // Get box regions, respecting NoBoxes and RegionSize constraints.
-  static _getBoxRegions(shape, constraintMap) {
+  static _getBoxRegions(geometry, constraintMap) {
     if (constraintMap.has('NoBoxes')) return [];
 
     const size = this._getEffectiveBoxSize(constraintMap);
-    return SudokuConstraintBase.boxRegions(shape, size);
+    return SudokuConstraintBase.boxRegions(geometry, size);
   }
 
   // Get the effective box size from RegionSize constraint, or null for default.
@@ -56,11 +56,11 @@ export class SudokuBuilder {
     return regionSizeConstraints?.[0]?.size ?? null;
   }
 
-  static *_rowColHandlers(shape) {
-    for (const cells of SudokuConstraintBase.rowRegions(shape)) {
+  static *_rowColHandlers(geometry) {
+    for (const cells of SudokuConstraintBase.rowRegions(geometry)) {
       yield new HandlerModule.AllDifferent(cells);
     }
-    for (const cells of SudokuConstraintBase.colRegions(shape)) {
+    for (const cells of SudokuConstraintBase.colRegions(geometry)) {
       yield new HandlerModule.AllDifferent(cells);
     }
   }
@@ -71,19 +71,19 @@ export class SudokuBuilder {
     }
   }
 
-  static *_strictAdjHandlers(constraints, shape, fnKey) {
-    const numCells = shape.numGridCells;
+  static *_strictAdjHandlers(constraints, geometry, fnKey) {
+    const numCells = geometry.numGridCells;
     const intCmp = (a, b) => a - b;
     const pairId = p => p[0] + p[1] * numCells;
 
     // Find all the cell pairs that have constraints.
     const cellPairs = constraints
-      .flatMap(c => c.adjacentPairs(shape));
+      .flatMap(c => c.adjacentPairs(geometry));
     cellPairs.forEach(p => p.sort(intCmp));
     const pairIds = new Set(cellPairs.map(pairId));
 
     // Add negative constraints for all other cell pairs.
-    for (const p of this._allAdjacentCellPairs(shape)) {
+    for (const p of this._allAdjacentCellPairs(geometry)) {
       p.sort(intCmp);
       if (pairIds.has(pairId(p))) continue;
       yield new HandlerModule.BinaryConstraint(
@@ -98,7 +98,7 @@ export class SudokuBuilder {
     return new HandlerModule.GivenCandidates(givensMap);
   }
 
-  static * _regionSumLineHandlers(cells, regions, shape) {
+  static * _regionSumLineHandlers(cells, regions, geometry) {
     // Map cells to regions.
     const cellToRegion = new Map();
     for (const region of regions) {
@@ -119,17 +119,17 @@ export class SudokuBuilder {
       curSet.push(cell);
     }
 
-    yield* this._equalSumHandlers(cellSets, shape);
+    yield* this._equalSumHandlers(cellSets, geometry);
   }
 
   // Emit handlers enforcing that every cell set in `cellSets` has the same sum.
-  static * _equalSumHandlers(cellSets, shape) {
+  static * _equalSumHandlers(cellSets, geometry) {
     const singles = cellSets.filter(s => s.length === 1).map(s => s[0]);
     const multis = cellSets.filter(s => s.length > 1);
 
     if (singles.length > 1) {
       const key = SudokuConstraint.SameValues.fnKey(
-        shape.numValues, shape.valueOffset);
+        geometry.numValues, geometry.valueOffset);
       yield new HandlerModule.BinaryPairwise(
         key, ...singles);
     }
@@ -153,54 +153,54 @@ export class SudokuBuilder {
     }
   }
 
-  static _regionSize(constraintMap, shape) {
+  static _regionSize(constraintMap, geometry) {
     return constraintMap.get('RegionSize')?.[0]?.size
-      ?? shape.constructor.defaultNumValues(shape.numRows, shape.numCols);
+      ?? geometry.constructor.defaultNumValues(geometry.numRows, geometry.numCols);
   }
 
-  static * _constraintHandlers(constraintMap, shape) {
+  static * _constraintHandlers(constraintMap, geometry) {
     const constraints = [].concat(...constraintMap.values());
 
     for (const constraint of constraints) {
-      // Validate constraint is compatible with the shape.
+      // Validate constraint is compatible with the geometry.
       const validateShape = constraint.constructor.VALIDATE_SHAPE_FN;
-      if (validateShape && !validateShape(shape)) {
+      if (validateShape && !validateShape(geometry)) {
         throw new InvalidConstraintError(
           `${constraint.constructor.displayName()} is not compatible with ` +
-          `grid ${shape.name}.`);
+          `grid ${geometry.name}.`);
       }
 
       let cells;
       switch (constraint.type) {
         case 'Doppelganger':
-          yield* this._doppelgangerHandlers(shape, constraintMap);
+          yield* this._doppelgangerHandlers(geometry, constraintMap);
           break;
 
         case 'AntiKnight':
-          yield* this._antiHandlers(shape,
+          yield* this._antiHandlers(geometry,
             (r, c) => [[r + 1, c + 2], [r + 2, c + 1], [r + 1, c - 2], [r + 2, c - 1]]);
           break;
 
         case 'AntiKing':
-          yield* this._antiHandlers(shape, (r, c) => [[r + 1, c + 1], [r + 1, c - 1]]);
+          yield* this._antiHandlers(geometry, (r, c) => [[r + 1, c + 1], [r + 1, c - 1]]);
           break;
 
         case 'AntiConsecutive':
-          yield* this._antiConsecutiveHandlers(shape);
+          yield* this._antiConsecutiveHandlers(geometry);
           break;
 
         case 'AntiTaxicab':
-          if (shape.valueOffset !== 0) {
+          if (geometry.valueOffset !== 0) {
             throw new InvalidConstraintError(
               'Anti-Taxicab is incompatible with 0-based values.');
           }
           {
-            for (let i = 0; i < shape.numGridCells; i++) {
+            for (let i = 0; i < geometry.numGridCells; i++) {
               const valueMap = [];
-              for (let d = 1; d <= shape.numValues; d++) {
-                const [r, c] = shape.splitCellIndex(i);
+              for (let d = 1; d <= geometry.numValues; d++) {
+                const [r, c] = geometry.splitCellIndex(i);
                 valueMap.push(
-                  SudokuConstraint.AntiTaxicab.taxicabCells(r, c, d, shape));
+                  SudokuConstraint.AntiTaxicab.taxicabCells(r, c, d, geometry));
               }
               yield new HandlerModule.ValueDependentUniqueValueExclusion(
                 i, valueMap);
@@ -210,16 +210,16 @@ export class SudokuBuilder {
 
         case 'Jigsaw':
           {
-            if (constraint.shapeSpec !== shape.name) {
+            if (constraint.shapeSpec !== geometry.name) {
               throw new InvalidConstraintError(
                 `Jigsaw shapeSpec ${constraint.shapeSpec} does not match ` +
-                `puzzle shape ${shape.name}`);
+                `puzzle geometry ${geometry.name}`);
             }
-            cells = constraint.cells.map(c => shape.parseCellId(c).cell);
-            const regionSize = this._regionSize(constraintMap, shape);
+            cells = constraint.cells.map(c => geometry.parseCellId(c).cell);
+            const regionSize = this._regionSize(constraintMap, geometry);
             if (cells.length !== regionSize) {
               throw new InvalidConstraintError(
-                `Jigsaw pieces must have ${regionSize} cells for the current shape.`);
+                `Jigsaw pieces must have ${regionSize} cells for the current geometry.`);
             }
             yield new HandlerModule.AllDifferent(cells);
             // Just to let the solver know that this is a jigsaw puzzle.
@@ -229,17 +229,17 @@ export class SudokuBuilder {
 
         case 'ChaosConstruction':
           {
-            const regionSize = this._regionSize(constraintMap, shape);
+            const regionSize = this._regionSize(constraintMap, geometry);
             if (regionSize < 2) {
               throw new InvalidConstraintError(
                 'Chaos Construction requires a region size of at least 2.');
             }
-            if (shape.numGridCells % regionSize !== 0) {
+            if (geometry.numGridCells % regionSize !== 0) {
               throw new InvalidConstraintError(
                 'Chaos Construction requires grid cell count to be divisible by region size.');
             }
-            const regionCells = shape.varCellsForGroup('CC');
-            if (!regionCells || regionCells.length !== shape.numGridCells) {
+            const regionCells = geometry.varCellsForGroup('CC');
+            if (!regionCells || regionCells.length !== geometry.numGridCells) {
               throw new InvalidConstraintError(
                 'Chaos Construction requires one region cell for every grid cell.');
             }
@@ -250,21 +250,21 @@ export class SudokuBuilder {
                   'Chaos Construction requires contiguous region cells.');
               }
             }
-            yield new ChaosHandlerModule.ChaosConstruction(shape.numGridCells, regionCellOffset, regionSize);
+            yield new ChaosHandlerModule.ChaosConstruction(geometry.numGridCells, regionCellOffset, regionSize);
           }
           break;
 
         case 'ChaosArrow':
           {
-            const regionCells = shape.varCellsForGroup('CC');
-            if (!regionCells || regionCells.length !== shape.numGridCells) {
+            const regionCells = geometry.varCellsForGroup('CC');
+            if (!regionCells || regionCells.length !== geometry.numGridCells) {
               throw new InvalidConstraintError('ChaosArrow requires Chaos Construction.');
             }
-            const controlCell = shape.parseCellId(constraint.cells[0]).cell;
+            const controlCell = geometry.parseCellId(constraint.cells[0]).cell;
             const regionCellOffset = regionCells[0];
             const regionCellLimit = regionCellOffset + regionCells.length;
-            const chaosArms = constraint.expandedArms(shape)
-              .map(arm => arm.map(cellId => shape.parseCellId(cellId).cell));
+            const chaosArms = constraint.expandedArms(geometry)
+              .map(arm => arm.map(cellId => geometry.parseCellId(cellId).cell));
             if (chaosArms.flat().some(c => c < regionCellOffset || c >= regionCellLimit)) {
               throw new InvalidConstraintError(
                 'ChaosArrow cells after the control cell must be Chaos Construction region cells.');
@@ -277,15 +277,15 @@ export class SudokuBuilder {
 
         case 'ChaosCount':
           {
-            const regionCells = shape.varCellsForGroup('CC');
-            if (!regionCells || regionCells.length !== shape.numGridCells) {
+            const regionCells = geometry.varCellsForGroup('CC');
+            if (!regionCells || regionCells.length !== geometry.numGridCells) {
               throw new InvalidConstraintError('ChaosCount requires Chaos Construction.');
             }
-            const controlCell = shape.parseCellId(constraint.cells[0]).cell;
+            const controlCell = geometry.parseCellId(constraint.cells[0]).cell;
             const regionCellOffset = regionCells[0];
             const regionCellLimit = regionCellOffset + regionCells.length;
-            const countCells = constraint.expandedRegionCells(shape)
-              .map(c => shape.parseCellId(c).cell);
+            const countCells = constraint.expandedRegionCells(geometry)
+              .map(c => geometry.parseCellId(c).cell);
             if (countCells.some(c => c < regionCellOffset || c >= regionCellLimit)) {
               throw new InvalidConstraintError(
                 'ChaosCount cells after the control cell must be Chaos Construction region cells.');
@@ -297,13 +297,13 @@ export class SudokuBuilder {
           break;
 
         case 'Diagonal':
-          if (!shape.isSquare()) {
+          if (!geometry.isSquare()) {
             throw new InvalidConstraintError('Diagonal constraint requires a square grid');
           }
           cells = [];
-          for (let r = 0; r < shape.numRows; r++) {
-            let c = constraint.direction > 0 ? shape.numCols - r - 1 : r;
-            cells.push(shape.cellIndex(r, c));
+          for (let r = 0; r < geometry.numRows; r++) {
+            let c = constraint.direction > 0 ? geometry.numCols - r - 1 : r;
+            cells.push(geometry.cellIndex(r, c));
           }
           yield new HandlerModule.AllDifferent(cells);
           break;
@@ -311,7 +311,7 @@ export class SudokuBuilder {
         case 'Arrow':
           {
             const cells = (
-              constraint.cells.map(c => shape.parseCellId(c).cell));
+              constraint.cells.map(c => geometry.parseCellId(c).cell));
             yield SumHandlerModule.Sum.makeEqual(
               [cells[0]], cells.slice(1));
           }
@@ -320,7 +320,7 @@ export class SudokuBuilder {
         case 'DoubleArrow':
           {
             const cells = (
-              constraint.cells.map(c => shape.parseCellId(c).cell));
+              constraint.cells.map(c => geometry.parseCellId(c).cell));
 
             const center = cells.splice(1, cells.length - 2);
             yield SumHandlerModule.Sum.makeEqual(cells, center);
@@ -334,7 +334,7 @@ export class SudokuBuilder {
               throw new InvalidConstraintError('Pill size must be 2 or 3');
             }
             const cells = (
-              constraint.cells.map(c => shape.parseCellId(c).cell));
+              constraint.cells.map(c => geometry.parseCellId(c).cell));
             if (cells.length <= pillSize) {
               throw new InvalidConstraintError(
                 'Pill Arrow must have more cells than the pill size');
@@ -352,7 +352,7 @@ export class SudokuBuilder {
 
             yield new SumHandlerModule.Sum(cells, 0, coeffs);
 
-            if (shape.numValues > 9) {
+            if (geometry.numValues > 9) {
               // Limit pill values to 1-9, other than the first cell.
               const values = [...Array(9).keys()].map(i => i + 1);
               for (let i = 1; i < pillSize; i++) {
@@ -363,7 +363,7 @@ export class SudokuBuilder {
           break;
 
         case 'Cage':
-          cells = constraint.cells.map(c => shape.parseCellId(c).cell);
+          cells = constraint.cells.map(c => geometry.parseCellId(c).cell);
           // A sum of 0 means any sum is ok - i.e. the same as AllDifferent.
           if (constraint.sum !== 0) {
             yield new SumHandlerModule.Sum(cells, constraint.sum);
@@ -372,15 +372,15 @@ export class SudokuBuilder {
           break;
 
         case 'RellikCage':
-          cells = constraint.cells.map(c => shape.parseCellId(c).cell);
+          cells = constraint.cells.map(c => geometry.parseCellId(c).cell);
           yield new HandlerModule.Rellik(cells, constraint.sum);
           yield new HandlerModule.AllDifferent(cells);
           break;
 
         case 'EqualityCage':
           {
-            cells = constraint.cells.map(c => shape.parseCellId(c).cell);
-            const allValues = shape.allValues();
+            cells = constraint.cells.map(c => geometry.parseCellId(c).cell);
+            const allValues = geometry.allValues();
             const half = allValues.length >> 1;
             yield new HandlerModule.AllDifferent(cells);
             // Odd-even partition.
@@ -397,30 +397,30 @@ export class SudokuBuilder {
           break;
 
         case 'Sum':
-          cells = constraint.cells.map(c => shape.parseCellId(c).cell);
+          cells = constraint.cells.map(c => geometry.parseCellId(c).cell);
           yield new SumHandlerModule.Sum(
             cells, constraint.sum, constraint.coeffs || undefined);
           break;
 
         case 'Regex':
           {
-            const cells = constraint.cells.map(c => shape.parseCellId(c).cell);
-            const nfa = compileRegex(constraint.pattern, shape.numValues, shape.valueOffset);
+            const cells = constraint.cells.map(c => geometry.parseCellId(c).cell);
+            const nfa = compileRegex(constraint.pattern, geometry.numValues, geometry.valueOffset);
             yield new NFAHandlerModule.NFAConstraint(cells, nfa);
           }
           break;
 
         case 'NFA':
           {
-            const cells = constraint.cells.map(c => shape.parseCellId(c).cell);
-            const nfa = compileNFA(constraint.encodedNFA, shape.numValues);
+            const cells = constraint.cells.map(c => geometry.parseCellId(c).cell);
+            const nfa = compileNFA(constraint.encodedNFA, geometry.numValues);
             yield new NFAHandlerModule.NFAConstraint(cells, nfa);
           }
           break;
 
         case 'LittleKiller':
-          cells = constraint.getCells(shape)?.map(
-            c => shape.parseCellId(c).cell);
+          cells = constraint.getCells(geometry)?.map(
+            c => geometry.parseCellId(c).cell);
           if (!cells) throw new InvalidConstraintError('Invalid Little Killer line: ' + constraint.arrowId);
           yield new SumHandlerModule.Sum(
             cells, constraint.value);
@@ -428,8 +428,8 @@ export class SudokuBuilder {
 
         case 'XSum':
           {
-            const cells = constraint.getCells(shape).map(
-              c => shape.parseCellId(c).cell);
+            const cells = constraint.getCells(geometry).map(
+              c => geometry.parseCellId(c).cell);
             const sum = constraint.value;
             const controlCell = cells[0];
 
@@ -453,45 +453,45 @@ export class SudokuBuilder {
           break;
 
         case 'Sandwich':
-          cells = constraint.getCells(shape).map(
-            c => shape.parseCellId(c).cell);
+          cells = constraint.getCells(geometry).map(
+            c => geometry.parseCellId(c).cell);
           yield new HandlerModule.Lunchbox(cells, constraint.value);
           break;
 
         case 'Lunchbox':
-          cells = constraint.cells.map(c => shape.parseCellId(c).cell);
+          cells = constraint.cells.map(c => geometry.parseCellId(c).cell);
           yield new HandlerModule.Lunchbox(cells, constraint.sum);
           break;
 
         case 'Skyscraper':
-          cells = constraint.getCells(shape).map(
-            c => shape.parseCellId(c).cell);
+          cells = constraint.getCells(geometry).map(
+            c => geometry.parseCellId(c).cell);
           yield new HandlerModule.Skyscraper(
             cells, constraint.value);
           break;
 
         case 'HiddenSkyscraper':
-          cells = constraint.getCells(shape).map(
-            c => shape.parseCellId(c).cell);
+          cells = constraint.getCells(geometry).map(
+            c => geometry.parseCellId(c).cell);
           yield new HandlerModule.HiddenSkyscraper(
             cells, constraint.value);
           break;
 
         case 'NumberedRoom':
-          cells = constraint.getCells(shape).map(
-            c => shape.parseCellId(c).cell);
+          cells = constraint.getCells(geometry).map(
+            c => geometry.parseCellId(c).cell);
           yield new HandlerModule.Indexing(
             cells[0], cells, constraint.value);
           break;
 
         case 'AllDifferent':
-          cells = constraint.cells.map(c => shape.parseCellId(c).cell);
+          cells = constraint.cells.map(c => geometry.parseCellId(c).cell);
           yield new HandlerModule.AllDifferent(cells);
           break;
 
         case 'Given':
           {
-            const cell = shape.parseCellId(constraint.cell).cell;
+            const cell = geometry.parseCellId(constraint.cell).cell;
             const valueMap = new Map();
             valueMap.set(cell, constraint.values);
             yield new HandlerModule.GivenCandidates(valueMap);
@@ -499,29 +499,29 @@ export class SudokuBuilder {
           break;
 
         case 'Thermo':
-          cells = constraint.cells.map(c => shape.parseCellId(c).cell);
+          cells = constraint.cells.map(c => geometry.parseCellId(c).cell);
           for (let i = 1; i < cells.length; i++) {
             yield new HandlerModule.BinaryConstraint(
               cells[i - 1], cells[i],
-              SudokuConstraint.Thermo.fnKey(shape.numValues, shape.valueOffset));
+              SudokuConstraint.Thermo.fnKey(geometry.numValues, geometry.valueOffset));
           }
           break;
 
         case 'Whisper':
           let difference = constraint.difference;
-          cells = constraint.cells.map(c => shape.parseCellId(c).cell);
+          cells = constraint.cells.map(c => geometry.parseCellId(c).cell);
           for (let i = 1; i < cells.length; i++) {
             yield new HandlerModule.BinaryConstraint(
               cells[i - 1], cells[i],
-              SudokuConstraint.Whisper.fnKey(difference, shape.numValues, shape.valueOffset));
+              SudokuConstraint.Whisper.fnKey(difference, geometry.numValues, geometry.valueOffset));
           }
           break;
 
         case 'Renban':
-          cells = constraint.cells.map(c => shape.parseCellId(c).cell);
+          cells = constraint.cells.map(c => geometry.parseCellId(c).cell);
           {
             const handler = new HandlerModule.BinaryPairwise(
-              SudokuConstraint.Renban.fnKey(cells.length, shape.numValues, shape.valueOffset),
+              SudokuConstraint.Renban.fnKey(cells.length, geometry.numValues, geometry.valueOffset),
               ...cells);
             handler.enableHiddenSingles();
             yield handler;
@@ -529,17 +529,17 @@ export class SudokuBuilder {
           break;
 
         case 'Modular':
-          cells = constraint.cells.map(c => shape.parseCellId(c).cell);
+          cells = constraint.cells.map(c => geometry.parseCellId(c).cell);
           {
             const mod = constraint.mod;
             // First `mod` cells must all be different mod n.
             const firstCells = cells.slice(0, mod);
             const handler = new HandlerModule.BinaryPairwise(
-              SudokuConstraint.Modular.neqFnKey(mod, shape.numValues, shape.valueOffset),
+              SudokuConstraint.Modular.neqFnKey(mod, geometry.numValues, geometry.valueOffset),
               ...firstCells);
             yield handler;
             // Cells at positions i, i+mod, i+2*mod, ... must all be equal mod n.
-            const eqKey = SudokuConstraint.Modular.eqFnKey(mod, shape.numValues, shape.valueOffset);
+            const eqKey = SudokuConstraint.Modular.eqFnKey(mod, geometry.numValues, geometry.valueOffset);
             for (let i = 0; i < mod; i++) {
               const equalCells = [];
               for (let j = i; j < cells.length; j += mod) {
@@ -553,20 +553,20 @@ export class SudokuBuilder {
           break;
 
         case 'Entropic':
-          if (shape.numValues !== 9 || shape.valueOffset !== 0) {
+          if (geometry.numValues !== 9 || geometry.valueOffset !== 0) {
             throw new InvalidConstraintError(
               'Entropic Line requires exactly 9 values (1-9)');
           }
-          cells = constraint.cells.map(c => shape.parseCellId(c).cell);
+          cells = constraint.cells.map(c => geometry.parseCellId(c).cell);
           if (cells.length < 3) {
             const handler = new HandlerModule.BinaryPairwise(
-              SudokuConstraint.Entropic.fnKey(shape.numValues),
+              SudokuConstraint.Entropic.fnKey(geometry.numValues),
               ...cells);
             yield handler;
           } else {
             for (let i = 3; i <= cells.length; i++) {
               const handler = new HandlerModule.BinaryPairwise(
-                SudokuConstraint.Entropic.fnKey(shape.numValues),
+                SudokuConstraint.Entropic.fnKey(geometry.numValues),
                 ...cells.slice(i - 3, i));
               yield handler;
             }
@@ -580,16 +580,16 @@ export class SudokuBuilder {
               throw new InvalidConstraintError(
                 'RegionSumLine is not supported with Chaos Construction.');
             }
-            cells = constraint.cells.map(c => shape.parseCellId(c).cell);
-            const boxRegions = this._getBoxRegions(shape, constraintMap);
+            cells = constraint.cells.map(c => geometry.parseCellId(c).cell);
+            const boxRegions = this._getBoxRegions(geometry, constraintMap);
             if (boxRegions.length) {
-              yield* this._regionSumLineHandlers(cells, boxRegions, shape);
+              yield* this._regionSumLineHandlers(cells, boxRegions, geometry);
             } else if (constraintMap.has('Jigsaw')) {
               // If no boxes, try to use the jigsaw regions.
               const jigsawConstraints = constraintMap.get('Jigsaw');
               const regions = jigsawConstraints.map(
-                c => c.cells.map(c => shape.parseCellId(c).cell));
-              yield* this._regionSumLineHandlers(cells, regions, shape);
+                c => c.cells.map(c => geometry.parseCellId(c).cell));
+              yield* this._regionSumLineHandlers(cells, regions, geometry);
             } else {
               // There are no regions, so the constraint is trivially satisfied.
             }
@@ -597,26 +597,26 @@ export class SudokuBuilder {
           break;
 
         case 'Between':
-          cells = constraint.cells.map(c => shape.parseCellId(c).cell);
+          cells = constraint.cells.map(c => geometry.parseCellId(c).cell);
           yield new HandlerModule.Between(cells);
           break;
 
         case 'Lockout':
-          cells = constraint.cells.map(c => shape.parseCellId(c).cell);
+          cells = constraint.cells.map(c => geometry.parseCellId(c).cell);
           yield new HandlerModule.Lockout(constraint.minDiff, cells);
           break;
 
         case 'Palindrome':
-          cells = constraint.cells.map(c => shape.parseCellId(c).cell);
+          cells = constraint.cells.map(c => geometry.parseCellId(c).cell);
           const numCells = cells.length;
           for (let i = 0; i < numCells / 2; i++) {
             yield new HandlerModule.BinaryConstraint(
               cells[i], cells[numCells - 1 - i],
-              SudokuConstraint.Palindrome.fnKey(shape.numValues, shape.valueOffset));
+              SudokuConstraint.Palindrome.fnKey(geometry.numValues, geometry.valueOffset));
           }
           break;
         case 'Zipper':
-          cells = constraint.cells.map(c => shape.parseCellId(c).cell);
+          cells = constraint.cells.map(c => geometry.parseCellId(c).cell);
           {
             const pairs = [];
             const numCells = cells.length;
@@ -648,40 +648,40 @@ export class SudokuBuilder {
         case 'SumLine':
           cells = new CellArgs(constraint.cells, constraint.type);
           yield new HandlerModule.SumLine(
-            cells.cellIds(shape), cells.isLoop(), constraint.sum);
+            cells.cellIds(geometry), cells.isLoop(), constraint.sum);
           break;
 
         case 'WhiteDot':
-          for (const [a, b] of constraint.adjacentPairs(shape)) {
+          for (const [a, b] of constraint.adjacentPairs(geometry)) {
             yield new HandlerModule.BinaryConstraint(
               a, b,
-              SudokuConstraint.WhiteDot.fnKey(shape.numValues, shape.valueOffset));
+              SudokuConstraint.WhiteDot.fnKey(geometry.numValues, geometry.valueOffset));
           }
           break;
 
         case 'BlackDot':
-          for (const [a, b] of constraint.adjacentPairs(shape)) {
+          for (const [a, b] of constraint.adjacentPairs(geometry)) {
             yield new HandlerModule.BinaryConstraint(
               a, b,
-              SudokuConstraint.BlackDot.fnKey(shape.numValues, shape.valueOffset));
+              SudokuConstraint.BlackDot.fnKey(geometry.numValues, geometry.valueOffset));
           }
           break;
 
         case 'X':
-          for (const pair of constraint.adjacentPairs(shape)) {
+          for (const pair of constraint.adjacentPairs(geometry)) {
             yield new SumHandlerModule.Sum(pair, 10);
           }
           break;
 
         case 'V':
-          for (const pair of constraint.adjacentPairs(shape)) {
+          for (const pair of constraint.adjacentPairs(geometry)) {
             yield new SumHandlerModule.Sum(pair, 5);
           }
           break;
 
         case 'GreaterThan': {
-          const fn = SudokuConstraint.GreaterThan.fnKey(shape.numValues, shape.valueOffset);
-          for (const [a, b] of constraint.adjacentPairs(shape)) {
+          const fn = SudokuConstraint.GreaterThan.fnKey(geometry.numValues, geometry.valueOffset);
+          for (const [a, b] of constraint.adjacentPairs(geometry)) {
             yield new HandlerModule.BinaryConstraint(a, b, fn);
           }
           break;
@@ -690,65 +690,65 @@ export class SudokuBuilder {
         case 'ValueIndexing':
           {
             const cells = constraint.cells.map(
-              c => shape.parseCellId(c).cell);
+              c => geometry.parseCellId(c).cell);
             yield new HandlerModule.ValueIndexing(...cells);
           }
           break;
         case 'Windoku':
           for (const cells of SudokuConstraint.Windoku.regions(
-            shape, this._getEffectiveBoxSize(constraintMap))) {
+            geometry, this._getEffectiveBoxSize(constraintMap))) {
             yield new HandlerModule.AllDifferent(cells);
           }
           break;
 
         case 'DisjointSets':
           for (const cells of SudokuConstraintBase.disjointSetRegions(
-            shape, this._getEffectiveBoxSize(constraintMap))) {
+            geometry, this._getEffectiveBoxSize(constraintMap))) {
             yield new HandlerModule.AllDifferent(cells);
           }
           break;
 
         case 'GlobalEntropy':
-          if (shape.numValues !== 9 || shape.valueOffset !== 0) {
+          if (geometry.numValues !== 9 || geometry.valueOffset !== 0) {
             throw new InvalidConstraintError(
               'Global Entropy requires exactly 9 values (1-9)');
           }
-          for (const cells of SudokuConstraintBase.square2x2Regions(shape)) {
+          for (const cells of SudokuConstraintBase.square2x2Regions(geometry)) {
             yield new HandlerModule.LocalEntropy(cells);
           }
           break;
 
         case 'GlobalMod':
-          for (const cells of SudokuConstraintBase.square2x2Regions(shape)) {
+          for (const cells of SudokuConstraintBase.square2x2Regions(geometry)) {
             yield new HandlerModule.LocalMod3(cells);
           }
           break;
 
         case 'FullRankTies':
           yield new HandlerModule.FullRank(
-            shape.numGridCells, [], fullRankTieMode(constraint));
+            geometry.numGridCells, [], fullRankTieMode(constraint));
           break;
 
         case 'DutchFlatmates':
-          if (shape.valueOffset !== 0) {
+          if (geometry.valueOffset !== 0) {
             throw new InvalidConstraintError(
               'Dutch Flatmates does not support shifted value ranges.');
           }
-          for (const cells of SudokuConstraintBase.colRegions(shape)) {
+          for (const cells of SudokuConstraintBase.colRegions(geometry)) {
             yield new HandlerModule.DutchFlatmateLine(cells);
           }
           break;
 
         case 'ContainAtLeast':
           yield new HandlerModule.RequiredValues(
-            constraint.cells.map(c => shape.parseCellId(c).cell),
+            constraint.cells.map(c => geometry.parseCellId(c).cell),
             constraint.values.split('_').map(v => +v),
             /* strict = */ false);
           break;
 
         case 'ContainExact':
           yield new HandlerModule.RequiredValues(
-            constraint.cells.map(c => shape.parseCellId(c).cell),
+            constraint.cells.map(c => geometry.parseCellId(c).cell),
             constraint.values.split('_').map(v => +v),
             /* strict = */ true);
           break;
@@ -760,20 +760,20 @@ export class SudokuBuilder {
             if (constraintMap.has('Jigsaw')) {
               const jigsawConstraints = constraintMap.get('Jigsaw');
               const jigsawRegions = jigsawConstraints.map(
-                c => c.cells.map(id => shape.parseCellId(id).cell));
+                c => c.cells.map(id => geometry.parseCellId(id).cell));
 
               regions.push(...jigsawRegions);
             }
 
-            regions.push(...SudokuConstraintBase.rowRegions(shape));
-            regions.push(...SudokuConstraintBase.colRegions(shape));
-            regions.push(...this._getBoxRegions(shape, constraintMap));
+            regions.push(...SudokuConstraintBase.rowRegions(geometry));
+            regions.push(...SudokuConstraintBase.colRegions(geometry));
+            regions.push(...this._getBoxRegions(geometry, constraintMap));
 
             // We only want the largest regions.
             const maxSize = Math.max(...regions.map(r => r.length));
             const filteredRegions = regions.filter(r => r.length === maxSize);
 
-            if (maxSize !== shape.numValues && filteredRegions.length >= 2) {
+            if (maxSize !== geometry.numValues && filteredRegions.length >= 2) {
               yield new HandlerModule.SameValues(...filteredRegions);
             }
           }
@@ -783,12 +783,12 @@ export class SudokuBuilder {
           {
             if (constraint.numSets < constraint.cells.length) {
               let sets = constraint.splitCells();
-              sets = sets.map(cells => cells.map(c => shape.parseCellId(c).cell));
+              sets = sets.map(cells => cells.map(c => geometry.parseCellId(c).cell));
               yield new HandlerModule.SameValues(...sets);
             } else {
               // All cells must have the same value, use binary constraints.
-              const cells = constraint.cells.map(c => shape.parseCellId(c).cell);
-              const key = SudokuConstraint.SameValues.fnKey(shape.numValues, shape.valueOffset);
+              const cells = constraint.cells.map(c => geometry.parseCellId(c).cell);
+              const key = SudokuConstraint.SameValues.fnKey(geometry.numValues, geometry.valueOffset);
               yield new HandlerModule.BinaryPairwise(
                 key, ...cells);
             }
@@ -798,22 +798,22 @@ export class SudokuBuilder {
         case 'EqualSum':
           {
             const segments = constraint.segments.map(
-              s => s.map(c => shape.parseCellId(c).cell));
-            yield* this._equalSumHandlers(segments, shape);
+              s => s.map(c => geometry.parseCellId(c).cell));
+            yield* this._equalSumHandlers(segments, geometry);
           }
           break;
 
         case 'Quad':
           yield new HandlerModule.RequiredValues(
             SudokuConstraint.Quad.cells(
-              constraint.topLeftCell, shape).map(c => shape.parseCellId(c).cell),
+              constraint.topLeftCell, geometry).map(c => geometry.parseCellId(c).cell),
             constraint.values.map(v => +v),
             /* strict = */ false);
           break;
 
         case 'Pair':
           {
-            cells = constraint.cells.map(c => c && shape.parseCellId(c).cell);
+            cells = constraint.cells.map(c => c && geometry.parseCellId(c).cell);
             for (let i = 1; i < cells.length; i++) {
               yield new HandlerModule.BinaryConstraint(
                 cells[i - 1], cells[i],
@@ -824,7 +824,7 @@ export class SudokuBuilder {
 
         case 'PairX':
           {
-            cells = constraint.cells.map(c => c && shape.parseCellId(c).cell);
+            cells = constraint.cells.map(c => c && geometry.parseCellId(c).cell);
             yield new HandlerModule.BinaryPairwise(
               constraint.key, ...cells);
           }
@@ -832,19 +832,19 @@ export class SudokuBuilder {
 
         case 'Indexing':
           for (let i = 0; i < constraint.cells.length; i++) {
-            const controlCell = shape.parseCellId(constraint.cells[i]);
+            const controlCell = geometry.parseCellId(constraint.cells[i]);
             const value =
               constraint.indexType === SudokuConstraint.Indexing.ROW_INDEXING
                 ? controlCell.row + 1 : controlCell.col + 1;
 
             const cells = [];
             const iterCount = constraint.indexType === SudokuConstraint.Indexing.ROW_INDEXING
-              ? shape.numRows : shape.numCols;
+              ? geometry.numRows : geometry.numCols;
             for (let i = 0; i < iterCount; i++) {
               if (constraint.indexType === SudokuConstraint.Indexing.ROW_INDEXING) {
-                cells.push(shape.cellIndex(i, controlCell.col));
+                cells.push(geometry.cellIndex(i, controlCell.col));
               } else {
-                cells.push(shape.cellIndex(controlCell.row, i));
+                cells.push(geometry.cellIndex(controlCell.row, i));
               }
             }
 
@@ -855,11 +855,11 @@ export class SudokuBuilder {
 
         case 'FullRank':
           {
-            const line = constraint.getCells(shape).map(
-              c => shape.parseCellId(c).cell);
+            const line = constraint.getCells(geometry).map(
+              c => geometry.parseCellId(c).cell);
 
             yield new HandlerModule.FullRank(
-              shape.numGridCells,
+              geometry.numGridCells,
               [{ rank: constraint.value, line }],
               fullRankTieMode(constraintMap.get('FullRankTies')?.[0]));
           }
@@ -868,12 +868,12 @@ export class SudokuBuilder {
         case 'CountingCircles':
           cells = new CellArgs(constraint.cells, constraint.type);
           yield new HandlerModule.CountingCircles(
-            cells.cellIds(shape));
+            cells.cellIds(geometry));
           break;
 
         case 'CountDistinct':
           {
-            const allCells = constraint.cells.map(c => shape.parseCellId(c).cell);
+            const allCells = constraint.cells.map(c => geometry.parseCellId(c).cell);
             yield new HandlerModule.CountDistinct(allCells[0], allCells.slice(1));
           }
           break;
@@ -883,8 +883,8 @@ export class SudokuBuilder {
             const types = ['BlackDot', 'WhiteDot'];
             yield* SudokuBuilder._strictAdjHandlers(
               types.flatMap(t => constraintMap.get(t) || []),
-              shape,
-              SudokuConstraint.StrictKropki.fnKey(shape.numValues, shape.valueOffset));
+              geometry,
+              SudokuConstraint.StrictKropki.fnKey(geometry.numValues, geometry.valueOffset));
           }
           break;
 
@@ -893,20 +893,20 @@ export class SudokuBuilder {
             const types = ['X', 'V'];
             yield* SudokuBuilder._strictAdjHandlers(
               types.flatMap(t => constraintMap.get(t) || []),
-              shape,
-              SudokuConstraint.StrictXV.fnKey(shape.numValues, shape.valueOffset));
+              geometry,
+              SudokuConstraint.StrictXV.fnKey(geometry.numValues, geometry.valueOffset));
           }
           break;
 
         case 'Priority':
-          cells = constraint.cells.map(c => shape.parseCellId(c).cell);
+          cells = constraint.cells.map(c => geometry.parseCellId(c).cell);
           yield new HandlerModule.Priority(cells, constraint.priority);
           break;
 
         case 'Or':
           {
             const branches = constraint.constraints.map(
-              c => [...this._constraintHandlers(c.toMap(), shape)]);
+              c => [...this._constraintHandlers(c.toMap(), geometry)]);
             yield* this._yieldOr(branches);
           }
           break;
@@ -915,13 +915,13 @@ export class SudokuBuilder {
           {
             if (constraint.constraints.length === 0) break;
 
-            const originIdx = shape.parseCellId(constraint.origin).cell;
+            const originIdx = geometry.parseCellId(constraint.origin).cell;
             const targets = SudokuConstraint.Replicate.decodeTargetCells(
-              constraint.targetBitset, constraint.origin, shape);
+              constraint.targetBitset, constraint.origin, geometry);
 
             if (targets.length === 0) break;
 
-            const graph = shape.cellGraph();
+            const graph = geometry.cellGraph();
             const originPos = graph.cellPosition(originIdx);
             const originSubgraph = originPos[2];
 
@@ -930,7 +930,7 @@ export class SudokuBuilder {
                 throw new Error('All Replicate cells must be in the same cell group.');
               }
               const shiftFn = cellId => {
-                const cell = shape.parseCellId(cellId).cell;
+                const cell = geometry.parseCellId(cellId).cell;
                 const cellPos = graph.cellPosition(cell);
                 if (cellPos[2] !== originSubgraph) {
                   throw new Error('All Replicate constraints must be in the same cell group.');
@@ -940,10 +940,10 @@ export class SudokuBuilder {
                   cellPos[0] - originPos[0],
                   cellPos[1] - originPos[1]);
                 if (newCell === null) throw new Error('Shifted cell is out of bounds.');
-                return shape.makeCellIdFromIndex(newCell);
+                return geometry.makeCellIdFromIndex(newCell);
               };
               for (const child of constraint.constraints) {
-                yield* this._constraintHandlers(child.makeShifted(shiftFn).toMap(), shape);
+                yield* this._constraintHandlers(child.makeShifted(shiftFn).toMap(), geometry);
               }
             }
           }
@@ -951,7 +951,7 @@ export class SudokuBuilder {
 
         case 'And':
           for (const c of constraint.constraints) {
-            yield* this._constraintHandlers(c.toMap(), shape);
+            yield* this._constraintHandlers(c.toMap(), geometry);
           }
 
         case 'NoBoxes':
@@ -990,26 +990,26 @@ export class SudokuBuilder {
       ...branches.map(b => this._wrapAnd(b)));
   }
 
-  static * _doppelgangerHandlers(shape, constraintMap) {
-    const regionSize = this._regionSize(constraintMap, shape);
-    const gridSize = shape.numValues - 1;
-    if (shape.valueOffset !== -1
-      || gridSize !== shape.numRows
-      || gridSize !== shape.numCols
+  static * _doppelgangerHandlers(geometry, constraintMap) {
+    const regionSize = this._regionSize(constraintMap, geometry);
+    const gridSize = geometry.numValues - 1;
+    if (geometry.valueOffset !== -1
+      || gridSize !== geometry.numRows
+      || gridSize !== geometry.numCols
       || gridSize !== regionSize) {
       throw new InvalidConstraintError(
-        'Doppelganger requires shape with values 0-N '
+        'Doppelganger requires geometry with values 0-N '
         + '(e.g. 9x9~0-9 for a 9x9 grid).');
     }
 
-    const rowRegions = SudokuConstraintBase.rowRegions(shape);
-    const colRegions = SudokuConstraintBase.colRegions(shape);
-    const boxRegions = this._getBoxRegions(shape, constraintMap);
+    const rowRegions = SudokuConstraintBase.rowRegions(geometry);
+    const colRegions = SudokuConstraintBase.colRegions(geometry);
+    const boxRegions = this._getBoxRegions(geometry, constraintMap);
 
-    const [zeroCell] = shape.varCellsForGroup('DGZ');
-    const colVarCells = shape.varCellsForGroup('DGC');
-    const rowVarCells = shape.varCellsForGroup('DGR');
-    const boxVarCells = shape.varCellsForGroup('DGB');
+    const [zeroCell] = geometry.varCellsForGroup('DGZ');
+    const colVarCells = geometry.varCellsForGroup('DGC');
+    const rowVarCells = geometry.varCellsForGroup('DGR');
+    const boxVarCells = geometry.varCellsForGroup('DGB');
 
     // Fix the zero cell to value 0. This propagates through the var cell
     // AllDifferent groups to prevent var cells from holding 0 (Rule 1).
@@ -1052,7 +1052,7 @@ export class SudokuBuilder {
     // Rule 3: For each 0 in the grid, the digits missing in its row, column,
     // and box must be three different digits.
     const NO_BOX = 255;
-    const cellToBox = new Uint8Array(shape.numGridCells).fill(NO_BOX);
+    const cellToBox = new Uint8Array(geometry.numGridCells).fill(NO_BOX);
     for (let b = 0; b < boxRegions.length; b++) {
       for (const cell of boxRegions[b]) {
         cellToBox[cell] = b;
@@ -1060,7 +1060,7 @@ export class SudokuBuilder {
     }
     for (let r = 0; r < gridSize; r++) {
       for (let c = 0; c < gridSize; c++) {
-        const cell = shape.cellIndex(r, c);
+        const cell = geometry.cellIndex(r, c);
         const varCells = [colVarCells[r], rowVarCells[c]];
         const boxIdx = cellToBox[cell];
         if (boxIdx !== NO_BOX) varCells.push(boxVarCells[boxIdx]);
@@ -1069,37 +1069,37 @@ export class SudokuBuilder {
     }
   }
 
-  static * _antiHandlers(shape, exclusionFn) {
-    const numRows = shape.numRows;
-    const numCols = shape.numCols;
+  static * _antiHandlers(geometry, exclusionFn) {
+    const numRows = geometry.numRows;
+    const numCols = geometry.numCols;
 
     for (let r = 0; r < numRows; r++) {
       for (let c = 0; c < numCols; c++) {
-        const cell = shape.cellIndex(r, c);
+        const cell = geometry.cellIndex(r, c);
         // We only need half the constraints, as the other half will be
         // added by the corresponding exclusion cell.
         for (const [rr, cc] of exclusionFn(r, c)) {
           if (rr < 0 || rr >= numRows || cc < 0 || cc >= numCols) continue;
-          const exclusionCell = shape.cellIndex(rr, cc);
+          const exclusionCell = geometry.cellIndex(rr, cc);
           yield new HandlerModule.AllDifferent([cell, exclusionCell]);
         }
       }
     }
   }
 
-  static _allAdjacentCellPairs(shape) {
+  static _allAdjacentCellPairs(geometry) {
     const pairs = [];
 
-    const numRows = shape.numRows;
-    const numCols = shape.numCols;
+    const numRows = geometry.numRows;
+    const numCols = geometry.numCols;
 
     for (let r = 0; r < numRows; r++) {
       for (let c = 0; c < numCols; c++) {
-        let cell = shape.cellIndex(r, c);
+        let cell = geometry.cellIndex(r, c);
         // Only look at adjacent cells with larger indexes.
         for (const [rr, cc] of [[r + 1, c], [r, c + 1]]) {
           if (rr < 0 || rr >= numRows || cc < 0 || cc >= numCols) continue;
-          pairs.push([cell, shape.cellIndex(rr, cc)]);
+          pairs.push([cell, geometry.cellIndex(rr, cc)]);
         }
       }
     }
@@ -1107,11 +1107,11 @@ export class SudokuBuilder {
     return pairs;
   }
 
-  static * _antiConsecutiveHandlers(shape) {
-    for (const [cell, exclusionCell] of this._allAdjacentCellPairs(shape)) {
+  static * _antiConsecutiveHandlers(geometry) {
+    for (const [cell, exclusionCell] of this._allAdjacentCellPairs(geometry)) {
       yield new HandlerModule.BinaryConstraint(
         cell, exclusionCell,
-        SudokuConstraint.AntiConsecutive.fnKey(shape.numValues, shape.valueOffset));
+        SudokuConstraint.AntiConsecutive.fnKey(geometry.numValues, geometry.valueOffset));
     }
   }
 }

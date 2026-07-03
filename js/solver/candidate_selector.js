@@ -112,8 +112,8 @@ export class SeenCandidateSet {
 }
 
 export class CandidateSelector {
-  constructor(shape, numSearchCells, handlerSet, debugLogger) {
-    this._shape = shape;
+  constructor(geometry, numSearchCells, handlerSet, debugLogger) {
+    this._geometry = geometry;
     this._cellOrder = new Uint16Array(numSearchCells);
 
     this._conflictScores = null;
@@ -130,7 +130,7 @@ export class CandidateSelector {
     // _candidateSelectionStates entry is valid.
     this._candidateSelectionFlags = new Uint8Array(numSearchCells);
 
-    this._candidateFinderSet = new CandidateFinderSet(handlerSet, shape, numSearchCells);
+    this._candidateFinderSet = new CandidateFinderSet(handlerSet, geometry, numSearchCells);
   }
 
   reset(conflictScores) {
@@ -297,7 +297,7 @@ export class CandidateSelector {
 
   _logSelectNextCandidate(msg, cell, value, count, cellDepth, isNewNode) {
     const args = {
-      cell: this._shape.makeCellIdFromIndex(cell),
+      cell: this._geometry.makeCellIdFromIndex(cell),
       value: LookupTables.toValue(value),
       numOptions: count,
       cellDepth: cellDepth,
@@ -590,9 +590,9 @@ export class CandidateSelector {
 }
 
 class CandidateFinderSet {
-  constructor(handlerSet, shape, numSearchCells) {
+  constructor(handlerSet, geometry, numSearchCells) {
     this._handlerSet = handlerSet;
-    this._shape = shape;
+    this._geometry = geometry;
     this.initialized = false;
     this._finders = [];
 
@@ -603,10 +603,10 @@ class CandidateFinderSet {
   }
 
   initialize(gridState) {
-    const shape = this._shape;
+    const geometry = this._geometry;
     const finders = [];
     for (const h of this._handlerSet) {
-      finders.push(...h.candidateFinders(gridState, shape));
+      finders.push(...h.candidateFinders(gridState, geometry));
     }
     this._finders = finders;
 
@@ -771,8 +771,8 @@ CandidateFinders.House = class House extends CandidateFinderBase {
 // An extension of the candidate selector which chooses values at random
 // from the chosen cell, and only searches a single branch of the tree.
 export class SamplingCandidateSelector extends CandidateSelector {
-  constructor(shape, numSearchCells, handlerSet, debugLogger) {
-    super(shape, numSearchCells, handlerSet, debugLogger);
+  constructor(geometry, numSearchCells, handlerSet, debugLogger) {
+    super(geometry, numSearchCells, handlerSet, debugLogger);
     this._totalWeight = new Float64Array(this._numSearchCells + 1);
     this._totalWeight[0] = 1.0;
     this._optionSelector = new RandomOptionSelector(/* seed = */ 0);

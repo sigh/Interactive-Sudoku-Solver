@@ -135,10 +135,10 @@ export class ChaosConstruction extends SudokuConstraintHandler {
   }
 
   // Picks up to three well-separated, high-priority edge cells to pre-seed region labels 0,1,2.
-  _chooseCanonicalAnchors(shape, cellPriorities) {
+  _chooseCanonicalAnchors(geometry, cellPriorities) {
     if (this._numRegions < 3 || this._numGridCells < 3) return [0];
 
-    const { numRows, numCols, numValues } = shape;
+    const { numRows, numCols, numValues } = geometry;
     const regionCellOffset = this._regionCellOffset;
     const anchorScore = cell => cellPriorities[cell] + cellPriorities[regionCellOffset + cell];
 
@@ -184,31 +184,31 @@ export class ChaosConstruction extends SudokuConstraintHandler {
     return bestCells.sort((a, b) => a - b);
   }
 
-  _configureShape(shape) {
-    if (this._numGridCells !== shape.numGridCells
-      || this._regionCellOffset < shape.numGridCells
-      || this._regionCellOffset + this._numGridCells > shape.totalCells()) {
+  _configureShape(geometry) {
+    if (this._numGridCells !== geometry.numGridCells
+      || this._regionCellOffset < geometry.numGridCells
+      || this._regionCellOffset + this._numGridCells > geometry.totalCells()) {
       throw new InvalidConstraintError(
         'ChaosConstruction requires one region cell for every grid cell.');
     }
-    if (shape.numGridCells % this._regionSize !== 0) {
+    if (geometry.numGridCells % this._regionSize !== 0) {
       throw new InvalidConstraintError(
         'ChaosConstruction requires grid cell count to be divisible by region size.');
     }
-    this._numRegions = shape.numGridCells / this._regionSize;
+    this._numRegions = geometry.numGridCells / this._regionSize;
     // Region labels reuse the normal value bitmask representation.
     this._regionMask = (1 << this._numRegions) - 1;
-    this._numValues = shape.numValues;
+    this._numValues = geometry.numValues;
     this._effectiveValueMask &= (1 << this._numValues) - 1;
   }
 
-  initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
-    this._configureShape(shape);
+  initialize(initialGridCells, cellExclusions, geometry, stateAllocator) {
+    this._configureShape(geometry);
 
-    const numGridCells = shape.numGridCells;
+    const numGridCells = geometry.numGridCells;
 
     // === Immutable configuration (built once, never mutated) ===
-    this._neighbors = neighborTable(shape.numRows, shape.numCols);  // 4-neighbour adjacency
+    this._neighbors = neighborTable(geometry.numRows, geometry.numCols);  // 4-neighbour adjacency
 
     // === Branch state (saved/restored across backtracking by stateAllocator) ===
     // NOTE: the two allocate() calls must keep this relative order — offsets are
@@ -294,9 +294,9 @@ export class ChaosConstruction extends SudokuConstraintHandler {
     return true;
   }
 
-  selectPriorityAnchorCells(shape, cellPriorities) {
-    this._configureShape(shape);
-    const anchorCells = this._chooseCanonicalAnchors(shape, cellPriorities);
+  selectPriorityAnchorCells(geometry, cellPriorities) {
+    this._configureShape(geometry);
+    const anchorCells = this._chooseCanonicalAnchors(geometry, cellPriorities);
     const numAnchors = Math.min(anchorCells.length, this._numRegions);
     this._canonicalAnchorCells = anchorCells.slice(0, numAnchors);
   }
@@ -1153,16 +1153,16 @@ export class ChaosArrow extends SudokuConstraintHandler {
     this._regionShardState = regionShardState;
   }
 
-  initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
-    this._offset += shape.valueOffset;
+  initialize(initialGridCells, cellExclusions, geometry, stateAllocator) {
+    this._offset += geometry.valueOffset;
     const maxArmCells = this._regionArms.reduce((sum, arm) => sum + arm.length, 0)
       - this._duplicateStartCount;
-    const maxValueCount = Math.min(shape.numValues, maxArmCells - this._offset);
+    const maxValueCount = Math.min(geometry.numValues, maxArmCells - this._offset);
     if (maxValueCount < 1) return false;
 
     this._canMergeRegionShards = this._regionRunArms.every(arm => {
       for (let i = 1; i < arm.length; i++) {
-        if (!cellsAreAdjacent(arm[i - 1], arm[i], shape.numCols)) return false;
+        if (!cellsAreAdjacent(arm[i - 1], arm[i], geometry.numCols)) return false;
       }
       return true;
     });
@@ -1171,7 +1171,7 @@ export class ChaosArrow extends SudokuConstraintHandler {
     // (e.g. arrows in all four directions),
     // the run must extend into that arm, so the run length is >= 2. Unlike a
     // count, a run length has no per-cell growth, so this is purely static.
-    const neighbors = neighborTable(shape.numRows, shape.numCols);
+    const neighbors = neighborTable(geometry.numRows, geometry.numCols);
     const armSteps = new Set();
     for (const arm of this._regionRunArms) {
       if (arm.length >= 2) armSteps.add(arm[1]);
@@ -1407,15 +1407,15 @@ export class ChaosCount extends SudokuConstraintHandler {
     this._regionShardState = regionShardState;
   }
 
-  initialize(initialGridCells, cellExclusions, shape, stateAllocator) {
-    this._offset += shape.valueOffset;
-    const maxCount = Math.min(shape.numValues, this._regionCells.length - this._offset);
+  initialize(initialGridCells, cellExclusions, geometry, stateAllocator) {
+    this._offset += geometry.valueOffset;
+    const maxCount = Math.min(geometry.numValues, this._regionCells.length - this._offset);
 
     const regionRunCells = this._regionRunCells;
     const mergePairs = [];
     for (let i = 1; i < regionRunCells.length; i++) {
       for (let j = 0; j < i; j++) {
-        if (!cellsAreAdjacent(regionRunCells[i], regionRunCells[j], shape.numCols)) continue;
+        if (!cellsAreAdjacent(regionRunCells[i], regionRunCells[j], geometry.numCols)) continue;
         mergePairs.push(j, i);
       }
     }
@@ -1426,7 +1426,7 @@ export class ChaosCount extends SudokuConstraintHandler {
     // an orthogonal neighbour; if every neighbour is itself a counted cell that
     // neighbour is counted, so the count is >= 2. The neighbours (as region-lane
     // cells) are kept for the stronger per-region check in enforceConsistency.
-    const neighbors = neighborTable(shape.numRows, shape.numCols);
+    const neighbors = neighborTable(geometry.numRows, geometry.numCols);
     const counted = new Set(regionRunCells);
     const regionCellOffset = this._regionCells[0] - regionRunCells[0];
     const enclosingCells = enclosingNeighbors(neighbors, regionRunCells[0], counted);

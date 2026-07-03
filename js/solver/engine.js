@@ -13,13 +13,13 @@ const { CandidateSelector, SamplingCandidateSelector, ConflictScores, SeenCandid
 const HandlerModule = await import('./handlers.js' + self.VERSION_PARAM);
 
 export class SudokuSolver {
-  constructor(handlers, shape, debugOptions) {
+  constructor(handlers, geometry, debugOptions) {
     this._debugLogger = new DebugLogger(this, debugOptions);
-    this._shape = shape;
-    this._numSearchCells = shape.totalCells();
+    this._geometry = geometry;
+    this._numSearchCells = geometry.totalCells();
 
     this._internalSolver = new InternalSolver(
-      handlers, shape, this._debugLogger);
+      handlers, geometry, this._debugLogger);
 
     this._progressExtraStateFn = null;
     this._progressCallback = null;
@@ -74,7 +74,7 @@ export class SudokuSolver {
       let result = {};
       if (sampleSolution) {
         result.solutions = [SudokuSolverUtil.gridToSolution(
-          sampleSolution.subarray(0, this._numSearchCells), this._shape.valueOffset)];
+          sampleSolution.subarray(0, this._numSearchCells), this._geometry.valueOffset)];
         this._internalSolver.unsetSampleSolution();
       }
       if (estimationCounters) {
@@ -113,7 +113,7 @@ export class SudokuSolver {
 
     if (!grid) return null;
     return SudokuSolverUtil.gridToSolution(
-      grid.subarray(0, this._numSearchCells), this._shape.valueOffset);
+      grid.subarray(0, this._numSearchCells), this._geometry.valueOffset);
   }
 
   nthStep(n, stepGuides) {
@@ -131,7 +131,7 @@ export class SudokuSolver {
     }
 
     // Convert user-visible step guide values to solver values.
-    const offset = this._shape.valueOffset;
+    const offset = this._geometry.valueOffset;
     if (stepGuides && offset !== 0) {
       const converted = new Map();
       for (const [k, guide] of stepGuides) {
@@ -167,7 +167,7 @@ export class SudokuSolver {
     };
 
     if (result.guessDepth !== -1) {
-      const numGridCells = this._shape.numGridCells;
+      const numGridCells = this._geometry.numGridCells;
       // The guess cell is the last item in the cell order.
       const guessCellIndex = result.cellOrder[result.guessDepth];
       // The options are the values that existed in the old grid for the guess
@@ -178,7 +178,7 @@ export class SudokuSolver {
       returnValue.diffPencilmarks = SudokuSolverUtil.makeDiffPencilmarks(
         result.oldGrid.subarray(0, numGridCells),
         result.grid.subarray(0, numGridCells), offset);
-      returnValue.guessCell = this._shape.makeCellIdFromIndex(guessCellIndex);
+      returnValue.guessCell = this._geometry.makeCellIdFromIndex(guessCellIndex);
     }
 
     return returnValue;
@@ -195,7 +195,7 @@ export class SudokuSolver {
       if (!solutions.length) return null;
       return {
         solutions: solutions.splice(0).map(
-          s => SudokuSolverUtil.gridToSolution(s, this._shape.valueOffset)),
+          s => SudokuSolverUtil.gridToSolution(s, this._geometry.valueOffset)),
       };
     };
 
@@ -346,9 +346,9 @@ class DebugLogger {
 
 class InternalSolver {
 
-  constructor(handlerGen, shape, debugLogger) {
-    this._shape = shape;
-    this._numSearchCells = shape.totalCells();
+  constructor(handlerGen, geometry, debugLogger) {
+    this._geometry = geometry;
+    this._numSearchCells = geometry.totalCells();
     this._debugLogger = debugLogger;
 
     this._progress = {
@@ -358,11 +358,11 @@ class InternalSolver {
 
     this._handlerSet = this._setUpHandlers(Array.from(handlerGen));
 
-    this._seenCandidateSet = new SeenCandidateSet(this._numSearchCells, shape.numValues);
+    this._seenCandidateSet = new SeenCandidateSet(this._numSearchCells, geometry.numValues);
 
     this._handlerAccumulator = new HandlerAccumulator(this._handlerSet);
     this._candidateSelector = new CandidateSelector(
-      shape, this._numSearchCells, this._handlerSet, debugLogger);
+      geometry, this._numSearchCells, this._handlerSet, debugLogger);
 
     this._recStack = this._initStack();
     this._debugValueBuffer = new Uint16Array(this._numSearchCells);
@@ -415,12 +415,12 @@ class InternalSolver {
     // Optimize handlers.
     const optimizer = new SudokuConstraintOptimizer(this._debugLogger);
     this._cellPriorities = optimizer.optimize(
-      handlerSet, cellExclusions, this._shape);
+      handlerSet, cellExclusions, this._geometry);
 
-    this._cellPriorities ??= new Int32Array(this._shape.totalCells());
+    this._cellPriorities ??= new Int32Array(this._geometry.totalCells());
 
     const stateAllocator = new GridStateAllocator(
-      this._shape, this._numSearchCells);
+      this._geometry, this._numSearchCells);
 
     // Add the exclusion handlers for all search cells.
     for (let i = 0; i < this._numSearchCells; i++) {
@@ -431,7 +431,7 @@ class InternalSolver {
     // Initialize handlers.
     for (const handler of handlerSet) {
       const initialCells = handler.cells;
-      if (!handler.initialize(stateAllocator.mutableGridCells(), cellExclusions, this._shape, stateAllocator)) {
+      if (!handler.initialize(stateAllocator.mutableGridCells(), cellExclusions, this._geometry, stateAllocator)) {
         if (this._debugLogger.enableLogs) {
           this._debugLogger.log({
             loc: '_setUpHandlers',
@@ -482,7 +482,7 @@ class InternalSolver {
     // to the candidateSelector.
     this._conflictScores = new ConflictScores(
       this._cellPriorities,
-      this._shape.numValues);
+      this._geometry.numValues);
     this._seenCandidateSet.reset();
 
     // Setup sample solution in a set state, so that by default we don't
@@ -514,7 +514,7 @@ class InternalSolver {
     const values = this._debugValueBuffer.subarray(0, cellDepth);
 
     const cells = this._candidateSelector.getCellOrder(cellDepth);
-    const offset = this._shape.valueOffset;
+    const offset = this._geometry.valueOffset;
     for (let i = 0; i < cellDepth; i++) {
       values[i] = LookupTables.toOffsetValue(stackFrame.gridCells[cells[i]], offset);
     }
@@ -553,7 +553,7 @@ class InternalSolver {
       for (let i = 0; i < numSearchCells; i++) {
         if (oldGridState[i] !== gridState[i]) {
           candidates[i] = LookupTables.toValuesArray(oldGridState[i] & ~gridState[i]);
-          diff[this._shape.makeCellIdFromIndex(i)] = candidates[i];
+          diff[this._geometry.makeCellIdFromIndex(i)] = candidates[i];
         }
       }
 
@@ -973,14 +973,14 @@ class InternalSolver {
     // Only choose the full houses.
     const houseHandlers = this._handlerSet.getAllofType(
       HandlerModule.PerfectAllDifferent).filter(
-        h => h.cells.length === this._shape.numValues);
+        h => h.cells.length === this._geometry.numValues);
 
     const finalize = (grid) => {
       if (!grid) return null;
 
       this.counters.branchesIgnored = 1 - this.counters.progressRatio;
       return SudokuSolverUtil.gridToSolution(
-        grid.subarray(0, this._shape.numGridCells), this._shape.valueOffset);
+        grid.subarray(0, this._geometry.numGridCells), this._geometry.valueOffset);
     };
 
     // Non-standard grids may not have any house handlers (e.g. when there are
@@ -1084,7 +1084,7 @@ class InternalSolver {
     // Use a fixed seed so the result is deterministic.
     // TODO: Allows us to save and restore the original.
     this._candidateSelector = new SamplingCandidateSelector(
-      this._shape, this._numSearchCells, this._handlerSet, this._debugLogger);
+      this._geometry, this._numSearchCells, this._handlerSet, this._debugLogger);
 
     while (true) {
       this._resetRun();
@@ -1435,11 +1435,11 @@ export class CellExclusions {
 }
 
 class GridStateAllocator {
-  constructor(shape, numSearchCells) {
+  constructor(geometry, numSearchCells) {
     this._extraState = [];
 
     this._gridCells = new Uint16Array(numSearchCells);
-    const allValues = LookupTables.get(shape.numValues).allValues
+    const allValues = LookupTables.get(geometry.numValues).allValues
     this._gridCells.fill(allValues);
   }
 
